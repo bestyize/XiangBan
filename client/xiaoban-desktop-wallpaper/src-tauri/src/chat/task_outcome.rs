@@ -19,6 +19,8 @@ pub struct TaskOutcome {
     pub validator: String,
     pub evidence: String,
     pub verified_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub last_tool_call_id: Option<String>,
 }
 
 fn safe_id(id: &str) -> bool {
@@ -44,6 +46,25 @@ pub fn load(root: &Path, session: &str, run: &str) -> Result<Option<TaskOutcome>
     }
 }
 
+/// Restore each run at its own tool boundary. A damaged outcome cannot make another task succeed.
+pub fn history(root: &Path, runs: &Path, session: &str) -> Vec<TaskOutcome> {
+    if !safe_id(session) { return Vec::new(); }
+    let Ok(entries) = fs::read_dir(root.join(session)) else { return Vec::new(); };
+    let journal = JsonlRunLog::new(runs);
+    entries.flatten().filter_map(|entry| {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("json") { return None; }
+        let run = path.file_stem()?.to_str()?;
+        let mut outcome = load(root, session, run).ok().flatten()?;
+        // Older records predate the anchor field. Resolve it from the trace without replaying anything.
+        if outcome.last_tool_call_id.is_none() {
+            outcome.last_tool_call_id = inspect(&journal, session, run).ok().and_then(|o| o.last_tool_call_id);
+        }
+        outcome.last_tool_call_id.as_ref()?;
+        Some(outcome)
+    }).collect()
+}
+
 pub fn save(root: &Path, record: &TaskOutcome) -> Result<(), String> {
     let path = outcome_path(root, &record.session_id, &record.run_id)?;
     fs::create_dir_all(path.parent().ok_or("invalid outcome path")?).map_err(|e| e.to_string())?;
@@ -56,6 +77,7 @@ pub fn inspect(journal: &JsonlRunLog, session: &str, run: &str) -> Result<TaskOu
     // Read all tool end statuses using a bounded cursor, not model text.
     let mut after = 0;
     let mut failed_tools = 0usize;
+    let mut last_tool_call_id = None;
     let mut calls = std::collections::HashMap::new();
     let mut unresolved = Vec::new();
     loop {
@@ -66,6 +88,7 @@ pub fn inspect(journal: &JsonlRunLog, session: &str, run: &str) -> Result<TaskOu
             if let RunEventBody::Event { event } = &record.body {
                 match event {
                     Event::ToolStart { id, name, arguments } => {
+                        last_tool_call_id = Some(id.clone());
                         let arguments = serde_json::from_str::<serde_json::Value>(arguments)
                             .unwrap_or_else(|_| serde_json::Value::String(arguments.clone()));
                         calls.insert(id.clone(), (name.clone(), arguments));
@@ -103,7 +126,7 @@ pub fn inspect(journal: &JsonlRunLog, session: &str, run: &str) -> Result<TaskOu
         validator: "run_trace_only".into(),
         evidence: format!("terminal={}; tool_errors={failed_tools}; unresolved_tool_errors={}; incomplete_tools={}",
             inspection.terminal, unresolved.len(), inspection.incomplete_tools.len()),
-        verified_at_ms: None })
+        verified_at_ms: None, last_tool_call_id })
 }
 
 /// Deterministic validator for one explicitly declared file-output objective.
@@ -133,6 +156,7 @@ pub fn verify_file(root: &Path, session: &str, run: &str, workspace: &Path,
     let actual=format!("{:x}",digest.finalize());
     if !actual.eq_ignore_ascii_case(expected_sha256) { return Err("SHA256 mismatch".into()); }
     let result=TaskOutcome { session_id: session.into(), run_id: run.into(),
+        last_tool_call_id: load(root, session, run).ok().flatten().and_then(|old| old.last_tool_call_id),
         status: Status::Succeeded, validator:"expected_file_sha256".into(),
         evidence: format!("verified sha256={actual} bytes={size} path={relative}"),
         verified_at_ms:Some(std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
@@ -196,4 +220,29 @@ mod tests {
         let _=fs::remove_dir_all(base);
     }
  }
+}
+
+#[cfg(test)]
+mod history_regressions {
+    use super::*;
+    use agent_kernel::{RunEvent, RunEventBody};
+    #[test]
+    fn restores_legacy_and_current_outcomes_with_their_own_tool_anchors() {
+        let root = std::env::temp_dir().join(format!("outcome-history-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let runs = root.join("runs"); let outcomes = root.join("outcomes"); let journal = JsonlRunLog::new(&runs);
+        for (run, tool) in [("old", "old-tool"), ("new", "new-tool")] {
+            journal.append(&RunEvent { run_id:run.into(), session_id:"s1".into(), parent_run_id:None, sequence:1, timestamp_ms:1,
+                body:RunEventBody::Event { event:Event::ToolStart { id:tool.into(), name:"todo".into(), arguments:"{}".into() } } }).unwrap();
+            let record = inspect(&journal, "s1", run).unwrap();
+            assert_eq!(record.last_tool_call_id.as_deref(), Some(tool)); save(&outcomes, &record).unwrap();
+        }
+        let old_path = outcomes.join("s1/old.json");
+        let mut legacy: serde_json::Value = serde_json::from_slice(&fs::read(&old_path).unwrap()).unwrap();
+        legacy.as_object_mut().unwrap().remove("lastToolCallId"); fs::write(old_path, serde_json::to_vec(&legacy).unwrap()).unwrap();
+        fs::write(outcomes.join("s1/broken.json"), "{partial").unwrap();
+        let records = history(&outcomes, &runs, "s1"); assert_eq!(records.len(), 2);
+        assert_eq!(records.iter().find(|o| o.run_id == "old").unwrap().last_tool_call_id.as_deref(), Some("old-tool"));
+        assert_eq!(records.iter().find(|o| o.run_id == "new").unwrap().last_tool_call_id.as_deref(), Some("new-tool"));
+        assert!(history(&outcomes, &runs, "other").is_empty()); drop(journal); fs::remove_dir_all(root).unwrap();
+    }
 }

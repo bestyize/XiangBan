@@ -181,14 +181,15 @@ async function submit() {
   attachments.value = [];
   skills.value = [];
   emit('sending');
-  if (!(await chat.send(withSkills(text, chosen.map(s => s.name)), images, undefined, references.map(({ kind, id }) => ({ kind, id })))) && !owner.text) {
-    // The host refused, so nothing was sent: hand the whole message back untouched.
-    owner.text = text;
-    if (!owner.attachments.length) owner.attachments = images;
-    if (!owner.skills.length) owner.skills = chosen;
+  const sent = await chat.send(withSkills(text, chosen.map(s => s.name)), images, undefined, references.map(({ kind, id }) => ({ kind, id })));
+  if (!sent) {
+    // Keep both the refused message and anything typed while the host was responding.
+    owner.text = [text, owner.text].filter(Boolean).join('\n\n');
+    owner.attachments = [...images, ...owner.attachments];
+    owner.skills = [...chosen, ...owner.skills.filter(skill => !chosen.some(old => old.name === skill.name))];
   }
   await nextTick();
-  emit('sent');
+  if (sent) emit('sent');
 }
 /* ── `/` menu: skills the user can start by name ───────────────────── */
 const slashSkills = ref<SlashSkill[]>([]);

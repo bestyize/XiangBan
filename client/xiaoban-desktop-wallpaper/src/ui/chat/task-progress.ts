@@ -59,7 +59,7 @@ export function taskProgress(block: ReplyBlock, active: boolean, waiting: 'quest
   else if (active) state = 'running';
   else if (notice || unresolved.size > 0 || taskStatus === 'partial' || taskStatus === 'failed') state = notice?.kind === 'notice' && notice.text === '已停止' ? 'paused' : 'blocked';
   else if (taskStatus === 'cancelled') state = 'paused';
-  else state = completed === plan.steps.length ? taskStatus === 'unknown' ? 'unverified' : 'completed' : 'paused';
+  else state = completed === plan.steps.length ? taskStatus === 'succeeded' ? 'completed' : 'unverified' : 'paused';
   const message = state === 'waiting' ? '回答下方问题后，小伴会继续执行。'
     : state === 'approval' ? '请在下方确认本次操作，计划不需要另行审批。'
     : state === 'blocked' ? (notice?.kind === 'notice' ? notice.text : '执行遇到问题，请先查看执行过程和实际结果，再决定是否继续。')

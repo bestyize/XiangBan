@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { watchEffect } from 'vue';
+import { replyBlocks } from './replies.ts';
+import { taskProgress } from './task-progress.ts';
 import { createChatStore, type ChatDeps } from './chat-store.ts';
 import type { ApprovalRequest, KernelEvent, Overview, QuestionRequest, SessionSummary, WireMessage } from './types.ts';
 
@@ -1048,4 +1050,41 @@ it('retains backend partial outcomes after an unrelated successful tool',async()
   h.emit('chat-task-outcome',{session:'s1',outcome:{runId:'r1',status:'partial',validator:'run_trace_only',evidence:'unresolved_tool_errors=1'}});
   expect(h.store.current()?.items).toContainEqual(expect.objectContaining({kind:'notice',taskStatus:'partial',tone:'warning',canContinue:true}));
   h.store.dispose();
+});
+
+it('updates verification in place and does not let a delayed trace outcome undo it', async () => {
+  const h = harness(); await h.store.init();
+  h.events('s1', { type: 'tool_start', id: 't1', name: 'todo', arguments: '{}' }, { type: 'tool_end', id: 't1', output: 'Todo list updated:', is_error: false });
+  const outcome = { runId: 'r1', sessionId: 's1', lastToolCallId: 't1', status: 'unknown', validator: 'run_trace_only', evidence: '' };
+  h.emit('chat-task-outcome', { session: 's1', outcome });
+  h.emit('chat-task-outcome', { session: 's1', outcome: { ...outcome, status: 'succeeded', validator: 'user_confirmation', verifiedAtMs: 100, evidence: '已核实' } });
+  h.emit('chat-task-outcome', { session: 's1', outcome });
+  const notices = h.store.views.s1.items.filter(i => i.id === 'outcome:r1');
+  expect(notices).toHaveLength(1); expect(notices[0]).toMatchObject({ taskStatus: 'succeeded', details: '已核实' });
+  h.store.dispose();
+});
+
+it('restores each saved outcome to its own reply rather than the latest task', async () => {
+  const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')], snapshotProtocol: 1 }),
+    chat_session_snapshot: () => ({ runId: 'r2', running: false, ready: true, messages: [
+      { role: 'user', parts: [{ type: 'text', text: '旧任务' }] },
+      { role: 'assistant', tool_calls: [{ id: 'old-tool', name: 'todo', arguments: JSON.stringify({ todos: [{ content: '检查结果', status: 'completed' }] }) }] },
+      { role: 'tool', tool_call_id: 'old-tool', parts: [{ type: 'text', text: 'Todo list updated:' }] },
+      { role: 'user', parts: [{ type: 'text', text: '新任务' }] },
+      { role: 'assistant', tool_calls: [{ id: 'new-tool', name: 'todo', arguments: JSON.stringify({ todos: [{ content: '检查结果', status: 'completed' }] }) }] },
+      { role: 'tool', tool_call_id: 'new-tool', parts: [{ type: 'text', text: 'Todo list updated:' }] },
+    ], outcomes: [
+      { runId: 'r1', sessionId: 's1', lastToolCallId: 'old-tool', status: 'unknown', validator: 'run_trace_only', evidence: 'old' },
+      { runId: 'r2', sessionId: 's1', lastToolCallId: 'new-tool', status: 'succeeded', validator: 'user_confirmation', evidence: 'new', verifiedAtMs: 100 },
+    ] }) });
+  await h.store.init(); await h.store.select('s1');
+  const items = h.store.views.s1.items;
+  const nextUser = items.findIndex(i => i.kind === 'user' && i.text === '新任务');
+  expect(items.findIndex(i => i.id === 'outcome:r1')).toBeLessThan(nextUser);
+  expect(items.findIndex(i => i.id === 'outcome:r2')).toBeGreaterThan(nextUser);
+  expect(items.find(i => i.id === 'outcome:r1')).toMatchObject({ taskStatus: 'unknown' });
+  expect(items.find(i => i.id === 'outcome:r2')).toMatchObject({ taskStatus: 'succeeded' });
+  const replies = replyBlocks(items).filter(block => block.calls.length);
+  expect(taskProgress(replies[0], false)?.state).toBe('unverified');
+  expect(taskProgress(replies[1], false)?.state).toBe('completed'); h.store.dispose();
 });

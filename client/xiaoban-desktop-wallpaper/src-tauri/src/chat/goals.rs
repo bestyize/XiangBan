@@ -311,6 +311,7 @@ pub fn chat_goal_finish(
     if let Some(run) = &goal.last_run_id {
         let outcome = task_outcome::TaskOutcome {
             run_id: run.clone(), session_id: session_id.clone(), status: task_outcome::Status::Succeeded,
+            last_tool_call_id: task_outcome::inspect(&JsonlRunLog::new(Dirs::of(&app)?.runs().join(&session_id)), &session_id, run).ok().and_then(|record| record.last_tool_call_id),
             validator: "user_confirmation".into(), evidence: goal.note.clone(), verified_at_ms: Some(goal.updated_at_ms),
         };
         task_outcome::save(&Dirs::of(&app)?.outcomes(), &outcome)?;

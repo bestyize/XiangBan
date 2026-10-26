@@ -50,7 +50,8 @@ describe('conversation state isolation', () => {
   });
 
   it('keeps pending model, context and connector choices with the newly created session', async () => {
-    const h = setup({ chat_new_session: args => ({ ...session('new'), model: args!.model, connectors: args!.connectors }) });
+    let created: SessionSummary;
+    const h = setup({ chat_new_session: args => (created = { ...session('new'), model: args!.model, connectors: args!.connectors } as SessionSummary), chat_send: () => created });
     await h.store.init();
     await h.store.setModel(model('pending'));
     await h.store.setContextSize(512_000);
@@ -135,4 +136,21 @@ describe('conversation state isolation', () => {
     expect(view?.model).toBe('a-model'); expect(view?.providers![0].replyPreference).toBe('deeper');
     expect(config.model).toBe('a-default'); expect(config.providers![0].replyPreference).toBe('faster');
   });
+});
+
+it('accepts a remote connector update without writing the cached selection back', async () => {
+  const h = setup(); h.list[0].connectors = ['old'];
+  await h.store.init(); await h.store.select('a');
+  expect(h.store.draft.connectors.map(c => c.id)).toEqual(['old']);
+  h.invoke.mockClear();
+  h.handlers.get('chat-sessions-changed')!([{ ...session('a'), connectors: ['new'] }, session('b')] as never);
+  await Promise.resolve();
+  expect(h.store.sessions[0].connectors).toEqual(['new']);
+  expect(h.store.draft.connectors.map(c => c.id)).toEqual(['new']);
+  expect(h.invoke).not.toHaveBeenCalledWith('chat_set_session_options', expect.anything());
+  h.store.draft.connectors.push({ kind: 'connector', id: 'local', name: 'local', description: '' });
+  await Promise.resolve(); await Promise.resolve();
+  expect(h.invoke).toHaveBeenCalledWith('chat_set_session_options', { sessionId: 'a', connectors: ['new', 'local'] });
+  await h.store.select('b');
+  expect(h.store.draft.connectors).toEqual([]); h.store.dispose();
 });

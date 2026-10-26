@@ -215,7 +215,7 @@ mod tests {
         assert!(!result.is_error && result.output.contains("unique needle"), "{}", result.output);
 
         let write = fs_write_tools(vec![workspace.clone()]).unwrap().into_iter().find(|t| t.spec().name == "write_file").unwrap();
-        let scoped = ScopedFileTool::new(write, &workspace, vec![workspace], base.join("attachments"), approve);
+        let scoped = ScopedFileTool::new(write, &workspace, vec![workspace.clone()], base.join("attachments"), approve);
         let target = outside.join("new").join("created.txt");
         let result = scoped.execute_result(serde_json::json!({"path":target,"content":"written"}), &ToolCtx::detached("s"));
         assert!(!result.is_error, "{}", result.output);
@@ -249,5 +249,32 @@ mod tests {
         assert!(is_external_write("edit_file", &serde_json::json!({"path":workspace.join("link.txt")}), &workspace));
         assert_eq!(resolve_requested(&workspace, "read_file", "link.txt").unwrap(), target);
         let _ = std::fs::remove_dir_all(&base);
+    }
+}
+
+#[cfg(test)]
+mod wait_regressions {
+    use super::*;
+    use agent_kernel::{Agent, MemoryStore, RunControl, RunOptions, Part};
+    use agent_kernel::provider::scripted::{ScriptedProvider, Step};
+    use std::sync::atomic::AtomicBool;
+    #[test]
+    fn waiting_for_external_read_consent_does_not_spend_the_run_budget() {
+        let base = std::env::temp_dir().join(format!("file-consent-budget-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let work = base.join("work"); std::fs::create_dir_all(&work).unwrap();
+        let external = base.join("external.txt"); std::fs::write(&external, "approved data").unwrap();
+        let original = ReadFile::new(vec![work.clone()], AttachmentStore::new(base.join("attachments"))).unwrap();
+        let approve: Arc<ApprovePath> = Arc::new(|_, _, _, _, ctx| {
+            let (tx, rx) = std::sync::mpsc::channel();
+            std::thread::spawn(move || { std::thread::sleep(Duration::from_millis(450)); let _ = tx.send(true); });
+            ctx.wait_for_user(&rx).unwrap_or(false)
+        });
+        let scoped = ScopedFileTool::new(Arc::new(original), &work, vec![work.clone()], base.join("attachments"), approve);
+        let provider = Arc::new(ScriptedProvider::new(vec![Step::tool_call("read", "read_file", &serde_json::json!({"path":external}).to_string()), Step::text("done")]));
+        let agent = Agent::builder(provider, Arc::new(MemoryStore::new())).tool(scoped).build().unwrap();
+        let control = RunControl::bounded(Duration::from_millis(300), 1000);
+        let result = agent.run_parts_observed("s1", vec![Part::Text { text:"read".into() }], RunOptions { control:Some(control.clone()), ..Default::default() }, &mut |_| Ok(()), &Arc::new(AtomicBool::new(false)));
+        assert!(result.is_ok(), "{result:?}"); assert!(control.excluded_wait() >= Duration::from_millis(400));
+        std::fs::remove_dir_all(base).unwrap();
     }
 }

@@ -103,6 +103,7 @@ pub struct ToolCtx {
     pub(crate) run_cancel: Arc<AtomicBool>,
     pub(crate) call_cancel: Arc<AtomicBool>,
     pub(crate) control: crate::RunControl,
+    pub(crate) call_control: crate::RunControl,
     pub(crate) budget: Option<Arc<crate::ToolBudget>>,
 }
 
@@ -120,7 +121,7 @@ impl ToolCtx {
 
     /// A context that is never cancelled, for calling a tool directly, for example in a host's tests.
     pub fn detached(session: &str) -> Self {
-        Self { session: session.to_string(), run_id: format!("detached-{session}"), run_cancel: Arc::new(AtomicBool::new(false)), call_cancel: Arc::new(AtomicBool::new(false)), budget: None, control: Default::default() }
+        Self { session: session.to_string(), run_id: format!("detached-{session}"), run_cancel: Arc::new(AtomicBool::new(false)), call_cancel: Arc::new(AtomicBool::new(false)), budget: None, control: Default::default(), call_control: Default::default() }
     }
 
     /// True after the user cancels the run or this call hits its timeout.
@@ -131,6 +132,13 @@ impl ToolCtx {
     /// Waits for a value from `rx` (for example the user's answer from a dialog) and gives up with
     /// `None` when the run is cancelled, the call times out, or the sender is dropped. Code that
     /// blocks on a person should wait this way, or the run cannot be cancelled while it waits.
+    /// Human input pauses this call's timeout and the shared execution budget. Other tools keep their own deadlines.
+    pub fn wait_for_user<T>(&self, rx: &Receiver<T>) -> Option<T> {
+        let _run_wait = self.control.wait_for_user();
+        let _call_wait = self.call_control.wait_for_user();
+        self.wait_for(rx)
+    }
+
     pub fn wait_for<T>(&self, rx: &Receiver<T>) -> Option<T> {
         loop {
             match rx.recv_timeout(Duration::from_millis(50)) {

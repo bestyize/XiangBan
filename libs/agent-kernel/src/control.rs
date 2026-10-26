@@ -68,6 +68,16 @@ impl RunControl {
             tokens: AtomicU64::new(0), limit: tokens.unwrap_or(u64::MAX) }))
     }
 
+    pub(crate) fn tool_timeout(timeout: Duration) -> Self {
+        Self(Arc::new(Inner { isolate: false,
+            deadline: Mutex::new(Clock { end: Instant::now().checked_add(timeout), ..Default::default() }),
+            tokens: AtomicU64::new(0), limit: u64::MAX }))
+    }
+    pub(crate) fn time_expired_at(&self, at: Instant) -> bool {
+        let clock = self.0.deadline.lock().unwrap_or_else(|e| e.into_inner());
+        clock.end.is_some_and(|end| clock.since.unwrap_or(at) >= end)
+    }
+
     pub fn reported_tokens(&self) -> u64 { self.0.tokens.load(Ordering::SeqCst) }
 
     pub fn bounded(duration: Duration, tokens: u64) -> Self {

@@ -181,9 +181,9 @@ pub(super) fn request(app: &tauri::AppHandle, references: &[String], ctx: &ToolC
     if ctx.is_cancelled() { return Err("连接请求已取消".into()); }
     let state = app.state::<ChatState>();
     let broker = &state.broker;
-    let (id, rx) = broker.open_question_payload(ctx.session(), json!({"question":"连接服务后继续当前任务", "options":[], "connectors":candidates}));
+    let (id, rx) = broker.open_connector_question(ctx.session(), ctx.run_id(), json!(candidates))?;
     emit(app, "chat-pending-changed", json!({"session":ctx.session(), "pending":broker.snapshot(ctx.session())}));
-    let answer = ctx.wait_for(&rx).flatten();
+    let answer = ctx.wait_for_user(&rx).flatten();
     broker.close_question(&id);
     emit(app, "chat-pending-changed", json!({"session":ctx.session(), "pending":broker.snapshot(ctx.session())}));
     let Some(answer) = answer else { return Ok(json!({"status":"skipped"})); };

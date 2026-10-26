@@ -11,7 +11,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 static NEXT_INDEX: AtomicU64 = AtomicU64::new(0);
@@ -52,20 +52,7 @@ fn git(repo: &Repo, args: &[&str], index: Option<&Path>) -> Result<Output, Strin
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000);
     }
-    let mut child = cmd.spawn().map_err(|e| format!("git is not available: {e}"))?;
-    let end = Instant::now() + TIMEOUT;
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) if Instant::now() < end => std::thread::sleep(Duration::from_millis(20)),
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err("git took too long".into());
-            }
-        }
-    }
-    let output = child.wait_with_output().map_err(|e| e.to_string())?;
+    let output = super::git_command::output(&mut cmd, TIMEOUT)?;
     if output.status.success() {
         Ok(output)
     } else {

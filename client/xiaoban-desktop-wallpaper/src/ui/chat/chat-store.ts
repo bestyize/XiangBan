@@ -154,8 +154,8 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   const activeRun = new Map<string, string>();
   const cursors = new Map<string, number>();
   let revisingPlan = false;
-  interface Outcome {runId:string;status:string;validator:string;evidence:string}
-  interface Snapshot { outcome?:Outcome; pending?: PendingSnapshot; messages: WireMessage[]; runId?: string; sequence?: number; events?: ChatEventPayload[]; running?: boolean; ready?: boolean; warning?: string; interrupted?: boolean }
+  interface Outcome {runId:string;status:string;validator:string;evidence:string;sessionId?:string;lastToolCallId?:string;verifiedAtMs?:number|null}
+  interface Snapshot { outcomes?:Outcome[]; outcome?:Outcome; pending?: PendingSnapshot; messages: WireMessage[]; runId?: string; sequence?: number; events?: ChatEventPayload[]; running?: boolean; ready?: boolean; warning?: string; interrupted?: boolean }
 
 
   const store: ChatStore = reactive({
@@ -163,7 +163,8 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     get draft() { return store.draftFor(store.currentId); },
     draftFor(id: string | null) {
       const key = id ?? '$new';
-      return store.drafts[key] ??= { text: '', attachments: [], skills: [], connectors: (store.sessions.find(s => s.id === id)?.connectors ?? []).map(id => ({ kind: 'connector' as const, id, name: id, description: '' })) };
+      store.drafts[key] ??= { text: '', attachments: [], skills: [], connectors: (store.sessions.find(s => s.id === id)?.connectors ?? []).map(id => ({ kind: 'connector' as const, id, name: id, description: '' })) };
+      return store.drafts[key];
     },
     pendingModel: null as SessionModel | null,
     pendingContextTokens: null as number | null,
@@ -740,21 +741,34 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     }
   }
 
-  function applyOutcome(session:string,outcome:Outcome){
-    const v=viewOf(session,true);
-    if(!v.items.some(i=>i.kind==='tool'))return;
-    if(activeRun.has(session) && activeRun.get(session)!==outcome.runId)return;
-    const id=`outcome:${outcome.runId}`;
-    if(v.items.some(i=>i.id===id))return;
-    const partial=outcome.status==='partial', failed=outcome.status==='failed';
-    const verified=outcome.status==='succeeded';
-    const status=['succeeded','failed','partial','cancelled','unknown'].includes(outcome.status)
+  function applyOutcome(session: string, outcome: Outcome) {
+    const v = viewOf(session, true);
+    if (outcome.sessionId && outcome.sessionId !== session) return;
+    const id = `outcome:${outcome.runId}`;
+    const existing = v.items.findIndex(item => item.id === id);
+    const old = existing >= 0 ? v.items[existing] : undefined;
+    // A late trace-only event must not undo explicit verification.
+    if (old?.kind === 'notice' && old.taskStatus === 'succeeded'
+      && (outcome.status !== 'succeeded' || (old.verifiedAtMs ?? 0) > (outcome.verifiedAtMs ?? 0))) return;
+    const anchors = outcome.lastToolCallId ? v.items.map((item, index) => item.kind === 'tool' && item.id === outcome.lastToolCallId ? index : -1).filter(index => index >= 0) : [];
+    if (existing < 0 && outcome.lastToolCallId && anchors.length !== 1) return;
+    if (existing < 0 && !outcome.lastToolCallId && (!v.items.some(i => i.kind === 'tool')
+      || activeRun.has(session) && activeRun.get(session) !== outcome.runId)) return;
+    const partial = outcome.status === 'partial', failed = outcome.status === 'failed';
+    const verified = outcome.status === 'succeeded';
+    const status = ['succeeded','failed','partial','cancelled','unknown'].includes(outcome.status)
       ? outcome.status as 'succeeded'|'failed'|'partial'|'cancelled'|'unknown' : 'unknown';
-    v.items.push({kind:'notice',id,taskStatus:status,tone:partial||failed?'warning':'info',
-      text:partial?'仍有未解决的操作失败，请核对结果后继续。':failed?'本次执行失败，已保留当前进度。'
-        :verified?outcome.validator==='expected_file_sha256'?'指定文件已通过 SHA256 验收。':'任务已通过指定验收。'
-        :outcome.status==='cancelled'?'已停止':'执行已结束，任务结果尚未独立验收。',
-      canContinue:partial||failed,details:outcome.evidence,detailsLabel:'查看执行依据'});
+    const notice: ChatItem = { kind: 'notice', id, taskStatus: status, tone: partial || failed ? 'warning' : 'info',
+      text: partial ? '仍有未解决的操作失败，请核对结果后继续。' : failed ? '本次执行失败，已保留当前进度。'
+        : verified ? outcome.validator === 'expected_file_sha256' ? '指定文件已通过 SHA256 验收。' : '任务已通过指定验收。'
+        : outcome.status === 'cancelled' ? '已停止' : '执行已结束，任务结果尚未独立验收。',
+      verifiedAtMs: outcome.verifiedAtMs ?? undefined,
+      canContinue: partial || failed, details: outcome.evidence, detailsLabel: '查看执行依据' };
+    if (existing >= 0) v.items.splice(existing, 1, notice);
+    else {
+      const nextUser = anchors.length ? v.items.findIndex((item, index) => index > anchors[0] && item.kind === 'user') : -1;
+      v.items.splice(nextUser < 0 ? v.items.length : nextUser, 0, notice);
+    }
   }
 
   function applyPending(id:string,p:PendingSnapshot) {
@@ -786,6 +800,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         for (const payload of snapshot.events ?? []) applyEvent(view, payload.event);
         if(snapshot.pending) applyPending(id,snapshot.pending);
         if (snapshot.runId) activeRun.set(id, snapshot.runId);
+        for (const outcome of snapshot.outcomes ?? []) applyOutcome(id, outcome);
         if(snapshot.outcome)applyOutcome(id,snapshot.outcome);
         view.loaded = snapshot.ready !== false;
         if (snapshot.runId) {
@@ -874,17 +889,35 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     if (!list.some(item => item.id === request.id)) list.push(request);
   }
 
-  unsubscribers.push(watch(() => store.draft.connectors.map(c => c.id), ids => {
-    const id = store.currentId;
-    if (!id || disposed || !deps.desktop) return;
-    const session = store.sessions.find(s => s.id === id);
-    if (!session || JSON.stringify(session.connectors ?? []) === JSON.stringify(ids)) return;
-    session.connectors = [...ids];
-    const previous = connectorWrites.get(id) ?? Promise.resolve();
-    const write = previous.catch(() => {}).then(() => deps.invoke('chat_set_session_options', { sessionId: id, connectors: [...ids] }))
-      .catch(error => deps.notify(error, 'error'));
-    connectorWrites.set(id, write);
-    void write.finally(() => { if (connectorWrites.get(id) === write) connectorWrites.delete(id); });
+  let syncingConnectors = false;
+  // A host update is authoritative; it must never look like a local composer edit.
+  unsubscribers.push(watch(() => store.sessions, sessions => {
+    syncingConnectors = true;
+    try {
+      for (const session of sessions) {
+        const draft = store.drafts[session.id];
+        if (!draft || session.connectors === undefined || connectorWrites.has(session.id)) continue;
+        draft.connectors = (session.connectors ?? []).map(id => draft.connectors.find(item => item.id === id)
+          ?? { kind: 'connector' as const, id, name: id, description: '' });
+      }
+    } finally { syncingConnectors = false; }
+  }, { flush: 'sync' }));
+  // Observe draft data only, including background conversations. Creating a draft is not an edit.
+  unsubscribers.push(watch(() => Object.entries(store.drafts).map(([id, draft]) => [id, draft.connectors.map(c => c.id)] as const), (drafts, before) => {
+    if (syncingConnectors || disposed || !deps.desktop) return;
+    const previousDrafts = new Map(before);
+    for (const [id, ids] of drafts) {
+      const old = previousDrafts.get(id);
+      if (id === '$new' || !old || JSON.stringify(old) === JSON.stringify(ids)) continue;
+      const session = store.sessions.find(s => s.id === id);
+      if (!session || JSON.stringify(session.connectors ?? []) === JSON.stringify(ids)) continue;
+      session.connectors = [...ids];
+      const previous = connectorWrites.get(id) ?? Promise.resolve();
+      const write = previous.catch(() => {}).then(() => deps.invoke('chat_set_session_options', { sessionId: id, connectors: [...ids] }))
+        .catch(error => deps.notify(error, 'error'));
+      connectorWrites.set(id, write);
+      void write.finally(() => { if (connectorWrites.get(id) === write) connectorWrites.delete(id); });
+    }
   }, { flush: 'sync' }));
   return store;
 }

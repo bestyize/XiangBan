@@ -13,7 +13,7 @@ const POLL: Duration = Duration::from_millis(20);
 struct Inflight {
     index: usize,
     rx: Receiver<(Instant, ToolResult)>,
-    deadline: Option<Instant>,
+    clock: crate::RunControl,
 
     call_cancel: Arc<AtomicBool>,
     grace: Duration,
@@ -25,17 +25,19 @@ enum Prepared {
     Run { tool: Arc<dyn Tool>, args: Value, ctx: ToolCtx },
 }
 
-fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, ctx: ToolCtx) -> Result<Inflight, ToolResult> {
+fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, mut ctx: ToolCtx) -> Result<Inflight, ToolResult> {
     let timeout = tool.spec().timeout;
     let call_cancel = ctx.call_cancel.clone();
     let grace = tool.cancel_grace();
-    let deadline = Instant::now().checked_add(timeout);
+    let clock = crate::RunControl::tool_timeout(timeout);
+    ctx.call_control = clock.clone();
+    let watched_clock = clock.clone();
     let run_cancel = ctx.run_cancel.clone();
     let worker_cancel = call_cancel.clone();
     // Each worker owns a watchdog; waiting for another result or an approval
     // must not postpone this call's cancellation.
     let watch = crate::StopWatch::new(
-        move || run_cancel.load(Ordering::Relaxed) || deadline.is_some_and(|d| Instant::now() >= d),
+        move || run_cancel.load(Ordering::Relaxed) || watched_clock.time_expired_at(Instant::now()),
         move || worker_cancel.store(true, Ordering::SeqCst),
     );
     let (tx, rx) = mpsc::channel();
@@ -46,11 +48,11 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, ctx: ToolCtx) -> Result
             let _ = tx.send((Instant::now(), result));
         })
         .map_err(|e| ToolResult::error(format!("could not start tool: {e}")))?;
-    Ok(Inflight { index, rx, deadline, call_cancel, grace, _watch: watch })
+    Ok(Inflight { index, rx, clock, call_cancel, grace, _watch: watch })
 }
 
 fn reported(call: &Inflight, finished: Instant, mut result: ToolResult) -> ToolResult {
-    if call.deadline.is_some_and(|d| finished >= d) {
+    if call.clock.time_expired_at(finished) {
         result.is_error = true;
         result.output = format!("Tool timed out; final worker report (action may have completed; inspect state before retrying): {}", result.output);
     }
@@ -63,7 +65,7 @@ fn await_call(call: &Inflight, cancel: &AtomicBool) -> ToolResult {
             Ok((finished, result)) => return reported(call, finished, result),
             Err(RecvTimeoutError::Disconnected) => return ToolResult::unknown("worker crashed without a result"),
             Err(RecvTimeoutError::Timeout) => {
-                if cancel.load(Ordering::Relaxed) || call.deadline.is_some_and(|d| Instant::now() >= d) {
+                if cancel.load(Ordering::Relaxed) || call.clock.time_expired_at(Instant::now()) {
                     call.call_cancel.store(true, Ordering::SeqCst);
                     return match call.rx.recv_timeout(call.grace) {
                         Ok((finished, result)) => reported(call, finished, result),
@@ -173,6 +175,7 @@ impl Agent {
             call_cancel: Arc::new(AtomicBool::new(false)),
             budget: budget.cloned(),
             control: control.clone(),
+            call_control: Default::default(),
         };
         match tool.resource(&args) {
             Err(error) => return Prepared::Done(ToolResult::error(error)),
@@ -248,3 +251,55 @@ impl Agent {
     }
 }
 
+
+#[cfg(test)]
+mod user_wait_regressions {
+    use super::*;
+    use crate::{Risk, ToolSpec, RunControl};
+    struct WaitingTool { spec: ToolSpec }
+    impl Tool for WaitingTool {
+        fn spec(&self) -> &ToolSpec { &self.spec }
+        fn execute_result(&self, _: Value, ctx: &ToolCtx) -> ToolResult {
+            let (tx, rx) = mpsc::channel();
+            std::thread::spawn(move || { std::thread::sleep(Duration::from_millis(250)); let _ = tx.send("approved"); });
+            match ctx.wait_for_user(&rx) { Some(_) => ToolResult::ok("continued"), None => ToolResult::error("cancelled") }
+        }
+    }
+    fn human() -> Arc<dyn Tool> {
+        Arc::new(WaitingTool { spec: ToolSpec::new("human", "wait", serde_json::json!({"type":"object"})).risk(Risk::Read).timeout(Duration::from_millis(100)) })
+    }
+    #[test]
+    fn human_input_preserves_both_call_and_run_active_time() {
+        let mut ctx = ToolCtx::detached("s"); ctx.control = RunControl::bounded(Duration::from_millis(150), 1000);
+        let budget = ctx.control.clone(); let call = spawn(0, human(), Value::Null, ctx).unwrap();
+        let result = await_call(&call, &AtomicBool::new(false));
+        assert!(!result.is_error, "{}", result.output);
+        assert!(budget.check().is_ok()); assert!(budget.excluded_wait() >= Duration::from_millis(200));
+    }
+    #[test]
+    fn waiting_for_a_person_does_not_pause_a_different_calls_timeout() {
+        struct Slow(ToolSpec);
+        impl Tool for Slow {
+            fn spec(&self) -> &ToolSpec { &self.0 }
+            fn execute_result(&self, _: Value, ctx: &ToolCtx) -> ToolResult {
+                while !ctx.is_cancelled() { std::thread::sleep(Duration::from_millis(5)); }
+                ToolResult::error("stopped")
+            }
+        }
+        let ctx = ToolCtx::detached("s"); let mut other = ToolCtx::detached("s");
+        other.control = ctx.control.clone(); other.run_cancel = ctx.run_cancel.clone();
+        let person = spawn(0, human(), Value::Null, ctx).unwrap();
+        let slow = Arc::new(Slow(ToolSpec::new("slow", "slow", serde_json::json!({"type":"object"})).timeout(Duration::from_millis(70))));
+        let began = Instant::now(); let slow = spawn(1, slow, Value::Null, other).unwrap();
+        assert!(await_call(&slow, &AtomicBool::new(false)).is_error);
+        assert!(began.elapsed() < Duration::from_millis(200));
+        assert!(!await_call(&person, &AtomicBool::new(false)).is_error);
+    }
+    #[test]
+    fn cancellation_interrupts_a_human_wait_even_while_its_clocks_are_paused() {
+        let ctx = ToolCtx::detached("s"); let cancel = ctx.run_cancel.clone();
+        let call = spawn(0, human(), Value::Null, ctx).unwrap();
+        cancel.store(true, Ordering::SeqCst);
+        assert!(await_call(&call, &cancel).is_error);
+    }
+}

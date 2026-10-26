@@ -12,7 +12,6 @@ use super::sessions::WorktreeLink;
 use super::*;
 use serde::Serialize;
 use std::process::{Command, Stdio};
-use std::time::Instant;
 
 const SHORT_TIMEOUT: Duration = Duration::from_secs(20);
 const LONG_TIMEOUT: Duration = Duration::from_secs(180);
@@ -30,20 +29,7 @@ fn git(dir: &Path, args: &[&str], timeout: Duration) -> Result<String, String> {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x0800_0000);
     }
-    let mut child = cmd.spawn().map_err(|e| format!("找不到 git，无法使用独立副本：{e}"))?;
-    let end = Instant::now() + timeout;
-    loop {
-        match child.try_wait() {
-            Ok(Some(_)) => break,
-            Ok(None) if Instant::now() < end => std::thread::sleep(Duration::from_millis(20)),
-            _ => {
-                let _ = child.kill();
-                let _ = child.wait();
-                return Err("git 运行太久，已停止".into());
-            }
-        }
-    }
-    let output = child.wait_with_output().map_err(|e| e.to_string())?;
+    let output = super::git_command::output(&mut cmd, timeout)?;
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     } else {
@@ -191,9 +177,19 @@ pub fn merge(store: &Path, link: &WorktreeLink, title: &str) -> Result<String, S
         return Ok("副本里没有改动，已清理掉副本".into());
     }
     let message = format!("合并小伴的改动：{title}");
+    let before = git(&root, &["rev-parse", "HEAD"], SHORT_TIMEOUT)?;
     if let Err(error) = git(&root, &["merge", "--no-ff", "-m", &message, &link.branch], LONG_TIMEOUT) {
-        let _ = git(&root, &["merge", "--abort"], SHORT_TIMEOUT);
-        return Err(format!("合并时有冲突，原文件夹没有被改动。副本和分支“{}”都还在，可以手动处理：{error}", link.branch));
+        // A timeout/output error may happen after git committed. Check reality before aborting or reporting failure.
+        let after = git(&root, &["rev-parse", "HEAD"], SHORT_TIMEOUT);
+        let committed = after.as_ref().is_ok_and(|head| head != &before)
+            && git(&root, &["merge-base", "--is-ancestor", &link.branch, "HEAD"], SHORT_TIMEOUT).is_ok();
+        if !committed {
+            let merging = git(&root, &["rev-parse", "--verify", "MERGE_HEAD"], SHORT_TIMEOUT).is_ok();
+            let aborted = merging && git(&root, &["merge", "--abort"], SHORT_TIMEOUT).is_ok();
+            let detail = if aborted { "合并未完成（可能有冲突），已中止本次合并" }
+                else { "合并未能确认完成，请检查原文件夹的文件和 Git 状态" };
+            return Err(format!("{detail}。副本和分支“{}”都还在：{error}", link.branch));
+        }
     }
     discard(store, link)?;
     Ok(format!("已把 {ahead} 个提交合并进“{origin_branch}”，并清理了副本"))
@@ -411,6 +407,22 @@ mod tests {
         assert!(!Path::new(&made.link.path).exists(), "the copy is removed after a merge");
         assert!(run(&rig.repo, &["branch", "--list", &made.link.branch]).is_empty(), "and so is its branch");
         assert!(run(&rig.repo, &["log", "-1", "--format=%s"]).contains("合并小伴的改动"));
+    }
+
+    #[test]
+    fn merges_large_diffstat_output_and_reports_the_committed_result() {
+        let rig = Rig::new("large-output");
+        let made = rig.make("large");
+        for n in 0..2000 {
+            std::fs::write(made.workspace.join(format!("file-{n:04}-normal-source-name.txt")), "new data\n").unwrap();
+        }
+        // Commit outside the helper so this specifically exercises merge's output and result handling.
+        run(&made.workspace, &["add", "-A"]);
+        run(&made.workspace, &["commit", "-q", "-m", "many files"]);
+        assert!(merge(&rig.store, &made.link, "大批文件").unwrap().contains("合并进"));
+        assert!(rig.repo.join("file-0000-normal-source-name.txt").is_file());
+        assert!(run(&rig.repo, &["log", "-1", "--format=%s"]).contains("大批文件"));
+        assert!(!made.workspace.exists());
     }
 
     #[test]

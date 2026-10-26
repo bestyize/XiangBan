@@ -31,6 +31,10 @@ impl Broker {
  }
  pub fn recovered_question(&self,id:&str)->Option<Value>{lock(&self.recovered).get(id).cloned()}
  pub fn finish_recovered(&self,id:&str)->Result<(),String>{self.clear_saved(id)?;lock(&self.recovered).remove(id);lock(&self.state).revision+=1;Ok(())}
+ pub fn open_connector_question(&self, session: &str, run: &str, connectors: Value) -> Result<(String, Receiver<Option<String>>), String> {
+    self.open_question_checked(session, json!({"question":"连接服务后继续当前任务", "options":[],
+        "kind":"connector_request", "runId":run, "connectors":connectors}))
+ }
  pub fn open_question_checked(&self,s:&str,mut value:Value)->Result<(String,Receiver<Option<String>>),String>{
     if !Self::safe(s){return Err("invalid session id".into());}
     let id=self.id('q');value["id"]=json!(id);value["session"]=json!(s);
@@ -57,6 +61,26 @@ impl Broker {
  pub fn snapshot(&self,id:&str)->Value{let s=lock(&self.state);json!({"revision":s.revision,"approvals":s.approvals.values().filter(|(session,_,_)|session==id).map(|(_,_,v)|v).collect::<Vec<_>>(),"questions":s.questions.values().filter(|(session,_,_)|session==id).map(|(_,_,v)|v.clone()).chain(lock(&self.recovered).values().filter(|v|v["session"]==id).cloned()).collect::<Vec<_>>()})}
  #[cfg(test)]pub fn pending(&self)->usize{let s=lock(&self.state);s.approvals.len()+s.questions.len()}
 }
+/// A restart resumes with new user input, never by replaying the interrupted tool call.
+pub fn recovery_text(saved: &Value, answer: &str, inspection: &agent_kernel::journal::RunInspection) -> Result<String, String> {
+    let connector = saved["kind"] == "connector_request" || saved["connectors"].is_array();
+    let tool = if connector { "connector_request" } else { "ask_user" };
+    if inspection.incomplete_tools.iter().any(|t| t.dispatched && t.name != tool) {
+        return Err("上次还有结果不明的操作，请先检查实际结果后再继续".into());
+    }
+    if inspection.terminal || !inspection.incomplete_tools.iter().any(|t| t.dispatched && t.name == tool) {
+        return Err("这个问题已经结束，请跳过后在会话中继续".into());
+    }
+    if connector {
+        if !saved["connectors"].as_array().is_some_and(|items| items.iter().any(|c| c["reference"] == answer)) {
+            return Err("连接器选择无效".into());
+        }
+        Ok(format!("上次执行在等待连接服务时中断。我已处理连接卡片，选择的服务引用：{answer}。请先使用 connector_search 核对当前连接状态和工具，再继续原任务；不要重放已执行或结果不明的操作。"))
+    } else {
+        Ok(format!("上次执行在等待我回答时中断。问题：{}\n我的回答：{}\n请检查现场后继续；不要重放已执行或结果不明的操作。", saved["question"].as_str().unwrap_or(""), answer))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,6 +185,50 @@ mod durable_question_tests {
     fn a_failed_checkpoint_does_not_create_a_live_question() {
         let root=std::env::temp_dir().join(format!("broker-unwritable-{}",std::process::id()));std::fs::write(&root,"occupied").unwrap();
         let broker=Broker::persistent(root.clone());assert!(broker.open_question_checked("s1",json!({"question":"q"})).is_err());assert_eq!(broker.pending(),0);
+        std::fs::remove_file(root).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod recovery_regressions {
+    use super::*;
+    use agent_kernel::journal::{IncompleteTool, RunInspection};
+    fn waiting(name: &str) -> RunInspection {
+        RunInspection { last_sequence: 2, state: Some(agent_kernel::RunState::Running), terminal: false,
+            incomplete_tools: vec![IncompleteTool { id: "tool-1".into(), name: name.into(), dispatched: true }] }
+    }
+    #[test]
+    fn connector_checkpoint_reopens_with_its_kind_and_run_and_can_be_closed() {
+        let root = std::env::temp_dir().join(format!("connector-recovery-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let first = Broker::persistent(root.clone());
+        let (id, _rx) = first.open_connector_question("s1", "r1", json!([{"reference":"installed:github"}])).unwrap();
+        drop(first);
+        let reopened = Broker::persistent(root.clone());
+        let saved = reopened.recovered_question(&id).unwrap();
+        assert_eq!(saved["runId"], "r1"); assert_eq!(saved["kind"], "connector_request");
+        assert!(recovery_text(&saved, "installed:github", &waiting("connector_request")).unwrap().contains("connector_search"));
+        assert!(recovery_text(&saved, "installed:other", &waiting("connector_request")).is_err());
+        let mut unknown_write = waiting("connector_request");
+        unknown_write.incomplete_tools.push(IncompleteTool { id: "write".into(), name: "write_file".into(), dispatched: true });
+        assert!(recovery_text(&saved, "installed:github", &unknown_write).is_err());
+        reopened.finish_recovered(&id).unwrap();
+        assert!(Broker::persistent(root.clone()).snapshot("s1")["questions"].as_array().unwrap().is_empty());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn a_legacy_connector_card_can_be_dismissed_without_run_metadata() {
+        let root = std::env::temp_dir().join(format!("legacy-connector-{}", std::process::id()));
+        let b = Broker::persistent(root.clone());
+        let (id, _rx) = b.open_question_checked("s1", json!({"question":"连接服务", "connectors":[]})).unwrap();
+        drop(b); let reopened = Broker::persistent(root.clone());
+        reopened.finish_recovered(&id).unwrap();
+        assert!(reopened.recovered_question(&id).is_none()); std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn a_connector_checkpoint_write_failure_is_returned_without_panicking() {
+        let root = std::env::temp_dir().join(format!("connector-checkpoint-file-{}", std::process::id()));
+        std::fs::write(&root, "occupied").unwrap(); let b = Broker::persistent(root.clone());
+        assert!(b.open_connector_question("s1", "r1", json!([])).is_err()); assert_eq!(b.pending(), 0);
         std::fs::remove_file(root).unwrap();
     }
 }

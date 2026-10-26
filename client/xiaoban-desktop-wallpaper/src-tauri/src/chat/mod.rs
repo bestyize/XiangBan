@@ -17,6 +17,7 @@ mod mentions;
 mod widget_content;
 mod broker;
 mod checkpoints;
+mod git_command;
 mod git_snapshot;
 mod community;
 mod compact;
@@ -811,7 +812,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             let (id, rx) = broker.open_approval_payload(session, payload.clone());
             emit(&app, "chat-pending-changed", json!({"session":session,"pending":broker.snapshot(session)}));
             emit(&app, "chat-approval", json!({"id":id,"session":session,"tool":tool,"risk":risk_name(risk),"arguments":payload["arguments"],"tainted":false,"canRemember":false,"externalPath":true}));
-            let allowed = matches!(ctx.wait_for(&rx), Some(Approval::Once | Approval::Always));
+            let allowed = matches!(ctx.wait_for_user(&rx), Some(Approval::Once | Approval::Always));
             broker.close_approval(&id);
             emit(&app, "chat-pending-changed", json!({"session":session,"pending":broker.snapshot(session)}));
             allowed && !ctx.is_cancelled()
@@ -1118,11 +1119,13 @@ pub fn chat_session_snapshot(app: tauri::AppHandle, window: tauri::WebviewWindow
                 if run_history::latest_run_id(&dirs.runs().join(&session_id), &session_id).ok().flatten() != run_id { continue; }
                 let mut snapshot=run_history::snapshot_projection(messages, run_id, sequence, events, running);
                 snapshot["pending"]=app.state::<ChatState>().broker.snapshot(&session_id);
+                snapshot["outcomes"]=json!(task_outcome::history(&dirs.outcomes(), &dirs.runs().join(&session_id), &session_id));
                 if let Some(run)=snapshot["runId"].as_str(){if let Ok(Some(outcome))=task_outcome::load(&dirs.outcomes(),&session_id,run){snapshot["outcome"]=json!(outcome);}}
                 return Ok(snapshot);
             }
             Err(_) => return Ok(json!({"messages":messages,"events":[],"running":running,"ready":true,
-                "pending":app.state::<ChatState>().broker.snapshot(&session_id),"warning":"运行日志无法读取，已加载正常会话历史。"})),
+                "pending":app.state::<ChatState>().broker.snapshot(&session_id),
+                "outcomes":task_outcome::history(&dirs.outcomes(), &dirs.runs().join(&session_id), &session_id),"warning":"运行日志无法读取，已加载正常会话历史。"})),
         }
     }
     Err("会话正在切换运行，请稍后重试。".into())
@@ -2043,19 +2046,14 @@ pub fn chat_answer_question(app: tauri::AppHandle, window: tauri::WebviewWindow,
     let state=app.state::<ChatState>();
     if let Some(saved)=state.broker.recovered_question(&id){
         let session=saved["session"].as_str().ok_or("恢复的问题缺少会话")?;
-        let run=saved["runId"].as_str().ok_or("恢复的问题缺少执行记录")?;
-        if lock(&state.runs).contains_key(session){return Err("请先停止当前回答再恢复问题".into());}
-        let dirs=Dirs::of(&app)?;
-        let inspection=JsonlRunLog::new(dirs.runs().join(session)).inspect(run).map_err(|e|e.to_string())?;
-        if inspection.incomplete_tools.iter().any(|tool|tool.dispatched&&tool.name!="ask_user"){
-            return Err("上次还有结果不明的操作，请先检查实际结果后再继续".into());
-        }
-        if let Some(answer)=answer {
-            if inspection.terminal || !inspection.incomplete_tools.iter().any(|tool|tool.dispatched&&tool.name=="ask_user") {
-                return Err("这个问题已结束，请关闭后在会话中继续".into());
-            }
-            let text=format!("上次执行在等待我回答时中断。问题：{}\n我的回答：{}\n请检查现场后继续；不要重放已执行或结果不明的操作。",saved["question"].as_str().unwrap_or(""),answer);
-            goals::resume_answer(&app,session,text)?;
+        // Dismissal must also work for old/incomplete checkpoints and finished runs.
+        if let Some(answer) = answer {
+            if lock(&state.runs).contains_key(session) { return Err("请先停止当前回答再恢复问题".into()); }
+            let run = saved["runId"].as_str().ok_or("旧版请求缺少执行记录，请跳过此卡片后在会话中继续")?;
+            let dirs = Dirs::of(&app)?;
+            let inspection = JsonlRunLog::new(dirs.runs().join(session)).inspect(run).map_err(|e| e.to_string())?;
+            let text = broker::recovery_text(&saved, &answer, &inspection)?;
+            goals::resume_answer(&app, session, text)?;
         }
         state.broker.finish_recovered(&id)?;
         emit(&app,"chat-pending-changed",json!({"session":session,"pending":state.broker.snapshot(session)}));
