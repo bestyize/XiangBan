@@ -160,7 +160,7 @@ fn normalized_config(value: &Value) -> Result<Value, String> {
             .get("authMode")
             .and_then(Value::as_str)
             .unwrap_or("auto");
-        if !matches!(mode, "auto" | "oauth" | "token" | "none") {
+        if !matches!(mode, "auto" | "oauth" | "device" | "token" | "none") {
             return Err("未知的认证方式".into());
         }
         let client_id = obj.get("clientId").and_then(Value::as_str).unwrap_or("");
@@ -176,9 +176,11 @@ fn normalized_config(value: &Value) -> Result<Value, String> {
         if session.is_some_and(|s| !oauth::valid_session(s)) {
             return Err("授权会话无效".into());
         }
-        return Ok(
-            json!({"url":url,"headers":string_map(obj.get("headers"))?,"authMode":mode,"clientId":client_id,"scope":scope,"oauthSession":session,"transport":if transport == "sse" {"sse"} else {"streamable-http"}}),
-        );
+        let mut normalized = json!({"url":url,"headers":string_map(obj.get("headers"))?,"authMode":mode,"clientId":client_id,"scope":scope,"oauthSession":session,"transport":if transport == "sse" {"sse"} else {"streamable-http"}});
+        if let Some(dev) = obj.get("deviceAuth") {
+            normalized["deviceAuth"] = dev.clone();
+        }
+        return Ok(normalized);
     }
     let command = obj
         .get("command")

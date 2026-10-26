@@ -12,6 +12,7 @@ pub(super) struct Pending {
     pub id: String,
     pub cancel: AtomicBool,
     url: String,
+    user_code: Option<String>,
     session_id: String,
     created: Instant,
     status: Mutex<Value>,
@@ -43,7 +44,7 @@ impl ConnectorManager {
             .as_object()
             .is_some_and(|m| m.keys().any(|k| k.eq_ignore_ascii_case("authorization")));
         if effective["url"].as_str().is_none()
-            || !matches!(mode, "auto" | "oauth")
+            || !matches!(mode, "auto" | "oauth" | "device")
             || (mode == "auto" && explicit_key)
             || !(error.starts_with("MCP HTTP 401") || error.contains(oauth::AUTH_REQUIRED))
         {
@@ -56,6 +57,7 @@ impl ConnectorManager {
             id: id.into(),
             cancel: AtomicBool::new(false),
             url: flow.url.clone(),
+            user_code: flow.user_code.clone(),
             session_id: flow.session_id.clone(),
             created: Instant::now(),
             status: Mutex::new(json!({"status":"authorizing"})),
@@ -130,9 +132,11 @@ impl ConnectorManager {
                 pending.cancel.store(true, Ordering::SeqCst);
                 "无法启动网页授权"
             })?;
-        Ok(
-            json!({"status":"authorization_required","flowId":flow_id,"authorizationUrl":pending.url}),
-        )
+        let mut started = json!({"status":"authorization_required","flowId":flow_id,"authorizationUrl":pending.url});
+        if let Some(code) = &pending.user_code {
+            started["userCode"] = json!(code);
+        }
+        Ok(started)
     }
     pub fn reconnect_with_authorization(self: &Arc<Self>, id: &str) -> Result<Value, String> {
         let record = self

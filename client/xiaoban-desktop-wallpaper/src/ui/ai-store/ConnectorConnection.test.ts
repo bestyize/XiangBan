@@ -64,6 +64,17 @@ describe('connection and authorization in place', () => {
     expect(wrapper.text()).toContain('已连接，可在任务中使用');
     expect(wrapper.findComponent(ConnectorConnection).emitted('connected')).toHaveLength(1);
   });
+  it('displays user code for device authorization flow and copies on demand', async () => {
+    const deviceFlow = { status: 'authorization_required', flowId: 'f-device', authorizationUrl: 'https://github.com/login/device', userCode: 'ABCD-1234' };
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    vi.mocked(invoke).mockResolvedValueOnce(deviceFlow);
+    await setup({}, true);
+    expect(wrapper.get('[data-testid=connector-user-code]').text()).toBe('ABCD-1234');
+    expect(wrapper.text()).toContain('请输入下方验证码');
+    await click('复制验证码');
+    expect(writeText).toHaveBeenCalledWith('ABCD-1234');
+  });
   it('keeps browser-open failure actionable without abandoning authorization', async () => {
     vi.mocked(invoke).mockResolvedValueOnce(flow).mockRejectedValueOnce('浏览器不可用');
     await setup({}, true); expect(wrapper.text()).toContain('无法打开授权页面');

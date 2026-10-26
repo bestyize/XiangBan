@@ -18,7 +18,7 @@ interface Pack { slug: string; name: string; description: string; entrySkill: st
 interface PackReview extends Pack { content: string; skills: SkillReview[] }
 interface Connection { id: string; name: string; connected: boolean; enabled: boolean; toolCount: number; error?: string }
 interface ConnectorDetail { readme: string; configs: { name: string; config: Record<string, unknown> }[]; connector?: MarketConnector; version?: string }
-interface ConnectionResult { status?:string; connected?:boolean; flowId?:string; authorizationUrl?:string }
+interface ConnectionResult { status?:string; connected?:boolean; flowId?:string; authorizationUrl?:string; userCode?:string }
 const props = withDefaults(defineProps<{ kind: 'experts' | 'connectors'; query: string; category: string; store: ControlStore; installedOnly?: boolean; source?: 'market' | 'hub'; updates?: Record<string, UpdateInfo> }>(), { installedOnly: false, source: 'hub' });
 const emit = defineEmits<{ unavailable: [message: string]; installed: []; changed: []; center: [plugin: string] }>();
 const fromMarket = () => props.source === 'market' && props.kind === 'connectors';
@@ -40,10 +40,15 @@ const selected = ref<Entry | null>(null), packReview = ref<PackReview | null>(nu
 const marketPlugin = computed(() => fromMarket() ? connectorDetail.value?.connector || selected.value?.connector : undefined);
 const detailLoading = ref(false), detailError = ref(''), confirmed = ref(false), busy = ref(false), removing = ref(false);
 const configText = ref(''), configIndex = ref(0);
-const configValid=ref(false), authorization=ref<{flowId:string;authorizationUrl:string}|null>(null);
+const configValid=ref(false), authorization=ref<{flowId:string;authorizationUrl:string;userCode?:string}|null>(null);
+const codeCopied=ref(false);
 let authTimer:ReturnType<typeof setTimeout>|undefined;
 let pollingFlow:string|undefined;
 watch(configText,()=>{confirmed.value=false;});
+async function copyUserCode(){
+  if(!authorization.value?.userCode)return;
+  try{await navigator.clipboard.writeText(authorization.value.userCode);codeCopied.value=true;setTimeout(()=>{codeCopied.value=false;},2000);}catch{}
+}
 function abandonAuthorization(){clearTimeout(authTimer);const flow=authorization.value;authorization.value=null;if(flow)void invoke('ai_store_connector_auth_cancel',{flowId:flow.flowId}).catch(()=>{});}
 const brokenIcons = ref<Record<string, boolean>>({});
 const icon = (entry: Entry) => !brokenIcons.value[entry.slug] && entry.iconUrl?.startsWith('https://') ? entry.iconUrl : null;
@@ -178,7 +183,7 @@ async function pollAuthorization(){
 async function handleConnectionResult(result:ConnectionResult|undefined,context:number){
   if(result?.status==='authorization_required'&&result.flowId&&result.authorizationUrl){
     if(context!==detailId){await invoke('ai_store_connector_auth_cancel',{flowId:result.flowId});return;}
-    authorization.value={flowId:result.flowId,authorizationUrl:result.authorizationUrl};
+    authorization.value={flowId:result.flowId,authorizationUrl:result.authorizationUrl,userCode:result.userCode};
     configText.value='';await openAuthorizationPage();authTimer=setTimeout(()=>void pollAuthorization(),1000);return;
   }
   if(result?.status!=='connected'&&result?.connected!==true)throw new Error('连接未返回成功状态，请重试。');
@@ -298,7 +303,18 @@ defineExpose({ refresh, refreshLocal, installedCount, open });
           <MarketConnectorDetail v-if="connectorDetail && !detailLoading" :key="selected.slug + (selected.version || '')" :connector="marketPlugin" :slug="selected.slug" :namespace="selected.namespace" :version="connectorDetail.version" :installed="!!plugin(selected.slug)" :update-version="pluginUpdate(selected)" :local-error="pluginError || (!pluginReady ? '正在读取已安装连接器…' : '')" @busy="busy = $event" @installed="pluginInstalled" @changed="pluginConnectionChanged" @center="goToCenter" />
         </template>
         <template v-else>
-          <div v-if="authorization" class="authorization-wait" role="status"><h4>等待网页授权</h4><p>请在服务商页面登录并确认权限。完成后会自动检测连接结果。</p><div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="cancelAuthorization">取消授权</button><button class="store-secondary" :disabled="busy" @click="pollAuthorization">检查结果</button><button class="store-primary" :disabled="busy" @click="openAuthorizationPage">重新打开授权页</button></div></div>
+          <div v-if="authorization" class="authorization-wait" role="status">
+            <h4>等待网页授权</h4>
+            <div v-if="authorization.userCode" class="device-code-inline">
+              <p>请在已打开的网页中输入下方验证码：</p>
+              <div class="code-row">
+                <strong class="user-code">{{ authorization.userCode }}</strong>
+                <button class="store-secondary" type="button" @click="copyUserCode">{{ codeCopied ? '已复制' : '复制验证码' }}</button>
+              </div>
+            </div>
+            <p v-else>请在服务商页面登录并确认权限。完成后会自动检测连接结果。</p>
+            <div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="cancelAuthorization">取消授权</button><button class="store-secondary" :disabled="busy" @click="pollAuthorization">检查结果</button><button class="store-primary" :disabled="busy" @click="openAuthorizationPage">重新打开授权页</button></div>
+          </div>
           <template v-else>
           <div v-if="connection(selected.slug)" class="connection-summary"><p>{{ connection(selected.slug)?.connected ? '已连接，发现 ' + connection(selected.slug)?.toolCount + ' 个工具。' : '已保存配置，可以重新连接。' }}</p><div class="dialog-actions"><button v-if="connection(selected.slug)?.connected" class="store-secondary" :disabled="busy" @click="connectionAction('disconnect')">断开连接</button><button v-else class="store-secondary" :disabled="busy" @click="connectionAction('reconnect')">使用已保存配置重连</button></div></div>
           <template v-if="connectorDetail">
@@ -327,6 +343,9 @@ defineExpose({ refresh, refreshLocal, installedCount, open });
 .pagination button{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:8px;background:var(--ui-control);color:var(--ui-text-primary);cursor:pointer}
 .pagination button:disabled{opacity:.45;cursor:not-allowed}
 .connection-status{display:inline-flex;align-items:center;margin-left:4px;font-size:12px;color:var(--ui-text-secondary);white-space:nowrap}
+.device-code-inline{background:var(--ui-control);padding:10px 12px;border-radius:8px;margin:8px 0}
+.code-row{display:flex;align-items:center;gap:10px;margin-top:6px}
+.user-code{font-size:18px;letter-spacing:2px;font-family:monospace;background:rgba(0,0,0,0.15);padding:4px 10px;border-radius:6px}
 .connection-status.xb-ok{color:var(--ui-success-text)}
 .store-empty{min-height:200px}
 </style>

@@ -7,7 +7,8 @@ import { connectorStatus, type ConnectorAuthorization, type InstalledConnector }
 const props = defineProps<{ connector: InstalledConnector; autoConnect?: boolean }>();
 const emit = defineEmits<{ updated: [item: InstalledConnector]; connected: [item: InstalledConnector]; busy: [value: boolean] }>();
 const busy = ref(false), error = ref('');
-const authorization = ref<{ flowId: string; authorizationUrl: string } | null>(null);
+const authorization = ref<{ flowId: string; authorizationUrl: string; userCode?: string } | null>(null);
+const copied = ref(false);
 let alive = true, polling = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 const local = computed(() => props.connector.transport === 'stdio');
@@ -25,6 +26,14 @@ async function refresh(notifyConnected = false) {
   if (!item) throw new Error('连接器已被移除，请重新安装。');
   update(item, notifyConnected);
   return item;
+}
+async function copyUserCode() {
+  if (!authorization.value?.userCode) return;
+  try {
+    await navigator.clipboard.writeText(authorization.value.userCode);
+    copied.value = true;
+    setTimeout(() => { copied.value = false; }, 2000);
+  } catch { /* Clipboard unavailable */ }
 }
 async function openAuthorizationPage() {
   if (!authorization.value) return;
@@ -63,7 +72,7 @@ async function connect(values: Record<string, string> = {}) {
       return;
     }
     if (result.status === 'authorization_required' && 'flowId' in result && result.flowId && result.authorizationUrl) {
-      authorization.value = { flowId: result.flowId, authorizationUrl: result.authorizationUrl };
+      authorization.value = { flowId: result.flowId, authorizationUrl: result.authorizationUrl, userCode: result.userCode };
       await openAuthorizationPage();
       if (alive) timer = setTimeout(() => void pollAuthorization(), 1000);
     } else if ('id' in result) {
@@ -106,7 +115,14 @@ onBeforeUnmount(() => {
     <p v-if="connector.unsupported" role="alert">暂不支持：{{ connector.unsupported }}</p>
     <p v-if="error || connector.error" role="alert">{{ error || connector.error }}</p>
     <template v-if="authorization">
-      <p role="status">请在浏览器完成授权，完成后会自动更新连接状态。</p>
+      <div v-if="authorization.userCode" class="device-code-box" role="status">
+        <p>已在浏览器打开授权页，请输入下方验证码完成授权：</p>
+        <div class="code-row">
+          <strong class="user-code" data-testid="connector-user-code">{{ authorization.userCode }}</strong>
+          <button class="xb-btn" type="button" @click="copyUserCode">{{ copied ? '已复制' : '复制验证码' }}</button>
+        </div>
+      </div>
+      <p v-else role="status">请在浏览器完成授权，完成后会自动更新连接状态。</p>
       <button class="xb-btn" :disabled="busy" @click="openAuthorizationPage">打开授权页面</button>
       <button class="xb-btn" :disabled="busy" @click="pollAuthorization">检查授权状态</button>
       <button class="xb-btn" :disabled="busy" @click="cancelAuthorization">取消授权</button>
@@ -129,4 +145,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .connector-connection{margin:12px 0}.connector-connection p{font-size:13px;line-height:1.7;overflow-wrap:anywhere}.connector-connection button{margin:4px 6px 4px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;background:var(--ui-control);padding:10px;border-radius:8px}
+.device-code-box{background:var(--ui-control);padding:10px 12px;border-radius:8px;margin-bottom:8px}
+.code-row{display:flex;align-items:center;gap:10px;margin:6px 0}
+.user-code{font-size:18px;letter-spacing:2px;font-family:monospace;background:rgba(0,0,0,0.15);padding:4px 10px;border-radius:6px}
 </style>

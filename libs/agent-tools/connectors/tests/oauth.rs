@@ -28,6 +28,7 @@ struct State {
     refuse_refresh: bool,
     legacy: bool,
     post_auth: bool,
+    device_polls: usize,
     stream: Option<TcpStream>,
 }
 struct Server {
@@ -169,6 +170,77 @@ fn handle(mut stream: TcpStream, base: &str, state: &Mutex<State>) {
             json!({"issuer":base,"authorization_endpoint":format!("{base}/login"),"token_endpoint":format!("{base}/token"),"registration_endpoint":format!("{base}/register"),"code_challenge_methods_supported":["S256"]}),
             "",
         ),
+        ("POST", "/device/code") => {
+            send(
+                &mut stream,
+                "200 OK",
+                json!({
+                    "device_code": "dev-code-1234",
+                    "user_code": "XB-7788",
+                    "verification_uri": format!("{base}/verify"),
+                    "expires_in": 30,
+                    "interval": 1
+                }),
+                "",
+            );
+        }
+        ("POST", "/device/token") => {
+            let body = Url::parse(&format!(
+                "https://form.invalid/?{}",
+                String::from_utf8(bytes).unwrap()
+            ))
+            .unwrap();
+            let p = body
+                .query_pairs()
+                .collect::<std::collections::HashMap<_, _>>();
+            state.token_calls += 1;
+            if p.get("grant_type").map(|s| s.as_ref())
+                == Some("urn:ietf:params:oauth:grant-type:device_code")
+            {
+                assert_eq!(p["device_code"], "dev-code-1234");
+                if state.device_polls == 0 {
+                    state.device_polls += 1;
+                    send(
+                        &mut stream,
+                        "200 OK",
+                        json!({"error": "authorization_pending"}),
+                        "",
+                    );
+                } else {
+                    send(
+                        &mut stream,
+                        "200 OK",
+                        json!({
+                            "access_token": "device-access-1",
+                            "refresh_token": "device-refresh-1",
+                            "token_type": "Bearer",
+                            "expires_in": if state.short_lived { 1 } else { 3600 }
+                        }),
+                        "",
+                    );
+                }
+            } else if p.get("grant_type").map(|s| s.as_ref()) == Some("refresh_token") {
+                state.refreshes += 1;
+                send(
+                    &mut stream,
+                    "200 OK",
+                    json!({
+                        "access_token": "device-access-2",
+                        "refresh_token": "device-refresh-2",
+                        "token_type": "Bearer",
+                        "expires_in": 3600
+                    }),
+                    "",
+                );
+            } else {
+                send(
+                    &mut stream,
+                    "400 Bad Request",
+                    json!({"error": "unsupported_grant_type"}),
+                    "",
+                );
+            }
+        }
         ("POST", "/register") => {
             let body: Value = serde_json::from_slice(&bytes).unwrap();
             assert_eq!(body["token_endpoint_auth_method"], "none");
@@ -236,12 +308,18 @@ fn handle(mut stream: TcpStream, base: &str, state: &Mutex<State>) {
         ("POST", "/mcp" | "/messages") => {
             assert_eq!(path == "/messages", state.legacy);
             if auth.is_empty()
-                || (state.expire && (auth == "Bearer access-secret-1" || state.refuse_refresh))
+                || (state.expire
+                    && (auth == "Bearer access-secret-1"
+                        || auth == "Bearer device-access-1"
+                        || state.refuse_refresh))
             {
                 send(&mut stream,"401 Unauthorized",json!({}),&format!("WWW-Authenticate: Bearer resource_metadata=\"{base}/resource\", scope=\"read\"\r\n"));
                 return;
             }
-            assert!(auth.starts_with("Bearer access-secret-"));
+            assert!(
+                auth.starts_with("Bearer access-secret-")
+                    || auth.starts_with("Bearer device-access-")
+            );
             let body: Value = serde_json::from_slice(&bytes).unwrap();
             let result = match body["method"].as_str().unwrap() {
                 "initialize" => {
@@ -528,6 +606,58 @@ fn plugin_oauth_encrypts_rotates_restores_and_unbinds_credentials() {
     restored.unbind_plugin(&id).unwrap();
     assert!(restored.tools().is_empty());
     assert_eq!(fs::read_dir(root.join("vault")).unwrap().map(Result::unwrap).filter(|e| e.path().extension().is_some_and(|s| s == "json")).count(), 0);
+    restored.shutdown();
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn device_authorization_polls_returns_code_refreshes_and_restores() {
+    let server = Server::new();
+    let root = root();
+    let manager = Arc::new(ConnectorManager::new(root.clone(), root.clone()).unwrap());
+    let config = json!({
+        "url": format!("{}/mcp", server.base),
+        "authMode": "device",
+        "deviceAuth": {
+            "codeUrl": format!("{}/device/code", server.base),
+            "tokenUrl": format!("{}/device/token", server.base),
+            "clientId": "test-device-client",
+            "scope": "repo"
+        }
+    });
+    let flow = manager
+        .begin_connect("dev-flow-test", "Device Flow", config, true)
+        .unwrap();
+    assert_eq!(flow["status"], "authorization_required");
+    assert_eq!(flow["userCode"], "XB-7788");
+    assert_eq!(flow["authorizationUrl"], format!("{}/verify", server.base));
+    let status = finish(&manager, &flow);
+    assert_eq!(status["status"], "connected", "{status}");
+    let tools = manager.tools();
+    assert_eq!(tools.len(), 1);
+    assert_eq!(
+        tools[0]
+            .execute(json!({}), &ToolCtx::detached("device-first"))
+            .unwrap(),
+        "authorized result"
+    );
+    server.state.lock().unwrap().expire = true;
+    assert_eq!(
+        tools[0]
+            .execute(json!({}), &ToolCtx::detached("device-refresh"))
+            .unwrap(),
+        "authorized result"
+    );
+    assert_eq!(server.state.lock().unwrap().refreshes, 1);
+    manager.shutdown();
+    let restored = ConnectorManager::new(root.clone(), root.clone()).unwrap();
+    assert_eq!(restored.tools().len(), 1);
+    assert_eq!(
+        restored.tools()[0]
+            .execute(json!({}), &ToolCtx::detached("device-restored"))
+            .unwrap(),
+        "authorized result"
+    );
     restored.shutdown();
     fs::remove_dir_all(root).unwrap();
 }

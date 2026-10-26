@@ -53,6 +53,7 @@ export interface ConnectorAuthorization {
   connected?: boolean;
   flowId?: string;
   authorizationUrl?: string;
+  userCode?: string;
 }
 export const connectorStatus: Record<InstalledConnector['status'], string> = {
   disconnected: '未连接', connecting: '连接中', connected: '已连接', needs_auth: '需要授权', error: '连接失败', disabled: '已停用',

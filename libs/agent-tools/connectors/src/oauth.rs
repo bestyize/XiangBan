@@ -141,6 +141,8 @@ fn form(client: &Client, url: &str, pairs: &[(&str, &str)]) -> Result<Value, Str
     let response = client
         .post(url)
         .header("Content-Type", "application/x-www-form-urlencoded")
+        // GitHub answers token requests with a urlencoded body unless JSON is requested.
+        .header("Accept", "application/json")
         .body(encoded)
         .send()
         .map_err(|_| "授权请求失败或超时")?;
@@ -212,6 +214,10 @@ fn token_values(
     value: &Value,
     old_refresh: Option<String>,
 ) -> Result<(String, Option<String>, u64), String> {
+    // GitHub reports a rejected grant as HTTP 200 with an `error` field.
+    if value["error"].is_string() {
+        return Err(format!("{AUTH_REQUIRED}：登录已失效或授权请求被拒绝"));
+    }
     if !value["token_type"]
         .as_str()
         .is_some_and(|s| s.eq_ignore_ascii_case("bearer"))
@@ -328,16 +334,16 @@ impl HttpAuthorization for Session {
         let mut data = self.data.lock().unwrap_or_else(|e| e.into_inner());
         if refresh || data.expires_at <= now() + 30 {
             let token = data.refresh_token.as_deref().ok_or(AUTH_REQUIRED)?;
-            let value = form(
-                &self.client,
-                &data.token_endpoint,
-                &[
-                    ("grant_type", "refresh_token"),
-                    ("refresh_token", token),
-                    ("client_id", &data.client_id),
-                    ("resource", &data.resource),
-                ],
-            )?;
+            let mut pairs = vec![
+                ("grant_type", "refresh_token"),
+                ("refresh_token", token),
+                ("client_id", data.client_id.as_str()),
+            ];
+            // Device-flow services (GitHub) have no RFC 8707 resource binding.
+            if !data.resource.is_empty() {
+                pairs.push(("resource", data.resource.as_str()));
+            }
+            let value = form(&self.client, &data.token_endpoint, &pairs)?;
             let (access, refresh, expires) = token_values(&value, data.refresh_token.clone())?;
             let mut next = data.clone();
             next.access_token = access;
@@ -355,10 +361,68 @@ impl HttpAuthorization for Session {
         self.data.try_lock().ok().map(|v| v.access_token.clone())
     }
 }
+/// RFC 8628 device authorization for services whose OAuth has no discovery or dynamic registration.
+pub(crate) struct DeviceSpec {
+    pub code_url: String,
+    pub token_url: String,
+    pub client_id: String,
+    pub scope: String,
+}
+struct Device {
+    code: String,
+    interval: u64,
+    wait: Duration,
+}
+/// The client ID is public (device flow needs no secret); GitHub OAuth App "小伴" with Device Flow enabled.
+const GITHUB_DEVICE_CLIENT_ID: &str = "Ov23liVklr8MnYx5S5wI";
+const GITHUB_DEVICE_SCOPE: &str = "repo read:org read:user";
+/// Hosts known to need the device flow. A configured `clientId` replaces the built-in one.
+pub(crate) fn device_spec(config: &Value, target: &Url) -> Option<DeviceSpec> {
+    let custom = config.get("deviceAuth").and_then(Value::as_object);
+    let is_github = target.scheme() == "https" && target.host_str() == Some("api.githubcopilot.com");
+    let is_device_mode = config["authMode"] == "device";
+    if !is_github && !is_device_mode && custom.is_none() {
+        return None;
+    }
+    let text = |key: &str| config[key].as_str().filter(|s| !s.trim().is_empty());
+    let (code_url, token_url, default_client, default_scope) = if let Some(m) = custom {
+        (
+            m.get("codeUrl").and_then(Value::as_str).unwrap_or(""),
+            m.get("tokenUrl").and_then(Value::as_str).unwrap_or(""),
+            m.get("clientId").and_then(Value::as_str).unwrap_or(GITHUB_DEVICE_CLIENT_ID),
+            m.get("scope").and_then(Value::as_str).unwrap_or(GITHUB_DEVICE_SCOPE),
+        )
+    } else {
+        (
+            "https://github.com/login/device/code",
+            "https://github.com/login/oauth/access_token",
+            GITHUB_DEVICE_CLIENT_ID,
+            GITHUB_DEVICE_SCOPE,
+        )
+    };
+    if code_url.is_empty() || token_url.is_empty() {
+        return None;
+    }
+    Some(DeviceSpec {
+        code_url: code_url.into(),
+        token_url: token_url.into(),
+        client_id: text("clientId").unwrap_or(default_client).into(),
+        scope: text("scope").unwrap_or(default_scope).into(),
+    })
+}
+fn bounded(value: &Value, max: usize) -> Option<String> {
+    value
+        .as_str()
+        .filter(|s| !s.is_empty() && s.len() <= max && !s.chars().any(char::is_control))
+        .map(str::to_string)
+}
 pub struct Flow {
     pub url: String,
     pub session_id: String,
-    listener: TcpListener,
+    /// Shown to the user to type into the verification page; only set for device flows.
+    pub user_code: Option<String>,
+    listener: Option<TcpListener>,
+    device: Option<Device>,
     redirect: String,
     state: String,
     verifier: String,
@@ -368,6 +432,107 @@ pub struct Flow {
     pub encrypt_credentials: bool,
 }
 impl Flow {
+    pub(crate) fn begin_device(
+        server: &str,
+        spec: DeviceSpec,
+        root: &Path,
+        id: &str,
+        local: bool,
+    ) -> Result<Self, String> {
+        let code_url = endpoint(&spec.code_url, local)?;
+        let token_url = endpoint(&spec.token_url, local)?;
+        let client = client()?;
+        let grant = form(
+            &client,
+            code_url.as_str(),
+            &[("client_id", spec.client_id.as_str()), ("scope", spec.scope.as_str())],
+        )?;
+        if grant["error"].is_string() {
+            return Err("授权服务未开放设备授权，请联系服务商或改用密钥连接".into());
+        }
+        let code = bounded(&grant["device_code"], 1024).ok_or("设备授权响应无效")?;
+        let user_code = bounded(&grant["user_code"], 64).ok_or("设备授权响应无效")?;
+        let verification = endpoint(grant["verification_uri"].as_str().ok_or("设备授权响应无效")?, local)?;
+        if verification.origin() != code_url.origin() {
+            return Err("设备授权页面与授权服务不一致".into());
+        }
+        let session_id = random()?;
+        let path = token_path(root, id, &session_id)?;
+        Ok(Self {
+            url: verification.to_string(),
+            session_id,
+            user_code: Some(user_code),
+            listener: None,
+            device: Some(Device {
+                code,
+                interval: grant["interval"].as_u64().unwrap_or(5).clamp(1, 30),
+                wait: Duration::from_secs(grant["expires_in"].as_u64().unwrap_or(300).clamp(30, 300)),
+            }),
+            redirect: String::new(),
+            state: String::new(),
+            verifier: String::new(),
+            client,
+            credentials: Credentials {
+                server: server.into(),
+                resource: String::new(),
+                issuer: code_url.origin().ascii_serialization(),
+                token_endpoint: token_url.to_string(),
+                client_id: spec.client_id,
+                access_token: String::new(),
+                refresh_token: None,
+                expires_at: 0,
+                scope: spec.scope,
+            },
+            path,
+            encrypt_credentials: false,
+        })
+    }
+    fn complete_device(mut self, cancel: &AtomicBool) -> Result<Arc<Session>, String> {
+        let device = self.device.take().ok_or("设备授权会话无效")?;
+        let start = Instant::now();
+        let mut interval = device.interval;
+        let mut next = Instant::now() + Duration::from_secs(interval);
+        let value = loop {
+            if cancel.load(Ordering::SeqCst) {
+                return Err("授权已取消".into());
+            }
+            if start.elapsed() > device.wait {
+                return Err("授权等待超时，请重新连接".into());
+            }
+            if Instant::now() < next {
+                std::thread::sleep(Duration::from_millis(75));
+                continue;
+            }
+            let value = form(
+                &self.client,
+                &self.credentials.token_endpoint,
+                &[
+                    ("client_id", self.credentials.client_id.as_str()),
+                    ("device_code", device.code.as_str()),
+                    ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+                ],
+            )?;
+            match value["error"].as_str() {
+                None => break value,
+                Some("authorization_pending") => {}
+                Some("slow_down") => interval = (interval + 5).min(60),
+                Some("access_denied") => return Err("用户未完成授权，请重新连接".into()),
+                Some("expired_token") => return Err("授权等待超时，请重新连接".into()),
+                Some(_) => return Err("授权失败，请重新连接".into()),
+            }
+            next = Instant::now() + Duration::from_secs(interval);
+        };
+        let (access, refresh, expires) = token_values(&value, None)?;
+        let mut data = self.credentials;
+        data.access_token = access;
+        data.refresh_token = refresh;
+        data.expires_at = expires;
+        if cancel.load(Ordering::SeqCst) {
+            return Err("授权已取消".into());
+        }
+        write_credentials(&self.path, &data, self.encrypt_credentials)?;
+        Session::load(self.path, &data.server)
+    }
     pub fn begin(config: &Value, root: &Path, id: &str) -> Result<Self, String> {
         let server = config["url"].as_str().ok_or("网页授权仅适用于远程 MCP")?;
         let target = Url::parse(server).map_err(|_| "服务地址无效")?;
@@ -375,6 +540,9 @@ impl Flow {
         endpoint(server, local)?;
         if target.query().is_some() {
             return Err("网页授权的服务地址不可携带查询凭据，请使用不含密钥的 MCP 地址".into());
+        }
+        if let Some(spec) = device_spec(config, &target) {
+            return Self::begin_device(server, spec, root, id, local);
         }
         let client = client()?;
         let legacy = config["transport"] == "sse" || config["type"] == "sse";
@@ -579,7 +747,9 @@ impl Flow {
         Ok(Self {
             url: url.to_string(),
             session_id,
-            listener,
+            user_code: None,
+            listener: Some(listener),
+            device: None,
             redirect,
             state,
             verifier,
@@ -600,6 +770,10 @@ impl Flow {
         })
     }
     pub fn complete(self, cancel: &AtomicBool) -> Result<Arc<Session>, String> {
+        if self.device.is_some() {
+            return self.complete_device(cancel);
+        }
+        let listener = self.listener.as_ref().ok_or("本机回调不可用")?;
         let start = Instant::now();
         let code = loop {
             if cancel.load(Ordering::SeqCst) {
@@ -608,7 +782,7 @@ impl Flow {
             if start.elapsed() > Duration::from_secs(300) {
                 return Err("授权等待超时，请重新连接".into());
             }
-            match self.listener.accept() {
+            match listener.accept() {
                 Ok((mut stream, address)) => {
                     if !address.ip().is_loopback() {
                         continue;
