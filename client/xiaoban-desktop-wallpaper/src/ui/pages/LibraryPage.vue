@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NButton, NInput, NModal, NSelect } from 'naive-ui';
-import { FolderDown, Plus, Search, Download, X } from 'lucide-vue-next';
+import { FolderDown, Plus, Search, Download, FileText, X } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { createLibraryStore, folderPath, folderTree, searchText, type LibraryDoc, type LibrarySaved } from '../library/library-store.ts';
 import LibraryDocs from '../library/LibraryDocs.vue';
+import DesignWorkbench from '../design/DesignWorkbench.vue';
+import type { Payload } from '../design/model.ts';
 import LibraryCloud from '../library/LibraryCloud.vue';
 import LibrarySavedTab from '../library/LibrarySaved.vue';
 import LibraryMemory from '../library/LibraryMemory.vue';
@@ -25,7 +27,20 @@ const TAB_KEY = 'xiaoban.library-tab';
 const saved = (() => { try { return localStorage.getItem(TAB_KEY) as Tab | null; } catch { return null; } })();
 const tab = ref<Tab>(saved && ['docs', 'cloud', 'saved', 'memory'].includes(saved) ? saved : 'docs');
 function pick(next: Tab) { tab.value = next; try { localStorage.setItem(TAB_KEY, next); } catch { /* only a convenience */ } }
-const query = ref('');
+const query = ref(''), designId = ref(''), designImporting = ref(false);
+async function importDesign() {
+  if (designImporting.value) return;
+  designImporting.value = true;
+  try { const p = await invoke<Payload | null>('design_import', { session: props.store.chat.currentId ?? '' }); if (p) { await library.refresh(); designId.value = p.project.id; } }
+  catch (e) { notify(e, 'error'); } finally { designImporting.value = false; }
+}
+async function designRequest(message: string, session: string) {
+  if (session && props.store.chat.sessions.some(s => s.id === session)) {
+    await props.store.chat.select(session);
+    if (props.store.chat.current()?.running) { notify('修改意见已保存在画布中，请在当前任务结束后继续', 'info'); return; }
+    designId.value = ''; props.store.navigate('chat'); await props.store.chat.send(message);
+  } else { designId.value = ''; await startTask(message); }
+}
 
 /** Each tab shows how many items match the search, so a search finds things in the other tabs too. */
 const counts = computed(() => {
@@ -101,6 +116,7 @@ async function startTask(draft: string, attachments: NonNullable<ControlStore['c
   props.store.navigate('new-task');
 }
 async function askWith(doc: LibraryDoc) {
+  if (doc.designId) { designId.value = doc.designId; return; }
   const attachment = await library.attachment(doc.id);
   if (attachment) await startTask(`请参考资料库里的「${doc.name}」：`, [attachment]);
 }
@@ -127,6 +143,7 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
           <button v-if="query" type="button" class="xb-icon-btn is-sm" aria-label="清空搜索" title="清空搜索" @click="query = ''; searchBox?.focus()"><X :size="12" /></button>
         </label>
         <template v-if="tab === 'docs'">
+          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || designImporting" aria-label="导入设计稿" title="导入设计稿（ZIP / HTML）" @click="importDesign"><FileText :size="17" /></button>
           <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="导入文件夹" title="导入文件夹" data-testid="library-import-folder" @click="docsTab?.importFrom(true)"><FolderDown :size="17" /></button>
           <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="导入文档" title="导入文档" data-testid="library-import" @click="docsTab?.importFrom(false)"><Download :size="17" /></button>
           <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || library.busy" aria-label="新建文档" title="新建文档" data-testid="library-create-doc" @click="openCreate('doc')"><Plus :size="17" /></button>
@@ -137,7 +154,7 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
       </div>
     </header>
     <div :id="`library-panel-${tab}`" class="library-body" role="tabpanel" :aria-labelledby="`library-tab-${tab}`">
-      <LibraryDocs v-if="tab === 'docs'" ref="docsTab" :library="library" :query="query" :desktop="store.desktop" @ask="askWith" @notify="notify" />
+      <LibraryDocs v-if="tab === 'docs'" ref="docsTab" :library="library" :query="query" :desktop="store.desktop" @ask="askWith" @design="id => designId = id" @notify="notify" />
       <LibraryCloud v-else-if="tab === 'cloud'" ref="cloudTab" :library="library" :query="query" :desktop="store.desktop" :open-url="openUrl" @notify="notify" />
       <LibrarySavedTab v-else-if="tab === 'saved'" ref="savedTab" :library="library" :query="query" @open="item => item.sessionId && openSession(item.sessionId)" @ask="askAbout" @notify="notify" />
       <LibraryMemory v-else ref="memoryTab" :library="library" :query="query" :desktop="store.desktop" :session-title="sessionTitle" @open-session="openSession" @created="query = ''" />
@@ -152,10 +169,12 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
         <div class="lib-form-actions"><NButton :disabled="creatingBusy" @click="creating = null">取消</NButton><NButton type="primary" attr-type="submit" :loading="creatingBusy" :disabled="creatingBusy || !createText.trim() || (creating === 'doc' && !createTitle.trim())" data-testid="library-create-save">{{ creating === 'doc' ? '创建文档' : '添加收藏' }}</NButton></div>
       </form>
     </NModal>
+    <NModal :show="!!designId" :mask-closable="false" :close-on-esc="false"><div class="library-design-modal"><DesignWorkbench :project-id="designId" :notify="notify" @close="designId = ''" @request="designRequest" /></div></NModal>
   </section>
 </template>
 
 <style scoped>
+.library-design-modal{display:flex;width:calc(100vw - 48px);height:calc(100dvh - 64px);border:1px solid var(--ui-line);border-radius:10px;overflow:hidden;background:var(--ui-surface)}
 .library-page{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;padding-bottom:0;color:var(--ui-text-primary);background:var(--ui-surface)}
 .library-head{flex:none;flex-wrap:wrap;row-gap:14px}
 .xb-tabs-lg>button{display:inline-flex;align-items:baseline;gap:6px}

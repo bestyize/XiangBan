@@ -5,7 +5,7 @@ export interface LibraryFolder { id: string; name: string; parent: string | null
 export type DocStatus = 'reading' | 'ready' | 'failed' | 'unsupported' | 'tooLarge';
 export interface LibraryDoc {
   id: string; name: string; folder: string | null; ext: string; size: number; importedMs: number;
-  origin: string; status: DocStatus; note: string; preview: string; tags: string[];
+  designId?: string | null; origin: string; status: DocStatus; note: string; preview: string; tags: string[];
 }
 export type Platform = 'feishu' | 'tencent' | 'baidu' | 'shimo' | 'yuque' | 'wps' | 'other';
 export interface LibraryLink { id: string; url: string; title: string; platform: Platform; kind: string; code: string | null; folder: string | null; addedMs: number }
@@ -73,7 +73,7 @@ export function folderTree(data: LibraryData): TreeRow[] {
   return rows;
 }
 
-const MATCH: Record<string, string[]> = { PDF: ['pdf'], 文档: ['docx', 'doc'], 表格: ['xlsx', 'xls', 'csv', 'tsv'], 演示: ['pptx', 'ppt'], 图片: ['png', 'jpg', 'jpeg', 'gif', 'webp'], 文本: ['md', 'txt', 'json', 'log'] };
+const MATCH: Record<string, string[]> = { 设计稿: ['design'], PDF: ['pdf'], 文档: ['docx', 'doc'], 表格: ['xlsx', 'xls', 'csv', 'tsv'], 演示: ['pptx', 'ppt'], 图片: ['png', 'jpg', 'jpeg', 'gif', 'webp'], 文本: ['md', 'txt', 'json', 'log'] };
 export const DOC_FILTERS = ['全部', ...Object.keys(MATCH)];
 export const matchesFilter = (doc: LibraryDoc, filter: string) => filter === '全部' || (MATCH[filter] ?? []).includes(doc.ext);
 

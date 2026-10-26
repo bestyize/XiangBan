@@ -54,6 +54,7 @@ mod computer_permissions;
 mod capture_editor;
 mod assistant_hit_test;
 mod data_library;
+mod design;
 mod window_control;
 mod voice_turn;
 mod inference;
@@ -850,16 +851,18 @@ fn main() {
             chat::store_market::ai_market_updates, chat::store_market::ai_market_update,
             chat::plugins::ai_plugin_installed, chat::connectors::ai_connector_installed, chat::connectors::ai_connector_configure, chat::connectors::ai_connector_set_enabled, chat::connectors::ai_connector_unbind, chat::connectors::ai_connector_reauthorize, chat::connectors::ai_mentions, chat::plugins::ai_plugin_pick_file, chat::plugins::ai_plugin_inspect_file, chat::plugins::ai_plugin_install_file, chat::plugins::ai_plugin_remove, chat::plugins::ai_plugin_avatar,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
-            assistant_hit_test::assistant_set_regions, data_library::library_state, data_library::library_pick_import, data_library::library_import_data, data_library::library_create_folder, data_library::library_rename_folder, data_library::library_delete_folder, data_library::library_move, data_library::library_update_doc, data_library::library_remove, data_library::library_reveal, data_library::library_attachment, data_library::library_add_link, data_library::library_rename_link, data_library::library_save, chat::memory_center::chat_memory_overview, chat::memory_center::chat_memory_set_remembering, chat::memory_center::chat_memory_edit_experience, chat::memory_center::chat_memory_forget_experience, chat::memory_center::chat_memory_write_note, chat::memory_center::chat_memory_delete_note, chat::memory_center::chat_memory_clear, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
+            assistant_hit_test::assistant_set_regions, design::design_list, design::design_read, design::design_save, design::design_draft_save, design::design_draft_clear, design::design_history, design::design_restore, design::design_import, design::design_export, data_library::library_state, data_library::library_pick_import, data_library::library_import_data, data_library::library_create_folder, data_library::library_rename_folder, data_library::library_delete_folder, data_library::library_move, data_library::library_update_doc, data_library::library_remove, data_library::library_reveal, data_library::library_attachment, data_library::library_add_link, data_library::library_rename_link, data_library::library_save, chat::memory_center::chat_memory_overview, chat::memory_center::chat_memory_set_remembering, chat::memory_center::chat_memory_edit_experience, chat::memory_center::chat_memory_forget_experience, chat::memory_center::chat_memory_write_note, chat::memory_center::chat_memory_delete_note, chat::memory_center::chat_memory_clear, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
             chat_screenshot, float_assistant::assistant_screenshot, float_assistant::assistant_drag, float_assistant::assistant_unfold, float_assistant::assistant_focus,
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
             float_assistant::assistant_reanchor_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
         .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(window_control::WindowState::default()).manage(chat::store_market::PendingLink::default()).manage(voice_turn::VoiceTurnState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
+        .register_uri_scheme_protocol("design-preview", |context, request| design::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
+            if command.starts_with("design_") && label != "control" { invoke.resolver.reject("只能在主窗口访问设计稿"); return true; }
             if command.starts_with("asr_") && label != "control" && label != float_assistant::LABEL {
                 invoke.resolver.reject("只能在聊天和声音设置中使用语音识别");
                 return true;

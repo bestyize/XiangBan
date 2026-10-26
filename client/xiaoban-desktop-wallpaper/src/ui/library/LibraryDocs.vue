@@ -9,7 +9,7 @@ import {
 } from './library-store.ts';
 
 const props = defineProps<{ library: LibraryStore; query: string; desktop: boolean }>();
-const emit = defineEmits<{ ask: [doc: LibraryDoc]; notify: [message: string, type?: 'success' | 'error' | 'info'] }>();
+const emit = defineEmits<{ ask: [doc: LibraryDoc]; design: [id: string]; notify: [message: string, type?: 'success' | 'error' | 'info'] }>();
 const confirm = useConfirm();
 const isMac = /Mac/i.test(navigator.userAgent);
 
@@ -41,6 +41,7 @@ const totalBytes = computed(() => data.value.docs.reduce((sum, d) => sum + d.siz
 const empty = computed(() => !data.value.docs.length && !folders.value.length);
 
 const KINDS: Record<string, [string, string, string]> = {
+  design: ['设计', '#FFF0F2', '#D84F6A'],
   pdf: ['PDF', '#FDECEC', '#C4323A'], docx: ['DOC', '#E8F0FD', '#2F6FDB'], doc: ['DOC', '#E8F0FD', '#2F6FDB'],
   xlsx: ['XLS', '#E6F5EC', '#23885A'], xls: ['XLS', '#E6F5EC', '#23885A'], csv: ['CSV', '#E6F5EC', '#23885A'],
   pptx: ['PPT', '#FDF0E6', '#D2691E'], ppt: ['PPT', '#FDF0E6', '#D2691E'],
@@ -177,7 +178,7 @@ defineExpose({ importFrom, newFolder: () => { naming.value = { mode: 'create', i
             <span class="lib-muted">打开 ›</span>
           </button>
           <button v-for="doc in docs" :key="doc.id" type="button" role="listitem" class="row" :class="{ selected: current?.id === doc.id }" :aria-pressed="current?.id === doc.id" draggable="true" :data-testid="`library-doc-${doc.id}`"
-            @click="selected = doc.id" @dragstart="dragDoc($event, doc)">
+            @click="selected = doc.id" @dblclick="doc.designId && emit('design', doc.designId)" @dragstart="dragDoc($event, doc)">
             <span class="row-main">
               <span class="file-icon" :style="{ background: kind(doc)[1], color: kind(doc)[2] }">{{ kind(doc)[0] }}</span>
               <span class="row-text"><b>{{ doc.name }}</b><span class="lib-muted">{{ kind(doc)[0] }} · {{ formatSize(doc.size) }} · {{ formatWhen(doc.importedMs) }}<template v-if="showWhere"> · {{ folderPath(folders, doc.folder) }}</template></span></span>
@@ -210,7 +211,8 @@ defineExpose({ importFrom, newFolder: () => { naming.value = { mode: 'create', i
         <template v-if="current.origin"><dt>原文件</dt><dd class="origin">{{ current.origin }}</dd></template>
       </dl>
       <div class="detail-actions">
-        <button type="button" class="xb-btn-primary" :disabled="!desktop || !['ready', 'reading'].includes(current.status)" :title="['ready', 'reading'].includes(current.status) ? '' : current.note" data-testid="library-ask" @click="emit('ask', current)"><AtSign :size="14" />用这份资料提问</button>
+        <button v-if="current.designId" type="button" class="xb-btn-primary" :disabled="!desktop" data-testid="library-open-design" @click="emit('design', current.designId)"><FileText :size="14" />打开设计画布</button>
+        <button v-else type="button" class="xb-btn-primary" :disabled="!desktop || !['ready', 'reading'].includes(current.status)" :title="['ready', 'reading'].includes(current.status) ? '' : current.note" data-testid="library-ask" @click="emit('ask', current)"><AtSign :size="14" />用这份资料提问</button>
         <div class="pair">
           <button type="button" class="xb-btn" :disabled="!desktop" @click="library.reveal(current.id)"><FolderOpen :size="14" />{{ isMac ? '在访达中显示' : '在文件夹中显示' }}</button>
           <button type="button" class="xb-btn is-danger" aria-label="从资料库删除" @click="removeDoc(current)"><Trash2 :size="14" /></button>

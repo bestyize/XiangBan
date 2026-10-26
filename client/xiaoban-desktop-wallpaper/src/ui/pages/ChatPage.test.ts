@@ -9,8 +9,8 @@ import { createChatStore, CONTINUE_TEXT, type ChatDeps } from '../chat/chat-stor
 import type { ControlStore } from '../control-types.ts';
 import type { ApprovalRequest, ChatGroup, KernelEvent, Overview, SessionSummary, WireMessage } from '../chat/types.ts';
 
-vi.mock('../../bridge.ts', async importOriginal => ({ ...await importOriginal<typeof import('../../bridge.ts')>(), invoke: vi.fn() }));
-import { invoke as bridgeInvoke } from '../../bridge.ts';
+vi.mock('../../bridge.ts', async importOriginal => ({ ...await importOriginal<typeof import('../../bridge.ts')>(), invoke: vi.fn(), listen: vi.fn(async () => () => {}) }));
+import { invoke as bridgeInvoke, listen as bridgeListen } from '../../bridge.ts';
 
 const summary = (id: string, title: string, updatedAt = Math.floor(Date.now() / 1000)): SessionSummary => ({ id, title, createdAt: updatedAt, updatedAt });
 const overview = (patch: Partial<Overview> = {}): Overview => ({ configured: true, sessions: [], running: [], workspace: '/Users/me/小伴/工作区', permissionMode: 'ask', hideToolCalls: false, ...patch });
@@ -22,11 +22,12 @@ let currentStore: ControlStore | undefined;
 async function open(responders: Record<string, Responder> = {}, options: { desktop?: boolean; extra?: Record<string, unknown> } = {}) {
   const handlers = new Map<string, (payload: never) => void>();
   const calls: [string, Record<string, unknown> | undefined][] = [];
-  const table: Record<string, Responder> = { chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
-  // The ring's numbers are read on their own schedule, so they are kept apart from the calls a test is about.
+  const bridgeHandlers = new Map<string, Set<(payload: never) => void>>();
+  const table: Record<string, Responder> = { design_list: () => [], chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
+  // Background model/context/design reads have their own assertions; chat command order stays focused on sending and loading.
   const contextCalls: (Record<string, unknown> | undefined)[] = [];
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
-    if (command === 'chat_context') contextCalls.push(args); else if (command !== 'get_ai_config') calls.push([command, args]);
+    if (command === 'chat_context') contextCalls.push(args); else if (!['get_ai_config', 'refresh_ai_providers', 'ai_gateway_tiers', 'design_list'].includes(command)) calls.push([command, args]);
     if (command === 'get_ai_config' && !table[command]) return { model: 'coding-model', activeProvider: 'demo', providers: [{ id: 'demo', name: '演示模型', models: [{ id: 'coding-model', name: 'Coding Model' }] }] } as never;
     const respond = table[command];
     if (!respond) throw new Error(`unexpected ${command}`);
@@ -36,13 +37,14 @@ async function open(responders: Record<string, Responder> = {}, options: { deskt
   const desktop = options.desktop ?? true;
   const deps: ChatDeps = { desktop, invoke, notify, listen: async (event, callback) => { handlers.set(event, callback as never); return () => {}; } };
   vi.mocked(bridgeInvoke).mockImplementation(invoke as never);
+  vi.mocked(bridgeListen).mockImplementation((async (event: string, callback: (payload: never) => void) => { const set = bridgeHandlers.get(event) ?? new Set(); set.add(callback); bridgeHandlers.set(event, set); return () => set.delete(callback); }) as never);
   const chat = createChatStore(deps);
   const store = reactive({ desktop, chat, settingsTab: 'general', page: 'chat', navigate: vi.fn(), notify, openSettings: vi.fn(), ...options.extra }) as unknown as ControlStore;
   vi.mocked(store.openSettings).mockImplementation(tab => { if (tab) store.settingsTab = tab; });
   currentStore = store;
   wrapper = mount(ChatPage, { props: { store }, attachTo: document.body });
   await flushPromises();
-  const emit = (event: string, payload: unknown) => handlers.get(event)!(payload as never);
+  const emit = (event: string, payload: unknown) => { handlers.get(event)?.(payload as never); bridgeHandlers.get(event)?.forEach(callback => callback(payload as never)); };
   const events = async (session: string, ...list: KernelEvent[]) => { list.forEach(event => emit('chat-event', { session, event })); await flushPromises(); };
   return { store, chat, calls, contextCalls, invoke, notify, emit, events, commands: () => calls.map(([c]) => c) };
 }
@@ -329,7 +331,7 @@ describe('the chat page before a conversation', () => {
   it('only says it is a preview in the browser', async () => {
     const h = await open({}, { desktop: false });
     expect(q('chat-preview-only')).not.toBeNull();
-    expect(h.invoke).not.toHaveBeenCalled();
+    expect(h.calls).toEqual([]);
     expect(textarea().disabled).toBe(true);
   });
 
@@ -1240,4 +1242,38 @@ it('picks and sends a document-only question with its named attachment card', as
   const sent=h.calls.find(([command])=>command==='chat_send')?.[1];
   expect(sent).toMatchObject({text:'',attachments:[{name:'预算.csv',dataUrl:expect.stringMatching(/^data:text\/csv;base64,/)}]});
   expect(q('msg-user')?.textContent).toContain('预算.csv');
+});
+
+
+describe('design deliveries in the original conversation', () => {
+  it('opens one multi-board project, closes and reopens it without making another source copy', async () => {
+    const project = { id: 'design-012345678901234567890123', title: '界面设计', sessionId: 's1', revision: 1, updatedMs: 1, canvas: { v: 3, boards: { 'Main.dc.html': { w: 390, h: 844 }, 'More.dc.html': { w: 390, h: 844, x: 450 } }, order: ['Main.dc.html', 'More.dc.html'] }, files: { 'Main.dc.html': '<x-dc>首页</x-dc>', 'More.dc.html': '<x-dc>更多</x-dc>' } };
+    const h = await open({ chat_overview: () => overview({ sessions: [summary('s1', '设计')] }), chat_load_session: () => [], design_list: () => [{ ...project, artboards: 2 }], design_read: () => ({ project, origin: 'design-preview://localhost' }) });
+    await openSession('s1');
+    expect(wrapper!.find('.design-deliveries').text()).toContain('2 个画板');
+    expect(wrapper!.findAll('.artboard')).toHaveLength(2);
+    await wrapper!.get('[role="separator"]').trigger('keydown', { key: 'ArrowLeft' });
+    expect(wrapper!.get('[role="separator"]').attributes('aria-valuenow')).toBe('66');
+    await wrapper!.get('[aria-label="关闭设计画布"]').trigger('click'); await flushPromises();
+    expect(wrapper!.find('[data-testid="design-workbench"]').exists()).toBe(false);
+    await wrapper!.get('.design-deliveries button').trigger('click'); await flushPromises();
+    expect(wrapper!.findAll('.artboard')).toHaveLength(2);
+    expect(h.invoke).toHaveBeenCalledWith('design_read', { id: project.id });
+    expect(h.invoke.mock.calls.some(([command]) => command === 'design_save')).toBe(false);
+    await h.chat.select(null); await flushPromises();
+    expect(wrapper!.find('.design-deliveries').exists()).toBe(false);
+  });
+});
+
+describe('library design continuation in a new conversation', () => {
+  it('accepts a linked project event whose original session has been deleted', async () => {
+    const project = { id: 'design-012345678901234567890123', title: '继续设计', sessionId: 'deleted', sessionIds: ['s1'], revision: 2, updatedMs: 2, canvas: { v: 3, boards: { 'Main.dc.html': { w: 390, h: 844 } }, order: ['Main.dc.html'] }, files: { 'Main.dc.html': '<x-dc>同一份源文件</x-dc>' } };
+    const h = await open({ chat_overview: () => overview({ sessions: [summary('s1', '继续修改')] }), chat_load_session: () => [], design_read: () => ({ project, origin: 'design-preview://localhost' }) });
+    await openSession('s1');
+    expect(wrapper!.find('.design-deliveries').exists()).toBe(false);
+    h.emit('design-changed', { ...project, artboards: 1 }); await flushPromises();
+    expect(wrapper!.find('.design-deliveries').text()).toContain('继续设计');
+    expect(h.invoke).toHaveBeenCalledWith('design_read', { id: project.id });
+    expect(wrapper!.findAll('.artboard')).toHaveLength(1);
+  });
 });
