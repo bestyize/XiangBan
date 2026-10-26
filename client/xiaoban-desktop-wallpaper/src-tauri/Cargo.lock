@@ -106,6 +106,7 @@ dependencies = [
  "reqwest",
  "serde_json",
  "sha2",
+ "tokio",
  "zip 9.0.4",
 ]
 

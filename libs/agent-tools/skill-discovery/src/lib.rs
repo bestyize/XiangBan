@@ -3,6 +3,8 @@
 mod acquisition;
 mod package;
 mod runner;
+mod download;
+mod review;
 pub use runner::authorize_installed_file;
 pub mod catalog;
 pub mod market;
@@ -10,10 +12,11 @@ pub mod packs;
 pub mod plugin;
 use agent_kernel::{Risk, Tool, ToolCtx, ToolSpec};
 use package::{is_script, plan, Plan};
-use reqwest::{blocking::Client, redirect::Policy, Url};
+use reqwest::Url;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::{fs, io::Read, net::IpAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{path::PathBuf, sync::Arc, time::Duration};
+use download::{Download, SEARCH_BUDGET, REVIEW_BUDGET, INSTALL_BUDGET};
 
 const BASE: &str = "https://api.skillhub.cn";
 
@@ -26,32 +29,8 @@ fn valid_version(s: &str) -> bool {
         && s.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b'+')
 }
 
-fn client() -> Result<Client, String> {
-    agent_kernel::net::blocking_builder(Client::builder().timeout(Duration::from_secs(30))
-        // Objects live behind HTTPS redirects; never send to a literal private IP.
-        .redirect(Policy::custom(|attempt| {
-            let u = attempt.url();
-            let host = u.host_str().unwrap_or("");
-            if attempt.previous().len() >= 4 || u.scheme() != "https" || host.is_empty()
-                || host.parse::<IpAddr>().is_ok()
-                || host == "localhost" || host.ends_with(".local") || host.ends_with(".internal") {
-                attempt.stop()
-            } else {
-                attempt.follow()
-            }
-        })))?.build().map_err(|e| e.to_string())
-}
 fn bytes(url: &str, max: u64) -> Result<Vec<u8>, String> {
-    let mut response = client()?.get(url).send().map_err(|e| e.to_string())?;
-    if !response.status().is_success() {
-        return Err(format!("SkillHub HTTP {}", response.status()));
-    }
-    let mut result = Vec::new();
-    response.take(max + 1).read_to_end(&mut result).map_err(|e| e.to_string())?;
-    if result.len() as u64 > max {
-        return Err("SkillHub response exceeds size limit".into());
-    }
-    Ok(result)
+    Download::new(&|| false, SEARCH_BUDGET).bytes(url, max)
 }
 fn json_url(url: &str) -> Result<Value, String> {
     serde_json::from_slice(&bytes(url, 2 * 1024 * 1024)?).map_err(|e| e.to_string())
@@ -61,12 +40,16 @@ fn endpoint(route: &str, pairs: &[(&str, &str)]) -> Result<String, String> {
         .map(|url| url.to_string()).map_err(|e| e.to_string())
 }
 fn file_info(slug: &str, version: &str, namespace: Option<&str>) -> Result<Plan, String> {
+    file_info_with(slug, version, namespace, &Download::new(&|| false, REVIEW_BUDGET))
+}
+fn file_info_with(slug: &str, version: &str, namespace: Option<&str>, download: &Download<'_>) -> Result<Plan, String> {
     // Default resolution differs between SkillHub detail, file and download routes.
     // Resolve once, then use the exact publisher on every subsequent request.
-    let detail=json_url(&endpoint(&format!("/api/v1/skills/{slug}"),&[("namespace",namespace.unwrap_or(""))])?)?;
+    let json = |url: &str| -> Result<Value,String> { serde_json::from_slice(&download.bytes(url, 2 * 1024 * 1024)?).map_err(|e| e.to_string()) };
+    let detail=json(&endpoint(&format!("/api/v1/skills/{slug}"),&[("namespace",namespace.unwrap_or(""))])?)?;
     let namespace=canonical_namespace(&detail,slug,namespace)?;
     let url = endpoint(&format!("/api/v1/skills/{slug}/files"), &[("version", version), ("namespace", &namespace)])?;
-    let result = json_url(&url)?;
+    let result = json(&url)?;
     if result["version"].as_str() != Some(version) {
         return Err("SkillHub version changed unexpectedly".into());
     }
@@ -77,7 +60,7 @@ fn file_info(slug: &str, version: &str, namespace: Option<&str>) -> Result<Plan,
     plan.namespace = Some(namespace.clone());
     let description=detail["skill"]["summary_zh"].as_str().filter(|s|!s.trim().is_empty())
         .or(detail["skill"]["summary"].as_str()).filter(|s|!s.trim().is_empty()).ok_or("SkillHub description missing")?;
-    plan.metadata=Some(json!({"name":slug,"description":description}));
+    plan.metadata=Some(json!({"name":slug,"description":description,"registryIdentity":true}));
     plan.icon_url=detail["skill"]["iconUrl"].as_str().filter(|s|s.starts_with("https://")).map(str::to_string);
     // Pin registry metadata too: headerless legacy documents keep their original bytes.
     let binding=json!({"namespace":namespace,"metadata":plan.metadata});
@@ -106,10 +89,10 @@ fn canonical_namespace(detail:&Value,slug:&str,requested:Option<&str>)->Result<S
     }
     Ok(namespace.to_string())
 }
-fn content(slug: &str, version: &str, namespace: Option<&str>, path: &str, max: u64) -> Result<Vec<u8>, String> {
+fn content_with(slug: &str, version: &str, namespace: Option<&str>, path: &str, max: u64, download: &Download<'_>) -> Result<Vec<u8>, String> {
     let url = endpoint(&format!("/api/v1/skills/{slug}/file"),
         &[("version", version), ("path", path), ("namespace", namespace.unwrap_or(""))])?;
-    bytes(&url, max)
+    download.bytes(&url, max)
 }
 fn validate_skill(slug: &str, raw: &[u8], expected: &str) -> Result<String, String> {
     let hash = format!("{:x}", Sha256::digest(raw));
@@ -131,6 +114,11 @@ fn validate_registry_skill(slug:&str,raw:&[u8],expected:&str,metadata:Option<&Va
     if format!("{:x}",Sha256::digest(raw))!=expected{return Err("SkillHub SKILL.md SHA256 mismatch".into());}
     let text=std::str::from_utf8(raw).map_err(|_|"SKILL.md is not UTF-8")?;
     if text.trim_start_matches('\u{feff}').starts_with("---") {
+        if metadata.is_some_and(|m| m["registryIdentity"] == true && m["name"] == slug && m["description"].as_str().is_some_and(|s| !s.trim().is_empty())) {
+            // Publisher + slug bind the package identity. The pinned document keeps its authored name and flags.
+            agent_kernel::skills::parse_skill_metadata_named(text, Some(slug))?;
+            return Ok(text.to_string());
+        }
         return validate_skill(slug,raw,expected);
     }
     let metadata=metadata.ok_or("SKILL.md has no frontmatter and no pinned registry metadata")?;
@@ -232,7 +220,7 @@ impl SkillDiscovery {
         acquisition::AcquisitionPolicy::default()
     }
     pub fn tools(&self) -> Vec<Arc<dyn Tool>> {
-        let mut tools: Vec<Arc<dyn Tool>> = ["skill_search", "skill_inspect", "skill_install"]
+        let mut tools: Vec<Arc<dyn Tool>> = ["skill_search", "skill_inspect", "skill_review_read", "skill_install"]
             .into_iter().map(|name| {
                 let schema = match name {
                     "skill_search" => json!({"type":"object","properties":{
@@ -245,15 +233,22 @@ impl SkillDiscovery {
                     },"required":["keyword"]}),
                     "skill_inspect" => json!({"type":"object","properties":{
                         "slug":{"type":"string"},"version":{"type":"string"},"namespace":{"type":"string"}},"required":["slug","version"]}),
+                    "skill_review_read" => json!({"type":"object","properties":{
+                        "slug":{"type":"string"},"version":{"type":"string"},"namespace":{"type":"string"},
+                        "sha256":{"type":"string","minLength":64,"maxLength":64},
+                        "section":{"type":"string","enum":["manifest","file"]},"path":{"type":"string"},
+                        "offset":{"type":"integer","minimum":0,"description":"Use nextOffset from the previous page; file offsets are UTF-8 bytes, manifest offsets are file indices."},
+                        "limit":{"type":"integer","minimum":4,"maximum":2048}},"required":["slug","version","sha256"]}),
                     _ => json!({"type":"object","properties":{
                         "slug":{"type":"string"},"version":{"type":"string"},"namespace":{"type":"string"},
                         "sha256":{"type":"string","minLength":64,"maxLength":64}},
                         "required":["slug","version","sha256"]})
                 };
                 let spec = ToolSpec::new(name,
-                    "Search, review or install a pinned SkillHub package. Review its complete file list and script previews before installing. Installing does not execute scripts.",
+                    "Search or inspect a pinned SkillHub package; skill_inspect returns a summary only. Use skill_review_read to page through the complete manifest, SKILL.md and relevant scripts before claiming a full review or installing. Install only the exact reviewed coordinates and SHA256 after user approval; installation never executes scripts.",
                     schema)
-                    .risk(if name == "skill_install" { Risk::Write } else { Risk::Network });
+                    .risk(if name == "skill_install" { Risk::Write } else { Risk::Network })
+                    .timeout(match name { "skill_install"=>INSTALL_BUDGET,"skill_search"=>SEARCH_BUDGET,_=>REVIEW_BUDGET } + Duration::from_secs(5));
                 let spec = if name == "skill_install" { spec.always_ask() }
                     else { spec.untrusted_output() };
                 Arc::new(DiscoveryTool { root: self.root.clone(), spec, gateway: self.gateway.clone() }) as Arc<dyn Tool>
@@ -264,49 +259,54 @@ impl SkillDiscovery {
     }
 }
 /// The product catalog's answer, in the shape `skill_search` returns from SkillHub.
+fn catalog_item(item:&Value)->Value {
+    let description=item["description_zh"].as_str().or(item["description"].as_str()).unwrap_or("");
+    json!({"slug":item["slug"],"version":item["version"],"namespace":skill_namespace(item),
+        "name":review::prefix(item["name"].as_str().unwrap_or(""),80),
+        "source":review::prefix(item["source"].as_str().unwrap_or(""),32),
+        "description":review::prefix(description,240),"descriptionTruncated":description.len()>240,
+        "homepage":item["homepage"].as_str().filter(|s|s.len()<=200)})
+}
 fn gateway_results(found: &Value, page: u64) -> Result<String, String> {
     let items = found["results"].as_array().ok_or("invalid catalog search response")?;
     Ok(json!({"provider":"skillhub","page":page,"total":found["total"].as_u64(),
         "hasMore":found["hasMore"].as_bool().unwrap_or(false),
-        "results":items.iter().take(20).map(|s|json!({
-            "slug":s["slug"],"name":s["name"],"version":s["version"],"namespace":s["namespace"],
-            "source":s["source"],"description":s["description"],"homepage":s["homepage"]
-        })).collect::<Vec<_>>()}).to_string())
+        "results":items.iter().take(20).map(catalog_item).collect::<Vec<_>>()}).to_string())
 }
 struct DiscoveryTool { spec: ToolSpec, root: PathBuf, gateway: Option<CatalogSearch> }
 impl Tool for DiscoveryTool {
     fn spec(&self) -> &ToolSpec { &self.spec }
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
-        self.run(args, &|| ctx.is_cancelled())
+        self.run_with(args, &|| ctx.is_cancelled(), true)
     }
+    fn cancel_grace(&self) -> Duration { Duration::from_secs(2) }
 }
 impl DiscoveryTool {
-    fn run(&self, args: Value, cancelled: &dyn Fn() -> bool) -> Result<String, String> {
+    fn run(&self, args: Value, cancelled: &(dyn Fn() -> bool + Sync)) -> Result<String, String> {
+        self.run_with(args,cancelled,false)
+    }
+    fn run_with(&self, args: Value, cancelled: &(dyn Fn() -> bool + Sync), model_review: bool) -> Result<String, String> {
+        let download=Download::new(cancelled,match self.spec.name.as_str(){"skill_install"=>INSTALL_BUDGET,"skill_search"=>SEARCH_BUDGET,_=>REVIEW_BUDGET});
         if cancelled() { return Err("cancelled".into()); }
         if self.spec.name == "skill_search" {
             let keyword = args["keyword"].as_str().ok_or("keyword required")?.trim();
-            if keyword.len() < 2 || keyword.len() > 80 { return Err("invalid keyword".into()); }
+            if !(2..=80).contains(&keyword.chars().count()) { return Err("invalid keyword".into()); }
             let page = args.get("page").map(Value::as_u64).unwrap_or(Some(1))
                 .filter(|p| (1..=5).contains(p)).ok_or("Skill search page must be 1–5")?;
             let sort_by = args["sortBy"].as_str().unwrap_or("score");
             validate_browse_filters("", "", sort_by)?;
             if let Some(search) = &self.gateway {
-                if let Some(found) = search(keyword, page as u32, sort_by)? { return gateway_results(&found, page); }
+                if let Some(found) = search(keyword, page as u32, sort_by)? { download.check()?; return gateway_results(&found, page); }
             }
             let page_text = page.to_string();
             let url = endpoint("/api/skills", &[("keyword", keyword), ("page", &page_text),
                 ("pageSize", "20"), ("sortBy", sort_by), ("order", "desc")])?;
-            let j = json_url(&url)?;
+            let j:Value = serde_json::from_slice(&download.bytes(&url,2*1024*1024)?).map_err(|e|e.to_string())?;
             let items = j["data"]["skills"].as_array().ok_or("invalid SkillHub search response")?;
             let total = j["data"]["total"].as_u64();
             return Ok(json!({"provider":"skillhub","page":page,"total":total,
                 "hasMore":total.map(|n| page*20<n).unwrap_or(items.len()>=20),
-                "results":items.iter().take(20).map(|s|json!({
-                    "slug":s["slug"],"name":s["name"],"version":s["version"],
-                    "namespace":skill_namespace(s),"source":s["source"],
-                    "description":s["description_zh"].as_str().or(s["description"].as_str()).unwrap_or(""),
-                    "homepage":s["homepage"]
-                })).collect::<Vec<_>>()}).to_string());
+                "results":items.iter().take(20).map(catalog_item).collect::<Vec<_>>()}).to_string());
         }
         let slug = args["slug"].as_str().ok_or("slug required")?;
         let version = args["version"].as_str().ok_or("version required")?;
@@ -315,18 +315,20 @@ impl DiscoveryTool {
         }
         let namespace = args["namespace"].as_str().filter(|s| !s.is_empty());
         if namespace.is_some_and(|s| !catalog::valid_namespace(s)) { return Err("invalid SkillHub namespace".into()); }
-        let package = file_info(slug, version, namespace)?;
+        let package = file_info_with(slug, version, namespace, &download)?;
         let namespace = package.namespace.as_deref();
+        if self.spec.name == "skill_review_read" { return Ok(review::read(slug,&package,&args,&download)?.to_string()); }
         if self.spec.name == "skill_inspect" {
             let skill_file = package.files.iter().find(|f| f.path == "SKILL.md").ok_or("SKILL.md missing")?;
             let markdown = validate_registry_skill(slug,
-                &content(slug, version, namespace, "SKILL.md", 100 * 1024)?, &skill_file.sha256, package.metadata.as_ref())?;
+                &content_with(slug, version, namespace, "SKILL.md", 100 * 1024,&download)?, &skill_file.sha256, package.metadata.as_ref())?;
+            if model_review { return Ok(review::summary(slug,&package,&markdown).to_string()); }
             let mut scripts = Vec::new();
             for item in package.files.iter().filter(|f| is_script(&f.path)) {
-                if cancelled() { return Err("cancelled".into()); }
+                download.check()?;
                 // Truncated display is not a security audit. Every byte is still pinned by SHA256.
                 let preview = if item.size <= 1024 * 1024 {
-                    match content(slug, version, namespace, &item.path, 1024 * 1024) {
+                    match content_with(slug, version, namespace, &item.path, 1024 * 1024,&download) {
                         Ok(file) if format!("{:x}", Sha256::digest(&file)) == item.sha256 =>
                             String::from_utf8(file).ok().map(|s| s.chars().take(8000).collect::<String>()),
                         _ => None,
@@ -336,30 +338,27 @@ impl DiscoveryTool {
                     "preview":preview,"previewTruncated":item.size > 8000,
                     "warning":"Untrusted executable code; inspect source and approve each run."}));
             }
+            download.check()?;
             return Ok(json!({"provider":"skillhub","slug":slug,
                 "namespace":namespace,"manifest":package.summary(),"sha256":package.sha256,"content":markdown,"scripts":scripts,
                 "requiresInstallationApproval":true,"requiresExecutionApproval":true,
                 "warning":"SHA256 checks integrity, not safety. Third-party skills run with local user permissions; no sandbox."}).to_string());
         }
-        let expected = args["sha256"].as_str().ok_or("expected manifest SHA256 required")?;
-        if expected.len() != 64 || !expected.bytes().all(|b| b.is_ascii_hexdigit())
-            || package.sha256 != expected.to_ascii_lowercase() {
-            return Err("SkillHub file manifest differs from the reviewed SHA256".into());
-        }
+        review::check_digest(&package,&args)?;
         if cancelled() { return Err("cancelled".into()); }
         let url = endpoint("/api/v1/download", &[("slug", slug), ("version", version), ("namespace", namespace.unwrap_or(""))])?;
-        let files=match bytes(&url,12*1024*1024).and_then(|archive|package::verified_files(slug,&package,&archive)){
+        let files=match download.bytes(&url,12*1024*1024).and_then(|archive|package::verified_files(slug,&package,&archive)){
             Ok(files)=>files,
-            Err(zip_error)=>package::canonical_files(&package,|item|{
-                if cancelled(){return Err("cancelled".into());}
-                content(slug,version,namespace,&item.path,item.size)
+            Err(zip_error)=>download.files(&package,&|item,download|{
+                download.check()?;
+                content_with(slug,version,namespace,&item.path,item.size,download)
             }).map_err(|e|format!("ZIP unavailable or inconsistent ({zip_error}); canonical download failed: {e}"))?,
         };
         if cancelled() { return Err("cancelled".into()); }
         // Validate original SKILL.md metadata before materializing any file.
         let skill_file = package.files.iter().find(|f| f.path == "SKILL.md").ok_or("SKILL.md missing")?;
         validate_registry_skill(slug, files.get("SKILL.md").ok_or("SKILL.md missing")?, &skill_file.sha256, package.metadata.as_ref())?;
-        package::install(&self.root, slug, &package, &files)?;
+        package::install_cancellable(&self.root, slug, &package, &files,&||download.check())?;
         Ok(format!("Installed SkillHub {slug}@{version}: {} verified files (including {} scripts); manifest SHA256={}",
             package.files.len(), package.files.iter().filter(|f| is_script(&f.path)).count(), package.sha256))
     }
@@ -451,6 +450,41 @@ mod tests {
         assert!(canonical_namespace(&detail,"other-skill",None).is_err());
         assert!(canonical_namespace(&json!({"skill":{"slug":"demo-skill"}}),"demo-skill",None).is_err());
     }
+    #[test]
+    fn search_summaries_keep_all_twenty_coordinates_without_spilling_long_descriptions() {
+        let items=(0..20).map(|i|json!({"slug":format!("fiction-{i}"),"version":"1.0","namespace":"publisher","name":"小说写作".repeat(50),"description":"写作方法".repeat(20000),"homepage":"https://example.com"})).collect::<Vec<_>>();
+        let output=gateway_results(&json!({"results":items,"hasMore":true,"total":100}),1).unwrap();
+        assert!(output.len()<16000);let result:Value=serde_json::from_str(&output).unwrap();
+        assert_eq!(result["results"].as_array().unwrap().len(),20);
+        assert_eq!(result["results"][19]["slug"],"fiction-19");assert_eq!(result["results"][0]["descriptionTruncated"],true);
+    }
+
+    #[test]
+    fn registry_aliases_keep_original_bytes_but_require_a_pinned_registry_identity() {
+        let metadata=json!({"name":"market-name","description":"registry description","registryIdentity":true});
+        for name in ["novel-writing","寻梦写作","dragon-writer"] {
+            let text=format!("---\nname: {name}\ndescription: test\ndisable-model-invocation: true\n---\nBody");
+            let hash=format!("{:x}",Sha256::digest(text.as_bytes()));
+            assert_eq!(validate_registry_skill("market-name",text.as_bytes(),&hash,Some(&metadata)).unwrap(),text);
+            assert!(validate_registry_skill("different-publisher-skill",text.as_bytes(),&hash,Some(&metadata)).is_err());
+            assert!(validate_registry_skill("market-name",text.as_bytes(),&"0".repeat(64),Some(&metadata)).is_err());
+            assert!(validate_registry_skill("market-name",text.as_bytes(),&hash,None).is_err());
+        }
+        let malformed=b"---\nname: alias\n---\nno description";
+        let hash=format!("{:x}",Sha256::digest(malformed));
+        assert!(validate_registry_skill("market-name",malformed,&hash,Some(&metadata)).is_err());
+    }
+
+    #[test]
+    fn discovery_timeouts_leave_time_for_cooperative_cleanup() {
+        let tools=SkillDiscovery::new(PathBuf::new(),PathBuf::new()).tools();
+        let install=tools.iter().find(|t|t.spec().name=="skill_install").unwrap();
+        assert!(install.spec().timeout>INSTALL_BUDGET); assert!(install.spec().always_ask);
+        let review=tools.iter().find(|t|t.spec().name=="skill_inspect").unwrap();
+        assert!(review.spec().timeout>REVIEW_BUDGET);
+        assert!(tools.iter().any(|t|t.spec().name=="skill_review_read"));
+    }
+
     #[test]
     fn headerless_registry_skills_require_pinned_identity_and_description() {
         let raw=b"# Legacy skill\nUse these instructions.";

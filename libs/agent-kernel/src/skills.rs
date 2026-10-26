@@ -143,6 +143,7 @@ impl Skills {
             return Err(format!("no skill named `{name}`. Available: {}", self.names_hint()));
         };
         let text = read_limited(&info.dir.join("SKILL.md"))?;
+        managed_lock(&info.dir, name, &text)?;
         let body = split_frontmatter(&text).map_or(text.as_str(), |(_, body)| body);
         Ok(format!("Skill `{}` (directory: {})\n\n{}", info.name, info.dir.display(), body.trim()))
     }
@@ -394,16 +395,34 @@ fn split_frontmatter(text: &str) -> Option<(&str, &str)> {
     None
 }
 
+/// A managed registry identity never overrides integrity or authored invocation flags.
+fn managed_lock(dir: &Path, name: &str, text: &str) -> Result<Option<Value>, String> {
+    use sha2::{Digest, Sha256};
+    let path=dir.join(".skillhub-lock.json");
+    if !path.exists() { return Ok(None); }
+    if fs::metadata(&path).map_err(|e|e.to_string())?.len()>1024*1024 { return Err("skill installation manifest is too large".into()); }
+    let lock:Value=serde_json::from_slice(&fs::read(path).map_err(|e|e.to_string())?).map_err(|_|"invalid skill installation manifest")?;
+    if lock["provider"]!="skillhub" || lock["slug"]!=name { return Err("skill installation identity mismatch".into()); }
+    let files=lock["files"].as_array().filter(|f|!f.is_empty() && f.len()<=512).ok_or("invalid skill installation file list")?;
+    let matches=files.iter().filter(|f|f["path"]=="SKILL.md").collect::<Vec<_>>();
+    if matches.len()!=1 || matches[0]["sha256"].as_str()!=Some(format!("{:x}",Sha256::digest(text.as_bytes())).as_str()) {
+        return Err("SKILL.md changed after installation; review and reinstall the skill".into());
+    }
+    let real_dir=dir.canonicalize().map_err(|e|e.to_string())?;
+    if !dir.join("SKILL.md").canonicalize().map_err(|e|e.to_string())?.starts_with(real_dir) { return Err("skill file escapes installation directory".into()); }
+    Ok(Some(lock))
+}
 fn read_info(root: &Root, name: &str) -> Option<SkillInfo> {
     let dir = root.path.join(name);
     if !fs::symlink_metadata(&dir).ok()?.is_dir() {
         return None;
     }
     let text = read_limited(&dir.join("SKILL.md")).ok()?;
-    let metadata = match parse_skill_metadata_named(&text, Some(name)) {
+    let registry=managed_lock(&dir,name,&text).ok()?;
+    let mut metadata = match parse_skill_metadata_named(&text, Some(name)) {
         Ok(metadata)=>metadata,
         Err(_) if !text.trim_start_matches('\u{feff}').starts_with("---")=>{
-            let lock:Value=serde_json::from_str(&read_limited(&dir.join(".skillhub-lock.json")).ok()?).ok()?;
+            let lock=registry.as_ref()?;
             if lock["provider"]!="skillhub" || lock["slug"]!=name || lock["metadata"]["name"]!=name {return None;}
             let description=lock["metadata"]["description"].as_str().filter(|s|!s.trim().is_empty())?;
             SkillMetadata::basic(name, description.split_whitespace().collect::<Vec<_>>().join(" "), None)
@@ -411,13 +430,18 @@ fn read_info(root: &Root, name: &str) -> Option<SkillInfo> {
         Err(_)=>return None,
     };
     if metadata.name != name {
-        return None;
+        let lock=registry.as_ref()?;
+        let namespace=lock["namespace"].as_str().filter(|s|!s.is_empty() && s.len()<=128)?;
+        if !namespace.bytes().all(|b|b.is_ascii_alphanumeric() || b"._-".contains(&b))
+            || lock["metadata"]["registryIdentity"]!=true || lock["metadata"]["name"]!=name { return None; }
+        if metadata.display_name.is_none() { metadata.display_name=Some(metadata.name.clone()); }
+        metadata.name=name.to_string();
     }
     Some(SkillInfo {
         name: name.to_string(),
         description: metadata.description,
         dir,
-        agent_created: metadata.origin.as_deref() == Some("agent"),
+        agent_created: registry.is_none() && metadata.origin.as_deref() == Some("agent"),
         writable: root.writable,
         user_invocable: metadata.user_invocable,
         model_invocable: metadata.model_invocable,
@@ -616,6 +640,28 @@ impl Tool for SkillManage {
 #[cfg(test)]
 mod frontmatter_tests {
     use super::*;
+    use sha2::Digest;
+    #[test]
+    fn managed_registry_aliases_preserve_invocation_flags_and_reject_modified_documents() {
+        let root=std::env::temp_dir().join(format!("skill-registry-alias-{}-{}",std::process::id(),now_millis()));
+        let dir=root.join("market-name");fs::create_dir_all(&dir).unwrap();
+        let text="---\nname: 寻梦写作\ndescription: Write fiction\norigin: agent\ndisable-model-invocation: true\n---\nOriginal instructions";
+        fs::write(dir.join("SKILL.md"),text).unwrap();
+        let skills=Skills::new().writable_root(&root);
+        assert!(skills.find("market-name").is_none());
+        let mut lock=json!({"provider":"skillhub","slug":"market-name","namespace":"publisher","metadata":{"name":"market-name","registryIdentity":true},"files":[{"path":"SKILL.md","sha256":format!("{:x}",sha2::Sha256::digest(text.as_bytes()))}]});
+        fs::write(dir.join(".skillhub-lock.json"),lock.to_string()).unwrap();
+        let info=skills.find("market-name").unwrap();
+        assert_eq!(info.name,"market-name");assert!(!info.model_invocable);assert!(!info.agent_created);assert_eq!(info.display_name.as_deref(),Some("寻梦写作"));
+        assert!(skills.load("market-name").unwrap_err().contains("only be started by the user"));
+        assert!(skills.load_for_user("market-name").unwrap().contains("Original instructions"));
+        assert_eq!(fs::read_to_string(dir.join("SKILL.md")).unwrap(),text);
+        lock["metadata"]["registryIdentity"]=json!(false);
+        fs::write(dir.join(".skillhub-lock.json"),lock.to_string()).unwrap();assert!(skills.find("market-name").is_none());
+        lock["metadata"]["registryIdentity"]=json!(true);fs::write(dir.join(".skillhub-lock.json"),lock.to_string()).unwrap();
+        fs::write(dir.join("SKILL.md"),text.replace("Original","Changed")).unwrap();assert!(skills.find("market-name").is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn headerless_skills_load_only_with_matching_registry_metadata() {
         let root=std::env::temp_dir().join(format!("headerless-skill-{}-{}",std::process::id(),now_millis()));
@@ -624,7 +670,7 @@ mod frontmatter_tests {
         fs::write(dir.join("SKILL.md"),body).unwrap();
         let skills=Skills::new().writable_root(&root);
         assert!(skills.find("legacy-skill").is_none());
-        let mut lock=json!({"provider":"skillhub","slug":"legacy-skill","metadata":{"name":"legacy-skill","description":"Verified registry description"}});
+        let mut lock=json!({"provider":"skillhub","slug":"legacy-skill","metadata":{"name":"legacy-skill","description":"Verified registry description"},"files":[{"path":"SKILL.md","sha256":format!("{:x}",sha2::Sha256::digest(body.as_bytes()))}]});
         fs::write(dir.join(".skillhub-lock.json"),lock.to_string()).unwrap();
         let info=skills.find("legacy-skill").unwrap();
         assert!(!info.agent_created);

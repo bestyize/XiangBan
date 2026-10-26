@@ -32,12 +32,13 @@ impl SkillRun {
         },"required":["skill","script"]});
         let spec = ToolSpec::new("skill_run",
             "Execute a verified installed SkillHub script with an installed interpreter (Python, Node, shell, PowerShell or Ruby). Always ask user permission; this is not sandboxed. Arguments are literal, never shell-interpreted.",
-            schema).risk(Risk::Exec).serial().always_ask().timeout(MAX_RUNTIME);
+            schema).risk(Risk::Exec).serial().always_ask().timeout(MAX_RUNTIME + Duration::from_secs(5));
         Self { spec, root, workspace }
     }
 }
 impl Tool for SkillRun {
     fn spec(&self) -> &ToolSpec { &self.spec }
+    fn cancel_grace(&self) -> Duration { Duration::from_secs(3) }
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         if ctx.is_cancelled() { return Err("cancelled".into()); }
         let slug = args["skill"].as_str().ok_or("skill is required")?;
@@ -141,8 +142,8 @@ pub(crate) struct SkillRead { spec: ToolSpec, root: PathBuf }
 impl SkillRead {
     pub(crate) fn new(root: PathBuf) -> Self {
         let spec = ToolSpec::new("skill_read",
-            "Read one UTF-8 file from a verified installed SkillHub package (references, scripts, assets or SKILL.md); binary assets are not supported by this reader.",
-            json!({"type":"object","properties":{"skill":{"type":"string"},"path":{"type":"string"}},
+            "Read a UTF-8 file page from a verified installed SkillHub package. Follow nextOffset while hasMore is true; offsets are UTF-8 bytes. Every page revalidates all package files. Binary assets are not supported.",
+            json!({"type":"object","properties":{"skill":{"type":"string"},"path":{"type":"string"},"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":4,"maximum":2048}},
                 "required":["skill","path"]}))
             .risk(Risk::Read).parallel().untrusted_output();
         Self { spec, root }
@@ -160,10 +161,9 @@ impl Tool for SkillRead {
             return Err("invalid skill or path".into());
         }
         let file = verified_package_file(&self.root, slug, path)?;
-        if fs::metadata(&file).map_err(|e|e.to_string())?.len() > 100 * 1024 {
-            return Err("skill_read only supports files <=100 KiB".into());
-        }
-        fs::read_to_string(file).map_err(|_| "not a UTF-8 text file".into())
+        let text=fs::read_to_string(file).map_err(|_| "not a UTF-8 text file")?;
+        let offset=args["offset"].as_u64().unwrap_or(0).try_into().map_err(|_|"invalid offset")?;
+        Ok(crate::review::page(&text,offset,args["limit"].as_u64().unwrap_or(2048).min(2048) as usize)?.to_string())
     }
 }
 
@@ -198,12 +198,13 @@ pub(crate) fn verified_package_file(root: &Path, skill: &str, path: &str) -> Res
         return Err("SkillHub lock identity mismatch".into());
     }
     let items = lock["files"].as_array().ok_or("SkillHub lock missing files")?;
-    if items.is_empty() || items.len() > 100 { return Err("invalid SkillHub lock".into()); }
+    if items.is_empty() || items.len() > crate::package::MAX_FILES { return Err("invalid SkillHub lock".into()); }
     let mut script_exists = false;
+    let mut paths=std::collections::HashSet::new(); let mut total=0u64;
     for item in items {
         let name = item["path"].as_str().ok_or("invalid locked path")?;
         let expected = item["sha256"].as_str().ok_or("invalid locked hash")?;
-        if !valid_path(name) || expected.len() != 64 || !expected.bytes().all(|b| b.is_ascii_hexdigit()) {
+        if !valid_path(name) || !paths.insert(name.to_lowercase()) || expected.len() != 64 || !expected.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err("invalid SkillHub manifest entry".into());
         }
         // Resolve symlinks but reject any path escaping the installed skill.
@@ -212,7 +213,8 @@ pub(crate) fn verified_package_file(root: &Path, skill: &str, path: &str) -> Res
             return Err(format!("unsafe SkillHub file: {name}"));
         }
         let metadata = fs::metadata(&file).map_err(|e| e.to_string())?;
-        if metadata.len() > 4 * 1024 * 1024 {
+        total=total.checked_add(metadata.len()).ok_or("SkillHub package too large")?;
+        if metadata.len() > crate::package::MAX_FILE || total > crate::package::MAX_TOTAL {
             return Err(format!("SkillHub file too large: {name}"));
         }
         let bytes = fs::read(&file).map_err(|e| e.to_string())?;
@@ -232,6 +234,23 @@ fn terminate_tree(pid: u32) { agent_kernel::process_tree::terminate(pid); }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn installed_packages_above_one_hundred_files_remain_readable_and_tampering_is_rejected() {
+        let root=std::env::temp_dir().join(format!("skill-large-read-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let dir=root.join("large-skill");fs::create_dir_all(dir.join("references")).unwrap();
+        let text="中文参考".repeat(30000);let mut files=Vec::new();
+        for i in 0..120 {let path=format!("references/{i}.md");let content=if i==0{text.as_str()}else{"reference"};
+            fs::write(dir.join(&path),content).unwrap();files.push(json!({"path":path,"sha256":format!("{:x}",Sha256::digest(content.as_bytes()))}));
+        }
+        fs::write(dir.join(".skillhub-lock.json"),json!({"provider":"skillhub","slug":"large-skill","files":files}).to_string()).unwrap();
+        let reader=SkillRead::new(root.clone());
+        let result:Value=serde_json::from_str(&reader.execute(json!({"skill":"large-skill","path":"references/0.md"}),&ToolCtx::detached("test")).unwrap()).unwrap();
+        assert_eq!(result["hasMore"],true);assert_eq!(result["totalBytes"],text.len());
+        assert!(result["content"].as_str().unwrap().len()<=2048);
+        fs::write(dir.join("references/119.md"),"changed").unwrap();
+        assert!(reader.execute(json!({"skill":"large-skill","path":"references/0.md"}),&ToolCtx::detached("test")).unwrap_err().contains("changed after installation"));
+        fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn ordinary_reads_only_authorize_listed_unchanged_installed_skill_files() {
         let temp = std::env::temp_dir().join(format!("skill-read-authorize-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));

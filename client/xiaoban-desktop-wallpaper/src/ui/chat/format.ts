@@ -2,6 +2,7 @@ import type { ApprovalRequest, Risk } from './types.ts';
 
 const TOOL_LABELS: Record<string, string> = {
   connector_search: '查找连接器', connector_request: '连接服务', connector_call: '调用连接器工具',
+  skill_review_read: '读取技能审查详情',
   shell: '运行命令', read_file: '读取文件', write_file: '写入文件', edit_file: '修改文件', list_dir: '查看文件夹', grep: '搜索文件',
   web_fetch: '打开网页', web_search: '搜索网页', todo: '任务清单', ask_user: '向你提问', time_now: '查看时间',
   memory_read: '读取笔记', memory_write: '保存笔记', load_skill: '读取技能', skill_manage: '管理技能',

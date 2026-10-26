@@ -255,7 +255,7 @@ impl Market {
         let summary = manifest["summary"].as_str().filter(|s| !s.trim().is_empty()).unwrap_or("").to_string();
         let name = manifest["name"].as_str().unwrap_or(&p.slug).to_string();
         // SKILL.md without a header relies on registry metadata, which is pinned in the lock file.
-        let metadata = json!({"name": p.slug, "description": summary});
+        let metadata = json!({"name": p.slug, "description": summary,"registryIdentity":true});
         let skill = plan.files.iter().find(|f| f.path == "SKILL.md").ok_or("SKILL.md missing")?;
         validate_registry_skill(&p.slug, files.get("SKILL.md").ok_or("SKILL.md missing")?, &skill.sha256, Some(&metadata))?;
         plan.namespace = Some(p.namespace.clone());
@@ -762,7 +762,7 @@ mod tests {
         assert_eq!((lock["origin"]["service"].as_str(), lock["origin"]["kind"].as_str(), lock["namespace"].as_str(), lock["manifestSha256"].as_str()),
             (Some("xiaoban-market"), Some("skill"), Some("acme"), Some(sha.as_str())));
         assert!(root.join("pdf-kit/scripts/run.py").is_file());
-        assert!(market.install(&root, &skill("pdf-kit"), &sha).unwrap_err().contains("already exists"));
+        market.install(&root, &skill("pdf-kit"), &sha).unwrap();
         assert_eq!(installed_packages(&root)[0]["slug"], "pdf-kit");
         let updates = market.check_updates(&root).unwrap();
         assert_eq!(updates["results"].as_array().unwrap().len(), 1);

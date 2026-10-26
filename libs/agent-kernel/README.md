@@ -157,6 +157,8 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 
 Skills：`<根>/<name>/SKILL.md`，开头 `---` 块含 `name`、`description`，提示里只放名称和描述，正文由 `load_skill` 按需读取。多个根时靠前的根优先，符号链接目录被忽略。`skill_manage`（只在配置了可写根时提供）可 create、patch、delete：只能动自己写入的（`origin: agent`）且在可写根里的 skill，用户手写的和随包的只读；修改前备份到 `.history/`（不自动清理）；删除只删 `SKILL.md`，目录里有别的文件则保留。
 
+受管技能的 `.skillhub-lock.json` 必须绑定目录身份与 SKILL.md 的 SHA256，加载时重新校验。注册中心的包内名称与市场 slug 不同时，只有带发布者和显式 `metadata.registryIdentity` 的已验证锁文件允许使用市场标识作为加载名；原文不会改写，`disable-model-invocation` 等限制继续按原文执行。无头部兼容同样要求有效原文哈希，损坏或被修改的受管文档不会进入技能索引。
+
 ## 存储
 
 `JsonlStore`：每个会话一个文件，每行一条带版本号的记录。会话 id 转义后做文件名（含大写字母，因为 macOS、Windows 默认不区分大小写），加 `s-` 前缀避开 `con`、`nul`。崩溃留下的半行读取时忽略、下次追加时删除。Unix 下仅所有者可读写。

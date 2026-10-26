@@ -18,6 +18,8 @@ MCP 连接器使用服务 README 中的标准配置，支持本机 stdio、远�
 
 运行时分别位于 [skill-discovery](../../libs/agent-tools/skill-discovery/README.md) 与 [connectors](../../libs/agent-tools/connectors/README.md)。针对性验证：`cargo test --manifest-path libs/agent-tools/skill-discovery/Cargo.toml`、`cargo test --manifest-path libs/agent-tools/connectors/Cargo.toml`（仓库根目录），以及本目录 `npx vitest run src/ui/pages/AiStorePage.test.ts src/ui/ai-store/RegistryCatalog.test.ts`。真实目录及临时安装联调：`cargo run --manifest-path libs/agent-tools/skill-discovery/Cargo.toml --example catalog-smoke -- tech-test-automation --install`，不执行包内脚本。
 
+对话内 Skill 接入支持市场 slug 与包内名称不同的受管技能；名称映射保留原文和调用限制，加载时校验文件哈希。模型先通过 `skill_inspect` 获取摘要，再用 `skill_review_read` 分页审查清单、正文和相关脚本。安装有独立的下载总预算和可取消请求，回退下载最多并发 4 个文件；相同且完整的已安装版本支持安全重试。读取、运行统一支持 512 文件上限，大型文本引用通过 `skill_read` 分页查看。
+
 Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮小伴，也可以切换成位于桌面图标下方的动态壁纸。内置通用 Agent 聊天与 AI 商店；默认连接 `https://wallpaper.xiangban.xyz` 获取在线图片、动态视频、版本与公告。Windows 缺少运行组件时会联网补齐；组件与缓存可用后可离线运行。角色、场景、控制台与互动逻辑共用，桌面宿主分平台接入。
 
 2.1.0（构建中，SHA-256 待出包后补）：界面与能力更新包括——桌面伙伴改为主题制，官方「花朵心语」「多肉点点」共七只，支持自定义主题、导入导出与每只独立取名/大小/心情/层级；桌面组件与特效、宠物、游戏统一为「官方 / 自定义」两栏，每个组件可选择“贴在桌面”或“始终置顶”，自定义组件单独归类；聊天回答下方可展开执行过程，支持粘贴图片与文件作为附件、选中文字复制；小伴 AI 面向用户只保留“日常 / 深入”两种使用模式，兼容端点可另设回答偏好；超级小伴新增紧凑工具栏、区域截图与标注、彩虹生命球，以及 macOS 截图权限的自助修复入口。

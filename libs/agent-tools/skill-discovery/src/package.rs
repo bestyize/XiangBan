@@ -254,20 +254,32 @@ pub(crate) fn canonical_files(plan:&Plan,mut read:impl FnMut(&Item)->Result<Vec<
     Ok(files)
 }
 pub(crate) fn install(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Vec<u8>>) -> Result<(), String> {
-    install_with(root, slug, plan, files, None)
+    install_with(root, slug, plan, files, None, &||Ok(()))
+}
+pub(crate) fn install_cancellable(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Vec<u8>>, check: &dyn Fn()->Result<(),String>) -> Result<(), String> {
+    install_with(root,slug,plan,files,None,check)
 }
 /// Swap an installed package for a newer verified one. The old directory is moved (not deleted)
 /// into `backups`, and moved back if the swap fails, so an update can never leave the skill missing.
 pub(crate) fn replace(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Vec<u8>>, backups: &Path) -> Result<(), String> {
-    install_with(root, slug, plan, files, Some(backups))
+    install_with(root, slug, plan, files, Some(backups), &||Ok(()))
 }
-fn install_with(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Vec<u8>>, backups: Option<&Path>) -> Result<(), String> {
+fn install_with(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Vec<u8>>, backups: Option<&Path>, check: &dyn Fn()->Result<(),String>) -> Result<(), String> {
+    check()?;
     if files.len()!=plan.files.len(){return Err("incomplete SkillHub package".into());}
     // Validate the entire set again before any filesystem writes, independent of transport.
     canonical_files(plan,|item|files.get(&item.path).cloned().ok_or("missing SkillHub file".into()))?;
     fs::create_dir_all(root).map_err(|e| e.to_string())?;
     let destination = root.join(slug);
     if destination.exists() && backups.is_none() {
+        // A retry after an uncertain result may acknowledge an intact, identical installation.
+        let lock=fs::read(destination.join(".skillhub-lock.json")).ok().and_then(|b|serde_json::from_slice::<Value>(&b).ok());
+        let real_root=root.canonicalize().map_err(|e|e.to_string())?;
+        let expected_files=json!(plan.files.iter().map(|f|json!({"path":f.path,"sha256":f.sha256})).collect::<Vec<_>>());
+        if lock.as_ref().is_some_and(|lock|lock["provider"]=="skillhub" && lock["slug"]==slug && lock["version"]==plan.version
+            && lock["manifestSha256"]==plan.sha256 && lock["namespace"]==json!(plan.namespace) && lock["metadata"]==json!(plan.metadata)
+            && lock["origin"]==json!(plan.origin) && lock["files"]==expected_files)
+            && files.iter().all(|(path,bytes)|destination.join(path).canonicalize().ok().is_some_and(|p|p.starts_with(&real_root) && fs::read(p).is_ok_and(|b|b==*bytes))) { return Ok(()); }
         return Err("skill already exists; no overwrite permitted".into());
     }
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e| e.to_string())?.as_nanos();
@@ -275,6 +287,7 @@ fn install_with(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Ve
     fs::create_dir(&temporary).map_err(|e| e.to_string())?;
     let stage = Stage(temporary);
     for (name, data) in files {
+        check()?;
         let target = stage.0.join(&name);
         if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -286,6 +299,7 @@ fn install_with(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Ve
         "files":plan.files.iter().map(|i|json!({"path":i.path,"sha256":i.sha256})).collect::<Vec<_>>()});
     fs::write(stage.0.join(".skillhub-lock.json"), lock.to_string()).map_err(|e| e.to_string())?;
     let Some(backups) = backups else {
+        check()?;
         if destination.exists() {
             return Err("skill already exists; no overwrite permitted".into());
         }
@@ -312,6 +326,23 @@ fn install_with(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Ve
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cancelled_staging_is_removed_and_exact_install_retries_are_idempotent() {
+        let (plan,archive)=fixture();let files=verified_files("demo-skill",&plan,&archive).unwrap();
+        let root=std::env::temp_dir().join(format!("skill-install-cancel-{}-{}",std::process::id(),SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let calls=std::cell::Cell::new(0);
+        let result=install_cancellable(&root,"demo-skill",&plan,&files,&||{let n=calls.get()+1;calls.set(n);if n>=3 {Err("cancelled".into())}else{Ok(())}});
+        assert!(result.is_err());assert!(!root.join("demo-skill").exists());
+        assert_eq!(fs::read_dir(&root).unwrap().count(),0);
+        install(&root,"demo-skill",&plan,&files).unwrap();install(&root,"demo-skill",&plan,&files).unwrap();
+        let lock_file=root.join("demo-skill/.skillhub-lock.json");let original_lock=fs::read(&lock_file).unwrap();
+        let mut changed_lock:Value=serde_json::from_slice(&original_lock).unwrap();changed_lock["files"]=json!([]);
+        fs::write(&lock_file,changed_lock.to_string()).unwrap();assert!(install(&root,"demo-skill",&plan,&files).is_err());
+        fs::write(&lock_file,&original_lock).unwrap();
+        fs::write(root.join("demo-skill/SKILL.md"),"tampered").unwrap();
+        assert!(install(&root,"demo-skill",&plan,&files).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
     use std::io::Write;
     use zip::write::SimpleFileOptions;
 

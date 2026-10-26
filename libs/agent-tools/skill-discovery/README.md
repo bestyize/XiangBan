@@ -5,18 +5,21 @@
 | 工具 | 用途 | 授权 |
 | --- | --- | --- |
 | skill_search(keyword) | 关键词检索 | Network，不可信结果 |
-| skill_inspect(slug, version) | 审查版本锁定的 manifest、SKILL.md 和脚本预览 | Network，不可信结果 |
+| skill_inspect(slug, version, namespace?) | 返回版本锁定的摘要、SHA256、文件/脚本数量及截断标记 | Network，不可信结果 |
+| skill_review_read(slug, version, sha256, section?, path?, offset?) | 按摘要固定身份和版本，分页读取完整清单、正文或脚本源码 | Network，不可信结果 |
 | skill_install(slug, version, sha256) | 安装已审查的完整多文件包 | 每次需要用户批准 |
-| skill_read(skill, path) | 阅读已安装、校验后的文本/引用文件 | Read，不可信结果 |
+| skill_read(skill, path, offset?, limit?) | 分页阅读已安装、整包校验后的文本/引用文件 | Read，不可信结果 |
 | skill_run(skill, script, args?) | 运行已安装并校验后的脚本 | 每次需要用户批准 |
 
 ## 生命周期
 
 1. 通过 skill_search 找到目标，再选择固定版本。若未指定发布者，先从详情解析 namespace，再在文件清单、原文和下载请求中固定使用该发布者，校验清单返回的发布者身份。
-2. skill_inspect 展示完整文件清单、各文件 SHA256、SKILL.md 正文和脚本预览；返回 manifest.sha256，即整个版本清单的摘要。
-3. skill_install 用该 manifest.sha256 校验锁定版本，使用 SkillHub 下载 API 取 ZIP。每个 ZIP 路径都与清单比对，限制文件数量、体积、文件类型和哈希。若上游 ZIP 与清单不一致，改从同一发布者、同一版本的文件接口逐项下载，仍须全部满足原清单的大小与 SHA256；安装阶段绝不执行代码。
+2. 模型工具 skill_inspect 返回完整可解析的有界 JSON 摘要（`reviewStatus: summary_only`），不把整份长正文和脚本堆进输出后再依赖通用截断。使用 skill_review_read 的 `section: manifest` 分页读清单，`section: file` 分页读 SKILL.md 或清单内的源码；用 `nextOffset` 续读直到 `hasMore: false`。正文页最多 2048 字节，保证 UTF-8 边界；每页重新校验发布者、版本、整包摘要及文件哈希。摘要不代表完成源码审查。原生 UI 的 inspect / inspect_coordinate 继续返回完整审查和脚本预览。
+3. skill_install 用返回的 sha256 校验锁定版本，使用 SkillHub 下载 API 取 ZIP。每个 ZIP 路径都与清单比对，限制文件数量、体积、文件类型和哈希。若上游 ZIP 与清单不一致，改从同一发布者、同一版本的文件接口下载，最多并发 4 个请求、首个错误停止其余请求，仍须全部满足原清单的大小与 SHA256；安装阶段绝不执行代码。
 4. 全部验证成功后写入临时目录，并原子移动到用户的 chat/skills/<slug>。没有覆盖操作。
 5. load_skill 按需加载 SKILL.md；skill_read 读取引用文件；只有用户再次批准 skill_run 才调用本机解释器。运行前复核整包内容与锁文件一致。
+
+搜索、审查、安装分别有 45 / 180 / 300 秒的内部总预算，外层工具另留 5 秒清理时间；单次 HTTP 请求 30 秒、连接 8 秒。请求头和响应体等待均可响应取消，下载结束后及每个暂存文件写入、发布前再次检查取消状态。只在全包校验成功后原子发布，取消的暂存目录会清理。相同发布者、版本、摘要且文件仍完整的重复安装可以确认已有结果；不同来源、版本或被修改的目录仍拒绝覆盖。
 
 桌面端的普通 `read_file` 也可按绝对路径分页读取已安装技能的清单文件：宿主使用 `authorize_installed_file` 逐次核对目录边界、安装清单和整包哈希。未列入清单、被修改或逃逸技能目录的文件仍会被拒绝；这不会开放整个用户数据目录或写权限。
 
@@ -67,7 +70,7 @@ AI 商店专家页读取 `/api/v1/skillsets`，连接器页读取 `/api/v1/mcp/s
 
 专家包审查固定工作流正文、依赖发布者命名空间、版本、文件清单与脚本预览，生成整包摘要。安装时再次审查，摘要不一致则拒绝；所有依赖验证完成后发布工作流，失败回滚本次新增目录，不覆盖已有不同来源或版本。移除工作流保留共享依赖。依赖缺失或内容改变时标记未就绪。
 
-部分历史技能没有 YAML frontmatter。仅对注册中心提供了匹配身份及非空描述的技能，允许将元数据写进本机锁文件；元数据同样纳入审查摘要，原始 SKILL.md 字节及文件 SHA256 保持不变，安装与加载共用此约定。有头部的文件仍使用标准 YAML 解析并核对名称，不用注册中心描述掩盖损坏头部。
+部分历史技能没有 YAML frontmatter，另有技能的包内 name 与市场 slug 不同（包括中文名称）。注册中心发布者 + slug 决定安装身份，别名兼容通过锁文件 `metadata.registryIdentity` 显式标记；SkillHub 的元数据绑定同样纳入审查摘要，原始 SKILL.md 字节及文件 SHA256 保持不变。加载层核对锁文件与原文哈希，以市场 slug 加载，同时保留原文的描述、展示名和 user/model invocation 限制。损坏 YAML、缺失描述和错误哈希仍拒绝，普通手写技能仍要求名称与目录一致。安装、读取和运行统一支持最多 512 个文件；较大的文本引用通过 skill_read 分页读取，不再误用 100 文件/100 KiB 的旧限制。
 
 MCP 目录读取详情与 README，并在平台提供摘要时校验 README SHA256；JSON 配置模板只用于展示，用户填写凭据并确认后才交给连接器管理器启动。WorkBuddy 专用注册脚本或路径不会自动在小伴执行。
 
