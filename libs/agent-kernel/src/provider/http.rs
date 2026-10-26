@@ -31,11 +31,11 @@ pub(crate) trait Decoder {
 }
 
 pub(crate) fn new_client(profile: &super::wire::ProviderProfile) -> Result<Client, HarnessError> {
-    // Bound each request as well as header and stream idle time.
-    // The first response header and SSE idle have separate, shorter watchdogs below.
+    // Do not set a total request timeout: reqwest includes streaming body reads in
+    // that deadline, so a healthy long reasoning/output stream would be cut off.
+    // Header and per-chunk idle watchdogs below still bound stalled requests.
     let builder = Client::builder()
-        .connect_timeout(Duration::from_secs(15))
-        .timeout(Duration::from_secs(300));
+        .connect_timeout(Duration::from_secs(15));
     let builder = match profile.proxy_mode.as_str() {
         "direct" => builder.no_proxy(),
         "manual" => builder.no_proxy().proxy(reqwest::Proxy::all(profile.proxy_url.as_str())
@@ -56,6 +56,30 @@ pub(crate) fn merge_headers(mut headers: Vec<(String, String)>, extra: &[(String
 
 fn status_is_retryable(status: u16) -> bool {
     matches!(status, 408 | 425 | 429) || status >= 500
+}
+
+async fn wait_for_io<F: std::future::Future>(
+    future: F, cancel: &AtomicBool, timeout: Duration, phase: &str,
+) -> Result<F::Output, HarnessError> {
+    crate::net::wait(future, || cancel.load(Ordering::Relaxed), timeout).await
+        .map_err(|error| match error {
+            HarnessError::Provider { .. } => HarnessError::provider(
+                format!("model HTTP timeout {phase}: no data for {}s", timeout.as_secs()), true),
+            other => other,
+        })
+}
+
+fn transport_error(error: reqwest::Error, phase: &str) -> HarnessError {
+    let kind = if error.is_timeout() { "timed out" } else { "failed" };
+    // reqwest may label a body timeout as a decode error. Keep its source chain
+    // for diagnostics while showing the timeout and transport phase explicitly.
+    let mut detail = error.to_string();
+    let mut source = std::error::Error::source(&error);
+    while let Some(cause) = source {
+        detail.push_str(&format!(": {cause}"));
+        source = cause.source();
+    }
+    HarnessError::provider(format!("model HTTP {phase} {kind}: {detail}"), true)
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -81,19 +105,19 @@ pub(crate) fn post_stream_with_reasoning(
     rt.block_on(async {
         let mut builder=client.post(call.url);
         for (name,value) in call.headers {builder=builder.header(name,value);}
-        let mut response=crate::net::wait(builder.body(call.body).send(),||cancel.load(Ordering::Relaxed),RESPONSE_HEADER_TIMEOUT).await?
-            .map_err(|e|HarnessError::provider(format!("request failed: {e}"),true))?;
+        let mut response=wait_for_io(builder.body(call.body).send(),cancel,RESPONSE_HEADER_TIMEOUT,"waiting for response headers").await?
+            .map_err(|e|transport_error(e,"request"))?;
         if !response.status().is_success(){
             let status=response.status().as_u16();let mut raw=Vec::new();
             while raw.len()<ERROR_BODY_LIMIT as usize {
-                let chunk=crate::net::wait(response.chunk(),||cancel.load(Ordering::Relaxed),Duration::from_secs(10)).await?.map_err(|e|HarnessError::provider(e.to_string(),true))?;
+                let chunk=wait_for_io(response.chunk(),cancel,Duration::from_secs(10),"reading error response").await?.map_err(|e|transport_error(e,"error response read"))?;
                 let Some(chunk)=chunk else{break;};let n=chunk.len().min(ERROR_BODY_LIMIT as usize-raw.len());raw.extend_from_slice(&chunk[..n]);
             }
             return Err(HarnessError::provider(if status==413 { "HTTP 413: request_too_large: 请求体积超过服务端限制，请减少图片、降低截图尺寸或压缩会话后继续。".into() } else {format!("HTTP {status}: {}",String::from_utf8_lossy(&raw))},status_is_retryable(status)));
         }
         let mut parser=SseParser::default();let mut buffer=Vec::new();let mut total=0usize;let mut event_bytes=0usize;
         loop {
-            let chunk=crate::net::wait(response.chunk(),||cancel.load(Ordering::Relaxed),STREAM_IDLE_TIMEOUT).await?.map_err(|e|HarnessError::provider(e.to_string(),true))?;
+            let chunk=wait_for_io(response.chunk(),cancel,STREAM_IDLE_TIMEOUT,"waiting for stream data").await?.map_err(|e|transport_error(e,"stream read"))?;
             let Some(chunk)=chunk else{break;};total=total.saturating_add(chunk.len());
             if total>64*1024*1024 {return Err(HarnessError::provider("model stream exceeds 64 MiB",false));}
             buffer.extend_from_slice(&chunk);
@@ -116,11 +140,89 @@ pub(crate) fn post_stream_with_reasoning(
 mod cancellation_tests {
     use super::*;
     use std::sync::{Arc,mpsc};
-    use std::{io::Write, net::TcpListener};
+    use std::{io::{Read, Write}, net::TcpListener};
     struct NeverDone;
     impl Decoder for NeverDone {
         fn push(&mut self, _: &str, _: &mut dyn FnMut(&str)) -> Result<bool, HarnessError> { Ok(false) }
         fn complete(&self) -> bool { false }
+    }
+
+    // Release the final event only after the client has advanced its clock.
+    fn held_stream() -> (String, mpsc::Sender<()>, std::thread::JoinHandle<()>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let (release, wait) = mpsc::channel();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            let mut request = Vec::new();
+            let mut byte = [0];
+            while !request.ends_with(b"\r\n\r\n") {
+                if socket.read(&mut byte).unwrap_or(0) == 0 { return; }
+                request.push(byte[0]);
+            }
+            socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\ndata: thinking\n\n").unwrap();
+            let _ = wait.recv_timeout(Duration::from_secs(5));
+            let _ = socket.write_all(b"data: [DONE]\n\n");
+        });
+        (url, release, server)
+    }
+
+    #[test]
+    fn model_stream_can_read_past_the_former_total_deadline() {
+        let (url, release, server) = held_stream();
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let result = rt.block_on(async {
+            let mut profile = super::super::wire::ProviderProfile::new(&url, "", "test");
+            profile.proxy_mode = "direct".into();
+            let client = new_client(&profile).unwrap();
+            let mut response = client.get(&url).send().await.unwrap();
+            assert_eq!(response.chunk().await.unwrap().unwrap().as_ref(), b"data: thinking\n\n");
+            tokio::time::pause();
+            // Exercise reqwest's actual deadline without a five-minute wall-clock test.
+            tokio::time::advance(Duration::from_secs(301)).await;
+            tokio::time::resume();
+            release.send(()).unwrap();
+            response.chunk().await
+        });
+        server.join().unwrap();
+        assert_eq!(result.unwrap().unwrap().as_ref(), b"data: [DONE]\n\n");
+    }
+
+    #[test]
+    fn body_timeout_is_reported_as_timeout_instead_of_just_decode_error() {
+        let (url, release, server) = held_stream();
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let error = rt.block_on(async {
+            let client = Client::builder().no_proxy().timeout(Duration::from_secs(300)).build().unwrap();
+            let mut response = client.get(url).send().await.unwrap();
+            response.chunk().await.unwrap().unwrap();
+            tokio::time::pause();
+            tokio::time::advance(Duration::from_secs(301)).await;
+            tokio::time::resume();
+            let error = response.chunk().await.unwrap_err();
+            let _ = release.send(());
+            transport_error(error, "stream read")
+        });
+        server.join().unwrap();
+        assert!(matches!(error, HarnessError::Provider { message, retryable: true }
+            if message.contains("stream read timed out")), "body timeout must retain its cause");
+    }
+
+    #[test]
+    fn io_watchdogs_report_the_phase_and_still_honor_cancellation() {
+        let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        rt.block_on(async {
+            for phase in ["waiting for response headers", "waiting for stream data"] {
+                let error = wait_for_io(std::future::pending::<()>(), &AtomicBool::new(false),
+                    Duration::ZERO, phase).await.unwrap_err();
+                assert!(matches!(error, HarnessError::Provider { message, retryable: true }
+                    if message.contains(phase) && message.contains("timeout")));
+            }
+            let error = wait_for_io(std::future::pending::<()>(), &AtomicBool::new(true),
+                STREAM_IDLE_TIMEOUT, "waiting for stream data").await.unwrap_err();
+            assert_eq!(error, HarnessError::Cancelled);
+        });
     }
     #[test]
     fn cancel_does_not_wait_for_the_first_response_headers() {
