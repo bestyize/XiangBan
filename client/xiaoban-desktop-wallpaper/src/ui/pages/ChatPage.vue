@@ -10,6 +10,7 @@ import ChatWorkspaceMenu from '../components/ChatWorkspaceMenu.vue';
 import ChatExpertChip from '../components/ChatExpertChip.vue';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatActivity from '../chat/ChatActivity.vue';
+import ChatTaskCard from '../chat/ChatTaskCard.vue';
 import ChatReasoning from '../chat/ChatReasoning.vue';
 import ChatGoalPanel from '../chat/ChatGoalPanel.vue';
 import ChatConnectorRequest from '../chat/ChatConnectorRequest.vue';
@@ -18,9 +19,10 @@ import MarkdownView from '../chat/MarkdownView.ts';
 import SelectionCopyMenu from '../chat/SelectionCopyMenu.vue';
 import { attachmentImage } from '../chat/attachments.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
-import { approvalPreview, formatTokens, isImeEnter, isNearBottom, riskVerb, toolLabel } from '../chat/format.ts';
+import { approvalPreview, clip, formatTokens, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from '../chat/format.ts';
 import { describeCall } from '../chat/view.ts';
 import { replyBlocks, type ReplyBlock, type ToolCall } from '../chat/replies.ts';
+import { taskProgress, type TaskProgress } from '../chat/task-progress.ts';
 import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest } from '../chat/types.ts';
 
 const props = defineProps<{ store: ControlStore }>();
@@ -70,6 +72,47 @@ const thinking = computed(() => {
 });
 const statusLine = computed(() => view.value?.status || (waiting.value ? '等你确认后继续' : thinking.value ? '思考中…' : ''));
 const lastBlockId = computed(() => blocks.value.at(-1)?.id);
+const progressByBlock = computed(() => new Map(blocks.value.map(block => [block.id, taskProgress(block,
+  running.value && block.id === lastBlockId.value,
+  block.id === lastBlockId.value ? view.value?.questions.length ? 'question' : view.value?.approvals.length ? 'approval' : null : null,
+  block.id === lastBlockId.value ? statusLine.value : '',
+)])));
+const progressOf = (block: ReplyBlock) => progressByBlock.value.get(block.id) ?? null;
+const planEditorOpen = ref(false);
+const planInstruction = ref('');
+const planRevisionBusy = ref(false);
+const planSession = ref<string | null>(null);
+const editingProgress = ref<TaskProgress | null>(null);
+function adjustPlan(block: ReplyBlock) {
+  planSession.value = chat.currentId;
+  editingProgress.value = progressOf(block);
+  planInstruction.value = '';
+  planEditorOpen.value = true;
+}
+async function savePlanRevision() {
+  if (!planInstruction.value.trim() || planRevisionBusy.value) return;
+  if (chat.currentId !== planSession.value) { props.store.notify('会话已切换，请回到原会话调整计划。', 'info'); return; }
+  planRevisionBusy.value = true;
+  props.store.asr?.deactivate();
+  try {
+    if (await chat.revisePlan(planInstruction.value)) { planEditorOpen.value = false; stick.value = true; }
+  } finally { planRevisionBusy.value = false; }
+}
+function showTaskProcess(block: ReplyBlock) {
+  if (!panelOpen.value) togglePanel();
+  processBlockId.value = block.id;
+}
+async function showTaskAttention() {
+  await nextTick();
+  const target = scroller.value?.querySelector<HTMLElement>('[data-testid="chat-question"], [data-testid="chat-approval"]');
+  target?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+  target?.querySelector<HTMLElement>('button, input')?.focus();
+}
+function resumeTask() {
+  props.store.asr?.deactivate();
+  stick.value = true;
+  void chat.send('请先核对已完成的进展和当前状态，再从未完成的步骤继续原任务。结果不明的操作先检查，不要直接重放；原有授权范围不变。');
+}
 
 onMounted(async () => {
   const first = !chat.ready;
@@ -220,9 +263,12 @@ function clearSearch() { searchOpen.value = false; searchText.value = ''; hits.v
 const PANEL_KEY = 'xiaoban.chat.exec-panel';
 function savedPanel() { try { return localStorage.getItem(PANEL_KEY) === '1'; } catch { return false; } }
 const panelOpen = ref(savedPanel());
-function togglePanel() { panelOpen.value = !panelOpen.value; try { localStorage.setItem(PANEL_KEY, panelOpen.value ? '1' : '0'); } catch { /* remembered for this visit only */ } }
+const processBlockId = ref<string | null>(null);
+function togglePanel() { panelOpen.value = !panelOpen.value; processBlockId.value = null; try { localStorage.setItem(PANEL_KEY, panelOpen.value ? '1' : '0'); } catch { /* remembered for this visit only */ } }
 const allCalls = computed(() => (view.value?.items ?? []).filter((item): item is ToolCall => item.kind === 'tool'));
-const panelFiles = computed(() => filesOf(allCalls.value));
+const panelCalls = computed(() => processBlockId.value ? blocks.value.find(block => block.id === processBlockId.value)?.calls ?? [] : allCalls.value);
+const panelFiles = computed(() => filesOf(panelCalls.value));
+watch(() => chat.currentId, () => { processBlockId.value = null; planEditorOpen.value = false; });
 
 /* ── Asking the user ─────────────────────────────────────────────────── */
 const decide = (request: ApprovalRequest, decision: ApprovalDecision) => chat.answerApproval(request, decision);
@@ -251,6 +297,12 @@ async function openLink(href: string) {
     </div>
   </NModal>
   <ChatNameDialog :show="renaming" title="重命名对话" placeholder="给这个对话起个名字" :initial="session?.title ?? ''" :max-length="60" confirm-text="保存" :busy="renameBusy" @close="renaming = false" @submit="submitRename" />
+  <NModal v-model:show="planEditorOpen" preset="card" title="调整后续计划" class="task-plan-editor" :style="{ width: '480px', maxWidth: 'calc(100vw - 32px)' }" :mask-closable="!planRevisionBusy" :close-on-esc="!planRevisionBusy" :closable="!planRevisionBusy">
+    <p class="plan-editor-note">已完成的步骤会保留。提交后会先停止当前执行，再由小伴核对现场、调整计划并继续。</p>
+    <ol v-if="editingProgress" class="plan-editor-steps"><li v-for="(step, index) in editingProgress.plan.steps" :key="index" :class="{ done: step.status === 'completed' }"><Check v-if="step.status === 'completed'" :size="12" /><span v-else>{{ index + 1 }}</span>{{ step.content }}</li></ol>
+    <NInput v-model:value="planInstruction" type="textarea" autofocus :maxlength="2000" :disabled="planRevisionBusy" placeholder="例如：汇报改为面向管理层，控制在 5 分钟内" :autosize="{ minRows: 3, maxRows: 7 }" data-testid="task-plan-input" />
+    <template #footer><div class="plan-editor-actions"><NButton size="small" :disabled="planRevisionBusy" @click="planEditorOpen = false">取消</NButton><NButton type="primary" size="small" :disabled="!planInstruction.trim()" :loading="planRevisionBusy" data-testid="task-plan-submit" @click="savePlanRevision">调整并继续</NButton></div></template>
+  </NModal>
   <section class="chat-page" data-testid="chat-page">
     <div class="chat-main">
       <header class="chat-head" data-tauri-drag-region>
@@ -326,7 +378,8 @@ async function openLink(href: string) {
               </div>
               <section v-else class="reply" data-testid="chat-reply">
                 <header v-if="speaks(block)" class="reply-head"><span class="brand-mark" aria-hidden="true"><Sprout :size="14" :stroke-width="2.2" /></span><b>小伴</b></header>
-                <ChatActivity v-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === lastBlockId" :waiting="waiting && block.id === lastBlockId" :status="block.id === lastBlockId ? statusLine : ''" />
+                <ChatTaskCard v-if="progressOf(block)" :progress="progressOf(block)!" :calls="block.calls" :current="block.id === lastBlockId" :show-logs="!chat.hideToolCalls" :disabled="planRevisionBusy" :configured="chat.configured" @logs="showTaskProcess(block)" @adjust="adjustPlan(block)" @resume="resumeTask" @stop="chat.cancel()" @attention="showTaskAttention" />
+                <ChatActivity v-else-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === lastBlockId" :waiting="waiting && block.id === lastBlockId" :status="block.id === lastBlockId ? statusLine : ''" />
                 <template v-for="item in block.items" :key="item.id">
                   <ChatReasoning v-if="item.kind === 'reasoning'" :text="item.text" :reasoning-kind="item.reasoningKind" :streaming="item.streaming" />
                   <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
@@ -348,8 +401,8 @@ async function openLink(href: string) {
                     </template>
                   </div>
                 </template>
-                <details v-if="finished(block) && filesOf(block.calls).length" class="file-cards" data-testid="chat-files">
-                  <summary class="file-summary" data-testid="chat-files-toggle"><ChevronRight :size="14" class="file-chevron" /><FileText :size="14" /><span>文件变更</span><span class="file-count">{{ filesOf(block.calls).length }}</span><small>{{ spaceName }}</small></summary>
+                <details v-if="finished(block) && filesOf(block.calls).length" class="file-cards" :open="!!progressOf(block)" :class="{ 'task-delivery': !!progressOf(block) }" data-testid="chat-files">
+                  <summary class="file-summary" data-testid="chat-files-toggle"><ChevronRight :size="14" class="file-chevron" /><FileText :size="14" /><span>{{ progressOf(block)?.state === 'completed' ? '交付文件' : '文件变更' }}</span><span class="file-count">{{ filesOf(block.calls).length }}</span><small>{{ spaceName }}</small></summary>
                   <div class="file-list" role="list" aria-label="本轮变更的文件">
                     <div v-for="file in filesOf(block.calls)" :key="file.path" class="file-card" data-testid="chat-file-card" :title="file.path" role="listitem">
                       <span class="file-ext" aria-hidden="true">{{ file.ext }}</span>
@@ -407,7 +460,7 @@ async function openLink(href: string) {
     </div>
 
     <aside v-if="panelOpen" class="exec-panel" data-testid="chat-exec-panel" aria-label="执行面板">
-      <header class="panel-head"><b>执行面板</b><button type="button" class="xb-icon-btn is-sm" aria-label="隐藏执行面板" @click="togglePanel"><X :size="14" /></button></header>
+      <header class="panel-head"><b>{{ processBlockId ? '任务执行过程' : '执行面板' }}</b><button type="button" class="xb-icon-btn is-sm" aria-label="隐藏执行面板" @click="togglePanel"><X :size="14" /></button></header>
       <div class="panel-body xb-scroll">
         <section class="panel-section">
           <h3>工作区</h3>
@@ -419,12 +472,12 @@ async function openLink(href: string) {
           <p class="panel-mode" :class="{ danger: chat.permissionMode === 'auto' }"><ShieldAlert v-if="chat.permissionMode === 'auto'" :size="14" /><ShieldCheck v-else :size="14" />{{ chat.permissionMode === 'auto' ? '完全信任：不再询问直接执行' : '默认权限：执行前先问你' }}</p>
         </section>
         <section class="panel-section">
-          <h3>执行步骤<small v-if="allCalls.length">{{ allCalls.length }}</small></h3>
-          <p v-if="!allCalls.length" class="panel-empty">小伴还没有执行操作。读写文件、运行命令时会在这里列出来。</p>
+          <h3>执行步骤<small v-if="panelCalls.length">{{ panelCalls.length }}</small></h3>
+          <p v-if="!panelCalls.length" class="panel-empty">小伴还没有执行操作。读写文件、运行命令时会在这里列出来。</p>
           <ol v-else class="panel-steps">
-            <li v-for="call in allCalls" :key="call.id" :class="call.status">
+            <li v-for="call in panelCalls" :key="call.id" :class="call.status">
               <LoaderCircle v-if="call.status === 'running'" :size="13" class="spin" /><Check v-else-if="call.status === 'done'" :size="13" /><X v-else :size="13" />
-              <span><b>{{ toolLabel(call.name) }}</b><small :title="describeCall(call.name, call.arguments)">{{ describeCall(call.name, call.arguments) }}</small></span>
+              <details class="panel-call"><summary><b>{{ toolLabel(call.name) }}</b><small :title="describeCall(call.name, call.arguments)">{{ describeCall(call.name, call.arguments) }}</small></summary><pre v-if="call.arguments">{{ clip(prettyArguments(call.arguments)) }}</pre><pre v-if="call.output">{{ clip(call.output) }}</pre></details>
             </li>
           </ol>
         </section>
@@ -444,6 +497,11 @@ async function openLink(href: string) {
 </template>
 
 <style scoped>
+.plan-editor-note{margin:0 0 12px;color:var(--ui-text-secondary);font-size:12px;line-height:1.7}
+.plan-editor-steps{list-style:none;margin:0 0 15px;padding:0;display:grid;gap:8px;color:var(--ui-text-primary);font-size:12px}
+.plan-editor-steps li{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}.plan-editor-steps li>span{width:12px;flex:none;color:var(--ui-text-tertiary);font-size:10px}.plan-editor-steps .done{color:var(--ui-text-tertiary)}.plan-editor-steps .done svg{flex:none;color:var(--ui-ink)}.plan-editor-actions{display:flex;justify-content:flex-end;gap:8px}
+.task-delivery{max-width:600px}
+.panel-call{min-width:0;flex:1}.panel-call summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:1px}.panel-call summary::-webkit-details-marker{display:none}.panel-call pre{max-height:180px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--ui-control);border-radius:7px;padding:8px;margin:7px 0 0;font:11px/1.6 var(--ui-font-mono);color:var(--ui-text-secondary)}
 .goal-modal-content{width:fit-content;max-width:100%;outline:none}
 .chat-page{flex:1;min-height:0;min-width:0;display:flex;background:var(--ui-surface);position:relative}
 .chat-main{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;position:relative}

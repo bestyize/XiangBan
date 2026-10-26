@@ -49,6 +49,44 @@ function harness(responders: Record<string, Responder> = {}, desktop = true) {
   return { store, deps, emit, events, calls, contextCalls, commands, handlers, stopped, table };
 }
 
+describe('revising a running task plan', () => {
+  it('waits for cancellation to finish before sending the revision and keeps the original authorization mode', async () => {
+    const h = harness({ chat_new_session: () => summary('s1'), chat_send: () => summary('s1'), chat_cancel: () => undefined });
+    await h.store.init(); await h.store.send('制作汇报');
+    const revised = h.store.revisePlan('改为面向管理层');
+    await Promise.resolve(); await Promise.resolve();
+    expect(h.calls.filter(([c]) => c === 'chat_send')).toHaveLength(1);
+    h.events('s1', { type: 'cancelled' });
+    expect(await revised).toBe(true);
+    expect(h.calls.filter(([c]) => c === 'chat_send').at(-1)?.[1]?.text).toContain('改为面向管理层');
+    expect(h.calls.filter(([c]) => c === 'chat_send').at(-1)?.[1]?.text).toContain('原有授权范围不变');
+    expect(h.store.permissionMode).toBe('ask'); h.store.dispose();
+  });
+
+  it('retains the instruction on cancellation failure and never sends it to a different conversation', async () => {
+    const h = harness({ chat_new_session: () => summary('s1'), chat_send: () => summary('s1'), chat_cancel: () => { throw new Error('无法停止'); } });
+    await h.store.init(); await h.store.send('制作汇报');
+    expect(await h.store.revisePlan('新要求')).toBe(false);
+    expect(h.calls.filter(([c]) => c === 'chat_send')).toHaveLength(1);
+    h.table.chat_cancel = () => { void h.store.select(null); h.events('s1', { type: 'cancelled' }); };
+    expect(await h.store.revisePlan('仍属于 s1 的要求')).toBe(false);
+    expect(h.calls.filter(([c]) => c === 'chat_send')).toHaveLength(1); h.store.dispose();
+  });
+
+  it('does not send the revision when native work never acknowledges cancellation', async () => {
+    vi.useFakeTimers();
+    const h = harness({ chat_new_session: () => summary('s1'), chat_send: () => summary('s1'), chat_cancel: () => undefined });
+    try {
+      await h.store.init(); await h.store.send('制作汇报');
+      const revised = h.store.revisePlan('改计划');
+      await vi.advanceTimersByTimeAsync(5001);
+      expect(await revised).toBe(false);
+      expect(h.calls.filter(([c]) => c === 'chat_send')).toHaveLength(1);
+      expect(h.store.current()?.running).toBe(true);
+    } finally { h.store.dispose(); vi.useRealTimers(); }
+  });
+});
+
 describe('an answer cut off by a crash', () => {
   it('says so after the history loads, naming what may already have run', async () => {
     const h = harness({

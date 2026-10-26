@@ -77,6 +77,70 @@ const approval = (patch: Partial<ApprovalRequest> = {}): ApprovalRequest => ({ i
 beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); });
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; });
 
+describe('compact task execution cards', () => {
+  const plan = (complete = false) => JSON.stringify({ todos: [
+    { content: '读取工作记录', status: 'completed', evidence: '已读取 notes.md' },
+    { content: '生成周报', status: complete ? 'completed' : 'in_progress', evidence: complete ? '已写入 周报.md' : '' },
+  ] });
+  it('updates the same card, keeps operation permissions independent and reveals actual output files', async () => {
+    const h = await open({ ...startChat, chat_answer_approval: () => undefined });
+    await type('整理工作记录并生成周报'); await click('chat-send');
+    await h.events('s1', { type: 'tool_start', id: 'p1', name: 'todo', arguments: plan() });
+    expect(q('chat-task-card')).toBeNull();
+    await h.events('s1', { type: 'tool_end', id: 'p1', output: 'Todo list updated:', is_error: false });
+    expect(q('task-count')?.textContent).toBe('已完成 1 / 2 步');
+    expect(q('chat-activity')).toBeNull();
+    h.emit('chat-approval', approval()); await flushPromises();
+    expect(q('task-state')?.textContent).toContain('等待授权');
+    expect(q('chat-approval')).not.toBeNull();
+    await click('approval-once');
+    await h.events('s1', { type: 'tool_start', id: 'w', name: 'write_file', arguments: '{"path":"周报.md","content":"周报正文"}' }, { type: 'tool_end', id: 'w', output: 'written', is_error: false });
+    await h.events('s1', { type: 'tool_start', id: 'p2', name: 'todo', arguments: plan(true) }, { type: 'tool_end', id: 'p2', output: 'Todo list updated:', is_error: false });
+    expect(all('[data-testid="chat-task-card"]')).toHaveLength(1);
+    expect(q('task-count')?.textContent).toBe('已完成 2 / 2 步');
+    expect(q('task-state')?.textContent).toContain('执行中');
+    await h.events('s1', { type: 'text_delta', text: '已生成周报。' }, { type: 'done' });
+    expect(q('task-state')?.textContent).toContain('已完成');
+    expect(q<HTMLDetailsElement>('chat-files')?.open).toBe(true);
+    expect(q('chat-files-toggle')?.textContent).toContain('交付文件');
+    expect(q('chat-file-card')?.textContent).toContain('周报.md');
+    await click('task-logs');
+    expect(q('chat-exec-panel')?.textContent).toContain('任务执行过程');
+    expect(all('.panel-call')).toHaveLength(3);
+  });
+
+  it('restores persisted plans even when raw tool cards are hidden, without claiming an interrupted plan completed', async () => {
+    await open({
+      chat_overview: () => overview({ sessions: [summary('s1', '生成周报')], hideToolCalls: true }),
+      chat_load_session: () => [
+        { role: 'user', parts: [{ type: 'text', text: '生成周报' }] },
+        { role: 'assistant', tool_calls: [{ id: 'p', name: 'todo', arguments: plan() }] },
+        { role: 'tool', tool_call_id: 'p', parts: [{ type: 'text', text: 'Todo list updated:' }] },
+      ],
+    });
+    await openSession('s1');
+    expect(q('task-count')?.textContent).toContain('1 / 2');
+    expect(q('task-state')?.textContent).toContain('已暂停');
+    expect(q('task-logs')).toBeNull();
+    expect(q('chat-activity')).toBeNull();
+    expect(q('task-resume')).not.toBeNull();
+  });
+
+  it('submits a revision only after the original task has stopped', async () => {
+    const h = await open({ ...startChat, chat_cancel: () => undefined });
+    await type('生成周报'); await click('chat-send');
+    await h.events('s1', { type: 'tool_start', id: 'p', name: 'todo', arguments: plan() }, { type: 'tool_end', id: 'p', output: 'Todo list updated:', is_error: false });
+    await click('task-adjust');
+    const input = inBody('task-plan-input')!.querySelector('textarea')!;
+    input.value = '改为面向管理层'; input.dispatchEvent(new Event('input', { bubbles: true })); await flushPromises();
+    inBody('task-plan-submit')!.click(); await flushPromises();
+    expect(h.commands().filter(c => c === 'chat_send')).toHaveLength(1);
+    expect(h.commands()).toContain('chat_cancel');
+    await h.events('s1', { type: 'cancelled' }); await flushPromises();
+    expect(h.calls.filter(([c]) => c === 'chat_send').at(-1)?.[1]?.text).toContain('改为面向管理层');
+  });
+});
+
 describe('chat workbench composer actions', () => {
   it('keeps capability menus in the composer and uses the desktop AI Store inventories', async () => {
     const h = await open({

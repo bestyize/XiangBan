@@ -1,7 +1,7 @@
 import type { PendingAttachment } from './attachments.ts';
 import type { Mention } from './mentions.ts';
 import { modelFailure } from './model-errors.ts';
-import { reactive } from 'vue';
+import { reactive, watch } from 'vue';
 import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, ExpertView, Library, Overview, QuestionRequest, RecentWorkspace, SessionSummary, SessionView, WireMessage, WorktreeInfo, WorktreeLink } from './types.ts';
 import { applyEvent, checkpointNotice, interruptedNotice, itemsFromHistory, newView, nextId, summaryNotice, workspaceNotice } from './view.ts';
 import { toolLabel } from './format.ts';
@@ -79,6 +79,8 @@ export interface ChatStore {
   sentHere(session: string): boolean;
   retry(): Promise<boolean>;
   cancel(): Promise<void>;
+  /** Stop the current run and wait for its terminal event before sending a plan revision. */
+  revisePlan(instruction: string): Promise<boolean>;
   remove(id: string): Promise<void>;
   /** The size of the next request in the open conversation (or of a new one), against the limit chosen in settings. */
   context: ContextInfo;
@@ -126,6 +128,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   const loading = new Map<string, Promise<void>>();
   const activeRun = new Map<string, string>();
   const cursors = new Map<string, number>();
+  let revisingPlan = false;
   interface Outcome {runId:string;status:string;validator:string;evidence:string}
   interface Snapshot { outcome?:Outcome; pending?: PendingSnapshot; messages: WireMessage[]; runId?: string; sequence?: number; events?: ChatEventPayload[]; running?: boolean; ready?: boolean; warning?: string; interrupted?: boolean }
 
@@ -457,6 +460,31 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       deps.onActivity?.();
       const id = store.currentId;
       if (id) await deps.invoke('chat_cancel', { sessionId: id }).catch(error => deps.notify(error, 'error'));
+    },
+
+    async revisePlan(instruction) {
+      const id = store.currentId, view = store.current();
+      if (!id || !view || !instruction.trim() || revisingPlan) return false;
+      const run = activeRun.get(id);
+      revisingPlan = true;
+      try {
+        if (view.running) {
+          // A cancellation request returning does not mean native tools have finished stopping.
+          await deps.invoke('chat_cancel', { sessionId: id });
+          if (view.running) await new Promise<void>((resolve, reject) => {
+            const stop = watch(() => view.running, running => {
+              if (!running) { clearTimeout(timeout); stop(); resolve(); }
+            }, { flush: 'sync' });
+            const timeout = setTimeout(() => { stop(); reject(new Error('任务尚未停止，修改要求已保留，请稍后再试。')); }, 5000);
+          });
+        }
+        if (disposed || store.currentId !== id || store.views[id] !== view || activeRun.get(id) !== run) {
+          deps.notify('会话或运行已切换，修改要求尚未发送。', 'info');
+          return false;
+        }
+        return await store.send(`请调整当前任务的后续计划：\n${instruction.trim()}\n保留已经完成的进展，先核对当前状态和执行依据，再用 todo 更新后续步骤并继续。结果不明的操作先检查，不要直接重放；原有授权范围不变。`);
+      } catch (error) { deps.notify(error, 'error'); return false; }
+      finally { revisingPlan = false; }
     },
 
     async remove(id) {
