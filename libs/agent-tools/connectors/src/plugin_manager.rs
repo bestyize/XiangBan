@@ -17,6 +17,78 @@ pub struct ConnectorState {
     #[serde(default)]
     pub env_overrides: BTreeMap<String, String>,
 }
+
+#[cfg(test)]
+mod browser_auth_tests {
+    use super::*;
+    use crate::plugin::{AuthSpec, Display, ServerSpec, TokenField, TokenSchema};
+    fn github() -> ConnectorPlugin {
+        ConnectorPlugin { name: "old-github-package".into(), version: "1".into(), display: Display::default(),
+            skills_dir: None, icon: None, servers: vec![ServerSpec {
+                name: "github".into(), transport: Transport::StreamableHttp,
+                url: Some("https://api.githubcopilot.com/mcp/".into()), command: None, args: vec![], env: BTreeMap::new(),
+                headers: BTreeMap::from([("Authorization".into(), "Bearer ${TOKEN}".into()), ("X-MCP-Readonly".into(), "true".into())]),
+                auth: AuthSpec::Token { schema: TokenSchema { fields: vec![TokenField {
+                    key: "TOKEN".into(), label: "Token".into(), label_en: String::new(), field_type: "password".into(),
+                    required: true, placeholder: String::new(), placeholder_en: String::new(), description: String::new(), description_en: String::new(),
+                }], ..TokenSchema::default() }, headers: vec![("Authorization".into(), "TOKEN".into(), "Bearer ".into())] },
+                disabled_tools: vec!["delete_repository".into()], timeout_ms: Some(1234),
+            }] }
+    }
+    #[test]
+    fn legacy_token_binding_uses_browser_without_requiring_or_forwarding_saved_secrets() {
+        let root = std::env::temp_dir().join(format!("github-adapter-{}", crate::oauth::random().unwrap()));
+        let manager = std::sync::Arc::new(ConnectorManager::new(root.clone(), root.clone()).unwrap());
+        let plugin = github();
+        let id = plugin.connection_id("github");
+        assert!(plugin.build_config("github", &BTreeMap::new()).is_err());
+        manager.plugin_vault().unwrap().set(&id, "TOKEN", "saved-pat").unwrap();
+        let reference = "headers:Authorization";
+        manager.plugin_vault().unwrap().set(&format!("{id}/overrides"), reference, "Bearer override-secret").unwrap();
+        let mut state = manager.plugin_state(&id);
+        state.header_overrides.insert("Authorization".into(), reference.into());
+        manager.store_plugin_state(&id, state).unwrap();
+        let legacy = json!({"connectorPlugin":Binding { plugin: plugin.clone(), server:"github".into() }});
+        let mut browser = legacy.clone(); browser["browserAuth"] = json!(true);
+        let snapshot = crate::normalized_config(&browser).unwrap();
+        let snapshot: Value = serde_json::from_slice(&serde_json::to_vec(&snapshot).unwrap()).unwrap();
+        let (config, disabled, timeout) = manager.resolve_plugin_config(&id, &snapshot).unwrap();
+        assert_eq!(config["authMode"], "device");
+        assert_eq!(config["headers"]["X-MCP-Readonly"], "true");
+        assert!(config["headers"].get("Authorization").is_none());
+        assert!(!config.to_string().contains("secret"));
+        assert!(!config.to_string().contains("saved-pat"));
+        assert_eq!(disabled, vec!["delete_repository"]);
+        assert_eq!(timeout, Duration::from_millis(1234));
+        // Manual fallback still resolves the original package and saved PATs.
+        assert_eq!(manager.resolve_plugin_config(&id, &legacy).unwrap().0["headers"]["Authorization"], "Bearer override-secret");
+        assert_eq!(manager.plugin_vault().unwrap().get(&id, "TOKEN").unwrap().as_deref(), Some("saved-pat"));
+        assert!(manager.begin_connect_plugin_with_auth(&plugin, "github", &BTreeMap::new(), false, true).is_err());
+        let mut authenticated = snapshot; authenticated["oauthSession"] = json!(crate::oauth::random().unwrap());
+        let config = crate::normalized_config(&authenticated).unwrap();
+        let (effective, _, _) = manager.resolve_plugin_config(&id, &config).unwrap();
+        assert_eq!(effective["authMode"], "oauth");
+        assert_eq!(effective["oauthSession"], config["oauthSession"]);
+        manager.shutdown(); std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn adapter_recognizes_official_packages_and_rejects_titles_and_lookalike_hosts() {
+        let mut plugin = github(); let spec = &mut plugin.servers[0];
+        for bad in ["https://api.githubcopilot.com.evil.example/mcp/", "https://github.example/mcp/",
+            "https://api.githubcopilot.com/chat/completions", "https://api.githubcopilot.com:444/mcp/",
+            "https://token@api.githubcopilot.com/mcp/", "https://api.githubcopilot.com/mcp/?token=secret"] {
+            spec.url = Some(bad.into()); assert!(spec.browser_auth_config().is_none(), "{bad}");
+        }
+        spec.transport = Transport::Stdio; spec.url = None;
+        for (command, args) in [("npx", vec!["-y", "@modelcontextprotocol/server-github@0.6.2"]),
+            ("docker", vec!["run", "ghcr.io/github/github-mcp-server:latest"]), ("/usr/local/bin/github-mcp-server", vec!["stdio"])] {
+            spec.command = Some(command.into()); spec.args = args.iter().map(|s| s.to_string()).collect();
+            assert_eq!(spec.browser_auth_config().unwrap()["url"], "https://api.githubcopilot.com/mcp/");
+        }
+        spec.command = Some("npx".into()); spec.args = vec!["@other/server-github".into()];
+        assert!(spec.browser_auth_config().is_none());
+    }
+}
 impl Default for ConnectorState {
     fn default() -> Self {
         Self {
@@ -170,6 +242,22 @@ impl ConnectorManager {
         values: &BTreeMap<String, String>,
         confirmed: bool,
     ) -> Result<Value, String> {
+        self.begin_connect_plugin_with_auth(plugin, server, values, confirmed, values.is_empty())
+    }
+    /// The browser path deliberately ignores saved PATs. Manual token fallback
+    /// uses the original package and vault, including previously saved fields.
+    pub fn begin_connect_plugin_with_auth(
+        self: &std::sync::Arc<Self>, plugin: &ConnectorPlugin, server: &str,
+        values: &BTreeMap<String, String>, confirmed: bool, prefer_browser: bool,
+    ) -> Result<Value, String> {
+        if !confirmed { return Err("连接插件前需要用户明确确认配置".into()); }
+        if prefer_browser && values.is_empty() && plugin.server(server)?.browser_auth_config().is_some() {
+            let _operation = self.plugin_operations.lock().unwrap_or_else(|e| e.into_inner());
+            let id = plugin.connection_id(server);
+            self.enable_plugin_state(&id)?;
+            return self.begin_connect(&id, &plugin.display.name.chars().take(100).collect::<String>(),
+                json!({"connectorPlugin":Binding { plugin: plugin.clone(), server: server.into() },"browserAuth":true}), true);
+        }
         match self.connect_plugin(plugin, server, values, confirmed) {
             Ok(mut status) => {
                 status["status"] = json!("connected");
@@ -220,14 +308,20 @@ impl ConnectorManager {
         if !state.enabled || state.user_disabled {
             return Err("连接器已停用".into());
         }
-        let vault = self.plugin_vault()?;
-        let values = self.plugin_values(&binding.plugin, &binding.server, id, &vault)?;
-        let mut built = binding.plugin.build_config(&binding.server, &values)?;
         let spec = binding.plugin.server(&binding.server)?;
+        let browser = config["browserAuth"] == true;
+        let vault = self.plugin_vault()?;
+        let mut built = if browser {
+            spec.browser_auth_config().ok_or("此连接器不支持内置网页登录，请使用原有配置连接")?
+        } else {
+            let values = self.plugin_values(&binding.plugin, &binding.server, id, &vault)?;
+            binding.plugin.build_config(&binding.server, &values)?
+        };
         for (target, overrides) in [
             ("headers", &state.header_overrides),
             ("env", &state.env_overrides),
         ] {
+            if browser { continue; } // Never forward legacy PAT/env overrides into browser auth.
             if !overrides.is_empty() {
                 let map = built[target]
                     .as_object_mut()

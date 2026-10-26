@@ -9,10 +9,13 @@ const emit = defineEmits<{ updated: [item: InstalledConnector]; connected: [item
 const busy = ref(false), error = ref('');
 const authorization = ref<{ flowId: string; authorizationUrl: string; userCode?: string } | null>(null);
 const copied = ref(false);
+const manualToken = ref(false);
+const browserAuth = computed(() => props.connector.auth.browser === true && !manualToken.value);
+const browserOpened = ref(false);
 let alive = true, polling = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
-const local = computed(() => props.connector.transport === 'stdio');
-const missing = computed(() => props.connector.auth.schema?.fields.some(f => f.required && !props.connector.auth.configured.includes(f.key)) ?? false);
+const local = computed(() => props.connector.transport === 'stdio' && !browserAuth.value);
+const missing = computed(() => !browserAuth.value && (props.connector.auth.schema?.fields.some(f => f.required && !props.connector.auth.configured.includes(f.key)) ?? false));
 const configurable = computed(() => !props.connector.unsupported && (!['token', 'env'].includes(props.connector.auth.type) || !!props.connector.auth.schema));
 function setBusy(value: boolean) { busy.value = value; emit('busy', value || !!authorization.value); }
 function update(item: InstalledConnector, notifyConnected = true) {
@@ -33,11 +36,11 @@ async function copyUserCode() {
     await navigator.clipboard.writeText(authorization.value.userCode);
     copied.value = true;
     setTimeout(() => { copied.value = false; }, 2000);
-  } catch { /* Clipboard unavailable */ }
+  } catch { error.value = '复制失败，请手动复制上方验证码。'; }
 }
 async function openAuthorizationPage() {
   if (!authorization.value) return;
-  try { await invoke('open_download_url', { url: authorization.value.authorizationUrl }); }
+  try { await invoke('open_download_url', { url: authorization.value.authorizationUrl }); browserOpened.value = true; error.value = ''; }
   catch (e) { if (alive) error.value = `无法打开授权页面，请点击“打开授权页面”重试：${String(e)}`; }
 }
 async function pollAuthorization() {
@@ -66,13 +69,16 @@ async function connect(values: Record<string, string> = {}) {
   if (busy.value || authorization.value || !configurable.value) return;
   setBusy(true); error.value = '';
   try {
-    const result = await invoke<InstalledConnector | ConnectorAuthorization>('ai_connector_configure', { id: props.connector.id, values, confirmed: true });
+    const result = await invoke<InstalledConnector | ConnectorAuthorization>('ai_connector_configure', { id: props.connector.id, values, confirmed: true,
+      ...(props.connector.auth.browser ? { preferBrowser: browserAuth.value } : {}) });
     if (!alive) {
       if ('flowId' in result && result.flowId) await invoke('ai_store_connector_auth_cancel', { flowId: result.flowId });
       return;
     }
     if (result.status === 'authorization_required' && 'flowId' in result && result.flowId && result.authorizationUrl) {
       authorization.value = { flowId: result.flowId, authorizationUrl: result.authorizationUrl, userCode: result.userCode };
+      copied.value = false;
+      browserOpened.value = false;
       await openAuthorizationPage();
       if (alive) timer = setTimeout(() => void pollAuthorization(), 1000);
     } else if ('id' in result) {
@@ -113,10 +119,10 @@ onBeforeUnmount(() => {
 <template>
   <section class="connector-connection" :aria-label="`${connector.name}连接`">
     <p v-if="connector.unsupported" role="alert">暂不支持：{{ connector.unsupported }}</p>
-    <p v-if="error || connector.error" role="alert">{{ error || connector.error }}</p>
+    <p v-if="error || (!authorization && connector.error)" role="alert">{{ error || connector.error }}</p>
     <template v-if="authorization">
       <div v-if="authorization.userCode" class="device-code-box" role="status">
-        <p>已在浏览器打开授权页，请输入下方验证码完成授权：</p>
+        <p>{{ browserOpened ? '已在浏览器打开授权页，请输入下方验证码完成授权：' : '请打开授权页面，输入下方验证码完成授权：' }}</p>
         <div class="code-row">
           <strong class="user-code" data-testid="connector-user-code">{{ authorization.userCode }}</strong>
           <button class="xb-btn" type="button" @click="copyUserCode">{{ copied ? '已复制' : '复制验证码' }}</button>
@@ -134,10 +140,11 @@ onBeforeUnmount(() => {
         <p v-if="local">连接时将在本机运行以下命令，需要本机已有对应运行环境：</p>
         <pre v-if="local && connector.command">{{ [connector.command, ...(connector.args ?? [])].join(' ') }}</pre>
         <p v-if="connector.auth.type === 'cli'">此服务需要专属命令行登录。请先按服务商说明完成登录；小伴暂不代办此登录流程。</p>
-        <p v-else-if="!connector.auth.schema?.fields.length">无需手动填写配置。需要登录时，会打开浏览器授权页面。</p>
+        <p v-else-if="browserAuth || !connector.auth.schema?.fields.length">无需手动填写配置。需要登录时，会打开浏览器授权页面。</p>
       </template>
-      <ConnectorTokenForm v-if="connector.auth.schema?.fields.length" :schema="connector.auth.schema" :configured="connector.auth.configured" :busy="busy || connector.status === 'connecting'" :confirmation-required="false" :submit-label="connector.status === 'connected' ? '保存并重新连接' : local ? '运行并连接' : '连接'" @connect="connect" />
+      <ConnectorTokenForm v-if="!browserAuth && connector.auth.schema?.fields.length" :schema="connector.auth.schema" :configured="connector.auth.configured" :busy="busy || connector.status === 'connecting'" :confirmation-required="false" :submit-label="connector.status === 'connected' ? '保存并重新连接' : local ? '运行并连接' : '连接'" @connect="connect" />
       <button v-else-if="connector.status !== 'connected'" class="store-primary" :disabled="busy || connector.status === 'connecting'" @click="connect()">{{ busy ? '正在连接…' : connector.status === 'connecting' ? connectorStatus.connecting : local ? '运行并连接' : connector.auth.type === 'oauth' ? '登录并连接' : '连接' }}</button>
+      <button v-if="connector.auth.browser && connector.auth.schema?.fields.length" class="xb-btn" type="button" :disabled="busy || connector.status === 'connecting'" @click="manualToken = !manualToken; error = ''">{{ manualToken ? '使用网页登录' : '使用 Token 连接' }}</button>
     </template>
     <p v-else-if="!connector.unsupported">此连接器缺少配置表单，请更新插件后重试。</p>
   </section>

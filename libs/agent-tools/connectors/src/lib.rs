@@ -113,6 +113,7 @@ fn normalized_config(value: &Value) -> Result<Value, String> {
             .map_err(|_| "插件连接配置无效")?;
         if serde_json::to_vec(value).map_err(|_| "插件连接配置无效")?.len() > 512 * 1024 { return Err("插件连接配置过大".into()); }
         let mut config = json!({"connectorPlugin":binding});
+        if value["browserAuth"] == true { config["browserAuth"] = json!(true); }
         if let Some(session) = value.get("oauthSession") {
             if !session.as_str().is_some_and(oauth::valid_session) { return Err("授权会话无效".into()); }
             config["oauthSession"] = session.clone();

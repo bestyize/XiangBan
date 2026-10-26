@@ -29,6 +29,7 @@ struct State {
     legacy: bool,
     post_auth: bool,
     device_polls: usize,
+    unauthenticated_probes: usize,
     stream: Option<TcpStream>,
 }
 struct Server {
@@ -306,6 +307,7 @@ fn handle(mut stream: TcpStream, base: &str, state: &Mutex<State>) {
             send(&mut stream, "200 OK", json!({}), "");
         }
         ("POST", "/mcp" | "/messages") => {
+            if auth.is_empty() { state.unauthenticated_probes += 1; }
             assert_eq!(path == "/messages", state.legacy);
             if auth.is_empty()
                 || (state.expire
@@ -631,6 +633,7 @@ fn device_authorization_polls_returns_code_refreshes_and_restores() {
     assert_eq!(flow["status"], "authorization_required");
     assert_eq!(flow["userCode"], "XB-7788");
     assert_eq!(flow["authorizationUrl"], format!("{}/verify", server.base));
+    assert_eq!(server.state.lock().unwrap().unauthenticated_probes, 0, "device login must not wait for an MCP challenge");
     let status = finish(&manager, &flow);
     assert_eq!(status["status"], "connected", "{status}");
     let tools = manager.tools();

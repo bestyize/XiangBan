@@ -238,14 +238,16 @@ fn token_values(
                 .to_string(),
         ),
     };
-    let duration = match value.get("expires_in") {
-        None => 3600,
-        Some(v) => v
+    let expires = match value.get("expires_in") {
+        // GitHub OAuth App tokens have no expiry or refresh token. Do not turn
+        // a successful login into a forced reauthorization one hour later.
+        None => u64::MAX,
+        Some(v) => now() + v
             .as_u64()
             .filter(|v| *v > 0 && *v <= 366 * 86400)
             .ok_or("授权有效期无效")?,
     };
-    Ok((access, refresh, now() + duration))
+    Ok((access, refresh, expires))
 }
 pub struct Session {
     path: PathBuf,
@@ -447,8 +449,13 @@ impl Flow {
             code_url.as_str(),
             &[("client_id", spec.client_id.as_str()), ("scope", spec.scope.as_str())],
         )?;
-        if grant["error"].is_string() {
-            return Err("授权服务未开放设备授权，请联系服务商或改用密钥连接".into());
+        if let Some(error) = grant["error"].as_str() {
+            return Err(match error {
+                "incorrect_client_credentials" => "GitHub 授权应用的 Client ID 无效，请更新客户端或联系管理员",
+                "device_flow_disabled" => "GitHub 授权应用尚未开启 Device Flow，请联系管理员启用",
+                "slow_down" | "rate_limit_exceeded" => "授权请求过于频繁，请稍后重试",
+                _ => "授权服务未开放设备授权，请联系服务商或改用 Token 连接",
+            }.into());
         }
         let code = bounded(&grant["device_code"], 1024).ok_or("设备授权响应无效")?;
         let user_code = bounded(&grant["user_code"], 64).ok_or("设备授权响应无效")?;
@@ -466,7 +473,7 @@ impl Flow {
             device: Some(Device {
                 code,
                 interval: grant["interval"].as_u64().unwrap_or(5).clamp(1, 30),
-                wait: Duration::from_secs(grant["expires_in"].as_u64().unwrap_or(300).clamp(30, 300)),
+                wait: Duration::from_secs(grant["expires_in"].as_u64().unwrap_or(300).clamp(30, 900)),
             }),
             redirect: String::new(),
             state: String::new(),
@@ -486,6 +493,9 @@ impl Flow {
             path,
             encrypt_credentials: false,
         })
+    }
+    pub(crate) fn timeout(&self) -> Duration {
+        self.device.as_ref().map(|device| device.wait).unwrap_or(Duration::from_secs(300))
     }
     fn complete_device(mut self, cancel: &AtomicBool) -> Result<Arc<Session>, String> {
         let device = self.device.take().ok_or("设备授权会话无效")?;
@@ -947,5 +957,13 @@ mod tests {
         assert!(endpoint(&format!("https://auth.example/{}", "x".repeat(8192)), false).is_err());
         assert!(token_path(Path::new("/tmp"), "../escape", &random().unwrap()).is_err());
         assert!(token_path(Path::new("/tmp"), "valid", "../escape").is_err());
+    }
+    #[test]
+    fn github_nonexpiring_tokens_do_not_force_a_refresh_without_a_refresh_token() {
+        let (_, refresh, expiry) = token_values(&json!({"access_token":"test-access","token_type":"bearer"}), None).unwrap();
+        assert!(refresh.is_none());
+        assert_eq!(expiry, u64::MAX);
+        let (_, _, expiry) = token_values(&json!({"access_token":"test-access","token_type":"bearer","expires_in":3600}), None).unwrap();
+        assert!(expiry > now() && expiry <= now() + 3600);
     }
 }

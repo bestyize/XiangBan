@@ -96,13 +96,14 @@ fn entry_json(manager: &agent_connector_tools::ConnectorManager, e: &Entry, stat
     let multi = e.plugin.servers.len() > 1;
     let skills: Vec<String> = e.plugin.skills_dir.as_ref().and_then(|dir| fs::read_dir(dir).ok()).into_iter().flatten().flatten()
         .filter(|f| f.path().join("SKILL.md").is_file()).filter_map(|f| f.file_name().to_str().map(String::from)).collect();
-    let auth = match &spec.auth {
+    let browser_auth = spec.browser_auth_config().is_some();
+    let auth = if browser_auth { "oauth" } else { match &spec.auth {
         AuthSpec::None if spec.transport != Transport::Stdio => "auto",
         AuthSpec::None => "none",
         AuthSpec::Token { .. } => "token",
         AuthSpec::OAuth => "oauth",
         AuthSpec::Cli => "cli",
-    };
+    }};
     let examples: Vec<&String> = if d.examples_zh.is_empty() { d.examples_en.iter().collect() } else { d.examples_zh.iter().collect() };
     json!({
         "id": e.id, "plugin": e.plugin.name, "server": e.server,
@@ -113,7 +114,7 @@ fn entry_json(manager: &agent_connector_tools::ConnectorManager, e: &Entry, stat
         "namespace": e.namespace,
         "iconUrl": icon_data_url(&e.plugin),
         "transport": spec.transport, "command": spec.command, "args": spec.args,
-        "auth": { "type": auth, "schema": schema_json(spec), "configured": manager.configured_plugin_fields(&e.id).unwrap_or_default() },
+        "auth": { "type": auth, "browser": browser_auth, "schema": schema_json(spec), "configured": manager.configured_plugin_fields(&e.id).unwrap_or_default() },
         "status": state, "enabled": enabled, "error": error,
         "tools": manager.tool_list(&e.id).into_iter().map(|(name, description)| json!({"name": name, "description": description})).collect::<Vec<_>>(),
         "examples": examples, "skills": skills,
@@ -227,14 +228,14 @@ pub async fn ai_connector_installed(app: tauri::AppHandle, window: tauri::Webvie
 
 /// 保存令牌并连接；自动发现 OAuth 时直接返回浏览器授权流程。
 #[tauri::command]
-pub async fn ai_connector_configure(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, values: BTreeMap<String, String>, confirmed: bool) -> Result<Value, String> {
+pub async fn ai_connector_configure(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, values: BTreeMap<String, String>, confirmed: bool, prefer_browser: Option<bool>) -> Result<Value, String> {
     super::store::control(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = super::store::MUTATIONS.lock().map_err(|e| e.to_string())?;
         let manager = super::connector_manager(&app)?;
         let e = find(&Dirs::of(&app)?.plugins(), &id)?;
         let values: BTreeMap<String, String> = values.into_iter().filter(|(_, v)| !v.is_empty()).collect();
-        let result = manager.begin_connect_plugin(&e.plugin, &e.server, &values, confirmed)?;
+        let result = manager.begin_connect_plugin_with_auth(&e.plugin, &e.server, &values, confirmed, prefer_browser.unwrap_or(values.is_empty()))?;
         if result["status"] == "authorization_required" {
             Ok(result)
         } else {

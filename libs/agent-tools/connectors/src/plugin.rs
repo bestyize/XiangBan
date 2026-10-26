@@ -90,6 +90,35 @@ pub struct ServerSpec {
     pub timeout_ms: Option<u64>,
 }
 impl ServerSpec {
+    /// Recognize the official GitHub service by endpoint or executable, never by
+    /// a marketplace title. Legacy token/stdio packages can use the remote login
+    /// without executing a local command or changing their stable connection ID.
+    pub fn browser_auth_config(&self) -> Option<Value> {
+        let url = if self.transport == Transport::Stdio {
+            let command = self.command.as_deref()?.rsplit(['/', '\\']).next()?;
+            let official = matches!(command, "github-mcp-server" | "github-mcp-server.exe")
+                || (matches!(command, "npx" | "npx.cmd" | "npx.exe") && self.args.iter().any(|a|
+                    a == "@modelcontextprotocol/server-github" || a.starts_with("@modelcontextprotocol/server-github@")))
+                || (matches!(command, "docker" | "docker.exe") && self.args.iter().any(|a|
+                    a == "ghcr.io/github/github-mcp-server" || a.starts_with("ghcr.io/github/github-mcp-server:")
+                        || a.starts_with("ghcr.io/github/github-mcp-server@sha256:")));
+            if !official { return None; }
+            "https://api.githubcopilot.com/mcp/".to_string()
+        } else {
+            let url = reqwest::Url::parse(self.url.as_deref()?).ok()?;
+            if url.scheme() != "https" || url.host_str() != Some("api.githubcopilot.com")
+                || url.port_or_known_default() != Some(443) || !url.username().is_empty() || url.password().is_some()
+                || url.query().is_some() || url.fragment().is_some()
+                || !(url.path() == "/mcp" || url.path().starts_with("/mcp/")) { return None; }
+            url.to_string()
+        };
+        let headers: BTreeMap<_, _> = self.headers.iter().filter(|(key, value)|
+            matches!(key.to_ascii_lowercase().as_str(), "x-mcp-toolsets" | "x-mcp-readonly" | "x-mcp-lockdown")
+                && !value.contains("${") && !value.contains("YOUR_"))
+            .map(|(k, v)| (k.clone(), v.clone())).collect();
+        Some(json!({"url":url,"transport":"streamable-http","authMode":"device","headers":headers}))
+    }
+
     /// Known transports are supported; legacy SSE uses its own GET stream.
     pub fn unsupported(&self) -> Option<&'static str> {
         None

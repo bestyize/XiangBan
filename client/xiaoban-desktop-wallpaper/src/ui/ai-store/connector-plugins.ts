@@ -28,7 +28,7 @@ export interface InstalledConnector {
   transport?: 'stdio' | 'streamable-http' | 'sse';
   command?: string;
   args?: string[];
-  auth: { type: 'none' | 'auto' | 'token' | 'oauth' | 'env' | 'cli'; schema?: TokenSchema; configured: string[] };
+  auth: { type: 'none' | 'auto' | 'token' | 'oauth' | 'env' | 'cli'; browser?: boolean; schema?: TokenSchema; configured: string[] };
   status: 'disconnected' | 'connecting' | 'connected' | 'needs_auth' | 'error' | 'disabled';
   enabled: boolean;
   error?: string;

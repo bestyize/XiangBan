@@ -14,7 +14,7 @@ pub(super) struct Pending {
     url: String,
     user_code: Option<String>,
     session_id: String,
-    created: Instant,
+    expires: Instant,
     status: Mutex<Value>,
 }
 impl ConnectorManager {
@@ -32,14 +32,18 @@ impl ConnectorManager {
         let config = normalized_config(&config)?;
         let (effective, _, _) = self.resolve_plugin_config(id, &config)?;
         self.cancel_for_connector(id);
-        let error = match self.connect(id, name, config.clone(), true) {
+        let mode = effective["authMode"].as_str().unwrap_or("auto");
+        // Explicit device login needs no unauthenticated MCP probe. In particular,
+        // a blocked/slow resource host must not prevent opening GitHub's login page.
+        let error = if mode == "device" && effective["oauthSession"].as_str().is_none() {
+            oauth::AUTH_REQUIRED.to_string()
+        } else { match self.connect(id, name, config.clone(), true) {
             Ok(mut status) => {
                 status["status"] = json!("connected");
                 return Ok(status);
             }
             Err(e) => e,
-        };
-        let mode = effective["authMode"].as_str().unwrap_or("auto");
+        }};
         let explicit_key = effective["headers"]
             .as_object()
             .is_some_and(|m| m.keys().any(|k| k.eq_ignore_ascii_case("authorization")));
@@ -59,7 +63,7 @@ impl ConnectorManager {
             url: flow.url.clone(),
             user_code: flow.user_code.clone(),
             session_id: flow.session_id.clone(),
-            created: Instant::now(),
+            expires: Instant::now() + flow.timeout() + Duration::from_secs(60),
             status: Mutex::new(json!({"status":"authorizing"})),
         });
         {
@@ -67,7 +71,10 @@ impl ConnectorManager {
                 .authorizations
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
-            flows.retain(|_, p| p.created.elapsed() < Duration::from_secs(360));
+            flows.retain(|_, p| {
+                if Instant::now() < p.expires { true }
+                else { p.cancel.store(true, Ordering::SeqCst); false }
+            });
             if flows.len() >= 16 {
                 return Err("等待授权的连接过多，请取消后重试".into());
             }

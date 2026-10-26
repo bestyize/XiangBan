@@ -30,6 +30,24 @@ async function setup(patch: Partial<InstalledConnector> = {}, autoConnect = fals
 }
 async function click(text: string) { await wrapper.findAll('button').find(b => b.text() === text)!.trigger('click'); await flushPromises(); }
 describe('connection and authorization in place', () => {
+  const githubAuth: InstalledConnector['auth'] = { type: 'oauth', browser: true, configured: [],
+    schema: { title: 'GitHub Token', fields: [{ key: 'TOKEN', label: 'Token', type: 'password', required: true }] } };
+  it('logs in GitHub without the legacy required token form, including stdio packages', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({ ...flow, userCode: 'ABCD-1234' });
+    await setup({ transport: 'stdio', command: 'npx', args: ['@modelcontextprotocol/server-github'], auth: githubAuth }, true);
+    expect(wrapper.find('form').exists()).toBe(false);
+    expect(invoke).toHaveBeenCalledWith('ai_connector_configure', { id: current.id, values: {}, confirmed: true, preferBrowser: true });
+    expect(invoke).toHaveBeenCalledWith('open_download_url', { url: flow.authorizationUrl });
+    expect(wrapper.get('[data-testid=connector-user-code]').text()).toBe('ABCD-1234');
+  });
+  it('keeps saved tokens optional and can deliberately reconnect with them', async () => {
+    await setup({ auth: { ...githubAuth, configured: ['TOKEN'] } });
+    expect(wrapper.find('form').exists()).toBe(false);
+    await click('使用 Token 连接');
+    expect(wrapper.find('form').exists()).toBe(true);
+    await wrapper.get('form').trigger('submit'); await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('ai_connector_configure', { id: current.id, values: {}, confirmed: true, preferBrowser: false });
+  });
   it('connects remote services only after an explicit action and has no empty config form', async () => {
     await setup(); expect(invoke).not.toHaveBeenCalledWith('ai_connector_configure', expect.anything());
     expect(wrapper.find('form').exists()).toBe(false); expect(wrapper.find('input').exists()).toBe(false);
@@ -80,6 +98,16 @@ describe('connection and authorization in place', () => {
     await setup({}, true); expect(wrapper.text()).toContain('无法打开授权页面');
     await click('打开授权页面'); await vi.advanceTimersByTimeAsync(1000);
     expect(wrapper.text()).toContain('已连接，可在任务中使用');
+  });
+  it('does not claim the device authorization page opened when the browser fails', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce({ ...flow, userCode: 'ABCD-1234' }).mockRejectedValueOnce('浏览器不可用');
+    await setup({}, true);
+    expect(wrapper.text()).not.toContain('已在浏览器打开授权页');
+    expect(wrapper.text()).toContain('请打开授权页面');
+    expect(wrapper.get('[data-testid=connector-user-code]').text()).toBe('ABCD-1234');
+    await click('打开授权页面');
+    expect(wrapper.text()).toContain('已在浏览器打开授权页');
+    expect(wrapper.text()).not.toContain('无法打开授权页面');
   });
   it('stops polling after cancellation and does not report connected', async () => {
     vi.mocked(invoke).mockResolvedValueOnce(flow); await setup({}, true);
