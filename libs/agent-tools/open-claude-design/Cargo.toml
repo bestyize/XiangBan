@@ -1,0 +1,13 @@
+[package]
+name = "open-claude-design"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Built-in multi-artboard DC HTML design projects for agent-kernel hosts"
+
+[dependencies]
+agent-kernel = { path = "../../agent-kernel" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+getrandom = "0.3"
+

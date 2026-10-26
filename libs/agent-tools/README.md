@@ -8,6 +8,7 @@ Kernel 外的通用工具扩展，按能力放在独立子目录中。各工具�
 | [files](files/README.md) | agent-file-tools | 文件读取、文档提取、会话附件、分析 Skill 与脚本 |
 | [skill-discovery](skill-discovery/README.md) | agent-skill-discovery | 技能检索、审查、安装与 WorkBuddy 插件解析 |
 | [connectors](connectors/README.md) | agent-connector-tools | MCP 连接、OAuth、插件配置与加密凭据保险箱 |
+| [open-claude-design](open-claude-design/README.md) | open-claude-design | 多画板 DC HTML 设计项目、版本校验与独立预览运行时；桌面接入待完成 |
 
 新增类型时在本目录新增独立工具包，复用 agent-kernel 的 Tool/ToolResult 接口。解析器、平台依赖及运行环境留在对应工具包，agent-kernel 不反向依赖这些扩展。
 
