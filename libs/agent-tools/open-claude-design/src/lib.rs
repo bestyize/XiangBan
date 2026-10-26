@@ -13,7 +13,7 @@ const MAX_PROJECT: usize = 16 * 1024 * 1024;
 // Separate Store handles (UI commands and agent runs) share mutation ownership.
 static STORAGE_LOCK: Mutex<()> = Mutex::new(());
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
     pub id: String,
@@ -114,7 +114,7 @@ impl Store {
         for entry in fs::read_dir(&self.root).map_err(|e| e.to_string())?.flatten() {
             let id = entry.file_name().to_string_lossy().to_string();
             if safe_id(&id) {
-                let project = self.load(&id)?;
+                let Ok(project) = self.load(&id) else { continue };
                 if session == "*" || project.session_id == session { list.push(project); }
             }
         }
@@ -150,6 +150,30 @@ impl Store {
             for (_, path) in revisions.into_iter().take(remove) { let _ = fs::remove_file(path); }
         }
         Ok(project)
+    }
+    /// Failed UI edits remain recoverable without changing the canonical revision.
+    pub fn save_draft(&self, project: &Project) -> Result<(), String> {
+        let _lock=STORAGE_LOCK.lock().map_err(|_|"设计存储锁不可用")?;
+        self.load(&project.id)?;validate(project)?;
+        let dir=self.dir(&project.id)?;let temp=dir.join(format!("{}.tmp",nonce()?));
+        fs::write(&temp,serde_json::to_vec(project).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+        fs::rename(&temp,dir.join("draft.json")).map_err(|e|e.to_string())
+    }
+    pub fn draft(&self, id: &str) -> Result<Option<Project>, String> {
+        self.load(id)?;let path=self.dir(id)?.join("draft.json");
+        if !path.exists(){return Ok(None)}
+        let meta=fs::symlink_metadata(&path).map_err(|e|e.to_string())?;
+        if meta.file_type().is_symlink()||meta.len()>MAX_PROJECT as u64{return Err("恢复草稿无效或过大".into())}
+        let p:Project=serde_json::from_slice(&fs::read(path).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+        if p.id!=id{return Err("草稿编号不匹配".into())}validate(&p)?;Ok(Some(p))
+    }
+    pub fn clear_draft(&self, expected: &Project) -> Result<(), String> {
+        let _lock=STORAGE_LOCK.lock().map_err(|_|"设计存储锁不可用")?;
+        if self.draft(&expected.id)?.as_ref()==Some(expected){fs::remove_file(self.dir(&expected.id)?.join("draft.json")).map_err(|e|e.to_string())?;}Ok(())
+    }
+    pub fn remove(&self, id: &str) -> Result<(), String> {
+        let _lock = STORAGE_LOCK.lock().map_err(|_| "设计存储锁不可用")?;
+        fs::remove_dir_all(self.dir(id)?).or_else(|e| if e.kind()==std::io::ErrorKind::NotFound { Ok(()) } else { Err(e) }).map_err(|e|e.to_string())
     }
     pub fn history(&self, id: &str) -> Result<Vec<Project>, String> {
         self.load(id)?;
@@ -272,4 +296,32 @@ mod tests {
         store.create("x".into(),"s",canvas(),files()).unwrap(); t.messages=vec![Message::user_text("颜色改浅")];mid.before_model(&mut t).unwrap();assert!(t.messages[1].synthetic);
         fs::remove_dir_all(root).unwrap();
     }
+    #[test] fn retries_reuse_project_and_save_preserves_manual_source() {
+        let (store,root)=fixture();let tool=DesignTool::new(store.clone(), |_|Ok(()));let ctx=ToolCtx::detached("s");
+        let args=json!({"action":"create","title":"demo","request_id":"stable-1","canvas":canvas(),"files":files()});
+        let a=tool.call(args.clone(),&ctx).unwrap();let b=tool.call(args,&ctx).unwrap();assert_eq!(a["project"]["id"],b["project"]["id"]);
+        let id=a["project"]["id"].as_str().unwrap();let mut manual=store.load(id).unwrap();manual.files.insert("extra.css".into(),"/* user */".into());let manual=store.save(manual,1).unwrap();
+        assert!(tool.call(json!({"action":"save","id":id,"expected_revision":1,"files":{}}),&ctx).is_err());
+        tool.call(json!({"action":"save","id":id,"expected_revision":manual.revision,"files":{"Main.dc.html":"AI edit"}}),&ctx).unwrap();
+        assert_eq!(store.load(id).unwrap().files["extra.css"],"/* user */");assert_eq!(store.list("s").unwrap().len(),1);fs::remove_dir_all(root).unwrap();
+    }
+    #[test] fn history_is_bounded_and_deleted_projects_cannot_be_resurrected() {
+        let (store,root)=fixture();let mut p=store.create("demo".into(),"s",canvas(),files()).unwrap();
+        for _ in 0..34 {let rev=p.revision;p=store.save(p,rev).unwrap();}
+        let h=store.history(&p.id).unwrap();assert_eq!(h.len(),30);assert_eq!(h[0].revision,34);assert_eq!(h[29].revision,5);
+        store.remove(&p.id).unwrap();assert!(store.save(p,35).is_err());fs::remove_dir_all(root).unwrap();
+    }
+    #[test] fn one_corrupt_project_does_not_hide_other_documents() {
+        let (store,root)=fixture();let p=store.create("demo".into(),"s",canvas(),files()).unwrap();
+        let bad=root.join("design-000000000000000000000000");fs::create_dir_all(&bad).unwrap();fs::write(bad.join("project.json"),"broken").unwrap();
+        assert_eq!(store.list("*").unwrap().len(),1);assert_eq!(store.list("s").unwrap()[0].id,p.id);fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test] fn draft_recovery_does_not_change_saved_revision_or_clear_newer_edits() {
+        let (store,root)=fixture();let p=store.create("demo".into(),"s",canvas(),files()).unwrap();
+        let mut first=p.clone();first.title="unsaved".into();store.save_draft(&first).unwrap();assert_eq!(Store::new(&root).draft(&p.id).unwrap(),Some(first.clone()));assert_eq!(store.load(&p.id).unwrap().title,"demo");
+        let mut newer=first.clone();newer.title="newer draft".into();store.save_draft(&newer).unwrap();store.clear_draft(&first).unwrap();assert_eq!(store.draft(&p.id).unwrap(),Some(newer.clone()));
+        store.clear_draft(&newer).unwrap();assert!(store.draft(&p.id).unwrap().is_none());fs::remove_dir_all(root).unwrap();
+    }
+
 }

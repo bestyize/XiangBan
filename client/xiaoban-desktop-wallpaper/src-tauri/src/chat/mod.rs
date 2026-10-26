@@ -237,6 +237,7 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
         danger::assess(tool, args, folder_for(&workspaces, session).as_deref()).map(str::to_string)
     })
     // "这类命令都允许" for one kind of simple command (`npm test`), never for commands in general.
+    .allow_tool(open_claude_design::NAME)
     .remember_exec_as(danger::remember_key)
     // 专家团成员的会话（`<对话>#team-…`）沿用主对话的权限模式、授权和确认卡片。
     .children_inherit()
@@ -603,6 +604,8 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         open_computer_use_error: computer_use_error.as_deref(),
     };
 
+    let design_store = open_claude_design::Store::new(dirs.chat.parent().ok_or("缺少数据目录")?.join("data-library/files"));
+    let design_desktop = desktop.clone();
     let mut builder = Agent::builder(provider.clone(), Arc::new(AttachmentHistory::new(CompactingStore::new(JsonlStore::new(dirs.sessions())), attachments.clone())))
         .system_prompt(prompt::system_prompt(&environment))
         .prompt_section(skills.prompt_section())
@@ -615,6 +618,8 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
             let workspace = workspace.to_path_buf();
             move || project_rules::section(&workspace)
         })
+        .tool(open_claude_design::DesignTool::new(design_store.clone(), move |project| design_desktop.design_saved(project)))
+        .middleware(open_claude_design::DesignContext(design_store))
         .tool(TimeNow::new().utc_offset_minutes(utc_offset_minutes))
         .middleware(todo.clone())
         .tool_arc(todo)

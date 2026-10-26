@@ -56,6 +56,7 @@ pub struct Doc {
     pub note: String,
     pub preview: String,
     pub tags: Vec<String>,
+    pub design_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -234,7 +235,7 @@ fn copy_in(app: &tauri::AppHandle, library: &mut Library, root: &Path, name: &st
     library.docs.push(Doc {
         id: id.clone(), name, folder, ext, size, imported_ms: now_ms(),
         origin: source.map(|p| p.display().to_string()).unwrap_or_default(),
-        status: status.into(), note: note.into(), preview: String::new(), tags: Vec::new(),
+        status: status.into(), note: note.into(), preview: String::new(), tags: Vec::new(), design_id: None,
     });
     Ok(id)
 }
@@ -345,6 +346,8 @@ pub fn detect(url: &str) -> Result<(String, String, Option<String>), String> {
 pub fn library_state(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Library, String> {
     control_only(&window)?;
     let root = root(&app)?;
+    // Recover a source commit whose indexing was interrupted, without duplicating documents.
+    for p in crate::design::store(&app)?.list("*")? { upsert_design(&app,&p)?; }
     let library = load(&root);
     // A reading interrupted by quitting picks up where it stopped.
     if library.docs.iter().any(|d| d.status == "reading") { read_pending(&app); }
@@ -457,11 +460,17 @@ pub fn library_update_doc(app: tauri::AppHandle, window: tauri::WebviewWindow, i
         let doc = library.docs.iter_mut().find(|d| d.id == id).ok_or("这份文档已经不在了")?;
         if let Some(name) = patch.name {
             let name = clean_name(&name)?;
+            if let Some(id)=&doc.design_id {
+                let store=crate::design::store(&app)?;let mut p=store.load(id)?;let rev=p.revision;p.title=name.clone();let p=store.save(p,rev)?;doc.name=name;doc.imported_ms=p.updated_ms;
+                doc.preview=format!("{} 个画板 · 版本 {}",open_claude_design::boards(&p.canvas)?.len(),p.revision);
+                let _=app.emit_to("control","design-changed",open_claude_design::summary(&p));
+            } else {
             // The copy keeps its extension, so it still opens with the same app.
             let name = if ext_of(&name) == doc.ext || doc.ext.is_empty() { name } else { format!("{name}.{}", doc.ext) };
             let dir = root.join("files").join(&doc.id);
             fs::rename(dir.join(&doc.name), dir.join(&name)).map_err(|e| format!("改名失败：{e}"))?;
             doc.name = name;
+            }
         }
         if let Some(tags) = patch.tags {
             let mut clean: Vec<String> = tags.into_iter().map(|t| t.trim().chars().take(20).collect::<String>()).filter(|t| !t.is_empty()).collect();
@@ -479,7 +488,8 @@ pub fn library_remove(app: tauri::AppHandle, window: tauri::WebviewWindow, ids: 
     control_only(&window)?;
     change(&app, |library, root| {
         for doc in library.docs.iter().filter(|d| ids.contains(&d.id)) {
-            let _ = fs::remove_dir_all(root.join("files").join(&doc.id));
+            if let Some(id)=&doc.design_id { crate::design::store(&app)?.remove(id)?; }
+            else { let _ = fs::remove_dir_all(root.join("files").join(&doc.id)); }
         }
         library.docs.retain(|d| !ids.contains(&d.id));
         library.links.retain(|l| !ids.contains(&l.id));
@@ -503,6 +513,7 @@ pub fn library_attachment(app: tauri::AppHandle, window: tauri::WebviewWindow, i
     control_only(&window)?;
     let root = root(&app)?;
     let doc = load(&root).docs.into_iter().find(|d| d.id == id).ok_or("这份文档已经不在了")?;
+    if doc.design_id.is_some() { return Err("请打开设计画布继续修改这份作品".into()); }
     if let Some((_, note)) = readable_kind(&doc.ext, doc.size) { return Err(note.into()); }
     let bytes = fs::read(root.join("files").join(&doc.id).join(&doc.name)).map_err(|e| format!("读取失败：{e}"))?;
     let image = IMAGES.contains(&doc.ext.as_str());
@@ -630,4 +641,20 @@ mod tests {
         assert_eq!(read_text(&broken, "pdf").0, "failed");
         let _ = fs::remove_dir_all(&dir);
     }
+}
+
+/// Project source is durable before this index. Startup reconciliation repairs an interrupted update.
+pub fn upsert_design(app:&tauri::AppHandle, project:&open_claude_design::Project)->Result<(),String>{
+    let p=crate::design::store(app)?.load(&project.id)?;
+    let preview=format!("{} 个画板 · 版本 {}",open_claude_design::boards(&p.canvas)?.len(),p.revision);
+    if load(&root(app)?).docs.iter().any(|d|d.design_id.as_deref()==Some(&p.id)&&d.name==p.title&&d.imported_ms==p.updated_ms&&d.preview==preview){return Ok(());}
+    change(app,|library,_|{
+        let p=crate::design::store(app)?.load(&project.id)?;
+        let count=open_claude_design::boards(&p.canvas)?.len();
+        let bytes=serde_json::to_vec(&p).map_err(|e|e.to_string())?.len() as u64;
+        if let Some(doc)=library.docs.iter_mut().find(|d|d.design_id.as_deref()==Some(&p.id)){
+            doc.name=p.title.clone();doc.size=bytes;doc.imported_ms=p.updated_ms;doc.preview=format!("{count} 个画板 · 版本 {}",p.revision);
+        }else{library.docs.push(Doc{id:p.id.clone(),name:p.title.clone(),folder:None,ext:"design".into(),size:bytes,imported_ms:p.updated_ms,origin:String::new(),status:"ready".into(),note:String::new(),preview:format!("{count} 个画板 · 版本 {}",p.revision),tags:vec!["设计稿".into()],design_id:Some(p.id.clone())});}
+        Ok(())
+    }).map(|_|())
 }
