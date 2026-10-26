@@ -88,8 +88,8 @@ describe('小伴市场', () => {
     await wrapper.get('.skill-card .small-action').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_inspect', { kind: 'skills', namespace: 'acme', slug: 'pdf-kit', version: '1.2.0' });
     expect(wrapper.get('.version-lock').text()).toContain('aaaaaaaa…aaaaaa');
-    expect(wrapper.get('.test-modal .store-primary').attributes('disabled')).toBeDefined();
-    await wrapper.get('.review-confirm input').setValue(true);
+    expect(wrapper.get('.test-modal .store-primary').attributes('disabled')).toBeUndefined();
+
     await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_install', { kind: 'skills', namespace: 'acme', slug: 'pdf-kit', version: '1.2.0', sha256: sha });
     expect(store.notify).toHaveBeenCalledWith('已安装「PDF 文档处理」，可在新任务中使用');
@@ -138,8 +138,8 @@ describe('小伴市场', () => {
     expect(invoke).toHaveBeenCalledWith('ai_market_group_inspect', { kind: 'experts', namespace: 'acme', slug: 'launch-team' });
     expect(wrapper.get('.test-modal').text()).toContain('已安装 · 跳过');
     const install = wrapper.get('.test-modal .store-primary');
-    expect(install.attributes('disabled')).toBeDefined();
-    await wrapper.get('.test-modal .review-confirm input').setValue(true);
+    expect(install.attributes('disabled')).toBeUndefined();
+
     await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_group_install', { kind: 'experts', namespace: 'acme', slug: 'launch-team', sha256: 'd'.repeat(64) });
     expect(store.notify).toHaveBeenCalledWith('已安装「产品发布小组」的 1 位专家，跳过 1 个已安装');
@@ -159,7 +159,7 @@ describe('小伴市场', () => {
     const text = wrapper.get('.update-dialog, .test-modal').text();
     expect(text).toContain('修改'); expect(text).toContain('新增'); expect(text).toContain('删除');
     expect(text).toContain('旧版本保留为备份');
-    await wrapper.get('.test-modal .review-confirm input').setValue(true);
+
     await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_update', { kind: 'skills', namespace: 'acme', slug: 'pdf-kit', version: '1.2.0', sha256: sha });
     expect(store.notify).toHaveBeenCalledWith('「PDF 文档处理」已更新到 v1.2.0，旧版本已备份');
@@ -187,7 +187,7 @@ describe('网页唤起', () => {
     expect(invoke).not.toHaveBeenCalledWith('ai_market_install', expect.anything());
     await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_inspect', { kind: 'skills', namespace: 'acme', slug: 'pdf-kit', version: '1.2.0' });
-    expect(wrapper.get('.test-modal').text()).toContain('确认安装');
+    expect(wrapper.get('.test-modal').text()).toContain('安装');
     expect(invoke).not.toHaveBeenCalledWith('ai_market_install', expect.anything());
   });
 

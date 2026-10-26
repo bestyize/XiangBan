@@ -22,7 +22,7 @@ interface ConnectorReview {
 const props = defineProps<{ connector: MarketConnector; slug: string; namespace?: string; version?: string; installed: boolean; updateVersion?: string; localError: string }>();
 const emit = defineEmits<{ installed: []; changed: []; center: []; connected: []; busy: [value: boolean] }>();
 const review = ref<ConnectorReview | null>(null);
-const loading = ref(false), busy = ref(false), confirmed = ref(false), error = ref(''), done = ref(false);
+const loading = ref(false), busy = ref(false), error = ref(''), done = ref(false);
 const services = ref<InstalledConnector[]>([]);
 const connecting = ref<Record<string, boolean>>({});
 const connectOnInstall = ref(true);
@@ -41,11 +41,11 @@ onBeforeUnmount(() => { alive = false; });
 const warnings = computed(() => [...new Set([...(review.value?.manifest.warnings ?? []), ...(review.value?.warnings ?? [])])]);
 const targetVersion = computed(() => props.updateVersion || props.version);
 let reviewId = 0;
-watch(targetVersion, () => { ++reviewId; review.value = null; confirmed.value = false; loading.value = false; error.value = ''; });
+watch(targetVersion, () => { ++reviewId; review.value = null; loading.value = false; error.value = ''; });
 const canInstall = computed(() => !props.localError && !!props.namespace && !!targetVersion.value && (!props.installed || !!props.updateVersion) && !done.value);
 async function inspect() {
   if (!canInstall.value || loading.value || busy.value) return;
-  loading.value = true; error.value = ''; confirmed.value = false; review.value = null;
+  loading.value = true; error.value = ''; review.value = null;
   const id = ++reviewId, version = targetVersion.value;
   try {
     const result = await invoke<ConnectorReview>('ai_market_inspect', { kind: 'connectors', namespace: props.namespace, slug: props.slug, version });
@@ -58,11 +58,11 @@ async function inspect() {
 }
 async function install() {
   const r = review.value;
-  if (!r || r.manifest.version !== targetVersion.value || !confirmed.value || busy.value || !canInstall.value) return;
+  if (!r || r.manifest.version !== targetVersion.value || busy.value || !canInstall.value) return;
   busy.value = true; emit('busy', true); error.value = '';
   try {
     await invoke('ai_market_install', { kind: 'connectors', namespace: props.namespace, slug: props.slug, version: r.manifest.version, sha256: r.sha256 });
-    done.value = true; review.value = null; confirmed.value = false;
+    done.value = true; review.value = null;
     emit('installed');
     await loadServices();
     installationFinished.value = true;
@@ -99,7 +99,6 @@ async function install() {
       <details v-for="script in review.scripts" :key="script.path" class="script-preview"><summary>{{ script.path }} · 脚本预览{{ script.previewTruncated ? '（已截断）' : '' }}</summary><pre class="review-content">{{ script.preview || '此脚本暂无文本预览，请在确认来源后再安装。' }}</pre></details>
       <p class="detail-note">确认后安装此版本，并在当前窗口完成配置和授权。远程服务将尝试连接；本地命令会展示运行入口，点击“运行并连接”后才会启动。文件校验不代表安全认证。</p>
       <label class="connect-option"><input v-model="connectOnInstall" type="checkbox" :disabled="busy" />安装后连接远程服务（需要登录时打开浏览器）</label>
-      <label class="review-confirm"><input v-model="confirmed" type="checkbox" :disabled="busy" />我已查看此版本的说明、MCP 服务、文件清单和脚本预览，同意安装。</label>
     </template>
     <template v-if="done">
       <p role="status">{{ allConnected ? '已安装并连接，可以使用了' : services.length ? '已安装，在此完成连接即可使用' : '已安装' }}</p>
@@ -109,7 +108,7 @@ async function install() {
     <p v-else-if="!namespace || !targetVersion" class="detail-note">此连接器暂未提供可安装的版本或市场来源。</p>
     <div class="dialog-actions">
       <button v-if="installed || done" class="store-secondary" :disabled="busy" @click="emit('center')">去连接器中心</button>
-      <button v-if="!done && (!installed || updateVersion)" class="store-primary" :disabled="busy || loading || !canInstall || (!!review && !confirmed)" @click="review ? install() : inspect()">{{ busy ? '正在安装…' : loading ? '正在审查…' : review ? connectOnInstall ? '安装并连接' : '确认安装' : updateVersion ? '更新' : '安装' }}</button>
+      <button v-if="!done && (!installed || updateVersion)" class="store-primary" :disabled="busy || loading || !canInstall" @click="review ? install() : inspect()">{{ busy ? '正在安装…' : loading ? '正在审查…' : review ? connectOnInstall ? '安装并连接' : '安装' : updateVersion ? '更新' : '安装' }}</button>
     </div>
   </div>
 </template>

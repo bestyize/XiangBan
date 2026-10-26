@@ -69,8 +69,8 @@ describe('SkillHub registry integration', () => {
     await wrapper.get('.expert-card .small-action').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_store_expert_review', { slug: 'real-pack' });
     expect(wrapper.get('.test-modal').text()).toContain('@publisher/child-skill');
-    expect(wrapper.get('.test-modal .store-primary').attributes('disabled')).toBeDefined();
-    await wrapper.get('.review-confirm input').setValue(true);
+    expect(wrapper.get('.test-modal .store-primary').attributes('disabled')).toBeUndefined();
+    expect(wrapper.find('.review-confirm').exists()).toBe(false);
     await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_store_expert_install', { slug: 'real-pack', sha256: review.sha256 });
   });

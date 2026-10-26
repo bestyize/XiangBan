@@ -191,7 +191,7 @@ async function handleConnectionResult(result:ConnectionResult|undefined,context:
 }
 async function installPack() {
   const review = packReview.value;
-  if (!review || !confirmed.value || busy.value || localError.value) return;
+  if (!review || busy.value || localError.value) return;
   busy.value = true;
   try {
     await invoke('ai_store_expert_install', { slug: review.slug, sha256: review.sha256 });
@@ -295,8 +295,7 @@ defineExpose({ refresh, refreshLocal, installedCount, open });
             <h4>依赖技能与固定版本</h4>
             <details v-for="(item, i) in packReview.skills" :key="item.slug" class="dependency-review"><summary>{{ packReview.dependencies[i]?.namespace ? '@' + packReview.dependencies[i]?.namespace + '/' : '' }}{{ item.slug }} · {{ item.manifest.version }} · {{ item.manifest.fileCount }} 个文件</summary><pre>{{ item.content }}</pre><ul><li v-for="file in item.manifest.files" :key="file.path">{{ file.path }}<small>SHA256 {{ file.sha256 }}</small></li></ul><details v-for="script in item.scripts" :key="script.path"><summary>{{ script.path }}{{ script.previewTruncated ? '（预览已截断）' : '' }}</summary><pre>{{ script.preview || '暂无脚本文本预览' }}</pre></details></details>
             <p class="detail-note">安装会校验整个工作流和各依赖版本，不执行脚本或覆盖不同版本。脚本及外部工具使用时另行确认。</p>
-            <label class="review-confirm"><input v-model="confirmed" type="checkbox" :disabled="busy" />我已审查工作流、依赖来源、文件和脚本，同意安装。</label>
-            <div class="dialog-actions"><button class="store-primary" :disabled="busy || !confirmed || !!localError" @click="installPack">{{ busy ? '正在安装…' : '安装专家包' }}<Download :size="14" /></button></div>
+            <div class="dialog-actions"><button class="store-primary" :disabled="busy || !!localError" @click="installPack">{{ busy ? '正在安装…' : '安装专家包' }}<Download :size="14" /></button></div>
           </template>
         </template>
         <template v-else-if="marketPlugin">

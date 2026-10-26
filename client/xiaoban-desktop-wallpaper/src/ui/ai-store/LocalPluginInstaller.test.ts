@@ -26,9 +26,10 @@ it('reviews before installation and locks the installed package to its digest', 
   expect(wrapper.text()).toContain('repository · v1.0'); expect(wrapper.text()).toContain('技能 1');
   expect(wrapper.text()).toContain('请核实来源'); expect(wrapper.text()).toContain('安装后需要你确认并配置才会连接');
   expect(invoke).not.toHaveBeenCalledWith('ai_plugin_install_file', expect.anything());
-  const install = wrapper.findAll('button').find(b => b.text() === '确认安装')!;
-  expect(install.attributes('disabled')).toBeDefined();
-  await wrapper.get('input[type=checkbox]').setValue(true); await install.trigger('click'); await flushPromises();
+  const install = wrapper.findAll('button').find(b => b.text() === '安装')!;
+  expect(install.attributes('disabled')).toBeUndefined();
+  expect(wrapper.find('input[type=checkbox]').exists()).toBe(false);
+  await install.trigger('click'); await flushPromises();
   expect(invoke).toHaveBeenCalledWith('ai_plugin_install_file', { path: 'C:\\plugins\\repository.zip', sha256: review.manifestSha256, confirmed: true });
   expect(wrapper.emitted('installed')).toHaveLength(1);
 });
@@ -56,9 +57,9 @@ it('accepts native dropped ZIP paths and removes the listener when destroyed', a
 it('invalidates a review when the path changes and surfaces install errors', async () => {
   await open(); await inspect();
   await wrapper.get('[aria-label="插件包完整路径"]').setValue('C:\\other.zip'); expect(wrapper.find('input[type=checkbox]').exists()).toBe(false);
-  await inspect(); await wrapper.get('input[type=checkbox]').setValue(true);
+  await inspect();
   vi.mocked(invoke).mockRejectedValueOnce('插件包与审查时不一致');
-  await wrapper.findAll('button').find(b => b.text() === '确认安装')!.trigger('click'); await flushPromises();
+  await wrapper.findAll('button').find(b => b.text() === '安装')!.trigger('click'); await flushPromises();
   expect(wrapper.text()).toContain('插件包与审查时不一致'); expect(wrapper.emitted('installed')).toBeUndefined();
 });
 it('requires a review digest and reports inspection errors', async () => {

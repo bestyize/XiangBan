@@ -60,7 +60,7 @@ describe('conversational connector request', () => {
     wrapper = mount(ChatConnectorRequest, { props: { request: marketRequest } });
     await wrapper.get('.connector-choice').trigger('click'); await flushPromises();
     await wrapper.get('.store-primary').trigger('click'); await flushPromises();
-    await wrapper.get('.review-confirm input').setValue(true); await wrapper.get('.store-primary').trigger('click'); await flushPromises();
+    expect(wrapper.find('.review-confirm').exists()).toBe(false); await wrapper.get('.store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_install', expect.anything());
     expect(wrapper.text()).toContain('请在浏览器完成授权');
     expect(invoke).toHaveBeenCalledWith('open_download_url', { url: 'https://auth.example/login' });

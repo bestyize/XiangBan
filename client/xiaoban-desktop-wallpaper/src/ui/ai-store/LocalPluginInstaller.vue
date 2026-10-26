@@ -10,14 +10,14 @@ interface PluginReview {
 }
 const props = defineProps<{ desktop: boolean }>();
 const emit = defineEmits<{ installed: [] }>();
-const show = ref(false), busy = ref(false), confirmed = ref(false), error = ref('');
+const show = ref(false), busy = ref(false), error = ref('');
 const path = ref(''), review = ref<PluginReview | null>(null);
 let reviewedPath = '';
 let unlisten: (() => void) | undefined;
 let alive = true;
 const kindLabel: Record<string, string> = { connector: '连接器', agent: '专家', team: '专家团', skill: '技能包', skills: '技能包', bundle: '技能包' };
 async function open() {
-  show.value = true; review.value = null; path.value = ''; error.value = ''; confirmed.value = false;
+  show.value = true; review.value = null; path.value = ''; error.value = '';
   // Native drag/drop carries absolute paths; the HTML File API intentionally does not.
   if (!unlisten) {
     try {
@@ -35,13 +35,13 @@ async function pick() {
   try {
     const chosen = await invoke<string | null>('ai_plugin_pick_file');
     if (!alive || !chosen) return;
-    review.value = null; confirmed.value = false; path.value = chosen;
+    review.value = null; path.value = chosen;
     await inspect();
   } catch (e) { if (alive) error.value = String(e); }
 }
 async function inspect() {
   if (busy.value) return;
-  review.value = null; confirmed.value = false; error.value = '';
+  review.value = null; error.value = '';
   const selectedPath = path.value.trim();
   if (!/\.zip$/i.test(selectedPath) || !/^(?:[a-z]:[\\/]|\\\\|\/)/i.test(selectedPath)) { error.value = '请选择 ZIP 插件包，或填写 ZIP 文件的完整路径。'; return; }
   busy.value = true;
@@ -53,7 +53,7 @@ async function inspect() {
   finally { busy.value = false; }
 }
 async function install() {
-  if (!review.value || !confirmed.value || busy.value) return;
+  if (!review.value || busy.value) return;
   busy.value = true; error.value = '';
   try {
     // Keep the existing digest lock and also send the documented explicit confirmation.
@@ -70,7 +70,7 @@ onBeforeUnmount(() => { alive = false; unlisten?.(); });
   <NModal :show="show" preset="card" title="从本地插件包安装" class="store-dialog" :mask-closable="!busy" :closable="!busy" style="width:600px;max-width:calc(100vw - 36px)" @update:show="!$event && !busy && (show = false)">
     <form class="local-plugin-form" @submit.prevent="inspect">
       <p>选择或拖入 ZIP 插件包，先查看审查结果再安装。</p>
-      <label>插件包完整路径<input v-model="path" aria-label="插件包完整路径" :disabled="busy" placeholder="粘贴 ZIP 文件的完整路径" @input="review = null; confirmed = false" /></label>
+      <label>插件包完整路径<input v-model="path" aria-label="插件包完整路径" :disabled="busy" placeholder="粘贴 ZIP 文件的完整路径" @input="review = null" /></label>
       <div><button type="button" class="xb-btn" :disabled="busy" @click="pick">选择 ZIP 文件</button> <button class="xb-btn" type="submit" :disabled="busy">{{ busy ? '正在处理…' : '审查插件包' }}</button></div>
     </form>
     <p v-if="error" role="alert">{{ error }}</p>
@@ -80,8 +80,7 @@ onBeforeUnmount(() => { alive = false; unlisten?.(); });
       <ul><li v-for="warning in review.warnings" :key="warning">{{ warning }}</li></ul>
       <p v-if="review.hasMcp || review.kind === 'connector'">安装后需要你确认并配置才会连接。</p>
       <p>安装不会执行包内脚本。</p>
-      <label class="confirm"><input v-model="confirmed" type="checkbox" :disabled="busy" />我已查看此插件包的说明和警告，同意安装。</label>
-      <div class="dialog-actions"><button class="store-primary" :disabled="busy || !confirmed" @click="install">确认安装</button></div>
+      <div class="dialog-actions"><button class="store-primary" :disabled="busy" @click="install">安装</button></div>
     </template>
   </NModal>
 </template>

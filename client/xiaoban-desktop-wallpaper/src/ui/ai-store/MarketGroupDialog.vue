@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 专家团 / 技能套件：一次审查全部成员，一次确认，整组安装或整组撤销。
+// 专家团 / 技能套件：一次审查全部成员，整组安装或整组撤销。
 import { computed, ref, watch } from 'vue';
 import { NAlert, NModal } from 'naive-ui';
 import { Check, Download, RefreshCw } from 'lucide-vue-next';
@@ -11,7 +11,7 @@ import './store-cards.css';
 const props = defineProps<{ item: Skill | null; kind: 'skills' | 'experts' }>();
 const emit = defineEmits<{ close: []; done: [message: string] }>();
 const review = ref<GroupReview | null>(null);
-const loading = ref(false), busy = ref(false), error = ref(''), confirmed = ref(false);
+const loading = ref(false), busy = ref(false), error = ref('');
 let token = 0;
 const pending = computed(() => review.value?.members.filter(m => m.state === 'pending') ?? []);
 const files = computed(() => pending.value.reduce((n, m) => n + m.manifest.fileCount, 0));
@@ -21,7 +21,7 @@ const unit = computed(() => props.kind === 'experts' ? '位专家' : '个技能'
 
 async function load() {
   const item = props.item, id = ++token;
-  review.value = null; error.value = ''; confirmed.value = false;
+  review.value = null; error.value = '';
   if (!item?.namespace) return;
   loading.value = true;
   try {
@@ -34,7 +34,7 @@ watch(() => props.item, () => void load(), { immediate: true });
 
 async function install() {
   const item = props.item, r = review.value;
-  if (!item || !r || !confirmed.value || busy.value || !pending.value.length) return;
+  if (!item || !r || busy.value || !pending.value.length) return;
   busy.value = true; error.value = '';
   try {
     const result = await invoke<{ installed: number; skipped: number }>('ai_market_group_install', { kind: props.kind, namespace: item.namespace, slug: item.slug, sha256: r.sha256 });
@@ -66,10 +66,9 @@ function close() { if (!busy.value) emit('close'); }
         </ul>
         <div class="group-summary"><span>将安装 {{ pending.length }} {{ unit }} · 共 {{ files }} 个文件 · {{ bytes(total) }}</span><span>整组摘要 <code>{{ shortDigest(review.sha256) }}</code></span></div>
         <p class="detail-note">全部通过校验后一起生效；任何一个失败，会撤销本次新增的内容，不影响已安装的。安装不会执行脚本；脚本运行时需单独确认，并使用本机账户权限。</p>
-        <label v-if="pending.length" class="review-confirm"><input v-model="confirmed" type="checkbox" :disabled="busy" />我已查看 {{ pending.length }} {{ unit }}的说明、文件清单和脚本预览，同意安装。</label>
-        <div v-else class="installed-detail"><Check :size="17" /><p>这个组合的成员都已安装。</p></div>
+        <div v-if="!pending.length" class="installed-detail"><Check :size="17" /><p>这个组合的成员都已安装。</p></div>
       </template>
-      <div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="close">取消</button><button class="store-primary" :disabled="!review || !pending.length || !confirmed || busy" @click="install">{{ busy ? '正在安装…' : `安装${variantLabel(item.variant) || '组合'}（${pending.length}）` }}<Download :size="14" /></button></div>
+      <div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="close">取消</button><button class="store-primary" :disabled="!review || !pending.length || busy" @click="install">{{ busy ? '正在安装…' : `安装${variantLabel(item.variant) || '组合'}（${pending.length}）` }}<Download :size="14" /></button></div>
     </template>
   </NModal>
 </template>

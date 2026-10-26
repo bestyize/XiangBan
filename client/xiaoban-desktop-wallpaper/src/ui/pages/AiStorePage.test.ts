@@ -101,8 +101,8 @@ describe('AI 商店', () => {
     expect(invoke).toHaveBeenCalledWith('ai_store_inspect', { slug: 'demo-skill', version: '1.2.3' });
     expect(wrapper.get('.test-modal').text()).toContain('scripts/run.py');
     expect(wrapper.get('.script-preview pre').text()).toBe('print("hello")');
-    expect(wrapper.get('.test-modal .store-primary').attributes('disabled')).toBeDefined();
-    await wrapper.get('.review-confirm input').setValue(true);
+    expect(wrapper.get('.test-modal .store-primary').attributes('disabled')).toBeUndefined();
+
     await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_store_install', { slug: 'demo-skill', version: '1.2.3', sha256: manifestHash });
     expect(wrapper.get('.skill-card .small-action').text()).toContain('已安装');
@@ -116,7 +116,7 @@ describe('AI 商店', () => {
     expect(wrapper.get('.test-modal .store-primary').attributes('disabled')).toBeDefined();
     vi.mocked(invoke).mockImplementation(original);
     await wrapper.get('.test-modal .text-action').trigger('click'); await flushPromises();
-    expect(wrapper.find('.review-confirm').exists()).toBe(true);
+    expect(wrapper.find('.review-confirm').exists()).toBe(false);
   });
   it('filters by the official SkillHub category key, separately from the search keyword', async () => {
     const { wrapper } = setup(); await skills(wrapper);

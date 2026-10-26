@@ -12,7 +12,7 @@ export interface InstalledPackage { slug: string; name: string; namespace?: stri
 const props = defineProps<{ pkg: InstalledPackage | null; info: UpdateInfo | null }>();
 const emit = defineEmits<{ close: []; done: [message: string] }>();
 const review = ref<SkillReview | null>(null);
-const loading = ref(false), busy = ref(false), error = ref(''), confirmed = ref(false);
+const loading = ref(false), busy = ref(false), error = ref('');
 let token = 0;
 const changes = computed(() => review.value ? diffFiles(props.pkg?.files ?? [], review.value.manifest.files) : []);
 const count = (kind: string) => changes.value.filter(c => c.change === kind).length;
@@ -23,7 +23,7 @@ const kind = computed(() => props.pkg?.marketKind === 'expert' ? 'experts' : 'sk
 
 async function load() {
   const { pkg, info } = props, id = ++token;
-  review.value = null; error.value = ''; confirmed.value = false;
+  review.value = null; error.value = '';
   if (!pkg || !info || !pkg.namespace) return;
   loading.value = true;
   try {
@@ -36,7 +36,7 @@ watch(() => [props.pkg?.slug, props.info?.latest], () => void load(), { immediat
 
 async function update() {
   const { pkg, info } = props, r = review.value;
-  if (!pkg || !info || !r || !confirmed.value || busy.value) return;
+  if (!pkg || !info || !r || busy.value) return;
   busy.value = true; error.value = '';
   try {
     await invoke('ai_market_update', { kind: kind.value, namespace: pkg.namespace, slug: pkg.slug, version: info.latest, sha256: r.sha256 });
@@ -62,9 +62,8 @@ function close() { if (!busy.value) emit('close'); }
         <details v-for="s in newScripts" :key="s.path" class="script-preview"><summary>{{ s.path }} · 脚本预览{{ s.previewTruncated ? '（已截断）' : '' }}</summary><pre>{{ s.preview || '此脚本暂无文本预览，请在确认来源后再更新。' }}</pre></details>
         <div class="digest-line"><span>清单摘要</span><code>{{ shortDigest(pkg.sha256 || '') || '—' }}</code><ArrowRight :size="12" /><code>{{ shortDigest(review.sha256) }}</code></div>
         <p class="detail-note">先完整校验新版本，再替换已安装的版本；旧版本保留为备份，更新失败时自动恢复。新增或修改的脚本仍需在运行时单独确认。</p>
-        <label class="review-confirm"><input v-model="confirmed" type="checkbox" :disabled="busy" />我已查看文件变化和脚本预览，同意更新到 v{{ info.latest }}。</label>
       </template>
-      <div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="close">暂不更新</button><button class="store-primary" :disabled="!review || !confirmed || busy" @click="update">{{ busy ? '正在更新…' : `更新到 v${info.latest}` }}</button></div>
+      <div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="close">暂不更新</button><button class="store-primary" :disabled="!review || busy" @click="update">{{ busy ? '正在更新…' : `更新到 v${info.latest}` }}</button></div>
     </template>
   </NModal>
 </template>
