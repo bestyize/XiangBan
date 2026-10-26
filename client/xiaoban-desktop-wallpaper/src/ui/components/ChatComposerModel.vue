@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Check, ChevronDown, ChevronRight, Settings } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, toAccountError, type AiConfigView, type AiReplyPreference, type AiTier, type ProviderConfigView } from '../../bridge.ts';
 import { providerReasoningLevels, preferenceOptions } from '../ai-config.ts';
@@ -17,6 +17,8 @@ const emit = defineEmits<{ switched: []; settings: [] }>();
 const root = ref<HTMLElement | null>(null);
 const open = ref(false);
 const busy = ref(false);
+const loading = ref(false);
+const loadingTiers = ref(false);
 const error = ref('');
 const config = ref<AiConfigView | null>(null);
 const tiers = ref<AiTier[]>([]);
@@ -81,41 +83,63 @@ async function chooseStrength(preference: AiReplyPreference) {
   else if (target?.kind === 'gateway') await chooseGateway(target.tier, preference);
 }
 let generation = 0;
+let pendingGeneration: number | undefined;
 function outside(e: PointerEvent) { if (root.value && !root.value.contains(e.target as Node) && !reasoningPanel.value?.contains(e.target as Node)) close(); }
 function escape(e: KeyboardEvent) { if (e.key === 'Escape') { if (reasoningTarget.value) hideReasoning(); else close(); } }
-function close() { hideReasoning(); open.value = false; ++generation; }
+function close() { hideReasoning(); open.value = false; ++generation; loading.value = false; loadingTiers.value = false; }
 watch(open, value => {
   if (value) { document.addEventListener('pointerdown', outside); document.addEventListener('keydown', escape); window.addEventListener('resize', hideReasoning); }
   else { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); window.removeEventListener('resize', hideReasoning); }
 });
 onBeforeUnmount(() => { ++generation; hideReasoning(); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); window.removeEventListener('resize', hideReasoning); });
 watch(() => props.disabled, disabled => { if (disabled) close(); });
-async function toggle() {
+onMounted(() => { void load(); });
+function toggle() {
   if (open.value) { close(); return; }
-  open.value = true; error.value = ''; gatewayError.value = ''; tiers.value = []; busy.value = true;
+  open.value = true;
+  void load();
+}
+async function load() {
+  if (pendingGeneration === generation) return;
+  error.value = ''; gatewayError.value = ''; loading.value = true;
   const id = ++generation;
+  pendingGeneration = id;
   try {
     const initial = await invoke<AiConfigView>('get_ai_config');
     if (id !== generation) return;
     config.value = initial;
-    const [refresh, modes] = await Promise.allSettled([
-      invoke<AiConfigView>('refresh_ai_providers', { force: false }),
-      initial.gatewayEnabled === false ? Promise.resolve([] as AiTier[]) : invoke<AiTier[]>('ai_gateway_tiers'),
+    loading.value = false;
+    loadingTiers.value = initial.gatewayEnabled !== false;
+    // Keep the last list visible. Each source updates independently, so a slow
+    // catalogue request cannot hold gateway modes or local model selection up.
+    await Promise.allSettled([
+      (async () => {
+        try {
+          const refreshed = await invoke<AiConfigView>('refresh_ai_providers', { force: false });
+          if (id === generation) config.value = refreshed;
+        } catch { /* The locally saved providers remain usable while offline. */ }
+      })(),
+      (async () => {
+        try {
+          if (initial.gatewayEnabled === false) return;
+          const modes = await invoke<AiTier[]>('ai_gateway_tiers');
+          if (id !== generation) return;
+          tiers.value = modes;
+          loadingTiers.value = false;
+          const latest = await invoke<AiConfigView>('get_ai_config');
+          if (id === generation) config.value = latest;
+        } catch (e) { if (id === generation) gatewayError.value = toAccountError(e).message; }
+        finally { if (id === generation) loadingTiers.value = false; }
+      })(),
     ]);
-    if (id !== generation) return;
-    if (refresh.status === 'fulfilled') config.value = refresh.value;
-    if (modes.status === 'fulfilled') {
-      tiers.value = modes.value;
-      const latest = await invoke<AiConfigView>('get_ai_config');
-      if (id !== generation) return;
-      config.value = latest;
-    }
-    else gatewayError.value = toAccountError(modes.reason).message;
   } catch (e) { if (id === generation) error.value = String(e); }
-  finally { if (id === generation) busy.value = false; }
+  finally {
+    if (id === generation) loading.value = false;
+    if (pendingGeneration === id) pendingGeneration = undefined;
+  }
 }
 async function chooseGateway(tier: AiTier, preference?: AiReplyPreference) {
-  if (busy.value || props.disabled || !tier.available || !gatewayEnabled.value) return;
+  if (busy.value || loading.value || loadingTiers.value || props.disabled || !tier.available || !gatewayEnabled.value) return;
   if (currentTier(tier) && (preference === undefined || preference === (config.value?.gatewayReplyPreference ?? 'default'))) { close(); return; }
   busy.value = true; error.value = '';
   try {
@@ -126,7 +150,7 @@ async function chooseGateway(tier: AiTier, preference?: AiReplyPreference) {
   finally { busy.value = false; }
 }
 async function choose(entry: ModelChoice, preference?: AiReplyPreference) {
-  if (busy.value || props.disabled) return;
+  if (busy.value || loading.value || props.disabled) return;
   if (current(entry) && (preference === undefined || preference === (entry.provider.replyPreference ?? 'default'))) { close(); return; }
   busy.value = true; error.value = '';
   const p = entry.provider;
@@ -147,23 +171,24 @@ function settings() { close(); emit('settings'); }
     <button type="button" class="composer-model" data-testid="chat-workbench-model" :title="provider ? `${provider} · ${label}` : label" :disabled="disabled" :aria-expanded="open" aria-haspopup="menu" @click="toggle"><i class="model-badge" :class="{ brand: gateway }" aria-hidden="true">{{ badge }}</i><span>{{ label }}</span><ChevronDown :size="11" :stroke-width="2.4" /></button>
     <div v-if="open" class="model-panel xb-menu" role="menu" aria-label="选择模型" @scroll="hideReasoning">
       <div class="model-heading">选择模型</div>
-      <div v-if="busy && !config" class="model-state">读取已配置模型…</div>
+      <div v-if="loading && !config" class="model-state">读取已配置模型…</div>
       <div v-if="gatewayEnabled" class="model-group" data-testid="chat-model-gateway">
         <div class="provider-name"><i class="model-badge brand" aria-hidden="true">伴</i>小伴 AI</div>
-        <button v-for="tier in tiers" :key="tier.tier" type="button" class="model-choice" :title="tier.description" :disabled="busy || !tier.available" :class="{ selected: currentTier(tier) }" :data-testid="`chat-model-xiaoban-ai-${tier.tier}`" aria-haspopup="menu" :aria-expanded="targetTier(tier)" @mouseenter="showReasoning({ kind: 'gateway', tier }, $event)" @mouseleave="leaveReasoning" @focus="showReasoning({ kind: 'gateway', tier }, $event)" @keydown.right.prevent="showReasoning({ kind: 'gateway', tier }, $event, true)" @click="chooseGateway(tier)">
+        <button v-for="tier in tiers" :key="tier.tier" type="button" class="model-choice" :title="tier.description" :disabled="busy || loading || loadingTiers || !tier.available" :class="{ selected: currentTier(tier) }" :data-testid="`chat-model-xiaoban-ai-${tier.tier}`" aria-haspopup="menu" :aria-expanded="targetTier(tier)" @mouseenter="showReasoning({ kind: 'gateway', tier }, $event)" @mouseleave="leaveReasoning" @focus="showReasoning({ kind: 'gateway', tier }, $event)" @keydown.right.prevent="showReasoning({ kind: 'gateway', tier }, $event, true)" @click="chooseGateway(tier)">
           <span>{{ tier.displayName }}{{ !tier.available ? '（暂不可用）' : '' }}</span><Check v-if="currentTier(tier)" :size="14" /><ChevronRight :size="12" />
         </button>
         <p v-if="gatewayError" class="model-state error">{{ gatewayError }}</p>
-        <p v-else-if="!tiers.length" class="model-state">{{ busy ? '读取使用模式…' : '暂无可用模式，请到模型设置查看。' }}</p>
+        <div v-else-if="!tiers.length && loadingTiers" class="mode-skeleton" role="status" aria-label="正在加载使用模式"><div v-for="row in 2" :key="row" class="model-choice" aria-hidden="true"><span></span></div></div>
+        <p v-else-if="!tiers.length" class="model-state">暂无可用模式，请到模型设置查看。</p>
       </div>
       <div v-for="group in providers" :key="group.provider.id" class="model-group">
         <div class="provider-name"><i class="model-badge" aria-hidden="true">{{ providerBadge(group.provider.name) }}</i>{{ group.provider.name }}</div>
-        <button v-for="item in group.models" :key="item.model" type="button" class="model-choice" :title="item.model" :disabled="busy" :class="{ selected: current(item) }" :data-testid="`chat-model-${group.provider.id}-${item.model}`" aria-haspopup="menu" :aria-expanded="targetModel(item)" @mouseenter="showReasoning({ kind: 'model', entry: item }, $event)" @mouseleave="leaveReasoning" @focus="showReasoning({ kind: 'model', entry: item }, $event)" @keydown.right.prevent="showReasoning({ kind: 'model', entry: item }, $event, true)" @click="choose(item)">
+        <button v-for="item in group.models" :key="item.model" type="button" class="model-choice" :title="item.model" :disabled="busy || loading" :class="{ selected: current(item) }" :data-testid="`chat-model-${group.provider.id}-${item.model}`" aria-haspopup="menu" :aria-expanded="targetModel(item)" @mouseenter="showReasoning({ kind: 'model', entry: item }, $event)" @mouseleave="leaveReasoning" @focus="showReasoning({ kind: 'model', entry: item }, $event)" @keydown.right.prevent="showReasoning({ kind: 'model', entry: item }, $event, true)" @click="choose(item)">
           <span>{{ item.name }}</span><Check v-if="current(item)" :size="14" /><ChevronRight :size="12" />
         </button>
       </div>
       <p v-if="error" class="model-state error">{{ error }}</p>
-      <p v-if="!busy && !providers.length && !gatewayEnabled && !error" class="model-state">暂无已配置的可用模型</p>
+      <p v-if="!loading && !providers.length && !gatewayEnabled && !error" class="model-state">暂无已配置的可用模型</p>
       <button type="button" class="model-settings" @click="settings"><Settings :size="13" />管理模型</button>
     </div>
   </div>
@@ -200,6 +225,7 @@ function settings() { close(); emit('settings'); }
 .model-choice:disabled{cursor:not-allowed;opacity:.55}
 .model-state{color:var(--ui-text-tertiary);font-size:11.5px;line-height:1.6;padding:4px 10px;margin:0}
 .model-state.error{color:var(--ui-danger)}
+.mode-skeleton .model-choice{cursor:default}.mode-skeleton .model-choice>span{flex:none;width:88px;height:12px;border-radius:4px;background:var(--ui-control)}
 .reasoning-panel{position:fixed;z-index:1000;overflow-y:auto;box-sizing:border-box}
 .reasoning-model{padding:0 10px 6px;color:var(--ui-text-tertiary);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .model-settings{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:0 10px;margin-top:4px;border:0;border-top:1px solid var(--ui-line);border-radius:0 0 8px 8px;background:none;color:var(--ui-text-secondary);cursor:pointer;font:inherit;font-size:12.5px}

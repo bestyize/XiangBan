@@ -42,6 +42,63 @@ async function dialog() {
 }
 
 describe('gateway in the composer model menu', () => {
+  it('keeps cached modes visible when reopening while both sources refresh', async () => {
+    const view = await composer();
+    await view.get('[data-testid="chat-workbench-model"]').trigger('click');
+    ipc.mockImplementation(command => {
+      if (command === 'get_ai_config') return Promise.resolve(structuredClone(config)) as never;
+      return new Promise(() => {}) as never;
+    });
+    await view.get('[data-testid="chat-workbench-model"]').trigger('click');
+    await flushPromises();
+    expect(view.find('[data-testid="chat-model-xiaoban-ai-standard"]').exists()).toBe(true);
+    expect(view.find('.mode-skeleton').exists()).toBe(false);
+    expect(view.text()).not.toContain('读取使用模式');
+    expect(view.get<HTMLButtonElement>('[data-testid="chat-model-local-local-model"]').element.disabled).toBe(false);
+  });
+
+  it('shows modes as soon as they arrive even if provider refresh is stalled', async () => {
+    ipc.mockImplementation(command => {
+      if (command === 'refresh_ai_providers') return new Promise(() => {}) as never;
+      return Promise.resolve(structuredClone(command === 'ai_gateway_tiers' ? tiers : config)) as never;
+    });
+    const view = await composer();
+    expect(view.get<HTMLButtonElement>('[data-testid="chat-model-xiaoban-ai-standard"]').element.disabled).toBe(false);
+    expect(view.find('.mode-skeleton').exists()).toBe(false);
+    expect(ipc.mock.calls.filter(([command]) => command === 'ai_gateway_tiers')).toHaveLength(1);
+  });
+
+  it('reserves mode rows on first load and lets local models switch during a slow gateway request', async () => {
+    ipc.mockImplementation(command => {
+      if (command === 'ai_gateway_tiers') return new Promise(() => {}) as never;
+      return Promise.resolve(structuredClone(config)) as never;
+    });
+    const view = await composer();
+    expect(view.get('.mode-skeleton').findAll('.model-choice')).toHaveLength(2);
+    await view.get('[data-testid="chat-model-local-local-model"]').trigger('click');
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ providerId: 'local' }));
+    expect(view.emitted('switched')).toHaveLength(1);
+  });
+
+  it('ignores a stale gateway response after the menu closes and reopens', async () => {
+    let finishOld!: (value: AiTier[]) => void;
+    const old = new Promise<AiTier[]>(resolve => { finishOld = resolve; });
+    let calls = 0;
+    ipc.mockImplementation(command => {
+      if (command === 'ai_gateway_tiers') return (++calls === 1 ? old : Promise.resolve(tiers)) as never;
+      return Promise.resolve(structuredClone(config)) as never;
+    });
+    const view = await composer();
+    await view.get('[data-testid="chat-workbench-model"]').trigger('click');
+    await view.get('[data-testid="chat-workbench-model"]').trigger('click');
+    await flushPromises();
+    finishOld([{ ...tiers[0], displayName: '过期模式' }]);
+    await flushPromises();
+    expect(view.get('[data-testid="chat-model-xiaoban-ai-standard"]').text()).toBe('日常');
+    expect(view.text()).not.toContain('过期模式');
+  });
+
   it('shows the active mode, disables unavailable modes and keeps local providers', async () => {
     const view = await composer();
     expect(view.get('[data-testid="chat-model-xiaoban-ai-standard"]').classes()).toContain('selected');
