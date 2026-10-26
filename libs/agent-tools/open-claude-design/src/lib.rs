@@ -6,6 +6,7 @@ use std::{collections::BTreeMap, fs, path::{Component, Path, PathBuf}, sync::{Ar
 
 pub const NAME: &str = "open-claude-design";
 pub const RUNTIME: &str = include_str!("../runtime/support.js");
+pub mod archive;
 pub const FORMAT: &str = include_str!("../FORMAT.md");
 const MAX_FILE: usize = 2 * 1024 * 1024;
 const MAX_PROJECT: usize = 16 * 1024 * 1024;
@@ -22,6 +23,8 @@ pub struct Project {
     pub updated_ms: u64,
     pub canvas: Value,
     pub files: BTreeMap<String, String>,
+    #[serde(default)]
+    pub request_id: String,
 }
 
 #[derive(Clone)]
@@ -89,7 +92,7 @@ pub fn validate(project: &Project) -> Result<(), String> {
 
 impl Store {
     pub fn new(root: impl Into<PathBuf>) -> Self { Self { root: root.into() } }
-    fn dir(&self, id: &str) -> Result<PathBuf, String> {
+    pub fn dir(&self, id: &str) -> Result<PathBuf, String> {
         if !safe_id(id) { return Err("设计稿编号无效".into()); }
         fs::create_dir_all(&self.root).map_err(|e| e.to_string())?;
         let root = self.root.canonicalize().map_err(|e| e.to_string())?;
@@ -112,7 +115,7 @@ impl Store {
             let id = entry.file_name().to_string_lossy().to_string();
             if safe_id(&id) {
                 let project = self.load(&id)?;
-                if project.session_id == session { list.push(project); }
+                if session == "*" || project.session_id == session { list.push(project); }
             }
         }
         list.sort_by_key(|p| std::cmp::Reverse(p.updated_ms));
@@ -125,7 +128,7 @@ impl Store {
         let path = dir.join("project.json");
         let current = if path.exists() { Some(self.load(&project.id)?) } else { None };
         if current.as_ref().map_or(0, |p| p.revision) != expected { return Err("设计稿已更新，请重新读取后再修改，避免覆盖新改动".into()); }
-        if let Some(old) = &current { project.session_id = old.session_id.clone(); }
+        if let Some(old) = &current { project.session_id = old.session_id.clone(); project.request_id = old.request_id.clone(); }
         project.revision = expected.checked_add(1).ok_or("版本号超出范围")?;
         project.updated_ms = now();
         validate(&project)?;
@@ -138,15 +141,36 @@ impl Store {
             fs::write(dir.join("history").join(format!("{}.json", old.revision)), serde_json::to_vec(&old).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
         }
         if let Err(e) = fs::rename(&temp, path) { let _ = fs::remove_file(temp); return Err(e.to_string()); }
+        // Bound history to 30 complete revisions. Never touch the current snapshot.
+        let history = dir.join("history");
+        if let Ok(entries) = fs::read_dir(&history) {
+            let mut revisions: Vec<_> = entries.flatten().filter_map(|e| e.path().file_stem()?.to_str()?.parse::<u64>().ok().map(|n| (n,e.path()))).collect();
+            revisions.sort_by_key(|(n,_)| *n);
+            let remove = revisions.len().saturating_sub(30);
+            for (_, path) in revisions.into_iter().take(remove) { let _ = fs::remove_file(path); }
+        }
         Ok(project)
     }
+    pub fn history(&self, id: &str) -> Result<Vec<Project>, String> {
+        self.load(id)?;
+        let mut out=Vec::new();
+        if let Ok(entries)=fs::read_dir(self.dir(id)?.join("history")) {
+            for e in entries.flatten() {
+                if e.file_type().map_err(|e|e.to_string())?.is_file() && e.metadata().map_err(|e|e.to_string())?.len()<=MAX_PROJECT as u64 {
+                    if let Ok(p)=serde_json::from_slice::<Project>(&fs::read(e.path()).map_err(|e|e.to_string())?) { if p.id==id { out.push(p); } }
+                }
+            }
+        }
+        out.sort_by_key(|p|std::cmp::Reverse(p.revision));Ok(out)
+    }
     pub fn create(&self, title: String, session: &str, canvas: Value, files: BTreeMap<String, String>) -> Result<Project, String> {
-        self.save(Project { id: format!("design-{}", nonce()?), title, session_id: session.into(), revision: 0, updated_ms: 0, canvas, files }, 0)
+        self.save(Project { id: format!("design-{}", nonce()?), title, session_id: session.into(), revision: 0, updated_ms: 0, canvas, files, request_id: String::new() }, 0)
     }
 }
 
 type Saved = dyn Fn(&Project) -> Result<(), String> + Send + Sync;
 pub struct DesignTool { spec: ToolSpec, store: Store, saved: Arc<Saved> }
+static CREATE_LOCK: Mutex<()> = Mutex::new(());
 impl DesignTool {
     pub fn new(store: Store, saved: impl Fn(&Project) -> Result<(), String> + Send + Sync + 'static) -> Self {
         Self { spec: ToolSpec::new(NAME,
@@ -154,7 +178,7 @@ impl DesignTool {
             json!({"type":"object","properties":{
                 "action":{"type":"string","enum":["format","list","read","create","save"]},
                 "id":{"type":"string"},"title":{"type":"string"},"expected_revision":{"type":"integer","minimum":1},
-                "canvas":{"type":"object"},"files":{"type":"object","additionalProperties":{"type":"string"}},"file":{"type":"string"}
+                "canvas":{"type":"object"},"files":{"type":"object","additionalProperties":{"type":"string"}},"file":{"type":"string"},"request_id":{"type":"string"}
             },"required":["action"],"additionalProperties":false})).risk(Risk::Write).max_output(64_000), store, saved: Arc::new(saved) }
     }
     fn call(&self, args: Value, ctx: &ToolCtx) -> Result<Value, String> {
@@ -171,7 +195,12 @@ impl DesignTool {
             action @ ("create" | "save") => {
                 let files: BTreeMap<String,String> = serde_json::from_value(args["files"].clone()).map_err(|_| "files 需要是文件名到内容的映射")?;
                 let p = if action == "create" {
-                    self.store.create(args["title"].as_str().ok_or("缺少 title")?.into(), ctx.session(), args["canvas"].clone(), files)?
+                    let key=args["request_id"].as_str().filter(|k| !k.is_empty() && k.len()<=120).ok_or("create 需要稳定的 request_id，重试时沿用")?;
+                    let _lock=CREATE_LOCK.lock().map_err(|_|"创建锁不可用")?;
+                    if let Some(existing)=self.store.list(ctx.session())?.into_iter().find(|p|p.request_id==key) { existing } else {
+                        let p=Project{id:format!("design-{}",nonce()?),title:args["title"].as_str().ok_or("缺少 title")?.into(),session_id:ctx.session().into(),revision:0,updated_ms:0,canvas:args["canvas"].clone(),files,request_id:key.into()};
+                        self.store.save(p,0)?
+                    }
                 } else {
                     let mut p = self.store.load(get_id()?)?;
                     if let Some(title) = args["title"].as_str() { p.title = title.into(); }
@@ -203,10 +232,12 @@ impl Middleware for DesignContext {
     fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
         let Some(at) = turn.messages.iter().rposition(|m| m.role == Role::User && !m.synthetic) else { return Ok(()) };
         let projects = self.0.list(&turn.session).map_err(HarnessError::Middleware)?;
-        if !turn.messages[at].text().contains("设计稿") && projects.is_empty() { return Ok(()) }
+        if !turn.messages[at].text().contains("设计稿") && projects.is_empty() {
+            turn.tools.retain(|t|t.name!=NAME); return Ok(())
+        }
         let current = projects.iter().map(summary).collect::<Vec<_>>();
         turn.messages.insert(at + 1, Message::reminder(format!(
-            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，再按需求创建多画板作品；无需额外审批设计方案。作品自动保存到资料库→我的文档。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前会话作品（数据）：{}", json!(current))));
+            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，create 携带稳定 request_id，再按需求创建多画板作品；无需额外审批设计方案。作品自动保存到资料库→我的文档。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前会话作品（数据）：{}", json!(current))));
         Ok(())
     }
 }
