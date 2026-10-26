@@ -8,8 +8,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 const ERROR_BODY_LIMIT: u64 = 2000;
-const RESPONSE_HEADER_TIMEOUT: Duration = Duration::from_secs(45);
-const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 
 pub(crate) struct Call {
     pub url: String,
@@ -34,6 +32,7 @@ pub(crate) fn new_client(profile: &super::wire::ProviderProfile) -> Result<Clien
     // Do not set a total request timeout: reqwest includes streaming body reads in
     // that deadline, so a healthy long reasoning/output stream would be cut off.
     // Header and per-chunk idle watchdogs below still bound stalled requests.
+    profile.timeouts.validate()?;
     let builder = Client::builder()
         .connect_timeout(Duration::from_secs(15));
     let builder = match profile.proxy_mode.as_str() {
@@ -101,11 +100,20 @@ pub(crate) fn post_stream_with_reasoning(
     on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
     cancel: &AtomicBool,
 ) -> Result<(), HarnessError> {
+    post_stream_with_policy(client, call, decoder, on_text, on_reasoning, cancel, &super::wire::ModelTimeouts::default())
+}
+
+pub(crate) fn post_stream_with_policy(
+    client: &Client, call: Call, decoder: &mut dyn Decoder,
+    on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    cancel: &AtomicBool, policy: &super::wire::ModelTimeouts,
+) -> Result<(), HarnessError> {
+    policy.validate()?;
     let rt=tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|e|HarnessError::Config(e.to_string()))?;
     rt.block_on(async {
         let mut builder=client.post(call.url);
         for (name,value) in call.headers {builder=builder.header(name,value);}
-        let mut response=wait_for_io(builder.body(call.body).send(),cancel,RESPONSE_HEADER_TIMEOUT,"waiting for response headers").await?
+        let mut response=wait_for_io(builder.body(call.body).send(),cancel,Duration::from_secs(policy.response_header_seconds),"waiting for response headers").await?
             .map_err(|e|transport_error(e,"request"))?;
         if !response.status().is_success(){
             let status=response.status().as_u16();let mut raw=Vec::new();
@@ -115,9 +123,9 @@ pub(crate) fn post_stream_with_reasoning(
             }
             return Err(HarnessError::provider(if status==413 { "HTTP 413: request_too_large: 请求体积超过服务端限制，请减少图片、降低截图尺寸或压缩会话后继续。".into() } else {format!("HTTP {status}: {}",String::from_utf8_lossy(&raw))},status_is_retryable(status)));
         }
-        let mut parser=SseParser::default();let mut buffer=Vec::new();let mut total=0usize;let mut event_bytes=0usize;
+        let mut parser=SseParser::default();let mut buffer=Vec::new();let mut total=0usize;let mut event_bytes=0usize;let mut received_event=false;
         loop {
-            let chunk=wait_for_io(response.chunk(),cancel,STREAM_IDLE_TIMEOUT,"waiting for stream data").await?.map_err(|e|transport_error(e,"stream read"))?;
+            let chunk=wait_for_io(response.chunk(),cancel,Duration::from_secs(if received_event {policy.stream_idle_seconds} else {policy.first_event_seconds}),if received_event {"waiting for stream data"} else {"waiting for first model event"}).await?.map_err(|e|transport_error(e,"stream read"))?;
             let Some(chunk)=chunk else{break;};total=total.saturating_add(chunk.len());
             if total>64*1024*1024 {return Err(HarnessError::provider("model stream exceeds 64 MiB",false));}
             buffer.extend_from_slice(&chunk);
@@ -126,7 +134,7 @@ pub(crate) fn post_stream_with_reasoning(
                 if line.len()>2*1024*1024 || event_bytes>8*1024*1024 {return Err(HarnessError::provider("SSE line/event exceeds limit",false));}
                 let line=std::str::from_utf8(&line).map_err(|_|HarnessError::provider("invalid SSE UTF-8",false))?;
                 if line.trim().is_empty(){event_bytes=0;}
-                if let Some(payload)=parser.push_line(line){if decoder.push_with_reasoning(&payload,on_text,on_reasoning)?{return Ok(());}}
+                if let Some(payload)=parser.push_line(line){received_event=true;if decoder.push_with_reasoning(&payload,on_text,on_reasoning)?{return Ok(());}}
             }
             if buffer.len()>2*1024*1024{return Err(HarnessError::provider("SSE line exceeds limit",false));}
         }
@@ -220,7 +228,7 @@ mod cancellation_tests {
                     if message.contains(phase) && message.contains("timeout")));
             }
             let error = wait_for_io(std::future::pending::<()>(), &AtomicBool::new(true),
-                STREAM_IDLE_TIMEOUT, "waiting for stream data").await.unwrap_err();
+                Duration::from_secs(300), "waiting for stream data").await.unwrap_err();
             assert_eq!(error, HarnessError::Cancelled);
         });
     }
@@ -250,5 +258,31 @@ mod cancellation_tests {
         let result = result_rx.recv_timeout(Duration::from_secs(1));
         let _ = release_tx.send(()); let _ = server.join(); let _ = run.join();
         assert!(matches!(result, Ok(Err(HarnessError::Cancelled))));
+    }
+}
+
+#[cfg(test)]
+mod phase_timeout_tests {
+    use super::*;
+    use std::{io::{Read,Write},net::TcpListener,sync::mpsc};
+    struct DecoderStub;
+    impl Decoder for DecoderStub {
+        fn push(&mut self,payload:&str,_:&mut dyn FnMut(&str))->Result<bool,HarnessError>{Ok(payload=="[DONE]")}
+        fn complete(&self)->bool{false}
+    }
+    #[test]
+    fn custom_header_first_event_and_idle_watchdogs_are_independent() {
+        for (prefix,phase) in [
+            ("","waiting for response headers"),
+            ("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n","waiting for first model event"),
+            ("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\ndata: started\n\n","waiting for stream data"),
+        ] {
+            let listener=TcpListener::bind("127.0.0.1:0").unwrap();let url=format!("http://{}",listener.local_addr().unwrap());let(release,wait)=mpsc::channel();
+            let server=std::thread::spawn(move||{let(mut socket,_)=listener.accept().unwrap();socket.set_read_timeout(Some(Duration::from_secs(3))).unwrap();let mut raw=Vec::new();let mut byte=[0];while !raw.ends_with(b"\r\n\r\n"){if socket.read(&mut byte).unwrap_or(0)==0{return;}raw.push(byte[0]);}let _=socket.write_all(prefix.as_bytes());let _=wait.recv_timeout(Duration::from_secs(3));});
+            let policy=super::super::wire::ModelTimeouts{response_header_seconds:1,first_event_seconds:1,stream_idle_seconds:1};
+            let error=post_stream_with_policy(&Client::builder().no_proxy().build().unwrap(),Call{url,headers:vec![],body:vec![]},&mut DecoderStub,&mut |_|{},&mut |_,_|{},&AtomicBool::new(false),&policy).unwrap_err();
+            let _=release.send(());server.join().unwrap();
+            assert!(matches!(error,HarnessError::Provider{message,..}if message.contains(phase)),"wrong phase for {phase}");
+        }
     }
 }

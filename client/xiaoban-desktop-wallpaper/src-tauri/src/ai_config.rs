@@ -176,6 +176,8 @@ impl ProviderConfig {
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AiConfig {
+    /// Optional endpoint-specific inactivity budgets, keyed by provider id.
+    pub model_timeouts: std::collections::BTreeMap<String, agent_kernel::provider::wire::ModelTimeouts>,
     pub gateway_reply_preference: ReplyPreference,
     pub gateway_reasoning_efforts: Vec<String>,
     pub catalogue_received: bool,
@@ -209,6 +211,7 @@ pub struct AiConfig {
 impl Default for AiConfig {
     fn default() -> Self {
         let mut cfg = Self {
+            model_timeouts: Default::default(),
             gateway_reply_preference: ReplyPreference::Default,
             gateway_reasoning_efforts: Vec::new(),
             catalogue_received: false, catalogue_owner: String::new(), catalogue_fetched_at: 0,

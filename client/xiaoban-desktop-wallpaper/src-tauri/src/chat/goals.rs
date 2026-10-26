@@ -226,6 +226,23 @@ pub(super) fn start_saved(app: &tauri::AppHandle, session_id: String) -> Result<
     }
 }
 
+/// Only used after the host proves that the sole unresolved dispatch was ask_user.
+pub(super) fn resume_answer(app: &tauri::AppHandle, session: &str, answer: String) -> Result<(), String> {
+    let state=app.state::<ChatState>();
+    let _write=lock(&state.goal_io);
+    let _lease=metadata_lease(app,session)?;
+    let Some(mut goal)=current(app,session)? else {
+        super::send(app.clone(),session.into(),answer,None,None,None)?;return Ok(());
+    };
+    let previous=goal.clone();
+    if matches!(goal.state,GoalState::Interrupted|GoalState::NeedsReview){goal.state=GoalState::Paused;}
+    goal.begin(millis())?;
+    store(app)?.save(&goal)?;
+    let input=format!("{}\n\n{}",prompt(&goal),answer);
+    if let Err(error)=super::send(app.clone(),session.into(),input,None,None,None){store(app)?.save(&previous)?;return Err(error);}
+    changed(app,session,Some(&goal));Ok(())
+}
+
 #[tauri::command]
 pub fn chat_goal_pause(
     app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String,
@@ -321,7 +338,7 @@ pub fn chat_goal_delete(
 
 /// Called only after the corresponding RunEvent has been durably appended
 /// to JsonlRunLog. If updating a goal fails, the observer fails closed.
-pub(super) fn observe(app: &tauri::AppHandle, record: &RunEvent, tokens: u64) -> Result<(), String> {
+pub(super) fn observe(app: &tauri::AppHandle, record: &RunEvent, tokens: u64, excluded_wait_ms: u64) -> Result<(), String> {
     if !matches!(&record.body, RunEventBody::State { .. } | RunEventBody::Event { event: agent_kernel::Event::Usage { .. } | agent_kernel::Event::ToolEnd { .. } }) { return Ok(()); }
     let chat = app.state::<ChatState>();
     let _write = lock(&chat.goal_io);
@@ -329,7 +346,7 @@ pub(super) fn observe(app: &tauri::AppHandle, record: &RunEvent, tokens: u64) ->
     let db = store(app)?;
     if let Some(mut goal) = db.load(&record.session_id)? {
         if goal.state == GoalState::Running || (goal.state == GoalState::Paused && goal.last_run_id.as_deref() == Some(&record.run_id)) {
-            goal.account(&record.run_id, tokens, record.timestamp_ms)?;
+            goal.account(&record.run_id, tokens, record.timestamp_ms.saturating_sub(excluded_wait_ms))?;
             if let RunEventBody::State { state, reason } = &record.body {
                 goal.observe(&record.run_id, *state, record.timestamp_ms)?;
                 if let Some(reason) = reason { goal.note = reason.chars().take(2000).collect(); }

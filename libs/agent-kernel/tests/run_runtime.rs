@@ -38,7 +38,7 @@ fn observed_runs_have_unique_ids_monotonic_events_and_explicit_terminal_states()
         }
     ));
     assert!(matches!(
-        records.last().unwrap().body,
+        records[records.len() - 2].body,
         RunEventBody::State {
             state: RunState::Completed,
             ..
@@ -131,7 +131,7 @@ fn a_tool_batch_over_budget_is_not_partially_executed_and_pauses() {
             ..Default::default()
         },
         &mut |record| {
-            last = Some(record.body);
+            if matches!(record.body, RunEventBody::State { .. }) { last = Some(record.body); }
             Ok(())
         },
         &Arc::new(AtomicBool::new(false)),
@@ -256,4 +256,28 @@ fn delegated_run_records_keep_parent_identity_and_use_temporary_session_resource
         |record| record.parent_run_id.as_deref() == Some(&summary.run_id)
             && record.run_id != summary.run_id
     ));
+}
+
+#[test]
+fn failed_terminal_commit_never_announces_done() {
+    let h = harness(vec![Step::text("done")], |b|b);
+    let mut seen=Vec::new();
+    let result=h.agent.run_parts_observed("s1",vec![Part::Text{text:"go".into()}],RunOptions::default(),&mut |record| {
+        if matches!(record.body,RunEventBody::State{state:RunState::Completed,..}) {return Err(HarnessError::Store("commit failed".into()));}
+        seen.push(record.body);Ok(())
+    },&Arc::new(AtomicBool::new(false)));
+    assert!(result.is_err());
+    assert!(!seen.iter().any(|e|matches!(e,RunEventBody::Event{event:Event::Done})));
+    assert!(seen.iter().any(|e|matches!(e,RunEventBody::State{state:RunState::Failed,..})));
+}
+
+#[test]
+fn changing_observation_counters_do_not_reset_the_idle_budget() {
+    let mut steps=Vec::new();for n in 0..12 {steps.push(Step::tool_call(&format!("c{n}"),"read_status","{}"));}
+    steps.push(Step::text("done"));
+    let counter=Arc::new(AtomicUsize::new(0));
+    let h=harness(steps,|b|b.unlimited_turns().tool(FnTool::new(spec("read_status"),move|_,_|Ok(format!("still pending; counter={}",counter.fetch_add(1,Ordering::SeqCst))))));
+    let result=h.agent.run_parts_observed("s1",vec![Part::Text{text:"go".into()}],RunOptions{max_no_progress_rounds:Some(6),..Default::default()},&mut |_|Ok(()),&Arc::new(AtomicBool::new(false)));
+    assert!(matches!(result,Err(HarnessError::Paused(ref reason)) if reason=="no_progress_tool_rounds"));
+    assert!(h.provider.requests().len()<12);
 }

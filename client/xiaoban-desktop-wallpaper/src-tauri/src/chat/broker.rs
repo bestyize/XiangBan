@@ -4,20 +4,57 @@ use serde_json::{Value,json};
 use std::{collections::HashMap,sync::{Mutex,MutexGuard,atomic::{AtomicU64,Ordering},mpsc::{self,Sender,Receiver}}};
 type Waiting<T> = HashMap<String,(String,Sender<T>,Value)>;
 #[derive(Default)]struct State { approvals:Waiting<Approval>,questions:Waiting<Option<String>>,revision:u64 }
-#[derive(Default)]pub struct Broker {state:Mutex<State>,next:AtomicU64}
+#[derive(Default)]pub struct Broker {state:Mutex<State>,next:AtomicU64,root:Option<std::path::PathBuf>,recovered:Mutex<HashMap<String,Value>>}
 fn lock<T>(m:&Mutex<T>)->MutexGuard<'_,T>{m.lock().unwrap_or_else(|e|e.into_inner())}
 impl Broker {
- fn id(&self,p:char)->String{format!("{p}{}",self.next.fetch_add(1,Ordering::Relaxed)+1)}
+ fn id(&self,p:char)->String{format!("{p}{}-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos(),self.next.fetch_add(1,Ordering::Relaxed)+1)}
+ pub fn persistent(root:std::path::PathBuf)->Self {
+    let broker=Self{root:Some(root.clone()),..Default::default()};
+    if let Ok(entries)=std::fs::read_dir(root){for entry in entries.flatten(){
+        let path=entry.path();if path.extension().and_then(|s|s.to_str())!=Some("json"){continue;}
+        if entry.metadata().map_or(true,|m|m.len()>16*1024){continue;}
+        if let Ok(raw)=std::fs::read(&path){if let Ok(mut value)=serde_json::from_slice::<Value>(&raw){
+            if let Some(id)=value["id"].as_str().map(str::to_owned){
+                if Self::safe(&id)&&value["session"].as_str().is_some_and(Self::safe)&&value["question"].is_string(){
+                    value["recovered"]=json!(true);lock(&broker.recovered).insert(id,value);
+                }
+            }
+        }}
+    }}
+    broker
+ }
+ fn safe(id:&str)->bool{!id.is_empty()&&id.len()<=128&&id.bytes().all(|b|b.is_ascii_alphanumeric()||b==b'-'||b==b'_')}
+ fn clear_saved(&self,id:&str)->Result<(),String>{
+    if !Self::safe(id){return Err("invalid question id".into());}
+    if let Some(root)=&self.root{match std::fs::remove_file(root.join(format!("{id}.json"))){Ok(())=>{},Err(e)if e.kind()==std::io::ErrorKind::NotFound=>{},Err(e)=>return Err(e.to_string())}}
+    Ok(())
+ }
+ pub fn recovered_question(&self,id:&str)->Option<Value>{lock(&self.recovered).get(id).cloned()}
+ pub fn finish_recovered(&self,id:&str)->Result<(),String>{self.clear_saved(id)?;lock(&self.recovered).remove(id);lock(&self.state).revision+=1;Ok(())}
+ pub fn open_question_checked(&self,s:&str,mut value:Value)->Result<(String,Receiver<Option<String>>),String>{
+    if !Self::safe(s){return Err("invalid session id".into());}
+    let id=self.id('q');value["id"]=json!(id);value["session"]=json!(s);
+    if let Some(root)=&self.root{
+        std::fs::create_dir_all(root).map_err(|e|e.to_string())?;
+        let file=root.join(format!("{id}.json"));let temporary=file.with_extension("tmp");
+        let raw=serde_json::to_vec(&value).map_err(|e|e.to_string())?;
+        #[cfg(unix)]{use std::os::unix::fs::OpenOptionsExt;use std::io::Write;let mut f=std::fs::OpenOptions::new().write(true).create_new(true).mode(0o600).open(&temporary).map_err(|e|e.to_string())?;f.write_all(&raw).and_then(|_|f.sync_all()).map_err(|e|e.to_string())?;}
+        #[cfg(not(unix))]std::fs::write(&temporary,raw).map_err(|e|e.to_string())?;
+        std::fs::rename(temporary,file).map_err(|e|e.to_string())?;
+    }
+    let(tx,rx)=mpsc::channel();let mut state=lock(&self.state);state.questions.insert(id.clone(),(s.into(),tx,value));state.revision+=1;Ok((id,rx))
+ }
  pub fn open_approval(&self,s:&str)->(String,Receiver<Approval>){self.open_approval_payload(s,json!({}))}
  pub fn open_approval_payload(&self,s:&str,mut value:Value)->(String,Receiver<Approval>){let id=self.id('a');let(tx,rx)=mpsc::channel();value["id"]=json!(id);value["session"]=json!(s);let mut state=lock(&self.state);state.approvals.insert(id.clone(),(s.into(),tx,value));state.revision+=1;(id,rx)}
  pub fn open_question(&self,s:&str)->(String,Receiver<Option<String>>){self.open_question_payload(s,json!({}))}
- pub fn open_question_payload(&self,s:&str,mut value:Value)->(String,Receiver<Option<String>>){let id=self.id('q');let(tx,rx)=mpsc::channel();value["id"]=json!(id);value["session"]=json!(s);let mut state=lock(&self.state);state.questions.insert(id.clone(),(s.into(),tx,value));state.revision+=1;(id,rx)}
+ pub fn open_question_payload(&self,s:&str,value:Value)->(String,Receiver<Option<String>>){self.open_question_checked(s,value).expect("valid in-memory question")}
+
  pub fn answer_approval(&self,id:&str,value:Approval)->Result<(),String>{let mut s=lock(&self.state);let item=s.approvals.remove(id);s.revision+=1;item.ok_or("这个确认已经结束")?.1.send(value).map_err(|_|"这个确认已经结束".into())}
- pub fn answer_question(&self,id:&str,value:Option<String>)->Result<(),String>{let mut s=lock(&self.state);let item=s.questions.remove(id);s.revision+=1;item.ok_or("这个问题已经结束")?.1.send(value).map_err(|_|"这个问题已经结束".into())}
+ pub fn answer_question(&self,id:&str,value:Option<String>)->Result<(),String>{let mut s=lock(&self.state);if !s.questions.contains_key(id){return Err("这个问题已经结束".into());}self.clear_saved(id)?;let item=s.questions.remove(id);s.revision+=1;item.ok_or("这个问题已经结束")?.1.send(value).map_err(|_|"这个问题已经结束".into())}
  pub fn close_approval(&self,id:&str){let mut s=lock(&self.state);s.approvals.remove(id);s.revision+=1;}
- pub fn close_question(&self,id:&str){let mut s=lock(&self.state);s.questions.remove(id);s.revision+=1;}
- pub fn drop_session(&self,id:&str){let mut s=lock(&self.state);s.approvals.retain(|_,(session,_,_)|session!=id);s.questions.retain(|_,(session,_,_)|session!=id);s.revision+=1;}
- pub fn snapshot(&self,id:&str)->Value{let s=lock(&self.state);json!({"revision":s.revision,"approvals":s.approvals.values().filter(|(session,_,_)|session==id).map(|(_,_,v)|v).collect::<Vec<_>>(),"questions":s.questions.values().filter(|(session,_,_)|session==id).map(|(_,_,v)|v).collect::<Vec<_>>()})}
+ pub fn close_question(&self,id:&str){let _=self.clear_saved(id);let mut s=lock(&self.state);s.questions.remove(id);s.revision+=1;}
+ pub fn drop_session(&self,id:&str){let mut s=lock(&self.state);s.approvals.retain(|_,(session,_,_)|session!=id);s.questions.retain(|key,(session,_,_)|{if session==id{let _=self.clear_saved(key);false}else{true}});s.revision+=1;}
+ pub fn snapshot(&self,id:&str)->Value{let s=lock(&self.state);json!({"revision":s.revision,"approvals":s.approvals.values().filter(|(session,_,_)|session==id).map(|(_,_,v)|v).collect::<Vec<_>>(),"questions":s.questions.values().filter(|(session,_,_)|session==id).map(|(_,_,v)|v.clone()).chain(lock(&self.recovered).values().filter(|v|v["session"]==id).cloned()).collect::<Vec<_>>()})}
  #[cfg(test)]pub fn pending(&self)->usize{let s=lock(&self.state);s.approvals.len()+s.questions.len()}
 }
 #[cfg(test)]
@@ -99,5 +136,31 @@ mod tests {
         let (id, rx) = broker.open_approval("s1");
         drop(rx);
         assert!(broker.answer_approval(&id, Approval::Once).is_err());
+    }
+}
+
+#[cfg(test)]
+mod durable_question_tests {
+    use super::*;
+    #[test]
+    fn unanswered_questions_survive_restart_without_replaying_a_worker() {
+        let root=std::env::temp_dir().join(format!("broker-persist-{}",std::process::id()));let _=std::fs::remove_dir_all(&root);
+        let first=Broker::persistent(root.clone());
+        let(id,_rx)=first.open_question_checked("s1",json!({"question":"选择目录？","options":["A","B"],"runId":"r1"})).unwrap();
+        drop(first);
+        let second=Broker::persistent(root.clone());
+        assert_eq!(second.snapshot("s1")["questions"][0]["id"],id);
+        assert_eq!(second.snapshot("s1")["questions"][0]["recovered"],true);
+        assert_eq!(second.recovered_question(&id).unwrap()["runId"],"r1");
+        assert!(second.answer_question(&id,Some("A".into())).is_err(),"a recovered question has no live tool to replay");
+        second.finish_recovered(&id).unwrap();
+        assert!(Broker::persistent(root.clone()).snapshot("s1")["questions"].as_array().unwrap().is_empty());
+        let _=std::fs::remove_dir_all(root);
+    }
+    #[test]
+    fn a_failed_checkpoint_does_not_create_a_live_question() {
+        let root=std::env::temp_dir().join(format!("broker-unwritable-{}",std::process::id()));std::fs::write(&root,"occupied").unwrap();
+        let broker=Broker::persistent(root.clone());assert!(broker.open_question_checked("s1",json!({"question":"q"})).is_err());assert_eq!(broker.pending(),0);
+        std::fs::remove_file(root).unwrap();
     }
 }

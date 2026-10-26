@@ -19,6 +19,14 @@ pub(super) fn forward(
     log: &JsonlRunLog, record: RunEvent, api_key: &str,
     mut notify: impl FnMut(&str, Value),
 ) -> Result<(), HarnessError> {
+    forward_observed(log, record, api_key, |_| Ok(()), notify)
+}
+
+pub(super) fn forward_observed(
+    log: &JsonlRunLog, record: RunEvent, api_key: &str,
+    before_notify: impl FnOnce(&RunEvent) -> Result<(), HarnessError>,
+    mut notify: impl FnMut(&str, Value),
+) -> Result<(), HarnessError> {
     let record = if api_key.is_empty() {
         record
     } else {
@@ -29,6 +37,7 @@ pub(super) fn forward(
             .map_err(|e| HarnessError::Store(format!("deserialize run event: {e}")))?
     };
     log.append(&record)?;
+    before_notify(&record)?;
     let RunEvent { run_id, session_id, sequence, timestamp_ms, body, .. } = record;
     match body {
         RunEventBody::State { state, reason } => notify("chat-run-state", json!({
@@ -305,5 +314,17 @@ mod durable_recovery_tests {
         assert_eq!(done["running"],false);
         let failed=snapshot_projection(vec![Message::user_text("q")],Some("failed".into()),3,vec![json!({"event":{"type":"error","message":"network"}})],true);
         assert_eq!(failed["events"].as_array().unwrap().len(),1); assert_eq!(failed["running"],false);
+    }
+}
+
+#[cfg(test)]
+mod terminal_commit_tests {
+    use super::*;
+    #[test]
+    fn failed_goal_commit_is_not_forwarded_as_a_successful_terminal() {
+        let root=std::env::temp_dir().join(format!("terminal-commit-{}",std::process::id()));let _=std::fs::remove_dir_all(&root);let log=JsonlRunLog::new(&root);let mut sent=false;
+        let record=RunEvent{run_id:"r1".into(),session_id:"s1".into(),parent_run_id:None,sequence:1,timestamp_ms:1,body:RunEventBody::State{state:agent_kernel::RunState::Completed,reason:None}};
+        assert!(forward_observed(&log,record,"",|_|Err(HarnessError::Store("goal write failed".into())),|_,_|sent=true).is_err());assert!(!sent);
+        let _=std::fs::remove_dir_all(root);
     }
 }

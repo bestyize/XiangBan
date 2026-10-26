@@ -13,7 +13,7 @@ pub struct Question {
     pub options: Vec<String>,
 }
 
-type Handler = Box<dyn Fn(&str, &Question, &ToolCtx) -> Option<String> + Send + Sync>;
+type Handler = Box<dyn Fn(&str, &Question, &ToolCtx) -> Result<Option<String>, String> + Send + Sync>;
 
 /// Lets the model ask the user a question mid-run. The host shows it in its own UI; the handler
 /// blocks until the user answers and returns `None` if they dismiss it.
@@ -27,6 +27,10 @@ impl AskUser {
     /// with `ctx.wait_for(&rx)` so cancelling the run can close the dialog; a handler that ignores
     /// cancellation holds the cancel up until the user answers.
     pub fn new(handler: impl Fn(&str, &Question, &ToolCtx) -> Option<String> + Send + Sync + 'static) -> Self {
+        Self::new_fallible(move |session, question, ctx| Ok(handler(session, question, ctx)))
+    }
+
+    pub fn new_fallible(handler: impl Fn(&str, &Question, &ToolCtx) -> Result<Option<String>, String> + Send + Sync + 'static) -> Self {
         let schema = json!({
             "type": "object",
             "properties": {
@@ -37,7 +41,7 @@ impl AskUser {
         });
         let description = "Ask the user a question when you need a decision or missing information that you cannot \
                            find yourself. Ask one clear question at a time.";
-        let spec = ToolSpec::new("ask_user", description, schema).risk(Risk::Read).serial().timeout(Duration::from_secs(600));
+        let spec = ToolSpec::new("ask_user", description, schema).risk(Risk::Read).serial().timeout(Duration::MAX);
         Self { spec, handler: Box::new(handler) }
     }
 }
@@ -69,7 +73,8 @@ impl Tool for AskUser {
 
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         let question = parse_question(&args)?;
-        let answer = (self.handler)(ctx.session(), &question, ctx);
+        let _waiting = ctx.control().wait_for_user();
+        let answer = (self.handler)(ctx.session(), &question, ctx)?;
         // wait_for returns None both for cancellation and dismissal. Cancellation must never
         // become a user's decision merely because this worker wins the race with the harness.
         if ctx.is_cancelled() { return Err("cancelled".into()); }

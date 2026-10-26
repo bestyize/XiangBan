@@ -3,9 +3,30 @@ use crate::types::{Message, Part, Role};
 use serde_json::{json, Map, Value};
 use std::{fmt, sync::Arc};
 
+/// Per-provider inactivity budgets; never a total streaming request deadline.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ModelTimeouts {
+    pub response_header_seconds: u64,
+    pub first_event_seconds: u64,
+    pub stream_idle_seconds: u64,
+}
+impl Default for ModelTimeouts {
+    fn default() -> Self { Self { response_header_seconds: 600, first_event_seconds: 600, stream_idle_seconds: 300 } }
+}
+impl ModelTimeouts {
+    pub fn validate(&self) -> Result<(), crate::HarnessError> {
+        if [self.response_header_seconds, self.first_event_seconds, self.stream_idle_seconds].iter().any(|n| *n == 0 || *n > 86_400) {
+            return Err(crate::HarnessError::Config("model inactivity timeouts must be 1..=86400 seconds".into()));
+        }
+        Ok(())
+    }
+}
+
 /// Everything needed to talk to one OpenAI-compatible endpoint.
 #[derive(Clone)]
 pub struct ProviderProfile {
+    pub timeouts: ModelTimeouts,
     /// Without the `/chat/completions` suffix, e.g. `https://api.openai.com/v1`.
     pub base_url: String,
     pub api_key: String,
@@ -39,6 +60,7 @@ pub struct ProviderProfile {
 impl ProviderProfile {
     pub fn new(base_url: impl Into<String>, api_key: impl Into<String>, model: impl Into<String>) -> Self {
         Self {
+            timeouts: ModelTimeouts::default(),
             base_url: base_url.into(),
             api_key: api_key.into(),
             model: model.into(),

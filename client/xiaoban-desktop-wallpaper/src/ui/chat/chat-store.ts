@@ -643,12 +643,20 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   }
 
   function applyOutcome(session:string,outcome:Outcome){
-    // An unverified outcome is internal bookkeeping, not a user-facing warning.
-    // Actual errors and uncertain operations have their own execution events.
-    if(outcome.status!=='succeeded'||outcome.validator!=='expected_file_sha256')return;
-    const v=viewOf(session,true);if(!v.items.some(i=>i.kind==='tool'))return;
-    const id=`outcome:${outcome.runId}`;if(v.items.some(i=>i.id===id))return;
-    v.items.push({kind:'notice',id,tone:'info',text:'指定文件已通过 SHA256 验收。',details:outcome.evidence,detailsLabel:'查看执行依据'});
+    const v=viewOf(session,true);
+    if(!v.items.some(i=>i.kind==='tool'))return;
+    if(activeRun.has(session) && activeRun.get(session)!==outcome.runId)return;
+    const id=`outcome:${outcome.runId}`;
+    if(v.items.some(i=>i.id===id))return;
+    const partial=outcome.status==='partial', failed=outcome.status==='failed';
+    const verified=outcome.status==='succeeded';
+    const status=['succeeded','failed','partial','cancelled','unknown'].includes(outcome.status)
+      ? outcome.status as 'succeeded'|'failed'|'partial'|'cancelled'|'unknown' : 'unknown';
+    v.items.push({kind:'notice',id,taskStatus:status,tone:partial||failed?'warning':'info',
+      text:partial?'仍有未解决的操作失败，请核对结果后继续。':failed?'本次执行失败，已保留当前进度。'
+        :verified?outcome.validator==='expected_file_sha256'?'指定文件已通过 SHA256 验收。':'任务已通过指定验收。'
+        :outcome.status==='cancelled'?'已停止':'执行已结束，任务结果尚未独立验收。',
+      canContinue:partial||failed,details:outcome.evidence,detailsLabel:'查看执行依据'});
   }
 
   function applyPending(id:string,p:PendingSnapshot) {
@@ -675,10 +683,11 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         }
         if (disposed || !store.views[id]) return;
         view.items = itemsFromHistory(view, snapshot.messages);
-        if(snapshot.pending) applyPending(id,snapshot.pending);
         view.usage = undefined;
         view.status = '';
         for (const payload of snapshot.events ?? []) applyEvent(view, payload.event);
+        if(snapshot.pending) applyPending(id,snapshot.pending);
+        if (snapshot.runId) activeRun.set(id, snapshot.runId);
         if(snapshot.outcome)applyOutcome(id,snapshot.outcome);
         view.loaded = snapshot.ready !== false;
         if (snapshot.runId) {

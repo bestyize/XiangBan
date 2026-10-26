@@ -304,7 +304,10 @@ impl Middleware for Permission {
 
         if needs_ask {
             let request = ApprovalRequest { session, tool: name, risk: spec.risk, arguments: args, tainted, danger: danger.as_deref(), remember_as: exec_key.as_deref(), ctx };
-            let decision = self.approver.approve(&request);
+            let decision = {
+                let _waiting = ctx.control().wait_for_user();
+                self.approver.approve(&request)
+            };
             if ctx.is_cancelled() {
                 return ToolGate::Block("cancelled".to_string());
             }

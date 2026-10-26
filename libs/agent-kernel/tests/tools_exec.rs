@@ -140,3 +140,29 @@ fn unknown_tool_with_no_registered_tools_does_not_suggest_a_missing_command() {
     assert!(run(&h.agent, "go").0.is_ok());
     assert!(tool_messages(&h)[0].1.contains("Available tools: (none)"));
 }
+
+#[test]
+fn parallel_deadlines_cancel_later_workers_independently() {
+    let acted = Arc::new(AtomicBool::new(false)); let flag = acted.clone();
+    let first = FnTool::new(spec("first").timeout(Duration::from_secs(2)), |_, _| {
+        std::thread::sleep(Duration::from_millis(300)); Ok("first".into())
+    });
+    let second = FnTool::new(spec("second").timeout(Duration::from_millis(40)), move |_, ctx| {
+        for _ in 0..15 { std::thread::sleep(Duration::from_millis(10)); if ctx.is_cancelled() { return Err("cancelled".into()); } }
+        flag.store(true, Ordering::SeqCst); Ok("late action".into())
+    });
+    let h = harness(vec![Step::tool_call("a","first","{}").and_tool_call("b","second","{}"), Step::text("done")], |b|b.tool(first).tool(second));
+    assert!(run(&h.agent,"go").0.is_ok());
+    assert!(!acted.load(Ordering::SeqCst));
+    let messages = h.store.load("s1").unwrap();
+    assert!(messages.iter().find(|m|m.tool_call_id.as_deref()==Some("b")).unwrap().is_error);
+}
+
+#[test]
+fn a_buffered_result_completed_before_its_deadline_is_not_marked_timed_out() {
+    let first = FnTool::new(spec("first"), |_, _| {std::thread::sleep(Duration::from_millis(150));Ok("first".into())});
+    let second = FnTool::new(spec("second").timeout(Duration::from_millis(80)), |_, _| Ok("early".into()));
+    let h=harness(vec![Step::tool_call("a","first","{}").and_tool_call("b","second","{}"),Step::text("done")],|b|b.tool(first).tool(second));
+    assert!(run(&h.agent,"go").0.is_ok());
+    assert!(!h.store.load("s1").unwrap().iter().find(|m|m.tool_call_id.as_deref()==Some("b")).unwrap().is_error);
+}

@@ -561,13 +561,13 @@ mod client {
                 let mut decoder = AnthropicStream::default();
                 // Anything streamed (answer or thinking) means the request was accepted: no retry with a lower limit.
                 let emitted = std::cell::Cell::new(false);
-                let result = http::post_stream_with_reasoning(&self.client, call, &mut decoder, &mut |text| {
+                let result = http::post_stream_with_policy(&self.client, call, &mut decoder, &mut |text| {
                     emitted.set(true);
                     on_text(text);
                 }, &mut |kind, text| {
                     emitted.set(true);
                     on_reasoning(kind, text);
-                }, cancel);
+                }, cancel, &self.profile.timeouts);
                 match result {
                     Ok(()) => {
                         let mut reply = decoder.finish();

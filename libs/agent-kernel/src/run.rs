@@ -172,12 +172,15 @@ impl Agent {
             Err(HarnessError::Cancelled) => Event::Cancelled,
             Err(error) => Event::Error { message: error.to_string() },
         };
-        let finalized = emitter.emit(RunEventBody::Event { event }).and_then(|_| {
-            emitter.emit(RunEventBody::State { state: crate::runtime::state_of(&result), reason: result.as_ref().err().map(ToString::to_string) })
-        });
+        // Commit the final state before announcing completion to UI/stdio clients.
+        let finalized = emitter.emit(RunEventBody::State {
+            state: crate::runtime::state_of(&result), reason: result.as_ref().err().map(ToString::to_string),
+        }).and_then(|_| emitter.emit(RunEventBody::Event { event }));
         if let Err(error) = finalized {
             let failed = RunEnd { state: RunState::Failed, ..end };
             for tool in &self.tools { let _ = tool.on_run_end(&failed); }
+            let _ = emitter.emit(RunEventBody::State { state: RunState::Failed, reason: Some(error.to_string()) });
+            let _ = emitter.emit(RunEventBody::Event { event: Event::Error { message: error.to_string() } });
             return Err(error);
         }
         result
@@ -355,11 +358,19 @@ impl Agent {
                     continue;
                 }
                 let Ok(args) = serde_json::from_str::<serde_json::Value>(&call.arguments) else { continue };
-                use std::hash::{Hash,Hasher};
-                let mut hash=std::collections::hash_map::DefaultHasher::new();
-                result.output.hash(&mut hash);
-                if let Some(v)=&result.structured_content{v.to_string().hash(&mut hash);}
-                let key = (call.name.clone(), args,hash.finish());
+                // A changing timestamp, counter or log cursor is not task progress.
+                // Generic observations count once per operation/target. A managed
+                // process counts when its real lifecycle changes, not on every read.
+                let args = if call.name == "process_read" {
+                    serde_json::json!({"id":args["id"], "state":result.structured_content.as_ref().map(|v| &v["state"])})
+                } else {
+                    let state = result.structured_content.as_ref().map(|v| serde_json::json!({
+                        "state":v.get("state"), "status":v.get("status"), "exit_code":v.get("exit_code"),
+                        "revision":v.get("revision"), "sha256":v.get("sha256"),
+                    }));
+                    serde_json::json!({"arguments":args,"observed_state":state})
+                };
+                let key = (call.name.clone(), args);
                 if successful_calls.insert(key) {
                     continuations_without_progress = 0;
                     truncated_tool_retries = 0;

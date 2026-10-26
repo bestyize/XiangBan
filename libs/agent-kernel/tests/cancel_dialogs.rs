@@ -143,3 +143,19 @@ fn a_detached_context_is_never_cancelled_and_waits_for_values() {
     drop(tx);
     assert_eq!(ctx.wait_for(&rx), None, "a dropped sender ends the wait");
 }
+
+#[test]
+fn waiting_for_a_person_does_not_spend_the_execution_time_budget() {
+    let ask=AskUser::new(|_,_,_| {std::thread::sleep(Duration::from_millis(240));Some("yes".into())});
+    assert_eq!(ask.spec().timeout,Duration::MAX);
+    let h=harness(vec![Step::tool_call("q","ask_user",r#"{"question":"continue?"}"#),Step::text("done")],|b|b.tool(ask));
+    let control=RunControl::bounded(Duration::from_millis(160),1000);
+    let result=h.agent.run_parts_observed("s1",vec![Part::Text{text:"go".into()}],RunOptions{control:Some(control.clone()),..Default::default()},&mut |_|Ok(()),&Arc::new(AtomicBool::new(false)));
+    assert!(result.is_ok(),"{result:?}");assert!(control.excluded_wait()>=Duration::from_millis(240));
+}
+#[test]
+fn question_checkpoint_failure_is_an_error_not_a_user_dismissal() {
+    let ask=AskUser::new_fallible(|_,_,_| Err("cannot persist question".into()));
+    let result=ask.execute(serde_json::json!({"question":"q"}),&ToolCtx::detached("s"));
+    assert_eq!(result,Err("cannot persist question".into()));
+}

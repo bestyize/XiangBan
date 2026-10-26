@@ -1037,3 +1037,13 @@ describe('which window asked', () => {
     expect(h.store.sentHere('s1')).toBe(false);
   });
 });
+
+it('retains backend partial outcomes after an unrelated successful tool',async()=>{
+  const h=harness({chat_new_session:()=>summary('s1'),chat_send:()=>summary('s1')});
+  await h.store.init();await h.store.send('生成文件');
+  h.events('s1',{type:'tool_start',id:'a',name:'write_file',arguments:'{"path":"a.txt"}'},{type:'tool_end',id:'a',output:'failed',is_error:true},
+    {type:'tool_start',id:'b',name:'read_file',arguments:'{"path":"b.txt"}'},{type:'tool_end',id:'b',output:'ok',is_error:false},{type:'done'});
+  h.emit('chat-task-outcome',{session:'s1',outcome:{runId:'r1',status:'partial',validator:'run_trace_only',evidence:'unresolved_tool_errors=1'}});
+  expect(h.store.current()?.items).toContainEqual(expect.objectContaining({kind:'notice',taskStatus:'partial',tone:'warning',canContinue:true}));
+  h.store.dispose();
+});

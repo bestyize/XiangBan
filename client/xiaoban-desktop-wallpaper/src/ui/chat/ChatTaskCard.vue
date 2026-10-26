@@ -10,7 +10,7 @@ const props = defineProps<{ progress: TaskProgress; calls: ToolCall[]; current: 
 const emit = defineEmits<{ logs: []; adjust: []; resume: []; stop: []; attention: [] }>();
 const expanded = ref(true);
 const stepOpen = ref(new Set<number>());
-const labels = { running: '执行中', waiting: '等待输入', approval: '等待授权', blocked: '执行受阻', paused: '已暂停', completed: '已完成' };
+const labels = { running: '执行中', waiting: '等待输入', approval: '等待授权', blocked: '执行受阻', paused: '已暂停', completed: '已完成', unverified: '待核验' };
 const active = computed(() => ['running', 'waiting', 'approval'].includes(props.progress.state));
 const attention = computed(() => ['waiting', 'approval', 'blocked'].includes(props.progress.state));
 const latest = computed(() => [...props.calls].reverse().find(call => call.name !== 'todo'));
@@ -50,7 +50,7 @@ function toggleStep(index: number) {
           <div v-if="stepOpen.has(index)" class="step-details" data-testid="task-step-details"><template v-if="step.evidence"><b>小伴记录的执行依据</b><p>{{ step.evidence }}</p></template><p v-else>{{ step.status === 'completed' ? '这一步已记录为完成，未附执行依据。可查看执行过程核对结果。' : index === progress.current ? progress.message : '完成前面的步骤后继续。' }}</p></div>
         </li>
       </ol>
-      <div v-if="attention || progress.state === 'paused'" class="task-intervention" :class="{ caution: attention }" data-testid="task-intervention">
+      <div v-if="attention || progress.state === 'paused' || progress.state === 'unverified'" class="task-intervention" :class="{ caution: attention }" data-testid="task-intervention">
         <p>{{ progress.message }}</p><p v-if="progress.plan.handoff" class="handoff">{{ progress.plan.handoff }}</p>
         <button v-if="current && (progress.state === 'waiting' || progress.state === 'approval')" type="button" class="task-primary" @click="emit('attention')">{{ progress.state === 'waiting' ? '回答问题' : '查看待确认操作' }}</button>
         <button v-else-if="current && progress.canResume" type="button" class="task-primary" data-testid="task-resume" :disabled="disabled || configured === false" @click="emit('resume')">核对后继续</button>

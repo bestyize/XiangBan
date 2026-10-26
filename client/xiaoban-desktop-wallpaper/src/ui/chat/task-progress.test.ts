@@ -75,3 +75,16 @@ describe('accepted task plans', () => {
     expect(taskProgress(block([failed, recovered, plan]), false)?.state).toBe('completed');
   });
 });
+
+it('keeps an unrelated success from repairing an earlier failed operation', () => {
+  const plan=checkpoint('all',todos.map(t=>({...t,status:'completed'})));
+  const failed:ToolCall={kind:'tool',id:'a',name:'write_file',arguments:'{"path":"a.txt"}',output:'failed',status:'error'};
+  const read:ToolCall={kind:'tool',id:'b',name:'read_file',arguments:'{"path":"b.txt"}',output:'ok',status:'done'};
+  expect(taskProgress(block([failed,read,plan]),false)?.state).toBe('blocked');
+});
+it('retains backend partial outcomes and distinguishes an unverified plan', () => {
+  const plan=checkpoint('all',todos.map(t=>({...t,status:'completed'})));
+  const b={...block([plan]),items:[{kind:'notice' as const,id:'outcome',tone:'info' as const,text:'待核验',taskStatus:'unknown' as const}]};
+  expect(taskProgress(b,false)?.state).toBe('unverified');
+  expect(taskProgress({...b,items:[{...b.items[0]!,taskStatus:'partial' as const}]},false)?.state).toBe('blocked');
+});

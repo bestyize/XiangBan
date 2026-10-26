@@ -12,11 +12,12 @@ const POLL: Duration = Duration::from_millis(20);
 
 struct Inflight {
     index: usize,
-    rx: Receiver<ToolResult>,
+    rx: Receiver<(Instant, ToolResult)>,
     deadline: Option<Instant>,
 
     call_cancel: Arc<AtomicBool>,
     grace: Duration,
+    _watch: crate::StopWatch,
 }
 
 enum Prepared {
@@ -28,21 +29,50 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, ctx: ToolCtx) -> Result
     let timeout = tool.spec().timeout;
     let call_cancel = ctx.call_cancel.clone();
     let grace = tool.cancel_grace();
+    let deadline = Instant::now().checked_add(timeout);
+    let run_cancel = ctx.run_cancel.clone();
+    let worker_cancel = call_cancel.clone();
+    // Each worker owns a watchdog; waiting for another result or an approval
+    // must not postpone this call's cancellation.
+    let watch = crate::StopWatch::new(
+        move || run_cancel.load(Ordering::Relaxed) || deadline.is_some_and(|d| Instant::now() >= d),
+        move || worker_cancel.store(true, Ordering::SeqCst),
+    );
     let (tx, rx) = mpsc::channel();
     std::thread::Builder::new()
         .name(format!("tool-{}", tool.spec().name))
         .spawn(move || {
-            let _ = tx.send(tool.execute_result(args, &ctx));
+            let result = tool.execute_result(args, &ctx);
+            let _ = tx.send((Instant::now(), result));
         })
         .map_err(|e| ToolResult::error(format!("could not start tool: {e}")))?;
-    Ok(Inflight { index, rx, deadline: Instant::now().checked_add(timeout), call_cancel, grace })
+    Ok(Inflight { index, rx, deadline, call_cancel, grace, _watch: watch })
 }
 
-fn await_call(call:&Inflight,cancel:&AtomicBool)->ToolResult{
- loop{match call.rx.recv_timeout(POLL){Ok(result)=>return result,Err(RecvTimeoutError::Disconnected)=>return ToolResult::unknown("worker crashed without a result"),Err(RecvTimeoutError::Timeout)=>{
-  if cancel.load(Ordering::Relaxed)||call.deadline.is_some_and(|d|Instant::now()>=d){call.call_cancel.store(true,Ordering::SeqCst);let timed_out=!cancel.load(Ordering::Relaxed);
-                    return match call.rx.recv_timeout(call.grace){Ok(mut result)=>{if timed_out {result.output=format!("Tool timed out; final worker report (action may have completed): {}",result.output);}result},Err(_)=>ToolResult::unknown("worker did not acknowledge cancellation/deadline")};}
- }}}
+fn reported(call: &Inflight, finished: Instant, mut result: ToolResult) -> ToolResult {
+    if call.deadline.is_some_and(|d| finished >= d) {
+        result.is_error = true;
+        result.output = format!("Tool timed out; final worker report (action may have completed; inspect state before retrying): {}", result.output);
+    }
+    result
+}
+
+fn await_call(call: &Inflight, cancel: &AtomicBool) -> ToolResult {
+    loop {
+        match call.rx.recv_timeout(POLL) {
+            Ok((finished, result)) => return reported(call, finished, result),
+            Err(RecvTimeoutError::Disconnected) => return ToolResult::unknown("worker crashed without a result"),
+            Err(RecvTimeoutError::Timeout) => {
+                if cancel.load(Ordering::Relaxed) || call.deadline.is_some_and(|d| Instant::now() >= d) {
+                    call.call_cancel.store(true, Ordering::SeqCst);
+                    return match call.rx.recv_timeout(call.grace) {
+                        Ok((finished, result)) => reported(call, finished, result),
+                        Err(_) => ToolResult::unknown("worker did not acknowledge cancellation/deadline"),
+                    };
+                }
+            }
+        }
+    }
 }
 
 impl Agent {

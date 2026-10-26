@@ -18,6 +18,8 @@ struct Writer {
     poisoned: bool,
     last_sync: std::time::Instant,
     unsynced_bytes: usize,
+    terminal_state: Option<RunState>,
+    terminal_event: bool,
 }
 
 #[derive(Deserialize)]
@@ -113,6 +115,8 @@ impl JsonlRunLog {
                     poisoned: false,
                     last_sync: std::time::Instant::now(),
                     unsynced_bytes: 0,
+                    terminal_state: None,
+                    terminal_event: false,
                 },
             );
         }
@@ -127,6 +131,9 @@ impl JsonlRunLog {
             || event.sequence != writer.sequence + 1
         {
             return Err(error("session or sequence does not match the writer"));
+        }
+        if writer.terminal_state.is_some_and(|state| !valid_terminal_tail(state, &event.body, writer.terminal_event)) {
+            return Err(error("unexpected event after terminal state"));
         }
         let sync = !matches!(
             &event.body,
@@ -148,9 +155,13 @@ impl JsonlRunLog {
         }
         if sync { writer.last_sync = std::time::Instant::now(); writer.unsynced_bytes = 0; }
         writer.sequence = event.sequence;
-        if matches!(event.body, RunEventBody::State { state, .. } if state != RunState::Running) {
-            writers.remove(&event.run_id);
+        // Support legacy event-before-state logs and state-before-event commits.
+        // Keep the same exclusive writer through the final UI notification.
+        if let RunEventBody::State { state, .. } = &event.body {
+            if *state != RunState::Running { writer.terminal_state = Some(*state); }
         }
+        writer.terminal_event |= matches!(event.body, RunEventBody::Event { event: Event::Done | Event::Cancelled | Event::Error { .. } });
+        if writer.terminal_state.is_some() && writer.terminal_event { writers.remove(&event.run_id); }
         Ok(())
     }
 
@@ -233,6 +244,17 @@ impl JsonlRunLog {
     }
 }
 
+fn valid_terminal_tail(state: RunState, body: &RunEventBody, terminal_event: bool) -> bool {
+    match body {
+        RunEventBody::Event { event: Event::Done } => state == RunState::Completed,
+        RunEventBody::Event { event: Event::Cancelled } => state == RunState::Cancelled,
+        RunEventBody::Event { event: Event::Error { .. } } => matches!(state, RunState::Failed | RunState::Paused),
+        // A host may reject the state commit before its UI notification.
+        RunEventBody::State { state: RunState::Failed, .. } => !terminal_event,
+        _ => false,
+    }
+}
+
 fn scan_file(
     path: &Path,
     run_id: &str,
@@ -243,6 +265,8 @@ fn scan_file(
     let mut session = None;
     let mut parent = None;
     let mut terminal = false;
+    let mut terminal_state = None;
+    let mut terminal_event = false;
     loop {
         let mut line = Vec::new();
         let n = (&mut reader)
@@ -271,11 +295,18 @@ fn scan_file(
         {
             return Err(error("invalid run identity or event sequence"));
         }
+        if let Some(state) = terminal_state {
+            let valid_tail = valid_terminal_tail(state, &event.body, terminal_event);
+            if !valid_tail { return Err(error("unexpected event after terminal state")); }
+        }
         sequence = event.sequence;
         session = Some(event.session_id.clone());
         parent = Some(event.parent_run_id.clone());
-        terminal =
-            matches!(event.body, RunEventBody::State { state, .. } if state != RunState::Running);
+        if let RunEventBody::State { state, .. } = &event.body {
+            if *state != RunState::Running { terminal_state = Some(*state); }
+        }
+        terminal_event |= matches!(&event.body, RunEventBody::Event { event: Event::Done | Event::Cancelled | Event::Error { .. } });
+        terminal = terminal_state.is_some() && terminal_event;
         if !accept(event) {
             return Ok(());
         }

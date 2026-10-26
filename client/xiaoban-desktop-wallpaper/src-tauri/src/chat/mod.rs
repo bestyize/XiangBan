@@ -181,7 +181,7 @@ pub struct ChatState {
 
 impl ChatState {
     pub fn new(app: &tauri::AppHandle) -> Self {
-        let broker = Arc::new(Broker::default());
+        let broker = Arc::new(match Dirs::of(app) { Ok(dirs) => Broker::persistent(dirs.chat.join("waiting-questions")), Err(_) => Broker::default() });
         let approver = {
             let (app, broker) = (app.clone(), broker.clone());
             move |request: &ApprovalRequest<'_>| ask_approval(&app, &broker, request)
@@ -337,8 +337,8 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
     decision
 }
 
-fn ask_question(app: &tauri::AppHandle, broker: &Broker, session: &str, question: &Question, ctx: &ToolCtx) -> Option<String> {
-    let (id, rx) = broker.open_question_payload(session,json!({"question":question.text,"options":question.options}));
+fn ask_question(app: &tauri::AppHandle, broker: &Broker, session: &str, question: &Question, ctx: &ToolCtx) -> Result<Option<String>, String> {
+    let (id, rx) = broker.open_question_checked(session,json!({"question":question.text,"options":question.options,"runId":ctx.run_id()}))?;
     emit(app,"chat-pending-changed",json!({"session":session,"pending":broker.snapshot(session)}));
     crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::AwaitingUser);
     emit(app, "chat-question", json!({ "id": id, "session": session, "question": question.text, "options": question.options }));
@@ -346,7 +346,7 @@ fn ask_question(app: &tauri::AppHandle, broker: &Broker, session: &str, question
     broker.close_question(&id);
     emit(app,"chat-pending-changed",json!({"session":session,"pending":broker.snapshot(session)}));
     crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::Running);
-    answer
+    Ok(answer)
 }
 
 #[derive(Clone)]
@@ -381,6 +381,7 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
     profile.extra_body = config.reasoning_body();
     profile.max_request_bytes = Some(8 * 1024 * 1024);
     let network = crate::network::current();
+    profile.timeouts = config.model_timeouts.get(&config.active_provider).cloned().unwrap_or_default();
     profile.proxy_mode = network.mode;
     profile.proxy_url = network.proxy_url;
     // Central model policy: compatible APIs use endpoint defaults; Anthropic
@@ -813,7 +814,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
     };
     let ask = {
         let (app, broker) = (app.clone(), state.broker.clone());
-        AskUser::new(move |session, question, ctx| ask_question(&app, &broker, session, question, ctx))
+        AskUser::new_fallible(move |session, question, ctx| ask_question(&app, &broker, session, question, ctx))
     };
     if !config.open_computer_use {
         // Switched off: the shared server is not needed any more.
@@ -1330,10 +1331,11 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
                             *message = ai_gateway::readable_error(message);
                         }
                     }
-                    run_history::forward(&journal, record.clone(), &config_owned.api_key, |channel, payload| {
+                    run_history::forward_observed(&journal, record.clone(), &config_owned.api_key, |record| {
+                        goals::observe(&handle, record, control.reported_tokens(), control.excluded_wait().as_millis().min(u128::from(u64::MAX)) as u64).map_err(agent_kernel::HarnessError::Store)
+                    }, |channel, payload| {
                         emit(&sender, channel, payload);
                     })?;
-                    goals::observe(&handle, &record, control.reported_tokens()).map_err(agent_kernel::HarnessError::Store)?;
                     if terminal { terminal_delivered = true; }
                     Ok(())
                 };
@@ -1951,7 +1953,27 @@ pub fn chat_answer_approval(app: tauri::AppHandle, window: tauri::WebviewWindow,
 pub fn chat_answer_question(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, answer: Option<String>) -> Result<(), String> {
     chat_window(&window)?;
     let answer = answer.map(|a| a.trim().to_string()).filter(|a| !a.is_empty());
-    app.state::<ChatState>().broker.answer_question(&id, answer)
+    let state=app.state::<ChatState>();
+    if let Some(saved)=state.broker.recovered_question(&id){
+        let session=saved["session"].as_str().ok_or("恢复的问题缺少会话")?;
+        let run=saved["runId"].as_str().ok_or("恢复的问题缺少执行记录")?;
+        if lock(&state.runs).contains_key(session){return Err("请先停止当前回答再恢复问题".into());}
+        let dirs=Dirs::of(&app)?;
+        let inspection=JsonlRunLog::new(dirs.runs().join(session)).inspect(run).map_err(|e|e.to_string())?;
+        if inspection.incomplete_tools.iter().any(|tool|tool.dispatched&&tool.name!="ask_user"){
+            return Err("上次还有结果不明的操作，请先检查实际结果后再继续".into());
+        }
+        if let Some(answer)=answer {
+            if inspection.terminal || !inspection.incomplete_tools.iter().any(|tool|tool.dispatched&&tool.name=="ask_user") {
+                return Err("这个问题已结束，请关闭后在会话中继续".into());
+            }
+            let text=format!("上次执行在等待我回答时中断。问题：{}\n我的回答：{}\n请检查现场后继续；不要重放已执行或结果不明的操作。",saved["question"].as_str().unwrap_or(""),answer);
+            goals::resume_answer(&app,session,text)?;
+        }
+        state.broker.finish_recovered(&id)?;
+        emit(&app,"chat-pending-changed",json!({"session":session,"pending":state.broker.snapshot(session)}));
+        Ok(())
+    }else{state.broker.answer_question(&id, answer)}
 }
 
 #[tauri::command]

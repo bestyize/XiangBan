@@ -537,7 +537,7 @@ mod client {
             }
             let call = Call { url: endpoint_url(&self.profile.base_url), headers: http::merge_headers(headers, &self.profile.extra_headers), body };
             let mut decoder = ResponsesStream::default();
-            http::post_stream_with_reasoning(&self.client, call, &mut decoder, on_text, on_reasoning, cancel)?;
+            http::post_stream_with_policy(&self.client, call, &mut decoder, on_text, on_reasoning, cancel, &self.profile.timeouts)?;
             let mut reply = decoder.finish();
             super::super::wire::bind_state(&mut reply.message, &self.profile);
             Ok(reply)

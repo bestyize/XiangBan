@@ -136,3 +136,14 @@ fn competing_writers_invalid_paths_and_sequence_gaps_are_rejected() {
         );
     }
 }
+
+#[test]
+fn terminal_state_allows_only_its_notification_or_a_failed_commit_correction() {
+    let dir=TempDir::new("terminal-tail");let log=JsonlRunLog::new(&dir.0);
+    log.append(&record(1,RunEventBody::State{state:RunState::Running,reason:None})).unwrap();
+    log.append(&record(2,RunEventBody::State{state:RunState::Completed,reason:None})).unwrap();
+    assert!(log.append(&record(3,RunEventBody::Event{event:Event::TextDelta{text:"late output".into()}})).is_err());
+    log.append(&record(3,RunEventBody::State{state:RunState::Failed,reason:Some("goal commit failed".into())})).unwrap();
+    log.append(&record(4,RunEventBody::Event{event:Event::Error{message:"goal commit failed".into()}})).unwrap();
+    assert_eq!(log.inspect("r-test").unwrap().state,Some(RunState::Failed));
+}
