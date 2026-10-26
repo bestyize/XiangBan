@@ -34,6 +34,10 @@ Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮�
 
 工程内的设计文档入口见 [设计规范目录](docs/design-specs/README.md)。超级小伴的 [悬浮按钮设计稿](docs/design-specs/prototypes/assistant-floating-tools.html) 与 [截图工具设计稿](docs/design-specs/prototypes/assistant-capture-overlay.html) 均可直接用浏览器打开；交互约定及正式代码对应关系见 [超级小伴设计规范](docs/design-specs/super-assistant.md)。
 
+## 聊天输入框：技能 / 专家 / 连接器
+
+新建任务与会话共用一个输入框：技能以 chip 放在文字上方左侧（一次性，最多 3 个，发送时写成 `/名称`）；专家 / 专家团和连接器放在右上角，整个对话内一直生效，连接器图标最多显示 3 个、其余折成 +N，点开逐个开关。规范见 [聊天输入框规范](docs/design-specs/chat-composer.md)。
+
 ## 长程任务执行
 
 交互聊天默认不再设置固定模型轮数或工具调用次数。设置 → 安全与权限 → 任务执行可分别设置轮数、工具次数、时间和累计模型用量，全部默认不限制（与 Claude Code 一致），需要时再手动设置上限；停止、权限、重复调用和无进展检测继续生效。长期目标的活跃时间与用量跨继续累计，原“继续”按钮沿用目标预算；只读定时任务仍保留独立预算。

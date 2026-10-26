@@ -53,34 +53,56 @@ describe('composer mentions', () => {
   it('does not match email addresses and accepts Chinese queries', () => {
     expect(mentionToken('me@example.com')).toBeNull(); expect(mentionToken('看 @仓库')).toEqual({ start: 2, query: '仓库' });
   });
-  it('selects by keyboard, adds a removable connector tag, sends structured metadata with unchanged text', async () => {
+  it('selects by keyboard, adds a connector to the top row, sends structured metadata with unchanged text and keeps it for the next message', async () => {
     await open(); await type('请查提交 @');
     expect(invoke).toHaveBeenCalledWith('ai_mentions'); expect(wrapper.get('[role=listbox]').text()).toContain('审查专家');
     await key('Enter');
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('请查提交 ');
-    expect(wrapper.text()).toContain('本次优先使用 代码仓库'); expect(host).not.toHaveBeenCalledWith('chat_send', expect.anything());
+    expect(wrapper.get('[data-testid=chat-connectors-toggle]').attributes('aria-label')).toContain('已选 1 个连接器'); expect(host).not.toHaveBeenCalledWith('chat_send', expect.anything());
     await wrapper.get('[data-testid=chat-send]').trigger('click'); await flushPromises();
     expect(host).toHaveBeenCalledWith('chat_send', { sessionId: 's1', text: '请查提交', mentions: [{ kind: 'connector', id: 'repo' }] });
-    expect(wrapper.find('.mention-tags').exists()).toBe(false);
+    // The conversation got its id from that message; the choice belongs to the conversation, so it stays.
+    expect(wrapper.find('[data-testid=chat-connectors]').exists()).toBe(true);
+
   });
-  it('deduplicates, filters, and removes selected connector tags', async () => {
+  it('deduplicates, filters, and switches a selected connector off in its list', async () => {
     await open(); await type('@仓库'); await pick('代码仓库');
-    await type('@repo'); await pick('代码仓库'); expect(wrapper.findAll('.mention-tags button')).toHaveLength(1);
-    await wrapper.get('[aria-label="移除连接器 代码仓库"]').trigger('click'); expect(wrapper.find('.mention-tags').exists()).toBe(false);
+    await type('@repo'); await pick('代码仓库'); expect(wrapper.findAll('[data-testid=chat-connectors] .tile')).toHaveLength(1);
+    await wrapper.get('[data-testid=chat-connectors-toggle]').trigger('click'); await flushPromises();
+    await wrapper.get('[aria-label="优先使用 代码仓库"]').trigger('click'); await flushPromises();
+    expect(wrapper.findAll('[data-testid=chat-connectors] .tile')).toHaveLength(0);
   });
   it('inserts skills with the slash syntax and summons experts through the existing expert path', async () => {
     await open(); await type('帮我 @质量'); await pick('质量检查');
-    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('/check 帮我 ');
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('帮我 ');
+    expect(wrapper.get('[data-testid=chat-skill-check]').text()).toContain('质量检查');
     await type('@审查'); await pick('审查专家');
     expect(store.chat.pendingExpert).toMatchObject({ plugin: 'reviewer-plugin', name: '审查专家', agent: 'lead' });
     expect(store.navigate).toHaveBeenCalledWith('new-task');
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('');
   });
-  it('preserves a rejected message and its connector tags for retry', async () => {
-    await open(); await type('查提交 @repo'); await pick('代码仓库'); sendFails = true;
+  it('preserves a rejected message, its skills and its connectors for retry', async () => {
+    await open(); await type('查提交 @repo'); await pick('代码仓库'); await type('查提交 @质量'); await pick('质量检查'); sendFails = true;
     await wrapper.get('[data-testid=chat-send]').trigger('click'); await flushPromises();
     expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('查提交');
-    expect(wrapper.text()).toContain('本次优先使用 代码仓库');
+    expect(wrapper.find('[data-testid=chat-skill-check]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid=chat-connectors-toggle]').attributes('aria-label')).toContain('已选 1 个连接器');
+  });
+  it('sends chosen skills as /names in front of the text, at most three, and clears them', async () => {
+    await open();
+    for (const [typed, name] of [['@质量', '质量检查']]) { await type(typed); await pick(name); }
+    expect(wrapper.findAll('[data-testid^=chat-skill-]')).toHaveLength(1);
+    await type('帮我看看'); await wrapper.get('[data-testid=chat-send]').trigger('click'); await flushPromises();
+    expect(host).toHaveBeenCalledWith('chat_send', { sessionId: 's1', text: '/check 帮我看看' });
+    expect(wrapper.find('[data-testid=chat-composer-top]').exists()).toBe(false);
+  });
+  it('removes a skill chip with its x and lets a chip alone be sent', async () => {
+    await open(); await type('@质量'); await pick('质量检查');
+    await wrapper.get('[aria-label="移除技能 质量检查"]').trigger('click');
+    expect(wrapper.find('[data-testid=chat-skill-check]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid=chat-send]').attributes('disabled')).toBeDefined();
+    await type('@质量'); await pick('质量检查');
+    expect(wrapper.get('[data-testid=chat-send]').attributes('disabled')).toBeUndefined();
   });
   it('supports Escape, IME composition, and arrow keys without sending', async () => {
     await open(); await type('@'); await key('ArrowDown');
@@ -94,7 +116,9 @@ describe('composer mentions', () => {
     await key('Enter'); expect(host).not.toHaveBeenCalledWith('chat_send', expect.anything());
   });
   it('clears connector choices when a different conversation is selected', async () => {
-    await open(); await type('@repo'); await pick('代码仓库'); store.chat.currentId = 'another'; await flushPromises();
-    expect(wrapper.find('.mention-tags').exists()).toBe(false);
+    await open(); await type('@repo'); await pick('代码仓库'); store.chat.currentId = 's1'; await flushPromises();
+    expect(wrapper.find('[data-testid=chat-connectors]').exists()).toBe(true);
+    store.chat.currentId = 'another'; await flushPromises();
+    expect(wrapper.find('[data-testid=chat-connectors]').exists()).toBe(false);
   });
 });

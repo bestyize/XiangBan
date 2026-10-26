@@ -40,16 +40,17 @@ export function filterSkills(items: SlashSkill[], query: string, limit = 8): Sla
   return scored.slice(0, limit).map((s) => s.item);
 }
 
-/** 把末尾的 `/xxx` 换成选中的 `/名称 `。 */
-export function applySlash(draft: string, token: SlashToken, name: string): string {
-  return `${draft.slice(0, token.start)}/${name} `;
+/** 选中技能后，把末尾正在输入的 `/xxx` 去掉（技能变成输入框上方的 chip，不留在文字里）。 */
+export function dropSlash(draft: string, token: SlashToken): string {
+  return draft.slice(0, token.start);
 }
 
-/** 从“＋”菜单选了技能：把 `/名称 ` 放在草稿最前面，已经有就不重复。 */
-export function withLeadingSlash(draft: string, name: string): string {
-  const lead = `/${name}`;
-  if (draft === lead || draft.startsWith(`${lead} `) || draft.startsWith(`${lead}\n`)) return draft;
-  return draft.trim() ? `${lead} ${draft}` : `${lead} `;
+/** 一条消息最多用几个技能，和后端 `skill_invocation` 一次展开的上限一致。 */
+export const MAX_SKILLS = 3;
+
+/** 输入框里选好的技能 chip 在发送时变成消息开头的 `/名称 `，后端照旧展开，对话记录里也留着用了什么。 */
+export function withSkills(text: string, names: string[]): string {
+  return [...names.map((name) => `/${name}`), text].filter(Boolean).join(' ');
 }
 
 export const SOURCE_LABEL: Record<string, string> = { plugin: '插件', installed: '已安装', assistant: '小伴创建', builtin: '内置' };

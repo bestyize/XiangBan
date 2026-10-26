@@ -1,13 +1,15 @@
 <script setup lang="ts">
 /**
- * The message box shared by 新建任务 and the conversation page: attachments, the text, and one row of tools —
- * ＋ (files, screenshot, experts, skills, connectors), the working folder (new task only), the permission mode,
- * then the context ring, the model, voice input and send / stop on the right.
+ * The message box shared by 新建任务 and the conversation page: attachments, a top row, the text, and one row of tools.
+ * Top row: the skills chosen for this message on the left (chips, gone once sent); on the right the expert the
+ * conversation is bound to and the connectors it should prefer (both stay for the whole conversation).
+ * Tool row: ＋ (files, screenshot, experts, skills, connectors), the working folder (new task only), the permission
+ * mode, then the context ring, the model, voice input and send / stop on the right.
  * Each page keeps its own instance (both stay alive), so voice input only runs on the page that is shown.
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { NInput } from 'naive-ui';
-import { ArrowUp, AudioLines, LoaderCircle, Mic, MicOff, Square, X } from 'lucide-vue-next';
+import { ArrowUp, AudioLines, LoaderCircle, Mic, MicOff, Square, X, Zap } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, type AiConfigView, type AiTier } from '../../bridge.ts';
 import type { ControlPage, ControlStore } from '../control-types.ts';
 import ChatWorkbenchTools from './ChatWorkbenchTools.vue';
@@ -15,6 +17,7 @@ import ChatSlashMenu from './ChatSlashMenu.vue';
 import ChatMentionMenu from './ChatMentionMenu.vue';
 import { useComposerMentions, type MentionItem } from '../chat/mentions.ts';
 import ChatExpertChip from './ChatExpertChip.vue';
+import ChatConnectorCluster from './ChatConnectorCluster.vue';
 import ChatComposerPet from './ChatComposerPet.vue';
 import ChatComposerModel from './ChatComposerModel.vue';
 import ChatWorkspaceMenu from './ChatWorkspaceMenu.vue';
@@ -23,7 +26,7 @@ import ChatContextRing from './ChatContextRing.vue';
 import AsrStatus from './AsrStatus.vue';
 import { ATTACHMENT_ACCEPT, MAX_ATTACHMENTS, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment, type PendingAttachment } from '../chat/attachments.ts';
 import { isImeEnter } from '../chat/format.ts';
-import { applySlash, filterSkills, slashToken, withLeadingSlash, type SlashSkill } from '../chat/slash.ts';
+import { MAX_SKILLS, dropSlash, filterSkills, slashToken, withSkills, type SlashSkill } from '../chat/slash.ts';
 
 const props = withDefaults(defineProps<{
   store: ControlStore;
@@ -82,7 +85,8 @@ const attachmentReading = ref(false);
 let attachmentVersion = 0;
 const filePicker = ref<HTMLInputElement | null>(null);
 const MAX_IMAGES = MAX_ATTACHMENTS;
-const canSend = computed(() => chat.configured && !running.value && !compacting.value && !attachmentReading.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0));
+const skills = ref<{ name: string; title: string }[]>([]);
+const canSend = computed(() => chat.configured && !running.value && !compacting.value && !attachmentReading.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0 || skills.value.length > 0));
 
 /* ── Voice ───────────────────────────────────────────────────────────── */
 const voiceHasText = ref(false);
@@ -99,7 +103,9 @@ watch(() => chat.currentId, (id, before) => {
   if (before && id !== before) live?.end();
   if (shown.value && !liveActive.value) asr?.deactivate();
   attachmentVersion++; attachments.value = [];
-  mentions.selected.value = [];
+  skills.value = [];
+  // Connectors stay chosen through the first message of a new conversation (it only gives it an id) and are dropped when another one is opened.
+  if (before) mentions.selected.value = [];
 }, { flush: 'sync' });
 watch(microphoneAllowed, allowed => { if (!allowed && shown.value && !liveActive.value) asr?.deactivate(); }, { flush: 'sync' });
 watch(shown, now => { if (!now && !liveActive.value) asr?.deactivate(); else if (now) void readModelLabel(); }, { flush: 'sync' });
@@ -164,18 +170,20 @@ onUnmounted(() => {
 /* ── Sending ─────────────────────────────────────────────────────────── */
 async function submit() {
   const text = draft.value.trim();
-  if ((!text && !attachments.value.length) || !canSend.value) return;
+  if ((!text && !attachments.value.length && !skills.value.length) || !canSend.value) return;
   asr?.deactivate();
   const images = [...attachments.value];
   const references = [...mentions.selected.value];
-  mentions.selected.value = [];
+  const chosen = [...skills.value];
   draft.value = '';
   attachments.value = [];
+  skills.value = [];
   emit('sending');
-  if (!(await chat.send(text, images, undefined, references.map(({ kind, id }) => ({ kind, id })))) && !draft.value) {
+  if (!(await chat.send(withSkills(text, chosen.map(s => s.name)), images, undefined, references.map(({ kind, id }) => ({ kind, id })))) && !draft.value) {
     // The host refused, so nothing was sent: hand the whole message back untouched.
     draft.value = text;
     attachments.value = images;
+    skills.value = chosen;
     mentions.selected.value = references;
   }
   await nextTick();
@@ -199,7 +207,8 @@ watch(slashItems, (items) => { if (slashIndex.value >= items.length) slashIndex.
 function pickSkill(name: string) {
   const at = token.value;
   if (!at) return;
-  draft.value = applySlash(draft.value, at, name);
+  draft.value = dropSlash(draft.value, at);
+  addSkill(name, slashSkills.value.find(s => s.name === name)?.displayName);
   slashDismissed.value = '';
   void nextTick(() => input.value?.focus());
 }
@@ -285,13 +294,24 @@ async function useExpert(entrySkill: string, name: string, expert?: { slug: stri
   await nextTick();
   input.value?.focus();
 }
-/** 从“＋”选了技能：和在输入框里打 `/名称` 一样，发送时后端会把这个技能的说明交给小伴。 */
-const useSkill = (slug: string) => { draft.value = withLeadingSlash(draft.value, slug); void nextTick(() => input.value?.focus()); };
+/** 技能变成输入框上方的 chip；发送时写成消息开头的 `/名称`，后端会把这个技能的说明交给小伴。 */
+function addSkill(slug: string, title?: string) {
+  if (skills.value.some(s => s.name === slug)) return;
+  if (skills.value.length >= MAX_SKILLS) { props.store.notify(`一条消息最多用 ${MAX_SKILLS} 个技能`, 'info'); return; }
+  skills.value.push({ name: slug, title: title || slug });
+}
+const useSkill = (slug: string, title?: string) => { addSkill(slug, title); void nextTick(() => input.value?.focus()); };
+const removeSkill = (slug: string) => { skills.value = skills.value.filter(s => s.name !== slug); };
 const useConnector = (name: string, id: string) => {
   if (!mentions.selected.value.some(item => item.id === id)) mentions.selected.value.push({ kind: 'connector', id, name, description: '' });
 };
+/** The switches in the connector list: choose a connector for this conversation, or drop it. */
+function toggleConnector(item: { id: string; name: string }) {
+  if (mentions.selected.value.some(i => i.id === item.id)) mentions.selected.value = mentions.selected.value.filter(i => i.id !== item.id);
+  else useConnector(item.name, item.id);
+}
 const mentions = useComposerMentions(draft, () => props.store.desktop && shown.value, async (item: MentionItem) => {
-  if (item.kind === 'skill') { useSkill(item.id); return true; }
+  if (item.kind === 'skill') { useSkill(item.id, item.name); return true; }
   if (item.kind === 'expert') {
     if (running.value) { props.store.notify('这个对话还在回答，请等它结束或先停止，再召唤专家', 'info'); return false; }
     type Expert = NonNullable<Parameters<typeof useExpert>[2]> & { entrySkill?: string };
@@ -337,10 +357,17 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 个附件 · 发送时会一起交给小伴</small>
       </div>
       <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
-      <ChatExpertChip v-if="chat.currentExpert" class="composer-expert" :expert="chat.currentExpert" :removable="!chat.currentId" :desktop="store.desktop" @clear="chat.pendingExpert = null" />
+      <div v-if="skills.length || chat.currentExpert || mentions.selected.value.length" class="composer-top" data-testid="chat-composer-top">
+        <ul class="skill-chips" aria-label="这条消息用的技能">
+          <li v-for="skill in skills" :key="skill.name" class="skill-chip" :data-testid="`chat-skill-${skill.name}`"><Zap :size="14" aria-hidden="true" /><span :title="`/${skill.name}`">{{ skill.title }}</span><button type="button" class="chip-x" :aria-label="`移除技能 ${skill.title}`" :disabled="running" @click="removeSkill(skill.name)"><X :size="11" :stroke-width="2.6" /></button></li>
+        </ul>
+        <div class="composer-ctx">
+          <ChatExpertChip v-if="chat.currentExpert" compact :expert="chat.currentExpert" :removable="!chat.currentId" :desktop="store.desktop" @clear="chat.pendingExpert = null" />
+          <ChatConnectorCluster :selected="mentions.selected.value" :desktop="store.desktop" :disabled="running" :down="page === 'new-task'" @toggle="toggleConnector" @manage="store.navigate('ai-store')" />
+        </div>
+      </div>
       <ChatSlashMenu v-if="slashOpen" :items="slashItems" :active="slashIndex" @pick="pickSkill" @hover="slashIndex = $event" />
       <ChatMentionMenu v-if="mentions.open.value" :items="mentions.items.value" :active="mentions.index.value" :loading="mentions.loading.value" @pick="mentions.pick" @hover="mentions.index.value = $event" />
-      <div v-if="mentions.selected.value.length" class="mention-tags"><button v-for="item in mentions.selected.value" :key="item.id" type="button" class="xb-btn is-sm" :aria-label="`移除连接器 ${item.name}`" @click="mentions.selected.value = mentions.selected.value.filter(i => i.id !== item.id)">本次优先使用 {{ item.name }} <X :size="12" /></button></div>
       <div class="composer-editor">
         <NInput ref="input" v-model:value="draft" type="textarea" :autosize="{ minRows, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
       </div>
@@ -363,14 +390,22 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 </template>
 
 <style scoped>
-.mention-tags{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px 0}
 .composer{position:relative;width:100%;box-sizing:border-box}
 .composer-box{position:relative;display:flex;flex-direction:column;gap:4px;background:var(--ui-surface);border-radius:18px;box-shadow:0 0 0 1px var(--ui-border),0 2px 4px rgba(0,0,0,.03),0 12px 32px rgba(0,0,0,.07);padding:14px 12px 8px 16px;transition:box-shadow .15s}
 html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:0 0 0 1px var(--ui-border-strong),0 12px 32px rgba(0,0,0,.35)}
 .composer-box:focus-within{box-shadow:0 0 0 1px var(--ui-border-strong),0 2px 4px rgba(0,0,0,.03),0 12px 32px rgba(0,0,0,.09)}
 .composer-box.voice-active{box-shadow:0 0 0 1.5px var(--ui-btn),0 0 0 4px var(--ui-soft),0 12px 32px rgba(0,0,0,.07)}
 .page-new-task .composer-box{padding:16px 14px 10px 18px}
-.composer-expert{align-self:flex-start;margin:0 0 6px 2px}
+.composer-top{display:flex;align-items:flex-start;gap:8px;min-width:0;min-height:28px;margin-bottom:4px}
+.skill-chips{flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;list-style:none}
+.skill-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;height:28px;padding:0 4px 0 9px;border-radius:8px;background:var(--ui-soft);color:var(--ui-ink);font-size:13px;font-weight:500}
+.skill-chip svg{flex:none}
+.skill-chip span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip-x{flex:none;display:grid;place-items:center;width:20px;height:20px;padding:0;border:0;border-radius:6px;background:transparent;color:inherit;cursor:pointer}
+.chip-x:hover:not(:disabled){background:var(--ui-control-hover)}
+.chip-x:disabled{opacity:.5;cursor:not-allowed}
+.chip-x:focus-visible{outline:2px solid var(--ui-btn);outline-offset:1px}
+.composer-ctx{display:flex;align-items:center;gap:2px;flex:none;min-width:0;margin-left:auto;max-width:70%}
 .composer-editor{display:flex;min-width:0;padding:0 2px 2px}
 .composer-editor :deep(.n-input){flex:1;min-width:0;width:100%;--n-border:none;--n-border-hover:none;--n-border-focus:none;--n-box-shadow-focus:none;--n-color:transparent;--n-color-focus:transparent;--n-color-disabled:transparent;background:transparent;font-size:14.5px}
 .page-new-task .composer-editor :deep(.n-input){font-size:15px}

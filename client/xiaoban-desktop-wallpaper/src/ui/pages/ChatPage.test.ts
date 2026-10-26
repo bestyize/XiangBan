@@ -96,12 +96,13 @@ describe('chat workbench composer actions', () => {
     await click('chat-add-menu');
     await click('chat-add-skills');
     await click('chat-installed-check');
-    expect(textarea().value.startsWith('/check ')).toBe(true);
+    expect(textarea().value).not.toContain('/check');
+    expect(q('chat-skill-check')?.textContent).toContain('质量检查');
     await click('chat-add-menu');
     await click('chat-add-connectors');
     await click('chat-installed-github');
     expect(textarea().value).not.toContain('GitHub');
-    expect(q('chat-input')?.closest('.composer')?.textContent).toContain('本次优先使用 GitHub');
+    expect(q('chat-connectors-toggle')?.getAttribute('aria-label')).toContain('已选 1 个连接器');
     expect(h.commands()).toContain('ai_store_connector_status');
   });
 
@@ -122,7 +123,8 @@ describe('chat workbench composer actions', () => {
     // Down moves the highlight, Enter inserts it instead of sending.
     expect((await press({ key: 'ArrowDown' })).defaultPrevented).toBe(true);
     expect((await press({ key: 'Enter' })).defaultPrevented).toBe(true);
-    expect(textarea().value).toBe('先做 /pptx ');
+    expect(textarea().value).toBe('先做 ');
+    expect(q('chat-skill-pptx')?.textContent).toContain('PPT 演示文稿');
     expect(q('chat-slash-menu')).toBeNull();
     expect(h.commands()).not.toContain('chat_send');
     // A finished name or a path opens nothing; Escape closes the menu and leaves the text alone.

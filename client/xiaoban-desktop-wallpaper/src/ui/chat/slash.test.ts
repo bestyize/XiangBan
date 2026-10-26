@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applySlash, filterSkills, slashToken, withLeadingSlash, type SlashSkill } from './slash.ts';
+import { MAX_SKILLS, dropSlash, filterSkills, slashToken, withSkills, type SlashSkill } from './slash.ts';
 
 const skill = (name: string, displayName = name, description = ''): SlashSkill => ({ name, displayName, description, source: 'installed' });
 
@@ -29,15 +29,16 @@ describe('filterSkills', () => {
   });
 });
 
-describe('inserting a skill', () => {
-  it('replaces the typed token with the chosen name and a space', () => {
-    expect(applySlash('先做表格 /xl', { start: 5, query: 'xl' }, 'xlsx')).toBe('先做表格 /xlsx ');
-    expect(applySlash('/', { start: 0, query: '' }, 'pptx')).toBe('/pptx ');
+describe('choosing a skill', () => {
+  it('drops the typed /token, because the skill becomes a chip above the box', () => {
+    expect(dropSlash('先做表格 /xl', { start: 5, query: 'xl' })).toBe('先做表格 ');
+    expect(dropSlash('/', { start: 0, query: '' })).toBe('');
   });
-  it('puts a skill from the plus menu in front of the draft, once', () => {
-    expect(withLeadingSlash('', 'pptx')).toBe('/pptx ');
-    expect(withLeadingSlash('做个汇报', 'pptx')).toBe('/pptx 做个汇报');
-    expect(withLeadingSlash('/pptx 做个汇报', 'pptx')).toBe('/pptx 做个汇报');
-    expect(withLeadingSlash('/pptxx 做', 'pptx')).toBe('/pptx /pptxx 做');
+  it('writes the chosen skills in front of the message as /names, in order', () => {
+    expect(withSkills('做个汇报', ['pptx'])).toBe('/pptx 做个汇报');
+    expect(withSkills('做个汇报', ['research', 'pptx'])).toBe('/research /pptx 做个汇报');
+    expect(withSkills('', ['pptx'])).toBe('/pptx');
+    expect(withSkills('你好', [])).toBe('你好');
   });
+  it('allows as many skills as the host expands for one message', () => { expect(MAX_SKILLS).toBe(3); });
 });

@@ -5,7 +5,7 @@ import { X } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ExpertView } from '../chat/types.ts';
 
-const props = defineProps<{ expert: ExpertView; removable?: boolean; desktop?: boolean }>();
+const props = defineProps<{ expert: ExpertView; removable?: boolean; desktop?: boolean; /** 输入框右上角用：只显示头像和名字，职业放进提示。 */ compact?: boolean }>();
 const emit = defineEmits<{ clear: [] }>();
 
 /** 头像读一次就记住；没有头像或读不出来就用名字的第一个字。 */
@@ -24,10 +24,10 @@ watch(() => props.expert.plugin, load);
 </script>
 
 <template>
-  <div class="expert-chip" data-testid="chat-expert" :title="expert.profession ? `${expert.name} · ${expert.profession}` : expert.name">
-    <span class="expert-avatar" aria-hidden="true"><img v-if="avatar" :src="avatar" alt="" /><template v-else>{{ expert.name.slice(0, 1) }}</template></span>
+  <div class="expert-chip" :class="{ compact }" data-testid="chat-expert" :title="expert.profession ? `${expert.name} · ${expert.profession}` : expert.name">
+    <span class="expert-avatar" :class="{ team: expert.kind === 'team' }" aria-hidden="true"><img v-if="avatar" :src="avatar" alt="" /><template v-else>{{ expert.name.slice(0, 1) }}</template></span>
     <span class="expert-name">{{ expert.name }}</span>
-    <span v-if="expert.profession" class="expert-profession">{{ expert.profession }}</span>
+    <span v-if="expert.profession && !compact" class="expert-profession">{{ expert.profession }}</span>
     <button v-if="removable" type="button" class="expert-clear" data-testid="chat-expert-clear" aria-label="取消召唤这位专家" @click="emit('clear')"><X :size="12" /></button>
   </div>
 </template>
@@ -36,6 +36,9 @@ watch(() => props.expert.plugin, load);
 .expert-chip{display:inline-flex;align-items:center;gap:7px;max-width:100%;min-width:0;height:28px;padding:0 6px 0 4px;border-radius:999px;background:var(--ui-soft);color:var(--ui-ink);font-size:12.5px}
 .expert-avatar{flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;overflow:hidden;background:var(--ui-surface);font-size:11px;font-weight:600}
 .expert-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.expert-avatar.team{border-radius:6px}
+.expert-chip.compact{background:transparent;box-shadow:inset 0 0 0 1px var(--ui-border-strong);color:var(--ui-text-primary);max-width:200px}
+.expert-chip.compact .expert-avatar{background:var(--ui-soft);color:var(--ui-ink)}
 .expert-name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .expert-profession{color:var(--ui-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .expert-clear{flex:none;display:grid;place-items:center;width:18px;height:18px;margin-left:2px;border:0;border-radius:50%;background:transparent;color:var(--ui-text-secondary);cursor:pointer}
