@@ -35,10 +35,11 @@ const goalOpen = ref(false);
 const goalBusy = ref(false);
 const retryAfterSwitch = ref(false);
 function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
-async function modelSwitched() {
+async function modelSwitched(sessionId: string | null) {
+  if (chat.currentId !== sessionId) return;
   await chat.refresh();
   await composer.value?.refreshModel();
-  if (retryAfterSwitch.value) await chat.retry();
+  if (retryAfterSwitch.value && chat.currentId === sessionId) await chat.retry();
   props.store.notify('模型已切换', 'success');
 }
 /** 设置 → AI 模型, in the settings dialog. */
@@ -219,7 +220,7 @@ async function submitRename(value: string) {
 }
 const confirmingDelete = ref('');
 function askDelete() { closeMore(); if (session.value && !running.value) confirmingDelete.value = session.value.id; }
-watch(() => chat.currentId, () => { confirmingDelete.value = ''; renaming.value = false; clearSearch(); });
+watch(() => chat.currentId, () => { modelDialog.value = false; retryAfterSwitch.value = false; confirmingDelete.value = ''; renaming.value = false; clearSearch(); });
 async function remove(id: string) {
   confirmingDelete.value = '';
   await chat.remove(id);
@@ -286,7 +287,7 @@ async function openLink(href: string) {
 </script>
 
 <template>
-  <ModelSwitchDialog v-model:show="modelDialog" :retry="retryAfterSwitch" @switched="modelSwitched" @settings="openAiSettings" />
+  <ModelSwitchDialog :chat="chat" v-model:show="modelDialog" :retry="retryAfterSwitch" @switched="modelSwitched" @settings="openAiSettings" />
   <GuideModal v-model:show="guideDialog" :desktop="store.desktop" @select-prompt="useExample" @open-settings="openAiSettings" />
   <NModal v-model:show="goalOpen" :mask-closable="!goalBusy" :close-on-esc="!goalBusy">
     <div class="goal-modal-content">

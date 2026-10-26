@@ -5,6 +5,7 @@ import { LoaderCircle, Sparkles } from 'lucide-vue-next';
 import { CONTEXT_MAX, CONTEXT_MIN, CONTEXT_STEP, contextLevel, contextPercent, formatTokens } from '../chat/format.ts';
 
 const props = defineProps<{
+  sessionId?: string | null;
   used: number;
   limit: number;
   canCompact: boolean;
@@ -17,7 +18,7 @@ const props = defineProps<{
   /** No conversation to measure yet (the new-task page): an empty ring that does not open. */
   inert?: boolean;
 }>();
-const emit = defineEmits<{ compact: []; resize: [tokens: number] }>();
+const emit = defineEmits<{ compact: []; resize: [tokens: number, sessionId: string | null] }>();
 
 const RADIUS = 8;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
@@ -29,18 +30,25 @@ const clampLimit = (value: number) => Math.min(CONTEXT_MAX, Math.max(CONTEXT_MIN
 // What the slider shows. It leads the host's number while a change is on its way, so the bar and the ring follow the thumb.
 const shown = ref(clampLimit(props.limit));
 let pending: ReturnType<typeof setTimeout> | null = null;
+let pendingSession: string | null = null;
+let pendingLimit = shown.value;
 watch(() => props.limit, value => { if (pending === null) shown.value = clampLimit(value); });
 
 function slide(value: number) {
   shown.value = value;
   if (pending !== null) clearTimeout(pending);
-  pending = setTimeout(() => { pending = null; emit('resize', shown.value); }, SAVE_AFTER_MS);
+  pendingSession = props.sessionId ?? null; pendingLimit = value;
+  pending = setTimeout(() => { pending = null; emit('resize', pendingLimit, pendingSession); }, SAVE_AFTER_MS);
 }
+watch(() => props.sessionId, () => {
+  if (pending !== null) { clearTimeout(pending); pending = null; emit('resize', pendingLimit, pendingSession); }
+  shown.value = clampLimit(props.limit); show.value = false;
+});
 onBeforeUnmount(() => {
   if (pending === null) return;
   clearTimeout(pending);
   pending = null;
-  emit('resize', shown.value);
+  emit('resize', pendingLimit, pendingSession);
 });
 
 const percent = computed(() => (props.inert ? 0 : contextPercent(props.used, shown.value)));

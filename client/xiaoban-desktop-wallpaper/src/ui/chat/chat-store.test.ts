@@ -717,20 +717,22 @@ describe('the context limit and the host compacting by itself', () => {
 
   it('shows a new limit at once, saves it, and then reads the numbers back from the host', async () => {
     let limit = 256_000;
-    const h = harness({ chat_overview: () => overview(), chat_context: () => info(100_000, limit), set_context_tokens: args => { limit = Number(args?.tokens); return undefined; } });
+    const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')] }), chat_load_session: () => [], chat_context: () => info(100_000, limit), chat_set_session_options: args => { limit = Number(args?.contextTokens); return undefined; } });
     await h.store.init();
+    await h.store.select('s1');
     await vi.waitFor(() => expect(h.store.context.limit).toBe(256_000));
 
     const pending = h.store.setContextSize(512_000);
     expect(h.store.context.limit).toBe(512_000);
     expect(await pending).toBe(true);
-    expect(h.calls.at(-1)).toEqual(['set_context_tokens', { tokens: 512_000 }]);
+    expect(h.calls.at(-1)).toEqual(['chat_set_session_options', { sessionId: 's1', contextTokens: 512_000 }]);
     expect(h.store.context).toEqual(info(100_000, 512_000));
   });
 
   it('puts the old limit back and says why when the host refuses', async () => {
-    const h = harness({ chat_overview: () => overview(), chat_context: () => info(100_000), set_context_tokens: () => { throw new Error('无法保存上下文大小：磁盘已满'); } });
+    const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')] }), chat_load_session: () => [], chat_context: () => info(100_000), chat_set_session_options: () => { throw new Error('无法保存上下文大小：磁盘已满'); } });
     await h.store.init();
+    await h.store.select('s1');
     await vi.waitFor(() => expect(h.store.context.used).toBe(100_000));
     expect(await h.store.setContextSize(900_000)).toBe(false);
     expect(h.store.context.limit).toBe(256_000);

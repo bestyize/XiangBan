@@ -4,6 +4,7 @@ import { NButton, NSelect } from 'naive-ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatComposerModel from './ChatComposerModel.vue';
 import ModelSwitchDialog from './ModelSwitchDialog.vue';
+import { createChatStore } from '../chat/chat-store.ts';
 import { GATEWAY_PROVIDER, invoke, type AiConfigView, type AiTier } from '../../bridge.ts';
 
 vi.mock('../../bridge.ts', async importOriginal => ({ ...await importOriginal<typeof import('../../bridge.ts')>(), invoke: vi.fn() }));
@@ -21,22 +22,28 @@ const config: AiConfigView = {
 let wrapper: VueWrapper | undefined;
 beforeEach(() => {
   vi.resetAllMocks();
-  ipc.mockImplementation(async command => {
+  ipc.mockImplementation(async (command, args) => {
     if (command === 'get_ai_config' || command === 'refresh_ai_providers') return structuredClone(config) as never;
     if (command === 'ai_gateway_tiers') return structuredClone(tiers) as never;
-    if (command === 'use_ai_gateway' || command === 'save_ai_provider') return structuredClone(config) as never;
+    if (command === 'chat_set_model') return args?.selection as never;
     throw new Error(`unexpected ${command}`);
   });
 });
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; vi.useRealTimers(); });
+function chat() {
+  return createChatStore({ desktop: true, invoke: async (command, args) => {
+    if (command === 'chat_set_model') { await ipc(command, args); return args?.selection as never; }
+    return undefined as never;
+  }, listen: async () => () => {}, notify: vi.fn() });
+}
 async function composer() {
-  wrapper = mount(ChatComposerModel, { props: { label: '小伴 AI · 日常' }, attachTo: document.body });
+  wrapper = mount(ChatComposerModel, { props: { chat: chat(), label: '小伴 AI · 日常' }, attachTo: document.body });
   await wrapper.get('[data-testid="chat-workbench-model"]').trigger('click');
   await flushPromises();
   return wrapper;
 }
 async function dialog() {
-  wrapper = mount(ModelSwitchDialog, { props: { show: true, retry: true }, attachTo: document.body });
+  wrapper = mount(ModelSwitchDialog, { props: { chat: chat(), show: true, retry: true }, attachTo: document.body });
   await flushPromises();
   return wrapper;
 }
@@ -77,7 +84,7 @@ describe('gateway in the composer model menu', () => {
     expect(view.get('.mode-skeleton').findAll('.model-choice')).toHaveLength(2);
     await view.get('[data-testid="chat-model-local-local-model"]').trigger('click');
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ providerId: 'local' }));
+    expect(ipc).toHaveBeenCalledWith('chat_set_model', expect.objectContaining({ sessionId: null, selection: expect.objectContaining({ providerId: 'local' }) }));
     expect(view.emitted('switched')).toHaveLength(1);
   });
 
@@ -109,7 +116,7 @@ describe('gateway in the composer model menu', () => {
     expect(ipc).not.toHaveBeenCalledWith('use_ai_gateway', expect.anything());
   });
 
-  it('switches gateway modes through use_ai_gateway instead of saving a provider', async () => {
+  it('switches the conversation gateway mode without changing provider defaults', async () => {
     ipc.mockImplementation(async command => {
       if (command === 'ai_gateway_tiers') return tiers.map(t => ({ ...t, available: true })) as never;
       return structuredClone(config) as never;
@@ -117,7 +124,7 @@ describe('gateway in the composer model menu', () => {
     const view = await composer();
     await view.get('[data-testid="chat-model-xiaoban-ai-advanced"]').trigger('click');
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('use_ai_gateway', { tier: 'advanced' });
+    expect(ipc).toHaveBeenCalledWith('chat_set_model', expect.objectContaining({ selection: expect.objectContaining({ providerId: GATEWAY_PROVIDER, model: 'advanced' }) }));
     expect(ipc.mock.calls.some(([command]) => command === 'save_ai_provider')).toBe(false);
     expect(view.emitted('switched')).toHaveLength(1);
   });
@@ -131,7 +138,7 @@ describe('gateway in the composer model menu', () => {
     expect(view.text()).toContain('请先登录小伴账号');
     await view.get('[data-testid="chat-model-local-local-model"]').trigger('click');
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ providerId: 'local', model: 'local-model' }));
+    expect(ipc).toHaveBeenCalledWith('chat_set_model', expect.objectContaining({ sessionId: null, selection: expect.objectContaining({ providerId: 'local', model: 'local-model' }) }));
   });
 
   it('hides the gateway when the site has disabled it', async () => {
@@ -143,6 +150,25 @@ describe('gateway in the composer model menu', () => {
 });
 
 describe('gateway in the retry model dialog', () => {
+  it('does not request a retry in another conversation after a delayed model switch', async () => {
+    const original = ipc.getMockImplementation()!;
+    let finish!: () => void;
+    const gate = new Promise<void>(resolve => { finish = resolve; });
+    ipc.mockImplementation(async (command, args) => {
+      if (command === 'chat_set_model') { await gate; return args?.selection as never; }
+      return original(command, args);
+    });
+    const view = await dialog();
+    view.getComponent(NSelect).vm.$emit('update:value', JSON.stringify(['local', 'local-model']));
+    await flushPromises();
+    await view.findAllComponents(NButton).find(button => button.props('type') === 'primary')!.trigger('click');
+    const owner = (view.props() as { chat: ReturnType<typeof chat> }).chat;
+    owner.currentId = 'another'; await flushPromises();
+    finish(); await flushPromises();
+    expect(view.emitted('switched')).toBeUndefined();
+    expect(owner.currentId).toBe('another');
+  });
+
   it('lists gateway modes and routes switch-and-retry to the gateway command', async () => {
     const view = await dialog();
     const select = view.getComponent(NSelect);
@@ -155,7 +181,7 @@ describe('gateway in the retry model dialog', () => {
     await flushPromises();
     await view.findAllComponents(NButton).find(button => button.props('type') === 'primary')!.trigger('click');
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('use_ai_gateway', { tier: 'standard' });
+    expect(ipc).toHaveBeenCalledWith('chat_set_model', expect.objectContaining({ selection: expect.objectContaining({ providerId: GATEWAY_PROVIDER, model: 'standard' }) }));
     expect(view.emitted('switched')).toHaveLength(1);
     expect(view.emitted('update:show')).toEqual([[false]]);
   });
@@ -202,9 +228,9 @@ describe('hovering a model to choose thinking strength', () => {
     expect(panel()).not.toBeNull();
     strength('deeper').click();
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({
-      providerId: provider.id, model: provider.model, replyPreference: 'deeper', activate: true,
-    }));
+    expect(ipc).toHaveBeenCalledWith('chat_set_model', expect.objectContaining({ sessionId: null, selection: expect.objectContaining({
+      providerId: provider.id, model: provider.model, replyPreference: 'deeper',
+    }) }));
     expect(panel()).toBeNull();
     expect(view.emitted('switched')).toHaveLength(1);
   });
@@ -215,7 +241,7 @@ describe('hovering a model to choose thinking strength', () => {
     await view.get('[data-testid="chat-model-my-openai-gpt-6-luna"]').trigger('mouseenter');
     strength('faster').click();
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ providerId: provider.id, model: 'gpt-6-luna', replyPreference: 'faster' }));
+    expect(ipc).toHaveBeenCalledWith('chat_set_model', expect.objectContaining({ sessionId: null, selection: expect.objectContaining({ providerId: provider.id, model: 'gpt-6-luna', replyPreference: 'faster' }) }));
     expect(ipc.mock.calls.some(([command]) => command === 'use_ai_gateway')).toBe(false);
   });
 
@@ -273,7 +299,7 @@ describe('hovering a model to choose thinking strength', () => {
     expect(panel()?.querySelectorAll('[aria-checked="true"]')).toHaveLength(1);
     strength('deeper').click();
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('use_ai_gateway', { tier: 'standard', replyPreference: 'deeper' });
+    expect(ipc).toHaveBeenCalledWith('chat_set_model', expect.objectContaining({ selection: expect.objectContaining({ providerId: GATEWAY_PROVIDER, model: 'standard', replyPreference: 'deeper' }) }));
   });
 
   it('preserves a saved level for an inactive provider and defaults other models separately', async () => {
@@ -300,7 +326,7 @@ describe('hovering a model to choose thinking strength', () => {
     expect(strength('medium')).toBeNull();
     strength('max').click();
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('use_ai_gateway', {tier:'standard', replyPreference:'max'});
+    expect(ipc).toHaveBeenCalledWith('chat_set_model', expect.objectContaining({ selection: expect.objectContaining({ providerId: GATEWAY_PROVIDER, model: 'standard', replyPreference: 'max' }) }));
     expect(view.emitted('switched')).toHaveLength(1);
   });
 
@@ -315,7 +341,7 @@ describe('hovering a model to choose thinking strength', () => {
     expect(strength('faster')).toBeNull();
     strength('medium').click();
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({model:'alias', replyPreference:'medium'}));
+    expect(ipc).toHaveBeenCalledWith('chat_set_model', expect.objectContaining({ sessionId: null, selection: expect.objectContaining({model:'alias', replyPreference:'medium'}) }));
   });
 
   it('allows keyboard entry and closes the submenu before the model list on Escape', async () => {

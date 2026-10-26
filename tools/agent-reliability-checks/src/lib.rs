@@ -18,3 +18,10 @@ mod task_outcome;
 mod task_runtime;
 #[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/agent_settings.rs"]
 mod agent_settings;
+
+#[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/ai_reasoning.rs"]
+mod ai_reasoning;
+#[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/model_selection.rs"]
+mod model_selection;
+#[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/sessions.rs"]
+mod sessions;

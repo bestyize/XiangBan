@@ -50,6 +50,20 @@ async function pick(name: string) {
   await item.trigger('click'); await flushPromises();
 }
 describe('composer mentions', () => {
+  it('ignores a delayed expert lookup after opening a different conversation', async () => {
+    await open(); store.chat.currentId = 'a'; await flushPromises();
+    await type('@审查');
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    let finish!: (value: unknown) => void;
+    vi.mocked(invoke).mockImplementation((command, args) => command === 'ai_store_experts_installed'
+      ? new Promise(resolve => { finish = resolve; }) as never : original(command, args));
+    await pick('审查专家'); store.chat.currentId = 'b'; await flushPromises(); await type('B 的草稿');
+    finish([{ slug: 'reviewer', plugin: 'reviewer-plugin', name: '审查专家', agent: 'lead' }]); await flushPromises();
+    expect(store.chat.currentId).toBe('b'); expect(store.chat.pendingExpert).toBeNull();
+    expect(store.navigate).not.toHaveBeenCalled();
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('B 的草稿');
+  });
+
   it('binds workflow experts instead of adding a one-message skill chip',async()=>{
     await open();
     const menu=wrapper.findComponent({name:'ChatWorkbenchTools'});
@@ -98,6 +112,24 @@ describe('composer mentions', () => {
     expect(wrapper.find('[data-testid=chat-skill-check]').exists()).toBe(true);
     expect(wrapper.get('[data-testid=chat-connectors-toggle]').attributes('aria-label')).toContain('已选 1 个连接器');
   });
+
+  it('restores a failed send to its original draft after switching to another conversation', async () => {
+    await open(); store.chat.currentId = 'a'; await flushPromises();
+    await type('A 的待发送消息');
+    store.chat.draft.attachments = ['data:image/png;base64,YQ=='];
+    const owner = store.chat.draft;
+    let reject!: (reason: unknown) => void;
+    host.mockImplementation(command => command === 'chat_send' ? new Promise((_, no) => { reject = no; }) : Promise.resolve([]));
+    await wrapper.get('[data-testid=chat-send]').trigger('click'); await flushPromises();
+    store.chat.currentId = 'b'; await flushPromises(); await type('B 的草稿');
+    reject(new Error('服务不可用')); await flushPromises();
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('B 的草稿');
+    expect(store.chat.draft.attachments).toEqual([]);
+    expect(owner.text).toBe('A 的待发送消息');
+    expect(owner.attachments).toEqual(['data:image/png;base64,YQ==']);
+    store.chat.currentId = 'a'; await flushPromises();
+    expect((wrapper.get('textarea').element as HTMLTextAreaElement).value).toBe('A 的待发送消息');
+  });
   it('sends chosen skills as /names in front of the text, at most three, and clears them', async () => {
     await open();
     for (const [typed, name] of [['@质量', '质量检查']]) { await type(typed); await pick(name); }
@@ -125,10 +157,12 @@ describe('composer mentions', () => {
     expect(store.notify).toHaveBeenCalledWith('读取引用失败', 'error');
     await key('Enter'); expect(host).not.toHaveBeenCalledWith('chat_send', expect.anything());
   });
-  it('clears connector choices when a different conversation is selected', async () => {
-    await open(); await type('@repo'); await pick('代码仓库'); store.chat.currentId = 's1'; await flushPromises();
+  it('restores connector choices when returning to the same conversation', async () => {
+    await open(); store.chat.currentId = 's1'; await flushPromises(); await type('@repo'); await pick('代码仓库'); await flushPromises();
     expect(wrapper.find('[data-testid=chat-connectors]').exists()).toBe(true);
     store.chat.currentId = 'another'; await flushPromises();
     expect(wrapper.find('[data-testid=chat-connectors]').exists()).toBe(false);
+    store.chat.currentId = 's1'; await flushPromises();
+    expect(wrapper.find('[data-testid=chat-connectors]').exists()).toBe(true);
   });
 });

@@ -886,7 +886,12 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         let connectors = connectors.clone();
         Arc::new(move || connectors.statuses())
     };
-    let mentions = lock(&state.mentions).remove(session).unwrap_or_default();
+    let mut mentions = lock(&state.mentions).remove(session).unwrap_or_default();
+    if !mentions.iter().any(|mention| mention.kind == "connector") {
+        if let Some(summary) = mutate(app, |index| index.get(session).cloned())? {
+            mentions.extend(summary.connectors.into_iter().map(|id| mentions::Mention { kind: "connector".into(), id }));
+        }
+    }
     let dirs=Dirs::of(app)?;
     let mut agent = assemble_with_connectors(Parts {
         provider,
@@ -955,6 +960,71 @@ fn list(app: &tauri::AppHandle) -> Result<Vec<SessionSummary>, String> {
     mutate(app, |index| index.list())
 }
 
+fn pin_session_defaults(app: &tauri::AppHandle, config: &AiConfig) -> Result<(), String> {
+    let default = ai_config::default_workspace(app)?;
+    let model = config.session_model();
+    mutate(app, |index| index.pin_defaults(model.as_ref(), config.context_tokens, &config.workspace_or(&default).display().to_string()))
+}
+
+fn session_config(app: &tauri::AppHandle, id: &str) -> Result<AiConfig, String> {
+    let config = ai_config::current(app)?;
+    pin_session_defaults(app, &config)?;
+    let summary = mutate(app, |index| index.get(id).cloned())?.ok_or("这个对话已经不存在")?;
+    let mut config = match &summary.model { Some(model) => config.for_session_model(model)?, None => config };
+    if let Some(tokens) = summary.context_tokens { config.context_tokens = tokens; }
+    Ok(config)
+}
+
+fn validate_model(app: &tauri::AppHandle, mut model: ai_config::SessionModel) -> Result<ai_config::SessionModel, String> {
+    let config = ai_config::current(app)?;
+    if model.provider_id == ai_gateway::GATEWAY_ID {
+        let tiers = tauri::async_runtime::block_on(ai_gateway::ai_gateway_tiers(app.clone())).map_err(|e| e.message)?;
+        let tier = tiers.iter().find(|tier| tier.tier == model.model && tier.available).ok_or("小伴 AI 模式暂不可用")?;
+        model.reasoning_efforts = Some(tier.reasoning_efforts.clone());
+        if model.reply_preference.effort().is_some_and(|effort| !tier.reasoning_efforts.iter().any(|level| level == effort)) {
+            return Err("此模式不支持所选思考等级".into());
+        }
+    } else { model.reasoning_efforts = None; }
+    let resolved = config.for_session_model(&model)?;
+    crate::ai_catalogue::usable(app, &resolved)?;
+    Ok(model)
+}
+
+#[tauri::command]
+pub fn chat_set_model(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: Option<String>, selection: ai_config::SessionModel) -> Result<ai_config::SessionModel, String> {
+    chat_window(&window)?;
+    let selection = validate_model(&app, selection)?;
+    if let Some(id) = session_id {
+        checked_session_id(&id)?;
+        let state = app.state::<ChatState>();
+        let runs = lock(&state.runs);
+        if runs.contains_key(&id) { return Err("这个对话还在回答，请先停止再切换模型".into()); }
+        pin_session_defaults(&app, &ai_config::current(&app)?)?;
+        mutate(&app, |index| index.set_options(&id, Some(selection.clone()), None, None))?.ok_or("这个对话已经不存在")?;
+        emit(&app, "chat-sessions-changed", json!(list(&app)?));
+    }
+    Ok(selection)
+}
+
+#[tauri::command]
+pub fn chat_set_session_options(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, context_tokens: Option<usize>, connectors: Option<Vec<String>>) -> Result<SessionSummary, String> {
+    chat_window(&window)?;
+    checked_session_id(&session_id)?;
+    if context_tokens.is_some_and(|n| !(ai_config::MIN_CONTEXT_TOKENS..=ai_config::MAX_CONTEXT_TOKENS).contains(&n)) { return Err("上下文大小超出范围".into()); }
+    let connectors = connectors.map(clean_connectors).transpose()?;
+    pin_session_defaults(&app, &ai_config::current(&app)?)?;
+    let summary = mutate(&app, |index| index.set_options(&session_id, None, context_tokens, connectors))?.ok_or("这个对话已经不存在")?;
+    emit(&app, "chat-sessions-changed", json!(list(&app)?));
+    Ok(summary)
+}
+
+fn clean_connectors(ids: Vec<String>) -> Result<Vec<String>, String> {
+    if ids.len() > mentions::MAX_MENTIONS || ids.iter().any(|id| id.is_empty() || id.len() > 200 || id.chars().any(char::is_control)) { return Err("连接器选择不正确".into()); }
+    let mut result = Vec::new();
+    for id in ids { if !result.contains(&id) { result.push(id); } }
+    Ok(result)
+}
+
 struct HostRunCleanup{app:tauri::AppHandle,session:String}
 impl Drop for HostRunCleanup{fn drop(&mut self){if std::thread::panicking(){emit(&self.app,"chat-event",json!({"session":self.session,"event":{"type":"error","message":"任务异常中断；已派发操作可能产生结果，请核对后继续。"}}));}finish_run(&self.app,&self.session);}}
 
@@ -976,6 +1046,7 @@ fn finish_run(app: &tauri::AppHandle, session: &str) {
 pub fn chat_overview(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Value, String> {
     chat_window(&window)?;
     let config = ai_config::current(&app)?;
+    pin_session_defaults(&app, &config)?;
     let default = ai_config::default_workspace(&app)?;
     let running: Vec<String> = lock(&app.state::<ChatState>().runs).keys().cloned().collect();
     let mode = if app.state::<ChatState>().permission.mode() == PermissionMode::Auto { "auto" } else { "ask" };
@@ -1073,8 +1144,14 @@ fn interrupted_run(journal_dir: &Path, session: &str) -> Option<(String, Vec<Str
 /// An empty conversation. The chat page makes one when the first message is sent, so the page
 /// already knows the id when the answer's events start to arrive.
 #[tauri::command]
-pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, permission_mode: Option<String>, workspace: Option<String>, expert: Option<ExpertPick>) -> Result<SessionSummary, String> {
+pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, permission_mode: Option<String>, workspace: Option<String>, expert: Option<ExpertPick>, model: Option<ai_config::SessionModel>, context_tokens: Option<usize>, connectors: Option<Vec<String>>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
+    let config = ai_config::current(&app)?;
+    pin_session_defaults(&app, &config)?;
+    let model = model.map(|model| validate_model(&app, model)).transpose()?.or_else(|| config.session_model());
+    let context_tokens = context_tokens.unwrap_or(config.context_tokens);
+    if !(ai_config::MIN_CONTEXT_TOKENS..=ai_config::MAX_CONTEXT_TOKENS).contains(&context_tokens) { return Err("上下文大小超出范围".into()); }
+    let connectors = clean_connectors(connectors.unwrap_or_default())?;
     let mode = match permission_mode.as_deref() {
         None => "ask",
         Some(mode @ ("ask" | "auto")) => mode,
@@ -1098,6 +1175,7 @@ pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, per
     };
     let (seconds, millis) = now();
     let mut summary = mutate(&app, |index| index.create_in(seconds, millis, mode, &folder))??;
+    summary = mutate(&app, |index| index.set_options(&summary.id, model, Some(context_tokens), Some(connectors)))?.ok_or("无法创建会话")?;
     if let Some(binding) = binding {
         let id = summary.id.clone();
         mutate(&app, |index| index.set_expert(&id, Some(binding.clone())))?;
@@ -1195,7 +1273,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
             return Err("这条消息已产生回复或执行工具，无法直接重放。请发送新的消息继续。".into());
         }
     }
-    let config = ai_config::current(&app)?;
+    let config = session_config(&app, &session_id)?;
     crate::ai_catalogue::usable(&app, &config)?;
     if !config.is_complete() {
         return Err("还没有配置模型，请先到“设置 → AI 模型”填写".into());
@@ -1651,9 +1729,13 @@ fn context_of(app: &tauri::AppHandle, config: &AiConfig, session: Option<&str>, 
 /// How big the next request in a conversation would be, against the limit chosen in settings.
 /// `None` is a conversation that has not been started yet.
 #[tauri::command]
-pub fn chat_context(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: Option<String>) -> Result<ContextInfo, String> {
+pub fn chat_context(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: Option<String>, model: Option<ai_config::SessionModel>, context_tokens: Option<usize>) -> Result<ContextInfo, String> {
     chat_window(&window)?;
-    let config = ai_config::current(&app)?;
+    let mut config = match session_id.as_deref() { Some(id) => session_config(&app, id)?, None => ai_config::current(&app)? };
+    if session_id.is_none() {
+        if let Some(model) = model { config = config.for_session_model(&model)?; }
+        if let Some(tokens) = context_tokens { config.context_tokens = tokens.clamp(ai_config::MIN_CONTEXT_TOKENS, ai_config::MAX_CONTEXT_TOKENS); }
+    }
     let raw = match session_id.as_deref() {
         Some(id) => {
             checked_session_id(id)?;
@@ -1674,7 +1756,7 @@ fn write_summary(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<K
 }
 
 fn compact_session(app: &tauri::AppHandle, id: &str, cancel: &AtomicBool) -> Result<ContextInfo, String> {
-    let config = ai_config::current(app)?;
+    let config = session_config(app, id)?;
     crate::ai_catalogue::usable(app, &config)?;
     if !config.is_complete() {
         return Err("还没有配置模型，请先到“设置 → AI 模型”填写".into());
@@ -1984,18 +2066,20 @@ pub fn chat_set_permission_mode(app: tauri::AppHandle, window: tauri::WebviewWin
     }
     let perm_mode = if mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
     let state = app.state::<ChatState>();
+    if let Some(sid) = session_id.as_deref() {
+        checked_session_id(sid)?;
+        mutate(&app, |index| {
+            if index.get(sid).is_none() { return false; }
+            index.set_permission_mode(sid, &mode);
+            true
+        })?.then_some(()).ok_or("这个对话已经不存在")?;
+    }
     match session_id.as_deref() {
         // A running conversation picks the change up at its next tool call; no other conversation is affected.
         Some(sid) if sessions::valid_id(sid) => state.permission.set_session_mode(sid, perm_mode),
         Some(_) => return Err("对话编号不对".into()),
         // No conversation yet: the default for the next new one.
         None => state.permission.set_mode(perm_mode),
-    }
-
-    if let Some(ref sid) = session_id {
-        let _ = mutate(&app, |index| {
-            index.set_permission_mode(sid, &mode);
-        });
     }
 
     emit(&app, "chat-permission-mode-changed", json!({ "sessionId": session_id, "mode": mode }));

@@ -4,7 +4,7 @@ import { NSlider } from 'naive-ui';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ChatContextRing from './ChatContextRing.vue';
 
-const base = { used: 64_000, limit: 256_000, canCompact: true, compacting: false, busy: false, disabled: false };
+const base = { sessionId: null as string | null, used: 64_000, limit: 256_000, canCompact: true, compacting: false, busy: false, disabled: false };
 let wrapper: VueWrapper | undefined;
 
 const mountRing = (props: Partial<typeof base> = {}) => (wrapper = mount(ChatContextRing, { props: { ...base, ...props }, attachTo: document.body }));
@@ -110,6 +110,14 @@ describe('the context ring', () => {
 });
 
 describe('the limit slider', () => {
+  it('flushes a delayed resize to its original conversation when the selection changes', async () => {
+    mountRing({ sessionId: 'a' }); await openPopover();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    await slide(512_000); await wrapper!.setProps({ sessionId: 'b', limit: 256_000 });
+    expect(wrapper!.emitted('resize')).toEqual([[512_000, 'a']]);
+    vi.advanceTimersByTime(400);
+    expect(wrapper!.emitted('resize')).toHaveLength(1);
+  });
   it('moves the numbers, the bar and the ring at once, and tells the page once the dragging pauses', async () => {
     mountRing();
     await openPopover();
@@ -124,7 +132,7 @@ describe('the limit slider', () => {
     vi.advanceTimersByTime(349);
     expect(wrapper!.emitted('resize')).toBeUndefined();
     vi.advanceTimersByTime(2);
-    expect(wrapper!.emitted('resize')).toEqual([[520_000]]);
+    expect(wrapper!.emitted('resize')).toEqual([[520_000, null]]);
   });
 
   it('keeps following the host after a save, and takes a new limit from it when nothing is pending', async () => {
@@ -139,7 +147,7 @@ describe('the limit slider', () => {
     await wrapper!.setProps({ limit: 640_000 });
     expect(slider().props('value')).toBe(768_000);
     vi.advanceTimersByTime(400);
-    expect(wrapper!.emitted('resize')).toEqual([[768_000]]);
+    expect(wrapper!.emitted('resize')).toEqual([[768_000, null]]);
   });
 
   it('saves a change that is still waiting when the page goes away', async () => {
@@ -148,7 +156,7 @@ describe('the limit slider', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await slide(384_000);
     wrapper!.unmount();
-    expect(wrapper!.emitted('resize')).toEqual([[384_000]]);
+    expect(wrapper!.emitted('resize')).toEqual([[384_000, null]]);
     vi.advanceTimersByTime(1000);
     expect(wrapper!.emitted('resize')).toHaveLength(1);
   });
@@ -169,6 +177,6 @@ describe('the limit slider', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await slide(300_000);
     vi.advanceTimersByTime(400);
-    expect(wrapper!.emitted('resize')).toEqual([[300_000]]);
+    expect(wrapper!.emitted('resize')).toEqual([[300_000, null]]);
   });
 });

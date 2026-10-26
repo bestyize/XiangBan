@@ -1,5 +1,7 @@
 import type { AttachmentCard } from './attachments.ts';
 import type { InstalledConnector, MarketConnector } from '../ai-store/connector-plugins.ts';
+import type { AiReplyPreference, AiReasoningEffort } from '../../bridge.ts';
+export interface SessionModel { providerId: string; model: string; replyPreference?: AiReplyPreference; reasoningEfforts?: AiReasoningEffort[] | null }
 /** What the host sends and accepts for the chat. Field names are the host's own (snake_case for kernel events). */
 
 /** The installed expert a conversation was started with (a WorkBuddy-style agent persona). */
@@ -10,7 +12,7 @@ export interface ExpertView {
   workflow?: string;
   quickPrompts?: string[]; tags?: string[]; hasAvatar?: boolean; kind?: 'agent' | 'team';
 }
-export interface SessionSummary { expert?: ExpertBinding | null; id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto'; /** The group it was moved into; empty or missing when it is not in one. */ group?: string; /** The folder it works in; empty or missing for an old conversation, which uses the default folder. */ workspace?: string; companionId?: string; companionName?: string; companionCursor?: number; /** Set while it works in an isolated copy of its folder; `workspace` is then the copy. */ worktree?: WorktreeLink | null }
+export interface SessionSummary { model?: SessionModel | null; contextTokens?: number | null; connectors?: string[]; expert?: ExpertBinding | null; id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto'; /** The group it was moved into; empty or missing when it is not in one. */ group?: string; /** The folder it works in; empty or missing for an old conversation, which uses the default folder. */ workspace?: string; companionId?: string; companionName?: string; companionCursor?: number; /** Set while it works in an isolated copy of its folder; `workspace` is then the copy. */ worktree?: WorktreeLink | null }
 
 /** A working folder in the chat page's folder menu. `wide` is a home folder or a disk's root. */
 /** The isolated git copy a conversation works in (see `worktree.rs`): `origin` is where the user's own files are. */

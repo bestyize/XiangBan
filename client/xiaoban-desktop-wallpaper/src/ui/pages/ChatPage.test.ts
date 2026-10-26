@@ -271,12 +271,13 @@ describe('chat workbench composer actions', () => {
       hasKey: true, isCustom: true, models: [{ id: 'coding-model', name: 'Coding Model' }, { id: 'reasoning', name: '推理模型' }],
     }] };
     const h = await open({ get_ai_config: () => config, refresh_ai_providers: () => config,
-      save_ai_provider: () => undefined });
+      chat_set_model: args => args?.selection });
     expect(q('chat-workbench-model')!.textContent).toContain('Coding Model');
     await click('chat-workbench-model');
     expect(wrapper!.element.textContent).toContain('演示供应商');
     await click('chat-model-demo-reasoning');
-    expect(h.commands()).toContain('save_ai_provider');
+    expect(h.commands()).toContain('chat_set_model');
+    expect(h.commands()).not.toContain('save_ai_provider');
   });
 
   it('shows a friendly gateway mode label and updates it after switching', async () => {
@@ -286,11 +287,12 @@ describe('chat workbench composer actions', () => {
       { tier: 'advanced', displayName: '深入', available: true },
     ];
     const h = await open({ get_ai_config: () => config, refresh_ai_providers: () => config, ai_gateway_tiers: () => tiers,
-      use_ai_gateway: args => { config.gatewayTier = config.model = args!.tier as string; return config; } });
+      chat_set_model: args => args?.selection });
     expect(q('chat-workbench-model')!.textContent).toContain('小伴 AI · 日常');
     await click('chat-workbench-model');
     await click('chat-model-xiaoban-ai-advanced');
-    expect(h.calls).toContainEqual(['use_ai_gateway', { tier: 'advanced' }]);
+    expect(h.calls).toContainEqual(['chat_set_model', { sessionId: null, selection: { providerId: 'xiaoban-ai', model: 'advanced', replyPreference: 'default' } }]);
+    expect(config.model).toBe('standard');
     expect(q('chat-workbench-model')!.textContent).toContain('小伴 AI · 深入');
   });
 });
@@ -926,12 +928,12 @@ describe('permission mode toggle', () => {
     expect(q('perm-auto')?.classList.contains('active')).toBe(false);
 
     await click('perm-auto');
-    expect(h.calls.at(-1)).toEqual(['chat_set_permission_mode', { mode: 'auto' }]);
+    expect(h.calls.some(([command]) => command === 'chat_set_permission_mode')).toBe(false);
     expect(q('perm-auto')?.classList.contains('active')).toBe(true);
     expect(q('perm-ask')?.classList.contains('active')).toBe(false);
 
     await click('perm-ask');
-    expect(h.calls.at(-1)).toEqual(['chat_set_permission_mode', { mode: 'ask' }]);
+    expect(h.calls.some(([command]) => command === 'chat_set_permission_mode')).toBe(false);
     expect(q('perm-ask')?.classList.contains('active')).toBe(true);
   });
 });
@@ -1174,6 +1176,21 @@ describe('the context ring in the composer', () => {
 });
 
 describe('the limit slider and automatic compaction in the composer', () => {
+  it('saves a pending slider change to the original conversation when another one opens', async () => {
+    const limits: Record<string, number> = { a: 256_000, b: 256_000 };
+    const h = await open({
+      chat_overview: () => overview({ sessions: [summary('a', 'A'), summary('b', 'B')] }), chat_load_session: () => [],
+      chat_context: args => ({ used: 100, limit: limits[String(args?.sessionId)] ?? 256_000, canCompact: false }),
+      chat_set_session_options: args => { limits[String(args?.sessionId)] = Number(args?.contextTokens); },
+    });
+    await openSession('a'); await click('chat-context');
+    wrapper!.findComponent(NSlider).vm.$emit('update:value', 512_000); await flushPromises();
+    await openSession('b'); await flushPromises();
+    expect(h.calls).toContainEqual(['chat_set_session_options', { sessionId: 'a', contextTokens: 512_000 }]);
+    expect(h.chat.currentId).toBe('b'); expect(h.chat.context.limit).toBe(256_000);
+    expect(limits.b).toBe(256_000);
+  });
+
   const info = (used: number, limit = 256_000, canCompact = true) => ({ used, limit, canCompact });
   const say = (value: string) => [{ type: 'text' as const, text: value }];
   const history: WireMessage[] = [{ role: 'user', parts: say('早') }, { role: 'assistant', parts: say('早上好') }];
@@ -1181,13 +1198,14 @@ describe('the limit slider and automatic compaction in the composer', () => {
 
   it('saves the limit a moment after the slider stops and shows the host\'s number', async () => {
     let limit = 256_000;
-    const h = await open({ ...listed, chat_context: () => info(64_000, limit), set_context_tokens: a => { limit = Number(a?.tokens); return undefined; } });
+    const h = await open({ ...listed, chat_context: () => info(64_000, limit), chat_set_session_options: a => { limit = Number(a?.contextTokens); return undefined; } });
+    await openSession('s1');
     await flushPromises();
     await click('chat-context');
     wrapper!.findComponent(NSlider).vm.$emit('update:value', 640_000);
     await flushPromises();
     expect(inBody('ctx-numbers')!.textContent).toBe('64K / 640K');
-    await vi.waitFor(() => expect(h.calls.at(-1)).toEqual(['set_context_tokens', { tokens: 640_000 }]));
+    await vi.waitFor(() => expect(h.calls.at(-1)).toEqual(['chat_set_session_options', { sessionId: 's1', contextTokens: 640_000 }]));
     await vi.waitFor(() => expect(h.chat.context.limit).toBe(640_000));
     expect(inBody('ctx-numbers')!.textContent).toBe('64K / 640K');
   });

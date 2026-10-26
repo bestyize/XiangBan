@@ -23,6 +23,9 @@ const MAX_GROUPS: usize = 30;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct SessionSummary {
+    pub model: Option<crate::model_selection::SessionModel>,
+    pub context_tokens: Option<usize>,
+    pub connectors: Vec<String>,
     pub id: String,
     pub title: String,
     pub created_at: i64,
@@ -74,6 +77,7 @@ pub struct WorktreeLink {
 impl Default for SessionSummary {
     fn default() -> Self {
         Self {
+            model: None, context_tokens: None, connectors: Vec::new(),
             id: String::new(),
             title: DEFAULT_TITLE.into(),
             created_at: 0,
@@ -299,6 +303,23 @@ impl Index {
         }
     }
 
+    pub fn set_options(&mut self, id: &str, model: Option<crate::model_selection::SessionModel>, context: Option<usize>, connectors: Option<Vec<String>>) -> Option<SessionSummary> {
+        let session = self.sessions.iter_mut().find(|s| s.id == id)?;
+        if let Some(model) = model { session.model = Some(model); }
+        if let Some(context) = context { session.context_tokens = Some(context); }
+        if let Some(connectors) = connectors { session.connectors = connectors; }
+        Some(session.clone())
+    }
+
+    /// Pin legacy conversations once, before a later settings change can move them to another model/folder.
+    pub fn pin_defaults(&mut self, model: Option<&crate::model_selection::SessionModel>, context: usize, workspace: &str) {
+        for session in &mut self.sessions {
+            if session.model.is_none() { session.model = model.cloned(); }
+            if session.context_tokens.is_none() { session.context_tokens = Some(context); }
+            if session.workspace.is_empty() { session.workspace = workspace.into(); }
+        }
+    }
+
     pub fn set_workspace(&mut self, id: &str, workspace: &str) -> bool {
         if let Some(s) = self.sessions.iter_mut().find(|s| s.id == id) {
             s.workspace = workspace.to_string();
@@ -403,6 +424,31 @@ fn rebuild(sessions_dir: &Path, store: &JsonlStore) -> Vec<SessionSummary> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn model_context_and_connectors_stay_with_each_saved_conversation() {
+        let dir = temp("session-options");
+        let (mut index, _) = open(&dir);
+        let a = index.create_in(1, 1, "ask", "/a").unwrap();
+        let b = index.create_in(2, 2, "auto", "/b").unwrap();
+        let pick = crate::model_selection::SessionModel { provider_id: "local".into(), model: "m1".into(),
+            reply_preference: crate::ai_reasoning::ReplyPreference::Medium, reasoning_efforts: None };
+        index.pin_defaults(Some(&pick), 256_000, "/default");
+        let mut changed = pick.clone(); changed.model = "m2".into();
+        index.set_options(&a.id, Some(changed.clone()), Some(512_000), Some(vec!["repo".into()]));
+        index.save().unwrap();
+        let (mut reopened, _) = open(&dir);
+        reopened.pin_defaults(Some(&changed), 640_000, "/other-default");
+        assert_eq!(reopened.get(&a.id).unwrap().model.as_ref(), Some(&changed));
+        assert_eq!(reopened.get(&a.id).unwrap().context_tokens, Some(512_000));
+        assert_eq!(reopened.get(&a.id).unwrap().connectors, vec!["repo".to_string()]);
+        assert_eq!(reopened.get(&b.id).unwrap().model.as_ref(), Some(&pick));
+        assert_eq!(reopened.get(&b.id).unwrap().context_tokens, Some(256_000));
+        assert!(reopened.get(&b.id).unwrap().connectors.is_empty());
+        assert_eq!(reopened.get(&b.id).unwrap().workspace, "/b");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
     use agent_kernel::Message;
 
     fn temp(tag: &str) -> PathBuf {

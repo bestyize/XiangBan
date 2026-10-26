@@ -1278,6 +1278,7 @@ name = "xiangban-agent-reliability-checks"
 version = "0.1.0"
 dependencies = [
  "agent-kernel",
+ "getrandom",
  "serde",
  "serde_json",
  "sha2",

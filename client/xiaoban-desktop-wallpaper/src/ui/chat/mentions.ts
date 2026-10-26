@@ -8,9 +8,9 @@ export function mentionToken(draft: string) {
   const match = /(^|\s)@([^\s@]*)$/.exec(draft);
   return match ? { start: match.index + match[1].length, query: match[2] } : null;
 }
-export function useComposerMentions(draft: Ref<string>, enabled: () => boolean, choose: (item: MentionItem) => Promise<boolean>, notify: (error: unknown) => void) {
+export function useComposerMentions(draft: Ref<string>, enabled: () => boolean, choose: (item: MentionItem, isCurrent: () => boolean) => Promise<boolean>, notify: (error: unknown) => void, selection?: Ref<MentionItem[]>, scope?: () => unknown) {
   const inventory = ref<MentionItem[]>([]), index = ref(0), dismissed = ref(''), loading = ref(false);
-  const selected = ref<MentionItem[]>([]);
+  const selected = selection ?? ref<MentionItem[]>([]);
   const selecting = ref(false);
   const token = computed(() => mentionToken(draft.value));
   let generation = 0;
@@ -31,14 +31,17 @@ export function useComposerMentions(draft: Ref<string>, enabled: () => boolean, 
   const open = computed(() => !!token.value && enabled() && dismissed.value !== draft.value);
   async function pick(item: MentionItem) {
     const at = token.value, original = draft.value;
+    const owner = scope?.();
+    const isCurrent = () => !scope || scope() === owner;
     if (!at || selecting.value) return;
     selecting.value = true;
     const cleared = original.slice(0, at.start);
     draft.value = cleared;
     try {
-      if (!(await choose(item))) { if (draft.value === cleared) draft.value = original; return; }
+      if (!(await choose(item, isCurrent))) { if (isCurrent() && draft.value === cleared) draft.value = original; return; }
+      if (!isCurrent()) return;
       if (item.kind === 'connector' && !selected.value.some(i => i.id === item.id)) selected.value.push(item);
-    } catch (e) { if (draft.value === cleared) draft.value = original; notify(e); }
+    } catch (e) { if (isCurrent() && draft.value === cleared) draft.value = original; notify(e); }
     finally { selecting.value = false; }
   }
   function keydown(event: KeyboardEvent, composing: boolean) {

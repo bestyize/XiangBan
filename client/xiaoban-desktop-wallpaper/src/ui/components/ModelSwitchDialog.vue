@@ -2,9 +2,14 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { NAlert, NButton, NModal, NSelect } from 'naive-ui';
 import { GATEWAY_PROVIDER, invoke, toAccountError, type AiConfigView, type AiTier, type ProviderConfigView } from '../../bridge.ts';
-const props = defineProps<{ show: boolean; retry?: boolean }>();
-const emit = defineEmits<{ 'update:show': [value: boolean]; switched: [] ; settings: [] }>();
-const config = ref<AiConfigView | null>(null);
+import type { ChatStore } from '../chat/chat-store.ts';
+import { sessionModelConfig } from '../chat/session-model.ts';
+const props = defineProps<{ chat: ChatStore; show: boolean; retry?: boolean }>();
+const emit = defineEmits<{ 'update:show': [value: boolean]; switched: [sessionId: string | null] ; settings: [] }>();
+const registry = ref<AiConfigView | null>(null);
+const config = computed(() => sessionModelConfig(registry.value, props.chat.model));
+let targetSession: string | null = null;
+watch(() => props.chat.currentId, () => { ++generation; emit('update:show', false); });
 const selected = ref('');
 const busy = ref(false);
 const error = ref('');
@@ -29,17 +34,18 @@ onBeforeUnmount(() => { ++generation; });
 watch(() => props.show, async show => {
   const id = ++generation;
   if (!show) return;
+  targetSession = props.chat.currentId;
   error.value = ''; gatewayError.value = ''; tiers.value = []; selected.value = ''; busy.value = true;
   try {
     const initial = await invoke<AiConfigView>('get_ai_config');
     if (id !== generation) return;
-    config.value = initial;
+    registry.value = initial;
     const [refresh, modes] = await Promise.allSettled([
       invoke<AiConfigView>('refresh_ai_providers', { force: false }),
       initial.gatewayEnabled === false ? Promise.resolve([] as AiTier[]) : invoke<AiTier[]>('ai_gateway_tiers'),
     ]);
     if (id !== generation) return;
-    if (refresh.status === 'fulfilled') config.value = refresh.value;
+    if (refresh.status === 'fulfilled') registry.value = refresh.value;
     if (modes.status === 'fulfilled') tiers.value = modes.value;
     else gatewayError.value = toAccountError(modes.reason).message;
   } catch (e) { if (id === generation) error.value = String(e instanceof Error ? e.message : e); }
@@ -53,11 +59,12 @@ async function switchModel() {
   const p = config.value.providers?.find(p => p.id === id);
   if (id !== GATEWAY_PROVIDER && !p) return;
   busy.value = true; error.value = '';
+  const request = generation;
   try {
-    if (id === GATEWAY_PROVIDER) await invoke('use_ai_gateway', { tier: model });
-    else if (p) await invoke('save_ai_provider', { providerId: p.id, name: p.name, protocol: p.protocol, baseUrl: p.baseUrl,
-      model, apiKey: null, clearKey: false, activate: true, selectionMode: 'manual' });
-    emit('update:show', false); emit('switched');
+    const sessionId = targetSession;
+    const saved = await props.chat.setModel({ providerId: id, model, replyPreference: 'default' }, sessionId);
+    if (!saved || request !== generation || !props.show || props.chat.currentId !== sessionId) return;
+    emit('update:show', false); emit('switched', sessionId);
   } catch (e) { error.value = toAccountError(e).message; }
   finally { busy.value = false; }
 }

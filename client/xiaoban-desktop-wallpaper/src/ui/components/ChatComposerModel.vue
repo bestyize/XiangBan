@@ -2,9 +2,11 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Check, ChevronDown, ChevronRight, Settings } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, toAccountError, type AiConfigView, type AiReplyPreference, type AiTier, type ProviderConfigView } from '../../bridge.ts';
+import type { ChatStore } from '../chat/chat-store.ts';
+import { sessionModelConfig } from '../chat/session-model.ts';
 import { providerReasoningLevels, preferenceOptions } from '../ai-config.ts';
 
-const props = defineProps<{ label: string; disabled?: boolean; /** The service the model comes from, for the small badge; empty when unknown. */ provider?: string; /** The model is 小伴 AI. */ gateway?: boolean }>();
+const props = defineProps<{ chat: ChatStore; label: string; disabled?: boolean; /** The service the model comes from, for the small badge; empty when unknown. */ provider?: string; /** The model is 小伴 AI. */ gateway?: boolean }>();
 /** Two letters of the service's name (or its first character), like a tiny logo. */
 const badge = computed(() => {
   if (props.gateway) return '伴';
@@ -20,7 +22,8 @@ const busy = ref(false);
 const loading = ref(false);
 const loadingTiers = ref(false);
 const error = ref('');
-const config = ref<AiConfigView | null>(null);
+const registry = ref<AiConfigView | null>(null);
+const config = computed(() => sessionModelConfig(registry.value, props.chat.model));
 const tiers = ref<AiTier[]>([]);
 const gatewayError = ref('');
 const gatewayEnabled = computed(() => config.value && config.value.gatewayEnabled !== false);
@@ -94,8 +97,9 @@ watch(open, value => {
   else { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); window.removeEventListener('resize', hideReasoning); }
 });
 onBeforeUnmount(() => { ++generation; hideReasoning(); document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape); window.removeEventListener('resize', hideReasoning); });
+watch(() => props.chat.currentId, close);
 watch(() => props.disabled, disabled => { if (disabled) close(); });
-onMounted(() => { void load(); });
+onMounted(() => { if (!props.disabled) void invoke<AiConfigView>('get_ai_config').then(value => { registry.value = value; }).catch(() => {}); });
 function toggle() {
   if (open.value) { close(); return; }
   open.value = true;
@@ -109,7 +113,7 @@ async function load() {
   try {
     const initial = await invoke<AiConfigView>('get_ai_config');
     if (id !== generation) return;
-    config.value = initial;
+    registry.value = initial;
     loading.value = false;
     loadingTiers.value = initial.gatewayEnabled !== false;
     // Keep the last list visible. Each source updates independently, so a slow
@@ -118,7 +122,7 @@ async function load() {
       (async () => {
         try {
           const refreshed = await invoke<AiConfigView>('refresh_ai_providers', { force: false });
-          if (id === generation) config.value = refreshed;
+          if (id === generation) registry.value = refreshed;
         } catch { /* The locally saved providers remain usable while offline. */ }
       })(),
       (async () => {
@@ -129,7 +133,7 @@ async function load() {
           tiers.value = modes;
           loadingTiers.value = false;
           const latest = await invoke<AiConfigView>('get_ai_config');
-          if (id === generation) config.value = latest;
+          if (id === generation) registry.value = latest;
         } catch (e) { if (id === generation) gatewayError.value = toAccountError(e).message; }
         finally { if (id === generation) loadingTiers.value = false; }
       })(),
@@ -145,7 +149,10 @@ async function chooseGateway(tier: AiTier, preference?: AiReplyPreference) {
   if (currentTier(tier) && (preference === undefined || preference === (config.value?.gatewayReplyPreference ?? 'default'))) { close(); return; }
   busy.value = true; error.value = '';
   try {
-    await invoke('use_ai_gateway', { tier: tier.tier, ...(preference !== undefined ? { replyPreference: preference } : {}) });
+    const sessionId = props.chat.currentId;
+    if (!(await props.chat.setModel({ providerId: GATEWAY_PROVIDER, model: tier.tier,
+      replyPreference: preference ?? (currentTier(tier) ? config.value?.gatewayReplyPreference : 'default') ?? 'default' }, sessionId))) return;
+    if (props.chat.currentId !== sessionId) return;
     close();
     emit('switched');
   } catch (e) { error.value = toAccountError(e).message; }
@@ -157,9 +164,10 @@ async function choose(entry: ModelChoice, preference?: AiReplyPreference) {
   busy.value = true; error.value = '';
   const p = entry.provider;
   try {
-    await invoke('save_ai_provider', { providerId: p.id, name: p.name, protocol: p.protocol, baseUrl: p.baseUrl,
-      model: entry.model, apiKey: null, clearKey: false, activate: true, selectionMode: 'manual',
-      ...(preference !== undefined ? { replyPreference: canTune(entry) ? preference : 'default' } : {}) });
+    const sessionId = props.chat.currentId;
+    if (!(await props.chat.setModel({ providerId: p.id, model: entry.model,
+      replyPreference: canTune(entry) ? preference ?? (p.model === entry.model ? p.replyPreference : 'default') ?? 'default' : 'default' }, sessionId))) return;
+    if (props.chat.currentId !== sessionId) return;
     close();
     emit('switched');
   } catch (e) { error.value = String(e); }

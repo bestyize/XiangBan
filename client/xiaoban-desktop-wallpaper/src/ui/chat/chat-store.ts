@@ -1,7 +1,8 @@
 import type { PendingAttachment } from './attachments.ts';
-import type { Mention } from './mentions.ts';
+import type { Mention, MentionItem } from './mentions.ts';
+import type { SessionModel } from './types.ts';
 import { modelFailure } from './model-errors.ts';
-import { reactive, watch } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, ExpertView, Library, Overview, QuestionRequest, RecentWorkspace, SessionSummary, SessionView, WireMessage, WorktreeInfo, WorktreeLink } from './types.ts';
 import { applyEvent, checkpointNotice, interruptedNotice, itemsFromHistory, newView, nextId, summaryNotice, workspaceNotice } from './view.ts';
 import { toolLabel } from './format.ts';
@@ -16,6 +17,14 @@ export interface ChatDeps {
 }
 
 export interface ChatStore {
+  drafts: Record<string, ComposerDraft>;
+  readonly draft: ComposerDraft;
+  draftFor(id: string | null): ComposerDraft;
+  pendingModel: SessionModel | null;
+  pendingContextTokens: number | null;
+  readonly model: SessionModel | null;
+  setModel(model: SessionModel, sessionId?: string | null): Promise<boolean>;
+  readonly sending: boolean;
   /** The first overview has been read (or there is no desktop to ask). */
   ready: boolean;
   /** A model address and name are saved, so a message can be sent. */
@@ -91,7 +100,7 @@ export interface ChatStore {
   /** Replaces the older part of the open conversation, for the model only, with a summary. Returns whether it was done; the reason is shown when not. */
   compact(): Promise<boolean>;
   /** Saves the context limit the slider chose. The ring shows it at once; it is put back if the host refuses. */
-  setContextSize(tokens: number): Promise<boolean>;
+  setContextSize(tokens: number, sessionId?: string | null): Promise<boolean>;
   /** The edits below return whether the host accepted them, so a dialog can stay open when it did not. The host's reason is shown to the user. */
   rename(id: string, title: string): Promise<boolean>;
   /** `null` takes the conversation out of its group. */
@@ -108,6 +117,13 @@ export interface ChatStore {
   current(): SessionView | null;
 }
 
+export interface ComposerDraft {
+  text: string;
+  attachments: PendingAttachment[];
+  skills: { name: string; title: string }[];
+  connectors: MentionItem[];
+}
+
 /** Sent by the host around an automatic compaction (`chat-compacting`). */
 interface CompactingEvent { session: string; state: 'start' | 'done' | 'failed'; summary?: string; message?: string }
 
@@ -115,6 +131,15 @@ export const CONTINUE_TEXT = '请接着上面的内容继续写完。';
 const STALE = '这个确认已经结束';
 
 export function createChatStore(deps: ChatDeps): ChatStore {
+  let selectionRevision = 0;
+  const draftSending = ref(false);
+  const defaultPermissionMode = ref<'ask' | 'auto'>('ask');
+  const pendingPermissionMode = ref<'ask' | 'auto'>('ask');
+  let contextRevision = 0;
+  const connectorWrites = new Map<string, Promise<unknown>>();
+  const modelChanges = reactive(new Set<string>());
+  const defaultConfigured = ref(false);
+  const modelRevisions = new Map<string, number>();
   const unsubscribers: (() => void)[] = [];
   let starting: Promise<void> | null = null;
   let disposed = false;
@@ -134,8 +159,37 @@ export function createChatStore(deps: ChatDeps): ChatStore {
 
 
   const store: ChatStore = reactive({
+    drafts: {} as Record<string, ComposerDraft>,
+    get draft() { return store.draftFor(store.currentId); },
+    draftFor(id: string | null) {
+      const key = id ?? '$new';
+      return store.drafts[key] ??= { text: '', attachments: [], skills: [], connectors: (store.sessions.find(s => s.id === id)?.connectors ?? []).map(id => ({ kind: 'connector' as const, id, name: id, description: '' })) };
+    },
+    pendingModel: null as SessionModel | null,
+    pendingContextTokens: null as number | null,
+    get model() { return store.currentId ? store.sessions.find(s => s.id === store.currentId)?.model ?? null : store.pendingModel; },
+    get sending() { return draftSending.value || modelChanges.has(store.currentId ?? '$new'); },
+    async setModel(model: SessionModel, sessionId: string | null = store.currentId) {
+      const key = sessionId ?? '$new';
+      const revision = (modelRevisions.get(key) ?? 0) + 1;
+      modelRevisions.set(key, revision);
+      const draft = sessionId ? null : store.draftFor(null);
+      modelChanges.add(key);
+      try {
+        const saved = await deps.invoke<SessionModel>('chat_set_model', { sessionId, selection: model });
+        if (disposed || modelRevisions.get(key) !== revision) return false;
+        if (sessionId) {
+          const session = store.sessions.find(s => s.id === sessionId);
+          if (session) session.model = saved;
+        } else if (store.draftFor(null) === draft) { store.pendingModel = saved; }
+        if (store.currentId === sessionId) void store.refreshContext();
+        return true;
+      } catch (error) { deps.notify(error, 'error'); return false; }
+      finally { if (modelRevisions.get(key) === revision) modelChanges.delete(key); }
+    },
     ready: false,
-    configured: false,
+    get configured() { return Boolean(store.model) || defaultConfigured.value; },
+    set configured(value: boolean) { defaultConfigured.value = value; },
     workspace: '',
     recentWorkspaces: [] as RecentWorkspace[],
     pendingWorkspace: '',
@@ -264,19 +318,28 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         deps.notify(error, 'error');
       }
     },
-    permissionMode: 'ask' as 'ask' | 'auto',
+    get permissionMode(): 'ask' | 'auto' { return store.currentId ? store.sessions.find(s => s.id === store.currentId)?.permissionMode ?? 'ask' : pendingPermissionMode.value; },
+    set permissionMode(mode: 'ask' | 'auto') {
+      const session = store.currentId ? store.sessions.find(s => s.id === store.currentId) : null;
+      if (session) session.permissionMode = mode;
+      else pendingPermissionMode.value = mode;
+    },
     hideToolCalls: false,
     async setPermissionMode(mode: 'ask' | 'auto') {
+      const id = store.currentId;
+      const before = store.permissionMode;
       store.permissionMode = mode;
       if (store.currentId) {
         const s = store.sessions.find(item => item.id === store.currentId);
         if (s) s.permissionMode = mode;
       }
-      if (!deps.desktop) return;
+      if (!deps.desktop || !id) return;
       try {
-        const args = store.currentId ? { sessionId: store.currentId, mode } : { mode };
+        const args = { sessionId: id, mode };
         await deps.invoke('chat_set_permission_mode', args);
       } catch (error) {
+        const session = store.sessions.find(s => s.id === id);
+        if (session?.permissionMode === mode) session.permissionMode = before;
         deps.notify(error, 'error');
       }
     },
@@ -312,7 +375,8 @@ export function createChatStore(deps: ChatDeps): ChatStore {
                     store.permissionMode = payload.mode;
                   }
                 } else {
-                  store.permissionMode = payload.mode;
+                  defaultPermissionMode.value = payload.mode;
+                  if (!store.currentId) pendingPermissionMode.value = payload.mode;
                 }
               }
             }),
@@ -351,7 +415,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         store.configured = overview.configured;
         store.workspace = overview.workspace;
         store.recentWorkspaces = overview.recentWorkspaces ?? [];
-        if (overview.permissionMode) store.permissionMode = overview.permissionMode;
+        if (overview.permissionMode) defaultPermissionMode.value = overview.permissionMode;
         if (typeof overview.hideToolCalls === 'boolean') store.hideToolCalls = overview.hideToolCalls;
         store.sessions = overview.sessions;
         store.groups = overview.groups ?? [];
@@ -375,10 +439,14 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     },
 
     async select(id) {
+      ++selectionRevision;
       deps.onActivity?.();
       store.currentId = id;
       void store.refreshContext();
-      if (!id) return;
+      if (!id) {
+        if (draftSending.value) { delete store.drafts.$new; store.pendingModel = null; store.pendingContextTokens = null; }
+        pendingPermissionMode.value = defaultPermissionMode.value; return;
+      }
       const curSession = store.sessions.find(s => s.id === id);
       if (curSession?.permissionMode) {
         store.permissionMode = curSession.permissionMode;
@@ -392,26 +460,44 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       deps.onActivity?.();
       if (!deps.desktop) { deps.notify('请在桌面应用中使用聊天', 'error'); return false; }
       let id = store.currentId;
+      const revision = selectionRevision;
+      const ownerDraft = store.draft;
+      const pendingWorkspace = store.pendingWorkspace;
+      const pendingExpert = store.pendingExpert;
+      const pendingModel = store.pendingModel;
+      const pendingContext = store.pendingContextTokens;
+      if (!id && draftSending.value) return false;
       let created = false;
       try {
         if (!id) {
+          draftSending.value = true;
           // The host runs each conversation in the mode saved with it, so a new one must be created in the
           // mode the top bar shows now; otherwise "完全信任" would be displayed but not applied.
           const summary = await deps.invoke<SessionSummary>('chat_new_session', {
             permissionMode: store.permissionMode, ...(store.pendingWorkspace ? { workspace: store.pendingWorkspace } : {}),
             ...(store.pendingExpert ? { expert: store.pendingExpert.workflow ? { workflow: store.pendingExpert.workflow } : { plugin: store.pendingExpert.plugin, ...(store.pendingExpert.agent ? { agent: store.pendingExpert.agent } : {}) } } : {}),
+            ...(store.pendingModel ? { model: store.pendingModel } : {}),
+            ...(store.pendingContextTokens ? { contextTokens: store.pendingContextTokens } : {}),
+            ...(ownerDraft.connectors.length ? { connectors: ownerDraft.connectors.map(c => c.id) } : {}),
           });
-          store.pendingWorkspace = '';
-          store.pendingExpert = null;
+          if (store.pendingWorkspace === pendingWorkspace) store.pendingWorkspace = '';
+          if (store.pendingExpert === pendingExpert) store.pendingExpert = null;
           id = summary.id;
           created = true;
           upsert(summary);
           store.views[id] = newView(id, true);
-          store.currentId = id;
+          store.drafts[id] = ownerDraft;
+          if (selectionRevision === revision && store.currentId === null) store.currentId = id;
+          if (store.drafts.$new === ownerDraft) delete store.drafts.$new;
+          if (store.pendingModel === pendingModel) store.pendingModel = null;
+          if (store.pendingContextTokens === pendingContext) store.pendingContextTokens = null;
+          if (selectionRevision === revision) pendingPermissionMode.value = defaultPermissionMode.value;
         }
       } catch (error) {
         deps.notify(error, 'error');
         return false;
+      } finally {
+        draftSending.value = false;
       }
       const view = viewOf(id, true);
       if (view.running) return false;
@@ -433,9 +519,16 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         deps.notify(error, 'error');
         if (created && !view.items.length) {
           const sessionId = id;
-          void deps.invoke<SessionSummary[]>('chat_delete_session', { sessionId }).then(sessions => { if (!disposed && sessions) store.sessions = sessions; }).catch(() => {});
+          void deps.invoke<SessionSummary[]>('chat_delete_session', { sessionId }).then(() => { if (!disposed) store.sessions = store.sessions.filter(s => s.id !== sessionId); }).catch(() => {});
           delete store.views[sessionId];
-          store.currentId = null;
+          if (!store.drafts.$new || (store.currentId === sessionId && selectionRevision === revision)) {
+            store.drafts.$new = ownerDraft;
+            store.pendingModel = pendingModel; store.pendingContextTokens = pendingContext;
+            store.pendingExpert = pendingExpert; store.pendingWorkspace = pendingWorkspace;
+          }
+          if (store.currentId === sessionId && selectionRevision === revision) {
+            store.currentId = null;
+          }
         }
         return false;
       }
@@ -503,8 +596,9 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       if (!deps.desktop) return;
       const id = store.currentId;
       try {
-        const info = await deps.invoke<ContextInfo>('chat_context', { sessionId: id });
-        if (!disposed && store.currentId === id && info) store.context = info;
+        const revision = ++contextRevision;
+        const info = await deps.invoke<ContextInfo>('chat_context', { sessionId: id, ...(!id && store.pendingModel ? { model: store.pendingModel } : {}), ...(!id && store.pendingContextTokens ? { contextTokens: store.pendingContextTokens } : {}) });
+        if (!disposed && store.currentId === id && revision === contextRevision && info) store.context = info;
       } catch {
         // A failed estimate is not worth a warning; the ring keeps its last numbers.
       }
@@ -535,18 +629,22 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       }
     },
 
-    async setContextSize(tokens) {
+    async setContextSize(tokens, sessionId: string | null = store.currentId) {
       if (!deps.desktop) return false;
-      const before = store.context.limit;
-      store.context = { ...store.context, limit: tokens };
+      const session = store.sessions.find(s => s.id === sessionId);
+      const before = session?.contextTokens ?? store.pendingContextTokens;
+      if (sessionId && !session) return false;
+      if (session) session.contextTokens = tokens; else store.pendingContextTokens = tokens;
+      if (store.currentId === sessionId) store.context = { ...store.context, limit: tokens };
       try {
-        await deps.invoke('set_context_tokens', { tokens });
+        if (sessionId) await deps.invoke('chat_set_session_options', { sessionId, contextTokens: tokens });
       } catch (error) {
         deps.notify(error, 'error');
-        if (!disposed) store.context = { ...store.context, limit: before };
+        if (session?.contextTokens === tokens) session.contextTokens = before;
+        if (!sessionId && store.pendingContextTokens === tokens) store.pendingContextTokens = before;
         return false;
       } finally {
-        await store.refreshContext();
+        if (store.currentId === sessionId) await store.refreshContext();
       }
       return true;
     },
@@ -776,5 +874,17 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     if (!list.some(item => item.id === request.id)) list.push(request);
   }
 
+  unsubscribers.push(watch(() => store.draft.connectors.map(c => c.id), ids => {
+    const id = store.currentId;
+    if (!id || disposed || !deps.desktop) return;
+    const session = store.sessions.find(s => s.id === id);
+    if (!session || JSON.stringify(session.connectors ?? []) === JSON.stringify(ids)) return;
+    session.connectors = [...ids];
+    const previous = connectorWrites.get(id) ?? Promise.resolve();
+    const write = previous.catch(() => {}).then(() => deps.invoke('chat_set_session_options', { sessionId: id, connectors: [...ids] }))
+      .catch(error => deps.notify(error, 'error'));
+    connectorWrites.set(id, write);
+    void write.finally(() => { if (connectorWrites.get(id) === write) connectorWrites.delete(id); });
+  }, { flush: 'sync' }));
   return store;
 }

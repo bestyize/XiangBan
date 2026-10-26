@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sessionModelConfig } from '../chat/session-model.ts';
 /**
  * The message box shared by 新建任务 and the conversation page: attachments, a top row, the text, and one row of tools.
  * Top row: the skills chosen for this message on the left (chips, gone once sent); on the right the expert the
@@ -43,7 +44,7 @@ const emit = defineEmits<{ sending: []; sent: []; settings: []; preview: [url: s
 
 const chat = props.store.chat;
 const asr = props.store.asr;
-const draft = ref('');
+const draft = computed({ get: () => chat.draft.text, set: text => { chat.draft.text = text; } });
 const composing = ref(false);
 const shown = computed(() => props.store.page === props.page);
 
@@ -56,7 +57,7 @@ async function readModelLabel() {
   if (!props.store.desktop) return;
   const generation = ++modelLabelGeneration;
   try {
-    const config = await invoke<AiConfigView>('get_ai_config');
+    const config = sessionModelConfig(await invoke<AiConfigView>('get_ai_config'), chat.model)!;
     if (generation !== modelLabelGeneration) return;
     if (config.activeProvider === GATEWAY_PROVIDER) {
       modelLabel.value = '小伴 AI'; modelProvider.value = '小伴 AI'; modelGateway.value = true;
@@ -80,13 +81,13 @@ async function modelSwitched() { await chat.refresh(); await readModelLabel(); p
 const view = computed(() => chat.current());
 const running = computed(() => !!view.value?.running);
 const compacting = computed(() => !!chat.currentId && chat.compactingId === chat.currentId);
-const attachments = ref<PendingAttachment[]>([]);
+const attachments = computed({ get: () => chat.draft.attachments, set: value => { chat.draft.attachments = value; } });
 const attachmentReading = ref(false);
 let attachmentVersion = 0;
 const filePicker = ref<HTMLInputElement | null>(null);
 const MAX_IMAGES = MAX_ATTACHMENTS;
-const skills = ref<{ name: string; title: string }[]>([]);
-const canSend = computed(() => chat.configured && !running.value && !compacting.value && !attachmentReading.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0 || skills.value.length > 0));
+const skills = computed({ get: () => chat.draft.skills, set: value => { chat.draft.skills = value; } });
+const canSend = computed(() => chat.configured && !chat.sending && !running.value && !compacting.value && !attachmentReading.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0 || skills.value.length > 0));
 
 /* ── Voice ───────────────────────────────────────────────────────────── */
 const voiceHasText = ref(false);
@@ -102,12 +103,11 @@ watch(() => chat.currentId, (id, before) => {
   // Another conversation was opened; the first message of a new one only gives it an id.
   if (before && id !== before) live?.end();
   if (shown.value && !liveActive.value) asr?.deactivate();
-  attachmentVersion++; attachments.value = [];
-  skills.value = [];
-  // Connectors stay chosen through the first message of a new conversation (it only gives it an id) and are dropped when another one is opened.
-  if (before) mentions.selected.value = [];
+  attachmentVersion++;
+  if (shown.value) void readModelLabel();
 }, { flush: 'sync' });
 watch(microphoneAllowed, allowed => { if (!allowed && shown.value && !liveActive.value) asr?.deactivate(); }, { flush: 'sync' });
+watch(() => chat.model, () => { if (shown.value) void readModelLabel(); }, { deep: true });
 watch(shown, now => { if (!now && !liveActive.value) asr?.deactivate(); else if (now) void readModelLabel(); }, { flush: 'sync' });
 /** 实时对话 sits beside send; it waits while an answer is being written or a dictation is under way. */
 const offersLive = computed(() => Boolean(live && asr) && props.store.desktop && asr!.microphoneSupported !== false);
@@ -150,7 +150,8 @@ async function toggleVoice() {
   }
   if (!microphoneAllowed.value) return;
   voiceHasText.value = false;
-  void asr.activate(text => { voiceHasText.value = true; draft.value += (draft.value && !/\s$/.test(draft.value) ? ' ' : '') + text; });
+  const owner = chat.draft;
+  void asr.activate(text => { voiceHasText.value = true; owner.text += (owner.text && !/\s$/.test(owner.text) ? ' ' : '') + text; });
 }
 onMounted(() => {
   if (shown.value) asr?.deactivate();
@@ -169,6 +170,7 @@ onUnmounted(() => {
 
 /* ── Sending ─────────────────────────────────────────────────────────── */
 async function submit() {
+  const owner = chat.draft;
   const text = draft.value.trim();
   if ((!text && !attachments.value.length && !skills.value.length) || !canSend.value) return;
   asr?.deactivate();
@@ -179,12 +181,11 @@ async function submit() {
   attachments.value = [];
   skills.value = [];
   emit('sending');
-  if (!(await chat.send(withSkills(text, chosen.map(s => s.name)), images, undefined, references.map(({ kind, id }) => ({ kind, id })))) && !draft.value) {
+  if (!(await chat.send(withSkills(text, chosen.map(s => s.name)), images, undefined, references.map(({ kind, id }) => ({ kind, id })))) && !owner.text) {
     // The host refused, so nothing was sent: hand the whole message back untouched.
-    draft.value = text;
-    attachments.value = images;
-    skills.value = chosen;
-    mentions.selected.value = references;
+    owner.text = text;
+    if (!owner.attachments.length) owner.attachments = images;
+    if (!owner.skills.length) owner.skills = chosen;
   }
   await nextTick();
   emit('sent');
@@ -288,6 +289,7 @@ function insertPrompt(instruction: string) { draft.value = draft.value.trim() ? 
 async function useExpert(entrySkill: string, name: string, expert?: { slug: string; name: string; profession?: string; description?: string; agent?: string | null; quickPrompts?: string[]; tags?: string[]; hasAvatar?: boolean; kind?: 'agent' | 'team'; plugin?: string }) {
   if (running.value) { props.store.notify('这个对话还在回答，请等它结束或先停止，再召唤专家', 'info'); return; }
   if (chat.currentId) await chat.select(null);
+  if (chat.currentId) return;
   chat.pendingExpert = expert?.plugin
     ? { plugin: expert.plugin, name: expert.name, profession: expert.profession ?? '', description: expert.description, agent: expert.agent, quickPrompts: expert.quickPrompts, tags: expert.tags, hasAvatar: expert.hasAvatar, kind: expert.kind }
     : { plugin: '', workflow: entrySkill, name, profession: '', description: expert?.description, hasAvatar: false };
@@ -311,18 +313,19 @@ function toggleConnector(item: { id: string; name: string }) {
   if (mentions.selected.value.some(i => i.id === item.id)) mentions.selected.value = mentions.selected.value.filter(i => i.id !== item.id);
   else useConnector(item.name, item.id);
 }
-const mentions = useComposerMentions(draft, () => props.store.desktop && shown.value, async (item: MentionItem) => {
+const mentions = useComposerMentions(draft, () => props.store.desktop && shown.value, async (item: MentionItem, isCurrent) => {
   if (item.kind === 'skill') { useSkill(item.id, item.name); return true; }
   if (item.kind === 'expert') {
     if (running.value) { props.store.notify('这个对话还在回答，请等它结束或先停止，再召唤专家', 'info'); return false; }
     type Expert = NonNullable<Parameters<typeof useExpert>[2]> & { entrySkill?: string };
     const experts = await invoke<Expert[]>('ai_store_experts_installed');
+    if (!isCurrent()) return false;
     const expert = experts.find(e => e.slug === item.id || e.plugin === item.id);
     if (!expert) throw new Error('这位专家已不可用，请刷新后重试');
     await useExpert(expert.entrySkill || expert.slug, expert.name, expert);
   }
   return true;
-}, error => props.store.notify(String(error), 'error'));
+}, error => props.store.notify(String(error), 'error'), computed({ get: () => chat.draft.connectors, set: value => { chat.draft.connectors = value; } }), () => chat.draft);
 /** A prompt handed over by another page (装扮 → 用 AI 创作…) lands in the box that is shown, unsent. */
 watch([() => props.store.creationDraft, () => chat.configured, shown], ([text, configured, now]) => {
   if (!text || !configured || !now) return;
@@ -377,8 +380,8 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <ChatWorkspaceMenu v-if="workspace" :chat="chat" :disabled="running || !store.desktop" />
         <ChatPermissionMenu :store="store" :disabled="!store.desktop" />
         <span class="composer-spacer" />
-        <ChatContextRing v-if="store.desktop" :inert="!chat.currentId && page === 'new-task'" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="chat.setContextSize($event)" />
-        <ChatComposerModel :label="modelLabel" :provider="modelProvider" :gateway="modelGateway" :disabled="!store.desktop || running" @switched="modelSwitched" @settings="emit('settings')" />
+        <ChatContextRing :session-id="chat.currentId" v-if="store.desktop" :inert="!chat.currentId && page === 'new-task'" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="(tokens, id) => chat.setContextSize(tokens, id)" />
+        <ChatComposerModel :chat="chat" :label="modelLabel" :provider="modelProvider" :gateway="modelGateway" :disabled="!store.desktop || running || chat.sending" @switched="modelSwitched" @settings="emit('settings')" />
         <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在转写</button>
         <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束录音' : '取消准备' }}</button>
         <button v-else-if="asr" type="button" class="xb-icon-btn voice" data-testid="chat-asr-toggle" aria-label="开始录音" aria-pressed="false" title="录音：说完转成文字，留在输入框，由你确认后发送" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><Mic :size="17" /></button>

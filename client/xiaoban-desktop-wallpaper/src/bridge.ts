@@ -66,6 +66,7 @@ export interface ProviderConfigView {
 
 /** What the host tells the web side about the model service. The key itself is never sent back. */
 export interface AiConfigView {
+  contextTokens?: number;
   catalogueReceived?: boolean;
   catalogueFetchedAt?: number;
   activeProvider?: string;

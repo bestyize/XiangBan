@@ -24,6 +24,8 @@ pub const MIN_CONTEXT_TOKENS: usize = 16_000;
 pub const MAX_CONTEXT_TOKENS: usize = 1_000_000;
 pub const DEFAULT_CONTEXT_TOKENS: usize = 256_000;
 
+pub use crate::model_selection::SessionModel;
+
 /// The built-in providers a fresh install starts with: id, display name, and the chat-completions
 /// address and default model. Each vendor also serves the Responses and Anthropic wire formats on
 /// its own path; the web side switches the address with the protocol, and the host only needs a
@@ -235,6 +237,46 @@ impl Default for AiConfig {
 }
 
 impl AiConfig {
+    pub fn session_model(&self) -> Option<SessionModel> {
+        self.is_complete().then(|| SessionModel {
+            provider_id: self.active_provider.clone(), model: self.model.clone(),
+            reply_preference: self.reply_preference(),
+            reasoning_efforts: (self.active_provider == crate::ai_gateway::GATEWAY_ID).then(|| self.gateway_reasoning_efforts.clone()),
+        })
+    }
+
+    /// Resolve against the latest registry; never copy credentials into conversation metadata or change the default.
+    pub fn for_session_model(&self, selection: &SessionModel) -> Result<Self, String> {
+        let mut config = self.clone();
+        let model = selection.model.trim();
+        if model.is_empty() || model.len() > MAX_MODEL || model.chars().any(char::is_control) {
+            return Err("模型名称不正确，请重新选择".into());
+        }
+        if selection.provider_id == crate::ai_gateway::GATEWAY_ID {
+            if !config.gateway_enabled || !["standard", "advanced"].contains(&model) { return Err("小伴 AI 模式不可用，请重新选择".into()); }
+            config.active_provider = selection.provider_id.clone();
+            config.model = model.into(); config.gateway_tier = model.into();
+            config.protocol = "responses".into();
+            // prepare() replaces the address and obtains a fresh account token before a request.
+            config.base_url = format!("{}/v1", crate::ai_gateway::ai_base_url());
+            config.api_key.clear();
+            config.gateway_reply_preference = selection.reply_preference;
+            config.gateway_reasoning_efforts = selection.reasoning_efforts.clone().unwrap_or_default();
+        } else {
+            let provider = config.providers.iter_mut().find(|p| p.id == selection.provider_id)
+                .ok_or("此会话的模型供应商已删除，请选择其他模型")?;
+            if !provider.available { return Err("此会话的模型供应商已停用，请选择其他模型".into()); }
+            if provider.remote && provider.provider_type != "third" && !provider.models.iter().any(|m| m.id == model) {
+                return Err("此会话的模型已停用，请选择其他模型".into());
+            }
+            provider.reply_preference = clean_reply_preference(provider, &provider.base_url, model, &provider.protocol, Some(selection.reply_preference))?;
+            provider.model = model.into();
+            config.active_provider = provider.id.clone(); config.protocol = provider.protocol.clone();
+            config.base_url = provider.base_url.clone(); config.api_key = provider.api_key.clone(); config.model = provider.model.clone();
+        }
+        Ok(config)
+    }
+
     /// Enough to send a request.
     pub fn is_complete(&self) -> bool {
         !self.base_url.trim().is_empty() && !self.model.trim().is_empty()
@@ -328,6 +370,7 @@ impl fmt::Debug for AiConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiConfigView {
+    pub context_tokens: usize,
     pub gateway_reply_preference: ReplyPreference,
     pub gateway_reasoning_efforts: Vec<String>,
     pub catalogue_received: bool,
@@ -353,6 +396,7 @@ impl AiConfig {
     pub fn view(&self, default_workspace: &Path) -> AiConfigView {
         let providers_view = self.providers.iter().map(|p| p.view()).collect();
         AiConfigView {
+            context_tokens: self.context_tokens,
             gateway_reply_preference: self.gateway_reply_preference,
             gateway_reasoning_efforts: self.gateway_reasoning_efforts.clone(),
             catalogue_received: self.catalogue_received, catalogue_fetched_at: self.catalogue_fetched_at,
@@ -1142,6 +1186,47 @@ pub async fn fetch_ai_models(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn conversation_model_and_reasoning_do_not_modify_registry_or_default() {
+        let mut config = AiConfig::default();
+        config.providers.push(ProviderConfig { id: "my-models".into(), protocol: "responses".into(),
+            base_url: "https://models.example/v1".into(), model: "gpt-6.1-sol".into(), api_key: "original-key".into(),
+            reply_preference: ReplyPreference::Faster, ..ProviderConfig::default() });
+        let original = config.clone();
+        let pick = SessionModel { provider_id: "my-models".into(), model: "gpt-6.1-sol".into(),
+            reply_preference: ReplyPreference::Deeper, reasoning_efforts: None };
+        let resolved = config.for_session_model(&pick).unwrap();
+        assert_eq!(resolved.api_key, "original-key");
+        assert_eq!(resolved.reply_preference(), ReplyPreference::Deeper);
+        assert_eq!(config, original);
+        config.providers.last_mut().unwrap().api_key = "rotated-key".into();
+        assert_eq!(config.for_session_model(&pick).unwrap().api_key, "rotated-key");
+        let metadata = serde_json::to_string(&pick).unwrap();
+        assert!(!metadata.contains("key"));
+    }
+
+    #[test]
+    fn deleted_or_disabled_conversation_provider_never_falls_back_to_default() {
+        let mut config = AiConfig::default();
+        let pick = SessionModel { provider_id: "missing".into(), model: "m1".into(),
+            reply_preference: ReplyPreference::Default, reasoning_efforts: None };
+        assert!(config.for_session_model(&pick).is_err());
+        config.providers.push(ProviderConfig { id: "missing".into(), available: false, ..ProviderConfig::default() });
+        assert!(config.for_session_model(&pick).is_err());
+    }
+
+    #[test]
+    fn conversation_gateway_uses_its_own_tier_and_strength() {
+        let config = AiConfig { gateway_tier: "standard".into(), gateway_reply_preference: ReplyPreference::Faster, ..AiConfig::default() };
+        let pick = SessionModel { provider_id: crate::ai_gateway::GATEWAY_ID.into(), model: "advanced".into(),
+            reply_preference: ReplyPreference::Max, reasoning_efforts: Some(vec!["high".into(), "max".into()]) };
+        let resolved = config.for_session_model(&pick).unwrap();
+        assert_eq!(resolved.gateway_tier, "advanced");
+        assert_eq!(resolved.reply_preference(), ReplyPreference::Max);
+        assert_eq!(config.gateway_tier, "standard");
+        assert!(resolved.api_key.is_empty());
+    }
 
     const KEY: &str = "sk-abcdefghijklmnop1234";
 
