@@ -5,6 +5,35 @@ import type { WireMessage } from './types.ts';
 const text = (value: string) => [{ type: 'text' as const, text: value }];
 
 describe('history to chat items', () => {
+  it('keeps a resource wait active, clears it when acquired, and resumes the same operation', () => {
+    const view = newView('s1');
+    view.running = true;
+    applyEvent(view, { type: 'tool_start', id: 'w', name: 'wallpaper_apply', arguments: '{}' });
+    applyEvent(view, { type: 'tool_waiting', id: 'w', resource: 'app-state', owner_session: 'other', waiting: true });
+    expect(view.running).toBe(true);
+    expect(view.status).toContain('自动继续');
+    expect(view.items[0]).toMatchObject({ status: 'running', waitingFor: { resource: 'app-state', ownerSession: 'other' } });
+    applyEvent(view, { type: 'tool_waiting', id: 'w', resource: 'app-state', waiting: false });
+    expect(view.items[0]).not.toHaveProperty('waitingFor');
+    expect(view.status).toBe('');
+    applyEvent(view, { type: 'tool_end', id: 'w', output: 'applied', is_error: false });
+    expect(view.items).toHaveLength(1);
+    expect(view.items[0]).toMatchObject({ status: 'done', output: 'applied' });
+  });
+
+  it('clears resource waits when stopped and ignores late waiting events', () => {
+    const view = newView('s1');
+    view.running = true;
+    applyEvent(view, { type: 'tool_start', id: 'w', name: 'wallpaper_apply', arguments: '{}' });
+    applyEvent(view, { type: 'tool_waiting', id: 'w', resource: 'app-state', waiting: true });
+    applyEvent(view, { type: 'cancelled' });
+    applyEvent(view, { type: 'tool_waiting', id: 'w', resource: 'app-state', waiting: true });
+    expect(view.running).toBe(false);
+    expect(view.status).toBe('');
+    expect(view.items[0]).not.toHaveProperty('waitingFor');
+    expect(view.items[0]).toMatchObject({ status: 'error', output: '已中断' });
+  });
+
   it.each([
     ['verification_required', '目标尚未通过指定命令验收'],
     ['unfinished_milestones', '还有未完成的里程碑'],

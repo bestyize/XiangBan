@@ -32,46 +32,96 @@ impl Drop for UserWait {
 }
 /// A tool's shared mutation domain. File paths must be resolved by the tool,
 /// rather than trusting a model-supplied relative path or alias.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ToolResource {
+    /// Unknown mutation domain: conflicts with all other mutation resources.
     Global,
+    /// Keep file ownership for the run, so competing conversations cannot overwrite its work.
     File(std::path::PathBuf),
+    /// An application-owned domain, exclusively held only while the call is executing.
+    Named(String),
+    /// A sequence-sensitive domain (such as the user's desktop), exclusively held for the run.
+    RunExclusive(String),
+}
+impl ToolResource {
+    fn conflicts(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Global, _) | (_, Self::Global) => true,
+            (Self::File(a), Self::File(b)) => a == b,
+            (Self::Named(a) | Self::RunExclusive(a), Self::Named(b) | Self::RunExclusive(b)) => a == b,
+            _ => false,
+        }
+    }
+    pub(crate) fn label(&self) -> String {
+        match self {
+            Self::Global => "shared mutation resource".into(),
+            Self::File(path) => path.display().to_string(),
+            Self::Named(name) | Self::RunExclusive(name) => name.clone(),
+        }
+    }
+    pub(crate) fn held_for_run(&self) -> bool {
+        matches!(self, Self::File(_) | Self::RunExclusive(_))
+    }
+}
+#[derive(Debug)]
+struct ResourceOwner {
+    run: Weak<Inner>,
+    transient: bool,
+    uncertain: AtomicBool,
+}
+struct Ownership {
+    resource: ToolResource,
+    owner: Weak<ResourceOwner>,
+    session: Option<String>,
 }
 #[derive(Default)]
-struct Owners {
-    global: Option<Weak<Inner>>,
-    files: std::collections::HashMap<std::path::PathBuf, Weak<Inner>>,
+struct Owners { entries: Vec<Ownership> }
+struct Conflict {
+    persistent: bool,
+    session: Option<String>,
 }
 static ACTIVE: OnceLock<Mutex<Owners>> = OnceLock::new();
 #[derive(Clone, Debug)]
-pub struct RunControl(Arc<Inner>);
+pub struct RunControl(Arc<Inner>, Arc<ResourceOwner>);
 impl Default for RunControl {
     fn default() -> Self {
-        Self(Arc::new(Inner {
+        Self::new(Inner {
             isolate: false,
             deadline: Mutex::new(Clock::default()),
             tokens: AtomicU64::new(0),
             limit: u64::MAX,
-        }))
+        })
     }
 }
 impl RunControl {
+    fn new(inner: Inner) -> Self {
+        let inner = Arc::new(inner);
+        let owner = Arc::new(ResourceOwner { run: Arc::downgrade(&inner), transient: false, uncertain: AtomicBool::new(false) });
+        Self(inner, owner)
+    }
+    /// Shares the run budget, but releases call-owned resources when the last worker/transport exits.
+    pub(crate) fn tool_scope(&self) -> Self {
+        Self(self.0.clone(), Arc::new(ResourceOwner {
+            run: Arc::downgrade(&self.0), transient: true, uncertain: AtomicBool::new(false),
+        }))
+    }
+    pub(crate) fn mark_uncertain(&self) { self.1.uncertain.store(true, Ordering::SeqCst); }
     /// No time/token cap, while retaining mutation-domain isolation.
     pub fn unlimited() -> Self {
-        Self(Arc::new(Inner { isolate: true, deadline: Mutex::new(Clock::default()),
-            tokens: AtomicU64::new(0), limit: u64::MAX }))
+        Self::new(Inner { isolate: true, deadline: Mutex::new(Clock::default()),
+            tokens: AtomicU64::new(0), limit: u64::MAX })
     }
 
     pub fn limits(duration: Option<Duration>, tokens: Option<u64>) -> Self {
-        Self(Arc::new(Inner { isolate: true,
+        Self::new(Inner { isolate: true,
             deadline: Mutex::new(Clock { end: duration.map(|d| Instant::now() + d), ..Default::default() }),
-            tokens: AtomicU64::new(0), limit: tokens.unwrap_or(u64::MAX) }))
+            tokens: AtomicU64::new(0), limit: tokens.unwrap_or(u64::MAX) })
     }
 
     pub(crate) fn tool_timeout(timeout: Duration) -> Self {
-        Self(Arc::new(Inner { isolate: false,
+        Self::new(Inner { isolate: false,
             deadline: Mutex::new(Clock { end: Instant::now().checked_add(timeout), ..Default::default() }),
-            tokens: AtomicU64::new(0), limit: u64::MAX }))
+            tokens: AtomicU64::new(0), limit: u64::MAX })
     }
     pub(crate) fn time_expired_at(&self, at: Instant) -> bool {
         let clock = self.0.deadline.lock().unwrap_or_else(|e| e.into_inner());
@@ -81,35 +131,68 @@ impl RunControl {
     pub fn reported_tokens(&self) -> u64 { self.0.tokens.load(Ordering::SeqCst) }
 
     pub fn bounded(duration: Duration, tokens: u64) -> Self {
-        Self(Arc::new(Inner {
+        Self::new(Inner {
             isolate: true,
             deadline: Mutex::new(Clock { end: Some(Instant::now() + duration), ..Default::default() }),
             tokens: AtomicU64::new(0),
             limit: tokens,
-        }))
+        })
     }
     pub fn claim(&self) -> Result<(), String> {
         self.claim_resource(&ToolResource::Global)
     }
     pub fn claim_resource(&self, resource: &ToolResource) -> Result<(), String> {
+        self.try_claim(resource, None).map_err(|conflict| format!(
+            "another task{} still owns {}; inspect its state or resume after it has stopped",
+            conflict.session.map(|s| format!(" (session {s})")).unwrap_or_default(), resource.label(),
+        ))
+    }
+    fn try_claim(&self, resource: &ToolResource, session: Option<&str>) -> Result<(), Conflict> {
         if !self.0.isolate {
             return Ok(());
         }
         let mut active = ACTIVE.get_or_init(Default::default).lock().unwrap_or_else(|e| e.into_inner());
-        active.files.retain(|_, owner| owner.strong_count() != 0);
-        let foreign = |owner: &Weak<Inner>| owner.upgrade().is_some_and(|old| !Arc::ptr_eq(&old, &self.0));
-        let conflict = active.global.as_ref().is_some_and(foreign) || match resource {
-            ToolResource::Global => active.files.values().any(foreign),
-            ToolResource::File(path) => active.files.get(path).is_some_and(foreign),
-        };
-        if conflict {
-            return Err("another task still owns this tool resource; inspect its state or resume after it has stopped".into());
+        active.entries.retain(|entry| entry.owner.strong_count() != 0);
+        let mut conflict: Option<Conflict> = None;
+        for entry in &active.entries {
+            let Some(owner) = entry.owner.upgrade() else { continue };
+            if owner.run.ptr_eq(&self.1.run) || !entry.resource.conflicts(resource) { continue; }
+            let persistent = !owner.transient || owner.uncertain.load(Ordering::SeqCst);
+            if conflict.as_ref().map_or(true, |old| persistent && !old.persistent) {
+                conflict = Some(Conflict { persistent, session: entry.session.clone() });
+            }
         }
-        match resource {
-            ToolResource::Global => active.global = Some(Arc::downgrade(&self.0)),
-            ToolResource::File(path) => { active.files.insert(path.clone(), Arc::downgrade(&self.0)); }
+        if let Some(conflict) = conflict { return Err(conflict); }
+        if !active.entries.iter().any(|entry| entry.resource == *resource && entry.owner.ptr_eq(&Arc::downgrade(&self.1))) {
+            active.entries.push(Ownership { resource: resource.clone(), owner: Arc::downgrade(&self.1), session: session.map(String::from) });
         }
         Ok(())
+    }
+    /// Wait only for in-flight calls. Run-owned files and uncertain actions require an explicit
+    /// decision: waiting on those could deadlock two runs that already own different files.
+    pub(crate) fn claim_tool_resource(
+        &self, resource: &ToolResource, session: &str, cancel: &AtomicBool,
+        mut waiting: impl FnMut(bool, Option<&str>),
+    ) -> Result<(), crate::ToolResult> {
+        let mut notified = false;
+        loop {
+            if cancel.load(Ordering::Relaxed) { return Err(crate::ToolResult::error("cancelled while waiting for resource")); }
+            if let Err(error) = self.check() { return Err(crate::ToolResult::error(error.to_string())); }
+            match self.try_claim(resource, Some(session)) {
+                Ok(()) => {
+                    if notified { waiting(false, None); }
+                    return Ok(());
+                }
+                Err(conflict) if conflict.persistent => return Err(crate::ToolResult::error(format!(
+                    "Resource {} is held by another task{} for an active run or an unconfirmed action. No operation was dispatched. For conflicting project edits, use a separate worktree.",
+                    resource.label(), conflict.session.as_ref().map(|s| format!(" (session {s})")).unwrap_or_default(),
+                )).with_structured_content(serde_json::json!({"harness_status":"resource_busy","resource":resource.label(),"owner_session":conflict.session,"executed":false}))),
+                Err(conflict) => {
+                    if !notified { waiting(true, conflict.session.as_deref()); notified = true; }
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+            }
+        }
     }
     pub fn record(&self, u: crate::Usage) {
         self.0.tokens.fetch_add(u.budget_units(), Ordering::SeqCst);
@@ -193,5 +276,21 @@ mod user_wait_tests {
         std::thread::sleep(Duration::from_millis(100));assert!(c.check().is_err());
         let c=RunControl::bounded(Duration::from_secs(5),1);let _wait=c.wait_for_user();
         c.record(crate::Usage{prompt_tokens:1,..Default::default()});assert!(c.check().is_err());
+    }
+
+    #[test]
+    fn overlapping_call_scopes_keep_each_lease_and_share_the_run_budget() {
+        let run = RunControl::unlimited();
+        let a = run.tool_scope();
+        let b = run.tool_scope();
+        let resource = ToolResource::Named("overlapping-unit-test".into());
+        a.claim_resource(&resource).unwrap();
+        b.claim_resource(&resource).unwrap();
+        a.record(crate::Usage { prompt_tokens: 10, ..Default::default() });
+        assert_eq!(run.reported_tokens(), 10);
+        drop(b);
+        assert!(RunControl::unlimited().claim_resource(&resource).is_err());
+        drop(a);
+        assert!(RunControl::unlimited().claim_resource(&resource).is_ok());
     }
 }

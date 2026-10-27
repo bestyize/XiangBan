@@ -154,6 +154,10 @@ struct PermissionCheckedTool {
 
 impl agent_kernel::Tool for PermissionCheckedTool {
     fn spec(&self) -> &agent_kernel::ToolSpec { &self.spec }
+    fn resource(&self, _: &serde_json::Value) -> Result<Option<agent_kernel::ToolResource>, String> {
+        // Keep observe/click/type sequences together, without blocking unrelated file work.
+        Ok(Some(agent_kernel::ToolResource::RunExclusive("computer".into())))
+    }
     fn execute(&self, args: serde_json::Value, ctx: &agent_kernel::ToolCtx) -> Result<String, String> {
         let result = self.execute_result(args, ctx);
         if result.is_error { Err(result.output) } else { Ok(result.output) }
@@ -254,6 +258,19 @@ mod tests {
         assert_eq!(lock["version"], RUNTIME_VERSION);
         assert!(SKILL.contains(&format!("name: {SKILL_NAME}")));
         assert!(SKILL.contains(SKILL_ORIGIN_MARKER));
+    }
+
+    #[test]
+    fn wrapped_computer_actions_reserve_only_the_computer_for_the_run() {
+        use agent_kernel::{Tool, ToolSpec, ToolResource};
+        struct Action(ToolSpec);
+        impl Tool for Action { fn spec(&self) -> &ToolSpec { &self.0 } }
+        let tool = PermissionCheckedTool {
+            spec: ToolSpec::new("click", "fixture", serde_json::json!({"type":"object"})),
+            inner: Arc::new(Action(ToolSpec::new("click", "fixture", serde_json::json!({"type":"object"})))),
+            root: std::path::PathBuf::new(),
+        };
+        assert_eq!(tool.resource(&serde_json::json!({})).unwrap(), Some(ToolResource::RunExclusive("computer".into())));
     }
 
     #[cfg(target_os = "macos")]

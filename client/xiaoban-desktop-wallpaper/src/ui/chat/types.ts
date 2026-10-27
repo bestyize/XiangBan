@@ -68,6 +68,7 @@ export type KernelEvent =
   | { type: 'text_delta'; text: string }
   | { type: 'reasoning_delta'; kind: 'summary' | 'text'; text: string }
   | { type: 'tool_start'; id: string; name: string; arguments: string }
+  | { type: 'tool_waiting'; id: string; resource: string; owner_session?: string | null; waiting: boolean }
   | { type: 'tool_dispatched'; id: string }
   | { type: 'tool_end'; id: string; output: string; is_error: boolean; parts?: WirePart[]; structured_content?: unknown }
   | { type: 'usage'; prompt_tokens: number; completion_tokens: number }
@@ -111,7 +112,7 @@ export type ChatItem =
   | { kind: 'user'; id: string; text: string; images: string[]; files?: AttachmentCard[] }
   | { kind: 'reasoning'; id: string; text: string; reasoningKind: 'summary' | 'text'; streaming: boolean }
   | { kind: 'assistant'; id: string; text: string; streaming: boolean; /** Tokens of the whole answer, research helpers included. */ usage?: TokenUsage }
-  | { kind: 'tool'; id: string; name: string; arguments: string; output: string; status: 'running' | 'done' | 'error' }
+  | { kind: 'tool'; id: string; name: string; arguments: string; output: string; status: 'running' | 'done' | 'error'; waitingFor?: { resource: string; ownerSession?: string } }
   | { kind: 'notice'; id: string; tone: 'info' | 'warning' | 'error'; text: string; code?: 'truncated'; taskStatus?: 'succeeded' | 'failed' | 'partial' | 'cancelled' | 'unknown'; verifiedAtMs?: number; canContinue?: boolean; canSwitchModel?: boolean; canRetry?: boolean; details?: string; /** The label on the fold-out `details`; "错误详情" when missing. */ detailsLabel?: string; /** The answer whose file changes this notice can undo. */ undoRun?: string };
 
 export interface SessionView {

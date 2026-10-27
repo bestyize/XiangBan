@@ -11,7 +11,7 @@ const history = ref<HTMLElement | null>(null);
 const follow = ref(true);
 const latest = computed(() => [...props.calls].reverse().find(call => call.status === 'running') ?? props.calls.at(-1));
 const errors = computed(() => props.calls.filter(call => call.status === 'error').length);
-const label = computed(() => !props.active ? '已完成' : props.waiting ? '等待确认' : props.calls.some(call => call.status === 'running') ? '执行中' : props.status || '执行中');
+const label = computed(() => !props.active ? '已完成' : props.waiting ? '等待确认' : props.calls.some(call => call.waitingFor) ? '等待资源' : props.calls.some(call => call.status === 'running') ? '执行中' : props.status || '执行中');
 /** How long the turn worked, measured while it is watched here; unknown for a conversation read from disk. */
 const startedAt = ref<number | null>(props.active ? Date.now() : null);
 const elapsed = ref<number | null>(null);
@@ -53,7 +53,7 @@ function onScroll() { if (history.value) follow.value = isNearBottom(history.val
         <div :key="latest.id" class="step" :class="latest.status" :data-testid="`tool-${latest.id}`">
           <LoaderCircle v-if="latest.status === 'running'" :size="13" class="spin" /><Check v-else-if="latest.status === 'done'" :size="13" /><X v-else :size="13" />
           <span class="step-name">{{ toolLabel(latest.name) }}</span>
-          <span class="step-description" :title="describeCall(latest.name, latest.arguments)">{{ describeCall(latest.name, latest.arguments) }}</span>
+          <span class="step-description" :title="latest.waitingFor ? `${latest.waitingFor.resource} · ${latest.waitingFor.ownerSession || '其他会话'}` : describeCall(latest.name, latest.arguments)">{{ latest.waitingFor ? '等待资源释放后自动继续，可随时停止' : describeCall(latest.name, latest.arguments) }}</span>
         </div>
       </Transition>
     </div>
@@ -62,7 +62,7 @@ function onScroll() { if (history.value) follow.value = isNearBottom(history.val
       <details v-for="call in calls" :key="call.id" class="tool" :class="call.status" :data-testid="`tool-${call.id}`">
         <summary>
           <LoaderCircle v-if="call.status === 'running'" :size="13" class="spin" /><Check v-else-if="call.status === 'done'" :size="13" /><X v-else :size="13" />
-          <b>{{ toolLabel(call.name) }}</b><span class="step-description">{{ describeCall(call.name, call.arguments) }}</span>
+          <b>{{ toolLabel(call.name) }}</b><span class="step-description">{{ call.waitingFor ? '等待资源释放后自动继续，可随时停止' : describeCall(call.name, call.arguments) }}</span>
           <ChevronRight :size="12" class="call-chevron" />
         </summary>
         <div class="tool-body">

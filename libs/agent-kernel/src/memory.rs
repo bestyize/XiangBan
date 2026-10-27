@@ -180,6 +180,9 @@ impl MemoryWrite {
 }
 
 impl Tool for MemoryWrite {
+    fn resource(&self, _: &Value) -> Result<Option<crate::ToolResource>, String> {
+        Ok(Some(crate::ToolResource::Named("memory-store".into())))
+    }
     fn spec(&self) -> &ToolSpec {
         &self.spec
     }
