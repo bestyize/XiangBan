@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed,onBeforeUnmount,onMounted,nextTick,ref,watch} from 'vue';
-import {Check,Copy,Download,Hand,ExternalLink,MessageSquare,Minus,MousePointer2,PanelRight,Play,Plus,RotateCcw,RotateCw,Send,Sun,Moon,Trash2,X,ClipboardCopy,Palette,Layers} from 'lucide-vue-next';
+import {Check,Copy,Download,Hand,ExternalLink,Pencil,Maximize2,MessageSquare,Minus,MousePointer2,PanelRight,Play,Plus,RotateCcw,RotateCw,Send,Sun,Moon,Trash2,X,ClipboardCopy,Palette,Layers} from 'lucide-vue-next';
 import {invoke} from '../../bridge.ts';
 import BoardPreview from './BoardPreview.vue';
 import {
@@ -11,9 +11,9 @@ import {
 import {clampScale,zoomAt,wheelPixels,type CanvasView} from './viewport.ts';
 import {createDesignStore} from './design-store.ts';
 const props=defineProps<{projectId:string;detached?:boolean;notify:(message:unknown,type?:'success'|'error'|'info')=>void}>();
-const emit=defineEmits<{close:[];detach:[];dock:[];request:[message:string,session:string]}>();
+const emit=defineEmits<{close:[];detach:[];dock:[];copied:[id:string];request:[message:string,session:string]}>();
 const ds=createDesignStore(props.notify),selected=ref(''),page=ref(''),mode=ref<'select'|'play'|'hand'>('select'),scale=ref(.4),properties=ref(false),spaceHeld=ref(false),viewport=ref<HTMLElement|null>(null);
-const theme=ref<'light'|'dark'>('light'),hideResolved=ref(false);
+const theme=ref<'light'|'dark'>('light'),hideResolved=ref(false),renameOpen=ref(false),projectTitle=ref('');let offDeleted:(()=>void)|undefined,unmounted=false;
 const activeTab=ref<'properties'|'design-system'>('properties');
 const node=ref<{id:string;text:string;tag:string;path?:string;quote?:string;styles?:Record<string,string>}|null>(null);
 const nodeText=ref(''),commentText=ref(''),sendComment=ref(true),commentOpen=ref(false),sourceOpen=ref(false),source=ref(''),renderErrors=ref<Record<string,string>>({});
@@ -32,7 +32,7 @@ const tokens=computed(()=>project.value?tokensOf(project.value.canvas):{});
 const dsCards=computed<DsCard[]>(()=>project.value?dsCardsOf(project.value):[]);
 const minX=computed(()=>Math.min(0,...boards.value.map(b=>b.x))),minY=computed(()=>Math.min(0,...boards.value.map(b=>b.y)));
 const extent=computed(()=>({w:Math.max(600,...boards.value.map(b=>b.x+b.w))-minX.value+96,h:Math.max(500,...boards.value.map(b=>b.y+b.h))-minY.value+140}));
-const canEdit=computed(()=>!!project.value&&!ds.busy&&!ds.conflict&&!ds.dirty);
+const canEdit=computed(()=>!!project.value&&!ds.busy&&!ds.conflict);
 
 function boardPins(file:string){
   return allComments.value
@@ -50,7 +50,7 @@ async function open(id:string){
     selected.value=allBoards.value[0]?.file??'';
     page.value='';node.value=null;sourceOpen.value=false;commentOpen.value=false;versionsOpen.value=false;
     history.value=[];future.value=[];renderErrors.value={};token.value=crypto.randomUUID();
-    const view=await invoke<CanvasView|null>('design_view_read',{id});
+    const view=await invoke<CanvasView|null>('design_view_read',{id}).catch(()=>null);
     if(project.value?.id!==id)return;
     if(view){
       if(allBoards.value.some(b=>b.file===view.selected))selected.value=view.selected!;
@@ -70,10 +70,18 @@ watch([selected,page,scale,mode,theme],scheduleView);
 function rememberView(){if(!project.value)return Promise.resolve();return invoke('design_view_save',{id:project.value.id,view:{selected:selected.value,page:page.value,scale:scale.value,left:viewport.value?.scrollLeft??0,top:viewport.value?.scrollTop??0,mode:mode.value,theme:theme.value}});}
 async function handoff(){if(ds.busy||ds.dirty){props.notify('请先保存当前修改再切换窗口','info');return;}try{await rememberView();if(props.detached)emit('dock');else emit('detach');}catch(e){report(e);}}
 function releaseSpace(){spaceHeld.value=false;cancelDrag();}
-onMounted(()=>{window.addEventListener('keyup',keyup);window.addEventListener('blur',releaseSpace);});
-onBeforeUnmount(()=>{clearTimeout(viewTimer);void rememberView().catch(()=>{});ds.dispose();window.removeEventListener('keyup',keyup);window.removeEventListener('blur',releaseSpace);});
+onMounted(async()=>{offDeleted=await (await import('../../bridge.ts')).listen<{id:string}>('design-deleted',row=>{if(row.id===project.value?.id){ds.close();props.notify('设计稿已被删除','info');}});if(unmounted){offDeleted();return;}window.addEventListener('keyup',keyup);window.addEventListener('blur',releaseSpace);});
+onBeforeUnmount(()=>{unmounted=true;offDeleted?.();clearTimeout(viewTimer);void rememberView().catch(()=>{});ds.dispose();window.removeEventListener('keyup',keyup);window.removeEventListener('blur',releaseSpace);});
 watch(()=>project.value?.revision,()=>{if(!allBoards.value.some(b=>b.file===selected.value))selected.value=allBoards.value[0]?.file??'';renderErrors.value={};node.value=null;});
 
+async function copyProject(){
+ if(!project.value||!canEdit.value)return;
+ try{const result=await invoke<{project:Project}>('design_copy',{id:project.value.id,session:project.value.sessionIds?.at(-1)??project.value.sessionId});
+  if(!props.detached)emit('copied',result.project.id);props.notify('副本已保存','success');
+ }catch(e){report(e);}
+}
+function renameProject(){projectTitle.value=project.value?.title??'';renameOpen.value=true;}
+async function saveTitle(){if(await edit(p=>{p.title=projectTitle.value.trim();}))renameOpen.value=false;}
 async function edit(fn:(p:Project)=>void,record=true){
   if(!project.value||!canEdit.value)return false;
   const before=clone(project.value),epoch=remoteEpoch;
@@ -222,12 +230,14 @@ function move(e:PointerEvent){if(!drag)return;drag.dx=(e.clientX-drag.x)/scale.v
 function cancelDrag(){drag=null;dragging.value=null;}
 function up(){if(!drag)return;const d=drag;drag=null;dragging.value=null;if(d.type==='board'&&(Math.abs(d.dx)>1||Math.abs(d.dy)>1))void edit(p=>changeBoard(p,d.board!.file,{x:Math.round(d.board!.x+d.dx),y:Math.round(d.board!.y+d.dy)}));}
 function position(b:Board){const moving=dragging.value?.file===b.file?dragging.value:null;return {left:((moving?.x??b.x)-minX.value+32)+'px',top:((moving?.y??b.y)-minY.value+40)+'px',width:b.w+'px',height:(b.h+28)+'px'};}
-function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textarea,select,[contenteditable]'))return;if(e.key==='Escape'){node.value=null;sourceOpen.value=false;commentOpen.value=false;versionsOpen.value=false;releaseSpace();}if(e.key===' '){e.preventDefault();spaceHeld.value=true;}if(['+','=','-','0','1'].includes(e.key)){e.preventDefault();canvasKey(e.key);}if((e.metaKey||e.ctrlKey)&&e.key==='z'){e.preventDefault();void(e.shiftKey?redo():undo());}}
+function key(e:KeyboardEvent){if(props.detached&&e.key==='F11'){e.preventDefault();void invoke('design_window_fullscreen',{id:props.projectId}).catch(report);return;}if((e.target as HTMLElement).matches('input,textarea,select,[contenteditable]'))return;if(e.key==='Escape'){node.value=null;sourceOpen.value=false;commentOpen.value=false;versionsOpen.value=false;releaseSpace();}if(e.key===' '){e.preventDefault();spaceHeld.value=true;}if(['+','=','-','0','1'].includes(e.key)){e.preventDefault();canvasKey(e.key);}if((e.metaKey||e.ctrlKey)&&e.key==='z'){e.preventDefault();void(e.shiftKey?redo():undo());}}
 </script>
 <template>
 <section class="design-workbench" tabindex="0" aria-label="设计工作台" data-testid="design-workbench" @keydown="key">
 <header>
   <span class="brand">✦</span><b>{{project?.title??'读取设计稿…'}}</b>
+  <button :disabled="!canEdit" title="重命名设计稿" @click="renameProject"><Pencil :size="13"/></button>
+  <button :disabled="!canEdit" title="创建副本" @click="copyProject"><Copy :size="13"/></button>
   <span v-if="project" class="saved">{{statusLabel(project.status)}}</span>
   <span class="saved" :class="{error:ds.error}">{{ds.busy?'保存中…':ds.error?'未保存':ds.dirty?'有未保存修改':'已保存'}}</span>
   <span class="spacer"/>
@@ -245,6 +255,7 @@ function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textar
       <button @click="copyMarkdown"><ClipboardCopy :size="12"/> 复制 Markdown</button>
     </div>
   </details>
+  <button v-if="detached" title="窗口全屏 (F11)" @click="invoke('design_window_fullscreen',{id:projectId}).catch(report)"><Maximize2 :size="14"/></button>
   <button :title="detached?'回到分屏':'独立窗口'" @click="handoff"><ExternalLink :size="14"/></button>
   <button aria-label="关闭设计画布" @click="close"><X :size="15"/></button>
 </header>
@@ -390,6 +401,7 @@ function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textar
   <span class="spacer"/>
   <span>我的文档 · {{allBoards.length}} 个画板 · {{dsCards.length}} 个组件卡片</span>
 </footer>
+<div v-if="renameOpen" class="overlay"><form class="dialog" @submit.prevent="saveTitle"><h3>重命名设计稿</h3><input v-model="projectTitle" required maxlength="120" aria-label="设计稿名称"/><div class="actions"><button type="button" @click="renameOpen=false">取消</button><button class="primary" :disabled="!canEdit||!projectTitle.trim()">保存</button></div></form></div>
 <div v-if="commentOpen" class="overlay">
   <form class="dialog" @submit.prevent="postComment">
     <h3>添加批注</h3>

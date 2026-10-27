@@ -103,4 +103,12 @@ describe('compact design workbench',()=>{
   await click('画板源代码');await w.get('.source-dialog textarea').trigger('keydown',{key:'-'});expect(w.get('.zoom').text()).toBe('100%');
  });
 
+ it('copies a project without changing the original and saves a title as a versioned edit',async()=>{
+  const w=await open();const copied={...fixture(),id:'design-000000000000000000000000'};
+  mocks.invoke.mockImplementation(async(cmd,args)=>cmd==='design_copy'?{project:copied}:cmd==='design_save'?{project:{...args.project,revision:args.expectedRevision+1},origin:'preview:'}:undefined);
+  await click('创建副本');expect(w.emitted('copied')?.[0]).toEqual([copied.id]);expect(w.text()).toContain('紧凑设计');
+  await click('重命名设计稿');await w.get('[aria-label="设计稿名称"]').setValue('新名字');await w.get('form.dialog').trigger('submit');await flushPromises();
+  expect(mocks.invoke).toHaveBeenCalledWith('design_save',expect.objectContaining({project:expect.objectContaining({id:fixture().id,title:'新名字'}),expectedRevision:1}));
+ });
+
 });

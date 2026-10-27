@@ -1140,3 +1140,12 @@ describe('durable message queues', () => {
     expect(h.calls.filter(([c])=>c==='chat_queue_update')).toHaveLength(0);h.store.dispose();
   });
 });
+
+it('keeps the design selected at submission in both direct and queued messages',async()=>{
+ const h=harness({chat_new_session:()=>summary('s1'),chat_send:()=>summary('s1'),chat_enqueue:()=>({revision:1,paused:false,reason:'',items:[]})});await h.store.init();
+ const first='design-012345678901234567890123',second='design-000000000000000000000000';
+ expect(await h.store.send('紧凑一点',[],undefined,[],first)).toBe(true);h.events('s1',{type:'done'});
+ expect(await h.store.enqueue('改首页',[],[],'queue',second)).toBe(true);
+ expect(h.calls.find(([c])=>c==='chat_send')?.[1]).toMatchObject({text:'紧凑一点',designId:first});
+ expect(h.calls.find(([c])=>c==='chat_enqueue')?.[1]).toMatchObject({text:'改首页',designId:second});h.store.dispose();
+});

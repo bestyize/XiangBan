@@ -19,7 +19,7 @@ export interface ChatDeps {
 export interface ChatStore {
   queues: Record<string, MessageQueue>;
   readonly queue: MessageQueue | null;
-  enqueue(text: string, attachments: PendingAttachment[], mentions: Mention[], mode?: 'queue' | 'steer' | 'replace'): Promise<boolean>;
+  enqueue(text: string, attachments: PendingAttachment[], mentions: Mention[], mode?: 'queue' | 'steer' | 'replace', designId?:string): Promise<boolean>;
   updateQueue(action: 'pause' | 'resume' | 'remove' | 'edit' | 'reorder' | 'send_now', id?: string, options?: { text?: string; order?: string[]; removeImages?: number[]; removeFiles?: string[] }, sessionId?: string): Promise<boolean>;
   drafts: Record<string, ComposerDraft>;
   readonly draft: ComposerDraft;
@@ -84,7 +84,7 @@ export interface ChatStore {
    * Returns false when nothing was sent, so the caller can give the text back to the user.
    * `note` goes to the model at the front of the message and is not shown (see `voice/interruption.ts`).
    */
-  send(text: string, attachments?: PendingAttachment[], note?: string, mentions?: Mention[]): Promise<boolean>;
+  send(text: string, attachments?: PendingAttachment[], note?: string, mentions?: Mention[], designId?:string): Promise<boolean>;
   /**
    * Whether this window sent the question being answered in the conversation. Both windows hear every chat event,
    * and only the one the user spoke or typed into should read the answer aloud.
@@ -352,18 +352,18 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     },
     queues: {} as Record<string, MessageQueue>,
     get queue() { return store.currentId ? store.queues[store.currentId] ?? null : null; },
-    async enqueue(text, attachments, mentions, mode = 'queue') {
+    async enqueue(text, attachments, mentions, mode = 'queue', designId) {
       const session = store.currentId;
       if (!deps.desktop || !session || queueSending.has(session)) return false;
       queueSending.add(session);
       try {
-        const payload = JSON.stringify([text, attachments, mentions, mode]);
+        const payload = JSON.stringify([text, attachments, mentions, mode, designId]);
         const uniqueId = typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
         if (queueAttempts.get(session)?.payload !== payload) queueAttempts.set(session, { payload, id: `q-${uniqueId}` });
         const requestId = queueAttempts.get(session)!.id;
         const images = attachments.filter((a): a is string => typeof a === 'string');
         const files = attachments.filter(a => typeof a !== 'string').map(({ name, dataUrl }) => ({ name, dataUrl }));
-        const queue = await deps.invoke<MessageQueue>('chat_enqueue', { sessionId: session, text, mode: mode === 'replace' ? 'queue' : mode, stopNow: mode === 'replace', requestId, images, attachments: files, mentions });
+        const queue = await deps.invoke<MessageQueue>('chat_enqueue', { sessionId: session, text, mode: mode === 'replace' ? 'queue' : mode, stopNow: mode === 'replace', requestId, images, attachments: files, mentions, ...(designId?{designId}:{}) });
         applyQueue(session, queue);
         queueAttempts.delete(session);
         sent.add(session);
@@ -493,7 +493,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       if (!viewOf(id, false).loaded) await loadView(id);
     },
 
-    async send(text, attachments = [], note = '', mentions = []) {
+    async send(text, attachments = [], note = '', mentions = [], designId) {
       const images = attachments.filter((item): item is string => typeof item === "string");
       const files = attachments.filter(item => typeof item !== "string");
       deps.onActivity?.();
@@ -546,7 +546,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       view.status = '';
       try {
         // Images are left out entirely when there are none, so a plain message keeps its old shape.
-        const args = { sessionId: id, text: note ? note + text : text, ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}), ...(mentions.length ? { mentions: mentions.map(({kind,id}) => ({kind,id})) } : {}) };
+        const args = { sessionId: id, text: note ? note + text : text, ...(designId?{designId}:{}), ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}), ...(mentions.length ? { mentions: mentions.map(({kind,id}) => ({kind,id})) } : {}) };
         sent.add(id);
         upsert(await deps.invoke<SessionSummary>('chat_send', args));
         return true;

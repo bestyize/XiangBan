@@ -256,10 +256,9 @@
       send('canvas-wheel',{dx:e.deltaX,dy:e.deltaY,deltaMode:e.deltaMode,ctrl:e.ctrlKey,meta:e.metaKey,shift:e.shiftKey,x:e.clientX,y:e.clientY});
     },{passive:false});
     for (const type of ['keydown','keyup']) document.addEventListener(type,e=>{
-      if(e.target?.closest?.('input,textarea,select,[contenteditable]'))return;
+      if(!editing||e.target?.closest?.('input,textarea,select,[contenteditable]'))return;
       if([' ','+','=','-','0','1'].includes(e.key)){e.preventDefault();send('canvas-key',{key:e.key,down:type==='keydown'});}
     });
-    addEventListener('blur',()=>send('canvas-key',{key:' ',down:false}));
     let pan=null;
     document.addEventListener('pointerdown',e=>{if(e.button===1){e.preventDefault();pan={id:e.pointerId,x:e.clientX,y:e.clientY};e.target?.setPointerCapture?.(e.pointerId);}},true);
     document.addEventListener('pointermove',e=>{if(pan&&pan.id===e.pointerId){send('canvas-pan',{dx:e.clientX-pan.x,dy:e.clientY-pan.y});pan.x=e.clientX;pan.y=e.clientY;}});

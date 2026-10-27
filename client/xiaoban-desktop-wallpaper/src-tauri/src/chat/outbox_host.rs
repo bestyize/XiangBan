@@ -114,6 +114,7 @@ pub(super) fn kick(app: &tauri::AppHandle, session: &str) {
             None,
             None,
             Some(entry),
+            None,
         )?;
         Ok(())
     })();
@@ -213,9 +214,11 @@ pub fn chat_enqueue(
     mentions: Option<Vec<mentions::Mention>>,
     request_id: String,
     stop_now: Option<bool>,
+    design_id: Option<String>,
 ) -> Result<Value, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
+    if let Some(id)=&design_id{crate::design::store(&app)?.load(id)?;}
     let state = app.state::<ChatState>();
     let _delivery = lock(&state.delivery);
     let context = binding(&app, &session_id)?;
@@ -262,7 +265,7 @@ pub fn chat_enqueue(
     let files = AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments"));
     let saved = files.import(&session_id, &inputs)?;
     let mut message = Message::user(user_parts(&text, &images));
-    message.structured_content = Some(json!({"attachments":saved}));
+    message.structured_content = Some(json!({"attachments":saved,"designId":design_id}));
     let mentions = mentions
         .unwrap_or_default()
         .into_iter()

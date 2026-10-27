@@ -30,16 +30,19 @@ import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest } fro
 
 const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
-const designs = ref<DesignSummary[]>([]), designId = ref(''), designClosed = ref(false), designWidth = ref(64);
+const designs = ref<DesignSummary[]>([]), designId = ref(''), designContextId=ref(''), designClosed = ref(false), designWidth = ref(64);
 const designPicker=ref(false);
+let designOpenEpoch=0,detachBusy=false;
 async function openDesign(id:string){
+  const epoch=++designOpenEpoch,session=chat.currentId;
   try{
-    if(await invoke<boolean>('design_window_status',{id})){await invoke('design_window_open',{id});designPicker.value=false;return;}
+    if(session)await invoke('design_link',{id,session});if(epoch!==designOpenEpoch||chat.currentId!==session)return;designContextId.value=id;
+    const detached=await invoke<boolean>('design_window_status',{id});if(epoch!==designOpenEpoch||chat.currentId!==session)return;
+    if(detached){await invoke('design_window_open',{id});designPicker.value=false;return;}
     designId.value=id;designClosed.value=false;designPicker.value=false;panelOpen.value=false;
   }catch(e){props.store.notify(e,'error');}
 }
-async function detachDesign(){const id=designId.value;try{await invoke('design_window_open',{id});if(designId.value===id)closeDesign();}catch(e){props.store.notify(e,'error');}}
-watch(()=>props.store.designOpening,id=>{if(id){designId.value=id;designClosed.value=false;props.store.designOpening='';}},{immediate:true});
+async function detachDesign(){if(detachBusy)return;detachBusy=true;const id=designId.value;try{await invoke('design_window_open',{id});if(designId.value===id)closeDesign();}catch(e){props.store.notify(e,'error');}finally{detachBusy=false;}}
 let designSplit: { x: number; width: number; value: number } | null = null;
 function startDesignSplit(event: PointerEvent) {
   if (event.button !== 0) return;
@@ -50,6 +53,7 @@ function startDesignSplit(event: PointerEvent) {
 function moveDesignSplit(event: PointerEvent) { if (designSplit) designWidth.value = Math.max(35, Math.min(85, designSplit.value + (designSplit.x - event.clientX) / designSplit.width * 100)); }
 function finishDesignSplit() { designSplit = null; }
 function designSplitKey(event: KeyboardEvent) { if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return; event.preventDefault(); designWidth.value = Math.max(35, Math.min(85, designWidth.value + (event.key === 'ArrowLeft' ? 2 : -2))); }
+let designDeleteOff:(()=>void)|undefined;
 let designOff: (() => void) | undefined, designDisposed = false;
 async function loadDesigns() {
   const id = chat.currentId;
@@ -60,21 +64,26 @@ async function loadDesigns() {
     const merged = new Map(designs.value.map(row => [row.id, row]));
     for (const row of Array.isArray(rows) ? rows : []) if (!merged.has(row.id) || merged.get(row.id)!.revision <= row.revision) merged.set(row.id, row);
     designs.value = [...merged.values()].sort((a, b) => b.updatedMs - a.updatedMs);
-    if (!designClosed.value && !designId.value) designId.value = designs.value.find(p=>!p.detached)?.id ?? '';
+    if(!designContextId.value)designContextId.value=designs.value.find(p=>p.active)?.id??designs.value[0]?.id??'';
+    if (!designClosed.value && !designId.value) {const target=designs.value.find(p=>p.id===designContextId.value);if(target&&!target.detached)designId.value=target.id;}
   } catch (e) { props.store.notify(e, 'error'); }
 }
-watch(() => chat.currentId, () => { designId.value = ''; designClosed.value = false; designs.value = []; void loadDesigns(); }, { immediate: true });
+watch(() => chat.currentId, () => { designOpenEpoch++;designId.value = '';designContextId.value=''; designClosed.value = false; designs.value = []; void loadDesigns(); }, { immediate: true });
+watch(()=>props.store.designOpening,id=>{if(id){designId.value=id;designContextId.value=id;designClosed.value=false;props.store.designOpening='';}},{immediate:true});
+
 onMounted(async () => {
   if (!props.store.desktop) return;
   const off = await listen<DesignSummary>('design-changed', row => {
     if (row.sessionId !== chat.currentId && !row.sessionIds?.includes(chat.currentId ?? '')) return;
     designs.value = [row, ...designs.value.filter(p => p.id !== row.id)];
-    if (!designClosed.value&&!row.detached) { designId.value = row.id; panelOpen.value = false; }
+    if (!designClosed.value&&!row.detached) { designId.value = row.id;designContextId.value=row.id; panelOpen.value = false; }
   });
   if (designDisposed) off(); else designOff = off;
+  const removed=await listen<{id:string}>('design-deleted',row=>{designs.value=designs.value.filter(p=>p.id!==row.id);if(designId.value===row.id)closeDesign();if(designContextId.value===row.id)designContextId.value='';});
+  if(designDisposed)removed();else designDeleteOff=removed;
 });
-onBeforeUnmount(() => { designDisposed = true; designOff?.(); });
-function closeDesign() { designId.value = ''; designClosed.value = true; }
+onBeforeUnmount(() => { designDisposed = true; designOff?.();designDeleteOff?.(); });
+function closeDesign() { designOpenEpoch++;designId.value = ''; designClosed.value = true; }
 async function designRequest(message: string) {
   if (running.value) { composer.value?.setDraft(message); props.store.notify('修改要求已放入输入框，当前任务结束后可发送', 'info'); return; }
   await chat.send(message);
@@ -516,7 +525,7 @@ async function openLink(href: string) {
       <button v-if="!stick && view?.items.length" type="button" class="to-bottom" data-testid="chat-bottom" aria-label="回到最新" @click="stick = true; toBottom()"><ArrowDown :size="16" /></button>
 
       <div class="composer-wrap">
-        <ChatComposer ref="composer" :store="store" page="chat" pet="sm" placeholder="发送消息给小伴" @sending="stick = true" @sent="toBottom" @settings="openAiSettings" @preview="preview = $event" />
+        <ChatComposer ref="composer" :design-id="designContextId||undefined" :store="store" page="chat" pet="sm" placeholder="发送消息给小伴" @sending="stick = true" @sent="toBottom" @settings="openAiSettings" @preview="preview = $event" />
         <p class="disclaimer">内容由 AI 生成，请核对重要信息</p>
       </div>
     </div>
@@ -555,7 +564,7 @@ async function openLink(href: string) {
       <button type="button" class="lightbox-close" data-testid="chat-image-preview-close" aria-label="关闭预览" @click="preview = null"><X :size="18" /></button>
     </div>
     <div v-if="designId" class="design-splitter" role="separator" tabindex="0" aria-label="调整聊天和画布宽度" aria-orientation="vertical" :aria-valuenow="Math.round(designWidth)" :aria-valuemin="35" :aria-valuemax="85" @pointerdown="startDesignSplit" @pointermove="moveDesignSplit" @pointerup="finishDesignSplit" @pointercancel="finishDesignSplit" @keydown="designSplitKey" />
-    <aside v-if="designId" :style="{ width: designWidth + '%' }" class="design-dock" aria-label="设计工作台"><DesignWorkbench :project-id="designId" :notify="store.notify" @close="closeDesign" @detach="detachDesign" @request="designRequest" /></aside>
+    <aside v-if="designId" :style="{ width: designWidth + '%' }" class="design-dock" aria-label="设计工作台"><DesignWorkbench :project-id="designId" :notify="store.notify" @close="closeDesign" @detach="detachDesign" @copied="openDesign" @request="designRequest" /></aside>
     <SelectionCopyMenu :scope="scroller" />
   </section>
 </template>

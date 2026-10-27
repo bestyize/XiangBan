@@ -23,7 +23,7 @@ async function open(responders: Record<string, Responder> = {}, options: { deskt
   const handlers = new Map<string, (payload: never) => void>();
   const calls: [string, Record<string, unknown> | undefined][] = [];
   const bridgeHandlers = new Map<string, Set<(payload: never) => void>>();
-  const table: Record<string, Responder> = { design_window_status:()=>false, design_view_read:()=>null, design_view_save:()=>null, design_list: () => [], chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
+  const table: Record<string, Responder> = { design_link:()=>({}), design_window_status:()=>false, design_view_read:()=>null, design_view_save:()=>null, design_list: () => [], chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
   // Background model/context/design reads have their own assertions; chat command order stays focused on sending and loading.
   const contextCalls: (Record<string, unknown> | undefined)[] = [];
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
@@ -1278,4 +1278,12 @@ describe('library design continuation in a new conversation', () => {
     expect(h.invoke).toHaveBeenCalledWith('design_read', { id: project.id });
     expect(wrapper!.findAll('.artboard')).toHaveLength(1);
   });
+});
+
+describe('returning a design from its independent window',()=>{
+ it('consumes the pending project after session initialization without losing it on mount',async()=>{
+  const id='design-012345678901234567890123';const project={id,title:'回到分屏',sessionId:'old',revision:1,updatedMs:1,canvas:{v:3,boards:{'Main.dc.html':{w:390,h:844}},order:['Main.dc.html']},files:{'Main.dc.html':'<x-dc>design</x-dc>'}};
+  const h=await open({design_read:()=>({project,origin:'preview:'})});wrapper!.unmount();h.store.designOpening=id;
+  wrapper=mount(ChatPage,{props:{store:h.store},attachTo:document.body});await flushPromises();expect(wrapper.findAll('.artboard')).toHaveLength(1);expect(h.store.designOpening).toBe('');
+ });
 });

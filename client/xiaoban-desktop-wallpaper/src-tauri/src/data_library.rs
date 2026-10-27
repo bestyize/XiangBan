@@ -462,8 +462,8 @@ pub fn library_update_doc(app: tauri::AppHandle, window: tauri::WebviewWindow, i
             let name = clean_name(&name)?;
             if let Some(id)=&doc.design_id {
                 let store=crate::design::store(&app)?;let mut p=store.load(id)?;let rev=p.revision;p.title=name.clone();let p=store.save(p,rev)?;doc.name=name;doc.imported_ms=p.updated_ms;
-                doc.preview=format!("{} 个画板 · 版本 {}",open_claude_design::boards(&p.canvas)?.len(),p.revision);
-                let _=app.emit_to("control","design-changed",open_claude_design::summary(&p));
+                doc.preview=design_preview(&p);
+                let _=app.emit("design-changed",open_claude_design::summary(&p));
             } else {
             // The copy keeps its extension, so it still opens with the same app.
             let name = if ext_of(&name) == doc.ext || doc.ext.is_empty() { name } else { format!("{name}.{}", doc.ext) };
@@ -488,7 +488,7 @@ pub fn library_remove(app: tauri::AppHandle, window: tauri::WebviewWindow, ids: 
     control_only(&window)?;
     change(&app, |library, root| {
         for doc in library.docs.iter().filter(|d| ids.contains(&d.id)) {
-            if let Some(id)=&doc.design_id { crate::design::store(&app)?.remove(id)?; }
+            if let Some(id)=&doc.design_id { crate::design::store(&app)?.remove(id)?;let _=app.emit("design-deleted",serde_json::json!({"id":id})); }
             else { let _ = fs::remove_dir_all(root.join("files").join(&doc.id)); }
         }
         library.docs.retain(|d| !ids.contains(&d.id));
@@ -646,15 +646,18 @@ mod tests {
 /// Project source is durable before this index. Startup reconciliation repairs an interrupted update.
 pub fn upsert_design(app:&tauri::AppHandle, project:&open_claude_design::Project)->Result<(),String>{
     let p=crate::design::store(app)?.load(&project.id)?;
-    let preview=format!("{} 个画板 · 版本 {}",open_claude_design::boards(&p.canvas)?.len(),p.revision);
+    let preview=design_preview(&p);
     if load(&root(app)?).docs.iter().any(|d|d.design_id.as_deref()==Some(&p.id)&&d.name==p.title&&d.imported_ms==p.updated_ms&&d.preview==preview){return Ok(());}
     change(app,|library,_|{
         let p=crate::design::store(app)?.load(&project.id)?;
-        let count=open_claude_design::boards(&p.canvas)?.len();
         let bytes=serde_json::to_vec(&p).map_err(|e|e.to_string())?.len() as u64;
         if let Some(doc)=library.docs.iter_mut().find(|d|d.design_id.as_deref()==Some(&p.id)){
-            doc.name=p.title.clone();doc.size=bytes;doc.imported_ms=p.updated_ms;doc.preview=format!("{count} 个画板 · 版本 {}",p.revision);
-        }else{library.docs.push(Doc{id:p.id.clone(),name:p.title.clone(),folder:None,ext:"design".into(),size:bytes,imported_ms:p.updated_ms,origin:String::new(),status:"ready".into(),note:String::new(),preview:format!("{count} 个画板 · 版本 {}",p.revision),tags:vec!["设计稿".into()],design_id:Some(p.id.clone())});}
+            doc.name=p.title.clone();doc.size=bytes;doc.imported_ms=p.updated_ms;doc.preview=design_preview(&p);
+        }else{library.docs.push(Doc{id:p.id.clone(),name:p.title.clone(),folder:None,ext:"design".into(),size:bytes,imported_ms:p.updated_ms,origin:String::new(),status:"ready".into(),note:String::new(),preview:design_preview(&p),tags:vec!["设计稿".into()],design_id:Some(p.id.clone())});}
         Ok(())
     }).map(|_|())
 }
+
+pub(crate) fn forget_design(app:&tauri::AppHandle,id:&str)->Result<(),String>{change(app,|library,_|{library.docs.retain(|doc|doc.design_id.as_deref()!=Some(id));Ok(())}).map(|_|())}
+
+fn design_preview(p:&open_claude_design::Project)->String{let status=match p.status{open_claude_design::ProjectStatus::Draft=>"草稿",open_claude_design::ProjectStatus::Generating=>"生成中",open_claude_design::ProjectStatus::Ready=>"已完成",open_claude_design::ProjectStatus::Failed=>"待恢复"};format!("{status} · {} 个画板 · 版本 {}",open_claude_design::boards(&p.canvas).map(|b|b.len()).unwrap_or(0),p.revision)}

@@ -633,6 +633,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         open_computer_use_error: computer_use_error.as_deref(),
     };
 
+    let design_remove_desktop=desktop.clone();
     let design_store = open_claude_design::Store::new(dirs.chat.parent().ok_or("缺少数据目录")?.join("data-library/files"));
     let design_desktop = desktop.clone();
     let mut builder = Agent::builder(provider.clone(), Arc::new(AttachmentHistory::new(CompactingStore::new(JsonlStore::new(dirs.sessions())), attachments.clone())))
@@ -647,7 +648,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
             let workspace = workspace.to_path_buf();
             move || project_rules::section(&workspace)
         })
-        .tool(open_claude_design::DesignTool::new(design_store.clone(), move |project| design_desktop.design_saved(project)))
+        .tool(open_claude_design::DesignTool::new(design_store.clone(), move |project| design_desktop.design_saved(project)).on_remove(move|id|design_remove_desktop.design_removed(id)))
         .middleware(open_claude_design::DesignContext(design_store))
         .tool(TimeNow::new().utc_offset_minutes(utc_offset_minutes))
         .middleware(todo.clone())
@@ -1240,8 +1241,9 @@ fn bind_expert(plugins: &Path, pick: &ExpertPick) -> Result<sessions::ExpertBind
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>, design_id:Option<String>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
+    if let Some(id)=&design_id{crate::design::store(&app)?.load(id)?;}
     // The existing Continue button must resume the saved goal and its cumulative
     // budget, rather than silently starting a fresh ordinary-chat budget.
     if matches!(text.trim(), "请接着上面的内容继续写完。" | "继续" | "继续目标" | "继续任务" | "继续执行" | "接着做") && retry != Some(true)
@@ -1262,17 +1264,17 @@ pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id
         let state = app.state::<ChatState>();
         if mentions.is_empty() { lock(&state.mentions).remove(&session_id); } else { lock(&state.mentions).insert(session_id.clone(), mentions); }
     }
-    send_prepared(app.clone(), session_id, text, images, retry, attachments, None)
+    send_prepared(app.clone(), session_id, text, images, retry, attachments, None, design_id)
 }
 
 /// Starts an answer. The command above checks who is asking; the host's own callers (long-term goals) come here.
 pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
     let state = app.state::<ChatState>();
     let _delivery = lock(&state.delivery);
-    send_prepared(app.clone(), session_id, text, images, retry, attachments, None)
+    send_prepared(app.clone(), session_id, text, images, retry, attachments, None, None)
 }
 
-fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, queued: Option<outbox::Entry>) -> Result<SessionSummary, String> {
+fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, queued: Option<outbox::Entry>,design_id:Option<String>) -> Result<SessionSummary, String> {
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
@@ -1381,7 +1383,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
         Err(error) => { lock(&state.runs).remove(&session_id); lock(&state.leases).remove(&session_id); return Err(error); }
     };
     let saved_for_thread = saved.clone();
-    let input_metadata = queued.as_ref().and_then(|entry|entry.message.structured_content.clone()).or_else(||Some(json!({"attachments":saved})));
+    let input_metadata = queued.as_ref().and_then(|entry|entry.message.structured_content.clone()).or_else(||Some(json!({"attachments":saved,"designId":design_id})));
     if let Err(error) = outbox_host::open(&app, &session_id) {
         lock(&state.runs).remove(&session_id); lock(&state.leases).remove(&session_id);
         if queued.is_none() { attachment_store.rollback(&saved); }

@@ -1,7 +1,7 @@
 //! Trusted project-scoped design windows; previews retain their opaque sandbox origin.
 use serde::{Deserialize,Serialize};
 use serde_json::{json,Value};
-use std::{fs,sync::{Arc,Mutex}};
+use std::{sync::{Arc,Mutex}};
 use tauri::{Emitter,Manager,WebviewUrl,WebviewWindowBuilder};
 
 pub fn label(id:&str)->String { format!("design-window-{}",id.strip_prefix("design-").unwrap_or("invalid")) }
@@ -15,11 +15,12 @@ pub fn guard(window:&tauri::WebviewWindow,id:&str)->Result<(),String>{
 }
 pub fn permitted(label:&str,command:&str)->Option<bool>{
     if command.starts_with("design_"){return Some(label=="control"||project_id(label).is_some()&&[
-        "design_read","design_save","design_view_read","design_view_save","design_draft_save","design_draft_clear","design_history","design_restore","design_export","design_copy","design_window_return","design_window_close","design_window_request"
+        "design_read","design_save","design_view_read","design_view_save","design_draft_save","design_draft_clear","design_history","design_restore","design_export","design_copy","design_window_return","design_window_close","design_window_request","design_window_fullscreen"
     ].contains(&command))}
     if project_id(label).is_some(){return Some(false)}
     None
 }
+static OPEN_LOCK:Mutex<()>=Mutex::new(());
 #[derive(Clone,Default,Serialize,Deserialize)]
 struct Placement { x:i32,y:i32,w:u32,h:u32,maximized:bool }
 #[tauri::command]
@@ -28,10 +29,10 @@ pub fn design_window_status(app:tauri::AppHandle,window:tauri::WebviewWindow,id:
 }
 #[tauri::command]
 pub async fn design_window_open(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<(),String>{
+    let _open=OPEN_LOCK.lock().map_err(|_|"设计窗口锁不可用")?;
     guard(&window,&id)?;let store=crate::design::store(&app)?;let project=store.load(&id)?;let name=label(&id);
     if let Some(existing)=app.get_webview_window(&name){let _=existing.unminimize();existing.show().map_err(|e|e.to_string())?;return existing.set_focus().map_err(|e|e.to_string())}
-    let path=store.dir(&id)?.join("window.json");
-    let placement=fs::read(&path).ok().filter(|b|b.len()<4096).and_then(|b|serde_json::from_slice::<Placement>(&b).ok()).unwrap_or_default();
+    let placement=store.read_view(&id,"window.json").ok().flatten().and_then(|v|serde_json::from_value::<Placement>(v).ok()).unwrap_or_default();
     let mut builder=WebviewWindowBuilder::new(&app,&name,WebviewUrl::App(format!("index.html?scene=design&id={id}").into()))
         .title(format!("{} · 小伴设计",project.title)).inner_size(1280.,840.).min_inner_size(640.,480.).resizable(true).decorations(true);
     let monitor=app.available_monitors().map_err(|e|e.to_string())?.into_iter().find(|m|{
@@ -50,7 +51,7 @@ pub async fn design_window_open(app:tauri::AppHandle,window:tauri::WebviewWindow
             }
             if matches!(event,tauri::WindowEvent::CloseRequested{..}){
                 state.maximized=own.is_maximized().unwrap_or(false);
-                if let Ok(bytes)=serde_json::to_vec(&*state){let _=fs::write(&path,bytes);}
+                if let Ok(value)=serde_json::to_value(&*state){let _=store.save_view(&id,"window.json",&value);}
             }
         }
         if matches!(event,tauri::WindowEvent::Destroyed){let _=own.app_handle().emit_to("control","design-window-closed",json!({"id":id}));}
@@ -76,3 +77,8 @@ pub fn design_window_request(app:tauri::AppHandle,window:tauri::WebviewWindow,id
     app.emit_to("control","design-request",json!({"id":id,"session":session,"message":message})).map_err(|e|e.to_string())?;Ok(json!({"sent":true}))
 }
 #[cfg(test)]mod tests{use super::*;#[test]fn labels_cannot_expand_project_permissions(){assert_eq!(project_id("design-window-012345678901234567890123").as_deref(),Some("design-012345678901234567890123"));assert!(project_id("design-window-../../private").is_none());assert_eq!(permitted("design-window-012345678901234567890123","chat_send"),Some(false));assert_eq!(permitted("wallpaper","design_read"),Some(false));}}
+
+#[tauri::command]
+pub fn design_window_fullscreen(window:tauri::WebviewWindow,id:String)->Result<(),String>{
+    if project_id(window.label()).as_deref()!=Some(id.as_str()){return Err("只能操作当前设计窗口".into())}window.set_fullscreen(!window.is_fullscreen().map_err(|e|e.to_string())?).map_err(|e|e.to_string())
+}

@@ -32,6 +32,7 @@ import { MAX_SKILLS, dropSlash, filterSkills, slashToken, withSkills, type Slash
 
 const props = withDefaults(defineProps<{
   store: ControlStore;
+  designId?:string;
   /** The page this box lives on; voice input and incoming drafts only act while it is the page shown. */
   page: Extract<ControlPage, 'chat' | 'new-task'>;
   /** Show the working-folder menu in the tool row (the new-task page). */
@@ -189,8 +190,8 @@ async function submit(mode: 'queue' | 'steer' | 'replace' = 'queue') {
   emit('sending');
   const message = withSkills(text, chosen.map(s => s.name));
   const sent = chat.currentId
-    ? await chat.enqueue(message, images, references.map(({ kind, id }) => ({ kind, id })), mode)
-    : await chat.send(message, images, undefined, references.map(({ kind, id }) => ({ kind, id })));
+    ? await chat.enqueue(message, images, references.map(({ kind, id }) => ({ kind, id })), mode, props.designId)
+    : await chat.send(message, images, undefined, references.map(({ kind, id }) => ({ kind, id })), props.designId);
   if (!sent) {
     // Keep both the refused message and anything typed while the host was responding.
     owner.text = [text, owner.text].filter(Boolean).join('\n\n');

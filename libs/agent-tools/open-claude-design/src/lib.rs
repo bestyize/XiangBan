@@ -1,5 +1,5 @@
 //! Local design authoring. No account, external CLI or model-specific dependency.
-use agent_kernel::{HarnessError, Message, Middleware, Risk, Role, Tool, ToolCtx, ToolResult, ToolSpec, Turn};
+use agent_kernel::{HarnessError, Message, Middleware, Risk, Role, Tool, ToolCtx, ToolResult, ToolSpec, Turn, Stop, StopDecision, Nudge, FinishReason};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{collections::BTreeMap, fs, path::{Component, Path, PathBuf}, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
@@ -129,6 +129,27 @@ pub fn validate(project: &Project) -> Result<(), String> {
     Ok(())
 }
 
+/// Agent canvas updates are patches: omitted boards and unknown metadata survive.
+fn merge_canvas(target:&mut Value,patch:&Value){
+    fn merge(target:&mut Value,patch:&Value){
+        if let (Some(old),Some(new))=(target.as_object_mut(),patch.as_object()){
+            for(key,value)in new{if let Some(slot)=old.get_mut(key){merge(slot,value)}else{old.insert(key.clone(),value.clone());}}
+        }else{*target=patch.clone();}
+    }
+    let previous=boards(target).unwrap_or_default();merge(target,patch);
+    if target["boards"].is_object(){
+        for(file,board)in previous{
+            if target["boards"].get(&file).is_none(){target["boards"][&file]=board;}
+            if let Some(order)=target["order"].as_array_mut(){if !order.iter().any(|v|v==&file){order.push(json!(file));}}
+        }
+    }else if let Some(items)=target["artboards"].as_array_mut(){
+        for(file,mut board)in previous{
+            if let Some(current)=items.iter_mut().find(|b|b["file"].as_str()==Some(file.as_str())){merge(&mut board,current);*current=board;}
+            else{items.push(board);}
+        }
+    }
+}
+
 impl Store {
     pub fn new(root: impl Into<PathBuf>) -> Self { Self { root: root.into() } }
     pub fn dir(&self, id: &str) -> Result<PathBuf, String> {
@@ -173,13 +194,47 @@ impl Store {
         if p.session_id!=session&&!p.session_ids.iter().any(|id|id==session) {
             p.session_ids.push(session.into()); let rev=p.revision; p=self.save(p,rev)?;
         }
-        Ok(p)
+        self.set_active(session,id)?;Ok(p)
     }
     pub fn copy(&self, id: &str, session: &str, title: Option<&str>) -> Result<Project,String> {
         let mut p=self.load(id)?; p.id=format!("design-{}",nonce()?); p.revision=0; p.updated_ms=0;
         p.session_id=session.into(); p.session_ids.clear(); p.request_id.clear();
         p.title=title.map(str::to_string).unwrap_or_else(||format!("{} 副本",p.title.chars().take(116).collect::<String>()));
         self.save(p,0)
+    }
+    /// Small UI metadata is separate from design revisions and cannot follow symlinks.
+    pub fn read_view(&self,id:&str,name:&str)->Result<Option<Value>,String>{
+        if !["view.json","window.json"].contains(&name){return Err("无效的视图记录".into())}
+        self.load(id)?;let path=self.dir(id)?.join(name);
+        if fs::symlink_metadata(&path).is_ok_and(|m|m.file_type().is_symlink()||m.len()>4096){return Err("视图记录无效".into())}
+        Ok(fs::read(path).ok().and_then(|b|serde_json::from_slice(&b).ok()))
+    }
+    pub fn save_view(&self,id:&str,name:&str,value:&Value)->Result<(),String>{
+        let _lock=STORAGE_LOCK.lock().map_err(|_|"设计存储锁不可用")?;
+        if !["view.json","window.json"].contains(&name){return Err("无效的视图记录".into())}
+        self.load(id)?;let bytes=serde_json::to_vec(value).map_err(|e|e.to_string())?;
+        if bytes.len()>4096||!value.is_object(){return Err("视图记录无效".into())}
+        let dir=self.dir(id)?;let temp=dir.join(format!("{}.tmp",nonce()?));
+        fs::write(&temp,bytes).map_err(|e|e.to_string())?;fs::rename(&temp,dir.join(name)).map_err(|e|e.to_string())
+    }
+    pub fn active(&self,session:&str)->Option<String>{
+        let path=self.root.join("active.json");
+        if fs::symlink_metadata(&path).is_ok_and(|m|m.file_type().is_symlink()||m.len()>65536){return None}
+        let map:BTreeMap<String,String>=serde_json::from_slice(&fs::read(path).ok()?).ok()?;
+        let id=map.get(session)?;self.load(id).ok()?;Some(id.clone())
+    }
+    fn set_active(&self,session:&str,id:&str)->Result<(),String>{
+        let _lock=STORAGE_LOCK.lock().map_err(|_|"设计存储锁不可用")?;
+        if session.is_empty()||session.len()>200{return Err("会话无效".into())}self.load(id)?;
+        let path=self.root.join("active.json");
+        let mut map:BTreeMap<String,String>=if fs::symlink_metadata(&path).is_ok_and(|m|!m.file_type().is_symlink()&&m.len()<=65536){fs::read(&path).ok().and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or_default()}else{BTreeMap::new()};
+        while map.len()>=256{if let Some(key)=map.keys().find(|key|key.as_str()!=session).cloned(){map.remove(&key);}else{break}}
+        map.insert(session.into(),id.into());let temp=self.root.join(format!("{}.tmp",nonce()?));
+        fs::write(&temp,serde_json::to_vec(&map).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;fs::rename(temp,path).map_err(|e|e.to_string())
+    }
+    pub fn remove_checked(&self,id:&str,expected:u64)->Result<(),String>{
+        let _lock=STORAGE_LOCK.lock().map_err(|_|"设计存储锁不可用")?;let p=self.load(id)?;
+        if p.revision!=expected{return Err("设计稿已更新，重新读取后再删除".into())}fs::remove_dir_all(self.dir(id)?).map_err(|e|e.to_string())
     }
     /// Compare-and-swap the whole bundle; source, index and comments change together.
     pub fn save(&self, mut project: Project, expected: u64) -> Result<Project, String> {
@@ -214,7 +269,7 @@ impl Store {
     /// Failed UI edits remain recoverable without changing the canonical revision.
     pub fn save_draft(&self, project: &Project) -> Result<(), String> {
         let _lock=STORAGE_LOCK.lock().map_err(|_|"设计存储锁不可用")?;
-        self.load(&project.id)?;validate(project)?;
+        self.load(&project.id)?;let mut check=project.clone();check.status=ProjectStatus::Draft;validate(&check)?;
         let dir=self.dir(&project.id)?;let temp=dir.join(format!("{}.tmp",nonce()?));
         fs::write(&temp,serde_json::to_vec(project).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
         fs::rename(&temp,dir.join("draft.json")).map_err(|e|e.to_string())
@@ -225,7 +280,7 @@ impl Store {
         let meta=fs::symlink_metadata(&path).map_err(|e|e.to_string())?;
         if meta.file_type().is_symlink()||meta.len()>MAX_PROJECT as u64{return Err("恢复草稿无效或过大".into())}
         let p:Project=serde_json::from_slice(&fs::read(path).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
-        if p.id!=id{return Err("草稿编号不匹配".into())}validate(&p)?;Ok(Some(p))
+        if p.id!=id{return Err("草稿编号不匹配".into())}let mut check=p.clone();check.status=ProjectStatus::Draft;validate(&check)?;Ok(Some(p))
     }
     pub fn clear_draft(&self, expected: &Project) -> Result<(), String> {
         let _lock=STORAGE_LOCK.lock().map_err(|_|"设计存储锁不可用")?;
@@ -253,18 +308,19 @@ impl Store {
 }
 
 type Saved = dyn Fn(&Project) -> Result<(), String> + Send + Sync;
-pub struct DesignTool { spec: ToolSpec, store: Store, saved: Arc<Saved> }
+pub struct DesignTool { spec: ToolSpec, store: Store, saved: Arc<Saved>, removed:Arc<dyn Fn(&str)->Result<(),String>+Send+Sync> }
 static CREATE_LOCK: Mutex<()> = Mutex::new(());
 impl DesignTool {
     pub fn new(store: Store, saved: impl Fn(&Project) -> Result<(), String> + Send + Sync + 'static) -> Self {
         Self { spec: ToolSpec::new(NAME,
-            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax. create allocates a durable id even with missing boards (draft). save merges changed files with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list defaults to all projects; scope=session restricts it. query searches title, exact id or request_id; since_ms/before_ms filter updated time (epoch milliseconds). open links the same project; copy creates an independent project. Does not publish or install anything.",
+            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax. create allocates a durable id even with missing boards (draft). save merges changed files and canvas fields, preserving omitted boards and metadata (remove_boards explicitly removes boards), with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list defaults to all projects; scope=session restricts it. query searches title, exact id or request_id; since_ms/before_ms filter updated time (epoch milliseconds). open links the same project; copy creates an independent project. Does not publish or install anything.",
             json!({"type":"object","properties":{
-                "action":{"type":"string","enum":["format","list","read","manifest","create","save","complete","open","copy"]},
+                "action":{"type":"string","enum":["format","list","read","manifest","create","save","complete","open","copy","delete"]},
                 "scope":{"type":"string","enum":["all","session"]},"query":{"type":"string"},"since_ms":{"type":"integer","minimum":0},"before_ms":{"type":"integer","minimum":0},"status":{"type":"string","enum":["draft","generating","ready","failed"]},"id":{"type":"string"},"title":{"type":"string"},"expected_revision":{"type":"integer","minimum":1},
-                "canvas":{"type":"object"},"files":{"type":"object","additionalProperties":{"type":"string"}},"file":{"type":"string"},"request_id":{"type":"string"}
-            },"required":["action"],"additionalProperties":false})).risk(Risk::Write).max_output(64_000), store, saved: Arc::new(saved) }
+                "remove_boards":{"type":"array","items":{"type":"string"}},"canvas":{"type":"object"},"files":{"type":"object","additionalProperties":{"type":"string"}},"file":{"type":"string"},"request_id":{"type":"string"}
+            },"required":["action"],"additionalProperties":false})).risk(Risk::Write).max_output(64_000), store, saved: Arc::new(saved),removed:Arc::new(|_|Ok(())) }
     }
+    pub fn on_remove(mut self,removed:impl Fn(&str)->Result<(),String>+Send+Sync+'static)->Self{self.removed=Arc::new(removed);self}
     fn call(&self, args: Value, ctx: &ToolCtx) -> Result<Value, String> {
         if ctx.is_cancelled() { return Err("已取消".into()); }
         let get_id = || args["id"].as_str().ok_or("缺少 id");
@@ -280,6 +336,10 @@ impl DesignTool {
                     p.session_id=ctx.session().into();p.session_ids.clear();p.request_id=key.into();self.store.save(p,0)?
                 };
                 (self.saved)(&p)?;Ok(json!({"project":summary(&p)}))
+            }
+            "delete" => {
+                let id=get_id()?;self.store.remove_checked(id,args["expected_revision"].as_u64().ok_or("删除必须传入最新 expected_revision")?)?;
+                (self.removed)(id)?;Ok(json!({"deleted":id}))
             }
             "manifest" => {
                 let p = self.store.load(get_id()?)?;
@@ -304,13 +364,15 @@ impl DesignTool {
                 } else {
                     let mut p = self.store.load(get_id()?)?;
                     if let Some(title) = args["title"].as_str() { p.title = title.into(); }
-                    if let Some(canvas) = args.get("canvas") { p.canvas = canvas.clone(); }
+                    if let Some(canvas) = args.get("canvas") { merge_canvas(&mut p.canvas,canvas); }
+                    if let Some(remove)=args["remove_boards"].as_array(){for name in remove{let name=name.as_str().ok_or("remove_boards 必须是文件名数组")?;if let Some(map)=p.canvas["boards"].as_object_mut(){map.remove(name);}if let Some(order)=p.canvas["order"].as_array_mut(){order.retain(|v|v!=name);}if let Some(items)=p.canvas["artboards"].as_array_mut(){items.retain(|b|b["file"]!=name);}}}
                     p.files.extend(files);
                     p.status = if action == "complete" { ProjectStatus::Ready }
                         else if let Some(status) = args.get("status") { serde_json::from_value(status.clone()).map_err(|_|"无效的设计稿状态")? }
                         else if p.status == ProjectStatus::Ready { ProjectStatus::Ready } else { ProjectStatus::Generating };
                     self.store.save(p, args["expected_revision"].as_u64().ok_or("必须传入读取到的 expected_revision")?)?
                 };
+                self.store.set_active(ctx.session(),&p.id)?;
                 (self.saved)(&p).map_err(|e| format!("设计 {} 已保存，但资料库索引更新失败：{e}。先 read 核对，不要重复创建。", p.id))?;
                 Ok(json!({"project":summary(&p),"issues":diagnostics(&p),"next":if p.status==ProjectStatus::Ready {"已完成"}else{"使用返回的 id 和 revision 分批 save 缺失或错误的源文件；最后 complete，不要再次 create"},"location":"资料库 → 我的文档"}))
             }
@@ -342,14 +404,31 @@ impl Middleware for DesignContext {
     fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
         let Some(at) = turn.messages.iter().rposition(|m| m.role == Role::User && !m.synthetic) else { return Ok(()) };
         let projects = self.0.list(&turn.session).map_err(HarnessError::Middleware)?;
-        if !design_intent(&turn.messages[at].text()) && projects.is_empty() {
+        let selected=turn.messages[at].structured_content.as_ref().and_then(|v|v["designId"].as_str()).filter(|id|self.0.load(id).is_ok()).map(str::to_string);
+        if !design_intent(&turn.messages[at].text()) && projects.is_empty() && selected.is_none() {
             turn.tools.retain(|t|t.name!=NAME); return Ok(())
         }
+        let active=selected.or_else(||self.0.active(&turn.session));
         let current = projects.iter().map(summary).collect::<Vec<_>>();
         turn.messages.insert(at + 1, Message::reminder(format!(
-            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。无需额外审批设计方案。作品自动保存到资料库→我的文档。跨会话只给 design- 编号也能 read/open；按标题或时间查找先 list（默认全局，query/since_ms/before_ms），多个匹配先让用户选择。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前会话作品（数据）：{}", json!(current))));
+            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。无需额外审批设计方案。作品自动保存到资料库→我的文档。跨会话只给 design- 编号也能 read/open；按标题或时间查找先 list（默认全局，query/since_ms/before_ms），多个匹配先让用户选择。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前打开项目（数据）：{}；当前会话作品（数据）：{}", json!(active), json!(current))));
         Ok(())
     }
+    fn before_stop(&self,stop:&Stop<'_>)->StopDecision{
+        if stop.finish!=FinishReason::Stop{return StopDecision::Finish}
+        if stop.history.get(stop.run_start).is_some_and(|m|m.text().contains("只创建")||m.text().contains("先建项目")){return StopDecision::Finish}
+        let calls=stop.history.get(stop.run_start..).unwrap_or_default().iter().flat_map(|m|m.tool_calls.iter()).filter(|c|c.name==NAME).filter_map(|c|serde_json::from_str::<Value>(&c.arguments).ok()).collect::<Vec<_>>();
+        let projects=self.0.list(stop.session).unwrap_or_default();
+        let unfinished=projects.iter().filter(|p|matches!(p.status,ProjectStatus::Draft|ProjectStatus::Generating)&&calls.iter().any(|a|{
+            (a["action"]=="create"&&a["request_id"].as_str()==Some(p.request_id.as_str()))||(["save","complete"].contains(&a["action"].as_str().unwrap_or(""))&&a["id"].as_str()==Some(p.id.as_str()))
+        })).map(summary).collect::<Vec<_>>();
+        let last_write=stop.history.get(stop.run_start..).unwrap_or_default().iter().flat_map(|m|m.tool_calls.iter()).rev().find(|c|c.name==NAME&&serde_json::from_str::<Value>(&c.arguments).is_ok_and(|a|["create","save","complete"].contains(&a["action"].as_str().unwrap_or(""))));
+        let write_failed=last_write.is_some_and(|c|stop.history.iter().any(|m|m.tool_call_id.as_deref()==Some(c.id.as_str())&&m.is_error));
+        if unfinished.is_empty()&&!write_failed{return StopDecision::Finish}
+        if stop.continuations>=4||stop.continuations_without_progress>=2{return StopDecision::Pause("design_incomplete_saved".into())}
+        StopDecision::Continue(Nudge{reason:"design_incomplete".into(),message:format!("本轮写入的设计稿还未完成，草稿已保存：{}。先 read 最新版本，逐页 save 补齐全部 issues，再 complete；只有 ready 才能交付。若用户只要求草稿、或确实受阻，save status=failed 保留现场并如实说明。",json!(unfinished))})
+    }
+
 }
 
 #[cfg(test)]
@@ -456,6 +535,36 @@ mod tests {
         assert_eq!(tool.call(json!({"action":"copy","id":p.id,"request_id":"copy-once"}),&ctx).unwrap(),copied);
         let copy=store.load(copied["project"]["id"].as_str().unwrap()).unwrap();assert_eq!(copy.files,p.files);assert!(copy.session_ids.is_empty());
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test] fn incomplete_delivery_continues_only_a_project_written_in_this_run_and_is_bounded(){
+        let(store,root)=fixture();let tool=DesignTool::new(store.clone(),|_|Ok(()));let ctx=ToolCtx::detached("s");
+        let args=json!({"action":"create","title":"draft","request_id":"unfinished","canvas":canvas()});
+        let result=tool.call(args.clone(),&ctx).unwrap();let id=result["project"]["id"].as_str().unwrap();
+        let history=vec![Message::user_text("设计一个应用"),Message::assistant("",vec![agent_kernel::ToolCall{id:"call".into(),name:NAME.into(),arguments:args.to_string()}]),Message::assistant("完成了",vec![])];
+        let mid=DesignContext(store.clone());let mut stop=Stop{session:"s",history:&history,run_start:0,finish:FinishReason::Stop,continuations:0,continuations_without_progress:0};
+        assert!(matches!(mid.before_stop(&stop),StopDecision::Continue(_)));stop.continuations=4;assert!(matches!(mid.before_stop(&stop),StopDecision::Pause(_)));
+        let inspect=vec![Message::user_text("看看设计稿")];stop.history=&inspect;stop.continuations=0;assert_eq!(mid.before_stop(&stop),StopDecision::Finish);
+        tool.call(json!({"action":"save","id":id,"expected_revision":1,"status":"failed"}),&ctx).unwrap();stop.history=&history;assert_eq!(mid.before_stop(&stop),StopDecision::Finish);fs::remove_dir_all(root).unwrap();
+    }
+    #[test] fn view_metadata_and_active_projects_survive_without_changing_revisions(){
+        let(store,root)=fixture();let first=store.create("first".into(),"old",canvas(),files()).unwrap();let second=store.copy(&first.id,"old",Some("second")).unwrap();
+        store.link(&first.id,"new").unwrap();store.link(&second.id,"new").unwrap();assert_eq!(Store::new(&root).active("new").as_deref(),Some(second.id.as_str()));
+        let rev=store.load(&first.id).unwrap().revision;store.save_view(&first.id,"view.json",&json!({"scale":1.5,"left":321})).unwrap();assert_eq!(store.load(&first.id).unwrap().revision,rev);assert_eq!(store.read_view(&first.id,"view.json").unwrap().unwrap()["left"],321);assert!(store.save_view(&first.id,"../private",&json!({})).is_err());
+        let mut message=Message::user_text("首页更紧凑");message.structured_content=Some(json!({"designId":first.id}));let mut turn=Turn{session:"new".into(),index:0,messages:vec![message],tools:vec![]};DesignContext(store.clone()).before_model(&mut turn).unwrap();
+        assert!(turn.messages[1].text().contains(&format!("当前打开项目（数据）：\"{}\"",first.id)));
+        assert!(store.remove_checked(&first.id,rev-1).is_err());store.remove_checked(&first.id,rev).unwrap();assert_eq!(store.list("*").unwrap().len(),1);assert_eq!(store.load(&second.id).unwrap().files,second.files);fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test] fn canvas_patch_keeps_other_boards_and_unknown_fields(){
+        let mut c=canvas();c["boards"]["More.dc.html"]=json!({"w":200,"h":300,"unknown":"keep"});c["order"].as_array_mut().unwrap().push(json!("More.dc.html"));
+        merge_canvas(&mut c,&json!({"boards":{"Main.dc.html":{"title":"changed"}},"order":["Main.dc.html"]}));
+        assert_eq!(boards(&c).unwrap().len(),2);assert_eq!(c["boards"]["Main.dc.html"]["w"],390);assert_eq!(c["unknown"]["keep"],true);assert_eq!(c["boards"]["More.dc.html"]["unknown"],"keep");
+    }
+
+    #[test] fn an_invalid_edit_remains_recoverable_without_weakening_canonical_validation(){
+        let(store,root)=fixture();let saved=store.create("demo".into(),"s",canvas(),files()).unwrap();let mut draft=saved.clone();draft.files.clear();
+        assert!(validate(&draft).is_err());store.save_draft(&draft).unwrap();assert_eq!(store.draft(&saved.id).unwrap(),Some(draft));assert_eq!(store.load(&saved.id).unwrap().files,saved.files);fs::remove_dir_all(root).unwrap();
     }
 
 }

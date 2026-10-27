@@ -170,7 +170,7 @@ async function detachDesign(){try{await invoke('design_window_open',{id:designId
         <div class="lib-form-actions"><NButton :disabled="creatingBusy" @click="creating = null">取消</NButton><NButton type="primary" attr-type="submit" :loading="creatingBusy" :disabled="creatingBusy || !createText.trim() || (creating === 'doc' && !createTitle.trim())" data-testid="library-create-save">{{ creating === 'doc' ? '创建文档' : '添加收藏' }}</NButton></div>
       </form>
     </NModal>
-    <NModal :show="!!designId" :mask-closable="false" :close-on-esc="false"><div class="library-design-modal"><DesignWorkbench :project-id="designId" :notify="notify" @close="designId = ''" @detach="detachDesign" @request="designRequest" /></div></NModal>
+    <NModal :show="!!designId" :mask-closable="false" :close-on-esc="false"><div class="library-design-modal"><DesignWorkbench :project-id="designId" :notify="notify" @close="designId = ''" @detach="detachDesign" @copied="designId=$event" @request="designRequest" /></div></NModal>
   </section>
 </template>
 

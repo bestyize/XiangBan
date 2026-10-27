@@ -13,7 +13,7 @@ pub fn saved(app:&tauri::AppHandle,p:&Project)->Result<(),String>{
 }
 fn payload(p:Project)->Value{json!({"project":p,"origin":if cfg!(windows){"http://design-preview.localhost"}else{"design-preview://localhost"}})}
 #[tauri::command]
-pub fn design_list(app:tauri::AppHandle,window:tauri::WebviewWindow,session:String,query:Option<String>)->Result<Vec<Value>,String>{guard(&window)?;Ok(store(&app)?.search(&session,query.as_deref().unwrap_or(""),None,None)?.iter().map(|p|{let mut row=open_claude_design::summary(p);row["detached"]=json!(app.get_webview_window(&crate::design_window::label(&p.id)).is_some());row}).collect())}
+pub fn design_list(app:tauri::AppHandle,window:tauri::WebviewWindow,session:String,query:Option<String>)->Result<Vec<Value>,String>{guard(&window)?;let s=store(&app)?;let active=s.active(&session);Ok(s.search(&session,query.as_deref().unwrap_or(""),None,None)?.iter().map(|p|{let mut row=open_claude_design::summary(p);row["active"]=json!(active.as_deref()==Some(p.id.as_str()));row["detached"]=json!(app.get_webview_window(&crate::design_window::label(&p.id)).is_some());row}).collect())}
 #[tauri::command]
 pub fn design_link(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,session:String)->Result<Value,String>{
     guard(&window)?;let p=store(&app)?.link(&id,&session)?;saved(&app,&p)?;Ok(payload(p))
@@ -25,7 +25,9 @@ pub fn design_create(app:tauri::AppHandle,window:tauri::WebviewWindow,session:St
 }
 #[tauri::command]
 pub fn design_copy(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,session:String)->Result<Value,String>{
-    crate::design_window::guard(&window,&id)?;let p=store(&app)?.copy(&id,&session,None)?;saved(&app,&p)?;Ok(payload(p))
+    crate::design_window::guard(&window,&id)?;let p=store(&app)?.copy(&id,&session,None)?;saved(&app,&p)?;
+    if crate::design_window::project_id(window.label()).is_some(){crate::present_control(&app)?;let _=app.emit_to("control","design-open",json!({"id":p.id,"session":session}));}
+    Ok(payload(p))
 }
 #[tauri::command]
 pub fn design_read(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{crate::design_window::guard(&window,&id)?;let s=store(&app)?;let p=s.load(&id)?;let mut result=payload(p.clone());
@@ -46,14 +48,11 @@ pub fn design_save(app:tauri::AppHandle,window:tauri::WebviewWindow,project:Proj
 }
 #[tauri::command]
 pub fn design_view_save(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,view:Value)->Result<(),String>{
-    crate::design_window::guard(&window,&id)?;let s=store(&app)?;s.load(&id)?;
-    let bytes=serde_json::to_vec(&view).map_err(|e|e.to_string())?;if bytes.len()>4096||!view.is_object(){return Err("画布视图无效".into())}
-    fs::write(s.dir(&id)?.join("view.json"),bytes).map_err(|e|e.to_string())
+    crate::design_window::guard(&window,&id)?;store(&app)?.save_view(&id,"view.json",&view)
 }
 #[tauri::command]
 pub fn design_view_read(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{
-    crate::design_window::guard(&window,&id)?;let s=store(&app)?;s.load(&id)?;
-    Ok(fs::read(s.dir(&id)?.join("view.json")).ok().filter(|b|b.len()<=4096).and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null))
+    crate::design_window::guard(&window,&id)?;Ok(store(&app)?.read_view(&id,"view.json")?.unwrap_or(Value::Null))
 }
 #[tauri::command]
 pub fn design_history(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Vec<Value>,String>{crate::design_window::guard(&window,&id)?;Ok(store(&app)?.history(&id)?.iter().map(open_claude_design::summary).collect())}
@@ -104,3 +103,5 @@ pub fn serve(app:&tauri::AppHandle,request:tauri::http::Request<Vec<u8>>)->tauri
     let (status,body)=match result{Ok(b)=>(200,b),Err(e)=>(400,format!("<!doctype html><meta charset=utf-8><p>预览未就绪：{}</p>",e.replace('&',"&amp;").replace('<',"&lt;")).into_bytes())};
     tauri::http::Response::builder().status(status).header("Content-Type","text/html; charset=utf-8").header("Content-Security-Policy",csp()).header("X-Content-Type-Options","nosniff").header("Referrer-Policy","no-referrer").header("Cache-Control","no-store").body(body).unwrap_or_default()
 }
+
+pub fn removed(app:&tauri::AppHandle,id:&str)->Result<(),String>{crate::data_library::forget_design(app,id)?;let _=app.emit("design-deleted",json!({"id":id}));Ok(())}

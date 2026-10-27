@@ -2,9 +2,9 @@
 
 ## 内置设计工具：open-claude-design
 
-真实用户消息包含“设计稿”时进入调试入口；一份作品支持多个 DC HTML 画板。聊天右侧画布支持拖动分栏、缩放与抓手、选择/Play、属性与源码编辑、批注交给小伴修改、撤销重做和历史恢复。作品保存在「资料库 → 我的文档」，聊天与资料库读取同一份源数据；可导入 ZIP / HTML，导出 ZIP 源包或独立 HTML。
+真实用户消息提到设计、画板、原型或准确 design- 编号时可发现设计工具；聊天顶部「设计稿」入口支持全局搜索、打开与新建。支持草稿立即落盘、逐页生成、完成校验与受阻恢复；一份作品支持多个 DC HTML 画板。聊天右侧画布支持拖动分屏、弹出独立窗口（复用、最大化、系统全屏、窗口位置记忆、回到分屏），支持以指针为中心的 Ctrl/⌘ 滚轮缩放、触控板捏合、Space/中键平移、选择/Play、属性与源码编辑、批注交给小伴修改、撤销重做和历史恢复。作品保存在「资料库 → 我的文档」，聊天与资料库读取同一份源数据；可导入 ZIP / HTML，导出 ZIP 源包或独立 HTML。
 
-保存有版本检查和恢复草稿，保留 30 个历史版本。兼容 v3 boards/order 与旧版 artboards；当前只支持独立 DC HTML 运行时子集，React、dc-import 和二进制素材导入尚不支持。详见 [模块说明](../../libs/agent-tools/open-claude-design/README.md) 与 [实施和验证记录](../../docs/agent/open-claude-design.md)。
+保存有版本检查和恢复草稿，保留 30 个历史版本，支持重命名、创建独立副本与历史恢复。聊天及排队消息固定发送时选中的设计稿，避免切换作品后改错项目。兼容 v3 boards/order 与旧版 artboards；当前只支持独立 DC HTML 运行时子集，React 和二进制素材导入尚不支持。详见 [模块说明](../../libs/agent-tools/open-claude-design/README.md) 与 [实施和验证记录](../../docs/agent/open-claude-design.md)。
 
 
 ## AI 商店：SkillHub 专家包与 MCP

@@ -20,6 +20,7 @@ pub struct CompanionChange {
 }
 
 pub trait Desktop: Send + Sync {
+    fn design_removed(&self,_id:&str)->Result<(),String>{Ok(())}
     fn design_saved(&self, _project: &open_claude_design::Project) -> Result<(), String> { Ok(()) }
     fn connector_search(&self, _keyword: &str) -> Result<Value, String> { Err("当前宿主不支持连接器目录".into()) }
     fn connector_request(&self, _references: &[String], _ctx: &ToolCtx) -> Result<Value, String> { Err("当前宿主不支持连接器授权".into()) }
@@ -91,6 +92,7 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn design_removed(&self,id:&str)->Result<(),String>{crate::design::removed(&self.app,id)}
     fn design_saved(&self, project: &open_claude_design::Project) -> Result<(), String> { crate::design::saved(&self.app, project) }
     fn connector_search(&self, keyword: &str) -> Result<Value, String> { super::connectors::search(&self.app, keyword) }
     fn connector_request(&self, references: &[String], ctx: &ToolCtx) -> Result<Value, String> { super::connectors::request(&self.app, references, ctx) }
