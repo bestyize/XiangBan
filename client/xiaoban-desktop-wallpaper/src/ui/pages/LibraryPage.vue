@@ -128,6 +128,7 @@ async function openSession(id: string) {
 const askAbout = (item: LibrarySaved) => startTask(`参考我收藏的这段内容：\n\n${item.text.slice(0, 4000)}\n\n`);
 const sessionTitle = (id: string) => props.store.chat.sessions.find(s => s.id === id)?.title ?? '';
 const openUrl = (url: string) => { void invoke('open_download_url', { url }).catch(() => notify('这个链接打不开', 'error')); };
+async function detachDesign(){try{await invoke('design_window_open',{id:designId.value});designId.value='';}catch(e){notify(e,'error');}}
 </script>
 
 <template>
@@ -169,7 +170,7 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
         <div class="lib-form-actions"><NButton :disabled="creatingBusy" @click="creating = null">取消</NButton><NButton type="primary" attr-type="submit" :loading="creatingBusy" :disabled="creatingBusy || !createText.trim() || (creating === 'doc' && !createTitle.trim())" data-testid="library-create-save">{{ creating === 'doc' ? '创建文档' : '添加收藏' }}</NButton></div>
       </form>
     </NModal>
-    <NModal :show="!!designId" :mask-closable="false" :close-on-esc="false"><div class="library-design-modal"><DesignWorkbench :project-id="designId" :notify="notify" @close="designId = ''" @request="designRequest" /></div></NModal>
+    <NModal :show="!!designId" :mask-closable="false" :close-on-esc="false"><div class="library-design-modal"><DesignWorkbench :project-id="designId" :notify="notify" @close="designId = ''" @detach="detachDesign" @request="designRequest" /></div></NModal>
   </section>
 </template>
 

@@ -6,14 +6,14 @@ use tauri::{Emitter,Manager};
 use tauri_plugin_dialog::DialogExt;
 
 pub fn store(app:&tauri::AppHandle)->Result<Store,String>{Ok(Store::new(crate::storage::root(app)?.join("data-library/files")))}
-fn guard(window:&tauri::WebviewWindow)->Result<(),String>{if window.label()=="control"{Ok(())}else{Err("请在主窗口编辑设计稿".into())}}
+fn guard(window:&tauri::WebviewWindow)->Result<(),String>{if window.label()=="control"||crate::design_window::project_id(window.label()).is_some(){Ok(())}else{Err("请在主窗口编辑设计稿".into())}}
 pub fn saved(app:&tauri::AppHandle,p:&Project)->Result<(),String>{
     crate::data_library::upsert_design(app,p)?;
-    let _=app.emit_to("control","design-changed",open_claude_design::summary(p));Ok(())
+    let mut row=open_claude_design::summary(p);row["detached"]=json!(app.get_webview_window(&crate::design_window::label(&p.id)).is_some());let _=app.emit("design-changed",row);Ok(())
 }
 fn payload(p:Project)->Value{json!({"project":p,"origin":if cfg!(windows){"http://design-preview.localhost"}else{"design-preview://localhost"}})}
 #[tauri::command]
-pub fn design_list(app:tauri::AppHandle,window:tauri::WebviewWindow,session:String,query:Option<String>)->Result<Vec<Value>,String>{guard(&window)?;Ok(store(&app)?.search(&session,query.as_deref().unwrap_or(""),None,None)?.iter().map(open_claude_design::summary).collect())}
+pub fn design_list(app:tauri::AppHandle,window:tauri::WebviewWindow,session:String,query:Option<String>)->Result<Vec<Value>,String>{guard(&window)?;Ok(store(&app)?.search(&session,query.as_deref().unwrap_or(""),None,None)?.iter().map(|p|{let mut row=open_claude_design::summary(p);row["detached"]=json!(app.get_webview_window(&crate::design_window::label(&p.id)).is_some());row}).collect())}
 #[tauri::command]
 pub fn design_link(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,session:String)->Result<Value,String>{
     guard(&window)?;let p=store(&app)?.link(&id,&session)?;saved(&app,&p)?;Ok(payload(p))
@@ -25,10 +25,10 @@ pub fn design_create(app:tauri::AppHandle,window:tauri::WebviewWindow,session:St
 }
 #[tauri::command]
 pub fn design_copy(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,session:String)->Result<Value,String>{
-    guard(&window)?;let p=store(&app)?.copy(&id,&session,None)?;saved(&app,&p)?;Ok(payload(p))
+    crate::design_window::guard(&window,&id)?;let p=store(&app)?.copy(&id,&session,None)?;saved(&app,&p)?;Ok(payload(p))
 }
 #[tauri::command]
-pub fn design_read(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{guard(&window)?;let s=store(&app)?;let p=s.load(&id)?;let mut result=payload(p.clone());
+pub fn design_read(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{crate::design_window::guard(&window,&id)?;let s=store(&app)?;let p=s.load(&id)?;let mut result=payload(p.clone());
     match s.draft(&id) {
         Ok(Some(draft)) if draft.files!=p.files||draft.canvas!=p.canvas||draft.title!=p.title => result["draft"]=json!(draft),
         Err(e) => result["draftError"]=json!(format!("恢复草稿损坏，已打开最后保存版本：{e}")),
@@ -36,24 +36,35 @@ pub fn design_read(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->
     }
     Ok(result)}
 #[tauri::command]
-pub fn design_draft_save(app:tauri::AppHandle,window:tauri::WebviewWindow,project:Project)->Result<(),String>{guard(&window)?;store(&app)?.save_draft(&project)}
+pub fn design_draft_save(app:tauri::AppHandle,window:tauri::WebviewWindow,project:Project)->Result<(),String>{crate::design_window::guard(&window,&project.id)?;store(&app)?.save_draft(&project)}
 #[tauri::command]
-pub fn design_draft_clear(app:tauri::AppHandle,window:tauri::WebviewWindow,project:Project)->Result<(),String>{guard(&window)?;store(&app)?.clear_draft(&project)}
+pub fn design_draft_clear(app:tauri::AppHandle,window:tauri::WebviewWindow,project:Project)->Result<(),String>{crate::design_window::guard(&window,&project.id)?;store(&app)?.clear_draft(&project)}
 #[tauri::command]
 pub fn design_save(app:tauri::AppHandle,window:tauri::WebviewWindow,project:Project,expected_revision:u64)->Result<Value,String>{
-    guard(&window)?;if project.revision!=expected_revision{return Err("保存版本不匹配，请先刷新".into());}
+    crate::design_window::guard(&window,&project.id)?;if project.revision!=expected_revision{return Err("保存版本不匹配，请先刷新".into());}
     let p=store(&app)?.save(project,expected_revision)?;saved(&app,&p)?;Ok(payload(p))
 }
 #[tauri::command]
-pub fn design_history(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Vec<Value>,String>{guard(&window)?;Ok(store(&app)?.history(&id)?.iter().map(open_claude_design::summary).collect())}
+pub fn design_view_save(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,view:Value)->Result<(),String>{
+    crate::design_window::guard(&window,&id)?;let s=store(&app)?;s.load(&id)?;
+    let bytes=serde_json::to_vec(&view).map_err(|e|e.to_string())?;if bytes.len()>4096||!view.is_object(){return Err("画布视图无效".into())}
+    fs::write(s.dir(&id)?.join("view.json"),bytes).map_err(|e|e.to_string())
+}
+#[tauri::command]
+pub fn design_view_read(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{
+    crate::design_window::guard(&window,&id)?;let s=store(&app)?;s.load(&id)?;
+    Ok(fs::read(s.dir(&id)?.join("view.json")).ok().filter(|b|b.len()<=4096).and_then(|b|serde_json::from_slice(&b).ok()).unwrap_or(Value::Null))
+}
+#[tauri::command]
+pub fn design_history(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Vec<Value>,String>{crate::design_window::guard(&window,&id)?;Ok(store(&app)?.history(&id)?.iter().map(open_claude_design::summary).collect())}
 #[tauri::command]
 pub fn design_restore(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,revision:u64,expected_revision:u64)->Result<Value,String>{
-    guard(&window)?;let s=store(&app)?;let p=s.history(&id)?.into_iter().find(|p|p.revision==revision).ok_or("这个版本已经不在了")?;
+    crate::design_window::guard(&window,&id)?;let s=store(&app)?;let p=s.history(&id)?.into_iter().find(|p|p.revision==revision).ok_or("这个版本已经不在了")?;
     let p=s.save(p,expected_revision)?;saved(&app,&p)?;Ok(payload(p))
 }
 #[tauri::command]
 pub async fn design_export(window:tauri::WebviewWindow,id:String,format:String,project:Option<Project>)->Result<Option<String>,String>{
-    guard(&window)?;let app=window.app_handle().clone();
+    crate::design_window::guard(&window,&id)?;let app=window.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move||{
         let saved=store(&app)?.load(&id)?;
         let p=project.unwrap_or(saved);if p.id!=id{return Err("设计稿编号不一致".into());}open_claude_design::validate(&p)?;

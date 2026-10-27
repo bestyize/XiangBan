@@ -23,6 +23,7 @@ export type StudioTab = "wallpapers" | "effects" | "widgets" | "pets";
 /** The categories of the settings dialog. */
 export type SettingsTab = "general" | "appearance" | "ai" | "assistant" | "voice" | "network" | "safety" | "about";
 export interface ControlStore {
+  designOpening?:string;
   settings: Settings;
   info: AppInfo;
   library: WallpaperLibrary;

@@ -54,4 +54,12 @@ describe('independent DC runtime',()=>{
   w.eval("dispatchEvent(new MessageEvent('message',{source:parent,data:{channel:'open-claude-design',type:'pins',pins:[{num:1,text:'批注一'}]}}))");
   expect(w.document.querySelector('[data-ocd-pin-layer]')).not.toBeNull();
  });
+ it('forwards editing wheel events while leaving normal prototype scrolling available in Play',async()=>{
+  const {w,messages}=await preview('<x-dc><p>page</p></x-dc>');
+  const wheel=new w.WheelEvent('wheel',{deltaY:80,cancelable:true});Object.defineProperty(wheel,'ctrlKey',{value:true});w.document.dispatchEvent(wheel);
+  expect(wheel.defaultPrevented).toBe(true);expect(messages).toHaveBeenCalledWith(expect.objectContaining({type:'canvas-wheel',dy:80,ctrl:true}),'*');
+  w.eval("dispatchEvent(new MessageEvent('message',{source:parent,data:{channel:'open-claude-design',type:'mode',editing:false}}))");
+  const scroll=new w.WheelEvent('wheel',{deltaY:40,cancelable:true});w.document.dispatchEvent(scroll);expect(scroll.defaultPrevented).toBe(false);
+ });
+
 });

@@ -248,6 +248,22 @@
         addEventListener('unload', () => { if (mounted) instance.componentWillUnmount?.(); });
       } catch (e) { report(e); }
     }
+    for(const type of ['gesturestart','gesturechange'])document.addEventListener(type,e=>{e.preventDefault();send('canvas-gesture',{start:type==='gesturestart',scale:e.scale,x:e.clientX,y:e.clientY});},{passive:false});
+    // Opaque iframes do not bubble input to the canvas host.
+    document.addEventListener('wheel', e => {
+      if (!editing && !e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      send('canvas-wheel',{dx:e.deltaX,dy:e.deltaY,deltaMode:e.deltaMode,ctrl:e.ctrlKey,meta:e.metaKey,shift:e.shiftKey,x:e.clientX,y:e.clientY});
+    },{passive:false});
+    for (const type of ['keydown','keyup']) document.addEventListener(type,e=>{
+      if(e.target?.closest?.('input,textarea,select,[contenteditable]'))return;
+      if([' ','+','=','-','0','1'].includes(e.key)){e.preventDefault();send('canvas-key',{key:e.key,down:type==='keydown'});}
+    });
+    addEventListener('blur',()=>send('canvas-key',{key:' ',down:false}));
+    let pan=null;
+    document.addEventListener('pointerdown',e=>{if(e.button===1){e.preventDefault();pan={id:e.pointerId,x:e.clientX,y:e.clientY};e.target?.setPointerCapture?.(e.pointerId);}},true);
+    document.addEventListener('pointermove',e=>{if(pan&&pan.id===e.pointerId){send('canvas-pan',{dx:e.clientX-pan.x,dy:e.clientY-pan.y});pan.x=e.clientX;pan.y=e.clientY;}});
+    for(const type of ['pointerup','pointercancel'])document.addEventListener(type,()=>pan=null);
     document.addEventListener('click', e => {
       const target = e.target.closest?.('[data-ocd-node]');
       if (editing) {

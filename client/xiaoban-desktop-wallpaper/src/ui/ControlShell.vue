@@ -428,6 +428,19 @@ async function listenForAssistant() {
   const off = await Promise.all([
     listen<{ session: string | null }>('assistant-open-chat', ({ session }) => { if (session) void openSession(session); else void newTask(); }),
     listen<{ tab: 'ai' | 'assistant' }>('assistant-open-settings', ({ tab }) => { store.openSettings(tab); }),
+    listen<{id:string;session:string}>('design-open', async ({id,session}) => {
+      if(store.chat.sessions.some(s=>s.id===session))await openSession(session);
+      else {await store.chat.select(null);navigate('chat');}
+      store.designOpening=id;
+    }),
+    listen<{id:string;session:string;message:string}>('design-request', async ({session,message}) => {
+      try{
+        if(store.chat.sessions.some(s=>s.id===session))await openSession(session);
+        else {await store.chat.select(null);navigate('chat');}
+        if(store.chat.currentId)await store.chat.enqueue(message,[],[]);
+        else await store.chat.send(message);
+      }catch(e){store.notify(e,'error');}
+    }),
     listen<unknown>('games-open', () => { navigate('games'); }),
     listen<{ page: string; tab?: string | null }>('control-navigate', ({ page, tab }) => openPageFromAssistant(page, tab ?? undefined)),
   ]);

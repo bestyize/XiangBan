@@ -3,6 +3,7 @@
   "description": "Local control and scene events",
   "windows": [
     "control",
+    "design-window-*",
     "pet",
     "wallpaper"
   ],

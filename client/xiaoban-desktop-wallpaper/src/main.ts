@@ -15,6 +15,9 @@ async function init() {
     await mountControl();
     return;
   }
+  if (mode === "design") {
+    const {mountDesign}=await import("./ui/design/mount.ts");mountDesign();return;
+  }
   if (mode === "capture") {
     const { mountCapture } = await import("./capture/mount.ts");
     await mountCapture();

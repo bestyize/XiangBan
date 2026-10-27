@@ -32,7 +32,14 @@ const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
 const designs = ref<DesignSummary[]>([]), designId = ref(''), designClosed = ref(false), designWidth = ref(64);
 const designPicker=ref(false);
-function openDesign(id:string){designId.value=id;designClosed.value=false;designPicker.value=false;panelOpen.value=false;}
+async function openDesign(id:string){
+  try{
+    if(await invoke<boolean>('design_window_status',{id})){await invoke('design_window_open',{id});designPicker.value=false;return;}
+    designId.value=id;designClosed.value=false;designPicker.value=false;panelOpen.value=false;
+  }catch(e){props.store.notify(e,'error');}
+}
+async function detachDesign(){const id=designId.value;try{await invoke('design_window_open',{id});if(designId.value===id)closeDesign();}catch(e){props.store.notify(e,'error');}}
+watch(()=>props.store.designOpening,id=>{if(id){designId.value=id;designClosed.value=false;props.store.designOpening='';}},{immediate:true});
 let designSplit: { x: number; width: number; value: number } | null = null;
 function startDesignSplit(event: PointerEvent) {
   if (event.button !== 0) return;
@@ -53,7 +60,7 @@ async function loadDesigns() {
     const merged = new Map(designs.value.map(row => [row.id, row]));
     for (const row of Array.isArray(rows) ? rows : []) if (!merged.has(row.id) || merged.get(row.id)!.revision <= row.revision) merged.set(row.id, row);
     designs.value = [...merged.values()].sort((a, b) => b.updatedMs - a.updatedMs);
-    if (!designClosed.value && !designId.value) designId.value = designs.value[0]?.id ?? '';
+    if (!designClosed.value && !designId.value) designId.value = designs.value.find(p=>!p.detached)?.id ?? '';
   } catch (e) { props.store.notify(e, 'error'); }
 }
 watch(() => chat.currentId, () => { designId.value = ''; designClosed.value = false; designs.value = []; void loadDesigns(); }, { immediate: true });
@@ -62,7 +69,7 @@ onMounted(async () => {
   const off = await listen<DesignSummary>('design-changed', row => {
     if (row.sessionId !== chat.currentId && !row.sessionIds?.includes(chat.currentId ?? '')) return;
     designs.value = [row, ...designs.value.filter(p => p.id !== row.id)];
-    if (!designClosed.value) { designId.value = row.id; panelOpen.value = false; }
+    if (!designClosed.value&&!row.detached) { designId.value = row.id; panelOpen.value = false; }
   });
   if (designDisposed) off(); else designOff = off;
 });
@@ -388,7 +395,7 @@ async function openLink(href: string) {
         </div>
       </header>
       <div v-if="designs.length" class="design-deliveries" aria-label="设计交付物">
-        <button v-for="d in designs" :key="d.id" type="button" :class="{ active: designId === d.id }" @click="designId = d.id; designClosed = false; panelOpen = false"><FileText :size="13" /><b>{{ d.title }}</b><small>{{ d.artboards }} 个画板 · 我的文档</small></button>
+        <button v-for="d in designs" :key="d.id" type="button" :class="{ active: designId === d.id }" @click="openDesign(d.id)"><FileText :size="13" /><b>{{ d.title }}</b><small>{{ d.artboards }} 个画板 · 我的文档</small></button>
       </div>
       <div v-if="confirmingDelete" class="delete-bar" data-testid="chat-delete-confirm" role="alertdialog" aria-label="删除对话">
         <span>删除“{{ title }}”？删除后无法恢复。</span>
@@ -548,7 +555,7 @@ async function openLink(href: string) {
       <button type="button" class="lightbox-close" data-testid="chat-image-preview-close" aria-label="关闭预览" @click="preview = null"><X :size="18" /></button>
     </div>
     <div v-if="designId" class="design-splitter" role="separator" tabindex="0" aria-label="调整聊天和画布宽度" aria-orientation="vertical" :aria-valuenow="Math.round(designWidth)" :aria-valuemin="35" :aria-valuemax="85" @pointerdown="startDesignSplit" @pointermove="moveDesignSplit" @pointerup="finishDesignSplit" @pointercancel="finishDesignSplit" @keydown="designSplitKey" />
-    <aside v-if="designId" :style="{ width: designWidth + '%' }" class="design-dock" aria-label="设计工作台"><DesignWorkbench :project-id="designId" :notify="store.notify" @close="closeDesign" @request="designRequest" /></aside>
+    <aside v-if="designId" :style="{ width: designWidth + '%' }" class="design-dock" aria-label="设计工作台"><DesignWorkbench :project-id="designId" :notify="store.notify" @close="closeDesign" @detach="detachDesign" @request="designRequest" /></aside>
     <SelectionCopyMenu :scope="scroller" />
   </section>
 </template>

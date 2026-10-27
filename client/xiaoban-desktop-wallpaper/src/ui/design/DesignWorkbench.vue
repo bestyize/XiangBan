@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import {computed,onBeforeUnmount,onMounted,ref,watch} from 'vue';
-import {Check,Copy,Download,Hand,Maximize2,MessageSquare,Minus,MousePointer2,PanelRight,Play,Plus,RotateCcw,RotateCw,Send,Sun,Moon,Trash2,X,ClipboardCopy,Palette,Layers} from 'lucide-vue-next';
+import {computed,onBeforeUnmount,onMounted,nextTick,ref,watch} from 'vue';
+import {Check,Copy,Download,Hand,ExternalLink,MessageSquare,Minus,MousePointer2,PanelRight,Play,Plus,RotateCcw,RotateCw,Send,Sun,Moon,Trash2,X,ClipboardCopy,Palette,Layers} from 'lucide-vue-next';
 import {invoke} from '../../bridge.ts';
 import BoardPreview from './BoardPreview.vue';
 import {
@@ -8,17 +8,18 @@ import {
   tokensOf,setToken,dsCardsOf,insertComponentImport,formatCommentPrompt,toMarkdownSpec,DEVICE_PRESETS,
   type Board,type Comment,type Project,type Summary,type DsCard
 } from './model.ts';
+import {clampScale,zoomAt,wheelPixels,type CanvasView} from './viewport.ts';
 import {createDesignStore} from './design-store.ts';
-const props=defineProps<{projectId:string;notify:(message:unknown,type?:'success'|'error'|'info')=>void}>();
-const emit=defineEmits<{close:[];request:[message:string,session:string]}>();
-const ds=createDesignStore(props.notify),selected=ref(''),page=ref(''),mode=ref<'select'|'play'|'hand'>('select'),scale=ref(.4),properties=ref(false),full=ref(false),viewport=ref<HTMLElement|null>(null);
+const props=defineProps<{projectId:string;detached?:boolean;notify:(message:unknown,type?:'success'|'error'|'info')=>void}>();
+const emit=defineEmits<{close:[];detach:[];dock:[];request:[message:string,session:string]}>();
+const ds=createDesignStore(props.notify),selected=ref(''),page=ref(''),mode=ref<'select'|'play'|'hand'>('select'),scale=ref(.4),properties=ref(false),spaceHeld=ref(false),viewport=ref<HTMLElement|null>(null);
 const theme=ref<'light'|'dark'>('light'),hideResolved=ref(false);
 const activeTab=ref<'properties'|'design-system'>('properties');
 const node=ref<{id:string;text:string;tag:string;path?:string;quote?:string;styles?:Record<string,string>}|null>(null);
 const nodeText=ref(''),commentText=ref(''),sendComment=ref(true),commentOpen=ref(false),sourceOpen=ref(false),source=ref(''),renderErrors=ref<Record<string,string>>({});
 const history=ref<Project[]>([]),future=ref<Project[]>([]),versions=ref<Summary[]>([]),versionsOpen=ref(false);
 const newTokenKey=ref(''),newTokenValue=ref('');
-let sourceRevision=0,remoteEpoch=0;
+let sourceRevision=0,remoteEpoch=0,viewReady=false;let viewTimer:ReturnType<typeof setTimeout>|undefined;
 const token=ref(crypto.randomUUID());const project=computed(()=>ds.project);
 const allBoards=computed(()=>project.value?boardsOf(project.value.canvas):[]),pages=computed(()=>project.value?.canvas.pages??[]);
 const boards=computed(()=>allBoards.value.filter(b=>!page.value||b.page===page.value));
@@ -42,17 +43,35 @@ function boardPins(file:string){
 function close(){if(ds.busy){props.notify('正在保存，请稍候关闭','info');return;}emit('close');}
 function report(e:unknown){props.notify(e,'error');}
 async function open(id:string){
-  remoteEpoch++;
+  remoteEpoch++;viewReady=false;
   try{
     await ds.open(id);
+    if(project.value?.id!==id)return;
     selected.value=allBoards.value[0]?.file??'';
     page.value='';node.value=null;sourceOpen.value=false;commentOpen.value=false;versionsOpen.value=false;
     history.value=[];future.value=[];renderErrors.value={};token.value=crypto.randomUUID();
+    const view=await invoke<CanvasView|null>('design_view_read',{id});
+    if(project.value?.id!==id)return;
+    if(view){
+      if(allBoards.value.some(b=>b.file===view.selected))selected.value=view.selected!;
+      if(pages.value.some((p:any)=>p.id===view.page))page.value=view.page!;
+      if(Number.isFinite(view.scale))scale.value=clampScale(view.scale!);
+      if(['select','play','hand'].includes(view.mode??''))mode.value=view.mode!;
+      if(view.theme==='dark'||view.theme==='light')theme.value=view.theme;
+      await nextTick();if(viewport.value){viewport.value.scrollLeft=Math.max(0,Number(view.left)||0);viewport.value.scrollTop=Math.max(0,Number(view.top)||0);}
+    }
+    viewReady=true;
   }catch(e){ds.error=String(e);report(e);}
 }
 watch(()=>props.projectId,id=>void open(id),{immediate:true});
 onMounted(()=>void ds.init(summary=>{if(summary.id===project.value?.id&&summary.revision>project.value.revision&&!ds.busy){remoteEpoch++;history.value=[];future.value=[];}}).catch(report));
-onBeforeUnmount(()=>ds.dispose());
+function scheduleView(){if(!viewReady)return;clearTimeout(viewTimer);viewTimer=setTimeout(()=>void rememberView().catch(()=>{}),200);}
+watch([selected,page,scale,mode,theme],scheduleView);
+function rememberView(){if(!project.value)return Promise.resolve();return invoke('design_view_save',{id:project.value.id,view:{selected:selected.value,page:page.value,scale:scale.value,left:viewport.value?.scrollLeft??0,top:viewport.value?.scrollTop??0,mode:mode.value,theme:theme.value}});}
+async function handoff(){if(ds.busy||ds.dirty){props.notify('请先保存当前修改再切换窗口','info');return;}try{await rememberView();if(props.detached)emit('dock');else emit('detach');}catch(e){report(e);}}
+function releaseSpace(){spaceHeld.value=false;cancelDrag();}
+onMounted(()=>{window.addEventListener('keyup',keyup);window.addEventListener('blur',releaseSpace);});
+onBeforeUnmount(()=>{clearTimeout(viewTimer);void rememberView().catch(()=>{});ds.dispose();window.removeEventListener('keyup',keyup);window.removeEventListener('blur',releaseSpace);});
 watch(()=>project.value?.revision,()=>{if(!allBoards.value.some(b=>b.file===selected.value))selected.value=allBoards.value[0]?.file??'';renderErrors.value={};node.value=null;});
 
 async function edit(fn:(p:Project)=>void,record=true){
@@ -72,6 +91,14 @@ function patchBoard(patch:Partial<Board>){if(current.value)void edit(p=>changeBo
 function applyPreset(preset:{w:number;h:number}){patchBoard({w:preset.w,h:preset.h});}
 
 function onPreview(b:Board,data:Record<string,any>){
+  if(data.type==='canvas-wheel'){
+    const rect=viewport.value?.querySelector(`[data-board="${CSS.escape(b.file)}"] .surface`)?.getBoundingClientRect();
+    if(rect)wheel({deltaX:Number(data.dx)||0,deltaY:Number(data.dy)||0,deltaMode:Number(data.deltaMode)||0,ctrlKey:!!data.ctrl,metaKey:!!data.meta,shiftKey:!!data.shift,clientX:rect.left+(Number(data.x)||0)*scale.value,clientY:rect.top+(Number(data.y)||0)*scale.value});return;
+  }
+  if(data.type==='canvas-key'){if(data.key===' ')spaceHeld.value=!!data.down;else if(data.down)canvasKey(String(data.key));return;}
+  if(data.type==='canvas-gesture'){const rect=viewport.value?.querySelector(`[data-board="${CSS.escape(b.file)}"] .surface`)?.getBoundingClientRect();if(data.start)gestureStart();else if(rect)gestureChange({scale:Number(data.scale),clientX:rect.left+(Number(data.x)||0)*scale.value,clientY:rect.top+(Number(data.y)||0)*scale.value} as any);return;}
+  if(data.type==='canvas-pan'){if(viewport.value){viewport.value.scrollLeft-=(Number(data.dx)||0)*scale.value;viewport.value.scrollTop-=(Number(data.dy)||0)*scale.value;}return;}
+
   if(data.type==='select'&&mode.value==='select'){
     select(b);
     node.value={
@@ -92,7 +119,19 @@ function onPreview(b:Board,data:Record<string,any>){
   }
 }
 function focus(b:Board){const el=viewport.value;if(!el)return;el.scrollTo({left:(b.x-minX.value)*scale.value,top:(b.y-minY.value)*scale.value,behavior:'smooth'});}
-function fit(){if(!viewport.value)return;scale.value=Math.max(.1,Math.min(1,(viewport.value.clientWidth-32)/extent.value.w));viewport.value.scrollTo({left:0,top:0});}
+function zoom(next:number,x?:number,y?:number){const el=viewport.value;if(!el)return;const r=el.getBoundingClientRect();const z=zoomAt(scale.value,next,el.scrollLeft,el.scrollTop,x===undefined?el.clientWidth/2:x-r.left,y===undefined?el.clientHeight/2:y-r.top);scale.value=z.scale;void nextTick(()=>{el.scrollLeft=z.left;el.scrollTop=z.top;});}
+function wheel(e:Pick<WheelEvent,'deltaX'|'deltaY'|'deltaMode'|'ctrlKey'|'metaKey'|'shiftKey'|'clientX'|'clientY'>){
+ const el=viewport.value;if(!el)return;const dx=wheelPixels(e.deltaX,e.deltaMode,el.clientWidth),dy=wheelPixels(e.deltaY,e.deltaMode,el.clientHeight);
+ if(e.ctrlKey||e.metaKey)zoom(scale.value*Math.exp(-dy*.002),e.clientX,e.clientY);
+ else if(e.shiftKey)el.scrollLeft+=dy||dx;else{el.scrollLeft+=dx;el.scrollTop+=dy;}
+}
+let gestureScale=1;
+function gestureStart(){gestureScale=scale.value;}
+function gestureChange(event:Event){const e=event as Event&{scale:number;clientX:number;clientY:number};if(Number.isFinite(e.scale))zoom(gestureScale*e.scale,e.clientX,e.clientY);}
+function fit(){const el=viewport.value;if(!el)return;scale.value=clampScale(Math.min((el.clientWidth-32)/extent.value.w,(el.clientHeight-32)/extent.value.h));void nextTick(()=>el.scrollTo({left:0,top:0}));}
+function fitCurrent(){const el=viewport.value,b=current.value;if(!el||!b)return;scale.value=clampScale(Math.min((el.clientWidth-48)/b.w,(el.clientHeight-64)/(b.h+28)));void nextTick(()=>el.scrollTo({left:Math.max(0,(b.x-minX.value+32)*scale.value-24),top:Math.max(0,(b.y-minY.value+40)*scale.value-24)}));}
+function canvasKey(key:string){if(key==='+'||key==='=')zoom(scale.value*1.2);if(key==='-')zoom(scale.value/1.2);if(key==='0')fit();if(key==='1')zoom(1);}
+function keyup(e:KeyboardEvent){if(e.key===' ')releaseSpace();}
 
 function patchText(){if(!current.value||!node.value)return;void edit(p=>{p.files[current.value!.file]=patchNode(p.files[current.value!.file],node.value!.id,{text:nodeText.value});});}
 function patchStyle(key:string,value:string){
@@ -178,15 +217,15 @@ async function restore(v:Summary){if(!project.value||!canEdit.value)return;try{c
 
 let drag:{type:'pan'|'board';x:number;y:number;left:number;top:number;board?:Board;dx:number;dy:number}|null=null;
 const dragging=ref<{file:string;x:number;y:number}|null>(null);
-function down(event:PointerEvent,b?:Board){if(event.button!==0||(!b&&mode.value!=='hand')||(b&&!canEdit.value))return;if(b){select(b);if(mode.value!=='select')return;}const el=viewport.value!;drag={type:b?'board':'pan',x:event.clientX,y:event.clientY,left:el.scrollLeft,top:el.scrollTop,board:b?clone(b):undefined,dx:0,dy:0};(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);event.preventDefault();}
+function down(event:PointerEvent,b?:Board){const panning=event.button===1||spaceHeld.value||mode.value==='hand';if(!panning&&(event.button!==0||(!b&&mode.value!=='hand')||(b&&!canEdit.value)))return;if(panning)b=undefined;if(b){select(b);if(mode.value!=='select')return;}const el=viewport.value!;drag={type:b?'board':'pan',x:event.clientX,y:event.clientY,left:el.scrollLeft,top:el.scrollTop,board:b?clone(b):undefined,dx:0,dy:0};(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);event.preventDefault();}
 function move(e:PointerEvent){if(!drag)return;drag.dx=(e.clientX-drag.x)/scale.value;drag.dy=(e.clientY-drag.y)/scale.value;if(drag.type==='pan'){viewport.value!.scrollLeft=drag.left+drag.x-e.clientX;viewport.value!.scrollTop=drag.top+drag.y-e.clientY;}else dragging.value={file:drag.board!.file,x:drag.board!.x+drag.dx,y:drag.board!.y+drag.dy};}
 function cancelDrag(){drag=null;dragging.value=null;}
 function up(){if(!drag)return;const d=drag;drag=null;dragging.value=null;if(d.type==='board'&&(Math.abs(d.dx)>1||Math.abs(d.dy)>1))void edit(p=>changeBoard(p,d.board!.file,{x:Math.round(d.board!.x+d.dx),y:Math.round(d.board!.y+d.dy)}));}
 function position(b:Board){const moving=dragging.value?.file===b.file?dragging.value:null;return {left:((moving?.x??b.x)-minX.value+32)+'px',top:((moving?.y??b.y)-minY.value+40)+'px',width:b.w+'px',height:(b.h+28)+'px'};}
-function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textarea,select,[contenteditable]'))return;if(e.key==='Escape'){node.value=null;sourceOpen.value=false;commentOpen.value=false;versionsOpen.value=false;full.value=false;}if((e.metaKey||e.ctrlKey)&&e.key==='z'){e.preventDefault();void(e.shiftKey?redo():undo());}}
+function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textarea,select,[contenteditable]'))return;if(e.key==='Escape'){node.value=null;sourceOpen.value=false;commentOpen.value=false;versionsOpen.value=false;releaseSpace();}if(e.key===' '){e.preventDefault();spaceHeld.value=true;}if(['+','=','-','0','1'].includes(e.key)){e.preventDefault();canvasKey(e.key);}if((e.metaKey||e.ctrlKey)&&e.key==='z'){e.preventDefault();void(e.shiftKey?redo():undo());}}
 </script>
 <template>
-<section class="design-workbench" :class="{full}" tabindex="0" aria-label="设计工作台" data-testid="design-workbench" @keydown="key">
+<section class="design-workbench" tabindex="0" aria-label="设计工作台" data-testid="design-workbench" @keydown="key">
 <header>
   <span class="brand">✦</span><b>{{project?.title??'读取设计稿…'}}</b>
   <span v-if="project" class="saved">{{statusLabel(project.status)}}</span>
@@ -206,7 +245,7 @@ function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textar
       <button @click="copyMarkdown"><ClipboardCopy :size="12"/> 复制 Markdown</button>
     </div>
   </details>
-  <button title="放大画布" @click="full=!full"><Maximize2 :size="14"/></button>
+  <button :title="detached?'回到分屏':'独立窗口'" @click="handoff"><ExternalLink :size="14"/></button>
   <button aria-label="关闭设计画布" @click="close"><X :size="15"/></button>
 </header>
 <div class="tools">
@@ -222,10 +261,10 @@ function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textar
   <button :disabled="!canEdit||!history.length" title="撤销" @click="undo"><RotateCcw :size="13"/></button>
   <button :disabled="!canEdit||!future.length" title="重做" @click="redo"><RotateCw :size="13"/></button>
   <i/>
-  <button @click="fit">适合</button>
-  <button title="缩小" @click="scale=Math.max(.1,scale-.1)"><Minus :size="12"/></button>
-  <span class="zoom">{{Math.round(scale*100)}}%</span>
-  <button title="放大" @click="scale=Math.min(2,scale+.1)"><Plus :size="12"/></button>
+  <button title="适应全部画板 (0)" @click="fit">适合</button><button title="适应当前画板" @click="fitCurrent">当前</button>
+  <button title="缩小" @click="zoom(scale/1.2)"><Minus :size="12"/></button>
+  <span class="zoom" title="双击恢复 100% (1)" @dblclick="zoom(1)">{{Math.round(scale*100)}}%</span>
+  <button title="放大" @click="zoom(scale*1.2)"><Plus :size="12"/></button>
 </div>
 <div v-if="ds.error" class="errorbar" role="alert">
   {{ds.error}}<small v-if="ds.dirty"> · 草稿未写入预览，可先导出保留</small>
@@ -245,10 +284,10 @@ function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textar
       <button :disabled="!current" title="画板源代码" @click="openSource">&lt;/&gt;</button>
     </div>
   </nav>
-  <div ref="viewport" class="viewport" :class="{hand:mode==='hand'}" @pointerdown.self="down($event)" @pointermove="move" @pointerup="up" @pointercancel="cancelDrag">
-    <div class="scroll-space" :style="{width:extent.w*scale+'px',height:extent.h*scale+'px'}" @pointerdown.self="down($event)">
-      <div class="canvas" :style="{width:extent.w+'px',height:extent.h+'px',transform:`scale(${scale})`}" @pointerdown.self="down($event)">
-        <section v-for="b in boards" :key="b.file" class="artboard" :class="{selected:selected===b.file}" :style="position(b)">
+  <div ref="viewport" class="viewport" :class="{hand:mode==='hand'||spaceHeld}" @wheel.prevent="wheel" @scroll.passive="scheduleView" @gesturestart.prevent="gestureStart" @gesturechange.prevent="gestureChange" @pointerdown="down($event)" @pointermove="move" @pointerup="up" @pointercancel="cancelDrag">
+    <div class="scroll-space" :style="{width:extent.w*scale+'px',height:extent.h*scale+'px'}" @pointerdown.self.stop="down($event)">
+      <div class="canvas" :style="{width:extent.w+'px',height:extent.h+'px',transform:`scale(${scale})`}" @pointerdown.self.stop="down($event)">
+        <section v-for="b in boards" :key="b.file" class="artboard" :data-board="b.file" :class="{selected:selected===b.file}" :style="position(b)">
           <div class="board-title" @pointerdown.stop="down($event,b)">
             <b>{{b.title}} <small>{{b.w}}×{{b.h}}</small></b>
             <button @pointerdown.stop @click="select(b);mode='play';focus(b)"><Play :size="13"/> Play</button>
@@ -256,7 +295,7 @@ function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textar
           <div class="surface" :style="{height:b.h+'px'}">
             <div v-if="!project?.files[b.file]?.trim()" class="pending-board">画板尚未生成，可让小伴继续完成</div>
             <BoardPreview v-else :src="project?previewUrl(ds.origin,project,b.file,token):''" :title="b.title" :editing="mode!=='play'" :commenting="mode==='select'" :theme="theme" :pins="boardPins(b.file)" :token="token" @message="onPreview(b,$event)" @error="renderErrors[b.file]=$event"/>
-            <div v-if="mode==='hand'" class="pan-shield" @pointerdown="down($event)"/>
+            <div v-if="mode==='hand'||spaceHeld" class="pan-shield" @pointerdown.stop="down($event)"/>
             <div v-if="renderErrors[b.file]" class="render-error" role="alert">预览错误：{{renderErrors[b.file]}}<button @click="select(b);openSource()">查看源代码</button></div>
           </div>
         </section>
@@ -369,5 +408,5 @@ function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textar
 </section>
 </template>
 <style scoped>
-.design-workbench{position:relative;container-type:inline-size;flex:1;display:flex;flex-direction:column;min-width:0;height:100%;background:var(--ui-surface,#fff);color:var(--ui-text-primary,#30333b);font-size:11px;outline:none}.design-workbench.full{position:fixed;inset:0;z-index:1000}.design-workbench button{display:inline-flex;gap:4px;align-items:center;justify-content:center;border:0;background:transparent;color:inherit;font:inherit;border-radius:5px;cursor:pointer;min-height:25px;padding:3px 6px}.design-workbench button:hover:not(:disabled){background:var(--ui-control,#f0f0f4)}.design-workbench button:disabled{opacity:.35;cursor:default}.spacer{flex:1}header{display:flex;gap:7px;align-items:center;height:39px;flex:none;padding:0 10px;border-bottom:1px solid var(--ui-line,#e8e9ed)}header b{font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.brand{color:var(--ui-btn,#d94e60)}.saved{color:#8c9b91;font-size:9px}.saved.error{color:#d05b65}.tools{height:36px;display:flex;align-items:center;gap:2px;flex:none;padding:0 7px;border-bottom:1px solid var(--ui-line,#e8e9ed)}.tools select{max-width:110px;font:inherit;color:inherit;background:transparent;border:0}.tools i{width:1px;height:14px;background:var(--ui-line,#e8e9ed);margin:0 4px}.tools button.on{background:var(--ui-soft,#fceff1);color:var(--ui-ink,#c14558)}.zoom{font-size:9px;min-width:30px;text-align:center}.export{position:relative}.export summary{display:flex;align-items:center;gap:4px;cursor:pointer;padding:4px;font-size:10px}.export>div{position:absolute;right:0;top:100%;z-index:5;background:var(--ui-surface,#fff);border:1px solid var(--ui-line,#eee);border-radius:6px;padding:5px;min-width:130px;box-shadow:0 5px 16px #0001}.export>div button{width:100%;justify-content:start}.editor{display:flex;flex:1;min-height:0;position:relative}.rail{width:132px;flex:none;padding:10px 6px;border-right:1px solid var(--ui-line,#eee);overflow:auto;background:var(--ui-surface,#fff)}.rail-head{padding:0 6px 9px;color:var(--ui-text-tertiary,#999);font-size:10px}.rail-head small{margin-left:5px}.rail>button{width:100%;justify-content:start;text-align:left;font-size:10px;padding:6px;gap:7px}.rail>button span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rail>button.active{background:var(--ui-soft,#fceff1);color:var(--ui-ink,#be4054)}.rail-actions{border-top:1px solid var(--ui-line,#eee);margin-top:10px;padding-top:8px;display:flex;justify-content:space-around}.viewport{flex:1;min-width:0;overflow:auto;background:var(--ui-surface-sunken,#f5f5f7);background-image:radial-gradient(#b5b7c233 .7px,transparent .7px);background-size:14px 14px;position:relative}.viewport.hand{cursor:grab}.viewport.hand:active{cursor:grabbing}.scroll-space{position:relative;min-width:100%;min-height:100%}.canvas{position:absolute;left:0;top:0;transform-origin:0 0}.artboard{position:absolute}.board-title{height:28px;display:flex;align-items:center;justify-content:space-between;color:#9799a5;font-size:13px;touch-action:none;user-select:none}.board-title b{font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.board-title b small{font-weight:400;font-size:10px;margin-left:4px;color:#aaa}.board-title button{font-size:12px}.surface{background:white;position:relative;outline:1px solid #dedfe6}.artboard.selected .surface{outline:3px solid var(--ui-btn,#d94e60)}.pan-shield{position:absolute;inset:0;touch-action:none}.render-error{position:absolute;bottom:0;left:0;right:0;background:#fff0f0;color:#b54454;padding:12px;font-size:14px}.render-error button{border:1px solid #efb5c0;margin-left:12px}.properties{width:220px;flex:none;padding:13px 12px;overflow:auto;border-left:1px solid var(--ui-line,#eee);background:var(--ui-surface,#fff)}.properties h3{font-size:11px;margin:0 0 14px}.properties h4{font-size:10px;border-top:1px solid var(--ui-line,#eee);padding-top:12px;margin:12px 0}.properties label{display:flex;justify-content:space-between;align-items:center;gap:9px;margin:9px 0;font-size:10px;color:var(--ui-text-secondary,#777)}.properties input,.properties select{font:inherit;min-width:0;width:115px;background:var(--ui-control,#f8f8fa);color:var(--ui-text-primary,#333);border:1px solid var(--ui-line,#e8e9ed);border-radius:5px;padding:4px}.properties input[type=color]{height:25px;width:35px;padding:2px}.properties input[type=checkbox]{width:15px}.dimensions{display:flex;gap:8px}.dimensions label{display:block;width:50%}.dimensions input{width:100%;margin-top:4px}.presets{display:flex;gap:4px;margin-bottom:12px}.presets button{flex:1;font-size:9px;padding:2px 4px;border:1px solid var(--ui-line,#e8e9ed)}.prop-tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--ui-line,#eee);padding-bottom:6px}.prop-tabs button{flex:1;font-size:10px;padding:4px 6px}.prop-tabs button.active{background:var(--ui-soft,#fceff1);color:var(--ui-ink,#c14558);font-weight:600}.node-path{font-size:9px;color:#999;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:-4px 0 8px}.comment-head{display:flex;align-items:center;justify-content:space-between}.mini-btn{font-size:9px;padding:2px 4px;color:var(--ui-text-tertiary,#999)}.comment{padding:8px;border:1px solid var(--ui-line,#eee);border-radius:6px;margin-bottom:8px;font-size:10px}.comment-node{display:block;color:#aaa;font-size:9px}.comment p{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ui-text-secondary,#777);margin:5px 0}.comment-foot{display:flex;align-items:center;justify-content:space-between}.comment span{font-size:9px;color:#a5a6b0}.comment button{font-size:9px}.text-btn{width:100%;border:1px solid var(--ui-line,#eee)!important;margin-top:6px}.text-btn.primary-soft{background:var(--ui-soft,#fceff1);color:var(--ui-ink,#c14558);border-color:#f5c9cf!important}.text-btn.mini{padding:2px 6px;min-height:20px;font-size:9px}.token-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px}.token-row code{font-size:9px;color:#c14558}.token-row input{width:90px;font-size:10px;padding:2px 4px}.add-token{display:flex;flex-direction:column;gap:4px;margin-top:10px}.add-token input{width:100%;box-sizing:border-box}.card-item{padding:8px;border:1px solid var(--ui-line,#eee);border-radius:6px;margin-bottom:8px}.card-meta{display:flex;justify-content:space-between;align-items:center}.card-meta small{color:#999;font-size:9px}.card-file{font-size:9px;color:#888;font-family:monospace;margin:2px 0 4px}.empty-note{color:#aaa;font-size:9px;line-height:1.5}.quote{font-style:italic;color:#666;border-left:2px solid var(--ui-btn,#d94e60);padding-left:6px;margin:4px 0}.empty{padding:30px;color:#999;line-height:1.8}.errorbar{background:#fff0f0;color:#aa4250;font-size:10px;padding:7px 10px}.errorbar button{text-decoration:underline}footer{height:23px;flex:none;display:flex;align-items:center;gap:12px;padding:0 11px;border-top:1px solid var(--ui-line,#eee);font-size:9px;color:var(--ui-text-tertiary,#999)}.overlay{position:absolute;inset:0;z-index:20;background:#25273333;display:flex;align-items:center;justify-content:center}.dialog{width:350px;max-width:90%;max-height:85%;overflow:auto;background:var(--ui-surface,#fff);border:1px solid var(--ui-line,#eee);border-radius:10px;padding:18px;box-shadow:0 12px 40px #0002}.dialog h3{font-size:13px;margin:0 0 10px}.dialog p{font-size:11px;color:#999}.dialog textarea{width:100%;height:90px;resize:vertical;box-sizing:border-box;font:inherit;font-size:12px;line-height:1.6;color:inherit;background:var(--ui-control,#f8f8fa);border:1px solid var(--ui-line,#e8e9ed);border-radius:6px;padding:8px}.check{display:flex;align-items:center;gap:6px;font-size:11px;margin-top:9px}.actions{display:flex;gap:8px;justify-content:end;margin-top:15px}.actions .primary{background:var(--ui-btn,#d94e60);color:white}.source-dialog{width:750px}.source-dialog textarea{height:50vh;font:11px/1.7 monospace}.version-row{display:flex;justify-content:space-between;align-items:center;margin:8px 0;font-size:11px}@container(max-width:760px){.properties{position:absolute;right:0;top:0;bottom:0;z-index:4;box-shadow:-5px 0 20px #0001}.rail{width:115px}.saved{display:none}}
+.design-workbench{position:relative;container-type:inline-size;flex:1;display:flex;flex-direction:column;min-width:0;height:100%;background:var(--ui-surface,#fff);color:var(--ui-text-primary,#30333b);font-size:11px;outline:none}.design-workbench button{display:inline-flex;gap:4px;align-items:center;justify-content:center;border:0;background:transparent;color:inherit;font:inherit;border-radius:5px;cursor:pointer;min-height:25px;padding:3px 6px}.design-workbench button:hover:not(:disabled){background:var(--ui-control,#f0f0f4)}.design-workbench button:disabled{opacity:.35;cursor:default}.spacer{flex:1}header{display:flex;gap:7px;align-items:center;height:39px;flex:none;padding:0 10px;border-bottom:1px solid var(--ui-line,#e8e9ed)}header b{font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.brand{color:var(--ui-btn,#d94e60)}.saved{color:#8c9b91;font-size:9px}.saved.error{color:#d05b65}.tools{height:36px;display:flex;align-items:center;gap:2px;flex:none;padding:0 7px;border-bottom:1px solid var(--ui-line,#e8e9ed)}.tools select{max-width:110px;font:inherit;color:inherit;background:transparent;border:0}.tools i{width:1px;height:14px;background:var(--ui-line,#e8e9ed);margin:0 4px}.tools button.on{background:var(--ui-soft,#fceff1);color:var(--ui-ink,#c14558)}.zoom{font-size:9px;min-width:30px;text-align:center}.export{position:relative}.export summary{display:flex;align-items:center;gap:4px;cursor:pointer;padding:4px;font-size:10px}.export>div{position:absolute;right:0;top:100%;z-index:5;background:var(--ui-surface,#fff);border:1px solid var(--ui-line,#eee);border-radius:6px;padding:5px;min-width:130px;box-shadow:0 5px 16px #0001}.export>div button{width:100%;justify-content:start}.editor{display:flex;flex:1;min-height:0;position:relative}.rail{width:132px;flex:none;padding:10px 6px;border-right:1px solid var(--ui-line,#eee);overflow:auto;background:var(--ui-surface,#fff)}.rail-head{padding:0 6px 9px;color:var(--ui-text-tertiary,#999);font-size:10px}.rail-head small{margin-left:5px}.rail>button{width:100%;justify-content:start;text-align:left;font-size:10px;padding:6px;gap:7px}.rail>button span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rail>button.active{background:var(--ui-soft,#fceff1);color:var(--ui-ink,#be4054)}.rail-actions{border-top:1px solid var(--ui-line,#eee);margin-top:10px;padding-top:8px;display:flex;justify-content:space-around}.viewport{flex:1;min-width:0;overflow:auto;background:var(--ui-surface-sunken,#f5f5f7);background-image:radial-gradient(#b5b7c233 .7px,transparent .7px);background-size:14px 14px;position:relative}.viewport.hand{cursor:grab}.viewport.hand:active{cursor:grabbing}.scroll-space{position:relative;min-width:100%;min-height:100%}.canvas{position:absolute;left:0;top:0;transform-origin:0 0}.artboard{position:absolute}.board-title{height:28px;display:flex;align-items:center;justify-content:space-between;color:#9799a5;font-size:13px;touch-action:none;user-select:none}.board-title b{font-weight:500;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.board-title b small{font-weight:400;font-size:10px;margin-left:4px;color:#aaa}.board-title button{font-size:12px}.surface{background:white;position:relative;outline:1px solid #dedfe6}.artboard.selected .surface{outline:3px solid var(--ui-btn,#d94e60)}.pending-board{display:grid;place-items:center;height:100%;font-size:18px;color:#999;background:#fafafa}.pan-shield{position:absolute;inset:0;touch-action:none}.render-error{position:absolute;bottom:0;left:0;right:0;background:#fff0f0;color:#b54454;padding:12px;font-size:14px}.render-error button{border:1px solid #efb5c0;margin-left:12px}.properties{width:220px;flex:none;padding:13px 12px;overflow:auto;border-left:1px solid var(--ui-line,#eee);background:var(--ui-surface,#fff)}.properties h3{font-size:11px;margin:0 0 14px}.properties h4{font-size:10px;border-top:1px solid var(--ui-line,#eee);padding-top:12px;margin:12px 0}.properties label{display:flex;justify-content:space-between;align-items:center;gap:9px;margin:9px 0;font-size:10px;color:var(--ui-text-secondary,#777)}.properties input,.properties select{font:inherit;min-width:0;width:115px;background:var(--ui-control,#f8f8fa);color:var(--ui-text-primary,#333);border:1px solid var(--ui-line,#e8e9ed);border-radius:5px;padding:4px}.properties input[type=color]{height:25px;width:35px;padding:2px}.properties input[type=checkbox]{width:15px}.dimensions{display:flex;gap:8px}.dimensions label{display:block;width:50%}.dimensions input{width:100%;margin-top:4px}.presets{display:flex;gap:4px;margin-bottom:12px}.presets button{flex:1;font-size:9px;padding:2px 4px;border:1px solid var(--ui-line,#e8e9ed)}.prop-tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--ui-line,#eee);padding-bottom:6px}.prop-tabs button{flex:1;font-size:10px;padding:4px 6px}.prop-tabs button.active{background:var(--ui-soft,#fceff1);color:var(--ui-ink,#c14558);font-weight:600}.node-path{font-size:9px;color:#999;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:-4px 0 8px}.comment-head{display:flex;align-items:center;justify-content:space-between}.mini-btn{font-size:9px;padding:2px 4px;color:var(--ui-text-tertiary,#999)}.comment{padding:8px;border:1px solid var(--ui-line,#eee);border-radius:6px;margin-bottom:8px;font-size:10px}.comment-node{display:block;color:#aaa;font-size:9px}.comment p{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ui-text-secondary,#777);margin:5px 0}.comment-foot{display:flex;align-items:center;justify-content:space-between}.comment span{font-size:9px;color:#a5a6b0}.comment button{font-size:9px}.text-btn{width:100%;border:1px solid var(--ui-line,#eee)!important;margin-top:6px}.text-btn.primary-soft{background:var(--ui-soft,#fceff1);color:var(--ui-ink,#c14558);border-color:#f5c9cf!important}.text-btn.mini{padding:2px 6px;min-height:20px;font-size:9px}.token-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px}.token-row code{font-size:9px;color:#c14558}.token-row input{width:90px;font-size:10px;padding:2px 4px}.add-token{display:flex;flex-direction:column;gap:4px;margin-top:10px}.add-token input{width:100%;box-sizing:border-box}.card-item{padding:8px;border:1px solid var(--ui-line,#eee);border-radius:6px;margin-bottom:8px}.card-meta{display:flex;justify-content:space-between;align-items:center}.card-meta small{color:#999;font-size:9px}.card-file{font-size:9px;color:#888;font-family:monospace;margin:2px 0 4px}.empty-note{color:#aaa;font-size:9px;line-height:1.5}.quote{font-style:italic;color:#666;border-left:2px solid var(--ui-btn,#d94e60);padding-left:6px;margin:4px 0}.empty{padding:30px;color:#999;line-height:1.8}.errorbar{background:#fff0f0;color:#aa4250;font-size:10px;padding:7px 10px}.errorbar button{text-decoration:underline}footer{height:23px;flex:none;display:flex;align-items:center;gap:12px;padding:0 11px;border-top:1px solid var(--ui-line,#eee);font-size:9px;color:var(--ui-text-tertiary,#999)}.overlay{position:absolute;inset:0;z-index:20;background:#25273333;display:flex;align-items:center;justify-content:center}.dialog{width:350px;max-width:90%;max-height:85%;overflow:auto;background:var(--ui-surface,#fff);border:1px solid var(--ui-line,#eee);border-radius:10px;padding:18px;box-shadow:0 12px 40px #0002}.dialog h3{font-size:13px;margin:0 0 10px}.dialog p{font-size:11px;color:#999}.dialog textarea{width:100%;height:90px;resize:vertical;box-sizing:border-box;font:inherit;font-size:12px;line-height:1.6;color:inherit;background:var(--ui-control,#f8f8fa);border:1px solid var(--ui-line,#e8e9ed);border-radius:6px;padding:8px}.check{display:flex;align-items:center;gap:6px;font-size:11px;margin-top:9px}.actions{display:flex;gap:8px;justify-content:end;margin-top:15px}.actions .primary{background:var(--ui-btn,#d94e60);color:white}.source-dialog{width:750px}.source-dialog textarea{height:50vh;font:11px/1.7 monospace}.version-row{display:flex;justify-content:space-between;align-items:center;margin:8px 0;font-size:11px}@container(max-width:760px){.properties{position:absolute;right:0;top:0;bottom:0;z-index:4;box-shadow:-5px 0 20px #0001}.rail{width:115px}.saved{display:none}}
 </style>

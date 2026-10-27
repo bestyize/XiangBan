@@ -56,6 +56,7 @@ mod assistant_hit_test;
 mod data_library;
 mod design;
 mod window_control;
+mod design_window;
 mod voice_turn;
 mod inference;
 mod network;
@@ -851,7 +852,7 @@ fn main() {
             chat::store_market::ai_market_updates, chat::store_market::ai_market_update,
             chat::plugins::ai_plugin_installed, chat::connectors::ai_connector_installed, chat::connectors::ai_connector_configure, chat::connectors::ai_connector_set_enabled, chat::connectors::ai_connector_unbind, chat::connectors::ai_connector_reauthorize, chat::connectors::ai_mentions, chat::plugins::ai_plugin_pick_file, chat::plugins::ai_plugin_inspect_file, chat::plugins::ai_plugin_install_file, chat::plugins::ai_plugin_remove, chat::plugins::ai_plugin_avatar,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
-            assistant_hit_test::assistant_set_regions, design::design_list, design::design_link, design::design_create, design::design_copy, design::design_read, design::design_save, design::design_draft_save, design::design_draft_clear, design::design_history, design::design_restore, design::design_import, design::design_export, data_library::library_state, data_library::library_pick_import, data_library::library_import_data, data_library::library_create_folder, data_library::library_rename_folder, data_library::library_delete_folder, data_library::library_move, data_library::library_update_doc, data_library::library_remove, data_library::library_reveal, data_library::library_attachment, data_library::library_add_link, data_library::library_rename_link, data_library::library_save, chat::memory_center::chat_memory_overview, chat::memory_center::chat_memory_set_remembering, chat::memory_center::chat_memory_edit_experience, chat::memory_center::chat_memory_forget_experience, chat::memory_center::chat_memory_write_note, chat::memory_center::chat_memory_delete_note, chat::memory_center::chat_memory_clear, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
+            assistant_hit_test::assistant_set_regions, design_window::design_window_open, design_window::design_window_status, design_window::design_window_return, design_window::design_window_close, design_window::design_window_request, design::design_view_read, design::design_view_save, design::design_list, design::design_link, design::design_create, design::design_copy, design::design_read, design::design_save, design::design_draft_save, design::design_draft_clear, design::design_history, design::design_restore, design::design_import, design::design_export, data_library::library_state, data_library::library_pick_import, data_library::library_import_data, data_library::library_create_folder, data_library::library_rename_folder, data_library::library_delete_folder, data_library::library_move, data_library::library_update_doc, data_library::library_remove, data_library::library_reveal, data_library::library_attachment, data_library::library_add_link, data_library::library_rename_link, data_library::library_save, chat::memory_center::chat_memory_overview, chat::memory_center::chat_memory_set_remembering, chat::memory_center::chat_memory_edit_experience, chat::memory_center::chat_memory_forget_experience, chat::memory_center::chat_memory_write_note, chat::memory_center::chat_memory_delete_note, chat::memory_center::chat_memory_clear, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
             chat_screenshot, float_assistant::assistant_screenshot, float_assistant::assistant_drag, float_assistant::assistant_unfold, float_assistant::assistant_focus,
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
             float_assistant::assistant_reanchor_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
@@ -862,12 +863,12 @@ fn main() {
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
-            if command.starts_with("design_") && label != "control" { invoke.resolver.reject("只能在主窗口访问设计稿"); return true; }
+            if command.starts_with("design_") && design_window::permitted(label,command)!=Some(true) { invoke.resolver.reject("只能在主窗口访问设计稿"); return true; }
             if command.starts_with("asr_") && label != "control" && label != float_assistant::LABEL {
                 invoke.resolver.reject("只能在聊天和声音设置中使用语音识别");
                 return true;
             }
-            let allowed=capture_editor::permitted(label,command).or_else(||companion_dialogue::permitted(label,command)).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
+            let allowed=design_window::permitted(label,command).or_else(||capture_editor::permitted(label,command)).or_else(||companion_dialogue::permitted(label,command)).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if matches!(command, "get_network_config" | "save_network_config" | "test_network_connection") { return label=="control"; }
                 if matches!(command, "reset_screen_capture_permission" | "open_screen_capture_settings") { return label=="control"; }
                 // 资料库 is managed from the console; 超级小伴 may only save into it (see float_assistant's shared list).

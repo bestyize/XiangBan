@@ -23,7 +23,7 @@ async function open(responders: Record<string, Responder> = {}, options: { deskt
   const handlers = new Map<string, (payload: never) => void>();
   const calls: [string, Record<string, unknown> | undefined][] = [];
   const bridgeHandlers = new Map<string, Set<(payload: never) => void>>();
-  const table: Record<string, Responder> = { design_list: () => [], chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
+  const table: Record<string, Responder> = { design_window_status:()=>false, design_view_read:()=>null, design_view_save:()=>null, design_list: () => [], chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
   // Background model/context/design reads have their own assertions; chat command order stays focused on sending and loading.
   const contextCalls: (Record<string, unknown> | undefined)[] = [];
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {

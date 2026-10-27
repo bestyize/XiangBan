@@ -92,4 +92,15 @@ describe('compact design workbench',()=>{
   const w=await open();expect(w.text()).toContain('生成中');expect(w.findAll('iframe')).toHaveLength(1);expect(w.text()).toContain('画板尚未生成');
  });
 
+ it('saves canvas view before detaching, and offers docking in an independent window',async()=>{
+  const w=await open();await click('独立窗口');
+  expect(mocks.invoke).toHaveBeenCalledWith('design_view_save',expect.objectContaining({id:fixture().id,view:expect.objectContaining({scale:.4,selected:'Main.dc.html'})}));
+  expect(w.emitted('detach')).toHaveLength(1);await w.setProps({detached:true});await click('回到分屏');expect(w.emitted('dock')).toHaveLength(1);
+ });
+ it('applies zoom shortcuts without intercepting source text entry',async()=>{
+  const w=await open();const root=w.get('[data-testid="design-workbench"]');await root.trigger('keydown',{key:'+'});expect(w.get('.zoom').text()).toBe('48%');
+  await root.trigger('keydown',{key:'1'});expect(w.get('.zoom').text()).toBe('100%');
+  await click('画板源代码');await w.get('.source-dialog textarea').trigger('keydown',{key:'-'});expect(w.get('.zoom').text()).toBe('100%');
+ });
+
 });
