@@ -227,6 +227,9 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
     Permission::new(mode, approver).danger_check_in_session(move |session, tool, args| {
         // In Auto mode, always_ask alone does not trigger approval when a danger
         // policy is installed; third-party skill installation must be flagged here.
+        if tool == "phone_pack_install" {
+            return Some("下载或更新第三方手机操作包需要确认来源及固定摘要；安装不会执行脚本或覆盖本机学习补丁".to_string());
+        }
         if tool == "skill_install" || tool == "skill_run" || tool == "connector_call" || tool.starts_with("mcp_ext_") {
             return Some("安装第三方 Skill、执行脚本或调用外部 MCP 工具必须逐次经过用户确认".to_string());
         }
@@ -711,6 +714,13 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         for tool in agent_computer_use_tools::checked_tools(mcp_client, &desktop.computer_use_runtime_root()?) {
             builder = builder.deferred_tool_arc(tool);
         }
+    }
+    // Android packs have their own package-name namespace and learned patch layer.
+    // Tool schemas and pack bodies are discovered on demand; ADB is never started at chat setup.
+    let phone_store = agent_phone_use_tools::Store::new(dirs.chat.join("phone-packs"));
+    let adb = agent_phone_use_tools::adb::Adb::new(std::env::var_os("XIAOBAN_ADB").map(PathBuf::from).unwrap_or_else(|| PathBuf::from("adb")));
+    for tool in agent_phone_use_tools::tools(phone_store, adb, workspace.to_path_buf()) {
+        builder = builder.deferred_tool_arc(tool);
     }
     for tool in connector_tools { builder = builder.deferred_tool_arc(tool); }
     for tool in team_tools { builder = builder.tool_arc(tool); }

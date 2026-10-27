@@ -28,6 +28,7 @@ dirs = "6"
 chrono = { version = "0.4", features = ["clock", "serde"] }
 getrandom = "0.3"
 agent-computer-use-tools = { path = "../../../libs/agent-tools/computer-use" }
+agent-phone-use-tools = { path = "../../../libs/agent-tools/phone-use" }
 open-claude-design = { path = "../../../libs/agent-tools/open-claude-design" }
 agent-file-tools = { path = "../../../libs/agent-tools/files" }
 agent-learning = { path = "../../../libs/agent-learning" }

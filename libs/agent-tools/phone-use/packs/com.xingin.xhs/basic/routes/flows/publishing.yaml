@@ -1,0 +1,8 @@
+nodes:
+  - {id: album, title: 选择素材, page: pages/album-picker.md, role: feature, priority: 0.9, stability: 0.7, confidence: 0.2}
+  - {id: editor, title: 编辑图文, page: pages/note-editor.md, role: feature, priority: 0.9, stability: 0.7, confidence: 0.2}
+  - {id: result, title: 发布结果, page: pages/publish-result.md, role: feature, priority: 0.8, stability: 0.6, confidence: 0.2}
+edges:
+  - {id: home-album, from: home, to: album, action: 根据当前页面识别发布入口并进入素材选择, role: feature, cost: 2, stability: 0.7, confidence: 0.2}
+  - {id: album-editor, from: album, to: editor, action: 按用户顺序选择指定素材并推进至编辑页, role: feature, cost: 3, stability: 0.7, confidence: 0.2}
+  - {id: editor-result, from: editor, to: result, action: 核对内容及发布授权后提交一次并检查结果, role: feature, cost: 2, stability: 0.6, confidence: 0.2}

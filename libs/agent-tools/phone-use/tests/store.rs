@@ -59,6 +59,8 @@ fn exact_version_patch_overrides_but_update_keeps_and_invalidates_it() {
     install(&store,archive("1",&[]));
     store.save_patch(PACKAGE,"pages/home.md","修正后的首页",patch("1")).unwrap();
     assert_eq!(store.read(PACKAGE,"pages/home.md",Some("8.1"),0,100,Utc::now()).unwrap().source,"patch/pages/home.md");
+    assert!(!store.read(PACKAGE,"pages/home.md",Some("8.1"),0,100,Utc::now()).unwrap().verified_app_version,
+        "recording a patch must not certify the whole app version");
     for version in [None,Some("8.2")] {
         assert_eq!(store.read(PACKAGE,"pages/home.md",version,0,100,Utc::now()).unwrap().source,"basic/pages/home.md");
     }
@@ -159,6 +161,18 @@ fn patch_rejects_traversal_missing_evidence_and_wrong_base() {
     assert!(store.save_patch(PACKAGE,"pages/home.md","body",patch("old")).is_err());
     let mut info=patch("1"); info.evidence.clear();
     assert!(store.save_patch(PACKAGE,"pages/home.md","body",info).is_err());
+}
+
+#[cfg(windows)]
+#[test]
+fn windows_package_case_alias_cannot_replace_another_android_identity() {
+    let temp=tempfile::tempdir().unwrap(); let store=Store::new(temp.path()); install(&store,archive("1",&[]));
+    let alias=PACKAGE.to_uppercase();
+    let meta=json!({"package_name":alias,"name":"alias","description":"alias","version":"2","verified_app_versions":[]}).to_string();
+    let bytes=zip_entries(&[("skill.md","alias"),("basic/package.json",&meta)]);
+    let hash=format!("{:x}",Sha256::digest(&bytes));
+    assert!(store.install(&alias,&bytes,&hash).is_err());
+    assert_eq!(store.metadata(PACKAGE).unwrap().version,"1");
 }
 
 #[cfg(unix)]

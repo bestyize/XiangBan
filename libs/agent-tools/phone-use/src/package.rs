@@ -126,6 +126,21 @@ pub fn page(text: &str, source: &str, offset: usize, limit: usize, verified: boo
 impl Store {
     pub fn new(root: impl Into<PathBuf>) -> Self { Self { root: root.into() } }
 
+    pub fn contains(&self, package: &str) -> Result<bool> {
+        if !valid_package(package) { return Err("invalid package name".into()); }
+        if !self.root.exists() { return Ok(false); }
+        Ok(self.dir(package)?.exists())
+    }
+
+    pub fn asset(&self, package: &str, path: &str) -> Result<Vec<u8>> {
+        let _guard = STORE_LOCK.lock().map_err(|_| "pack store lock poisoned")?;
+        if !path.starts_with("assets/") || !valid_path(path)
+            || !matches!(path.rsplit('.').next(), Some("png" | "jpg" | "jpeg" | "webp")) {
+            return Err("expected an image under assets/".into());
+        }
+        read_small(&safe_file(&self.dir(package)?, &format!("basic/{path}"))?)
+    }
+
     fn dir(&self, package: &str) -> Result<PathBuf> {
         if !valid_package(package) { return Err("invalid Android package name".into()); }
         safe_file(&self.root, package)
@@ -187,7 +202,8 @@ impl Store {
         if patch.exists() {
             let (info, text) = split_patch(&read_small(&patch)?)?;
             if info.applies(&meta, app_version, now) {
-                return page(&text, &format!("patch/{path}"), offset, limit, true);
+                // A learned correction is not independent certification of the whole APP version.
+                return page(&text, &format!("patch/{path}"), offset, limit, verified);
             }
         }
         let text = String::from_utf8(read_small(&safe_file(&dir, &format!("basic/{path}"))?)?).map_err(|_| "not a UTF-8 text asset")?;
@@ -294,6 +310,8 @@ impl Store {
         let destination = self.dir(package)?;
         fs::create_dir_all(stage.path().join("patch")).map_err(|e| e.to_string())?;
         if destination.exists() {
+            // A case-insensitive host must not let a differently cased Android identity replace this pack.
+            self.metadata_unlocked(package)?;
             let patch = safe_file(&destination, "patch")?;
             let mut files = Vec::new();
             collect(&patch, "", &mut files, &mut 0)?;
