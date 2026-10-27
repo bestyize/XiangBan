@@ -1,0 +1,18 @@
+schema: 1
+package_name: com.xingin.xhs
+name: 打开图文相册
+description: 参考9.51.0实机页面资料的本地导航工作流；此执行器尚未真机性能验收。到达相册后交回模型识别指定素材，不自动猜测缩略图。
+app_versions: ["9.51.0"]
+parameters: {}
+steps:
+  - action: launch
+  - action: tap
+    selector: {description: 发布}
+  - action: wait
+    selector: {text: 从相册选择}
+  - action: tap
+    selector: {text: 从相册选择}
+  - action: wait
+    selector: {text: 草稿箱}
+  - action: yield
+    reason: 已到相册。用当前截图核对用户指定素材并选择，再进入图片编辑；不要重放之前的打开步骤。选图后可审查并运行prepare-image-note.yaml。

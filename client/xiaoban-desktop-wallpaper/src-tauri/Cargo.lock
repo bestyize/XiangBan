@@ -98,6 +98,7 @@ dependencies = [
  "agent-kernel",
  "base64 0.22.1",
  "chrono",
+ "getrandom 0.3.4",
  "quick-xml 0.42.0",
  "reqwest",
  "serde",

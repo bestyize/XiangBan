@@ -1,0 +1,23 @@
+schema: 1
+package_name: com.xingin.xhs
+name: 准备图文内容
+description: 从已选好指定图片的图片编辑页进入正文编辑，填写空标题和正文并逐字段核验；停在预览，不提交或存草稿。此执行器仅经模拟验证。
+app_versions: ["9.51.0"]
+parameters:
+  title: {description: 用户指定的标题, max_bytes: 240}
+  body: {description: 用户指定的正文, max_bytes: 12000}
+steps:
+  - action: wait
+    selector: {text: 下一步}
+  - action: tap
+    selector: {text: 下一步}
+  - action: wait
+    selector: {text: 添加标题, class: android.widget.EditText}
+  - action: fill
+    selector: {text: 添加标题, class: android.widget.EditText}
+    parameter: title
+  - action: fill
+    selector: {text: 添加正文, class: android.widget.EditText}
+    parameter: body
+  - action: verify_fields
+    parameters: [title, body]

@@ -2,6 +2,6 @@
   "package_name": "com.xingin.xhs",
   "name": "小红书",
   "description": "小米17 Android16 / 小红书9.51.0已验证传图、选图、图片编辑及中文标题正文准备；实际发布和发布结果核验仍待授权验收。",
-  "version": "0.2.0-device-preview",
+  "version": "0.3.0-local-workflows",
   "verified_app_versions": []
 }
