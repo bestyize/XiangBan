@@ -1,7 +1,11 @@
 // @vitest-environment happy-dom
 import {describe,it,expect} from 'vitest';
-import {addBoard,boardsOf,changeBoard,clone,patchNode,patchProp,propsOf,removeBoard,sourceDoc,targetFile,type Project} from './model.ts';
-export const fixture=():Project=>({id:'design-012345678901234567890123',title:'多屏作品',sessionId:'s1',revision:1,updatedMs:1,canvas:{v:3,boards:{'Main.dc.html':{x:0,y:0,w:390,h:844,title:'首页',custom:{keep:true}}},order:['Main.dc.html'],notes:{},unknown:123},files:{'Main.dc.html':`<!doctype html><html><head></head><body><x-dc><h1>标题</h1><p>{{title}}</p></x-dc><script type="text/x-dc" data-dc-script data-props='{"tone":{"editor":"enum","default":"light","options":["light","dark"]}}'>class Component extends DCLogic { renderVals(){ return {title:'动态文字'}; } }</script></body></html>`}});
+import {
+  addBoard,boardsOf,changeBoard,clone,patchNode,patchProp,propsOf,removeBoard,sourceDoc,targetFile,
+  tokensOf,setToken,dsCardsOf,insertComponentImport,formatCommentPrompt,toMarkdownSpec,type Project
+} from './model.ts';
+export const fixture=():Project=>({id:'design-012345678901234567890123',title:'多屏作品',sessionId:'s1',revision:1,updatedMs:1,canvas:{v:3,boards:{'Main.dc.html':{x:0,y:0,w:390,h:844,title:'首页',custom:{keep:true}}},order:['Main.dc.html'],notes:{},designSystems:[{name:'Brand',tokens:{primary:'#d94e60'}}],unknown:123},files:{'Main.dc.html':`<!-- @dsCard group="Screens" name="Main Screen" subtitle="Home" -->\n<!doctype html><html><head></head><body><x-dc><h1>标题</h1><p>{{title}}</p></x-dc><script type="text/x-dc" data-dc-script data-props='{"tone":{"editor":"enum","default":"light","options":["light","dark"]}}'>class Component extends DCLogic { renderVals(){ return {title:'动态文字'}; } }</script></body></html>`,'components/Card.dc.html':'<!-- @dsCard group="Cards" name="Item Card" -->\n<x-dc><div class="card">Card</div></x-dc>'}});
+
 describe('design source adapter',()=>{
  it('edits v3 and legacy indexes while retaining unknown source and canvas metadata',()=>{
   for(const legacy of [false,true]){const p=fixture();if(legacy){p.canvas={artboards:boardsOf(p.canvas),pages:[{id:'p1'}],unknown:123};}
@@ -17,5 +21,41 @@ describe('design source adapter',()=>{
   expect(targetFile('pages/Main.dc.html','../Settings.dc.html',['Settings.dc.html'])).toBe('Settings.dc.html');
   for(const url of ['https://example.com','file:///private','#anchor','/Settings.dc.html','missing.dc.html'])expect(targetFile('Main.dc.html',url,['Settings.dc.html'])).toBeNull();
   expect(clone(fixture())).toEqual(fixture());
+ });
+ it('manages design tokens, cards, imports, and formats single and batch comment prompts',()=>{
+  const p=fixture();
+  expect(tokensOf(p.canvas).primary).toBe('#d94e60');
+  setToken(p,'secondary','#4a90e2');
+  expect(tokensOf(p.canvas).secondary).toBe('#4a90e2');
+  setToken(p,'secondary','');
+  expect(tokensOf(p.canvas).secondary).toBeUndefined();
+
+  const cards=dsCardsOf(p);
+  expect(cards).toHaveLength(2);
+  expect(cards.find(c=>c.name==='Main Screen')?.group).toBe('Screens');
+  expect(cards.find(c=>c.name==='Item Card')?.group).toBe('Cards');
+
+  const withImport=insertComponentImport(p.files['Main.dc.html'],'components/Card.dc.html');
+  expect(withImport).toContain('<dc-import src="components/Card.dc.html"></dc-import>');
+
+  const promptSingle=formatCommentPrompt(p,[{id:'c1',file:'Main.dc.html',node:'n0',path:'h1',quote:'标题',text:'换成问候语',revision:1,status:'saved'}]);
+  expect(promptSingle).toContain('Main.dc.html');
+  expect(promptSingle).toContain('元素 n0');
+  expect(promptSingle).toContain('路径 h1');
+  expect(promptSingle).toContain('换成问候语');
+  expect(promptSingle).toContain('先读取最新版');
+
+  const promptBatch=formatCommentPrompt(p,[
+    {id:'c1',file:'Main.dc.html',node:'n0',text:'第一条',revision:1,status:'saved'},
+    {id:'c2',file:'Main.dc.html',node:'n1',text:'第二条',revision:1,status:'saved'},
+  ]);
+  expect(promptBatch).toContain('批量处理设计稿');
+  expect(promptBatch).toContain('1. [c1]');
+  expect(promptBatch).toContain('2. [c2]');
+
+  const md=toMarkdownSpec(p);
+  expect(md).toContain('多屏作品');
+  expect(md).toContain('--ds-primary');
+  expect(md).toContain('Item Card');
  });
 });

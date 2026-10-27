@@ -81,8 +81,8 @@ pub fn boards(canvas: &Value) -> Result<Vec<(String, Value)>, String> {
 pub fn validate(project: &Project) -> Result<(), String> {
     if project.title.trim().is_empty() || project.title.chars().count() > 120 { return Err("标题需要 1 到 120 个字".into()); }
     if project.session_ids.len()>64 || project.session_ids.iter().any(|id|id.is_empty()||id.len()>200||id.chars().any(char::is_control)){return Err("关联会话无效或超过 64 个".into());}
-    let source_count=project.files.iter().filter(|(name,text)|!((name.as_str()=="support.js"||name.ends_with("/support.js"))&&text.as_str()==RUNTIME)).count();
-    if source_count > 300 || project.files.len()>400 { return Err("设计稿文件过多".into()); }
+    let source_count=project.files.iter().filter(|(name,text)|!(((name.as_str()=="support.js"||name.ends_with("/support.js"))&&text.as_str()==RUNTIME)||name.as_str()=="_ds_manifest.json"||name.ends_with("/_ds_manifest.json"))).count();
+    if source_count > 300 || project.files.len()>405 { return Err("设计稿文件过多".into()); }
     for (name, text) in &project.files {
         if !file_name(name) { return Err(format!("不支持的设计文件路径：{name}")); }
         if text.len() > MAX_FILE { return Err(format!("{name} 超过 2MiB")); }
@@ -202,9 +202,9 @@ static CREATE_LOCK: Mutex<()> = Mutex::new(());
 impl DesignTool {
     pub fn new(store: Store, saved: impl Fn(&Project) -> Result<(), String> + Send + Sync + 'static) -> Self {
         Self { spec: ToolSpec::new(NAME,
-            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax. create/save write a complete project atomically; save requires expected_revision. read returns canvas and optional file contents; list is scoped to this conversation. Does not publish or install anything.",
+            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax. create/save write a complete project atomically; save requires expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list is scoped to this conversation. Does not publish or install anything.",
             json!({"type":"object","properties":{
-                "action":{"type":"string","enum":["format","list","read","create","save"]},
+                "action":{"type":"string","enum":["format","list","read","manifest","create","save"]},
                 "id":{"type":"string"},"title":{"type":"string"},"expected_revision":{"type":"integer","minimum":1},
                 "canvas":{"type":"object"},"files":{"type":"object","additionalProperties":{"type":"string"}},"file":{"type":"string"},"request_id":{"type":"string"}
             },"required":["action"],"additionalProperties":false})).risk(Risk::Write).max_output(64_000), store, saved: Arc::new(saved) }
@@ -215,6 +215,10 @@ impl DesignTool {
         match args["action"].as_str().ok_or("缺少 action")? {
             "format" => Ok(json!({"format": FORMAT})),
             "list" => Ok(json!(self.store.list(ctx.session())?.iter().map(summary).collect::<Vec<_>>())),
+            "manifest" => {
+                let p = self.store.load(get_id()?)?;
+                Ok(archive::ds_manifest(&p))
+            }
             "read" => {
                 let mut p = self.store.load(get_id()?)?;
                 if p.session_id!=ctx.session()&&!p.session_ids.iter().any(|id|id==ctx.session()) {
@@ -223,7 +227,7 @@ impl DesignTool {
                 // Opening a library project in a new conversation links the same source, never a copy.
                 (self.saved)(&p)?;
                 let file = args["file"].as_str().map(|name| p.files.get(name).map(|text| json!({"name":name,"text":text})).ok_or("设计文件不存在")).transpose()?;
-                Ok(json!({"project":summary(&p),"canvas":p.canvas,"files":p.files.keys().collect::<Vec<_>>(),"file":file}))
+                Ok(json!({"project":summary(&p),"canvas":p.canvas,"files":p.files.keys().collect::<Vec<_>>(),"file":file,"manifest":archive::ds_manifest(&p)}))
             }
             action @ ("create" | "save") => {
                 let files: BTreeMap<String,String> = serde_json::from_value(args["files"].clone()).map_err(|_| "files 需要是文件名到内容的映射")?;

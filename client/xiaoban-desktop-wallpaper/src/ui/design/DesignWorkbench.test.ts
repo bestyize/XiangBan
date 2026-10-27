@@ -46,4 +46,44 @@ describe('compact design workbench',()=>{
   expect(w.text()).toContain('AI 最新版本');expect((w.get('[title="撤销"]').element as HTMLButtonElement).disabled).toBe(true);
  });
 
+ it('supports batch sending pending comments and manages design system tokens',async()=>{
+  const withComments:Project={
+    ...fixture(),
+    canvas:{
+      ...fixture().canvas,
+      designSystems:[{name:'Brand',tokens:{primary:'#d94e60'}}],
+      xiaoban:{
+        comments:[
+          {id:'c1',file:'Main.dc.html',node:'n0',text:'第一条批注',revision:1,status:'saved'},
+          {id:'c2',file:'More.dc.html',node:'n1',text:'第二条批注',revision:1,status:'saved'},
+        ]
+      }
+    }
+  };
+  mocks.invoke.mockImplementation(async(command,args)=>{
+    if(command==='design_read')return {project:withComments,origin:'design-preview://localhost'};
+    if(command==='design_save')return {project:{...args.project,revision:args.expectedRevision+1},origin:'design-preview://localhost'};
+    if(command==='design_export')return 'exported.md';
+  });
+  const w=await open();
+  await click('属性面板');
+  expect(w.text()).toContain('全部发给小伴 (2)');
+  await w.get('.primary-soft').trigger('click');
+  await flushPromises();
+  const req=w.emitted('request')![0];
+  expect(req[0]).toContain('批量处理设计稿');
+  expect(req[0]).toContain('1. [c1]');
+  expect(req[0]).toContain('2. [c2]');
+
+  const dsTab=w.findAll('.prop-tabs button').find(b=>b.text()==='设计系统')!;
+  await dsTab.trigger('click');
+  await flushPromises();
+  expect(w.text()).toContain('--ds-primary');
+
+  const exportBtn=w.findAll('.export div button').find(b=>b.text().includes('Markdown'))!;
+  await exportBtn.trigger('click');
+  await flushPromises();
+  expect(mocks.invoke).toHaveBeenCalledWith('design_export',expect.objectContaining({format:'md'}));
+ });
+
 });
