@@ -413,7 +413,7 @@ async function openLink(href: string) {
       </div>
 
       <div ref="scroller" class="chat-scroll" data-testid="chat-messages" @scroll.passive="onScroll">
-        <div class="chat-column">
+        <div class="chat-column" :class="{ 'has-messages': !!view?.items.length }">
           <p v-if="!chat.ready" class="state-line">正在读取对话…</p>
           <div v-else-if="!store.desktop" class="info-card" data-testid="chat-preview-only"><b>请在桌面应用中使用聊天</b><p>浏览器预览里只能看到界面。</p></div>
           <div v-else-if="!chat.configured && !view?.items.length" class="info-card" data-testid="chat-unconfigured">
@@ -745,5 +745,7 @@ async function openLink(href: string) {
   .bubble{max-width:90%}
   .head-search input{width:100px}
 }
+/* The visible composer pet extends 92px upward; keep the last message above it. */
+@media(min-width:621px){.chat-column.has-messages{padding-bottom:112px}}
 @media(prefers-reduced-motion:reduce){.spin,.cursor{animation:none}}
 </style>
