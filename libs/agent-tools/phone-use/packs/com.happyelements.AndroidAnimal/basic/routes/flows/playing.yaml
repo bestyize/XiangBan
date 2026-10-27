@@ -1,0 +1,6 @@
+nodes:
+  - {id: board, title: 关卡棋盘, page: pages/board.md, role: feature, priority: 1.0, stability: 0.8, confidence: 0.2}
+  - {id: result, title: 关卡结果, page: pages/result.md, role: feature, priority: 0.8, stability: 0.7, confidence: 0.2}
+edges:
+  - {id: map-board, from: map, to: board, action: 用户进入已选择的关卡后接手观察, role: feature, cost: 1, stability: 0.8, confidence: 0.2}
+  - {id: board-result, from: board, to: result, action: 连续观察和单步操作直到当前关卡结束, role: feature, cost: 10, stability: 0.5, confidence: 0.2}

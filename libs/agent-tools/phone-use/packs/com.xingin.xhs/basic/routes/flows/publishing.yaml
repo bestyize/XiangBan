@@ -1,0 +1,12 @@
+nodes:
+  - {id: creation, title: 发布方式面板, page: pages/creation-methods.md, role: feature, priority: 0.9, stability: 0.6, confidence: 0.8}
+  - {id: album, title: 选择素材, page: pages/album-picker.md, role: feature, priority: 0.9, stability: 0.7, confidence: 0.2}
+  - {id: editor, title: 编辑图文, page: pages/note-editor.md, role: feature, priority: 0.9, stability: 0.7, confidence: 0.2}
+  - {id: image-editor, title: 图片编辑, page: pages/image-editor.md, role: feature, priority: 0.8, stability: 0.6, confidence: 0.8}
+  - {id: result, title: 发布结果, page: pages/publish-result.md, role: feature, priority: 0.8, stability: 0.6, confidence: 0.2}
+edges:
+  - {id: home-creation, from: home, to: creation, action: 在当前首页以描述发布定位入口后观察方式面板, role: feature, cost: 1, stability: 0.7, confidence: 0.8}
+  - {id: creation-album, from: creation, to: album, action: 在方式面板选择文字从相册选择并核对相册页, role: feature, cost: 1, stability: 0.7, confidence: 0.8}
+  - {id: album-image-editor, from: album, to: image-editor, action: 观察并选择指定图片后点击描述下一步并核对图片编辑工具栏, role: feature, cost: 3, stability: 0.7, confidence: 0.8}
+  - {id: image-editor-editor, from: image-editor, to: editor, action: 点击文字下一步后确认标题与正文输入框, role: feature, cost: 1, stability: 0.7, confidence: 0.8}
+  - {id: editor-result, from: editor, to: result, action: 核对内容及发布授权后提交一次并检查结果, role: feature, cost: 2, stability: 0.6, confidence: 0.2}

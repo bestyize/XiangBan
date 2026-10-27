@@ -198,6 +198,37 @@ fn run(rig: &Rig, text: &str) -> (Result<agent_kernel::RunSummary, agent_kernel:
 }
 
 #[test]
+fn phone_packs_are_discovered_progressively_without_starting_a_device() {
+    let rig = rig("phone-pack-discovery", vec![
+        load(&["phone_pack_find", "phone_pack_read", "phone_routes"]),
+        call("find-phone", "phone_pack_find", json!({"query":"小红书"})),
+        call("read-phone", "phone_pack_read", json!({"package":"com.xingin.xhs","path":"skill.md"})),
+        call("route-phone", "phone_routes", json!({"package":"com.xingin.xhs","scope":"flows/publishing","from":"home","to":"result"})),
+        Step::text("已找到发布流程，尚未操作手机"),
+    ], Approval::Deny);
+    run(&rig, "查看小红书操作包").0.unwrap();
+    let outputs = tool_results(&rig).join("\n");
+    assert!(outputs.contains("com.xingin.xhs") && outputs.contains("requires_live_verification"), "{outputs}");
+    assert!(rig.dirs.chat.join("phone-packs/com.xingin.xhs/basic/package.json").exists());
+    assert!(!rig.dirs.skills().join("com.xingin.xhs").exists());
+    assert!(lock(&rig.asked).is_empty(), "local knowledge discovery does not need execution approval");
+}
+
+#[test]
+fn phone_pack_install_is_confirmed_in_full_trust_before_reading_or_downloading() {
+    let (rig, asked) = trusted_rig("phone-pack-install-confirm", vec![
+        load(&["phone_pack_install"]),
+        call("install-phone", "phone_pack_install", json!({"package":"com.example.phone","source":"https://invalid.example/pack.zip","sha256":"0".repeat(64)})),
+        Step::text("用户已拒绝安装"),
+    ]);
+    run(&rig,"安装操作包").0.unwrap();
+    assert_eq!(lock(&asked).len(),1);
+    assert_eq!(lock(&asked)[0].0,"phone_pack_install");
+    assert!(!rig.dirs.chat.join("phone-packs").exists());
+    assert!(tool_results(&rig).iter().any(|s|s.contains("denied")));
+}
+
+#[test]
 fn observed_chat_run_persists_events_and_keeps_legacy_chat_stream() {
     let rig = rig("observed-journal", vec![Step::text("任务已回答")], Approval::Once);
     let journal = JsonlRunLog::new(rig.dirs.runs().join("s1"));
@@ -294,13 +325,15 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     names.sort();
     let mut expected = vec![
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage", "skill_find",
-        "memory_read", "memory_write", "research", "experience_recall", "skill_search", "skill_inspect", "skill_install", "skill_read", "skill_run",
+        "memory_read", "memory_write", "research", "experience_recall", "skill_search", "skill_inspect", "skill_review_read", "skill_install", "skill_read", "skill_run", "connector_request", "connector_search",
         "tool_search", "tool_load",
     ];
     expected.sort();
     assert_eq!(names, expected, "only everyday tools are sent with every turn");
     let system = request.messages[0].text();
     let deferred = [
+        "connector_call",
+        "phone_devices", "phone_connect", "phone_observe", "phone_action", "phone_push_image", "phone_pack_find", "phone_pack_read", "phone_pack_install", "phone_patch_list", "phone_patch_save", "phone_routes", "phone_match3",
         "app_guide", "open_page", "desktop_settings_set", "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_read_format", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_read_format", "game_create", "game_delete",
         "request_accessibility_permission", "computer_use_diagnose", "computer_use_repair_permissions", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove",

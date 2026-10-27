@@ -1,0 +1,3 @@
+nodes:
+  - {id: home, title: 首页, page: pages/home.md, role: core, priority: 1.0, stability: 0.8, confidence: 0.2}
+edges: []
