@@ -164,7 +164,7 @@ pub async fn ai_gateway_tiers(app: tauri::AppHandle) -> Result<Vec<Tier>, Accoun
     Ok(tiers)
 }
 
-fn clean_tier(raw: &str) -> Result<String, String> {
+pub(crate) fn clean_tier(raw: &str) -> Result<String, String> {
     let tier = raw.trim();
     if tier.is_empty() {
         return Err("请先选择一个使用模式".into());

@@ -33,7 +33,7 @@ const unchanged = computed(() => gatewayActive.value && activeTier.value === pic
 const cardDescription = computed(() => {
   if (!props.store.desktop) return '在桌面应用中使用。';
   if (!uid.value) return '登录小伴账号即可使用，新用户有试用额度，不用自己准备密钥。';
-  return '选择日常或深入模式，按额度使用，可用兑换码充值。';
+  return '选择小伴 AI 提供的模型，按额度使用，可用兑换码充值。';
 });
 const cardFact = computed(() => {
   if (gatewayActive.value && activeTierName.value) return { label: '当前模式：', value: activeTierName.value };
@@ -160,8 +160,8 @@ watch(uid, () => {
   <template v-if="tiers.length && uid">
     <div class="xb-group-title">使用模式</div>
     <div class="xb-group" data-testid="gateway-modes">
-      <div class="xb-row">
-        <div class="xb-row-text"><b>小伴 AI 模式</b><span>{{ pickedTier?.description || '日常更快；深入会多想一步，适合复杂任务' }}{{ gatewayActive ? '' : '。选好后点“启用此服务商”生效' }}</span></div>
+      <div class="xb-row gw-modes-row">
+        <div class="xb-row-text"><b>小伴 AI 模式</b><span>{{ pickedTier?.description || '选择要使用的模型' }}{{ gatewayActive ? '' : '。选好后点“启用此服务商”生效' }}</span></div>
         <div class="xb-seg" role="radiogroup" aria-label="小伴 AI 模式">
           <button v-for="tier in tiers" :key="tier.tier" type="button" role="radio" :aria-checked="picked === tier.tier" :disabled="!tier.available || enabling" :title="tier.available ? undefined : '兑换付费额度后可用'" :data-testid="`gateway-mode-${tier.tier}`" @click="pickMode(tier.tier)">{{ tier.displayName }}</button>
         </div>
@@ -255,6 +255,9 @@ watch(uid, () => {
 .gw-status{font-size:12px;color:var(--ui-text-secondary)}
 .gw-status.is-warn{color:var(--ui-warning-text)}
 .gw-row .xb-btn,.gw-row .xb-btn-primary{flex-shrink:0}
+.gw-modes-row{align-items:flex-start;flex-direction:column}
+.gw-modes-row .xb-seg{flex-wrap:wrap;max-width:100%;gap:4px}
+.gw-modes-row .xb-seg>button{height:auto;min-height:26px;white-space:normal;overflow-wrap:anywhere;text-align:left}
 .gw-modal { display: grid; gap: 18px; }
 .gw-signin { display: grid; gap: 14px; justify-items: start; }
 .gw-signin p { margin: 0; line-height: 1.7; color: var(--ui-text-secondary); }

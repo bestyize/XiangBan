@@ -234,6 +234,35 @@ describe('小伴 AI dialog: balance and redeem', () => {
 });
 
 describe('小伴 AI dialog: chat model', () => {
+  it('lists server-defined tiers beyond two and keeps using their IDs after a refresh', async () => {
+    let modes: AiTier[] = [
+      { ...standard, tier: 'standrad', displayName: 'deepseek-v4.1-flash' },
+      { ...premiumOpen, displayName: 'claude-opus-5-5' },
+      { ...standard, tier: 'custom_model', displayName: '自定义模型', description: '', isDefault: false },
+    ];
+    backend({
+      ...defaults,
+      ai_gateway_tiers: () => modes,
+      use_ai_gateway: (args?: Record<string, unknown>) => aiConfig({ activeProvider: 'xiaoban-ai', gatewayTier: String(args?.tier) }),
+    });
+    mountCard(createStore(session('u1')), aiConfig({ activeProvider: 'xiaoban-ai', gatewayTier: 'premium' }));
+    await flushPromises();
+    await openDialog();
+    expect(q('gateway-tier-premium')!.getAttribute('aria-checked')).toBe('true');
+    for (const mode of modes) {
+      expect(text(`gateway-mode-${mode.tier}`)).toBe(mode.displayName);
+      expect(text(`gateway-tier-${mode.tier}`)).toContain(mode.displayName);
+    }
+    expect(text('gateway-card-fact')).toBe('claude-opus-5-5');
+    modes = [...modes, { ...standard, tier: 'another_model', displayName: '新增模型', isDefault: false }];
+    await click('gateway-refresh');
+    expect(text('gateway-tier-another_model')).toContain('新增模型');
+    await click('gateway-tier-custom_model');
+    await click('gateway-use-btn');
+    expect(ipc).toHaveBeenCalledWith('use_ai_gateway', { tier: 'custom_model' });
+    expect((wrapper!.emitted('config')![0][0] as AiConfigView).gatewayTier).toBe('custom_model');
+  });
+
   it('lists the tiers, preselects the default and locks a paid tier the account cannot use yet', async () => {
     backend(defaults);
     mountCard(createStore(session('u1')));

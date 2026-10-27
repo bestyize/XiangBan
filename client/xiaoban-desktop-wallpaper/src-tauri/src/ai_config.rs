@@ -253,9 +253,12 @@ impl AiConfig {
             return Err("模型名称不正确，请重新选择".into());
         }
         if selection.provider_id == crate::ai_gateway::GATEWAY_ID {
-            if !config.gateway_enabled || !["standard", "advanced"].contains(&model) { return Err("小伴 AI 模式不可用，请重新选择".into()); }
+            if !config.gateway_enabled { return Err("小伴 AI 入口已被关闭，暂时不能启用".into()); }
+            // Tier IDs belong to the gateway. Selection checks its latest list; requests are
+            // authorized by the gateway again, so restoring a session needs no fixed whitelist.
+            let tier = crate::ai_gateway::clean_tier(model)?;
             config.active_provider = selection.provider_id.clone();
-            config.model = model.into(); config.gateway_tier = model.into();
+            config.model = tier.clone(); config.gateway_tier = tier;
             config.protocol = "responses".into();
             // prepare() replaces the address and obtains a fresh account token before a request.
             config.base_url = format!("{}/v1", crate::ai_gateway::ai_base_url());
@@ -1226,6 +1229,37 @@ mod tests {
         assert_eq!(resolved.reply_preference(), ReplyPreference::Max);
         assert_eq!(config.gateway_tier, "standard");
         assert!(resolved.api_key.is_empty());
+    }
+
+    #[test]
+    fn conversation_gateway_restores_server_defined_tiers_without_changing_defaults() {
+        let config = AiConfig { gateway_tier: "standrad".into(), ..AiConfig::default() };
+        let original = config.clone();
+        for tier in ["standrad", "premium", "deepseek-flash", "claude-opus-5-5", "custom_tier_3"] {
+            let pick = SessionModel { provider_id: crate::ai_gateway::GATEWAY_ID.into(), model: tier.into(),
+                reply_preference: ReplyPreference::Default, reasoning_efforts: None };
+            let restored: SessionModel = serde_json::from_str(&serde_json::to_string(&pick).unwrap()).unwrap();
+            let resolved = config.for_session_model(&restored).unwrap();
+            assert_eq!(resolved.model, tier);
+            assert_eq!(resolved.gateway_tier, tier);
+            assert_eq!(resolved.protocol, "responses");
+            assert!(resolved.api_key.is_empty());
+            assert_eq!(config, original);
+        }
+    }
+
+    #[test]
+    fn conversation_gateway_rejects_invalid_tiers_and_a_closed_entry() {
+        let mut config = AiConfig::default();
+        let mut pick = SessionModel { provider_id: crate::ai_gateway::GATEWAY_ID.into(), model: "premium".into(),
+            reply_preference: ReplyPreference::Default, reasoning_efforts: None };
+        for tier in ["", "a b", "bad\nname", &"x".repeat(65)] {
+            pick.model = tier.into();
+            assert!(config.for_session_model(&pick).is_err(), "{tier:?}");
+        }
+        pick.model = "premium".into();
+        config.gateway_enabled = false;
+        assert!(config.for_session_model(&pick).unwrap_err().contains("入口已被关闭"));
     }
 
     const KEY: &str = "sk-abcdefghijklmnop1234";

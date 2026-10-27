@@ -49,6 +49,29 @@ async function dialog() {
 }
 
 describe('gateway in the composer model menu', () => {
+  it('selects any server-defined tier beyond the original two using its ID', async () => {
+    const dynamicTiers: AiTier[] = [
+      { ...tiers[0], tier: 'standrad', displayName: 'deepseek-v4.1-flash' },
+      { ...tiers[0], tier: 'premium', displayName: 'claude-opus-5-5', isDefault: false },
+      { ...tiers[0], tier: 'custom_model', displayName: '第三个模型', isDefault: false },
+    ];
+    ipc.mockImplementation(async (command, args) => {
+      if (command === 'ai_gateway_tiers') return structuredClone(dynamicTiers) as never;
+      if (command === 'chat_set_model') return args?.selection as never;
+      return structuredClone({ ...config, gatewayTier: 'premium', model: 'premium' }) as never;
+    });
+    const view = await composer();
+    for (const tier of dynamicTiers) {
+      expect(view.get(`[data-testid="chat-model-xiaoban-ai-${tier.tier}"]`).text()).toContain(tier.displayName);
+    }
+    await view.get('[data-testid="chat-model-xiaoban-ai-custom_model"]').trigger('click');
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('chat_set_model', expect.objectContaining({
+      selection: expect.objectContaining({ providerId: GATEWAY_PROVIDER, model: 'custom_model' }),
+    }));
+    expect(view.emitted('switched')).toHaveLength(1);
+  });
+
   it('keeps cached modes visible when reopening while both sources refresh', async () => {
     const view = await composer();
     await view.get('[data-testid="chat-workbench-model"]').trigger('click');
