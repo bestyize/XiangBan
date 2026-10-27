@@ -2,7 +2,7 @@
 
 参考包名：com.happyelements.AndroidAnimal。不同渠道版本可能使用不同身份，必须先检查实际包名，不能把此包自动用于不匹配的应用。
 
-本包是未经真机验证的单关操作种子；从 tasks/index.md 发现任务，再读 tasks/play-level.md。路由用 phone_routes(core / flows/playing)；棋盘规则按需读 knowledge/match3.md。
+小米 17 / Android 16 / 游戏 1.162 的第 4181 关已验证普通棋子局部评分与两次 ADB 交换，剩余步数 27→26→25；没有执行完整通关验收，verified_app_versions 仍为空。从 tasks/index.md 发现任务，再读 tasks/play-level.md。路由用 phone_routes(core / flows/playing)；棋盘规则按需读 knowledge/match3.md、knowledge/level-4181.md。
 
 首轮支持普通颜色棋子的局部交换评分，没有完整棋盘识别器、特殊棋子/障碍模拟或通关保证。每次通过截图观察，模型将可识别的普通棋盘转成矩阵，调用 phone_match3 在本地评分，然后只执行一手并重新观察。
 

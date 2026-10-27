@@ -4,7 +4,7 @@
 
 对话按需发现 `phone_` 工具，可通过本机 ADB 操作 USB / 无线 Android 设备；应用包以包名保存 `skill.md + basic/ + patch/`，支持 ZIP 导入 / HTTPS 下载、版本化补丁及分层页面路由。工具及种子包在 [phone-use](../../libs/agent-tools/phone-use/README.md)，方案见 [Android 手机操作](../../docs/agent/android-phone-use.md)。数据放在用户聊天目录的 `phone-packs/`；不与普通 Skill 混用目录。
 
-需要本机已安装 Android Platform Tools（PATH 中的 adb，可用 `XIAOBAN_ADB` 指定路径）并由用户在手机授权。中文输入需要手机已安装且已选中 ADB Keyboard。首轮通过聊天使用，没有独立手机管理页、无障碍接收端或 iOS 支持。小红书图文发布、开心消消乐单关操作是未经真机验证的种子知识；消消乐仅有本地普通三消候选评分，没有完整棋盘识别器、特殊机关策略或通关保证。发布等动作必须遵循用户授权，结果不明先观察，不能盲目重试。
+需要本机已安装 Android Platform Tools（PATH 中的 adb，可用 `XIAOBAN_ADB` 指定路径）并由用户在手机授权。中文输入需要手机已安装且已选中 ADB Keyboard（Android 16 实测使用上游 v2.5-dev）。首轮通过聊天使用，没有独立手机管理页、无障碍接收端或 iOS 支持。小米17 Android16已验证小红书9.51.0的传图、选图和中文图文准备，以及消消乐1.162第4181关的两次交换；发布与通关尚未验收。消消乐仅有本地普通三消候选评分，没有完整棋盘识别器、特殊机关策略或通关保证。发布等动作必须遵循用户授权，结果不明先观察，不能盲目重试。
 
 ## 内置设计工具：open-claude-design
 

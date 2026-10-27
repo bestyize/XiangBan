@@ -23,7 +23,7 @@ const NONE: &[&str] = &[];
 
 pub(super) const FEATURES: &[Feature] = &[
     Feature { id: "android-phone", name: "Android 手机操作", path: "对话中使用，暂无独立管理页面", page: None,
-        does: "通过本机 ADB 连接 USB / 无线 Android 手机；查看截图和 UI 树、执行输入与手势、传输图片。应用操作包以包名管理 skill.md、basic/、patch/，按需发现任务与分层路由。内置小红书发帖和开心消消乐的未验证种子流程；消消乐只提供普通三消局部评分，没有完整视觉识别器或通关保证。不支持 iOS。",
+        does: "通过本机 ADB 连接 USB / 无线 Android 手机；查看截图和固定快照 UI 树、按精确文字或描述定位控件、执行输入与手势、传输图片。应用操作包以包名管理 skill.md、basic/、patch/，按需发现任务与分层路由。小米17 Android16已验证小红书9.51.0的图文准备和中文输入，以及消消乐1.162第4181关的两次交换；发布和通关尚未验收。消消乐只有普通三消局部评分，没有完整视觉识别器或通关保证。不支持 iOS。",
         by_hand: "用户在手机开启调试并授权，预先安装本机 Android Platform Tools；无线配对需手机显示的配对码。登录、系统权限及中文输入所需 ADB Keyboard 由用户配置。",
         tools: &["phone_devices", "phone_connect", "phone_observe", "phone_action", "phone_push_image", "phone_pack_find", "phone_pack_read", "phone_pack_install", "phone_patch_list", "phone_patch_save", "phone_routes", "phone_match3"] },
     Feature { id: "chat", name: "对话与任务", path: "侧栏「新建任务」", page: Some(("new-task", None)),

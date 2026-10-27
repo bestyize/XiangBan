@@ -2,7 +2,7 @@ use crate::package::{valid_package, Result};
 use agent_kernel::ToolCtx;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
-use std::{fs, io::{Read, Write}, path::{Path, PathBuf}, process::{Command, Stdio}, sync::{mpsc, Arc}, thread, time::{Duration, Instant}};
+use std::{fs, io::{Read, Write}, path::{Path, PathBuf}, process::{Command, Stdio}, sync::{mpsc, Arc, atomic::{AtomicU64,Ordering}}, thread, time::{Duration, Instant}};
 
 pub trait Transport: Send + Sync {
     fn run(&self, args: &[String], stdin: &[u8], ctx: &ToolCtx, max: usize) -> Result<Vec<u8>>;
@@ -138,7 +138,14 @@ impl Adb {
 
     pub fn ui(&self, serial: &str, ctx: &ToolCtx) -> Result<String> {
         self.ready(serial,ctx)?;
-        let text=self.shell(serial,&["uiautomator","dump","/dev/tty"],ctx)?;
+        // Some Android 16 builds report success for /dev/tty but return no XML.
+        // Unique files prevent cross-session snapshots from mixing; the remote shell cleans up.
+        static UI_SEQUENCE:AtomicU64=AtomicU64::new(0);
+        let path=format!("/data/local/tmp/xiaoban-ui-{}-{}.xml",std::process::id(),UI_SEQUENCE.fetch_add(1,Ordering::Relaxed));
+        let quoted=shell_quote(&path);
+        let cleanup=shell_quote(&format!("rm -f {quoted}"));
+        let script=format!("trap {cleanup} EXIT; uiautomator dump --compressed {quoted} >/dev/null && cat {quoted}");
+        let text=self.shell(serial,&["sh","-c",&script],ctx)?;
         let start=text.find("<?xml").or_else(||text.find("<hierarchy")).ok_or("UI tree unavailable; use a screenshot for custom-drawn pages")?;
         let end=text.rfind("</hierarchy>").ok_or("incomplete UI tree")?+"</hierarchy>".len();
         Ok(text[start..end].to_string())
@@ -162,6 +169,22 @@ impl Adb {
         self.ready(serial,ctx)?;
         if !valid_package(package) { return Err("invalid package name".into()); }
         if action!="launch" { self.guard(serial,package,ctx)?; }
+        let guarded_ui=if let Some(selector)=args.get("guard_selector") {
+            if action=="launch" {return Err("launch cannot use a current-page guard".into());}
+            let selector:crate::ui::Selector=serde_json::from_value(selector.clone()).map_err(|e|e.to_string())?;
+            let xml=self.ui(serial,ctx)?;
+            crate::ui::target(&xml,&selector).map_err(|e|format!("current-page guard failed: {e}"))?;
+            self.guard(serial,package,ctx)?;
+            Some(xml)
+        } else {None};
+        if action=="tap_element" {
+            let selector:crate::ui::Selector=serde_json::from_value(args["selector"].clone()).map_err(|e|e.to_string())?;
+            let xml=match guarded_ui {Some(xml)=>xml,None=>self.ui(serial,ctx)?};
+            let target=crate::ui::target(&xml,&selector)?;
+            self.guard(serial,package,ctx)?;
+            let output=self.shell(serial,&["input","tap",&target.x.to_string(),&target.y.to_string()],ctx)?;
+            return Ok(json!({"dispatched":true,"matched":target,"result":output.trim(),"requires_live_verification":true}));
+        }
         let result=match action {
             "launch" => self.shell(serial,&["monkey","-p",package,"-c","android.intent.category.LAUNCHER","1"],ctx)?,
             "tap" => {

@@ -11,6 +11,7 @@ struct Fake {
     calls:Mutex<Vec<(Vec<String>,Vec<u8>)>>,
     wrong_foreground:bool,
     unicode_ime:bool,
+    ui_xml:Mutex<Option<String>>,
 }
 impl Transport for Fake {
     fn run(&self,args:&[String],input:&[u8],_:&ToolCtx,_:usize)->Result<Vec<u8>,String> {
@@ -24,7 +25,9 @@ impl Transport for Fake {
             else {"mResumedActivity: ActivityRecord{123 u0 com.xingin.xhs/.Main t12}"}
         } else if joined.contains("'dumpsys' 'package'") {"versionCode=123\nversionName=8.1\n"}
         else if joined.contains("'wm' 'size'") {"Physical size: 1080x1920"}
-        else if joined.contains("'uiautomator'") {"<?xml version=\"1.0\"?><hierarchy><node text=\"你好\" /></hierarchy>\nUI hierarchy dumped to: /dev/tty"}
+        else if joined.contains("uiautomator dump") {
+            return Ok(self.ui_xml.lock().unwrap().clone().unwrap_or_else(||"<?xml version=\"1.0\"?><hierarchy><node text=\"你好\" /></hierarchy>".into()).into_bytes());
+        }
         else if joined.contains("default_input_method") {
             if self.unicode_ime {"com.android.adbkeyboard/.AdbIME\n"} else {"com.example.keyboard/.IME\n"}
         }
@@ -86,10 +89,15 @@ fn pair_code_is_stdin_not_a_command_argument_and_invalid_endpoints_never_dispatc
 
 #[test]
 fn status_returns_actual_foreground_version_and_ui_is_complete() {
-    let adb=Adb::with_transport(Arc::new(Fake::default()));
+    let fake=Arc::new(Fake::default());
+    let adb=Adb::with_transport(fake.clone());
     let status=adb.status("usb-one",None,&ctx()).unwrap();
     assert_eq!(status["foreground_package"],PACKAGE); assert_eq!(status["app_version"],"8.1");
     assert!(adb.ui("usb-one",&ctx()).unwrap().ends_with("</hierarchy>"));
+    let calls=fake.calls.lock().unwrap();
+    let command=calls.last().unwrap().0.join(" ");
+    assert!(command.contains("/data/local/tmp/xiaoban-ui-") && command.contains("trap") && command.contains("--compressed"));
+    assert!(!command.contains("/dev/tty"));
 }
 
 #[test]
@@ -113,7 +121,7 @@ fn seeds_can_be_discovered_read_and_planned_without_touching_adb() {
     let found:Value=serde_json::from_str(&result.output).unwrap(); assert_eq!(found["total"],1);
     assert!(found["packs"][0]["verified_app_versions"].as_array().unwrap().is_empty());
     let graph=store.routes(PACKAGE,"flows/publishing",None,false,chrono::Utc::now()).unwrap();
-    assert_eq!(graph.plan("home","result").unwrap()["steps"].as_array().unwrap().len(),3);
+    assert_eq!(graph.plan("home","result").unwrap()["steps"].as_array().unwrap().len(),5);
     for seed in seeds::SEEDS {
         let graph=store.routes(seed.package,if seed.package==PACKAGE {"flows/publishing"} else {"flows/playing"},None,false,chrono::Utc::now()).unwrap();
         for node in graph.nodes {assert!(!store.read(seed.package,&node.page,None,0,8192,chrono::Utc::now()).unwrap().content.is_empty());}
@@ -144,6 +152,18 @@ fn match3_finds_valid_swap_and_rejects_unsettled_or_malformed_boards() {
     }
     let no_moves=agent_phone_use_tools::match3::candidates(&[vec![0;3],vec![0;3],vec![0;3]]).unwrap();
     assert_eq!(no_moves["total"],0);
+}
+
+#[test]
+fn level_4181_observed_opening_recommends_the_verified_plain_color_exchange() {
+    let mut board=vec![vec![0;9];9];
+    board[6][4..8].copy_from_slice(&[1,1,2,1]);
+    board[7][4..8].copy_from_slice(&[3,3,1,3]);
+    board[8][4..8].copy_from_slice(&[3,2,3,3]);
+    let plan=agent_phone_use_tools::match3::candidates(&board).unwrap();
+    assert_eq!(plan["candidates"][0]["from"],json!({"row":6,"column":6}));
+    assert_eq!(plan["candidates"][0]["to"],json!({"row":7,"column":6}));
+    assert_eq!(plan["candidates"][0]["score"],4);
 }
 
 #[test]
@@ -190,4 +210,44 @@ fn timed_out_tool_cancels_the_actual_client_process_promptly() {
     agent.run("cancel-test","run the test client",&mut |_|{},&Arc::new(std::sync::atomic::AtomicBool::new(false))).unwrap();
     assert!(started.elapsed()<Duration::from_secs(5));
     assert!(provider.requests().last().unwrap().messages.iter().any(|m|m.text().contains("cancelled or timed out")));
+}
+
+#[test]
+fn semantic_tap_uses_fresh_unique_target_and_checks_foreground_again() {
+    let fake=Arc::new(Fake::default());
+    *fake.ui_xml.lock().unwrap()=Some("<hierarchy><node clickable=\"true\" enabled=\"true\" bounds=\"[10,20][110,100]\" content-desc=\"发布\" /></hierarchy>".into());
+    let adb=Adb::with_transport(fake.clone());
+    let result=adb.action("usb-one",PACKAGE,"tap_element",&json!({"selector":{"description":"发布"}}),&ctx()).unwrap();
+    assert_eq!(result["matched"]["x"],60);assert_eq!(result["matched"]["y"],60);
+    let calls=fake.calls.lock().unwrap();
+    assert_eq!(calls.iter().filter(|(a,_)|a.join(" ").contains("'dumpsys' 'activity'")).count(),2);
+    assert!(calls.last().unwrap().0.join(" ").contains("'input' 'tap' '60' '60'"));
+}
+
+#[test]
+fn ui_pages_read_one_frozen_snapshot_and_actions_invalidate_it() {
+    let temp=tempfile::tempdir().unwrap();let fake=Arc::new(Fake::default());
+    *fake.ui_xml.lock().unwrap()=Some(format!("<hierarchy><node text=\"{}\" /></hierarchy>","A".repeat(12000)));
+    let tools=agent_phone_use_tools::tools(Store::new(temp.path().join("packs")),Adb::with_transport(fake.clone()),temp.path().to_path_buf());
+    let observe=tools.iter().find(|t|t.spec().name=="phone_observe").unwrap();
+    let first=observe.execute_result(json!({"serial":"usb-one","kind":"ui"}),&ctx());
+    assert!(!first.is_error,"{}",first.output);
+    let first:Value=serde_json::from_str(&first.output).unwrap();assert_eq!(first["has_more"],true);
+    *fake.ui_xml.lock().unwrap()=Some("<hierarchy><node text=\"changed\"/></hierarchy>".into());
+    let next=observe.execute_result(json!({"serial":"usb-one","kind":"ui","offset":first["next_offset"],"snapshot_id":first["snapshot_id"]}),&ctx());
+    let next:Value=serde_json::from_str(&next.output).unwrap();
+    assert!(next["content"].as_str().unwrap().contains("AAAA"));assert!(!next["content"].as_str().unwrap().contains("changed"));
+    assert_eq!(fake.calls.lock().unwrap().iter().filter(|(a,_)|a.join(" ").contains("uiautomator dump")).count(),1);
+    assert!(observe.execute_result(json!({"serial":"usb-one","kind":"ui","offset":8192}),&ctx()).is_error);
+    let action=tools.iter().find(|t|t.spec().name=="phone_action").unwrap();
+    assert!(!action.execute_result(json!({"serial":"usb-one","package":PACKAGE,"action":"tap","x":1,"y":1}),&ctx()).is_error);
+    assert!(observe.execute_result(json!({"serial":"usb-one","kind":"ui","offset":8192,"snapshot_id":first["snapshot_id"]}),&ctx()).is_error);
+}
+
+#[test]
+fn coordinate_input_is_blocked_when_the_current_page_witness_is_missing() {
+    let fake=Arc::new(Fake::default());let adb=Adb::with_transport(fake.clone());
+    let error=adb.action("usb-one",PACKAGE,"tap",&json!({"x":319,"y":520,"guard_selector":{"text":"草稿箱"}}),&ctx()).unwrap_err();
+    assert!(error.contains("current-page guard failed"));
+    assert!(!fake.calls.lock().unwrap().iter().any(|(a,_)|a.join(" ").contains("'input'")));
 }

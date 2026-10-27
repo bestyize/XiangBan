@@ -3,9 +3,10 @@ use agent_kernel::{Part, Risk, Tool, ToolCtx, ToolResult, ToolSpec};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use chrono::{DateTime, Utc};
 use serde_json::{json,Value};
-use std::{io::Read, path::{Path,PathBuf}, sync::Arc, time::Duration};
+use std::{collections::BTreeMap,io::Read, path::{Path,PathBuf}, sync::{Arc,Mutex,atomic::{AtomicU64,Ordering}}, time::{Duration,Instant}};
 
-struct Runtime { store:Store, adb:Adb, workspace:PathBuf }
+struct UiSnapshot {id:String,content:String,created:Instant}
+struct Runtime { store:Store, adb:Adb, workspace:PathBuf, snapshots:Mutex<BTreeMap<(String,String),UiSnapshot>> }
 struct PhoneTool { spec:ToolSpec, runtime:Arc<Runtime> }
 
 fn schema(properties:Value,required:&[&str])->Value {
@@ -17,7 +18,7 @@ fn text<'a>(args:&'a Value,key:&str)->Result<&'a str,String> {
 }
 
 pub fn tools(store:Store, adb:Adb, workspace:PathBuf)->Vec<Arc<dyn Tool>> {
-    let runtime=Arc::new(Runtime {store,adb,workspace});
+    let runtime=Arc::new(Runtime {store,adb,workspace,snapshots:Mutex::new(BTreeMap::new())});
     let mut tools:Vec<Arc<dyn Tool>>=Vec::new();
     let mut add=|name:&str,description:&str,schema:Value,risk:Risk| {
         let mut spec=ToolSpec::new(name,description,schema).risk(risk).serial().untrusted_output()
@@ -41,19 +42,22 @@ pub fn tools(store:Store, adb:Adb, workspace:PathBuf)->Vec<Arc<dyn Tool>> {
     add("phone_devices","List local ADB Android devices, USB or wireless, with authorization state. Requires Android Platform Tools (adb) installed on this computer; never downloads software. Choose a device serial explicitly for all subsequent tools.",schema(json!({}),&[]),Risk::Read);
     add("phone_connect","Pair/connect/disconnect wireless ADB using host:port. Android wireless debugging must be enabled by the user. Pair uses the six-digit code from the phone; connection port may differ from pairing port. Does not enable debugging or change network security settings.",
         schema(json!({"mode":{"enum":["pair","connect","disconnect"]},"endpoint":string(),"code":{"type":"string","pattern":"^[0-9]{6}$"}}),&["mode","endpoint"]),Risk::Exec);
-    add("phone_observe","Observe an explicit Android device: status includes foreground package/app version; screenshot returns a native PNG image; ui returns a paginated UI tree. UI trees may omit game/custom-drawn content. Observe again after input; a command dispatch is not task completion.",
-        schema(json!({"serial":string(),"kind":{"enum":["status","screenshot","ui"]},"package":string(),"offset":{"type":"integer","minimum":0}}),&["serial","kind"]),Risk::Read);
-    let mut action=schema(json!({"serial":string(),"package":string(),"action":{"enum":["launch","tap","swipe","key","text"]},
+    add("phone_observe","Observe an explicit Android device: status includes foreground package/app version; screenshot returns a native PNG image; ui returns a frozen paginated UI tree and snapshot_id. Continuations require the same snapshot_id and next_offset within 120 seconds; offset=0 captures a new tree. UI trees may omit game/custom-drawn content. Observe again after input; dispatch is not completion.",
+        schema(json!({"serial":string(),"kind":{"enum":["status","screenshot","ui"]},"package":string(),"snapshot_id":string(),"offset":{"type":"integer","minimum":0}}),&["serial","kind"]),Risk::Read);
+    let mut action=schema(json!({"serial":string(),"package":string(),"action":{"enum":["launch","tap","tap_element","swipe","key","text"]},
         "x":{"type":"integer","minimum":0,"maximum":16000},"y":{"type":"integer","minimum":0,"maximum":16000},
         "x2":{"type":"integer","minimum":0,"maximum":16000},"y2":{"type":"integer","minimum":0,"maximum":16000},
-        "duration_ms":{"type":"integer","minimum":50,"maximum":3000},"key":{"enum":["back","home","enter","delete","recents"]},"text":{"type":"string","minLength":1,"maxLength":12000}}),&["serial","package","action"]);
+        "duration_ms":{"type":"integer","minimum":50,"maximum":3000},"key":{"enum":["back","home","enter","delete","recents"]},"text":{"type":"string","minLength":1,"maxLength":12000},
+        "selector":{"type":"object","properties":{"text":string(),"description":string(),"resource_id":string(),"class":string()},"minProperties":1,"additionalProperties":false},
+        "guard_selector":{"type":"object","description":"Optional exact unique current-page witness checked on a fresh tree before input; recommended for coordinate taps and publishing.","properties":{"text":string(),"description":string(),"resource_id":string(),"class":string()},"minProperties":1,"additionalProperties":false}}),&["serial","package","action"]);
     action["allOf"]=json!([
         {"if":{"properties":{"action":{"const":"tap"}}},"then":{"required":["x","y"]}},
+        {"if":{"properties":{"action":{"const":"tap_element"}}},"then":{"required":["selector"]}},
         {"if":{"properties":{"action":{"const":"swipe"}}},"then":{"required":["x","y","x2","y2"]}},
         {"if":{"properties":{"action":{"const":"key"}}},"then":{"required":["key"]}},
         {"if":{"properties":{"action":{"const":"text"}}},"then":{"required":["text"]}}
     ]);
-    add("phone_action","Perform ONE Android launch/tap/swipe/system-key/text action. package is the expected foreground app (launch opens it); mismatched foreground blocks input. Coordinates come from the latest screenshot, in pixels. Unicode input requires ADB Keyboard already installed and selected. Follow user authorization for sending/publishing; if result is unknown, observe before retrying.",action,Risk::Exec);
+    add("phone_action","Perform ONE Android launch/tap_element/tap/swipe/key/text action. Prefer tap_element with exact text/description/resource_id/class selectors from observed UI or applicable knowledge; a fresh tree must match exactly one enabled element, then its clickable ancestor is used. Ambiguous matches block input. package guards foreground. Pixel coordinates come from the latest screenshot. Unicode requires active ADB Keyboard. Follow user authorization; observe unknown outcomes before retrying.",action,Risk::Exec);
     add("phone_push_image","Copy a workspace image (PNG/JPEG/WebP, at most 20 MiB) into /sdcard/Pictures/XiaoBan and request media indexing. Returns its deterministic device path and hash. Inspect actual album thumbnails and selection order before publishing.",
         schema(json!({"serial":string(),"source":string()}),&["serial","source"]),Risk::Exec);
     add("phone_match3","Score legal swaps locally for a settled plain-color match-three board. Supply a rectangular 3..12 matrix from the observed screen, 0=blocked/unknown and 1..32=colors. Returns up to five moves in zero-based grid coordinates. No device input; special pieces/obstacles/goal strategy are not simulated. Execute one move then observe again.",
@@ -109,7 +113,27 @@ impl PhoneTool {
                 let serial=text(args,"serial")?;
                 match text(args,"kind")? {
                     "status"=>r.adb.status(serial,args["package"].as_str(),ctx)?,
-                    "ui"=>serde_json::to_value(page(&r.adb.ui(serial,ctx)?,"live-ui",offset,8192,false)?).map_err(|e|e.to_string())?,
+                    "ui"=> {
+                        static SNAPSHOT_SEQUENCE:AtomicU64=AtomicU64::new(0);
+                        let key=(ctx.session().to_string(),serial.to_string());
+                        if offset==0 {
+                            let content=r.adb.ui(serial,ctx)?;
+                            let mut snapshots=r.snapshots.lock().map_err(|_|"UI snapshot lock poisoned")?;
+                            snapshots.retain(|_,snapshot|snapshot.created.elapsed()<Duration::from_secs(120));
+                            if snapshots.len()>=8 {
+                                if let Some(old)=snapshots.keys().next().cloned() {snapshots.remove(&old);}
+                            }
+                            snapshots.insert(key.clone(),UiSnapshot {id:format!("ui-{}-{}",std::process::id(),SNAPSHOT_SEQUENCE.fetch_add(1,Ordering::Relaxed)),content,created:Instant::now()});
+                        }
+                        let snapshots=r.snapshots.lock().map_err(|_|"UI snapshot lock poisoned")?;
+                        let snapshot=snapshots.get(&key).ok_or("UI snapshot unavailable; capture again with offset=0")?;
+                        if snapshot.created.elapsed()>=Duration::from_secs(120) || (offset>0 && args["snapshot_id"].as_str()!=Some(&snapshot.id)) {
+                            return Err("UI continuation snapshot_id is missing, expired or changed; capture again with offset=0".into());
+                        }
+                        let mut value=serde_json::to_value(page(&snapshot.content,"live-ui",offset,8192,false)?).map_err(|e|e.to_string())?;
+                        value["snapshot_id"]=json!(snapshot.id);
+                        value
+                    },
                     "screenshot"=> {
                         let bytes=r.adb.screenshot(serial,ctx)?;
                         let width=u32::from_be_bytes(bytes[16..20].try_into().map_err(|_|"invalid PNG width")?);
@@ -121,7 +145,12 @@ impl PhoneTool {
                     _=>return Err("unknown observation kind".into()),
                 }
             },
-            "phone_action"=>r.adb.action(text(args,"serial")?,text(args,"package")?,text(args,"action")?,args,ctx)?,
+            "phone_action"=> {
+                let serial=text(args,"serial")?;
+                // Invalidate before dispatch too: a timeout may mean the action already happened.
+                r.snapshots.lock().map_err(|_|"UI snapshot lock poisoned")?.retain(|(_,device),_|device!=serial);
+                r.adb.action(serial,text(args,"package")?,text(args,"action")?,args,ctx)?
+            },
             "phone_push_image"=>r.adb.push_image(text(args,"serial")?,Path::new(text(args,"source")?),&r.workspace,ctx)?,
             "phone_match3"=> {
                 let board:Vec<Vec<u8>>=serde_json::from_value(args["board"].clone()).map_err(|e|e.to_string())?;

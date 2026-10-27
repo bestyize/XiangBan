@@ -1,6 +1,6 @@
 # Android 手机操作工具
 
-独立于 Tauri 的 Rust 工具包。设计与首轮边界见 [实现方案](../../../docs/agent/android-phone-use.md)。
+独立于 Tauri 的 Rust 工具包。设计与首轮边界见 [实现方案](../../../docs/agent/android-phone-use.md)，实机范围见 [小米17联调记录](../../../docs/agent/android-phone-device-validation.md)。
 
 应用包以 `<packagename>/skill.md + basic/ + patch/` 保存。`basic/package.json` 提供应用摘要；`tasks/`、`pages/`、`knowledge/`、`assets/` 按需读取；`routes/core.yaml` 与 `routes/flows/*.yaml` 表达核心骨架和功能路径。
 
@@ -26,6 +26,10 @@ cargo test --manifest-path libs/agent-tools/phone-use/Cargo.toml
 
 本机需安装 Android Platform Tools，默认使用 PATH 中的 adb；小伴宿主允许 `XIAOBAN_ADB` 指定程序。Unicode 输入要求手机已安装且选中 [ADB Keyboard](https://github.com/senzhk/ADBKeyBoard) 的 `com.android.adbkeyboard/.AdbIME`；工具不会安装 APK 或自动更改输入法。
 
+优先使用 `phone_action(action=tap_element, selector={description: "发布"})` 等精确语义选择器，支持 text / description / resource_id / class 组合。每次重新读取 UI，只有唯一、启用且可点击（或有可点击祖先）的目标才执行；混淆后的重复资源 ID 必须补充条件。坐标动作可加 `guard_selector`，例如选图前要求当前页唯一出现“草稿箱”，页面变化时拒绝输入。
+
+`phone_observe(kind=ui)` 使用设备私有临时文件读取并清理 XML，兼容部分 Android 16 系统 `/dev/tty` 只有成功提示却不返回 XML 的行为。分页续读必须传首屏返回的 `snapshot_id` 和 `next_offset`，固定同一份树，120 秒内有效；输入前会使缓存失效。
+
 `phone_match3` 是普通棋盘的本地候选交换评分器，不包含图像识别、重力 / 连锁模拟或完整关卡策略。两个种子包首次按需使用时安装到用户数据目录，已有包不被内置资料覆盖。
 
 生成可分发 ZIP（输出目录建议放在工作区外，仓库不提交 ZIP）：
@@ -36,4 +40,12 @@ cargo run --manifest-path libs/agent-tools/phone-use/Cargo.toml --example export
 
 每个 ZIP 附带 `.sha256` 文件；可放入用户工作区导入，或由后续操作包托管服务提供 HTTPS 下载。首轮不包含在线目录、托管部署、十款应用完整适配或手机管理 UI。
 
-首轮种子知识不代表当前 APP 真机适配，`verified_app_versions` 为空。任务执行必须读取实际页面、核验用户目标，不能把基础包描述或学习证据当成已完成结果。
+`verified_app_versions` 仍为空：已在小米17 Android16上验证小红书9.51.0的图文准备（未发布）和消消乐1.162第4181关的两次交换，未对整条发布或通关任务验收。任务执行必须读取实际页面、核验用户目标，不能把基础包描述或学习证据当成已完成结果。
+
+开发者真机调试入口（直接调用真实工具，不经过宿主模型与授权中间件，只用于已获用户授权的联调）：
+
+```sh
+cargo run --manifest-path libs/agent-tools/phone-use/Cargo.toml --example device-debug -- <独立包目录> <工作区> <请求JSON路径> <输出目录>
+```
+
+请求格式为 `{"tool":"phone_observe","arguments":{"serial":"显式设备序列号","kind":"ui"}}`。截图保存为 PNG，UI 自动续读同一快照并保存完整 `ui.xml`；不会把图片 Base64 打印到终端。调试截图、XML、设备序列号和账号信息不提交仓库。使用独立包目录隔离生产资料。

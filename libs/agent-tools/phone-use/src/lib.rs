@@ -4,6 +4,7 @@ pub mod routes;
 pub mod adb;
 pub mod match3;
 pub mod tools;
+pub mod ui;
 pub mod seeds;
 
 pub use package::Store;

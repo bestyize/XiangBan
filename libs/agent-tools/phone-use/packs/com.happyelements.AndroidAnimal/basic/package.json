@@ -1,7 +1,7 @@
 {
   "package_name": "com.happyelements.AndroidAnimal",
   "name": "开心消消乐",
-  "description": "普通三消棋盘单关操作与本地候选交换评分；尚无完整视觉识别器、复杂机关策略或真机验证。",
-  "version": "0.1.0-seed",
+  "description": "小米17 Android16 / 1.162第4181关已验证普通棋子局部评分与两次ADB交换；尚无自动视觉识别、复杂机关策略或通关验收。",
+  "version": "0.2.0-device-preview",
   "verified_app_versions": []
 }
