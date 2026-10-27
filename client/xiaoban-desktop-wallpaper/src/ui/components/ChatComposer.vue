@@ -10,10 +10,11 @@ import { sessionModelConfig } from '../chat/session-model.ts';
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { NInput } from 'naive-ui';
-import { ArrowUp, AudioLines, LoaderCircle, Mic, MicOff, Square, X, Zap } from 'lucide-vue-next';
+import { ArrowUp, ChevronDown, ListPlus, AudioLines, LoaderCircle, Mic, MicOff, Square, X, Zap } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, type AiConfigView, type AiTier } from '../../bridge.ts';
 import type { ControlPage, ControlStore } from '../control-types.ts';
 import ChatWorkbenchTools from './ChatWorkbenchTools.vue';
+import ChatMessageQueue from './ChatMessageQueue.vue';
 import ChatSlashMenu from './ChatSlashMenu.vue';
 import ChatMentionMenu from './ChatMentionMenu.vue';
 import { useComposerMentions, type MentionItem } from '../chat/mentions.ts';
@@ -83,11 +84,12 @@ const running = computed(() => !!view.value?.running);
 const compacting = computed(() => !!chat.currentId && chat.compactingId === chat.currentId);
 const attachments = computed({ get: () => chat.draft.attachments, set: value => { chat.draft.attachments = value; } });
 const attachmentReading = ref(false);
+const capturing = ref(false);
 let attachmentVersion = 0;
 const filePicker = ref<HTMLInputElement | null>(null);
 const MAX_IMAGES = MAX_ATTACHMENTS;
 const skills = computed({ get: () => chat.draft.skills, set: value => { chat.draft.skills = value; } });
-const canSend = computed(() => chat.configured && !chat.sending && !running.value && !compacting.value && !attachmentReading.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0 || skills.value.length > 0));
+const canSend = computed(() => chat.configured && !chat.sending && !compacting.value && !attachmentReading.value && !capturing.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0 || skills.value.length > 0));
 
 /* ── Voice ───────────────────────────────────────────────────────────── */
 const voiceHasText = ref(false);
@@ -104,6 +106,7 @@ watch(() => chat.currentId, (id, before) => {
   if (before && id !== before) live?.end();
   if (shown.value && !liveActive.value) asr?.deactivate();
   attachmentVersion++;
+  deliveryMenu.value = false;
   if (shown.value) void readModelLabel();
 }, { flush: 'sync' });
 watch(microphoneAllowed, allowed => { if (!allowed && shown.value && !liveActive.value) asr?.deactivate(); }, { flush: 'sync' });
@@ -169,7 +172,10 @@ onUnmounted(() => {
 });
 
 /* ── Sending ─────────────────────────────────────────────────────────── */
-async function submit() {
+const deliveryMenu = ref(false);
+function deliveryBlur(event: FocusEvent) { if (!(event.currentTarget as HTMLElement).contains(event.relatedTarget as Node | null)) deliveryMenu.value = false; }
+async function submit(mode: 'queue' | 'steer' | 'replace' = 'queue') {
+  deliveryMenu.value = false;
   const owner = chat.draft;
   const text = draft.value.trim();
   if ((!text && !attachments.value.length && !skills.value.length) || !canSend.value) return;
@@ -181,7 +187,10 @@ async function submit() {
   attachments.value = [];
   skills.value = [];
   emit('sending');
-  const sent = await chat.send(withSkills(text, chosen.map(s => s.name)), images, undefined, references.map(({ kind, id }) => ({ kind, id })));
+  const message = withSkills(text, chosen.map(s => s.name));
+  const sent = chat.currentId
+    ? await chat.enqueue(message, images, references.map(({ kind, id }) => ({ kind, id })), mode)
+    : await chat.send(message, images, undefined, references.map(({ kind, id }) => ({ kind, id })));
   if (!sent) {
     // Keep both the refused message and anything typed while the host was responding.
     owner.text = [text, owner.text].filter(Boolean).join('\n\n');
@@ -235,7 +244,7 @@ function onKeydown(event: KeyboardEvent) {
 
 /* ── Attachments ─────────────────────────────────────────────────────── */
 async function addFiles(files: File[]) {
-  if (!files.length || attachmentReading.value || running.value) return;
+  if (!files.length || attachmentReading.value) return;
   const version = attachmentVersion;
   attachmentReading.value = true;
   try {
@@ -245,6 +254,7 @@ async function addFiles(files: File[]) {
       try {
         const item = await readAttachment(file);
         if (version !== attachmentVersion) break;
+        if (attachments.value.length >= MAX_IMAGES) { props.store.notify('一次最多添加 8 个附件', 'info'); break; }
         if (attachments.value.reduce((sum, a) => sum + attachmentBytes(a), 0) + attachmentBytes(item) > MAX_TOTAL_BYTES) { props.store.notify('附件合计不能超过 30MB', 'error'); continue; }
         attachments.value.push(item);
       } catch (error) { props.store.notify(error instanceof Error ? error.message : String(error), 'error'); }
@@ -266,15 +276,15 @@ function onPick(event: Event) {
 }
 const removeAttachment = (index: number) => { attachments.value = attachments.value.filter((_, n) => n !== index); };
 const openPicker = () => filePicker.value?.click();
-const capturing = ref(false);
 async function takeScreenshot() {
-  if (!props.store.desktop || capturing.value || running.value || !chat.configured || attachments.value.length >= MAX_IMAGES) return;
+  if (!props.store.desktop || capturing.value || !chat.configured || attachments.value.length >= MAX_IMAGES) return;
   const version = attachmentVersion;
   capturing.value = true;
   try {
     const image = await invoke<string | null>('chat_screenshot');
     if (version !== attachmentVersion || !image) return;
     if (!image.startsWith('data:image/')) throw new Error('截图结果格式错误');
+    if (attachments.value.length >= MAX_IMAGES) throw new Error('一次最多添加 8 个附件');
     if (attachments.value.reduce((sum, a) => sum + attachmentBytes(a), 0) + attachmentBytes(image) > MAX_TOTAL_BYTES) throw new Error('附件合计不能超过 30MB');
     attachments.value.push(image);
   } catch (error) { if (version === attachmentVersion) props.store.notify(error instanceof Error ? error.message : String(error), 'error'); }
@@ -343,6 +353,8 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 
 <template>
   <footer class="composer" :class="[`page-${page}`]" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste" @dragover.prevent @drop.prevent="addFiles(Array.from($event.dataTransfer?.files ?? []))">
+    <ChatMessageQueue :chat="chat" :running="running" />
+    <div class="composer-content">
     <ChatComposerPet v-if="pet" :size="pet" :paused="store.settings?.paused ?? false" />
     <div v-if="live && liveActive" class="composer-box live-bar" :class="{ muted: live.muted }" data-testid="chat-live">
       <span class="live-orb" :class="live.status === '在说' ? 'speak' : live.status === '在听' ? 'listen' : 'wait'" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
@@ -357,14 +369,14 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <div v-for="(url, n) in attachments" :key="n" class="thumb">
           <img v-if="attachmentImage(url)" :src="attachmentImage(url)!" :alt="`待发送的第 ${n + 1} 张图片`" :data-testid="`chat-attachment-${n}`" @click="emit('preview', attachmentImage(url)!)" />
           <span v-if="!attachmentImage(url)" class="file-chip" :title="attachmentName(url)">📄 {{ attachmentName(url) }}</span>
-          <button type="button" class="thumb-remove" :data-testid="`chat-attachment-remove-${n}`" :aria-label="`移除第 ${n + 1} 个附件`" :disabled="running" @click="removeAttachment(n)"><X :size="12" /></button>
+          <button type="button" class="thumb-remove" :data-testid="`chat-attachment-remove-${n}`" :aria-label="`移除第 ${n + 1} 个附件`" :disabled="attachmentReading" @click="removeAttachment(n)"><X :size="12" /></button>
         </div>
         <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 个附件 · 发送时会一起交给小伴</small>
       </div>
       <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
       <div v-if="skills.length || chat.currentExpert || mentions.selected.value.length" class="composer-top" data-testid="chat-composer-top">
         <ul class="skill-chips" aria-label="这条消息用的技能">
-          <li v-for="skill in skills" :key="skill.name" class="skill-chip" :data-testid="`chat-skill-${skill.name}`"><Zap :size="14" aria-hidden="true" /><span :title="`/${skill.name}`">{{ skill.title }}</span><button type="button" class="chip-x" :aria-label="`移除技能 ${skill.title}`" :disabled="running" @click="removeSkill(skill.name)"><X :size="11" :stroke-width="2.6" /></button></li>
+          <li v-for="skill in skills" :key="skill.name" class="skill-chip" :data-testid="`chat-skill-${skill.name}`"><Zap :size="14" aria-hidden="true" /><span :title="`/${skill.name}`">{{ skill.title }}</span><button type="button" class="chip-x" :aria-label="`移除技能 ${skill.title}`" @click="removeSkill(skill.name)"><X :size="11" :stroke-width="2.6" /></button></li>
         </ul>
         <div class="composer-ctx">
           <ChatExpertChip v-if="chat.currentExpert" compact :expert="chat.currentExpert" :removable="!chat.currentId" :desktop="store.desktop" @clear="chat.pendingExpert = null" />
@@ -377,7 +389,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <NInput ref="input" v-model:value="draft" type="textarea" :autosize="{ minRows, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
       </div>
       <div class="composer-row">
-        <ChatWorkbenchTools :store="store" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || running || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || running || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" />
+        <ChatWorkbenchTools :store="store" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" />
         <ChatWorkspaceMenu v-if="workspace" :chat="chat" :disabled="running || !store.desktop" />
         <ChatPermissionMenu :store="store" :disabled="!store.desktop" />
         <span class="composer-spacer" />
@@ -387,14 +399,26 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束录音' : '取消准备' }}</button>
         <button v-else-if="asr" type="button" class="xb-icon-btn voice" data-testid="chat-asr-toggle" aria-label="开始录音" aria-pressed="false" title="录音：说完转成文字，留在输入框，由你确认后发送" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><Mic :size="17" /></button>
         <button v-if="offersLive" type="button" class="xb-icon-btn live-start" data-testid="chat-live-start" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" :disabled="liveDisabled" @click="startLive"><AudioLines :size="18" :stroke-width="2" /></button>
-        <button v-if="running" type="button" class="send-btn is-stop" data-testid="chat-stop" aria-label="停止" title="停止" @click="chat.cancel()"><Square :size="12" fill="currentColor" /></button>
-        <button v-else type="button" class="send-btn" data-testid="chat-send" aria-label="发送" title="发送（Enter）" :disabled="!canSend" @click="submit"><ArrowUp :size="17" :stroke-width="2.4" /></button>
+        <button v-if="running" type="button" class="xb-icon-btn stop-run" data-testid="chat-stop" aria-label="停止" title="停止当前任务并暂停队列" @click="chat.cancel()"><Square :size="13" fill="currentColor" /></button>
+        <div class="delivery-control" @focusout="deliveryBlur" @keydown.esc="deliveryMenu = false">
+          <div v-if="deliveryMenu && running" class="delivery-menu" role="menu" aria-label="消息发送方式">
+            <button type="button" role="menuitem" @click="submit('queue')">加入队列<span>当前任务结束后发送</span></button>
+            <button type="button" role="menuitem" @click="submit('steer')">补充当前任务<span>下一次模型请求时接收</span></button>
+            <button type="button" role="menuitem" @click="submit('replace')">停止并发送<span>其余排队消息暂停</span></button>
+          </div>
+          <button type="button" class="send-btn" data-testid="chat-send" :aria-label="running || chat.queue?.items.length ? '加入队列' : '发送'" :title="running || chat.queue?.items.length ? '加入队列（Enter）' : '发送（Enter）'" :disabled="!canSend" @click="submit()"><ListPlus v-if="running || chat.queue?.items.length" :size="17" /><ArrowUp v-else :size="17" :stroke-width="2.4" /></button>
+          <button v-if="running" type="button" class="delivery-toggle" data-testid="chat-delivery-menu" aria-label="选择发送方式" :aria-expanded="deliveryMenu" :disabled="!canSend" @click="deliveryMenu = !deliveryMenu"><ChevronDown :size="12" /></button>
+        </div>
       </div>
+    </div>
     </div>
   </footer>
 </template>
 
 <style scoped>
+.delivery-control{position:relative;display:flex;align-items:center;gap:2px}.delivery-toggle{display:grid;place-items:center;border:0;border-radius:5px;background:none;color:var(--ui-text-secondary);width:16px;height:28px;padding:0;cursor:pointer}.delivery-toggle:disabled{opacity:.35;cursor:default}.delivery-toggle:hover:not(:disabled){background:var(--ui-surface-hover)}.delivery-menu{position:absolute;bottom:44px;right:0;width:205px;padding:5px;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.12);z-index:35}.delivery-menu button{display:block;width:100%;border:0;border-radius:8px;padding:9px 10px;text-align:left;background:none;color:var(--ui-text-primary);font:inherit;font-size:12px;cursor:pointer}.delivery-menu button:hover{background:var(--ui-surface-hover)}.delivery-menu span{display:block;margin-top:3px;color:var(--ui-text-tertiary);font-size:10px}.stop-run{flex:none}
+
+.composer-content{position:relative}
 .composer{position:relative;width:100%;box-sizing:border-box}
 .composer-box{position:relative;display:flex;flex-direction:column;gap:4px;background:var(--ui-surface);border-radius:18px;box-shadow:0 0 0 1px var(--ui-border),0 2px 4px rgba(0,0,0,.03),0 12px 32px rgba(0,0,0,.07);padding:14px 12px 8px 16px;transition:box-shadow .15s}
 html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:0 0 0 1px var(--ui-border-strong),0 12px 32px rgba(0,0,0,.35)}

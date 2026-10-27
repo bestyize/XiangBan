@@ -416,3 +416,13 @@ describe('reliability pause reasons', () => {
     expect(view.items[1]).toHaveProperty('text', expect.stringContaining('模型用量'));
   });
 });
+
+
+it('places a received follow-up between answers, preserving attachment cards and ending the earlier stream', () => {
+  const view = newView('s1', true);
+  applyEvent(view, {type:'text_delta',text:'first answer'});
+  applyEvent(view, {type:'user_message',initial:false,message:{role:'user',parts:[{type:'text',text:'also check this'}],structured_content:{delivery:'steer',attachments:[{id:'f1',name:'report.txt',size:1,mime:'text/plain'}]}}});
+  applyEvent(view, {type:'text_delta',text:'updated answer'});
+  expect(view.items.map(i=>i.kind)).toEqual(['assistant','user','assistant']);
+  expect(view.items[0]).toMatchObject({streaming:false});expect(view.items[1]).toMatchObject({delivery:'steer',text:'also check this',files:[{id:'f1',name:'report.txt'}]});expect(view.running).toBe(true);
+});

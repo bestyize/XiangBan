@@ -121,8 +121,8 @@ describe('starting up', () => {
     const h = harness({ chat_overview: () => overview({ sessions: [summary('s1', '第一个')], workspace: '/Users/me/work', configured: true }) });
     await Promise.all([h.store.init(), h.store.init()]);
     await h.store.init();
-    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
-    expect(h.deps.listen).toHaveBeenCalledTimes(11);
+    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-queue-changed', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
+    expect(h.deps.listen).toHaveBeenCalledTimes(12);
     expect(h.commands()).toEqual(['chat_overview']);
     expect(h.store).toMatchObject({ ready: true, configured: true, workspace: '/Users/me/work' });
     expect(h.store.sessions.map(s => s.title)).toEqual(['第一个']);
@@ -516,7 +516,7 @@ describe('shutting down', () => {
     const h = harness();
     await h.store.init();
     h.store.dispose();
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-queue-changed', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
     h.events('s1', { type: 'text_delta', text: 'late' });
     h.emit('chat-approval', approval('a1'));
     expect(h.store.views.s1).toBeUndefined();
@@ -527,7 +527,7 @@ describe('shutting down', () => {
     const starting = h.store.init();
     h.store.dispose();
     await starting;
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-queue-changed', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
     expect(h.store.sessions).toEqual([]);
   });
 });
@@ -1098,4 +1098,45 @@ it('restores each saved outcome to its own reply rather than the latest task', a
   const replies = replyBlocks(items).filter(block => block.calls.length);
   expect(taskProgress(replies[0], false)?.state).toBe('unverified');
   expect(taskProgress(replies[1], false)?.state).toBe('completed'); h.store.dispose();
+});
+
+
+describe('durable message queues', () => {
+  const queued = (revision = 1) => ({revision,paused:false,reason:'',enqueuedId:'q1',items:[{id:'q1',text:'next',mode:'queue' as const,dispatching:false,images:0,files:[]}]});
+  it('keeps a pending enqueue and its attachments bound to the original session after switching', async () => {
+    let finish!: (value: unknown) => void;
+    const h = harness({chat_overview:()=>overview({sessions:[summary('s1'),summary('s2')]}),chat_load_session:()=>[],chat_enqueue:()=>new Promise(resolve=>{finish=resolve;})});
+    await h.store.init();await h.store.select('s1');h.events('s1',{type:'text_delta',text:'working'});
+    const task=h.store.enqueue('next',[{name:'report.txt',size:1,mime:'text/plain',dataUrl:'data:text/plain;base64,YQ=='}],[]);
+    expect(await h.store.enqueue('duplicate',[],[])).toBe(false);
+    await h.store.select('s2');finish(queued());expect(await task).toBe(true);
+    expect(h.store.currentId).toBe('s2');expect(h.store.queue).toBeNull();expect(h.store.queues.s1.items[0]?.text).toBe('next');
+    expect(h.calls.find(([c])=>c==='chat_enqueue')?.[1]).toMatchObject({sessionId:'s1',attachments:[{name:'report.txt',dataUrl:'data:text/plain;base64,YQ=='}]});
+    expect(h.calls.filter(([c])=>c==='chat_enqueue')).toHaveLength(1);h.store.dispose();
+  });
+  it('reuses the submission identity after a failed enqueue and supports older WebViews without randomUUID', async () => {
+    let fail=true;
+    const h=harness({chat_overview:()=>overview({sessions:[summary('s1')]}),chat_load_session:()=>[],chat_enqueue:()=>{if(fail)throw Error('lost response');return queued();}});
+    await h.store.init();await h.store.select('s1');
+    vi.stubGlobal('crypto', {});
+    try {
+      expect(await h.store.enqueue('next',[],[])).toBe(false);fail=false;expect(await h.store.enqueue('next',[],[])).toBe(true);
+      const calls=h.calls.filter(([c])=>c==='chat_enqueue');expect(calls[0]?.[1]?.requestId).toBe(calls[1]?.[1]?.requestId);expect(calls[0]?.[1]?.requestId).toMatch(/^q-[a-z0-9-]+$/);
+      expect(h.store.sending).toBe(false);
+    } finally {vi.unstubAllGlobals();h.store.dispose();}
+  });
+  it('ignores stale queue events and keeps another session isolated', async () => {
+    const h=harness({chat_overview:()=>overview({sessions:[summary('s1')]}),chat_load_session:()=>[]});await h.store.init();await h.store.select('s1');
+    h.emit('chat-queue-changed',{session:'s1',queue:queued(5)});
+    h.emit('chat-queue-changed',{session:'s1',queue:{...queued(4),items:[]}});
+    h.emit('chat-queue-changed',{session:'s2',queue:{...queued(9),paused:true}});
+    expect(h.store.queue?.revision).toBe(5);expect(h.store.queue?.items).toHaveLength(1);expect(h.store.queue?.paused).toBe(false);h.store.dispose();
+  });
+  it('uses the accepted message id for stop-and-send even if another window queued later', async () => {
+    const value=queued();value.items.push({...value.items[0]!,id:'other',text:'another window'});
+    const h=harness({chat_overview:()=>overview({sessions:[summary('s1')]}),chat_load_session:()=>[],chat_enqueue:()=>value,chat_queue_update:()=>queued(2)});await h.store.init();await h.store.select('s1');
+    expect(await h.store.enqueue('next',[],[],'replace')).toBe(true);
+    expect(h.calls.find(([c])=>c==='chat_enqueue')?.[1]).toMatchObject({sessionId:'s1',stopNow:true});
+    expect(h.calls.filter(([c])=>c==='chat_queue_update')).toHaveLength(0);h.store.dispose();
+  });
 });

@@ -6,10 +6,20 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Host mailbox. Poll only at complete model/tool boundaries; acknowledge only after history is saved.
+/// `closing` seals an empty mailbox so a late submission can be handled by the host's next run.
+pub trait RunInput: Send + Sync + std::fmt::Debug {
+    fn poll(&self, session: &str, closing: bool) -> Result<Vec<crate::Message>, HarnessError>;
+    fn accepted(&self, session: &str, messages: &[crate::Message]) -> Result<(), HarnessError>;
+}
+
 static RUN_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Default)]
 pub struct RunOptions {
+    pub input: Option<Arc<dyn RunInput>>,
+    /// Trusted host metadata for the initial user message (e.g. durable delivery identity).
+    pub input_metadata: Option<serde_json::Value>,
     pub control: Option<crate::RunControl>,
     pub max_no_progress_rounds: Option<usize>,
     pub parent_run_id: Option<String>,

@@ -12,6 +12,10 @@
 
 `AgentBuilder::unlimited_turns()` 显式取消轮数上限；现有宿主默认 25 轮与 `max_turns(n)` 语义保持。`RunControl::limits` 可分别设置或取消时间/token 预算，同时保留资源互斥。`Todo::persistent(directory)` 与 `.middleware(todo.clone())` 配合，将计划、证据和交接说明独立落盘，在新运行开始时恢复；证据是模型记录，不能替代外部验收。
 
+## 运行中的用户补充
+
+宿主可在 `RunOptions.input` 注入 `RunInput`。内核仅在完整模型请求或整批工具结果之后轮询，把真实用户消息写入历史并发出 `UserMessage` 事件后才调用 `accepted`；最终结束前用 `closing` 封口检查晚到输入。宿主负责持久队列、提交编号去重、取消与失败后的暂停，以及封口后转入下一轮。`input_metadata` 允许为首次输入保存宿主投递编号和附件元数据。此能力不改写进行中的 HTTP 流，也不授予额外权限。
+
 ## 0.3 运行与进程
 
 - 保留 `run` / `run_parts` / `retry_last`；新增 `run_parts_observed` / `retry_last_observed`，事件带独立 run_id、连续 sequence、时间戳和可选父 run。`RunSummary` 新增 run_id。运行状态与模型消息分开；completed 表示循环正常结束，不替代业务验收。

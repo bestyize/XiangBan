@@ -5,6 +5,8 @@
 
 mod agent_settings;
 mod task_runtime;
+mod outbox;
+pub mod outbox_host;
 mod app_guide;
 mod feature_hints;
 mod file_access;
@@ -160,6 +162,8 @@ pub struct ChatState {
     workspaces: Workspaces,
     todo: Arc<Todo>,
     runs: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    delivery: Mutex<()>,
+    outbox: Mutex<Option<outbox::Outbox>>,
     /// Held for every active model/tool run, independent of whether its window is open.
     leases: Mutex<HashMap<String, SessionLease>>,
     index: Mutex<Option<Index>>,
@@ -199,6 +203,8 @@ impl ChatState {
                 Err(_) => Todo::new(),
             }),
             runs: Mutex::new(HashMap::new()),
+            delivery: Mutex::new(()),
+            outbox: Mutex::new(None),
             leases: Mutex::new(HashMap::new()),
             index: Mutex::new(None),
             goal_io: Mutex::new(()),
@@ -1031,11 +1037,12 @@ fn clean_connectors(ids: Vec<String>) -> Result<Vec<String>, String> {
     Ok(result)
 }
 
-struct HostRunCleanup{app:tauri::AppHandle,session:String}
-impl Drop for HostRunCleanup{fn drop(&mut self){if std::thread::panicking(){emit(&self.app,"chat-event",json!({"session":self.session,"event":{"type":"error","message":"任务异常中断；已派发操作可能产生结果，请核对后继续。"}}));}finish_run(&self.app,&self.session);}}
+struct HostRunCleanup{app:tauri::AppHandle,session:String,success:Option<bool>}
+impl Drop for HostRunCleanup{fn drop(&mut self){if std::thread::panicking(){emit(&self.app,"chat-event",json!({"session":self.session,"event":{"type":"error","message":"任务异常中断；已派发操作可能产生结果，请核对后继续。"}}));}finish_run(&self.app,&self.session,self.success.map(|success|success && !std::thread::panicking()));}}
 
-fn finish_run(app: &tauri::AppHandle, session: &str) {
+fn finish_run(app: &tauri::AppHandle, session: &str, success: Option<bool>) {
     let state = app.state::<ChatState>();
+    let _delivery = lock(&state.delivery);
     lock(&state.runs).remove(session);
     lock(&state.leases).remove(session);
     state.broker.drop_session(session);
@@ -1046,6 +1053,7 @@ fn finish_run(app: &tauri::AppHandle, session: &str) {
     }) {
         emit(app, "chat-sessions-changed", json!(sessions));
     }
+    if let Some(success) = success { outbox_host::finished(app, session, success); }
 }
 
 #[tauri::command]
@@ -1056,7 +1064,10 @@ pub fn chat_overview(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Res
     let default = ai_config::default_workspace(&app)?;
     let running: Vec<String> = lock(&app.state::<ChatState>().runs).keys().cloned().collect();
     let mode = if app.state::<ChatState>().permission.mode() == PermissionMode::Auto { "auto" } else { "ask" };
+    let mut queues = serde_json::Map::new();
+    for saved in list(&app)? { queues.insert(saved.id.clone(), json!(outbox_host::snapshot(&app, &saved.id)?)); }
     Ok(json!({
+        "queueProtocol":1, "queues":queues,
         "pendingProtocol":1, "snapshotProtocol": 1,
         "configured": config.is_complete(),
         "sessions": list(&app)?,
@@ -1243,16 +1254,25 @@ pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id
         }
     }
     // 点名只对这一条消息有效；先放好，构建 agent 时取走。
+    let state = app.state::<ChatState>();
+    let _delivery = lock(&state.delivery);
+    if lock(&state.runs).contains_key(&session_id) { return Err("这个对话还在回答或正在压缩，请等它结束或先停止".into()); }
     let mentions: Vec<mentions::Mention> = mentions.unwrap_or_default().into_iter().take(mentions::MAX_MENTIONS).collect();
     if sessions::valid_id(&session_id) {
         let state = app.state::<ChatState>();
         if mentions.is_empty() { lock(&state.mentions).remove(&session_id); } else { lock(&state.mentions).insert(session_id.clone(), mentions); }
     }
-    send(app, session_id, text, images, retry, attachments)
+    send_prepared(app.clone(), session_id, text, images, retry, attachments, None)
 }
 
 /// Starts an answer. The command above checks who is asking; the host's own callers (long-term goals) come here.
 pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
+    let state = app.state::<ChatState>();
+    let _delivery = lock(&state.delivery);
+    send_prepared(app.clone(), session_id, text, images, retry, attachments, None)
+}
+
+fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, queued: Option<outbox::Entry>) -> Result<SessionSummary, String> {
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
@@ -1260,12 +1280,14 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
     let attachments = attachments.unwrap_or_default();
     let text = text.trim().to_string();
     let images = images.unwrap_or_default();
-    if images.len() + attachments.len() > MAX_IMAGES {
+    let staged_count = queued.as_ref().and_then(|entry|entry.message.structured_content.as_ref())
+        .and_then(|v|v["attachments"].as_array()).map_or(0,Vec::len);
+    if queued.as_ref().map_or(images.len() + attachments.len(), |_|staged_count) > MAX_IMAGES {
         return Err(format!("一次最多发送 {MAX_IMAGES} 个附件"));
     }
     let images = images.iter().map(|raw| clean_image(raw)).collect::<Result<Vec<_>, _>>()?;
     if retry && (!attachments.is_empty() || !images.is_empty()) { return Err("重试不能添加新附件".into()); }
-    if !retry && text.is_empty() && images.is_empty() && attachments.is_empty() {
+    if !retry && text.is_empty() && images.is_empty() && attachments.is_empty() && staged_count == 0 {
         return Err("请先输入内容".into());
     }
     if text.chars().count() > MAX_INPUT_CHARS {
@@ -1350,19 +1372,30 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
         let extension = if image.starts_with("data:image/jpeg;") { "jpg" } else if image.starts_with("data:image/gif;") { "gif" } else if image.starts_with("data:image/webp;") { "webp" } else { "png" };
         inputs.push(AttachmentInput { name: format!("图片-{}.{extension}", index + 1), data_url: image.clone() });
     }
-    let saved = match attachment_store.import(&session_id, &inputs) {
+    let imported = match &queued {
+        Some(entry) => serde_json::from_value(entry.message.structured_content.as_ref().map(|v|v["attachments"].clone()).unwrap_or(json!([]))).map_err(|e|e.to_string()),
+        None => attachment_store.import(&session_id, &inputs),
+    };
+    let saved = match imported {
         Ok(saved) => saved,
         Err(error) => { lock(&state.runs).remove(&session_id); lock(&state.leases).remove(&session_id); return Err(error); }
     };
     let saved_for_thread = saved.clone();
+    let input_metadata = queued.as_ref().and_then(|entry|entry.message.structured_content.clone()).or_else(||Some(json!({"attachments":saved})));
+    if let Err(error) = outbox_host::open(&app, &session_id) {
+        lock(&state.runs).remove(&session_id); lock(&state.leases).remove(&session_id);
+        if queued.is_none() { attachment_store.rollback(&saved); }
+        return Err(error);
+    }
 
     // Build the agent and run it entirely on a dedicated OS thread.
     // reqwest::blocking::Client internally manages its own current-thread runtime;
     // building or dropping it inside Tokio's async worker threads panics.
     let parts = user_parts(&text, &images);
     let (handle, id, parts_owned, config_owned, workspace_owned) = (app.clone(), summary.id.clone(), parts, config, workspace);
+    let from_queue = queued.is_some();
     let started = std::thread::Builder::new().name(format!("chat-{id}")).spawn(move || {
-        let _cleanup=HostRunCleanup{app:handle.clone(),session:id.clone()};
+        let mut cleanup=HostRunCleanup{app:handle.clone(),session:id.clone(),success:Some(false)};
         let _watch=control.watch(cancel.clone());
         let sender = handle.clone();
         let session = id.clone();
@@ -1379,7 +1412,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
             build_agent(&handle, &config, source.clone(), &workspace_owned, saved_for_thread.clone(), &id, &cancel, &control).map(|agent| (agent, config, source))
         });
         if cancel.load(Ordering::SeqCst) {
-            attachment_store.rollback(&saved_for_thread);
+            if queued.is_none() { attachment_store.rollback(&saved_for_thread); }
             let _ = goals::failed_before_run(&handle, &id, "任务已取消");
             emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "cancelled" } }));
             return;
@@ -1387,7 +1420,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
         let (agent, config_owned, key_source) = match prepared {
             Ok(ready) => ready,
             Err(error) => {
-                attachment_store.rollback(&saved_for_thread);
+                if queued.is_none() { attachment_store.rollback(&saved_for_thread); }
                 let _ = goals::failed_before_run(&handle, &id, &error);
                 emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": error } }));
                 return;
@@ -1400,7 +1433,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
         let answered = match Dirs::of(&handle) {
             Ok(dirs) => {
                 let journal = JsonlRunLog::new(dirs.runs().join(&id));
-                let options = RunOptions { control:Some(control.clone()),max_no_progress_rounds:Some(6),max_tool_calls: execution.max_tool_calls, ..Default::default() };
+                let options = RunOptions { input:Some(outbox_host::input(&handle)), input_metadata, control:Some(control.clone()),max_no_progress_rounds:Some(6),max_tool_calls: execution.max_tool_calls, ..Default::default() };
                 let mut observed_run_id: Option<String> = None;
                 let mut observe = |mut record: agent_kernel::RunEvent| {
                     observed_run_id = Some(record.run_id.clone());
@@ -1489,11 +1522,12 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
             let persisted = messages.iter().any(|m| m.structured_content.as_ref()
                 .and_then(|v| v.get("attachments")).and_then(Value::as_array)
                 .is_some_and(|items| items.iter().any(|item| saved_for_thread.iter().any(|a| item["id"].as_str() == Some(a.id.as_str())))));
-            if !persisted { attachment_store.rollback(&saved_for_thread); }
+            if !persisted && queued.is_none() { attachment_store.rollback(&saved_for_thread); }
         }
+        cleanup.success = Some(answered.is_ok() && !cancel.load(Ordering::SeqCst));
     });
     if let Err(error) = started {
-        AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).rollback(&saved);
+        if !from_queue { AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).rollback(&saved); }
         lock(&state.runs).remove(&summary.id);
         lock(&state.leases).remove(&summary.id);
         return Err(format!("无法开始回答：{error}"));
@@ -1624,7 +1658,9 @@ pub fn chat_rollback_skill_proposal(app:tauri::AppHandle,window:tauri::WebviewWi
 
 #[tauri::command]
 pub fn chat_cancel(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) {
-    if chat_window(&window).is_err() { return; }
+    if chat_window(&window).is_err() || checked_session_id(&session_id).is_err() { return; }
+    let state = app.state::<ChatState>(); let _delivery = lock(&state.delivery);
+    if let Err(error)=outbox_host::pause(&app, &session_id, "任务已停止，队列已暂停") { eprintln!("无法保存队列暂停状态：{error}"); }
     cancel_run(&app, &session_id);
 }
 
@@ -1657,7 +1693,10 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     // A second instance must not publish goal metadata while deletion is underway.
     let _goal_io = lock(&state.goal_io);
     let _goal_lease = goals::metadata_lease(&app, &session_id)?;
+    // Goal starts take goal_io before delivery; keep the same order during deletion.
+    let _delivery = lock(&state.delivery);
     JsonlStore::new(Dirs::of(&app)?.sessions()).remove(&session_id).map_err(|e| e.to_string())?;
+    outbox_host::forget(&app, &session_id)?;
     AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).remove_session(&session_id)?;
     let run_dir = Dirs::of(&app)?.runs().join(&session_id);
     if let Err(error) = fs::remove_dir_all(&run_dir) {

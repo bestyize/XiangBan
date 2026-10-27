@@ -27,3 +27,9 @@ mod ai_reasoning;
 mod model_selection;
 #[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/sessions.rs"]
 mod sessions;
+
+#[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/outbox.rs"]
+mod outbox;
+
+#[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/git_command.rs"]
+mod git_command;

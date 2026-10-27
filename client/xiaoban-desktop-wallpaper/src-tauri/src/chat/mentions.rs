@@ -9,7 +9,7 @@ use std::sync::Arc;
 /// 一条消息最多带这么多个点名。
 pub const MAX_MENTIONS: usize = 8;
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, serde::Serialize, Deserialize, PartialEq, Eq)]
 pub struct Mention {
     /// `skill` / `connector` / `expert`。专家在界面上召唤成新对话，这里不处理。
     pub kind: String,

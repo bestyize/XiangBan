@@ -32,7 +32,11 @@ export interface ChatGroup { id: string; name: string }
 /** What the host sends back after it changes names or groups: the whole list, so both stay in step. */
 export interface Library { sessions: SessionSummary[]; groups: ChatGroup[] }
 
+export interface QueueEntry { id: string; text: string; mode: 'queue' | 'steer'; dispatching: boolean; images: number; files: AttachmentCard[] }
+export interface MessageQueue { enqueuedId?: string; revision: number; paused: boolean; reason: string; items: QueueEntry[] }
 export interface Overview {
+  queueProtocol?: number;
+  queues?: Record<string, MessageQueue>;
   pendingProtocol?: number;
   snapshotProtocol?: number;
   configured: boolean;
@@ -65,6 +69,7 @@ export interface WireMessage {
 }
 
 export type KernelEvent =
+  | { type: 'user_message'; message: WireMessage; initial: boolean }
   | { type: 'text_delta'; text: string }
   | { type: 'reasoning_delta'; kind: 'summary' | 'text'; text: string }
   | { type: 'tool_start'; id: string; name: string; arguments: string }
@@ -109,7 +114,7 @@ export interface ConnectorSuggestion {
 export interface QuestionRequest { id: string; session: string; question: string; options: string[]; connectors?: ConnectorSuggestion[] }
 
 export type ChatItem =
-  | { kind: 'user'; id: string; text: string; images: string[]; files?: AttachmentCard[] }
+  | { kind: 'user'; delivery?: 'steer' | 'queue'; id: string; text: string; images: string[]; files?: AttachmentCard[] }
   | { kind: 'reasoning'; id: string; text: string; reasoningKind: 'summary' | 'text'; streaming: boolean }
   | { kind: 'assistant'; id: string; text: string; streaming: boolean; /** Tokens of the whole answer, research helpers included. */ usage?: TokenUsage }
   | { kind: 'tool'; id: string; name: string; arguments: string; output: string; status: 'running' | 'done' | 'error'; waitingFor?: { resource: string; ownerSession?: string } }

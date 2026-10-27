@@ -76,7 +76,7 @@ impl VisibleTail {
                     self.reasoning.push(agent_kernel::ReasoningSegment { kind: *kind, text: text.clone() });
                 }
             }
-            Event::ToolStart { .. } | Event::ToolEnd { .. } | Event::Continuing { .. } | Event::Done => {
+            Event::UserMessage { .. } | Event::ToolStart { .. } | Event::ToolEnd { .. } | Event::Continuing { .. } | Event::Done => {
                 *self = Self::default();
             }
             _ => {}
@@ -174,16 +174,29 @@ pub(super) fn latest_events(
 }
 
 pub(super) fn snapshot_projection(
-    mut messages: Vec<agent_kernel::Message>, run_id: Option<String>, sequence: u64, events: Vec<Value>, running: bool,
+    mut messages: Vec<agent_kernel::Message>, run_id: Option<String>, sequence: u64, mut events: Vec<Value>, running: bool,
 ) -> Value {
     let terminal = events.iter().any(|v| matches!(v["event"]["type"].as_str(), Some("done" | "cancelled" | "error")));
     let running = running && !terminal;
     let has_output = events.iter().any(|v| matches!(v["event"]["type"].as_str(),
-        Some("text_delta" | "reasoning_delta" | "tool_start" | "done" | "cancelled" | "error")));
+        Some("user_message" | "text_delta" | "reasoning_delta" | "tool_start" | "done" | "cancelled" | "error")));
     // Model callbacks only begin after the user's message is saved. Prior to
     // that boundary the UI keeps waiting and retries on the first model event.
-    if let Some(index) = has_output.then(|| messages.iter().rposition(|m| m.role == agent_kernel::Role::User && !m.synthetic)).flatten() {
-        messages.truncate(index + 1);
+    let inputs: Vec<_> = events.iter().filter(|v|v["event"]["type"] == "user_message").collect();
+    let id_of = |m: &agent_kernel::Message| m.structured_content.as_ref().and_then(|v|v["outboxId"].as_str()).map(str::to_string);
+    let initial = inputs.iter().find(|v|v["event"]["initial"] == true).and_then(|v|v["event"]["message"]["structured_content"]["outboxId"].as_str());
+    let boundary = initial.and_then(|id|messages.iter().position(|m|id_of(m).as_deref() == Some(id)))
+        .or_else(|| messages.iter().rposition(|m|m.role == agent_kernel::Role::User && !m.synthetic && !inputs.iter().any(|v|id_of(m).as_deref().is_some_and(|id|v["event"]["message"]["structured_content"]["outboxId"] == id))).map(|i|i+1));
+    // A long run may compact its original input after several follow-ups. Resume
+    // projection at the earliest retained input instead of waiting for the run to end.
+    let retained = if boundary.is_none() { messages.iter().enumerate().find_map(|(at,m)| {
+        let id=id_of(m)?;
+        events.iter().position(|v|v["event"]["type"] == "user_message" && v["event"]["message"]["structured_content"]["outboxId"] == id).map(|event|(at,event))
+    }) } else {None};
+    let boundary=boundary.or_else(||retained.map(|(at,_)|at));
+    if let Some((_,event))=retained {events=events.into_iter().skip(event).collect();}
+    if let Some(boundary) = has_output.then_some(boundary).flatten() {
+        messages.truncate(boundary);
         let interrupted = !running && !events.iter().any(|v| matches!(v["event"]["type"].as_str(), Some("done" | "cancelled" | "error")));
         json!({"messages":messages,"runId":run_id,"sequence":sequence,"events":events,"running":running,"ready":true,"interrupted":interrupted})
     } else {
@@ -196,6 +209,29 @@ mod tests {
     use super::*;
     use agent_kernel::RunState;
 
+    #[test]
+    fn snapshot_replays_follow_up_in_its_original_position() {
+        let mut follow=agent_kernel::Message::user_text("change direction");follow.structured_content=Some(json!({"outboxId":"q1"}));
+        let messages=vec![agent_kernel::Message::user_text("original"),agent_kernel::Message::assistant("first",vec![]),follow.clone(),agent_kernel::Message::assistant("second",vec![])];
+        let events=vec![json!({"event":{"type":"text_delta","text":"first"}}),json!({"event":{"type":"user_message","initial":false,"message":follow}}),json!({"event":{"type":"text_delta","text":"second"}})];
+        let projection=snapshot_projection(messages,Some("r1".into()),4,events,true);
+        assert_eq!(projection["messages"].as_array().unwrap().len(),1);assert_eq!(projection["events"].as_array().unwrap().len(),3);
+    }
+    #[test]
+    fn snapshot_stays_live_when_compaction_has_removed_the_original_input() {
+        let mut follow=agent_kernel::Message::user_text("latest instruction");follow.structured_content=Some(json!({"outboxId":"q2"}));
+        let summary=agent_kernel::Message::reminder("earlier work was compacted");
+        let events=vec![json!({"event":{"type":"text_delta","text":"old output"}}),json!({"event":{"type":"user_message","initial":false,"message":follow}}),json!({"event":{"type":"text_delta","text":"new output"}})];
+        let p=snapshot_projection(vec![summary,follow],Some("r1".into()),4,events,true);
+        assert_eq!(p["messages"].as_array().unwrap().len(),1);assert_eq!(p["events"].as_array().unwrap().len(),2);assert_eq!(p["ready"],true);
+    }
+    #[test]
+    fn snapshot_does_not_duplicate_the_initial_queued_input() {
+        let mut initial=agent_kernel::Message::user_text("queued question");initial.structured_content=Some(json!({"outboxId":"q1"}));
+        let events=vec![json!({"event":{"type":"user_message","initial":true,"message":initial}})];
+        let projection=snapshot_projection(vec![initial],Some("r1".into()),2,events,true);
+        assert_eq!(projection["messages"].as_array().unwrap().len(),0);assert!(projection["ready"].as_bool().unwrap());
+    }
     #[test]
     fn run_events_are_redacted_and_journaled_in_order() {
         let dir = std::env::temp_dir().join(format!("xiaoban-run-history-{}", std::process::id()));

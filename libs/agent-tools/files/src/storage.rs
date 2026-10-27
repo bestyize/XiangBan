@@ -229,7 +229,8 @@ impl<S: SessionStore> SessionStore for AttachmentHistory<S> {
                 .iter_mut()
                 .find(|m| m.role == Role::User && !m.synthetic)
             {
-                message.structured_content = Some(json!({"attachments":items}));
+                let metadata = message.structured_content.get_or_insert_with(|| json!({}));
+                metadata["attachments"] = json!(items);
                 used = true;
             }
         }

@@ -105,7 +105,7 @@ fn attempt(app: &tauri::AppHandle, rule_id: &str, prompt: &str, conversation_id:
         }
         runs.insert(session.clone(), cancel.clone());
     }
-    let _cleanup=HostRunCleanup{app:app.clone(),session:session.clone()};
+    let _cleanup=HostRunCleanup{app:app.clone(),session:session.clone(),success:None};
     let dirs = Dirs::of(app)?;
     let result = (|| -> Result<(String, agent_kernel::Usage), String> {
         let _lease = agent_kernel::supervisor::SessionLease::acquire(dirs.leases(), &session)?;

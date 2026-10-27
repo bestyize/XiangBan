@@ -416,6 +416,7 @@ async function openLink(href: string) {
               <div v-if="isUserBlock(block)" class="msg user" data-testid="msg-user">
                 <div v-for="item in block.items" :key="item.id" class="bubble" data-search>
                   <template v-if="item.kind === 'user'">
+                    <small v-if="item.delivery === 'steer'" class="delivered-follow-up">已补充到当前任务</small>
                     <div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = attachmentImage(url)" /></div>
                     <div v-if="item.files?.length" class="bubble-files"><span v-for="(file, n) in item.files" :key="n" class="bubble-file" :title="file.name"><FileText :size="13" />{{ file.name }} · {{ Math.ceil(file.size / 1024) }} KB</span></div>
                     <template v-if="item.text">{{ item.text }}</template>
@@ -546,6 +547,8 @@ async function openLink(href: string) {
 </template>
 
 <style scoped>
+.delivered-follow-up{display:block;margin-bottom:5px;font-size:10px;opacity:.7}
+
 .design-deliveries{display:flex;gap:6px;overflow:auto;padding:4px 18px 8px;flex:none}.design-deliveries button{display:flex;align-items:center;gap:6px;padding:6px 9px;background:var(--ui-control);border:1px solid var(--ui-line);border-radius:7px;color:var(--ui-text-secondary);font-size:11px;cursor:pointer;white-space:nowrap}.design-deliveries b{font-weight:500}.design-deliveries small{font-size:10px;color:var(--ui-text-tertiary)}.design-deliveries .active{border-color:var(--ui-ink);color:var(--ui-ink)}
 .design-splitter{width:4px;flex:none;cursor:col-resize;touch-action:none;background:transparent}.design-splitter:hover,.design-splitter:focus-visible{background:var(--ui-soft);outline:0}
 .design-dock{width:64%;min-width:420px;max-width:calc(100% - 250px);border-left:1px solid var(--ui-line);flex:none;min-height:0;display:flex}@media(max-width:900px){.design-splitter{display:none}.design-dock{position:absolute;inset:0;width:100%!important;min-width:0;max-width:none;z-index:8;background:var(--ui-surface)}}

@@ -199,6 +199,8 @@ impl AddAssign for Usage {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Event {
+    /// An additional real user message, persisted before the next model request.
+    UserMessage { message: Message, initial: bool },
     TextDelta { text: String },
     ReasoningDelta { kind: ReasoningKind, text: String },
     ToolStart { id: String, name: String, arguments: String },

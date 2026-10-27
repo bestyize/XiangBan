@@ -1,6 +1,6 @@
 import type { PendingAttachment } from './attachments.ts';
 import type { Mention, MentionItem } from './mentions.ts';
-import type { SessionModel } from './types.ts';
+import type { MessageQueue, SessionModel } from './types.ts';
 import { modelFailure } from './model-errors.ts';
 import { reactive, ref, watch } from 'vue';
 import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, ExpertView, Library, Overview, QuestionRequest, RecentWorkspace, SessionSummary, SessionView, WireMessage, WorktreeInfo, WorktreeLink } from './types.ts';
@@ -17,6 +17,10 @@ export interface ChatDeps {
 }
 
 export interface ChatStore {
+  queues: Record<string, MessageQueue>;
+  readonly queue: MessageQueue | null;
+  enqueue(text: string, attachments: PendingAttachment[], mentions: Mention[], mode?: 'queue' | 'steer' | 'replace'): Promise<boolean>;
+  updateQueue(action: 'pause' | 'resume' | 'remove' | 'edit' | 'reorder' | 'send_now', id?: string, options?: { text?: string; order?: string[]; removeImages?: number[]; removeFiles?: string[] }, sessionId?: string): Promise<boolean>;
   drafts: Record<string, ComposerDraft>;
   readonly draft: ComposerDraft;
   draftFor(id: string | null): ComposerDraft;
@@ -133,6 +137,8 @@ const STALE = '这个确认已经结束';
 export function createChatStore(deps: ChatDeps): ChatStore {
   let selectionRevision = 0;
   const draftSending = ref(false);
+  const queueSending = reactive(new Set<string>());
+  const queueAttempts = new Map<string, { payload: string; id: string }>();
   const defaultPermissionMode = ref<'ask' | 'auto'>('ask');
   const pendingPermissionMode = ref<'ask' | 'auto'>('ask');
   let contextRevision = 0;
@@ -169,7 +175,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     pendingModel: null as SessionModel | null,
     pendingContextTokens: null as number | null,
     get model() { return store.currentId ? store.sessions.find(s => s.id === store.currentId)?.model ?? null : store.pendingModel; },
-    get sending() { return draftSending.value || modelChanges.has(store.currentId ?? '$new'); },
+    get sending() { return draftSending.value || queueSending.has(store.currentId ?? '$new') || modelChanges.has(store.currentId ?? '$new'); },
     async setModel(model: SessionModel, sessionId: string | null = store.currentId) {
       const key = sessionId ?? '$new';
       const revision = (modelRevisions.get(key) ?? 0) + 1;
@@ -344,6 +350,35 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         deps.notify(error, 'error');
       }
     },
+    queues: {} as Record<string, MessageQueue>,
+    get queue() { return store.currentId ? store.queues[store.currentId] ?? null : null; },
+    async enqueue(text, attachments, mentions, mode = 'queue') {
+      const session = store.currentId;
+      if (!deps.desktop || !session || queueSending.has(session)) return false;
+      queueSending.add(session);
+      try {
+        const payload = JSON.stringify([text, attachments, mentions, mode]);
+        const uniqueId = typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+        if (queueAttempts.get(session)?.payload !== payload) queueAttempts.set(session, { payload, id: `q-${uniqueId}` });
+        const requestId = queueAttempts.get(session)!.id;
+        const images = attachments.filter((a): a is string => typeof a === 'string');
+        const files = attachments.filter(a => typeof a !== 'string').map(({ name, dataUrl }) => ({ name, dataUrl }));
+        const queue = await deps.invoke<MessageQueue>('chat_enqueue', { sessionId: session, text, mode: mode === 'replace' ? 'queue' : mode, stopNow: mode === 'replace', requestId, images, attachments: files, mentions });
+        applyQueue(session, queue);
+        queueAttempts.delete(session);
+        sent.add(session);
+        return true;
+      } catch (error) { deps.notify(error, 'error'); return false; }
+      finally { queueSending.delete(session); }
+    },
+    async updateQueue(action, id, options = {}, sessionId) {
+      const session = sessionId ?? store.currentId;
+      if (!deps.desktop || !session) return false;
+      try {
+        const queue = await deps.invoke<MessageQueue>('chat_queue_update', { sessionId: session, action, id, ...options });
+        applyQueue(session, queue); return true;
+      } catch (error) { deps.notify(error, 'error'); return false; }
+    },
     loadError: '',
     sessions: [] as SessionSummary[],
     groups: [] as ChatGroup[],
@@ -362,6 +397,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         try {
           const listeners = await Promise.all([
             deps.listen<ChatEventPayload>('chat-event', payload => { if (!disposed) receive(payload); }),
+            deps.listen<{session: string; queue: MessageQueue}>('chat-queue-changed', payload => { if (!disposed) applyQueue(payload.session, payload.queue); }),
             deps.listen<ApprovalRequest>('chat-approval', request => { if (!disposed && !supportsPending) addPending(viewOf(request.session, true).approvals, request); }),
             deps.listen<QuestionRequest>('chat-question', request => { if (!disposed && !supportsPending) addPending(viewOf(request.session, true).questions, request); }),
             deps.listen<{session:string;pending:PendingSnapshot}>('chat-pending-changed', p=>{if(!disposed) applyPending(p.session,p.pending);}),
@@ -419,6 +455,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         if (overview.permissionMode) defaultPermissionMode.value = overview.permissionMode;
         if (typeof overview.hideToolCalls === 'boolean') store.hideToolCalls = overview.hideToolCalls;
         store.sessions = overview.sessions;
+        for (const [session, queue] of Object.entries(overview.queues ?? {})) applyQueue(session, queue);
         store.groups = overview.groups ?? [];
         for (const id of overview.running) viewOf(id, false).running = true;
         store.loadError = '';
@@ -433,6 +470,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     dispose() {
       disposed = true;
       unsubscribers.splice(0).forEach(stop => stop());
+      queueAttempts.clear();
     },
 
     current() {
@@ -587,6 +625,8 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         const sessions = await deps.invoke<SessionSummary[]>('chat_delete_session', { sessionId: id });
         store.sessions = sessions ?? store.sessions.filter(s => s.id !== id);
         delete store.views[id];
+        delete store.queues[id];
+        queueAttempts.delete(id);
         if (store.currentId === id) store.currentId = null;
       } catch (error) {
         deps.notify(error, 'error');
@@ -704,6 +744,11 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       }
     },
   }) as ChatStore;
+
+  function applyQueue(session: string, queue: MessageQueue) {
+    if (disposed || !queue || queue.revision < (store.queues[session]?.revision ?? -1)) return;
+    store.queues[session] = queue;
+  }
 
   function receive(payload: ChatEventPayload) {
     const { session, runId, sequence } = payload;

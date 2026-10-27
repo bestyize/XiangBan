@@ -186,6 +186,22 @@ impl Agent {
         result
     }
 
+    fn receive_input(&self, session: &str, options: &crate::RunOptions, history: &mut Vec<Message>, closing: bool, cancel: &AtomicBool,
+        on_event: &mut dyn FnMut(Event)) -> Result<bool, HarnessError> {
+        let Some(source) = &options.input else { return Ok(false); };
+        let messages = source.poll(session, closing)?;
+        if messages.is_empty() { return Ok(false); }
+        if cancel.load(Ordering::Relaxed) { return Err(HarnessError::Cancelled); }
+        if messages.iter().any(|m| m.role != Role::User || m.synthetic || !m.tool_calls.is_empty() || (m.parts.is_empty() && !m.structured_content.as_ref().and_then(|v|v["attachments"].as_array()).is_some_and(|a|!a.is_empty()))) {
+            return Err(HarnessError::Config("host input must contain real user messages".into()));
+        }
+        self.store.append(session, &messages)?;
+        history.extend(messages.clone());
+        for message in &messages { on_event(Event::UserMessage { message: message.clone(), initial: false }); }
+        source.accepted(session, &messages)?;
+        Ok(true)
+    }
+
     fn acquire(&self, session: &str) -> Result<SessionGuard<'_>, HarnessError> {
         let mut running = self.running.lock().unwrap_or_else(|e| e.into_inner());
         if !running.insert(session.to_string()) {
@@ -213,8 +229,13 @@ impl Agent {
             history.extend(repair);
         }
         if let Some(input) = input {
-            let user = Message::user(input);
+            let mut user = Message::user(input);
+            user.structured_content = options.input_metadata.clone();
             self.store.append(session, std::slice::from_ref(&user))?;
+            if user.structured_content.as_ref().is_some_and(|v| v["outboxId"].is_string()) {
+                on_event(Event::UserMessage { message: user.clone(), initial: true });
+                if let Some(source) = &options.input { source.accepted(session, std::slice::from_ref(&user))?; }
+            }
             history.push(user);
         }
         let run_start = history.len().saturating_sub(1);
@@ -237,6 +258,7 @@ impl Agent {
             if cancel.load(Ordering::Relaxed) {
                 return Err(HarnessError::Cancelled);
             }
+            self.receive_input(session, options, &mut history, false, cancel, on_event)?;
             let mut messages = Vec::with_capacity(history.len() + 1);
             let system = self.system_text();
             if !system.is_empty() {
@@ -332,6 +354,10 @@ impl Agent {
                     .unwrap_or(StopDecision::Finish);
                 let nudge = match decision {
                     StopDecision::Finish => {
+                        if self.max_turns != Some(index + 1) && self.receive_input(session, options, &mut history, true, cancel, on_event)? {
+                            continuations_without_progress = 0;
+                            continue;
+                        }
                         if cut_off {
                             on_event(Event::Truncated);
                         }
