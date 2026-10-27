@@ -14,6 +14,7 @@ struct Inflight {
     index: usize,
     rx: Receiver<(Instant, ToolResult)>,
     clock: crate::RunControl,
+    scope: crate::RunControl,
 
     call_cancel: Arc<AtomicBool>,
     grace: Duration,
@@ -34,6 +35,7 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, mut ctx: ToolCtx) -> Re
     let watched_clock = clock.clone();
     let run_cancel = ctx.run_cancel.clone();
     let worker_cancel = call_cancel.clone();
+    let scope = ctx.control.clone();
     // Each worker owns a watchdog; waiting for another result or an approval
     // must not postpone this call's cancellation.
     let watch = crate::StopWatch::new(
@@ -45,10 +47,12 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, mut ctx: ToolCtx) -> Re
         .name(format!("tool-{}", tool.spec().name))
         .spawn(move || {
             let result = tool.execute_result(args, &ctx);
+            if result.outcome_unknown() { ctx.control.mark_uncertain(); }
+            drop(ctx);
             let _ = tx.send((Instant::now(), result));
         })
         .map_err(|e| ToolResult::error(format!("could not start tool: {e}")))?;
-    Ok(Inflight { index, rx, clock, call_cancel, grace, _watch: watch })
+    Ok(Inflight { index, rx, clock, scope, call_cancel, grace, _watch: watch })
 }
 
 fn reported(call: &Inflight, finished: Instant, mut result: ToolResult) -> ToolResult {
@@ -96,12 +100,45 @@ impl Agent {
             if results.iter().flatten().any(ToolResult::halts_dispatch){results[i]=Some(self.finalize(session,call,ToolResult::error("Not dispatched: earlier action needs review"),on_event));continue;}
             match self.prepare(session, run_id, call, cancel, budget, control) {
                 Prepared::Done(result) => results[i] = Some(self.finalize(session, call, result, on_event)),
-                Prepared::Run { tool, args, ctx } => {
+                Prepared::Run { tool, args, mut ctx } => {
                     let serial = !tool.spec().parallel_safe;
                     if serial {
                         self.drain(session, &mut inflight, &mut results, calls, cancel, on_event);
                     }
                     if results.iter().flatten().any(ToolResult::halts_dispatch){results[i]=Some(self.finalize(session,call,ToolResult::error("Not dispatched: earlier action needs review"),on_event));continue;}
+                    let resource = match tool.resource(&args) {
+                        Ok(resource) => resource,
+                        Err(error) => {
+                            results[i] = Some(self.finalize(session, call, ToolResult::error(error), on_event));
+                            continue;
+                        }
+                    };
+                    if let Some(resource) = resource {
+                        // Permissions have already been resolved. File/sequence ownership lasts
+                        // through the run; ordinary mutation ownership belongs to this worker.
+                        if resource.held_for_run() { ctx.control = control.clone(); }
+                        let claimed = ctx.control.claim_tool_resource(&resource, session, cancel, |waiting, owner| {
+                            on_event(Event::ToolWaiting { id: call.id.clone(), resource: resource.label(), owner_session: owner.map(String::from), waiting });
+                        });
+                        if let Err(result) = claimed {
+                            results[i] = Some(self.finalize(session, call, result, on_event));
+                            continue;
+                        }
+                    }
+                    if cancel.load(Ordering::Relaxed) {
+                        results[i] = Some(self.finalize(session, call, ToolResult::error("cancelled before dispatch"), on_event));
+                        continue;
+                    }
+                    let blocked = self.middleware.iter().filter(|mw| !mw.authorizes_tool()).find_map(|mw| {
+                        match mw.before_tool(&ctx, call, &args, tool.spec()) {
+                            ToolGate::Proceed => None,
+                            ToolGate::Block(reason) => Some(ToolResult::error(reason)),
+                        }
+                    });
+                    if let Some(result) = blocked {
+                        results[i] = Some(self.finalize(session, call, result, on_event));
+                        continue;
+                    }
                     on_event(Event::ToolDispatched { id: call.id.clone() });
                     if cancel.load(Ordering::Relaxed) {
                         results[i] = Some(self.finalize(session, call, ToolResult::error("cancelled before dispatch"), on_event));
@@ -148,6 +185,7 @@ impl Agent {
         if cancel.load(Ordering::Relaxed) {
             return Prepared::Done(ToolResult::error("cancelled"));
         }
+        if let Err(error) = control.check() { return Prepared::Done(ToolResult::error(error.to_string())); }
         let args = if call.arguments.trim().is_empty() {
             Value::Object(Map::new())
         } else {
@@ -176,17 +214,10 @@ impl Agent {
             run_cancel: cancel.clone(),
             call_cancel: Arc::new(AtomicBool::new(false)),
             budget: budget.cloned(),
-            control: control.clone(),
+            control: control.tool_scope(),
             call_control: Default::default(),
         };
-        match tool.resource(&args) {
-            Err(error) => return Prepared::Done(ToolResult::error(error)),
-            Ok(Some(resource)) => if let Err(error) = control.claim_resource(&resource) {
-                return Prepared::Done(ToolResult::error(error).with_structured_content(serde_json::json!({"harness_status":"resource_busy"})));
-            },
-            Ok(None) => {}
-        }
-        for mw in &self.middleware {
+        for mw in self.middleware.iter().filter(|mw| mw.authorizes_tool()) {
             if let ToolGate::Block(reason) = mw.before_tool(&ctx, call, &args, tool.spec()) {
                 let denied = reason.starts_with("The user denied permission to run `");
                 let result = ToolResult::error(reason);
@@ -210,6 +241,7 @@ impl Agent {
     ) {
         for call in inflight.drain(..) {
             let result = await_call(&call, cancel);
+            if result.outcome_unknown() { call.scope.mark_uncertain(); }
             results[call.index] = Some(self.finalize(session, &calls[call.index], result, on_event));
         }
     }

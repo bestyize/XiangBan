@@ -7,6 +7,18 @@ import type { ToolCall } from './replies.ts';
 const call = (id: string, status: ToolCall['status'] = 'done'): ToolCall => ({ kind: 'tool', id, name: 'shell', arguments: '{"command":"ls"}', output: '文件清单', status });
 
 describe('compact execution progress', () => {
+  it('shows resource contention as an automatic wait in both compact and expanded views', async () => {
+    const pending = { ...call('waiting', 'running'), waitingFor: { resource: 'app-state', ownerSession: 'other' } };
+    const wrapper = mount(ChatActivity, { props: { calls: [pending], active: true } });
+    expect(wrapper.get('[data-testid="activity-toggle"]').text()).toContain('等待资源');
+    expect(wrapper.get('[data-testid="activity-live"]').text()).toContain('自动继续');
+    await wrapper.get('button').trigger('click');
+    expect(wrapper.get('summary').text()).toContain('自动继续');
+    await wrapper.setProps({ calls: [call('waiting', 'running')] });
+    expect(wrapper.get('[data-testid="activity-toggle"]').text()).toContain('执行中');
+    expect(wrapper.get('summary').text()).not.toContain('自动继续');
+    wrapper.unmount();
+  });
   it('shows one live operation, retains parallel work, and keeps errors visible after completion', async () => {
     const wrapper = mount(ChatActivity, { props: { calls: [call('slow', 'running'), call('fast')], active: true } });
     expect(wrapper.findAll('[data-testid^="tool-"]')).toHaveLength(1);

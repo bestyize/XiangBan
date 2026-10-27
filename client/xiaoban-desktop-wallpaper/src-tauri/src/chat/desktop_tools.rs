@@ -326,6 +326,16 @@ impl Tool for DesktopTool {
         &self.spec
     }
 
+    fn resource(&self, _: &Value) -> Result<Option<agent_kernel::ToolResource>, String> {
+        Ok(if self.spec.risk == Risk::Read { None }
+        else if matches!(self.spec.name.as_str(), "computer_use_repair_permissions" | "request_accessibility_permission") {
+            Some(agent_kernel::ToolResource::RunExclusive("computer".into()))
+        } else if matches!(self.spec.name.as_str(), "open_page" | "desktop_window_set" | "game_open" | "game_close") {
+            // Focus/window changes must not interrupt another run's screen-control sequence.
+            Some(agent_kernel::ToolResource::Named("computer".into()))
+        } else { Some(agent_kernel::ToolResource::Named("app-state".into())) })
+    }
+
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         if ctx.is_cancelled() { return Err("操作开始前已取消".into()); }
         (self.run)(self.desktop.as_ref(), &args)

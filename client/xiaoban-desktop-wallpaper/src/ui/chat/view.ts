@@ -113,7 +113,7 @@ function settle(view: SessionView) {
     if (reply?.kind === 'assistant') reply.usage = view.usage;
     view.usage = undefined;
   }
-  for (const item of view.items) if (item.kind === 'tool' && item.status === 'running') { item.status = 'error'; item.output = item.output || '已中断'; }
+  for (const item of view.items) if (item.kind === 'tool' && item.status === 'running') { item.status = 'error'; item.output = item.output || '已中断'; delete item.waitingFor; }
   view.running = false;
   view.approvals = [];
   view.questions = [];
@@ -155,10 +155,23 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
     case 'tool_dispatched':
       // The existing tool card remains running; dispatch is an execution-log boundary.
       break;
+    case 'tool_waiting': {
+      const item = view.items.find((i): i is Extract<ChatItem, { kind: 'tool' }> => i.kind === 'tool' && i.id === event.id);
+      if (!item || item.status !== 'running') break;
+      if (event.waiting) item.waitingFor = { resource: event.resource, ownerSession: event.owner_session ?? undefined };
+      else delete item.waitingFor;
+      view.status = view.items.some(i => i.kind === 'tool' && i.waitingFor)
+        ? '另一个会话正在使用所需资源，释放后会自动继续。可以随时停止。' : '';
+      break;
+    }
     case 'tool_end': {
       const item = view.items.find((i): i is Extract<ChatItem, { kind: 'tool' }> => i.kind === 'tool' && i.id === event.id);
       const output = toolOutput(event.output, event.structured_content);
-      if (item) { item.output = output; item.status = event.is_error ? 'error' : 'done'; }
+      if (item) {
+        if (item.waitingFor) view.status = '';
+        delete item.waitingFor;
+        item.output = output; item.status = event.is_error ? 'error' : 'done';
+      }
       else view.items.push({ kind: 'tool', id: event.id, name: '', arguments: '', output, status: event.is_error ? 'error' : 'done' });
       if (!event.is_error) clearRecoveredCutoff(view);
       break;
@@ -202,7 +215,7 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
         const invalid = event.message.endsWith(': invalid_model_terminal_or_call_identity');
         const text = uncertain ? '操作结果尚未确认，已暂停。请先核对实际状态，勿直接重复执行；后续修改会重新请求授权。'
           : invalid ? '模型返回了不完整或无效的终态，本批操作未执行。请调整请求或模型后再继续。'
-          : event.message.endsWith(': resources_busy') ? '另一个任务仍占用共享工具，当前任务已暂停。等它结束后再继续。'
+          : event.message.endsWith(': resources_busy') ? '另一个会话正在修改同一文件、独占电脑控制，或有操作结果尚未确认，当前任务已暂停。请查看执行详情；同项目并行修改可使用“在独立副本中工作”。'
           : event.message.endsWith(': no_progress_tool_rounds') ? '连续工具调用未取得新结果，已暂停。请调整方案后继续。'
           : event.message.endsWith(': verification_required') ? '目标尚未通过指定命令验收，已保存进展并暂停。可处理验收问题后继续。'
           : event.message.endsWith(': unfinished_milestones') ? '还有未完成的里程碑，已保存计划和交接说明。可调整任务后继续。'

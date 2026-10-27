@@ -8,6 +8,8 @@ mod broker;
 mod compact;
 #[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/run_history.rs"]
 mod run_history;
+#[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/git_command.rs"]
+mod git_command;
 #[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/git_snapshot.rs"]
 mod git_snapshot;
 #[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/checkpoints.rs"]

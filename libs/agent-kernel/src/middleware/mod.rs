@@ -52,9 +52,12 @@ pub struct Turn {
     pub tools: Vec<crate::ToolSchema>,
 }
 
-/// Hooks run in registration order. Permission, context trimming, output spilling and budgets
+/// Hooks run in registration order within each phase. Permission, context trimming, output spilling and budgets
 /// are all middleware; the loop itself knows none of them.
 pub trait Middleware: Send + Sync {
+    /// Authorization-only gates run before resource acquisition, so human input does not reserve
+    /// resources. Other before_tool hooks (for example snapshots) run after acquisition.
+    fn authorizes_tool(&self) -> bool { false }
     fn before_model(&self, _turn: &mut Turn) -> Result<(), HarnessError> {
         Ok(())
     }
@@ -80,6 +83,7 @@ pub trait Middleware: Send + Sync {
 
 /// Lets a host keep a handle (for example to switch the permission mode) while the agent owns another.
 impl<T: Middleware + ?Sized> Middleware for Arc<T> {
+    fn authorizes_tool(&self) -> bool { (**self).authorizes_tool() }
     fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
         (**self).before_model(turn)
     }

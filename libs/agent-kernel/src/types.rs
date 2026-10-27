@@ -202,6 +202,8 @@ pub enum Event {
     TextDelta { text: String },
     ReasoningDelta { kind: ReasoningKind, text: String },
     ToolStart { id: String, name: String, arguments: String },
+    /// Resource contention before dispatch. `waiting: false` means the call acquired it.
+    ToolWaiting { id: String, resource: String, owner_session: Option<String>, waiting: bool },
     /// Emitted after validation and approval, immediately before dispatch. Observers may fail
     /// closed at this point. A crash after this event leaves the action's outcome uncertain.
     ToolDispatched { id: String },

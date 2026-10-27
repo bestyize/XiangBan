@@ -251,6 +251,10 @@ impl DesignTool {
 pub fn summary(p: &Project) -> Value { json!({"id":p.id,"title":p.title,"sessionId":p.session_id,"sessionIds":p.session_ids,"revision":p.revision,"updatedMs":p.updated_ms,"artboards":boards(&p.canvas).map(|b|b.len()).unwrap_or(0)}) }
 impl Tool for DesignTool {
     fn spec(&self) -> &ToolSpec { &self.spec }
+    fn resource(&self, args: &Value) -> Result<Option<agent_kernel::ToolResource>, String> {
+        // Store already enforces revision checks; its writes must not reserve unrelated user files.
+        Ok(if args["action"] == "format" { None } else { Some(agent_kernel::ToolResource::Named("design-store".into())) })
+    }
     fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
         match self.call(args, ctx) {
             Ok(value) => ToolResult::ok(value.to_string()).with_structured_content(value),

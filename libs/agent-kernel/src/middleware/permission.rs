@@ -263,6 +263,7 @@ impl Permission {
 }
 
 impl Middleware for Permission {
+    fn authorizes_tool(&self) -> bool { true }
     fn before_tool(&self, ctx: &ToolCtx, _call: &ToolCall, args: &Value, spec: &ToolSpec) -> ToolGate {
         let session = self.root_session(ctx.session());
         let name = spec.name.as_str();
