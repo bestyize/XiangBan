@@ -44,7 +44,7 @@ pub async fn design_export(window:tauri::WebviewWindow,id:String,format:String,p
     tauri::async_runtime::spawn_blocking(move||{
         let saved=store(&app)?.load(&id)?;
         let p=project.unwrap_or(saved);if p.id!=id{return Err("设计稿编号不一致".into());}open_claude_design::validate(&p)?;
-        let (ext,bytes)=match format.as_str(){"zip"=>("zip",open_claude_design::archive::to_zip(&p)?),"html"=>("html",open_claude_design::archive::standalone(&p)?.into_bytes()),_=>return Err("不支持的导出格式".into())};
+        let (ext,bytes)=match format.as_str(){"zip"=>("zip",open_claude_design::archive::to_zip(&p)?),"html"=>("html",open_claude_design::archive::standalone(&p)?.into_bytes()),"md"=>("md",open_claude_design::archive::markdown(&p)?.into_bytes()),_=>return Err("不支持的导出格式".into())};
         let name=p.title.chars().filter(|c|!"/\\:*?\"<>|".contains(*c)&&!c.is_control()).collect::<String>();
         let Some(file)=app.dialog().file().set_title("导出设计稿").set_file_name(format!("{name}.{ext}")).add_filter("设计稿",&[ext]).blocking_save_file() else{return Ok(None)};
         let path=file.into_path().map_err(|_|"请选择本机文件")?;fs::write(&path,bytes).map_err(|e|e.to_string())?;Ok(Some(path.display().to_string()))
@@ -74,8 +74,8 @@ pub fn serve(app:&tauri::AppHandle,request:tauri::http::Request<Vec<u8>>)->tauri
         let path=decode(request.uri().path()).ok_or("路径编码无效")?;let mut parts=path.trim_start_matches('/').splitn(3,'/');
         let id=parts.next().ok_or("缺少 id")?;let revision=parts.next().ok_or("缺少版本")?.parse::<u64>().map_err(|_|"版本无效")?;let name=parts.next().ok_or("缺少画板")?;
         let p=store(app)?.load(id)?;if revision!=p.revision{return Err("预览版本已更新，请刷新".into());}
-        let text=p.files.get(name).ok_or("设计文件不存在")?;if !name.ends_with(".dc.html"){return Err("此预览仅允许画板".into());}
-        Ok(open_claude_design::archive::preview(text).into_bytes())
+        if !p.files.contains_key(name){return Err("设计文件不存在".into());}if !name.ends_with(".dc.html"){return Err("此预览仅允许画板".into());}
+        Ok(open_claude_design::archive::preview_in_project(&p,name)?.into_bytes())
     })();
     let (status,body)=match result{Ok(b)=>(200,b),Err(e)=>(400,format!("<!doctype html><meta charset=utf-8><p>预览未就绪：{}</p>",e.replace('&',"&amp;").replace('<',"&lt;")).into_bytes())};
     tauri::http::Response::builder().status(status).header("Content-Type","text/html; charset=utf-8").header("Content-Security-Policy",csp()).header("X-Content-Type-Options","nosniff").header("Referrer-Policy","no-referrer").header("Cache-Control","no-store").body(body).unwrap_or_default()

@@ -102,6 +102,8 @@ describe('compact task execution cards', () => {
     expect(q('task-count')?.textContent).toBe('已完成 2 / 2 步');
     expect(q('task-state')?.textContent).toContain('执行中');
     await h.events('s1', { type: 'text_delta', text: '已生成周报。' }, { type: 'done' });
+    h.emit('chat-task-outcome', { session: 's1', outcome: { runId: 'r1', sessionId: 's1', status: 'succeeded' } });
+    await flushPromises();
     expect(q('task-state')?.textContent).toContain('已完成');
     expect(q<HTMLDetailsElement>('chat-files')?.open).toBe(true);
     expect(q('chat-files-toggle')?.textContent).toContain('交付文件');
