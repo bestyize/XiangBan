@@ -41,7 +41,7 @@ describe('accepted task plans', () => {
     applyEvent(view, { type: 'done' });
     const blocks = replyBlocks(view.items);
     expect(blocks).toHaveLength(1);
-    expect(taskProgress(blocks[0], false)).toMatchObject({ state: 'unverified', completed: 3 });
+    expect(taskProgress(blocks[0], false)).toMatchObject({ state: 'completed', completed: 3 });
     const history: WireMessage[] = [
       { role: 'assistant', tool_calls: [{ id: first.id, name: first.name, arguments: first.arguments }] },
       { role: 'tool', tool_call_id: first.id, parts: [{ type: 'text', text: first.output }] },
@@ -72,7 +72,7 @@ describe('accepted task plans', () => {
     expect(taskProgress(block([plan, failed]), false)?.state).toBe('blocked');
     expect(taskProgress(block([failed, plan]), false)?.state).toBe('blocked');
     const recovered = { ...failed, id: 'ok', status: 'done' as const };
-    expect(taskProgress(block([failed, recovered, plan]), false)?.state).toBe('unverified');
+    expect(taskProgress(block([failed, recovered, plan]), false)?.state).toBe('completed');
   });
 });
 
@@ -82,10 +82,10 @@ it('keeps an unrelated success from repairing an earlier failed operation', () =
   const read:ToolCall={kind:'tool',id:'b',name:'read_file',arguments:'{"path":"b.txt"}',output:'ok',status:'done'};
   expect(taskProgress(block([failed,read,plan]),false)?.state).toBe('blocked');
 });
-it('retains backend partial outcomes and distinguishes an unverified plan', () => {
+it('keeps partial failures visible without requiring a separate completion validator', () => {
   const plan=checkpoint('all',todos.map(t=>({...t,status:'completed'})));
   const b={...block([plan]),items:[{kind:'notice' as const,id:'outcome',tone:'info' as const,text:'待核验',taskStatus:'unknown' as const}]};
-  expect(taskProgress(b,false)?.state).toBe('unverified');
+  expect(taskProgress(b,false)?.state).toBe('completed');
   expect(taskProgress({...b,items:[{...b.items[0]!,taskStatus:'succeeded' as const}]},false)?.state).toBe('completed');
-  expect(taskProgress({...b,items:[{...b.items[0]!,taskStatus:'partial' as const}]},false)?.state).toBe('blocked');
+  expect(taskProgress({...b,items:[{...b.items[0]!,taskStatus:'partial' as const}]},false)?.state).toBe('partial');
 });

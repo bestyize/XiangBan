@@ -4,8 +4,10 @@ import type { MessageQueue, SessionModel } from './types.ts';
 import { modelFailure } from './model-errors.ts';
 import { reactive, ref, watch } from 'vue';
 import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, ExpertView, Library, Overview, QuestionRequest, RecentWorkspace, SessionSummary, SessionView, WireMessage, WorktreeInfo, WorktreeLink } from './types.ts';
-import { applyEvent, checkpointNotice, interruptedNotice, itemsFromHistory, newView, nextId, summaryNotice, workspaceNotice } from './view.ts';
+import { applyEvent, checkpointNotice, describeCall, interruptedNotice, itemsFromHistory, newView, nextId, summaryNotice, workspaceNotice } from './view.ts';
 import { toolLabel } from './format.ts';
+import { replyBlocks } from './replies.ts';
+import { unresolvedCalls } from './task-progress.ts';
 
 export interface ChatDeps {
   onReply?(session: string, text: string, key?: string): void;
@@ -800,15 +802,29 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     if (existing < 0 && !outcome.lastToolCallId && (!v.items.some(i => i.kind === 'tool')
       || activeRun.has(session) && activeRun.get(session) !== outcome.runId)) return;
     const partial = outcome.status === 'partial', failed = outcome.status === 'failed';
-    const verified = outcome.status === 'succeeded';
     const status = ['succeeded','failed','partial','cancelled','unknown'].includes(outcome.status)
       ? outcome.status as 'succeeded'|'failed'|'partial'|'cancelled'|'unknown' : 'unknown';
-    const notice: ChatItem = { kind: 'notice', id, taskStatus: status, tone: partial || failed ? 'warning' : 'info',
-      text: partial ? '仍有未解决的操作失败，请核对结果后继续。' : failed ? '本次执行失败，已保留当前进度。'
-        : verified ? outcome.validator === 'expected_file_sha256' ? '指定文件已通过 SHA256 验收。' : '任务已通过指定验收。'
-        : outcome.status === 'cancelled' ? '已停止' : '执行已结束，任务结果尚未独立验收。',
+    const blocks = replyBlocks(v.items);
+    const block = outcome.lastToolCallId
+      ? blocks.find(block => block.calls.some(call => call.id === outcome.lastToolCallId))
+      : [...blocks].reverse().find(block => block.calls.length);
+    const errors = unresolvedCalls(block?.calls ?? []);
+    const lastError = errors.at(-1);
+    const failure = block?.items.find(item => item.kind === 'notice' && !item.taskStatus && item.tone !== 'info');
+    const target = lastError ? describeCall(lastError.name, lastError.arguments) : '';
+    const reason = lastError ? `${toolLabel(lastError.name)}${target ? `（${target}）` : ''}失败。` : '';
+    // Keep verification metadata for recovery without turning the absence of a validator into a warning.
+    const uncertain = status === 'unknown' && outcome.validator === 'run_trace_only'
+      && /(?:terminal=false|incomplete_tools=[1-9]\d*)/.test(outcome.evidence);
+    const notice: ChatItem = { kind: 'notice', id, taskStatus: status, tone: partial || failed || uncertain ? 'warning' : 'info',
+      text: partial ? `部分完成${reason ? `：${reason}` : '，仍有操作未完成。'}`
+        : failed ? (failure?.kind === 'notice' ? failure.text : reason || '本次任务未完成。')
+        : outcome.status === 'cancelled' ? '已停止'
+        : uncertain ? '有操作尚未返回结果，请展开执行详情查看。' : '',
       verifiedAtMs: outcome.verifiedAtMs ?? undefined,
-      canContinue: partial || failed, details: outcome.evidence, detailsLabel: '查看执行依据' };
+      canContinue: (partial || failed) && (!failure || failure.kind === 'notice' && !!failure.canContinue),
+      details: [failure?.kind === 'notice' ? failure.details : '', ...errors.map(call => `${toolLabel(call.name)}：${call.output}`), outcome.evidence].filter(Boolean).join('\n'),
+      detailsLabel: '执行详情' };
     if (existing >= 0) v.items.splice(existing, 1, notice);
     else {
       const nextUser = anchors.length ? v.items.findIndex((item, index) => index > anchors[0] && item.kind === 'user') : -1;

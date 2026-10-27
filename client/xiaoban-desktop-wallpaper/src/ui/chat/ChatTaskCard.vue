@@ -8,17 +8,18 @@ import type { TaskProgress } from './task-progress.ts';
 
 const props = defineProps<{ progress: TaskProgress; calls: ToolCall[]; current: boolean; showLogs: boolean; disabled?: boolean; configured?: boolean }>();
 const emit = defineEmits<{ logs: []; adjust: []; resume: []; stop: []; attention: [] }>();
-const expanded = ref(true);
+const expanded = ref(['running', 'waiting', 'approval'].includes(props.progress.state));
 const stepOpen = ref(new Set<number>());
-const labels = { running: '执行中', waiting: '等待输入', approval: '等待授权', blocked: '执行受阻', paused: '已暂停', completed: '已完成', unverified: '待核验' };
+const labels = { running: '执行中', waiting: '等待输入', approval: '等待授权', blocked: '执行受阻', paused: '已暂停', completed: '已完成', partial: '部分完成', failed: '未完成' };
 const active = computed(() => ['running', 'waiting', 'approval'].includes(props.progress.state));
-const attention = computed(() => ['waiting', 'approval', 'blocked'].includes(props.progress.state));
+const attention = computed(() => ['waiting', 'approval', 'blocked', 'partial', 'failed'].includes(props.progress.state));
 const latest = computed(() => [...props.calls].reverse().find(call => call.name !== 'todo'));
 const runningTool = computed(() => latest.value?.status === 'running' ? latest.value : null);
 const progressLabel = computed(() => `已完成 ${props.progress.completed} / ${props.progress.plan.steps.length} 步`);
 watch(() => props.progress.state, (state, before) => {
   // Bring questions and failures into view, without reopening a reader's collapsed card on every update.
-  if (state !== before && ['waiting', 'approval', 'blocked'].includes(state)) expanded.value = true;
+  if (state === 'completed' && state !== before) expanded.value = false;
+  else if (state !== before && ['running', 'waiting', 'approval', 'blocked', 'partial', 'failed'].includes(state)) expanded.value = true;
 });
 watch(() => props.progress.plan.callId, () => { stepOpen.value = new Set(); });
 function toggleStep(index: number) {
@@ -38,7 +39,7 @@ function toggleStep(index: number) {
       </button>
       <span class="task-badge" data-testid="task-state" role="status"><i aria-hidden="true"></i>{{ labels[progress.state] }}</span>
     </header>
-    <div class="task-track" role="progressbar" :aria-valuenow="progress.completed" :aria-valuemin="0" :aria-valuemax="progress.plan.steps.length" :aria-valuetext="progressLabel" aria-label="任务步骤完成进度"><i :style="{ width: `${progress.completed / progress.plan.steps.length * 100}%` }"></i></div>
+    <div v-if="expanded" class="task-track" role="progressbar" :aria-valuenow="progress.completed" :aria-valuemin="0" :aria-valuemax="progress.plan.steps.length" :aria-valuetext="progressLabel" aria-label="任务步骤完成进度"><i :style="{ width: `${progress.completed / progress.plan.steps.length * 100}%` }"></i></div>
     <div v-if="expanded" data-testid="task-body">
       <ol class="task-steps">
         <li v-for="(step, index) in progress.plan.steps" :key="index" class="task-step" :class="{ done: step.status === 'completed', active: index === progress.current, stopped: !active }" :data-testid="`task-step-${index}`">
@@ -47,17 +48,17 @@ function toggleStep(index: number) {
             <span class="step-content"><span class="step-title">{{ step.content }}</span><small v-if="index === progress.current && runningTool" class="step-live">{{ toolLabel(runningTool.name) }}<span v-if="describeCall(runningTool.name, runningTool.arguments)"> · {{ describeCall(runningTool.name, runningTool.arguments) }}</span></small></span>
             <small class="step-state">{{ step.status === 'completed' ? '已完成' : index === progress.current ? labels[progress.state] : '待执行' }}</small>
           </button>
-          <div v-if="stepOpen.has(index)" class="step-details" data-testid="task-step-details"><template v-if="step.evidence"><b>小伴记录的执行依据</b><p>{{ step.evidence }}</p></template><p v-else>{{ step.status === 'completed' ? '这一步已记录为完成，未附执行依据。可查看执行过程核对结果。' : index === progress.current ? progress.message : '完成前面的步骤后继续。' }}</p></div>
+          <div v-if="stepOpen.has(index)" class="step-details" data-testid="task-step-details"><template v-if="step.evidence"><b>执行详情</b><p>{{ step.evidence }}</p></template><p v-else>{{ step.status === 'completed' ? '此步骤已完成。' : index === progress.current ? progress.message : '完成前面的步骤后继续。' }}</p></div>
         </li>
       </ol>
-      <div v-if="attention || progress.state === 'paused' || progress.state === 'unverified'" class="task-intervention" :class="{ caution: attention }" data-testid="task-intervention">
+      <div v-if="attention || progress.state === 'paused'" class="task-intervention" :class="{ caution: attention }" data-testid="task-intervention">
         <p>{{ progress.message }}</p><p v-if="progress.plan.handoff" class="handoff">{{ progress.plan.handoff }}</p>
         <button v-if="current && (progress.state === 'waiting' || progress.state === 'approval')" type="button" class="task-primary" @click="emit('attention')">{{ progress.state === 'waiting' ? '回答问题' : '查看待确认操作' }}</button>
-        <button v-else-if="current && progress.canResume" type="button" class="task-primary" data-testid="task-resume" :disabled="disabled || configured === false" @click="emit('resume')">核对后继续</button>
+        <button v-else-if="current && progress.canResume" type="button" class="task-primary" data-testid="task-resume" :disabled="disabled || configured === false" @click="emit('resume')">继续完成</button>
       </div>
-      <footer class="task-footer"><span>{{ active && progress.state === 'running' ? progress.message : progressLabel }}</span><button v-if="current && active" type="button" data-testid="task-stop" :disabled="disabled" @click="emit('stop')">停止</button><button v-if="current && progress.state !== 'completed'" type="button" data-testid="task-adjust" :disabled="disabled || configured === false" @click="emit('adjust')">调整计划</button><button v-if="showLogs" type="button" data-testid="task-logs" @click="emit('logs')">查看过程 ↗</button></footer>
+      <footer class="task-footer"><span>{{ active && progress.state === 'running' ? progress.message : progressLabel }}</span><button v-if="current && active" type="button" data-testid="task-stop" :disabled="disabled" @click="emit('stop')">停止</button><button v-if="current && progress.state !== 'completed'" type="button" data-testid="task-adjust" :disabled="disabled || configured === false" @click="emit('adjust')">调整计划</button><button v-if="showLogs" type="button" data-testid="task-logs" @click="emit('logs')">执行详情 ↗</button></footer>
     </div>
-    <p v-else class="task-collapsed">{{ progress.state === 'running' && progress.current >= 0 ? `当前步骤：${progress.plan.steps[progress.current]!.content}` : progress.message }}</p>
+    <p v-else-if="progress.state !== 'completed'" class="task-collapsed">{{ progress.state === 'running' && progress.current >= 0 ? `当前步骤：${progress.plan.steps[progress.current]!.content}` : progress.message }}</p>
   </section>
 </template>
 
@@ -65,7 +66,7 @@ function toggleStep(index: number) {
 .task-card{width:100%;max-width:600px;min-width:0;box-sizing:border-box;border:1px solid var(--ui-border);border-radius:11px;overflow:hidden;background:var(--ui-surface);font-size:12px}
 .task-head{display:flex;align-items:center;gap:10px;padding:11px 14px}.task-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:9px;padding:0;border:0;background:none;color:var(--ui-text-primary);font:inherit;text-align:left;cursor:pointer}
 .task-symbol{display:grid;place-items:center;flex:none;width:28px;height:28px;border-radius:8px;background:var(--ui-soft);color:var(--ui-ink)}.task-heading{display:flex;flex-direction:column;gap:2px}.task-heading b{font-size:12.5px;font-weight:600;line-height:1.35}.task-heading small{font-size:10px;color:var(--ui-text-tertiary);font-variant-numeric:tabular-nums}.chevron{color:var(--ui-text-tertiary);transition:transform .15s}.chevron.expanded{transform:rotate(180deg)}
-.task-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;flex:none;border-radius:5px;background:var(--ui-soft);color:var(--ui-ink);font-size:10px;white-space:nowrap}.task-badge i{width:4px;height:4px;border-radius:50%;background:currentColor}.waiting .task-badge,.approval .task-badge,.blocked .task-badge{background:color-mix(in srgb,var(--ui-warning) 12%,transparent);color:var(--ui-warning-text)}.paused .task-badge{background:var(--ui-control);color:var(--ui-text-secondary)}
+.task-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;flex:none;border-radius:5px;background:var(--ui-soft);color:var(--ui-ink);font-size:10px;white-space:nowrap}.task-badge i{width:4px;height:4px;border-radius:50%;background:currentColor}.waiting .task-badge,.approval .task-badge,.blocked .task-badge,.partial .task-badge,.failed .task-badge{background:color-mix(in srgb,var(--ui-warning) 12%,transparent);color:var(--ui-warning-text)}.paused .task-badge{background:var(--ui-control);color:var(--ui-text-secondary)}
 .task-track{height:2px;margin:0 14px;background:var(--ui-line)}.task-track>i{display:block;height:100%;background:var(--ui-btn);transition:width .2s}
 .task-steps{list-style:none;margin:0;padding:6px 14px 4px}.task-step{position:relative}.task-step:not(:last-child):before{content:'';position:absolute;left:8.5px;width:1px;top:23px;bottom:-2px;background:var(--ui-line)}
 .step-button{position:relative;display:flex;align-items:flex-start;gap:10px;width:100%;padding:6px 0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}.step-mark{position:relative;display:grid;place-items:center;flex:none;width:18px;height:18px;box-sizing:border-box;border:1px solid var(--ui-border);border-radius:50%;background:var(--ui-surface);color:var(--ui-text-disabled);font-size:9px}.done .step-mark{border-color:transparent;background:var(--ui-soft);color:var(--ui-ink)}.active:not(.done) .step-mark{border-color:transparent;color:var(--ui-ink)}.stopped.active:not(.done) .step-mark{color:var(--ui-warning-text)}

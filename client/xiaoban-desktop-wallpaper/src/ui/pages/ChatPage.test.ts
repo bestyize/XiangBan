@@ -102,12 +102,17 @@ describe('compact task execution cards', () => {
     expect(q('task-count')?.textContent).toBe('已完成 2 / 2 步');
     expect(q('task-state')?.textContent).toContain('执行中');
     await h.events('s1', { type: 'text_delta', text: '已生成周报。' }, { type: 'done' });
-    h.emit('chat-task-outcome', { session: 's1', outcome: { runId: 'r1', sessionId: 's1', status: 'succeeded' } });
+    h.emit('chat-task-outcome', { session: 's1', outcome: { runId: 'r1', sessionId: 's1', status: 'unknown', validator: 'run_trace_only', evidence: 'terminal=true; tool_errors=0; incomplete_tools=0' } });
     await flushPromises();
     expect(q('task-state')?.textContent).toContain('已完成');
-    expect(q<HTMLDetailsElement>('chat-files')?.open).toBe(true);
+    expect(q<HTMLDetailsElement>('chat-files')?.open).toBe(false);
+    expect(q('task-body')).toBeNull();
+    expect(q('notice-info')?.querySelector('summary')?.textContent).toBe('执行详情');
+    expect(q('notice-info')?.querySelector('details')?.open).toBe(false);
+    expect(q('notice-info')?.textContent).not.toContain('验收');
     expect(q('chat-files-toggle')?.textContent).toContain('交付文件');
     expect(q('chat-file-card')?.textContent).toContain('周报.md');
+    await click('task-toggle');
     await click('task-logs');
     expect(q('chat-exec-panel')?.textContent).toContain('任务执行过程');
     expect(all('.panel-call')).toHaveLength(3);
@@ -127,6 +132,7 @@ describe('compact task execution cards', () => {
     expect(q('task-state')?.textContent).toContain('已暂停');
     expect(q('task-logs')).toBeNull();
     expect(q('chat-activity')).toBeNull();
+    await click('task-toggle');
     expect(q('task-resume')).not.toBeNull();
   });
 

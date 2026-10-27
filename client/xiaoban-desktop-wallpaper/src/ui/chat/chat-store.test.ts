@@ -18,8 +18,8 @@ it('does not turn ordinary unverified execution outcomes into warnings', async (
   h.events('s1',{type:'tool_start',id:'write',name:'write_file',arguments:'{}'});
   h.events('s1',{type:'tool_end',id:'write',output:'saved',is_error:false});
   h.events('s1',{type:'done'});
-  for (const status of ['unknown','partial']) h.emit('chat-task-outcome',{session:'s1',outcome:{runId:'r1',status,validator:'run_trace_only',evidence:'terminal=true; tool_errors=0'}});
-  expect(h.store.current()?.items.some(i=>i.kind==='notice')).toBe(false);
+  for (const status of ['unknown','succeeded']) h.emit('chat-task-outcome',{session:'s1',outcome:{runId:'r1',status,validator:'run_trace_only',evidence:'terminal=true; tool_errors=0'}});
+  expect(h.store.current()?.items.filter(i=>i.kind==='notice')).toEqual([expect.objectContaining({text:'',tone:'info',detailsLabel:'执行详情'})]);
   h.store.dispose();
 });
 
@@ -1096,7 +1096,7 @@ it('restores each saved outcome to its own reply rather than the latest task', a
   expect(items.find(i => i.id === 'outcome:r1')).toMatchObject({ taskStatus: 'unknown' });
   expect(items.find(i => i.id === 'outcome:r2')).toMatchObject({ taskStatus: 'succeeded' });
   const replies = replyBlocks(items).filter(block => block.calls.length);
-  expect(taskProgress(replies[0], false)?.state).toBe('unverified');
+  expect(taskProgress(replies[0], false)?.state).toBe('completed');
   expect(taskProgress(replies[1], false)?.state).toBe('completed'); h.store.dispose();
 });
 
@@ -1148,4 +1148,27 @@ it('keeps the design selected at submission in both direct and queued messages',
  expect(await h.store.enqueue('改首页',[],[],'queue',second)).toBe(true);
  expect(h.calls.find(([c])=>c==='chat_send')?.[1]).toMatchObject({text:'紧凑一点',designId:first});
  expect(h.calls.find(([c])=>c==='chat_enqueue')?.[1]).toMatchObject({text:'改首页',designId:second});h.store.dispose();
+});
+
+it('uses the failed operation from the correct reply and preserves uncertainty guards', async () => {
+  const h = harness(); await h.store.init();
+  h.events('s1', { type: 'tool_start', id: 'write', name: 'write_file', arguments: '{"path":"settings.html"}' },
+    { type: 'tool_end', id: 'write', output: 'Permission denied', is_error: true }, { type: 'done' });
+  const outcome = { runId: 'r1', sessionId: 's1', lastToolCallId: 'write', status: 'partial', validator: 'run_trace_only', evidence: 'unresolved_tool_errors=1' };
+  h.emit('chat-task-outcome', { session: 's1', outcome });
+  expect(h.store.views.s1.items.find(item => item.id === 'outcome:r1')).toMatchObject({
+    text: '部分完成：写入文件（settings.html）失败。', details: expect.stringContaining('Permission denied'), canContinue: true,
+  });
+  h.emit('chat-task-outcome', { session: 's1', outcome: { ...outcome, status: 'unknown', evidence: 'terminal=true; incomplete_tools=1' } });
+  expect(h.store.views.s1.items.find(item => item.id === 'outcome:r1')).toMatchObject({ tone: 'warning', canContinue: false, text: expect.stringContaining('尚未返回结果') });
+  h.store.dispose();
+});
+
+it('does not enable continuation after an outcome-needs-review guard', async () => {
+  const h = harness(); await h.store.init();
+  h.events('s1', { type: 'tool_start', id: 'external', name: 'shell', arguments: '{}' },
+    { type: 'error', message: 'run paused by continuation guard: tool_outcome_needs_review' });
+  h.emit('chat-task-outcome', { session: 's1', outcome: { runId: 'r1', lastToolCallId: 'external', status: 'failed', validator: 'run_trace_only', evidence: 'terminal=true' } });
+  expect(h.store.views.s1.items.find(item => item.id === 'outcome:r1')).toMatchObject({ canContinue: false, text: expect.stringContaining('操作结果尚未确认') });
+  h.store.dispose();
 });

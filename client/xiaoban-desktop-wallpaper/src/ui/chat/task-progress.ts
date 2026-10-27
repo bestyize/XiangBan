@@ -2,7 +2,7 @@ import type { ReplyBlock, ToolCall } from './replies.ts';
 
 export interface TaskStep { content: string; status: 'pending' | 'in_progress' | 'completed'; evidence: string }
 export interface TaskPlan { steps: TaskStep[]; handoff: string; callId: string }
-export type TaskState = 'running' | 'waiting' | 'approval' | 'blocked' | 'paused' | 'completed' | 'unverified';
+export type TaskState = 'running' | 'waiting' | 'approval' | 'blocked' | 'paused' | 'completed' | 'partial' | 'failed';
 export interface TaskProgress {
   plan: TaskPlan; state: TaskState; completed: number; current: number; message: string; canResume: boolean;
 }
@@ -39,6 +39,16 @@ function operation(call: ToolCall): string {
   catch { return `${call.name}:${call.arguments}`; }
 }
 
+export function unresolvedCalls(calls: ToolCall[]): ToolCall[] {
+  const unresolved = new Map<string, ToolCall>();
+  for (const call of calls) {
+    if (call.name === 'todo') continue;
+    if (call.status === 'error') unresolved.set(operation(call), call);
+    else if (call.status === 'done') unresolved.delete(operation(call));
+  }
+  return [...unresolved.values()];
+}
+
 export function taskProgress(block: ReplyBlock, active: boolean, waiting: 'question' | 'approval' | null = null, status = ''): TaskProgress | null {
   const plan = taskPlan(block.calls);
   if (!plan) return null;
@@ -46,27 +56,23 @@ export function taskProgress(block: ReplyBlock, active: boolean, waiting: 'quest
   const working = plan.steps.findIndex(step => step.status === 'in_progress');
   const current = working >= 0 ? working : plan.steps.findIndex(step => step.status === 'pending');
   const notice = [...block.items].reverse().find(item => item.kind === 'notice' && (item.tone !== 'info' || item.canContinue || item.text === '已停止'));
-  const unresolved = new Set<string>();
-  for (const call of block.calls) {
-    if (call.name === 'todo') continue;
-    if (call.status === 'error') unresolved.add(operation(call));
-    else if (call.status === 'done') unresolved.delete(operation(call));
-  }
+  const unresolved = unresolvedCalls(block.calls);
   const outcome = [...block.items].reverse().find(item => item.kind === 'notice' && item.taskStatus);
   const taskStatus = outcome?.kind === 'notice' ? outcome.taskStatus : undefined;
   let state: TaskState;
   if (waiting) state = waiting === 'question' ? 'waiting' : 'approval';
   else if (active) state = 'running';
-  else if (notice || unresolved.size > 0 || taskStatus === 'partial' || taskStatus === 'failed') state = notice?.kind === 'notice' && notice.text === '已停止' ? 'paused' : 'blocked';
-  else if (taskStatus === 'cancelled') state = 'paused';
-  else state = completed === plan.steps.length ? taskStatus === 'succeeded' ? 'completed' : 'unverified' : 'paused';
+  else if (taskStatus === 'cancelled' || notice?.text === '已停止') state = 'paused';
+  else if (taskStatus === 'partial') state = 'partial';
+  else if (taskStatus === 'failed') state = 'failed';
+  else if (notice || unresolved.length > 0 || block.calls.some(call => call.status === 'running')) state = 'blocked';
+  else state = completed === plan.steps.length ? 'completed' : 'paused';
   const message = state === 'waiting' ? '回答下方问题后，小伴会继续执行。'
     : state === 'approval' ? '请在下方确认本次操作，计划不需要另行审批。'
-    : state === 'blocked' ? (notice?.kind === 'notice' ? notice.text : '执行遇到问题，请先查看执行过程和实际结果，再决定是否继续。')
-    : state === 'paused' ? '已保留当前进度，继续前会先核对执行结果。'
-    : state === 'unverified' ? '步骤已勾选完成，结果待核验'
+    : state === 'blocked' || state === 'partial' || state === 'failed' ? (notice?.kind === 'notice' ? notice.text : '有操作未完成，可展开执行详情查看原因。')
+    : state === 'paused' ? '已暂停，当前进度已保留。'
     : state === 'completed' ? '所有步骤已完成'
     : status || (current < 0 ? '正在汇总结果与交付文件…' : '按计划继续执行');
-  const canResume = !active && state !== 'completed' && state !== 'unverified' && (!notice || notice.kind === 'notice' && (notice.text === '已停止' || !!notice.canContinue));
+  const canResume = !active && state !== 'completed' && (!notice || notice.kind === 'notice' && (notice.text === '已停止' || !!notice.canContinue));
   return { plan, state, completed, current, message, canResume };
 }

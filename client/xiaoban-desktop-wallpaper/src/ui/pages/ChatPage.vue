@@ -455,7 +455,7 @@ async function openLink(href: string) {
                   <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
                     <div class="answer" data-search><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span></div>
                   </div>
-                  <div v-else-if="item.kind === 'notice'" class="notice" :class="item.tone" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
+                  <div v-else-if="item.kind === 'notice' && (item.text || item.details)" class="notice" :class="[item.tone, { 'outcome-details': item.taskStatus && !item.text }]" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
                     {{ item.text }}
                     <details v-if="item.details"><summary>{{ item.detailsLabel ?? '错误详情' }}</summary><span class="notice-details">{{ item.details }}</span></details>
                     <button v-if="item.canSwitchModel && !view.running" type="button" class="xb-link" @click="chooseModel(!!item.canRetry)">切换模型</button>
@@ -471,7 +471,7 @@ async function openLink(href: string) {
                     </template>
                   </div>
                 </template>
-                <details v-if="finished(block) && filesOf(block.calls).length" class="file-cards" :open="!!progressOf(block)" :class="{ 'task-delivery': !!progressOf(block) }" data-testid="chat-files">
+                <details v-if="finished(block) && filesOf(block.calls).length" class="file-cards" :class="{ 'task-delivery': !!progressOf(block) }" data-testid="chat-files">
                   <summary class="file-summary" data-testid="chat-files-toggle"><ChevronRight :size="14" class="file-chevron" /><FileText :size="14" /><span>{{ progressOf(block)?.state === 'completed' ? '交付文件' : '文件变更' }}</span><span class="file-count">{{ filesOf(block.calls).length }}</span><small>{{ spaceName }}</small></summary>
                   <div class="file-list" role="list" aria-label="本轮变更的文件">
                     <div v-for="file in filesOf(block.calls)" :key="file.path" class="file-card" data-testid="chat-file-card" :title="file.path" role="listitem">
@@ -664,6 +664,7 @@ async function openLink(href: string) {
 .act:disabled{opacity:.4;cursor:not-allowed}
 .usage{margin-left:8px;font-size:11.5px;color:var(--ui-text-tertiary);font-variant-numeric:tabular-nums}
 .notice{font-size:13px;padding:8px 12px;border-radius:10px;background:var(--ui-surface-sunken);color:var(--ui-text-secondary);display:flex;flex-wrap:wrap;gap:12px;align-items:center;line-height:1.6}
+.notice.outcome-details{padding:0;background:none;font-size:12px;color:var(--ui-text-tertiary)}
 .notice.error{background:color-mix(in srgb,var(--ui-danger) 9%,var(--ui-surface));color:var(--ui-danger)}
 .notice.warning{background:color-mix(in srgb,var(--ui-warning) 14%,var(--ui-surface));color:var(--ui-warning-text)}
 .notice details{flex:1;min-width:0}
