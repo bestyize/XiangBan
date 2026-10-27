@@ -14,6 +14,9 @@ const emit=defineEmits<{settings:[]}>();
 const now=ref(new Date()),error=ref(''),saving=ref(false),addOpen=ref(false),editingItem=ref<TodoItem|ReminderItem>();
 const size=computed(()=>baseSize(props.widget.kind,props.widget.custom)),clock=computed(()=>now.value.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}));
 const customFrame=ref<HTMLIFrameElement>();
+const customShell=desktop
+  ? navigator.userAgent.includes('Windows')?'http://wallpaper-asset.localhost/widget-sandbox':'wallpaper-asset://localhost/widget-sandbox'
+  : '/widgets/sandbox.html';
 const surfaceScale=computed(()=>props.widget.kind==='custom'?props.renderScale:1);
 function customLayout(){customFrame.value?.contentWindow?.postMessage({type:'xiaoban-widget-layout',scale:props.renderScale,width:size.value.width,height:size.value.height},'*');}
 watch(()=>props.renderScale,customLayout,{flush:'post'});
@@ -129,7 +132,11 @@ async function movePending(){if(moving)return;moving=true;try{while(pending){con
 function startDrag(e:PointerEvent){if(e.button!==0||props.preview||!props.payload)return;if((e.target as Element).closest('button,input,textarea,select,form,[data-no-drag]'))return;suppressClick=false;drag={x:e.screenX,y:e.screenY,grabX:e.clientX/Math.max(1,innerWidth),grabY:e.clientY/Math.max(1,innerHeight),moved:false};(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);}
 function move(e:Pick<PointerEvent,'screenX'|'screenY'>,commit=false){if(!drag)return;if(Math.hypot(e.screenX-drag.x,e.screenY-drag.y)>5)drag.moved=true;if(drag.moved){suppressClick=true;pending={grabX:drag.grabX,grabY:drag.grabY,commit};void movePending();}if(commit){drag=null;clickTimer=setTimeout(()=>suppressClick=false,0);}}
 function customDrag(event:MessageEvent){
- if(props.preview||!props.payload||!customFrame.value?.contentWindow||event.source!==customFrame.value.contentWindow)return;
+ if(!customFrame.value?.contentWindow||event.source!==customFrame.value.contentWindow)return;
+ if(event.data?.type==='xiaoban-widget-shell-ready'){
+  customFrame.value.contentWindow.postMessage({type:'xiaoban-widget-init',html:customDocument.value},'*');return;
+ }
+ if(props.preview||!props.payload)return;
  if(event.data?.type==='xiaoban-widget-settings'){settings();return;}
  if(props.editing||!isCustomDragMessage(event.data))return;
  const data=event.data;
@@ -191,15 +198,13 @@ onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown'
   <div class="lake-art" aria-hidden="true"/><header><h2 class="anniversary-title"><Heart :size="23" fill="#ef796b" stroke="#ec6c5c"/>{{ countdown.title }}</h2></header><p class="countdown-date">{{ remaining.date.replace('-','年').replace('-','月') }}日 {{ new Date(remaining.date+'T12:00').toLocaleDateString('zh-CN',{weekday:'long'}) }}</p><div class="countdown-value"><strong>{{ remaining.days }}</strong><span>{{ remaining.label==='还有'?'天后':remaining.label==='已经'?'天了':remaining.label==='就是今天'?'就是今天':'天前' }}</span></div><p class="anniversary-quote"><span>“</span> 和你在一起的每一天，<br>　 都是值得期待的日子。 <span>”</span></p>
  </template>
  <template v-else-if="widget.kind==='custom'">
-  <header class="custom-widget-header">
-   <span class="custom-widget-title">{{ widget.custom?.name||'自创组件' }}</span>
-   
-  </header>
   <div class="custom-widget-box" :data-testid="`custom-${widget.customId||'widget'}`">
    <iframe
+     :key="customDocument"
      ref="customFrame"
      @load="customLayout"
-     :srcdoc="customDocument"
+     :src="customShell"
+     :title="widget.custom?.name||'自创组件'"
      sandbox="allow-scripts"
      class="custom-widget-frame"
      scrolling="no"

@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src https: data: blob:; media-src https: data: blob:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"></head><body><script>
+// Load through a separate document URL: srcdoc would inherit the host's script-src
+// and block both widget scripts and the injected drag/layout helpers.
+addEventListener('message', function initialize(event) {
+  if (event.source !== parent || event.data?.type !== 'xiaoban-widget-init'
+    || typeof event.data.html !== 'string' || event.data.html.length > 256 * 1024) return;
+  removeEventListener('message', initialize);
+  document.open();
+  document.write(event.data.html);
+  document.close();
+});
+parent.postMessage({type:'xiaoban-widget-shell-ready'}, '*');
+</script></body></html>

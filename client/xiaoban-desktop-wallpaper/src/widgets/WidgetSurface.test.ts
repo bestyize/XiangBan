@@ -1,7 +1,13 @@
 // @vitest-environment happy-dom
 import {mount,flushPromises} from '@vue/test-utils';
 import {nextTick} from 'vue';
-import {describe,it,expect,vi} from 'vitest';
+import {describe,it,expect,vi,beforeAll,afterAll} from 'vitest';
+import type {Window as HappyWindow} from 'happy-dom';
+// Host messaging is exercised here; actual sandbox navigation is covered in a browser.
+const navigation=(window as unknown as HappyWindow).happyDOM.settings.navigation;
+const childNavigationDisabled=navigation.disableChildFrameNavigation;
+beforeAll(()=>{navigation.disableChildFrameNavigation=true;});
+afterAll(()=>{navigation.disableChildFrameNavigation=childNavigationDisabled;});
 vi.mock('../bridge.ts',()=>({desktop:false,invoke:vi.fn().mockResolvedValue(undefined)}));
 import WidgetSurface from './WidgetSurface.vue';
 import {invoke} from '../bridge.ts';
@@ -28,7 +34,7 @@ describe('custom widget host drag',()=>{
  it('resizes the iframe viewport without reloading its document or resetting its interactions',async()=>{
   const widget=custom();
   const view=mount(WidgetSurface,{attachTo:document.body,props:{widget,renderScale:1.3}});
-  const iframe=view.get('iframe').element as HTMLIFrameElement,srcdoc=iframe.srcdoc;
+  const iframe=view.get('iframe').element as HTMLIFrameElement,src=iframe.src;
   const post=vi.spyOn(iframe.contentWindow!,'postMessage');
   await view.get('iframe').trigger('load');
   expect((view.element as HTMLElement).style.width).toBe('364px');
@@ -36,8 +42,29 @@ describe('custom widget host drag',()=>{
   await view.setProps({renderScale:1.5});
   expect((view.element as HTMLElement).style.width).toBe('420px');
   expect(view.get('iframe').element).toBe(iframe);
-  expect(iframe.srcdoc).toBe(srcdoc);
+  expect(iframe.src).toBe(src);
   expect(post).toHaveBeenLastCalledWith({type:'xiaoban-widget-layout',scale:1.5,width:280,height:240},'*');
+  view.unmount();
+ });
+ it.each([false,true])('initializes the isolated document from its own shell (preview=%s)',async preview=>{
+  const widget=custom(),view=mount(WidgetSurface,{attachTo:document.body,props:{widget,preview}});
+  const iframe=view.get('iframe').element as HTMLIFrameElement;
+  expect(iframe.getAttribute('src')).toBe('/widgets/sandbox.html');
+  expect(iframe.hasAttribute('srcdoc')).toBe(false);
+  expect(iframe.getAttribute('sandbox')).toBe('allow-scripts');
+  expect(view.find('.custom-widget-header').exists()).toBe(false);
+  const post=vi.spyOn(iframe.contentWindow!,'postMessage');
+  const data={type:'xiaoban-widget-shell-ready'};
+  window.dispatchEvent(new MessageEvent('message',{source:window,data}));
+  expect(post).not.toHaveBeenCalled();
+  window.dispatchEvent(new MessageEvent('message',{source:iframe.contentWindow,data}));
+  expect(post).toHaveBeenCalledOnce();
+  const init=post.mock.calls[0][0] as {type:string;html:string};
+  expect(init.type).toBe('xiaoban-widget-init');
+  expect(init.html).toContain('Kitty');
+  expect(init.html.includes('xiaoban-widget-drag')).toBe(!preview);
+  await view.setProps({widget:{...widget,custom:{...widget.custom!,html:'<button>Updated</button>'}}});
+  expect(view.get('iframe').element).not.toBe(iframe);
   view.unmount();
  });
  it('accepts only its own iframe and saves the scaled grab position on release',async()=>{
