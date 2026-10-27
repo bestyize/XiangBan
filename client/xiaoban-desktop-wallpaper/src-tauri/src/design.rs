@@ -13,7 +13,20 @@ pub fn saved(app:&tauri::AppHandle,p:&Project)->Result<(),String>{
 }
 fn payload(p:Project)->Value{json!({"project":p,"origin":if cfg!(windows){"http://design-preview.localhost"}else{"design-preview://localhost"}})}
 #[tauri::command]
-pub fn design_list(app:tauri::AppHandle,window:tauri::WebviewWindow,session:String)->Result<Vec<Value>,String>{guard(&window)?;Ok(store(&app)?.list(&session)?.iter().map(open_claude_design::summary).collect())}
+pub fn design_list(app:tauri::AppHandle,window:tauri::WebviewWindow,session:String,query:Option<String>)->Result<Vec<Value>,String>{guard(&window)?;Ok(store(&app)?.search(&session,query.as_deref().unwrap_or(""),None,None)?.iter().map(open_claude_design::summary).collect())}
+#[tauri::command]
+pub fn design_link(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,session:String)->Result<Value,String>{
+    guard(&window)?;let p=store(&app)?.link(&id,&session)?;saved(&app,&p)?;Ok(payload(p))
+}
+#[tauri::command]
+pub fn design_create(app:tauri::AppHandle,window:tauri::WebviewWindow,session:String)->Result<Value,String>{
+    guard(&window)?;let s=store(&app)?;let p=s.create("未命名设计稿".into(),&session,json!({"v":3,"boards":{"Main.dc.html":{"title":"首页","w":390,"h":844,"x":0,"y":0}},"order":["Main.dc.html"]}),BTreeMap::from([("Main.dc.html".into(),"<x-dc><main>告诉小伴你的设计需求</main></x-dc>".into())]))?;
+    let mut p=p;p.status=open_claude_design::ProjectStatus::Draft;let rev=p.revision;let p=s.save(p,rev)?;saved(&app,&p)?;Ok(payload(p))
+}
+#[tauri::command]
+pub fn design_copy(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,session:String)->Result<Value,String>{
+    guard(&window)?;let p=store(&app)?.copy(&id,&session,None)?;saved(&app,&p)?;Ok(payload(p))
+}
 #[tauri::command]
 pub fn design_read(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{guard(&window)?;let s=store(&app)?;let p=s.load(&id)?;let mut result=payload(p.clone());
     match s.draft(&id) {

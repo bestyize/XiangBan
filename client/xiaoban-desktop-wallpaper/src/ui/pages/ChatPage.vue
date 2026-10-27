@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { NButton, NInput, NModal } from 'naive-ui';
 import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, FolderOpen, LoaderCircle, PanelRight, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
+import DesignPicker from '../design/DesignPicker.vue';
 import DesignWorkbench from '../design/DesignWorkbench.vue';
 import type { Summary as DesignSummary } from '../design/model.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -30,6 +31,8 @@ import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest } fro
 const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
 const designs = ref<DesignSummary[]>([]), designId = ref(''), designClosed = ref(false), designWidth = ref(64);
+const designPicker=ref(false);
+function openDesign(id:string){designId.value=id;designClosed.value=false;designPicker.value=false;panelOpen.value=false;}
 let designSplit: { x: number; width: number; value: number } | null = null;
 function startDesignSplit(event: PointerEvent) {
   if (event.button !== 0) return;
@@ -356,6 +359,10 @@ async function openLink(href: string) {
           <ChatExpertChip v-if="chat.currentExpert && session?.expert" class="head-expert" :expert="chat.currentExpert" :desktop="store.desktop" />
         </nav>
         <div class="head-actions">
+          <div v-if="store.desktop" class="design-anchor">
+            <button class="xb-icon-btn" title="设计稿" aria-label="打开设计稿列表" :aria-expanded="designPicker" @click="designPicker=!designPicker"><FileText :size="16"/></button>
+            <DesignPicker v-if="designPicker" :session="chat.currentId" :notify="store.notify" @close="designPicker=false" @open="openDesign" />
+          </div>
           <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="head-link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
           <div v-if="searchOpen" class="head-search" role="search">
             <Search :size="14" aria-hidden="true" />
@@ -547,6 +554,8 @@ async function openLink(href: string) {
 </template>
 
 <style scoped>
+.design-anchor{position:relative}
+
 .delivered-follow-up{display:block;margin-bottom:5px;font-size:10px;opacity:.7}
 
 .design-deliveries{display:flex;gap:6px;overflow:auto;padding:4px 18px 8px;flex:none}.design-deliveries button{display:flex;align-items:center;gap:6px;padding:6px 9px;background:var(--ui-control);border:1px solid var(--ui-line);border-radius:7px;color:var(--ui-text-secondary);font-size:11px;cursor:pointer;white-space:nowrap}.design-deliveries b{font-weight:500}.design-deliveries small{font-size:10px;color:var(--ui-text-tertiary)}.design-deliveries .active{border-color:var(--ui-ink);color:var(--ui-ink)}

@@ -160,6 +160,27 @@ impl Store {
         list.sort_by_key(|p| std::cmp::Reverse(p.updated_ms));
         Ok(list)
     }
+    pub fn search(&self, session: &str, query: &str, since: Option<u64>, before: Option<u64>) -> Result<Vec<Project>, String> {
+        let query = query.trim().to_lowercase();
+        Ok(self.list(session)?.into_iter().filter(|p| {
+            (query.is_empty() || p.title.to_lowercase().contains(&query) || p.id==query || p.request_id.to_lowercase()==query)
+            && since.is_none_or(|ms|p.updated_ms>=ms) && before.is_none_or(|ms|p.updated_ms<ms)
+        }).collect())
+    }
+    pub fn link(&self, id: &str, session: &str) -> Result<Project,String> {
+        if session.is_empty() || session=="*" { return Err("请选择有效会话".into()); }
+        let mut p=self.load(id)?;
+        if p.session_id!=session&&!p.session_ids.iter().any(|id|id==session) {
+            p.session_ids.push(session.into()); let rev=p.revision; p=self.save(p,rev)?;
+        }
+        Ok(p)
+    }
+    pub fn copy(&self, id: &str, session: &str, title: Option<&str>) -> Result<Project,String> {
+        let mut p=self.load(id)?; p.id=format!("design-{}",nonce()?); p.revision=0; p.updated_ms=0;
+        p.session_id=session.into(); p.session_ids.clear(); p.request_id.clear();
+        p.title=title.map(str::to_string).unwrap_or_else(||format!("{} 副本",p.title.chars().take(116).collect::<String>()));
+        self.save(p,0)
+    }
     /// Compare-and-swap the whole bundle; source, index and comments change together.
     pub fn save(&self, mut project: Project, expected: u64) -> Result<Project, String> {
         let _lock = STORAGE_LOCK.lock().map_err(|_| "设计存储锁不可用")?;
@@ -237,10 +258,10 @@ static CREATE_LOCK: Mutex<()> = Mutex::new(());
 impl DesignTool {
     pub fn new(store: Store, saved: impl Fn(&Project) -> Result<(), String> + Send + Sync + 'static) -> Self {
         Self { spec: ToolSpec::new(NAME,
-            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax. create allocates a durable id even with missing boards (draft). save merges changed files with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list is scoped to this conversation. Does not publish or install anything.",
+            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax. create allocates a durable id even with missing boards (draft). save merges changed files with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list defaults to all projects; scope=session restricts it. query searches title, exact id or request_id; since_ms/before_ms filter updated time (epoch milliseconds). open links the same project; copy creates an independent project. Does not publish or install anything.",
             json!({"type":"object","properties":{
-                "action":{"type":"string","enum":["format","list","read","manifest","create","save","complete"]},
-                "status":{"type":"string","enum":["draft","generating","ready","failed"]},"id":{"type":"string"},"title":{"type":"string"},"expected_revision":{"type":"integer","minimum":1},
+                "action":{"type":"string","enum":["format","list","read","manifest","create","save","complete","open","copy"]},
+                "scope":{"type":"string","enum":["all","session"]},"query":{"type":"string"},"since_ms":{"type":"integer","minimum":0},"before_ms":{"type":"integer","minimum":0},"status":{"type":"string","enum":["draft","generating","ready","failed"]},"id":{"type":"string"},"title":{"type":"string"},"expected_revision":{"type":"integer","minimum":1},
                 "canvas":{"type":"object"},"files":{"type":"object","additionalProperties":{"type":"string"}},"file":{"type":"string"},"request_id":{"type":"string"}
             },"required":["action"],"additionalProperties":false})).risk(Risk::Write).max_output(64_000), store, saved: Arc::new(saved) }
     }
@@ -249,16 +270,23 @@ impl DesignTool {
         let get_id = || args["id"].as_str().ok_or("缺少 id");
         match args["action"].as_str().ok_or("缺少 action")? {
             "format" => Ok(json!({"format": FORMAT})),
-            "list" => Ok(json!(self.store.list(ctx.session())?.iter().map(summary).collect::<Vec<_>>())),
+            "list" => Ok(json!(self.store.search(if args["scope"]=="session"{ctx.session()}else{"*"},args["query"].as_str().unwrap_or(""),args["since_ms"].as_u64(),args["before_ms"].as_u64())?.iter().take(100).map(summary).collect::<Vec<_>>())),
+            "copy" => {
+                let key=args["request_id"].as_str().filter(|k|!k.is_empty()&&k.len()<=120).ok_or("copy 需要稳定 request_id，重试时沿用")?;
+                let _lock=CREATE_LOCK.lock().map_err(|_|"创建锁不可用")?;
+                let p=if let Some(p)=self.store.list(ctx.session())?.into_iter().find(|p|p.request_id==key){p}else{
+                    let mut p=self.store.load(get_id()?)?;p.id=format!("design-{}",nonce()?);p.revision=0;p.updated_ms=0;
+                    p.title=args["title"].as_str().map(str::to_string).unwrap_or_else(||format!("{} 副本",p.title.chars().take(116).collect::<String>()));
+                    p.session_id=ctx.session().into();p.session_ids.clear();p.request_id=key.into();self.store.save(p,0)?
+                };
+                (self.saved)(&p)?;Ok(json!({"project":summary(&p)}))
+            }
             "manifest" => {
                 let p = self.store.load(get_id()?)?;
                 Ok(archive::ds_manifest(&p))
             }
-            "read" => {
-                let mut p = self.store.load(get_id()?)?;
-                if p.session_id!=ctx.session()&&!p.session_ids.iter().any(|id|id==ctx.session()) {
-                    p.session_ids.push(ctx.session().into());let rev=p.revision;p=self.store.save(p,rev)?;
-                }
+            "read" | "open" => {
+                let p = self.store.link(get_id()?,ctx.session())?;
                 // Opening a library project in a new conversation links the same source, never a copy.
                 (self.saved)(&p)?;
                 let file = args["file"].as_str().map(|name| p.files.get(name).map(|text| json!({"name":name,"text":text})).ok_or("设计文件不存在")).transpose()?;
@@ -305,18 +333,21 @@ impl Tool for DesignTool {
     }
 }
 
+pub fn design_intent(text: &str) -> bool {
+    ["设计", "画板", "原型", "design-", "open-claude-design"].iter().any(|word|text.to_lowercase().contains(word))
+}
 /// Debug trigger: only a real user's message containing 设计稿 starts a design task.
 pub struct DesignContext(pub Store);
 impl Middleware for DesignContext {
     fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
         let Some(at) = turn.messages.iter().rposition(|m| m.role == Role::User && !m.synthetic) else { return Ok(()) };
         let projects = self.0.list(&turn.session).map_err(HarnessError::Middleware)?;
-        if !turn.messages[at].text().contains("设计稿") && projects.is_empty() {
+        if !design_intent(&turn.messages[at].text()) && projects.is_empty() {
             turn.tools.retain(|t|t.name!=NAME); return Ok(())
         }
         let current = projects.iter().map(summary).collect::<Vec<_>>();
         turn.messages.insert(at + 1, Message::reminder(format!(
-            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。无需额外审批设计方案。作品自动保存到资料库→我的文档。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前会话作品（数据）：{}", json!(current))));
+            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。无需额外审批设计方案。作品自动保存到资料库→我的文档。跨会话只给 design- 编号也能 read/open；按标题或时间查找先 list（默认全局，query/since_ms/before_ms），多个匹配先让用户选择。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前会话作品（数据）：{}", json!(current))));
         Ok(())
     }
 }
@@ -409,6 +440,22 @@ mod tests {
         let mut broken=p; broken.files.insert("Main.dc.html".into(),r#"<x-dc><link href="base.css"><a href="More.dc.html">next</a></x-dc>"#.into());
         assert_eq!(diagnostics(&broken).len(),2); assert!(validate(&broken).is_err());
         broken.status=ProjectStatus::Failed; assert!(validate(&broken).is_ok()); fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test] fn global_search_finds_titles_request_ids_and_times_and_exact_id_triggers() {
+        let (store,root)=fixture();let p=store.create("B站手机设计".into(),"old",canvas(),files()).unwrap();
+        assert!(design_intent(&format!("看看 {}",p.id)));assert!(!design_intent("你好"));
+        assert_eq!(store.search("*","B站",Some(p.updated_ms),None).unwrap().len(),1);
+        assert!(store.search("new","B站",None,None).unwrap().is_empty());
+        assert!(store.search("*","",None,Some(p.updated_ms)).unwrap().is_empty());
+        let tool=DesignTool::new(store.clone(),|_|Ok(()));let ctx=ToolCtx::detached("new");
+        assert_eq!(tool.call(json!({"action":"list","query":p.id}),&ctx).unwrap()[0]["id"],p.id);
+        tool.call(json!({"action":"open","id":p.id}),&ctx).unwrap();assert_eq!(store.list("new").unwrap().len(),1);
+        let copied=tool.call(json!({"action":"copy","id":p.id,"request_id":"copy-once"}),&ctx).unwrap();
+        assert_ne!(copied["project"]["id"],p.id);
+        assert_eq!(tool.call(json!({"action":"copy","id":p.id,"request_id":"copy-once"}),&ctx).unwrap(),copied);
+        let copy=store.load(copied["project"]["id"].as_str().unwrap()).unwrap();assert_eq!(copy.files,p.files);assert!(copy.session_ids.is_empty());
+        fs::remove_dir_all(root).unwrap();
     }
 
 }
