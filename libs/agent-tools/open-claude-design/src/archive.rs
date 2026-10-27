@@ -3,7 +3,7 @@ use super::*;
 use std::io::{Cursor, Read, Write};
 use regex::Regex;
 
-fn resolve_rel(base: &str, href: &str) -> Option<String> {
+pub(crate) fn resolve_rel(base: &str, href: &str) -> Option<String> {
     let clean = href.trim();
     if clean.is_empty() || clean.starts_with('/') || clean.contains(':') || clean.contains(['?', '#']) { return None; }
     let mut parts: Vec<&str> = base.split('/').collect();
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn source_roundtrip_keeps_indexes_and_logic() {
         let canvas = json!({"v":3,"boards":{"a/Main.dc.html":{"w":400,"h":800,"custom":123}},"order":["a/Main.dc.html"],"notes":{}});
-        let p = Project{id:format!("design-{}",nonce().unwrap()),title:"demo".into(),session_id:"s".into(),session_ids:Vec::new(),revision:1,updated_ms:0,canvas:canvas.clone(),files:[("a/Main.dc.html".into(),"<x-dc>{{value}}</x-dc>".into())].into(),request_id:String::new()};
+        let p = Project{status:ProjectStatus::Ready,id:format!("design-{}",nonce().unwrap()),title:"demo".into(),session_id:"s".into(),session_ids:Vec::new(),revision:1,updated_ms:0,canvas:canvas.clone(),files:[("a/Main.dc.html".into(),"<x-dc>{{value}}</x-dc>".into())].into(),request_id:String::new()};
         let (c, f) = from_zip(&to_zip(&p).unwrap()).unwrap();
         assert_eq!(c, canvas);
         assert_eq!(f["a/Main.dc.html"], p.files["a/Main.dc.html"]);
@@ -264,7 +264,7 @@ mod tests {
     fn maximum_source_count_roundtrips_with_generated_runtime() {
         let mut files = BTreeMap::from([("Main.dc.html".into(), "<x-dc>ok</x-dc>".into())]);
         for n in 0..299 { files.insert(format!("asset{n}.css"), "body{}".into()); }
-        let mut p = Project{id:format!("design-{}",nonce().unwrap()),title:"full".into(),session_id:"s".into(),session_ids:Vec::new(),revision:1,updated_ms:0,canvas:json!({"v":3,"boards":{"Main.dc.html":{"w":100,"h":200}},"order":["Main.dc.html"]}),files,request_id:String::new()};
+        let mut p = Project{status:ProjectStatus::Ready,id:format!("design-{}",nonce().unwrap()),title:"full".into(),session_id:"s".into(),session_ids:Vec::new(),revision:1,updated_ms:0,canvas:json!({"v":3,"boards":{"Main.dc.html":{"w":100,"h":200}},"order":["Main.dc.html"]}),files,request_id:String::new()};
         let (c, f) = from_zip(&to_zip(&p).unwrap()).unwrap();
         p.canvas = c; p.files = f;
         assert_eq!(p.files.len(), 301);
@@ -278,7 +278,7 @@ mod tests {
             ("theme.css".into(), ".btn{color:var(--ds-primary)}".into()),
             ("components/Btn.dc.html".into(), "<x-dc><button class=\"btn\">OK</button></x-dc>".into()),
         ]);
-        let p = Project{id:format!("design-{}",nonce().unwrap()),title:"DS Demo".into(),session_id:"s".into(),session_ids:Vec::new(),revision:1,updated_ms:0,canvas,files,request_id:String::new()};
+        let p = Project{status:ProjectStatus::Ready,id:format!("design-{}",nonce().unwrap()),title:"DS Demo".into(),session_id:"s".into(),session_ids:Vec::new(),revision:1,updated_ms:0,canvas,files,request_id:String::new()};
         let m = ds_manifest(&p);
         assert_eq!(m["cards"][0]["group"], "Actions");
         assert_eq!(m["cards"][0]["name"], "Primary Button");

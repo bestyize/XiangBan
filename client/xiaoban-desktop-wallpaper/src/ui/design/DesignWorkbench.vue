@@ -4,7 +4,7 @@ import {Check,Copy,Download,Hand,Maximize2,MessageSquare,Minus,MousePointer2,Pan
 import {invoke} from '../../bridge.ts';
 import BoardPreview from './BoardPreview.vue';
 import {
-  addBoard,boardsOf,changeBoard,clone,patchNode,patchProp,previewUrl,propsOf,removeBoard,targetFile,
+  statusLabel,addBoard,boardsOf,changeBoard,clone,patchNode,patchProp,previewUrl,propsOf,removeBoard,targetFile,
   tokensOf,setToken,dsCardsOf,insertComponentImport,formatCommentPrompt,toMarkdownSpec,DEVICE_PRESETS,
   type Board,type Comment,type Project,type Summary,type DsCard
 } from './model.ts';
@@ -23,7 +23,7 @@ const token=ref(crypto.randomUUID());const project=computed(()=>ds.project);
 const allBoards=computed(()=>project.value?boardsOf(project.value.canvas):[]),pages=computed(()=>project.value?.canvas.pages??[]);
 const boards=computed(()=>allBoards.value.filter(b=>!page.value||b.page===page.value));
 const current=computed(()=>allBoards.value.find(b=>b.file===selected.value)??allBoards.value[0]);
-const config=computed(()=>project.value&&current.value?Object.entries(propsOf(project.value.files[current.value.file])).filter(([key,c])=>key!=='$preview'&&c&&typeof c==='object'):[]);
+const config=computed(()=>project.value&&current.value?Object.entries(propsOf(project.value.files[current.value.file]??'')).filter(([key,c])=>key!=='$preview'&&c&&typeof c==='object'):[]);
 const allComments=computed<Comment[]>(()=>project.value?.canvas.xiaoban?.comments??[]);
 const comments=computed<Comment[]>(()=>hideResolved.value?allComments.value.filter(c=>c.status!=='resolved'):allComments.value);
 const pendingComments=computed(()=>allComments.value.filter(c=>c.status!=='resolved'));
@@ -171,7 +171,7 @@ async function copyMarkdown(){
   catch{props.notify('复制失败，请重试','error');}
 }
 
-function openSource(){if(!current.value||!project.value)return;source.value=project.value.files[current.value.file];sourceRevision=project.value.revision;sourceOpen.value=true;}
+function openSource(){if(!current.value||!project.value)return;source.value=project.value.files[current.value.file]??'';sourceRevision=project.value.revision;sourceOpen.value=true;}
 async function saveSource(){if(!current.value)return;if(project.value?.revision!==sourceRevision){props.notify('源文件已有新版本，请先复制当前草稿，再重新打开源代码','error');return;}if(await edit(p=>{p.files[current.value!.file]=source.value;}))sourceOpen.value=false;}
 async function showVersions(){if(!project.value)return;try{versions.value=await invoke('design_history',{id:project.value.id});versionsOpen.value=true;}catch(e){report(e);}}
 async function restore(v:Summary){if(!project.value||!canEdit.value)return;try{const result=await invoke<{project:Project;origin:string}>('design_restore',{id:project.value.id,revision:v.revision,expectedRevision:project.value.revision});ds.project=result.project;ds.origin=result.origin;versionsOpen.value=false;history.value=[];future.value=[];}catch(e){report(e);}}
@@ -189,6 +189,7 @@ function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textar
 <section class="design-workbench" :class="{full}" tabindex="0" aria-label="设计工作台" data-testid="design-workbench" @keydown="key">
 <header>
   <span class="brand">✦</span><b>{{project?.title??'读取设计稿…'}}</b>
+  <span v-if="project" class="saved">{{statusLabel(project.status)}}</span>
   <span class="saved" :class="{error:ds.error}">{{ds.busy?'保存中…':ds.error?'未保存':ds.dirty?'有未保存修改':'已保存'}}</span>
   <span class="spacer"/>
   <button :title="theme==='light'?'切换暗色预览':'切换亮色预览'" @click="theme=theme==='light'?'dark':'light'">
@@ -253,7 +254,8 @@ function key(e:KeyboardEvent){if((e.target as HTMLElement).matches('input,textar
             <button @pointerdown.stop @click="select(b);mode='play';focus(b)"><Play :size="13"/> Play</button>
           </div>
           <div class="surface" :style="{height:b.h+'px'}">
-            <BoardPreview :src="project?previewUrl(ds.origin,project,b.file,token):''" :title="b.title" :editing="mode!=='play'" :commenting="mode==='select'" :theme="theme" :pins="boardPins(b.file)" :token="token" @message="onPreview(b,$event)" @error="renderErrors[b.file]=$event"/>
+            <div v-if="!project?.files[b.file]?.trim()" class="pending-board">画板尚未生成，可让小伴继续完成</div>
+            <BoardPreview v-else :src="project?previewUrl(ds.origin,project,b.file,token):''" :title="b.title" :editing="mode!=='play'" :commenting="mode==='select'" :theme="theme" :pins="boardPins(b.file)" :token="token" @message="onPreview(b,$event)" @error="renderErrors[b.file]=$event"/>
             <div v-if="mode==='hand'" class="pan-shield" @pointerdown="down($event)"/>
             <div v-if="renderErrors[b.file]" class="render-error" role="alert">预览错误：{{renderErrors[b.file]}}<button @click="select(b);openSource()">查看源代码</button></div>
           </div>

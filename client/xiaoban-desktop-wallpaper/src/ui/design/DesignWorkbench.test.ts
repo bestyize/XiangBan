@@ -86,4 +86,10 @@ describe('compact design workbench',()=>{
   expect(mocks.invoke).toHaveBeenCalledWith('design_export',expect.objectContaining({format:'md'}));
  });
 
+ it('opens incomplete drafts as placeholders without requesting missing preview files',async()=>{
+  const draft=fixture();draft.status='generating';delete draft.files['More.dc.html'];
+  mocks.invoke.mockResolvedValue({project:draft,origin:'design-preview://localhost'});
+  const w=await open();expect(w.text()).toContain('生成中');expect(w.findAll('iframe')).toHaveLength(1);expect(w.text()).toContain('画板尚未生成');
+ });
+
 });

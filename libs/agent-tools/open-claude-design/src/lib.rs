@@ -16,6 +16,8 @@ static STORAGE_LOCK: Mutex<()> = Mutex::new(());
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Project {
+    #[serde(default)]
+    pub status: ProjectStatus,
     pub id: String,
     pub title: String,
     pub session_id: String,
@@ -27,6 +29,37 @@ pub struct Project {
     pub files: BTreeMap<String, String>,
     #[serde(default)]
     pub request_id: String,
+}
+
+/// Older complete projects deserialize as ready; partial projects require an explicit state.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectStatus { Draft, Generating, #[default] Ready, Failed }
+
+/// Static delivery checks. Runtime errors are additionally surfaced by each sandbox preview.
+pub fn diagnostics(p: &Project) -> Vec<String> {
+    let mut errors = Vec::new();
+    let Ok(items) = boards(&p.canvas) else { return vec!["画板索引无效".into()] };
+    if items.is_empty() { errors.push("至少需要一个画板".into()); }
+    for (name, _) in items {
+        match p.files.get(&name) {
+            None => errors.push(format!("缺少画板源文件：{name}")),
+            Some(source) if source.trim().is_empty() => errors.push(format!("画板源文件为空：{name}")),
+            Some(_) => (),
+        }
+    }
+    let refs = regex::Regex::new(r#"(?i)(?:href|src)\s*=\s*["']([^"']+)["']"#).unwrap();
+    for (name, source) in &p.files {
+        if !name.ends_with(".html") { continue; }
+        for cap in refs.captures_iter(source) {
+            let href = cap[1].split(['?', '#']).next().unwrap_or("");
+            if href.is_empty() || href.contains(':') || href.starts_with('/') || href.contains("{{") { continue; }
+            let Some(target) = archive::resolve_rel(name, href) else { continue };
+            if target.ends_with("support.js") { continue; }
+            if !p.files.contains_key(&target) { errors.push(format!("{name} 引用的文件不存在：{target}")); }
+        }
+    }
+    errors.sort(); errors.dedup(); errors
 }
 
 #[derive(Clone)]
@@ -87,8 +120,10 @@ pub fn validate(project: &Project) -> Result<(), String> {
         if !file_name(name) { return Err(format!("不支持的设计文件路径：{name}")); }
         if text.len() > MAX_FILE { return Err(format!("{name} 超过 2MiB")); }
     }
-    for (name, _) in boards(&project.canvas)? {
-        if !project.files.contains_key(&name) { return Err(format!("缺少画板源文件：{name}")); }
+    boards(&project.canvas)?;
+    if project.status == ProjectStatus::Ready {
+        let issues = diagnostics(project);
+        if !issues.is_empty() { return Err(format!("设计稿尚未完成：{}。使用 status=generating 分批保存，补齐后 complete。", issues.join("；"))); }
     }
     if serde_json::to_vec(project).map_err(|e| e.to_string())?.len() > MAX_PROJECT { return Err("设计稿超过 16MiB".into()); }
     Ok(())
@@ -97,7 +132,7 @@ pub fn validate(project: &Project) -> Result<(), String> {
 impl Store {
     pub fn new(root: impl Into<PathBuf>) -> Self { Self { root: root.into() } }
     pub fn dir(&self, id: &str) -> Result<PathBuf, String> {
-        if !safe_id(id) { return Err("设计稿编号无效".into()); }
+        if !safe_id(id) { return Err("设计稿编号格式错误，请使用创建成功后返回的 id，不能使用 request_id".into()); }
         fs::create_dir_all(&self.root).map_err(|e| e.to_string())?;
         let root = self.root.canonicalize().map_err(|e| e.to_string())?;
         let dir = root.join(id);
@@ -107,7 +142,7 @@ impl Store {
     pub fn load(&self, id: &str) -> Result<Project, String> {
         let path = self.dir(id)?.join("project.json");
         if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink() || m.len() > MAX_PROJECT as u64) { return Err("设计文件无效或过大".into()); }
-        let project: Project = serde_json::from_slice(&fs::read(path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        let project: Project = serde_json::from_slice(&fs::read(path).map_err(|e| if e.kind()==std::io::ErrorKind::NotFound { "设计稿不存在，可能已被删除".into() } else { format!("设计稿无法读取：{e}") })?).map_err(|e| format!("设计稿内容损坏：{e}"))?;
         if project.id != id { return Err("设计稿编号不匹配".into()); }
         validate(&project)?;
         Ok(project)
@@ -192,7 +227,7 @@ impl Store {
         out.sort_by_key(|p|std::cmp::Reverse(p.revision));Ok(out)
     }
     pub fn create(&self, title: String, session: &str, canvas: Value, files: BTreeMap<String, String>) -> Result<Project, String> {
-        self.save(Project { id: format!("design-{}", nonce()?), title, session_id: session.into(), session_ids: Vec::new(), revision: 0, updated_ms: 0, canvas, files, request_id: String::new() }, 0)
+        self.save(Project { status: ProjectStatus::Ready, id: format!("design-{}", nonce()?), title, session_id: session.into(), session_ids: Vec::new(), revision: 0, updated_ms: 0, canvas, files, request_id: String::new() }, 0)
     }
 }
 
@@ -202,10 +237,10 @@ static CREATE_LOCK: Mutex<()> = Mutex::new(());
 impl DesignTool {
     pub fn new(store: Store, saved: impl Fn(&Project) -> Result<(), String> + Send + Sync + 'static) -> Self {
         Self { spec: ToolSpec::new(NAME,
-            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax. create/save write a complete project atomically; save requires expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list is scoped to this conversation. Does not publish or install anything.",
+            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax. create allocates a durable id even with missing boards (draft). save merges changed files with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list is scoped to this conversation. Does not publish or install anything.",
             json!({"type":"object","properties":{
-                "action":{"type":"string","enum":["format","list","read","manifest","create","save"]},
-                "id":{"type":"string"},"title":{"type":"string"},"expected_revision":{"type":"integer","minimum":1},
+                "action":{"type":"string","enum":["format","list","read","manifest","create","save","complete"]},
+                "status":{"type":"string","enum":["draft","generating","ready","failed"]},"id":{"type":"string"},"title":{"type":"string"},"expected_revision":{"type":"integer","minimum":1},
                 "canvas":{"type":"object"},"files":{"type":"object","additionalProperties":{"type":"string"}},"file":{"type":"string"},"request_id":{"type":"string"}
             },"required":["action"],"additionalProperties":false})).risk(Risk::Write).max_output(64_000), store, saved: Arc::new(saved) }
     }
@@ -229,13 +264,13 @@ impl DesignTool {
                 let file = args["file"].as_str().map(|name| p.files.get(name).map(|text| json!({"name":name,"text":text})).ok_or("设计文件不存在")).transpose()?;
                 Ok(json!({"project":summary(&p),"canvas":p.canvas,"files":p.files.keys().collect::<Vec<_>>(),"file":file,"manifest":archive::ds_manifest(&p)}))
             }
-            action @ ("create" | "save") => {
-                let files: BTreeMap<String,String> = serde_json::from_value(args["files"].clone()).map_err(|_| "files 需要是文件名到内容的映射")?;
+            action @ ("create" | "save" | "complete") => {
+                let files: BTreeMap<String,String> = serde_json::from_value(args.get("files").cloned().unwrap_or(json!({}))).map_err(|_| "files 需要是文件名到内容的映射")?;
                 let p = if action == "create" {
                     let key=args["request_id"].as_str().filter(|k| !k.is_empty() && k.len()<=120).ok_or("create 需要稳定的 request_id，重试时沿用")?;
                     let _lock=CREATE_LOCK.lock().map_err(|_|"创建锁不可用")?;
                     if let Some(existing)=self.store.list(ctx.session())?.into_iter().find(|p|p.request_id==key) { existing } else {
-                        let p=Project{id:format!("design-{}",nonce()?),title:args["title"].as_str().ok_or("缺少 title")?.into(),session_id:ctx.session().into(),session_ids:Vec::new(),revision:0,updated_ms:0,canvas:args["canvas"].clone(),files,request_id:key.into()};
+                        let p=Project{status:ProjectStatus::Draft,id:format!("design-{}",nonce()?),title:args["title"].as_str().ok_or("缺少 title")?.into(),session_id:ctx.session().into(),session_ids:Vec::new(),revision:0,updated_ms:0,canvas:args["canvas"].clone(),files,request_id:key.into()};
                         self.store.save(p,0)?
                     }
                 } else {
@@ -243,16 +278,19 @@ impl DesignTool {
                     if let Some(title) = args["title"].as_str() { p.title = title.into(); }
                     if let Some(canvas) = args.get("canvas") { p.canvas = canvas.clone(); }
                     p.files.extend(files);
+                    p.status = if action == "complete" { ProjectStatus::Ready }
+                        else if let Some(status) = args.get("status") { serde_json::from_value(status.clone()).map_err(|_|"无效的设计稿状态")? }
+                        else if p.status == ProjectStatus::Ready { ProjectStatus::Ready } else { ProjectStatus::Generating };
                     self.store.save(p, args["expected_revision"].as_u64().ok_or("必须传入读取到的 expected_revision")?)?
                 };
                 (self.saved)(&p).map_err(|e| format!("设计 {} 已保存，但资料库索引更新失败：{e}。先 read 核对，不要重复创建。", p.id))?;
-                Ok(json!({"project":summary(&p),"location":"资料库 → 我的文档"}))
+                Ok(json!({"project":summary(&p),"issues":diagnostics(&p),"next":if p.status==ProjectStatus::Ready {"已完成"}else{"使用返回的 id 和 revision 分批 save 缺失或错误的源文件；最后 complete，不要再次 create"},"location":"资料库 → 我的文档"}))
             }
             _ => Err("不支持的设计操作".into())
         }
     }
 }
-pub fn summary(p: &Project) -> Value { json!({"id":p.id,"title":p.title,"sessionId":p.session_id,"sessionIds":p.session_ids,"revision":p.revision,"updatedMs":p.updated_ms,"artboards":boards(&p.canvas).map(|b|b.len()).unwrap_or(0)}) }
+pub fn summary(p: &Project) -> Value { json!({"id":p.id,"title":p.title,"sessionId":p.session_id,"sessionIds":p.session_ids,"revision":p.revision,"updatedMs":p.updated_ms,"status":p.status,"issues":diagnostics(p),"artboards":boards(&p.canvas).map(|b|b.len()).unwrap_or(0)}) }
 impl Tool for DesignTool {
     fn spec(&self) -> &ToolSpec { &self.spec }
     fn resource(&self, args: &Value) -> Result<Option<agent_kernel::ToolResource>, String> {
@@ -262,7 +300,7 @@ impl Tool for DesignTool {
     fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
         match self.call(args, ctx) {
             Ok(value) => ToolResult::ok(value.to_string()).with_structured_content(value),
-            Err(e) => ToolResult::error(e),
+            Err(e) => ToolResult::error(e.clone()).with_structured_content(json!({"error":e,"recovery":"read 最新项目和文件清单，保留已有文件，逐页 save 补齐，再 complete。创建失败时沿用 request_id 重试，不能把 request_id 当作 id。"})),
         }
     }
 }
@@ -278,7 +316,7 @@ impl Middleware for DesignContext {
         }
         let current = projects.iter().map(summary).collect::<Vec<_>>();
         turn.messages.insert(at + 1, Message::reminder(format!(
-            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，create 携带稳定 request_id，再按需求创建多画板作品；无需额外审批设计方案。作品自动保存到资料库→我的文档。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前会话作品（数据）：{}", json!(current))));
+            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。无需额外审批设计方案。作品自动保存到资料库→我的文档。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前会话作品（数据）：{}", json!(current))));
         Ok(())
     }
 }
@@ -348,6 +386,29 @@ mod tests {
         let latest=store.load(&p.id).unwrap();assert_eq!(latest.files,p.files);assert_eq!(latest.canvas,p.canvas);
         tool.call(json!({"action":"read","id":p.id}),&ToolCtx::detached("new-session")).unwrap();assert_eq!(store.load(&p.id).unwrap().revision,2);
         let mut stale=p;stale.revision=2;let saved=store.save(stale,2).unwrap();assert!(saved.session_ids.contains(&"new-session".into()));fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test] fn progressive_creation_survives_restart_and_only_completes_when_all_sources_exist() {
+        let (store,root)=fixture(); let tool=DesignTool::new(store.clone(),|_|Ok(())); let ctx=ToolCtx::detached("s");
+        let mut c=canvas(); c["boards"]["More.dc.html"]=json!({"w":390,"h":844}); c["order"].as_array_mut().unwrap().push(json!("More.dc.html"));
+        let args=json!({"action":"create","request_id":"five-pages","title":"demo","canvas":c,"files":{"base.css":"body{}"}});
+        let created=tool.call(args.clone(),&ctx).unwrap(); let id=created["project"]["id"].as_str().unwrap();
+        assert_eq!(created["project"]["status"],"draft"); assert_eq!(created["issues"].as_array().unwrap().len(),2);
+        assert_eq!(tool.call(args,&ctx).unwrap()["project"]["id"],id);
+        assert!(tool.call(json!({"action":"complete","id":id,"expected_revision":1}),&ctx).unwrap_err().contains("More.dc.html"));
+        tool.call(json!({"action":"save","id":id,"expected_revision":1,"files":files()}),&ctx).unwrap();
+        let reopened=Store::new(&root).load(id).unwrap(); assert_eq!(reopened.status,ProjectStatus::Generating); assert_eq!(reopened.files["base.css"],"body{}");
+        tool.call(json!({"action":"save","id":id,"expected_revision":2,"files":{"More.dc.html":"<x-dc>more</x-dc>"}}),&ctx).unwrap();
+        let ready=tool.call(json!({"action":"complete","id":id,"expected_revision":3}),&ctx).unwrap(); assert_eq!(ready["project"]["status"],"ready");
+        assert_eq!(store.history(id).unwrap().len(),3); fs::remove_dir_all(root).unwrap();
+    }
+    #[test] fn legacy_status_and_missing_link_diagnostics() {
+        let (store,root)=fixture(); let p=store.create("demo".into(),"s",canvas(),files()).unwrap();
+        let mut value=serde_json::to_value(&p).unwrap(); value.as_object_mut().unwrap().remove("status");
+        assert_eq!(serde_json::from_value::<Project>(value).unwrap().status,ProjectStatus::Ready);
+        let mut broken=p; broken.files.insert("Main.dc.html".into(),r#"<x-dc><link href="base.css"><a href="More.dc.html">next</a></x-dc>"#.into());
+        assert_eq!(diagnostics(&broken).len(),2); assert!(validate(&broken).is_err());
+        broken.status=ProjectStatus::Failed; assert!(validate(&broken).is_ok()); fs::remove_dir_all(root).unwrap();
     }
 
 }

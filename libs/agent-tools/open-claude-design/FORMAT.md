@@ -1,7 +1,7 @@
 # open-claude-design authoring contract
 
 Create one project with multiple artboards. Always call this tool instead of writing a loose HTML answer.
-`create`: title, stable request_id, canvas, files. Reuse request_id on retries. `save`: id, expected_revision, optional title/canvas, files containing only changed files.
+`create`: title, stable request_id, canvas, files (may be empty). Returns a durable draft id immediately. Generate each planned HTML source yourself; never ask the user to supply it. Save each board with status=generating and the latest expected_revision, then call `complete` with id and expected_revision to validate all boards and local references and mark ready. Only ready is a delivered design; a partial project remains recoverable. Follow issues to fix and retry; reuse the same id. `status=failed` can preserve interrupted work. Reuse request_id on retries. `save`: id, expected_revision, optional title/canvas, files containing only changed files.
 `read`: id for the index and filenames, plus file to read one source. Opening a project from another conversation links that same project to the current session; use the returned latest revision. Never overwrite a user edit from an old revision.
 `list`: projects in this conversation. After restarting, read the existing id and continue it.
 `manifest`: id to inspect the compiled `_ds_manifest.json` design system cards and tokens.

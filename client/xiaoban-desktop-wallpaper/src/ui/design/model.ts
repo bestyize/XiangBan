@@ -11,8 +11,10 @@ export interface Comment {
   status:'saved'|'sent'|'resolved';
 }
 export interface DsCard { name:string; path:string; group:string; subtitle:string; viewport:{width:number;height:number} }
-export interface Project { id:string; title:string; sessionId:string; sessionIds?:string[]; revision:number; updatedMs:number; canvas:Record<string,any>; files:Record<string,string>; requestId?:string }
-export interface Summary { id:string; title:string; sessionId:string; sessionIds?:string[]; revision:number; updatedMs:number; artboards:number }
+export type ProjectStatus = 'draft'|'generating'|'ready'|'failed';
+export const statusLabel = (status?:ProjectStatus) => ({draft:'草稿',generating:'生成中',ready:'已完成',failed:'待恢复'}[status??'ready']);
+export interface Project { status?:ProjectStatus; id:string; title:string; sessionId:string; sessionIds?:string[]; revision:number; updatedMs:number; canvas:Record<string,any>; files:Record<string,string>; requestId?:string }
+export interface Summary { status?:ProjectStatus; issues?:string[]; id:string; title:string; sessionId:string; sessionIds?:string[]; revision:number; updatedMs:number; artboards:number }
 export interface Payload { project:Project; origin:string; draft?:Project; draftError?:string }
 
 export const DEVICE_PRESETS: { id:string; label:string; w:number; h:number }[] = [
