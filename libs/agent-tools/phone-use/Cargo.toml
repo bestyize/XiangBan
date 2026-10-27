@@ -1,0 +1,18 @@
+[package]
+name = "agent-phone-use-tools"
+version = "0.1.0"
+edition = "2021"
+description = "Android device tools and progressively discovered application knowledge packs"
+
+[dependencies]
+agent-kernel = { path = "../../agent-kernel", features = ["process-tree"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml_ng = "0.10"
+sha2 = "0.10"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+tempfile = "3"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "native-tls-no-alpn"] }
+zip = { version = "=9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
