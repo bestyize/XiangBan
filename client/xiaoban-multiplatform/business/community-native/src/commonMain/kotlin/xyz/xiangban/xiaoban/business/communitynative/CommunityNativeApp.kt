@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.sp
  * 社区原生界面入口：底部四个 Tab（社区、讨论、小伴、我的）加一个页面栈。
  * 打开详情页时 Tab 页仍留在下面（只是被盖住），返回后滚动位置和已加载的数据都在。
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun CommunityNativeApp(env: CommunityEnv) {
     XiaobanTheme {
