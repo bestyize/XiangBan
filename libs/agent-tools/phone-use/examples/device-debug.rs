@@ -13,7 +13,7 @@ fn main()->Result<(),Box<dyn std::error::Error>> {
     let request:Value=serde_json::from_slice(&std::fs::read(&args[2])?)?;
     let name=request["tool"].as_str().ok_or("missing tool name")?;
     let adb=Adb::new(std::env::var_os("XIAOBAN_ADB").map(PathBuf::from).unwrap_or_else(||PathBuf::from("adb")));
-    let tools=agent_phone_use_tools::tools(Store::new(&args[0]),adb,args[1].clone());
+    let tools=agent_phone_use_tools::tools(Store::new(&args[0]),adb.clone(),args[1].clone());
     let tool=tools.iter().find(|tool|tool.spec().name==name).ok_or("unknown phone tool")?;
     let context=ToolCtx::detached("device-debug");
     let result=tool.execute_result(request["arguments"].clone(),&context);
@@ -48,6 +48,7 @@ fn main()->Result<(),Box<dyn std::error::Error>> {
         }
     }
     println!("{}",serde_json::to_string_pretty(&json!({"is_error":result.is_error,"output":result.output,"structured_content":result.structured_content,"media":media,"artifacts":artifacts}))?);
+    adb.close()?;
     if result.is_error {std::process::exit(1);}
     Ok(())
 }

@@ -229,6 +229,19 @@ fn phone_pack_install_is_confirmed_in_full_trust_before_reading_or_downloading()
 }
 
 #[test]
+fn phone_workflow_execution_is_confirmed_before_any_device_access_in_full_trust() {
+    let (rig, asked)=trusted_rig("phone-workflow-confirm",vec![
+        load(&["phone_workflow_inspect","phone_workflow_run"]),
+        call("inspect-flow","phone_workflow_inspect",json!({"package":"com.xingin.xhs","path":"tasks/open-image-picker.yaml","app_version":"9.51.0"})),
+        call("run-flow","phone_workflow_run",json!({"serial":"simulator-no-device","package":"com.xingin.xhs","path":"tasks/open-image-picker.yaml","sha256":"0".repeat(64),"parameters":{}})),
+        Step::text("已停止执行"),
+    ]);
+    run(&rig,"查看工作流").0.unwrap();
+    let asked=lock(&asked);assert_eq!(asked.len(),1);assert_eq!(asked[0].0,"phone_workflow_run");
+    let output=tool_results(&rig).join("\n");assert!(output.contains("app_versions")&&output.contains("denied"));
+}
+
+#[test]
 fn observed_chat_run_persists_events_and_keeps_legacy_chat_stream() {
     let rig = rig("observed-journal", vec![Step::text("任务已回答")], Approval::Once);
     let journal = JsonlRunLog::new(rig.dirs.runs().join("s1"));
@@ -333,7 +346,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     let system = request.messages[0].text();
     let deferred = [
         "connector_call",
-        "phone_devices", "phone_connect", "phone_observe", "phone_action", "phone_push_image", "phone_pack_find", "phone_pack_read", "phone_pack_install", "phone_patch_list", "phone_patch_save", "phone_routes", "phone_match3",
+        "phone_devices", "phone_connect", "phone_observe", "phone_action", "phone_push_image", "phone_pack_find", "phone_pack_read", "phone_pack_install", "phone_patch_list", "phone_patch_save", "phone_routes", "phone_match3", "phone_workflow_inspect", "phone_workflow_run",
         "app_guide", "open_page", "desktop_settings_set", "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_read_format", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_read_format", "game_create", "game_delete",
         "request_accessibility_permission", "computer_use_diagnose", "computer_use_repair_permissions", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove",

@@ -225,6 +225,21 @@ impl Store {
         Ok(serde_json::json!({"patches":result}))
     }
 
+    /// Resolve a bounded workflow atomically; never concatenate pages from changing pack revisions.
+    pub fn workflow_document(&self,package:&str,path:&str,app_version:Option<&str>,now:DateTime<Utc>)->Result<(String,String)> {
+        let _guard=STORE_LOCK.lock().map_err(|_|"pack store lock poisoned")?;
+        if !valid_path(path)||!path.starts_with("tasks/")||!path.ends_with(".yaml") {return Err("workflow must be a tasks/*.yaml logical path".into());}
+        let meta=self.metadata_unlocked(package)?;let dir=self.dir(package)?;
+        let patch=safe_file(&dir,&format!("patch/{path}"))?;
+        let (source,text)=if patch.exists() {
+            let (info,text)=split_patch(&read_small(&patch)?)?;
+            if info.applies(&meta,app_version,now) {(format!("patch/{path}"),text)}
+            else {(format!("basic/{path}"),String::from_utf8(read_small(&safe_file(&dir,&format!("basic/{path}"))?)?).map_err(|_|"workflow is not UTF-8")?)}
+        } else {(format!("basic/{path}"),String::from_utf8(read_small(&safe_file(&dir,&format!("basic/{path}"))?)?).map_err(|_|"workflow is not UTF-8")?)};
+        if text.len()>64*1024 {return Err("workflow exceeds 64 KiB".into());}
+        Ok((source,text))
+    }
+
     pub fn save_patch(&self, package: &str, path: &str, content: &str, info: PatchMeta) -> Result<()> {
         let _guard = STORE_LOCK.lock().map_err(|_| "pack store lock poisoned")?;
         let meta = self.metadata_unlocked(package)?;

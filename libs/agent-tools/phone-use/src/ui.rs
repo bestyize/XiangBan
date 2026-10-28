@@ -4,13 +4,14 @@ use quick_xml::{events::{BytesStart,Event},Reader};
 use serde::{Deserialize,Serialize};
 use std::collections::BTreeMap;
 
-#[derive(Debug,Default,Deserialize)]
+#[derive(Debug,Default,Clone,Deserialize,Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Selector {
     pub text:Option<String>,
     pub description:Option<String>,
     pub resource_id:Option<String>,
     pub class:Option<String>,
+    pub focused:Option<bool>,
 }
 #[derive(Debug,Serialize)]
 pub struct Target {
@@ -57,6 +58,7 @@ pub fn target(xml:&str,selector:&Selector)->Result<Target> {
     let matches=nodes.iter().enumerate().filter(|(_,node)| {
         node.attributes.get("enabled").is_none_or(|s|s=="true")
             && node.attributes.get("visible-to-user").is_none_or(|s|s=="true")
+            && selector.focused.is_none_or(|focused|node.attributes.get("focused").map(String::as_str)==Some(if focused {"true"} else {"false"}))
             && filters.iter().all(|(key,value)|value.as_ref().is_none_or(|value|node.attributes.get(*key)==Some(value)))
     }).map(|(index,_)|index).collect::<Vec<_>>();
     if matches.len()!=1 {return Err(format!("element selector matched {} nodes; refine it or re-observe, no input dispatched",matches.len()));}
@@ -74,4 +76,25 @@ pub fn target(xml:&str,selector:&Selector)->Result<Target> {
     if bounds.iter().any(|v|*v>16000)||bounds[2]<=bounds[0]||bounds[3]<=bounds[1] {return Err("element is offscreen or has empty bounds".into());}
     Ok(Target {text:node.get("text").cloned().unwrap_or_default(),description:node.get("content-desc").cloned().unwrap_or_default(),
         resource_id:node.get("resource-id").cloned().unwrap_or_default(),bounds:[bounds[0],bounds[1],bounds[2],bounds[3]],x:(bounds[0]+bounds[2])/2,y:(bounds[1]+bounds[3])/2})
+}
+
+/// Ordered editable fields, for a version-specific preparation workflow's final postcondition.
+pub fn editable_values(xml:&str)->Result<Vec<String>> {
+    let mut reader=Reader::from_str(xml);let mut values=Vec::new();let mut count=0;
+    loop {
+        match reader.read_event().map_err(|e|e.to_string())? {
+            Event::Start(start)|Event::Empty(start) if start.name().as_ref()=="node"=>{
+                count+=1;if count>10000 {return Err("UI node budget exceeded".into());}
+                let attrs=attributes(&start)?;
+                if attrs.get("class").map(String::as_str)==Some("android.widget.EditText")
+                    && attrs.get("enabled").is_none_or(|v|v=="true")&&attrs.get("visible-to-user").is_none_or(|v|v=="true") {
+                    values.push(attrs.get("text").cloned().unwrap_or_default());
+                }
+            },
+            Event::DocType(_)=>return Err("UI document types are not supported".into()),
+            Event::Eof=>break,
+            _=>{},
+        }
+    }
+    Ok(values)
 }

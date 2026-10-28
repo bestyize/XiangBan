@@ -133,7 +133,7 @@ fn seeds_can_be_discovered_read_and_planned_without_touching_adb() {
 fn data_tools_have_distinct_permissions_and_native_device_actions_are_not_self_managed() {
     let temp=tempfile::tempdir().unwrap();
     let tools=agent_phone_use_tools::tools(Store::new(temp.path().join("packs")),Adb::with_transport(Arc::new(Fake::default())),temp.path().to_path_buf());
-    assert_eq!(tools.len(),12);
+    assert_eq!(tools.len(),14);
     for tool in tools {
         let spec=tool.spec(); assert!(spec.untrusted_output); assert!(!spec.parallel_safe);
         if matches!(spec.name.as_str(),"phone_action"|"phone_push_image"|"phone_connect") {assert_eq!(spec.risk,Risk::Exec);assert!(!spec.self_managed);}

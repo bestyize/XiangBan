@@ -20,6 +20,21 @@ cargo test --manifest-path libs/agent-tools/phone-use/Cargo.toml
 
 全部工具由宿主按需注册，普通聊天不启动 ADB。`phone_pack_find` 发现摘要；`phone_pack_read` 读取技能、任务、页面和基础图片；`phone_patch_list` 发现学习内容；`phone_routes` 合并路由 / 规划路径。分页读取使用 `next_offset` 直到 `has_more=false`。
 
+## 常驻通道与本地工作流
+
+默认 Adb 在一次任务内按显式设备序列号复用 `adb -s <serial> shell -T`，不再为每个 Shell 命令重启客户端或反复执行 devices -l。设备未授权/离线时，指定设备的通道建立或使用会失败；不会改用另一台手机。命令用随机标记分帧，串行执行、限制输出并响应取消；断连、超时、写入异常后关闭通道，结果未知的命令不自动重放。任务结束清理全部连接。截图、配对与文件传输仍使用独立命令，uiautomator dump 仍逐次启动，尚未提供常驻 UI 服务、画面流或游戏识别器。
+
+操作包可在 tasks/ 放结构化 YAML：schema=1、package_name、name、description、app_versions、parameters、steps。仅支持 launch、wait、tap、fill、verify_fields、yield，最多32步；不支持 Shell、任意工具调用或循环。声明的 APP 版本是执行约束，不是验证证明。工作流必须以可观测后置条件或 yield 结束；序列化审查内容最多12000字节，超出应拆分流程。
+
+1. `phone_workflow_inspect(package,path,app_version)` 原子读取适用基础资料/补丁，返回完整步骤和内容 SHA-256。
+2. 核对用户目标和全部动作后，`phone_workflow_run(serial,package,path,sha256,parameters)` 需独立确认（包括完全信任模式），执行前重新读取手机真实版本和固定内容。
+3. 已知步骤在本地连续运行，目标控件等待成功后复用刚刚取得的树（最多250ms）定位本次动作；每次输入前仍检查前台包。填写前确认目标 EditText 获焦，填写后回读，最后按字段顺序核对全部参数。输入后不复用旧树。
+4. 目标歧义、前台切换、参数/摘要/版本不符或取消时停止；已开始的动作不重放，不自动从头重启。返回 completed / needs_model、checkpoint、逐步耗时、ADB 命令数、Shell 启动/复用数；不回显用户参数正文。执行器在步骤间检查90秒任务预算，单命令另有45秒超时，外层工具最多120秒。
+
+内置小红书两段工作流：`tasks/open-image-picker.yaml` 到相册后 yield，让模型根据当前画面选指定素材；`tasks/prepare-image-note.yaml` 从图片编辑页进入正文编辑，填写并核对 title / body，停在预览，不发布、不存草稿。初始字段必须为空；已有文字会停止而非覆盖。对新执行器的验证仅限本地模拟，原先的真机逐步操作记录不能算其性能验收。
+
+本地协议模拟器只运行 Python 标准库脚本、不调用 ADB；应用运行时不需要 Python。测试覆盖4条 Shell 命令复用1个本地进程、设备隔离、断连不重放、取消清理、工作流完成/交回模型、焦点/长正文回读及摘要更新拦截。尚无真实手机 P50/P95 或端到端提速结论。
+
 `phone_pack_install` 接受 HTTPS URL 或当前工作区 ZIP 及固定 SHA-256；宿主对第三方安装逐次确认。`phone_patch_save` 在包内记录版本化经验，属于本机应用数据写入；它不会把模型自述的 evidence 转换为独立验证证明。补丁图片采集和编辑尚未实现。
 
 `phone_devices`、`phone_connect`、`phone_observe`、`phone_action`、`phone_push_image` 提供设备连接、状态 / UI / 图片、单次动作、图片传输；必须显式选择已授权设备。输入前检查预期前台包名，但系统页面可能在检查后变化，仍须每次行动后回读。ADB 客户端有输出预算、45 秒内部超时、停止与清理；不启动后台自动操作循环。手机端已经开始的动作不能保证撤回，停止后先观察再继续。
