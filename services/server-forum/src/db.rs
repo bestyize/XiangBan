@@ -951,4 +951,14 @@ CREATE TABLE IF NOT EXISTS sensitive_words (
     created_by TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 屏蔽用户：屏蔽者在列表、搜索、回复里不再看到对方的内容，也不会收到对方带来的通知。
+CREATE TABLE IF NOT EXISTS user_blocks (
+    blocker    UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    blocked    UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (blocker, blocked),
+    CHECK (blocker <> blocked)
+);
+CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks (blocked);
 "#;

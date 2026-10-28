@@ -30,6 +30,8 @@ pub struct PostItem {
     pub edited_at: Option<DateTime<Utc>>,
     pub liked: bool,
     pub mine: bool,
+    /// 读者屏蔽了这个作者：正文不返回，前端折叠成一行，可以点开看。
+    pub blocked: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -48,6 +50,7 @@ struct PostRow {
     created_at: DateTime<Utc>,
     edited_at: Option<DateTime<Utc>>,
     liked: bool,
+    blocked: bool,
 }
 
 #[derive(Deserialize)]
@@ -73,7 +76,8 @@ pub async fn list(
     let rows: Vec<PostRow> = sqlx::query_as(
         "SELECT p.id, p.floor, p.reply_to, r.floor AS reply_to_floor, p.author_uid, u.nickname, u.avatar_url, u.trust_level,
                 p.body_html, p.status, p.like_count, p.created_at, p.edited_at,
-                ($4::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM likes l WHERE l.target_type = 'post' AND l.target_id = p.id AND l.uid = $4)) AS liked
+                ($4::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM likes l WHERE l.target_type = 'post' AND l.target_id = p.id AND l.uid = $4)) AS liked,
+                ($4::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker = $4 AND b.blocked = p.author_uid)) AS blocked
          FROM posts p JOIN users u ON u.uid = p.author_uid LEFT JOIN posts r ON r.id = p.reply_to
          WHERE p.topic_id = $1 ORDER BY p.floor LIMIT $2 OFFSET $3",
     )
@@ -87,7 +91,7 @@ pub async fn list(
         .into_iter()
         .map(|r| {
             // 被删除或隐藏的楼层保留位置，只显示占位文字。
-            let visible = r.status == "normal";
+            let visible = r.status == "normal" && !r.blocked;
             PostItem {
                 id: r.id,
                 floor: r.floor,
@@ -101,6 +105,7 @@ pub async fn list(
                 created_at: r.created_at,
                 edited_at: r.edited_at,
                 liked: r.liked,
+                blocked: r.blocked,
             }
         })
         .collect();

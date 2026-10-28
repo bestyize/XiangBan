@@ -64,7 +64,11 @@ async function remove() {
 </script>
 
 <template>
-  <article :id="`floor-${post.floor}`" class="post">
+  <article v-if="post.blocked" :id="`floor-${post.floor}`" class="post blocked-row">
+    <span class="muted">你已屏蔽 {{ post.author.nickname }}，这条回复已折叠。</span>
+    <RouterLink :to="`/u/${post.author.uid}`" class="muted-link">去取消屏蔽</RouterLink>
+  </article>
+  <article v-else :id="`floor-${post.floor}`" class="post">
     <RouterLink :to="`/u/${post.author.uid}`" class="avatar" :aria-label="post.author.nickname">
       <UserAvatar :name="post.author.nickname" :src="post.author.avatar_url" :size="34" />
     </RouterLink>
@@ -229,5 +233,17 @@ async function remove() {
     padding: 14px 0;
     gap: 10px;
   }
+}
+.blocked-row {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 0;
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+}
+.muted-link {
+  color: var(--ink-2);
+  text-decoration: underline;
 }
 </style>

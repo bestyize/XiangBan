@@ -96,6 +96,10 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 敏感词由管理员在后台维护（`/admin/words`），**不内置任何词**。词表在发帖、编辑、回复、发布内容包与新版本、发布方案时检查：命中“拦截”的直接 400，且不告诉用户是哪个词；命中“复核”的先发布并进入待审队列。匹配前先归一化（转小写、去掉空白和标点），所以“违 禁-词”也命中“违禁词”；每个词 2～40 个字。实现见 `src/moderation.rs`。
 - 待审队列（`/admin/moderation`）汇集用户新发布的内容包和命中复核词的帖子、回复、方案；内容包与方案可直接通过或拒绝，帖子和回复要到帖子管理里隐藏，再标记“已处理”（`POST /admin/moderation/{id}/resolve`）。
 
+## 屏蔽用户
+
+`PUT/DELETE /users/{uid}/block`、`GET /me/blocks`。屏蔽后互相取消关注；被屏蔽者的帖子不再出现在屏蔽者的列表、搜索和关注流里，回复折叠（接口返回 `blocked: true` 且不带正文）；对方看不出自己被屏蔽（接口不报错、其他人看到的不变）。个人主页返回 `blocked`，设置页列出屏蔽的人并可取消。通知（见下节）也会跳过被屏蔽者带来的事件。
+
 ## 业务规则
 
 - 正文是 Markdown，服务端用 pulldown-cmark 渲染、ammonia 清洗后存 `body_html`；外链加 `nofollow ugc`。新人（TL0）的链接和图片会被去掉，只留文字。
@@ -115,7 +119,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 ## 已知限制与后续
 
 - 数据库兼容：阅读权限是追加的列（`ALTER TABLE topics ADD COLUMN IF NOT EXISTS min_read_level ... DEFAULT 0`），已部署的库启动时自动补上，旧帖子都按公开处理。
-- 二期（PRD 里的 M2 起）未做：站内通知和关键词订阅、TL2 自动升级、屏蔽用户、图片上传到腾讯云 COS、赞助位。积分规则见上面的运行与验证；正文插图已经走本机磁盘（见业务规则），COS 是二期的存储替换。
+- 二期（PRD 里的 M2 起）未做：站内通知和关键词订阅、TL2 自动升级、图片上传到腾讯云 COS、赞助位。积分规则见上面的运行与验证；正文插图已经走本机磁盘（见业务规则），COS 是二期的存储替换。
 - 账号中心还没有用户自助注销，设置页提示发邮件处理。
 - SEO 页面只渲染第一页（30-50 条），sitemap 每次请求实时查询，没有进程内缓存。
 - 部署：香港机 `/home/ubuntu/xiangban-forum`，systemd 服务 `server-forum`，监听 127.0.0.1:55010，Nginx 反代 chat.xiangban.xyz（Let's Encrypt），库 `xiaban_forum` 在 `wallpaper_postgres` 容器里，独立角色 `forum`。账号中心已登记 `forum-web` 并在 `ACCOUNT_CORS_ORIGINS` 加入 `https://chat.xiangban.xyz`。初始管理员密码在服务器 `.env` 的 `FORUM_ADMIN_PASSWORD`，登录 /admin 改密码后删掉它。更新时本地交叉编译后替换二进制和 `web/dist`，再重启服务（index.html 启动时读一次）。

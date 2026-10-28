@@ -142,6 +142,8 @@ export interface PostItem {
   edited_at: string | null
   liked: boolean
   mine: boolean
+  /** 你屏蔽了这个作者：正文不返回，界面折叠 */
+  blocked: boolean
 }
 
 export interface Page<T> {
@@ -159,6 +161,8 @@ export interface Profile extends PublicUser {
   post_count: number
   banned: boolean
   following: boolean
+  /** 你是否屏蔽了这个用户 */
+  blocked: boolean
   following_count: number
   follower_count: number
 }

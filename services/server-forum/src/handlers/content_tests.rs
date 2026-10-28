@@ -381,6 +381,51 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     let (s, _) = call(&app, "POST", "/api/schemes", Some(&author_t), json!({"title":"违禁词方案","items":[{"pack_id":oid}]})).await;
     assert_eq!(s, StatusCode::OK);
 
+    // 屏蔽用户：对方的帖子从列表消失，回复折叠；互相取消关注；对方不会收到任何提示。
+    let (s, _) = call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&author_t), json!({"body": "作者自己的一条回复"})).await;
+    assert_eq!(s, StatusCode::OK);
+    call(&app, "PUT", &format!("/api/users/{author}/follow"), Some(&other_t), Value::Null).await;
+    let titles = |v: &Value| v["items"].as_array().unwrap().iter().map(|i| i["title"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let (_, before) = call(&app, "GET", "/api/topics", Some(&other_t), Value::Null).await;
+    assert!(titles(&before).contains(&"另一个正常标题".to_string()));
+
+    let (s, _) = call(&app, "PUT", &format!("/api/users/{other}/block"), Some(&other_t), Value::Null).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "不能屏蔽自己");
+    let (s, _) = call(&app, "PUT", &format!("/api/users/{}/block", Uuid::new_v4()), Some(&other_t), Value::Null).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, b) = call(&app, "PUT", &format!("/api/users/{author}/block"), Some(&other_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let (s, _) = call(&app, "PUT", &format!("/api/users/{author}/block"), Some(&other_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK, "重复屏蔽是幂等的");
+
+    let (_, after) = call(&app, "GET", "/api/topics", Some(&other_t), Value::Null).await;
+    assert!(!titles(&after).contains(&"另一个正常标题".to_string()), "被屏蔽作者的帖子不出现在列表里");
+    let (_, anon) = call(&app, "GET", "/api/topics", None, Value::Null).await;
+    assert!(titles(&anon).contains(&"另一个正常标题".to_string()), "不影响其他读者");
+    let (_, author_view) = call(&app, "GET", "/api/topics", Some(&author_t), Value::Null).await;
+    assert!(titles(&author_view).contains(&"另一个正常标题".to_string()), "作者看不出自己被屏蔽");
+    let (_, found) = call(&app, "GET", "/api/search?q=%E5%8F%A6%E4%B8%80%E4%B8%AA", Some(&other_t), Value::Null).await;
+    assert!(found["items"].as_array().unwrap().is_empty(), "搜索也过滤");
+
+    let (_, posts) = call(&app, "GET", &format!("/api/topics/{topic_id}/posts"), Some(&other_t), Value::Null).await;
+    let mine_view = posts["items"].as_array().unwrap().iter().find(|p| p["author"]["uid"] == author.to_string()).unwrap();
+    assert_eq!(mine_view["blocked"], true);
+    assert_eq!(mine_view["body_html"], "");
+    let (_, posts) = call(&app, "GET", &format!("/api/topics/{topic_id}/posts"), None, Value::Null).await;
+    assert!(posts["items"].as_array().unwrap().iter().all(|p| p["blocked"] == false && p["body_html"] != ""));
+
+    let (_, profile) = call(&app, "GET", &format!("/api/users/{author}"), Some(&other_t), Value::Null).await;
+    assert_eq!(profile["blocked"], true);
+    assert_eq!(profile["follower_count"], 0, "屏蔽时取消了关注");
+    let (_, list) = call(&app, "GET", "/api/me/blocks", Some(&other_t), Value::Null).await;
+    assert_eq!(list["items"].as_array().unwrap().len(), 1);
+    let (s, _) = call(&app, "GET", "/api/me/blocks", None, Value::Null).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+
+    call(&app, "DELETE", &format!("/api/users/{author}/block"), Some(&other_t), Value::Null).await;
+    let (_, restored) = call(&app, "GET", "/api/topics", Some(&other_t), Value::Null).await;
+    assert!(titles(&restored).contains(&"另一个正常标题".to_string()), "取消屏蔽后恢复");
+
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
     Ok(())
 }

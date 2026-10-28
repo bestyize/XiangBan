@@ -138,6 +138,8 @@ export const api = {
   profile: (uid: string) => request<Profile>('GET', `/users/${uid}`),
   follow: (uid: string, on: boolean) =>
     request<FollowState>(on ? 'PUT' : 'DELETE', `/users/${uid}/follow`),
+  block: (uid: string, on: boolean) => request<{ blocked: boolean }>(on ? 'PUT' : 'DELETE', `/users/${uid}/block`),
+  myBlocks: () => request<{ items: (PublicUser & { blocked_at: string })[] }>('GET', '/me/blocks'),
   following: (uid: string, page = 1) =>
     request<Page<PublicUser>>('GET', `/users/${uid}/following${qs({ page })}`),
   followers: (uid: string, page = 1) =>

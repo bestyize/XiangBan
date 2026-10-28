@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import TopicList from '@/components/TopicList.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { api } from '@/api/forum'
@@ -13,6 +14,20 @@ const session = useSession()
 const { preference, setPreference } = useTheme()
 
 const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
+
+const blocked = ref<{ uid: string; nickname: string }[]>([])
+async function loadBlocks() {
+  try {
+    blocked.value = (await api.myBlocks()).items
+  } catch {
+    blocked.value = []
+  }
+}
+async function unblock(uid: string) {
+  await api.block(uid, false)
+  await loadBlocks()
+}
+onMounted(loadBlocks)
 </script>
 
 <template>
@@ -43,6 +58,19 @@ const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
       <h2 id="bm-title">我的收藏</h2>
       <TopicList :items="bookmarks.items.value" :loading="bookmarks.loading.value" empty="还没有收藏。看到有用的帖子，点帖子下方的收藏就能存到这里。" />
       <PagerNav :page="bookmarks.page.value" :page-size="bookmarks.pageSize.value" :total="bookmarks.total.value" @go="bookmarks.go" />
+    </section>
+
+    <section class="block" aria-labelledby="blocks-title">
+      <h2 id="blocks-title">屏蔽的用户</h2>
+      <div class="panel box">
+        <p v-if="!blocked.length" class="muted">没有屏蔽任何人。在对方的主页可以屏蔽。</p>
+        <ul v-else class="blocked-list">
+          <li v-for="u in blocked" :key="u.uid">
+            <RouterLink :to="`/u/${u.uid}`">{{ u.nickname }}</RouterLink>
+            <button type="button" class="btn btn-sm" @click="unblock(u.uid)">取消屏蔽</button>
+          </li>
+        </ul>
+      </div>
     </section>
 
     <section class="block" aria-labelledby="profile-title">
@@ -184,5 +212,17 @@ h2 {
   .row .btn {
     margin-top: 0;
   }
+}
+.blocked-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.blocked-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>

@@ -229,6 +229,12 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
         qb.push(" OR t.author_uid = ").push_bind(uid);
     }
     qb.push(")");
+    // 读者屏蔽了的作者，帖子不出现在任何列表和搜索里。
+    if let Some(uid) = f.reader.uid {
+        qb.push(" AND NOT EXISTS (SELECT 1 FROM user_blocks b WHERE b.blocker = ")
+            .push_bind(uid)
+            .push(" AND b.blocked = t.author_uid)");
+    }
     if let Some(slug) = f.category.as_deref().filter(|s| !s.is_empty()) {
         qb.push(" AND (c.slug = ")
             .push_bind(slug.to_string())

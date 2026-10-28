@@ -89,6 +89,8 @@ pub struct Profile {
     pub post_count: i64,
     pub banned: bool,
     pub following: bool,
+    /// 读者是否屏蔽了这个用户。
+    pub blocked: bool,
     pub following_count: i64,
     pub follower_count: i64,
 }
@@ -112,6 +114,10 @@ pub async fn profile(
     .fetch_one(&state.pool)
     .await?;
     let follows = super::follows::stats(&state.pool, uid, reader.uid).await?;
+    let blocked = match reader.uid {
+        Some(me) => sqlx::query_as::<_, (bool,)>("SELECT EXISTS(SELECT 1 FROM user_blocks WHERE blocker = $1 AND blocked = $2)").bind(me).bind(uid).fetch_one(&state.pool).await?.0,
+        None => false,
+    };
     Ok(Json(Profile {
         user: PublicUser { uid, nickname: user.nickname, avatar_url: user.avatar_url, trust_level: user.trust_level },
         points: user.points,
@@ -121,6 +127,7 @@ pub async fn profile(
         post_count,
         banned: user.status == "banned",
         following: follows.following,
+        blocked,
         following_count: follows.following_count,
         follower_count: follows.follower_count,
     }))

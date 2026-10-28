@@ -20,7 +20,7 @@ use axum::{
     Router,
 };
 use config::AppConfig;
-use handlers::{admin, attachments, content as packs, follows, help, images, interact, me, meta, moderation as review, posts, topics};
+use handlers::{admin, attachments, blocks, content as packs, follows, help, images, interact, me, meta, moderation as review, posts, topics};
 use state::AppState;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::{
@@ -45,6 +45,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/me/following/topics", get(follows::topics))
         .route("/users/{uid}", get(me::profile))
         .route("/users/{uid}/follow", put(follows::follow).delete(follows::unfollow))
+        .route("/users/{uid}/block", put(blocks::block).delete(blocks::unblock))
+        .route("/me/blocks", get(blocks::list))
         .route("/users/{uid}/following", get(follows::following))
         .route("/users/{uid}/followers", get(follows::followers))
         .route("/users/{uid}/topics", get(me::user_topics))
