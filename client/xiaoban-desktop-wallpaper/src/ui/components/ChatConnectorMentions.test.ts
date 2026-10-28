@@ -119,7 +119,7 @@ describe('composer mentions', () => {
     store.chat.draft.attachments = ['data:image/png;base64,YQ=='];
     const owner = store.chat.draft;
     let reject!: (reason: unknown) => void;
-    host.mockImplementation(command => command === 'chat_send' ? new Promise((_, no) => { reject = no; }) : Promise.resolve([]));
+    host.mockImplementation(command => command === 'chat_enqueue' ? new Promise((_, no) => { reject = no; }) : Promise.resolve([]));
     await wrapper.get('[data-testid=chat-send]').trigger('click'); await flushPromises();
     store.chat.currentId = 'b'; await flushPromises(); await type('B 的草稿');
     reject(new Error('服务不可用')); await flushPromises();

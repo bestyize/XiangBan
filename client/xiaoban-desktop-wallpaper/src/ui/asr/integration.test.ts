@@ -9,6 +9,8 @@ import { createSpeechStore, speechDefaults } from '../speech/store.ts';
 import { createAsrStore, type AsrDeps } from './store.ts';
 import type { ControlStore } from '../control-types.ts';
 
+// The page reads designs through the bridge directly; without a desktop it only has the standard answer for "none".
+vi.mock('../../bridge.ts', async original => ({ ...await original<typeof import('../../bridge.ts')>(), invoke: vi.fn(async (command: string) => { if (command === 'design_list') return []; throw new Error('请通过桌面程序运行这个功能'); }) }));
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r; }); return { promise, resolve }; }
 const cleanup: (() => void)[] = [];
 afterEach(() => { cleanup.splice(0).reverse().forEach(fn => fn()); });
@@ -21,6 +23,7 @@ async function open(options: { enabled?: boolean; prepare?: () => Promise<unknow
     if (command === 'chat_overview') return { configured: true, sessions: [summary('A'), summary('B')], running: [], workspace: '', permissionMode: 'ask', hideToolCalls: false };
     if (command === 'chat_load_session') return [];
     if (command === 'chat_send') return summary(args!.sessionId as string);
+    if (command === 'chat_enqueue') return { enqueuedId: 'q1', revision: 1, paused: false, reason: '', items: [] };
     if (command === 'tts_get_settings') return { ...speechDefaults };
     if (command === 'tts_cancel') return;
     if (command === 'asr_get_status') return { enabled, modelReady: enabled, engineReady: false };
@@ -128,8 +131,8 @@ it('finishes downloading after a switch without opening the microphone until cli
 it('stops on send and stays off after the assistant completes its response', async () => {
   const h = await open(); await h.clickMic(); h.phrase(); await flushPromises();
   await h.page().get('[data-testid="chat-send"]').trigger('click'); await flushPromises();
-  expect(h.pressed()).toBe('false'); expect(h.chat.current()!.running).toBe(true);
-  h.chat.current()!.running = false; await flushPromises();
+  expect(h.pressed()).toBe('false'); expect(h.invoke.mock.calls.map(([command]) => command)).toContain('chat_enqueue');
+  h.chat.current()!.running = true; await flushPromises(); h.chat.current()!.running = false; await flushPromises();
   expect(h.pressed()).toBe('false'); expect(h.capture).toHaveBeenCalledOnce();
 });
 

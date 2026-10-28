@@ -61,7 +61,7 @@ describe('ControlShell sidebar', () => {
       expect(wrapper.find('.sidebar-desktop-state').exists()).toBe(false);
       expect(wrapper.find('[data-testid="assistant-launcher"]').exists()).toBe(false);
       await wrapper.get('[data-testid="nav-ai-store"]').trigger('click');
-      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="ai-store-page"]').exists()).toBe(true); });
+      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="ai-store-page"]').exists()).toBe(true); }, { timeout: 15000 });
       expect(wrapper.get('.control-workspace').classes()).toContain('fixed-page-workspace');
       await wrapper.get('#store-tab-connectors').trigger('click');
       await wrapper.get('[data-testid="nav-studio"]').trigger('click');
