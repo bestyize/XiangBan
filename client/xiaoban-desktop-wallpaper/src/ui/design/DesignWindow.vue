@@ -1,7 +1,23 @@
 <script setup lang="ts">
-import {ref} from 'vue';
-import {invoke} from '../../bridge.ts';
+import {onBeforeUnmount,onMounted,ref,watchEffect} from 'vue';
+import {invoke,listen} from '../../bridge.ts';
+import {accent,followAccent,followHost,isDark} from '../appearance.ts';
+import {applyUiTokens} from '../design-tokens.ts';
 import DesignWorkbench from './DesignWorkbench.vue';
+watchEffect(()=>{applyUiTokens(isDark.value,accent.value);document.documentElement.dataset.theme=isDark.value?'dark':'light';});
+type Appearance={appearance?:string;accent?:string};
+let disposed=false,offSettings:(()=>void)|undefined;
+function follow(value:Appearance){followHost(value.appearance);followAccent(value.accent);}
+onMounted(async()=>{
+ let changes=0;
+ try{
+  const off=await listen<Appearance>('settings-changed',value=>{changes++;follow(value);});
+  if(disposed){off();return;}offSettings=off;
+  const version=changes,value=await invoke<Appearance>('get_appearance');
+  if(!disposed&&version===changes)follow(value);
+ }catch(e){if(!disposed)notify(e);}
+});
+onBeforeUnmount(()=>{disposed=true;offSettings?.();clearTimeout(timer);});
 const id=new URLSearchParams(location.search).get('id')??'';
 const toast=ref('');let timer:ReturnType<typeof setTimeout>|undefined;
 function notify(message:unknown){toast.value=String(message);clearTimeout(timer);timer=setTimeout(()=>toast.value='',4000);}

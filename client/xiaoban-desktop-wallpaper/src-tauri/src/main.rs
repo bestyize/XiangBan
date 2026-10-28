@@ -429,7 +429,8 @@ fn set_companion_links(app: tauri::AppHandle, enabled: bool) -> Result<Settings,
 }
 
 fn apply_window_appearance(app: &tauri::AppHandle, mode: &str) {
-    if let Some(window) = app.get_webview_window("control") {
+    for (label, window) in app.webview_windows() {
+        if label != "control" && design_window::project_id(&label).is_none() { continue; }
         let theme = match mode {
             "dark" => Some(Theme::Dark),
             "light" => Some(Theme::Light),
@@ -477,7 +478,7 @@ fn set_accent(app: tauri::AppHandle, accent: String) -> Result<Settings, String>
 #[tauri::command]
 fn get_appearance(app: tauri::AppHandle) -> serde_json::Value {
     let s = settings(&app);
-    serde_json::json!({ "appearance": s.appearance, "appearanceKept": s.appearance_kept })
+    serde_json::json!({ "appearance": s.appearance, "appearanceKept": s.appearance_kept, "accent": s.accent })
 }
 
 #[tauri::command]

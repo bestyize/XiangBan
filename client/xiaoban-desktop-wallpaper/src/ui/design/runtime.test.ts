@@ -74,7 +74,7 @@ describe('canvas direct editing protocol',()=>{
  });
  it('supports shift multiselect and a cancellable inline text editor',async()=>{
   const {w,messages}=await preview('<x-dc><h1>标题</h1><p>正文</p></x-dc>');mode(w);const h=w.document.querySelector('h1')!,p=w.document.querySelector('p')!;h.click();p.dispatchEvent(new w.MouseEvent('click',{shiftKey:true,bubbles:true}));expect(last(messages,'select')?.nodes).toHaveLength(2);
-  h.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));expect(h.getAttribute('contenteditable')).toBe('plaintext-only');h.textContent='直接改';h.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));expect(last(messages,'element-edit')?.action).toMatchObject({type:'text',text:'直接改'});
+  h.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));expect(last(messages,'editor-command')?.command).toBe('showProperties');expect(h.getAttribute('contenteditable')).toBe('plaintext-only');h.textContent='直接改';h.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));expect(last(messages,'element-edit')?.action).toMatchObject({type:'text',text:'直接改'});
   h.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));h.textContent='取消';h.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));expect(h.textContent).toBe('直接改');
  });
  it('commits drag and resize once on pointerup and rolls back cancelled gestures',async()=>{

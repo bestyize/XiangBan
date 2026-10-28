@@ -105,7 +105,7 @@
       if(el.namespaceURI!=='http://www.w3.org/1999/xhtml'||locked(el)||generated(el)||el.children.length||original?.textContent?.includes('{{')&&original.getAttribute('data-ocd-literal')!=='true'){notice('动态文字、组件或组合元素请通过批注修改');return;}
       textEdit={el,original:el.textContent,outline:el.style.outline,blur:()=>finishText(false)};el.setAttribute('contenteditable','plaintext-only');el.style.outline=`${1/zoom}px solid #d94e60`;el.focus();const range=document.createRange();range.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(range);el.addEventListener('blur',textEdit.blur,{once:true});draw();
     }
-    document.addEventListener('dblclick',e=>{if(editing&&!commenting&&!textEdit&&!own(e.target)){e.preventDefault();const target=e.target.closest?.('[data-ocd-node]');if(target&&sourceMap.has(id(target))){choose([target],false,true);beginText();}}},true);
+    document.addEventListener('dblclick',e=>{if(editing&&!commenting&&!textEdit&&!own(e.target)){e.preventDefault();const target=e.target.closest?.('[data-ocd-node]');if(target&&sourceMap.has(id(target))){choose([target],false,true);send('editor-command',{command:'showProperties'});beginText();}}},true);
     document.addEventListener('contextmenu',e=>{if(!editing||own(e.target))return;e.preventDefault();const target=e.target.closest?.('[data-ocd-node]');if(target&&!selected.includes(target))choose([target]);send('editor-context',{x:e.clientX,y:e.clientY});});
     function align(which){
       const bs=operands().map(baseline);if(!bs.length)return;const u=bs.length===1?rect(bs[0].el.parentElement||document.body):union(bs.map(b=>b.box));const patches=[];

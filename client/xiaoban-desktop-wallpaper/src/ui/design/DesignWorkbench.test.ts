@@ -13,6 +13,16 @@ async function click(title:string){await wrapper!.get(`[title="${title}"]`).trig
 beforeEach(()=>{vi.resetAllMocks();vi.stubGlobal('IntersectionObserver',undefined);mocks.listen.mockResolvedValue(()=>{});mocks.invoke.mockImplementation(async(command,args)=>{if(command==='design_read')return {project:fixture(),origin:'design-preview://localhost'};if(command==='design_save')return {project:{...args.project,revision:args.expectedRevision+1},origin:'design-preview://localhost'};});});
 afterEach(()=>{wrapper?.unmount();wrapper=undefined;vi.unstubAllGlobals();});
 describe('compact design workbench',()=>{
+ it('opens element properties on double-click requests and keeps them open on repeated requests',async()=>{
+  const w=await open(),preview=w.findAllComponents(BoardPreview)[1];
+  preview.vm.$emit('message',{type:'select',node:'n0',tag:'P',text:'另一屏',nodes:[{node:'n0'}]});await flushPromises();
+  expect(w.find('.properties').exists()).toBe(false);
+  preview.vm.$emit('message',{type:'editor-command',command:'showProperties'});await flushPromises();
+  expect(w.find('.properties').exists()).toBe(true);expect(w.get('.properties h3').text()).toBe('p');
+  const input=w.findAll('.properties label').find(l=>l.text()==='文字')!.get('input');expect((input.element as HTMLInputElement).value).toBe('另一屏');
+  preview.vm.$emit('message',{type:'editor-command',command:'showProperties'});await flushPromises();expect(w.find('.properties').exists()).toBe(true);
+ });
+
  it('shows multiple sandboxed boards, starts with properties closed and saves additions with undo/redo',async()=>{
   const w=await open();expect(w.find('.properties').exists()).toBe(false);expect(w.findAll('.artboard')).toHaveLength(2);expect(w.findAll('iframe').every(f=>f.attributes('sandbox')==='allow-scripts')).toBe(true);
   await click('新增画板');expect(w.findAll('.artboard')).toHaveLength(3);expect(mocks.invoke).toHaveBeenCalledWith('design_save',expect.objectContaining({expectedRevision:1}));
