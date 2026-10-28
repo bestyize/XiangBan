@@ -37,9 +37,12 @@ async fn value(request: reqwest::RequestBuilder) -> Value {
 }
 async fn busy_value(request: reqwest::RequestBuilder) -> Value {
     let response = request.send().await.unwrap();
-    assert_eq!(response.status(), 429);
-    assert_eq!(response.headers()["retry-after"], "2");
-    response.json().await.unwrap()
+    // 忙是工具层的错误：HTTP 200，不带 Retry-After，错误在 JSON-RPC 结果的 isError 里。
+    assert_eq!(response.status(), 200);
+    assert!(response.headers().get("retry-after").is_none());
+    let body: Value = response.json().await.unwrap();
+    assert_eq!(body["result"]["structuredContent"]["busy"], true);
+    body
 }
 #[tokio::test]
 async fn legacy_initialize_notification_ping_list_and_all_tools() {

@@ -250,6 +250,8 @@ pub(crate) async fn handle(
                 ),
                 Ok(Err(error)) if error.status == StatusCode::FORBIDDEN => error.into_response(),
                 failure => {
+                    // 忙、超时、后端失败都是“工具执行出错”：HTTP 200 加 isError 的结果。
+                    // 不能返回 429，否则一些 MCP 客户端会把它当成传输错误，看不到下面这句话。
                     let busy = matches!(&failure, Ok(Err(error)) if error.status == StatusCode::TOO_MANY_REQUESTS);
                     let message = match failure {
                         Ok(Err(error)) if error.status == StatusCode::TOO_MANY_REQUESTS => {
@@ -262,18 +264,12 @@ pub(crate) async fn handle(
                         Ok(Err(_)) => "语音后端不可用或调用失败",
                         _ => "语音工具调用超时",
                     };
-                    let mut response = result(
-                        id,
-                        json!({"content":[{"type":"text","text":message}],"isError":true}),
-                        modern,
-                    );
+                    let mut value =
+                        json!({"content":[{"type":"text","text":message}],"isError":true});
                     if busy {
-                        *response.status_mut() = StatusCode::TOO_MANY_REQUESTS;
-                        response
-                            .headers_mut()
-                            .insert(header::RETRY_AFTER, "2".parse().unwrap());
+                        value["structuredContent"] = json!({"busy":true,"retry_after_seconds":2});
                     }
-                    response
+                    result(id, value, modern)
                 }
             }
         }

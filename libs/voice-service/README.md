@@ -59,7 +59,7 @@ async fn serve(
 | `POST /mcp` | JSON-RPC 2.0；同时接受新版和旧版 MCP，见下文 |
 | `GET /mcp` | 405，不提供独立 SSE 流 |
 
-转写按文件内容识别 WAV PCM16/24/32、WAV float32、MP3、FLAC、OGG Vorbis，不依赖上传的扩展名。多声道平均，流式线性插值重采样至 16 kHz；有效采样率 1..384000 Hz，1..8 声道。WebM / Opus / M4A 返回 415，并列出支持格式。损坏的已支持格式返回 400。空音频或不足 0.1 秒返回 `audio_too_short`；解码时即限制总时长 10 分钟，超过返回 413。
+转写按文件内容识别 WAV PCM16/24/32、WAV float32、MP3、FLAC、OGG Vorbis，不依赖上传的扩展名。多声道平均，流式重采样至 16 kHz：源采样率高于 16 kHz 时先做 Blackman 窗 sinc 低通（截止 7 kHz、过渡带 2 kHz）再取样，9 kHz 以上的成分衰减 80 dB 以上、不会折叠进语音频段，通带内 0.3–6 kHz 幅度误差在 2% 内，不引入时间偏移；不高于 16 kHz 时用线性插值；有效采样率 1..384000 Hz，1..8 声道。WebM / Opus / M4A 返回 415，并列出支持格式。损坏的已支持格式返回 400。空音频或不足 0.1 秒返回 `audio_too_short`；解码时即限制总时长 10 分钟，超过返回 413。
 
 每段不超过后端上限。为让 ±1.5 秒搜索窗口完全落在硬上限内，名义切点设置为 `max_samples - radius`，`radius=min(1.5秒,max_samples/4)`；搜索最低局部均方能量（约 20 ms 窗口），不重叠、不丢采样。`language=zh*` 无分隔拼接，其他情况用空格。`verbose_json` / `srt` / `vtt` 等返回 400 `unsupported_response_format`。
 
@@ -99,7 +99,7 @@ HTTP 错误统一为 `{"error":{"message":"...","type":"invalid_request_error","
 | `converse` | `text`、`voice?`、`max_seconds?` | 先朗读再收听；开始前批准四项能力 |
 | `notify` | `text` | 后台合成/播放，返回 `{"queued":true}`；Synthesize + Speak |
 
-结果同时提供 JSON 文本 content 与 structuredContent。麦克风缺失隐藏 listen / converse；扬声器缺失隐藏 speak / notify / converse；调用隐藏工具返回 JSON-RPC `-32602`。同一时刻只有一个 listen（包括 converse 的整个过程）及一个播放操作；识别槽与 HTTP 转写共用。按任务单并发限制，MCP 的 Busy 返回 HTTP 429、`Retry-After: 2`，正文同时是 `isError:true` 的工具结果，收听忙提示“麦克风正被占用”。stdio 代理保留这个 JSON-RPC 工具结果；直接 HTTP 客户端需读取 429 的正文，部分客户端可能先将其作为传输错误。鉴权/同意拒绝仍是 HTTP 401/403。
+结果同时提供 JSON 文本 content 与 structuredContent。麦克风缺失隐藏 listen / converse；扬声器缺失隐藏 speak / notify / converse；调用隐藏工具返回 JSON-RPC `-32602`。同一时刻只有一个 listen（包括 converse 的整个过程）及一个播放操作；识别槽与 HTTP 转写共用。MCP 的 Busy 是工具层错误：HTTP 200，结果为 `isError:true`，`structuredContent` 里带 `{"busy":true,"retry_after_seconds":2}`，收听忙提示“麦克风正被占用”，扬声器忙提示“扬声器正被占用”。不返回 429，免得 MCP 客户端把它当传输错误而看不到提示。鉴权/同意拒绝仍是 HTTP 401/403。
 
 每个工具整体最多 120 秒（含同意），麦克风单次另有 `max_seconds+5` 秒截止。notify 仅表示已排入后台，失败不会异步通知客户端；持有播放槽防止无限堆积，服务关闭会取消后台工作。静音判定只做空音频/过短或全部样本振幅低于 0.0001 的保底，真实说话检测归麦克风实现。
 
@@ -122,7 +122,7 @@ cargo run --bin xiaoban-voice-mcp-stdio
 - Origin 必须精确命中 `allowed_origins`，无 Origin 放行；从不发送通配 CORS。OPTIONS 默认拒绝；白名单 Origin 的预检只返回许可头、不执行能力。预检本身免 Bearer 以支持浏览器，后续业务请求仍需 Bearer。
 - ClientInfo.name 优先 X-Client-Name，再 User-Agent，再 unknown；缓存键是完整 ClientInfo（含可选 User-Agent）+ Capability。只缓存允许，拒绝下次重问，缓存仅存内存。标签由持令牌的客户端自报，**不是独立的可信身份隔离**。
 - 同意请求串行，排队和询问合计最多 30 秒；重启清空授权缓存。所有相关能力批准前不打开设备。
-- 完整请求体（含 multipart 包装）默认最多 25 MiB；读取最多 30 秒，含 chunked 也受限制。完整请求截止 180 秒；识别/合成单次最多 120 秒。最多 2 个识别，1 个 listen；抢不到立即失败。
+- 完整请求体（含 multipart 包装）默认最多 25 MiB；读取最多 30 秒，含 chunked 也受限制。完整请求截止 180 秒（`/v1/audio/transcriptions` 放宽到 660 秒，因为最长要处理 10 分钟的音频）；识别/合成单次最多 120 秒。最多 2 个识别，1 个 listen；抢不到立即失败。
 - 解码在阻塞线程池，持有识别许可；异步请求被取消时不会提前释放正在解码的许可。解码输出最多 960 万 f32，约 38.4 MB，另有上传正文及编解码器开销。
 - 库不落盘、不出站。stdio 代理仅对本服务发回环请求，是单独的二进制入口。宿主注入的合成/识别实现是否联网由宿主负责。
 - 只产生固定路由标签、状态码、耗时、大小的 tracing 事件，不记录正文、原始路径/查询、身份头、token 或识别文本。宿主额外中间件/后端的日志政策由宿主负责。
@@ -150,7 +150,7 @@ cargo run --bin xiaoban-voice-mcp-stdio
 
 自动测试全部使用假后端及回环 TCP，`cargo test` 一条命令覆盖安全、OpenAI、格式/频率/时长、分段、同意超时、并发、错误映射、日志脱敏、新旧 MCP 和真实 stdio 子进程往返。具体命令、原始输出、curl 实测见 [验收记录](ACCEPTANCE.md)。
 
-- 重采样使用低内存线性插值，**没有抗混叠低通滤波**；适合初步接入，高频内容下采样有混叠风险。需要高保真时可后续替换带滤波的重采样实现。
+- 重采样：源采样率高于 16 kHz 时的低通是 FIR（48 kHz 源约 132 个抽头），长音频在调试构建下较慢（30 秒 48 kHz 约 1.3 秒），发布构建快得多；缓存只保留内核宽度加一个批量。7–8 kHz 之间属于过渡带，该频段的信息会被部分衰减，对语音识别影响可忽略。
 - MP3 由 puremp3 解码；它不保证所有编码器/损坏文件的兼容性，不裁剪编码延迟/padding；总时长边界按解码得到的采样计算。音频整体驻留内存，HTTP 识别不流式返回。
 - 没有真实设备、模型、Edge 网络服务、VoiceMode、Claude Code / Codex 配置端到端测试；仅 Windows x64 实测，未验证 Linux/macOS 编译。
 - 旧版模式不建立会话，也不在服务器保存初始化状态；通知取消不会保证终止宿主自行启动的工作。无后台 notify 成功回执、进度及服务器推送。

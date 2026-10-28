@@ -14,13 +14,59 @@ fn unsupported() -> VoiceError {
     VoiceError::Unsupported("WAV, MP3, FLAC, OGG Vorbis".into())
 }
 
-// Keeps only one previous source sample and the bounded 16 kHz output, even for
-// compressed input. Linear interpolation preserves duration; no anti-alias filter.
+/// 低通截止与过渡带。16 kHz 输出的奈奎斯特是 8 kHz，截止放在 7 kHz，过渡带 2 kHz，
+/// 这样 9 kHz 以上（会折叠进 0–7 kHz 的成分）被压到约 -50 dB 以下。
+const CUTOFF_HZ: f64 = 7000.0;
+const TRANSITION_HZ: f64 = 2000.0;
+/// 分数相位的查表精度：1/512 个源采样。
+const PHASES: usize = 512;
+
+/// 加窗 sinc 内核表（Blackman 窗），只在源采样率高于 16 kHz 时使用。
+struct Kernel {
+    half: usize,
+    taps: Vec<f32>,
+}
+impl Kernel {
+    fn new(rate: u32) -> Self {
+        let half = ((2.75 * rate as f64 / TRANSITION_HZ).ceil() as usize).clamp(8, 512);
+        let wc = CUTOFF_HZ / rate as f64;
+        let mut taps = Vec::with_capacity((PHASES + 1) * 2 * half);
+        for p in 0..=PHASES {
+            let frac = p as f64 / PHASES as f64;
+            for j in 0..2 * half {
+                let d = frac + (half as f64 - 1.0 - j as f64);
+                let x = d / half as f64;
+                let value = if x.abs() >= 1.0 {
+                    0.0
+                } else {
+                    let sinc = if d == 0.0 {
+                        2.0 * wc
+                    } else {
+                        (2.0 * std::f64::consts::PI * wc * d).sin() / (std::f64::consts::PI * d)
+                    };
+                    let window = 0.42
+                        + 0.5 * (std::f64::consts::PI * x).cos()
+                        + 0.08 * (2.0 * std::f64::consts::PI * x).cos();
+                    sinc * window
+                };
+                taps.push(value as f32);
+            }
+        }
+        Self { half, taps }
+    }
+}
+
+// 流式重采样到 16 kHz。源采样率不高于 16 kHz 时用线性插值（只保留上一个采样）；
+// 高于 16 kHz 时先低通再取样（加窗 sinc 内核，只缓存内核宽度内的源采样），避免高频成分折叠进语音频段。
 struct Resampler {
     rate: u32,
     frames: usize,
     previous: f32,
     output: Vec<f32>,
+    kernel: Option<Kernel>,
+    /// 低通路径的源采样缓存：`buffer[0]` 对应源下标 `base`。
+    buffer: Vec<f32>,
+    base: usize,
 }
 impl Resampler {
     fn new(rate: u32, channels: usize) -> Result<Self, VoiceError> {
@@ -32,7 +78,14 @@ impl Resampler {
             frames: 0,
             previous: 0.0,
             output: Vec::new(),
+            kernel: (rate as usize > SAMPLE_RATE).then(|| Kernel::new(rate)),
+            buffer: Vec::new(),
+            base: 0,
         })
+    }
+    fn target_len(&self) -> usize {
+        ((self.frames as u64 * SAMPLE_RATE as u64 + self.rate as u64 / 2) / self.rate as u64)
+            as usize
     }
     fn push(&mut self, sample: f32) -> Result<(), VoiceError> {
         if !sample.is_finite() {
@@ -42,6 +95,12 @@ impl Resampler {
             return Err(VoiceError::TooLong);
         }
         let sample = sample.clamp(-1.0, 1.0);
+        if self.kernel.is_some() {
+            self.buffer.push(sample);
+            self.frames += 1;
+            self.emit(false);
+            return Ok(());
+        }
         let position = self.frames as f64;
         loop {
             let next = self.output.len() as f64 * self.rate as f64 / SAMPLE_RATE as f64;
@@ -56,10 +115,55 @@ impl Resampler {
         self.frames += 1;
         Ok(())
     }
+    /// 低通路径：输出所有“内核已完整落在已收到采样内”的点；`flush` 时把末尾补零直到总长度。
+    fn emit(&mut self, flush: bool) {
+        let Some(kernel) = self.kernel.as_ref() else {
+            return;
+        };
+        let half = kernel.half;
+        let width = 2 * half;
+        let target = self.target_len();
+        let mut keep_from = self.base;
+        loop {
+            let m = self.output.len();
+            if flush && m >= target {
+                break;
+            }
+            let t = m as f64 * self.rate as f64 / SAMPLE_RATE as f64;
+            let i0 = t.floor() as usize;
+            if !flush && i0 + half >= self.frames {
+                break;
+            }
+            let phase = (((t - i0 as f64) * PHASES as f64).round() as usize).min(PHASES);
+            let row = &kernel.taps[phase * width..(phase + 1) * width];
+            let first = i0 as isize - half as isize + 1;
+            let lo = first.max(0) as usize;
+            let hi = ((first + width as isize) as usize).min(self.frames);
+            let mut acc = 0.0f32;
+            if hi > lo {
+                let taps = &row[(lo as isize - first) as usize..(hi as isize - first) as usize];
+                let data = &self.buffer[lo - self.base..hi - self.base];
+                acc = taps.iter().zip(data).map(|(a, b)| a * b).sum();
+            }
+            // 窗函数的过冲可能略超 ±1，输出必须保持在合法范围内。
+            self.output.push(acc.clamp(-1.0, 1.0));
+            keep_from = lo.max(keep_from);
+        }
+        // 成批丢弃已不会再用的源采样，缓存只保留内核宽度加一个批量。
+        if keep_from - self.base > 16_384 {
+            self.buffer.drain(..keep_from - self.base);
+            self.base = keep_from;
+        }
+    }
     fn finish(mut self) -> Pcm {
-        let length =
-            (self.frames as u64 * SAMPLE_RATE as u64 + self.rate as u64 / 2) / self.rate as u64;
-        self.output.resize(length as usize, self.previous);
+        if self.kernel.is_some() {
+            self.emit(true);
+            return Pcm {
+                samples: self.output,
+            };
+        }
+        let length = self.target_len();
+        self.output.resize(length, self.previous);
         Pcm {
             samples: self.output,
         }
