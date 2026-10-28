@@ -20,6 +20,7 @@ describe('compact design workbench',()=>{
  });
  it('patches the selected source element and keeps other boards intact',async()=>{
   const w=await open();w.findComponent(BoardPreview).vm.$emit('message',{type:'select',node:'n0',tag:'H1',text:'源标题'});await flushPromises();
+  await click('属性面板');
   const input=w.findAll('.properties label').find(l=>l.text()==='文字')!.get('input');await input.setValue('手改标题');await input.trigger('change');await flushPromises();
   const save=mocks.invoke.mock.calls.find(([cmd])=>cmd==='design_save')![1];expect(save.project.files['Main.dc.html']).toContain('手改标题');expect(save.project.files['More.dc.html']).toBe(fixture().files['More.dc.html']);expect(save.expectedRevision).toBe(1);
  });
@@ -109,6 +110,22 @@ describe('compact design workbench',()=>{
   await click('创建副本');expect(w.emitted('copied')?.[0]).toEqual([copied.id]);expect(w.text()).toContain('紧凑设计');
   await click('重命名设计稿');await w.get('[aria-label="设计稿名称"]').setValue('新名字');await w.get('form.dialog').trigger('submit');await flushPromises();
   expect(mocks.invoke).toHaveBeenCalledWith('design_save',expect.objectContaining({project:expect.objectContaining({id:fixture().id,title:'新名字'}),expectedRevision:1}));
+ });
+
+ it('deletes a selected element in place, keeps the sidebar closed, and supports undo',async()=>{
+  const w=await open();w.findComponent(BoardPreview).vm.$emit('message',{type:'select',node:'n0',tag:'H1',text:'源标题',nodes:[{node:'n0'}]});await flushPromises();expect(w.find('.properties').exists()).toBe(false);expect(w.find('[aria-label="选中元素操作"]').exists()).toBe(true);
+  await w.get('[aria-label="删除元素"]').trigger('click');await flushPromises();const save=mocks.invoke.mock.calls.find(([cmd])=>cmd==='design_save')![1];expect(save.project.files['Main.dc.html']).not.toContain('<h1');expect(save.project.files['More.dc.html']).toBe(fixture().files['More.dc.html']);await click('撤销');const last=mocks.invoke.mock.calls.filter(([cmd])=>cmd==='design_save').at(-1)![1];expect(last.project.files['Main.dc.html']).toContain('源标题');
+ });
+ it('saves inline text and gesture overrides from the current frame and rejects stale revision edits',async()=>{
+  const w=await open();w.findComponent(BoardPreview).vm.$emit('message',{type:'element-edit',revision:0,action:{type:'delete',ids:['n0']}});await flushPromises();expect(mocks.invoke.mock.calls.some(([cmd])=>cmd==='design_save')).toBe(false);
+  w.findComponent(BoardPreview).vm.$emit('message',{type:'element-edit',revision:1,action:{type:'text',id:'n0',text:'画板里直接改'}});await flushPromises();let save=mocks.invoke.mock.calls.filter(([cmd])=>cmd==='design_save').at(-1)![1];expect(save.project.files['Main.dc.html']).toContain('画板里直接改');
+  w.findComponent(BoardPreview).vm.$emit('message',{type:'element-edit',revision:2,action:{type:'style',patches:[{id:'n0',style:{translate:'24px 10px',width:'220px'}}]}});await flushPromises();save=mocks.invoke.mock.calls.filter(([cmd])=>cmd==='design_save').at(-1)![1];expect(save.project.files['Main.dc.html']).toContain('data-ocd-style');expect(save.project.files['Main.dc.html']).toContain('translate: 24px 10px');expect(save.expectedRevision).toBe(2);
+ });
+ it('does not delete source while editing an input or running the prototype',async()=>{
+  const w=await open();await click('画板源代码');await w.get('.source-dialog textarea').trigger('keydown',{key:'Delete'});expect(mocks.invoke.mock.calls.some(([cmd])=>cmd==='design_save')).toBe(false);await w.get('.source-dialog .actions button').trigger('click');await click('演示原型');w.findComponent(BoardPreview).vm.$emit('message',{type:'element-edit',action:{type:'delete',ids:['n0']}});await flushPromises();expect(mocks.invoke.mock.calls.some(([cmd])=>cmd==='design_save')).toBe(false);
+ });
+ it('inserts source-backed text and selects its stable id after save',async()=>{
+  const w=await open();await w.get('[aria-label="插入元素"]').setValue('text');await flushPromises();const save=mocks.invoke.mock.calls.find(([cmd])=>cmd==='design_save')![1];expect(save.project.files['Main.dc.html']).toContain('双击编辑文字');expect(w.findComponent(BoardPreview).props('selection')?.[0]).toMatch(/^ocd-/);expect(w.findAll('.layer-row')).toHaveLength(2);
  });
 
 });

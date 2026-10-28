@@ -144,7 +144,9 @@
     const wrapper = document.createElement('div');
     wrapper.append(...[...compRoot.childNodes].map(n => n.cloneNode(true)));
     expandChildren(wrapper, compScope, {...ctx, file: resolved || rawSrc, depth: ctx.depth + 1});
-    if (node.hasAttribute('data-ocd-node') && wrapper.firstElementChild && !wrapper.firstElementChild.hasAttribute('data-ocd-node')) {
+    for(const el of wrapper.querySelectorAll('[data-ocd-node]'))el.setAttribute('data-ocd-node','import:'+node.getAttribute('data-ocd-node')+':'+el.getAttribute('data-ocd-node'));
+    for(const el of wrapper.children)el.setAttribute('data-ocd-imported','true');
+    if (node.hasAttribute('data-ocd-node') && wrapper.firstElementChild) {
       wrapper.firstElementChild.setAttribute('data-ocd-node', node.getAttribute('data-ocd-node'));
     }
     node.replaceWith(...wrapper.childNodes);
@@ -189,6 +191,8 @@
     if (hover) { const original = node.getAttribute('style') || ''; node.addEventListener('mouseenter', () => { node.style.cssText = original + ';' + hover; }); node.addEventListener('mouseleave', () => { node.style.cssText = original; }); }
     const active = node.getAttribute('style-active');
     if (active) { const original = node.getAttribute('style') || ''; node.addEventListener('mousedown', () => { node.style.cssText = original + ';' + active; }); node.addEventListener('mouseup', () => { node.style.cssText = original; }); }
+    if(node.hasAttribute('data-ocd-style'))node.style.cssText+=';'+node.getAttribute('data-ocd-style');
+    if(node.getAttribute('data-ocd-hidden')==='true')node.style.setProperty('display','none','important');
     expandChildren(node, scope, ctx);
   }
   function renderPins() {
@@ -218,6 +222,7 @@
       const host = root || document.body, used = new Set([...host.querySelectorAll('[data-ocd-node]')].map(el => el.getAttribute('data-ocd-node'))); let n = 0;
       host.querySelectorAll('*').forEach(el => { if (!el.hasAttribute('data-ocd-node')) { while (used.has('n' + n)) n++; el.setAttribute('data-ocd-node', 'n' + n); used.add('n' + n++); } });
     }
+    window.__OCD_EDITOR_SOURCE__=(root||document.body).cloneNode(true);
     if (root) {
       try {
         const template = root.cloneNode(true), script = document.querySelector('script[data-dc-script]');
@@ -242,7 +247,7 @@
           clone.querySelectorAll('helmet').forEach(h => { for (const n of [...h.children]) { n.setAttribute('data-ocd-helmet', ''); document.head.append(n); } h.remove(); });
           root.replaceChildren(...clone.childNodes);
           if (selection) { const active = [...root.querySelectorAll('[data-ocd-node]')].find(n => n.getAttribute('data-ocd-node') === selection); active?.focus(); if (typeof active?.setSelectionRange === 'function') try { active.setSelectionRange(rangeStart, rangeEnd); } catch {} }
-          renderPins();
+          renderPins();dispatchEvent(new Event('ocd-rendered'));
         };
         render(); mounted = true; instance.componentDidMount?.();
         addEventListener('unload', () => { if (mounted) instance.componentWillUnmount?.(); });
@@ -256,7 +261,7 @@
       send('canvas-wheel',{dx:e.deltaX,dy:e.deltaY,deltaMode:e.deltaMode,ctrl:e.ctrlKey,meta:e.metaKey,shift:e.shiftKey,x:e.clientX,y:e.clientY});
     },{passive:false});
     for (const type of ['keydown','keyup']) document.addEventListener(type,e=>{
-      if(!editing||e.target?.closest?.('input,textarea,select,[contenteditable]'))return;
+      if(window.__OCD_CANVAS_EDITOR__||!editing||e.target?.closest?.('input,textarea,select,[contenteditable]'))return;
       if([' ','+','=','-','0','1'].includes(e.key)){e.preventDefault();send('canvas-key',{key:e.key,down:type==='keydown'});}
     });
     let pan=null;
@@ -266,6 +271,7 @@
     document.addEventListener('click', e => {
       const target = e.target.closest?.('[data-ocd-node]');
       if (editing) {
+        if(window.__OCD_CANVAS_EDITOR__)return;
         e.preventDefault(); e.stopImmediatePropagation();
         if (target) {
           const style = target.getAttribute('style') || '';

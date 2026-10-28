@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use std::{collections::BTreeMap, fs, path::{Component, Path, PathBuf}, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 
 pub const NAME: &str = "open-claude-design";
-pub const RUNTIME: &str = include_str!("../runtime/support.js");
+pub const RUNTIME: &str = concat!(include_str!("../runtime/support.js"),"\n",include_str!("../runtime/editor.js"));
 pub mod archive;
 pub const FORMAT: &str = include_str!("../FORMAT.md");
 const MAX_FILE: usize = 2 * 1024 * 1024;
