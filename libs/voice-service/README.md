@@ -151,7 +151,19 @@ cargo run --bin xiaoban-voice-mcp-stdio
 自动测试全部使用假后端及回环 TCP，`cargo test` 一条命令覆盖安全、OpenAI、格式/频率/时长、分段、同意超时、并发、错误映射、日志脱敏、新旧 MCP 和真实 stdio 子进程往返。具体命令、原始输出、curl 实测见 [验收记录](ACCEPTANCE.md)。
 
 - 重采样：源采样率高于 16 kHz 时的低通是 FIR（48 kHz 源约 132 个抽头），长音频在调试构建下较慢（30 秒 48 kHz 约 1.3 秒），发布构建快得多；缓存只保留内核宽度加一个批量。7–8 kHz 之间属于过渡带，该频段的信息会被部分衰减，对语音识别影响可忽略。
+- 2026-10-28 在 Windows x64 / Rust 1.94.1 上以 release 构建解码 FFmpeg 生成的 10 分钟单声道 16 位静音 FLAC，各次使用独立进程，峰值为进程工作集（含运行时与输入），结果仅代表该机器：
+
+  | 采样率 | 解码耗时 | 峰值工作集 |
+  | --- | ---: | ---: |
+  | 48 kHz | 1.16 秒 | 70.81 MiB |
+  | 96 kHz | 1.78 秒 | 70.11 MiB |
+  | 192 kHz | 3.33 秒 | 71.63 MiB |
+  | 384 kHz | 6.80 秒 | 72.56 MiB |
+
+  例如用 `ffmpeg -f lavfi -i anullsrc=r=48000:cl=mono -t 600 -c:a flac -sample_fmt s16 silence.flac` 生成样本，替换 `48000` 即可测试其他采样率。用 `VOICE_BENCH_FILE` 指向该文件，运行 `cargo test --release --test hostile_audio release_flac_stress_measurement -- --ignored --nocapture` 重测（工作集读取目前仅支持 Windows）。测量值受 CPU 和并发负载影响。
 - MP3 由 puremp3 解码；它不保证所有编码器/损坏文件的兼容性，不裁剪编码延迟/padding；总时长边界按解码得到的采样计算。音频整体驻留内存，HTTP 识别不流式返回。
+- 损坏 MP3 的解码器 panic 在 `panic=unwind` 构建中转换为输入错误；如果宿主使用 `panic=abort`，无法捕获该 panic，恶意文件仍可能终止进程。
+- 请求体读取有 30 秒上限，但当前监听器没有请求头读取超时：实测不完整请求头可保持连接超过 35 秒。由于该服务只允许回环访问，持有本机连接能力的进程仍可占用连接资源；该问题尚未修复。
 - 没有真实设备、模型、Edge 网络服务、VoiceMode、Claude Code / Codex 配置端到端测试；仅 Windows x64 实测，未验证 Linux/macOS 编译。
 - 旧版模式不建立会话，也不在服务器保存初始化状态；通知取消不会保证终止宿主自行启动的工作。无后台 notify 成功回执、进度及服务器推送。
 - 独立 HTTP 请求和 MCP 工具均有截止；无法强制终止不配合取消的宿主推理线程。宿主应自己管理进程、设备占用和真正的 VAD。
