@@ -14,9 +14,11 @@
 | 模块 | 说明 |
 | --- | --- |
 | `:common:webview` | 通用网页外壳 `WebShell`：加载进度、失败重试、返回键、站内外链判定（站外链接交给系统浏览器）、按系统深浅色套用 `WebShellPalette`（系统栏边距与失败页）。基于 compose-webview-multiplatform，目标只有 Android 和 iOS。 |
-| `:business:community` | 社区前台入口 `CommunityApp`：加载 https://chat.xiangban.xyz（周刊、资源、讨论、项目的只读浏览，分享先用网页上的“复制链接”），站内域名只有 chat.xiangban.xyz，配色取自论坛前端的品牌色与黑白灰。对应实施计划的 MA（网页壳）。 |
+| `:business:community` | 社区网页壳（MA，已不被 `:shell` 装配，保留作回退）`CommunityApp`：加载 https://chat.xiangban.xyz（周刊、资源、讨论、项目的只读浏览，分享先用网页上的“复制链接”），站内域名只有 chat.xiangban.xyz，配色取自论坛前端的品牌色与黑白灰。对应实施计划的 MA（网页壳）。 |
+| `:common:community-core` | 社区与账号的网络层和状态逻辑（不依赖 Compose）：`ForumApi`、`AccountApi`（与网页同一组接口）、`SessionManager`（令牌存储、临近过期自动刷新且并发共用一次、仅服务端明确拒绝才登出）、`FeedController`/`DiscussController`/`Loader`、`DesignTokens`（与论坛前端同一套配色圆角）。能在 JVM 上直接跑单元测试：`./gradlew :common:community-core:jvmTest`。账号中心要先登记客户端 `xiaoban-android`。 |
+| `:business:community-native` | 社区原生界面（Compose）：底栏（社区、讨论、小伴占位、我的）、登录/注册、“我的”、信息流与内容包/周刊/项目/帖子详情。平台能力（复制、分享、打开链接）通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。 |
 | `:business:xiaban` | xiaban.xyz 入口 `XiabanApp`：地址、站内域名、与网页一致的浅色/深色配色。 |
-| `:shell` | 装配层，`App()` 目前渲染 `CommunityApp()`（原先是 `XiabanApp()`，该模块保留）。模板自带的 `Greeting`/`Platform` 示例与测试仍在，未使用。 |
+| `:shell` | 装配层，`App(storage, platform)` 渲染 `CommunityNativeApp`；Android 入口传入 `SharedPrefsTokenStorage` 和 `AndroidPlatformActions`（`androidApp/.../AndroidPlatform.kt`），iOS 暂用内存存储。模板自带的 `Greeting`/`Platform` 示例与测试仍在，未使用。 |
 | `:androidApp` `iosApp/` | Android、iOS 入口。 |
 | `desktopApp/` | 桌面壳（Rust，Tauri 2）：`src/main.rs` 建窗口与外链处理，`src/links.rs` 是站内/站外/拦截的判定与单元测试，`ui/index.html` 是启动页（先测网络，通了再进站，不通显示「连不上相伴」和重试按钮）。 |
 
