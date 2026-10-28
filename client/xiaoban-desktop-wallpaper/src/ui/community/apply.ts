@@ -86,6 +86,7 @@ export interface SchemeItem { pack_id: number; kind: string; version?: number }
 
 export function startScheme(title: string, items: SchemeItem[]): number {
   const supported = items.filter(i => SUPPORTED_KINDS.includes(i.kind));
+  trackEvent('desktop_scheme_replicate');
   schemeFlow.title = title;
   schemeFlow.total = supported.length;
   schemeFlow.skipped = items.length - supported.length;
@@ -111,7 +112,14 @@ export function stopScheme() {
   applyFlow.state = { phase: 'idle' };
 }
 
+/** 匿名统计（失败不影响任何操作）：只报事件名和内容类型。 */
+export function trackEvent(name: string, dim?: string) {
+  void (async () => { try { await invoke('community_track', { name, dim: dim ?? null }); } catch { /* 统计失败不影响任何操作 */ } })();
+}
+
 export function closeApply() {
+  // 在确认窗口里取消（没点应用就关掉）算一次“取消”。
+  if (applyFlow.state.phase === 'confirm') trackEvent('desktop_apply_cancel', applyFlow.state.preview.kind);
   applyFlow.state = { phase: 'idle' };
   if (schemeFlow.queue.length) nextInScheme();
   else schemeFlow.total = 0;

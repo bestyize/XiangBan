@@ -12,6 +12,7 @@ import UsersPanel from './UsersPanel.vue'
 import EditorPanel from './EditorPanel.vue'
 import EditorAccounts from './EditorAccounts.vue'
 import CategoriesPanel from './CategoriesPanel.vue'
+import MetricsPanel from './MetricsPanel.vue'
 import ModerationPanel from './ModerationPanel.vue'
 import WordsPanel from './WordsPanel.vue'
 import PacksPanel from './PacksPanel.vue'
@@ -24,6 +25,7 @@ import './admin.css'
 
 const SECTIONS = [
   { key: '', label: '概览', comp: OverviewPanel },
+  { key: 'metrics', label: '数据', comp: MetricsPanel },
   { key: 'reports', label: '举报', comp: ReportsPanel },
   { key: 'topics', label: '帖子', comp: TopicsPanel },
   { key: 'users', label: '用户', comp: UsersPanel },

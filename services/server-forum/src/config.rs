@@ -46,6 +46,8 @@ pub struct AppConfig {
     pub upload_ticket_ttl_secs: i64,
     /// 普通用户每天最多发布的内容包数。
     pub daily_pack_publishes: i64,
+    /// 匿名设备标识的哈希盐。换了盐，旧数据里的设备就无法再对应。
+    pub analytics_salt: Vec<u8>,
 }
 
 const MB: u64 = 1024 * 1024;
@@ -133,6 +135,7 @@ impl AppConfig {
             download_url_ttl_secs: num("FORUM_DOWNLOAD_URL_TTL_SECS", 600).max(60),
             upload_ticket_ttl_secs: num("FORUM_UPLOAD_TICKET_TTL_SECS", 1800).max(60),
             daily_pack_publishes: num("FORUM_DAILY_PACK_PUBLISHES", 5).max(1),
+            analytics_salt: get("FORUM_ANALYTICS_SALT").map(String::into_bytes).unwrap_or_else(|| b"xiaoban-analytics-v1".to_vec()),
         }
     }
 }

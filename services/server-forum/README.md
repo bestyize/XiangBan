@@ -104,6 +104,10 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 `GET /me/notifications?page=&unread=`、`GET /me/notifications/unread`（未读数）、`POST /me/notifications/read`（带 `{ids:[…]}` 标记指定几条，不带请求体全部已读）。事件：别人回复了你的帖子（`reply`）、回复了你的楼层（`reply_to`，和 `reply` 不重复发）、正文里 `@用户名` 提到了你（`mention`，一条最多提 5 人，发帖和回复都算，编辑不重复通知）、你的回答被采纳（`accepted`）、你的内容包审核通过或被拒（`pack_approved`/`pack_rejected`，下架与恢复不通知）。通知在业务事务里写入；自己对自己不通知；屏蔽了对方的人不收到对方带来的通知。标题和摘要是写入时的快照；已读超过 90 天的由定时任务清理。只做站内，没有邮件和系统推送。前台顶栏有铃铛和未读数（登录后每分钟刷新），`/notifications` 是列表页，打开即标记已读。
 
+## 匿名埋点
+
+`POST /events`（匿名，`{device, events:[{name, dim?, count?}]}`，成功一律 204，不合格的事件静默丢弃）。依据 PRD §8.3：设备标识由客户端随机生成，服务端只存加盐 SHA-256（`FORUM_ANALYTICS_SALT`，生产请设置）；事件名和维度（内容类型或来源）都来自白名单（`src/analytics.rs`），不收账号、内容、搜索词、文件名；只存“某设备某天某事件几次”（表 `events_daily`），不保存行为流。后台「数据」页（`GET /admin/metrics`）看每日活跃设备、事件次数与独立设备数、次日留存。网页端在设置页可一键关闭（同时删除本地设备标识），浏览器开启“不跟踪”也不上报；桌面端在社区页关闭。隐私政策已披露。事件：看首页/周刊/项目/内容包/讨论、搜索、点“在小伴中打开”、下载、复制链接、发布开始与完成，以及桌面端的社区页打开、应用确认、成功、取消、方案复刻。暂未做 IP 限流，量大后再加。
+
 ## 业务规则
 
 - 正文是 Markdown，服务端用 pulldown-cmark 渲染、ammonia 清洗后存 `body_html`；外链加 `nofollow ugc`。新人（TL0）的链接和图片会被去掉，只留文字。

@@ -1,4 +1,5 @@
 pub mod admin;
+pub mod analytics;
 pub mod attachments;
 pub mod blocks;
 pub mod content;

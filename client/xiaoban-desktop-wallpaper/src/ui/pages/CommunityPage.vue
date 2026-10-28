@@ -3,7 +3,7 @@ import { onActivated, onMounted, ref } from 'vue';
 import { NAlert, NButton, NSkeleton } from 'naive-ui';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
-import { KIND_LABEL, startApply, startScheme, SUPPORTED_KINDS, TRUST_LABEL, type SchemeItem } from '../community/apply.ts';
+import { KIND_LABEL, startApply, startScheme, SUPPORTED_KINDS, trackEvent, TRUST_LABEL, type SchemeItem } from '../community/apply.ts';
 
 defineOptions({ name: 'CommunityPage' });
 const props = defineProps<{ store: ControlStore }>();
@@ -55,7 +55,13 @@ function open(row: PackRow) { void startApply({ packId: row.id }); }
 function openWeeklyPack(item: WeeklyItem) { if (item.type === 'pack' && item.id) void startApply({ packId: item.id }); }
 const supported = (k: string) => SUPPORTED_KINDS.includes(k);
 
-function refresh() { if (props.store.desktop) { void loadWeekly(); void loadPacks(); } else loading.value = false; }
+const statsOn = ref(true);
+async function loadStats() { try { statsOn.value = await invoke<boolean>('community_analytics_get'); } catch { /* 保持默认显示 */ } }
+async function toggleStats() {
+  const next = !statsOn.value;
+  try { await invoke('community_analytics_set', { on: next }); statsOn.value = next; } catch (e) { props.store.notify(e, 'error'); }
+}
+function refresh() { if (props.store.desktop) { trackEvent('desktop_community_open'); void loadWeekly(); void loadPacks(); void loadStats(); } else loading.value = false; }
 onMounted(refresh);
 onActivated(refresh);
 </script>
@@ -108,6 +114,10 @@ onActivated(refresh);
           <small v-else class="community-tag">请在网页查看</small>
         </li>
       </ul>
+      <p class="community-foot">
+        匿名统计：只记匿名设备做过哪类操作的次数，不关联账号，不记录内容、搜索词和文件名。
+        <button type="button" class="community-link" :aria-pressed="statsOn" @click="toggleStats">{{ statsOn ? '已开启，点击关闭' : '已关闭，点击开启' }}</button>
+      </p>
     </template>
   </section>
 </template>
@@ -128,5 +138,6 @@ h1 { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
 .community-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--xb-line, #eee); }
 .community-main p { margin: 2px 0 0; font-size: 13px; color: var(--xb-text-2, #666); }
 .community-tag { margin-left: 8px; font-size: 12px; color: var(--xb-text-3, #888); }
+.community-foot { margin-top: 20px; font-size: 12px; color: var(--xb-text-3, #888); }
 .community-empty { color: var(--xb-text-3, #888); }
 </style>

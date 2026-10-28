@@ -978,4 +978,15 @@ CREATE TABLE IF NOT EXISTS notifications (
 );
 CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (uid, id DESC);
 CREATE INDEX IF NOT EXISTS notifications_unread_idx ON notifications (uid) WHERE read_at IS NULL;
+
+-- 匿名埋点：某匿名设备某天某事件几次。不记账号、内容、搜索词，不保存行为流。
+CREATE TABLE IF NOT EXISTS events_daily (
+    day    DATE NOT NULL,
+    name   TEXT NOT NULL,
+    dim    TEXT NOT NULL DEFAULT '-',
+    device TEXT NOT NULL,
+    count  INT NOT NULL DEFAULT 1,
+    PRIMARY KEY (day, name, dim, device)
+);
+CREATE INDEX IF NOT EXISTS events_daily_device_idx ON events_daily (device, day);
 "#;

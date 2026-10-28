@@ -287,6 +287,7 @@ export const adminApi = {
   createPack: (body: OfficialPackInput) => request<{ id: number; slug: string }>('POST', '/packs', body),
   reviewPack: (id: number, action: PackReviewAction, note = '') =>
     request<{ id: number; trust_level: number; status: string }>('POST', `/packs/${id}/review`, { action, note }),
+  metrics: (days = 14) => request<Metrics>('GET', `/metrics${qs({ days })}`),
   moderationQueue: () => request<{ items: ModerationRow[] }>('GET', '/moderation'),
   resolveModeration: (id: number, action: 'approve' | 'reject', note = '') =>
     request<{ id: number; status: string }>('POST', `/moderation/${id}/resolve`, { action, note }),
@@ -297,6 +298,12 @@ export const adminApi = {
   weeklyIssues: () => request<{ items: (WeeklyInput & { week: string })[] }>('GET', '/weekly'),
   putProject: (slug: string, body: ProjectInput) => request<{ slug: string }>('PUT', `/projects/${encodeURIComponent(slug)}`, body),
   putWeekly: (week: string, body: WeeklyInput) => request<{ week: string }>('PUT', `/weekly/${encodeURIComponent(week)}`, body),
+}
+
+export interface Metrics {
+  daily_devices: { day: string; devices: number }[]
+  events: { day: string; name: string; dim: string; count: number; devices: number }[]
+  retention: { day: string; devices: number; returned: number }[]
 }
 
 export type PackReviewAction = 'approve' | 'reject' | 'remove' | 'restore'

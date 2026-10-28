@@ -500,6 +500,37 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(items[0]["kind"], "pack_approved");
     assert_eq!(items[0]["pack_id"], id);
 
+    // 匿名埋点：只收白名单事件；设备标识加盐哈希；后台能看到每日设备、事件次数与次日留存。
+    let device = "dev-0123456789abcdef-aaaa";
+    let (s, _) = call(&app, "POST", "/api/events", None, json!({"device": "x", "events": []})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "设备标识不合格");
+    let (s, _) = call(&app, "POST", "/api/events", None, json!({
+        "device": device,
+        "events": [
+            {"name": "view_pack", "dim": "effect"}, {"name": "view_pack", "dim": "effect", "count": 2},
+            {"name": "apply_click", "dim": "effect"}, {"name": "search"},
+            {"name": "view_pack", "dim": "我的文件名.zip"}, {"name": "keylogger"}
+        ]
+    })).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    call(&app, "POST", "/api/events", None, json!({"device": "dev-fedcba9876543210-bbbb", "events": [{"name": "view_pack", "dim": "effect"}]})).await;
+    let (stored,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM events_daily").fetch_one(&pool).await?;
+    assert_eq!(stored, 4, "白名单外的事件和维度被丢掉：view_pack×2 设备、apply_click、search");
+    let (raw,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM events_daily WHERE device = $1").bind(device).fetch_one(&pool).await?;
+    assert_eq!(raw, 0, "库里不存原始设备标识");
+    // 昨天也出现过第一个设备：次日留存 1/2。
+    sqlx::query("INSERT INTO events_daily (day, name, dim, device) SELECT CURRENT_DATE - 1, 'view_home', '-', device FROM events_daily WHERE name = 'search'").execute(&pool).await?;
+    sqlx::query("INSERT INTO events_daily (day, name, dim, device) VALUES (CURRENT_DATE - 1, 'view_home', '-', 'someoneelse')").execute(&pool).await?;
+    let (s, _) = call(&app, "GET", "/api/admin/metrics", Some(&author_t), Value::Null).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, m) = call(&app, "GET", "/api/admin/metrics?days=7", Some(&admin_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    assert_eq!(m["daily_devices"][0]["devices"], 2);
+    let view = m["events"].as_array().unwrap().iter().find(|e| e["name"] == "view_pack").unwrap();
+    assert_eq!((view["count"].as_i64(), view["devices"].as_i64(), view["dim"].as_str()), (Some(4), Some(2), Some("effect")));
+    assert_eq!(m["retention"][0]["devices"], 2);
+    assert_eq!(m["retention"][0]["returned"], 1);
+
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
     Ok(())
 }

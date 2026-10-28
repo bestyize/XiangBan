@@ -19,7 +19,7 @@
 
 侧栏「社区」页只读浏览周刊和热门内容包，网页上的「在小伴中打开」通过 `xiaoban://community/apply/{kind}/{pack_id}?version=&sha256=` 唤起本应用。流程固定为：**下载 → SHA-256 与大小校验（主地址失败回退官方镜像）→ 压缩包结构检查 → 展示内容 → 用户确认 → 才应用**；链接带的 `sha256` 会锁定网页上看到的那一版，版本已更新则拒绝。支持 `effect`（沿用特效包校验，写入特效文件夹）、`reminder`（提醒规则）、`routine`（例行事项：按时只读执行的任务，添加后**默认不启用**，到提醒页确认后再打开）、`task`（任务模板：完整展示提示词、场景和风险，确认后放进新对话的输入框，**不自动发送**）、`goal`（目标模板：确认后填入长期目标表单，由用户自己保存；不携带验证命令）。社区页的「方案」Tab 可以“复刻”别人分享的方案：把里面的内容逐项走同一条确认流程，一次一项，桌面端暂不支持的类型会跳过，已下架的会提示。尚未做：把当前桌面保存成方案并分享。其他类型先提示去网页查看。
 
-下载、校验与压缩包检查在 [`libs/community-packs`](../../libs/community-packs/README.md)，可独立测试；`src-tauri/src/community.rs` 只负责暂存检查结果和落地，命令只允许设置面板调用（`community_*`）。论坛地址随应用内置（`https://chat.xiangban.xyz`），仅调试版可用 `XIAOBAN_COMMUNITY_URL` 指向本机。
+**匿名统计**：社区页会上报匿名使用次数（随机设备标识、固定事件名、至多一个内容类型，不含账号、内容、搜索词和文件名），社区页底部一键关闭，关闭同时删除本地设备标识；见论坛隐私政策。下载、校验与压缩包检查在 [`libs/community-packs`](../../libs/community-packs/README.md)，可独立测试；`src-tauri/src/community.rs` 只负责暂存检查结果和落地，命令只允许设置面板调用（`community_*`）。论坛地址随应用内置（`https://chat.xiangban.xyz`），仅调试版可用 `XIAOBAN_COMMUNITY_URL` 指向本机。
 
 验证：`npx vitest run src/ui/community`；`cargo test --manifest-path ../../libs/community-packs/Cargo.toml`。`src-tauri` 里的 Rust 改动（`community.rs`、`reminders::import_rules`、`main.rs` 的链接分流）需要在 Windows / macOS 上完整编译确认，Linux 云端环境缺少 GTK/WebKit 无法编译整个应用。
 
