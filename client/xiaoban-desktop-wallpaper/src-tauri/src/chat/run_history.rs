@@ -167,10 +167,31 @@ pub(super) fn latest_events(
         if record.session_id != session || record.parent_run_id.is_some() { return; }
         sequence = record.sequence;
         if let RunEventBody::Event { event } = record.body {
-            events.push(json!({"session":session,"runId":run,"sequence":record.sequence,"event":event}));
+            let next = json!({"session":session,"runId":run,"sequence":record.sequence,"event":event});
+            push_snapshot_event(&mut events, next);
         }
     })?;
     Ok((Some(run), sequence, events))
+}
+
+// A model may stream tens of thousands of tiny deltas. Coalesce only adjacent
+// deltas of the same kind; tool and message boundaries must stay in order.
+fn push_snapshot_event(events: &mut Vec<Value>, next: Value) {
+    let ty = next["event"]["type"].as_str();
+    if matches!(ty, Some("text_delta" | "reasoning_delta")) {
+        if let Some(last) = events.last_mut() {
+            if last["event"]["type"].as_str() == ty
+                && (ty != Some("reasoning_delta") || last["event"]["kind"] == next["event"]["kind"])
+            {
+                if let (Value::String(old), Some(text)) = (&mut last["event"]["text"], next["event"]["text"].as_str()) {
+                    old.push_str(text);
+                    last["sequence"] = next["sequence"].clone();
+                    return;
+                }
+            }
+        }
+    }
+    events.push(next);
 }
 
 pub(super) fn snapshot_projection(
@@ -208,6 +229,28 @@ pub(super) fn snapshot_projection(
 mod tests {
     use super::*;
     use agent_kernel::RunState;
+
+    #[test]
+    fn snapshot_coalesces_deltas_without_crossing_boundaries() {
+        let mut events = Vec::new();
+        for (seq, event) in [
+            (1, json!({"type":"reasoning_delta","kind":"summary","text":"a"})),
+            (2, json!({"type":"reasoning_delta","kind":"summary","text":"b"})),
+            (3, json!({"type":"reasoning_delta","kind":"text","text":"c"})),
+            (4, json!({"type":"tool_start","id":"x","name":"read_file"})),
+            (5, json!({"type":"text_delta","text":"d"})),
+            (6, json!({"type":"text_delta","text":"e"})),
+        ] {
+            push_snapshot_event(&mut events, json!({"sequence":seq,"event":event}));
+        }
+        assert_eq!(events.len(), 4);
+        assert_eq!(events[0]["event"]["text"], "ab");
+        assert_eq!(events[0]["sequence"], 2);
+        assert_eq!(events[1]["event"]["text"], "c");
+        assert_eq!(events[2]["event"]["type"], "tool_start");
+        assert_eq!(events[3]["event"]["text"], "de");
+        assert_eq!(events[3]["sequence"], 6);
+    }
 
     #[test]
     fn snapshot_replays_follow_up_in_its_original_position() {

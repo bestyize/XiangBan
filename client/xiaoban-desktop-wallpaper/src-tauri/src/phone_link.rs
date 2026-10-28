@@ -1056,6 +1056,91 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
     }
 }
 
+pub fn observe_delegation_event(app: &tauri::AppHandle, event: &agent_bridge::observer::ObservedEvent) {
+    let Some(state) = app.try_state::<PhoneLinkState>() else { return };
+    let (link, subs) = {
+        let guard = lock(&state.inner);
+        let Some(link) = guard.link.clone() else { return };
+        (link, guard.subscriptions.clone())
+    };
+    let send_to_session = |session: &str, msg: &Value, notify: bool| {
+        let Ok(bytes) = serde_json::to_vec(msg) else { return };
+        for peer in link.peers() {
+            let subscribed = subs.get(&peer.id).is_none_or(|set| set.is_empty() || set.contains(session));
+            if (peer.online && subscribed) || notify {
+                let _ = link.send(&peer.id, &bytes, notify);
+            }
+        }
+    };
+    match event {
+        agent_bridge::observer::ObservedEvent::SessionStarted { .. } => {
+            if let Ok(page) = crate::chat::remote_sessions_list(app, 50, None) {
+                if let Some(items) = page.get("items") {
+                    broadcast_json(&link, &json!({
+                        "t": "sessions.changed",
+                        "id": state.next_msg_id(),
+                        "items": items,
+                    }), false);
+                }
+            }
+        }
+        agent_bridge::observer::ObservedEvent::ToolStarted { session_id, tool_name, summary } => {
+            send_to_session(session_id, &json!({
+                "t": "event",
+                "id": state.next_msg_id(),
+                "session": session_id,
+                "kind": "tool.start",
+                "data": { "name": tool_name, "arguments": summary },
+            }), false);
+        }
+        agent_bridge::observer::ObservedEvent::ToolFinished { session_id, tool_name, ok, preview } => {
+            send_to_session(session_id, &json!({
+                "t": "event",
+                "id": state.next_msg_id(),
+                "session": session_id,
+                "kind": "tool.end",
+                "data": { "name": tool_name, "is_error": !ok, "output": preview },
+            }), false);
+        }
+        agent_bridge::observer::ObservedEvent::PermissionRequested { session_id, request_id, tool_name, detail, risk } => {
+            let title = format!("允许外部任务执行 {tool_name}？");
+            lock(&state.inner).open_approvals.insert(request_id.clone(), session_id.clone());
+            broadcast_json(&link, &json!({
+                "t": "approval.request",
+                "id": state.next_msg_id(),
+                "approval_id": request_id,
+                "session": session_id,
+                "title": title,
+                "detail": { "task_id": session_id, "detail": detail },
+                "risk": risk,
+                "options": [
+                    { "id": "allow", "label": "允许" },
+                    { "id": "deny", "label": "拒绝" }
+                ],
+            }), true);
+        }
+        agent_bridge::observer::ObservedEvent::TaskCompleted { session_id, summary, success } => {
+            send_to_session(session_id, &json!({
+                "t": "event",
+                "id": state.next_msg_id(),
+                "session": session_id,
+                "kind": if *success { "turn.done" } else { "error" },
+                "data": { "message": summary },
+            }), true);
+            if let Ok(page) = crate::chat::remote_sessions_list(app, 50, None) {
+                if let Some(items) = page.get("items") {
+                    broadcast_json(&link, &json!({
+                        "t": "sessions.changed",
+                        "id": state.next_msg_id(),
+                        "items": items,
+                    }), false);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 // ───────────── Tauri 命令 ─────────────
 
 #[tauri::command]

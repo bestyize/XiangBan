@@ -180,6 +180,7 @@ fn start_broadcast_listener(app: &tauri::AppHandle) {
         let Some(chat_state) = handle.try_state::<crate::chat::ChatState>() else { return };
         let mut rx = chat_state.delegation.hub().subscribe();
         while let Ok(event) = rx.recv().await {
+            crate::phone_link::observe_delegation_event(&handle, &event);
             if let Some(announcement) = event.announcement() {
                 let cfg = load_config(&handle);
                 if cfg.speech_broadcast {

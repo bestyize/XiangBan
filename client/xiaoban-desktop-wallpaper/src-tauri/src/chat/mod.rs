@@ -1099,7 +1099,12 @@ pub fn chat_load_session(app: tauri::AppHandle, window: tauri::WebviewWindow, se
 /// A cursor and a projection from the same run trace. Persisted messages after
 /// the run's user input are replaced by that trace, never combined twice.
 #[tauri::command]
-pub fn chat_session_snapshot(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Value, String> {
+pub async fn chat_session_snapshot(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || chat_session_snapshot_blocking(app, window, session_id))
+        .await.map_err(|e| format!("读取对话快照失败：{e}"))?
+}
+
+fn chat_session_snapshot_blocking(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Value, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
     let _ = chat_load_session(app.clone(), window, session_id.clone())?;
@@ -2120,27 +2125,79 @@ pub(crate) fn remote_sessions_list(app: &tauri::AppHandle, limit: usize, cursor:
     let limit = limit.clamp(1, 100);
     let running: std::collections::HashSet<String> = lock(&app.state::<ChatState>().runs).keys().cloned().collect();
     let all = list(app)?;
+
+    let mut items: Vec<Value> = Vec::new();
+    // 1. 外部 Agent 委派任务（Claude Code / Codex）
+    let delegation_tasks = app.state::<ChatState>().delegation.list();
+    for task in delegation_tasks {
+        let is_running = task.status == agent_bridge::delegation::DelegationStatus::Running;
+        let prefix = if task.agent == "claude" { "[Claude Code]" } else { "[Codex]" };
+        items.push(json!({
+            "id": task.task_id,
+            "title": format!("{prefix} {}", task.prompt),
+            "updated_at": task.started_at_ms / 1000,
+            "state": if is_running { "running" } else { "idle" },
+            "externalAgent": task.agent,
+        }));
+    }
+
+    // 2. 本机小伴会话
+    for s in all {
+        items.push(json!({
+            "id": s.id,
+            "title": s.title,
+            "updated_at": s.updated_at,
+            "state": if running.contains(&s.id) { "running" } else { "idle" },
+        }));
+    }
+    items.sort_by(|a, b| b["updated_at"].as_i64().cmp(&a["updated_at"].as_i64()));
+
     let start = match cursor {
-        Some(c) if !c.is_empty() => all.iter().position(|s| s.id == c).map_or(0, |i| i + 1),
+        Some(c) if !c.is_empty() => items.iter().position(|s| s["id"] == c).map_or(0, |i| i + 1),
         _ => 0,
     };
-    let slice: Vec<_> = all.into_iter().skip(start).take(limit).collect();
-    let next_cursor = if slice.len() == limit { slice.last().map(|s| s.id.clone()) } else { None };
-    let items: Vec<Value> = slice
-        .into_iter()
-        .map(|s| {
-            json!({
-                "id": s.id,
-                "title": s.title,
-                "updated_at": s.updated_at,
-                "state": if running.contains(&s.id) { "running" } else { "idle" },
-            })
-        })
-        .collect();
-    Ok(json!({ "items": items, "cursor": next_cursor }))
+    let slice: Vec<_> = items.into_iter().skip(start).take(limit).collect();
+    let next_cursor = if slice.len() == limit { slice.last().and_then(|s| s["id"].as_str().map(str::to_string)) } else { None };
+    Ok(json!({ "items": slice, "cursor": next_cursor }))
 }
 
 pub(crate) fn remote_session_snapshot(app: &tauri::AppHandle, session_id: &str, after: Option<usize>) -> Result<Value, String> {
+    if session_id.starts_with("del-") {
+        let task = app.state::<ChatState>().delegation.status(session_id)
+            .ok_or_else(|| format!("未找到委派任务 {session_id}"))?;
+        let is_running = task.status == agent_bridge::delegation::DelegationStatus::Running;
+        let mut messages = Vec::new();
+        messages.push(Message::user(user_parts(&task.prompt, &[])));
+        if !task.recent_output.trim().is_empty() {
+            messages.push(Message::assistant(task.recent_output.clone(), Vec::new()));
+        }
+        let total = messages.len();
+        let skip = after.unwrap_or(0).min(total);
+        let slice: Vec<Message> = messages.into_iter().skip(skip).collect();
+
+        let pending = if let Some(approval) = task.pending_approval {
+            json!({
+                "approvals": [{
+                    "id": format!("{session_id}:approval"),
+                    "tool": format!("外部 Agent ({}) 权限确认", task.agent),
+                    "danger": approval,
+                    "arguments": { "task_id": session_id, "detail": approval }
+                }],
+                "questions": []
+            })
+        } else {
+            json!({ "approvals": [], "questions": [] })
+        };
+
+        return Ok(json!({
+            "session": session_id,
+            "messages": slice,
+            "state": if is_running { "running" } else { "idle" },
+            "pending": pending,
+            "cursor": total,
+        }));
+    }
+
     checked_session_id(session_id)?;
     let dirs = Dirs::of(app)?;
     let messages = JsonlStore::new(dirs.sessions()).load(session_id).map_err(|e| e.to_string())?;
@@ -2169,6 +2226,21 @@ pub(crate) fn remote_send_message(
     let text = text.trim();
     if text.is_empty() {
         return Err("请先输入内容".into());
+    }
+    if let Some(sid) = session_id {
+        if sid.starts_with("del-") {
+            let task = app.state::<ChatState>().delegation.status(sid)
+                .ok_or_else(|| format!("未找到委派任务 {sid}"))?;
+            let ws = PathBuf::from(&task.workspace);
+            let summary = tauri::async_runtime::block_on(async {
+                app.state::<ChatState>().delegation.delegate(&task.agent, text, &ws).await
+            })?;
+            return Ok(json!({
+                "client_id": client_id,
+                "session": summary.task_id,
+                "message_id": format!("{}-1", summary.task_id),
+            }));
+        }
     }
     let sid = match session_id {
         Some(id) if !id.is_empty() => {
@@ -2212,6 +2284,15 @@ pub(crate) fn remote_send_message(
 }
 
 pub(crate) fn remote_answer_approval(app: &tauri::AppHandle, approval_id: &str, choice: &str) -> Result<(), String> {
+    if approval_id.starts_with("del-") || approval_id.starts_with("req-") {
+        let task_id = approval_id.split(':').next().unwrap_or(approval_id);
+        let decision = match choice {
+            "once" | "approve" | "allow" => "allow",
+            _ => "deny",
+        };
+        return app.state::<ChatState>().delegation.approve(task_id, approval_id, decision);
+    }
+
     let state = app.state::<ChatState>();
     if approval_id.starts_with('a') {
         let decision = match choice {

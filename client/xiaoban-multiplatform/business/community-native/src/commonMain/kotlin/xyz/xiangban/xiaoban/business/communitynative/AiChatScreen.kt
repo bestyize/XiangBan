@@ -318,6 +318,9 @@ private fun RemoteChatView(
     }
 
     // 电脑在线：展示会话切换栏、会话内容、工具进度、审批卡片与输入框
+    val currentSession = state.sessions.firstOrNull { it.id == state.selectedSessionId }
+    val isDelegated = state.selectedSessionId?.startsWith("del-") == true || currentSession?.title?.startsWith("[") == true
+
     Column(Modifier.fillMaxSize()) {
         // 会话切换栏
         RemoteSessionsBar(
@@ -330,11 +333,35 @@ private fun RemoteChatView(
         )
         Hairline()
 
+        if (isDelegated && currentSession != null) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+                    .padding(horizontal = Gutter, vertical = 8.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        "外部 Coding Agent · ${currentSession.title}",
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Brand,
+                    )
+                    Text(
+                        if (currentSession.state == "running") "后台执行中…" else "已结束",
+                        fontSize = 12.sp,
+                        color = LocalExtraColors.current.ink3,
+                    )
+                }
+            }
+            Hairline()
+        }
+
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (state.messages.isEmpty()) {
                 Box(Modifier.fillMaxSize().padding(Gutter), contentAlignment = Alignment.Center) {
                     Text(
-                        if (state.selectedSessionId == null) "新电脑对话：发一条消息，电脑端将新建会话并执行" else "该会话暂无消息，直接发送开始提问",
+                        if (state.selectedSessionId == null) "新电脑对话：发一条消息，电脑端将新建会话并执行" else if (isDelegated) "正在连接并读取外部 Agent 运行输出…" else "该会话暂无消息，直接发送开始提问",
                         color = LocalExtraColors.current.ink3,
                         fontSize = 13.sp,
                     )
@@ -366,7 +393,7 @@ private fun RemoteChatView(
             input = input,
             onInputChange = onInputChange,
             sending = state.sending,
-            placeholder = "发给电脑小伴…",
+            placeholder = if (isDelegated) "给外部 Agent 补充指令…" else "发给电脑小伴…",
             onSend = {
                 val text = input.trim()
                 if (text.isNotEmpty()) {
