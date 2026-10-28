@@ -18,7 +18,9 @@ import ChatReasoning from '../chat/ChatReasoning.vue';
 import ChatReasoningGroup from '../chat/ChatReasoningGroup.vue';
 import { groupReasoning } from '../chat/reasoning-group.ts';
 import ChatGoalPanel from '../chat/ChatGoalPanel.vue';
-import ChatConnectorRequest from '../chat/ChatConnectorRequest.vue';
+import ChatQuestion from '../chat/ChatQuestion.vue';
+import ChatAnswered from '../chat/ChatAnswered.vue';
+import { askRecords } from '../chat/ask-record.ts';
 import GuideModal from '../components/GuideModal.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
 import SelectionCopyMenu from '../chat/SelectionCopyMenu.vue';
@@ -110,8 +112,6 @@ function openAiSettings() { modelDialog.value = false; closeMore(); props.store.
 
 const scroller = ref<HTMLElement | null>(null);
 const stick = ref(true);
-const answerText = ref('');
-const composing = ref(false);
 const preview = ref<string | null>(null);
 const examples = ['帮我看看工作目录里有什么，整理一份清单', '把壁纸换成一张安静的风景', '每天下午三点提醒我喝水', '查一下今天是几号，再告诉我这周还剩几天'];
 const exampleTags = ['工作区', '壁纸', '关怀', '日常'];
@@ -356,7 +356,7 @@ watch(() => chat.currentId, () => { processBlockId.value = null; planEditorOpen.
 
 /* ── Asking the user ─────────────────────────────────────────────────── */
 const decide = (request: ApprovalRequest, decision: ApprovalDecision) => chat.answerApproval(request, decision);
-function answer(request: QuestionRequest, value: string | null) { answerText.value = ''; return chat.answerQuestion(request, value); }
+function answer(request: QuestionRequest, value: string | null) { return chat.answerQuestion(request, value); }
 
 async function openLink(href: string) {
   const url = href.split('#')[0];
@@ -479,6 +479,7 @@ async function openLink(href: string) {
                 <header v-if="speaks(block)" class="reply-head"><span class="brand-mark" aria-hidden="true"><Sprout :size="14" :stroke-width="2.2" /></span><b>小伴</b></header>
                 <ChatTaskCard v-if="progressOf(block)" :progress="progressOf(block)!" :calls="block.calls" :current="block.id === lastBlockId" :show-logs="!chat.hideToolCalls" :disabled="planRevisionBusy" :configured="chat.configured" @logs="showTaskProcess(block)" @adjust="adjustPlan(block)" @resume="resumeTask" @stop="chat.cancel()" @attention="showTaskAttention" />
                 <ChatActivity v-else-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === lastBlockId" :waiting="waiting && block.id === lastBlockId" :status="block.id === lastBlockId ? statusLine : ''" />
+                <ChatAnswered v-for="record in askRecords(block.calls)" :key="record.id" :record="record" />
                 <template v-for="item in groupReasoning(block.items)" :key="item.id">
                   <ChatReasoningGroup v-if="item.kind === 'reasoning-group'" :group="item" />
                   <ChatReasoning v-else-if="item.kind === 'reasoning'" :text="item.text" :reasoning-kind="item.reasoningKind" :streaming="item.streaming" />
@@ -535,17 +536,7 @@ async function openLink(href: string) {
               </footer>
             </section>
 
-            <section v-for="request in view.questions" :key="request.id" class="card question" data-testid="chat-question" role="alertdialog" aria-label="小伴想问你">
-              <header><span>{{ request.question }}</span></header>
-              <ChatConnectorRequest v-if="request.connectors" :request="request" @answer="answer(request, $event)" />
-              <div v-else-if="request.options.length" class="options"><NButton v-for="(option, n) in request.options" :key="option" size="small" :data-testid="`question-option-${n}`" @click="answer(request, option)">{{ option }}</NButton></div>
-              <footer v-if="!request.connectors" @compositionstart="composing = true" @compositionend="composing = false">
-                <button type="button" class="xb-link" :disabled="running" @click="chooseModel()">切换模型</button>
-                <NInput v-model:value="answerText" size="small" placeholder="或者自己回答" data-testid="question-input" @keydown.enter="!isImeEnter($event, composing) && answerText.trim() && answer(request, answerText)" />
-                <NButton type="primary" size="small" :disabled="!answerText.trim()" data-testid="question-submit" @click="answer(request, answerText)">回答</NButton>
-                <NButton size="small" quaternary data-testid="question-skip" @click="answer(request, null)">跳过</NButton>
-              </footer>
-            </section>
+            <ChatQuestion v-for="request in view.questions" :key="request.id" :request="request" @answer="answer(request, $event)" />
 
             <p v-if="statusLine && (chat.hideToolCalls || !blocks.at(-1)?.calls.length)" class="status-line" data-testid="chat-status"><LoaderCircle class="spin" :size="14" />{{ statusLine }}</p>
           </template>

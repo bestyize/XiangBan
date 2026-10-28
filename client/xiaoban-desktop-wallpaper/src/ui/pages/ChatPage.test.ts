@@ -657,7 +657,7 @@ describe('asking the user', () => {
 
     h.emit('chat-question', { id: 'q2', session: 's1', question: '叫什么名字？', options: [] });
     await flushPromises();
-    const input = q('question-input')!.querySelector('input')!;
+    const input = q<HTMLInputElement>('question-input')!;
     input.value = '周报';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     await flushPromises();
@@ -668,6 +668,35 @@ describe('asking the user', () => {
     await flushPromises();
     await click('question-skip');
     expect(h.calls.at(-1)).toEqual(['chat_answer_question', { id: 'q3', answer: null }]);
+  });
+
+  it('answers a question from the keyboard: number keys, Enter in the input and Esc', async () => {
+    const h = await running();
+    const press = async (target: Element, key: string) => { target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })); await flushPromises(); };
+    h.emit('chat-question', { id: 'k1', session: 's1', question: '文件放哪里？', options: ['桌面', '文档'] });
+    await flushPromises();
+    await press(q('chat-question')!, '2');
+    expect(h.calls.at(-1)).toEqual(['chat_answer_question', { id: 'k1', answer: '文档' }]);
+
+    h.emit('chat-question', { id: 'k2', session: 's1', question: '叫什么名字？', options: ['周报'] });
+    await flushPromises();
+    const input = q<HTMLInputElement>('question-input')!;
+    input.value = '2';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await press(input, '2');
+    expect(h.calls.at(-1)).toEqual(['chat_answer_question', { id: 'k1', answer: '文档' }]);
+    await press(input, 'Escape');
+    expect(input.value).toBe('');
+    expect(h.calls.at(-1)).toEqual(['chat_answer_question', { id: 'k1', answer: '文档' }]);
+    input.value = '月报';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await press(input, 'Enter');
+    expect(h.calls.at(-1)).toEqual(['chat_answer_question', { id: 'k2', answer: '月报' }]);
+
+    h.emit('chat-question', { id: 'k3', session: 's1', question: '继续吗？', options: [] });
+    await flushPromises();
+    await press(q('chat-question')!, 'Escape');
+    expect(h.calls.at(-1)).toEqual(['chat_answer_question', { id: 'k3', answer: null }]);
   });
 
   it('removes the cards when the answer ends without waiting for them', async () => {
