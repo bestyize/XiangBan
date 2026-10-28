@@ -52,7 +52,7 @@ pub fn tools(
     let delegate_tool = SimpleTool {
         spec: ToolSpec::new(
             "agent_delegate",
-            "把编程任务委派给本机已安装的外部 Coding Agent（Claude Code 或 Codex）在后台独立执行。当用户要求用 Claude Code / Codex、排查复杂 Bug、修测试、看大型项目或跑长任务时使用本工具。agent: claude 或 codex，也可填 auto 自动选择；prompt: 具体的任务提示词；workspace: 可选的工作目录路径，默认使用当前对话工作区。",
+            "把编程任务委派给本机已安装的外部 Coding Agent（Claude Code 或 Codex）在后台独立执行。当用户要求用 Claude Code / Codex、排查复杂 Bug、修测试、看大型项目或跑长任务时使用本工具。agent: claude 或 codex，也可填 auto 自动选择；prompt: 具体的任务提示词；workspace: 可选的工作目录路径，默认使用当前对话工作区。权限：Claude Code 默认只能读文件，要写文件或执行命令时会暂停，等用户批准后才继续（agent_status 会给出 pendingApprovalId，用户也可以在手机上批准）；Codex 目前只读。",
             json!({
                 "type": "object",
                 "properties": {
@@ -129,6 +129,7 @@ pub fn tools(
                 "status": summary.status,
                 "recentOutput": summary.recent_output,
                 "pendingApproval": summary.pending_approval,
+                "pendingApprovalId": summary.pending_approval_id,
                 "sessionId": summary.session_id,
             }).to_string())
         }),
@@ -138,7 +139,7 @@ pub fn tools(
     let approve_tool = SimpleTool {
         spec: ToolSpec::new(
             "agent_approve",
-            "为后台外部 Agent 的待确认操作提交允许或拒绝决定。task_id: 委派任务编号；approval_id: 待审批编号；decision: allow（允许）或 deny（拒绝）。",
+            "为后台外部 Agent 的待确认操作提交允许或拒绝决定。task_id: 委派任务编号；approval_id: 待审批编号（agent_status 返回的 pendingApprovalId）；decision: allow（允许）或 deny（拒绝）。",
             json!({
                 "type": "object",
                 "properties": {

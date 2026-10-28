@@ -31,7 +31,7 @@ async fn request_timeout_is_reported() {
     ));
 }
 #[tokio::test]
-async fn claude_fails_closed_while_hooks_are_unverified() {
+async fn claude_reports_a_missing_executable_and_rejects_relative_directories() {
     let a = ClaudeCode::new("missing-claude");
     let result = a
         .resume(
@@ -40,7 +40,11 @@ async fn claude_fails_closed_while_hooks_are_unverified() {
             PermissionProfile::Strict,
         )
         .await;
-    assert!(matches!(result, Err(BridgeError::Unsupported)));
+    assert!(matches!(result, Err(BridgeError::NotInstalled)));
+    let relative = a
+        .resume("x", Path::new("relative"), PermissionProfile::Strict)
+        .await;
+    assert!(matches!(relative, Err(BridgeError::InvalidArgument)));
 }
 #[test]
 fn risk_examples() {

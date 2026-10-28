@@ -2176,10 +2176,10 @@ pub(crate) fn remote_session_snapshot(app: &tauri::AppHandle, session_id: &str, 
         let after = after.unwrap_or(0).min(raw.len());
         let page = crate::phone_wire::snapshot_page(&raw, after, crate::phone_wire::SNAPSHOT_PAGE_BYTES);
 
-        let pending = if let Some(approval) = task.pending_approval {
+        let pending = if let (Some(approval), Some(approval_id)) = (task.pending_approval, task.pending_approval_id) {
             json!({
                 "approvals": [{
-                    "id": format!("{session_id}:approval"),
+                    "id": approval_id,
                     "tool": format!("外部 Agent ({}) 权限确认", task.agent),
                     "danger": approval,
                     "arguments": { "task_id": session_id, "detail": approval }

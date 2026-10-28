@@ -1,6 +1,6 @@
 name: Desktop Agent Platform Tests
 
-# Runs the agent kernel and the desktop app's Rust tests on real Windows and macOS: shell quoting and environment,
+# Runs the agent kernel, the phone-link / agent libraries and the desktop app's Rust tests on real Windows and macOS: shell quoting and environment,
 # CRLF and GBK file edits, the macOS Seatbelt sandbox and the Windows low-integrity sandbox (tests/os_sandbox.rs),
 # none of which a Linux run can exercise. Manual only, as every workflow in this repository: run it from the Actions tab.
 on:
@@ -50,3 +50,37 @@ jobs:
         run: mkdir -p client/xiaoban-desktop-wallpaper/src-tauri/resources/computer-use
       - name: Desktop Rust tests
         run: cargo test --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml --no-fail-fast
+      # The phone-link secrets go to the real Windows Credential Manager / macOS Keychain; this is the only place the
+      # `security -i` write path is exercised on a real Mac. Kept apart so a locked CI keychain shows up on its own.
+      - name: Phone link keystore round trip (real OS keystore)
+        run: cargo test --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml os_backend -- --ignored --nocapture
+
+  libs:
+    name: Phone link and agent libraries (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            libs/link-protocol
+            libs/link-client
+            libs/agent-bridge
+            libs/agent-hooks
+            libs/voice-service
+      - name: link-protocol
+        run: cargo test --manifest-path libs/link-protocol/Cargo.toml --no-fail-fast
+      - name: link-client
+        run: cargo test --manifest-path libs/link-client/Cargo.toml --no-fail-fast
+      - name: agent-bridge
+        run: cargo test --manifest-path libs/agent-bridge/Cargo.toml --no-fail-fast
+      - name: agent-hooks
+        run: cargo test --manifest-path libs/agent-hooks/Cargo.toml --no-fail-fast
+      - name: voice-service
+        run: cargo test --manifest-path libs/voice-service/Cargo.toml --no-fail-fast

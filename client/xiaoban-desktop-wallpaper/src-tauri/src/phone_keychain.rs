@@ -533,6 +533,23 @@ mod tests {
         let _ = fs::remove_dir_all(file.parent().unwrap());
     }
 
+    /// 真实系统钥匙串（Windows 凭据管理器 / macOS Keychain）的往返。默认不跑，CI 的 Windows、macOS 机器上用
+    /// `cargo test os_backend -- --ignored` 显式运行；Linux 上走进程内存实现，也应通过。
+    #[test]
+    #[ignore = "触碰真实系统钥匙串，只在平台测试工作流里显式运行"]
+    fn os_backend_round_trips_with_the_real_keystore() {
+        let service = format!("xyz.xiaban.test.link.{}", std::process::id());
+        let backend = OsBackend;
+        let account = "device:dsk_ci";
+        assert_eq!(backend.get(&service, account).unwrap(), None, "新条目应为缺失而不是错误");
+        backend.set(&service, account, "AbC-_=+/.9").unwrap();
+        assert_eq!(backend.get(&service, account).unwrap().as_deref(), Some("AbC-_=+/.9"));
+        backend.set(&service, account, "second_value-2").unwrap();
+        assert_eq!(backend.get(&service, account).unwrap().as_deref(), Some("second_value-2"), "覆盖写入");
+        backend.delete(&service, account);
+        assert_eq!(backend.get(&service, account).unwrap(), None);
+    }
+
     #[test]
     fn macos_command_keeps_the_secret_out_of_shell_syntax() {
         let line = macos_add_command("xyz.x.link", "device:dsk_1", "AbC-_=+/.9").unwrap();
