@@ -219,3 +219,47 @@ pub async fn community_apply(app: tauri::AppHandle, window: tauri::WebviewWindow
         Ok(result)
     }).await.map_err(|e| e.to_string())?
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_community_deep_links() {
+        let sha = "a".repeat(64);
+        let link_url = format!("xiaoban://community/apply/effect/7?version=2&sha256={sha}");
+        let parsed = community::parse_link(&link_url).unwrap();
+        let json = parsed.to_json();
+        assert_eq!(json["action"], "apply");
+        assert_eq!(json["kind"], "effect");
+        assert_eq!(json["packId"], 7);
+        assert_eq!(json["version"], 2);
+        assert_eq!(json["sha256"], sha);
+
+        let open_url = "xiaoban://community/open/weekly/2026-W44";
+        let open_parsed = community::parse_link(open_url).unwrap();
+        let open_json = open_parsed.to_json();
+        assert_eq!(open_json["action"], "open");
+        assert_eq!(open_json["target"], "weekly");
+        assert_eq!(open_json["id"], "2026-W44");
+
+        assert!(community::parse_link("xiaoban://other/path").is_err());
+        assert!(community::parse_link("https://chat.xiangban.xyz").is_err());
+    }
+
+    #[test]
+    fn community_state_stages_and_takes_link() {
+        let state = CommunityState::default();
+        assert!(state.link.lock().unwrap().is_none());
+
+        let sha = "b".repeat(64);
+        let link = community::parse_link(&format!("xiaoban://community/apply/reminder/12?version=1&sha256={sha}")).unwrap();
+        *state.link.lock().unwrap() = Some(link.to_json());
+
+        let taken = state.link.lock().unwrap().take().unwrap();
+        assert_eq!(taken["action"], "apply");
+        assert_eq!(taken["kind"], "reminder");
+        assert_eq!(taken["packId"], 12);
+        assert!(state.link.lock().unwrap().is_none(), "take 之后清空暂存");
+    }
+}

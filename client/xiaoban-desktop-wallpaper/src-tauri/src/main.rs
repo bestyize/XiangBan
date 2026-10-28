@@ -819,6 +819,12 @@ fn main() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(float_assistant::plugin())
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
+            for arg in &arguments {
+                let clean = arg.trim().trim_matches('"');
+                if clean.starts_with("xiaoban://") {
+                    route_link(app, clean);
+                }
+            }
             if !arguments.iter().any(|arg| arg == "--autostart") { let _ = present_control(app); }
         }));
     #[cfg(target_os = "macos")]
