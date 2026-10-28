@@ -235,14 +235,19 @@ fn incomplete_responses_keep_what_was_produced_and_failures_are_errors() {
     assert_eq!(done, Ok(true));
     assert_eq!(stream.finish().message.text(), "partial");
 
-    for (code, retryable) in [("server_error", true), ("rate_limit_exceeded", true), ("invalid_prompt", false), ("", false)] {
+    for (code, message, retryable) in [
+        ("server_error", "server_error: it failed", true),
+        ("rate_limit_exceeded", "rate_limit_exceeded: it failed", true),
+        ("invalid_prompt", "invalid_prompt: it failed", false),
+        ("", "it failed", false),
+    ] {
         let mut stream = ResponsesStream::default();
         let event = json!({"type": "response.failed", "response": {"error": {"code": code, "message": "it failed"}}});
-        assert_eq!(stream.push_event(&event, &mut |_| {}).unwrap_err(), HarnessError::provider("it failed", retryable), "{code}");
+        assert_eq!(stream.push_event(&event, &mut |_| {}).unwrap_err(), HarnessError::provider(message, retryable), "{code}");
     }
     let mut stream = ResponsesStream::default();
     let event = json!({"type": "error", "code": "server_error", "message": "stream error"});
-    assert_eq!(stream.push_event(&event, &mut |_| {}).unwrap_err(), HarnessError::provider("stream error", true));
+    assert_eq!(stream.push_event(&event, &mut |_| {}).unwrap_err(), HarnessError::provider("server_error: stream error", true));
     assert!(matches!(stream.push_payload("{oops", &mut |_| {}), Err(HarnessError::Provider { retryable: false, .. })));
 }
 
