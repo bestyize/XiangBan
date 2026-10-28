@@ -96,6 +96,7 @@ Codex 官方文档站（developers.openai.com）在沙箱里被网络策略拦�
 | 会话文件位置 | `~/.claude/projects/<工作目录把非字母数字换成 ->/<session_id>.jsonl`，与文档一致 |
 | 单进程多轮 | `--input-format stream-json --output-format stream-json --verbose`，向标准输入逐行写 `{"type":"user","message":{"role":"user","content":[{"type":"text","text":"…"}]}}`，每轮得到一个 `result` 事件；第二轮约 5 秒（含模型耗时） |
 | `system/init` 事件 | 含 `session_id`、`model`、`tools`、`mcp_servers`、`permissionMode`、`capabilities`（功能探测用）等 |
+| **hooks 注入新指令** | `Stop` hook 返回 `{"decision":"block","reason":"…"}` 后，会话**带着这条新指令继续做事**（实测：reason 里要求 `touch` 一个文件，文件真的被创建，最终回复按新指令给出）。这是 mcp-voice-hooks 一类工具“把话送进正在工作的会话”的机制，已在 `-p` 模式验证；交互模式按文档行为应一致，仍需真机确认。注意要在第二次 `Stop` 放行（`stop_hook_active` 为真时不再拦），否则会死循环 |
 | 环境陷阱 | 如果从 Claude Code 里面运行脚本，子进程会继承 `CLAUDE_CODE_SESSION_ID` 之类变量而复用同一个会话编号；小伴拉起子进程时必须清掉这类变量 |
 
 仍需真机验证：Windows 与 macOS 的同类行为、桌面版应用的快捷键与无障碍、终端里手动 `claude --resume` 看到完整历史。
