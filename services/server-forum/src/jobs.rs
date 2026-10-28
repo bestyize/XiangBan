@@ -25,6 +25,12 @@ pub fn spawn(state: AppState) {
                 Ok(_) => {}
                 Err(e) => tracing::warn!("清理附件失败: {e}"),
             }
+            // 已读超过 90 天的通知清掉，未读的一直留着。
+            if round % 6 == 3 {
+                if let Err(e) = sqlx::query("DELETE FROM notifications WHERE read_at < now() - interval '90 days'").execute(&state.pool).await {
+                    tracing::warn!("清理通知失败: {e}");
+                }
+            }
             // 要在所有正文里搜图片 id，一小时做一次就够。
             if round % 6 == 1 {
                 match images::purge_unused(&state.pool, &state.config.upload_dir).await {

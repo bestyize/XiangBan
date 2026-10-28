@@ -186,9 +186,36 @@ pub async fn create(
     if let Some(word) = &review {
         crate::moderation::enqueue(&mut tx, "post", id, &format!("命中复核词：{word}")).await?;
     }
+    notify_reply(&mut tx, user.uid, topic_id, id, input.reply_to, &body).await?;
     tx.commit().await?;
     models::refresh_hot_scores(&state.pool, Some(topic_id)).await?;
     Ok(Json(json!({ "id": id, "floor": floor })))
+}
+
+/// 回复产生的通知：被回复的楼层作者（kind=reply_to）、帖子作者（kind=reply，已经因为被回复通知过的不再重复）、正文里 @ 到的人。
+async fn notify_reply(
+    tx: &mut sqlx::PgConnection, actor: Uuid, topic_id: i64, post_id: i64, reply_to: Option<i64>, body: &str,
+) -> AppResult<()> {
+    use crate::notifications::{self as n, Note};
+    let (topic_author, title): (Uuid, String) = sqlx::query_as("SELECT author_uid, title FROM topics WHERE id = $1")
+        .bind(topic_id)
+        .fetch_one(&mut *tx)
+        .await?;
+    let excerpt = markdown::excerpt(body, 80);
+    let note = |kind| Note { kind, actor: Some(actor), topic_id: Some(topic_id), post_id: Some(post_id), pack_id: None, title: &title, excerpt: &excerpt };
+    let mut done = vec![actor];
+    if let Some(rt) = reply_to {
+        let target: Option<(Uuid,)> = sqlx::query_as("SELECT author_uid FROM posts WHERE id = $1").bind(rt).fetch_optional(&mut *tx).await?;
+        if let Some((to,)) = target {
+            n::notify(tx, to, &note(n::REPLY_TO)).await?;
+            done.push(to);
+        }
+    }
+    if !done.contains(&topic_author) {
+        n::notify(tx, topic_author, &note(n::REPLY)).await?;
+        done.push(topic_author);
+    }
+    n::notify_mentions(tx, body, actor, &done, &note(n::MENTION)).await
 }
 
 pub async fn update(

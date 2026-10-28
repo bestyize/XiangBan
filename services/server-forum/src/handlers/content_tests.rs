@@ -426,6 +426,80 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     let (_, restored) = call(&app, "GET", "/api/topics", Some(&other_t), Value::Null).await;
     assert!(titles(&restored).contains(&"另一个正常标题".to_string()), "取消屏蔽后恢复");
 
+    // 站内通知：回复、被回复、被 @、回答被采纳、内容包审核结果；自己对自己不通知，屏蔽后对方的动作不通知。
+    let nick = |uid: Uuid| {
+        let pool = pool.clone();
+        async move { sqlx::query_as::<_, (String,)>("SELECT nickname FROM users WHERE uid = $1").bind(uid).fetch_one(&pool).await.map(|r| r.0) }
+    };
+    let (author_nick, other_nick) = (nick(author).await?, nick(other).await?);
+    call(&app, "POST", "/api/me/notifications/read", Some(&author_t), Value::Null).await;
+    call(&app, "POST", "/api/me/notifications/read", Some(&other_t), Value::Null).await;
+    let unread = |t: String| {
+        let app = app.clone();
+        async move { call(&app, "GET", "/api/me/notifications/unread", Some(&t), Value::Null).await.1["unread"].as_i64().unwrap() }
+    };
+    assert_eq!(unread(author_t.clone()).await, 0);
+    let (s, _) = call(&app, "GET", "/api/me/notifications/unread", None, Value::Null).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+
+    // other 回复 author 的帖子 → author 收到一条 reply。
+    let (_, reply1) = call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&other_t), json!({"body": "我来回复一下这个帖子"})).await;
+    let reply1_id = reply1["id"].as_i64().unwrap();
+    assert_eq!(unread(author_t.clone()).await, 1);
+    let (_, list) = call(&app, "GET", "/api/me/notifications", Some(&author_t), Value::Null).await;
+    assert_eq!(list["items"][0]["kind"], "reply");
+    assert_eq!(list["items"][0]["actor"]["nickname"], other_nick);
+    assert_eq!(list["items"][0]["title"], "另一个正常标题");
+    assert_eq!(list["items"][0]["read"], false);
+
+    // author 回复 other 的楼层并 @ 他：只收到一条 reply_to，不重复 mention。
+    call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&author_t), json!({"body": format!("回你一下 @{other_nick}"), "reply_to": reply1_id})).await;
+    assert_eq!(unread(other_t.clone()).await, 1);
+    let (_, list) = call(&app, "GET", "/api/me/notifications?unread=true", Some(&other_t), Value::Null).await;
+    assert_eq!(list["items"][0]["kind"], "reply_to");
+    // 单独 @ 他：mention；@ 自己和不存在的人不通知。
+    call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&author_t), json!({"body": format!("看这里 @{other_nick} @{author_nick} @没有这个人")})).await;
+    assert_eq!(unread(other_t.clone()).await, 2);
+    assert_eq!(unread(author_t.clone()).await, 1, "自己对自己、@ 自己都不通知");
+
+    // 标记已读：按编号和全部。
+    let first = list["items"][0]["id"].as_i64().unwrap();
+    call(&app, "POST", "/api/me/notifications/read", Some(&other_t), json!({"ids": [first]})).await;
+    assert_eq!(unread(other_t.clone()).await, 1);
+    call(&app, "POST", "/api/me/notifications/read", Some(&other_t), Value::Null).await;
+    assert_eq!(unread(other_t.clone()).await, 0);
+    let (_, all) = call(&app, "GET", "/api/me/notifications", Some(&other_t), Value::Null).await;
+    assert!(all["items"].as_array().unwrap().iter().all(|n| n["read"] == true));
+
+    // other 屏蔽 author 后，author 的回复不再通知 other。
+    call(&app, "PUT", &format!("/api/users/{author}/block"), Some(&other_t), Value::Null).await;
+    call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&author_t), json!({"body": format!("再提一次 @{other_nick}"), "reply_to": reply1_id})).await;
+    assert_eq!(unread(other_t.clone()).await, 0, "被屏蔽者的动作不通知屏蔽者");
+    call(&app, "DELETE", &format!("/api/users/{author}/block"), Some(&other_t), Value::Null).await;
+
+    // 求助回答被采纳 → 回答者收到 accepted。
+    sqlx::query("UPDATE users SET trust_level = 1 WHERE uid = $1").bind(author).execute(&pool).await?;
+    let (help_cat,): (i32,) = sqlx::query_as("SELECT id FROM categories WHERE slug = 'share-help'").fetch_one(&pool).await?;
+    let (s, h) = call(&app, "POST", "/api/topics", Some(&author_t), json!({"category_id": help_cat, "title": "想要一个番茄钟组件", "body": "希望桌面上有一个简单的番茄钟", "help": {"bounty": 0, "days": 7}})).await;
+    assert_eq!(s, StatusCode::OK, "{h}");
+    let help_id = h["id"].as_i64().unwrap();
+    let (_, answer) = call(&app, "POST", &format!("/api/topics/{help_id}/posts"), Some(&other_t), json!({"body": "我做了一个，看我的内容包"})).await;
+    let (s, a) = call(&app, "POST", &format!("/api/topics/{help_id}/help/accept"), Some(&author_t), json!({"post_id": answer["id"]})).await;
+    assert_eq!(s, StatusCode::OK, "{a}");
+    let (_, list) = call(&app, "GET", "/api/me/notifications?unread=true", Some(&other_t), Value::Null).await;
+    let kinds: Vec<&str> = list["items"].as_array().unwrap().iter().map(|n| n["kind"].as_str().unwrap()).collect();
+    assert!(kinds.contains(&"accepted"), "{kinds:?}");
+
+    // 审核结果通知内容包作者；下架不通知。
+    call(&app, "POST", "/api/me/notifications/read", Some(&author_t), Value::Null).await;
+    call(&app, "POST", &format!("/api/admin/packs/{id}/review"), Some(&admin_t), json!({"action":"approve"})).await;
+    call(&app, "POST", &format!("/api/admin/packs/{id}/review"), Some(&admin_t), json!({"action":"remove"})).await;
+    let (_, list) = call(&app, "GET", "/api/me/notifications?unread=true", Some(&author_t), Value::Null).await;
+    let items = list["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["kind"], "pack_approved");
+    assert_eq!(items[0]["pack_id"], id);
+
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
     Ok(())
 }

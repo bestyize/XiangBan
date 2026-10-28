@@ -100,6 +100,10 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 `PUT/DELETE /users/{uid}/block`、`GET /me/blocks`。屏蔽后互相取消关注；被屏蔽者的帖子不再出现在屏蔽者的列表、搜索和关注流里，回复折叠（接口返回 `blocked: true` 且不带正文）；对方看不出自己被屏蔽（接口不报错、其他人看到的不变）。个人主页返回 `blocked`，设置页列出屏蔽的人并可取消。通知（见下节）也会跳过被屏蔽者带来的事件。
 
+## 站内通知
+
+`GET /me/notifications?page=&unread=`、`GET /me/notifications/unread`（未读数）、`POST /me/notifications/read`（带 `{ids:[…]}` 标记指定几条，不带请求体全部已读）。事件：别人回复了你的帖子（`reply`）、回复了你的楼层（`reply_to`，和 `reply` 不重复发）、正文里 `@用户名` 提到了你（`mention`，一条最多提 5 人，发帖和回复都算，编辑不重复通知）、你的回答被采纳（`accepted`）、你的内容包审核通过或被拒（`pack_approved`/`pack_rejected`，下架与恢复不通知）。通知在业务事务里写入；自己对自己不通知；屏蔽了对方的人不收到对方带来的通知。标题和摘要是写入时的快照；已读超过 90 天的由定时任务清理。只做站内，没有邮件和系统推送。前台顶栏有铃铛和未读数（登录后每分钟刷新），`/notifications` 是列表页，打开即标记已读。
+
 ## 业务规则
 
 - 正文是 Markdown，服务端用 pulldown-cmark 渲染、ammonia 清洗后存 `body_html`；外链加 `nofollow ugc`。新人（TL0）的链接和图片会被去掉，只留文字。
@@ -119,7 +123,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 ## 已知限制与后续
 
 - 数据库兼容：阅读权限是追加的列（`ALTER TABLE topics ADD COLUMN IF NOT EXISTS min_read_level ... DEFAULT 0`），已部署的库启动时自动补上，旧帖子都按公开处理。
-- 二期（PRD 里的 M2 起）未做：站内通知和关键词订阅、TL2 自动升级、图片上传到腾讯云 COS、赞助位。积分规则见上面的运行与验证；正文插图已经走本机磁盘（见业务规则），COS 是二期的存储替换。
+- 二期（PRD 里的 M2 起）未做：关键词订阅、TL2 自动升级、图片上传到腾讯云 COS、赞助位。积分规则见上面的运行与验证；正文插图已经走本机磁盘（见业务规则），COS 是二期的存储替换。
 - 账号中心还没有用户自助注销，设置页提示发邮件处理。
 - SEO 页面只渲染第一页（30-50 条），sitemap 每次请求实时查询，没有进程内缓存。
 - 部署：香港机 `/home/ubuntu/xiangban-forum`，systemd 服务 `server-forum`，监听 127.0.0.1:55010，Nginx 反代 chat.xiangban.xyz（Let's Encrypt），库 `xiaban_forum` 在 `wallpaper_postgres` 容器里，独立角色 `forum`。账号中心已登记 `forum-web` 并在 `ACCOUNT_CORS_ORIGINS` 加入 `https://chat.xiangban.xyz`。初始管理员密码在服务器 `.env` 的 `FORUM_ADMIN_PASSWORD`，登录 /admin 改密码后删掉它。更新时本地交叉编译后替换二进制和 `web/dist`，再重启服务（index.html 启动时读一次）。

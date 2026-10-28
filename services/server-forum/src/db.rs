@@ -961,4 +961,21 @@ CREATE TABLE IF NOT EXISTS user_blocks (
     CHECK (blocker <> blocked)
 );
 CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks (blocked);
+
+-- 站内通知：标题与摘要是写入时的快照。
+CREATE TABLE IF NOT EXISTS notifications (
+    id         BIGSERIAL PRIMARY KEY,
+    uid        UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,
+    actor_uid  UUID REFERENCES users(uid) ON DELETE SET NULL,
+    topic_id   BIGINT REFERENCES topics(id) ON DELETE CASCADE,
+    post_id    BIGINT,
+    pack_id    BIGINT REFERENCES packs(id) ON DELETE CASCADE,
+    title      TEXT NOT NULL DEFAULT '',
+    excerpt    TEXT NOT NULL DEFAULT '',
+    read_at    TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (uid, id DESC);
+CREATE INDEX IF NOT EXISTS notifications_unread_idx ON notifications (uid) WHERE read_at IS NULL;
 "#;

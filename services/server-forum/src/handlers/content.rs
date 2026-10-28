@@ -1003,6 +1003,21 @@ pub struct ReviewInput {
     note: String,
 }
 
+/// 审核结果通知作者：通过或被拒（下架、恢复不通知）。
+pub(crate) async fn notify_pack_author(tx: &mut sqlx::PgConnection, pack_id: i64, action: &str, note: &str) -> AppResult<()> {
+    use crate::notifications::{self as n, Note};
+    let kind = match action {
+        "approve" => n::PACK_APPROVED,
+        "reject" => n::PACK_REJECTED,
+        _ => return Ok(()),
+    };
+    let row: Option<(Option<Uuid>, String)> = sqlx::query_as("SELECT author_uid, title FROM packs WHERE id = $1").bind(pack_id).fetch_optional(&mut *tx).await?;
+    if let Some((Some(author), title)) = row {
+        n::notify(tx, author, &Note { kind, actor: None, topic_id: None, post_id: None, pack_id: Some(pack_id), title: &title, excerpt: note }).await?;
+    }
+    Ok(())
+}
+
 async fn admin_review_pack(
     State(state): State<AppState>,
     AuthAdmin(admin): AuthAdmin,
@@ -1042,6 +1057,7 @@ async fn admin_review_pack(
         .await?;
     }
     audit(&mut tx, &admin, &format!("pack.{}", input.action), "pack", id, format!("{status} -> {new_status}; {note}")).await?;
+    notify_pack_author(&mut tx, id, &input.action, &note).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "trust_level": new_trust, "status": new_status })))
 }

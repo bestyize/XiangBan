@@ -147,6 +147,9 @@ async fn resolve(State(state): State<AppState>, AuthAdmin(admin): AuthAdmin, Pat
         // 通过审核的内容包升为“已审核”，和后台内容包页的“通过”一致。
         sqlx::query("UPDATE packs SET trust_level = LEAST(trust_level, 1), updated_at = now() WHERE id = $1").bind(target_id).execute(&mut *tx).await?;
     }
+    if target_type == "pack" {
+        crate::handlers::content::notify_pack_author(&mut tx, target_id, &input.action, input.note.trim()).await?;
+    }
     let status = if input.action == "approve" { "approved" } else { "rejected" };
     sqlx::query("UPDATE moderation_queue SET status = $2, note = CASE WHEN $3 = '' THEN note ELSE $3 END, handled_by = $4, handled_at = now() WHERE id = $1")
         .bind(id)

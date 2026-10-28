@@ -273,6 +273,12 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     if let Some(word) = &review {
         crate::moderation::enqueue(&mut tx, "topic", id, &format!("命中复核词：{word}")).await?;
     }
+    {
+        use crate::notifications::{self as n, Note};
+        let excerpt = markdown::excerpt(&body, 80);
+        let note = Note { kind: n::MENTION, actor: Some(user.uid), topic_id: Some(id), post_id: None, pack_id: None, title: &title, excerpt: &excerpt };
+        n::notify_mentions(&mut tx, &body, user.uid, &[], &note).await?;
+    }
     tx.commit().await?;
     save_tags(&state.pool, id, &tags).await?;
     models::refresh_hot_scores(&state.pool, Some(id)).await?;

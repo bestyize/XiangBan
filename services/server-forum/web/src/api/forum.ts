@@ -2,6 +2,7 @@ import type {
   Attachment,
   Category,
   FollowState,
+  NotificationItem,
   Page,
   PinScope,
   PostItem,
@@ -138,6 +139,9 @@ export const api = {
   profile: (uid: string) => request<Profile>('GET', `/users/${uid}`),
   follow: (uid: string, on: boolean) =>
     request<FollowState>(on ? 'PUT' : 'DELETE', `/users/${uid}/follow`),
+  notifications: (page = 1) => request<Page<NotificationItem>>('GET', `/me/notifications${qs({ page })}`),
+  unreadCount: () => request<{ unread: number }>('GET', '/me/notifications/unread'),
+  markRead: (ids?: number[]) => request<{ marked: number }>('POST', '/me/notifications/read', ids ? { ids } : undefined),
   block: (uid: string, on: boolean) => request<{ blocked: boolean }>(on ? 'PUT' : 'DELETE', `/users/${uid}/block`),
   myBlocks: () => request<{ items: (PublicUser & { blocked_at: string })[] }>('GET', '/me/blocks'),
   following: (uid: string, page = 1) =>

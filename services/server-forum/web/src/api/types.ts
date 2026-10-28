@@ -146,6 +146,19 @@ export interface PostItem {
   blocked: boolean
 }
 
+export interface NotificationItem {
+  id: number
+  kind: 'reply' | 'reply_to' | 'mention' | 'accepted' | 'pack_approved' | 'pack_rejected'
+  actor: { uid: string; nickname: string | null; avatar_url: string | null } | null
+  topic_id: number | null
+  post_id: number | null
+  pack_id: number | null
+  title: string
+  excerpt: string
+  read: boolean
+  created_at: string
+}
+
 export interface Page<T> {
   items: T[]
   page: number
