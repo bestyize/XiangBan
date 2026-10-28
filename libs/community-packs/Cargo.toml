@@ -1,0 +1,13 @@
+[package]
+name = "xiaoban-community"
+version = "0.1.0"
+edition = "2021"
+description = "社区内容包的客户端逻辑：链接解析、下载与哈希校验、压缩包检查，不含界面与应用落地"
+
+[dependencies]
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "json", "native-tls-no-alpn"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+url = "2"
+zip = { version = "=9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }

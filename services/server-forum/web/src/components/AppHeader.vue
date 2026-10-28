@@ -51,12 +51,15 @@ async function logout() {
 
       <nav class="nav" aria-label="主导航">
         <RouterLink to="/" :class="{ on: route.name === 'home' }">首页</RouterLink>
+        <RouterLink to="/resources" :class="{ on: route.name === 'resources' || route.name === 'pack' }">资源</RouterLink>
+        <RouterLink to="/weekly" :class="{ on: route.name === 'weekly' || route.name === 'weekly-issue' }">周刊</RouterLink>
+        <RouterLink to="/projects" :class="{ on: route.name === 'projects' || route.name === 'project' }">项目</RouterLink>
       </nav>
 
       <form class="search" :class="{ open: searchOpen }" role="search" @submit.prevent="submit">
         <label class="sr-only" for="site-search">搜索</label>
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="M13.5 13.5 17 17" /></svg>
-        <input id="site-search" v-model="q" type="search" placeholder="搜羊毛或帖子" maxlength="50" enterkeyhint="search" />
+        <input id="site-search" v-model="q" type="search" placeholder="搜索帖子" maxlength="50" enterkeyhint="search" />
       </form>
 
       <div class="actions">

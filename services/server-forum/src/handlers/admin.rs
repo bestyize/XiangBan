@@ -192,7 +192,7 @@ impl FromRequestParts<AppState> for AuthAdmin {
 }
 
 /// 写一条操作日志。传连接是为了能和业务改动放在同一个事务里。
-async fn audit(
+pub(crate) async fn audit(
     conn: &mut PgConnection,
     admin: &AdminIdentity,
     action: &str,

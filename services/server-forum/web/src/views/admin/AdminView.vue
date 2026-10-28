@@ -12,6 +12,9 @@ import UsersPanel from './UsersPanel.vue'
 import EditorPanel from './EditorPanel.vue'
 import EditorAccounts from './EditorAccounts.vue'
 import CategoriesPanel from './CategoriesPanel.vue'
+import PacksPanel from './PacksPanel.vue'
+import ProjectsPanel from './ProjectsPanel.vue'
+import WeeklyPanel from './WeeklyPanel.vue'
 import AuditPanel from './AuditPanel.vue'
 import AccountPanel from './AccountPanel.vue'
 import { openReports, toasts } from './shared'
@@ -25,6 +28,9 @@ const SECTIONS = [
   { key: 'editor-accounts', label: '编辑账号', comp: EditorAccounts },
   { key: 'editor', label: '批量发帖', comp: EditorPanel },
   { key: 'categories', label: '分类', comp: CategoriesPanel },
+  { key: 'packs', label: '内容包', comp: PacksPanel },
+  { key: 'projects', label: '项目', comp: ProjectsPanel },
+  { key: 'weekly', label: '周刊', comp: WeeklyPanel },
   { key: 'audit', label: '操作日志', comp: AuditPanel },
   { key: 'account', label: '账号', comp: AccountPanel },
 ] as const

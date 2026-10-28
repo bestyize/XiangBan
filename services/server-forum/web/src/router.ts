@@ -4,6 +4,12 @@ import { useSession } from '@/stores/session'
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
+  { path: '/resources', name: 'resources', component: () => import('@/views/ResourcesView.vue') },
+  { path: '/packs/:id(\\d+)', name: 'pack', component: () => import('@/views/PackView.vue') },
+  { path: '/weekly', name: 'weekly', component: () => import('@/views/WeeklyListView.vue') },
+  { path: '/weekly/:week', name: 'weekly-issue', component: () => import('@/views/WeeklyView.vue') },
+  { path: '/projects', name: 'projects', component: () => import('@/views/ProjectsView.vue') },
+  { path: '/projects/:slug', name: 'project', component: () => import('@/views/ProjectView.vue') },
   { path: '/deals', name: 'deals', component: () => import('@/views/DealsView.vue') },
   { path: '/c/:slug', name: 'category', component: () => import('@/views/CategoryView.vue') },
   { path: '/t/:id(\\d+)', name: 'topic', component: () => import('@/views/TopicView.vue') },

@@ -38,6 +38,14 @@ pub struct AppConfig {
     pub upload_limit_admin: u64,
     /// 正文插图的大小上限（字节），所有人一样。
     pub upload_limit_image: u64,
+    /// 资源机（大文件、封面、压缩包）的对外地址；为空表示还没有接入，下载与直传相关接口返回 503。
+    pub resource_base_url: Option<String>,
+    /// 与资源机共用的签名密钥：签下载地址、上传凭证，校验资源机的回调。
+    pub resource_secret: Vec<u8>,
+    pub download_url_ttl_secs: i64,
+    pub upload_ticket_ttl_secs: i64,
+    /// 普通用户每天最多发布的内容包数。
+    pub daily_pack_publishes: i64,
 }
 
 const MB: u64 = 1024 * 1024;
@@ -78,6 +86,16 @@ impl AppConfig {
             }
         };
 
+        let resource_secret = match get("FORUM_RESOURCE_SECRET") {
+            Some(s) if s.len() >= 32 => s.into_bytes(),
+            _ => {
+                tracing::warn!("FORUM_RESOURCE_SECRET 未设置或少于 32 位，使用随机密钥，资源机无法校验签名，重启后已签发的地址与凭证失效");
+                let a = uuid::Uuid::new_v4();
+                let b = uuid::Uuid::new_v4();
+                [a.as_bytes().as_slice(), b.as_bytes().as_slice()].concat()
+            }
+        };
+
         AppConfig {
             host: get("FORUM_HOST").unwrap_or_else(|| "127.0.0.1".into()),
             port: num("FORUM_PORT", 55010) as u16,
@@ -110,6 +128,11 @@ impl AppConfig {
             upload_limit_user: num("FORUM_UPLOAD_MAX_MB_USER", 5).max(1) as u64 * MB,
             upload_limit_admin: num("FORUM_UPLOAD_MAX_MB_ADMIN", 30).max(1) as u64 * MB,
             upload_limit_image: num("FORUM_UPLOAD_MAX_MB_IMAGE", 5).max(1) as u64 * MB,
+            resource_base_url: get("FORUM_RESOURCE_BASE_URL").map(|v| v.trim_end_matches('/').to_string()),
+            resource_secret,
+            download_url_ttl_secs: num("FORUM_DOWNLOAD_URL_TTL_SECS", 600).max(60),
+            upload_ticket_ttl_secs: num("FORUM_UPLOAD_TICKET_TTL_SECS", 1800).max(60),
+            daily_pack_publishes: num("FORUM_DAILY_PACK_PUBLISHES", 5).max(1),
         }
     }
 }

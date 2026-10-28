@@ -1,5 +1,6 @@
 mod auth;
 mod config;
+mod content;
 mod db;
 mod error;
 mod handlers;
@@ -18,7 +19,7 @@ use axum::{
     Router,
 };
 use config::AppConfig;
-use handlers::{admin, attachments, follows, help, images, interact, me, meta, posts, topics};
+use handlers::{admin, attachments, content as packs, follows, help, images, interact, me, meta, posts, topics};
 use state::AppState;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::{
@@ -75,7 +76,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/images/{id}", get(images::show))
         .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
         .route("/attachments/{id}/purchase", post(attachments::purchase))
-        .nest("/admin", admin::routes())
+        .merge(packs::routes())
+        .nest("/admin", admin::routes().merge(packs::admin_routes()))
         .nest("/editor", handlers::editor::routes());
 
     // 凭证只走 Authorization 头，不用 Cookie，跨域放开不构成 CSRF 面。

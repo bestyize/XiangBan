@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod attachments;
+pub mod content;
 pub mod follows;
 pub mod help;
 pub mod images;

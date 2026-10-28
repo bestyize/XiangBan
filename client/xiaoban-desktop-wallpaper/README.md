@@ -15,6 +15,14 @@
 保存有版本检查和恢复草稿，保留 30 个历史版本，支持重命名、创建独立副本与历史恢复。聊天及排队消息固定发送时选中的设计稿，避免切换作品后改错项目。兼容 v3 boards/order 与旧版 artboards；当前只支持独立 DC HTML 运行时子集，React 和二进制素材导入尚不支持。详见 [模块说明](../../libs/agent-tools/open-claude-design/README.md) 与 [实施和验证记录](../../docs/agent/open-claude-design.md)。
 
 
+## 社区内容包（xiaoban://community）
+
+侧栏「社区」页只读浏览周刊和热门内容包，网页上的「在小伴中打开」通过 `xiaoban://community/apply/{kind}/{pack_id}?version=&sha256=` 唤起本应用。流程固定为：**下载 → SHA-256 与大小校验（主地址失败回退官方镜像）→ 压缩包结构检查 → 展示内容 → 用户确认 → 才应用**；链接带的 `sha256` 会锁定网页上看到的那一版，版本已更新则拒绝。首批支持 `effect`（沿用特效包校验，写入特效文件夹）、`reminder`（提醒规则）和 `task`（定时任务模板，会让小伴代为执行，应用后**默认不启用**，到提醒页确认后再打开）；其他类型先提示去网页查看。
+
+下载、校验与压缩包检查在 [`libs/community-packs`](../../libs/community-packs/README.md)，可独立测试；`src-tauri/src/community.rs` 只负责暂存检查结果和落地，命令只允许设置面板调用（`community_*`）。论坛地址随应用内置（`https://chat.xiangban.xyz`），仅调试版可用 `XIAOBAN_COMMUNITY_URL` 指向本机。
+
+验证：`npx vitest run src/ui/community`；`cargo test --manifest-path ../../libs/community-packs/Cargo.toml`。`src-tauri` 里的 Rust 改动（`community.rs`、`reminders::import_rules`、`main.rs` 的链接分流）需要在 Windows / macOS 上完整编译确认，Linux 云端环境缺少 GTK/WebKit 无法编译整个应用。
+
 ## AI 商店：SkillHub 专家包与 MCP
 
 **小伴市场（默认来源）**：AI 插件页默认从自建的小伴市场获取专家、技能和连接器，筛选行右侧可切换到 SkillHub；市场连不上时自动先显示 SkillHub，已安装的插件不受影响。市场地址随应用内置（`src-tauri/src/chat/store_market.rs` 的 `DEFAULT_MARKET`，当前为 `https://market.xiangban.xyz`；仅调试版可用环境变量 `XIAOBAN_MARKET_URL` 指向本机）。安装前展示说明、文件清单、逐文件 SHA256 和脚本预览，并按清单摘要锁定版本；已安装的市场插件有新版本时提示更新，更新前展示文件差异，旧版本保留备份（`chat/skill-backups`）；专家团、技能套件一次审查、整组安装、失败整组回滚。网页上的「在小伴中安装」通过 `xiaoban://market/...` 唤起本应用，只弹出确认窗口，不会静默安装；协议关联由 `tauri-plugin-deep-link` 在打包安装版里注册（`tauri.conf.json` 的 `plugins.deep-link`）。「插件来源」设置里可关闭 SkillHub 补充来源和自动检查更新（保存在本机界面偏好中）。

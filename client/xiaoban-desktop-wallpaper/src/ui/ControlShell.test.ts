@@ -56,7 +56,7 @@ describe('ControlShell sidebar', () => {
     try {
       await flushPromises();
       expect(wrapper.findAll('#control-navigation .nav-item[data-testid^="nav-"]').map(b => b.attributes('data-testid')))
-        .toEqual(['nav-ai-group', 'nav-new-task', 'nav-ai-store', 'nav-library', 'nav-studio', 'nav-games', 'nav-care']);
+        .toEqual(['nav-ai-group', 'nav-new-task', 'nav-ai-store', 'nav-library', 'nav-studio', 'nav-games', 'nav-care', 'nav-community']);
       expect(wrapper.find('.control-statusbar').exists()).toBe(false);
       expect(wrapper.find('.sidebar-desktop-state').exists()).toBe(false);
       expect(wrapper.find('[data-testid="assistant-launcher"]').exists()).toBe(false);

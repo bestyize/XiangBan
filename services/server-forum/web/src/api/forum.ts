@@ -63,7 +63,7 @@ function qs(params?: Query) {
   return s ? `?${s}` : ''
 }
 
-async function request<T>(method: string, path: string, body?: unknown, auth = true): Promise<T> {
+export async function request<T>(method: string, path: string, body?: unknown, auth = true): Promise<T> {
   const headers: Record<string, string> = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (auth) {
