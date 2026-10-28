@@ -9,6 +9,7 @@ pub const SEEDS:&[Seed]=&[
     Seed {package:"com.xingin.xhs",files:&[
         file!("com.xingin.xhs","skill.md"),file!("com.xingin.xhs","basic/package.json"),
         file!("com.xingin.xhs","basic/tasks/index.md"),file!("com.xingin.xhs","basic/tasks/publish-image-note.md"),
+        file!("com.xingin.xhs","basic/tasks/open-image-picker.yaml"),file!("com.xingin.xhs","basic/tasks/prepare-image-note.yaml"),
         file!("com.xingin.xhs","basic/pages/home.md"),file!("com.xingin.xhs","basic/pages/album-picker.md"),
         file!("com.xingin.xhs","basic/pages/creation-methods.md"),file!("com.xingin.xhs","basic/pages/image-editor.md"),
         file!("com.xingin.xhs","basic/pages/note-editor.md"),file!("com.xingin.xhs","basic/pages/publish-result.md"),

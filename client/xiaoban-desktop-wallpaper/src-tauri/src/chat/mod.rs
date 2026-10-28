@@ -236,6 +236,9 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
         if tool == "phone_pack_install" {
             return Some("下载或更新第三方手机操作包需要确认来源及固定摘要；安装不会执行脚本或覆盖本机学习补丁".to_string());
         }
+        if tool == "phone_workflow_run" {
+            return Some("即将在真实手机连续执行已审查且摘要固定的应用工作流，需要核对全部步骤、目标应用及输入参数".to_string());
+        }
         if tool == "skill_install" || tool == "skill_run" || tool == "connector_call" || tool.starts_with("mcp_ext_") {
             return Some("安装第三方 Skill、执行脚本或调用外部 MCP 工具必须逐次经过用户确认".to_string());
         }

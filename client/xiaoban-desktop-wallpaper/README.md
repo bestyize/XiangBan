@@ -1,8 +1,10 @@
 # 小伴桌面：桌宠、动态壁纸与 Agent
 
-## Android 手机操作（首轮基础）
+## Android 手机操作（基础与本地工作流）
 
 对话按需发现 `phone_` 工具，可通过本机 ADB 操作 USB / 无线 Android 设备；应用包以包名保存 `skill.md + basic/ + patch/`，支持 ZIP 导入 / HTTPS 下载、版本化补丁及分层页面路由。工具及种子包在 [phone-use](../../libs/agent-tools/phone-use/README.md)，方案见 [Android 手机操作](../../docs/agent/android-phone-use.md)。数据放在用户聊天目录的 `phone-packs/`；不与普通 Skill 混用目录。
+
+同一任务按设备复用非交互 ADB Shell；任务结束关闭连接。`phone_workflow_inspect` 审查操作包的结构化 YAML 工作流，`phone_workflow_run` 经确认后连续执行已知步骤，返回逐步耗时、通信次数及异常 checkpoint。内置小红书工作流分为“打开相册并交回模型选图”“从图片编辑进入正文、填写空字段并核对预览”，不包含发布。此优化仅经本地模拟测试，按用户要求暂未在小米17重测；uiautomator 仍逐次启动，截图/传图仍用独立命令，不代表生产延迟已达标。
 
 需要本机已安装 Android Platform Tools（PATH 中的 adb，可用 `XIAOBAN_ADB` 指定路径）并由用户在手机授权。中文输入需要手机已安装且已选中 ADB Keyboard（Android 16 实测使用上游 v2.5-dev）。首轮通过聊天使用，没有独立手机管理页、无障碍接收端或 iOS 支持。小米17 Android16已验证小红书9.51.0的传图、选图和中文图文准备，以及消消乐1.162第4181关的两次交换；发布与通关尚未验收。消消乐仅有本地普通三消候选评分，没有完整棋盘识别器、特殊机关策略或通关保证。发布等动作必须遵循用户授权，结果不明先观察，不能盲目重试。
 

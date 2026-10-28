@@ -23,7 +23,7 @@ pub fn tools(store:Store, adb:Adb, workspace:PathBuf)->Vec<Arc<dyn Tool>> {
     let mut add=|name:&str,description:&str,schema:Value,risk:Risk| {
         let mut spec=ToolSpec::new(name,description,schema).risk(risk).serial().untrusted_output()
             .timeout(Duration::from_secs(120)).max_output(16000);
-        if name=="phone_pack_install" { spec=spec.always_ask(); }
+        if name=="phone_pack_install" || name=="phone_workflow_run" { spec=spec.always_ask(); }
         if name=="phone_patch_save" {spec=spec.self_managed();}
         tools.push(Arc::new(PhoneTool {spec,runtime:runtime.clone()}));
     };
@@ -39,6 +39,10 @@ pub fn tools(store:Store, adb:Adb, workspace:PathBuf)->Vec<Arc<dyn Tool>> {
         schema(json!({"package":string(),"source":string(),"sha256":{"type":"string","pattern":"^[a-fA-F0-9]{64}$"}}),&["package","source","sha256"]),Risk::Write);
     add("phone_patch_save","Record a corrected or newly learned Android task/page/knowledge file, or route delta by ID. Save only after observing the actual result, with exact app_version and evidence. Replaces a complete text document; route YAML is merged by ID. Temporary routes require expires_at (RFC3339). Does not modify basic/ or execute content.",
         schema(json!({"package":string(),"path":string(),"content":{"type":"string","minLength":1,"maxLength":64000},"app_version":string(),"evidence":{"type":"string","minLength":1,"maxLength":4000},"expires_at":string()}),&["package","path","content","app_version","evidence"]),Risk::Write);
+    add("phone_workflow_inspect","Inspect a local Android tasks/*.yaml workflow, its exact steps, parameters, declared APP versions and SHA-256. Resolve applicable patches by app_version. Read the full returned plan and check it against user intent before requesting execution; packs cannot grant device or publishing permission.",
+        schema(json!({"package":string(),"path":string(),"app_version":string()}),&["package","path"]),Risk::Read);
+    add("phone_workflow_run","Execute one reviewed SHA-256-pinned Android workflow locally, without model calls between known steps. Requires explicit serial, compatible installed APP version and exactly the declared parameters. Every input checks the foreground; fill confirms focus and text. Unknown state, timeout or ambiguity stops with a checkpoint, never automatically replays. Final publishing is not part of bundled preparation workflows. Execution requires user confirmation.",
+        schema(json!({"serial":string(),"package":string(),"path":string(),"sha256":{"type":"string","pattern":"^[a-fA-F0-9]{64}$"},"parameters":{"type":"object","maxProperties":8,"additionalProperties":{"type":"string","maxLength":12000}}}),&["serial","package","path","sha256","parameters"]),Risk::Exec);
     add("phone_devices","List local ADB Android devices, USB or wireless, with authorization state. Requires Android Platform Tools (adb) installed on this computer; never downloads software. Choose a device serial explicitly for all subsequent tools.",schema(json!({}),&[]),Risk::Read);
     add("phone_connect","Pair/connect/disconnect wireless ADB using host:port. Android wireless debugging must be enabled by the user. Pair uses the six-digit code from the phone; connection port may differ from pairing port. Does not enable debugging or change network security settings.",
         schema(json!({"mode":{"enum":["pair","connect","disconnect"]},"endpoint":string(),"code":{"type":"string","pattern":"^[0-9]{6}$"}}),&["mode","endpoint"]),Risk::Exec);
@@ -71,10 +75,17 @@ impl PhoneTool {
         let r=&self.runtime; let name=self.spec.name.as_str(); let now=Utc::now();
         let offset=args["offset"].as_u64().unwrap_or(0).try_into().map_err(|_|"offset too large")?;
         let app_version=args["app_version"].as_str();
-        if matches!(name,"phone_pack_find"|"phone_pack_read"|"phone_patch_list"|"phone_routes"|"phone_patch_save") {
+        if matches!(name,"phone_pack_find"|"phone_pack_read"|"phone_patch_list"|"phone_routes"|"phone_patch_save"|"phone_workflow_inspect"|"phone_workflow_run") {
             crate::seeds::ensure(&r.store)?;
         }
         let value=match name {
+            "phone_workflow_inspect"=>crate::workflow::inspect(&r.store,text(args,"package")?,text(args,"path")?,app_version)?,
+            "phone_workflow_run"=> {
+                let serial=text(args,"serial")?;
+                r.snapshots.lock().map_err(|_|"UI snapshot lock poisoned")?.retain(|(_,device),_|device!=serial);
+                let parameters:BTreeMap<String,String>=serde_json::from_value(args["parameters"].clone()).map_err(|e|e.to_string())?;
+                crate::workflow::run(&r.store,&r.adb,serial,text(args,"package")?,text(args,"path")?,text(args,"sha256")?,parameters,ctx)?
+            },
             "phone_pack_find"=>r.store.discover(args["query"].as_str().unwrap_or(""))?,
             "phone_pack_read"=> {
                 let package=text(args,"package")?; let path=text(args,"path")?;
@@ -165,6 +176,7 @@ impl PhoneTool {
 impl Tool for PhoneTool {
     fn spec(&self)->&ToolSpec {&self.spec}
     fn cancel_grace(&self)->Duration {Duration::from_secs(5)}
+    fn on_run_end(&self,_:&agent_kernel::RunEnd)->Result<(),String> {self.runtime.adb.close()}
     fn execute(&self,args:Value,ctx:&ToolCtx)->Result<String,String> {self.run(&args,ctx).map(|r|r.output)}
     fn execute_result(&self,args:Value,ctx:&ToolCtx)->ToolResult {
         match self.run(&args,ctx) {Ok(result)=>result,Err(error)=>ToolResult::error(error)}

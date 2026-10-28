@@ -6,6 +6,9 @@ use std::{fs, io::{Read, Write}, path::{Path, PathBuf}, process::{Command, Stdio
 
 pub trait Transport: Send + Sync {
     fn run(&self, args: &[String], stdin: &[u8], ctx: &ToolCtx, max: usize) -> Result<Vec<u8>>;
+    fn bound_device_channel(&self)->bool {false}
+    fn stats(&self)->crate::persistent::TransportStats {Default::default()}
+    fn close(&self)->Result<()> {Ok(())}
 }
 
 pub struct ProcessTransport { executable: PathBuf }
@@ -65,15 +68,26 @@ impl Transport for ProcessTransport {
     }
 }
 
+#[derive(Default)]
+struct Counters {commands:AtomicU64,elapsed_us:AtomicU64}
+#[derive(Debug,Clone,Copy,serde::Serialize)]
+pub struct AdbStats {pub commands:u64,pub command_time_us:u64,pub transport:crate::persistent::TransportStats}
+impl AdbStats {pub fn since(self,old:Self)->Self {Self {commands:self.commands.saturating_sub(old.commands),command_time_us:self.command_time_us.saturating_sub(old.command_time_us),transport:self.transport.since(old.transport)}}}
 #[derive(Clone)]
-pub struct Adb { transport: Arc<dyn Transport> }
+pub struct Adb { transport: Arc<dyn Transport>, counters:Arc<Counters> }
 impl Adb {
-    pub fn new(executable: impl Into<PathBuf>) -> Self { Self { transport:Arc::new(ProcessTransport::new(executable)) } }
-    pub fn with_transport(transport: Arc<dyn Transport>) -> Self { Self { transport } }
+    pub fn new(executable: impl Into<PathBuf>) -> Self {Self::with_transport(Arc::new(crate::persistent::PersistentTransport::new(executable)))}
+    pub fn with_transport(transport: Arc<dyn Transport>) -> Self { Self { transport,counters:Arc::default() } }
+    pub fn close(&self)->Result<()> {self.transport.close()}
+    pub fn stats(&self)->AdbStats {AdbStats {commands:self.counters.commands.load(Ordering::Relaxed),command_time_us:self.counters.elapsed_us.load(Ordering::Relaxed),transport:self.transport.stats()}}
 
     fn command(&self, args: &[&str], input: &[u8], ctx: &ToolCtx, max: usize) -> Result<Vec<u8>> {
         if ctx.is_cancelled() { return Err("cancelled before ADB dispatch".into()); }
-        self.transport.run(&args.iter().map(|s|s.to_string()).collect::<Vec<_>>(),input,ctx,max)
+        let start=Instant::now();
+        let result=self.transport.run(&args.iter().map(|s|s.to_string()).collect::<Vec<_>>(),input,ctx,max);
+        self.counters.commands.fetch_add(1,Ordering::Relaxed);
+        self.counters.elapsed_us.fetch_add(start.elapsed().as_micros().min(u64::MAX as u128) as u64,Ordering::Relaxed);
+        result
     }
 
     pub fn devices(&self, ctx: &ToolCtx) -> Result<Value> {
@@ -88,10 +102,12 @@ impl Adb {
     }
 
     fn ready(&self, serial: &str, ctx: &ToolCtx) -> Result<()> {
-        if serial.is_empty() || serial.len()>200 || serial.starts_with('-')
-            || !serial.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-:[]".contains(&b)) {
+        if !valid_serial(serial) {
             return Err("invalid explicit device serial".into());
         }
+        // An explicit channel is bound to one authorized device. A missing/unauthorized
+        // device fails when the channel opens or is used; never fall back to another device.
+        if self.transport.bound_device_channel() {return Ok(());}
         let devices=self.devices(ctx)?;
         if !devices["devices"].as_array().is_some_and(|items| items.iter().any(|d|d["serial"]==serial && d["state"]=="device")) {
             return Err("device is not connected and authorized; inspect phone_devices and approve debugging on the phone".into());
@@ -127,6 +143,25 @@ impl Adb {
         let version=details.lines().find_map(|line|line.trim().strip_prefix("versionName=")).map(str::to_owned);
         let dimensions=self.shell(serial,&["wm","size"],ctx)?;
         Ok(json!({"serial":serial,"foreground_package":foreground,"package_name":package,"app_version":version,"display":dimensions.trim()}))
+    }
+
+    pub fn app_version(&self,serial:&str,package:&str,ctx:&ToolCtx)->Result<String> {
+        self.ready(serial,ctx)?;
+        if !valid_package(package) {return Err("invalid package".into());}
+        self.shell(serial,&["dumpsys","package",package],ctx)?.lines()
+            .find_map(|line|line.trim().strip_prefix("versionName=").map(str::to_string))
+            .filter(|version|!version.is_empty()).ok_or("unable to read installed app version".into())
+    }
+
+    pub fn checked_ui(&self,serial:&str,package:&str,ctx:&ToolCtx)->Result<String> {
+        self.ready(serial,ctx)?;self.guard(serial,package,ctx)?;self.ui(serial,ctx)
+    }
+
+    /// Consume a fresh in-process observation, rather than dumping the same tree again.
+    pub fn tap_observed(&self,serial:&str,package:&str,xml:&str,selector:&crate::ui::Selector,ctx:&ToolCtx)->Result<()> {
+        let target=crate::ui::target(xml,selector)?;
+        self.ready(serial,ctx)?;self.guard(serial,package,ctx)?;
+        self.shell(serial,&["input","tap",&target.x.to_string(),&target.y.to_string()],ctx)?;Ok(())
     }
 
     pub fn screenshot(&self, serial: &str, ctx: &ToolCtx) -> Result<Vec<u8>> {
@@ -248,6 +283,10 @@ impl Adb {
 }
 
 pub fn shell_quote(value: &str) -> String { format!("'{}'",value.replace('\'',"'\\''")) }
+pub fn valid_serial(serial:&str)->bool {
+    !serial.is_empty() && serial.len()<=200 && !serial.starts_with('-')
+        && serial.bytes().all(|b|b.is_ascii_alphanumeric()||b"._-:[]".contains(&b))
+}
 fn coordinate(args:&Value,key:&str)->Result<u64> {
     args[key].as_u64().filter(|v|*v<=16000).ok_or_else(||format!("{key} must be an integer screenshot coordinate in 0..16000"))
 }
