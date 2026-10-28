@@ -16,7 +16,7 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 
-const TABS = [{ key: '', label: '全部' }, ...PACK_KINDS.filter(k => k.key !== 'scheme'), { key: 'schemes', label: '方案' }]
+const TABS = [{ key: '', label: '全部' }, ...PACK_KINDS, { key: 'schemes', label: '方案' }]
 const tab = computed(() => {
   const k = String(route.query.kind ?? '')
   return TABS.some(t => t.key === k) ? k : ''

@@ -60,7 +60,7 @@ export async function confirmApply(): Promise<string | null> {
 export function closeApply() { applyFlow.state = { phase: 'idle' }; }
 
 export const KIND_LABEL: Record<string, string> = {
-  effect: '特效', reminder: '提醒', task: '定时任务', routine: '例行事项', goal: '目标', scheme: '方案',
+  effect: '特效', reminder: '提醒', task: '定时任务', routine: '例行事项', goal: '目标',
   widget: '组件', game: '游戏', wallpaper: '壁纸', skill: '技能', expert: '专家', workflow: '工作流',
 };
 export const TRUST_LABEL = ['官方', '已审核', '未审核'];

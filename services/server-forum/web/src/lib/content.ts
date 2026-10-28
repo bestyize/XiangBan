@@ -13,7 +13,6 @@ export const PACK_KINDS = [
   { key: 'skill', label: '技能' },
   { key: 'expert', label: '专家' },
   { key: 'workflow', label: '工作流' },
-  { key: 'scheme', label: '方案文件' },
 ] as const
 
 export function kindLabel(kind: string): string {

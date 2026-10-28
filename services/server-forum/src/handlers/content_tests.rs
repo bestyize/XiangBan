@@ -111,14 +111,14 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha}), false).await, StatusCode::UNAUTHORIZED);
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":999,"sha256":sha,"manifest":manifest("effect","sunset","1.0.0")}), true).await, StatusCode::CONFLICT);
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha}), true).await, StatusCode::BAD_REQUEST, "内容包回调必须带 manifest");
-    assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha,"manifest":manifest("scheme","sunset","1.0.0")}), true).await, StatusCode::BAD_REQUEST, "manifest 类型要与上传类型一致");
+    assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha,"manifest":manifest("reminder","sunset","1.0.0")}), true).await, StatusCode::BAD_REQUEST, "manifest 类型要与上传类型一致");
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha,"manifest":manifest("effect","sunset","1.0.0")}), true).await, StatusCode::OK);
 
     // 别人不能拿走这个文件；作者可以发布，并且是 T2、一键可用（effect）。
     let (s, _) = call(&app, "POST", "/api/packs", Some(&other_t), publish.clone()).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
     let mut wrong = publish.clone();
-    wrong["kind"] = json!("scheme");
+    wrong["kind"] = json!("reminder");
     let (s, _) = call(&app, "POST", "/api/packs", Some(&author_t), wrong).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "上传时的类型与发布类型不一致应拒绝");
     let (s, p) = call(&app, "POST", "/api/packs", Some(&author_t), publish.clone()).await;

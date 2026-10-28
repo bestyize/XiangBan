@@ -11,12 +11,12 @@ const MAX_PAYLOAD: u64 = 256 * 1024;
 const MB: u64 = 1024 * 1024;
 
 /// 纯数据类：包里只有 `manifest.json` 与 `payload.json`（可带说明文件），不含可执行内容。
-const PURE_DATA: &[&str] = &["effect", "scheme", "reminder", "routine", "task", "goal"];
+const PURE_DATA: &[&str] = &["effect", "reminder", "routine", "task", "goal"];
 
 /// 各类型压缩包大小上限，与论坛、资源机一致。
 pub fn size_limit(kind: &str) -> Option<u64> {
     match kind {
-        "effect" | "scheme" | "reminder" | "routine" | "task" | "goal" | "expert" => Some(MB),
+        "effect" | "reminder" | "routine" | "task" | "goal" | "expert" => Some(MB),
         "widget" | "game" | "skill" | "workflow" => Some(8 * MB),
         "wallpaper" => Some(32 * MB),
         _ => None,
