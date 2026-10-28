@@ -46,6 +46,7 @@ kotlin {
         }
         commonMain.dependencies {
             implementation(project(":business:xiaban"))
+            implementation(project(":business:community"))
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)

@@ -82,12 +82,13 @@ async function copyLink() {
           {{ pack.trust_level === 2 ? '这是用户发布、尚未审核的内容，不支持一键应用；' : '' }}在小伴桌面端会先展示它会做什么、需要哪些权限，由你确认后才安装。
         </p>
         <div class="actions">
-          <a class="btn btn-primary" :href="open">在小伴中打开</a>
+          <a class="btn btn-primary open-app" :href="open">在小伴中打开</a>
           <button class="btn" type="button" :disabled="busy" @click="download">下载压缩包</button>
           <button class="btn" type="button" @click="copyLink">复制链接</button>
           <RouterLink v-if="pack.topic_id" class="btn" :to="`/t/${pack.topic_id}`">看讨论</RouterLink>
         </div>
         <p class="hint">没有安装小伴？在桌面端“社区”页里也能找到它。</p>
+        <p class="hint only-phone">在手机上请先复制链接，到电脑上打开即可应用。</p>
       </div>
 
       <section v-if="pack.versions.length" class="versions">
@@ -163,6 +164,18 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+.only-phone {
+  display: none;
+}
+/* 手机不能应用内容包，只留下载与复制链接。 */
+@media (max-width: 767px) {
+  .open-app {
+    display: none;
+  }
+  .only-phone {
+    display: block;
+  }
 }
 .hint {
   margin: 8px 0 0;
