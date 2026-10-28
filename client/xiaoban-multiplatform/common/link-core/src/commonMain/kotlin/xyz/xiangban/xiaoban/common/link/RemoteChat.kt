@@ -17,6 +17,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -411,18 +412,35 @@ class RemoteChatController(
                 val sid = obj["session"].asStr()
                 if (peer == _state.value.selectedPeerId && (sid == null || sid == _state.value.selectedSessionId)) {
                     val rawMessages = obj["messages"]?.jsonArray.orEmpty()
+                    // 桌面按字节预算分页：`after` 为本页起点，`has_more` 为真时用 `cursor` 继续取。
+                    val after = obj["after"]?.jsonPrimitive?.intOrNull ?: 0
                     val turns = mutableListOf<RemoteTurn>()
                     for ((index, m) in rawMessages.withIndex()) {
                         val mObj = m.jsonObject
                         val role = mObj["role"].asStr() ?: "assistant"
                         val content = extractMessageText(mObj)
-                        turns.add(RemoteTurn(id = "snap-$index", role = role, text = content))
+                        turns.add(RemoteTurn(id = "snap-${after + index}", role = role, text = content))
                     }
-                    _state.value = _state.value.copy(messages = turns)
-                    val pendingObj = obj["pending"] as? JsonObject
-                    val req = parsePendingApprovals(pendingObj, sid.orEmpty())
-                    if (req != null) {
-                        _state.value = _state.value.copy(pendingApproval = req)
+                    val merged = if (after > 0) {
+                        val current = _state.value.messages
+                        current.filter { it.id.startsWith("snap-") } + turns + current.filter { !it.id.startsWith("snap-") }
+                    } else {
+                        turns
+                    }
+                    _state.value = _state.value.copy(messages = merged)
+                    val hasMore = obj["has_more"]?.jsonPrimitive?.booleanOrNull == true
+                    val cursor = obj["cursor"]?.jsonPrimitive?.intOrNull
+                    if (hasMore && cursor != null && cursor > after && sid != null) {
+                        sendJson(peer, buildJsonObject {
+                            put("t", "session.open")
+                            put("id", nextId())
+                            put("session", sid)
+                            put("after", cursor)
+                        })
+                    } else {
+                        // 最后一页：以桌面当前的待审批为准；没有待审批就收起可能已过期的卡片。
+                        val pendingObj = obj["pending"] as? JsonObject
+                        _state.value = _state.value.copy(pendingApproval = parsePendingApprovals(pendingObj, sid.orEmpty()))
                     }
                 }
             }

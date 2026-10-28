@@ -2161,6 +2161,7 @@ pub(crate) fn remote_sessions_list(app: &tauri::AppHandle, limit: usize, cursor:
     Ok(json!({ "items": slice, "cursor": next_cursor }))
 }
 
+/// 给手机的会话快照：精简投影 + 按字节预算分页。`after` 是原始消息下标；`has_more` 为真时手机用 `after = cursor` 取下一页。
 pub(crate) fn remote_session_snapshot(app: &tauri::AppHandle, session_id: &str, after: Option<usize>) -> Result<Value, String> {
     if session_id.starts_with("del-") {
         let task = app.state::<ChatState>().delegation.status(session_id)
@@ -2171,9 +2172,9 @@ pub(crate) fn remote_session_snapshot(app: &tauri::AppHandle, session_id: &str, 
         if !task.recent_output.trim().is_empty() {
             messages.push(Message::assistant(task.recent_output.clone(), Vec::new()));
         }
-        let total = messages.len();
-        let skip = after.unwrap_or(0).min(total);
-        let slice: Vec<Message> = messages.into_iter().skip(skip).collect();
+        let raw: Vec<Value> = messages.iter().filter_map(|m| serde_json::to_value(m).ok()).collect();
+        let after = after.unwrap_or(0).min(raw.len());
+        let page = crate::phone_wire::snapshot_page(&raw, after, crate::phone_wire::SNAPSHOT_PAGE_BYTES);
 
         let pending = if let Some(approval) = task.pending_approval {
             json!({
@@ -2191,27 +2192,31 @@ pub(crate) fn remote_session_snapshot(app: &tauri::AppHandle, session_id: &str, 
 
         return Ok(json!({
             "session": session_id,
-            "messages": slice,
+            "messages": page.messages,
             "state": if is_running { "running" } else { "idle" },
             "pending": pending,
-            "cursor": total,
+            "after": after,
+            "cursor": page.cursor,
+            "has_more": page.has_more,
         }));
     }
 
     checked_session_id(session_id)?;
     let dirs = Dirs::of(app)?;
     let messages = JsonlStore::new(dirs.sessions()).load(session_id).map_err(|e| e.to_string())?;
-    let total = messages.len();
-    let skip = after.unwrap_or(0).min(total);
-    let slice: Vec<Message> = messages.into_iter().skip(skip).collect();
+    let raw: Vec<Value> = messages.iter().filter_map(|m| serde_json::to_value(m).ok()).collect();
+    let after = after.unwrap_or(0).min(raw.len());
+    let page = crate::phone_wire::snapshot_page(&raw, after, crate::phone_wire::SNAPSHOT_PAGE_BYTES);
     let running = lock(&app.state::<ChatState>().runs).contains_key(session_id);
     let pending = app.state::<ChatState>().broker.snapshot(session_id);
     Ok(json!({
         "session": session_id,
-        "messages": slice,
+        "messages": page.messages,
         "state": if running { "running" } else { "idle" },
         "pending": pending,
-        "cursor": total,
+        "after": after,
+        "cursor": page.cursor,
+        "has_more": page.has_more,
     }))
 }
 
@@ -2304,6 +2309,10 @@ pub(crate) fn remote_answer_approval(app: &tauri::AppHandle, approval_id: &str, 
         };
         state.broker.answer_approval(approval_id, decision)
     } else if approval_id.starts_with('q') {
+        // 桌面重启后恢复的问题要重建运行现场，只能在电脑上处理。
+        if state.broker.recovered_question(approval_id).is_some() {
+            return Err("这个问题需要在电脑上处理".into());
+        }
         let answer = if choice.is_empty() || choice == "__dismiss__" {
             None
         } else {

@@ -112,4 +112,44 @@ class RemoteChatTest {
         link.emitEventForTest(LinkEvent.Message("dsk_1", resolved.encodeToByteArray()))
         assertNull(controller.state.value.pendingApproval)
     }
+
+    @Test
+    fun `paged snapshot appends pages, requests the next one and settles stale approvals on the last page`() = runTest {
+        val link = createLink()
+        link.start()
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"sessions.page","id":"1","items":[{"id":"s_1","title":"长对话","updated_at":1,"state":"idle"}]}""".encodeToByteArray()))
+
+        // 一张过期的审批卡片还挂在界面上
+        val stale = """{"t":"approval.request","id":"2","approval_id":"a_old","session":"s_1","title":"允许执行 ls？","risk":"low","options":[{"id":"once","label":"允许一次"}]}"""
+        link.emitEventForTest(LinkEvent.Message("dsk_1", stale.encodeToByteArray()))
+        assertNotNull(controller.state.value.pendingApproval)
+
+        val page1 = """{"t":"session.snapshot","id":"3","session":"s_1","after":0,"cursor":2,"has_more":true,"messages":[{"role":"user","parts":[{"type":"text","text":"一"}]},{"role":"assistant","parts":[{"type":"text","text":"二"}]}]}"""
+        link.emitEventForTest(LinkEvent.Message("dsk_1", page1.encodeToByteArray()))
+        assertEquals(listOf("一", "二"), controller.state.value.messages.map { it.text })
+        assertNotNull(controller.state.value.pendingApproval, "还有后续页时不提前改动审批卡片")
+
+        val page2 = """{"t":"session.snapshot","id":"4","session":"s_1","after":2,"cursor":3,"has_more":false,"messages":[{"role":"user","parts":[{"type":"text","text":"三"}]}],"pending":{}}"""
+        link.emitEventForTest(LinkEvent.Message("dsk_1", page2.encodeToByteArray()))
+        assertEquals(listOf("一", "二", "三"), controller.state.value.messages.map { it.text })
+        assertEquals(listOf("snap-0", "snap-1", "snap-2"), controller.state.value.messages.map { it.id })
+        assertNull(controller.state.value.pendingApproval, "最后一页没有待审批，过期卡片应被收起")
+    }
+
+    @Test
+    fun `expired approval reply clears the card`() = runTest {
+        val link = createLink()
+        link.start()
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        val req = """{"t":"approval.request","id":"2","approval_id":"a_9","session":"s_1","title":"允许？","risk":"low","options":[]}"""
+        link.emitEventForTest(LinkEvent.Message("dsk_1", req.encodeToByteArray()))
+        val expired = """{"t":"approval.resolved","id":"3","approval_id":"a_9","by":"expired","reason":"这个问题需要在电脑上处理"}"""
+        link.emitEventForTest(LinkEvent.Message("dsk_1", expired.encodeToByteArray()))
+        assertNull(controller.state.value.pendingApproval)
+    }
 }
