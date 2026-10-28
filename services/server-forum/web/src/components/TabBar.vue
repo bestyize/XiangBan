@@ -26,9 +26,17 @@ function me() {
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4z" /></svg>
       <span>首页</span>
     </RouterLink>
+    <RouterLink to="/resources" :class="{ on: route.name === 'resources' || route.name === 'pack' }">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>
+      <span>资源</span>
+    </RouterLink>
     <button type="button" class="compose" aria-label="发帖" @click="compose">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
     </button>
+    <RouterLink to="/weekly" :class="{ on: route.name === 'weekly' || route.name === 'weekly-issue' || route.name === 'projects' || route.name === 'project' }">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /></svg>
+      <span>周刊</span>
+    </RouterLink>
     <button type="button" :class="{ on: route.name === 'user' || route.name === 'settings' }" @click="me">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20c1-3.6 4-5.5 7.5-5.5s6.5 1.9 7.5 5.5" /></svg>
       <span>我的</span>
@@ -48,7 +56,7 @@ function me() {
     bottom: 0;
     z-index: 30;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     align-items: center;
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);

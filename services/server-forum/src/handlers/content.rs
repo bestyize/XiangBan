@@ -187,16 +187,16 @@ async fn get_pack(State(state): State<AppState>, MaybeUser(user): MaybeUser, Pat
     if !visible(&pack, user.as_ref().map(|u| u.uid)) {
         return Err(AppError::not_found("内容包"));
     }
-    let versions: Vec<(i32, String, i64, Value, String, DateTime<Utc>)> = sqlx::query_as(
-        "SELECT version, label, size, manifest, changelog, created_at FROM pack_versions WHERE pack_id = $1 ORDER BY version DESC",
+    let versions: Vec<(i32, String, String, i64, Value, String, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT version, label, sha256, size, manifest, changelog, created_at FROM pack_versions WHERE pack_id = $1 ORDER BY version DESC",
     )
     .bind(id)
     .fetch_all(&state.pool)
     .await?;
     let versions: Vec<Value> = versions
         .into_iter()
-        .map(|(version, label, size, manifest, changelog, created_at)| {
-            json!({ "version": version, "label": label, "size": size, "manifest": manifest, "changelog": changelog, "created_at": created_at })
+        .map(|(version, label, sha256, size, manifest, changelog, created_at)| {
+            json!({ "version": version, "label": label, "sha256": sha256, "size": size, "manifest": manifest, "changelog": changelog, "created_at": created_at })
         })
         .collect();
     let mut body = pack.json(&state);
