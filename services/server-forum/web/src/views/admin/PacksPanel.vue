@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 内容包：待审队列、全部内容包的上下架与审核，以及官方直接登记。
 import { onMounted, reactive, ref } from 'vue'
-import { adminApi, type AdminPack, type ModerationRow, type PackReviewAction } from '@/api/admin'
+import { adminApi, type AdminPack, type PackReviewAction } from '@/api/admin'
 import { kindLabel, PACK_KINDS, trustLabel } from '@/lib/content'
 import AdminPager from './AdminPager.vue'
 import { fmtTime, perform, usePagedList } from './shared'
@@ -12,17 +12,12 @@ const status = ref('')
 const kind = ref('')
 const list = usePagedList<AdminPack>((page, size) => adminApi.packs({ status: status.value, kind: kind.value, page, page_size: size }), 30)
 
-const queue = ref<ModerationRow[]>([])
-async function loadQueue() {
-  queue.value = (await adminApi.moderationQueue()).items
-}
-
 async function review(id: number, action: PackReviewAction, confirmText?: string) {
   if (confirmText && !window.confirm(confirmText)) return
   const note = action === 'reject' ? (window.prompt('拒绝原因（会记录在操作日志里）') ?? '') : ''
   if (action === 'reject' && !note.trim()) return
   const ok = await perform(() => adminApi.reviewPack(id, action, note.trim()), '已处理')
-  if (ok) await Promise.all([list.load(), loadQueue()])
+  if (ok) await list.load()
 }
 
 // ───────── 官方登记 ─────────
@@ -86,34 +81,10 @@ async function register() {
   }
 }
 
-onMounted(() => {
-  list.load()
-  loadQueue()
-})
+onMounted(list.load)
 </script>
 
 <template>
-  <section v-if="queue.length" class="panel adm-card">
-    <h2 class="adm-section-title">待审 {{ queue.length }}</h2>
-    <table class="adm-table">
-      <thead>
-        <tr><th>内容</th><th>类型</th><th>作者</th><th>提交时间</th><th>操作</th></tr>
-      </thead>
-      <tbody>
-        <tr v-for="q in queue" :key="q.id">
-          <td data-label="内容"><RouterLink :to="`/packs/${q.target_id}`" target="_blank">{{ q.title ?? `#${q.target_id}` }}</RouterLink></td>
-          <td data-label="类型">{{ q.kind ? kindLabel(q.kind) : '-' }}</td>
-          <td data-label="作者">{{ q.author ?? '-' }}</td>
-          <td data-label="提交时间" class="shrink">{{ fmtTime(q.created_at) }}</td>
-          <td data-label="操作" class="adm-actions">
-            <button class="btn btn-sm btn-primary" @click="review(q.target_id, 'approve')">通过</button>
-            <button class="btn btn-sm" @click="review(q.target_id, 'reject')">拒绝</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </section>
-
   <div class="adm-toolbar">
     <select v-model="status" class="select" aria-label="状态" @change="list.search()">
       <option value="">全部状态</option>

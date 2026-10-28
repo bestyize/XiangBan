@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import TopicList from '@/components/TopicList.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { api } from '@/api/forum'
@@ -7,12 +8,33 @@ import { useTopicList } from '@/lib/useList'
 import { TRUST_LABEL } from '@/lib/format'
 import { useHead } from '@/lib/head'
 import { THEME_OPTIONS, useTheme } from '@/lib/theme'
+import { analyticsEnabled, setAnalyticsEnabled } from '@/lib/analytics'
 
 useHead(() => ({ title: '收藏与设置' }))
 const session = useSession()
 const { preference, setPreference } = useTheme()
 
 const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
+
+const statsOn = ref(analyticsEnabled())
+function toggleStats() {
+  statsOn.value = !statsOn.value
+  setAnalyticsEnabled(statsOn.value)
+}
+
+const blocked = ref<{ uid: string; nickname: string }[]>([])
+async function loadBlocks() {
+  try {
+    blocked.value = (await api.myBlocks()).items
+  } catch {
+    blocked.value = []
+  }
+}
+async function unblock(uid: string) {
+  await api.block(uid, false)
+  await loadBlocks()
+}
+onMounted(loadBlocks)
 </script>
 
 <template>
@@ -43,6 +65,27 @@ const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
       <h2 id="bm-title">我的收藏</h2>
       <TopicList :items="bookmarks.items.value" :loading="bookmarks.loading.value" empty="还没有收藏。看到有用的帖子，点帖子下方的收藏就能存到这里。" />
       <PagerNav :page="bookmarks.page.value" :page-size="bookmarks.pageSize.value" :total="bookmarks.total.value" @go="bookmarks.go" />
+    </section>
+
+    <section class="block" aria-labelledby="stats-title">
+      <h2 id="stats-title">匿名统计</h2>
+      <div class="panel box">
+        <p class="muted">用来了解哪些内容有人看、有人用。只记匿名设备做过哪类操作的次数，不关联账号，不记录内容、搜索词和文件名。</p>
+        <button type="button" class="btn btn-sm" role="switch" :aria-checked="statsOn" @click="toggleStats">{{ statsOn ? '已开启，点击关闭' : '已关闭，点击开启' }}</button>
+      </div>
+    </section>
+
+    <section class="block" aria-labelledby="blocks-title">
+      <h2 id="blocks-title">屏蔽的用户</h2>
+      <div class="panel box">
+        <p v-if="!blocked.length" class="muted">没有屏蔽任何人。在对方的主页可以屏蔽。</p>
+        <ul v-else class="blocked-list">
+          <li v-for="u in blocked" :key="u.uid">
+            <RouterLink :to="`/u/${u.uid}`">{{ u.nickname }}</RouterLink>
+            <button type="button" class="btn btn-sm" @click="unblock(u.uid)">取消屏蔽</button>
+          </li>
+        </ul>
+      </div>
     </section>
 
     <section class="block" aria-labelledby="profile-title">
@@ -184,5 +227,17 @@ h2 {
   .row .btn {
     margin-top: 0;
   }
+}
+.blocked-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.blocked-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>

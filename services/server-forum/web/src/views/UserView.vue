@@ -32,6 +32,7 @@ const profile = ref<Profile | null>(null)
 const missing = ref(false)
 const replies = ref<UserReply[]>([])
 const followBusy = ref(false)
+const blockBusy = ref(false)
 let profileSeq = 0
 
 useHead(() => ({ title: profile.value?.nickname ?? '用户' }))
@@ -55,6 +56,25 @@ watch(
   },
   { immediate: true },
 )
+
+async function toggleBlock() {
+  if (!session.requireLogin() || blockBusy.value || !profile.value) return
+  const current = profile.value
+  if (!current.blocked && !window.confirm(`屏蔽 ${current.nickname}？他的帖子不会再出现在你的列表和搜索里，回复会被折叠，你们会互相取消关注。对方不会收到提示。`)) return
+  blockBusy.value = true
+  try {
+    const res = await api.block(current.uid, !current.blocked)
+    if (profile.value === current) {
+      current.blocked = res.blocked
+      if (res.blocked) current.following = false
+    }
+    toast.show(res.blocked ? '已屏蔽' : '已取消屏蔽')
+  } catch (e) {
+    toast.error(e)
+  } finally {
+    blockBusy.value = false
+  }
+}
 
 async function toggleFollow() {
   if (!session.requireLogin() || followBusy.value || !profile.value) return
@@ -119,6 +139,7 @@ watch([uid, () => session.user?.uid], () => (replies.value = []), { flush: 'sync
           :aria-pressed="profile.following"
           @click="toggleFollow"
         >{{ followBusy ? '处理中…' : profile.following ? '已关注 · 取消' : '+ 关注' }}</button>
+        <button v-if="!isMe" type="button" class="btn btn-sm edit" :disabled="blockBusy" @click="toggleBlock">{{ profile.blocked ? '取消屏蔽' : '屏蔽' }}</button>
       </header>
 
       <div class="tabs" role="tablist">

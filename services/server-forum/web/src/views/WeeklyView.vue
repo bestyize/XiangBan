@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import ContentShell from '@/components/ContentShell.vue'
+import PosterDialog from '@/components/PosterDialog.vue'
 import PackCard from '@/components/PackCard.vue'
 import { ApiError } from '@/api/forum'
 import { contentApi, type WeeklyDetail } from '@/api/content'
@@ -12,6 +13,10 @@ const route = useRoute()
 const toast = useToast()
 const issue = ref<WeeklyDetail | null>(null)
 const missing = ref(false)
+const posterOpen = ref(false)
+const posterInput = computed(() =>
+  issue.value ? { tag: `周刊 ${issue.value.week}`, title: issue.value.title, summary: issue.value.summary || '本周精选', url: `${window.location.origin}/weekly/${issue.value.week}`, seed: issue.value.week.length } : null,
+)
 
 useHead(() => ({ title: issue.value ? `${issue.value.title}（${issue.value.week}）` : '周刊' }))
 
@@ -39,6 +44,7 @@ watch(
       <p class="week">{{ issue.week }}</p>
       <h1>{{ issue.title }}</h1>
       <p v-if="issue.summary" class="lead">{{ issue.summary }}</p>
+      <button class="btn btn-sm" type="button" @click="posterOpen = true">生成海报</button>
       <section v-for="(it, i) in issue.items" :key="i" class="entry">
         <template v-if="it.type === 'pack'">
           <PackCard :pack="it" wide />
@@ -56,6 +62,7 @@ watch(
       </section>
     </article>
   </ContentShell>
+  <PosterDialog :open="posterOpen" :poster="posterInput" :name="issue?.week ?? ''" @close="posterOpen = false" />
 </template>
 
 <style scoped>

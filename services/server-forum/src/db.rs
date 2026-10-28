@@ -242,6 +242,7 @@ pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     sqlx::raw_sql(SCHEMA).execute(pool).await?;
     sqlx::raw_sql(POINTS_SCHEMA).execute(pool).await?;
     sqlx::raw_sql(CONTENT_SCHEMA).execute(pool).await?;
+    sqlx::raw_sql(COMPLIANCE_SCHEMA).execute(pool).await?;
     // 搜索用的三元组索引是可选的：数据库没有 pg_trgm 扩展时退化为普通 ILIKE 扫描。
     if sqlx::raw_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm").execute(pool).await.is_ok() {
         let _ = sqlx::raw_sql(
@@ -940,3 +941,52 @@ mod removal_tests {
         Ok(())
     }
 }
+
+/// 开放用户发布前的合规项：敏感词表。
+const COMPLIANCE_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS sensitive_words (
+    id         SERIAL PRIMARY KEY,
+    word       TEXT NOT NULL UNIQUE,
+    action     TEXT NOT NULL CHECK (action IN ('block', 'review')),
+    created_by TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 屏蔽用户：屏蔽者在列表、搜索、回复里不再看到对方的内容，也不会收到对方带来的通知。
+CREATE TABLE IF NOT EXISTS user_blocks (
+    blocker    UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    blocked    UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (blocker, blocked),
+    CHECK (blocker <> blocked)
+);
+CREATE INDEX IF NOT EXISTS user_blocks_blocked_idx ON user_blocks (blocked);
+
+-- 站内通知：标题与摘要是写入时的快照。
+CREATE TABLE IF NOT EXISTS notifications (
+    id         BIGSERIAL PRIMARY KEY,
+    uid        UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,
+    actor_uid  UUID REFERENCES users(uid) ON DELETE SET NULL,
+    topic_id   BIGINT REFERENCES topics(id) ON DELETE CASCADE,
+    post_id    BIGINT,
+    pack_id    BIGINT REFERENCES packs(id) ON DELETE CASCADE,
+    title      TEXT NOT NULL DEFAULT '',
+    excerpt    TEXT NOT NULL DEFAULT '',
+    read_at    TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications (uid, id DESC);
+CREATE INDEX IF NOT EXISTS notifications_unread_idx ON notifications (uid) WHERE read_at IS NULL;
+
+-- 匿名埋点：某匿名设备某天某事件几次。不记账号、内容、搜索词，不保存行为流。
+CREATE TABLE IF NOT EXISTS events_daily (
+    day    DATE NOT NULL,
+    name   TEXT NOT NULL,
+    dim    TEXT NOT NULL DEFAULT '-',
+    device TEXT NOT NULL,
+    count  INT NOT NULL DEFAULT 1,
+    PRIMARY KEY (day, name, dim, device)
+);
+CREATE INDEX IF NOT EXISTS events_daily_device_idx ON events_daily (device, day);
+"#;

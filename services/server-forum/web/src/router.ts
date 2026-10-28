@@ -2,6 +2,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
 import DiscussView from '@/views/DiscussView.vue'
 import { useSession } from '@/stores/session'
+import { trackRoute } from '@/lib/analytics'
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
@@ -23,6 +24,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/search', name: 'search', component: () => import('@/views/SearchView.vue') },
   { path: '/u/:uid', name: 'user', component: () => import('@/views/UserView.vue') },
   { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { auth: true } },
+  { path: '/notifications', name: 'notifications', component: () => import('@/views/NotificationsView.vue'), meta: { auth: true } },
   { path: '/points', name: 'points', component: () => import('@/views/PointsView.vue'), meta: { auth: true } },
   { path: '/rules', name: 'rules', component: () => import('@/views/StaticView.vue'), props: { page: 'rules' } },
   { path: '/terms', name: 'terms', component: () => import('@/views/StaticView.vue'), props: { page: 'terms' } },
@@ -41,6 +43,8 @@ export const router = createRouter({
     return { top: 0 }
   },
 })
+
+router.afterEach(to => trackRoute(to.name, to.query))
 
 // 需要登录的页面：没登录就弹登录框，停在原页面（直接打开时回首页）。
 router.beforeEach((to, from) => {

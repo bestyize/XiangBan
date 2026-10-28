@@ -76,6 +76,11 @@ pub async fn accept(
         Some(author), &id.to_string(), "回答被采纳，获得悬赏").await?;
     sqlx::query("UPDATE help_requests SET status = 'solved', accepted_post_id = $2, settled_at = now() WHERE topic_id = $1")
         .bind(id).bind(input.post_id).execute(&mut *tx).await?;
+    let (title,): (String,) = sqlx::query_as("SELECT title FROM topics WHERE id = $1").bind(id).fetch_one(&mut *tx).await?;
+    crate::notifications::notify(&mut tx, winner, &crate::notifications::Note {
+        kind: crate::notifications::ACCEPTED, actor: Some(author), topic_id: Some(id), post_id: Some(input.post_id),
+        pack_id: None, title: &title, excerpt: "",
+    }).await?;
     tx.commit().await?;
     Ok(Json(json!({ "status": "solved", "accepted_post_id": input.post_id, "bounty": request.bounty })))
 }

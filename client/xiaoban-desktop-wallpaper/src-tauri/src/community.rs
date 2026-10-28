@@ -23,6 +23,68 @@ pub struct CommunityState {
 }
 struct Staged { token: String, pack_id: i64, version: i32, kind: String, payload: Value, can_apply: bool }
 
+/// Anonymous usage counts (PRD §8.3): a random device id that is not tied to any account, a fixed list of event names,
+/// and at most a pack kind. No content, file names or search words are ever sent. Off with one switch; failures are ignored.
+const DESKTOP_EVENTS: [&str; 6] = [
+    "desktop_community_open", "desktop_apply_open", "desktop_apply_confirm", "desktop_apply_success", "desktop_apply_cancel", "desktop_scheme_replicate",
+];
+
+fn analytics_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> { Ok(crate::storage::root(app)?.join("config")) }
+
+fn analytics_enabled(app: &tauri::AppHandle) -> bool {
+    analytics_dir(app).is_ok_and(|dir| !dir.join("community-analytics-off").exists())
+}
+
+/// The device id lives in one small file; turning statistics off deletes it, so turning them on again starts a new anonymous device.
+fn device_id(app: &tauri::AppHandle) -> Option<String> {
+    let path = analytics_dir(app).ok()?.join("community-device");
+    if let Ok(text) = std::fs::read_to_string(&path) {
+        let id = text.trim().to_string();
+        if (16..=64).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-') { return Some(id); }
+    }
+    let mut random = [0u8; 16];
+    getrandom::fill(&mut random).ok()?;
+    let id: String = random.iter().map(|b| format!("{b:02x}")).collect();
+    std::fs::create_dir_all(path.parent()?).ok()?;
+    std::fs::write(&path, &id).ok()?;
+    Some(id)
+}
+
+pub fn track(app: &tauri::AppHandle, name: &'static str, dim: Option<String>) {
+    if !DESKTOP_EVENTS.contains(&name) || !analytics_enabled(app) { return; }
+    let Some(device) = device_id(app) else { return };
+    std::thread::spawn(move || {
+        if let Ok(client) = community::Community::new(&origin()) { client.track(&device, &[(name, dim.as_deref())]); }
+    });
+}
+
+#[tauri::command]
+pub fn community_analytics_get(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<bool, String> {
+    control(&window)?;
+    Ok(analytics_enabled(&app))
+}
+
+#[tauri::command]
+pub fn community_analytics_set(app: tauri::AppHandle, window: tauri::WebviewWindow, on: bool) -> Result<(), String> {
+    control(&window)?;
+    let dir = analytics_dir(&app)?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let off = dir.join("community-analytics-off");
+    if on { let _ = std::fs::remove_file(&off); } else {
+        std::fs::write(&off, b"off").map_err(|e| e.to_string())?;
+        let _ = std::fs::remove_file(dir.join("community-device"));
+    }
+    Ok(())
+}
+
+/// Events the console itself notices (the page opened, a confirmation was cancelled, a scheme was replicated).
+#[tauri::command]
+pub fn community_track(app: tauri::AppHandle, window: tauri::WebviewWindow, name: String, dim: Option<String>) -> Result<(), String> {
+    control(&window)?;
+    if let Some(known) = DESKTOP_EVENTS.iter().find(|e| **e == name) { track(&app, *known, dim); }
+    Ok(())
+}
+
 fn control(window: &tauri::WebviewWindow) -> Result<(), String> {
     if window.label() != "control" { return Err("只有设置面板可以使用社区内容".into()); }
     Ok(())
@@ -107,6 +169,7 @@ pub async fn community_prepare(
         *app.state::<CommunityState>().staged.lock().unwrap_or_else(|e| e.into_inner()) = Some(Staged {
             token: token.clone(), pack_id: info.pack_id, version: info.version, kind: info.kind.clone(), payload, can_apply,
         });
+        track(&app, "desktop_apply_open", Some(info.kind.clone()));
         Ok(json!({
             "token": token, "packId": info.pack_id, "kind": info.kind, "title": found.manifest["name"],
             "version": info.label, "trustLevel": info.trust_level, "canApply": can_apply, "size": info.size,
@@ -130,6 +193,7 @@ pub async fn community_apply(app: tauri::AppHandle, window: tauri::WebviewWindow
         }
     };
     if !staged.can_apply { return Err("这个内容还没有通过审核，不能一键应用".into()); }
+    track(&app, "desktop_apply_confirm", Some(staged.kind.clone()));
     tauri::async_runtime::spawn_blocking(move || {
         // `status` tells the console what to do next: "applied" is finished; "task" and "goal" hand the template to the
         // console, which puts it in front of the user to start themselves (nothing is sent or created here).
@@ -151,6 +215,7 @@ pub async fn community_apply(app: tauri::AppHandle, window: tauri::WebviewWindow
             other => return Err(format!("不支持应用「{other}」类型的内容包")),
         };
         if let Ok(client) = community::Community::new(&origin()) { client.report_applied(staged.pack_id, staged.version); }
+        track(&app, "desktop_apply_success", Some(staged.kind.clone()));
         Ok(result)
     }).await.map_err(|e| e.to_string())?
 }

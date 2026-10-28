@@ -54,6 +54,10 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   'category.update': '修改分类',
   'product.create': '新建产品',
   'product.update': '修改产品',
+  'words.add': '添加敏感词',
+  'words.delete': '删除敏感词',
+  'moderation.approve': '审核通过',
+  'moderation.reject': '审核拒绝',
   'pack.create': '登记内容包',
   'pack.approve': '通过内容包审核',
   'pack.reject': '拒绝内容包',
@@ -73,6 +77,7 @@ export const AUDIT_TARGETS: Record<string, string> = {
   category: '分类',
   product: '产品',
   pack: '内容包',
+  words: '敏感词',
   project: '项目',
   weekly: '周刊',
 }

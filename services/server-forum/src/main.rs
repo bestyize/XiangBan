@@ -1,3 +1,4 @@
+mod analytics;
 mod auth;
 mod config;
 mod content;
@@ -7,6 +8,8 @@ mod handlers;
 mod jobs;
 mod markdown;
 mod models;
+mod moderation;
+mod notifications;
 mod points;
 mod seo;
 mod state;
@@ -19,7 +22,7 @@ use axum::{
     Router,
 };
 use config::AppConfig;
-use handlers::{admin, attachments, content as packs, follows, help, images, interact, me, meta, posts, topics};
+use handlers::{admin, analytics as metrics, attachments, blocks, content as packs, follows, help, images, interact, me, meta, moderation as review, notifications as inbox, posts, topics};
 use state::AppState;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::{
@@ -44,6 +47,12 @@ pub fn build_router(state: AppState) -> Router {
         .route("/me/following/topics", get(follows::topics))
         .route("/users/{uid}", get(me::profile))
         .route("/users/{uid}/follow", put(follows::follow).delete(follows::unfollow))
+        .route("/users/{uid}/block", put(blocks::block).delete(blocks::unblock))
+        .route("/me/blocks", get(blocks::list))
+        .route("/events", post(metrics::ingest))
+        .route("/me/notifications", get(inbox::list))
+        .route("/me/notifications/unread", get(inbox::unread_count))
+        .route("/me/notifications/read", post(inbox::mark_read))
         .route("/users/{uid}/following", get(follows::following))
         .route("/users/{uid}/followers", get(follows::followers))
         .route("/users/{uid}/topics", get(me::user_topics))
@@ -76,7 +85,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
         .route("/attachments/{id}/purchase", post(attachments::purchase))
         .merge(packs::routes())
-        .nest("/admin", admin::routes().merge(packs::admin_routes()))
+        .nest("/admin", admin::routes().merge(packs::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()))
         .nest("/editor", handlers::editor::routes());
 
     // 凭证只走 Authorization 头，不用 Cookie，跨域放开不构成 CSRF 面。

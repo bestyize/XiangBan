@@ -142,6 +142,21 @@ export interface PostItem {
   edited_at: string | null
   liked: boolean
   mine: boolean
+  /** 你屏蔽了这个作者：正文不返回，界面折叠 */
+  blocked: boolean
+}
+
+export interface NotificationItem {
+  id: number
+  kind: 'reply' | 'reply_to' | 'mention' | 'accepted' | 'pack_approved' | 'pack_rejected'
+  actor: { uid: string; nickname: string | null; avatar_url: string | null } | null
+  topic_id: number | null
+  post_id: number | null
+  pack_id: number | null
+  title: string
+  excerpt: string
+  read: boolean
+  created_at: string
 }
 
 export interface Page<T> {
@@ -159,6 +174,8 @@ export interface Profile extends PublicUser {
   post_count: number
   banned: boolean
   following: boolean
+  /** 你是否屏蔽了这个用户 */
+  blocked: boolean
   following_count: number
   follower_count: number
 }

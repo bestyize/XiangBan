@@ -321,6 +321,216 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     let (s, _) = call(&app, "POST", "/api/packs/upload-ticket", Some(&other_t), json!({"kind":"effect","size":10,"sha256":"d".repeat(64)})).await;
     assert_eq!(s, StatusCode::TOO_MANY_REQUESTS);
 
+    // 敏感词：拦截的不让发（不暴露词），复核的先发布并进队列；归一化后加空格也挡得住。
+    let (s, _) = call(&app, "POST", "/api/admin/words", Some(&author_t), json!({"words":"违禁词","action":"block"})).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, _) = call(&app, "POST", "/api/admin/words", Some(&admin_t), json!({"words":"字","action":"block"})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "单字不收");
+    let (s, w) = call(&app, "POST", "/api/admin/words", Some(&admin_t), json!({"words":"违禁词, 拦截句","action":"block"})).await;
+    assert_eq!(s, StatusCode::OK, "{w}");
+    assert_eq!(w["added"], 2);
+    call(&app, "POST", "/api/admin/words", Some(&admin_t), json!({"words":"复核词","action":"review"})).await;
+    let (_, words) = call(&app, "GET", "/api/admin/words", Some(&admin_t), Value::Null).await;
+    assert_eq!(words["items"].as_array().unwrap().len(), 3);
+
+    let (cat,): (i32,) = sqlx::query_as("SELECT id FROM categories WHERE slug = 'xiaoban-wallpaper'").fetch_one(&pool).await?;
+    let topic = |title: &str, body: &str| json!({"category_id": cat, "title": title, "body": body});
+    let (s, _) = call(&app, "POST", "/api/topics", Some(&author_t), topic("正常的标题啊", "这是一段正常的正文内容")).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, e) = call(&app, "POST", "/api/topics", Some(&author_t), topic("带违 禁 词的标题", "这是一段正常的正文内容")).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert!(!e["message"].as_str().unwrap().contains("违禁"), "不能告诉用户命中了哪个词");
+    let (s, t) = call(&app, "POST", "/api/topics", Some(&author_t), topic("另一个正常标题", "正文里有复核词，应该先发布再复核")).await;
+    assert_eq!(s, StatusCode::OK, "复核词不拦截：{t}");
+    let topic_id = t["id"].as_i64().unwrap();
+    let (s, r) = call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&other_t), json!({"body": "回复里也有 复核 词 呢"})).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let (s, _) = call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&other_t), json!({"body": "回复里有拦截句"})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    let (_, q) = call(&app, "GET", "/api/admin/moderation", Some(&admin_t), Value::Null).await;
+    let items = q["items"].as_array().unwrap();
+    let topic_entry = items.iter().find(|i| i["target_type"] == "topic").expect("帖子进了队列");
+    assert_eq!(topic_entry["target_id"], topic_id);
+    assert!(topic_entry["note"].as_str().unwrap().contains("复核词"));
+    let post_entry = items.iter().find(|i| i["target_type"] == "post").expect("回复进了队列");
+    assert_eq!(post_entry["topic_id"], topic_id, "回复带着所在帖子，后台可以跳过去");
+    let (s, _) = call(&app, "POST", &format!("/api/admin/moderation/{}/resolve", topic_entry["id"]), Some(&admin_t), json!({"action":"reject"})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "帖子要到帖子管理里隐藏");
+    let (s, _) = call(&app, "POST", &format!("/api/admin/moderation/{}/resolve", topic_entry["id"]), Some(&admin_t), json!({"action":"approve","note":"没问题"})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = call(&app, "POST", &format!("/api/admin/moderation/{}/resolve", topic_entry["id"]), Some(&admin_t), json!({"action":"approve"})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "不能重复处理");
+
+    // 方案同样过词表；复核的方案被拒后下架。
+    let (s, _) = call(&app, "POST", "/api/schemes", Some(&author_t), json!({"title":"违禁词方案","items":[{"pack_id":oid}]})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, sc2) = call(&app, "POST", "/api/schemes", Some(&author_t), json!({"title":"复核词方案","items":[{"pack_id":oid}]})).await;
+    assert_eq!(s, StatusCode::OK, "{sc2}");
+    let (_, q) = call(&app, "GET", "/api/admin/moderation", Some(&admin_t), Value::Null).await;
+    let scheme_entry = q["items"].as_array().unwrap().iter().find(|i| i["target_type"] == "scheme").expect("方案进了队列");
+    let (s, _) = call(&app, "POST", &format!("/api/admin/moderation/{}/resolve", scheme_entry["id"]), Some(&admin_t), json!({"action":"reject","note":"不合适"})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, listed) = call(&app, "GET", "/api/schemes", None, Value::Null).await;
+    assert!(listed["items"].as_array().unwrap().iter().all(|i| i["title"] != "复核词方案"));
+
+    // 删掉词之后恢复可发。
+    let blocked_id = words["items"].as_array().unwrap().iter().find(|i| i["word"] == "违禁词").unwrap()["id"].clone();
+    let (s, _) = call(&app, "DELETE", &format!("/api/admin/words/{blocked_id}"), Some(&admin_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = call(&app, "POST", "/api/schemes", Some(&author_t), json!({"title":"违禁词方案","items":[{"pack_id":oid}]})).await;
+    assert_eq!(s, StatusCode::OK);
+
+    // 屏蔽用户：对方的帖子从列表消失，回复折叠；互相取消关注；对方不会收到任何提示。
+    let (s, _) = call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&author_t), json!({"body": "作者自己的一条回复"})).await;
+    assert_eq!(s, StatusCode::OK);
+    call(&app, "PUT", &format!("/api/users/{author}/follow"), Some(&other_t), Value::Null).await;
+    let titles = |v: &Value| v["items"].as_array().unwrap().iter().map(|i| i["title"].as_str().unwrap().to_string()).collect::<Vec<_>>();
+    let (_, before) = call(&app, "GET", "/api/topics", Some(&other_t), Value::Null).await;
+    assert!(titles(&before).contains(&"另一个正常标题".to_string()));
+
+    let (s, _) = call(&app, "PUT", &format!("/api/users/{other}/block"), Some(&other_t), Value::Null).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "不能屏蔽自己");
+    let (s, _) = call(&app, "PUT", &format!("/api/users/{}/block", Uuid::new_v4()), Some(&other_t), Value::Null).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, b) = call(&app, "PUT", &format!("/api/users/{author}/block"), Some(&other_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let (s, _) = call(&app, "PUT", &format!("/api/users/{author}/block"), Some(&other_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK, "重复屏蔽是幂等的");
+
+    let (_, after) = call(&app, "GET", "/api/topics", Some(&other_t), Value::Null).await;
+    assert!(!titles(&after).contains(&"另一个正常标题".to_string()), "被屏蔽作者的帖子不出现在列表里");
+    let (_, anon) = call(&app, "GET", "/api/topics", None, Value::Null).await;
+    assert!(titles(&anon).contains(&"另一个正常标题".to_string()), "不影响其他读者");
+    let (_, author_view) = call(&app, "GET", "/api/topics", Some(&author_t), Value::Null).await;
+    assert!(titles(&author_view).contains(&"另一个正常标题".to_string()), "作者看不出自己被屏蔽");
+    let (_, found) = call(&app, "GET", "/api/search?q=%E5%8F%A6%E4%B8%80%E4%B8%AA", Some(&other_t), Value::Null).await;
+    assert!(found["items"].as_array().unwrap().is_empty(), "搜索也过滤");
+
+    let (_, posts) = call(&app, "GET", &format!("/api/topics/{topic_id}/posts"), Some(&other_t), Value::Null).await;
+    let mine_view = posts["items"].as_array().unwrap().iter().find(|p| p["author"]["uid"] == author.to_string()).unwrap();
+    assert_eq!(mine_view["blocked"], true);
+    assert_eq!(mine_view["body_html"], "");
+    let (_, posts) = call(&app, "GET", &format!("/api/topics/{topic_id}/posts"), None, Value::Null).await;
+    assert!(posts["items"].as_array().unwrap().iter().all(|p| p["blocked"] == false && p["body_html"] != ""));
+
+    let (_, profile) = call(&app, "GET", &format!("/api/users/{author}"), Some(&other_t), Value::Null).await;
+    assert_eq!(profile["blocked"], true);
+    assert_eq!(profile["follower_count"], 0, "屏蔽时取消了关注");
+    let (_, list) = call(&app, "GET", "/api/me/blocks", Some(&other_t), Value::Null).await;
+    assert_eq!(list["items"].as_array().unwrap().len(), 1);
+    let (s, _) = call(&app, "GET", "/api/me/blocks", None, Value::Null).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+
+    call(&app, "DELETE", &format!("/api/users/{author}/block"), Some(&other_t), Value::Null).await;
+    let (_, restored) = call(&app, "GET", "/api/topics", Some(&other_t), Value::Null).await;
+    assert!(titles(&restored).contains(&"另一个正常标题".to_string()), "取消屏蔽后恢复");
+
+    // 站内通知：回复、被回复、被 @、回答被采纳、内容包审核结果；自己对自己不通知，屏蔽后对方的动作不通知。
+    let nick = |uid: Uuid| {
+        let pool = pool.clone();
+        async move { sqlx::query_as::<_, (String,)>("SELECT nickname FROM users WHERE uid = $1").bind(uid).fetch_one(&pool).await.map(|r| r.0) }
+    };
+    let (author_nick, other_nick) = (nick(author).await?, nick(other).await?);
+    call(&app, "POST", "/api/me/notifications/read", Some(&author_t), Value::Null).await;
+    call(&app, "POST", "/api/me/notifications/read", Some(&other_t), Value::Null).await;
+    let unread = |t: String| {
+        let app = app.clone();
+        async move { call(&app, "GET", "/api/me/notifications/unread", Some(&t), Value::Null).await.1["unread"].as_i64().unwrap() }
+    };
+    assert_eq!(unread(author_t.clone()).await, 0);
+    let (s, _) = call(&app, "GET", "/api/me/notifications/unread", None, Value::Null).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+
+    // other 回复 author 的帖子 → author 收到一条 reply。
+    let (_, reply1) = call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&other_t), json!({"body": "我来回复一下这个帖子"})).await;
+    let reply1_id = reply1["id"].as_i64().unwrap();
+    assert_eq!(unread(author_t.clone()).await, 1);
+    let (_, list) = call(&app, "GET", "/api/me/notifications", Some(&author_t), Value::Null).await;
+    assert_eq!(list["items"][0]["kind"], "reply");
+    assert_eq!(list["items"][0]["actor"]["nickname"], other_nick);
+    assert_eq!(list["items"][0]["title"], "另一个正常标题");
+    assert_eq!(list["items"][0]["read"], false);
+
+    // author 回复 other 的楼层并 @ 他：只收到一条 reply_to，不重复 mention。
+    call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&author_t), json!({"body": format!("回你一下 @{other_nick}"), "reply_to": reply1_id})).await;
+    assert_eq!(unread(other_t.clone()).await, 1);
+    let (_, list) = call(&app, "GET", "/api/me/notifications?unread=true", Some(&other_t), Value::Null).await;
+    assert_eq!(list["items"][0]["kind"], "reply_to");
+    // 单独 @ 他：mention；@ 自己和不存在的人不通知。
+    call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&author_t), json!({"body": format!("看这里 @{other_nick} @{author_nick} @没有这个人")})).await;
+    assert_eq!(unread(other_t.clone()).await, 2);
+    assert_eq!(unread(author_t.clone()).await, 1, "自己对自己、@ 自己都不通知");
+
+    // 标记已读：按编号和全部。
+    let first = list["items"][0]["id"].as_i64().unwrap();
+    call(&app, "POST", "/api/me/notifications/read", Some(&other_t), json!({"ids": [first]})).await;
+    assert_eq!(unread(other_t.clone()).await, 1);
+    call(&app, "POST", "/api/me/notifications/read", Some(&other_t), Value::Null).await;
+    assert_eq!(unread(other_t.clone()).await, 0);
+    let (_, all) = call(&app, "GET", "/api/me/notifications", Some(&other_t), Value::Null).await;
+    assert!(all["items"].as_array().unwrap().iter().all(|n| n["read"] == true));
+
+    // other 屏蔽 author 后，author 的回复不再通知 other。
+    call(&app, "PUT", &format!("/api/users/{author}/block"), Some(&other_t), Value::Null).await;
+    call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&author_t), json!({"body": format!("再提一次 @{other_nick}"), "reply_to": reply1_id})).await;
+    assert_eq!(unread(other_t.clone()).await, 0, "被屏蔽者的动作不通知屏蔽者");
+    call(&app, "DELETE", &format!("/api/users/{author}/block"), Some(&other_t), Value::Null).await;
+
+    // 求助回答被采纳 → 回答者收到 accepted。
+    sqlx::query("UPDATE users SET trust_level = 1 WHERE uid = $1").bind(author).execute(&pool).await?;
+    let (help_cat,): (i32,) = sqlx::query_as("SELECT id FROM categories WHERE slug = 'share-help'").fetch_one(&pool).await?;
+    let (s, h) = call(&app, "POST", "/api/topics", Some(&author_t), json!({"category_id": help_cat, "title": "想要一个番茄钟组件", "body": "希望桌面上有一个简单的番茄钟", "help": {"bounty": 0, "days": 7}})).await;
+    assert_eq!(s, StatusCode::OK, "{h}");
+    let help_id = h["id"].as_i64().unwrap();
+    let (_, answer) = call(&app, "POST", &format!("/api/topics/{help_id}/posts"), Some(&other_t), json!({"body": "我做了一个，看我的内容包"})).await;
+    let (s, a) = call(&app, "POST", &format!("/api/topics/{help_id}/help/accept"), Some(&author_t), json!({"post_id": answer["id"]})).await;
+    assert_eq!(s, StatusCode::OK, "{a}");
+    let (_, list) = call(&app, "GET", "/api/me/notifications?unread=true", Some(&other_t), Value::Null).await;
+    let kinds: Vec<&str> = list["items"].as_array().unwrap().iter().map(|n| n["kind"].as_str().unwrap()).collect();
+    assert!(kinds.contains(&"accepted"), "{kinds:?}");
+
+    // 审核结果通知内容包作者；下架不通知。
+    call(&app, "POST", "/api/me/notifications/read", Some(&author_t), Value::Null).await;
+    call(&app, "POST", &format!("/api/admin/packs/{id}/review"), Some(&admin_t), json!({"action":"approve"})).await;
+    call(&app, "POST", &format!("/api/admin/packs/{id}/review"), Some(&admin_t), json!({"action":"remove"})).await;
+    let (_, list) = call(&app, "GET", "/api/me/notifications?unread=true", Some(&author_t), Value::Null).await;
+    let items = list["items"].as_array().unwrap();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["kind"], "pack_approved");
+    assert_eq!(items[0]["pack_id"], id);
+
+    // 匿名埋点：只收白名单事件；设备标识加盐哈希；后台能看到每日设备、事件次数与次日留存。
+    let device = "dev-0123456789abcdef-aaaa";
+    let (s, _) = call(&app, "POST", "/api/events", None, json!({"device": "x", "events": []})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "设备标识不合格");
+    let (s, _) = call(&app, "POST", "/api/events", None, json!({
+        "device": device,
+        "events": [
+            {"name": "view_pack", "dim": "effect"}, {"name": "view_pack", "dim": "effect", "count": 2},
+            {"name": "apply_click", "dim": "effect"}, {"name": "search"},
+            {"name": "view_pack", "dim": "我的文件名.zip"}, {"name": "keylogger"}
+        ]
+    })).await;
+    assert_eq!(s, StatusCode::NO_CONTENT);
+    call(&app, "POST", "/api/events", None, json!({"device": "dev-fedcba9876543210-bbbb", "events": [{"name": "view_pack", "dim": "effect"}]})).await;
+    let (stored,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM events_daily").fetch_one(&pool).await?;
+    assert_eq!(stored, 4, "白名单外的事件和维度被丢掉：view_pack×2 设备、apply_click、search");
+    let (raw,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM events_daily WHERE device = $1").bind(device).fetch_one(&pool).await?;
+    assert_eq!(raw, 0, "库里不存原始设备标识");
+    // 昨天也出现过第一个设备：次日留存 1/2。
+    sqlx::query("INSERT INTO events_daily (day, name, dim, device) SELECT CURRENT_DATE - 1, 'view_home', '-', device FROM events_daily WHERE name = 'search'").execute(&pool).await?;
+    sqlx::query("INSERT INTO events_daily (day, name, dim, device) VALUES (CURRENT_DATE - 1, 'view_home', '-', 'someoneelse')").execute(&pool).await?;
+    let (s, _) = call(&app, "GET", "/api/admin/metrics", Some(&author_t), Value::Null).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, m) = call(&app, "GET", "/api/admin/metrics?days=7", Some(&admin_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    assert_eq!(m["daily_devices"][0]["devices"], 2);
+    let view = m["events"].as_array().unwrap().iter().find(|e| e["name"] == "view_pack").unwrap();
+    assert_eq!((view["count"].as_i64(), view["devices"].as_i64(), view["dim"].as_str()), (Some(4), Some(2), Some("effect")));
+    assert_eq!(m["retention"][0]["devices"], 2);
+    assert_eq!(m["retention"][0]["returned"], 1);
+
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
     Ok(())
 }

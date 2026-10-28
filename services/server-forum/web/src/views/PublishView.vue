@@ -6,6 +6,7 @@ import { contentApi, type PackDetail } from '@/api/content'
 import { COVER_LIMIT, fmtSize, KIND_LIMIT, PACK_KINDS } from '@/lib/content'
 import { uploadFile } from '@/lib/upload'
 import { useHead } from '@/lib/head'
+import { track } from '@/lib/analytics'
 import { useToast } from '@/stores/toast'
 
 const route = useRoute()
@@ -93,6 +94,7 @@ async function submit() {
       cover_key: coverKey,
       rights_ack: form.rights,
     })
+    track('publish_done', form.kind)
     toast.show('已发布')
     router.replace(`/packs/${res.id}`)
   } catch (e) {

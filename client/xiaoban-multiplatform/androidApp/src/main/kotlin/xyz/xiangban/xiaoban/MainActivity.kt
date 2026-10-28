@@ -12,8 +12,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
+        val storage = SharedPrefsTokenStorage(this)
+        val platform = AndroidPlatformActions(this)
         setContent {
-            App()
+            App(storage, platform)
         }
     }
 }

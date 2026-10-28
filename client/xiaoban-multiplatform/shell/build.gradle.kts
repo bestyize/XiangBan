@@ -46,7 +46,8 @@ kotlin {
         }
         commonMain.dependencies {
             implementation(project(":business:xiaban"))
-            implementation(project(":business:community"))
+            // 手机端社区用原生界面；webview 版 :business:community 先保留模块，不再装配。
+            api(project(":business:community-native"))
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)

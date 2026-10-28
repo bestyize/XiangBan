@@ -122,6 +122,18 @@ impl Community {
             .send();
     }
 
+    /// 匿名埋点（PRD §8.3）：只报白名单事件名和一个内容类型维度，带随机设备标识，不带账号、内容和文件名。
+    /// 尽力而为：失败静默忽略，不能影响用户正在做的事。
+    pub fn track(&self, device: &str, events: &[(&str, Option<&str>)]) {
+        let events: Vec<serde_json::Value> = events.iter().map(|(name, dim)| serde_json::json!({ "name": name, "dim": dim })).collect();
+        let _ = self
+            .http
+            .post(format!("{}/api/events", self.origin))
+            .json(&serde_json::json!({ "device": device, "events": events }))
+            .timeout(Duration::from_secs(5))
+            .send();
+    }
+
     /// 依次尝试主地址和官方镜像，返回第一份通过校验的字节。
     pub fn fetch(&self, info: &DownloadInfo) -> Result<Vec<u8>, String> {
         let mut failures = Vec::new();
@@ -281,6 +293,44 @@ mod tests {
         ] {
             assert!(client.browse(bad).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn track_sends_only_the_named_events_and_device() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let (tx, rx) = std::sync::mpsc::channel();
+        thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut line = String::new();
+            reader.read_line(&mut line).unwrap();
+            let mut length = 0usize;
+            loop {
+                let mut header = String::new();
+                reader.read_line(&mut header).unwrap();
+                if header == "\r\n" {
+                    break;
+                }
+                if let Some(v) = header.to_ascii_lowercase().strip_prefix("content-length:") {
+                    length = v.trim().parse().unwrap();
+                }
+            }
+            let mut body = vec![0u8; length];
+            std::io::Read::read_exact(&mut reader, &mut body).unwrap();
+            let _ = write!(stream, "HTTP/1.1 204 No Content\r\nconnection: close\r\n\r\n");
+            tx.send((line, String::from_utf8(body).unwrap())).unwrap();
+        });
+        Community::new(&origin).unwrap().track("dev-0123456789abcdef", &[("desktop_apply_success", Some("effect")), ("desktop_community_open", None)]);
+        let (line, body) = rx.recv_timeout(Duration::from_secs(5)).unwrap();
+        assert!(line.starts_with("POST /api/events "), "{line}");
+        let v: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["device"], "dev-0123456789abcdef");
+        assert_eq!(v["events"][0], json!({"name": "desktop_apply_success", "dim": "effect"}));
+        assert_eq!(v["events"][1]["dim"], serde_json::Value::Null);
+        assert_eq!(v.as_object().unwrap().len(), 2, "除设备标识和事件外不带任何东西");
+        // 连不上也不报错。
+        Community::new("http://127.0.0.1:9").unwrap().track("dev-0123456789abcdef", &[("search", None)]);
     }
 
     #[test]

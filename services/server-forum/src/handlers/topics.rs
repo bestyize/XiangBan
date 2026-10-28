@@ -244,6 +244,7 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     let body = clean_body(&input.body, 10)?;
     let tags = clean_tags(&input.tags)?;
     let read_level = clean_read_level(input.min_read_level, user.trust_level, None)?;
+    let review = crate::moderation::screen(&state.pool, &[&title, &body]).await?;
     let trusted = user.trust_level >= 1;
     let html = markdown::render(&body, trusted);
     let excerpt = markdown::excerpt(&body, 140);
@@ -269,6 +270,15 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
         attachments::set_prices(&mut tx, id, user.uid, prices).await?;
     }
     super::help::create_for_topic(&mut tx, id, user.uid, cat.id, input.help.as_ref()).await?;
+    if let Some(word) = &review {
+        crate::moderation::enqueue(&mut tx, "topic", id, &format!("命中复核词：{word}")).await?;
+    }
+    {
+        use crate::notifications::{self as n, Note};
+        let excerpt = markdown::excerpt(&body, 80);
+        let note = Note { kind: n::MENTION, actor: Some(user.uid), topic_id: Some(id), post_id: None, pack_id: None, title: &title, excerpt: &excerpt };
+        n::notify_mentions(&mut tx, &body, user.uid, &[], &note).await?;
+    }
     tx.commit().await?;
     save_tags(&state.pool, id, &tags).await?;
     models::refresh_hot_scores(&state.pool, Some(id)).await?;
@@ -306,6 +316,7 @@ pub async fn update(
     let body = clean_body(&input.body, 10)?;
     let tags = clean_tags(&input.tags)?;
     let read_level = clean_read_level(input.min_read_level, user.trust_level, Some(topic.min_read_level))?;
+    let review = crate::moderation::screen(&state.pool, &[&title, &body]).await?;
     let html = markdown::render(&body, user.trust_level >= 1);
     let excerpt = markdown::excerpt(&body, 140);
 
@@ -331,6 +342,9 @@ pub async fn update(
     };
     if let Some(prices) = &input.attachment_prices {
         attachments::set_prices(&mut tx, id, user.uid, prices).await?;
+    }
+    if let Some(word) = &review {
+        crate::moderation::enqueue(&mut tx, "topic", id, &format!("命中复核词：{word}")).await?;
     }
     tx.commit().await?;
     attachments::remove_files(&state.config.upload_dir, &removed).await;

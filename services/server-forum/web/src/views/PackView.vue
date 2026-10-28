@@ -2,11 +2,13 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import ContentShell from '@/components/ContentShell.vue'
+import PosterDialog from '@/components/PosterDialog.vue'
 import { ApiError } from '@/api/forum'
 import { contentApi, type PackDetail } from '@/api/content'
 import { applyLink, coverStyle, fmtSize, kindLabel, trustLabel } from '@/lib/content'
 import { timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
+import { track } from '@/lib/analytics'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
 
@@ -16,6 +18,7 @@ const session = useSession()
 const pack = ref<PackDetail | null>(null)
 const missing = ref(false)
 const busy = ref(false)
+const posterOpen = ref(false)
 
 useHead(() => ({ title: pack.value?.title ?? '内容详情' }))
 
@@ -26,6 +29,7 @@ watch(
     missing.value = false
     try {
       pack.value = await contentApi.pack(Number(id))
+      track('view_pack', pack.value.kind)
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) missing.value = true
       else toast.error(e)
@@ -40,6 +44,7 @@ const open = computed(() => (pack.value && latest.value ? applyLink(pack.value, 
 
 async function download() {
   if (!pack.value || busy.value) return
+  track('download_click', pack.value.kind)
   busy.value = true
   try {
     const info = await contentApi.download(pack.value.id)
@@ -51,7 +56,14 @@ async function download() {
   }
 }
 
+const posterInput = computed(() =>
+  pack.value
+    ? { tag: kindLabel(pack.value.kind), title: pack.value.title, summary: pack.value.summary || '在小伴里一键应用', cover: pack.value.cover_url, url: `${window.location.origin}/packs/${pack.value.id}`, seed: pack.value.id }
+    : null,
+)
+
 async function copyLink() {
+  track('share_copy_link', 'pack')
   try {
     await navigator.clipboard.writeText(window.location.href)
     toast.show('链接已复制')
@@ -85,9 +97,10 @@ async function copyLink() {
           {{ pack.trust_level === 2 ? '这是用户发布、尚未审核的内容，不支持一键应用；' : '' }}在小伴桌面端会先展示它会做什么、需要哪些权限，由你确认后才安装。
         </p>
         <div class="actions">
-          <a class="btn btn-primary open-app" :href="open">在小伴中打开</a>
+          <a class="btn btn-primary open-app" :href="open" @click="track('apply_click', pack.kind)">在小伴中打开</a>
           <button class="btn" type="button" :disabled="busy" @click="download">下载压缩包</button>
           <button class="btn" type="button" @click="copyLink">复制链接</button>
+          <button class="btn" type="button" @click="posterOpen = true">生成海报</button>
           <RouterLink v-if="pack.topic_id" class="btn" :to="`/t/${pack.topic_id}`">看讨论</RouterLink>
           <RouterLink v-if="isAuthor" class="btn" :to="`/publish?pack=${pack.id}`">发布新版本</RouterLink>
         </div>
@@ -107,6 +120,7 @@ async function copyLink() {
       </section>
     </article>
   </ContentShell>
+  <PosterDialog :open="posterOpen" :poster="posterInput" :name="pack?.title ?? ''" @close="posterOpen = false" />
 </template>
 
 <style scoped>

@@ -30,6 +30,8 @@ pub struct PostItem {
     pub edited_at: Option<DateTime<Utc>>,
     pub liked: bool,
     pub mine: bool,
+    /// 读者屏蔽了这个作者：正文不返回，前端折叠成一行，可以点开看。
+    pub blocked: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -48,6 +50,7 @@ struct PostRow {
     created_at: DateTime<Utc>,
     edited_at: Option<DateTime<Utc>>,
     liked: bool,
+    blocked: bool,
 }
 
 #[derive(Deserialize)]
@@ -73,7 +76,8 @@ pub async fn list(
     let rows: Vec<PostRow> = sqlx::query_as(
         "SELECT p.id, p.floor, p.reply_to, r.floor AS reply_to_floor, p.author_uid, u.nickname, u.avatar_url, u.trust_level,
                 p.body_html, p.status, p.like_count, p.created_at, p.edited_at,
-                ($4::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM likes l WHERE l.target_type = 'post' AND l.target_id = p.id AND l.uid = $4)) AS liked
+                ($4::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM likes l WHERE l.target_type = 'post' AND l.target_id = p.id AND l.uid = $4)) AS liked,
+                ($4::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker = $4 AND b.blocked = p.author_uid)) AS blocked
          FROM posts p JOIN users u ON u.uid = p.author_uid LEFT JOIN posts r ON r.id = p.reply_to
          WHERE p.topic_id = $1 ORDER BY p.floor LIMIT $2 OFFSET $3",
     )
@@ -87,7 +91,7 @@ pub async fn list(
         .into_iter()
         .map(|r| {
             // 被删除或隐藏的楼层保留位置，只显示占位文字。
-            let visible = r.status == "normal";
+            let visible = r.status == "normal" && !r.blocked;
             PostItem {
                 id: r.id,
                 floor: r.floor,
@@ -101,6 +105,7 @@ pub async fn list(
                 created_at: r.created_at,
                 edited_at: r.edited_at,
                 liked: r.liked,
+                blocked: r.blocked,
             }
         })
         .collect();
@@ -143,6 +148,7 @@ pub async fn create(
     }
     users::ensure_daily_quota(&state.pool, user, "posts", &state.config.trust.daily_posts, "回复").await?;
     let body = clean_reply(&input.body)?;
+    let review = crate::moderation::screen(&state.pool, &[&body]).await?;
     if let Some(reply_to) = input.reply_to {
         let ok: Option<(i64,)> = sqlx::query_as("SELECT id FROM posts WHERE id = $1 AND topic_id = $2")
             .bind(reply_to)
@@ -177,9 +183,39 @@ pub async fn create(
     .bind(user.uid)
     .execute(&mut *tx)
     .await?;
+    if let Some(word) = &review {
+        crate::moderation::enqueue(&mut tx, "post", id, &format!("命中复核词：{word}")).await?;
+    }
+    notify_reply(&mut tx, user.uid, topic_id, id, input.reply_to, &body).await?;
     tx.commit().await?;
     models::refresh_hot_scores(&state.pool, Some(topic_id)).await?;
     Ok(Json(json!({ "id": id, "floor": floor })))
+}
+
+/// 回复产生的通知：被回复的楼层作者（kind=reply_to）、帖子作者（kind=reply，已经因为被回复通知过的不再重复）、正文里 @ 到的人。
+async fn notify_reply(
+    tx: &mut sqlx::PgConnection, actor: Uuid, topic_id: i64, post_id: i64, reply_to: Option<i64>, body: &str,
+) -> AppResult<()> {
+    use crate::notifications::{self as n, Note};
+    let (topic_author, title): (Uuid, String) = sqlx::query_as("SELECT author_uid, title FROM topics WHERE id = $1")
+        .bind(topic_id)
+        .fetch_one(&mut *tx)
+        .await?;
+    let excerpt = markdown::excerpt(body, 80);
+    let note = |kind| Note { kind, actor: Some(actor), topic_id: Some(topic_id), post_id: Some(post_id), pack_id: None, title: &title, excerpt: &excerpt };
+    let mut done = vec![actor];
+    if let Some(rt) = reply_to {
+        let target: Option<(Uuid,)> = sqlx::query_as("SELECT author_uid FROM posts WHERE id = $1").bind(rt).fetch_optional(&mut *tx).await?;
+        if let Some((to,)) = target {
+            n::notify(tx, to, &note(n::REPLY_TO)).await?;
+            done.push(to);
+        }
+    }
+    if !done.contains(&topic_author) {
+        n::notify(tx, topic_author, &note(n::REPLY)).await?;
+        done.push(topic_author);
+    }
+    n::notify_mentions(tx, body, actor, &done, &note(n::MENTION)).await
 }
 
 pub async fn update(
@@ -190,6 +226,7 @@ pub async fn update(
 ) -> AppResult<Json<Value>> {
     users::ensure_can_write(&auth.user)?;
     let body = clean_reply(&input.body)?;
+    let review = crate::moderation::screen(&state.pool, &[&body]).await?;
     let html = markdown::render(&body, auth.user.trust_level >= 1);
     let mut tx = state.pool.begin().await?;
     lock_topic_for_post(&mut tx, id).await?;
@@ -208,6 +245,9 @@ pub async fn update(
     .rows_affected();
     if done == 0 {
         return Err(AppError::Forbidden("只能编辑自己的未采纳回复，已采纳回答保留原文".into()));
+    }
+    if let Some(word) = &review {
+        crate::moderation::enqueue(&mut tx, "post", id, &format!("命中复核词：{word}")).await?;
     }
     tx.commit().await?;
     Ok(Json(json!({ "ok": true, "body_html": html })))

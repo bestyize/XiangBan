@@ -6,12 +6,14 @@ import UserAvatar from './UserAvatar.vue'
 import BrandMark from './BrandMark.vue'
 import { useTheme, THEME_LABEL } from '@/lib/theme'
 import { sectionOf } from '@/lib/sections'
+import { useNotifications } from '@/stores/notifications'
 
 const session = useSession()
 const { preference, resolved, cycleTheme } = useTheme()
 const route = useRoute()
 const router = useRouter()
 
+const inbox = useNotifications()
 const section = computed(() => sectionOf(route))
 
 const q = ref(typeof route.query.q === 'string' ? route.query.q : '')
@@ -76,6 +78,10 @@ async function logout() {
         <button class="btn btn-primary compose only-desktop" type="button" @click="compose">发帖</button>
 
         <template v-if="session.loggedIn">
+          <RouterLink to="/notifications" class="bell" :aria-label="inbox.unread ? `通知，${inbox.unread} 条未读` : '通知'">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4" /></svg>
+            <span v-if="inbox.unread" class="badge">{{ inbox.unread > 99 ? '99+' : inbox.unread }}</span>
+          </RouterLink>
           <RouterLink to="/points" class="points-entry" aria-label="积分与签到">积分 {{ session.user?.points ?? '…' }}</RouterLink>
           <div class="me">
             <button class="me-btn" type="button" :aria-expanded="menuOpen" aria-haspopup="menu" @click="menuOpen = !menuOpen">
@@ -103,6 +109,11 @@ async function logout() {
 </template>
 
 <style scoped>
+.bell { position: relative; width: 36px; height: 36px; display: grid; place-items: center; }
+.bell svg { width: 21px; height: 21px; fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.badge { position: absolute; top: 2px; right: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--brand); color: var(--brand-ink); font-size: 10px; line-height: 16px; text-align: center; font-weight: 600; }
+@media (max-width: 767px) { .points-entry { display: none; } }
+
 .points-entry { white-space: nowrap; color: var(--ink-2); font-size: var(--fs-xs); }
 .points-entry:hover { color: var(--brand); }
 .header {
