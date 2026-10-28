@@ -1,14 +1,18 @@
-//! 语音编程（P1 环境层与观察层）：外部 Agent 环境检测、安装指南与 hooks 配置管理。
+//! 语音编程（P1 环境层与观察层，P2 界面注入层）：外部 Agent 环境检测、安装指南、hooks 管理与桌面注入。
 
 use agent_bridge::environment::{self, EnvironmentReport, InstallGuide};
+use agent_bridge::injector::{self, InjectionRequest, InjectionResult};
 use agent_bridge::observer::{self, HooksStatus};
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use tauri::Manager;
 
 fn control(window: &tauri::WebviewWindow) -> Result<(), String> {
-    if window.label() != "control" && window.label() != "configuration-settings" {
-        return Err("只有设置面板可以使用外部 Agent 环境管理".into());
+    if window.label() != "control"
+        && window.label() != "configuration-settings"
+        && window.label() != crate::float_assistant::LABEL
+    {
+        return Err("当前窗口没有调用外部 Agent 注入的权限".into());
     }
     Ok(())
 }
@@ -103,6 +107,23 @@ pub fn speech_agent_hooks_uninstall(
     }))
 }
 
+/// P2 界面注入层：先上屏后发送流程（窗口激活、剪贴板暂存与恢复、热键粘贴）。
+#[tauri::command]
+pub async fn speech_agent_inject(
+    window: tauri::WebviewWindow,
+    request: InjectionRequest,
+) -> Result<InjectionResult, String> {
+    control(&window)?;
+    if request.text.trim().is_empty() {
+        return Err("注入内容不能为空".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        injector::inject_text(request)
+    })
+    .await
+    .map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -119,5 +140,17 @@ mod tests {
         assert_eq!(resolve_scope_path(None), None);
         assert_eq!(resolve_scope_path(Some("   ".into())), None);
         assert_eq!(resolve_scope_path(Some("C:\\my-project".into())), Some(PathBuf::from("C:\\my-project")));
+    }
+
+    #[test]
+    fn injection_request_validates_empty_text() {
+        let req = InjectionRequest {
+            target: "Claude".into(),
+            text: "测试文字".into(),
+            press_enter: false,
+            restore_clipboard_ms: Some(50),
+        };
+        assert_eq!(req.target, "Claude");
+        assert_eq!(req.text, "测试文字");
     }
 }

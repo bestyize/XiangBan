@@ -1,14 +1,15 @@
 //! Adapters for locally installed coding agents.
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 pub mod claude;
 pub mod codex;
 pub mod environment;
+pub mod injector;
 pub mod model;
 pub mod observer;
 mod process;
 pub use environment::*;
+pub use injector::*;
 pub use model::*;
 pub use observer::*;
 

@@ -942,6 +942,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "windows-sys",
  "xiaoban-agent-hooks",
 ]
 
