@@ -7,4 +7,5 @@
 | [agent-kernel](agent-kernel/README.md) | 模型协议、Agent 循环、工具、中间件、执行日志、受管进程与 MCP |
 | [agent-learning](agent-learning/README.md) | 本地 SQLite + FTS5 任务结果、经验与评测记录 |
 | [agent-proactivity](agent-proactivity/README.md) | 主动感知、授权、免打扰、注意力预算与反馈策略 |
+| [community-packs](community-packs/README.md) | 社区内容包的链接解析、哈希校验下载与压缩包检查（xiaoban-community） |
 | [agent-tools](agent-tools/README.md) | 电脑控制、文件分析、技能发现与连接器扩展 |
