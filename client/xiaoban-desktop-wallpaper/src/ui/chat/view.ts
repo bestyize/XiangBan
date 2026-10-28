@@ -1,5 +1,5 @@
 import { attachmentCards } from './attachments.ts';
-import { modelFailure } from './model-errors.ts';
+import { modelFailure, retryNotice } from './model-errors.ts';
 import { withoutVoiceNotes } from '../../voice/interruption.ts';
 import type { ChatItem, KernelEvent, SessionView, WireMessage } from './types.ts';
 
@@ -122,6 +122,8 @@ function settle(view: SessionView) {
 
 /** Folds one event of a running answer into the conversation shown. */
 export function applyEvent(view: SessionView, event: KernelEvent): void {
+  view.activityAt = Date.now();
+  if (event.type !== 'retrying' && event.type !== 'usage') view.retry = undefined;
   switch (event.type) {
     case 'user_message': {
       endStreaming(view);
@@ -186,7 +188,8 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
     case 'retrying':
       // 重试会重新生成：失败那一次已经流出的思考内容作废，不留在界面上和新的思考重复。
       while (view.items[view.items.length - 1]?.kind === 'reasoning' && (view.items[view.items.length - 1] as { streaming?: boolean }).streaming) view.items.pop();
-      view.status = `连接不太稳，正在第 ${event.attempt} 次重试…`;
+      view.status = retryNotice(event.attempt, event.message);
+      view.retry = event.attempt;
       break;
     case 'truncated':
       endStreaming(view);

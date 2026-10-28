@@ -20,3 +20,36 @@ export function modelFailure(raw: string): ModelFailure {
   if (/\b404\b/.test(value)) return { message: '当前服务配置可能有误，请检查地址和协议或切换模型。', refresh: false };
   return { message: '暂时无法完成回复，可以重试或切换模型。', refresh: false };
 }
+
+/** The reason shown while the host retries a model request by itself; `message` is the provider's own wording. */
+export function retryReason(message: string): string {
+  if (/[\u4e00-\u9fa5]/.test(message)) return message.replace(/[，。,.；;]?正在重试.*$/, '').replace(/[。.]$/, '');
+  const value = message.toLowerCase();
+  if (/response headers|first model event|stream data|timed out|timeout/.test(value)) return '模型服务长时间没有响应';
+  if (/\b429\b|rate[_ -]limit/.test(value)) return '模型服务繁忙，请求被限流';
+  if (/\b(408|425|5\d\d)\b|overloaded/.test(value)) return '模型服务暂时出错';
+  if (/stream ended|reset|closed|connect|request failed|stream read/.test(value)) return '与模型的连接中断了';
+  return '与模型的连接不稳定';
+}
+
+/** The status line for an automatic retry: what went wrong, and that the host is already trying again. */
+export function retryNotice(attempt: number, message: string): string {
+  return `${retryReason(message)}，正在进行第 ${attempt} 次重试…`;
+}
+
+/** "12 秒", "1 分 05 秒". */
+export function waitedFor(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  return s < 60 ? `${s} 秒` : `${Math.floor(s / 60)} 分 ${String(s % 60).padStart(2, '0')} 秒`;
+}
+
+/** Seconds of silence from the model after which the page says so instead of a bare "思考中…". */
+export const SILENCE_NOTICE_SECONDS = 10;
+
+/** The status while a model request has been silent for a while; `retryStatus` is the retry line, when one is showing. */
+export function silenceNotice(seconds: number, retryStatus = ''): string {
+  if (seconds < SILENCE_NOTICE_SECONDS) return retryStatus;
+  return retryStatus
+    ? `${retryStatus}（已等待 ${waitedFor(seconds)}）`
+    : `模型暂时没有新输出，已等待 ${waitedFor(seconds)}；长时间没有响应会自动重试。`;
+}

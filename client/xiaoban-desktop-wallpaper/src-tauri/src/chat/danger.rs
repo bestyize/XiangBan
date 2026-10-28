@@ -31,6 +31,7 @@ const R_PUBLISH: &str = "发布到公共仓库";
 const R_DATABASE: &str = "删除数据库或数据表";
 const R_PIPE_RUN: &str = "把其他命令的输出当作脚本执行";
 const R_INLINE: &str = "内联脚本会删除文件或执行系统命令";
+const R_OUTSIDE_SANDBOX: &str = "命令被沙箱拦住，要在沙箱之外运行这一次";
 
 const MAX_DEPTH: usize = 4;
 
@@ -51,6 +52,11 @@ pub fn assess(tool: &str, args: &Value, workspace: Option<&Path>) -> Option<&'st
     }
     if !matches!(tool, "shell" | "process_start") {
         return None;
+    }
+    // The model repeats a command the command sandbox refused. Asking is what lets the approval take it out of the
+    // sandbox once (`sandbox_gate::allow_once`), even in 完全信任.
+    if args.get("outside_sandbox").and_then(Value::as_bool) == Some(true) {
+        return Some(R_OUTSIDE_SANDBOX);
     }
     assess_command(args.get("command")?.as_str()?, &Ctx { workspace, depth: 0, stdin_targets: false, cwd_left: false })
 }
@@ -706,6 +712,16 @@ mod tests {
         assert_eq!(assess("process_write", &json!({"id":"p","input":"sudo true\n"}), None), Some(R_PRIV));
         assert_eq!(assess("process_write", &json!({"id":"p","input":"yes\n"}), None), None);
         assert_eq!(assess("process_read", &json!({"id":"p"}), None), None);
+    }
+
+    #[test]
+    fn repeating_a_sandbox_refused_command_outside_the_sandbox_is_always_asked() {
+        let work = Some(Path::new("/work"));
+        for tool in ["shell", "process_start"] {
+            assert_eq!(assess(tool, &json!({"command":"npm uninstall -g x","outside_sandbox":true}), work), Some(R_OUTSIDE_SANDBOX));
+            assert_eq!(assess(tool, &json!({"command":"npm uninstall -g x","outside_sandbox":false}), work), None);
+            assert_eq!(assess(tool, &json!({"command":"npm uninstall -g x"}), work), None, "a first attempt stays inside the sandbox");
+        }
     }
 
     #[test]

@@ -48,3 +48,20 @@ fn responses_cache_field_is_read() {
     assert_eq!(done, Ok(true));
     assert_eq!(stream.finish().usage, Some(usage(120, 30, 100)));
 }
+
+#[test]
+fn zero_reported_output_is_replaced_by_an_estimate_of_what_was_streamed() {
+    use agent_kernel::provider::scripted::{ScriptedProvider, Step};
+    use std::sync::{atomic::AtomicBool, Arc};
+    let provider = ScriptedProvider::new(vec![
+        Step::text(&"x".repeat(300)).with_usage(1000, 0),
+        Step::text("tiny").with_usage(10, 7),
+    ]);
+    let agent = Agent::builder(Arc::new(provider), Arc::new(MemoryStore::new())).build().unwrap();
+    for (session, expected) in [("zero", 100), ("reported", 7)] {
+        let mut seen = Vec::new();
+        let summary = agent.run(session, "go", &mut |event| if let Event::Usage { completion_tokens, .. } = event { seen.push(completion_tokens) }, &Arc::new(AtomicBool::new(false))).unwrap();
+        assert_eq!(seen, vec![expected], "{session}");
+        assert_eq!(summary.usage.completion_tokens, expected, "{session}");
+    }
+}

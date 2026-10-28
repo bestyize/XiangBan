@@ -176,3 +176,10 @@ fn a_working_folder_with_spaces_and_chinese_characters_is_used_as_is() {
     assert!(out.contains(&real.display().to_string()) && out.contains("新 文件.txt"), "{out}");
     assert_eq!(std::fs::read_to_string(dir.join("新 文件.txt")).unwrap(), "内容\n");
 }
+
+#[test]
+fn shell_declares_the_one_shot_sandbox_escape() {
+    let shell = Shell::new(std::env::temp_dir());
+    assert_eq!(shell.spec().schema["properties"]["outside_sandbox"]["type"], "boolean");
+    assert!(shell.spec().schema["required"].as_array().unwrap().iter().all(|k| k != "outside_sandbox"));
+}

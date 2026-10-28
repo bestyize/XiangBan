@@ -116,9 +116,16 @@ pub fn seatbelt_profile(policy: &SandboxPolicy) -> String {
 
 /// Appended to a failed sandboxed command whose output looks like the sandbox stopped it, so the model asks the
 /// user instead of trying other ways around it.
-pub(crate) const BLOCKED_HINT: &str = "[sandbox: this command ran with host-configured OS isolation. Permission errors may come from \
-the command sandbox's path restrictions, not the file owner or normal OS permissions. This output alone does not prove the cause. \
-Do not suggest sudo or bypass isolation. Explain the possible sandbox restriction and let the user change the host's command-isolation setting or approve the operation.]";
+pub(crate) const BLOCKED_HINT: &str = "[sandbox: this command ran with host-configured OS isolation, which only allows writing inside the \
+working folder, temporary folders and package caches. A permission error (EPERM, EACCES, \"Operation not permitted\") on a path \
+outside them is most likely the sandbox refusing the write, even when the user owns that folder; this output alone does not prove it. \
+Say so to the user instead of blaming system permissions. Do not suggest sudo or other ways around it. If the change is really needed, \
+run the same command again with `outside_sandbox: true`: the user is asked first, and only that one run leaves the sandbox.]";
+
+/// The description of the `outside_sandbox` argument of `shell` and `process_start`. The host's danger check turns it
+/// into an approval; without that check it changes nothing.
+pub(crate) const OUTSIDE_SANDBOX_ARG: &str = "Set true only to repeat a command that the command sandbox refused (permission error \
+outside the working folder). The user is asked before it runs once without the sandbox. Never set it on a first attempt.";
 
 pub(crate) fn looks_blocked(output: &str) -> bool {
     let output = output.to_ascii_lowercase();

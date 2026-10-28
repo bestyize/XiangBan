@@ -130,6 +130,10 @@ export interface SessionView {
   questions: QuestionRequest[];
   /** A short line about what is happening, such as a retry. Empty when nothing needs saying. */
   status: string;
+  /** The retry the host is making now (its number), until the model answers; the page adds how long it has waited. */
+  retry?: number;
+  /** When the last event of the running answer arrived (ms): silence is measured from here. */
+  activityAt?: number;
   /** Counter for item ids. */
   seq: number;
   /** Tokens of the answer running now; put on its last reply when it ends. */

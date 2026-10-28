@@ -12,7 +12,10 @@ pub struct ModelTimeouts {
     pub stream_idle_seconds: u64,
 }
 impl Default for ModelTimeouts {
-    fn default() -> Self { Self { response_header_seconds: 600, first_event_seconds: 600, stream_idle_seconds: 300 } }
+    /// A gateway that accepted the request but sends nothing back is retried after these budgets, so they stay short:
+    /// a streaming endpoint answers with headers at once and then keeps events (or pings) flowing. Slower,
+    /// buffering gateways raise them per provider through `AiConfig::model_timeouts`.
+    fn default() -> Self { Self { response_header_seconds: 45, first_event_seconds: 90, stream_idle_seconds: 90 } }
 }
 impl ModelTimeouts {
     pub fn validate(&self) -> Result<(), crate::HarnessError> {

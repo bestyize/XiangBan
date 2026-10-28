@@ -630,7 +630,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .middleware(discovery.acquisition_policy())
         // The user's own checks run first: a call they stop is never put to them for approval.
         .middleware(hooks::Hooks::new(dirs.chat.join("hooks.json"), workspace))
-        .middleware(permission)
+        .middleware(permission.clone())
         // After the permission check, so a refused write leaves nothing behind.
         .middleware(checkpoints::Checkpoints::new(dirs.checkpoints(), workspace))
         // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
