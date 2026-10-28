@@ -28,7 +28,14 @@ export function append(name, line) {
 export function which(cmd) {
   const r = spawnSync(isWin ? 'where' : 'which', [cmd], { encoding: 'utf8' })
   if (r.status !== 0) return null
-  return r.stdout.split(/\r?\n/).filter(Boolean)[0] ?? null
+  const lines = r.stdout.split(/\r?\n/).filter(Boolean)
+  if (isWin) {
+    const exe = lines.find(p => /\.exe$/i.test(p))
+    if (exe) return exe
+    const batch = lines.find(p => /\.(cmd|bat)$/i.test(p))
+    if (batch) return batch
+  }
+  return lines[0] ?? null
 }
 
 function winQuote(arg) {
