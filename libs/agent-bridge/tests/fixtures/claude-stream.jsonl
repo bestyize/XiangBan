@@ -1,0 +1,4 @@
+{"type":"stream_event","event":{"delta":{"text":"hello"}}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"reply"},{"type":"tool_use","id":"t1","name":"Read","input":{}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"data"}]}}
+{"type":"result","is_error":false,"result":"done","usage":{"input_tokens":3,"output_tokens":4}}
