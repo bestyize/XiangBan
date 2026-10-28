@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, ref, type Component } from 'vue';
 import { NModal } from 'naive-ui';
-import { Info, Palette, Search, Settings, ShieldCheck, Sparkles, Volume2, Wifi, X, Zap } from 'lucide-vue-next';
+import { Info, Palette, Search, Settings, ShieldCheck, Sparkles, Terminal, Volume2, Wifi, X, Zap } from 'lucide-vue-next';
 import type { ControlStore, SettingsTab } from '../control-types.ts';
 import GeneralSettings from './settings/GeneralSettings.vue';
 import AppearanceSettings from './settings/AppearanceSettings.vue';
@@ -11,6 +11,7 @@ const AiConfigCard = defineAsyncComponent(() => import('./AiConfigCard.vue'));
 const AssistantPage = defineAsyncComponent(() => import('../pages/AssistantPage.vue'));
 const VoiceSettingsCard = defineAsyncComponent(() => import('./VoiceSettingsCard.vue'));
 const AgentSafetyCard = defineAsyncComponent(() => import('./AgentSafetyCard.vue'));
+const SpeechAgentSettings = defineAsyncComponent(() => import('./settings/SpeechAgentSettings.vue'));
 
 const props = defineProps<{ store: ControlStore; detached?: boolean }>();
 const emit = defineEmits<{ openSite: [] }>();
@@ -20,6 +21,7 @@ const tabs: { id: SettingsTab; label: string; color: string | null; icon: Compon
   { id: 'general', label: '通用', color: '#8E8E93', icon: Settings, keywords: '开机 启动 动画 帧率 暂停 数据 目录' },
   { id: 'appearance', label: '外观', color: null, icon: Palette, keywords: '深色 浅色 主题 颜色 主题色 跟随系统' },
   { id: 'ai', label: 'AI 模型', color: '#7152D8', icon: Sparkles, keywords: '模型 供应商 密钥 api deepseek 网关' },
+  { id: 'agent', label: '外部 Agent', color: '#10A37F', icon: Terminal, keywords: 'agent claude codex 外部 语音编程 hooks 委派 观察 mcp' },
   { id: 'assistant', label: '超级小伴', color: '#E5484D', icon: Zap, keywords: '快捷键 悬浮球 呼出 截图' },
   { id: 'voice', label: '声音', color: '#E0457B', icon: Volume2, keywords: '语音 朗读 识别 麦克风 音色' },
   { id: 'network', label: '连接与网络', color: '#3386C7', icon: Wifi, keywords: '代理 proxy 网络 连接 socks5 http https VPN 测试 手机 扫码 配对 遥控 互联' },
@@ -57,6 +59,7 @@ function pick(id: SettingsTab) { props.store.settingsTab = id; }
           <GeneralSettings v-if="current.id === 'general'" :store="store" />
           <AppearanceSettings v-else-if="current.id === 'appearance'" />
           <div v-else-if="current.id === 'ai'" data-testid="settings-ai"><AiConfigCard :store="store" /></div>
+          <div v-else-if="current.id === 'agent'" data-testid="settings-agent"><SpeechAgentSettings /></div>
           <div v-else-if="current.id === 'assistant'" data-testid="settings-assistant"><AssistantPage :store="store" embedded /></div>
           <div v-else-if="current.id === 'voice'" data-testid="settings-voice"><VoiceSettingsCard v-if="store.speech" :store="store" /></div>
           <NetworkSettings v-else-if="current.id === 'network'" />
