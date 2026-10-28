@@ -120,13 +120,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     admin::seed_admin(&pool, &config).await?;
 
     let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
-    info!("server-forum issuer={} client={} listening on {addr}", config.account_issuer, config.account_client_id);
+    info!("server-forum issuer={} client={} extra_clients={:?} listening on {addr}", config.account_issuer, config.account_client_id, config.account_extra_client_ids);
 
     let verifier = auth::JwksVerifier::new(
         config.account_issuer.clone(),
         config.account_jwks_url.clone(),
         config.account_client_id.clone(),
-    );
+    )
+    .with_extra_audiences(&config.account_extra_client_ids);
     let state = AppState {
         pool,
         config: Arc::new(config),
