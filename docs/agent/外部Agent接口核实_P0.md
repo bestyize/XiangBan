@@ -6,12 +6,12 @@
 
 | 对象 | 版本 | 方式 | 范围 |
 | --- | --- | --- | --- |
-| Claude Code | 2.1.312 | 在云端沙箱用 npm 装官方包，读 `--help`；读官方文档的 hooks、无界面、会话、Remote Control 页 | Linux；**未登录，没有发起过真实对话** |
-| Codex CLI | 0.165.0 | 同上；另用 `codex app-server generate-json-schema` 生成协议定义并统计方法 | Linux；**未登录，没有发起过真实对话** |
+| Claude Code | 2.1.312 | 在云端沙箱用 npm 装官方包，读 `--help`；读官方文档的 hooks、无界面、会话、Remote Control 页；用 `tools/p0-verify` 的脚本跑真实对话（见 §4b） | Linux |
+| Codex CLI | 0.165.0 | 同上；另用 `codex app-server generate-json-schema` 生成协议定义并统计方法；用脚本握手并列会话（见 §4b） | Linux；**未登录，没发起过真实对话**（`turn/start` 等需登录的部分未实测） |
 | Happy（slopus/happy） | 当前主分支 | 读仓库首页与搜索结果 | 只看到概述，没读源码；协议、加密细节未核实 |
 | Claude 桌面版、ChatGPT 桌面版 | — | **未核实** | 云端沙箱装不了桌面应用，快捷键与无障碍树要在 Windows 和 macOS 真机上验证（见 §6） |
 
-Codex 官方文档站（developers.openai.com）在沙箱里被网络策略拦住，所以 Codex 的信息来自**实际装出来的程序**（`--help` 与协议定义），比文档更可靠，但没有文字说明，语义要实测。
+Codex 官方文档站（developers.openai.com）在沙箱里被网络策略拦住，所以 Codex 的信息来自**实际装出来的程序**（`--help`、协议定义、握手实测），比文档更可靠，但没有文字说明，语义要实测。
 
 ## 2. Claude Code
 
@@ -30,7 +30,7 @@ Codex 官方文档站（developers.openai.com）在沙箱里被网络策略拦�
 | 会话开始/结束 | `SessionStart`、`SessionEnd` |
 
 - `Notification` 类 hook 不能阻塞；`PermissionRequest` 可以返回决定，这是**小伴把权限请求转到手机或语音确认**的正规入口。
-- 注意：`claude -p` 默认会加载项目里的 hooks 和 MCP；`--bare` 会跳过它们。小伴自己拉起会话时要选择是否带 `--bare`，并只加载小伴自己的配置。
+- 注意：`claude -p` 默认会加载项目里的 hooks 和 MCP；`--bare` 会跳过它们（且不读 OAuth 登录，只认 API 密钥）。小伴自己拉起会话时要选择是否带 `--bare`，并只加载小伴自己的配置。
 
 ### 2.2 无界面运行与会话接续（接续层的基础）
 
@@ -79,6 +79,27 @@ Codex 官方文档站（developers.openai.com）在沙箱里被网络策略拦�
 
 借鉴：端到端加密中转、扫码配对、权限推送、多提供方适配。许可是 MIT，可以参考设计，若复制代码需保留版权声明；我们不开源，所以**不直接搬代码，只参考设计**，并在引入任何代码前再核对许可。
 
+## 4b. 实测结果（Linux 沙箱，用真实登录跑脚本，2026-10-28）
+
+脚本在 `tools/p0-verify/`，样例在其 `samples/`。以下都是实际跑出来的，不是文档摘抄：
+
+| 项 | 结果 |
+| --- | --- |
+| Codex app-server 传输 | 默认 `stdio://`，**逐行 JSON**（一行一个消息，请求带 `id` 和 `method`，**没有 `jsonrpc` 字段**）；`initialize` 传 `clientInfo` 即可，未登录也能握手；之后发 `initialized` 通知 |
+| Codex `thread/list` | 未登录可调用，返回 `data`、`readStates`、`nextCursor`、`backwardsCursor` |
+| Codex 启动时的通知 | 会主动推 `configWarning`、`remoteControl/status/changed` |
+| Claude hooks，`http` 类型 | 能收到 `UserPromptSubmit`、`PreToolUse`、`PermissionRequest`、`PostToolUse`、`Stop`、`SessionEnd`；**收不到 `SessionStart`**（该事件只有 `command` 类型会触发） |
+| Claude hooks，`command` 类型（`args` 形式，不经 shell） | 上述事件加 `SessionStart` 全部收到 |
+| `PermissionRequest` 的回应 | 需要权限的 Bash 命令（`touch` 文件）触发；hook 返回 `{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}` 后工具**真的执行了**（http 与 command 两种都验证）。只读命令（`echo`）会被自动放行，**不会**触发 `PermissionRequest` |
+| `Stop` 载荷 | 带 `last_assistant_message`（本轮最后的回答文字）、`stop_hook_active`、`background_tasks`——播报“做完了，结果是……”所需的信息一个事件里就有 |
+| 无界面恢复 | `claude -p … --output-format json` 返回 `session_id`；`claude -p --resume <id>` 在**另一个进程**里仍记得内容，且仍是同一个 `session_id` |
+| 会话文件位置 | `~/.claude/projects/<工作目录把非字母数字换成 ->/<session_id>.jsonl`，与文档一致 |
+| 单进程多轮 | `--input-format stream-json --output-format stream-json --verbose`，向标准输入逐行写 `{"type":"user","message":{"role":"user","content":[{"type":"text","text":"…"}]}}`，每轮得到一个 `result` 事件；第二轮约 5 秒（含模型耗时） |
+| `system/init` 事件 | 含 `session_id`、`model`、`tools`、`mcp_servers`、`permissionMode`、`capabilities`（功能探测用）等 |
+| 环境陷阱 | 如果从 Claude Code 里面运行脚本，子进程会继承 `CLAUDE_CODE_SESSION_ID` 之类变量而复用同一个会话编号；小伴拉起子进程时必须清掉这类变量 |
+
+仍需真机验证：Windows 与 macOS 的同类行为、桌面版应用的快捷键与无障碍、终端里手动 `claude --resume` 看到完整历史。
+
 ## 5. 对计划的影响
 
 1. **官方远程控制已出现**（Claude Code 的 Remote Control、Codex 的 remote-control），“手机遥控电脑上的编程 Agent”不再是稀缺能力，不能拿它当主卖点。
@@ -94,7 +115,7 @@ Codex 官方文档站（developers.openai.com）在沙箱里被网络策略拦�
 
 | 事项 | 为什么没核实 | 谁来做 |
 | --- | --- | --- |
-| 两个 CLI 的真实对话输出（stream-json 事件样例、app-server 的请求/通知实例） | 沙箱里没有登录，也不应该存放凭据 | 在你的电脑上登录后跑，我提供脚本把样例抓成文件 |
+| Codex 真实对话的 app-server 事件样例（`turn/start` 之后的流、三类权限请求） | 沙箱里没有 Codex 登录 | 在你的电脑上登录后跑 `02-codex-appserver.mjs --chat` |
 | Windows 上两个 CLI 的行为（路径、`.cmd` 垫片、PowerShell 与 hooks 的命令写法） | 沙箱是 Linux | 在 Windows 真机上验证 |
 | Claude 桌面版、ChatGPT 桌面版：全局快捷键、快速输入、无障碍树是否暴露输入框、粘贴并回车是否可行 | 无法安装桌面应用 | 在 Windows 与 macOS 真机上验证，我写验证脚本和记录表 |
 | Codex 的 `notify` 配置（载荷字段）、hooks 配置格式与信任机制 | 官方文档站被拦；程序里能看到 `hooks/list` 与 `hook/started`，但没有字段说明 | 读程序生成的配置模板与实测 |

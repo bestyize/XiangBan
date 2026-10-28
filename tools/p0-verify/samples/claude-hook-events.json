@@ -1,0 +1,106 @@
+{
+  "UserPromptSubmit": {
+    "session_id": "a6381a22-0c93-5e20-9eab-8c5e01b3d488",
+    "transcript_path": "~/.claude/projects/-tmp-p0-claude-http-5jg024/a6381a22-0c93-5e20-9eab-8c5e01b3d488.jsonl",
+    "cwd": "/tmp/p0-claude-http-5jg024",
+    "prompt_id": "5019369d-9def-4e77-9e55-25537c26ac32",
+    "permission_mode": "default",
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "用 Bash 工具执行命令 touch p0-hook-test.txt ，然后只回复两个字：完成"
+  },
+  "PreToolUse": {
+    "session_id": "a6381a22-0c93-5e20-9eab-8c5e01b3d488",
+    "transcript_path": "~/.claude/projects/-tmp-p0-claude-http-5jg024/a6381a22-0c93-5e20-9eab-8c5e01b3d488.jsonl",
+    "cwd": "/tmp/p0-claude-http-5jg024",
+    "prompt_id": "5019369d-9def-4e77-9e55-25537c26ac32",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "touch p0-hook-test.txt",
+      "description": "Create empty test file"
+    },
+    "tool_use_id": "toolu_01P3DbPf2Y36prjyxzSeMzyQ"
+  },
+  "PermissionRequest": {
+    "session_id": "a6381a22-0c93-5e20-9eab-8c5e01b3d488",
+    "transcript_path": "~/.claude/projects/-tmp-p0-claude-http-5jg024/a6381a22-0c93-5e20-9eab-8c5e01b3d488.jsonl",
+    "cwd": "/tmp/p0-claude-http-5jg024",
+    "prompt_id": "5019369d-9def-4e77-9e55-25537c26ac32",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PermissionRequest",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "touch p0-hook-test.txt",
+      "description": "Create empty test file"
+    },
+    "permission_suggestions": [
+      {
+        "type": "addDirectories",
+        "directories": [
+          "/tmp/p0-claude-http-5jg024"
+        ],
+        "destination": "session"
+      },
+      {
+        "type": "setMode",
+        "mode": "acceptEdits",
+        "destination": "session"
+      }
+    ]
+  },
+  "PostToolUse": {
+    "session_id": "a6381a22-0c93-5e20-9eab-8c5e01b3d488",
+    "transcript_path": "~/.claude/projects/-tmp-p0-claude-http-5jg024/a6381a22-0c93-5e20-9eab-8c5e01b3d488.jsonl",
+    "cwd": "/tmp/p0-claude-http-5jg024",
+    "prompt_id": "5019369d-9def-4e77-9e55-25537c26ac32",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "PostToolUse",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "touch p0-hook-test.txt",
+      "description": "Create empty test file"
+    },
+    "tool_response": {
+      "stdout": "",
+      "stderr": "",
+      "interrupted": false,
+      "isImage": false,
+      "noOutputExpected": true
+    },
+    "tool_use_id": "toolu_01P3DbPf2Y36prjyxzSeMzyQ",
+    "duration_ms": 106
+  },
+  "Stop": {
+    "session_id": "a6381a22-0c93-5e20-9eab-8c5e01b3d488",
+    "transcript_path": "~/.claude/projects/-tmp-p0-claude-http-5jg024/a6381a22-0c93-5e20-9eab-8c5e01b3d488.jsonl",
+    "cwd": "/tmp/p0-claude-http-5jg024",
+    "prompt_id": "5019369d-9def-4e77-9e55-25537c26ac32",
+    "permission_mode": "default",
+    "effort": {
+      "level": "medium"
+    },
+    "hook_event_name": "Stop",
+    "stop_hook_active": false,
+    "last_assistant_message": "完成",
+    "background_tasks": [],
+    "session_crons": []
+  },
+  "SessionEnd": {
+    "session_id": "a6381a22-0c93-5e20-9eab-8c5e01b3d488",
+    "transcript_path": "~/.claude/projects/-tmp-p0-claude-http-5jg024/a6381a22-0c93-5e20-9eab-8c5e01b3d488.jsonl",
+    "cwd": "/tmp/p0-claude-http-5jg024",
+    "prompt_id": "5019369d-9def-4e77-9e55-25537c26ac32",
+    "hook_event_name": "SessionEnd",
+    "reason": "other"
+  }
+}
