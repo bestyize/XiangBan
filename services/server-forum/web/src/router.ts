@@ -10,6 +10,8 @@ const routes: RouteRecordRaw[] = [
   { path: '/resources', redirect: '/' },
   { path: '/packs/:id(\\d+)', name: 'pack', component: () => import('@/views/PackView.vue') },
   { path: '/weekly', redirect: { path: '/', query: { tab: 'weekly' } } },
+  { path: '/publish', name: 'publish', component: () => import('@/views/PublishView.vue'), meta: { auth: true } },
+  { path: '/me/works', name: 'works', component: () => import('@/views/MyWorksView.vue'), meta: { auth: true } },
   { path: '/weekly/:week', name: 'weekly-issue', component: () => import('@/views/WeeklyView.vue') },
   { path: '/projects', redirect: { path: '/', query: { tab: 'projects' } } },
   { path: '/projects/:slug', name: 'project', component: () => import('@/views/ProjectView.vue') },

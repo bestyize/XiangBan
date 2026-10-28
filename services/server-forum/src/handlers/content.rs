@@ -32,6 +32,8 @@ pub fn routes() -> Router<AppState> {
         .route("/packs/{id}/download", get(download))
         .route("/packs/{id}/applied", post(applied))
         .route("/packs/{id}/versions", post(add_version))
+        .route("/packs/{id}/remove", post(remove_own_pack))
+        .route("/me/packs", get(my_packs))
         .route("/schemes", get(list_schemes).post(create_scheme))
         .route("/projects", get(list_projects))
         .route("/projects/{slug}", get(get_project))
@@ -411,6 +413,9 @@ pub struct CreatePackInput {
     tags: Vec<String>,
     file_key: String,
     cover_key: Option<String>,
+    /// 发布者确认自己有权发布这份内容（原创或已获授权），不勾选不能发布。
+    #[serde(default)]
+    rights_ack: bool,
 }
 
 fn clean_tags(tags: &[String]) -> AppResult<Vec<String>> {
@@ -477,6 +482,9 @@ async fn check_cover(tx: &mut sqlx::PgConnection, uid: Uuid, cover_key: &str) ->
 }
 
 async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input): Json<CreatePackInput>) -> AppResult<Json<Value>> {
+    if !input.rights_ack {
+        return Err(AppError::BadRequest("请确认你拥有这份内容的发布权利".into()));
+    }
     check_pack_quota_for_publish(&state, &auth).await?;
     if !content::is_known_kind(&input.kind) {
         return Err(AppError::BadRequest("未知的内容类型".into()));
@@ -610,6 +618,46 @@ async fn add_version(
         .await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "version": next, "trust_level": content::T2 })))
+}
+
+/// 我的作品：自己发布的全部内容包，含已下架和被拒的，附未处理的审核状态。
+async fn my_packs(State(state): State<AppState>, auth: AuthUser) -> AppResult<Json<Value>> {
+    let rows: Vec<PackRow> = sqlx::query_as(&format!(
+        "SELECT {PACK_COLUMNS} FROM packs p LEFT JOIN users u ON u.uid = p.author_uid
+         WHERE p.author_uid = $1 ORDER BY p.updated_at DESC, p.id DESC LIMIT 200"
+    ))
+    .bind(auth.user.uid)
+    .fetch_all(&state.pool)
+    .await?;
+    let pending: Vec<(i64,)> =
+        sqlx::query_as("SELECT target_id FROM moderation_queue WHERE target_type = 'pack' AND status = 'pending'")
+            .fetch_all(&state.pool)
+            .await?;
+    let pending: std::collections::HashSet<i64> = pending.into_iter().map(|r| r.0).collect();
+    let items: Vec<Value> = rows
+        .iter()
+        .map(|r| {
+            let mut v = r.json(&state);
+            v["in_review"] = json!(pending.contains(&r.id));
+            v
+        })
+        .collect();
+    Ok(Json(json!({ "items": items })))
+}
+
+/// 作者自己下架：只改状态，不删数据，已应用的人不受影响。
+async fn remove_own_pack(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+    let updated = sqlx::query(
+        "UPDATE packs SET status = 'removed', updated_at = now() WHERE id = $1 AND author_uid = $2 AND status <> 'removed'",
+    )
+    .bind(id)
+    .bind(auth.user.uid)
+    .execute(&state.pool)
+    .await?;
+    if updated.rows_affected() == 0 {
+        return Err(AppError::not_found("内容包"));
+    }
+    Ok(Json(json!({ "id": id, "status": "removed" })))
 }
 
 // ───────────────────────── 方案 ─────────────────────────

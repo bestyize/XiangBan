@@ -87,6 +87,8 @@ async function logout() {
                 <strong>{{ session.user?.nickname ?? '加载中' }}</strong>
               </div>
               <RouterLink v-if="session.user" role="menuitem" :to="`/u/${session.user.uid}`">我的主页</RouterLink>
+              <RouterLink role="menuitem" to="/me/works">我的作品</RouterLink>
+              <RouterLink role="menuitem" to="/publish">发布内容包</RouterLink>
               <RouterLink role="menuitem" to="/settings">收藏与设置</RouterLink>
               <RouterLink role="menuitem" to="/points">积分、签到与邀请</RouterLink>
               <button role="menuitem" type="button" @click="logout">退出登录</button>

@@ -174,3 +174,34 @@ async fn forum_rejection_removes_the_file() {
     assert!(!dir.join("packs/effect/y.zip").exists());
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[tokio::test]
+async fn browsers_can_upload_across_origins() {
+    let dir = std::env::temp_dir().join(format!("res-{}", uuid::Uuid::new_v4()));
+    let (cb, _) = fake_forum(StatusCode::OK).await;
+    let app = build_router(state(&dir, cb), &["https://chat.example".to_string()]);
+    let preflight = Request::builder()
+        .method("OPTIONS")
+        .uri("/upload")
+        .header("origin", "https://chat.example")
+        .header("access-control-request-method", "PUT")
+        .header("access-control-request-headers", "x-upload-ticket")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.clone().oneshot(preflight).await.unwrap();
+    assert!(res.status().is_success());
+    assert_eq!(res.headers()["access-control-allow-origin"], "https://chat.example");
+    assert!(res.headers()["access-control-allow-headers"].to_str().unwrap().contains("x-upload-ticket"));
+    assert!(res.headers()["access-control-allow-methods"].to_str().unwrap().contains("PUT"));
+
+    // 不在白名单的网页源拿不到放行头。
+    let other = Request::builder()
+        .method("OPTIONS")
+        .uri("/upload")
+        .header("origin", "https://evil.example")
+        .header("access-control-request-method", "PUT")
+        .body(Body::empty())
+        .unwrap();
+    let res = app.oneshot(other).await.unwrap();
+    assert!(res.headers().get("access-control-allow-origin").is_none_or(|v| v != "https://evil.example"));
+}

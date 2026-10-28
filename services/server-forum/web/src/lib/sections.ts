@@ -9,6 +9,8 @@ export function sectionOf(route: Pick<RouteLocationNormalizedLoaded, 'name' | 'p
     case 'pack':
     case 'weekly-issue':
     case 'project':
+    case 'publish':
+    case 'works':
       return 'home'
     case 'category': {
       const slug = String(route.params.slug ?? '')

@@ -87,6 +87,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
   3. 资源机落盘并重算哈希后，回调 `POST /api/internal/pack-uploaded`，请求体 `{file_key,size,sha256,manifest}`（`manifest` 是资源机从压缩包根目录读出的 `manifest.json`，内容包必带，封面不带；本服务会按上传类型再校验一遍），头 `X-Signature` 为请求体的 HMAC-SHA256（十六进制，密钥同 `FORUM_RESOURCE_SECRET`）；
   4. `POST /packs {kind,title,summary,tags,file_key,cover_key?}` 发布，清单以资源机回调里的为准，客户端不再自报。封面同样先申请 `kind:"cover"` 的凭证（≤ 2MB，键为 `covers/{id}`，公开可读，不签名），`cover_key` 必须是自己上传并已确认的封面。只认已被资源机确认、属于该用户、没用过的上传；发布后是 T2 并进审核队列。`POST /packs/{id}/versions {file_key,changelog}` 发新版本（id 必须一致，已审核的会降回未审并重新入队）。
 - 资源机侧约定：下载地址 `{base}/{file_key}?exp=&sig=`，`sig = hex(HMAC-SHA256(secret, "GET\n{file_key}\n{exp}"))`；上传凭证是 `base64url(JSON声明).hex(HMAC-SHA256(secret, "PUT\n{base64url部分}"))`，声明含 `uid, kind, size, sha256, file_key, exp`。`src/content.rs` 里的 `verify_download`、`verify_upload_ticket`、`sign_callback` 是资源机实现的参考，有单元测试。
+- 我的作品：`GET /me/packs`（自己发布的全部内容包，含下架、被拒与是否在审核中）、`POST /packs/{id}/remove`（作者自己下架）。发布时必须带 `rights_ack: true`（权利声明）。网页入口是 `/publish`（上传 zip 与封面、填信息、勾选声明；`?pack=编号` 发新版本）和 `/me/works`。
 - 后台（管理员令牌）：`GET/POST /admin/packs`（POST 是官方直接登记 T0/T1，文件已由运维放进资源机，可带魔搭等 https 镜像）、`POST /admin/packs/{id}/review`（`approve|reject|remove|restore`）、`GET /admin/moderation`（待审队列）、`PUT /admin/projects/{slug}`、`PUT /admin/weekly/{week}`（草稿不对外，周刊条目只存引用，下架的内容包读取时自动隐去）。
 - 集成测试：`TEST_DATABASE_URL=postgres://… cargo test content_tests` 覆盖凭证、回调、发布、版本、审核、下载签名、配额、周刊和分享。
 

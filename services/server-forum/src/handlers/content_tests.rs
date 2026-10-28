@@ -103,7 +103,7 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
 
     // 资源机还没确认前不能发布。
     let publish = json!({"kind":"effect","title":"夕阳特效","summary":"桌面夕阳","tags":["特效"," 特效 ","桌面"],
-        "file_key":file_key});
+        "file_key":file_key,"rights_ack":true});
     let (s, _) = call(&app, "POST", "/api/packs", Some(&author_t), publish.clone()).await;
     assert_eq!(s, StatusCode::CONFLICT);
 
@@ -121,6 +121,10 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     wrong["kind"] = json!("reminder");
     let (s, _) = call(&app, "POST", "/api/packs", Some(&author_t), wrong).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "上传时的类型与发布类型不一致应拒绝");
+    let mut no_ack = publish.clone();
+    no_ack["rights_ack"] = json!(false);
+    let (s, _) = call(&app, "POST", "/api/packs", Some(&author_t), no_ack).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "必须勾选权利声明");
     let (s, p) = call(&app, "POST", "/api/packs", Some(&author_t), publish.clone()).await;
     assert_eq!(s, StatusCode::OK, "{p}");
     let id = p["id"].as_i64().unwrap();
@@ -140,7 +144,7 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     let (_, t3) = call(&app, "POST", "/api/packs/upload-ticket", Some(&author_t), json!({"kind":"effect","size":500,"sha256":sha2})).await;
     let key3 = t3["file_key"].as_str().unwrap().to_string();
     assert_eq!(callback(&app, &secret, json!({"file_key":key3,"size":500,"sha256":sha2,"manifest":manifest("effect","dawn","1.0.0")}), true).await, StatusCode::OK);
-    let with_cover = json!({"kind":"effect","title":"晨光","file_key":key3,"cover_key":cover_key});
+    let with_cover = json!({"kind":"effect","title":"晨光","file_key":key3,"cover_key":cover_key,"rights_ack":true});
     let (s, _) = call(&app, "POST", "/api/packs", Some(&author_t), with_cover.clone()).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "封面未确认");
     let (s, _) = call(&app, "POST", "/api/packs", Some(&other_t), with_cover.clone()).await;
@@ -180,6 +184,21 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(s, StatusCode::OK);
     let (_, hot) = call(&app, "GET", "/api/packs?sort=hot", None, Value::Null).await;
     assert_eq!(hot["items"][0]["apply_count"], 1);
+
+    // 我的作品：只看到自己的，含审核状态；作者可以自己下架。
+    let (s, _) = call(&app, "GET", "/api/me/packs", None, Value::Null).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (_, mine) = call(&app, "GET", "/api/me/packs", Some(&author_t), Value::Null).await;
+    assert_eq!(mine["items"].as_array().unwrap().len(), 2);
+    assert_eq!(mine["items"][0]["in_review"], true);
+    let (_, theirs) = call(&app, "GET", "/api/me/packs", Some(&other_t), Value::Null).await;
+    assert!(theirs["items"].as_array().unwrap().is_empty());
+    let (s, _) = call(&app, "POST", &format!("/api/packs/{dawn_id}/remove"), Some(&other_t), Value::Null).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "别人不能下架");
+    let (s, _) = call(&app, "POST", &format!("/api/packs/{dawn_id}/remove"), Some(&author_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = call(&app, "GET", &format!("/api/packs/{dawn_id}/download"), None, Value::Null).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
 
     // 新版本：只有作者；id 必须一致；版本号递增。
     let (_, t2) = call(&app, "POST", "/api/packs/upload-ticket", Some(&author_t), json!({"kind":"effect","size":2000,"sha256":"b".repeat(64)})).await;

@@ -118,7 +118,35 @@ function qs(params: Record<string, string | number | undefined>) {
   return s ? `?${s}` : ''
 }
 
+export interface UploadTicket {
+  ticket: string
+  upload_url: string
+  file_key: string
+  expires_at: number
+}
+
+export interface MyPack extends PackItem {
+  in_review: boolean
+}
+
+export interface PublishInput {
+  kind: string
+  title: string
+  summary: string
+  tags: string[]
+  file_key: string
+  cover_key?: string
+  rights_ack: boolean
+}
+
 export const contentApi = {
+  uploadTicket: (kind: string, size: number, sha256: string) =>
+    request<UploadTicket>('POST', '/packs/upload-ticket', { kind, size, sha256 }),
+  publish: (input: PublishInput) => request<{ id: number; slug: string }>('POST', '/packs', input),
+  addVersion: (id: number, file_key: string, changelog: string) =>
+    request<{ id: number; version: number }>('POST', `/packs/${id}/versions`, { file_key, changelog }),
+  removeOwn: (id: number) => request<{ id: number }>('POST', `/packs/${id}/remove`),
+  myPacks: () => request<{ items: MyPack[] }>('GET', '/me/packs'),
   packs: (p: PackListParams) => request<Page<PackItem>>('GET', `/packs${qs({ ...p })}`, undefined, false),
   pack: (id: number) => request<PackDetail>('GET', `/packs/${id}`),
   download: (id: number, version?: number) => request<DownloadInfo>('GET', `/packs/${id}/download${qs({ version })}`, undefined, false),
