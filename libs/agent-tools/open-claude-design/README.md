@@ -24,6 +24,8 @@
 
 ## 格式边界
 
+创作质量要求见 [CRAFT.md](CRAFT.md)（风格方向与 tokens、真实内容、组件状态、交付前自查），随 format 动作一并返回。
+
 详见 [FORMAT.md](FORMAT.md)：支持 v3 boards/order 与旧版 artboards 索引，保留未知索引字段和原始 DC 程序。选择文字或样式时修改源模板，不用渲染后的 DOM 覆盖程序；动态文字通过批注修改。
 
 支持 x-dc、helmet、表达式、sc-if/sc-for、DCLogic 状态和事件、参数默认值、画板间相对链接。图片使用内嵌 data URL，CSS 使用内联样式；本地 CSS/SVG/JS 等文本可在源包中保留，但不会作为外部资源加载。
