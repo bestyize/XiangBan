@@ -1,5 +1,6 @@
 import { reactive } from 'vue';
 import { invoke } from '../../bridge.ts';
+import type { ControlStore } from '../control-types.ts';
 
 /** What `community_prepare` reports about a checked pack. Nothing has been changed on this machine at this point. */
 export interface PackPreview {
@@ -43,12 +44,27 @@ export async function startApply(request: ApplyRequest) {
   }
 }
 
-export async function confirmApply(): Promise<string | null> {
+/** What the console does with a template that is handed over rather than applied. */
+export interface ApplyHandlers {
+  task(prompt: string): Promise<void> | void;
+  goal(goal: NonNullable<ControlStore['goalTemplate']>): Promise<void> | void;
+}
+
+interface ApplyResult {
+  status: 'applied' | 'task' | 'goal';
+  message: string;
+  task?: { prompt: string };
+  goal?: NonNullable<ControlStore['goalTemplate']>;
+}
+
+export async function confirmApply(handlers?: ApplyHandlers): Promise<string | null> {
   const current = applyFlow.state;
   if (current.phase !== 'confirm') return null;
   applyFlow.state = { phase: 'applying', preview: current.preview };
   try {
-    const result = await invoke<{ message: string }>('community_apply', { token: current.preview.token });
+    const result = await invoke<ApplyResult>('community_apply', { token: current.preview.token });
+    if (result.status === 'task' && result.task) await handlers?.task(result.task.prompt);
+    if (result.status === 'goal' && result.goal) await handlers?.goal(result.goal);
     applyFlow.state = { phase: 'done', message: result.message };
     return result.message;
   } catch (error) {
@@ -57,10 +73,52 @@ export async function confirmApply(): Promise<string | null> {
   }
 }
 
-export function closeApply() { applyFlow.state = { phase: 'idle' }; }
+/** 桌面端现在能应用的类型。 */
+export const SUPPORTED_KINDS = ['effect', 'reminder', 'routine', 'task', 'goal'];
+
+/**
+ * 复刻方案：把方案里的内容逐项走同一条“下载 → 校验 → 展示 → 确认”流程，一次只处理一项，
+ * 每一项都要用户点头；桌面端还不支持的类型跳过，下架的内容会在那一步报错，不影响后面的。
+ */
+export const schemeFlow = reactive<{ title: string; queue: ApplyRequest[]; total: number; skipped: number }>({ title: '', queue: [], total: 0, skipped: 0 });
+
+export interface SchemeItem { pack_id: number; kind: string; version?: number }
+
+export function startScheme(title: string, items: SchemeItem[]): number {
+  const supported = items.filter(i => SUPPORTED_KINDS.includes(i.kind));
+  schemeFlow.title = title;
+  schemeFlow.total = supported.length;
+  schemeFlow.skipped = items.length - supported.length;
+  schemeFlow.queue = supported.map(i => ({ packId: i.pack_id, version: i.version ?? null }));
+  nextInScheme();
+  return supported.length;
+}
+
+function nextInScheme() {
+  const next = schemeFlow.queue.shift();
+  if (next) void startApply(next);
+}
+
+/** 第几项 / 共几项，不在复刻中返回空。 */
+export function schemeProgress(): string {
+  if (!schemeFlow.total || applyFlow.state.phase === 'idle') return '';
+  return `方案「${schemeFlow.title}」第 ${schemeFlow.total - schemeFlow.queue.length} / ${schemeFlow.total} 项`;
+}
+
+export function stopScheme() {
+  schemeFlow.queue = [];
+  schemeFlow.total = 0;
+  applyFlow.state = { phase: 'idle' };
+}
+
+export function closeApply() {
+  applyFlow.state = { phase: 'idle' };
+  if (schemeFlow.queue.length) nextInScheme();
+  else schemeFlow.total = 0;
+}
 
 export const KIND_LABEL: Record<string, string> = {
-  effect: '特效', reminder: '提醒', task: '定时任务', routine: '例行事项', goal: '目标', scheme: '方案',
+  effect: '特效', reminder: '提醒', task: '任务模板', routine: '例行事项', goal: '目标',
   widget: '组件', game: '游戏', wallpaper: '壁纸', skill: '技能', expert: '专家', workflow: '工作流',
 };
 export const TRUST_LABEL = ['官方', '已审核', '未审核'];

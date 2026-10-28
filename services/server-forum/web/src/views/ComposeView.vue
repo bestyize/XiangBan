@@ -8,7 +8,7 @@ import type { Attachment, TopicInput } from '@/api/types'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
-import { CONDITIONS, READ_LEVELS, TRUST_LABEL, requiredPostLevel, tagLabel } from '@/lib/format'
+import { READ_LEVELS, TRUST_LABEL, requiredPostLevel, tagLabel } from '@/lib/format'
 import { useHead } from '@/lib/head'
 
 const route = useRoute()
@@ -26,11 +26,6 @@ const form = reactive({
   title: '',
   body: '',
   tags: [] as string[],
-  valueText: '',
-  conditions: 0,
-  linkUrl: '',
-  expiry: 'unknown' as 'unknown' | 'date' | 'long',
-  expiresDate: '',
   /** 谁能读：0 所有人，1 成员以上，2 老用户以上，3 守护者 */
   readLevel: 0,
   bounty: 0,
@@ -42,7 +37,6 @@ const attachments = ref<Attachment[]>([])
 const tagDraft = ref('')
 const busy = ref(false)
 const error = ref('')
-const loadedKind = ref<'deal' | 'normal' | null>(null)
 
 /** 当前登录用户的信任等级；没登录按 0。 */
 const myLevel = computed(() => session.user?.trust_level ?? 0)
@@ -58,12 +52,10 @@ const roots = computed(() =>
       ...n,
       children: n.children.filter(c => editId.value || requiredPostLevel(c) <= myLevel.value),
     }))
-    .filter(n => editId.value || n.children.length > 0)
-    .filter(n => !loadedKind.value || n.kind === loadedKind.value),
+    .filter(n => editId.value || n.children.length > 0),
 )
 const root = computed(() => roots.value.find(r => r.id === form.rootId))
 const leaves = computed(() => root.value?.children ?? [])
-const isDeal = computed(() => root.value?.kind === 'deal')
 const leaf = computed(() => leaves.value.find(l => l.id === form.categoryId))
 const isHelp = computed(() => leaf.value?.slug === 'share-help')
 /** 选中的二级分类上的内置标签；已经加到帖子上的也留着，方便点第二次取消。 */
@@ -115,15 +107,7 @@ watch(
       form.readLevel = t.min_read_level
       attachments.value = [...t.attachments]
       originalReadLevel.value = t.min_read_level
-      loadedKind.value = t.deal ? 'deal' : 'normal'
       if (t.help) form.bounty = t.help.bounty
-      if (t.deal) {
-        form.valueText = t.deal.value_text
-        form.conditions = t.deal.conditions
-        form.linkUrl = t.deal.link_url
-        form.expiry = t.deal.long_term ? 'long' : t.deal.expires_at ? 'date' : 'unknown'
-        form.expiresDate = t.deal.expires_at ? t.deal.expires_at.slice(0, 10) : ''
-      }
     } catch (e) {
       toast.error(e)
     }
@@ -135,10 +119,6 @@ function togglePreset(tag: string) {
   const i = form.tags.indexOf(tag)
   if (i >= 0) form.tags.splice(i, 1)
   else if (form.tags.length < 5) form.tags.push(tag)
-}
-
-function toggleCondition(bit: number) {
-  form.conditions ^= bit
 }
 
 function addTag() {
@@ -169,9 +149,7 @@ function readLevelDisabled(level: number) {
 
 const titleLen = computed(() => Array.from(form.title.trim()).length)
 
-const titleHint = computed(() =>
-  isDeal.value ? '写清楚是什么福利，比如：Claude API 新用户送 $5 额度，无需信用卡' : '一句话说清楚你想讨论什么',
-)
+const titleHint = '一句话说清楚你想讨论什么'
 
 async function submit() {
   error.value = ''
@@ -179,7 +157,6 @@ async function submit() {
   if (titleLen.value < 4) return (error.value = '标题至少 4 个字')
   if (attachments.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) return (error.value = '附件下载积分必须为 0～10 的整数')
   if (isHelp.value && !editId.value && (!Number.isInteger(form.bounty) || form.bounty < 0 || form.bounty > 1000)) return (error.value = '悬赏积分必须为 0～1000 的整数')
-  if (isDeal.value && form.expiry === 'date' && !form.expiresDate) return (error.value = '请选择截止日期，或改成"不清楚"')
   addTag()
   const input: TopicInput = {
     category_id: form.categoryId,
@@ -191,16 +168,6 @@ async function submit() {
     attachment_prices: attachments.value.map(a => ({ id: a.id, price: a.price })),
   }
   if (isHelp.value && !editId.value) input.help = { bounty: form.bounty, days: form.helpDays }
-  if (isDeal.value) {
-    input.deal = {
-      value_text: form.valueText,
-      conditions: form.conditions,
-      link_url: form.linkUrl.trim(),
-      // 截止日期按北京时间当天结束算。
-      expires_at: form.expiry === 'date' ? new Date(`${form.expiresDate}T23:59:59+08:00`).toISOString() : null,
-      long_term: form.expiry === 'long',
-    }
-  }
   busy.value = true
   try {
     const res = editId.value ? await api.updateTopic(editId.value, input) : await api.createTopic(input)
@@ -225,7 +192,6 @@ const blocked = computed(() => {
   return ''
 })
 
-const today = new Date().toISOString().slice(0, 10)
 </script>
 
 <template>
@@ -245,8 +211,8 @@ const today = new Date().toISOString().slice(0, 10)
         <fieldset class="kinds">
           <legend>发到哪里</legend>
           <div class="root-opts">
-            <label v-for="r in roots" :key="r.id" class="root" :class="{ on: form.rootId === r.id, deal: r.kind === 'deal' }">
-              <input v-model="form.rootId" type="radio" name="root" :value="r.id" :disabled="!!editId && r.kind !== loadedKind" />
+            <label v-for="r in roots" :key="r.id" class="root" :class="{ on: form.rootId === r.id }">
+              <input v-model="form.rootId" type="radio" name="root" :value="r.id" />
               <span class="rname">{{ r.name }}</span>
               <span class="rdesc">{{ r.description }}</span>
             </label>
@@ -259,41 +225,6 @@ const today = new Date().toISOString().slice(0, 10)
           </label>
         </div>
         <p v-if="leaf?.description" class="leaf-note">{{ leaf.description }}</p>
-      </section>
-
-      <section v-if="isDeal" class="panel section deal">
-        <h2>羊毛信息 <span class="optional">都是选填，不确定的可以不填</span></h2>
-        <div class="grid one">
-          <label class="field">
-            <span>能领到什么</span>
-            <input v-model="form.valueText" class="input" maxlength="40" placeholder="$5 额度、首月 1 元、3 个月 Pro" />
-          </label>
-          <label class="field">
-            <span>官方活动页</span>
-            <input v-model="form.linkUrl" class="input" type="url" inputmode="url" maxlength="500" placeholder="https://" />
-            <small>不要带 ref、aff、invite 这类个人推广参数。</small>
-          </label>
-        </div>
-
-        <fieldset class="field conds">
-          <legend>领取条件</legend>
-          <div class="checks">
-            <label v-for="c in CONDITIONS" :key="c.key" class="check" :class="{ on: form.conditions & c.bit }">
-              <input type="checkbox" :checked="!!(form.conditions & c.bit)" @change="toggleCondition(c.bit)" />
-              {{ c.label }}
-            </label>
-          </div>
-        </fieldset>
-
-        <fieldset class="field">
-          <legend>有效期</legend>
-          <div class="seg">
-            <label :class="{ on: form.expiry === 'unknown' }"><input v-model="form.expiry" type="radio" value="unknown" />不清楚</label>
-            <label :class="{ on: form.expiry === 'date' }"><input v-model="form.expiry" type="radio" value="date" />截止到</label>
-            <label :class="{ on: form.expiry === 'long' }"><input v-model="form.expiry" type="radio" value="long" />长期有效</label>
-          </div>
-          <input v-if="form.expiry === 'date'" v-model="form.expiresDate" class="input date" type="date" :min="today" aria-label="截止日期" />
-        </fieldset>
       </section>
 
       <section v-if="isHelp" class="panel section">
@@ -316,13 +247,13 @@ const today = new Date().toISOString().slice(0, 10)
           <small>{{ titleLen }} / 80</small>
         </label>
         <div class="field">
-          <span>{{ isDeal ? '领取步骤和补充说明' : '正文' }}</span>
+          <span>正文</span>
           <MarkdownEditor
             id="topic-body"
             v-model="form.body"
-            :label="isDeal ? '领取步骤' : '正文'"
+            :label="'正文'"
             :rows="12"
-            :placeholder="isDeal ? '1. 打开活动页注册\n2. 在控制台领取\n3. 注意事项……' : '至少 10 个字'"
+            :placeholder="'至少 10 个字'"
           />
         </div>
         <div class="field">
@@ -496,9 +427,6 @@ legend {
   border-color: var(--ink);
   box-shadow: inset 0 0 0 1px var(--ink);
 }
-.root.deal.on {
-  background: color-mix(in srgb, var(--brand) 7%, var(--surface));
-}
 .rname {
   font-weight: 700;
   font-size: var(--fs-sm);
@@ -564,9 +492,6 @@ legend {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--paper);
-}
-.deal {
-  border-color: color-mix(in srgb, var(--brand) 35%, var(--line));
 }
 .grid {
   display: grid;

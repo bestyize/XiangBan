@@ -3,7 +3,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { adminApi, type AdminCategory, type CategoryInput } from '@/api/admin'
 import CategoryForm from './CategoryForm.vue'
-import { CATEGORY_KIND, errorText, perform, trustName } from './shared'
+import { errorText, perform, trustName } from './shared'
 
 const all = ref<AdminCategory[]>([])
 const loading = ref(true)
@@ -83,7 +83,6 @@ onMounted(load)
             <div class="adm-title">
               {{ c.name }}
               <span class="adm-tags" style="margin-left: 6px">
-                <span class="adm-tag" :class="c.kind === 'deal' ? 'valid' : ''">{{ CATEGORY_KIND[c.kind] }}</span>
                 <span v-if="c.admin_only" class="adm-tag line">仅守护者</span>
                 <span v-if="!c.on_home" class="adm-tag line">不上首页</span>
                 <span v-if="!c.award_points" class="adm-tag line">不奖励积分</span>

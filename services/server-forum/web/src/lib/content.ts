@@ -13,12 +13,19 @@ export const PACK_KINDS = [
   { key: 'skill', label: '技能' },
   { key: 'expert', label: '专家' },
   { key: 'workflow', label: '工作流' },
-  { key: 'scheme', label: '方案文件' },
 ] as const
 
 export function kindLabel(kind: string): string {
   return PACK_KINDS.find(k => k.key === kind)?.label ?? kind
 }
+
+/** 各类型压缩包的大小上限（字节），与服务端一致；封面单独 2MB。 */
+const MB = 1024 * 1024
+export const KIND_LIMIT: Record<string, number> = {
+  effect: MB, reminder: MB, routine: MB, task: MB, goal: MB, expert: MB,
+  widget: 8 * MB, game: 8 * MB, skill: 8 * MB, workflow: 8 * MB, wallpaper: 32 * MB,
+}
+export const COVER_LIMIT = 2 * MB
 
 /** 视觉类内容用封面图卡片，文字为主的能力类用单列。 */
 export const VISUAL_KINDS = ['effect', 'wallpaper', 'widget', 'game']

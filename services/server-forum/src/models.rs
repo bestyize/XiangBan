@@ -7,17 +7,6 @@ use sqlx::{PgPool, Postgres, QueryBuilder};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-/// 领取条件位标志，和前端 `CONDITIONS` 保持一致。
-pub const CONDITIONS: &[(&str, i32)] = &[
-    ("card", 1),
-    ("phone_cn", 2),
-    ("phone_intl", 4),
-    ("edu", 8),
-    ("work_email", 16),
-    ("realname", 32),
-];
-pub const CONDITION_MASK: i32 = 63;
-
 /// 信任等级的名称，下标就是等级。
 pub const TRUST_NAMES: [&str; 4] = ["新人", "成员", "老用户", "守护者"];
 
@@ -82,15 +71,6 @@ pub struct CategoryRef {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct DealInfo {
-    pub value_text: String,
-    pub conditions: i32,
-    pub link_url: String,
-    pub expires_at: Option<DateTime<Utc>>,
-    pub long_term: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
 pub struct HelpInfo {
     pub bounty: i32,
     pub status: String,
@@ -119,7 +99,6 @@ pub struct TopicItem {
     pub created_at: DateTime<Utc>,
     pub last_reply_at: DateTime<Utc>,
     pub edited_at: Option<DateTime<Utc>>,
-    pub deal: Option<DealInfo>,
     pub help: Option<HelpInfo>,
 }
 
@@ -147,11 +126,6 @@ struct TopicRow {
     author_nickname: String,
     author_avatar: Option<String>,
     author_level: i16,
-    value_text: Option<String>,
-    conditions: Option<i32>,
-    link_url: Option<String>,
-    expires_at: Option<DateTime<Utc>>,
-    long_term: Option<bool>,
     bounty: Option<i32>,
     help_status: Option<String>,
     accepted_post_id: Option<i64>,
@@ -160,14 +134,6 @@ struct TopicRow {
 
 impl TopicRow {
     fn into_item(self, tags: Vec<String>) -> TopicItem {
-        // 有 deals 记录（value_text 一定非空列）就是羊毛帖；产品可以没有。
-        let deal = self.value_text.map(|value_text| DealInfo {
-            value_text,
-            conditions: self.conditions.unwrap_or(0),
-            link_url: self.link_url.unwrap_or_default(),
-            expires_at: self.expires_at,
-            long_term: self.long_term.unwrap_or(false),
-        });
         let help = match (self.bounty, self.help_status, self.help_expires_at) {
             (Some(bounty), Some(status), Some(expires_at)) => Some(HelpInfo {
                 bounty, status, accepted_post_id: self.accepted_post_id, expires_at,
@@ -198,7 +164,6 @@ impl TopicRow {
             created_at: self.created_at,
             last_reply_at: self.last_reply_at,
             edited_at: self.edited_at,
-            deal,
             help,
         }
     }
@@ -208,12 +173,10 @@ const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.pin
         t.reply_count, t.like_count, t.view_count, t.min_read_level, t.created_at, t.last_reply_at, t.edited_at,
         c.id AS category_id, c.slug AS category_slug, c.name AS category_name,
         u.uid AS author_uid, u.nickname AS author_nickname, u.avatar_url AS author_avatar, u.trust_level AS author_level,
-        d.value_text, d.conditions, d.link_url, d.expires_at, d.long_term,
         h.bounty, h.status AS help_status, h.accepted_post_id, h.expires_at AS help_expires_at
     FROM topics t
     JOIN categories c ON c.id = t.category_id
     JOIN users u ON u.uid = t.author_uid
-    LEFT JOIN deals d ON d.topic_id = t.id
     LEFT JOIN help_requests h ON h.topic_id = t.id";
 
 #[derive(Debug, Default, Clone, Deserialize)]
@@ -227,16 +190,11 @@ pub struct ListFilter {
     #[serde(skip)]
     pub followed_by: Option<Uuid>,
     pub q: Option<String>,
-    /// latest（最新回复）/ new（最新发布）/ hot / expiring（即将过期）
+    /// latest（最新回复）/ new（最新发布）/ hot
     pub sort: Option<String>,
     /// 只看首页可见分类（排除闲聊等）
     #[serde(default)]
     pub home: bool,
-    /// deal：只看羊毛；normal：只看普通帖
-    pub kind: Option<String>,
-    /// 默认不返回已到期的羊毛；用户主页、搜索、标签页等需要完整历史时设为 true。
-    #[serde(default)]
-    pub include_expired: bool,
     #[serde(default)]
     pub featured: bool,
     pub page: Option<i64>,
@@ -304,19 +262,6 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
     if f.home {
         qb.push(" AND c.on_home");
     }
-    match f.kind.as_deref() {
-        Some("deal") => {
-            qb.push(" AND d.topic_id IS NOT NULL");
-        }
-        Some("normal") => {
-            qb.push(" AND d.topic_id IS NULL");
-        }
-        _ => {}
-    }
-    if !f.include_expired {
-        // 到期时间已过的羊毛不再展示（长期有效或没写有效期的一直展示）。
-        qb.push(" AND (d.topic_id IS NULL OR d.long_term OR d.expires_at IS NULL OR d.expires_at > now())");
-    }
     if f.featured {
         qb.push(" AND t.featured");
     }
@@ -330,8 +275,7 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
 
 pub async fn list_topics(pool: &PgPool, f: &ListFilter) -> Result<Page<TopicItem>, AppError> {
     let mut count = QueryBuilder::<Postgres>::new(
-        "SELECT COUNT(*) FROM topics t JOIN categories c ON c.id = t.category_id
-         LEFT JOIN deals d ON d.topic_id = t.id",
+        "SELECT COUNT(*) FROM topics t JOIN categories c ON c.id = t.category_id",
     );
     push_filters(&mut count, f);
     let (total,): (i64,) = count.build_query_as().fetch_one(pool).await?;
@@ -360,7 +304,6 @@ pub async fn list_topics(pool: &PgPool, f: &ListFilter) -> Result<Page<TopicItem
     let order = match f.sort.as_deref() {
         Some("new") => "t.created_at DESC",
         Some("hot") => "t.hot_score DESC, t.created_at DESC",
-        Some("expiring") => "d.expires_at ASC NULLS LAST, t.created_at DESC",
         _ => "t.last_reply_at DESC",
     };
     qb.push(format!("{order}, t.id DESC LIMIT "))
@@ -448,7 +391,6 @@ mod tests {
         assert!(sql.contains("t.min_read_level <="));
         assert!(sql.contains("f.follower_uid ="));
         assert!(sql.contains("followed.status <> 'banned'"));
-        assert!(sql.contains("d.expires_at > now()"));
     }
 
     fn reader(level: i16, uid: Option<Uuid>) -> Reader {

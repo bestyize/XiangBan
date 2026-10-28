@@ -32,6 +32,8 @@ pub fn routes() -> Router<AppState> {
         .route("/packs/{id}/download", get(download))
         .route("/packs/{id}/applied", post(applied))
         .route("/packs/{id}/versions", post(add_version))
+        .route("/packs/{id}/remove", post(remove_own_pack))
+        .route("/me/packs", get(my_packs))
         .route("/schemes", get(list_schemes).post(create_scheme))
         .route("/projects", get(list_projects))
         .route("/projects/{slug}", get(get_project))
@@ -45,6 +47,7 @@ pub fn admin_routes() -> Router<AppState> {
     Router::new()
         .route("/packs", get(admin_list_packs).post(admin_create_pack))
         .route("/packs/{id}/review", post(admin_review_pack))
+        .route("/packs/{id}/mirrors", post(admin_add_mirror))
         .route("/moderation", get(admin_moderation))
         .route("/projects", get(admin_list_projects))
         .route("/projects/{slug}", put(admin_put_project))
@@ -411,6 +414,9 @@ pub struct CreatePackInput {
     tags: Vec<String>,
     file_key: String,
     cover_key: Option<String>,
+    /// 发布者确认自己有权发布这份内容（原创或已获授权），不勾选不能发布。
+    #[serde(default)]
+    rights_ack: bool,
 }
 
 fn clean_tags(tags: &[String]) -> AppResult<Vec<String>> {
@@ -477,6 +483,9 @@ async fn check_cover(tx: &mut sqlx::PgConnection, uid: Uuid, cover_key: &str) ->
 }
 
 async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input): Json<CreatePackInput>) -> AppResult<Json<Value>> {
+    if !input.rights_ack {
+        return Err(AppError::BadRequest("请确认你拥有这份内容的发布权利".into()));
+    }
     check_pack_quota_for_publish(&state, &auth).await?;
     if !content::is_known_kind(&input.kind) {
         return Err(AppError::BadRequest("未知的内容类型".into()));
@@ -610,6 +619,46 @@ async fn add_version(
         .await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "version": next, "trust_level": content::T2 })))
+}
+
+/// 我的作品：自己发布的全部内容包，含已下架和被拒的，附未处理的审核状态。
+async fn my_packs(State(state): State<AppState>, auth: AuthUser) -> AppResult<Json<Value>> {
+    let rows: Vec<PackRow> = sqlx::query_as(&format!(
+        "SELECT {PACK_COLUMNS} FROM packs p LEFT JOIN users u ON u.uid = p.author_uid
+         WHERE p.author_uid = $1 ORDER BY p.updated_at DESC, p.id DESC LIMIT 200"
+    ))
+    .bind(auth.user.uid)
+    .fetch_all(&state.pool)
+    .await?;
+    let pending: Vec<(i64,)> =
+        sqlx::query_as("SELECT target_id FROM moderation_queue WHERE target_type = 'pack' AND status = 'pending'")
+            .fetch_all(&state.pool)
+            .await?;
+    let pending: std::collections::HashSet<i64> = pending.into_iter().map(|r| r.0).collect();
+    let items: Vec<Value> = rows
+        .iter()
+        .map(|r| {
+            let mut v = r.json(&state);
+            v["in_review"] = json!(pending.contains(&r.id));
+            v
+        })
+        .collect();
+    Ok(Json(json!({ "items": items })))
+}
+
+/// 作者自己下架：只改状态，不删数据，已应用的人不受影响。
+async fn remove_own_pack(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+    let updated = sqlx::query(
+        "UPDATE packs SET status = 'removed', updated_at = now() WHERE id = $1 AND author_uid = $2 AND status <> 'removed'",
+    )
+    .bind(id)
+    .bind(auth.user.uid)
+    .execute(&state.pool)
+    .await?;
+    if updated.rows_affected() == 0 {
+        return Err(AppError::not_found("内容包"));
+    }
+    Ok(Json(json!({ "id": id, "status": "removed" })))
 }
 
 // ───────────────────────── 方案 ─────────────────────────
@@ -990,6 +1039,55 @@ async fn admin_review_pack(
     audit(&mut tx, &admin, &format!("pack.{}", input.action), "pack", id, format!("{status} -> {new_status}; {note}")).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "trust_level": new_trust, "status": new_status })))
+}
+
+#[derive(Deserialize)]
+pub struct MirrorInput {
+    /// 不传就是当前版本。镜像按版本锁定：每个版本各有自己的镜像地址。
+    version: Option<i32>,
+    name: String,
+    url: String,
+}
+
+/// 给某个版本补一个官方镜像（如魔搭）。同名镜像会被替换。客户端对每个来源都校验 sha256，所以镜像地址本身不需要被信任。
+async fn admin_add_mirror(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Path(id): Path<i64>,
+    Json(input): Json<MirrorInput>,
+) -> AppResult<Json<Value>> {
+    let name = clean_text(&input.name, "镜像名称", 30, true)?;
+    if !input.url.starts_with("https://") || input.url.len() > 500 || input.url.contains(char::is_whitespace) {
+        return Err(AppError::BadRequest("镜像需要 https 地址".into()));
+    }
+    let mut tx = state.pool.begin().await?;
+    let (current,): (i32,) = sqlx::query_as("SELECT current_version FROM packs WHERE id = $1 FOR UPDATE")
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("内容包"))?;
+    let version = input.version.unwrap_or(current);
+    let (mirrors,): (Value,) = sqlx::query_as("SELECT mirrors FROM pack_versions WHERE pack_id = $1 AND version = $2 FOR UPDATE")
+        .bind(id)
+        .bind(version)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("版本"))?;
+    let mut list: Vec<Value> = mirrors.as_array().cloned().unwrap_or_default();
+    list.retain(|m| m.get("name").and_then(Value::as_str) != Some(name.as_str()));
+    list.push(json!({ "name": name, "url": input.url }));
+    if list.len() > 5 {
+        return Err(AppError::BadRequest("每个版本最多 5 个镜像".into()));
+    }
+    sqlx::query("UPDATE pack_versions SET mirrors = $3 WHERE pack_id = $1 AND version = $2")
+        .bind(id)
+        .bind(version)
+        .bind(Value::Array(list.clone()))
+        .execute(&mut *tx)
+        .await?;
+    audit(&mut tx, &admin, "pack.mirror", "pack", id, format!("v{version} {name}")).await?;
+    tx.commit().await?;
+    Ok(Json(json!({ "id": id, "version": version, "mirrors": list })))
 }
 
 async fn admin_moderation(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Json<Value>> {

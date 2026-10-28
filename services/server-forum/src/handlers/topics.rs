@@ -3,7 +3,7 @@ use crate::{
     auth::{AuthUser, MaybeUser},
     error::{AppError, AppResult},
     markdown,
-    models::{self, ListFilter, Page, Reader, TopicItem, CONDITION_MASK, TRUST_NAMES},
+    models::{self, ListFilter, Page, Reader, TopicItem, TRUST_NAMES},
     state::AppState,
     users,
 };
@@ -11,7 +11,6 @@ use axum::{
     extract::{Path, Query, State},
     Json,
 };
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::PgPool;
@@ -23,19 +22,6 @@ pub async fn list(
     Query(mut f): Query<ListFilter>,
 ) -> AppResult<Json<Page<TopicItem>>> {
     f.reader = Reader::from_user(user.as_ref());
-    Ok(Json(models::list_topics(&state.pool, &f).await?))
-}
-
-pub async fn list_deals(
-    State(state): State<AppState>,
-    MaybeUser(user): MaybeUser,
-    Query(mut f): Query<ListFilter>,
-) -> AppResult<Json<Page<TopicItem>>> {
-    f.reader = Reader::from_user(user.as_ref());
-    f.kind = Some("deal".into());
-    if f.sort.is_none() {
-        f.sort = Some("new".into());
-    }
     Ok(Json(models::list_topics(&state.pool, &f).await?))
 }
 
@@ -106,21 +92,6 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
     Ok(Json(TopicDetail { topic, body_html, body_md, attachments, viewer }))
 }
 
-/// 羊毛信息，每一项发帖人都可以不填。
-#[derive(Deserialize, Default)]
-pub struct DealInput {
-    #[serde(default)]
-    pub value_text: String,
-    /// 领取条件位标志，0 表示没有特殊条件或没写。
-    #[serde(default)]
-    pub conditions: i32,
-    #[serde(default)]
-    pub link_url: String,
-    pub expires_at: Option<DateTime<Utc>>,
-    #[serde(default)]
-    pub long_term: bool,
-}
-
 #[derive(Deserialize)]
 pub struct TopicInput {
     pub category_id: i32,
@@ -128,7 +99,6 @@ pub struct TopicInput {
     pub body: String,
     #[serde(default)]
     pub tags: Vec<String>,
-    pub deal: Option<DealInput>,
     /// 谁能读：0 所有人，1 成员以上，2 老用户以上，3 守护者以上。
     /// 不能超过发帖人自己的信任等级。发帖不传按 0，编辑不传保持原样。
     pub min_read_level: Option<i16>,
@@ -163,7 +133,6 @@ fn level_error(admin_only: bool, need: i16) -> AppError {
 #[derive(sqlx::FromRow)]
 struct CategoryRules {
     id: i32,
-    kind: String,
     min_post_level: i16,
     admin_only: bool,
     has_children: bool,
@@ -171,7 +140,7 @@ struct CategoryRules {
 
 async fn category_rules(pool: &PgPool, id: i32) -> AppResult<CategoryRules> {
     sqlx::query_as(
-        "SELECT c.id, c.kind, c.min_post_level, c.admin_only,
+        "SELECT c.id, c.min_post_level, c.admin_only,
                 EXISTS(SELECT 1 FROM categories k WHERE k.parent_id = c.id) AS has_children
          FROM categories c WHERE c.id = $1",
     )
@@ -179,27 +148,6 @@ async fn category_rules(pool: &PgPool, id: i32) -> AppResult<CategoryRules> {
     .fetch_optional(pool)
     .await?
     .ok_or_else(|| AppError::BadRequest("分类不存在".into()))
-}
-
-/// 推广参数默认不允许出现在羊毛链接里，站方统一管理推广链接。
-const REFERRAL_PARAMS: &[&str] = &["ref", "aff", "affiliate", "referral", "referrer", "invite", "invite_code", "invitecode", "via", "fpr"];
-
-pub fn validate_link(url: &str) -> AppResult<()> {
-    if url.is_empty() {
-        return Ok(());
-    }
-    if url.len() > 500 || !(url.starts_with("https://") || url.starts_with("http://")) || url.contains(char::is_whitespace) {
-        return Err(AppError::BadRequest("活动链接需要是 http(s) 地址".into()));
-    }
-    if let Some((_, query)) = url.split_once('?') {
-        for pair in query.split(['&', '#']) {
-            let key = pair.split('=').next().unwrap_or("").to_lowercase();
-            if REFERRAL_PARAMS.contains(&key.as_str()) {
-                return Err(AppError::BadRequest("请贴官方活动页，不要带个人推广参数（如 ref、aff、invite）".into()));
-            }
-        }
-    }
-    Ok(())
 }
 
 pub(super) fn clean_title(raw: &str) -> AppResult<String> {
@@ -240,16 +188,6 @@ pub(super) fn clean_tags(raw: &[String]) -> AppResult<Vec<String>> {
         return Err(AppError::BadRequest("最多 5 个标签".into()));
     }
     Ok(tags)
-}
-
-fn clean_deal(d: &DealInput) -> AppResult<()> {
-    if d.value_text.chars().count() > 40 {
-        return Err(AppError::BadRequest("价值描述最多 40 个字".into()));
-    }
-    if d.conditions & !CONDITION_MASK != 0 {
-        return Err(AppError::BadRequest("领取条件无效".into()));
-    }
-    validate_link(d.link_url.trim())
 }
 
 pub async fn save_tags(pool: &PgPool, topic_id: i64, tags: &[String]) -> AppResult<()> {
@@ -303,21 +241,9 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     users::ensure_daily_quota(&state.pool, user, "topics", &state.config.trust.daily_topics, "发帖").await?;
 
     let title = clean_title(&input.title)?;
-    let body = clean_body(&input.body, if cat.kind == "deal" { 0 } else { 10 })?;
+    let body = clean_body(&input.body, 10)?;
     let tags = clean_tags(&input.tags)?;
     let read_level = clean_read_level(input.min_read_level, user.trust_level, None)?;
-    let empty_deal = DealInput::default();
-    let deal = match (cat.kind.as_str(), &input.deal) {
-        ("deal", Some(d)) => {
-            clean_deal(d)?;
-            Some(d)
-        }
-        // 羊毛信息全是选填，什么都没填也照样发成羊毛帖。
-        ("deal", None) => Some(&empty_deal),
-        (_, Some(_)) => return Err(AppError::BadRequest("只有福利羊毛分类可以填写羊毛信息".into())),
-        _ => None,
-    };
-
     let trusted = user.trust_level >= 1;
     let html = markdown::render(&body, trusted);
     let excerpt = markdown::excerpt(&body, 140);
@@ -336,20 +262,6 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     .bind(read_level)
     .fetch_one(&mut *tx)
     .await?;
-    if let Some(d) = deal {
-        sqlx::query(
-            "INSERT INTO deals (topic_id, value_text, conditions, link_url, expires_at, long_term)
-             VALUES ($1, $2, $3, $4, $5, $6)",
-        )
-        .bind(id)
-        .bind(d.value_text.trim())
-        .bind(d.conditions)
-        .bind(d.link_url.trim())
-        .bind(if d.long_term { None } else { d.expires_at })
-        .bind(d.long_term)
-        .execute(&mut *tx)
-        .await?;
-    }
     if let Some(ids) = &input.attachment_ids {
         attachments::set_for_topic(&mut tx, id, user.uid, ids).await?;
     }
@@ -378,9 +290,8 @@ pub async fn update(
     if topic.locked {
         return Err(AppError::Forbidden("帖子已锁定，不能编辑".into()));
     }
-    // 编辑不允许换到别的类型的分类，避免羊毛信息丢失。
     let cat = category_rules(&state.pool, input.category_id).await?;
-    if cat.has_children || (cat.kind == "deal") != topic.deal.is_some() {
+    if cat.has_children {
         return Err(AppError::BadRequest("不能移动到这个分类".into()));
     }
     // 留在原分类总是允许（比如守护者后来被降级，仍然能改自己发的公告）；
@@ -392,7 +303,7 @@ pub async fn update(
         }
     }
     let title = clean_title(&input.title)?;
-    let body = clean_body(&input.body, if cat.kind == "deal" { 0 } else { 10 })?;
+    let body = clean_body(&input.body, 10)?;
     let tags = clean_tags(&input.tags)?;
     let read_level = clean_read_level(input.min_read_level, user.trust_level, Some(topic.min_read_level))?;
     let html = markdown::render(&body, user.trust_level >= 1);
@@ -414,23 +325,6 @@ pub async fn update(
     .execute(&mut *tx)
     .await?;
     super::help::ensure_category(&mut tx, id, cat.id).await?;
-    if let Some(d) = &input.deal {
-        if topic.deal.is_some() {
-            clean_deal(d)?;
-            sqlx::query(
-                "UPDATE deals SET value_text = $2, conditions = $3, link_url = $4, expires_at = $5, long_term = $6
-                 WHERE topic_id = $1",
-            )
-            .bind(id)
-            .bind(d.value_text.trim())
-            .bind(d.conditions)
-            .bind(d.link_url.trim())
-            .bind(if d.long_term { None } else { d.expires_at })
-            .bind(d.long_term)
-            .execute(&mut *tx)
-            .await?;
-        }
-    }
     let removed = match &input.attachment_ids {
         Some(ids) => attachments::set_for_topic(&mut tx, id, user.uid, ids).await?,
         None => Vec::new(),
@@ -543,16 +437,6 @@ pub async fn preview(auth: AuthUser, Json(input): Json<PreviewInput>) -> AppResu
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn referral_links_are_rejected() {
-        assert!(validate_link("https://claude.ai/upgrade").is_ok());
-        assert!(validate_link("https://x.com/a?utm_source=x").is_ok());
-        assert!(validate_link("https://x.com/a?ref=abc").is_err());
-        assert!(validate_link("https://x.com/a?b=1&AFF=2").is_err());
-        assert!(validate_link("javascript:alert(1)").is_err());
-        assert!(validate_link("").is_ok());
-    }
 
     #[test]
     fn read_level_cannot_exceed_own_trust_level() {

@@ -2,7 +2,6 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
-import DealPanel from '@/components/DealPanel.vue'
 import PostEntry from '@/components/PostEntry.vue'
 import AttachmentList from '@/components/AttachmentList.vue'
 import HelpPanel from '@/components/HelpPanel.vue'
@@ -284,7 +283,6 @@ async function closeHelp() {
         <span v-if="topic.locked" class="locked">已锁定</span>
       </div>
 
-      <DealPanel v-if="topic.deal" :topic="topic" />
       <HelpPanel v-if="topic.help" :help="topic.help" :owner="helpOwner" :busy="helpBusy" :expired="helpExpired" @close="closeHelp" />
 
       <div v-if="topic.body_html" class="body prose" v-html="topic.body_html" />
@@ -357,7 +355,7 @@ async function closeHelp() {
       <section id="reply-box" class="reply-box" aria-label="回复">
         <p v-if="topic.locked" class="panel note">帖子已锁定，不能再回复。</p>
         <div v-else-if="!session.loggedIn" class="panel note">
-          <span>登录后参与讨论，或者告诉大家这条羊毛还能不能领。</span>
+          <span>登录后参与讨论，或者告诉大家你的看法。</span>
           <button type="button" class="btn btn-primary btn-sm" @click="session.loginOpen = true">登录</button>
         </div>
         <form v-else class="compose" @submit.prevent="sendReply">

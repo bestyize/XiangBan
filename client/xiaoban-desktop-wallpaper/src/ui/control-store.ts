@@ -57,7 +57,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     effectList: noPacks(),
     account: null,
     showLoginModal: false,
-    page: "new-task", creationDraft: null, creationAttachments: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, claimVoice: () => voice.claim(), turnModels: () => loadTurnModels(invoke) }), speech: createSpeechStore({ desktop, invoke, notify, claimVoice: () => voice.claim() }), chat: createChatStore({ desktop, invoke, listen, notify,
+    page: "new-task", creationDraft: null, goalTemplate: null, creationAttachments: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, claimVoice: () => voice.claim(), turnModels: () => loadTurnModels(invoke) }), speech: createSpeechStore({ desktop, invoke, notify, claimVoice: () => voice.claim() }), chat: createChatStore({ desktop, invoke, listen, notify,
       onActivity: () => { if (store.live?.activity()) return; store.asr.deactivate(); void store.speech.stop(); },
       onReply: (session, text, key) => { if (!store.chat.sentHere(session)) return; if (store.live?.active) { store.live.replied(session, text, key); return; } if (chatLike(store.page) && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,

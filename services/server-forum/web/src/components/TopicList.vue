@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { TopicItem } from '@/api/types'
-import DealRow from './DealRow.vue'
 import TopicRow from './TopicRow.vue'
 
 withDefaults(defineProps<{ items: TopicItem[]; loading?: boolean; showCategory?: boolean; empty?: string }>(), {
@@ -11,10 +10,7 @@ withDefaults(defineProps<{ items: TopicItem[]; loading?: boolean; showCategory?:
 <template>
   <div class="list" :aria-busy="loading">
     <template v-if="items.length">
-      <template v-for="t in items" :key="t.id">
-        <DealRow v-if="t.deal" :topic="t" />
-        <TopicRow v-else :topic="t" :show-category="showCategory" />
-      </template>
+      <TopicRow v-for="t in items" :key="t.id" :topic="t" :show-category="showCategory" />
     </template>
     <div v-else-if="loading" class="skeleton" aria-label="加载中">
       <div v-for="i in 5" :key="i" class="bar" />

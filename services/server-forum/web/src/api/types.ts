@@ -35,7 +35,7 @@ export interface Category {
   slug: string
   name: string
   description: string
-  kind: 'deal' | 'normal'
+  kind: 'normal'
   sort_order: number
   min_post_level: number
   on_home: boolean
@@ -44,15 +44,6 @@ export interface Category {
   /** 内置标签：发帖时按这个分类给出的可一键选用的标签 */
   preset_tags: string[]
   topic_count: number
-}
-
-export interface DealInfo {
-  value_text: string
-  /** 领取条件位标志，见 lib/format 的 CONDITIONS */
-  conditions: number
-  link_url: string
-  expires_at: string | null
-  long_term: boolean
 }
 
 export type PinScope = 'none' | 'site' | 'parent' | 'category'
@@ -77,7 +68,6 @@ export interface TopicItem {
   created_at: string
   last_reply_at: string
   edited_at: string | null
-  deal: DealInfo | null
   help: HelpInfo | null
 }
 
@@ -167,7 +157,6 @@ export interface Profile extends PublicUser {
   last_seen_at: string
   topic_count: number
   post_count: number
-  deal_count: number
   banned: boolean
   following: boolean
   following_count: number
@@ -189,20 +178,11 @@ export interface UserReply {
   created_at: string
 }
 
-export interface DealInput {
-  value_text: string
-  conditions: number
-  link_url: string
-  expires_at: string | null
-  long_term: boolean
-}
-
 export interface TopicInput {
   category_id: number
   title: string
   body: string
   tags: string[]
-  deal?: DealInput
   /** 不传：发帖按公开，编辑保持原样 */
   min_read_level?: number
   /** 不传：发帖没有附件，编辑保持原样；传了以这个列表为准 */

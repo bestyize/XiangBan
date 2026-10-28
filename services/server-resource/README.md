@@ -37,11 +37,18 @@
 - 数据目录 `RESOURCE_DATA_DIR` 需要持久化；`packs/` 下的内容包需要异地备份（官方大资源另外镜像到魔搭，镜像按版本锁定，客户端对每个来源都校验 sha256）。
 - 带宽到 70% 时告警；下载地址有效期默认 10 分钟，限制被转发盗链的窗口。
 
+## 运维脚本（`scripts/`）
+
+- `backup.sh`：把 `packs/`、`covers/` 追加式同步到备份机（只增不删，文件键不复用，主机误删不会连带删掉备份），并维护 `SHA256SUMS` 清单；`backup.sh verify` 在备份端核对，恢复演练前先跑。`BACKUP_TARGET` 可以是 `user@host:/path` 或本机目录。`test-backup.sh` 是它的本机测试（同步、核对、篡改后核对失败、主机删文件后备份仍在）。
+- `bandwidth_alert.py`：读网卡出口流量，占 `LINK_MBPS`（默认 200）的比例连续 3 次采样超过 70% 才告警，发 `ALERT_WEBHOOK`，30 分钟冷却，回落发恢复通知。`python3 -m unittest test_bandwidth_alert`。
+- `mirror_modelscope.py`：把官方内容包镜像到魔搭并登记到论坛（`POST /api/admin/packs/{id}/mirrors`，按版本锁定）：从资源机下载并核对 sha256，用 `modelscope upload` 上传，再从魔搭下载回来核对，通过才登记。`--dry-run` 只做下载与校验。魔搭上传这一步需要 `modelscope` 命令和账号令牌，云端环境没有验证过。
+
 ## 验证
 
 ```bash
 cd services/server-resource
 cargo test
+cd scripts && ./test-backup.sh && python3 -m unittest discover -p 'test_*.py'
 ```
 
 测试覆盖：凭证伪造、大小与哈希不符、非 zip、缺清单、路径穿越、封面类型、论坛拒绝或不可达时撤销文件、签名下载的过期与错键、Range。

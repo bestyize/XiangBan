@@ -361,7 +361,7 @@ async fn change_password(
 // ───────────────────────── 数据概览 ─────────────────────────
 
 async fn stats(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Json<Value>> {
-    let row: (i64, i64, i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
+    let row: (i64, i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
         "SELECT
             (SELECT COUNT(*) FROM users),
             (SELECT COUNT(*) FROM users WHERE created_at > now() - interval '1 day'),
@@ -370,8 +370,6 @@ async fn stats(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Js
             (SELECT COUNT(*) FROM topics WHERE created_at > now() - interval '1 day'),
             (SELECT COUNT(*) FROM posts),
             (SELECT COUNT(*) FROM posts WHERE created_at > now() - interval '1 day'),
-            (SELECT COUNT(*) FROM deals d JOIN topics t ON t.id = d.topic_id
-                WHERE (d.long_term OR d.expires_at IS NULL OR d.expires_at > now()) AND t.status = 'normal'),
             (SELECT COUNT(*) FROM reports WHERE status = 'open'),
             (SELECT COUNT(*) FROM users WHERE last_seen_at > now() - interval '1 day')",
     )
@@ -385,9 +383,8 @@ async fn stats(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Js
         "topics_24h": row.4,
         "posts_total": row.5,
         "posts_24h": row.6,
-        "deals_active": row.7,
-        "reports_open": row.8,
-        "dau": row.9,
+        "reports_open": row.7,
+        "dau": row.8,
     })))
 }
 
@@ -610,7 +607,6 @@ struct AdminTopic {
     locked: bool,
     reply_count: i32,
     created_at: DateTime<Utc>,
-    is_deal: bool,
     min_read_level: i16,
     open_reports: i64,
 }
@@ -648,7 +644,7 @@ async fn list_topics(
         }
     };
     const FROM: &str = " FROM topics t JOIN categories c ON c.id = t.category_id
-         JOIN users u ON u.uid = t.author_uid LEFT JOIN deals d ON d.topic_id = t.id";
+         JOIN users u ON u.uid = t.author_uid";
 
     let mut count = QueryBuilder::<Postgres>::new(format!("SELECT COUNT(*){FROM}"));
     filter(&mut count);
@@ -656,7 +652,7 @@ async fn list_topics(
 
     let mut qb = QueryBuilder::<Postgres>::new(format!(
         "SELECT t.id, t.title, t.status, t.category_id, c.name AS category_name, t.author_uid, u.nickname AS author_nickname,
-                t.pinned, t.pin_scope, t.featured, t.locked, t.reply_count, (d.topic_id IS NOT NULL) AS is_deal, t.min_read_level,
+                t.pinned, t.pin_scope, t.featured, t.locked, t.reply_count, t.min_read_level,
                 (SELECT COUNT(*) FROM reports r WHERE r.target_type = 'topic' AND r.target_id = t.id AND r.status = 'open') AS open_reports{FROM}"
     ));
     filter(&mut qb);
@@ -749,7 +745,7 @@ struct MoveInput {
     category_id: i32,
 }
 
-/// 只能移到叶子分类，且和帖子原分类同类型（羊毛帖只在羊毛分类之间移动）。
+/// 只能移到叶子分类。
 async fn move_topic(
     State(state): State<AppState>,
     AuthAdmin(admin): AuthAdmin,
@@ -757,15 +753,15 @@ async fn move_topic(
     Json(input): Json<MoveInput>,
 ) -> AppResult<Json<Value>> {
     let mut tx = state.pool.begin().await?;
-    let (from_id, from_kind): (i32, String) = sqlx::query_as(
-        "SELECT t.category_id, c.kind FROM topics t JOIN categories c ON c.id = t.category_id WHERE t.id = $1 FOR UPDATE OF t",
+    let (from_id,): (i32,) = sqlx::query_as(
+        "SELECT category_id FROM topics WHERE id = $1 FOR UPDATE",
     )
     .bind(id)
     .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(|| AppError::not_found("帖子"))?;
-    let (kind, name, has_children): (String, String, bool) = sqlx::query_as(
-        "SELECT kind, name, EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = categories.id) FROM categories WHERE id = $1",
+    let (name, has_children): (String, bool) = sqlx::query_as(
+        "SELECT name, EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = categories.id) FROM categories WHERE id = $1",
     )
     .bind(input.category_id)
     .fetch_optional(&mut *tx)
@@ -773,13 +769,6 @@ async fn move_topic(
     .ok_or_else(|| AppError::BadRequest("目标分类不存在".into()))?;
     if has_children {
         return Err(AppError::BadRequest("请选择具体的子分类".into()));
-    }
-    if kind != from_kind {
-        return Err(AppError::BadRequest(if from_kind == "deal" {
-            "羊毛帖只能移动到羊毛分类".into()
-        } else {
-            "普通帖不能移动到羊毛分类".into()
-        }));
     }
     sqlx::query("UPDATE topics SET category_id = $2 WHERE id = $1").bind(id).bind(input.category_id).execute(&mut *tx).await?;
     super::help::ensure_category(&mut tx, id, input.category_id).await?;
@@ -1087,8 +1076,8 @@ async fn create_category(
     validate_slug(&slug)?;
     let name = validate_name(&input.name, "分类名", 20)?;
     let description = validate_text(&input.description, "分类说明", 200)?;
-    if !matches!(input.kind.as_str(), "deal" | "normal") {
-        return Err(AppError::BadRequest("kind 只能是 deal 或 normal".into()));
+    if input.kind != "normal" {
+        return Err(AppError::BadRequest("kind 只能是 normal".into()));
     }
     validate_level(input.min_post_level)?;
     let preset_tags = validate_preset_tags(&input.preset_tags)?;

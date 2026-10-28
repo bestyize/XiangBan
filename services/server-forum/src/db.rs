@@ -111,16 +111,6 @@ CREATE TABLE IF NOT EXISTS editor_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS deals (
-    topic_id   BIGINT PRIMARY KEY REFERENCES topics(id) ON DELETE CASCADE,
-    value_text TEXT NOT NULL DEFAULT '',
-    conditions INT NOT NULL DEFAULT 0,
-    link_url   TEXT NOT NULL DEFAULT '',
-    expires_at TIMESTAMPTZ,
-    long_term  BOOLEAN NOT NULL DEFAULT false
-);
-CREATE INDEX IF NOT EXISTS deals_expires_idx ON deals (expires_at);
-
 CREATE TABLE IF NOT EXISTS posts (
     id         BIGSERIAL PRIMARY KEY,
     topic_id   BIGINT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
@@ -327,12 +317,6 @@ const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool
     ("share-music", "音乐资源", "歌单、乐评，以及公版和授权音乐，不要贴盗版下载链接", "normal", Some("share"), 1, true, true, false),
     ("share-learn", "学习资料", "课程、电子书、文档和笔记，请只分享可以公开的资料", "normal", Some("share"), 1, true, true, false),
     ("share-help", "资源求助", "求助合法来源的软件、学习资料和资源，可使用积分悬赏", "normal", Some("share"), 1, true, true, false),
-    ("deals", "福利羊毛", "大家分享的免费额度、试用和优惠", "deal", None, 1, true, true, false),
-    ("deals-ai", "AI 羊毛", "大模型 API、AI 对话、编程工具、绘图视频音频的免费额度和优惠", "deal", Some("deals"), 1, true, true, false),
-    ("deals-cloud", "云服务器 · GPU", "VPS 促销、GPU 试用、算力赠金", "deal", Some("deals"), 1, true, true, false),
-    ("deals-dev", "开发者福利", "域名、CDN、数据库、学生包", "deal", Some("deals"), 1, true, true, false),
-    ("deals-public", "公益站", "只收录信息，站方不做担保", "deal", Some("deals"), 1, true, true, false),
-    ("deals-other", "其他福利", "不属于以上分类的福利和优惠", "deal", Some("deals"), 1, true, true, false),
     ("xiaoban", "小伴产品", "小伴系列产品的官方介绍与更新：壁纸、游戏、App。由站方发布，欢迎在帖子下回复反馈", "normal", None, 3, true, false, false),
     ("xiaoban-wallpaper", "小伴壁纸", "小伴壁纸的下载、更新和使用技巧，也欢迎分享你自己做的壁纸、特效、组件资源包", "normal", Some("xiaoban"), 0, true, false, false),
     ("xiaoban-game", "小伴游戏", "小伴游戏的新玩法、攻略和更新，也欢迎分享你自己做的游戏资源包", "normal", Some("xiaoban"), 0, true, false, false),
@@ -406,6 +390,38 @@ pub async fn seed(pool: &PgPool) -> Result<(), AppError> {
     }
     apply_movie_tag_migration(pool).await?;
     apply_open_share_boards_migration(pool).await?;
+    remove_deals(pool).await?;
+    Ok(())
+}
+
+/// 福利羊毛功能整体下线：删除羊毛分类下的全部帖子（连同回复、点赞、收藏、标签关联、附件记录）、
+/// 相关举报和站方稿件，再删掉羊毛分类和 `deals` 表。只做一次，记进 `data_migrations`。
+/// 附件和插图的磁盘文件不在这里清理，运维可以按 `attachments`/`images` 里没有记录的文件另行清除。
+async fn remove_deals(pool: &PgPool) -> Result<(), AppError> {
+    const NAME: &str = "remove-deals-v1";
+    let done: Option<(String,)> =
+        sqlx::query_as("SELECT name FROM data_migrations WHERE name = $1").bind(NAME).fetch_optional(pool).await?;
+    if done.is_some() {
+        return Ok(());
+    }
+    let mut tx = pool.begin().await?;
+    sqlx::raw_sql(
+        "DELETE FROM reports WHERE (target_type = 'topic' AND target_id IN
+                (SELECT id FROM topics WHERE category_id IN (SELECT id FROM categories WHERE kind = 'deal')))
+            OR (target_type = 'post' AND target_id IN
+                (SELECT p.id FROM posts p JOIN topics t ON t.id = p.topic_id
+                 WHERE t.category_id IN (SELECT id FROM categories WHERE kind = 'deal')));
+         DELETE FROM editor_drafts WHERE category_id IN (SELECT id FROM categories WHERE kind = 'deal')
+            OR topic_id IN (SELECT id FROM topics WHERE category_id IN (SELECT id FROM categories WHERE kind = 'deal'));
+         DELETE FROM topics WHERE category_id IN (SELECT id FROM categories WHERE kind = 'deal');
+         DELETE FROM categories WHERE kind = 'deal' AND parent_id IS NOT NULL;
+         DELETE FROM categories WHERE kind = 'deal';
+         DROP TABLE IF EXISTS deals;",
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query("INSERT INTO data_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING").bind(NAME).execute(&mut *tx).await?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -704,9 +720,9 @@ mod tests {
     }
 
     #[test]
-    fn xiaoban_is_a_root_between_deals_and_casual_with_open_share_boards() {
+    fn xiaoban_is_a_root_between_share_and_casual_with_open_share_boards() {
         let roots: Vec<&str> = CATEGORIES.iter().filter(|c| c.4.is_none()).map(|c| c.0).collect();
-        assert_eq!(roots, ["tech", "share", "deals", "xiaoban", "casual", "site"]);
+        assert_eq!(roots, ["tech", "share", "xiaoban", "casual", "site"]);
         assert_eq!(children("xiaoban"), ["小伴壁纸", "小伴游戏", "小伴App"]);
         // 官方板块只有守护者能发帖，但不是 admin_only（admin_only 会拦住所有人，包括守护者）。
         // 小伴壁纸、小伴游戏用来分享用户自己的资源包，所有人（含新人）都能发。
@@ -858,3 +874,69 @@ CREATE TABLE IF NOT EXISTS moderation_queue (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS moderation_pending_idx ON moderation_queue (target_type, target_id) WHERE status = 'pending';
 "#;
+
+#[cfg(test)]
+mod removal_tests {
+    use uuid::Uuid;
+
+    /// 旧库里有羊毛分类、帖子、回复、点赞、收藏、举报和 `deals` 表：迁移后羊毛相关全部消失，其他内容不动，且只执行一次。
+    #[tokio::test]
+    async fn deals_are_removed_with_everything_attached() -> Result<(), Box<dyn std::error::Error>> {
+        let Ok(url) = std::env::var("TEST_DATABASE_URL") else { return Ok(()) };
+        let admin = super::connect(&url, None).await?;
+        let schema = format!("deals_test_{}", Uuid::new_v4().simple());
+        sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin).await?;
+        let pool = super::connect(&url, Some(&schema)).await?;
+        super::migrate(&pool).await?;
+        sqlx::raw_sql("CREATE TABLE deals (topic_id BIGINT PRIMARY KEY REFERENCES topics(id) ON DELETE CASCADE, value_text TEXT NOT NULL DEFAULT '')")
+            .execute(&pool)
+            .await?;
+        let uid = Uuid::new_v4();
+        sqlx::query("INSERT INTO users (uid, nickname) VALUES ($1, 'u')").bind(uid).execute(&pool).await?;
+        let cat = |slug: &'static str, kind: &'static str, parent: Option<i32>| {
+            let pool = pool.clone();
+            async move {
+                sqlx::query_as::<_, (i32,)>("INSERT INTO categories (parent_id, slug, name, kind) VALUES ($1, $2, $2, $3) RETURNING id")
+                    .bind(parent)
+                    .bind(slug)
+                    .bind(kind)
+                    .fetch_one(&pool)
+                    .await
+                    .map(|r| r.0)
+            }
+        };
+        let deal_root = cat("deals", "deal", None).await?;
+        let deal_child = cat("deals-ai", "deal", Some(deal_root)).await?;
+        let normal = cat("tech", "normal", None).await?;
+        let mut topics = Vec::new();
+        for (c, title) in [(deal_child, "羊毛帖"), (normal, "普通帖")] {
+            let (id,): (i64,) = sqlx::query_as("INSERT INTO topics (category_id, author_uid, title, body_md, body_html) VALUES ($1, $2, $3, 'x', 'x') RETURNING id")
+                .bind(c).bind(uid).bind(title).fetch_one(&pool).await?;
+            let (post,): (i64,) = sqlx::query_as("INSERT INTO posts (topic_id, author_uid, floor, body_md, body_html) VALUES ($1, $2, 1, 'r', 'r') RETURNING id")
+                .bind(id).bind(uid).fetch_one(&pool).await?;
+            sqlx::query("INSERT INTO bookmarks (uid, topic_id) VALUES ($1, $2)").bind(uid).bind(id).execute(&pool).await?;
+            sqlx::query("INSERT INTO reports (target_type, target_id, reporter_uid, reason) VALUES ('post', $1, $2, 'spam')").bind(post).bind(uid).execute(&pool).await?;
+            topics.push(id);
+        }
+        sqlx::query("INSERT INTO deals (topic_id, value_text) VALUES ($1, '免费')").bind(topics[0]).execute(&pool).await?;
+
+        super::remove_deals(&pool).await?;
+        super::remove_deals(&pool).await?;
+
+        let count = |sql: &'static str| {
+            let pool = pool.clone();
+            async move { sqlx::query_as::<_, (i64,)>(sql).fetch_one(&pool).await.map(|r| r.0) }
+        };
+        assert_eq!(count("SELECT COUNT(*) FROM topics").await?, 1);
+        assert_eq!(count("SELECT COUNT(*) FROM posts").await?, 1);
+        assert_eq!(count("SELECT COUNT(*) FROM bookmarks").await?, 1);
+        assert_eq!(count("SELECT COUNT(*) FROM reports").await?, 1);
+        assert_eq!(count("SELECT COUNT(*) FROM categories WHERE kind = 'deal'").await?, 0);
+        assert_eq!(count("SELECT COUNT(*) FROM categories").await?, 1);
+        assert_eq!(count("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'deals'").await?, 0);
+        assert_eq!(count("SELECT COUNT(*) FROM data_migrations WHERE name = 'remove-deals-v1'").await?, 1);
+
+        sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await?;
+        Ok(())
+    }
+}

@@ -7,10 +7,12 @@ import { contentApi, type PackDetail } from '@/api/content'
 import { applyLink, coverStyle, fmtSize, kindLabel, trustLabel } from '@/lib/content'
 import { timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
+import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
 
 const route = useRoute()
 const toast = useToast()
+const session = useSession()
 const pack = ref<PackDetail | null>(null)
 const missing = ref(false)
 const busy = ref(false)
@@ -32,6 +34,7 @@ watch(
   { immediate: true },
 )
 
+const isAuthor = computed(() => !!pack.value?.author && pack.value.author.uid === session.user?.uid)
 const latest = computed(() => pack.value?.versions[0])
 const open = computed(() => (pack.value && latest.value ? applyLink(pack.value, latest.value.version, latest.value.sha256) : ''))
 
@@ -86,6 +89,7 @@ async function copyLink() {
           <button class="btn" type="button" :disabled="busy" @click="download">下载压缩包</button>
           <button class="btn" type="button" @click="copyLink">复制链接</button>
           <RouterLink v-if="pack.topic_id" class="btn" :to="`/t/${pack.topic_id}`">看讨论</RouterLink>
+          <RouterLink v-if="isAuthor" class="btn" :to="`/publish?pack=${pack.id}`">发布新版本</RouterLink>
         </div>
         <p class="hint">没有安装小伴？在桌面端“社区”页里也能找到它。</p>
         <p class="hint only-phone">在手机上请先复制链接，到电脑上打开即可应用。</p>

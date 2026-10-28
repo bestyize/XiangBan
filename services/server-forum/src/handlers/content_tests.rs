@@ -103,7 +103,7 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
 
     // 资源机还没确认前不能发布。
     let publish = json!({"kind":"effect","title":"夕阳特效","summary":"桌面夕阳","tags":["特效"," 特效 ","桌面"],
-        "file_key":file_key});
+        "file_key":file_key,"rights_ack":true});
     let (s, _) = call(&app, "POST", "/api/packs", Some(&author_t), publish.clone()).await;
     assert_eq!(s, StatusCode::CONFLICT);
 
@@ -111,16 +111,20 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha}), false).await, StatusCode::UNAUTHORIZED);
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":999,"sha256":sha,"manifest":manifest("effect","sunset","1.0.0")}), true).await, StatusCode::CONFLICT);
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha}), true).await, StatusCode::BAD_REQUEST, "内容包回调必须带 manifest");
-    assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha,"manifest":manifest("scheme","sunset","1.0.0")}), true).await, StatusCode::BAD_REQUEST, "manifest 类型要与上传类型一致");
+    assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha,"manifest":manifest("reminder","sunset","1.0.0")}), true).await, StatusCode::BAD_REQUEST, "manifest 类型要与上传类型一致");
     assert_eq!(callback(&app, &secret, json!({"file_key":file_key,"size":1000,"sha256":sha,"manifest":manifest("effect","sunset","1.0.0")}), true).await, StatusCode::OK);
 
     // 别人不能拿走这个文件；作者可以发布，并且是 T2、一键可用（effect）。
     let (s, _) = call(&app, "POST", "/api/packs", Some(&other_t), publish.clone()).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
     let mut wrong = publish.clone();
-    wrong["kind"] = json!("scheme");
+    wrong["kind"] = json!("reminder");
     let (s, _) = call(&app, "POST", "/api/packs", Some(&author_t), wrong).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "上传时的类型与发布类型不一致应拒绝");
+    let mut no_ack = publish.clone();
+    no_ack["rights_ack"] = json!(false);
+    let (s, _) = call(&app, "POST", "/api/packs", Some(&author_t), no_ack).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "必须勾选权利声明");
     let (s, p) = call(&app, "POST", "/api/packs", Some(&author_t), publish.clone()).await;
     assert_eq!(s, StatusCode::OK, "{p}");
     let id = p["id"].as_i64().unwrap();
@@ -140,7 +144,7 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     let (_, t3) = call(&app, "POST", "/api/packs/upload-ticket", Some(&author_t), json!({"kind":"effect","size":500,"sha256":sha2})).await;
     let key3 = t3["file_key"].as_str().unwrap().to_string();
     assert_eq!(callback(&app, &secret, json!({"file_key":key3,"size":500,"sha256":sha2,"manifest":manifest("effect","dawn","1.0.0")}), true).await, StatusCode::OK);
-    let with_cover = json!({"kind":"effect","title":"晨光","file_key":key3,"cover_key":cover_key});
+    let with_cover = json!({"kind":"effect","title":"晨光","file_key":key3,"cover_key":cover_key,"rights_ack":true});
     let (s, _) = call(&app, "POST", "/api/packs", Some(&author_t), with_cover.clone()).await;
     assert_eq!(s, StatusCode::BAD_REQUEST, "封面未确认");
     let (s, _) = call(&app, "POST", "/api/packs", Some(&other_t), with_cover.clone()).await;
@@ -180,6 +184,21 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(s, StatusCode::OK);
     let (_, hot) = call(&app, "GET", "/api/packs?sort=hot", None, Value::Null).await;
     assert_eq!(hot["items"][0]["apply_count"], 1);
+
+    // 我的作品：只看到自己的，含审核状态；作者可以自己下架。
+    let (s, _) = call(&app, "GET", "/api/me/packs", None, Value::Null).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (_, mine) = call(&app, "GET", "/api/me/packs", Some(&author_t), Value::Null).await;
+    assert_eq!(mine["items"].as_array().unwrap().len(), 2);
+    assert_eq!(mine["items"][0]["in_review"], true);
+    let (_, theirs) = call(&app, "GET", "/api/me/packs", Some(&other_t), Value::Null).await;
+    assert!(theirs["items"].as_array().unwrap().is_empty());
+    let (s, _) = call(&app, "POST", &format!("/api/packs/{dawn_id}/remove"), Some(&other_t), Value::Null).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "别人不能下架");
+    let (s, _) = call(&app, "POST", &format!("/api/packs/{dawn_id}/remove"), Some(&author_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = call(&app, "GET", &format!("/api/packs/{dawn_id}/download"), None, Value::Null).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
 
     // 新版本：只有作者；id 必须一致；版本号递增。
     let (_, t2) = call(&app, "POST", "/api/packs/upload-ticket", Some(&author_t), json!({"kind":"effect","size":2000,"sha256":"b".repeat(64)})).await;
@@ -235,6 +254,18 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(s, StatusCode::CONFLICT, "id 重复");
     let (_, od) = call(&app, "GET", &format!("/api/packs/{oid}/download"), None, Value::Null).await;
     assert_eq!(od["mirrors"][0]["name"], "modelscope");
+    // 补镜像：同名替换、必须 https、按版本。
+    let mirror = |name: &str, url: &str| json!({"name": name, "url": url});
+    let (s, _) = call(&app, "POST", &format!("/api/admin/packs/{oid}/mirrors"), Some(&admin_t), mirror("x", "http://insecure/x.zip")).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = call(&app, "POST", &format!("/api/admin/packs/{oid}/mirrors"), Some(&author_t), mirror("x", "https://m.example/x.zip")).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, m) = call(&app, "POST", &format!("/api/admin/packs/{oid}/mirrors"), Some(&admin_t), mirror("modelscope", "https://modelscope.cn/new.zip")).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    assert_eq!(m["mirrors"].as_array().unwrap().len(), 1, "同名镜像被替换");
+    assert_eq!(m["mirrors"][0]["url"], "https://modelscope.cn/new.zip");
+    let (s, _) = call(&app, "POST", &format!("/api/admin/packs/{oid}/mirrors"), Some(&admin_t), json!({"version": 9, "name": "a", "url": "https://a.example/x"})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
     assert_eq!(od["trust_level"], 0);
     let mut big = json!({"kind":"effect","title":"x","manifest":manifest("effect","big","1"),"file_key":"a/b.zip","sha256":sha,"size":5*1024*1024});
     let (s, _) = call(&app, "POST", "/api/admin/packs", Some(&admin_t), big.clone()).await;

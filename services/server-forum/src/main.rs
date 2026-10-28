@@ -50,7 +50,6 @@ pub fn build_router(state: AppState) -> Router {
         .route("/users/{uid}/posts", get(me::user_posts))
         .route("/search", get(me::search))
         .route("/topics", get(topics::list).post(topics::create))
-        .route("/deals", get(topics::list_deals))
         .route("/markdown/preview", post(topics::preview))
         .route("/topics/{id}", get(topics::get).patch(topics::update).delete(topics::delete))
         .route("/topics/{id}/posts", get(posts::list).post(posts::create))

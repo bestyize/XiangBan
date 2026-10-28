@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use url::Url;
 
 const KINDS: &[&str] = &[
-    "effect", "scheme", "reminder", "routine", "task", "goal", "widget", "game", "wallpaper", "skill", "expert", "workflow",
+    "effect", "reminder", "routine", "task", "goal", "widget", "game", "wallpaper", "skill", "expert", "workflow",
 ];
 const TARGETS: &[&str] = &["pack", "topic", "scheme", "project", "weekly"];
 

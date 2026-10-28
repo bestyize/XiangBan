@@ -34,6 +34,8 @@ export interface ControlStore {
   showLoginModal: boolean;
   page: ControlPage;
   creationDraft: string | null;
+  /** A goal template chosen in the community; the goal form picks it up and clears it. */
+  goalTemplate: { outcome: string; verification: string; constraints: string; boundaries: string; stopWhen: string } | null;
   /** Files handed to the next message along with `creationDraft` (资料库 → 用这份资料提问). */
   creationAttachments: import('./chat/attachments.ts').PendingAttachment[] | null;
   startCreation(kind: "wallpaper" | "effect" | "widget" | "game" | "pet"): Promise<void>;

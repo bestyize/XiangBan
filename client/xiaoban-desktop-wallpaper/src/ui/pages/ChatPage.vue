@@ -98,6 +98,8 @@ const composer = ref<InstanceType<typeof ChatComposer> | null>(null);
 const modelDialog = ref(false);
 const guideDialog = ref(false);
 const goalOpen = ref(false);
+// A goal template from the community opens the goal form, filled in; the user still saves it themselves.
+watch(() => props.store.goalTemplate, template => { if (template) goalOpen.value = true; }, { immediate: true });
 const goalBusy = ref(false);
 const retryAfterSwitch = ref(false);
 function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
@@ -398,7 +400,7 @@ async function openLink(href: string) {
     <div class="goal-modal-content">
       <ChatGoalPanel v-if="goalOpen" :session-id="chat.currentId" :running="running"
         :configured="chat.configured" :desktop="store.desktop" :permission-mode="chat.permissionMode"
-        :session-title="title" @busy-change="goalBusy = $event"
+        :session-title="title" :template="store.goalTemplate" @template-used="store.goalTemplate = null" @busy-change="goalBusy = $event"
         @close="goalOpen = false" @session-created="goalSessionCreated" @changed="chat.refresh()" />
     </div>
   </NModal>

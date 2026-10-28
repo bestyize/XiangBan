@@ -105,7 +105,6 @@ watch([uid, () => session.user?.uid], () => (replies.value = []), { flush: 'sync
         <dl class="stats">
           <div><dt><button type="button" @click="setTab('following')">关注</button></dt><dd>{{ profile.following_count }}</dd></div>
           <div><dt><button type="button" @click="setTab('followers')">粉丝</button></dt><dd>{{ profile.follower_count }}</dd></div>
-          <div><dt>羊毛</dt><dd>{{ profile.deal_count }}</dd></div>
           <div><dt>帖子</dt><dd>{{ profile.topic_count }}</dd></div>
           <div><dt>回复</dt><dd>{{ profile.post_count }}</dd></div>
           <div><dt>积分</dt><dd>{{ profile.points }}</dd></div>

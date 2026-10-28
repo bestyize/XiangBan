@@ -3,7 +3,7 @@ import { onActivated, onMounted, ref } from 'vue';
 import { NAlert, NButton, NSkeleton } from 'naive-ui';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
-import { KIND_LABEL, startApply, TRUST_LABEL } from '../community/apply.ts';
+import { KIND_LABEL, startApply, startScheme, SUPPORTED_KINDS, TRUST_LABEL, type SchemeItem } from '../community/apply.ts';
 
 defineOptions({ name: 'CommunityPage' });
 const props = defineProps<{ store: ControlStore }>();
@@ -13,9 +13,11 @@ interface WeeklyItem { type: string; id?: number; kind?: string; title?: string 
 interface Weekly { week: string; title: string; summary: string; items: WeeklyItem[] }
 
 /** 桌面端现在能应用的类型，其余类型先在网页上看。 */
-const KINDS = [{ key: '', label: '全部' }, { key: 'effect', label: '特效' }, { key: 'reminder', label: '提醒' }, { key: 'task', label: '任务模板' }];
+const KINDS = [{ key: '', label: '全部' }, { key: 'schemes', label: '方案' }, { key: 'effect', label: '特效' }, { key: 'reminder', label: '提醒' }, { key: 'routine', label: '例行事项' }, { key: 'task', label: '任务模板' }, { key: 'goal', label: '目标模板' }];
 const kind = ref('');
-const packs = ref<PackRow[]>([]);
+const packs = ref<PackRow[]>([])
+interface SchemeRow { id: number; title: string; author: { nickname: string | null }; items: SchemeItem[] }
+const schemes = ref<SchemeRow[]>([]);
 const weekly = ref<Weekly | null>(null);
 const loading = ref(true);
 const error = ref('');
@@ -33,6 +35,12 @@ async function loadPacks() {
   loading.value = true;
   error.value = '';
   try {
+    if (kind.value === 'schemes') {
+      schemes.value = (await invoke<{ items: SchemeRow[] }>('community_browse', { path: '/api/schemes?page=1' })).items;
+      packs.value = [];
+      return;
+    }
+    schemes.value = [];
     const query = kind.value ? `kind=${kind.value}&sort=hot` : 'sort=hot';
     const page = await invoke<{ items: PackRow[] }>('community_browse', { path: `/api/packs?${query}` });
     packs.value = page.items;
@@ -40,9 +48,12 @@ async function loadPacks() {
   finally { loading.value = false; }
 }
 function pick(next: string) { kind.value = next; void loadPacks(); }
+function replicate(row: SchemeRow) {
+  if (!startScheme(row.title, row.items)) props.store.notify('这个方案里的内容桌面端暂时都不能应用', 'info');
+}
 function open(row: PackRow) { void startApply({ packId: row.id }); }
 function openWeeklyPack(item: WeeklyItem) { if (item.type === 'pack' && item.id) void startApply({ packId: item.id }); }
-const supported = (k: string) => ['effect', 'reminder', 'task'].includes(k);
+const supported = (k: string) => SUPPORTED_KINDS.includes(k);
 
 function refresh() { if (props.store.desktop) { void loadWeekly(); void loadPacks(); } else loading.value = false; }
 onMounted(refresh);
@@ -74,6 +85,16 @@ onActivated(refresh);
 
       <NAlert v-if="error" type="warning" :show-icon="false">{{ error }}<NButton size="tiny" quaternary @click="loadPacks">重试</NButton></NAlert>
       <NSkeleton v-else-if="loading && !packs.length" text :repeat="4" />
+      <ul v-else-if="kind === 'schemes' && schemes.length" class="community-list">
+        <li v-for="row in schemes" :key="row.id">
+          <div class="community-main">
+            <strong>{{ row.title }}</strong>
+            <span class="community-tag">{{ row.author.nickname }}</span>
+            <span class="community-tag">{{ row.items.length }} 项内容</span>
+          </div>
+          <NButton size="small" @click="replicate(row)">复刻</NButton>
+        </li>
+      </ul>
       <p v-else-if="!packs.length" class="community-empty">这里还没有内容。</p>
       <ul v-else class="community-list">
         <li v-for="row in packs" :key="row.id">

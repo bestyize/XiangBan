@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// 帖子管理：搜索与筛选，行内隐藏/删除/置顶/加精/锁定，移动分类，修改羊毛状态。
+// 帖子管理：搜索与筛选，行内隐藏/删除/置顶/加精/锁定，移动分类。
 import { computed, onMounted, ref } from 'vue'
 import { adminApi, type AdminCategory, type AdminTopic, type TopicAction, type PinScope, type TopicState } from '@/api/admin'
 import AdminPager from './AdminPager.vue'
@@ -27,7 +27,7 @@ const pinScopeLabel: Record<PinScope, string> = {
   category: '二级板块置顶',
 }
 
-/** 可移动到的分类：叶子分类，且类型（羊毛/普通）与原分类一致。 */
+/** 可移动到的分类：叶子分类。 */
 function moveTargets(t: AdminTopic) {
   const kind = catById.value.get(t.category_id)?.kind
   return leaves.value.filter(c => c.kind === kind && c.id !== t.category_id)
@@ -142,8 +142,7 @@ onMounted(async () => {
           <td data-label="状态" class="shrink">
             <span class="adm-tags">
               <span class="adm-tag" :class="topicTone(t.status)">{{ TOPIC_STATUS[t.status] }}</span>
-              <span v-if="t.is_deal" class="adm-tag">羊毛</span>
-              <span v-if="t.min_read_level > 0" class="adm-tag">仅{{ trustName(t.min_read_level) }}以上</span>
+                  <span v-if="t.min_read_level > 0" class="adm-tag">仅{{ trustName(t.min_read_level) }}以上</span>
             </span>
           </td>
           <td data-label="回复" class="num">{{ t.reply_count }}</td>

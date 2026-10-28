@@ -13,7 +13,6 @@ const MB: u64 = 1024 * 1024;
 /// 内容类型：名称、体积上限、是否纯数据（不含可运行的代码）。
 const KINDS: &[(&str, u64, bool)] = &[
     ("effect", MB, true),
-    ("scheme", MB, true),
     ("reminder", MB, true),
     ("routine", MB, true),
     ("task", MB, true),
@@ -27,7 +26,7 @@ const KINDS: &[(&str, u64, bool)] = &[
 ];
 
 /// 用户（T2）发布后无需审核就可以一键应用的类型：只有纯数据且不会代替用户执行动作的那几种。
-const T2_ONE_CLICK: &[&str] = &["effect", "scheme", "reminder"];
+const T2_ONE_CLICK: &[&str] = &["effect", "reminder"];
 
 /// 封面图：不是内容包，走同一套直传，只收小图。
 pub const COVER: &str = "cover";
@@ -226,7 +225,7 @@ packs/effect/a.zip
         assert!(one_click_allowed("game", 0, "published"));
         assert!(one_click_allowed("widget", 1, "published"));
         assert!(one_click_allowed("effect", 2, "published"));
-        assert!(one_click_allowed("scheme", 2, "published"));
+        assert!(!one_click_allowed("scheme", 2, "published"), "方案不是内容包类型");
         assert!(one_click_allowed("reminder", 2, "published"));
         // 用户未审的任务、例行、目标和所有可运行内容都不能一键
         assert!(!one_click_allowed("task", 2, "published"));

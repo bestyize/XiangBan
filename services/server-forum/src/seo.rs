@@ -8,7 +8,7 @@
 
 use crate::{
     error::AppError,
-    models::{self, DealInfo, ListFilter, TopicItem},
+    models::{self, ListFilter, TopicItem},
     state::AppState,
 };
 use axum::{
@@ -92,22 +92,6 @@ fn truncate_chars(s: &str, max: usize) -> String {
 fn cn_date(dt: DateTime<Utc>) -> String {
     let tz = FixedOffset::east_opt(8 * 3600).expect("固定时区");
     dt.with_timezone(&tz).format("%Y-%m-%d").to_string()
-}
-
-fn condition_labels(bits: i32) -> Vec<&'static str> {
-    models::CONDITIONS
-        .iter()
-        .filter(|(_, b)| bits & b != 0)
-        .map(|(k, _)| match *k {
-            "card" => "需信用卡",
-            "phone_cn" => "需国内手机号",
-            "phone_intl" => "需海外手机号",
-            "edu" => "需教育邮箱",
-            "work_email" => "需企业邮箱",
-            "realname" => "需实名认证",
-            _ => "其他条件",
-        })
-        .collect()
 }
 
 // ---------- index.html 注入 ----------
@@ -229,7 +213,7 @@ pub fn routes(state: &AppState) -> Router<AppState> {
 
     Router::new()
         .route("/", get(home))
-        .route("/deals", get(deals_page))
+        .route("/discuss", get(home))
         .route("/t/{id}", get(topic_page))
         .route("/c/{slug}", get(category_page))
         .route("/tag/{name}", get(tag_page))
@@ -315,16 +299,7 @@ type Res = Result<Response, AppError>;
 
 // ---------- HTML 片段 ----------
 
-/// "能领到什么"，选填；没写就是空串（未转义的纯文本）。
-fn deal_plain_summary(d: &DealInfo) -> String {
-    d.value_text.trim().to_string()
-}
-
-fn deal_summary(d: &DealInfo) -> String {
-    escape(&deal_plain_summary(d))
-}
-
-/// 帖子列表：标题链接 + 羊毛摘要 + 分类和作者。
+/// 帖子列表：标题链接 + 分类和作者。
 fn topic_list(items: &[TopicItem]) -> String {
     if items.is_empty() {
         return "<p>暂无内容</p>".into();
@@ -332,9 +307,6 @@ fn topic_list(items: &[TopicItem]) -> String {
     let mut s = String::from("<ul>\n");
     for t in items {
         s.push_str(&format!("<li><a href=\"/t/{}\">{}</a>", t.id, escape(&t.title)));
-        if let Some(d) = &t.deal {
-            s.push_str(&format!(" <span>【{}】</span>", deal_summary(d)));
-        }
         s.push_str(&format!(
             " <small>{} · {} · {}</small></li>\n",
             escape(&t.category.name),
@@ -353,34 +325,13 @@ fn tag_links(tags: &[String]) -> String {
         .join(" ")
 }
 
-/// 帖子页里的羊毛信息：几项都是选填，填了哪项显示哪项。
-fn deal_block(d: &DealInfo) -> String {
-    let mut rows = String::new();
-    if !d.value_text.trim().is_empty() {
-        rows.push_str(&format!("<dt>羊毛</dt><dd>{}</dd>\n", escape(d.value_text.trim())));
-    }
-    let conds = condition_labels(d.conditions);
-    if !conds.is_empty() {
-        rows.push_str(&format!("<dt>领取条件</dt><dd>{}</dd>\n", conds.join("、")));
-    }
-    if d.long_term {
-        rows.push_str("<dt>有效期</dt><dd>长期有效</dd>\n");
-    } else if let Some(at) = d.expires_at {
-        rows.push_str(&format!("<dt>有效期</dt><dd>{} 截止</dd>\n", cn_date(at)));
-    }
-    if rows.is_empty() {
-        return String::new();
-    }
-    format!("<dl>\n{rows}</dl>")
-}
-
-/// 全站导航：福利羊毛和分类树，让不跑 JS 的爬虫能顺着链接爬到各板块。
+/// 全站导航：资源、周刊、项目和分类树，让不跑 JS 的爬虫能顺着链接爬到各板块。
 async fn category_nav(state: &AppState) -> Result<String, AppError> {
     let rows: Vec<(i32, Option<i32>, String, String)> =
         sqlx::query_as("SELECT id, parent_id, slug, name FROM categories ORDER BY sort_order, id")
             .fetch_all(&state.pool)
             .await?;
-    let mut s = String::from("<nav>\n<a href=\"/deals\">福利羊毛</a>\n<ul>\n");
+    let mut s = String::from("<nav>\n<a href=\"/\">首页</a> · <a href=\"/discuss\">讨论</a>\n<ul>\n");
     for (id, _, slug, name) in rows.iter().filter(|r| r.1.is_none()) {
         s.push_str(&format!("<li><a href=\"/c/{}\">{}</a>", percent_encode(slug), escape(name)));
         let children: Vec<_> = rows.iter().filter(|r| r.1 == Some(*id)).collect();
@@ -434,28 +385,6 @@ async fn home(State(state): State<AppState>, Extension(index): Extension<Index>)
     }))
 }
 
-async fn deals_page(State(state): State<AppState>, Extension(index): Extension<Index>) -> Res {
-    let cx = Ctx::new(&state, &index);
-    let deals = models::list_topics(
-        &state.pool,
-        &ListFilter { kind: Some("deal".into()), sort: Some("new".into()), page_size: Some(50), ..Default::default() },
-    )
-    .await?;
-    let body = format!(
-        "<h1>福利羊毛</h1>\n<p>最新收录的免费额度、新用户赠金、试用和优惠，共 {} 条。</p>\n{}",
-        deals.total,
-        topic_list(&deals.items)
-    );
-    Ok(cx.ok(Page {
-        title: cx.full_title("福利羊毛"),
-        description: "最新的免费额度、新用户赠金和试用优惠，覆盖 AI、云服务和开发者工具，标注领取条件和有效期。".into(),
-        path: "/deals".into(),
-        og_type: "website",
-        body,
-        json_ld: None,
-    }))
-}
-
 async fn topic_page(
     State(state): State<AppState>,
     Extension(index): Extension<Index>,
@@ -492,10 +421,6 @@ async fn topic_page(
         iso = topic.created_at.to_rfc3339(),
         date = cn_date(topic.created_at),
     );
-    if let Some(d) = &topic.deal {
-        body.push_str(&deal_block(d));
-        body.push('\n');
-    }
     body.push_str(&format!("<div>{body_html}</div>\n"));
     if !topic.tags.is_empty() {
         body.push_str(&format!("<p>{}</p>\n", tag_links(&topic.tags)));
@@ -516,12 +441,6 @@ async fn topic_page(
 
     let path = format!("/t/{id}");
     let mut desc = topic.excerpt.clone();
-    if let Some(d) = &topic.deal {
-        let summary = deal_plain_summary(d);
-        if !summary.is_empty() {
-            desc = format!("【{summary}】{desc}");
-        }
-    }
     if desc.trim().is_empty() {
         desc = topic.title.clone();
     }
@@ -670,7 +589,7 @@ async fn sitemap(State(state): State<AppState>) -> Res {
     let mut xml = String::from(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
     );
-    for p in ["/", "/deals"] {
+    for p in ["/", "/discuss"] {
         sitemap_entry(&mut xml, &format!("{base}{p}"), None);
     }
     for (s,) in &cats {
