@@ -1,0 +1,37 @@
+[package]
+name = "xiaoban-voice-service"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Loopback-only, backend-injected OpenAI audio and MCP service"
+
+[features]
+default = ["stdio"]
+stdio = ["dep:reqwest"]
+
+[[bin]]
+name = "xiaoban-voice-mcp-stdio"
+path = "src/bin/xiaoban-voice-mcp-stdio.rs"
+required-features = ["stdio"]
+
+[dependencies]
+async-trait = "0.1"
+axum = { version = "0.8", features = ["multipart"] }
+claxon = "0.4"
+hound = "3.5"
+lewton = "0.10"
+puremp3 = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+subtle = "2.6"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "sync", "time", "signal", "io-std", "io-util"] }
+tracing = "0.1"
+reqwest = { version = "0.12", optional = true, default-features = false, features = ["json"] }
+base64 = "0.22"
+
+[dev-dependencies]
+reqwest = { version = "0.12", default-features = false, features = ["json", "multipart", "stream"] }
+tokio = { version = "1", features = ["test-util", "process", "io-util"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "registry"] }
+
