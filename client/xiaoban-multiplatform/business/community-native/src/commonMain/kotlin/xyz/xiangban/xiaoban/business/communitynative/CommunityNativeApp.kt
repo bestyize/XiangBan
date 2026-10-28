@@ -14,6 +14,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -23,6 +25,7 @@ import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import xyz.xiangban.xiaoban.common.community.CloudChatController
 
 /**
  * 社区原生界面入口：底部四个 Tab（社区、讨论、小伴、我的）加一个页面栈。
@@ -32,6 +35,8 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun CommunityNativeApp(env: CommunityEnv) {
     XiaobanTheme {
+        val appScope = rememberCoroutineScope()
+        val chat = remember(env) { CloudChatController(env.ai, appScope) }
         var tab by rememberSaveable { mutableStateOf(Tab.Community.name) }
         var stackText by rememberSaveable { mutableStateOf("") }
         val stack = Route.decodeStack(stackText)
@@ -47,7 +52,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                     when (Tab.valueOf(tab)) {
                         Tab.Community -> FeedScreen(env, ::push)
                         Tab.Discuss -> DiscussScreen(env, ::push)
-                        Tab.Ai -> AiPlaceholderScreen()
+                        Tab.Ai -> AiChatScreen(env, chat) { push(Route.Login) }
                         Tab.Mine -> MineScreen(env) { push(Route.Login) }
                     }
                 }

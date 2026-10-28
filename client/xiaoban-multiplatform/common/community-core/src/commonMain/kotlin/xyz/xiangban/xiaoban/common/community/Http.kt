@@ -63,11 +63,18 @@ class JsonHttp(private val client: HttpClient, private val base: String) {
         if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
     }
 
-    private fun errorFrom(status: Int, text: String): ApiException {
-        val obj = runCatching { CommunityJson.parseToJsonElement(text) as? JsonObject }.getOrNull()
-        val message = obj?.get("message")?.jsonPrimitive?.contentOrNull ?: "请求失败（$status）"
-        val code = obj?.get("code")?.jsonPrimitive?.contentOrNull
-        val retry = obj?.get("retry_after")?.let { runCatching { it.jsonPrimitive.int }.getOrNull() }
-        return ApiException(status, message, code, retry)
-    }
+    private fun errorFrom(status: Int, text: String): ApiException = parseApiError(status, text)
+}
+
+/** 解析服务端错误体：兼容平台统一的 `{"message","code"}` 与 OpenAI 兼容接口的 `{"error":{"message","code"}}`。 */
+fun parseApiError(status: Int, text: String): ApiException {
+    val obj = runCatching { CommunityJson.parseToJsonElement(text) as? JsonObject }.getOrNull()
+    val nested = obj?.get("error") as? JsonObject
+    val message = nested?.get("message")?.jsonPrimitive?.contentOrNull
+        ?: obj?.get("message")?.jsonPrimitive?.contentOrNull
+        ?: "请求失败（$status）"
+    val code = nested?.get("code")?.jsonPrimitive?.contentOrNull
+        ?: obj?.get("code")?.jsonPrimitive?.contentOrNull
+    val retry = obj?.get("retry_after")?.let { runCatching { it.jsonPrimitive.int }.getOrNull() }
+    return ApiException(status, message, code, retry)
 }

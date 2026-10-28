@@ -22,6 +22,12 @@ class FakeServer {
     fun on(pathStartsWith: String, status: HttpStatusCode = HttpStatusCode.OK, body: String) =
         on({ it.url.encodedPath.startsWith(pathStartsWith) || (it.url.encodedPath + (it.url.encodedQuery.takeIf { q -> q.isNotEmpty() }?.let { q -> "?$q" } ?: "")).startsWith(pathStartsWith) }, status, body)
 
+    fun onSse(pathStartsWith: String, body: String) {
+        routes += ({ r: HttpRequestData -> r.url.encodedPath.startsWith(pathStartsWith) }) to {
+            respond(body, HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+        }
+    }
+
     fun onThrow(pathStartsWith: String) {
         routes += ({ r: HttpRequestData -> r.url.encodedPath.startsWith(pathStartsWith) }) to { throw Exception("offline") }
     }

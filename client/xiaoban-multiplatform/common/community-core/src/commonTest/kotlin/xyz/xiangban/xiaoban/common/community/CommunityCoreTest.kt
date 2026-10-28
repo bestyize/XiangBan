@@ -343,3 +343,145 @@ class TextAndTokensTest {
         assertEquals(8f, DesignTokens.RadiusCard)
     }
 }
+
+class AiGatewayAndCloudChatTest {
+    private val config = CommunityConfig()
+    private fun scope() = CoroutineScope(Dispatchers.Unconfined)
+
+    private val tiersJson = """{"tiers":[
+        {"tier":"standrad","display_name":"日常","description":"响应更快、额度更省","is_default":true,"requires_paid":false,"available":true,"reasoning_efforts":[]},
+        {"tier":"premium","display_name":"深入","description":"适合复杂任务","is_default":false,"requires_paid":true,"available":false,"reasoning_efforts":["low","high"]}
+    ],"media":{}}"""
+
+    private val balanceJson = """{
+        "product":{"product_id":"xiaoban-android","name":"小伴手机"},
+        "quota_per_unit":500000,
+        "total":250000,
+        "paid":0,
+        "buckets":[{"id":1,"kind":"trial","total":250000,"remaining":250000,"expires_at":"2026-11-28T00:00:00Z","created_at":"2026-10-28T00:00:00Z"}],
+        "trial":{"available":false,"quota":250000,"days":30}
+    }"""
+
+    @Test
+    fun `money formatting and tier selection match desktop rules`() {
+        assertEquals("$0.50", formatAiMoney(250_000, 500_000))
+        assertEquals("$0.125", formatAiMoney(62_500, 500_000))
+        assertEquals("$12.50", formatAiMoney(6_250_000, 500_000))
+        assertEquals("$120", formatAiMoney(60_000_000, 500_000))
+        assertEquals("试用额度", bucketKindLabel("trial"))
+        assertEquals("月卡", bucketKindLabel("monthly"))
+        assertEquals("加油包", bucketKindLabel("topup"))
+
+        val tiers = listOf(
+            AiTier(tier = "standrad", displayName = "日常", isDefault = true, available = true),
+            AiTier(tier = "premium", displayName = "深入", isDefault = false, requiresPaid = true, available = false),
+        )
+        assertEquals("standrad", pickAiTier(tiers, ""))
+        assertEquals("standrad", pickAiTier(tiers, "premium"), "不可用的档位回退到默认可用档位")
+    }
+
+    @Test
+    fun `tiers, balance, redeem and streaming SSE work end to end`() = runTest {
+        val server = FakeServer()
+        server.on("/api/ai/tiers", body = tiersJson)
+        server.on("/api/ai/balance", body = balanceJson)
+        server.on("/api/ai/redeem", body = """{"ok":true,"kind":"topup","quota":500000,"expires_at":null,"balance":750000}""")
+        server.onSse(
+            "/v1/chat/completions",
+            body = """
+                : keep-alive
+                data: {"id":"1","model":"standrad","choices":[{"delta":{"content":"你好，"}}]}
+
+                data: {"id":"1","model":"standrad","choices":[{"delta":{"content":"我是云端小伴"}}]}
+
+                data: [DONE]
+            """.trimIndent() + "\n",
+        )
+        val api = AiGatewayApi(server.client, config) { "tok-ai" }
+
+        val tiers = api.tiers()
+        assertEquals(2, tiers.size)
+        assertEquals("日常", tiers[0].displayName)
+        assertFalse(tiers[1].available)
+
+        val balance = api.balance()
+        assertEquals(250_000L, balance.total)
+        assertEquals(1, balance.buckets.size)
+
+        val redeemed = api.redeem("ABCD-EFGH-JKLM-NPQR")
+        assertEquals(500_000L, redeemed.quota)
+        assertEquals(750_000L, redeemed.balance)
+
+        val chunks = mutableListOf<String>()
+        val full = api.streamChat(listOf(ChatMessage("user", "打个招呼")), tier = "standrad") { chunks += it }
+        assertEquals(listOf("你好，", "我是云端小伴"), chunks)
+        assertEquals("你好，我是云端小伴", full)
+        val chatReq = server.requests.last()
+        assertEquals("Bearer tok-ai", chatReq.headers[HttpHeaders.Authorization])
+        val bodyObj = Json.parseToJsonElement((chatReq.body as TextContent).text).jsonObject
+        assertEquals("standrad", bodyObj["model"].toString().trim('"'))
+        assertEquals("true", bodyObj["stream"].toString())
+    }
+
+    @Test
+    fun `openai formatted quota and paid errors are parsed with code and message`() = runTest {
+        val server = FakeServer()
+        server.on(
+            "/v1/chat/completions",
+            HttpStatusCode.PaymentRequired,
+            """{"error":{"message":"额度已用完，请兑换额度后继续使用","type":"invalid_request_error","code":"insufficient_quota"}}""",
+        )
+        val api = AiGatewayApi(server.client, config) { "tok" }
+        val err = assertFailsWith<ApiException> {
+            api.streamChat(listOf(ChatMessage("user", "hi")), tier = "standrad")
+        }
+        assertEquals(402, err.status)
+        assertEquals("insufficient_quota", err.code)
+        assertEquals("额度已用完，请兑换额度后继续使用", err.message)
+    }
+
+    @Test
+    fun `cloud chat controller loads meta, streams replies, retries failures, and redeems codes`() = runTest {
+        val server = FakeServer()
+        server.on("/api/ai/tiers", body = tiersJson)
+        server.on("/api/ai/balance", body = balanceJson)
+        val api = AiGatewayApi(server.client, config) { "tok" }
+        val controller = CloudChatController(api, scope())
+
+        controller.loadMeta()
+        controller.state.await { !it.loadingMeta && it.tiers.isNotEmpty() }
+        assertEquals("standrad", controller.state.value.selectedTier)
+        assertEquals(250_000L, controller.state.value.balance?.total)
+
+        // 不可用的付费档不能被切过去
+        controller.selectTier("premium")
+        assertEquals("standrad", controller.state.value.selectedTier)
+
+        // 第一次对话失败，随后 retryLast 重试成功
+        server.on(
+            "/v1/chat/completions",
+            HttpStatusCode.BadGateway,
+            """{"error":{"message":"AI 服务暂时不可用，请稍后再试","type":"api_error","code":"bad_gateway"}}""",
+        )
+        controller.send("今天天气怎么样")
+        controller.state.await { !it.sending && it.messages.size == 2 }
+        assertEquals("AI 服务暂时不可用，请稍后再试", controller.state.value.messages.last().error)
+
+        server.onSse(
+            "/v1/chat/completions",
+            body = "data: {\"choices\":[{\"delta\":{\"content\":\"晴朗温和\"}}]}\n\ndata: [DONE]\n",
+        )
+        controller.retryLast()
+        controller.state.await { !it.sending && it.messages.lastOrNull()?.error == null && it.messages.lastOrNull()?.text == "晴朗温和" }
+        assertEquals(2, controller.state.value.messages.size)
+        assertEquals("今天天气怎么样", controller.state.value.messages[0].text)
+        assertEquals("晴朗温和", controller.state.value.messages[1].text)
+
+        // 兑换码成功后刷新提示与余额
+        server.on("/api/ai/redeem", body = """{"ok":true,"kind":"topup","quota":500000,"expires_at":null,"balance":750000}""")
+        controller.redeem("ABCD-EFGH-JKLM-NPQR")
+        controller.state.await { !it.redeeming && it.redeemMessage != null }
+        assertEquals("兑换成功，到账 $1.00", controller.state.value.redeemMessage)
+    }
+}
+

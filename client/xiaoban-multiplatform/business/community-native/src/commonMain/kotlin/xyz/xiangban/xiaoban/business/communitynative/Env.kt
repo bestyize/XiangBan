@@ -4,6 +4,7 @@ import io.ktor.client.HttpClient
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import xyz.xiangban.xiaoban.common.community.AccountApi
+import xyz.xiangban.xiaoban.common.community.AiGatewayApi
 import xyz.xiangban.xiaoban.common.community.CommunityConfig
 import xyz.xiangban.xiaoban.common.community.ForumApi
 import xyz.xiangban.xiaoban.common.community.InMemoryTokenStorage
@@ -30,4 +31,5 @@ class CommunityEnv(
     @OptIn(ExperimentalTime::class)
     val session = SessionManager(account, storage, now = { Clock.System.now().toEpochMilliseconds() })
     val forum = ForumApi(client, config) { session.accessToken() }
+    val ai = AiGatewayApi(client, config) { session.accessToken() }
 }
