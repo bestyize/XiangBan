@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
 import PostEntry from '@/components/PostEntry.vue'
 import AttachmentList from '@/components/AttachmentList.vue'
+import PosterDialog from '@/components/PosterDialog.vue'
 import HelpPanel from '@/components/HelpPanel.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
@@ -26,6 +27,12 @@ const toast = useToast()
 
 const id = computed(() => Number(route.params.id))
 const topic = ref<TopicDetail | null>(null)
+const posterOpen = ref(false)
+const posterInput = computed(() =>
+  topic.value
+    ? { tag: topic.value.category.name, title: topic.value.title, summary: topic.value.excerpt || topic.value.title, url: `${window.location.origin}/t/${topic.value.id}`, seed: topic.value.id }
+    : null,
+)
 const pinScopeDraft = ref<Exclude<PinScope, 'none'>>('site')
 const pinActionLabel = computed(() => {
   if (!topic.value?.pinned) return '置顶'
@@ -302,6 +309,7 @@ async function closeHelp() {
           {{ topic.viewer.bookmarked ? '已收藏' : '收藏' }}
         </button>
         <button type="button" class="btn" @click="share">分享</button>
+        <button type="button" class="btn" @click="posterOpen = true">海报</button>
         <span class="spacer" />
         <template v-if="topic.viewer.can_pin">
           <label class="pin-scope-control">
@@ -383,6 +391,7 @@ async function closeHelp() {
 
     <ReportDialog :target="reportTarget" @close="reportTarget = null" />
   </ForumShell>
+  <PosterDialog :open="posterOpen" :poster="posterInput" :name="topic?.title ?? ''" @close="posterOpen = false" />
 </template>
 
 <style scoped>

@@ -108,6 +108,10 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 `POST /events`（匿名，`{device, events:[{name, dim?, count?}]}`，成功一律 204，不合格的事件静默丢弃）。依据 PRD §8.3：设备标识由客户端随机生成，服务端只存加盐 SHA-256（`FORUM_ANALYTICS_SALT`，生产请设置）；事件名和维度（内容类型或来源）都来自白名单（`src/analytics.rs`），不收账号、内容、搜索词、文件名；只存“某设备某天某事件几次”（表 `events_daily`），不保存行为流。后台「数据」页（`GET /admin/metrics`）看每日活跃设备、事件次数与独立设备数、次日留存。网页端在设置页可一键关闭（同时删除本地设备标识），浏览器开启“不跟踪”也不上报；桌面端在社区页关闭。隐私政策已披露。事件：看首页/周刊/项目/内容包/讨论、搜索、点“在小伴中打开”、下载、复制链接、发布开始与完成，以及桌面端的社区页打开、应用确认、成功、取消、方案复刻。暂未做 IP 限流，量大后再加。
 
+## 分享海报
+
+内容包详情、周刊和帖子页都有“生成海报”：在浏览器里用 canvas 画一张竖版图（封面或渐变底、类型标签、标题、摘要、品牌和指向该页的二维码），不经过服务器，可保存或复制链接，手机上长按图片也能保存。二维码用 `web/src/lib/vendor/qrcode.js`（qrcode-generator 1.4.4，MIT，仅把出口改成 ES 模块），已用 OpenCV 解码核对内容一致。`npm run test:poster` 覆盖折行与二维码矩阵。封面图跨域读取需要资源机允许跨域（已默认放开）。
+
 ## 业务规则
 
 - 正文是 Markdown，服务端用 pulldown-cmark 渲染、ammonia 清洗后存 `body_html`；外链加 `nofollow ugc`。新人（TL0）的链接和图片会被去掉，只留文字。
