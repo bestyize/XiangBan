@@ -1,17 +1,3 @@
-/** 领取条件位标志，与后端 models::CONDITIONS 一致。 */
-export const CONDITIONS = [
-  { key: 'card', bit: 1, label: '需要信用卡' },
-  { key: 'phone_cn', bit: 2, label: '需要国内手机号' },
-  { key: 'phone_intl', bit: 4, label: '需要海外手机号' },
-  { key: 'edu', bit: 8, label: '需要 edu 邮箱' },
-  { key: 'work_email', bit: 16, label: '需要企业邮箱' },
-  { key: 'realname', bit: 32, label: '需要实名' },
-] as const
-
-export function conditionLabels(bits: number) {
-  return CONDITIONS.filter(c => bits & c.bit).map(c => c.label)
-}
-
 export const TRUST_LABEL = ['新人', '成员', '老用户', '守护者']
 
 /**
@@ -59,23 +45,6 @@ export function formatDateTime(iso: string) {
   const d = new Date(iso)
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${formatDate(iso)} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
-/** 有效期文案：长期有效 / 未知 / 还剩 N 天 / 已过期。 */
-export function expiryText(expiresAt: string | null, longTerm: boolean, now = Date.now()) {
-  if (longTerm) return '长期有效'
-  if (!expiresAt) return '有效期未知'
-  const diff = new Date(expiresAt).getTime() - now
-  if (diff <= 0) return '已过期'
-  if (diff < DAY) return `${Math.max(1, Math.floor(diff / HOUR))} 小时后截止`
-  if (diff < 15 * DAY) return `还剩 ${Math.ceil(diff / DAY)} 天`
-  return `${formatDate(expiresAt)}截止`
-}
-
-export function expiringSoon(expiresAt: string | null, longTerm: boolean, now = Date.now()) {
-  if (longTerm || !expiresAt) return false
-  const diff = new Date(expiresAt).getTime() - now
-  return diff > 0 && diff < 3 * DAY
 }
 
 export function compactCount(n: number) {

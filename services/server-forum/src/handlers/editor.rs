@@ -529,8 +529,8 @@ async fn save(
             ));
         }
     }
-    let (category, kind) = check_category(&mut tx, input.author_uid, &input.category).await?;
-    let body = topics::clean_body(&body, if kind == "deal" { 0 } else { 10 })?;
+    let (category, _) = check_category(&mut tx, input.author_uid, &input.category).await?;
+    let body = topics::clean_body(&body, 10)?;
     let id = existing.map_or_else(Uuid::new_v4, |v| v.0);
     sqlx::query("INSERT INTO editor_drafts(id,author_uid,external_id,category_id,title,body_md,tags) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO UPDATE SET category_id=$4,title=$5,body_md=$6,tags=$7,updated_at=clock_timestamp()")
         .bind(id).bind(input.author_uid).bind(&input.external_id).bind(category).bind(title).bind(body).bind(tags).execute(&mut *tx).await?;
@@ -661,9 +661,9 @@ async fn publish(
         .bind(d.category_id)
         .fetch_one(&mut *tx)
         .await?;
-    let (_, kind) = check_category(&mut tx, d.author_uid, &slug).await?;
+    check_category(&mut tx, d.author_uid, &slug).await?;
     let title = topics::clean_title(&d.title)?;
-    let body = topics::clean_body(&d.body_md, if kind == "deal" { 0 } else { 10 })?;
+    let body = topics::clean_body(&d.body_md, 10)?;
     let mut tags = topics::clean_tags(&d.tags)?;
     tags.sort();
     // 发布前确认所有文件仍存在，再在同一事务里公开图片和正式帖子。
@@ -684,12 +684,6 @@ async fn publish(
         sqlx::query("INSERT INTO topic_tags(topic_id,tag_id) VALUES ($1,$2)")
             .bind(topic)
             .bind(tag_id)
-            .execute(&mut *tx)
-            .await?;
-    }
-    if kind == "deal" {
-        sqlx::query("INSERT INTO deals(topic_id) VALUES ($1)")
-            .bind(topic)
             .execute(&mut *tx)
             .await?;
     }

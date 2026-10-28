@@ -89,11 +89,8 @@ export interface ListParams extends Query {
   category?: string
   tag?: string
   q?: string
-  sort?: 'latest' | 'new' | 'hot' | 'expiring'
+  sort?: 'latest' | 'new' | 'hot'
   home?: boolean
-  kind?: 'deal' | 'normal'
-  /** 默认不返回已到期的羊毛 */
-  include_expired?: boolean
   featured?: boolean
   page?: number
   page_size?: number
@@ -114,7 +111,6 @@ export const api = {
   bookmarks: (page = 1) => request<Page<TopicItem>>('GET', `/me/bookmarks${qs({ page })}`),
 
   topics: (p: ListParams) => request<Page<TopicItem>>('GET', `/topics${qs(p)}`),
-  deals: (p: ListParams) => request<Page<TopicItem>>('GET', `/deals${qs(p)}`),
   search: (p: ListParams) => request<Page<TopicItem>>('GET', `/search${qs(p)}`),
   topic: (id: number) => request<TopicDetail>('GET', `/topics/${id}`),
   createTopic: (input: TopicInput) => request<{ id: number }>('POST', '/topics', input),

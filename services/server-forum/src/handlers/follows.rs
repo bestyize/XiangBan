@@ -120,7 +120,6 @@ pub async fn topics(
     f.reader = Reader::from_user(Some(&auth.user));
     f.followed_by = Some(auth.user.uid);
     f.home = false;
-    f.include_expired = false;
     f.sort = Some("new".into());
     Ok(Json(models::list_topics(&state.pool, &f).await?))
 }

@@ -60,7 +60,7 @@ function submit() {
   <ForumShell :rail="false">
     <form class="search" role="search" @submit.prevent="submit">
       <label for="search-page" class="sr-only">搜索</label>
-      <input id="search-page" v-model="input" class="input" type="search" maxlength="50" placeholder="搜羊毛或帖子" />
+      <input id="search-page" v-model="input" class="input" type="search" maxlength="50" placeholder="搜帖子或内容" />
       <button class="btn btn-primary" type="submit">搜索</button>
     </form>
 

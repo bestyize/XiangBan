@@ -113,7 +113,6 @@ export interface AdminStats {
   topics_24h: number
   posts_total: number
   posts_24h: number
-  deals_active: number
   reports_open: number
   dau: number
 }
@@ -166,7 +165,6 @@ export interface AdminTopic {
   locked: boolean
   reply_count: number
   created_at: string
-  is_deal: boolean
   /** 阅读权限：0 所有人，1 成员以上，2 老用户以上，3 守护者 */
   min_read_level: number
   open_reports: number
@@ -193,7 +191,7 @@ export interface AdminCategory {
   slug: string
   name: string
   description: string
-  kind: 'deal' | 'normal'
+  kind: 'normal'
   sort_order: number
   min_post_level: number
   on_home: boolean
@@ -206,7 +204,7 @@ export interface AdminCategory {
 export interface CategoryInput {
   parent_id?: number | null
   slug?: string
-  kind?: 'deal' | 'normal'
+  kind?: 'normal'
   name: string
   description: string
   sort_order: number

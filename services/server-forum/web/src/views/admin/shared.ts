@@ -22,7 +22,6 @@ export const REPORT_REASONS: Record<string, string> = {
   other: '其他',
 }
 export const REPORT_STATUS: Record<string, string> = { open: '待处理', resolved: '已处理', dismissed: '已驳回' }
-export const CATEGORY_KIND: Record<string, string> = { deal: '羊毛', normal: '普通' }
 
 /** 操作日志里的动作码对应的中文说明，未收录的原样显示。 */
 export const AUDIT_ACTIONS: Record<string, string> = {
@@ -47,7 +46,6 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   'topic.lock': '锁定帖子',
   'topic.unlock': '解除锁定',
   'topic.move': '移动帖子',
-  'deal.status': '修改羊毛状态',
   'post.hide': '隐藏回复',
   'post.restore': '恢复回复',
   'user.trust': '修改信任等级',

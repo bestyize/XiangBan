@@ -41,7 +41,7 @@ const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
 
     <section class="block" aria-labelledby="bm-title">
       <h2 id="bm-title">我的收藏</h2>
-      <TopicList :items="bookmarks.items.value" :loading="bookmarks.loading.value" empty="还没有收藏。看到有用的羊毛，点帖子下方的收藏就能存到这里。" />
+      <TopicList :items="bookmarks.items.value" :loading="bookmarks.loading.value" empty="还没有收藏。看到有用的帖子，点帖子下方的收藏就能存到这里。" />
       <PagerNav :page="bookmarks.page.value" :page-size="bookmarks.pageSize.value" :total="bookmarks.total.value" @go="bookmarks.go" />
     </section>
 

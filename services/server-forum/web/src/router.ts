@@ -10,7 +10,6 @@ const routes: RouteRecordRaw[] = [
   { path: '/weekly/:week', name: 'weekly-issue', component: () => import('@/views/WeeklyView.vue') },
   { path: '/projects', name: 'projects', component: () => import('@/views/ProjectsView.vue') },
   { path: '/projects/:slug', name: 'project', component: () => import('@/views/ProjectView.vue') },
-  { path: '/deals', name: 'deals', component: () => import('@/views/DealsView.vue') },
   { path: '/c/:slug', name: 'category', component: () => import('@/views/CategoryView.vue') },
   { path: '/t/:id(\\d+)', name: 'topic', component: () => import('@/views/TopicView.vue') },
   { path: '/t/:id(\\d+)/edit', name: 'edit', component: () => import('@/views/ComposeView.vue'), meta: { auth: true } },

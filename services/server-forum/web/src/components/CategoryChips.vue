@@ -17,13 +17,13 @@ const root = computed(() => meta.tree.find(n => n.slug === meta.parentOf(current
       <RouterLink
         v-for="node in meta.tree"
         :key="node.id"
-        :to="node.kind === 'deal' ? '/deals' : `/c/${node.slug}`"
+        :to="`/c/${node.slug}`"
         class="chip"
-        :class="{ on: root?.slug === node.slug || (node.kind === 'deal' && active === 'deals') }"
+        :class="{ on: root?.slug === node.slug }"
         >{{ node.name }}</RouterLink
       >
     </nav>
-    <nav v-if="root && root.children.length && active !== 'deals'" class="row sub" :aria-label="`${root.name}的子分类`">
+    <nav v-if="root && root.children.length" class="row sub" :aria-label="`${root.name}的子分类`">
       <RouterLink :to="`/c/${root.slug}`" class="chip" :class="{ on: active === root.slug }">全部</RouterLink>
       <RouterLink
         v-for="c in root.children"

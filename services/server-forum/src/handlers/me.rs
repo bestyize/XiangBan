@@ -87,7 +87,6 @@ pub struct Profile {
     pub last_seen_at: DateTime<Utc>,
     pub topic_count: i64,
     pub post_count: i64,
-    pub deal_count: i64,
     pub banned: bool,
     pub following: bool,
     pub following_count: i64,
@@ -101,13 +100,11 @@ pub async fn profile(
 ) -> AppResult<Json<Profile>> {
     let reader = Reader::from_user(viewer.as_ref());
     let user = users::find(&state.pool, uid).await?.ok_or_else(|| AppError::not_found("用户"))?;
-    let (topic_count, post_count, deal_count): (i64, i64, i64) = sqlx::query_as(
+    let (topic_count, post_count): (i64, i64) = sqlx::query_as(
         "SELECT (SELECT COUNT(*) FROM topics t WHERE t.author_uid = $1 AND t.status = 'normal'
                    AND (t.min_read_level <= $2 OR t.author_uid = $3)),
                 (SELECT COUNT(*) FROM posts p JOIN topics t ON t.id = p.topic_id
-                 WHERE p.author_uid = $1 AND p.status = 'normal' AND (t.min_read_level <= $2 OR t.author_uid = $3)),
-                (SELECT COUNT(*) FROM topics t JOIN deals d ON d.topic_id = t.id
-                 WHERE t.author_uid = $1 AND t.status = 'normal' AND (t.min_read_level <= $2 OR t.author_uid = $3))",
+                 WHERE p.author_uid = $1 AND p.status = 'normal' AND (t.min_read_level <= $2 OR t.author_uid = $3))",
     )
     .bind(uid)
     .bind(reader.level)
@@ -122,7 +119,6 @@ pub async fn profile(
         last_seen_at: user.last_seen_at,
         topic_count,
         post_count,
-        deal_count,
         banned: user.status == "banned",
         following: follows.following,
         following_count: follows.following_count,
@@ -138,7 +134,6 @@ pub async fn user_topics(
 ) -> AppResult<Json<Page<TopicItem>>> {
     f.reader = Reader::from_user(viewer.as_ref());
     f.author = Some(uid);
-    f.include_expired = true;
     if f.sort.is_none() {
         f.sort = Some("new".into());
     }
@@ -195,7 +190,6 @@ pub async fn search(
     if f.sort.is_none() {
         f.sort = Some("new".into());
     }
-    f.include_expired = true;
     Ok(Json(models::list_topics(&state.pool, &f).await?))
 }
 

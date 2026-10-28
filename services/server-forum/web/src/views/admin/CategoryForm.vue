@@ -2,7 +2,7 @@
 // 分类表单：新建和编辑共用。编辑时 slug、父分类、类型不可改。
 import { computed, reactive, watch } from 'vue'
 import type { AdminCategory, CategoryInput } from '@/api/admin'
-import { CATEGORY_KIND, TRUST_LEVELS } from './shared'
+import { TRUST_LEVELS } from './shared'
 
 const props = defineProps<{
   /** 传入则为编辑模式 */
@@ -18,7 +18,6 @@ const editing = computed(() => !!props.category)
 const form = reactive({
   parent_id: props.category?.parent_id ?? (null as number | null),
   slug: props.category?.slug ?? '',
-  kind: (props.category?.kind ?? 'normal') as 'deal' | 'normal',
   name: props.category?.name ?? '',
   description: props.category?.description ?? '',
   sort_order: props.category?.sort_order ?? 0,
@@ -29,16 +28,6 @@ const form = reactive({
   // 内置标签在表单里用逗号分隔的一行文字编辑。
   preset_tags: (props.category?.preset_tags ?? []).join('，'),
 })
-
-// 选了父分类后，子分类类型必须和父分类一致。
-watch(
-  () => form.parent_id,
-  id => {
-    const p = props.parents.find(c => c.id === id)
-    if (p) form.kind = p.kind
-  },
-)
-const kindLocked = computed(() => editing.value || form.parent_id !== null)
 
 function submit() {
   const body: CategoryInput = {
@@ -54,7 +43,7 @@ function submit() {
   if (!editing.value) {
     body.parent_id = form.parent_id
     body.slug = form.slug.trim()
-    body.kind = form.kind
+    body.kind = 'normal'
   }
   emit('save', body)
 }
@@ -72,14 +61,8 @@ function submit() {
       </label>
       <label v-if="!editing" class="field">
         <span>slug</span>
-        <input v-model="form.slug" class="input" required maxlength="40" placeholder="deals-example" />
+        <input v-model="form.slug" class="input" required maxlength="40" placeholder="tech-example" />
         <small>2-40 位小写字母、数字或连字符，创建后不可修改</small>
-      </label>
-      <label class="field">
-        <span>类型</span>
-        <select v-model="form.kind" class="select" style="width: 100%" :disabled="kindLocked">
-          <option v-for="(label, key) in CATEGORY_KIND" :key="key" :value="key">{{ label }}</option>
-        </select>
       </label>
       <label class="field">
         <span>名称</span>
