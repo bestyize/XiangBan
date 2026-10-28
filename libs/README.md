@@ -8,4 +8,5 @@
 | [agent-learning](agent-learning/README.md) | 本地 SQLite + FTS5 任务结果、经验与评测记录 |
 | [agent-proactivity](agent-proactivity/README.md) | 主动感知、授权、免打扰、注意力预算与反馈策略 |
 | [community-packs](community-packs/README.md) | 社区内容包的链接解析、哈希校验下载与压缩包检查（xiaoban-community） |
+| [link-protocol](link-protocol/README.md) | 手机与桌面互联协议的参考实现：配对、密钥派生、端到端加密信封、重放防护，附测试向量（xiaoban-link-protocol） |
 | [agent-tools](agent-tools/README.md) | 电脑控制、文件分析、技能发现与连接器扩展 |
