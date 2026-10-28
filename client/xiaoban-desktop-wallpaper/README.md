@@ -239,6 +239,8 @@ Canvas 运行在独立的低权限壁纸窗口和 opaque-origin iframe 中，不
 
 `game_create` 兼容原有 `files`，新增与其二选一的 `source_dir`。较长游戏先在当前工作目录的专用子目录（如 `game-drafts/my-game/`）用 `write_file` 分文件创作、`edit_file` 局部修改，再传 `id/name/description/source_dir` 安装，避免重复传输整包源码。草稿保留供之后修改；它只接受工作目录内的普通 UTF-8 文本文件，拒绝越界、符号链接、manifest 与非支持类型，沿用 40 文件 / 单文件 1 MiB / 合计 4 MiB / 路径 4 层限制。校验通过后复用原子安装流程；无效草稿不会替换已安装游戏。保存成功不代表玩法或视觉已经实机验证。
 
+`game_read_format` 与 `widget_read_format` 在格式规范之后附带创作手册（[游戏](docs/craft/game.md)、[小组件](docs/craft/widget.md)），写明风格方向、层级配色、手感反馈、完整流程与交付前自查；手册只约束创作质量，不改变宿主校验。
+
 自定义及第三方服务商使用 Responses / Anthropic 协议时，可在配置弹窗的“高级设置”单独设置单次输出上限（1024–131072 token）；留空优先读取模型目录可选的 `maxOutputTokens`（自动最多 32768），未知模型保守使用 8192，不根据模型名称猜测能力。显式设置仍受模型声明上限和上下文一半的约束，真实请求与上下文预留使用同一有效预算。更换模型、地址或协议时恢复自动；目录更新更换推荐模型时也会清除旧设置。小伴 AI 继续采用保守预算；Chat Completions 保留端点默认输出参数，暂不提供此控件。旧配置可直接读取。
 
 针对性验证：`npx vitest run src/ui/chat/view.test.ts src/ui/chat/chat-store.test.ts src/ui/components/AiConfigCard.test.ts`、`npx vue-tsc --noEmit`；原生运行 `cargo test --manifest-path src-tauri/Cargo.toml --locked --bin xiaoban-desktop-wallpaper chat::`、相同命令筛选 `ai_config::` 与 `ai_catalogue::`。内核回归测试在仓库根运行 `cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --features openai,anthropic --test truncation --test guards --test anthropic --test responses --test openai_http`，使用脚本模型与本地假服务，不消耗生产模型额度。

@@ -8,6 +8,8 @@ pub const NAME: &str = "open-claude-design";
 pub const RUNTIME: &str = concat!(include_str!("../runtime/support.js"),"\n",include_str!("../runtime/editor.js"));
 pub mod archive;
 pub const FORMAT: &str = include_str!("../FORMAT.md");
+/// Quality guidance returned with the format: tokens first, real content, complete states, a check before complete.
+pub const CRAFT: &str = include_str!("../CRAFT.md");
 const MAX_FILE: usize = 2 * 1024 * 1024;
 const MAX_PROJECT: usize = 16 * 1024 * 1024;
 // Separate Store handles (UI commands and agent runs) share mutation ownership.
@@ -313,7 +315,7 @@ static CREATE_LOCK: Mutex<()> = Mutex::new(());
 impl DesignTool {
     pub fn new(store: Store, saved: impl Fn(&Project) -> Result<(), String> + Send + Sync + 'static) -> Self {
         Self { spec: ToolSpec::new(NAME,
-            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax. create allocates a durable id even with missing boards (draft). save merges changed files and canvas fields, preserving omitted boards and metadata (remove_boards explicitly removes boards), with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list defaults to all projects; scope=session restricts it. query searches title, exact id or request_id; since_ms/before_ms filter updated time (epoch milliseconds). open links the same project; copy creates an independent project. Does not publish or install anything.",
+            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax and the quality guide (craft). create allocates a durable id even with missing boards (draft). save merges changed files and canvas fields, preserving omitted boards and metadata (remove_boards explicitly removes boards), with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list defaults to all projects; scope=session restricts it. query searches title, exact id or request_id; since_ms/before_ms filter updated time (epoch milliseconds). open links the same project; copy creates an independent project. Does not publish or install anything.",
             json!({"type":"object","properties":{
                 "action":{"type":"string","enum":["format","list","read","manifest","create","save","complete","open","copy","delete"]},
                 "scope":{"type":"string","enum":["all","session"]},"query":{"type":"string"},"since_ms":{"type":"integer","minimum":0},"before_ms":{"type":"integer","minimum":0},"status":{"type":"string","enum":["draft","generating","ready","failed"]},"id":{"type":"string"},"title":{"type":"string"},"expected_revision":{"type":"integer","minimum":1},
@@ -325,7 +327,7 @@ impl DesignTool {
         if ctx.is_cancelled() { return Err("已取消".into()); }
         let get_id = || args["id"].as_str().ok_or("缺少 id");
         match args["action"].as_str().ok_or("缺少 action")? {
-            "format" => Ok(json!({"format": FORMAT})),
+            "format" => Ok(json!({"format": FORMAT, "craft": CRAFT})),
             "list" => Ok(json!(self.store.search(if args["scope"]=="session"{ctx.session()}else{"*"},args["query"].as_str().unwrap_or(""),args["since_ms"].as_u64(),args["before_ms"].as_u64())?.iter().take(100).map(summary).collect::<Vec<_>>())),
             "copy" => {
                 let key=args["request_id"].as_str().filter(|k|!k.is_empty()&&k.len()<=120).ok_or("copy 需要稳定 request_id，重试时沿用")?;
@@ -411,7 +413,7 @@ impl Middleware for DesignContext {
         let active=selected.or_else(||self.0.active(&turn.session));
         let current = projects.iter().map(summary).collect::<Vec<_>>();
         turn.messages.insert(at + 1, Message::reminder(format!(
-            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。无需额外审批设计方案。作品自动保存到资料库→我的文档。跨会话只给 design- 编号也能 read/open；按标题或时间查找先 list（默认全局，query/since_ms/before_ms），多个匹配先让用户选择。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前打开项目（数据）：{}；当前会话作品（数据）：{}", json!(active), json!(current))));
+            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。无需请用户审批设计方案，但 create 前先按 format 返回的 craft 定好风格方向并写入 designSystems tokens，complete 前按其中的清单自查。作品自动保存到资料库→我的文档。跨会话只给 design- 编号也能 read/open；按标题或时间查找先 list（默认全局，query/since_ms/before_ms），多个匹配先让用户选择。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前打开项目（数据）：{}；当前会话作品（数据）：{}", json!(active), json!(current))));
         Ok(())
     }
     fn before_stop(&self,stop:&Stop<'_>)->StopDecision{
@@ -437,6 +439,11 @@ mod tests {
     fn fixture() -> (Store, PathBuf) { let root = std::env::temp_dir().join(format!("ocd-{}",nonce().unwrap())); (Store::new(&root),root) }
     fn canvas() -> Value { json!({"v":3,"boards":{"Main.dc.html":{"x":0,"y":0,"w":390,"h":844}},"order":["Main.dc.html"],"notes":{},"unknown":{"keep":true}}) }
     fn files() -> BTreeMap<String,String> { [("Main.dc.html".into(),"<x-dc><h1>Hello</h1></x-dc>".into())].into() }
+    #[test] fn format_comes_with_the_quality_guide() {
+        let (store,_root)=fixture();let tool=DesignTool::new(store,|_|Ok(()));
+        let out=tool.call(json!({"action":"format"}),&ToolCtx::detached("s")).unwrap();
+        assert_eq!(out["format"],FORMAT);assert!(out["craft"].as_str().unwrap().contains("complete 之前自查"));
+    }
     #[test] fn revisions_are_atomic_and_survive_reopen() {
         let (store,root)=fixture(); let a=store.create("设计稿".into(),"s",canvas(),files()).unwrap();
         let mut b=a.clone(); b.files.insert("Main.dc.html".into(),"user edit".into());

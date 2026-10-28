@@ -1031,8 +1031,11 @@ const GAME_FORMAT: &str = "游戏包规范（小伴程序内置，无需查找�
 5. 可选成绩：开始一局发 type:'game.start'，之后可发 type:'game.progress' 和一次 type:'game.result'，都带非负整数 score（消息结构同上，channel 为 'xiaban.game-pack'，带 nonce）。\n\
 6. 存档（仅 save=true 时有效）：游戏在 game.ready 之后用 {channel:'xiaban.game-pack', protocol:1, nonce, type:'game.save', data:{…}} 提交存档，data 必须是普通 JSON 对象，序列化后不超过 32 KiB；宿主存在本机，下次启动时放进 host.init 的 save 字段。进度变化时就发送，不要依赖退出时才存。save=false 时不要发送 game.save，宿主会忽略。";
 
+/// How to make a game worth playing, returned after the rules so the model reads both before writing.
+const GAME_CRAFT: &str = include_str!("../../../docs/craft/game.md");
+
 fn game_read_format(_: &dyn Desktop, _: &Value) -> Result<String, String> {
-    Ok(GAME_FORMAT.into())
+    Ok(format!("{GAME_FORMAT}\n\n{GAME_CRAFT}"))
 }
 
 /// What `widget_read_format` returns: the rules for a custom widget's HTML.
@@ -1043,8 +1046,11 @@ const WIDGET_FORMAT: &str = "自定义小组件规范（小伴程序内置，无
 4. 裁切：宿主按声明的矩形视口裁切。角色头部、耳朵、蝴蝶结、突出装饰及动画最大位移都必须包含在视口内，并预留透明安全边距。绝对定位前确认实际的 position 容器；探出卡片的角色应以卡片为定位父级，并在整体视口中预留顶部空间，不能用负 top 让内容伸出整个视口，不能依赖 overflow:visible 越过 iframe 或窗口边界。\n\
 5. 拖动：宿主统一提供按住非交互区域拖动和位置保存，无需自行实现窗口拖拽；不要使用 Electron 的 -webkit-app-region 或直接调用 Tauri。按钮、输入框等使用语义化元素；自定义手势区域加 data-no-drag，保留可拖动的背景区域。";
 
+/// How to make a widget look good, returned after the rules so the model reads both before writing.
+const WIDGET_CRAFT: &str = include_str!("../../../docs/craft/widget.md");
+
 fn widget_read_format(_: &dyn Desktop, _: &Value) -> Result<String, String> {
-    Ok(WIDGET_FORMAT.into())
+    Ok(format!("{WIDGET_FORMAT}\n\n{WIDGET_CRAFT}"))
 }
 
 fn game_close(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
@@ -2150,6 +2156,9 @@ mod tests {
         for needle in ["host.init", "game.ready", "game.save", "32 KiB", "xiaban.game-pack", "hostNonce", "ES modules", "desktop-host.js", "source_dir"] {
             assert!(format.contains(needle), "the format mentions {needle}");
         }
+        assert!(format.contains("游戏创作手册") && format.contains("安装前自查"), "the craft guide follows the rules");
+        let widget = call(&fake, "widget_read_format", json!({})).unwrap();
+        assert!(widget.starts_with("自定义小组件规范") && widget.contains("小组件创作手册") && widget.contains("保存前自查"), "{widget}");
         let spec_text = tools(fake.clone()).iter().find(|t| t.spec().name == "game_create").unwrap().spec().description.clone();
         assert!(spec_text.contains("game_read_format") && !spec_text.contains("host.init"), "the long rules are read on demand");
     }
