@@ -25,6 +25,7 @@ use xiaoban_link_protocol::{envelope::Envelope, MAX_CIPHERTEXT, VERSION};
 /// 空闲超过这个时间没收到任何帧就断开（客户端每 25 秒发一次 ping）。
 const IDLE_TIMEOUT: Duration = Duration::from_secs(75);
 const OUTBOX: usize = 256;
+const MAX_WS_MESSAGE: usize = 512 * 1024;
 
 #[derive(Deserialize)]
 pub struct WsQuery {
@@ -48,7 +49,8 @@ pub async fn connect(State(state): State<AppState>, headers: HeaderMap, Query(q)
     let token = ws_token(&headers).ok_or_else(|| AppError::Unauthorized("请先登录".into()))?;
     let uid = state.verifier.verify(&token).await?;
     let device = owned_device(&state.pool, uid, &q.device_id, None).await?;
-    Ok(ws.protocols([WS_PROTOCOL]).on_upgrade(move |socket| run(state, device, socket)))
+    Ok(ws.max_message_size(MAX_WS_MESSAGE).max_frame_size(MAX_WS_MESSAGE)
+        .protocols([WS_PROTOCOL]).on_upgrade(move |socket| run(state, device, socket)))
 }
 
 async fn active_peers(state: &AppState, device: &str) -> HashSet<String> {

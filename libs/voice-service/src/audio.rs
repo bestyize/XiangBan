@@ -187,7 +187,9 @@ pub fn decode(bytes: &[u8]) -> Result<Pcm, VoiceError> {
             .get(..2)
             .is_some_and(|b| b[0] == 0xff && b[1] & 0xe0 == 0xe0)
     {
-        decode_mp3(bytes)
+        // puremp3 can panic on malformed frame metadata (including bit-reservoir
+        // underflow); translate decoder panics into the ordinary malformed-input error.
+        std::panic::catch_unwind(|| decode_mp3(bytes)).unwrap_or_else(|_| Err(invalid()))
     } else {
         Err(unsupported())
     }

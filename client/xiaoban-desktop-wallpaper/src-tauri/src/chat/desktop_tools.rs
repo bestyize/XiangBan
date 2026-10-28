@@ -26,6 +26,7 @@ pub trait Desktop: Send + Sync {
     fn connector_request(&self, _references: &[String], _ctx: &ToolCtx) -> Result<Value, String> { Err("当前宿主不支持连接器授权".into()) }
     fn connector_call(&self, _name: &str, _args: Value, _ctx: &ToolCtx) -> agent_kernel::ToolResult { agent_kernel::ToolResult::error("当前宿主不支持连接器调用") }
     fn connector_target(&self, _name: &str) -> Result<Option<Arc<dyn Tool>>, String> { Ok(None) }
+    fn delegation_manager(&self) -> Option<Arc<agent_bridge::delegation::DelegationManager>> { None }
     fn pet_catalog(&self)->Result<Value,String>{Err("当前宿主不支持宠物库".into())}
     fn pet_save_theme(&self,_theme:crate::pet_packs::Theme,_overwrite:bool)->Result<Value,String>{Err("当前宿主不支持宠物创作".into())}
     fn pet_delete_theme(&self,_id:String)->Result<Value,String>{Err("当前宿主不支持宠物主题".into())}
@@ -96,6 +97,9 @@ impl Desktop for TauriDesktop {
     fn connector_target(&self, name: &str) -> Result<Option<Arc<dyn Tool>>, String> {
         super::connector_manager(&self.app)?.tools().into_iter().find(|tool| tool.spec().name == name)
             .map(Some).ok_or_else(|| "连接器工具当前不可用，请检查连接状态".into())
+    }
+    fn delegation_manager(&self) -> Option<Arc<agent_bridge::delegation::DelegationManager>> {
+        Some(self.app.state::<super::ChatState>().delegation.clone())
     }
     fn design_removed(&self,id:&str)->Result<(),String>{crate::design::removed(&self.app,id)}
     fn design_saved(&self, project: &open_claude_design::Project) -> Result<(), String> { crate::design::saved(&self.app, project) }
@@ -1095,7 +1099,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
     let game_workspace = workspace.to_path_buf();
     let none = || object(json!({}), &[]);
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
-    vec![
+    let mut items = vec![
         tool(&desktop, ToolSpec::new("app_guide", "查小伴桌面的功能清单：每项功能能做什么、在控制台哪个页面、对应哪些工具、哪些要用户自己在页面里操作。用户问“能不能…”“在哪里…”“怎么设置…”，或你想说“不支持”之前先调用。topic 可填功能名、页面名、工具名或关键词（如 置顶、代理、提醒）；不填则返回完整目录。", object(json!({"topic":{"type":"string"}}), &[])).risk(Risk::Read).parallel(), |_, a| Ok(super::app_guide::describe(optional_text(a, "topic")?))),
         tool(&desktop, ToolSpec::new("open_page", "把小伴控制台带到前台并打开指定页面，用来带用户去对话里做不了、或用户想自己操作的地方（如代理、API 密钥、权限、插件商店）。page: new-task 新建任务、ai-store AI 插件、library 资料库、studio 装扮、games 游玩、care 提醒、settings 设置。studio 的 tab: wallpapers 壁纸、effects 特效、widgets 组件、pets 伙伴；settings 的 tab: general、appearance、ai、assistant、voice、network、safety、about。具体页面对应什么功能见 app_guide。", object(json!({
             "page":{"type":"string","enum":super::app_guide::PAGES},
@@ -1470,7 +1474,11 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             ).risk(Risk::Read).serial().timeout(std::time::Duration::from_secs(25)),
             |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.computer_use_diagnose()?.to_string()) },
         ),
-    ]
+    ];
+    if let Some(mgr) = desktop.delegation_manager() {
+        items.extend(super::delegation_tools::tools(mgr, workspace));
+    }
+    items
 }
 
 #[cfg(test)]

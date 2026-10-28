@@ -1,0 +1,23 @@
+[package]
+name = "xiaoban-agent-hooks"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "=1.0.151", features = ["preserve_order"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
+axum = "0.8"
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio", "service"] }
+rand = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+thiserror = "2"
+tempfile = "3"
+
+[dev-dependencies]
+tempfile = "3"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
+

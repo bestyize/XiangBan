@@ -44,7 +44,7 @@ cargo run --manifest-path services/server-account/Cargo.toml -- gen-keys
 | `ACCOUNT_ISSUER` | `https://account.xiangban.xyz` | JWT `iss`，各服务校验时必须一致 |
 | `ACCOUNT_DATA_DIR` | `account_data` | 首次启动自动生成 `jwt_ed25519.pk8`（签名私钥）与 `master.key`（权限 0600），必须持久化并备份 |
 | `ACCOUNT_JWT_PKCS8_BASE64` / `ACCOUNT_MASTER_KEY_BASE64` | 空 | 容器部署时用环境变量代替上面两个文件，主密钥至少 32 字节 |
-| `ACCOUNT_CLIENTS` | 内置 5 个产品 | 启动时登记的应用，`id:名称,id2:名称2`，只增不删 |
+| `ACCOUNT_CLIENTS` | 内置 6 个产品 | 启动时登记的应用，`id:名称,id2:名称2`，只增不删；默认已包含 `xiaoban-android`（小伴手机应用） |
 | `ACCOUNT_ACCESS_TTL_SECS` / `ACCOUNT_REFRESH_TTL_DAYS` | `1800` / `30` | 访问 / 刷新令牌有效期；桌面客户端 `xiaoban-desktop-wallpaper` 的访问令牌固定为 30 天，其他应用使用此配置 |
 | `ACCOUNT_CODE_TTL_SECS` / `ACCOUNT_RESEND_COOLDOWN_SECS` | `300` / `60` | 验证码有效期与重发间隔 |
 | `ACCOUNT_MAX_CODE_ATTEMPTS` | `5` | 单个验证码最多错误次数 |
