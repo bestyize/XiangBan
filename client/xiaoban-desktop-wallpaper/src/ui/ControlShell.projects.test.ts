@@ -51,6 +51,23 @@ afterEach(() => { wrapper?.unmount(); wrapper = undefined; vi.restoreAllMocks();
 function render() { wrapper = mount(ControlShell, { attachTo: document.body }); return wrapper; }
 
 describe('workspace project actions', () => {
+  it('reveals the sidebar and all sessions when using its compact expand action', async () => {
+    fixture.store.chat.currentId = null;
+    fixture.store.chat.sessions = Array.from({ length: 8 }, (_, index) => ({ id: `recent${index}`, title: `会话 ${index}`, workspace: '' }));
+    render();
+    await button('sidebar-toggle').trigger('click');
+    expect(wrapper!.classes()).toContain('is-collapsed');
+    const more = button('sessions-more-__recent__');
+    expect(more.attributes('title')).toBe('最近任务：展开全部会话');
+    expect(more.attributes('aria-label')).toBe('最近任务：展开全部会话');
+    expect(wrapper!.findAll('.nav-session')).toHaveLength(6);
+    await more.trigger('click');
+    expect(wrapper!.classes()).not.toContain('is-collapsed');
+    expect(wrapper!.findAll('.nav-session')).toHaveLength(8);
+    expect(more.attributes('aria-expanded')).toBe('true');
+    expect(more.attributes('title')).toBe('最近任务：收起会话');
+  });
+
   it('limits projects and sessions to six and reveals a hidden search result', async () => {
     fixture.store.chat.sessions = Array.from({ length: 8 }, (_, project) => Array.from({ length: 8 }, (_, row) => ({ id: `p${project}s${row}`, title: `会话 ${project}-${row}`, workspace: `/项目${project}` }))).flat();
     fixture.store.chat.currentId = null;

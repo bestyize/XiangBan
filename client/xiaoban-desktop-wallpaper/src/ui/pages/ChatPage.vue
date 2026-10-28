@@ -511,8 +511,8 @@ async function openLink(href: string) {
                     <div class="answer" data-search><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span></div>
                   </div>
                   <div v-else-if="item.kind === 'notice' && (item.text || item.details)" class="notice" :class="[item.tone, { 'outcome-details': item.taskStatus && !item.text }]" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
-                    {{ item.text }}
-                    <details v-if="item.details"><summary>{{ item.detailsLabel ?? '错误详情' }}</summary><span class="notice-details">{{ item.details }}</span></details>
+                    <span v-if="item.text" class="notice-text">{{ item.text }}</span>
+                    <details v-if="item.details"><summary :title="item.detailsLabel ?? '错误详情'" :aria-label="item.detailsLabel ?? '错误详情'"><ChevronRight :size="12" class="notice-chevron" aria-hidden="true" /><FileText :size="14" class="notice-compact-icon" aria-hidden="true" /><span class="notice-action-label">{{ item.detailsLabel ?? '错误详情' }}</span></summary><span class="notice-details">{{ item.details }}</span></details>
                     <button v-if="item.canSwitchModel && !view.running" type="button" class="xb-link" @click="chooseModel(!!item.canRetry)">切换模型</button>
                     <button v-if="item.canRetry && !view.running" type="button" class="xb-link" @click="chat.retry()">重试</button>
                     <button v-if="item.canContinue && !view.running" type="button" class="xb-link" data-testid="chat-continue" @click="continueAnswer">继续</button>
@@ -711,12 +711,23 @@ async function openLink(href: string) {
 .act.is-on{color:var(--ui-ink);background:var(--ui-soft)}
 .act:disabled{opacity:.4;cursor:not-allowed}
 .usage{margin-left:8px;font-size:11.5px;color:var(--ui-text-tertiary);font-variant-numeric:tabular-nums}
-.notice{font-size:13px;padding:8px 12px;border-radius:10px;background:var(--ui-surface-sunken);color:var(--ui-text-secondary);display:flex;flex-wrap:wrap;gap:12px;align-items:center;line-height:1.6}
+.notice{container:notice / inline-size;min-width:0;font-size:13px;padding:8px 12px;border-radius:10px;background:var(--ui-surface-sunken);color:var(--ui-text-secondary);display:flex;flex-wrap:wrap;gap:12px;align-items:center;line-height:1.6}
 .notice.outcome-details{padding:0;background:none;font-size:12px;color:var(--ui-text-tertiary)}
 .notice.error{background:color-mix(in srgb,var(--ui-danger) 9%,var(--ui-surface));color:var(--ui-danger)}
 .notice.warning{background:color-mix(in srgb,var(--ui-warning) 14%,var(--ui-surface));color:var(--ui-warning-text)}
-.notice details{flex:1;min-width:0}
-.notice summary{cursor:pointer}
+.notice-text{flex:1 1 200px;min-width:0;overflow-wrap:anywhere}
+.notice details{flex:0 0 auto;min-width:0;max-width:100%}
+.notice details[open]{flex-basis:100%}
+.notice summary{display:flex;width:fit-content;align-items:center;gap:4px;min-width:28px;min-height:28px;cursor:pointer;white-space:nowrap;list-style:none}
+.notice summary::-webkit-details-marker{display:none}
+.notice-chevron{flex:none}.notice details[open]>summary .notice-chevron{transform:rotate(90deg)}
+.notice-compact-icon{display:none;flex:none}
+.notice>.xb-link{flex:none;white-space:nowrap}
+@container notice (max-width:360px){
+.notice-action-label,.notice-chevron{display:none}
+.notice-compact-icon{display:block}
+.notice summary{justify-content:center}
+}
 .notice-details{display:block;margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;color:var(--ui-text-secondary)}
 .undo-warning{color:var(--ui-text-secondary)}
 .card{border-radius:14px;background:var(--ui-surface);padding:14px 16px;display:grid;gap:10px;box-shadow:var(--ui-shadow-card),0 6px 20px rgba(0,0,0,.05);min-width:0;box-sizing:border-box}

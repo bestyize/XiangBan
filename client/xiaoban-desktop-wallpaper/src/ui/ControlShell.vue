@@ -49,6 +49,7 @@ function windowAction(action: 'minimize' | 'toggleMaximize' | 'close') { void na
 /* ── Sidebar ─────────────────────────────────────────────────────────── */
 const collapsed = ref(false);
 function toggleNavigation() { collapsed.value = !collapsed.value; }
+function expandNavigation() { if (collapsed.value) { collapsed.value = false; aiOpen.value = true; workspacesOpen.value = true; } }
 const aiOpen = ref(true);
 const bottomItems = [
   { id: 'studio', label: '装扮', icon: Palette },
@@ -529,11 +530,11 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
                 </button>
                 <button type="button" class="xb-icon-btn is-sm nav-session-more" aria-haspopup="menu" :aria-expanded="sessionMenu?.id === session.id" :aria-label="`更多操作：${session.title || '新对话'}`" title="更多" :data-testid="`session-more-${session.id}`" @click.stop="openSessionMenu(session.id, $event, $event.currentTarget)"><Ellipsis :size="14" /></button>
               </div>
-              <button v-if="space.sessions.length > displayLimit" type="button" class="workspace-more sessions-more" :aria-expanded="expandedSessionLists.has(space.key)" :data-testid="`sessions-more-${space.key}`" @click="expandedSessionLists.has(space.key) ? expandedSessionLists.delete(space.key) : expandedSessionLists.add(space.key)"><ChevronDown :size="12" /><span>{{ expandedSessionLists.has(space.key) ? '收起会话' : '展开全部会话' }}</span><i v-if="hiddenSessionsWaiting(space)" class="xb-dot" aria-label="折叠的会话中有待确认操作" /><small>{{ expandedSessionLists.has(space.key) ? `显示 ${displayLimit} 个` : `还有 ${space.sessions.length - displayLimit} 个` }}</small></button>
+              <button v-if="space.sessions.length > displayLimit" type="button" class="workspace-more sessions-more" :title="`${space.name}：${expandedSessionLists.has(space.key) ? '收起会话' : '展开全部会话'}`" :aria-label="`${space.name}：${expandedSessionLists.has(space.key) ? '收起会话' : '展开全部会话'}`" :aria-expanded="expandedSessionLists.has(space.key)" :data-testid="`sessions-more-${space.key}`" @click="expandNavigation(); expandedSessionLists.has(space.key) ? expandedSessionLists.delete(space.key) : expandedSessionLists.add(space.key)"><ChevronDown :size="12" /><span>{{ expandedSessionLists.has(space.key) ? '收起会话' : '展开全部会话' }}</span><i v-if="hiddenSessionsWaiting(space)" class="xb-dot" aria-label="折叠的会话中有待确认操作" /><small>{{ expandedSessionLists.has(space.key) ? `显示 ${displayLimit} 个` : `还有 ${space.sessions.length - displayLimit} 个` }}</small></button>
               <p v-if="!space.sessions.length" class="nav-empty">{{ space.key === '__recent__' ? '还没有任务' : '新任务会出现在这里' }}</p>
             </template>
           </div>
-          <button v-if="projectSpaces.length > displayLimit" type="button" class="workspace-more" :aria-expanded="showAllProjects" aria-controls="workspace-tree" data-testid="workspace-projects-more" @click="cancelWorkspaceSort(); showAllProjects = !showAllProjects"><ChevronDown :size="12" /><span>{{ showAllProjects ? '收起项目' : '展开全部项目' }}</span><i v-if="hiddenProjectsWaiting" class="xb-dot" aria-label="折叠的项目中有待确认操作" /><small>{{ showAllProjects ? `显示 ${displayLimit} 个` : `还有 ${projectSpaces.length - displayLimit} 个` }}</small></button>
+          <button v-if="projectSpaces.length > displayLimit" type="button" class="workspace-more" :title="showAllProjects ? '收起项目' : '展开全部项目'" :aria-label="showAllProjects ? '收起项目' : '展开全部项目'" :aria-expanded="showAllProjects" aria-controls="workspace-tree" data-testid="workspace-projects-more" @click="expandNavigation(); cancelWorkspaceSort(); showAllProjects = !showAllProjects"><ChevronDown :size="12" /><span>{{ showAllProjects ? '收起项目' : '展开全部项目' }}</span><i v-if="hiddenProjectsWaiting" class="xb-dot" aria-label="折叠的项目中有待确认操作" /><small>{{ showAllProjects ? `显示 ${displayLimit} 个` : `还有 ${projectSpaces.length - displayLimit} 个` }}</small></button>
           </div>
         </div>
         <div class="nav-sep"></div>
@@ -637,9 +638,9 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 </template>
 <style>
 .workspace-tools{display:flex;align-items:center;gap:3px}
-.workspace-more{display:flex;align-items:center;gap:6px;min-height:28px;width:calc(100% - 28px);margin:4px 0 4px 22px;padding:5px 9px;border:0;border-radius:6px;background:none;color:var(--ui-text-secondary);font:inherit;font-size:11px;text-align:left;cursor:pointer}.workspace-more:hover{background:var(--ui-surface);color:var(--ui-text-primary)}.workspace-more svg{flex:none;color:var(--ui-text-tertiary)}.workspace-more[aria-expanded=true] svg{transform:rotate(180deg)}.workspace-more small{margin-left:auto;white-space:nowrap;font-size:10px;color:var(--ui-text-tertiary)}.sessions-more{margin-left:35px;width:calc(100% - 41px)}
+.workspace-more{box-sizing:border-box;display:flex;align-items:center;gap:6px;min-height:28px;width:calc(100% - 28px);margin:4px 0 4px 22px;padding:5px 9px;border:0;border-radius:6px;background:none;color:var(--ui-text-secondary);font:inherit;font-size:11px;text-align:left;cursor:pointer}.workspace-more>span{white-space:nowrap}.workspace-more:hover{background:var(--ui-surface);color:var(--ui-text-primary)}.workspace-more svg{flex:none;color:var(--ui-text-tertiary)}.workspace-more[aria-expanded=true] svg{transform:rotate(180deg)}.workspace-more small{margin-left:auto;white-space:nowrap;font-size:10px;color:var(--ui-text-tertiary)}.sessions-more{margin-left:35px;width:calc(100% - 41px)}
 /* Sidebar (方案四): tint background, 264 wide, soft + ink selection. */
-.control-sidebar{position:relative;display:flex;flex-direction:column;min-height:0;padding:0 12px 12px;background:var(--ui-tint);color:var(--ui-text-primary)}
+.control-sidebar{container:sidebar / inline-size;position:relative;display:flex;flex-direction:column;min-height:0;padding:0 12px 12px;background:var(--ui-tint);color:var(--ui-text-primary)}
 .sidebar-top{height:48px;flex-shrink:0;display:flex;align-items:center;justify-content:flex-end;gap:2px}
 .sidebar-top .xb-icon-btn:disabled{opacity:.45}
 .control-brand{display:flex;align-items:center;gap:10px;padding:2px 6px 16px;flex-shrink:0}
@@ -754,6 +755,11 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 .is-collapsed .nav-group .nav-attention{position:absolute;top:6px;right:8px;margin:0}
 .is-collapsed .account-chip{justify-content:center;padding:0}
 .is-collapsed .sidebar-scroll{margin:0;padding:0}
+@container sidebar (max-width:200px){
+.workspace-more,.sessions-more{position:relative;width:100%;min-height:32px;margin:4px 0;padding:0;justify-content:center}
+.workspace-more>span,.workspace-more>small{display:none}
+.workspace-more>.xb-dot{position:absolute;top:4px;right:6px}
+}
 </style>
 
 
