@@ -614,6 +614,22 @@ pub fn notify_approval_resolved(app: &tauri::AppHandle, approval_id: &str, by: &
     }
 }
 
+/// 只有打开过该会话（`session.open` / `message.send`）的手机才收内容事件；`notify` 事件（完成 / 出错）
+/// 对其他手机和离线手机仍会送达，但内容脱敏，只剩“有事发生”。
+fn send_session_event(link: &Link, subs: &HashMap<String, HashSet<String>>, session: &str, msg: &Value, notify: bool) {
+    let kind = msg.get("kind").and_then(Value::as_str).unwrap_or("");
+    for peer in link.peers() {
+        let subscribed = subs.get(&peer.id).is_some_and(|set| set.contains(session));
+        if peer.online && subscribed {
+            let _ = send_json(link, &peer.id, msg, notify);
+        } else if notify {
+            let mut redacted = msg.clone();
+            redacted["data"] = phone_wire::redact_for_unsubscribed(kind, &msg["data"]);
+            let _ = send_json(link, &peer.id, &redacted, notify);
+        }
+    }
+}
+
 pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: &Value) {
     let Some(state) = app.try_state::<PhoneLinkState>() else { return };
     let (link, subs) = {
@@ -621,21 +637,7 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
         let Some(link) = guard.link.clone() else { return };
         (link, guard.subscriptions.clone())
     };
-    // 只有打开过该会话（`session.open` / `message.send`）的手机才收内容事件；`notify` 事件（完成 / 出错）
-    // 对其他手机和离线手机仍会送达，但内容脱敏，只剩“有事发生”。
-    let send_to_session = |session: &str, msg: &Value, notify: bool| {
-        let kind = msg.get("kind").and_then(Value::as_str).unwrap_or("");
-        for peer in link.peers() {
-            let subscribed = subs.get(&peer.id).is_some_and(|set| set.contains(session));
-            if peer.online && subscribed {
-                let _ = send_json(&link, &peer.id, msg, notify);
-            } else if notify {
-                let mut redacted = msg.clone();
-                redacted["data"] = phone_wire::redact_for_unsubscribed(kind, &msg["data"]);
-                let _ = send_json(&link, &peer.id, &redacted, notify);
-            }
-        }
-    };
+    let send_to_session = |session: &str, msg: &Value, notify: bool| send_session_event(&link, &subs, session, msg, notify);
 
     match name {
         "chat-sessions-changed" => {
@@ -824,15 +826,7 @@ pub fn observe_delegation_event(app: &tauri::AppHandle, event: &agent_bridge::ob
         let Some(link) = guard.link.clone() else { return };
         (link, guard.subscriptions.clone())
     };
-    let send_to_session = |session: &str, msg: &Value, notify: bool| {
-        let Ok(bytes) = serde_json::to_vec(msg) else { return };
-        for peer in link.peers() {
-            let subscribed = subs.get(&peer.id).is_none_or(|set| set.is_empty() || set.contains(session));
-            if (peer.online && subscribed) || notify {
-                let _ = link.send(&peer.id, &bytes, notify);
-            }
-        }
-    };
+    let send_to_session = |session: &str, msg: &Value, notify: bool| send_session_event(&link, &subs, session, msg, notify);
     match event {
         agent_bridge::observer::ObservedEvent::SessionStarted { .. } => {
             if let Ok(page) = crate::chat::remote_sessions_list(app, 50, None) {
@@ -851,7 +845,7 @@ pub fn observe_delegation_event(app: &tauri::AppHandle, event: &agent_bridge::ob
                 "id": state.next_msg_id(),
                 "session": session_id,
                 "kind": "tool.start",
-                "data": { "name": tool_name, "arguments": summary },
+                "data": { "name": tool_name, "arguments": phone_wire::clip_value(&json!(summary), phone_wire::MAX_EVENT_FIELD_CHARS) },
             }), false);
         }
         agent_bridge::observer::ObservedEvent::ToolFinished { session_id, tool_name, ok, preview } => {
@@ -860,7 +854,7 @@ pub fn observe_delegation_event(app: &tauri::AppHandle, event: &agent_bridge::ob
                 "id": state.next_msg_id(),
                 "session": session_id,
                 "kind": "tool.end",
-                "data": { "name": tool_name, "is_error": !ok, "output": preview },
+                "data": { "name": tool_name, "is_error": !ok, "output": phone_wire::clip_value(&json!(preview), phone_wire::MAX_EVENT_FIELD_CHARS) },
             }), false);
         }
         agent_bridge::observer::ObservedEvent::PermissionRequested { session_id, request_id, tool_name, detail, risk } => {
@@ -872,7 +866,7 @@ pub fn observe_delegation_event(app: &tauri::AppHandle, event: &agent_bridge::ob
                 "approval_id": request_id,
                 "session": session_id,
                 "title": title,
-                "detail": { "task_id": session_id, "detail": detail },
+                "detail": { "task_id": session_id, "detail": phone_wire::clip_value(&json!(detail), phone_wire::MAX_EVENT_FIELD_CHARS) },
                 "risk": risk,
                 "options": [
                     { "id": "allow", "label": "允许" },
@@ -886,7 +880,7 @@ pub fn observe_delegation_event(app: &tauri::AppHandle, event: &agent_bridge::ob
                 "id": state.next_msg_id(),
                 "session": session_id,
                 "kind": if *success { "turn.done" } else { "error" },
-                "data": { "message": summary },
+                "data": { "message": phone_wire::clip_value(&json!(summary), phone_wire::MAX_EVENT_FIELD_CHARS) },
             }), true);
             if let Ok(page) = crate::chat::remote_sessions_list(app, 50, None) {
                 if let Some(items) = page.get("items") {
