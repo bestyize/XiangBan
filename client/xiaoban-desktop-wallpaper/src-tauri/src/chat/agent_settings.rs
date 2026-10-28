@@ -1,4 +1,4 @@
-//! "安全与权限" settings: whether full-trust commands may use the network, the user's hooks file, and the
+//! "安全与权限" settings: optional command isolation and networking, the user's hooks file, and the
 //! "always allow" answers saved per conversation so they survive a restart.
 //!
 //! Stored in `chat/agent-settings.json`; hooks keep their own file (`chat/hooks.json`, see `hooks`).
@@ -20,6 +20,8 @@ pub struct Grant {
 #[serde(default, rename_all = "camelCase")]
 pub struct AgentSettings {
     pub execution: super::task_runtime::ExecutionLimits,
+    /// Optional macOS command isolation. Full trust uses the user's normal permissions by default.
+    pub command_sandbox: bool,
     /// Commands in the full-trust sandbox may reach the network (installing dependencies needs it).
     pub sandbox_network: bool,
     /// Saved grants, by conversation.
@@ -36,7 +38,7 @@ pub struct AgentSettings {
 
 impl Default for AgentSettings {
     fn default() -> Self {
-        Self { execution: Default::default(), sandbox_network: true, grants: BTreeMap::new(), windows_sandbox: false, labelled: Vec::new(), scheduled_sessions: BTreeMap::new(), recent_workspaces: Vec::new() }
+        Self { execution: Default::default(), command_sandbox: false, sandbox_network: true, grants: BTreeMap::new(), windows_sandbox: false, labelled: Vec::new(), scheduled_sessions: BTreeMap::new(), recent_workspaces: Vec::new() }
     }
 }
 
@@ -110,6 +112,15 @@ impl AgentSettings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn legacy_settings_do_not_silently_enable_command_isolation() {
+        let mut settings: AgentSettings = serde_json::from_str(r#"{"sandboxNetwork":false}"#).unwrap();
+        assert!(!settings.command_sandbox);
+        assert!(!settings.sandbox_network);
+        settings.command_sandbox = true;
+        assert!(serde_json::from_str::<AgentSettings>(&serde_json::to_string(&settings).unwrap()).unwrap().command_sandbox);
+    }
 
     #[test]
     fn missing_legacy_limits_use_defaults_but_corrupt_budgets_fail_closed() {

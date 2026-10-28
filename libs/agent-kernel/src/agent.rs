@@ -236,7 +236,7 @@ impl AgentBuilder {
 }
 
 /// Tool schemas may refer to definitions inside themselves, never to host files or the network.
-struct NoExternalSchemas;
+pub(crate) struct NoExternalSchemas;
 
 impl jsonschema::Retrieve for NoExternalSchemas {
     fn retrieve(&self, _uri: &jsonschema::Uri<String>) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {

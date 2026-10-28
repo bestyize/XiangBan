@@ -1,8 +1,8 @@
 //! When the shell and background processes run inside the OS sandbox.
 //!
-//! In "完全信任" the user is not asked about ordinary commands, so on systems that have a sandbox (macOS) those
-//! commands run inside it: writes stay in the working folder, temporary folders and package caches. In "默认权限"
-//! every command is shown to the user first, so it runs as before.
+//! Full trust uses normal user permissions by default. Command isolation is a separate opt-in setting;
+//! when enabled, writes stay in the workspace, temporary folders and package caches. Ask mode keeps
+//! running explicitly approved commands with the user's normal permissions.
 //!
 //! A command the danger check flagged is asked even in full trust; when the user allows it, they mean that very
 //! command, which usually reaches outside the folder (`rm -rf ~/Downloads/old`). It runs once outside the sandbox.
@@ -15,6 +15,12 @@ use std::sync::{Arc, Mutex, OnceLock};
 
 /// "完全信任时允许命令联网" in settings; on by default, since installing dependencies needs it.
 static NETWORK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+static ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_enabled(enabled: bool) {
+    ENABLED.store(enabled, std::sync::atomic::Ordering::Relaxed);
+}
 
 pub fn set_network(allowed: bool) {
     NETWORK.store(allowed, std::sync::atomic::Ordering::Relaxed);
@@ -64,8 +70,10 @@ fn take(session: &str, command: &str) -> bool {
 }
 
 /// The decision itself, apart from the system and the shared state, so it can be tested anywhere.
-fn decide(available: bool, mode: PermissionMode, allowed_once: impl FnOnce() -> bool, policy: &SandboxPolicy) -> Option<SandboxPolicy> {
-    if !available || mode != PermissionMode::Auto || allowed_once() {
+fn decide(available: bool, enabled: bool, mode: PermissionMode, allowed_once: impl FnOnce() -> bool, policy: &SandboxPolicy) -> Option<SandboxPolicy> {
+    // Consume tickets even when isolation is disabled; they must not become a future escape grant.
+    let allowed_once = allowed_once();
+    if !available || !enabled || mode != PermissionMode::Auto || allowed_once {
         return None;
     }
     Some(policy.clone())
@@ -76,8 +84,10 @@ pub fn hook(permission: Arc<Permission>, workspace: &Path) -> SandboxHook {
     SandboxHook::new(move |session, command| {
         let policy = SandboxPolicy { network: NETWORK.load(std::sync::atomic::Ordering::Relaxed), ..policy.clone() };
         let available = sandbox::available() || WINDOWS.load(std::sync::atomic::Ordering::Relaxed);
+        let enabled = ENABLED.load(std::sync::atomic::Ordering::Relaxed) && sandbox::available()
+            || WINDOWS.load(std::sync::atomic::Ordering::Relaxed);
         // 专家团成员的会话按主对话算：用户在主对话里放行的那一次命令，成员的 shell 也认。
-        decide(available, permission.mode_for(session), || take(permission.root_session(session), command), &policy)
+        decide(available, enabled, permission.mode_for(session), || take(permission.root_session(session), command), &policy)
     })
 }
 
@@ -86,12 +96,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_unasked_commands_on_a_system_with_a_sandbox_are_sandboxed() {
+    fn full_trust_uses_normal_permissions_unless_isolation_is_enabled() {
         let policy = SandboxPolicy::for_workspace(Path::new("/work"));
-        assert_eq!(decide(true, PermissionMode::Auto, || false, &policy), Some(policy.clone()));
-        assert_eq!(decide(true, PermissionMode::Ask, || false, &policy), None, "every command is shown to the user in ask mode");
-        assert_eq!(decide(false, PermissionMode::Auto, || false, &policy), None, "no sandbox on this system");
-        assert_eq!(decide(true, PermissionMode::Auto, || true, &policy), None, "the user allowed this flagged command");
+        assert_eq!(decide(true, false, PermissionMode::Auto, || false, &policy), None, "full trust is unrestricted by default");
+        assert_eq!(decide(true, true, PermissionMode::Auto, || false, &policy), Some(policy.clone()));
+        assert_eq!(decide(true, true, PermissionMode::Ask, || false, &policy), None, "every command is shown to the user in ask mode");
+        assert_eq!(decide(false, true, PermissionMode::Auto, || false, &policy), None, "no sandbox on this system");
+        assert_eq!(decide(true, true, PermissionMode::Auto, || true, &policy), None, "the user allowed this flagged command");
+    }
+
+    #[test]
+    fn disabled_isolation_still_consumes_an_escape_ticket() {
+        let policy = SandboxPolicy::for_workspace(Path::new("/work"));
+        allow_once("disabled-escape", "echo approved");
+        assert_eq!(decide(true, false, PermissionMode::Auto, || take("disabled-escape", "echo approved"), &policy), None);
+        assert!(!take("disabled-escape", "echo approved"));
     }
 
     #[test]

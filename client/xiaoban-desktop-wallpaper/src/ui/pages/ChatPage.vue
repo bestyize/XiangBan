@@ -525,7 +525,7 @@ async function openLink(href: string) {
 
             <section v-for="request in view.approvals" :key="request.id" class="card approval" :class="{ exec: request.risk === 'exec', dangerous: !!request.danger }" data-testid="chat-approval" role="alertdialog" :aria-label="`需要你确认：${toolLabel(request.tool)}`">
               <header><ShieldAlert :size="16" /><span>{{ request.externalPath ? '小伴请求访问工作区外路径：' : `小伴想要${riskVerb(request.risk)}：` }}<b>{{ toolLabel(request.tool) }}</b></span></header>
-              <p v-if="request.externalPath" class="caution">只授权本次指定文件或目录操作（目录搜索包含子文件），不保存长期权限。完全信任也需要单独确认。</p>
+              <p v-if="request.externalPath" class="caution">只授权本次指定文件或目录操作（目录搜索包含子文件），不保存长期权限。切换到完全信任后，普通文件访问不再逐次确认。</p>
               <p v-if="request.danger" class="caution danger-note" data-testid="approval-danger"><b>高风险操作：{{ request.danger }}。</b>即使在“完全信任”下，这类操作也要你确认，每次都问。</p>
               <p v-if="request.tainted" class="caution" data-testid="approval-tainted">这段对话读过网页等外部内容，其中可能夹带诱导，所以这次每一步都要你确认。</p>
               <pre class="preview" data-testid="approval-preview">{{ approvalPreview(request) }}</pre>

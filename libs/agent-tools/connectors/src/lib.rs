@@ -513,6 +513,22 @@ impl ConnectorManager {
     pub fn tools(&self) -> Vec<Arc<dyn Tool>> {
         self.selected_tools(None)
     }
+
+    /// Direct host entry point. Agent dispatchers resolve the pinned target before acquiring resources.
+    pub fn call_authorized(&self, name: &str, args: Value, ctx: &ToolCtx, permission: &agent_kernel::Permission) -> ToolResult {
+        use agent_kernel::Middleware;
+        let Some(tool) = self.tools().into_iter().find(|tool| tool.spec().name == name) else {
+            return ToolResult::error("连接器工具不可用或已断开，请重新核对连接状态");
+        };
+        {
+            let call = agent_kernel::ToolCall { id: "connector-dispatch".into(), name: name.into(), arguments: args.to_string() };
+            if let agent_kernel::ToolGate::Block(reason) = permission.before_tool(ctx, &call, &args, tool.spec()) {
+                return ToolResult::error(reason);
+            }
+        }
+        if ctx.is_cancelled() { return ToolResult::error("cancelled"); }
+        tool.execute_result(args, ctx)
+    }
     /// Current, gated tools for the chosen connections, including connections added during a run.
     pub fn tools_for(&self, ids: &[String]) -> Vec<Arc<dyn Tool>> {
         self.selected_tools(Some(ids))

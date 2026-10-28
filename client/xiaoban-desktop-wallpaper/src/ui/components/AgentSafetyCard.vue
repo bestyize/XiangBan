@@ -8,7 +8,7 @@ import { toolLabel } from '../chat/format.ts';
 interface SavedGrant { session: string; title: string; tool: string; kind?: string | null }
 interface AgentSettingsView {
   execution?: ExecutionLimits;
-  sandboxAvailable: boolean; sandboxNetwork: boolean; hooks: string; hooksPath: string; grants: SavedGrant[];
+  sandboxAvailable: boolean; commandSandbox?: boolean; sandboxNetwork: boolean; hooks: string; hooksPath: string; grants: SavedGrant[];
   platform?: string; windowsSandbox?: boolean;
 }
 interface ExecutionLimits {
@@ -46,6 +46,7 @@ async function act(key: string, action: () => Promise<unknown>, success?: string
   } catch (error) { props.store.notify(error, 'error'); } finally { busy.value = ''; }
 }
 
+const setCommandSandbox = (enabled: boolean) => act('sandbox', () => invoke('chat_set_command_sandbox', { enabled }));
 const setNetwork = (allowed: boolean) => act('network', () => invoke('chat_set_sandbox_network', { allowed }));
 const saveLimits = () => act('limits', () => invoke('chat_set_execution_limits', { limits: { ...limits.value } }), '执行预算已保存，下次开始或继续时生效');
 const setWindowsSandbox = (enabled: boolean) => act('windows', () => invoke('chat_set_windows_sandbox', { enabled }),
@@ -77,20 +78,25 @@ onMounted(load);
         <div class="xb-row"><div class="xb-row-text"><span>模型用量依据服务商回传，包含子任务；命中提示词缓存的输入按 1/10 计入（与 Claude Code 按费用估算一致），并非精确费用上限。后台定时任务保留独立预算。</span></div><button type="button" class="xb-btn-primary is-sm" :disabled="!limitsChanged || !!busy" data-testid="execution-save" @click="saveLimits">{{ busy === 'limits' ? '保存中…' : '保存执行预算' }}</button></div>
       </div>
 
-      <div class="xb-group-title">完全信任时的沙箱</div>
+      <div class="xb-group-title">权限与命令沙箱</div>
       <div class="xb-group">
+        <div class="xb-row"><div class="xb-row-text"><b>完全信任使用当前用户权限</b><span>可读写工作区外的文件、安装或卸载全局软件包、运行命令。提权、批量删除等高风险操作仍需确认；系统管理员和隐私权限由操作系统决定。命令沙箱默认关闭，开启后只限制命令，不改变文件工具的权限。</span></div></div>
         <div v-if="view.sandboxAvailable" class="xb-row">
-          <div class="xb-row-text"><b>允许沙箱中的命令联网</b><span>“完全信任”下不逐一询问的命令在系统沙箱里运行：只能写工作目录、临时目录和软件包缓存，读不到密钥目录。安装依赖、拉取代码需要联网；关闭后只能访问本机服务。</span></div>
+          <div class="xb-row-text"><b>隔离完全信任下的命令</b><span>可选。开启后命令只能写工作目录、临时目录和软件包缓存，并限制读取密钥目录。全局 npm、brew 等操作可能被拦截；关闭后恢复当前用户权限。对下一次启动的命令生效，已经运行的进程需停止后重启。</span></div>
+          <NSwitch :value="!!view.commandSandbox" :loading="busy === 'sandbox'" :disabled="!!busy" aria-label="命令沙箱" data-testid="command-sandbox" @update:value="setCommandSandbox" />
+        </div>
+        <div v-if="view.sandboxAvailable && view.commandSandbox" class="xb-row">
+          <div class="xb-row-text"><b>允许沙箱中的命令联网</b><span>仅在命令沙箱开启时生效。安装依赖、拉取代码需要联网；关闭后沙箱内命令只能访问本机服务。此开关不控制文件写入范围。</span></div>
           <NSwitch :value="view.sandboxNetwork" :loading="busy === 'network'" :disabled="!!busy" aria-label="允许沙箱中的命令联网" data-testid="sandbox-network" @update:value="setNetwork" />
         </div>
-        <template v-else-if="view.platform === 'windows'">
+        <template v-if="view.platform === 'windows'">
           <div class="xb-row">
             <div class="xb-row-text"><b>Windows 沙箱（实验性）</b><span>完全信任下的命令以“低完整性”运行，只能写工作目录和小伴自己的临时目录，不能改动你的其他文件；不限制读取，也不限制联网。</span></div>
             <NSwitch :value="!!view.windowsSandbox" :loading="busy === 'windows'" :disabled="!!busy" aria-label="Windows 沙箱" data-testid="windows-sandbox" @update:value="setWindowsSandbox" />
           </div>
           <div class="xb-row"><NAlert type="warning" :show-icon="false" style="flex:1" data-testid="windows-sandbox-note">开启时会把工作目录及其中的文件标记为“低完整性”（修改的是这些文件的系统安全标签，不改内容），之后换的工作目录也会在第一次使用前标记。标记较多文件需要一点时间。部分需要写入用户目录的工具（如全局安装、某些编译器缓存）可能在沙箱里失败，遇到时可关闭此选项。</NAlert></div>
         </template>
-        <div v-else class="xb-row"><NAlert type="warning" :show-icon="false" style="flex:1" data-testid="sandbox-unavailable">当前系统还不支持沙箱（目前仅 macOS）。“完全信任”下的命令不受系统隔离，只有高风险操作会停下来询问。</NAlert></div>
+        <div v-if="!view.sandboxAvailable && view.platform !== 'windows'" class="xb-row"><NAlert type="warning" :show-icon="false" style="flex:1" data-testid="sandbox-unavailable">当前系统不支持可选命令沙箱。完全信任下按当前用户权限执行，高风险操作仍需确认。</NAlert></div>
       </div>
 
       <div class="xb-group-title">已记住的授权</div>

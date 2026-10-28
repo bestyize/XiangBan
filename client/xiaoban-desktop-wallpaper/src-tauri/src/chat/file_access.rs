@@ -14,23 +14,28 @@ use std::collections::HashSet;
 pub(super) type ApprovePath = dyn Fn(&str, &Path, Risk, &Value, &ToolCtx) -> bool + Send + Sync;
 pub const EXTERNAL_WRITE_NOTICE: &str = "修改工作区外文件，必须确认具体目标路径";
 
-type WriteGrant = (String, String, String, PathBuf);
-fn write_grants() -> &'static Mutex<HashSet<WriteGrant>> {
-    static GRANTS: OnceLock<Mutex<HashSet<WriteGrant>>> = OnceLock::new();
+/// Evaluate live session policy so changing modes never leaves an old per-agent grant behind.
+pub fn trusted_path_access(permission: &agent_kernel::Permission, ctx: &ToolCtx) -> bool {
+    !ctx.is_cancelled() && permission.mode_for(ctx.session()) == agent_kernel::PermissionMode::Auto
+}
+
+type PathGrant = (String, String, String, PathBuf);
+fn path_grants() -> &'static Mutex<HashSet<PathGrant>> {
+    static GRANTS: OnceLock<Mutex<HashSet<PathGrant>>> = OnceLock::new();
     GRANTS.get_or_init(Default::default)
 }
 
-/// Permission approved this precise outside-workspace write. The file tool consumes it once.
-pub fn allow_write_once(session: &str, run: &str, tool: &str, path: PathBuf) {
-    write_grants().lock().unwrap_or_else(|e| e.into_inner()).insert((session.into(), run.into(), tool.into(), path));
+/// Permission approved this precise outside-workspace operation. The file tool consumes it once.
+pub fn allow_path_once(session: &str, run: &str, tool: &str, path: PathBuf) {
+    path_grants().lock().unwrap_or_else(|e| e.into_inner()).insert((session.into(), run.into(), tool.into(), path));
 }
 
-pub fn take_write_approval(session: &str, run: &str, tool: &str, path: &Path) -> bool {
-    write_grants().lock().unwrap_or_else(|e| e.into_inner()).remove(&(session.into(), run.into(), tool.into(), path.to_path_buf()))
+pub fn take_path_approval(session: &str, run: &str, tool: &str, path: &Path) -> bool {
+    path_grants().lock().unwrap_or_else(|e| e.into_inner()).remove(&(session.into(), run.into(), tool.into(), path.to_path_buf()))
 }
 
 pub fn forget_session(session: &str) {
-    write_grants().lock().unwrap_or_else(|e| e.into_inner()).retain(|(s, _, _, _)| s.as_str() != session);
+    path_grants().lock().unwrap_or_else(|e| e.into_inner()).retain(|(s, _, _, _)| s.as_str() != session);
 }
 
 pub fn resolve_requested(workspace: &Path, tool: &str, path: &str) -> Result<PathBuf, String> {
@@ -169,6 +174,29 @@ mod tests {
     }
 
     #[test]
+    fn full_trust_accesses_external_files_and_reverts_immediately_in_ask_mode() {
+        let (base, workspace, outside) = fixture();
+        let permission = Arc::new(agent_kernel::Permission::new(agent_kernel::PermissionMode::Ask, |_: &agent_kernel::ApprovalRequest<'_>| agent_kernel::Approval::Deny).children_inherit());
+        permission.set_session_mode("trusted", agent_kernel::PermissionMode::Auto);
+        let p = permission.clone();
+        let approve: Arc<ApprovePath> = Arc::new(move |_, _, _, _, ctx| trusted_path_access(&p, ctx));
+        let original = fs_write_tools(vec![workspace.clone()]).unwrap().into_iter().find(|t| t.spec().name == "write_file").unwrap();
+        let scoped = ScopedFileTool::new(original, &workspace, vec![workspace.clone()], base.join("attachments"), approve.clone());
+        let target = outside.join("created.txt");
+        let args = serde_json::json!({"path":target,"content":"trusted write"});
+        let ctx = ToolCtx::detached("trusted#team-worker");
+        assert!(!scoped.execute_result(args.clone(), &ctx).is_error);
+        let original = ReadFile::new(vec![workspace.clone()], AttachmentStore::new(base.join("attachments"))).unwrap();
+        let read = ScopedFileTool::new(Arc::new(original), &workspace, vec![workspace.clone()], base.join("attachments"), approve);
+        assert!(read.execute_result(serde_json::json!({"path":target}), &ctx).output.contains("trusted write"));
+        assert!(scoped.execute_result(args.clone(), &ToolCtx::detached("other")).is_error);
+        permission.set_session_mode("trusted", agent_kernel::PermissionMode::Ask);
+        assert!(scoped.execute_result(args, &ctx).is_error);
+        assert!(read.execute_result(serde_json::json!({"path":target}), &ctx).is_error);
+        std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
     fn outside_read_needs_exact_approval_and_denial_does_not_fall_back() {
         let (base, workspace, outside) = fixture();
         std::fs::write(outside.join("secret.txt"), "external content").unwrap();
@@ -231,11 +259,11 @@ mod tests {
         std::fs::write(&first, "one").unwrap();
         assert!(is_external_write("edit_file", &serde_json::json!({"path":first}), &workspace));
         assert!(!is_external_write("write_file", &serde_json::json!({"path":workspace.join("local.txt")}), &workspace));
-        allow_write_once("s", "r", "edit_file", first.clone());
-        assert!(!take_write_approval("s", "other", "edit_file", &first));
-        assert!(!take_write_approval("s", "r", "edit_file", &second));
-        assert!(take_write_approval("s", "r", "edit_file", &first));
-        assert!(!take_write_approval("s", "r", "edit_file", &first));
+        allow_path_once("s", "r", "edit_file", first.clone());
+        assert!(!take_path_approval("s", "other", "edit_file", &first));
+        assert!(!take_path_approval("s", "r", "edit_file", &second));
+        assert!(take_path_approval("s", "r", "edit_file", &first));
+        assert!(!take_path_approval("s", "r", "edit_file", &first));
         let _ = std::fs::remove_dir_all(&base);
     }
 

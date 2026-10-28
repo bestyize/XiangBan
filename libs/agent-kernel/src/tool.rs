@@ -29,6 +29,8 @@ pub struct ToolSpec {
     pub untrusted_output: bool,
     /// Always ask the user, in every mode, and never remember an approval.
     pub always_ask: bool,
+    /// Host or server metadata identifies an operation that requires fresh consent even in Auto mode.
+    pub confirmation_reason: Option<String>,
     /// Changes only this app's own state (its windows, appearance, settings or saved content), never the
     /// user's files, other applications or the system. `Ask` mode runs it without asking and a session that
     /// read external content is not asked again for it; `ReadOnly` still blocks it, and a `danger_check`
@@ -48,6 +50,7 @@ impl ToolSpec {
             max_output: DEFAULT_MAX_OUTPUT,
             untrusted_output: false,
             always_ask: false,
+            confirmation_reason: None,
             self_managed: false,
         }
     }
@@ -59,6 +62,11 @@ impl ToolSpec {
 
     pub fn always_ask(mut self) -> Self {
         self.always_ask = true;
+        self
+    }
+
+    pub fn require_confirmation(mut self, reason: impl Into<String>) -> Self {
+        self.confirmation_reason = Some(reason.into());
         self
     }
 
@@ -134,9 +142,27 @@ impl ToolCtx {
     /// blocks on a person should wait this way, or the run cannot be cancelled while it waits.
     /// Human input pauses this call's timeout and the shared execution budget. Other tools keep their own deadlines.
     pub fn wait_for_user<T>(&self, rx: &Receiver<T>) -> Option<T> {
+        self.wait_for_user_or(rx, || None)
+    }
+
+    /// Re-evaluate host policy while waiting, without cancelling or replaying the tool call.
+    pub fn wait_for_user_or<T>(&self, rx: &Receiver<T>, policy_answer: impl Fn() -> Option<T>) -> Option<T> {
         let _run_wait = self.control.wait_for_user();
         let _call_wait = self.call_control.wait_for_user();
-        self.wait_for(rx)
+        loop {
+            if self.is_cancelled() { return None; }
+            match rx.try_recv() {
+                Ok(value) => return Some(value),
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => return None,
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+            }
+            if let Some(value) = policy_answer() { return Some(value); }
+            match rx.recv_timeout(Duration::from_millis(50)) {
+                Ok(value) => return Some(value),
+                Err(RecvTimeoutError::Disconnected) => return None,
+                Err(RecvTimeoutError::Timeout) => {}
+            }
+        }
     }
 
     pub fn wait_for<T>(&self, rx: &Receiver<T>) -> Option<T> {
@@ -152,6 +178,10 @@ impl ToolCtx {
 }
 
 pub trait Tool: Send + Sync {
+    /// Resolve a dynamic dispatcher to one pinned tool before validation, permissions and resource acquisition.
+    /// The resolved target is validated and executed directly; it cannot change while consent is pending.
+    fn resolve_call(&self, _args: &Value) -> Result<Option<(Arc<dyn Tool>, Value)>, String> { Ok(None) }
+
     /// Reads do not acquire mutation ownership. Unknown mutation domains are
     /// conservative; tools such as file writers may declare a narrower resource.
     fn resource(&self, _args: &Value) -> Result<Option<crate::ToolResource>, String> {

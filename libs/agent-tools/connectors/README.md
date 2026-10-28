@@ -44,3 +44,5 @@ OAuth 令牌提前 30 秒刷新，收到 401 时再刷新并重试一次；刷�
 `vault::Vault` 使用 ring 的 AES-256-GCM 与 HKDF-SHA256，按连接器和字段派生密钥、每次写入生成随机 nonce，并认证连接器/字段身份。Windows 主密钥用当前用户 DPAPI 保护；Unix 目录 0700、文件 0600。`has` 返回 `Result<Vec<String>, String>`，以便将密文损坏报告为错误。不要删除或替换主密钥，否则已有凭据无法解密。
 
 新增测试直接读取本机 WorkBuddy 官方市场（不存在时跳过），不会复制其文件到仓库。Unix 权限代码需要在对应平台验证；本机 Windows 测试覆盖 DPAPI、密文篡改和更换主密钥。
+
+权限由宿主当前会话模式决定。MCP 的 readOnlyHint 与 destructiveHint 在各传输间保留；显式破坏性标记要求新确认，不能被完全信任或已记住授权覆盖。小伴动态 connector_call 先固定真实工具，再校验、授权和执行，与直接注册的工具一致；断开/禁用门禁仍在调用时检查。

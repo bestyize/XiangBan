@@ -162,7 +162,7 @@ impl HttpMcpClient {
                 if !seen.insert(name.to_string()) || this.specs.len() >= 500 {
                     return Err("MCP 工具名称重复或数量超限".into());
                 }
-                let spec = ToolSpec::new(
+                let spec = super::annotated_spec(ToolSpec::new(
                     format!("{}{name}", config.tool_prefix),
                     tool["description"].as_str().unwrap_or(""),
                     tool.get("inputSchema")
@@ -172,7 +172,7 @@ impl HttpMcpClient {
                 .risk(Risk::Exec)
                 .untrusted_output()
                 .always_ask()
-                .timeout(config.timeout);
+                .timeout(config.timeout), tool);
                 this.specs.push((name.into(), spec));
             }
             cursor = result["nextCursor"].as_str().map(str::to_string);

@@ -9,7 +9,7 @@
 | skill_review_read(slug, version, sha256, section?, path?, offset?) | 按摘要固定身份和版本，分页读取完整清单、正文或脚本源码 | Network，不可信结果 |
 | skill_install(slug, version, sha256) | 安装已审查的完整多文件包 | 每次需要用户批准 |
 | skill_read(skill, path, offset?, limit?) | 分页阅读已安装、整包校验后的文本/引用文件 | Read，不可信结果 |
-| skill_run(skill, script, args?) | 运行已安装并校验后的脚本 | 每次需要用户批准 |
+| skill_run(skill, script, args?) | 运行已安装并校验后的脚本 | 默认权限需确认；完全信任由宿主放行 |
 
 ## 生命周期
 
@@ -17,7 +17,7 @@
 2. 模型工具 skill_inspect 返回完整可解析的有界 JSON 摘要（`reviewStatus: summary_only`），不把整份长正文和脚本堆进输出后再依赖通用截断。使用 skill_review_read 的 `section: manifest` 分页读清单，`section: file` 分页读 SKILL.md 或清单内的源码；用 `nextOffset` 续读直到 `hasMore: false`。正文页最多 2048 字节，保证 UTF-8 边界；每页重新校验发布者、版本、整包摘要及文件哈希。摘要不代表完成源码审查。原生 UI 的 inspect / inspect_coordinate 继续返回完整审查和脚本预览。
 3. skill_install 用返回的 sha256 校验锁定版本，使用 SkillHub 下载 API 取 ZIP。每个 ZIP 路径都与清单比对，限制文件数量、体积、文件类型和哈希。若上游 ZIP 与清单不一致，改从同一发布者、同一版本的文件接口下载，最多并发 4 个请求、首个错误停止其余请求，仍须全部满足原清单的大小与 SHA256；安装阶段绝不执行代码。
 4. 全部验证成功后写入临时目录，并原子移动到用户的 chat/skills/<slug>。没有覆盖操作。
-5. load_skill 按需加载 SKILL.md；skill_read 读取引用文件；只有用户再次批准 skill_run 才调用本机解释器。运行前复核整包内容与锁文件一致。
+5. load_skill 按需加载 SKILL.md；skill_read 读取引用文件；skill_run 按宿主当前权限模式调用本机解释器。运行前复核整包内容与锁文件一致。
 
 搜索、审查、安装分别有 45 / 180 / 300 秒的内部总预算，外层工具另留 5 秒清理时间；单次 HTTP 请求 30 秒、连接 8 秒。请求头和响应体等待均可响应取消，下载结束后及每个暂存文件写入、发布前再次检查取消状态。只在全包校验成功后原子发布，取消的暂存目录会清理。相同发布者、版本、摘要且文件仍完整的重复安装可以确认已有结果；不同来源、版本或被修改的目录仍拒绝覆盖。
 
@@ -32,7 +32,7 @@ SkillHub API 文档：https://github.com/Tencent/skillhub/blob/main/docs/api/REA
 - 脚本参数直接传给解释器，不通过 shell 插值。进程环境清理后只透传基本系统路径；限制输出和运行时间。
 - ZIP 可以包含单个顶层包装目录。完整包最多 512 个文件、解压后 12 MiB，单文件 4 MiB，ZIP 12 MiB，SKILL.md 100 KiB。读取文件清单时核对 SkillHub 返回的 `count` 和实际文件数；空清单、数量不一致和超过上限会明确报错，不会安装不完整的包。
 - 拒绝路径穿越、绝对路径、符号链接、Windows 保留路径、大小写重复路径、哈希不匹配和未经 API 文件清单列出的文件。
-- 用户在「完全信任」模式下，安装与运行第三方脚本仍须逐次确认。
+- 小伴的「完全信任」下，已安装且校验通过的脚本可直接运行；新安装或更新仍须确认来源和摘要。其他宿主可继续用 always_ask 保持逐次确认。
 
 ## 不保证的能力
 

@@ -12,7 +12,7 @@ const ipc = vi.mocked(invoke);
 
 function view(over: Record<string, unknown> = {}) {
   return {
-    sandboxAvailable: true, sandboxNetwork: true, hooks: '', hooksPath: '/data/chat/hooks.json',
+    sandboxAvailable: true, commandSandbox: false, sandboxNetwork: true, hooks: '', hooksPath: '/data/chat/hooks.json',
     grants: [{ session: 's1', title: '整理笔记', tool: 'shell', kind: 'npm test' }, { session: 's1', title: '整理笔记', tool: 'write_file', kind: null }],
     ...over,
   };
@@ -60,13 +60,24 @@ describe('安全与权限', () => {
   });
 
   it('switches network for the sandbox, or says there is none on this system', async () => {
-    const { wrapper } = await open();
-    await wrapper.getComponent(NSwitch).vm.$emit('update:value', false);
+    const { wrapper } = await open(view({ commandSandbox: true }));
+    await wrapper.findAllComponents(NSwitch)[1]!.vm.$emit('update:value', false);
     await flushPromises();
     expect(ipc).toHaveBeenCalledWith('chat_set_sandbox_network', { allowed: false });
     const other = await open(view({ sandboxAvailable: false }));
     expect(other.wrapper.find('[data-testid="sandbox-unavailable"]').exists()).toBe(true);
     expect(other.wrapper.find('[data-testid="sandbox-network"]').exists()).toBe(false);
+  });
+
+  it('keeps command isolation off by default and lets the user opt in', async () => {
+    const { wrapper } = await open();
+    expect(wrapper.getComponent(NSwitch).props('value')).toBe(false);
+    expect(wrapper.find('[data-testid="sandbox-network"]').exists()).toBe(false);
+    expect(wrapper.text()).toContain('完全信任使用当前用户权限');
+    await wrapper.getComponent(NSwitch).vm.$emit('update:value', true);
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('chat_set_command_sandbox', { enabled: true });
+    wrapper.unmount();
   });
 
   it('offers the experimental sandbox on Windows and turns it on', async () => {

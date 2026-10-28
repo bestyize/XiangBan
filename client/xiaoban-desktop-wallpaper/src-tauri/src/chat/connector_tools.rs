@@ -7,6 +7,11 @@ use std::{sync::Arc, time::Duration};
 struct ConnectorTool { spec: ToolSpec, desktop: Arc<dyn Desktop> }
 impl Tool for ConnectorTool {
     fn spec(&self) -> &ToolSpec { &self.spec }
+    fn resolve_call(&self, args: &Value) -> Result<Option<(Arc<dyn Tool>, Value)>, String> {
+        if self.spec.name != "connector_call" { return Ok(None); }
+        let name = args["tool"].as_str().ok_or("缺少工具名称")?;
+        Ok(self.desktop.connector_target(name)?.map(|tool| (tool, args["arguments"].clone())))
+    }
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         if ctx.is_cancelled() { return Err("连接器操作已取消".into()); }
         let value = match self.spec.name.as_str() {

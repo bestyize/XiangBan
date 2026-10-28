@@ -152,7 +152,7 @@ fn member_agent(
     let skills = Arc::new(skills_for(dirs, dirs.chat.join("bundled-skills")));
     fs::create_dir_all(dirs.spill()).map_err(|e| format!("无法创建 {}：{e}", dirs.spill().display()))?;
     let roots = vec![workspace.to_path_buf(), dirs.spill()];
-    let system = format!("{persona}\n\n## 工作环境\n操作系统：{}；工作目录：{}。文件默认只能访问工作目录和会话附件；任务明确要求工作区外文件时，文件工具会按指定路径逐次请求主会话用户授权，拒绝后不可换工具绕过。", std::env::consts::OS, workspace.display());
+    let system = format!("{persona}\n\n## 工作环境\n操作系统：{}；工作目录：{}。文件与命令遵循当前主会话的权限模式，运行中切换也会生效。默认权限下，工作区外文件按指定路径请求用户授权；完全信任下，普通文件访问和命令按当前用户权限直接执行，不限工作区。敏感文件访问、提权、批量删除等高风险操作仍需确认。手动开启的命令沙箱仍限制命令，权限错误要区分应用沙箱和系统权限。拒绝后不可换工具绕过。", std::env::consts::OS, workspace.display());
     let mut builder = Agent::builder(provider, Arc::new(agent_kernel::MemoryStore::new()))
         .system_prompt(system)
         .prompt_section(skills.prompt_section())

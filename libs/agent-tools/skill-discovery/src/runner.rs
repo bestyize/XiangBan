@@ -31,7 +31,7 @@ impl SkillRun {
             "args":{"type":"array","items":{"type":"string"},"maxItems":32}
         },"required":["skill","script"]});
         let spec = ToolSpec::new("skill_run",
-            "Execute a verified installed SkillHub script with an installed interpreter (Python, Node, shell, PowerShell or Ruby). Always ask user permission; this is not sandboxed. Arguments are literal, never shell-interpreted.",
+            "Execute a verified installed SkillHub script with an installed interpreter (Python, Node, shell, PowerShell or Ruby). The host permission mode controls approval; verified scripts may run directly in full trust. This is not sandboxed. Arguments are literal, never shell-interpreted.",
             schema).risk(Risk::Exec).serial().always_ask().timeout(MAX_RUNTIME + Duration::from_secs(5));
         Self { spec, root, workspace }
     }

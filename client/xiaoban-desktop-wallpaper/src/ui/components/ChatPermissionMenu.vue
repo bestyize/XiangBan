@@ -5,8 +5,8 @@ import type { ControlStore } from '../control-types.ts';
 
 /** 默认权限 / 完全信任 under the message box. The mode is the chat store's `permissionMode`:
  *  `ask` asks before writing files, running commands and changing settings (an approval can be remembered);
- *  `auto` runs them without asking. On systems with a sandbox (macOS, or Windows when turned on in settings)
- *  those commands then run inside it, limited to the working folder; dangerous operations are still asked. */
+ *  `auto` uses normal user permissions, including outside-workspace files; dangerous operations still ask.
+ *  Optional command isolation can be enabled separately in settings. */
 const props = defineProps<{ store: ControlStore; disabled?: boolean }>();
 
 const root = ref<HTMLElement | null>(null);
@@ -15,7 +15,7 @@ const mode = computed(() => props.store.chat.permissionMode);
 const full = computed(() => mode.value === 'auto');
 const options = [
   { id: 'ask', label: '默认权限', desc: '读写文件、运行命令前先问你，可以记住授权' },
-  { id: 'auto', label: '完全信任', desc: '不再询问，直接执行；高风险操作仍会先问你。支持沙箱的系统上，命令只在工作区内运行' },
+  { id: 'auto', label: '完全信任', desc: '按当前用户权限访问文件和执行命令，不限工作区；高风险操作仍会先问你。命令沙箱可在设置中单独开启' },
 ] as const;
 
 function close() { open.value = false; }

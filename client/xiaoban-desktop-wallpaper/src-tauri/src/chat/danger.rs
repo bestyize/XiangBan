@@ -36,7 +36,19 @@ const MAX_DEPTH: usize = 4;
 
 /// The reason the call must be confirmed, or `None` when it may run. `workspace` is the folder the shell works in.
 pub fn assess(tool: &str, args: &Value, workspace: Option<&Path>) -> Option<&'static str> {
-    if tool == "process_write" { return Some(R_BLIND); }
+    if matches!(tool, "read_file" | "list_dir" | "grep" | "write_file" | "edit_file") {
+        let path = args.get("path")?.as_str()?;
+        let resolved = workspace.and_then(|work| super::file_access::resolve_requested(work, tool, path).ok());
+        let path = resolved.as_deref().unwrap_or_else(|| Path::new(path)).to_string_lossy().to_lowercase().replace('\\', "/");
+        if SECRET_PATHS.iter().any(|pattern| path.contains(pattern)) { return Some(R_SECRET); }
+        if matches!(tool, "write_file" | "edit_file") && STARTUP_PATHS.iter().any(|pattern| path.contains(pattern)) { return Some(R_STARTUP); }
+        return None;
+    }
+    if tool == "process_write" {
+        let input = args.get("input").and_then(Value::as_str).unwrap_or("");
+        // Pipe input is data, but a shell/REPL may execute it. Keep the same checks as direct commands.
+        return assess_command(input, &Ctx { workspace, depth: 0, stdin_targets: false, cwd_left: false });
+    }
     if !matches!(tool, "shell" | "process_start") {
         return None;
     }
@@ -691,7 +703,8 @@ mod tests {
         for command in ["npm run build", "sudo true", "git push --force", "rm -rf /outside"] {
             assert_eq!(assess("process_start", &json!({"command":command}), Some(Path::new("/work"))), check(command));
         }
-        assert_eq!(assess("process_write", &json!({"id":"p","input":"sudo true\n"}), None), Some(R_BLIND));
+        assert_eq!(assess("process_write", &json!({"id":"p","input":"sudo true\n"}), None), Some(R_PRIV));
+        assert_eq!(assess("process_write", &json!({"id":"p","input":"yes\n"}), None), None);
         assert_eq!(assess("process_read", &json!({"id":"p"}), None), None);
     }
 
@@ -708,7 +721,7 @@ mod tests {
         ] {
             assert_eq!(check(command), None, "{command}");
         }
-        assert_eq!(assess("write_file", &json!({ "path": "/etc/passwd", "content": "x" }), None), None, "only the shell is examined");
+        assert_eq!(assess("write_file", &json!({ "path": "/etc/passwd", "content": "x" }), None), Some(R_STARTUP));
         assert_eq!(assess("shell", &json!({}), None), None);
     }
 

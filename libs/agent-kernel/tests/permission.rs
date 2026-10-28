@@ -52,6 +52,21 @@ fn run_calls(fx: &Fixture, permission: &Arc<Permission>, session: &str, calls: &
 }
 
 #[test]
+fn mode_aware_policy_follows_live_session_modes_and_child_inheritance() {
+    let (fx, p) = setup(PermissionMode::Ask, vec![], |p| p.children_inherit().danger_check_in_mode(|mode, _, tool, _| {
+        if tool == "runner" || mode != PermissionMode::Auto { Some("review this operation".into()) } else { None }
+    }));
+    p.set_session_mode("trusted", PermissionMode::Auto);
+    assert_eq!(run_calls(&fx, &p, "trusted#team-worker", &["writer"]), vec!["ran"]);
+    assert!(fx.asked.lock().unwrap().is_empty());
+    assert!(run_calls(&fx, &p, "other", &["writer"])[0].contains("denied permission"));
+    assert!(run_calls(&fx, &p, "trusted", &["runner"])[0].contains("denied permission"), "dangerous calls still ask in full trust");
+    p.set_session_mode("trusted", PermissionMode::Ask);
+    assert!(run_calls(&fx, &p, "trusted#team-worker", &["writer"])[0].contains("denied permission"));
+    assert_eq!(fx.asked.lock().unwrap().len(), 3);
+}
+
+#[test]
 fn read_only_mode_blocks_everything_but_reads() {
     let (fx, p) = setup(PermissionMode::ReadOnly, vec![], |p| p);
     let out = run_calls(&fx, &p, "s1", &["reader", "writer", "runner"]);
@@ -430,4 +445,96 @@ fn child_sessions_follow_their_parent_only_when_asked_to() {
     assert!(out[0].contains("denied permission"));
     assert_eq!(fx.asked.lock().unwrap().clone(), vec![("s1".into(), "runner".into(), Risk::Exec)], "the card is for the parent conversation");
     assert_eq!(p.root_session("s1#team-dev-2"), "s1");
+}
+
+#[test]
+fn explicit_grants_can_survive_taint_without_allowing_other_calls() {
+    let runs = Arc::new(AtomicUsize::new(0));
+    let (fx, p) = setup(PermissionMode::Ask, vec![Approval::Once, Approval::Always], |p| p.honor_grants_after_taint());
+    run_set(&p, "s1", &["fetch", "writer", "writer"], &runs);
+    assert_eq!(fx.asked.lock().unwrap().len(), 2, "the write grant remains effective after the fetch");
+    assert!(run_set(&p, "s1", &["saver"], &runs)[0].contains("denied"));
+    assert!(run_set(&p, "s2", &["writer"], &runs)[0].contains("denied"));
+    p.revoke("s1", "writer", None);
+    assert!(run_set(&p, "s1", &["writer"], &runs)[0].contains("denied"));
+}
+
+#[test]
+fn sensitive_reads_and_metadata_require_consent_even_in_auto_mode() {
+    let p = Permission::new(PermissionMode::Auto, |_: &ApprovalRequest<'_>| Approval::Deny)
+        .danger_check(|_, args| (args["secret"] == true).then(|| "sensitive read".into())).check_reads();
+    let ctx = ToolCtx::detached("s");
+    let call = ToolCall { id:"c".into(), name:"reader".into(), arguments:"{}".into() };
+    let read = spec("reader").risk(Risk::Read);
+    assert!(matches!(p.before_tool(&ctx, &call, &serde_json::json!({"secret":true}), &read), ToolGate::Block(_)));
+    assert!(matches!(p.before_tool(&ctx, &call, &serde_json::json!({}), &read), ToolGate::Proceed));
+    let destructive = read.require_confirmation("destructive metadata");
+    assert!(matches!(p.before_tool(&ctx, &call, &serde_json::json!({}), &destructive), ToolGate::Block(_)));
+}
+
+#[test]
+fn changing_modes_resumes_only_ordinary_pending_calls_in_that_session() {
+    use std::sync::mpsc;
+    use std::time::Duration;
+    for flagged in [false, true] {
+        let (ready_tx, ready_rx) = mpsc::channel();
+        let (answer_tx, answer_rx) = mpsc::channel();
+        let answers = Mutex::new(answer_rx);
+        let p = Arc::new(Permission::new(PermissionMode::Ask, move |request: &ApprovalRequest<'_>| {
+            ready_tx.send(()).unwrap();
+            request.wait_for_approval(&answers.lock().unwrap()).unwrap_or(Approval::Deny)
+        }).danger_check(move |_, _| flagged.then(|| "dangerous".into())).children_inherit());
+        let permission = p.clone();
+        let (done_tx, done_rx) = mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let ctx=ToolCtx::detached("parent#team-worker");
+            let call=ToolCall{id:"c".into(),name:"writer".into(),arguments:"{}".into()};
+            let gate=permission.before_tool(&ctx,&call,&serde_json::json!({}),&spec("writer").risk(Risk::Write));
+            done_tx.send(gate).unwrap();
+        });
+        ready_rx.recv_timeout(Duration::from_secs(2)).unwrap();
+        p.set_session_mode("another", PermissionMode::Auto);
+        assert!(done_rx.recv_timeout(Duration::from_millis(80)).is_err());
+        p.set_session_mode("parent", PermissionMode::Auto);
+        if flagged {
+            assert!(done_rx.recv_timeout(Duration::from_millis(80)).is_err());
+            answer_tx.send(Approval::Deny).unwrap();
+            assert!(matches!(done_rx.recv_timeout(Duration::from_secs(2)).unwrap(), ToolGate::Block(_)));
+        } else {
+            assert!(matches!(done_rx.recv_timeout(Duration::from_secs(2)).unwrap(), ToolGate::Proceed));
+        }
+        worker.join().unwrap();
+    }
+}
+
+#[test]
+fn dynamic_dispatch_validates_and_authorizes_the_pinned_target_before_resources() {
+    struct Target { spec:ToolSpec, resources:Arc<AtomicUsize>, runs:Arc<AtomicUsize> }
+    impl Tool for Target {
+        fn spec(&self)->&ToolSpec{&self.spec}
+        fn resource(&self,_:&serde_json::Value)->Result<Option<ToolResource>,String>{self.resources.fetch_add(1,Ordering::SeqCst);Ok(Some(ToolResource::Global))}
+        fn execute(&self,_:serde_json::Value,_:&ToolCtx)->Result<String,String>{self.runs.fetch_add(1,Ordering::SeqCst);Ok("target ran".into())}
+    }
+    struct Router {spec:ToolSpec,target:Arc<dyn Tool>}
+    impl Tool for Router {
+        fn spec(&self)->&ToolSpec{&self.spec}
+        fn resolve_call(&self,args:&serde_json::Value)->Result<Option<(Arc<dyn Tool>,serde_json::Value)>,String>{Ok(Some((self.target.clone(),args["arguments"].clone())))}
+        fn execute(&self,_:serde_json::Value,_:&ToolCtx)->Result<String,String>{panic!("resolved calls must execute the pinned target")}
+    }
+    for (dangerous, valid) in [(false,true),(true,true),(false,false)] {
+        let runs=Arc::new(AtomicUsize::new(0));let resources=Arc::new(AtomicUsize::new(0));let asked=Arc::new(AtomicUsize::new(0));let count=asked.clone();
+        let p=Arc::new(Permission::new(PermissionMode::Auto,move |request:&ApprovalRequest<'_>|{
+            assert_eq!(request.tool,"actual_tool");assert_eq!(request.arguments["value"],1);count.fetch_add(1,Ordering::SeqCst);Approval::Deny
+        }).danger_check(|_,_|None));
+        let mut target_spec=ToolSpec::new("actual_tool","target",serde_json::json!({"type":"object","required":["value"],"properties":{"value":{"type":"integer"}}})).risk(Risk::Write);
+        if dangerous {target_spec=target_spec.require_confirmation("destructive operation");}
+        let router=Router{spec:spec("dispatcher"),target:Arc::new(Target{spec:target_spec,resources:resources.clone(),runs:runs.clone()})};
+        let args=if valid {serde_json::json!({"arguments":{"value":1}})} else {serde_json::json!({"arguments":{"value":"wrong"}})};
+        let h=harness(vec![Step::tool_call("c","dispatcher",&args.to_string()),Step::text("done")],|b|b.tool(router).middleware(p));
+        run(&h.agent,"go").0.unwrap();
+        let allowed=valid&&!dangerous;
+        assert_eq!(runs.load(Ordering::SeqCst),usize::from(allowed));
+        assert_eq!(resources.load(Ordering::SeqCst),usize::from(allowed),"no resource may be held while consent is pending or validation fails");
+        assert_eq!(asked.load(Ordering::SeqCst),usize::from(valid&&dangerous));
+    }
 }
