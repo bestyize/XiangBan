@@ -203,6 +203,14 @@ mod tests {
 
     const SECRET: &[u8] = b"0123456789abcdef0123456789abcdef";
 
+    /// 固定向量：资源机 server-resource 的 sign.rs 断言同样的值，防止两边约定漂移。
+    #[test]
+    fn signature_vectors() {
+        assert_eq!(sign(SECRET, "GET
+packs/effect/a.zip
+1900000000"), "f8b2ad6a870024d63002c60ec4468de0988451eb421ef3dc8378fd5e5fcd714f");
+    }
+
     #[test]
     fn kind_limits_follow_the_plan() {
         assert_eq!(kind_limit("effect"), Some(MB));
