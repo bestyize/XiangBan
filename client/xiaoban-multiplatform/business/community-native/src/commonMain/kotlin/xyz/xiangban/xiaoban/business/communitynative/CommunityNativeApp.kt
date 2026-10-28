@@ -52,8 +52,8 @@ fun CommunityNativeApp(env: CommunityEnv) {
                     when (Tab.valueOf(tab)) {
                         Tab.Community -> FeedScreen(env, ::push)
                         Tab.Discuss -> DiscussScreen(env, ::push)
-                        Tab.Ai -> AiChatScreen(env, chat) { push(Route.Login) }
-                        Tab.Mine -> MineScreen(env) { push(Route.Login) }
+                        Tab.Ai -> AiChatScreen(env, chat, ::push)
+                        Tab.Mine -> MineScreen(env, ::push)
                     }
                 }
                 BottomBar(Tab.valueOf(tab)) { tab = it.name }
@@ -76,6 +76,7 @@ private fun RouteScreen(env: CommunityEnv, route: Route, push: (Route) -> Unit, 
         is Route.Weekly -> WeeklyDetailScreen(env, route.week, push, pop)
         is Route.Project -> ProjectDetailScreen(env, route.slug, pop)
         Route.Login -> LoginScreen(env, done = pop, back = pop)
+        Route.Devices -> DevicesScreen(env, back = pop)
     }
 }
 

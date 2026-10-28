@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +44,12 @@ import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.CloudChatState
 import xyz.xiangban.xiaoban.common.community.bucketKindLabel
 import xyz.xiangban.xiaoban.common.community.formatAiMoney
+import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
+import xyz.xiangban.xiaoban.common.link.RemoteChatState
+import xyz.xiangban.xiaoban.common.link.RemoteToolProgress
+import xyz.xiangban.xiaoban.common.link.RemoteTurn
+
+private enum class AiMode(val label: String) { Cloud("云端小伴"), Remote("我的电脑") }
 
 private val StarterPrompts = listOf(
     "帮我理清今天最重要的三件事",
@@ -51,35 +58,52 @@ private val StarterPrompts = listOf(
 )
 
 /**
- * 手机端“小伴”页（云端纯聊天）：
- * 直接对接 `server-ai`，支持流式对话、档位选择（日常/深入）、额度展示与兑换码充值，不依赖电脑在线。
+ * 手机端“小伴”页：
+ * - 顶部在「云端小伴」与「我的电脑」之间切换
+ * - 云端模式：直接对接 `server-ai`，支持流式对话、档位选择（日常/深入）、额度展示与兑换码充值
+ * - 电脑模式：遥控已连接的桌面小伴，支持会话列表、快照流式事件、工具进度、待办审批卡片（含高危二次确认）与离线自动降级
  */
 @Composable
-fun AiChatScreen(env: CommunityEnv, chat: CloudChatController, login: () -> Unit) {
+fun AiChatScreen(env: CommunityEnv, chat: CloudChatController, openRoute: (Route) -> Unit) {
     val session by env.session.state.collectAsState()
-    val state by chat.state.collectAsState()
+    val cloudState by chat.state.collectAsState()
+    val remoteState by env.remoteChat.state.collectAsState()
+    var mode by rememberSaveable { mutableStateOf(AiMode.Cloud.name) }
     var showQuota by rememberSaveable { mutableStateOf(false) }
-    var input by rememberSaveable { mutableStateOf("") }
-    var copiedId by remember { mutableStateOf<Long?>(null) }
+    var cloudInput by rememberSaveable { mutableStateOf("") }
+    var remoteInput by rememberSaveable { mutableStateOf("") }
+    var copiedId by remember { mutableStateOf<String?>(null) }
+    var highRiskConfirmTarget by remember { mutableStateOf<Pair<String, String>?>(null) }
 
     LaunchedEffect(session.loggedIn) {
-        if (session.loggedIn) chat.loadMeta() else chat.reset()
+        if (session.loggedIn) {
+            chat.loadMeta()
+            env.remoteChat.refreshPeers()
+        } else {
+            chat.reset()
+        }
     }
 
     Column(Modifier.fillMaxSize()) {
         PageHeader(
-            title = "小伴 · 云端",
+            title = if (mode == AiMode.Cloud.name) "小伴 · 云端" else "小伴 · 遥控",
             actions = {
                 if (session.loggedIn) {
-                    TextButton(onClick = {
-                        showQuota = !showQuota
-                        if (showQuota) chat.clearRedeemFeedback()
-                    }) {
-                        Text(if (showQuota) "收起额度" else "额度与兑换", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
-                    }
-                    if (state.messages.isNotEmpty()) {
-                        TextButton(onClick = { chat.clearConversation() }) {
-                            Text("新对话", color = Brand, fontSize = 13.sp)
+                    if (mode == AiMode.Cloud.name) {
+                        TextButton(onClick = {
+                            showQuota = !showQuota
+                            if (showQuota) chat.clearRedeemFeedback()
+                        }) {
+                            Text(if (showQuota) "收起额度" else "额度与兑换", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
+                        }
+                        if (cloudState.messages.isNotEmpty()) {
+                            TextButton(onClick = { chat.clearConversation() }) {
+                                Text("新对话", color = Brand, fontSize = 13.sp)
+                            }
+                        }
+                    } else {
+                        TextButton(onClick = { openRoute(Route.Devices) }) {
+                            Text("设备管理", color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp)
                         }
                     }
                 }
@@ -87,70 +111,461 @@ fun AiChatScreen(env: CommunityEnv, chat: CloudChatController, login: () -> Unit
         )
 
         if (!session.loggedIn) {
-            UnauthenticatedAiCard(login)
+            UnauthenticatedAiCard { openRoute(Route.Login) }
             return@Column
         }
 
-        TierAndQuotaBar(
-            state = state,
-            onSelectTier = { tier ->
-                if (tier.available) {
-                    chat.selectTier(tier.tier)
+        // 顶部切换模式：“云端小伴” / “我的电脑”
+        Row(
+            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Chip("云端小伴", selected = mode == AiMode.Cloud.name) { mode = AiMode.Cloud.name }
+            val peer = remoteState.selectedPeer
+            val peerLabel = if (peer != null) {
+                if (peer.online) "${peer.name}·在线" else "${peer.name}·离线"
+            } else {
+                "我的电脑"
+            }
+            Chip(peerLabel, selected = mode == AiMode.Remote.name) { mode = AiMode.Remote.name }
+        }
+        Hairline()
+
+        if (mode == AiMode.Cloud.name) {
+            // 云端纯聊天模式
+            TierAndQuotaBar(
+                state = cloudState,
+                onSelectTier = { tier ->
+                    if (tier.available) chat.selectTier(tier.tier) else showQuota = true
+                },
+                onToggleQuota = {
+                    showQuota = !showQuota
+                    if (!showQuota) chat.clearRedeemFeedback()
+                },
+                onReloadMeta = chat::loadMeta,
+            )
+            Hairline()
+
+            if (showQuota) {
+                QuotaAndRedeemPanel(
+                    state = cloudState,
+                    onRedeem = chat::redeem,
+                    onRefresh = chat::loadMeta,
+                )
+                Hairline()
+            }
+
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                if (cloudState.messages.isEmpty()) {
+                    WelcomeGuide(onPickPrompt = { prompt -> chat.send(prompt) })
                 } else {
-                    showQuota = true
+                    CloudMessageList(
+                        messages = cloudState.messages,
+                        canCopy = env.platform != null,
+                        copiedId = copiedId,
+                        onCopy = { turn ->
+                            env.platform?.copy(turn.text)
+                            copiedId = "cloud-${turn.id}"
+                        },
+                        onRetry = chat::retryLast,
+                        onOpenQuota = { showQuota = true },
+                    )
                 }
-            },
-            onToggleQuota = {
-                showQuota = !showQuota
-                if (!showQuota) chat.clearRedeemFeedback()
-            },
-            onReloadMeta = chat::loadMeta,
+            }
+
+            Hairline()
+            ComposerBar(
+                input = cloudInput,
+                onInputChange = { cloudInput = it },
+                sending = cloudState.sending,
+                placeholder = "发给云端小伴…",
+                onSend = {
+                    val text = cloudInput.trim()
+                    if (text.isNotEmpty()) {
+                        cloudInput = ""
+                        chat.send(text)
+                    }
+                },
+                onStop = chat::stop,
+            )
+        } else {
+            // 电脑遥控模式
+            RemoteChatView(
+                env = env,
+                state = remoteState,
+                input = remoteInput,
+                onInputChange = { remoteInput = it },
+                canCopy = env.platform != null,
+                copiedId = copiedId,
+                onCopy = { turn ->
+                    env.platform?.copy(turn.text)
+                    copiedId = "remote-${turn.id}"
+                },
+                onSwitchToCloud = { mode = AiMode.Cloud.name },
+                onOpenDevices = { openRoute(Route.Devices) },
+                onRequestApprovalDecision = { approvalId, choice, isHighRisk ->
+                    if (isHighRisk && choice == "once") {
+                        highRiskConfirmTarget = approvalId to choice
+                    } else {
+                        env.remoteChat.answerApproval(approvalId, choice)
+                    }
+                },
+            )
+        }
+    }
+
+    // 高危审批二次确认弹窗
+    highRiskConfirmTarget?.let { (approvalId, choice) ->
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f))
+                .clickable(indication = null, interactionSource = null) { highRiskConfirmTarget = null },
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                Modifier
+                    .padding(24.dp)
+                    .clip(CardShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, Brand, CardShape)
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Text("⚠️ 高危操作二次确认", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Brand)
+                Text(
+                    "即将批准执行高危操作（如系统命令、外部修改或文件变更）。由于来自远程手机授权，请再次核对是否确定放行？",
+                    fontSize = 13.5.sp,
+                    lineHeight = 20.sp,
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = { highRiskConfirmTarget = null }) { Text("取消") }
+                    BrandButton("确定放行", onClick = {
+                        highRiskConfirmTarget = null
+                        env.remoteChat.answerApproval(approvalId, choice)
+                    })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteChatView(
+    env: CommunityEnv,
+    state: RemoteChatState,
+    input: String,
+    onInputChange: (String) -> Unit,
+    canCopy: Boolean,
+    copiedId: String?,
+    onCopy: (RemoteTurn) -> Unit,
+    onSwitchToCloud: () -> Unit,
+    onOpenDevices: () -> Unit,
+    onRequestApprovalDecision: (String, String, Boolean) -> Unit,
+) {
+    if (state.peers.isEmpty()) {
+        Column(
+            Modifier.fillMaxSize().padding(Gutter),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Column(
+                Modifier.fillMaxWidth().clip(CardShape).background(MaterialTheme.colorScheme.surface).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text("尚未连接电脑", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "在电脑端小伴打开「设置 → 连接与网络」，点击「连接手机」生成二维码或配对串，即可在此绑定并遥控桌面小伴。",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 13.5.sp,
+                )
+                BrandButton("去配对电脑", onClick = onOpenDevices, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+            }
+        }
+        return
+    }
+
+    // 离线降级：电脑离线时明确告知，并提供切回云端小伴入口
+    if (!state.isPeerOnline) {
+        Column(Modifier.fillMaxSize()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f))
+                    .padding(horizontal = Gutter, vertical = 12.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                    Column(Modifier.weight(1f)) {
+                        Text("电脑当前不在线", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Brand)
+                        Text("电脑小伴已离线，无法接收远程指令。你可以直接使用云端小伴对话。", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    BrandButton("切换至云端", onClick = onSwitchToCloud)
+                }
+            }
+            Hairline()
+
+            Box(Modifier.weight(1f).fillMaxWidth().padding(Gutter), contentAlignment = Alignment.Center) {
+                Text("电脑离线中，等待电脑小伴上线后自动恢复遥控…", color = LocalExtraColors.current.ink3, fontSize = 13.sp)
+            }
+
+            Hairline()
+            Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(Gutter), horizontalArrangement = Arrangement.Center) {
+                BrandButton("切换到云端小伴直接提问", onClick = onSwitchToCloud, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        return
+    }
+
+    // 电脑在线：展示会话切换栏、会话内容、工具进度、审批卡片与输入框
+    Column(Modifier.fillMaxSize()) {
+        // 会话切换栏
+        RemoteSessionsBar(
+            sessions = state.sessions,
+            selectedId = state.selectedSessionId,
+            loading = state.loadingSessions,
+            onSelect = env.remoteChat::selectSession,
+            onNew = env.remoteChat::newSession,
+            onRefresh = { env.remoteChat.fetchSessions() },
         )
         Hairline()
 
-        if (showQuota) {
-            QuotaAndRedeemPanel(
-                state = state,
-                onRedeem = chat::redeem,
-                onRefresh = chat::loadMeta,
-            )
-            Hairline()
-        }
-
         Box(Modifier.weight(1f).fillMaxWidth()) {
             if (state.messages.isEmpty()) {
-                WelcomeGuide(onPickPrompt = { prompt -> chat.send(prompt) })
+                Box(Modifier.fillMaxSize().padding(Gutter), contentAlignment = Alignment.Center) {
+                    Text(
+                        if (state.selectedSessionId == null) "新电脑对话：发一条消息，电脑端将新建会话并执行" else "该会话暂无消息，直接发送开始提问",
+                        color = LocalExtraColors.current.ink3,
+                        fontSize = 13.sp,
+                    )
+                }
             } else {
-                MessageList(
+                RemoteMessageList(
                     messages = state.messages,
-                    canCopy = env.platform != null,
+                    toolProgress = state.toolProgress,
+                    canCopy = canCopy,
                     copiedId = copiedId,
-                    onCopy = { turn ->
-                        env.platform?.copy(turn.text)
-                        copiedId = turn.id
-                    },
-                    onRetry = chat::retryLast,
-                    onOpenQuota = { showQuota = true },
+                    onCopy = onCopy,
                 )
             }
+        }
+
+        // 待办审批卡片
+        state.pendingApproval?.let { pending ->
+            ApprovalCard(
+                pending = pending,
+                onDecision = { choice ->
+                    onRequestApprovalDecision(pending.approvalId, choice, pending.isHighRisk)
+                },
+            )
+            Hairline()
         }
 
         Hairline()
         ComposerBar(
             input = input,
-            onInputChange = { input = it },
+            onInputChange = onInputChange,
             sending = state.sending,
+            placeholder = "发给电脑小伴…",
             onSend = {
                 val text = input.trim()
                 if (text.isNotEmpty()) {
-                    input = ""
-                    chat.send(text)
+                    onInputChange("")
+                    env.remoteChat.send(text)
                 }
             },
-            onStop = chat::stop,
+            onStop = {},
         )
     }
 }
+
+@Composable
+private fun RemoteSessionsBar(
+    sessions: List<xyz.xiangban.xiaoban.common.link.RemoteSessionSummary>,
+    selectedId: String?,
+    loading: Boolean,
+    onSelect: (String) -> Unit,
+    onNew: () -> Unit,
+    onRefresh: () -> Unit,
+) {
+    LazyRow(
+        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 6.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        item {
+            Chip("+ 新对话", selected = selectedId == null, onClick = onNew)
+        }
+        items(sessions, key = { it.id }) { s ->
+            val label = if (s.state == "running") "${s.title}·运行中" else s.title
+            Chip(label, selected = s.id == selectedId) { onSelect(s.id) }
+        }
+        if (sessions.isEmpty()) {
+            item {
+                Text(if (loading) "加载电脑会话中…" else "点击刷新获取会话", fontSize = 12.sp, color = LocalExtraColors.current.ink3, modifier = Modifier.clickable(onClick = onRefresh).padding(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteMessageList(
+    messages: List<RemoteTurn>,
+    toolProgress: List<RemoteToolProgress>,
+    canCopy: Boolean,
+    copiedId: String?,
+    onCopy: (RemoteTurn) -> Unit,
+) {
+    val listState = rememberLazyListState()
+    val lastLen = messages.lastOrNull()?.text?.length ?: 0
+    val progressLen = toolProgress.size
+    LaunchedEffect(messages.size, lastLen, progressLen) {
+        if (messages.isNotEmpty()) {
+            listState.scrollToItem(messages.lastIndex)
+        }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(Gutter),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(messages, key = { it.id }) { turn ->
+            RemoteChatBubble(
+                turn = turn,
+                canCopy = canCopy,
+                copied = copiedId == "remote-${turn.id}",
+                onCopy = { onCopy(turn) },
+            )
+        }
+        if (toolProgress.isNotEmpty()) {
+            item {
+                Column(
+                    Modifier.fillMaxWidth().clip(CardShape).background(MaterialTheme.colorScheme.surface).border(0.5.dp, LocalExtraColors.current.hairline, CardShape).padding(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text("电脑执行进展：", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    toolProgress.forEach { t ->
+                        val statusText = when {
+                            t.running -> "正在运行…"
+                            t.isError == true -> "执行报错"
+                            else -> "已完成"
+                        }
+                        Text("• ${t.name}：$statusText", fontSize = 13.sp, color = if (t.isError == true) Brand else MaterialTheme.colorScheme.onSurface)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteChatBubble(
+    turn: RemoteTurn,
+    canCopy: Boolean,
+    copied: Boolean,
+    onCopy: () -> Unit,
+) {
+    val isUser = turn.role == "user"
+    val bubbleShape = RoundedCornerShape(
+        topStart = 12.dp,
+        topEnd = 12.dp,
+        bottomStart = if (isUser) 12.dp else 4.dp,
+        bottomEnd = if (isUser) 4.dp else 12.dp,
+    )
+    Box(
+        Modifier.fillMaxWidth(),
+        contentAlignment = if (isUser) Alignment.CenterEnd else Alignment.CenterStart,
+    ) {
+        Column(
+            Modifier
+                .widthIn(max = 320.dp)
+                .clip(bubbleShape)
+                .background(if (isUser) Brand else MaterialTheme.colorScheme.surface)
+                .then(
+                    if (isUser) Modifier
+                    else Modifier.border(0.5.dp, LocalExtraColors.current.hairline, bubbleShape)
+                )
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            when {
+                turn.streaming && turn.text.isEmpty() ->
+                    Text("电脑正在处理…", color = LocalExtraColors.current.ink3, fontSize = 14.sp)
+                turn.text.isNotEmpty() ->
+                    Text(
+                        text = if (turn.streaming) "${turn.text} ▍" else turn.text,
+                        color = if (isUser) Color.White else MaterialTheme.colorScheme.onSurface,
+                        fontSize = 15.sp,
+                        lineHeight = 22.sp,
+                    )
+            }
+            if (turn.error != null) {
+                Text(turn.error.orEmpty(), color = Brand, fontSize = 13.sp)
+            } else if (!isUser && !turn.streaming && turn.text.isNotEmpty() && canCopy) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Text(
+                        text = if (copied) "已复制" else "复制",
+                        modifier = Modifier.clickable(onClick = onCopy).padding(top = 2.dp),
+                        color = LocalExtraColors.current.ink3,
+                        fontSize = 12.sp,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 审批卡片：展示电脑端发过来的待确认事项，含高危提醒与多选项按钮。 */
+@Composable
+private fun ApprovalCard(
+    pending: RemoteApprovalRequest,
+    onDecision: (String) -> Unit,
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(if (pending.isHighRisk) MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f) else MaterialTheme.colorScheme.surface)
+            .border(if (pending.isHighRisk) 1.dp else 0.5.dp, if (pending.isHighRisk) Brand else LocalExtraColors.current.hairline)
+            .padding(Gutter),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (pending.isHighRisk) {
+                Text("⚠️ 高危操作待确认", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Brand)
+            } else {
+                Text("操作确认", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            }
+        }
+        Text(pending.title, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        if (pending.detail.isNotEmpty()) {
+            Text(
+                pending.detail.toString(),
+                fontSize = 12.sp,
+                color = LocalExtraColors.current.ink3,
+                maxLines = 4,
+            )
+        }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            pending.options.forEach { opt ->
+                if (opt.id == "once" || opt.id == "always") {
+                    BrandButton(opt.label, onClick = { onDecision(opt.id) }, modifier = Modifier.weight(1f))
+                } else {
+                    OutlinedButton(onClick = { onDecision(opt.id) }, shape = CardShape, modifier = Modifier.weight(1f)) {
+                        Text(opt.label)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ───────────── 云端纯聊天子组件 ─────────────
 
 @Composable
 private fun UnauthenticatedAiCard(login: () -> Unit) {
@@ -163,9 +578,9 @@ private fun UnauthenticatedAiCard(login: () -> Unit) {
             Modifier.fillMaxWidth().clip(CardShape).background(MaterialTheme.colorScheme.surface).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("登录即可与云端小伴对话", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text("登录即可与小伴对话", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
             Text(
-                "使用统一小伴账号直接开启流式对话，新用户享有免费试用额度，无需自己准备模型密钥。电脑不在线时也能随时提问。",
+                "使用统一小伴账号直接开启对话，新用户享有免费试用额度，无需自己准备模型密钥。电脑在线时还可远程遥控电脑小伴。",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
             )
@@ -328,10 +743,10 @@ private fun WelcomeGuide(onPickPrompt: (String) -> Unit) {
 }
 
 @Composable
-private fun MessageList(
+private fun CloudMessageList(
     messages: List<ChatTurn>,
     canCopy: Boolean,
-    copiedId: Long?,
+    copiedId: String?,
     onCopy: (ChatTurn) -> Unit,
     onRetry: () -> Unit,
     onOpenQuota: () -> Unit,
@@ -351,10 +766,10 @@ private fun MessageList(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(messages, key = { it.id }) { turn ->
-            ChatBubble(
+            CloudChatBubble(
                 turn = turn,
                 canCopy = canCopy,
-                copied = copiedId == turn.id,
+                copied = copiedId == "cloud-${turn.id}",
                 onCopy = { onCopy(turn) },
                 onRetry = onRetry,
                 onOpenQuota = onOpenQuota,
@@ -364,7 +779,7 @@ private fun MessageList(
 }
 
 @Composable
-private fun ChatBubble(
+private fun CloudChatBubble(
     turn: ChatTurn,
     canCopy: Boolean,
     copied: Boolean,
@@ -433,6 +848,7 @@ private fun ComposerBar(
     input: String,
     onInputChange: (String) -> Unit,
     sending: Boolean,
+    placeholder: String = "发给云端小伴…",
     onSend: () -> Unit,
     onStop: () -> Unit,
 ) {
@@ -445,7 +861,7 @@ private fun ComposerBar(
             value = input,
             onValueChange = onInputChange,
             modifier = Modifier.weight(1f),
-            placeholder = { Text("发给云端小伴…") },
+            placeholder = { Text(placeholder) },
             maxLines = 4,
         )
         if (sending) {

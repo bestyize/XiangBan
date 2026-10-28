@@ -66,6 +66,10 @@ class PhoneLink(
     private val _events = MutableSharedFlow<LinkEvent>(extraBufferCapacity = 512)
     val events: SharedFlow<LinkEvent> = _events.asSharedFlow()
 
+    internal suspend fun emitEventForTest(event: LinkEvent) {
+        _events.emit(event)
+    }
+
     /** 启动：读状态，启动计数加一并落盘，已配对过的话开始后台连接。 */
     suspend fun start() {
         lock.withLock {
