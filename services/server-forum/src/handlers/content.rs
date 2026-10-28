@@ -284,16 +284,24 @@ pub struct TicketInput {
 
 async fn upload_ticket(State(state): State<AppState>, auth: AuthUser, Json(input): Json<TicketInput>) -> AppResult<Json<Value>> {
     let base = require_resource(&state)?;
-    let limit = content::kind_limit(&input.kind).ok_or_else(|| AppError::BadRequest("未知的内容类型".into()))?;
+    let limit = content::upload_limit(&input.kind).ok_or_else(|| AppError::BadRequest("未知的内容类型".into()))?;
     if input.size == 0 || input.size > limit {
         return Err(AppError::BadRequest(format!("该类型的内容包不能超过 {} MB", limit / 1024 / 1024)));
     }
     if !content::valid_sha256(&input.sha256) {
         return Err(AppError::BadRequest("sha256 需要是 64 位小写十六进制".into()));
     }
-    check_pack_quota(&state, &auth).await?;
+    if input.kind == content::COVER {
+        check_cover_quota(&state, &auth).await?;
+    } else {
+        check_pack_quota(&state, &auth).await?;
+    }
 
-    let file_key = format!("packs/{}/{}.zip", input.kind, Uuid::new_v4().simple());
+    let file_key = if input.kind == content::COVER {
+        format!("covers/{}", Uuid::new_v4().simple())
+    } else {
+        format!("packs/{}/{}.zip", input.kind, Uuid::new_v4().simple())
+    };
     let exp = Utc::now().timestamp() + state.config.upload_ticket_ttl_secs;
     sqlx::query("INSERT INTO pack_uploads (file_key, uid, kind, size, sha256) VALUES ($1, $2, $3, $4, $5)")
         .bind(&file_key)
@@ -326,7 +334,7 @@ async fn upload_ticket(State(state): State<AppState>, auth: AuthUser, Json(input
 async fn check_pack_quota(state: &AppState, auth: &AuthUser) -> AppResult<()> {
     let (count,): (i64,) = sqlx::query_as(
         "SELECT (SELECT count(*) FROM packs WHERE author_uid = $1 AND created_at > now() - interval '1 day')
-              + (SELECT count(*) FROM pack_uploads WHERE uid = $1 AND used = false AND created_at > now() - interval '1 day')",
+              + (SELECT count(*) FROM pack_uploads WHERE uid = $1 AND kind <> 'cover' AND used = false AND created_at > now() - interval '1 day')",
     )
     .bind(auth.user.uid)
     .fetch_one(&state.pool)
@@ -337,11 +345,25 @@ async fn check_pack_quota(state: &AppState, auth: &AuthUser) -> AppResult<()> {
     Ok(())
 }
 
+async fn check_cover_quota(state: &AppState, auth: &AuthUser) -> AppResult<()> {
+    let (count,): (i64,) =
+        sqlx::query_as("SELECT count(*) FROM pack_uploads WHERE uid = $1 AND kind = 'cover' AND created_at > now() - interval '1 day'")
+            .bind(auth.user.uid)
+            .fetch_one(&state.pool)
+            .await?;
+    if count >= state.config.daily_pack_publishes * 4 {
+        return Err(AppError::TooManyRequests { message: "今天上传的图片有点多，明天再来".into(), retry_after: 3600 });
+    }
+    Ok(())
+}
+
 #[derive(Deserialize)]
 struct UploadedCallback {
     file_key: String,
     size: u64,
     sha256: String,
+    /// 资源机从压缩包根目录读出的 `manifest.json`；内容包必带，封面没有。发布时以这里为准，不信客户端自己报的。
+    manifest: Option<Value>,
 }
 
 /// 资源机在文件落盘并重算哈希后回调；请求体由 `X-Signature`（HMAC-SHA256）保护。
@@ -351,12 +373,22 @@ async fn pack_uploaded(State(state): State<AppState>, headers: HeaderMap, body: 
         return Err(AppError::Unauthorized("签名无效".into()));
     }
     let cb: UploadedCallback = serde_json::from_slice(&body).map_err(|_| AppError::BadRequest("回调内容无效".into()))?;
+    let kind: Option<(String,)> = sqlx::query_as("SELECT kind FROM pack_uploads WHERE file_key = $1")
+        .bind(&cb.file_key)
+        .fetch_optional(&state.pool)
+        .await?;
+    let (kind,) = kind.ok_or_else(|| AppError::Conflict("没有匹配的上传记录".into()))?;
+    if kind != content::COVER {
+        let manifest = cb.manifest.as_ref().ok_or_else(|| AppError::BadRequest("缺少 manifest".into()))?;
+        content::validate_manifest(manifest, &kind).map_err(AppError::BadRequest)?;
+    }
     let updated = sqlx::query(
-        "UPDATE pack_uploads SET verified = true WHERE file_key = $1 AND size = $2 AND sha256 = $3",
+        "UPDATE pack_uploads SET verified = true, manifest = $4 WHERE file_key = $1 AND size = $2 AND sha256 = $3",
     )
     .bind(&cb.file_key)
     .bind(cb.size as i64)
     .bind(&cb.sha256)
+    .bind(&cb.manifest)
     .execute(&state.pool)
     .await?;
     if updated.rows_affected() == 0 {
@@ -376,7 +408,6 @@ pub struct CreatePackInput {
     #[serde(default)]
     tags: Vec<String>,
     file_key: String,
-    manifest: Value,
     cover_key: Option<String>,
 }
 
@@ -404,22 +435,22 @@ fn clean_text(value: &str, what: &str, max: usize, required: bool) -> AppResult<
     Ok(value.to_string())
 }
 
-/// 取走一条属于该用户、已被资源机确认且没用过的上传记录。
+/// 取走一条属于该用户、已被资源机确认且没用过的上传记录，返回大小、哈希和资源机读出的清单。
 async fn claim_upload(
     tx: &mut sqlx::PgConnection,
     uid: Uuid,
     kind: &str,
     file_key: &str,
-) -> AppResult<(i64, String)> {
-    let row: Option<(i64, String, bool, bool)> = sqlx::query_as(
-        "SELECT size, sha256, verified, used FROM pack_uploads WHERE file_key = $1 AND uid = $2 AND kind = $3 FOR UPDATE",
+) -> AppResult<(i64, String, Value)> {
+    let row: Option<(i64, String, Option<Value>, bool, bool)> = sqlx::query_as(
+        "SELECT size, sha256, manifest, verified, used FROM pack_uploads WHERE file_key = $1 AND uid = $2 AND kind = $3 FOR UPDATE",
     )
     .bind(file_key)
     .bind(uid)
     .bind(kind)
     .fetch_optional(&mut *tx)
     .await?;
-    let (size, sha256, verified, used) = row.ok_or_else(|| AppError::BadRequest("没有找到这次上传，请重新上传".into()))?;
+    let (size, sha256, manifest, verified, used) = row.ok_or_else(|| AppError::BadRequest("没有找到这次上传，请重新上传".into()))?;
     if !verified {
         return Err(AppError::Conflict("文件还没有通过资源服务器校验，请稍后再试或重新上传".into()));
     }
@@ -427,22 +458,36 @@ async fn claim_upload(
         return Err(AppError::Conflict("这个文件已经用于发布".into()));
     }
     sqlx::query("UPDATE pack_uploads SET used = true WHERE file_key = $1").bind(file_key).execute(&mut *tx).await?;
-    Ok((size, sha256))
+    Ok((size, sha256, manifest.unwrap_or(Value::Null)))
+}
+
+/// 封面必须是自己上传并已被资源机确认的图片。
+async fn check_cover(tx: &mut sqlx::PgConnection, uid: Uuid, cover_key: &str) -> AppResult<()> {
+    let ok: Option<(bool,)> = sqlx::query_as("SELECT verified FROM pack_uploads WHERE file_key = $1 AND uid = $2 AND kind = 'cover'")
+        .bind(cover_key)
+        .bind(uid)
+        .fetch_optional(&mut *tx)
+        .await?;
+    if ok != Some((true,)) {
+        return Err(AppError::BadRequest("封面还没有上传完成，请重新上传".into()));
+    }
+    Ok(())
 }
 
 async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input): Json<CreatePackInput>) -> AppResult<Json<Value>> {
     check_pack_quota_for_publish(&state, &auth).await?;
+    if !content::is_known_kind(&input.kind) {
+        return Err(AppError::BadRequest("未知的内容类型".into()));
+    }
     let title = clean_text(&input.title, "标题", 60, true)?;
     let summary = clean_text(&input.summary, "简介", 500, false)?;
     let tags = clean_tags(&input.tags)?;
-    let info = content::validate_manifest(&input.manifest, &input.kind).map_err(AppError::BadRequest)?;
-    if let Some(cover) = &input.cover_key {
-        if !content::valid_file_key(cover) {
-            return Err(AppError::BadRequest("封面键无效".into()));
-        }
-    }
     let mut tx = state.pool.begin().await?;
-    let (size, sha256) = claim_upload(&mut tx, auth.user.uid, &input.kind, &input.file_key).await?;
+    if let Some(cover) = &input.cover_key {
+        check_cover(&mut tx, auth.user.uid, cover).await?;
+    }
+    let (size, sha256, manifest) = claim_upload(&mut tx, auth.user.uid, &input.kind, &input.file_key).await?;
+    let info = content::validate_manifest(&manifest, &input.kind).map_err(AppError::BadRequest)?;
     let (id,): (i64,) = sqlx::query_as(
         "INSERT INTO packs (kind, slug, title, summary, tags, author_uid, trust_level, status, cover_key)
          VALUES ($1, $2, $3, $4, $5, $6, 2, 'published', $7) RETURNING id",
@@ -457,7 +502,7 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     .fetch_one(&mut *tx)
     .await
     .map_err(slug_conflict)?;
-    insert_version(&mut tx, id, 1, &info.version_label, &sha256, size, &input.manifest, &input.file_key, &json!([]), "").await?;
+    insert_version(&mut tx, id, 1, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), "").await?;
     // 用户发布的内容先上架（未审标记），同时进审核队列，由人工看过后升级为“已审核”。
     sqlx::query("INSERT INTO moderation_queue (target_type, target_id) VALUES ('pack', $1)").bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
@@ -518,7 +563,6 @@ async fn insert_version(
 #[derive(Deserialize)]
 pub struct AddVersionInput {
     file_key: String,
-    manifest: Value,
     #[serde(default)]
     changelog: String,
 }
@@ -540,13 +584,13 @@ async fn add_version(
     if author != Some(auth.user.uid) {
         return Err(AppError::Forbidden("只有作者可以更新自己的内容包".into()));
     }
-    let info = content::validate_manifest(&input.manifest, &kind).map_err(AppError::BadRequest)?;
+    let (size, sha256, manifest) = claim_upload(&mut tx, auth.user.uid, &kind, &input.file_key).await?;
+    let info = content::validate_manifest(&manifest, &kind).map_err(AppError::BadRequest)?;
     if info.slug != slug {
         return Err(AppError::BadRequest("新版本的 id 必须与原来一致".into()));
     }
-    let (size, sha256) = claim_upload(&mut tx, auth.user.uid, &kind, &input.file_key).await?;
     let next = current + 1;
-    insert_version(&mut tx, id, next, &info.version_label, &sha256, size, &input.manifest, &input.file_key, &json!([]), &changelog)
+    insert_version(&mut tx, id, next, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), &changelog)
         .await
         .map_err(|e| match e {
             AppError::Database(sqlx::Error::Database(db)) if db.is_unique_violation() => AppError::Conflict("版本冲突，请重试".into()),
@@ -861,6 +905,11 @@ async fn admin_create_pack(
         let url = m.get("url").and_then(Value::as_str).unwrap_or("");
         if !url.starts_with("https://") || m.get("name").and_then(Value::as_str).is_none() {
             return Err(AppError::BadRequest("镜像需要 name 和 https 地址".into()));
+        }
+    }
+    if let Some(cover) = &input.cover_key {
+        if !content::valid_file_key(cover) {
+            return Err(AppError::BadRequest("封面键无效".into()));
         }
     }
     let title = clean_text(&input.title, "标题", 60, true)?;

@@ -799,6 +799,7 @@ CREATE TABLE IF NOT EXISTS pack_uploads (
     kind          TEXT NOT NULL,
     size          BIGINT NOT NULL,
     sha256        TEXT NOT NULL,
+    manifest      JSONB,
     verified      BOOLEAN NOT NULL DEFAULT false,
     used          BOOLEAN NOT NULL DEFAULT false,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()

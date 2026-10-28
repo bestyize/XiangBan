@@ -29,6 +29,10 @@ const KINDS: &[(&str, u64, bool)] = &[
 /// 用户（T2）发布后无需审核就可以一键应用的类型：只有纯数据且不会代替用户执行动作的那几种。
 const T2_ONE_CLICK: &[&str] = &["effect", "scheme", "reminder"];
 
+/// 封面图：不是内容包，走同一套直传，只收小图。
+pub const COVER: &str = "cover";
+pub const COVER_LIMIT: u64 = 2 * MB;
+
 pub fn kind_limit(kind: &str) -> Option<u64> {
     KINDS.iter().find(|(k, _, _)| *k == kind).map(|(_, limit, _)| *limit)
 }
@@ -39,6 +43,11 @@ pub fn is_pure_data(kind: &str) -> bool {
 
 pub fn is_known_kind(kind: &str) -> bool {
     kind_limit(kind).is_some()
+}
+
+/// 上传凭证可用的类型：内容包类型或封面。
+pub fn upload_limit(kind: &str) -> Option<u64> {
+    if kind == COVER { Some(COVER_LIMIT) } else { kind_limit(kind) }
 }
 
 /// 信任分级：0 官方，1 已审核，2 用户未审。
