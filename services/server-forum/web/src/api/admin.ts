@@ -283,4 +283,70 @@ export const adminApi = {
 
 
   audit: (limit = 50) => request<AuditRow[]>('GET', `/audit${qs({ limit })}`),
+
+  packs: (params: { status?: string; kind?: string; page?: number; page_size?: number }) =>
+    request<AdminPage<AdminPack>>('GET', `/packs${qs(params)}`),
+  createPack: (body: OfficialPackInput) => request<{ id: number; slug: string }>('POST', '/packs', body),
+  reviewPack: (id: number, action: PackReviewAction, note = '') =>
+    request<{ id: number; trust_level: number; status: string }>('POST', `/packs/${id}/review`, { action, note }),
+  moderationQueue: () => request<{ items: ModerationRow[] }>('GET', '/moderation'),
+  projects: () => request<{ items: (ProjectInput & { slug: string })[] }>('GET', '/projects'),
+  weeklyIssues: () => request<{ items: (WeeklyInput & { week: string })[] }>('GET', '/weekly'),
+  putProject: (slug: string, body: ProjectInput) => request<{ slug: string }>('PUT', `/projects/${encodeURIComponent(slug)}`, body),
+  putWeekly: (week: string, body: WeeklyInput) => request<{ week: string }>('PUT', `/weekly/${encodeURIComponent(week)}`, body),
+}
+
+export type PackReviewAction = 'approve' | 'reject' | 'remove' | 'restore'
+
+export interface AdminPack {
+  id: number
+  kind: string
+  slug: string
+  title: string
+  author: { uid: string; nickname: string | null } | null
+  trust_level: number
+  status: 'pending' | 'published' | 'rejected' | 'removed'
+  version: number
+  apply_count: number
+  updated_at: string
+}
+
+export interface ModerationRow {
+  id: number
+  target_type: string
+  target_id: number
+  created_at: string
+  title: string | null
+  kind: string | null
+  author: string | null
+}
+
+export interface OfficialPackInput {
+  kind: string
+  title: string
+  summary: string
+  tags: string[]
+  manifest: Record<string, unknown>
+  file_key: string
+  sha256: string
+  size: number
+  cover_key?: string
+  mirrors: { name: string; url: string }[]
+  trust_level: 0 | 1
+}
+
+export interface ProjectInput {
+  name: string
+  summary: string
+  body_md: string
+  links: { title: string; url: string }[]
+  status: 'draft' | 'published'
+  sort_order: number
+}
+
+export interface WeeklyInput {
+  title: string
+  summary: string
+  items: { type: 'pack' | 'topic' | 'text'; ref?: number; title?: string; note: string }[]
+  status: 'draft' | 'published'
 }

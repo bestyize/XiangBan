@@ -46,7 +46,9 @@ pub fn admin_routes() -> Router<AppState> {
         .route("/packs", get(admin_list_packs).post(admin_create_pack))
         .route("/packs/{id}/review", post(admin_review_pack))
         .route("/moderation", get(admin_moderation))
+        .route("/projects", get(admin_list_projects))
         .route("/projects/{slug}", put(admin_put_project))
+        .route("/weekly", get(admin_list_weekly))
         .route("/weekly/{week}", put(admin_put_weekly))
 }
 
@@ -1006,6 +1008,34 @@ async fn admin_moderation(State(state): State<AppState>, _admin: AuthAdmin) -> A
             json!({ "id": id, "target_type": target_type, "target_id": target_id, "created_at": created_at,
                     "title": title, "kind": kind, "author": author })
         })
+        .collect();
+    Ok(Json(json!({ "items": items })))
+}
+
+/// 后台列表包含草稿，并返回可编辑的 Markdown 原文。
+async fn admin_list_projects(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Json<Value>> {
+    let rows: Vec<(String, String, String, String, Value, String, i32)> = sqlx::query_as(
+        "SELECT slug, name, summary, body_md, links, status, sort_order FROM projects ORDER BY sort_order, updated_at DESC",
+    )
+    .fetch_all(&state.pool)
+    .await?;
+    let items: Vec<Value> = rows
+        .into_iter()
+        .map(|(slug, name, summary, body_md, links, status, sort_order)| {
+            json!({ "slug": slug, "name": name, "summary": summary, "body_md": body_md, "links": links, "status": status, "sort_order": sort_order })
+        })
+        .collect();
+    Ok(Json(json!({ "items": items })))
+}
+
+async fn admin_list_weekly(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Json<Value>> {
+    let rows: Vec<(String, String, String, Value, String)> =
+        sqlx::query_as("SELECT week, title, summary, items, status FROM weekly_issues ORDER BY week DESC LIMIT 100")
+            .fetch_all(&state.pool)
+            .await?;
+    let items: Vec<Value> = rows
+        .into_iter()
+        .map(|(week, title, summary, items, status)| json!({ "week": week, "title": title, "summary": summary, "items": items, "status": status }))
         .collect();
     Ok(Json(json!({ "items": items })))
 }

@@ -56,6 +56,13 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   'category.update': '修改分类',
   'product.create': '新建产品',
   'product.update': '修改产品',
+  'pack.create': '登记内容包',
+  'pack.approve': '通过内容包审核',
+  'pack.reject': '拒绝内容包',
+  'pack.remove': '下架内容包',
+  'pack.restore': '恢复内容包',
+  'project.put': '保存项目',
+  'weekly.put': '保存周刊',
 }
 
 export const AUDIT_TARGETS: Record<string, string> = {
@@ -67,6 +74,9 @@ export const AUDIT_TARGETS: Record<string, string> = {
   user: '用户',
   category: '分类',
   product: '产品',
+  pack: '内容包',
+  project: '项目',
+  weekly: '周刊',
 }
 
 export function trustName(level: number): string {

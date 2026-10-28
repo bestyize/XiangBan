@@ -249,6 +249,10 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(s, StatusCode::OK);
     let (_, projects) = call(&app, "GET", "/api/projects", None, Value::Null).await;
     assert_eq!(projects["items"].as_array().unwrap().len(), 1);
+    let (s, _) = call(&app, "GET", "/api/admin/projects", Some(&author_t), Value::Null).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (_, admin_projects) = call(&app, "GET", "/api/admin/projects", Some(&admin_t), Value::Null).await;
+    assert_eq!(admin_projects["items"][0]["body_md"], "**hi**");
     let (s, pr) = call(&app, "GET", "/api/projects/xiaoban", None, Value::Null).await;
     assert_eq!(s, StatusCode::OK);
     assert!(pr["body_html"].as_str().unwrap().contains("<strong>"));
@@ -259,6 +263,8 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(s, StatusCode::OK);
     let (s, _) = call(&app, "GET", &format!("/api/weekly/{week}"), None, Value::Null).await;
     assert_eq!(s, StatusCode::NOT_FOUND, "草稿不对外");
+    let (_, drafts) = call(&app, "GET", "/api/admin/weekly", Some(&admin_t), Value::Null).await;
+    assert_eq!(drafts["items"][0]["status"], "draft", "后台能看到草稿");
     let mut published = issue;
     published["status"] = json!("published");
     call(&app, "PUT", &format!("/api/admin/weekly/{week}"), Some(&admin_t), published).await;
