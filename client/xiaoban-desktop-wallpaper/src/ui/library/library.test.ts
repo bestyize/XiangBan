@@ -289,7 +289,7 @@ describe('资料库 page', () => {
 
 
 describe('design documents in My Documents', () => {
-  it('opens the same project from its single document record instead of attaching a rendered copy', async () => {
+  it.each(['button', 'double-click'])('opens the original project in a standalone window via %s', async how => {
     localStorage.clear();const { wrapper } = setup();await flushPromises();
     const original = invoke.getMockImplementation()!;
     const id = 'design-012345678901234567890123';
@@ -300,7 +300,18 @@ describe('design documents in My Documents', () => {
       return original(command, args);
     });
     await wrapper.findComponent(LibraryDocs).props('library').refresh();await flushPromises();
-    await wrapper.get(`[data-testid="library-doc-${id}"]`).trigger('click');await wrapper.get('[data-testid="library-open-design"]').trigger('click');await flushPromises();
-    expect(wrapper.findComponent(DesignWorkbench).props('projectId')).toBe(id);expect(invoke).toHaveBeenCalledWith('design_read', { id });expect(invoke.mock.calls.some(([command]) => command === 'library_attachment')).toBe(false);wrapper.unmount();
+    await wrapper.get(`[data-testid="library-doc-${id}"]`).trigger('click');
+    if (how === 'button') await wrapper.get('[data-testid="library-open-design"]').trigger('click');
+    else await wrapper.get(`[data-testid="library-doc-${id}"]`).trigger('dblclick');
+    await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('design_window_open', { id });expect(wrapper.findComponent(DesignWorkbench).exists()).toBe(false);expect(wrapper.find('.library-design-modal').exists()).toBe(false);expect(invoke.mock.calls.some(([command]) => command === 'design_read')).toBe(false);expect(invoke.mock.calls.some(([command]) => command === 'library_attachment')).toBe(false);wrapper.unmount();
   });
+  it('opens imported designs directly in a window and reports failures without an embedded fallback', async () => {
+    localStorage.clear();const { wrapper, store } = setup();await flushPromises();const original=invoke.getMockImplementation()!;
+    invoke.mockImplementation(async(command,args)=>{if(command==='design_import')return {project:{id:'design-imported'}};if(command==='design_window_open')throw Error('窗口创建失败');return original(command,args);});
+    await wrapper.get('[aria-label="导入设计稿"]').trigger('click');await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('design_window_open',{id:'design-imported'});expect(store.notify).toHaveBeenCalledWith(expect.any(Error),'error');expect(wrapper.findComponent(DesignWorkbench).exists()).toBe(false);
+    invoke.mockImplementation(async(command,args)=>command==='design_window_open'?undefined:original(command,args));wrapper.findComponent(LibraryDocs).vm.$emit('design','design-imported');await flushPromises();expect(invoke.mock.calls.filter(([c])=>c==='design_window_open')).toHaveLength(2);wrapper.unmount();
+  });
+
 });

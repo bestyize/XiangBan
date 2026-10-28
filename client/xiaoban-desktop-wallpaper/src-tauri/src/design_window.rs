@@ -20,6 +20,18 @@ pub fn permitted(label:&str,command:&str)->Option<bool>{
     if project_id(label).is_some(){return Some(false)}
     None
 }
+mod placement;
+
+fn keep_visible(window:&tauri::WebviewWindow, fallback:Option<tauri::Monitor>)->Result<(),String>{
+    if window.is_maximized().unwrap_or(false)||window.is_fullscreen().unwrap_or(false){return Ok(())}
+    let monitor=window.current_monitor().map_err(|e|e.to_string())?.or(fallback);
+    let Some(monitor)=monitor else{return Ok(())};
+    let a=monitor.work_area();let p=window.outer_position().map_err(|e|e.to_string())?;let outer=window.outer_size().map_err(|e|e.to_string())?;let inner=window.inner_size().map_err(|e|e.to_string())?;
+    let rect=placement::Rect{x:p.x,y:p.y,w:outer.width,h:outer.height};let fitted=placement::fit(rect,placement::Rect{x:a.position.x,y:a.position.y,w:a.size.width,h:a.size.height});
+    if fitted.w!=rect.w||fitted.h!=rect.h{window.set_size(tauri::PhysicalSize::new(fitted.w.saturating_sub(outer.width.saturating_sub(inner.width)).max(1),fitted.h.saturating_sub(outer.height.saturating_sub(inner.height)).max(1))).map_err(|e|e.to_string())?;}
+    if fitted.x!=rect.x||fitted.y!=rect.y{window.set_position(tauri::PhysicalPosition::new(fitted.x,fitted.y)).map_err(|e|e.to_string())?;}Ok(())
+}
+
 static OPEN_LOCK:Mutex<()>=Mutex::new(());
 #[derive(Clone,Default,Serialize,Deserialize)]
 struct Placement { x:i32,y:i32,w:u32,h:u32,maximized:bool }
@@ -31,17 +43,20 @@ pub fn design_window_status(app:tauri::AppHandle,window:tauri::WebviewWindow,id:
 pub async fn design_window_open(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<(),String>{
     let _open=OPEN_LOCK.lock().map_err(|_|"设计窗口锁不可用")?;
     guard(&window,&id)?;let store=crate::design::store(&app)?;let project=store.load(&id)?;let name=label(&id);
-    if let Some(existing)=app.get_webview_window(&name){let _=existing.unminimize();existing.show().map_err(|e|e.to_string())?;return existing.set_focus().map_err(|e|e.to_string())}
+    let fallback=window.current_monitor().map_err(|e|e.to_string())?.or(app.primary_monitor().map_err(|e|e.to_string())?);
+    if let Some(existing)=app.get_webview_window(&name){let _=existing.unminimize();keep_visible(&existing,fallback)?;existing.show().map_err(|e|e.to_string())?;return existing.set_focus().map_err(|e|e.to_string())}
     let placement=store.read_view(&id,"window.json").ok().flatten().and_then(|v|serde_json::from_value::<Placement>(v).ok()).unwrap_or_default();
     let mut builder=WebviewWindowBuilder::new(&app,&name,WebviewUrl::App(format!("index.html?scene=design&id={id}").into()))
-        .title(format!("{} · 小伴设计",project.title)).inner_size(1280.,840.).min_inner_size(640.,480.).resizable(true).decorations(true);
+        .title(format!("{} · 小伴设计",project.title)).inner_size(1280.,840.).min_inner_size(640.,480.).resizable(true).decorations(true).visible(false);
+    if let Some(m)=&fallback{let a=m.work_area();let f=m.scale_factor();let w=(a.size.width as f64/f-32.).max(1.);let h=(a.size.height as f64/f-64.).max(1.);builder=builder.inner_size(1280f64.min(w),840f64.min(h)).min_inner_size(640f64.min(w),480f64.min(h));}
     let monitor=app.available_monitors().map_err(|e|e.to_string())?.into_iter().find(|m|{
         let p=m.position();let s=m.size();placement.x>=p.x&&placement.y>=p.y&&i64::from(placement.x)<i64::from(p.x)+i64::from(s.width)-100&&i64::from(placement.y)<i64::from(p.y)+i64::from(s.height)-80
     });
     if let Some(m)=monitor.filter(|_|placement.w>=640&&placement.h>=480){
-        let f=m.scale_factor();builder=builder.position(placement.x as f64/f,placement.y as f64/f).inner_size((placement.w as f64/f).min(m.size().width as f64/f),(placement.h as f64/f).min(m.size().height as f64/f));
+        let f=m.scale_factor();let a=m.work_area();let w=(a.size.width as f64/f-32.).max(1.);let h=(a.size.height as f64/f-64.).max(1.);builder=builder.min_inner_size(640f64.min(w),480f64.min(h)).position(placement.x as f64/f,placement.y as f64/f).inner_size((placement.w as f64/f).min(w),(placement.h as f64/f).min(h));
     }else{builder=builder.center();}
     let child=builder.build().map_err(|e|e.to_string())?;
+    keep_visible(&child,fallback)?;
     let own=child.clone();let remembered=Arc::new(Mutex::new(placement.clone()));
     child.on_window_event(move|event|{
         if let Ok(mut state)=remembered.lock(){
@@ -57,6 +72,7 @@ pub async fn design_window_open(app:tauri::AppHandle,window:tauri::WebviewWindow
         if matches!(event,tauri::WindowEvent::Destroyed){let _=own.app_handle().emit_to("control","design-window-closed",json!({"id":id}));}
     });
     if placement.maximized{child.maximize().map_err(|e|e.to_string())?;}
+    child.show().map_err(|e|e.to_string())?;
     child.set_focus().map_err(|e|e.to_string())
 }
 #[tauri::command]

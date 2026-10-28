@@ -6,7 +6,6 @@ import { invoke, listen } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { createLibraryStore, folderPath, folderTree, searchText, type LibraryDoc, type LibrarySaved } from '../library/library-store.ts';
 import LibraryDocs from '../library/LibraryDocs.vue';
-import DesignWorkbench from '../design/DesignWorkbench.vue';
 import type { Payload } from '../design/model.ts';
 import LibraryCloud from '../library/LibraryCloud.vue';
 import LibrarySavedTab from '../library/LibrarySaved.vue';
@@ -27,21 +26,21 @@ const TAB_KEY = 'xiaoban.library-tab';
 const saved = (() => { try { return localStorage.getItem(TAB_KEY) as Tab | null; } catch { return null; } })();
 const tab = ref<Tab>(saved && ['docs', 'cloud', 'saved', 'memory'].includes(saved) ? saved : 'docs');
 function pick(next: Tab) { tab.value = next; try { localStorage.setItem(TAB_KEY, next); } catch { /* only a convenience */ } }
-const query = ref(''), designId = ref(''), designImporting = ref(false);
+const query = ref(''), designImporting = ref(false);
+const openingDesigns = new Set<string>();
+async function openDesign(id: string) {
+  if (!props.store.desktop || openingDesigns.has(id)) return;
+  openingDesigns.add(id);
+  try { await invoke('design_window_open', { id }); }
+  catch (e) { notify(e, 'error'); }
+  finally { openingDesigns.delete(id); }
+}
 async function importDesign() {
   if (designImporting.value) return;
   designImporting.value = true;
-  try { const p = await invoke<Payload | null>('design_import', { session: props.store.chat.currentId ?? '' }); if (p) { await library.refresh(); designId.value = p.project.id; } }
+  try { const p = await invoke<Payload | null>('design_import', { session: props.store.chat.currentId ?? '' }); if (p) { await library.refresh(); await openDesign(p.project.id); } }
   catch (e) { notify(e, 'error'); } finally { designImporting.value = false; }
 }
-async function designRequest(message: string, session: string) {
-  if (session && props.store.chat.sessions.some(s => s.id === session)) {
-    await props.store.chat.select(session);
-    if (props.store.chat.current()?.running) { notify('修改意见已保存在画布中，请在当前任务结束后继续', 'info'); return; }
-    designId.value = ''; props.store.navigate('chat'); await props.store.chat.send(message);
-  } else { designId.value = ''; await startTask(message); }
-}
-
 /** Each tab shows how many items match the search, so a search finds things in the other tabs too. */
 const counts = computed(() => {
   const q = query.value, d = library.data, m = library.memory;
@@ -116,7 +115,7 @@ async function startTask(draft: string, attachments: NonNullable<ControlStore['c
   props.store.navigate('new-task');
 }
 async function askWith(doc: LibraryDoc) {
-  if (doc.designId) { designId.value = doc.designId; return; }
+  if (doc.designId) { await openDesign(doc.designId); return; }
   const attachment = await library.attachment(doc.id);
   if (attachment) await startTask(`请参考资料库里的「${doc.name}」：`, [attachment]);
 }
@@ -128,7 +127,6 @@ async function openSession(id: string) {
 const askAbout = (item: LibrarySaved) => startTask(`参考我收藏的这段内容：\n\n${item.text.slice(0, 4000)}\n\n`);
 const sessionTitle = (id: string) => props.store.chat.sessions.find(s => s.id === id)?.title ?? '';
 const openUrl = (url: string) => { void invoke('open_download_url', { url }).catch(() => notify('这个链接打不开', 'error')); };
-async function detachDesign(){try{await invoke('design_window_open',{id:designId.value});designId.value='';}catch(e){notify(e,'error');}}
 </script>
 
 <template>
@@ -155,7 +153,7 @@ async function detachDesign(){try{await invoke('design_window_open',{id:designId
       </div>
     </header>
     <div :id="`library-panel-${tab}`" class="library-body" role="tabpanel" :aria-labelledby="`library-tab-${tab}`">
-      <LibraryDocs v-if="tab === 'docs'" ref="docsTab" :library="library" :query="query" :desktop="store.desktop" @ask="askWith" @design="id => designId = id" @notify="notify" />
+      <LibraryDocs v-if="tab === 'docs'" ref="docsTab" :library="library" :query="query" :desktop="store.desktop" @ask="askWith" @design="openDesign" @notify="notify" />
       <LibraryCloud v-else-if="tab === 'cloud'" ref="cloudTab" :library="library" :query="query" :desktop="store.desktop" :open-url="openUrl" @notify="notify" />
       <LibrarySavedTab v-else-if="tab === 'saved'" ref="savedTab" :library="library" :query="query" @open="item => item.sessionId && openSession(item.sessionId)" @ask="askAbout" @notify="notify" />
       <LibraryMemory v-else ref="memoryTab" :library="library" :query="query" :desktop="store.desktop" :session-title="sessionTitle" @open-session="openSession" @created="query = ''" />
@@ -170,12 +168,10 @@ async function detachDesign(){try{await invoke('design_window_open',{id:designId
         <div class="lib-form-actions"><NButton :disabled="creatingBusy" @click="creating = null">取消</NButton><NButton type="primary" attr-type="submit" :loading="creatingBusy" :disabled="creatingBusy || !createText.trim() || (creating === 'doc' && !createTitle.trim())" data-testid="library-create-save">{{ creating === 'doc' ? '创建文档' : '添加收藏' }}</NButton></div>
       </form>
     </NModal>
-    <NModal :show="!!designId" :mask-closable="false" :close-on-esc="false"><div class="library-design-modal"><DesignWorkbench :project-id="designId" :notify="notify" @close="designId = ''" @detach="detachDesign" @copied="designId=$event" @request="designRequest" /></div></NModal>
   </section>
 </template>
 
 <style scoped>
-.library-design-modal{display:flex;width:calc(100vw - 48px);height:calc(100dvh - 64px);border:1px solid var(--ui-line);border-radius:10px;overflow:hidden;background:var(--ui-surface)}
 .library-page{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;padding-bottom:0;color:var(--ui-text-primary);background:var(--ui-surface)}
 .library-head{flex:none;flex-wrap:wrap;row-gap:14px}
 .xb-tabs-lg>button{display:inline-flex;align-items:baseline;gap:6px}
