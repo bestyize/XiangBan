@@ -34,7 +34,7 @@ libs/agent-bridge/
     probe.rs          # 探测本机：装了哪个、版本、能不能列会话（不发起对话）
 ```
 
-只用 MIT / Apache-2.0 / BSD 许可的依赖，README 里列出。不写 `unsafe`。公共 API 写文档注释。
+依赖许可：允许 MIT、Apache-2.0、BSD-2/3-Clause、ISC、Zlib、BSL-1.0、CC0-1.0、**Unicode-3.0**（含 `(MIT OR Apache-2.0) AND Unicode-3.0` 这类组合）。其中 Unicode-3.0 是宽松的数据/字符表许可，`unicode-ident`（经 `proc-macro2`、`syn`、`serde_derive` 进入几乎所有用 serde 的 Rust 项目）就带它，**不可避免，仓库里现有的库也都包含**，不要为此换掉 serde 或自己造轮子。不允许 GPL / AGPL / LGPL / MPL / SSPL 等；遇到这些先停下来在交付说明里提出，不要自行决定。README 里列出直接依赖及其许可。不写 `unsafe`。公共 API 写文档注释。
 
 ## 3. 统一接口（签名可微调，语义不变）
 

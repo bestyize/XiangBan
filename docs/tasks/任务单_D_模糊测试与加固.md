@@ -20,6 +20,7 @@
 - 可以修改：上述三个目录里的**源码**，但仅限**为修复本任务发现的问题**所需的最小改动；每处修改都要有对应的回归测试，且在交付说明里逐条说明。**不要**重构、改接口、改协议。
 - 不要改 `libs/link-protocol/vectors/v1.json`，也不要改任何影响协议字节的行为。
 - 不要新建 GitHub Actions 工作流（仓库规定所有工作流只能手动触发）。
+- 新增的 dev-dependencies 同样受许可限制：允许 MIT、Apache-2.0、BSD、ISC、Zlib、BSL-1.0、CC0-1.0、Unicode-3.0（`unicode-ident` 经 serde 链路进入，不可避免）；不允许 GPL / AGPL / LGPL / MPL 等，遇到先停下来提出。
 - 默认用 `proptest`（稳定版 Rust 即可跑）。`cargo fuzz` 需要夜间版工具链且不支持 Windows，作为**可选**项：若提供，放在各库的 `fuzz/` 里并在 README 说明如何运行。
 
 ## 3. 目标一：`libs/voice-service` 的输入解析
