@@ -1,0 +1,22 @@
+[package]
+name = "xiaoban-link-client"
+version = "0.1.0"
+edition = "2021"
+description = "小伴桌面端的互联客户端：设备身份、配对、WebSocket 重连、端到端加密收发。不含界面，宿主通过事件接入"
+
+[dependencies]
+xiaoban-link-protocol = { path = "../link-protocol" }
+base64 = "0.22"
+futures-util = "0.3"
+rand = "0.8"
+reqwest = { version = "0.13", default-features = false, features = ["json", "native-tls-no-alpn"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt", "sync", "time", "macros"] }
+tokio-tungstenite = { version = "0.26", features = ["native-tls"] }
+
+[dev-dependencies]
+server-link = { path = "../../services/server-link", features = ["testing"] }
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }

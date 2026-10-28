@@ -1,0 +1,6 @@
+{"dir": "out", "id": 1, "method": "initialize", "params": {"clientInfo": {"name": "xiaoban-p0-verify", "title": "小伴 P0 验证", "version": "0.0.1"}}}
+{"dir": "in", "id": 1, "result": {"userAgent": "xiaoban-p0-verify/0.165.0 (Ubuntu 24.4.0; x86_64) linux (xiaoban-p0-verify; 0.0.1)", "codexHome": "~/.codex", "platformFamily": "unix", "platformOs": "linux"}}
+{"dir": "out", "id": 2, "method": "thread/list", "params": {"limit": 5}}
+{"dir": "in", "method": "configWarning", "params": {"summary": "Codex could not find bubblewrap on PATH. Install bubblewrap with your OS package manager. See the sandbox prerequisites: https://developers.openai.com/codex/concepts/sandboxing#prerequisites. Codex will use the bundled bubblewrap in the meantime.", "details": null}, "emittedAtMs": 1793187000718}
+{"dir": "in", "method": "remoteControl/status/changed", "params": {"status": "disabled", "serverName": "vm", "installationId": "<redacted>", "environmentId": null}, "emittedAtMs": 1793187000718}
+{"dir": "in", "id": 2, "result": {"data": [], "readStates": {}, "nextCursor": null, "backwardsCursor": null}}

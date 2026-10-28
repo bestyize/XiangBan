@@ -8,6 +8,7 @@
 - [server-xiaoban-market](server-xiaoban-market/README.md)：专家、技能、连接器目录与采集工作台。
 - [server-forum](server-forum/README.md)：超级小伴论坛 chat.xiangban.xyz，技术交流、资源分享、福利羊毛与闲聊的社区，一期网页版已实现，已部署在香港机。
 - [server-resource](server-resource/README.md)：资源机，社区内容包与封面图的直传校验和签名下载，部署在独立的大带宽机器上。
+- [server-link](server-link/README.md)：手机与桌面互联的中转服务，设备配对、端到端加密信封的转发与在线状态，看不到消息正文；L1 已实现、未部署。
 - [server-ai](server-ai/README.md)：AI 网关与额度系统，一期已实现、未部署；账号中心验签，经 New API 调用上游模型，额度按账号与产品隔离。
 - [server-asr](server-asr/README.md)：规划的语音识别服务。
 - [server-edgetts](server-edgetts/README.md)：规划的 Edge TTS 服务。

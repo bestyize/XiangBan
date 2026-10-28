@@ -1,0 +1,56 @@
+[package]
+name = "server-link"
+version = "0.1.0"
+edition = "2021"
+description = "小伴手机与桌面互联的中转服务：设备与配对、端到端加密信封的转发、在线状态。看不到消息正文"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1.40", features = ["full"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+futures-util = "0.3"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+dotenvy = "0.15"
+base64 = "0.22"
+rand = "0.8"
+sha2 = "0.10"
+
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "chrono", "uuid"] }
+jsonwebtoken = "9.3"
+
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "2.0"
+
+xiaoban-link-protocol = { path = "../../libs/link-protocol" }
+ring = { version = "0.17", optional = true }
+
+[features]
+# 给其他 crate 的集成测试用：暴露 testing 模块（固定公钥、临时 schema、本机端口）。
+testing = ["dep:ring"]
+
+[dev-dependencies]
+ring = "0.17"
+tokio-tungstenite = "0.26"
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+
+[profile.dev]
+debug = false
+incremental = false
+strip = "debuginfo"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+panic = "abort"
+strip = true
