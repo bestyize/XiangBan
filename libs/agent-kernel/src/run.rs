@@ -298,6 +298,15 @@ impl Agent {
             for mw in &self.middleware {
                 mw.after_model(&turn, &mut reply.message)?;
             }
+            // Some gateways report usage with `output_tokens: 0` however much they streamed; counting that as zero
+            // leaves the budget and the usage line blind to the whole output. Charge an estimate instead.
+            if let Some(u) = reply.usage.as_mut().filter(|u| u.completion_tokens == 0) {
+                let message = &reply.message;
+                let chars = message.text().chars().count()
+                    + message.reasoning.iter().map(|r| r.text.chars().count()).sum::<usize>()
+                    + message.tool_calls.iter().map(|c| c.name.chars().count() + c.arguments.chars().count()).sum::<usize>();
+                u.completion_tokens = chars.div_ceil(3).min(u32::MAX as usize) as u32;
+            }
             if let Some(u) = reply.usage {
                 usage += u;
                 control.record(u);

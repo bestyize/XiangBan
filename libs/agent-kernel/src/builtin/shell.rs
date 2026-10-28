@@ -56,7 +56,10 @@ impl Shell {
     pub fn new(cwd: impl Into<PathBuf>) -> Self {
         let schema = json!({
             "type": "object",
-            "properties": { "command": { "type": "string", "description": format!("One command line, run by the system shell, at most {MAX_COMMAND_CHARS} characters. Put a long script in a file instead.") } },
+            "properties": {
+                "command": { "type": "string", "description": format!("One command line, run by the system shell, at most {MAX_COMMAND_CHARS} characters. Put a long script in a file instead.") },
+                "outside_sandbox": { "type": "boolean", "description": crate::sandbox::OUTSIDE_SANDBOX_ARG }
+            },
             "required": ["command"]
         });
         let description = format!(
