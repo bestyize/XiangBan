@@ -73,6 +73,8 @@ pub fn restore_latest_backup(scope: &Scope) -> Result<(), HooksError>;
 
 ### 3.4 默认安装的事件
 
+超时的层次必须一致：写进设置的 hook `timeout`——`PermissionRequest` 为 130 秒、其余事件 30 秒；转发程序等待 125 秒；接收端的权限决定超时 120 秒。每一层都比里面一层略长，这样最先超时的总是接收端，返回 `{}`，而不是 Claude Code 把 hook 当作失败。
+
 `PermissionRequest`、`Notification`、`Stop`、`StopFailure`、`SubagentStop`、`UserPromptSubmit`、`SessionStart`、`SessionEnd`。（`PreToolUse`/`PostToolUse` 噪声太大，默认不装，可通过 `InstallSpec.events` 指定。）
 
 ### 3.5 编辑要求
@@ -123,7 +125,7 @@ pub enum HookDecision { Allow, Deny { message: Option<String> }, NoOpinion }
 
 - 从“端点文件”读取接收端的端口和令牌：`<用户数据目录>/xiaoban/hook-endpoint.json`（`{"port":…,"token":"…","pid":…}`；用户数据目录：Windows `%APPDATA%`，macOS `~/Library/Application Support`，Linux `$XDG_DATA_HOME` 或 `~/.local/share`；可被环境变量 `XIAOBAN_HOOK_ENDPOINT` 覆盖，便于测试）。端点文件由接收端启动时写入、关闭时删除（权限 0600）。
 - 把事件 `POST` 到 `http://127.0.0.1:<端口>/h/<令牌>/<事件名>`，把响应体原样打印到标准输出。
-- **永不阻塞、永不报错**：端点文件不存在、端口连不上、接收端无响应（连接 500 毫秒、普通事件总共 2 秒；`PermissionRequest` 总共等到 `--wait <秒>`，默认 110 秒）→ 静默退出，退出码 0，标准输出为空（相当于“没有意见”）。绝不向标准错误打印会干扰 Claude Code 的内容。
+- **永不阻塞、永不报错**：端点文件不存在、端口连不上、接收端无响应（连接 500 毫秒、普通事件总共 2 秒；`PermissionRequest` 总共等到 `--wait <秒>`，默认 125 秒）→ 静默退出，退出码 0，标准输出为空（相当于“没有意见”）。绝不向标准错误打印会干扰 Claude Code 的内容。
 - 冷启动要快：不要引入异步运行时，用阻塞的最小 HTTP 客户端（可以直接用标准库的 `TcpStream` 手写一个 HTTP/1.1 POST），目标 < 20 毫秒。
 - 只读标准输入最多 1 MiB。
 
