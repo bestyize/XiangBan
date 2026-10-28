@@ -124,6 +124,59 @@ pub async fn speech_agent_inject(
     .map_err(|e| e.to_string())
 }
 
+/// P3 接续层：发起外部 Agent 委派任务。
+#[tauri::command]
+pub async fn speech_agent_delegate(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    agent: String,
+    prompt: String,
+    workspace: Option<String>,
+) -> Result<agent_bridge::delegation::DelegatedTaskSummary, String> {
+    control(&window)?;
+    let target_ws = match resolve_scope_path(workspace) {
+        Some(p) => p,
+        None => crate::ai_config::default_workspace(&app)?,
+    };
+    let mgr = app.state::<crate::chat::ChatState>().delegation.clone();
+    mgr.delegate(&agent, &prompt, &target_ws).await
+}
+
+/// P3 接续层：查询委派任务状态与最近输出。
+#[tauri::command]
+pub fn speech_agent_task_status(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    task_id: String,
+) -> Result<agent_bridge::delegation::DelegatedTaskSummary, String> {
+    control(&window)?;
+    let mgr = app.state::<crate::chat::ChatState>().delegation.clone();
+    mgr.status(&task_id).ok_or_else(|| format!("未找到任务 {task_id}"))
+}
+
+/// P3 接续层：取消/打断委派任务。
+#[tauri::command]
+pub fn speech_agent_task_cancel(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+    task_id: String,
+) -> Result<(), String> {
+    control(&window)?;
+    let mgr = app.state::<crate::chat::ChatState>().delegation.clone();
+    mgr.cancel(&task_id)
+}
+
+/// P3 接续层：列出所有委派任务。
+#[tauri::command]
+pub fn speech_agent_task_list(
+    app: tauri::AppHandle,
+    window: tauri::WebviewWindow,
+) -> Result<Vec<agent_bridge::delegation::DelegatedTaskSummary>, String> {
+    control(&window)?;
+    let mgr = app.state::<crate::chat::ChatState>().delegation.clone();
+    Ok(mgr.list())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

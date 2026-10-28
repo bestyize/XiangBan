@@ -3,11 +3,13 @@
 
 pub mod claude;
 pub mod codex;
+pub mod delegation;
 pub mod environment;
 pub mod injector;
 pub mod model;
 pub mod observer;
 mod process;
+pub use delegation::*;
 pub use environment::*;
 pub use injector::*;
 pub use model::*;

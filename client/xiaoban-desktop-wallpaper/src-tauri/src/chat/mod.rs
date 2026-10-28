@@ -28,6 +28,7 @@ mod danger;
 mod desktop_tools;
 mod tool_discovery;
 mod game_draft;
+pub mod delegation_tools;
 mod hooks;
 // Public so `generate_handler!` can reach the commands by their own module path: a `pub use` re-export of a command
 // does not carry the hidden items Tauri's macro generates next to it.
@@ -180,6 +181,8 @@ pub struct ChatState {
     /// Background processes (dev servers, long builds), one manager per working folder; kept across answers so a
     /// `keep_alive` process outlives the answer that started it, and switching folders stops nothing.
     processes: Mutex<HashMap<PathBuf, Arc<ProcessManager>>>,
+    /// External agent delegation manager (Claude Code, Codex).
+    pub(crate) delegation: Arc<agent_bridge::delegation::DelegationManager>,
     /// The computer-control server, started once and shared by answers while it stays connected, instead of a
     /// new process for every message.
     computer_use: Mutex<Option<Arc<agent_kernel::mcp::McpClient>>>,
@@ -214,6 +217,7 @@ impl ChatState {
             connectors: Mutex::new(None),
             mentions: Mutex::new(HashMap::new()),
             processes: Mutex::new(HashMap::new()),
+            delegation: Arc::new(agent_bridge::delegation::DelegationManager::new()),
             computer_use: Mutex::new(None),
         }
     }
