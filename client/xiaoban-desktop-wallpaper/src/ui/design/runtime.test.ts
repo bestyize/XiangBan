@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {Window} from 'happy-dom';
 import {afterEach,describe,expect,it,vi} from 'vitest';
-const runtime=readFileSync('../../libs/agent-tools/open-claude-design/runtime/support.js','utf8');
+const runtime=readFileSync('../../libs/agent-tools/open-claude-design/runtime/support.js','utf8')+'\n'+readFileSync('../../libs/agent-tools/open-claude-design/runtime/editor.js','utf8');
 const windows:Window[]=[];
 async function preview(body:string,bundle?:{base?:string;files?:Record<string,string>;tokens?:Record<string,string>}){
   const w=new Window({url:'https://preview.test/?token=abc'});
@@ -62,4 +62,28 @@ describe('independent DC runtime',()=>{
   const scroll=new w.WheelEvent('wheel',{deltaY:40,cancelable:true});w.document.dispatchEvent(scroll);expect(scroll.defaultPrevented).toBe(false);
  });
 
+});
+
+describe('canvas direct editing protocol',()=>{
+ const mode=(w:Window,editing=true)=>w.eval(`dispatchEvent(new MessageEvent('message',{source:parent,data:{channel:'open-claude-design',type:'mode',editing:${editing},writable:true,zoom:1,guides:false}}))`);
+ const last=(m:ReturnType<typeof vi.spyOn>,type:string)=>m.mock.calls.map(([v])=>v as Record<string,any>).filter(v=>v.type===type).at(-1);
+ it('draws selection handles and forwards delete/duplicate/undo instead of mutating program source',async()=>{
+  const {w,messages}=await preview('<x-dc><h1>标题</h1><p>正文</p></x-dc>');mode(w);const h=w.document.querySelector('h1')!;h.click();expect(w.document.querySelectorAll('[data-handle]')).toHaveLength(8);
+  w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Delete',bubbles:true}));expect(last(messages,'editor-command')?.command).toBe('delete');expect(h.isConnected).toBe(true);
+  w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'d',ctrlKey:true,bubbles:true}));expect(last(messages,'editor-command')?.command).toBe('duplicate');w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'z',metaKey:true,bubbles:true}));expect(last(messages,'editor-command')?.command).toBe('undo');
+ });
+ it('supports shift multiselect and a cancellable inline text editor',async()=>{
+  const {w,messages}=await preview('<x-dc><h1>标题</h1><p>正文</p></x-dc>');mode(w);const h=w.document.querySelector('h1')!,p=w.document.querySelector('p')!;h.click();p.dispatchEvent(new w.MouseEvent('click',{shiftKey:true,bubbles:true}));expect(last(messages,'select')?.nodes).toHaveLength(2);
+  h.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));expect(h.getAttribute('contenteditable')).toBe('plaintext-only');h.textContent='直接改';h.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));expect(last(messages,'element-edit')?.action).toMatchObject({type:'text',text:'直接改'});
+  h.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));h.textContent='取消';h.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));expect(h.textContent).toBe('直接改');
+ });
+ it('commits drag and resize once on pointerup and rolls back cancelled gestures',async()=>{
+  const {w,messages}=await preview('<x-dc><div style="position:absolute;width:100px;height:60px">盒子</div></x-dc>');mode(w);const el=w.document.querySelector('x-dc div')!;vi.spyOn(el,'getBoundingClientRect').mockReturnValue({left:10,top:20,right:110,bottom:80,x:10,y:20,width:100,height:60,toJSON:()=>({})} as never);
+  el.dispatchEvent(new w.PointerEvent('pointerdown',{button:0,pointerId:1,clientX:30,clientY:30,bubbles:true}));w.document.dispatchEvent(new w.PointerEvent('pointermove',{pointerId:1,clientX:50,clientY:40,bubbles:true}));expect(last(messages,'element-edit')).toBeUndefined();w.document.dispatchEvent(new w.PointerEvent('pointerup',{pointerId:1,bubbles:true}));expect(last(messages,'element-edit')?.action.patches[0].style.translate).toBe('20px 10px');
+  const handle=w.document.querySelector('[data-handle="se"]')!;handle.dispatchEvent(new w.PointerEvent('pointerdown',{button:0,pointerId:2,clientX:110,clientY:80,bubbles:true}));w.document.dispatchEvent(new w.PointerEvent('pointermove',{pointerId:2,clientX:130,clientY:100,bubbles:true}));w.document.dispatchEvent(new w.PointerEvent('pointerup',{pointerId:2,bubbles:true}));expect(last(messages,'element-edit')?.action.patches[0].style).toMatchObject({width:'120px',height:'80px'});
+  const count=messages.mock.calls.length;el.dispatchEvent(new w.PointerEvent('pointerdown',{button:0,pointerId:3,clientX:30,clientY:30,bubbles:true}));w.document.dispatchEvent(new w.PointerEvent('pointermove',{pointerId:3,clientX:100,clientY:90,bubbles:true}));w.document.dispatchEvent(new w.PointerEvent('pointercancel',{pointerId:3,bubbles:true}));expect(messages.mock.calls.slice(count).some(([v])=>(v as any).type==='element-edit')).toBe(false);
+ });
+ it('protects generated text and leaves Play controls interactive',async()=>{
+  const {w,messages}=await preview('<x-dc><h1>{{title}}</h1><button onclick="{{click}}">{{count}}</button></x-dc><script type="text/x-dc" data-dc-script>class Component extends DCLogic{state={count:0};renderVals(){return {title:"动态",count:this.state.count,click:()=>this.setState(s=>({count:s.count+1}))};}}</script>');mode(w);w.document.querySelector('h1')!.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));expect(last(messages,'editor-notice')?.message).toContain('动态');expect(w.document.querySelector('[contenteditable]')).toBeNull();mode(w,false);w.document.querySelector('button')!.click();expect(w.document.querySelector('button')?.textContent).toBe('1');expect(w.document.querySelectorAll('[data-handle]')).toHaveLength(0);
+ });
 });

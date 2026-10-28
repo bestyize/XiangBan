@@ -11,7 +11,7 @@ export type ElementAction =
  | {type:'insert';kind:'text'|'rectangle'|'ellipse'|'note';parent?:string}
  | {type:'lock'|'hide';ids:string[];value:boolean};
 const protectedTags=new Set(['script','style','helmet','head','meta','link','base','html','body','x-dc','sc-for','sc-if','sc-else','sc-else-if']);
-const allowedStyle=/^(translate|scale|rotate|width|height|min-width|min-height|box-sizing|left|top|position|z-index|color|background-color|font-size|font-weight|text-align|padding|margin|border-radius|opacity|display|gap|align-items|justify-content)$/;
+const allowedStyle=/^(translate|scale|rotate|width|height|min-width|min-height|box-sizing|left|top|position|z-index|color|background-color|font-size|font-weight|text-align|padding|margin|border-radius|border-color|border-width|opacity|display|flex-direction|gap|align-items|justify-content)$/;
 const rootOf=(d:Document)=>d.querySelector('x-dc')??d.body;
 const uid=()=>`ocd-${crypto.randomUUID()}`;
 function read(source:string){const d=sourceDoc(source);assignNodeIds(d);return d;}
@@ -24,13 +24,13 @@ function editable(el:Element,structural=true){
  if(el.closest('[data-ocd-locked="true"]')||(structural&&el.querySelector('[data-ocd-locked="true"]')))throw Error('请先解锁所选元素');
 }
 function selection(d:Document,ids:string[],check=true){
- if(!ids.length||ids.length>500)throw Error('请选择 1 到 500 个元素');
+ if(!Array.isArray(ids)||!ids.length||ids.length>500||ids.some(id=>typeof id!=='string'))throw Error('请选择 1 到 500 个元素');
  const els=[...new Set(ids)].map(id=>find(d,id));const roots=els.filter(el=>!els.some(other=>other!==el&&other.contains(el)));
  roots.sort((a,b)=>a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING?-1:1);if(check)roots.forEach(el=>editable(el));return roots;
 }
 function overrides(el:Element,style:Record<string,string>){
  const parser=el.ownerDocument.createElement('div');parser.setAttribute('style',el.getAttribute('data-ocd-style')??'');
- for(const [key,value] of Object.entries(style)){if(!allowedStyle.test(key)||value.length>180||/[{};<>]|url\s*\(|expression\s*\(/i.test(value))throw Error('不支持的元素样式');if(value)parser.style.setProperty(key,value);else parser.style.removeProperty(key);}
+ for(const [key,value] of Object.entries(style)){if(typeof value!=='string'||!allowedStyle.test(key)||value.length>180||/[{};<>]|url\s*\(|expression\s*\(/i.test(value))throw Error('不支持的元素样式');if(value)parser.style.setProperty(key,value);else parser.style.removeProperty(key);}
  el.setAttribute('data-ocd-style',parser.getAttribute('style')??'');
 }
 function copies(els:Element[]){
@@ -49,6 +49,7 @@ export function layersOf(source:string):ElementLayer[]{const d=read(source),root
 });}
 export function copyElements(source:string,ids:string[]):Fragment{const d=read(source);return {kind:'open-claude-design/elements',html:selection(d,ids).map(el=>el.outerHTML)};}
 export function mutateElements(source:string,action:ElementAction):Mutation{
+ if(!action||!['delete','duplicate','group','ungroup','style','text','reorder','paste','insert','lock','hide'].includes(action.type))throw Error('不支持的画布指令');
  const d=read(source),root=rootOf(d);let selected:Element[]=[];
  if('ids' in action)selected=selection(d,action.ids,action.type!=='lock'&&action.type!=='hide');
  let ids=selected.map(el=>el.getAttribute('data-ocd-node')!);
@@ -60,7 +61,7 @@ export function mutateElements(source:string,action:ElementAction):Mutation{
  }
  if(action.type==='ungroup'){ids=[];for(const el of selected){if(el.getAttribute('data-ocd-group')!=='true')throw Error('只能解散通过画布创建的编组');ids.push(...[...el.children].map(n=>n.getAttribute('data-ocd-node')!).filter(Boolean));el.replaceWith(...el.childNodes);}}
  if(action.type==='style'){if(!action.patches.length||action.patches.length>500)throw Error('修改元素过多');ids=[];for(const patch of action.patches){const el=find(d,patch.id);editable(el,false);overrides(el,patch.style);ids.push(patch.id);}}
- if(action.type==='text'){const el=find(d,action.id);editable(el,false);if(el.children.length||el.textContent?.includes('{{'))throw Error('动态文字或组合元素请通过批注修改');if(action.text.length>50000)throw Error('文字过长');el.textContent=action.text;ids=[action.id];}
+ if(action.type==='text'){const el=find(d,action.id);editable(el,false);if(el.children.length||el.textContent?.includes('{{'))throw Error('动态文字或组合元素请通过批注修改');if(typeof action.text!=='string'||action.text.length>50000)throw Error('文字过长');el.textContent=action.text;ids=[action.id];}
  if(action.type==='reorder'){
   const parent=selected[0].parentElement!;if(selected.some(el=>el.parentElement!==parent))throw Error('排序需要在同一容器内进行');
   if(action.direction==='front')parent.append(...selected);else if(action.direction==='back')parent.prepend(...selected);
@@ -70,7 +71,7 @@ export function mutateElements(source:string,action:ElementAction):Mutation{
  }
  if(action.type==='lock'||action.type==='hide'){for(const el of selected)el.setAttribute(action.type==='lock'?'data-ocd-locked':'data-ocd-hidden',String(action.value));}
  if(action.type==='paste'){
-  if(action.fragment?.kind!=='open-claude-design/elements'||!Array.isArray(action.fragment.html)||action.fragment.html.length>500||action.fragment.html.join('').length>500000)throw Error('不是有效的设计元素剪贴板');
+  if(action.fragment?.kind!=='open-claude-design/elements'||!Array.isArray(action.fragment.html)||action.fragment.html.length>500||action.fragment.html.some(s=>typeof s!=='string')||action.fragment.html.join('').length>500000)throw Error('不是有效的设计元素剪贴板');
   const holder=d.createElement('div');holder.innerHTML=action.fragment.html.join('');if(holder.querySelector('script,iframe,object,embed,base,meta,link'))throw Error('剪贴板包含不支持的程序节点');
   const parent=action.parent?find(d,action.parent):root;if(parent!==root)editable(parent,false);const nodes=copies([...holder.children]);parent.append(...nodes);ids=nodes.map(n=>n.getAttribute('data-ocd-node')!);
  }
