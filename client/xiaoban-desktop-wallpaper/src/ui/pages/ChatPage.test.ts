@@ -407,6 +407,26 @@ describe('实时对话', () => {
   });
 });
 
+describe('a silent model', () => {
+  it('shows how long it has been quiet and what the automatic retry is about, instead of a bare 思考中', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    try {
+      const h = await open(startChat);
+      await type('你好');
+      await click('chat-send');
+      expect(q('chat-status')!.textContent).toContain('思考中');
+      await vi.advanceTimersByTimeAsync(12_000);
+      expect(q('chat-status')!.textContent).toContain('已等待 12 秒');
+      await h.events('s1', { type: 'retrying', attempt: 1, delay_ms: 500, message: 'model HTTP timeout waiting for response headers: no data for 45s' });
+      expect(q('chat-status')!.textContent).toContain('模型服务长时间没有响应，正在进行第 1 次重试');
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(q('chat-status')!.textContent).toContain('已等待 20 秒');
+      await h.events('s1', { type: 'text_delta', text: '好' });
+      expect(q('chat-status')).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+});
+
 describe('talking', () => {
   it('sends with the button, shows the question at once, streams the answer and shows rich text safely', async () => {
     const h = await open(startChat);

@@ -28,6 +28,7 @@ import { attachmentImage } from '../chat/attachments.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
 import { approvalPreview, clip, formatTokens, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from '../chat/format.ts';
 import { describeCall } from '../chat/view.ts';
+import { silenceNotice } from '../chat/model-errors.ts';
 import { replyBlocks, type ReplyBlock, type ToolCall } from '../chat/replies.ts';
 import { taskProgress, type TaskProgress } from '../chat/task-progress.ts';
 import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest } from '../chat/types.ts';
@@ -134,7 +135,28 @@ const thinking = computed(() => {
   const last = v.items[v.items.length - 1];
   return !(last?.kind === 'assistant' && last.streaming);
 });
-const statusLine = computed(() => view.value?.status || (waiting.value ? '等你确认后继续' : thinking.value ? '思考中…' : ''));
+/** Ticks once a second while an answer runs, so a silent model shows how long it has been silent. */
+const clock = ref(Date.now());
+let clockTimer: ReturnType<typeof setInterval> | undefined;
+/** The answer was sent before any event came back (the question is shown at once), so silence counts from here too. */
+let runStartedAt = 0;
+watch(running, on => {
+  clearInterval(clockTimer);
+  clockTimer = undefined;
+  if (on) { runStartedAt = Date.now(); clock.value = Date.now(); clockTimer = setInterval(() => { clock.value = Date.now(); }, 1000); }
+}, { immediate: true });
+onBeforeUnmount(() => clearInterval(clockTimer));
+/** The model is the one being waited on: not an approval, a question, or a tool that is still running. */
+const awaitingModel = computed(() => thinking.value && !view.value?.items.some(i => i.kind === 'tool' && i.status === 'running'));
+const silentSeconds = computed(() => {
+  const at = Math.max(view.value?.activityAt ?? 0, runStartedAt);
+  return awaitingModel.value && at ? Math.max(0, Math.floor((clock.value - at) / 1000)) : 0;
+});
+const statusLine = computed(() => {
+  const base = view.value?.status || (waiting.value ? '等你确认后继续' : thinking.value ? '思考中…' : '');
+  if (!awaitingModel.value || (view.value?.status && !view.value.retry)) return base;
+  return silenceNotice(silentSeconds.value, view.value?.retry ? base : '') || base;
+});
 const lastBlockId = computed(() => blocks.value.at(-1)?.id);
 const progressByBlock = computed(() => new Map(blocks.value.map(block => [block.id, taskProgress(block,
   running.value && block.id === lastBlockId.value,

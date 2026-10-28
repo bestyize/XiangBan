@@ -172,6 +172,18 @@ describe('events while an answer is running', () => {
     expect(view.status).toBe('');
   });
 
+  it('says why it is retrying and how often, and forgets the retry once the model answers', () => {
+    const view = newView('s1', true);
+    applyEvent(view, { type: 'retrying', attempt: 1, delay_ms: 500, message: 'model HTTP timeout waiting for response headers: no data for 45s' });
+    expect(view.status).toBe('模型服务长时间没有响应，正在进行第 1 次重试…');
+    expect(view.retry).toBe(1);
+    applyEvent(view, { type: 'usage', prompt_tokens: 1, completion_tokens: 0 });
+    expect(view.retry).toBe(1);
+    applyEvent(view, { type: 'reasoning_delta', kind: 'text', text: '想' });
+    expect([view.status, view.retry]).toEqual(['', undefined]);
+    expect(view.activityAt).toBeGreaterThan(0);
+  });
+
   it('drops the reasoning of an attempt that stalled when the retry starts, and keeps earlier steps', () => {
     const view = newView('s1', true);
     applyEvent(view, { type: 'tool_start', id: 't1', name: 'shell', arguments: '{}' });
