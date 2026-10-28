@@ -40,6 +40,8 @@ ring = "0.17"
 tokio-tungstenite = "0.26"
 tower = { version = "0.5", features = ["util"] }
 http-body-util = "0.1"
+# 让普通 `cargo test` 也打开 testing feature，否则 tests/ws_hostile.rs 会被 cfg 掉、实际跑 0 个
+server-link = { path = ".", features = ["testing"] }
 
 [profile.dev]
 debug = false
@@ -52,5 +54,5 @@ debug = false
 [profile.release]
 opt-level = 3
 codegen-units = 1
-panic = "abort"
+# 不用 panic = "abort"：unwind 下单个请求任务 panic 只会让该连接断开，而不是整个中转服务退出
 strip = true

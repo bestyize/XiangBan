@@ -1823,6 +1823,7 @@ dependencies = [
  "ring",
  "serde",
  "serde_json",
+ "server-link",
  "sha2",
  "sqlx",
  "thiserror",
