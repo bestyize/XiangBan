@@ -254,6 +254,18 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(s, StatusCode::CONFLICT, "id 重复");
     let (_, od) = call(&app, "GET", &format!("/api/packs/{oid}/download"), None, Value::Null).await;
     assert_eq!(od["mirrors"][0]["name"], "modelscope");
+    // 补镜像：同名替换、必须 https、按版本。
+    let mirror = |name: &str, url: &str| json!({"name": name, "url": url});
+    let (s, _) = call(&app, "POST", &format!("/api/admin/packs/{oid}/mirrors"), Some(&admin_t), mirror("x", "http://insecure/x.zip")).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, _) = call(&app, "POST", &format!("/api/admin/packs/{oid}/mirrors"), Some(&author_t), mirror("x", "https://m.example/x.zip")).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, m) = call(&app, "POST", &format!("/api/admin/packs/{oid}/mirrors"), Some(&admin_t), mirror("modelscope", "https://modelscope.cn/new.zip")).await;
+    assert_eq!(s, StatusCode::OK, "{m}");
+    assert_eq!(m["mirrors"].as_array().unwrap().len(), 1, "同名镜像被替换");
+    assert_eq!(m["mirrors"][0]["url"], "https://modelscope.cn/new.zip");
+    let (s, _) = call(&app, "POST", &format!("/api/admin/packs/{oid}/mirrors"), Some(&admin_t), json!({"version": 9, "name": "a", "url": "https://a.example/x"})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
     assert_eq!(od["trust_level"], 0);
     let mut big = json!({"kind":"effect","title":"x","manifest":manifest("effect","big","1"),"file_key":"a/b.zip","sha256":sha,"size":5*1024*1024});
     let (s, _) = call(&app, "POST", "/api/admin/packs", Some(&admin_t), big.clone()).await;

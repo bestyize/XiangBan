@@ -47,6 +47,7 @@ pub fn admin_routes() -> Router<AppState> {
     Router::new()
         .route("/packs", get(admin_list_packs).post(admin_create_pack))
         .route("/packs/{id}/review", post(admin_review_pack))
+        .route("/packs/{id}/mirrors", post(admin_add_mirror))
         .route("/moderation", get(admin_moderation))
         .route("/projects", get(admin_list_projects))
         .route("/projects/{slug}", put(admin_put_project))
@@ -1038,6 +1039,55 @@ async fn admin_review_pack(
     audit(&mut tx, &admin, &format!("pack.{}", input.action), "pack", id, format!("{status} -> {new_status}; {note}")).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "trust_level": new_trust, "status": new_status })))
+}
+
+#[derive(Deserialize)]
+pub struct MirrorInput {
+    /// 不传就是当前版本。镜像按版本锁定：每个版本各有自己的镜像地址。
+    version: Option<i32>,
+    name: String,
+    url: String,
+}
+
+/// 给某个版本补一个官方镜像（如魔搭）。同名镜像会被替换。客户端对每个来源都校验 sha256，所以镜像地址本身不需要被信任。
+async fn admin_add_mirror(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Path(id): Path<i64>,
+    Json(input): Json<MirrorInput>,
+) -> AppResult<Json<Value>> {
+    let name = clean_text(&input.name, "镜像名称", 30, true)?;
+    if !input.url.starts_with("https://") || input.url.len() > 500 || input.url.contains(char::is_whitespace) {
+        return Err(AppError::BadRequest("镜像需要 https 地址".into()));
+    }
+    let mut tx = state.pool.begin().await?;
+    let (current,): (i32,) = sqlx::query_as("SELECT current_version FROM packs WHERE id = $1 FOR UPDATE")
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("内容包"))?;
+    let version = input.version.unwrap_or(current);
+    let (mirrors,): (Value,) = sqlx::query_as("SELECT mirrors FROM pack_versions WHERE pack_id = $1 AND version = $2 FOR UPDATE")
+        .bind(id)
+        .bind(version)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("版本"))?;
+    let mut list: Vec<Value> = mirrors.as_array().cloned().unwrap_or_default();
+    list.retain(|m| m.get("name").and_then(Value::as_str) != Some(name.as_str()));
+    list.push(json!({ "name": name, "url": input.url }));
+    if list.len() > 5 {
+        return Err(AppError::BadRequest("每个版本最多 5 个镜像".into()));
+    }
+    sqlx::query("UPDATE pack_versions SET mirrors = $3 WHERE pack_id = $1 AND version = $2")
+        .bind(id)
+        .bind(version)
+        .bind(Value::Array(list.clone()))
+        .execute(&mut *tx)
+        .await?;
+    audit(&mut tx, &admin, "pack.mirror", "pack", id, format!("v{version} {name}")).await?;
+    tx.commit().await?;
+    Ok(Json(json!({ "id": id, "version": version, "mirrors": list })))
 }
 
 async fn admin_moderation(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Json<Value>> {
