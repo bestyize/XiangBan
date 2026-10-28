@@ -13,7 +13,7 @@ const root = computed(() => meta.tree.find(n => n.slug === meta.parentOf(current
 <template>
   <div class="chips-wrap">
     <nav class="row" aria-label="分类">
-      <RouterLink to="/" class="chip" :class="{ on: active === 'home' }">首页</RouterLink>
+      <RouterLink to="/discuss" class="chip" :class="{ on: active === 'home' }">首页</RouterLink>
       <RouterLink
         v-for="node in meta.tree"
         :key="node.id"

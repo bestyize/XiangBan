@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSession } from '@/stores/session'
 import UserAvatar from './UserAvatar.vue'
 import BrandMark from './BrandMark.vue'
 import { useTheme, THEME_LABEL } from '@/lib/theme'
+import { sectionOf } from '@/lib/sections'
 
 const session = useSession()
 const { preference, resolved, cycleTheme } = useTheme()
 const route = useRoute()
 const router = useRouter()
+
+const section = computed(() => sectionOf(route))
 
 const q = ref(typeof route.query.q === 'string' ? route.query.q : '')
 const searchOpen = ref(false)
@@ -50,10 +53,9 @@ async function logout() {
       </RouterLink>
 
       <nav class="nav" aria-label="主导航">
-        <RouterLink to="/" :class="{ on: route.name === 'home' }">首页</RouterLink>
-        <RouterLink to="/resources" :class="{ on: route.name === 'resources' || route.name === 'pack' }">资源</RouterLink>
-        <RouterLink to="/weekly" :class="{ on: route.name === 'weekly' || route.name === 'weekly-issue' }">周刊</RouterLink>
-        <RouterLink to="/projects" :class="{ on: route.name === 'projects' || route.name === 'project' }">项目</RouterLink>
+        <RouterLink to="/" :class="{ on: section === 'home' }">首页</RouterLink>
+        <RouterLink to="/c/share" :class="{ on: section === 'resources' }">资源</RouterLink>
+        <RouterLink to="/discuss" :class="{ on: section === 'discuss' }">讨论</RouterLink>
       </nav>
 
       <form class="search" :class="{ open: searchOpen }" role="search" @submit.prevent="submit">
@@ -257,9 +259,21 @@ async function logout() {
     gap: 10px;
     height: 52px;
   }
-  .nav,
   .only-desktop {
     display: none;
+  }
+  /* 手机上首页、资源、讨论与标识、搜索图标在同一行：只留标识，不放字样。 */
+  .wordmark {
+    display: none;
+  }
+  .nav {
+    flex: 1;
+    justify-content: center;
+    gap: 0;
+  }
+  .nav a {
+    padding: 6px 9px;
+    font-size: var(--fs-sm);
   }
   .only-mobile {
     display: grid;

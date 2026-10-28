@@ -20,7 +20,7 @@ function visibleChildren(node: (typeof meta.tree)[number]) {
 
 <template>
   <nav class="side" aria-label="分类">
-    <RouterLink to="/" class="item top" :class="{ on: active === 'home' }">首页</RouterLink>
+    <RouterLink to="/discuss" class="item top" :class="{ on: active === 'home' }">首页</RouterLink>
     <div v-for="node in meta.tree" :key="node.id" class="group">
       <RouterLink
         :to="`/c/${node.slug}`"

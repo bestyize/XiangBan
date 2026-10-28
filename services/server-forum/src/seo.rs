@@ -213,6 +213,7 @@ pub fn routes(state: &AppState) -> Router<AppState> {
 
     Router::new()
         .route("/", get(home))
+        .route("/discuss", get(home))
         .route("/t/{id}", get(topic_page))
         .route("/c/{slug}", get(category_page))
         .route("/tag/{name}", get(tag_page))
@@ -330,7 +331,7 @@ async fn category_nav(state: &AppState) -> Result<String, AppError> {
         sqlx::query_as("SELECT id, parent_id, slug, name FROM categories ORDER BY sort_order, id")
             .fetch_all(&state.pool)
             .await?;
-    let mut s = String::from("<nav>\n<a href=\"/resources\">资源</a> · <a href=\"/weekly\">周刊</a> · <a href=\"/projects\">项目</a>\n<ul>\n");
+    let mut s = String::from("<nav>\n<a href=\"/\">首页</a> · <a href=\"/discuss\">讨论</a>\n<ul>\n");
     for (id, _, slug, name) in rows.iter().filter(|r| r.1.is_none()) {
         s.push_str(&format!("<li><a href=\"/c/{}\">{}</a>", percent_encode(slug), escape(name)));
         let children: Vec<_> = rows.iter().filter(|r| r.1 == Some(*id)).collect();
@@ -588,7 +589,7 @@ async fn sitemap(State(state): State<AppState>) -> Res {
     let mut xml = String::from(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
     );
-    for p in ["/", "/resources", "/weekly", "/projects"] {
+    for p in ["/", "/discuss"] {
         sitemap_entry(&mut xml, &format!("{base}{p}"), None);
     }
     for (s,) in &cats {

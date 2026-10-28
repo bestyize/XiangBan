@@ -2,11 +2,13 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSession } from '@/stores/session'
+import { sectionOf } from '@/lib/sections'
 
 const route = useRoute()
 const router = useRouter()
 const session = useSession()
 
+const section = computed(() => sectionOf(route))
 const meTarget = computed(() => (session.user ? `/u/${session.user.uid}` : ''))
 
 function compose() {
@@ -22,20 +24,20 @@ function me() {
 
 <template>
   <nav class="tabbar" aria-label="底部导航">
-    <RouterLink to="/" :class="{ on: route.name === 'home' }">
+    <RouterLink to="/" :class="{ on: section === 'home' }">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4z" /></svg>
       <span>首页</span>
     </RouterLink>
-    <RouterLink to="/resources" :class="{ on: route.name === 'resources' || route.name === 'pack' }">
+    <RouterLink to="/c/share" :class="{ on: section === 'resources' }">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>
       <span>资源</span>
     </RouterLink>
     <button type="button" class="compose" aria-label="发帖" @click="compose">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
     </button>
-    <RouterLink to="/weekly" :class="{ on: route.name === 'weekly' || route.name === 'weekly-issue' || route.name === 'projects' || route.name === 'project' }">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM9 9h6M9 13h6M9 17h3" /></svg>
-      <span>周刊</span>
+    <RouterLink to="/discuss" :class="{ on: section === 'discuss' && route.name !== 'user' && route.name !== 'settings' }">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H10l-5 4z" /></svg>
+      <span>讨论</span>
     </RouterLink>
     <button type="button" :class="{ on: route.name === 'user' || route.name === 'settings' }" @click="me">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20c1-3.6 4-5.5 7.5-5.5s6.5 1.9 7.5 5.5" /></svg>

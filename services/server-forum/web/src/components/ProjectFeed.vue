@@ -1,11 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import ContentShell from '@/components/ContentShell.vue'
 import { contentApi, type ProjectItem } from '@/api/content'
-import { useHead } from '@/lib/head'
 import { useToast } from '@/stores/toast'
 
-useHead(() => ({ title: '项目' }))
 const toast = useToast()
 const items = ref<ProjectItem[]>([])
 const loading = ref(true)
@@ -22,8 +19,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <ContentShell>
-    <h1 class="sr-only">项目</h1>
+  <div>
     <p v-if="loading" class="state">加载中</p>
     <p v-else-if="!items.length" class="state">还没有项目。</p>
     <ul v-else class="projects">
@@ -34,7 +30,7 @@ onMounted(async () => {
         </RouterLink>
       </li>
     </ul>
-  </ContentShell>
+  </div>
 </template>
 
 <style scoped>

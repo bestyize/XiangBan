@@ -1,12 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import ContentShell from '@/components/ContentShell.vue'
-import PagerNav from '@/components/PagerNav.vue'
+import PagerNav from './PagerNav.vue'
 import { contentApi, type WeeklyIssueItem } from '@/api/content'
-import { useHead } from '@/lib/head'
 import { useToast } from '@/stores/toast'
 
-useHead(() => ({ title: '周刊' }))
 const toast = useToast()
 const items = ref<WeeklyIssueItem[]>([])
 const page = ref(1)
@@ -30,8 +27,7 @@ onMounted(() => load())
 </script>
 
 <template>
-  <ContentShell>
-    <h1 class="sr-only">周刊</h1>
+  <div>
     <p v-if="loading && !items.length" class="state">加载中</p>
     <p v-else-if="!items.length" class="state">周刊还没有发布，敬请期待。</p>
     <ul v-else class="issues">
@@ -44,7 +40,7 @@ onMounted(() => load())
       </li>
     </ul>
     <PagerNav :page="page" :page-size="pageSize" :total="total" @go="load" />
-  </ContentShell>
+  </div>
 </template>
 
 <style scoped>

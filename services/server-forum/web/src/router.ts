@@ -1,14 +1,17 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import HomeView from '@/views/HomeView.vue'
+import DiscussView from '@/views/DiscussView.vue'
 import { useSession } from '@/stores/session'
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
-  { path: '/resources', name: 'resources', component: () => import('@/views/ResourcesView.vue') },
+  { path: '/discuss', name: 'discuss', component: DiscussView },
+  // 旧入口：资源、周刊、项目列表都并进了首页的二级 Tab。
+  { path: '/resources', redirect: '/' },
   { path: '/packs/:id(\\d+)', name: 'pack', component: () => import('@/views/PackView.vue') },
-  { path: '/weekly', name: 'weekly', component: () => import('@/views/WeeklyListView.vue') },
+  { path: '/weekly', redirect: { path: '/', query: { tab: 'weekly' } } },
   { path: '/weekly/:week', name: 'weekly-issue', component: () => import('@/views/WeeklyView.vue') },
-  { path: '/projects', name: 'projects', component: () => import('@/views/ProjectsView.vue') },
+  { path: '/projects', redirect: { path: '/', query: { tab: 'projects' } } },
   { path: '/projects/:slug', name: 'project', component: () => import('@/views/ProjectView.vue') },
   { path: '/c/:slug', name: 'category', component: () => import('@/views/CategoryView.vue') },
   { path: '/t/:id(\\d+)', name: 'topic', component: () => import('@/views/TopicView.vue') },

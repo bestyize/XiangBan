@@ -4,7 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
 import TopicList from '@/components/TopicList.vue'
 import PagerNav from '@/components/PagerNav.vue'
+import PackCard from '@/components/PackCard.vue'
 import { api } from '@/api/forum'
+import { contentApi, type PackItem } from '@/api/content'
 import type { TopicItem } from '@/api/types'
 import { useToast } from '@/stores/toast'
 import { useHead } from '@/lib/head'
@@ -18,6 +20,8 @@ const input = ref(q.value)
 useHead(() => ({ title: q.value ? `搜索 ${q.value}` : '搜索' }))
 
 const items = ref<TopicItem[]>([])
+const packs = ref<PackItem[]>([])
+const packTotal = ref(0)
 const total = ref(0)
 const page = ref(1)
 const loading = ref(false)
@@ -25,12 +29,22 @@ const loading = ref(false)
 async function load(p = 1) {
   if (!q.value) {
     items.value = []
+    packs.value = []
     total.value = 0
+    packTotal.value = 0
     return
   }
   loading.value = true
   try {
-    const res = await api.search({ q: q.value, page: p })
+    // 内容包只在第一页搜，翻页只翻帖子；内容包搜索失败不影响帖子结果。
+    const [res, found] = await Promise.all([
+      api.search({ q: q.value, page: p }),
+      p === 1 ? contentApi.packs({ q: q.value, page_size: 8 }).catch(() => null) : Promise.resolve(null),
+    ])
+    if (p === 1) {
+      packs.value = found?.items ?? []
+      packTotal.value = found?.total ?? 0
+    }
     items.value = res.items
     total.value = res.total
     page.value = res.page
@@ -65,11 +79,17 @@ function submit() {
     </form>
 
     <template v-if="q">
+      <section v-if="packs.length" class="packs">
+        <p class="summary muted">内容 {{ packTotal }} 个</p>
+        <div class="pack-grid">
+          <PackCard v-for="p in packs" :key="p.id" :pack="p" />
+        </div>
+      </section>
       <p class="summary muted">找到 {{ total }} 个和"{{ q }}"有关的帖子</p>
-      <TopicList :items="items" :loading="loading" empty="没有找到，换个关键词试试，比如「免费额度」。" />
+      <TopicList :items="items" :loading="loading" empty="没有找到，换个关键词试试。" />
       <PagerNav :page="page" :page-size="30" :total="total" @go="load" />
     </template>
-    <p v-else class="muted hint">输入任何关键词，搜帖子的标题和内容。</p>
+    <p v-else class="muted hint">输入任何关键词，搜帖子和内容包。</p>
   </ForumShell>
 </template>
 
@@ -85,6 +105,19 @@ function submit() {
 .search .btn {
   height: auto;
   padding: 0 20px;
+}
+.packs {
+  margin-bottom: 16px;
+}
+.pack-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
+}
+@media (min-width: 768px) {
+  .pack-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 .summary {
   font-size: var(--fs-sm);
