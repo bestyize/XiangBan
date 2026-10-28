@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NButton, NInput, NModal } from 'naive-ui';
-import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, FolderOpen, LoaderCircle, PanelRight, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
+import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, FolderOpen, GripVertical, LoaderCircle, PanelRight, Plus, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 import DesignPicker from '../design/DesignPicker.vue';
 import DesignWorkbench from '../design/DesignWorkbench.vue';
@@ -15,6 +15,8 @@ import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatActivity from '../chat/ChatActivity.vue';
 import ChatTaskCard from '../chat/ChatTaskCard.vue';
 import ChatReasoning from '../chat/ChatReasoning.vue';
+import ChatReasoningGroup from '../chat/ChatReasoningGroup.vue';
+import { groupReasoning } from '../chat/reasoning-group.ts';
 import ChatGoalPanel from '../chat/ChatGoalPanel.vue';
 import ChatConnectorRequest from '../chat/ChatConnectorRequest.vue';
 import GuideModal from '../components/GuideModal.vue';
@@ -144,20 +146,40 @@ const planEditorOpen = ref(false);
 const planInstruction = ref('');
 const planRevisionBusy = ref(false);
 const planSession = ref<string | null>(null);
-const editingProgress = ref<TaskProgress | null>(null);
+const planSteps = ref<string[]>([]);
+const planBase = ref<string[]>([]);
+const planDrag = ref(-1);
+const planChips = ['更简短', '面向管理层', '跳过最后一步', '多检查一遍'];
+const pendingSteps = (progress: TaskProgress | null) => (progress?.plan.steps ?? []).filter(step => step.status !== 'completed').map(step => step.content);
 function adjustPlan(block: ReplyBlock) {
   planSession.value = chat.currentId;
-  editingProgress.value = progressOf(block);
+  planBase.value = pendingSteps(progressOf(block));
+  planSteps.value = [...planBase.value];
   planInstruction.value = '';
   planEditorOpen.value = true;
 }
+const planEdited = computed(() => planSteps.value.map(text => text.trim()).filter(Boolean));
+const planStepsChanged = computed(() => planEdited.value.length > 0 && JSON.stringify(planEdited.value) !== JSON.stringify(planBase.value));
+const planReady = computed(() => !!planInstruction.value.trim() || planStepsChanged.value);
+const planChip = (text: string) => { planInstruction.value = planInstruction.value.trim() ? `${planInstruction.value.trim()}，${text}` : text; };
+function planDrop(target: number) {
+  const from = planDrag.value;
+  planDrag.value = -1;
+  if (from < 0 || from === target) return;
+  const next = [...planSteps.value];
+  next.splice(target, 0, next.splice(from, 1)[0]!);
+  planSteps.value = next;
+}
 async function savePlanRevision() {
-  if (!planInstruction.value.trim() || planRevisionBusy.value) return;
+  if (!planReady.value || planRevisionBusy.value) return;
   if (chat.currentId !== planSession.value) { props.store.notify('会话已切换，请回到原会话调整计划。', 'info'); return; }
+  const parts: string[] = [];
+  if (planStepsChanged.value) parts.push(`后续步骤改为：\n${planEdited.value.map((text, index) => `${index + 1}. ${text}`).join('\n')}`);
+  if (planInstruction.value.trim()) parts.push(planInstruction.value.trim());
   planRevisionBusy.value = true;
   props.store.asr?.deactivate();
   try {
-    if (await chat.revisePlan(planInstruction.value)) { planEditorOpen.value = false; stick.value = true; }
+    if (await chat.revisePlan(parts.join('\n\n'))) { planEditorOpen.value = false; stick.value = true; }
   } finally { planRevisionBusy.value = false; }
 }
 function showTaskProcess(block: ReplyBlock) {
@@ -359,11 +381,18 @@ async function openLink(href: string) {
     </div>
   </NModal>
   <ChatNameDialog :show="renaming" title="重命名对话" placeholder="给这个对话起个名字" :initial="session?.title ?? ''" :max-length="60" confirm-text="保存" :busy="renameBusy" @close="renaming = false" @submit="submitRename" />
-  <NModal v-model:show="planEditorOpen" preset="card" title="调整后续计划" class="task-plan-editor" :style="{ width: '480px', maxWidth: 'calc(100vw - 32px)' }" :mask-closable="!planRevisionBusy" :close-on-esc="!planRevisionBusy" :closable="!planRevisionBusy">
-    <p class="plan-editor-note">已完成的步骤会保留。提交后会先停止当前执行，再由小伴核对现场、调整计划并继续。</p>
-    <ol v-if="editingProgress" class="plan-editor-steps"><li v-for="(step, index) in editingProgress.plan.steps" :key="index" :class="{ done: step.status === 'completed' }"><Check v-if="step.status === 'completed'" :size="12" /><span v-else>{{ index + 1 }}</span>{{ step.content }}</li></ol>
-    <NInput v-model:value="planInstruction" type="textarea" autofocus :maxlength="2000" :disabled="planRevisionBusy" placeholder="例如：汇报改为面向管理层，控制在 5 分钟内" :autosize="{ minRows: 3, maxRows: 7 }" data-testid="task-plan-input" />
-    <template #footer><div class="plan-editor-actions"><NButton size="small" :disabled="planRevisionBusy" @click="planEditorOpen = false">取消</NButton><NButton type="primary" size="small" :disabled="!planInstruction.trim()" :loading="planRevisionBusy" data-testid="task-plan-submit" @click="savePlanRevision">调整并继续</NButton></div></template>
+  <NModal v-model:show="planEditorOpen" preset="card" title="调整后续计划" class="task-plan-editor" :style="{ width: '400px', maxWidth: 'calc(100vw - 32px)' }" :header-style="{ padding: '12px 14px 8px', fontSize: '13px' }" :content-style="{ padding: '0 14px' }" :footer-style="{ padding: '10px 14px 12px' }" :mask-closable="!planRevisionBusy" :close-on-esc="!planRevisionBusy" :closable="!planRevisionBusy">
+    <div class="plan-steps" data-testid="task-plan-steps">
+      <div v-for="(_, index) in planSteps" :key="index" class="plan-row" :class="{ dragging: planDrag === index }" draggable="true" @dragstart="planDrag = index" @dragend="planDrag = -1" @dragover.prevent @drop.prevent="planDrop(index)">
+        <GripVertical :size="13" class="plan-grip" aria-hidden="true" />
+        <NInput v-model:value="planSteps[index]" size="small" :maxlength="300" :disabled="planRevisionBusy" :aria-label="`后续第 ${index + 1} 步`" />
+        <button type="button" class="plan-remove" :disabled="planRevisionBusy" :aria-label="`删除第 ${index + 1} 步`" @click="planSteps.splice(index, 1)"><X :size="13" /></button>
+      </div>
+      <button type="button" class="plan-add" :disabled="planRevisionBusy || planSteps.length >= 50" @click="planSteps.push('')"><Plus :size="13" />添加一步</button>
+    </div>
+    <NInput v-model:value="planInstruction" type="textarea" :maxlength="2000" :disabled="planRevisionBusy" placeholder="想怎么改？例如：汇报面向管理层，5 分钟内" :autosize="{ minRows: 2, maxRows: 5 }" data-testid="task-plan-input" />
+    <div class="plan-chips"><button v-for="chip in planChips" :key="chip" type="button" :disabled="planRevisionBusy" @click="planChip(chip)">{{ chip }}</button></div>
+    <template #footer><div class="plan-editor-actions"><NButton size="small" quaternary :disabled="planRevisionBusy" @click="planEditorOpen = false">取消</NButton><NButton type="primary" size="small" :disabled="!planReady" :loading="planRevisionBusy" data-testid="task-plan-submit" @click="savePlanRevision">调整并继续</NButton></div></template>
   </NModal>
   <section class="chat-page" data-testid="chat-page">
     <div class="chat-main">
@@ -450,8 +479,9 @@ async function openLink(href: string) {
                 <header v-if="speaks(block)" class="reply-head"><span class="brand-mark" aria-hidden="true"><Sprout :size="14" :stroke-width="2.2" /></span><b>小伴</b></header>
                 <ChatTaskCard v-if="progressOf(block)" :progress="progressOf(block)!" :calls="block.calls" :current="block.id === lastBlockId" :show-logs="!chat.hideToolCalls" :disabled="planRevisionBusy" :configured="chat.configured" @logs="showTaskProcess(block)" @adjust="adjustPlan(block)" @resume="resumeTask" @stop="chat.cancel()" @attention="showTaskAttention" />
                 <ChatActivity v-else-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === lastBlockId" :waiting="waiting && block.id === lastBlockId" :status="block.id === lastBlockId ? statusLine : ''" />
-                <template v-for="item in block.items" :key="item.id">
-                  <ChatReasoning v-if="item.kind === 'reasoning'" :text="item.text" :reasoning-kind="item.reasoningKind" :streaming="item.streaming" />
+                <template v-for="item in groupReasoning(block.items)" :key="item.id">
+                  <ChatReasoningGroup v-if="item.kind === 'reasoning-group'" :group="item" />
+                  <ChatReasoning v-else-if="item.kind === 'reasoning'" :text="item.text" :reasoning-kind="item.reasoningKind" :streaming="item.streaming" />
                   <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
                     <div class="answer" data-search><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span></div>
                   </div>
@@ -577,9 +607,12 @@ async function openLink(href: string) {
 .design-deliveries{display:flex;gap:6px;overflow:auto;padding:4px 18px 8px;flex:none}.design-deliveries button{display:flex;align-items:center;gap:6px;padding:6px 9px;background:var(--ui-control);border:1px solid var(--ui-line);border-radius:7px;color:var(--ui-text-secondary);font-size:11px;cursor:pointer;white-space:nowrap}.design-deliveries b{font-weight:500}.design-deliveries small{font-size:10px;color:var(--ui-text-tertiary)}.design-deliveries .active{border-color:var(--ui-ink);color:var(--ui-ink)}
 .design-splitter{width:4px;flex:none;cursor:col-resize;touch-action:none;background:transparent}.design-splitter:hover,.design-splitter:focus-visible{background:var(--ui-soft);outline:0}
 .design-dock{width:64%;min-width:420px;max-width:calc(100% - 250px);border-left:1px solid var(--ui-line);flex:none;min-height:0;display:flex}@media(max-width:900px){.design-splitter{display:none}.design-dock{position:absolute;inset:0;width:100%!important;min-width:0;max-width:none;z-index:8;background:var(--ui-surface)}}
-.plan-editor-note{margin:0 0 12px;color:var(--ui-text-secondary);font-size:12px;line-height:1.7}
-.plan-editor-steps{list-style:none;margin:0 0 15px;padding:0;display:grid;gap:8px;color:var(--ui-text-primary);font-size:12px}
-.plan-editor-steps li{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}.plan-editor-steps li>span{width:12px;flex:none;color:var(--ui-text-tertiary);font-size:10px}.plan-editor-steps .done{color:var(--ui-text-tertiary)}.plan-editor-steps .done svg{flex:none;color:var(--ui-ink)}.plan-editor-actions{display:flex;justify-content:flex-end;gap:8px}
+.plan-steps{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
+.plan-row{display:flex;align-items:center;gap:6px}.plan-row.dragging{opacity:.4}.plan-grip{flex:none;color:var(--ui-text-disabled);cursor:grab}
+.plan-remove{display:grid;place-items:center;flex:none;width:22px;height:22px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--ui-text-tertiary);cursor:pointer}.plan-remove:hover{background:var(--ui-surface-hover);color:var(--ui-text-primary)}
+.plan-add{display:inline-flex;align-items:center;gap:4px;align-self:flex-start;height:22px;margin-left:18px;padding:0 6px;border:0;border-radius:6px;background:transparent;color:var(--ui-ink);font:inherit;font-size:11.5px;cursor:pointer}.plan-add:hover{background:var(--ui-soft)}
+.plan-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}.plan-chips button{height:22px;padding:0 9px;border:0;border-radius:11px;background:var(--ui-control);color:var(--ui-text-secondary);font:inherit;font-size:11.5px;cursor:pointer}.plan-chips button:hover:not(:disabled){color:var(--ui-text-primary)}
+.plan-editor-actions{display:flex;justify-content:flex-end;gap:6px}
 .task-delivery{max-width:600px}
 .panel-call{min-width:0;flex:1}.panel-call summary{list-style:none;cursor:pointer;display:flex;flex-direction:column;gap:1px}.panel-call summary::-webkit-details-marker{display:none}.panel-call pre{max-height:180px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--ui-control);border-radius:7px;padding:8px;margin:7px 0 0;font:11px/1.6 var(--ui-font-mono);color:var(--ui-text-secondary)}
 .goal-modal-content{width:fit-content;max-width:100%;outline:none}

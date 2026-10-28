@@ -32,7 +32,7 @@ const preview = computed(() => props.text.trim().replace(/\s+/g, ' ').slice(-105
 </template>
 
 <style scoped>
-.reasoning{margin:0 0 0 40px;min-width:0;max-width:100%;color:var(--ui-text-secondary);font-size:12px}
+.reasoning{margin:0;min-width:0;max-width:100%;color:var(--ui-text-secondary);font-size:12px}
 .toggle{display:flex;align-items:center;gap:7px;max-width:100%;min-height:29px;padding:4px 0;border:0;background:transparent;color:var(--ui-text-secondary);cursor:pointer;text-align:left;font:inherit}
 .toggle:hover{color:var(--ui-text-primary)}
 .toggle:focus-visible{outline:2px solid var(--ui-primary);outline-offset:2px;border-radius:4px}

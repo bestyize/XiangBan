@@ -112,7 +112,7 @@ describe('compact task execution cards', () => {
     expect(q('notice-info')?.textContent).not.toContain('验收');
     expect(q('chat-files-toggle')?.textContent).toContain('交付文件');
     expect(q('chat-file-card')?.textContent).toContain('周报.md');
-    await click('task-toggle');
+    await click('task-more');
     await click('task-logs');
     expect(q('chat-exec-panel')?.textContent).toContain('任务执行过程');
     expect(all('.panel-call')).toHaveLength(3);
@@ -140,6 +140,7 @@ describe('compact task execution cards', () => {
     const h = await open({ ...startChat, chat_cancel: () => undefined });
     await type('生成周报'); await click('chat-send');
     await h.events('s1', { type: 'tool_start', id: 'p', name: 'todo', arguments: plan() }, { type: 'tool_end', id: 'p', output: 'Todo list updated:', is_error: false });
+    await click('task-more');
     await click('task-adjust');
     const input = inBody('task-plan-input')!.querySelector('textarea')!;
     input.value = '改为面向管理层'; input.dispatchEvent(new Event('input', { bubbles: true })); await flushPromises();

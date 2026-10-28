@@ -12,19 +12,24 @@ const progress = (): TaskProgress => ({
   ] }, state: 'running', completed: 1, current: 1, message: '按计划继续执行', canResume: false,
 });
 
-it('keeps completed-step evidence out of the compact rows, exposes it safely and opens execution logs', async () => {
+it('shows a one-line evidence tail on completed steps, exposes the full text safely and opens execution logs from the menu', async () => {
   const wrapper = mount(ChatTaskCard, { props: { progress: progress(), calls: [], current: true, showLogs: true } });
   expect(wrapper.findAll('.task-step')).toHaveLength(3);
   expect(wrapper.get('[data-testid="task-count"]').text()).toBe('已完成 1 / 3 步');
+  expect(wrapper.get('.task-count').text()).toBe('1/3');
+  expect(wrapper.findAll('.task-segs i.done')).toHaveLength(1);
+  expect(wrapper.get('[data-testid="task-step-0"] .step-tail').text()).toBe('<script>untrusted()</script>');
+  expect(wrapper.find('script').exists()).toBe(false);
   expect(wrapper.find('[data-testid="task-step-details"]').exists()).toBe(false);
   await wrapper.get('[data-testid="task-step-0"] button').trigger('click');
   expect(wrapper.get('[data-testid="task-step-details"]').text()).toContain('<script>untrusted()</script>');
   expect(wrapper.find('script').exists()).toBe(false);
   await wrapper.get('[data-testid="task-toggle"]').trigger('click');
   expect(wrapper.find('[data-testid="task-body"]').exists()).toBe(false);
-  await wrapper.get('[data-testid="task-toggle"]').trigger('click');
+  await wrapper.get('[data-testid="task-more"]').trigger('click');
   await wrapper.get('[data-testid="task-logs"]').trigger('click');
   expect(wrapper.emitted('logs')).toHaveLength(1);
+  expect(wrapper.find('[data-testid="task-logs"]').exists()).toBe(false);
   wrapper.unmount();
 });
 
@@ -39,8 +44,8 @@ it('opens actionable waiting states but keeps historical cards from controlling 
   expect(wrapper.find('[data-testid="task-resume"]').exists()).toBe(false);
   await wrapper.setProps({ progress: { ...progress(), state: 'paused', canResume: true }, current: false });
   expect(wrapper.find('[data-testid="task-resume"]').exists()).toBe(false);
-  expect(wrapper.find('[data-testid="task-adjust"]').exists()).toBe(false);
-  expect(wrapper.find('[data-testid="task-logs"]').exists()).toBe(false);
+  expect(wrapper.find('[data-testid="task-more"]').exists()).toBe(false);
+  expect(wrapper.find('[data-testid="task-stop"]').exists()).toBe(false);
   wrapper.unmount();
 });
 
@@ -68,5 +73,19 @@ it.each([['partial', '部分完成'], ['failed', '未完成']] as const)('shows 
   expect(wrapper.get('[data-testid="task-intervention"]').text()).toContain('settings.html');
   await wrapper.get('[data-testid="task-resume"]').trigger('click');
   expect(wrapper.emitted('resume')).toHaveLength(1);
+  wrapper.unmount();
+});
+
+it('shows the current step in the header while collapsed and offers stop and adjust without a footer', async () => {
+  const wrapper = mount(ChatTaskCard, { props: { progress: progress(), calls: [], current: true, showLogs: false, configured: true } });
+  expect(wrapper.find('.task-footer').exists()).toBe(false);
+  await wrapper.get('[data-testid="task-toggle"]').trigger('click');
+  expect(wrapper.find('[data-testid="task-body"]').exists()).toBe(false);
+  expect(wrapper.get('.task-now').text()).toBe('生成汇报');
+  await wrapper.get('[data-testid="task-stop"]').trigger('click');
+  expect(wrapper.emitted('stop')).toHaveLength(1);
+  await wrapper.get('[data-testid="task-more"]').trigger('click');
+  await wrapper.get('[data-testid="task-adjust"]').trigger('click');
+  expect(wrapper.emitted('adjust')).toHaveLength(1);
   wrapper.unmount();
 });
