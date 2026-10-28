@@ -57,7 +57,8 @@ impl JwksVerifier {
         }
     }
 
-    #[cfg(test)]
+    /// 测试用：固定公钥，不拉取 JWKS。
+    #[cfg(any(test, feature = "testing"))]
     pub fn with_static_key(issuer: String, client_ids: Vec<String>, key: DecodingKey) -> Self {
         let mut v = Self::new(issuer, String::new(), client_ids);
         v.static_key = Some(key);

@@ -1,11 +1,9 @@
 //! 集成测试：真实 Postgres（TEST_DATABASE_URL，每个测试独立 schema）、真实 HTTP 与 WebSocket 连接。
-use crate::{auth::JwksVerifier, build_router, config::Config, db, hub::Hub, ratelimit::WindowLimiter, state::AppState};
+use crate::testing::TestServer;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
 use futures_util::{SinkExt, StreamExt};
-use jsonwebtoken::{encode, Algorithm, DecodingKey, EncodingKey, Header};
-use ring::signature::{Ed25519KeyPair, KeyPair};
 use serde_json::{json, Value};
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 use tokio::net::TcpStream;
 use tokio_tungstenite::{
     connect_async,
@@ -18,20 +16,15 @@ use xiaoban_link_protocol::{envelope::{open, Sender}, keys::DeviceKey, pairing};
 type Ws = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
 struct Env {
+    srv: TestServer,
     base: String,
     ws_base: String,
     http: reqwest::Client,
-    enc: EncodingKey,
 }
 
 impl Env {
-    fn token_aud(&self, uid: Uuid, aud: &str, ttl: i64) -> String {
-        #[derive(serde::Serialize)]
-        struct C { iss: String, sub: String, aud: String, exp: i64 }
-        let c = C { iss: "iss".into(), sub: uid.to_string(), aud: aud.into(), exp: chrono::Utc::now().timestamp() + ttl };
-        encode(&Header::new(Algorithm::EdDSA), &c, &self.enc).unwrap()
-    }
-    fn token(&self, uid: Uuid) -> String { self.token_aud(uid, "xiaoban-android", 600) }
+    fn token_aud(&self, uid: Uuid, aud: &str, ttl: i64) -> String { self.srv.token_aud(uid, aud, ttl) }
+    fn token(&self, uid: Uuid) -> String { self.srv.phone_token(uid) }
 
     async fn call(&self, method: &str, path: &str, token: Option<&str>, body: Value) -> (u16, Value) {
         let m = reqwest::Method::from_bytes(method.as_bytes()).unwrap();
@@ -80,39 +73,13 @@ async fn setup() -> Option<(Env, sqlx::PgPool)> {
         eprintln!("skipped: TEST_DATABASE_URL is not set");
         return None;
     };
-    let schema = format!("link_test_{}", Uuid::new_v4().simple());
-    let admin = db::connect(&url, None).await.unwrap();
-    sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin).await.unwrap();
-    let pool = db::connect(&url, Some(&schema)).await.unwrap();
-    db::migrate(&pool).await.unwrap();
-    db::migrate(&pool).await.unwrap();
-
-    let mut config = Config::from_env();
-    config.client_ids = vec!["xiaoban-desktop-wallpaper".into(), "xiaoban-android".into()];
-    config.pair_code_max_redeems = 3;
-    config.notify_queue_cap = 2;
-    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new()).unwrap();
-    let pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
-    let x = B64.encode(pair.public_key().as_ref());
-    let verifier = JwksVerifier::with_static_key("iss".into(), config.client_ids.clone(), DecodingKey::from_ed_components(&x).unwrap());
-    // 签发者要和验签一致。
-    let state = AppState {
-        pool: pool.clone(),
-        hub: Arc::new(Hub::new(config.notify_queue_cap, config.notify_ttl)),
-        limiter: Arc::new(WindowLimiter::default()),
-        verifier: Arc::new(verifier),
-        config: Arc::new(config),
-    };
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let addr = listener.local_addr().unwrap();
-    tokio::spawn(async move { axum::serve(listener, build_router(state)).await.unwrap() });
-    let env = Env {
-        base: format!("http://{addr}/api/link"),
-        ws_base: format!("ws://{addr}/api/link"),
-        http: reqwest::Client::new(),
-        enc: EncodingKey::from_ed_der(pkcs8.as_ref()),
-    };
-    Some((env, pool))
+    let srv = TestServer::start_with(&url, |c| {
+        c.pair_code_max_redeems = 3;
+        c.notify_queue_cap = 2;
+    })
+    .await;
+    let pool = srv.pool.clone();
+    Some((Env { base: srv.base.clone(), ws_base: srv.ws_base.clone(), http: reqwest::Client::new(), srv }, pool))
 }
 
 struct Party {

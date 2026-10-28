@@ -29,6 +29,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2.0"
 
 xiaoban-link-protocol = { path = "../../libs/link-protocol" }
+ring = { version = "0.17", optional = true }
+
+[features]
+# 给其他 crate 的集成测试用：暴露 testing 模块（固定公钥、临时 schema、本机端口）。
+testing = ["dep:ring"]
 
 [dev-dependencies]
 ring = "0.17"
