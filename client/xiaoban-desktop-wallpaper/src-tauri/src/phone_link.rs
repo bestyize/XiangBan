@@ -1,5 +1,5 @@
 //! 桌面端手机互联接入层（L2）：
-//! - 私钥与配对密钥存入系统钥匙串（Windows 凭据管理器 / macOS Keychain），其余非敏感状态与重放进度存 `config/phone-link-state.json`
+//! - 私钥与配对密钥存入系统钥匙串（见 `phone_keychain.rs`），其余非敏感状态与重放进度存 `config/phone-link-state.json`
 //! - “允许手机遥控”开关（默认关闭），开启或首次点击“连接手机”时启动 `xiaoban-link-client`
 //! - 会话桥：`sessions.list` / `sessions.page` / `sessions.changed`、`session.open` / `session.snapshot` / `session.close`、`message.send` / `message.accepted`
 //! - 流式事件旁路：将桌面 `chat-event` / `chat-run-state` 映射为互联协议的 `event`
@@ -20,14 +20,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{Emitter, Manager};
-use xiaoban_link_client::{
-    store::{LinkStore, State as StoredState},
-    Error as LinkError, Link, LinkConfig, LinkEvent, PairingOffer, TokenFn,
-};
+use crate::phone_keychain::{read_public_state, KeychainLinkStore};
+use crate::phone_wire;
+use xiaoban_link_client::{store::LinkStore, Link, LinkConfig, LinkEvent, PairingOffer, TokenFn};
 
 const DEFAULT_RELAY_URL: &str = "https://link.xiangban.xyz/api/link";
-const KEYCHAIN_SERVICE: &str = "xyz.xiaban.desktop-wallpaper.link";
-const KEYCHAIN_PLACEHOLDER: &str = "@keychain";
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
@@ -58,300 +55,6 @@ fn default_device_name() -> String {
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "小伴电脑".to_string())
-}
-
-// ───────────── 系统钥匙串 / Windows 凭据管理器 ─────────────
-
-#[cfg(windows)]
-mod os_keystore {
-    use std::ffi::OsStr;
-    use std::os::windows::ffi::OsStrExt;
-    use std::ptr;
-
-    const CRED_TYPE_GENERIC: u32 = 1;
-    const CRED_PERSIST_LOCAL_MACHINE: u32 = 2;
-
-    #[repr(C)]
-    struct FileTime {
-        dw_low_date_time: u32,
-        dw_high_date_time: u32,
-    }
-
-    #[repr(C)]
-    struct CredentialW {
-        flags: u32,
-        cred_type: u32,
-        target_name: *mut u16,
-        comment: *mut u16,
-        last_written: FileTime,
-        credential_blob_size: u32,
-        credential_blob: *mut u8,
-        persist: u32,
-        attribute_count: u32,
-        attributes: *mut u8,
-        target_alias: *mut u16,
-        user_name: *mut u16,
-    }
-
-    #[link(name = "advapi32")]
-    extern "system" {
-        fn CredWriteW(credential: *const CredentialW, flags: u32) -> i32;
-        fn CredReadW(target_name: *const u16, cred_type: u32, flags: u32, credential: *mut *mut CredentialW) -> i32;
-        fn CredDeleteW(target_name: *const u16, cred_type: u32, flags: u32) -> i32;
-        fn CredFree(buffer: *mut CredentialW);
-    }
-
-    fn wide(s: &str) -> Vec<u16> {
-        OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
-    }
-
-    pub fn set(service: &str, account: &str, secret: &str) -> Result<(), String> {
-        let target = format!("{service}/{account}");
-        let mut target_w = wide(&target);
-        let mut user_w = wide(account);
-        let mut blob = secret.as_bytes().to_vec();
-        let cred = CredentialW {
-            flags: 0,
-            cred_type: CRED_TYPE_GENERIC,
-            target_name: target_w.as_mut_ptr(),
-            comment: ptr::null_mut(),
-            last_written: FileTime { dw_low_date_time: 0, dw_high_date_time: 0 },
-            credential_blob_size: blob.len() as u32,
-            credential_blob: blob.as_mut_ptr(),
-            persist: CRED_PERSIST_LOCAL_MACHINE,
-            attribute_count: 0,
-            attributes: ptr::null_mut(),
-            target_alias: ptr::null_mut(),
-            user_name: user_w.as_mut_ptr(),
-        };
-        let ok = unsafe { CredWriteW(&cred, 0) };
-        if ok != 0 {
-            Ok(())
-        } else {
-            Err(format!("写入 Windows 凭据管理器失败：{}", std::io::Error::last_os_error()))
-        }
-    }
-
-    pub fn get(service: &str, account: &str) -> Result<Option<String>, String> {
-        let target = format!("{service}/{account}");
-        let target_w = wide(&target);
-        let mut ptr_cred: *mut CredentialW = ptr::null_mut();
-        let ok = unsafe { CredReadW(target_w.as_ptr(), CRED_TYPE_GENERIC, 0, &mut ptr_cred) };
-        if ok == 0 {
-            let err = std::io::Error::last_os_error();
-            // ERROR_NOT_FOUND = 1168
-            if err.raw_os_error() == Some(1168) {
-                return Ok(None);
-            }
-            return Err(format!("读取 Windows 凭据管理器失败：{err}"));
-        }
-        let result = unsafe {
-            let cred = &*ptr_cred;
-            let slice = if cred.credential_blob.is_null() || cred.credential_blob_size == 0 {
-                &[][..]
-            } else {
-                std::slice::from_raw_parts(cred.credential_blob, cred.credential_blob_size as usize)
-            };
-            let text = String::from_utf8(slice.to_vec()).map_err(|e| e.to_string());
-            CredFree(ptr_cred);
-            text
-        }?;
-        Ok(Some(result))
-    }
-
-    pub fn delete(service: &str, account: &str) {
-        let target = format!("{service}/{account}");
-        let target_w = wide(&target);
-        unsafe {
-            let _ = CredDeleteW(target_w.as_ptr(), CRED_TYPE_GENERIC, 0);
-        }
-    }
-}
-
-#[cfg(target_os = "macos")]
-mod os_keystore {
-    use std::process::Command;
-
-    pub fn set(service: &str, account: &str, secret: &str) -> Result<(), String> {
-        let status = Command::new("/usr/bin/security")
-            .args(["add-generic-password", "-U", "-s", service, "-a", account, "-w", secret])
-            .output()
-            .map_err(|e| format!("调用 macOS 钥匙串失败：{e}"))?;
-        if status.status.success() {
-            Ok(())
-        } else {
-            Err("写入 macOS 钥匙串失败".into())
-        }
-    }
-
-    pub fn get(service: &str, account: &str) -> Result<Option<String>, String> {
-        let out = Command::new("/usr/bin/security")
-            .args(["find-generic-password", "-s", service, "-a", account, "-w"])
-            .output()
-            .map_err(|e| format!("调用 macOS 钥匙串失败：{e}"))?;
-        if !out.status.success() {
-            return Ok(None);
-        }
-        Ok(Some(String::from_utf8_lossy(&out.stdout).trim().to_string()))
-    }
-
-    pub fn delete(service: &str, account: &str) {
-        let _ = Command::new("/usr/bin/security")
-            .args(["delete-generic-password", "-s", service, "-a", account])
-            .output();
-    }
-}
-
-#[cfg(not(any(windows, target_os = "macos")))]
-mod os_keystore {
-    use std::{collections::HashMap, sync::{Mutex, OnceLock}};
-    fn mem() -> &'static Mutex<HashMap<String, String>> {
-        static MAP: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
-        MAP.get_or_init(Default::default)
-    }
-    pub fn set(service: &str, account: &str, secret: &str) -> Result<(), String> {
-        mem().lock().unwrap().insert(format!("{service}/{account}"), secret.to_string());
-        Ok(())
-    }
-    pub fn get(service: &str, account: &str) -> Result<Option<String>, String> {
-        Ok(mem().lock().unwrap().get(&format!("{service}/{account}")).cloned())
-    }
-    pub fn delete(service: &str, account: &str) {
-        mem().lock().unwrap().remove(&format!("{service}/{account}"));
-    }
-}
-
-/// 把设备私钥与配对密钥 PRK 存进系统钥匙串，其余元数据与重放计数存入 JSON 文件。
-pub struct KeychainLinkStore {
-    path: PathBuf,
-    service: String,
-    cache: Mutex<HashMap<String, String>>,
-}
-
-impl KeychainLinkStore {
-    pub fn new(path: impl Into<PathBuf>) -> Self {
-        Self::with_service(path, KEYCHAIN_SERVICE)
-    }
-
-    pub fn with_service(path: impl Into<PathBuf>, service: impl Into<String>) -> Self {
-        Self {
-            path: path.into(),
-            service: service.into(),
-            cache: Mutex::new(HashMap::new()),
-        }
-    }
-
-    fn put_secret(&self, account: &str, secret: &str) -> Result<(), LinkError> {
-        if secret.is_empty() || secret == KEYCHAIN_PLACEHOLDER {
-            return Ok(());
-        }
-        {
-            let cache = lock(&self.cache);
-            if cache.get(account).map(String::as_str) == Some(secret) {
-                return Ok(());
-            }
-        }
-        os_keystore::set(&self.service, account, secret).map_err(LinkError::Store)?;
-        lock(&self.cache).insert(account.to_string(), secret.to_string());
-        Ok(())
-    }
-
-    fn read_secret(&self, account: &str, fallback: &str) -> Result<String, LinkError> {
-        if !fallback.is_empty() && fallback != KEYCHAIN_PLACEHOLDER {
-            // 兼容旧版明文文件：第一次读到时迁入系统钥匙串。
-            let _ = self.put_secret(account, fallback);
-            return Ok(fallback.to_string());
-        }
-        if let Some(cached) = lock(&self.cache).get(account).cloned() {
-            return Ok(cached);
-        }
-        let loaded = os_keystore::get(&self.service, account)
-            .map_err(LinkError::Store)?
-            .ok_or_else(|| LinkError::Store(format!("系统钥匙串中缺少密钥：{account}")))?;
-        lock(&self.cache).insert(account.to_string(), loaded.clone());
-        Ok(loaded)
-    }
-
-    fn remove_secret(&self, account: &str) {
-        lock(&self.cache).remove(account);
-        os_keystore::delete(&self.service, account);
-    }
-}
-
-impl LinkStore for KeychainLinkStore {
-    fn load(&self) -> Result<StoredState, LinkError> {
-        let mut state: StoredState = match fs::read(&self.path) {
-            Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| LinkError::Store(format!("状态文件损坏：{e}")))?,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(StoredState::default()),
-            Err(e) => return Err(LinkError::Store(e.to_string())),
-        };
-        if let Some(device) = &mut state.device {
-            let key = format!("device:{}", device.id);
-            match self.read_secret(&key, &device.private_key) {
-                Ok(secret) => device.private_key = secret,
-                Err(_) => {
-                    // 钥匙串里的设备私钥已被清除：重置本地设备身份以便重新登记。
-                    state.device = None;
-                    state.peers.clear();
-                    state.pending_pair = None;
-                    return Ok(state);
-                }
-            }
-        }
-        let mut broken = Vec::new();
-        for (peer_id, rec) in &mut state.peers {
-            let key = format!("peer:{peer_id}");
-            match self.read_secret(&key, &rec.prk) {
-                Ok(secret) => rec.prk = secret,
-                Err(_) => broken.push(peer_id.clone()),
-            }
-        }
-        for peer_id in broken {
-            state.peers.remove(&peer_id);
-        }
-        Ok(state)
-    }
-
-    fn save(&self, state: &StoredState) -> Result<(), LinkError> {
-        let mut scrubbed = state.clone();
-        let mut active_accounts = HashSet::new();
-
-        if let Some(device) = &mut scrubbed.device {
-            let account = format!("device:{}", device.id);
-            self.put_secret(&account, &device.private_key)?;
-            active_accounts.insert(account);
-            device.private_key = KEYCHAIN_PLACEHOLDER.to_string();
-        }
-        for (peer_id, rec) in &mut scrubbed.peers {
-            let account = format!("peer:{peer_id}");
-            self.put_secret(&account, &rec.prk)?;
-            active_accounts.insert(account);
-            rec.prk = KEYCHAIN_PLACEHOLDER.to_string();
-        }
-
-        // 清理已移除对端或已撤销设备的钥匙串条目
-        let stale: Vec<String> = lock(&self.cache)
-            .keys()
-            .filter(|k| !active_accounts.contains(*k))
-            .cloned()
-            .collect();
-        for account in stale {
-            self.remove_secret(&account);
-        }
-
-        if let Some(dir) = self.path.parent() {
-            fs::create_dir_all(dir).map_err(|e| LinkError::Store(e.to_string()))?;
-        }
-        let tmp = self.path.with_extension("tmp");
-        let bytes = serde_json::to_vec_pretty(&scrubbed).map_err(|e| LinkError::Store(e.to_string()))?;
-        fs::write(&tmp, bytes).map_err(|e| LinkError::Store(e.to_string()))?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&tmp, fs::Permissions::from_mode(0o600));
-        }
-        fs::rename(&tmp, &self.path).map_err(|e| LinkError::Store(e.to_string()))
-    }
 }
 
 // ───────────── 配置与运行态 ─────────────
@@ -449,6 +152,8 @@ impl Default for RuntimeInner {
 pub struct PhoneLinkState {
     inner: Mutex<RuntimeInner>,
     seq: AtomicU64,
+    /// 串行化 `ensure_running`：应用启动与用户操作同时触发时只起一个 `Link`。
+    start_lock: tauri::async_runtime::Mutex<()>,
 }
 
 impl Default for PhoneLinkState {
@@ -456,6 +161,7 @@ impl Default for PhoneLinkState {
         Self {
             inner: Mutex::new(RuntimeInner::default()),
             seq: AtomicU64::new(1),
+            start_lock: tauri::async_runtime::Mutex::new(()),
         }
     }
 }
@@ -492,8 +198,8 @@ pub fn status_value(app: &tauri::AppHandle) -> Result<Value, String> {
         (link.device_id(), list)
     } else {
         // 未启动连接时也从本地状态展示已绑定的手机列表（显示为离线）。
-        let store = KeychainLinkStore::new(state_path(app)?);
-        let saved = store.load().unwrap_or_default();
+        // 只读非敏感字段，不触碰钥匙串（状态会被前端频繁刷新）。
+        let saved = read_public_state(&state_path(app)?);
         let mut list: Vec<Value> = saved
             .peers
             .values()
@@ -533,6 +239,8 @@ pub fn start(app: &tauri::AppHandle) {
 }
 
 async fn ensure_running(app: &tauri::AppHandle) -> Result<Link, String> {
+    let runtime = app.state::<PhoneLinkState>();
+    let _starting = runtime.start_lock.lock().await;
     {
         let state = app.state::<PhoneLinkState>();
         let guard = lock(&state.inner);
@@ -587,31 +295,34 @@ fn stop_running(app: &tauri::AppHandle) {
     emit_status(app);
 }
 
-fn send_json(link: &Link, peer: &str, msg: &Value, notify: bool) {
-    if let Ok(bytes) = serde_json::to_vec(msg) {
-        let _ = link.send(peer, &bytes, notify);
-    }
+/// 序列化并发送；超过协议单信封上限的事件会被换成一条简短的错误事件，其他超限消息返回错误让调用方处理。
+fn send_json(link: &Link, peer: &str, msg: &Value, notify: bool) -> Result<(), String> {
+    let bytes = match phone_wire::fit_for_wire(msg) {
+        Ok(bytes) => bytes,
+        Err(Some(replacement)) => serde_json::to_vec(&replacement).map_err(|e| e.to_string())?,
+        Err(None) => return Err("消息太大，无法发送".into()),
+    };
+    link.send(peer, &bytes, notify).map_err(|e| e.to_string())
 }
 
 fn broadcast_json(link: &Link, msg: &Value, notify: bool) {
-    let Ok(bytes) = serde_json::to_vec(msg) else { return };
     for peer in link.peers() {
         if peer.online || notify {
-            let _ = link.send(&peer.id, &bytes, notify);
+            let _ = send_json(link, &peer.id, msg, notify);
         }
     }
 }
 
 fn send_hello(app: &tauri::AppHandle, link: &Link, peer: &str) {
     let id = app.state::<PhoneLinkState>().next_msg_id();
-    send_json(
+    let _ = send_json(
         link,
         peer,
         &json!({
             "t": "hello",
             "id": id,
             "v": 1,
-            "caps": ["sessions", "stream", "approvals"],
+            "caps": ["sessions", "stream", "approvals", "snapshot_paging"],
             "app": env!("CARGO_PKG_VERSION"),
         }),
         false,
@@ -695,7 +406,7 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
         "hello" => {
             let v = msg.get("v").and_then(Value::as_u64).unwrap_or(1);
             if v != 1 {
-                send_json(
+                let _ = send_json(
                     link,
                     peer,
                     &json!({ "t": "unsupported", "id": state.next_msg_id(), "ref": req_id, "reason": "version_mismatch" }),
@@ -710,7 +421,7 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                 page["t"] = json!("sessions.page");
                 page["id"] = json!(state.next_msg_id());
                 page["ref"] = json!(req_id);
-                send_json(link, peer, &page, false);
+                let _ = send_json(link, peer, &page, false);
             }
         }
         "session.open" => {
@@ -721,11 +432,29 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                 .entry(peer.to_string())
                 .or_default()
                 .insert(session_id.to_string());
-            if let Ok(mut snap) = crate::chat::remote_session_snapshot(app, session_id, after) {
-                snap["t"] = json!("session.snapshot");
-                snap["id"] = json!(state.next_msg_id());
-                snap["ref"] = json!(req_id);
-                send_json(link, peer, &snap, false);
+            let failure = match crate::chat::remote_session_snapshot(app, session_id, after) {
+                Ok(mut snap) => {
+                    snap["t"] = json!("session.snapshot");
+                    snap["id"] = json!(state.next_msg_id());
+                    snap["ref"] = json!(req_id);
+                    send_json(link, peer, &snap, false).err()
+                }
+                Err(error) => Some(error),
+            };
+            if let Some(message) = failure {
+                // 不能让手机一直转圈：同步失败要明确告诉它。
+                let _ = send_json(
+                    link,
+                    peer,
+                    &json!({
+                        "t": "event",
+                        "id": state.next_msg_id(),
+                        "session": session_id,
+                        "kind": "error",
+                        "data": { "message": format!("同步会话失败：{message}") },
+                    }),
+                    false,
+                );
             }
         }
         "session.close" => {
@@ -761,7 +490,7 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                             .or_default()
                             .insert(sid.to_string());
                     }
-                    send_json(
+                    let _ = send_json(
                         link,
                         peer,
                         &json!({
@@ -775,7 +504,7 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                     );
                 }
                 Err(error) => {
-                    send_json(
+                    let _ = send_json(
                         link,
                         peer,
                         &json!({
@@ -805,18 +534,36 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                     }),
                 );
             }
-            if crate::chat::remote_answer_approval(app, approval_id, choice).is_ok() {
-                lock(&state.inner).open_approvals.remove(approval_id);
-                broadcast_json(
-                    link,
-                    &json!({
-                        "t": "approval.resolved",
-                        "id": state.next_msg_id(),
-                        "approval_id": approval_id,
-                        "by": "phone",
-                    }),
-                    false,
-                );
+            match crate::chat::remote_answer_approval(app, approval_id, choice) {
+                Ok(()) => {
+                    lock(&state.inner).open_approvals.remove(approval_id);
+                    broadcast_json(
+                        link,
+                        &json!({
+                            "t": "approval.resolved",
+                            "id": state.next_msg_id(),
+                            "approval_id": approval_id,
+                            "by": "phone",
+                        }),
+                        false,
+                    );
+                }
+                Err(reason) => {
+                    // 审批已被桌面处理、已过期，或需要在电脑上处理：告诉这台手机收起卡片，不要让它一直挂着。
+                    lock(&state.inner).open_approvals.remove(approval_id);
+                    let _ = send_json(
+                        link,
+                        peer,
+                        &json!({
+                            "t": "approval.resolved",
+                            "id": state.next_msg_id(),
+                            "approval_id": approval_id,
+                            "by": "expired",
+                            "reason": reason,
+                        }),
+                        false,
+                    );
+                }
             }
         }
         "unpair" => {
@@ -829,7 +576,7 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
             });
         }
         _ => {
-            send_json(
+            let _ = send_json(
                 link,
                 peer,
                 &json!({
@@ -874,12 +621,18 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
         let Some(link) = guard.link.clone() else { return };
         (link, guard.subscriptions.clone())
     };
+    // 只有打开过该会话（`session.open` / `message.send`）的手机才收内容事件；`notify` 事件（完成 / 出错）
+    // 对其他手机和离线手机仍会送达，但内容脱敏，只剩“有事发生”。
     let send_to_session = |session: &str, msg: &Value, notify: bool| {
-        let Ok(bytes) = serde_json::to_vec(msg) else { return };
+        let kind = msg.get("kind").and_then(Value::as_str).unwrap_or("");
         for peer in link.peers() {
-            let subscribed = subs.get(&peer.id).is_none_or(|set| set.is_empty() || set.contains(session));
-            if (peer.online && subscribed) || notify {
-                let _ = link.send(&peer.id, &bytes, notify);
+            let subscribed = subs.get(&peer.id).is_some_and(|set| set.contains(session));
+            if peer.online && subscribed {
+                let _ = send_json(&link, &peer.id, msg, notify);
+            } else if notify {
+                let mut redacted = msg.clone();
+                redacted["data"] = phone_wire::redact_for_unsubscribed(kind, &msg["data"]);
+                let _ = send_json(&link, &peer.id, &redacted, notify);
             }
         }
     };
@@ -917,8 +670,16 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
             let mapped = match ev_type {
                 "text_delta" => Some(("text.delta", json!({ "text": ev["text"] }), false)),
                 "reasoning_delta" => Some(("reasoning.delta", json!({ "text": ev["text"] }), false)),
-                "tool_start" => Some(("tool.start", json!({ "id": ev["id"], "name": ev["name"], "arguments": ev["arguments"] }), false)),
-                "tool_end" => Some(("tool.end", json!({ "id": ev["id"], "name": ev["name"], "output": ev["output"], "is_error": ev["is_error"] }), false)),
+                "tool_start" => Some((
+                    "tool.start",
+                    json!({ "id": ev["id"], "name": ev["name"], "arguments": phone_wire::clip_value(&ev["arguments"], phone_wire::MAX_EVENT_FIELD_CHARS) }),
+                    false,
+                )),
+                "tool_end" => Some((
+                    "tool.end",
+                    json!({ "id": ev["id"], "name": ev["name"], "output": phone_wire::clip_value(&ev["output"], phone_wire::MAX_EVENT_FIELD_CHARS), "is_error": ev["is_error"] }),
+                    false,
+                )),
                 "done" => Some(("turn.done", json!({}), true)),
                 "cancelled" => Some(("state", json!({ "state": "cancelled" }), false)),
                 "error" => Some(("error", json!({ "message": ev["message"] }), true)),
@@ -980,7 +741,7 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
                     "approval_id": approval_id,
                     "session": session,
                     "title": title,
-                    "detail": payload["arguments"],
+                    "detail": phone_wire::clip_detail(&payload["arguments"], phone_wire::MAX_EVENT_FIELD_CHARS),
                     "risk": risk,
                     "options": options,
                 }),
@@ -1137,7 +898,7 @@ pub async fn phone_link_unpair(app: tauri::AppHandle, peer_id: String) -> Result
     };
     if let Some(link) = link {
         let id = app.state::<PhoneLinkState>().next_msg_id();
-        send_json(&link, &peer_id, &json!({ "t": "unpair", "id": id }), false);
+        let _ = send_json(&link, &peer_id, &json!({ "t": "unpair", "id": id }), false);
         link.unpair(&peer_id).await.map_err(|e| e.to_string())?;
     } else {
         let store = KeychainLinkStore::new(state_path(&app)?);
@@ -1152,53 +913,6 @@ pub async fn phone_link_unpair(app: tauri::AppHandle, peer_id: String) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
-    use xiaoban_link_client::store::{DeviceIdentity, PeerRecord};
-
-    #[test]
-    fn keychain_store_keeps_private_key_and_prk_out_of_json_file() {
-        let dir = std::env::temp_dir().join(format!("xiaoban-keychain-store-{}", std::process::id()));
-        let _ = fs::remove_dir_all(&dir);
-        let file = dir.join("phone-link-state.json");
-        let service = format!("xyz.xiaban.test.link.{}", std::process::id());
-        let store = KeychainLinkStore::with_service(&file, &service);
-
-        let mut state = StoredState {
-            device: Some(DeviceIdentity {
-                id: "dsk_test1".into(),
-                name: "测试电脑".into(),
-                private_key: "secret_private_key_32bytes_base64url".into(),
-            }),
-            start_counter: 3,
-            peers: HashMap::new(),
-            pending_pair: None,
-        };
-        state.peers.insert(
-            "phn_test1".into(),
-            PeerRecord {
-                pairing_id: "pair_1".into(),
-                peer_id: "phn_test1".into(),
-                peer_name: "测试手机".into(),
-                peer_public: "pub_1".into(),
-                prk: "secret_pairing_prk_32bytes_base64url".into(),
-                replay: Some((1, "ep_abc".into(), 9)),
-            },
-        );
-        store.save(&state).unwrap();
-
-        let on_disk = fs::read_to_string(&file).unwrap();
-        assert!(!on_disk.contains("secret_private_key_32bytes_base64url"), "私钥不得以明文出现在 JSON 文件中");
-        assert!(!on_disk.contains("secret_pairing_prk_32bytes_base64url"), "配对密钥 PRK 不得以明文出现在 JSON 文件中");
-        assert!(on_disk.contains(KEYCHAIN_PLACEHOLDER));
-
-        // 新建实例（空内存缓存）从系统钥匙串/凭据库恢复完整私钥与 PRK
-        let reopened = KeychainLinkStore::with_service(&file, &service);
-        let loaded = reopened.load().unwrap();
-        assert_eq!(loaded, state);
-
-        // 移除全部状态后清理钥匙串条目
-        reopened.save(&StoredState::default()).unwrap();
-        let _ = fs::remove_dir_all(&dir);
-    }
 
     #[test]
     fn peer_messages_and_audit_log_are_parsed_and_recorded() {
