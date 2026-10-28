@@ -37,7 +37,9 @@ agent-connector-tools = { path = "../../../libs/agent-tools/connectors" }
 agent-skill-discovery = { path = "../../../libs/agent-tools/skill-discovery" }
 xiaoban-community = { path = "../../../libs/community-packs" }
 xiaoban-link-client = { path = "../../../libs/link-client" }
+xiaoban-voice-service = { path = "../../../libs/voice-service", default-features = false }
 agent-bridge = { package = "xiaoban-agent-bridge", path = "../../../libs/agent-bridge" }
+async-trait = "0.1"
 tokio = { version = "1", features = ["rt", "sync", "time"] }
 agent-kernel = { path = "../../../libs/agent-kernel", features = ["native-tls", "fs", "skills", "memory", "web", "shell", "mcp", "process", "journal", "sandbox"] }
 zip = { version = "=9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }

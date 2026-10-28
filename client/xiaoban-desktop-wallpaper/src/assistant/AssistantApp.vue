@@ -6,7 +6,7 @@ import MarkdownView from '../ui/chat/MarkdownView.ts';
 import SelectionCopyMenu from '../ui/chat/SelectionCopyMenu.vue';
 import type { AsrStore } from '../ui/asr/store.ts';
 import type { ApprovalRequest, ChatItem } from '../ui/chat/types.ts';
-import { invoke } from '../bridge.ts';
+import { invoke, listen } from '../bridge.ts';
 import { ballDisc, BALL_DIAMETER, boxOf, glassFrame, HoverIntent, MORPH_DURATION, MORPH_EASING, orbFrame, type Box } from './morph.ts';
 import { isDark } from '../ui/appearance.ts';
 import Orb from './Orb.vue';
@@ -352,6 +352,34 @@ async function act(action: () => Promise<void> | void) {
 async function newChat() { await act(() => props.store.newConversation()); cardShown.value = false; void nextTick(() => field.value?.focus()); }
 async function pickSession(id: string) { await act(() => props.store.switchSession(id)); cardShown.value = true; }
 
+const injecting = ref(false);
+async function injectToDesktop() {
+  const text = props.store.input.trim();
+  if (!text || injecting.value) return;
+  injecting.value = true;
+  try {
+    const res = await invoke<{ ok: boolean; target_found: boolean; window_title?: string; error?: string }>('speech_agent_inject', {
+      request: { target: 'Claude', text, press_enter: false },
+    });
+    if (res.ok) {
+      props.store.note(`已送字到 ${res.window_title || 'Claude'}`);
+    } else {
+      const retry = await invoke<{ ok: boolean; target_found: boolean; window_title?: string; error?: string }>('speech_agent_inject', {
+        request: { target: 'ChatGPT', text, press_enter: false },
+      });
+      if (retry.ok) {
+        props.store.note(`已送字到 ${retry.window_title || 'ChatGPT'}`);
+      } else {
+        props.store.note(res.error || '未找到 Claude 或 ChatGPT 桌面窗口');
+      }
+    }
+  } catch (e) {
+    props.store.note(`送字失败：${e}`);
+  } finally {
+    injecting.value = false;
+  }
+}
+
 /**
  * The text box grows with its text, up to four lines, then scrolls. Empty, it is one line whatever its width:
  * measured while the window is still narrow, the placeholder would wrap and leave the box tall.
@@ -524,11 +552,18 @@ const onFocus=()=>{
     void takeScreenshot(true);
   }
 };
+let unlistenAnnounce: (() => void) | undefined;
 onMounted(()=>{
   void nextTick(queueHitRegions);window.addEventListener('resize',queueHitRegions);window.addEventListener('resize',grow);
   document.addEventListener('pointerdown',outsideMenus);document.addEventListener('keydown',onAskShortcut);window.addEventListener('blur',onBlur);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
+  void (async () => {
+    unlistenAnnounce = await listen<{ text: string }>('speech-announcement', payload => {
+      if (payload.text) props.store.note(payload.text);
+    });
+  })();
 });
 onBeforeUnmount(()=>{
+  unlistenAnnounce?.();
   stopMorph(); hover.cancel(); clearTimeout(peekTimer); clearTimeout(movingFallback); clearTimeout(movingGiveUp); clearTimeout(fadeEnd);
   cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);window.removeEventListener('resize',grow);clearTimeout(blurTimer);clearTimeout(bubbleTimer);clearTimeout(copyTimer);
   window.removeEventListener('blur',onBlur);document.removeEventListener('pointerdown',outsideMenus);document.removeEventListener('keydown',onAskShortcut);imageVersion++; releasePress();window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();
@@ -623,7 +658,8 @@ onBeforeUnmount(()=>{
             </div>
           </section>
         </Transition>
-        <div v-if="chipsShown" class="chips" data-testid="assistant-chips">
+        <div v-if="chipsShown || (Boolean(store.input.trim()) && store.open)" class="chips" data-testid="assistant-chips">
+          <button v-if="store.input.trim() && store.open" type="button" class="chip" data-testid="assistant-chip-inject" @click="injectToDesktop"><ArrowUpRight :size="14" :stroke-width="1.75" /><span class="chip-text">送字到桌面版</span></button>
           <button v-if="continueTitle" type="button" class="chip" data-testid="assistant-chip-continue" @click="revealCard"><History :size="14" :stroke-width="1.75" /><span class="chip-text">继续「{{ continueTitle }}」</span></button>
           <button v-else-if="otherRecent" type="button" class="chip" data-testid="assistant-chip-recent" @click="continueOther(otherRecent.id)"><History :size="14" :stroke-width="1.75" /><span class="chip-text">继续「{{ otherRecent.title }}」</span></button>
         </div>

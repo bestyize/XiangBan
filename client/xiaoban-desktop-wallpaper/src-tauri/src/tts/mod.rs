@@ -94,6 +94,13 @@ fn synthesize(app: &tauri::AppHandle, id: u64, text: &str, options: &Options) ->
             .map_err(|fallback| if error.is_empty() { fallback } else { error }),
     }
 }
+
+pub(crate) fn synthesize_raw(app: &tauri::AppHandle, text: &str, options: Option<&Options>) -> Result<Vec<u8>, String> {
+    let default_options = tts_get_settings(app.clone()).map(|s| s.options).unwrap_or_default();
+    let opts = options.unwrap_or(&default_options);
+    let id = app.state::<TtsState>().generation.load(Ordering::SeqCst);
+    synthesize(app, id, text, opts)
+}
 fn cached(app: &tauri::AppHandle, key: &impl serde::Serialize, make: impl FnOnce() -> Result<Vec<u8>, String>) -> Result<Vec<u8>, String> {
     let key = format!("{:x}", Sha256::digest(serde_json::to_vec(key).map_err(|_| "语音参数无效")?));
     if let Some((_, audio)) = app.state::<TtsState>().cache.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(k, _)| *k == key) { return Ok(audio.clone()); }
