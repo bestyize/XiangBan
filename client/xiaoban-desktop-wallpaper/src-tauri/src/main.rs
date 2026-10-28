@@ -22,6 +22,7 @@ mod asr;
 mod ai_catalogue;
 mod ai_gateway;
 mod chat;
+mod community;
 mod storage;
 mod local_media;
 mod resource_packs;
@@ -582,6 +583,12 @@ fn show_control(app: tauri::AppHandle) -> Result<(), String> {
     present_control(&app)
 }
 
+/// Sends a `xiaoban://` link to the feature it names: `market` (the AI store) or `community` (packs and the community page).
+/// Each only asks the console to show something; the user confirms there.
+fn route_link(app: &tauri::AppHandle, text: &str) {
+    if text.starts_with("xiaoban://community") { community::receive_link(app, text); } else { chat::store_market::receive_link(app, text); }
+}
+
 pub(crate) fn present_control(app: &tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     app.show().map_err(|error| error.to_string())?;
@@ -850,6 +857,7 @@ fn main() {
             chat::store_market::ai_market_take_link, chat::store_market::ai_market_info, chat::store_market::ai_market_browse, chat::store_market::ai_market_categories, chat::store_market::ai_market_detail,
             chat::store_market::ai_market_inspect, chat::store_market::ai_market_install, chat::store_market::ai_market_group_inspect, chat::store_market::ai_market_group_install,
             chat::store_market::ai_market_updates, chat::store_market::ai_market_update,
+            community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
             chat::plugins::ai_plugin_installed, chat::connectors::ai_connector_installed, chat::connectors::ai_connector_configure, chat::connectors::ai_connector_set_enabled, chat::connectors::ai_connector_unbind, chat::connectors::ai_connector_reauthorize, chat::connectors::ai_mentions, chat::plugins::ai_plugin_pick_file, chat::plugins::ai_plugin_inspect_file, chat::plugins::ai_plugin_install_file, chat::plugins::ai_plugin_remove, chat::plugins::ai_plugin_avatar,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
             assistant_hit_test::assistant_set_regions, design_window::design_window_fullscreen, design_window::design_window_open, design_window::design_window_status, design_window::design_window_return, design_window::design_window_close, design_window::design_window_request, design::design_view_read, design::design_view_save, design::design_list, design::design_link, design::design_create, design::design_copy, design::design_read, design::design_save, design::design_draft_save, design::design_draft_clear, design::design_history, design::design_restore, design::design_import, design::design_export, data_library::library_state, data_library::library_pick_import, data_library::library_import_data, data_library::library_create_folder, data_library::library_rename_folder, data_library::library_delete_folder, data_library::library_move, data_library::library_update_doc, data_library::library_remove, data_library::library_reveal, data_library::library_attachment, data_library::library_add_link, data_library::library_rename_link, data_library::library_save, chat::memory_center::chat_memory_overview, chat::memory_center::chat_memory_set_remembering, chat::memory_center::chat_memory_edit_experience, chat::memory_center::chat_memory_forget_experience, chat::memory_center::chat_memory_write_note, chat::memory_center::chat_memory_delete_note, chat::memory_center::chat_memory_clear, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
@@ -857,7 +865,7 @@ fn main() {
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
             float_assistant::assistant_reanchor_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(window_control::WindowState::default()).manage(chat::store_market::PendingLink::default()).manage(voice_turn::VoiceTurnState::default())
+        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(window_control::WindowState::default()).manage(chat::store_market::PendingLink::default()).manage(community::CommunityState::default()).manage(voice_turn::VoiceTurnState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("design-preview", |context, request| design::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
@@ -897,10 +905,10 @@ fn main() {
                 use tauri_plugin_deep_link::DeepLinkExt;
                 let handle = app.handle().clone();
                 app.deep_link().on_open_url(move |event| {
-                    for url in event.urls() { chat::store_market::receive_link(&handle, url.as_str()); }
+                    for url in event.urls() { route_link(&handle, url.as_str()); }
                 });
                 if let Ok(Some(urls)) = app.deep_link().get_current() {
-                    for url in urls { chat::store_market::receive_link(app.handle(), url.as_str()); }
+                    for url in urls { route_link(app.handle(), url.as_str()); }
                 }
             }
             app.manage(chat::ChatState::new(app.handle()));

@@ -10,6 +10,7 @@ vi.mock('../bridge.ts', () => ({ invoke: vi.fn().mockResolvedValue(null), listen
 vi.mock('./components/SettingsDialog.vue', () => ({ __esModule: true, default: { template: '<div />' } }));
 vi.mock('./components/ChatNameDialog.vue', () => ({ __esModule: true, default: { template: '<div />' } }));
 vi.mock('./components/LoginModal.vue', () => ({ __esModule: true, default: { template: '<div />' } }));
+vi.mock('./community/CommunityApplyDialog.vue', () => ({ __esModule: true, default: { template: '<div />' } }));
 vi.mock('./components/WorkspaceSearchDialog.vue', () => ({ default: { props: ['show', 'spaces'], emits: ['select', 'update:show'], template: '<div v-if="show" data-testid="workspace-search-dialog" />' } }));
 vi.mock('naive-ui', () => ({ NAlert: { template: '<div />' }, NButton: { template: '<button />' }, NSkeleton: { template: '<div />' }, useMessage: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }) }));
 

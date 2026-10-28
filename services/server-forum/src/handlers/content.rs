@@ -801,7 +801,7 @@ async fn share(State(state): State<AppState>, Path((kind, id)): Path<(String, St
                 .fetch_optional(&state.pool)
                 .await?;
             let (title, summary) = t.ok_or_else(|| AppError::not_found("帖子"))?;
-            json!({ "kind": "topic", "title": title, "summary": summary, "url": format!("{site}/t/{id}"), "app_link": format!("xiaoban://community/topic/{id}") })
+            json!({ "kind": "topic", "title": title, "summary": summary, "url": format!("{site}/t/{id}"), "app_link": format!("xiaoban://community/open/topic/{id}") })
         }
         "scheme" => {
             let s: Option<(String, String)> = sqlx::query_as("SELECT title, summary FROM schemes WHERE id = $1 AND status = 'published'")
@@ -809,7 +809,7 @@ async fn share(State(state): State<AppState>, Path((kind, id)): Path<(String, St
                 .fetch_optional(&state.pool)
                 .await?;
             let (title, summary) = s.ok_or_else(|| AppError::not_found("方案"))?;
-            json!({ "kind": "scheme", "title": title, "summary": summary, "url": format!("{site}/schemes/{id}"), "app_link": format!("xiaoban://community/scheme/{id}") })
+            json!({ "kind": "scheme", "title": title, "summary": summary, "url": format!("{site}/schemes/{id}"), "app_link": format!("xiaoban://community/open/scheme/{id}") })
         }
         "project" => {
             let p: Option<(String, String)> = sqlx::query_as("SELECT name, summary FROM projects WHERE slug = $1 AND status = 'published'")
@@ -817,7 +817,7 @@ async fn share(State(state): State<AppState>, Path((kind, id)): Path<(String, St
                 .fetch_optional(&state.pool)
                 .await?;
             let (title, summary) = p.ok_or_else(|| AppError::not_found("项目"))?;
-            json!({ "kind": "project", "title": title, "summary": summary, "url": format!("{site}/projects/{id}"), "app_link": format!("xiaoban://community/project/{id}") })
+            json!({ "kind": "project", "title": title, "summary": summary, "url": format!("{site}/projects/{id}"), "app_link": format!("xiaoban://community/open/project/{id}") })
         }
         "weekly" => {
             let w: Option<(String, String)> = sqlx::query_as("SELECT title, summary FROM weekly_issues WHERE week = $1 AND status = 'published'")
@@ -825,7 +825,7 @@ async fn share(State(state): State<AppState>, Path((kind, id)): Path<(String, St
                 .fetch_optional(&state.pool)
                 .await?;
             let (title, summary) = w.ok_or_else(|| AppError::not_found("周刊"))?;
-            json!({ "kind": "weekly", "title": title, "summary": summary, "url": format!("{site}/weekly/{id}"), "app_link": format!("xiaoban://community/weekly/{id}") })
+            json!({ "kind": "weekly", "title": title, "summary": summary, "url": format!("{site}/weekly/{id}"), "app_link": format!("xiaoban://community/open/weekly/{id}") })
         }
         _ => return Err(AppError::BadRequest("不支持分享这种内容".into())),
     };

@@ -283,8 +283,25 @@ pub fn configure_care(window: tauri::WebviewWindow, config: CareConfig) -> Resul
 }
 
 #[tauri::command]
-pub fn upsert_care_rule(window: tauri::WebviewWindow, mut rule: Rule) -> Result<serde_json::Value, String> {
-    control(&window)?; let app = window.app_handle(); let state = app.state::<ReminderState>();
+pub fn upsert_care_rule(window: tauri::WebviewWindow, rule: Rule) -> Result<serde_json::Value, String> {
+    control(&window)?; upsert_rule(window.app_handle(), rule)
+}
+/// Adds the rules of a community pack the user has just confirmed. Every rule goes through the same checks as one
+/// written by hand. Rules that act for the user (agent tasks) pass `enable = false` and arrive switched off.
+pub fn import_rules(app: &tauri::AppHandle, rules: Vec<serde_json::Value>, enable: bool) -> Result<usize, String> {
+    let mut parsed = Vec::with_capacity(rules.len());
+    for value in rules {
+        let mut rule: Rule = serde_json::from_value(value).map_err(|e| format!("规则格式不对：{e}"))?;
+        rule.id = String::new();
+        rule.enabled = enable && rule.enabled;
+        parsed.push(rule);
+    }
+    let count = parsed.len();
+    for rule in parsed { upsert_rule(app, rule)?; }
+    Ok(count)
+}
+fn upsert_rule(app: &tauri::AppHandle, mut rule: Rule) -> Result<serde_json::Value, String> {
+    let state = app.state::<ReminderState>();
     let now = Local::now().timestamp();
     let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner()); let mut next = store.clone();
     if rule.id.is_empty() {

@@ -6128,6 +6128,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ea6fc2961e4ef194dcbfe56bb845534d0dc8098940c7e5c012a258bfec6701bd"
 
 [[package]]
+name = "xiaoban-community"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "url",
+ "zip 9.0.4",
+]
+
+[[package]]
 name = "xiaoban-desktop-wallpaper"
 version = "2.1.0"
 dependencies = [
@@ -6167,6 +6179,7 @@ dependencies = [
  "windows-registry",
  "windows-sys 0.61.2",
  "windows-version",
+ "xiaoban-community",
  "zip 9.0.4",
 ]
 

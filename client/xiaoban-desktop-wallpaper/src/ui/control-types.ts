@@ -11,7 +11,7 @@ import type { GameCatalog } from "../games/catalog.ts";
 export type { GameCatalog };
 
 /** The pages the shell shows (方案四). */
-export type MainPage = "new-task" | "chat" | "ai-store" | "library" | "studio" | "games" | "care" | "interactive";
+export type MainPage = "new-task" | "chat" | "ai-store" | "library" | "studio" | "games" | "care" | "community" | "interactive";
 /**
  * Older ids that still work with `navigate`: the four studio kinds open 装扮 on that tab,
  * "settings" / "assistant" open the settings dialog instead of a page.

@@ -9,6 +9,7 @@ import type { ControlPage, SettingsTab } from './control-types.ts';
 import type { SessionSummary } from './chat/types.ts';
 import SettingsDialog from './components/SettingsDialog.vue';
 import ChatNameDialog from './components/ChatNameDialog.vue';
+import CommunityApplyDialog from './community/CommunityApplyDialog.vue';
 import WorkspaceSearchDialog from './components/WorkspaceSearchDialog.vue';
 import { useWorkspaceSort } from './workspace-sort.ts';
 const pageLoaders = {
@@ -20,6 +21,7 @@ const pageLoaders = {
   interactive: () => import('./pages/InteractivePage.vue'),
   games: () => import('./pages/GamesPage.vue'),
   care: () => import('./pages/CarePage.vue'),
+  community: () => import('./pages/CommunityPage.vue'),
 };
 const NewTaskPage = defineAsyncComponent(pageLoaders['new-task']);
 const ChatPage = defineAsyncComponent(pageLoaders.chat);
@@ -29,6 +31,7 @@ const StudioPage = defineAsyncComponent(pageLoaders.studio);
 const InteractivePage = defineAsyncComponent(pageLoaders.interactive);
 const GamesPage = defineAsyncComponent(pageLoaders.games);
 const CarePage = defineAsyncComponent(pageLoaders.care);
+const CommunityPage = defineAsyncComponent(pageLoaders.community);
 const LoginModal = defineAsyncComponent(() => import('./components/LoginModal.vue'));
 
 const message = useMessage();
@@ -51,6 +54,7 @@ const bottomItems = [
   { id: 'studio', label: '装扮', icon: Palette },
   { id: 'games', label: '游玩', icon: Gamepad2 },
   { id: 'care', label: '提醒', icon: Bell },
+  { id: 'community', label: '社区', icon: Globe },
 ] as const;
 const aiItems = computed(() => [
   { id: 'new-task', label: '新建任务', icon: SquarePen, hint: `${mod.value}N` },
@@ -621,12 +625,14 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
           <InteractivePage v-else-if="store.page === 'interactive'" :store="store" />
           <GamesPage v-else-if="store.page === 'games'" :store="store" />
           <CarePage v-else-if="store.page === 'care'" :store="store" />
+          <CommunityPage v-else-if="store.page === 'community'" :store="store" />
         </KeepAlive></template>
       </main>
     </div>
     <SettingsDialog :store="store" @open-site="openOfficialSite" />
     <WorkspaceSearchDialog v-model:show="searchOpen" :desktop="store.desktop" :spaces="spaces" @select="selectSearchResult" />
     <LoginModal :store="store" />
+    <CommunityApplyDialog :store="store" />
   </div>
 </template>
 <style>

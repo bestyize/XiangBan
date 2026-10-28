@@ -92,6 +92,36 @@ impl Community {
         Ok(info)
     }
 
+    /// 社区页的只读浏览：只放行周刊和内容包列表，调用方给的路径不能借此访问别的接口。
+    pub fn browse(&self, path: &str) -> Result<serde_json::Value, String> {
+        let allowed = path == "/api/weekly"
+            || path.starts_with("/api/weekly?")
+            || path.strip_prefix("/api/weekly/").is_some_and(|w| w.len() <= 12 && w.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'))
+            || path == "/api/packs"
+            || path.starts_with("/api/packs?")
+            || path.strip_prefix("/api/packs/").is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()));
+        if !allowed || path.contains("..") || path.contains('#') || path.len() > 200 {
+            return Err("不支持的社区页请求".into());
+        }
+        let response = self.http.get(format!("{}{path}", self.origin)).send().map_err(|_| "无法连接社区服务器".to_string())?;
+        if !response.status().is_success() {
+            let status = response.status();
+            let message = response.json::<serde_json::Value>().ok().and_then(|v| v["message"].as_str().map(str::to_string));
+            return Err(message.unwrap_or_else(|| format!("社区服务器返回 {status}")));
+        }
+        response.json().map_err(|_| "社区服务器返回了无法识别的内容".to_string())
+    }
+
+    /// 应用成功后告诉论坛一声（只做聚合计数）。失败不影响已经完成的应用，所以不返回错误。
+    pub fn report_applied(&self, pack_id: i64, version: i32) {
+        let _ = self
+            .http
+            .post(format!("{}/api/packs/{pack_id}/applied", self.origin))
+            .json(&serde_json::json!({ "version": version }))
+            .timeout(Duration::from_secs(10))
+            .send();
+    }
+
     /// 依次尝试主地址和官方镜像，返回第一份通过校验的字节。
     pub fn fetch(&self, info: &DownloadInfo) -> Result<Vec<u8>, String> {
         let mut failures = Vec::new();
@@ -234,6 +264,23 @@ mod tests {
         let only_bad: DownloadInfo = serde_json::from_slice(&info_json(&origin, &data, json!([]))).unwrap();
         let err = client.fetch(&only_bad).unwrap_err();
         assert!(err.contains("SHA-256"), "{err}");
+    }
+
+    #[test]
+    fn browse_only_allows_read_only_community_paths() {
+        let routes: Routes = Arc::default();
+        let origin = serve(routes.clone());
+        routes.lock().unwrap().push(("/api/weekly".into(), 200, br#"{"items":[]}"#.to_vec()));
+        routes.lock().unwrap().push(("/api/packs?kind=effect&sort=hot".into(), 200, br#"{"items":[1]}"#.to_vec()));
+        let client = Community::new(&origin).unwrap();
+        assert_eq!(client.browse("/api/weekly").unwrap()["items"].as_array().unwrap().len(), 0);
+        assert!(client.browse("/api/packs?kind=effect&sort=hot").is_ok());
+        for bad in [
+            "/api/admin/packs", "/api/me/points", "/api/weekly/../admin", "/api/packs/abc", "/api/weekly/2026-W44/x",
+            "/api/internal/pack-uploaded", "http://evil.test/api/weekly", "/api/weeklyx", "/api/packs#x",
+        ] {
+            assert!(client.browse(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]
