@@ -111,12 +111,12 @@ pub fn inspect(bytes: &[u8], kind: &str) -> Result<Inspected, String> {
     Ok(Inspected { manifest, payload: if is_pure_data(kind) { payload } else { None }, files })
 }
 
-/// 提醒与任务模板载荷是 `{ "rules": [...] }`；这里只检查数量与类型归属，字段细节由桌面端已有的提醒校验负责。
-/// `reminder` 只能含普通提醒与休息提醒；`task` 只能含小伴定时任务（agent），因为它会让助手代为执行。
+/// 提醒与例行事项的载荷是 `{ "rules": [...] }`；这里只检查数量与类型归属，字段细节由桌面端已有的提醒校验负责。
+/// `reminder` 只含不会运行助手的普通规则；`routine` 只含会让小伴按时代为执行只读任务的 `agent` 规则。
 pub fn rules_for(kind: &str, payload: &Value) -> Result<Vec<Value>, String> {
     let allowed: &[&str] = match kind {
         "reminder" => &["custom", "off-work", "rest"],
-        "task" => &["agent"],
+        "routine" => &["agent"],
         _ => return Err("这个类型不含提醒规则".into()),
     };
     let rules = payload.get("rules").and_then(Value::as_array).ok_or("payload.json 需要 rules 数组")?;
@@ -130,6 +130,49 @@ pub fn rules_for(kind: &str, payload: &Value) -> Result<Vec<Value>, String> {
         }
     }
     Ok(rules.clone())
+}
+
+fn text_field(obj: &Value, key: &str, max: usize, required: bool) -> Result<String, String> {
+    let value = obj.get(key).and_then(Value::as_str).unwrap_or("").trim().to_string();
+    if required && value.is_empty() {
+        return Err(format!("缺少 {key}"));
+    }
+    if value.chars().count() > max {
+        return Err(format!("{key} 最多 {max} 个字"));
+    }
+    Ok(value)
+}
+
+/// 任务模板：一段可直接交给助手的任务。只取白名单字段并限制长度，原样交给用户确认后放进新对话的输入框，
+/// 不会自动发送；写文件、运行命令仍按权限模式逐次确认。
+pub fn task_template(payload: &Value) -> Result<Value, String> {
+    let skills: Vec<String> = payload
+        .get("requiredSkills")
+        .and_then(Value::as_array)
+        .map(|list| list.iter().filter_map(Value::as_str).map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+        .unwrap_or_default();
+    if skills.len() > 10 || skills.iter().any(|s| s.chars().count() > 60) {
+        return Err("requiredSkills 最多 10 项，每项最多 60 个字".into());
+    }
+    Ok(serde_json::json!({
+        "title": text_field(payload, "title", 60, true)?,
+        "scenario": text_field(payload, "scenario", 300, false)?,
+        "prompt": text_field(payload, "prompt", 4000, true)?,
+        "requiredSkills": skills,
+        "expectedOutput": text_field(payload, "expectedOutput", 300, false)?,
+        "risk": text_field(payload, "risk", 300, false)?,
+    }))
+}
+
+/// 目标模板：结果、验收方式、约束、边界、停止条件。**不携带验证命令和自动续跑**——它们会执行命令，只能由用户自己填写。
+pub fn goal_template(payload: &Value) -> Result<Value, String> {
+    Ok(serde_json::json!({
+        "outcome": text_field(payload, "outcome", 1000, true)?,
+        "verification": text_field(payload, "verification", 1000, false)?,
+        "constraints": text_field(payload, "constraints", 1000, false)?,
+        "boundaries": text_field(payload, "boundaries", 1000, false)?,
+        "stopWhen": text_field(payload, "stopWhen", 1000, false)?,
+    }))
 }
 
 #[cfg(test)]
@@ -178,12 +221,32 @@ mod tests {
     fn rules_follow_the_kind() {
         let reminders = json!({"rules":[{"kind":"custom","text":"喝水"},{"kind":"rest","text":"站起来"}]});
         assert_eq!(rules_for("reminder", &reminders).unwrap().len(), 2);
-        assert!(rules_for("task", &reminders).is_err(), "任务模板只能含 agent 规则");
-        let tasks = json!({"rules":[{"kind":"agent","text":"整理周报"}]});
-        assert!(rules_for("task", &tasks).is_ok());
-        assert!(rules_for("reminder", &tasks).is_err(), "提醒包不能夹带会代为执行的任务");
+        assert!(rules_for("routine", &reminders).is_err(), "例行事项只能含 agent 规则");
+        let routines = json!({"rules":[{"kind":"agent","text":"每天早上整理新闻简报"}]});
+        assert!(rules_for("routine", &routines).is_ok());
+        assert!(rules_for("reminder", &routines).is_err(), "提醒包不能夹带会代为执行的任务");
         assert!(rules_for("reminder", &json!({"rules":[]})).is_err());
         assert!(rules_for("reminder", &json!({})).is_err());
         assert!(rules_for("effect", &reminders).is_err());
+        assert!(rules_for("task", &routines).is_err());
+    }
+
+    #[test]
+    fn task_templates_keep_only_known_fields() {
+        let t = task_template(&json!({"title":"整理下载文件夹","prompt":"请把下载文件夹按类型分类","requiredSkills":["files"," "],"evil":"x"})).unwrap();
+        assert_eq!(t["title"], "整理下载文件夹");
+        assert_eq!(t["requiredSkills"], json!(["files"]));
+        assert!(t.get("evil").is_none());
+        assert!(task_template(&json!({"title":"x"})).is_err(), "缺提示词");
+        assert!(task_template(&json!({"title":"x","prompt":"a".repeat(4001)})).is_err());
+        assert!(task_template(&json!({"title":"x","prompt":"p","requiredSkills":vec!["s";11]})).is_err());
+    }
+
+    #[test]
+    fn goal_templates_never_carry_commands() {
+        let g = goal_template(&json!({"outcome":"四周内完成开题报告","verification":"导师确认","verificationCommand":"rm -rf /","autoResume":true})).unwrap();
+        assert_eq!(g["outcome"], "四周内完成开题报告");
+        assert!(g.get("verificationCommand").is_none() && g.get("autoResume").is_none());
+        assert!(goal_template(&json!({"verification":"x"})).is_err(), "目标结果必填");
     }
 }

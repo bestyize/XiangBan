@@ -21,8 +21,10 @@ const props = defineProps<{
   desktop: boolean;
   permissionMode: 'ask' | 'auto';
   sessionTitle?: string;
+  /** A goal template from the community: fills the form, but nothing is created until the user saves. */
+  template?: { outcome: string; verification: string; constraints: string; boundaries: string; stopWhen: string } | null;
 }>();
-const emit = defineEmits<{ (e: 'session-created', id: string): void; (e: 'changed'): void; (e: 'close'): void; (e: 'busy-change', value: boolean): void }>();
+const emit = defineEmits<{ (e: 'template-used'): void; (e: 'session-created', id: string): void; (e: 'changed'): void; (e: 'close'): void; (e: 'busy-change', value: boolean): void }>();
 const goal = ref<GoalRecord | null>(null);
 const outcome = ref('');
 const verification = ref('');
@@ -77,6 +79,22 @@ async function refresh() {
   } catch (e) { if (props.sessionId === id) error.value = String(e); }
 }
 watch(() => props.sessionId, () => { evidence.value = ''; creatingNew.value = false; void refresh(); }, { immediate: true });
+/** The template fills the form only when there is no goal in progress; it never carries a verification command. */
+async function applyTemplate() {
+  const template = props.template;
+  if (!template) return;
+  await refresh();
+  emit('template-used');
+  if (goal.value && goal.value.state !== 'draft' && goal.value.state !== 'completed') {
+    error.value = '当前目标尚未结束，请先处理它，再套用模板';
+    return;
+  }
+  if (goal.value) creatingNew.value = true;
+  outcome.value = template.outcome; verification.value = template.verification; constraints.value = template.constraints;
+  boundaries.value = template.boundaries; stopWhen.value = template.stopWhen;
+  verificationCommand.value = ''; autoResume.value = false;
+}
+watch(() => props.template, () => { void applyTemplate(); }, { immediate: true });
 watch(() => props.running, (running, wasRunning) => {
   if (wasRunning && !running) void refresh();
 });

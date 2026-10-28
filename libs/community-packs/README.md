@@ -13,7 +13,7 @@
 zip 根目录：
 
 - `manifest.json`：`{ "schemaVersion": 1, "kind": "effect", "id": "aurora", "name": "极光", "version": "1.0.0" }`，与论坛、资源机的检查一致。
-- `payload.json`（纯数据类必需）：`effect` 是桌面现有的特效包 JSON；`reminder`、`task` 是 `{ "rules": [ … ] }`，规则字段沿用桌面提醒规则（`reminder` 只含 `custom`/`off-work`/`rest`，`task` 只含会让小伴代为执行的 `agent`）。
+- `payload.json`（纯数据类必需）：`effect` 是桌面现有的特效包 JSON；`reminder`、`routine` 是 `{ "rules": [ … ] }`，规则字段沿用桌面提醒规则（`reminder` 只含 `custom`/`off-work`/`rest`，`routine` 例行事项只含按时只读执行的 `agent`）；`task` 任务模板是 `{ title, scenario?, prompt, requiredSkills?, expectedOutput?, risk? }`，只取这些字段并限制长度；`goal` 目标模板是 `{ outcome, verification?, constraints?, boundaries?, stopWhen? }`，**不携带验证命令和自动续跑**。
 - 可选 `README.md`、`preview.png`。
 
 压缩包大小上限与论坛一致：纯数据类与专家 ≤ 1 MB，组件、游戏、技能、工作流 ≤ 8 MB，壁纸 ≤ 32 MB。

@@ -28,6 +28,33 @@ function open(props: Partial<typeof baseProps> = {}) {
 beforeEach(() => vi.resetAllMocks());
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); });
 
+describe('goal templates from the community', () => {
+  const template = { outcome: '四周内完成开题报告', verification: '导师确认', constraints: '', boundaries: '', stopWhen: '' };
+
+  it('fills the form without saving anything and never fills a verification command', async () => {
+    vi.mocked(invoke).mockImplementation(async command => {
+      if (command === 'chat_goal_get') return null as never;
+      throw new Error('unexpected ' + command);
+    });
+    const wrapper = open({ template } as never);
+    await flushPromises();
+    expect((wrapper.get('[data-testid="goal-outcome"] textarea').element as HTMLTextAreaElement).value).toBe('四周内完成开题报告');
+    expect((wrapper.get('[data-testid="goal-verification-command"] input').element as HTMLInputElement).value).toBe('');
+    expect(vi.mocked(invoke).mock.calls.some(([command]) => command === 'chat_goal_set')).toBe(false);
+    expect(wrapper.emitted('template-used')).toHaveLength(1);
+  });
+
+  it('does not overwrite a goal that is still in progress', async () => {
+    vi.mocked(invoke).mockImplementation(async command => {
+      if (command === 'chat_goal_get') return goal('running') as never;
+      throw new Error('unexpected ' + command);
+    });
+    const wrapper = open({ template } as never);
+    await flushPromises();
+    expect(wrapper.text()).toContain('请先处理它');
+  });
+});
+
 describe('durable goal workbench', () => {
   it('saves the exact user-selected acceptance command and optional restart permission', async () => {
     vi.mocked(invoke).mockImplementation(async command => {

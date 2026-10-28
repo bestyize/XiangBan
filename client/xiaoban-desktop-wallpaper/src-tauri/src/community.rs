@@ -70,17 +70,36 @@ pub async fn community_prepare(
         let found = community::inspect(&bytes, &info.kind)?;
         let payload = found.payload.clone().ok_or("这个内容包没有可应用的内容")?;
         // What the user will be asked to confirm: for rules the whole text, for an effect its own checks.
-        let (items, can_apply) = match info.kind.as_str() {
+        let (items, can_apply, payload) = match info.kind.as_str() {
             "effect" => {
                 crate::effect_packs::validate(&payload)?;
-                (vec![json!({ "title": payload["name"], "detail": payload["description"] })], info.one_click)
+                (vec![json!({ "title": payload["name"], "detail": payload["description"] })], info.one_click, payload)
             }
-            "reminder" | "task" => {
+            "reminder" | "routine" => {
                 let rules = community::rules_for(&info.kind, &payload)?;
                 let items: Vec<Value> = rules.iter().map(|rule| json!({
                     "title": rule["kind"], "detail": rule["text"], "schedule": { "repeat": rule["repeat"], "time": rule["time"], "weekdays": rule["weekdays"], "intervalMinutes": rule["intervalMinutes"] },
                 })).collect();
-                (items, info.one_click)
+                (items, info.one_click, payload)
+            }
+            "task" => {
+                let task = community::task_template(&payload)?;
+                let mut detail = format!("将发给助手的提示词：\n{}", task["prompt"].as_str().unwrap_or_default());
+                for (label, key) in [("适用场景", "scenario"), ("预期产出", "expectedOutput"), ("风险说明", "risk")] {
+                    if let Some(text) = task[key].as_str().filter(|t| !t.is_empty()) { detail.push_str(&format!("\n{label}：{text}")); }
+                }
+                if let Some(skills) = task["requiredSkills"].as_array().filter(|l| !l.is_empty()) {
+                    detail.push_str(&format!("\n需要的技能：{}", skills.iter().filter_map(Value::as_str).collect::<Vec<_>>().join("、")));
+                }
+                (vec![json!({ "title": task["title"], "detail": detail })], info.one_click, task)
+            }
+            "goal" => {
+                let goal = community::goal_template(&payload)?;
+                let mut detail = String::new();
+                for (label, key) in [("结果", "outcome"), ("验收方式", "verification"), ("约束", "constraints"), ("边界", "boundaries"), ("停止条件", "stopWhen")] {
+                    if let Some(text) = goal[key].as_str().filter(|t| !t.is_empty()) { detail.push_str(&format!("{label}：{text}\n")); }
+                }
+                (vec![json!({ "title": "长期目标", "detail": detail.trim_end() })], info.one_click, goal)
             }
             other => return Err(format!("桌面端暂时还不能应用「{other}」类型的内容包，请先在网页上查看")),
         };
@@ -92,8 +111,8 @@ pub async fn community_prepare(
             "token": token, "packId": info.pack_id, "kind": info.kind, "title": found.manifest["name"],
             "version": info.label, "trustLevel": info.trust_level, "canApply": can_apply, "size": info.size,
             "sha256": info.sha256, "items": items,
-            // Tasks act for the user, so they arrive switched off and the user turns them on after reading them.
-            "startsDisabled": info.kind == "task",
+            // Routines run for the user while they are away, so they arrive switched off and the user turns them on after reading them.
+            "startsDisabled": info.kind == "routine",
         }))
     }).await.map_err(|e| e.to_string())?
 }
@@ -112,22 +131,26 @@ pub async fn community_apply(app: tauri::AppHandle, window: tauri::WebviewWindow
     };
     if !staged.can_apply { return Err("这个内容还没有通过审核，不能一键应用".into()); }
     tauri::async_runtime::spawn_blocking(move || {
-        let message = match staged.kind.as_str() {
+        // `status` tells the console what to do next: "applied" is finished; "task" and "goal" hand the template to the
+        // console, which puts it in front of the user to start themselves (nothing is sent or created here).
+        let result = match staged.kind.as_str() {
             "effect" => {
                 let file = crate::effects::save_pack(&app, &staged.payload, false)?;
-                format!("已添加特效（{file}），到装扮里选用它")
+                json!({ "status": "applied", "message": format!("已添加特效（{file}），到装扮里选用它") })
             }
             "reminder" => {
                 let rules = community::rules_for("reminder", &staged.payload)?;
-                format!("已添加 {} 条提醒", crate::reminders::import_rules(&app, rules, true)?)
+                json!({ "status": "applied", "message": format!("已添加 {} 条提醒", crate::reminders::import_rules(&app, rules, true)?) })
             }
-            "task" => {
-                let rules = community::rules_for("task", &staged.payload)?;
-                format!("已添加 {} 个定时任务，默认未启用，到提醒页确认后打开", crate::reminders::import_rules(&app, rules, false)?)
+            "routine" => {
+                let rules = community::rules_for("routine", &staged.payload)?;
+                json!({ "status": "applied", "message": format!("已添加 {} 个例行事项，默认未启用，到提醒页确认后打开", crate::reminders::import_rules(&app, rules, false)?) })
             }
+            "task" => json!({ "status": "task", "message": "已放进新对话的输入框，确认后再发送", "task": staged.payload }),
+            "goal" => json!({ "status": "goal", "message": "已填入长期目标表单，确认后再创建", "goal": staged.payload }),
             other => return Err(format!("不支持应用「{other}」类型的内容包")),
         };
         if let Ok(client) = community::Community::new(&origin()) { client.report_applied(staged.pack_id, staged.version); }
-        Ok(json!({ "status": "applied", "message": message }))
+        Ok(result)
     }).await.map_err(|e| e.to_string())?
 }

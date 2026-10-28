@@ -7,4 +7,4 @@ pub mod pack;
 
 pub use client::{Community, DownloadInfo, Mirror};
 pub use link::{parse_link, Link};
-pub use pack::{inspect, is_pure_data, rules_for, size_limit, Inspected};
+pub use pack::{goal_template, inspect, is_pure_data, rules_for, size_limit, task_template, Inspected};
