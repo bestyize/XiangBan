@@ -82,6 +82,16 @@ pub(crate) struct App {
 }
 pub(crate) const OPERATION_TIMEOUT: Duration = Duration::from_secs(120);
 
+/// 整个请求的处理上限。转写最长要处理 10 分钟的音频（分段识别、每段另有 [`OPERATION_TIMEOUT`]），
+/// 所以单独放宽；其余接口都是短操作。
+pub(crate) fn request_timeout(path: &str) -> Duration {
+    if path == "/v1/audio/transcriptions" {
+        Duration::from_secs(660)
+    } else {
+        Duration::from_secs(180)
+    }
+}
+
 /// Start a loopback-only server. Rejects non-loopback binds and short/invalid tokens.
 /// Library operations use only memory, the listening socket, and injected backends.
 pub async fn start(config: ServerConfig, backends: Backends) -> io::Result<RunningServer> {
@@ -238,6 +248,7 @@ async fn guarded(app: Arc<App>, request: Request, next: Next) -> (Response, usiz
         );
     }
     let (parts, body) = request.into_parts();
+    let parts_path = parts.uri.path().to_owned();
     let bytes =
         match tokio::time::timeout(Duration::from_secs(30), to_bytes(body, app.max_body)).await {
             Ok(Ok(bytes)) => bytes,
@@ -266,8 +277,8 @@ async fn guarded(app: Arc<App>, request: Request, next: Next) -> (Response, usiz
         };
     let size = bytes.len();
     let request = Request::from_parts(parts, Body::from(bytes));
-    let mut response = match tokio::time::timeout(Duration::from_secs(180), next.run(request)).await
-    {
+    let limit = request_timeout(parts_path.as_str());
+    let mut response = match tokio::time::timeout(limit, next.run(request)).await {
         Ok(response) => response,
         Err(_) => ApiError::new(StatusCode::GATEWAY_TIMEOUT, "timeout", "request timed out")
             .into_response(),
@@ -386,5 +397,27 @@ impl App {
                 " "
             },
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn only_transcription_gets_the_long_deadline() {
+        assert_eq!(
+            request_timeout("/v1/audio/transcriptions"),
+            Duration::from_secs(660)
+        );
+        for path in [
+            "/v1/audio/speech",
+            "/v1/audio/voices",
+            "/mcp",
+            "/health",
+            "/other",
+        ] {
+            assert_eq!(request_timeout(path), Duration::from_secs(180), "{path}");
+        }
     }
 }
