@@ -5,7 +5,7 @@ use super::stream::SseParser;
 use crate::error::HarnessError;
 use reqwest::Client;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 const ERROR_BODY_LIMIT: u64 = 2000;
 
@@ -24,6 +24,8 @@ pub(crate) trait Decoder {
         &mut self, payload: &str, on_text: &mut dyn FnMut(&str),
         _on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
     ) -> Result<bool, HarnessError> { self.push(payload, on_text) }
+    /// The tool call being written out right now, if any, for progress reports while its arguments stream in.
+    fn pending_tool(&self) -> Option<super::ToolProgress> { None }
     /// Whether the stream may end here without a terminal event and still count as complete.
     fn complete(&self) -> bool;
 }
@@ -51,6 +53,17 @@ pub(crate) fn merge_headers(mut headers: Vec<(String, String)>, extra: &[(String
         headers.push((name.clone(), value.clone()));
     }
     headers
+}
+
+/// A tool call's streaming arguments are reported about once a second while they grow, sooner (but at most four times
+/// a second) for every 4 KB: enough to show a long silent write is moving, without an event per chunk.
+fn progress_due(last: &mut (Instant, usize, bool), bytes: usize) -> bool {
+    let (at, seen, any) = *last;
+    if bytes == seen && any { return false; }
+    let due = !any || at.elapsed() >= Duration::from_secs(1)
+        || (bytes.saturating_sub(seen) >= 4096 && at.elapsed() >= Duration::from_millis(250));
+    if due { *last = (Instant::now(), bytes, true); }
+    due
 }
 
 fn status_is_retryable(status: u16) -> bool {
@@ -100,13 +113,13 @@ pub(crate) fn post_stream_with_reasoning(
     on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
     cancel: &AtomicBool,
 ) -> Result<(), HarnessError> {
-    post_stream_with_policy(client, call, decoder, on_text, on_reasoning, cancel, &super::wire::ModelTimeouts::default())
+    post_stream_with_policy(client, call, decoder, on_text, on_reasoning, &mut |_| {}, cancel, &super::wire::ModelTimeouts::default())
 }
 
 pub(crate) fn post_stream_with_policy(
     client: &Client, call: Call, decoder: &mut dyn Decoder,
     on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
-    cancel: &AtomicBool, policy: &super::wire::ModelTimeouts,
+    on_tool: &mut dyn FnMut(&super::ToolProgress), cancel: &AtomicBool, policy: &super::wire::ModelTimeouts,
 ) -> Result<(), HarnessError> {
     policy.validate()?;
     let rt=tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|e|HarnessError::Config(e.to_string()))?;
@@ -123,7 +136,7 @@ pub(crate) fn post_stream_with_policy(
             }
             return Err(HarnessError::provider(if status==413 { "HTTP 413: request_too_large: 请求体积超过服务端限制，请减少图片、降低截图尺寸或压缩会话后继续。".into() } else {format!("HTTP {status}: {}",String::from_utf8_lossy(&raw))},status_is_retryable(status)));
         }
-        let mut parser=SseParser::default();let mut buffer=Vec::new();let mut total=0usize;let mut event_bytes=0usize;let mut received_event=false;
+        let mut parser=SseParser::default();let mut buffer=Vec::new();let mut total=0usize;let mut event_bytes=0usize;let mut received_event=false;let mut reported=(Instant::now(),0usize,false);
         loop {
             let chunk=wait_for_io(response.chunk(),cancel,Duration::from_secs(if received_event {policy.stream_idle_seconds} else {policy.first_event_seconds}),if received_event {"waiting for stream data"} else {"waiting for first model event"}).await?.map_err(|e|transport_error(e,"stream read"))?;
             let Some(chunk)=chunk else{break;};total=total.saturating_add(chunk.len());
@@ -137,6 +150,9 @@ pub(crate) fn post_stream_with_policy(
                 if let Some(payload)=parser.push_line(line){received_event=true;if decoder.push_with_reasoning(&payload,on_text,on_reasoning)?{return Ok(());}}
             }
             if buffer.len()>2*1024*1024{return Err(HarnessError::provider("SSE line exceeds limit",false));}
+            if let Some(progress)=decoder.pending_tool() {
+                if progress_due(&mut reported,progress.bytes) {on_tool(&progress);}
+            }
         }
         if !buffer.is_empty(){let line=std::str::from_utf8(&buffer).map_err(|_|HarnessError::provider("invalid SSE UTF-8",false))?;if let Some(p)=parser.push_line(line){if decoder.push_with_reasoning(&p,on_text,on_reasoning)?{return Ok(());}}}
         if let Some(p)=parser.flush(){if decoder.push_with_reasoning(&p,on_text,on_reasoning)?{return Ok(());}}
@@ -280,9 +296,36 @@ mod phase_timeout_tests {
             let listener=TcpListener::bind("127.0.0.1:0").unwrap();let url=format!("http://{}",listener.local_addr().unwrap());let(release,wait)=mpsc::channel();
             let server=std::thread::spawn(move||{let(mut socket,_)=listener.accept().unwrap();socket.set_read_timeout(Some(Duration::from_secs(3))).unwrap();let mut raw=Vec::new();let mut byte=[0];while !raw.ends_with(b"\r\n\r\n"){if socket.read(&mut byte).unwrap_or(0)==0{return;}raw.push(byte[0]);}let _=socket.write_all(prefix.as_bytes());let _=wait.recv_timeout(Duration::from_secs(3));});
             let policy=super::super::wire::ModelTimeouts{response_header_seconds:1,first_event_seconds:1,stream_idle_seconds:1};
-            let error=post_stream_with_policy(&Client::builder().no_proxy().build().unwrap(),Call{url,headers:vec![],body:vec![]},&mut DecoderStub,&mut |_|{},&mut |_,_|{},&AtomicBool::new(false),&policy).unwrap_err();
+            let error=post_stream_with_policy(&Client::builder().no_proxy().build().unwrap(),Call{url,headers:vec![],body:vec![]},&mut DecoderStub,&mut |_|{},&mut |_,_|{},&mut |_|{},&AtomicBool::new(false),&policy).unwrap_err();
             let _=release.send(());server.join().unwrap();
             assert!(matches!(error,HarnessError::Provider{message,..}if message.contains(phase)),"wrong phase for {phase}");
         }
+    }
+}
+
+#[cfg(test)]
+mod progress_tests {
+    use super::*;
+
+    #[test]
+    fn progress_is_reported_first_then_on_growth_but_never_per_chunk() {
+        let mut last = (Instant::now(), 0usize, false);
+        assert!(progress_due(&mut last, 10), "the first sign of a tool call is reported at once");
+        assert!(!progress_due(&mut last, 10), "no growth, no report");
+        assert!(!progress_due(&mut last, 3000), "a small step right after a report waits");
+        assert!(!progress_due(&mut last, 9000), "so does a big one inside the minimum gap");
+        last.0 = Instant::now() - Duration::from_millis(300);
+        assert!(progress_due(&mut last, 9000), "4 KB of growth after the minimum gap");
+        last.0 = Instant::now() - Duration::from_millis(1100);
+        assert!(progress_due(&mut last, 9100), "a second of silence with any growth");
+    }
+
+    #[test]
+    fn the_target_path_is_read_from_half_written_arguments() {
+        use super::super::path_hint;
+        assert_eq!(path_hint(r#"{"path":"a/b.js","content":"xx"#).as_deref(), Some("a/b.js"));
+        assert_eq!(path_hint(r#"{ "path" : "with \"quote\".js""#).as_deref(), Some("with \"quote\".js"));
+        assert_eq!(path_hint(r#"{"path":"unfinished"#), None, "a path that is still being written is not shown");
+        assert_eq!(path_hint(r#"{"content":"x"}"#), None);
     }
 }

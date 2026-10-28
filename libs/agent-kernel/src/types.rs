@@ -204,6 +204,9 @@ pub enum Event {
     TextDelta { text: String },
     ReasoningDelta { kind: ReasoningKind, text: String },
     ToolStart { id: String, name: String, arguments: String },
+    /// A tool call whose arguments are still streaming in from the model (a large `write_file`, say): sent about once a
+    /// second, or every 4 KB, so a long silent stretch shows that it is moving. `path` is the target once it is known.
+    ToolInput { id: String, name: String, path: Option<String>, bytes: usize },
     /// Resource contention before dispatch. `waiting: false` means the call acquired it.
     ToolWaiting { id: String, resource: String, owner_session: Option<String>, waiting: bool },
     /// Emitted after validation and approval, immediately before dispatch. Observers may fail

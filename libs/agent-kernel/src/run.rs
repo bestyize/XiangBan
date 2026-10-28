@@ -18,6 +18,10 @@ pub struct RunSummary {
     pub finish: FinishReason,
 }
 
+/// Refused unchanged re-reads that warn the model on their own, even while other calls still make progress.
+const UNCHANGED_WARN_AFTER: usize = 3;
+const MAX_STALL_WARNINGS: usize = 3;
+
 const CUT_OFF_MESSAGE: &str = "Not run: your reply hit the output length limit, so this tool call may be incomplete. \
                                No calls in this batch were executed. Do not continue or concatenate partial JSON. \
                                Retry with complete, smaller tool calls: write files separately and use targeted edits \
@@ -239,6 +243,8 @@ impl Agent {
             history.push(user);
         }
         let run_start = history.len().saturating_sub(1);
+        // Reads of an earlier run may have left the context since: this run starts with a clean log.
+        self.read_log.lock().unwrap_or_else(|e| e.into_inner()).remove(session);
 
         let mut usage = Usage::default();
         let mut continuations = 0;
@@ -253,6 +259,12 @@ impl Agent {
         let mut stream_continuations = 0;
         let control=options.control.clone().unwrap_or_default();
         let mut idle_rounds=0;
+        // Calls refused as unchanged repeats since the last warning, and the last of them, for naming the loop.
+        let mut unchanged_skips=0usize;
+        let mut last_repeat=String::new();
+        // Round of the last stall warning, and how many were given: one more round to explain, then the run pauses.
+        let mut stall_warned_at:Option<usize>=None;
+        let mut stall_warnings=0usize;
         for index in 0..self.max_turns.unwrap_or(usize::MAX) {
             control.check()?;
             if cancel.load(Ordering::Relaxed) {
@@ -413,6 +425,11 @@ impl Agent {
             }
             let previous_successes=successful_calls.len();
             for (call, result) in calls.iter().zip(&results) {
+                if result.structured_content.as_ref().is_some_and(|v| v["harness_status"] == "unchanged_repeat") {
+                    unchanged_skips += 1;
+                    last_repeat = format!("{} {}", call.name, call.arguments);
+                    continue;
+                }
                 if result.is_error || matches!(call.name.as_str(), "todo" | "ask_user" | "time_now") {
                     continue;
                 }
@@ -444,7 +461,25 @@ impl Agent {
                     && result.structured_content.as_ref().is_some_and(|v| v["state"] == "running")
             });
             idle_rounds=if previous_successes!=successful_calls.len(){0}else if waiting{idle_rounds}else{idle_rounds+1};
-            if options.max_no_progress_rounds.is_some_and(|limit|idle_rounds>=limit){return Err(HarnessError::Paused("no_progress_tool_rounds".into()));}
+            if let Some(limit)=options.max_no_progress_rounds {
+                let stalled=idle_rounds>=limit;
+                if stalled || unchanged_skips>=UNCHANGED_WARN_AFTER {
+                    // The model already ignored the per-call notes. Before pausing, tell it plainly to stop and explain,
+                    // and give it one more round to do so; pausing right away would look like a failure to the user.
+                    let warned_just_now=stall_warned_at.is_some_and(|at| index<=at+1);
+                    if warned_just_now || stall_warnings>=MAX_STALL_WARNINGS {
+                        return Err(HarnessError::Paused("no_progress_tool_rounds".into()));
+                    }
+                    let why=if stalled { format!("the last {idle_rounds} tool rounds brought nothing new") } else { format!("it repeated reads whose targets had not changed ({})", last_repeat.trim()) };
+                    let reminder=Message::reminder(format!("You are going in circles: {why}. Stop calling tools now. Tell the user in plain words what you are waiting for or what is blocking you, what is already done, and what you suggest next. If the task is actually complete, say so. Do not repeat earlier calls."));
+                    self.store.append(session, std::slice::from_ref(&reminder))?;
+                    history.push(reminder);
+                    on_event(Event::Continuing { reason: "no_progress_warning".into() });
+                    stall_warned_at=Some(index);
+                    stall_warnings+=1;
+                    unchanged_skips=0;
+                }
+            }
         }
         if cancel.load(Ordering::Relaxed) {
             return Err(HarnessError::Cancelled);
@@ -482,7 +517,7 @@ impl Agent {
             // Both provider callbacks share one observer without aliasing two &mut borrows.
             let result = {
                 let sink = std::cell::RefCell::new(&mut *on_event);
-                self.provider.chat_with_reasoning(
+                self.provider.chat_with_progress(
                     request,
                     &mut |text| {
                         if text.is_empty() { return; }
@@ -500,6 +535,10 @@ impl Agent {
                             visible_reasoning.push(crate::ReasoningSegment { kind, text: text.to_owned() });
                         }
                         (*sink.borrow_mut())(Event::ReasoningDelta { kind, text: text.to_owned() });
+                    },
+                    &mut |tool| {
+                        // Only a sign of life for the page: nothing here is kept, and a retry may discard it.
+                        (*sink.borrow_mut())(Event::ToolInput { id: tool.id.clone(), name: tool.name.clone(), path: tool.path.clone(), bytes: tool.bytes });
                     },
                     cancel,
                 )

@@ -138,7 +138,7 @@ impl JsonlRunLog {
         let sync = !matches!(
             &event.body,
             RunEventBody::Event {
-                event: Event::TextDelta { .. } | Event::ReasoningDelta { .. }
+                event: Event::TextDelta { .. } | Event::ReasoningDelta { .. } | Event::ToolInput { .. }
             }
         );
         writer.unsynced_bytes = writer.unsynced_bytes.saturating_add(data.len());

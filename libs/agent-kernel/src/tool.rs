@@ -192,6 +192,10 @@ pub trait Tool: Send + Sync {
         })
     }
     fn spec(&self) -> &ToolSpec;
+    /// A cheap fingerprint of what this read-only call would observe right now (a file's size and modification time,
+    /// a directory listing). The harness stops running a call whose arguments and fingerprint have not changed since
+    /// it last ran twice; `None` means the tool is never deduplicated. Only `Risk::Read` tools are asked.
+    fn observe(&self, _args: &Value) -> Option<String> { None }
     /// How long a cancelled or timed-out call may take to report before its outcome is declared unknown.
     /// Tools that always finish their own cleanup (such as killing a process tree) may ask for longer.
     fn cancel_grace(&self) -> std::time::Duration { std::time::Duration::from_millis(250) }

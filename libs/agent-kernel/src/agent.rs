@@ -35,6 +35,8 @@ pub struct Agent {
     pub(crate) max_truncated_tool_retries: usize,
     pub(crate) retry: RetryPolicy,
     pub(crate) running: Mutex<HashSet<String>>,
+    /// Per session: the read-only calls of this run by call key, with the fingerprint they saw and how often they were asked.
+    pub(crate) read_log: Mutex<HashMap<String, HashMap<String, (String, usize)>>>,
     discovery: Option<Arc<crate::discovery::ToolDiscovery>>,
 }
 
@@ -230,6 +232,7 @@ impl AgentBuilder {
             max_truncated_tool_retries: self.max_truncated_tool_retries,
             retry: self.retry,
             running: Mutex::new(HashSet::new()),
+            read_log: Mutex::new(HashMap::new()),
             discovery,
         })
     }

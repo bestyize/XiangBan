@@ -53,3 +53,17 @@ export function silenceNotice(seconds: number, retryStatus = ''): string {
     ? `${retryStatus}（已等待 ${waitedFor(seconds)}）`
     : `模型暂时没有新输出，已等待 ${waitedFor(seconds)}；长时间没有响应会自动重试。`;
 }
+
+/** "1.2 KB", "32 KB". */
+export function kilobytes(bytes: number): string {
+  const kb = bytes / 1024;
+  return kb < 10 ? `${kb.toFixed(1)} KB` : `${Math.round(kb)} KB`;
+}
+
+/** The status while the model writes out a tool call's arguments, which can take minutes for a big file. */
+export function toolInputNotice(name: string, path: string | null | undefined, bytes: number): string {
+  const target = path ? ` ${path}` : '';
+  return name === 'write_file' || name === 'edit_file'
+    ? `正在写入${target}，已收到 ${kilobytes(bytes)}…`
+    : `正在生成工具调用${name ? `「${name}」` : ''}的内容${target}，已收到 ${kilobytes(bytes)}…`;
+}

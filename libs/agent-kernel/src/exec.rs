@@ -221,6 +221,7 @@ impl Agent {
                 call.name, errors.join("; "), tool.spec().schema.get("required").unwrap_or(&Value::Null)
             )).with_structured_content(serde_json::json!({"harness_status":"invalid_arguments","executed":false})));
         }
+        if let Some(skipped) = self.unchanged_repeat(session, &self.tools[index], &args) { return Prepared::Done(skipped); }
         let mut authorization = None;
         match tool.resolve_call(&args) {
             Ok(Some((target, target_args))) => {
@@ -262,6 +263,36 @@ impl Agent {
             return Prepared::Done(ToolResult::error("cancelled"));
         }
         Prepared::Run { tool, args, ctx }
+    }
+
+    /// The third identical read-only call whose target has not changed is not run again: its result is already in the
+    /// conversation, and asking the model to look at it once more only burns a round. Anything that could change the
+    /// target (a write, a command) clears the log, so "write, then look" is never refused.
+    fn unchanged_repeat(&self, session: &str, tool: &Arc<dyn Tool>, args: &Value) -> Option<ToolResult> {
+        let spec = tool.spec();
+        let mut log = self.read_log.lock().unwrap_or_else(|e| e.into_inner());
+        if spec.risk != crate::Risk::Read {
+            log.remove(session);
+            return None;
+        }
+        let fingerprint = tool.observe(args)?;
+        let key = format!("{}\u{0}{}", spec.name, args);
+        let seen = log.entry(session.to_string()).or_default();
+        match seen.get_mut(&key) {
+            Some((before, count)) if *before == fingerprint => {
+                *count += 1;
+                if *count < 3 { return None; }
+                let repeats = *count - 1;
+                Some(ToolResult::ok(format!(
+                    "Not run: `{}` with these exact arguments already returned its result {repeats} times and the target has not changed since (same size and modification time). The earlier result in this conversation is still valid. Do not repeat the call: use that result, make a change, or tell the user what you are waiting for.",
+                    spec.name
+                )).with_structured_content(serde_json::json!({"harness_status":"unchanged_repeat","tool":spec.name,"arguments":args,"repeats":repeats})))
+            }
+            _ => {
+                seen.insert(key, (fingerprint, 1));
+                None
+            }
+        }
     }
 
     fn drain(

@@ -1,5 +1,5 @@
 import { attachmentCards } from './attachments.ts';
-import { modelFailure, retryNotice } from './model-errors.ts';
+import { modelFailure, retryNotice, toolInputNotice } from './model-errors.ts';
 import { withoutVoiceNotes } from '../../voice/interruption.ts';
 import type { ChatItem, KernelEvent, SessionView, WireMessage } from './types.ts';
 
@@ -161,6 +161,9 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       endStreaming(view);
       view.items.push({ kind: 'tool', id: event.id, name: event.name, arguments: event.arguments, output: '', status: 'running' });
       break;
+    case 'tool_input':
+      view.status = toolInputNotice(event.name, event.path, event.bytes);
+      break;
     case 'tool_dispatched':
       // The existing tool card remains running; dispatch is an execution-log boundary.
       break;
@@ -201,6 +204,7 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       clearRecoveredCutoff(view);
       view.status = event.reason === 'tool_call_length'
         ? '代码生成超过单次输出上限，小伴正在调整步骤重试…'
+        : event.reason === 'no_progress_warning' ? '连续几轮没有新进展，已提醒小伴停下来说明情况…'
         : event.reason === 'provider_interrupted' ? '模型连接中断，已保存进展，小伴正在接着处理…'
         : event.reason === 'length' ? '回答达到单次输出上限，小伴正在接着写…'
           : '还没做完，小伴继续处理中…';
@@ -226,7 +230,7 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
         const text = uncertain ? '操作结果尚未确认，已暂停。请先核对实际状态，勿直接重复执行；后续修改会重新请求授权。'
           : invalid ? '模型返回了不完整或无效的终态，本批操作未执行。请调整请求或模型后再继续。'
           : event.message.endsWith(': resources_busy') ? '另一个会话正在修改同一文件、独占电脑控制，或有操作结果尚未确认，当前任务已暂停。请查看执行详情；同项目并行修改可使用“在独立副本中工作”。'
-          : event.message.endsWith(': no_progress_tool_rounds') ? '连续工具调用未取得新结果，已暂停。请调整方案后继续。'
+          : event.message.endsWith(': no_progress_tool_rounds') ? stallNotice(view.items.slice(lastUser + 1))
           : event.message.endsWith(': verification_required') ? '目标尚未通过指定命令验收，已保存进展并暂停。可处理验收问题后继续。'
           : event.message.endsWith(': unfinished_milestones') ? '还有未完成的里程碑，已保存计划和交接说明。可调整任务后继续。'
           : event.message.endsWith(': progress_store_unavailable') ? '任务进度暂时无法读取，已暂停。请检查本机存储后继续。'
@@ -254,6 +258,26 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       view.usage = { prompt: (view.usage?.prompt ?? 0) + event.prompt_tokens, completion: (view.usage?.completion ?? 0) + event.completion_tokens };
       break;
   }
+}
+
+const STALL_LABELS: Record<string, string> = { list_dir: '查看目录', read_file: '读取文件', grep: '搜索', shell: '执行命令' };
+
+/** Why a run stopped for going round in circles: names what it kept doing, from the calls of this answer. */
+export function stallNotice(items: ChatItem[]): string {
+  const counts = new Map<string, { name: string; target: string; count: number }>();
+  for (const item of items) {
+    if (item.kind !== 'tool' || !item.name) continue;
+    const target = describeCall(item.name, item.arguments);
+    const key = `${item.name}\u0000${target}`;
+    const seen = counts.get(key) ?? { name: item.name, target, count: 0 };
+    seen.count += 1;
+    counts.set(key, seen);
+  }
+  const top = [...counts.values()].sort((a, b) => b.count - a.count)[0];
+  const tail = '已完成的进展已保存。点“继续”让小伴换个思路接着做，或告诉它该怎么办。';
+  if (!top || top.count < 3) return `模型连续多轮没有取得新进展，已暂停。${tail}`;
+  const what = `${STALL_LABELS[top.name] ?? `调用「${top.name}」`}${top.target ? `“${top.target}”` : ''}`;
+  return `模型连续多轮没有新进展，一直在重复${what}（共 ${top.count} 次），已暂停。${tail}`;
 }
 
 /** A short label for a tool call's arguments, shown on the collapsed card. */

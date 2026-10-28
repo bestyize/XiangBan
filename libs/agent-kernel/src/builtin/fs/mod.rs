@@ -163,6 +163,13 @@ impl Tool for ReadFile {
         &self.spec
     }
 
+    fn observe(&self, args: &Value) -> Option<String> {
+        let path = self.roots.resolve(str_arg(args, "path").ok()?).ok()?;
+        let meta = fs::metadata(path).ok().filter(|m| m.is_file())?;
+        let modified = meta.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?;
+        Some(format!("{}:{}", meta.len(), modified.as_nanos()))
+    }
+
     fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
         use sha2::{Digest, Sha256};
         // Version evidence for editable files must describe the same bytes the model
@@ -264,6 +271,15 @@ impl ListDir {
 impl Tool for ListDir {
     fn spec(&self) -> &ToolSpec {
         &self.spec
+    }
+
+    /// The listing itself: what the model would see again, entry names, kinds and sizes.
+    fn observe(&self, args: &Value) -> Option<String> {
+        use std::hash::{Hash, Hasher};
+        let listing = self.execute(args.clone(), &ToolCtx::detached("")).ok()?;
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        listing.hash(&mut hasher);
+        Some(format!("{}:{:x}", listing.len(), hasher.finish()))
     }
 
     fn execute(&self, args: Value, _ctx: &ToolCtx) -> Result<String, String> {

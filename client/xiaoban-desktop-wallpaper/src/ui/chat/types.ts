@@ -73,6 +73,8 @@ export type KernelEvent =
   | { type: 'text_delta'; text: string }
   | { type: 'reasoning_delta'; kind: 'summary' | 'text'; text: string }
   | { type: 'tool_start'; id: string; name: string; arguments: string }
+  /** The arguments of a tool call are still streaming in (a large file write): a sign of life, roughly once a second. */
+  | { type: 'tool_input'; id: string; name: string; path?: string | null; bytes: number }
   | { type: 'tool_waiting'; id: string; resource: string; owner_session?: string | null; waiting: boolean }
   | { type: 'tool_dispatched'; id: string }
   | { type: 'tool_end'; id: string; output: string; is_error: boolean; parts?: WirePart[]; structured_content?: unknown }

@@ -49,7 +49,7 @@ pub use middleware::{
     estimate_tokens, estimate_tool_tokens, Approval, ApprovalRequest, Approver, ContextTrim, ContinueGuard, Middleware, Nudge, Permission,
     PermissionMode, RepeatGuard, SpillOutput, Stop, StopDecision, Turn,
 };
-pub use provider::{ChatRequest, ModelProvider, Reply, ToolSchema};
+pub use provider::{ChatRequest, ModelProvider, Reply, ToolProgress, ToolSchema};
 pub use run::RunSummary;
 pub use runtime::{RunEnd, RunEvent, RunEventBody, RunInput, RunOptions, RunState, ToolBudget};
 pub use store::{JsonlStore, MemoryStore, SessionStore};

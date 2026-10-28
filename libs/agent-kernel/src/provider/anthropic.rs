@@ -432,6 +432,14 @@ impl AnthropicStream {
         }
     }
 
+    /// The last tool call and how much of its input has arrived.
+    pub(crate) fn pending_tool_call(&self) -> Option<super::ToolProgress> {
+        self.blocks.iter().rev().flatten().find_map(|block| match block {
+            Block::Tool { id, name, partial, .. } => Some(super::ToolProgress { id: id.clone(), name: name.clone(), path: super::path_hint(partial), bytes: partial.len() }),
+            _ => None,
+        })
+    }
+
     pub fn is_complete(&self) -> bool {
         self.done || self.stop_reason.is_some()
     }
@@ -503,6 +511,10 @@ mod client {
             self.push_payload_with_reasoning(payload, on_text, on_reasoning)
         }
 
+        fn pending_tool(&self) -> Option<super::super::ToolProgress> {
+            self.pending_tool_call()
+        }
+
         fn complete(&self) -> bool {
             self.is_complete()
         }
@@ -538,6 +550,15 @@ mod client {
             on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
             cancel: &AtomicBool,
         ) -> Result<Reply, HarnessError> {
+            self.chat_with_progress(request, on_text, on_reasoning, &mut |_| {}, cancel)
+        }
+
+        fn chat_with_progress(
+            &self, request: &ChatRequest, on_text: &mut dyn FnMut(&str),
+            on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+            on_tool: &mut dyn FnMut(&super::super::ToolProgress),
+            cancel: &AtomicBool,
+        ) -> Result<Reply, HarnessError> {
             let mut profile = self.profile.clone();
             let mut max_tokens = profile.max_output_tokens
                 .unwrap_or_else(|| model_max_output_tokens(&profile.model))
@@ -567,6 +588,9 @@ mod client {
                 }, &mut |kind, text| {
                     emitted.set(true);
                     on_reasoning(kind, text);
+                }, &mut |progress| {
+                    emitted.set(true);
+                    on_tool(progress);
                 }, cancel, &self.profile.timeouts);
                 match result {
                     Ok(()) => {

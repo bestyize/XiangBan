@@ -184,6 +184,42 @@ describe('events while an answer is running', () => {
     expect(view.activityAt).toBeGreaterThan(0);
   });
 
+  it('shows how far a big tool call has been written while nothing else arrives', () => {
+    const view = newView('s1', true);
+    applyEvent(view, { type: 'tool_input', id: 'c1', name: 'write_file', path: 'game-drafts/wind-relics-extension.js', bytes: 5058 });
+    expect(view.status).toBe('正在写入 game-drafts/wind-relics-extension.js，已收到 4.9 KB…');
+    applyEvent(view, { type: 'tool_input', id: 'c1', name: 'write_file', path: 'game-drafts/wind-relics-extension.js', bytes: 32 * 1024 + 7 });
+    expect(view.status).toContain('已收到 32 KB');
+    applyEvent(view, { type: 'tool_input', id: 'c2', name: 'shell', path: null, bytes: 100 });
+    expect(view.status).toBe('正在生成工具调用「shell」的内容，已收到 0.1 KB…');
+    applyEvent(view, { type: 'tool_start', id: 'c1', name: 'write_file', arguments: '{}' });
+    expect(view.status).toBe('');
+  });
+
+  it('says what the model kept repeating when it is paused for going in circles', () => {
+    const view = newView('s1', true);
+    applyEvent(view, { type: 'user_message', message: { role: 'user', parts: [{ type: 'text', text: '继续' }] } as never, initial: true });
+    for (let n = 0; n < 7; n++) {
+      applyEvent(view, { type: 'tool_start', id: `c${n}`, name: 'list_dir', arguments: '{"path":"game-drafts/wind-relics"}' });
+      applyEvent(view, { type: 'tool_end', id: `c${n}`, output: 'a.js', is_error: false });
+    }
+    applyEvent(view, { type: 'continuing', reason: 'no_progress_warning' });
+    expect(view.status).toContain('已提醒小伴停下来说明情况');
+    applyEvent(view, { type: 'error', message: 'run paused by continuation guard: no_progress_tool_rounds' });
+    const notice = view.items.at(-1) as { kind: string; tone: string; text: string; canContinue: boolean };
+    expect(notice).toMatchObject({ kind: 'notice', tone: 'warning', canContinue: true });
+    expect(notice.text).toContain('一直在重复查看目录“game-drafts/wind-relics”（共 7 次），已暂停');
+    expect(notice.text).toContain('点“继续”');
+  });
+
+  it('falls back to a plain reason when no single call was repeated', () => {
+    const view = newView('s1', true);
+    applyEvent(view, { type: 'user_message', message: { role: 'user', parts: [{ type: 'text', text: 'x' }] } as never, initial: true });
+    applyEvent(view, { type: 'tool_start', id: 'a', name: 'read_file', arguments: '{"path":"a.js"}' });
+    applyEvent(view, { type: 'error', message: 'run paused by continuation guard: no_progress_tool_rounds' });
+    expect((view.items.at(-1) as { text: string }).text).toContain('模型连续多轮没有取得新进展，已暂停');
+  });
+
   it('drops the reasoning of an attempt that stalled when the retry starts, and keeps earlier steps', () => {
     const view = newView('s1', true);
     applyEvent(view, { type: 'tool_start', id: 't1', name: 'shell', arguments: '{}' });
