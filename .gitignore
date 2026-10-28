@@ -32,7 +32,6 @@ dev-dist/
 artifacts/
 services/server-pan/pandown_data/
 services/server-forum/data/
-services/server-pan/backend/target/
 *.log
 
 # Local tool config
@@ -48,5 +47,43 @@ video/
 # Downloaded native Computer Use artifacts are prepared per target at build time.
 client/xiaoban-desktop-wallpaper/src-tauri/resources/computer-use/
 client/xiaoban-desktop-wallpaper/src-tauri/resources/computer-use.stage-*/
-tools/xiaoban-infer/target/
 
+# Rust build targets (按文件夹区分)
+# client
+client/xiaoban-desktop-wallpaper/src-tauri/target/
+client/xiaoban-multiplatform/desktopApp/target/
+client/**/target/
+
+# services
+services/server-account/target/
+services/server-ai/target/
+services/server-forum/target/
+services/server-link/target/
+services/server-pan/backend/target/
+services/server-resource/target/
+services/server-xiangban-wallpaper/target/
+services/server-xiaoban-appstore/target/
+services/server-xiaoban-market/target/
+services/**/target/
+
+# libs
+libs/agent-bridge/target/
+libs/agent-hooks/target/
+libs/agent-kernel/target/
+libs/agent-learning/target/
+libs/agent-proactivity/target/
+libs/agent-tools/*/target/
+libs/community-packs/target/
+libs/link-client/target/
+libs/link-protocol/target/
+libs/voice-service/target/
+libs/**/target/
+
+# tools
+tools/agent-reliability-checks/target/
+tools/protocol-reliability-tests/target/
+tools/xiaoban-infer/target/
+tools/**/target/
+
+# dev & others
+.dev/**/target/
