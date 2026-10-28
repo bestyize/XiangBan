@@ -323,3 +323,24 @@ async fn keeps_retrying_until_a_token_is_available() {
     assert!(calls.load(Ordering::SeqCst) >= 4);
     link.shutdown();
 }
+
+#[tokio::test]
+async fn pairing_right_after_start_registers_only_one_device() {
+    let Some(srv) = server().await else { return };
+    let uid = Uuid::new_v4();
+    // 不等连接建立就配对：连接循环和 begin_pairing 同时需要设备身份，只能登记一次，且二维码里的设备就是连上去的那台。
+    let (link, mut rx) = start_desktop(&srv, uid, Arc::new(MemoryStore::new())).await;
+    let offer = link.begin_pairing().await.unwrap();
+    let (phone, _) = phone_pair(&srv, uid, &offer.qr_text, false).await;
+    event(&mut rx, |e| matches!(e, LinkEvent::Paired(_))).await;
+    let devices: Value = reqwest::Client::new().get(format!("{}/devices", srv.base)).bearer_auth(srv.desktop_token(uid)).send().await.unwrap().json().await.unwrap();
+    let desktops = devices["items"].as_array().unwrap().iter().filter(|d| d["kind"] == "desktop").count();
+    assert_eq!(desktops, 1, "只应登记一台桌面设备");
+    let mut ws = phone.connect().await;
+    phone.wait_op(&mut ws, "ready").await;
+    event(&mut rx, |e| matches!(e, LinkEvent::PeerOnline { online: true, .. })).await;
+    let mut tx = phone.sender(1);
+    phone.send(&mut ws, &tx.seal(b"hi").unwrap(), false).await;
+    event(&mut rx, |e| matches!(e, LinkEvent::Message { .. })).await;
+    link.shutdown();
+}

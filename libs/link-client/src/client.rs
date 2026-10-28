@@ -90,6 +90,8 @@ struct Inner {
     api: Api,
     token: TokenFn,
     store: Arc<dyn LinkStore>,
+    /// 登记设备要串行：启动后马上配对时，连接循环和 `begin_pairing` 会同时发现“还没有身份”。
+    identity_lock: tokio::sync::Mutex<()>,
     state: Mutex<State>,
     start_counter: u64,
     senders: Mutex<HashMap<String, Sender>>,
@@ -134,6 +136,7 @@ impl Link {
             cfg,
             token,
             store,
+            identity_lock: tokio::sync::Mutex::new(()),
             start_counter: state.start_counter,
             state: Mutex::new(state),
             senders: Mutex::default(),
@@ -261,6 +264,7 @@ impl Inner {
     async fn emit(&self, event: LinkEvent) { let _ = self.events.send(event).await; }
 
     async fn ensure_identity(&self) -> Result<DeviceIdentity, Error> {
+        let _guard = self.identity_lock.lock().await;
         if let Some(d) = self.state.lock().unwrap().device.clone() {
             return Ok(d);
         }

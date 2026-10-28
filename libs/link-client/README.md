@@ -31,6 +31,8 @@ while let Some(e) = events.recv().await { /* Message { peer, data } 等 */ }
 TEST_DATABASE_URL=postgres://… cargo test
 ```
 
-6 项端到端集成测试，用真实的 server-link（真实 Postgres 与 WebSocket，通过它的 `testing` 特性拉起）、本库的桌面端、以及测试里按协议手写的手机端：配对后双向收发并保持顺序；错误证明与已关闭窗口被拒、真手机随后仍可配对；重启后配对关系恢复、旧信封重放被拒、新会话被手机接受；桌面离线时的通知在上线后补发而指令不补发；两端各自解除配对；拿不到令牌时持续重试直到成功。没有 `TEST_DATABASE_URL` 时跳过。
+7 项端到端集成测试，用真实的 server-link（真实 Postgres 与 WebSocket，通过它的 `testing` 特性拉起）、本库的桌面端、以及测试里按协议手写的手机端：配对后双向收发并保持顺序；错误证明与已关闭窗口被拒、真手机随后仍可配对；重启后配对关系恢复、旧信封重放被拒、新会话被手机接受；桌面离线时的通知在上线后补发而指令不补发；两端各自解除配对；拿不到令牌时持续重试直到成功；启动后立刻配对时只登记一台设备（登记串行化的回归测试）。
+
+另有跨语言互通示例 `examples/interop_desktop.rs`：起真实 server-link 和桌面端并打开配对窗口，供 Kotlin 手机端的 `InteropTest` 连接（见 `:common:link-core` 的 README）。没有 `TEST_DATABASE_URL` 时跳过。
 
 桌面应用（`src-tauri`）的接入层还没写：需要把事件映射到现有会话和审批（见互联计划 §3.6），并在 Windows / macOS 上编译验证。
