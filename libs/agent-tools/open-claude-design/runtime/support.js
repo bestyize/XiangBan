@@ -152,7 +152,7 @@
     node.replaceWith(...wrapper.childNodes);
   }
   function expand(node, scope, ctx) {
-    if (node.nodeType === Node.TEXT_NODE) { node.textContent = String(expr(node.textContent || '', scope) ?? ''); return; }
+    if (node.nodeType === Node.TEXT_NODE) { if(node.parentElement?.closest('[data-ocd-literal="true"]'))return; node.textContent = String(expr(node.textContent || '', scope) ?? ''); return; }
     if (!(node instanceof Element)) return;
     if (node.localName === 'sc-if' || node.localName === 'sc-else-if' || node.localName === 'sc-else') {
       if (node.localName !== 'sc-else' && !bool(expr(node.getAttribute('value') || '', scope))) { node.remove(); return; }
@@ -187,12 +187,12 @@
         else node.setAttribute(attr.name, String(v ?? ''));
       }
     }
+    if(node.hasAttribute('data-ocd-style'))node.style.cssText+=';'+node.getAttribute('data-ocd-style');
+    if(node.getAttribute('data-ocd-hidden')==='true')node.style.setProperty('display','none','important');
     const hover = node.getAttribute('style-hover');
     if (hover) { const original = node.getAttribute('style') || ''; node.addEventListener('mouseenter', () => { node.style.cssText = original + ';' + hover; }); node.addEventListener('mouseleave', () => { node.style.cssText = original; }); }
     const active = node.getAttribute('style-active');
     if (active) { const original = node.getAttribute('style') || ''; node.addEventListener('mousedown', () => { node.style.cssText = original + ';' + active; }); node.addEventListener('mouseup', () => { node.style.cssText = original; }); }
-    if(node.hasAttribute('data-ocd-style'))node.style.cssText+=';'+node.getAttribute('data-ocd-style');
-    if(node.getAttribute('data-ocd-hidden')==='true')node.style.setProperty('display','none','important');
     expandChildren(node, scope, ctx);
   }
   function renderPins() {
