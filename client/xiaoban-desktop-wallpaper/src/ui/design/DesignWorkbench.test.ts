@@ -128,4 +128,21 @@ describe('compact design workbench',()=>{
   const w=await open();await w.get('[aria-label="插入元素"]').setValue('text');await flushPromises();const save=mocks.invoke.mock.calls.find(([cmd])=>cmd==='design_save')![1];expect(save.project.files['Main.dc.html']).toContain('双击编辑文字');expect(w.findComponent(BoardPreview).props('selection')?.[0]).toMatch(/^ocd-/);expect(w.findAll('.layer-row')).toHaveLength(2);
  });
 
+ it('resizes an artboard directly with one versioned save',async()=>{
+  const w=await open();const handle=w.get('.board-size-handle');await handle.trigger('pointerdown',{button:0,pointerId:4,clientX:100,clientY:100});await handle.trigger('pointermove',{pointerId:4,clientX:140,clientY:120});expect(mocks.invoke.mock.calls.some(([c])=>c==='design_save')).toBe(false);await handle.trigger('pointerup',{pointerId:4});await flushPromises();const saved=mocks.invoke.mock.calls.find(([c])=>c==='design_save')![1];expect(saved.project.canvas.boards['Main.dc.html']).toMatchObject({w:490,h:894});expect(saved.expectedRevision).toBe(1);
+ });
+ it('keeps an asynchronous cut attached to its original artboard when selection changes',async()=>{
+  const w=await open();let finish:()=>void=()=>{};Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:vi.fn(()=>new Promise<void>(r=>{finish=r;})),readText:vi.fn()}});
+  w.findComponent(BoardPreview).vm.$emit('message',{type:'select',node:'n0',tag:'H1',text:'源标题'});await flushPromises();w.findComponent(BoardPreview).vm.$emit('message',{type:'editor-command',command:'cut'});await flushPromises();await w.findAll('.rail>button')[1].trigger('click');finish();await flushPromises();const save=mocks.invoke.mock.calls.find(([c])=>c==='design_save')![1];expect(save.project.files['Main.dc.html']).not.toContain('源标题');expect(save.project.files['More.dc.html']).toBe(fixture().files['More.dc.html']);expect(w.findComponent(BoardPreview).props('selection')).toEqual([]);
+ });
+ it('pastes plain OS text as literal content, including text that looks like a template',async()=>{
+  const w=await open();Object.defineProperty(navigator,'clipboard',{configurable:true,value:{readText:vi.fn(async()=>'<b>{{literal}}</b>')}});await w.get('[data-testid="design-workbench"]').trigger('keydown',{key:'v',ctrlKey:true});await flushPromises();const save=mocks.invoke.mock.calls.find(([c])=>c==='design_save')![1];expect(save.project.files['Main.dc.html']).toContain('&lt;b&gt;{{literal}}&lt;/b&gt;');expect(save.project.files['Main.dc.html']).toContain('data-ocd-literal="true"');
+ });
+ it('navigates layer hierarchy and does not submit edits during IME composition',async()=>{
+  const p=fixture();p.files['Main.dc.html']='<x-dc><main><h1>标题</h1><p>正文</p></main></x-dc>';mocks.invoke.mockImplementation(async command=>command==='design_read'?{project:p,origin:'preview:'}:undefined);const w=await open();const row=w.get('.layer-row');await row.get('.layer-select').trigger('keydown',{key:'ArrowLeft'});await flushPromises();expect(w.findAll('.layer-row')).toHaveLength(1);await w.get('.layer-select').trigger('keydown',{key:'ArrowRight'});await flushPromises();expect(w.findAll('.layer-row')).toHaveLength(3);await w.get('[data-testid="design-workbench"]').trigger('keydown',{key:'Delete',isComposing:true});expect(mocks.invoke.mock.calls.some(([c])=>c==='design_save')).toBe(false);
+ });
+ it('ignores the legacy WebView IME confirmation key without deleting a board',async()=>{
+  const w=await open();await w.get('[data-testid="design-workbench"]').trigger('keydown',{key:'Delete',keyCode:229});await flushPromises();expect(mocks.invoke.mock.calls.some(([c])=>c==='design_save')).toBe(false);
+ });
+
 });

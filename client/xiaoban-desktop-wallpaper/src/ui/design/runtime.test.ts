@@ -66,7 +66,7 @@ describe('independent DC runtime',()=>{
 
 describe('canvas direct editing protocol',()=>{
  const mode=(w:Window,editing=true)=>w.eval(`dispatchEvent(new MessageEvent('message',{source:parent,data:{channel:'open-claude-design',type:'mode',editing:${editing},writable:true,zoom:1,guides:false}}))`);
- const last=(m:ReturnType<typeof vi.spyOn>,type:string)=>m.mock.calls.map(([v])=>v as Record<string,any>).filter(v=>v.type===type).at(-1);
+ const last=(m:{mock:{calls:unknown[][]}},type:string)=>m.mock.calls.map(([v])=>v as Record<string,any>).filter(v=>v.type===type).at(-1);
  it('draws selection handles and forwards delete/duplicate/undo instead of mutating program source',async()=>{
   const {w,messages}=await preview('<x-dc><h1>标题</h1><p>正文</p></x-dc>');mode(w);const h=w.document.querySelector('h1')!;h.click();expect(w.document.querySelectorAll('[data-handle]')).toHaveLength(8);
   w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Delete',bubbles:true}));expect(last(messages,'editor-command')?.command).toBe('delete');expect(h.isConnected).toBe(true);
@@ -86,4 +86,17 @@ describe('canvas direct editing protocol',()=>{
  it('protects generated text and leaves Play controls interactive',async()=>{
   const {w,messages}=await preview('<x-dc><h1>{{title}}</h1><button onclick="{{click}}">{{count}}</button></x-dc><script type="text/x-dc" data-dc-script>class Component extends DCLogic{state={count:0};renderVals(){return {title:"动态",count:this.state.count,click:()=>this.setState(s=>({count:s.count+1}))};}}</script>');mode(w);w.document.querySelector('h1')!.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));expect(last(messages,'editor-notice')?.message).toContain('动态');expect(w.document.querySelector('[contenteditable]')).toBeNull();mode(w,false);w.document.querySelector('button')!.click();expect(w.document.querySelector('button')?.textContent).toBe('1');expect(w.document.querySelectorAll('[data-handle]')).toHaveLength(0);
  });
+ it('preserves literal text and style overrides through hover effects',async()=>{
+  const {w}=await preview('<x-dc><p data-ocd-literal="true">{{literal}}</p><button style="color:red" style-hover="color:blue" data-ocd-style="translate:24px 10px">按钮</button></x-dc>');expect(w.document.querySelector('p')!.textContent).toBe('{{literal}}');const button=w.document.querySelector('button')!;button.dispatchEvent(new w.MouseEvent('mouseenter'));expect(button.style.translate).toBe('24px 10px');button.dispatchEvent(new w.MouseEvent('mouseleave'));expect(button.style.translate).toBe('24px 10px');
+ });
+ it('reorders flex children for Alt+arrow and passes focus navigation to the parent',async()=>{
+  const {w,messages}=await preview('<x-dc><main style="display:flex"><p>A</p><p>B</p></main></x-dc>');mode(w);w.document.querySelector('p')!.click();w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'ArrowRight',altKey:true,bubbles:true}));expect(last(messages,'element-edit')?.action).toMatchObject({type:'reorder',direction:'next'});w.document.dispatchEvent(new w.KeyboardEvent('keydown',{key:'F6',bubbles:true}));expect(last(messages,'editor-command')?.command).toBe('focusNext');
+ });
+ it('does not commit inline text when Enter only confirms IME composition',async()=>{
+  const {w,messages}=await preview('<x-dc><p>标题</p></x-dc>');mode(w);const p=w.document.querySelector('p')!;p.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));p.textContent='中文输入';p.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',isComposing:true,bubbles:true}));expect(last(messages,'element-edit')).toBeUndefined();expect(p.hasAttribute('contenteditable')).toBe(true);p.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true}));expect(last(messages,'element-edit')?.action.text).toBe('中文输入');
+ });
+ it('keeps inline editing active for the legacy WebView IME confirmation key',async()=>{
+  const {w,messages}=await preview('<x-dc><p>标题</p></x-dc>');mode(w);const p=w.document.querySelector('p')!;p.dispatchEvent(new w.MouseEvent('dblclick',{bubbles:true}));p.textContent='中文';p.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',keyCode:229,bubbles:true}));expect(last(messages,'element-edit')).toBeUndefined();expect(p.hasAttribute('contenteditable')).toBe(true);
+ });
+
 });
