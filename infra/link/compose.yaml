@@ -1,0 +1,60 @@
+# 手机与桌面互联中转服务（server-link）的独立部署栈：自带 PostgreSQL，与账号中心、主站互不依赖，数据卷与备份各自独立。
+# 镜像在构建机打包后加载到服务器，这里不 build；见 docs/deployment/LINK_DEPLOYMENT.md。
+name: xiangban-link
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: xiaoban_link
+      POSTGRES_USER: link
+      POSTGRES_PASSWORD: ${LINK_DB_PASSWORD:?在服务器端 .env 中设置 LINK_DB_PASSWORD}
+    volumes:
+      - link_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U link -d xiaoban_link"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  link:
+    image: xiangban-link:${LINK_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      LINK_DATABASE_URL: postgres://link:${LINK_DB_PASSWORD}@postgres:5432/xiaoban_link
+      # 与账号中心的 ACCOUNT_ISSUER 完全一致；JWKS 用于离线验签，服务启动后按需从这里拉取。
+      LINK_ACCOUNT_ISSUER: ${LINK_ACCOUNT_ISSUER:-https://account.xiangban.xyz}
+      LINK_ACCOUNT_JWKS_URL: ${LINK_ACCOUNT_JWKS_URL:-https://account.xiangban.xyz/.well-known/jwks.json}
+      LINK_ACCOUNT_CLIENT_IDS: ${LINK_ACCOUNT_CLIENT_IDS:-xiaoban-desktop-wallpaper,xiaoban-android}
+      LINK_CORS_ORIGINS: ${LINK_CORS_ORIGINS:-}
+      LINK_MAX_DEVICES_PER_USER: ${LINK_MAX_DEVICES_PER_USER:-20}
+      LINK_MSGS_PER_SEC: ${LINK_MSGS_PER_SEC:-30}
+      LINK_BYTES_PER_SEC: ${LINK_BYTES_PER_SEC:-1048576}
+      RUST_LOG: ${LINK_LOG:-server_link=info,tower_http=info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # 只绑定本机回环，唯一入口是宿主机 Nginx（终止 TLS 并转发 WebSocket）。
+    ports:
+      - "${LINK_BIND_ADDRESS:-127.0.0.1}:55030:55030"
+    # 服务运行期不写磁盘，根文件系统只读。
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+      - edge
+
+volumes:
+  link_pg_data:
+
+networks:
+  # 数据库所在网络不能出网；中转服务额外接入 edge 才能发布端口并访问账号中心的 JWKS。
+  backend:
+    internal: true
+  edge:

@@ -1,6 +1,10 @@
-# xiaoban-agent-bridge（未完成原型）
+# xiaoban-agent-bridge
 
-此库尚未通过任务单验收，**不可用于启动真实 Agent 会话**。`start` 和 `resume` 当前始终返回 `Unsupported`：Codex 的 `untrusted` 是否对每条命令和每次写入请求审批尚未证明；Claude 的 HTTP hook 丢失、超时或被设置禁用时能否阻止工具执行尚未证明。必须先验证并实现失败时拒绝，才能开放这两个入口。内部存在未启用的会话代码，不代表它已通过安全或端到端验证。
+状态（2026-10-28）：**Claude Code 路径已开放，Codex 路径仍关闭。**
+
+- **Claude Code**：`start` / `resume` 可用，固定走最严格档（`--permission-mode default`，只放行 `Read,Glob,Grep`，其余工具在 `PermissionRequest` hook 上暂停，等人批准）。依据：真实 Claude Code 2.1.x 上的两项验证——① 批准前命令不执行、批准后执行（`XIAOBAN_REAL_CLAUDE=1 cargo test --lib real_claude`，另有经 `DelegationManager` 的同款测试）；② hook 服务不可达时工具被拒绝而不是放行（用桥接用的同一组启动参数实测）。**已知边界**：用户自己的 Claude 设置（用户级或项目级 `settings.json`）里若写了 `permissions.allow` 的规则（例如 `Bash(*)`），这些规则会先于 hook 生效，委派任务会按用户自己的规则放行；桥接不去改写用户的设置来源，因为那会同时丢掉用户在设置里配置的接口地址等环境变量。
+- **委派（`DelegationManager`）**：Claude 任务走上面的桥接，审批出现在小伴界面和已配对的手机上；任务第一轮结束即完成。Codex 任务仍用 `codex exec --sandbox read-only`，只读，不能审批、不能写——**这条命令行参数未在真机核实**，参数不对时任务会失败并显示原因，不会放行。
+- **Codex 的 `start` / `resume`**（app-server 路径）仍返回 `Unsupported`：`untrusted` 是否对每条命令和每次写入请求审批尚未证明。
 
 边界：只启动用户本机安装的官方 Codex CLI / Claude Code；不读取、转存或借用它们的登录令牌、凭据文件，不重新分发它们的程序；外部 Agent 的完整会话由其自身保存，库不解析内部会话文件。不提供全自动档位，不自行提升权限。
 

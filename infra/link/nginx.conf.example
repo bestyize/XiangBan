@@ -1,0 +1,68 @@
+# 宿主机 Nginx 反代示例，放进 /etc/nginx/conf.d/。把 link.xiangban.xyz 换成你的域名；证书用 certbot 签发。
+# 桌面端默认连 https://link.xiangban.xyz/api/link，域名改了要同步改桌面端默认值。
+# limit_req_zone 必须位于 http 上下文，conf.d 下的文件已经在 http 里。
+
+limit_req_status 429;
+limit_req_zone $binary_remote_addr zone=link_api:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=link_pair:10m rate=30r/m;
+
+# WebSocket 升级：没有 Upgrade 头时按普通请求处理。
+map $http_upgrade $link_connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 80;
+    server_name link.xiangban.xyz;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name link.xiangban.xyz;
+
+    ssl_certificate     /etc/letsencrypt/live/link.xiangban.xyz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/link.xiangban.xyz/privkey.pem;
+
+    server_tokens off;
+    # REST 请求体很小；信封走 WebSocket，不受这个限制。
+    client_max_body_size 64k;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 30s;
+
+    # 长连接：设备常驻在线，空闲时靠应用层心跳保活；读超时放宽到 1 小时，不要缓冲。
+    location = /api/link/ws {
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $link_connection_upgrade;
+        proxy_read_timeout 3600s;
+        proxy_send_timeout 3600s;
+        proxy_buffering off;
+        proxy_pass http://127.0.0.1:55030;
+    }
+
+    # 配对码申请与兑换：服务内另有按账号的限频，这里再按来源 IP 兜一层。
+    location ~ ^/api/link/(pair-codes|pair)$ {
+        limit_req zone=link_pair burst=10 nodelay;
+        proxy_pass http://127.0.0.1:55030;
+    }
+
+    location /api/link/ {
+        limit_req zone=link_api burst=30 nodelay;
+        proxy_pass http://127.0.0.1:55030;
+    }
+
+    # 其余路径不对外。
+    location / {
+        return 404;
+    }
+}

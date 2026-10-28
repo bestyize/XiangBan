@@ -47,8 +47,16 @@ impl ClaudeCode {
         self.timeout = duration;
         self
     }
+    /// Whether the executable can be started (found and answering `--version`).
+    pub async fn availability_installed(&self) -> bool {
+        self.availability().await.installed
+    }
+    /// Hook enforcement has been verified end to end against a real Claude Code (2.1.x, `-p` stream-json):
+    /// a tool outside the allow-list pauses on the `PermissionRequest` hook until answered, and an unreachable
+    /// hook server leaves it denied (see the opt-in `real_claude_touch_requires_explicit_approval` test and
+    /// `docs/agent/外部Agent接口核实_P0.md`).
     fn hooks_verified() -> bool {
-        false
+        true
     }
     async fn launch(
         &self,
@@ -63,7 +71,7 @@ impl ClaudeCode {
             return Err(BridgeError::InvalidArgument);
         }
         // Fail closed until hook enforcement and failure behavior have been verified end to end.
-        if !Self::hooks_verified() && !cfg!(test) {
+        if !Self::hooks_verified() {
             return Err(BridgeError::Unsupported);
         }
         let (tx, rx) = mpsc::unbounded_channel();
