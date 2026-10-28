@@ -2,6 +2,7 @@
 import { onMounted, reactive, ref } from 'vue';
 import { NAlert, NSelect } from 'naive-ui';
 import { invoke, desktop } from '../../../bridge.ts';
+import PhoneLinkCard from './PhoneLinkCard.vue';
 
 type Mode = 'system' | 'direct' | 'manual';
 interface NetworkConfig { mode: Mode; proxyUrl: string }
@@ -50,6 +51,7 @@ async function test() {
 </script>
 <template>
   <div class="network-settings" data-testid="settings-network">
+    <PhoneLinkCard />
     <div class="xb-group-title">网络连接方式</div>
     <div class="xb-group">
       <div class="xb-row">

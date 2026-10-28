@@ -22,7 +22,7 @@ const tabs: { id: SettingsTab; label: string; color: string | null; icon: Compon
   { id: 'ai', label: 'AI 模型', color: '#7152D8', icon: Sparkles, keywords: '模型 供应商 密钥 api deepseek 网关' },
   { id: 'assistant', label: '超级小伴', color: '#E5484D', icon: Zap, keywords: '快捷键 悬浮球 呼出 截图' },
   { id: 'voice', label: '声音', color: '#E0457B', icon: Volume2, keywords: '语音 朗读 识别 麦克风 音色' },
-  { id: 'network', label: '连接与网络', color: '#3386C7', icon: Wifi, keywords: '代理 proxy 网络 连接 socks5 http https VPN 测试' },
+  { id: 'network', label: '连接与网络', color: '#3386C7', icon: Wifi, keywords: '代理 proxy 网络 连接 socks5 http https VPN 测试 手机 扫码 配对 遥控 互联' },
   { id: 'safety', label: '安全与权限', color: '#2F6FDB', icon: ShieldCheck, keywords: '权限 沙箱 确认 命令 文件' },
   { id: 'about', label: '关于与更新', color: '#55555B', icon: Info, keywords: '版本 更新 公告 官网' },
 ];

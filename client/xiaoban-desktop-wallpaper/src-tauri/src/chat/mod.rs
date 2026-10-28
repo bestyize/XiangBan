@@ -222,6 +222,7 @@ impl ChatState {
 use permission_policy::{Workspaces, folder_for, permission_with_danger_check};
 
 fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: Value) {
+    crate::phone_link::observe_chat_event(app, name, &payload);
     // One emit, not one per window: a listener registered the usual way (the page's global `listen`) matches every
     // targeted emit, so emitting to each window in turn would hand that listener every event twice.
     let _ = app.emit_filter(name, payload, |target| {
@@ -2077,7 +2078,9 @@ pub fn chat_answer_approval(app: tauri::AppHandle, window: tauri::WebviewWindow,
         "deny" => Approval::Deny,
         _ => return Err("不认识这个选择".into()),
     };
-    app.state::<ChatState>().broker.answer_approval(&id, decision)
+    app.state::<ChatState>().broker.answer_approval(&id, decision)?;
+    crate::phone_link::notify_approval_resolved(&app, &id, "desktop");
+    Ok(())
 }
 
 #[tauri::command]
@@ -2098,8 +2101,133 @@ pub fn chat_answer_question(app: tauri::AppHandle, window: tauri::WebviewWindow,
         }
         state.broker.finish_recovered(&id)?;
         emit(&app,"chat-pending-changed",json!({"session":session,"pending":state.broker.snapshot(session)}));
+        crate::phone_link::notify_approval_resolved(&app, &id, "desktop");
         Ok(())
-    }else{state.broker.answer_question(&id, answer)}
+    }else{
+        state.broker.answer_question(&id, answer)?;
+        crate::phone_link::notify_approval_resolved(&app, &id, "desktop");
+        Ok(())
+    }
+}
+
+// ───────────── 手机互联桥接入口 ─────────────
+
+pub(crate) fn remote_sessions_list(app: &tauri::AppHandle, limit: usize, cursor: Option<&str>) -> Result<Value, String> {
+    let limit = limit.clamp(1, 100);
+    let running: std::collections::HashSet<String> = lock(&app.state::<ChatState>().runs).keys().cloned().collect();
+    let all = list(app)?;
+    let start = match cursor {
+        Some(c) if !c.is_empty() => all.iter().position(|s| s.id == c).map_or(0, |i| i + 1),
+        _ => 0,
+    };
+    let slice: Vec<_> = all.into_iter().skip(start).take(limit).collect();
+    let next_cursor = if slice.len() == limit { slice.last().map(|s| s.id.clone()) } else { None };
+    let items: Vec<Value> = slice
+        .into_iter()
+        .map(|s| {
+            json!({
+                "id": s.id,
+                "title": s.title,
+                "updated_at": s.updated_at,
+                "state": if running.contains(&s.id) { "running" } else { "idle" },
+            })
+        })
+        .collect();
+    Ok(json!({ "items": items, "cursor": next_cursor }))
+}
+
+pub(crate) fn remote_session_snapshot(app: &tauri::AppHandle, session_id: &str, after: Option<usize>) -> Result<Value, String> {
+    checked_session_id(session_id)?;
+    let dirs = Dirs::of(app)?;
+    let messages = JsonlStore::new(dirs.sessions()).load(session_id).map_err(|e| e.to_string())?;
+    let total = messages.len();
+    let skip = after.unwrap_or(0).min(total);
+    let slice: Vec<Message> = messages.into_iter().skip(skip).collect();
+    let running = lock(&app.state::<ChatState>().runs).contains_key(session_id);
+    let pending = app.state::<ChatState>().broker.snapshot(session_id);
+    Ok(json!({
+        "session": session_id,
+        "messages": slice,
+        "state": if running { "running" } else { "idle" },
+        "pending": pending,
+        "cursor": total,
+    }))
+}
+
+/// 手机发来的 `message.send`：强制将该对话切换为最严格权限（`ask` + `require_review`），并写入持久化 outbox。
+pub(crate) fn remote_send_message(
+    app: &tauri::AppHandle,
+    peer_id: &str,
+    session_id: Option<&str>,
+    text: &str,
+    client_id: &str,
+) -> Result<Value, String> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Err("请先输入内容".into());
+    }
+    let sid = match session_id {
+        Some(id) if !id.is_empty() => {
+            checked_session_id(id)?;
+            id.to_string()
+        }
+        _ => {
+            let config = ai_config::current(app)?;
+            pin_session_defaults(app, &config)?;
+            let folder = workspace::for_new_conversation(app)?;
+            let (seconds, millis) = now();
+            let mut summary = mutate(app, |index| index.create_in(seconds, millis, "ask", &folder))??;
+            summary = mutate(app, |index| index.set_options(&summary.id, config.session_model(), Some(config.context_tokens), Some(Vec::new())))?
+                .ok_or("无法创建会话")?;
+            if let Ok(sessions) = list(app) {
+                emit(app, "chat-sessions-changed", json!(sessions));
+            }
+            summary.id
+        }
+    };
+
+    // 远程来源最严格权限策略：禁止全自动信任，强制切回 ask 并要求逐项复核
+    mutate(app, |index| {
+        index.set_permission_mode(&sid, "ask");
+    })?;
+    let state = app.state::<ChatState>();
+    state.permission.set_session_mode(&sid, PermissionMode::Ask);
+    if let Ok(dirs) = Dirs::of(app) {
+        let _ = state.permission.restore_trust(&dirs.chat.join("trust"), &sid, false);
+        let _ = state.permission.require_review(&sid);
+    }
+    emit(app, "chat-permission-mode-changed", json!({ "sessionId": sid, "mode": "ask" }));
+
+    let request_id = format!("remote:{peer_id}:{client_id}");
+    let message_id = outbox_host::enqueue_remote(app, &sid, peer_id, text, &request_id)?;
+    Ok(json!({
+        "client_id": client_id,
+        "session": sid,
+        "message_id": message_id,
+    }))
+}
+
+pub(crate) fn remote_answer_approval(app: &tauri::AppHandle, approval_id: &str, choice: &str) -> Result<(), String> {
+    let state = app.state::<ChatState>();
+    if approval_id.starts_with('a') {
+        let decision = match choice {
+            "once" | "approve" | "allow" => Approval::Once,
+            // 远程来源的高危操作不授予永久本对话放行，最多按单次允许处理
+            "always" => Approval::Once,
+            "deny" | "reject" => Approval::Deny,
+            _ => return Err("不认识这个选择".into()),
+        };
+        state.broker.answer_approval(approval_id, decision)
+    } else if approval_id.starts_with('q') {
+        let answer = if choice.is_empty() || choice == "__dismiss__" {
+            None
+        } else {
+            Some(choice.to_string())
+        };
+        state.broker.answer_question(approval_id, answer)
+    } else {
+        Err("未知的审批编号".into())
+    }
 }
 
 #[tauri::command]

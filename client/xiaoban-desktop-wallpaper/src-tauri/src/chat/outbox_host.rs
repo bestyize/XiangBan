@@ -303,6 +303,49 @@ pub fn chat_enqueue(
     Ok(value)
 }
 
+/// 手机经端到端加密通道发来的消息写入同一个持久化 outbox 队列，享受与本机消息一致的幂等与顺序保证。
+pub(super) fn enqueue_remote(
+    app: &tauri::AppHandle,
+    session_id: &str,
+    peer_id: &str,
+    text: &str,
+    request_id: &str,
+) -> Result<String, String> {
+    checked_session_id(session_id)?;
+    let state = app.state::<ChatState>();
+    let _delivery = lock(&state.delivery);
+    let context = binding(app, session_id)?;
+    if with_queue(app, |q| q.known(session_id, request_id))? {
+        let _ = publish(app, session_id);
+        return Ok(request_id.to_string());
+    }
+    if !lock(&state.runs).contains_key(session_id) && snapshot(app, session_id)?.items.is_empty() {
+        with_queue(app, |q| q.resume(session_id, context.clone()))?;
+    }
+    let text = text.trim().to_string();
+    if text.is_empty() {
+        return Err("请先输入内容".into());
+    }
+    if text.chars().count() > MAX_INPUT_CHARS {
+        return Err("消息不能超过 30000 字".into());
+    }
+    let mut message = Message::user(user_parts(&text, &[]));
+    message.structured_content = Some(json!({ "attachments": [], "source": "phone", "peerId": peer_id }));
+    let id = with_queue(app, |q| {
+        q.enqueue(
+            session_id,
+            message,
+            Delivery::Queue,
+            context,
+            json!([]),
+            Some(request_id.to_string()),
+        )
+    })?;
+    kick(app, session_id);
+    let _ = publish(app, session_id);
+    Ok(id)
+}
+
 #[tauri::command]
 pub fn chat_queue_update(
     app: tauri::AppHandle,
