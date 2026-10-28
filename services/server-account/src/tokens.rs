@@ -75,4 +75,14 @@ mod tests {
         let token = issue_access(&keys, "iss", Uuid::new_v4(), "c", -60).unwrap();
         assert!(verify_access(&keys, "iss", &token).is_err());
     }
+
+    #[test]
+    fn issued_token_for_xiaoban_android_has_matching_audience() {
+        let keys = Keys::ephemeral();
+        let uid = Uuid::new_v4();
+        let token = issue_access(&keys, "https://account.xiangban.xyz", uid, "xiaoban-android", 1800).unwrap();
+        let claims = verify_access(&keys, "https://account.xiangban.xyz", &token).unwrap();
+        assert_eq!(claims.aud, "xiaoban-android");
+        assert_eq!(claims.sub, uid.to_string());
+    }
 }

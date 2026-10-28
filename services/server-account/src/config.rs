@@ -64,6 +64,7 @@ const DEFAULT_CLIENTS: &[(&str, &str)] = &[
     ("xiangban-wallpaper-web", "小伴壁纸网站"),
     ("xiaoban-desktop-wallpaper", "小伴桌面壁纸"),
     ("xiaoban-mobile-wallpaper", "小伴手机壁纸"),
+    ("xiaoban-android", "小伴手机应用"),
 ];
 
 impl AppConfig {
@@ -147,4 +148,20 @@ impl AppConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_clients_contain_xiaoban_android_for_token_audience() {
+        let default_ids: Vec<&str> = DEFAULT_CLIENTS.iter().map(|(id, _)| *id).collect();
+        assert!(default_ids.contains(&"xiaoban-android"), "DEFAULT_CLIENTS 必须包含 xiaoban-android 客户端");
+        assert!(default_ids.contains(&"xiaoban-desktop-wallpaper"));
+
+        let cfg = AppConfig::from_lookup(|_| None);
+        assert!(cfg.clients.iter().any(|(id, name)| id == "xiaoban-android" && name == "小伴手机应用"));
+    }
+}
+
 
