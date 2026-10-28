@@ -47,6 +47,12 @@
 
 ---
 
+# 界面约定
+
+- 修改小伴桌面控制台（`client/xiaoban-desktop-wallpaper/src/ui`）里的菜单、弹窗、卡片前，先读 [`client/xiaoban-desktop-wallpaper/docs/design-specs/ui-conventions.md`](client/xiaoban-desktop-wallpaper/docs/design-specs/ui-conventions.md)：菜单一项一行、说明放悬停提示、优先复用 `xb-menu` 共享类、颜色走 `--ui-*` 主题变量。
+
+---
+
 # 前端依赖安装（npm 镜像源）
 
 - 各前端子项目的 `package-lock.json` 里 `resolved` 地址固定为 `https://registry.npmmirror.com`（npmmirror 镜像）。**云端沙箱 / 受限网络的代理通常不放行 npmmirror**，直接 `npm ci` 会长时间卡住或失败（表现为 `connect_rejected`、`MaxListenersExceededWarning` 后无进展）。
