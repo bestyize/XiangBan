@@ -68,6 +68,10 @@ pub struct InstallGuide {
 
 fn command_with_clean_env(path: &Path) -> Command {
     let mut cmd = Command::new(path);
+    // Environment checks run in the background of a GUI application. In
+    // particular, Windows npm .cmd launchers otherwise flash console windows.
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
     cmd.env_remove("CLAUDE_CODE_SESSION_ID")
         .env_remove("CLAUDE_CODE_CHILD_SESSION")
         .env_remove("CLAUDE_CODE_REMOTE_SESSION_ID")
@@ -159,7 +163,7 @@ async fn detect_desktop_apps() -> Vec<DesktopAppStatus> {
     {
         if let Ok(Ok(output)) = timeout(
             Duration::from_secs(4),
-            Command::new("tasklist").args(["/fo", "csv", "/nh"]).output(),
+            command_with_clean_env(Path::new("tasklist")).args(["/fo", "csv", "/nh"]).output(),
         ).await {
             let text = String::from_utf8_lossy(&output.stdout).to_lowercase();
             for app in &mut targets {
@@ -266,6 +270,23 @@ pub fn install_guides() -> Vec<InstallGuide> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn windows_background_probe_has_no_console() {
+        const CHILD: &str = "XIAOBAN_TEST_BACKGROUND_PROBE";
+        if std::env::var_os(CHILD).is_some() {
+            #[link(name = "kernel32")]
+            unsafe extern "system" { fn GetConsoleWindow() -> isize; }
+            assert_eq!(unsafe { GetConsoleWindow() }, 0, "background probe attached to a console");
+            return;
+        }
+        let output = command_with_clean_env(&std::env::current_exe().unwrap())
+            .args(["--exact", "environment::tests::windows_background_probe_has_no_console"])
+            .env(CHILD, "1")
+            .output().await.unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    }
 
     #[tokio::test]
     async fn detect_environment_reports_os_and_structure() {

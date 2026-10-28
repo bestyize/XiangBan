@@ -82,6 +82,7 @@ const copiedKey = ref<string | null>(null);
 
 let unlistenAnnounce: (() => void) | null = null;
 let taskPollTimer: ReturnType<typeof setInterval> | null = null;
+let disposed = false;
 
 async function copyText(key: string, text: string) {
   try {
@@ -216,11 +217,14 @@ async function cancelTask(taskId: string) {
 
 onMounted(async () => {
   await loadData();
+  if (disposed) return;
   if (desktop) {
-    unlistenAnnounce = await listen<{ text: string }>('speech-announcement', payload => {
+    const unlisten = await listen<{ text: string }>('speech-announcement', payload => {
       message.value = `语音播报：${payload.text}`;
       isError.value = false;
     });
+    if (disposed) { unlisten(); return; }
+    unlistenAnnounce = unlisten;
   }
   taskPollTimer = setInterval(async () => {
     if (desktop && envReport.value?.readyForSpeechCoding) {
@@ -232,6 +236,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  disposed = true;
   unlistenAnnounce?.();
   if (taskPollTimer) clearInterval(taskPollTimer);
 });
