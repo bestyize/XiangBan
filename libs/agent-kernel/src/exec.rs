@@ -18,6 +18,7 @@ struct Inflight {
 
     call_cancel: Arc<AtomicBool>,
     grace: Duration,
+    read_fingerprint: Option<String>,
     _watch: crate::StopWatch,
 }
 
@@ -43,6 +44,7 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, mut ctx: ToolCtx) -> Re
     let timeout = tool.spec().timeout;
     let call_cancel = ctx.call_cancel.clone();
     let grace = tool.cancel_grace();
+    let read_fingerprint = if tool.spec().risk == crate::Risk::Read { tool.observe(&args) } else { None };
     let clock = crate::RunControl::tool_timeout(timeout);
     ctx.call_control = clock.clone();
     let watched_clock = clock.clone();
@@ -65,7 +67,7 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, mut ctx: ToolCtx) -> Re
             let _ = tx.send((Instant::now(), result));
         })
         .map_err(|e| ToolResult::error(format!("could not start tool: {e}")))?;
-    Ok(Inflight { index, rx, clock, scope, call_cancel, grace, _watch: watch })
+    Ok(Inflight { index, rx, clock, scope, call_cancel, grace, read_fingerprint, _watch: watch })
 }
 
 fn reported(call: &Inflight, finished: Instant, mut result: ToolResult) -> ToolResult {
@@ -265,7 +267,7 @@ impl Agent {
         Prepared::Run { tool, args, ctx }
     }
 
-    /// The third identical read-only call whose target has not changed is not run again: its result is already in the
+    /// After two successful identical reads whose target has not changed, do not run another: its result is already in the
     /// conversation, and asking the model to look at it once more only burns a round. Anything that could change the
     /// target (a write, a command) clears the log, so "write, then look" is never refused.
     fn unchanged_repeat(&self, session: &str, tool: &Arc<dyn Tool>, args: &Value) -> Option<ToolResult> {
@@ -277,22 +279,29 @@ impl Agent {
         }
         let fingerprint = tool.observe(args)?;
         let key = format!("{}\u{0}{}", spec.name, args);
-        let seen = log.entry(session.to_string()).or_default();
-        match seen.get_mut(&key) {
-            Some((before, count)) if *before == fingerprint => {
-                *count += 1;
-                if *count < 3 { return None; }
-                let repeats = *count - 1;
+        match log.get(session).and_then(|seen| seen.get(&key)) {
+            Some((before, count)) if *before == fingerprint && *count >= 2 => {
+                let repeats = *count;
                 Some(ToolResult::ok(format!(
                     "Not run: `{}` with these exact arguments already returned its result {repeats} times and the target has not changed since (same size and modification time). The earlier result in this conversation is still valid. Do not repeat the call: use that result, make a change, or tell the user what you are waiting for.",
                     spec.name
                 )).with_structured_content(serde_json::json!({"harness_status":"unchanged_repeat","tool":spec.name,"arguments":args,"repeats":repeats})))
             }
-            _ => {
-                seen.insert(key, (fingerprint, 1));
-                None
-            }
+            _ => None,
         }
+    }
+
+    fn remember_read(&self, session: &str, call: &ToolCall, before: &str) {
+        let Some(&index) = self.tool_index.get(&call.name) else { return };
+        let args = if call.arguments.trim().is_empty() { Value::Object(Map::new()) }
+            else { match serde_json::from_str::<Value>(&call.arguments) { Ok(args) => args, Err(_) => return } };
+        // A changed target, failed call, approval rejection or skipped dispatch is never cached as a successful read.
+        if self.tools[index].observe(&args).as_deref() != Some(before) { return; }
+        let key = format!("{}\u{0}{}", call.name, args);
+        let mut log = self.read_log.lock().unwrap_or_else(|e| e.into_inner());
+        let entry = log.entry(session.to_string()).or_default().entry(key).or_insert_with(|| (before.into(), 0));
+        if entry.0 != before { *entry = (before.into(), 0); }
+        entry.1 += 1;
     }
 
     fn drain(
@@ -307,7 +316,12 @@ impl Agent {
         for call in inflight.drain(..) {
             let result = await_call(&call, cancel);
             if result.outcome_unknown() { call.scope.mark_uncertain(); }
-            results[call.index] = Some(self.finalize(session, &calls[call.index], result, on_event));
+            let succeeded = !result.is_error;
+            let result = self.finalize(session, &calls[call.index], result, on_event);
+            if succeeded && !result.is_error {
+                if let Some(before) = &call.read_fingerprint { self.remember_read(session, &calls[call.index], before); }
+            }
+            results[call.index] = Some(result);
         }
     }
 
@@ -325,10 +339,16 @@ impl Agent {
             crate::Part::Image { url } => url.len(),
         }).sum();
         let max = self.tool_index.get(&call.name).map_or(DEFAULT_MAX_OUTPUT, |&i| self.tools[i].spec().max_output);
-        if media_bytes > 6 * 1024 * 1024 {
-            result = ToolResult::error("Tool returned too much media (limit: 6 MiB); request a smaller result. The tool may already have performed its action.");
+        let oversized = if media_bytes > 6 * 1024 * 1024 {
+            Some("Tool returned too much media (limit: 6 MiB); request a smaller result. The tool may already have performed its action.")
         } else if result.structured_content.as_ref().is_some_and(|v| v.to_string().len() > max) {
-            result = ToolResult::error("Tool returned structured data larger than its output limit; request a smaller result. The tool may already have performed its action.");
+            Some("Tool returned structured data larger than its output limit; request a smaller result. The tool may already have performed its action.")
+        } else { None };
+        if let Some(message) = oversized {
+            // Payload limits must not remove an execution barrier or permit replay of an uncertain action.
+            let status = result.halts_dispatch().then(|| result.structured_content.as_ref().unwrap()["harness_status"].clone());
+            result = ToolResult::error(message);
+            if let Some(status) = status { result.structured_content = Some(serde_json::json!({"harness_status":status})); }
         }
         let mut images = Vec::new();
         for part in std::mem::take(&mut result.parts) {

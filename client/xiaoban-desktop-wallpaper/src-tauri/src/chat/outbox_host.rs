@@ -175,7 +175,7 @@ impl agent_kernel::RunInput for Input {
                 return Ok(vec![]);
             }
             publish(&self.app, session).map_err(agent_kernel::HarnessError::Store)?;
-            Ok(vec![entry.message])
+            Ok(vec![entry.into_message()])
         } else {
             Ok(vec![])
         }

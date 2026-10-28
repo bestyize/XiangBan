@@ -28,6 +28,14 @@ pub struct Entry {
     #[serde(default)]
     pub dispatching: bool,
 }
+impl Entry {
+    /// Carry message-specific selections across an active run's mailbox, including older saved entries.
+    pub fn into_message(mut self) -> Message {
+        let metadata = self.message.structured_content.get_or_insert_with(|| json!({}));
+        metadata["mentions"] = self.mentions;
+        self.message
+    }
+}
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Snapshot {
@@ -437,6 +445,20 @@ impl Outbox {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn delivery_adds_selections_to_legacy_entries_without_losing_message_metadata() {
+        let entry: Entry = serde_json::from_value(json!({
+            "id":"q1", "mode":"steer", "binding":{},
+            "message": {"role":"user","parts":[{"type":"text","text":"change"}],
+                "structured_content":{"outboxId":"q1","attachments":[{"id":"file"}]}},
+            "mentions":[{"kind":"connector","id":"service"}]
+        })).unwrap();
+        let message = entry.into_message();
+        let metadata = message.structured_content.unwrap();
+        assert_eq!(metadata["outboxId"], "q1");
+        assert_eq!(metadata["attachments"][0]["id"], "file");
+        assert_eq!(metadata["mentions"][0]["id"], "service");
+    }
     fn temp() -> PathBuf {
         std::env::temp_dir().join(format!(
             "outbox-test-{}-{}",

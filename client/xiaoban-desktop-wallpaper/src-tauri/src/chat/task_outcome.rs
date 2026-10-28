@@ -101,7 +101,7 @@ pub fn inspect(journal: &JsonlRunLog, session: &str, run: &str) -> Result<TaskOu
                                 || output.starts_with("invalid arguments for `");
                             let failure = (key, validation);
                             if !unresolved.contains(&failure) { unresolved.push(failure); }
-                        } else {
+                        } else if !structured_content.as_ref().is_some_and(|v| v["harness_status"] == "unchanged_repeat") {
                             // A later successful retry of the same operation can repair a
                             // failed attempt. A different tool/target is not proof of repair.
                             unresolved.retain(|(old, validation)| old != &key && !(*validation && old.0 == key.0
@@ -173,6 +173,39 @@ pub fn verify_file(root: &Path, session: &str, run: &str, workspace: &Path,
 #[cfg(test)]
 mod tests {
  use super::*;
+ #[test]
+ fn skipping_an_unchanged_read_does_not_repair_failed_execution() {
+    use agent_kernel::{Agent, MemoryStore, Tool, ToolSpec, ToolCtx, ToolResult, Risk, Part, RunOptions};
+    use agent_kernel::provider::scripted::{ScriptedProvider, Step};
+    use std::sync::{Arc, atomic::{AtomicBool, AtomicUsize, Ordering}};
+    struct Read { spec: ToolSpec, calls: AtomicUsize }
+    impl Tool for Read {
+        fn spec(&self) -> &ToolSpec { &self.spec }
+        fn execute_result(&self, _: serde_json::Value, _: &ToolCtx) -> ToolResult {
+            match self.calls.fetch_add(1, Ordering::SeqCst) {
+                0 => ToolResult::error("read failed"),
+                1 => ToolResult::ok("not dispatched").with_structured_content(serde_json::json!({"harness_status":"unchanged_repeat"})),
+                _ => ToolResult::ok("actual file contents"),
+            }
+        }
+    }
+    for actual_retry in [false, true] {
+        let root = std::env::temp_dir().join(format!("xiaoban-skipped-outcome-{}-{actual_retry}",std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let mut steps = vec![Step::tool_call("a","read","{}"),Step::tool_call("b","read","{}")];
+        if actual_retry { steps.push(Step::tool_call("c","read","{}")); }
+        steps.push(Step::text("report"));
+        let agent = Agent::builder(Arc::new(ScriptedProvider::new(steps)), Arc::new(MemoryStore::new()))
+            .tool(Read { spec:ToolSpec::new("read","read",serde_json::json!({"type":"object"})).risk(Risk::Read),calls:AtomicUsize::new(0) })
+            .build().unwrap();
+        let journal = JsonlRunLog::new(&root);
+        let run = agent.run_parts_observed("s",vec![Part::Text{text:"read".into()}],RunOptions::default(),
+            &mut |record|journal.append(&record), &Arc::new(AtomicBool::new(false))).unwrap();
+        let outcome = inspect(&journal,"s",&run.run_id).unwrap();
+        assert_eq!(outcome.status, if actual_retry {Status::Unknown} else {Status::Partial});
+        fs::remove_dir_all(root).unwrap();
+    }
+ }
  #[test] fn never_claim_success_from_model_completion() {
     let base=std::env::temp_dir().join(format!("xiaoban-outcome-{}",std::process::id()));
     let _=fs::remove_dir_all(&base);

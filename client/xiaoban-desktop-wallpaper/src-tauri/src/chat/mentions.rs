@@ -91,7 +91,12 @@ pub fn context_text(statuses: &Value, focus: &[String]) -> Option<String> {
 impl Middleware for ConnectorContext {
     fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
         let Some(at) = turn.messages.iter().rposition(|m| m.role == Role::User && !m.synthetic) else { return Ok(()) };
-        if let Some(text) = context_text(&(self.statuses)(), &self.focus) {
+        let selected = turn.messages[at].structured_content.as_ref().and_then(|v| v.get("mentions"))
+            .and_then(|v| serde_json::from_value::<Vec<Mention>>(v.clone()).ok());
+        let focus: Vec<String> = selected.as_ref().map(|mentions| mentions.iter()
+            .filter(|m| m.kind == "connector").take(MAX_MENTIONS).map(|m| m.id.clone()).collect())
+            .unwrap_or_else(|| self.focus.clone());
+        if let Some(text) = context_text(&(self.statuses)(), &focus) {
             turn.messages.insert(at + 1, Message::reminder(text));
         }
         Ok(())
@@ -105,6 +110,37 @@ mod tests {
 
     fn mention(kind: &str, id: &str) -> Mention {
         Mention { kind: kind.into(), id: id.into() }
+    }
+
+    #[test]
+    fn steered_connector_selections_reach_the_model_and_override_the_initial_focus() {
+        use super::super::outbox::{Delivery, Outbox};
+        let root = std::env::temp_dir().join(format!("xiaoban-steer-mentions-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let mut queue = Outbox::new(root.clone());
+        queue.open("s");
+        let id = queue.enqueue("s", Message::user_text("把结果放到这里"), Delivery::Steer,
+            json!({}), json!([mention("connector", "new-service")]), None).unwrap();
+        let message = queue.claim("s", true, false).unwrap().unwrap().into_message();
+        let context = ConnectorContext::new(Arc::new(|| json!([])), &[mention("connector", "old-service")]);
+        let mut turn = Turn { session: "s".into(), index: 1, messages: vec![message], tools: vec![] };
+        context.before_model(&mut turn).unwrap();
+        assert!(turn.messages[1].text().contains("new-service"));
+        assert!(!turn.messages[1].text().contains("old-service"));
+        assert_eq!(turn.messages[0].structured_content.as_ref().unwrap()["outboxId"], id);
+        queue.accepted("s", &[id]).unwrap();
+        assert!(queue.snapshot("s").unwrap().items.is_empty());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn an_explicit_empty_selection_does_not_reuse_an_older_messages_connector() {
+        let context = ConnectorContext::new(Arc::new(|| json!([])), &[mention("connector", "old-service")]);
+        let mut message = Message::user_text("新的补充要求");
+        message.structured_content = Some(json!({"mentions":[]}));
+        let mut turn = Turn { session: "s".into(), index: 1, messages: vec![message], tools: vec![] };
+        context.before_model(&mut turn).unwrap();
+        assert_eq!(turn.messages.len(), 1);
     }
 
     #[test]

@@ -31,5 +31,5 @@ mod sessions;
 #[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/outbox.rs"]
 mod outbox;
 
-#[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/git_command.rs"]
-mod git_command;
+#[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/mentions.rs"]
+mod mentions;

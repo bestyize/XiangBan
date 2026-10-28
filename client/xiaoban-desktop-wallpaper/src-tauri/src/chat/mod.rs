@@ -1831,22 +1831,28 @@ pub async fn chat_compact(app: tauri::AppHandle, window: tauri::WebviewWindow, s
     let cancel = Arc::new(AtomicBool::new(false));
     {
         let state = app.state::<ChatState>();
+        let _delivery = lock(&state.delivery);
         let mut runs = lock(&state.runs);
         if runs.contains_key(&session_id) {
             return Err("这个对话还在回答或正在压缩，请等它结束再试".into());
         }
+        let lease = SessionLease::acquire(Dirs::of(&app)?.leases(), &session_id)?;
+        lock(&state.leases).insert(session_id.clone(), lease);
         runs.insert(session_id.clone(), cancel.clone());
     }
     let (sender, receiver) = std::sync::mpsc::channel();
     let (handle, id) = (app.clone(), session_id.clone());
     // The model client blocks, so it runs on its own thread, as a chat answer does.
     let started = std::thread::Builder::new().name(format!("compact-{id}")).spawn(move || {
+        let mut cleanup = HostRunCleanup { app: handle.clone(), session: id.clone(), success: Some(false) };
         let result = compact_session(&handle, &id, &cancel);
-        lock(&handle.state::<ChatState>().runs).remove(&id);
+        cleanup.success = Some(result.is_ok() && !cancel.load(Ordering::SeqCst));
+        // Release ownership and wake (or explicitly pause) queued input before reporting completion.
+        drop(cleanup);
         let _ = sender.send(result);
     });
     if let Err(error) = started {
-        lock(&app.state::<ChatState>().runs).remove(&session_id);
+        finish_run(&app, &session_id, Some(false));
         return Err(format!("无法开始压缩：{error}"));
     }
     tauri::async_runtime::spawn_blocking(move || receiver.recv().unwrap_or_else(|_| Err("压缩被中断了".to_string())))
