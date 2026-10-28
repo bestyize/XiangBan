@@ -12,6 +12,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 thiserror = "2"
 rand = "0.8"
+xiaoban-agent-hooks = { path = "../agent-hooks" }
 
 [[bin]]
 name = "fake-codex"

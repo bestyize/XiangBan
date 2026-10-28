@@ -4,9 +4,13 @@
 
 pub mod claude;
 pub mod codex;
+pub mod environment;
 pub mod model;
+pub mod observer;
 mod process;
+pub use environment::*;
 pub use model::*;
+pub use observer::*;
 
 #[cfg(test)]
 mod test_support {
