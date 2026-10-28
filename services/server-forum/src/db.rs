@@ -251,6 +251,7 @@ pub async fn connect(url: &str, schema: Option<&str>) -> Result<PgPool, AppError
 pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     sqlx::raw_sql(SCHEMA).execute(pool).await?;
     sqlx::raw_sql(POINTS_SCHEMA).execute(pool).await?;
+    sqlx::raw_sql(CONTENT_SCHEMA).execute(pool).await?;
     // 搜索用的三元组索引是可选的：数据库没有 pg_trgm 扩展时退化为普通 ILIKE 扫描。
     if sqlx::raw_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm").execute(pool).await.is_ok() {
         let _ = sqlx::raw_sql(
@@ -752,3 +753,107 @@ mod tests {
 }
 
 
+
+/// 社区内容层：内容包、版本、应用计数、方案、项目、周刊与审核队列。
+const CONTENT_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS packs (
+    id            BIGSERIAL PRIMARY KEY,
+    topic_id      BIGINT REFERENCES topics(id) ON DELETE SET NULL,
+    kind          TEXT NOT NULL,
+    slug          TEXT NOT NULL UNIQUE,
+    title         TEXT NOT NULL,
+    summary       TEXT NOT NULL DEFAULT '',
+    tags          TEXT[] NOT NULL DEFAULT '{}',
+    author_uid    UUID REFERENCES users(uid),
+    trust_level   SMALLINT NOT NULL DEFAULT 2 CHECK (trust_level BETWEEN 0 AND 2),
+    status        TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('pending', 'published', 'rejected', 'removed')),
+    current_version INT NOT NULL DEFAULT 1,
+    cover_key     TEXT,
+    apply_count   BIGINT NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS packs_list_idx ON packs (status, kind, updated_at DESC);
+CREATE INDEX IF NOT EXISTS packs_hot_idx ON packs (status, apply_count DESC);
+CREATE INDEX IF NOT EXISTS packs_author_idx ON packs (author_uid, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS pack_versions (
+    pack_id       BIGINT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
+    version       INT NOT NULL,
+    label         TEXT NOT NULL,
+    sha256        TEXT NOT NULL CHECK (length(sha256) = 64),
+    size          BIGINT NOT NULL CHECK (size > 0),
+    manifest      JSONB NOT NULL,
+    storage       TEXT NOT NULL DEFAULT 'resource',
+    file_key      TEXT NOT NULL,
+    mirrors       JSONB NOT NULL DEFAULT '[]',
+    changelog     TEXT NOT NULL DEFAULT '',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (pack_id, version)
+);
+
+-- 直传凭证签发记录：资源机回调确认文件落盘并校验过哈希后才算 verified，发布内容包只认已确认的上传。
+CREATE TABLE IF NOT EXISTS pack_uploads (
+    file_key      TEXT PRIMARY KEY,
+    uid           UUID NOT NULL REFERENCES users(uid),
+    kind          TEXT NOT NULL,
+    size          BIGINT NOT NULL,
+    sha256        TEXT NOT NULL,
+    verified      BOOLEAN NOT NULL DEFAULT false,
+    used          BOOLEAN NOT NULL DEFAULT false,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS pack_applies (
+    pack_id       BIGINT NOT NULL REFERENCES packs(id) ON DELETE CASCADE,
+    day           DATE NOT NULL,
+    count         INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (pack_id, day)
+);
+
+CREATE TABLE IF NOT EXISTS schemes (
+    id            BIGSERIAL PRIMARY KEY,
+    author_uid    UUID NOT NULL REFERENCES users(uid),
+    title         TEXT NOT NULL,
+    summary       TEXT NOT NULL DEFAULT '',
+    items         JSONB NOT NULL DEFAULT '[]',
+    status        TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'removed')),
+    apply_count   BIGINT NOT NULL DEFAULT 0,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS schemes_list_idx ON schemes (status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS projects (
+    slug          TEXT PRIMARY KEY,
+    name          TEXT NOT NULL,
+    summary       TEXT NOT NULL DEFAULT '',
+    body_md       TEXT NOT NULL DEFAULT '',
+    body_html     TEXT NOT NULL DEFAULT '',
+    links         JSONB NOT NULL DEFAULT '[]',
+    status        TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('draft', 'published')),
+    sort_order    INT NOT NULL DEFAULT 0,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS weekly_issues (
+    week          TEXT PRIMARY KEY,
+    title         TEXT NOT NULL,
+    summary       TEXT NOT NULL DEFAULT '',
+    items         JSONB NOT NULL DEFAULT '[]',
+    status        TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+    published_at  TIMESTAMPTZ,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS moderation_queue (
+    id            BIGSERIAL PRIMARY KEY,
+    target_type   TEXT NOT NULL,
+    target_id     BIGINT NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    note          TEXT NOT NULL DEFAULT '',
+    handled_by    TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    handled_at    TIMESTAMPTZ
+);
+CREATE UNIQUE INDEX IF NOT EXISTS moderation_pending_idx ON moderation_queue (target_type, target_id) WHERE status = 'pending';
+"#;
