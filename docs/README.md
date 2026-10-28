@@ -5,6 +5,7 @@
 - [agent](agent/README.md)：小伴 Agent 演进规划、实现入口与建议验收清单。
 - [product](product/README.md)：需求与商业规划。
 - [deployment](deployment/README.md)：现有部署栈、备份与数据模型。
+- [交接文档_2026-10-28.md](交接文档_2026-10-28.md)：这一轮云端会话的交接（手机桌面互联、语音编程、哪些没验证过、本地怎么起）。带日期的阶段记录，本地验证完、内容落进各 README 后可以删除。
 - [design-preview](design-preview/README.md)：设计资源与交互预览，包含小伴桌面已确认设计稿，不是运行入口。
 
 源码和子项目 README 说明实际状态；产品计划、设计稿和历史交接不代表已实现能力。路径、入口、协议和运行方式变化时更新相应文档。
