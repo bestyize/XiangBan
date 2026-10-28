@@ -37,14 +37,18 @@ kotlin {
             api(libs.kotlinx.coroutines.core)
             api(libs.kotlinx.serialization.json)
             api(libs.ktor.client.core)
-            implementation(libs.ktor.client.websockets)
+            api(libs.ktor.client.websockets)
         }
         // Android 与 JVM 都用 Java 密码学接口（javax.crypto / java.security），同一份实现编进两边。
         jvmMain { kotlin.srcDir("src/jvmCommon/kotlin") }
-        androidMain { kotlin.srcDir("src/jvmCommon/kotlin") }
+        androidMain {
+            kotlin.srcDir("src/jvmCommon/kotlin")
+            kotlin.srcDir("src/androidMain/kotlin")
+        }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
             implementation(libs.kotlinx.coroutines.test)
+            implementation(libs.ktor.client.mock)
         }
         jvmTest.dependencies {
             implementation(libs.ktor.client.cio)

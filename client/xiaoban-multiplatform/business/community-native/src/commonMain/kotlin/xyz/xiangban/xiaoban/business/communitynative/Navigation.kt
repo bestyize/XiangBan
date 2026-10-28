@@ -7,6 +7,7 @@ sealed interface Route {
     data class Weekly(val week: String) : Route
     data class Project(val slug: String) : Route
     data object Login : Route
+    data object Devices : Route
 
     fun encode(): String = when (this) {
         is Pack -> "pack:$id"
@@ -14,6 +15,7 @@ sealed interface Route {
         is Weekly -> "weekly:$week"
         is Project -> "project:$slug"
         Login -> "login"
+        Devices -> "devices"
     }
 
     companion object {
@@ -26,6 +28,7 @@ sealed interface Route {
                 "weekly" -> value.takeIf { it.isNotEmpty() }?.let(::Weekly)
                 "project" -> value.takeIf { it.isNotEmpty() }?.let(::Project)
                 "login" -> Login
+                "devices" -> Devices
                 else -> null
             }
         }

@@ -135,9 +135,10 @@ private fun MetaTextWrap(text: String) = Text(text, color = LocalExtraColors.cur
 
 /** “我的”：未登录是登录入口，已登录显示账号与论坛资料、未读通知，网页端功能给出入口。 */
 @Composable
-fun MineScreen(env: CommunityEnv, login: () -> Unit) {
+fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
+    val remoteState by env.remoteChat.state.collectAsState()
     var nickname by remember { mutableStateOf<String?>(null) }
     var points by remember { mutableStateOf<Int?>(null) }
     var unread by remember { mutableStateOf(0) }
@@ -167,10 +168,17 @@ fun MineScreen(env: CommunityEnv, login: () -> Unit) {
                         Text("未登录", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                         MetaText("登录后同步你在社区的身份")
                     }
-                    BrandButton("登录", login)
+                    BrandButton("登录", { open(Route.Login) })
                 }
             }
             Hairline()
+            val peers = remoteState.peers
+            val peerDetail = if (peers.isNotEmpty()) {
+                val onlineCount = peers.count { it.online }
+                if (onlineCount > 0) "${peers.size} 台电脑（$onlineCount 在线）" else "${peers.size} 台电脑（离线）"
+            } else "未配对"
+            MineRow("我的电脑 / 设备互联", peerDetail) { open(Route.Devices) }
+
             if (session.loggedIn) {
                 MineRow("通知", if (unread > 0) "$unread 条未读" else null) { env.platform?.openUrl("${env.config.forumBase.trimEnd('/')}/notifications") }
                 MineRow("我的作品", null) { env.platform?.openUrl("${env.config.forumBase.trimEnd('/')}/me/works") }

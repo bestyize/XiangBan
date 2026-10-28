@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import xyz.xiangban.xiaoban.common.link.AndroidKeystoreLinkStorage
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -14,8 +15,9 @@ class MainActivity : ComponentActivity() {
 
         val storage = SharedPrefsTokenStorage(this)
         val platform = AndroidPlatformActions(this)
+        val linkStorage = AndroidKeystoreLinkStorage(this)
         setContent {
-            App(storage, platform)
+            App(storage, platform, linkStorage)
         }
     }
 }

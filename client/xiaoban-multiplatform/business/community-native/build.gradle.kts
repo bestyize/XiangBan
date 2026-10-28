@@ -33,6 +33,7 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             api(project(":common:community-core"))
+            api(project(":common:link-core"))
             implementation(libs.compose.runtime)
             implementation(libs.compose.foundation)
             implementation(libs.compose.material3)

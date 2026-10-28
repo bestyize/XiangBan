@@ -7,7 +7,7 @@ import kotlin.test.assertNull
 class RouteTest {
     @Test
     fun everyRouteSurvivesEncoding() {
-        val routes = listOf(Route.Pack(42), Route.Topic(7), Route.Weekly("2026-W43"), Route.Project("xiaoban"), Route.Login)
+        val routes = listOf(Route.Pack(42), Route.Topic(7), Route.Weekly("2026-W43"), Route.Project("xiaoban"), Route.Login, Route.Devices)
         routes.forEach { assertEquals(it, Route.decode(it.encode())) }
         assertEquals(routes, Route.decodeStack(Route.encodeStack(routes)))
     }
