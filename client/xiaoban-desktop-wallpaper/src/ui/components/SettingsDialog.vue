@@ -12,7 +12,7 @@ const AssistantPage = defineAsyncComponent(() => import('../pages/AssistantPage.
 const VoiceSettingsCard = defineAsyncComponent(() => import('./VoiceSettingsCard.vue'));
 const AgentSafetyCard = defineAsyncComponent(() => import('./AgentSafetyCard.vue'));
 
-const props = defineProps<{ store: ControlStore }>();
+const props = defineProps<{ store: ControlStore; detached?: boolean }>();
 const emit = defineEmits<{ openSite: [] }>();
 
 /** Category list. `color: null` uses the theme colour. Keywords feed the search box. */
@@ -37,8 +37,8 @@ const hasUpdate = computed(() => !!props.store.website.update?.available);
 function pick(id: SettingsTab) { props.store.settingsTab = id; }
 </script>
 <template>
-  <NModal v-model:show="show" :auto-focus="false" transform-origin="center" class="xb-settings-modal">
-    <div class="xb-settings" role="dialog" aria-modal="true" aria-label="设置" data-testid="settings-page">
+  <component :is="detached ? 'div' : NModal" v-model:show="show" :auto-focus="false" transform-origin="center" class="xb-settings-modal">
+    <div class="xb-settings" :class="{ 'is-detached': detached }" role="dialog" :aria-modal="detached ? undefined : true" aria-label="设置" data-testid="settings-page">
       <nav class="xb-settings-nav" aria-label="设置分类">
         <label class="xb-search"><Search :size="13" /><input v-model="query" type="search" placeholder="搜索设置" aria-label="搜索设置" data-testid="settings-search" /></label>
         <button type="button" class="xb-settings-account" data-testid="settings-account" @click="store.account ? undefined : store.openLogin()">
@@ -65,7 +65,7 @@ function pick(id: SettingsTab) { props.store.settingsTab = id; }
         </div>
       </section>
     </div>
-  </NModal>
+  </component>
 </template>
 <style>
 .xb-settings{width:940px;height:660px;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);display:flex;border-radius:var(--ui-radius-dialog);overflow:hidden;background:var(--ui-surface-sunken);box-shadow:var(--ui-shadow-dialog);color:var(--ui-text-primary);font-family:var(--ui-font-family);font-size:13px}
@@ -90,4 +90,6 @@ html[data-theme=dark] .xb-settings-tab.on{background:rgba(255,255,255,.1)}
 .xb-settings-main>header h1{margin:0;font-size:15px;font-weight:600}
 .xb-settings-main>header .xb-icon-btn{margin-left:auto;width:28px;height:28px}
 .xb-settings-body{flex:1;min-height:0;padding:8px 28px 28px}
+.xb-settings.is-detached{width:100%;height:100dvh;max-width:none;max-height:none;border-radius:0;box-shadow:none}
+@media(max-width:680px){.xb-settings.is-detached .xb-settings-nav{width:168px;padding:10px 8px}.xb-settings.is-detached .xb-settings-body{padding:8px 16px 20px}.xb-settings.is-detached .xb-settings-main>header{padding-left:16px}}
 </style>

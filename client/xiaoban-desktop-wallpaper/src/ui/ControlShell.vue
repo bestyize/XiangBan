@@ -3,7 +3,7 @@ import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, r
 import { NAlert, NButton, NSkeleton, useMessage } from 'naive-ui';
 import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LogIn, LogOut, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Trash2, Zap } from 'lucide-vue-next';
 import { invoke, listen } from '../bridge.ts';
-import { accent, accents, isDark, appearanceMode, appearanceModes, publishAccentTo, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
+import { accent, accents, followHost, followAccent, isDark, appearanceMode, appearanceModes, publishAccentTo, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
 import type { ControlPage, SettingsTab } from './control-types.ts';
 import type { SessionSummary } from './chat/types.ts';
@@ -12,6 +12,7 @@ import ChatNameDialog from './components/ChatNameDialog.vue';
 import CommunityApplyDialog from './community/CommunityApplyDialog.vue';
 import WorkspaceSearchDialog from './components/WorkspaceSearchDialog.vue';
 import { useWorkspaceSort } from './workspace-sort.ts';
+import { serveConfigurationWindows } from './configuration/windows.ts';
 const pageLoaders = {
   'new-task': () => import('./pages/NewTaskPage.vue'),
   chat: () => import('./pages/ChatPage.vue'),
@@ -403,9 +404,9 @@ async function shareAppearance() {
   publishAppearanceTo(mode => { store.setAppearance(mode).catch(error => store.notify(error, 'error')); });
   // The theme colour lives in this window's storage; the host only relays it to the floating assistant.
   publishAccentTo(id => { void invoke('set_accent', { accent: id }).catch(() => {}); });
-  void invoke('set_accent', { accent: accent.value }).catch(() => {});
   try {
-    const kept = await invoke<{ appearance: string; appearanceKept?: boolean }>('get_appearance');
+    const kept = await invoke<{ appearance: string; appearanceKept?: boolean; accent?: string }>('get_appearance');
+    followAccent(kept.accent);
     const step = reconcile(kept, appearanceMode.value);
     if (step.send) await store.setAppearance(step.send);
     else if (step.adopt) appearanceMode.value = step.adopt;
@@ -460,6 +461,8 @@ function onKeydown(event: KeyboardEvent) {
   else if (event.key.toLowerCase() === 'k') { event.preventDefault(); openSearch(); }
   else if (event.key.toLowerCase() === 'n') { event.preventDefault(); void newTask(); }
 }
+watch(() => store.settings, value => { if (store.ready) { followHost(value.appearance); followAccent(value.accent); } });
+let configurationDisposed = false;
 const focus = () => store.refreshSettings().catch(error => store.notify(error, 'error'));
 onMounted(() => {
   if (typeof window !== 'undefined' && store.desktop) {
@@ -469,6 +472,8 @@ onMounted(() => {
       return null;
     };
   }
+  if (store.desktop) void listen('configuration-login', () => store.openLogin()).then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); });
+  if (store.desktop) void serveConfigurationWindows().then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); }).catch(error => store.notify(error, 'error'));
   void store.initialize().then(async () => { if (store.info.uiSmoke) await (await import('./ui-smoke.ts')).runUiSmoke(store); });
   window.addEventListener('focus', focus);
   window.addEventListener('widgets-manage', manageWidgets);
@@ -478,6 +483,7 @@ onMounted(() => {
   if (store.desktop) { void listenForAssistant(); void introduceAssistant(); void shareAppearance(); }
 });
 onBeforeUnmount(() => {
+  configurationDisposed = true;
   assistantListeners.splice(0).forEach(off => off()); store.dispose();
   window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); window.removeEventListener('pets-manage', managePets);
   window.removeEventListener('keydown', onKeydown); document.removeEventListener('pointerdown', onPointerDown, true);
@@ -630,7 +636,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
         </KeepAlive></template>
       </main>
     </div>
-    <SettingsDialog :store="store" @open-site="openOfficialSite" />
+    <SettingsDialog v-if="!store.desktop" :store="store" @open-site="openOfficialSite" />
     <WorkspaceSearchDialog v-model:show="searchOpen" :desktop="store.desktop" :spaces="spaces" @select="selectSearchResult" />
     <LoginModal :store="store" />
     <CommunityApplyDialog :store="store" />

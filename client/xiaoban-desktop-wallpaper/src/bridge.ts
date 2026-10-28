@@ -1,6 +1,8 @@
 import type { EffectsChoice } from "./effects/types.ts";
 
 export interface Settings {
+  /** Host-persisted accent shared by independent configuration windows. */
+  accent?: string;
   mode: "floating" | "wallpaper";
   /** The console's colour scheme. Kept by the host so the floating assistant can match it. */
   appearance: "system" | "light" | "dark";
@@ -319,6 +321,11 @@ export function invoke<T>(
 ): Promise<T> {
   if (!window.__TAURI__)
     return Promise.reject(new Error("请通过桌面程序运行这个功能"));
+  // Configuration webviews have no direct console privileges; the native host authenticates
+  // a bounded request and the control window executes it using its existing guards.
+  if (new URLSearchParams(location.search).get('scene') === 'configuration' && !command.startsWith('configuration_window_')) {
+    return window.__TAURI__.core.invoke<T>('configuration_window_invoke', { command, args: args ?? {} });
+  }
   return window.__TAURI__.core.invoke<T>(command, args);
 }
 /** Tells every window; the others hear it through `listen`. */

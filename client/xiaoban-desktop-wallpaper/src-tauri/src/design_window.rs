@@ -22,7 +22,7 @@ pub fn permitted(label:&str,command:&str)->Option<bool>{
 }
 mod placement;
 
-fn keep_visible(window:&tauri::WebviewWindow, fallback:Option<tauri::Monitor>)->Result<(),String>{
+pub(crate) fn keep_visible(window:&tauri::WebviewWindow, fallback:Option<tauri::Monitor>)->Result<(),String>{
     if window.is_maximized().unwrap_or(false)||window.is_fullscreen().unwrap_or(false){return Ok(())}
     let monitor=window.current_monitor().map_err(|e|e.to_string())?.or(fallback);
     let Some(monitor)=monitor else{return Ok(())};

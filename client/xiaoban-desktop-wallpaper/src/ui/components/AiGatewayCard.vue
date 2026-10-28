@@ -2,14 +2,16 @@
 import { computed, ref, watch } from 'vue';
 import { NAlert, NButton, NInput, NModal, NTag } from 'naive-ui';
 import { Settings, Sprout } from 'lucide-vue-next';
-import { GATEWAY_PROVIDER, invoke, toAccountError, type AiBalance, type AiConfigView, type AiRedeemed, type AiTier } from '../../bridge.ts';
+import { GATEWAY_PROVIDER, desktop as nativeDesktop, invoke, toAccountError, type AiBalance, type AiConfigView, type AiRedeemed, type AiTier } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
+import { closeConfigurationWindow, openModelWindow } from '../configuration/windows.ts';
 import { bucketLabel, expiryText, money, pickTier } from '../ai-gateway.ts';
 
-const props = defineProps<{ store: ControlStore; config: AiConfigView | null }>();
+const props = defineProps<{ store: ControlStore; config: AiConfigView | null; detached?: boolean }>();
 const emit = defineEmits<{ config: [view: AiConfigView] }>();
 
-const open = ref(false);
+const open = ref(!!props.detached);
+watch(open, value => { if (props.detached && !value) void closeConfigurationWindow().catch(error => props.store.notify(error, 'error')); });
 const balance = ref<AiBalance | null>(null);
 const tiers = ref<AiTier[]>([]);
 const picked = ref('');
@@ -120,12 +122,14 @@ async function activate() {
 }
 
 function openModal() {
+  if (props.store.desktop && nativeDesktop && !props.detached) { void openModelWindow(GATEWAY_PROVIDER).catch(error => props.store.notify(error, 'error')); return; }
   open.value = true;
   redeemError.value = redeemDone.value = enableError.value = '';
   void load();
 }
 
 function signIn() {
+  if (props.detached) { props.store.openLogin(); return; }
   open.value = false;
   props.store.openLogin();
 }
@@ -140,6 +144,7 @@ watch(uid, () => {
 </script>
 
 <template>
+  <template v-if="!detached">
   <div class="xb-group gateway-card" :class="{ active: gatewayActive }" data-testid="ai-gateway-card">
     <div class="xb-row gw-row">
       <span class="gw-logo" aria-hidden="true"><Sprout :size="22" :stroke-width="2" /></span>
@@ -169,7 +174,8 @@ watch(uid, () => {
     </div>
   </template>
 
-  <NModal v-model:show="open" preset="card" title="小伴 AI" style="max-width: 600px; width: 92vw;" data-testid="gateway-modal">
+  </template>
+  <component :is="detached ? 'div' : NModal" v-model:show="open" preset="card" title="小伴 AI" :style="detached ? { height: '100dvh', overflow: 'auto', padding: '20px', boxSizing: 'border-box' } : { maxWidth: '600px', width: '92vw' }" data-testid="gateway-modal">
     <div class="gw-modal">
       <div v-if="!uid" class="gw-signin" data-testid="gateway-signin">
         <p>登录小伴账号后，就能直接用小伴 AI 聊天：不用自己找模型、申请密钥，新用户还有试用额度。有兑换码的话，登录后在这里输入即可充值。</p>
@@ -241,7 +247,7 @@ watch(uid, () => {
         </section>
       </template>
     </div>
-  </NModal>
+  </component>
 </template>
 
 <style scoped>

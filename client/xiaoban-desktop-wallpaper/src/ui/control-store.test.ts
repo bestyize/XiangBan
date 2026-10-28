@@ -5,16 +5,16 @@ import { clone, createControlStore } from './control-store.ts';
 import { invoke, listen } from '../bridge.ts';
 vi.mock('../bridge.ts', async (importOriginal) => ({ ...await importOriginal<typeof import('../bridge.ts')>(), desktop: true, invoke: vi.fn(), listen: vi.fn() }));
 const ipc = vi.mocked(invoke);
-beforeEach(() => { vi.resetAllMocks(); vi.mocked(listen).mockResolvedValue(() => {}); });
+beforeEach(() => { vi.resetAllMocks(); ipc.mockResolvedValue(undefined); vi.mocked(listen).mockResolvedValue(() => {}); });
 describe('control state with native settings', () => {
-  it('routes previous assistant settings links into the settings dialog without leaving the page', () => {
+  it('routes old settings links into a native window without leaving or blocking the page', () => {
     const store=createControlStore(vi.fn());
     const before = store.page;
     store.navigate('assistant');
-    expect(store.settingsOpen).toBe(true);expect(store.settingsTab).toBe('assistant');expect(store.page).toBe(before);
+    expect(ipc).toHaveBeenCalledWith('configuration_window_open', {target:'settings',tab:'assistant',provider:null});expect(store.settingsOpen).toBe(false);expect(store.settingsTab).toBe('assistant');expect(store.page).toBe(before);
     store.closeSettings(); store.settingsTab = 'ai';
     store.navigate('settings');
-    expect(store.settingsOpen).toBe(true);expect(store.settingsTab).toBe('ai');
+    expect(ipc).toHaveBeenCalledWith('configuration_window_open', {target:'settings',tab:null,provider:null});expect(store.settingsOpen).toBe(false);expect(store.settingsTab).toBe('ai');
     store.dispose();
   });
   it('maps the old studio pages to tabs of 装扮', () => {

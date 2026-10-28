@@ -1,0 +1,6 @@
+{
+  "identifier": "configuration",
+  "description": "Host-created native settings and model windows can receive events. All console operations use a native authenticated, allowlisted request queue; configuration webviews cannot invoke console commands directly.",
+  "windows": ["configuration-settings", "configuration-model-*"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "core:event:allow-emit"]
+}

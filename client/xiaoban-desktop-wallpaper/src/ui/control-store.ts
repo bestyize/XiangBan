@@ -10,6 +10,7 @@ import { createChatStore } from "./chat/chat-store.ts";
 import { loadTurnModels } from '../voice/turn/models.ts';
 import { createLiveTalk } from '../voice/live-talk.ts';
 import { createVoiceOwner } from '../voice/owner.ts';
+import { configurationScene, openSettingsWindow } from './configuration/windows.ts';
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -38,11 +39,11 @@ function mockLogin(username: string, isNewUser: boolean): LoginResult {
 const studioTabs: Partial<Record<ControlPage, StudioTab>> = { wallpapers: "wallpapers", effects: "effects", widgets: "widgets", companion: "pets" };
 /** The new-task page and an open conversation share the composer, so going between them is not leaving the chat. */
 const chatLike = (page: ControlPage) => page === "chat" || page === "new-task";
-export function createControlStore(notify: ControlStore["notify"]): ControlStore {
+export function createControlStore(notify: ControlStore["notify"], options: { configuration?: boolean } = {}): ControlStore {
   let disposed = false;
   const unsubscribers: (() => void)[] = [];
   // The floating assistant has its own microphone and voice; whichever window uses them last has them (`voice/owner.ts`).
-  const voice = createVoiceOwner({ me: 'control', emit, listen, onLost: () => { store.live?.end(); store.asr.deactivate(); void store.speech.stop(); } });
+  const voice = createVoiceOwner({ me: options.configuration ? 'configuration-settings' : 'control', emit, listen, onLost: () => { store.live?.end(); store.asr.deactivate(); void store.speech.stop(); } });
   // Serialize partial appearance updates so a fast sequence cannot overwrite another setting.
   let appearanceQueue = Promise.resolve();
   // Same for the effect choice: sliders send many updates in a row, and only the last may win.
@@ -68,7 +69,11 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       if (store.page !== page && !(chatLike(store.page) && chatLike(page))) { store.live?.end(); void store.speech.stop(); store.asr.deactivate(); }
       store.page = page;
     },
-    openSettings(tab) { if (tab) store.settingsTab = tab; store.settingsOpen = true; },
+    openSettings(tab) {
+      if (tab) store.settingsTab = tab;
+      if (desktop && !configurationScene()) { void openSettingsWindow(tab).catch(error => notify(error, 'error')); return; }
+      store.settingsOpen = true;
+    },
     closeSettings() { store.settingsOpen = false; },
     async startCreation(kind) {
       const prompts = {
@@ -106,6 +111,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
           return;
         }
         const subscriptions = await Promise.all([
+          listen<typeof store.speech.settings>("tts-settings-changed", value => { if (!disposed) store.speech.settings = value; }),
           listen<AiConfigView>("ai-config-changed", () => { if (!disposed) void store.chat.refresh(); }),
           listen<Settings>("settings-changed", (settings) => { if (!disposed) store.settings = settings; }),
           listen<WebsiteStatus>("website-status", (website) => { if (!disposed) store.website = website; }),
@@ -142,7 +148,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       } catch (error) { store.initialError = String(error); }
       finally { if (!disposed) store.ready = true; }
     },
-    dispose() { disposed = true; voice.dispose(); store.chat.dispose(); store.speech.dispose(); store.asr.dispose(); unsubscribers.splice(0).forEach((unlisten) => unlisten()); },
+    dispose() { disposed = true; voice.dispose(); store.chat.dispose(); if (!options.configuration || store.speech.status !== 'idle') store.speech.dispose(); store.asr.dispose(); unsubscribers.splice(0).forEach((unlisten) => unlisten()); },
     async refreshSettings() {
       if (!desktop || disposed) return;
       store.settings = await invoke<Settings>("get_settings");

@@ -2,8 +2,9 @@
 import { computed, onDeactivated, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { NAlert, NInput, NModal, NPopconfirm, NSelect, NSwitch } from 'naive-ui';
 import { Check, ChevronsUpDown, ExternalLink, FolderOpen, Plus, RefreshCw, SlidersHorizontal, Star, Trash2, X, Zap } from 'lucide-vue-next';
-import { GATEWAY_PROVIDER, invoke, listen, type AiConfigView, type AiProtocol, type AiReplyPreference, type AiReasoningEffort, type ProviderConfigView } from '../../bridge.ts';
+import { GATEWAY_PROVIDER, desktop as nativeDesktop, invoke, listen, type AiConfigView, type AiProtocol, type AiReplyPreference, type AiReasoningEffort, type ProviderConfigView } from '../../bridge.ts';
 import AiGatewayCard from './AiGatewayCard.vue';
+import { closeConfigurationWindow, openModelWindow } from '../configuration/windows.ts';
 import { modelFacts, modelFactsPayload, type ModelFacts } from '../model-capabilities.ts';
 import type { ControlStore } from '../control-types.ts';
 import {
@@ -30,7 +31,7 @@ import {
   type ReasoningMode,
 } from '../ai-config.ts';
 
-const props = defineProps<{ store: ControlStore }>();
+const props = defineProps<{ store: ControlStore; detached?: boolean; initialProvider?: string }>();
 
 const blank: AiConfigView = {
   activeProvider: '',
@@ -66,6 +67,7 @@ const openComputerUse = ref(false);
 
 // Modal state
 const modalVisible = ref(false);
+watch(modalVisible, visible => { if (props.detached && !visible) void closeConfigurationWindow().catch(error => props.store.notify(error, 'error')); });
 const editingId = ref<string>('deepseek');
 const modalName = ref('');
 const modalProtocol = ref<AiProtocol>('responses');
@@ -377,6 +379,7 @@ onMounted(async () => {
   try {
     fill(await invoke<AiConfigView>('get_ai_config'));
     unlisten = await listen<AiConfigView>('ai-config-changed', fill);
+    if (props.detached) { if (props.initialProvider === '__new__') openCreateCustomModal(); else openConfigureModal(props.initialProvider ?? 'deepseek'); }
     void invoke<AiConfigView>('refresh_ai_providers', { force: false }).then(fill).catch(() => {});
   } catch (error) {
     loadError.value = String(error instanceof Error ? error.message : error);
@@ -395,6 +398,7 @@ function resetModalState() {
 }
 
 function openConfigureModal(id: string) {
+  if (props.store.desktop && nativeDesktop && !props.detached) { void openModelWindow(id).catch(error => props.store.notify(error, 'error')); return; }
   editingId.value = id;
   const meta = getProviderMeta(id);
   const p = getProviderSaved(id);
@@ -422,6 +426,7 @@ function openConfigureModal(id: string) {
 }
 
 function openCreateCustomModal() {
+  if (props.store.desktop && nativeDesktop && !props.detached) { void openModelWindow('__new__').catch(error => props.store.notify(error, 'error')); return; }
   modalSelectionMode.value = 'manual';
   modalReplyPreference.value = 'default';
   const newId = `custom_${Date.now()}`;
@@ -640,7 +645,8 @@ function openExternal(url?: string) {
 </script>
 
 <template>
-  <section class="ai-config" data-testid="ai-config-card">
+  <section class="ai-config" :class="{ 'is-detached': detached }" data-testid="ai-config-card">
+    <template v-if="!detached">
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">请在桌面应用中配置模型服务。</NAlert>
     <NAlert v-if="loadError" type="warning" :show-icon="false" data-testid="ai-load-error">
       {{ loadError }}。可以稍后刷新，已有配置会保留。
@@ -677,9 +683,11 @@ function openExternal(url?: string) {
     </div>
     <p class="status-line" data-testid="ai-status">{{ activeStatusText }}</p>
 
+    </template>
+    <NAlert v-if="detached && loadError" type="error">{{ loadError }}</NAlert>
     <!-- Provider dialog -->
-    <NModal v-model:show="modalVisible" :close-on-esc="false" :mask-closable="false" data-testid="ai-provider-modal" transform-origin="center">
-      <div class="xb-provider" role="dialog" aria-modal="true" :aria-label="modalTitle" data-testid="ai-provider-dialog">
+    <component :is="detached ? 'div' : NModal" v-model:show="modalVisible" :close-on-esc="false" :mask-closable="false" data-testid="ai-provider-modal" transform-origin="center">
+      <div class="xb-provider" role="dialog" :aria-modal="detached ? undefined : true" :aria-label="modalTitle" data-testid="ai-provider-dialog">
         <header class="pv-head">
           <span class="ptile is-lg" :class="`hue-${modalTile.hue}`" aria-hidden="true">{{ modalTile.mono }}</span>
           <div class="pv-title">
@@ -833,7 +841,8 @@ function openExternal(url?: string) {
           <button v-else type="button" class="xb-btn-primary" :disabled="!store.desktop || !!modalFormError || !!busy" data-testid="ai-save" @click="saveProvider(false)">保存</button>
         </footer>
       </div>
-    </NModal>
+    </component>
+    <template v-if="!detached">
 
     <div class="xb-group-title">对话与工具</div>
     <div class="xb-group">
@@ -850,6 +859,7 @@ function openExternal(url?: string) {
     </div>
 
     <p class="ai-note">密钥保存在本机用户数据目录（私密权限保护），不会上传到小伴网站或云端服务器。</p>
+    </template>
   </section>
 </template>
 
@@ -983,4 +993,5 @@ html[data-theme=dark] .hue-pink{--tile-bg:rgba(238,143,179,.16);--tile-ink:#F095
 .workspace-row{align-items:flex-start}
 .ws-actions{display:flex;flex-direction:column;align-items:stretch;gap:6px;flex-shrink:0}
 .ai-note{margin:14px 4px 0;font-size:12px;line-height:1.7;color:var(--ui-text-tertiary)}
+.ai-config.is-detached{height:100%;margin:0;overflow:hidden}.ai-config.is-detached .xb-provider{width:100%;height:100dvh;max-width:none;max-height:none;border-radius:0;box-shadow:none}.ai-config.is-detached .pv-head,.ai-config.is-detached .pv-foot{flex-shrink:0}.ai-config.is-detached .pv-body{min-height:0}
 </style>

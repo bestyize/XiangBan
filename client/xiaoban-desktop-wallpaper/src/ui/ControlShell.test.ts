@@ -201,7 +201,7 @@ describe('ControlShell sidebar', () => {
     } finally { wrapper.unmount(); }
   });
 
-  it('opens settings as a dialog from the account menu, and old settings links open the right category', async () => {
+  it('opens a native settings window without blocking or changing the current page', async () => {
     const wrapper = mount(ControlShell, { attachTo: document.body });
     try {
       await flushPromises();
@@ -209,22 +209,14 @@ describe('ControlShell sidebar', () => {
       store.navigate('games');
       await wrapper.get('[data-testid="account-entry"]').trigger('click');
       await wrapper.get('[data-testid="nav-settings"]').trigger('click');
-      await vi.waitFor(async () => { await flushPromises(); expect(document.querySelector('[data-testid="settings-page"]')).not.toBeNull(); });
+      expect(invoke).toHaveBeenCalledWith('configuration_window_open', { target: 'settings', tab: null, provider: null });
+      expect(document.querySelector('[data-testid="settings-page"]')).toBeNull();
+      expect(store.settingsOpen).toBe(false);
       expect(store.page).toBe('games');
       expect(wrapper.find('[data-testid="account-menu"]').exists()).toBe(false);
-      const labels = [...document.querySelectorAll('.xb-settings-tab')].map(tab => tab.textContent?.trim());
-      expect(labels).toEqual(['通用', '外观', 'AI 模型', '超级小伴', '声音', '连接与网络', '安全与权限', '关于与更新']);
-      // Native settings links switch the category while the dialog is open.
       const handler = vi.mocked(listen).mock.calls.find(([name]) => name === 'assistant-open-settings')![1];
       handler({ tab: 'assistant' });
-      await vi.waitFor(async () => { await flushPromises(); expect(document.querySelector('[data-testid="assistant-page"]')).not.toBeNull(); });
-      expect(document.querySelector('[data-testid="assistant-page"]')!.classList).toContain('is-embedded');
-      expect(store.settingsTab).toBe('assistant');
-      (document.querySelector('[data-testid="settings-close"]') as HTMLButtonElement).click();
-      await flushPromises();
-      expect(store.settingsOpen).toBe(false);
-      store.navigate('settings');
-      expect(store.settingsOpen).toBe(true);
+      expect(invoke).toHaveBeenCalledWith('configuration_window_open', { target: 'settings', tab: 'assistant', provider: null });
       expect(store.page).toBe('games');
     } finally { wrapper.unmount(); }
   });
@@ -241,7 +233,8 @@ describe('ControlShell sidebar', () => {
       open({ page: 'care', tab: null });
       expect(store.page).toBe('care');
       open({ page: 'settings', tab: 'network' });
-      expect(store.settingsOpen).toBe(true);
+      expect(store.settingsOpen).toBe(false);
+      expect(invoke).toHaveBeenCalledWith('configuration_window_open', { target: 'settings', tab: 'network', provider: null });
       expect(store.settingsTab).toBe('network');
       open({ page: 'games' });
       expect(store.settingsOpen).toBe(false);
@@ -393,8 +386,8 @@ describe('ControlShell sidebar', () => {
     expect(wrapper.find('[data-testid="nav-notice-dot"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="nav-notices"] .xb-dot').exists()).toBe(true);
     await wrapper.get('[data-testid="nav-check-update"]').trigger('click');
-    await vi.waitFor(async () => { await flushPromises(); expect(document.querySelector('[data-testid="settings-about"]')).not.toBeNull(); });
-    expect(document.querySelector('[data-testid="about-tab-new"]')?.textContent).toBe('新');
+    expect(invoke).toHaveBeenCalledWith('configuration_window_open', { target: 'settings', tab: 'about', provider: null });
+    expect(document.querySelector('[data-testid="settings-page"]')).toBeNull();
     wrapper.unmount();
     document.body.innerHTML = '';
 

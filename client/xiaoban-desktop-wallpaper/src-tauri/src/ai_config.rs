@@ -668,7 +668,7 @@ pub(crate) fn emit_changed<R: tauri::Runtime>(app: &tauri::AppHandle<R>, view: &
 fn configuration_target(target: &tauri::EventTarget) -> bool {
     use tauri::EventTarget::{AnyLabel, Webview, WebviewWindow, Window};
     matches!(target, AnyLabel { label } | Webview { label } | WebviewWindow { label } | Window { label }
-        if label == "control" || label == crate::float_assistant::LABEL)
+        if label == "control" || label == crate::float_assistant::LABEL || crate::configuration_window::kind(label).is_some())
 }
 
 #[tauri::command]
