@@ -116,12 +116,13 @@ pub fn seatbelt_profile(policy: &SandboxPolicy) -> String {
 
 /// Appended to a failed sandboxed command whose output looks like the sandbox stopped it, so the model asks the
 /// user instead of trying other ways around it.
-pub(crate) const BLOCKED_HINT: &str = "[sandbox: this command ran in a sandbox that only allows writing inside the working folder, \
-temporary folders and package caches, and blocks reading credential folders. \"Operation not permitted\" above most likely \
-comes from it. Do not look for a way around it; if the change is really needed, tell the user what and why so they can approve it.]";
+pub(crate) const BLOCKED_HINT: &str = "[sandbox: this command ran with host-configured OS isolation. Permission errors may come from \
+the command sandbox's path restrictions, not the file owner or normal OS permissions. This output alone does not prove the cause. \
+Do not suggest sudo or bypass isolation. Explain the possible sandbox restriction and let the user change the host's command-isolation setting or approve the operation.]";
 
 pub(crate) fn looks_blocked(output: &str) -> bool {
-    output.contains("Operation not permitted")
+    let output = output.to_ascii_lowercase();
+    ["operation not permitted", "permission denied", "eperm", "eacces"].iter().any(|error| output.contains(error))
 }
 
 /// `sh -c command`, inside the sandbox when `policy` is given. Refuses to run when a sandbox is asked for and this
@@ -333,6 +334,14 @@ mod launcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn permission_diagnostics_cover_npm_and_shell_errors() {
+        for output in ["Operation not permitted", "npm error EPERM: operation not permitted, mkdir", "EACCES", "Permission denied"] {
+            assert!(looks_blocked(output), "{output}");
+        }
+        assert!(!looks_blocked("package not found"));
+    }
 
     #[test]
     fn the_profile_denies_writes_except_listed_folders_and_escapes_paths() {

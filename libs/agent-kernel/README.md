@@ -119,6 +119,10 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 
 - `danger_check`（可选）：宿主给 `Permission` 装一个检查函数，参数是工具名和参数，返回“太危险”的原因。装了它，`Auto` 才真正只在被标出的调用上询问：污染和 `always_ask` 在 `Auto` 下不再强制询问，被标出的调用每次都问、不记忆，原因通过 `ApprovalRequest::danger`（stdio 协议里是 `danger` 字段）告知宿主。`Ask` 和 `ReadOnly` 的行为不变，只读工具不会被检查。不装它，`Auto` 保持上面更严格的行为。
 
+宿主可选择 `check_reads()` 将敏感读取纳入 danger_check，选择 `honor_grants_after_taint()` 保留用户明确给出的工具/命令种类授权；两者默认关闭，兼容已有宿主。高风险原因、未知执行结果和撤销始终优先。`ToolSpec::require_confirmation` 的明确原因在 Auto 下仍需确认，MCP 的 destructiveHint 会映射到此字段。等待确认的桌面宿主使用 `ApprovalRequest::wait_for_approval`，普通待确认操作可在切换 Auto 后继续；高风险和结果不明的操作不会自动继续。
+
+动态工具可实现 `resolve_call`：在参数校验、权限判断与资源获取之前返回固定的实际工具和参数；解析后的参数会再次按目标 schema 校验，外部 schema 引用被禁止。权限使用实际工具的风险与参数；日志和用户 hooks 保持外层调用身份，执行及资源占用使用固定目标。
+
 这是纵深防御，不是隔离：已污染会话里用户点了同意，注入的内容照样能执行；`danger_check` 由宿主实现，通常是对命令行的启发式判断，拦不住藏在脚本里的命令。
 
 ## 其他中间件

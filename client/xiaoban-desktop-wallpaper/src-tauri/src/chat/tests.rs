@@ -771,7 +771,7 @@ fn full_trust_runs_everyday_commands_and_stops_only_for_the_dangerous_ones() {
 }
 
 #[test]
-fn installed_skill_scripts_still_require_permission_in_full_trust() {
+fn full_trust_still_confirms_installation_and_validates_scripts_before_running() {
     let steps = vec![
         call("1", "skill_install", json!({
             "slug": "demo-skill", "version": "1.0.0", "sha256": "a".repeat(64)
@@ -786,9 +786,9 @@ fn installed_skill_scripts_still_require_permission_in_full_trust() {
     assert_eq!(result.unwrap().text, "stopped");
     let asked = lock(&asked).clone();
     assert_eq!(asked.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>(),
-        vec!["skill_install", "skill_run"]);
+        vec!["skill_install"]);
     for (_, reason) in &asked {
-        assert!(reason.as_ref().is_some_and(|s| s.contains("必须逐次经过用户确认")));
+        assert!(reason.as_ref().is_some_and(|s| s.contains("确认来源和内容摘要")));
     }
     assert!(!rig.dirs.skills().join("demo-skill").exists(),
         "denied third-party package was not installed");
@@ -1138,7 +1138,7 @@ fn research_runs_a_read_only_helper_and_returns_only_its_findings() {
 #[test]
 fn the_window_filter_keeps_conversation_commands_where_they_belong() {
     let decide = |label: &str, command: &str| crate::float_assistant::permitted(label, command).unwrap_or_else(|| crate::content::permitted(label, command));
-    for command in ["chat_send", "chat_set_permission_mode", "chat_undo_run", "chat_save_hooks", "chat_revoke_grant", "chat_set_sandbox_network", "chat_agent_settings", "chat_delete_session"] {
+    for command in ["chat_send", "chat_set_permission_mode", "chat_undo_run", "chat_save_hooks", "chat_revoke_grant", "chat_set_sandbox_network", "chat_set_command_sandbox", "chat_agent_settings", "chat_delete_session"] {
         assert!(decide("control", command), "{command} in the control window");
         for label in ["widget-1", "pet-1", "games", "deskgame", "effects", "media-a", "care", "ritual"] {
             assert!(!decide(label, command), "{command} must not reach {label}");

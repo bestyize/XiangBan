@@ -49,9 +49,22 @@ pub struct ApprovalRequest<'a> {
     /// `None` means "always" is not offered for this call: it is asked every time.
     pub remember_as: Option<&'a str>,
     pub(crate) ctx: &'a ToolCtx,
+    permission: &'a Permission,
+    spec: &'a ToolSpec,
 }
 
 impl ApprovalRequest<'_> {
+    /// Match the kernel's actual grant rules so a host never offers a grant that cannot take effect.
+    pub fn can_remember(&self) -> bool {
+        self.danger.is_none() && !self.spec.always_ask && !self.permission.needs_review(self.session)
+            && (self.risk != Risk::Exec || self.remember_as.is_some())
+    }
+    /// Ordinary pending calls resume after a switch to Auto. Flagged calls and unknown side effects still wait.
+    pub fn wait_for_approval(&self, rx: &Receiver<Approval>) -> Option<Approval> {
+        self.ctx.wait_for_user_or(rx, || {
+            self.permission.can_auto_approve(self.session, self.arguments, self.spec).then_some(Approval::Once)
+        })
+    }
     /// Identifies the run that is waiting for this approval, for single-call host grants.
     pub fn run_id(&self) -> &str {
         self.ctx.run_id()
@@ -94,7 +107,7 @@ where
     }
 }
 
-type DangerCheck = Arc<dyn Fn(&str, &str, &Value) -> Option<String> + Send + Sync>;
+type DangerCheck = Arc<dyn Fn(PermissionMode, &str, &str, &Value) -> Option<String> + Send + Sync>;
 type RememberKey = Arc<dyn Fn(&str, &Value) -> Option<String> + Send + Sync>;
 
 pub struct Permission {
@@ -111,6 +124,8 @@ pub struct Permission {
     session_modes: Mutex<HashMap<String, PermissionMode>>,
     /// Child sessions (`<session>#<job>`) follow their parent's mode, grants, taint and trust.
     children_inherit: bool,
+    check_reads: bool,
+    honor_grants_after_taint: bool,
 }
 
 impl Permission {
@@ -127,6 +142,8 @@ impl Permission {
             trust_dir: Mutex::new(None),
             session_modes: Mutex::new(HashMap::new()),
             children_inherit: false,
+            check_reads: false,
+            honor_grants_after_taint: false,
         }
     }
 
@@ -160,9 +177,34 @@ impl Permission {
 
     /// `danger_check` for a host whose rules depend on the conversation, e.g. each one working in its own folder:
     /// `check` also gets the session id first.
-    pub fn danger_check_in_session(mut self, check: impl Fn(&str, &str, &Value) -> Option<String> + Send + Sync + 'static) -> Self {
+    pub fn danger_check_in_session(self, check: impl Fn(&str, &str, &Value) -> Option<String> + Send + Sync + 'static) -> Self {
+        self.danger_check_in_mode(move |_, session, tool, args| check(session, tool, args))
+    }
+
+    /// A host policy that also sees the current session's effective mode, including inherited child modes.
+    pub fn danger_check_in_mode(mut self, check: impl Fn(PermissionMode, &str, &str, &Value) -> Option<String> + Send + Sync + 'static) -> Self {
         self.danger = Some(Arc::new(check));
         self
+    }
+
+    /// Include sensitive reads in the host's risk policy. Default remains write/execute-only for compatibility.
+    pub fn check_reads(mut self) -> Self { self.check_reads = true; self }
+
+    /// Explicit, scoped user grants remain valid after external content is read; danger/review always win.
+    pub fn honor_grants_after_taint(mut self) -> Self { self.honor_grants_after_taint = true; self }
+
+    fn danger_for(&self, mode: PermissionMode, session: &str, args: &Value, spec: &ToolSpec) -> Option<String> {
+        spec.confirmation_reason.clone().or_else(|| match &self.danger {
+            Some(check) if self.check_reads || spec.risk != Risk::Read => check(mode, session, &spec.name, args),
+            _ => None,
+        })
+    }
+
+    fn can_auto_approve(&self, session: &str, args: &Value, spec: &ToolSpec) -> bool {
+        self.mode_for(session) == PermissionMode::Auto && !self.deny.contains(&spec.name)
+            && !(self.needs_review(session) && spec.risk != Risk::Read)
+            && (self.danger.is_some() || !spec.always_ask && !self.is_tainted(session))
+            && self.danger_for(PermissionMode::Auto, session, args, spec).is_none()
     }
 
     /// Lets "always" apply to a kind of command instead of never applying to `Risk::Exec` tools. `key` gets the
@@ -276,10 +318,7 @@ impl Middleware for Permission {
         }
 
         let tainted = self.is_tainted(session);
-        let danger = match &self.danger {
-            Some(check) if spec.risk != Risk::Read => check(session, name, args),
-            _ => None,
-        };
+        let danger = self.danger_for(mode, session, args, spec);
         let exec_key = match &self.remember {
             Some(key) if spec.risk == Risk::Exec && !spec.always_ask && danger.is_none() => key(name, args),
             _ => None,
@@ -287,24 +326,26 @@ impl Middleware for Permission {
         let review=self.needs_review(session)&&spec.risk!=Risk::Read;
         let sticky = review || (spec.risk == Risk::Exec && exec_key.is_none()) || spec.always_ask || danger.is_some();
         let key = Self::grant_key(session, name, exec_key.as_deref());
+        let remembered = !sticky && self.always.lock().unwrap_or_else(|e| e.into_inner()).contains(&key);
         let needs_ask = if review {true} else if self.danger.is_some() && mode == PermissionMode::Auto {
             danger.is_some()
         } else if spec.always_ask {
+            true
+        } else if danger.is_some() {
             true
         } else if spec.risk == Risk::Read {
             false
         } else if spec.self_managed {
             // Only the host app's own state changes, so neither a flag nor external content makes this a user decision.
             danger.is_some()
-        } else if tainted {
+        } else if tainted && !(self.honor_grants_after_taint && remembered) {
             true
         } else {
-            let remembered = !sticky && self.always.lock().unwrap_or_else(|e| e.into_inner()).contains(&key);
             !(mode == PermissionMode::Auto || self.allow.contains(name) || remembered)
         };
 
         if needs_ask {
-            let request = ApprovalRequest { session, tool: name, risk: spec.risk, arguments: args, tainted, danger: danger.as_deref(), remember_as: exec_key.as_deref(), ctx };
+            let request = ApprovalRequest { session, tool: name, risk: spec.risk, arguments: args, tainted, danger: danger.as_deref(), remember_as: exec_key.as_deref(), ctx, permission: self, spec };
             let decision = {
                 let _waiting = ctx.control().wait_for_user();
                 self.approver.approve(&request)

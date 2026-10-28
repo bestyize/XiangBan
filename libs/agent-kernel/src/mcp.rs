@@ -102,6 +102,21 @@ struct McpToolInfo {
     spec: ToolSpec,
 }
 
+/// Preserve explicit server risk hints across stdio, Streamable HTTP and SSE transports.
+fn annotated_spec(mut spec: ToolSpec, tool: &Value) -> ToolSpec {
+    let annotations = &tool["annotations"];
+    let name = tool["name"].as_str().unwrap_or("").to_ascii_lowercase();
+    let destructive_name = name.split(['_', '-', '.']).any(|part| ["delete", "destroy", "drop", "truncate", "erase", "wipe", "publish"].contains(&part));
+    if annotations["destructiveHint"].as_bool() == Some(true)
+        || annotations["readOnlyHint"].as_bool() != Some(true) && annotations["destructiveHint"].as_bool() != Some(false) && destructive_name {
+        spec.risk = Risk::Exec;
+        spec.confirmation_reason = Some("MCP 工具的风险标记或操作名称表明此操作可能破坏、删除或发布数据".into());
+    } else if annotations["readOnlyHint"].as_bool() == Some(true) {
+        spec.risk = Risk::Read;
+    }
+    spec
+}
+
 struct PendingRequest {
     tx: Sender<Result<Value, String>>,
     // Cancellation ends the caller's wait, not the server's operation. Retain ownership
@@ -289,7 +304,7 @@ impl McpClient {
             for t in tools {
                 let name=t["name"].as_str().filter(|n|!n.is_empty()).ok_or_else(||HarnessError::Config("missing MCP name".into()))?;
                 if !names.insert(name.to_string()) || tool_infos.len()>=500 {return Err(HarnessError::Config("duplicate/oversized MCP catalog".into()));}
-                let spec=ToolSpec::new(format!("{}{name}",config.tool_prefix),t["description"].as_str().unwrap_or(""),t.get("inputSchema").cloned().unwrap_or_else(||json!({"type":"object"}))).risk(config.default_risk).untrusted_output().serial().timeout(config.timeout);
+                let spec=annotated_spec(ToolSpec::new(format!("{}{name}",config.tool_prefix),t["description"].as_str().unwrap_or(""),t.get("inputSchema").cloned().unwrap_or_else(||json!({"type":"object"}))).risk(config.default_risk).untrusted_output().serial().timeout(config.timeout),t);
                 tool_infos.push(McpToolInfo{original_name:name.into(),spec});
             }
             cursor=match result.get("nextCursor") {None|Some(Value::Null)=>None,Some(Value::String(c)) if !c.is_empty()=>Some(c.clone()),_=>return Err(HarnessError::Config("invalid MCP cursor".into()))};
@@ -486,4 +501,23 @@ fn decode_result(res: &Value) -> Result<ToolResult, String> {
         result.output = if result.is_error { "MCP tool reported an error" } else { "ok" }.into();
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod risk_metadata_tests {
+    use super::*;
+    #[test]
+    fn transports_preserve_destructive_hints_and_do_not_downgrade_conflicting_metadata() {
+        let base = ToolSpec::new("test", "test", json!({}));
+        let read = annotated_spec(base.clone(), &json!({"annotations":{"readOnlyHint":true}}));
+        assert_eq!(read.risk, Risk::Read);
+        assert!(read.confirmation_reason.is_none());
+        let destructive = annotated_spec(base.clone(), &json!({"annotations":{"readOnlyHint":true,"destructiveHint":true}}));
+        assert_eq!(destructive.risk, Risk::Exec);
+        assert!(destructive.confirmation_reason.is_some());
+        let unknown = annotated_spec(base, &json!({}));
+        assert_eq!(unknown.risk, Risk::Exec);
+        let named_delete = annotated_spec(ToolSpec::new("delete", "test", json!({})), &json!({"name":"delete_records"}));
+        assert!(named_delete.confirmation_reason.is_some());
+    }
 }

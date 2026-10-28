@@ -26,6 +26,19 @@ enum Prepared {
     Run { tool: Arc<dyn Tool>, args: Value, ctx: ToolCtx },
 }
 
+/// Keep dispatcher events/hooks stable while execution and resource ownership use the pinned target.
+struct ResolvedTool {
+    spec: crate::ToolSpec,
+    target: Arc<dyn Tool>,
+    args: Value,
+}
+impl Tool for ResolvedTool {
+    fn spec(&self) -> &crate::ToolSpec { &self.spec }
+    fn resource(&self, _: &Value) -> Result<Option<crate::ToolResource>, String> { self.target.resource(&self.args) }
+    fn cancel_grace(&self) -> Duration { self.target.cancel_grace() }
+    fn execute_result(&self, _: Value, ctx: &ToolCtx) -> ToolResult { self.target.execute_result(self.args.clone(), ctx) }
+}
+
 fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, mut ctx: ToolCtx) -> Result<Inflight, ToolResult> {
     let timeout = tool.spec().timeout;
     let call_cancel = ctx.call_cancel.clone();
@@ -196,7 +209,7 @@ impl Agent {
                 Err(e) => return Prepared::Done(ToolResult::error(format!("arguments are not valid JSON: {e}"))),
             }
         };
-        let tool = self.tools[index].clone();
+        let mut tool = self.tools[index].clone();
         if !args.is_object() {
             return Prepared::Done(ToolResult::error("arguments must be a JSON object"));
         }
@@ -208,6 +221,26 @@ impl Agent {
                 call.name, errors.join("; "), tool.spec().schema.get("required").unwrap_or(&Value::Null)
             )).with_structured_content(serde_json::json!({"harness_status":"invalid_arguments","executed":false})));
         }
+        let mut authorization = None;
+        match tool.resolve_call(&args) {
+            Ok(Some((target, target_args))) => {
+                let validator = match jsonschema::options().with_retriever(crate::agent::NoExternalSchemas).build(&target.spec().schema) {
+                    Ok(validator) => validator,
+                    Err(error) => return Prepared::Done(ToolResult::error(format!("invalid target schema: {error}"))),
+                };
+                if !target_args.is_object() || !validator.is_valid(&target_args) {
+                    return Prepared::Done(ToolResult::error("invalid arguments for resolved tool; no tool was executed")
+                        .with_structured_content(serde_json::json!({"harness_status":"invalid_arguments","executed":false})));
+                }
+                authorization = Some((target.spec().clone(), target_args.clone()));
+                let mut spec = tool.spec().clone();
+                spec.timeout = target.spec().timeout;
+                spec.max_output = target.spec().max_output;
+                tool = Arc::new(ResolvedTool { spec, target, args: target_args });
+            }
+            Ok(None) => {}
+            Err(error) => return Prepared::Done(ToolResult::error(error)),
+        }
         let ctx = ToolCtx {
             session: session.to_string(),
             run_id: run_id.to_string(),
@@ -218,7 +251,8 @@ impl Agent {
             call_control: Default::default(),
         };
         for mw in self.middleware.iter().filter(|mw| mw.authorizes_tool()) {
-            if let ToolGate::Block(reason) = mw.before_tool(&ctx, call, &args, tool.spec()) {
+            let (spec, permission_args) = authorization.as_ref().map(|(spec,args)| (spec,args)).unwrap_or((tool.spec(), &args));
+            if let ToolGate::Block(reason) = mw.before_tool(&ctx, call, permission_args, spec) {
                 let denied = reason.starts_with("The user denied permission to run `");
                 let result = ToolResult::error(reason);
                 return Prepared::Done(if denied { result.with_structured_content(serde_json::json!({"harness_status":"permission_denied"})) } else { result });

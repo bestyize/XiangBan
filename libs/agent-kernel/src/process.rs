@@ -104,6 +104,7 @@ struct Shared {
     changed: Condvar,
     stdin: Mutex<Option<ChildStdin>>,
     capacity: usize,
+    sandboxed: bool,
 }
 
 struct Entry {
@@ -225,6 +226,7 @@ impl ProcessManager {
             scope,
             pid: owned.child.id(),
             capacity: self.config.output_bytes,
+            sandboxed: policy.is_some(),
             stdin: Mutex::new(owned.child.stdin.take()),
             changed: Condvar::new(),
             state: Mutex::new(State {
@@ -544,6 +546,11 @@ fn snapshot(process: &Shared, cursor: u64, limit: usize) -> Result<ProcessSnapsh
         }
     }
     let next = start + data.len() as u64;
+    let mut output = String::from_utf8_lossy(&data).into_owned();
+    if process.sandboxed && crate::sandbox::looks_blocked(&output) {
+        output.push('\n');
+        output.push_str(crate::sandbox::BLOCKED_HINT);
+    }
     Ok(ProcessSnapshot {
         id: process.id.clone(),
         run_id: process.run_id.clone(),
@@ -552,7 +559,7 @@ fn snapshot(process: &Shared, cursor: u64, limit: usize) -> Result<ProcessSnapsh
         pid: process.pid,
         exit_code: state.exit_code,
         error: state.error.clone(),
-        output: String::from_utf8_lossy(&data).into_owned(),
+        output,
         next_cursor: next,
         dropped_bytes: start.saturating_sub(cursor),
         has_more: next < state.end,
@@ -679,3 +686,28 @@ fn supervise(
 }
 
 use crate::process_tree::ChildTree as ManagedChild;
+
+#[cfg(test)]
+mod sandbox_diagnostic_tests {
+    use super::*;
+
+    #[test]
+    fn sandbox_hint_is_scoped_to_isolated_processes_and_preserves_log_cursors() {
+        let bytes = b"npm error EPERM: operation not permitted, mkdir\n";
+        for sandboxed in [false, true] {
+            let process = Shared {
+                id: "p".into(), order: 0, session: "s".into(), run_id: "r".into(),
+                scope: ProcessScope::Run, pid: 0, sandboxed, capacity: 1024,
+                stdin: Mutex::new(None), changed: Condvar::new(),
+                state: Mutex::new(State {
+                    status: ProcessState::Exited, stop: None, exit_code: Some(1), error: None,
+                    output: bytes.iter().copied().collect(), first: 0, end: bytes.len() as u64, input_cancel: None,
+                }),
+            };
+            let result = snapshot(&process, 0, 1024).unwrap();
+            assert_eq!(result.output.contains("[sandbox:"), sandboxed);
+            assert_eq!(result.next_cursor, bytes.len() as u64);
+            assert!(snapshot(&process, result.next_cursor, 1024).unwrap().output.is_empty());
+        }
+    }
+}

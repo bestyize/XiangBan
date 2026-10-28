@@ -25,6 +25,7 @@ pub trait Desktop: Send + Sync {
     fn connector_search(&self, _keyword: &str) -> Result<Value, String> { Err("当前宿主不支持连接器目录".into()) }
     fn connector_request(&self, _references: &[String], _ctx: &ToolCtx) -> Result<Value, String> { Err("当前宿主不支持连接器授权".into()) }
     fn connector_call(&self, _name: &str, _args: Value, _ctx: &ToolCtx) -> agent_kernel::ToolResult { agent_kernel::ToolResult::error("当前宿主不支持连接器调用") }
+    fn connector_target(&self, _name: &str) -> Result<Option<Arc<dyn Tool>>, String> { Ok(None) }
     fn pet_catalog(&self)->Result<Value,String>{Err("当前宿主不支持宠物库".into())}
     fn pet_save_theme(&self,_theme:crate::pet_packs::Theme,_overwrite:bool)->Result<Value,String>{Err("当前宿主不支持宠物创作".into())}
     fn pet_delete_theme(&self,_id:String)->Result<Value,String>{Err("当前宿主不支持宠物主题".into())}
@@ -92,16 +93,17 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn connector_target(&self, name: &str) -> Result<Option<Arc<dyn Tool>>, String> {
+        super::connector_manager(&self.app)?.tools().into_iter().find(|tool| tool.spec().name == name)
+            .map(Some).ok_or_else(|| "连接器工具当前不可用，请检查连接状态".into())
+    }
     fn design_removed(&self,id:&str)->Result<(),String>{crate::design::removed(&self.app,id)}
     fn design_saved(&self, project: &open_claude_design::Project) -> Result<(), String> { crate::design::saved(&self.app, project) }
     fn connector_search(&self, keyword: &str) -> Result<Value, String> { super::connectors::search(&self.app, keyword) }
     fn connector_request(&self, references: &[String], ctx: &ToolCtx) -> Result<Value, String> { super::connectors::request(&self.app, references, ctx) }
     fn connector_call(&self, name: &str, args: Value, ctx: &ToolCtx) -> agent_kernel::ToolResult {
         match super::connector_manager(&self.app) {
-            Ok(manager) => match manager.tools().into_iter().find(|t| t.spec().name == name) {
-                Some(tool) => tool.execute_result(args, ctx),
-                None => agent_kernel::ToolResult::error("连接器工具当前不可用，请检查连接状态"),
-            },
+            Ok(manager) => manager.call_authorized(name, args, ctx, &self.app.state::<super::ChatState>().permission),
             Err(error) => agent_kernel::ToolResult::error(error),
         }
     }
