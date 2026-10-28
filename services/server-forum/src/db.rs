@@ -242,6 +242,7 @@ pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     sqlx::raw_sql(SCHEMA).execute(pool).await?;
     sqlx::raw_sql(POINTS_SCHEMA).execute(pool).await?;
     sqlx::raw_sql(CONTENT_SCHEMA).execute(pool).await?;
+    sqlx::raw_sql(COMPLIANCE_SCHEMA).execute(pool).await?;
     // 搜索用的三元组索引是可选的：数据库没有 pg_trgm 扩展时退化为普通 ILIKE 扫描。
     if sqlx::raw_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm").execute(pool).await.is_ok() {
         let _ = sqlx::raw_sql(
@@ -940,3 +941,14 @@ mod removal_tests {
         Ok(())
     }
 }
+
+/// 开放用户发布前的合规项：敏感词表。
+const COMPLIANCE_SCHEMA: &str = r#"
+CREATE TABLE IF NOT EXISTS sensitive_words (
+    id         SERIAL PRIMARY KEY,
+    word       TEXT NOT NULL UNIQUE,
+    action     TEXT NOT NULL CHECK (action IN ('block', 'review')),
+    created_by TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+"#;

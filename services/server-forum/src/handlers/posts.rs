@@ -143,6 +143,7 @@ pub async fn create(
     }
     users::ensure_daily_quota(&state.pool, user, "posts", &state.config.trust.daily_posts, "回复").await?;
     let body = clean_reply(&input.body)?;
+    let review = crate::moderation::screen(&state.pool, &[&body]).await?;
     if let Some(reply_to) = input.reply_to {
         let ok: Option<(i64,)> = sqlx::query_as("SELECT id FROM posts WHERE id = $1 AND topic_id = $2")
             .bind(reply_to)
@@ -177,6 +178,9 @@ pub async fn create(
     .bind(user.uid)
     .execute(&mut *tx)
     .await?;
+    if let Some(word) = &review {
+        crate::moderation::enqueue(&mut tx, "post", id, &format!("命中复核词：{word}")).await?;
+    }
     tx.commit().await?;
     models::refresh_hot_scores(&state.pool, Some(topic_id)).await?;
     Ok(Json(json!({ "id": id, "floor": floor })))
@@ -190,6 +194,7 @@ pub async fn update(
 ) -> AppResult<Json<Value>> {
     users::ensure_can_write(&auth.user)?;
     let body = clean_reply(&input.body)?;
+    let review = crate::moderation::screen(&state.pool, &[&body]).await?;
     let html = markdown::render(&body, auth.user.trust_level >= 1);
     let mut tx = state.pool.begin().await?;
     lock_topic_for_post(&mut tx, id).await?;
@@ -208,6 +213,9 @@ pub async fn update(
     .rows_affected();
     if done == 0 {
         return Err(AppError::Forbidden("只能编辑自己的未采纳回复，已采纳回答保留原文".into()));
+    }
+    if let Some(word) = &review {
+        crate::moderation::enqueue(&mut tx, "post", id, &format!("命中复核词：{word}")).await?;
     }
     tx.commit().await?;
     Ok(Json(json!({ "ok": true, "body_html": html })))

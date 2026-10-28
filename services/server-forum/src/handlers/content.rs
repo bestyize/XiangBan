@@ -48,7 +48,6 @@ pub fn admin_routes() -> Router<AppState> {
         .route("/packs", get(admin_list_packs).post(admin_create_pack))
         .route("/packs/{id}/review", post(admin_review_pack))
         .route("/packs/{id}/mirrors", post(admin_add_mirror))
-        .route("/moderation", get(admin_moderation))
         .route("/projects", get(admin_list_projects))
         .route("/projects/{slug}", put(admin_put_project))
         .route("/weekly", get(admin_list_weekly))
@@ -493,6 +492,7 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     let title = clean_text(&input.title, "标题", 60, true)?;
     let summary = clean_text(&input.summary, "简介", 500, false)?;
     let tags = clean_tags(&input.tags)?;
+    let review = crate::moderation::screen(&state.pool, &[&title, &summary, &tags.join(" ")]).await?;
     let mut tx = state.pool.begin().await?;
     if let Some(cover) = &input.cover_key {
         check_cover(&mut tx, auth.user.uid, cover).await?;
@@ -515,7 +515,8 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     .map_err(slug_conflict)?;
     insert_version(&mut tx, id, 1, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), "").await?;
     // 用户发布的内容先上架（未审标记），同时进审核队列，由人工看过后升级为“已审核”。
-    sqlx::query("INSERT INTO moderation_queue (target_type, target_id) VALUES ('pack', $1)").bind(id).execute(&mut *tx).await?;
+    let note = review.map_or(String::new(), |w| format!("命中复核词：{w}"));
+    crate::moderation::enqueue(&mut tx, "pack", id, &note).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "slug": info.slug, "version": 1, "trust_level": content::T2, "status": "published" })))
 }
@@ -585,6 +586,7 @@ async fn add_version(
     Json(input): Json<AddVersionInput>,
 ) -> AppResult<Json<Value>> {
     let changelog = clean_text(&input.changelog, "更新说明", 500, false)?;
+    let review = crate::moderation::screen(&state.pool, &[&changelog]).await?;
     let mut tx = state.pool.begin().await?;
     let (kind, slug, author, current): (String, String, Option<Uuid>, i32) =
         sqlx::query_as("SELECT kind, slug, author_uid, current_version FROM packs WHERE id = $1 AND status <> 'removed' FOR UPDATE")
@@ -613,10 +615,8 @@ async fn add_version(
         .bind(next)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("INSERT INTO moderation_queue (target_type, target_id) VALUES ('pack', $1) ON CONFLICT DO NOTHING")
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
+    let note = review.map_or(String::new(), |w| format!("命中复核词：{w}"));
+    crate::moderation::enqueue(&mut tx, "pack", id, &note).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "version": next, "trust_level": content::T2 })))
 }
@@ -706,6 +706,7 @@ pub struct CreateSchemeInput {
 async fn create_scheme(State(state): State<AppState>, auth: AuthUser, Json(input): Json<CreateSchemeInput>) -> AppResult<Json<Value>> {
     let title = clean_text(&input.title, "标题", 60, true)?;
     let summary = clean_text(&input.summary, "简介", 500, false)?;
+    let review = crate::moderation::screen(&state.pool, &[&title, &summary]).await?;
     if input.items.is_empty() || input.items.len() > 20 {
         return Err(AppError::BadRequest("方案需要包含 1～20 个内容".into()));
     }
@@ -733,6 +734,10 @@ async fn create_scheme(State(state): State<AppState>, auth: AuthUser, Json(input
         .bind(Value::Array(resolved))
         .fetch_one(&state.pool)
         .await?;
+    if let Some(word) = review {
+        let mut conn = state.pool.acquire().await?;
+        crate::moderation::enqueue(&mut conn, "scheme", id, &format!("命中复核词：{word}")).await?;
+    }
     Ok(Json(json!({ "id": id })))
 }
 
@@ -1088,26 +1093,6 @@ async fn admin_add_mirror(
     audit(&mut tx, &admin, "pack.mirror", "pack", id, format!("v{version} {name}")).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "version": version, "mirrors": list })))
-}
-
-async fn admin_moderation(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Json<Value>> {
-    let rows: Vec<(i64, String, i64, DateTime<Utc>, Option<String>, Option<String>, Option<String>)> = sqlx::query_as(
-        "SELECT q.id, q.target_type, q.target_id, q.created_at, p.title, p.kind, u.nickname
-         FROM moderation_queue q
-         LEFT JOIN packs p ON q.target_type = 'pack' AND p.id = q.target_id
-         LEFT JOIN users u ON u.uid = p.author_uid
-         WHERE q.status = 'pending' ORDER BY q.created_at LIMIT 200",
-    )
-    .fetch_all(&state.pool)
-    .await?;
-    let items: Vec<Value> = rows
-        .into_iter()
-        .map(|(id, target_type, target_id, created_at, title, kind, author)| {
-            json!({ "id": id, "target_type": target_type, "target_id": target_id, "created_at": created_at,
-                    "title": title, "kind": kind, "author": author })
-        })
-        .collect();
-    Ok(Json(json!({ "items": items })))
 }
 
 /// 后台列表包含草稿，并返回可编辑的 Markdown 原文。

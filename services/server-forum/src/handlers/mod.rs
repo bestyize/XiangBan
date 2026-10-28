@@ -7,6 +7,7 @@ pub mod images;
 pub mod interact;
 pub mod me;
 pub mod meta;
+pub mod moderation;
 pub mod posts;
 pub mod topics;
 

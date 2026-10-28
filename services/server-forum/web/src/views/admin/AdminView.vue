@@ -12,6 +12,8 @@ import UsersPanel from './UsersPanel.vue'
 import EditorPanel from './EditorPanel.vue'
 import EditorAccounts from './EditorAccounts.vue'
 import CategoriesPanel from './CategoriesPanel.vue'
+import ModerationPanel from './ModerationPanel.vue'
+import WordsPanel from './WordsPanel.vue'
 import PacksPanel from './PacksPanel.vue'
 import ProjectsPanel from './ProjectsPanel.vue'
 import WeeklyPanel from './WeeklyPanel.vue'
@@ -28,6 +30,8 @@ const SECTIONS = [
   { key: 'editor-accounts', label: '编辑账号', comp: EditorAccounts },
   { key: 'editor', label: '批量发帖', comp: EditorPanel },
   { key: 'categories', label: '分类', comp: CategoriesPanel },
+  { key: 'moderation', label: '待审', comp: ModerationPanel },
+  { key: 'words', label: '敏感词', comp: WordsPanel },
   { key: 'packs', label: '内容包', comp: PacksPanel },
   { key: 'projects', label: '项目', comp: ProjectsPanel },
   { key: 'weekly', label: '周刊', comp: WeeklyPanel },

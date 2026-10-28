@@ -288,6 +288,11 @@ export const adminApi = {
   reviewPack: (id: number, action: PackReviewAction, note = '') =>
     request<{ id: number; trust_level: number; status: string }>('POST', `/packs/${id}/review`, { action, note }),
   moderationQueue: () => request<{ items: ModerationRow[] }>('GET', '/moderation'),
+  resolveModeration: (id: number, action: 'approve' | 'reject', note = '') =>
+    request<{ id: number; status: string }>('POST', `/moderation/${id}/resolve`, { action, note }),
+  words: () => request<{ items: SensitiveWord[] }>('GET', '/words'),
+  addWords: (words: string, action: 'block' | 'review') => request<{ added: number; submitted: number }>('POST', '/words', { words, action }),
+  deleteWord: (id: number) => request<{ ok: boolean }>('DELETE', `/words/${id}`),
   projects: () => request<{ items: (ProjectInput & { slug: string })[] }>('GET', '/projects'),
   weeklyIssues: () => request<{ items: (WeeklyInput & { week: string })[] }>('GET', '/weekly'),
   putProject: (slug: string, body: ProjectInput) => request<{ slug: string }>('PUT', `/projects/${encodeURIComponent(slug)}`, body),
@@ -311,12 +316,22 @@ export interface AdminPack {
 
 export interface ModerationRow {
   id: number
-  target_type: string
+  target_type: 'pack' | 'topic' | 'post' | 'scheme' | string
   target_id: number
+  note: string
   created_at: string
   title: string | null
   kind: string | null
   author: string | null
+  /** 回复和帖子所在的帖子编号，后台用它跳到帖子页 */
+  topic_id: number | null
+}
+
+export interface SensitiveWord {
+  id: number
+  word: string
+  action: 'block' | 'review'
+  created_at: string
 }
 
 export interface OfficialPackInput {

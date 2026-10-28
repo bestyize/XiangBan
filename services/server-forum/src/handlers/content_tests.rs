@@ -321,6 +321,66 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     let (s, _) = call(&app, "POST", "/api/packs/upload-ticket", Some(&other_t), json!({"kind":"effect","size":10,"sha256":"d".repeat(64)})).await;
     assert_eq!(s, StatusCode::TOO_MANY_REQUESTS);
 
+    // 敏感词：拦截的不让发（不暴露词），复核的先发布并进队列；归一化后加空格也挡得住。
+    let (s, _) = call(&app, "POST", "/api/admin/words", Some(&author_t), json!({"words":"违禁词","action":"block"})).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, _) = call(&app, "POST", "/api/admin/words", Some(&admin_t), json!({"words":"字","action":"block"})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "单字不收");
+    let (s, w) = call(&app, "POST", "/api/admin/words", Some(&admin_t), json!({"words":"违禁词, 拦截句","action":"block"})).await;
+    assert_eq!(s, StatusCode::OK, "{w}");
+    assert_eq!(w["added"], 2);
+    call(&app, "POST", "/api/admin/words", Some(&admin_t), json!({"words":"复核词","action":"review"})).await;
+    let (_, words) = call(&app, "GET", "/api/admin/words", Some(&admin_t), Value::Null).await;
+    assert_eq!(words["items"].as_array().unwrap().len(), 3);
+
+    let (cat,): (i32,) = sqlx::query_as("SELECT id FROM categories WHERE slug = 'xiaoban-wallpaper'").fetch_one(&pool).await?;
+    let topic = |title: &str, body: &str| json!({"category_id": cat, "title": title, "body": body});
+    let (s, _) = call(&app, "POST", "/api/topics", Some(&author_t), topic("正常的标题啊", "这是一段正常的正文内容")).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, e) = call(&app, "POST", "/api/topics", Some(&author_t), topic("带违 禁 词的标题", "这是一段正常的正文内容")).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    assert!(!e["message"].as_str().unwrap().contains("违禁"), "不能告诉用户命中了哪个词");
+    let (s, t) = call(&app, "POST", "/api/topics", Some(&author_t), topic("另一个正常标题", "正文里有复核词，应该先发布再复核")).await;
+    assert_eq!(s, StatusCode::OK, "复核词不拦截：{t}");
+    let topic_id = t["id"].as_i64().unwrap();
+    let (s, r) = call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&other_t), json!({"body": "回复里也有 复核 词 呢"})).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    let (s, _) = call(&app, "POST", &format!("/api/topics/{topic_id}/posts"), Some(&other_t), json!({"body": "回复里有拦截句"})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+
+    let (_, q) = call(&app, "GET", "/api/admin/moderation", Some(&admin_t), Value::Null).await;
+    let items = q["items"].as_array().unwrap();
+    let topic_entry = items.iter().find(|i| i["target_type"] == "topic").expect("帖子进了队列");
+    assert_eq!(topic_entry["target_id"], topic_id);
+    assert!(topic_entry["note"].as_str().unwrap().contains("复核词"));
+    let post_entry = items.iter().find(|i| i["target_type"] == "post").expect("回复进了队列");
+    assert_eq!(post_entry["topic_id"], topic_id, "回复带着所在帖子，后台可以跳过去");
+    let (s, _) = call(&app, "POST", &format!("/api/admin/moderation/{}/resolve", topic_entry["id"]), Some(&admin_t), json!({"action":"reject"})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "帖子要到帖子管理里隐藏");
+    let (s, _) = call(&app, "POST", &format!("/api/admin/moderation/{}/resolve", topic_entry["id"]), Some(&admin_t), json!({"action":"approve","note":"没问题"})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = call(&app, "POST", &format!("/api/admin/moderation/{}/resolve", topic_entry["id"]), Some(&admin_t), json!({"action":"approve"})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND, "不能重复处理");
+
+    // 方案同样过词表；复核的方案被拒后下架。
+    let (s, _) = call(&app, "POST", "/api/schemes", Some(&author_t), json!({"title":"违禁词方案","items":[{"pack_id":oid}]})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    let (s, sc2) = call(&app, "POST", "/api/schemes", Some(&author_t), json!({"title":"复核词方案","items":[{"pack_id":oid}]})).await;
+    assert_eq!(s, StatusCode::OK, "{sc2}");
+    let (_, q) = call(&app, "GET", "/api/admin/moderation", Some(&admin_t), Value::Null).await;
+    let scheme_entry = q["items"].as_array().unwrap().iter().find(|i| i["target_type"] == "scheme").expect("方案进了队列");
+    let (s, _) = call(&app, "POST", &format!("/api/admin/moderation/{}/resolve", scheme_entry["id"]), Some(&admin_t), json!({"action":"reject","note":"不合适"})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, listed) = call(&app, "GET", "/api/schemes", None, Value::Null).await;
+    assert!(listed["items"].as_array().unwrap().iter().all(|i| i["title"] != "复核词方案"));
+
+    // 删掉词之后恢复可发。
+    let blocked_id = words["items"].as_array().unwrap().iter().find(|i| i["word"] == "违禁词").unwrap()["id"].clone();
+    let (s, _) = call(&app, "DELETE", &format!("/api/admin/words/{blocked_id}"), Some(&admin_t), Value::Null).await;
+    assert_eq!(s, StatusCode::OK);
+    let (s, _) = call(&app, "POST", "/api/schemes", Some(&author_t), json!({"title":"违禁词方案","items":[{"pack_id":oid}]})).await;
+    assert_eq!(s, StatusCode::OK);
+
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
     Ok(())
 }
