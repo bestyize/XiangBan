@@ -16,6 +16,7 @@
 | `02-codex-appserver.mjs` | 启动 `codex app-server`，握手、列出会话；加 `--chat` 再发一轮真实对话 | 仅 `--chat` 时（一轮，极短） |
 | `03-claude-hooks.mjs` | 在临时目录里配 hooks（http 与 command 两种），跑一轮需要权限确认的对话，看收到哪些事件、hook 返回“允许”是否生效 | 是（两轮，极短） |
 | `04-claude-resume.mjs` | 无界面建立会话 → 按编号恢复 → 确认会话文件位置 → 单进程多轮输入；最后提示你在真实终端里手动 `claude --resume` | 是（四轮，极短） |
+| `06-claude-stop-inject.mjs` | 验证 `Stop` hook 返回“继续并附上指令”后会话是否带着新指令接着做（语音指令注入运行中会话的机制） | 是（两轮，极短） |
 | `05-desktop-probe.mjs <应用名>` | 用系统无障碍接口找桌面版的输入框；试“激活并粘贴”（不按回车）并计时 | 否 |
 
 ```sh
