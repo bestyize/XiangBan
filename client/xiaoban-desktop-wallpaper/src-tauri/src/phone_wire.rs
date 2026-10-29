@@ -14,6 +14,15 @@ pub const MAX_MESSAGE_CHARS: usize = 20_000;
 /// 事件里工具参数 / 输出的字符上限。
 pub const MAX_EVENT_FIELD_CHARS: usize = 8_000;
 
+/// 手机发来的消息写进发送队列时用的幂等编号：同一台手机的同一个 `client_id` 永远得到同一个编号。
+/// 队列只认字母、数字、`-`、`_`，且最长 128 个字符，所以其余字符（比如手机编号里没有、但 `client_id` 可能带的冒号）换成 `_`。
+pub fn remote_request_id(peer_id: &str, client_id: &str) -> String {
+    fn clean(raw: &str, max: usize) -> String {
+        raw.chars().take(max).map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect()
+    }
+    format!("remote-{}-{}", clean(peer_id, 40), clean(client_id, 80))
+}
+
 /// 按字符数截断；返回（文本，是否被截断）。
 pub fn truncate_chars(text: &str, max: usize) -> (String, bool) {
     match text.char_indices().nth(max) {
@@ -164,6 +173,18 @@ mod tests {
 
     fn msg(role: &str, text: &str) -> Value {
         json!({ "role": role, "parts": [{ "type": "text", "text": text }], "provider_state": { "secret": "x" } })
+    }
+
+    #[test]
+    fn remote_request_ids_are_accepted_by_the_outbox_rules() {
+        let ok = |id: &str| !id.is_empty() && id.len() <= 128 && id.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+        for (peer, client) in [("phn_a1b2c3", "c-1730000000000-1"), ("phn_x", "带:冒号 和空格/斜杠"), ("p", &"x".repeat(500))] {
+            let id = remote_request_id(peer, client);
+            assert!(ok(&id), "{id}");
+        }
+        assert_eq!(remote_request_id("phn_a", "c-1"), remote_request_id("phn_a", "c-1"));
+        assert_ne!(remote_request_id("phn_a", "c-1"), remote_request_id("phn_b", "c-1"));
+        assert_ne!(remote_request_id("phn_a", "c-1"), remote_request_id("phn_a", "c-2"));
     }
 
     #[test]

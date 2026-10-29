@@ -2279,7 +2279,7 @@ pub(crate) fn remote_send_message(
     }
     emit(app, "chat-permission-mode-changed", json!({ "sessionId": sid, "mode": "ask" }));
 
-    let request_id = format!("remote:{peer_id}:{client_id}");
+    let request_id = crate::phone_wire::remote_request_id(peer_id, client_id);
     let message_id = outbox_host::enqueue_remote(app, &sid, peer_id, text, &request_id)?;
     Ok(json!({
         "client_id": client_id,
