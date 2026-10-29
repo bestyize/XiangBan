@@ -272,6 +272,42 @@ class VoiceCallTest {
     }
 
     @Test
+    fun `a confirmation during a call is shown on the call and answered without hanging up`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val asr = object : RecognizerEngine { override val name = "手机识别"; override suspend fun recognize(pcm: ByteArray) = "把临时文件删掉" }
+        val tts = object : SynthesizerEngine { override val name = "合成"; override suspend fun synthesize(text: String) = byteArrayOf(1) }
+        val assistant = object : CallAssistant {
+            @Volatile var answered: String? = null
+            override fun unavailableReason(): String? = null
+            override fun ask(text: String) {}
+            override fun cancel() {}
+            override fun reply() = AssistantReply(if (answered == null) "" else "好的，已经处理。", busy = answered == null)
+            override fun prompt() = if (answered != null) null else CallPrompt(
+                "小伴想要运行命令：bash", "rm -rf ./tmp", null, false,
+                listOf(CallPromptOption("once", "允许一次", CallPromptOption.Role.Allow), CallPromptOption("deny", "拒绝", CallPromptOption.Role.Deny)),
+            )
+            override fun answerPrompt(id: String) { answered = id }
+        }
+        val platform = ScriptedMic()
+        val call = SpokenCall(scope, platform, assistant, listOf(asr), listOf(tts))
+        call.start()
+        waitFor("listening") { call.state.value.phase == CallPhase.Listening }
+        platform.speak()
+        waitFor("prompt shown") { call.state.value.prompt != null }
+        assertEquals(listOf("once", "deny"), call.state.value.prompt!!.options.map { it.id })
+        assertEquals(null, call.state.value.notice, "能在通话里回答的确认，不该再提示“请挂断”")
+        call.answerPrompt("once")
+        waitFor("reply after answer") { call.state.value.replyText.contains("已经处理") }
+        assertEquals("once", assistant.answered)
+        assertEquals(null, call.state.value.prompt)
+        assertTrue(!call.state.value.ended, "回答之后通话还在")
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
     fun `while muted nothing is heard and after unmuting the next sentence is`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val client = HttpClient(MockEngine { request ->

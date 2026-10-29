@@ -41,6 +41,14 @@ interface VoicePlatform {
     fun speechGate(): SpeechGate? = null
 }
 
+/** 通话里小伴要你确认的操作或让你选的问题；点一个选项就回答，不用挂断。 */
+class CallPrompt(val title: String, val detail: String, val danger: String?, val question: Boolean, val options: List<CallPromptOption>)
+
+/** [role]：允许（主操作）、普通选项、拒绝或跳过（弱操作）。 */
+class CallPromptOption(val id: String, val label: String, val role: Role = Role.Neutral) {
+    enum class Role { Allow, Neutral, Deny }
+}
+
 enum class CallPhase { Starting, Listening, Hearing, Thinking, Speaking }
 
 data class CallState(
@@ -60,6 +68,8 @@ data class CallState(
     val bargeIn: Boolean = true,
     /** 静音：麦克风的声音不再交给识别，小伴听不到你，也不会被你的声音打断。 */
     val muted: Boolean = false,
+    /** 小伴正等你确认的操作或选择；有它时通话页显示卡片，回答之后小伴接着做。 */
+    val prompt: CallPrompt? = null,
 )
 
 /** 这次通话没法继续，原因要告诉用户。 */
@@ -110,6 +120,9 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
             }
         }
     }
+
+    /** 回答通话里的确认或选择（[CallPrompt] 的某个选项）。 */
+    open fun answerPrompt(id: String) {}
 
     /** 挂断。 */
     fun stop() {
@@ -341,11 +354,15 @@ interface CallAssistant {
     /** 把你说的话交给它。 */
     fun ask(text: String)
     fun reply(): AssistantReply
+    /** 小伴正等你确认或选择的事；没有就是 null。 */
+    fun prompt(): CallPrompt? = null
+    /** 回答 [prompt] 的某个选项。 */
+    fun answerPrompt(id: String) {}
     /** 让它别说了。 */
     fun cancel()
 }
 
-/** 通话时小伴要你确认操作的提示（确认只能回到对话里做）。 */
+/** 通话时有事需要你处理、又没法在通话里回答时的提示（能在通话里回答的会给出 [CallPrompt]）。 */
 const val AttentionNotice = "小伴需要你确认一个操作，请挂断后在对话里处理"
 
 /** 助手此刻的状态：[busy] 还在生成；[attention] 有需要你亲自处理的事（比如确认一个操作）。 */
@@ -361,9 +378,23 @@ class CloudAssistant(private val chat: CloudChatController) : CallAssistant {
         val turn = state.messages.lastOrNull { it.role == "assistant" }
         return AssistantReply(
             turn?.text.orEmpty(), busy = state.sending || turn?.streaming == true, error = turn?.error,
-            attention = if (state.approval != null) AttentionNotice else null,
+            attention = null,
         )
     }
+
+    override fun prompt(): CallPrompt? {
+        val approval = chat.state.value.approval ?: return null
+        return CallPrompt(
+            title = "小伴想要${toolLabel(approval.tool)}", detail = approval.detail, danger = approval.danger, question = false,
+            options = buildList {
+                add(CallPromptOption("once", "允许一次", CallPromptOption.Role.Allow))
+                if (approval.danger == null) add(CallPromptOption("always", "本对话都允许"))
+                add(CallPromptOption("deny", "拒绝", CallPromptOption.Role.Deny))
+            },
+        )
+    }
+
+    override fun answerPrompt(id: String) = chat.answerApproval(id)
 }
 
 /**
@@ -383,6 +414,11 @@ class SpokenCall(
     override fun interrupt() {
         super.interrupt()
         assistant.cancel()
+    }
+
+    override fun answerPrompt(id: String) {
+        assistant.answerPrompt(id)
+        update { it.copy(prompt = null) }
     }
 
     override suspend fun run() {
@@ -478,8 +514,9 @@ class SpokenCall(
                     for (s in splitter.feed(reply.text.substring(spoken))) sentences.send(s)
                     spoken = reply.text.length
                 }
-                update { it.copy(replyText = reply.text, notice = reply.attention ?: it.notice?.takeIf { n -> n != AttentionNotice }) }
+                update { it.copy(replyText = reply.text, prompt = assistant.prompt(), notice = reply.attention ?: it.notice?.takeIf { n -> n != AttentionNotice }) }
                 if (!reply.busy) {
+                    update { it.copy(prompt = null) }
                     reply.error?.let { error -> update { it.copy(notice = error) } }
                     break
                 }

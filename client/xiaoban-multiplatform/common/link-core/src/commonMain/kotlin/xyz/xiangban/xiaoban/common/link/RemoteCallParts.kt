@@ -1,7 +1,9 @@
 package xyz.xiangban.xiaoban.common.link
 
 import xyz.xiangban.xiaoban.common.community.AssistantReply
-import xyz.xiangban.xiaoban.common.community.AttentionNotice
+import xyz.xiangban.xiaoban.common.community.CallPrompt
+import xyz.xiangban.xiaoban.common.community.CallPromptOption
+import xyz.xiangban.xiaoban.common.community.toolLabel
 import xyz.xiangban.xiaoban.common.community.CallAssistant
 import xyz.xiangban.xiaoban.common.community.EngineUnavailable
 import xyz.xiangban.xiaoban.common.community.RecognizerEngine
@@ -19,8 +21,38 @@ class RemoteAssistant(private val chat: RemoteChatController) : CallAssistant {
         return AssistantReply(
             turn?.text.orEmpty(), busy = state.sending || turn?.streaming == true,
             error = turn?.error?.takeIf { it != TurnCancelled },
-            attention = if (state.pendingApproval != null) AttentionNotice else null,
+            attention = null,
         )
+    }
+
+    override fun prompt(): CallPrompt? {
+        val request = chat.state.value.pendingApproval ?: return null
+        if (request.isQuestion) {
+            return CallPrompt(
+                title = request.question.ifBlank { request.title }, detail = "", danger = null, question = true,
+                options = if (request.connectors) listOf(CallPromptOption(DismissChoice, "跳过", CallPromptOption.Role.Deny))
+                else request.choices.map { CallPromptOption(it, it) } + CallPromptOption(DismissChoice, "跳过", CallPromptOption.Role.Deny),
+            )
+        }
+        val verb = when (request.riskKind) { "read" -> "读取文件"; "write" -> "写入文件"; "network" -> "联网访问"; "exec" -> "运行命令"; else -> "执行操作" }
+        val tool = if (request.tool.isBlank()) request.title else toolLabel(request.tool)
+        var allowed = false
+        return CallPrompt(
+            title = "小伴想要$verb：$tool", detail = request.summary, danger = if (request.isHighRisk) (request.danger ?: "高风险操作") else null, question = false,
+            options = request.options.filter { it.id != DismissChoice }.map { option ->
+                val role = when {
+                    option.id == "deny" -> CallPromptOption.Role.Deny
+                    !allowed -> { allowed = true; CallPromptOption.Role.Allow }
+                    else -> CallPromptOption.Role.Neutral
+                }
+                CallPromptOption(option.id, option.label, role)
+            },
+        )
+    }
+
+    override fun answerPrompt(id: String) {
+        val request = chat.state.value.pendingApproval ?: return
+        chat.answerApproval(request.approvalId, id)
     }
 }
 
@@ -42,3 +74,6 @@ class DesktopRecognizer(private val chat: RemoteChatController) : RecognizerEngi
         return ""
     }
 }
+
+/** 界面上“跳过”一个问题时回给电脑的选项，和聊天页里的跳过一致。 */
+private const val DismissChoice = "__dismiss__"
