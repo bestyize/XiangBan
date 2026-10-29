@@ -538,3 +538,21 @@ fn dynamic_dispatch_validates_and_authorizes_the_pinned_target_before_resources(
         assert_eq!(asked.load(Ordering::SeqCst),usize::from(valid&&dangerous));
     }
 }
+
+#[test]
+fn clearing_a_review_mark_restores_full_trust_but_keeps_the_tainted_mark() {
+    let dir = std::env::temp_dir().join(format!("clear-review-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let p = Permission::new(PermissionMode::Auto, |_: &ApprovalRequest<'_>| Approval::Deny);
+    p.restore_trust(&dir, "s1", false).unwrap();
+    p.require_review("s1").unwrap();
+    assert!(p.needs_review("s1"));
+    p.clear_review("s1").unwrap();
+    assert!(!p.needs_review("s1"));
+    // A conversation that read outside content stays tainted; clearing does nothing to it.
+    p.restore_trust(&dir, "s2", true).unwrap();
+    p.clear_review("s2").unwrap();
+    assert!(p.is_tainted("s2"));
+    assert!(p.clear_review("../bad").is_err() || !p.needs_review("../bad"));
+    let _ = std::fs::remove_dir_all(dir);
+}

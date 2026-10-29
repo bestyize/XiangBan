@@ -168,8 +168,8 @@ data class RemoteChatState(
     val toolProgress: List<RemoteToolProgress> = emptyList(),
     val sending: Boolean = false,
     val pendingApproval: RemoteApprovalRequest? = null,
-    /** 当前对话在电脑上的权限：`ask` 默认权限（执行前先问），`auto` 完全信任（高风险操作仍然每次都问）。 */
-    val permissionMode: String = "ask",
+    /** 当前对话在电脑上的权限：`auto` 完全信任（默认，高风险操作仍然每次都问），`ask` 默认权限（执行前先问）。开发阶段便利优先。 */
+    val permissionMode: String = "auto",
     val error: String? = null,
 ) {
     val fullTrust: Boolean get() = permissionMode == "auto"
@@ -330,7 +330,7 @@ class RemoteChatController(
         _state.value = _state.value.copy(
             selectedSessionId = sessionId,
             newChatWorkspace = null,
-            permissionMode = "ask",
+            permissionMode = "auto",
             messages = cachedMsgs,
             toolProgress = emptyList(),
             pendingApproval = null,
@@ -361,7 +361,7 @@ class RemoteChatController(
         _state.value = _state.value.copy(
             selectedSessionId = null,
             newChatWorkspace = keep.ifBlank { null },
-            permissionMode = "ask",
+            permissionMode = "auto",
             messages = emptyList(),
             toolProgress = emptyList(),
             pendingApproval = null,
@@ -426,7 +426,7 @@ class RemoteChatController(
             if (!sid.isNullOrBlank()) put("session", sid)
             else {
                 _state.value.newChatWorkspace?.takeIf { it.isNotBlank() }?.let { put("workspace", it) }
-                if (_state.value.fullTrust) put("permission", "auto")
+                put("permission", _state.value.permissionMode)
             }
             put("text", text)
             put("client_id", clientId)
