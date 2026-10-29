@@ -182,8 +182,8 @@ fun RemoteListScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                 }
             }
         }
-        if (menu) {
-            BottomSheet({ menu = false }) {
+        OverlayTransition(menu) { panel ->
+            BottomSheet({ menu = false }, panel) {
                 Text(peer?.name ?: "电脑", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                 SheetAction(XIcons.Close, "从账号中移除这台电脑", "它再次启动并开启手机遥控后会重新出现") {
                     menu = false
@@ -226,6 +226,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     val online = peer?.online == true
     var input by rememberSaveable { mutableStateOf("") }
     var highRisk by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var lastHighRisk by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmed by remember { mutableStateOf(false) }
 
     LaunchedEffect(peerId) {
@@ -256,7 +257,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             remote.pendingApproval?.let { pending ->
                 ApprovalCard(pending, peer?.name ?: "电脑") { choice ->
                     val denies = choice == "deny" || choice == "__dismiss__"
-                    if (pending.isHighRisk && !denies) { confirmed = false; highRisk = pending.approvalId to choice } else env.remoteChat.answerApproval(pending.approvalId, choice)
+                    if (pending.isHighRisk && !denies) { confirmed = false; lastHighRisk = pending.approvalId to choice; highRisk = lastHighRisk } else env.remoteChat.answerApproval(pending.approvalId, choice)
                 }
             }
 
@@ -278,9 +279,10 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                 }
             }
         }
-        highRisk?.let { (approvalId, choice) ->
+        OverlayTransition(highRisk != null) { panel ->
+          lastHighRisk?.let { (approvalId, choice) ->
             val pending = remote.pendingApproval
-            BottomSheet({ highRisk = null }) {
+            BottomSheet({ highRisk = null }, panel) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(Modifier.size(36.dp).clip(CircleShape).background(LocalExtraColors.current.brandSoft), contentAlignment = Alignment.Center) { XIcon(XIcons.Warning, tint = Brand, size = 20.dp) }
                     Text("这是高危操作", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
@@ -292,11 +294,12 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                     Text("我已看清上面的内容", fontSize = 14.sp)
                 }
                 Row(Modifier.padding(top = 8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DarkPillButton("拒绝", { highRisk = null; env.remoteChat.answerApproval(approvalId, "deny") }, Modifier.weight(1f))
-                    GhostPillButton("仍然允许", { highRisk = null; env.remoteChat.answerApproval(approvalId, choice) }, Modifier.weight(1f), enabled = confirmed)
+                    DarkPillButton("拒绝", { if (highRisk != null) { highRisk = null; env.remoteChat.answerApproval(approvalId, "deny") } }, Modifier.weight(1f))
+                    GhostPillButton("仍然允许", { if (highRisk != null) { highRisk = null; env.remoteChat.answerApproval(approvalId, choice) } }, Modifier.weight(1f), enabled = confirmed && highRisk != null)
                 }
                 Text("勾选后“仍然允许”才可点；手机上只能允许这一次。", Modifier.padding(top = 8.dp).fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
             }
+          }
         }
     }
 }

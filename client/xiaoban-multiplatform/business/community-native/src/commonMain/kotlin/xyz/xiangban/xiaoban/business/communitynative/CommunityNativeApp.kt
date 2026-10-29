@@ -43,34 +43,38 @@ fun CommunityNativeApp(env: CommunityEnv) {
         // 回调可能在异步操作（如登录）结束后才调用，所以每次都读最新的栈，而不是组合时捕获的那份。
         fun push(route: Route) { stackText = Route.encodeStack(Route.decodeStack(stackText) + route) }
         fun pop() { stackText = Route.encodeStack(Route.decodeStack(stackText).dropLast(1)) }
+        fun closeLogin() { if (Route.decodeStack(stackText).lastOrNull() == Route.Login) pop() }
 
         BackHandler(enabled = stack.isNotEmpty()) { pop() }
 
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             Box(Modifier.fillMaxSize()) {
                 when (Tab.valueOf(tab)) {
-                    Tab.Ai -> AiHomeScreen(env, chat, ::push, aiDrawerOpen, { aiDrawerOpen = it })
+                    Tab.Ai -> AiHomeScreen(env, chat, ::push, { aiDrawerOpen = true })
                     Tab.Games -> GamesScreen()
                     Tab.Community -> CommunityScreen(env, ::push)
                     Tab.Mine -> MineScreen(env, ::push)
                 }
             }
-            if (!aiDrawerOpen) {
-                FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
-            }
-            stack.lastOrNull()?.let { route ->
+            FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
+            AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
+            stack.lastOrNull { it != Route.Login }?.let { route ->
                 // 盖在最上面，并吃掉点击，免得穿透到下面的一级页。
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding().clickable(indication = null, interactionSource = null) {}) {
                     RouteScreen(env, chat, route, ::push, ::pop)
                 }
             }
-            if (publishOpen) {
+            OverlayTransition(publishOpen) { panel ->
                 PublishSheet(
                     env,
                     onDismiss = { publishOpen = false },
                     onAiCreate = { publishOpen = false; chat.clearConversation(); push(Route.AiChat) },
                     onNewPost = { publishOpen = false; push(Route.NewPost) },
+                    panelModifier = panel,
                 )
+            }
+            OverlayTransition(stack.lastOrNull() == Route.Login, direction = "center") {
+                LoginDialog(env, done = ::closeLogin, back = ::closeLogin)
             }
         }
     }
@@ -83,7 +87,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.Topic -> TopicDetailScreen(env, route.id, pop, push)
         is Route.Weekly -> WeeklyDetailScreen(env, route.week, push, pop)
         is Route.Project -> ProjectDetailScreen(env, route.slug, pop)
-        Route.Login -> LoginScreen(env, done = pop, back = pop)
+        Route.Login -> Unit // 登录作为弹窗显示在当前页面之上。
         Route.Search -> SearchScreen(env, back = pop, open = push)
         Route.NewPost -> NewPostScreen(env, back = pop, open = push)
         Route.Settings -> SettingsScreen(env, back = pop, open = push)
@@ -97,9 +101,9 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
 
 /** 发布弹层：用 AI 创作走云端小伴；发布已有作品和发帖目前在网页上完成。 */
 @Composable
-private fun PublishSheet(env: CommunityEnv, onDismiss: () -> Unit, onAiCreate: () -> Unit, onNewPost: () -> Unit) {
+private fun PublishSheet(env: CommunityEnv, onDismiss: () -> Unit, onAiCreate: () -> Unit, onNewPost: () -> Unit, panelModifier: Modifier) {
     val site = env.config.forumBase.trimEnd('/')
-    BottomSheet(onDismiss) {
+    BottomSheet(onDismiss, panelModifier) {
         Text("发布", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         SheetAction(XIcons.Sparkle, "用 AI 创作", "一句话生成特效、壁纸、组件或小游戏", onAiCreate)
         SheetAction(XIcons.Upload, "发布已有作品", "选择资源包（.zip），在网页上发布到社区") { onDismiss(); env.platform?.openUrl("$site/publish") }

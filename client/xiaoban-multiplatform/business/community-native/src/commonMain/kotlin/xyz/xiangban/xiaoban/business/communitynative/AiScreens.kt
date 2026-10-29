@@ -86,11 +86,10 @@ private fun LoginPrompt(title: String, desc: String, onLogin: () -> Unit, modifi
 /** 小伴AI 首页：问候、输入卡片（点一下进入对话页）、功能入口、试试这样问我、当前对话。 */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit, drawer: Boolean, onDrawerChange: (Boolean) -> Unit) {
+fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit, onOpenDrawer: () -> Unit) {
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
     val remote by env.remoteChat.state.collectAsState()
-    BackHandler(enabled = drawer) { onDrawerChange(false) }
 
     LaunchedEffect(session.loggedIn) {
         if (session.loggedIn) {
@@ -105,7 +104,7 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
         Column(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxWidth().statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconTap(XIcons.Menu, "对话列表", { onDrawerChange(true) })
+                    IconTap(XIcons.Menu, "对话列表", onOpenDrawer)
                     Text("小伴AI", Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                     Spacer(Modifier.width(44.dp))
                 }
@@ -172,16 +171,24 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
                 Spacer(Modifier.height(NavInset))
             }
         }
-        if (drawer) {
-            AiDrawer(
-                cloud = cloud,
-                onClose = { onDrawerChange(false) },
-                onNew = { onDrawerChange(false); chat.clearConversation(); open(Route.AiChat) },
-                onOpenCurrent = { onDrawerChange(false); open(Route.AiChat) },
-                onModels = { onDrawerChange(false); open(Route.Models) },
-                onSettings = { onDrawerChange(false); open(Route.Settings) },
-            )
-        }
+    }
+}
+
+@OptIn(ExperimentalComposeUiApi::class)
+@Composable
+fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> Unit, open: (Route) -> Unit) {
+    val cloud by chat.state.collectAsState()
+    BackHandler(enabled = visible, onBack = onClose)
+    OverlayTransition(visible, direction = "left") { panel ->
+        AiDrawer(
+            cloud = cloud,
+            onClose = onClose,
+            onNew = { onClose(); chat.clearConversation(); open(Route.AiChat) },
+            onOpenCurrent = { onClose(); open(Route.AiChat) },
+            onModels = { onClose(); open(Route.Models) },
+            onSettings = { onClose(); open(Route.Settings) },
+            panelModifier = panel,
+        )
     }
 }
 
@@ -201,9 +208,9 @@ private fun FeatureTile(icon: androidx.compose.ui.graphics.vector.ImageVector, t
 
 /** 左侧对话列表抽屉：新对话、当前对话、模型与额度、设置。 */
 @Composable
-private fun AiDrawer(cloud: CloudChatState, onClose: () -> Unit, onNew: () -> Unit, onOpenCurrent: () -> Unit, onModels: () -> Unit, onSettings: () -> Unit) {
+private fun AiDrawer(cloud: CloudChatState, onClose: () -> Unit, onNew: () -> Unit, onOpenCurrent: () -> Unit, onModels: () -> Unit, onSettings: () -> Unit, panelModifier: Modifier) {
     Row(Modifier.fillMaxSize()) {
-        Column(Modifier.width(300.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).statusBarsPadding().navigationBarsPadding().padding(vertical = 16.dp)) {
+        Column(panelModifier.width(300.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).statusBarsPadding().navigationBarsPadding().padding(vertical = 16.dp)) {
             Text("小伴AI", Modifier.padding(horizontal = 16.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             PillButton("新对话", onNew, Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp).fillMaxWidth(), height = 44.dp, icon = XIcons.Plus)
             Text("最近", Modifier.padding(start = 16.dp, top = 14.dp, bottom = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -281,8 +288,8 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                 }
             }
         }
-        if (modelSheet) {
-            BottomSheet({ modelSheet = false }) {
+        OverlayTransition(modelSheet) { panel ->
+            BottomSheet({ modelSheet = false }, panel) {
                 Text("选择模型", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                 Text("只对当前这个对话生效。", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("小伴AI · 官方", Modifier.padding(top = 12.dp), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -398,8 +405,8 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                 }
             }
         }
-        if (sheet) {
-            BottomSheet({ sheet = false }) {
+        OverlayTransition(sheet) { panel ->
+            BottomSheet({ sheet = false }, panel) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
                     Column(Modifier.weight(1f)) {

@@ -27,7 +27,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -43,9 +45,10 @@ import xyz.xiangban.xiaoban.common.community.messageOf
 
 private enum class LoginMode(val label: String) { Code("验证码登录"), Password("密码登录") }
 
-/** 登录；验证码登录遇到新用户时，接着在同一页走“完成注册”。登录成功后回到上一页。 */
+/** 登录与完成注册共用一个弹窗，成功后回到当前页面。 */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun LoginScreen(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
+fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
     val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf(LoginMode.Code) }
     var identifier by remember { mutableStateOf("") }
@@ -78,9 +81,14 @@ fun LoginScreen(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
     }
 
     val registering = registrationToken != null
-    Column(Modifier.fillMaxSize()) {
-        ScreenBar(if (registering) "完成注册" else "登录", onBack = if (registering) ({ registrationToken = null; error = null }) else back)
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 24.dp)) {
+    CenterDialog(onDismiss = back) {
+        BackHandler(enabled = registering) { registrationToken = null; error = null }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            if (registering) IconTap(XIcons.ChevronLeft, "返回登录", { registrationToken = null; error = null })
+            Text(if (registering) "完成注册" else "登录", Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            IconTap(XIcons.Close, "关闭", back)
+        }
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 8.dp)) {
             if (!registering) {
                 Text("登录小伴", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
                 Text("社区、云端小伴和遥控电脑都用这个账号。电脑和手机登录同一个账号，就能互相找到。", Modifier.padding(top = 6.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
