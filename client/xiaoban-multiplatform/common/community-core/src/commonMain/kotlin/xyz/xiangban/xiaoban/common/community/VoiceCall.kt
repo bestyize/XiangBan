@@ -58,6 +58,8 @@ data class CallState(
     val ended: Boolean = false,
     /** 小伴说话时，你直接开口是否能打断它（有回声的环境可以关掉）。 */
     val bargeIn: Boolean = true,
+    /** 静音：麦克风的声音不再交给识别，小伴听不到你，也不会被你的声音打断。 */
+    val muted: Boolean = false,
 )
 
 /** 这次通话没法继续，原因要告诉用户。 */
@@ -85,6 +87,7 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
     @Volatile private var bargeTriggered = false
 
     @Volatile protected var interrupted = false
+    @Volatile private var muted = false
 
     fun start() {
         if (job != null) return
@@ -121,6 +124,13 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
         playback?.complete(true)
     }
 
+    /** 静音/取消静音。静音时正在听的半句话作废，回到“请说话”。 */
+    fun setMuted(on: Boolean) {
+        muted = on
+        if (on) drainMic()
+        update { it.copy(muted = on, level = if (on) 0f else it.level, phase = if (on && it.phase == CallPhase.Hearing) CallPhase.Listening else it.phase) }
+    }
+
     /** 打开/关闭“小伴说话时直接开口打断”。 */
     fun setBargeIn(on: Boolean) = update { it.copy(bargeIn = on) }
 
@@ -135,7 +145,7 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
     /** 麦克风在整通电话里一直开着（这样小伴说话时也能听见你开口）；第一次需要时才打开。 */
     private suspend fun openMic() {
         if (stopMic != null) return
-        stopMic = platform.streamRecording { mic.trySend(it) } ?: throw CallError("没有麦克风权限，没法通话")
+        stopMic = platform.streamRecording { if (!muted) mic.trySend(it) } ?: throw CallError("没有麦克风权限，没法通话")
     }
 
     private fun drainMic() {

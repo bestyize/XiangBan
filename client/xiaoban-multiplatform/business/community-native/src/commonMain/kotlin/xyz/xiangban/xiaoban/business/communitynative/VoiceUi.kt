@@ -1,47 +1,29 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import xyz.xiangban.xiaoban.common.community.CallPhase
-import xyz.xiangban.xiaoban.common.community.CloudRecognizer
 import xyz.xiangban.xiaoban.common.community.CloudSynthesizer
 import xyz.xiangban.xiaoban.common.community.EdgeTtsSynthesizer
 import xyz.xiangban.xiaoban.common.community.EngineUnavailable
@@ -74,74 +56,6 @@ suspend fun recognizeWith(engines: List<RecognizerEngine>, pcm: ByteArray): Pair
         }
     }
     return null to (reason ?: "没有可用的语音识别")
-}
-
-// ───────────── 通话界面 ─────────────
-
-/** 语音通话的全屏界面：呼吸圆点、状态、你说的话和小伴的回答、打断和挂断。 */
-@OptIn(ExperimentalComposeUiApi::class)
-@Composable
-fun VoiceCallScreen(call: VoiceCall, title: String, subtitle: String, onClosed: (String?) -> Unit) {
-    val state by call.state.collectAsState()
-    val extra = LocalExtraColors.current
-    BackHandler(onBack = { call.stop() })
-    LaunchedEffect(Unit) { call.start() }
-    LaunchedEffect(state.ended) { if (state.ended) onClosed(state.notice) }
-    DisposableEffect(call) { onDispose { call.stop() } }
-    Column(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).statusBarsPadding().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(subtitle, Modifier.padding(top = 2.dp), fontSize = 12.sp, color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.weight(1f))
-        // 呼吸的圆：听的时候随你的声音大小变化，想和说的时候固定大小。
-        val grow = if (state.phase == CallPhase.Hearing || state.phase == CallPhase.Listening) state.level else 0f
-        val diameter = 120 + (grow * 60).toInt()
-        Box(Modifier.size(200.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(diameter.dp).clip(CircleShape).background(if (state.phase == CallPhase.Speaking) Brand else if (state.phase == CallPhase.Thinking) extra.line else Brand.copy(alpha = 0.18f)))
-            XIcon(
-                when (state.phase) { CallPhase.Speaking -> XIcons.Volume; CallPhase.Thinking -> XIcons.SparkleSmall; else -> XIcons.Mic },
-                tint = if (state.phase == CallPhase.Speaking) Color.White else Brand, size = 40.dp,
-            )
-        }
-        Text(
-            when (state.phase) {
-                CallPhase.Starting -> "正在接通…"
-                CallPhase.Listening -> "请说话，我在听"
-                CallPhase.Hearing -> "听到了…"
-                CallPhase.Thinking -> "小伴在想…"
-                CallPhase.Speaking -> "小伴在说话"
-            },
-            Modifier.padding(top = 12.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold,
-        )
-        if (state.partial.isNotBlank()) Text(state.partial, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = extra.ink3, textAlign = TextAlign.Center)
-        if (state.userText.isNotBlank()) Text("你：${state.userText}", Modifier.padding(top = 14.dp).fillMaxWidth(), fontSize = 14.sp, lineHeight = 21.sp, color = extra.ink3, maxLines = 3, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        if (state.replyText.isNotBlank()) Text(state.replyText, Modifier.padding(top = 8.dp).fillMaxWidth(), fontSize = 15.sp, lineHeight = 23.sp, maxLines = 6, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
-        state.notice?.let { Text(it, Modifier.padding(top = 12.dp), fontSize = 13.sp, lineHeight = 19.sp, color = Brand, textAlign = TextAlign.Center) }
-        Spacer(Modifier.weight(1f))
-        Row(horizontalArrangement = Arrangement.spacedBy(40.dp), verticalAlignment = Alignment.CenterVertically) {
-            val canInterrupt = state.phase == CallPhase.Speaking || state.phase == CallPhase.Thinking
-            CallButton(XIcons.Close, if (canInterrupt) "打断" else "挂断", if (canInterrupt) MaterialTheme.colorScheme.onSurface else Brand, onClick = { if (canInterrupt) call.interrupt() else call.stop() })
-            if (canInterrupt) CallButton(XIcons.Close, "挂断", Brand, onClick = { call.stop() })
-        }
-        // 小伴说话时直接开口就能打断它；周围回声大、总被误打断时可以关掉，改用上面的“打断”按钮。
-        Text(
-            if (state.bargeIn) "直接开口打断：开" else "直接开口打断：关",
-            Modifier.padding(top = 18.dp).clip(RoundedCornerShape(8.dp)).clickable { call.setBargeIn(!state.bargeIn) }.padding(horizontal = 12.dp, vertical = 8.dp),
-            fontSize = 13.sp, color = extra.ink3,
-        )
-    }
-}
-
-@Composable
-private fun CallButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, color: Color, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(64.dp).clip(CircleShape).background(color).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
-            XIcon(icon, tint = Color.White, size = 28.dp, description = label)
-        }
-        Text(label, Modifier.padding(top = 6.dp), fontSize = 13.sp)
-    }
 }
 
 // ───────────── 本地语音模型下载 ─────────────
@@ -305,10 +219,10 @@ fun rememberVoiceCallHost(env: CommunityEnv): VoiceCallHost = remember(env) { Vo
 
 /** 通话相关的两层界面：询问下载模型的底部弹层，和通话本身的全屏界面。 */
 @Composable
-fun VoiceCallLayer(env: CommunityEnv, host: VoiceCallHost, title: String, subtitle: String, onNotice: (String) -> Unit) {
+fun VoiceCallLayer(env: CommunityEnv, host: VoiceCallHost, title: String, onNotice: (String) -> Unit) {
     OverlayTransition(host.offering) { panel -> SpeechModelSheet(env, panel) { host.offerFinished(it) } }
     host.call?.let { current ->
-        VoiceCallScreen(current, title, subtitle) { notice ->
+        VoiceCallScreen(current, title) { notice ->
             host.call = null
             notice?.let(onNotice)
         }

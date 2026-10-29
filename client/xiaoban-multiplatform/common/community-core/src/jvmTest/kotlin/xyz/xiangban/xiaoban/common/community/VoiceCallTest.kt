@@ -272,6 +272,40 @@ class VoiceCallTest {
     }
 
     @Test
+    fun `while muted nothing is heard and after unmuting the next sentence is`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/chat/completions" -> respond(sse("好的。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+                else -> respond("{}", HttpStatusCode.OK)
+            }
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        val heard = AtomicInteger()
+        val asr = object : RecognizerEngine { override val name = "手机识别"; override suspend fun recognize(pcm: ByteArray): String { heard.incrementAndGet(); return "你好" } }
+        val tts = object : SynthesizerEngine { override val name = "合成"; override suspend fun synthesize(text: String) = byteArrayOf(1) }
+        val platform = ScriptedMic()
+        val call = SpokenCall(scope, platform, CloudAssistant(CloudChatController(api, scope)), listOf(asr), listOf(tts))
+        call.start()
+        waitFor("listening") { call.state.value.phase == CallPhase.Listening }
+        call.setMuted(true)
+        assertTrue(call.state.value.muted)
+        platform.speak()
+        delay(1500)
+        assertEquals(0, heard.get(), "静音时不该识别到任何话")
+        assertEquals("", call.state.value.userText)
+        call.setMuted(false)
+        delay(300) // 取消静音后先有一小段安静，识别才会把接下来的声音当成人声
+        platform.speak()
+        waitFor("heard after unmute") { call.state.value.userText == "你好" }
+        assertTrue(!call.state.value.muted)
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
     fun `a local recognizer judges whether the sentence is finished from its punctuation`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val client = HttpClient(MockEngine { request ->

@@ -32,6 +32,7 @@ object XIcons {
     val Globe: ImageVector by lazy { strokeIcon("Globe", "M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18") }
     val Grid: ImageVector by lazy { strokeIcon("Grid", "M6 4h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2zM15 4h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2zM6 13h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2zM15 13h3a2 2 0 0 1 2 2v3a2 2 0 0 1 -2 2h-3a2 2 0 0 1 -2 -2v-3a2 2 0 0 1 2 -2z") }
     val Hash: ImageVector by lazy { strokeIcon("Hash", "M5 9h14M5 15h14M10 4L8 20M16 4l-2 16") }
+    val Hangup: ImageVector by lazy { handsetIcon("Hangup") }
     val Heart: ImageVector by lazy { strokeIcon("Heart", "M12 20s-7-4.4-7-10a4 4 0 017-2.6A4 4 0 0119 10c0 5.6-7 10-7 10z") }
     val Image: ImageVector by lazy { strokeIcon("Image", "M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2zM7.4 10a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM4 18l5-5 4 4 3-3 4 4") }
     val Link: ImageVector by lazy { strokeIcon("Link", "M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1") }
@@ -39,6 +40,7 @@ object XIcons {
     val Menu: ImageVector by lazy { strokeIcon("Menu", "M4 7h16M4 12h16M4 17h10") }
     val Message: ImageVector by lazy { strokeIcon("Message", "M5 6h14a1 1 0 011 1v9a1 1 0 01-1 1h-7l-4 3v-3H5a1 1 0 01-1-1V7a1 1 0 011-1z") }
     val Mic: ImageVector by lazy { strokeIcon("Mic", "M12 3h0a3 3 0 0 1 3 3v5a3 3 0 0 1 -3 3h-0a3 3 0 0 1 -3 -3v-5a3 3 0 0 1 3 -3zM5 11a7 7 0 0014 0M12 18v3") }
+    val MicOff: ImageVector by lazy { strokeIcon("MicOff", "M5 5l14 14M9 9v2a3 3 0 005.1 2.1M15 9.6V6a3 3 0 00-5.9-.8M5 11a7 7 0 0011.5 5.3M19 11a7 7 0 01-.6 2.8M12 18v3") }
     val Monitor: ImageVector by lazy { strokeIcon("Monitor", "M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2zM8 21h8M12 17v4") }
     val More: ImageVector by lazy { strokeIcon("More", "M3.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM17.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0z") }
     val MoreVertical: ImageVector by lazy { strokeIcon("MoreVertical", "M10.4 5a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 19a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0z") }
@@ -53,7 +55,10 @@ object XIcons {
     val Share: ImageVector by lazy { strokeIcon("Share", "M12 15V4M8 8l4-4 4 4M5 12v6a2 2 0 002 2h10a2 2 0 002-2v-6") }
     val Shield: ImageVector by lazy { strokeIcon("Shield", "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z") }
     val Sliders: ImageVector by lazy { strokeIcon("Sliders", "M4 7h10M18 7h2M4 17h2M10 17h10M14 7a2 2 0 1 0 4 0a2 2 0 1 0 -4 0zM6 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0z") }
+    val SkipNext: ImageVector by lazy { strokeIcon("SkipNext", "M5 5l9 7-9 7zM18 5v14") }
     val Sparkle: ImageVector by lazy { strokeIcon("Sparkle", "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z") }
+    /** 小伴的品牌标志：一颗大闪光加一个小十字和一个小圆圈（和应用图标里的是同一个）。 */
+    val Sparkles: ImageVector by lazy { strokeIcon("Sparkles", "M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594zM20 2v4M22 4h-4M2 20a2 2 0 1 0 4 0a2 2 0 1 0 -4 0z") }
     val SparkleSmall: ImageVector by lazy { strokeIcon("SparkleSmall", "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z") }
     val Star: ImageVector by lazy { strokeIcon("Star", "M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z") }
     val Stop: ImageVector by lazy { strokeIcon("Stop", "M8 6h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2v-8a2 2 0 0 1 2 -2z") }
@@ -77,4 +82,19 @@ private fun strokeIcon(name: String, path: String): ImageVector =
             strokeLineCap = StrokeCap.Round,
             strokeLineJoin = StrokeJoin.Round,
         )
+        .build()
+
+/** 挂断用的实心听筒：一个电话听筒转 135 度，听筒口朝下。 */
+private fun handsetIcon(name: String): ImageVector =
+    ImageVector.Builder(name = name, defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addGroup(rotate = 135f, pivotX = 12f, pivotY = 12f)
+        .addPath(
+            pathData = addPathNodes("M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"),
+            fill = SolidColor(Color.Black),
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 1.4f,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round,
+        )
+        .clearGroup()
         .build()

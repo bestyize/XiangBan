@@ -6,3 +6,4 @@ fun Modifier.clip(shape: Shape): Modifier = this
 fun Modifier.rotate(degrees: Float): Modifier = this
 fun Modifier.shadow(elevation: Dp, shape: Shape? = null, clip: Boolean = true): Modifier = this
 fun Modifier.alpha(alpha: Float): Modifier = this
+fun Modifier.drawBehind(onDraw: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit): Modifier = this
