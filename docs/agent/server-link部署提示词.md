@@ -22,10 +22,11 @@
 5. Nginx：使用 infra/link/nginx.conf.example，域名 link.xiangban.xyz（若不同请告诉我，因为桌面端默认值写死了这个域名）。重点确认：/api/link/ws 带 Upgrade/Connection 头、proxy_read_timeout 至少 3600s、关闭缓冲；服务只监听 127.0.0.1:55030，安全组/防火墙不对外开放 55030 和数据库端口。证书用 certbot，改完先 nginx -t 再 reload。
 6. 安全：容器保持 read_only、cap_drop ALL、no-new-privileges（compose 里已有，别删）；数据库网络保持 internal。不要开启任何调试端口。
 
-验证（全部通过才算完成，逐条把实际命令和结果贴给我，令牌之类敏感信息打码）：
+验证（不需要令牌的项全部通过才算完成，逐条把实际命令和结果贴给我，令牌之类敏感信息打码）：
+令牌说明：访问令牌只有约 30 分钟有效，且由用户登录后手工提供，默认不提供。没有令牌时，所有带令牌的验证项一律标记为“跳过，由用户用真机配对验证”，不要向我索取，也不要自己创建账号或想办法绕过；只做不需要令牌的验证。如果我主动给了令牌（可能连同 refresh_token），那就在一次连续操作里把带令牌的验证项跑完；令牌过期时，若我给了 refresh_token，就用 POST https://account.xiangban.xyz/api/auth/refresh（{"refresh_token":"…","client_id":"xiaoban-android"}）换新的，没给就停下来告诉我，不要反复催。
 1. docker compose ps 显示 postgres 与 link 均 healthy；curl 127.0.0.1:55030/api/link/health 返回 JSON。
 2. curl https://link.xiangban.xyz/api/link/health 返回 JSON；不带令牌 GET /api/link/devices 返回 401。
-3. 向我索取一个测试账号的访问令牌（aud 为 xiaoban-android 或 xiaoban-desktop-wallpaper），然后：POST /api/link/devices 登记一台名为“部署自检”的设备（public_key 用 32 字节随机数的 base64）应成功；用同一令牌按 WebSocket 子协议 ["xb-link","xiaoban-token.<令牌>"] 连 wss://link.xiangban.xyz/api/link/ws?device_id=<刚登记的设备编号>，应在 10 秒内收到状态帧并保持连接超过 5 分钟；最后 DELETE 这台设备清理现场。
+3. （带令牌，可选，没有令牌就写“跳过，由用户真机配对验证”）如果我给了测试账号的访问令牌（aud 为 xiaoban-android 或 xiaoban-desktop-wallpaper），则：POST /api/link/devices 登记一台名为“部署自检”的设备（public_key 用 32 字节随机数的 base64）应成功；用同一令牌按 WebSocket 子协议 ["xb-link","xiaoban-token.<令牌>"] 连 wss://link.xiangban.xyz/api/link/ws?device_id=<刚登记的设备编号>，应在 10 秒内收到状态帧并保持连接超过 5 分钟；最后 DELETE 这台设备清理现场。
 4. 重启 link 容器后 health 恢复，数据库数据仍在。
 5. 做一次 pg_dump 备份并确认文件非空，把备份命令写进部署目录的 README，说明回滚到旧镜像标签的步骤。
 
