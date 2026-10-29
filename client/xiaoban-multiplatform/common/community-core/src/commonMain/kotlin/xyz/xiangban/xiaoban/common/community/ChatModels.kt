@@ -187,3 +187,24 @@ fun changedFiles(calls: List<ToolCallInfo>): List<ChangedFile> {
     }
     return out.values.toList()
 }
+
+/** 987、1.2k、15k。 */
+fun formatTokens(n: Int): String = when {
+    n < 1000 -> n.toString()
+    n < 10_000 -> "${n / 1000}.${(n % 1000) / 100}k"
+    else -> "${n / 1000}k"
+}
+
+/** 朗读用的文字：去掉 Markdown 符号，只留人话。 */
+fun speechText(markdown: String): String = parseMarkdown(markdown).joinToString("\n") { block ->
+    fun inl(list: List<MdInline>) = list.joinToString("") { when (it) { is MdInline.Text -> it.text; is MdInline.Bold -> it.text; is MdInline.Italic -> it.text; is MdInline.Code -> it.text; is MdInline.Link -> it.label } }
+    when (block) {
+        is MdBlock.Heading -> inl(block.inlines)
+        is MdBlock.Paragraph -> inl(block.inlines)
+        is MdBlock.Bullets -> block.items.joinToString("\n") { inl(it) }
+        is MdBlock.Numbered -> block.items.joinToString("\n") { inl(it) }
+        is MdBlock.Quote -> inl(block.inlines)
+        is MdBlock.Code -> ""
+        MdBlock.Rule -> ""
+    }
+}.lines().filter { it.isNotBlank() }.joinToString("\n")

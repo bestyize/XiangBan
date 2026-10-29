@@ -388,4 +388,53 @@ class RemoteChatTest {
         val revision = sent.first { it.contains("message.send") }
         assertTrue(revision.contains("只整理图片") && revision.contains("todo"), revision)
     }
+
+    @Test
+    fun `usage, truncation, undo, models and saving to the library`() = runTest {
+        val link = createLink()
+        val sent = mutableListOf<String>()
+        link.sendObserverForTest = { _, data -> sent += data.decodeToString() }
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"sessions.page","id":"1","items":[{"id":"s_1","title":"整理","updated_at":1,"state":"idle"}]}""".encodeToByteArray()))
+        suspend fun event(kind: String, data: String) = link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"e","session":"s_1","kind":"$kind","data":$data}""".encodeToByteArray()))
+        event("text.delta", """{"text":"写好了"}""")
+        event("usage", """{"prompt":1200,"completion":300}""")
+        event("usage", """{"prompt":100,"completion":40}""")
+        event("truncated", "{}")
+        event("turn.done", "{}")
+        event("checkpoint", """{"run_id":"r1","files":["a.txt","b.txt"],"count":2}""")
+        var turn = controller.state.value.messages.last()
+        assertEquals(1300 to 340, turn.promptTokens to turn.completionTokens)
+        assertTrue(turn.truncated)
+        assertEquals(RunCheckpoint("r1", 2, listOf("a.txt", "b.txt")), turn.checkpoint)
+
+        sent.clear()
+        controller.undoRun("r1")
+        assertEquals("undoing", controller.state.value.messages.last().checkpoint?.state)
+        assertTrue(sent.single().contains("\"t\":\"run.undo\"") && sent.single().contains("\"run_id\":\"r1\""))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"run.undo","id":"2","ok":true,"session":"s_1","run_id":"r1","restored":["a.txt"],"removed":["b.txt"],"failed":[]}""".encodeToByteArray()))
+        turn = controller.state.value.messages.last()
+        assertEquals("undone", turn.checkpoint?.state)
+        assertTrue(turn.checkpoint!!.message.contains("恢复 1 个") && turn.checkpoint!!.message.contains("删除 1 个"))
+
+        controller.fetchModels()
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"models.list","id":"3","ok":true,"models":[{"provider":"p1","provider_name":"服务一","id":"m1","name":"模型一"},{"provider":"p1","id":"m2"}],"current":{"provider":"p1","model":"m1"}}""".encodeToByteArray()))
+        assertEquals(listOf("m1", "m2"), controller.state.value.models.map { it.id })
+        assertEquals("m1", controller.state.value.currentModel)
+        controller.setModel("p1", "m2")
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"session.model","id":"4","ok":true,"session":"s_1","provider":"p1","model":"m2"}""".encodeToByteArray()))
+        assertEquals("m2", controller.state.value.currentModel)
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"session.model","id":"5","ok":false,"error":"这个对话还在回答"}""".encodeToByteArray()))
+        assertEquals("这个对话还在回答", controller.state.value.error)
+
+        sent.clear()
+        controller.saveToLibrary(controller.state.value.messages.last())
+        val request = sent.single()
+        assertTrue(request.contains("\"t\":\"library.save\"") && request.contains("写好了"), request)
+        val ref = Regex("\"id\":\"([^\"]+)\"").find(request)!!.groupValues[1]
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"library.save","id":"6","ref":"$ref","ok":true,"item":"x"}""".encodeToByteArray()))
+        assertTrue(controller.state.value.messages.last().id in controller.state.value.savedTurns)
+    }
 }

@@ -570,14 +570,23 @@ pub struct SaveInput {
 #[tauri::command]
 pub fn library_save(app: tauri::AppHandle, window: tauri::WebviewWindow, item: SaveInput) -> Result<String, String> {
     let source = match window.label() { "control" => "main", crate::float_assistant::LABEL => "assistant", _ => return Err("这个窗口不能存到资料库".into()) };
+    save_item(&app, source, item)
+}
+
+/// 手机上点“存到资料库”：只存回答文字，来源记为 phone。
+pub(crate) fn remote_save(app: &tauri::AppHandle, title: &str, text: &str, session_id: Option<String>, session_title: &str) -> Result<String, String> {
+    save_item(app, "phone", SaveInput { kind: "answer".into(), title: title.into(), text: text.into(), session_id, session_title: session_title.into() })
+}
+
+fn save_item(app: &tauri::AppHandle, source: &str, item: SaveInput) -> Result<String, String> {
     if !["answer", "text", "file", "image", "shot"].contains(&item.kind.as_str()) { return Err("不支持这种收藏".into()); }
     let text = item.text.trim().to_string();
     if text.is_empty() || text.len() > 200_000 { return Err("要收藏的内容是空的或太长".into()); }
     let title: String = if item.title.trim().is_empty() { text.lines().next().unwrap_or("").chars().take(40).collect() } else { item.title.trim().chars().take(80).collect() };
-    let (id, _) = change(&app, |library, _| {
+    let (id, _) = change(app, |library, _| {
         // Saving the same answer twice keeps one.
         if let Some(existing) = library.saved.iter().find(|s| s.kind == item.kind && s.text == text && s.session_id == item.session_id) { return Ok(existing.id.clone()); }
-        let id = new_id(&app);
+        let id = new_id(app);
         library.saved.insert(0, Saved { id: id.clone(), kind: item.kind, title, text, session_id: item.session_id, session_title: item.session_title.chars().take(80).collect(), source: source.into(), saved_ms: now_ms() });
         Ok(id)
     })?;

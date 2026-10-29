@@ -5,6 +5,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.speech.tts.TextToSpeech
+import java.util.Locale
 import android.util.Base64
 import org.json.JSONObject
 import xyz.xiangban.xiaoban.business.communitynative.PlatformActions
@@ -52,6 +54,30 @@ class AndroidPlatformActions(private val context: Context) : PlatformActions {
             putExtra(Intent.EXTRA_TEXT, "$title $url")
         }
         context.startActivity(Intent.createChooser(send, title).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
+    private var ttsWaiting: String? = null
+
+    override fun speak(text: String): Boolean {
+        val line = text.take(3900)
+        val engine = tts ?: TextToSpeech(context.applicationContext) { status ->
+            ttsReady = status == TextToSpeech.SUCCESS
+            if (ttsReady) {
+                tts?.language = Locale.CHINA
+                ttsWaiting?.let { tts?.speak(it, TextToSpeech.QUEUE_FLUSH, null, "xiaoban") }
+            }
+            ttsWaiting = null
+        }.also { tts = it }
+        if (!ttsReady) { ttsWaiting = line; return true }
+        engine.speak(line, TextToSpeech.QUEUE_FLUSH, null, "xiaoban")
+        return true
+    }
+
+    override fun stopSpeaking() {
+        ttsWaiting = null
+        tts?.stop()
     }
 
     override fun openUrl(url: String) {

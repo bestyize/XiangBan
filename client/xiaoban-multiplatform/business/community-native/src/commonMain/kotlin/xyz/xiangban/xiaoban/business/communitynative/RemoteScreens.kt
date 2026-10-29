@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -45,6 +46,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -195,6 +197,14 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     val uiScope = rememberCoroutineScope()
     var follow by remember { mutableStateOf(true) }
     var adjust by remember { mutableStateOf(false) }
+    var modelSheet by remember { mutableStateOf(false) }
+    val openModels: () -> Unit = {
+        when {
+            remote.selectedSessionId == null -> toast = "先发一条消息开始对话，之后就能切换模型"
+            remote.sending -> toast = "小伴正在回答，停下后再切换模型"
+            else -> { env.remoteChat.fetchModels(); modelSheet = true }
+        }
+    }
     var adjustSteps by remember { mutableStateOf(emptyList<String>()) }
     BackHandler(enabled = drawer) { drawer = false }
 
@@ -202,6 +212,9 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
         if (remote.peers.none { it.id == activePeer }) env.remoteChat.refreshPeers()
         if (env.remoteChat.state.value.selectedPeerId != activePeer) env.remoteChat.selectPeer(activePeer)
     }
+
+    // 打开对话后读一下电脑上的模型，输入框上的模型名才对得上。
+    LaunchedEffect(remote.selectedSessionId, online) { if (online && remote.selectedSessionId != null) env.remoteChat.fetchModels() }
 
     val current = remote.selectedSession
     val lastTurn = remote.messages.lastOrNull()
@@ -244,6 +257,8 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                         adjustSteps = lastTurn?.let { turn -> taskPlan(turn.tools)?.steps?.filter { !it.done }?.map { it.content } }.orEmpty()
                         adjust = true
                     },
+                    savedTurns = remote.savedTurns, onSave = env.remoteChat::saveToLibrary, onUndo = env.remoteChat::undoRun,
+                    onSwitchModel = openModels,
                 )
             }
 
@@ -274,8 +289,9 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                     )
                 }
                 ChatComposer(
-                    input, { input = it }, if (online) "对设备上的小伴说点什么…" else "设备不在线，上线后可继续对话", "跟随电脑",
-                    onModel = { toast = "选择模型即将支持，目前沿用设备上的设置" },
+                    input, { input = it }, if (online) "对设备上的小伴说点什么…" else "设备不在线，上线后可继续对话",
+                    remote.models.firstOrNull { it.id == remote.currentModel }?.name ?: remote.currentModel.ifBlank { "跟随电脑" },
+                    onModel = openModels,
                     onAttach = { attach = true },
                     onWeb = { toast = "联网搜索即将支持" },
                     onVoice = { toast = "语音输入即将支持" },
@@ -309,6 +325,24 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                     )
                     GhostPillButton("取消", { permissionStep = 0 }, Modifier.padding(top = 8.dp).fillMaxWidth())
                 }
+            }
+        }
+        OverlayTransition(modelSheet) { panel ->
+            BottomSheet({ modelSheet = false }, panel) {
+                Text("这个对话用的模型", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text("只对当前这个对话生效，模型来自${peer?.name ?: "设备"}上已经配置好的服务。", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
+                    if (remote.models.isEmpty()) {
+                        Text("还没有读到可选的模型。请确认设备在线，并且在设备上配置过模型服务。", Modifier.padding(vertical = 12.dp), fontSize = 13.sp, lineHeight = 20.sp, color = LocalExtraColors.current.ink3)
+                    }
+                    remote.models.forEach { model ->
+                        RadioRow(
+                            selected = model.id == remote.currentModel, title = model.name, desc = model.providerName,
+                            onClick = { modelSheet = false; env.remoteChat.setModel(model.provider, model.id) },
+                        )
+                    }
+                }
+                GhostPillButton("取消", { modelSheet = false }, Modifier.padding(top = 8.dp).fillMaxWidth())
             }
         }
         OverlayTransition(adjust) { panel ->
@@ -373,6 +407,10 @@ private fun RemoteMessages(
     onStop: () -> Unit,
     onSend: (String) -> Unit,
     onAdjust: () -> Unit,
+    savedTurns: Set<String>,
+    onSave: (RemoteTurn) -> Unit,
+    onUndo: (String) -> Unit,
+    onSwitchModel: () -> Unit,
 ) {
     val last = messages.lastOrNull()
     val lastUserText = messages.lastOrNull { it.role == "user" }?.text
@@ -396,22 +434,41 @@ private fun RemoteMessages(
         }
         return
     }
-    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        items(messages, key = { it.id }) { turn ->
-            if (turn.role == "user") {
-                UserBubble(turn.text)
-            } else {
-                val again = if (turn === last && !turn.streaming && lastUserText != null) ({ onSend(lastUserText) }) else null
-                val waiting = if (turn.streaming && pending != null) (if (pending.isQuestion) "question" else "approval") else null
-                AssistantRow {
-                    AssistantTurnCards(
-                        text = turn.text, streaming = turn.streaming, error = turn.error, reasoning = turn.reasoning, tools = turn.tools, records = turn.records,
-                        waiting = waiting, platform = platform, idleText = "电脑正在处理…", onStop = onStop, onSend = onSend,
-                        onRetry = if (turn.error != null && turn.error != TurnCancelled) again else null, onRegenerate = again,
-                        onAdjust = if (turn === last) onAdjust else null,
+    Box(Modifier.fillMaxSize()) {
+        LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(messages, key = { it.id }) { turn ->
+                if (turn.role == "user") {
+                    UserBubble(turn.text, images = turn.images)
+                } else {
+                    val isLast = turn === last
+                    val again = if (isLast && !turn.streaming && lastUserText != null) ({ onSend(lastUserText) }) else null
+                    val waiting = if (turn.streaming && pending != null) (if (pending.isQuestion) "question" else "approval") else null
+                    val failed = turn.error != null && turn.error != TurnCancelled
+                    val extras = TurnExtras(
+                        promptTokens = turn.promptTokens, completionTokens = turn.completionTokens,
+                        truncated = turn.truncated && isLast, onContinue = if (isLast) ({ onSend("继续") }) else null,
+                        checkpoint = turn.checkpoint, onUndo = onUndo,
+                        onSave = if (turn.text.isNotBlank() && !turn.streaming) ({ onSave(turn) }) else null, saved = turn.id in savedTurns,
+                        onSwitchModel = if (isLast && failed) onSwitchModel else null,
                     )
+                    AssistantRow {
+                        AssistantTurnCards(
+                            text = turn.text, streaming = turn.streaming, error = turn.error, reasoning = turn.reasoning, tools = turn.tools, records = turn.records,
+                            waiting = waiting, platform = platform, idleText = "电脑正在处理…", onStop = onStop, onSend = onSend,
+                            onRetry = if (failed) again else null, onRegenerate = again,
+                            onAdjust = if (isLast) onAdjust else null, extras = extras,
+                        )
+                    }
                 }
             }
+        }
+        // 往上翻之后，右下角一个“回到最新”。
+        if (!follow && listState.canScrollForward) {
+            Box(
+                Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = 12.dp).size(40.dp).shadow(4.dp, CircleShape).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface).clickable { onFollow(true) },
+                contentAlignment = Alignment.Center,
+            ) { XIcon(XIcons.ChevronDown, size = 20.dp, description = "回到最新") }
         }
     }
 }
