@@ -1,6 +1,6 @@
 # 论坛设计方案（草案）
 
-状态：一期（网页论坛，对应 M1）已实现于 [services/server-forum](../../services/server-forum/README.md)，未部署；App 放到二期。站点名「超级小伴」，域名 `chat.xiangban.xyz`。
+状态：一期网页论坛已实现于 [services/server-forum](../../services/server-forum/README.md)，历史记录显示 2026-10-11 已部署；当前线上状态需核实。移动端已实现原生社区界面，具体范围以多端 App README 为准。站点名「超级小伴」，域名 `chat.xiangban.xyz`。
 
 ## 1. 定位
 
@@ -101,7 +101,7 @@
 
 按仓库默认选型，新建 `services/server-forum`：
 
-- 后端：Rust Axum + PostgreSQL（sqlx），结构参考 `server-account` 和 `server-xiangban-wallpaper`
+- 后端：Rust Axum + PostgreSQL（sqlx），结构参考 `server-account` 和 `server-xiaoban`
 - 前端：Vue 3 + Vite，构建产物用 rust-embed 嵌进二进制，单进程部署
 - 鉴权：前端在浏览器里用账号中心验证码登录，拿到 access token 直接调论坛接口；论坛后端用 JWKS 验签（`iss`、`aud = forum-web`），和壁纸站一样。首次登录在本地 `users` 表建档
 - 昵称头像：账号中心是权威数据，论坛本地缓存一份用于列表展示，每次登录刷新

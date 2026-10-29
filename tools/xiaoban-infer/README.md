@@ -48,4 +48,4 @@ cargo test --release && cargo build --release
 | `silero_vad.onnx` | pipecat-ai 1.13.0 发布包 `pipecat/audio/vad/data/silero_vad.onnx` | 2327524 | `1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3` |
 | `smart-turn-v3.2.onnx` | pipecat-ai 1.13.0 发布包 `pipecat/audio/turn/smart_turn/data/smart-turn-v3.2-cpu.onnx`（改名） | 8679182 | `2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f` |
 
-模型的大小与 SHA-256 写死在 `client/xiaoban-desktop-wallpaper/src-tauri/src/asr/engine.rs` 和 `src-tauri/src/voice_turn/mod.rs`，下载后逐一校验。引擎文件可同时放一份到备用源 `https://wallpaper.xiangban.xyz/app-packages/`。模型许可见 [MODELS.md](MODELS.md)。
+模型的大小与 SHA-256 写死在 `client/xiaoban-desktop/src-tauri/src/asr/engine.rs` 和 `src-tauri/src/voice_turn/mod.rs`，下载后逐一校验。引擎文件可同时放一份到备用源 `https://wallpaper.xiangban.xyz/app-packages/`。模型许可见 [MODELS.md](MODELS.md)。

@@ -64,8 +64,8 @@ Interrupted --原契约允许自动恢复，且无未知动作--> Running（启�
 
 ```sh
 cargo test --manifest-path libs/agent-kernel/Cargo.toml --features journal
-cargo test --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml chat:: --locked
-cd client/xiaoban-desktop-wallpaper
+cargo test --manifest-path client/xiaoban-desktop/src-tauri/Cargo.toml chat:: --locked
+cd client/xiaoban-desktop
 npm ci
 npx vue-tsc --noEmit
 npx vitest run src/ui/chat/ChatGoalPanel.test.ts src/ui/pages/ChatPage.test.ts

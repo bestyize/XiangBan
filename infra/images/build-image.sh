@@ -3,7 +3,7 @@
 # CI（BuildXiaoBanWallpaper 的“服务端镜像”任务）和本地用同一个脚本。
 #
 # 用法：infra/images/build-image.sh <服务编号> <输出目录> [镜像标签]
-#   服务编号见 services.json（account、ai、forum、link、market、appstore、resource、wallpaper-collect、api、web）
+#   服务编号见 services.json（account、ai、forum、link、market、resource、wallpaper-collect）
 #   镜像标签默认取当前提交的前 12 位
 # 环境变量：
 #   STAGE_ONLY=1       只编译并装配上下文，不调用 docker（本机没有 docker 时验证用）

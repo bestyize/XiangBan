@@ -84,22 +84,6 @@ services:
       - backend
       - frontend
 
-  web:
-    image: xiaban-web:latest
-    build:
-      context: ..
-      dockerfile: client/xiaban-web/Dockerfile
-      args:
-        VITE_PUBLIC_URL: ${PUBLIC_BASE_URL:-https://${XIABAN_DOMAIN:?Set XIABAN_DOMAIN in the server-side .env file}}
-        VITE_DATA_OVERSEAS: ${VITE_DATA_OVERSEAS:-true}
-    restart: unless-stopped
-    depends_on:
-      - server
-    ports:
-      - "${WEB_BIND_ADDRESS:-127.0.0.1}:18080:80"
-    networks:
-      - frontend
-
 volumes:
   postgres_data:
   redis_data:

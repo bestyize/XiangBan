@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "小伴",
+  "version": "3.0.0",
+  "identifier": "xyz.xiaban.desktop-wallpaper",
+  "build": {
+    "beforeDevCommand": "npm run computer-use:prepare && npm run dev",
+    "beforeBuildCommand": "node scripts/generate-icon.mjs && npm run computer-use:prepare && npm run build",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "macOSPrivateApi": true,
+    "windows": [{
+      "label": "control", "title": "小伴桌面", "width": 1280, "height": 800,
+      "minWidth": 960, "minHeight": 600, "center": true, "visible": false
+    }],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: http://localhost:* http://127.0.0.1:* data: blob: wallpaper-asset: http://wallpaper-asset.localhost game-pack: http://game-pack.localhost; media-src 'self' https: http://localhost:* http://127.0.0.1:* blob: wallpaper-asset: http://wallpaper-asset.localhost; frame-src 'self' design-preview: http://design-preview.localhost wallpaper-asset: http://wallpaper-asset.localhost game-pack: http://game-pack.localhost; connect-src 'self' ipc: http://ipc.localhost wallpaper-asset: http://wallpaper-asset.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420"
+    }
+  },
+  "plugins": {
+    "deep-link": { "desktop": { "schemes": ["xiaoban"] } }
+  },
+  "bundle": {
+    "active": false,
+    "resources": {
+      "resources/computer-use/": "agent-tools/computer-use/"
+    },
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "windows": { "webviewInstallMode": { "type": "downloadBootstrapper" } }
+  }
+}

@@ -12,6 +12,8 @@
 
 先阅读根目录 README.md，再阅读本次修改涉及的子项目 README.md，确认职责、实现状态、依赖边界和验证命令。
 
+涉及产品名称、项目归属或历史标识时，查阅根目录 [项目名称与术语](TERMINOLOGY.md)，避免混淆桌面应用、官网、市场和兼容标识。
+
 客户端允许重复实现，按任务决定是否复用。接口库保持协议兼容，业务策略归后端。目录迁移时同时检查构建、测试、部署和文档路径。
 
 **云服务器部署规范**：云服务器性能较差、资源有限，编译耗时极长。凡遇到需要部署到云服务器上的服务时，**一律优先在本地编译/构建好产物**（如二进制执行文件、前端静态资源包或 Docker 镜像），再上传或同步至云服务器，严禁在远端直接执行大型编译任务。
@@ -49,7 +51,7 @@
 
 # 界面约定
 
-- 修改小伴桌面控制台（`client/xiaoban-desktop-wallpaper/src/ui`）里的菜单、弹窗、卡片前，先读 [`client/xiaoban-desktop-wallpaper/docs/design-specs/ui-conventions.md`](client/xiaoban-desktop-wallpaper/docs/design-specs/ui-conventions.md)：菜单一项一行、说明放悬停提示、优先复用 `xb-menu` 共享类、颜色走 `--ui-*` 主题变量。
+- 修改小伴桌面控制台（`client/xiaoban-desktop/src/ui`）里的菜单、弹窗、卡片前，先读 [`client/xiaoban-desktop/docs/design-specs/ui-conventions.md`](client/xiaoban-desktop/docs/design-specs/ui-conventions.md)：菜单一项一行、说明放悬停提示、优先复用 `xb-menu` 共享类、颜色走 `--ui-*` 主题变量。
 
 ---
 
@@ -57,7 +59,7 @@
 
 - **桌面版设置、模型/服务商配置以及后续新增的复杂编辑、审查、预览界面，默认使用原生独立窗口**；禁止用内嵌遮罩、`NModal` 或全局焦点锁替代。
 - 保留系统标题栏，可移动、缩放、独立关闭，不阻塞主窗口。窗口外框必须适配当前显示器工作区并校正恢复位置；主题和保存结果跨窗口同步。
-- 小型重命名、删除确认可保留内嵌；浏览器预览可降级。实现遵守 `client/xiaoban-desktop-wallpaper/docs/design-specs/ui-conventions.md` 的“独立窗口”章节，优先复用 `configuration_window` 基础设施。
+- 小型重命名、删除确认可保留内嵌；浏览器预览可降级。实现遵守 `client/xiaoban-desktop/docs/design-specs/ui-conventions.md` 的“独立窗口”章节，优先复用 `configuration_window` 基础设施。
 
 ---
 

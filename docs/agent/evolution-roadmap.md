@@ -158,7 +158,7 @@ libs/
     ├── evaluation.rs          # 对照试验与改进判定
     └── storage/               # 可替换存储接口/SQLite 适配
 
-client/xiaoban-desktop-wallpaper/src-tauri/src/
+client/xiaoban-desktop/src-tauri/src/
 ├── chat/                       # [已有] 当前聊天业务，不必一次搬迁
 ├── agent_runtime/              # [建议整理] 宿主逻辑模块，先非独立 crate
 │   ├── mod.rs                  # 模块装配/生命周期

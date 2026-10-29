@@ -42,7 +42,7 @@ test('Cargo development launch runs a signed app bundle, including paths with sp
   mkdirSync(path.join(root, 'src'));
   writeFileSync(path.join(root, 'Cargo.toml'), '[package]\nname="signed-launch-fixture"\nversion="0.1.0"\nedition="2021"\n');
   writeFileSync(path.join(root, 'src/main.rs'), 'fn main() { println!("signed dev launch works"); }');
-  const scripts = fileURLToPath(new URL('../../client/xiaoban-desktop-wallpaper/scripts/', import.meta.url));
+  const scripts = fileURLToPath(new URL('../../client/xiaoban-desktop/scripts/', import.meta.url));
   const result = execFileSync('cargo', ['run', '--offline', '--quiet', '--manifest-path', path.join(root, 'Cargo.toml')], {
     encoding: 'utf8', timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, CARGO_TARGET_DIR: path.join(root, 'target'), PATH: scripts + path.delimiter + process.env.PATH,

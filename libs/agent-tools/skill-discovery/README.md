@@ -47,7 +47,7 @@ SkillHub API 文档：https://github.com/Tencent/skillhub/blob/main/docs/api/REA
 在可运行 Rust 的环境中分别执行：
 
     cargo test --manifest-path libs/agent-tools/skill-discovery/Cargo.toml
-    cargo test --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml --locked
+    cargo test --manifest-path client/xiaoban-desktop/src-tauri/Cargo.toml --locked
 
 ## 技能目录检索
 

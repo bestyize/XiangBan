@@ -13,8 +13,8 @@
 - `src/lib.rs`：工具、真实用户关键词上下文、项目校验、版本检查、创建去重、会话关联、历史与恢复草稿。
 - `src/archive.rs`：有大小限制的 ZIP 源包导入导出、独立 HTML 预览导出。
 - `runtime/support.js`：独立实现的 DC HTML 兼容运行时子集，不使用 Anthropic 的 support.js。
-- `client/xiaoban-desktop-wallpaper/src-tauri/src/design.rs`：主窗口命令、原生文件选择、专用预览响应。
-- `client/xiaoban-desktop-wallpaper/src/ui/design/`：多画板画布、选择/抓手/Play、属性、源码、批注、撤销重做、历史和冲突处理。
+- `client/xiaoban-desktop/src-tauri/src/design.rs`：主窗口命令、原生文件选择、专用预览响应。
+- `client/xiaoban-desktop/src/ui/design/`：多画板画布、选择/抓手/Play、属性、源码、批注、撤销重做、历史和冲突处理。
 
 生命周期：create 立即保存 draft（允许缺少页面），逐页 save 为 generating，complete 检查源文件与本地引用后变为 ready，failed 保留受阻现场。缺失画板显示占位；Agent 停止前对本轮未完成写入最多续行 4 次、无进展最多 2 次，避免假交付与无限重试。每条聊天/队列消息固定提交时的设计稿编号，跨会话打开同源，copy 创建独立副本，delete 要求最新 revision。
 

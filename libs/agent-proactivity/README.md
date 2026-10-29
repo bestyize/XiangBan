@@ -25,7 +25,7 @@
 
 ## 桌面接入
 
-`client/xiaoban-desktop-wallpaper/src-tauri/src/proactivity.rs` 是宿主适配层：
+`client/xiaoban-desktop/src-tauri/src/proactivity.rs` 是宿主适配层：
 复用 `presence_tick` 的首次活跃/归来/深夜事件，只保存聚合计数。
 Stage II 进一步把宠物 hit-test 的悬停和点击接入本模块；**只有用户手动开启
 「桌面宠物 → 桌面伙伴 → 主动陪伴」后**，宿主才可能调用 `consider` 授权展示
@@ -40,7 +40,7 @@ Stage II 进一步把宠物 hit-test 的悬停和点击接入本模块；**只�
 
 ```sh
 cargo test --manifest-path libs/agent-proactivity/Cargo.toml
-cargo check --locked --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml
+cargo check --locked --manifest-path client/xiaoban-desktop/src-tauri/Cargo.toml
 ```
 
 测试覆盖默认禁用、授权、游戏与全屏、频控、跨日与时钟回拨、话题去重、反馈幂等、

@@ -4,8 +4,8 @@ import unittest
 from pathlib import Path
 
 SKILL = Path(__file__).resolve().parents[1]
-DOCS = SKILL.parents[2] / "client" / "xiaoban-desktop-wallpaper" / "docs"
-FILES = ["resource-pack-format.md", "effects.md", "effect-pack-example.json"]
+DOCS = SKILL.parents[2] / "client" / "xiaoban-desktop" / "docs"
+FILES = ["resource-pack-format.md", "effects.md", "effect-pack-example.json", "pets.md"]
 EXAMPLE = ["manifest.json", "index.html", "game.js"]
 
 
@@ -16,7 +16,7 @@ class ReferencesInSync(unittest.TestCase):
             self.assertEqual(
                 (SKILL / "references" / name).read_bytes(),
                 (DOCS / name).read_bytes(),
-                f"{name} differs from client/xiaoban-desktop-wallpaper/docs; copy it over again",
+                f"{name} differs from client/xiaoban-desktop/docs; copy it over again",
             )
 
     def test_the_desktop_game_example_matches(self):

@@ -10,7 +10,7 @@ name: BuildXiaoBanWallpaper
 #
 # 二、服务端镜像 → 单独的 GitHub Release server-<UTC 时间>-<提交前 7 位>（每次运行一个，只保留最近 5 个）
 #   servers  要打包的服务编号，逗号分隔，或 all；留空不打包。编号见 infra/images/services.json：
-#            account、ai、forum、link、market、appstore、resource、wallpaper-collect、api、web
+#            account、ai、forum、link、market、resource、wallpaper-collect
 #   每个服务产出 <镜像>-<标签>.tar.gz（docker load 用）和 <镜像>-<标签>-bundle.tar.gz（二进制 + 前端，非 Docker 主机用），
 #   外加 SHA256SUMS 和 manifest.json（服务、镜像标签、文件、校验和、部署文档位置）。
 #   拿到 Release 后怎么更新线上服务：docs/deployment/RELEASE_AND_DEPLOY.md
@@ -32,7 +32,7 @@ on:
         type: boolean
         default: true
       servers:
-        description: 要打包的服务端镜像（编号逗号分隔，或 all；留空不打包）。可选 account、ai、forum、link、market、appstore、resource、wallpaper-collect、api、web
+        description: 要打包的服务端镜像（编号逗号分隔，或 all；留空不打包）。可选 account、ai、forum、link、market、resource、wallpaper-collect
         type: string
         default: ''
 
@@ -103,7 +103,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          version=$(node -p "require('./client/xiaoban-desktop-wallpaper/src-tauri/tauri.conf.json').version")
+          version=$(node -p "require('./client/xiaoban-desktop/src-tauri/tauri.conf.json').version")
           tag="xiaoban-wallpaper-v$version"
           if ! gh release view "$tag" -R "$GH_REPO" > /dev/null 2>&1; then
             gh release create "$tag" -R "$GH_REPO" --target "$GITHUB_SHA" --title "小伴 $version" \
@@ -119,18 +119,18 @@ jobs:
     timeout-minutes: 45
     defaults:
       run:
-        working-directory: client/xiaoban-desktop-wallpaper
+        working-directory: client/xiaoban-desktop
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: client/xiaoban-desktop-wallpaper/package-lock.json
+          cache-dependency-path: client/xiaoban-desktop/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: client/xiaoban-desktop-wallpaper/src-tauri
+          workspaces: client/xiaoban-desktop/src-tauri
       - name: Install dependencies
         run: npm ci
       - name: Verify NSIS-only one-click release contract
@@ -176,20 +176,20 @@ jobs:
     timeout-minutes: 45
     defaults:
       run:
-        working-directory: client/xiaoban-desktop-wallpaper
+        working-directory: client/xiaoban-desktop
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: client/xiaoban-desktop-wallpaper/package-lock.json
+          cache-dependency-path: client/xiaoban-desktop/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: client/xiaoban-desktop-wallpaper/src-tauri
+          workspaces: client/xiaoban-desktop/src-tauri
       - name: Install dependencies
         run: npm ci
       - name: Validate custom DMG instructions

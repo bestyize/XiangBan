@@ -1,0 +1,96 @@
+[package]
+name = "xiaoban-desktop"
+version = "3.0.0"
+description = "小伴：Windows / macOS 悬浮桌宠与动态壁纸"
+edition = "2021"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "native-tls-no-alpn"] }
+sha2 = "0.10"
+tungstenite = { version = "=0.28.0", default-features = false, features = ["handshake", "native-tls"] }
+semver = "1"
+url = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-deep-link = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-global-shortcut = "=2.4.1"
+dirs = "6"
+chrono = { version = "0.4", features = ["clock", "serde"] }
+getrandom = "0.3"
+agent-computer-use-tools = { path = "../../../libs/agent-tools/computer-use" }
+agent-phone-use-tools = { path = "../../../libs/agent-tools/phone-use" }
+open-claude-design = { path = "../../../libs/agent-tools/open-claude-design" }
+agent-file-tools = { path = "../../../libs/agent-tools/files" }
+agent-learning = { path = "../../../libs/agent-learning" }
+agent-proactivity = { path = "../../../libs/agent-proactivity" }
+agent-connector-tools = { path = "../../../libs/agent-tools/connectors" }
+agent-skill-discovery = { path = "../../../libs/agent-tools/skill-discovery" }
+xiaoban-community = { path = "../../../libs/community-packs" }
+xiaoban-link-client = { path = "../../../libs/link-client" }
+xiaoban-voice-service = { path = "../../../libs/voice-service", default-features = false }
+agent-bridge = { package = "xiaoban-agent-bridge", path = "../../../libs/agent-bridge" }
+async-trait = "0.1"
+tokio = { version = "1", features = ["rt", "sync", "time"] }
+agent-kernel = { path = "../../../libs/agent-kernel", features = ["native-tls", "fs", "skills", "memory", "web", "shell", "mcp", "process", "journal", "sandbox"] }
+zip = { version = "=9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+  "Win32_Foundation", "Win32_UI_Controls", "Win32_UI_WindowsAndMessaging",
+  "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_Graphics_Imaging", "Win32_System_JobObjects", "Win32_Security"
+] }
+windows-version = "0.1.7"
+windows-registry = "0.6.1"
+windows-sys = { version = "0.61", features = [
+  "Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_System_SystemInformation", "Win32_UI_Shell",
+  "Win32_System_Memory", "Win32_System_Threading", "Win32_System_StationsAndDesktops",
+  "Win32_UI_Controls", "Win32_System_Diagnostics_Debug", "Win32_Graphics_Dwm"
+] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+tauri-plugin-autostart = "2"
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+  "std", "NSApplication", "NSWindow", "NSView", "NSScreen", "NSEvent", "NSColor", "NSAppearance", "objc2-core-foundation"
+] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry"] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = [
+  "std", "CFArray", "CFDictionary", "CFString", "CFNumber"
+] }
+objc2-core-graphics = { version = "0.3", default-features = false, features = [
+  "std", "CGWindow", "CGWindowLevel"
+] }
+
+[profile.dev]
+debug = false
+incremental = false
+strip = "debuginfo"
+
+[profile.dev.package."*"]
+debug = false
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = true
+# Unwind, not abort: a panic in one tool thread or command must not take the wallpaper, pets and every chat down with it.
+panic = "unwind"
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+tokio = { version = "1", features = ["macros", "rt"] }
+
+
+

@@ -62,7 +62,7 @@ const DEFAULT_CLIENTS: &[(&str, &str)] = &[
     ("xiaban-web", "相伴网页"),
     ("xiaban-api", "相伴主 API"),
     ("xiangban-wallpaper-web", "小伴壁纸网站"),
-    ("xiaoban-desktop-wallpaper", "小伴桌面壁纸"),
+    ("xiaoban-desktop-wallpaper", "小伴桌面"),
     ("xiaoban-mobile-wallpaper", "小伴手机壁纸"),
     ("xiaoban-android", "小伴手机应用"),
 ];
