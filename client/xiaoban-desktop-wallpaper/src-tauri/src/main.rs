@@ -24,6 +24,7 @@ mod ai_gateway;
 mod chat;
 mod community;
 mod phone_link;
+mod phone_voice;
 mod phone_wire;
 mod speech_agent;
 mod voice_service;

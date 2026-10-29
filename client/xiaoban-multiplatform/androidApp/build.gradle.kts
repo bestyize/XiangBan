@@ -35,6 +35,8 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0.0"
+        // 手机只支持 64 位 ARM（arm64-v8a）：原生库只打这一种，其他 CPU 的包不装。
+        ndk { abiFilters += "arm64-v8a" }
     }
     packaging {
         resources {

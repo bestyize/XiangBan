@@ -2,6 +2,9 @@ package xyz.xiangban.xiaoban
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import kotlin.coroutines.Continuation
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 import android.Manifest
 import android.os.Build
 import androidx.activity.compose.setContent
@@ -19,7 +22,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val storage = SharedPrefsTokenStorage(this)
-        val platform = AndroidPlatformActions(this)
+        // 第一次录音时才弹麦克风权限；用户选完以后接着往下走。
+        var micWaiting: Continuation<Boolean>? = null
+        val micLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            micWaiting?.resume(granted)
+            micWaiting = null
+        }
+        val platform = AndroidPlatformActions(this) {
+            suspendCoroutine { continuation ->
+                micWaiting = continuation
+                micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            }
+        }
         val linkStorage = SharedPrefsLinkStorage(this)
         val remoteCache = SqliteRemoteCache(this)
         // 小伴要给你设提醒时才会弹出通知权限的请求；没有内核库（本地没编 Rust 库的调试包）就只有纯云端聊天。
@@ -29,8 +43,9 @@ class MainActivity : ComponentActivity() {
         }
         val agentBridge = nativeAgentBridgeOrNull()
         val agentDir = filesDir.resolve("agent").absolutePath
+        val speech = AndroidLocalSpeech(this)
         setContent {
-            App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders)
+            App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech)
         }
     }
 }

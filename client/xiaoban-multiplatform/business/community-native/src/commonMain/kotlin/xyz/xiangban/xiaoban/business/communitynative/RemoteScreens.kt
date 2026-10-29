@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -57,7 +58,11 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.taskPlan
 import xyz.xiangban.xiaoban.common.community.taskProgress
+import xyz.xiangban.xiaoban.common.community.CloudRecognizer
+import xyz.xiangban.xiaoban.common.community.SpokenCall
+import xyz.xiangban.xiaoban.common.link.DesktopRecognizer
 import xyz.xiangban.xiaoban.common.link.PeerSummary
+import xyz.xiangban.xiaoban.common.link.RemoteAssistant
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
 import xyz.xiangban.xiaoban.common.link.RemoteChatState
 import xyz.xiangban.xiaoban.common.link.folderName
@@ -195,6 +200,29 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     var follow by remember { mutableStateOf(true) }
     var adjust by remember { mutableStateOf(false) }
     var modelSheet by remember { mutableStateOf(false) }
+    // 语音：麦克风是“说完变成文字放进输入框”，波形键是“语音通话”。识别先用手机本地的 SenseVoice，不行再让电脑识别，最后云端。
+    val platform = env.platform
+    val voiceInput = rememberVoiceInput(
+        env, { env.recognizers(DesktopRecognizer(env.remoteChat), CloudRecognizer(env.ai)) },
+        onText = { text -> input = if (input.isBlank()) text else input.trimEnd() + " " + text },
+        onMessage = { toast = it },
+    )
+    val callHost = rememberVoiceCallHost(env)
+    val uiScopeForCall = uiScope
+    val startCall: () -> Unit = {
+        when {
+            platform == null -> toast = "这个平台暂不支持语音通话"
+            !online -> toast = "设备不在线，没法通话"
+            voiceInput.busy -> toast = "先结束当前的录音"
+            else -> callHost.request {
+                SpokenCall(
+                    uiScopeForCall, platform, RemoteAssistant(env.remoteChat),
+                    env.recognizers(DesktopRecognizer(env.remoteChat), CloudRecognizer(env.ai)), env.synthesizers(),
+                )
+            }
+        }
+    }
+    DisposableEffect(Unit) { onDispose { platform?.stopAudio() } }
     val openModels: () -> Unit = {
         when {
             remote.selectedSessionId == null -> toast = "先发一条消息开始对话，之后就能切换模型"
@@ -270,6 +298,15 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             }
 
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
+                if (voiceInput.busy) {
+                    VoiceBar(
+                        if (voiceInput.recording) "正在听… ${voiceInput.seconds / 60}:${(voiceInput.seconds % 60).toString().padStart(2, '0')}" else "正在识别…",
+                        recording = voiceInput.recording,
+                        hint = if (voiceInput.recording) "再点一下麦克风结束，文字会放进输入框" else null,
+                        onCancel = { voiceInput.finish(false) },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
                 if (showMini && liveProgress != null) {
                     TaskMiniBar(
                         liveProgress, modifier = Modifier.padding(bottom = 8.dp),
@@ -289,7 +326,8 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                     onModel = openModels,
                     onAttach = { attach = true },
                     onWeb = { toast = "联网搜索即将支持" },
-                    onVoice = { toast = "语音输入即将支持" },
+                    onVoice = { voiceInput.toggle() },
+                    onLive = startCall,
                     onSend = { val text = input.trim(); if (text.isNotEmpty()) { input = ""; env.remoteChat.send(text) } },
                     enabled = online, sending = remote.sending,
                 )
@@ -344,6 +382,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             AdjustPlanSheet(adjustSteps, onDismiss = { adjust = false }, onSubmit = { adjust = false; follow = true; env.remoteChat.revisePlan(it) }, panelModifier = panel)
         }
         OverlayTransition(attach) { panel -> AttachSheet({ attach = false }, { attach = false; toast = "$it 即将支持" }, panel) }
+        VoiceCallLayer(env, callHost, peer?.name ?: "设备", "语音通话") { toast = it }
         Toast(toast) { toast = null }
         OverlayTransition(drawer, direction = "left") { panel ->
             RemoteDrawer(

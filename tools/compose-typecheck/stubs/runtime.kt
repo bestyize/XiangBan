@@ -23,3 +23,6 @@ operator fun <T> MutableState<T>.setValue(thisObj: Any?, property: KProperty<*>,
 abstract class ProvidableCompositionLocal<T> { val current: T @Composable get() = TODO(); infix fun provides(v: T): Any = TODO() }
 fun <T> compositionLocalOf(defaultFactory: () -> T): ProvidableCompositionLocal<T> = TODO()
 @Composable fun CompositionLocalProvider(vararg values: Any, content: @Composable () -> Unit) {}
+interface DisposableEffectResult
+class DisposableEffectScope { fun onDispose(onDisposeEffect: () -> Unit): DisposableEffectResult = TODO() }
+@Composable fun DisposableEffect(key1: Any?, effect: DisposableEffectScope.() -> DisposableEffectResult) {}

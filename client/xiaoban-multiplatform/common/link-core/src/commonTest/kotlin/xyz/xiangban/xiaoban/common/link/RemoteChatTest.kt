@@ -437,4 +437,53 @@ class RemoteChatTest {
         link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"library.save","id":"6","ref":"$ref","ok":true,"item":"x"}""".encodeToByteArray()))
         assertTrue(controller.state.value.messages.last().id in controller.state.value.savedTurns)
     }
+
+    @OptIn(kotlin.io.encoding.ExperimentalEncodingApi::class)
+    @Test
+    fun `a recording goes up in pieces and the recognized text lands in the box or is sent and spoken`() = runTest {
+        val link = createLink()
+        val sent = mutableListOf<String>()
+        link.sendObserverForTest = { _, data -> sent += data.decodeToString() }
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"sessions.page","id":"1","items":[{"id":"s_1","title":"整理","updated_at":1,"state":"idle"}]}""".encodeToByteArray()))
+
+        sent.clear()
+        controller.sendVoice(ByteArray(200_000) { 1 }, speakReply = false)
+        assertEquals("recognizing", controller.state.value.voicePhase)
+        assertEquals(3, sent.size)
+        assertTrue(sent.all { it.contains("\"t\":\"voice.chunk\"") })
+        assertTrue(sent[0].contains("\"seq\":0") && sent[0].contains("\"last\":false") && sent[2].contains("\"last\":true"))
+        val voiceId = Regex("\"voice_id\":\"([^\"]+)\"").find(sent[0])!!.groupValues[1]
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"voice.text","id":"2","voice_id":"$voiceId","ok":true,"text":" 帮我整理下载文件夹 "}""".encodeToByteArray()))
+        assertEquals("帮我整理下载文件夹", controller.state.value.voiceText)
+        assertEquals("idle", controller.state.value.voicePhase)
+        controller.consumeVoiceText()
+        assertEquals(null, controller.state.value.voiceText)
+
+        // 对话模式：识别完自动发出去，并要求电脑把回答念出来
+        sent.clear()
+        controller.sendVoice(ByteArray(40_000) { 1 }, speakReply = true)
+        val second = Regex("\"voice_id\":\"([^\"]+)\"").find(sent[0])!!.groupValues[1]
+        sent.clear()
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"voice.text","id":"3","voice_id":"$second","ok":true,"text":"现在几点"}""".encodeToByteArray()))
+        assertTrue(sent.single().contains("\"t\":\"message.send\"") && sent.single().contains("\"speak\":true") && sent.single().contains("现在几点"), sent.toString())
+
+        // 电脑把回答念成语音分片发回来
+        val a = kotlin.io.encoding.Base64.encode(byteArrayOf(1, 2, 3))
+        val b = kotlin.io.encoding.Base64.encode(byteArrayOf(4, 5))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"voice.audio","id":"4","session":"s_1","audio_id":"a1","ok":true,"seq":0,"last":false,"mime":"audio/mpeg","data":"$a"}""".encodeToByteArray()))
+        assertEquals(null, controller.state.value.voiceClip)
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"voice.audio","id":"5","session":"s_1","audio_id":"a1","ok":true,"seq":1,"last":true,"mime":"audio/mpeg","data":"$b"}""".encodeToByteArray()))
+        assertEquals(listOf<Byte>(1, 2, 3, 4, 5), controller.state.value.voiceClip!!.bytes.toList())
+        controller.consumeVoiceClip()
+        assertEquals(null, controller.state.value.voiceClip)
+
+        // 识别失败：回到空闲并说明原因
+        controller.sendVoice(ByteArray(40_000) { 1 }, speakReply = false)
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"voice.text","id":"6","voice_id":"x","ok":false,"error":"电脑上还没有开启语音识别"}""".encodeToByteArray()))
+        assertEquals("idle", controller.state.value.voicePhase)
+        assertEquals("电脑上还没有开启语音识别", controller.state.value.error)
+    }
 }

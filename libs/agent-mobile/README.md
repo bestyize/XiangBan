@@ -40,4 +40,4 @@ AGENT_MOBILE_LIB=$PWD/target/debug/libagent_mobile.so  # 然后在 client/xiaoba
 
 ## 打包
 
-GitHub 工作流 `BuildXiaoBanWallpaper` 的 Android 任务用 `cargo-ndk` 编出 arm64-v8a、armeabi-v7a、x86_64 三个库，放进 `androidApp/src/main/jniLibs/`（已在 `.gitignore`）。本地没有这些库时，App 照常运行，只是没有智能体，退回纯云端聊天。
+GitHub 工作流 `BuildXiaoBanWallpaper` 的 Android 任务用 `cargo-ndk` 编出 arm64-v8a 的库（手机只支持 64 位 ARM），放进 `androidApp/src/main/jniLibs/`（已在 `.gitignore`）。本地没有这些库时，App 照常运行，只是没有智能体，退回纯云端聊天。

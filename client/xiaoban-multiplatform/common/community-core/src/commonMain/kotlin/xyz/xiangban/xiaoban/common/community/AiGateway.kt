@@ -2,7 +2,13 @@ package xyz.xiangban.xiaoban.common.community
 
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.timeout
+import io.ktor.client.request.forms.formData
+import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.statement.readRawBytes
+import io.ktor.http.Headers
+import io.ktor.http.isSuccess
 import io.ktor.client.request.preparePost
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsChannel
@@ -32,6 +38,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -185,6 +192,53 @@ class AiGatewayApi(
         if (clean.length > MAX_REDEEM_CODE_LEN) throw ApiException(400, "兑换码太长，请检查是否复制完整", "code_invalid")
         val body = buildJsonObject { put("code", clean) }.toString()
         return http.send(HttpMethod.Post, "/api/ai/redeem", AiRedeemed.serializer(), body = body, token = requireToken())
+    }
+
+    /** 云端语音识别：上传一段 WAV，返回识别出的文字。网关没开这项功能时抛 `transcribe_unavailable`。 */
+    suspend fun transcribe(wav: ByteArray, language: String = "zh"): String {
+        val token = requireToken()
+        val response = try {
+            client.submitFormWithBinaryData(
+                "$base/v1/audio/transcriptions",
+                formData {
+                    append("language", language)
+                    append("file", wav, Headers.build {
+                        append(HttpHeaders.ContentType, "audio/wav")
+                        append(HttpHeaders.ContentDisposition, "filename=\"speech.wav\"")
+                    })
+                },
+            ) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                timeout { requestTimeoutMillis = 60_000 }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw ApiException(0, "连接小伴 AI 服务失败，请检查网络后重试")
+        }
+        val text = response.bodyAsText()
+        if (!response.status.isSuccess()) throw parseApiError(response.status.value, text)
+        val heard = runCatching { CommunityJson.parseToJsonElement(text).jsonObject["text"]?.jsonPrimitive?.contentOrNull }.getOrNull()
+        return heard.orEmpty().trim()
+    }
+
+    /** 云端语音合成：一句话变成 MP3。网关没开这项功能时抛 `speech_unavailable`。 */
+    suspend fun speak(text: String): ByteArray {
+        val token = requireToken()
+        val response = try {
+            client.post("$base/v1/audio/speech") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(buildJsonObject { put("input", text.trim()) }.toString())
+                timeout { requestTimeoutMillis = 60_000 }
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            throw ApiException(0, "连接小伴 AI 服务失败，请检查网络后重试")
+        }
+        if (!response.status.isSuccess()) throw parseApiError(response.status.value, response.bodyAsText())
+        return response.readRawBytes()
     }
 
     internal suspend fun postChatRaw(body: String, onLine: suspend (String) -> Unit): ModelResult {

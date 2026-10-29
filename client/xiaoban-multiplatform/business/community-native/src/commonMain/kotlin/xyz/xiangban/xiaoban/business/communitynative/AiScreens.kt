@@ -35,6 +35,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +51,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.community.AiBalance
 import xyz.xiangban.xiaoban.common.community.ChatApproval
+import xyz.xiangban.xiaoban.common.community.CloudAssistant
+import xyz.xiangban.xiaoban.common.community.CloudRecognizer
+import xyz.xiangban.xiaoban.common.community.SpokenCall
 import xyz.xiangban.xiaoban.common.community.toolLabel
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalOption
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
@@ -259,6 +263,14 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     var drawer by rememberSaveable { mutableStateOf(false) }
     var attach by rememberSaveable { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
+    // 语音：麦克风把一句话变成文字放进输入框；波形键是语音通话。识别先用手机本地的 SenseVoice，不行再用云端；合成直连 Edge 朗读。
+    val voiceInput = rememberVoiceInput(
+        env, { env.recognizers(CloudRecognizer(env.ai)) },
+        onText = { text -> input = if (input.isBlank()) text else input.trimEnd() + " " + text },
+        onMessage = { toast = it },
+    )
+    val callHost = rememberVoiceCallHost(env)
+    val callScope = rememberCoroutineScope()
 
     LaunchedEffect(session.loggedIn) { if (session.loggedIn) chat.loadMeta() }
 
@@ -292,13 +304,33 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     }
                 }
                 Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
+                    if (voiceInput.busy) {
+                        VoiceBar(
+                            if (voiceInput.recording) "正在听… ${voiceInput.seconds / 60}:${(voiceInput.seconds % 60).toString().padStart(2, '0')}" else "正在识别…",
+                            recording = voiceInput.recording,
+                            hint = if (voiceInput.recording) "再点一下麦克风结束，文字会放进输入框" else null,
+                            onCancel = { voiceInput.finish(false) },
+                            modifier = Modifier.padding(bottom = 8.dp),
+                        )
+                    }
                     ChatComposer(
                         input, { input = it }, "问点什么，或描述想要的装扮、游戏…", cloud.modelName(),
                         onModel = { modelSheet = true },
                         onAttach = { attach = true },
                         onWeb = { toast = "联网搜索即将支持" },
-                        onVoice = { toast = "语音输入即将支持" },
-                        onLive = { toast = "实时对话即将支持" },
+                        onVoice = { voiceInput.toggle() },
+                        onLive = {
+                            val platform = env.platform
+                            when {
+                                platform == null -> toast = "这个平台暂不支持语音通话"
+                                !session.loggedIn -> toast = "请先登录小伴账号"
+                                cloud.sending -> toast = "小伴正在回答，稍后再通话"
+                                voiceInput.busy -> toast = "先结束当前的录音"
+                                else -> callHost.request {
+                                    SpokenCall(callScope, platform, CloudAssistant(chat), env.recognizers(CloudRecognizer(env.ai)), env.synthesizers())
+                                }
+                            }
+                        },
                         onSend = { val text = input.trim(); if (text.isNotEmpty()) { input = ""; chat.send(text) } },
                         sending = cloud.sending, onStop = chat::stop,
                     )
@@ -310,6 +342,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         }
         AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
         Toast(toast) { toast = null }
+        VoiceCallLayer(env, callHost, "小伴AI", "语音通话") { toast = it }
         OverlayTransition(modelSheet) { panel ->
             BottomSheet({ modelSheet = false }, panel) {
                 Text("选择模型", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
