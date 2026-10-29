@@ -2,7 +2,7 @@
 import { flushPromises, mount } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SpeechAgentSettings from './SpeechAgentSettings.vue';
-import { invoke } from '../../../bridge.ts';
+import { invoke, listen } from '../../../bridge.ts';
 
 vi.mock('../../../bridge.ts', async importOriginal => ({
   ...(await importOriginal<typeof import('../../../bridge.ts')>()),
@@ -16,6 +16,37 @@ const ipc = vi.mocked(invoke);
 describe('SpeechAgentSettings', () => {
   beforeEach(() => {
     ipc.mockReset();
+    vi.mocked(listen).mockReset().mockResolvedValue(() => {});
+  });
+
+  it('does not attach listeners or polling after the settings tab is closed during loading', async () => {
+    let finish!: (value: unknown) => void;
+    ipc.mockImplementation(command => command === 'speech_agent_env'
+      ? new Promise(resolve => { finish = resolve; })
+      : Promise.resolve(null));
+    const interval = vi.spyOn(globalThis, 'setInterval');
+    const wrapper = mount(SpeechAgentSettings);
+    wrapper.unmount();
+    finish(null);
+    await flushPromises();
+    expect(listen).not.toHaveBeenCalled();
+    expect(interval).not.toHaveBeenCalled();
+    interval.mockRestore();
+  });
+
+  it('removes a listener that finishes attaching after the tab is closed', async () => {
+    let finish!: (unlisten: () => void) => void;
+    const unlisten = vi.fn();
+    ipc.mockImplementation(command => Promise.resolve(
+      command === 'speech_agent_task_list' || command === 'speech_agent_install_guides' ? [] : null,
+    ));
+    vi.mocked(listen).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const wrapper = mount(SpeechAgentSettings);
+    await flushPromises();
+    wrapper.unmount();
+    finish(unlisten);
+    await flushPromises();
+    expect(unlisten).toHaveBeenCalledOnce();
   });
 
   it('renders environment status and allows hooks install and voice service toggle', async () => {
@@ -134,5 +165,6 @@ describe('SpeechAgentSettings', () => {
     await voiceToggle.trigger('click');
     await flushPromises();
     expect(ipc).toHaveBeenCalledWith('voice_service_set_enabled', { enabled: true, speechBroadcast: null });
+    wrapper.unmount();
   });
 });
