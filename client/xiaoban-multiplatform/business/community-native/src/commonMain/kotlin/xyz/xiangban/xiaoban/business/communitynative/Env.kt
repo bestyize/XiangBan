@@ -35,6 +35,9 @@ interface PlatformActions {
     fun copy(text: String)
     fun share(title: String, url: String)
     fun openUrl(url: String)
+    /** 朗读一段文字；平台不支持就返回 false。 */
+    fun speak(text: String): Boolean = false
+    fun stopSpeaking() {}
 }
 
 fun defaultLinkHttpClient(): HttpClient = HttpClient {

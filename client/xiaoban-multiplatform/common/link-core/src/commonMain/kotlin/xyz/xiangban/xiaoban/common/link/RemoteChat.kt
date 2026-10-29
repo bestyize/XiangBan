@@ -167,7 +167,29 @@ data class RemoteTurn(
     val tools: List<ToolCallInfo> = emptyList(),
     /** 回答过的问题、处理过的审批留下的痕迹。 */
     val records: List<ChatRecord> = emptyList(),
+    /** 这一轮模型用量（输入、输出 token），只有实时收到的才有。 */
+    val promptTokens: Int = 0,
+    val completionTokens: Int = 0,
+    /** 回答达到单次输出上限被截断，可以点“继续”。 */
+    val truncated: Boolean = false,
+    /** 这一轮改过文件时，可以撤销的记录。 */
+    val checkpoint: RunCheckpoint? = null,
+    /** 用户消息里带的图片张数（电脑只告诉张数，不给内容）。 */
+    val images: Int = 0,
 )
+
+/** 一轮回答改过的文件，电脑上留了备份，可以整体撤销。`state`：`ready` 可撤销，`undoing` 撤销中，`undone` 已撤销，`failed` 没撤销成功。 */
+@Serializable
+data class RunCheckpoint(
+    val runId: String,
+    val count: Int,
+    val files: List<String> = emptyList(),
+    val state: String = "ready",
+    val message: String = "",
+)
+
+/** 电脑上可以切换到的一个模型。 */
+data class RemoteModel(val provider: String, val providerName: String, val id: String, val name: String)
 
 data class RemoteChatState(
     val selectedPeerId: String? = null,
@@ -187,6 +209,11 @@ data class RemoteChatState(
     val pendingApproval: RemoteApprovalRequest? = null,
     /** 当前对话在电脑上的权限：`auto` 完全信任（默认，高风险操作仍然每次都问），`ask` 默认权限（执行前先问）。开发阶段便利优先。 */
     val permissionMode: String = "auto",
+    /** 电脑上可选的模型，和当前对话在用的那个（`模型编号`，读不到是空）。 */
+    val models: List<RemoteModel> = emptyList(),
+    val currentModel: String = "",
+    /** 已经存到电脑资料库的回复。 */
+    val savedTurns: Set<String> = emptySet(),
     val error: String? = null,
 ) {
     val fullTrust: Boolean get() = permissionMode == "auto"
@@ -449,6 +476,70 @@ class RemoteChatController(
         })
     }
 
+    /** 回答被截断时让小伴接着写。 */
+    fun continueAnswer() = send("继续")
+
+    /** 撤销某一轮回答改过的文件（电脑上有备份）。 */
+    fun undoRun(runId: String) {
+        val peerId = _state.value.selectedPeerId ?: return
+        val session = _state.value.selectedSessionId ?: return
+        updateCheckpoint(runId) { it.copy(state = "undoing", message = "") }
+        sendJson(peerId, buildJsonObject {
+            put("t", "run.undo")
+            put("id", nextId())
+            put("session", session)
+            put("run_id", runId)
+        })
+    }
+
+    /** 读电脑上可以切换的模型。 */
+    fun fetchModels() {
+        val peerId = _state.value.selectedPeerId ?: return
+        sendJson(peerId, buildJsonObject {
+            put("t", "models.list")
+            put("id", nextId())
+            _state.value.selectedSessionId?.let { put("session", it) }
+        })
+    }
+
+    /** 切换当前对话用的模型（对话已经开始、电脑上没有在回答时才行）。 */
+    fun setModel(provider: String, model: String) {
+        val peerId = _state.value.selectedPeerId ?: return
+        val session = _state.value.selectedSessionId ?: return
+        sendJson(peerId, buildJsonObject {
+            put("t", "session.model")
+            put("id", nextId())
+            put("session", session)
+            put("provider", provider)
+            put("model", model)
+        })
+    }
+
+    /** 把一条回复存到电脑的资料库。 */
+    fun saveToLibrary(turn: RemoteTurn) {
+        val peerId = _state.value.selectedPeerId ?: return
+        if (turn.text.isBlank() || turn.id in _state.value.savedTurns) return
+        val ref = nextId()
+        pendingLibrary[ref] = turn.id
+        sendJson(peerId, buildJsonObject {
+            put("t", "library.save")
+            put("id", ref)
+            put("text", turn.text)
+            put("title", turn.text.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().trim('#', ' ').take(40))
+            _state.value.selectedSessionId?.let { put("session", it) }
+            put("session_title", _state.value.selectedSession?.title.orEmpty())
+        })
+    }
+
+    private val pendingLibrary = mutableMapOf<String, String>()
+
+    private fun updateCheckpoint(runId: String, transform: (RunCheckpoint) -> RunCheckpoint) {
+        _state.value = _state.value.copy(messages = _state.value.messages.map { turn ->
+            val cp = turn.checkpoint
+            if (cp != null && cp.runId == runId) turn.copy(checkpoint = transform(cp)) else turn
+        })
+    }
+
     /** 让电脑停下当前这一轮（和电脑上点“停止”一样）；结果从事件里回来。 */
     fun cancel() {
         val peerId = _state.value.selectedPeerId ?: return
@@ -639,6 +730,46 @@ class RemoteChatController(
                     currentAccountId?.let { acc -> cache.saveSessions(acc, peer, sorted) }
                 }
             }
+            "run.undo" -> {
+                val runId = obj["run_id"].asStr() ?: return
+                if ((obj["ok"] as? JsonPrimitive)?.booleanOrNull == true) {
+                    val restored = obj["restored"]?.jsonArray?.size ?: 0
+                    val removed = obj["removed"]?.jsonArray?.size ?: 0
+                    val failed = obj["failed"]?.jsonArray?.size ?: 0
+                    updateCheckpoint(runId) {
+                        it.copy(state = "undone", message = "已撤销：恢复 $restored 个、删除 $removed 个文件" + if (failed > 0) "，另有 $failed 个没能恢复" else "")
+                    }
+                } else {
+                    updateCheckpoint(runId) { it.copy(state = "failed", message = obj["error"].asStr() ?: "撤销失败") }
+                }
+            }
+            "models.list" -> {
+                if (peer == _state.value.selectedPeerId && (obj["ok"] as? JsonPrimitive)?.booleanOrNull == true) {
+                    val list = obj["models"]?.jsonArray.orEmpty().mapNotNull {
+                        val o = it as? JsonObject ?: return@mapNotNull null
+                        val provider = o["provider"].asStr() ?: return@mapNotNull null
+                        val id = o["id"].asStr() ?: return@mapNotNull null
+                        RemoteModel(provider, o["provider_name"].asStr() ?: provider, id, o["name"].asStr() ?: id)
+                    }
+                    val current = (obj["current"] as? JsonObject)?.get("model").asStr().orEmpty()
+                    _state.value = _state.value.copy(models = list, currentModel = current)
+                }
+            }
+            "session.model" -> {
+                if ((obj["ok"] as? JsonPrimitive)?.booleanOrNull == true) {
+                    _state.value = _state.value.copy(currentModel = obj["model"].asStr().orEmpty())
+                } else {
+                    _state.value = _state.value.copy(error = obj["error"].asStr() ?: "切换模型失败")
+                }
+            }
+            "library.save" -> {
+                val turnId = pendingLibrary.remove(obj["ref"].asStr())
+                if ((obj["ok"] as? JsonPrimitive)?.booleanOrNull == true) {
+                    if (turnId != null) _state.value = _state.value.copy(savedTurns = _state.value.savedTurns + turnId)
+                } else {
+                    _state.value = _state.value.copy(error = obj["error"].asStr() ?: "存到资料库失败")
+                }
+            }
             "session.permission" -> {
                 val sid = obj["session"].asStr()
                 if (peer == _state.value.selectedPeerId && sid == _state.value.selectedSessionId) {
@@ -792,6 +923,20 @@ class RemoteChatController(
                 val msg = data["message"].asStr() ?: "执行出错"
                 finalizeAssistant(error = msg)
             }
+            "usage" -> {
+                val prompt = data["prompt"]?.jsonPrimitive?.intOrNull ?: 0
+                val completion = data["completion"]?.jsonPrimitive?.intOrNull ?: 0
+                updateLastAssistant { it.copy(promptTokens = it.promptTokens + prompt, completionTokens = it.completionTokens + completion) }
+            }
+            "truncated" -> updateLastAssistant { it.copy(truncated = true) }
+            "checkpoint" -> {
+                val runId = data["run_id"].asStr()
+                if (runId != null) {
+                    val files = data["files"]?.jsonArray.orEmpty().mapNotNull { it.asStr() }
+                    val count = data["count"]?.jsonPrimitive?.intOrNull ?: files.size
+                    updateLastAssistant { it.copy(checkpoint = RunCheckpoint(runId, count, files)) }
+                }
+            }
             "permission" -> {
                 _state.value = _state.value.copy(permissionMode = if (data["mode"].asStr() == "auto") "auto" else "ask")
             }
@@ -802,6 +947,14 @@ class RemoteChatController(
                 }
             }
         }
+    }
+
+    /** 改最后一条小伴回复（不新建）。用量、被截断、可撤销记录这类在回复结束前后到达的信息用它。 */
+    private fun updateLastAssistant(transform: (RemoteTurn) -> RemoteTurn) {
+        val msgs = _state.value.messages
+        val idx = msgs.indexOfLast { it.role == "assistant" }
+        if (idx < 0) return
+        _state.value = _state.value.copy(messages = msgs.mapIndexed { i, t -> if (i == idx) transform(t) else t })
     }
 
     private fun appendAssistantDelta(delta: String) = updateStreaming { it.copy(text = it.text + delta) }
@@ -919,7 +1072,7 @@ internal fun foldSnapshot(earlier: List<RemoteTurn>, raw: List<JsonObject>, afte
     for ((index, m) in raw.withIndex()) {
         val id = "snap-${after + index}"
         when (m["role"].asStr() ?: "assistant") {
-            "user" -> turns += RemoteTurn(id = id, role = "user", text = messageText(m))
+            "user" -> turns += RemoteTurn(id = id, role = "user", text = messageText(m), images = (m["images"] as? JsonPrimitive)?.intOrNull ?: 0)
             "assistant" -> {
                 val last = turns.lastOrNull()
                 var block = if (last != null && last.role == "assistant") turns.removeAt(turns.lastIndex) else RemoteTurn(id = id, role = "assistant", text = "")

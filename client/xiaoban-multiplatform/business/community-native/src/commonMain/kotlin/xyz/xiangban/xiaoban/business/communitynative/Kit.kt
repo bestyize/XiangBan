@@ -426,9 +426,17 @@ private val UserBubbleShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.d
 internal val AssistantBubbleShape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
 
 @Composable
-fun UserBubble(text: String, modifier: Modifier = Modifier) {
+fun UserBubble(text: String, modifier: Modifier = Modifier, images: Int = 0) {
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        Text(text, Modifier.widthIn(max = 280.dp).clip(UserBubbleShape).background(Brand).padding(horizontal = 14.dp, vertical = 10.dp), color = Color.White, fontSize = 15.sp, lineHeight = 22.sp)
+        Column(Modifier.widthIn(max = 280.dp).clip(UserBubbleShape).background(Brand).padding(horizontal = 14.dp, vertical = 10.dp)) {
+            if (images > 0) {
+                Row(Modifier.padding(bottom = if (text.isNotBlank()) 6.dp else 0.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    XIcon(XIcons.Image, tint = Color.White, size = 16.dp)
+                    Text("$images 张图片", color = Color.White, fontSize = 13.sp)
+                }
+            }
+            if (text.isNotBlank()) Text(text, color = Color.White, fontSize = 15.sp, lineHeight = 22.sp)
+        }
     }
 }
 

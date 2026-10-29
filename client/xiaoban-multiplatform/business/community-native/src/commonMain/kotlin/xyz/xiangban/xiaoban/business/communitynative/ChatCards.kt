@@ -64,6 +64,8 @@ import xyz.xiangban.xiaoban.common.community.TaskState
 import xyz.xiangban.xiaoban.common.community.ToolCallInfo
 import xyz.xiangban.xiaoban.common.community.ToolStatus
 import xyz.xiangban.xiaoban.common.community.ChangedFile
+import xyz.xiangban.xiaoban.common.community.formatTokens
+import xyz.xiangban.xiaoban.common.community.speechText
 import xyz.xiangban.xiaoban.common.community.activitySummary
 import xyz.xiangban.xiaoban.common.community.changedFiles
 import xyz.xiangban.xiaoban.common.community.describeCall
@@ -72,6 +74,7 @@ import xyz.xiangban.xiaoban.common.community.parseMarkdown
 import xyz.xiangban.xiaoban.common.community.taskProgress
 import xyz.xiangban.xiaoban.common.community.toolLabel
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
+import xyz.xiangban.xiaoban.common.link.RunCheckpoint
 import xyz.xiangban.xiaoban.common.link.TurnCancelled
 
 /*
@@ -647,6 +650,19 @@ fun RecordRow(record: ChatRecord, modifier: Modifier = Modifier) {
 
 // ───────────── 一条小伴回复 ─────────────
 
+/** 一条回复的附加信息和动作（设备聊天才有的：用量、被截断、可撤销、存资料库、切换模型）。 */
+class TurnExtras(
+    val promptTokens: Int = 0,
+    val completionTokens: Int = 0,
+    val truncated: Boolean = false,
+    val onContinue: (() -> Unit)? = null,
+    val checkpoint: RunCheckpoint? = null,
+    val onUndo: ((String) -> Unit)? = null,
+    val onSave: (() -> Unit)? = null,
+    val saved: Boolean = false,
+    val onSwitchModel: (() -> Unit)? = null,
+)
+
 /**
  * 一条小伴回复里的所有内容，按设计稿顺序：思考 → 任务执行卡 → 工具调用组 → 回答 → 留下的痕迹 → 提示。
  * [waiting] 只给正在进行的那一轮：`question` 或 `approval`。
@@ -667,6 +683,7 @@ fun AssistantTurnCards(
     onRetry: (() -> Unit)? = null,
     onRegenerate: (() -> Unit)? = null,
     onAdjust: (() -> Unit)? = null,
+    extras: TurnExtras = TurnExtras(),
 ) {
     val stopped = error == TurnCancelled
     val failure = error?.takeIf { !stopped }
@@ -686,9 +703,14 @@ fun AssistantTurnCards(
         if (files.isNotEmpty()) FileChangesCard(files, delivered = progress?.state == TaskState.Completed)
     }
     records.forEach { RecordRow(it) }
-    if (!streaming && text.isNotEmpty() && failure == null) ReplyActions(text, platform, onRegenerate)
+    if (!streaming && extras.truncated && extras.onContinue != null) HintLine("回答太长，被截断了。", alert = false, button = "继续", onButton = extras.onContinue)
+    if (!streaming) extras.checkpoint?.let { cp -> if (extras.onUndo != null) CheckpointNotice(cp, extras.onUndo) }
+    if (!streaming && text.isNotEmpty() && failure == null) ReplyActions(text, platform, onRegenerate, extras)
     if (stopped) HintLine("已停止", alert = false)
-    if (failure != null) Banner(failure, warn = true, actionText = if (onRetry != null) "重试" else null, onAction = onRetry)
+    if (failure != null) {
+        Banner(failure, warn = true, actionText = if (onRetry != null) "重试" else null, onAction = onRetry)
+        if (extras.onSwitchModel != null) LinkText("换个模型试试 ›", extras.onSwitchModel)
+    }
 }
 
 // ───────────── 文件变更与回复操作 ─────────────
@@ -727,13 +749,14 @@ fun FileChangesCard(files: List<ChangedFile>, delivered: Boolean, modifier: Modi
     }
 }
 
-/** 回复下面一排小图标：复制、重新生成。 */
+/** 回复下面一排小图标：复制、存到资料库、朗读、重新生成，右边是本轮用量。 */
 @Composable
-private fun ReplyActions(text: String, platform: PlatformActions?, onRegenerate: (() -> Unit)?) {
+private fun ReplyActions(text: String, platform: PlatformActions?, onRegenerate: (() -> Unit)?, extras: TurnExtras) {
     val extra = LocalExtraColors.current
     var copied by remember(text) { mutableStateOf(false) }
-    if (platform == null && onRegenerate == null) return
-    Row(Modifier.padding(start = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+    var speaking by remember(text) { mutableStateOf(false) }
+    if (platform == null && onRegenerate == null && extras.onSave == null) return
+    Row(Modifier.fillMaxWidth().padding(start = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         if (platform != null) {
             Row(
                 Modifier.heightIn(min = 30.dp).clip(RoundedCornerShape(8.dp)).clickable { platform.copy(text); copied = true }.padding(horizontal = 8.dp),
@@ -743,9 +766,49 @@ private fun ReplyActions(text: String, platform: PlatformActions?, onRegenerate:
                 if (copied) Text("已复制", fontSize = 11.sp, color = extra.ink3)
             }
         }
-        if (onRegenerate != null) {
-            Box(Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onRegenerate), contentAlignment = Alignment.Center) {
-                XIcon(XIcons.Refresh, tint = extra.ink3, size = 15.dp, description = "重新生成")
+        extras.onSave?.let { save ->
+            ActionIcon(XIcons.Star, if (extras.saved) Brand else extra.ink3, if (extras.saved) "已存到资料库" else "存到资料库", save)
+        }
+        if (platform != null) {
+            ActionIcon(XIcons.Volume, if (speaking) Brand else extra.ink3, if (speaking) "停止朗读" else "朗读") {
+                if (speaking) { platform.stopSpeaking(); speaking = false } else speaking = platform.speak(speechText(text))
+            }
+        }
+        if (onRegenerate != null) ActionIcon(XIcons.Refresh, extra.ink3, "重新生成", onRegenerate)
+        Spacer(Modifier.weight(1f))
+        if (extras.promptTokens + extras.completionTokens > 0) {
+            Text("输入 ${formatTokens(extras.promptTokens)} · 输出 ${formatTokens(extras.completionTokens)}", fontSize = 11.sp, color = extra.ink3, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun ActionIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, description: String, onClick: () -> Unit) {
+    Box(Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        XIcon(icon, tint = tint, size = 15.dp, description = description)
+    }
+}
+
+/** 这一轮改了文件：撤销这些改动（点了先二次确认），撤销之后留一行结果。 */
+@Composable
+private fun CheckpointNotice(cp: RunCheckpoint, onUndo: (String) -> Unit) {
+    val extra = LocalExtraColors.current
+    var confirm by remember(cp.runId) { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(extra.fill).padding(horizontal = 10.dp, vertical = 6.dp)) {
+        when {
+            cp.state == "undone" -> Text(cp.message.ifBlank { "已撤销这些改动" }, fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            cp.state == "undoing" -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Spinner(12.dp); Text("正在撤销…", fontSize = 12.sp, color = extra.ink3) }
+            confirm -> {
+                Text("这些文件会回到这一轮回答之前的样子，之后对它们的修改也会被覆盖。", fontSize = 12.sp, lineHeight = 17.sp)
+                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SmallButton("确认撤销", BtnKind.Brand, { confirm = false; onUndo(cp.runId) })
+                    SmallButton("取消", BtnKind.Ghost, { confirm = false })
+                }
+            }
+            else -> {
+                Text("这一轮改了 ${cp.count} 个文件。", fontSize = 12.sp, lineHeight = 17.sp)
+                if (cp.state == "failed" && cp.message.isNotBlank()) Text(cp.message, fontSize = 11.sp, lineHeight = 16.sp, color = Brand)
+                Text("撤销这些改动", Modifier.clip(RoundedCornerShape(6.dp)).clickable { confirm = true }.padding(vertical = 4.dp), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
             }
         }
     }

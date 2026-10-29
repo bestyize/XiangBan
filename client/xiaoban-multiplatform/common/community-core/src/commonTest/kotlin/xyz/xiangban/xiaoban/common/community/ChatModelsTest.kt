@@ -116,4 +116,10 @@ class ChatModelsTest {
         assertEquals("HTML", files[0].extension)
         assertEquals("game.js", files[1].name)
     }
+
+    @Test
+    fun `token counts and speech text read naturally`() {
+        assertEquals(listOf("987", "1.2k", "9.9k", "15k"), listOf(987, 1234, 9999, 15000).map(::formatTokens))
+        assertEquals("标题\n第一点\n第二点\n请看 链接", speechText("# 标题\n\n- **第一点**\n- 第二点\n\n```kotlin\nval x = 1\n```\n\n请看 [链接](https://a.b)"))
+    }
 }

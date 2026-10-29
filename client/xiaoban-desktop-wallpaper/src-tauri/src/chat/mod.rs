@@ -2365,6 +2365,52 @@ pub(crate) fn remote_set_permission(app: &tauri::AppHandle, session_id: &str, mo
     Ok(mode.to_string())
 }
 
+/// 手机请求撤销某一轮回答改过的文件（和桌面“撤销这些改动”一样；对话还在回答时不行）。
+pub(crate) fn remote_undo_run(app: &tauri::AppHandle, session_id: &str, run_id: &str) -> Result<Value, String> {
+    checked_session_id(session_id)?;
+    if lock(&app.state::<ChatState>().runs).contains_key(session_id) {
+        return Err("这个对话还在回答，请等它结束或先停止再撤销".into());
+    }
+    let control = agent_kernel::RunControl::bounded(Duration::from_secs(60), 100);
+    control.claim()?;
+    Ok(json!(checkpoints::undo(&Dirs::of(app)?.checkpoints(), session_id, run_id)?))
+}
+
+/// 手机能切换到的模型：各个可用服务商下的模型，加上当前对话正在用的。
+pub(crate) fn remote_models(app: &tauri::AppHandle, session_id: Option<&str>) -> Result<Value, String> {
+    let config = ai_config::current(app)?;
+    let mut models = Vec::new();
+    for provider in config.providers.iter().filter(|p| p.available && p.id != ai_gateway::GATEWAY_ID) {
+        for model in provider.models.iter().take(60) {
+            let name = if model.name.is_empty() { model.id.clone() } else { model.name.clone() };
+            models.push(json!({ "provider": provider.id, "provider_name": provider.name, "id": model.id, "name": name }));
+        }
+    }
+    let current = match session_id {
+        Some(id) => session_config(app, id).ok().and_then(|c| c.session_model()),
+        None => config.session_model(),
+    };
+    Ok(json!({
+        "models": models,
+        "current": current.map(|m| json!({ "provider": m.provider_id, "model": m.model })),
+    }))
+}
+
+/// 手机切换这个对话的模型；只允许 `remote_models` 列出来的那些。
+pub(crate) fn remote_set_model(app: &tauri::AppHandle, session_id: &str, provider: &str, model: &str) -> Result<(), String> {
+    checked_session_id(session_id)?;
+    let listed = remote_models(app, Some(session_id))?;
+    let allowed = listed["models"].as_array().is_some_and(|all| all.iter().any(|m| m["provider"] == provider && m["id"] == model));
+    if !allowed { return Err("电脑上没有这个模型".into()); }
+    let selection = validate_model(app, ai_config::SessionModel { provider_id: provider.into(), model: model.into(), reply_preference: Default::default(), reasoning_efforts: None })?;
+    let state = app.state::<ChatState>();
+    if lock(&state.runs).contains_key(session_id) { return Err("这个对话还在回答，请先停止再切换模型".into()); }
+    pin_session_defaults(app, &ai_config::current(app)?)?;
+    mutate(app, |index| index.set_options(session_id, Some(selection.clone()), None, None))?.ok_or("这个对话已经不存在")?;
+    emit(app, "chat-sessions-changed", json!(list(app)?));
+    Ok(())
+}
+
 pub(crate) fn remote_answer_approval(app: &tauri::AppHandle, approval_id: &str, choice: &str) -> Result<(), String> {
     if approval_id.starts_with("del-") || approval_id.starts_with("req-") {
         let task_id = approval_id.split(':').next().unwrap_or(approval_id);

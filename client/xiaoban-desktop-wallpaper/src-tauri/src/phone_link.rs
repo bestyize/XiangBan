@@ -478,6 +478,82 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                 }
             }
         }
+        "run.undo" => {
+            let (Some(session_id), Some(run_id)) = (msg.get("session").and_then(Value::as_str), msg.get("run_id").and_then(Value::as_str)) else { return };
+            if let Ok(audit) = audit_path(app) {
+                append_remote_audit(&audit, &json!({ "timestampMs": now_ms(), "peerId": peer, "action": "run.undo", "session": session_id, "runId": run_id }));
+            }
+            let mut reply = json!({ "t": "run.undo", "id": state.next_msg_id(), "ref": req_id, "session": session_id, "run_id": run_id });
+            match crate::chat::remote_undo_run(app, session_id, run_id) {
+                Ok(report) => {
+                    reply["ok"] = json!(true);
+                    reply["restored"] = report["restored"].clone();
+                    reply["removed"] = report["removed"].clone();
+                    reply["failed"] = report["failed"].clone();
+                }
+                Err(error) => {
+                    reply["ok"] = json!(false);
+                    reply["error"] = json!(error);
+                }
+            }
+            let _ = send_json(link, peer, &reply, false);
+        }
+        "models.list" => {
+            let session_id = msg.get("session").and_then(Value::as_str);
+            let mut reply = json!({ "t": "models.list", "id": state.next_msg_id(), "ref": req_id });
+            match crate::chat::remote_models(app, session_id) {
+                Ok(listed) => {
+                    reply["ok"] = json!(true);
+                    reply["models"] = listed["models"].clone();
+                    reply["current"] = listed["current"].clone();
+                }
+                Err(error) => {
+                    reply["ok"] = json!(false);
+                    reply["error"] = json!(error);
+                }
+            }
+            let _ = send_json(link, peer, &reply, false);
+        }
+        "session.model" => {
+            let (Some(session_id), Some(provider), Some(model)) = (
+                msg.get("session").and_then(Value::as_str),
+                msg.get("provider").and_then(Value::as_str),
+                msg.get("model").and_then(Value::as_str),
+            ) else { return };
+            if let Ok(audit) = audit_path(app) {
+                append_remote_audit(&audit, &json!({ "timestampMs": now_ms(), "peerId": peer, "action": "session.model", "session": session_id, "provider": provider, "model": model }));
+            }
+            let mut reply = json!({ "t": "session.model", "id": state.next_msg_id(), "ref": req_id, "session": session_id, "provider": provider, "model": model });
+            match crate::chat::remote_set_model(app, session_id, provider, model) {
+                Ok(()) => reply["ok"] = json!(true),
+                Err(error) => {
+                    reply["ok"] = json!(false);
+                    reply["error"] = json!(error);
+                }
+            }
+            let _ = send_json(link, peer, &reply, false);
+        }
+        "library.save" => {
+            let Some(text) = msg.get("text").and_then(Value::as_str) else { return };
+            let title = msg.get("title").and_then(Value::as_str).unwrap_or("");
+            let session_id = msg.get("session").and_then(Value::as_str).map(str::to_string);
+            let session_title = msg.get("session_title").and_then(Value::as_str).unwrap_or("");
+            if let Ok(audit) = audit_path(app) {
+                append_remote_audit(&audit, &json!({ "timestampMs": now_ms(), "peerId": peer, "action": "library.save", "session": session_id }));
+            }
+            let mut reply = json!({ "t": "library.save", "id": state.next_msg_id(), "ref": req_id });
+            match crate::data_library::remote_save(app, title, text, session_id, session_title) {
+                Ok(id) => {
+                    reply["ok"] = json!(true);
+                    reply["item"] = json!(id);
+                }
+                Err(error) => {
+                    reply["ok"] = json!(false);
+                    reply["error"] = json!(error);
+                }
+            }
+            let _ = send_json(link, peer, &reply, false);
+        }
         "message.cancel" => {
             let Some(session_id) = msg.get("session").and_then(Value::as_str).filter(|s| !s.trim().is_empty()) else { return };
             if let Ok(audit) = audit_path(app) {
@@ -709,6 +785,8 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
                     false,
                 )),
                 "done" => Some(("turn.done", json!({}), true)),
+                "usage" => Some(("usage", json!({ "prompt": ev["prompt_tokens"], "completion": ev["completion_tokens"] }), false)),
+                "truncated" => Some(("truncated", json!({}), false)),
                 "cancelled" => Some(("state", json!({ "state": "cancelled" }), false)),
                 "error" => Some(("error", json!({ "message": ev["message"] }), true)),
                 _ => None,
@@ -726,6 +804,22 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
                     notify,
                 );
             }
+        }
+        "chat-checkpoint" => {
+            let Some(session) = payload.get("session").and_then(Value::as_str) else { return };
+            let files: Vec<Value> = payload["files"].as_array().map(|all| all.iter().take(30).cloned().collect()).unwrap_or_default();
+            let count = payload["files"].as_array().map_or(0, Vec::len);
+            send_to_session(
+                session,
+                &json!({
+                    "t": "event",
+                    "id": state.next_msg_id(),
+                    "session": session,
+                    "kind": "checkpoint",
+                    "data": { "run_id": payload["runId"], "files": files, "count": count },
+                }),
+                false,
+            );
         }
         "chat-permission-mode-changed" => {
             let Some(session) = payload.get("sessionId").and_then(Value::as_str) else { return };
