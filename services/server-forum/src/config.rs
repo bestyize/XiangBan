@@ -23,6 +23,8 @@ pub struct AppConfig {
     pub account_issuer: String,
     pub account_jwks_url: String,
     pub account_client_id: String,
+    /// 除网页外也接受的令牌受众（手机应用等），`FORUM_ACCOUNT_EXTRA_CLIENT_IDS`，逗号分隔。
+    pub account_extra_client_ids: Vec<String>,
     pub cors_origins: Vec<String>,
     pub account_provision_key: Option<String>,
     pub admin_user: Option<String>,
@@ -111,6 +113,9 @@ impl AppConfig {
             account_issuer,
             account_jwks_url,
             account_client_id: get("FORUM_ACCOUNT_CLIENT_ID").unwrap_or_else(|| "forum-web".into()),
+            account_extra_client_ids: get("FORUM_ACCOUNT_EXTRA_CLIENT_IDS")
+                .map(|raw| raw.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+                .unwrap_or_else(|| vec!["xiaoban-android".into()]),
             cors_origins: get("FORUM_CORS_ORIGINS")
                 .map(|raw| raw.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
                 .unwrap_or_default(),

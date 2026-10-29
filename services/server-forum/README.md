@@ -35,7 +35,8 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 | `FORUM_DATABASE_URL` | `postgres://xiaban@localhost:5432/xiaban_forum` | 独立库 |
 | `FORUM_PUBLIC_URL` | `https://chat.xiangban.xyz` | SEO 页面的 canonical 和 sitemap |
 | `FORUM_ACCOUNT_ISSUER` | `https://account.xiangban.xyz` | 必须和账号中心 `ACCOUNT_ISSUER` 完全一致 |
-| `FORUM_ACCOUNT_CLIENT_ID` | `forum-web` | 令牌 `aud` 必须是它，需要先在账号中心后台登记 |
+| `FORUM_ACCOUNT_CLIENT_ID` | `forum-web` | 网页的令牌 `aud`，需要先在账号中心后台登记；也是 `/api/meta` 告诉前端用的 client_id |
+| `FORUM_ACCOUNT_EXTRA_CLIENT_IDS` | `xiaoban-android` | 除网页外也接受的令牌 `aud`（逗号分隔），让小伴手机应用登录后能发帖、评论；设置后会替换默认值，要保留手机应用请写上 `xiaoban-android` |
 | `FORUM_ADMIN_USER` / `FORUM_ADMIN_PASSWORD` | 无 | 没有管理员时创建初始管理员 |
 | `FORUM_ADMIN_JWT_SECRET` | 随机 | 管理员令牌密钥，生产必须设置（≥32 位） |
 | `FORUM_WEB_DIR` | `services/server-forum/web/dist` | 前端产物；index.html 启动时读一次，换前端后要重启 |
@@ -134,7 +135,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 二期（PRD 里的 M2 起）未做：关键词订阅、TL2 自动升级、图片上传到腾讯云 COS、赞助位。积分规则见上面的运行与验证；正文插图已经走本机磁盘（见业务规则），COS 是二期的存储替换。
 - 账号中心还没有用户自助注销，设置页提示发邮件处理。
 - SEO 页面只渲染第一页（30-50 条），sitemap 每次请求实时查询，没有进程内缓存。
-- 部署：香港机 `/home/ubuntu/xiangban-forum`，systemd 服务 `server-forum`，监听 127.0.0.1:55010，Nginx 反代 chat.xiangban.xyz（Let's Encrypt），库 `xiaban_forum` 在 `wallpaper_postgres` 容器里，独立角色 `forum`。账号中心已登记 `forum-web` 并在 `ACCOUNT_CORS_ORIGINS` 加入 `https://chat.xiangban.xyz`。初始管理员密码在服务器 `.env` 的 `FORUM_ADMIN_PASSWORD`，登录 /admin 改密码后删掉它。更新时本地交叉编译后替换二进制和 `web/dist`，再重启服务（index.html 启动时读一次）。
+- 部署：香港机 `/home/ubuntu/xiangban-forum`，systemd 服务 `server-forum`，监听 127.0.0.1:55010，Nginx 反代 chat.xiangban.xyz（Let's Encrypt），库 `xiaban_forum` 在 `wallpaper_postgres` 容器里，独立角色 `forum`。账号中心已登记 `forum-web` 并在 `ACCOUNT_CORS_ORIGINS` 加入 `https://chat.xiangban.xyz`。初始管理员密码在服务器 `.env` 的 `FORUM_ADMIN_PASSWORD`，登录 /admin 改密码后删掉它。更新时本地交叉编译后替换二进制和 `web/dist`，再重启服务（index.html 启动时读一次）。手机应用的令牌（`aud=xiaoban-android`）由 `FORUM_ACCOUNT_EXTRA_CLIENT_IDS` 接受（默认已含，账号中心要登记该客户端），见 [手机互联上线清单](../../docs/deployment/MOBILE_LINK_ROLLOUT.md)。
 
 ## 站方图文创作与批量发帖
 

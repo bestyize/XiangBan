@@ -40,7 +40,8 @@ pub struct JwksVerifier {
     http: reqwest::Client,
     issuer: String,
     jwks_url: String,
-    client_id: String,
+    /// 接受的令牌受众：网页的 `FORUM_ACCOUNT_CLIENT_ID`，加上手机应用等其他客户端。
+    audiences: Vec<String>,
     cache: RwLock<JwksCache>,
     /// 测试用：固定公钥，不拉取 JWKS。
     static_key: Option<DecodingKey>,
@@ -52,10 +53,21 @@ impl JwksVerifier {
             http: reqwest::Client::builder().timeout(Duration::from_secs(5)).build().unwrap_or_default(),
             issuer,
             jwks_url,
-            client_id,
+            audiences: vec![client_id],
             cache: RwLock::new(JwksCache { keys: HashMap::new(), expires_at: Instant::now() }),
             static_key: None,
         }
+    }
+
+    /// 追加可接受的受众（例如 `xiaoban-android`）；重复或空值忽略。
+    pub fn with_extra_audiences(mut self, extra: &[String]) -> Self {
+        for aud in extra {
+            let aud = aud.trim();
+            if !aud.is_empty() && !self.audiences.iter().any(|a| a == aud) {
+                self.audiences.push(aud.to_string());
+            }
+        }
+        self
     }
 
     #[cfg(test)]
@@ -74,7 +86,7 @@ impl JwksVerifier {
 
         let mut validation = Validation::new(Algorithm::EdDSA);
         validation.set_issuer(&[&self.issuer]);
-        validation.set_audience(&[&self.client_id]);
+        validation.set_audience(&self.audiences);
         validation.leeway = 10;
 
         let data = decode::<AccessClaims>(token, &key, &validation).map_err(|err| match err.kind() {
@@ -215,5 +227,14 @@ mod tests {
         assert!(verifier.verify(&sign("https://account.test", "forum-web", now - 600)).await.is_err());
         assert!(verifier.verify(&sign("https://evil.test", "forum-web", now + 600)).await.is_err());
         assert!(verifier.verify(&sign("https://account.test", "xiaban-web", now + 600)).await.is_err());
+        // 没有追加受众时，手机应用的令牌不被接受。
+        assert!(verifier.verify(&sign("https://account.test", "xiaoban-android", now + 600)).await.is_err());
+
+        let verifier = verifier.with_extra_audiences(&["xiaoban-android".into(), " ".into(), "forum-web".into()]);
+        assert_eq!(verifier.audiences, vec!["forum-web".to_string(), "xiaoban-android".to_string()]);
+        assert_eq!(verifier.verify(&sign("https://account.test", "xiaoban-android", now + 600)).await.unwrap(), uid);
+        assert_eq!(verifier.verify(&sign("https://account.test", "forum-web", now + 600)).await.unwrap(), uid);
+        assert!(verifier.verify(&sign("https://account.test", "xiaban-web", now + 600)).await.is_err(), "其他受众仍然被拒绝");
+        assert!(verifier.verify(&sign("https://evil.test", "xiaoban-android", now + 600)).await.is_err());
     }
 }
