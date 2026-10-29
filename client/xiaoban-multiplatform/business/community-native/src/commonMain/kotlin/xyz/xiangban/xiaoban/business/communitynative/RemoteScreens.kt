@@ -185,9 +185,6 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     val peer = remote.peers.firstOrNull { it.id == activePeer }
     val online = peer?.online == true
     var input by rememberSaveable { mutableStateOf("") }
-    var highRisk by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var lastHighRisk by remember { mutableStateOf<Pair<String, String>?>(null) }
-    var confirmed by remember { mutableStateOf(false) }
     var drawer by rememberSaveable { mutableStateOf(false) }
     var attach by rememberSaveable { mutableStateOf(false) }
     // 0 关着，1 选权限，2 确认开启完全信任
@@ -267,10 +264,8 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                 if (pending.isQuestion) {
                     AskCard(pending, { answer -> env.remoteChat.answerApproval(pending.approvalId, answer) }, cardModifier)
                 } else {
-                    ApprovalCard(pending, { choice ->
-                        val denies = choice == "deny" || choice == "__dismiss__"
-                        if (pending.isHighRisk && !denies) { confirmed = false; lastHighRisk = pending.approvalId to choice; highRisk = lastHighRisk } else env.remoteChat.answerApproval(pending.approvalId, choice)
-                    }, cardModifier)
+                    // 高风险的卡片上已经写明风险和完整命令，不再额外弹二次确认（开发阶段便利优先）。
+                    ApprovalCard(pending, { choice -> env.remoteChat.answerApproval(pending.approvalId, choice) }, cardModifier)
                 }
             }
 
@@ -350,28 +345,6 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
         }
         OverlayTransition(attach) { panel -> AttachSheet({ attach = false }, { attach = false; toast = "$it 即将支持" }, panel) }
         Toast(toast) { toast = null }
-        OverlayTransition(highRisk != null) { panel ->
-          lastHighRisk?.let { (approvalId, choice) ->
-            val pending = remote.pendingApproval
-            BottomSheet({ highRisk = null }, panel) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Box(Modifier.size(36.dp).clip(CircleShape).background(LocalExtraColors.current.brandSoft), contentAlignment = Alignment.Center) { XIcon(XIcons.Warning, tint = Brand, size = 20.dp) }
-                    Text("这是高危操作", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                }
-                Text("它会在“${peer?.name ?: "电脑"}”上执行下面的操作，可能无法撤销。请看清内容再决定。", Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                CodeBox(pending?.summary.orEmpty().ifBlank { pending?.title.orEmpty() }, Modifier.padding(top = 10.dp))
-                Row(Modifier.padding(top = 14.dp).fillMaxWidth().height(44.dp).clickable { confirmed = !confirmed }, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    CheckBox(confirmed, { confirmed = it })
-                    Text("我已看清上面的内容", fontSize = 14.sp)
-                }
-                Row(Modifier.padding(top = 8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DarkPillButton("拒绝", { if (highRisk != null) { highRisk = null; env.remoteChat.answerApproval(approvalId, "deny") } }, Modifier.weight(1f))
-                    GhostPillButton("仍然允许", { if (highRisk != null) { highRisk = null; env.remoteChat.answerApproval(approvalId, choice) } }, Modifier.weight(1f), enabled = confirmed && highRisk != null)
-                }
-                Text("勾选后“仍然允许”才可点；手机上只能允许这一次。", Modifier.padding(top = 8.dp).fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-            }
-          }
-        }
         OverlayTransition(drawer, direction = "left") { panel ->
             RemoteDrawer(
                 panelModifier = panel,
@@ -387,11 +360,6 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             )
         }
     }
-}
-
-@Composable
-private fun CodeBox(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).padding(horizontal = 10.dp, vertical = 8.dp), fontSize = 12.sp, lineHeight = 19.sp, maxLines = 6, overflow = TextOverflow.Ellipsis)
 }
 
 @Composable

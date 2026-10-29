@@ -611,7 +611,7 @@ fun ApprovalCard(pending: RemoteApprovalRequest, onDecision: (String) -> Unit, m
             val allow = pending.options.filter { it.id != "deny" && it.id != DismissChoice }
             val deny = pending.options.firstOrNull { it.id == "deny" || it.id == DismissChoice }
             Row(Modifier.padding(top = 8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                allow.forEachIndexed { i, opt -> SmallButton(opt.label, if (i == 0) BtnKind.Ink else BtnKind.Ghost, { onDecision(opt.id) }, Modifier.weight(1f)) }
+                allow.forEachIndexed { i, opt -> SmallButton(opt.label, if (i == 0) (if (high) BtnKind.Brand else BtnKind.Ink) else BtnKind.Ghost, { onDecision(opt.id) }, Modifier.weight(1f)) }
                 if (deny != null) SmallButton(deny.label, BtnKind.Text, { onDecision(deny.id) })
             }
         }
