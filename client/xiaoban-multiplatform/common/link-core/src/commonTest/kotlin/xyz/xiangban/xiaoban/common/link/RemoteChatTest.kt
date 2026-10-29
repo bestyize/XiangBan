@@ -213,4 +213,40 @@ class RemoteChatTest {
         val second = sent.single { it.contains("\"message.send\"") }
         assertTrue(second.contains("\"session\":\"old\"") && !second.contains("workspace"), second)
     }
+
+    @Test
+    fun `full trust is sent with the first message of a new chat and switched live in an open one`() = runTest {
+        val link = createLink()
+        val sent = mutableListOf<String>()
+        link.sendObserverForTest = { _, data -> sent += data.decodeToString() }
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+
+        controller.newSession("D:\\a")
+        controller.setPermission("auto")
+        assertTrue(controller.state.value.fullTrust)
+        sent.clear()
+        controller.send("干活")
+        val first = sent.single { it.contains("\"message.send\"") }
+        assertTrue(first.contains("\"permission\":\"auto\""), first)
+
+        // 已有对话：让电脑切换，电脑确认后才算数；电脑也可以主动通知模式变了。
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"message.accepted","id":"1","client_id":"c","session":"s_9","message_id":"m"}""".encodeToByteArray()))
+        sent.clear()
+        controller.setPermission("ask")
+        assertTrue(sent.single().contains("\"session.permission\"") && sent.single().contains("\"mode\":\"ask\""), sent.toString())
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"2","session":"s_9","kind":"permission","data":{"mode":"auto"}}""".encodeToByteArray()))
+        assertTrue(controller.state.value.fullTrust, "桌面上改成完全信任，手机跟着变")
+
+        // 电脑拒绝切换（比如对话已被删除）：回到实际模式并报错。
+        controller.setPermission("ask")
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"session.permission","id":"3","session":"s_9","ok":false,"error":"这个对话已经不存在"}""".encodeToByteArray()))
+        assertTrue(controller.state.value.fullTrust)
+        assertEquals("这个对话已经不存在", controller.state.value.error)
+
+        // 打开对话时快照带着当前模式。
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"session.snapshot","id":"4","session":"s_9","permission":"ask","messages":[],"after":0,"cursor":0,"has_more":false}""".encodeToByteArray()))
+        assertFalse(controller.state.value.fullTrust)
+    }
 }

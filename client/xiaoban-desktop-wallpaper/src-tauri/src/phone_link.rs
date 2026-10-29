@@ -437,6 +437,40 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                 );
             }
         }
+        "session.permission" => {
+            let Some(session_id) = msg.get("session").and_then(Value::as_str) else { return };
+            let mode = msg.get("mode").and_then(Value::as_str).unwrap_or("");
+            if let Ok(audit) = audit_path(app) {
+                append_remote_audit(
+                    &audit,
+                    &json!({
+                        "timestampMs": now_ms(),
+                        "peerId": peer,
+                        "action": "session.permission",
+                        "session": session_id,
+                        "mode": mode,
+                    }),
+                );
+            }
+            let result = crate::chat::remote_set_permission(app, session_id, mode);
+            let mut reply = json!({
+                "t": "session.permission",
+                "id": state.next_msg_id(),
+                "ref": req_id,
+                "session": session_id,
+            });
+            match result {
+                Ok(applied) => {
+                    reply["ok"] = json!(true);
+                    reply["mode"] = json!(applied);
+                }
+                Err(error) => {
+                    reply["ok"] = json!(false);
+                    reply["error"] = json!(error);
+                }
+            }
+            let _ = send_json(link, peer, &reply, false);
+        }
         "session.close" => {
             if let Some(session_id) = msg.get("session").and_then(Value::as_str) {
                 if let Some(set) = lock(&state.inner).subscriptions.get_mut(peer) {
@@ -449,6 +483,7 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
             let text = msg.get("text").and_then(Value::as_str).unwrap_or("");
             let client_id = msg.get("client_id").and_then(Value::as_str).unwrap_or(&req_id);
             let workspace = msg.get("workspace").and_then(Value::as_str);
+            let permission = msg.get("permission").and_then(Value::as_str);
             if let Ok(audit) = audit_path(app) {
                 append_remote_audit(
                     &audit,
@@ -460,10 +495,11 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                         "clientId": client_id,
                         "chars": text.chars().count(),
                         "workspace": workspace,
+                        "permission": permission,
                     }),
                 );
             }
-            match crate::chat::remote_send_message(app, peer, session_id, text, client_id, workspace) {
+            match crate::chat::remote_send_message(app, peer, session_id, text, client_id, workspace, permission) {
                 Ok(accepted) => {
                     if let Some(sid) = accepted.get("session").and_then(Value::as_str) {
                         lock(&state.inner)
@@ -674,6 +710,21 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
                     notify,
                 );
             }
+        }
+        "chat-permission-mode-changed" => {
+            let Some(session) = payload.get("sessionId").and_then(Value::as_str) else { return };
+            let mode = if payload.get("mode").and_then(Value::as_str) == Some("auto") { "auto" } else { "ask" };
+            send_to_session(
+                session,
+                &json!({
+                    "t": "event",
+                    "id": state.next_msg_id(),
+                    "session": session,
+                    "kind": "permission",
+                    "data": { "mode": mode },
+                }),
+                false,
+            );
         }
         "chat-run-state" => {
             let Some(session) = payload.get("session").and_then(Value::as_str) else { return };

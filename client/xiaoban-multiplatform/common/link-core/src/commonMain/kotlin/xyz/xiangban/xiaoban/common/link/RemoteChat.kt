@@ -168,8 +168,12 @@ data class RemoteChatState(
     val toolProgress: List<RemoteToolProgress> = emptyList(),
     val sending: Boolean = false,
     val pendingApproval: RemoteApprovalRequest? = null,
+    /** 当前对话在电脑上的权限：`ask` 默认权限（执行前先问），`auto` 完全信任（高风险操作仍然每次都问）。 */
+    val permissionMode: String = "ask",
     val error: String? = null,
 ) {
+    val fullTrust: Boolean get() = permissionMode == "auto"
+
     val selectedPeer: PeerSummary? get() = peers.firstOrNull { it.id == selectedPeerId }
     val selectedSession: RemoteSessionSummary? get() = sessions.firstOrNull { it.id == selectedSessionId }
 
@@ -326,6 +330,7 @@ class RemoteChatController(
         _state.value = _state.value.copy(
             selectedSessionId = sessionId,
             newChatWorkspace = null,
+            permissionMode = "ask",
             messages = cachedMsgs,
             toolProgress = emptyList(),
             pendingApproval = null,
@@ -356,11 +361,33 @@ class RemoteChatController(
         _state.value = _state.value.copy(
             selectedSessionId = null,
             newChatWorkspace = keep.ifBlank { null },
+            permissionMode = "ask",
             messages = emptyList(),
             toolProgress = emptyList(),
             pendingApproval = null,
             sending = false,
         )
+    }
+
+    /**
+     * 切换权限：`auto` 是完全信任，`ask` 是默认权限。已有对话会让电脑改掉它的模式（电脑回确认后才算数）；
+     * 还没发出第一条消息的新对话只记在手机上，随第一条消息一起告诉电脑。
+     */
+    fun setPermission(mode: String) {
+        val normalized = if (mode == "auto") "auto" else "ask"
+        val s = _state.value
+        if (s.permissionMode == normalized) return
+        val peerId = s.selectedPeerId
+        val sid = s.selectedSessionId
+        _state.value = s.copy(permissionMode = normalized)
+        if (peerId != null && sid != null) {
+            sendJson(peerId, buildJsonObject {
+                put("t", "session.permission")
+                put("id", nextId())
+                put("session", sid)
+                put("mode", normalized)
+            })
+        }
     }
 
     /** 把电脑上最近用过的一个文件夹加成项目，并在里面开始一个新对话。 */
@@ -397,7 +424,10 @@ class RemoteChatController(
             put("id", nextId())
             val sid = _state.value.selectedSessionId
             if (!sid.isNullOrBlank()) put("session", sid)
-            else _state.value.newChatWorkspace?.takeIf { it.isNotBlank() }?.let { put("workspace", it) }
+            else {
+                _state.value.newChatWorkspace?.takeIf { it.isNotBlank() }?.let { put("workspace", it) }
+                if (_state.value.fullTrust) put("permission", "auto")
+            }
             put("text", text)
             put("client_id", clientId)
         })
@@ -559,9 +589,22 @@ class RemoteChatController(
                     currentAccountId?.let { acc -> cache.saveSessions(acc, peer, sorted) }
                 }
             }
+            "session.permission" -> {
+                val sid = obj["session"].asStr()
+                if (peer == _state.value.selectedPeerId && sid == _state.value.selectedSessionId) {
+                    if ((obj["ok"] as? JsonPrimitive)?.booleanOrNull == true) {
+                        _state.value = _state.value.copy(permissionMode = if (obj["mode"].asStr() == "auto") "auto" else "ask")
+                    } else {
+                        // 电脑没答应：回到电脑上实际的模式，并说明原因。
+                        val actual = if (_state.value.permissionMode == "auto") "ask" else "auto"
+                        _state.value = _state.value.copy(permissionMode = actual, error = obj["error"].asStr() ?: "切换权限失败")
+                    }
+                }
+            }
             "session.snapshot" -> {
                 val sid = obj["session"].asStr()
                 if (peer == _state.value.selectedPeerId && (sid == null || sid == _state.value.selectedSessionId)) {
+                    obj["permission"].asStr()?.let { _state.value = _state.value.copy(permissionMode = if (it == "auto") "auto" else "ask") }
                     val rawMessages = obj["messages"]?.jsonArray.orEmpty()
                     // 桌面按字节预算分页：`after` 为本页起点，`has_more` 为真时用 `cursor` 继续取。
                     val after = obj["after"]?.jsonPrimitive?.intOrNull ?: 0
@@ -672,6 +715,9 @@ class RemoteChatController(
             "error" -> {
                 val msg = data["message"].asStr() ?: "执行出错"
                 finalizeAssistant(error = msg)
+            }
+            "permission" -> {
+                _state.value = _state.value.copy(permissionMode = if (data["mode"].asStr() == "auto") "auto" else "ask")
             }
             "state" -> {
                 val st = data["state"].asStr()

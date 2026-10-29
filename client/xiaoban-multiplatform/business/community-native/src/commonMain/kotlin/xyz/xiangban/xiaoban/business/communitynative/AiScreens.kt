@@ -412,6 +412,7 @@ private fun AgentApprovalCard(pending: ChatApproval, onDecision: (String) -> Uni
             GhostPillButton("拒绝", { onDecision("deny") }, Modifier.weight(1f), height = 44.dp)
             PillButton("允许这一次", { onDecision("once") }, Modifier.weight(1f), height = 44.dp)
         }
+        if (pending.danger == null) LinkText("这段对话里都允许，不再问我", { onDecision("always") }, Modifier.padding(top = 10.dp))
     }
 }
 
