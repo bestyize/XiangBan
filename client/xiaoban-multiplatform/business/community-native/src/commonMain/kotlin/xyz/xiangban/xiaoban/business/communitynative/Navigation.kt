@@ -14,9 +14,7 @@ sealed interface Route {
     /** 云端小伴的对话页。 */
     data object AiChat : Route
     data object Devices : Route
-    /** 某台电脑上的会话列表。 */
-    data class RemoteList(val peer: String) : Route
-    /** 某台电脑上的一个会话（具体会话由遥控控制器记着）。 */
+    /** 某台设备上的聊天页：左侧栏是这台设备的项目和对话，具体打开哪个对话由遥控控制器记着。 */
     data class RemoteChat(val peer: String) : Route
 
     fun encode(): String = when (this) {
@@ -31,7 +29,6 @@ sealed interface Route {
         Models -> "models"
         AiChat -> "aichat"
         Devices -> "devices"
-        is RemoteList -> "rlist:$peer"
         is RemoteChat -> "rchat:$peer"
     }
 
@@ -51,7 +48,6 @@ sealed interface Route {
                 "models" -> Models
                 "aichat" -> AiChat
                 "devices" -> Devices
-                "rlist" -> value.takeIf { it.isNotEmpty() }?.let(::RemoteList)
                 "rchat" -> value.takeIf { it.isNotEmpty() }?.let(::RemoteChat)
                 else -> null
             }

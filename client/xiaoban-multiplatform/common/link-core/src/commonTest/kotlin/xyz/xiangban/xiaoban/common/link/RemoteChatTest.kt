@@ -150,4 +150,67 @@ class RemoteChatTest {
         link.emitEventForTest(LinkEvent.Message("dsk_1", expired.encodeToByteArray()))
         assertNull(controller.state.value.pendingApproval)
     }
+
+    @Test
+    fun `sidebar groups conversations by project folder and keeps loose ones apart`() {
+        val sessions = listOf(
+            RemoteSessionSummary("s1", "修复登录页的测试", 300, "running", "D:\\work\\xiaoban-web"),
+            RemoteSessionSummary("s2", "整理本周周报", 100, "idle", "D:\\docs\\weekly"),
+            RemoteSessionSummary("s3", "给项目加深色模式", 200, "idle", "D:\\work\\xiaoban-web\\"),
+            RemoteSessionSummary("s4", "查端口占用", 50, "idle", ""),
+        )
+        val bar = buildSidebar(sessions, added = listOf("D:\\work\\xiaoban-docs", "D:\\docs\\weekly\\"))
+        assertEquals(listOf("xiaoban-web", "weekly", "xiaoban-docs"), bar.projects.map { it.name })
+        assertEquals(listOf("s1", "s3"), bar.projects[0].sessions.map { it.id }, "新的在前，末尾多一个分隔符算同一个项目")
+        assertTrue(bar.projects[0].running)
+        assertEquals(emptyList(), bar.projects[2].sessions, "刚添加的项目没有对话也要显示")
+        assertEquals(1, bar.projects.count { it.name == "weekly" }, "已有对话的项目不会因为被添加过而重复")
+        assertEquals(listOf("s4"), bar.loose.map { it.id })
+        assertEquals("xiaoban-web", folderName("/Users/me/xiaoban-web/"))
+        assertEquals("C:", folderName("C:\\"))
+    }
+
+    @Test
+    fun `a new chat in a project sends the folder once and the first list opens only the latest chat`() = runTest {
+        val link = createLink()
+        val sent = mutableListOf<String>()
+        link.sendObserverForTest = { _, data -> sent += data.decodeToString() }
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        assertTrue(sent.any { it.contains("\"projects.list\"") }, "上线后要向电脑要最近的项目")
+
+        val page = """{"t":"sessions.page","id":"1","items":[
+            {"id":"old","title":"旧的","updated_at":10,"state":"idle","workspace":"D:\\a"},
+            {"id":"new","title":"新的","updated_at":20,"state":"idle","workspace":"D:\\b"}]}"""
+        link.emitEventForTest(LinkEvent.Message("dsk_1", page.encodeToByteArray()))
+        assertEquals("new", controller.state.value.selectedSessionId, "进设备先打开最近的对话")
+        assertEquals("D:\\b", controller.state.value.currentWorkspace)
+
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"projects.page","id":"2","recent":[{"path":"D:\\a","name":"a"},{"path":"D:\\c"}]}""".encodeToByteArray()))
+        assertEquals(listOf("a", "c"), controller.state.value.recentProjects.map { it.name })
+
+        controller.addProject("D:\\c")
+        assertNull(controller.state.value.selectedSessionId)
+        assertEquals("D:\\c", controller.state.value.currentWorkspace)
+        assertTrue(controller.state.value.sidebar.projects.any { it.name == "c" })
+
+        // 重新拉列表不能把用户从新对话里拽回旧对话
+        link.emitEventForTest(LinkEvent.Message("dsk_1", page.encodeToByteArray()))
+        assertNull(controller.state.value.selectedSessionId)
+
+        sent.clear()
+        controller.send("在 c 里做点事")
+        val frame = sent.single { it.contains("\"message.send\"") }
+        assertTrue(frame.contains("\"workspace\":\"D:\\\\c\""), frame)
+        assertFalse(frame.contains("\"session\""), frame)
+
+        // 已有对话里发消息，不再带文件夹
+        controller.selectSession("old")
+        sent.clear()
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"3","session":"old","kind":"turn.done","data":{}}""".encodeToByteArray()))
+        controller.send("继续")
+        val second = sent.single { it.contains("\"message.send\"") }
+        assertTrue(second.contains("\"session\":\"old\"") && !second.contains("workspace"), second)
+    }
 }

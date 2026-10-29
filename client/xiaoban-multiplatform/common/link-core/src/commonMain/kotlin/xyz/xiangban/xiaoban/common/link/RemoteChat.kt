@@ -35,7 +35,66 @@ data class RemoteSessionSummary(
     val title: String,
     @SerialName("updated_at") val updatedAt: Long = 0,
     val state: String = "idle",
+    /** 这个对话在电脑上的工作文件夹，也就是它所属的项目；老对话可能为空。 */
+    val workspace: String = "",
 )
+
+/** 电脑上最近用过、手机可以拿来当项目的文件夹。 */
+data class RemoteProject(val path: String, val name: String = folderName(path))
+
+/** 侧栏里的一个项目：文件夹加它下面的对话（新的在前）。 */
+data class RemoteProjectGroup(
+    val path: String,
+    val name: String,
+    val sessions: List<RemoteSessionSummary>,
+) {
+    val running: Boolean get() = sessions.any { it.state == "running" }
+}
+
+/** 侧栏要显示的内容：按项目分好的对话，加上没有项目的对话。 */
+data class RemoteSidebar(
+    val projects: List<RemoteProjectGroup>,
+    val loose: List<RemoteSessionSummary>,
+)
+
+private fun trimSeparators(path: String): String = path.trim().trimEnd('/', '\\')
+
+/** 文件夹路径的最后一段（项目名）；同时认 `/` 和 `\\`，因为路径来自 Windows 或 macOS 的电脑。 */
+fun folderName(path: String): String {
+    val trimmed = trimSeparators(path)
+    val last = trimmed.substringAfterLast('/').substringAfterLast('\\')
+    return last.ifEmpty { path }
+}
+
+/**
+ * 把一台电脑的对话按项目（工作文件夹）分组。项目按最近一次对话的时间排，`added` 是手机上刚添加、还没有对话的项目，排在最后；
+ * 没有文件夹的对话放进 `loose`。两边文件夹只差末尾分隔符时算同一个项目。
+ */
+fun buildSidebar(sessions: List<RemoteSessionSummary>, added: Collection<String> = emptyList()): RemoteSidebar {
+    val byFolder = LinkedHashMap<String, MutableList<RemoteSessionSummary>>()
+    val shown = HashMap<String, String>()
+    val loose = mutableListOf<RemoteSessionSummary>()
+    for (session in sessions.sortedByDescending { it.updatedAt }) {
+        if (session.workspace.isBlank()) {
+            loose += session
+            continue
+        }
+        val key = trimSeparators(session.workspace)
+        shown.getOrPut(key) { session.workspace }
+        byFolder.getOrPut(key) { mutableListOf() } += session
+    }
+    for (path in added) {
+        val key = trimSeparators(path)
+        if (key.isNotEmpty() && key !in byFolder) {
+            shown[key] = path
+            byFolder[key] = mutableListOf()
+        }
+    }
+    return RemoteSidebar(
+        projects = byFolder.map { (key, items) -> RemoteProjectGroup(shown.getValue(key), folderName(shown.getValue(key)), items) },
+        loose = loose,
+    )
+}
 
 @Serializable
 data class RemoteApprovalOption(
@@ -96,6 +155,12 @@ data class RemoteChatState(
     val peers: List<PeerSummary> = emptyList(),
     val isPeerOnline: Boolean = false,
     val sessions: List<RemoteSessionSummary> = emptyList(),
+    /** 电脑上最近用过的文件夹，“新项目”里选。 */
+    val recentProjects: List<RemoteProject> = emptyList(),
+    /** 在手机上添加、还没有对话的项目（只保存在本次打开期间；有了对话就由电脑记着）。 */
+    val addedProjects: List<String> = emptyList(),
+    /** 下一条新对话要在哪个项目文件夹里开始；空表示沿用电脑上最近用的。 */
+    val newChatWorkspace: String? = null,
     val selectedSessionId: String? = null,
     val loadingSessions: Boolean = false,
     val messages: List<RemoteTurn> = emptyList(),
@@ -105,6 +170,13 @@ data class RemoteChatState(
     val error: String? = null,
 ) {
     val selectedPeer: PeerSummary? get() = peers.firstOrNull { it.id == selectedPeerId }
+    val selectedSession: RemoteSessionSummary? get() = sessions.firstOrNull { it.id == selectedSessionId }
+
+    /** 当前所处的项目文件夹：正在开始的新对话用选的那个，否则是当前对话所在的。 */
+    val currentWorkspace: String
+        get() = if (selectedSessionId == null) newChatWorkspace.orEmpty() else selectedSession?.workspace.orEmpty()
+
+    val sidebar: RemoteSidebar get() = buildSidebar(sessions, addedProjects)
 }
 
 private val ProtocolJson = Json { ignoreUnknownKeys = true; explicitNulls = false }
@@ -131,6 +203,9 @@ class RemoteChatController(
 
     private var nextMsgSeq = 1L
     private var eventConsumerJob: Job? = null
+
+    /** 刚选中一台电脑时，第一页对话列表回来后自动打开最近的一个；用户自己点了新对话或别的对话以后就不再抢。 */
+    private var openLatestWhenListed = true
 
     init {
         startListening()
@@ -165,11 +240,13 @@ class RemoteChatController(
         if (chosen != null && chosen.online) {
             sendHello(chosen.id)
             fetchSessions(chosen.id)
+            fetchProjects(chosen.id)
         }
     }
 
     fun selectPeer(peerId: String) {
         val peer = _state.value.peers.firstOrNull { it.id == peerId } ?: return
+        openLatestWhenListed = true
         val oldPeer = _state.value.selectedPeerId
         val oldSession = _state.value.selectedSessionId
         if (oldPeer != null && oldSession != null) {
@@ -183,6 +260,9 @@ class RemoteChatController(
             selectedPeerId = peer.id,
             isPeerOnline = peer.online,
             sessions = emptyList(),
+            recentProjects = emptyList(),
+            addedProjects = emptyList(),
+            newChatWorkspace = null,
             selectedSessionId = null,
             messages = emptyList(),
             toolProgress = emptyList(),
@@ -191,10 +271,12 @@ class RemoteChatController(
         if (peer.online) {
             sendHello(peer.id)
             fetchSessions(peer.id)
+            fetchProjects(peer.id)
         }
     }
 
     fun selectSession(sessionId: String) {
+        openLatestWhenListed = false
         val peerId = _state.value.selectedPeerId ?: return
         val oldSession = _state.value.selectedSessionId
         if (oldSession != null && oldSession != sessionId) {
@@ -206,6 +288,7 @@ class RemoteChatController(
         }
         _state.value = _state.value.copy(
             selectedSessionId = sessionId,
+            newChatWorkspace = null,
             messages = emptyList(),
             toolProgress = emptyList(),
             pendingApproval = null,
@@ -218,7 +301,10 @@ class RemoteChatController(
         })
     }
 
-    fun newSession() {
+    /** 开始一个新对话。`workspace` 是要在哪个项目里开始；不传就留在当前所在的项目。 */
+    fun newSession(workspace: String? = null) {
+        openLatestWhenListed = false
+        val keep = workspace ?: _state.value.currentWorkspace
         val peerId = _state.value.selectedPeerId
         val oldSession = _state.value.selectedSessionId
         if (peerId != null && oldSession != null) {
@@ -230,11 +316,21 @@ class RemoteChatController(
         }
         _state.value = _state.value.copy(
             selectedSessionId = null,
+            newChatWorkspace = keep.ifBlank { null },
             messages = emptyList(),
             toolProgress = emptyList(),
             pendingApproval = null,
             sending = false,
         )
+    }
+
+    /** 把电脑上最近用过的一个文件夹加成项目，并在里面开始一个新对话。 */
+    fun addProject(path: String) {
+        if (path.isBlank()) return
+        val s = _state.value
+        val known = s.sidebar.projects.any { trimSeparators(it.path) == trimSeparators(path) }
+        if (!known) _state.value = s.copy(addedProjects = s.addedProjects + path)
+        newSession(path)
     }
 
     fun send(rawText: String) {
@@ -257,6 +353,7 @@ class RemoteChatController(
             put("id", nextId())
             val sid = _state.value.selectedSessionId
             if (!sid.isNullOrBlank()) put("session", sid)
+            else _state.value.newChatWorkspace?.takeIf { it.isNotBlank() }?.let { put("workspace", it) }
             put("text", text)
             put("client_id", clientId)
         })
@@ -307,6 +404,7 @@ class RemoteChatController(
                 add(JsonPrimitive("sessions"))
                 add(JsonPrimitive("stream"))
                 add(JsonPrimitive("approvals"))
+                add(JsonPrimitive("projects"))
             })
             put("app", "xiaoban-android")
         })
@@ -319,6 +417,14 @@ class RemoteChatController(
             put("t", "sessions.list")
             put("id", nextId())
             put("limit", 50)
+        })
+    }
+
+    fun fetchProjects(peerId: String? = _state.value.selectedPeerId) {
+        val target = peerId ?: return
+        sendJson(target, buildJsonObject {
+            put("t", "projects.list")
+            put("id", nextId())
         })
     }
 
@@ -343,6 +449,7 @@ class RemoteChatController(
                 if (event.peer == _state.value.selectedPeerId && event.online) {
                     sendHello(event.peer)
                     fetchSessions(event.peer)
+                    fetchProjects(event.peer)
                     val sid = _state.value.selectedSessionId
                     if (sid != null) {
                         sendJson(event.peer, buildJsonObject {
@@ -375,9 +482,20 @@ class RemoteChatController(
                         runCatching { ProtocolJson.decodeFromJsonElement(RemoteSessionSummary.serializer(), it) }.getOrNull()
                     }
                     _state.value = _state.value.copy(sessions = items, loadingSessions = false)
-                    if (_state.value.selectedSessionId == null && items.isNotEmpty()) {
-                        selectSession(items[0].id)
+                    if (openLatestWhenListed && _state.value.selectedSessionId == null && items.isNotEmpty()) {
+                        openLatestWhenListed = false
+                        selectSession(items.maxByOrNull { it.updatedAt }!!.id)
                     }
+                }
+            }
+            "projects.page" -> {
+                if (peer == _state.value.selectedPeerId) {
+                    val items = obj["recent"]?.jsonArray.orEmpty().mapNotNull {
+                        val o = it as? JsonObject ?: return@mapNotNull null
+                        val path = o["path"].asStr()?.takeIf { p -> p.isNotBlank() } ?: return@mapNotNull null
+                        RemoteProject(path, o["name"].asStr()?.takeIf { n -> n.isNotBlank() } ?: folderName(path))
+                    }
+                    _state.value = _state.value.copy(recentProjects = items)
                 }
             }
             "sessions.changed" -> {
@@ -434,6 +552,7 @@ class RemoteChatController(
                 val sid = obj["session"].asStr()
                 if (sid != null && _state.value.selectedSessionId == null) {
                     _state.value = _state.value.copy(selectedSessionId = sid)
+                    fetchSessions(peer)
                 }
             }
             "event" -> {

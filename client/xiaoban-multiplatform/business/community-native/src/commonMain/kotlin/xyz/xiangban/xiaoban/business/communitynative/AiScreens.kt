@@ -133,12 +133,12 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
                 val peers = remote.peers
                 val computerDesc = when {
                     !session.loggedIn -> "登录后可用"
-                    peers.isEmpty() -> "还没有找到电脑"
+                    peers.isEmpty() -> "还没有找到设备"
                     peers.any { it.online } -> peers.first { it.online }.name + " · 在线"
-                    else -> "电脑都不在线"
+                    else -> "设备都不在线"
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FeatureTile(XIcons.Monitor, "我的电脑", computerDesc, Modifier.weight(1f)) { open(Route.Devices) }
+                    FeatureTile(XIcons.Monitor, "我的设备", computerDesc, Modifier.weight(1f)) { open(Route.Devices) }
                     FeatureTile(XIcons.Star, "模型与额度", if (session.loggedIn) quotaText(cloud.balance) else "登录后可用", Modifier.weight(1f)) { open(Route.Models) }
                 }
 

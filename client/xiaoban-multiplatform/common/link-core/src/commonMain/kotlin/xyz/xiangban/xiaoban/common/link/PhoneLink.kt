@@ -73,6 +73,9 @@ class PhoneLink(
         _events.emit(event)
     }
 
+    /** 测试用：每次 `send` 先通知它，方便检查发出去的内容（没有连上中转时也会通知）。 */
+    internal var sendObserverForTest: ((peer: String, data: ByteArray) -> Unit)? = null
+
     internal suspend fun seedPeersForTest(peers: List<PeerSummary>) = lock.withLock {
         peerMap.clear()
         peers.forEach { peerMap[it.id] = it }
@@ -148,6 +151,7 @@ class PhoneLink(
     suspend fun send(peer: String, data: ByteArray, notify: Boolean = false) {
         if (data.size > MAX_LINK_MESSAGE_BYTES) throw LinkException("消息太大")
         if (lock.withLock { peer !in peerMap }) throw LinkException("没有这台电脑")
+        sendObserverForTest?.invoke(peer, data)
         val channel = out ?: throw LinkException("没有连上中转服务")
         val frame = buildJsonObject {
             put("op", "send"); put("to", peer); put("data", data.decodeToString()); put("notify", notify)

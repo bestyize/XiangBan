@@ -23,6 +23,21 @@ pub fn remote_request_id(peer_id: &str, client_id: &str) -> String {
     format!("remote-{}-{}", clean(peer_id, 40), clean(client_id, 80))
 }
 
+/// 文件夹路径的最后一段（项目名）。同时认 `/` 和 `\\`，因为路径来自 Windows 或 macOS 的电脑，而测试可能跑在另一种系统上。
+pub fn folder_name(path: &str) -> String {
+    let trimmed = path.trim_end_matches(['/', '\\']);
+    let last = trimmed.rsplit(['/', '\\']).next().unwrap_or("");
+    if last.is_empty() { path.to_string() } else { last.to_string() }
+}
+
+/// 手机指定的项目文件夹是否在电脑已知的文件夹里（最近用过的、已有对话用的）。只比较去掉末尾分隔符后的原样文本，
+/// 所以手机不能借此把对话指到电脑上任意一个路径。
+pub fn workspace_allowed(candidate: &str, known: &[String]) -> bool {
+    let norm = |p: &str| p.trim().trim_end_matches(['/', '\\']).to_string();
+    let wanted = norm(candidate);
+    !wanted.is_empty() && known.iter().any(|k| norm(k) == wanted)
+}
+
 /// 按字符数截断；返回（文本，是否被截断）。
 pub fn truncate_chars(text: &str, max: usize) -> (String, bool) {
     match text.char_indices().nth(max) {
@@ -287,6 +302,26 @@ mod tests {
         assert_eq!(clip_detail(&json!({ "cmd": "ls" }), 100), json!({ "cmd": "ls" }));
         assert!(clip_detail(&json!({ "cmd": "x".repeat(500) }), 50)["text"].is_string());
         assert_eq!(clip_detail(&json!("rm -rf"), 50), json!({ "text": "rm -rf" }));
+    }
+
+    #[test]
+    fn folder_name_takes_the_last_segment_of_either_style_of_path() {
+        assert_eq!(folder_name("D:\\work\\xiaoban-web"), "xiaoban-web");
+        assert_eq!(folder_name("/Users/me/docs/"), "docs");
+        assert_eq!(folder_name("C:\\"), "C:");
+        assert_eq!(folder_name("/"), "/");
+        assert_eq!(folder_name("项目"), "项目");
+    }
+
+    #[test]
+    fn a_phone_can_only_pick_folders_the_computer_already_knows() {
+        let known = vec!["D:\\work\\xiaoban-web".to_string(), "/Users/me/docs".to_string()];
+        assert!(workspace_allowed("D:\\work\\xiaoban-web", &known));
+        assert!(workspace_allowed("/Users/me/docs/", &known));
+        assert!(!workspace_allowed("D:\\work", &known));
+        assert!(!workspace_allowed("/Users/me/docs/../.ssh", &known));
+        assert!(!workspace_allowed("", &known));
+        assert!(!workspace_allowed("/", &known));
     }
 
     #[test]
