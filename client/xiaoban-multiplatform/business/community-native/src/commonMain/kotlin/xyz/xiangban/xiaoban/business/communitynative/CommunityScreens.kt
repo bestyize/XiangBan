@@ -37,7 +37,7 @@ private enum class CommunitySection(val label: String) { Home("首页"), Resourc
 fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
     var section by rememberSaveable { mutableStateOf(CommunitySection.Home.name) }
     Column(Modifier.fillMaxSize()) {
-        CommunityHeader(CommunitySection.valueOf(section)) { section = it.name }
+        CommunityHeader(CommunitySection.valueOf(section), onSelect = { section = it.name }, onSearch = { open(Route.Search) })
         Hairline()
         Box(Modifier.weight(1f).fillMaxWidth().padding(bottom = NavInset)) {
             when (CommunitySection.valueOf(section)) {
@@ -50,7 +50,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
 }
 
 @Composable
-private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySection) -> Unit) {
+private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySection) -> Unit, onSearch: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(72.dp)) {
@@ -70,7 +70,7 @@ private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySecti
                     }
                 }
             }
-            Spacer(Modifier.width(72.dp))
+            Box(Modifier.width(72.dp), contentAlignment = Alignment.CenterEnd) { IconTap(XIcons.Search, "搜索", onSearch) }
         }
     }
 }

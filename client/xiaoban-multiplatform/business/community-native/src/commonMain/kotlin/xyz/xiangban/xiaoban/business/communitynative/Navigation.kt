@@ -7,6 +7,8 @@ sealed interface Route {
     data class Weekly(val week: String) : Route
     data class Project(val slug: String) : Route
     data object Login : Route
+    data object Search : Route
+    data object NewPost : Route
     data object Settings : Route
     data object Models : Route
     /** 云端小伴的对话页。 */
@@ -23,6 +25,8 @@ sealed interface Route {
         is Weekly -> "weekly:$week"
         is Project -> "project:$slug"
         Login -> "login"
+        Search -> "search"
+        NewPost -> "newpost"
         Settings -> "settings"
         Models -> "models"
         AiChat -> "aichat"
@@ -41,6 +45,8 @@ sealed interface Route {
                 "weekly" -> value.takeIf { it.isNotEmpty() }?.let(::Weekly)
                 "project" -> value.takeIf { it.isNotEmpty() }?.let(::Project)
                 "login" -> Login
+                "search" -> Search
+                "newpost" -> NewPost
                 "settings" -> Settings
                 "models" -> Models
                 "aichat" -> AiChat

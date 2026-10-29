@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -273,6 +274,28 @@ fun TextBox(
             },
         )
     }
+}
+
+/** 多行输入框：和 [TextBox] 同样的描边样式，高度随内容增长，至少 [minHeight]。 */
+@Composable
+fun AreaBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, placeholder: String = "", minHeight: Dp = 120.dp, enabled: Boolean = true) {
+    BasicTextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier.fillMaxWidth(),
+        enabled = enabled,
+        textStyle = TextStyle(fontSize = 15.sp, lineHeight = 24.sp, color = MaterialTheme.colorScheme.onSurface),
+        cursorBrush = SolidColor(Brand),
+        decorationBox = { inner ->
+            Box(
+                Modifier.fillMaxWidth().heightIn(min = minHeight).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface)
+                    .border(1.dp, LocalExtraColors.current.line, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+            ) {
+                if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 15.sp, lineHeight = 24.sp)
+                inner()
+            }
+        },
+    )
 }
 
 /** 开关：48×28，开启时品牌红。 */

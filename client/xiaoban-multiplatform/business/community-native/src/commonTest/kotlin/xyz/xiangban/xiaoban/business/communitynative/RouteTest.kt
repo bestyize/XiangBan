@@ -8,7 +8,7 @@ class RouteTest {
     @Test
     fun everyRouteSurvivesEncoding() {
         val routes = listOf(Route.Pack(42), Route.Topic(7), Route.Weekly("2026-W43"), Route.Project("xiaoban"), Route.Login, Route.Devices,
-            Route.Settings, Route.Models, Route.AiChat, Route.RemoteList("dsk_abc123"), Route.RemoteChat("dsk_abc123"))
+            Route.Search, Route.NewPost, Route.Settings, Route.Models, Route.AiChat, Route.RemoteList("dsk_abc123"), Route.RemoteChat("dsk_abc123"))
         routes.forEach { assertEquals(it, Route.decode(it.encode())) }
         assertEquals(routes, Route.decodeStack(Route.encodeStack(routes)))
     }

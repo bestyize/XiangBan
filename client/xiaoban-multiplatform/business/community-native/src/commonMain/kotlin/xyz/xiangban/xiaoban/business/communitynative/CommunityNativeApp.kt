@@ -66,6 +66,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                     env,
                     onDismiss = { publishOpen = false },
                     onAiCreate = { publishOpen = false; chat.clearConversation(); push(Route.AiChat) },
+                    onNewPost = { publishOpen = false; push(Route.NewPost) },
                 )
             }
         }
@@ -76,10 +77,12 @@ fun CommunityNativeApp(env: CommunityEnv) {
 private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Route, push: (Route) -> Unit, pop: () -> Unit) {
     when (route) {
         is Route.Pack -> PackDetailScreen(env, route.id, pop)
-        is Route.Topic -> TopicDetailScreen(env, route.id, pop)
+        is Route.Topic -> TopicDetailScreen(env, route.id, pop, push)
         is Route.Weekly -> WeeklyDetailScreen(env, route.week, push, pop)
         is Route.Project -> ProjectDetailScreen(env, route.slug, pop)
         Route.Login -> LoginScreen(env, done = pop, back = pop)
+        Route.Search -> SearchScreen(env, back = pop, open = push)
+        Route.NewPost -> NewPostScreen(env, back = pop, open = push)
         Route.Settings -> SettingsScreen(env, back = pop, open = push)
         Route.Models -> ModelsScreen(env, chat, back = pop, open = push)
         Route.AiChat -> AiChatPage(env, chat, back = pop, open = push)
@@ -91,13 +94,13 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
 
 /** 发布弹层：用 AI 创作走云端小伴；发布已有作品和发帖目前在网页上完成。 */
 @Composable
-private fun PublishSheet(env: CommunityEnv, onDismiss: () -> Unit, onAiCreate: () -> Unit) {
+private fun PublishSheet(env: CommunityEnv, onDismiss: () -> Unit, onAiCreate: () -> Unit, onNewPost: () -> Unit) {
     val site = env.config.forumBase.trimEnd('/')
     BottomSheet(onDismiss) {
         Text("发布", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         SheetAction(XIcons.Sparkle, "用 AI 创作", "一句话生成特效、壁纸、组件或小游戏", onAiCreate)
         SheetAction(XIcons.Upload, "发布已有作品", "选择资源包（.zip），在网页上发布到社区") { onDismiss(); env.platform?.openUrl("$site/publish") }
-        SheetAction(XIcons.Pen, "发帖", "在讨论或资源里发一个帖子（网页）") { onDismiss(); env.platform?.openUrl("$site/new") }
+        SheetAction(XIcons.Pen, "发帖", "在讨论或资源里发一个帖子", onNewPost)
         GhostPillButton("取消", onDismiss, Modifier.padding(top = 8.dp).fillMaxWidth())
     }
 }
