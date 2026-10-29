@@ -221,6 +221,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                 SpokenCall(
                     uiScopeForCall, platform, RemoteAssistant(env.remoteChat),
                     env.recognizers(DesktopRecognizer(env.remoteChat), CloudRecognizer(env.ai)), env.synthesizers(),
+                    env.turnJudge(),
                 )
             }
         }

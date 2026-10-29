@@ -20,6 +20,7 @@ dependencies {
     implementation(project(":shell"))
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.onnxruntime.android)
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)

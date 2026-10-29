@@ -524,7 +524,11 @@ class CloudChatController(
         _state.value = _state.value.copy(selectedTier = tier)
     }
 
-    fun send(rawPrompt: String) {
+    fun send(rawPrompt: String) = sendPrompt(rawPrompt, "")
+
+    fun sendVoice(rawPrompt: String, note: String) = sendPrompt(rawPrompt, note)
+
+    private fun sendPrompt(rawPrompt: String, note: String) {
         val prompt = rawPrompt.trim()
         if (prompt.isEmpty() || _state.value.sending) return
         val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt)
@@ -537,7 +541,7 @@ class CloudChatController(
                     add(ChatMessage(turn.role, turn.text))
                 }
             }
-            add(ChatMessage("user", prompt))
+            add(ChatMessage("user", note + prompt))
         }
         val tier = _state.value.selectedTier.ifEmpty { null }
         _state.value = _state.value.copy(
@@ -553,7 +557,7 @@ class CloudChatController(
                     // 先记下这一轮的编号再发出去，免得回来的事件比赋值还早。
                     val runId = agent.nextRunId()
                     agentRun = runId
-                    agent.run(agentSession, prompt, runId)
+                    agent.run(agentSession, note + prompt, runId)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {

@@ -14,6 +14,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 class RemoteAssistant(private val chat: RemoteChatController) : CallAssistant {
     override fun unavailableReason(): String? = if (chat.state.value.isPeerOnline) null else "设备不在线，没法通话"
     override fun ask(text: String) = chat.send(text)
+    override fun askWithNote(text: String, note: String) = chat.sendVoiceText(text, note)
     override fun cancel() { if (chat.state.value.sending) chat.cancel() }
     override fun reply(): AssistantReply {
         val state = chat.state.value

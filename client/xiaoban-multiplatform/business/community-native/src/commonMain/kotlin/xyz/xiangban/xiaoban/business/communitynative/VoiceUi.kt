@@ -44,7 +44,11 @@ import xyz.xiangban.xiaoban.common.community.VoiceCall
 
 /** 通话和语音输入用的识别引擎，按顺序用：手机本地（模型下好了才有）→ [fallbacks]（电脑上的、云端的）。 */
 fun CommunityEnv.recognizers(vararg fallbacks: RecognizerEngine): List<RecognizerEngine> =
-    listOfNotNull(speech?.recognizer?.takeIf { speechModels?.ready == true }) + fallbacks
+    listOfNotNull(speech?.recognizer?.takeIf { xyz.xiangban.xiaoban.common.community.SenseVoiceModel.Files.all { spec -> speech.files.size(spec.name) == spec.bytes } }) + fallbacks
+
+fun CommunityEnv.turnJudge(): (suspend (ByteArray) -> Boolean?)? =
+    speech?.takeIf { it.files.size(xyz.xiangban.xiaoban.common.community.VoiceModels.SmartTurnName) == xyz.xiangban.xiaoban.common.community.VoiceModels.SmartTurn.bytes }
+        ?.let { local -> { audio -> local.turnComplete(audio) } }
 
 /** 依次试每个引擎，第一个出结果的算数；一个都不行返回 null 和原因。 */
 suspend fun recognizeWith(engines: List<RecognizerEngine>, pcm: ByteArray): Pair<String?, String?> {
@@ -77,7 +81,7 @@ fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Bo
     BottomSheet({ job?.cancel(); onFinished(false) }, panelModifier) {
         Text("在手机上识别语音", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Text(
-            "下载语音模型（SenseVoice 识别加 Silero 人声检测，共约 ${(total / 1_000_000)} MB，和电脑上用的是同一套），之后识别和判断你说完没有都在手机上完成，不用把录音传出去，也不依赖电脑在线。建议在 Wi-Fi 下载。",
+            "下载语音模型（SenseVoice 识别、Silero 人声检测和 Smart Turn 判停，共约 ${(total / 1_000_000)} MB，和电脑上用的是同一套）；已下载的文件会复用。之后识别和判断你说完没有都在手机上完成。建议在 Wi-Fi 下载。",
             Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (running || done > 0) {

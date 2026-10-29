@@ -55,7 +55,7 @@ class RemoteChatTest {
         assertEquals("s_1", controller.state.value.selectedSessionId)
 
         // 模拟对端发来快照消息
-        val snapshotJson = """{"t":"session.snapshot","id":"2","session":"s_1","messages":[{"role":"user","content":"你好"},{"role":"assistant","content":"我是小伴"}]}"""
+        val snapshotJson = """{"t":"session.snapshot","id":"2","session":"s_1","messages":[{"role":"user","content":"【语音打断】之前已经听到一部分。\n你好"},{"role":"assistant","content":"我是小伴"}]}"""
         link.emitEventForTest(LinkEvent.Message("dsk_1", snapshotJson.encodeToByteArray()))
         assertEquals(2, controller.state.value.messages.size)
         assertEquals("你好", controller.state.value.messages[0].text)

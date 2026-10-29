@@ -19,6 +19,7 @@ import xyz.xiangban.xiaoban.common.community.SpeechSettings
 import xyz.xiangban.xiaoban.common.community.SpeechSource
 import xyz.xiangban.xiaoban.common.community.SpeechSplitter
 import xyz.xiangban.xiaoban.common.community.SynthesizerEngine
+import xyz.xiangban.xiaoban.common.community.speechText
 
 /**
  * 声音设置的当前值。放在全局的可观察状态里，设置页改了，聊天里的朗读、通话马上按新的来；
@@ -67,7 +68,7 @@ class ReplyReader(private val env: CommunityEnv) {
     }
 
     fun enqueue(text: String, voice: String? = null) {
-        val clean = text.trim()
+        val clean = speechText(text)
         if (clean.isEmpty() || env.platform == null) return
         pending.addLast(Item(clean, voice))
         speaking = true

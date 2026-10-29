@@ -1,6 +1,10 @@
 package xyz.xiangban.xiaoban
 
 import android.content.Context
+import ai.onnxruntime.OnnxTensor
+import ai.onnxruntime.OrtEnvironment
+import ai.onnxruntime.OrtSession
+import java.nio.FloatBuffer
 import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
@@ -17,6 +21,7 @@ import xyz.xiangban.xiaoban.common.community.ModelWriter
 import xyz.xiangban.xiaoban.common.community.RecognizerEngine
 import xyz.xiangban.xiaoban.common.community.SenseVoiceModel
 import xyz.xiangban.xiaoban.common.community.SpeechGate
+import xyz.xiangban.xiaoban.common.community.SmartTurnFeatures
 import xyz.xiangban.xiaoban.common.community.VoiceModels
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
@@ -73,6 +78,7 @@ class SherpaRecognizer(private val files: ModelFiles) : RecognizerEngine {
     override val local = true
     private var recognizer: OfflineRecognizer? = null
     private val lock = Any()
+    private val decoding = kotlinx.coroutines.sync.Mutex()
 
     private fun load(): OfflineRecognizer = synchronized(lock) {
         recognizer?.let { return it }
@@ -98,6 +104,8 @@ class SherpaRecognizer(private val files: ModelFiles) : RecognizerEngine {
     }
 
     override suspend fun recognize(pcm: ByteArray): String = withContext(Dispatchers.Default) {
+        decoding.lock()
+        try {
         val engine = load()
         val samples = FloatArray(pcm.size / 2) { i -> (((pcm[2 * i + 1].toInt() shl 8) or (pcm[2 * i].toInt() and 0xFF)).toShort()) / 32768f }
         val stream = engine.createStream()
@@ -107,6 +115,9 @@ class SherpaRecognizer(private val files: ModelFiles) : RecognizerEngine {
             SenseVoiceModel.cleanText(engine.getResult(stream).text)
         } finally {
             stream.release()
+        }
+        } finally {
+            decoding.unlock()
         }
     }
 }
@@ -163,6 +174,34 @@ class SileroGate(modelPath: String) : SpeechGate {
 class AndroidLocalSpeech(context: Context) : LocalSpeech {
     override val files: ModelFiles = AndroidModelFiles(context)
     override val recognizer: RecognizerEngine = SherpaRecognizer(files)
+    private val turnLock = kotlinx.coroutines.sync.Mutex()
+    private var turnSession: OrtSession? = null
+
+    override suspend fun turnComplete(pcm: ByteArray): Boolean? = withContext(Dispatchers.Default) {
+        if (files.size(VoiceModels.SmartTurnName) != VoiceModels.SmartTurn.bytes) return@withContext null
+        turnLock.lock()
+        try {
+            val environment = OrtEnvironment.getEnvironment()
+            val session = turnSession ?: OrtSession.SessionOptions().use { options ->
+                options.setIntraOpNumThreads(2)
+                environment.createSession(files.path(VoiceModels.SmartTurnName), options).also { turnSession = it }
+            }
+            val features = SmartTurnFeatures.fromPcm(pcm)
+            OnnxTensor.createTensor(environment, FloatBuffer.wrap(features), longArrayOf(1, 80, 800)).use { input ->
+                session.run(mapOf("input_features" to input)).use { result ->
+                    ((result[0] as OnnxTensor).floatBuffer.get() >= 0.5f)
+                }
+            }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        } catch (_: LinkageError) {
+            null
+        } finally {
+            turnLock.unlock()
+        }
+    }
 
     /** 新的人声检测；模型还没下载或原生库不可用时返回 null，通话就改用声音大小判断。 */
     fun newGate(): SpeechGate? {

@@ -90,7 +90,7 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
     val state: StateFlow<CallState> = _state.asStateFlow()
     private var job: Job? = null
     private var playback: CompletableDeferred<Boolean>? = null
-    private var idleRounds = 0
+    protected var cachedRecognition: String? = null
     private val mic = Channel<ByteArray>(Channel.UNLIMITED)
     private var stopMic: (() -> Unit)? = null
     @Volatile private var pendingBarge: ByteArray? = null
@@ -149,6 +149,8 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
 
     protected abstract suspend fun run()
 
+    protected open suspend fun confirmBarge(audio: ByteArray): Boolean = true
+
     protected fun update(change: (CallState) -> CallState) {
         _state.update(change)
     }
@@ -172,7 +174,10 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
      * 给了 [judge] 就用它判断“说完了吗”（停顿很短就能收尾，没说完的会多等一会儿），否则固定停顿一会儿就算说完。
      * 小伴说话时用户开口打断的那句话已经被录下来了，直接交出来。
      */
-    protected suspend fun listenUtterance(judge: (suspend (ByteArray) -> Boolean)? = null): ByteArray? {
+    protected suspend fun listenUtterance(
+        judge: (suspend (ByteArray) -> Boolean)? = null,
+        preview: (suspend (ByteArray) -> String)? = null,
+    ): ByteArray? {
         pendingBarge?.let { pendingBarge = null; interrupted = false; return it }
         interrupted = false
         openMic()
@@ -180,25 +185,48 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
         update { it.copy(phase = CallPhase.Listening, partial = "") }
         val detector = newDetector(strict = false, useJudge = judge != null)
         val verdicts = Channel<Pair<Int, Boolean>>(Channel.UNLIMITED)
+        val previews = Channel<Pair<Int, String>>(Channel.UNLIMITED)
+        var previewJob: Job? = null
+        val judges = mutableListOf<Job>()
+        var latestPreview: Pair<Int, String>? = null
+        cachedRecognition = null
         try {
             var counter = 0
             for (frame in mic) {
                 while (true) { val v = verdicts.tryReceive().getOrNull() ?: break; detector.verdict(v.first, v.second) }
+                while (true) {
+                    val p = previews.tryReceive().getOrNull() ?: break
+                    latestPreview = p
+                    if (p.second.isNotBlank() && !isVoiceNoise(p.second)) update { it.copy(partial = p.second) }
+                }
                 val result = detector.feed(frame)
                 // 声音大小不用每 20ms 都刷新界面。
                 if (++counter % 5 == 0) update { it.copy(level = result.level, phase = if (result.speaking) CallPhase.Hearing else CallPhase.Listening) }
                 if (result.ask != null && judge != null) {
                     val ticket = result.askTicket
                     val audio = result.ask
-                    scope.launch { verdicts.trySend(ticket to (try { judge(audio) } catch (e: CancellationException) { throw e } catch (e: Exception) { false })) }
+                    judges += scope.launch { verdicts.trySend(ticket to (try { judge(audio) } catch (e: CancellationException) { throw e } catch (e: Exception) { false })) }
                 }
-                if (result.utterance != null) return result.utterance
+                if (result.preview != null && preview != null && previewJob?.isActive != true) {
+                    val audio = result.preview
+                    val version = result.speechVersion
+                    previewJob = scope.launch {
+                        try { previews.trySend(version to preview(audio)) } catch (e: CancellationException) { throw e } catch (_: Exception) { }
+                    }
+                }
+                if (result.utterance != null) {
+                    cachedRecognition = latestPreview?.takeIf { it.first == result.speechVersion }?.second?.takeIf { it.isNotBlank() && !isVoiceNoise(it) }
+                    return result.utterance
+                }
                 if (result.timedOut) return null
             }
             return null
         } finally {
             detector.close()
             verdicts.close()
+            previews.close()
+            previewJob?.cancel()
+            judges.forEach { it.cancel() }
         }
     }
 
@@ -211,18 +239,24 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
         bargeTriggered = false
         return scope.launch {
             var detector = newDetector(strict = true)
+            var nextCheck = BargeMs
             try {
                 for (frame in mic) {
                     val r = detector.feed(frame)
-                    if (!bargeTriggered && r.speaking && r.voicedMs >= BargeMs) {
-                        bargeTriggered = true
-                        interrupt()
-                        update { it.copy(phase = CallPhase.Hearing) }
+                    if (!bargeTriggered && r.speaking && r.voicedMs >= nextCheck) {
+                        nextCheck = r.voicedMs + 300
+                        val audio = detector.snapshot()
+                        if (audio != null && confirmBarge(audio) && !interrupted) {
+                            bargeTriggered = true
+                            interrupt()
+                            update { it.copy(phase = CallPhase.Hearing) }
+                        }
                     }
                     if (r.utterance != null || r.timedOut) {
                         if (bargeTriggered && r.utterance != null) { pendingBarge = r.utterance; return@launch }
                         detector.close()
                         detector = newDetector(strict = true)
+                        nextCheck = BargeMs
                     }
                 }
             } finally {
@@ -278,18 +312,7 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
         }
     }
 
-    /** 这一轮没听到话；连续几轮没人说话就结束通话。返回是否应该结束。 */
-    protected fun noSpeech(): Boolean {
-        idleRounds++
-        if (idleRounds >= MaxIdleRounds) {
-            update { it.copy(notice = "好一会儿没听到声音，已结束通话") }
-            return true
-        }
-        return false
-    }
-
     protected fun heardSomething() {
-        idleRounds = 0
         update { it.copy(notice = null) }
     }
 
@@ -297,7 +320,6 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
         withTimeoutOrNull(timeoutMs) { flow.first(predicate) }
 
     private companion object {
-        const val MaxIdleRounds = 3
         /** 连续出声这么久才算打断。 */
         const val BargeMs = 400
     }
@@ -353,6 +375,7 @@ interface CallAssistant {
     fun unavailableReason(): String?
     /** 把你说的话交给它。 */
     fun ask(text: String)
+    fun askWithNote(text: String, note: String) = ask(text)
     fun reply(): AssistantReply
     /** 小伴正等你确认或选择的事；没有就是 null。 */
     fun prompt(): CallPrompt? = null
@@ -372,6 +395,7 @@ class AssistantReply(val text: String, val busy: Boolean, val error: String? = n
 class CloudAssistant(private val chat: CloudChatController) : CallAssistant {
     override fun unavailableReason(): String? = null
     override fun ask(text: String) = chat.send(text)
+    override fun askWithNote(text: String, note: String) = chat.sendVoice(text, note)
     override fun cancel() { if (chat.state.value.sending) chat.stop() }
     override fun reply(): AssistantReply {
         val state = chat.state.value
@@ -407,11 +431,17 @@ class SpokenCall(
     private val assistant: CallAssistant,
     recognizers: List<RecognizerEngine>,
     synthesizers: List<SynthesizerEngine>,
+    private val turnJudge: (suspend (ByteArray) -> Boolean?)? = null,
 ) : VoiceCall(scope, platform) {
     private val recognizers = recognizers.toMutableList()
     private val synthesizers = synthesizers.toMutableList()
+    private var spokenText = ""
+    private var interruptionNote = ""
+    private var lastAck: String? = null
+    private val ackClips = MutableStateFlow<Map<String, ByteArray>>(emptyMap())
 
     override fun interrupt() {
+        if (!interrupted) interruptionNote = voiceInterruptionNote(spokenText)
         super.interrupt()
         assistant.cancel()
     }
@@ -421,14 +451,36 @@ class SpokenCall(
         update { it.copy(prompt = null) }
     }
 
+    override suspend fun confirmBarge(audio: ByteArray): Boolean {
+        val local = recognizers.firstOrNull { it.local } ?: return true
+        val text = try { local.recognize(audio).trim() } catch (e: CancellationException) { throw e } catch (_: Exception) { return false }
+        return !isVoiceNoise(text) && !isVoiceEcho(text, spokenText)
+    }
+
     override suspend fun run() {
         assistant.unavailableReason()?.let { throw CallError(it) }
-        while (true) {
-            val text = hear() ?: if (noSpeech()) return else continue
-            heardSomething()
-            update { it.copy(userText = text, replyText = "", partial = "") }
-            phase(CallPhase.Thinking)
-            answer(text)
+        // 只预热免费的 Edge 朗读，失败不影响正常通话。
+        val warm = (synthesizers.firstOrNull() as? EdgeTtsSynthesizer)?.let { engine ->
+            scope.launch {
+                for (phrase in AllVoiceAckPhrases) {
+                    try {
+                        val clip = withTimeoutOrNull(3_000) { engine.synthesize(phrase) } ?: break
+                        ackClips.update { it + (phrase to clip) }
+                    } catch (e: CancellationException) { throw e } catch (_: Exception) { break }
+                }
+            }
+        }
+        try {
+            while (true) {
+                val text = hear() ?: continue
+                if (isVoiceNoise(text)) continue
+                heardSomething()
+                update { it.copy(userText = text, replyText = "", partial = "") }
+                phase(CallPhase.Thinking)
+                answer(text)
+            }
+        } finally {
+            warm?.cancel()
         }
     }
 
@@ -437,6 +489,7 @@ class SpokenCall(
      * 停在“我想要……”这样的半截话上就多等一会儿（电脑端用 Smart Turn 模型判断，手机上用识别结果的标点）。
      */
     private suspend fun finished(audio: ByteArray): Boolean {
+        turnJudge?.invoke(audio)?.let { return it }
         val engine = recognizers.firstOrNull { it.local } ?: return false
         val text = try { engine.recognize(audio).trim() } catch (e: CancellationException) { throw e } catch (e: Exception) { return false }
         return text.isNotEmpty() && text.last() in "。！？!?…"
@@ -445,13 +498,18 @@ class SpokenCall(
     /** 听一句话，转成文字；没听清返回 null。 */
     private suspend fun hear(): String? {
         if (recognizers.isEmpty()) return listenSystem().trim().ifEmpty { null }
-        val pcm = listenUtterance(if (recognizers.any { it.local }) ::finished else null) ?: return null
+        val local = recognizers.firstOrNull { it.local }
+        val pcm = listenUtterance(
+            if (local != null || turnJudge != null) ::finished else null,
+            local?.let { engine -> { audio -> engine.recognize(audio).trim() } },
+        ) ?: return null
         phase(CallPhase.Thinking)
         update { it.copy(partial = "") }
         while (recognizers.isNotEmpty()) {
             val engine = recognizers.first()
             try {
-                return engine.recognize(pcm).trim().ifEmpty { null }
+                val recognized = if (engine.local) cachedRecognition ?: engine.recognize(pcm) else engine.recognize(pcm)
+                return recognized.trim().ifEmpty { null }
             } catch (e: EngineUnavailable) {
                 recognizers.remove(engine)
                 val next = recognizers.firstOrNull()?.name ?: "手机自带的识别"
@@ -471,6 +529,16 @@ class SpokenCall(
 
     private suspend fun answer(text: String) = coroutineScope {
         interrupted = false
+        spokenText = ""
+        // 先开口说什么要在发出去之前定下来，好告诉模型别再说一遍；声音没准备好就不说，也不告诉模型。
+        val ackKind = voiceAckKind(text)
+        val ackPhrase = ackKind?.let { kind ->
+            val ready = ackClips.value
+            chooseVoiceAck(VoiceAckPhrases.getValue(kind).filter { it in ready }, lastAck)
+        }
+        val ackAudio = ackPhrase?.let { ackClips.value[it] }
+        val ack = if (ackKind != null && ackPhrase != null) ackKind to ackPhrase else null
+        if (ackPhrase != null) lastAck = ackPhrase
         val sentences = Channel<String>(Channel.UNLIMITED)
         val clips = Channel<Pair<String, ByteArray?>>(2)
         val synth = launch {
@@ -496,21 +564,37 @@ class SpokenCall(
             clips.close()
         }
         val watcher = watchForBarge()
+        var ackStarted = false
+        val note = interruptionNote + if (ack != null && ackAudio != null) voiceSpokenNote(ack.second) else ""
+        assistant.askWithNote(text, note)
+        interruptionNote = ""
+        val ackJob = if (ack != null && ackAudio != null) launch {
+            val wait = voiceAckDelayMs(ack.first)
+            if (wait > 0) delay(wait)
+            if (!interrupted && assistant.reply().busy && assistant.reply().text.isEmpty()) {
+                ackStarted = true
+                spokenText = ack.second
+                phase(CallPhase.Speaking)
+                playClip(ackAudio, "audio/mpeg")
+            }
+        } else null
         val player = launch {
+            ackJob?.join()
             for ((sentence, audio) in clips) {
                 if (interrupted) continue
                 phase(CallPhase.Speaking)
+                spokenText += sentence
                 val ok = if (audio != null) playClip(audio, "audio/mpeg") else false
                 if (!ok && !interrupted) speakSystem(sentence)
             }
         }
         try {
-            assistant.ask(text)
             val splitter = SpeechSplitter()
             var spoken = 0
             while (true) {
                 val reply = assistant.reply()
                 if (reply.text.length > spoken) {
+                    if (!ackStarted) ackJob?.cancel()
                     for (s in splitter.feed(reply.text.substring(spoken))) sentences.send(s)
                     spoken = reply.text.length
                 }
