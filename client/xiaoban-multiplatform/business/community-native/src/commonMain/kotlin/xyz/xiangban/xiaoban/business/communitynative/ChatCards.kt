@@ -44,6 +44,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withLink
@@ -58,7 +59,9 @@ import xyz.xiangban.xiaoban.common.community.TaskProgress
 import xyz.xiangban.xiaoban.common.community.TaskState
 import xyz.xiangban.xiaoban.common.community.ToolCallInfo
 import xyz.xiangban.xiaoban.common.community.ToolStatus
+import xyz.xiangban.xiaoban.common.community.ChangedFile
 import xyz.xiangban.xiaoban.common.community.activitySummary
+import xyz.xiangban.xiaoban.common.community.changedFiles
 import xyz.xiangban.xiaoban.common.community.describeCall
 import xyz.xiangban.xiaoban.common.community.formatDuration
 import xyz.xiangban.xiaoban.common.community.parseMarkdown
@@ -564,6 +567,7 @@ fun AssistantTurnCards(
     onStop: (() -> Unit)?,
     onSend: (String) -> Unit,
     onRetry: (() -> Unit)? = null,
+    onRegenerate: (() -> Unit)? = null,
 ) {
     val stopped = error == TurnCancelled
     val failure = error?.takeIf { !stopped }
@@ -578,9 +582,74 @@ fun AssistantTurnCards(
     } else if (streaming && waiting != null) {
         StatusLine("等你确认后继续…", alert = true)
     }
+    if (!streaming) {
+        val files = remember(tools) { changedFiles(tools) }
+        if (files.isNotEmpty()) FileChangesCard(files, delivered = progress?.state == TaskState.Completed)
+    }
     records.forEach { RecordRow(it) }
+    if (!streaming && text.isNotEmpty() && failure == null) ReplyActions(text, platform, onRegenerate)
     if (stopped) HintLine("已停止", alert = false)
     if (failure != null) Banner(failure, warn = true, actionText = if (onRetry != null) "重试" else null, onAction = onRetry)
+}
+
+// ───────────── 文件变更与回复操作 ─────────────
+
+/** 本轮写入、修改过的文件。任务完成时叫“交付文件”，否则叫“文件变更”。 */
+@Composable
+fun FileChangesCard(files: List<ChangedFile>, delivered: Boolean, modifier: Modifier = Modifier) {
+    val extra = LocalExtraColors.current
+    var open by rememberSaveable(files.size) { mutableStateOf(files.size <= 4) }
+    CardSurface(modifier) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 30.dp).clickable { open = !open }.padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            XIcon(XIcons.File, size = 15.dp)
+            Text(if (delivered) "交付文件" else "文件变更", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("${files.size}", Modifier.clip(RoundedCornerShape(9.dp)).background(extra.fill).padding(horizontal = 7.dp, vertical = 1.dp), fontSize = 11.sp, color = extra.ink3)
+            Spacer(Modifier.weight(1f))
+            XIcon(XIcons.ChevronDown, tint = extra.ink3, size = 14.dp, modifier = Modifier.rotated(open))
+        }
+        if (open) {
+            Column(Modifier.padding(horizontal = 10.dp)) {
+                files.forEach { file ->
+                    Hairline()
+                    Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            file.extension.ifEmpty { "文件" }, Modifier.widthIn(min = 30.dp).clip(RoundedCornerShape(6.dp)).background(extra.fill).padding(horizontal = 4.dp, vertical = 2.dp),
+                            fontSize = 10.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, maxLines = 1,
+                        )
+                        Text(file.name, Modifier.weight(1f), fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(if (file.created) "已写入" else "已修改", fontSize = 11.sp, color = extra.ink3, maxLines = 1)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 回复下面一排小图标：复制、重新生成。 */
+@Composable
+private fun ReplyActions(text: String, platform: PlatformActions?, onRegenerate: (() -> Unit)?) {
+    val extra = LocalExtraColors.current
+    var copied by remember(text) { mutableStateOf(false) }
+    if (platform == null && onRegenerate == null) return
+    Row(Modifier.padding(start = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (platform != null) {
+            Row(
+                Modifier.heightIn(min = 30.dp).clip(RoundedCornerShape(8.dp)).clickable { platform.copy(text); copied = true }.padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                XIcon(if (copied) XIcons.Check else XIcons.Copy, tint = extra.ink3, size = 15.dp, description = "复制")
+                if (copied) Text("已复制", fontSize = 11.sp, color = extra.ink3)
+            }
+        }
+        if (onRegenerate != null) {
+            Box(Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).clickable(onClick = onRegenerate), contentAlignment = Alignment.Center) {
+                XIcon(XIcons.Refresh, tint = extra.ink3, size = 15.dp, description = "重新生成")
+            }
+        }
+    }
 }
 
 @Composable

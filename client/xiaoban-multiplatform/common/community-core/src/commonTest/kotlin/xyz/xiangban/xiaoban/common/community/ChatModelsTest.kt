@@ -98,4 +98,22 @@ class ChatModelsTest {
         assertEquals(listOf(MdInline.Text("snake_case_name")), parseInlines("snake_case_name"))
         assertEquals(listOf(MdInline.Text("2*3*4")), parseInlines("2*3*4"))
     }
+
+    @Test
+    fun `changed files come from successful writes and edits once each`() {
+        fun call(id: String, name: String, args: String, status: ToolStatus = ToolStatus.Done) = ToolCallInfo(id, name, args, status = status)
+        val files = changedFiles(listOf(
+            call("1", "write_file", """{"path":"game/index.html","content":"x"}"""),
+            call("2", "edit_file", """{"path":"game/index.html","old":"a","new":"b"}"""),
+            call("3", "edit_file", """{"path":"C:\\work\\game.js"}"""),
+            call("4", "write_file", """{"path":"bad.txt"}""", ToolStatus.Error),
+            call("5", "read_file", """{"path":"x.md"}"""),
+            call("6", "write_file", "not json"),
+        ))
+        assertEquals(listOf("game/index.html", "C:\\work\\game.js"), files.map { it.path })
+        assertEquals(listOf(true, false), files.map { it.created })
+        assertEquals("index.html", files[0].name)
+        assertEquals("HTML", files[0].extension)
+        assertEquals("game.js", files[1].name)
+    }
 }

@@ -533,15 +533,20 @@ class CloudChatController(
 
     /** 上一条回复失败时，原样重试最后一条用户提问。 */
     fun retryLast() {
+        val last = _state.value.messages.lastOrNull() ?: return
+        if (last.role != "assistant" || last.error == null) return
+        regenerate()
+    }
+
+    /** 丢掉最后一条回复，把最后一条用户提问再问一遍。 */
+    fun regenerate() {
         val current = _state.value
         if (current.sending) return
-        val last = current.messages.lastOrNull() ?: return
-        if (last.role != "assistant" || last.error == null) return
-        val withoutFailed = current.messages.dropLast(1)
-        val lastUser = withoutFailed.lastOrNull { it.role == "user" } ?: return
-        val trimmed = withoutFailed.dropLastWhile { it.id != lastUser.id }.dropLast(1)
-        _state.value = current.copy(messages = trimmed)
-        send(lastUser.text)
+        val index = current.messages.indexOfLast { it.role == "user" }
+        if (index < 0) return
+        val prompt = current.messages[index].text
+        _state.value = current.copy(messages = current.messages.take(index))
+        send(prompt)
     }
 
     /** 停止正在生成的流式回复，保留已输出的部分文字。 */
