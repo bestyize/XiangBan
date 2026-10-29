@@ -18,7 +18,7 @@ const conversation = () => [
   { kind: 'user', id: 'u1', text: '今天如何放松', images: [] as string[] },
   { kind: 'assistant', id: 'a1', text: '可以先休息片刻。', streaming: false },
 ];
-function setup(overrides: Record<string, unknown> = {}, stubs: Record<string, unknown> = {}) {
+function setup(overrides: Record<string, unknown> = {}, stubs: Record<string, unknown> = {}, extraProps: Record<string, unknown> = {}) {
   const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null as null | { id: string; question: string; options: string[] },
     items: conversation() as unknown[], title: '放松一下', currentId: 's1' as string | null, recent: [{ id: 's1', title: '放松一下', createdAt: 1, updatedAt: 2 }, { id: 's2', title: '周报整理', createdAt: 1, updatedAt: 1 }],
     unread: false, notice: null as null | { kind: string; text: string }, dismissNotice: vi.fn(), switchSession: vi.fn(async () => {}), retry: vi.fn(async () => {}), decide: vi.fn(), reply: vi.fn(),
@@ -27,7 +27,7 @@ function setup(overrides: Record<string, unknown> = {}, stubs: Record<string, un
     voiceAvailable: false, voiceStatus: '', live: false, muted: false, liveSince: 0, liveStatus: '', startLive: vi.fn(async () => {}), endLive: vi.fn(), toggleMute: vi.fn(async () => {}), ...overrides });
   store.dismissNotice.mockImplementation(() => { store.notice = null; });
   const asr=reactive({level:0,enabled:true,microphoneSupported:true,listening:false,preparing:false,recordingRequested:false,microphoneError:''});
-  const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:asr as AsrStore},global:{stubs:{MarkdownView:true,...stubs}}});
+  const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:asr as AsrStore,...extraProps},global:{stubs:{MarkdownView:true,...stubs}}});
   wrappers.push(wrapper);
   return {store,asr,wrapper};
 }
@@ -539,4 +539,39 @@ it('accepts a document drop in the capsule and renders a removable named card', 
   expect(store.attachments[0]).toMatchObject({name:'预算.csv',dataUrl:expect.stringMatching(/^data:text\/csv;base64,/)});
   expect(wrapper.get('[data-testid="assistant-attachments"]').text()).toContain('预算.csv');
   await wrapper.get('[aria-label="移除附件 1"]').trigger('click');expect(store.attachments).toHaveLength(0);
+});
+
+describe('dictation chip', () => {
+  const fakeDictation = () => reactive({ active: false, starting: false, target: 'Claude', partial: '', last: '', start: vi.fn(async function (this: { active: boolean }) { return true; }), stop: vi.fn(async () => {}), micLost: vi.fn() });
+
+  it('starts dictation to the chosen app after taking the microphone from the assistant', async () => {
+    const dictation = fakeDictation();
+    const { store, wrapper } = setup({ voiceAvailable: true, phase: 'idle', items: [], input: '', yieldVoice: vi.fn() }, {}, { dictation });
+    await nextTick();
+    const chip = wrapper.get('[data-testid="assistant-chip-dictation"]');
+    expect(chip.text()).toContain('听写到 Claude');
+    await wrapper.get('[data-testid="assistant-chip-dictation-target"]').trigger('click');
+    expect(dictation.target).toBe('ChatGPT');
+    await chip.trigger('click');
+    expect((store as unknown as { yieldVoice: ReturnType<typeof vi.fn> }).yieldVoice).toHaveBeenCalledOnce();
+    expect(dictation.start).toHaveBeenCalledWith('ChatGPT');
+  });
+
+  it('ends dictation from the same chip and from the orb, and hides the target switch while it runs', async () => {
+    const dictation = fakeDictation(); dictation.active = true;
+    const { wrapper } = setup({ voiceAvailable: true, phase: 'idle', items: [], input: '', yieldVoice: vi.fn() }, {}, { dictation });
+    await nextTick();
+    expect(wrapper.find('[data-testid="assistant-chip-dictation-target"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="assistant-chip-dictation"]').text()).toContain('听写中');
+    await wrapper.get('[data-testid="assistant-chip-dictation"]').trigger('click');
+    expect(dictation.stop).toHaveBeenCalledTimes(1);
+    await wrapper.get('[data-testid="assistant-orb"]').trigger('click');
+    expect(dictation.stop).toHaveBeenCalledTimes(2);
+  });
+
+  it('is not offered when voice input is unavailable', async () => {
+    const { wrapper } = setup({ voiceAvailable: false, phase: 'idle', items: [], input: '' }, {}, { dictation: fakeDictation() });
+    await nextTick();
+    expect(wrapper.find('[data-testid="assistant-chip-dictation"]').exists()).toBe(false);
+  });
 });

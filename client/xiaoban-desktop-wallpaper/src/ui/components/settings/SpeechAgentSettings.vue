@@ -382,7 +382,7 @@ function runCatching(fn: () => Promise<void>) {
       <div v-if="voiceService?.enabled" class="xb-row cmd-row">
         <div class="xb-row-text">
           <b>MCP 配置片段 (给 Claude Code / Desktop)</b>
-          <span>将下方配置写入 <code>.claude/settings.json</code> 即可为外部 Agent 添加中文耳朵与嘴巴：</span>
+          <span>写进项目根目录的 <code>.mcp.json</code>（不是 <code>.claude/settings.json</code>，Claude Code 不读那里的 mcpServers），或用 <code>claude mcp add --transport http</code> 添加，再在 Claude Code 里用 <code>/mcp</code> 查看。<b>目前这个服务的麦克风/扬声器工具还在开发中，连上后工具列表为空；想用中文语音输入，请用助手里的“听写到 Claude”。</b></span>
           <pre class="mcp-code">{{ JSON.stringify(voiceService.mcpConfigSnippet ?? {}, null, 2) }}</pre>
         </div>
         <button
