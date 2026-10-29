@@ -8,6 +8,7 @@ use tokio::time::timeout;
 
 /// Status of a local CLI development tool.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct ToolStatus {
     /// Tool identifier (e.g. "claude", "codex", "node", "git").
     pub name: String,
@@ -25,6 +26,7 @@ pub struct ToolStatus {
 
 /// Running status of a GUI desktop app.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DesktopAppStatus {
     /// App display name (e.g. "Claude", "ChatGPT", "Codex").
     pub name: String,
@@ -34,6 +36,7 @@ pub struct DesktopAppStatus {
 
 /// Comprehensive report of the local environment for speech coding.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct EnvironmentReport {
     /// Operating system and architecture.
     pub os: String,
@@ -53,6 +56,7 @@ pub struct EnvironmentReport {
 
 /// Installation and configuration guide for a missing or upgradable tool.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct InstallGuide {
     /// Tool name.
     pub tool: String,
@@ -270,6 +274,24 @@ pub fn install_guides() -> Vec<InstallGuide> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// 设置页（SpeechAgentSettings.vue）按 camelCase 读这些字段；字段名一变页面渲染就会抛错变成空白。
+    #[tokio::test]
+    async fn environment_report_and_guides_use_the_camel_case_keys_the_settings_page_reads() {
+        let report = serde_json::to_value(detect_environment().await).unwrap();
+        for key in ["os", "node", "git", "claude", "codex", "desktopApps", "readyForSpeechCoding"] {
+            assert!(report.get(key).is_some(), "缺少 {key}：{report}");
+        }
+        assert!(report["desktopApps"].is_array());
+        for key in ["name", "installed", "path", "version", "loggedIn", "notes"] {
+            assert!(report["claude"].get(key).is_some(), "ToolStatus 缺少 {key}");
+        }
+        let guides = serde_json::to_value(install_guides()).unwrap();
+        for key in ["tool", "officialCommand", "mirrorCommand", "loginCommand", "documentationUrl"] {
+            assert!(guides[0].get(key).is_some(), "InstallGuide 缺少 {key}");
+        }
+        assert!(!report.to_string().contains("desktop_apps") && !guides.to_string().contains("official_command"));
+    }
 
     #[cfg(windows)]
     #[tokio::test]

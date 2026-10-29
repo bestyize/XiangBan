@@ -100,6 +100,7 @@ impl ObservedEvent {
 
 /// Status of Claude Code hooks configuration in a given scope.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct HooksStatus {
     /// Scope description.
     pub scope: String,
@@ -283,6 +284,21 @@ impl ObservationHub {
 mod tests {
     use super::*;
     use std::sync::Arc;
+
+    #[test]
+    fn hooks_status_uses_camel_case_keys() {
+        let status = HooksStatus {
+            scope: "s".into(),
+            settings_path: "p".into(),
+            is_installed: true,
+            events: vec!["Stop".into()],
+            other_hooks: false,
+        };
+        let value = serde_json::to_value(status).unwrap();
+        for key in ["scope", "settingsPath", "isInstalled", "events", "otherHooks"] {
+            assert!(value.get(key).is_some(), "缺少 {key}");
+        }
+    }
 
     #[test]
     fn announcements_produce_natural_chinese_speech_cues() {
