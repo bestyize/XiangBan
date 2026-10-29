@@ -1,0 +1,1533 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>雅韵五子棋 · 单文件纯享版</title>
+  <script>
+    /* Inlined desktop host adapter */
+    (() => {
+      const nonce = new URLSearchParams(location.search).get('hostNonce');
+      if (!nonce || window.parent === window) return;
+      window.addEventListener('keydown', event => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, type: 'game.exit', nonce }, '*');
+      }, true);
+      window.addEventListener('message', async event => {
+        const d = event.data;
+        if (event.source !== window.parent || !d || d.channel !== 'xiaban.game-host' || d.protocol !== 1 || d.nonce !== nonce) return;
+        if (d.type === 'host.init') {
+          document.body.classList.add('desktop-hosted');
+          window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, type: 'game.ready', nonce }, '*');
+        }
+      });
+    })();
+  </script>
+  <style>
+    :root {
+      --bg-deep: #110e0b;
+      --board-base: #281e16;
+      --board-edge: #433325;
+      --gold-bright: #f9e2af;
+      --gold-mid: #c9a463;
+      --gold-dark: #7d5e2a;
+      --text-main: #f5eedb;
+      --text-sub: #b8a68b;
+      --panel-bg: rgba(26, 20, 16, 0.88);
+      --panel-border: rgba(201, 164, 99, 0.35);
+      --btn-bg: #231a14;
+      --btn-hover: #33261d;
+      --btn-active: #18120e;
+      --danger: #b23b36;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 40%, #1c1612 0%, #100c09 70%, #080605 100%);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    #game-container {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    header.game-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 52px;
+      padding: 0 16px;
+      background: rgba(14, 11, 9, 0.7);
+      border-bottom: 1px solid rgba(201, 164, 99, 0.2);
+      backdrop-filter: blur(12px);
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-seal {
+      width: 26px;
+      height: 26px;
+      background: #8f2622;
+      border: 1px solid #bf4e48;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      color: #faebe4;
+      font-weight: bold;
+      font-family: "Songti SC", "SimSun", serif;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.4);
+    }
+
+    h1.game-title {
+      font-size: 17px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: var(--gold-bright);
+      font-family: "Songti SC", "SimSun", "Noto Serif SC", serif;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(35, 27, 21, 0.75);
+      border: 1px solid rgba(201, 164, 99, 0.3);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      color: var(--text-main);
+    }
+
+    .turn-stone-indicator {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.6);
+      transition: all 0.3s ease;
+    }
+
+    .turn-stone-black {
+      background: radial-gradient(circle at 35% 30%, #5d636b 0%, #151719 75%, #050607 100%);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .turn-stone-white {
+      background: radial-gradient(circle at 35% 30%, #ffffff 0%, #ebe4d8 60%, #baa992 100%);
+      border: 1px solid rgba(138, 117, 89, 0.4);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      background: rgba(35, 27, 21, 0.6);
+      border: 1px solid rgba(201, 164, 99, 0.25);
+      color: var(--text-sub);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:hover {
+      background: rgba(55, 43, 33, 0.8);
+      color: var(--gold-bright);
+      border-color: var(--gold-mid);
+    }
+
+    main.game-main {
+      flex: 1;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      gap: 16px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .board-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 16px 40px rgba(0,0,0,0.8), 0 2px 10px rgba(0,0,0,0.5);
+      border-radius: 12px;
+      background: #251c15;
+    }
+
+    canvas#board-canvas {
+      display: block;
+      border-radius: 10px;
+      cursor: pointer;
+      touch-action: none;
+    }
+
+    .controls-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      padding: 16px;
+      width: 210px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      flex-shrink: 0;
+    }
+
+    .panel-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .panel-label {
+      font-size: 12px;
+      color: var(--text-sub);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+    }
+
+    .segmented-control {
+      display: flex;
+      background: #18130f;
+      border: 1px solid rgba(201, 164, 99, 0.2);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .seg-btn {
+      flex: 1;
+      padding: 6px 4px;
+      background: transparent;
+      border: none;
+      color: var(--text-sub);
+      font-size: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .seg-btn.active {
+      background: linear-gradient(135deg, #443427, #2c2117);
+      color: var(--gold-bright);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+
+    .game-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: rgba(20, 16, 13, 0.7);
+      border: 1px solid rgba(201, 164, 99, 0.15);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .stat-item span {
+      color: var(--text-sub);
+      font-size: 11px;
+    }
+
+    .stat-item strong {
+      color: var(--gold-bright);
+      font-size: 14px;
+      font-family: monospace;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 12px;
+      background: var(--btn-bg);
+      border: 1px solid rgba(201, 164, 99, 0.35);
+      border-radius: 8px;
+      color: var(--text-main);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .action-btn:hover:not(:disabled) {
+      background: var(--btn-hover);
+      border-color: var(--gold-mid);
+      color: var(--gold-bright);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .action-btn:active:not(:disabled) {
+      background: var(--btn-active);
+      transform: translateY(1px);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      border-color: rgba(201, 164, 99, 0.15);
+    }
+
+    .action-btn.primary {
+      background: linear-gradient(135deg, #4d3824, #362617);
+      border-color: var(--gold-mid);
+      color: var(--gold-bright);
+    }
+
+    .action-btn.danger-subtle {
+      border-color: rgba(178, 59, 54, 0.35);
+      color: #e28884;
+    }
+
+    .action-btn.danger-subtle:hover:not(:disabled) {
+      background: rgba(178, 59, 54, 0.2);
+      border-color: #b23b36;
+      color: #ff9d99;
+    }
+
+    .modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: linear-gradient(145deg, #2a2018, #18130f);
+      border: 1px solid var(--gold-mid);
+      border-radius: 16px;
+      padding: 24px 28px;
+      width: 85%;
+      max-width: 340px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(201, 164, 99, 0.25);
+      transform: scale(0.92);
+      transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .modal-overlay.show .modal-card {
+      transform: scale(1);
+    }
+
+    .modal-badge {
+      font-size: 38px;
+      margin-bottom: 8px;
+      line-height: 1;
+    }
+
+    .modal-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--gold-bright);
+      font-family: "Songti SC", "SimSun", serif;
+      margin-bottom: 8px;
+    }
+
+    .modal-desc {
+      font-size: 13.5px;
+      color: var(--text-sub);
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .modal-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .modal-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+
+    .modal-btn-primary {
+      background: linear-gradient(135deg, #a47a3e, #7c5825);
+      color: #fff9ed;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+
+    .modal-btn-primary:hover {
+      background: linear-gradient(135deg, #b88d4d, #8f6730);
+    }
+
+    .modal-btn-sub {
+      background: rgba(45, 35, 27, 0.7);
+      border: 1px solid rgba(201, 164, 99, 0.3);
+      color: var(--text-main);
+    }
+
+    .modal-btn-sub:hover {
+      background: rgba(65, 50, 39, 0.9);
+    }
+
+    @media (max-width: 720px) {
+      header.game-header {
+        height: 46px;
+        padding: 0 10px;
+      }
+      h1.game-title {
+        font-size: 15px;
+      }
+      main.game-main {
+        flex-direction: column;
+        padding: 8px;
+        gap: 10px;
+        justify-content: flex-start;
+      }
+      .controls-panel {
+        width: 100%;
+        max-width: 440px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        padding: 10px 12px;
+        gap: 8px;
+        border-radius: 10px;
+      }
+      .controls-panel .panel-block {
+        flex: 1;
+        min-width: 130px;
+      }
+      .controls-panel .action-buttons {
+        width: 100%;
+        flex-direction: row;
+      }
+      .controls-panel .action-btn {
+        flex: 1;
+        padding: 7px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container">
+    <header class="game-header">
+      <div class="title-group">
+        <div class="brand-seal" aria-hidden="true">雅</div>
+        <h1 class="game-title">雅韵五子棋</h1>
+      </div>
+
+      <div class="status-badge" id="status-badge">
+        <span class="turn-stone-indicator turn-stone-black" id="turn-indicator"></span>
+        <span id="status-text">黑方下子（先手）</span>
+      </div>
+
+      <div class="header-actions">
+        <button class="icon-btn" id="sound-btn" title="静音切换" aria-label="静音切换">🔊</button>
+        <button class="icon-btn" id="exit-btn" title="退出游戏" aria-label="退出游戏">✕</button>
+      </div>
+    </header>
+
+    <main class="game-main">
+      <div class="board-wrapper">
+        <canvas id="board-canvas"></canvas>
+      </div>
+
+      <aside class="controls-panel">
+        <div class="panel-block">
+          <div class="panel-label">对局模式</div>
+          <div class="segmented-control" id="mode-seg">
+            <button class="seg-btn active" data-mode="pve">人机博弈</button>
+            <button class="seg-btn" data-mode="pvp">双人同屏</button>
+          </div>
+        </div>
+
+        <div class="panel-block" id="difficulty-block">
+          <div class="panel-label">棋力水平</div>
+          <div class="segmented-control" id="diff-seg">
+            <button class="seg-btn active" data-diff="master">大师（精深）</button>
+            <button class="seg-btn" data-diff="casual">雅趣（轻松）</button>
+          </div>
+        </div>
+
+        <div class="panel-block" id="side-block">
+          <div class="panel-label">执子阵营</div>
+          <div class="segmented-control" id="side-seg">
+            <button class="seg-btn active" data-side="black">执黑（先手）</button>
+            <button class="seg-btn" data-side="white">执白（后手）</button>
+          </div>
+        </div>
+
+        <div class="game-stats">
+          <div class="stat-item">
+            <span>对局步数</span>
+            <strong id="stat-moves">0 步</strong>
+          </div>
+          <div class="stat-item">
+            <span>最后落子</span>
+            <strong id="stat-pos">--</strong>
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button class="action-btn" id="undo-btn" disabled>
+            <span>↶</span> 悔棋一步
+          </button>
+          <button class="action-btn danger-subtle" id="resign-btn">
+            <span>⚐</span> 投子认输
+          </button>
+          <button class="action-btn primary" id="restart-btn">
+            <span>↺</span> 重新开局
+          </button>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Game Over Modal -->
+    <div class="modal-overlay" id="game-over-modal">
+      <div class="modal-card">
+        <div class="modal-badge" id="modal-badge">🏆</div>
+        <h2 class="modal-title" id="modal-title">五子连珠 · 胜负已分</h2>
+        <p class="modal-desc" id="modal-desc">恭喜执黑一方连成五子，取得本次博弈的胜利！</p>
+        <div class="modal-buttons">
+          <button class="modal-btn modal-btn-sub" id="modal-review-btn">复盘棋局</button>
+          <button class="modal-btn modal-btn-primary" id="modal-restart-btn">再来一局</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class AudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+        try {
+          this.muted = localStorage.getItem('jade-gomoku-muted') === 'true';
+        } catch (_) {}
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        try {
+          localStorage.setItem('jade-gomoku-muted', this.muted);
+        } catch (_) {}
+        return this.muted;
+      }
+
+      playStone() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const osc1 = this.ctx.createOscillator();
+        const gain1 = this.ctx.createGain();
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(2400 + Math.random() * 300, now);
+        osc1.frequency.exponentialRampToValueAtTime(800, now + 0.035);
+
+        gain1.gain.setValueAtTime(0.5, now);
+        gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.045);
+
+        osc1.connect(gain1);
+        gain1.connect(this.ctx.destination);
+        osc1.start(now);
+        osc1.stop(now + 0.05);
+
+        const osc2 = this.ctx.createOscillator();
+        const gain2 = this.ctx.createGain();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(220 + Math.random() * 20, now);
+        osc2.frequency.exponentialRampToValueAtTime(70, now + 0.09);
+
+        gain2.gain.setValueAtTime(0.4, now);
+        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+        osc2.connect(gain2);
+        gain2.connect(this.ctx.destination);
+        osc2.start(now);
+        osc2.stop(now + 0.13);
+      }
+
+      playWin() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const notes = [523.25, 587.33, 659.25, 783.99, 880.00];
+        notes.forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+
+          const start = now + idx * 0.08;
+          gain.gain.setValueAtTime(0.25, start);
+          gain.gain.exponentialRampToValueAtTime(0.001, start + 1.2);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(start);
+          osc.stop(start + 1.25);
+        });
+      }
+
+      playClick() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now + 0.05);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.06);
+      }
+    }
+
+    class GomokuAI {
+      constructor() {
+        this.SIZE = 15;
+        this.DIR = [
+          [1, 0],
+          [0, 1],
+          [1, 1],
+          [1, -1]
+        ];
+      }
+
+      evaluateMove(board, x, y, role, isMaster = true) {
+        let myScore = 0;
+        let oppScore = 0;
+        const opp = role === 1 ? 2 : 1;
+
+        for (const [dx, dy] of this.DIR) {
+          myScore += this.evalDirection(board, x, y, dx, dy, role);
+          oppScore += this.evalDirection(board, x, y, dx, dy, opp);
+        }
+
+        const centerDist = Math.abs(x - 7) + Math.abs(y - 7);
+        const positionScore = (14 - centerDist) * 2;
+        const score = myScore + oppScore * 1.05 + positionScore;
+        return isMaster ? score : score * (0.85 + Math.random() * 0.3);
+      }
+
+      evalDirection(board, x, y, dx, dy, role) {
+        let count = 1;
+        let openEnds = 0;
+
+        let i = 1;
+        while (true) {
+          const nx = x + dx * i;
+          const ny = y + dy * i;
+          if (nx < 0 || nx >= this.SIZE || ny < 0 || ny >= this.SIZE) break;
+          if (board[ny][nx] === role) {
+            count++;
+            i++;
+          } else if (board[ny][nx] === 0) {
+            openEnds++;
+            break;
+          } else {
+            break;
+          }
+        }
+
+        let j = 1;
+        while (true) {
+          const nx = x - dx * j;
+          const ny = y - dy * j;
+          if (nx < 0 || nx >= this.SIZE || ny < 0 || ny >= this.SIZE) break;
+          if (board[ny][nx] === role) {
+            count++;
+            j++;
+          } else if (board[ny][nx] === 0) {
+            openEnds++;
+            break;
+          } else {
+            break;
+          }
+        }
+
+        if (count >= 5) return 100000;
+        if (count === 4 && openEnds === 2) return 12000;
+        if (count === 4 && openEnds === 1) return 2500;
+        if (count === 3 && openEnds === 2) return 3000;
+        if (count === 3 && openEnds === 1) return 500;
+        if (count === 2 && openEnds === 2) return 300;
+        if (count === 2 && openEnds === 1) return 50;
+
+        return 10;
+      }
+
+      getBestMove(board, role, isMaster = true) {
+        let stoneCount = 0;
+        for (let r = 0; r < this.SIZE; r++) {
+          for (let c = 0; c < this.SIZE; c++) {
+            if (board[r][c] !== 0) stoneCount++;
+          }
+        }
+        if (stoneCount === 0) return { x: 7, y: 7 };
+
+        let candidates = [];
+        const hasNeighbor = (x, y) => {
+          for (let dy = -2; dy <= 2; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              const nx = x + dx;
+              const ny = y + dy;
+              if (nx >= 0 && nx < this.SIZE && ny >= 0 && ny < this.SIZE) {
+                if (board[ny][nx] !== 0) return true;
+              }
+            }
+          }
+          return false;
+        };
+
+        for (let y = 0; y < this.SIZE; y++) {
+          for (let x = 0; x < this.SIZE; x++) {
+            if (board[y][x] === 0 && hasNeighbor(x, y)) {
+              const score = this.evaluateMove(board, x, y, role, isMaster);
+              candidates.push({ x, y, score });
+            }
+          }
+        }
+
+        if (candidates.length === 0) return { x: 7, y: 7 };
+        candidates.sort((a, b) => b.score - a.score);
+
+        if (isMaster) {
+          const topScore = candidates[0].score;
+          const bestPool = candidates.filter(c => c.score >= topScore * 0.96);
+          return bestPool[Math.floor(Math.random() * bestPool.length)];
+        } else {
+          const pool = candidates.slice(0, Math.min(3, candidates.length));
+          return pool[Math.floor(Math.random() * pool.length)];
+        }
+      }
+    }
+
+    class GomokuGame {
+      constructor() {
+        this.SIZE = 15;
+        this.board = Array.from({ length: 15 }, () => Array(15).fill(0));
+        this.history = [];
+        this.currentTurn = 1;
+        this.gameMode = 'pve';
+        this.aiDifficulty = 'master';
+        this.playerRole = 1;
+        this.isGameOver = false;
+        this.winningLine = null;
+        this.hoverCell = null;
+        this.aiThinking = false;
+
+        this.ripples = [];
+        this.particles = [];
+
+        this.audio = new AudioEngine();
+        this.ai = new GomokuAI();
+
+        this.initDOM();
+        this.initCanvas();
+        this.bindEvents();
+        this.render();
+      }
+
+      initDOM() {
+        this.canvas = document.getElementById('board-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.turnIndicator = document.getElementById('turn-indicator');
+        this.statusText = document.getElementById('status-text');
+        this.statMoves = document.getElementById('stat-moves');
+        this.statPos = document.getElementById('stat-pos');
+        this.undoBtn = document.getElementById('undo-btn');
+        this.resignBtn = document.getElementById('resign-btn');
+        this.restartBtn = document.getElementById('restart-btn');
+        this.soundBtn = document.getElementById('sound-btn');
+        this.exitBtn = document.getElementById('exit-btn');
+
+        this.modal = document.getElementById('game-over-modal');
+        this.modalBadge = document.getElementById('modal-badge');
+        this.modalTitle = document.getElementById('modal-title');
+        this.modalDesc = document.getElementById('modal-desc');
+        this.modalRestartBtn = document.getElementById('modal-restart-btn');
+        this.modalReviewBtn = document.getElementById('modal-review-btn');
+
+        if (this.audio.muted) {
+          this.soundBtn.textContent = '🔇';
+        }
+      }
+
+      initCanvas() {
+        this.resize();
+        window.addEventListener('resize', () => this.resize());
+      }
+
+      resize() {
+        const parent = this.canvas.parentElement;
+        const isNarrow = window.innerWidth <= 720;
+
+        let availableWidth = isNarrow ? window.innerWidth - 24 : parent.parentElement.clientWidth - 260;
+        let availableHeight = isNarrow ? window.innerHeight - 260 : window.innerHeight - 90;
+
+        let size = Math.min(availableWidth, availableHeight, 640);
+        size = Math.max(size, 280);
+
+        const dpr = window.devicePixelRatio || 1;
+        this.canvasSize = size;
+        this.canvas.width = Math.floor(size * dpr);
+        this.canvas.height = Math.floor(size * dpr);
+        this.canvas.style.width = `${size}px`;
+        this.canvas.style.height = `${size}px`;
+
+        this.ctx.scale(dpr, dpr);
+
+        this.padding = size * 0.068;
+        this.gridSpacing = (size - this.padding * 2) / (this.SIZE - 1);
+        this.stoneRadius = this.gridSpacing * 0.44;
+      }
+
+      bindEvents() {
+        const handlePoint = (clientX, clientY) => {
+          if (this.isGameOver || this.aiThinking) return;
+          const rect = this.canvas.getBoundingClientRect();
+          const x = clientX - rect.left;
+          const y = clientY - rect.top;
+
+          const col = Math.round((x - this.padding) / this.gridSpacing);
+          const row = Math.round((y - this.padding) / this.gridSpacing);
+
+          if (col >= 0 && col < this.SIZE && row >= 0 && row < this.SIZE) {
+            if (this.gameMode === 'pve' && this.currentTurn !== this.playerRole) return;
+            this.makeMove(col, row);
+          }
+        };
+
+        this.canvas.addEventListener('click', (e) => {
+          handlePoint(e.clientX, e.clientY);
+        });
+
+        this.canvas.addEventListener('mousemove', (e) => {
+          if (this.isGameOver || this.aiThinking) {
+            this.hoverCell = null;
+            return;
+          }
+          const rect = this.canvas.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          const col = Math.round((x - this.padding) / this.gridSpacing);
+          const row = Math.round((y - this.padding) / this.gridSpacing);
+          if (col >= 0 && col < this.SIZE && row >= 0 && row < this.SIZE && this.board[row][col] === 0) {
+            this.hoverCell = { x: col, y: row };
+          } else {
+            this.hoverCell = null;
+          }
+        });
+
+        this.canvas.addEventListener('mouseleave', () => {
+          this.hoverCell = null;
+        });
+
+        this.canvas.addEventListener('touchstart', (e) => {
+          if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            handlePoint(touch.clientX, touch.clientY);
+          }
+        }, { passive: true });
+
+        document.getElementById('mode-seg').addEventListener('click', (e) => {
+          const btn = e.target.closest('.seg-btn');
+          if (!btn) return;
+          document.querySelectorAll('#mode-seg .seg-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.gameMode = btn.dataset.mode;
+          document.getElementById('difficulty-block').style.display = this.gameMode === 'pve' ? 'flex' : 'none';
+          document.getElementById('side-block').style.display = this.gameMode === 'pve' ? 'flex' : 'none';
+          this.restart();
+        });
+
+        document.getElementById('diff-seg').addEventListener('click', (e) => {
+          const btn = e.target.closest('.seg-btn');
+          if (!btn) return;
+          document.querySelectorAll('#diff-seg .seg-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.aiDifficulty = btn.dataset.diff;
+          this.audio.playClick();
+        });
+
+        document.getElementById('side-seg').addEventListener('click', (e) => {
+          const btn = e.target.closest('.seg-btn');
+          if (!btn) return;
+          document.querySelectorAll('#side-seg .seg-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          this.playerRole = btn.dataset.side === 'black' ? 1 : 2;
+          this.restart();
+        });
+
+        this.undoBtn.addEventListener('click', () => this.undo());
+
+        this.resignBtn.addEventListener('click', () => {
+          if (this.isGameOver) return;
+          this.audio.playClick();
+          const winner = this.currentTurn === 1 ? 2 : 1;
+          this.endGame(winner, true);
+        });
+
+        this.restartBtn.addEventListener('click', () => {
+          this.audio.playClick();
+          this.restart();
+        });
+
+        this.soundBtn.addEventListener('click', () => {
+          const muted = this.audio.toggleMute();
+          this.soundBtn.textContent = muted ? '🔇' : '🔊';
+        });
+
+        this.exitBtn.addEventListener('click', () => {
+          const nonce = new URLSearchParams(location.search).get('hostNonce');
+          if (nonce && window.parent !== window) {
+            window.parent.postMessage({ channel: 'xiaban.game-pack', protocol: 1, type: 'game.exit', nonce }, '*');
+          } else {
+            window.history.back();
+          }
+        });
+
+        this.modalRestartBtn.addEventListener('click', () => {
+          this.modal.classList.remove('show');
+          this.restart();
+        });
+        this.modalReviewBtn.addEventListener('click', () => {
+          this.modal.classList.remove('show');
+        });
+      }
+
+      makeMove(x, y) {
+        if (this.board[y][x] !== 0 || this.isGameOver) return;
+
+        const role = this.currentTurn;
+        this.board[y][x] = role;
+        this.history.push({ x, y, role });
+
+        this.createRipple(x, y);
+        this.audio.playStone();
+
+        const colLetters = 'ABCDEFGHIJKLMNO';
+        const posText = `${colLetters[x]}${this.SIZE - y}`;
+        this.statMoves.textContent = `${this.history.length} 步`;
+        this.statPos.textContent = `${role === 1 ? '黑' : '白'} · ${posText}`;
+        this.undoBtn.disabled = this.history.length === 0;
+
+        const winLine = this.checkWin(x, y, role);
+        if (winLine) {
+          this.endGame(role, false, winLine);
+          return;
+        }
+
+        if (this.history.length >= this.SIZE * this.SIZE) {
+          this.endGame(0, false);
+          return;
+        }
+
+        this.currentTurn = role === 1 ? 2 : 1;
+        this.updateStatus();
+
+        if (this.gameMode === 'pve' && this.currentTurn !== this.playerRole && !this.isGameOver) {
+          this.aiThinking = true;
+          this.updateStatus();
+          setTimeout(() => {
+            if (this.isGameOver) return;
+            const isMaster = this.aiDifficulty === 'master';
+            const best = this.ai.getBestMove(this.board, this.currentTurn, isMaster);
+            this.aiThinking = false;
+            this.makeMove(best.x, best.y);
+          }, 350 + Math.random() * 200);
+        }
+      }
+
+      checkWin(x, y, role) {
+        const dirs = [
+          [1, 0],
+          [0, 1],
+          [1, 1],
+          [1, -1]
+        ];
+
+        for (const [dx, dy] of dirs) {
+          let line = [{ x, y }];
+
+          let i = 1;
+          while (true) {
+            const nx = x + dx * i;
+            const ny = y + dy * i;
+            if (nx >= 0 && nx < this.SIZE && ny >= 0 && ny < this.SIZE && this.board[ny][nx] === role) {
+              line.push({ x: nx, y: ny });
+              i++;
+            } else break;
+          }
+
+          let j = 1;
+          while (true) {
+            const nx = x - dx * j;
+            const ny = y - dy * j;
+            if (nx >= 0 && nx < this.SIZE && ny >= 0 && ny < this.SIZE && this.board[ny][nx] === role) {
+              line.push({ x: nx, y: ny });
+              j++;
+            } else break;
+          }
+
+          if (line.length >= 5) {
+            return line;
+          }
+        }
+        return null;
+      }
+
+      endGame(winnerRole, isResign = false, winLine = null) {
+        this.isGameOver = true;
+        this.winningLine = winLine;
+
+        if (winLine) {
+          this.createWinParticles(winLine);
+          this.audio.playWin();
+        }
+
+        let title = '';
+        let desc = '';
+        let badge = '🏆';
+
+        if (winnerRole === 0) {
+          title = '和局 · 势均力敌';
+          desc = '棋盘布满，双方棋艺精湛，旗鼓相当。';
+          badge = '⚖️';
+        } else {
+          const winnerName = winnerRole === 1 ? '黑方（墨玉）' : '白方（白玉）';
+          if (isResign) {
+            title = `${winnerName} 获胜！`;
+            desc = `对手投子认输，本局博弈宣告结束。共博弈 ${this.history.length} 手。`;
+            badge = '⚐';
+          } else {
+            title = `五子连珠 · ${winnerName} 胜！`;
+            desc = `行云流水，气贯长虹！在第 ${this.history.length} 手达成连珠绝杀。`;
+            badge = '✨';
+          }
+        }
+
+        setTimeout(() => {
+          this.modalBadge.textContent = badge;
+          this.modalTitle.textContent = title;
+          this.modalDesc.textContent = desc;
+          this.modal.classList.add('show');
+        }, winLine ? 1000 : 300);
+
+        this.updateStatus();
+      }
+
+      undo() {
+        if (this.history.length === 0 || this.isGameOver || this.aiThinking) return;
+
+        this.audio.playClick();
+        if (this.gameMode === 'pve') {
+          if (this.history.length >= 2) {
+            const last1 = this.history.pop();
+            const last2 = this.history.pop();
+            this.board[last1.y][last1.x] = 0;
+            this.board[last2.y][last2.x] = 0;
+          } else if (this.history.length === 1 && this.playerRole === 1) {
+            const last = this.history.pop();
+            this.board[last.y][last.x] = 0;
+          }
+          this.currentTurn = this.playerRole;
+        } else {
+          const last = this.history.pop();
+          this.board[last.y][last.x] = 0;
+          this.currentTurn = last.role;
+        }
+
+        const lastMove = this.history[this.history.length - 1];
+        if (lastMove) {
+          const colLetters = 'ABCDEFGHIJKLMNO';
+          this.statPos.textContent = `${lastMove.role === 1 ? '黑' : '白'} · ${colLetters[lastMove.x]}${this.SIZE - lastMove.y}`;
+        } else {
+          this.statPos.textContent = '--';
+        }
+        this.statMoves.textContent = `${this.history.length} 步`;
+        this.undoBtn.disabled = this.history.length === 0;
+
+        this.updateStatus();
+      }
+
+      restart() {
+        this.board = Array.from({ length: 15 }, () => Array(15).fill(0));
+        this.history = [];
+        this.currentTurn = 1;
+        this.isGameOver = false;
+        this.winningLine = null;
+        this.hoverCell = null;
+        this.aiThinking = false;
+        this.ripples = [];
+        this.particles = [];
+
+        this.statMoves.textContent = '0 步';
+        this.statPos.textContent = '--';
+        this.undoBtn.disabled = true;
+        this.modal.classList.remove('show');
+
+        this.updateStatus();
+
+        if (this.gameMode === 'pve' && this.playerRole === 2) {
+          this.aiThinking = true;
+          this.updateStatus();
+          setTimeout(() => {
+            const best = this.ai.getBestMove(this.board, 1, this.aiDifficulty === 'master');
+            this.aiThinking = false;
+            this.makeMove(best.x, best.y);
+          }, 450);
+        }
+      }
+
+      updateStatus() {
+        if (this.isGameOver) {
+          this.statusText.textContent = '对局已结束';
+          return;
+        }
+
+        if (this.aiThinking) {
+          this.statusText.textContent = `${this.currentTurn === 1 ? '黑方' : '白方'}（小伴思考中…）`;
+          this.turnIndicator.className = `turn-stone-indicator turn-stone-${this.currentTurn === 1 ? 'black' : 'white'}`;
+          return;
+        }
+
+        const isPlayerTurn = (this.gameMode === 'pvp') || (this.currentTurn === this.playerRole);
+        const roleName = this.currentTurn === 1 ? '黑方（墨玉）' : '白方（白玉）';
+        const roleSub = isPlayerTurn ? '请落子' : '执子中';
+
+        this.statusText.textContent = `${roleName} · ${roleSub}`;
+        this.turnIndicator.className = `turn-stone-indicator turn-stone-${this.currentTurn === 1 ? 'black' : 'white'}`;
+      }
+
+      createRipple(x, y) {
+        const cx = this.padding + x * this.gridSpacing;
+        const cy = this.padding + y * this.gridSpacing;
+        this.ripples.push({
+          x: cx,
+          y: cy,
+          r: this.stoneRadius * 0.8,
+          maxR: this.gridSpacing * 1.8,
+          alpha: 0.85
+        });
+      }
+
+      createWinParticles(winLine) {
+        winLine.forEach(p => {
+          const cx = this.padding + p.x * this.gridSpacing;
+          const cy = this.padding + p.y * this.gridSpacing;
+          for (let i = 0; i < 8; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 1.2 + Math.random() * 2.5;
+            this.particles.push({
+              x: cx,
+              y: cy,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed,
+              r: 2 + Math.random() * 3,
+              alpha: 1,
+              decay: 0.015 + Math.random() * 0.01
+            });
+          }
+        });
+      }
+
+      render() {
+        this.ctx.clearRect(0, 0, this.canvasSize, this.canvasSize);
+
+        this.drawBoardBackground();
+        this.drawGridAndLabels();
+        this.drawStones();
+        this.drawEffects();
+
+        requestAnimationFrame(() => this.render());
+      }
+
+      drawBoardBackground() {
+        const size = this.canvasSize;
+        const ctx = this.ctx;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(0, 0, size, size, 10);
+        ctx.clip();
+
+        const grad = ctx.createRadialGradient(size * 0.5, size * 0.45, size * 0.1, size * 0.5, size * 0.5, size * 0.7);
+        grad.addColorStop(0, '#362a20');
+        grad.addColorStop(0.65, '#261c15');
+        grad.addColorStop(1, '#15100c');
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, size, size);
+
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(240, 195, 125, 0.035)';
+        for (let i = 0; i < size; i += 7) {
+          ctx.beginPath();
+          ctx.moveTo(0, i);
+          ctx.bezierCurveTo(size * 0.35, i + Math.sin(i * 0.15) * 6, size * 0.65, i - Math.sin(i * 0.15) * 6, size, i);
+          ctx.stroke();
+        }
+
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = '#574330';
+        ctx.strokeRect(1.5, 1.5, size - 3, size - 3);
+
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = 'rgba(245, 224, 163, 0.25)';
+        ctx.strokeRect(3, 3, size - 6, size - 6);
+
+        ctx.restore();
+      }
+
+      drawGridAndLabels() {
+        const ctx = this.ctx;
+        const pad = this.padding;
+        const sp = this.gridSpacing;
+        const max = pad + (this.SIZE - 1) * sp;
+
+        ctx.save();
+
+        ctx.lineWidth = 1.4;
+        ctx.strokeStyle = 'rgba(215, 175, 105, 0.85)';
+        ctx.strokeRect(pad, pad, (this.SIZE - 1) * sp, (this.SIZE - 1) * sp);
+
+        ctx.lineWidth = 0.85;
+        ctx.strokeStyle = 'rgba(200, 160, 95, 0.65)';
+
+        for (let i = 1; i < this.SIZE - 1; i++) {
+          const coord = pad + i * sp;
+          ctx.beginPath();
+          ctx.moveTo(pad, coord);
+          ctx.lineTo(max, coord);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.moveTo(coord, pad);
+          ctx.lineTo(coord, max);
+          ctx.stroke();
+        }
+
+        const stars = [
+          [3, 3], [11, 3], [7, 7], [3, 11], [11, 11],
+          [3, 7], [11, 7], [7, 3], [7, 11]
+        ];
+        stars.forEach(([sx, sy]) => {
+          const cx = pad + sx * sp;
+          const cy = pad + sy * sp;
+          const r = sx === 7 && sy === 7 ? 3.2 : 2.5;
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fillStyle = '#f7e2a8';
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(cx, cy, r + 1.2, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(200, 160, 95, 0.4)';
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+        });
+
+        ctx.font = `${Math.floor(this.gridSpacing * 0.32)}px "Songti SC", "SimSun", serif`;
+        ctx.fillStyle = 'rgba(215, 185, 135, 0.55)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        const colLetters = 'ABCDEFGHIJKLMNO';
+        for (let i = 0; i < this.SIZE; i++) {
+          const pos = pad + i * sp;
+          ctx.fillText(colLetters[i], pos, pad * 0.48);
+          ctx.fillText(colLetters[i], pos, this.canvasSize - pad * 0.48);
+          const numStr = String(this.SIZE - i);
+          ctx.fillText(numStr, pad * 0.48, pos);
+          ctx.fillText(numStr, this.canvasSize - pad * 0.48, pos);
+        }
+
+        ctx.restore();
+      }
+
+      drawStones() {
+        const ctx = this.ctx;
+        const pad = this.padding;
+        const sp = this.gridSpacing;
+        const r = this.stoneRadius;
+
+        for (let y = 0; y < this.SIZE; y++) {
+          for (let x = 0; x < this.SIZE; x++) {
+            const role = this.board[y][x];
+            if (role !== 0) {
+              const cx = pad + x * sp;
+              const cy = pad + y * sp;
+              this.drawSingleStone(cx, cy, r, role);
+            }
+          }
+        }
+
+        if (this.hoverCell && !this.isGameOver) {
+          const cx = pad + this.hoverCell.x * sp;
+          const cy = pad + this.hoverCell.y * sp;
+          ctx.save();
+          ctx.globalAlpha = 0.45;
+          this.drawSingleStone(cx, cy, r, this.currentTurn);
+
+          ctx.strokeStyle = 'rgba(245, 224, 163, 0.6)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.arc(cx, cy, r * 1.25, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        if (this.history.length > 0 && !this.winningLine) {
+          const last = this.history[this.history.length - 1];
+          const cx = pad + last.x * sp;
+          const cy = pad + last.y * sp;
+
+          ctx.save();
+          const pulse = (Math.sin(Date.now() * 0.006) + 1) * 0.5;
+          ctx.strokeStyle = last.role === 1 ? `rgba(245, 224, 163, ${0.7 + pulse * 0.3})` : `rgba(178, 65, 50, ${0.7 + pulse * 0.3})`;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r * 0.45, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      drawSingleStone(cx, cy, r, role) {
+        const ctx = this.ctx;
+        ctx.save();
+
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+        ctx.shadowBlur = r * 0.45;
+        ctx.shadowOffsetX = r * 0.12;
+        ctx.shadowOffsetY = r * 0.22;
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.fillStyle = '#000';
+        ctx.fill();
+
+        ctx.restore();
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+
+        if (role === 1) {
+          const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.05, cx, cy, r);
+          grad.addColorStop(0, '#57606a');
+          grad.addColorStop(0.25, '#292e33');
+          grad.addColorStop(0.7, '#131518');
+          grad.addColorStop(1, '#07080a');
+          ctx.fillStyle = grad;
+          ctx.fill();
+
+          ctx.lineWidth = 0.8;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.ellipse(cx - r * 0.32, cy - r * 0.32, r * 0.32, r * 0.18, -Math.PI / 4, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+          ctx.fill();
+        } else {
+          const grad = ctx.createRadialGradient(cx - r * 0.32, cy - r * 0.32, r * 0.05, cx, cy, r);
+          grad.addColorStop(0, '#ffffff');
+          grad.addColorStop(0.4, '#f8f4ec');
+          grad.addColorStop(0.78, '#ded6c6');
+          grad.addColorStop(1, '#aba08e');
+          ctx.fillStyle = grad;
+          ctx.fill();
+
+          ctx.lineWidth = 1;
+          ctx.strokeStyle = 'rgba(125, 105, 80, 0.3)';
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.ellipse(cx - r * 0.32, cy - r * 0.32, r * 0.35, r * 0.2, -Math.PI / 4, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+          ctx.fill();
+        }
+
+        ctx.restore();
+      }
+
+      drawEffects() {
+        const ctx = this.ctx;
+
+        for (let i = this.ripples.length - 1; i >= 0; i--) {
+          const rip = this.ripples[i];
+          rip.r += 1.8;
+          rip.alpha -= 0.035;
+
+          if (rip.alpha <= 0) {
+            this.ripples.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(rip.x, rip.y, rip.r, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(249, 226, 175, ${rip.alpha})`;
+          ctx.lineWidth = 1.6;
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        if (this.winningLine && this.winningLine.length >= 5) {
+          ctx.save();
+          const pad = this.padding;
+          const sp = this.gridSpacing;
+
+          const pFirst = this.winningLine[0];
+          const pLast = this.winningLine[this.winningLine.length - 1];
+          const x1 = pad + pFirst.x * sp;
+          const y1 = pad + pFirst.y * sp;
+          const x2 = pad + pLast.x * sp;
+          const y2 = pad + pLast.y * sp;
+
+          const pulse = (Math.sin(Date.now() * 0.008) + 1) * 0.5;
+
+          ctx.strokeStyle = `rgba(255, 215, 0, ${0.4 + pulse * 0.4})`;
+          ctx.lineWidth = 7;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+
+          this.winningLine.forEach(p => {
+            const cx = pad + p.x * sp;
+            const cy = pad + p.y * sp;
+            ctx.beginPath();
+            ctx.arc(cx, cy, this.stoneRadius * (1.2 + pulse * 0.15), 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(249, 226, 175, ${0.6 + pulse * 0.4})`;
+            ctx.lineWidth = 1.8;
+            ctx.stroke();
+          });
+
+          ctx.restore();
+        }
+
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+          const pt = this.particles[i];
+          pt.x += pt.vx;
+          pt.y += pt.vy;
+          pt.alpha -= pt.decay;
+
+          if (pt.alpha <= 0) {
+            this.particles.splice(i, 1);
+            continue;
+          }
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(249, 226, 175, ${pt.alpha})`;
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      new GomokuGame();
+    });
+  </script>
+</body>
+</html>

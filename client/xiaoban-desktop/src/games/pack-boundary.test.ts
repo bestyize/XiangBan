@@ -8,8 +8,8 @@ const hosts = import.meta.glob('../../public/game-packs/*/desktop-host.js', { qu
 const packs = Object.keys(html).map(f => f.slice(prefix.length).split('/')[0]).sort();
 
 describe('self-contained desktop game packs', () => {
-  it('finds all eight packs', () => {
-    expect(packs).toEqual(['block-puzzle', 'dusk-glider', 'falling-blocks', 'ink-blade', 'merge-2048', 'pro-cube', 'snake-arena', 'water-sort']);
+  it('finds all nine packs', () => {
+    expect(packs).toEqual(['block-puzzle', 'dusk-glider', 'falling-blocks', 'ink-blade', 'jade-gomoku', 'merge-2048', 'pro-cube', 'snake-arena', 'water-sort']);
   });
 
   it.each(packs)('%s index.html only references files inside its own directory', id => {

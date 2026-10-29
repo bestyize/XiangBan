@@ -51,7 +51,7 @@ try {
   const result = JSON.parse(await readFile(report, 'utf8'))
   const game = result.games?.Ok
   assert.ok(game, JSON.stringify(result.games))
-  assert.deepEqual([...game.frontend.ready].sort(), ['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort', 'snake-arena', 'ink-blade', 'dusk-glider', 'pro-cube'].sort())
+  assert.deepEqual([...game.frontend.ready].sort(), ['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort', 'snake-arena', 'ink-blade', 'dusk-glider', 'pro-cube', 'jade-gomoku'].sort())
   assert.ok(Object.values(game.frontend.security).every(v => v === true))
   for (const key of ['backgroundSuspended', 'settingsPreserved', 'positionRestored', 'closed']) assert.equal(game[key], true, key)
   assert.equal(game.frontend.directLaunch, 'falling-blocks')
@@ -65,7 +65,7 @@ try {
     assert.equal(ui.configBound, true, 'ui.configBound')
     assert.equal(ui.marker, 'vue-native-control-readonly', 'ui.marker')
     assert.deepEqual([...ui.pages].sort(), ['wallpapers', 'companion', 'games', 'care', 'settings'].sort(), 'ui.pages')
-    assert.equal(ui.gamePackCount, 8, 'ui.gamePackCount')
+    assert.equal(ui.gamePackCount, 9, 'ui.gamePackCount')
   }
   if (careSmoke) {
     const care = result.care?.Ok
@@ -73,7 +73,7 @@ try {
     for (const key of ['persistence', 'previewNoTask', 'bubbleReady', 'noFocus', 'dismiss', 'snooze', 'disableCancels', 'delete', 'gameDeferred', 'gameResumeSummary', 'expiry', 'restartDedup']) assert.equal(care[key], true, `care.${key}`)
     assert.equal(care.weatherNetworkUsed, false, 'care.weatherNetworkUsed')
   }
-  console.log(`PASS: eight offline packs ready, opaque iframe IPC boundary, local save, background suspension and restore${careSmoke ? ', plus care delivery and persistence' : ''}${uiSmoke ? ', plus native control UI report' : ''}. ${report}`)
+  console.log(`PASS: nine offline packs ready, opaque iframe IPC boundary, local save, background suspension and restore${careSmoke ? ', plus care delivery and persistence' : ''}${uiSmoke ? ', plus native control UI report' : ''}. ${report}`)
 } finally {
   clearTimeout(timeout)
   cleanupTestStartup()
