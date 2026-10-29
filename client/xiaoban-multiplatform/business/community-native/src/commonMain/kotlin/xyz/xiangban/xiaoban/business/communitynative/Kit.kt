@@ -166,10 +166,10 @@ fun OverlayTransition(visible: Boolean, direction: String = "bottom", content: @
     }
 }
 
-/** 盖住整页的半透明遮罩，底部是圆角白色面板。点遮罩或按返回键关闭。 */
+/** 盖住整页的半透明遮罩，底部是圆角白色面板。点遮罩或按返回键关闭。[flush] 为真时面板里的选项通栏接边（自己管左右边距）。 */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun BottomSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+fun BottomSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, flush: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     BackHandler(onBack = onDismiss)
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).clickable(indication = null, interactionSource = null) { onDismiss() },
@@ -178,7 +178,7 @@ fun BottomSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, conte
         Column(
             panelModifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)).background(MaterialTheme.colorScheme.surface)
                 .clickable(indication = null, interactionSource = null) {}
-                .navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 24.dp),
+                .navigationBarsPadding().let { if (flush) it.padding(top = 16.dp) else it.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 24.dp) },
             content = content,
         )
     }

@@ -275,6 +275,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     val callScope = rememberCoroutineScope()
 
     LaunchedEffect(session.loggedIn) { if (session.loggedIn) chat.loadMeta() }
+    cloud.messages.lastOrNull().let { last -> AutoRead(env.reader, last?.id, last?.role, last?.text.orEmpty(), last?.streaming == true) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().imePadding()) {

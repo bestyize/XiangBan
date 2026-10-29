@@ -121,6 +121,14 @@ class AndroidPlatformActions(
         return started
     }
 
+    override fun speakReply(text: String, onDone: (Boolean) -> Unit): Boolean {
+        val id = "reply-${System.nanoTime()}"
+        ttsDone[id] = onDone
+        val started = speakWith(text.take(3900), id)
+        if (!started) ttsDone.remove(id)
+        return started
+    }
+
     override fun stopSpeaking() {
         ttsWaiting = null
         ttsDone.clear()

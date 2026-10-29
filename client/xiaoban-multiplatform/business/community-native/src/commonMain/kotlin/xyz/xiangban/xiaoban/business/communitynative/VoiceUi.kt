@@ -46,9 +46,6 @@ import xyz.xiangban.xiaoban.common.community.VoiceCall
 fun CommunityEnv.recognizers(vararg fallbacks: RecognizerEngine): List<RecognizerEngine> =
     listOfNotNull(speech?.recognizer?.takeIf { speechModels?.ready == true }) + fallbacks
 
-/** 合成引擎：手机直连 Edge 朗读（和电脑同一个服务）→ 云端小伴 AI 的语音合成。 */
-fun CommunityEnv.synthesizers(): List<SynthesizerEngine> = listOf(EdgeTtsSynthesizer(client), CloudSynthesizer(ai))
-
 /** 依次试每个引擎，第一个出结果的算数；一个都不行返回 null 和原因。 */
 suspend fun recognizeWith(engines: List<RecognizerEngine>, pcm: ByteArray): Pair<String?, String?> {
     var reason: String? = null
@@ -256,14 +253,14 @@ class VoiceCallHost(private val env: CommunityEnv) {
             offering = true
         } else {
             minimized = false
-            call = factory()
+            call = factory().also { c -> SpeechState.settings.bargeIn?.let(c::setBargeIn) }
         }
     }
 
     fun offerFinished(downloaded: Boolean) {
         offering = false
         if (!downloaded) declined = true
-        pending?.let { minimized = false; call = it() }
+        pending?.let { make -> minimized = false; call = make().also { c -> SpeechState.settings.bargeIn?.let(c::setBargeIn) } }
         pending = null
     }
 }

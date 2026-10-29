@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,8 +40,9 @@ import xyz.xiangban.xiaoban.common.community.CloudChatController
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun CommunityNativeApp(env: CommunityEnv) {
-    remember(env) { ThemeState.load(env.prefs) }
+    remember(env) { ThemeState.load(env.prefs); SpeechState.load(env.prefs) }
     XiaobanTheme {
+      CompositionLocalProvider(LocalReplyReader provides env.reader) {
         val appScope = rememberCoroutineScope()
         val chat = remember(env) { CloudChatController(env.ai, appScope, agent = env.agent) }
         var tab by rememberSaveable { mutableStateOf(Tab.Ai.name) }
@@ -101,6 +103,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                 LoginDialog(env, done = ::closeLogin, back = ::closeLogin)
             }
         }
+      }
     }
 }
 
@@ -118,6 +121,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         Route.Models -> ModelsScreen(env, chat, back = pop, open = push)
         Route.Appearance -> AppearanceScreen(back = pop, open = push)
         Route.AccentColor -> AccentScreen(back = pop)
+        Route.Voice -> VoiceSettingsScreen(env, back = pop)
         Route.AiChat -> AiChatPage(env, chat, back = pop, open = push)
         Route.Devices -> DevicesScreen(env, back = pop, open = push)
         is Route.RemoteChat -> RemoteChatScreen(env, route.peer, back = pop, open = push)
