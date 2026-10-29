@@ -256,7 +256,6 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     val cloud by chat.state.collectAsState()
     var input by rememberSaveable { mutableStateOf("") }
     var modelSheet by rememberSaveable { mutableStateOf(false) }
-    var copiedId by remember { mutableStateOf<Long?>(null) }
     var drawer by rememberSaveable { mutableStateOf(false) }
     var attach by rememberSaveable { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
@@ -283,7 +282,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     if (cloud.messages.isEmpty()) {
                         ChatWelcome()
                     } else {
-                        CloudMessages(cloud.messages, cloud.sending, env.platform != null, copiedId, env.platform, onCopy = { turn -> env.platform?.copy(turn.text); copiedId = turn.id }, onRetry = chat::retryLast, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) })
+                        CloudMessages(cloud.messages, cloud.sending, env.platform, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) })
                     }
                 }
                 cloud.approval?.let { pending -> ApprovalCard(pending.toRequest(), { chat.answerApproval(it) }, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp)) }
@@ -349,7 +348,7 @@ private fun ChatWelcome() {
 }
 
 @Composable
-private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, canCopy: Boolean, copiedId: Long?, platform: PlatformActions?, onCopy: (ChatTurn) -> Unit, onRetry: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit) {
+private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit) {
     val listState = rememberLazyListState()
     val last = messages.lastOrNull()
     val progressMark = (last?.text?.length ?: 0) + (last?.tools?.size ?: 0) * 7 + (last?.records?.size ?: 0) * 13
@@ -364,9 +363,9 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, canCopy: B
                         text = turn.text, streaming = turn.streaming, error = turn.error, reasoning = "", tools = turn.tools, records = turn.records,
                         waiting = null, platform = platform, idleText = "思考中…", onStop = onStop, onSend = onSend,
                         onRetry = if (turn.error != null && !sending) onRetry else null,
+                        onRegenerate = if (turn.id == last?.id && !turn.streaming && !sending) onRegenerate else null,
                     )
                     if (turn.error.orEmpty().let { it.contains("额度") || it.contains("兑换") }) LinkText("去兑换额度 ›", onQuota)
-                    if (turn.error == null && !turn.streaming && turn.text.isNotEmpty() && canCopy) LinkText(if (copiedId == turn.id) "已复制" else "复制", { onCopy(turn) })
                 }
             }
         }

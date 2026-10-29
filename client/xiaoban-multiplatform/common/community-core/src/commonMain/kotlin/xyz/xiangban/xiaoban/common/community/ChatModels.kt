@@ -164,3 +164,26 @@ fun formatDuration(ms: Long): String {
     val seconds = (ms / 1000).coerceAtLeast(0)
     return if (seconds < 60) "${seconds} 秒" else "${seconds / 60} 分 ${(seconds % 60).toString().padStart(2, '0')} 秒"
 }
+
+// ───────────── 文件变更 ─────────────
+
+/** 本轮写入或修改过的一个文件。`created` 为真是新写入，否则是修改。 */
+data class ChangedFile(val path: String, val created: Boolean) {
+    val name: String get() = path.trimEnd('/', '\\').substringAfterLast('/').substringAfterLast('\\').ifEmpty { path }
+    /** 扩展名徽标，全大写，最多 4 个字符；没有扩展名是空。 */
+    val extension: String get() = name.substringAfterLast('.', "").take(4).uppercase()
+}
+
+/** 从成功的 `write_file` / `edit_file` 调用里取出改过的文件，同一路径只算一次（写入后又修改仍算写入）。 */
+fun changedFiles(calls: List<ToolCallInfo>): List<ChangedFile> {
+    val out = LinkedHashMap<String, ChangedFile>()
+    for (call in calls) {
+        if (call.status != ToolStatus.Done || (call.name != "write_file" && call.name != "edit_file")) continue
+        val obj = runCatching { CommunityJson.parseToJsonElement(call.arguments) as? JsonObject }.getOrNull() ?: continue
+        val path = ((obj["path"] ?: obj["file_path"]) as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
+        if (path.isEmpty()) continue
+        val created = call.name == "write_file"
+        out[path] = ChangedFile(path, created || out[path]?.created == true)
+    }
+    return out.values.toList()
+}

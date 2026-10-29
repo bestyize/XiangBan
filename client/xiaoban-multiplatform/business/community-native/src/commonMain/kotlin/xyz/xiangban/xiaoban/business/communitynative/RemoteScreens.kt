@@ -57,6 +57,7 @@ import xyz.xiangban.xiaoban.common.link.RemoteChatState
 import xyz.xiangban.xiaoban.common.link.folderName
 import xyz.xiangban.xiaoban.common.link.RemoteSessionSummary
 import xyz.xiangban.xiaoban.common.link.RemoteTurn
+import xyz.xiangban.xiaoban.common.link.TurnCancelled
 
 private val SetupSteps = listOf(
     "在设备上安装小伴并登录" to "用和手机相同的账号登录。",
@@ -339,6 +340,7 @@ private fun RemoteMessages(
 ) {
     val listState = rememberLazyListState()
     val last = messages.lastOrNull()
+    val lastUserText = messages.lastOrNull { it.role == "user" }?.text
     val progressMark = (last?.text?.length ?: 0) + (last?.reasoning?.length ?: 0) + (last?.tools?.size ?: 0) * 7 + (last?.records?.size ?: 0) * 13
     LaunchedEffect(messages.size, progressMark, pending?.approvalId) { if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex) }
     if (messages.isEmpty()) {
@@ -355,11 +357,13 @@ private fun RemoteMessages(
             if (turn.role == "user") {
                 UserBubble(turn.text)
             } else {
+                val again = if (turn === last && !turn.streaming && lastUserText != null) ({ onSend(lastUserText) }) else null
                 val waiting = if (turn.streaming && pending != null) (if (pending.isQuestion) "question" else "approval") else null
                 AssistantRow {
                     AssistantTurnCards(
                         text = turn.text, streaming = turn.streaming, error = turn.error, reasoning = turn.reasoning, tools = turn.tools, records = turn.records,
                         waiting = waiting, platform = platform, idleText = "电脑正在处理…", onStop = onStop, onSend = onSend,
+                        onRetry = if (turn.error != null && turn.error != TurnCancelled) again else null, onRegenerate = again,
                     )
                 }
             }
