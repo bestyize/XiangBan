@@ -10,5 +10,5 @@ enum class StrokeCap { Butt, Round, Square }
 enum class StrokeJoin { Miter, Round, Bevel }
 interface Shape
 class PathEffect { companion object { fun dashPathEffect(intervals: FloatArray, phase: Float = 0f): PathEffect = PathEffect() } }
-interface GraphicsLayerScope { var scaleX: Float; var scaleY: Float; var alpha: Float; var rotationZ: Float }
+interface GraphicsLayerScope { val size: androidx.compose.ui.geometry.Size; var translationX: Float; var scaleX: Float; var scaleY: Float; var alpha: Float; var rotationZ: Float }
 fun androidx.compose.ui.Modifier.graphicsLayer(block: GraphicsLayerScope.() -> Unit): androidx.compose.ui.Modifier = this
