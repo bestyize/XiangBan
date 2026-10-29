@@ -10,6 +10,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
@@ -458,6 +460,22 @@ class RemoteChatController(
         })
     }
 
+    /** 调整任务的后续计划：先让电脑停下当前这一轮，等它停稳后再把调整要求发过去（和桌面“调整计划”一样）。 */
+    fun revisePlan(instruction: String) {
+        val text = instruction.trim()
+        if (text.isEmpty()) return
+        scope.launch {
+            if (_state.value.sending) {
+                cancel()
+                if (withTimeoutOrNull(5_000) { _state.first { !it.sending } } == null) {
+                    _state.value = _state.value.copy(error = "任务还没有停下来，调整要求没有发出，请稍后再试。")
+                    return@launch
+                }
+            }
+            send("请调整当前任务的后续计划：\n$text\n保留已经完成的进展，先核对当前状态和执行依据，再用 todo 更新后续步骤并继续。结果不明的操作先检查，不要直接重放；原有授权范围不变。")
+        }
+    }
+
     fun answerApproval(approvalId: String, choice: String) {
         val peerId = _state.value.selectedPeerId ?: return
         sendJson(peerId, buildJsonObject {
@@ -812,7 +830,7 @@ class RemoteChatController(
     private fun finalizeAssistant(error: String?) {
         val msgs = _state.value.messages.map { turn ->
             if (turn.role == "assistant" && turn.streaming) {
-                turn.copy(streaming = false, error = error, tools = turn.tools.map { if (it.status == ToolStatus.Running) it.copy(status = if (error != null) ToolStatus.Error else ToolStatus.Done) else it })
+                turn.copy(streaming = false, error = error, tools = turn.tools.map { if (it.status == ToolStatus.Running) it.copy(status = if (error != null && error != TurnCancelled) ToolStatus.Error else ToolStatus.Done) else it })
             } else {
                 turn
             }

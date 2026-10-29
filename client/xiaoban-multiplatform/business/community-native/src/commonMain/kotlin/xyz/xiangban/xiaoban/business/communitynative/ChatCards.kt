@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -32,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.AnnotatedString
@@ -287,7 +291,7 @@ private fun TaskState.chip(): String? = when (this) {
 
 /** 任务计划（来自 `todo` 工具）：分段进度条加步骤列表。进行中带停止；暂停和受阻时给“继续完成”“让小伴修复”。 */
 @Composable
-fun TaskCard(progress: TaskProgress, durationMs: Long, modifier: Modifier = Modifier, onStop: (() -> Unit)? = null, onSend: (String) -> Unit = {}) {
+fun TaskCard(progress: TaskProgress, durationMs: Long, modifier: Modifier = Modifier, onStop: (() -> Unit)? = null, onSend: (String) -> Unit = {}, onAdjust: (() -> Unit)? = null) {
     val extra = LocalExtraColors.current
     val state = progress.state
     val completed = state == TaskState.Completed
@@ -326,6 +330,9 @@ fun TaskCard(progress: TaskProgress, durationMs: Long, modifier: Modifier = Modi
             Text("${progress.completed}/${progress.total}", fontSize = 12.sp, color = extra.ink3, maxLines = 1)
             if (state == TaskState.Running && onStop != null) {
                 Box(Modifier.size(32.dp).clip(CircleShape).clickable(onClick = onStop), contentAlignment = Alignment.Center) { XIcon(XIcons.Stop, size = 14.dp, description = "停止") }
+            }
+            if (state == TaskState.Running && onAdjust != null) {
+                Box(Modifier.size(32.dp).clip(CircleShape).clickable(onClick = onAdjust), contentAlignment = Alignment.Center) { XIcon(XIcons.More, tint = extra.ink3, size = 16.dp, description = "调整计划") }
             }
             XIcon(XIcons.ChevronDown, tint = extra.ink3, size = 16.dp, modifier = Modifier.padding(end = 8.dp).rotated(open))
         }
@@ -403,6 +410,97 @@ private fun SegmentBar(progress: TaskProgress, modifier: Modifier = Modifier) {
                 else -> Brand
             }
             Box(Modifier.weight(1f).height(3.dp).clip(RoundedCornerShape(2.dp)).background(color))
+        }
+    }
+}
+
+/** 任务卡滚出屏幕后吸在输入框上方的一行：当前步骤、进度、停止；点一下回到任务卡。 */
+@Composable
+fun TaskMiniBar(progress: TaskProgress, onClick: () -> Unit, onStop: () -> Unit, modifier: Modifier = Modifier) {
+    val extra = LocalExtraColors.current
+    val alert = progress.state == TaskState.Waiting || progress.state == TaskState.Approval
+    Box(modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Row(
+            Modifier.widthIn(max = 320.dp).fillMaxWidth().height(36.dp).shadow(4.dp, CircleShape).clip(CircleShape).background(MaterialTheme.colorScheme.surface)
+                .border(0.5.dp, extra.hairline, CircleShape).clickable(onClick = onClick).padding(start = 14.dp, end = 3.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            when (progress.state) {
+                TaskState.Waiting -> XIcon(XIcons.Question, tint = Brand, size = 16.dp)
+                TaskState.Approval -> XIcon(XIcons.Shield, tint = Brand, size = 16.dp)
+                else -> Spinner(14.dp)
+            }
+            val now = progress.plan.steps.getOrNull(progress.current)?.content ?: "任务执行"
+            Text(
+                when (progress.state) { TaskState.Waiting -> "等你回答"; TaskState.Approval -> "等待授权"; else -> now },
+                Modifier.weight(1f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (alert) Brand else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Text("${progress.completed}/${progress.total}", fontSize = 12.sp, color = extra.ink3, maxLines = 1)
+            Box(Modifier.size(30.dp).clip(CircleShape).clickable(onClick = onStop), contentAlignment = Alignment.Center) { XIcon(XIcons.Stop, size = 14.dp, description = "停止") }
+        }
+    }
+}
+
+/** 调整后续计划：已完成的步骤保留，后面的步骤可以改字、上移、删除、添加，再补一句想怎么改。提交后先停当前这一轮，再由小伴核对现场、调整并继续。 */
+@Composable
+fun AdjustPlanSheet(pending: List<String>, onDismiss: () -> Unit, onSubmit: (String) -> Unit, panelModifier: Modifier) {
+    val extra = LocalExtraColors.current
+    var steps by remember { mutableStateOf(pending) }
+    var note by remember { mutableStateOf("") }
+    val edited = steps.map { it.trim() }.filter { it.isNotEmpty() }
+    val changed = edited.isNotEmpty() && edited != pending
+    val ready = changed || note.isNotBlank()
+    BottomSheet(onDismiss, panelModifier) {
+        Text("调整后续计划", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text("已完成的步骤会保留。提交后先停止当前执行，再由小伴核对现场、调整计划并继续。", Modifier.padding(top = 4.dp), fontSize = 12.sp, lineHeight = 18.sp, color = extra.ink3)
+        Column(Modifier.padding(top = 6.dp).heightIn(max = 220.dp).verticalScroll(rememberScrollState())) {
+            steps.forEachIndexed { i, text ->
+                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(
+                        Modifier.size(28.dp).clip(CircleShape).clickable(enabled = i > 0) { steps = steps.toMutableList().also { list -> list.add(i - 1, list.removeAt(i)) } },
+                        contentAlignment = Alignment.Center,
+                    ) { if (i > 0) XIcon(XIcons.ArrowUp, tint = extra.ink3, size = 15.dp, description = "上移") }
+                    val shape = RoundedCornerShape(8.dp)
+                    BasicTextField(
+                        value = text, onValueChange = { v -> steps = steps.mapIndexed { j, old -> if (j == i) v else old } }, modifier = Modifier.weight(1f).heightIn(min = 32.dp).clip(shape).border(1.dp, extra.line, shape).padding(horizontal = 10.dp, vertical = 6.dp),
+                        textStyle = TextStyle(fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(Brand),
+                    )
+                    Box(Modifier.size(28.dp).clip(CircleShape).clickable { steps = steps.filterIndexed { j, _ -> j != i } }, contentAlignment = Alignment.Center) { XIcon(XIcons.Close, tint = extra.ink3, size = 16.dp, description = "删除这一步") }
+                }
+            }
+        }
+        Row(
+            Modifier.padding(top = 2.dp).height(30.dp).clip(RoundedCornerShape(8.dp)).clickable { steps = steps + "" }.padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            XIcon(XIcons.Plus, size = 14.dp)
+            Text("添加一步", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+        val boxShape = RoundedCornerShape(10.dp)
+        BasicTextField(
+            value = note, onValueChange = { note = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(boxShape).border(1.dp, extra.line, boxShape).padding(horizontal = 10.dp, vertical = 8.dp),
+            textStyle = TextStyle(fontSize = 13.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(Brand), maxLines = 4,
+            decorationBox = { inner ->
+                Box { if (note.isEmpty()) Text("想怎么改？例如：汇报面向管理层，5 分钟内", fontSize = 13.sp, lineHeight = 19.sp, color = extra.ink3); inner() }
+            },
+        )
+        Row(Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            listOf("更简短", "面向管理层", "跳过最后一步", "多检查一遍").forEach { chip ->
+                Text(
+                    chip, Modifier.height(26.dp).clip(CircleShape).border(1.dp, extra.line, CircleShape).clickable { note = if (note.isBlank()) chip else "${note.trim()}，$chip" }.padding(horizontal = 10.dp, vertical = 4.dp),
+                    fontSize = 12.sp, maxLines = 1,
+                )
+            }
+        }
+        Row(Modifier.padding(top = 12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            GhostPillButton("取消", onDismiss, Modifier.weight(1f), height = 40.dp)
+            PillButton("调整并继续", {
+                val parts = buildList {
+                    if (changed) add("后续步骤改为：\n" + edited.mapIndexed { i, step -> "${i + 1}. $step" }.joinToString("\n"))
+                    if (note.isNotBlank()) add(note.trim())
+                }
+                onSubmit(parts.joinToString("\n\n"))
+            }, Modifier.weight(1f), enabled = ready, height = 40.dp)
         }
     }
 }
@@ -568,12 +666,13 @@ fun AssistantTurnCards(
     onSend: (String) -> Unit,
     onRetry: (() -> Unit)? = null,
     onRegenerate: (() -> Unit)? = null,
+    onAdjust: (() -> Unit)? = null,
 ) {
     val stopped = error == TurnCancelled
     val failure = error?.takeIf { !stopped }
     if (reasoning.isNotBlank()) ReasoningView(reasoning, live = streaming && text.isEmpty())
     val progress = remember(tools, streaming, waiting, stopped, failure) { taskProgress(tools, running = streaming, waiting = waiting, stopped = stopped, error = failure) }
-    if (progress != null) TaskCard(progress, remember(tools) { activitySummary(tools).durationMs }, onStop = onStop, onSend = onSend)
+    if (progress != null) TaskCard(progress, remember(tools) { activitySummary(tools).durationMs }, onStop = onStop, onSend = onSend, onAdjust = if (streaming) onAdjust else null)
     ToolGroup(tools, live = streaming)
     if (text.isNotEmpty()) {
         MarkdownBubble(text, streaming, platform)

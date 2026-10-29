@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -31,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,6 +53,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import xyz.xiangban.xiaoban.common.community.taskPlan
+import xyz.xiangban.xiaoban.common.community.taskProgress
 import xyz.xiangban.xiaoban.common.link.PeerSummary
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
 import xyz.xiangban.xiaoban.common.link.RemoteChatState
@@ -187,6 +191,11 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     // 0 关着，1 选权限，2 确认开启完全信任
     var permissionStep by rememberSaveable { mutableStateOf(0) }
     var toast by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    val uiScope = rememberCoroutineScope()
+    var follow by remember { mutableStateOf(true) }
+    var adjust by remember { mutableStateOf(false) }
+    var adjustSteps by remember { mutableStateOf(emptyList<String>()) }
     BackHandler(enabled = drawer) { drawer = false }
 
     LaunchedEffect(activePeer) {
@@ -195,6 +204,15 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     }
 
     val current = remote.selectedSession
+    val lastTurn = remote.messages.lastOrNull()
+    val liveProgress = if (lastTurn != null && lastTurn.role == "assistant" && lastTurn.streaming) {
+        taskProgress(lastTurn.tools, running = true, waiting = remote.pendingApproval?.let { if (it.isQuestion) "question" else "approval" })
+    } else null
+    val lastIndex = remote.messages.lastIndex
+    // 任务卡滚出屏幕（最后一条回复已经往上滚了一截）后，在输入框上方吸一行进度。
+    val showMini by remember(liveProgress != null, lastIndex) {
+        derivedStateOf { liveProgress != null && listState.firstVisibleItemIndex == lastIndex && listState.firstVisibleItemScrollOffset > 100 }
+    }
     val projectName = remote.currentWorkspace.takeIf { it.isNotBlank() }?.let(::folderName)
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().imePadding()) {
@@ -220,8 +238,12 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 RemoteMessages(
-                    remote.messages, remote.pendingApproval, online, remote.selectedSessionId == null, env.platform,
+                    remote.messages, remote.pendingApproval, online, remote.selectedSessionId == null, env.platform, listState, follow, { follow = it },
                     onStop = env.remoteChat::cancel, onSend = env.remoteChat::send,
+                    onAdjust = {
+                        adjustSteps = lastTurn?.let { turn -> taskPlan(turn.tools)?.steps?.filter { !it.done }?.map { it.content } }.orEmpty()
+                        adjust = true
+                    },
                 )
             }
 
@@ -238,6 +260,13 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             }
 
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
+                if (showMini && liveProgress != null) {
+                    TaskMiniBar(
+                        liveProgress, modifier = Modifier.padding(bottom = 8.dp),
+                        onClick = { follow = false; uiScope.launch { listState.animateScrollToItem(lastIndex) } },
+                        onStop = env.remoteChat::cancel,
+                    )
+                }
                 Row(Modifier.padding(bottom = 8.dp, start = 4.dp)) {
                     ChipPill(
                         if (remote.fullTrust) "完全信任" else "默认权限", icon = XIcons.Lock, trailingIcon = XIcons.ChevronDown,
@@ -281,6 +310,9 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                     GhostPillButton("取消", { permissionStep = 0 }, Modifier.padding(top = 8.dp).fillMaxWidth())
                 }
             }
+        }
+        OverlayTransition(adjust) { panel ->
+            AdjustPlanSheet(adjustSteps, onDismiss = { adjust = false }, onSubmit = { adjust = false; follow = true; env.remoteChat.revisePlan(it) }, panelModifier = panel)
         }
         OverlayTransition(attach) { panel -> AttachSheet({ attach = false }, { attach = false; toast = "$it 即将支持" }, panel) }
         Toast(toast) { toast = null }
@@ -335,14 +367,26 @@ private fun RemoteMessages(
     online: Boolean,
     isNew: Boolean,
     platform: PlatformActions?,
+    listState: LazyListState,
+    follow: Boolean,
+    onFollow: (Boolean) -> Unit,
     onStop: () -> Unit,
     onSend: (String) -> Unit,
+    onAdjust: () -> Unit,
 ) {
-    val listState = rememberLazyListState()
     val last = messages.lastOrNull()
     val lastUserText = messages.lastOrNull { it.role == "user" }?.text
     val progressMark = (last?.text?.length ?: 0) + (last?.reasoning?.length ?: 0) + (last?.tools?.size ?: 0) * 7 + (last?.records?.size ?: 0) * 13
-    LaunchedEffect(messages.size, progressMark, pending?.approvalId) { if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex) }
+    // 跟着最新内容往下走；用户往上翻就不再拽回去，发新消息或回到底部后恢复。
+    LaunchedEffect(listState.lastScrolledBackward) { if (listState.lastScrolledBackward) onFollow(false) }
+    LaunchedEffect(listState.canScrollForward) { if (!listState.canScrollForward) onFollow(true) }
+    LaunchedEffect(messages.lastOrNull { it.role == "user" }?.id) { onFollow(true) }
+    LaunchedEffect(messages.size, progressMark, pending?.approvalId, follow) {
+        if (follow && messages.isNotEmpty()) {
+            if (listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index != messages.lastIndex) listState.scrollToItem(messages.lastIndex)
+            listState.scrollBy(1_000_000f)
+        }
+    }
     if (messages.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text(
@@ -364,6 +408,7 @@ private fun RemoteMessages(
                         text = turn.text, streaming = turn.streaming, error = turn.error, reasoning = turn.reasoning, tools = turn.tools, records = turn.records,
                         waiting = waiting, platform = platform, idleText = "电脑正在处理…", onStop = onStop, onSend = onSend,
                         onRetry = if (turn.error != null && turn.error != TurnCancelled) again else null, onRegenerate = again,
+                        onAdjust = if (turn === last) onAdjust else null,
                     )
                 }
             }

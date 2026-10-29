@@ -369,4 +369,23 @@ class RemoteChatTest {
         link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"3","session":"s_1","kind":"state","data":{"state":"cancelled"}}""".encodeToByteArray()))
         assertEquals(TurnCancelled, controller.state.value.messages.last().error)
     }
+
+    @Test
+    fun `revising the plan stops the run first and then sends the new steps`() = runTest {
+        val link = createLink()
+        val sent = mutableListOf<String>()
+        link.sendObserverForTest = { _, data -> sent += data.decodeToString() }
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"sessions.page","id":"1","items":[{"id":"s_1","title":"整理","updated_at":1,"state":"running"}]}""".encodeToByteArray()))
+        controller.send("开始整理")
+        sent.clear()
+        controller.revisePlan("后续步骤改为：\n1. 只整理图片")
+        assertTrue(sent.any { it.contains("message.cancel") })
+        assertTrue(sent.none { it.contains("message.send") }, "还没停稳不能发")
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"3","session":"s_1","kind":"state","data":{"state":"cancelled"}}""".encodeToByteArray()))
+        val revision = sent.first { it.contains("message.send") }
+        assertTrue(revision.contains("只整理图片") && revision.contains("todo"), revision)
+    }
 }
