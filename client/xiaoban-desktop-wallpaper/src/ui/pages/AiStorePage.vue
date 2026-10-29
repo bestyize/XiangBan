@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NAlert, NModal, NSkeleton } from 'naive-ui';
-import { Search, RefreshCw, ArrowRight, Download, Check, Plus, Puzzle, Monitor, ChevronLeft, ChevronRight, SlidersHorizontal, Users, Layers, TriangleAlert } from 'lucide-vue-next';
+import { Search, RefreshCw, ArrowRight, Download, Check, Plus, Puzzle, Monitor, ChevronLeft, ChevronRight, SlidersHorizontal, Users, Layers, TriangleAlert, Zap, Plug } from 'lucide-vue-next';
 import { invoke, listen, type AiConfigView } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { type Skill, type SkillPage, type SkillReview } from '../ai-store/catalog.ts';
@@ -21,7 +21,7 @@ import '../ai-store/store-cards.css';
 
 const props = defineProps<{ store: ControlStore }>();
 type Tab = 'experts' | 'skills' | 'connectors';
-const tabs: { id: Tab; label: string }[] = [{ id: 'experts', label: '专家' }, { id: 'skills', label: '技能' }, { id: 'connectors', label: '连接器' }];
+const tabs = [{ id: 'experts', label: '专家', icon: Users }, { id: 'skills', label: '技能', icon: Zap }, { id: 'connectors', label: '连接器', icon: Plug }] as const;
 const tab = ref<Tab>('experts');
 const query = ref('');
 const category = ref('全部');
@@ -333,7 +333,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
   <section class="ai-store-page xb-page" data-testid="ai-store-page" aria-label="AI 插件">
     <header class="xb-page-head store-header" data-tauri-drag-region>
       <div class="xb-tabs-lg store-tabs" role="tablist" aria-label="插件类型" @keydown="tabKey">
-        <button v-for="t in tabs" :id="`store-tab-${t.id}`" :key="t.id" type="button" role="tab" :aria-controls="`store-panel-${t.id}`" :aria-selected="tab === t.id" :tabindex="tab === t.id ? 0 : -1" @click="switchTab(t.id)">{{ t.label }}</button>
+        <button v-for="t in tabs" :id="`store-tab-${t.id}`" :key="t.id" type="button" role="tab" :aria-label="t.label" :title="t.label" :aria-controls="`store-panel-${t.id}`" :aria-selected="tab === t.id" :tabindex="tab === t.id ? 0 : -1" @click="switchTab(t.id)"><component :is="t.icon" class="store-tab-icon" :size="20" aria-hidden="true" /><span class="store-tab-label">{{ t.label }}</span></button>
       </div>
       <div class="xb-page-actions">
         <form class="xb-search store-search" role="search" @submit.prevent="tab === 'skills' ? browse() : registry?.refresh()">
@@ -452,6 +452,9 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 <style scoped>
 .ai-store-page{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;padding-bottom:0;color:var(--ui-text-primary);background:var(--ui-surface);container-type:inline-size}
 .store-header{flex:none}
+.store-tabs{flex:none}
+.store-tabs>button{white-space:nowrap}
+.store-tab-icon{display:none}
 .store-header .xb-page-actions .xb-search{width:220px;height:32px;padding:0 10px;gap:8px;border-radius:9px;background:var(--ui-control);box-sizing:border-box}
 .store-search .clear{border:0;background:none;color:var(--ui-text-tertiary);font-size:16px;line-height:1;cursor:pointer;padding:0}
 .installed-filter .count{min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--ui-soft);color:var(--ui-ink);font-size:11px;font-weight:600;display:inline-grid;place-items:center}
@@ -487,4 +490,17 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 .version-lock{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;padding:11px 14px;border-radius:12px;box-shadow:0 0 0 1px var(--ui-border);font-size:12px;color:var(--ui-text-secondary)}
 .version-lock code{color:var(--ui-text-primary)}
 .lock-ok{display:inline-flex;align-items:center;gap:4px;color:var(--ui-success-text)}
+@container (max-width: 760px){
+  .store-tabs{gap:8px}
+  .store-tabs>button{display:grid;place-items:center;width:32px;height:32px;border-radius:8px}
+  .store-tabs>button[aria-selected=true]{background:var(--ui-soft);color:var(--ui-ink)}
+  .store-tab-icon{display:block}
+  .store-tab-label{display:none}
+  .store-header .xb-page-actions .xb-search{width:140px}
+}
+@container (max-width: 500px){
+  .store-header{flex-wrap:wrap;gap:10px}
+  .store-header .xb-page-actions{width:100%;min-width:0}
+  .store-header .xb-page-actions .xb-search{flex:1;min-width:0}
+}
 </style>
