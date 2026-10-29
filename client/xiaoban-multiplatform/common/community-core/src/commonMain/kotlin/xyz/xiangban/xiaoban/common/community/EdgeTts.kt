@@ -221,11 +221,11 @@ internal object EdgeProtocol {
 
     /** `Tue Nov 14 2023 22:13:20 GMT+0000 (Coordinated Universal Time)`。 */
     fun timestamp(unix: Long): String {
-        val days = Math.floorDiv(unix, 86_400L)
-        val secs = Math.floorMod(unix, 86_400L).toInt()
+        val days = unix.floorDiv(86_400L)
+        val secs = unix.mod(86_400L).toInt()
         // 从 1970-01-01 的天数换算年月日（公历）。
         val z = days + 719_468
-        val era = Math.floorDiv(z, 146_097L)
+        val era = z.floorDiv(146_097L)
         val doe = (z - era * 146_097).toInt()
         val yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
         val doy = doe - (365 * yoe + yoe / 4 - yoe / 100)
@@ -233,7 +233,7 @@ internal object EdgeProtocol {
         val day = doy - (153 * mp + 2) / 5 + 1
         val month = if (mp < 10) mp + 3 else mp - 9
         val year = (yoe + era * 400 + if (month <= 2) 1 else 0).toInt()
-        val weekday = Days[Math.floorMod(days, 7L).toInt()]
+        val weekday = Days[days.mod(7L).toInt()]
         fun two(n: Int) = n.toString().padStart(2, '0')
         return "$weekday ${Months[month - 1]} ${two(day)} $year ${two(secs / 3600)}:${two(secs % 3600 / 60)}:${two(secs % 60)} GMT+0000 (Coordinated Universal Time)"
     }

@@ -13,7 +13,6 @@ class LazyListState {
     val lastScrolledBackward: Boolean = false
     suspend fun scrollToItem(index: Int, scrollOffset: Int = 0) {}
     suspend fun animateScrollToItem(index: Int, scrollOffset: Int = 0) {}
-    suspend fun scrollBy(value: Float): Float = 0f
 }
 @Composable fun rememberLazyListState(): LazyListState = TODO()
 interface LazyListScope { fun item(key: Any? = null, content: @Composable () -> Unit); fun <T> items(items: List<T>, key: ((T) -> Any)? = null, itemContent: @Composable (T) -> Unit) }
