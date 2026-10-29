@@ -19,6 +19,55 @@ import kotlinx.coroutines.withTimeout
 
 /** 整条链：对话控制器 → 智能体运行时 → 真正的 Rust 内核（JNI）→ 假的 server-ai（MockEngine）和假的提醒调度。 */
 class AgentChatTest {
+    @Test
+    fun `an unexpectedly closed engine ends the turn and can be restarted`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val closed = java.util.concurrent.atomic.AtomicBoolean(false)
+        val starts = java.util.concurrent.atomic.AtomicInteger()
+        val bridge = object : AgentBridge {
+            override fun start(config: String) = starts.incrementAndGet().toLong()
+            override fun send(handle: Long, line: String) { closed.set(true) }
+            override fun poll(handle: Long, timeoutMs: Long): String? {
+                Thread.sleep(20)
+                return if (closed.getAndSet(false)) """{"type":"closed"}""" else null
+            }
+            override fun stop(handle: Long) = Unit
+        }
+        val api = AiGatewayApi(HttpClient(MockEngine { respond("{}") }), CommunityConfig()) { "token" }
+        val runtime = AgentRuntime(bridge, { _, _ -> ModelResult(200) }, emptyList(), "", "", scope)
+        val chat = CloudChatController(api, scope, agent = runtime)
+        delay(100) // 等控制器开始接收引擎事件。
+        chat.send("你好")
+        withTimeout(5_000) { while (chat.state.value.sending) delay(10) }
+        assertTrue(chat.state.value.messages.last().error.orEmpty().contains("意外退出"))
+        chat.retryLast()
+        withTimeout(5_000) { while (chat.state.value.sending) delay(10) }
+        assertEquals(2, starts.get())
+        runtime.stop()
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
+    fun `a failed native send ends the turn with an error instead of waiting forever`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val bridge = object : AgentBridge {
+            override fun start(config: String) = 1L
+            override fun send(handle: Long, line: String) { throw IllegalStateException("引擎发送失败") }
+            override fun poll(handle: Long, timeoutMs: Long): String? { Thread.sleep(20); return null }
+            override fun stop(handle: Long) = Unit
+        }
+        val api = AiGatewayApi(HttpClient(MockEngine { respond("{}") }), CommunityConfig()) { "token" }
+        val runtime = AgentRuntime(bridge, { _, _ -> ModelResult(200) }, emptyList(), "", "", scope)
+        val chat = CloudChatController(api, scope, agent = runtime)
+        chat.send("你好")
+        withTimeout(5_000) { while (chat.state.value.sending) delay(10) }
+        assertTrue(chat.state.value.messages.last().error.orEmpty().contains("引擎发送失败"))
+        runtime.stop()
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
     private class JvmBridge : AgentBridge {
         override fun start(config: String) = AgentNative.nativeStart(config)
         override fun send(handle: Long, line: String) = AgentNative.nativeSend(handle, line)

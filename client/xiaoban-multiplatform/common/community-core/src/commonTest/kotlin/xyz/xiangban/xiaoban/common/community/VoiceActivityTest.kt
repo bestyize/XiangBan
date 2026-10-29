@@ -28,6 +28,16 @@ class VoiceActivityTest {
     }
 
     @Test
+    fun `speaking immediately after opening the call is not calibrated as noise`() {
+        val detector = EndpointDetector()
+        var result: VadResult? = null
+        repeat(50) { result = detector.feed(frame(3000, it)) }
+        repeat(50) { if (result?.utterance == null) result = detector.feed(frame(0, it)) }
+        assertNotNull(result?.utterance)
+        detector.close()
+    }
+
+    @Test
     fun `a spoken sentence ends after a pause and keeps its beginning`() {
         val vad = EndpointDetector()
         var result: VadResult? = null

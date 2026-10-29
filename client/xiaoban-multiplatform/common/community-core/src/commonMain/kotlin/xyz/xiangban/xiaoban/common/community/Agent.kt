@@ -83,7 +83,7 @@ class AgentRuntime(
     val events: SharedFlow<AgentEvent> = _events.asSharedFlow()
 
     private val lock = Mutex()
-    private var handle = 0L
+    @Volatile private var handle = 0L
     private var pump: Job? = null
     private var currentModel = ""
     private val requests = HashMap<String, Job>()
@@ -94,7 +94,8 @@ class AgentRuntime(
 
     private fun send(text: String) {
         val h = handle
-        if (h != 0L) runCatching { bridge.send(h, text) }
+        check(h != 0L) { "智能体引擎未启动" }
+        bridge.send(h, text)
     }
 
     /** 引擎没在跑就启动它，已经在跑就只换模型。 */
@@ -113,13 +114,13 @@ class AgentRuntime(
                     })
                 })
             }.toString()
-            handle = bridge.start(config)
+            handle = bridge.start(config).also { check(it != 0L) { "智能体引擎启动失败" } }
             currentModel = modelName
             val started = handle
             pump = scope.launch(Dispatchers.Default) { pumpLoop(started) }
         } else if (modelName != currentModel) {
-            currentModel = modelName
             send(line { put("type", "set_model"); put("model", modelName) })
+            currentModel = modelName
         }
     }
 
@@ -131,7 +132,7 @@ class AgentRuntime(
         return id
     }
 
-    fun cancel(run: String) = send(line { put("type", "cancel"); put("id", run) })
+    fun cancel(run: String) { runCatching { send(line { put("type", "cancel"); put("id", run) }) } }
 
     /** `decision`：once（允许这一次）、always（这次对话里一直允许）、deny（拒绝）。 */
     fun answerApproval(id: String, decision: String) = send(line { put("type", "approval"); put("id", id); put("decision", decision) })
@@ -153,12 +154,19 @@ class AgentRuntime(
             while (scope.isActive) {
                 val text = withBlocking { bridge.poll(h, 400) } ?: continue
                 val obj = runCatching { AgentJson.parseToJsonElement(text).jsonObject }.getOrNull() ?: continue
-                if (obj["type"].str() == "closed") break
+                if (obj["type"].str() == "closed") throw IllegalStateException("智能体引擎意外退出，请重试")
                 dispatch(obj)
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
+            lock.withLock {
+                if (handle == h) {
+                    handle = 0L
+                    pump = null
+                    withBlocking { runCatching { bridge.stop(h) } }
+                }
+            }
             _events.emit(AgentEvent.Failure(e.message ?: "智能体引擎出错"))
         }
     }
@@ -180,12 +188,14 @@ class AgentRuntime(
                         ModelResult(0, error = e.message ?: "请求失败")
                     }
                     requestsLock.withLock { requests.remove(id) }
-                    if (h != 0L) runCatching {
+                    if (h != 0L && handle == h) try {
                         bridge.send(h, line {
                             put("type", "model_end"); put("id", id); put("status", result.status)
                             result.error?.let { put("error", it) }
                             result.body?.let { put("body", it) }
                         })
+                    } catch (e: Exception) {
+                        _events.emit(AgentEvent.Failure(e.message ?: "向智能体发送模型结果失败"))
                     }
                 }
                 requestsLock.withLock { requests[id] = job }
@@ -206,27 +216,27 @@ class AgentRuntime(
                     send(line { put("type", "tool_result"); put("id", id); put("ok", result.ok); put("output", result.output) })
                 }
             }
-            "approval_request" -> _events.tryEmit(
+            "approval_request" -> _events.emit(
                 AgentEvent.Approval(
                     id = obj["id"].str().orEmpty(), tool = obj["tool"].str().orEmpty(), risk = obj["risk"].str() ?: "write",
                     arguments = obj["arguments"] as? JsonObject ?: JsonObject(emptyMap()), danger = obj["danger"].str(),
                 ),
             )
-            "run_end" -> _events.tryEmit(
+            "run_end" -> _events.emit(
                 AgentEvent.RunEnd(obj["run"].str().orEmpty(), obj["ok"].let { (it as? JsonPrimitive)?.booleanOrNull } == true, obj["text"].str(), obj["error"].str()),
             )
             "event" -> {
                 val run = obj["run"].str().orEmpty()
                 val ev = obj["event"] as? JsonObject ?: return
                 when (ev["type"].str()) {
-                    "text_delta" -> ev["text"].str()?.let { _events.tryEmit(AgentEvent.Text(run, it)) }
-                    "tool_start" -> _events.tryEmit(AgentEvent.ToolStart(run, ev["id"].str().orEmpty(), ev["name"].str().orEmpty(), ev["arguments"].str().orEmpty()))
-                    "tool_end" -> _events.tryEmit(
+                    "text_delta" -> ev["text"].str()?.let { _events.emit(AgentEvent.Text(run, it)) }
+                    "tool_start" -> _events.emit(AgentEvent.ToolStart(run, ev["id"].str().orEmpty(), ev["name"].str().orEmpty(), ev["arguments"].str().orEmpty()))
+                    "tool_end" -> _events.emit(
                         AgentEvent.ToolEnd(run, ev["id"].str().orEmpty(), ev["output"].str().orEmpty(), (ev["is_error"] as? JsonPrimitive)?.booleanOrNull == true),
                     )
                 }
             }
-            "error" -> _events.tryEmit(AgentEvent.Failure(obj["message"].str() ?: "智能体引擎出错"))
+            "error" -> _events.emit(AgentEvent.Failure(obj["message"].str() ?: "智能体引擎出错"))
         }
     }
 }

@@ -122,21 +122,29 @@ class SileroGate(modelPath: String) : SpeechGate {
             sampleRate = 16000, numThreads = 1, provider = "cpu",
         ),
     )
-    private val window = FloatArray(Window)
+    // Silero V5 needs the last 64 samples of the previous window as context.
+    private val window = FloatArray(Overlap + Window)
     private var filled = 0
     private var probability = 0f
     private var level = 0f
+    private val fallback = xyz.xiangban.xiaoban.common.community.EnergyGate()
+    private var nativeUnavailable = false
 
-    override fun level(frame: ByteArray): Float = level
+    override fun level(frame: ByteArray): Float = if (nativeUnavailable) fallback.level(frame) else level
 
     override fun voiced(frame: ByteArray, strict: Boolean): Boolean {
+        if (nativeUnavailable) return fallback.voiced(frame, strict)
         var peak = 0f
         for (i in 0 until frame.size / 2) {
             val sample = (((frame[2 * i + 1].toInt() shl 8) or (frame[2 * i].toInt() and 0xFF)).toShort()) / 32768f
             peak = maxOf(peak, kotlin.math.abs(sample))
-            window[filled++] = sample
+            window[Overlap + filled++] = sample
             if (filled == Window) {
-                probability = vad.compute(window)
+                probability = try { vad.compute(window) } catch (_: LinkageError) {
+                    nativeUnavailable = true
+                    return fallback.voiced(frame, strict)
+                }
+                window.copyInto(window, 0, Window, Overlap + Window)
                 filled = 0
             }
         }
@@ -148,6 +156,7 @@ class SileroGate(modelPath: String) : SpeechGate {
 
     private companion object {
         const val Window = 512
+        const val Overlap = 64
     }
 }
 

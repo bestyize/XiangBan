@@ -43,6 +43,8 @@ class EnergyGate : SpeechGate {
             calibrated++
             return false
         }
+        // 用户可能一打开通话就说话；不能把校准时的整段人声当成环境噪声。
+        if (calibrated == CalibrationFrames) { floor = floor.coerceAtMost(MinThreshold / 3.0); calibrated++ }
         val threshold = maxOf(MinThreshold, floor * 3.0) * (if (strict) 1.8 else 1.0)
         val loud = value > threshold
         if (!loud) floor = floor * 0.95 + value * 0.05
