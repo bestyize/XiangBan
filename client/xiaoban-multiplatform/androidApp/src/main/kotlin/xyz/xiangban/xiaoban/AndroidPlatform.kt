@@ -140,6 +140,10 @@ class AndroidPlatformActions(
         runCatching { context.startActivity(view) }
     }
 
+    override fun exitApp() {
+        (context as? android.app.Activity)?.finish()
+    }
+
     override fun openAppSettings(): Boolean {
         val settings = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching { context.startActivity(settings) }.isSuccess

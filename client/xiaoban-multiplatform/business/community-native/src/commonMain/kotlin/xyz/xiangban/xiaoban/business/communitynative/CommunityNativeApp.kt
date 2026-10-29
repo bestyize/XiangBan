@@ -1,6 +1,8 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -27,8 +29,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.community.CloudChatController
@@ -37,6 +41,9 @@ import xyz.xiangban.xiaoban.common.community.CloudChatController
  * 社区原生界面入口：四个去处（小伴AI、游戏、社区、我的）加一个页面栈，底部是悬浮胶囊导航，中间的“发布”打开弹层。
  * 打开子页面时一级页仍留在下面（只是被盖住），返回后滚动位置和已加载的数据都在。
  */
+/** 页面进入、返回的转场时长。 */
+private const val PageMillis = 260
+
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun CommunityNativeApp(env: CommunityEnv) {
@@ -56,30 +63,36 @@ fun CommunityNativeApp(env: CommunityEnv) {
         fun closeLogin() { if (Route.decodeStack(stackText).lastOrNull() == Route.Login) pop() }
 
         BackHandler(enabled = stack.isNotEmpty()) { pop() }
+        // 回到最外面再按返回：由应用自己结束，用普通的关闭动画，不让系统播放“缩到右下角”的返回桌面动画。放在其它返回处理（弹层、侧栏）前面，优先级最低。
+        BackHandler(enabled = env.platform != null && stack.isEmpty()) { env.platform?.exitApp() }
 
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            AnimatedContent(targetState = Tab.valueOf(tab), modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) }, label = "主导航切换") { currentTab ->
-                when (currentTab) {
-                    Tab.Ai -> AiHomeScreen(env, chat, ::push, { aiDrawerOpen = true })
-                    Tab.Games -> GamesScreen()
-                    Tab.Community -> CommunityScreen(env, ::push)
-                    Tab.Mine -> MineScreen(env, ::push)
+            // 一级页（含底部导航和对话列表侧栏）：打开子页面时整层往左推出屏幕，和子页面同步移动，过程中不会露出首页；
+            // 返回时再原样推回来，滚动位置和已加载的数据都在。
+            val tabShift by animateFloatAsState(if (stack.any { it != Route.Login }) 1f else 0f, tween<Float>(PageMillis, easing = FastOutSlowInEasing), label = "一级页让位")
+            Box(Modifier.fillMaxSize().graphicsLayer { translationX = -size.width * tabShift }) {
+                AnimatedContent(targetState = Tab.valueOf(tab), modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) }, label = "主导航切换") { currentTab ->
+                    when (currentTab) {
+                        Tab.Ai -> AiHomeScreen(env, chat, ::push, { aiDrawerOpen = true })
+                        Tab.Games -> GamesScreen()
+                        Tab.Community -> CommunityScreen(env, ::push)
+                        Tab.Mine -> MineScreen(env, ::push)
+                    }
                 }
+                FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
+                AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
             }
-            FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
-            AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
             val pages = stack.filter { it != Route.Login }
             AnimatedContent(
                 targetState = pages,
                 modifier = Modifier.fillMaxSize(),
+                // 页面一直是实心的，不叠淡入淡出；新旧两页（包括下面的一级页）整屏一起滑动，任何时候都铺满屏幕，不会露出别的页：
+                // 进入时新页从右边推进来、旧页往左推出；返回时反过来。
                 transitionSpec = {
-                    if (targetState.size > initialState.size) {
-                        (slideInHorizontally(tween(220)) { it } + fadeIn(tween(220))) togetherWith
-                            (slideOutHorizontally(tween(220)) { -it / 4 } + fadeOut(tween(220)))
-                    } else {
-                        (slideInHorizontally(tween(220)) { -it / 4 } + fadeIn(tween(220))) togetherWith
-                            (slideOutHorizontally(tween(220)) { it } + fadeOut(tween(220)))
-                    }
+                    val push = targetState.size > initialState.size
+                    val spec = tween<IntOffset>(PageMillis, easing = FastOutSlowInEasing)
+                    if (push) slideInHorizontally(spec) { it } togetherWith slideOutHorizontally(spec) { -it }
+                    else slideInHorizontally(spec) { -it } togetherWith slideOutHorizontally(spec) { it }
                 },
                 label = "页面切换",
             ) { visiblePages ->
