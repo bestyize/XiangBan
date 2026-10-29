@@ -303,4 +303,18 @@ class VoiceCallTest {
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         Unit
     }
+
+    @Test
+    fun `without echo cancellation barge in starts switched off and says why`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val api = AiGatewayApi(HttpClient(MockEngine { respond("{}", HttpStatusCode.OK) }), CommunityConfig()) { "tok" }
+        val noEcho = object : VoicePlatform { override fun bargeInSafe() = false }
+        val call = SpokenCall(scope, noEcho, CloudAssistant(CloudChatController(api, scope)), emptyList(), emptyList())
+        assertTrue(!call.state.value.bargeIn)
+        assertTrue(call.state.value.notice.orEmpty().contains("回声消除不可用"))
+        call.setBargeIn(true)
+        assertTrue(call.state.value.bargeIn, "戴耳机后可以手动打开")
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
 }

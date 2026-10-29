@@ -34,6 +34,9 @@ interface VoicePlatform {
     fun stopAudio() {}
     fun stopSpeaking() {}
 
+    /** 这台手机现在能不能把小伴自己的声音从麦克风里去掉（系统回声消除可用，或戴着耳机）。不能的话“直接开口打断”默认关闭，免得它被自己的声音打断。 */
+    fun bargeInSafe(): Boolean = true
+
     /** “有没有人在说话”的判断；每次调用给一个新的（带自己的状态）。没有更准的就返回 null，用声音大小判断。 */
     fun speechGate(): SpeechGate? = null
 }
@@ -65,7 +68,13 @@ class CallError(message: String) : Exception(message)
  * 子类决定一句话怎么变成回答、怎么念出来。
  */
 abstract class VoiceCall(protected val scope: CoroutineScope, protected val platform: VoicePlatform) {
-    private val _state = MutableStateFlow(CallState())
+    private val bargeSafe = platform.bargeInSafe()
+    private val _state = MutableStateFlow(
+        CallState(
+            bargeIn = bargeSafe,
+            notice = if (bargeSafe) null else "这台手机的回声消除不可用，已关闭“直接开口打断”，请用“打断”按钮；戴耳机时可以在下面打开",
+        ),
+    )
     val state: StateFlow<CallState> = _state.asStateFlow()
     private var job: Job? = null
     private var playback: CompletableDeferred<Boolean>? = null

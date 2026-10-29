@@ -54,6 +54,7 @@ class AndroidPlatformActions(
     override fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean = voice.play(bytes, onDone)
     override fun stopAudio() = voice.stopPlayback()
     override fun speechGate() = gate()
+    override fun bargeInSafe(): Boolean = voice.echoSafe()
     override suspend fun streamRecording(onFrame: (ByteArray) -> Unit): (() -> Unit)? = voice.stream(onFrame)
     override fun listenOnce(onPartial: (String) -> Unit, onResult: (String?, String?) -> Unit): (() -> Unit)? = voice.listenOnce(onPartial, onResult)
 
