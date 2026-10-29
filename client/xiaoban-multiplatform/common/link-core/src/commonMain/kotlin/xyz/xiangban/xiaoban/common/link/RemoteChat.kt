@@ -199,6 +199,9 @@ data class RemoteChatState(
     val sidebar: RemoteSidebar get() = buildSidebar(sessions, addedProjects)
 }
 
+/** 这一轮被停止时记在回复上的说明；界面把它当“已停止”而不是错误。 */
+const val TurnCancelled = "已取消"
+
 private val ProtocolJson = Json { ignoreUnknownKeys = true; explicitNulls = false }
 
 private fun JsonElement?.asStr(): String? =
@@ -441,6 +444,17 @@ class RemoteChatController(
             }
             put("text", text)
             put("client_id", clientId)
+        })
+    }
+
+    /** 让电脑停下当前这一轮（和电脑上点“停止”一样）；结果从事件里回来。 */
+    fun cancel() {
+        val peerId = _state.value.selectedPeerId ?: return
+        val session = _state.value.selectedSessionId ?: return
+        sendJson(peerId, buildJsonObject {
+            put("t", "message.cancel")
+            put("id", nextId())
+            put("session", session)
         })
     }
 
@@ -766,7 +780,7 @@ class RemoteChatController(
             "state" -> {
                 val st = data["state"].asStr()
                 if (st == "cancelled") {
-                    finalizeAssistant(error = "已取消")
+                    finalizeAssistant(error = TurnCancelled)
                 }
             }
         }

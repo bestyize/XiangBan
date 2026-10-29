@@ -478,6 +478,22 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                 }
             }
         }
+        "message.cancel" => {
+            let Some(session_id) = msg.get("session").and_then(Value::as_str).filter(|s| !s.trim().is_empty()) else { return };
+            if let Ok(audit) = audit_path(app) {
+                append_remote_audit(
+                    &audit,
+                    &json!({
+                        "timestampMs": now_ms(),
+                        "peerId": peer,
+                        "action": "message.cancel",
+                        "session": session_id,
+                    }),
+                );
+            }
+            // 和电脑上点“停止”一样：让正在跑的这一轮尽快结束；没有在跑就什么也不发生。
+            crate::chat::cancel_run(app, session_id);
+        }
         "message.send" => {
             let session_id = msg.get("session").and_then(Value::as_str).filter(|s| !s.trim().is_empty());
             let text = msg.get("text").and_then(Value::as_str).unwrap_or("");

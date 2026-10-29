@@ -423,7 +423,7 @@ fun EmptyState(icon: ImageVector, title: String, desc: String, modifier: Modifie
 // ───────────── 对话部件（云端小伴与遥控电脑共用） ─────────────
 
 private val UserBubbleShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp)
-private val AssistantBubbleShape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
+internal val AssistantBubbleShape = RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
 
 @Composable
 fun UserBubble(text: String, modifier: Modifier = Modifier) {
@@ -452,26 +452,6 @@ fun AssistantBubble(text: String, modifier: Modifier = Modifier, muted: Boolean 
         modifier.clip(AssistantBubbleShape).background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 10.dp),
         fontSize = 14.sp, lineHeight = 22.sp, color = if (muted) LocalExtraColors.current.ink3 else MaterialTheme.colorScheme.onSurface,
     )
-}
-
-/** 工具执行进度的一行（运行命令、读取文件…）。 */
-@Composable
-fun ToolCard(icon: ImageVector, title: String, detail: String, status: String, done: Boolean) {
-    val shape = RoundedCornerShape(8.dp)
-    Row(
-        Modifier.fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface).border(0.5.dp, LocalExtraColors.current.hairline, shape).padding(horizontal = 10.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        IconBox(icon, 28.dp, 8.dp, iconSize = 16.dp)
-        Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (detail.isNotBlank()) Text(detail, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 1.dp))
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (done) XIcon(XIcons.CheckBold, size = 14.dp)
-            Text(status, fontSize = 12.sp, color = if (done) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
 }
 
 /** 输入卡片：上面一个多行输入框，下面一行放选择器和发送按钮（由调用方通过 [actions] 放）。 */

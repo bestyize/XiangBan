@@ -15,6 +15,8 @@ import io.ktor.utils.io.readUTF8Line
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToLong
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -355,15 +357,10 @@ data class ChatTurn(
     val text: String,
     val streaming: Boolean = false,
     val error: String? = null,
-)
-
-/** 智能体这一轮里调用的一个工具，界面显示成一张小卡片。 */
-data class ChatToolCall(
-    val id: String,
-    val name: String,
-    val detail: String = "",
-    val running: Boolean = true,
-    val isError: Boolean = false,
+    /** 这一轮智能体调用的工具（含参数和结果），界面画成工具调用组。 */
+    val tools: List<ToolCallInfo> = emptyList(),
+    /** 处理过的授权、回答过的问题留下的痕迹。 */
+    val records: List<ChatRecord> = emptyList(),
 )
 
 /** 智能体要改动东西之前问用户：同意这一次，还是拒绝。 */
@@ -385,8 +382,6 @@ data class CloudChatState(
     val redeeming: Boolean = false,
     val redeemMessage: String? = null,
     val redeemError: String? = null,
-    /** 本轮智能体调用的工具；没有智能体（纯聊天）时一直是空的。 */
-    val tools: List<ChatToolCall> = emptyList(),
     val approval: ChatApproval? = null,
 ) {
     val activeTier: AiTier? get() = tiers.firstOrNull { it.tier == selectedTier }
@@ -494,7 +489,6 @@ class CloudChatController(
         _state.value = _state.value.copy(
             messages = _state.value.messages + userTurn + assistantTurn,
             sending = true,
-            tools = emptyList(),
             approval = null,
         )
         if (agent != null) {
@@ -558,7 +552,7 @@ class CloudChatController(
         val updated = _state.value.messages.mapNotNull { turn ->
             if (!turn.streaming) turn
             else if (turn.text.isEmpty() && turn.error == null) null
-            else turn.copy(streaming = false)
+            else turn.copy(streaming = false, tools = settleTools(turn.tools, false))
         }
         _state.value = _state.value.copy(messages = updated, sending = false, approval = null)
     }
@@ -567,7 +561,7 @@ class CloudChatController(
         stop()
         agentSession = newSessionId()
         agentRun = null
-        _state.value = _state.value.copy(messages = emptyList(), tools = emptyList(), approval = null)
+        _state.value = _state.value.copy(messages = emptyList(), approval = null)
     }
 
     /** 回答智能体的确认：`once` 允许这一次，`deny` 拒绝。 */
@@ -575,17 +569,30 @@ class CloudChatController(
         val pending = _state.value.approval ?: return
         _state.value = _state.value.copy(approval = null)
         agent?.answerApproval(pending.id, decision)
+        val record = ChatRecord("approval", toolLabel(pending.tool), if (decision == "deny") null else "已允许")
+        updateTurn(agentReplyId) { it.copy(records = it.records + record) }
     }
+
+    @OptIn(ExperimentalTime::class)
+    private fun nowMs(): Long = Clock.System.now().toEpochMilliseconds()
+
+    /** 一轮结束时还没有结果的工具调用，按这一轮成败收尾，免得界面一直转圈。 */
+    private fun settleTools(tools: List<ToolCallInfo>, failed: Boolean): List<ToolCallInfo> =
+        tools.map { if (it.status == ToolStatus.Running) it.copy(status = if (failed) ToolStatus.Error else ToolStatus.Done, endedAtMs = nowMs()) else it }
 
     private fun onAgentEvent(event: AgentEvent) {
         when (event) {
             is AgentEvent.Text -> if (event.run == agentRun) updateTurn(agentReplyId) { it.copy(text = it.text + event.text) }
             is AgentEvent.ToolStart -> if (event.run == agentRun) {
-                val call = ChatToolCall(event.id, event.name, summarizeToolArguments(event.name, event.arguments))
-                _state.value = _state.value.copy(tools = _state.value.tools + call)
+                val call = ToolCallInfo(event.id, event.name, event.arguments, startedAtMs = nowMs())
+                updateTurn(agentReplyId) { it.copy(tools = it.tools + call) }
             }
             is AgentEvent.ToolEnd -> if (event.run == agentRun) {
-                _state.value = _state.value.copy(tools = _state.value.tools.map { if (it.id == event.id) it.copy(running = false, isError = event.isError) else it })
+                updateTurn(agentReplyId) { turn ->
+                    turn.copy(tools = turn.tools.map {
+                        if (it.id == event.id) it.copy(output = event.output, status = if (event.isError) ToolStatus.Error else ToolStatus.Done, endedAtMs = nowMs()) else it
+                    })
+                }
             }
             is AgentEvent.Approval -> _state.value = _state.value.copy(
                 approval = ChatApproval(event.id, event.tool, summarizeToolArguments(event.tool, event.arguments.toString()), event.danger),
@@ -594,7 +601,7 @@ class CloudChatController(
                 val failure = if (event.ok) null else friendlyAgentError(event.error)
                 updateTurn(agentReplyId) { turn ->
                     // 只调工具、没有说话的一轮，回复里留空；失败时把原因挂在这条回复上。
-                    turn.copy(streaming = false, error = failure, text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text)
+                    turn.copy(streaming = false, error = failure, text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text, tools = settleTools(turn.tools, !event.ok))
                 }
                 _state.value = _state.value.copy(sending = false, approval = null)
                 agentRun = null
@@ -602,7 +609,7 @@ class CloudChatController(
                 else if (event.ok) refreshBalanceQuietly()
             }
             is AgentEvent.Failure -> {
-                updateTurn(agentReplyId) { it.copy(streaming = false, error = event.message) }
+                updateTurn(agentReplyId) { it.copy(streaming = false, error = event.message, tools = settleTools(it.tools, true)) }
                 _state.value = _state.value.copy(sending = false, approval = null)
             }
         }

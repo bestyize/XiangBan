@@ -352,4 +352,21 @@ class RemoteChatTest {
         assertEquals(null, controller.state.value.pendingApproval)
         assertEquals("已在电脑上处理", controller.state.value.messages.last().records.single().result)
     }
+
+    @Test
+    fun `stopping a turn asks the desktop to cancel and the reply is marked stopped`() = runTest {
+        val link = createLink()
+        val sent = mutableListOf<String>()
+        link.sendObserverForTest = { _, data -> sent += data.decodeToString() }
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"sessions.page","id":"1","items":[{"id":"s_1","title":"整理","updated_at":1,"state":"idle"}]}""".encodeToByteArray()))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"2","session":"s_1","kind":"text.delta","data":{"text":"先看看"}}""".encodeToByteArray()))
+        sent.clear()
+        controller.cancel()
+        assertTrue(sent.single().contains("\"t\":\"message.cancel\"") && sent.single().contains("\"session\":\"s_1\""))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"3","session":"s_1","kind":"state","data":{"state":"cancelled"}}""".encodeToByteArray()))
+        assertEquals(TurnCancelled, controller.state.value.messages.last().error)
+    }
 }
