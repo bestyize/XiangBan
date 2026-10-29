@@ -8,7 +8,7 @@ const TOOL_LABELS: Record<string, string> = {
   web_fetch: '打开网页', web_search: '搜索网页', todo: '任务清单', ask_user: '向你提问', time_now: '查看时间',
   memory_read: '读取笔记', memory_write: '保存笔记', load_skill: '读取技能', skill_manage: '管理技能',
   app_guide: '查看功能指南', open_page: '打开控制台页面', desktop_settings_set: '调整外观与动画', desktop_status: '查看桌面状态', desktop_windows: '查看小伴窗口', desktop_window_set: '调整小伴窗口', wallpaper_list: '查看壁纸', wallpaper_apply: '更换壁纸', wallpaper_create: '创作壁纸', wallpaper_delete: '删除壁纸',
-  effect_list: '查看特效', effect_set: '切换特效', effect_read_format: '读取特效格式', effect_create: '创作特效', effect_delete: '删除特效',
+  effect_list: '查看特效', effect_set: '切换特效', effect_monitor_set: '设置特效显示器', effect_read_format: '读取特效格式', effect_create: '创作特效', effect_delete: '删除特效',
   companion_set: '设置小伴', care_list: '查看提醒', care_set: '设置提醒', care_delete: '删除提醒',
   widget_list: '查看桌面组件', widget_add: '添加桌面组件', widget_update: '调整桌面组件', widget_remove: '移除桌面组件', widget_read_format: '读取组件格式', widget_create: '创作桌面组件', widget_delete_custom: '删除自创组件',
   pet_read_format: '读取宠物格式', pet_catalog: '查看宠物', pet_theme_save: '保存宠物主题', pet_theme_delete: '删除宠物主题',

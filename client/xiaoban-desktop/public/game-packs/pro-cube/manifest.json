@@ -1,0 +1,10 @@
+{
+  "id": "pro-cube",
+  "version": "1.0.0",
+  "name": "3D全阶魔方",
+  "description": "3~9阶全系真实质感磁力魔方：支持手势划动切层、键盘旋转、多阶层深控制与智能还原。",
+  "entry": "index.html",
+  "cover": "cover.svg",
+  "runtimeProtocol": 1,
+  "orientation": "landscape"
+}

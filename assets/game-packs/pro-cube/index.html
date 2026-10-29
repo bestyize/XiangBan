@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>3D全阶魔方 · Pro Cube Simulator</title>
+  <link rel="stylesheet" href="game.css" />
+</head>
+<body>
+
+  <!-- 3D Viewport Container -->
+  <div id="canvas-container" aria-label="3D 全阶魔方交互视图"></div>
+
+  <!-- Top HUD Bar -->
+  <header class="cube-hud-header">
+    <div class="hud-top-row">
+      <!-- Brand & Status -->
+      <div class="glass-panel brand-panel">
+        <div class="brand-cube-icon">
+          <div class="brand-mini-grid">
+            <span style="background: #e11d48;"></span>
+            <span style="background: #f59e0b;"></span>
+            <span style="background: #10b981;"></span>
+            <span style="background: #38bdf8;"></span>
+            <span style="background: #ffffff;"></span>
+            <span style="background: #f97316;"></span>
+            <span style="background: #f59e0b;"></span>
+            <span style="background: #e11d48;"></span>
+            <span style="background: #38bdf8;"></span>
+          </div>
+        </div>
+        <div class="brand-meta">
+          <h1>REAL CUBE <span id="current-order-badge" style="color: #fbbf24;">3×3</span> <span id="status-badge" class="status-badge">已复原</span></h1>
+          <p class="sub-desc">3~9阶全系真实磁力魔方 · 触屏/鼠标任意层直觉划动</p>
+        </div>
+      </div>
+
+      <!-- Center Timer & Stats -->
+      <div class="glass-panel stats-panel">
+        <div class="stat-item">
+          <div class="stat-title">计时</div>
+          <div id="timer-display" class="mono-num stat-val" style="color: #fbbf24;">00:00.0</div>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <div class="stat-title">步数</div>
+          <div id="moves-display" class="mono-num stat-val" style="color: #ffffff;">0</div>
+        </div>
+        <div class="stat-divider best-item"></div>
+        <div class="stat-item best-item">
+          <div class="stat-title">本阶最佳</div>
+          <div id="best-display" class="mono-num stat-val" style="color: #34d399; font-size: 0.875rem;">--:--.-</div>
+        </div>
+      </div>
+
+      <!-- Right Material, Audio & Exit Controls -->
+      <div class="glass-panel controls-panel">
+        <button id="btn-finish" class="hud-btn btn-action" title="切换魔方表面材质工艺">
+          <span style="width: 8px; height: 8px; border-radius: 9999px; background: #38bdf8; display: inline-block;"></span>
+          <span id="finish-label">亮面磁力贴片</span>
+        </button>
+        <button id="btn-sound" class="hud-icon-btn btn-action" title="开关真实机械音效" aria-label="开关音效">
+          <svg id="icon-sound-on" style="color: #34d399;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07M19.07 4.93a10 10 0 010 14.14" />
+          </svg>
+          <svg id="icon-sound-off" class="hidden" style="color: #94a3b8;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M11 5L6 9H2v6h4l5 4V5zM23 9l-6 6M17 9l6 6" />
+          </svg>
+        </button>
+        <button id="btn-help" class="hud-icon-btn btn-action" title="操作指南" aria-label="操作指南">
+          <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+        <button id="btn-exit" class="hud-btn btn-action" title="返回桌面或退出游戏" aria-label="返回">
+          <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          <span>退出</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 3阶 ~ 9阶 快速切换栏 -->
+    <div class="order-selector-wrap">
+      <div id="order-selector" class="glass-panel order-selector-bar no-scrollbar">
+        <span class="order-label">阶数:</span>
+        <button data-order="3" class="order-btn active btn-action">3阶</button>
+        <button data-order="4" class="order-btn btn-action">4阶</button>
+        <button data-order="5" class="order-btn btn-action">5阶</button>
+        <button data-order="6" class="order-btn btn-action">6阶</button>
+        <button data-order="7" class="order-btn btn-action">7阶</button>
+        <button data-order="8" class="order-btn btn-action">8阶</button>
+        <button data-order="9" class="order-btn btn-action">9阶</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Floating Hint Pill -->
+  <div class="hint-container">
+    <div id="gesture-hint" class="glass-panel gesture-hint-pill">
+      <span class="ping-dot"></span>
+      <span>按住任意层色块滑动即可精准拧动该层 · 拖动空白处旋转视角</span>
+    </div>
+  </div>
+
+  <!-- Bottom Control Deck -->
+  <footer class="cube-hud-footer">
+    <!-- Multi-Layer Face Pad -->
+    <div id="layer-pad" class="glass-panel layer-deck no-scrollbar">
+      <!-- 方向与层深选择 -->
+      <div class="layer-dir-depth">
+        <button id="btn-dir-toggle" class="depth-btn btn-action" title="切换顺时针/逆时针" style="background: rgba(245, 158, 11, 0.2); border-color: rgba(245, 158, 11, 0.4); color: #fcd34d;">
+          顺时针
+        </button>
+        <div id="depth-selector" class="depth-selector-wrap">
+          <!-- 动态生成第 1..floor(N/2) 层按钮 -->
+        </div>
+      </div>
+
+      <!-- 六面旋转按钮 -->
+      <button data-face="U" class="face-btn btn-action">
+        <span class="face-dot" style="background: #ffffff; color: #ffffff;"></span><span class="face-label">U</span>
+      </button>
+      <button data-face="D" class="face-btn btn-action">
+        <span class="face-dot" style="background: #facc15; color: #facc15;"></span><span class="face-label">D</span>
+      </button>
+      <button data-face="F" class="face-btn btn-action">
+        <span class="face-dot" style="background: #10b981; color: #10b981;"></span><span class="face-label">F</span>
+      </button>
+      <button data-face="B" class="face-btn btn-action">
+        <span class="face-dot" style="background: #2563eb; color: #2563eb;"></span><span class="face-label">B</span>
+      </button>
+      <button data-face="L" class="face-btn btn-action">
+        <span class="face-dot" style="background: #f97316; color: #f97316;"></span><span class="face-label">L</span>
+      </button>
+      <button data-face="R" class="face-btn btn-action">
+        <span class="face-dot" style="background: #e11d48; color: #e11d48;"></span><span class="face-label">R</span>
+      </button>
+    </div>
+
+    <!-- Main Action Toolbar -->
+    <div class="glass-panel main-action-toolbar">
+      <button id="btn-scramble" class="action-btn-primary btn-action">
+        <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5" />
+        </svg>
+        <span>随机打乱</span>
+      </button>
+
+      <button id="btn-solve" class="action-btn-emerald btn-action">
+        <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+        </svg>
+        <span>智能还原</span>
+      </button>
+
+      <button id="btn-undo" disabled class="action-btn-neutral btn-action">
+        <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+        </svg>
+        <span>撤回</span>
+      </button>
+
+      <button id="btn-camera-reset" class="action-btn-neutral btn-action" title="重置到标准观察视角">
+        <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        <span>回正视角</span>
+      </button>
+
+      <button id="btn-reset" class="action-btn-rose btn-action">
+        <svg style="width: 1rem; height: 1rem;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+        <span>重置</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- Help Modal -->
+  <div id="modal-overlay" class="modal-overlay">
+    <div class="glass-panel modal-card">
+      <div class="modal-header">
+        <h2>3~9阶全系魔方操作指南</h2>
+        <button id="btn-modal-close" class="modal-close-btn btn-action" aria-label="关闭">
+          <svg style="width: 1.25rem; height: 1.25rem;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <div class="guide-step">
+          <div class="guide-step-title" style="color: #fbbf24;">1. 任意阶数·直觉手势切层</div>
+          <p>无论当前是 3 阶还是 9 阶，直接按住魔方上的<strong>任意小色块</strong>并向目标方向滑动，3D 射线引擎会自动识别该色块所在的精确层并顺滑旋转。</p>
+        </div>
+        <div class="guide-step">
+          <div class="guide-step-title" style="color: #38bdf8;">2. 多层深度面板与全景视角</div>
+          <p>底部控制栏可切换<strong>第1层（外层）至第4层（内层）</strong>，点击 <code style="padding: 2px 6px; border-radius: 4px; background: #1e293b; color: #fbbf24;">U D F B L R</code> 即可精确转动高阶魔方指定内层。拖动魔方外空白处旋转视角，双指捏合或滚轮可自由缩放。</p>
+        </div>
+        <div class="guide-step">
+          <div class="guide-step-title" style="color: #34d399;">3. 三种真实魔方材质工艺</div>
+          <p>点击右上角材质按钮可实时切换<strong>亮面磁力贴片</strong>、<strong>竞速磨砂无贴纸</strong>与<strong>碳纤维纹理贴片</strong>，搭配合成磁力定位声效还原真机手感。</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-modal-ok" class="action-btn-primary btn-action">
+          开始挑战
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="vendor/three.min.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

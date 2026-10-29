@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+  <defs>
+    <clipPath id="c"><rect width="400" height="400" rx="28"/></clipPath>
+    <radialGradient id="bg-glow" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#1e293b"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+    <radialGradient id="cube-glow" cx="50%" cy="48%" r="45%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25"/>
+      <stop offset="60%" stop-color="#38bdf8" stop-opacity="0.1"/>
+      <stop offset="100%" stop-color="#020617" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="18" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+    <linearGradient id="core-edge" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+
+  <g clip-path="url(#c)">
+    <!-- Deep Cosmic Dark Studio Background -->
+    <rect width="400" height="400" fill="url(#bg-glow)"/>
+    <circle cx="200" cy="195" r="160" fill="url(#cube-glow)"/>
+
+    <!-- Subtle Ground Reflection Ellipse -->
+    <ellipse cx="200" cy="328" rx="120" ry="24" fill="#000000" opacity="0.45" filter="blur(10px)"/>
+
+    <!-- 3D Isometric Rubik's Cube Group -->
+    <g transform="translate(200, 192)" filter="url(#shadow)">
+
+      <!-- Isometric Cube Projection Matrix:
+           Right axis:  [cos(30°), sin(30°)]  = [0.866, 0.5]
+           Left axis:   [-cos(30°), sin(30°)] = [-0.866, 0.5]
+           Up axis:     [0, -1]
+           Side dimension ~ 42 units per piece, 3 pieces = 126
+      -->
+
+      <!-- Core Shadow Base -->
+      <path d="M0 -92 L106 -31 L106 91 L0 152 L-106 91 L-106 -31 Z" fill="#090d16" stroke="#1e293b" stroke-width="2"/>
+
+      <!-- TOP FACE TILES (Isometric rhombus: dx=32.5, dy=18.75) -->
+      <!-- Center (0,0) is at y = -92 + ... -->
+      <!-- Top Face: White / Ivory (#f8fafc) & Lemon (#facc15) -->
+      <!-- Row 0 (Top-left to top-right) -->
+      <polygon points="0,-88 32,-70 0,-52 -32,-70" fill="#f8fafc" stroke="#111827" stroke-width="3" rx="4"/>
+      <polygon points="35,-68 67,-50 35,-32 3,-50" fill="#f8fafc" stroke="#111827" stroke-width="3"/>
+      <polygon points="70,-48 102,-30 70,-12 38,-30" fill="#f8fafc" stroke="#111827" stroke-width="3"/>
+
+      <!-- Row 1 (Mid) -->
+      <polygon points="-35,-68 -3,-50 -35,-32 -67,-50" fill="#f8fafc" stroke="#111827" stroke-width="3"/>
+      <polygon points="0,-48 32,-30 0,-12 -32,-30" fill="#facc15" stroke="#111827" stroke-width="3"/>
+      <polygon points="35,-28 67,-10 35,8 3,-10" fill="#f8fafc" stroke="#111827" stroke-width="3"/>
+
+      <!-- Row 2 (Bottom of top face) -->
+      <polygon points="-70,-48 -38,-30 -70,-12 -102,-30" fill="#f8fafc" stroke="#111827" stroke-width="3"/>
+      <polygon points="-35,-28 -3,-10 -35,8 -67,-10" fill="#f8fafc" stroke="#111827" stroke-width="3"/>
+      <polygon points="0,-8 32,10 0,28 -32,10" fill="#f8fafc" stroke="#111827" stroke-width="3"/>
+
+      <!-- LEFT FACE TILES (Orange #f97316 & Green #10b981) -->
+      <!-- Col 0 (Outer left) -->
+      <polygon points="-104,-27 -72,-9 -72,27 -104,9" fill="#f97316" stroke="#111827" stroke-width="3"/>
+      <polygon points="-104,13 -72,31 -72,67 -104,49" fill="#f97316" stroke="#111827" stroke-width="3"/>
+      <polygon points="-104,53 -72,71 -72,107 -104,89" fill="#10b981" stroke="#111827" stroke-width="3"/>
+
+      <!-- Col 1 (Middle col) -->
+      <polygon points="-69,-7 -37,11 -37,47 -69,29" fill="#f97316" stroke="#111827" stroke-width="3"/>
+      <polygon points="-69,33 -37,51 -37,87 -69,69" fill="#10b981" stroke="#111827" stroke-width="3"/>
+      <polygon points="-69,73 -37,91 -37,127 -69,109" fill="#f97316" stroke="#111827" stroke-width="3"/>
+
+      <!-- Col 2 (Inner col) -->
+      <polygon points="-34,13 -2,31 -2,67 -34,49" fill="#10b981" stroke="#111827" stroke-width="3"/>
+      <polygon points="-34,53 -2,71 -2,107 -34,89" fill="#f97316" stroke="#111827" stroke-width="3"/>
+      <polygon points="-34,93 -2,111 -2,147 -34,129" fill="#10b981" stroke="#111827" stroke-width="3"/>
+
+      <!-- RIGHT FACE TILES (Red #e11d48 & Blue #2563eb) -->
+      <!-- Col 0 (Inner col) -->
+      <polygon points="2,31 34,13 34,49 2,67" fill="#e11d48" stroke="#111827" stroke-width="3"/>
+      <polygon points="2,71 34,53 34,89 2,107" fill="#2563eb" stroke="#111827" stroke-width="3"/>
+      <polygon points="2,111 34,93 34,129 2,147" fill="#e11d48" stroke="#111827" stroke-width="3"/>
+
+      <!-- Col 1 (Middle col) -->
+      <polygon points="37,11 69,-7 69,29 37,47" fill="#e11d48" stroke="#111827" stroke-width="3"/>
+      <polygon points="37,51 69,33 69,69 37,87" fill="#e11d48" stroke="#111827" stroke-width="3"/>
+      <polygon points="37,91 69,73 69,109 37,127" fill="#2563eb" stroke="#111827" stroke-width="3"/>
+
+      <!-- Col 2 (Outer right) -->
+      <polygon points="72,-9 104,-27 104,9 72,27" fill="#2563eb" stroke="#111827" stroke-width="3"/>
+      <polygon points="72,31 104,13 104,49 72,67" fill="#e11d48" stroke="#111827" stroke-width="3"/>
+      <polygon points="72,71 104,53 104,89 72,107" fill="#2563eb" stroke="#111827" stroke-width="3"/>
+
+      <!-- Subtle Highlights on Top Face -->
+      <path d="M0 -86 L30 -69 L0 -52 L-30 -69 Z" fill="#ffffff" opacity="0.45"/>
+    </g>
+
+    <!-- Header / Brand Text Overlay -->
+    <g transform="translate(24, 42)">
+      <rect width="112" height="26" rx="13" fill="#f59e0b" fill-opacity="0.2" stroke="#fbbf24" stroke-opacity="0.5"/>
+      <text x="56" y="17" fill="#fbbf24" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="1">3~9阶全系</text>
+    </g>
+
+    <!-- Bottom Name Badge -->
+    <g transform="translate(200, 362)">
+      <text x="0" y="0" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="17" font-weight="800" text-anchor="middle" letter-spacing="0.5">3D全阶魔方</text>
+      <text x="0" y="18" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="11" font-weight="500" text-anchor="middle">真机磁力手感 · 多层切层还原</text>
+    </g>
+  </g>
+</svg>

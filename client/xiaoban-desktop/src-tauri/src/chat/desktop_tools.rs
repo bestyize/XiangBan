@@ -939,6 +939,7 @@ pub fn resolve_game_id(input: &str) -> Option<&'static str> {
         "奶茶大师" | "倒水" | "分杯" | "奶茶" | "water_sort" => Some("water-sort"),
         "水墨剑客" | "剑客" | "水墨" | "ink_blade" => Some("ink-blade"),
         "暮色滑翔" | "滑翔" | "滑翔机" | "dusk_glider" => Some("dusk-glider"),
+        "魔方" | "3d魔方" | "全阶魔方" | "魔方模拟器" | "pro-cube" | "pro_cube" | "cube" => Some("pro-cube"),
         _ => None,
     }
 }
@@ -956,7 +957,7 @@ fn game_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
         let id = g["id"].as_str().unwrap_or("");
         format!("- {} ({id}): {}", g["name"].as_str().unwrap_or(id), g["description"].as_str().unwrap_or(""))
     };
-    let mut lines = vec![format!("小伴内置 7 款独立桌面小游戏（{state}）：")];
+    let mut lines = vec![format!("小伴内置 8 款独立桌面小游戏（{state}）：")];
     lines.extend(games.iter().filter(|g| !is_user_game(g)).map(line));
     let mine: Vec<&Value> = games.iter().filter(|g| is_user_game(g)).collect();
     if !mine.is_empty() {
@@ -984,7 +985,7 @@ fn game_open(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
                     Some(game) => game["id"].as_str().map(str::to_string),
                     None => {
                         let extra: String = mine.iter().filter_map(|g| g["id"].as_str().map(|id| format!("、{} ({id})", g["name"].as_str().unwrap_or(id)))).collect();
-                        return Err(format!("没有找到游戏“{raw}”。支持的游戏：小伴贪吃蛇 (snake-arena)、俄罗斯方块 (falling-blocks)、2048 (merge-2048)、消失高手 (block-puzzle)、奶茶大师 (water-sort)、水墨剑客 (ink-blade)、暮色滑翔 (dusk-glider){extra}"));
+                        return Err(format!("没有找到游戏“{raw}”。支持的游戏：小伴贪吃蛇 (snake-arena)、俄罗斯方块 (falling-blocks)、2048 (merge-2048)、消失高手 (block-puzzle)、奶茶大师 (water-sort)、水墨剑客 (ink-blade)、暮色滑翔 (dusk-glider)、3D全阶魔方 (pro-cube){extra}"));
                     }
                 }
             }
@@ -1370,12 +1371,12 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             ToolSpec::new("widget_remove", "从桌面移除指定的组件，id 来自 widget_list。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).self_managed().serial(),
             widget_remove,
         ),
-        tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（内置的贪吃蛇、俄罗斯方块、2048、消失高手、奶茶大师、水墨剑客、暮色滑翔，以及用户自创游戏）以及游戏空间状态。", none()).risk(Risk::Read).parallel(), game_list),
+        tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（内置的贪吃蛇、俄罗斯方块、2048、消失高手、奶茶大师、水墨剑客、暮色滑翔、3D全阶魔方，以及用户自创游戏）以及游戏空间状态。", none()).risk(Risk::Read).parallel(), game_list),
         tool(
             &desktop,
             ToolSpec::new(
                 "game_open",
-                "在单独的窗口里直接玩一款游戏，必须指定游戏 id（例如 snake-arena 为小伴贪吃蛇，falling-blocks 为俄罗斯方块，merge-2048 为 2048，block-puzzle 为消失高手，water-sort 为奶茶大师，ink-blade 为水墨剑客，dusk-glider 为暮色滑翔；用户自创游戏用 game_list 里的 id）。窗口默认不全屏，玩家可用系统标题栏切换全屏。不指定 id 只打开游戏空间页面，不会启动游戏。",
+                "在单独的窗口里直接玩一款游戏，必须指定游戏 id（例如 snake-arena 为小伴贪吃蛇，falling-blocks 为俄罗斯方块，merge-2048 为 2048，block-puzzle 为消失高手，water-sort 为奶茶大师，ink-blade 为水墨剑客，dusk-glider 为暮色滑翔，pro-cube 为 3D全阶魔方；用户自创游戏用 game_list 里的 id）。窗口默认不全屏，玩家可用系统标题栏切换全屏。不指定 id 只打开游戏空间页面，不会启动游戏。",
                 object(
                     json!({
                         "id": {
@@ -2130,11 +2131,12 @@ mod tests {
         assert_eq!(resolve_game_id("小伴贪吃蛇"), Some("snake-arena"));
         assert_eq!(resolve_game_id("2048"), Some("merge-2048"));
         assert_eq!(resolve_game_id("俄罗斯方块"), Some("falling-blocks"));
+        assert_eq!(resolve_game_id("魔方"), Some("pro-cube"));
         assert_eq!(resolve_game_id("unknown"), None);
 
         let fake = Arc::new(Fake::default());
         let list_out = call(&fake, "game_list", json!({})).unwrap();
-        assert!(list_out.contains("小伴内置 7 款独立桌面小游戏"));
+        assert!(list_out.contains("小伴内置 8 款独立桌面小游戏"));
         assert!(list_out.contains("小伴贪吃蛇 (snake-arena)"));
 
         let open_out = call(&fake, "game_open", json!({"id": "贪吃蛇"})).unwrap();

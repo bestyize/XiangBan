@@ -37,7 +37,7 @@ export async function runUiSmoke(store: ControlStore): Promise<void> {
       if (page === 'companion') {
         await wait(() => document.querySelector('[data-testid="companion-enabled"]')?.getAttribute('aria-checked') === String(store.settings.companionEnabled), 'companion setting binding');
       }
-      if (page === 'games') await wait(() => document.querySelectorAll('[data-testid="games-page"] .game-card').length === 7, 'seven packaged game manifests');
+      if (page === 'games') await wait(() => document.querySelectorAll('[data-testid="games-page"] .game-card').length === 8, 'eight packaged game manifests');
       if (page === 'settings') {
         await wait(() => {
           const switches = document.querySelectorAll('[data-testid="settings-page"] [role="switch"]');
@@ -49,7 +49,7 @@ export async function runUiSmoke(store: ControlStore): Promise<void> {
     if (!Array.isArray(care.rules) || !care.config || care.error) throw new Error(`Native care read failed: ${care.error || 'invalid response'}`);
     const nativeContextMenuReady = await (await import('./wallpaper/context-menu')).probeWallpaperNativeMenu();
     if (!nativeContextMenuReady) throw new Error('Native material context-menu API unavailable');
-    report = { ok: true, marker: 'vue-native-control-readonly', pages: mounted, gamePackCount: 7, careRuleCount: care.rules.length, localWallpaperCount: store.library.items.length, configBound: true, nativeContextMenuReady };
+    report = { ok: true, marker: 'vue-native-control-readonly', pages: mounted, gamePackCount: 8, careRuleCount: care.rules.length, localWallpaperCount: store.library.items.length, configBound: true, nativeContextMenuReady };
   } catch (error) {
     report = { ok: false, marker: 'vue-native-control-readonly', pages: mounted, error: error instanceof Error ? error.message : String(error) };
   } finally {
