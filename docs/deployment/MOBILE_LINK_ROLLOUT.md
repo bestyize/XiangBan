@@ -40,7 +40,7 @@
 
 ## 5. 真机联调
 
-1. 在 GitHub Actions 运行 “BuildXiaoBanWallpaper”：勾选 `package_android_app`（只要这个包的话取消 `build_release`，不动 Release），下载产物 `xiaoban-android-debug-apk` 装到手机；桌面端用最新的 Release 安装包。
+1. 在 GitHub Actions 运行 “BuildXiaoBanWallpaper”（只要手机 App 的话取消 Windows、macOS 两个勾选，`servers` 留空），到 Release `xiaoban-wallpaper-v<版本>` 下载 `XiaoBan-<版本>-Android.apk`（没配发布密钥时是 `…-Android-debug.apk`）装到手机；桌面端用同一个 Release 里的安装包。
 2. 桌面端（新版本）登录账号 → “设置 → 手机遥控”，打开“允许手机遥控这台电脑”；手机登录同一账号，“我的电脑”里会自动出现这台电脑（不需要配对）。
 3. 手机“小伴”页：切到“云端小伴”聊一句（验证 server-ai）；切到“我的电脑”发一条消息，看流式回复；让桌面触发一次需要批准的操作，在手机上批准一次（验证 server-link）。
 4. 手机“社区”页登录后发一条回复或点赞（验证论坛）。

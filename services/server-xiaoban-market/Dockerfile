@@ -1,6 +1,6 @@
-# 只含运行时的镜像：二进制与前端静态资源由 CI 在 ubuntu x64 上构建，再放进构建上下文。
-# 上下文目录结构：./server-xiaoban-market（release 二进制）与 ./web（前端 dist）。
-# 构建机必须是 ubuntu 24.04：二进制动态链接 glibc，运行时基础镜像要不低于构建机的 glibc 版本。
+# 小伴市场的运行时镜像（由 infra/images/gen-dockerfiles.py 按 infra/images/services.json 生成，不要手改）。
+# 二进制与前端静态资源由构建机（ubuntu 24.04 x64）编译后放进构建上下文，布局：./server-xiaoban-market、./web。
+# 二进制动态链接 glibc，运行时基础镜像要不低于构建机的 glibc 版本。
 FROM ubuntu:24.04
 
 RUN apt-get update \
@@ -13,11 +13,10 @@ WORKDIR /app
 COPY server-xiaoban-market /app/server-xiaoban-market
 COPY web /app/web
 
-# 安装包按内容哈希存放在 /data，部署时挂命名卷；根文件系统可以只读。
 ENV MARKET_HOST=0.0.0.0 \
     MARKET_PORT=55010 \
-    MARKET_WEB_DIR=/app/web \
-    MARKET_DATA_DIR=/data
+    MARKET_DATA_DIR=/data \
+    MARKET_WEB_DIR=/app/web
 
 USER market
 EXPOSE 55010

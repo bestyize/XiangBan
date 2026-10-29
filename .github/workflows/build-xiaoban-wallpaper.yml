@@ -1,45 +1,94 @@
 name: BuildXiaoBanWallpaper
 
-# Packages 小伴壁纸 for Windows x64, macOS aarch64 and Android arm64-v8a and attaches them to the GitHub Release
-# xiaoban-wallpaper-v<version> (created if missing, files replaced on a re-run). Release files do not count against
-# the Actions artifact storage quota. Run it manually from the Actions tab; pushing a tag does not trigger a build.
+# 小伴全家桶的打包入口，只能手动运行（Actions 页选 “BuildXiaoBanWallpaper” → Run workflow，或用 gh / API 的 workflow_dispatch 触发）。
 #
-# The same run can also package the phone-link pieces (tick the boxes when starting it):
-#   package_android_app  the Android debug APK of the Compose app (artifact xiaoban-android-debug-apk), installable by
-#                        sideloading for the real-device test
-#   package_server_link  the server-link deployment image (artifact xiangban-link-image-<commit>, a .tar.gz built on
-#                        Ubuntu 24.04), see docs/deployment/LINK_DEPLOYMENT.md
-# Without any box ticked the run behaves exactly as before: only the release packages are built. Untick
-# build_release to build just the ticked packages, without touching the release. No tests run here.
+# 一、客户端安装包 → GitHub Release xiaoban-wallpaper-v<桌面版本>（不存在就创建，重跑会替换同名文件）
+#   windows  Windows x64 一键安装版（NSIS）
+#   macos    macOS aarch64 dmg（固定自签名证书，未公证）
+#   android  小伴手机 App（Compose）的 Android APK；配了 XIAOBAN_ANDROID_KEYSTORE_* 密钥就是发布签名的包，
+#            没配就打可安装的 debug 包（release 包不签名装不上）
+#
+# 二、服务端镜像 → 单独的 GitHub Release server-<UTC 时间>-<提交前 7 位>（每次运行一个，只保留最近 5 个）
+#   servers  要打包的服务编号，逗号分隔，或 all；留空不打包。编号见 infra/images/services.json：
+#            account、ai、forum、link、market、appstore、resource、wallpaper-collect、api、web
+#   每个服务产出 <镜像>-<标签>.tar.gz（docker load 用）和 <镜像>-<标签>-bundle.tar.gz（二进制 + 前端，非 Docker 主机用），
+#   外加 SHA256SUMS 和 manifest.json（服务、镜像标签、文件、校验和、部署文档位置）。
+#   拿到 Release 后怎么更新线上服务：docs/deployment/RELEASE_AND_DEPLOY.md
+#
+# 这里不跑测试，只打包。Release 里的文件不占 Actions 产物额度。推送代码或标签不会触发构建。
 on:
   workflow_dispatch:
     inputs:
-      build_release:
-        description: 打包并上传 Windows / macOS / Android 安装包到 Release
+      windows:
+        description: 打包 Windows x64 安装包并上传到客户端 Release
         type: boolean
         default: true
-      package_android_app:
-        description: 打包小伴多端 App 的 Android 调试包（产物 xiaoban-android-debug-apk）
+      macos:
+        description: 打包 macOS aarch64 dmg 并上传到客户端 Release
         type: boolean
-        default: false
-      package_server_link:
-        description: 打包互联中转 server-link 的部署镜像（产物 xiangban-link-image-<提交>）
+        default: true
+      android:
+        description: 打包小伴手机 App 的 Android APK 并上传到客户端 Release
         type: boolean
-        default: false
+        default: true
+      servers:
+        description: 要打包的服务端镜像（编号逗号分隔，或 all；留空不打包）。可选 account、ai、forum、link、market、appstore、resource、wallpaper-collect、api、web
+        type: string
+        default: ''
 
 permissions:
   contents: write
   actions: write
 
 concurrency:
-  # A release build and a packages-only run must not cancel each other.
-  group: build-xiaoban-wallpaper-${{ github.ref }}-${{ inputs.build_release }}
+  # 打不同东西的运行互不取消；完全相同的重复运行才会取消前一个。
+  group: build-xiaoban-${{ github.ref }}-${{ inputs.windows }}-${{ inputs.macos }}-${{ inputs.android }}-${{ inputs.servers }}
   cancel-in-progress: true
 
 jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      client: ${{ steps.plan.outputs.client }}
+      servers: ${{ steps.plan.outputs.servers }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        env:
+          SERVERS: ${{ inputs.servers }}
+          WINDOWS: ${{ inputs.windows }}
+          MACOS: ${{ inputs.macos }}
+          ANDROID: ${{ inputs.android }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, sys
+          services = json.load(open("infra/images/services.json", encoding="utf-8"))["services"]
+          known = [s["id"] for s in services]
+          raw = [x for x in re.split(r"[,\s]+", os.environ.get("SERVERS", "").strip().lower()) if x]
+          picked = known if "all" in raw else raw
+          bad = [x for x in picked if x not in known]
+          if bad:
+              print(f"::error::不认识的服务编号：{', '.join(bad)}。可选：{', '.join(known)}、all")
+              sys.exit(1)
+          picked = [x for x in known if x in picked]  # 去重并按清单顺序
+          client = any(os.environ.get(k) == "true" for k in ("WINDOWS", "MACOS", "ANDROID"))
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as out:
+              out.write(f"client={'true' if client else 'false'}\n")
+              out.write(f"servers={json.dumps(picked)}\n")
+          summary = [f"客户端安装包：Windows={os.environ['WINDOWS']}，macOS={os.environ['MACOS']}，Android={os.environ['ANDROID']}", f"服务端镜像：{', '.join(picked) if picked else '无'}"]
+          open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8").write("\n\n".join(summary) + "\n")
+          print("\n".join(summary))
+          if not client and not picked:
+              print("::error::什么都没选：至少勾选一个客户端平台，或在 servers 里填服务编号。")
+              sys.exit(1)
+          PY
+
   release:
-    name: Prepare release
-    if: ${{ inputs.build_release }}
+    name: Prepare client release
+    needs: plan
+    if: ${{ needs.plan.outputs.client == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -57,14 +106,15 @@ jobs:
           version=$(node -p "require('./client/xiaoban-desktop-wallpaper/src-tauri/tauri.conf.json').version")
           tag="xiaoban-wallpaper-v$version"
           if ! gh release view "$tag" -R "$GH_REPO" > /dev/null 2>&1; then
-            gh release create "$tag" -R "$GH_REPO" --target "$GITHUB_SHA" --title "小伴壁纸 $version" \
-              --notes "小伴壁纸 $version：Windows x64 一键安装版（NSIS，当前用户目录）、macOS aarch64 dmg（固定自签名证书，未公证）、Android arm64-v8a APK。"
+            gh release create "$tag" -R "$GH_REPO" --target "$GITHUB_SHA" --title "小伴 $version" \
+              --notes "小伴 $version：Windows x64 一键安装版（NSIS，当前用户目录）、macOS aarch64 dmg（固定自签名证书，未公证）、Android APK（小伴手机 App）。"
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
   windows-x64:
     name: Windows x64 · NSIS installer
-    needs: release
+    needs: [plan, release]
+    if: ${{ inputs.windows }}
     runs-on: windows-latest
     timeout-minutes: 45
     defaults:
@@ -120,7 +170,8 @@ jobs:
 
   macos-aarch64:
     name: macOS aarch64
-    needs: release
+    needs: [plan, release]
+    if: ${{ inputs.macos }}
     runs-on: macos-15
     timeout-minutes: 45
     defaults:
@@ -243,71 +294,10 @@ jobs:
           TAG: ${{ needs.release.outputs.tag }}
         run: gh release upload "$TAG" out/* --clobber
 
-  android-arm64-v8a:
-    name: Android arm64-v8a
-    needs: release
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    defaults:
-      run:
-        working-directory: client/xiaoban-mobile-wallpaper
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '21'
-      # The runner ships an Android SDK; accepting its licences lets the Android Gradle plugin download the compile SDK it needs.
-      - name: Accept Android SDK licences
-        run: |
-          sdkmanager=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
-          echo "sdk.dir=$ANDROID_HOME" > local.properties
-          yes | "$sdkmanager" --licenses > /dev/null || true
-          echo "Using $sdkmanager"
-      - uses: gradle/actions/setup-gradle@v4
-      # Optional: with the four secrets below the APK is signed with the release key; without them it is unsigned.
-      - name: Prepare signing key
-        env:
-          KEYSTORE_BASE64: ${{ secrets.XIAOBAN_ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
-            echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
-            echo "Signing with the release key."
-          else
-            echo "::warning::XIAOBAN_ANDROID_KEYSTORE_BASE64 is not set, the APK will be unsigned."
-          fi
-      - name: Build release APK
-        env:
-          KEYSTORE_PASSWORD: ${{ secrets.XIAOBAN_ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.XIAOBAN_ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.XIAOBAN_ANDROID_KEY_PASSWORD }}
-        run: ./gradlew :app:assembleRelease --no-configuration-cache
-      - name: Package
-        run: |
-          version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
-          mkdir -p out
-          for apk in app/build/outputs/apk/release/*.apk; do
-            case "$apk" in
-              *-unsigned.apk) cp "$apk" "out/XiaoBanWallpaper-$version-Android-arm64-v8a-unsigned.apk" ;;
-              *) cp "$apk" "out/XiaoBanWallpaper-$version-Android-arm64-v8a.apk" ;;
-            esac
-          done
-          rm -f "$RUNNER_TEMP/release.jks"
-          ls -lh out
-      - name: Upload to release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          TAG: ${{ needs.release.outputs.tag }}
-        run: gh release upload "$TAG" out/* --clobber
-  # ───────────── Phone-link packages beyond the wallpaper release ─────────────
-
-  android-app:
-    name: Android app (Compose) · debug APK
-    if: ${{ inputs.package_android_app }}
-    permissions:
-      contents: read
+  android:
+    name: Android · 小伴手机 App
+    needs: [plan, release]
+    if: ${{ inputs.android }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     defaults:
@@ -327,53 +317,152 @@ jobs:
           yes | "$sdkmanager" --licenses > /dev/null || true
           echo "Using $sdkmanager"
       - uses: gradle/actions/setup-gradle@v4
-      - name: Build the Android debug APK
-        run: ./gradlew :androidApp:assembleDebug --no-configuration-cache
-      - name: Upload the debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: xiaoban-android-debug-apk
-          path: client/xiaoban-multiplatform/androidApp/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-          retention-days: 14
+      # 配了下面几个密钥就用发布密钥签名；没配就打 debug 包（未签名的 release 包装不上手机）。
+      - name: Prepare signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.XIAOBAN_ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "SIGNED=true" >> "$GITHUB_ENV"
+            echo "Signing with the release key."
+          else
+            echo "SIGNED=false" >> "$GITHUB_ENV"
+            echo "::warning::XIAOBAN_ANDROID_KEYSTORE_BASE64 is not set, building an installable debug APK instead of a signed release APK."
+          fi
+      - name: Build the APK
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.XIAOBAN_ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.XIAOBAN_ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.XIAOBAN_ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ "$SIGNED" = "true" ]; then
+            ./gradlew :androidApp:assembleRelease --no-configuration-cache
+          else
+            ./gradlew :androidApp:assembleDebug --no-configuration-cache
+          fi
+      - name: Package
+        run: |
+          set -euo pipefail
+          version=$(grep -oP 'versionName = "\K[^"]+' androidApp/build.gradle.kts)
+          mkdir -p out
+          if [ "$SIGNED" = "true" ]; then
+            apk=$(ls androidApp/build/outputs/apk/release/*.apk | head -1)
+            cp "$apk" "out/XiaoBan-$version-Android.apk"
+          else
+            apk=$(ls androidApp/build/outputs/apk/debug/*.apk | head -1)
+            cp "$apk" "out/XiaoBan-$version-Android-debug.apk"
+          fi
+          rm -f "$RUNNER_TEMP/release.jks"
+          ls -lh out
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # 旧的“小伴壁纸”Android 应用已被小伴手机 App 取代：重跑已有 Release 时把旧文件名的包清掉。
+          gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^XiaoBanWallpaper-.*-Android-arm64-v8a(-unsigned)?\.apk$' | while read -r name; do
+            gh release delete-asset "$TAG" "$name" --yes
+          done || true
+          gh release upload "$TAG" out/* --clobber
 
-  server-link-package:
-    name: server-link deployment image
-    if: ${{ inputs.package_server_link }}
+  # ───────────── 服务端镜像：单独的 Release，供服务器上拉取更新 ─────────────
+
+  servers:
+    name: Server image · ${{ matrix.id }}
+    needs: plan
+    if: ${{ needs.plan.outputs.servers != '[]' }}
     permissions:
       contents: read
-    # Ubuntu 24.04 on purpose: the runtime image is ubuntu:24.04 and the binary links glibc dynamically.
+    # Ubuntu 24.04 on purpose: the runtime images are ubuntu:24.04 and the binaries link glibc dynamically.
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        id: ${{ fromJSON(needs.plan.outputs.servers) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Locate the Rust crate
+        id: crate
+        run: echo "dir=$(python3 -c "import json;print(next((s.get('crate','') for s in json.load(open('infra/images/services.json'))['services'] if s['id']=='${{ matrix.id }}'), ''))")" >> "$GITHUB_OUTPUT"
+      - uses: Swatinem/rust-cache@v2
+        if: ${{ steps.crate.outputs.dir != '' }}
+        with:
+          workspaces: ${{ steps.crate.outputs.dir }}
+      - name: Check the generated Dockerfiles are up to date
+        run: python3 infra/images/gen-dockerfiles.py --check
+      - name: Build the image
+        run: infra/images/build-image.sh "${{ matrix.id }}" out "$(git rev-parse --short=12 HEAD)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.id }}
+          path: |
+            out/*.tar.gz
+            out/*.meta.json
+            out/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 1
+
+  server-release:
+    name: Publish server release
+    needs: [plan, servers]
+    if: ${{ needs.servers.result == 'success' }}
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/download-artifact@v4
         with:
-          workspaces: services/server-link
-      - name: Build the release binary
-        run: cargo build --release --locked --manifest-path services/server-link/Cargo.toml
-      - name: Build and save the image
+          pattern: server-*
+          path: parts
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          tag=$(git rev-parse --short=12 HEAD)
-          staging=$(mktemp -d)
-          cp services/server-link/target/release/server-link "$staging/server-link"
-          docker build -f services/server-link/Dockerfile -t "xiangban-link:$tag" "$staging"
-          mkdir -p out
-          docker save "xiangban-link:$tag" | gzip > "out/xiangban-link-$tag.tar.gz"
-          echo "IMAGE_TAG=$tag" >> "$GITHUB_ENV"
-      - name: Upload the image
-        uses: actions/upload-artifact@v4
-        with:
-          name: xiangban-link-image-${{ env.IMAGE_TAG }}
-          path: out/*.tar.gz
-          if-no-files-found: error
-          retention-days: 14
+          mkdir -p release
+          find parts -type f \( -name '*.tar.gz' \) -exec mv {} release/ \;
+          cat parts/*/SHA256SUMS | sort -k2 > release/SHA256SUMS
+          sha=$(git rev-parse HEAD)
+          tag="server-$(date -u +%Y%m%d-%H%M)-${sha:0:7}"
+          python3 - "$tag" "$sha" <<'PY'
+          import glob, json, sys
+          tag, sha = sys.argv[1:]
+          catalogue = {s["id"]: s for s in json.load(open("infra/images/services.json", encoding="utf-8"))["services"]}
+          items = []
+          for path in sorted(glob.glob("parts/*/*.meta.json")):
+              meta = json.load(open(path, encoding="utf-8"))
+              info = catalogue[meta["id"]]
+              meta.update({"title": info["title"], "port": info.get("port"), "health": info.get("health"), "stack": info.get("stack"), "tagVar": info.get("tagVar"), "doc": info.get("doc")})
+              items.append(meta)
+          manifest = {"release": tag, "commit": sha, "services": items}
+          json.dump(manifest, open("release/manifest.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+          lines = [f"服务端镜像，提交 {sha[:7]}。更新线上服务的步骤见 docs/deployment/RELEASE_AND_DEPLOY.md；manifest.json 记录了每个服务的镜像标签、文件和校验和。", ""]
+          for m in items:
+              lines.append(f"- {m['title']}（{m['id']}）：{m['image']}:{m['tag']}")
+          open("release/NOTES.md", "w", encoding="utf-8").write("\n".join(lines) + "\n")
+          PY
+          gh release create "$tag" -R "$GH_REPO" --target "$sha" --title "服务端镜像 $tag" --notes-file release/NOTES.md release/*.tar.gz release/SHA256SUMS release/manifest.json
+          echo "release=$tag" >> "$GITHUB_STEP_SUMMARY"
+          # 只留最近 5 个服务端 Release。
+          gh release list -R "$GH_REPO" --limit 100 --json tagName,createdAt --jq '[.[] | select(.tagName | startswith("server-"))] | sort_by(.createdAt) | reverse | .[5:][] | .tagName' |
+          while read -r old; do
+            echo "Deleting old server release: $old"
+            gh release delete "$old" -R "$GH_REPO" --yes --cleanup-tag
+          done
 
   cleanup-history:
     name: Keep latest 2 runs
-    needs: [release, windows-x64, macos-aarch64, android-arm64-v8a, android-app, server-link-package]
+    needs: [plan, release, windows-x64, macos-aarch64, android, servers, server-release]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
