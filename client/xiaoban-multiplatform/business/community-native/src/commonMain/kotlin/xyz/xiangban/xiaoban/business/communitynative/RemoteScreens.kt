@@ -56,7 +56,6 @@ import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
 import xyz.xiangban.xiaoban.common.link.RemoteChatState
 import xyz.xiangban.xiaoban.common.link.folderName
 import xyz.xiangban.xiaoban.common.link.RemoteSessionSummary
-import xyz.xiangban.xiaoban.common.link.RemoteToolProgress
 import xyz.xiangban.xiaoban.common.link.RemoteTurn
 
 private val SetupSteps = listOf(
@@ -169,14 +168,6 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
 
 // ───────────── 遥控会话页 ─────────────
 
-private fun toolLabel(name: String): String = when (name.lowercase()) {
-    "bash", "shell", "run_command", "exec", "execute_command", "command" -> "运行命令"
-    "read", "read_file", "view" -> "读取文件"
-    "write", "write_file", "edit", "edit_file", "apply_patch", "str_replace" -> "修改文件"
-    "grep", "glob", "search", "find", "list_files", "ls" -> "搜索文件"
-    else -> name
-}
-
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: (Route) -> Unit) {
@@ -227,13 +218,21 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             remote.error?.let { Banner(it, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true) }
 
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                RemoteMessages(remote.messages, remote.toolProgress, remote.sending, remote.pendingApproval != null, online, remote.selectedSessionId == null)
+                RemoteMessages(
+                    remote.messages, remote.pendingApproval, online, remote.selectedSessionId == null, env.platform,
+                    onStop = env.remoteChat::cancel, onSend = env.remoteChat::send,
+                )
             }
 
             remote.pendingApproval?.let { pending ->
-                ApprovalCard(pending, peer?.name ?: "电脑") { choice ->
-                    val denies = choice == "deny" || choice == "__dismiss__"
-                    if (pending.isHighRisk && !denies) { confirmed = false; lastHighRisk = pending.approvalId to choice; highRisk = lastHighRisk } else env.remoteChat.answerApproval(pending.approvalId, choice)
+                val cardModifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
+                if (pending.isQuestion) {
+                    AskCard(pending, { answer -> env.remoteChat.answerApproval(pending.approvalId, answer) }, cardModifier)
+                } else {
+                    ApprovalCard(pending, { choice ->
+                        val denies = choice == "deny" || choice == "__dismiss__"
+                        if (pending.isHighRisk && !denies) { confirmed = false; lastHighRisk = pending.approvalId to choice; highRisk = lastHighRisk } else env.remoteChat.answerApproval(pending.approvalId, choice)
+                    }, cardModifier)
                 }
             }
 
@@ -329,10 +328,19 @@ private fun CodeBox(text: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun RemoteMessages(messages: List<RemoteTurn>, tools: List<RemoteToolProgress>, sending: Boolean, waitingApproval: Boolean, online: Boolean, isNew: Boolean) {
+private fun RemoteMessages(
+    messages: List<RemoteTurn>,
+    pending: RemoteApprovalRequest?,
+    online: Boolean,
+    isNew: Boolean,
+    platform: PlatformActions?,
+    onStop: () -> Unit,
+    onSend: (String) -> Unit,
+) {
     val listState = rememberLazyListState()
-    val lastLen = messages.lastOrNull()?.text?.length ?: 0
-    LaunchedEffect(messages.size, lastLen, tools.size) { if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex + (if (tools.isNotEmpty()) 1 else 0)) }
+    val last = messages.lastOrNull()
+    val progressMark = (last?.text?.length ?: 0) + (last?.reasoning?.length ?: 0) + (last?.tools?.size ?: 0) * 7 + (last?.records?.size ?: 0) * 13
+    LaunchedEffect(messages.size, progressMark, pending?.approvalId) { if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex) }
     if (messages.isEmpty()) {
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text(
@@ -347,64 +355,17 @@ private fun RemoteMessages(messages: List<RemoteTurn>, tools: List<RemoteToolPro
             if (turn.role == "user") {
                 UserBubble(turn.text)
             } else {
+                val waiting = if (turn.streaming && pending != null) (if (pending.isQuestion) "question" else "approval") else null
                 AssistantRow {
-                    when {
-                        turn.streaming && turn.text.isEmpty() -> AssistantBubble("电脑正在处理…", muted = true)
-                        turn.text.isNotEmpty() -> AssistantBubble(if (turn.streaming) turn.text + " ▍" else turn.text)
-                    }
-                    if (turn.error != null) Banner(turn.error.orEmpty(), warn = true)
+                    AssistantTurnCards(
+                        text = turn.text, streaming = turn.streaming, error = turn.error, reasoning = turn.reasoning, tools = turn.tools, records = turn.records,
+                        waiting = waiting, platform = platform, idleText = "电脑正在处理…", onStop = onStop, onSend = onSend,
+                    )
                 }
-            }
-        }
-        if (tools.isNotEmpty()) {
-            item(key = "tools") {
-                AssistantRow(avatar = false) {
-                    tools.forEach { t ->
-                        ToolCard(
-                            XIcons.Tool, toolLabel(t.name), t.detail,
-                            status = if (t.running) "执行中…" else if (t.isError == true) "出错" else "完成",
-                            done = !t.running && t.isError != true,
-                        )
-                    }
-                }
-            }
-        }
-        if (waitingApproval || sending) {
-            item(key = "hint") {
-                Text(if (waitingApproval) "等你确认后继续…" else "电脑正在处理…", Modifier.fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
             }
         }
     }
 }
-
-/** 电脑请求确认：标题、要做的事、选项。高危操作的“允许”会先弹二次确认。 */
-@Composable
-private fun ApprovalCard(pending: RemoteApprovalRequest, peerName: String, onDecision: (String) -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
-    Column(
-        Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp).fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
-            .border(0.5.dp, LocalExtraColors.current.line, shape).padding(14.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            XIcon(if (pending.isHighRisk) XIcons.Warning else XIcons.Lock, tint = if (pending.isHighRisk) Brand else MaterialTheme.colorScheme.onSurface, size = 22.dp)
-            Text(if (pending.isHighRisk) "电脑请求高危操作" else "电脑请求你的确认", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        }
-        Text(pending.title.ifBlank { "允许在“$peerName”上执行操作吗？" }, Modifier.padding(top = 6.dp), fontSize = 14.sp, lineHeight = 21.sp)
-        val summary = pending.summary
-        if (summary.isNotBlank()) CodeBox(summary, Modifier.padding(top = 8.dp))
-        Text("在电脑上也可以处理，任一边处理后另一边会自动消失。", Modifier.padding(top = 6.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        // 高危操作手机上只能“允许一次”，不给“总是允许”。
-        val options = pending.options.filter { !(pending.isHighRisk && it.id == "always") }
-        Row(Modifier.padding(top = 12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            options.sortedBy { if (it.id == "deny" || it.id == "__dismiss__") 0 else 1 }.forEach { opt ->
-                val negative = opt.id == "deny" || opt.id == "__dismiss__"
-                if (negative) GhostPillButton(opt.label, { onDecision(opt.id) }, Modifier.weight(1f), height = 44.dp)
-                else PillButton(opt.label, { onDecision(opt.id) }, Modifier.weight(1f), height = 44.dp)
-            }
-        }
-    }
-}
-
 
 // ───────────── 左侧栏：设备、项目、对话 ─────────────
 

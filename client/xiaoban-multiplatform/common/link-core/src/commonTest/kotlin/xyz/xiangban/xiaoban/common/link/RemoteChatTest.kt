@@ -13,6 +13,11 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
+import xyz.xiangban.xiaoban.common.community.ToolStatus
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
 
 class RemoteChatTest {
     private val scope = CoroutineScope(Dispatchers.Unconfined)
@@ -65,13 +70,14 @@ class RemoteChatTest {
         // 工具进度 tool.start
         val toolStart = """{"t":"event","id":"3","session":"s_1","kind":"tool.start","data":{"id":"t_1","name":"shell"}}"""
         link.emitEventForTest(LinkEvent.Message("dsk_1", toolStart.encodeToByteArray()))
-        assertEquals(1, controller.state.value.toolProgress.size)
-        assertEquals("shell", controller.state.value.toolProgress[0].name)
-        assertTrue(controller.state.value.toolProgress[0].running)
+        val tools = { controller.state.value.messages.last().tools }
+        assertEquals(1, tools().size)
+        assertEquals("shell", tools()[0].name)
+        assertEquals(ToolStatus.Running, tools()[0].status)
         // 带参数的工具调用：命令、路径会被提炼成一行说明
         val toolWithArgs = """{"t":"event","id":"3b","session":"s_1","kind":"tool.start","data":{"id":"t_2","name":"bash","arguments":{"command":"npm test -- login","timeout":30}}}"""
         link.emitEventForTest(LinkEvent.Message("dsk_1", toolWithArgs.encodeToByteArray()))
-        assertEquals("npm test -- login", controller.state.value.toolProgress[1].detail)
+        assertEquals("""{"command":"npm test -- login","timeout":30}""", tools()[1].arguments)
         assertEquals("src/a.vue", summarizeArgs(kotlinx.serialization.json.Json.parseToJsonElement("""{"file_path":"src/a.vue"}""")))
         assertEquals("rm -rf build", summarizeArgs(kotlinx.serialization.json.Json.parseToJsonElement("""{"anything":"rm -rf build"}""")))
         assertEquals("", summarizeArgs(kotlinx.serialization.json.Json.parseToJsonElement("{}")))
@@ -85,8 +91,8 @@ class RemoteChatTest {
         // 工具结束 tool.end
         val toolEnd = """{"t":"event","id":"5","session":"s_1","kind":"tool.end","data":{"id":"t_1","is_error":false}}"""
         link.emitEventForTest(LinkEvent.Message("dsk_1", toolEnd.encodeToByteArray()))
-        assertFalse(controller.state.value.toolProgress[0].running)
-        assertTrue(controller.state.value.toolProgress[1].running)
+        assertEquals(ToolStatus.Done, tools()[0].status)
+        assertEquals(ToolStatus.Running, tools()[1].status)
 
         // 回复完成 turn.done
         val turnDone = """{"t":"event","id":"6","session":"s_1","kind":"turn.done","data":{}}"""
@@ -254,5 +260,113 @@ class RemoteChatTest {
         // 打开对话时快照带着当前模式。
         link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"session.snapshot","id":"4","session":"s_9","permission":"auto","messages":[],"after":0,"cursor":0,"has_more":false}""".encodeToByteArray()))
         assertTrue(controller.state.value.fullTrust)
+    }
+
+    private fun parse(text: String): JsonObject = Json.parseToJsonElement(text).jsonObject
+
+    @Test
+    fun `history folds assistant messages and tool results into one reply with tool cards`() {
+        val page1 = listOf(
+            """{"role":"user","parts":[{"type":"text","text":"跑测试"}]}""",
+            """{"role":"assistant","parts":[{"type":"text","text":"好的，我先看看。"}],"reasoning":["先读文件"],"tool_calls":[{"id":"c1","name":"read_file","arguments":"{\"path\":\"a.vue\"}"}]}""",
+            """{"role":"tool","tool_call_id":"c1","parts":[{"type":"text","text":"文件内容"}]}""",
+            """{"role":"assistant","parts":[],"tool_calls":[{"id":"c2","name":"shell","arguments":"{\"command\":\"npm test\"}"}]}""",
+        ).map(::parse)
+        val first = foldSnapshot(emptyList(), page1, 0)
+        assertEquals(listOf("user", "assistant"), first.map { it.role })
+        assertEquals(listOf("snap-0", "snap-1"), first.map { it.id })
+        val reply = first[1]
+        assertEquals("好的，我先看看。", reply.text)
+        assertEquals("先读文件", reply.reasoning)
+        assertEquals(listOf("read_file", "shell"), reply.tools.map { it.name })
+        assertEquals("文件内容", reply.tools[0].output)
+        assertEquals(ToolStatus.Done, reply.tools[0].status)
+        assertEquals(ToolStatus.Running, reply.tools[1].status, "还没有结果的调用")
+
+        // 一轮回答跨页：下一页接着折进同一条回复
+        val page2 = listOf(
+            """{"role":"tool","tool_call_id":"c2","is_error":true,"parts":[{"type":"text","text":"退出码 1"}]}""",
+            """{"role":"assistant","parts":[{"type":"text","text":"有一个用例失败。"}]}""",
+            """{"role":"user","parts":[{"type":"text","text":"修一下"}]}""",
+        ).map(::parse)
+        val second = foldSnapshot(first, page2, 4)
+        assertEquals(3, second.size)
+        assertEquals("好的，我先看看。\n\n有一个用例失败。", second[1].text)
+        assertEquals(ToolStatus.Error, second[1].tools[1].status)
+        assertEquals("退出码 1", second[1].tools[1].output)
+        assertEquals("snap-6", second[2].id)
+    }
+
+    @Test
+    fun `a question becomes a choice card and the answer is kept in the conversation`() = runTest {
+        val link = createLink()
+        val sent = mutableListOf<String>()
+        link.sendObserverForTest = { _, data -> sent += data.decodeToString() }
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"sessions.page","id":"1","items":[{"id":"s_1","title":"整理","updated_at":1,"state":"idle"}]}""".encodeToByteArray()))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"2","session":"s_1","kind":"text.delta","data":{"text":"我先看了一下。"}}""".encodeToByteArray()))
+
+        val request = """{"t":"approval.request","id":"3","approval_id":"q_1","session":"s_1","title":"重复文件怎么处理？","detail":{},"risk":"low",
+            "options":[{"id":"移到文件夹","label":"移到文件夹"},{"id":"__dismiss__","label":"跳过"}],"kind":"question","question":"重复文件怎么处理？","choices":["移到文件夹","直接删除"],"free_text":true}"""
+        link.emitEventForTest(LinkEvent.Message("dsk_1", request.encodeToByteArray()))
+        val pending = controller.state.value.pendingApproval!!
+        assertTrue(pending.isQuestion)
+        assertEquals(listOf("移到文件夹", "直接删除"), pending.choices)
+        assertTrue(pending.freeText)
+
+        sent.clear()
+        controller.answerApproval("q_1", "直接删除")
+        assertTrue(sent.single().contains("\"choice\":\"直接删除\""))
+        assertEquals(null, controller.state.value.pendingApproval)
+        val record = controller.state.value.messages.last().records.single()
+        assertEquals("answer", record.kind)
+        assertEquals("重复文件怎么处理？", record.title)
+        assertEquals("直接删除", record.result)
+
+        // 跳过：留下“已跳过”
+        link.emitEventForTest(LinkEvent.Message("dsk_1", request.replace("q_1", "q_2").encodeToByteArray()))
+        controller.answerApproval("q_2", "__dismiss__")
+        assertEquals(null, controller.state.value.messages.last().records.last().result)
+    }
+
+    @Test
+    fun `an approval carries what the card needs and desktop handling leaves a record`() = runTest {
+        val link = createLink()
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"sessions.page","id":"0","items":[{"id":"s_1","title":"整理","updated_at":1,"state":"idle"}]}""".encodeToByteArray()))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"1","session":"s_1","kind":"text.delta","data":{"text":"好"}}""".encodeToByteArray()))
+        val request = """{"t":"approval.request","id":"2","approval_id":"a_1","session":"s_1","title":"允许执行 shell？","detail":{"command":"rm -rf build"},"risk":"high",
+            "options":[{"id":"once","label":"允许一次"},{"id":"deny","label":"拒绝"}],"tool":"shell","risk_kind":"exec","external_path":false,"tainted":true,"danger":"删除多个文件"}"""
+        link.emitEventForTest(LinkEvent.Message("dsk_1", request.encodeToByteArray()))
+        val a = controller.state.value.pendingApproval!!
+        assertEquals("shell", a.tool)
+        assertEquals("exec", a.riskKind)
+        assertTrue(a.tainted && a.isHighRisk)
+        assertEquals("删除多个文件", a.danger)
+        assertEquals("rm -rf build", a.summary)
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"approval.resolved","id":"3","approval_id":"a_1","by":"desktop"}""".encodeToByteArray()))
+        assertEquals(null, controller.state.value.pendingApproval)
+        assertEquals("已在电脑上处理", controller.state.value.messages.last().records.single().result)
+    }
+
+    @Test
+    fun `stopping a turn asks the desktop to cancel and the reply is marked stopped`() = runTest {
+        val link = createLink()
+        val sent = mutableListOf<String>()
+        link.sendObserverForTest = { _, data -> sent += data.decodeToString() }
+        val controller = RemoteChatController(link, scope)
+        controller.refreshPeers()
+        link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"sessions.page","id":"1","items":[{"id":"s_1","title":"整理","updated_at":1,"state":"idle"}]}""".encodeToByteArray()))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"2","session":"s_1","kind":"text.delta","data":{"text":"先看看"}}""".encodeToByteArray()))
+        sent.clear()
+        controller.cancel()
+        assertTrue(sent.single().contains("\"t\":\"message.cancel\"") && sent.single().contains("\"session\":\"s_1\""))
+        link.emitEventForTest(LinkEvent.Message("dsk_1", """{"t":"event","id":"3","session":"s_1","kind":"state","data":{"state":"cancelled"}}""".encodeToByteArray()))
+        assertEquals(TurnCancelled, controller.state.value.messages.last().error)
     }
 }

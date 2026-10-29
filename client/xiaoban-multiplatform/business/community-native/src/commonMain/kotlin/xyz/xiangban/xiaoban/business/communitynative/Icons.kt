@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.dp
 /** 设计稿里用到的线条图标（24×24，描边 1.8）。路径数据直接取自设计稿的 SVG，由脚本生成。 */
 object XIcons {
     val ArrowRight: ImageVector by lazy { strokeIcon("ArrowRight", "M5 12h13M13 6l6 6-6 6") }
+    val ArrowUp: ImageVector by lazy { strokeIcon("ArrowUp", "M12 19V5M6 11l6-6 6 6") }
     val Bell: ImageVector by lazy { strokeIcon("Bell", "M6 17V11a6 6 0 0112 0v6l1.5 2h-15zM10 21h4") }
     val Bolt: ImageVector by lazy { strokeIcon("Bolt", "M13 3L5 14h6l-1 7 8-11h-6z") }
     val Book: ImageVector by lazy { strokeIcon("Book", "M5 4h10a3 3 0 013 3v13H8a3 3 0 01-3-3zM5 17a3 3 0 013-3h10") }
@@ -22,6 +23,7 @@ object XIcons {
     val ChevronLeft: ImageVector by lazy { strokeIcon("ChevronLeft", "M15 5l-7 7 7 7") }
     val ChevronRight: ImageVector by lazy { strokeIcon("ChevronRight", "M9 5l7 7-7 7") }
     val Clock: ImageVector by lazy { strokeIcon("Clock", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM12 7.5V12l3 2") }
+    val Copy: ImageVector by lazy { strokeIcon("Copy", "M11 9h7a2 2 0 012 2v7a2 2 0 01-2 2h-7a2 2 0 01-2-2v-7a2 2 0 012-2zM5 15V6a2 2 0 012-2h9") }
     val Close: ImageVector by lazy { strokeIcon("Close", "M6 6l12 12M18 6L6 18") }
     val File: ImageVector by lazy { strokeIcon("File", "M7 3h7l5 5v13H7zM14 3v5h5") }
     val Flag: ImageVector by lazy { strokeIcon("Flag", "M5 21V4M5 4h11l-2 4 2 4H5") }
@@ -42,11 +44,14 @@ object XIcons {
     val MoreVertical: ImageVector by lazy { strokeIcon("MoreVertical", "M10.4 5a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 19a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0z") }
     val NewChat: ImageVector by lazy { strokeIcon("NewChat", "M12 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-6M17.5 3.5a2 2 0 013 3L12 15l-4 1 1-4z") }
     val Pen: ImageVector by lazy { strokeIcon("Pen", "M4 20l4-1 11-11a2 2 0 00-3-3L5 16l-1 4z") }
+    val Pause: ImageVector by lazy { strokeIcon("Pause", "M9 6v12M15 6v12") }
     val Plan: ImageVector by lazy { strokeIcon("Plan", "M5 4v16M5 5h12l-2.5 4 2.5 4H5") }
     val Plus: ImageVector by lazy { strokeIcon("Plus", "M12 5v14M5 12h14") }
+    val Question: ImageVector by lazy { strokeIcon("Question", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM9.5 9.5a2.5 2.5 0 114 2c-.9.6-1.5 1-1.5 2M12 17v.5") }
     val Refresh: ImageVector by lazy { strokeIcon("Refresh", "M20 12a8 8 0 10-2.3 5.6M20 5v5h-5") }
     val Search: ImageVector by lazy { strokeIcon("Search", "M4.5 11a6.5 6.5 0 1 0 13 0a6.5 6.5 0 1 0 -13 0zM16 16l4.5 4.5") }
     val Share: ImageVector by lazy { strokeIcon("Share", "M12 15V4M8 8l4-4 4 4M5 12v6a2 2 0 002 2h10a2 2 0 002-2v-6") }
+    val Shield: ImageVector by lazy { strokeIcon("Shield", "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z") }
     val Sliders: ImageVector by lazy { strokeIcon("Sliders", "M4 7h10M18 7h2M4 17h2M10 17h10M14 7a2 2 0 1 0 4 0a2 2 0 1 0 -4 0zM6 17a2 2 0 1 0 4 0a2 2 0 1 0 -4 0z") }
     val Sparkle: ImageVector by lazy { strokeIcon("Sparkle", "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z") }
     val SparkleSmall: ImageVector by lazy { strokeIcon("SparkleSmall", "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z") }

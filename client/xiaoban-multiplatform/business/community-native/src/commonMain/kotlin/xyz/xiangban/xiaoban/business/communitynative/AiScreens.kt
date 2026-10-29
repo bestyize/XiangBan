@@ -50,7 +50,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.community.AiBalance
 import xyz.xiangban.xiaoban.common.community.ChatApproval
-import xyz.xiangban.xiaoban.common.community.ChatToolCall
+import xyz.xiangban.xiaoban.common.community.toolLabel
+import xyz.xiangban.xiaoban.common.link.RemoteApprovalOption
+import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import xyz.xiangban.xiaoban.common.community.ChatTurn
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.CloudChatState
@@ -279,10 +283,10 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     if (cloud.messages.isEmpty()) {
                         ChatWelcome()
                     } else {
-                        CloudMessages(cloud.messages, cloud.tools, cloud.sending, env.platform != null, copiedId, onCopy = { turn -> env.platform?.copy(turn.text); copiedId = turn.id }, onRetry = chat::retryLast, onQuota = { open(Route.Models) })
+                        CloudMessages(cloud.messages, cloud.sending, env.platform != null, copiedId, env.platform, onCopy = { turn -> env.platform?.copy(turn.text); copiedId = turn.id }, onRetry = chat::retryLast, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) })
                     }
                 }
-                cloud.approval?.let { pending -> AgentApprovalCard(pending) { chat.answerApproval(it) } }
+                cloud.approval?.let { pending -> ApprovalCard(pending.toRequest(), { chat.answerApproval(it) }, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp)) }
                 if (cloud.messages.isEmpty()) {
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         StarterPrompts.forEach { prompt -> ChipPill(prompt, onClick = { chat.send(prompt) }) }
@@ -345,76 +349,42 @@ private fun ChatWelcome() {
 }
 
 @Composable
-private fun CloudMessages(messages: List<ChatTurn>, tools: List<ChatToolCall>, sending: Boolean, canCopy: Boolean, copiedId: Long?, onCopy: (ChatTurn) -> Unit, onRetry: () -> Unit, onQuota: () -> Unit) {
+private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, canCopy: Boolean, copiedId: Long?, platform: PlatformActions?, onCopy: (ChatTurn) -> Unit, onRetry: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit) {
     val listState = rememberLazyListState()
-    val lastLen = messages.lastOrNull()?.text?.length ?: 0
-    LaunchedEffect(messages.size, lastLen, tools.size) { if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex + (if (tools.isNotEmpty()) 1 else 0)) }
+    val last = messages.lastOrNull()
+    val progressMark = (last?.text?.length ?: 0) + (last?.tools?.size ?: 0) * 7 + (last?.records?.size ?: 0) * 13
+    LaunchedEffect(messages.size, progressMark) { if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex) }
     LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items(messages, key = { it.id }) { turn ->
             if (turn.role == "user") {
                 UserBubble(turn.text)
             } else {
                 AssistantRow {
-                    when {
-                        turn.streaming && turn.text.isEmpty() -> AssistantBubble("思考中…", muted = true)
-                        turn.text.isNotEmpty() -> AssistantBubble(if (turn.streaming) turn.text + " ▍" else turn.text)
-                    }
-                    if (turn.error != null) {
-                        Banner(turn.error.orEmpty(), warn = true, actionText = "重试", onAction = onRetry)
-                        if (turn.error.orEmpty().contains("额度") || turn.error.orEmpty().contains("兑换")) {
-                            LinkText("去兑换额度 ›", onQuota)
-                        }
-                    } else if (!turn.streaming && turn.text.isNotEmpty() && canCopy) {
-                        LinkText(if (copiedId == turn.id) "已复制" else "复制", { onCopy(turn) })
-                    }
-                }
-            }
-        }
-        if (tools.isNotEmpty()) {
-            item(key = "tools") {
-                AssistantRow(avatar = false) {
-                    tools.forEach { t ->
-                        ToolCard(
-                            XIcons.Tool, agentToolLabel(t.name), t.detail,
-                            status = if (t.running) "执行中…" else if (t.isError) "没有执行" else "完成",
-                            done = !t.running && !t.isError,
-                        )
-                    }
+                    AssistantTurnCards(
+                        text = turn.text, streaming = turn.streaming, error = turn.error, reasoning = "", tools = turn.tools, records = turn.records,
+                        waiting = null, platform = platform, idleText = "思考中…", onStop = onStop, onSend = onSend,
+                        onRetry = if (turn.error != null && !sending) onRetry else null,
+                    )
+                    if (turn.error.orEmpty().let { it.contains("额度") || it.contains("兑换") }) LinkText("去兑换额度 ›", onQuota)
+                    if (turn.error == null && !turn.streaming && turn.text.isNotEmpty() && canCopy) LinkText(if (copiedId == turn.id) "已复制" else "复制", { onCopy(turn) })
                 }
             }
         }
     }
 }
 
-private fun agentToolLabel(name: String): String = when (name) {
-    "set_reminder" -> "设置提醒"
-    "time_now", "current_time", "now" -> "查看时间"
-    else -> name
-}
-
-/** 智能体要改动东西之前问用户：允许这一次，或者拒绝。 */
-@Composable
-private fun AgentApprovalCard(pending: ChatApproval, onDecision: (String) -> Unit) {
-    val shape = RoundedCornerShape(16.dp)
-    Column(
-        Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp).fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
-            .border(0.5.dp, LocalExtraColors.current.line, shape).padding(14.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            XIcon(XIcons.Lock, size = 22.dp)
-            Text("小伴想帮你：${agentToolLabel(pending.tool)}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        }
-        if (pending.detail.isNotBlank()) {
-            Text(pending.detail, Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).padding(horizontal = 10.dp, vertical = 8.dp), fontSize = 13.sp, lineHeight = 19.sp)
-        }
-        pending.danger?.let { Text(it, Modifier.padding(top = 6.dp), fontSize = 12.sp, color = Brand) }
-        Row(Modifier.padding(top = 12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GhostPillButton("拒绝", { onDecision("deny") }, Modifier.weight(1f), height = 44.dp)
-            PillButton("允许这一次", { onDecision("once") }, Modifier.weight(1f), height = 44.dp)
-        }
-        if (pending.danger == null) LinkText("这段对话里都允许，不再问我", { onDecision("always") }, Modifier.padding(top = 10.dp))
-    }
-}
+/** 手机内核要的授权，画成和设备聊天同一张紧凑授权卡。 */
+private fun ChatApproval.toRequest(): RemoteApprovalRequest = RemoteApprovalRequest(
+    approvalId = id, session = "", title = toolLabel(tool),
+    detail = JsonObject(mapOf("detail" to JsonPrimitive(detail))),
+    risk = if (danger != null) "high" else "low",
+    options = buildList {
+        add(RemoteApprovalOption("once", "允许一次"))
+        if (danger == null) add(RemoteApprovalOption("always", "本对话都允许"))
+        add(RemoteApprovalOption("deny", "拒绝"))
+    },
+    tool = tool, danger = danger,
+)
 
 // ───────────── 模型与额度 ─────────────
 

@@ -478,6 +478,22 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                 }
             }
         }
+        "message.cancel" => {
+            let Some(session_id) = msg.get("session").and_then(Value::as_str).filter(|s| !s.trim().is_empty()) else { return };
+            if let Ok(audit) = audit_path(app) {
+                append_remote_audit(
+                    &audit,
+                    &json!({
+                        "timestampMs": now_ms(),
+                        "peerId": peer,
+                        "action": "message.cancel",
+                        "session": session_id,
+                    }),
+                );
+            }
+            // 和电脑上点“停止”一样：让正在跑的这一轮尽快结束；没有在跑就什么也不发生。
+            crate::chat::cancel_run(app, session_id);
+        }
         "message.send" => {
             let session_id = msg.get("session").and_then(Value::as_str).filter(|s| !s.trim().is_empty());
             let text = msg.get("text").and_then(Value::as_str).unwrap_or("");
@@ -771,6 +787,13 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
                     "detail": phone_wire::clip_detail(&payload["arguments"], phone_wire::MAX_EVENT_FIELD_CHARS),
                     "risk": risk,
                     "options": options,
+                    // 手机的审批卡要显示的细节：具体是读/写/联网/执行，是不是工作区外路径，读过外部内容，高风险原因。
+                    "tool": tool,
+                    "risk_kind": payload.get("risk").cloned().unwrap_or(Value::Null),
+                    "external_path": external,
+                    "tainted": payload.get("tainted").and_then(Value::as_bool).unwrap_or(false),
+                    "danger": danger,
+                    "remember_as": payload.get("rememberAs").cloned().unwrap_or(Value::Null),
                 }),
                 true,
             );
@@ -797,6 +820,12 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
                     "detail": {},
                     "risk": "low",
                     "options": options,
+                    // 新手机把它画成选择卡：问题、选项（不含“跳过”）、可以自己输入；老手机仍当作带按钮的确认卡。
+                    "kind": "question",
+                    "question": question,
+                    "choices": payload.get("options").cloned().unwrap_or_else(|| json!([])),
+                    "free_text": true,
+                    "connectors": payload.get("connectors").map(|c| !c.is_null()).unwrap_or(false),
                 }),
                 true,
             );

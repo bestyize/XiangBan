@@ -12,6 +12,7 @@ operator fun <T> MutableState<T>.setValue(thisObj: Any?, property: KProperty<*>,
 @Composable fun <T> remember(calculation: () -> T): T = TODO()
 @Composable fun <T> remember(key1: Any?, calculation: () -> T): T = TODO()
 @Composable fun <T> remember(key1: Any?, key2: Any?, calculation: () -> T): T = TODO()
+@Composable fun <T> remember(vararg keys: Any?, calculation: () -> T): T = TODO()
 @Composable fun rememberCoroutineScope(): CoroutineScope = TODO()
 @Composable fun <T> StateFlow<T>.collectAsState(): State<T> = TODO()
 @Composable fun LaunchedEffect(key1: Any?, block: suspend CoroutineScope.() -> Unit) {}
