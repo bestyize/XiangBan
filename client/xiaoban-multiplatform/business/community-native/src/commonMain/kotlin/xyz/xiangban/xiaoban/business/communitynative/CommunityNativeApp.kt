@@ -1,6 +1,7 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -29,6 +30,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.community.CloudChatController
@@ -72,14 +74,17 @@ fun CommunityNativeApp(env: CommunityEnv) {
             AnimatedContent(
                 targetState = pages,
                 modifier = Modifier.fillMaxSize(),
+                // 页面一直是实心的，不叠淡入淡出（不然两页会透出来叠在一起）：进入时新页从右边推进来，下面那页往左让一点；
+                // 返回时当前页往右滑出（始终盖在最上面），下面那页从左边回到原位。
                 transitionSpec = {
-                    if (targetState.size > initialState.size) {
-                        (slideInHorizontally(tween(220)) { it } + fadeIn(tween(220))) togetherWith
-                            (slideOutHorizontally(tween(220)) { -it / 4 } + fadeOut(tween(220)))
+                    val push = targetState.size > initialState.size
+                    val spec = tween<IntOffset>(260, easing = FastOutSlowInEasing)
+                    val change = if (push) {
+                        slideInHorizontally(spec) { it } togetherWith slideOutHorizontally(spec) { -it / 4 }
                     } else {
-                        (slideInHorizontally(tween(220)) { -it / 4 } + fadeIn(tween(220))) togetherWith
-                            (slideOutHorizontally(tween(220)) { it } + fadeOut(tween(220)))
+                        slideInHorizontally(spec) { -it / 4 } togetherWith slideOutHorizontally(spec) { it }
                     }
+                    change.apply { targetContentZIndex = if (push) 1f else -1f }
                 },
                 label = "页面切换",
             ) { visiblePages ->

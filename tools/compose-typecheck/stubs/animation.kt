@@ -8,7 +8,7 @@ import androidx.compose.ui.unit.IntOffset
 
 class EnterTransition { operator fun plus(other: EnterTransition): EnterTransition = TODO() }
 class ExitTransition { operator fun plus(other: ExitTransition): ExitTransition = TODO() }
-class ContentTransform
+class ContentTransform { var targetContentZIndex: Float = 0f }
 infix fun EnterTransition.togetherWith(exit: ExitTransition): ContentTransform = TODO()
 interface AnimatedVisibilityScope {
     fun Modifier.animateEnterExit(enter: EnterTransition = fadeIn(), exit: ExitTransition = fadeOut(), label: String = "animateEnterExit"): Modifier
