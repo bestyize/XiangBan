@@ -88,27 +88,15 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
         if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(rec.audioSessionId)?.let { it.enabled = true; effects += it }
         if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(rec.audioSessionId)?.let { it.enabled = true; effects += it }
         val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-        val oldMode = audio.mode
-        val oldSpeaker = audio.isSpeakerphoneOn
-        audio.mode = AudioManager.MODE_IN_COMMUNICATION
-        val callAttributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
-        // 像打电话一样占用音频焦点：别的应用在放的音乐/视频会暂停，通话结束再恢复。
+        val callAttributes = AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build()
+        // 占用音频焦点：别的应用在放的音乐/视频会暂停，通话结束再恢复。
         var focus: AudioFocusRequest? = null
         if (Build.VERSION.SDK_INT >= 26) {
             focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT).setAudioAttributes(callAttributes).setOnAudioFocusChangeListener { }.build()
             audio.requestAudioFocus(focus)
         } else {
             @Suppress("DEPRECATION")
-            audio.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-        }
-        // 外放还是耳机：有耳机（有线、蓝牙、USB）就交给系统选，否则用手机扬声器（通话模式默认走听筒）。
-        if (Build.VERSION.SDK_INT >= 31) {
-            val devices = audio.availableCommunicationDevices
-            val headset = devices.any { it.type in HeadsetTypes }
-            if (!headset) devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }?.let { audio.setCommunicationDevice(it) }
-        } else {
-            @Suppress("DEPRECATION")
-            if (!audio.isWiredHeadsetOn && !audio.isBluetoothScoAvailableOffCall) audio.isSpeakerphoneOn = true
+            audio.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
         }
         val running = java.util.concurrent.atomic.AtomicBoolean(true)
         rec.startRecording()
@@ -126,10 +114,6 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
             runCatching { rec.stop() }
             effects.forEach { runCatching { it.release() } }
             rec.release()
-            if (Build.VERSION.SDK_INT >= 31) audio.clearCommunicationDevice()
-            @Suppress("DEPRECATION")
-            audio.isSpeakerphoneOn = oldSpeaker
-            audio.mode = oldMode
             if (Build.VERSION.SDK_INT >= 26) focus?.let { audio.abandonAudioFocusRequest(it) }
             else {
                 @Suppress("DEPRECATION")
@@ -199,14 +183,16 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
         }
     }
 
+    private val playSeq = java.util.concurrent.atomic.AtomicInteger()
+
     fun play(bytes: ByteArray, onDone: () -> Unit): Boolean {
         stopPlayback()
         return try {
-            val file = File(context.cacheDir, "reply-voice.mp3")
+            val file = File(context.cacheDir, "reply-voice-${playSeq.incrementAndGet() % 4}.mp3")
             file.writeBytes(bytes)
             val mp = MediaPlayer()
-            // 按通话的声音类型播放，系统回声消除才知道要从麦克风里减掉它。
-            mp.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
+            // 使用媒体流属性播放，避免电话通道硬件降噪与窄带滤波导致的破音与沙沙声
+            mp.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
             mp.setDataSource(file.absolutePath)
             mp.setOnCompletionListener { stopPlayback(); onDone() }
             mp.setOnErrorListener { _, _, _ -> stopPlayback(); onDone(); true }

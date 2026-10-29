@@ -78,16 +78,8 @@ class AndroidPlatformActions(
     private var ttsWaiting: Pair<String, String>? = null
     private val ttsDone = java.util.concurrent.ConcurrentHashMap<String, (Boolean) -> Unit>()
 
-    /** 通话里的朗读按通话的声音类型播放（配合回声消除）；单独点“朗读”按钮时按普通媒体播放。 */
-    private var ttsForCall = false
-
     private fun speakWith(text: String, utteranceId: String, forCall: Boolean = false): Boolean {
         if (ttsFailed) return false
-        if (forCall != ttsForCall) {
-            ttsForCall = forCall
-            val usage = if (forCall) android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION else android.media.AudioAttributes.USAGE_MEDIA
-            tts?.setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(usage).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
-        }
         val engine = tts ?: TextToSpeech(context.applicationContext) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
             ttsFailed = !ttsReady
@@ -95,7 +87,7 @@ class AndroidPlatformActions(
             ttsWaiting = null
             if (ttsReady) {
                 tts?.language = Locale.CHINA
-                if (ttsForCall) tts?.setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+                tts?.setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
                     override fun onDone(utteranceId: String?) { utteranceId?.let { ttsDone.remove(it)?.invoke(true) } }
