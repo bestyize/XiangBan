@@ -125,6 +125,12 @@ fun VoiceCallScreen(call: VoiceCall, title: String, subtitle: String, onClosed: 
             CallButton(XIcons.Close, if (canInterrupt) "打断" else "挂断", if (canInterrupt) MaterialTheme.colorScheme.onSurface else Brand, onClick = { if (canInterrupt) call.interrupt() else call.stop() })
             if (canInterrupt) CallButton(XIcons.Close, "挂断", Brand, onClick = { call.stop() })
         }
+        // 小伴说话时直接开口就能打断它；周围回声大、总被误打断时可以关掉，改用上面的“打断”按钮。
+        Text(
+            if (state.bargeIn) "直接开口打断：开" else "直接开口打断：关",
+            Modifier.padding(top = 18.dp).clip(RoundedCornerShape(8.dp)).clickable { call.setBargeIn(!state.bargeIn) }.padding(horizontal = 12.dp, vertical = 8.dp),
+            fontSize = 13.sp, color = extra.ink3,
+        )
     }
 }
 
@@ -145,14 +151,14 @@ private fun CallButton(icon: androidx.compose.ui.graphics.vector.ImageVector, la
 fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Boolean) -> Unit) {
     val models = env.speechModels ?: return
     var done by remember { mutableStateOf(0L) }
-    var total by remember { mutableStateOf(xyz.xiangban.xiaoban.common.community.SenseVoiceModel.TotalBytes) }
+    var total by remember { mutableStateOf(xyz.xiangban.xiaoban.common.community.VoiceModels.TotalBytes) }
     var running by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var job by remember { mutableStateOf<Job?>(null) }
     BottomSheet({ job?.cancel(); onFinished(false) }, panelModifier) {
         Text("在手机上识别语音", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Text(
-            "下载语音识别模型（SenseVoice，约 ${(total / 1_000_000)} MB，和电脑上用的是同一个），之后说话的识别在手机上完成，不用把录音传出去，也不依赖电脑在线。建议在 Wi-Fi 下载。",
+            "下载语音模型（SenseVoice 识别加 Silero 人声检测，共约 ${(total / 1_000_000)} MB，和电脑上用的是同一套），之后识别和判断你说完没有都在手机上完成，不用把录音传出去，也不依赖电脑在线。建议在 Wi-Fi 下载。",
             Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (running || done > 0) {

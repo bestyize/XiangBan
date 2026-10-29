@@ -19,6 +19,53 @@ fun pcm16ToWav(pcm: ByteArray, sampleRate: Int = SampleRate): ByteArray {
     return out
 }
 
+/** 一帧（20ms）里有没有人在说话。不同平台可以换更准的实现（安卓上是 Silero VAD）。 */
+interface SpeechGate {
+    /** [strict] 为真时只认很明确的人声：小伴自己在说话时，它的回声不能被当成用户开口。 */
+    fun voiced(frame: ByteArray, strict: Boolean): Boolean
+    /** 声音大小，0 到 1，给界面画呼吸动画。 */
+    fun level(frame: ByteArray): Float
+    /** 用完了，释放占用的资源。 */
+    fun release() {}
+}
+
+/** 按声音大小（RMS）判断：先用开头一小段估出环境噪声，说话要明显高过它。没有 VAD 模型时的备选。 */
+class EnergyGate : SpeechGate {
+    private var floor = -1.0
+    private var calibrated = 0
+
+    override fun level(frame: ByteArray): Float = (rms(frame) / 6000.0).coerceIn(0.0, 1.0).toFloat()
+
+    override fun voiced(frame: ByteArray, strict: Boolean): Boolean {
+        val value = rms(frame)
+        if (calibrated < CalibrationFrames) {
+            floor = if (floor < 0) value else (floor * calibrated + value) / (calibrated + 1)
+            calibrated++
+            return false
+        }
+        val threshold = maxOf(MinThreshold, floor * 3.0) * (if (strict) 1.8 else 1.0)
+        val loud = value > threshold
+        if (!loud) floor = floor * 0.95 + value * 0.05
+        return loud
+    }
+
+    private fun rms(frame: ByteArray): Double {
+        val n = frame.size / 2
+        if (n == 0) return 0.0
+        var sum = 0.0
+        for (i in 0 until n) {
+            val sample = ((frame[2 * i + 1].toInt() shl 8) or (frame[2 * i].toInt() and 0xFF)).toShort().toInt()
+            sum += sample.toDouble() * sample
+        }
+        return sqrt(sum / n)
+    }
+
+    private companion object {
+        const val CalibrationFrames = 10
+        const val MinThreshold = 450.0
+    }
+}
+
 /** 一帧（20ms）喂进去之后的结果。 */
 class VadResult(
     /** 当前声音大小，0 到 1，给界面画呼吸动画。 */
@@ -29,44 +76,58 @@ class VadResult(
     val utterance: ByteArray? = null,
     /** 等了很久一直没人说话。 */
     val timedOut: Boolean = false,
+    /** 这句话里已经有多少毫秒的人声。 */
+    val voicedMs: Int = 0,
+    /** 停顿够长了，该问一句“说完了吗”：到目前为止的录音。回答用 [EndpointDetector.verdict] 交回来。 */
+    val ask: ByteArray? = null,
+    val askTicket: Int = 0,
 )
 
 /**
- * 最朴素的“说完了”判断：按声音大小（RMS）分说话和安静，先用开头一小段估出环境噪声，说话要明显高过它；
- * 连续安静一阵（[endSilenceMs]）就算说完。太短的一声响（咳嗽、碰桌子）不算话。
+ * “这句话说完了没有”的判断，思路和电脑端 `voice/turn/segmenter.ts` 一样：
+ * 人声门（Silero 或声音大小）分出说话和安静；太短的一声响不算话；说完话后停顿一会儿就算说完。
+ * 有“判停”的话（[useJudge]）：停顿 [askAfterMs] 就问一次“说完了吗”，说没说完就再等，隔 [askAgainAfterMs] 再问一次，
+ * 无论如何停顿到 [giveUpAfterMs] 就结束；没有判停就固定停顿 [endSilenceMs] 结束。
  * 一个检测器只管一句话，说完或超时后换新的。
  */
 class EndpointDetector(
+    private val gate: SpeechGate = EnergyGate(),
+    private val strict: Boolean = false,
+    private val useJudge: Boolean = false,
     private val frameMs: Int = 20,
-    private val minSpeechMs: Int = 300,
+    private val minSpeechMs: Int = if (strict) 400 else 300,
     private val endSilenceMs: Int = 900,
+    private val askAfterMs: Int = 350,
+    private val askAgainAfterMs: Int = 900,
+    private val giveUpAfterMs: Int = 1_600,
     private val maxSpeechMs: Int = 20_000,
     private val maxWaitMs: Int = 10_000,
     private val preRollMs: Int = 300,
 ) {
-    private var floor = -1.0
-    private var calibrated = 0
     private var voiced = 0
     private var silentRun = 0
     private var speechFrames = 0
     private var waited = 0
     private var started = false
+    private var asked = 0
+    private var ticket = 0
+    private var verdictComplete = false
     private val preRoll = ArrayDeque<ByteArray>()
     private val captured = ArrayList<ByteArray>()
 
+    /** 这个检测器不用了。 */
+    fun close() = gate.release()
+
+    /** 判停的回答。[ticket] 是 [VadResult.askTicket]；中间又开口说话了，旧的回答就作废。 */
+    fun verdict(ticket: Int, complete: Boolean) {
+        if (ticket == this.ticket && started) verdictComplete = complete
+    }
+
     fun feed(frame: ByteArray): VadResult {
-        val rms = rms(frame)
-        // 开头 200ms 只用来估环境噪声（那时一般还没开口）。
-        if (calibrated < CalibrationFrames) {
-            floor = if (floor < 0) rms else (floor * calibrated + rms) / (calibrated + 1)
-            calibrated++
-            remember(frame)
-            return VadResult(level(rms), false)
-        }
-        val threshold = maxOf(MinThreshold, floor * 3.0)
-        val loud = rms > threshold
+        val level = gate.level(frame)
+        val loud = gate.voiced(frame, strict)
         if (!started) {
-            if (loud) voiced++ else { voiced = 0; floor = floor * 0.95 + rms * 0.05 }
+            if (loud) voiced++ else voiced = 0
             remember(frame)
             if (voiced >= StartFrames) {
                 started = true
@@ -74,27 +135,49 @@ class EndpointDetector(
                 preRoll.clear()
                 speechFrames = voiced
                 silentRun = 0
+                asked = 0
+                ticket++
             } else {
                 waited++
-                if (waited * frameMs >= maxWaitMs) return VadResult(level(rms), false, timedOut = true)
+                if (waited * frameMs >= maxWaitMs) return VadResult(level, false, timedOut = true)
             }
-            return VadResult(level(rms), started)
+            return VadResult(level, started, voicedMs = speechFrames * frameMs)
         }
         captured.add(frame)
-        if (loud) { speechFrames++; silentRun = 0 } else silentRun++
-        val done = silentRun * frameMs >= endSilenceMs || captured.size * frameMs >= maxSpeechMs
+        if (loud) {
+            speechFrames++
+            silentRun = 0
+            // 又开口了：之前对停顿的判断作废。
+            if (asked > 0 || verdictComplete) { asked = 0; verdictComplete = false; ticket++ }
+        } else silentRun++
+        val silenceMs = silentRun * frameMs
+        val tooLong = captured.size * frameMs >= maxSpeechMs
+        val done = when {
+            tooLong -> true
+            useJudge -> verdictComplete && speechFrames * frameMs >= minSpeechMs || silenceMs >= giveUpAfterMs
+            else -> silenceMs >= endSilenceMs
+        }
         if (done) {
             if (speechFrames * frameMs < minSpeechMs) {
                 // 只是一声响：当作没发生，接着等。
-                captured.clear(); started = false; voiced = 0; speechFrames = 0; silentRun = 0
-                return VadResult(level(rms), false)
+                captured.clear(); started = false; voiced = 0; speechFrames = 0; silentRun = 0; asked = 0; verdictComplete = false
+                return VadResult(level, false)
             }
-            val all = ByteArray(captured.sumOf { it.size })
-            var at = 0
-            for (f in captured) { f.copyInto(all, at); at += f.size }
-            return VadResult(level(rms), false, utterance = all)
+            return VadResult(level, false, utterance = join(captured), voicedMs = speechFrames * frameMs)
         }
-        return VadResult(level(rms), true)
+        var ask: ByteArray? = null
+        if (useJudge && !verdictComplete && speechFrames * frameMs >= minSpeechMs) {
+            val due = when (asked) { 0 -> askAfterMs; 1 -> askAgainAfterMs; else -> Int.MAX_VALUE }
+            if (silenceMs >= due) { asked++; ask = join(captured) }
+        }
+        return VadResult(level, true, voicedMs = speechFrames * frameMs, ask = ask, askTicket = ticket)
+    }
+
+    private fun join(frames: List<ByteArray>): ByteArray {
+        val all = ByteArray(frames.sumOf { it.size })
+        var at = 0
+        for (f in frames) { f.copyInto(all, at); at += f.size }
+        return all
     }
 
     private fun remember(frame: ByteArray) {
@@ -102,23 +185,8 @@ class EndpointDetector(
         while (preRoll.size * frameMs > preRollMs) preRoll.removeFirst()
     }
 
-    private fun level(rms: Double): Float = (rms / 6000.0).coerceIn(0.0, 1.0).toFloat()
-
-    private fun rms(frame: ByteArray): Double {
-        val n = frame.size / 2
-        if (n == 0) return 0.0
-        var sum = 0.0
-        for (i in 0 until n) {
-            val s = ((frame[2 * i + 1].toInt() shl 8) or (frame[2 * i].toInt() and 0xFF)).toShort().toInt()
-            sum += s.toDouble() * s
-        }
-        return sqrt(sum / n)
-    }
-
     private companion object {
-        const val CalibrationFrames = 10
         const val StartFrames = 3
-        const val MinThreshold = 450.0
     }
 }
 

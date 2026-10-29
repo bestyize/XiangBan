@@ -70,13 +70,13 @@ class SpeechModelsTest {
     @Test
     fun `files that are already there are not fetched again`() = runTest {
         val files = MemoryFiles()
-        for (spec in SenseVoiceModel.Files) files.stored[spec.name] = ByteArray(spec.bytes.toInt())
+        for (spec in VoiceModels.Files) files.stored[spec.name] = ByteArray(spec.bytes.toInt())
         var requests = 0
         val models = SpeechModels(HttpClient(MockEngine { requests++; respond("", HttpStatusCode.OK) }), files)
         assertTrue(models.ready)
         var last = 0L
         models.download { done, _ -> last = done }
         assertEquals(0, requests)
-        assertEquals(SenseVoiceModel.TotalBytes, last)
+        assertEquals(VoiceModels.TotalBytes, last)
     }
 }

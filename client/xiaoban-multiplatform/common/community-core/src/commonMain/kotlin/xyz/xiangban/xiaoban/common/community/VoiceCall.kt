@@ -33,6 +33,12 @@ interface VoicePlatform {
     fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean = false
     fun stopAudio() {}
     fun stopSpeaking() {}
+
+    /** 这台手机现在能不能把小伴自己的声音从麦克风里去掉（系统回声消除可用，或戴着耳机）。不能的话“直接开口打断”默认关闭，免得它被自己的声音打断。 */
+    fun bargeInSafe(): Boolean = true
+
+    /** “有没有人在说话”的判断；每次调用给一个新的（带自己的状态）。没有更准的就返回 null，用声音大小判断。 */
+    fun speechGate(): SpeechGate? = null
 }
 
 enum class CallPhase { Starting, Listening, Hearing, Thinking, Speaking }
@@ -50,6 +56,8 @@ data class CallState(
     /** 要让你知道的事：出错原因、需要你去确认操作、好久没人说话。 */
     val notice: String? = null,
     val ended: Boolean = false,
+    /** 小伴说话时，你直接开口是否能打断它（有回声的环境可以关掉）。 */
+    val bargeIn: Boolean = true,
 )
 
 /** 这次通话没法继续，原因要告诉用户。 */
@@ -60,11 +68,21 @@ class CallError(message: String) : Exception(message)
  * 子类决定一句话怎么变成回答、怎么念出来。
  */
 abstract class VoiceCall(protected val scope: CoroutineScope, protected val platform: VoicePlatform) {
-    private val _state = MutableStateFlow(CallState())
+    private val bargeSafe = platform.bargeInSafe()
+    private val _state = MutableStateFlow(
+        CallState(
+            bargeIn = bargeSafe,
+            notice = if (bargeSafe) null else "这台手机的回声消除不可用，已关闭“直接开口打断”，请用“打断”按钮；戴耳机时可以在下面打开",
+        ),
+    )
     val state: StateFlow<CallState> = _state.asStateFlow()
     private var job: Job? = null
     private var playback: CompletableDeferred<Boolean>? = null
     private var idleRounds = 0
+    private val mic = Channel<ByteArray>(Channel.UNLIMITED)
+    private var stopMic: (() -> Unit)? = null
+    @Volatile private var pendingBarge: ByteArray? = null
+    @Volatile private var bargeTriggered = false
 
     @Volatile protected var interrupted = false
 
@@ -80,6 +98,9 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
             } catch (e: Exception) {
                 update { it.copy(notice = e.message ?: "语音通话出错了") }
             } finally {
+                stopMic?.invoke()
+                stopMic = null
+                mic.close()
                 platform.stopAudio()
                 platform.stopSpeaking()
                 update { it.copy(ended = true, level = 0f) }
@@ -100,6 +121,9 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
         playback?.complete(true)
     }
 
+    /** 打开/关闭“小伴说话时直接开口打断”。 */
+    fun setBargeIn(on: Boolean) = update { it.copy(bargeIn = on) }
+
     protected abstract suspend fun run()
 
     protected fun update(change: (CallState) -> CallState) {
@@ -108,27 +132,86 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
 
     protected fun phase(phase: CallPhase) = update { it.copy(phase = phase, level = if (phase == CallPhase.Listening || phase == CallPhase.Hearing) it.level else 0f) }
 
-    /** 听到一句话：返回它的录音；等了很久没人说话返回 null；不能录音时抛 [CallError]。 */
-    protected suspend fun listenUtterance(): ByteArray? {
+    /** 麦克风在整通电话里一直开着（这样小伴说话时也能听见你开口）；第一次需要时才打开。 */
+    private suspend fun openMic() {
+        if (stopMic != null) return
+        stopMic = platform.streamRecording { mic.trySend(it) } ?: throw CallError("没有麦克风权限，没法通话")
+    }
+
+    private fun drainMic() {
+        while (mic.tryReceive().isSuccess) { /* 想和说的时候录下的声音已经过期 */ }
+    }
+
+    private fun newDetector(strict: Boolean, useJudge: Boolean = false) = EndpointDetector(platform.speechGate() ?: EnergyGate(), strict = strict, useJudge = useJudge)
+
+    /**
+     * 听到一句话：返回它的录音；等了很久没人说话返回 null；不能录音时抛 [CallError]。
+     * 给了 [judge] 就用它判断“说完了吗”（停顿很短就能收尾，没说完的会多等一会儿），否则固定停顿一会儿就算说完。
+     * 小伴说话时用户开口打断的那句话已经被录下来了，直接交出来。
+     */
+    protected suspend fun listenUtterance(judge: (suspend (ByteArray) -> Boolean)? = null): ByteArray? {
+        pendingBarge?.let { pendingBarge = null; interrupted = false; return it }
         interrupted = false
+        openMic()
+        drainMic()
         update { it.copy(phase = CallPhase.Listening, partial = "") }
-        val detector = EndpointDetector()
-        val frames = Channel<ByteArray>(Channel.UNLIMITED)
-        val stopRecording = platform.streamRecording { frames.trySend(it) } ?: throw CallError("没有麦克风权限，没法通话")
+        val detector = newDetector(strict = false, useJudge = judge != null)
+        val verdicts = Channel<Pair<Int, Boolean>>(Channel.UNLIMITED)
         try {
             var counter = 0
-            for (frame in frames) {
+            for (frame in mic) {
+                while (true) { val v = verdicts.tryReceive().getOrNull() ?: break; detector.verdict(v.first, v.second) }
                 val result = detector.feed(frame)
                 // 声音大小不用每 20ms 都刷新界面。
                 if (++counter % 5 == 0) update { it.copy(level = result.level, phase = if (result.speaking) CallPhase.Hearing else CallPhase.Listening) }
+                if (result.ask != null && judge != null) {
+                    val ticket = result.askTicket
+                    val audio = result.ask
+                    scope.launch { verdicts.trySend(ticket to (try { judge(audio) } catch (e: CancellationException) { throw e } catch (e: Exception) { false })) }
+                }
                 if (result.utterance != null) return result.utterance
                 if (result.timedOut) return null
             }
             return null
         } finally {
-            stopRecording()
-            frames.close()
+            detector.close()
+            verdicts.close()
         }
+    }
+
+    /**
+     * 小伴想和说的时候麦克风继续听着：你连续出声一小会儿（比平时更严格，免得把它自己的回声当成你）就打断它，
+     * 并把你说的这句话录完，留给下一轮 [listenUtterance]。返回的任务要在这一轮结束时用 [finishBargeWatch] 收尾。
+     */
+    protected fun watchForBarge(): Job? {
+        if (!state.value.bargeIn || stopMic == null) return null
+        bargeTriggered = false
+        return scope.launch {
+            var detector = newDetector(strict = true)
+            try {
+                for (frame in mic) {
+                    val r = detector.feed(frame)
+                    if (!bargeTriggered && r.speaking && r.voicedMs >= BargeMs) {
+                        bargeTriggered = true
+                        interrupt()
+                        update { it.copy(phase = CallPhase.Hearing) }
+                    }
+                    if (r.utterance != null || r.timedOut) {
+                        if (bargeTriggered && r.utterance != null) { pendingBarge = r.utterance; return@launch }
+                        detector.close()
+                        detector = newDetector(strict = true)
+                    }
+                }
+            } finally {
+                detector.close()
+            }
+        }
+    }
+
+    /** 这一轮结束：已经被打断的就等用户把话说完，否则不用再听了。 */
+    protected suspend fun finishBargeWatch(watcher: Job?) {
+        if (watcher == null) return
+        if (bargeTriggered) watcher.join() else watcher.cancel()
     }
 
     /** 用手机自带的识别听一句话。 */
@@ -192,6 +275,8 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
 
     private companion object {
         const val MaxIdleRounds = 3
+        /** 连续出声这么久才算打断。 */
+        const val BargeMs = 400
     }
 }
 
@@ -201,6 +286,8 @@ class EngineUnavailable(message: String) : Exception(message)
 /** 把一句话的录音（16kHz、单声道、16 位小端 PCM）识别成文字。 */
 interface RecognizerEngine {
     val name: String
+    /** 在手机本地跑（快、不花钱、不联网），可以拿来判断一句话说完没有。 */
+    val local: Boolean get() = false
     suspend fun recognize(pcm: ByteArray): String
 }
 
@@ -299,10 +386,20 @@ class SpokenCall(
         }
     }
 
+    /**
+     * “说完了吗”：停顿时把到目前为止的话在本地识别一下，句子以句号、问号、感叹号结尾就算说完；
+     * 停在“我想要……”这样的半截话上就多等一会儿（电脑端用 Smart Turn 模型判断，手机上用识别结果的标点）。
+     */
+    private suspend fun finished(audio: ByteArray): Boolean {
+        val engine = recognizers.firstOrNull { it.local } ?: return false
+        val text = try { engine.recognize(audio).trim() } catch (e: CancellationException) { throw e } catch (e: Exception) { return false }
+        return text.isNotEmpty() && text.last() in "。！？!?…"
+    }
+
     /** 听一句话，转成文字；没听清返回 null。 */
     private suspend fun hear(): String? {
         if (recognizers.isEmpty()) return listenSystem().trim().ifEmpty { null }
-        val pcm = listenUtterance() ?: return null
+        val pcm = listenUtterance(if (recognizers.any { it.local }) ::finished else null) ?: return null
         phase(CallPhase.Thinking)
         update { it.copy(partial = "") }
         while (recognizers.isNotEmpty()) {
@@ -352,6 +449,7 @@ class SpokenCall(
             }
             clips.close()
         }
+        val watcher = watchForBarge()
         val player = launch {
             for ((sentence, audio) in clips) {
                 if (interrupted) continue
@@ -383,5 +481,6 @@ class SpokenCall(
         }
         synth.join()
         player.join()
+        finishBargeWatch(watcher)
     }
 }

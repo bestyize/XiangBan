@@ -28,7 +28,8 @@ class MainActivity : ComponentActivity() {
             micWaiting?.resume(granted)
             micWaiting = null
         }
-        val platform = AndroidPlatformActions(this) {
+        val speech = AndroidLocalSpeech(this)
+        val platform = AndroidPlatformActions(this, gate = speech::newGate) {
             suspendCoroutine { continuation ->
                 micWaiting = continuation
                 micLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -43,7 +44,6 @@ class MainActivity : ComponentActivity() {
         }
         val agentBridge = nativeAgentBridgeOrNull()
         val agentDir = filesDir.resolve("agent").absolutePath
-        val speech = AndroidLocalSpeech(this)
         setContent {
             App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech)
         }
