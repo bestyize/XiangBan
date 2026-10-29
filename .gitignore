@@ -59,6 +59,7 @@ services/server-account/target/
 services/server-ai/target/
 services/server-forum/target/
 services/server-link/target/
+libs/agent-mobile/target/
 services/server-pan/backend/target/
 services/server-resource/target/
 services/server-xiangban-wallpaper/target/
@@ -90,3 +91,4 @@ tools/**/target/
 # compose-typecheck 的临时源码
 tools/compose-typecheck/build-src/
 tools/compose-typecheck/.gradle/
+client/xiaoban-multiplatform/androidApp/src/main/jniLibs/

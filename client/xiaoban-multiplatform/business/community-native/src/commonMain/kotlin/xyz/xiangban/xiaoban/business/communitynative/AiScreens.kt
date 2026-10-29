@@ -1,6 +1,7 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +49,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.community.AiBalance
+import xyz.xiangban.xiaoban.common.community.ChatApproval
+import xyz.xiangban.xiaoban.common.community.ChatToolCall
 import xyz.xiangban.xiaoban.common.community.ChatTurn
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.CloudChatState
@@ -276,9 +279,10 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     if (cloud.messages.isEmpty()) {
                         ChatWelcome()
                     } else {
-                        CloudMessages(cloud.messages, env.platform != null, copiedId, onCopy = { turn -> env.platform?.copy(turn.text); copiedId = turn.id }, onRetry = chat::retryLast, onQuota = { open(Route.Models) })
+                        CloudMessages(cloud.messages, cloud.tools, cloud.sending, env.platform != null, copiedId, onCopy = { turn -> env.platform?.copy(turn.text); copiedId = turn.id }, onRetry = chat::retryLast, onQuota = { open(Route.Models) })
                     }
                 }
+                cloud.approval?.let { pending -> AgentApprovalCard(pending) { chat.answerApproval(it) } }
                 if (cloud.messages.isEmpty()) {
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         StarterPrompts.forEach { prompt -> ChipPill(prompt, onClick = { chat.send(prompt) }) }
@@ -341,10 +345,10 @@ private fun ChatWelcome() {
 }
 
 @Composable
-private fun CloudMessages(messages: List<ChatTurn>, canCopy: Boolean, copiedId: Long?, onCopy: (ChatTurn) -> Unit, onRetry: () -> Unit, onQuota: () -> Unit) {
+private fun CloudMessages(messages: List<ChatTurn>, tools: List<ChatToolCall>, sending: Boolean, canCopy: Boolean, copiedId: Long?, onCopy: (ChatTurn) -> Unit, onRetry: () -> Unit, onQuota: () -> Unit) {
     val listState = rememberLazyListState()
     val lastLen = messages.lastOrNull()?.text?.length ?: 0
-    LaunchedEffect(messages.size, lastLen) { if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex) }
+    LaunchedEffect(messages.size, lastLen, tools.size) { if (messages.isNotEmpty()) listState.scrollToItem(messages.lastIndex + (if (tools.isNotEmpty()) 1 else 0)) }
     LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items(messages, key = { it.id }) { turn ->
             if (turn.role == "user") {
@@ -365,6 +369,48 @@ private fun CloudMessages(messages: List<ChatTurn>, canCopy: Boolean, copiedId: 
                     }
                 }
             }
+        }
+        if (tools.isNotEmpty()) {
+            item(key = "tools") {
+                AssistantRow(avatar = false) {
+                    tools.forEach { t ->
+                        ToolCard(
+                            XIcons.Tool, agentToolLabel(t.name), t.detail,
+                            status = if (t.running) "执行中…" else if (t.isError) "没有执行" else "完成",
+                            done = !t.running && !t.isError,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun agentToolLabel(name: String): String = when (name) {
+    "set_reminder" -> "设置提醒"
+    "time_now", "current_time", "now" -> "查看时间"
+    else -> name
+}
+
+/** 智能体要改动东西之前问用户：允许这一次，或者拒绝。 */
+@Composable
+private fun AgentApprovalCard(pending: ChatApproval, onDecision: (String) -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    Column(
+        Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp).fillMaxWidth().clip(shape).background(MaterialTheme.colorScheme.surface)
+            .border(0.5.dp, LocalExtraColors.current.line, shape).padding(14.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            XIcon(XIcons.Lock, size = 22.dp)
+            Text("小伴想帮你：${agentToolLabel(pending.tool)}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        }
+        if (pending.detail.isNotBlank()) {
+            Text(pending.detail, Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).padding(horizontal = 10.dp, vertical = 8.dp), fontSize = 13.sp, lineHeight = 19.sp)
+        }
+        pending.danger?.let { Text(it, Modifier.padding(top = 6.dp), fontSize = 12.sp, color = Brand) }
+        Row(Modifier.padding(top = 12.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            GhostPillButton("拒绝", { onDecision("deny") }, Modifier.weight(1f), height = 44.dp)
+            PillButton("允许这一次", { onDecision("once") }, Modifier.weight(1f), height = 44.dp)
         }
     }
 }
