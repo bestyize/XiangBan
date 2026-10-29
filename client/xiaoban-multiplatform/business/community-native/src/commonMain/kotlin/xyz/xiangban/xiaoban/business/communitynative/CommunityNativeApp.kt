@@ -38,6 +38,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
         var tab by rememberSaveable { mutableStateOf(Tab.Ai.name) }
         var stackText by rememberSaveable { mutableStateOf("") }
         var publishOpen by rememberSaveable { mutableStateOf(false) }
+        var aiDrawerOpen by rememberSaveable { mutableStateOf(false) }
         val stack = Route.decodeStack(stackText)
         // 回调可能在异步操作（如登录）结束后才调用，所以每次都读最新的栈，而不是组合时捕获的那份。
         fun push(route: Route) { stackText = Route.encodeStack(Route.decodeStack(stackText) + route) }
@@ -48,13 +49,15 @@ fun CommunityNativeApp(env: CommunityEnv) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             Box(Modifier.fillMaxSize()) {
                 when (Tab.valueOf(tab)) {
-                    Tab.Ai -> AiHomeScreen(env, chat, ::push)
+                    Tab.Ai -> AiHomeScreen(env, chat, ::push, aiDrawerOpen, { aiDrawerOpen = it })
                     Tab.Games -> GamesScreen()
                     Tab.Community -> CommunityScreen(env, ::push)
                     Tab.Mine -> MineScreen(env, ::push)
                 }
             }
-            FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
+            if (!aiDrawerOpen) {
+                FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
+            }
             stack.lastOrNull()?.let { route ->
                 // 盖在最上面，并吃掉点击，免得穿透到下面的一级页。
                 Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding().clickable(indication = null, interactionSource = null) {}) {

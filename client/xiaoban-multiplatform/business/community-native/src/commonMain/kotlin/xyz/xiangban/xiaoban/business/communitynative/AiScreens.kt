@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -85,12 +86,11 @@ private fun LoginPrompt(title: String, desc: String, onLogin: () -> Unit, modifi
 /** 小伴AI 首页：问候、输入卡片（点一下进入对话页）、功能入口、试试这样问我、当前对话。 */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit) {
+fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit, drawer: Boolean, onDrawerChange: (Boolean) -> Unit) {
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
     val remote by env.remoteChat.state.collectAsState()
-    var drawer by rememberSaveable { mutableStateOf(false) }
-    BackHandler(enabled = drawer) { drawer = false }
+    BackHandler(enabled = drawer) { onDrawerChange(false) }
 
     LaunchedEffect(session.loggedIn) {
         if (session.loggedIn) {
@@ -105,7 +105,7 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
         Column(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxWidth().statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconTap(XIcons.Menu, "对话列表", { drawer = true })
+                    IconTap(XIcons.Menu, "对话列表", { onDrawerChange(true) })
                     Text("小伴AI", Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                     Spacer(Modifier.width(44.dp))
                 }
@@ -175,11 +175,11 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
         if (drawer) {
             AiDrawer(
                 cloud = cloud,
-                onClose = { drawer = false },
-                onNew = { drawer = false; chat.clearConversation(); open(Route.AiChat) },
-                onOpenCurrent = { drawer = false; open(Route.AiChat) },
-                onModels = { drawer = false; open(Route.Models) },
-                onSettings = { drawer = false; open(Route.Settings) },
+                onClose = { onDrawerChange(false) },
+                onNew = { onDrawerChange(false); chat.clearConversation(); open(Route.AiChat) },
+                onOpenCurrent = { onDrawerChange(false); open(Route.AiChat) },
+                onModels = { onDrawerChange(false); open(Route.Models) },
+                onSettings = { onDrawerChange(false); open(Route.Settings) },
             )
         }
     }
@@ -203,7 +203,7 @@ private fun FeatureTile(icon: androidx.compose.ui.graphics.vector.ImageVector, t
 @Composable
 private fun AiDrawer(cloud: CloudChatState, onClose: () -> Unit, onNew: () -> Unit, onOpenCurrent: () -> Unit, onModels: () -> Unit, onSettings: () -> Unit) {
     Row(Modifier.fillMaxSize()) {
-        Column(Modifier.width(300.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).statusBarsPadding().padding(vertical = 16.dp)) {
+        Column(Modifier.width(300.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).statusBarsPadding().navigationBarsPadding().padding(vertical = 16.dp)) {
             Text("小伴AI", Modifier.padding(horizontal = 16.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             PillButton("新对话", onNew, Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp).fillMaxWidth(), height = 44.dp, icon = XIcons.Plus)
             Text("最近", Modifier.padding(start = 16.dp, top = 14.dp, bottom = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
