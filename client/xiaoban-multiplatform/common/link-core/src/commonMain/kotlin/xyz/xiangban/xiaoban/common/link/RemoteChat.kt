@@ -1,5 +1,9 @@
 package xyz.xiangban.xiaoban.common.link
 
+import xyz.xiangban.xiaoban.common.community.ChatRecord
+import xyz.xiangban.xiaoban.common.community.ToolCallInfo
+import xyz.xiangban.xiaoban.common.community.ToolStatus
+import xyz.xiangban.xiaoban.common.community.toolLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -109,21 +113,27 @@ data class RemoteApprovalRequest(
     val detail: JsonObject = JsonObject(emptyMap()),
     val risk: String = "low",
     val options: List<RemoteApprovalOption> = emptyList(),
+    /** `approval`（要不要允许一次操作）或 `question`（小伴向你提问，画成选择卡）。 */
+    val kind: String = "approval",
+    val tool: String = "",
+    /** 具体是什么类型的操作：read / write / network / exec；老版本电脑不带。 */
+    val riskKind: String = "",
+    val externalPath: Boolean = false,
+    /** 这段对话读过网页等外部内容，每一步都要确认。 */
+    val tainted: Boolean = false,
+    val danger: String? = null,
+    val question: String = "",
+    val choices: List<String> = emptyList(),
+    val freeText: Boolean = false,
+    /** 问题是“连接服务后继续任务”；手机上不能完成连接，只能跳过或去电脑上处理。 */
+    val connectors: Boolean = false,
 ) {
     val isHighRisk: Boolean get() = risk.equals("high", ignoreCase = true)
+    val isQuestion: Boolean get() = kind == "question"
 
     /** 给人看的操作内容：优先取命令、路径这类字段，没有就取整段参数。 */
     val summary: String get() = summarizeArgs(detail)
 }
-
-data class RemoteToolProgress(
-    val id: String,
-    val name: String,
-    val running: Boolean = true,
-    val isError: Boolean? = null,
-    /** 这次工具调用的要点（命令、文件路径…），可能为空。 */
-    val detail: String = "",
-)
 
 private val SummaryKeys = listOf("command", "cmd", "file_path", "path", "pattern", "query", "url", "text", "detail")
 
@@ -149,6 +159,12 @@ data class RemoteTurn(
     val text: String,
     val streaming: Boolean = false,
     val error: String? = null,
+    /** 思考过程（流式或历史里保存下来的），段与段之间空一行。 */
+    val reasoning: String = "",
+    /** 这一轮调用的工具（含参数和结果），界面画成工具调用组、任务执行卡。 */
+    val tools: List<ToolCallInfo> = emptyList(),
+    /** 回答过的问题、处理过的审批留下的痕迹。 */
+    val records: List<ChatRecord> = emptyList(),
 )
 
 data class RemoteChatState(
@@ -165,7 +181,6 @@ data class RemoteChatState(
     val selectedSessionId: String? = null,
     val loadingSessions: Boolean = false,
     val messages: List<RemoteTurn> = emptyList(),
-    val toolProgress: List<RemoteToolProgress> = emptyList(),
     val sending: Boolean = false,
     val pendingApproval: RemoteApprovalRequest? = null,
     /** 当前对话在电脑上的权限：`auto` 完全信任（默认，高风险操作仍然每次都问），`ask` 默认权限（执行前先问）。开发阶段便利优先。 */
@@ -301,7 +316,6 @@ class RemoteChatController(
             newChatWorkspace = null,
             selectedSessionId = null,
             messages = emptyList(),
-            toolProgress = emptyList(),
             pendingApproval = null,
         )
         if (peer.online) {
@@ -332,7 +346,6 @@ class RemoteChatController(
             newChatWorkspace = null,
             permissionMode = "auto",
             messages = cachedMsgs,
-            toolProgress = emptyList(),
             pendingApproval = null,
             sending = false,
         )
@@ -363,7 +376,6 @@ class RemoteChatController(
             newChatWorkspace = keep.ifBlank { null },
             permissionMode = "auto",
             messages = emptyList(),
-            toolProgress = emptyList(),
             pendingApproval = null,
             sending = false,
         )
@@ -412,7 +424,6 @@ class RemoteChatController(
         _state.value = _state.value.copy(
             messages = updatedMessages,
             sending = true,
-            toolProgress = emptyList(),
         )
         currentAccountId?.let { acc ->
             val sid = _state.value.selectedSessionId
@@ -441,10 +452,17 @@ class RemoteChatController(
             put("approval_id", approvalId)
             put("choice", choice)
         })
-        if (_state.value.pendingApproval?.approvalId == approvalId) {
+        val pending = _state.value.pendingApproval
+        if (pending?.approvalId == approvalId) {
             _state.value = _state.value.copy(pendingApproval = null)
+            val denied = choice == "deny" || choice == "__dismiss__" || choice.isBlank()
+            appendRecord(recordFor(pending, if (denied) null else choice, if (pending.isQuestion) null else "已允许"))
         }
     }
+
+    private fun recordFor(pending: RemoteApprovalRequest, answer: String?, approvedText: String?): ChatRecord =
+        if (pending.isQuestion) ChatRecord("answer", pending.question.ifBlank { pending.title }, answer)
+        else ChatRecord("approval", toolLabel(pending.tool.ifBlank { pending.title }), if (answer == null && approvedText != "已在电脑上处理") null else approvedText)
 
     /** 把一台电脑从账号的设备列表里移除（它再启动会重新出现）。 */
     fun removePeer(peerId: String) {
@@ -608,18 +626,21 @@ class RemoteChatController(
                     val rawMessages = obj["messages"]?.jsonArray.orEmpty()
                     // 桌面按字节预算分页：`after` 为本页起点，`has_more` 为真时用 `cursor` 继续取。
                     val after = obj["after"]?.jsonPrimitive?.intOrNull ?: 0
-                    val turns = mutableListOf<RemoteTurn>()
-                    for ((index, m) in rawMessages.withIndex()) {
-                        val mObj = m.jsonObject
-                        val role = mObj["role"].asStr() ?: "assistant"
-                        val content = extractMessageText(mObj)
-                        turns.add(RemoteTurn(id = "snap-${after + index}", role = role, text = content))
-                    }
-                    val merged = if (after > 0) {
-                        val current = _state.value.messages
-                        current.filter { it.id.startsWith("snap-") } + turns + current.filter { !it.id.startsWith("snap-") }
-                    } else {
-                        turns
+                    val current = _state.value.messages
+                    val earlier = if (after > 0) current.filter { it.id.startsWith("snap-") } else emptyList()
+                    val turns = foldSnapshot(earlier, rawMessages.mapNotNull { it as? JsonObject }, after)
+                    var merged = if (after > 0) turns + current.filter { !it.id.startsWith("snap-") } else turns
+                    val morePages = obj["has_more"]?.jsonPrimitive?.booleanOrNull == true
+                    if (!morePages) {
+                        // 最后一页：桌面还在跑就把最后一条回复标成输出中；没在跑，没有结果的工具调用算结束了。
+                        val running = obj["state"].asStr() == "running"
+                        val lastAssistant = merged.indexOfLast { it.role == "assistant" }
+                        merged = merged.mapIndexed { i, t ->
+                            if (t.role != "assistant" || !t.id.startsWith("snap-")) t
+                            else if (running && i == lastAssistant) t.copy(streaming = true)
+                            else t.copy(tools = t.tools.map { c -> if (c.status == ToolStatus.Running) c.copy(status = ToolStatus.Done) else c })
+                        }
+                        _state.value = _state.value.copy(sending = running)
                     }
                     _state.value = _state.value.copy(messages = merged)
                     currentAccountId?.let { acc ->
@@ -668,14 +689,30 @@ class RemoteChatController(
                     val label = opt["label"].asStr() ?: id
                     RemoteApprovalOption(id, label)
                 }
+                val isQuestion = obj["kind"].asStr() == "question"
                 _state.value = _state.value.copy(
-                    pendingApproval = RemoteApprovalRequest(approvalId, session, title, detail, risk, options),
+                    pendingApproval = RemoteApprovalRequest(
+                        approvalId, session, title, detail, risk, options,
+                        kind = if (isQuestion) "question" else "approval",
+                        tool = obj["tool"].asStr().orEmpty(),
+                        riskKind = obj["risk_kind"].asStr().orEmpty(),
+                        externalPath = (obj["external_path"] as? JsonPrimitive)?.booleanOrNull == true,
+                        tainted = (obj["tainted"] as? JsonPrimitive)?.booleanOrNull == true,
+                        danger = obj["danger"].asStr(),
+                        question = if (isQuestion) (obj["question"].asStr() ?: title) else "",
+                        choices = if (isQuestion) (obj["choices"] as? JsonArray).orEmpty().mapNotNull { it.asStr() } else emptyList(),
+                        freeText = (obj["free_text"] as? JsonPrimitive)?.booleanOrNull == true,
+                        connectors = (obj["connectors"] as? JsonPrimitive)?.booleanOrNull == true,
+                    ),
                 )
             }
             "approval.resolved" -> {
                 val approvalId = obj["approval_id"].asStr()
                 if (approvalId != null && _state.value.pendingApproval?.approvalId == approvalId) {
+                    val pending = _state.value.pendingApproval
                     _state.value = _state.value.copy(pendingApproval = null)
+                    // 在电脑上处理的，对话里留一行“已在电脑上处理”；过期的不留。
+                    if (obj["by"].asStr() == "desktop" && pending != null) appendRecord(recordFor(pending, null, "已在电脑上处理"))
                 }
             }
             else -> {}
@@ -693,21 +730,28 @@ class RemoteChatController(
                 }
             }
             "reasoning.delta" -> {
-                // 可选思考过程，暂不打断主正文
+                val piece = data["text"].asStr().orEmpty()
+                if (piece.isNotEmpty()) updateStreaming { it.copy(reasoning = it.reasoning + piece) }
             }
             "tool.start" -> {
-                val id = data["id"].asStr() ?: nextId("t")
-                val name = data["name"].asStr() ?: "工具调用"
-                val updated = _state.value.toolProgress + RemoteToolProgress(id, name, running = true, detail = summarizeArgs(data["arguments"]))
-                _state.value = _state.value.copy(toolProgress = updated)
+                val call = ToolCallInfo(
+                    id = data["id"].asStr() ?: nextId("t"),
+                    name = data["name"].asStr() ?: "工具调用",
+                    arguments = data["arguments"].asStr() ?: data["arguments"]?.toString().orEmpty(),
+                    startedAtMs = nowMs(),
+                )
+                updateStreaming { it.copy(tools = it.tools + call) }
             }
             "tool.end" -> {
                 val id = data["id"].asStr()
-                val isErr = data["is_error"]?.jsonPrimitive?.booleanOrNull
-                val updated = _state.value.toolProgress.map {
-                    if (it.id == id || (id == null && it.running)) it.copy(running = false, isError = isErr) else it
+                val failed = data["is_error"]?.jsonPrimitive?.booleanOrNull == true
+                val output = data["output"].asStr() ?: data["output"]?.toString().orEmpty()
+                val now = nowMs()
+                updateStreaming { turn ->
+                    turn.copy(tools = turn.tools.map {
+                        if (it.id == id || (id == null && it.status == ToolStatus.Running)) it.copy(status = if (failed) ToolStatus.Error else ToolStatus.Done, output = output, endedAtMs = now) else it
+                    })
                 }
-                _state.value = _state.value.copy(toolProgress = updated)
             }
             "turn.done" -> {
                 finalizeAssistant(error = null)
@@ -728,27 +772,38 @@ class RemoteChatController(
         }
     }
 
-    private fun appendAssistantDelta(delta: String) {
+    private fun appendAssistantDelta(delta: String) = updateStreaming { it.copy(text = it.text + delta) }
+
+    /** 改正在输出的那条回复；电脑上发起的任务手机上还没有这条回复时，先建一条。 */
+    private fun updateStreaming(transform: (RemoteTurn) -> RemoteTurn) {
         val msgs = _state.value.messages.toMutableList()
         val lastIdx = msgs.indexOfLast { it.role == "assistant" && it.streaming }
         if (lastIdx >= 0) {
-            val old = msgs[lastIdx]
-            msgs[lastIdx] = old.copy(text = old.text + delta)
+            msgs[lastIdx] = transform(msgs[lastIdx])
         } else {
-            msgs.add(RemoteTurn(id = nextId("r"), role = "assistant", text = delta, streaming = true))
+            msgs.add(transform(RemoteTurn(id = nextId("r"), role = "assistant", text = "", streaming = true)))
         }
         _state.value = _state.value.copy(messages = msgs)
+    }
+
+    /** 在最后一条回复上留一行痕迹（回答过的问题、处理过的审批）。 */
+    private fun appendRecord(record: ChatRecord?) {
+        if (record == null) return
+        val msgs = _state.value.messages
+        val idx = msgs.indexOfLast { it.role == "assistant" }
+        if (idx < 0) return
+        _state.value = _state.value.copy(messages = msgs.mapIndexed { i, t -> if (i == idx) t.copy(records = t.records + record) else t })
     }
 
     private fun finalizeAssistant(error: String?) {
         val msgs = _state.value.messages.map { turn ->
             if (turn.role == "assistant" && turn.streaming) {
-                turn.copy(streaming = false, error = error)
+                turn.copy(streaming = false, error = error, tools = turn.tools.map { if (it.status == ToolStatus.Running) it.copy(status = if (error != null) ToolStatus.Error else ToolStatus.Done) else it })
             } else {
                 turn
             }
         }
-        _state.value = _state.value.copy(messages = msgs, sending = false, toolProgress = emptyList())
+        _state.value = _state.value.copy(messages = msgs, sending = false)
         currentAccountId?.let { acc ->
             val sid = _state.value.selectedSessionId
             val peer = _state.value.selectedPeerId
@@ -756,21 +811,6 @@ class RemoteChatController(
                 cache.saveMessages(acc, peer, sid, msgs)
             }
         }
-    }
-
-    private fun extractMessageText(msgObj: JsonObject): String {
-        val parts = msgObj["parts"] as? JsonArray
-        if (parts != null) {
-            val sb = StringBuilder()
-            for (p in parts) {
-                val pObj = p.jsonObject
-                if (pObj["type"].asStr() == "text") {
-                    sb.append(pObj["text"].asStr().orEmpty())
-                }
-            }
-            return sb.toString()
-        }
-        return msgObj["content"].asStr().orEmpty()
     }
 
     private fun parsePendingApprovals(pending: JsonObject?, session: String): RemoteApprovalRequest? {
@@ -781,7 +821,8 @@ class RemoteChatController(
             val id = app["id"].asStr() ?: return null
             val tool = app["tool"].asStr() ?: "操作"
             val danger = app["danger"].asStr()
-            val risk = if (danger != null || app["externalPath"]?.jsonPrimitive?.booleanOrNull == true) "high" else "low"
+            val external = app["externalPath"]?.jsonPrimitive?.booleanOrNull == true
+            val risk = if (danger != null || external) "high" else "low"
             val title = danger ?: "允许执行 $tool？"
             return RemoteApprovalRequest(
                 approvalId = id,
@@ -793,6 +834,11 @@ class RemoteChatController(
                     RemoteApprovalOption("once", "允许一次"),
                     RemoteApprovalOption("deny", "拒绝"),
                 ),
+                tool = tool,
+                riskKind = app["risk"].asStr().orEmpty(),
+                externalPath = external,
+                tainted = app["tainted"]?.jsonPrimitive?.booleanOrNull == true,
+                danger = danger,
             )
         }
         val questions = pending["questions"] as? JsonArray
@@ -808,8 +854,66 @@ class RemoteChatController(
                 session = session,
                 title = text,
                 options = opts + RemoteApprovalOption("__dismiss__", "跳过"),
+                kind = "question",
+                question = text,
+                choices = opts.map { it.label },
+                freeText = true,
             )
         }
         return null
     }
+}
+
+private fun messageText(msgObj: JsonObject): String {
+    val parts = msgObj["parts"] as? JsonArray
+    if (parts != null) {
+        val sb = StringBuilder()
+        for (p in parts) {
+            val pObj = p as? JsonObject ?: continue
+            if (pObj["type"].asStr() == "text") sb.append(pObj["text"].asStr().orEmpty())
+        }
+        return sb.toString()
+    }
+    return msgObj["content"].asStr().orEmpty()
+}
+
+/**
+ * 把电脑发来的一页历史消息折进对话。用户消息一条一条；紧挨着的助手消息和工具结果合成一条回复
+ * （文字接在一起，思考合在一起，工具调用连参数带结果放进 `tools`），和桌面聊天页里“一轮回答”的样子一致。
+ * [earlier] 是前面几页折好的结果，一轮回答跨页时接着往下折。
+ */
+internal fun foldSnapshot(earlier: List<RemoteTurn>, raw: List<JsonObject>, after: Int): List<RemoteTurn> {
+    val turns = earlier.toMutableList()
+    for ((index, m) in raw.withIndex()) {
+        val id = "snap-${after + index}"
+        when (m["role"].asStr() ?: "assistant") {
+            "user" -> turns += RemoteTurn(id = id, role = "user", text = messageText(m))
+            "assistant" -> {
+                val last = turns.lastOrNull()
+                var block = if (last != null && last.role == "assistant") turns.removeAt(turns.lastIndex) else RemoteTurn(id = id, role = "assistant", text = "")
+                val text = messageText(m)
+                if (text.isNotEmpty()) block = block.copy(text = if (block.text.isEmpty()) text else block.text + "\n\n" + text)
+                val reasoning = (m["reasoning"] as? JsonArray).orEmpty().mapNotNull { it.asStr() }.filter { it.isNotBlank() }
+                if (reasoning.isNotEmpty()) block = block.copy(reasoning = (listOf(block.reasoning).filter { it.isNotEmpty() } + reasoning).joinToString("\n\n"))
+                val calls = (m["tool_calls"] as? JsonArray).orEmpty().mapNotNull { c ->
+                    val o = c as? JsonObject ?: return@mapNotNull null
+                    ToolCallInfo(id = o["id"].asStr() ?: return@mapNotNull null, name = o["name"].asStr().orEmpty(), arguments = o["arguments"].asStr().orEmpty())
+                }
+                if (calls.isNotEmpty()) block = block.copy(tools = block.tools + calls)
+                turns += block
+            }
+            "tool" -> {
+                val callId = m["tool_call_id"].asStr()
+                val idx = turns.indexOfLast { t -> t.role == "assistant" && t.tools.any { it.id == callId } }
+                if (idx >= 0) {
+                    val failed = (m["is_error"] as? JsonPrimitive)?.booleanOrNull == true
+                    val output = messageText(m)
+                    turns[idx] = turns[idx].let { t ->
+                        t.copy(tools = t.tools.map { if (it.id == callId) it.copy(output = output, status = if (failed) ToolStatus.Error else ToolStatus.Done) else it })
+                    }
+                }
+            }
+        }
+    }
+    return turns
 }

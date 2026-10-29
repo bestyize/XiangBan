@@ -13,6 +13,11 @@ pub const SNAPSHOT_PAGE_BYTES: usize = 120 * 1024;
 pub const MAX_MESSAGE_CHARS: usize = 20_000;
 /// 事件里工具参数 / 输出的字符上限。
 pub const MAX_EVENT_FIELD_CHARS: usize = 8_000;
+/// 快照里一次工具调用的参数、一条工具结果的字符上限（历史里的卡片只要能看清做了什么，不用全文）。
+pub const MAX_SNAPSHOT_TOOL_CHARS: usize = 3_000;
+/// 快照里一条消息最多带几段思考，每段的字符上限。
+pub const MAX_SNAPSHOT_REASONING: usize = 6;
+pub const MAX_SNAPSHOT_REASONING_CHARS: usize = 2_000;
 
 /// 手机发来的消息写进发送队列时用的幂等编号：同一台手机的同一个 `client_id` 永远得到同一个编号。
 /// 队列只认字母、数字、`-`、`_`，且最长 128 个字符，所以其余字符（比如手机编号里没有、但 `client_id` 可能带的冒号）换成 `_`。
@@ -99,7 +104,9 @@ pub fn slim_message(message: &Value) -> Option<Value> {
             }
         }
     }
-    let (text, truncated) = truncate_chars(&text, MAX_MESSAGE_CHARS);
+    // 工具结果只是给卡片看的，截得更短；其余消息按正文上限。
+    let limit = if role == "tool" { MAX_SNAPSHOT_TOOL_CHARS } else { MAX_MESSAGE_CHARS };
+    let (text, truncated) = truncate_chars(&text, limit);
     let mut out = json!({
         "role": role,
         "parts": [{ "type": "text", "text": text }],
@@ -114,12 +121,29 @@ pub fn slim_message(message: &Value) -> Option<Value> {
         out["is_error"] = json!(true);
     }
     if let Some(calls) = message.get("tool_calls").and_then(Value::as_array) {
-        let names: Vec<Value> = calls
+        let items: Vec<Value> = calls
             .iter()
-            .map(|c| json!({ "id": c["id"], "name": c["name"] }))
+            .map(|c| json!({ "id": c["id"], "name": c["name"], "arguments": truncate_chars(c["arguments"].as_str().unwrap_or(""), MAX_SNAPSHOT_TOOL_CHARS).0 }))
             .collect();
-        if !names.is_empty() {
-            out["tool_calls"] = Value::Array(names);
+        if !items.is_empty() {
+            out["tool_calls"] = Value::Array(items);
+        }
+    }
+    // 工具结果要对得上是哪次调用，手机才能把结果放回卡片里。
+    if let Some(id) = message.get("tool_call_id").and_then(Value::as_str) {
+        out["tool_call_id"] = json!(id);
+    }
+    // 保存下来的思考过程（模型明确给出可显示文字的那部分），按段截短。
+    if let Some(segments) = message.get("reasoning").and_then(Value::as_array).filter(|_| role == "assistant") {
+        let texts: Vec<Value> = segments
+            .iter()
+            .filter_map(|r| r.get("text").and_then(Value::as_str))
+            .filter(|t| !t.trim().is_empty())
+            .take(MAX_SNAPSHOT_REASONING)
+            .map(|t| json!(truncate_chars(t, MAX_SNAPSHOT_REASONING_CHARS).0))
+            .collect();
+        if !texts.is_empty() {
+            out["reasoning"] = Value::Array(texts);
         }
     }
     Some(out)
@@ -217,6 +241,25 @@ mod tests {
         assert!(!raw.contains("provider_state") && !raw.contains("data:image") && !raw.contains("思考"));
         assert!(slim_message(&json!({ "role": "user", "synthetic": true, "parts": [] })).is_none());
         assert!(slim_message(&msg("system", "你是小伴")).is_none());
+    }
+
+    #[test]
+    fn tool_calls_keep_their_arguments_and_results_point_back_at_the_call() {
+        let call = json!({
+            "role": "assistant", "parts": [],
+            "tool_calls": [{ "id": "c1", "name": "shell", "arguments": "{\"command\":\"npm test\"}" }],
+            "reasoning": [{ "kind": "summary", "text": "先跑测试" }, { "kind": "summary", "text": "  " }]
+        });
+        let slim = slim_message(&call).unwrap();
+        assert_eq!(slim["tool_calls"][0]["arguments"], "{\"command\":\"npm test\"}");
+        assert_eq!(slim["reasoning"], json!(["先跑测试"]));
+        let long = "x".repeat(MAX_SNAPSHOT_TOOL_CHARS + 10);
+        let result = json!({ "role": "tool", "tool_call_id": "c1", "parts": [{ "type": "text", "text": long }], "is_error": true });
+        let slim = slim_message(&result).unwrap();
+        assert_eq!(slim["tool_call_id"], "c1");
+        assert_eq!(slim["is_error"], true);
+        assert_eq!(slim["truncated"], true);
+        assert_eq!(slim["parts"][0]["text"].as_str().unwrap().chars().count(), MAX_SNAPSHOT_TOOL_CHARS);
     }
 
     #[test]
