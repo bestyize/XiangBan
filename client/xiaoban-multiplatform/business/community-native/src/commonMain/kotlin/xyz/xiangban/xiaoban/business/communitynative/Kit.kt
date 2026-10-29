@@ -93,11 +93,10 @@ fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifie
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitleContent != null) subtitleContent()
-                else if (subtitle != null) Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                else if (subtitle != null) Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (trailing != null) Box(Modifier.widthIn(min = 44.dp).height(44.dp), contentAlignment = Alignment.Center) { trailing() } else Spacer(Modifier.width(44.dp))
         }
-        Hairline()
     }
 }
 
@@ -206,16 +205,16 @@ fun CenterDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> U
 @Composable
 fun SheetAction(icon: ImageVector, title: String, desc: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        IconBox(icon, 44.dp, 12.dp)
+        IconBox(icon, 44.dp, 16.dp)
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(desc, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+            Text(desc, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }
 
 @Composable
-fun IconBox(icon: ImageVector, box: Dp = 44.dp, corner: Dp = 12.dp, tint: Color = MaterialTheme.colorScheme.onSurface, iconSize: Dp = 24.dp) {
+fun IconBox(icon: ImageVector, box: Dp = 44.dp, corner: Dp = 16.dp, tint: Color = MaterialTheme.colorScheme.onSurface, iconSize: Dp = 24.dp) {
     Box(Modifier.size(box).clip(RoundedCornerShape(corner)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
         XIcon(icon, tint = tint, size = iconSize)
     }
@@ -235,19 +234,11 @@ fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
     }
 }
 
-/** 黑色实心胶囊按钮（拒绝等）。 */
+/** 次要胶囊按钮：浅灰底深色字，不描边。直接放在灰色页面上时（[onPage]）用白底。 */
 @Composable
-fun DarkPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, height: Dp = 48.dp) {
-    Box(modifier.height(height).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface).clickable(onClick = onClick).padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
-        Text(text, color = MaterialTheme.colorScheme.surface, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-    }
-}
-
-/** 白底描边胶囊按钮。 */
-@Composable
-fun GhostPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, height: Dp = 48.dp, fontSize: Int = 15, textColor: Color = MaterialTheme.colorScheme.onSurface) {
+fun GhostPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, height: Dp = 48.dp, fontSize: Int = 15, textColor: Color = MaterialTheme.colorScheme.onSurface, onPage: Boolean = false) {
     Box(
-        modifier.height(height).alpha(if (enabled) 1f else 0.5f).clip(CircleShape).background(MaterialTheme.colorScheme.surface).border(1.dp, LocalExtraColors.current.line, CircleShape)
+        modifier.height(height).alpha(if (enabled) 1f else 0.5f).clip(CircleShape).background(if (onPage) MaterialTheme.colorScheme.surface else LocalExtraColors.current.fill)
             .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -258,7 +249,7 @@ fun GhostPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
 /** 文字链接样式的小按钮（“全部 ›”这类）。 */
 @Composable
 fun LinkText(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Text(text, modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 6.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+    Text(text, modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 6.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
 }
 
 // ───────────── 输入与开关 ─────────────
@@ -278,7 +269,7 @@ fun TextBox(
     fontSize: Int = 16,
 ) {
     Column(modifier) {
-        if (label != null) Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+        if (label != null) Text(label, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
@@ -291,8 +282,8 @@ fun TextBox(
             cursorBrush = SolidColor(Brand),
             decorationBox = { inner ->
                 Row(
-                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
-                        .border(1.dp, LocalExtraColors.current.line, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp),
+                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(8.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
+                        .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (leadingIcon != null) {
@@ -309,9 +300,9 @@ fun TextBox(
     }
 }
 
-/** 多行输入框：和 [TextBox] 同样的描边样式，高度随内容增长，至少 [minHeight]。 */
+/** 多行输入框：和 [TextBox] 同样的无描边样式，高度随内容增长，至少 [minHeight]。 */
 @Composable
-fun AreaBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, placeholder: String = "", minHeight: Dp = 120.dp, enabled: Boolean = true) {
+fun AreaBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, placeholder: String = "", minHeight: Dp = 120.dp, enabled: Boolean = true, filled: Boolean = false) {
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -321,8 +312,8 @@ fun AreaBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier =
         cursorBrush = SolidColor(Brand),
         decorationBox = { inner ->
             Box(
-                Modifier.fillMaxWidth().heightIn(min = minHeight).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface)
-                    .border(1.dp, LocalExtraColors.current.line, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
+                Modifier.fillMaxWidth().heightIn(min = minHeight).clip(RoundedCornerShape(8.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
             ) {
                 if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 15.sp, lineHeight = 24.sp)
                 inner()
@@ -345,13 +336,13 @@ fun Toggle(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = M
 /** 勾选框：22×22 圆角方块。 */
 @Composable
 fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(8.dp)
     Box(
-        modifier.size(22.dp).clip(shape).background(if (checked) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surface)
-            .border(2.dp, if (checked) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.line, shape).clickable { onChange(!checked) },
+        modifier.size(22.dp).clip(shape).background(if (checked) Brand else MaterialTheme.colorScheme.surface)
+            .border(2.dp, if (checked) Brand else LocalExtraColors.current.line, shape).clickable { onChange(!checked) },
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) XIcon(XIcons.Check, tint = MaterialTheme.colorScheme.surface, size = 16.dp)
+        if (checked) XIcon(XIcons.Check, tint = Color.White, size = 16.dp)
     }
 }
 
@@ -362,7 +353,7 @@ fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier =
 fun StatusDot(online: Boolean, label: String, fontSize: Int = 12) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (online) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF21A366)))
+            Box(Modifier.size(8.dp).clip(CircleShape).background(Success))
         } else {
             Box(Modifier.size(8.dp).clip(CircleShape).border(1.5.dp, MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
         }
@@ -370,22 +361,21 @@ fun StatusDot(online: Boolean, label: String, fontSize: Int = 12) {
     }
 }
 
-/** 页面顶部的提示条。[warn] 为真时用品牌红浅底，否则白底描边。 */
+/** 页面顶部的提示条。[warn] 为真时用主题色浅底，否则白底。 */
 @Composable
 fun Banner(title: String, modifier: Modifier = Modifier, desc: String? = null, icon: ImageVector? = null, warn: Boolean = false, actionText: String? = null, onAction: (() -> Unit)? = null) {
     val extra = LocalExtraColors.current
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     Row(
-        modifier.fillMaxWidth().clip(shape).background(if (warn) extra.brandSoft else MaterialTheme.colorScheme.surface)
-            .border(0.5.dp, if (warn) extra.brandSoftLine else extra.hairline, shape).padding(horizontal = 12.dp, vertical = 10.dp),
+        modifier.fillMaxWidth().clip(shape).background(if (warn) extra.brandSoft else MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         if (icon != null) XIcon(icon, size = 22.dp)
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = if (desc != null) 14.sp else 13.sp, fontWeight = if (desc != null) FontWeight.SemiBold else FontWeight.Normal, lineHeight = 19.sp)
+            Text(title, fontSize = if (desc != null) 14.sp else 14.sp, fontWeight = if (desc != null) FontWeight.SemiBold else FontWeight.Normal, lineHeight = 19.sp)
             if (desc != null) Text(desc, fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
-        if (actionText != null && onAction != null) GhostPillButton(actionText, onAction, height = 32.dp, fontSize = 13)
+        if (actionText != null && onAction != null) GhostPillButton(actionText, onAction, height = 32.dp, fontSize = 14)
     }
 }
 
@@ -412,7 +402,7 @@ fun NavRow(title: String, note: String? = null, first: Boolean = false, onClick:
 @Composable
 fun EmptyState(icon: ImageVector, title: String, desc: String, modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth().padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(Modifier.size(72.dp).shadow(2.dp, RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(72.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
             XIcon(icon, size = 32.dp)
         }
         Text(title, Modifier.padding(top = 16.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
@@ -427,15 +417,16 @@ internal val AssistantBubbleShape = RoundedCornerShape(topStart = 4.dp, topEnd =
 
 @Composable
 fun UserBubble(text: String, modifier: Modifier = Modifier, images: Int = 0) {
+    val ink = MaterialTheme.colorScheme.onSurface
     Box(modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) {
-        Column(Modifier.widthIn(max = 280.dp).clip(UserBubbleShape).background(Brand).padding(horizontal = 14.dp, vertical = 10.dp)) {
+        Column(Modifier.widthIn(max = 280.dp).clip(UserBubbleShape).background(LocalExtraColors.current.brandSoft).padding(horizontal = 14.dp, vertical = 10.dp)) {
             if (images > 0) {
                 Row(Modifier.padding(bottom = if (text.isNotBlank()) 6.dp else 0.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    XIcon(XIcons.Image, tint = Color.White, size = 16.dp)
-                    Text("$images 张图片", color = Color.White, fontSize = 13.sp)
+                    XIcon(XIcons.Image, tint = ink, size = 16.dp)
+                    Text("$images 张图片", color = ink, fontSize = 14.sp)
                 }
             }
-            if (text.isNotBlank()) Text(text, color = Color.White, fontSize = 15.sp, lineHeight = 22.sp)
+            if (text.isNotBlank()) Text(text, color = ink, fontSize = 15.sp, lineHeight = 22.sp)
         }
     }
 }
@@ -462,7 +453,7 @@ fun AssistantBubble(text: String, modifier: Modifier = Modifier, muted: Boolean 
     )
 }
 
-/** 输入卡片：上面一个多行输入框，下面一行放选择器和发送按钮（由调用方通过 [actions] 放）。 */
+/** 输入卡片：上面一个多行输入框（语音模式下换成 [voiceBar]），下面一行放选择器和发送按钮（由调用方通过 [actions] 放）。 */
 @Composable
 fun ComposerCard(
     value: String,
@@ -470,64 +461,95 @@ fun ComposerCard(
     placeholder: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    voiceBar: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit,
 ) {
     Column(modifier.fillMaxWidth().shadow(3.dp, RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp)).padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp)) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = enabled,
-            textStyle = TextStyle(fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface),
-            maxLines = 4,
-            cursorBrush = SolidColor(Brand),
-            decorationBox = { inner ->
-                Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 15.sp, maxLines = 1)
-                    inner()
-                }
-            },
-        )
+        if (voiceBar != null) {
+            voiceBar()
+        } else {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = enabled,
+                textStyle = TextStyle(fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface),
+                maxLines = 4,
+                cursorBrush = SolidColor(Brand),
+                decorationBox = { inner ->
+                    Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.CenterStart) {
+                        if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 15.sp, maxLines = 1)
+                        inner()
+                    }
+                },
+            )
+        }
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), content = actions)
     }
 }
 
 /**
- * 聊天输入卡片（设计稿 6 号和 35–39 号画板）：输入框，下面一行 + 添加内容、模型、联网、语音输入、（实时对话）、发送或停止。
- * 还没有对应功能的按钮由调用方在回调里提示“即将支持”，不假装能用。
+ * 聊天输入卡片（设计稿 6 号和 35–39 号画板）：输入框，下面一行只有图标——左边 + 添加内容、模型、权限（锁，设备聊天才有），
+ * 右边语音输入、实时对话、发送或停止。点麦克风切到“按住 说话”条（左边变成键盘图标，没有发送键）。联网一直开着，不放按钮。没有对应功能的按钮由调用方在回调里提示“即将支持”。
  */
 @Composable
 fun ChatComposer(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    modelLabel: String,
     onModel: () -> Unit,
     onAttach: () -> Unit,
-    onWeb: () -> Unit,
-    onVoice: () -> Unit,
+    voice: VoiceInputController,
+    voiceMode: Boolean,
+    onVoiceMode: (Boolean) -> Unit,
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    webOn: Boolean = false,
+    /** 按下说话条时先做的事（比如小伴正在回答就先停下）。 */
+    onVoicePress: () -> Unit = {},
+    /** 模型图标：云端小伴是芯片，跟随电脑的设备聊天是电脑。 */
+    modelIcon: ImageVector = XIcons.Cpu,
+    /** 指定了模型时图标右上角一个小红点。 */
+    modelPinned: Boolean = false,
+    /** 不为空就显示权限（锁）图标；[fullTrust] 为真时锁变红。 */
+    onPermission: (() -> Unit)? = null,
+    fullTrust: Boolean = false,
     sending: Boolean = false,
     onStop: (() -> Unit)? = null,
     onLive: (() -> Unit)? = null,
 ) {
     val extra = LocalExtraColors.current
-    ComposerCard(value, onValueChange, placeholder, modifier, enabled = enabled) {
-        RoundIconButton(XIcons.Plus, "添加内容", onAttach, MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurfaceVariant, enabled = enabled, bordered = true)
-        Box(Modifier.weight(1f, fill = false)) { ChipPill(modelLabel, trailingIcon = XIcons.ChevronDown, onClick = if (enabled) onModel else null) }
-        ChipPill("联网", icon = XIcons.Globe, selected = webOn, onClick = if (enabled) onWeb else null)
-        Spacer(Modifier.weight(1f))
-        IconTap(XIcons.Mic, "语音输入", onVoice, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 22.dp)
-        if (onLive != null) RoundIconButton(XIcons.Wave, "实时对话", onLive, extra.fill, MaterialTheme.colorScheme.onSurface, enabled = enabled)
-        if (sending) {
-            RoundIconButton(XIcons.Stop, if (onStop != null) "停止" else "正在处理", onStop ?: {}, MaterialTheme.colorScheme.onSurface.copy(alpha = if (onStop != null) 1f else 0.35f), MaterialTheme.colorScheme.surface, enabled = onStop != null)
-        } else {
-            val canSend = enabled && value.trim().isNotEmpty()
-            RoundIconButton(XIcons.ArrowRight, "发送", onSend, if (canSend) Brand else extra.line, Color.White, enabled = canSend)
+    val muted = MaterialTheme.colorScheme.onSurfaceVariant
+    ComposerCard(
+        value, onValueChange, placeholder, modifier, enabled = enabled,
+        voiceBar = if (voiceMode) ({ PressBar(voice, enabled, if (sending) "小伴正在回答，按住可以打断" else "按住 说话", onVoicePress) }) else null,
+    ) {
+        if (voiceMode) ToolbarIcon(XIcons.Keyboard, "切回键盘输入", { onVoiceMode(false) }, true)
+        ToolbarIcon(XIcons.Plus, "添加内容", onAttach, enabled)
+        Box {
+            ToolbarIcon(modelIcon, "模型", onModel, enabled)
+            if (modelPinned) Box(Modifier.align(Alignment.TopEnd).padding(top = 6.dp, end = 6.dp).size(8.dp).clip(CircleShape).background(Danger))
         }
+        if (onPermission != null) ToolbarIcon(XIcons.Lock, if (fullTrust) "权限：完全信任" else "权限：默认权限", onPermission, enabled, tint = if (fullTrust) Danger else muted)
+        Spacer(Modifier.weight(1f))
+        if (!voiceMode) ToolbarIcon(XIcons.Mic, "语音输入", { onVoiceMode(true) }, true)
+        if (onLive != null) ToolbarIcon(XIcons.Wave, "实时对话", onLive, enabled)
+        if (!voiceMode) {
+            if (sending) {
+                RoundIconButton(XIcons.Stop, if (onStop != null) "停止" else "正在处理", onStop ?: {}, Brand.copy(alpha = if (onStop != null) 1f else 0.35f), Color.White, enabled = onStop != null)
+            } else {
+                val canSend = enabled && value.trim().isNotEmpty()
+                RoundIconButton(XIcons.ArrowRight, "发送", onSend, if (canSend) Brand else extra.line, Color.White, enabled = canSend)
+            }
+        }
+    }
+}
+
+/** 工具栏里的图标：36dp 的点击区域，不加圆形底，也不描边。 */
+@Composable
+private fun ToolbarIcon(icon: ImageVector, description: String, onClick: () -> Unit, enabled: Boolean, tint: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Box(Modifier.size(36.dp).alpha(if (enabled) 1f else 0.4f).clip(CircleShape).clickable(enabled = enabled, onClick = onClick), contentAlignment = Alignment.Center) {
+        XIcon(icon, tint = tint, size = 20.dp, description = description)
     }
 }
 
@@ -540,7 +562,7 @@ fun AttachSheet(onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: 
             listOf(XIcons.Camera to "相机", XIcons.Image to "相册", XIcons.File to "文件", XIcons.Book to "资料库").forEach { (icon, label) ->
                 Column(Modifier.weight(1f).clickable { onPick(label) }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     IconBox(icon, 56.dp, 16.dp)
-                    Text(label, fontSize = 13.sp)
+                    Text(label, fontSize = 14.sp)
                 }
             }
         }
@@ -548,27 +570,27 @@ fun AttachSheet(onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: 
     }
 }
 
-/** 圆形图标按钮（发送、停止、附件）。 */
+/** 圆形图标按钮（发送、停止）。 */
 @Composable
-fun RoundIconButton(icon: ImageVector, description: String, onClick: () -> Unit, background: Color, tint: Color, modifier: Modifier = Modifier, enabled: Boolean = true, bordered: Boolean = false) {
+fun RoundIconButton(icon: ImageVector, description: String, onClick: () -> Unit, background: Color, tint: Color, modifier: Modifier = Modifier, enabled: Boolean = true) {
     Box(
-        modifier.size(36.dp).clip(CircleShape).background(background).let { if (bordered) it.border(1.dp, LocalExtraColors.current.line, CircleShape) else it }.clickable(enabled = enabled, onClick = onClick),
+        modifier.size(36.dp).clip(CircleShape).background(background).clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         XIcon(icon, tint = tint, size = 20.dp, description = description)
     }
 }
 
-/** 输入卡片里的小胶囊（模型选择、设备名）。 */
+/** 浅灰底的小胶囊（快捷建议、状态入口），不描边；选中时用主题色浅底。 */
 @Composable
 fun ChipPill(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, trailingIcon: ImageVector? = null, onClick: (() -> Unit)? = null, selected: Boolean = false) {
     val extra = LocalExtraColors.current
     Row(
-        modifier.height(32.dp).clip(CircleShape).background(if (selected) extra.brandSoft else Color.Transparent).border(1.dp, if (selected) Brand else extra.line, CircleShape).let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(horizontal = 12.dp),
+        modifier.height(34.dp).clip(CircleShape).background(if (selected) extra.brandSoft else extra.fill).let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (icon != null) XIcon(icon, tint = if (selected) Brand else MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
-        Text(text, fontSize = 13.sp, color = if (selected) Brand else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
+        if (icon != null) XIcon(icon, tint = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
+        Text(text, fontSize = 14.sp, color = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
         if (trailingIcon != null) XIcon(trailingIcon, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
     }
 }

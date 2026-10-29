@@ -3,7 +3,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
-interface ColumnScope { fun Modifier.weight(weight: Float, fill: Boolean = true): Modifier = this }
+interface ColumnScope { fun Modifier.weight(weight: Float, fill: Boolean = true): Modifier = this; fun Modifier.align(alignment: Alignment.Horizontal): Modifier = this }
 interface RowScope { fun Modifier.weight(weight: Float, fill: Boolean = true): Modifier = this }
 interface BoxScope { fun Modifier.align(alignment: Alignment): Modifier = this }
 object Arrangement { interface Vertical; interface Horizontal; interface HorizontalOrVertical : Vertical, Horizontal
@@ -24,6 +24,7 @@ fun Modifier.padding(start: Dp = Dp(0f), top: Dp = Dp(0f), end: Dp = Dp(0f), bot
 fun Modifier.size(size: Dp): Modifier = this
 fun Modifier.size(width: Dp, height: Dp): Modifier = this
 fun Modifier.width(w: Dp): Modifier = this
+fun Modifier.wrapContentWidth(align: Alignment.Horizontal = Alignment.CenterHorizontally, unbounded: Boolean = false): Modifier = this
 fun Modifier.height(h: Dp): Modifier = this
 fun Modifier.widthIn(min: Dp = Dp(0f), max: Dp = Dp(0f)): Modifier = this
 fun Modifier.fillMaxSize(fraction: Float = 1f): Modifier = this

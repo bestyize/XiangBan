@@ -2,7 +2,9 @@ package xyz.xiangban.xiaoban
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import xyz.xiangban.xiaoban.business.communitynative.AppPrefs
 import xyz.xiangban.xiaoban.business.communitynative.CommunityEnv
+import xyz.xiangban.xiaoban.business.communitynative.InMemoryPrefs
 import xyz.xiangban.xiaoban.business.communitynative.CommunityNativeApp
 import xyz.xiangban.xiaoban.business.communitynative.PlatformActions
 import xyz.xiangban.xiaoban.common.community.AgentBridge
@@ -26,9 +28,10 @@ fun App(
     agentDir: String? = null,
     reminders: ReminderScheduler? = null,
     speech: LocalSpeech? = null,
+    prefs: AppPrefs = InMemoryPrefs(),
 ) {
-    val env = remember(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech) {
-        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech)
+    val env = remember(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs) {
+        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech, prefs = prefs)
     }
     CommunityNativeApp(env)
 }

@@ -39,6 +39,7 @@ import xyz.xiangban.xiaoban.common.community.CloudChatController
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun CommunityNativeApp(env: CommunityEnv) {
+    remember(env) { ThemeState.load(env.prefs) }
     XiaobanTheme {
         val appScope = rememberCoroutineScope()
         val chat = remember(env) { CloudChatController(env.ai, appScope, agent = env.agent) }
@@ -115,6 +116,8 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         Route.NewPost -> NewPostScreen(env, back = pop, open = push)
         Route.Settings -> SettingsScreen(env, back = pop, open = push)
         Route.Models -> ModelsScreen(env, chat, back = pop, open = push)
+        Route.Appearance -> AppearanceScreen(back = pop, open = push)
+        Route.AccentColor -> AccentScreen(back = pop)
         Route.AiChat -> AiChatPage(env, chat, back = pop, open = push)
         Route.Devices -> DevicesScreen(env, back = pop, open = push)
         is Route.RemoteChat -> RemoteChatScreen(env, route.peer, back = pop, open = push)

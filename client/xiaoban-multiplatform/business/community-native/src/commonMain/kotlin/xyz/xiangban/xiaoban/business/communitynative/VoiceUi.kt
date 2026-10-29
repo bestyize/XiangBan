@@ -12,10 +12,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.Alignment
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +34,8 @@ import xyz.xiangban.xiaoban.common.community.CloudSynthesizer
 import xyz.xiangban.xiaoban.common.community.EdgeTtsSynthesizer
 import xyz.xiangban.xiaoban.common.community.EngineUnavailable
 import xyz.xiangban.xiaoban.common.community.ModelDownloadException
+import xyz.xiangban.xiaoban.common.community.Ptt
+import xyz.xiangban.xiaoban.common.community.PttAction
 import xyz.xiangban.xiaoban.common.community.RecognizerEngine
 import xyz.xiangban.xiaoban.common.community.SynthesizerEngine
 import xyz.xiangban.xiaoban.common.community.VoiceCall
@@ -82,7 +90,7 @@ fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Bo
             }
             Text("${(fraction * 100).toInt()}%  ${done / 1_000_000} / ${total / 1_000_000} MB", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
         }
-        error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 13.sp, color = Brand) }
+        error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = Danger) }
         Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GhostPillButton(if (running) "取消" else "先不用", { job?.cancel(); onFinished(false) }, Modifier.weight(1f))
             PillButton(if (running) "下载中…" else if (error != null) "重试" else "下载", {
@@ -111,53 +119,95 @@ fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Bo
 
 // ───────────── 页面里用的两个小控制器 ─────────────
 
-/** 输入框的麦克风：点一下开始录，再点一下结束并识别，文字交给 [onText]；最长 20 秒。 */
+/**
+ * 输入框的“按住说话”（设计规范第 8 节）：按下开始录，松手按手指位置处理——发送（识别后直接发出去）、转文字（识别后放进输入框）或取消；
+ * 最长 20 秒，不到 0.5 秒算太短。识别先用手机本地的，不行再用 [engines] 里后面的。
+ */
 class VoiceInputController(
     private val env: CommunityEnv,
     private val scope: kotlinx.coroutines.CoroutineScope,
     private val engines: () -> List<RecognizerEngine>,
     private val onText: (String) -> Unit,
+    private val onSend: (String) -> Unit,
     private val onMessage: (String) -> Unit,
 ) {
-    var recording by mutableStateOf(false)
+    /** 手指正按着、正在录音。 */
+    var pressing by mutableStateOf(false)
         private set
-    var seconds by mutableStateOf(0)
+    /** 现在松手会怎样；手指移动时更新。 */
+    var action by mutableStateOf(PttAction.Send)
+        private set
+    var elapsedMs by mutableStateOf(0L)
         private set
     var recognizing by mutableStateOf(false)
         private set
-    private var timer: Job? = null
+    /** 没有麦克风权限：界面弹出“需要使用麦克风”的面板。 */
+    var micDenied by mutableStateOf(false)
+    private var starting = false
+    private var released = false
+    private var ticker: Job? = null
+    private var startedAt: kotlin.time.TimeMark? = null
 
-    val busy: Boolean get() = recording || recognizing
+    val busy: Boolean get() = pressing || starting || recognizing
 
-    fun toggle() {
+    /** 按下：录音是异步起来的（第一次要先要麦克风权限），起来之前就松手的话，起来后直接丢掉。 */
+    fun pressStart() {
         val platform = env.platform
         when {
             platform == null -> onMessage("这个平台暂不支持录音")
-            recording -> finish(send = true)
             recognizing -> onMessage("正在识别上一段语音")
-            else -> scope.launch {
-                platform.stopAudio()
-                if (!platform.startRecording()) { onMessage("没有麦克风权限，没法录音"); return@launch }
-                seconds = 0
-                recording = true
-                timer = scope.launch {
-                    while (recording) {
-                        kotlinx.coroutines.delay(1000)
-                        seconds += 1
-                        if (seconds >= 20) finish(send = true)
+            pressing || starting -> Unit
+            else -> {
+                starting = true
+                released = false
+                scope.launch {
+                    platform.stopAudio()
+                    val ok = platform.startRecording()
+                    starting = false
+                    when {
+                        !ok -> micDenied = true
+                        released -> platform.stopRecording()
+                        else -> begin()
                     }
                 }
             }
         }
     }
 
-    /** 结束录音；[send] 为假就丢掉。 */
-    fun finish(send: Boolean) {
-        if (!recording) return
-        recording = false
-        timer?.cancel()
+    private fun begin() {
+        val mark = kotlin.time.TimeSource.Monotonic.markNow()
+        startedAt = mark
+        elapsedMs = 0
+        action = PttAction.Send
+        pressing = true
+        ticker = scope.launch {
+            while (pressing) {
+                kotlinx.coroutines.delay(100)
+                elapsedMs = mark.elapsedNow().inWholeMilliseconds
+                if (Ptt.expired(elapsedMs)) {
+                    onMessage("已到 20 秒，自动发送")
+                    end(PttAction.Send)
+                }
+            }
+        }
+    }
+
+    fun pressMove(to: PttAction) { if (pressing) action = to }
+
+    /** 手指抬起：按当前位置处理。 */
+    fun pressRelease() { if (pressing) end(action) else if (starting) released = true }
+
+    /** 被打断（来电、页面离开、手势被系统取消）：直接丢掉。 */
+    fun pressCancel() { if (pressing) end(PttAction.Cancel) else if (starting) released = true }
+
+    private fun end(how: PttAction) {
+        if (!pressing) return
+        pressing = false
+        ticker?.cancel()
+        val elapsed = startedAt?.elapsedNow()?.inWholeMilliseconds ?: elapsedMs
         val pcm = env.platform?.stopRecording()
-        if (!send || pcm == null) return
+        if (how == PttAction.Cancel || pcm == null) return
+        if (Ptt.tooShort(elapsed)) { onMessage("说话时间太短"); return }
         recognizing = true
         scope.launch {
             try {
@@ -165,6 +215,7 @@ class VoiceInputController(
                 when {
                     text == null -> onMessage(reason ?: "没有识别出来")
                     text.isBlank() -> onMessage("没听清，请再说一次")
+                    how == PttAction.Send -> onSend(text)
                     else -> onText(text)
                 }
             } finally {
@@ -174,15 +225,15 @@ class VoiceInputController(
     }
 
     fun release() {
-        timer?.cancel()
-        if (recording) { recording = false; env.platform?.stopRecording() }
+        ticker?.cancel()
+        if (pressing) { pressing = false; env.platform?.stopRecording() }
     }
 }
 
 @Composable
-fun rememberVoiceInput(env: CommunityEnv, engines: () -> List<RecognizerEngine>, onText: (String) -> Unit, onMessage: (String) -> Unit): VoiceInputController {
+fun rememberVoiceInput(env: CommunityEnv, engines: () -> List<RecognizerEngine>, onText: (String) -> Unit, onSend: (String) -> Unit, onMessage: (String) -> Unit): VoiceInputController {
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val controller = remember(env) { VoiceInputController(env, scope, engines, onText, onMessage) }
+    val controller = remember(env) { VoiceInputController(env, scope, engines, onText, onSend, onMessage) }
     DisposableEffect(controller) { onDispose { controller.release() } }
     return controller
 }
@@ -190,6 +241,8 @@ fun rememberVoiceInput(env: CommunityEnv, engines: () -> List<RecognizerEngine>,
 /** 一通语音通话的发起与本地模型下载的询问。 */
 class VoiceCallHost(private val env: CommunityEnv) {
     var call by mutableStateOf<VoiceCall?>(null)
+    /** 通话收起成了顶部胶囊。 */
+    var minimized by mutableStateOf(false)
     var offering by mutableStateOf(false)
         private set
     private var declined = false
@@ -202,6 +255,7 @@ class VoiceCallHost(private val env: CommunityEnv) {
             pending = factory
             offering = true
         } else {
+            minimized = false
             call = factory()
         }
     }
@@ -209,7 +263,7 @@ class VoiceCallHost(private val env: CommunityEnv) {
     fun offerFinished(downloaded: Boolean) {
         offering = false
         if (!downloaded) declined = true
-        pending?.let { call = it() }
+        pending?.let { minimized = false; call = it() }
         pending = null
     }
 }
@@ -217,14 +271,31 @@ class VoiceCallHost(private val env: CommunityEnv) {
 @Composable
 fun rememberVoiceCallHost(env: CommunityEnv): VoiceCallHost = remember(env) { VoiceCallHost(env) }
 
-/** 通话相关的两层界面：询问下载模型的底部弹层，和通话本身的全屏界面。 */
+/**
+ * 通话相关的几层界面：询问下载模型的底部弹层、通话全屏界面，收起后是页面顶部的胶囊。
+ * 通话的开始、结束都在这里管，所以收起、展开不会打断通话。
+ */
 @Composable
 fun VoiceCallLayer(env: CommunityEnv, host: VoiceCallHost, title: String, onNotice: (String) -> Unit) {
     OverlayTransition(host.offering) { panel -> SpeechModelSheet(env, panel) { host.offerFinished(it) } }
-    host.call?.let { current ->
-        VoiceCallScreen(current, title) { notice ->
+    val current = host.call ?: return
+    val state by current.state.collectAsState()
+    var seconds by remember(current) { mutableStateOf(0) }
+    LaunchedEffect(current) { current.start() }
+    LaunchedEffect(current) { while (true) { delay(1000); seconds += 1 } }
+    DisposableEffect(current) { onDispose { current.stop() } }
+    LaunchedEffect(state.ended) {
+        if (state.ended) {
             host.call = null
-            notice?.let(onNotice)
+            host.minimized = false
+            state.notice?.let(onNotice)
         }
+    }
+    if (host.minimized) {
+        Box(Modifier.fillMaxSize()) {
+            CallCapsule(current, seconds, { host.minimized = false }, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 64.dp))
+        }
+    } else {
+        VoiceCallScreen(current, title, seconds, onMinimize = { host.minimized = true })
     }
 }
