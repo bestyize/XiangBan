@@ -182,8 +182,10 @@ impl ConnectorManager {
         if let Some(pending) = pending {
             pending.cancel.store(true, Ordering::SeqCst);
             let mut status = pending.status.lock().unwrap_or_else(|e| e.into_inner());
-            if status["status"] == "connected" {
-                self.disconnect_oauth_generation(&pending.id, &pending.session_id)?;
+            // Closing an authorization view can race with its last status poll.
+            // A completed flow is immutable; disconnect/unbind are separate actions.
+            if status["status"] == "connected" || status["status"] == "error" {
+                return Ok(());
             }
             *status = json!({"status":"cancelled"});
         }

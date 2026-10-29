@@ -107,10 +107,12 @@ describe('installed connector center', () => {
   });
   it('cancels OAuth and stops polling on cancel or unmount', async () => {
     vi.useFakeTimers(); await open({ auth: { type: 'oauth', configured: [] } });
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => command === 'ai_store_connector_auth_status' ? { status: 'cancelled' } : original(command, args));
     vi.mocked(invoke).mockResolvedValueOnce({ status: 'authorization_required', flowId: 'flow', authorizationUrl: 'https://auth.example/authorize' });
     await click('登录并连接'); await click('取消授权');
     expect(invoke).toHaveBeenCalledWith('ai_store_connector_auth_cancel', { flowId: 'flow' });
-    await vi.advanceTimersByTimeAsync(2000); expect(invoke).not.toHaveBeenCalledWith('ai_store_connector_auth_status', expect.anything());
+    await vi.advanceTimersByTimeAsync(2000); expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === 'ai_store_connector_auth_status')).toHaveLength(1);
     vi.mocked(invoke).mockResolvedValueOnce({ status: 'authorization_required', flowId: 'flow', authorizationUrl: 'https://auth.example/authorize' });
     await click('登录并连接'); wrapper.unmount(); expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === 'ai_store_connector_auth_cancel')).toHaveLength(2);
   });

@@ -540,9 +540,17 @@ fn replacing_disconnected_authorization_retires_only_the_old_generation() {
     manager
         .cancel_authorization(next["flowId"].as_str().unwrap())
         .unwrap();
-    assert!(manager.tools().is_empty());
-    assert_eq!(token_files(), 0);
+    assert_eq!(finish(&manager, &next)["status"], "connected");
+    assert_eq!(manager.tools()[0].execute(json!({}), &ToolCtx::detached("late-cancel")).unwrap(), "authorized result");
+    assert_eq!(token_files(), 1);
     manager.shutdown();
+    let restored = ConnectorManager::new(root.clone(), root.clone()).unwrap();
+    assert_eq!(restored.tools().len(), 1);
+    restored.disconnect("oauth-test").unwrap();
+    assert!(restored.tools().is_empty());
+    // Disconnect retains credentials for a deliberate reconnect.
+    assert_eq!(token_files(), 1);
+    restored.shutdown();
     fs::remove_dir_all(root).unwrap();
 }
 #[test]
@@ -636,6 +644,10 @@ fn device_authorization_polls_returns_code_refreshes_and_restores() {
     assert_eq!(server.state.lock().unwrap().unauthenticated_probes, 0, "device login must not wait for an MCP challenge");
     let status = finish(&manager, &flow);
     assert_eq!(status["status"], "connected", "{status}");
+    // Device login has no callback into the view. Cleanup before the next UI poll
+    // must not undo a connection that has already finished in the background.
+    manager.cancel_authorization(flow["flowId"].as_str().unwrap()).unwrap();
+    assert_eq!(finish(&manager, &flow)["status"], "connected");
     let tools = manager.tools();
     assert_eq!(tools.len(), 1);
     assert_eq!(

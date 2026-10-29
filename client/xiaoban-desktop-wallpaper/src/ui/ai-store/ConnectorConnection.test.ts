@@ -110,11 +110,21 @@ describe('connection and authorization in place', () => {
     expect(wrapper.text()).not.toContain('无法打开授权页面');
   });
   it('stops polling after cancellation and does not report connected', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => command === 'ai_store_connector_auth_status' ? { status: 'cancelled' } : original(command, args));
     vi.mocked(invoke).mockResolvedValueOnce(flow); await setup({}, true);
     await click('取消授权'); await vi.advanceTimersByTimeAsync(3000);
     expect(invoke).toHaveBeenCalledWith('ai_store_connector_auth_cancel', { flowId: 'f1' });
-    expect(invoke).not.toHaveBeenCalledWith('ai_store_connector_auth_status', expect.anything());
+    expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === 'ai_store_connector_auth_status')).toHaveLength(1);
     expect(wrapper.findComponent(ConnectorConnection).emitted('connected')).toBeUndefined();
+  });
+  it('keeps a connection that completed before a late cancellation', async () => {
+    vi.mocked(invoke).mockResolvedValueOnce(flow); await setup({}, true);
+    await click('取消授权'); await vi.advanceTimersByTimeAsync(3000);
+    expect(wrapper.text()).toContain('已连接，可在任务中使用');
+    expect(wrapper.text()).not.toContain('授权已取消');
+    expect(wrapper.findComponent(ConnectorConnection).emitted('connected')).toHaveLength(1);
+    expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === 'ai_store_connector_auth_status')).toHaveLength(1);
   });
   it('cancels a late OAuth response after navigating away', async () => {
     let resolve!: (value: unknown) => void;

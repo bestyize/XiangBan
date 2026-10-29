@@ -99,10 +99,12 @@ async function cancelAuthorization() {
   setBusy(true);
   try {
     await invoke('ai_store_connector_auth_cancel', { flowId: flow.flowId });
-    if (!alive) return;
+    if (!alive || authorization.value?.flowId !== flow.flowId) return;
     authorization.value = null; clearTimeout(timer);
-    error.value = '授权已取消，稍后可重新连接。';
-    await refresh();
+    const result = await invoke<{ status: string; error?: string }>('ai_store_connector_auth_status', { flowId: flow.flowId });
+    if (!alive) return;
+    error.value = result.status === 'connected' ? '' : result.error || '授权已取消，稍后可重新连接。';
+    await refresh(result.status === 'connected');
   } catch (e) { if (alive) error.value = `取消授权失败：${String(e)}`; }
   finally { if (alive) setBusy(false); }
 }

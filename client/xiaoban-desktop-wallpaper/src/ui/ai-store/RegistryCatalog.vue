@@ -158,7 +158,13 @@ function chooseConfig() {
 }
 async function cancelAuthorization(){
   const flow=authorization.value;if(!flow)return true;clearTimeout(authTimer);busy.value=true;
-  try{await invoke('ai_store_connector_auth_cancel',{flowId:flow.flowId});authorization.value=null;chooseConfig();return true;}
+  try{
+    await invoke('ai_store_connector_auth_cancel',{flowId:flow.flowId});authorization.value=null;
+    const result=await invoke<{status:string;error?:string}>('ai_store_connector_auth_status',{flowId:flow.flowId});
+    if(result.status==='connected'){await refreshLocal();selected.value=null;configText.value='';props.store.notify('授权完成，连接成功');}
+    else{chooseConfig();if(result.error)detailError.value=result.error;}
+    return true;
+  }
   catch(e){detailError.value='取消授权失败：'+String(e);return false;}
   finally{busy.value=false;}
 }
