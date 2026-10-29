@@ -229,11 +229,11 @@ private fun AiDrawer(cloud: CloudChatState, onClose: () -> Unit, onNew: () -> Un
             if (cloud.messages.isNotEmpty()) {
                 Text(
                     cloud.title(),
-                    Modifier.padding(horizontal = 8.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(LocalExtraColors.current.fill).clickable(onClick = onOpenCurrent).padding(horizontal = 8.dp, vertical = 11.dp),
+                    Modifier.padding(horizontal = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).clickable(onClick = onOpenCurrent).padding(horizontal = 8.dp, vertical = 11.dp),
                     fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             } else {
-                Text("还没有对话", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                Text("还没有对话", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
             }
             Spacer(Modifier.weight(1f))
             Hairline()
@@ -267,8 +267,10 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     val voiceInput = rememberVoiceInput(
         env, { env.recognizers(CloudRecognizer(env.ai)) },
         onText = { text -> input = if (input.isBlank()) text else input.trimEnd() + " " + text },
+        onSend = { text -> chat.send(text) },
         onMessage = { toast = it },
     )
+    var voiceMode by rememberSaveable { mutableStateOf(false) }
     val callHost = rememberVoiceCallHost(env)
     val callScope = rememberCoroutineScope()
 
@@ -304,21 +306,13 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     }
                 }
                 Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
-                    if (voiceInput.busy) {
-                        VoiceBar(
-                            if (voiceInput.recording) "正在听… ${voiceInput.seconds / 60}:${(voiceInput.seconds % 60).toString().padStart(2, '0')}" else "正在识别…",
-                            recording = voiceInput.recording,
-                            hint = if (voiceInput.recording) "再点一下麦克风结束，文字会放进输入框" else null,
-                            onCancel = { voiceInput.finish(false) },
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                    }
+                    PressTip(env, voiceMode, Modifier.padding(bottom = 8.dp))
                     ChatComposer(
-                        input, { input = it }, "问点什么，或描述想要的装扮、游戏…", cloud.modelName(),
+                        input, { input = it }, "问点什么，或描述想要的装扮、游戏…",
                         onModel = { modelSheet = true },
                         onAttach = { attach = true },
-                        onWeb = { toast = "联网搜索即将支持" },
-                        onVoice = { voiceInput.toggle() },
+                        voice = voiceInput, voiceMode = voiceMode, onVoiceMode = { voiceMode = it },
+                        onVoicePress = { if (cloud.sending) chat.stop() },
                         onLive = {
                             val platform = env.platform
                             when {
@@ -342,6 +336,8 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         }
         AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
         Toast(toast) { toast = null }
+        PressOverlay(voiceInput)
+        MicPermissionLayer(env, voiceInput) { toast = it }
         VoiceCallLayer(env, callHost, "小伴AI") { toast = it }
         OverlayTransition(modelSheet) { panel ->
             BottomSheet({ modelSheet = false }, panel) {
@@ -441,7 +437,7 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                     GroupLabel("小伴AI · 官方")
                     Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
+                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
                             Column(Modifier.weight(1f)) {
                                 Text("小伴AI", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                 Text("跟着账号走，换手机、换电脑自动同步", Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -449,7 +445,7 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                         }
                         Text(
                             "当前模型：${cloud.modelName()}\n${quotaText(cloud.balance)}" + (expiryText(cloud.balance)?.let { " · 到期 $it" } ?: ""),
-                            Modifier.padding(top = 12.dp), fontSize = 13.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Modifier.padding(top = 12.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         GhostPillButton("配置", { sheet = true; chat.clearRedeemFeedback() }, Modifier.padding(top = 12.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
                     }
@@ -464,14 +460,14 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
         OverlayTransition(sheet) { panel ->
             BottomSheet({ sheet = false }, panel) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
+                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
                     Column(Modifier.weight(1f)) {
                         Text("小伴AI", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                         Text("跟着账号走，换设备自动同步", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconTap(XIcons.Close, "关闭", { sheet = false })
                 }
-                Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.background).padding(vertical = 12.dp)) {
+                Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.background).padding(vertical = 12.dp)) {
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(cloud.balance?.let { formatAiMoney(it.total, it.quotaPerUnit) } ?: "—", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                         Text("剩余额度", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -482,12 +478,12 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                     }
                 }
                 Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextBox(code, { code = it }, Modifier.weight(1f), placeholder = "输入兑换码")
+                    TextBox(code, { code = it }, Modifier.weight(1f), placeholder = "输入兑换码", filled = true)
                     PillButton(if (cloud.redeeming) "兑换中…" else "兑换", { chat.redeem(code); code = "" }, enabled = !cloud.redeeming && code.isNotBlank(), height = 48.dp)
                 }
-                cloud.redeemMessage?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 13.sp, fontWeight = FontWeight.Medium) }
-                cloud.redeemError?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 13.sp, color = Brand) }
-                Text("可用模型", Modifier.padding(top = 16.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                cloud.redeemMessage?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+                cloud.redeemError?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = Danger) }
+                Text("可用模型", Modifier.padding(top = 16.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Text("点选一个作为默认；在对话里也可以单独为每个对话换。", Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 cloud.tiers.forEach { tier ->
                     RadioRow(

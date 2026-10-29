@@ -94,7 +94,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 Text("发到哪里", Modifier.padding(horizontal = 16.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 when {
                     loadError != null -> Banner(loadError.orEmpty(), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), warn = true, actionText = "重试", onAction = { attempt += 1 })
-                    categories == null -> Text("读取分类中…", Modifier.padding(16.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                    categories == null -> Text("读取分类中…", Modifier.padding(16.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
                     else -> {
                         ChipRow(parents.map { it.id to it.name }, parentId) { parentId = it; categoryId = -1 }
                         ChipRow(children.map { it.id to it.name }, categoryId) { categoryId = it }
@@ -109,7 +109,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                         Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                error?.let { Text(it, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 13.sp, color = Brand) }
+                error?.let { Text(it, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 14.sp, color = Danger) }
                 Text("需要贴图片、传附件或发悬赏求助，请到网页端发帖。", Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
             }
             Hairline()
@@ -146,9 +146,9 @@ private fun ChipRow(items: List<Pair<Int, String>>, selected: Int, onSelect: (In
             val on = id == selected
             Text(
                 name,
-                Modifier.height(32.dp).clip(CircleShape).background(if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surface)
-                    .border(1.dp, if (on) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.line, CircleShape).clickable { onSelect(id) }.padding(horizontal = 14.dp, vertical = 6.dp),
-                fontSize = 13.sp, color = if (on) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurface, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                Modifier.height(34.dp).clip(CircleShape).background(if (on) LocalExtraColors.current.brandSoft else MaterialTheme.colorScheme.surface)
+                    .clickable { onSelect(id) }.padding(horizontal = 14.dp, vertical = 7.dp),
+                fontSize = 14.sp, color = if (on) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurface, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
             )
         }
     }

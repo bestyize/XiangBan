@@ -38,6 +38,8 @@ interface PlatformActions : VoicePlatform {
     fun copy(text: String)
     fun share(title: String, url: String)
     fun openUrl(url: String)
+    /** 打开系统里这个应用的设置页（让用户去开麦克风权限）；平台不支持就返回 false。 */
+    fun openAppSettings(): Boolean = false
     /** 朗读一段文字；平台不支持就返回 false。 */
     fun speak(text: String): Boolean = false
 
@@ -45,6 +47,18 @@ interface PlatformActions : VoicePlatform {
     suspend fun startRecording(): Boolean = false
     /** 结束录音，拿到录下来的声音；没在录就是 null。 */
     fun stopRecording(): ByteArray? = null
+}
+
+/** 界面偏好（外观、主题色）的存放处；平台用自己的轻量存储实现，不提供就只在本次运行里记着。 */
+interface AppPrefs {
+    fun get(key: String): String?
+    fun put(key: String, value: String)
+}
+
+class InMemoryPrefs : AppPrefs {
+    private val values = mutableMapOf<String, String>()
+    override fun get(key: String) = values[key]
+    override fun put(key: String, value: String) { values[key] = value }
 }
 
 fun defaultLinkHttpClient(): HttpClient = HttpClient {
@@ -72,6 +86,7 @@ class CommunityEnv(
     reminders: ReminderScheduler? = null,
     /** 手机本地语音识别（安卓上是 sherpa-onnx 的 SenseVoice）；没有就只用云端和电脑上的识别。 */
     val speech: LocalSpeech? = null,
+    val prefs: AppPrefs = InMemoryPrefs(),
 ) {
     val account = AccountApi(client, config)
 

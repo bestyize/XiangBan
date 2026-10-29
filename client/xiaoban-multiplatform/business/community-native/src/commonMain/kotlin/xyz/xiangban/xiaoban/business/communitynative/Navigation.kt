@@ -11,6 +11,9 @@ sealed interface Route {
     data object NewPost : Route
     data object Settings : Route
     data object Models : Route
+    /** 设置里的外观（跟随系统 / 浅色 / 深色）和主题色。 */
+    data object Appearance : Route
+    data object AccentColor : Route
     /** 云端小伴的对话页。 */
     data object AiChat : Route
     data object Devices : Route
@@ -27,6 +30,8 @@ sealed interface Route {
         NewPost -> "newpost"
         Settings -> "settings"
         Models -> "models"
+        Appearance -> "appearance"
+        AccentColor -> "accent"
         AiChat -> "aichat"
         Devices -> "devices"
         is RemoteChat -> "rchat:$peer"
@@ -46,6 +51,8 @@ sealed interface Route {
                 "newpost" -> NewPost
                 "settings" -> Settings
                 "models" -> Models
+                "appearance" -> Appearance
+                "accent" -> AccentColor
                 "aichat" -> AiChat
                 "devices" -> Devices
                 "rchat" -> value.takeIf { it.isNotEmpty() }?.let(::RemoteChat)
