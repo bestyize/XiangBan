@@ -1,6 +1,6 @@
 //! 测试支持：用固定密钥签发令牌、独立 schema 的真实 Postgres、监听本机随机端口的真实服务。
 //! 只在测试或开启 `testing` 特性时编译，供其他 crate（如桌面链接层）做端到端集成测试。
-use crate::{auth::JwksVerifier, build_router, config::Config, db, hub::Hub, ratelimit::WindowLimiter, state::AppState};
+use crate::{auth::JwksVerifier, build_router, config::Config, db, hub::Hub, state::AppState};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
 use jsonwebtoken::{encode, Algorithm, DecodingKey, EncodingKey, Header};
 use ring::signature::{Ed25519KeyPair, KeyPair};
@@ -44,7 +44,6 @@ impl TestServer {
         let state = AppState {
             pool: pool.clone(),
             hub: Arc::new(Hub::new(config.notify_queue_cap, config.notify_ttl)),
-            limiter: Arc::new(WindowLimiter::default()),
             verifier: Arc::new(verifier),
             config: Arc::new(config),
         };

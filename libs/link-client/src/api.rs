@@ -15,26 +15,8 @@ pub struct PeerInfo {
     pub id: String,
     pub kind: String,
     pub name: String,
-    pub public_key: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct PairCode {
-    pub code: String,
-    pub expires_at: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Confirmed {
-    pub pairing_id: String,
-    pub phone: PeerInfo,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct PendingRequest {
-    pub pairing_id: String,
-    pub peer: PeerInfo,
-    pub proof: String,
+    #[serde(default)]
+    pub online: bool,
 }
 
 impl Api {
@@ -59,32 +41,17 @@ impl Api {
         serde_json::from_str(if text.is_empty() { "null" } else { &text }).map_err(|e| Error::Network(format!("解析响应失败：{e}")))
     }
 
-    pub async fn register_device(&self, kind: &str, name: &str, public_key: &str) -> Result<String, Error> {
-        let v: Value = self.call(reqwest::Method::POST, "/devices", Some(json!({"kind": kind, "name": name, "public_key": public_key}))).await?;
+    pub async fn register_device(&self, kind: &str, name: &str, install_id: &str) -> Result<String, Error> {
+        let v: Value = self.call(reqwest::Method::POST, "/devices", Some(json!({"kind": kind, "name": name, "install_id": install_id}))).await?;
         v["device_id"].as_str().map(str::to_string).ok_or_else(|| Error::Network("响应缺少 device_id".into()))
     }
 
-    pub async fn create_pair_code(&self, device_id: &str) -> Result<PairCode, Error> {
-        self.call(reqwest::Method::POST, "/pair-codes", Some(json!({"device_id": device_id}))).await
+    pub async fn remove_device(&self, device_id: &str) -> Result<(), Error> {
+        self.call::<Value>(reqwest::Method::DELETE, &format!("/devices/{device_id}"), None).await.map(|_| ())
     }
 
-    pub async fn confirm(&self, pairing_id: &str) -> Result<Confirmed, Error> {
-        self.call(reqwest::Method::POST, &format!("/pairings/{pairing_id}/confirm"), None).await
-    }
-
-    pub async fn reject(&self, pairing_id: &str) -> Result<(), Error> {
-        self.call::<Value>(reqwest::Method::POST, &format!("/pairings/{pairing_id}/reject"), None).await.map(|_| ())
-    }
-
-    pub async fn remove_pairing(&self, pairing_id: &str) -> Result<(), Error> {
-        self.call::<Value>(reqwest::Method::DELETE, &format!("/pairings/{pairing_id}"), None).await.map(|_| ())
-    }
-
-    pub async fn pending(&self, device_id: &str) -> Result<Vec<PendingRequest>, Error> {
-        let v: Value = self.call(reqwest::Method::GET, &format!("/pairings?device_id={device_id}&status=pending"), None).await?;
-        Ok(v["items"]
-            .as_array()
-            .map(|items| items.iter().filter_map(|i| Some(PendingRequest { pairing_id: i["pairing_id"].as_str()?.into(), peer: serde_json::from_value(i["peer"].clone()).ok()?, proof: i["proof"].as_str()?.into() })).collect())
-            .unwrap_or_default())
+    pub async fn peers(&self, device_id: &str) -> Result<Vec<PeerInfo>, Error> {
+        let v: Value = self.call(reqwest::Method::GET, &format!("/peers?device_id={device_id}"), None).await?;
+        Ok(serde_json::from_value(v["items"].clone()).unwrap_or_default())
     }
 }

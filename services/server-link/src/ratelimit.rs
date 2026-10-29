@@ -1,9 +1,5 @@
-//! 两种限流：连接内的令牌桶（消息数与字节数），以及按键的滑动窗口（配对码兑换、申请）。
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Mutex,
-    time::{Duration, Instant},
-};
+//! 连接内的令牌桶限流（消息数与字节数）。
+use std::time::Instant;
 
 /// 令牌桶：容量为速率的 2 倍，允许短时突发。
 pub struct Bucket {
@@ -35,40 +31,10 @@ impl Bucket {
     }
 }
 
-/// 滑动窗口计数：`window` 内最多 `limit` 次。
-#[derive(Default)]
-pub struct WindowLimiter {
-    hits: Mutex<HashMap<String, VecDeque<Instant>>>,
-}
-
-impl WindowLimiter {
-    /// 允许则记一次并返回 None；超限返回需要等待的秒数。
-    pub fn hit(&self, key: &str, limit: usize, window: Duration) -> Option<i64> {
-        self.hit_at(key, limit, window, Instant::now())
-    }
-
-    pub fn hit_at(&self, key: &str, limit: usize, window: Duration, now: Instant) -> Option<i64> {
-        let mut map = self.hits.lock().unwrap();
-        let q = map.entry(key.to_string()).or_default();
-        while q.front().is_some_and(|t| now.saturating_duration_since(*t) >= window) {
-            q.pop_front();
-        }
-        if q.len() >= limit {
-            let wait = window.saturating_sub(now.saturating_duration_since(*q.front().unwrap()));
-            return Some(wait.as_secs() as i64 + 1);
-        }
-        q.push_back(now);
-        // 顺手清理空键，避免无限增长。
-        if map.len() > 10_000 {
-            map.retain(|_, v| v.back().is_some_and(|t| now.saturating_duration_since(*t) < window));
-        }
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn bucket_allows_burst_then_refills() {
@@ -78,18 +44,5 @@ mod tests {
         assert!(!b.take_at(1.0, t0));
         assert!(b.take_at(5.0, t0 + Duration::from_millis(500)));
         assert!(!b.take_at(6.0, t0 + Duration::from_millis(500)));
-    }
-
-    #[test]
-    fn window_limits_and_expires() {
-        let l = WindowLimiter::default();
-        let t0 = Instant::now();
-        let w = Duration::from_secs(60);
-        for _ in 0..3 {
-            assert_eq!(l.hit_at("a", 3, w, t0), None);
-        }
-        assert!(l.hit_at("a", 3, w, t0).is_some());
-        assert_eq!(l.hit_at("b", 3, w, t0), None, "不同键互不影响");
-        assert_eq!(l.hit_at("a", 3, w, t0 + Duration::from_secs(61)), None);
     }
 }

@@ -59,6 +59,7 @@ class CommunityEnv(
         storage = linkStorage,
         token = { session.accessToken() },
         deviceName = config.deviceName,
+        baseUrl = config.linkBase,
     )
     val remoteChat = RemoteChatController(phoneLink, scope)
 

@@ -2,7 +2,7 @@
 
 服务说明见 [server-link](../../services/server-link/README.md)，独立部署栈见 [infra/link/compose.yaml](../../infra/link/compose.yaml)，环境模板见 [.env.production.example](../../infra/link/.env.production.example)，Nginx 示例见 [nginx.conf.example](../../infra/link/nginx.conf.example)。中转自带 PostgreSQL，数据卷、备份和发布节奏与账号中心、主站分开。让 AI 代做部署时，直接用 [server-link部署提示词](../agent/server-link部署提示词.md)。
 
-中转只存设备、公钥和配对关系，**不存消息**；暂存的离线通知只在内存里，重启即丢。因此它是单实例服务，升级时已连接的设备会掉线并自动重连（桌面和手机都有退避重连）。
+中转只存账号下有哪些设备，**不存消息**；暂存的离线通知只在内存里，重启即丢。因此它是单实例服务，升级时已连接的设备会掉线并自动重连（桌面和手机都有退避重连）。
 
 ## 先决条件
 
@@ -40,10 +40,9 @@ curl -fsS http://127.0.0.1:55030/api/link/health
 
 1. `curl -fsS https://<域名>/api/link/health` 返回 JSON。
 2. 不带令牌访问 `GET /api/link/devices` 返回 401（`unauthorized`）。
-3. （带令牌，可选；令牌约 30 分钟有效，没有就跳过，以第 5 条真机为准）用一个测试账号的访问令牌（`aud` 为 `xiaoban-desktop-wallpaper` 或 `xiaoban-android`）调用 `POST /api/link/devices`（`{"kind":"desktop","name":"部署自检","public_key":"<见下>"}`）应返回设备编号；再 `DELETE /api/link/devices/<编号>` 清理。
-   `public_key` 必须是 **base64url（无填充）编码的 65 字节 P-256 未压缩点（以 `0x04` 开头）**，否则返回 400。自检用的假公钥可以这样生成：`openssl ecparam -name prime256v1 -genkey -noout | openssl ec -pubout -outform DER 2>/dev/null | tail -c 65 | basenc --base64url | tr -d '=\n'`。
+3. （带令牌，可选；令牌约 30 分钟有效，没有就跳过，以第 5 条真机为准）用一个测试账号的访问令牌（`aud` 为 `xiaoban-desktop-wallpaper` 或 `xiaoban-android`）调用 `POST /api/link/devices`（`{"kind":"desktop","name":"部署自检","install_id":"<16–64 位字母数字，例如 openssl rand -hex 16 的输出>"}`）应返回设备编号；再 `DELETE /api/link/devices/<编号>` 清理。
 4. 用同一令牌通过 WebSocket 子协议 `["xb-link","xiaoban-token.<令牌>"]` 连 `wss://<域名>/api/link/ws?device_id=<编号>`，应在 10 秒内收到状态帧，连接保持一小时以上不被 Nginx 断开。
-5. 最终以真机为准：桌面端“设置 → 连接手机”出二维码，手机扫码配对成功，手机发一条消息电脑能收到。
+5. 最终以真机为准：桌面端登录账号，“设置 → 手机遥控”打开“允许手机遥控这台电脑”；手机登录同一个账号，“我的电脑”里自动出现这台电脑，手机发一条消息电脑能收到。
 
 ## 升级、回滚与备份
 
@@ -54,4 +53,6 @@ docker compose --env-file .env -f compose.yaml logs -f link
 docker compose --env-file .env -f compose.yaml exec -T postgres pg_dump -U link xiaoban_link | gzip > link-$(date +%F).sql.gz
 ```
 
-数据库丢失的后果有限：所有设备需要重新登记并重新配对，不会泄露消息内容。
+数据库丢失的后果有限：设备列表丢了，客户端会用新的登记自动重建（电脑和手机各自重连一次即可），不需要任何手工操作。
+
+**从旧版（配对版）升级**：旧版客户端与新版服务不兼容，服务和桌面、手机要一起更新。新版服务启动时会自动给 `devices` 表加 `install_id` 列，把旧版登记的设备标记为已移除；旧表 `pair_codes`、`pairings` 不再使用，留在库里不动。

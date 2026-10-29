@@ -11,14 +11,6 @@ pub struct Config {
     /// 接受的客户端编号（令牌的 aud）：桌面端与手机端各一个。
     pub client_ids: Vec<String>,
     pub cors_origins: Vec<String>,
-    /// 配对码有效期。
-    pub pair_code_ttl: Duration,
-    /// 一个配对码最多被兑换几次（被桌面拒绝的也算），超过即作废。
-    pub pair_code_max_redeems: i32,
-    /// 每个账号每分钟最多兑换几次配对码。
-    pub pair_redeems_per_minute: usize,
-    /// 每台设备每小时最多申请几次配对码。
-    pub pair_codes_per_hour: usize,
     /// 每个账号最多登记多少台设备。
     pub max_devices_per_user: i64,
     /// 对端离线时，每个对端最多暂存几条通知，以及暂存多久。
@@ -54,10 +46,6 @@ impl Config {
                 .filter(|s| !s.is_empty())
                 .collect(),
             cors_origins: get("LINK_CORS_ORIGINS").map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect()).unwrap_or_default(),
-            pair_code_ttl: Duration::from_secs(num("LINK_PAIR_CODE_TTL_SECS", 300)),
-            pair_code_max_redeems: num("LINK_PAIR_CODE_MAX_REDEEMS", 5),
-            pair_redeems_per_minute: num("LINK_PAIR_REDEEMS_PER_MINUTE", 10),
-            pair_codes_per_hour: num("LINK_PAIR_CODES_PER_HOUR", 20),
             max_devices_per_user: num("LINK_MAX_DEVICES_PER_USER", 20),
             notify_queue_cap: num("LINK_NOTIFY_QUEUE_CAP", 50),
             notify_ttl: Duration::from_secs(num("LINK_NOTIFY_TTL_SECS", 24 * 3600)),

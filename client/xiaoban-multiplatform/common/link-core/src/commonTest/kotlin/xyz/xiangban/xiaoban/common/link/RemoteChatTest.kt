@@ -20,24 +20,16 @@ class RemoteChatTest {
         respond("{}", HttpStatusCode.OK)
     })
 
-    private fun createLink(): PhoneLink {
-        val storage = InMemoryLinkStorage(
-            LinkState(
-                relayBase = "https://link.test",
-                device = DeviceIdentity("phn_1", "手机", "priv", "pub"),
-                startCounter = 1,
-                peers = mapOf(
-                    "dsk_1" to PeerRecord("pair_1", "dsk_1", "我的Mac电脑", "pub_dsk", "prk_123"),
-                ),
-            ),
-        )
-        return PhoneLink(scope, mockClient, storage, { "tok" }, "手机")
+    private suspend fun createLink(): PhoneLink {
+        val storage = InMemoryLinkStorage(LinkState(installId = "test-install-id-0123456789", device = DeviceIdentity("phn_1", "手机")))
+        val link = PhoneLink(scope, mockClient, storage, { null }, "手机")
+        link.seedPeersForTest(listOf(PeerSummary("dsk_1", "我的Mac电脑", false)))
+        return link
     }
 
     @Test
     fun `remote chat controller handles sessions, streaming text, tools and approvals`() = runTest {
         val link = createLink()
-        link.start()
         val controller = RemoteChatController(link, scope)
         controller.refreshPeers()
 
@@ -116,7 +108,6 @@ class RemoteChatTest {
     @Test
     fun `paged snapshot appends pages, requests the next one and settles stale approvals on the last page`() = runTest {
         val link = createLink()
-        link.start()
         val controller = RemoteChatController(link, scope)
         controller.refreshPeers()
         link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))
@@ -142,7 +133,6 @@ class RemoteChatTest {
     @Test
     fun `expired approval reply clears the card`() = runTest {
         val link = createLink()
-        link.start()
         val controller = RemoteChatController(link, scope)
         controller.refreshPeers()
         link.emitEventForTest(LinkEvent.PeerOnline("dsk_1", true))

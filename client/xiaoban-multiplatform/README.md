@@ -16,10 +16,10 @@
 | `:common:webview` | 通用网页外壳 `WebShell`：加载进度、失败重试、返回键、站内外链判定（站外链接交给系统浏览器）、按系统深浅色套用 `WebShellPalette`（系统栏边距与失败页）。基于 compose-webview-multiplatform，目标只有 Android 和 iOS。 |
 | `:business:community` | 社区网页壳（MA，已不被 `:shell` 装配，保留作回退）`CommunityApp`：加载 https://chat.xiangban.xyz（周刊、资源、讨论、项目的只读浏览，分享先用网页上的“复制链接”），站内域名只有 chat.xiangban.xyz，配色取自论坛前端的品牌色与黑白灰。对应实施计划的 MA（网页壳）。 |
 | `:common:community-core` | 社区、账号与 AI 网关的网络层和状态逻辑（不依赖 Compose）：`ForumApi`、`AccountApi`（与网页同一组接口）、`AiGatewayApi`（对接 `server-ai` 的档位、余额、兑换码与 `/v1/chat/completions` 流式对话）、`SessionManager`（令牌存储、临近过期自动刷新且并发共用一次、仅服务端明确拒绝才登出）、`FeedController`/`DiscussController`/`CloudChatController`/`Loader`、`DesignTokens`（与论坛前端同一套配色圆角）。能在 JVM 上直接跑单元测试：`./gradlew :common:community-core:jvmTest`。账号中心要先登记客户端 `xiaoban-android`。 |
-| `:common:link-core` | 与桌面互联的协议、客户端与应用控制器（`PhoneLink`、`RemoteChatController`、Android Keystore 保护的 `AndroidKeystoreLinkStorage`）：扫码配对、端到端加密收发、会话快照与流式增量、待办审批卡片、重连与重放防护；与 `libs/link-protocol` 共用测试向量。`./gradlew :common:link-core:jvmTest`。详见模块 README。 |
-| `:business:community-native` | 社区、云端与遥控小伴原生界面（Compose）：底栏（社区、讨论、小伴、我的）、登录/注册、“我的”、设备管理页 `DevicesScreen`（查看配对电脑、在线状态、移除、扫码/粘贴配对串配对）、“小伴”页（顶部切换“云端小伴”与“我的电脑”、电脑离线自动降级提示、远程会话列表与流式进度、高危二次确认审批卡片）、信息流与内容包/周刊/项目/帖子详情。平台能力通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。 |
+| `:common:link-core` | 与桌面互联的协议、客户端与应用控制器（`PhoneLink`、`RemoteChatController`、`SharedPrefsLinkStorage`）：同账号自动发现电脑、经中转收发、会话快照与流式增量、待办审批卡片、断线重连；有对真实 server-link 与 Rust 桌面端的跨语言互通测试。`./gradlew :common:link-core:jvmTest`。详见模块 README。 |
+| `:business:community-native` | 社区、云端与遥控小伴原生界面（Compose）：底栏（社区、讨论、小伴、我的）、登录/注册、“我的”、设备管理页 `DevicesScreen`（查看同账号下的电脑、在线状态、移除）、“小伴”页（顶部切换“云端小伴”与“我的电脑”、电脑离线自动降级提示、远程会话列表与流式进度、高危二次确认审批卡片）、信息流与内容包/周刊/项目/帖子详情。平台能力通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。 |
 | `:business:xiaban` | xiaban.xyz 入口 `XiabanApp`：地址、站内域名、与网页一致的浅色/深色配色。 |
-| `:shell` | 装配层，`App(storage, platform, linkStorage)` 渲染 `CommunityNativeApp`；Android 入口传入 `SharedPrefsTokenStorage`、`AndroidPlatformActions` 与 `AndroidKeystoreLinkStorage`，iOS 暂用内存存储。模板自带的 `Greeting`/`Platform` 示例与测试仍在，未使用。 |
+| `:shell` | 装配层，`App(storage, platform, linkStorage)` 渲染 `CommunityNativeApp`；Android 入口传入 `SharedPrefsTokenStorage`、`AndroidPlatformActions` 与 `SharedPrefsLinkStorage`，iOS 暂用内存存储。模板自带的 `Greeting`/`Platform` 示例与测试仍在，未使用。 |
 | `:androidApp` `iosApp/` | Android、iOS 入口。 |
 | `desktopApp/` | 桌面壳（Rust，Tauri 2）：`src/main.rs` 建窗口与外链处理，`src/links.rs` 是站内/站外/拦截的判定与单元测试，`ui/index.html` 是启动页（先测网络，通了再进站，不通显示「连不上相伴」和重试按钮）。 |
 

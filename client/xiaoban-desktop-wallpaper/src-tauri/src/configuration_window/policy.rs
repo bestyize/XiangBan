@@ -22,7 +22,7 @@ pub fn command_allowed(role: &str, command: &str) -> bool {
         "asr_get_status", "asr_set_enabled", "asr_prepare", "asr_report_microphone",
         "send_account_code", "login_account_with_code", "login_account_with_password", "register_account",
         "reset_account_password", "check_account_username", "get_signup_methods", "logout_account",
-        "phone_link_status", "phone_link_set_enabled", "phone_link_begin_pairing", "phone_link_cancel_pairing", "phone_link_unpair",
+        "phone_link_status", "phone_link_set_enabled", "phone_link_remove_peer",
         "speech_agent_env", "speech_agent_install_guides", "speech_agent_hooks_status", "speech_agent_hooks_install", "speech_agent_hooks_uninstall", "speech_agent_inject",
         "speech_agent_delegate", "speech_agent_task_status", "speech_agent_task_cancel", "speech_agent_task_list",
         "voice_service_status", "voice_service_set_enabled", "voice_service_reset_token",

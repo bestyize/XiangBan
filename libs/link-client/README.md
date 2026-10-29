@@ -1,29 +1,27 @@
 # xiaoban-link-client
 
-小伴桌面端的互联客户端。协议见 [设备互联协议](../../docs/agent/设备互联协议.md)，密码学在 [link-protocol](../link-protocol/README.md)，中转是 [server-link](../../services/server-link/README.md)。不含界面，不依赖 Tauri。
+小伴桌面端的互联客户端。协议见 [设备互联协议](../../docs/agent/设备互联协议.md)，中转是 [server-link](../../services/server-link/README.md)。不含界面，不依赖 Tauri。
+
+用同一个账号登录的手机和电脑自动互相发现：本库用账号令牌向中转登记这台设备，保持一条 WebSocket 连接，收到同账号下对端设备的列表与上下线通知，并收发文本消息。**没有配对、没有密钥。**
 
 宿主（桌面应用）提供三样东西：
 
-- **令牌**（`TokenFn`）：取当前账号访问令牌，每次请求、每次重连都会调；刷新由宿主负责。
-- **存储**（`store::LinkStore`）：保存设备私钥、各对端的配对密钥、重放防护进度、启动计数。内置 `FileStore`（JSON，Unix 上权限 0600）；**正式版应实现 `LinkStore`，把私钥和配对密钥放进系统钥匙串**。
-- **事件**（`LinkEvent` 流）：连接状态、对端上下线、配对结果、收到的明文消息、没送达、被丢弃的信封、被顶替、设备被撤销。
+- **令牌**（`TokenFn`）：取当前账号访问令牌，每次请求、每次重连都会调；刷新由宿主负责；没登录返回 `None`。
+- **存储**（`store::LinkStore`）：只存这台设备的编号和随机的 `install_id`，没有任何密钥。内置 `FileStore`（JSON）和 `MemoryStore`。
+- **事件**（`LinkEvent` 流）：连接状态、对端出现 / 消失 / 上下线、收到的消息、没送达、被顶替、设备被移除。
 
 ```rust
 let (link, mut events) = Link::start(LinkConfig::new("https://link.xiangban.xyz/api/link", "办公室电脑"), store, token).await?;
-let offer = link.begin_pairing().await?;          // offer.qr_text 画成二维码
-// 手机扫码 → 本库自动验证配对证明并确认 → 收到 LinkEvent::Paired
-link.send(&phone_id, b"...", false)?;             // 加密后经中转发给手机
-while let Some(e) = events.recv().await { /* Message { peer, data } 等 */ }
+link.send(&phone_id, b"...", false)?;             // 经中转发给手机
+while let Some(e) = events.recv().await { /* PeerAdded / Message { peer, data } 等 */ }
 ```
 
 ## 它负责什么
 
-- **设备身份**：首次启动生成 P-256 密钥并向中转登记；中转撤销设备后自动清除本地配对并重新登记。
-- **配对**：`begin_pairing` 申请配对码并打开配对窗口，生成二维码内容；手机兑换后，**用二维码里的一次性密钥验证它的证明**，通过才向中转确认并派生配对密钥；证明不对、窗口已关闭的请求一律拒绝。假请求不会烧掉窗口，真正的手机随后仍能配对。
-- **连接**：WebSocket 长连接，25 秒心跳，断线指数退避加抖动自动重连（初始/上限可配），拿不到令牌时持续重试；被同设备的新连接顶替时停止重连并报告。
-- **加解密**：每个对端一个发送方，会话标识 `ep` 由持久化的启动计数生成；收到的信封先解密再做重放检查，重放和解密失败的以 `Dropped` 事件报告，不当作消息。
-- **持久化**：重放防护进度每秒落盘一次（以及断开和关闭时），**崩溃时最多丢最近一秒的进度**，此窗口内的信封理论上可被重放；这是为了不在每个流式增量上写盘而做的取舍。
-- **解除配对**：`unpair` 通知中转，对端收到 `unpaired`；对端先解除时本地同步清除。
+- **设备登记**：首次启动生成随机 `install_id` 并登记；重复登记拿回同一个设备编号。设备在中转被移除（或换了账号）后，自动清除本地编号并以新的 `install_id` 重新登记。登记串行化，启动后立刻发消息也只会登记一台。
+- **连接**：WebSocket 长连接，25 秒心跳，断线指数退避加抖动自动重连；拿不到令牌时持续重试；被同设备的新连接顶替时停止重连并报告。
+- **对端表**：维护同账号下对端设备的名称与在线状态，`peers()` 随时可读；新对端登记不用重连就能看到。
+- **发送**：`send` 只接受已知对端和 UTF-8 文本，进入队列即返回；没送达会收到 `Undelivered`。`notify = true` 的消息在对端离线时由中转暂存。
 
 ## 验证
 
@@ -31,8 +29,6 @@ while let Some(e) = events.recv().await { /* Message { peer, data } 等 */ }
 TEST_DATABASE_URL=postgres://… cargo test
 ```
 
-7 项端到端集成测试，用真实的 server-link（真实 Postgres 与 WebSocket，通过它的 `testing` 特性拉起）、本库的桌面端、以及测试里按协议手写的手机端：配对后双向收发并保持顺序；错误证明与已关闭窗口被拒、真手机随后仍可配对；重启后配对关系恢复、旧信封重放被拒、新会话被手机接受；桌面离线时的通知在上线后补发而指令不补发；两端各自解除配对；拿不到令牌时持续重试直到成功；启动后立刻配对时只登记一台设备（登记串行化的回归测试）。
+6 项端到端集成测试，用真实的 server-link（真实 Postgres 与 WebSocket，通过它的 `testing` 特性拉起）和两个本库的客户端（一个当电脑、一个当手机）：同账号互相发现并双向收发（中文、6 万字大消息、连发 50 条保持顺序、来源由中转填写）；不同账号互相看不到；对端离线时通知在上线后补发而指令不补发；移除设备后它收到通知并重新登记成新设备；拿不到令牌时持续重试且只登记一台设备；状态文件重启后仍是同一台设备、旧版本的多余字段被忽略。没有 `TEST_DATABASE_URL` 时跳过。
 
-另有跨语言互通示例 `examples/interop_desktop.rs`：起真实 server-link 和桌面端并打开配对窗口，供 Kotlin 手机端的 `InteropTest` 连接（见 `:common:link-core` 的 README）。没有 `TEST_DATABASE_URL` 时跳过。
-
-桌面应用（`src-tauri`）的接入层还没写：需要把事件映射到现有会话和审批（见互联计划 §3.6），并在 Windows / macOS 上编译验证。
+跨语言互通示例 `examples/interop_desktop.rs`：起真实 server-link 和桌面端，供 Kotlin 手机端的 `InteropTest` 连接（见 `:common:link-core` 的 README）。

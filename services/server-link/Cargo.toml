@@ -2,7 +2,7 @@
 name = "server-link"
 version = "0.1.0"
 edition = "2021"
-description = "小伴手机与桌面互联的中转服务：设备与配对、端到端加密信封的转发、在线状态。看不到消息正文"
+description = "小伴手机与桌面互联的中转服务：同一账号的设备互相发现、消息转发、在线状态"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
@@ -28,7 +28,6 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2.0"
 
-xiaoban-link-protocol = { path = "../../libs/link-protocol" }
 ring = { version = "0.17", optional = true }
 
 [features]

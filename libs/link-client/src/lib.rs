@@ -1,14 +1,15 @@
-//! 小伴桌面端的互联客户端。协议见 `docs/agent/设备互联协议.md`，加密由 `xiaoban-link-protocol` 完成。
+//! 小伴桌面端的互联客户端。协议见 `docs/agent/设备互联协议.md`。
 //!
-//! 宿主（Tauri 应用）做三件事：提供令牌（[`TokenFn`]）、提供存储（[`store::LinkStore`]）、消费事件（[`LinkEvent`]）。
-//! 本库负责：登记设备、生成配对二维码、验证手机的配对证明并确认、保持 WebSocket 连接（断线自动重连）、
-//! 加解密收发、重放防护、解除配对。
+//! 同一个账号登录的手机和电脑自动互相发现，不需要配对：本库用账号令牌向中转登记这台设备，
+//! 保持一条 WebSocket 连接，收到“同账号下对端设备”的列表与上下线通知，并收发文本消息。
+//!
+//! 宿主（Tauri 应用）做三件事：提供令牌（[`TokenFn`]）、提供存储（[`store::LinkStore`]，只存设备编号）、消费事件（[`LinkEvent`]）。
 
 pub mod api;
 mod client;
 pub mod store;
 
-pub use client::{Link, LinkConfig, LinkEvent, PairingOffer, PeerSummary};
+pub use client::{Link, LinkConfig, LinkEvent, PeerSummary};
 
 use std::{future::Future, pin::Pin, sync::Arc};
 
@@ -36,14 +37,10 @@ pub enum Error {
     Store(String),
     #[error("没有连上中转服务")]
     NotConnected,
-    #[error("没有这个已配对的设备")]
+    #[error("没有这个设备")]
     UnknownPeer,
     #[error("发送队列已满")]
     Congested,
-    #[error("协议错误：{0}")]
-    Protocol(String),
-}
-
-impl From<xiaoban_link_protocol::Error> for Error {
-    fn from(e: xiaoban_link_protocol::Error) -> Self { Error::Protocol(e.to_string()) }
+    #[error("消息不是合法文本")]
+    BadMessage,
 }

@@ -176,7 +176,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
             val peerDetail = if (peers.isNotEmpty()) {
                 val onlineCount = peers.count { it.online }
                 if (onlineCount > 0) "${peers.size} 台电脑（$onlineCount 在线）" else "${peers.size} 台电脑（离线）"
-            } else "未配对"
+            } else "未发现电脑"
             MineRow("我的电脑 / 设备互联", peerDetail) { open(Route.Devices) }
 
             if (session.loggedIn) {

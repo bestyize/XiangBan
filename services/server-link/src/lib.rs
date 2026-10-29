@@ -22,7 +22,7 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
-use handlers::{devices, pairing};
+use handlers::{devices, peers};
 use state::AppState;
 use tower_http::{
     cors::{Any, CorsLayer},
@@ -34,12 +34,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(handlers::health))
         .route("/devices", post(devices::create).get(devices::list))
         .route("/devices/{id}", delete(devices::remove))
-        .route("/pair-codes", post(pairing::create_code))
-        .route("/pair", post(pairing::redeem))
-        .route("/pairings", get(pairing::list))
-        .route("/pairings/{id}", delete(pairing::remove))
-        .route("/pairings/{id}/confirm", post(pairing::confirm))
-        .route("/pairings/{id}/reject", post(pairing::reject))
+        .route("/peers", get(peers::list))
         .route("/ws", get(ws::connect));
 
     // 凭证只走 Authorization 头或 WebSocket 子协议，不用 Cookie，跨域放开不构成 CSRF 面。
@@ -52,10 +47,4 @@ pub fn build_router(state: AppState) -> Router {
     Router::new().nest("/api/link", api).layer(cors).layer(TraceLayer::new_for_http()).with_state(state)
 }
 
-/// 清理过期的配对码和早已结束的配对记录。
-pub async fn cleanup(pool: &sqlx::PgPool) {
-    let _ = sqlx::query("DELETE FROM pair_codes WHERE expires_at < now() - interval '1 day' OR used_at < now() - interval '1 day'").execute(pool).await;
-    let _ = sqlx::query("DELETE FROM pairings WHERE status IN ('rejected', 'revoked') AND COALESCE(revoked_at, created_at) < now() - interval '30 days'").execute(pool).await;
-    let _ = sqlx::query("DELETE FROM pairings WHERE status = 'pending' AND created_at < now() - interval '1 day'").execute(pool).await;
-}
 

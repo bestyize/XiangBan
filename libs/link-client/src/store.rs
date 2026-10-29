@@ -1,47 +1,23 @@
-//! 需要长期保存的状态：设备身份、配对密钥、重放防护进度、启动计数、正在进行的配对。
-//! 宿主决定存哪里：[`FileStore`] 是一个 JSON 文件（Unix 上权限 0600）；
-//! 桌面正式版应实现 [`LinkStore`]，把私钥和配对密钥放进系统钥匙串，其余放文件。
+//! 需要长期保存的状态：这台设备的编号。没有任何密钥，丢了只是重新登记成一台新设备。
+//! 宿主决定存哪里：[`FileStore`] 是一个 JSON 文件；测试用 [`MemoryStore`]。
 use crate::Error;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, path::PathBuf, sync::Mutex};
+use std::{path::PathBuf, sync::Mutex};
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct DeviceIdentity {
+    /// 中转分配的设备编号
     pub id: String,
     pub name: String,
-    /// 32 字节私钥，base64url
-    pub private_key: String,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct PeerRecord {
-    pub pairing_id: String,
-    pub peer_id: String,
-    pub peer_name: String,
-    /// 对端公钥，base64url
-    pub peer_public: String,
-    /// 配对密钥 PRK，base64url
-    pub prk: String,
-    /// 重放防护进度：(启动计数, ep, 最大序号)
-    pub replay: Option<(u64, String, u64)>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
-pub struct PendingPair {
-    pub code: String,
-    /// 二维码里的一次性密钥，base64url
-    pub secret: String,
-    /// 过期时间（Unix 毫秒）
-    pub expires_at_ms: i64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub struct State {
+    /// 首次运行时随机生成，登记时带上，让重复登记拿到同一个设备编号。
+    #[serde(default)]
+    pub install_id: String,
+    #[serde(default)]
     pub device: Option<DeviceIdentity>,
-    /// 每次启动加一后落盘，用于生成 `ep`（见协议 §2.3）。
-    pub start_counter: u64,
-    pub peers: HashMap<String, PeerRecord>,
-    pub pending_pair: Option<PendingPair>,
 }
 
 pub trait LinkStore: Send + Sync {
@@ -75,6 +51,7 @@ impl FileStore {
 impl LinkStore for FileStore {
     fn load(&self) -> Result<State, Error> {
         match std::fs::read(&self.path) {
+            // 旧版本（配对 + 密钥）留下的字段会被忽略。
             Ok(bytes) => serde_json::from_slice(&bytes).map_err(|e| Error::Store(format!("状态文件损坏：{e}"))),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(State::default()),
             Err(e) => Err(Error::Store(e.to_string())),
@@ -89,11 +66,6 @@ impl LinkStore for FileStore {
         let tmp = self.path.with_extension("tmp");
         let bytes = serde_json::to_vec_pretty(state).map_err(|e| Error::Store(e.to_string()))?;
         std::fs::write(&tmp, bytes).map_err(|e| Error::Store(e.to_string()))?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&tmp, std::fs::Permissions::from_mode(0o600));
-        }
         std::fs::rename(&tmp, &self.path).map_err(|e| Error::Store(e.to_string()))
     }
 }
