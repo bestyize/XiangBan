@@ -167,19 +167,21 @@ fun RemoteListScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 12.dp, bottom = 24.dp)) {
                 if (peer == null) {
                     Banner("这台电脑已退出账号或被移除，它重新登录同一个账号后会再次出现。", Modifier.padding(horizontal = 16.dp), warn = true, icon = XIcons.Warning, actionText = "回到我的电脑", onAction = back)
-                } else if (!peer.online) {
-                    Banner("${peer.name}现在不在线，暂时不能遥控。电脑上线后会自动恢复。", Modifier.padding(horizontal = 16.dp), warn = true, icon = XIcons.Monitor, actionText = "改用云端小伴", onAction = { open(Route.AiChat) })
                 } else {
-                    PillButton("新对话", { env.remoteChat.newSession(); open(Route.RemoteChat(peerId)) }, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), icon = XIcons.Plus)
+                    if (!peer.online) {
+                        Banner("${peer.name}现在不在线，当前显示的是已缓存的对话。电脑上线后自动恢复遥控。", Modifier.padding(horizontal = 16.dp), warn = true, icon = XIcons.Monitor, actionText = "改用云端小伴", onAction = { open(Route.AiChat) })
+                    } else {
+                        PillButton("新对话", { env.remoteChat.newSession(); open(Route.RemoteChat(peerId)) }, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), icon = XIcons.Plus)
+                    }
                     Text("电脑上的对话", Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 6.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     if (remote.sessions.isEmpty()) {
-                        Text(if (remote.loadingSessions) "读取电脑上的对话…" else "电脑上还没有对话。", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(if (remote.loadingSessions) "读取电脑上的对话…" else if (peer.online) "电脑上还没有对话。" else "暂无已缓存的对话记录。", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else {
                         Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
                             remote.sessions.forEachIndexed { i, s -> SessionRow(s, first = i == 0) { env.remoteChat.selectSession(s.id); open(Route.RemoteChat(peerId)) } }
                         }
                     }
-                    Text("这里是电脑小伴里的对话，手机上发的消息也会出现在电脑上。电脑关机或断网时，这里会提示不在线。", Modifier.padding(horizontal = 16.dp, vertical = 12.dp), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("这里是电脑小伴里的对话，手机上发的消息也会出现在电脑上。电脑关机或断网时，可浏览离线缓存历史。", Modifier.padding(horizontal = 16.dp, vertical = 12.dp), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -252,7 +254,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             } else if (peer == null) {
                 Banner("这台电脑已退出账号或被移除", Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true, icon = XIcons.Warning, actionText = "回到我的电脑", onAction = back)
             } else if (!online) {
-                Banner("${peer.name}现在不在线，暂时不能遥控。电脑上线后会自动恢复。", Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true, icon = XIcons.Monitor, actionText = "改用云端小伴", onAction = { open(Route.AiChat) })
+                Banner("${peer.name}现在不在线，当前显示的是离线缓存内容。电脑上线后自动恢复同步。", Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true, icon = XIcons.Monitor, actionText = "改用云端小伴", onAction = { open(Route.AiChat) })
             }
             remote.error?.let { Banner(it, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true) }
 
@@ -268,7 +270,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             }
 
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
-                ComposerCard(input, { input = it }, if (online) "对电脑上的小伴说点什么…" else "电脑不在线，暂时不能发送", enabled = online) {
+                ComposerCard(input, { input = it }, if (online) "对电脑上的小伴说点什么…" else "电脑不在线，上线后可继续对话", enabled = online) {
                     ChipPill(peer?.name ?: "电脑", icon = XIcons.Monitor)
                     Spacer(Modifier.weight(1f))
                     if (remote.sending) {
