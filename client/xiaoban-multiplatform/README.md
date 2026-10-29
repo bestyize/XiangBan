@@ -1,6 +1,6 @@
 # 小伴多端 App
 
-状态：可运行原型，目前三端都只是把 https://xiaban.xyz 套进原生壳。Android 与 macOS 已运行验证，iOS 只验证到编译，Windows/Linux 桌面未构建（见下）。这个目录固定保留为未来 App 的开发位置。
+状态：可运行原型。Android/iOS 的移动端入口使用 Compose 原生社区、AI 与桌面互联界面；桌面 Tauri 壳仍指向已停用的 xiaban.xyz。Android 与 macOS 的历史验证、iOS 编译和 Windows/Linux 桌面构建范围见下文，不代表当前版本均已实机验收。
 
 移动端和桌面端分开实现：
 

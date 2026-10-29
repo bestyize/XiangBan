@@ -63,9 +63,11 @@ Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮�
 
 ## 设计规范与交互稿
 
-超级小伴已采用月白 / 夜银两套配色与品牌标志小球（主题色圆底 + 白色 Sparkles），收起球使用待机动效；思考、文字回复及语音播放均可通过右侧方块停止。当前形态与品牌标志以 [超级小伴设计规范](docs/design-specs/super-assistant.md) 为准；[对话框设计稿](docs/design-specs/prototypes/assistant-conversation.html) 提供配色与回复交互参考，[旧生命球演示](docs/design-specs/prototypes/assistant-living-orb.html) 仅供历史追溯。
+内置游戏的运行资源在 `public/game-packs/`，构建时会与仓库内独立的 `assets/game-packs/` 基准包核对；修改游戏时需同步相关文件及桌面适配。
 
-工程内的设计文档入口见 [设计规范目录](docs/design-specs/README.md)。超级小伴的 [悬浮按钮设计稿](docs/design-specs/prototypes/assistant-floating-tools.html) 与 [截图工具设计稿](docs/design-specs/prototypes/assistant-capture-overlay.html) 均可直接用浏览器打开；交互约定及正式代码对应关系见 [超级小伴设计规范](docs/design-specs/super-assistant.md)。
+超级小伴已采用月白 / 夜银两套配色与品牌标志小球（主题色圆底 + 白色 Sparkles），收起球使用待机动效；思考、文字回复及语音播放均可通过右侧方块停止。当前形态与品牌标志以 [超级小伴设计规范](docs/design-specs/super-assistant.md) 为准；[对话框设计稿](docs/design-specs/prototypes/assistant-conversation.html) 提供配色与回复交互参考。
+
+工程内的设计文档入口见 [设计规范目录](docs/design-specs/README.md)。超级小伴的 [截图工具设计稿](docs/design-specs/prototypes/assistant-capture-overlay.html) 可直接用浏览器打开；交互约定及正式代码对应关系见 [超级小伴设计规范](docs/design-specs/super-assistant.md)。
 
 ## 聊天输入框：技能 / 专家 / 连接器
 
@@ -328,7 +330,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 
 ## 大仓开发边界
 
-本项目是桌面客户端，不承担网页、账户或后端业务。角色可以有自己的实现，修改角色行为时运行本地 npm test；不引用其他客户端或主后端的私有文件。两种窗口模式共用本应用场景，Windows/macOS 接入分文件。新增能力按本次需求，当前无聊天/账号/云端依赖。
+本项目是桌面客户端，不承担网页、账户或后端业务。角色可以有自己的实现，修改角色行为时运行本地 npm test；不引用其他客户端或主后端的私有文件。两种窗口模式共用本应用场景，Windows/macOS 接入分文件。新增能力按本次需求实现；聊天、账号和云端能力的实际范围以本 README 对应章节为准。
 
 品牌插画使用 `public/xiaoban.svg`，由本工程原有猫脸角色 `robotMarkup(stillFrame("idle"))` 导出；网站维护一份相同的静态 SVG，不导入客户端源码。
 

@@ -1,6 +1,6 @@
 # server-ai：相伴 AI 网关与额度系统
 
-状态：一期、二期（兑换码）已实现，未部署。为产品矩阵提供统一的 AI 调用入口：身份只认[账号中心](../server-account/README.md)，上游模型经 New API 网关调用，额度按「账号 × 产品」隔离。设计取舍见 [docs/architecture/ai-gateway.md](../../docs/architecture/ai-gateway.md)。
+状态：一期、二期（兑换码）已实现；当前线上部署状态需核实。为产品矩阵提供统一的 AI 调用入口：身份只认[账号中心](../server-account/README.md)，上游模型经 New API 网关调用，额度按「账号 × 产品」隔离。设计取舍见 [docs/architecture/ai-gateway.md](../../docs/architecture/ai-gateway.md)。
 
 技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），管理后台为 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。默认端口 55010。
 

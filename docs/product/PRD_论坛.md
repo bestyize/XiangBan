@@ -1,6 +1,6 @@
 # 论坛设计方案（草案）
 
-状态：一期（网页论坛，对应 M1）已实现于 [services/server-forum](../../services/server-forum/README.md)，未部署；App 放到二期。站点名「超级小伴」，域名 `chat.xiangban.xyz`。
+状态：一期网页论坛已实现于 [services/server-forum](../../services/server-forum/README.md)，历史记录显示 2026-10-11 已部署；当前线上状态需核实。移动端已实现原生社区界面，具体范围以多端 App README 为准。站点名「超级小伴」，域名 `chat.xiangban.xyz`。
 
 ## 1. 定位
 

@@ -1,5 +1,7 @@
 # 小伴桌面 --- 桌面端 UI 改造规范 V1.0
 
+> 历史视觉设计参考：尺寸、颜色和导航可能与当前界面不同，现行规则以 [桌面控制台 UI](docs/ui-design.md) 和 [界面约定](docs/design-specs/ui-conventions.md) 为准。
+
 > 各模块的设计文档与可交互原型统一从 [设计规范目录](docs/design-specs/README.md) 进入。超级小伴悬浮按钮和截图工具以 [专项设计规范](docs/design-specs/super-assistant.md) 及对应 HTML 为准。
 
 ## 设计定位

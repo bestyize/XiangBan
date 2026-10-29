@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f6f7f9">
+    <title>奶茶大师 · 下班啦</title>
+    <link rel="stylesheet" href="./game.css">
+    <link rel="stylesheet" href="../fresh-theme.css">
+    <link rel="stylesheet" href="../result-share.css">
+    <script src="./rules.js" defer></script>
+    <script src="./layout.js" defer></script>
+    <script src="../result-share.js" defer></script>
+    <script src="./game.js" defer></script>
+  </head>
+  <body class="fresh-game" data-game="water-sort">
+    <main class="game">
+      <header class="topbar">
+        <div><p class="eyebrow">下班奶茶店 · 轻松益智</p><h1>奶茶大师</h1></div>
+        <button id="exitButton" class="quiet-button exit-button" type="button" aria-label="返回游戏广场"><span class="exit-arrow" aria-hidden="true">‹</span><span class="exit-label">回广场</span></button>
+      </header>
+      <section class="stats" aria-label="本次游戏数据">
+        <div><span>关卡</span><strong id="levelNumber">1 / 8</strong></div>
+        <div><span>步数</span><strong id="moves">0</strong></div>
+        <div><span>完成</span><strong id="completed">0 / 8</strong></div>
+      </section>
+      <div class="level-bar">
+        <label for="levelSelect">今晚的菜单</label>
+        <select id="levelSelect" aria-label="选择已解锁关卡"></select>
+      </div>
+      <p class="intro">先点一杯，再点另一杯。同色才能接着倒。</p>
+      <section class="stage" aria-label="调饮料区域">
+        <div id="board" class="board" role="group" aria-label="饮料杯，Tab 切换杯子，Enter 或空格选择"></div>
+        <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultText" hidden>
+          <div class="result-card">
+            <div class="result-icon" aria-hidden="true">✦</div>
+            <p class="eyebrow">这一杯，调得漂亮</p>
+            <h2 id="resultTitle">本关完成！</h2>
+            <p id="resultText"></p>
+            <button id="shareResultButton" class="result-share-button" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m-4 4 4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" /></svg><span>分享战绩</span></button>
+            <div class="result-actions">
+              <button id="nextButton" class="primary-button" type="button">下一关</button>
+              <button id="replayButton" class="quiet-button" type="button">重玩本关</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <p id="status" class="status" role="status" aria-live="polite" aria-atomic="true">点选一杯饮料，开始调配。</p>
+      <footer class="footer">
+        <div class="actions">
+          <button id="undoButton" class="quiet-button" type="button" disabled>↶ 撤销</button>
+          <button id="resetButton" class="quiet-button" type="button">重置本关</button>
+        </div>
+        <p class="help">每杯装满一种饮料就过关 · 字母代表口味<br><span>Tab 切换 · Enter / 空格选杯 · Esc 取消选择</span></p>
+      </footer>
+    </main>
+  </body>
+</html>

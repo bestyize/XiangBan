@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f0b27a" />
+  <title>暮色滑翔</title>
+  <link rel="stylesheet" href="../result-share.css" />
+  <link rel="stylesheet" href="game.css" />
+</head>
+<body>
+  <main id="game" class="game" aria-label="暮色滑翔，横版 3D 滑翔游戏">
+    <canvas id="scene" aria-label="暮色滑翔画面。按住屏幕让纸鸟变重，顺着下坡俯冲；松开让它顺着上坡飞起。电脑可按住空格或鼠标。"></canvas>
+
+    <header class="hud" id="hud" hidden>
+      <div class="score-block"><strong id="score">0</strong><span><b id="distance">0</b> 米</span><span class="next-island" id="nextIsland" hidden>下一座岛 <b id="nextIslandDistance">0</b> 米</span></div>
+      <div class="daylight" id="daylight" role="progressbar" aria-label="余晖" aria-valuemin="0" aria-valuemax="60" aria-valuenow="60">
+        <span class="daylight-track"><span class="daylight-fill" id="daylightFill"></span><i class="daylight-sun" id="daylightSun"></i></span>
+        <small id="daylightLabel">余晖</small>
+      </div>
+      <div class="hud-actions">
+        <button class="icon-button" id="flipButton" type="button" aria-label="切换横持方向" title="换一边横持" hidden><svg viewBox="0 0 24 24"><path d="M5 9a7 7 0 0 1 12-3l2 2m0-5v5h-5M19 15a7 7 0 0 1-12 3l-2-2m0 5v-5h5" /></svg></button>
+        <button class="icon-button" id="soundButton" type="button" aria-label="开启声音" aria-pressed="false" title="声音"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5Z" /><path id="soundWaves" d="m16 9 5 6m0-6-5 6" /></svg></button>
+        <button class="icon-button" id="fullscreenButton" type="button" aria-label="进入全屏" title="全屏"><svg viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m8 0h5v-5" /></svg></button>
+        <button class="icon-button" id="pauseButton" type="button" aria-label="暂停" title="暂停"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14" /></svg></button>
+      </div>
+    </header>
+
+    <div class="chain" id="chain" aria-live="off" hidden><strong id="chainCount">0</strong><span id="chainLabel">连续完美</span></div>
+    <div class="callout" id="callout" aria-live="polite" hidden><strong id="calloutTitle"></strong><span id="calloutPoints"></span></div>
+    <div class="island-title" id="islandTitle" aria-live="polite" hidden><small id="islandSub"></small><strong id="islandName"></strong><span id="islandBonus"></span></div>
+    <div class="coach" id="coach" role="status" aria-live="polite" hidden>
+      <span class="coach-icon" aria-hidden="true"></span>
+      <span class="coach-text"><strong id="coachAction">按住</strong><small id="coachReason">顺着下坡加速</small></span>
+    </div>
+    <div class="prompt" id="prompt" role="status" aria-live="polite" hidden></div>
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    <div class="hold-ring" id="holdRing" aria-hidden="true"></div>
+    <button class="icon-button help-button" id="helpButton" type="button" aria-label="怎么玩" title="怎么玩" hidden><svg viewBox="0 0 24 24"><path d="M12 17h.01M9.1 9a3 3 0 1 1 4 2.8c-.7.3-1.1.9-1.1 1.7v.5" /></svg></button>
+
+    <section id="welcome" class="overlay welcome" aria-labelledby="welcomeTitle">
+      <button class="welcome-exit icon-button" id="welcomeExit" type="button" aria-label="返回游戏广场"><svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6" /></svg></button>
+      <button class="welcome-flip icon-button" id="welcomeFlip" type="button" aria-label="切换横持方向" title="换一边横持" hidden><svg viewBox="0 0 24 24"><path d="M5 9a7 7 0 0 1 12-3l2 2m0-5v5h-5M19 15a7 7 0 0 1-12 3l-2-2m0 5v-5h5" /></svg></button>
+      <div class="welcome-card">
+        <p class="welcome-kicker">一只纸鸟 · 一片群岛 · 一场日落</p>
+        <h1 id="welcomeTitle">暮色滑翔</h1>
+        <p class="welcome-description">天黑之前，飞到更远的岛。<br>按住俯冲，松开滑翔。</p>
+        <div class="welcome-actions">
+          <button id="startButton" class="primary-button" type="button">起飞 <svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></button>
+        </div>
+        <p class="welcome-foot"><span class="touch-copy">按住 = 俯冲 · 松开 = 滑翔</span><span class="desktop-copy">按住空格 / ↓ / 鼠标 = 俯冲 · 松开 = 滑翔</span></p>
+      </div>
+    </section>
+
+    <section id="pauseOverlay" class="overlay scrim" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
+      <div class="dialog-card"><h2 id="pauseTitle">落在云上歇一歇</h2><p id="pauseDescription">太阳也替你停住了，随时可以接着飞。</p><button id="resumeButton" class="primary-button" type="button">继续 <span aria-hidden="true">→</span></button><button id="pauseHelp" class="text-button" type="button">怎么玩</button><button id="pauseExit" class="text-button" type="button">返回游戏广场</button></div>
+    </section>
+
+    <section id="resultOverlay" class="overlay scrim" role="dialog" aria-modal="true" aria-labelledby="resultTitle" hidden>
+      <div class="dialog-card result-card">
+        <span class="result-badge" id="resultBadge">夜色降临</span>
+        <h2 id="resultTitle">纸鸟归巢</h2>
+        <p id="resultDescription"></p>
+        <div class="result-score"><strong id="resultScore">0</strong><span>本局积分</span></div>
+        <div class="result-stats">
+          <div><b id="resultPerfects">0</b><span>完美落地</span></div>
+          <div><b id="resultChain">0</b><span>最长连击</span></div>
+          <div><b id="resultIslands">1</b><span>抵达岛屿</span></div>
+          <div><b id="resultDistance">0</b><span>飞行米数</span></div>
+        </div>
+        <p id="resultBonus" class="result-bonus"></p>
+        <p id="bestLabel" class="best-label"></p>
+        <button id="shareResultButton" class="result-share-button" type="button" hidden>分享战绩 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7m-8 0h8v8" /></svg></button>
+        <div class="result-actions"><button id="restartButton" class="primary-button" type="button">再飞一次</button></div>
+        <button id="resultExit" class="text-button" type="button">返回游戏广场</button>
+      </div>
+    </section>
+
+    <section id="helpOverlay" class="overlay scrim help-overlay" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+      <div class="dialog-card help-card">
+        <h2 id="helpTitle">怎么玩</h2>
+        <ol class="howto" aria-label="玩法三步">
+          <li>
+            <svg viewBox="0 0 64 40" aria-hidden="true"><path class="hill" d="M4 8C24 8 32 30 60 32" /><circle class="press" cx="20" cy="15" r="5" /><path class="chev" d="M30 20l5 3-5 3M38 23l5 3-5 3" /></svg>
+            <b>下坡按住</b><span>金色路段 加速</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 64 40" aria-hidden="true"><path class="hill" d="M4 22C14 36 26 36 36 26S52 8 60 8" /><circle class="free" cx="20" cy="31" r="5" /><path class="fly" d="M40 20C48 6 56 4 62 10" /></svg>
+            <b>坡底松开</b><span>借上坡飞起</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 64 40" aria-hidden="true"><path class="hill" d="M4 16L60 36" /><path class="fly" d="M6 4C26 -2 40 8 46 24" /><ellipse class="target" cx="46" cy="29" rx="9" ry="3.6" /></svg>
+            <b>顺坡落地</b><span>白圈是普通，金圈才是完美，连三次进顺风</span>
+          </li>
+        </ol>
+        <p class="help-extra">赶上日光：每飞到一座新岛会补一段余晖，天黑就结束了。</p>
+        <div class="help-toggles">
+          <button id="helpAssist" class="text-toggle" type="button" aria-pressed="true">引导 · 开</button>
+          <button id="helpSound" class="text-toggle" type="button" aria-pressed="true">声音 · 开</button>
+        </div>
+        <button id="helpClose" class="primary-button" type="button">知道了</button>
+        <button id="helpRestart" class="text-button" type="button" hidden>重新开始一局</button>
+      </div>
+    </section>
+
+    <div class="fallback" id="fallback" hidden><p>这台设备暂时打不开 3D 画面（WebGL 不可用）。</p><button id="fallbackExit" class="primary-button" type="button">返回游戏广场</button></div>
+  </main>
+  <script src="viewport.js"></script>
+  <script src="rules.js"></script>
+  <script src="vendor/three.min.js"></script>
+  <script src="world.js"></script>
+  <script src="props.js"></script>
+  <script src="bird.js"></script>
+  <script src="guide.js"></script>
+  <script src="audio.js"></script>
+  <script src="../result-share.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

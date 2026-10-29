@@ -125,7 +125,7 @@ npm ci --registry=https://registry.npmjs.org/ --replace-registry-host=registry.n
 
 - **子 Agent** [已完成]：子任务的工具调用计入父任务的调用预算（见 2.9 第 37 条）。
 - **检查点的覆盖范围** [已完成]：不在 git 仓库的工作目录用私有仓库做快照（见 2.9 第 38 条）。超过 2 万个文件或 512 MB 的目录、用户主目录和磁盘根目录仍不覆盖。
-- **网页搜索** [待定]：需要选定方案。现有的搜索是 xiaban-api 后台配置的 SearXNG；走 server-ai 网关要新增带鉴权、限流和计费的搜索接口并部署，桌面端再接 `SearchBackend`。
+- **网页搜索**：原 xiaban-api 已移除；server-ai 已实现 `/v1/search` 和 `/v1/fetch`，实际部署和桌面端接入范围需以服务 README、代码及环境验证为准。
 - **Agent 复用**：电脑控制进程已复用；Agent 本身仍按消息重建（开销小，换来配置与工作目录变化即时生效）。
 
 ### 4.4 边界测试

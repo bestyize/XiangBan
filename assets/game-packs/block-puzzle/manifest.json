@@ -1,0 +1,10 @@
+{
+  "id": "block-puzzle",
+  "version": "1.0.0",
+  "name": "消失高手",
+  "description": "拖动方块填满整行或整列，一次消得越多，分数越高。慢慢摆，轻松消。",
+  "entry": "index.html",
+  "cover": "cover.svg",
+  "runtimeProtocol": 1,
+  "orientation": "portrait"
+}

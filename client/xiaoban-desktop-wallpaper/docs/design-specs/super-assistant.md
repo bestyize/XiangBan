@@ -5,7 +5,6 @@
 ## 设计参考
 
 - 当前形态以「小伴桌面 UI 升级设计稿」画布中的「④ 超级小伴」三张画板为准（见下一节）。
-- [悬浮按钮交互稿](prototypes/assistant-floating-tools.html)：旧版横排工具形态，已被方案四取代，仅作历史参考。
 - [截图工具交互稿](prototypes/assistant-capture-overlay.html)：定义截图蒙层、选区和标注工具栏。
 
 HTML 是可交互的视觉与行为参考，使用模拟桌面和对话。正式界面由 Vue/TypeScript 与 Tauri 实现，不在运行时加载这些文件。
@@ -68,7 +67,7 @@ HTML 是可交互的视觉与行为参考，使用模拟桌面和对话。正式
 - 生成中可以收起，回答在后台继续，小球显示进度环，完成后冒泡提示。
 - 收起后草稿与附件保留，下次展开原样还在；只有「新对话」会清空它们。
 
-正式实现：`src/assistant/AssistantApp.vue`、`src/assistant/assistant-store.ts`、`src-tauri/src/float_assistant.rs`。暂未实现（设计稿 P1/P2）：小球右键菜单、贴边吸附、卡片头部的模型名、回答下的「插入到原应用」「存到资料库」、划词唤起。
+正式实现：`src/assistant/AssistantApp.vue`、`src/assistant/assistant-store.ts`、`src-tauri/src/float_assistant.rs`。小球右键可打开设置，回答可存到资料库。暂未实现（设计稿 P1/P2）：贴边吸附、卡片头部的模型名、回答下的「插入到原应用」、划词唤起。
 
 ### 语音（第一期）
 
