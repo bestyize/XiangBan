@@ -233,7 +233,7 @@ private fun AiDrawer(cloud: CloudChatState, onClose: () -> Unit, onNew: () -> Un
                     fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             } else {
-                Text("还没有对话", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                Text("还没有对话", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
             }
             Spacer(Modifier.weight(1f))
             Hairline()
@@ -314,10 +314,9 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                         )
                     }
                     ChatComposer(
-                        input, { input = it }, "问点什么，或描述想要的装扮、游戏…", cloud.modelName(),
+                        input, { input = it }, "问点什么，或描述想要的装扮、游戏…",
                         onModel = { modelSheet = true },
                         onAttach = { attach = true },
-                        onWeb = { toast = "联网搜索即将支持" },
                         onVoice = { voiceInput.toggle() },
                         onLive = {
                             val platform = env.platform
@@ -449,7 +448,7 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                         }
                         Text(
                             "当前模型：${cloud.modelName()}\n${quotaText(cloud.balance)}" + (expiryText(cloud.balance)?.let { " · 到期 $it" } ?: ""),
-                            Modifier.padding(top = 12.dp), fontSize = 13.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Modifier.padding(top = 12.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         GhostPillButton("配置", { sheet = true; chat.clearRedeemFeedback() }, Modifier.padding(top = 12.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
                     }
@@ -482,12 +481,12 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                     }
                 }
                 Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextBox(code, { code = it }, Modifier.weight(1f), placeholder = "输入兑换码")
+                    TextBox(code, { code = it }, Modifier.weight(1f), placeholder = "输入兑换码", filled = true)
                     PillButton(if (cloud.redeeming) "兑换中…" else "兑换", { chat.redeem(code); code = "" }, enabled = !cloud.redeeming && code.isNotBlank(), height = 48.dp)
                 }
-                cloud.redeemMessage?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 13.sp, fontWeight = FontWeight.Medium) }
-                cloud.redeemError?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 13.sp, color = Brand) }
-                Text("可用模型", Modifier.padding(top = 16.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                cloud.redeemMessage?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, fontWeight = FontWeight.Medium) }
+                cloud.redeemError?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = Danger) }
+                Text("可用模型", Modifier.padding(top = 16.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Text("点选一个作为默认；在对话里也可以单独为每个对话换。", Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 cloud.tiers.forEach { tier ->
                     RadioRow(

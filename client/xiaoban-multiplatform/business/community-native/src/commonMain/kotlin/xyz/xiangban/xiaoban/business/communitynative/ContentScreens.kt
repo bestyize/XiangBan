@@ -101,7 +101,7 @@ fun TabStrip(tabs: List<Pair<String, String>>, selected: String, onSelect: (Stri
 @Composable
 private fun LoadMoreFooter(hasMore: Boolean, error: String?, count: Int, onMore: () -> Unit, onRetry: () -> Unit) {
     when {
-        error != null -> Text("加载失败，点这里重试", Modifier.fillMaxWidth().clickable(onClick = onRetry).padding(16.dp), color = Brand, fontSize = 13.sp)
+        error != null -> Text("加载失败，点这里重试", Modifier.fillMaxWidth().clickable(onClick = onRetry).padding(16.dp), color = Danger, fontSize = 14.sp)
         hasMore -> {
             // 这一项滚到可见才会进入组合，以此触发下一页；条数变化后再次触发。
             LaunchedEffect(count) { onMore() }
@@ -116,7 +116,7 @@ fun Toast(text: String?, onGone: () -> Unit) {
     if (text == null) return
     LaunchedEffect(text) { delay(1600); onGone() }
     Box(Modifier.fillMaxSize().padding(bottom = 120.dp), contentAlignment = Alignment.BottomCenter) {
-        Text(text, Modifier.clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(alpha = 0.78f)).padding(horizontal = 16.dp, vertical = 8.dp), color = Color.White, fontSize = 13.sp)
+        Text(text, Modifier.clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(alpha = 0.78f)).padding(horizontal = 16.dp, vertical = 8.dp), color = Color.White, fontSize = 14.sp)
     }
 }
 
@@ -132,7 +132,7 @@ private fun ShareSheet(env: CommunityEnv, title: String, sub: String, url: Strin
                 if (sub.isNotBlank()) Text(sub, Modifier.padding(top = 2.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        if (hint != null) Text(hint, Modifier.padding(top = 12.dp), fontSize = 13.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (hint != null) Text(hint, Modifier.padding(top = 12.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         val platform = env.platform
         Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GhostPillButton("复制链接", { platform?.copy(url); onDismiss(); onCopied() }, Modifier.weight(1f), enabled = platform != null)
@@ -202,7 +202,7 @@ private fun VisualCard(pack: Pack, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
         Box {
             Cover(pack.coverUrl, pack.id, Modifier.fillMaxWidth().aspectRatio(4f / 3f))
-            Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 2.dp), color = Color.White, fontSize = 10.sp)
+            Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp)
         }
         Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 10.dp)) {
             Text(pack.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -218,9 +218,9 @@ private fun VisualCard(pack: Pack, onClick: () -> Unit) {
 @Composable
 private fun TextCard(pack: Pack, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
-        Text(kindLabel(pack.kind), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+        Text(kindLabel(pack.kind), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
         Text(pack.title, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp)
-        if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 4.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             Avatar(pack.author?.nickname ?: "?")
             Text(listOfNotNull(pack.author?.nickname, pack.trustLabel.takeIf { pack.trustLevel < 2 }, "${pack.applyCount} 次应用".takeIf { pack.applyCount > 0 }).joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -241,10 +241,10 @@ private fun WeeklyRow(issue: WeeklyIssue, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(issue.week, Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(issue.publishedAt?.take(10).orEmpty(), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(issue.publishedAt?.take(10).orEmpty(), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(issue.title, Modifier.padding(top = 8.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp)
-        if (issue.summary.isNotBlank()) Text(issue.summary, Modifier.padding(top = 4.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (issue.summary.isNotBlank()) Text(issue.summary, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -254,7 +254,7 @@ private fun ProjectList(projects: List<Project>, open: (Route) -> Unit) {
         items(projects, key = { it.slug }) { project ->
             Column(Modifier.fillMaxWidth().clickable { open(Route.Project(project.slug)) }.padding(16.dp)) {
                 Text(project.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                if (project.summary.isNotBlank()) Text(project.summary, Modifier.padding(top = 4.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (project.summary.isNotBlank()) Text(project.summary, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
             Hairline(Modifier.padding(start = 16.dp))
         }
@@ -294,12 +294,12 @@ fun DiscussScreen(env: CommunityEnv, open: (Route) -> Unit, category: String? = 
 internal fun TopicRow(topic: Topic, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (topic.pinned) Text("置顶", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Brand)
-            if (topic.featured) Text("精华", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Brand)
-            Text(topic.category.name, fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            if (topic.pinned) Text("置顶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
+            if (topic.featured) Text("精华", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
+            Text(topic.category.name, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
         }
         Text(topic.title, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 22.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 4.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Avatar(topic.author.nickname, 16.dp)
             Text(topic.author.nickname, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
@@ -361,10 +361,10 @@ fun SearchScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 } else {
                     Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("搜索历史", Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Text("清空", Modifier.clickable { history = "" }.padding(4.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("清空", Modifier.clickable { history = "" }.padding(4.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items.forEach { h -> Text(h, Modifier.clip(CircleShape).background(LocalExtraColors.current.fill).clickable { search(h) }.padding(horizontal = 14.dp, vertical = 7.dp), fontSize = 13.sp) }
+                        items.forEach { h -> Text(h, Modifier.clip(CircleShape).background(LocalExtraColors.current.fill).clickable { search(h) }.padding(horizontal = 14.dp, vertical = 7.dp), fontSize = 14.sp) }
                     }
                 }
             }
@@ -426,13 +426,13 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
                             }
                         }
                         if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 16.dp), fontSize = 15.sp, lineHeight = 26.sp)
-                        if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, Modifier.padding(top = 12.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, Modifier.padding(top = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         val changes = pack.versions.filter { it.changelog.isNotBlank() }
                         if (changes.isNotEmpty()) {
                             Text("更新记录", Modifier.padding(top = 24.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                             changes.sortedByDescending { it.version }.forEach { v ->
-                                Text(v.label.ifBlank { "v${v.version}" }, Modifier.padding(top = 10.dp), fontSize = 13.sp, fontWeight = FontWeight.Medium)
-                                Text(v.changelog, Modifier.padding(top = 2.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(v.label.ifBlank { "v${v.version}" }, Modifier.padding(top = 10.dp), fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text(v.changelog, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -499,9 +499,9 @@ private fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0
         Text("评论 ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         posts.forEach { post -> PostItem(post) }
         when {
-            error != null -> Text("评论加载失败，点这里重试", Modifier.padding(top = 12.dp).clickable { retry += 1 }, color = Brand, fontSize = 13.sp)
+            error != null -> Text("评论加载失败，点这里重试", Modifier.padding(top = 12.dp).clickable { retry += 1 }, color = Danger, fontSize = 14.sp)
             more -> { LaunchedEffect(posts.size) { load() }; Spinner(Modifier.fillMaxWidth().height(48.dp)) }
-            posts.isEmpty() -> Text("还没有评论", Modifier.padding(top = 12.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+            posts.isEmpty() -> Text("还没有评论", Modifier.padding(top = 12.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
         }
         if (hint.isNotBlank()) {
             Text(hint, Modifier.padding(top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
@@ -516,7 +516,7 @@ private fun PostItem(post: Post) {
         Avatar(post.author.nickname, 30.dp, showInitial = true)
         Column(Modifier.weight(1f)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(post.author.nickname, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                Text(post.author.nickname, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Text("${post.floor} 楼 · ${post.createdAt.take(10)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             val body = when {
@@ -584,7 +584,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             }
                         }.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             XIcon(XIcons.Heart, tint = if (liked) Brand else MaterialTheme.colorScheme.onSurface, description = if (liked) "取消点赞" else "点赞")
-                            Text("$likeCount", fontSize = 13.sp, color = if (liked) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("$likeCount", fontSize = 14.sp, color = if (liked) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconTap(XIcons.Bookmark, if (bookmarked) "取消收藏" else "收藏", {
                             guarded { val next = !bookmarked; env.forum.setTopicBookmarked(topic.id, next); bookmarked = next; toast = if (next) "已收藏" else "已取消收藏" }
@@ -613,8 +613,8 @@ private fun ReplySheet(env: CommunityEnv, topicId: Long, onDismiss: () -> Unit, 
     var error by remember { mutableStateOf<String?>(null) }
     BottomSheet(onDismiss, panelModifier) {
         Text("回复", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-        AreaBox(text, { text = it }, Modifier.padding(top = 12.dp), placeholder = "写下你的回复（至少 2 个字）…", minHeight = 120.dp, enabled = !busy)
-        error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 13.sp, color = Brand) }
+        AreaBox(text, { text = it }, Modifier.padding(top = 12.dp), placeholder = "写下你的回复（至少 2 个字）…", minHeight = 120.dp, enabled = !busy, filled = true)
+        error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = Danger) }
         Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GhostPillButton("取消", onDismiss, Modifier.weight(1f))
             PillButton(if (busy) "发送中…" else "发送", {
@@ -672,9 +672,9 @@ private fun EntryColumn(rank: Int, title: String, summary: String, note: String,
         Text("$rank", Modifier.width(24.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = if (rank <= 3) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
         Column(Modifier.weight(1f)) {
             if (title.isNotBlank()) Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp)
-            if (summary.isNotBlank()) Text(summary, Modifier.padding(top = 4.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (summary.isNotBlank()) Text(summary, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (note.isNotBlank()) Text(note, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 22.sp)
-            if (label != null) Text(label, Modifier.padding(top = 8.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            if (label != null) Text(label, Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
         }
     }
 }

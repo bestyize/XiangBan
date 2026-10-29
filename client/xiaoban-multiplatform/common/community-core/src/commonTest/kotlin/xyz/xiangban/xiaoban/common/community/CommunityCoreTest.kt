@@ -366,6 +366,16 @@ class TextAndTokensTest {
     }
 
     @Test
+    fun `accent palettes start with the brand red and fall back to it`() {
+        assertEquals(6, DesignTokens.Accents.size)
+        assertEquals(DesignTokens.Brand, DesignTokens.Accents.first().light.btn)
+        assertEquals(DesignTokens.Accents.first(), DesignTokens.accentById(null))
+        assertEquals(DesignTokens.Accents.first(), DesignTokens.accentById("no-such-accent"))
+        assertEquals("海湾蓝", DesignTokens.accentById("blue").name)
+        assertEquals(DesignTokens.Accents.size, DesignTokens.Accents.map { it.id }.toSet().size)
+    }
+
+    @Test
     fun `brand colour matches the web front end`() {
         assertEquals(0xFFE3203CL, DesignTokens.Brand)
         assertEquals(8f, DesignTokens.RadiusCard)

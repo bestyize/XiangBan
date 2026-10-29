@@ -120,7 +120,7 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
                 } else {
                     TextBox(password, { password = it }, Modifier.padding(top = 12.dp), label = "密码", placeholder = "请输入密码", password = true, keyboardType = KeyboardType.Password, leadingIcon = XIcons.Lock, filled = true, fontSize = 14)
                 }
-                error?.let { Text(it, Modifier.padding(top = 10.dp), color = Brand, fontSize = 13.sp) }
+                error?.let { Text(it, Modifier.padding(top = 10.dp), color = Danger, fontSize = 14.sp) }
                 PillButton(
                     if (busy) "登录中…" else "登录",
                     {
@@ -146,7 +146,7 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
                 TextBox(username, { username = it.trim() }, Modifier.padding(top = 8.dp), label = "用户名", placeholder = "2–20 个字", leadingIcon = XIcons.User, filled = true, fontSize = 14)
                 Text("用户名不能修改，可用字母、数字、汉字和下划线", Modifier.padding(top = 6.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextBox(password, { password = it }, Modifier.padding(top = 12.dp), label = "密码", placeholder = "至少 8 位", password = true, keyboardType = KeyboardType.Password, leadingIcon = XIcons.Lock, filled = true, fontSize = 14)
-                error?.let { Text(it, Modifier.padding(top = 10.dp), color = Brand, fontSize = 13.sp) }
+                error?.let { Text(it, Modifier.padding(top = 10.dp), color = Danger, fontSize = 14.sp) }
                 PillButton(
                     if (busy) "提交中…" else "完成注册并登录",
                     { run { env.session.register(registrationToken.orEmpty(), username, password); done() } },
@@ -242,12 +242,15 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 NavRow("昵称与头像", session.user?.username, first = true) { env.platform?.openUrl("$site/settings") }
                 NavRow("绑定手机 / 邮箱") { env.platform?.openUrl("$site/settings") }
             }
+            GroupLabel("外观")
+            NavRow("主题", ThemeState.mode.label, first = true) { open(Route.Appearance) }
+            NavRow("主题色", ThemeState.accent.name) { open(Route.AccentColor) }
             GroupLabel("关于")
             NavRow("用户协议", first = true) { env.platform?.openUrl("$site/terms") }
             NavRow("隐私政策") { env.platform?.openUrl("$site/privacy") }
             NavRow("社区规则") { env.platform?.openUrl("$site/rules") }
             if (session.loggedIn) {
-                GhostPillButton("退出登录", { scope.launch { env.session.logout(); back() } }, Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp).fillMaxWidth(), textColor = Brand)
+                GhostPillButton("退出登录", { scope.launch { env.session.logout(); back() } }, Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp).fillMaxWidth(), textColor = Danger, onPage = true)
             } else {
                 PillButton("登录", { open(Route.Login) }, Modifier.padding(start = 16.dp, end = 16.dp, top = 20.dp).fillMaxWidth())
             }

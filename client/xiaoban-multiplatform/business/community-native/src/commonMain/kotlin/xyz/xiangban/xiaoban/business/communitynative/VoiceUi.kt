@@ -82,7 +82,7 @@ fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Bo
             }
             Text("${(fraction * 100).toInt()}%  ${done / 1_000_000} / ${total / 1_000_000} MB", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
         }
-        error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 13.sp, color = Brand) }
+        error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = Danger) }
         Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GhostPillButton(if (running) "取消" else "先不用", { job?.cancel(); onFinished(false) }, Modifier.weight(1f))
             PillButton(if (running) "下载中…" else if (error != null) "重试" else "下载", {
