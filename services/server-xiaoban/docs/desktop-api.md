@@ -53,7 +53,7 @@
 
 ### 壁纸交付
 
-检索列表直接使用网站现有 snake_case 字段和 `has_more` 分页语义。客户端执行保存或应用时根据列表中的 `id` 请求单项清单，其格式遵循[客户端资源协议](../../../client/xiaoban-desktop-wallpaper/docs/delivery-protocol.md)。
+检索列表直接使用网站现有 snake_case 字段和 `has_more` 分页语义。客户端执行保存或应用时根据列表中的 `id` 请求单项清单，其格式遵循[客户端资源协议](../../../client/xiaoban-desktop/docs/delivery-protocol.md)。
 
 采集只保留来源链接，本站副本是后备（见下文“直链优先”）。策略为 `copy` 的视频（含自定义上传）在管理员采集 / 自定义创建、重新上架与后台采集时先流式保存到服务器 `uploads/`；没有图片封面时用 FFmpeg 生成真实首帧 JPEG，副本信息写入 `local_copy`，来源链接不被改写（自定义上传没有来源链接，其本地路径仍按旧方式换成不可变副本）。处理失败时不将视频发布为可用内容。策略为 `source` 的内容采集时不下载任何素材，只检查存在可播放的 MP4/WebM 链接。已有记录在首次执行不带 `prefer` 的清单请求时按需补齐副本，不执行全库迁移；图片同样在该请求中生成不可变副本，并记录到 `local_copy`。素材最多 256 MiB；计算真实 SHA-256 与字节数后保存不可变副本，后续复用。外部源限制公开网络地址，逐跳校验并固定 DNS 解析结果，不允许访问内部网络。清单包含绝对资源 URL，网站自有内容寻址资源由客户端按已配置的网站源站解析（保留路径、SHA-256 与大小），避免本机地址配置后下载仍指向默认正式域名；外部 CDN 资源地址不改变。
 
@@ -143,7 +143,7 @@ Pixabay 图片默认 `copy` 的原因是官方 API 文档写明：“permanent h
 原生端到端测试需要临时网站数据库 / schema，不应指向正式数据库。启动该网站后设置 `XIAOBAN_WEBSITE_TEST_URL=http://127.0.0.1:8087`，在仓库根运行：
 
 ```powershell
-node client/xiaoban-desktop-wallpaper/scripts/verify-website.mjs client/xiaoban-desktop-wallpaper/src-tauri/target/release/xiaoban-desktop-wallpaper.exe
+node client/xiaoban-desktop/scripts/verify-website.mjs client/xiaoban-desktop/src-tauri/target/release/xiaoban-desktop.exe
 ```
 
 脚本使用测试网站默认管理员，写入测试版本 / 公告，上传测试图片 / 视频，通过隔离桌面实例实际检索、下载、渲染和检查消息。客户端使用独立数据目录和测试自启动项，不读取或修改正式桌面设置；报告位于客户端 `artifacts/website-smoke-*.json`。测试网站数据随后整体清理。

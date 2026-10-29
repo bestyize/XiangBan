@@ -6,7 +6,7 @@ import assert from 'node:assert/strict'
 const root = fileURLToPath(new URL('../', import.meta.url))
 await mkdir(path.join(root, 'artifacts'), { recursive: true })
 const report = path.join(root, `artifacts/games-smoke-${Date.now()}.json`)
-const defaultBinary = process.platform === 'win32' ? 'src-tauri/target/release/xiaoban-desktop-wallpaper.exe' : 'src-tauri/target/release/xiaoban-desktop-wallpaper'
+const defaultBinary = process.platform === 'win32' ? 'src-tauri/target/release/xiaoban-desktop.exe' : 'src-tauri/target/release/xiaoban-desktop'
 const startupId = `${Date.now()}${process.pid}`
 const startupName = `XiaoBanStartupSmoke-${startupId}`
 const careSmoke = process.env.XIAOBAN_CARE_SMOKE === '1'

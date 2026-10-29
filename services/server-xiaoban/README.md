@@ -38,7 +38,7 @@
 
 **相伴账号。** 网站顶栏右侧有「登录 / 注册」，邮箱验证码登录，新邮箱自动注册；浏览器直接调用账号中心（`/api/v1/auth/config` 返回的 `issuer`，应用 ID `xiangban-wallpaper-web`），令牌存 `localStorage`，过期前用刷新令牌换新，「我的」页可退出。服务端用 JWKS 离线验签（`src/auth.rs`），收藏按 `uid` 隔离，未登录时仍是访客收藏。账号中心的 `ACCOUNT_CORS_ORIGINS` 必须包含本站域名。
 
-桌面客户端 `client/xiaoban-desktop-wallpaper` 直接使用本网站的公开图库、分类、更新和公告接口；资源按真实大小与 SHA-256 校验后缓存，支持离线使用。启动及每 30 分钟后台检查消息，可以手动刷新或关闭自动检查。接口、运行时目录与端到端验证详见[桌面 API](docs/desktop-api.md)。配置复用现有 `app_settings`，未新增历史数据迁移。
+桌面客户端 `client/xiaoban-desktop` 直接使用本网站的公开图库、分类、更新和公告接口；资源按真实大小与 SHA-256 校验后缓存，支持离线使用。启动及每 30 分钟后台检查消息，可以手动刷新或关闭自动检查。接口、运行时目录与端到端验证详见[桌面 API](docs/desktop-api.md)。配置复用现有 `app_settings`，未新增历史数据迁移。
 
 **来源链接优先。** 采集始终保留供应商的原始链接（`preview_url`、`regular_url`、`downloads`、`video`），本站保存的文件只是后备，其路径、SHA-256、大小记录在 `wallpapers.local_copy`（可空 JSONB，启动时 `ADD COLUMN IF NOT EXISTS`）。每个供应商按图片 / 视频各有策略 `provider.<id>.hotlink.image|video`（`source` 或 `copy`，后台“供应商密钥”页可改）：默认 Pexels / Unsplash / okslop / Bing 图片与视频都是 `source`，Pixabay 图片 `copy`、视频 `source`；自定义上传与 demo 始终 `copy`。Pixabay 图片默认 `copy` 是因为其 API 文档写明“permanent hotlinking of images (using Pixabay URLs in your app) is not allowed ... please download them to your server first. Videos may be embedded directly in your applications”，且 `webformatURL` 只有 24 小时有效。策略为 `source` 的条目采集时不下载素材；公开检索 / 详情 JSON 在有本站副本且与主链接不同时增加可选 `fallback`；`GET /api/v1/desktop/wallpapers/{id}?prefer=source` 返回 `source` 链接且不下载，客户端失败再回退到 `resource` 或不带 `prefer` 的接口。更早采集的视频已被改写成本地路径、丢失了原始链接，保持 `copy`。详见[桌面 API](docs/desktop-api.md)。
 

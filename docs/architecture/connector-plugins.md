@@ -35,8 +35,8 @@ mcp.json 的服务条目：`{ "type": "streamable-http"|"streamableHttp"|"sse"|"
 | --- | --- | --- |
 | 连接器库 | [connectors README](../../libs/agent-tools/connectors/README.md) | 插件解析、表单、加密保险箱、策略过滤、OAuth；支持 stdio、Streamable HTTP 和旧式 HTTP+SSE |
 | 市场服务 | [市场 README](../../services/server-xiaoban-market/README.md) | 连接器/专家插件上传、公开摘要、图标校验、版本与清单摘要；官方市场批量导入默认草稿 |
-| 桌面宿主 | `client/xiaoban-desktop-wallpaper/src-tauri/src/chat/connectors.rs`、`plugins.rs` | 连接器管理命令、结构化引用、本地包选择与摘要锁定安装 |
-| 桌面界面 | `client/xiaoban-desktop-wallpaper/src/ui/ai-store/` | 连接器中心、令牌表单、安装审查；旧式 SSE 包与其他传输使用同一套审查、摘要锁定和确认流程 |
+| 桌面宿主 | `client/xiaoban-desktop/src-tauri/src/chat/connectors.rs`、`plugins.rs` | 连接器管理命令、结构化引用、本地包选择与摘要锁定安装 |
+| 桌面界面 | `client/xiaoban-desktop/src/ui/ai-store/` | 连接器中心、令牌表单、安装审查；旧式 SSE 包与其他传输使用同一套审查、摘要锁定和确认流程 |
 
 旧式 SSE 与其他传输共用市场安装及连接流程。用户明确选择“安装并连接”后，远程服务自动试连，令牌表单和 OAuth 浏览器授权在同一安装窗口完成；本地命令仍需单独点击运行。断流、超时或取消后不自动重放远程动作；结果未知时需核查，关闭本机连接不能撤回远端写操作。标准 MCP OAuth 可复用，WorkBuddy 私有身份与服务专属 CLI 登录仍需独立接入。
 

@@ -8,7 +8,7 @@ import {startWallpaperFixture} from './wallpaper-fixture.mjs'
 const base=process.env.XIAOBAN_WEBSITE_TEST_URL
 if(!base || !['localhost','127.0.0.1'].includes(new URL(base).hostname))throw new Error('Set XIAOBAN_WEBSITE_TEST_URL to an isolated localhost test website.')
 const root=fileURLToPath(new URL('../',import.meta.url))
-const binary=process.argv[2]??path.join(root,'src-tauri/target/release/xiaoban-desktop-wallpaper.exe')
+const binary=process.argv[2]??path.join(root,'src-tauri/target/release/xiaoban-desktop.exe')
 const fixture=await startWallpaperFixture()
 let cookie=''
 async function request(route,body,method=body?'POST':'GET') {

@@ -8,7 +8,7 @@ brand's default red and does **not** follow the user's runtime accent selection.
 
 ## Regenerate native assets
 
-From `client/xiaoban-desktop-wallpaper`, after `npm ci`:
+From `client/xiaoban-desktop`, after `npm ci`:
 
 ```sh
 node scripts/generate-icon.mjs

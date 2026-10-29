@@ -1,7 +1,7 @@
 ﻿param([string]$ExecutablePath)
 $ErrorActionPreference = 'Stop'
 $taskRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$taskExe = if ($ExecutablePath) { [IO.Path]::GetFullPath($ExecutablePath) } else { Join-Path $taskRoot 'src-tauri/target/release/xiaoban-desktop-wallpaper.exe' }
+$taskExe = if ($ExecutablePath) { [IO.Path]::GetFullPath($ExecutablePath) } else { Join-Path $taskRoot 'src-tauri/target/release/xiaoban-desktop.exe' }
 if (!(Test-Path -LiteralPath $taskExe)) { throw '请先运行 npm run desktop:build' }
 $taskArtifacts = Join-Path $taskRoot 'artifacts'
 New-Item -ItemType Directory -Path $taskArtifacts -Force | Out-Null

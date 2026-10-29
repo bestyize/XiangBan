@@ -26,7 +26,7 @@
 
 `npm run desktop:macos:build` 为主应用、内置引擎及辅助程序使用稳定证书；`npm run desktop:build` 在 macOS 也会为未打包二进制签名。`npm run desktop` 通过 Cargo target runner 在每次重编译后生成并签名 `<二进制目录>/xiaoban-dev/小伴.app` 再启动，保持原有开发数据目录和热更新。直接运行 `cargo run` / `npx tauri dev` 不经过这个开发启动器，不能代替上述命令验证权限身份。证书缺失、钥匙串失败或签名仍绑定 `cdhash` 时中止构建。`APPLE_SIGNING_IDENTITY=-` 被明确拒绝；CI 可以继续提供固定证书指纹。这份证书不应在每次构建时重新生成。
 
-针对性验证：`XIAOBAN_TEST_SIGNING=1 npm --prefix client/xiaoban-desktop-wallpaper run test:computer-use`，其中真实签名测试会替换测试 App 的原生二进制，核对前后 designated requirement 一致；不读取用户屏幕、不更改 TCC。默认不带此变量时跳过真实签名测试，纯平台打包测试仍可在其他系统运行。
+针对性验证：`XIAOBAN_TEST_SIGNING=1 npm --prefix client/xiaoban-desktop run test:computer-use`，其中真实签名测试会替换测试 App 的原生二进制，核对前后 designated requirement 一致；不读取用户屏幕、不更改 TCC。默认不带此变量时跳过真实签名测试，纯平台打包测试仍可在其他系统运行。
 
 ## 权限和兼容性验收
 

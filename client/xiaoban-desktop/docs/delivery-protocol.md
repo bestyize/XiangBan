@@ -1,6 +1,6 @@
 # 壁纸与更新下发协议 v1
 
-本协议属于 `client/xiaoban-desktop-wallpaper`，供内容提供方实现 HTTP 接口。当前支持 Windows/macOS，使用 UTF-8 JSON；地址在应用的“动态壁纸 → 添加订阅”和“关于小伴 → 更新服务设置”中配置。默认连接 `https://wallpaper.xiangban.xyz`。在线图库使用网站的分页检索与单项交付接口；订阅清单仍可独立配置。网站接口与公告协议见[网站接口文档](../../../services/server-xiangban-wallpaper/docs/desktop-api.md)，也不把网络失败当成“已是最新版本”。
+本协议属于 `client/xiaoban-desktop`，供内容提供方实现 HTTP 接口。当前支持 Windows/macOS，使用 UTF-8 JSON；地址在应用的“动态壁纸 → 添加订阅”和“关于小伴 → 更新服务设置”中配置。默认连接 `https://wallpaper.xiangban.xyz`。在线图库使用网站的分页检索与单项交付接口；订阅清单仍可独立配置。网站接口与公告协议见[网站接口文档](../../../services/server-xiaoban/docs/desktop-api.md)，也不把网络失败当成“已是最新版本”。
 
 ## 壁纸目录
 

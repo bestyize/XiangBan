@@ -101,7 +101,7 @@
 
 按仓库默认选型，新建 `services/server-forum`：
 
-- 后端：Rust Axum + PostgreSQL（sqlx），结构参考 `server-account` 和 `server-xiangban-wallpaper`
+- 后端：Rust Axum + PostgreSQL（sqlx），结构参考 `server-account` 和 `server-xiaoban`
 - 前端：Vue 3 + Vite，构建产物用 rust-embed 嵌进二进制，单进程部署
 - 鉴权：前端在浏览器里用账号中心验证码登录，拿到 access token 直接调论坛接口；论坛后端用 JWKS 验签（`iss`、`aud = forum-web`），和壁纸站一样。首次登录在本地 `users` 表建档
 - 昵称头像：账号中心是权威数据，论坛本地缓存一份用于列表展示，每次登录刷新

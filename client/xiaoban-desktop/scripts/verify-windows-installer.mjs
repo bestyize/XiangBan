@@ -31,5 +31,5 @@ assert.ok(installBody, 'the official install section must remain');
 assert.doesNotMatch(installBody, /Call CreateOrUpdateDesktopShortcut/);
 assert.match(workflow, /npm run desktop:windows:build/);
 assert.match(workflow, /bundle\/nsis\/\*-setup\.exe/);
-assert.doesNotMatch(workflow, /Copy-Item src-tauri\/target\/release\/xiaoban-desktop-wallpaper\.exe/);
+assert.doesNotMatch(workflow, /Copy-Item src-tauri\/target\/release\/xiaoban-desktop\.exe/);
 console.log('One-click Windows NSIS release contract OK');

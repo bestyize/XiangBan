@@ -7,7 +7,7 @@ import {startWallpaperFixture} from './wallpaper-fixture.mjs'
 const root=fileURLToPath(new URL('../',import.meta.url)),fixture=await startWallpaperFixture()
 await mkdir(path.join(root,'artifacts'),{recursive:true})
 const report=path.join(root,`artifacts/media-smoke-${Date.now()}.json`)
-const binary=process.argv[2]??path.join(root,'src-tauri/target/release/xiaoban-desktop-wallpaper.exe')
+const binary=process.argv[2]??path.join(root,'src-tauri/target/release/xiaoban-desktop.exe')
 const effectsSmoke=process.env.XIAOBAN_EFFECTS_SMOKE==='1'
 const child=spawn(binary,['--smoke-test','--autostart'],{env:{...process.env,XIAOBAN_SMOKE_REPORT:report,XIAOBAN_WALLPAPER_TEST_URL:fixture.catalogUrl,XIAOBAN_LOCAL_WALLPAPER_TEST_DIR:fixture.localDirectory,XIAOBAN_TEST_STARTUP_ID:Date.now().toString()},stdio:['ignore','pipe','pipe']})
 let output='';child.stdout.on('data',data=>output=(output+data).slice(-12000));child.stderr.on('data',data=>output=(output+data).slice(-12000))

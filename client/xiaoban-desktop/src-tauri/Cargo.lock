@@ -6421,8 +6421,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "xiaoban-desktop-wallpaper"
-version = "2.1.0"
+name = "xiaoban-desktop"
+version = "3.0.0"
 dependencies = [
  "agent-computer-use-tools",
  "agent-connector-tools",

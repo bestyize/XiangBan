@@ -10,7 +10,6 @@
 .gradle/
 build/
 out/
-!gradle/wrapper/gradle-wrapper.jar
 local.properties
 
 # Node
@@ -45,12 +44,12 @@ account_data/
 video/
 
 # Downloaded native Computer Use artifacts are prepared per target at build time.
-client/xiaoban-desktop-wallpaper/src-tauri/resources/computer-use/
-client/xiaoban-desktop-wallpaper/src-tauri/resources/computer-use.stage-*/
+client/xiaoban-desktop/src-tauri/resources/computer-use/
+client/xiaoban-desktop/src-tauri/resources/computer-use.stage-*/
 
 # Rust build targets (按文件夹区分)
 # client
-client/xiaoban-desktop-wallpaper/src-tauri/target/
+client/xiaoban-desktop/src-tauri/target/
 client/xiaoban-multiplatform/desktopApp/target/
 client/**/target/
 
@@ -62,7 +61,7 @@ services/server-link/target/
 libs/agent-mobile/target/
 services/server-pan/backend/target/
 services/server-resource/target/
-services/server-xiangban-wallpaper/target/
+services/server-xiaoban/target/
 services/server-xiaoban-appstore/target/
 services/server-xiaoban-market/target/
 services/**/target/

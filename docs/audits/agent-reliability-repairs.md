@@ -41,8 +41,8 @@ cargo test --locked --manifest-path libs/agent-kernel/Cargo.toml --features 'ope
 cargo test --locked --manifest-path tools/agent-reliability-checks/Cargo.toml
 cargo test --manifest-path libs/agent-tools/connectors/Cargo.toml
 cargo test --manifest-path libs/agent-tools/skill-discovery/Cargo.toml
-cargo test --locked --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml chat::
-cd client/xiaoban-desktop-wallpaper
+cargo test --locked --manifest-path client/xiaoban-desktop/src-tauri/Cargo.toml chat::
+cd client/xiaoban-desktop
 npx vitest run src/ui/chat/chat-store.test.ts src/ui/chat/view.test.ts
 ```
 

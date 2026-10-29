@@ -28,7 +28,7 @@ try {
         const profile = args.includes('--debug') ? 'debug' : args.includes('--profile') ? args[args.indexOf('--profile') + 1] : 'release';
         const targetDir = process.env.CARGO_TARGET_DIR ? path.resolve(root, 'src-tauri', process.env.CARGO_TARGET_DIR) : path.join(root, 'src-tauri/target');
         const output = path.join(targetDir, target, profile);
-        if (process.argv.includes('--no-bundle')) signMacos(path.join(output, 'xiaoban-desktop-wallpaper'), ['--identifier', 'xyz.xiaban.desktop-wallpaper']);
+        if (process.argv.includes('--no-bundle')) signMacos(path.join(output, 'xiaoban-desktop'), ['--identifier', 'xyz.xiaban.desktop-wallpaper']);
         else {
           const app = path.join(output, 'bundle/macos/小伴.app');
           verifyStableSignature(app);

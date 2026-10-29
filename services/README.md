@@ -1,6 +1,6 @@
 # 服务端项目
 
-- [server-xiangban-wallpaper](server-xiangban-wallpaper/README.md)：正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务。
+- [server-xiaoban](server-xiaoban/README.md)：正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务。
 - [server-account](server-account/README.md)：统一账号中心，验证码验证身份、用户名与密码登录、JWT 签发及管理后台。
 - [server-xiaoban-market](server-xiaoban-market/README.md)：专家、技能、连接器目录与采集工作台。
 - [server-forum](server-forum/README.md)：超级小伴论坛 chat.xiangban.xyz，技术交流、资源分享、福利羊毛与闲聊的社区，一期网页版已实现，已部署在香港机。

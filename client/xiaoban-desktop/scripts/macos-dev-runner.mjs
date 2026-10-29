@@ -13,7 +13,7 @@ export function stageDevApp(binary) {
   rmSync(app, { recursive: true, force: true });
   mkdirSync(path.join(contents, 'MacOS'), { recursive: true });
   mkdirSync(path.join(contents, 'Resources'), { recursive: true });
-  const executable = path.join(contents, 'MacOS/xiaoban-desktop-wallpaper');
+  const executable = path.join(contents, 'MacOS/xiaoban-desktop');
   copyFileSync(binary, executable);
   // icon.icns is generated, not tracked; `tauri dev` does not run the generator, so make it on first use.
   const icns = path.join(tauri, 'icons/icon.icns');
@@ -27,7 +27,7 @@ export function stageDevApp(binary) {
   // Keep privacy purpose strings from the release bundle. Development data remains isolated in Rust.
   const keys = `<key>CFBundleIdentifier</key><string>${config.identifier}</string>
 <key>CFBundleName</key><string>小伴</string>
-<key>CFBundleExecutable</key><string>xiaoban-desktop-wallpaper</string>
+<key>CFBundleExecutable</key><string>xiaoban-desktop</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>${config.version}</string>
 <key>CFBundleVersion</key><string>${config.version}</string>

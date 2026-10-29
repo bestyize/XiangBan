@@ -53,7 +53,7 @@ MCP 连接器使用服务 README 中的标准配置，支持本机 stdio、远�
 
 Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮小伴，也可以切换成位于桌面图标下方的动态壁纸。内置通用 Agent 聊天与 AI 商店；默认连接 `https://wallpaper.xiangban.xyz` 获取在线图片、动态视频、版本与公告。Windows 缺少运行组件时会联网补齐；组件与缓存可用后可离线运行。角色、场景、控制台与互动逻辑共用，桌面宿主分平台接入。
 
-2.1.0（构建中，SHA-256 待出包后补）：界面与能力更新包括——桌面伙伴改为主题制，官方「花朵心语」「多肉点点」共七只，支持自定义主题、导入导出与每只独立取名/大小/心情/层级；桌面组件与特效、宠物、游戏统一为「官方 / 自定义」两栏，每个组件可选择“贴在桌面”或“始终置顶”，自定义组件单独归类；聊天回答下方可展开执行过程，支持粘贴图片与文件作为附件、选中文字复制；小伴 AI 面向用户只保留“日常 / 深入”两种使用模式，兼容端点可另设回答偏好；超级小伴新增紧凑工具栏、区域截图与标注、彩虹生命球，以及 macOS 截图权限的自助修复入口。
+3.0.0（构建中，SHA-256 待出包后补）：界面与能力更新包括——桌面伙伴改为主题制，官方「花朵心语」「多肉点点」共七只，支持自定义主题、导入导出与每只独立取名/大小/心情/层级；桌面组件与特效、宠物、游戏统一为「官方 / 自定义」两栏，每个组件可选择“贴在桌面”或“始终置顶”，自定义组件单独归类；聊天回答下方可展开执行过程，支持粘贴图片与文件作为附件、选中文字复制；小伴 AI 面向用户只保留“日常 / 深入”两种使用模式，兼容端点可另设回答偏好；超级小伴新增紧凑工具栏、区域截图与标注、彩虹生命球，以及 macOS 截图权限的自助修复入口。
 
 2026-10-20 **2.0.0 正式版（重新出包）**：Windows x64 一键安装包 `XiaoBan-Setup-2.0.0-Windows-x64.exe`（12,196,799 bytes；SHA-256 `eb5ec63491d8fba3a6a143ecaf6c39e817b4a4b66fc7430b3406585488e6a80c`），macOS aarch64 dmg `XiaoBanWallpaper-2.0.0-MacOS-aarch64.dmg`（19,700,610 bytes；SHA-256 `8722b71b1f55c62673154db8971aca9ac79a3cf9fc58b68c96c7c0daf7e4e794`，固定自签名证书、未公证）。已上架 `wallpaper.xiangban.xyz`（含客户端更新接口）与 GitHub Release `xiaoban-wallpaper-v2.0.0`，下载后 SHA-256 与构建产物一致。
 
@@ -101,14 +101,14 @@ Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮�
 
 侧栏默认最多显示 6 个项目，每个分组内默认最多显示 6 个会话，超过后可展开全部或收起；“最近任务”和“伙伴”作为固定分组保留。折叠只影响展示，检索仍覆盖全部已保存会话。检索在本机后台读取用户与小伴的消息正文，不调用模型，不检索隐藏推理、工具输出或附件文件的内部内容；运行中的会话只搜索已保存部分。读取失败会显示提示，连续输入产生的过期结果不会覆盖当前结果。
 
-验证：`npx vitest run src/ui/ControlShell.test.ts src/ui/ControlShell.projects.test.ts src/ui/components/WorkspaceSearchDialog.test.ts`；原生运行 `cargo test --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop-wallpaper chat::search::tests`。
+验证：`npx vitest run src/ui/ControlShell.test.ts src/ui/ControlShell.projects.test.ts src/ui/components/WorkspaceSearchDialog.test.ts`；原生运行 `cargo test --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::search::tests`。
 
 ## 在 Windows 上运行
 
 需要 Node.js 22.12+（或 24）、Rust MSVC 工具链、Visual Studio C++ 构建工具和 WebView2 Runtime。在仓库根执行：
 
 ```powershell
-cd client/xiaoban-desktop-wallpaper
+cd client/xiaoban-desktop
 npm ci
 npm run desktop
 ```
@@ -179,7 +179,7 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 
 “动态壁纸 → 在线壁纸”使用网站相同的搜索、分类和分页接口；图片与动态视频作为第二层类型筛选。点击卡片在当前页右侧查看预览与适配 / 速度设置，不跳回本地页；“保存到我的壁纸”实际下载并校验后可离线使用，不更换桌面（网站提供来源链接时优先直接下载并按真实文件头检查类型，失败再回退到网站副本，见协议文档）；“应用到桌面”独立执行，未保存时先完成下载。视频无图片封面时显示真实首帧，悬停静音播放。内置官方源站 `https://wallpaper.xiangban.xyz`，侧栏底部提供直达官网按钮；可在设置中开启或关闭自动检查，或手动同步版本与公告。原生后台在启动及每天检查一次，控制台关闭时也继续运行；消息在控制台和托盘提示中展示，关闭同一修订后不再重复提醒。修改后的公告和新版本重新提示。配置、消息与已读状态保存在用户目录，网络失败保留已有内容，手动同步显示失败原因。
 
-网站对接协议见[网站接口文档](../../services/server-xiangban-wallpaper/docs/desktop-api.md)，本应用维护自身的类型与解析，不引用网站源码。原生联调测试 `scripts/verify-website.mjs` 使用隔离测试网站和桌面数据目录，验证真实图片 / 视频下载渲染、更新接口与公告已读状态。
+网站对接协议见[网站接口文档](../../services/server-xiaoban/docs/desktop-api.md)，本应用维护自身的类型与解析，不引用网站源码。原生联调测试 `scripts/verify-website.mjs` 使用隔离测试网站和桌面数据目录，验证真实图片 / 视频下载渲染、更新接口与公告已读状态。
 
 在线壁纸目录等 JSON 元数据请求遇到短暂网关错误时，客户端会有限重试，改善首次访问时偶发的瞬时失败。媒体下载仍沿用 120 秒超时及 SHA-256 校验；重试策略不改变媒体传输路径。
 
@@ -251,7 +251,7 @@ Canvas 运行在独立的低权限壁纸窗口和 opaque-origin iframe 中，不
 
 自定义及第三方服务商使用 Responses / Anthropic 协议时，可在配置弹窗的“高级设置”单独设置单次输出上限（1024–131072 token）；留空优先读取模型目录可选的 `maxOutputTokens`（自动最多 32768），未知模型保守使用 8192，不根据模型名称猜测能力。显式设置仍受模型声明上限和上下文一半的约束，真实请求与上下文预留使用同一有效预算。更换模型、地址或协议时恢复自动；目录更新更换推荐模型时也会清除旧设置。小伴 AI 继续采用保守预算；Chat Completions 保留端点默认输出参数，暂不提供此控件。旧配置可直接读取。
 
-针对性验证：`npx vitest run src/ui/chat/view.test.ts src/ui/chat/chat-store.test.ts src/ui/components/AiConfigCard.test.ts`、`npx vue-tsc --noEmit`；原生运行 `cargo test --manifest-path src-tauri/Cargo.toml --locked --bin xiaoban-desktop-wallpaper chat::`、相同命令筛选 `ai_config::` 与 `ai_catalogue::`。内核回归测试在仓库根运行 `cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --features openai,anthropic --test truncation --test guards --test anthropic --test responses --test openai_http`，使用脚本模型与本地假服务，不消耗生产模型额度。
+针对性验证：`npx vitest run src/ui/chat/view.test.ts src/ui/chat/chat-store.test.ts src/ui/components/AiConfigCard.test.ts`、`npx vue-tsc --noEmit`；原生运行 `cargo test --manifest-path src-tauri/Cargo.toml --locked --bin xiaoban-desktop chat::`、相同命令筛选 `ai_config::` 与 `ai_catalogue::`。内核回归测试在仓库根运行 `cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --features openai,anthropic --test truncation --test guards --test anthropic --test responses --test openai_http`，使用脚本模型与本地假服务，不消耗生产模型额度。
 
 ## 验证
 
@@ -343,7 +343,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 
 原生端再次校验选择；菜单只显示该模型支持的等级。Anthropic Messages 暂未接入可调等级，仍使用服务商默认。内核保留 Chat 的 `reasoning_content` 和 Responses 的 reasoning 项，用于工具调用后继续请求；状态随历史保存但不作为可见回答，并按模型、地址和协议隔离。
 
-针对性验证：`npx vitest run src/ui/ai-config.test.ts src/ui/components/AiConfigCard.test.ts src/ui/components/chat-model-selection.test.ts`、`npx vue-tsc --noEmit`；`cargo test --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop-wallpaper ai_reasoning:: --locked` 与同命令筛选 `reply_preference`、`ai_gateway::`。协议测试使用本地假服务，未使用生产密钥调用真实模型。
+针对性验证：`npx vitest run src/ui/ai-config.test.ts src/ui/components/AiConfigCard.test.ts src/ui/components/chat-model-selection.test.ts`、`npx vue-tsc --noEmit`；`cargo test --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop ai_reasoning:: --locked` 与同命令筛选 `reply_preference`、`ai_gateway::`。协议测试使用本地假服务，未使用生产密钥调用真实模型。
 
 ## Edge TTS 语音朗读
 
@@ -357,7 +357,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 
 设置 → 声音 →「语音识别」是全局能力开关，默认关闭；聊天页麦克风仅控制当前会话的本次录音，不持久化。设置页开启只准备引擎；聊天页手动点击麦克风时也可首次启用识别能力。首次开启提示加载引擎，从魔搭社区下载 SenseVoice Small 的 sherpa-onnx INT8 导出（模型与词表共约 229 MiB），显示进度并校验固定大小及 SHA-256。模型不随安装包分发；与判停模型、本地推理引擎 `xiaoban-infer` 一起保存至用户数据根目录的 `inference/`（引擎说明见 `tools/xiaoban-infer/README.md`），开关保存于 `config/asr.json`。关闭时停止采集、丢弃未完成识别并释放引擎，保留完整模型，下次开启离线复用；下载中断、校验失败及权限错误可重试。
 
-**后台预热**：应用启动 3 秒后，后台线程会检查语音模型，**所有用户**缺少就静默下载（无进度、无弹窗，失败按 20 秒 / 1 分钟 / 5 分钟 / 15 分钟退避重试）；语音开关开着的用户随后还会加载引擎，关着的只留文件、不占内存。状态通过 `asr-state` 事件同步给各窗口。用户在页面里主动开启时，后台下载会让路（`urgent` 标志），由页面带着进度重新下载。真实网络实测：空配置、语音关闭，约 30 秒下完 229 MB，SHA-256 与固定值一致，无 `.part` 残留。完整的 SHA-256 校验只在下载时（边写边算）或第一次启动时做一次，之后用“大小 + 修改时间”的 `<文件>.verified` 记录跳过：实测 239 MB 的整体校验约 9.5 秒（debug 构建），而加载引擎只要 0.45 秒、首次推理 0.08 秒，所以以前按下麦克风后的“好几秒”几乎全是重复校验。文件被改动或记录缺失时会重新校验。与真实引擎联调：`XIAOBAN_INFER_DIR=<引擎与模型目录> cargo test --bin xiaoban-desktop-wallpaper the_engine_serves_the_capability_it_was_started_for -- --ignored`。
+**后台预热**：应用启动 3 秒后，后台线程会检查语音模型，**所有用户**缺少就静默下载（无进度、无弹窗，失败按 20 秒 / 1 分钟 / 5 分钟 / 15 分钟退避重试）；语音开关开着的用户随后还会加载引擎，关着的只留文件、不占内存。状态通过 `asr-state` 事件同步给各窗口。用户在页面里主动开启时，后台下载会让路（`urgent` 标志），由页面带着进度重新下载。真实网络实测：空配置、语音关闭，约 30 秒下完 229 MB，SHA-256 与固定值一致，无 `.part` 残留。完整的 SHA-256 校验只在下载时（边写边算）或第一次启动时做一次，之后用“大小 + 修改时间”的 `<文件>.verified` 记录跳过：实测 239 MB 的整体校验约 9.5 秒（debug 构建），而加载引擎只要 0.45 秒、首次推理 0.08 秒，所以以前按下麦克风后的“好几秒”几乎全是重复校验。文件被改动或记录缺失时会重新校验。与真实引擎联调：`XIAOBAN_INFER_DIR=<引擎与模型目录> cargo test --bin xiaoban-desktop the_engine_serves_the_capability_it_was_started_for -- --ignored`。
 
 下载源为 `https://modelscope.cn/models/pengzhendong/sherpa-onnx-sense-voice-zh-en-ja-ko-yue`，固定版本 `73eca47697f980daa3d16112404174b6b950b514`，由 `iic/SenseVoiceSmall` 导出。推理使用 `sherpa-onnx` Rust 静态库和 CPU；构建时需要下载对应平台的原生推理库（可通过 `SHERPA_ONNX_ARCHIVE_DIR` 或 `SHERPA_ONNX_LIB_DIR` 使用本地库），无需用户安装 Python。
 

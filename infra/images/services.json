@@ -49,11 +49,11 @@
     },
     {
       "id": "wallpaper-collect", "title": "壁纸采集服务", "image": "xiangban-wallpaper-collect", "kind": "rust",
-      "crate": "services/server-xiangban-wallpaper", "bin": "wallpaper_collect", "uid": 10007, "user": "wallpaper",
-      "webEmbedded": { "dir": "services/server-xiangban-wallpaper/web" },
+      "crate": "services/server-xiaoban", "bin": "wallpaper_collect", "uid": 10007, "user": "wallpaper",
+      "webEmbedded": { "dir": "services/server-xiaoban/web" },
       "env": { "SERVER_HOST": "0.0.0.0", "SERVER_PORT": "8080" }, "portEnv": "SERVER_PORT", "port": 8080,
       "health": "/health", "stack": null, "tagVar": null,
-      "doc": "services/server-xiangban-wallpaper/README.md"
+      "doc": "services/server-xiaoban/README.md"
     }
   ]
 }

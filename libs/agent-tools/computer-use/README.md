@@ -8,7 +8,7 @@
 
 ```sh
 # 从仓库根准备某个平台的资源。省略 --target 时优先使用 TAURI_ENV_TARGET_TRIPLE，然后才是构建机平台。
-node libs/agent-tools/computer-use/scripts/prepare-runtime.mjs --target x86_64-pc-windows-msvc --output client/xiaoban-desktop-wallpaper/src-tauri/resources/computer-use
+node libs/agent-tools/computer-use/scripts/prepare-runtime.mjs --target x86_64-pc-windows-msvc --output client/xiaoban-desktop/src-tauri/resources/computer-use
 ```
 
 | 目标 | 只打包的原生资源 |

@@ -1,6 +1,6 @@
 # 聊天协议可靠性修复方案
 
-> 历史修复记录：四阶段已实施；下列测试结果仅对应记录时基线，当前实现与验证入口见 [内核 README](../../libs/agent-kernel/README.md) 和 [桌面 README](../../client/xiaoban-desktop-wallpaper/README.md)。
+> 历史修复记录：四阶段已实施；下列测试结果仅对应记录时基线，当前实现与验证入口见 [内核 README](../../libs/agent-kernel/README.md) 和 [桌面 README](../../client/xiaoban-desktop/README.md)。
 
 基线：e3a81c83d667c14ad71003779997d106e3d9faa4。
 
@@ -36,7 +36,7 @@
 ```sh
 cargo test --locked --manifest-path libs/agent-kernel/Cargo.toml --lib --test responses --test anthropic --test wire --test middleware_retry --test retry_last --test run_journal --features openai,anthropic,journal
 cargo test --locked --manifest-path tools/protocol-reliability-tests/Cargo.toml
-cd client/xiaoban-desktop-wallpaper
+cd client/xiaoban-desktop
 npx vitest run src/ui/chat/chat-store.test.ts src/ui/chat/view.test.ts src/ui/model-capabilities.test.ts
 ```
 

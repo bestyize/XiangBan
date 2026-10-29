@@ -4,7 +4,7 @@
 >
 > 状态：玩法与数值设计参考；原网页相关分享、切磋和服务端存档属于历史方案，网页已停用，桌面版以本地游戏包实现为准。P2、P3 是历史规划，是否实现需重新核对。
 >
-> 本文是这款游戏的设计基准：风格、玩法、关卡和数值都以这里为准。改动设计时先改本文，再改代码；只改数值时，同步更新本文中对应的表格。实现细节见游戏包 [README](../../client/xiaoban-desktop-wallpaper/public/game-packs/ink-blade/README.md)。关卡数据在 `levels.js`，规则在 `rules.js`，存档在 `progress.js`。
+> 本文是这款游戏的设计基准：风格、玩法、关卡和数值都以这里为准。改动设计时先改本文，再改代码；只改数值时，同步更新本文中对应的表格。实现细节见游戏包 [README](../../client/xiaoban-desktop/public/game-packs/ink-blade/README.md)。关卡数据在 `levels.js`，规则在 `rules.js`，存档在 `progress.js`。
 
 ## 1. 概述
 

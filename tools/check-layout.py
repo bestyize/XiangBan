@@ -18,9 +18,9 @@ def source_files(directory, pattern):
             yield file
 
 entrypoints = {
-    'client/xiaoban-desktop-wallpaper': 'src-tauri/Cargo.toml',
+    'client/xiaoban-desktop': 'src-tauri/Cargo.toml',
     'client/xiaoban-multiplatform': 'androidApp/build.gradle.kts',
-    'services/server-xiangban-wallpaper': 'Cargo.toml',
+    'services/server-xiaoban': 'Cargo.toml',
     'services/server-account': 'Cargo.toml',
     'libs/agent-kernel': 'Cargo.toml',
 }

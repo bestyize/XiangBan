@@ -8,7 +8,7 @@ import {startWallpaperFixture} from './wallpaper-fixture.mjs'
 
 if (process.platform !== 'darwin') throw new Error('这个脚本需要在 macOS 上执行')
 const root = fileURLToPath(new URL('../', import.meta.url))
-const binary = process.argv[2] || path.join(root, 'src-tauri/target/aarch64-apple-darwin/release/bundle/macos/小伴.app/Contents/MacOS/xiaoban-desktop-wallpaper')
+const binary = process.argv[2] || path.join(root, 'src-tauri/target/aarch64-apple-darwin/release/bundle/macos/小伴.app/Contents/MacOS/xiaoban-desktop')
 await mkdir(path.join(root, 'artifacts'), { recursive: true })
 const report = path.join(root, `artifacts/smoke-macos-${Date.now()}.json`)
 const bundle = path.resolve(binary, '../../..')
