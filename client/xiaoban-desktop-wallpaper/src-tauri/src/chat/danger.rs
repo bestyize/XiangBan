@@ -351,7 +351,42 @@ fn name(word: &Word) -> String {
 
 fn is_assignment(word: &Word) -> bool {
     let Some((key, _)) = word.text.split_once('=') else { return false };
+    // PowerShell writes variables as `$name=…` / `$env:NAME=…`.
+    let key = key.strip_prefix('$').unwrap_or(key);
+    let key = key.strip_prefix("env:").unwrap_or(key);
     !word.quoted && !key.is_empty() && !key.starts_with(|c: char| c.is_ascii_digit()) && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// PowerShell syntax that merely starts with a variable and does not run it: `$x = Get-Content a`, `$x -eq 1`,
+/// `$files.Count`, `$env:PATH`, `% { … }`. `Some(rest)` is what is left to check as a command (the right side of
+/// `=`, or what follows `in`); an empty rest means there is nothing more to run. `None` means this is the bash-style
+/// `$CMD args`, which is decided only when the shell expands it.
+fn powershell_expression<'a>(words: &'a [Word], start: usize) -> Option<&'a [Word]> {
+    let word = &words[start];
+    if word.quoted {
+        return None;
+    }
+    let text = word.text.as_str();
+    // `%` and `?` alone are the ForEach-Object / Where-Object aliases; `%var%` is a variable and stays suspect.
+    if text == "%" || text == "?" {
+        return Some(&[]);
+    }
+    if !text.starts_with('$') {
+        return None;
+    }
+    let next = words.get(start + 1).map(|w| w.text.to_lowercase());
+    const RUNS: &[&str] = &["=", "+=", "-=", "*=", "/=", "%=", "in"];
+    const COMPARES: &[&str] = &[
+        "-eq", "-ne", "-gt", "-lt", "-ge", "-le", "-like", "-notlike", "-match", "-notmatch", "-contains", "-notcontains", "-in", "-notin", "-is", "-isnot",
+        "-and", "-or", "-not", "-xor", "-replace", "-split", "-join", "-f", "++", "--",
+    ];
+    match next.as_deref() {
+        Some(op) if RUNS.contains(&op) => Some(&words[start + 2..]),
+        Some(op) if COMPARES.contains(&op) => Some(&[]),
+        // A variable with nothing after it (`$env:PATH`, `$files.Count`, `$content | …`) prints or pipes a value.
+        None => Some(&[]),
+        _ => None,
+    }
 }
 
 /// Where the command itself starts, after `FOO=1` and wrappers such as `env`, `nohup` and `timeout 5`.
@@ -466,6 +501,9 @@ fn reaches_outside(found: &[&str], ctx: &Ctx) -> bool {
 fn assess_words(words: &[Word], piped: bool, previous: Option<&str>, ctx: &Ctx) -> Option<&'static str> {
     let start = command_index(words)?;
     // `$CMD -rf /` or `${tool} …`: what runs is decided only when the shell expands it.
+    if let Some(rest) = powershell_expression(words, start) {
+        return if rest.is_empty() { None } else { assess_words(rest, piped, previous, ctx) };
+    }
     let program = words[start].text.to_lowercase().replace('\\', "/");
     let from_home = ["$home/", "${home}/", "%userprofile%/", "$env:userprofile/"].iter().any(|p| program.starts_with(p));
     if !words[start].quoted && !from_home && (program.starts_with('$') || program.starts_with('%')) {
@@ -833,6 +871,24 @@ mod tests {
             "node -e 'console.log(`a ${1}`)'", "$HOME/.cargo/bin/cargo build", "mv a.txt b.txt", "ln -s ./dist ./public", "git -c user.name=x commit -m y",
         ] {
             assert_eq!(check(command), None, "{command}");
+        }
+    }
+
+    #[test]
+    fn powershell_variables_and_control_flow_are_not_blind_commands() {
+        for command in [
+            "$c = Get-Content a.txt; $c.Length", "$files = Get-ChildItem -Recurse -Filter *.md; $files.Count", "$env:PATH", "$x=Get-Content a.txt",
+            "foreach ($f in Get-ChildItem *.txt) { Write-Output $f.Name }", "Get-ChildItem | % { $_.Name }", "Get-ChildItem | ? { $_.Length -gt 10 }",
+            "if ($x -eq 1) { Get-Content a.txt }", "$content | Set-Content out.txt", "$ErrorActionPreference = 'Stop'; npm test", "$i++",
+        ] {
+            assert_eq!(check(command), None, "{command}");
+        }
+        // 变量只是个壳，右边真正要运行的命令照常检查。
+        for (command, reason) in [
+            ("$x = Remove-Item -Recurse C:\\x", R_DELETE), ("foreach ($f in Get-Content ~/.ssh/id_rsa) { $f }", R_SECRET),
+            ("$CMD -rf /", R_BLIND), ("$cmd /c del x", R_BLIND), ("%CMD% -rf /", R_BLIND),
+        ] {
+            assert_eq!(check(command), Some(reason), "{command}");
         }
     }
 
