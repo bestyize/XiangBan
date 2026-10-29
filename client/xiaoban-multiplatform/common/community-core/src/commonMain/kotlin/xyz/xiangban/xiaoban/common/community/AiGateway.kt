@@ -185,6 +185,39 @@ class AiGatewayApi(
         return http.send(HttpMethod.Post, "/api/ai/redeem", AiRedeemed.serializer(), body = body, token = requireToken())
     }
 
+    internal suspend fun postChatRaw(body: String, onLine: suspend (String) -> Unit): ModelResult {
+        val token = try {
+            requireToken()
+        } catch (e: ApiException) {
+            return ModelResult(e.status, error = e.message)
+        }
+        return try {
+            client.preparePost("$base/v1/chat/completions") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, "text/event-stream")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+                timeout {
+                    requestTimeoutMillis = 180_000
+                    socketTimeoutMillis = 60_000
+                }
+            }.execute { response ->
+                val status = response.status.value
+                if (status !in 200..299) return@execute ModelResult(status, body = response.bodyAsText())
+                val channel = response.bodyAsChannel()
+                while (!channel.isClosedForRead) {
+                    val line = channel.readUTF8Line() ?: break
+                    onLine(line)
+                }
+                ModelResult(status)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            ModelResult(0, error = "连接小伴 AI 服务失败，请检查网络后重试")
+        }
+    }
+
     /**
      * 向 `/v1/chat/completions` 发起流式对话，每收到一段增量文字调用一次 [onDelta]，最后返回完整回复。
      */
@@ -269,6 +302,15 @@ class AiGatewayApi(
     }
 }
 
+/** 一次模型请求的结果：HTTP 状态，失败时的响应文本，或连接层面的错误。 */
+data class ModelResult(val status: Int, val body: String? = null, val error: String? = null)
+
+/**
+ * 把已经组好的 chat-completions 请求体（流式）发给 server-ai，响应的每一行原样交给 [onLine]。
+ * Agent 内核只负责拼请求和解析流，网络请求（地址、令牌、超时）都在这里，所以手机里不用带 TLS 库。
+ */
+suspend fun AiGatewayApi.postChatLines(body: String, onLine: suspend (String) -> Unit): ModelResult = postChatRaw(body, onLine)
+
 private fun JsonElement?.asStr(): String? =
     this?.takeIf { it !is JsonNull }?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
 
@@ -315,6 +357,23 @@ data class ChatTurn(
     val error: String? = null,
 )
 
+/** 智能体这一轮里调用的一个工具，界面显示成一张小卡片。 */
+data class ChatToolCall(
+    val id: String,
+    val name: String,
+    val detail: String = "",
+    val running: Boolean = true,
+    val isError: Boolean = false,
+)
+
+/** 智能体要改动东西之前问用户：同意这一次，还是拒绝。 */
+data class ChatApproval(
+    val id: String,
+    val tool: String,
+    val detail: String = "",
+    val danger: String? = null,
+)
+
 data class CloudChatState(
     val tiers: List<AiTier> = emptyList(),
     val selectedTier: String = "",
@@ -326,8 +385,28 @@ data class CloudChatState(
     val redeeming: Boolean = false,
     val redeemMessage: String? = null,
     val redeemError: String? = null,
+    /** 本轮智能体调用的工具；没有智能体（纯聊天）时一直是空的。 */
+    val tools: List<ChatToolCall> = emptyList(),
+    val approval: ChatApproval? = null,
 ) {
     val activeTier: AiTier? get() = tiers.firstOrNull { it.tier == selectedTier }
+}
+
+private var nextConversation = 1L
+
+/** 内核报的错带着“HTTP 402: ”这样的前缀，给人看时去掉。 */
+internal fun friendlyAgentError(raw: String?): String =
+    raw.orEmpty().replace(Regex("^HTTP \\d+: "), "").ifBlank { "智能体执行出错" }
+
+/** 给工具卡片和确认框看的一行说明。 */
+internal fun summarizeToolArguments(tool: String, arguments: String): String {
+    val obj = runCatching { CommunityJson.parseToJsonElement(arguments) as? JsonObject }.getOrNull() ?: return arguments.take(120)
+    if (tool == "set_reminder") {
+        val title = obj["title"].asStr().orEmpty()
+        val minutes = obj["minutes"].asStr()
+        return listOfNotNull(title.ifBlank { null }, minutes?.let { "$it 分钟后" }).joinToString(" · ")
+    }
+    return obj.entries.joinToString("，") { (k, v) -> "$k=${v.asStr() ?: v}" }.take(120)
 }
 
 private const val DEFAULT_SYSTEM_PROMPT =
@@ -341,12 +420,22 @@ class CloudChatController(
     private val api: AiGatewayApi,
     private val scope: CoroutineScope,
     private val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
+    /** 手机里的智能体内核；为空就是原来的纯云端聊天。 */
+    private val agent: AgentRuntime? = null,
+    private val newSessionId: () -> String = { "c${nextConversation++}" },
 ) {
     private val _state = MutableStateFlow(CloudChatState())
     val state: StateFlow<CloudChatState> = _state.asStateFlow()
     private var nextId = 1L
     private var metaJob: Job? = null
     private var chatJob: Job? = null
+    private var agentSession = newSessionId()
+    private var agentRun: String? = null
+    private var agentReplyId: Long = 0
+
+    init {
+        agent?.let { runtime -> scope.launch { runtime.events.collect(::onAgentEvent) } }
+    }
 
     /** 加载档位与余额，并按桌面端同一规则选定可用默认档位。 */
     fun loadMeta() {
@@ -405,7 +494,27 @@ class CloudChatController(
         _state.value = _state.value.copy(
             messages = _state.value.messages + userTurn + assistantTurn,
             sending = true,
+            tools = emptyList(),
+            approval = null,
         )
+        if (agent != null) {
+            agentReplyId = replyId
+            chatJob = scope.launch {
+                try {
+                    agent.ensureStarted(tier ?: "")
+                    // 先记下这一轮的编号再发出去，免得回来的事件比赋值还早。
+                    val runId = agent.nextRunId()
+                    agentRun = runId
+                    agent.run(agentSession, prompt, runId)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    updateTurn(replyId) { it.copy(streaming = false, error = "智能体启动失败：${e.message ?: "未知原因"}") }
+                    _state.value = _state.value.copy(sending = false)
+                }
+            }
+            return
+        }
         chatJob = scope.launch {
             try {
                 api.streamChat(history, tier) { delta ->
@@ -445,17 +554,58 @@ class CloudChatController(
     fun stop() {
         chatJob?.cancel()
         chatJob = null
+        agentRun?.let { agent?.cancel(it) }
         val updated = _state.value.messages.mapNotNull { turn ->
             if (!turn.streaming) turn
             else if (turn.text.isEmpty() && turn.error == null) null
             else turn.copy(streaming = false)
         }
-        _state.value = _state.value.copy(messages = updated, sending = false)
+        _state.value = _state.value.copy(messages = updated, sending = false, approval = null)
     }
 
     fun clearConversation() {
         stop()
-        _state.value = _state.value.copy(messages = emptyList())
+        agentSession = newSessionId()
+        agentRun = null
+        _state.value = _state.value.copy(messages = emptyList(), tools = emptyList(), approval = null)
+    }
+
+    /** 回答智能体的确认：`once` 允许这一次，`deny` 拒绝。 */
+    fun answerApproval(decision: String) {
+        val pending = _state.value.approval ?: return
+        _state.value = _state.value.copy(approval = null)
+        agent?.answerApproval(pending.id, decision)
+    }
+
+    private fun onAgentEvent(event: AgentEvent) {
+        when (event) {
+            is AgentEvent.Text -> if (event.run == agentRun) updateTurn(agentReplyId) { it.copy(text = it.text + event.text) }
+            is AgentEvent.ToolStart -> if (event.run == agentRun) {
+                val call = ChatToolCall(event.id, event.name, summarizeToolArguments(event.name, event.arguments))
+                _state.value = _state.value.copy(tools = _state.value.tools + call)
+            }
+            is AgentEvent.ToolEnd -> if (event.run == agentRun) {
+                _state.value = _state.value.copy(tools = _state.value.tools.map { if (it.id == event.id) it.copy(running = false, isError = event.isError) else it })
+            }
+            is AgentEvent.Approval -> _state.value = _state.value.copy(
+                approval = ChatApproval(event.id, event.tool, summarizeToolArguments(event.tool, event.arguments.toString()), event.danger),
+            )
+            is AgentEvent.RunEnd -> if (event.run == agentRun) {
+                val failure = if (event.ok) null else friendlyAgentError(event.error)
+                updateTurn(agentReplyId) { turn ->
+                    // 只调工具、没有说话的一轮，回复里留空；失败时把原因挂在这条回复上。
+                    turn.copy(streaming = false, error = failure, text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text)
+                }
+                _state.value = _state.value.copy(sending = false, approval = null)
+                agentRun = null
+                if (!event.ok && (failure.orEmpty().contains("额度") || failure.orEmpty().contains("兑换"))) refreshBalanceQuietly()
+                else if (event.ok) refreshBalanceQuietly()
+            }
+            is AgentEvent.Failure -> {
+                updateTurn(agentReplyId) { it.copy(streaming = false, error = event.message) }
+                _state.value = _state.value.copy(sending = false, approval = null)
+            }
+        }
     }
 
     fun clearRedeemFeedback() {
@@ -486,6 +636,9 @@ class CloudChatController(
     fun reset() {
         metaJob?.cancel()
         chatJob?.cancel()
+        agentRun?.let { agent?.cancel(it) }
+        agentSession = newSessionId()
+        agentRun = null
         _state.value = CloudChatState()
     }
 

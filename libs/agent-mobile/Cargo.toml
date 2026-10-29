@@ -1,0 +1,24 @@
+[package]
+name = "agent-mobile"
+version = "0.1.0"
+description = "Embeds agent-kernel in the phone app: the host (Kotlin) owns the network and the tools, this crate owns the agent loop"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# No `openai` feature: model requests go through the host (Ktor), so no TLS stack is built into the phone library.
+agent-kernel = { path = "../agent-kernel", features = ["stdio"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+jni = "0.21"
+
+# 手机上的库越小越好；这个 crate 自己是工作区根，所以这里的 profile 生效。
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "unwind"

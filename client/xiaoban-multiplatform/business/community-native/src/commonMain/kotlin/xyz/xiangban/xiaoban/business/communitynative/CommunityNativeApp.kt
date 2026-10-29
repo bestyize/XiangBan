@@ -41,7 +41,7 @@ import xyz.xiangban.xiaoban.common.community.CloudChatController
 fun CommunityNativeApp(env: CommunityEnv) {
     XiaobanTheme {
         val appScope = rememberCoroutineScope()
-        val chat = remember(env) { CloudChatController(env.ai, appScope) }
+        val chat = remember(env) { CloudChatController(env.ai, appScope, agent = env.agent) }
         var tab by rememberSaveable { mutableStateOf(Tab.Ai.name) }
         var stackText by rememberSaveable { mutableStateOf("") }
         var publishOpen by rememberSaveable { mutableStateOf(false) }

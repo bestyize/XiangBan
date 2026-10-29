@@ -12,6 +12,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import xyz.xiangban.xiaoban.common.community.AccountApi
+import xyz.xiangban.xiaoban.common.community.AgentBridge
+import xyz.xiangban.xiaoban.common.community.AgentRuntime
+import xyz.xiangban.xiaoban.common.community.ReminderScheduler
+import xyz.xiangban.xiaoban.common.community.SetReminderTool
+import xyz.xiangban.xiaoban.common.community.postChatLines
 import xyz.xiangban.xiaoban.common.community.AiGatewayApi
 import xyz.xiangban.xiaoban.common.community.CommunityConfig
 import xyz.xiangban.xiaoban.common.community.ForumApi
@@ -50,6 +55,11 @@ class CommunityEnv(
     val linkStorage: LinkStorage = InMemoryLinkStorage(),
     val remoteCache: RemoteCache = InMemoryRemoteCache(),
     val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
+    /** 手机里的智能体内核（Android 上是 Rust 库）；没有就是纯云端聊天。 */
+    agentBridge: AgentBridge? = null,
+    /** 智能体保存对话的文件夹。 */
+    agentDir: String? = null,
+    reminders: ReminderScheduler? = null,
 ) {
     val account = AccountApi(client, config)
 
@@ -58,6 +68,12 @@ class CommunityEnv(
     val session = SessionManager(account, storage, now = { Clock.System.now().toEpochMilliseconds() }, onAccountChanged = { old, new -> accountChanged(old, new) })
     val forum = ForumApi(client, config) { session.accessToken() }
     val ai = AiGatewayApi(client, config) { session.accessToken() }
+
+    @OptIn(ExperimentalTime::class)
+    val agent: AgentRuntime? = if (agentBridge != null && agentDir != null) {
+        val tools = listOfNotNull(reminders?.let { SetReminderTool(it) { Clock.System.now().toEpochMilliseconds() } })
+        AgentRuntime(agentBridge, { body, onLine -> ai.postChatLines(body, onLine) }, tools, agentDir, AGENT_SYSTEM_PROMPT, scope)
+    } else null
 
     val phoneLink = PhoneLink(
         scope = scope,
@@ -81,3 +97,7 @@ class CommunityEnv(
         }
     }
 }
+
+private const val AGENT_SYSTEM_PROMPT =
+    "你是小伴，用户随身的温和、真诚、靠谱的 AI 伙伴。回答直接清晰、重点突出，默认使用简体中文。" +
+        "你可以用工具帮用户做事；会改动手机上东西的操作，系统会先请用户确认。用户拒绝了就不要再试，直接告诉用户没有执行。"

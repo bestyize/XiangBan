@@ -5,7 +5,9 @@ import androidx.compose.runtime.remember
 import xyz.xiangban.xiaoban.business.communitynative.CommunityEnv
 import xyz.xiangban.xiaoban.business.communitynative.CommunityNativeApp
 import xyz.xiangban.xiaoban.business.communitynative.PlatformActions
+import xyz.xiangban.xiaoban.common.community.AgentBridge
 import xyz.xiangban.xiaoban.common.community.InMemoryTokenStorage
+import xyz.xiangban.xiaoban.common.community.ReminderScheduler
 import xyz.xiangban.xiaoban.common.community.TokenStorage
 import xyz.xiangban.xiaoban.common.link.InMemoryLinkStorage
 import xyz.xiangban.xiaoban.common.link.InMemoryRemoteCache
@@ -19,9 +21,12 @@ fun App(
     platform: PlatformActions? = null,
     linkStorage: LinkStorage = InMemoryLinkStorage(),
     remoteCache: RemoteCache = InMemoryRemoteCache(),
+    agentBridge: AgentBridge? = null,
+    agentDir: String? = null,
+    reminders: ReminderScheduler? = null,
 ) {
-    val env = remember(storage, platform, linkStorage, remoteCache) {
-        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache)
+    val env = remember(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders) {
+        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders)
     }
     CommunityNativeApp(env)
 }
