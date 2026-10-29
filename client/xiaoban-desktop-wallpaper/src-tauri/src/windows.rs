@@ -280,8 +280,11 @@ pub fn drag_companion(window: &tauri::WebviewWindow) -> Result<(), String> {
 /// All desktop layers are siblings below Explorer's icon view. Reapply this order
 /// after a scene becomes visible, including when a newly downloaded wallpaper replaces one.
 pub fn order_desktop_layers(app: &tauri::AppHandle) -> Result<(), String> {
-    for label in ["media-a", "media-b", crate::effects::LABEL, "pet"] {
-        let Some(window) = app.get_webview_window(label) else { continue; };
+    let mut labels: Vec<String> = ["media-a", "media-b"].into_iter().map(str::to_string).collect();
+    labels.extend(crate::effects::labels(app));
+    labels.push("pet".into());
+    for label in labels {
+        let Some(window) = app.get_webview_window(&label) else { continue; };
         let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as HWND;
         unsafe {
             if GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CHILD as isize == 0 { continue; }

@@ -8,8 +8,12 @@ import { normalizeChoice, paramsOf } from '../../effects/parse.ts';
 import { defaultParams, limits, type EffectsChoice } from '../../effects/types.ts';
 import type { ControlStore } from '../control-types.ts';
 import EffectPreview from '../components/EffectPreview.vue';
+import { createWidgetClient } from '../../widgets/client.ts';
 const props = defineProps<{ store: ControlStore }>();
 
+const displays = createWidgetClient();
+const monitors = computed(() => displays.layout.value.monitors ?? []);
+const missingMonitor = computed(() => displays.ready.value && !!choice.value.monitor && choice.value.monitor !== "*" && !monitors.value.some(m => m.id === choice.value.monitor));
 const choice = computed(() => normalizeChoice(props.store.settings.effects));
 const filter=ref<'all'|'desk'|'mine'>('all');
 const packs = computed(() => props.store.effectList.packs);
@@ -36,11 +40,11 @@ watch(() => [chosen.value?.id, chosen.value ? JSON.stringify(paramsOf(choice.val
 async function apply(next: EffectsChoice) {
   try { await props.store.setEffects(next); } catch (error) { props.store.notify(message(error), 'error'); }
 }
-function choose(id: string) { previewId.value = id; void apply({ selected: id, params: choice.value.params }); }
+function choose(id: string) { previewId.value = id; void apply({ ...choice.value, selected: id }); }
 function commit() {
   timer = null;
   if (!chosen.value) return;
-  void apply({ selected: chosen.value.id, params: { ...choice.value.params, [chosen.value.id]: { density: density.value, speed: speed.value, size: size.value } } });
+  void apply({ ...choice.value, selected: chosen.value.id, params: { ...choice.value.params, [chosen.value.id]: { density: density.value, speed: speed.value, size: size.value } } });
 }
 /** 恢复默认: this effect's density, speed and size go back to 1. */
 function restoreDefaults() {
@@ -77,9 +81,9 @@ async function removeEffect(id: string, name: string) {
     props.store.notify(message(error), 'error');
   }
 }
-onMounted(() => { void reload(false); });
+onMounted(() => { void reload(false); void displays.load(); });
 onDeactivated(() => { hoveredId.value = ''; previewId.value = ''; });
-onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
+onBeforeUnmount(() => { displays.dispose(); if (timer) { clearTimeout(timer); commit(); } });
 </script>
 <template>
   <section class="effects-page" data-testid="effects-page">
@@ -125,6 +129,13 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
         <Ban v-else :size="30" :stroke-width="1.4" />
       </div>
       <div class="fx-title"><b>{{ chosen ? chosen.name : '无特效' }}</b><span>{{ chosen ? chosen.description : '桌面保持安静，不叠加任何特效。' }}</span></div>
+      <label class="kv" v-if="store.desktop"><span>显示器</span>
+        <select class="fx-display" :value="choice.monitor || ''" data-testid="effect-monitor" @change="apply({ ...choice, monitor: ($event.target as HTMLSelectElement).value })">
+          <option value="">主显示器</option><option value="*">全部显示器</option>
+          <option v-if="missingMonitor" :value="choice.monitor">原显示器已断开（暂用主屏）</option>
+          <option v-for="monitor in monitors" :key="monitor.id" :value="monitor.id">{{ monitor.name }}{{ monitor.primary ? '（主屏）' : '' }}</option>
+        </select>
+      </label>
       <section v-if="chosen" class="fx-tuning" data-testid="effect-tuning">
         <div class="kv"><div class="h"><span>数量</span><span data-testid="effect-density-value">×{{ density.toFixed(1) }}</span></div><NSlider v-model:value="density" :min="limits.density[0]" :max="limits.density[1]" :step="0.1" :tooltip="false" @update:value="tune" /></div>
         <div class="kv"><div class="h"><span>速度</span><span data-testid="effect-speed-value">×{{ speed }}</span></div><NSlider v-model:value="speed" :min="limits.speed[0]" :max="limits.speed[1]" :step="0.25" :tooltip="false" @update:value="tune" /></div>
@@ -171,6 +182,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 .kv.row{flex-direction:row;align-items:center;gap:10px}
 .kv .grow{flex:1;display:flex;flex-direction:column}
 .kv small{font-size:11.5px;color:var(--ui-text-secondary)}
+.fx-display{width:100%;height:34px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-control);color:var(--ui-text-primary);padding:0 8px}
 .fx-buttons{margin-top:auto;padding-top:20px;display:flex;gap:8px}
 .fx-buttons .xb-btn{flex:1}
 @media(max-width:1000px){.effect-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

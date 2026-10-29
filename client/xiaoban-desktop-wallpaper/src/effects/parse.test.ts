@@ -95,5 +95,7 @@ describe("the user's choice", () => {
     expect(paramsOf(choice, "other")).toEqual({ density: 1, speed: 1, size: 1 });
     expect(normalizeChoice({ selected: "No Good" }).selected).toBe("");
     expect(normalizeChoice(undefined)).toEqual({ selected: "", params: {} });
+    expect(normalizeChoice({ selected: "rain", monitor: "screen-2" }).monitor).toBe("screen-2");
+    expect(normalizeChoice({ selected: "rain", monitor: "*" }).monitor).toBe("*");
   });
 });

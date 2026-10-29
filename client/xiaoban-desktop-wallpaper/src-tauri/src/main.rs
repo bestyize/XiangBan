@@ -512,7 +512,7 @@ fn poke(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) -> Result<(), String> {
-    if content::media_label(window.label()) || window.label() == effects::LABEL {
+    if content::media_label(window.label()) || effects::is_effect(window.label()) {
         if let Some(report) = report {
             if report.to_string().len() > 16384 { return Err("场景报告过大".into()); }
             let failed = report.get("error").is_some();
@@ -531,8 +531,8 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
     #[cfg(target_os = "macos")]
     macos::configure_scene(
         &window,
-        (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") || ["media-a", "media-b", effects::LABEL].contains(&window.label()),
-        ["media-a", "media-b", effects::LABEL].contains(&window.label()),
+        (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") || ["media-a", "media-b"].contains(&window.label()) || effects::is_effect(window.label()),
+        ["media-a", "media-b"].contains(&window.label()),
     )?;
     if window.label() == "pet" || window.label() == float_assistant::LABEL || widgets::is_widget(window.label()) || pets::is_pet(window.label()) {
         let default = if widgets::is_widget(window.label()) || (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") { "desktop" } else { "topmost" };

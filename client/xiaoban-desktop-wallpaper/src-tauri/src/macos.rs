@@ -189,7 +189,7 @@ pub fn configure_scene(
         if click_through {
             ns.setIgnoresMouseEvents(true);
         }
-        if !click_through || window.label() == crate::effects::LABEL {
+        if !click_through || crate::effects::is_effect(window.label()) {
             ns.setOpaque(false);
             ns.setBackgroundColor(Some(&NSColor::clearColor()));
         }

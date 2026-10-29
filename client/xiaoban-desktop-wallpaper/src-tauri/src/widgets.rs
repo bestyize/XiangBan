@@ -175,9 +175,12 @@ pub(crate) fn monitors(app:&tauri::AppHandle)->Result<Vec<crate::widget_geometry
     #[cfg(target_os="macos")] {return crate::macos::widget_monitors(app);}
     #[cfg(not(target_os="macos"))] {
         let primary=app.primary_monitor().map_err(|e|e.to_string())?;
-        Ok(app.available_monitors().map_err(|e|e.to_string())?.into_iter().enumerate().map(|(index,m)|{
+        let monitors=app.available_monitors().map_err(|e|e.to_string())?;
+        Ok(monitors.iter().enumerate().map(|(index,m)|{
             let name=m.name().cloned().unwrap_or_else(||format!("显示器 {}",index+1));
-            crate::widget_geometry::MonitorArea{id:name.clone(),name,x:m.position().x as f64,y:m.position().y as f64,width:m.size().width as f64,height:m.size().height as f64,scale:m.scale_factor(),primary:primary.as_ref().is_some_and(|p|p.position()==m.position())}
+            let duplicate=monitors.iter().filter(|other|other.name()==m.name()).count()>1;
+            let id=if duplicate {format!("{}@{},{}",name,m.position().x,m.position().y)} else {name.clone()};
+            crate::widget_geometry::MonitorArea{id,name,x:m.position().x as f64,y:m.position().y as f64,width:m.size().width as f64,height:m.size().height as f64,scale:m.scale_factor(),primary:primary.as_ref().is_some_and(|p|p.position()==m.position())}
         }).collect())
     }
 }
@@ -311,7 +314,7 @@ pub fn start(app: &tauri::AppHandle) {
     let app=app.clone();std::thread::spawn(move||{
         let mut previous=String::new();
         loop{std::thread::sleep(std::time::Duration::from_secs(3));
-            if let Ok(areas)=monitors(&app){let signature=serde_json::to_string(&areas).unwrap_or_default();if signature!=previous{previous=signature;sync(&app);}}
+            if let Ok(areas)=monitors(&app){let signature=serde_json::to_string(&areas).unwrap_or_default();if signature!=previous{previous=signature;sync(&app);crate::effects::sync(&app);crate::content::sync(&app);}}
         }
     });
 }

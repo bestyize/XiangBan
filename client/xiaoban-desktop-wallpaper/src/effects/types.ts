@@ -109,7 +109,7 @@ export interface EffectPack {
 }
 
 export interface EffectParams { density: number; speed: number; size: number }
-export interface EffectsChoice { selected: string; params: Record<string, EffectParams> }
+export interface EffectsChoice { selected: string; params: Record<string, EffectParams>; monitor?: string }
 
 export const limits = {
   layers: 6, countPerLayer: 1500, totalCount: 3000, pathLength: 6000, idPattern: /^[a-z0-9][a-z0-9_-]{0,47}$/,

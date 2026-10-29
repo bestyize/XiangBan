@@ -42,7 +42,7 @@ pub fn scene_level(label: &str, widget: bool, wallpaper: bool, effects_label: &s
     if widget || label == "pet" {
         return levels.icons + 1;
     }
-    if label == effects_label {
+    if label == effects_label || label.strip_prefix("effects-").is_some_and(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())) {
         return levels.desktop + 2;
     }
     levels.desktop + 1

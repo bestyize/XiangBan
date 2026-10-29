@@ -45,6 +45,7 @@ pub trait Desktop: Send + Sync {
     fn effects(&self) -> Result<Value, String>;
     /// Empty turns the effect off.
     fn set_effect(&self, id: &str) -> Result<(), String>;
+    fn set_effect_monitor(&self, _monitor: &str) -> Result<Value, String> { Err("当前宿主不支持特效显示器设置".into()) }
     /// Writes a new effect pack the user asked for. Returns the file name it landed in.
     fn create_effect(&self, pack: &Value, overwrite: bool) -> Result<String, String>;
     fn delete_effect(&self, id: &str) -> Result<String, String>;
@@ -186,6 +187,7 @@ impl Desktop for TauriDesktop {
     fn effects(&self) -> Result<Value, String> {
         let mut value = crate::effects::list_desktop_effects(self.control()?)?;
         value["selected"] = json!(crate::settings(&self.app).effects.selected);
+        value["display"] = crate::effects::monitor_state(&self.app)?;
         Ok(value)
     }
 
@@ -193,6 +195,22 @@ impl Desktop for TauriDesktop {
         let mut choice = serde_json::to_value(&crate::settings(&self.app).effects).map_err(|e| e.to_string())?;
         choice["selected"] = json!(id);
         crate::set_desktop_effects(self.app.clone(), choice).map(|_| ())
+    }
+
+    fn set_effect_monitor(&self, monitor: &str) -> Result<Value, String> {
+        let areas = crate::widgets::monitors(&self.app)?;
+        let current = crate::settings(&self.app).effects.monitor;
+        let chosen = if monitor == "next" {
+            if areas.len() != 2 || current == "*" { return Err("无法唯一确定另一块显示器，请先用 effect_list 查看并指定显示器".into()); }
+            let active = crate::widget_geometry::resolve(&areas, if current.is_empty() { None } else { Some(&current) }).ok_or("没有找到显示器")?;
+            areas.iter().find(|m| m.id != active.id).ok_or("没有找到另一块显示器")?.id.clone()
+        } else if monitor.is_empty() || monitor == "*" { monitor.to_string() }
+        else if areas.iter().any(|m| m.id == monitor) { monitor.to_string() }
+        else { return Err("显示器不存在或已断开，请先用 effect_list 查看可用显示器".into()); };
+        let mut choice = serde_json::to_value(&crate::settings(&self.app).effects).map_err(|e| e.to_string())?;
+        choice["monitor"] = json!(chosen);
+        crate::set_desktop_effects(self.app.clone(), choice)?;
+        crate::effects::monitor_state(&self.app)
     }
 
     fn create_effect(&self, pack: &Value, overwrite: bool) -> Result<String, String> {
@@ -430,6 +448,7 @@ fn effect_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     let value = desktop.effects()?;
     let selected = value["selected"].as_str().unwrap_or("");
     let mut lines = vec![format!("当前特效：{}", if selected.is_empty() { "无" } else { selected })];
+    if value["display"].is_object() { lines.push(format!("显示器状态：{}", value["display"])); }
     for pack in value["packs"].as_array().into_iter().flatten().take(LIST_LIMIT) {
         let id = pack["id"].as_str().unwrap_or("?");
         lines.push(format!("{id} | {}{}", pack["name"].as_str().unwrap_or(id), if id == selected { " | 正在使用" } else { "" }));
@@ -1168,7 +1187,12 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             ToolSpec::new("wallpaper_delete", "删除指定的本地导入或创作的壁纸，id 来自 wallpaper_list（必须是 local- 开头）。若该壁纸正在使用，会自动换回系统桌面。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
             wallpaper_delete,
         ),
-        tool(&desktop, ToolSpec::new("effect_list", "列出桌面特效（雨、雪、花瓣等）和正在使用的那个。", none()).risk(Risk::Read).parallel(), effect_list),
+        tool(&desktop, ToolSpec::new("effect_list", "列出桌面特效、当前选择及显示器状态，monitor id 用于切换屏幕。", none()).risk(Risk::Read).parallel(), effect_list),
+        tool(&desktop, ToolSpec::new("effect_monitor_set", "设置特效显示器。先调用 effect_list；monitor 使用返回的显示器 id，空字符串表示主屏，* 表示全部屏幕，next 表示另一块屏幕（仅两块且当前不是全部时可用）。配置会保存并异步应用；结果不代表画面已验证。", object(json!({"monitor":{"type":"string"}}), &["monitor"])).risk(Risk::Write).self_managed().serial(), |d,a| {
+            let monitor = a.get("monitor").and_then(Value::as_str).ok_or("缺少显示器参数")?;
+            let state = d.set_effect_monitor(monitor)?;
+            Ok(format!("特效显示器设置已保存，正在应用；画面尚未核验。当前配置：{state}"))
+        }),
         tool(
             &desktop,
             ToolSpec::new("effect_read_format", "读取程序内置的完整桌面特效包格式与可用 JSON 示例。创作特效前先调用本工具；无需搜索工作目录、安装目录或联网查找文档。", none()).risk(Risk::Read),
@@ -1545,6 +1569,10 @@ mod tests {
         fn set_effect(&self, id: &str) -> Result<(), String> {
             self.log(format!("effect {id:?}"))
         }
+        fn set_effect_monitor(&self, monitor: &str) -> Result<Value, String> {
+            self.log(format!("effect-monitor {monitor}"))?;
+            Ok(json!({"selected": monitor}))
+        }
         fn create_effect(&self, pack: &Value, overwrite: bool) -> Result<String, String> {
             self.log(format!("create-effect {} overwrite={overwrite}", pack["id"].as_str().unwrap_or("?")))?;
             Ok(format!("{}.json", pack["id"].as_str().unwrap_or("?")))
@@ -1750,6 +1778,14 @@ mod tests {
         assert_eq!(fake.calls().len(), 4, "invalid input never reaches the desktop");
     }
 
+    #[test]
+    fn changing_the_effect_display_does_not_claim_that_the_screen_was_verified() {
+        let fake = Arc::new(Fake::default());
+        let output = call(&fake, "effect_monitor_set", json!({"monitor":"next"})).unwrap();
+        assert!(output.contains("尚未核验"));
+        assert_eq!(fake.calls(), vec!["effect-monitor next"]);
+        assert!(call(&fake, "effect_monitor_set", json!({})).is_err());
+    }
     #[test]
     fn creating_an_effect_accepts_an_object_or_a_json_string_and_says_where_it_landed() {
         let fake = Arc::new(Fake::default());

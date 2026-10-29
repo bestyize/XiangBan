@@ -128,6 +128,6 @@ export function normalizeChoice(value: unknown): EffectsChoice {
   const raw = isObj(value) ? value : {};
   const params: EffectsChoice["params"] = {};
   if (isObj(raw.params)) for (const [id, item] of Object.entries(raw.params).slice(0, 64)) if (limits.idPattern.test(id)) params[id] = normalizeParams(item);
-  return { selected: typeof raw.selected === "string" && limits.idPattern.test(raw.selected) ? raw.selected : "", params };
+  return { selected: typeof raw.selected === "string" && limits.idPattern.test(raw.selected) ? raw.selected : "", params, ...(typeof raw.monitor === "string" && raw.monitor.length > 0 && raw.monitor.length <= 512 ? { monitor: raw.monitor } : {}) };
 }
 export const paramsOf = (choice: EffectsChoice, id: string): EffectParams => choice.params[id] ?? { ...defaultParams };

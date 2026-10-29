@@ -40,6 +40,8 @@ impl EffectParams {
 pub struct EffectsChoice {
     /// The pack in use; empty means no effect.
     pub selected: String,
+    /// Empty means primary; `*` means all screens; otherwise a saved monitor ID.
+    pub monitor: String,
     /// Each pack keeps its own parameters, so switching back finds them as they were left.
     pub params: BTreeMap<String, EffectParams>,
 }
@@ -58,7 +60,8 @@ impl EffectsChoice {
             let params = object.get("params").and_then(Value::as_object).map(|map| {
                 map.iter().filter(|(id, _)| valid_id(id)).take(64).map(|(id, item)| (id.clone(), EffectParams::from_value(item))).collect()
             }).unwrap_or_default();
-            return Self { selected, params };
+            let monitor = object.get("monitor").and_then(Value::as_str).filter(|id| id.len() <= 512).unwrap_or("").to_string();
+            return Self { selected, monitor, params };
         }
         let mut choice = Self::default();
         for (old, new) in LEGACY {
@@ -104,6 +107,15 @@ mod tests {
         for value in [json!(null), json!("snow"), json!(7), json!([1, 2]), json!({})] {
             assert_eq!(EffectsChoice::from_value(&value), EffectsChoice::default(), "{value}");
         }
+    }
+    #[test]
+    fn screen_selection_round_trips_and_old_settings_default_to_primary() {
+        for screen in ["", "*", "DELL@1920,0"] {
+            let choice = EffectsChoice::from_value(&json!({"selected":"rain", "monitor":screen}));
+            let saved: EffectsChoice = serde_json::from_value(serde_json::to_value(&choice).unwrap()).unwrap();
+            assert_eq!(saved.monitor, screen);
+        }
+        assert_eq!(EffectsChoice::from_value(&json!({"selected":"rain"})).monitor, "");
     }
     #[test]
     fn older_named_scenes_are_converted_and_leaves_become_maple() {

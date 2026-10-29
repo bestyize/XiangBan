@@ -124,6 +124,14 @@ describe('desktop effects page', () => {
     expect(wrapper.find('[data-testid="effect-tuning"]').exists()).toBe(false);
     wrapper.unmount();
   });
+  it('keeps the selected display when switching or tuning effects', async () => {
+    const { wrapper, sent } = setup({ selected: 'rain', params: {}, monitor: 'screen-2' });
+    await wrapper.get('[data-testid="effect-maple"]').trigger('click'); await flushPromises();
+    expect(sent[0].monitor).toBe('screen-2');
+    await wrapper.get('[data-testid="effect-none"]').trigger('click'); await flushPromises();
+    expect(sent[1].monitor).toBe('screen-2');
+    wrapper.unmount();
+  });
   it('sends slider changes once they settle, and the last values win', async () => {
     vi.useFakeTimers();
     try {

@@ -192,11 +192,14 @@ async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Resul
     crate::widgets::sync(app);
     crate::reminders::set_game_active(app, true);
     let _ = app.emit("games-active", true);
-    for label in ["pet", "wallpaper", "media-a", "media-b", "media-preview", crate::effects::LABEL] {
+    let mut background_labels: Vec<String> = ["pet", "wallpaper", "media-a", "media-b", "media-preview"].into_iter().map(str::to_string).collect();
+    background_labels.extend(crate::effects::labels(app));
+    for label in &background_labels {
         app.state::<crate::DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove(label);
         if let Some(background) = app.get_webview_window(label) { if let Err(e) = background.destroy() { state.active.store(false,Ordering::SeqCst); let _=window.destroy(); restore_background(app); return Err(e.to_string()); } }
     }
-    if let Err(error)=wait_gone(app,&["pet","wallpaper","media-a","media-b","media-preview",crate::effects::LABEL]).await {
+    let names: Vec<&str> = background_labels.iter().map(String::as_str).collect();
+    if let Err(error)=wait_gone(app,&names).await {
         state.active.store(false,Ordering::SeqCst); let _=window.destroy(); restore_background(app); return Err(error);
     }
     if let Err(e) = window.show().and_then(|_| window.set_focus()) {

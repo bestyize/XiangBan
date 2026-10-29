@@ -14,6 +14,18 @@ use tauri_plugin_dialog::DialogExt;
 pub const LABEL: &str = "effects";
 /// Serialises opening and closing; every pass reads the settings again, so the last pass always wins.
 static RECONCILE: Mutex<()> = Mutex::new(());
+static PLACEMENT: Mutex<String> = Mutex::new(String::new());
+pub fn is_effect(label: &str) -> bool { label == LABEL || label.strip_prefix("effects-").is_some_and(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())) }
+pub fn labels(app: &tauri::AppHandle) -> Vec<String> { app.webview_windows().keys().filter(|s| is_effect(s)).cloned().collect() }
+fn targets<'a>(areas: &'a [crate::widget_geometry::MonitorArea], selection: &str) -> Vec<&'a crate::widget_geometry::MonitorArea> {
+    if selection == "*" { areas.iter().collect() } else { crate::widget_geometry::resolve(areas, if selection.is_empty() { None } else { Some(selection) }).into_iter().collect() }
+}
+pub fn monitor_state(app: &tauri::AppHandle) -> Result<Value, String> {
+    let areas = crate::widgets::monitors(app)?;
+    let selected = settings(app).effects.monitor;
+    let active: Vec<_> = targets(&areas, &selected).iter().map(|m| m.id.clone()).collect();
+    Ok(json!({"selected": selected, "active": active, "fallback": !selected.is_empty() && selected != "*" && !areas.iter().any(|m| m.id == selected), "monitors": areas}))
+}
 
 fn folder(app: &tauri::AppHandle) -> Result<PathBuf, String> { Ok(storage::root(app)?.join("effects")) }
 
@@ -31,6 +43,10 @@ fn wanted(app: &tauri::AppHandle, config: &Settings) -> Option<Value> {
 
 pub fn render_payload(app: &tauri::AppHandle) -> Value {
     let config = settings(app);
+    // Windows custom wallpaper draws its own primary-screen effect. Never draw it there
+    // when the user selected only a secondary screen.
+    let primary_selected = crate::widgets::monitors(app).ok().is_some_and(|areas| targets(&areas, &config.effects.monitor).iter().any(|m| m.primary));
+    if !primary_selected { return Value::Null; }
     wanted(app, &config).map(|pack| payload(app, &config, &pack)).unwrap_or(Value::Null)
 }
 
@@ -45,33 +61,41 @@ pub fn sync(app: &tauri::AppHandle) {
 pub fn reconcile(app: &tauri::AppHandle) {
     let _guard = RECONCILE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let current = settings(app);
-    // HWND-backed transparent WebViews cannot alpha-compose over sibling WebViews
-    // on Windows. A custom wallpaper renders the same effect in its own page.
-    #[cfg(windows)]
-    if crate::content::composing(app) && wanted(app, &current).is_some() {
-        if let Some(window) = app.get_webview_window(LABEL) { let _ = window.hide(); }
-        return;
-    }
-    match (app.get_webview_window(LABEL), wanted(app, &current)) {
-        (Some(window), Some(pack)) => {
+    let Some(pack) = wanted(app, &current) else { if let Err(error) = close(app) { let _ = app.emit("desktop-error", error); } return; };
+    let areas = match crate::widgets::monitors(app) { Ok(areas) => areas, Err(e) => { let _ = app.emit("desktop-error", e); return; } };
+    let selected = targets(&areas, &current.effects.monitor);
+    if selected.is_empty() { let _ = app.emit("desktop-error", "没有找到显示器"); return; }
+    // When a Windows custom wallpaper renders the primary effect itself, keep
+    // the other screens' overlays; do not place an overlapping primary overlay.
+    #[cfg(windows)] let composing = crate::content::composing(app);
+    #[cfg(not(windows))] let composing = false;
+    let overlay: Vec<_> = selected.iter().copied().filter(|m| !(composing && m.primary)).collect();
+    let signature = serde_json::to_string(&overlay).unwrap_or_default();
+    let mut placement = PLACEMENT.lock().unwrap_or_else(|e| e.into_inner());
+    if *placement != signature || labels(app).len() != overlay.len() {
+        if let Err(error) = close(app) { let _ = app.emit("desktop-error", error); return; }
+        for (index, area) in overlay.iter().enumerate() {
+            let label = if index == 0 { LABEL.to_string() } else { format!("effects-{index}") };
+            if let Err(error) = open(app, &current, &pack, &label, area) {
+                let _ = close(app); *placement = String::new();
+                let _ = app.emit("desktop-error", format!("桌面特效无法显示：{error}")); return;
+            }
+        }
+        *placement = signature;
+    } else {
+        for label in labels(app) { if let Some(window) = app.get_webview_window(&label) {
             let _ = window.eval(format!("window.dispatchEvent(new CustomEvent('effects-config',{{detail:{}}}));", payload(app, &current, &pack)));
-            let _ = window.show();
-        }
-        (Some(_), None) => { if let Err(error) = close(app) { let _ = app.emit("desktop-error", error); } }
-        (None, Some(pack)) => {
-            if let Err(error) = open(app, &current, &pack) { let _ = app.emit("desktop-error", format!("桌面特效无法显示：{error}")); }
-        }
-        (None, None) => {}
+        } }
     }
 }
 
-/// Destroys the overlay and waits until Tauri has forgotten the label, so it can be opened again at once.
+/// Destroys every overlay, including the extra screens, and waits for their labels to disappear.
 pub fn close(app: &tauri::AppHandle) -> Result<(), String> {
-    app.state::<DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove(LABEL);
-    if let Some(window) = app.get_webview_window(LABEL) {
-        window.destroy().map_err(|e| e.to_string())?;
+    for label in labels(app) {
+        app.state::<DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove(&label);
+        if let Some(window) = app.get_webview_window(&label) { window.destroy().map_err(|e| e.to_string())?; }
         let deadline = Instant::now() + Duration::from_secs(3);
-        while app.get_webview_window(LABEL).is_some() {
+        while app.get_webview_window(&label).is_some() {
             if Instant::now() >= deadline { return Err("桌面特效窗口仍在关闭，请稍后重试".into()); }
             std::thread::sleep(Duration::from_millis(10));
         }
@@ -79,43 +103,34 @@ pub fn close(app: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-fn open(app: &tauri::AppHandle, current: &Settings, pack: &Value) -> Result<(), String> {
-    app.state::<DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove(LABEL);
-    app.state::<crate::content::ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).remove(LABEL);
-    let monitor = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("没有主显示器")?;
-    let scale = monitor.scale_factor();
+fn open(app: &tauri::AppHandle, current: &Settings, pack: &Value, label: &str, area: &crate::widget_geometry::MonitorArea) -> Result<(), String> {
+    app.state::<DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove(label);
+    app.state::<crate::content::ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).remove(label);
     #[cfg(windows)]
-    let parent = crate::windows::desktop_parent()?;
-    let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html?scene=effects".into()))
-        .title("小伴 · 桌面特效")
-        .decorations(false).shadow(false).resizable(false).skip_taskbar(true)
+    let monitor = app.available_monitors().map_err(|e| e.to_string())?.into_iter().find(|m| m.position().x as f64 == area.x && m.position().y as f64 == area.y).ok_or("显示器已断开")?;
+    #[cfg(windows)] let parent = crate::windows::desktop_parent()?;
+    let builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html?scene=effects".into()))
+        .title("小伴 · 桌面特效").decorations(false).shadow(false).resizable(false).skip_taskbar(true)
         .transparent(true).visible(false).focused(false)
         .initialization_script(format!("window.__XIAOBAN_EFFECTS__={};", payload(app, current, pack)))
-        .inner_size(monitor.size().width as f64 / scale, monitor.size().height as f64 / scale)
-        .position(monitor.position().x as f64 / scale, monitor.position().y as f64 / scale);
-    // macOS puts it at a desktop window level once the page reports ready (see `scene_ready`).
+        .inner_size(area.width / area.scale, area.height / area.scale)
+        .position(area.x / area.scale, area.y / area.scale);
     #[cfg(target_os = "macos")]
     let builder = builder.incognito(true).background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
-    // Host it below Explorer's icons, beside the wallpaper and desktop companion.
     #[cfg(windows)]
-    let builder = builder.parent_raw(::windows::Win32::Foundation::HWND(parent as _))
-        .data_directory(storage::webview(&storage::root(app)?));
+    let builder = builder.parent_raw(::windows::Win32::Foundation::HWND(parent as _)).data_directory(storage::webview(&storage::root(app)?));
     let window = builder.build().map_err(|e| e.to_string())?;
-    #[cfg(windows)]
-    if let Err(error) = crate::windows::attach_wallpaper(&window, &monitor, parent) {
-        let _ = window.destroy();
-        return Err(error);
-    }
-    if let Err(error) = window.set_ignore_cursor_events(true) {
-        let _ = window.destroy();
-        return Err(error.to_string());
-    }
-    #[cfg(target_os = "macos")]
-    if let Err(error) = crate::macos::configure_scene(&window, true, true) {
-        let _ = window.destroy();
-        return Err(error);
-    }
-    Ok(())
+    let result = (|| -> Result<(), String> {
+        #[cfg(windows)] crate::windows::attach_wallpaper(&window, &monitor, parent)?;
+        window.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
+        #[cfg(target_os = "macos")] {
+            crate::macos::configure_scene(&window, true, false)?;
+            crate::macos::place_widget(&window, area.x, area.y, area.width, area.height)?;
+        }
+        Ok(())
+    })();
+    if result.is_err() { let _ = window.destroy(); }
+    result
 }
 
 fn control_only(window: &tauri::WebviewWindow) -> Result<(), String> {
@@ -230,3 +245,20 @@ pub fn delete_desktop_effect(window: tauri::WebviewWindow, id: String) -> Result
 }
 
 
+
+#[cfg(test)]
+mod monitor_tests {
+    use super::*;
+    fn screen(id: &str, primary: bool) -> crate::widget_geometry::MonitorArea {
+        crate::widget_geometry::MonitorArea { id: id.into(), name: id.into(), x: 0., y: 0., width: 1920., height: 1080., scale: 1., primary }
+    }
+    #[test]
+    fn selected_all_and_disconnected_displays_resolve() {
+        let screens = vec![screen("main", true), screen("other", false)];
+        assert_eq!(targets(&screens, "")[0].id, "main");
+        assert_eq!(targets(&screens, "other")[0].id, "other");
+        assert_eq!(targets(&screens, "*").len(), 2);
+        assert_eq!(targets(&screens[..1], "other")[0].id, "main");
+        assert_eq!(targets(&screens, "other")[0].id, "other");
+    }
+}

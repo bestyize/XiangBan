@@ -32,7 +32,7 @@ pub fn permitted(label: &str, command: &str) -> bool {
     if ["control", "pet", "wallpaper"].contains(&label) {
         return true;
     }
-    ["media-a", "media-b", "media-preview", crate::effects::LABEL].contains(&label) && command == "scene_ready"
+    (["media-a", "media-b", "media-preview"].contains(&label) || crate::effects::is_effect(label)) && command == "scene_ready"
 }
 pub fn media_label(label: &str) -> bool {
     ["media-a", "media-b", "media-preview"].contains(&label)
