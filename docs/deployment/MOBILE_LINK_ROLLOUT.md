@@ -38,7 +38,7 @@
 
 ## 5. 真机联调
 
-1. GitHub Actions 运行 “Android and Link Core”，下载 `xiaoban-android-debug-apk` 装到手机；运行 “Desktop Agent Platform Tests” 确认桌面端在 Windows、macOS 上通过。
+1. 在 GitHub Actions 运行 “BuildXiaoBanWallpaper”：取消勾选 `build_release`（只做检查、不动 Release），勾选 `test_android_app` 和 `test_desktop`，下载产物 `xiaoban-android-debug-apk` 装到手机，并确认桌面端在 Windows、macOS 上的测试通过。
 2. 桌面端（新版本）登录账号 → “设置 → 连接手机”出二维码；手机登录同一账号，设备页扫码配对。
 3. 手机“小伴”页：切到“云端小伴”聊一句（验证 server-ai）；切到“我的电脑”发一条消息，看流式回复；让桌面触发一次需要批准的操作，在手机上批准一次（验证 server-link）。
 4. 手机“社区”页登录后发一条回复或点赞（验证论坛）。
