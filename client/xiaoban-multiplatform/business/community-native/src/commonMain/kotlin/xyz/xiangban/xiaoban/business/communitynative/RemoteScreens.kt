@@ -160,8 +160,9 @@ fun RemoteListScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
         Column(Modifier.fillMaxSize()) {
             ScreenBar(
                 peer?.name ?: "电脑", onBack = back,
-                subtitle = if (peer == null) "不在账号的电脑列表里" else (if (peer.online) "● 在线" else "○ 离线"),
+                subtitle = if (peer == null) "不在账号的电脑列表里" else null,
                 trailing = { IconTap(XIcons.More, "更多", { menu = true }) },
+                subtitleContent = if (peer != null) ({ StatusDot(peer.online, peer.statusText(), fontSize = 11) }) else null,
             )
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 12.dp, bottom = 24.dp)) {
                 if (peer == null) {
@@ -239,7 +240,12 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
         Column(Modifier.fillMaxSize().imePadding()) {
             ScreenBar(
                 current?.title?.ifBlank { null } ?: "新对话", onBack = back,
-                subtitle = (peer?.name ?: "电脑") + " · " + (if (online) "● 在线" else "○ 离线"),
+                subtitleContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text((peer?.name ?: "电脑") + " · ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        StatusDot(online, if (online) "在线" else "离线", fontSize = 11)
+                    }
+                },
             )
             if (!session.loggedIn) {
                 Banner("登录已过期，请重新登录", Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true, icon = XIcons.Lock, actionText = "去登录", onAction = { open(Route.Login) })
