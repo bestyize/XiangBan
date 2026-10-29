@@ -11,11 +11,14 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.graphics.Color
 import xyz.xiangban.xiaoban.common.community.DesignTokens as Tokens
 
-/** Material 色板里没有的两个灰度：次要文字（时间、计数）和发丝线。 */
+/** Material 色板里没有的颜色：次要文字（时间、计数）、发丝线、浅灰填充、描边，以及品牌红的浅底和它的描边。 */
 @Immutable
-data class ExtraColors(val ink3: Color, val hairline: Color)
+data class ExtraColors(val ink3: Color, val hairline: Color, val fill: Color, val line: Color, val brandSoft: Color, val brandSoftLine: Color)
 
-val LocalExtraColors = compositionLocalOf { ExtraColors(Color(Tokens.Ink3Light), Color(Tokens.HairlineLight)) }
+private val LightExtra = ExtraColors(Color(Tokens.Ink3Light), Color(Tokens.HairlineLight), Color(Tokens.FillLight), Color(Tokens.LineLight), Color(Tokens.BrandSoftLight), Color(Tokens.BrandSoftLineLight))
+private val DarkExtra = ExtraColors(Color(Tokens.Ink3Dark), Color(Tokens.HairlineDark), Color(Tokens.FillDark), Color(Tokens.LineDark), Color(Tokens.BrandSoftDark), Color(Tokens.BrandSoftLineDark))
+
+val LocalExtraColors = compositionLocalOf { LightExtra }
 
 val Brand = Color(Tokens.Brand)
 
@@ -39,7 +42,7 @@ fun XiaobanTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () 
             outline = Color(Tokens.HairlineLight), outlineVariant = Color(Tokens.HairlineLight),
         )
     }
-    val extra = if (dark) ExtraColors(Color(Tokens.Ink3Dark), Color(Tokens.HairlineDark)) else ExtraColors(Color(Tokens.Ink3Light), Color(Tokens.HairlineLight))
+    val extra = if (dark) DarkExtra else LightExtra
     CompositionLocalProvider(LocalExtraColors provides extra) {
         MaterialTheme(colorScheme = scheme, content = content)
     }

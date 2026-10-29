@@ -124,6 +124,28 @@ data class Topic(
     @SerialName("last_reply_at") val lastReplyAt: String = "",
     /** 详情里才有 */
     @SerialName("body_html") val bodyHtml: String = "",
+    /** 详情里才有，登录后才有内容：你是否点过赞、收藏过，能不能回复。 */
+    val viewer: TopicViewer? = null,
+)
+
+@Serializable
+data class TopicViewer(
+    val liked: Boolean = false,
+    val bookmarked: Boolean = false,
+    @SerialName("can_edit") val canEdit: Boolean = false,
+    @SerialName("can_reply") val canReply: Boolean = false,
+)
+
+/** 论坛分类；有子分类的是一级板块，只有没有子分类的才能发帖。 */
+@Serializable
+data class Category(
+    val id: Int,
+    @SerialName("parent_id") val parentId: Int? = null,
+    val slug: String,
+    val name: String,
+    val description: String = "",
+    @SerialName("min_post_level") val minPostLevel: Int = 0,
+    @SerialName("admin_only") val adminOnly: Boolean = false,
 )
 
 @Serializable

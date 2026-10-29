@@ -113,6 +113,34 @@ class ForumApiTest {
     }
 
     @Test
+    fun `writing to the forum sends the token and the right body`() = runTest {
+        val server = FakeServer()
+        // 后登记的优先匹配，所以通用的写前面。
+        server.on("/api/topics", body = """{"id":42}""")
+        server.on("/api/topics/9/bookmark", body = """{"bookmarked":true}""")
+        server.on("/api/topics/9/like", body = """{"liked":true,"like_count":3}""")
+        server.on("/api/topics/9/posts", body = """{"id":1}""")
+        server.on("/api/categories", body = """[{"id":3,"parent_id":1,"slug":"share-software","name":"精品软件","description":"d","min_post_level":1,"admin_only":false,"kind":"normal","sort_order":1}]""")
+        val api = ForumApi(server.client, config) { "T1" }
+        assertEquals(42L, api.createTopic(3, "标题", "这是一段足够长的正文内容"))
+        api.reply(9, "回复内容", replyTo = 5)
+        api.setTopicLiked(9, true)
+        api.setTopicLiked(9, false)
+        api.setTopicBookmarked(9, true)
+        assertEquals("精品软件", api.categories().single().name)
+        val create = server.requests[0]
+        assertEquals("POST", create.method.value)
+        assertEquals("Bearer T1", create.headers["Authorization"])
+        val sent = Json.parseToJsonElement((create.body as TextContent).text).jsonObject
+        assertEquals("3", sent["category_id"].toString())
+        assertEquals("标题", sent["title"].toString().trim('"'))
+        val reply = Json.parseToJsonElement((server.requests[1].body as TextContent).text).jsonObject
+        assertEquals("回复内容", reply["body"].toString().trim('"'))
+        assertEquals("5", reply["reply_to"].toString())
+        assertEquals(listOf("PUT", "DELETE", "PUT"), server.requests.subList(2, 5).map { it.method.value })
+    }
+
+    @Test
     fun `pages know whether there is more`() {
         assertTrue(Page<Int>(page = 1, pageSize = 20, total = 21).hasMore)
         assertFalse(Page<Int>(page = 2, pageSize = 20, total = 40).hasMore)
