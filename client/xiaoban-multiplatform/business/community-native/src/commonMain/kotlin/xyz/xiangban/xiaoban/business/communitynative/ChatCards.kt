@@ -759,7 +759,9 @@ fun FileChangesCard(files: List<ChangedFile>, delivered: Boolean, modifier: Modi
 private fun ReplyActions(text: String, platform: PlatformActions?, onRegenerate: (() -> Unit)?, extras: TurnExtras) {
     val extra = LocalExtraColors.current
     var copied by remember(text) { mutableStateOf(false) }
-    var speaking by remember(text) { mutableStateOf(false) }
+    val reader = LocalReplyReader.current
+    var mine by remember(text) { mutableStateOf(false) }
+    val speaking = mine && (reader == null || reader.speaking)
     if (platform == null && onRegenerate == null && extras.onSave == null) return
     Row(Modifier.fillMaxWidth().padding(start = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         if (platform != null) {
@@ -776,7 +778,9 @@ private fun ReplyActions(text: String, platform: PlatformActions?, onRegenerate:
         }
         if (platform != null) {
             ActionIcon(XIcons.Volume, if (speaking) Brand else extra.ink3, if (speaking) "停止朗读" else "朗读") {
-                if (speaking) { platform.stopSpeaking(); speaking = false } else speaking = platform.speak(speechText(text))
+                if (reader != null) {
+                    if (speaking) { reader.stop(); mine = false } else { reader.speak(speechText(text)); mine = true }
+                } else if (speaking) { platform.stopSpeaking(); mine = false } else mine = platform.speak(speechText(text))
             }
         }
         if (onRegenerate != null) ActionIcon(XIcons.Refresh, extra.ink3, "重新生成", onRegenerate)

@@ -14,6 +14,8 @@ sealed interface Route {
     /** 设置里的外观（跟随系统 / 浅色 / 深色）和主题色。 */
     data object Appearance : Route
     data object AccentColor : Route
+    /** 设置里的声音：语音识别、朗读（来源、音色、语速）、通话。 */
+    data object Voice : Route
     /** 云端小伴的对话页。 */
     data object AiChat : Route
     data object Devices : Route
@@ -32,6 +34,7 @@ sealed interface Route {
         Models -> "models"
         Appearance -> "appearance"
         AccentColor -> "accent"
+        Voice -> "voice"
         AiChat -> "aichat"
         Devices -> "devices"
         is RemoteChat -> "rchat:$peer"
@@ -53,6 +56,7 @@ sealed interface Route {
                 "models" -> Models
                 "appearance" -> Appearance
                 "accent" -> AccentColor
+                "voice" -> Voice
                 "aichat" -> AiChat
                 "devices" -> Devices
                 "rchat" -> value.takeIf { it.isNotEmpty() }?.let(::RemoteChat)

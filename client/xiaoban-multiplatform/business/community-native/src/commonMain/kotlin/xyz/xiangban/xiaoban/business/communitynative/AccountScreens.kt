@@ -39,6 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import xyz.xiangban.xiaoban.common.community.EdgeVoices
+import xyz.xiangban.xiaoban.common.community.SpeechSource
 import xyz.xiangban.xiaoban.common.community.ApiException
 import xyz.xiangban.xiaoban.common.community.CodeLogin
 import xyz.xiangban.xiaoban.common.community.messageOf
@@ -242,9 +244,10 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 NavRow("昵称与头像", session.user?.username, first = true) { env.platform?.openUrl("$site/settings") }
                 NavRow("绑定手机 / 邮箱") { env.platform?.openUrl("$site/settings") }
             }
-            GroupLabel("外观")
+            GroupLabel("外观与声音")
             NavRow("主题", ThemeState.mode.label, first = true) { open(Route.Appearance) }
             NavRow("主题色", ThemeState.accent.name) { open(Route.AccentColor) }
+            NavRow("声音", SpeechState.settings.let { if (it.source == SpeechSource.Edge) "Edge · ${EdgeVoices.byId(it.voice).name}" else it.source.label }) { open(Route.Voice) }
             GroupLabel("关于")
             NavRow("用户协议", first = true) { env.platform?.openUrl("$site/terms") }
             NavRow("隐私政策") { env.platform?.openUrl("$site/privacy") }

@@ -246,6 +246,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
 
     val current = remote.selectedSession
     val lastTurn = remote.messages.lastOrNull()
+    AutoRead(env.reader, lastTurn?.id, lastTurn?.role, lastTurn?.text.orEmpty(), lastTurn?.streaming == true)
     val liveProgress = if (lastTurn != null && lastTurn.role == "assistant" && lastTurn.streaming) {
         taskProgress(lastTurn.tools, running = true, waiting = remote.pendingApproval?.let { if (it.isQuestion) "question" else "approval" })
     } else null

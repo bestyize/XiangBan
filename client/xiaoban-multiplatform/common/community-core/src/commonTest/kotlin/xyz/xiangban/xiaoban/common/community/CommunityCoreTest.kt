@@ -382,6 +382,34 @@ class TextAndTokensTest {
     }
 }
 
+class SpeechSettingsTest {
+    @Test
+    fun `settings survive a round trip through key value storage`() {
+        val settings = SpeechSettings(SpeechSource.System, autoRead = true, voice = "zh-CN-YunxiNeural", rateStep = 3, bargeIn = false)
+        val stored = settings.encode()
+        assertEquals(settings, SpeechSettings.decode { stored[it] })
+    }
+
+    @Test
+    fun `missing or broken values fall back to the defaults`() {
+        assertEquals(SpeechSettings(), SpeechSettings.decode { null })
+        val broken = mapOf("speech.source" to "gateway", "speech.voice" to "nope", "speech.rate" to "99", "speech.barge" to "maybe")
+        val decoded = SpeechSettings.decode { broken[it] }
+        assertEquals(SpeechSource.Edge, decoded.source)
+        assertEquals(EdgeVoices.Default.id, decoded.voice)
+        assertEquals(SpeechRates.Names.lastIndex, decoded.rateStep)
+        assertEquals(null, decoded.bargeIn)
+    }
+
+    @Test
+    fun `rate steps map to edge percentages and the middle one is normal`() {
+        assertEquals(0, SpeechRates.percent(SpeechRates.DefaultStep))
+        assertEquals("正常", SpeechRates.Names[SpeechRates.DefaultStep])
+        assertTrue(SpeechRates.percent(0) < 0 && SpeechRates.percent(4) > 0)
+        assertEquals(SpeechRates.percent(4), SpeechRates.percent(9))
+    }
+}
+
 class PressToTalkTest {
     @Test
     fun `finger position decides what releasing does`() {

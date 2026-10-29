@@ -43,6 +43,9 @@ interface PlatformActions : VoicePlatform {
     /** 朗读一段文字；平台不支持就返回 false。 */
     fun speak(text: String): Boolean = false
 
+    /** 用系统朗读念一段回复（按媒体音量，不是通话音量），念完回调 [onDone]；平台不支持返回 false。 */
+    fun speakReply(text: String, onDone: (Boolean) -> Unit): Boolean = speakText(text, onDone)
+
     /** 开始录音（16kHz、单声道、16 位小端 PCM）；第一次会先向用户要麦克风权限。返回是否已经开始录。 */
     suspend fun startRecording(): Boolean = false
     /** 结束录音，拿到录下来的声音；没在录就是 null。 */
@@ -88,6 +91,9 @@ class CommunityEnv(
     val speech: LocalSpeech? = null,
     val prefs: AppPrefs = InMemoryPrefs(),
 ) {
+    /** 朗读回复：回复下面的“朗读”、自动朗读和设置里的试听都走这一个，来源、音色、语速按声音设置。 */
+    val reader: ReplyReader by lazy { ReplyReader(this) }
+
     val account = AccountApi(client, config)
 
     @OptIn(ExperimentalTime::class)
