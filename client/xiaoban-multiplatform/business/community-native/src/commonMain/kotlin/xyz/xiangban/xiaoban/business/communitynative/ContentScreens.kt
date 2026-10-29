@@ -122,8 +122,8 @@ fun Toast(text: String?, onGone: () -> Unit) {
 
 /** 分享弹层：预览卡片加“系统分享”“复制链接”。手机上分享的是网页链接，对方在电脑上打开后再用小伴桌面版。 */
 @Composable
-private fun ShareSheet(env: CommunityEnv, title: String, sub: String, url: String, heading: String = "分享", hint: String? = null, onDismiss: () -> Unit, onCopied: () -> Unit) {
-    BottomSheet(onDismiss) {
+private fun ShareSheet(env: CommunityEnv, title: String, sub: String, url: String, heading: String = "分享", hint: String? = null, onDismiss: () -> Unit, onCopied: () -> Unit, panelModifier: Modifier = Modifier) {
+    BottomSheet(onDismiss, panelModifier) {
         Text(heading, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Row(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.background).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)).background(Brand.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) { XIcon(XIcons.Link, tint = Brand, size = 24.dp) }
@@ -443,12 +443,13 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
                     PillButton("发到电脑", { share = true }, Modifier.fillMaxWidth())
                 }
             }
-            if (share) {
+            OverlayTransition(share) { panel ->
                 ShareSheet(
                     env, pack.title, kindLabel(pack.kind) + (pack.author?.nickname?.let { " · $it" } ?: ""), env.forum.packUrl(pack.id),
                     heading = "发到电脑",
                     hint = "手机上不能直接应用到桌面。把链接发到电脑（比如微信的“文件传输助手”），在电脑上用浏览器打开，再用桌面版小伴一键应用。",
                     onDismiss = { share = false }, onCopied = { toast = "链接已复制" },
+                    panelModifier = panel,
                 )
             }
         }
@@ -592,12 +593,12 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                 }
             }
         }
-        if (replying) {
-            ReplySheet(env, id, onDismiss = { replying = false }, onSent = { replying = false; reloadKey += 1; toast = "已发送" })
+        OverlayTransition(replying) { panel ->
+            ReplySheet(env, id, onDismiss = { replying = false }, onSent = { replying = false; reloadKey += 1; toast = "已发送" }, panelModifier = panel)
         }
-        if (share) {
+        OverlayTransition(share) { panel ->
             val topic = (state as? xyz.xiangban.xiaoban.common.community.Load.Ready<Topic>)?.value
-            ShareSheet(env, topic?.title ?: "帖子", topic?.category?.name.orEmpty(), env.forum.topicUrl(id), onDismiss = { share = false }, onCopied = { toast = "链接已复制" })
+            ShareSheet(env, topic?.title ?: "帖子", topic?.category?.name.orEmpty(), env.forum.topicUrl(id), onDismiss = { share = false }, onCopied = { toast = "链接已复制" }, panelModifier = panel)
         }
         Toast(toast) { toast = null }
     }
@@ -605,12 +606,12 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
 
 /** 写回复的弹层：多行输入加发送，失败时把服务端的原因显示在输入框下面。 */
 @Composable
-private fun ReplySheet(env: CommunityEnv, topicId: Long, onDismiss: () -> Unit, onSent: () -> Unit) {
+private fun ReplySheet(env: CommunityEnv, topicId: Long, onDismiss: () -> Unit, onSent: () -> Unit, panelModifier: Modifier) {
     val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    BottomSheet(onDismiss) {
+    BottomSheet(onDismiss, panelModifier) {
         Text("回复", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         AreaBox(text, { text = it }, Modifier.padding(top = 12.dp), placeholder = "写下你的回复（至少 2 个字）…", minHeight = 120.dp, enabled = !busy)
         error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 13.sp, color = Brand) }
@@ -648,7 +649,7 @@ fun WeeklyDetailScreen(env: CommunityEnv, week: String, open: (Route) -> Unit, b
                         Hairline(Modifier.padding(start = 16.dp))
                     }
                 }
-                if (share) ShareSheet(env, detail.title, detail.week, env.forum.weeklyUrl(detail.week), onDismiss = { share = false }, onCopied = { toast = "链接已复制" })
+                OverlayTransition(share) { panel -> ShareSheet(env, detail.title, detail.week, env.forum.weeklyUrl(detail.week), onDismiss = { share = false }, onCopied = { toast = "链接已复制" }, panelModifier = panel) }
             }
         }
         Toast(toast) { toast = null }
@@ -697,7 +698,7 @@ fun ProjectDetailScreen(env: CommunityEnv, slug: String, back: () -> Unit) {
                     val body = htmlToPlain(project.bodyHtml)
                     if (body.isNotBlank()) Text(body, Modifier.padding(top = 16.dp), fontSize = 15.sp, lineHeight = 26.sp)
                 }
-                if (share) ShareSheet(env, project.name, "项目", env.forum.projectUrl(project.slug), onDismiss = { share = false }, onCopied = { toast = "链接已复制" })
+                OverlayTransition(share) { panel -> ShareSheet(env, project.name, "项目", env.forum.projectUrl(project.slug), onDismiss = { share = false }, onCopied = { toast = "链接已复制" }, panelModifier = panel) }
             }
         }
         Toast(toast) { toast = null }

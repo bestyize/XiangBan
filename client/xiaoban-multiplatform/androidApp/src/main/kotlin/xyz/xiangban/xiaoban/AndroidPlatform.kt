@@ -5,6 +5,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Base64
+import org.json.JSONObject
 import xyz.xiangban.xiaoban.business.communitynative.PlatformActions
 import xyz.xiangban.xiaoban.common.community.TokenStorage
 import xyz.xiangban.xiaoban.common.community.Tokens
@@ -16,7 +18,12 @@ class SharedPrefsTokenStorage(context: Context) : TokenStorage {
     override fun load(): Tokens? {
         val access = prefs.getString("access", null) ?: return null
         val refresh = prefs.getString("refresh", null) ?: return null
-        return Tokens(access, refresh, prefs.getLong("expiresAt", 0))
+        // 旧版没有保存 uid；从已存储的账号令牌提取 sub，只用于隔离本地缓存，不用于鉴权。
+        val accountId = prefs.getString("accountId", null) ?: runCatching {
+            val payload = access.split('.').getOrNull(1) ?: return@runCatching null
+            JSONObject(String(Base64.decode(payload, Base64.URL_SAFE or Base64.NO_WRAP), Charsets.UTF_8)).optString("sub").takeIf { it.isNotBlank() }
+        }.getOrNull()
+        return Tokens(access, refresh, prefs.getLong("expiresAt", 0), accountId)
     }
 
     override fun save(tokens: Tokens?) {
@@ -25,6 +32,7 @@ class SharedPrefsTokenStorage(context: Context) : TokenStorage {
                 putString("access", tokens.accessToken)
                 putString("refresh", tokens.refreshToken)
                 putLong("expiresAt", tokens.expiresAtMillis)
+                putString("accountId", tokens.accountId)
             }
         }.apply()
     }

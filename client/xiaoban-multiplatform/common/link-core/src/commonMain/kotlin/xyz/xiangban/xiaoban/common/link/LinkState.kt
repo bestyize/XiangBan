@@ -34,6 +34,7 @@ class InMemoryLinkStorage(private var state: LinkState = LinkState()) : LinkStor
 }
 
 /** 同账号下的一台对端设备（手机的对端是电脑）。 */
+@Serializable
 data class PeerSummary(val id: String, val name: String, val online: Boolean)
 
 sealed interface LinkEvent {

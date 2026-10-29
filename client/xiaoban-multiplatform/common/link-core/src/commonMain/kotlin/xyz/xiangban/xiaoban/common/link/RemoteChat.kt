@@ -142,6 +142,7 @@ internal fun summarizeArgs(value: JsonElement?): String {
     return value.toString().take(300)
 }
 
+@Serializable
 data class RemoteTurn(
     val id: String,
     val role: String,
@@ -197,8 +198,16 @@ private fun JsonElement?.asStr(): String? =
 class RemoteChatController(
     val phoneLink: PhoneLink,
     private val scope: CoroutineScope,
+    private val cache: RemoteCache = InMemoryRemoteCache(),
+    initialAccountId: String? = null,
 ) {
-    private val _state = MutableStateFlow(RemoteChatState())
+    private var currentAccountId: String? = initialAccountId
+    private val _state = MutableStateFlow(
+        RemoteChatState(
+            peers = initialAccountId?.let { cache.peers(it) }.orEmpty(),
+            selectedPeerId = initialAccountId?.let { cache.peers(it).firstOrNull()?.id },
+        )
+    )
     val state: StateFlow<RemoteChatState> = _state.asStateFlow()
 
     private var nextMsgSeq = 1L
@@ -209,6 +218,21 @@ class RemoteChatController(
 
     init {
         startListening()
+    }
+
+    /** 账号切换时重置当前账号缓存上下文并加载对应缓存 */
+    fun changeAccount(newAccountId: String?) {
+        currentAccountId = newAccountId
+        if (newAccountId == null) {
+            _state.value = RemoteChatState()
+            return
+        }
+        val cachedPeers = cache.peers(newAccountId)
+        _state.value = RemoteChatState(
+            peers = cachedPeers,
+            selectedPeerId = cachedPeers.firstOrNull()?.id,
+            isPeerOnline = false,
+        )
     }
 
     private fun nextId(prefix: String = "p"): String =
@@ -230,10 +254,17 @@ class RemoteChatController(
         // 先向中转要一次最新的电脑列表（新开了遥控的电脑不用等推送），失败就用已有的。
         runCatching { phoneLink.reloadPeers() }
         val currentPeers = phoneLink.peers()
+        val peersToUse = if (currentPeers.isNotEmpty()) {
+            currentAccountId?.let { acc -> cache.savePeers(acc, currentPeers) }
+            currentPeers
+        } else {
+            val cached = currentAccountId?.let { acc -> cache.peers(acc) }.orEmpty()
+            if (cached.isNotEmpty()) cached else currentPeers
+        }
         val currentSel = _state.value.selectedPeerId
-        val chosen = currentPeers.firstOrNull { it.id == currentSel } ?: currentPeers.firstOrNull()
+        val chosen = peersToUse.firstOrNull { it.id == currentSel } ?: peersToUse.firstOrNull()
         _state.value = _state.value.copy(
-            peers = currentPeers,
+            peers = peersToUse,
             selectedPeerId = chosen?.id,
             isPeerOnline = chosen?.online ?: false,
         )
@@ -256,10 +287,11 @@ class RemoteChatController(
                 put("session", oldSession)
             })
         }
+        val cachedSessions = currentAccountId?.let { cache.sessions(it, peer.id) }.orEmpty()
         _state.value = _state.value.copy(
             selectedPeerId = peer.id,
             isPeerOnline = peer.online,
-            sessions = emptyList(),
+            sessions = cachedSessions,
             recentProjects = emptyList(),
             addedProjects = emptyList(),
             newChatWorkspace = null,
@@ -272,6 +304,10 @@ class RemoteChatController(
             sendHello(peer.id)
             fetchSessions(peer.id)
             fetchProjects(peer.id)
+        } else if (cachedSessions.isNotEmpty()) {
+            // 设备不在线、列表回不来：直接打开缓存里最近的对话。
+            openLatestWhenListed = false
+            selectSession(cachedSessions.maxByOrNull { it.updatedAt }!!.id)
         }
     }
 
@@ -286,19 +322,22 @@ class RemoteChatController(
                 put("session", oldSession)
             })
         }
+        val cachedMsgs = currentAccountId?.let { cache.messages(it, peerId, sessionId) }.orEmpty()
         _state.value = _state.value.copy(
             selectedSessionId = sessionId,
             newChatWorkspace = null,
-            messages = emptyList(),
+            messages = cachedMsgs,
             toolProgress = emptyList(),
             pendingApproval = null,
             sending = false,
         )
-        sendJson(peerId, buildJsonObject {
-            put("t", "session.open")
-            put("id", nextId())
-            put("session", sessionId)
-        })
+        if (_state.value.isPeerOnline) {
+            sendJson(peerId, buildJsonObject {
+                put("t", "session.open")
+                put("id", nextId())
+                put("session", sessionId)
+            })
+        }
     }
 
     /** 开始一个新对话。`workspace` 是要在哪个项目里开始；不传就留在当前所在的项目。 */
@@ -341,12 +380,17 @@ class RemoteChatController(
         val clientId = "c-${nowMs()}-${nextMsgSeq++}"
         val userTurn = RemoteTurn(id = clientId, role = "user", text = text)
         val assistantTurn = RemoteTurn(id = "r-$clientId", role = "assistant", text = "", streaming = true)
+        val updatedMessages = _state.value.messages + userTurn + assistantTurn
 
         _state.value = _state.value.copy(
-            messages = _state.value.messages + userTurn + assistantTurn,
+            messages = updatedMessages,
             sending = true,
             toolProgress = emptyList(),
         )
+        currentAccountId?.let { acc ->
+            val sid = _state.value.selectedSessionId
+            if (sid != null) cache.saveMessages(acc, peerId, sid, updatedMessages)
+        }
 
         sendJson(peerId, buildJsonObject {
             put("t", "message.send")
@@ -377,6 +421,7 @@ class RemoteChatController(
         scope.launch {
             try {
                 phoneLink.removeDevice(peerId)
+                currentAccountId?.let { acc -> cache.removePeer(acc, peerId) }
                 refreshPeers()
             } catch (e: CancellationException) {
                 throw e
@@ -482,6 +527,7 @@ class RemoteChatController(
                         runCatching { ProtocolJson.decodeFromJsonElement(RemoteSessionSummary.serializer(), it) }.getOrNull()
                     }
                     _state.value = _state.value.copy(sessions = items, loadingSessions = false)
+                    currentAccountId?.let { acc -> cache.saveSessions(acc, peer, items) }
                     if (openLatestWhenListed && _state.value.selectedSessionId == null && items.isNotEmpty()) {
                         openLatestWhenListed = false
                         selectSession(items.maxByOrNull { it.updatedAt }!!.id)
@@ -510,6 +556,7 @@ class RemoteChatController(
                     }
                     val sorted = existingMap.values.sortedByDescending { it.updatedAt }
                     _state.value = _state.value.copy(sessions = sorted)
+                    currentAccountId?.let { acc -> cache.saveSessions(acc, peer, sorted) }
                 }
             }
             "session.snapshot" -> {
@@ -532,6 +579,10 @@ class RemoteChatController(
                         turns
                     }
                     _state.value = _state.value.copy(messages = merged)
+                    currentAccountId?.let { acc ->
+                        val targetSid = sid ?: _state.value.selectedSessionId
+                        if (targetSid != null) cache.saveMessages(acc, peer, targetSid, merged)
+                    }
                     val hasMore = obj["has_more"]?.jsonPrimitive?.booleanOrNull == true
                     val cursor = obj["cursor"]?.jsonPrimitive?.intOrNull
                     if (hasMore && cursor != null && cursor > after && sid != null) {
@@ -652,6 +703,13 @@ class RemoteChatController(
             }
         }
         _state.value = _state.value.copy(messages = msgs, sending = false, toolProgress = emptyList())
+        currentAccountId?.let { acc ->
+            val sid = _state.value.selectedSessionId
+            val peer = _state.value.selectedPeerId
+            if (sid != null && peer != null) {
+                cache.saveMessages(acc, peer, sid, msgs)
+            }
+        }
     }
 
     private fun extractMessageText(msgObj: JsonObject): String {

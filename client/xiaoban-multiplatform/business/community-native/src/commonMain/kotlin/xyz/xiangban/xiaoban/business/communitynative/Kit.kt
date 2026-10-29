@@ -1,5 +1,13 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -76,14 +85,15 @@ fun IconTap(icon: ImageVector, description: String, onClick: () -> Unit, modifie
 
 /** 子页面顶栏：返回、居中标题（可带一行小字）、右侧操作。 */
 @Composable
-fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier, subtitle: String? = null, trailing: (@Composable () -> Unit)? = null, leading: (@Composable () -> Unit)? = null) {
+fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier, subtitle: String? = null, trailing: (@Composable () -> Unit)? = null, leading: (@Composable () -> Unit)? = null, subtitleContent: (@Composable () -> Unit)? = null) {
     Column(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (leading != null) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { leading() }
             else if (onBack != null) IconTap(XIcons.ChevronLeft, "返回", onBack) else Spacer(Modifier.width(44.dp))
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (subtitle != null) Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (subtitleContent != null) subtitleContent()
+                else if (subtitle != null) Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (trailing != null) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { trailing() } else Spacer(Modifier.width(44.dp))
         }
@@ -144,17 +154,30 @@ fun FloatingNav(current: Tab, publishOpen: Boolean, onSelect: (Tab) -> Unit, onP
     }
 }
 
+/** 遮罩淡入淡出，面板按方向滑动；退出动画结束后才移除内容。 */
+@Composable
+fun OverlayTransition(visible: Boolean, direction: String = "bottom", content: @Composable (Modifier) -> Unit) {
+    AnimatedVisibility(visible = visible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
+        val panel = when (direction) {
+            "left" -> Modifier.animateEnterExit(enter = slideInHorizontally(tween(200)) { -it }, exit = slideOutHorizontally(tween(200)) { -it })
+            "bottom" -> Modifier.animateEnterExit(enter = slideInVertically(tween(200)) { it }, exit = slideOutVertically(tween(200)) { it })
+            else -> Modifier
+        }
+        content(panel)
+    }
+}
+
 /** 盖住整页的半透明遮罩，底部是圆角白色面板。点遮罩或按返回键关闭。 */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun BottomSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun BottomSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     BackHandler(onBack = onDismiss)
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).clickable(indication = null, interactionSource = null) { onDismiss() },
         contentAlignment = Alignment.BottomCenter,
     ) {
         Column(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)).background(MaterialTheme.colorScheme.surface)
+            panelModifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)).background(MaterialTheme.colorScheme.surface)
                 .clickable(indication = null, interactionSource = null) {}
                 .navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 24.dp),
             content = content,
@@ -168,7 +191,7 @@ fun BottomSheet(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Un
 fun CenterDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     BackHandler(onBack = onDismiss)
     Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)).clickable(indication = null, interactionSource = null) { onDismiss() },
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)).clickable(indication = null, interactionSource = null) { onDismiss() }.statusBarsPadding().navigationBarsPadding().imePadding(),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -250,6 +273,9 @@ fun TextBox(
     password: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
     enabled: Boolean = true,
+    leadingIcon: ImageVector? = null,
+    filled: Boolean = false,
+    fontSize: Int = 16,
 ) {
     Column(modifier) {
         if (label != null) Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
@@ -258,19 +284,25 @@ fun TextBox(
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
-            textStyle = TextStyle(fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface),
+            textStyle = TextStyle(fontSize = fontSize.sp, color = MaterialTheme.colorScheme.onSurface),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             singleLine = true,
             visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
             cursorBrush = SolidColor(Brand),
             decorationBox = { inner ->
-                Box(
-                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface)
+                Row(
+                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
                         .border(1.dp, LocalExtraColors.current.line, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp),
-                    contentAlignment = Alignment.CenterStart,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 16.sp, maxLines = 1)
-                    inner()
+                    if (leadingIcon != null) {
+                        XIcon(leadingIcon, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = fontSize.sp, maxLines = 1)
+                        inner()
+                    }
                 }
             },
         )
@@ -319,7 +351,7 @@ fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier =
             .border(2.dp, if (checked) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.line, shape).clickable { onChange(!checked) },
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) XIcon(XIcons.Check, tint = Color.White, size = 16.dp)
+        if (checked) XIcon(XIcons.Check, tint = MaterialTheme.colorScheme.surface, size = 16.dp)
     }
 }
 
@@ -327,14 +359,14 @@ fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier =
 
 /** 在线用实心点，离线用空心点，不只靠颜色区分。 */
 @Composable
-fun StatusDot(online: Boolean, label: String) {
+fun StatusDot(online: Boolean, label: String, fontSize: Int = 12) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (online) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface))
+            Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF21A366)))
         } else {
             Box(Modifier.size(8.dp).clip(CircleShape).border(1.5.dp, MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
         }
-        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = fontSize.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

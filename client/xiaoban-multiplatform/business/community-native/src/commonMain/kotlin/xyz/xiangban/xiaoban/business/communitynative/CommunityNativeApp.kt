@@ -1,5 +1,12 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -38,36 +45,59 @@ fun CommunityNativeApp(env: CommunityEnv) {
         var tab by rememberSaveable { mutableStateOf(Tab.Ai.name) }
         var stackText by rememberSaveable { mutableStateOf("") }
         var publishOpen by rememberSaveable { mutableStateOf(false) }
+        var aiDrawerOpen by rememberSaveable { mutableStateOf(false) }
         val stack = Route.decodeStack(stackText)
         // 回调可能在异步操作（如登录）结束后才调用，所以每次都读最新的栈，而不是组合时捕获的那份。
         fun push(route: Route) { stackText = Route.encodeStack(Route.decodeStack(stackText) + route) }
         fun pop() { stackText = Route.encodeStack(Route.decodeStack(stackText).dropLast(1)) }
+        fun closeLogin() { if (Route.decodeStack(stackText).lastOrNull() == Route.Login) pop() }
 
         BackHandler(enabled = stack.isNotEmpty()) { pop() }
 
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            Box(Modifier.fillMaxSize()) {
-                when (Tab.valueOf(tab)) {
-                    Tab.Ai -> AiHomeScreen(env, chat, ::push)
+            AnimatedContent(targetState = Tab.valueOf(tab), modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) }, label = "主导航切换") { currentTab ->
+                when (currentTab) {
+                    Tab.Ai -> AiHomeScreen(env, chat, ::push, { aiDrawerOpen = true })
                     Tab.Games -> GamesScreen()
                     Tab.Community -> CommunityScreen(env, ::push)
                     Tab.Mine -> MineScreen(env, ::push)
                 }
             }
             FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
-            stack.lastOrNull()?.let { route ->
-                // 盖在最上面，并吃掉点击，免得穿透到下面的一级页。
-                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding().clickable(indication = null, interactionSource = null) {}) {
-                    RouteScreen(env, chat, route, ::push, ::pop)
+            AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
+            val pages = stack.filter { it != Route.Login }
+            AnimatedContent(
+                targetState = pages,
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    if (targetState.size > initialState.size) {
+                        (slideInHorizontally(tween(220)) { it } + fadeIn(tween(220))) togetherWith
+                            (slideOutHorizontally(tween(220)) { -it / 4 } + fadeOut(tween(220)))
+                    } else {
+                        (slideInHorizontally(tween(220)) { -it / 4 } + fadeIn(tween(220))) togetherWith
+                            (slideOutHorizontally(tween(220)) { it } + fadeOut(tween(220)))
+                    }
+                },
+                label = "页面切换",
+            ) { visiblePages ->
+                visiblePages.lastOrNull()?.let { route ->
+                    // 子页面盖住一级页，并吃掉点击，免得穿透到下面。
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding().clickable(indication = null, interactionSource = null) {}) {
+                        RouteScreen(env, chat, route, ::push, ::pop)
+                    }
                 }
             }
-            if (publishOpen) {
+            OverlayTransition(publishOpen) { panel ->
                 PublishSheet(
                     env,
                     onDismiss = { publishOpen = false },
                     onAiCreate = { publishOpen = false; chat.clearConversation(); push(Route.AiChat) },
                     onNewPost = { publishOpen = false; push(Route.NewPost) },
+                    panelModifier = panel,
                 )
+            }
+            OverlayTransition(stack.lastOrNull() == Route.Login, direction = "center") {
+                LoginDialog(env, done = ::closeLogin, back = ::closeLogin)
             }
         }
     }
@@ -80,7 +110,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.Topic -> TopicDetailScreen(env, route.id, pop, push)
         is Route.Weekly -> WeeklyDetailScreen(env, route.week, push, pop)
         is Route.Project -> ProjectDetailScreen(env, route.slug, pop)
-        Route.Login -> LoginScreen(env, done = pop, back = pop)
+        Route.Login -> Unit // 登录作为弹窗显示在当前页面之上。
         Route.Search -> SearchScreen(env, back = pop, open = push)
         Route.NewPost -> NewPostScreen(env, back = pop, open = push)
         Route.Settings -> SettingsScreen(env, back = pop, open = push)
@@ -93,9 +123,9 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
 
 /** 发布弹层：用 AI 创作走云端小伴；发布已有作品和发帖目前在网页上完成。 */
 @Composable
-private fun PublishSheet(env: CommunityEnv, onDismiss: () -> Unit, onAiCreate: () -> Unit, onNewPost: () -> Unit) {
+private fun PublishSheet(env: CommunityEnv, onDismiss: () -> Unit, onAiCreate: () -> Unit, onNewPost: () -> Unit, panelModifier: Modifier) {
     val site = env.config.forumBase.trimEnd('/')
-    BottomSheet(onDismiss) {
+    BottomSheet(onDismiss, panelModifier) {
         Text("发布", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         SheetAction(XIcons.Sparkle, "用 AI 创作", "一句话生成特效、壁纸、组件或小游戏", onAiCreate)
         SheetAction(XIcons.Upload, "发布已有作品", "选择资源包（.zip），在网页上发布到社区") { onDismiss(); env.platform?.openUrl("$site/publish") }

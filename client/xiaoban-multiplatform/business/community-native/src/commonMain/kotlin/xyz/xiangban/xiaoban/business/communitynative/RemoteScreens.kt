@@ -90,6 +90,7 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     val remote by env.remoteChat.state.collectAsState()
     var searching by remember { mutableStateOf(false) }
     var manage by remember { mutableStateOf<PeerSummary?>(null) }
+    var lastManage by remember { mutableStateOf<PeerSummary?>(null) }
 
     LaunchedEffect(session.loggedIn) { if (session.loggedIn) env.remoteChat.refreshPeers() }
     val refresh: () -> Unit = {
@@ -139,7 +140,7 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                                 Text(if (peer.online) "点一下进入聊天" else "不在线，上线后自动恢复", Modifier.padding(top = 3.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             StatusDot(peer.online, peer.statusText())
-                            IconTap(XIcons.More, "管理这台设备", { manage = peer })
+                            IconTap(XIcons.More, "管理这台设备", { lastManage = peer; manage = peer })
                         }
                     }
                 }
@@ -152,14 +153,16 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
             }
         }
     }
-    manage?.let { peer ->
-        BottomSheet({ manage = null }) {
-            Text(peer.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            SheetAction(XIcons.Close, "从账号中移除这台设备", "它再次启动并开启手机遥控后会重新出现") {
-                manage = null
-                env.remoteChat.removePeer(peer.id)
+    OverlayTransition(manage != null) { panel ->
+        lastManage?.let { peer ->
+            BottomSheet({ manage = null }, panel) {
+                Text(peer.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                SheetAction(XIcons.Close, "从账号中移除这台设备", "它再次启动并开启手机遥控后会重新出现") {
+                    manage = null
+                    env.remoteChat.removePeer(peer.id)
+                }
+                GhostPillButton("取消", { manage = null }, Modifier.padding(top = 8.dp).fillMaxWidth())
             }
-            GhostPillButton("取消", { manage = null }, Modifier.padding(top = 8.dp).fillMaxWidth())
         }
     }
 }
@@ -185,6 +188,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     val online = peer?.online == true
     var input by rememberSaveable { mutableStateOf("") }
     var highRisk by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var lastHighRisk by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmed by remember { mutableStateOf(false) }
     var drawer by rememberSaveable { mutableStateOf(false) }
     BackHandler(enabled = drawer) { drawer = false }
@@ -200,16 +204,21 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
         Column(Modifier.fillMaxSize().imePadding()) {
             ScreenBar(
                 current?.title?.ifBlank { null } ?: "新对话", onBack = null,
-                subtitle = listOfNotNull(peer?.name ?: "设备", projectName, if (online) "● 在线" else "○ 离线").joinToString(" · "),
                 leading = { IconTap(XIcons.Menu, "打开项目与对话", { drawer = true }, size = 22.dp) },
                 trailing = { IconTap(XIcons.NewChat, "新对话", { env.remoteChat.newSession() }, size = 22.dp) },
+                subtitleContent = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(listOfNotNull(peer?.name ?: "设备", projectName).joinToString(" · ") + " · ", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        StatusDot(online, if (online) "在线" else "离线", fontSize = 11)
+                    }
+                },
             )
             if (!session.loggedIn) {
                 Banner("登录已过期，请重新登录", Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true, icon = XIcons.Lock, actionText = "去登录", onAction = { open(Route.Login) })
             } else if (peer == null) {
                 Banner("这台设备已退出账号或被移除", Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true, icon = XIcons.Warning, actionText = "回到我的设备", onAction = back)
             } else if (!online) {
-                Banner("${peer.name}现在不在线，暂时不能遥控。上线后会自动恢复。", Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true, icon = XIcons.Monitor, actionText = "改用云端小伴", onAction = { open(Route.AiChat) })
+                Banner("${peer.name}现在不在线，当前显示的是离线缓存内容。上线后自动恢复同步。", Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true, icon = XIcons.Monitor, actionText = "改用云端小伴", onAction = { open(Route.AiChat) })
             }
             remote.error?.let { Banner(it, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp), warn = true) }
 
@@ -220,12 +229,12 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             remote.pendingApproval?.let { pending ->
                 ApprovalCard(pending, peer?.name ?: "电脑") { choice ->
                     val denies = choice == "deny" || choice == "__dismiss__"
-                    if (pending.isHighRisk && !denies) { confirmed = false; highRisk = pending.approvalId to choice } else env.remoteChat.answerApproval(pending.approvalId, choice)
+                    if (pending.isHighRisk && !denies) { confirmed = false; lastHighRisk = pending.approvalId to choice; highRisk = lastHighRisk } else env.remoteChat.answerApproval(pending.approvalId, choice)
                 }
             }
 
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
-                ComposerCard(input, { input = it }, if (online) "对设备上的小伴说点什么…" else "设备不在线，暂时不能发送", enabled = online) {
+                ComposerCard(input, { input = it }, if (online) "对设备上的小伴说点什么…" else "设备不在线，上线后可继续对话", enabled = online) {
                     ChipPill(listOfNotNull(peer?.name ?: "设备", projectName).joinToString(" · "), icon = XIcons.Monitor)
                     Spacer(Modifier.weight(1f))
                     if (remote.sending) {
@@ -242,9 +251,10 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                 }
             }
         }
-        highRisk?.let { (approvalId, choice) ->
+        OverlayTransition(highRisk != null) { panel ->
+          lastHighRisk?.let { (approvalId, choice) ->
             val pending = remote.pendingApproval
-            BottomSheet({ highRisk = null }) {
+            BottomSheet({ highRisk = null }, panel) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Box(Modifier.size(36.dp).clip(CircleShape).background(LocalExtraColors.current.brandSoft), contentAlignment = Alignment.Center) { XIcon(XIcons.Warning, tint = Brand, size = 20.dp) }
                     Text("这是高危操作", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
@@ -256,14 +266,16 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                     Text("我已看清上面的内容", fontSize = 14.sp)
                 }
                 Row(Modifier.padding(top = 8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DarkPillButton("拒绝", { highRisk = null; env.remoteChat.answerApproval(approvalId, "deny") }, Modifier.weight(1f))
-                    GhostPillButton("仍然允许", { highRisk = null; env.remoteChat.answerApproval(approvalId, choice) }, Modifier.weight(1f), enabled = confirmed)
+                    DarkPillButton("拒绝", { if (highRisk != null) { highRisk = null; env.remoteChat.answerApproval(approvalId, "deny") } }, Modifier.weight(1f))
+                    GhostPillButton("仍然允许", { if (highRisk != null) { highRisk = null; env.remoteChat.answerApproval(approvalId, choice) } }, Modifier.weight(1f), enabled = confirmed && highRisk != null)
                 }
                 Text("勾选后“仍然允许”才可点；手机上只能允许这一次。", Modifier.padding(top = 8.dp).fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
             }
+          }
         }
-        if (drawer) {
+        OverlayTransition(drawer, direction = "left") { panel ->
             RemoteDrawer(
+                panelModifier = panel,
                 remote = remote,
                 onClose = { drawer = false },
                 onSwitchPeer = { activePeer = it },
@@ -365,6 +377,7 @@ private fun ApprovalCard(pending: RemoteApprovalRequest, peerName: String, onDec
 
 @Composable
 private fun RemoteDrawer(
+    panelModifier: Modifier,
     remote: RemoteChatState,
     onClose: () -> Unit,
     onSwitchPeer: (String) -> Unit,
@@ -386,7 +399,7 @@ private fun RemoteDrawer(
     fun List<RemoteSessionSummary>.matching() = if (keyword.isEmpty()) this else filter { it.title.contains(keyword, ignoreCase = true) }
 
     Row(Modifier.fillMaxSize()) {
-        Column(Modifier.width(312.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).statusBarsPadding().padding(top = 12.dp)) {
+        Column(panelModifier.width(312.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).statusBarsPadding().padding(top = 12.dp)) {
             // 当前设备；点开可以换设备
             val shape = RoundedCornerShape(14.dp)
             Column(Modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(shape).border(0.5.dp, extra.line, shape)) {
@@ -471,7 +484,7 @@ private fun RemoteDrawer(
         }
         Box(Modifier.weight(1f).fillMaxHeight().background(Color.Black.copy(alpha = 0.45f)).clickable(indication = null, interactionSource = null) { onClose() })
     }
-    if (newProject) NewProjectSheet(remote, onDismiss = { newProject = false }, onPick = { newProject = false; onAddProject(it) })
+    OverlayTransition(newProject) { panel -> NewProjectSheet(remote, onDismiss = { newProject = false }, onPick = { newProject = false; onAddProject(it) }, panelModifier = panel) }
 }
 
 @Composable
@@ -492,9 +505,9 @@ private fun DrawerSession(s: RemoteSessionSummary, selected: Boolean, indent: Dp
 
 /** 新项目：只能从电脑上最近用过的文件夹里选（手机浏览不了电脑上的文件）。 */
 @Composable
-private fun NewProjectSheet(remote: RemoteChatState, onDismiss: () -> Unit, onPick: (String) -> Unit) {
+private fun NewProjectSheet(remote: RemoteChatState, onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: Modifier) {
     val have = remote.sidebar.projects.map { it.path.trimEnd('/', '\\') }.toSet()
-    BottomSheet(onDismiss) {
+    BottomSheet(onDismiss, panelModifier) {
         Text("新项目", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Text("项目是${remote.selectedPeer?.name ?: "设备"}上的一个文件夹，这个项目里的对话都在这个文件夹里干活。", Modifier.padding(top = 6.dp), fontSize = 13.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text("设备上最近用过的文件夹", Modifier.padding(top = 14.dp, bottom = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

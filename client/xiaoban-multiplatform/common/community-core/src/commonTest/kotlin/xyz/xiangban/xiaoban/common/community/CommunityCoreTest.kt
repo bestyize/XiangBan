@@ -189,7 +189,7 @@ class AccountAndSessionTest {
         manager.loginWithPassword("小明", "pw")
         assertTrue(manager.state.value.loggedIn)
         assertEquals("小明", manager.state.value.user?.username)
-        assertEquals(Tokens("A1", "R1", 1_000 + 900_000), storage.load())
+        assertEquals(Tokens("A1", "R1", 1_000 + 900_000, "u1"), storage.load())
         assertTrue(session(server, storage) { 2_000 }.state.value.loggedIn, "重启后仍是登录态")
         assertEquals("A1", session(server, storage) { 2_000 }.accessToken())
     }
