@@ -86,3 +86,7 @@ tools/**/target/
 
 # dev & others
 .dev/**/target/
+
+# compose-typecheck 的临时源码
+tools/compose-typecheck/build-src/
+tools/compose-typecheck/.gradle/
