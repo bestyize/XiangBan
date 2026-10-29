@@ -1,7 +1,8 @@
 package xyz.xiangban.xiaoban.common.community
 
 import io.ktor.client.HttpClient
-import io.ktor.client.request.get
+import io.ktor.client.plugins.HttpTimeoutConfig.Companion.INFINITE_TIMEOUT_MS
+import io.ktor.client.plugins.timeout
 import io.ktor.client.request.header
 import io.ktor.client.request.prepareGet
 import io.ktor.client.statement.bodyAsChannel
@@ -16,20 +17,29 @@ import kotlinx.coroutines.CancellationException
 /** 一个固定了大小和哈希的模型文件。 */
 class ModelSpec(val name: String, val bytes: Long, val sha256: String)
 
-/** 模型文件放在手机的什么地方（各平台自己实现）。写入先写到临时文件，校验通过才换成正式文件。 */
+/** 模型文件放在手机的什么地方（各平台自己实现）。写入先写到临时文件，校验通过才换成正式文件；下载中断后临时文件留着，下次接着下。 */
 interface ModelFiles {
     /** 文件大小；不存在返回 -1。 */
     fun size(name: String): Long
     fun path(name: String): String
-    fun beginWrite(name: String): ModelWriter
+    /** 上次没下完留下的临时文件的大小；没有返回 0。 */
+    fun partialSize(name: String): Long
+    /** 把留下的临时文件从头读一遍（续传前要把它重新算进校验）。 */
+    fun readPartial(name: String, onChunk: (ByteArray, Int) -> Unit)
+    /** 开始写。[append] 为真就接着临时文件往后写，否则从头写。 */
+    fun beginWrite(name: String, append: Boolean): ModelWriter
     fun delete(name: String)
+    /** 丢掉没下完的临时文件。 */
+    fun discardPartial(name: String)
 }
 
 interface ModelWriter {
     fun write(bytes: ByteArray, length: Int)
-    /** 写完了，把临时文件变成正式文件。 */
+    /** 写完了且校验通过，把临时文件变成正式文件。 */
     fun commit()
-    /** 放弃，删掉临时文件。 */
+    /** 中断了（断网、取消）：关上文件，临时文件留着以便续传。 */
+    fun close()
+    /** 内容不对：删掉临时文件。 */
     fun abort()
 }
 
@@ -95,44 +105,83 @@ class SpeechModels(
         for (spec in specs) {
             if (files.size(spec.name) == spec.bytes) continue
             val base = done
+            onProgress(base + files.partialSize(spec.name).coerceAtMost(spec.bytes), total)
             fetch(spec) { received -> onProgress(base + received, total) }
             done += spec.bytes
             onProgress(done, total)
         }
     }
 
+    /**
+     * 下载一个文件，支持断点续传：上次留下的临时文件先重新算进校验，再用 Range 请求剩下的部分；
+     * 服务器不支持 Range（回 200）就从头来。断网或取消时临时文件留着，内容不对（太大、校验不过）才删掉。
+     */
     private suspend fun fetch(spec: ModelSpec, progress: (Long) -> Unit) {
-        val writer = files.beginWrite(spec.name)
+        var offset = files.partialSize(spec.name)
+        if (offset > spec.bytes) { files.discardPartial(spec.name); offset = 0 }
+        val hash = Sha256()
+        if (offset > 0) files.readPartial(spec.name) { chunk, n -> hash.update(chunk, n) }
+        var received = offset
+        var writer: ModelWriter? = null
+        var discard = false
         try {
-            val hash = Sha256()
-            var received = 0L
-            client.prepareGet(source + spec.name) { header(HttpHeaders.UserAgent, "XiaoBan/1.0") }.execute { response ->
-                if (!response.status.isSuccess()) throw ModelDownloadException("下载 ${spec.name} 失败（${response.status.value}）")
-                val channel = response.bodyAsChannel()
-                val buffer = ByteArray(64 * 1024)
-                while (true) {
-                    val n = channel.readAvailable(buffer, 0, buffer.size)
-                    if (n < 0) break
-                    if (n == 0) continue
-                    received += n
-                    if (received > spec.bytes) throw ModelDownloadException("${spec.name} 比预期的大，已放弃")
-                    hash.update(buffer, n)
-                    writer.write(buffer, n)
-                    progress(received)
+            if (offset < spec.bytes) {
+                client.prepareGet(source + spec.name) {
+                    header(HttpHeaders.UserAgent, "XiaoBan/1.0")
+                    // 模型有两百多兆，共用客户端的“整个请求 30 秒”会把下载在半路掐断：这里不限总时长，只要 60 秒内还有数据到就行。
+                    timeout {
+                        requestTimeoutMillis = INFINITE_TIMEOUT_MS
+                        socketTimeoutMillis = 60_000
+                        connectTimeoutMillis = 15_000
+                    }
+                    if (offset > 0) header(HttpHeaders.Range, "bytes=$offset-")
+                }.execute { response ->
+                    val code = response.status.value
+                    when {
+                        code == 206 -> {}
+                        code == 416 -> { files.discardPartial(spec.name); throw ModelDownloadException("续传位置不对，已清掉重来，请再试一次") }
+                        !response.status.isSuccess() -> throw ModelDownloadException("下载 ${spec.name} 失败（$code）")
+                        else -> if (offset > 0) {
+                            // 服务器没理会 Range，整个文件重新发来：丢掉旧的，从头算。
+                            offset = 0; received = 0; hash.reset()
+                        }
+                    }
+                    writer = files.beginWrite(spec.name, append = offset > 0)
+                    val out = writer!!
+                    val channel = response.bodyAsChannel()
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        val n = channel.readAvailable(buffer, 0, buffer.size)
+                        if (n < 0) break
+                        if (n == 0) continue
+                        received += n
+                        if (received > spec.bytes) { discard = true; throw ModelDownloadException("${spec.name} 比预期的大，已放弃") }
+                        hash.update(buffer, n)
+                        out.write(buffer, n)
+                        progress(received)
+                    }
                 }
+            } else {
+                writer = files.beginWrite(spec.name, append = true)
             }
-            if (received != spec.bytes) throw ModelDownloadException("${spec.name} 没有下载完整（${received}/${spec.bytes}）")
-            if (hash.hex() != spec.sha256) throw ModelDownloadException("${spec.name} 校验没通过，请重试")
-            writer.commit()
+            if (received != spec.bytes) {
+                writer?.close()
+                throw ModelDownloadException("${spec.name} 还没下载完（${received}/${spec.bytes}），再点一次会接着下")
+            }
+            if (hash.hex() != spec.sha256) {
+                discard = true
+                throw ModelDownloadException("${spec.name} 校验没通过，已清掉，请重试")
+            }
+            writer!!.commit()
         } catch (e: CancellationException) {
-            writer.abort()
+            writer?.close()
             throw e
         } catch (e: ModelDownloadException) {
-            writer.abort()
+            if (discard) writer?.abort() else writer?.close()
             throw e
         } catch (e: Exception) {
-            writer.abort()
-            throw ModelDownloadException("下载 ${spec.name} 失败，请检查网络后重试")
+            writer?.close()
+            throw ModelDownloadException("下载 ${spec.name} 中断了（已下 ${received / 1_000_000} MB，再点一次会接着下），请检查网络")
         }
     }
 }
@@ -143,6 +192,13 @@ class Sha256 {
     private val block = ByteArray(64)
     private var filled = 0
     private var length = 0L
+
+    fun reset() {
+        val fresh = Sha256()
+        fresh.state.copyInto(state)
+        filled = 0
+        length = 0
+    }
 
     fun update(bytes: ByteArray, count: Int = bytes.size) {
         for (i in 0 until count) {
