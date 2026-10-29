@@ -4,15 +4,13 @@ name: BuildXiaoBanWallpaper
 # xiaoban-wallpaper-v<version> (created if missing, files replaced on a re-run). Release files do not count against
 # the Actions artifact storage quota. Run it manually from the Actions tab; pushing a tag does not trigger a build.
 #
-# The same run can also execute the checks the cloud sandbox cannot (tick the boxes when starting it):
-#   test_desktop      agent kernel, phone-link / agent libraries and the desktop app's Rust tests on real Windows and
-#                     macOS, plus the real OS keystore round trip
-#   test_android_app  Kotlin JVM tests (community-core, link-core) and the Android debug APK of the Compose app
-#                     (uploaded as the artifact xiaoban-android-debug-apk for the real-device pairing test)
-#   test_server_link  server-link tests against a real PostgreSQL
-#   package_server_link  build the server-link deployment image (xiangban-link-<commit>.tar.gz) on Ubuntu 24.04
+# The same run can also package the phone-link pieces (tick the boxes when starting it):
+#   package_android_app  the Android debug APK of the Compose app (artifact xiaoban-android-debug-apk), installable by
+#                        sideloading for the real-device pairing test
+#   package_server_link  the server-link deployment image (artifact xiangban-link-image-<commit>, a .tar.gz built on
+#                        Ubuntu 24.04), see docs/deployment/LINK_DEPLOYMENT.md
 # Without any box ticked the run behaves exactly as before: only the release packages are built. Untick
-# build_release to run the checks alone, without touching the release.
+# build_release to build just the ticked packages, without touching the release. No tests run here.
 on:
   workflow_dispatch:
     inputs:
@@ -20,20 +18,12 @@ on:
         description: 打包并上传 Windows / macOS / Android 安装包到 Release
         type: boolean
         default: true
-      test_desktop:
-        description: 在 Windows 与 macOS 上测试桌面端、Agent 内核与互联相关库（含真实系统钥匙串）
-        type: boolean
-        default: false
-      test_android_app:
-        description: 编译小伴多端 App 的 Android 调试包并跑 Kotlin 测试
-        type: boolean
-        default: false
-      test_server_link:
-        description: 用真实 PostgreSQL 测试互联中转 server-link
+      package_android_app:
+        description: 打包小伴多端 App 的 Android 调试包（产物 xiaoban-android-debug-apk）
         type: boolean
         default: false
       package_server_link:
-        description: 打包 server-link 部署镜像（会先跑它的测试）
+        description: 打包互联中转 server-link 的部署镜像（产物 xiangban-link-image-<提交>）
         type: boolean
         default: false
 
@@ -42,7 +32,7 @@ permissions:
   actions: write
 
 concurrency:
-  # Release builds and check-only runs must not cancel each other.
+  # A release build and a packages-only run must not cancel each other.
   group: build-xiaoban-wallpaper-${{ github.ref }}-${{ inputs.build_release }}
   cancel-in-progress: true
 
@@ -311,95 +301,11 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.release.outputs.tag }}
         run: gh release upload "$TAG" out/* --clobber
-  # ───────────── Checks and packages beyond the wallpaper release ─────────────
-
-  kernel-tests:
-    name: Agent kernel (${{ matrix.os }})
-    if: ${{ inputs.test_desktop }}
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: libs/agent-kernel
-      # Its own step, so the sandbox result is visible apart from the rest of the suite.
-      - name: Operating system sandbox and shell checks
-        run: cargo test --manifest-path libs/agent-kernel/Cargo.toml --all-features --test os_sandbox
-      - name: Full kernel test suite
-        run: cargo test --manifest-path libs/agent-kernel/Cargo.toml --all-features --no-fail-fast
-
-  desktop-rust-tests:
-    name: Desktop app Rust tests (${{ matrix.os }})
-    if: ${{ inputs.test_desktop }}
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: client/xiaoban-desktop-wallpaper/src-tauri
-      # A debug build only needs the bundled computer-use resource folder to exist; release builds prepare it.
-      - name: Placeholder for the computer-use resources
-        shell: bash
-        run: mkdir -p client/xiaoban-desktop-wallpaper/src-tauri/resources/computer-use
-      - name: Desktop Rust tests
-        run: cargo test --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml --no-fail-fast
-      # The phone-link secrets go to the real Windows Credential Manager / macOS Keychain; this is the only place the
-      # `security -i` write path is exercised on a real Mac. Kept apart so a locked CI keychain shows up on its own.
-      - name: Phone link keystore round trip (real OS keystore)
-        run: cargo test --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml os_backend -- --ignored --nocapture
-
-  link-libs-tests:
-    name: Phone link and agent libraries (${{ matrix.os }})
-    if: ${{ inputs.test_desktop }}
-    permissions:
-      contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: |
-            libs/link-protocol
-            libs/link-client
-            libs/agent-bridge
-            libs/agent-hooks
-            libs/voice-service
-      - name: link-protocol
-        run: cargo test --manifest-path libs/link-protocol/Cargo.toml --no-fail-fast
-      - name: link-client
-        run: cargo test --manifest-path libs/link-client/Cargo.toml --no-fail-fast
-      - name: agent-bridge
-        run: cargo test --manifest-path libs/agent-bridge/Cargo.toml --no-fail-fast
-      - name: agent-hooks
-        run: cargo test --manifest-path libs/agent-hooks/Cargo.toml --no-fail-fast
-      - name: voice-service
-        run: cargo test --manifest-path libs/voice-service/Cargo.toml --no-fail-fast
+  # ───────────── Phone-link packages beyond the wallpaper release ─────────────
 
   android-app:
-    name: Android app (Compose) · Kotlin tests and debug APK
-    if: ${{ inputs.test_android_app }}
+    name: Android app (Compose) · debug APK
+    if: ${{ inputs.package_android_app }}
     permissions:
       contents: read
     runs-on: ubuntu-latest
@@ -421,64 +327,19 @@ jobs:
           yes | "$sdkmanager" --licenses > /dev/null || true
           echo "Using $sdkmanager"
       - uses: gradle/actions/setup-gradle@v4
-      - name: JVM tests (community-core, link-core)
-        run: ./gradlew :common:community-core:jvmTest :common:link-core:jvmTest --no-configuration-cache
       - name: Build the Android debug APK
         run: ./gradlew :androidApp:assembleDebug --no-configuration-cache
-      - name: Upload test reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: kotlin-test-reports
-          path: client/xiaoban-multiplatform/common/*/build/reports/tests
-          if-no-files-found: ignore
-          retention-days: 7
       - name: Upload the debug APK
         uses: actions/upload-artifact@v4
         with:
           name: xiaoban-android-debug-apk
           path: client/xiaoban-multiplatform/androidApp/build/outputs/apk/debug/*.apk
           if-no-files-found: error
-          retention-days: 7
-
-  server-link-test:
-    name: server-link cargo test
-    if: ${{ inputs.test_server_link || inputs.package_server_link }}
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: xiaban
-          POSTGRES_PASSWORD: xiaban
-          POSTGRES_DB: xiaoban_link
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U xiaban"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      TEST_DATABASE_URL: postgres://xiaban:xiaban@localhost:5432/xiaoban_link
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: services/server-link
-      - name: Test
-        run: cargo test --manifest-path services/server-link/Cargo.toml --no-fail-fast
-      - name: Release build (unwind, no panic=abort)
-        run: cargo build --release --manifest-path services/server-link/Cargo.toml
+          retention-days: 14
 
   server-link-package:
     name: server-link deployment image
     if: ${{ inputs.package_server_link }}
-    needs: server-link-test
     permissions:
       contents: read
     # Ubuntu 24.04 on purpose: the runtime image is ubuntu:24.04 and the binary links glibc dynamically.
@@ -512,7 +373,7 @@ jobs:
 
   cleanup-history:
     name: Keep latest 2 runs
-    needs: [release, windows-x64, macos-aarch64, android-arm64-v8a, kernel-tests, desktop-rust-tests, link-libs-tests, android-app, server-link-test, server-link-package]
+    needs: [release, windows-x64, macos-aarch64, android-arm64-v8a, android-app, server-link-package]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5

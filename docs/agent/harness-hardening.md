@@ -75,7 +75,7 @@
 ### 2.8 第五批（`feat/agent-scheduled-tasks-20261022`）
 
 29. **上下文圆环的工具开销**：第一次回答前按实测值估算（上次启动保存在 `chat/tool-tokens.json`），没有实测值时用接近真实大小的默认值，测试保证默认值不偏离太多。
-30. **多平台测试工作流**：`.github/workflows/build-xiaoban-wallpaper.yml` 的 `test_desktop` 选项（原 `desktop-agent-platform-tests.yml`，已并入）只能手动运行，在 Windows 与 macOS 上跑内核和桌面端测试，其中 `tests/os_sandbox.rs` 检查 Seatbelt 沙箱、Windows 低完整性沙箱和 cmd 引号。顺带去掉 `agent-chat-tests.yml` 的自动触发。
+30. **多平台测试**：曾有只能手动运行的 `desktop-agent-platform-tests.yml`，在 Windows 与 macOS 上跑内核和桌面端测试，其中 `tests/os_sandbox.rs` 检查 Seatbelt 沙箱、Windows 低完整性沙箱和 cmd 引号。该工作流已按“工作流只打包、不跑测试”的决定删除；这些测试改在本机跑：`cargo test --manifest-path libs/agent-kernel/Cargo.toml --all-features` 与 `cargo test --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml`。顺带去掉了 `agent-chat-tests.yml` 的自动触发。
 31. **定时 Agent 任务**：关怀提醒新增“定时任务”类型。到点后小伴只用只读工具执行（读文件、列目录、搜索、时间、网页），没有需要确认的操作；每条规则的运行追加到它自己的会话，气泡显示答案开头，结果最多保留 12 小时。
 32. **精简创作类工具定义**：游戏、小组件、特效的长篇规范移到 `game_read_format`、`widget_read_format`、`effect_read_format`，创作时才读取。工具列表本身固定，不影响提示缓存。内置工具定义由约 9,600 token 降到约 7,900；测试限制单个工具定义不超过 600 token。
 

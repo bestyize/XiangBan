@@ -35,4 +35,4 @@
 ## 部署完成之后
 
 1. 桌面端和手机端的默认地址是 `https://link.xiangban.xyz/api/link`；域名不同要先改默认值再发版。
-2. 在 GitHub Actions 里运行 “BuildXiaoBanWallpaper”（勾选 `test_android_app`，可取消 `build_release`），下载 `xiaoban-android-debug-apk` 装到手机，桌面端“设置 → 连接手机”扫码配对，按 [LINK_DEPLOYMENT.md](../deployment/LINK_DEPLOYMENT.md) 第 5 条做一次真机完整场景，并把结果记到实施计划的 L3 一节。
+2. 在 GitHub Actions 里运行 “BuildXiaoBanWallpaper”（勾选 `package_android_app`，可取消 `build_release`），下载 `xiaoban-android-debug-apk` 装到手机，桌面端“设置 → 连接手机”扫码配对，按 [LINK_DEPLOYMENT.md](../deployment/LINK_DEPLOYMENT.md) 第 5 条做一次真机完整场景，并把结果记到实施计划的 L3 一节。
