@@ -383,7 +383,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             AdjustPlanSheet(adjustSteps, onDismiss = { adjust = false }, onSubmit = { adjust = false; follow = true; env.remoteChat.revisePlan(it) }, panelModifier = panel)
         }
         OverlayTransition(attach) { panel -> AttachSheet({ attach = false }, { attach = false; toast = "$it 即将支持" }, panel) }
-        VoiceCallLayer(env, callHost, peer?.name ?: "设备", "语音通话") { toast = it }
+        VoiceCallLayer(env, callHost, peer?.name ?: "设备") { toast = it }
         Toast(toast) { toast = null }
         OverlayTransition(drawer, direction = "left") { panel ->
             RemoteDrawer(

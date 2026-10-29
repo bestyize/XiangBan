@@ -342,7 +342,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         }
         AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
         Toast(toast) { toast = null }
-        VoiceCallLayer(env, callHost, "小伴AI", "语音通话") { toast = it }
+        VoiceCallLayer(env, callHost, "小伴AI") { toast = it }
         OverlayTransition(modelSheet) { panel ->
             BottomSheet({ modelSheet = false }, panel) {
                 Text("选择模型", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
