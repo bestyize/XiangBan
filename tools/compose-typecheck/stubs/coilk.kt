@@ -1,0 +1,2 @@
+package coil3.network.ktor3
+class KtorNetworkFetcherFactory
