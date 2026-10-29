@@ -790,11 +790,11 @@ class RemoteChatController(
                 val speakReply = pendingVoice.remove(obj["voice_id"].asStr()) ?: false
                 if ((obj["ok"] as? JsonPrimitive)?.booleanOrNull == true) {
                     val recognized = obj["text"].asStr().orEmpty().trim()
-                    _state.value = _state.value.copy(voicePhase = "idle")
+                    // 先把消息发出去再回到空闲：语音通话看到“空闲”时要能看到这条消息。
                     when {
-                        recognized.isEmpty() -> _state.value = _state.value.copy(error = "没听清，请再说一次")
-                        speakReply -> send(recognized, speak = true)
-                        else -> _state.value = _state.value.copy(voiceText = recognized)
+                        recognized.isEmpty() -> _state.value = _state.value.copy(voicePhase = "idle", error = "没听清，请再说一次")
+                        speakReply -> { send(recognized, speak = true); _state.value = _state.value.copy(voicePhase = "idle") }
+                        else -> _state.value = _state.value.copy(voicePhase = "idle", voiceText = recognized)
                     }
                 } else {
                     _state.value = _state.value.copy(voicePhase = "idle", error = obj["error"].asStr() ?: "语音识别失败")

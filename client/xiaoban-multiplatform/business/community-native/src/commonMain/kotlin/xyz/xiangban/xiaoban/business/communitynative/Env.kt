@@ -15,6 +15,7 @@ import xyz.xiangban.xiaoban.common.community.AccountApi
 import xyz.xiangban.xiaoban.common.community.AgentBridge
 import xyz.xiangban.xiaoban.common.community.AgentRuntime
 import xyz.xiangban.xiaoban.common.community.ReminderScheduler
+import xyz.xiangban.xiaoban.common.community.VoicePlatform
 import xyz.xiangban.xiaoban.common.community.SetReminderTool
 import xyz.xiangban.xiaoban.common.community.postChatLines
 import xyz.xiangban.xiaoban.common.community.AiGatewayApi
@@ -31,21 +32,17 @@ import xyz.xiangban.xiaoban.common.link.PhoneLink
 import xyz.xiangban.xiaoban.common.link.RemoteChatController
 
 /** 各平台才能做的事：复制到剪贴板、系统分享面板、用浏览器打开链接。不提供时对应按钮不可用。 */
-interface PlatformActions {
+interface PlatformActions : VoicePlatform {
     fun copy(text: String)
     fun share(title: String, url: String)
     fun openUrl(url: String)
     /** 朗读一段文字；平台不支持就返回 false。 */
     fun speak(text: String): Boolean = false
-    fun stopSpeaking() {}
 
     /** 开始录音（16kHz、单声道、16 位小端 PCM）；第一次会先向用户要麦克风权限。返回是否已经开始录。 */
     suspend fun startRecording(): Boolean = false
     /** 结束录音，拿到录下来的声音；没在录就是 null。 */
     fun stopRecording(): ByteArray? = null
-    /** 播放一段音频（电脑合成的语音），播完或出错调用 [onDone]。返回是否开始播放。 */
-    fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean = false
-    fun stopAudio() {}
 }
 
 fun defaultLinkHttpClient(): HttpClient = HttpClient {
