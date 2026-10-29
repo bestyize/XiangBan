@@ -85,36 +85,40 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
         BackHandler(enabled = registering) { registrationToken = null; error = null }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             if (registering) IconTap(XIcons.ChevronLeft, "返回登录", { registrationToken = null; error = null })
-            Text(if (registering) "完成注册" else "登录", Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            else {
+                XIcon(XIcons.Sparkle, tint = Brand, size = 22.dp)
+                Spacer(Modifier.size(8.dp))
+            }
+            Text(if (registering) "完成注册" else "登录小伴", Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             IconTap(XIcons.Close, "关闭", back)
         }
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 8.dp, bottom = 8.dp)) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 4.dp)) {
             if (!registering) {
-                Text("登录小伴", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
-                Text("社区、云端小伴和遥控电脑都用这个账号。电脑和手机登录同一个账号，就能互相找到。", Modifier.padding(top = 6.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(Modifier.fillMaxWidth().padding(top = 18.dp)) {
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp).clip(CircleShape).background(LocalExtraColors.current.fill).padding(3.dp)) {
                     LoginMode.entries.forEach { m ->
                         val selected = mode == m
-                        Column(Modifier.weight(1f).clickable { mode = m; error = null }, horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(m.label, Modifier.height(44.dp).padding(top = 10.dp), fontSize = 15.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-                            Box(Modifier.fillMaxWidth().height(2.dp).background(if (selected) Brand else Color.Transparent))
+                        Box(
+                            Modifier.weight(1f).height(40.dp).clip(CircleShape)
+                                .background(if (selected) LocalExtraColors.current.brandSoft else Color.Transparent)
+                                .clickable { mode = m; error = null },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(m.label, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
-                Hairline()
-                TextBox(identifier, { identifier = it.trim() }, Modifier.padding(top = 14.dp), label = if (mode == LoginMode.Code) "邮箱或手机号" else "用户名、邮箱或手机号", placeholder = if (mode == LoginMode.Code) "name@example.com" else "用户名")
+                TextBox(identifier, { identifier = it.trim() }, Modifier.padding(top = 14.dp), label = if (mode == LoginMode.Code) "邮箱或手机号" else "用户名、邮箱或手机号", placeholder = if (mode == LoginMode.Code) "请输入邮箱或手机号" else "请输入用户名、邮箱或手机号", leadingIcon = XIcons.User, filled = true, fontSize = 14)
                 if (mode == LoginMode.Code) {
-                    Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Bottom) {
-                        TextBox(code, { code = it.trim() }, Modifier.weight(1f), label = "验证码", placeholder = "6 位数字", keyboardType = KeyboardType.Number)
+                    Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                        TextBox(code, { code = it.trim() }, Modifier.weight(1f), label = "验证码", placeholder = "6 位数字", keyboardType = KeyboardType.Number, leadingIcon = XIcons.Lock, filled = true, fontSize = 14)
                         GhostPillButton(
                             if (cooldown > 0) "${cooldown}s" else "获取验证码",
                             { run { env.account.sendCode(identifier); cooldown = 60 } },
                             enabled = identifier.isNotBlank() && cooldown == 0 && !busy, height = 48.dp, fontSize = 14,
                         )
                     }
-                    Text("第一次使用验证码登录，验证后会引导你设置用户名和密码。", Modifier.padding(top = 10.dp), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 } else {
-                    TextBox(password, { password = it }, Modifier.padding(top = 14.dp), label = "密码", placeholder = "输入密码", password = true, keyboardType = KeyboardType.Password)
+                    TextBox(password, { password = it }, Modifier.padding(top = 12.dp), label = "密码", placeholder = "请输入密码", password = true, keyboardType = KeyboardType.Password, leadingIcon = XIcons.Lock, filled = true, fontSize = 14)
                 }
                 error?.let { Text(it, Modifier.padding(top = 10.dp), color = Brand, fontSize = 13.sp) }
                 PillButton(
@@ -132,24 +136,25 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
                             }
                         }
                     },
-                    Modifier.padding(top = 22.dp).fillMaxWidth(),
+                    Modifier.padding(top = 16.dp).fillMaxWidth(),
                     enabled = !busy && identifier.isNotBlank() && (if (mode == LoginMode.Code) code.isNotBlank() else password.isNotBlank()),
+                    height = 44.dp,
                 )
+                if (mode == LoginMode.Code) Text("首次登录将引导注册", Modifier.padding(top = 10.dp).fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 Text("登录即表示同意用户协议与隐私政策", Modifier.padding(top = 12.dp).fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             } else {
-                Text("验证通过，设置你的账号", fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
-                Text("用户名不能修改，也是你在社区里的名字。", Modifier.padding(top = 6.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextBox(username, { username = it.trim() }, Modifier.padding(top = 14.dp), label = "用户名", placeholder = "2–20 个字")
-                Text("可用：字母、数字、汉字、下划线", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                TextBox(password, { password = it }, Modifier.padding(top = 14.dp), label = "密码", placeholder = "至少 8 位", password = true, keyboardType = KeyboardType.Password)
+                TextBox(username, { username = it.trim() }, Modifier.padding(top = 8.dp), label = "用户名", placeholder = "2–20 个字", leadingIcon = XIcons.User, filled = true, fontSize = 14)
+                Text("用户名不能修改，可用字母、数字、汉字和下划线", Modifier.padding(top = 6.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextBox(password, { password = it }, Modifier.padding(top = 12.dp), label = "密码", placeholder = "至少 8 位", password = true, keyboardType = KeyboardType.Password, leadingIcon = XIcons.Lock, filled = true, fontSize = 14)
                 error?.let { Text(it, Modifier.padding(top = 10.dp), color = Brand, fontSize = 13.sp) }
                 PillButton(
                     if (busy) "提交中…" else "完成注册并登录",
                     { run { env.session.register(registrationToken.orEmpty(), username, password); done() } },
-                    Modifier.padding(top = 22.dp).fillMaxWidth(),
+                    Modifier.padding(top = 16.dp).fillMaxWidth(),
                     enabled = !busy && username.isNotBlank() && password.length >= 8,
+                    height = 44.dp,
                 )
-                Text("登录后，同一账号的电脑会自动出现在“我的电脑”里。", Modifier.padding(top = 12.dp).fillMaxWidth(), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text("登录即表示同意用户协议与隐私政策", Modifier.padding(top = 12.dp).fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }

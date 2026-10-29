@@ -271,6 +271,9 @@ fun TextBox(
     password: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
     enabled: Boolean = true,
+    leadingIcon: ImageVector? = null,
+    filled: Boolean = false,
+    fontSize: Int = 16,
 ) {
     Column(modifier) {
         if (label != null) Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
@@ -279,19 +282,25 @@ fun TextBox(
             onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled,
-            textStyle = TextStyle(fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurface),
+            textStyle = TextStyle(fontSize = fontSize.sp, color = MaterialTheme.colorScheme.onSurface),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             singleLine = true,
             visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
             cursorBrush = SolidColor(Brand),
             decorationBox = { inner ->
-                Box(
-                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface)
+                Row(
+                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
                         .border(1.dp, LocalExtraColors.current.line, RoundedCornerShape(12.dp)).padding(horizontal = 14.dp),
-                    contentAlignment = Alignment.CenterStart,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 16.sp, maxLines = 1)
-                    inner()
+                    if (leadingIcon != null) {
+                        XIcon(leadingIcon, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = fontSize.sp, maxLines = 1)
+                        inner()
+                    }
                 }
             },
         )
