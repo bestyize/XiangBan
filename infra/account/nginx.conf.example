@@ -2,7 +2,8 @@
 # 把 account.xiangban.xyz 换成你的域名，并与 ACCOUNT_ISSUER 保持一致；证书用 certbot 签发。
 # limit_req_zone 必须位于 http 上下文，conf.d 下的文件已经在 http 里。
 
-limit_req_status 429;
+# limit_req_status 不放在 http 层：它同一上下文里只能出现一次，服务器上别的配置常常已经写过，重复会让 nginx -t 报 duplicate。
+# 这里写在本站的 server 块里，只影响本站，不会冲突。
 limit_req_zone $binary_remote_addr zone=account_api:10m rate=10r/s;
 limit_req_zone $binary_remote_addr zone=account_code:10m rate=6r/m;
 limit_req_zone $binary_remote_addr zone=account_admin:10m rate=2r/s;
@@ -22,6 +23,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/account.xiangban.xyz/privkey.pem;
 
     server_tokens off;
+    limit_req_status 429;
     client_max_body_size 64k;
     add_header Strict-Transport-Security "max-age=31536000" always;
     add_header X-Content-Type-Options "nosniff" always;
