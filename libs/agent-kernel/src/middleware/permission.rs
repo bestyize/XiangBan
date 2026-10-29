@@ -281,6 +281,16 @@ impl Permission {
         if self.is_tainted(session){self.tainted.lock().unwrap_or_else(|e|e.into_inner()).insert(session.into());}Ok(())
     }
     pub fn needs_review(&self,session:&str)->bool{let session=self.root_session(session);self.trust_dir.lock().unwrap_or_else(|e|e.into_inner()).as_ref().is_some_and(|d|!matches!(std::fs::read(d.join(session)).ok().as_deref(),Some(b"clean" | b"tainted")))}
+    /// Lifts a `review` mark (set by `require_review`) so remembered grants and full trust work again. A `tainted` mark,
+    /// which comes from reading outside content, stays.
+    pub fn clear_review(&self,session:&str)->Result<(),String>{
+        use std::io::Write;
+        if !self.needs_review(session){return Ok(());}
+        let root=self.trust_dir.lock().unwrap_or_else(|e|e.into_inner());let dir=root.as_ref().ok_or("trust store not initialized")?;
+        if !session.bytes().all(|c|c.is_ascii_alphanumeric()||matches!(c,b'-'|b'_')){return Err("invalid trust identity".into());}
+        let mut f=std::fs::OpenOptions::new().write(true).truncate(true).open(dir.join(session)).map_err(|e|e.to_string())?;
+        f.write_all(b"clean").and_then(|_|f.sync_all()).map_err(|e|e.to_string())
+    }
     pub fn require_review(&self,session:&str)->Result<(),String>{
         use std::io::Write;
         let root=self.trust_dir.lock().unwrap_or_else(|e|e.into_inner());let dir=root.as_ref().ok_or("trust store not initialized")?;

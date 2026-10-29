@@ -276,7 +276,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                     )
                     RadioRow(
                         selected = remote.fullTrust, title = "完全信任", desc = "不再逐步询问，直接执行；高风险操作仍然每次都问",
-                        onClick = { if (remote.fullTrust) permissionStep = 0 else permissionStep = 2 },
+                        onClick = { permissionStep = 0; env.remoteChat.setPermission("auto") },
                     )
                     GhostPillButton("取消", { permissionStep = 0 }, Modifier.padding(top = 8.dp).fillMaxWidth())
                 }

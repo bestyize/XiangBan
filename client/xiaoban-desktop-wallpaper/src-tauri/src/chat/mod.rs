@@ -2304,12 +2304,12 @@ pub(crate) fn remote_send_message(
         }
     };
 
-    // 权限：手机新建的对话从“默认权限”（执行前先问）开始，手机也可以在新建时直接选“完全信任”；
+    // 权限（开发阶段便利优先）：手机新建的对话默认“完全信任”（高风险操作仍然每次都问），手机明确要 `ask` 才是默认权限；
     // 已有的对话保持它现在的模式，不因为手机发了一条消息就被降级或升级。
     // 以前这里每条消息都强制降回 ask 并要求逐步复核，结果每一步都要点一次，几乎没法干活。
     let state = app.state::<ChatState>();
     let mode = if created {
-        let wanted = if permission == Some("auto") { "auto" } else { "ask" };
+        let wanted = if permission == Some("ask") { "ask" } else { "auto" };
         mutate(app, |index| {
             index.set_permission_mode(&sid, wanted);
         })?;
@@ -2323,6 +2323,8 @@ pub(crate) fn remote_send_message(
         // 读过外部内容（有工具调用记录）的老对话按桌面一样标成需要复核；新对话是干净的。
         let had_tools = JsonlStore::new(dirs.sessions()).load(&sid).map(|m| m.iter().any(|x| x.role == agent_kernel::Role::Tool)).unwrap_or(false);
         let _ = state.permission.restore_trust(&dirs.chat.join("trust"), &sid, had_tools);
+        // 以前手机发的消息会给对话打上“逐步复核”的标记，老对话因此每一步都要点；这里解除（读过外部内容的标记保留）。
+        let _ = state.permission.clear_review(&sid);
     }
     emit(app, "chat-permission-mode-changed", json!({ "sessionId": sid, "mode": mode }));
 
