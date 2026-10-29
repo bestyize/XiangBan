@@ -1,5 +1,12 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -48,8 +55,8 @@ fun CommunityNativeApp(env: CommunityEnv) {
         BackHandler(enabled = stack.isNotEmpty()) { pop() }
 
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            Box(Modifier.fillMaxSize()) {
-                when (Tab.valueOf(tab)) {
+            AnimatedContent(targetState = Tab.valueOf(tab), modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) }, label = "主导航切换") { currentTab ->
+                when (currentTab) {
                     Tab.Ai -> AiHomeScreen(env, chat, ::push, { aiDrawerOpen = true })
                     Tab.Games -> GamesScreen()
                     Tab.Community -> CommunityScreen(env, ::push)
@@ -58,10 +65,26 @@ fun CommunityNativeApp(env: CommunityEnv) {
             }
             FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
             AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
-            stack.lastOrNull { it != Route.Login }?.let { route ->
-                // 盖在最上面，并吃掉点击，免得穿透到下面的一级页。
-                Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding().clickable(indication = null, interactionSource = null) {}) {
-                    RouteScreen(env, chat, route, ::push, ::pop)
+            val pages = stack.filter { it != Route.Login }
+            AnimatedContent(
+                targetState = pages,
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    if (targetState.size > initialState.size) {
+                        (slideInHorizontally(tween(220)) { it } + fadeIn(tween(220))) togetherWith
+                            (slideOutHorizontally(tween(220)) { -it / 4 } + fadeOut(tween(220)))
+                    } else {
+                        (slideInHorizontally(tween(220)) { -it / 4 } + fadeIn(tween(220))) togetherWith
+                            (slideOutHorizontally(tween(220)) { it } + fadeOut(tween(220)))
+                    }
+                },
+                label = "页面切换",
+            ) { visiblePages ->
+                visiblePages.lastOrNull()?.let { route ->
+                    // 子页面盖住一级页，并吃掉点击，免得穿透到下面。
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding().clickable(indication = null, interactionSource = null) {}) {
+                        RouteScreen(env, chat, route, ::push, ::pop)
+                    }
                 }
             }
             OverlayTransition(publishOpen) { panel ->
