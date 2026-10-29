@@ -38,8 +38,7 @@ import androidx.compose.runtime.remember
 import xyz.xiangban.xiaoban.common.community.DesignTokens as Tokens
 import xyz.xiangban.xiaoban.common.community.Load
 
-val Gutter = Tokens.GutterX.dp
-val CardShape = RoundedCornerShape(Tokens.RadiusCard.dp)
+private val CardShape = RoundedCornerShape(Tokens.RadiusCard.dp)
 
 @Composable
 fun Hairline(modifier: Modifier = Modifier) {
@@ -47,31 +46,8 @@ fun Hairline(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun MetaText(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier, color = LocalExtraColors.current.ink3, fontSize = Tokens.MetaSize.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-}
-
-@Composable
-fun TitleText(text: String, modifier: Modifier = Modifier, maxLines: Int = 2) {
-    Text(text, modifier, fontSize = Tokens.TitleSize.sp, fontWeight = FontWeight.Medium, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
-}
-
-/** 页面顶部标题条：标题居左，可带返回。 */
-@Composable
-fun PageHeader(title: String, onBack: (() -> Unit)? = null, actions: @Composable () -> Unit = {}) {
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = if (onBack != null) 4.dp else Gutter, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (onBack != null) TextButton(onClick = onBack) { Text("‹ 返回", color = MaterialTheme.colorScheme.onSurface) }
-            Text(title, Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            actions()
-        }
-        Hairline()
-    }
-}
-
-@Composable
 fun CenterMessage(text: String, action: String? = null, onAction: (() -> Unit)? = null, modifier: Modifier = Modifier.fillMaxSize()) {
-    Column(modifier.padding(Gutter), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(modifier.padding(16.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (action != null && onAction != null) OutlinedButton(onClick = onAction, Modifier.padding(top = 12.dp)) { Text(action) }
     }
@@ -93,11 +69,6 @@ fun <T> LoadBox(state: Load<T>, onRetry: () -> Unit, content: @Composable (T) ->
 }
 
 @Composable
-fun BrandButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
-    Button(onClick, modifier, enabled = enabled, shape = CardShape) { Text(text) }
-}
-
-@Composable
 fun rememberImageLoader(): ImageLoader {
     val context = LocalPlatformContext.current
     return remember(context) { ImageLoader.Builder(context).components { add(KtorNetworkFetcherFactory()) }.build() }
@@ -111,14 +82,5 @@ fun Cover(url: String?, id: Long, modifier: Modifier = Modifier) {
         if (!url.isNullOrBlank()) {
             AsyncImage(model = url, contentDescription = null, imageLoader = rememberImageLoader(), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
-    }
-}
-
-@Composable
-fun Chip(text: String, selected: Boolean, onClick: () -> Unit) {
-    val color = if (selected) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.ink3
-    Column(Modifier.clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text, color = color, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-        Box(Modifier.padding(top = 4.dp).size(width = 16.dp, height = 2.dp).background(if (selected) Brand else Color.Transparent))
     }
 }

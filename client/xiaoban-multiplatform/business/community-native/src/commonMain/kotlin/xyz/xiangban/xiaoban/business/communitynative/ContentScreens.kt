@@ -407,8 +407,8 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
                     Box(Modifier.fillMaxWidth().height(232.dp)) {
                         Cover(pack.coverUrl, pack.id, Modifier.fillMaxSize())
-                        CircleOverlayButton(XIcons.ChevronLeft, "返回", back, Modifier.align(Alignment.TopStart).padding(start = 12.dp, top = 12.dp))
-                        CircleOverlayButton(XIcons.Share, "分享", { share = true }, Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 12.dp))
+                        CircleOverlayButton(XIcons.ChevronLeft, "返回", back, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 12.dp, top = 12.dp))
+                        CircleOverlayButton(XIcons.Share, "分享", { share = true }, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 12.dp, top = 12.dp))
                     }
                     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
                         Text(pack.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, lineHeight = 29.sp)
@@ -453,7 +453,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
             }
         }
         if (state !is xyz.xiangban.xiaoban.common.community.Load.Ready<*>) {
-            Box(Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 4.dp)) { IconTap(XIcons.ChevronLeft, "返回", back) }
+            Box(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 4.dp, top = 4.dp)) { IconTap(XIcons.ChevronLeft, "返回", back) }
         }
         Toast(toast) { toast = null }
     }
