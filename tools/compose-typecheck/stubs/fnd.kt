@@ -12,4 +12,5 @@ fun Modifier.clickable(indication: Any?, interactionSource: Any?, enabled: Boole
 class ScrollState
 @Composable fun rememberScrollState(): ScrollState = TODO()
 fun Modifier.verticalScroll(state: ScrollState): Modifier = this
+fun Modifier.horizontalScroll(state: ScrollState): Modifier = this
 @Composable fun isSystemInDarkTheme(): Boolean = false

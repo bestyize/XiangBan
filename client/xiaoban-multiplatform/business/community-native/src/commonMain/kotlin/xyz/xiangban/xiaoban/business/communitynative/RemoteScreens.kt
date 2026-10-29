@@ -191,6 +191,8 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     var lastHighRisk by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmed by remember { mutableStateOf(false) }
     var drawer by rememberSaveable { mutableStateOf(false) }
+    var attach by rememberSaveable { mutableStateOf(false) }
+    var toast by remember { mutableStateOf<String?>(null) }
     BackHandler(enabled = drawer) { drawer = false }
 
     LaunchedEffect(activePeer) {
@@ -234,23 +236,19 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             }
 
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
-                ComposerCard(input, { input = it }, if (online) "对设备上的小伴说点什么…" else "设备不在线，上线后可继续对话", enabled = online) {
-                    ChipPill(listOfNotNull(peer?.name ?: "设备", projectName).joinToString(" · "), icon = XIcons.Monitor)
-                    Spacer(Modifier.weight(1f))
-                    if (remote.sending) {
-                        // 协议里还没有“取消”指令，所以这里只表示电脑正在处理。
-                        RoundIconButton(XIcons.Stop, "电脑正在处理", {}, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f), MaterialTheme.colorScheme.surface, enabled = false)
-                    } else {
-                        val canSend = online && input.trim().isNotEmpty()
-                        RoundIconButton(
-                            XIcons.ArrowRight, "发送",
-                            { val text = input.trim(); if (text.isNotEmpty()) { input = ""; env.remoteChat.send(text) } },
-                            if (canSend) Brand else LocalExtraColors.current.line, Color.White, enabled = canSend,
-                        )
-                    }
-                }
+                ChatComposer(
+                    input, { input = it }, if (online) "对设备上的小伴说点什么…" else "设备不在线，上线后可继续对话", "跟随电脑",
+                    onModel = { toast = "选择模型即将支持，目前沿用设备上的设置" },
+                    onAttach = { attach = true },
+                    onWeb = { toast = "联网搜索即将支持" },
+                    onVoice = { toast = "语音输入即将支持" },
+                    onSend = { val text = input.trim(); if (text.isNotEmpty()) { input = ""; env.remoteChat.send(text) } },
+                    enabled = online, sending = remote.sending,
+                )
             }
         }
+        OverlayTransition(attach) { panel -> AttachSheet({ attach = false }, { attach = false; toast = "$it 即将支持" }, panel) }
+        Toast(toast) { toast = null }
         OverlayTransition(highRisk != null) { panel ->
           lastHighRisk?.let { (approvalId, choice) ->
             val pending = remote.pendingApproval

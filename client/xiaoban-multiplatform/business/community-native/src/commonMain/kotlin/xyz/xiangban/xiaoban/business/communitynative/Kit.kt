@@ -95,7 +95,7 @@ fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifie
                 if (subtitleContent != null) subtitleContent()
                 else if (subtitle != null) Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            if (trailing != null) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { trailing() } else Spacer(Modifier.width(44.dp))
+            if (trailing != null) Box(Modifier.widthIn(min = 44.dp).height(44.dp), contentAlignment = Alignment.Center) { trailing() } else Spacer(Modifier.width(44.dp))
         }
         Hairline()
     }
@@ -504,6 +504,62 @@ fun ComposerCard(
     }
 }
 
+/**
+ * 聊天输入卡片（设计稿 6 号和 35–39 号画板）：输入框，下面一行 + 添加内容、模型、联网、语音输入、（实时对话）、发送或停止。
+ * 还没有对应功能的按钮由调用方在回调里提示“即将支持”，不假装能用。
+ */
+@Composable
+fun ChatComposer(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    modelLabel: String,
+    onModel: () -> Unit,
+    onAttach: () -> Unit,
+    onWeb: () -> Unit,
+    onVoice: () -> Unit,
+    onSend: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    webOn: Boolean = false,
+    sending: Boolean = false,
+    onStop: (() -> Unit)? = null,
+    onLive: (() -> Unit)? = null,
+) {
+    val extra = LocalExtraColors.current
+    ComposerCard(value, onValueChange, placeholder, modifier, enabled = enabled) {
+        RoundIconButton(XIcons.Plus, "添加内容", onAttach, MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.onSurfaceVariant, enabled = enabled, bordered = true)
+        Box(Modifier.weight(1f, fill = false)) { ChipPill(modelLabel, trailingIcon = XIcons.ChevronDown, onClick = if (enabled) onModel else null) }
+        ChipPill("联网", icon = XIcons.Globe, selected = webOn, onClick = if (enabled) onWeb else null)
+        Spacer(Modifier.weight(1f))
+        IconTap(XIcons.Mic, "语音输入", onVoice, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 22.dp)
+        if (onLive != null) RoundIconButton(XIcons.Wave, "实时对话", onLive, extra.fill, MaterialTheme.colorScheme.onSurface, enabled = enabled)
+        if (sending) {
+            RoundIconButton(XIcons.Stop, if (onStop != null) "停止" else "正在处理", onStop ?: {}, MaterialTheme.colorScheme.onSurface.copy(alpha = if (onStop != null) 1f else 0.35f), MaterialTheme.colorScheme.surface, enabled = onStop != null)
+        } else {
+            val canSend = enabled && value.trim().isNotEmpty()
+            RoundIconButton(XIcons.ArrowRight, "发送", onSend, if (canSend) Brand else extra.line, Color.White, enabled = canSend)
+        }
+    }
+}
+
+/** “添加内容”底部面板：相机、相册、文件、资料库（设计稿 6 号画板）。 */
+@Composable
+fun AttachSheet(onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: Modifier = Modifier) {
+    BottomSheet(onDismiss, panelModifier) {
+        Text("添加内容", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf(XIcons.Camera to "相机", XIcons.Image to "相册", XIcons.File to "文件", XIcons.Book to "资料库").forEach { (icon, label) ->
+                Column(Modifier.weight(1f).clickable { onPick(label) }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    IconBox(icon, 56.dp, 16.dp)
+                    Text(label, fontSize = 13.sp)
+                }
+            }
+        }
+        GhostPillButton("取消", onDismiss, Modifier.padding(top = 20.dp).fillMaxWidth())
+    }
+}
+
 /** 圆形图标按钮（发送、停止、附件）。 */
 @Composable
 fun RoundIconButton(icon: ImageVector, description: String, onClick: () -> Unit, background: Color, tint: Color, modifier: Modifier = Modifier, enabled: Boolean = true, bordered: Boolean = false) {
@@ -517,13 +573,14 @@ fun RoundIconButton(icon: ImageVector, description: String, onClick: () -> Unit,
 
 /** 输入卡片里的小胶囊（模型选择、设备名）。 */
 @Composable
-fun ChipPill(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, trailingIcon: ImageVector? = null, onClick: (() -> Unit)? = null) {
+fun ChipPill(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, trailingIcon: ImageVector? = null, onClick: (() -> Unit)? = null, selected: Boolean = false) {
+    val extra = LocalExtraColors.current
     Row(
-        modifier.height(32.dp).clip(CircleShape).border(1.dp, LocalExtraColors.current.line, CircleShape).let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(horizontal = 12.dp),
+        modifier.height(32.dp).clip(CircleShape).background(if (selected) extra.brandSoft else Color.Transparent).border(1.dp, if (selected) Brand else extra.line, CircleShape).let { if (onClick != null) it.clickable(onClick = onClick) else it }.padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (icon != null) XIcon(icon, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
-        Text(text, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
+        if (icon != null) XIcon(icon, tint = if (selected) Brand else MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
+        Text(text, fontSize = 13.sp, color = if (selected) Brand else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
         if (trailingIcon != null) XIcon(trailingIcon, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
     }
 }
