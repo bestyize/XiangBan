@@ -80,8 +80,6 @@ data class RemoteChatState(
     val toolProgress: List<RemoteToolProgress> = emptyList(),
     val sending: Boolean = false,
     val pendingApproval: RemoteApprovalRequest? = null,
-    val pairingBusy: Boolean = false,
-    val pairingError: String? = null,
     val error: String? = null,
 ) {
     val selectedPeer: PeerSummary? get() = peers.firstOrNull { it.id == selectedPeerId }
@@ -96,7 +94,7 @@ private fun JsonElement?.asStr(): String? =
 
 /**
  * 手机端遥控桌面小伴控制器：
- * - 监听 `PhoneLink` 事件，维护已配对电脑在线状态
+ * - 监听 `PhoneLink` 事件，维护同账号电脑的在线状态
  * - 拉取电脑上的会话列表（`sessions.list` / `sessions.page` / `sessions.changed`）
  * - 打开会话查看历史快照与实时流式增量（`event text.delta`）及工具进度（`tool.start`/`tool.end`）
  * - 发送远程指令（`message.send` / `message.accepted`）
@@ -253,40 +251,11 @@ class RemoteChatController(
         }
     }
 
-    fun pair(qrText: String) {
-        val clean = qrText.trim()
-        if (clean.isEmpty() || _state.value.pairingBusy) return
-        _state.value = _state.value.copy(pairingBusy = true, pairingError = null)
+    /** 把一台电脑从账号的设备列表里移除（它再启动会重新出现）。 */
+    fun removePeer(peerId: String) {
         scope.launch {
             try {
-                val paired = phoneLink.pair(clean)
-                val allPeers = phoneLink.peers()
-                _state.value = _state.value.copy(
-                    pairingBusy = false,
-                    peers = allPeers,
-                    selectedPeerId = paired.id,
-                    isPeerOnline = paired.online,
-                    pairingError = null,
-                )
-                if (paired.online) {
-                    sendHello(paired.id)
-                    fetchSessions(paired.id)
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _state.value = _state.value.copy(
-                    pairingBusy = false,
-                    pairingError = e.message ?: "配对失败，请重试",
-                )
-            }
-        }
-    }
-
-    fun unpair(peerId: String) {
-        scope.launch {
-            try {
-                phoneLink.unpair(peerId)
+                phoneLink.removeDevice(peerId)
                 refreshPeers()
             } catch (e: CancellationException) {
                 throw e
@@ -294,10 +263,6 @@ class RemoteChatController(
                 _state.value = _state.value.copy(error = e.message)
             }
         }
-    }
-
-    fun clearPairingError() {
-        _state.value = _state.value.copy(pairingError = null)
     }
 
     // ───────────── 协议收发处理 ─────────────
@@ -364,10 +329,7 @@ class RemoteChatController(
                     }
                 }
             }
-            is LinkEvent.Paired -> {
-                refreshPeers()
-            }
-            is LinkEvent.Unpaired -> {
+            is LinkEvent.PeerAdded, is LinkEvent.PeerRemoved -> {
                 refreshPeers()
             }
             is LinkEvent.Message -> {
@@ -477,12 +439,6 @@ class RemoteChatController(
                 val approvalId = obj["approval_id"].asStr()
                 if (approvalId != null && _state.value.pendingApproval?.approvalId == approvalId) {
                     _state.value = _state.value.copy(pendingApproval = null)
-                }
-            }
-            "unpair" -> {
-                scope.launch {
-                    phoneLink.unpair(peer)
-                    refreshPeers()
                 }
             }
             else -> {}

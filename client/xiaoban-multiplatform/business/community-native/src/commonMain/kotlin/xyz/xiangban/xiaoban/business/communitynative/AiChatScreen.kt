@@ -276,11 +276,11 @@ private fun RemoteChatView(
             ) {
                 Text("尚未连接电脑", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "在电脑端小伴打开「设置 → 连接与网络」，点击「连接手机」生成二维码或配对串，即可在此绑定并遥控桌面小伴。",
+                    "在电脑上登录同一个小伴账号，并打开「设置 → 手机遥控」里的「允许手机遥控这台电脑」，电脑会自动出现在这里，即可遥控桌面小伴。",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.5.sp,
                 )
-                BrandButton("去配对电脑", onClick = onOpenDevices, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                BrandButton("查看我的电脑", onClick = onOpenDevices, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
             }
         }
         return

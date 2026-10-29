@@ -303,7 +303,7 @@ pub fn chat_enqueue(
     Ok(value)
 }
 
-/// 手机经端到端加密通道发来的消息写入同一个持久化 outbox 队列，享受与本机消息一致的幂等与顺序保证。
+/// 手机经中转发来的消息写入同一个持久化 outbox 队列，享受与本机消息一致的幂等与顺序保证。
 pub(super) fn enqueue_remote(
     app: &tauri::AppHandle,
     session_id: &str,

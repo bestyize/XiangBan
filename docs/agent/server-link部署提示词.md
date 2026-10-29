@@ -12,7 +12,7 @@
 - services/server-link/README.md（接口、环境变量、隐私与限制）
 - infra/link/compose.yaml、infra/link/.env.production.example、infra/link/nginx.conf.example、services/server-link/Dockerfile
 
-背景：server-link 让手机和电脑上的小伴通过它转发端到端加密的消息。它只存设备、公钥和配对关系，不存消息正文；用账号中心的 JWKS 离线验签。技术栈是 Rust + PostgreSQL，端口 55030，路径前缀 /api/link，包含 WebSocket（/api/link/ws）。
+背景：server-link 让用同一个账号登录的手机和电脑上的小伴通过它互相发现并转发文本消息。它只存账号下有哪些设备，不存消息正文，也不做加密（不是金融服务，没有配对和密钥）；用账号中心的 JWKS 离线验签。技术栈是 Rust + PostgreSQL，端口 55030，路径前缀 /api/link，包含 WebSocket（/api/link/ws）。
 
 要求与约束：
 1. 独立部署栈：新建目录（例如 /home/ubuntu/xiangban-link），自带 PostgreSQL，不改动也不依赖账号中心、主站、市场等现有栈和它们的数据卷。动手前先看清服务器上已有的容器、Nginx 配置、端口占用，不要覆盖已有文件；有疑问先停下来问我。
@@ -23,10 +23,10 @@
 6. 安全：容器保持 read_only、cap_drop ALL、no-new-privileges（compose 里已有，别删）；数据库网络保持 internal。不要开启任何调试端口。
 
 验证（不需要令牌的项全部通过才算完成，逐条把实际命令和结果贴给我，令牌之类敏感信息打码）：
-令牌说明：访问令牌只有约 30 分钟有效，且由用户登录后手工提供，默认不提供。没有令牌时，所有带令牌的验证项一律标记为“跳过，由用户用真机配对验证”，不要向我索取，也不要自己创建账号或想办法绕过；只做不需要令牌的验证。如果我主动给了令牌（可能连同 refresh_token），那就在一次连续操作里把带令牌的验证项跑完；令牌过期时，若我给了 refresh_token，就用 POST https://account.xiangban.xyz/api/auth/refresh（{"refresh_token":"…","client_id":"xiaoban-android"}）换新的，没给就停下来告诉我，不要反复催。
+令牌说明：访问令牌只有约 30 分钟有效，且由用户登录后手工提供，默认不提供。没有令牌时，所有带令牌的验证项一律标记为“跳过，由用户用真机验证”，不要向我索取，也不要自己创建账号或想办法绕过；只做不需要令牌的验证。如果我主动给了令牌（可能连同 refresh_token），那就在一次连续操作里把带令牌的验证项跑完；令牌过期时，若我给了 refresh_token，就用 POST https://account.xiangban.xyz/api/auth/refresh（{"refresh_token":"…","client_id":"xiaoban-android"}）换新的，没给就停下来告诉我，不要反复催。
 1. docker compose ps 显示 postgres 与 link 均 healthy；curl 127.0.0.1:55030/api/link/health 返回 JSON。
 2. curl https://link.xiangban.xyz/api/link/health 返回 JSON；不带令牌 GET /api/link/devices 返回 401。
-3. （带令牌，可选，没有令牌就写“跳过，由用户真机配对验证”）如果我给了测试账号的访问令牌（aud 为 xiaoban-android 或 xiaoban-desktop-wallpaper），则：POST /api/link/devices 登记一台名为“部署自检”的设备（public_key 必须是 base64url（无填充）编码的 65 字节 P-256 未压缩点（0x04 开头），可用 openssl ecparam -name prime256v1 -genkey -noout | openssl ec -pubout -outform DER 2>/dev/null | tail -c 65 | basenc --base64url | tr -d '=\n' 生成）应成功；用同一令牌按 WebSocket 子协议 ["xb-link","xiaoban-token.<令牌>"] 连 wss://link.xiangban.xyz/api/link/ws?device_id=<刚登记的设备编号>，应在 10 秒内收到状态帧并保持连接超过 5 分钟；最后 DELETE 这台设备清理现场。
+3. （带令牌，可选，没有令牌就写“跳过，由用户真机验证”）如果我给了测试账号的访问令牌（aud 为 xiaoban-android 或 xiaoban-desktop-wallpaper），则：POST /api/link/devices 登记一台名为“部署自检”的设备（body 为 {"kind":"desktop","name":"部署自检","install_id":"<openssl rand -hex 16 的输出>"}）应成功；用同一令牌按 WebSocket 子协议 ["xb-link","xiaoban-token.<令牌>"] 连 wss://link.xiangban.xyz/api/link/ws?device_id=<刚登记的设备编号>，应在 10 秒内收到状态帧并保持连接超过 5 分钟；最后 DELETE 这台设备清理现场。
 4. 重启 link 容器后 health 恢复，数据库数据仍在。
 5. 做一次 pg_dump 备份并确认文件非空，把备份命令写进部署目录的 README，说明回滚到旧镜像标签的步骤。
 
@@ -36,4 +36,4 @@
 ## 部署完成之后
 
 1. 桌面端和手机端的默认地址是 `https://link.xiangban.xyz/api/link`；域名不同要先改默认值再发版。
-2. 在 GitHub Actions 里运行 “BuildXiaoBanWallpaper”（勾选 `package_android_app`，可取消 `build_release`），下载 `xiaoban-android-debug-apk` 装到手机，桌面端“设置 → 连接手机”扫码配对，按 [LINK_DEPLOYMENT.md](../deployment/LINK_DEPLOYMENT.md) 第 5 条做一次真机完整场景，并把结果记到实施计划的 L3 一节。
+2. 在 GitHub Actions 里运行 “BuildXiaoBanWallpaper”（勾选 `package_android_app`，可取消 `build_release`），下载 `xiaoban-android-debug-apk` 装到手机，桌面端“设置 → 手机遥控”打开开关、手机登录同一账号后“我的电脑”自动出现，按 [LINK_DEPLOYMENT.md](../deployment/LINK_DEPLOYMENT.md) 第 5 条做一次真机完整场景，并把结果记到实施计划的 L3 一节。

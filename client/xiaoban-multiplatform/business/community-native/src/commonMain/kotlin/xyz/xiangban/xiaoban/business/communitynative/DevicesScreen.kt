@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -34,16 +33,13 @@ import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.link.PeerSummary
 
 /**
- * 设备管理页：
- * - 查看已配对的电脑列表（名称、ID、在线/离线状态）
- * - 解除电脑配对
- * - 绑定新电脑（输入或粘贴电脑端生成的配对串 `xbl1:...`）
+ * 我的电脑：同一账号下登录了小伴电脑版并打开「允许手机遥控」的电脑会自动出现在这里，不需要配对。
+ * 可以查看在线状态，也可以把不用的电脑从账号的设备列表里移除。
  */
 @Composable
 fun DevicesScreen(env: CommunityEnv, back: () -> Unit) {
     val remoteState by env.remoteChat.state.collectAsState()
-    var pairInput by remember { mutableStateOf("") }
-    var unpairTarget by remember { mutableStateOf<PeerSummary?>(null) }
+    var removeTarget by remember { mutableStateOf<PeerSummary?>(null) }
 
     LaunchedEffect(Unit) {
         env.remoteChat.refreshPeers()
@@ -58,96 +54,40 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit) {
                 .padding(Gutter),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            // 已配对电脑列表
-            Text("已连接的电脑", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("同账号下的电脑", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             if (remoteState.peers.isEmpty()) {
-                Box(
+                Column(
                     Modifier
                         .fillMaxWidth()
                         .clip(CardShape)
                         .background(MaterialTheme.colorScheme.surface)
                         .padding(20.dp),
-                    contentAlignment = Alignment.Center,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text("暂未绑定电脑，完成配对后可在手机上遥控电脑小伴", color = LocalExtraColors.current.ink3, fontSize = 13.sp)
+                    Text("还没有找到电脑", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text(
+                        "在电脑上登录同一个小伴账号，打开「设置 → 手机遥控」里的「允许手机遥控这台电脑」，电脑就会自动出现在这里。",
+                        color = LocalExtraColors.current.ink3,
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp,
+                    )
                 }
             } else {
                 remoteState.peers.forEach { peer ->
-                    PeerCard(
-                        peer = peer,
-                        onUnpair = { unpairTarget = peer },
-                    )
+                    PeerCard(peer = peer, onRemove = { removeTarget = peer })
                 }
             }
-
-            // 配对新电脑
-            Text("配对新电脑", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(CardShape)
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text(
-                    "在电脑端小伴中打开「设置 → 连接与网络」，点击「连接手机」生成二维码，或点击「复制配对串」并粘贴在下方：",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 13.sp,
-                    lineHeight = 20.sp,
-                )
-
-                OutlinedTextField(
-                    value = pairInput,
-                    onValueChange = {
-                        pairInput = it.trim()
-                        env.remoteChat.clearPairingError()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("配对串（xbl1:...）") },
-                    placeholder = { Text("粘贴 xbl1:... 开头的配对内容") },
-                    maxLines = 3,
-                )
-
-                if (remoteState.pairingError != null) {
-                    Text(remoteState.pairingError.orEmpty(), color = Brand, fontSize = 13.sp)
-                }
-
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    BrandButton(
-                        text = if (remoteState.pairingBusy) "配对中…" else "确认配对",
-                        onClick = {
-                            if (pairInput.isNotBlank()) {
-                                env.remoteChat.pair(pairInput)
-                                pairInput = ""
-                            }
-                        },
-                        enabled = !remoteState.pairingBusy && pairInput.startsWith("xbl1:"),
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-
-                Text(
-                    "安全提示：配对要求手机与电脑登录同一小伴账号。通信基于 P-256 ECDH 端到端加密，中转服务无法解密你的对话正文。",
-                    color = LocalExtraColors.current.ink3,
-                    fontSize = 11.5.sp,
-                    lineHeight = 17.sp,
-                )
-            }
+            remoteState.error?.let { Text(it, color = Brand, fontSize = 13.sp) }
         }
     }
 
-    // 解除配对确认弹窗
-    unpairTarget?.let { peer ->
+    // 移除确认弹窗
+    removeTarget?.let { peer ->
         Box(
             Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f))
-                .clickable(indication = null, interactionSource = null) { unpairTarget = null },
+                .clickable(indication = null, interactionSource = null) { removeTarget = null },
             contentAlignment = Alignment.Center,
         ) {
             Column(
@@ -159,15 +99,15 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit) {
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                Text("解除配对确认", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text("确定要解除与「${peer.name}」的配对吗？解除后手机将无法再遥控该电脑。", fontSize = 14.sp)
+                Text("移除这台电脑", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("确定要把「${peer.name}」从账号的设备列表里移除吗？它再次启动并开启手机遥控后会重新出现。", fontSize = 14.sp)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { unpairTarget = null }) { Text("取消") }
+                    TextButton(onClick = { removeTarget = null }) { Text("取消") }
                     TextButton(onClick = {
                         val id = peer.id
-                        unpairTarget = null
-                        env.remoteChat.unpair(id)
-                    }) { Text("解除配对", color = Brand) }
+                        removeTarget = null
+                        env.remoteChat.removePeer(id)
+                    }) { Text("移除", color = Brand) }
                 }
             }
         }
@@ -175,7 +115,7 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit) {
 }
 
 @Composable
-private fun PeerCard(peer: PeerSummary, onUnpair: () -> Unit) {
+private fun PeerCard(peer: PeerSummary, onRemove: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -203,10 +143,9 @@ private fun PeerCard(peer: PeerSummary, onUnpair: () -> Unit) {
                     )
                 }
             }
-            MetaText("设备编号：${peer.id}")
         }
         OutlinedButton(
-            onClick = onUnpair,
+            onClick = onRemove,
             shape = CardShape,
         ) {
             Text("移除", fontSize = 12.sp, color = Brand)
