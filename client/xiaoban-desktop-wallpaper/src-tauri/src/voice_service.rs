@@ -265,6 +265,7 @@ pub fn voice_service_status(app: tauri::AppHandle) -> Result<Value, String> {
         "mcpConfigSnippet": {
             "mcpServers": {
                 "xiaoban-voice": {
+                    "type": "http",
                     "url": mcp_url,
                     "headers": {
                         "Authorization": format!("Bearer {}", cfg.token)

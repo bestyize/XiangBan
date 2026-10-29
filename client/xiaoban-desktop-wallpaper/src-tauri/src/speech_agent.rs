@@ -114,8 +114,9 @@ pub async fn speech_agent_inject(
     request: InjectionRequest,
 ) -> Result<InjectionResult, String> {
     control(&window)?;
-    if request.text.trim().is_empty() {
-        return Err("注入内容不能为空".into());
+    // 文字可以为空（只按回车发送刚送进去的内容）；其余校验（应用名称、长度）在注入库里统一做。
+    if request.text.trim().is_empty() && !request.text.is_empty() {
+        return Err("注入内容不能只有空白".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
         injector::inject_text(request)
