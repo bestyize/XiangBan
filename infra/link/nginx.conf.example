@@ -1,8 +1,9 @@
 # 宿主机 Nginx 反代示例，放进 /etc/nginx/conf.d/。把 link.xiangban.xyz 换成你的域名；证书用 certbot 签发。
 # 桌面端默认连 https://link.xiangban.xyz/api/link，域名改了要同步改桌面端默认值。
 # limit_req_zone 必须位于 http 上下文，conf.d 下的文件已经在 http 里。
+# limit_req_status 不放在这里：它同一上下文里只能出现一次，服务器上别的配置（例如账号中心的限流文件）常常已经在 http 里写过，
+# 重复会让 nginx -t 报 duplicate。这里把它写在下面本站的 server 块里，只影响本站，不会冲突。
 
-limit_req_status 429;
 limit_req_zone $binary_remote_addr zone=link_api:10m rate=10r/s;
 limit_req_zone $binary_remote_addr zone=link_pair:10m rate=30r/m;
 
@@ -27,6 +28,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/link.xiangban.xyz/privkey.pem;
 
     server_tokens off;
+    limit_req_status 429;
     # REST 请求体很小；信封走 WebSocket，不受这个限制。
     client_max_body_size 64k;
     add_header Strict-Transport-Security "max-age=31536000" always;

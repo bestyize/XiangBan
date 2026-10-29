@@ -40,7 +40,8 @@ curl -fsS http://127.0.0.1:55030/api/link/health
 
 1. `curl -fsS https://<域名>/api/link/health` 返回 JSON。
 2. 不带令牌访问 `GET /api/link/devices` 返回 401（`unauthorized`）。
-3. 用一个测试账号的访问令牌（`aud` 为 `xiaoban-desktop-wallpaper` 或 `xiaoban-android`）调用 `POST /api/link/devices`（`{"kind":"desktop","name":"部署自检","public_key":"<32 字节随机数的 base64>"}`）应返回设备编号；再 `DELETE /api/link/devices/<编号>` 清理。
+3. （带令牌，可选；令牌约 30 分钟有效，没有就跳过，以第 5 条真机为准）用一个测试账号的访问令牌（`aud` 为 `xiaoban-desktop-wallpaper` 或 `xiaoban-android`）调用 `POST /api/link/devices`（`{"kind":"desktop","name":"部署自检","public_key":"<见下>"}`）应返回设备编号；再 `DELETE /api/link/devices/<编号>` 清理。
+   `public_key` 必须是 **base64url（无填充）编码的 65 字节 P-256 未压缩点（以 `0x04` 开头）**，否则返回 400。自检用的假公钥可以这样生成：`openssl ecparam -name prime256v1 -genkey -noout | openssl ec -pubout -outform DER 2>/dev/null | tail -c 65 | basenc --base64url | tr -d '=\n'`。
 4. 用同一令牌通过 WebSocket 子协议 `["xb-link","xiaoban-token.<令牌>"]` 连 `wss://<域名>/api/link/ws?device_id=<编号>`，应在 10 秒内收到状态帧，连接保持一小时以上不被 Nginx 断开。
 5. 最终以真机为准：桌面端“设置 → 连接手机”出二维码，手机扫码配对成功，手机发一条消息电脑能收到。
 

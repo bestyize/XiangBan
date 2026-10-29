@@ -4,6 +4,8 @@
 
 手机端的地址都在 `CommunityConfig`（`common/community-core`）：论坛 `https://chat.xiangban.xyz`、账号 `https://account.xiangban.xyz`、AI 网关 `https://ai.xiangban.xyz`，客户端编号 `xiaoban-android`；中转 `https://link.xiangban.xyz/api/link`（桌面端默认值，手机端经桌面二维码拿到地址）。
 
+> **关于令牌**：标注“带令牌”的检查需要一张测试账号的访问令牌，它只有约 30 分钟有效（手机 app 会自动续期，手工拿的不会）。可以不提供：这些项标“跳过”，最后以第 5 节的真机配对为准，那一步用的是 app 自己登录、自己续期的令牌。
+
 ## 依赖关系与顺序
 
 ```
@@ -24,13 +26,13 @@
 
 - **要求**：令牌 `aud` 必须属于某个已启用的产品，否则返回 403。这是后台数据，不是代码：在 AI 网关管理后台「产品与档位」里，把 `xiaoban-android` 加进现有小伴产品的 `client_ids`（和 `xiaoban-desktop-wallpaper` 同一个产品，才能沿用同一份试用额度）。**一个客户端只能属于一个产品**，加之前先确认它没有出现在别的产品里。
 - **如果还没部署**（`services/server-ai/README.md` 写的是“未部署”，而桌面端默认就连 `https://ai.xiangban.xyz`，先确认线上到底有没有）：它依赖 New API 网关，部署和后台配置另行处理；默认端口 55010 与论坛、市场的默认端口相同，同机部署前先用 `ss -ltnp` 看清占用，改 `AI_PORT`。
-- **检查**：用测试账号的令牌（`aud=xiaoban-android`）调用 `GET /api/ai/tiers` 和 `GET /api/ai/balance`（只读，不会触发开通），应为 200 而不是 403。
+- **检查**（带令牌，可选）：用测试账号的令牌（`aud=xiaoban-android`）调用 `GET /api/ai/tiers` 和 `GET /api/ai/balance`（只读，不会触发开通），应为 200 而不是 403。
 
 ## 3. server-forum（论坛，手机社区的登录操作）
 
 - **要求**：包含 `FORUM_ACCOUNT_EXTRA_CLIENT_IDS` 的版本（默认值就是 `xiaoban-android`，不设环境变量即可）。旧版本只接受网页的 `forum-web`，手机上发帖、评论、点赞、“我的”会被拒绝。网页的 `FORUM_ACCOUNT_CLIENT_ID` 保持不变。
 - **部署方式**（见论坛 README 末尾）：香港机 `/home/ubuntu/xiangban-forum`，systemd 服务 `server-forum`，监听 `127.0.0.1:55010`；本地交叉编译后替换二进制和 `web/dist`，重启服务。库迁移在启动时自动完成，不需要手工改库。
-- **检查**：先看启动日志里有 `extra_clients=["xiaoban-android"]`；再用测试账号的令牌（`aud=xiaoban-android`）调用 `GET /api/me/points`（需要登录的只读接口）应为 200；用 `aud=forum-web` 的网页登录仍然正常；其他 `aud` 仍然 401。
+- **检查**：先看启动日志里有 `extra_clients=["xiaoban-android"]`；再（带令牌，可选）用测试账号的令牌（`aud=xiaoban-android`）调用 `GET /api/me/points`（需要登录的只读接口）应为 200；用 `aud=forum-web` 的网页登录仍然正常；其他 `aud` 仍然 401。
 
 ## 4. server-link（互联中转，新服务）
 
