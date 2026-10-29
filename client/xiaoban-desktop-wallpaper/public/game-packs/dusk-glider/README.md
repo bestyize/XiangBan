@@ -11,8 +11,8 @@ A landscape 3D glide game over a sunset archipelago, rendered with three.js. A p
 
 ## Files
 
-- `rules.js` — the deterministic simulation (`XiabanDuskGlider`): seeded island terrain built from cosine-interpolated peaks and valleys, glide physics, landing judgement, daylight and scoring. It has no DOM access. `client/xiaban-web/src/games/dusk-glider/rules.test.ts` runs this exact file.
-- `vendor/three.min.js` — a three.js r186 subset as a classic script exposing `THREE`. The host iframe has an opaque origin, so the pack cannot load ES modules. The export list is `client/xiaban-web/scripts/dusk-glider-three.js`; rebuild with `npm run build:glider-three` after changing it or bumping the pinned `three` dev dependency.
+- `rules.js` — the deterministic simulation (`XiabanDuskGlider`): seeded island terrain built from cosine-interpolated peaks and valleys, glide physics, landing judgement, daylight and scoring. It has no DOM access.
+- `vendor/three.min.js` — a three.js r186 subset exposed as a classic script for the sandboxed iframe.
 - `world.js` — the 3D world: streamed low-poly heightfield chunks around the track line (z = 0), distant ranges, a shader sea with sky reflection and sun glitter, a gradient sky with sun, moon and stars, clouds, sun / fill / hemisphere lights with a shadow map following the bird, and time-of-day keyframes driven by the remaining daylight. Seven biomes cycle by island.
 - `props.js` — per-chunk props for each biome (trees, houses, windmills, lighthouses, lanterns, fences, flowers…) merged into one or two meshes per chunk, plus ambient sailboats, balloons, flocks and night fireflies.
 - `bird.js` — the origami bird with pitch, wing fold and flap poses, its wind ribbon, a contact shadow and the particle effects.

@@ -3,7 +3,3 @@ services:
   server:
     build:
       dockerfile: services/xiaban-api/backend/Dockerfile.runtime
-  web:
-    build:
-      args:
-        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}

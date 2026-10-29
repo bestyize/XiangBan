@@ -17,5 +17,3 @@
 `rules.js` 提供纯规则函数，`game.js` 处理界面、输入以及版本 1 的宿主握手和退出协议。两个脚本使用普通 `defer` 加载，可直接运行在仅允许脚本的 iframe 中。
 
 分享按钮通过版本 1 的 `game.share` 消息把本局结果交给宿主；独立打开时进入公开战绩分享页。宿主可保存游戏记录，游戏包自身不调用账户或记录 API。
-
-规则测试位于 `client/xiaban-web/src/games/merge-2048/rules.test.ts`，与网站测试一起通过 `npm test` 执行。

@@ -7,7 +7,7 @@
 - Android、iOS：Kotlin Multiplatform + Compose Multiplatform，Gradle 工程在本目录根（`settings.gradle.kts`）。
 - 桌面：`desktopApp/`，Rust + Tauri 2 的独立工程，不在 Gradle 里，也不依赖 Kotlin 代码。
 
-允许与其他客户端重复代码；不要强行套用网页 UI 或全局共享实现。可选择引用 services/xiaban-api/api-contracts，也可以维护自己的模型。
+允许与其他客户端重复代码；不要强行套用网页 UI 或全局共享实现。各客户端维护自己的协议模型。
 
 ## 模块
 
@@ -55,7 +55,7 @@ cargo build --release --features custom-protocol   # 发布二进制（内嵌启
 
 ## 边界
 
-页面本身由 xiaban.xyz 提供，三端都没有实现 App 桥接协议（`client/xiaban-web/src/lib/bridge.ts`），也没有注入 `window.XiabanBridge`，网页按普通浏览器运行；注入后网页会在首次会话前等待 App 的 token，实现桥接时一并处理。Android/iOS 的系统栏边距按系统深浅色填充，网页若让用户单独选择深浅色，两者不一致时会有色差。
+页面本身由 xiaban.xyz 提供，三端都没有实现 App 桥接协议，也没有注入 `window.XiabanBridge`，网页按普通浏览器运行；注入后网页会在首次会话前等待 App 的 token，实现桥接时一并处理。Android/iOS 的系统栏边距按系统深浅色填充，网页若让用户单独选择深浅色，两者不一致时会有色差。
 
 桌面壳不给网页任何 Tauri 能力：`tauri.conf.json` 没有 capability，远程页面不能调用本地命令。站内只放行 `https://xiaban.xyz` 及其子域（默认端口），其他 http/https 链接、`mailto:`、`tel:` 交给系统打开，其余协议（`file:`、`javascript:`、`data:`、`blob:` 等）一律拦截。窗口数据（登录令牌所在的 localStorage）由系统 WebView 按应用标识 `xyz.xiangban.xiaoban` 持久化。
 

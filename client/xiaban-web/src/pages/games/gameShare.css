@@ -1,6 +1,0 @@
-.game-share-page { width: min(100%, 480px); min-height: 100dvh; margin: 0 auto; padding: calc(var(--safe-top, 0px) + 16px) 20px 0; background: var(--color-canvas); color: var(--color-ink); }
-.game-share-play { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; margin-top: 16px; padding: 12px 16px; border: 1px solid var(--color-line); border-radius: 16px; background: var(--color-surface); color: var(--color-ink); font-size: 14px; font-weight: 600; }
-.game-share-play span { color: var(--color-brand); font-size: 20px; }
-.game-share-invalid { display: flex; flex: 1; flex-direction: column; justify-content: center; padding-bottom: 80px; }
-.game-share-invalid h1 { font-size: 24px; font-weight: 750; line-height: 1.5; }
-.game-share-invalid p { margin: 12px 0 28px; font-size: 14px; line-height: 1.8; color: var(--color-muted); }

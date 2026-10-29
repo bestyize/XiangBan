@@ -20,18 +20,15 @@
 | `forum` | 论坛 | `xiangban-forum` | 香港机 systemd 服务 `server-forum`（用 bundle 替换文件） |
 | `link` | 手机与桌面互联中转 | `xiangban-link` | Docker 栈 `infra/link` |
 | `market` | 小伴市场 | `xiangban-market` | Docker 栈 `infra/market` |
-| `appstore` | 小伴应用商店 | `xiangban-appstore` | 先确认 |
 | `resource` | 资源文件服务 | `xiangban-resource` | 先确认 |
 | `wallpaper-collect` | 壁纸采集服务 | `xiangban-wallpaper-collect` | 先确认 |
-| `api` | 主站后端 | `xiaban-server` | 主站 Docker 栈 `infra/compose.yaml` |
-| `web` | 主站网页 | `xiaban-web` | 同上 |
 
-`server-asr`、`server-edgetts`、`server-websearch` 目前只有说明文档、没有代码，`server-pan` 是独立项目，都不在清单里。
+
 
 每个服务在 Release 里有两个包：
 
 - `<镜像>-<标签>.tar.gz`：`docker save` 的镜像，`docker load` 就能用。`<标签>` 是提交前 12 位。
-- `<镜像>-<标签>-bundle.tar.gz`：二进制和前端静态资源，给不用 Docker 的主机直接替换文件（`api`、`web` 没有这个包）。
+- `<镜像>-<标签>-bundle.tar.gz`：二进制和前端静态资源，给不用 Docker 的主机直接替换文件。
 
 另有 `SHA256SUMS`（所有包的校验和）和 `manifest.json`（每个服务的镜像标签、文件名、校验和、端口、健康检查路径、部署栈和文档）。**更新服务前先用 manifest.json 对表，不要凭记忆。**
 
@@ -55,7 +52,7 @@ gh release list --limit 30 --json tagName --jq '[.[] | select(.tagName | startsw
 
 注意：
 
-- **选哪些服务看改了什么。** 看上次部署的提交（上一个 server-… Release 的 `manifest.json` 里有 `commit`）到现在改过哪些目录：`services/server-<x>/`、`services/xiaban-api/`、`client/xiaban-web/` 对应各自的服务；`libs/` 下的改动会影响所有依赖它的 Rust 服务（用 `grep -rn 'path = "../../libs' services/*/Cargo.toml` 查），拿不准就多选，不要漏。
+- **选哪些服务看改了什么。** 看上次部署的提交（上一个 server-… Release 的 `manifest.json` 里有 `commit`）到现在改过哪些目录：`services/server-<x>/` 对应各自的服务；`libs/` 下的改动会影响所有依赖它的 Rust 服务（用 `grep -rn 'path = "../../libs' services/*/Cargo.toml` 查），拿不准就多选，不要漏。
 - 在 `main` 上打包；分支上的提交没合入就不要部署到线上。
 - 同样的输入重复触发会取消前一次还在跑的那个。
 - 手机 App 和桌面版是客户端，不用 SSH 更新：打包成功后产物就在 `xiaoban-wallpaper-v<版本>` Release 里。
@@ -124,12 +121,11 @@ journalctl -u server-forum -n 50 --no-pager
 
 镜像 `xiangban-forum` 也已经打好，将来要把论坛迁到 Docker 时直接可用（需要挂 `/data` 存上传文件，并配 `FORUM_DATABASE_URL`、账号中心地址等环境变量，见论坛 README）；迁移前不要在线上用它替换 systemd 版本。
 
-### 4.3 现状不明的服务（`ai`、`appstore`、`resource`、`wallpaper-collect`、`api`、`web`）
+### 4.3 现状不明的服务（`ai`、`resource`、`wallpaper-collect`）
 
-**先只读摸清**：`docker ps`、`systemctl list-units --type=service | grep -i -E 'ai|appstore|resource|wallpaper|xiaban'`、`ss -ltnp`、各部署目录。确认它是 Docker 还是 systemd 之后，分别照 4.1 / 4.2 做。拿不准或发现和文档不一致，停下来问人，不要自己猜着改。
+**先只读摸清**：`docker ps`、`systemctl list-units --type=service | grep -i -E 'ai|resource|wallpaper|xiaban'`、`ss -ltnp`、各部署目录。确认它是 Docker 还是 systemd 之后，分别照 4.1 / 4.2 做。拿不准或发现和文档不一致，停下来问人，不要自己猜着改。
 
 - `ai`（AI 网关）：同机常见端口冲突，镜像默认端口 55040，实际用的端口以服务器配置为准；它在 `/data` 里生成并保存 `master.key`，**更新时数据目录必须保持不变**，丢了会解不开已存的上游密钥。
-- `api` / `web`（主站）：镜像是 `xiaban-server`、`xiaban-web`，用 `infra/compose.yaml`；`web` 在构建时把站点地址写进前端，默认 `https://xiaban.xyz`，其他域名要重新打包。
 
 ## 5. 更新后的检查
 

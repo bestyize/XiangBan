@@ -18,7 +18,7 @@ The design baseline (art style, gameplay, level layout, tuning values and the co
 ## Files
 
 - `levels.js` — level data (`XiabanInkLevels`): each 卷's world (areas, platforms, tutorial prompts, encounters and their waves, and in 雪江卷 its `icicles`, `thinIce`, `iceZones`, `reeds` and `wind`) and each 幅 (its window of the world, start, encounters, par time, hit budget, 技 challenge and grade thresholds).
-- `rules.js` — the deterministic simulation (`XiabanInkBlade`): player physics, combat, enemy and boss AI, encounters, scoring, seals and grades. It has no DOM access. `client/xiaban-web/src/games/ink-blade/rules.test.ts` runs this exact file.
+- `rules.js` — the deterministic simulation (`XiabanInkBlade`): player physics, combat, enemy and boss AI, encounters, scoring, seals and grades. It has no DOM access.
 - `progress.js` — the save document (`XiabanInkProgress`): validates untrusted saves, records clears and unlocks 幅. Tested by `progress.test.ts`.
 - `art.js` — procedural painting: paper grain, ink-wash mountains with 皴 texture strokes and 点苔 tree dots, bamboo, ground, water, props, splashes, sun and moon. For 雪江卷 it also paints snowfields left as bare paper, snow pine forests, snow-laden rocks, plum boughs and ink clouds. Long parallax layers are split into chunks no wider than 2048 px.
 - `figures.js` — skeletal ink figures with smoothed poses, a bent-wrist one-handed sword grip, two-handed spears, hammers and rods, fluttering robes, the Verlet scarf, crows and straw dummies.
@@ -29,7 +29,7 @@ The design baseline (art style, gameplay, level layout, tuning values and the co
 
 ## Host
 
-The manifest sets `orientation: "landscape"`, and `viewport.js` rotates the game when the phone is held in portrait, exactly like the snake pack. The game reports `game.progress` / `game.result` with `score`, `lines` (kills) and `maxTile` (best combo). The desktop build has no result sharing; on the web, the shared `result-share.js` sends `{ score, lines: kills, maxTile: maxCombo, level: cleared ? 1 : 0, steps: parries, stage: levelCode, seals, grade }`, and `client/xiaban-web/src/games/ink-blade/index.ts` labels these as 击败 / 最高连击 / 弹反 and gives 小伴 its poster line. Share links use version 2 of the fragment; version 1 links from the single-scroll release still open, as 长卷.
+The manifest sets `orientation: "landscape"`. The game reports `game.progress` / `game.result` with `score`, `lines` (kills) and `maxTile` (best combo). The desktop build has no result sharing.
 
 The manifest also sets `"save": true`. The host passes the save document in `host.init` and the game sends `game.save` after every finished round and when the difficulty changes. Inside the host's sandboxed iframe the pack has no storage of its own. Opened directly (without the host, for development), it keeps progress in that page's `localStorage` under `xiaban.ink-blade.save` when storage is available, and in memory otherwise. Add `?debug=1` to expose `__ink.advance(seconds)` for stepping frames in hidden preview tabs.
 

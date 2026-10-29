@@ -10,7 +10,7 @@ name: BuildXiaoBanWallpaper
 #
 # 二、服务端镜像 → 单独的 GitHub Release server-<UTC 时间>-<提交前 7 位>（每次运行一个，只保留最近 5 个）
 #   servers  要打包的服务编号，逗号分隔，或 all；留空不打包。编号见 infra/images/services.json：
-#            account、ai、forum、link、market、appstore、resource、wallpaper-collect、api、web
+#            account、ai、forum、link、market、resource、wallpaper-collect
 #   每个服务产出 <镜像>-<标签>.tar.gz（docker load 用）和 <镜像>-<标签>-bundle.tar.gz（二进制 + 前端，非 Docker 主机用），
 #   外加 SHA256SUMS 和 manifest.json（服务、镜像标签、文件、校验和、部署文档位置）。
 #   拿到 Release 后怎么更新线上服务：docs/deployment/RELEASE_AND_DEPLOY.md
@@ -32,7 +32,7 @@ on:
         type: boolean
         default: true
       servers:
-        description: 要打包的服务端镜像（编号逗号分隔，或 all；留空不打包）。可选 account、ai、forum、link、market、appstore、resource、wallpaper-collect、api、web
+        description: 要打包的服务端镜像（编号逗号分隔，或 all；留空不打包）。可选 account、ai、forum、link、market、resource、wallpaper-collect
         type: string
         default: ''
 

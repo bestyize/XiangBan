@@ -41,14 +41,6 @@
       "doc": "docs/deployment/MARKET_DEPLOYMENT.md"
     },
     {
-      "id": "appstore", "title": "小伴应用商店", "image": "xiangban-appstore", "kind": "rust",
-      "crate": "services/server-xiaoban-appstore", "bin": "server-xiaoban-appstore", "uid": 10005, "user": "appstore",
-      "web": { "dir": "services/server-xiaoban-appstore/web", "env": "APPSTORE_WEB_DIR" },
-      "env": { "APPSTORE_HOST": "0.0.0.0", "APPSTORE_PORT": "55050" }, "portEnv": "APPSTORE_PORT", "port": 55050,
-      "health": "/api/health", "stack": null, "tagVar": null,
-      "doc": "services/server-xiaoban-appstore/README.md"
-    },
-    {
       "id": "resource", "title": "资源文件服务", "image": "xiangban-resource", "kind": "rust",
       "crate": "services/server-resource", "bin": "server-resource", "uid": 10006, "user": "resource",
       "env": { "RESOURCE_HOST": "0.0.0.0", "RESOURCE_PORT": "55020", "RESOURCE_DATA_DIR": "/data" }, "portEnv": "RESOURCE_PORT", "port": 55020,
@@ -62,17 +54,6 @@
       "env": { "SERVER_HOST": "0.0.0.0", "SERVER_PORT": "8080" }, "portEnv": "SERVER_PORT", "port": 8080,
       "health": "/health", "stack": null, "tagVar": null,
       "doc": "services/server-xiangban-wallpaper/README.md"
-    },
-    {
-      "id": "api", "title": "主站后端（xiaban-api）", "image": "xiaban-server", "kind": "docker",
-      "dockerfile": "services/xiaban-api/backend/Dockerfile", "context": ".",
-      "port": 8080, "stack": "infra", "doc": "docs/deployment/DEPLOYMENT.md"
-    },
-    {
-      "id": "web", "title": "主站网页（xiaban-web）", "image": "xiaban-web", "kind": "docker",
-      "dockerfile": "client/xiaban-web/Dockerfile", "context": ".",
-      "buildArgs": { "VITE_PUBLIC_URL": "https://xiaban.xyz", "VITE_DATA_OVERSEAS": "true" },
-      "port": 80, "stack": "infra", "doc": "docs/deployment/DEPLOYMENT.md"
     }
   ]
 }

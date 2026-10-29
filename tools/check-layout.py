@@ -18,20 +18,13 @@ def source_files(directory, pattern):
             yield file
 
 entrypoints = {
-    'client/xiaban-web': 'package.json',
     'client/xiaoban-desktop-wallpaper': 'src-tauri/Cargo.toml',
-    'client/xiaoban-pot-garden': 'package.json',
-    'client/xiaoban-mobile-wallpaper': 'app/build.gradle.kts',
-    'services/xiaban-api/backend': 'build.gradle.kts',
-    'services/xiaban-api/api-contracts': 'build.gradle.kts',
-    'services/server-pan': 'backend/Cargo.toml',
+    'client/xiaoban-multiplatform': 'androidApp/build.gradle.kts',
     'services/server-xiangban-wallpaper': 'Cargo.toml',
-    'services/server-xiaoban-appstore': 'Cargo.toml',
     'services/server-account': 'Cargo.toml',
     'libs/agent-kernel': 'Cargo.toml',
 }
-planned = ['client/xiaoban-multiplatform', 'client/xiaoban-realbot',
-           'services/server-asr', 'services/server-edgetts', 'services/server-websearch']
+planned = []
 for project in [*entrypoints, *planned]:
     if not (ROOT/project/'README.md').is_file(): fail(f'Missing project README: {project}')
 for project, entrypoint in entrypoints.items():
@@ -41,7 +34,7 @@ for old in ['web', 'server', 'shared', 'deploy', 'compose.yaml']:
 
 for directory in [ROOT/'client', ROOT/'services', ROOT/'infra', ROOT/'docs']:
     for readme in source_files(directory, '*.md'):
-        text = readme.read_text(encoding='utf-8-sig')
+        text = re.sub(r'`[^`\n]*`', '', readme.read_text(encoding='utf-8-sig'))
         for match in re.finditer(r'\[[^\]]*\]\(([^\n)]+)\)', text):
             target = match.group(1).strip().strip('<>')
             if urlsplit(target).scheme or target.startswith('#'): continue
@@ -62,7 +55,7 @@ for project in (ROOT/'client').iterdir():
         for file in source_files(project, suffix):
             for target in imports.findall(file.read_text(encoding='utf-8-sig')):
                 resolved = (file.parent/target).resolve()
-                if not resolved.is_relative_to(project.resolve()):
+                if resolved.is_relative_to((ROOT/'client').resolve()) and not resolved.is_relative_to(project.resolve()):
                     fail(f'Cross-client source import: {file.relative_to(ROOT)} -> {target}')
 
 if ERRORS:

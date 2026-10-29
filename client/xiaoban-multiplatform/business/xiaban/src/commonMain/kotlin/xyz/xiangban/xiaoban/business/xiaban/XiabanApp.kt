@@ -7,7 +7,7 @@ import xyz.xiangban.xiaoban.common.webview.WebShell
 import xyz.xiangban.xiaoban.common.webview.WebShellConfig
 import xyz.xiangban.xiaoban.common.webview.WebShellPalette
 
-/** xiaban.xyz in a native frame. Colors are the site's own light and dark tokens (client/xiaban-web/src/index.css). */
+/** xiaban.xyz in a native frame. Colors are the site's own light and dark tokens. */
 val XiabanWebConfig = WebShellConfig(
     homeUrl = "https://xiaban.xyz",
     internalHosts = setOf("xiaban.xyz"),
