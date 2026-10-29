@@ -32,7 +32,7 @@ private class FakeMic : VoicePlatform {
         Thread {
             var n = 0
             while (running.get()) {
-                val amplitude = if (n in 20 until 70) 3000 else 0
+                val amplitude = if (n % 200 in 20 until 70) 3000 else 0
                 val frame = ByteArray(640)
                 for (i in 0 until 320) {
                     val v = if (amplitude == 0) ((i * 7 + n) % 40 - 20) else (amplitude * sin(2 * PI * (i + n * 320) * 220 / 16000)).toInt()

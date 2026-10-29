@@ -42,13 +42,18 @@ class SharedPrefsTokenStorage(context: Context) : TokenStorage {
 }
 
 /** 复制、系统分享、用浏览器打开链接。 */
-class AndroidPlatformActions(private val context: Context, requestMic: suspend () -> Boolean = { false }) : PlatformActions {
+class AndroidPlatformActions(
+    private val context: Context,
+    private val gate: () -> xyz.xiangban.xiaoban.common.community.SpeechGate? = { null },
+    requestMic: suspend () -> Boolean = { false },
+) : PlatformActions {
     private val voice = AndroidVoice(context, requestMic)
 
     override suspend fun startRecording(): Boolean = voice.start()
     override fun stopRecording(): ByteArray? = voice.stop()
     override fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean = voice.play(bytes, onDone)
     override fun stopAudio() = voice.stopPlayback()
+    override fun speechGate() = gate()
     override suspend fun streamRecording(onFrame: (ByteArray) -> Unit): (() -> Unit)? = voice.stream(onFrame)
     override fun listenOnce(onPartial: (String) -> Unit, onResult: (String?, String?) -> Unit): (() -> Unit)? = voice.listenOnce(onPartial, onResult)
 
@@ -72,8 +77,16 @@ class AndroidPlatformActions(private val context: Context, requestMic: suspend (
     private var ttsWaiting: Pair<String, String>? = null
     private val ttsDone = java.util.concurrent.ConcurrentHashMap<String, (Boolean) -> Unit>()
 
-    private fun speakWith(text: String, utteranceId: String): Boolean {
+    /** 通话里的朗读按通话的声音类型播放（配合回声消除）；单独点“朗读”按钮时按普通媒体播放。 */
+    private var ttsForCall = false
+
+    private fun speakWith(text: String, utteranceId: String, forCall: Boolean = false): Boolean {
         if (ttsFailed) return false
+        if (forCall != ttsForCall) {
+            ttsForCall = forCall
+            val usage = if (forCall) android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION else android.media.AudioAttributes.USAGE_MEDIA
+            tts?.setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(usage).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+        }
         val engine = tts ?: TextToSpeech(context.applicationContext) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
             ttsFailed = !ttsReady
@@ -81,6 +94,7 @@ class AndroidPlatformActions(private val context: Context, requestMic: suspend (
             ttsWaiting = null
             if (ttsReady) {
                 tts?.language = Locale.CHINA
+                if (ttsForCall) tts?.setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
                 tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
                     override fun onDone(utteranceId: String?) { utteranceId?.let { ttsDone.remove(it)?.invoke(true) } }
@@ -101,7 +115,7 @@ class AndroidPlatformActions(private val context: Context, requestMic: suspend (
     override fun speakText(text: String, onDone: (Boolean) -> Unit): Boolean {
         val id = "call-${System.nanoTime()}"
         ttsDone[id] = onDone
-        val started = speakWith(text.take(3900), id)
+        val started = speakWith(text.take(3900), id, forCall = true)
         if (!started) ttsDone.remove(id)
         return started
     }

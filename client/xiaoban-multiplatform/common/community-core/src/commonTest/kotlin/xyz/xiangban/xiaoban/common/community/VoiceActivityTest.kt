@@ -68,6 +68,65 @@ class VoiceActivityTest {
     }
 
     @Test
+    fun `with a judge a finished sentence ends after a short pause but an unfinished one is waited out`() {
+        // 说完了：停顿约 0.35 秒时被问一次，回答“完整”后立刻结束。
+        var vad = EndpointDetector(useJudge = true)
+        var result: VadResult? = null
+        var ask: VadResult? = null
+        var silentFrames = 0
+        repeat(15) { vad.feed(frame(0, it)) }
+        repeat(50) { vad.feed(frame(3000, it)) }
+        while (ask == null && silentFrames < 100) { result = vad.feed(frame(0, silentFrames)); silentFrames++; if (result.ask != null) ask = result }
+        assertNotNull(ask, "停顿后该问一次")
+        assertTrue(silentFrames * 20 in 340..400, "${silentFrames * 20}ms")
+        vad.verdict(ask.askTicket, true)
+        val ended = vad.feed(frame(0, 0))
+        assertNotNull(ended.utterance)
+        assertTrue(ended.utterance!!.size / 32000.0 in 1.2..1.8, "${ended.utterance!!.size}")
+
+        // 没说完：回答“不完整”，不会结束，隔一会儿再问，直到停顿 1.6 秒。
+        vad = EndpointDetector(useJudge = true)
+        repeat(15) { vad.feed(frame(0, it)) }
+        repeat(50) { vad.feed(frame(3000, it)) }
+        var asks = 0
+        var finished: VadResult? = null
+        for (i in 0 until 200) {
+            val r = vad.feed(frame(0, i))
+            if (r.ask != null) { asks++; vad.verdict(r.askTicket, false) }
+            if (r.utterance != null) { finished = r; break }
+        }
+        assertEquals(2, asks)
+        assertNotNull(finished, "停顿太久还是要结束")
+    }
+
+    @Test
+    fun `an old verdict does not count once the speaker talks again`() {
+        val vad = EndpointDetector(useJudge = true)
+        repeat(15) { vad.feed(frame(0, it)) }
+        repeat(50) { vad.feed(frame(3000, it)) }
+        var staleTicket = -1
+        for (i in 0 until 40) { val r = vad.feed(frame(0, i)); if (r.ask != null) staleTicket = r.askTicket }
+        assertTrue(staleTicket >= 0)
+        repeat(10) { vad.feed(frame(3000, it)) }       // 又开口了
+        vad.verdict(staleTicket, true)                  // 迟到的旧回答
+        val r = vad.feed(frame(3000, 0))
+        assertNull(r.utterance)
+    }
+
+    @Test
+    fun `strict mode only accepts clearly loud voices`() {
+        fun speaks(strict: Boolean): Boolean {
+            val vad = EndpointDetector(strict = strict)
+            var r: VadResult? = null
+            repeat(15) { vad.feed(frame(0, it)) }
+            repeat(40) { r = vad.feed(frame(700, it)) }
+            return r!!.speaking
+        }
+        assertTrue(speaks(false))
+        assertTrue(!speaks(true))
+    }
+
+    @Test
     fun `wav has a proper header`() {
         val wav = pcm16ToWav(ByteArray(100))
         assertEquals(144, wav.size)

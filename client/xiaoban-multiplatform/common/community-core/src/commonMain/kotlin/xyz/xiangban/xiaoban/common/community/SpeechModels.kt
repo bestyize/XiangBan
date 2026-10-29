@@ -70,12 +70,20 @@ interface LocalSpeech {
     val recognizer: RecognizerEngine
 }
 
+/** 手机上本地语音需要的全部模型：SenseVoice（识别）加 Silero VAD（判断有没有人在说话），和电脑端 `voice_turn` 用的是同一个 Silero 文件。 */
+object VoiceModels {
+    const val SileroName = "silero_vad.onnx"
+    val Silero = ModelSpec(SileroName, 2_327_524, "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3")
+    val Files: List<ModelSpec> = SenseVoiceModel.Files + Silero
+    val TotalBytes: Long = Files.sumOf { it.bytes }
+}
+
 /** 管理本地语音识别模型：是否齐了、下载并校验。 */
 class SpeechModels(
     private val client: HttpClient,
     val files: ModelFiles,
     private val source: String = SenseVoiceModel.Source,
-    private val specs: List<ModelSpec> = SenseVoiceModel.Files,
+    private val specs: List<ModelSpec> = VoiceModels.Files,
 ) {
     val ready: Boolean get() = specs.all { files.size(it.name) == it.bytes }
 

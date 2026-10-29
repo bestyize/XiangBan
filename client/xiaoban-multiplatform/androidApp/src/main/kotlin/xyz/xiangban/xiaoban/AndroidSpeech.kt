@@ -16,6 +16,11 @@ import xyz.xiangban.xiaoban.common.community.ModelFiles
 import xyz.xiangban.xiaoban.common.community.ModelWriter
 import xyz.xiangban.xiaoban.common.community.RecognizerEngine
 import xyz.xiangban.xiaoban.common.community.SenseVoiceModel
+import xyz.xiangban.xiaoban.common.community.SpeechGate
+import xyz.xiangban.xiaoban.common.community.VoiceModels
+import com.k2fsa.sherpa.onnx.SileroVadModelConfig
+import com.k2fsa.sherpa.onnx.Vad
+import com.k2fsa.sherpa.onnx.VadModelConfig
 
 /** 语音模型放在应用私有目录 `files/speech/`；下载先写 `.part` 临时文件，校验通过才改名。 */
 class AndroidModelFiles(context: Context) : ModelFiles {
@@ -50,6 +55,7 @@ class AndroidModelFiles(context: Context) : ModelFiles {
  */
 class SherpaRecognizer(private val files: ModelFiles) : RecognizerEngine {
     override val name = "手机上的语音识别"
+    override val local = true
     private var recognizer: OfflineRecognizer? = null
     private val lock = Any()
 
@@ -90,7 +96,58 @@ class SherpaRecognizer(private val files: ModelFiles) : RecognizerEngine {
     }
 }
 
+/**
+ * Silero VAD（sherpa-onnx）：每 512 个采样算一次“这是人声”的概率，和电脑端 `voice/turn/segmenter.ts` 一样，
+ * 概率 ≥ 0.5 算人声，小伴自己在说话时要 ≥ 0.75（它的回声不能被当成用户开口）。
+ */
+class SileroGate(modelPath: String) : SpeechGate {
+    private val vad = Vad(
+        config = VadModelConfig(
+            sileroVadModelConfig = SileroVadModelConfig(model = modelPath, threshold = 0.5f, minSilenceDuration = 0.1f, minSpeechDuration = 0.05f, windowSize = Window, maxSpeechDuration = 30f),
+            sampleRate = 16000, numThreads = 1, provider = "cpu",
+        ),
+    )
+    private val window = FloatArray(Window)
+    private var filled = 0
+    private var probability = 0f
+    private var level = 0f
+
+    override fun level(frame: ByteArray): Float = level
+
+    override fun voiced(frame: ByteArray, strict: Boolean): Boolean {
+        var peak = 0f
+        for (i in 0 until frame.size / 2) {
+            val sample = (((frame[2 * i + 1].toInt() shl 8) or (frame[2 * i].toInt() and 0xFF)).toShort()) / 32768f
+            peak = maxOf(peak, kotlin.math.abs(sample))
+            window[filled++] = sample
+            if (filled == Window) {
+                probability = vad.compute(window)
+                filled = 0
+            }
+        }
+        level = (peak * 3f).coerceIn(0f, 1f)
+        return probability >= if (strict) 0.75f else 0.5f
+    }
+
+    override fun release() = vad.release()
+
+    private companion object {
+        const val Window = 512
+    }
+}
+
 class AndroidLocalSpeech(context: Context) : LocalSpeech {
     override val files: ModelFiles = AndroidModelFiles(context)
     override val recognizer: RecognizerEngine = SherpaRecognizer(files)
+
+    /** 新的人声检测；模型还没下载或原生库不可用时返回 null，通话就改用声音大小判断。 */
+    fun newGate(): SpeechGate? {
+        val spec = VoiceModels.Silero
+        if (files.size(spec.name) != spec.bytes) return null
+        return try {
+            SileroGate(files.path(spec.name))
+        } catch (e: Throwable) {
+            null
+        }
+    }
 }

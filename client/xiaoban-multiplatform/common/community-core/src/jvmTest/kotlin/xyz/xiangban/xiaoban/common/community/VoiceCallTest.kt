@@ -32,7 +32,7 @@ internal class FakeVoicePlatform : VoicePlatform {
         Thread {
             var n = 0
             while (running.get()) {
-                val amplitude = if (n in 20 until 70) 3000 else 0
+                val amplitude = if (n % 200 in 20 until 70) 3000 else 0
                 val frame = ByteArray(640)
                 for (i in 0 until 320) {
                     val v = if (amplitude == 0) ((i * 7 + n) % 40 - 20) else (amplitude * sin(2 * PI * (i + n * 320) * 220 / 16000)).toInt()
@@ -170,6 +170,134 @@ class VoiceCallTest {
         assertTrue(heardPcm.get() > 32_000, "录音至少一秒：${heardPcm.get()}")
         assertTrue(spokenByPhone.any { it.contains("记下了") })
         assertEquals(0, cloudAsked.get())
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    /** 按需出声的假麦克风：平时是安静的，[speak] 之后接着来一段人声。 */
+    private class ScriptedMic : VoicePlatform {
+        private val voiced = AtomicInteger()
+        val playing = java.util.concurrent.atomic.AtomicBoolean(false)
+        val stoppedAudio = AtomicInteger()
+        fun speak(frames: Int = 60) { voiced.addAndGet(frames) }
+
+        override suspend fun streamRecording(onFrame: (ByteArray) -> Unit): (() -> Unit)? {
+            val running = java.util.concurrent.atomic.AtomicBoolean(true)
+            Thread {
+                var n = 0
+                while (running.get()) {
+                    val loud = voiced.get() > 0 && n >= 15
+                    if (loud) voiced.decrementAndGet()
+                    val frame = ByteArray(640)
+                    for (i in 0 until 320) {
+                        val v = if (loud) (3000 * sin(2 * PI * (i + n * 320) * 220 / 16000)).toInt() else ((i * 7 + n) % 40 - 20)
+                        frame[2 * i] = v.toByte(); frame[2 * i + 1] = (v shr 8).toByte()
+                    }
+                    onFrame(frame)
+                    n++
+                    Thread.sleep(1)
+                }
+            }.also { it.isDaemon = true }.start()
+            return { running.set(false) }
+        }
+
+        override fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean { playing.set(true); return true }
+        override fun stopAudio() { if (playing.getAndSet(false)) stoppedAudio.incrementAndGet() }
+    }
+
+    @Test
+    fun `talking over the assistant interrupts it and the new sentence is heard`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/chat/completions" -> respond(sse("这是一句很长的回答，我会说很久很久。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+                else -> respond("{}", HttpStatusCode.OK)
+            }
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        val chat = CloudChatController(api, scope)
+        val heard = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val phoneAsr = object : RecognizerEngine {
+            override val name = "手机识别"
+            override suspend fun recognize(pcm: ByteArray): String { val text = if (heard.isEmpty()) "第一句" else "第二句"; heard += text; return text }
+        }
+        val tts = object : SynthesizerEngine { override val name = "合成"; override suspend fun synthesize(text: String) = byteArrayOf(1) }
+        val platform = ScriptedMic()
+        val call = SpokenCall(scope, platform, CloudAssistant(chat), listOf(phoneAsr), listOf(tts))
+        call.start()
+        waitFor("listening") { call.state.value.phase == CallPhase.Listening }
+        platform.speak()
+        waitFor("first") { call.state.value.userText == "第一句" }
+        waitFor("speaking") { platform.playing.get() }
+        // 小伴正在“说”（播放没结束）：用户开口
+        platform.speak()
+        waitFor("interrupted") { platform.stoppedAudio.get() >= 1 }
+        waitFor("second") { call.state.value.userText == "第二句" }
+        assertEquals(listOf("第一句", "第二句"), heard.toList())
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
+    fun `with barge in turned off the assistant keeps talking`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/chat/completions" -> respond(sse("这是一句很长的回答，我会说很久很久。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+                else -> respond("{}", HttpStatusCode.OK)
+            }
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        val phoneAsr = object : RecognizerEngine { override val name = "手机识别"; override suspend fun recognize(pcm: ByteArray) = "第一句" }
+        val tts = object : SynthesizerEngine { override val name = "合成"; override suspend fun synthesize(text: String) = byteArrayOf(1) }
+        val platform = ScriptedMic()
+        val call = SpokenCall(scope, platform, CloudAssistant(CloudChatController(api, scope)), listOf(phoneAsr), listOf(tts))
+        call.setBargeIn(false)
+        call.start()
+        waitFor("listening") { call.state.value.phase == CallPhase.Listening }
+        platform.speak()
+        waitFor("speaking") { platform.playing.get() }
+        platform.speak()
+        delay(800)
+        assertTrue(platform.playing.get(), "不该被打断")
+        assertEquals(0, platform.stoppedAudio.get())
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
+    fun `a local recognizer judges whether the sentence is finished from its punctuation`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/chat/completions" -> respond(sse("好的。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+                else -> respond("{}", HttpStatusCode.OK)
+            }
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        val calls = AtomicInteger()
+        val local = object : RecognizerEngine {
+            override val name = "手机识别"
+            override val local = true
+            override suspend fun recognize(pcm: ByteArray): String { calls.incrementAndGet(); return "现在几点了？" }
+        }
+        val platform = ScriptedMic()
+        val call = SpokenCall(scope, platform, CloudAssistant(CloudChatController(api, scope)), listOf(local), listOf(object : SynthesizerEngine {
+            override val name = "合成"
+            override suspend fun synthesize(text: String) = byteArrayOf(1)
+        }))
+        call.start()
+        waitFor("listening") { call.state.value.phase == CallPhase.Listening }
+        platform.speak()
+        waitFor("heard") { call.state.value.userText == "现在几点了？" }
+        // 停顿时问了一次“说完了吗”（识别一次），收尾后又识别一次拿最终文字。
+        assertTrue(calls.get() >= 2, "${calls.get()}")
         call.stop()
         waitFor("ended") { call.state.value.ended }
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
