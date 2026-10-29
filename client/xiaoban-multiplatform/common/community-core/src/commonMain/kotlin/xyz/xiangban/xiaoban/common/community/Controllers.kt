@@ -105,7 +105,8 @@ class FeedController(private val api: ForumApi, private val scope: CoroutineScop
 /** 讨论列表。 */
 data class DiscussState(val topics: List<Topic> = emptyList(), val loading: Boolean = false, val error: String? = null, val hasMore: Boolean = false, val sort: String = "latest")
 
-class DiscussController(private val api: ForumApi, private val scope: CoroutineScope) {
+/** [category] 不为空时只看这个分类（含子分类）的帖子，如资源分享用 `share`。 */
+class DiscussController(private val api: ForumApi, private val scope: CoroutineScope, private val category: String? = null) {
     private val _state = MutableStateFlow(DiscussState())
     val state: StateFlow<DiscussState> = _state.asStateFlow()
     private var page = 1
@@ -133,7 +134,7 @@ class DiscussController(private val api: ForumApi, private val scope: CoroutineS
         _state.value = _state.value.copy(loading = true, error = null)
         scope.launch {
             try {
-                val p = api.topics(sort = sort, page = requested)
+                val p = api.topics(sort = sort, category = category, page = requested)
                 if (mine == generation) _state.value = _state.value.copy(topics = (if (replace) emptyList() else _state.value.topics) + p.items, hasMore = p.hasMore, loading = false)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

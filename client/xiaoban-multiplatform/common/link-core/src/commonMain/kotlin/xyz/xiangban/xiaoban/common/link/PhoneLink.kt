@@ -185,6 +185,29 @@ class PhoneLink(
         return PeerSummary(id, o["name"]?.jsonPrimitive?.contentOrNull.orEmpty(), o["online"]?.jsonPrimitive?.booleanOrNull ?: false)
     }
 
+    /** 用一份完整的对端列表替换本地的，并按差别发出出现 / 消失 / 上下线事件。 */
+    private suspend fun applyPeers(fresh: Map<String, PeerSummary>) {
+        val (added, removed, changed) = lock.withLock {
+            val removed = peerMap.keys.filter { it !in fresh }
+            val added = fresh.values.filter { it.id !in peerMap }
+            val changed = fresh.values.filter { n -> peerMap[n.id]?.let { it.online != n.online } == true }
+            peerMap.clear(); peerMap.putAll(fresh)
+            Triple(added, removed, changed)
+        }
+        removed.forEach { _events.emit(LinkEvent.PeerRemoved(it)) }
+        added.forEach { _events.emit(LinkEvent.PeerAdded(it)) }
+        changed.forEach { _events.emit(LinkEvent.PeerOnline(it.id, it.online)) }
+    }
+
+    /** 主动向中转要一次对端列表（“重新查找”）。还没登记设备或没登录时什么也不做。 */
+    suspend fun reloadPeers() {
+        val device = lock.withLock { state.device } ?: return
+        val resp = call(HttpMethod.Get, "/peers?device_id=${device.id}")
+        val fresh = resp["items"]?.jsonArray?.mapNotNull { parsePeer(it) }?.associateBy { it.id } ?: return
+        // 连接上时在线状态以连接为准（presence 帧更新更及时），这里只补充名单。
+        applyPeers(if (out != null) fresh.mapValues { (id, p) -> peerMap[id]?.let { old -> p.copy(online = old.online || p.online) } ?: p } else fresh)
+    }
+
     private suspend fun session(): SessionResult {
         val tk = token() ?: return SessionResult.NotConnected
         val device = try {
@@ -249,16 +272,7 @@ class PhoneLink(
         when (v["op"]?.jsonPrimitive?.contentOrNull) {
             "peers" -> {
                 val fresh = v["items"]?.jsonArray?.mapNotNull { parsePeer(it) }?.associateBy { it.id } ?: return null
-                val (added, removed, changed) = lock.withLock {
-                    val removed = peerMap.keys.filter { it !in fresh }
-                    val added = fresh.values.filter { it.id !in peerMap }
-                    val changed = fresh.values.filter { n -> peerMap[n.id]?.let { it.online != n.online } == true }
-                    peerMap.clear(); peerMap.putAll(fresh)
-                    Triple(added, removed, changed)
-                }
-                removed.forEach { _events.emit(LinkEvent.PeerRemoved(it)) }
-                added.forEach { _events.emit(LinkEvent.PeerAdded(it)) }
-                changed.forEach { _events.emit(LinkEvent.PeerOnline(it.id, it.online)) }
+                applyPeers(fresh)
             }
             "peer.added" -> {
                 val incoming = parsePeer(v["device"]) ?: return null

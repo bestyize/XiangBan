@@ -68,6 +68,13 @@ class RemoteChatTest {
         assertEquals(1, controller.state.value.toolProgress.size)
         assertEquals("shell", controller.state.value.toolProgress[0].name)
         assertTrue(controller.state.value.toolProgress[0].running)
+        // 带参数的工具调用：命令、路径会被提炼成一行说明
+        val toolWithArgs = """{"t":"event","id":"3b","session":"s_1","kind":"tool.start","data":{"id":"t_2","name":"bash","arguments":{"command":"npm test -- login","timeout":30}}}"""
+        link.emitEventForTest(LinkEvent.Message("dsk_1", toolWithArgs.encodeToByteArray()))
+        assertEquals("npm test -- login", controller.state.value.toolProgress[1].detail)
+        assertEquals("src/a.vue", summarizeArgs(kotlinx.serialization.json.Json.parseToJsonElement("""{"file_path":"src/a.vue"}""")))
+        assertEquals("rm -rf build", summarizeArgs(kotlinx.serialization.json.Json.parseToJsonElement("""{"anything":"rm -rf build"}""")))
+        assertEquals("", summarizeArgs(kotlinx.serialization.json.Json.parseToJsonElement("{}")))
 
         // 文字增量 text.delta
         val textDelta = """{"t":"event","id":"4","session":"s_1","kind":"text.delta","data":{"text":"正在执行"}}"""
@@ -79,6 +86,7 @@ class RemoteChatTest {
         val toolEnd = """{"t":"event","id":"5","session":"s_1","kind":"tool.end","data":{"id":"t_1","is_error":false}}"""
         link.emitEventForTest(LinkEvent.Message("dsk_1", toolEnd.encodeToByteArray()))
         assertFalse(controller.state.value.toolProgress[0].running)
+        assertTrue(controller.state.value.toolProgress[1].running)
 
         // 回复完成 turn.done
         val turnDone = """{"t":"event","id":"6","session":"s_1","kind":"turn.done","data":{}}"""

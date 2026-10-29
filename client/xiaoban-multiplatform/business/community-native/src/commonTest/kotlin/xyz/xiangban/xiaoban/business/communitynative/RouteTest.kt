@@ -7,7 +7,8 @@ import kotlin.test.assertNull
 class RouteTest {
     @Test
     fun everyRouteSurvivesEncoding() {
-        val routes = listOf(Route.Pack(42), Route.Topic(7), Route.Weekly("2026-W43"), Route.Project("xiaoban"), Route.Login, Route.Devices)
+        val routes = listOf(Route.Pack(42), Route.Topic(7), Route.Weekly("2026-W43"), Route.Project("xiaoban"), Route.Login, Route.Devices,
+            Route.Settings, Route.Models, Route.AiChat, Route.RemoteList("dsk_abc123"), Route.RemoteChat("dsk_abc123"))
         routes.forEach { assertEquals(it, Route.decode(it.encode())) }
         assertEquals(routes, Route.decodeStack(Route.encodeStack(routes)))
     }
@@ -16,6 +17,8 @@ class RouteTest {
     fun garbageIsDroppedInsteadOfCrashing() {
         assertNull(Route.decode("pack:abc"))
         assertNull(Route.decode("weekly:"))
+        assertNull(Route.decode("rlist:"))
+        assertNull(Route.decode("rchat"))
         assertNull(Route.decode("unknown:1"))
         assertEquals(listOf(Route.Topic(3)), Route.decodeStack("\nbad\ntopic:3\n"))
         assertEquals(emptyList(), Route.decodeStack(""))

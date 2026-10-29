@@ -41,15 +41,14 @@ private val Sorts = listOf("latest" to "最新回复", "new" to "最新发布", 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DiscussScreen(env: CommunityEnv, open: (Route) -> Unit) {
+fun DiscussScreen(env: CommunityEnv, open: (Route) -> Unit, category: String? = null, emptyText: String = "还没有帖子") {
     val scope = rememberCoroutineScope()
-    val controller = remember(env) { DiscussController(env.forum, scope) }
+    val controller = remember(env, category) { DiscussController(env.forum, scope, category) }
     val state by controller.state.collectAsState()
     var sort by rememberSaveable { mutableStateOf("latest") }
     LaunchedEffect(sort) { controller.select(sort) }
 
     Column(Modifier.fillMaxSize()) {
-        PageHeader("讨论")
         Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 6.dp)) {
             Sorts.forEach { (key, label) -> Chip(label, sort == key) { sort = key } }
         }
@@ -58,7 +57,7 @@ fun DiscussScreen(env: CommunityEnv, open: (Route) -> Unit) {
             when {
                 state.loading && state.topics.isEmpty() -> Spinner()
                 state.error != null && state.topics.isEmpty() -> CenterMessage(state.error.orEmpty(), "重试", controller::refresh)
-                state.topics.isEmpty() -> CenterMessage("还没有帖子")
+                state.topics.isEmpty() -> CenterMessage(emptyText)
                 else -> LazyColumn(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
                     items(state.topics, key = { it.id }) { topic -> TopicRow(topic) { open(Route.Topic(topic.id)) }; Hairline(Modifier.padding(start = Gutter)) }
                     item {

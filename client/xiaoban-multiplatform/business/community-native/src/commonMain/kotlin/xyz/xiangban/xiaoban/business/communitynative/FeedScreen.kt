@@ -59,7 +59,6 @@ fun FeedScreen(env: CommunityEnv, open: (Route) -> Unit) {
     LaunchedEffect(tab) { controller.select(tab) }
 
     Column(Modifier.fillMaxSize()) {
-        PageHeader("社区")
         LazyRow(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface), contentPadding = PaddingValues(horizontal = 6.dp)) {
             items(FeedTabs, key = { it.first }) { (key, label) -> Chip(label, tab == key) { tab = key } }
         }

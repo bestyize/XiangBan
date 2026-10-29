@@ -52,6 +52,9 @@ data class RemoteApprovalRequest(
     val options: List<RemoteApprovalOption> = emptyList(),
 ) {
     val isHighRisk: Boolean get() = risk.equals("high", ignoreCase = true)
+
+    /** 给人看的操作内容：优先取命令、路径这类字段，没有就取整段参数。 */
+    val summary: String get() = summarizeArgs(detail)
 }
 
 data class RemoteToolProgress(
@@ -59,7 +62,26 @@ data class RemoteToolProgress(
     val name: String,
     val running: Boolean = true,
     val isError: Boolean? = null,
+    /** 这次工具调用的要点（命令、文件路径…），可能为空。 */
+    val detail: String = "",
 )
+
+private val SummaryKeys = listOf("command", "cmd", "file_path", "path", "pattern", "query", "url", "text", "detail")
+
+/** 把工具参数压成一行能看懂的文字：常见字段优先，只有一个字段就取它，否则退回整段 JSON（截断）。 */
+internal fun summarizeArgs(value: JsonElement?): String {
+    if (value == null || value is JsonNull) return ""
+    if (value is JsonPrimitive) return value.contentOrNull.orEmpty().take(300)
+    if (value is JsonObject) {
+        for (key in SummaryKeys) {
+            val hit = (value[key] as? JsonPrimitive)?.contentOrNull
+            if (!hit.isNullOrBlank()) return hit.take(300)
+        }
+        if (value.size == 1) summarizeArgs(value.values.first()).takeIf { it.isNotBlank() }?.let { return it }
+        if (value.isEmpty()) return ""
+    }
+    return value.toString().take(300)
+}
 
 data class RemoteTurn(
     val id: String,
@@ -130,6 +152,8 @@ class RemoteChatController(
     }
 
     suspend fun refreshPeers() {
+        // 先向中转要一次最新的电脑列表（新开了遥控的电脑不用等推送），失败就用已有的。
+        runCatching { phoneLink.reloadPeers() }
         val currentPeers = phoneLink.peers()
         val currentSel = _state.value.selectedPeerId
         val chosen = currentPeers.firstOrNull { it.id == currentSel } ?: currentPeers.firstOrNull()
@@ -461,7 +485,7 @@ class RemoteChatController(
             "tool.start" -> {
                 val id = data["id"].asStr() ?: nextId("t")
                 val name = data["name"].asStr() ?: "工具调用"
-                val updated = _state.value.toolProgress + RemoteToolProgress(id, name, running = true)
+                val updated = _state.value.toolProgress + RemoteToolProgress(id, name, running = true, detail = summarizeArgs(data["arguments"]))
                 _state.value = _state.value.copy(toolProgress = updated)
             }
             "tool.end" -> {

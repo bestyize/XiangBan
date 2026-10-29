@@ -8,12 +8,17 @@ package xyz.xiangban.xiaoban.common.community
 object DesignTokens {
     // 颜色（浅色 / 深色）
     const val Brand = 0xFFE3203CL
-    const val PaperLight = 0xFFF5F5F5L
+    const val PaperLight = 0xFFF7F7F7L
     const val SurfaceLight = 0xFFFFFFFFL
     const val InkLight = 0xFF222222L
     const val Ink2Light = 0xFF666666L
     const val Ink3Light = 0xFF999999L
     const val HairlineLight = 0xFFEDEDEDL
+    /** 浅灰填充（图标底、输入框底）、描边、品牌红的浅底与它的描边。 */
+    const val FillLight = 0xFFF2F2F2L
+    const val LineLight = 0xFFCFCFCFL
+    const val BrandSoftLight = 0xFFFFF3F4L
+    const val BrandSoftLineLight = 0xFFF5C7CDL
 
     const val PaperDark = 0xFF111111L
     const val SurfaceDark = 0xFF1B1B1BL
@@ -21,6 +26,10 @@ object DesignTokens {
     const val Ink2Dark = 0xFFCCCCCCL
     const val Ink3Dark = 0xFFA3A3A3L
     const val HairlineDark = 0xFF333333L
+    const val FillDark = 0xFF2A2A2AL
+    const val LineDark = 0xFF4A4A4AL
+    const val BrandSoftDark = 0xFF3A1F23L
+    const val BrandSoftLineDark = 0xFF5A2B33L
 
     // 尺寸（dp / sp）
     const val RadiusCard = 8f
