@@ -9,6 +9,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import xyz.xiangban.xiaoban.common.community.AccountApi
 import xyz.xiangban.xiaoban.common.community.AiGatewayApi
 import xyz.xiangban.xiaoban.common.community.CommunityConfig
@@ -17,7 +19,9 @@ import xyz.xiangban.xiaoban.common.community.InMemoryTokenStorage
 import xyz.xiangban.xiaoban.common.community.SessionManager
 import xyz.xiangban.xiaoban.common.community.TokenStorage
 import xyz.xiangban.xiaoban.common.link.InMemoryLinkStorage
+import xyz.xiangban.xiaoban.common.link.InMemoryRemoteCache
 import xyz.xiangban.xiaoban.common.link.LinkStorage
+import xyz.xiangban.xiaoban.common.link.RemoteCache
 import xyz.xiangban.xiaoban.common.link.PhoneLink
 import xyz.xiangban.xiaoban.common.link.RemoteChatController
 
@@ -44,12 +48,14 @@ class CommunityEnv(
     val platform: PlatformActions? = null,
     val client: HttpClient = defaultLinkHttpClient(),
     val linkStorage: LinkStorage = InMemoryLinkStorage(),
+    val remoteCache: RemoteCache = InMemoryRemoteCache(),
     val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob()),
 ) {
     val account = AccountApi(client, config)
 
     @OptIn(ExperimentalTime::class)
-    val session = SessionManager(account, storage, now = { Clock.System.now().toEpochMilliseconds() })
+    private var accountChanged: (String?, String?) -> Unit = { _, _ -> }
+    val session = SessionManager(account, storage, now = { Clock.System.now().toEpochMilliseconds() }, onAccountChanged = { old, new -> accountChanged(old, new) })
     val forum = ForumApi(client, config) { session.accessToken() }
     val ai = AiGatewayApi(client, config) { session.accessToken() }
 
@@ -61,9 +67,15 @@ class CommunityEnv(
         deviceName = config.deviceName,
         baseUrl = config.linkBase,
     )
-    val remoteChat = RemoteChatController(phoneLink, scope)
+    val remoteChat = RemoteChatController(phoneLink, scope, remoteCache, session.state.value.accountId)
 
     init {
+        val resetLock = Mutex()
+        accountChanged = { old, new ->
+            remoteChat.changeAccount(new)
+            if (old != null && old != new) remoteCache.clearAccount(old)
+            scope.launch { resetLock.withLock { phoneLink.resetForAccount() } }
+        }
         scope.launch {
             phoneLink.start()
         }

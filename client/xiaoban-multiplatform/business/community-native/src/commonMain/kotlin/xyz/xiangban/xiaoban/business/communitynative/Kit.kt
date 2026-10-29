@@ -85,13 +85,15 @@ fun IconTap(icon: ImageVector, description: String, onClick: () -> Unit, modifie
 
 /** 子页面顶栏：返回、居中标题（可带一行小字）、右侧操作。 */
 @Composable
-fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier, subtitle: String? = null, trailing: (@Composable () -> Unit)? = null) {
+fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifier, subtitle: String? = null, trailing: (@Composable () -> Unit)? = null, leading: (@Composable () -> Unit)? = null, subtitleContent: (@Composable () -> Unit)? = null) {
     Column(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (onBack != null) IconTap(XIcons.ChevronLeft, "返回", onBack) else Spacer(Modifier.width(44.dp))
+            if (leading != null) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { leading() }
+            else if (onBack != null) IconTap(XIcons.ChevronLeft, "返回", onBack) else Spacer(Modifier.width(44.dp))
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (subtitle != null) Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (subtitleContent != null) subtitleContent()
+                else if (subtitle != null) Text(subtitle, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (trailing != null) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { trailing() } else Spacer(Modifier.width(44.dp))
         }
@@ -357,14 +359,14 @@ fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier =
 
 /** 在线用实心点，离线用空心点，不只靠颜色区分。 */
 @Composable
-fun StatusDot(online: Boolean, label: String) {
+fun StatusDot(online: Boolean, label: String, fontSize: Int = 12) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (online) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface))
+            Box(Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF21A366)))
         } else {
             Box(Modifier.size(8.dp).clip(CircleShape).border(1.5.dp, MaterialTheme.colorScheme.onSurfaceVariant, CircleShape))
         }
-        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(label, fontSize = fontSize.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

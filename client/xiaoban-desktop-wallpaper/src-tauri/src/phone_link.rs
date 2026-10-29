@@ -299,7 +299,7 @@ fn send_hello(app: &tauri::AppHandle, link: &Link, peer: &str) {
             "t": "hello",
             "id": id,
             "v": 1,
-            "caps": ["sessions", "stream", "approvals", "snapshot_paging"],
+            "caps": ["sessions", "stream", "approvals", "snapshot_paging", "projects"],
             "app": env!("CARGO_PKG_VERSION"),
         }),
         false,
@@ -396,6 +396,14 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                 let _ = send_json(link, peer, &page, false);
             }
         }
+        "projects.list" => {
+            if let Ok(mut page) = crate::chat::remote_projects(app) {
+                page["t"] = json!("projects.page");
+                page["id"] = json!(state.next_msg_id());
+                page["ref"] = json!(req_id);
+                let _ = send_json(link, peer, &page, false);
+            }
+        }
         "session.open" => {
             let Some(session_id) = msg.get("session").and_then(Value::as_str) else { return };
             let after = msg.get("after").and_then(Value::as_u64).map(|n| n as usize);
@@ -440,6 +448,7 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
             let session_id = msg.get("session").and_then(Value::as_str).filter(|s| !s.trim().is_empty());
             let text = msg.get("text").and_then(Value::as_str).unwrap_or("");
             let client_id = msg.get("client_id").and_then(Value::as_str).unwrap_or(&req_id);
+            let workspace = msg.get("workspace").and_then(Value::as_str);
             if let Ok(audit) = audit_path(app) {
                 append_remote_audit(
                     &audit,
@@ -450,10 +459,11 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                         "session": session_id,
                         "clientId": client_id,
                         "chars": text.chars().count(),
+                        "workspace": workspace,
                     }),
                 );
             }
-            match crate::chat::remote_send_message(app, peer, session_id, text, client_id) {
+            match crate::chat::remote_send_message(app, peer, session_id, text, client_id, workspace) {
                 Ok(accepted) => {
                     if let Some(sid) = accepted.get("session").and_then(Value::as_str) {
                         lock(&state.inner)
@@ -614,6 +624,7 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
                             "title": s["title"],
                             "updated_at": s["updatedAt"],
                             "state": "idle",
+                            "workspace": s["workspace"],
                         })
                     })
                     .collect();

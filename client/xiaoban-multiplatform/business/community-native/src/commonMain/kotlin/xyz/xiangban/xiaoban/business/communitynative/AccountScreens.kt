@@ -207,12 +207,12 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
             Column(Modifier.padding(top = 8.dp)) {
                 val peers = remoteState.peers
                 val computers = when {
-                    peers.isEmpty() -> "未发现电脑"
+                    peers.isEmpty() -> "未发现设备"
                     peers.any { it.online } -> peers.first { it.online }.name + " · 在线"
-                    else -> "${peers.size} 台电脑 · 离线"
+                    else -> "${peers.size} 台设备 · 离线"
                 }
                 NavRow("模型与额度", first = true) { open(Route.Models) }
-                NavRow("我的电脑", computers) { open(Route.Devices) }
+                NavRow("我的设备", computers) { open(Route.Devices) }
                 NavRow("帮助与反馈") { env.platform?.openUrl("$site/c/site-feedback") }
             }
             Spacer(Modifier.height(NavInset))

@@ -1,5 +1,6 @@
 package xyz.xiangban.xiaoban.common.link
 
+import kotlin.concurrent.Volatile
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.websocket.webSocketSession
 import io.ktor.client.request.header
@@ -9,6 +10,7 @@ import io.ktor.websocket.close
 import io.ktor.websocket.readText
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -73,6 +75,9 @@ class PhoneLink(
         _events.emit(event)
     }
 
+    /** 测试用：每次 `send` 先通知它，方便检查发出去的内容（没有连上中转时也会通知）。 */
+    internal var sendObserverForTest: ((peer: String, data: ByteArray) -> Unit)? = null
+
     internal suspend fun seedPeersForTest(peers: List<PeerSummary>) = lock.withLock {
         peerMap.clear()
         peers.forEach { peerMap[it.id] = it }
@@ -90,9 +95,16 @@ class PhoneLink(
 
     suspend fun stop() {
         stopped = true
-        loop?.cancel()
+        loop?.cancelAndJoin()
         loop = null
         out?.close()
+    }
+
+    /** 换账号时断开旧连接并清除设备身份，避免继续接收旧账号的事件。 */
+    suspend fun resetForAccount() {
+        stop()
+        wipeIdentity()
+        start()
     }
 
     /** 同账号下的电脑，按名称排序。 */
@@ -148,6 +160,7 @@ class PhoneLink(
     suspend fun send(peer: String, data: ByteArray, notify: Boolean = false) {
         if (data.size > MAX_LINK_MESSAGE_BYTES) throw LinkException("消息太大")
         if (lock.withLock { peer !in peerMap }) throw LinkException("没有这台电脑")
+        sendObserverForTest?.invoke(peer, data)
         val channel = out ?: throw LinkException("没有连上中转服务")
         val frame = buildJsonObject {
             put("op", "send"); put("to", peer); put("data", data.decodeToString()); put("notify", notify)
@@ -200,12 +213,13 @@ class PhoneLink(
     }
 
     /** 主动向中转要一次对端列表（“重新查找”）。还没登记设备或没登录时什么也不做。 */
-    suspend fun reloadPeers() {
-        val device = lock.withLock { state.device } ?: return
+    suspend fun reloadPeers(): Boolean {
+        val device = lock.withLock { state.device } ?: return false
         val resp = call(HttpMethod.Get, "/peers?device_id=${device.id}")
-        val fresh = resp["items"]?.jsonArray?.mapNotNull { parsePeer(it) }?.associateBy { it.id } ?: return
+        val fresh = resp["items"]?.jsonArray?.mapNotNull { parsePeer(it) }?.associateBy { it.id } ?: return false
         // 连接上时在线状态以连接为准（presence 帧更新更及时），这里只补充名单。
         applyPeers(if (out != null) fresh.mapValues { (id, p) -> peerMap[id]?.let { old -> p.copy(online = old.online || p.online) } ?: p } else fresh)
+        return true
     }
 
     private suspend fun session(): SessionResult {

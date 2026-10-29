@@ -2138,6 +2138,7 @@ pub(crate) fn remote_sessions_list(app: &tauri::AppHandle, limit: usize, cursor:
             "updated_at": task.started_at_ms / 1000,
             "state": if is_running { "running" } else { "idle" },
             "externalAgent": task.agent,
+            "workspace": task.workspace.to_string(),
         }));
     }
 
@@ -2148,6 +2149,7 @@ pub(crate) fn remote_sessions_list(app: &tauri::AppHandle, limit: usize, cursor:
             "title": s.title,
             "updated_at": s.updated_at,
             "state": if running.contains(&s.id) { "running" } else { "idle" },
+            "workspace": s.workspace,
         }));
     }
     items.sort_by(|a, b| b["updated_at"].as_i64().cmp(&a["updated_at"].as_i64()));
@@ -2159,6 +2161,31 @@ pub(crate) fn remote_sessions_list(app: &tauri::AppHandle, limit: usize, cursor:
     let slice: Vec<_> = items.into_iter().skip(start).take(limit).collect();
     let next_cursor = if slice.len() == limit { slice.last().and_then(|s| s["id"].as_str().map(str::to_string)) } else { None };
     Ok(json!({ "items": slice, "cursor": next_cursor }))
+}
+
+/// 手机“新项目”里能选的文件夹：电脑上最近用过、仍存在、范围不算太宽的文件夹。手机不能浏览电脑上的文件，也不能指定别的路径。
+pub(crate) fn remote_projects(app: &tauri::AppHandle) -> Result<Value, String> {
+    let recent = workspace::recent(app)?;
+    let items: Vec<Value> = recent
+        .into_iter()
+        .filter(|d| d["exists"] == true && d["wide"] != true)
+        .map(|d| json!({ "path": d["path"], "name": d["name"] }))
+        .collect();
+    Ok(json!({ "recent": items }))
+}
+
+/// 手机指定的新对话文件夹：必须是电脑已知的（最近用过的，或已有对话在用的），仍存在，且范围不能太宽。
+fn remote_workspace(app: &tauri::AppHandle, requested: &str) -> Result<String, String> {
+    let mut known: Vec<String> = workspace::recent(app)?.iter().filter_map(|d| d["path"].as_str().map(str::to_string)).collect();
+    known.extend(list(app)?.into_iter().map(|s| s.workspace).filter(|w| !w.is_empty()));
+    if !crate::phone_wire::workspace_allowed(requested, &known) {
+        return Err("电脑上没有这个项目，请先在电脑小伴里打开一次这个文件夹".into());
+    }
+    let folder = workspace::checked(requested.trim())?;
+    if danger::too_wide(Path::new(&folder)) {
+        return Err("这个文件夹范围太大，不能作为项目".into());
+    }
+    Ok(folder)
 }
 
 /// 给手机的会话快照：精简投影 + 按字节预算分页。`after` 是原始消息下标；`has_more` 为真时手机用 `after = cursor` 取下一页。
@@ -2227,6 +2254,7 @@ pub(crate) fn remote_send_message(
     session_id: Option<&str>,
     text: &str,
     client_id: &str,
+    workspace: Option<&str>,
 ) -> Result<Value, String> {
     let text = text.trim();
     if text.is_empty() {
@@ -2255,7 +2283,12 @@ pub(crate) fn remote_send_message(
         _ => {
             let config = ai_config::current(app)?;
             pin_session_defaults(app, &config)?;
-            let folder = workspace::for_new_conversation(app)?;
+            // 手机选了项目就在那个文件夹里开始；没选沿用电脑上最近用的文件夹。已有对话的文件夹不能从手机改。
+            let folder = match workspace.map(str::trim).filter(|w| !w.is_empty()) {
+                Some(requested) => remote_workspace(app, requested)?,
+                None => workspace::for_new_conversation(app)?,
+            };
+            workspace::remember(app, &folder);
             let (seconds, millis) = now();
             let mut summary = mutate(app, |index| index.create_in(seconds, millis, "ask", &folder))??;
             summary = mutate(app, |index| index.set_options(&summary.id, config.session_model(), Some(config.context_tokens), Some(Vec::new())))?
