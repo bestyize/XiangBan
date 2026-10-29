@@ -1,6 +1,6 @@
 package androidx.compose.ui.unit
 data class IntOffset(val x: Int, val y: Int)
-@JvmInline value class Dp(val value: Float) { operator fun plus(o: Dp) = Dp(value + o.value) }
+@JvmInline value class Dp(val value: Float) { operator fun plus(o: Dp) = Dp(value + o.value); operator fun times(o: Int) = Dp(value * o); operator fun times(o: Float) = Dp(value * o) }
 val Int.dp: Dp get() = Dp(this.toFloat())
 val Float.dp: Dp get() = Dp(this)
 val Double.dp: Dp get() = Dp(this.toFloat())

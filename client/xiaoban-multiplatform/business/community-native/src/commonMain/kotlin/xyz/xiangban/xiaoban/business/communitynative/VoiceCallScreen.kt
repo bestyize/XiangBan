@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -61,6 +62,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import xyz.xiangban.xiaoban.common.community.CallPhase
+import xyz.xiangban.xiaoban.common.community.CallPrompt
+import xyz.xiangban.xiaoban.common.community.CallPromptOption
 import xyz.xiangban.xiaoban.common.community.VoiceCall
 import kotlin.math.PI
 import kotlin.math.cos
@@ -102,8 +105,12 @@ fun VoiceCallScreen(call: VoiceCall, title: String, seconds: Int, onMinimize: ()
             Text(clock(seconds), Modifier.padding(top = 5.dp), color = CallFg2, fontSize = 12.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
             Spacer(Modifier.weight(0.8f))
             CallAvatar(state.phase, state.level)
-            Column(Modifier.fillMaxWidth().height(190.dp).padding(horizontal = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                when (state.phase) {
+            Column(Modifier.fillMaxWidth().let { if (state.prompt != null) it.heightIn(min = 190.dp) else it.height(190.dp) }.padding(horizontal = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                val prompt = state.prompt
+                if (prompt != null) {
+                    StatusLine(if (prompt.question) "等你选择" else "等你确认")
+                    CallPromptCard(prompt, call::answerPrompt)
+                } else when (state.phase) {
                     CallPhase.Starting -> StatusLine("正在接通…")
                     CallPhase.Listening -> {
                         StatusLine("请说话，我在听")
@@ -145,17 +152,19 @@ private fun StatusLine(text: String) {
     Text(text, color = CallFg, fontSize = 24.sp, fontWeight = FontWeight.Light, letterSpacing = 3.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
-/** 小伴的回答：最多露出三行，可以上下滑；中间一行正常显示，上下两行渐渐淡出。 */
+/** 小伴的回答：最多露出三行，可以上下滑；中间一行正常显示，上下两行渐渐淡出。上下各垫一行的空白，所以第一行开始就在中间。 */
 @Composable
 private fun ReplyWindow(text: String, resetKey: String, modifier: Modifier = Modifier) {
     val scroll = rememberScrollState()
     LaunchedEffect(resetKey) { scroll.scrollTo(0) }
-    Box(modifier.fillMaxWidth().height(96.dp)) {
-        Text(text, Modifier.fillMaxWidth().verticalScroll(scroll), color = CallFg.copy(alpha = 0.86f), fontSize = 17.sp, lineHeight = 32.sp, textAlign = TextAlign.Center)
-        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(34.dp).background(Brush.verticalGradient(listOf(CallBg.copy(alpha = 0.9f), Color.Transparent))))
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(34.dp).background(Brush.verticalGradient(listOf(Color.Transparent, CallBg.copy(alpha = 0.9f)))))
+    Box(modifier.fillMaxWidth().height(ReplyLine * 3)) {
+        Text(text, Modifier.fillMaxWidth().verticalScroll(scroll).padding(vertical = ReplyLine), color = CallFg.copy(alpha = 0.86f), fontSize = 17.sp, lineHeight = 26.sp, textAlign = TextAlign.Center)
+        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(ReplyLine).background(Brush.verticalGradient(listOf(CallBg.copy(alpha = 0.9f), Color.Transparent))))
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(ReplyLine).background(Brush.verticalGradient(listOf(Color.Transparent, CallBg.copy(alpha = 0.9f)))))
     }
 }
+
+private val ReplyLine = 26.dp
 
 @Composable
 private fun Notice(text: String) {
@@ -315,5 +324,38 @@ fun CallCapsule(call: VoiceCall, seconds: Int, onExpand: () -> Unit, modifier: M
         Box(Modifier.size(36.dp).clip(CircleShape).background(CallHang).clickable { call.stop() }, contentAlignment = Alignment.Center) {
             XIcon(XIcons.Hangup, tint = Color.White, size = 18.dp, description = "挂断")
         }
+    }
+}
+
+// ───────────── 通话里的确认和选择 ─────────────
+
+/** 小伴要你确认一个操作、或让你选一个答案：直接在通话页里点，不用挂断。 */
+@Composable
+private fun CallPromptCard(prompt: CallPrompt, onChoose: (String) -> Unit) {
+    Column(Modifier.padding(top = 18.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(CallGlass).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(prompt.title, color = CallFg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        prompt.danger?.let { Text("高风险操作：$it。每次都要你确认。", color = CallWarn, fontSize = 12.sp, lineHeight = 18.sp) }
+        if (prompt.detail.isNotBlank()) Text(prompt.detail, color = CallFg3, fontSize = 12.sp, lineHeight = 18.sp, fontFamily = FontFamily.Monospace, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        if (prompt.question) {
+            Column(Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                prompt.options.forEach { option -> PromptButton(option, Modifier.fillMaxWidth(), onChoose) }
+            }
+        } else {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                prompt.options.forEach { option -> PromptButton(option, Modifier.weight(1f), onChoose) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PromptButton(option: CallPromptOption, modifier: Modifier, onChoose: (String) -> Unit) {
+    val (bg, fg) = when (option.role) {
+        CallPromptOption.Role.Allow -> CallFg to CallBg
+        CallPromptOption.Role.Neutral -> Color.White.copy(alpha = 0.12f) to CallFg
+        CallPromptOption.Role.Deny -> Color.Transparent to CallFg2
+    }
+    Box(modifier.height(44.dp).clip(CircleShape).background(bg).clickable { onChoose(option.id) }.padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
+        Text(option.label, color = fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
