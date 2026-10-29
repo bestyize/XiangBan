@@ -25,6 +25,14 @@
 
 新增业务壳放 `business/`，可复用的能力放 `common/`，`shell` 只做装配。
 
+## 安卓实时语音
+
+手机通话沿用桌面的级联方式：本地 Silero 检测人声、Smart Turn v3 判断是否说完、SenseVoice 转文字，再请求聊天模型并按句朗读。说话期间显示本地识别的中间字幕；可在小伴回答时开口打断，本地识别可用时会过滤语气词和朗读回声，下一轮带上已播放内容的说明。通话不会因安静自动挂断，用户可随时静音或结束；后台任务仍按原有权限运行。
+
+首次使用可下载 SenseVoice、Silero 和 Smart Turn（共约 250 MB），已下载的文件会复用；缺少 Smart Turn 或加载失败时回退到原有识别和停顿判定。模型在手机运行，聊天请求仍发到所选服务；无法使用本地识别时按原有顺序尝试电脑或云端识别。Edge 朗读可用时会预备少量简短接话，失败不阻塞对话。
+
+安卓构建使用 `onnxruntime-android` 运行 Smart Turn；sherpa-onnx 使用独立命名的运行库，避免两个版本的原生符号冲突。手动打包工作流在准备 sherpa 库时使用 `patchelf` 设置依赖和 SONAME。针对性验证：`./gradlew :common:community-core:jvmTest --tests '*VoiceAlignmentTest*' --tests '*VoiceActivityTest*' --tests '*VoiceCallTest*' --tests '*SpeechModelsTest*' :common:link-core:jvmTest --tests '*RemoteChatTest*' :androidApp:assembleDebug`；外放回声、打断和手机性能仍需实际设备验收。
+
 ## 开发与验证
 
 Android 与 iOS 在本目录运行。`local.properties` 的 `sdk.dir` 为空时设置 `ANDROID_HOME`（macOS 通常是 `~/Library/Android/sdk`）。

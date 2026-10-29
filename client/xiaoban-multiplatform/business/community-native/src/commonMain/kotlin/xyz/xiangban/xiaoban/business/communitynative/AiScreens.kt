@@ -322,7 +322,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                                 cloud.sending -> toast = "小伴正在回答，稍后再通话"
                                 voiceInput.busy -> toast = "先结束当前的录音"
                                 else -> callHost.request {
-                                    SpokenCall(callScope, platform, CloudAssistant(chat), env.recognizers(CloudRecognizer(env.ai)), env.synthesizers())
+                                    SpokenCall(callScope, platform, CloudAssistant(chat), env.recognizers(CloudRecognizer(env.ai)), env.synthesizers(), env.turnJudge())
                                 }
                             }
                         },

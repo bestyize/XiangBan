@@ -458,7 +458,11 @@ class RemoteChatController(
         newSession(path)
     }
 
-    fun send(rawText: String, speak: Boolean = false) {
+    fun send(rawText: String, speak: Boolean = false) = sendMessage(rawText, speak, "")
+
+    fun sendVoiceText(rawText: String, note: String) = sendMessage(rawText, false, note)
+
+    private fun sendMessage(rawText: String, speak: Boolean, note: String) {
         val text = rawText.trim()
         val peerId = _state.value.selectedPeerId ?: return
         if (text.isEmpty() || _state.value.sending || !_state.value.isPeerOnline) return
@@ -486,7 +490,7 @@ class RemoteChatController(
                 _state.value.newChatWorkspace?.takeIf { it.isNotBlank() }?.let { put("workspace", it) }
                 put("permission", _state.value.permissionMode)
             }
-            put("text", text)
+            put("text", note + text)
             put("client_id", clientId)
             if (speak) put("speak", true)
         })
@@ -1165,7 +1169,7 @@ internal fun foldSnapshot(earlier: List<RemoteTurn>, raw: List<JsonObject>, afte
     for ((index, m) in raw.withIndex()) {
         val id = "snap-${after + index}"
         when (m["role"].asStr() ?: "assistant") {
-            "user" -> turns += RemoteTurn(id = id, role = "user", text = messageText(m), images = (m["images"] as? JsonPrimitive)?.intOrNull ?: 0)
+            "user" -> turns += RemoteTurn(id = id, role = "user", text = xyz.xiangban.xiaoban.common.community.withoutVoiceNotes(messageText(m)), images = (m["images"] as? JsonPrimitive)?.intOrNull ?: 0)
             "assistant" -> {
                 val last = turns.lastOrNull()
                 var block = if (last != null && last.role == "assistant") turns.removeAt(turns.lastIndex) else RemoteTurn(id = id, role = "assistant", text = "")

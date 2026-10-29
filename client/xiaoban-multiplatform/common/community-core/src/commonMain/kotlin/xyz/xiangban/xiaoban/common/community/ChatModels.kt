@@ -195,7 +195,7 @@ fun formatTokens(n: Int): String = when {
     else -> "${n / 1000}k"
 }
 
-/** 朗读用的文字：去掉 Markdown 符号，只留人话。 */
+/** 朗读用的文字：去掉 Markdown 符号、表情、引号，只留人话。 */
 fun speechText(markdown: String): String = parseMarkdown(markdown).joinToString("\n") { block ->
     fun inl(list: List<MdInline>) = list.joinToString("") { when (it) { is MdInline.Text -> it.text; is MdInline.Bold -> it.text; is MdInline.Italic -> it.text; is MdInline.Code -> it.text; is MdInline.Link -> it.label } }
     when (block) {
@@ -207,4 +207,4 @@ fun speechText(markdown: String): String = parseMarkdown(markdown).joinToString(
         is MdBlock.Code -> ""
         MdBlock.Rule -> ""
     }
-}.lines().filter { it.isNotBlank() }.joinToString("\n")
+}.lines().map { withoutSpokenSymbols(it).trim() }.filter { it.isNotBlank() }.joinToString("\n")

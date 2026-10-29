@@ -73,6 +73,50 @@ class VoiceCallTest {
     }
 
     @Test
+    fun `voice context reaches the model but is hidden from the visible message`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        var requestBody = ""
+        val client = HttpClient(MockEngine { request ->
+            if (request.url.encodedPath == "/v1/chat/completions") {
+                requestBody = (request.body as io.ktor.http.content.TextContent).text
+                respond(sse("好的。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+            } else respond("{}", HttpStatusCode.OK)
+        })
+        val chat = CloudChatController(AiGatewayApi(client, CommunityConfig()) { "tok" }, scope)
+        chat.sendVoice("继续说", voiceInterruptionNote("刚才听到的内容"))
+        waitFor("response") { !chat.state.value.sending }
+        assertEquals("继续说", chat.state.value.messages.first().text)
+        assertTrue(requestBody.contains("语音打断"))
+        assertTrue(requestBody.contains("刚才听到的内容"))
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
+    fun `a quiet call remains active until the user ends it`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val platform = object : VoicePlatform {
+            override suspend fun streamRecording(onFrame: (ByteArray) -> Unit): (() -> Unit) {
+                val active = java.util.concurrent.atomic.AtomicBoolean(true)
+                Thread {
+                    while (active.get()) { onFrame(ByteArray(640)); Thread.sleep(1) }
+                }.also { it.isDaemon = true }.start()
+                return { active.set(false) }
+            }
+        }
+        val api = AiGatewayApi(HttpClient(MockEngine { respond("{}") }), CommunityConfig()) { "tok" }
+        val call = SpokenCall(scope, platform, CloudAssistant(CloudChatController(api, scope)), listOf(CloudRecognizer(api)), emptyList())
+        call.start()
+        waitFor("listening") { call.state.value.phase == CallPhase.Listening }
+        delay(2_200) // 加速麦克风已超过三个原来的 10 秒等待周期。
+        assertTrue(!call.state.value.ended)
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
     fun `a call hears a sentence, asks the assistant and speaks the answer`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val asked = AtomicInteger()
@@ -210,9 +254,13 @@ class VoiceCallTest {
     @Test
     fun `talking over the assistant interrupts it and the new sentence is heard`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val requests = java.util.concurrent.CopyOnWriteArrayList<String>()
         val client = HttpClient(MockEngine { request ->
             when (request.url.encodedPath) {
-                "/v1/chat/completions" -> respond(sse("这是一句很长的回答，我会说很久很久。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+                "/v1/chat/completions" -> {
+                    requests += (request.body as io.ktor.http.content.TextContent).text
+                    respond(sse("这是一句很长的回答，我会说很久很久。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+                }
                 else -> respond("{}", HttpStatusCode.OK)
             }
         })
@@ -235,7 +283,11 @@ class VoiceCallTest {
         platform.speak()
         waitFor("interrupted") { platform.stoppedAudio.get() >= 1 }
         waitFor("second") { call.state.value.userText == "第二句" }
+        waitFor("second request") { requests.size >= 2 }
         assertEquals(listOf("第一句", "第二句"), heard.toList())
+        assertTrue(requests.last().contains("语音打断"))
+        assertTrue(requests.last().contains("这是一句很长的回答"))
+        assertEquals("第二句", chat.state.value.messages.last { it.role == "user" }.text)
         call.stop()
         waitFor("ended") { call.state.value.ended }
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()

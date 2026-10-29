@@ -78,13 +78,17 @@ object SenseVoiceModel {
 interface LocalSpeech {
     val files: ModelFiles
     val recognizer: RecognizerEngine
+    /** 未准备好时返回 null，通话改用原有的判停方式。 */
+    suspend fun turnComplete(pcm: ByteArray): Boolean? = null
 }
 
 /** 手机上本地语音需要的全部模型：SenseVoice（识别）加 Silero VAD（判断有没有人在说话），和电脑端 `voice_turn` 用的是同一个 Silero 文件。 */
 object VoiceModels {
     const val SileroName = "silero_vad.onnx"
     val Silero = ModelSpec(SileroName, 2_327_524, "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3")
-    val Files: List<ModelSpec> = SenseVoiceModel.Files + Silero
+    const val SmartTurnName = "smart-turn-v3.2.onnx"
+    val SmartTurn = ModelSpec(SmartTurnName, 8_679_182, "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f")
+    val Files: List<ModelSpec> = SenseVoiceModel.Files + Silero + SmartTurn
     val TotalBytes: Long = Files.sumOf { it.bytes }
 }
 

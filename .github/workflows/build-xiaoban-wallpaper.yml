@@ -335,7 +335,7 @@ jobs:
           echo "Using NDK $ANDROID_NDK_HOME"
           cargo ndk -P 24 -t arm64-v8a -o "$GITHUB_WORKSPACE/client/xiaoban-multiplatform/androidApp/src/main/jniLibs" build --release --lib
           find "$GITHUB_WORKSPACE/client/xiaoban-multiplatform/androidApp/src/main/jniLibs" -name '*.so' -exec ls -l {} \;
-      # 手机上本地语音识别（SenseVoice）用的 sherpa-onnx 原生库：从官方发布包下载、校验后放进 jniLibs，只取 JNI 库和 onnxruntime。
+      # 手机上本地语音识别（SenseVoice）用的 sherpa-onnx 原生库：从官方发布包下载、校验后放进 jniLibs。
       # 版本要和 androidApp 里 com/k2fsa/sherpa/onnx 的 Kotlin 接口、电脑端 tools/xiaoban-infer 用的 sherpa-onnx 一致。
       - name: Fetch sherpa-onnx native libraries
         env:
@@ -348,7 +348,13 @@ jobs:
           tar -xjf "$RUNNER_TEMP/sherpa-android.tar.bz2" -C "$RUNNER_TEMP/sherpa"
           jni="$GITHUB_WORKSPACE/client/xiaoban-multiplatform/androidApp/src/main/jniLibs"
           mkdir -p "$jni/arm64-v8a"
-          cp "$RUNNER_TEMP/sherpa/jniLibs/arm64-v8a/libonnxruntime.so" "$RUNNER_TEMP/sherpa/jniLibs/arm64-v8a/libsherpa-onnx-jni.so" "$jni/arm64-v8a/"
+          # sherpa requires versioned ORT 1.28.2 symbols; Smart Turn uses the separately packaged ORT Java runtime.
+          # Give sherpa's runtime a distinct SONAME so both versions can coexist in one process.
+          command -v patchelf >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y patchelf)
+          cp "$RUNNER_TEMP/sherpa/jniLibs/arm64-v8a/libsherpa-onnx-jni.so" "$jni/arm64-v8a/"
+          cp "$RUNNER_TEMP/sherpa/jniLibs/arm64-v8a/libonnxruntime.so" "$jni/arm64-v8a/libort_sherpa.so"
+          patchelf --set-soname libort_sherpa.so "$jni/arm64-v8a/libort_sherpa.so"
+          patchelf --replace-needed libonnxruntime.so libort_sherpa.so "$jni/arm64-v8a/libsherpa-onnx-jni.so"
           find "$jni" -name 'libsherpa*' -o -name 'libonnxruntime*' | xargs ls -l
       # 配了下面几个密钥就用发布密钥签名；没配就打 debug 包（未签名的 release 包装不上手机）。
       - name: Prepare signing key

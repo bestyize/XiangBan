@@ -79,7 +79,7 @@ class VoiceActivityTest {
 
     @Test
     fun `with a judge a finished sentence ends after a short pause but an unfinished one is waited out`() {
-        // 说完了：停顿约 0.35 秒时被问一次，回答“完整”后立刻结束。
+        // 说完了：停顿约 0.15 秒时被问一次，回答“完整”后立刻结束。
         var vad = EndpointDetector(useJudge = true)
         var result: VadResult? = null
         var ask: VadResult? = null
@@ -88,7 +88,7 @@ class VoiceActivityTest {
         repeat(50) { vad.feed(frame(3000, it)) }
         while (ask == null && silentFrames < 100) { result = vad.feed(frame(0, silentFrames)); silentFrames++; if (result.ask != null) ask = result }
         assertNotNull(ask, "停顿后该问一次")
-        assertTrue(silentFrames * 20 in 340..400, "${silentFrames * 20}ms")
+        assertTrue(silentFrames * 20 in 150..200, "${silentFrames * 20}ms")
         vad.verdict(ask.askTicket, true)
         val ended = vad.feed(frame(0, 0))
         assertNotNull(ended.utterance)
