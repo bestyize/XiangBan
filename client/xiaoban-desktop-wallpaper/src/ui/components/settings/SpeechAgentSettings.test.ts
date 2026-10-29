@@ -167,4 +167,37 @@ describe('SpeechAgentSettings', () => {
     expect(ipc).toHaveBeenCalledWith('voice_service_set_enabled', { enabled: true, speechBroadcast: null });
     wrapper.unmount();
   });
+
+  const tool = (name: string, installed: boolean) => ({ name, installed, path: null, version: installed ? '1.0' : null, loggedIn: installed ? true : null, notes: [] });
+  const payloads = (env: unknown) => (command: string) => Promise.resolve(({
+    speech_agent_env: env,
+    speech_agent_install_guides: [{ tool: 'claude', officialCommand: 'a', mirrorCommand: null, loginCommand: null, documentationUrl: 'u' }],
+    speech_agent_hooks_status: { scope: 's', settingsPath: 'p', isInstalled: true, events: ['Stop'], otherHooks: false },
+    voice_service_status: { enabled: true, running: true, speechBroadcast: true, port: 1, token: 't', baseUrl: 'b', mcpUrl: 'm', mcpConfigSnippet: { a: 1 } },
+    speech_agent_task_list: [],
+  } as Record<string, unknown>)[command] ?? null);
+
+  it('renders the environment report the backend sends (camelCase keys)', async () => {
+    ipc.mockImplementation(payloads({
+      os: 'macos', node: tool('node', true), git: tool('git', true), claude: tool('claude', true), codex: tool('codex', false),
+      desktopApps: [{ name: 'Claude', running: true }], readyForSpeechCoding: true,
+    }) as never);
+    const wrapper = mount(SpeechAgentSettings);
+    await flushPromises();
+    expect(wrapper.text()).toContain('Claude Code CLI');
+    expect(wrapper.text()).toContain('检测到运行：Claude');
+    expect(wrapper.text()).toContain('正在监听 1 项生命周期事件');
+    wrapper.unmount();
+  });
+
+  it('keeps rendering when the report lacks optional lists instead of going blank', async () => {
+    ipc.mockImplementation(payloads({
+      os: 'macos', node: tool('node', true), git: tool('git', true), claude: tool('claude', true), codex: tool('codex', true),
+    }) as never);
+    const wrapper = mount(SpeechAgentSettings);
+    await flushPromises();
+    expect(wrapper.text()).toContain('外部 Coding Agent 环境');
+    expect(wrapper.text()).toContain('暂无运行的桌面客户端');
+    wrapper.unmount();
+  });
 });

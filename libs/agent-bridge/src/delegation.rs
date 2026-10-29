@@ -55,6 +55,7 @@ pub enum DelegationStatus {
 
 /// Snapshot summary of a delegated task for display and status reporting.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct DelegatedTaskSummary {
     /// Unique task identifier (e.g. `del-1730000000-1`).
     pub task_id: String,
@@ -572,6 +573,16 @@ async fn run_codex_exec(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn task_summary_uses_camel_case_keys_and_snake_case_status() {
+        let (entry, _commands) = manual_entry("del-json");
+        let value = serde_json::to_value(entry.summary()).unwrap();
+        for key in ["taskId", "agent", "prompt", "workspace", "startedAtMs", "status", "recentOutput", "pendingApproval", "pendingApprovalId", "sessionId"] {
+            assert!(value.get(key).is_some(), "缺少 {key}：{value}");
+        }
+        assert_eq!(value["status"], "running");
+    }
 
     fn manual_entry(task_id: &str) -> (Arc<TaskEntry>, mpsc::UnboundedReceiver<TaskCommand>) {
         let (commands, rx) = mpsc::unbounded_channel();

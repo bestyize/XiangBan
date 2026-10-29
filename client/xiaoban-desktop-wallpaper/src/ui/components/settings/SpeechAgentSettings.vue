@@ -282,10 +282,10 @@ function runCatching(fn: () => Promise<void>) {
       <div v-if="envReport" class="xb-row">
         <div class="xb-row-text">
           <b>运行中的桌面版应用</b>
-          <span>检测到运行：{{ envReport.desktopApps.filter(a => a.running).map(a => a.name).join('、') || '暂无运行的桌面客户端' }}</span>
+          <span>检测到运行：{{ (envReport.desktopApps ?? []).filter(a => a.running).map(a => a.name).join('、') || '暂无运行的桌面客户端' }}</span>
         </div>
         <div class="agent-actions">
-          <span v-for="app in envReport.desktopApps" :key="app.name" class="status-chip is-pill" :class="{ on: app.running }">
+          <span v-for="app in envReport.desktopApps ?? []" :key="app.name" class="status-chip is-pill" :class="{ on: app.running }">
             {{ app.name }}
           </span>
         </div>
@@ -297,7 +297,7 @@ function runCatching(fn: () => Promise<void>) {
       安装命令推荐（中国大陆镜像加速）
     </div>
     <div v-if="envReport && (!envReport.claude.installed || !envReport.codex.installed)" class="xb-group">
-      <div v-for="guide in guides.filter(g => (g.tool === 'claude' && !envReport?.claude.installed) || (g.tool === 'codex' && !envReport?.codex.installed))" :key="guide.tool" class="xb-row cmd-row">
+      <div v-for="guide in (guides ?? []).filter(g => (g.tool === 'claude' && !envReport?.claude.installed) || (g.tool === 'codex' && !envReport?.codex.installed))" :key="guide.tool" class="xb-row cmd-row">
         <div class="xb-row-text">
           <b>{{ guide.tool === 'claude' ? '安装 Claude Code' : '安装 OpenAI Codex' }}</b>
           <code>{{ guide.mirrorCommand || guide.officialCommand }}</code>
@@ -321,7 +321,7 @@ function runCatching(fn: () => Promise<void>) {
         <div class="xb-row-text">
           <b>小伴观察端点</b>
           <span>
-            {{ hooks?.isInstalled ? `已配置，正在监听 ${hooks.events.length} 项生命周期事件` : '未配置；一键安装后外部终端执行任务完成可提醒小伴' }}
+            {{ hooks?.isInstalled ? `已配置，正在监听 ${hooks.events?.length ?? 0} 项生命周期事件` : '未配置；一键安装后外部终端执行任务完成可提醒小伴' }}
           </span>
         </div>
         <div class="agent-actions">
@@ -383,12 +383,12 @@ function runCatching(fn: () => Promise<void>) {
         <div class="xb-row-text">
           <b>MCP 配置片段 (给 Claude Code / Desktop)</b>
           <span>将下方配置写入 <code>.claude/settings.json</code> 即可为外部 Agent 添加中文耳朵与嘴巴：</span>
-          <pre class="mcp-code">{{ JSON.stringify(voiceService.mcpConfigSnippet, null, 2) }}</pre>
+          <pre class="mcp-code">{{ JSON.stringify(voiceService.mcpConfigSnippet ?? {}, null, 2) }}</pre>
         </div>
         <button
           type="button"
           class="xb-btn is-sm is-ghost"
-          @click="copyText('mcp-snippet', JSON.stringify(voiceService.mcpConfigSnippet, null, 2))"
+          @click="copyText('mcp-snippet', JSON.stringify(voiceService.mcpConfigSnippet ?? {}, null, 2))"
         >
           <Check v-if="copiedKey === 'mcp-snippet'" :size="13" />
           <Copy v-else :size="13" />
