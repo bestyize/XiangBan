@@ -12,7 +12,7 @@
 
 ## 构建镜像
 
-和账号中心一样，镜像只含运行时，二进制在 Ubuntu 24.04 x64 上编译。可以用 GitHub Actions 的 “BuildXiaoBanWallpaper” 工作流（勾选 `package_server_link`，可取消 `build_release`）得到 `xiangban-link-<标签>.tar.gz` 产物，也可以手工：
+和账号中心一样，镜像只含运行时，二进制在 Ubuntu 24.04 x64 上编译。可以用 GitHub Actions 的 “BuildXiaoBanWallpaper” 工作流（`servers` 填 `link`，三个客户端平台取消勾选）把镜像打到服务端 Release `server-…` 里，拿到 `xiangban-link-<标签>.tar.gz`，完整的触发、下载和更新流程见 [RELEASE_AND_DEPLOY.md](RELEASE_AND_DEPLOY.md)；也可以手工（同一个脚本：`infra/images/build-image.sh link ./out`）：
 
 ```sh
 cargo build --release --locked --manifest-path services/server-link/Cargo.toml

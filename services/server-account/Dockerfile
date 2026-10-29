@@ -1,6 +1,6 @@
-# 只含运行时的镜像：二进制与管理后台前端由 CI 在 ubuntu x64 上构建，再放进构建上下文。
-# 上下文目录结构：./server-account（release 二进制）与 ./web（管理后台 dist）。
-# 构建机必须是 ubuntu 24.04：二进制动态链接 glibc，运行时基础镜像要不低于构建机的 glibc 版本。
+# 统一账号中心的运行时镜像（由 infra/images/gen-dockerfiles.py 按 infra/images/services.json 生成，不要手改）。
+# 二进制与前端静态资源由构建机（ubuntu 24.04 x64）编译后放进构建上下文，布局：./server-account、./web。
+# 二进制动态链接 glibc，运行时基础镜像要不低于构建机的 glibc 版本。
 FROM ubuntu:24.04
 
 RUN apt-get update \

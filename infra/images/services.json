@@ -1,0 +1,78 @@
+{
+  "_说明": "服务端镜像的唯一清单。build-image.sh、gen-dockerfiles.py 和 GitHub Actions 的“服务端镜像”任务都读它。kind=rust：在 ubuntu 24.04 上编译二进制（有前端的先 npm 构建），装进只含运行时的镜像；kind=docker：直接用仓库里已有的多阶段 Dockerfile。",
+  "services": [
+    {
+      "id": "account", "title": "统一账号中心", "image": "xiangban-account", "kind": "rust",
+      "crate": "services/server-account", "bin": "server-account", "uid": 10001, "user": "account",
+      "web": { "dir": "services/server-account/web", "env": "ACCOUNT_WEB_DIR" },
+      "env": { "ACCOUNT_HOST": "0.0.0.0", "ACCOUNT_PORT": "55009" }, "portEnv": "ACCOUNT_PORT", "port": 55009,
+      "health": "/api/health", "stack": "infra/account", "tagVar": "ACCOUNT_IMAGE_TAG",
+      "doc": "docs/deployment/ACCOUNT_CENTER_DEPLOYMENT.md"
+    },
+    {
+      "id": "ai", "title": "AI 网关", "image": "xiangban-ai", "kind": "rust",
+      "crate": "services/server-ai", "bin": "server-ai", "uid": 10003, "user": "ai",
+      "web": { "dir": "services/server-ai/web", "env": "AI_WEB_DIR" },
+      "env": { "AI_HOST": "0.0.0.0", "AI_PORT": "55040", "AI_DATA_DIR": "/data" }, "portEnv": "AI_PORT", "port": 55040,
+      "data": "/data", "health": "/api/health", "stack": null, "tagVar": null,
+      "doc": "services/server-ai/README.md"
+    },
+    {
+      "id": "forum", "title": "论坛（超级小伴）", "image": "xiangban-forum", "kind": "rust",
+      "crate": "services/server-forum", "bin": "server-forum", "uid": 10004, "user": "forum",
+      "web": { "dir": "services/server-forum/web", "env": "FORUM_WEB_DIR" },
+      "env": { "FORUM_HOST": "0.0.0.0", "FORUM_PORT": "55011", "FORUM_UPLOAD_DIR": "/data/uploads" }, "portEnv": "FORUM_PORT", "port": 55011,
+      "data": "/data", "health": "/api/health", "stack": null, "tagVar": null,
+      "doc": "services/server-forum/README.md"
+    },
+    {
+      "id": "link", "title": "手机与桌面互联中转", "image": "xiangban-link", "kind": "rust",
+      "crate": "services/server-link", "bin": "server-link", "uid": 10002, "user": "link",
+      "env": { "LINK_HOST": "0.0.0.0", "LINK_PORT": "55030" }, "portEnv": "LINK_PORT", "port": 55030,
+      "health": "/api/link/health", "stack": "infra/link", "tagVar": "LINK_IMAGE_TAG",
+      "doc": "docs/deployment/LINK_DEPLOYMENT.md"
+    },
+    {
+      "id": "market", "title": "小伴市场", "image": "xiangban-market", "kind": "rust",
+      "crate": "services/server-xiaoban-market", "bin": "server-xiaoban-market", "uid": 10001, "user": "market",
+      "web": { "dir": "services/server-xiaoban-market/web", "env": "MARKET_WEB_DIR" },
+      "env": { "MARKET_HOST": "0.0.0.0", "MARKET_PORT": "55010", "MARKET_DATA_DIR": "/data" }, "portEnv": "MARKET_PORT", "port": 55010,
+      "data": "/data", "health": "/api/health", "stack": "infra/market", "tagVar": "MARKET_IMAGE_TAG",
+      "doc": "docs/deployment/MARKET_DEPLOYMENT.md"
+    },
+    {
+      "id": "appstore", "title": "小伴应用商店", "image": "xiangban-appstore", "kind": "rust",
+      "crate": "services/server-xiaoban-appstore", "bin": "server-xiaoban-appstore", "uid": 10005, "user": "appstore",
+      "web": { "dir": "services/server-xiaoban-appstore/web", "env": "APPSTORE_WEB_DIR" },
+      "env": { "APPSTORE_HOST": "0.0.0.0", "APPSTORE_PORT": "55050" }, "portEnv": "APPSTORE_PORT", "port": 55050,
+      "health": "/api/health", "stack": null, "tagVar": null,
+      "doc": "services/server-xiaoban-appstore/README.md"
+    },
+    {
+      "id": "resource", "title": "资源文件服务", "image": "xiangban-resource", "kind": "rust",
+      "crate": "services/server-resource", "bin": "server-resource", "uid": 10006, "user": "resource",
+      "env": { "RESOURCE_HOST": "0.0.0.0", "RESOURCE_PORT": "55020", "RESOURCE_DATA_DIR": "/data" }, "portEnv": "RESOURCE_PORT", "port": 55020,
+      "data": "/data", "health": "/health", "stack": null, "tagVar": null,
+      "doc": "services/server-resource/README.md"
+    },
+    {
+      "id": "wallpaper-collect", "title": "壁纸采集服务", "image": "xiangban-wallpaper-collect", "kind": "rust",
+      "crate": "services/server-xiangban-wallpaper", "bin": "wallpaper_collect", "uid": 10007, "user": "wallpaper",
+      "webEmbedded": { "dir": "services/server-xiangban-wallpaper/web" },
+      "env": { "SERVER_HOST": "0.0.0.0", "SERVER_PORT": "8080" }, "portEnv": "SERVER_PORT", "port": 8080,
+      "health": "/health", "stack": null, "tagVar": null,
+      "doc": "services/server-xiangban-wallpaper/README.md"
+    },
+    {
+      "id": "api", "title": "主站后端（xiaban-api）", "image": "xiaban-server", "kind": "docker",
+      "dockerfile": "services/xiaban-api/backend/Dockerfile", "context": ".",
+      "port": 8080, "stack": "infra", "doc": "docs/deployment/DEPLOYMENT.md"
+    },
+    {
+      "id": "web", "title": "主站网页（xiaban-web）", "image": "xiaban-web", "kind": "docker",
+      "dockerfile": "client/xiaban-web/Dockerfile", "context": ".",
+      "buildArgs": { "VITE_PUBLIC_URL": "https://xiaban.xyz", "VITE_DATA_OVERSEAS": "true" },
+      "port": 80, "stack": "infra", "doc": "docs/deployment/DEPLOYMENT.md"
+    }
+  ]
+}
