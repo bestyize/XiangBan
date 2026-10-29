@@ -382,6 +382,30 @@ class TextAndTokensTest {
     }
 }
 
+class PressToTalkTest {
+    @Test
+    fun `finger position decides what releasing does`() {
+        assertEquals(PttAction.Send, Ptt.action(x = 100f, y = 10f, width = 300f, startY = 20f, upThreshold = 60f))
+        assertEquals(PttAction.Send, Ptt.action(x = 290f, y = -30f, width = 300f, startY = 20f, upThreshold = 60f))
+        assertEquals(PttAction.Cancel, Ptt.action(x = 100f, y = -60f, width = 300f, startY = 20f, upThreshold = 60f))
+        assertEquals(PttAction.Text, Ptt.action(x = 250f, y = -60f, width = 300f, startY = 20f, upThreshold = 60f))
+    }
+
+    @Test
+    fun `limits and countdown follow the spec`() {
+        assertTrue(Ptt.tooShort(499))
+        assertTrue(!Ptt.tooShort(500))
+        assertEquals(null, Ptt.secondsLeft(9_999))
+        assertEquals(10, Ptt.secondsLeft(10_000))
+        assertEquals(9, Ptt.secondsLeft(11_200))
+        assertEquals(0, Ptt.secondsLeft(20_000))
+        assertTrue(!Ptt.expired(19_999))
+        assertTrue(Ptt.expired(20_000))
+        assertEquals("0:06", Ptt.clock(6_400))
+        assertEquals("0:20", Ptt.clock(20_000))
+    }
+}
+
 class AiGatewayAndCloudChatTest {
     private val config = CommunityConfig()
     private fun scope() = CoroutineScope(Dispatchers.Unconfined)

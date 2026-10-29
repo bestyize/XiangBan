@@ -453,7 +453,7 @@ fun AssistantBubble(text: String, modifier: Modifier = Modifier, muted: Boolean 
     )
 }
 
-/** 输入卡片：上面一个多行输入框，下面一行放选择器和发送按钮（由调用方通过 [actions] 放）。 */
+/** 输入卡片：上面一个多行输入框（语音模式下换成 [voiceBar]），下面一行放选择器和发送按钮（由调用方通过 [actions] 放）。 */
 @Composable
 fun ComposerCard(
     value: String,
@@ -461,31 +461,36 @@ fun ComposerCard(
     placeholder: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    voiceBar: (@Composable () -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit,
 ) {
     Column(modifier.fillMaxWidth().shadow(3.dp, RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp)).padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 10.dp)) {
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier.fillMaxWidth(),
-            enabled = enabled,
-            textStyle = TextStyle(fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface),
-            maxLines = 4,
-            cursorBrush = SolidColor(Brand),
-            decorationBox = { inner ->
-                Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.CenterStart) {
-                    if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 15.sp, maxLines = 1)
-                    inner()
-                }
-            },
-        )
+        if (voiceBar != null) {
+            voiceBar()
+        } else {
+            BasicTextField(
+                value = value,
+                onValueChange = onValueChange,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = enabled,
+                textStyle = TextStyle(fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface),
+                maxLines = 4,
+                cursorBrush = SolidColor(Brand),
+                decorationBox = { inner ->
+                    Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.CenterStart) {
+                        if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 15.sp, maxLines = 1)
+                        inner()
+                    }
+                },
+            )
+        }
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), content = actions)
     }
 }
 
 /**
  * 聊天输入卡片（设计稿 6 号和 35–39 号画板）：输入框，下面一行只有图标——左边 + 添加内容、模型、权限（锁，设备聊天才有），
- * 右边语音输入、实时对话、发送或停止。联网一直开着，不放按钮。没有对应功能的按钮由调用方在回调里提示“即将支持”。
+ * 右边语音输入、实时对话、发送或停止。点麦克风切到“按住 说话”条（左边变成键盘图标，没有发送键）。联网一直开着，不放按钮。没有对应功能的按钮由调用方在回调里提示“即将支持”。
  */
 @Composable
 fun ChatComposer(
@@ -494,10 +499,14 @@ fun ChatComposer(
     placeholder: String,
     onModel: () -> Unit,
     onAttach: () -> Unit,
-    onVoice: () -> Unit,
+    voice: VoiceInputController,
+    voiceMode: Boolean,
+    onVoiceMode: (Boolean) -> Unit,
     onSend: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    /** 按下说话条时先做的事（比如小伴正在回答就先停下）。 */
+    onVoicePress: () -> Unit = {},
     /** 模型图标：云端小伴是芯片，跟随电脑的设备聊天是电脑。 */
     modelIcon: ImageVector = XIcons.Cpu,
     /** 指定了模型时图标右上角一个小红点。 */
@@ -511,7 +520,11 @@ fun ChatComposer(
 ) {
     val extra = LocalExtraColors.current
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
-    ComposerCard(value, onValueChange, placeholder, modifier, enabled = enabled) {
+    ComposerCard(
+        value, onValueChange, placeholder, modifier, enabled = enabled,
+        voiceBar = if (voiceMode) ({ PressBar(voice, enabled, if (sending) "小伴正在回答，按住可以打断" else "按住 说话", onVoicePress) }) else null,
+    ) {
+        if (voiceMode) ToolbarIcon(XIcons.Keyboard, "切回键盘输入", { onVoiceMode(false) }, true)
         ToolbarIcon(XIcons.Plus, "添加内容", onAttach, enabled)
         Box {
             ToolbarIcon(modelIcon, "模型", onModel, enabled)
@@ -519,13 +532,15 @@ fun ChatComposer(
         }
         if (onPermission != null) ToolbarIcon(XIcons.Lock, if (fullTrust) "权限：完全信任" else "权限：默认权限", onPermission, enabled, tint = if (fullTrust) Danger else muted)
         Spacer(Modifier.weight(1f))
-        ToolbarIcon(XIcons.Mic, "语音输入", onVoice, true)
+        if (!voiceMode) ToolbarIcon(XIcons.Mic, "语音输入", { onVoiceMode(true) }, true)
         if (onLive != null) ToolbarIcon(XIcons.Wave, "实时对话", onLive, enabled)
-        if (sending) {
-            RoundIconButton(XIcons.Stop, if (onStop != null) "停止" else "正在处理", onStop ?: {}, Brand.copy(alpha = if (onStop != null) 1f else 0.35f), Color.White, enabled = onStop != null)
-        } else {
-            val canSend = enabled && value.trim().isNotEmpty()
-            RoundIconButton(XIcons.ArrowRight, "发送", onSend, if (canSend) Brand else extra.line, Color.White, enabled = canSend)
+        if (!voiceMode) {
+            if (sending) {
+                RoundIconButton(XIcons.Stop, if (onStop != null) "停止" else "正在处理", onStop ?: {}, Brand.copy(alpha = if (onStop != null) 1f else 0.35f), Color.White, enabled = onStop != null)
+            } else {
+                val canSend = enabled && value.trim().isNotEmpty()
+                RoundIconButton(XIcons.ArrowRight, "发送", onSend, if (canSend) Brand else extra.line, Color.White, enabled = canSend)
+            }
         }
     }
 }

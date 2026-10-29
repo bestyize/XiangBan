@@ -267,8 +267,10 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     val voiceInput = rememberVoiceInput(
         env, { env.recognizers(CloudRecognizer(env.ai)) },
         onText = { text -> input = if (input.isBlank()) text else input.trimEnd() + " " + text },
+        onSend = { text -> chat.send(text) },
         onMessage = { toast = it },
     )
+    var voiceMode by rememberSaveable { mutableStateOf(false) }
     val callHost = rememberVoiceCallHost(env)
     val callScope = rememberCoroutineScope()
 
@@ -304,20 +306,12 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     }
                 }
                 Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
-                    if (voiceInput.busy) {
-                        VoiceBar(
-                            if (voiceInput.recording) "正在听… ${voiceInput.seconds / 60}:${(voiceInput.seconds % 60).toString().padStart(2, '0')}" else "正在识别…",
-                            recording = voiceInput.recording,
-                            hint = if (voiceInput.recording) "再点一下麦克风结束，文字会放进输入框" else null,
-                            onCancel = { voiceInput.finish(false) },
-                            modifier = Modifier.padding(bottom = 8.dp),
-                        )
-                    }
                     ChatComposer(
                         input, { input = it }, "问点什么，或描述想要的装扮、游戏…",
                         onModel = { modelSheet = true },
                         onAttach = { attach = true },
-                        onVoice = { voiceInput.toggle() },
+                        voice = voiceInput, voiceMode = voiceMode, onVoiceMode = { voiceMode = it },
+                        onVoicePress = { if (cloud.sending) chat.stop() },
                         onLive = {
                             val platform = env.platform
                             when {
@@ -341,6 +335,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         }
         AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
         Toast(toast) { toast = null }
+        PressOverlay(voiceInput)
         VoiceCallLayer(env, callHost, "小伴AI") { toast = it }
         OverlayTransition(modelSheet) { panel ->
             BottomSheet({ modelSheet = false }, panel) {

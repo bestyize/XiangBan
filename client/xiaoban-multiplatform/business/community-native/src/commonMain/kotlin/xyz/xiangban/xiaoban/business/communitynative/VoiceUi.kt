@@ -28,6 +28,8 @@ import xyz.xiangban.xiaoban.common.community.CloudSynthesizer
 import xyz.xiangban.xiaoban.common.community.EdgeTtsSynthesizer
 import xyz.xiangban.xiaoban.common.community.EngineUnavailable
 import xyz.xiangban.xiaoban.common.community.ModelDownloadException
+import xyz.xiangban.xiaoban.common.community.Ptt
+import xyz.xiangban.xiaoban.common.community.PttAction
 import xyz.xiangban.xiaoban.common.community.RecognizerEngine
 import xyz.xiangban.xiaoban.common.community.SynthesizerEngine
 import xyz.xiangban.xiaoban.common.community.VoiceCall
@@ -111,53 +113,93 @@ fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Bo
 
 // ───────────── 页面里用的两个小控制器 ─────────────
 
-/** 输入框的麦克风：点一下开始录，再点一下结束并识别，文字交给 [onText]；最长 20 秒。 */
+/**
+ * 输入框的“按住说话”（设计规范第 8 节）：按下开始录，松手按手指位置处理——发送（识别后直接发出去）、转文字（识别后放进输入框）或取消；
+ * 最长 20 秒，不到 0.5 秒算太短。识别先用手机本地的，不行再用 [engines] 里后面的。
+ */
 class VoiceInputController(
     private val env: CommunityEnv,
     private val scope: kotlinx.coroutines.CoroutineScope,
     private val engines: () -> List<RecognizerEngine>,
     private val onText: (String) -> Unit,
+    private val onSend: (String) -> Unit,
     private val onMessage: (String) -> Unit,
 ) {
-    var recording by mutableStateOf(false)
+    /** 手指正按着、正在录音。 */
+    var pressing by mutableStateOf(false)
         private set
-    var seconds by mutableStateOf(0)
+    /** 现在松手会怎样；手指移动时更新。 */
+    var action by mutableStateOf(PttAction.Send)
+        private set
+    var elapsedMs by mutableStateOf(0L)
         private set
     var recognizing by mutableStateOf(false)
         private set
-    private var timer: Job? = null
+    private var starting = false
+    private var released = false
+    private var ticker: Job? = null
+    private var startedAt: kotlin.time.TimeMark? = null
 
-    val busy: Boolean get() = recording || recognizing
+    val busy: Boolean get() = pressing || starting || recognizing
 
-    fun toggle() {
+    /** 按下：录音是异步起来的（第一次要先要麦克风权限），起来之前就松手的话，起来后直接丢掉。 */
+    fun pressStart() {
         val platform = env.platform
         when {
             platform == null -> onMessage("这个平台暂不支持录音")
-            recording -> finish(send = true)
             recognizing -> onMessage("正在识别上一段语音")
-            else -> scope.launch {
-                platform.stopAudio()
-                if (!platform.startRecording()) { onMessage("没有麦克风权限，没法录音"); return@launch }
-                seconds = 0
-                recording = true
-                timer = scope.launch {
-                    while (recording) {
-                        kotlinx.coroutines.delay(1000)
-                        seconds += 1
-                        if (seconds >= 20) finish(send = true)
+            pressing || starting -> Unit
+            else -> {
+                starting = true
+                released = false
+                scope.launch {
+                    platform.stopAudio()
+                    val ok = platform.startRecording()
+                    starting = false
+                    when {
+                        !ok -> onMessage("没有麦克风权限，没法录音")
+                        released -> platform.stopRecording()
+                        else -> begin()
                     }
                 }
             }
         }
     }
 
-    /** 结束录音；[send] 为假就丢掉。 */
-    fun finish(send: Boolean) {
-        if (!recording) return
-        recording = false
-        timer?.cancel()
+    private fun begin() {
+        val mark = kotlin.time.TimeSource.Monotonic.markNow()
+        startedAt = mark
+        elapsedMs = 0
+        action = PttAction.Send
+        pressing = true
+        ticker = scope.launch {
+            while (pressing) {
+                kotlinx.coroutines.delay(100)
+                elapsedMs = mark.elapsedNow().inWholeMilliseconds
+                if (Ptt.expired(elapsedMs)) {
+                    onMessage("已到 20 秒，自动发送")
+                    end(PttAction.Send)
+                }
+            }
+        }
+    }
+
+    fun pressMove(to: PttAction) { if (pressing) action = to }
+
+    /** 手指抬起：按当前位置处理。 */
+    fun pressRelease() { if (pressing) end(action) else if (starting) released = true }
+
+    /** 被打断（来电、页面离开、手势被系统取消）：直接丢掉。 */
+    fun pressCancel() { if (pressing) end(PttAction.Cancel) else if (starting) released = true }
+
+    private fun end(how: PttAction) {
+        if (!pressing) return
+        pressing = false
+        ticker?.cancel()
+        val elapsed = startedAt?.elapsedNow()?.inWholeMilliseconds ?: elapsedMs
         val pcm = env.platform?.stopRecording()
-        if (!send || pcm == null) return
+        if (how == PttAction.Cancel || pcm == null) return
+        if (Ptt.tooShort(elapsed)) { onMessage("说话时间太短"); return }
         recognizing = true
         scope.launch {
             try {
@@ -165,6 +207,7 @@ class VoiceInputController(
                 when {
                     text == null -> onMessage(reason ?: "没有识别出来")
                     text.isBlank() -> onMessage("没听清，请再说一次")
+                    how == PttAction.Send -> onSend(text)
                     else -> onText(text)
                 }
             } finally {
@@ -174,15 +217,15 @@ class VoiceInputController(
     }
 
     fun release() {
-        timer?.cancel()
-        if (recording) { recording = false; env.platform?.stopRecording() }
+        ticker?.cancel()
+        if (pressing) { pressing = false; env.platform?.stopRecording() }
     }
 }
 
 @Composable
-fun rememberVoiceInput(env: CommunityEnv, engines: () -> List<RecognizerEngine>, onText: (String) -> Unit, onMessage: (String) -> Unit): VoiceInputController {
+fun rememberVoiceInput(env: CommunityEnv, engines: () -> List<RecognizerEngine>, onText: (String) -> Unit, onSend: (String) -> Unit, onMessage: (String) -> Unit): VoiceInputController {
     val scope = androidx.compose.runtime.rememberCoroutineScope()
-    val controller = remember(env) { VoiceInputController(env, scope, engines, onText, onMessage) }
+    val controller = remember(env) { VoiceInputController(env, scope, engines, onText, onSend, onMessage) }
     DisposableEffect(controller) { onDispose { controller.release() } }
     return controller
 }

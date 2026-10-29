@@ -206,8 +206,10 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     val voiceInput = rememberVoiceInput(
         env, { env.recognizers(DesktopRecognizer(env.remoteChat), CloudRecognizer(env.ai)) },
         onText = { text -> input = if (input.isBlank()) text else input.trimEnd() + " " + text },
+        onSend = { text -> env.remoteChat.send(text) },
         onMessage = { toast = it },
     )
+    var voiceMode by rememberSaveable { mutableStateOf(false) }
     val callHost = rememberVoiceCallHost(env)
     val uiScopeForCall = uiScope
     val startCall: () -> Unit = {
@@ -299,15 +301,6 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             }
 
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
-                if (voiceInput.busy) {
-                    VoiceBar(
-                        if (voiceInput.recording) "正在听… ${voiceInput.seconds / 60}:${(voiceInput.seconds % 60).toString().padStart(2, '0')}" else "正在识别…",
-                        recording = voiceInput.recording,
-                        hint = if (voiceInput.recording) "再点一下麦克风结束，文字会放进输入框" else null,
-                        onCancel = { voiceInput.finish(false) },
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                }
                 if (showMini && liveProgress != null) {
                     TaskMiniBar(
                         liveProgress, modifier = Modifier.padding(bottom = 8.dp),
@@ -323,7 +316,8 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                     modelPinned = remote.currentModel.isNotBlank(),
                     onPermission = { permissionStep = 1 },
                     fullTrust = remote.fullTrust,
-                    onVoice = { voiceInput.toggle() },
+                    voice = voiceInput, voiceMode = voiceMode, onVoiceMode = { voiceMode = it },
+                    onVoicePress = { if (remote.sending) env.remoteChat.cancel() },
                     onLive = startCall,
                     onSend = { val text = input.trim(); if (text.isNotEmpty()) { input = ""; env.remoteChat.send(text) } },
                     enabled = online, sending = remote.sending,
@@ -379,6 +373,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             AdjustPlanSheet(adjustSteps, onDismiss = { adjust = false }, onSubmit = { adjust = false; follow = true; env.remoteChat.revisePlan(it) }, panelModifier = panel)
         }
         OverlayTransition(attach) { panel -> AttachSheet({ attach = false }, { attach = false; toast = "$it 即将支持" }, panel) }
+        PressOverlay(voiceInput)
         VoiceCallLayer(env, callHost, peer?.name ?: "设备") { toast = it }
         Toast(toast) { toast = null }
         OverlayTransition(drawer, direction = "left") { panel ->
