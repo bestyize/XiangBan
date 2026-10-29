@@ -21,7 +21,6 @@ const baseStatus = (patch: Partial<PhoneLinkStatus> = {}): PhoneLinkStatus => ({
   relayUrl: 'https://link.xiangban.xyz/api/link',
   loggedIn: true,
   peers: [],
-  pairing: null,
   lastError: null,
   ...patch,
 });
@@ -31,34 +30,15 @@ describe('PhoneLinkCard', () => {
     ipc.mockReset();
   });
 
-  it('loads status, starts pairing and renders QR SVG, and unpairs devices', async () => {
-    let state = baseStatus({
-      peers: [{ id: 'phn_1', name: '小明的小米手机', online: true }],
-    });
+  it('shows same-account phones, toggles remote control and removes a phone', async () => {
+    let state = baseStatus({ peers: [{ id: 'phn_1', name: '小明的小米手机', online: true }] });
     ipc.mockImplementation(async (command: string, args?: Record<string, unknown>) => {
       if (command === 'phone_link_status') return state;
       if (command === 'phone_link_set_enabled') {
         state = { ...state, enabled: Boolean(args?.enabled), connected: Boolean(args?.enabled) };
         return state;
       }
-      if (command === 'phone_link_begin_pairing') {
-        state = {
-          ...state,
-          enabled: true,
-          connected: true,
-          pairing: {
-            qrText: 'xbl1:eyJyIjoiaHR0cHM6Ly9saW5rLnhpYW5nYmFuLnh5ei9hcGkvbGluayIsImQiOiJkc2tfMSIsImMiOiJBBkNELUVGR0giLCJrIjoiQ19wdWIiLCJzIjoiU19zZWNyZXQifQ',
-            code: 'ABCD-EFGH',
-            expiresAtMs: Date.now() + 240_000,
-          },
-        };
-        return state;
-      }
-      if (command === 'phone_link_cancel_pairing') {
-        state = { ...state, pairing: null };
-        return state;
-      }
-      if (command === 'phone_link_unpair') {
+      if (command === 'phone_link_remove_peer') {
         state = { ...state, peers: state.peers.filter(p => p.id !== args?.peerId) };
         return state;
       }
@@ -67,27 +47,30 @@ describe('PhoneLinkCard', () => {
 
     const wrapper = mount(PhoneLinkCard);
     await flushPromises();
-
     expect(wrapper.find('[data-testid="phone-link-peer"]').text()).toContain('小明的小米手机');
     expect(wrapper.find('[data-testid="phone-link-peer"]').text()).toContain('在线');
-
-    // 点击“连接手机”打开配对窗口并渲染二维码 SVG
-    await wrapper.get('[data-testid="phone-link-pair"]').trigger('click');
-    await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('phone_link_begin_pairing');
-    const qrBox = wrapper.get('[data-testid="phone-link-qr"]');
-    expect(qrBox.html()).toContain('<svg');
-    expect(wrapper.get('[data-testid="phone-link-countdown"]').text()).toContain('二维码有效剩余');
-
-    // 关闭二维码
-    await wrapper.get('[data-testid="phone-link-cancel"]').trigger('click');
-    await flushPromises();
+    // 没有配对、二维码这些东西了。
     expect(wrapper.find('[data-testid="phone-link-qr"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="phone-link-pair"]').exists()).toBe(false);
 
-    // 移除已配对设备
-    await wrapper.get('[data-testid="phone-link-unpair"]').trigger('click');
+    await wrapper.get('[data-testid="phone-link-toggle"]').trigger('click');
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('phone_link_unpair', { peerId: 'phn_1' });
+    expect(ipc).toHaveBeenCalledWith('phone_link_set_enabled', { enabled: true });
+
+    await wrapper.get('[data-testid="phone-link-remove"]').trigger('click');
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('phone_link_remove_peer', { peerId: 'phn_1' });
     expect(wrapper.find('[data-testid="phone-link-peer"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="phone-link-empty"]').exists()).toBe(true);
+  });
+
+  it('shows an error returned by the desktop', async () => {
+    ipc.mockImplementation(async (command: string) => {
+      if (command === 'phone_link_status') return baseStatus({ lastError: '中转服务提示：rate_limited' });
+      throw new Error('x');
+    });
+    const wrapper = mount(PhoneLinkCard);
+    await flushPromises();
+    expect(wrapper.text()).toContain('rate_limited');
   });
 });

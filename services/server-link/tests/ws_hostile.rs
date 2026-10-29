@@ -1,12 +1,10 @@
 #![cfg(feature = "testing")]
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
 use futures_util::{SinkExt, StreamExt};
 use server_link::testing::TestServer;
 use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::{connect_async, tungstenite::{client::IntoClientRequest, Message}};
 use uuid::Uuid;
-use xiaoban_link_protocol::keys::DeviceKey;
 
 #[cfg(windows)]
 fn resident_bytes() -> Option<usize> {
@@ -98,9 +96,8 @@ async fn oversized_and_hostile_frames_do_not_affect_other_connections() {
     let http = reqwest::Client::new();
     let mut ids = Vec::new();
     for name in ["one", "two", "half-open"] {
-        let key = DeviceKey::generate();
         let response: Value = http.post(format!("{}/devices", server.base)).bearer_auth(&token)
-            .json(&json!({"kind":"phone", "name":name, "public_key":B64.encode(key.public_bytes())}))
+            .json(&json!({"kind":"phone", "name":name, "install_id":format!("hostile-{name}-{}", Uuid::new_v4().simple())}))
             .send().await.unwrap().error_for_status().unwrap().json().await.unwrap();
         ids.push(response["device_id"].as_str().unwrap().to_owned());
     }
@@ -114,10 +111,13 @@ async fn oversized_and_hostile_frames_do_not_affect_other_connections() {
     for ws in [&mut hostile, &mut healthy] {
         let ready = tokio::time::timeout(Duration::from_secs(5), ws.next()).await.unwrap().unwrap().unwrap();
         assert!(ready.to_text().unwrap().contains("ready"));
+        let peers = tokio::time::timeout(Duration::from_secs(5), ws.next()).await.unwrap().unwrap().unwrap();
+        assert!(peers.to_text().unwrap().contains("peers"));
     }
     let mut half_open = connect(ids[2].clone()).await;
     let ready = tokio::time::timeout(Duration::from_secs(5), half_open.next()).await.unwrap().unwrap().unwrap();
     assert!(ready.to_text().unwrap().contains("ready"));
+    let _ = tokio::time::timeout(Duration::from_secs(5), half_open.next()).await.unwrap().unwrap().unwrap();
     use tokio::io::AsyncWriteExt;
     half_open.get_mut().write_all(&[0x81, 0xfe, 0x01]).await.unwrap();
     healthy.send(Message::Text(r#"{"op":"ping"}"#.into())).await.unwrap();
@@ -127,7 +127,7 @@ async fn oversized_and_hostile_frames_do_not_affect_other_connections() {
         let frame = tokio::time::timeout(Duration::from_secs(5), hostile.next()).await.unwrap().unwrap().unwrap();
         assert!(frame.to_text().unwrap().contains("error"));
     }
-    for text in [format!("{{\"op\":\"send\",\"env\":{}}}", "[".repeat(200)), format!("{{\"op\":{}}}", "9".repeat(1000))] {
+    for text in [format!("{{\"op\":\"send\",\"data\":{}}}", "[".repeat(200)), format!("{{\"op\":{}}}", "9".repeat(1000))] {
         hostile.send(Message::Text(text.into())).await.unwrap();
         let frame = tokio::time::timeout(Duration::from_secs(5), hostile.next()).await.unwrap().unwrap().unwrap();
         assert!(frame.to_text().unwrap().contains("error"));
@@ -157,6 +157,7 @@ async fn oversized_and_hostile_frames_do_not_affect_other_connections() {
     use tokio_tungstenite::tungstenite::protocol::frame::{coding::{Data, OpCode}, Frame};
     let mut fragmented = connect(ids[0].clone()).await;
     assert!(tokio::time::timeout(Duration::from_secs(5), fragmented.next()).await.unwrap().unwrap().unwrap().to_text().unwrap().contains("ready"));
+    let _ = tokio::time::timeout(Duration::from_secs(5), fragmented.next()).await.unwrap().unwrap().unwrap();
     fragmented.send(Message::Frame(Frame::message(vec![b'x'; 400 * 1024], OpCode::Data(Data::Text), false))).await.unwrap();
     let _ = fragmented.send(Message::Frame(Frame::message(vec![b'x'; 400 * 1024], OpCode::Data(Data::Continue), true))).await;
     let closed = tokio::time::timeout(Duration::from_secs(5), fragmented.next()).await.unwrap();

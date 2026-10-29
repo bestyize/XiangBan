@@ -75,7 +75,6 @@ libs/agent-proactivity/target/
 libs/agent-tools/*/target/
 libs/community-packs/target/
 libs/link-client/target/
-libs/link-protocol/target/
 libs/voice-service/target/
 libs/**/target/
 

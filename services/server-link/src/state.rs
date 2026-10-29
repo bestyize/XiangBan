@@ -1,4 +1,4 @@
-use crate::{auth::JwksVerifier, config::Config, hub::Hub, ratelimit::WindowLimiter};
+use crate::{auth::JwksVerifier, config::Config, hub::Hub};
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -8,5 +8,4 @@ pub struct AppState {
     pub config: Arc<Config>,
     pub verifier: Arc<JwksVerifier>,
     pub hub: Arc<Hub>,
-    pub limiter: Arc<WindowLimiter>,
 }

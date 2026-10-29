@@ -5,7 +5,6 @@
 # 重复会让 nginx -t 报 duplicate。这里把它写在下面本站的 server 块里，只影响本站，不会冲突。
 
 limit_req_zone $binary_remote_addr zone=link_api:10m rate=10r/s;
-limit_req_zone $binary_remote_addr zone=link_pair:10m rate=30r/m;
 
 # WebSocket 升级：没有 Upgrade 头时按普通请求处理。
 map $http_upgrade $link_connection_upgrade {
@@ -49,12 +48,6 @@ server {
         proxy_read_timeout 3600s;
         proxy_send_timeout 3600s;
         proxy_buffering off;
-        proxy_pass http://127.0.0.1:55030;
-    }
-
-    # 配对码申请与兑换：服务内另有按账号的限频，这里再按来源 IP 兜一层。
-    location ~ ^/api/link/(pair-codes|pair)$ {
-        limit_req zone=link_pair burst=10 nodelay;
         proxy_pass http://127.0.0.1:55030;
     }
 

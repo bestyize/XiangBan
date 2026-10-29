@@ -1,6 +1,6 @@
 //! 桌面端手机互联接入层（L2）：
-//! - 私钥与配对密钥存入系统钥匙串（见 `phone_keychain.rs`），其余非敏感状态与重放进度存 `config/phone-link-state.json`
-//! - “允许手机遥控”开关（默认关闭），开启或首次点击“连接手机”时启动 `xiaoban-link-client`
+//! - 同一个小伴账号登录的手机和电脑自动互相发现，没有配对、没有密钥；本地只存这台电脑的设备编号（`config/phone-link-state.json`）
+//! - “允许手机遥控”开关（默认关闭），开启时启动 `xiaoban-link-client`；关闭时断开并不再响应任何手机消息
 //! - 会话桥：`sessions.list` / `sessions.page` / `sessions.changed`、`session.open` / `session.snapshot` / `session.close`、`message.send` / `message.accepted`
 //! - 流式事件旁路：将桌面 `chat-event` / `chat-run-state` 映射为互联协议的 `event`
 //! - 审批桥：`chat-approval` / `chat-question` ↔ `approval.request` / `approval.decision` / `approval.resolved`
@@ -20,9 +20,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{Emitter, Manager};
-use crate::phone_keychain::{read_public_state, KeychainLinkStore};
 use crate::phone_wire;
-use xiaoban_link_client::{store::LinkStore, Link, LinkConfig, LinkEvent, PairingOffer, TokenFn};
+use xiaoban_link_client::{store::{FileStore, LinkStore}, Link, LinkConfig, LinkEvent, TokenFn};
 
 const DEFAULT_RELAY_URL: &str = "https://link.xiangban.xyz/api/link";
 
@@ -128,9 +127,8 @@ pub fn append_remote_audit(root: &Path, entry: &Value) {
 struct RuntimeInner {
     link: Option<Link>,
     connected: bool,
-    pairing: Option<PairingOffer>,
     last_error: Option<String>,
-    /// 每个已配对手机当前订阅的桌面会话编号集合。
+    /// 每个手机当前订阅的桌面会话编号集合。
     subscriptions: HashMap<String, HashSet<String>>,
     /// 当前桌面等待用户确认的审批/问题：`approval_id -> session_id`，用于发现桌面已处理后向手机广播 `approval.resolved`。
     open_approvals: HashMap<String, String>,
@@ -141,7 +139,6 @@ impl Default for RuntimeInner {
         Self {
             link: None,
             connected: false,
-            pairing: None,
             last_error: None,
             subscriptions: HashMap::new(),
             open_approvals: HashMap::new(),
@@ -185,10 +182,7 @@ pub fn status_value(app: &tauri::AppHandle) -> Result<Value, String> {
         .try_state::<crate::account::AccountState>()
         .is_some_and(|s| s.session.lock().unwrap_or_else(|e| e.into_inner()).is_some());
     let state = app.state::<PhoneLinkState>();
-    let mut guard = lock(&state.inner);
-    if guard.pairing.as_ref().is_some_and(|p| p.expires_at_ms <= now_ms()) {
-        guard.pairing = None;
-    }
+    let guard = lock(&state.inner);
     let (device_id, peers) = if let Some(link) = &guard.link {
         let list: Vec<Value> = link
             .peers()
@@ -197,24 +191,10 @@ pub fn status_value(app: &tauri::AppHandle) -> Result<Value, String> {
             .collect();
         (link.device_id(), list)
     } else {
-        // 未启动连接时也从本地状态展示已绑定的手机列表（显示为离线）。
-        // 只读非敏感字段，不触碰钥匙串（状态会被前端频繁刷新）。
-        let saved = read_public_state(&state_path(app)?);
-        let mut list: Vec<Value> = saved
-            .peers
-            .values()
-            .map(|p| json!({ "id": p.peer_id, "name": p.peer_name, "online": false }))
-            .collect();
-        list.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
-        (saved.device.map(|d| d.id), list)
+        // 没连接时没有手机列表（列表来自中转），只展示本机的设备编号。
+        let saved = FileStore::new(state_path(app)?).load().unwrap_or_default();
+        (saved.device.map(|d| d.id), Vec::new())
     };
-    let pairing = guard.pairing.as_ref().map(|p| {
-        json!({
-            "qrText": p.qr_text,
-            "code": p.code,
-            "expiresAtMs": p.expires_at_ms,
-        })
-    });
     Ok(json!({
         "enabled": prefs.enabled,
         "connected": guard.connected,
@@ -223,7 +203,6 @@ pub fn status_value(app: &tauri::AppHandle) -> Result<Value, String> {
         "relayUrl": prefs.relay_url,
         "loggedIn": logged_in,
         "peers": peers,
-        "pairing": pairing,
         "lastError": guard.last_error,
     }))
 }
@@ -249,7 +228,7 @@ async fn ensure_running(app: &tauri::AppHandle) -> Result<Link, String> {
         }
     }
     let prefs = load_prefs(app);
-    let store = Arc::new(KeychainLinkStore::new(state_path(app)?));
+    let store = Arc::new(FileStore::new(state_path(app)?));
     let app_for_token = app.clone();
     let token_fn: TokenFn = Arc::new(move || {
         let handle = app_for_token.clone();
@@ -284,12 +263,10 @@ fn stop_running(app: &tauri::AppHandle) {
     let old = {
         let mut guard = lock(&state.inner);
         guard.connected = false;
-        guard.pairing = None;
         guard.subscriptions.clear();
         guard.link.take()
     };
     if let Some(link) = old {
-        link.cancel_pairing();
         link.shutdown();
     }
     emit_status(app);
@@ -349,17 +326,13 @@ fn handle_link_event(app: &tauri::AppHandle, link: &Link, event: LinkEvent) {
             }
             emit_status(app);
         }
-        LinkEvent::Paired(peer) => {
-            lock(&state.inner).pairing = None;
-            lock(&state.inner).last_error = None;
-            send_hello(app, link, &peer.id);
+        LinkEvent::PeerAdded(peer) => {
+            if peer.online {
+                send_hello(app, link, &peer.id);
+            }
             emit_status(app);
         }
-        LinkEvent::PairRejected { reason } => {
-            lock(&state.inner).last_error = Some(format!("配对请求被拒绝（{reason}）"));
-            emit_status(app);
-        }
-        LinkEvent::Unpaired { peer } => {
+        LinkEvent::PeerRemoved { peer } => {
             lock(&state.inner).subscriptions.remove(&peer);
             emit_status(app);
         }
@@ -375,16 +348,15 @@ fn handle_link_event(app: &tauri::AppHandle, link: &Link, event: LinkEvent) {
             emit_status(app);
         }
         LinkEvent::Revoked => {
-            lock(&state.inner).pairing = None;
             lock(&state.inner).subscriptions.clear();
-            lock(&state.inner).last_error = Some("设备凭据已被撤销，将自动重新登记".into());
+            lock(&state.inner).last_error = Some("这台电脑被从账号的设备列表里移除了，正在重新登记".into());
             emit_status(app);
         }
         LinkEvent::ServerError { code } => {
             lock(&state.inner).last_error = Some(format!("中转服务提示：{code}"));
             emit_status(app);
         }
-        LinkEvent::Undelivered { .. } | LinkEvent::Dropped { .. } => {}
+        LinkEvent::Undelivered { .. } => {}
     }
 }
 
@@ -565,15 +537,6 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                     );
                 }
             }
-        }
-        "unpair" => {
-            let link_clone = link.clone();
-            let peer_id = peer.to_string();
-            let handle = app.clone();
-            tauri::async_runtime::spawn(async move {
-                let _ = link_clone.unpair(&peer_id).await;
-                emit_status(&handle);
-            });
         }
         _ => {
             let _ = send_json(
@@ -909,6 +872,11 @@ pub async fn phone_link_set_enabled(
     enabled: bool,
     device_name: Option<String>,
 ) -> Result<Value, String> {
+    if enabled {
+        crate::account::fresh_access_token(&app)
+            .await
+            .map_err(|_| "请先登录小伴账号，手机登录同一个账号后才能连上这台电脑".to_string())?;
+    }
     let mut prefs = load_prefs(&app);
     prefs.enabled = enabled;
     if let Some(name) = device_name.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()) {
@@ -919,52 +887,16 @@ pub async fn phone_link_set_enabled(
     }
     save_prefs(&app, &prefs)?;
     if enabled {
-        let _ = ensure_running(&app).await;
+        ensure_running(&app).await?;
     } else {
         stop_running(&app);
     }
     status_value(&app)
 }
 
+/// 把一台手机从账号的设备列表里移除（它再登录会重新出现）。
 #[tauri::command]
-pub async fn phone_link_begin_pairing(app: tauri::AppHandle) -> Result<Value, String> {
-    crate::account::fresh_access_token(&app)
-        .await
-        .map_err(|_| "请先登录小伴账号，同一账号下才能配对手机".to_string())?;
-    let mut prefs = load_prefs(&app);
-    if !prefs.enabled {
-        prefs.enabled = true;
-        save_prefs(&app, &prefs)?;
-    }
-    let link = ensure_running(&app).await?;
-    let offer = link.begin_pairing().await.map_err(|e| e.to_string())?;
-    {
-        let state = app.state::<PhoneLinkState>();
-        let mut guard = lock(&state.inner);
-        guard.pairing = Some(offer);
-        guard.last_error = None;
-    }
-    emit_status(&app);
-    status_value(&app)
-}
-
-#[tauri::command]
-pub fn phone_link_cancel_pairing(app: tauri::AppHandle) -> Result<Value, String> {
-    let state = app.state::<PhoneLinkState>();
-    let link = {
-        let mut guard = lock(&state.inner);
-        guard.pairing = None;
-        guard.link.clone()
-    };
-    if let Some(link) = link {
-        link.cancel_pairing();
-    }
-    emit_status(&app);
-    status_value(&app)
-}
-
-#[tauri::command]
-pub async fn phone_link_unpair(app: tauri::AppHandle, peer_id: String) -> Result<Value, String> {
+pub async fn phone_link_remove_peer(app: tauri::AppHandle, peer_id: String) -> Result<Value, String> {
     let peer_id = peer_id.trim().to_string();
     if peer_id.is_empty() {
         return Err("缺少设备编号".into());
@@ -975,16 +907,8 @@ pub async fn phone_link_unpair(app: tauri::AppHandle, peer_id: String) -> Result
         guard.subscriptions.remove(&peer_id);
         guard.link.clone()
     };
-    if let Some(link) = link {
-        let id = app.state::<PhoneLinkState>().next_msg_id();
-        let _ = send_json(&link, &peer_id, &json!({ "t": "unpair", "id": id }), false);
-        link.unpair(&peer_id).await.map_err(|e| e.to_string())?;
-    } else {
-        let store = KeychainLinkStore::new(state_path(&app)?);
-        let mut saved = store.load().map_err(|e| e.to_string())?;
-        saved.peers.remove(&peer_id);
-        store.save(&saved).map_err(|e| e.to_string())?;
-    }
+    let link = link.ok_or_else(|| "请先开启“允许手机遥控”".to_string())?;
+    link.remove_device(&peer_id).await.map_err(|e| e.to_string())?;
     emit_status(&app);
     status_value(&app)
 }

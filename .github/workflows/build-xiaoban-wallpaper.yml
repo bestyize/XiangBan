@@ -6,7 +6,7 @@ name: BuildXiaoBanWallpaper
 #
 # The same run can also package the phone-link pieces (tick the boxes when starting it):
 #   package_android_app  the Android debug APK of the Compose app (artifact xiaoban-android-debug-apk), installable by
-#                        sideloading for the real-device pairing test
+#                        sideloading for the real-device test
 #   package_server_link  the server-link deployment image (artifact xiangban-link-image-<commit>, a .tar.gz built on
 #                        Ubuntu 24.04), see docs/deployment/LINK_DEPLOYMENT.md
 # Without any box ticked the run behaves exactly as before: only the release packages are built. Untick

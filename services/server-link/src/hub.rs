@@ -1,5 +1,5 @@
-//! 在线连接与路由。全部在内存里：谁在线、谁和谁配对（仅已连接设备）、离线时暂存的通知。
-//! 这里只处理已经序列化好的 JSON 文本帧，不解析信封里的密文。
+//! 在线连接与路由。全部在内存里：谁在线、谁能给谁发消息（同账号的手机与电脑）、离线时暂存的通知。
+//! 这里只处理已经序列化好的 JSON 文本帧。
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     sync::{
@@ -91,13 +91,20 @@ impl Hub {
         self.inner.lock().unwrap().peers.get(device).map(|p| p.iter().cloned().collect()).unwrap_or_default()
     }
 
+    /// 连接建立后补充可通信的对端（并入，不覆盖：查库期间新登记的设备可能已经被 `add_pair` 加进来）。
+    pub fn extend_peers(&self, device: &str, peers: impl IntoIterator<Item = String>) {
+        if let Some(p) = self.inner.lock().unwrap().peers.get_mut(device) {
+            p.extend(peers);
+        }
+    }
+
     pub fn add_pair(&self, a: &str, b: &str) {
         let mut g = self.inner.lock().unwrap();
         if let Some(p) = g.peers.get_mut(a) { p.insert(b.to_string()); }
         if let Some(p) = g.peers.get_mut(b) { p.insert(a.to_string()); }
     }
 
-    /// 解除配对：双方的路由关系删掉，并清掉各自给对方暂存的通知。
+    /// 解除关系：双方的路由关系删掉，并清掉各自给对方暂存的通知。
     pub fn remove_pair(&self, a: &str, b: &str) {
         let mut g = self.inner.lock().unwrap();
         if let Some(p) = g.peers.get_mut(a) { p.remove(b); }
@@ -172,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn routing_needs_pairing_and_reports_offline_or_congested() {
+    fn routing_needs_a_peer_relation_and_reports_offline_or_congested() {
         let hub = Hub::new(3, Duration::from_secs(60));
         let (t, mut r) = conn();
         hub.register("a", t, Arc::new(Notify::new()), ["b".to_string()].into());
@@ -186,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn notify_queue_is_capped_expires_and_cleared_on_unpair() {
+    fn notify_queue_is_capped_expires_and_cleared_when_removed() {
         let hub = Hub::new(3, Duration::from_secs(60));
         let t0 = Instant::now();
         for i in 0..5 { hub.store_notify_at("p", format!("n{i}"), t0); }

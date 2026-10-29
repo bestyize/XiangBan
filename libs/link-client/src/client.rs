@@ -1,39 +1,32 @@
 use crate::{
-    api::{Api, PeerInfo},
-    store::{DeviceIdentity, LinkStore, PeerRecord, PendingPair, State},
+    api::Api,
+    store::{DeviceIdentity, LinkStore, State},
     Error, TokenFn,
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD as B64, Engine};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use std::{
-    collections::{HashMap, HashSet},
+    collections::BTreeMap,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 use tokio::sync::{mpsc, Notify};
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{client::IntoClientRequest, http::HeaderValue, Message},
 };
-use xiaoban_link_protocol::{
-    envelope::{open, Envelope, Sender},
-    keys::DeviceKey,
-    pairing::{derive_pairing_key, verify_proof, QrPayload},
-    replay::ReplayGuard,
-};
 
 #[derive(Clone, Debug)]
 pub struct LinkConfig {
     /// 中转服务的 HTTP 地址，含路径前缀，如 `https://link.xiangban.xyz/api/link`。WebSocket 地址由它推出。
     pub base_url: String,
-    /// 显示给手机看的设备名称。
+    /// 显示给对端看的设备名称。
     pub device_name: String,
-    /// 二维码有效窗口（桌面侧）。
-    pub pairing_window: Duration,
+    /// 设备类型：桌面应用是 `desktop`；手机是 `phone`（这里主要给测试用）。
+    pub kind: String,
     /// 断线后第一次重连的等待时间，之后每次翻倍，直到上限。
     pub backoff_initial: Duration,
     pub backoff_max: Duration,
@@ -41,7 +34,7 @@ pub struct LinkConfig {
 
 impl LinkConfig {
     pub fn new(base_url: impl Into<String>, device_name: impl Into<String>) -> Self {
-        Self { base_url: base_url.into(), device_name: device_name.into(), pairing_window: Duration::from_secs(300), backoff_initial: Duration::from_secs(1), backoff_max: Duration::from_secs(30) }
+        Self { base_url: base_url.into(), device_name: device_name.into(), kind: "desktop".into(), backoff_initial: Duration::from_secs(1), backoff_max: Duration::from_secs(30) }
     }
 }
 
@@ -52,37 +45,31 @@ pub struct PeerSummary {
     pub online: bool,
 }
 
-#[derive(Clone, Debug)]
-pub struct PairingOffer {
-    /// 二维码的文本内容
-    pub qr_text: String,
-    /// 配对码（备用，手动输入）
-    pub code: String,
-    pub expires_at_ms: i64,
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LinkEvent {
     Connected,
     Disconnected,
     PeerOnline { peer: String, online: bool },
-    /// 手机的配对证明通过，已建立信任。
-    Paired(PeerSummary),
-    /// 配对请求被拒绝（证明不对，或没有打开配对窗口）。
-    PairRejected { reason: String },
-    Unpaired { peer: String },
-    /// 对端发来的明文（已解密、已通过重放检查）。
+    /// 同账号下多了一台对端设备（或它改了名字）。
+    PeerAdded(PeerSummary),
+    /// 对端设备被移除。
+    PeerRemoved { peer: String },
+    /// 对端发来的文本消息。
     Message { peer: String, data: Vec<u8> },
     /// 中转告知没送达（对端离线且没标通知）。
-    Undelivered { peer: String, seq: u64 },
-    /// 收到的信封被丢弃：解密失败或重放。
-    Dropped { peer: String, reason: String },
+    Undelivered { peer: String },
     /// 中转报告的错误，如 rate_limited。
     ServerError { code: String },
     /// 同一设备在别处连接，本连接被顶替，不再自动重连。
     Replaced,
-    /// 设备在中转被撤销，本地配对已清除。
+    /// 设备在中转被撤销，本地身份已清除，会重新登记成新设备。
     Revoked,
+}
+
+#[derive(Clone)]
+struct Peer {
+    name: String,
+    online: bool,
 }
 
 struct Inner {
@@ -90,17 +77,12 @@ struct Inner {
     api: Api,
     token: TokenFn,
     store: Arc<dyn LinkStore>,
-    /// 登记设备要串行：启动后马上配对时，连接循环和 `begin_pairing` 会同时发现“还没有身份”。
+    /// 登记设备要串行：启动后马上发消息时，连接循环和调用方会同时发现“还没有身份”。
     identity_lock: tokio::sync::Mutex<()>,
     state: Mutex<State>,
-    start_counter: u64,
-    senders: Mutex<HashMap<String, Sender>>,
-    guards: Mutex<HashMap<String, ReplayGuard>>,
-    online: Mutex<HashSet<String>>,
-    handled_pairings: Mutex<HashSet<String>>,
+    peers: Mutex<BTreeMap<String, Peer>>,
     out: Mutex<Option<mpsc::Sender<String>>>,
     events: mpsc::Sender<LinkEvent>,
-    dirty: AtomicBool,
     stopped: AtomicBool,
     stop: Notify,
 }
@@ -110,13 +92,13 @@ pub struct Link {
     inner: Arc<Inner>,
 }
 
-fn now_ms() -> i64 {
-    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
-}
-
 fn ws_url(base: &str) -> String {
     let b = base.trim_end_matches('/');
     if let Some(rest) = b.strip_prefix("https://") { format!("wss://{rest}") } else if let Some(rest) = b.strip_prefix("http://") { format!("ws://{rest}") } else { b.to_string() }
+}
+
+fn random_install_id() -> String {
+    (0..32).map(|_| char::from(b"abcdefghijklmnopqrstuvwxyz0123456789"[rand::Rng::gen_range(&mut rand::thread_rng(), 0..36)])).collect()
 }
 
 enum SessionEnd {
@@ -125,11 +107,13 @@ enum SessionEnd {
 }
 
 impl Link {
-    /// 启动：读状态、启动计数加一并落盘、开始后台连接。返回句柄和事件流。
+    /// 启动：读状态（没有安装编号就生成并落盘），开始后台连接。返回句柄和事件流。
     pub async fn start(cfg: LinkConfig, store: Arc<dyn LinkStore>, token: TokenFn) -> Result<(Link, mpsc::Receiver<LinkEvent>), Error> {
         let mut state = store.load()?;
-        state.start_counter += 1;
-        store.save(&state)?;
+        if state.install_id.is_empty() {
+            state.install_id = random_install_id();
+            store.save(&state)?;
+        }
         let (events, rx) = mpsc::channel(1024);
         let inner = Arc::new(Inner {
             api: Api::new(&cfg.base_url, token.clone()),
@@ -137,28 +121,14 @@ impl Link {
             token,
             store,
             identity_lock: tokio::sync::Mutex::new(()),
-            start_counter: state.start_counter,
             state: Mutex::new(state),
-            senders: Mutex::default(),
-            guards: Mutex::default(),
-            online: Mutex::default(),
-            handled_pairings: Mutex::default(),
+            peers: Mutex::default(),
             out: Mutex::new(None),
             events,
-            dirty: AtomicBool::new(false),
             stopped: AtomicBool::new(false),
             stop: Notify::new(),
         });
-        // 恢复各对端的重放防护进度。
-        {
-            let state = inner.state.lock().unwrap();
-            let mut guards = inner.guards.lock().unwrap();
-            for (peer, rec) in &state.peers {
-                guards.insert(peer.clone(), ReplayGuard::restore(rec.replay.clone()));
-            }
-        }
         tokio::spawn(inner.clone().run());
-        tokio::spawn(inner.clone().flusher());
         Ok((Link { inner }, rx))
     }
 
@@ -166,111 +136,56 @@ impl Link {
         self.inner.state.lock().unwrap().device.as_ref().map(|d| d.id.clone())
     }
 
+    /// 同账号下的对端设备（电脑的对端是手机），按名称排序。
     pub fn peers(&self) -> Vec<PeerSummary> {
-        let state = self.inner.state.lock().unwrap();
-        let online = self.inner.online.lock().unwrap();
-        let mut v: Vec<_> = state.peers.values().map(|p| PeerSummary { id: p.peer_id.clone(), name: p.peer_name.clone(), online: online.contains(&p.peer_id) }).collect();
+        let mut v: Vec<_> = self.inner.peers.lock().unwrap().iter().map(|(id, p)| PeerSummary { id: id.clone(), name: p.name.clone(), online: p.online }).collect();
         v.sort_by(|a, b| a.name.cmp(&b.name));
         v
     }
 
-    /// 打开配对窗口，返回二维码内容。窗口内第一个证明通过的手机会被接受。
-    pub async fn begin_pairing(&self) -> Result<PairingOffer, Error> {
-        let i = &self.inner;
-        let identity = i.ensure_identity().await?;
-        let code = i.api.create_pair_code(&identity.id).await?;
-        let mut secret = [0u8; 32];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut secret);
-        let key = DeviceKey::from_bytes(&B64.decode(&identity.private_key).ok().and_then(|b| b.try_into().ok()).ok_or_else(|| Error::Store("私钥格式不对".into()))?)?;
-        let qr = QrPayload { r: i.cfg.base_url.clone(), d: identity.id.clone(), c: code.code.clone(), k: B64.encode(key.public_bytes()), s: B64.encode(secret) };
-        let expires_at_ms = now_ms() + i.cfg.pairing_window.as_millis() as i64;
-        {
-            let mut state = i.state.lock().unwrap();
-            state.pending_pair = Some(PendingPair { code: code.code.clone(), secret: B64.encode(secret), expires_at_ms });
-            i.store.save(&state)?;
-        }
-        Ok(PairingOffer { qr_text: qr.encode(), code: code.code, expires_at_ms })
-    }
-
-    /// 关闭配对窗口（之后到达的配对请求一律拒绝）。
-    pub fn cancel_pairing(&self) {
-        let mut state = self.inner.state.lock().unwrap();
-        state.pending_pair = None;
-        let _ = self.inner.store.save(&state);
-    }
-
-    /// 给已配对的对端发一条明文消息（由本库加密）。`notify` 为真时，对端离线也由中转暂存。
+    /// 给对端发一条文本消息（内容是 UTF-8，通常是 JSON）。`notify` 为真时，对端离线也由中转暂存。
     /// 返回 Ok 只表示已进入发送队列；没送达会收到 [`LinkEvent::Undelivered`]。
     pub fn send(&self, peer: &str, data: &[u8], notify: bool) -> Result<(), Error> {
         let i = &self.inner;
-        let (my_id, prk) = {
-            let state = i.state.lock().unwrap();
-            let me = state.device.as_ref().ok_or(Error::NotConnected)?.id.clone();
-            let rec = state.peers.get(peer).ok_or(Error::UnknownPeer)?;
-            (me, decode32(&rec.prk)?)
-        };
-        // 加密和入队放在同一把锁里，保证序号和发送顺序一致。
-        let mut senders = i.senders.lock().unwrap();
-        let sender = senders.entry(peer.to_string()).or_insert_with(|| Sender::new(prk, &my_id, peer, i.start_counter));
+        let text = std::str::from_utf8(data).map_err(|_| Error::BadMessage)?;
+        if !i.peers.lock().unwrap().contains_key(peer) {
+            return Err(Error::UnknownPeer);
+        }
         let out = i.out.lock().unwrap().clone().ok_or(Error::NotConnected)?;
-        let env = sender.seal(data)?;
-        let frame = json!({ "op": "send", "env": env, "notify": notify }).to_string();
+        let frame = json!({ "op": "send", "to": peer, "data": text, "notify": notify }).to_string();
         out.try_send(frame).map_err(|_| Error::Congested)
     }
 
-    /// 解除与某个对端的配对（同时通知中转，对端会收到 unpaired）。
-    pub async fn unpair(&self, peer: &str) -> Result<(), Error> {
-        let i = &self.inner;
-        let rec = i.state.lock().unwrap().peers.get(peer).cloned().ok_or(Error::UnknownPeer)?;
-        match i.api.remove_pairing(&rec.pairing_id).await {
+    /// 移除一台对端设备（例如不再使用的旧手机）。它仍在运行的话，下次启动会重新登记成新设备。
+    pub async fn remove_device(&self, peer: &str) -> Result<(), Error> {
+        match self.inner.api.remove_device(peer).await {
             Ok(()) | Err(Error::Server { status: 404, .. }) => {}
             Err(e) => return Err(e),
         }
-        i.forget_peer(peer);
+        self.inner.forget_peer(peer);
         Ok(())
     }
 
     pub fn shutdown(&self) {
         self.inner.stopped.store(true, Ordering::SeqCst);
         self.inner.stop.notify_waiters();
-        self.inner.flush();
     }
-}
-
-fn decode32(text: &str) -> Result<[u8; 32], Error> {
-    B64.decode(text).ok().and_then(|b| b.try_into().ok()).ok_or_else(|| Error::Store("密钥格式不对".into()))
 }
 
 impl Inner {
-    fn save(&self, state: &State) { let _ = self.store.save(state); }
-
-    fn flush(&self) {
-        if self.dirty.swap(false, Ordering::SeqCst) {
-            let state = self.state.lock().unwrap();
-            self.save(&state);
-        }
-    }
-
-    async fn flusher(self: Arc<Self>) {
-        loop {
-            tokio::select! {
-                _ = tokio::time::sleep(Duration::from_secs(1)) => self.flush(),
-                _ = self.stop.notified() => { self.flush(); return; }
-            }
-            if self.stopped.load(Ordering::SeqCst) { return; }
-        }
-    }
-
     async fn emit(&self, event: LinkEvent) { let _ = self.events.send(event).await; }
 
     async fn ensure_identity(&self) -> Result<DeviceIdentity, Error> {
         let _guard = self.identity_lock.lock().await;
-        if let Some(d) = self.state.lock().unwrap().device.clone() {
-            return Ok(d);
-        }
-        let key = DeviceKey::generate();
-        let id = self.api.register_device("desktop", &self.cfg.device_name, &B64.encode(key.public_bytes())).await?;
-        let identity = DeviceIdentity { id, name: self.cfg.device_name.clone(), private_key: B64.encode(key.to_bytes()) };
+        let install_id = {
+            let state = self.state.lock().unwrap();
+            if let Some(d) = state.device.clone() {
+                return Ok(d);
+            }
+            state.install_id.clone()
+        };
+        let id = self.api.register_device(&self.cfg.kind, &self.cfg.device_name, &install_id).await?;
+        let identity = DeviceIdentity { id, name: self.cfg.device_name.clone() };
         let mut state = self.state.lock().unwrap();
         state.device = Some(identity.clone());
         self.store.save(&state)?;
@@ -278,24 +193,16 @@ impl Inner {
     }
 
     fn forget_peer(&self, peer: &str) {
-        self.senders.lock().unwrap().remove(peer);
-        self.guards.lock().unwrap().remove(peer);
-        self.online.lock().unwrap().remove(peer);
-        let mut state = self.state.lock().unwrap();
-        state.peers.remove(peer);
-        self.save(&state);
+        self.peers.lock().unwrap().remove(peer);
     }
 
-    /// 设备在中转被撤销：本地身份和所有配对作废，下次连接会重新登记成新设备。
+    /// 设备在中转被撤销：本地身份作废，下次连接会重新登记成新设备（安装编号换新，避免又拿回被撤销的）。
     fn wipe_identity(&self) {
-        self.senders.lock().unwrap().clear();
-        self.guards.lock().unwrap().clear();
-        self.online.lock().unwrap().clear();
+        self.peers.lock().unwrap().clear();
         let mut state = self.state.lock().unwrap();
         state.device = None;
-        state.peers.clear();
-        state.pending_pair = None;
-        self.save(&state);
+        state.install_id = random_install_id();
+        let _ = self.store.save(&state);
     }
 
     async fn run(self: Arc<Self>) {
@@ -345,18 +252,6 @@ impl Inner {
             let _ = sink.close().await;
         });
         self.emit(LinkEvent::Connected).await;
-        // 错过的配对请求（桌面离线时手机扫了码）从列表里补。
-        {
-            let me = self.clone();
-            let id = identity.id.clone();
-            tokio::spawn(async move {
-                if let Ok(list) = me.api.pending(&id).await {
-                    for p in list {
-                        me.clone().on_pair_request(p.pairing_id, p.peer, p.proof).await;
-                    }
-                }
-            });
-        }
 
         let mut ping = tokio::time::interval(Duration::from_secs(25));
         ping.tick().await;
@@ -379,44 +274,81 @@ impl Inner {
         *self.out.lock().unwrap() = None;
         drop(tx);
         let _ = writer.await;
-        self.flush();
-        let peers: Vec<String> = self.online.lock().unwrap().drain().collect();
-        for peer in peers { self.emit(LinkEvent::PeerOnline { peer, online: false }).await; }
+        let went_offline: Vec<String> = {
+            let mut peers = self.peers.lock().unwrap();
+            peers.iter_mut().filter(|(_, p)| p.online).map(|(id, p)| { p.online = false; id.clone() }).collect()
+        };
+        for peer in went_offline { self.emit(LinkEvent::PeerOnline { peer, online: false }).await; }
         self.emit(LinkEvent::Disconnected).await;
         end
+    }
+
+    fn peer_from(v: &Value) -> Option<(String, Peer)> {
+        Some((v["id"].as_str()?.to_string(), Peer { name: v["name"].as_str().unwrap_or("").to_string(), online: v["online"].as_bool().unwrap_or(false) }))
     }
 
     /// 返回 `Some(true)` 表示应停止重连，`Some(false)` 表示结束本次连接后重试，`None` 继续。
     async fn handle_frame(self: &Arc<Self>, text: &str) -> Option<bool> {
         let v: Value = serde_json::from_str(text).ok()?;
         match v["op"].as_str()? {
+            "peers" => {
+                let fresh: BTreeMap<String, Peer> = v["items"].as_array()?.iter().filter_map(Self::peer_from).collect();
+                let (added, removed, changed) = {
+                    let mut peers = self.peers.lock().unwrap();
+                    let removed: Vec<String> = peers.keys().filter(|id| !fresh.contains_key(*id)).cloned().collect();
+                    let mut added = Vec::new();
+                    let mut changed = Vec::new();
+                    for (id, p) in &fresh {
+                        match peers.get(id) {
+                            None => added.push(PeerSummary { id: id.clone(), name: p.name.clone(), online: p.online }),
+                            Some(old) if old.online != p.online => changed.push((id.clone(), p.online)),
+                            _ => {}
+                        }
+                    }
+                    *peers = fresh;
+                    (added, removed, changed)
+                };
+                for peer in removed { self.emit(LinkEvent::PeerRemoved { peer }).await; }
+                for summary in added { self.emit(LinkEvent::PeerAdded(summary)).await; }
+                for (peer, online) in changed { self.emit(LinkEvent::PeerOnline { peer, online }).await; }
+            }
+            "peer.added" => {
+                let (id, mut peer) = Self::peer_from(&v["device"])?;
+                let (is_new, renamed, online_changed) = {
+                    let mut peers = self.peers.lock().unwrap();
+                    let previous = peers.get(&id).cloned();
+                    if let Some(old) = &previous { peer.online = old.online || peer.online; }
+                    peers.insert(id.clone(), peer.clone());
+                    match previous {
+                        None => (true, false, false),
+                        Some(old) => (false, old.name != peer.name, old.online != peer.online),
+                    }
+                };
+                if is_new || renamed {
+                    self.emit(LinkEvent::PeerAdded(PeerSummary { id: id.clone(), name: peer.name.clone(), online: peer.online })).await;
+                } else if online_changed {
+                    self.emit(LinkEvent::PeerOnline { peer: id, online: peer.online }).await;
+                }
+            }
+            "peer.removed" => {
+                let peer = v["device"].as_str()?.to_string();
+                if self.peers.lock().unwrap().remove(&peer).is_some() {
+                    self.emit(LinkEvent::PeerRemoved { peer }).await;
+                }
+            }
             "presence" => {
                 let peer = v["device"].as_str()?.to_string();
                 let online = v["online"].as_bool()?;
-                {
-                    let mut set = self.online.lock().unwrap();
-                    if online { set.insert(peer.clone()); } else { set.remove(&peer); }
-                }
+                if let Some(p) = self.peers.lock().unwrap().get_mut(&peer) { p.online = online; }
                 self.emit(LinkEvent::PeerOnline { peer, online }).await;
             }
-            "pair.request" => {
-                let phone: PeerInfo = serde_json::from_value(v["phone"].clone()).ok()?;
-                let (id, proof) = (v["pairing_id"].as_str()?.to_string(), v["proof"].as_str()?.to_string());
-                tokio::spawn(self.clone().on_pair_request(id, phone, proof));
-            }
             "deliver" => {
-                let env: Envelope = serde_json::from_value(v["env"].clone()).ok()?;
-                self.on_deliver(env).await;
+                let peer = v["from"].as_str()?.to_string();
+                let data = v["data"].as_str()?.as_bytes().to_vec();
+                self.emit(LinkEvent::Message { peer, data }).await;
             }
             "undelivered" => {
-                self.emit(LinkEvent::Undelivered { peer: v["to"].as_str()?.into(), seq: v["seq"].as_u64().unwrap_or(0) }).await;
-            }
-            "unpaired" => {
-                let peer = v["device"].as_str()?.to_string();
-                if self.state.lock().unwrap().peers.contains_key(&peer) {
-                    self.forget_peer(&peer);
-                    self.emit(LinkEvent::Unpaired { peer }).await;
-                }
+                self.emit(LinkEvent::Undelivered { peer: v["to"].as_str()?.into() }).await;
             }
             "error" => {
                 let code = v["code"].as_str().unwrap_or("").to_string();
@@ -430,68 +362,5 @@ impl Inner {
         }
         None
     }
-
-    async fn on_pair_request(self: Arc<Self>, pairing_id: String, phone: PeerInfo, proof_b64: String) {
-        if !self.handled_pairings.lock().unwrap().insert(pairing_id.clone()) { return; }
-        let reject = |reason: &'static str| {
-            let me = self.clone();
-            let id = pairing_id.clone();
-            async move {
-                let _ = me.api.reject(&id).await;
-                me.emit(LinkEvent::PairRejected { reason: reason.into() }).await;
-            }
-        };
-        let (identity, pending) = {
-            let state = self.state.lock().unwrap();
-            (state.device.clone(), state.pending_pair.clone())
-        };
-        let (Some(identity), Some(pending)) = (identity, pending) else { return reject("no_window").await };
-        if pending.expires_at_ms < now_ms() { return reject("no_window").await; }
-        let (Ok(secret), Ok(phone_pub), Ok(proof)) = (decode32(&pending.secret), B64.decode(&phone.public_key), B64.decode(&proof_b64)) else { return reject("bad_proof").await };
-        if verify_proof(&secret, &phone.id, &identity.id, &phone_pub, &proof).is_err() { return reject("bad_proof").await; }
-        let Ok(private) = decode32(&identity.private_key) else { return };
-        let Ok(key) = DeviceKey::from_bytes(&private) else { return };
-        let Ok(prk) = derive_pairing_key(&key, &phone_pub, &secret) else { return reject("bad_proof").await };
-        if let Err(e) = self.api.confirm(&pairing_id).await {
-            self.emit(LinkEvent::ServerError { code: format!("confirm_failed:{e}") }).await;
-            return;
-        }
-        {
-            let mut state = self.state.lock().unwrap();
-            state.pending_pair = None;
-            state.peers.insert(phone.id.clone(), PeerRecord { pairing_id: pairing_id.clone(), peer_id: phone.id.clone(), peer_name: phone.name.clone(), peer_public: phone.public_key.clone(), prk: B64.encode(prk), replay: None });
-            self.save(&state);
-        }
-        self.senders.lock().unwrap().remove(&phone.id);
-        self.guards.lock().unwrap().insert(phone.id.clone(), ReplayGuard::new());
-        let online = self.online.lock().unwrap().contains(&phone.id);
-        self.emit(LinkEvent::Paired(PeerSummary { id: phone.id, name: phone.name, online })).await;
-    }
-
-    async fn on_deliver(&self, env: Envelope) {
-        let (my_id, rec) = {
-            let state = self.state.lock().unwrap();
-            (state.device.as_ref().map(|d| d.id.clone()), state.peers.get(&env.from).cloned())
-        };
-        let (Some(my_id), Some(rec)) = (my_id, rec) else { return };
-        if env.to != my_id { return; }
-        let Ok(prk) = decode32(&rec.prk) else { return };
-        let plain = match open(&prk, &env.from, &env.to, &env) {
-            Ok(p) => p,
-            Err(e) => return self.emit(LinkEvent::Dropped { peer: env.from.clone(), reason: format!("decrypt:{e}") }).await,
-        };
-        let progress = {
-            let mut guards = self.guards.lock().unwrap();
-            let guard = guards.entry(env.from.clone()).or_default();
-            guard.check(&env).map(|_| guard.state().cloned())
-        };
-        match progress {
-            Ok(state) => {
-                if let Some(rec) = self.state.lock().unwrap().peers.get_mut(&env.from) { rec.replay = state; }
-                self.dirty.store(true, Ordering::SeqCst);
-                self.emit(LinkEvent::Message { peer: env.from, data: plain }).await;
-            }
-            Err(e) => self.emit(LinkEvent::Dropped { peer: env.from, reason: format!("replay:{e}") }).await,
-        }
-    }
 }
+

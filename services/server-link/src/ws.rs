@@ -1,9 +1,10 @@
-//! 设备的 WebSocket 连接：认证、上线通知、信封转发、离线时只暂存通知。
+//! 设备的 WebSocket 连接：认证、上线通知、消息转发、离线时只暂存通知。
+//! 同一账号下，手机与电脑可以互发消息；中转按认证后的设备填写来源，转发的内容只做大小检查。
 use crate::{
     auth::{ws_token, WS_PROTOCOL},
     error::AppError,
     frames,
-    handlers::{owned_device, Device},
+    handlers::{counterparts, owned_device, Device},
     hub::Sent,
     ratelimit::Bucket,
     state::AppState,
@@ -18,14 +19,16 @@ use axum::{
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
+use serde_json::{json, Value};
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio::sync::{mpsc, Notify};
-use xiaoban_link_protocol::{envelope::Envelope, MAX_CIPHERTEXT, VERSION};
 
 /// 空闲超过这个时间没收到任何帧就断开（客户端每 25 秒发一次 ping）。
 const IDLE_TIMEOUT: Duration = Duration::from_secs(75);
 const OUTBOX: usize = 256;
 const MAX_WS_MESSAGE: usize = 512 * 1024;
+/// 一条消息正文（`data`）的最大字节数。
+pub const MAX_DATA: usize = 256 * 1024;
 
 #[derive(Deserialize)]
 pub struct WsQuery {
@@ -37,7 +40,8 @@ pub struct WsQuery {
 enum ClientFrame {
     #[serde(rename = "send")]
     Send {
-        env: Envelope,
+        to: String,
+        data: String,
         #[serde(default)]
         notify: bool,
     },
@@ -53,27 +57,18 @@ pub async fn connect(State(state): State<AppState>, headers: HeaderMap, Query(q)
         .protocols([WS_PROTOCOL]).on_upgrade(move |socket| run(state, device, socket)))
 }
 
-async fn active_peers(state: &AppState, device: &str) -> HashSet<String> {
-    sqlx::query_scalar::<_, String>(
-        "SELECT CASE WHEN desktop_id = $1 THEN phone_id ELSE desktop_id END FROM pairings WHERE (desktop_id = $1 OR phone_id = $1) AND status = 'active'",
-    )
-    .bind(device)
-    .fetch_all(&state.pool)
-    .await
-    .unwrap_or_default()
-    .into_iter()
-    .collect()
-}
-
 async fn run(state: AppState, device: Device, socket: WebSocket) {
     let (mut sink, mut stream) = socket.split();
     let (tx, mut rx) = mpsc::channel::<String>(OUTBOX);
     let kick = Arc::new(Notify::new());
-    let peers = active_peers(&state, &device.id).await;
-    let (conn_id, old) = state.hub.register(&device.id, tx.clone(), kick.clone(), peers.clone());
+    // 先登记连接再查库：查库期间新登记的设备会通过 `add_pair` 找到这条连接，不会漏掉。
+    let (conn_id, old) = state.hub.register(&device.id, tx.clone(), kick.clone(), HashSet::new());
     if let Some(old) = old {
         old.close_with(frames::error("replaced"));
     }
+    let peers = counterparts(&state.pool, device.uid, &device.kind).await.unwrap_or_default();
+    state.hub.extend_peers(&device.id, peers.iter().map(|p| p.id.clone()));
+    let peer_ids: HashSet<String> = peers.iter().map(|p| p.id.clone()).collect();
 
     let writer = tokio::spawn(async move {
         while let Some(frame) = rx.recv().await {
@@ -85,25 +80,10 @@ async fn run(state: AppState, device: Device, socket: WebSocket) {
     });
 
     let _ = tx.try_send(frames::ready(&device.id));
-    for peer in &peers {
-        let _ = tx.try_send(frames::presence(peer, state.hub.is_online(peer)));
+    let items: Vec<Value> = peers.iter().map(|p| json!({ "id": p.id, "kind": p.kind, "name": p.name, "online": state.hub.is_online(&p.id) })).collect();
+    let _ = tx.try_send(frames::peers(&items));
+    for peer in &peer_ids {
         state.hub.send(peer, frames::presence(&device.id, true));
-    }
-    // 桌面刚上线：把还没处理的配对请求补发给它。
-    if device.kind == "desktop" {
-        let pending: Vec<(uuid::Uuid, String, String, String, String)> = sqlx::query_as(
-            "SELECT p.id, d.id, d.name, d.public_key, p.phone_proof FROM pairings p JOIN devices d ON d.id = p.phone_id
-             WHERE p.desktop_id = $1 AND p.status = 'pending' AND d.revoked_at IS NULL AND p.created_at > now() - make_interval(secs => $2)",
-        )
-        .bind(&device.id)
-        .bind(state.config.pair_code_ttl.as_secs() as f64)
-        .fetch_all(&state.pool)
-        .await
-        .unwrap_or_default();
-        for (id, phone_id, name, key, proof) in pending {
-            let phone = serde_json::json!({ "id": phone_id, "kind": "phone", "name": name, "public_key": key });
-            let _ = tx.try_send(frames::pair_request(&id.to_string(), &phone, &proof));
-        }
     }
     for frame in state.hub.take_notify(&device.id) {
         let _ = tx.try_send(frame);
@@ -144,15 +124,6 @@ async fn run(state: AppState, device: Device, socket: WebSocket) {
     let _ = writer.await;
 }
 
-/// 信封字段的粗检查：只看形状和大小，不碰密文。
-fn envelope_ok(env: &Envelope) -> bool {
-    env.v == VERSION
-        && env.from.len() <= 64
-        && env.to.len() <= 64
-        && env.ep.len() <= 32
-        && env.ct.len() <= MAX_CIPHERTEXT * 4 / 3 + 8
-}
-
 fn handle_text(state: &AppState, device: &Device, tx: &mpsc::Sender<String>, text: &str) {
     let frame: ClientFrame = match serde_json::from_str(text) {
         Ok(f) => f,
@@ -165,27 +136,23 @@ fn handle_text(state: &AppState, device: &Device, tx: &mpsc::Sender<String>, tex
         ClientFrame::Ping => {
             let _ = tx.try_send(frames::pong());
         }
-        ClientFrame::Send { env, notify } => {
-            if !envelope_ok(&env) {
+        ClientFrame::Send { to, data, notify } => {
+            if data.len() > MAX_DATA || to.len() > 64 {
                 let _ = tx.try_send(frames::error("payload_too_large"));
                 return;
             }
-            if env.from != device.id {
-                let _ = tx.try_send(frames::error("bad_from"));
+            if !state.hub.is_paired(&device.id, &to) {
+                let _ = tx.try_send(frames::error("unknown_peer"));
                 return;
             }
-            if !state.hub.is_paired(&device.id, &env.to) {
-                let _ = tx.try_send(frames::error("not_paired"));
-                return;
-            }
-            let out = frames::deliver(&env);
-            match state.hub.send(&env.to, out.clone()) {
+            let out = frames::deliver(&device.id, &data);
+            match state.hub.send(&to, out.clone()) {
                 Sent::Delivered => {}
                 Sent::Offline | Sent::Congested => {
                     if notify {
-                        state.hub.store_notify(&env.to, out);
+                        state.hub.store_notify(&to, out);
                     } else {
-                        let _ = tx.try_send(frames::undelivered(&env.to, env.seq, "offline"));
+                        let _ = tx.try_send(frames::undelivered(&to, "offline"));
                     }
                 }
             }

@@ -1,5 +1,5 @@
-use server_link::{auth, build_router, cleanup, config::Config, db, hub, ratelimit, state::AppState};
-use std::{net::SocketAddr, sync::Arc, time::Duration};
+use server_link::{auth, build_router, config::Config, db, hub, state::AppState};
+use std::{net::SocketAddr, sync::Arc};
 use tracing::info;
 
 #[tokio::main]
@@ -19,16 +19,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let state = AppState {
         pool: pool.clone(),
         hub: Arc::new(hub::Hub::new(config.notify_queue_cap, config.notify_ttl)),
-        limiter: Arc::new(ratelimit::WindowLimiter::default()),
         verifier: Arc::new(verifier),
         config: Arc::new(config),
     };
-    tokio::spawn(async move {
-        loop {
-            cleanup(&pool).await;
-            tokio::time::sleep(Duration::from_secs(3600)).await;
-        }
-    });
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, build_router(state).into_make_service_with_connect_info::<SocketAddr>()).await?;

@@ -23,7 +23,6 @@ mod ai_catalogue;
 mod ai_gateway;
 mod chat;
 mod community;
-mod phone_keychain;
 mod phone_link;
 mod phone_wire;
 mod speech_agent;
@@ -872,7 +871,7 @@ fn main() {
             chat::store_market::ai_market_updates, chat::store_market::ai_market_update,
             community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
             community::community_analytics_get, community::community_analytics_set, community::community_track,
-            phone_link::phone_link_status, phone_link::phone_link_set_enabled, phone_link::phone_link_begin_pairing, phone_link::phone_link_cancel_pairing, phone_link::phone_link_unpair,
+            phone_link::phone_link_status, phone_link::phone_link_set_enabled, phone_link::phone_link_remove_peer,
             speech_agent::speech_agent_env, speech_agent::speech_agent_install_guides, speech_agent::speech_agent_hooks_status, speech_agent::speech_agent_hooks_install, speech_agent::speech_agent_hooks_uninstall, speech_agent::speech_agent_inject,
             speech_agent::speech_agent_delegate, speech_agent::speech_agent_task_status, speech_agent::speech_agent_task_cancel, speech_agent::speech_agent_task_list,
             voice_service::voice_service_status, voice_service::voice_service_set_enabled, voice_service::voice_service_reset_token,
