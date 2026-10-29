@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -249,6 +250,9 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     var input by rememberSaveable { mutableStateOf("") }
     var modelSheet by rememberSaveable { mutableStateOf(false) }
     var copiedId by remember { mutableStateOf<Long?>(null) }
+    var drawer by rememberSaveable { mutableStateOf(false) }
+    var attach by rememberSaveable { mutableStateOf(false) }
+    var toast by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(session.loggedIn) { if (session.loggedIn) chat.loadMeta() }
 
@@ -256,7 +260,12 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         Column(Modifier.fillMaxSize().imePadding()) {
             ScreenBar(
                 cloud.title(), onBack = back,
-                trailing = { IconTap(XIcons.Pen, "新对话", { chat.clearConversation(); input = "" }) },
+                trailing = {
+                    Row {
+                        IconTap(XIcons.NewChat, "新对话", { chat.clearConversation(); input = "" }, size = 22.dp)
+                        IconTap(XIcons.Menu, "对话列表", { drawer = true }, size = 22.dp)
+                    }
+                },
             )
             if (!session.loggedIn) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -265,29 +274,35 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
             } else {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
                     if (cloud.messages.isEmpty()) {
-                        ChatWelcome { prompt -> chat.send(prompt) }
+                        ChatWelcome()
                     } else {
                         CloudMessages(cloud.messages, env.platform != null, copiedId, onCopy = { turn -> env.platform?.copy(turn.text); copiedId = turn.id }, onRetry = chat::retryLast, onQuota = { open(Route.Models) })
                     }
                 }
-                Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
-                    ComposerCard(input, { input = it }, "问点什么，或描述想要的内容…") {
-                        ChipPill(cloud.modelName(), trailingIcon = XIcons.ChevronDown, onClick = { modelSheet = true })
-                        Spacer(Modifier.weight(1f))
-                        if (cloud.sending) {
-                            RoundIconButton(XIcons.Stop, "停止", chat::stop, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.surface)
-                        } else {
-                            val canSend = input.trim().isNotEmpty()
-                            RoundIconButton(
-                                XIcons.ArrowRight, "发送",
-                                { val text = input.trim(); if (text.isNotEmpty()) { input = ""; chat.send(text) } },
-                                if (canSend) Brand else LocalExtraColors.current.line, Color.White, enabled = canSend,
-                            )
-                        }
+                if (cloud.messages.isEmpty()) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        StarterPrompts.forEach { prompt -> ChipPill(prompt, onClick = { chat.send(prompt) }) }
                     }
+                }
+                Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
+                    ChatComposer(
+                        input, { input = it }, "问点什么，或描述想要的装扮、游戏…", cloud.modelName(),
+                        onModel = { modelSheet = true },
+                        onAttach = { attach = true },
+                        onWeb = { toast = "联网搜索即将支持" },
+                        onVoice = { toast = "语音输入即将支持" },
+                        onLive = { toast = "实时对话即将支持" },
+                        onSend = { val text = input.trim(); if (text.isNotEmpty()) { input = ""; chat.send(text) } },
+                        sending = cloud.sending, onStop = chat::stop,
+                    )
                 }
             }
         }
+        OverlayTransition(attach) { panel ->
+            AttachSheet({ attach = false }, { attach = false; toast = "$it 即将支持" }, panel)
+        }
+        AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
+        Toast(toast) { toast = null }
         OverlayTransition(modelSheet) { panel ->
             BottomSheet({ modelSheet = false }, panel) {
                 Text("选择模型", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
@@ -319,17 +334,9 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
 }
 
 @Composable
-private fun ChatWelcome(onPick: (String) -> Unit) {
+private fun ChatWelcome() {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.Bottom) {
         AssistantRow { AssistantBubble("你好，我是小伴。当前是云端对话，不依赖电脑在线。你可以随时提问、整理待办或润色文字。") }
-        Text("试试这样问我", Modifier.padding(top = 16.dp, bottom = 8.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        StarterPrompts.forEach { prompt ->
-            Text(
-                prompt,
-                Modifier.padding(bottom = 8.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surface).clickable { onPick(prompt) }.padding(horizontal = 14.dp, vertical = 8.dp),
-                fontSize = 13.sp,
-            )
-        }
     }
 }
 
