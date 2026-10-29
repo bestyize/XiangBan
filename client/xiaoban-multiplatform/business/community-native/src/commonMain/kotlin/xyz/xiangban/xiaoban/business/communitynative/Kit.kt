@@ -318,7 +318,7 @@ fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier =
             .border(2.dp, if (checked) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.line, shape).clickable { onChange(!checked) },
         contentAlignment = Alignment.Center,
     ) {
-        if (checked) XIcon(XIcons.Check, tint = Color.White, size = 16.dp)
+        if (checked) XIcon(XIcons.Check, tint = MaterialTheme.colorScheme.surface, size = 16.dp)
     }
 }
 

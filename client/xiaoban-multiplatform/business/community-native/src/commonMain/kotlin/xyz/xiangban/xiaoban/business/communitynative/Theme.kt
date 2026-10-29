@@ -1,6 +1,7 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -44,6 +45,10 @@ fun XiaobanTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () 
     }
     val extra = if (dark) DarkExtra else LightExtra
     CompositionLocalProvider(LocalExtraColors provides extra) {
-        MaterialTheme(colorScheme = scheme, content = content)
+        MaterialTheme(colorScheme = scheme) {
+            // Box backgrounds do not provide a content color like Material Surface does.
+            // Set the default explicitly so Text without a color follows the active theme.
+            CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+        }
     }
 }
