@@ -16,7 +16,7 @@
 
 要求与约束：
 1. 独立部署栈：新建目录（例如 /home/ubuntu/xiangban-link），自带 PostgreSQL，不改动也不依赖账号中心、主站、市场等现有栈和它们的数据卷。动手前先看清服务器上已有的容器、Nginx 配置、端口占用，不要覆盖已有文件；有疑问先停下来问我。
-2. 镜像：Dockerfile 只含运行时，二进制必须在 Ubuntu 24.04 x64 上编译（glibc 版本要匹配）。优先使用 GitHub Actions 工作流 “Server Link Tests”（勾选 package）产出的 xiangban-link-<标签>.tar.gz；没有的话按 LINK_DEPLOYMENT.md 在构建机手工构建。不要把 Windows 或 macOS 编译的二进制传上去。
+2. 镜像：Dockerfile 只含运行时，二进制必须在 Ubuntu 24.04 x64 上编译（glibc 版本要匹配）。优先使用 GitHub Actions 工作流 “BuildXiaoBanWallpaper”（勾选 `package_server_link`，可取消 `build_release`）产出的 xiangban-link-<标签>.tar.gz；没有的话按 LINK_DEPLOYMENT.md 在构建机手工构建。不要把 Windows 或 macOS 编译的二进制传上去。
 3. 配置：.env 权限 600，LINK_DB_PASSWORD 用 openssl rand -hex 24 生成；LINK_ACCOUNT_ISSUER 必须与线上账号中心的 ACCOUNT_ISSUER 完全一致（先去账号中心的 .env 或 /.well-known/jwks.json 所在域名核对）。任何密钥、令牌都不要打印到日志、聊天记录或提交到仓库。
 4. 先决条件检查：线上账号中心必须登记了客户端 xiaoban-android（新版本默认内置；若线上是旧版本，需要升级账号中心，或在其 .env 的 ACCOUNT_CLIENTS 里补上 xiaoban-android:小伴手机应用 后重启）。这一步会重启账号中心，动手前告诉我并等我确认。
 5. Nginx：使用 infra/link/nginx.conf.example，域名 link.xiangban.xyz（若不同请告诉我，因为桌面端默认值写死了这个域名）。重点确认：/api/link/ws 带 Upgrade/Connection 头、proxy_read_timeout 至少 3600s、关闭缓冲；服务只监听 127.0.0.1:55030，安全组/防火墙不对外开放 55030 和数据库端口。证书用 certbot，改完先 nginx -t 再 reload。
@@ -35,4 +35,4 @@
 ## 部署完成之后
 
 1. 桌面端和手机端的默认地址是 `https://link.xiangban.xyz/api/link`；域名不同要先改默认值再发版。
-2. 在 GitHub Actions 里运行 “Android and Link Core” 工作流，下载 `xiaoban-android-debug-apk` 装到手机，桌面端“设置 → 连接手机”扫码配对，按 [LINK_DEPLOYMENT.md](../deployment/LINK_DEPLOYMENT.md) 第 5 条做一次真机完整场景，并把结果记到实施计划的 L3 一节。
+2. 在 GitHub Actions 里运行 “BuildXiaoBanWallpaper”（勾选 `package_android_app`，可取消 `build_release`），下载 `xiaoban-android-debug-apk` 装到手机，桌面端“设置 → 连接手机”扫码配对，按 [LINK_DEPLOYMENT.md](../deployment/LINK_DEPLOYMENT.md) 第 5 条做一次真机完整场景，并把结果记到实施计划的 L3 一节。
