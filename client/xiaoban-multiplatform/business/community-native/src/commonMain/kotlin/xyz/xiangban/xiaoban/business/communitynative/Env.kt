@@ -15,6 +15,8 @@ import xyz.xiangban.xiaoban.common.community.AccountApi
 import xyz.xiangban.xiaoban.common.community.AgentBridge
 import xyz.xiangban.xiaoban.common.community.AgentRuntime
 import xyz.xiangban.xiaoban.common.community.ReminderScheduler
+import xyz.xiangban.xiaoban.common.community.LocalSpeech
+import xyz.xiangban.xiaoban.common.community.SpeechModels
 import xyz.xiangban.xiaoban.common.community.VoicePlatform
 import xyz.xiangban.xiaoban.common.community.SetReminderTool
 import xyz.xiangban.xiaoban.common.community.postChatLines
@@ -68,6 +70,8 @@ class CommunityEnv(
     /** 智能体保存对话的文件夹。 */
     agentDir: String? = null,
     reminders: ReminderScheduler? = null,
+    /** 手机本地语音识别（安卓上是 sherpa-onnx 的 SenseVoice）；没有就只用云端和电脑上的识别。 */
+    val speech: LocalSpeech? = null,
 ) {
     val account = AccountApi(client, config)
 
@@ -91,6 +95,9 @@ class CommunityEnv(
         deviceName = config.deviceName,
         baseUrl = config.linkBase,
     )
+    /** 本地语音识别模型的下载与状态。 */
+    val speechModels: SpeechModels? = speech?.let { SpeechModels(client, it.files) }
+
     val remoteChat = RemoteChatController(phoneLink, scope, remoteCache, session.state.value.accountId)
 
     init {

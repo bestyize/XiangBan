@@ -43,8 +43,9 @@ class MainActivity : ComponentActivity() {
         }
         val agentBridge = nativeAgentBridgeOrNull()
         val agentDir = filesDir.resolve("agent").absolutePath
+        val speech = AndroidLocalSpeech(this)
         setContent {
-            App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders)
+            App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech)
         }
     }
 }

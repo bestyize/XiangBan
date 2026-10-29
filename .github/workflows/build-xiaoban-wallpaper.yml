@@ -335,6 +335,23 @@ jobs:
           echo "Using NDK $ANDROID_NDK_HOME"
           cargo ndk -P 24 -t arm64-v8a -t armeabi-v7a -t x86_64 -o "$GITHUB_WORKSPACE/client/xiaoban-multiplatform/androidApp/src/main/jniLibs" build --release --lib
           find "$GITHUB_WORKSPACE/client/xiaoban-multiplatform/androidApp/src/main/jniLibs" -name '*.so' -exec ls -l {} \;
+      # 手机上本地语音识别（SenseVoice）用的 sherpa-onnx 原生库：从官方发布包下载、校验后放进 jniLibs，只取 JNI 库和 onnxruntime。
+      # 版本要和 androidApp 里 com/k2fsa/sherpa/onnx 的 Kotlin 接口、电脑端 tools/xiaoban-infer 用的 sherpa-onnx 一致。
+      - name: Fetch sherpa-onnx native libraries
+        env:
+          SHERPA_VERSION: v1.13.8
+          SHERPA_SHA256: 2ff63469a71cb6009aa2e3ed5f4a670f8abdcbe4bb9ffd23776afc792a6b4f44
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/sherpa-android.tar.bz2" "https://github.com/k2-fsa/sherpa-onnx/releases/download/${SHERPA_VERSION}/sherpa-onnx-${SHERPA_VERSION}-android.tar.bz2"
+          echo "${SHERPA_SHA256}  $RUNNER_TEMP/sherpa-android.tar.bz2" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/sherpa"
+          tar -xjf "$RUNNER_TEMP/sherpa-android.tar.bz2" -C "$RUNNER_TEMP/sherpa"
+          jni="$GITHUB_WORKSPACE/client/xiaoban-multiplatform/androidApp/src/main/jniLibs"
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            mkdir -p "$jni/$abi"
+            cp "$RUNNER_TEMP/sherpa/jniLibs/$abi/libonnxruntime.so" "$RUNNER_TEMP/sherpa/jniLibs/$abi/libsherpa-onnx-jni.so" "$jni/$abi/"
+          done
+          find "$jni" -name 'libsherpa*' -o -name 'libonnxruntime*' | xargs ls -l
       # 配了下面几个密钥就用发布密钥签名；没配就打 debug 包（未签名的 release 包装不上手机）。
       - name: Prepare signing key
         env:

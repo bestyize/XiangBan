@@ -7,6 +7,7 @@ import xyz.xiangban.xiaoban.business.communitynative.CommunityNativeApp
 import xyz.xiangban.xiaoban.business.communitynative.PlatformActions
 import xyz.xiangban.xiaoban.common.community.AgentBridge
 import xyz.xiangban.xiaoban.common.community.InMemoryTokenStorage
+import xyz.xiangban.xiaoban.common.community.LocalSpeech
 import xyz.xiangban.xiaoban.common.community.ReminderScheduler
 import xyz.xiangban.xiaoban.common.community.TokenStorage
 import xyz.xiangban.xiaoban.common.link.InMemoryLinkStorage
@@ -24,9 +25,10 @@ fun App(
     agentBridge: AgentBridge? = null,
     agentDir: String? = null,
     reminders: ReminderScheduler? = null,
+    speech: LocalSpeech? = null,
 ) {
-    val env = remember(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders) {
-        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders)
+    val env = remember(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech) {
+        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech)
     }
     CommunityNativeApp(env)
 }

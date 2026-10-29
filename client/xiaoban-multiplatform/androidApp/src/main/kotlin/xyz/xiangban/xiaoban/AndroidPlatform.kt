@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.speech.tts.TextToSpeech
+import android.speech.tts.UtteranceProgressListener
 import java.util.Locale
 import android.util.Base64
 import org.json.JSONObject
@@ -48,6 +49,8 @@ class AndroidPlatformActions(private val context: Context, requestMic: suspend (
     override fun stopRecording(): ByteArray? = voice.stop()
     override fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean = voice.play(bytes, onDone)
     override fun stopAudio() = voice.stopPlayback()
+    override suspend fun streamRecording(onFrame: (ByteArray) -> Unit): (() -> Unit)? = voice.stream(onFrame)
+    override fun listenOnce(onPartial: (String) -> Unit, onResult: (String?, String?) -> Unit): (() -> Unit)? = voice.listenOnce(onPartial, onResult)
 
     override fun copy(text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -65,25 +68,47 @@ class AndroidPlatformActions(private val context: Context, requestMic: suspend (
 
     private var tts: TextToSpeech? = null
     private var ttsReady = false
-    private var ttsWaiting: String? = null
+    private var ttsFailed = false
+    private var ttsWaiting: Pair<String, String>? = null
+    private val ttsDone = java.util.concurrent.ConcurrentHashMap<String, (Boolean) -> Unit>()
 
-    override fun speak(text: String): Boolean {
-        val line = text.take(3900)
+    private fun speakWith(text: String, utteranceId: String): Boolean {
+        if (ttsFailed) return false
         val engine = tts ?: TextToSpeech(context.applicationContext) { status ->
             ttsReady = status == TextToSpeech.SUCCESS
+            ttsFailed = !ttsReady
+            val waiting = ttsWaiting
+            ttsWaiting = null
             if (ttsReady) {
                 tts?.language = Locale.CHINA
-                ttsWaiting?.let { tts?.speak(it, TextToSpeech.QUEUE_FLUSH, null, "xiaoban") }
+                tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                    override fun onStart(utteranceId: String?) {}
+                    override fun onDone(utteranceId: String?) { utteranceId?.let { ttsDone.remove(it)?.invoke(true) } }
+                    @Deprecated("Deprecated in Java")
+                    override fun onError(utteranceId: String?) { utteranceId?.let { ttsDone.remove(it)?.invoke(false) } }
+                })
+                waiting?.let { (line, id) -> tts?.speak(line, TextToSpeech.QUEUE_FLUSH, null, id) }
+            } else {
+                waiting?.let { (_, id) -> ttsDone.remove(id)?.invoke(false) }
             }
-            ttsWaiting = null
         }.also { tts = it }
-        if (!ttsReady) { ttsWaiting = line; return true }
-        engine.speak(line, TextToSpeech.QUEUE_FLUSH, null, "xiaoban")
-        return true
+        if (!ttsReady) { ttsWaiting = text to utteranceId; return true }
+        return engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId) == TextToSpeech.SUCCESS
+    }
+
+    override fun speak(text: String): Boolean = speakWith(text.take(3900), "xiaoban")
+
+    override fun speakText(text: String, onDone: (Boolean) -> Unit): Boolean {
+        val id = "call-${System.nanoTime()}"
+        ttsDone[id] = onDone
+        val started = speakWith(text.take(3900), id)
+        if (!started) ttsDone.remove(id)
+        return started
     }
 
     override fun stopSpeaking() {
         ttsWaiting = null
+        ttsDone.clear()
         tts?.stop()
     }
 
