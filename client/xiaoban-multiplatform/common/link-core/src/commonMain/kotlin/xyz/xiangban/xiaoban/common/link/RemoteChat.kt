@@ -4,6 +4,8 @@ import xyz.xiangban.xiaoban.common.community.ChatRecord
 import xyz.xiangban.xiaoban.common.community.ToolCallInfo
 import xyz.xiangban.xiaoban.common.community.ToolStatus
 import xyz.xiangban.xiaoban.common.community.toolLabel
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -188,6 +190,9 @@ data class RunCheckpoint(
     val message: String = "",
 )
 
+/** 电脑合成好、念给手机听的一段回答语音（整段拼好了的）。 */
+class VoiceClip(val id: String, val bytes: ByteArray, val mime: String)
+
 /** 电脑上可以切换到的一个模型。 */
 data class RemoteModel(val provider: String, val providerName: String, val id: String, val name: String)
 
@@ -214,6 +219,12 @@ data class RemoteChatState(
     val currentModel: String = "",
     /** 已经存到电脑资料库的回复。 */
     val savedTurns: Set<String> = emptySet(),
+    /** 语音：`idle`，`recognizing`（录音已发给电脑，等识别结果）。 */
+    val voicePhase: String = "idle",
+    /** 识别出来、等界面放进输入框的文字（只语音输入、不自动发送时）。 */
+    val voiceText: String? = null,
+    /** 电脑念回答的语音，等界面播放。 */
+    val voiceClip: VoiceClip? = null,
     val error: String? = null,
 ) {
     val fullTrust: Boolean get() = permissionMode == "auto"
@@ -227,6 +238,10 @@ data class RemoteChatState(
 
     val sidebar: RemoteSidebar get() = buildSidebar(sessions, addedProjects)
 }
+
+private const val VoiceChunkBytes = 90_000
+private const val VoiceMinBytes = 3_200
+private const val VoiceMaxBytes = 20 * 16_000 * 2
 
 /** 这一轮被停止时记在回复上的说明；界面把它当“已停止”而不是错误。 */
 const val TurnCancelled = "已取消"
@@ -443,7 +458,7 @@ class RemoteChatController(
         newSession(path)
     }
 
-    fun send(rawText: String) {
+    fun send(rawText: String, speak: Boolean = false) {
         val text = rawText.trim()
         val peerId = _state.value.selectedPeerId ?: return
         if (text.isEmpty() || _state.value.sending || !_state.value.isPeerOnline) return
@@ -473,8 +488,48 @@ class RemoteChatController(
             }
             put("text", text)
             put("client_id", clientId)
+            if (speak) put("speak", true)
         })
     }
+
+    /**
+     * 把手机录的音（16kHz、单声道、16 位小端 PCM，最长 20 秒）分片发给电脑识别。
+     * [speakReply] 为真：识别完自动当成消息发出去，回答结束后电脑把回答念成语音发回来；否则只把识别出的文字交给界面放进输入框。
+     */
+    @OptIn(ExperimentalEncodingApi::class)
+    fun sendVoice(pcm: ByteArray, speakReply: Boolean) {
+        val peerId = _state.value.selectedPeerId ?: return
+        if (pcm.size < VoiceMinBytes || pcm.size > VoiceMaxBytes || _state.value.voicePhase != "idle" || !_state.value.isPeerOnline) {
+            if (pcm.size < VoiceMinBytes) _state.value = _state.value.copy(error = "录音太短了")
+            return
+        }
+        val voiceId = nextId("v")
+        pendingVoice[voiceId] = speakReply
+        _state.value = _state.value.copy(voicePhase = "recognizing", voiceText = null)
+        val count = (pcm.size + VoiceChunkBytes - 1) / VoiceChunkBytes
+        for (index in 0 until count) {
+            val part = pcm.copyOfRange(index * VoiceChunkBytes, minOf(pcm.size, (index + 1) * VoiceChunkBytes))
+            sendJson(peerId, buildJsonObject {
+                put("t", "voice.chunk")
+                put("id", nextId())
+                put("voice_id", voiceId)
+                put("seq", index)
+                put("last", index == count - 1)
+                put("data", Base64.encode(part))
+            })
+        }
+    }
+
+    fun consumeVoiceText() {
+        _state.value = _state.value.copy(voiceText = null)
+    }
+
+    fun consumeVoiceClip() {
+        _state.value = _state.value.copy(voiceClip = null)
+    }
+
+    private val pendingVoice = mutableMapOf<String, Boolean>()
+    private val incomingAudio = mutableMapOf<String, MutableList<ByteArray>>()
 
     /** 回答被截断时让小伴接着写。 */
     fun continueAnswer() = send("继续")
@@ -621,6 +676,7 @@ class RemoteChatController(
                 add(JsonPrimitive("stream"))
                 add(JsonPrimitive("approvals"))
                 add(JsonPrimitive("projects"))
+                add(JsonPrimitive("voice"))
             })
             put("app", "xiaoban-android")
         })
@@ -730,6 +786,21 @@ class RemoteChatController(
                     currentAccountId?.let { acc -> cache.saveSessions(acc, peer, sorted) }
                 }
             }
+            "voice.text" -> {
+                val speakReply = pendingVoice.remove(obj["voice_id"].asStr()) ?: false
+                if ((obj["ok"] as? JsonPrimitive)?.booleanOrNull == true) {
+                    val recognized = obj["text"].asStr().orEmpty().trim()
+                    _state.value = _state.value.copy(voicePhase = "idle")
+                    when {
+                        recognized.isEmpty() -> _state.value = _state.value.copy(error = "没听清，请再说一次")
+                        speakReply -> send(recognized, speak = true)
+                        else -> _state.value = _state.value.copy(voiceText = recognized)
+                    }
+                } else {
+                    _state.value = _state.value.copy(voicePhase = "idle", error = obj["error"].asStr() ?: "语音识别失败")
+                }
+            }
+            "voice.audio" -> handleVoiceAudio(obj)
             "run.undo" -> {
                 val runId = obj["run_id"].asStr() ?: return
                 if ((obj["ok"] as? JsonPrimitive)?.booleanOrNull == true) {
@@ -946,6 +1017,28 @@ class RemoteChatController(
                     finalizeAssistant(error = TurnCancelled)
                 }
             }
+        }
+    }
+
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun handleVoiceAudio(obj: JsonObject) {
+        val audioId = obj["audio_id"].asStr() ?: return
+        if ((obj["ok"] as? JsonPrimitive)?.booleanOrNull != true) {
+            incomingAudio.remove(audioId)
+            _state.value = _state.value.copy(error = obj["error"].asStr() ?: "电脑合成语音失败")
+            return
+        }
+        val bytes = runCatching { Base64.decode(obj["data"].asStr().orEmpty()) }.getOrNull() ?: return
+        val seq = obj["seq"]?.jsonPrimitive?.intOrNull ?: 0
+        val parts = if (seq == 0) mutableListOf<ByteArray>().also { incomingAudio[audioId] = it } else incomingAudio[audioId] ?: return
+        if (parts.size != seq) { incomingAudio.remove(audioId); return }
+        parts += bytes
+        if ((obj["last"] as? JsonPrimitive)?.booleanOrNull == true) {
+            incomingAudio.remove(audioId)
+            val all = ByteArray(parts.sumOf { it.size })
+            var at = 0
+            for (p in parts) { p.copyInto(all, at); at += p.size }
+            _state.value = _state.value.copy(voiceClip = VoiceClip(audioId, all, obj["mime"].asStr() ?: "audio/mpeg"))
         }
     }
 

@@ -38,6 +38,14 @@ interface PlatformActions {
     /** 朗读一段文字；平台不支持就返回 false。 */
     fun speak(text: String): Boolean = false
     fun stopSpeaking() {}
+
+    /** 开始录音（16kHz、单声道、16 位小端 PCM）；第一次会先向用户要麦克风权限。返回是否已经开始录。 */
+    suspend fun startRecording(): Boolean = false
+    /** 结束录音，拿到录下来的声音；没在录就是 null。 */
+    fun stopRecording(): ByteArray? = null
+    /** 播放一段音频（电脑合成的语音），播完或出错调用 [onDone]。返回是否开始播放。 */
+    fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean = false
+    fun stopAudio() {}
 }
 
 fun defaultLinkHttpClient(): HttpClient = HttpClient {

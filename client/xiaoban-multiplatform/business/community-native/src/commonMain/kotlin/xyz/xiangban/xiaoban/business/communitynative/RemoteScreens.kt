@@ -31,6 +31,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -54,6 +55,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.taskPlan
 import xyz.xiangban.xiaoban.common.community.taskProgress
@@ -195,6 +197,46 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     var follow by remember { mutableStateOf(true) }
     var adjust by remember { mutableStateOf(false) }
     var modelSheet by remember { mutableStateOf(false) }
+    // 语音：0 没在录，1 录给输入框（只转文字），2 语音对话（说完自动发出并念回答）
+    var recordMode by remember { mutableStateOf(0) }
+    var recordSeconds by remember { mutableStateOf(0) }
+    var speaking by remember { mutableStateOf(false) }
+    val platform = env.platform
+    val finishRecording: (Boolean) -> Unit = { send ->
+        val mode = recordMode
+        recordMode = 0
+        val pcm = platform?.stopRecording()
+        if (send && pcm != null) env.remoteChat.sendVoice(pcm, speakReply = mode == 2)
+    }
+    val startRecording: (Int) -> Unit = { mode ->
+        when {
+            platform == null -> toast = "这个平台暂不支持录音"
+            !online -> toast = "设备不在线，没法识别语音"
+            recordMode != 0 -> finishRecording(true)
+            remote.voicePhase != "idle" -> toast = "正在识别上一段语音"
+            else -> uiScope.launch {
+                platform.stopAudio(); speaking = false
+                if (platform.startRecording()) { recordSeconds = 0; recordMode = mode } else toast = "没有麦克风权限，没法录音"
+            }
+        }
+    }
+    LaunchedEffect(recordMode) {
+        while (recordMode != 0) {
+            delay(1000)
+            recordSeconds += 1
+            if (recordSeconds >= 20) finishRecording(true)
+        }
+    }
+    LaunchedEffect(remote.voiceText) {
+        remote.voiceText?.let { text -> input = if (input.isBlank()) text else input.trimEnd() + " " + text; env.remoteChat.consumeVoiceText() }
+    }
+    LaunchedEffect(remote.voiceClip) {
+        remote.voiceClip?.let { clip ->
+            speaking = platform?.playAudio(clip.bytes, clip.mime) { speaking = false } == true
+            env.remoteChat.consumeVoiceClip()
+        }
+    }
+    DisposableEffect(Unit) { onDispose { platform?.stopRecording(); platform?.stopAudio() } }
     val openModels: () -> Unit = {
         when {
             remote.selectedSessionId == null -> toast = "先发一条消息开始对话，之后就能切换模型"
@@ -270,6 +312,19 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             }
 
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
+                if (recordMode != 0 || remote.voicePhase != "idle" || speaking) {
+                    VoiceBar(
+                        when {
+                            recordMode != 0 -> "正在听… ${recordSeconds / 60}:${(recordSeconds % 60).toString().padStart(2, '0')}"
+                            remote.voicePhase != "idle" -> "电脑正在识别…"
+                            else -> "正在朗读回答…"
+                        },
+                        recording = recordMode != 0,
+                        hint = if (recordMode == 2) "点麦克风或波形结束并发送，小伴回答后会念给你听" else if (recordMode == 1) "点麦克风结束，文字会放进输入框" else null,
+                        onCancel = { if (recordMode != 0) finishRecording(false) else { platform?.stopAudio(); speaking = false } },
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
                 if (showMini && liveProgress != null) {
                     TaskMiniBar(
                         liveProgress, modifier = Modifier.padding(bottom = 8.dp),
@@ -289,7 +344,8 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                     onModel = openModels,
                     onAttach = { attach = true },
                     onWeb = { toast = "联网搜索即将支持" },
-                    onVoice = { toast = "语音输入即将支持" },
+                    onVoice = { startRecording(1) },
+                    onLive = { startRecording(2) },
                     onSend = { val text = input.trim(); if (text.isNotEmpty()) { input = ""; env.remoteChat.send(text) } },
                     enabled = online, sending = remote.sending,
                 )

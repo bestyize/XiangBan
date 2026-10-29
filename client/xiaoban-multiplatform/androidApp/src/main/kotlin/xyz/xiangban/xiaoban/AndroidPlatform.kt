@@ -41,7 +41,14 @@ class SharedPrefsTokenStorage(context: Context) : TokenStorage {
 }
 
 /** 复制、系统分享、用浏览器打开链接。 */
-class AndroidPlatformActions(private val context: Context) : PlatformActions {
+class AndroidPlatformActions(private val context: Context, requestMic: suspend () -> Boolean = { false }) : PlatformActions {
+    private val voice = AndroidVoice(context, requestMic)
+
+    override suspend fun startRecording(): Boolean = voice.start()
+    override fun stopRecording(): ByteArray? = voice.stop()
+    override fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean = voice.play(bytes, onDone)
+    override fun stopAudio() = voice.stopPlayback()
+
     override fun copy(text: String) {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("链接", text))

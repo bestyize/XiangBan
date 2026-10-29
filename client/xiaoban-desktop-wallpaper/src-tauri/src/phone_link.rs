@@ -20,6 +20,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use tauri::{Emitter, Manager};
+use crate::phone_voice;
 use crate::phone_wire;
 use xiaoban_link_client::{store::{FileStore, LinkStore}, Link, LinkConfig, LinkEvent, TokenFn};
 
@@ -132,6 +133,19 @@ struct RuntimeInner {
     subscriptions: HashMap<String, HashSet<String>>,
     /// 当前桌面等待用户确认的审批/问题：`approval_id -> session_id`，用于发现桌面已处理后向手机广播 `approval.resolved`。
     open_approvals: HashMap<String, String>,
+    /// 手机分片上传的录音，拼完交给语音识别。
+    voice_in: phone_voice::Assembler,
+    /// 要把回答念给手机听的对话：`会话编号 -> (手机, 这一轮最后一段回答的文字)`。
+    speak: HashMap<String, (String, String)>,
+    /// 合成语音的后台线程的入口；第一次有手机要听回答时才启动。
+    speak_tx: Option<std::sync::mpsc::Sender<SpeakJob>>,
+}
+
+/// 一轮回答结束后要合成语音发给手机的内容。
+struct SpeakJob {
+    peer: String,
+    session: String,
+    text: String,
 }
 
 impl Default for RuntimeInner {
@@ -142,6 +156,9 @@ impl Default for RuntimeInner {
             last_error: None,
             subscriptions: HashMap::new(),
             open_approvals: HashMap::new(),
+            voice_in: Default::default(),
+            speak: HashMap::new(),
+            speak_tx: None,
         }
     }
 }
@@ -478,6 +495,47 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                 }
             }
         }
+        "voice.chunk" => {
+            use base64::Engine as _;
+            let (Some(voice_id), Some(data)) = (msg.get("voice_id").and_then(Value::as_str), msg.get("data").and_then(Value::as_str)) else { return };
+            let seq = msg.get("seq").and_then(Value::as_u64).unwrap_or(0) as usize;
+            let last = msg.get("last").and_then(Value::as_bool).unwrap_or(false);
+            let fail = |error: &str| {
+                let _ = send_json(link, peer, &json!({ "t": "voice.text", "id": state.next_msg_id(), "voice_id": voice_id, "ok": false, "error": error }), false);
+            };
+            let Ok(bytes) = base64::engine::general_purpose::STANDARD.decode(data) else { return fail("录音数据无法解码") };
+            let key = format!("{peer}/{voice_id}");
+            let pushed = lock(&state.inner).voice_in.push(&key, seq, last, &bytes);
+            match pushed {
+                Err(error) => fail(&error),
+                Ok(None) => {}
+                Ok(Some(pcm)) => {
+                    if let Ok(audit) = audit_path(app) {
+                        append_remote_audit(&audit, &json!({ "timestampMs": now_ms(), "peerId": peer, "action": "voice.input", "bytes": pcm.len() }));
+                    }
+                    let (app, link, peer, voice_id) = (app.clone(), link.clone(), peer.to_string(), voice_id.to_string());
+                    tauri::async_runtime::spawn(async move {
+                        let result = match phone_voice::pcm16_to_f32(&pcm) {
+                            Ok(samples) => crate::asr::asr_transcribe(app.clone(), samples).await,
+                            Err(error) => Err(error),
+                        };
+                        let state = app.state::<PhoneLinkState>();
+                        let mut reply = json!({ "t": "voice.text", "id": state.next_msg_id(), "voice_id": voice_id });
+                        match result {
+                            Ok(text) => {
+                                reply["ok"] = json!(true);
+                                reply["text"] = json!(text.trim());
+                            }
+                            Err(error) => {
+                                reply["ok"] = json!(false);
+                                reply["error"] = json!(voice_error_text(&error));
+                            }
+                        }
+                        let _ = send_json(&link, &peer, &reply, false);
+                    });
+                }
+            }
+        }
         "run.undo" => {
             let (Some(session_id), Some(run_id)) = (msg.get("session").and_then(Value::as_str), msg.get("run_id").and_then(Value::as_str)) else { return };
             if let Ok(audit) = audit_path(app) {
@@ -576,12 +634,14 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
             let client_id = msg.get("client_id").and_then(Value::as_str).unwrap_or(&req_id);
             let workspace = msg.get("workspace").and_then(Value::as_str);
             let permission = msg.get("permission").and_then(Value::as_str);
+            let speak = msg.get("speak").and_then(Value::as_bool).unwrap_or(false);
             if let Ok(audit) = audit_path(app) {
                 append_remote_audit(
                     &audit,
                     &json!({
                         "timestampMs": now_ms(),
                         "peerId": peer,
+                        "speak": speak,
                         "action": "message.send",
                         "session": session_id,
                         "clientId": client_id,
@@ -599,6 +659,12 @@ fn handle_peer_message(app: &tauri::AppHandle, link: &Link, peer: &str, raw: &[u
                             .entry(peer.to_string())
                             .or_default()
                             .insert(sid.to_string());
+                        if speak {
+                            ensure_speaker(app);
+                            lock(&state.inner).speak.insert(sid.to_string(), (peer.to_string(), String::new()));
+                        } else {
+                            lock(&state.inner).speak.remove(sid);
+                        }
                     }
                     let _ = send_json(
                         link,
@@ -731,6 +797,78 @@ fn send_session_event(link: &Link, subs: &HashMap<String, HashSet<String>>, sess
     }
 }
 
+/// 第一次有手机要听回答时，起一个后台线程专门做语音合成并分片发给手机。
+fn ensure_speaker(app: &tauri::AppHandle) {
+    let state = app.state::<PhoneLinkState>();
+    let rx = {
+        let mut inner = lock(&state.inner);
+        if inner.speak_tx.is_some() {
+            return;
+        }
+        let (tx, rx) = std::sync::mpsc::channel::<SpeakJob>();
+        inner.speak_tx = Some(tx);
+        rx
+    };
+    let app = app.clone();
+    std::thread::spawn(move || {
+        for job in rx {
+            speak_job(&app, job);
+        }
+    });
+}
+
+fn speak_job(app: &tauri::AppHandle, job: SpeakJob) {
+    use base64::Engine as _;
+    let state = app.state::<PhoneLinkState>();
+    let Some(link) = lock(&state.inner).link.clone() else { return };
+    let text = phone_voice::speech_text(&job.text);
+    if text.is_empty() {
+        return;
+    }
+    let audio_id = state.next_msg_id();
+    match crate::tts::synthesize_raw(app, &text, None) {
+        Ok(audio) => {
+            let parts = phone_voice::audio_chunks(&audio);
+            let total = parts.len();
+            for (index, part) in parts.iter().enumerate() {
+                let _ = send_json(
+                    &link,
+                    &job.peer,
+                    &json!({
+                        "t": "voice.audio",
+                        "id": state.next_msg_id(),
+                        "session": job.session,
+                        "audio_id": audio_id,
+                        "ok": true,
+                        "seq": index,
+                        "last": index + 1 == total,
+                        "mime": "audio/mpeg",
+                        "data": base64::engine::general_purpose::STANDARD.encode(part),
+                    }),
+                    false,
+                );
+            }
+        }
+        Err(error) => {
+            let _ = send_json(
+                &link,
+                &job.peer,
+                &json!({ "t": "voice.audio", "id": state.next_msg_id(), "session": job.session, "audio_id": audio_id, "ok": false, "error": error }),
+                false,
+            );
+        }
+    }
+}
+
+/// 语音识别没开、引擎还没加载这类错误，换成手机上看得懂的话。
+fn voice_error_text(error: &str) -> String {
+    if error.contains("未开启") || error.contains("请先开启") {
+        "电脑上还没有开启语音识别，请先在电脑的设置里打开".to_string()
+    } else {
+        error.to_string()
+    }
+}
+
 pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: &Value) {
     let Some(state) = app.try_state::<PhoneLinkState>() else { return };
     let (link, subs) = {
@@ -771,6 +909,35 @@ pub fn observe_chat_event<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &s
             let Some(session) = payload.get("session").and_then(Value::as_str) else { return };
             let ev = &payload["event"];
             let ev_type = ev.get("type").and_then(Value::as_str).unwrap_or("");
+            // 手机要听回答的对话：攒下这一轮最后一段话，回答结束后合成语音（工具调用之前的话不念）。
+            match ev_type {
+                "text_delta" => {
+                    if let Some(entry) = lock(&state.inner).speak.get_mut(session) {
+                        entry.1.push_str(ev["text"].as_str().unwrap_or(""));
+                    }
+                }
+                "tool_start" => {
+                    if let Some(entry) = lock(&state.inner).speak.get_mut(session) {
+                        entry.1.clear();
+                    }
+                }
+                "done" => {
+                    let job = {
+                        let mut inner = lock(&state.inner);
+                        let entry = inner.speak.remove(session);
+                        entry.map(|(peer, text)| (peer, text, inner.speak_tx.clone()))
+                    };
+                    if let Some((peer, text, Some(tx))) = job {
+                        if !text.trim().is_empty() {
+                            let _ = tx.send(SpeakJob { peer, session: session.to_string(), text });
+                        }
+                    }
+                }
+                "cancelled" | "error" => {
+                    lock(&state.inner).speak.remove(session);
+                }
+                _ => {}
+            }
             let mapped = match ev_type {
                 "text_delta" => Some(("text.delta", json!({ "text": ev["text"] }), false)),
                 "reasoning_delta" => Some(("reasoning.delta", json!({ "text": ev["text"] }), false)),

@@ -417,6 +417,25 @@ private fun SegmentBar(progress: TaskProgress, modifier: Modifier = Modifier) {
     }
 }
 
+/** 录音、识别、朗读时输入框上方的一行：红点加状态，右边“取消/停止”。 */
+@Composable
+fun VoiceBar(status: String, recording: Boolean, hint: String?, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+    val extra = LocalExtraColors.current
+    CardSurface(modifier) {
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            if (recording) Box(Modifier.size(9.dp).clip(CircleShape).background(Brand)) else Spinner(12.dp)
+            Column(Modifier.weight(1f)) {
+                Text(status, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                if (hint != null) Text(hint, fontSize = 11.sp, color = extra.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Text(if (recording) "取消" else "停止", Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onCancel).padding(horizontal = 10.dp, vertical = 8.dp), fontSize = 13.sp, color = extra.ink3)
+        }
+    }
+}
+
 /** 任务卡滚出屏幕后吸在输入框上方的一行：当前步骤、进度、停止；点一下回到任务卡。 */
 @Composable
 fun TaskMiniBar(progress: TaskProgress, onClick: () -> Unit, onStop: () -> Unit, modifier: Modifier = Modifier) {
