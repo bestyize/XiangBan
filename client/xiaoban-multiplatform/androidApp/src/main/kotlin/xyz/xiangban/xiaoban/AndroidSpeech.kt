@@ -29,10 +29,24 @@ class AndroidModelFiles(context: Context) : ModelFiles {
     override fun size(name: String): Long = File(dir, name).takeIf { it.isFile }?.length() ?: -1
     override fun path(name: String): String = File(dir, name).absolutePath
     override fun delete(name: String) { File(dir, name).delete() }
+    override fun discardPartial(name: String) { File(dir, "$name.part").delete() }
 
-    override fun beginWrite(name: String): ModelWriter {
+    override fun partialSize(name: String): Long = File(dir, "$name.part").takeIf { it.isFile }?.length() ?: 0
+
+    override fun readPartial(name: String, onChunk: (ByteArray, Int) -> Unit) {
+        File(dir, "$name.part").inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                onChunk(buffer, n)
+            }
+        }
+    }
+
+    override fun beginWrite(name: String, append: Boolean): ModelWriter {
         val part = File(dir, "$name.part")
-        val out = FileOutputStream(part)
+        val out = FileOutputStream(part, append)
         return object : ModelWriter {
             override fun write(bytes: ByteArray, length: Int) = out.write(bytes, 0, length)
             override fun commit() {
@@ -41,6 +55,7 @@ class AndroidModelFiles(context: Context) : ModelFiles {
                 target.delete()
                 if (!part.renameTo(target)) throw java.io.IOException("无法保存 $name")
             }
+            override fun close() { runCatching { out.close() } }
             override fun abort() {
                 runCatching { out.close() }
                 part.delete()
