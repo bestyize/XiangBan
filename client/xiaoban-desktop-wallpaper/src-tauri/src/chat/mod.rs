@@ -2236,7 +2236,9 @@ pub(crate) fn remote_session_snapshot(app: &tauri::AppHandle, session_id: &str, 
     let page = crate::phone_wire::snapshot_page(&raw, after, crate::phone_wire::SNAPSHOT_PAGE_BYTES);
     let running = lock(&app.state::<ChatState>().runs).contains_key(session_id);
     let pending = app.state::<ChatState>().broker.snapshot(session_id);
+    let permission = mutate(app, |index| index.get(session_id).map(|s| s.permission_mode.clone()))?.unwrap_or_default();
     Ok(json!({
+        "permission": if permission == "auto" { "auto" } else { "ask" },
         "session": session_id,
         "messages": page.messages,
         "state": if running { "running" } else { "idle" },
@@ -2255,6 +2257,7 @@ pub(crate) fn remote_send_message(
     text: &str,
     client_id: &str,
     workspace: Option<&str>,
+    permission: Option<&str>,
 ) -> Result<Value, String> {
     let text = text.trim();
     if text.is_empty() {
@@ -2275,6 +2278,7 @@ pub(crate) fn remote_send_message(
             }));
         }
     }
+    let created = !matches!(session_id, Some(id) if !id.is_empty());
     let sid = match session_id {
         Some(id) if !id.is_empty() => {
             checked_session_id(id)?;
@@ -2300,17 +2304,27 @@ pub(crate) fn remote_send_message(
         }
     };
 
-    // 远程来源最严格权限策略：禁止全自动信任，强制切回 ask 并要求逐项复核
-    mutate(app, |index| {
-        index.set_permission_mode(&sid, "ask");
-    })?;
+    // 权限：手机新建的对话从“默认权限”（执行前先问）开始，手机也可以在新建时直接选“完全信任”；
+    // 已有的对话保持它现在的模式，不因为手机发了一条消息就被降级或升级。
+    // 以前这里每条消息都强制降回 ask 并要求逐步复核，结果每一步都要点一次，几乎没法干活。
     let state = app.state::<ChatState>();
-    state.permission.set_session_mode(&sid, PermissionMode::Ask);
+    let mode = if created {
+        let wanted = if permission == Some("auto") { "auto" } else { "ask" };
+        mutate(app, |index| {
+            index.set_permission_mode(&sid, wanted);
+        })?;
+        wanted.to_string()
+    } else {
+        let current = mutate(app, |index| index.get(&sid).map(|s| s.permission_mode.clone()))?.unwrap_or_default();
+        if current == "auto" { "auto".to_string() } else { "ask".to_string() }
+    };
+    state.permission.set_session_mode(&sid, if mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask });
     if let Ok(dirs) = Dirs::of(app) {
-        let _ = state.permission.restore_trust(&dirs.chat.join("trust"), &sid, false);
-        let _ = state.permission.require_review(&sid);
+        // 读过外部内容（有工具调用记录）的老对话按桌面一样标成需要复核；新对话是干净的。
+        let had_tools = JsonlStore::new(dirs.sessions()).load(&sid).map(|m| m.iter().any(|x| x.role == agent_kernel::Role::Tool)).unwrap_or(false);
+        let _ = state.permission.restore_trust(&dirs.chat.join("trust"), &sid, had_tools);
     }
-    emit(app, "chat-permission-mode-changed", json!({ "sessionId": sid, "mode": "ask" }));
+    emit(app, "chat-permission-mode-changed", json!({ "sessionId": sid, "mode": mode }));
 
     let request_id = crate::phone_wire::remote_request_id(peer_id, client_id);
     let message_id = outbox_host::enqueue_remote(app, &sid, peer_id, text, &request_id)?;
@@ -2319,6 +2333,34 @@ pub(crate) fn remote_send_message(
         "session": sid,
         "message_id": message_id,
     }))
+}
+
+/// 手机切换这个对话的权限：`ask`（默认权限，执行前先问）或 `auto`（完全信任）。
+/// 和桌面上的开关是同一个：高风险操作（删文件、危险命令等）在完全信任下仍然每次都问。
+pub(crate) fn remote_set_permission(app: &tauri::AppHandle, session_id: &str, mode: &str) -> Result<String, String> {
+    if session_id.starts_with("del-") {
+        return Err("外部 Agent 的任务有自己的权限，不能在这里切换".into());
+    }
+    if !["ask", "auto"].contains(&mode) {
+        return Err("不支持的权限模式".into());
+    }
+    checked_session_id(session_id)?;
+    if !sessions::valid_id(session_id) {
+        return Err("对话编号不对".into());
+    }
+    let found = mutate(app, |index| {
+        if index.get(session_id).is_none() {
+            return false;
+        }
+        index.set_permission_mode(session_id, mode);
+        true
+    })?;
+    if !found {
+        return Err("这个对话已经不存在".into());
+    }
+    app.state::<ChatState>().permission.set_session_mode(session_id, if mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask });
+    emit(app, "chat-permission-mode-changed", json!({ "sessionId": session_id, "mode": mode }));
+    Ok(mode.to_string())
 }
 
 pub(crate) fn remote_answer_approval(app: &tauri::AppHandle, approval_id: &str, choice: &str) -> Result<(), String> {

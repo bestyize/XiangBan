@@ -192,6 +192,8 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
     var confirmed by remember { mutableStateOf(false) }
     var drawer by rememberSaveable { mutableStateOf(false) }
     var attach by rememberSaveable { mutableStateOf(false) }
+    // 0 关着，1 选权限，2 确认开启完全信任
+    var permissionStep by rememberSaveable { mutableStateOf(0) }
     var toast by remember { mutableStateOf<String?>(null) }
     BackHandler(enabled = drawer) { drawer = false }
 
@@ -236,6 +238,12 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
             }
 
             Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
+                Row(Modifier.padding(bottom = 8.dp, start = 4.dp)) {
+                    ChipPill(
+                        if (remote.fullTrust) "完全信任" else "默认权限", icon = XIcons.Lock, trailingIcon = XIcons.ChevronDown,
+                        selected = remote.fullTrust, onClick = if (online) ({ permissionStep = 1 }) else null,
+                    )
+                }
                 ChatComposer(
                     input, { input = it }, if (online) "对设备上的小伴说点什么…" else "设备不在线，上线后可继续对话", "跟随电脑",
                     onModel = { toast = "选择模型即将支持，目前沿用设备上的设置" },
@@ -245,6 +253,33 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                     onSend = { val text = input.trim(); if (text.isNotEmpty()) { input = ""; env.remoteChat.send(text) } },
                     enabled = online, sending = remote.sending,
                 )
+            }
+        }
+        OverlayTransition(permissionStep != 0) { panel ->
+            BottomSheet({ permissionStep = 0 }, panel) {
+                if (permissionStep == 2) {
+                    Text("开启完全信任？", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "开启后，这个对话里小伴在“${peer?.name ?: "设备"}”上读写文件、运行命令都不再逐步问你，会直接执行。\n删除文件、危险命令这类高风险操作仍然每次都问你。\n只在你信任这次任务时开启，随时可以关掉。",
+                        Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        GhostPillButton("取消", { permissionStep = 0 }, Modifier.weight(1f))
+                        PillButton("开启完全信任", { permissionStep = 0; env.remoteChat.setPermission("auto") }, Modifier.weight(1f))
+                    }
+                } else {
+                    Text("这个对话的权限", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("只对当前这个对话生效，和电脑上的开关是同一个。", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    RadioRow(
+                        selected = !remote.fullTrust, title = "默认权限", desc = "改动文件、运行命令之前先问你",
+                        onClick = { permissionStep = 0; env.remoteChat.setPermission("ask") },
+                    )
+                    RadioRow(
+                        selected = remote.fullTrust, title = "完全信任", desc = "不再逐步询问，直接执行；高风险操作仍然每次都问",
+                        onClick = { if (remote.fullTrust) permissionStep = 0 else permissionStep = 2 },
+                    )
+                    GhostPillButton("取消", { permissionStep = 0 }, Modifier.padding(top = 8.dp).fillMaxWidth())
+                }
             }
         }
         OverlayTransition(attach) { panel -> AttachSheet({ attach = false }, { attach = false; toast = "$it 即将支持" }, panel) }
