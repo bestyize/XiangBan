@@ -82,23 +82,21 @@ private val CallWarn = Color(0xFFF0A050)
 
 private val AvatarSize = 54.dp
 
-/** 语音通话的全屏界面：头像、状态、你说的话和小伴的回答、静音/打断/挂断。 */
+/** 语音通话的全屏界面：头像、状态、你说的话和小伴的回答、静音/打断/挂断。通话本身由 [VoiceCallLayer] 管；左上角和返回键都是收起成胶囊。 */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun VoiceCallScreen(call: VoiceCall, title: String, onClosed: (String?) -> Unit) {
+fun VoiceCallScreen(call: VoiceCall, title: String, seconds: Int, onMinimize: () -> Unit) {
     val state by call.state.collectAsState()
-    BackHandler(onBack = { call.stop() })
-    LaunchedEffect(Unit) { call.start() }
-    LaunchedEffect(state.ended) { if (state.ended) onClosed(state.notice) }
-    DisposableEffect(call) { onDispose { call.stop() } }
-    var seconds by remember { mutableStateOf(0) }
-    LaunchedEffect(Unit) { while (true) { delay(1000); seconds += 1 } }
+    BackHandler(onBack = onMinimize)
 
     val canInterrupt = state.phase == CallPhase.Speaking || state.phase == CallPhase.Thinking
     Box(Modifier.fillMaxSize().background(CallBg).drawBehind { drawBackdrop() }) {
         // 两颗淡淡的品牌闪光，压在背景里。
         XIcon(XIcons.SparkleSmall, Modifier.align(Alignment.TopEnd).padding(top = 104.dp, end = 12.dp), tint = Brand.copy(alpha = 0.16f), size = 84.dp)
         XIcon(XIcons.SparkleSmall, Modifier.align(Alignment.BottomStart).padding(bottom = 250.dp, start = 24.dp), tint = Brand.copy(alpha = 0.13f), size = 52.dp)
+        Box(Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 4.dp, top = 4.dp).size(44.dp).clip(CircleShape).clickable(onClick = onMinimize), contentAlignment = Alignment.Center) {
+            XIcon(XIcons.ChevronDown, tint = CallFg2, size = 24.dp, description = "收起")
+        }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(title, Modifier.padding(top = 18.dp, start = 24.dp, end = 24.dp), color = CallFg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(clock(seconds), Modifier.padding(top = 5.dp), color = CallFg2, fontSize = 12.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
@@ -140,7 +138,7 @@ fun VoiceCallScreen(call: VoiceCall, title: String, onClosed: (String?) -> Unit)
     }
 }
 
-private fun clock(seconds: Int): String = "${(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}"
+internal fun clock(seconds: Int): String = "${(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}"
 
 @Composable
 private fun StatusLine(text: String) {
@@ -282,5 +280,40 @@ private fun DrawScope.drawBackdrop() {
         val half = 7.dp.toPx()
         drawLine(Brand.copy(alpha = 0.34f), Offset(p.x, p.y - half), Offset(p.x, p.y + half), strokeWidth = 1.6.dp.toPx(), cap = StrokeCap.Round)
         drawLine(Brand.copy(alpha = 0.34f), Offset(p.x - half, p.y), Offset(p.x + half, p.y), strokeWidth = 1.6.dp.toPx(), cap = StrokeCap.Round)
+    }
+}
+
+// ───────────── 收起成胶囊 ─────────────
+
+private fun phaseLabel(phase: CallPhase): String = when (phase) {
+    CallPhase.Starting -> "正在接通"
+    CallPhase.Listening -> "聆听中"
+    CallPhase.Hearing -> "听你说话"
+    CallPhase.Thinking -> "小伴在想"
+    CallPhase.Speaking -> "小伴在说话"
+}
+
+/** 收起后留在页面顶部的深色胶囊：声音起伏、状态、通话时长，右边红色挂断；点一下回到通话页。 */
+@Composable
+fun CallCapsule(call: VoiceCall, seconds: Int, onExpand: () -> Unit, modifier: Modifier = Modifier) {
+    val state by call.state.collectAsState()
+    val transition = rememberInfiniteTransition(label = "capsule")
+    val wobble by transition.animateFloat(0f, 1f, infiniteRepeatable(animation = tween<Float>(700, easing = LinearEasing), repeatMode = RepeatMode.Reverse), label = "wobble")
+    val active = state.phase == CallPhase.Hearing || state.phase == CallPhase.Speaking
+    Row(
+        modifier.padding(horizontal = 16.dp).fillMaxWidth().height(44.dp).clip(CircleShape).background(CallBg).clickable(onClick = onExpand).padding(start = 16.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(Modifier.height(18.dp), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
+            listOf(0.4f, 0.9f, 0.6f, 0.75f).forEachIndexed { i, base ->
+                val h = if (active) base * (0.55f + 0.45f * (if (i % 2 == 0) wobble else 1f - wobble)) else 0.35f
+                Box(Modifier.size(3.dp, (18f * h).dp).clip(CircleShape).background(Brand))
+            }
+        }
+        Text("通话中 · ${phaseLabel(state.phase)}", Modifier.weight(1f), color = CallFg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(clock(seconds), color = CallFg2, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+        Box(Modifier.size(36.dp).clip(CircleShape).background(CallHang).clickable { call.stop() }, contentAlignment = Alignment.Center) {
+            XIcon(XIcons.Hangup, tint = Color.White, size = 18.dp, description = "挂断")
+        }
     }
 }

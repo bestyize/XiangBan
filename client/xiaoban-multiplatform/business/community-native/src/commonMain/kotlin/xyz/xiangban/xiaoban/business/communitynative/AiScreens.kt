@@ -229,7 +229,7 @@ private fun AiDrawer(cloud: CloudChatState, onClose: () -> Unit, onNew: () -> Un
             if (cloud.messages.isNotEmpty()) {
                 Text(
                     cloud.title(),
-                    Modifier.padding(horizontal = 8.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(LocalExtraColors.current.fill).clickable(onClick = onOpenCurrent).padding(horizontal = 8.dp, vertical = 11.dp),
+                    Modifier.padding(horizontal = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).clickable(onClick = onOpenCurrent).padding(horizontal = 8.dp, vertical = 11.dp),
                     fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             } else {
@@ -306,6 +306,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     }
                 }
                 Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
+                    PressTip(env, voiceMode, Modifier.padding(bottom = 8.dp))
                     ChatComposer(
                         input, { input = it }, "问点什么，或描述想要的装扮、游戏…",
                         onModel = { modelSheet = true },
@@ -336,6 +337,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
         Toast(toast) { toast = null }
         PressOverlay(voiceInput)
+        MicPermissionLayer(env, voiceInput) { toast = it }
         VoiceCallLayer(env, callHost, "小伴AI") { toast = it }
         OverlayTransition(modelSheet) { panel ->
             BottomSheet({ modelSheet = false }, panel) {
@@ -435,7 +437,7 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                     GroupLabel("小伴AI · 官方")
                     Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
+                            Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
                             Column(Modifier.weight(1f)) {
                                 Text("小伴AI", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                 Text("跟着账号走，换手机、换电脑自动同步", Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -458,14 +460,14 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
         OverlayTransition(sheet) { panel ->
             BottomSheet({ sheet = false }, panel) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
+                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
                     Column(Modifier.weight(1f)) {
                         Text("小伴AI", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                         Text("跟着账号走，换设备自动同步", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconTap(XIcons.Close, "关闭", { sheet = false })
                 }
-                Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.background).padding(vertical = 12.dp)) {
+                Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.background).padding(vertical = 12.dp)) {
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(cloud.balance?.let { formatAiMoney(it.total, it.quotaPerUnit) } ?: "—", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                         Text("剩余额度", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

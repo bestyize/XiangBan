@@ -25,6 +25,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -143,3 +146,44 @@ private fun Waveform(color: Color) {
         }
     }
 }
+
+/** 没有麦克风权限时的底部面板：说明声音只用来识别，不保存；可以去系统设置里打开。 */
+@Composable
+fun MicPermissionLayer(env: CommunityEnv, voice: VoiceInputController, onNotice: (String) -> Unit) {
+    OverlayTransition(voice.micDenied) { panel ->
+        BottomSheet({ voice.micDenied = false }, panel) {
+            Text("需要使用麦克风", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                "按住说话要用麦克风。声音只用来识别，不会保存录音。你可以在系统设置里打开。",
+                Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                GhostPillButton("以后再说", { voice.micDenied = false }, Modifier.weight(1f))
+                PillButton("去设置", {
+                    voice.micDenied = false
+                    if (env.platform?.openAppSettings() != true) onNotice("请在系统设置里给小伴打开麦克风权限")
+                }, Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/** 第一次切到语音模式时输入框上方的提示：怎么按、怎么取消、怎么转文字。关掉后不再出现（记在本地偏好里）。 */
+@Composable
+fun PressTip(env: CommunityEnv, visible: Boolean, modifier: Modifier = Modifier) {
+    var seen by remember { mutableStateOf(env.prefs.get(TipKey) == "1") }
+    if (!visible || seen) return
+    Row(
+        modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface).padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(32.dp).clip(CircleShape).background(LocalExtraColors.current.brandSoft), contentAlignment = Alignment.Center) { XIcon(XIcons.Mic, tint = LocalExtraColors.current.brandInk, size = 18.dp) }
+        Column(Modifier.weight(1f)) {
+            Text("按住说话，松开发送", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text("上滑取消，滑到右边转成文字再改。", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        IconTap(XIcons.Close, "知道了", { seen = true; env.prefs.put(TipKey, "1") }, size = 18.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+private const val TipKey = "pttTipSeen"

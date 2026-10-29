@@ -131,4 +131,9 @@ class AndroidPlatformActions(
         val view = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { context.startActivity(view) }
     }
+
+    override fun openAppSettings(): Boolean {
+        val settings = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching { context.startActivity(settings) }.isSuccess
+    }
 }

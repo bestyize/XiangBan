@@ -308,6 +308,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                         onStop = env.remoteChat::cancel,
                     )
                 }
+                PressTip(env, voiceMode, Modifier.padding(bottom = 8.dp))
                 ChatComposer(
                     input, { input = it }, if (online) "对设备上的小伴说点什么…" else "设备不在线，上线后可继续对话",
                     onModel = openModels,
@@ -374,6 +375,7 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
         }
         OverlayTransition(attach) { panel -> AttachSheet({ attach = false }, { attach = false; toast = "$it 即将支持" }, panel) }
         PressOverlay(voiceInput)
+        MicPermissionLayer(env, voiceInput) { toast = it }
         VoiceCallLayer(env, callHost, peer?.name ?: "设备") { toast = it }
         Toast(toast) { toast = null }
         OverlayTransition(drawer, direction = "left") { panel ->
@@ -500,7 +502,7 @@ private fun RemoteDrawer(
     Row(Modifier.fillMaxSize()) {
         Column(panelModifier.width(312.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).statusBarsPadding().padding(top = 12.dp)) {
             // 当前设备；点开可以换设备
-            val shape = RoundedCornerShape(14.dp)
+            val shape = RoundedCornerShape(16.dp)
             Column(Modifier.padding(horizontal = 12.dp).fillMaxWidth().clip(shape).background(extra.fill)) {
                 Row(
                     Modifier.fillMaxWidth().clickable { switchOpen = !switchOpen }.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -553,7 +555,7 @@ private fun RemoteDrawer(
                     val open = keyword.isNotEmpty() || group.path !in collapsed
                     Row(Modifier.padding(horizontal = 8.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Row(
-                            Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).clickable { collapsed = if (group.path in collapsed) collapsed - group.path else collapsed + group.path }.padding(horizontal = 6.dp, vertical = 9.dp),
+                            Modifier.weight(1f).clip(RoundedCornerShape(8.dp)).clickable { collapsed = if (group.path in collapsed) collapsed - group.path else collapsed + group.path }.padding(horizontal = 6.dp, vertical = 9.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             XIcon(XIcons.ChevronDown, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp, modifier = Modifier.rotate(if (open) 0f else -90f))
@@ -589,7 +591,7 @@ private fun RemoteDrawer(
 @Composable
 private fun DrawerSession(s: RemoteSessionSummary, selected: Boolean, indent: Dp, onClick: () -> Unit) {
     Row(
-        Modifier.padding(start = indent, end = 8.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp))
+        Modifier.padding(start = indent, end = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp))
             .background(if (selected) LocalExtraColors.current.fill else Color.Transparent).clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {

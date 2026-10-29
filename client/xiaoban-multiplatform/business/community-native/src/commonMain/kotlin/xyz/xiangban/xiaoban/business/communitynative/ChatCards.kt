@@ -209,7 +209,7 @@ fun ReasoningView(reasoning: String, live: Boolean, modifier: Modifier = Modifie
         }
         if (open) {
             Column(Modifier.padding(start = 4.dp, end = 4.dp, top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                segments.take(3).forEach { Text(it, Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(extra.fill).padding(horizontal = 8.dp, vertical = 3.dp), fontSize = 12.sp, lineHeight = 19.sp, color = extra.ink3, maxLines = 6, overflow = TextOverflow.Ellipsis) }
+                segments.take(3).forEach { Text(it, Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 8.dp, vertical = 3.dp), fontSize = 12.sp, lineHeight = 19.sp, color = extra.ink3, maxLines = 6, overflow = TextOverflow.Ellipsis) }
                 if (segments.size > 3) Text("… 另 ${segments.size - 3} 段", Modifier.padding(start = 8.dp), fontSize = 12.sp, color = extra.ink3)
             }
         }
@@ -480,7 +480,7 @@ fun AdjustPlanSheet(pending: List<String>, onDismiss: () -> Unit, onSubmit: (Str
             XIcon(XIcons.Plus, size = 14.dp)
             Text("添加一步", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
         }
-        val boxShape = RoundedCornerShape(10.dp)
+        val boxShape = RoundedCornerShape(8.dp)
         BasicTextField(
             value = note, onValueChange = { note = it }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(boxShape).background(extra.fill).padding(horizontal = 10.dp, vertical = 8.dp),
             textStyle = TextStyle(fontSize = 14.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(Brand), maxLines = 4,
@@ -521,7 +521,7 @@ fun AskCard(pending: RemoteApprovalRequest, onAnswer: (String) -> Unit, modifier
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Box(Modifier.size(18.dp).clip(CircleShape).background(Danger), contentAlignment = Alignment.Center) { XIcon(XIcons.Question, tint = Color.White, size = 11.dp) }
                 Text("小伴想问你", Modifier.weight(1f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = extra.ink3)
-                Text("跳过", Modifier.clip(RoundedCornerShape(6.dp)).clickable { onAnswer(DismissChoice) }.padding(horizontal = 6.dp, vertical = 3.dp), fontSize = 12.sp, color = extra.ink3)
+                Text("跳过", Modifier.clip(RoundedCornerShape(8.dp)).clickable { onAnswer(DismissChoice) }.padding(horizontal = 6.dp, vertical = 3.dp), fontSize = 12.sp, color = extra.ink3)
             }
             Text(pending.question.ifBlank { pending.title }, Modifier.padding(top = 4.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, lineHeight = 20.sp)
             if (pending.connectors) {
@@ -529,17 +529,17 @@ fun AskCard(pending: RemoteApprovalRequest, onAnswer: (String) -> Unit, modifier
             } else {
                 pending.choices.forEachIndexed { i, choice ->
                     Row(
-                        Modifier.padding(top = 6.dp).fillMaxWidth().heightIn(min = 30.dp).clip(RoundedCornerShape(10.dp)).background(extra.fill).clickable { onAnswer(choice) }.padding(horizontal = 10.dp, vertical = 5.dp),
+                        Modifier.padding(top = 6.dp).fillMaxWidth().heightIn(min = 30.dp).clip(RoundedCornerShape(8.dp)).background(extra.fill).clickable { onAnswer(choice) }.padding(horizontal = 10.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        Box(Modifier.size(20.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(20.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface), contentAlignment = Alignment.Center) {
                             Text("${i + 1}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = extra.ink3)
                         }
                         Text(choice, Modifier.weight(1f), fontSize = 14.sp, lineHeight = 19.sp)
                     }
                 }
                 if (pending.freeText || pending.choices.isEmpty()) {
-                    val shape = RoundedCornerShape(10.dp)
+                    val shape = RoundedCornerShape(8.dp)
                     val ready = own.isNotBlank()
                     Row(
                         Modifier.padding(top = 6.dp).fillMaxWidth().heightIn(min = 34.dp).clip(shape).background(extra.fill).padding(start = 10.dp, end = 4.dp, top = 3.dp, bottom = 3.dp),
@@ -605,7 +605,7 @@ fun ApprovalCard(pending: RemoteApprovalRequest, onDecision: (String) -> Unit, m
                 Column(Modifier.padding(top = 6.dp)) {
                     CodeSnippet(preview, maxLines = if (full) 40 else 4)
                     if (preview.length > 120 || preview.count { it == '\n' } >= 3) {
-                        Text(if (full) "收起" else "查看全部", Modifier.clip(RoundedCornerShape(6.dp)).clickable { full = !full }.padding(vertical = 3.dp), fontSize = 12.sp, color = extra.ink3)
+                        Text(if (full) "收起" else "查看全部", Modifier.clip(RoundedCornerShape(8.dp)).clickable { full = !full }.padding(vertical = 3.dp), fontSize = 12.sp, color = extra.ink3)
                     }
                 }
             }
@@ -742,7 +742,7 @@ fun FileChangesCard(files: List<ChangedFile>, delivered: Boolean, modifier: Modi
                     Hairline()
                     Row(Modifier.fillMaxWidth().heightIn(min = 30.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            file.extension.ifEmpty { "文件" }, Modifier.widthIn(min = 30.dp).clip(RoundedCornerShape(6.dp)).background(extra.fill).padding(horizontal = 4.dp, vertical = 2.dp),
+                            file.extension.ifEmpty { "文件" }, Modifier.widthIn(min = 30.dp).clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 4.dp, vertical = 2.dp),
                             fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center, maxLines = 1,
                         )
                         Text(file.name, Modifier.weight(1f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -799,7 +799,7 @@ private fun ActionIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, ti
 private fun CheckpointNotice(cp: RunCheckpoint, onUndo: (String) -> Unit) {
     val extra = LocalExtraColors.current
     var confirm by remember(cp.runId) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(extra.fill).padding(horizontal = 10.dp, vertical = 6.dp)) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 10.dp, vertical = 6.dp)) {
         when {
             cp.state == "undone" -> Text(cp.message.ifBlank { "已撤销这些改动" }, fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             cp.state == "undoing" -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) { Spinner(12.dp); Text("正在撤销…", fontSize = 12.sp, color = extra.ink3) }
@@ -813,7 +813,7 @@ private fun CheckpointNotice(cp: RunCheckpoint, onUndo: (String) -> Unit) {
             else -> {
                 Text("这一轮改了 ${cp.count} 个文件。", fontSize = 12.sp, lineHeight = 17.sp)
                 if (cp.state == "failed" && cp.message.isNotBlank()) Text(cp.message, fontSize = 12.sp, lineHeight = 16.sp, color = Danger)
-                Text("撤销这些改动", Modifier.clip(RoundedCornerShape(6.dp)).clickable { confirm = true }.padding(vertical = 4.dp), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
+                Text("撤销这些改动", Modifier.clip(RoundedCornerShape(8.dp)).clickable { confirm = true }.padding(vertical = 4.dp), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
             }
         }
     }
@@ -846,7 +846,7 @@ fun MarkdownBubble(text: String, streaming: Boolean, platform: PlatformActions?,
                 is MdBlock.Paragraph -> Text(inlineText(block.inlines, codeBg, onLink), fontSize = 14.sp, lineHeight = 22.sp)
                 is MdBlock.Bullets -> block.items.forEach { item -> ListItem("•", item, codeBg, onLink) }
                 is MdBlock.Numbered -> block.items.forEachIndexed { i, item -> ListItem("${block.start + i}.", item, codeBg, onLink) }
-                is MdBlock.Quote -> Text(inlineText(block.inlines, codeBg, onLink), Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(extra.fill).padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                is MdBlock.Quote -> Text(inlineText(block.inlines, codeBg, onLink), Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 is MdBlock.Code -> CodeBlock(block.language, block.text, platform)
                 MdBlock.Rule -> Hairline()
             }
@@ -865,12 +865,12 @@ private fun ListItem(marker: String, inlines: List<MdInline>, codeBg: Color, onL
 @Composable
 private fun CodeBlock(language: String, code: String, platform: PlatformActions?) {
     var copied by remember(code) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Color(0xFF1E1E1E))) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(if (ThemeState.dark) 0xFF0C0C0E else 0xFF1E1E1E))) {
         Row(Modifier.fillMaxWidth().padding(start = 10.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(language.ifBlank { "代码" }, Modifier.weight(1f), fontSize = 12.sp, color = Color(0xFFBBBBBB), maxLines = 1)
             if (platform != null) {
                 Row(
-                    Modifier.heightIn(min = 28.dp).clip(RoundedCornerShape(6.dp)).clickable { platform.copy(code); copied = true }.padding(horizontal = 6.dp),
+                    Modifier.heightIn(min = 28.dp).clip(RoundedCornerShape(8.dp)).clickable { platform.copy(code); copied = true }.padding(horizontal = 6.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     XIcon(XIcons.Copy, tint = Color(0xFFBBBBBB), size = 12.dp)

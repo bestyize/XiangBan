@@ -38,6 +38,8 @@ interface PlatformActions : VoicePlatform {
     fun copy(text: String)
     fun share(title: String, url: String)
     fun openUrl(url: String)
+    /** 打开系统里这个应用的设置页（让用户去开麦克风权限）；平台不支持就返回 false。 */
+    fun openAppSettings(): Boolean = false
     /** 朗读一段文字；平台不支持就返回 false。 */
     fun speak(text: String): Boolean = false
 

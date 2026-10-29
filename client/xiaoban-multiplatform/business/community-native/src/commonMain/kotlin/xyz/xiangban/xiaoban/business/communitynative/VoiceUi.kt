@@ -12,10 +12,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.Alignment
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
@@ -135,6 +141,8 @@ class VoiceInputController(
         private set
     var recognizing by mutableStateOf(false)
         private set
+    /** 没有麦克风权限：界面弹出“需要使用麦克风”的面板。 */
+    var micDenied by mutableStateOf(false)
     private var starting = false
     private var released = false
     private var ticker: Job? = null
@@ -157,7 +165,7 @@ class VoiceInputController(
                     val ok = platform.startRecording()
                     starting = false
                     when {
-                        !ok -> onMessage("没有麦克风权限，没法录音")
+                        !ok -> micDenied = true
                         released -> platform.stopRecording()
                         else -> begin()
                     }
@@ -233,6 +241,8 @@ fun rememberVoiceInput(env: CommunityEnv, engines: () -> List<RecognizerEngine>,
 /** 一通语音通话的发起与本地模型下载的询问。 */
 class VoiceCallHost(private val env: CommunityEnv) {
     var call by mutableStateOf<VoiceCall?>(null)
+    /** 通话收起成了顶部胶囊。 */
+    var minimized by mutableStateOf(false)
     var offering by mutableStateOf(false)
         private set
     private var declined = false
@@ -245,6 +255,7 @@ class VoiceCallHost(private val env: CommunityEnv) {
             pending = factory
             offering = true
         } else {
+            minimized = false
             call = factory()
         }
     }
@@ -252,7 +263,7 @@ class VoiceCallHost(private val env: CommunityEnv) {
     fun offerFinished(downloaded: Boolean) {
         offering = false
         if (!downloaded) declined = true
-        pending?.let { call = it() }
+        pending?.let { minimized = false; call = it() }
         pending = null
     }
 }
@@ -260,14 +271,31 @@ class VoiceCallHost(private val env: CommunityEnv) {
 @Composable
 fun rememberVoiceCallHost(env: CommunityEnv): VoiceCallHost = remember(env) { VoiceCallHost(env) }
 
-/** 通话相关的两层界面：询问下载模型的底部弹层，和通话本身的全屏界面。 */
+/**
+ * 通话相关的几层界面：询问下载模型的底部弹层、通话全屏界面，收起后是页面顶部的胶囊。
+ * 通话的开始、结束都在这里管，所以收起、展开不会打断通话。
+ */
 @Composable
 fun VoiceCallLayer(env: CommunityEnv, host: VoiceCallHost, title: String, onNotice: (String) -> Unit) {
     OverlayTransition(host.offering) { panel -> SpeechModelSheet(env, panel) { host.offerFinished(it) } }
-    host.call?.let { current ->
-        VoiceCallScreen(current, title) { notice ->
+    val current = host.call ?: return
+    val state by current.state.collectAsState()
+    var seconds by remember(current) { mutableStateOf(0) }
+    LaunchedEffect(current) { current.start() }
+    LaunchedEffect(current) { while (true) { delay(1000); seconds += 1 } }
+    DisposableEffect(current) { onDispose { current.stop() } }
+    LaunchedEffect(state.ended) {
+        if (state.ended) {
             host.call = null
-            notice?.let(onNotice)
+            host.minimized = false
+            state.notice?.let(onNotice)
         }
+    }
+    if (host.minimized) {
+        Box(Modifier.fillMaxSize()) {
+            CallCapsule(current, seconds, { host.minimized = false }, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 64.dp))
+        }
+    } else {
+        VoiceCallScreen(current, title, seconds, onMinimize = { host.minimized = true })
     }
 }

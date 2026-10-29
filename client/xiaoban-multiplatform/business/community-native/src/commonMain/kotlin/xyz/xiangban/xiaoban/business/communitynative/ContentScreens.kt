@@ -126,7 +126,7 @@ private fun ShareSheet(env: CommunityEnv, title: String, sub: String, url: Strin
     BottomSheet(onDismiss, panelModifier) {
         Text(heading, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Row(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.background).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).clip(RoundedCornerShape(6.dp)).background(Brand.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) { XIcon(XIcons.Link, tint = Brand, size = 24.dp) }
+            Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Brand.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) { XIcon(XIcons.Link, tint = Brand, size = 24.dp) }
             Column(Modifier.weight(1f)) {
                 Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (sub.isNotBlank()) Text(sub, Modifier.padding(top = 2.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -202,7 +202,7 @@ private fun VisualCard(pack: Pack, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
         Box {
             Cover(pack.coverUrl, pack.id, Modifier.fillMaxWidth().aspectRatio(4f / 3f))
-            Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp)
+            Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp)
         }
         Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 10.dp)) {
             Text(pack.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)

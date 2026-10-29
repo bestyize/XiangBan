@@ -205,7 +205,7 @@ fun CenterDialog(onDismiss: () -> Unit, content: @Composable ColumnScope.() -> U
 @Composable
 fun SheetAction(icon: ImageVector, title: String, desc: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        IconBox(icon, 44.dp, 12.dp)
+        IconBox(icon, 44.dp, 16.dp)
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Text(desc, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
@@ -214,7 +214,7 @@ fun SheetAction(icon: ImageVector, title: String, desc: String, onClick: () -> U
 }
 
 @Composable
-fun IconBox(icon: ImageVector, box: Dp = 44.dp, corner: Dp = 12.dp, tint: Color = MaterialTheme.colorScheme.onSurface, iconSize: Dp = 24.dp) {
+fun IconBox(icon: ImageVector, box: Dp = 44.dp, corner: Dp = 16.dp, tint: Color = MaterialTheme.colorScheme.onSurface, iconSize: Dp = 24.dp) {
     Box(Modifier.size(box).clip(RoundedCornerShape(corner)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
         XIcon(icon, tint = tint, size = iconSize)
     }
@@ -282,7 +282,7 @@ fun TextBox(
             cursorBrush = SolidColor(Brand),
             decorationBox = { inner ->
                 Row(
-                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(12.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
+                    Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(8.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -312,7 +312,7 @@ fun AreaBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier =
         cursorBrush = SolidColor(Brand),
         decorationBox = { inner ->
             Box(
-                Modifier.fillMaxWidth().heightIn(min = minHeight).clip(RoundedCornerShape(12.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
+                Modifier.fillMaxWidth().heightIn(min = minHeight).clip(RoundedCornerShape(8.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 14.dp, vertical = 12.dp),
             ) {
                 if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 15.sp, lineHeight = 24.sp)
@@ -336,7 +336,7 @@ fun Toggle(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = M
 /** 勾选框：22×22 圆角方块。 */
 @Composable
 fun CheckBox(checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(8.dp)
     Box(
         modifier.size(22.dp).clip(shape).background(if (checked) Brand else MaterialTheme.colorScheme.surface)
             .border(2.dp, if (checked) Brand else LocalExtraColors.current.line, shape).clickable { onChange(!checked) },
@@ -365,7 +365,7 @@ fun StatusDot(online: Boolean, label: String, fontSize: Int = 12) {
 @Composable
 fun Banner(title: String, modifier: Modifier = Modifier, desc: String? = null, icon: ImageVector? = null, warn: Boolean = false, actionText: String? = null, onAction: (() -> Unit)? = null) {
     val extra = LocalExtraColors.current
-    val shape = RoundedCornerShape(12.dp)
+    val shape = RoundedCornerShape(16.dp)
     Row(
         modifier.fillMaxWidth().clip(shape).background(if (warn) extra.brandSoft else MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),

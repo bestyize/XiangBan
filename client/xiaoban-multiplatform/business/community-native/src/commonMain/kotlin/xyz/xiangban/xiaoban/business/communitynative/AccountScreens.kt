@@ -222,8 +222,8 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
 
 @Composable
 private fun QuickTile(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Column(modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onClick).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        IconBox(icon, 44.dp, 14.dp)
+    Column(modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        IconBox(icon, 44.dp, 16.dp)
         Text(label, fontSize = 12.sp)
     }
 }
