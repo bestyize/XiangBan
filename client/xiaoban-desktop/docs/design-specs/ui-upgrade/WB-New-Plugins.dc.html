@@ -250,7 +250,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
                     <sc-for list="{{skillRows}}" as="o" hint-placeholder-count="4">
                       <button type="button" class="pi" aria-pressed="{{o.checked}}" onClick="{{o.pick}}" style="background:{{o.bg}}">
                         <span class="ti" style="width:28px;height:28px;background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"></path></svg></span>
-                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">{{o.name}}</span><span class="ds">{{o.desc}}</span></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px" title="{{o.desc}}"><span class="pl">{{o.name}}</span></span>
                         <span class="tag">{{o.tag}}</span>
                         <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{o.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
                       </button>
@@ -273,7 +273,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
                     <sc-if value="{{showNone}}" hint-placeholder-val="{{ true }}">
                       <button type="button" class="pi" aria-pressed="{{exNone.checked}}" onClick="{{exNone.pick}}" style="background:{{exNone.bg}}">
                         <span class="ti" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(160deg,{{t.btnHi}},{{t.btn}});color:#fff"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path></svg></span>
-                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">通用小伴</span><span class="ds">不指定专家，由小伴自行判断</span></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px" title="不指定专家，由小伴自行判断"><span class="pl">通用小伴</span></span>
                         <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{exNone.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
                       </button>
                     </sc-if>
@@ -281,7 +281,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
                     <sc-for list="{{teamRows}}" as="o" hint-placeholder-count="2">
                       <button type="button" class="pi" aria-pressed="{{o.checked}}" onClick="{{o.pick}}" style="background:{{o.bg}}">
                         <span class="ti" style="width:28px;height:28px;border-radius:8px;background:{{o.avBg}};color:{{o.avInk}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 20a6 6 0 0 1 12 0M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.5a6 6 0 0 1 3 5.5"></path></svg></span>
-                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">{{o.name}}</span><span class="ds">{{o.desc}}</span></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px" title="{{o.desc}}"><span class="pl">{{o.name}}</span></span>
                         <span class="tag">{{o.meta}}</span>
                         <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{o.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
                       </button>
@@ -290,7 +290,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
                     <sc-for list="{{personRows}}" as="o" hint-placeholder-count="3">
                       <button type="button" class="pi" aria-pressed="{{o.checked}}" onClick="{{o.pick}}" style="background:{{o.bg}}">
                         <span class="ti" style="width:28px;height:28px;border-radius:50%;background:{{o.avBg}};color:{{o.avInk}};font-size:12px;font-weight:600">{{o.letter}}</span>
-                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">{{o.name}}</span><span class="ds">{{o.desc}}</span></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px" title="{{o.desc}}"><span class="pl">{{o.name}}</span></span>
                         <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{o.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
                       </button>
                     </sc-for>
@@ -311,7 +311,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
                     <sc-for list="{{connRows}}" as="o" hint-placeholder-count="5">
                       <div class="pi" style="cursor:default">
                         <span class="ti" style="width:28px;height:28px;border-radius:50%;background:{{o.bg}};color:{{o.ink}};font-size:12px;font-weight:600">{{o.letter}}</span>
-                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">{{o.name}}</span><span class="ds" style="color:{{o.statusColor}}">{{o.status}}</span></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px" title="{{o.status}}"><span class="pl">{{o.name}}</span></span>
                         <sc-if value="{{o.isOk}}" hint-placeholder-val="{{ true }}">
                           <button type="button" role="switch" aria-checked="{{o.checked}}" aria-label="启用 {{o.name}}" onClick="{{o.toggle}}" style="position:relative;width:34px;height:20px;border-radius:10px;border:0;padding:0;background:{{o.trackBg}};cursor:pointer;flex-shrink:0;transition:background .15s"><span style="position:absolute;top:2px;left:{{o.knob}};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .15s"></span></button>
                         </sc-if>
