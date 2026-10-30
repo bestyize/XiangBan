@@ -1139,9 +1139,9 @@ describe('sending images', () => {
     expect(h.notify).toHaveBeenCalledWith('暂不支持这种文件，请选择图片、PDF、Office 文档或文本文件', 'error');
     expect(q('chat-attachments')).toBeNull();
 
-    const huge = new File([new Uint8Array(3 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' });
+    const huge = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' });
     await pickFiles([huge]);
-    expect(h.notify).toHaveBeenCalledWith('这张图片太大了，请换一张小于 3MB 的', 'error');
+    expect(h.notify).toHaveBeenCalledWith('这张图片太大了，请换一张小于 10MB 的', 'error');
     expect(q('chat-attachments')).toBeNull();
   });
 

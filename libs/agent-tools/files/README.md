@@ -27,7 +27,7 @@ The bundled file-analysis Skill explains partial extraction, calculations, depen
 6. Render attachment metadata in chat history. Keep inline images compatible with older histories.
 7. Reject deleting an active session, remove its attachments with its conversation, and roll back unused imports.
 
-Files default to 10 MiB each, images to 3 MiB, 8 attachments / 30 MiB per message. Office archives are limited to 64 MiB declared expanded content and 10,000 members; extracted text is capped at 8 MiB. Reader outputs are paginated and bounded.
+Files and images default to 10 MiB each, with 8 attachments / 30 MiB per message. For vision, large images are prepared as a smaller model-facing copy; the original file is not overwritten. Office archives are limited to 64 MiB declared expanded content and 10,000 members; extracted text is capped at 8 MiB. Reader outputs are paginated and bounded.
 
 ## Verification
 

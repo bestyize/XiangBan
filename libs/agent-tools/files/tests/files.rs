@@ -164,6 +164,34 @@ fn images_are_multimodal_results() {
     assert!(!result.is_error);
     assert!(matches!(result.parts.first(), Some(Part::Image { .. })));
 }
+
+#[test]
+fn large_image_read_uses_smaller_model_copy_without_changing_original() {
+    use image::{DynamicImage, ImageBuffer, ImageFormat, Rgb};
+    use std::io::Cursor;
+    let temp = Temp::new();
+    let mut seed = 0x12345678u32;
+    let pixels: Vec<u8> = (0..1024 * 1024 * 3).map(|_| {
+        seed ^= seed << 13; seed ^= seed >> 17; seed ^= seed << 5; seed as u8
+    }).collect();
+    let image = DynamicImage::ImageRgb8(ImageBuffer::<Rgb<u8>, _>::from_raw(1024, 1024, pixels).unwrap());
+    let mut png = Cursor::new(Vec::new());
+    image.write_to(&mut png, ImageFormat::Png).unwrap();
+    let original = png.into_inner();
+    assert!(original.len() > 1024 * 1024);
+    let input_url = format!("data:image/png;base64,{}", STANDARD.encode(&original));
+    assert!(agent_kernel::image_payload::optimize_data_url(&input_url, 2000, 1024 * 1024).expect("image preparation failed").is_some());
+    let store = AttachmentStore::new(temp.0.join("files"));
+    let item = store.import("s", &[input("large.png", &original)]).unwrap().remove(0);
+    let reader = ReadFile::new(vec![temp.0.join("files")], store).unwrap();
+    let result = reader.execute_result(json!({"path":item.path}), &ToolCtx::detached("s"));
+    assert!(!result.is_error);
+    let Some(Part::Image { url }) = result.parts.first() else { panic!("missing image") };
+    let decoded = STANDARD.decode(url.split_once(',').unwrap().1).unwrap();
+    assert!(decoded.len() < original.len());
+    assert!(image::load_from_memory(&decoded).is_ok());
+    assert_eq!(fs::read(&item.path).unwrap(), original);
+}
 #[test]
 fn extracts_docx_text_entities_and_continuation() {
     let temp = Temp::new();

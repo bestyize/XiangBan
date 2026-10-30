@@ -19,6 +19,19 @@ describe('model failure recovery', () => {
       expect(view.items.filter(i => i.kind === 'user')).toHaveLength(1);
     }
   });
+  it('explains an oversized request without offering an identical retry or continuation', () => {
+    for (const message of ['request_too_large: too large', 'HTTP 413: payload too large']) {
+      for (const partial of [false, true]) {
+        const view = newView('s');
+        view.items.push({ kind: 'user', id: 'u', text: 'hello', images: [] });
+        if (partial) applyEvent(view, { type: 'tool_start', id: 't', name: 'read_file', arguments: '{}' });
+        applyEvent(view, { type: 'error', message });
+        expect(view.items.at(-1)).toMatchObject({ text: expect.stringContaining('新开会话') });
+        expect(view.items.at(-1)).not.toHaveProperty('canRetry');
+        expect(view.items.at(-1)).not.toHaveProperty('canContinue');
+      }
+    }
+  });
 });
 
 describe('what the page says while the host retries or waits', () => {

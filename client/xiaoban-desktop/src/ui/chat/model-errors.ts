@@ -2,6 +2,9 @@ export interface ModelFailure { message: string; refresh: boolean }
 /** Only explicit provider error content identifies a retired model; HTTP 404 alone does not. */
 export function modelFailure(raw: string): ModelFailure {
   const value = raw.toLowerCase();
+  if (/request[_ -]too[_ -]large|\b413\b/.test(value)) {
+    return { message: '会话内容太大，无法发送。请减少图片或新开会话后继续。', refresh: false };
+  }
   if (/model[_ -](not[_ -]found|not[_ -]supported|deprecated|disabled)|model.*(does not exist|no longer available|has been retired)|模型.*(不存在|已停用|已下线)/i.test(raw)) {
     return { message: '当前模型已不可用，可以切换模型后继续。', refresh: true };
   }

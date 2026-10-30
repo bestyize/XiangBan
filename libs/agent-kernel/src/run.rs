@@ -553,6 +553,15 @@ impl Agent {
                     completion_tokens: output.div_ceil(3).min(u32::MAX as usize) as u32, ..Default::default() });
             }
             match result {
+                Err(error @ HarnessError::Provider { .. }) if !streamed && matches!(&error, HarnessError::Provider { message, .. } if message.starts_with("request_too_large:")) && recoveries < 2 => {
+                    let used = estimate_tokens(&request.messages) + estimate_tool_tokens(&request.tools);
+                    let budget = used.saturating_mul(3) / 4;
+                    let before = request.messages.clone();
+                    if reduce(request, budget).is_err() || request.messages == before { return Err(error); }
+                    *recovered_budget = Some(budget);
+                    recoveries += 1;
+                    on_event(Event::Retrying { attempt: recoveries, delay_ms: 0, message: "请求体积过大，正在缩减旧历史；已执行的操作不会重放。".into() });
+                }
                 Err(error) if !streamed && error.is_context_limit() && recoveries < 2 => {
                     let used = estimate_tokens(&request.messages) + estimate_tool_tokens(&request.tools);
                     let budget = used.saturating_mul(3) / 4;
@@ -605,6 +614,27 @@ mod interrupted_output_tests {
     use crate::store::SessionStore;
     use crate::provider::ModelProvider;
     use std::sync::atomic::AtomicUsize;
+
+    #[test]
+    fn oversize_recovery_only_retries_after_changing_request() {
+        use crate::provider::scripted::{ScriptedProvider, Step};
+        let error = || HarnessError::provider("request_too_large: local preflight", false);
+        let provider = Arc::new(ScriptedProvider::new(vec![Step::error(error()), Step::text("ok")]));
+        let agent = Agent::builder(provider.clone(), Arc::new(crate::MemoryStore::new())).build().unwrap();
+        let mut request = ChatRequest { messages: vec![Message::user_text("a".repeat(10_000)), Message::assistant("old", vec![]), Message::user_text("current question")], tools: vec![] };
+        let mut budget = None;
+        assert!(agent.chat_with_retry("s", "r", &mut request, &mut budget, &crate::RunControl::unlimited(), &mut |_| {}, &AtomicBool::new(false)).is_ok());
+        let requests = provider.requests();
+        assert_eq!(requests.len(), 2);
+        assert_ne!(requests[0], requests[1]);
+        assert_eq!(requests[1].messages.last().unwrap().text(), "current question");
+
+        let provider = Arc::new(ScriptedProvider::new(vec![Step::error(error()), Step::text("must not run")]));
+        let agent = Agent::builder(provider.clone(), Arc::new(crate::MemoryStore::new())).build().unwrap();
+        let mut request = ChatRequest { messages: vec![Message::user_text("a".repeat(10_000))], tools: vec![] };
+        assert!(agent.chat_with_retry("s", "r", &mut request, &mut None, &crate::RunControl::unlimited(), &mut |_| {}, &AtomicBool::new(false)).is_err());
+        assert_eq!(provider.requests().len(), 1);
+    }
 
     struct InterruptedProvider {
         cancelled: bool,

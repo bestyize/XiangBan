@@ -21,6 +21,8 @@ pub mod process_tree;
 pub mod memory;
 mod middleware;
 pub mod provider;
+#[cfg(feature = "image-payload")]
+pub mod image_payload;
 pub mod model;
 pub mod goals;
 pub mod supervisor;

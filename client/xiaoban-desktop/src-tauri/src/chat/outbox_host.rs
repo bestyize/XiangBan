@@ -247,6 +247,7 @@ pub fn chat_enqueue(
         .iter()
         .map(|s| clean_image(s))
         .collect::<Result<Vec<_>, _>>()?;
+    let model_images = images.iter().map(|s| prepare_model_image(s)).collect::<Result<Vec<_>, _>>()?;
     for (n, image) in images.iter().enumerate() {
         let ext = if image.starts_with("data:image/jpeg;") {
             "jpg"
@@ -264,7 +265,7 @@ pub fn chat_enqueue(
     }
     let files = AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments"));
     let saved = files.import(&session_id, &inputs)?;
-    let mut message = Message::user(user_parts(&text, &images));
+    let mut message = Message::user(user_parts(&text, &model_images));
     message.structured_content = Some(json!({"attachments":saved,"designId":design_id}));
     let mentions = mentions
         .unwrap_or_default()

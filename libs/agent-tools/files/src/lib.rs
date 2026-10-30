@@ -90,15 +90,22 @@ impl ReadFile {
             .read_to_end(&mut header)
             .map_err(|e| e.to_string())?;
         if let Some(mime) = storage::image_mime(&header) {
-            if meta.len() > 3 * 1024 * 1024 {
-                return Err("image exceeds 3 MiB; resize using shell before viewing".into());
+            if meta.len() > MAX_FILE_BYTES as u64 {
+                return Err("image exceeds 10 MiB; resize before viewing".into());
             }
             let bytes = fs::read(&path).map_err(|e| e.to_string())?;
+            let original = format!("data:{mime};base64,{}", STANDARD.encode(bytes));
+            let prepared = match agent_kernel::image_payload::prepare_data_url(&original) {
+                Ok(Some(prepared)) => prepared,
+                Ok(None) => original,
+                Err(_) if meta.len() <= 1024 * 1024 => original,
+                Err(_) => return Err("could not decode large image; please resize it before viewing".into()),
+            };
             return Ok(ToolResult::ok(
                 "Image attached for visual inspection; requires a vision-capable model.",
             )
             .with_part(Part::Image {
-                url: format!("data:{mime};base64,{}", STANDARD.encode(bytes)),
+                url: prepared,
             }));
         }
         if matches!(ext.as_str(), "pdf" | "docx" | "pptx" | "xlsx") {

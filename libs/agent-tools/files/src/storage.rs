@@ -107,9 +107,6 @@ impl AttachmentStore {
                 return Err("附件扩展名无效".into());
             }
             let mime = if let Some(mime) = image_mime(&bytes) {
-                if bytes.len() > 3 * 1024 * 1024 {
-                    return Err("单张图片不能超过 3MB".into());
-                }
                 mime.to_string()
             } else {
                 match ext.as_str() {

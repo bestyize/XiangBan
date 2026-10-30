@@ -20,7 +20,7 @@ export function readAttachment(file: File): Promise<PendingAttachment> {
   const imageMime = IMAGE_TYPES.includes(file.type) ? file.type : fallbackMime[ext];
   const image = !!imageMime;
   if (!image && !DOCUMENT_EXTENSIONS.has(ext)) return Promise.reject(Error('暂不支持这种文件，请选择图片、PDF、Office 文档或文本文件'));
-  if (file.size > (image ? 3 : 10) * 1024 * 1024) return Promise.reject(Error(image ? '这张图片太大了，请换一张小于 3MB 的' : '单个文件不能超过 10MB'));
+  if (file.size > 10 * 1024 * 1024) return Promise.reject(Error(image ? '这张图片太大了，请换一张小于 10MB 的' : '单个文件不能超过 10MB'));
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = reader.onabort = () => reject(Error('文件读取失败，请重试'));
