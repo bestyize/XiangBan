@@ -34,6 +34,8 @@ pub struct ProviderProfile {
     pub base_url: String,
     pub api_key: String,
     pub model: String,
+    /// Host-provided stable identity of the provider and route, never a raw credential.
+    pub state_scope: Option<String>,
     /// Transport routing supplied by the host. Not sent to model APIs.
     pub proxy_mode: String,
     pub proxy_url: String,
@@ -67,6 +69,7 @@ impl ProviderProfile {
             base_url: base_url.into(),
             api_key: api_key.into(),
             model: model.into(),
+            state_scope: None,
             proxy_mode: "system".into(),
             proxy_url: String::new(),
             extra_headers: Vec::new(),
@@ -103,10 +106,12 @@ impl fmt::Debug for ProviderProfile {
 
 /// Bind opaque continuation state to the endpoint/model that produced it, never to credentials.
 pub(crate) fn state_source(profile: &ProviderProfile) -> Value {
-    json!({"base_url":profile.base_url.trim().trim_end_matches('/'), "model":profile.model})
+    let mut source = json!({"base_url":profile.base_url.trim().trim_end_matches('/'), "model":profile.model});
+    if let Some(scope) = &profile.state_scope { source["scope"] = json!(scope); }
+    source
 }
 pub(crate) fn matching_state<'a>(message: &'a Message, profile: &ProviderProfile, protocol: &str) -> Option<&'a Value> {
-    message.provider_state.as_ref().filter(|s| s["protocol"] == protocol && s.get("source").is_none_or(|source| source == &state_source(profile)))
+    message.provider_state.as_ref().filter(|s| s["protocol"] == protocol && s.get("source").is_some_and(|source| source == &state_source(profile)))
 }
 pub(crate) fn bind_state(message: &mut Message, profile: &ProviderProfile) {
     if let Some(state) = message.provider_state.as_mut() { state["source"] = state_source(profile); }

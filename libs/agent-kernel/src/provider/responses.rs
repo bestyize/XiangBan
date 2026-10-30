@@ -646,8 +646,9 @@ mod reliability_tests {
             {"type":"function_call","id":"f1","call_id":"c1","name":"lookup","arguments":"{}"}
         ]);
         stream.push_event(&json!({"type":"response.completed","response":{"output":output}}), &mut |_| {}).unwrap();
-        let reply = stream.finish();
+        let mut reply = stream.finish();
         let profile = ProviderProfile::new("https://local/v1", "", "model");
+        super::super::wire::bind_state(&mut reply.message, &profile);
         let request = ChatRequest { messages: vec![Message::user_text("question"), reply.message, Message::tool("c1", "result")], tools: vec![] };
         let body = build_request_body(&profile, &request);
         assert_eq!(body["input"][1], output[0]);

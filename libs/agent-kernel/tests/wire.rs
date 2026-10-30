@@ -172,7 +172,8 @@ fn thinking_chat_tool_history_is_preserved_without_becoming_visible_text() {
         json!({"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"ping","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}),
     ]);
     assert_eq!(visible, "Checking");
-    let message = acc.finish().message;
+    let mut message = acc.finish().message;
+    message.provider_state.as_mut().unwrap()["source"] = json!({"base_url":"https://proxy.example/v1", "model":"kimi-k3"});
     assert_eq!(message.text(), "Checking");
     let message: Message = serde_json::from_value(serde_json::to_value(&message).unwrap()).unwrap();
     let req = ChatRequest {messages:vec![Message::user_text("ping"),message.clone(),Message::tool("c1","ok")],tools:vec![]};
@@ -182,6 +183,11 @@ fn thinking_chat_tool_history_is_preserved_without_becoming_visible_text() {
     assert_eq!(body["reasoning_effort"], "high");
     assert_eq!(body["messages"][1]["reasoning_content"], "first second");
     assert_eq!(body["messages"][2]["tool_call_id"], "c1");
+    let mut scoped = message.clone();
+    scoped.provider_state.as_mut().unwrap()["source"]["scope"] = json!("provider-a");
+    p.state_scope = Some("provider-b".into());
+    let body = build_request_body(&p, &ChatRequest {messages:vec![scoped],tools:vec![]});
+    assert!(body["messages"][0].get("reasoning_content").is_none());
     let mut other = message;
     other.provider_state.as_mut().unwrap()["source"] = json!({"base_url":"https://other.example/v1","model":"kimi-k3"});
     let body = build_request_body(&p, &ChatRequest {messages:vec![other],tools:vec![]});

@@ -1104,6 +1104,35 @@ pub fn parse_model_list_json(raw: &str) -> Result<Vec<String>, String> {
     Ok(parse_model_details_json(raw, "chat")?.into_iter().map(|m| m.id).collect())
 }
 
+fn model_list_request(
+    client: &reqwest::blocking::Client, url: &str, base_url: &str, protocol: &str, key: &str,
+) -> Result<(reqwest::blocking::Response, Option<agent_kernel::provider::anthropic::auth::Header>), reqwest::Error> {
+    use agent_kernel::provider::anthropic::auth::{self, Header};
+    let mut method = auth::preferred(base_url, key);
+    for attempt in 0..2 {
+        let mut req = client.get(url).header("User-Agent", "XiaoBanDesktop/1.0");
+        if protocol == "anthropic" {
+            req = req.header("anthropic-version", "2023-06-01");
+            if !key.is_empty() {
+                req = match method {
+                    Header::ApiKey => req.header("x-api-key", key),
+                    Header::Bearer => req.header("Authorization", format!("Bearer {key}")),
+                };
+            }
+        } else if !key.is_empty() {
+            req = req.header("Authorization", format!("Bearer {key}"));
+        }
+        let response = req.send()?;
+        if protocol == "anthropic" && !key.is_empty() && attempt == 0
+            && response.status() == reqwest::StatusCode::UNAUTHORIZED {
+            method = method.alternate();
+            continue;
+        }
+        return Ok((response, (protocol == "anthropic").then_some(method)));
+    }
+    unreachable!("at most two model-list authentication attempts")
+}
+
 #[tauri::command]
 pub async fn fetch_ai_models(
     app: tauri::AppHandle,
@@ -1139,19 +1168,8 @@ pub async fn fetch_ai_models(
         let mut last_error = String::new();
 
         for url in urls {
-            let mut req = client.get(&url).header("User-Agent", "XiaoBanDesktop/1.0");
-            if protocol == "anthropic" {
-                req = req.header("anthropic-version", "2023-06-01");
-                if !effective_key.is_empty() {
-                    req = req.header("x-api-key", &effective_key)
-                        .header("Authorization", format!("Bearer {effective_key}"));
-                }
-            } else if !effective_key.is_empty() {
-                req = req.header("Authorization", format!("Bearer {effective_key}"));
-            }
-
-            let resp = match req.send() {
-                Ok(r) => r,
+            let (resp, auth_method) = match model_list_request(&client, &url, &base_url, &protocol, &effective_key) {
+                Ok(result) => result,
                 Err(e) => {
                     last_error = format!("网络请求失败：{e}");
                     continue;
@@ -1173,7 +1191,11 @@ pub async fn fetch_ai_models(
             }
 
             let body = resp.text().map_err(|e| format!("读取响应失败：{e}"))?;
-            return parse_model_details_json(&body, &protocol);
+            let models = parse_model_details_json(&body, &protocol)?;
+            if let Some(method) = auth_method {
+                agent_kernel::provider::anthropic::auth::remember(&base_url, &effective_key, method);
+            }
+            return Ok(models);
         }
 
         if last_error.is_empty() {
@@ -1189,6 +1211,38 @@ pub async fn fetch_ai_models(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn anthropic_model_list_retries_one_401_with_a_single_alternate_header() {
+        use std::{io::{Read, Write}, net::TcpListener, thread, time::Duration};
+        use agent_kernel::provider::anthropic::auth::Header;
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let server = thread::spawn(move || {
+            let mut seen = Vec::new();
+            for status in ["401 Unauthorized", "200 OK"] {
+                let (mut socket, _) = listener.accept().unwrap();
+                socket.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
+                let mut bytes = Vec::new(); let mut byte = [0u8; 1];
+                while !bytes.ends_with(b"\r\n\r\n") {
+                    if socket.read(&mut byte).unwrap_or(0) == 0 { break; }
+                    bytes.push(byte[0]);
+                }
+                seen.push(String::from_utf8(bytes).unwrap().to_lowercase());
+                write!(socket, "HTTP/1.1 {status}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+            }
+            seen
+        });
+        let client = reqwest::blocking::Client::builder().no_proxy().timeout(Duration::from_secs(3)).build().unwrap();
+        let (response, method) = model_list_request(&client, &format!("{base}/v1/models"), &base, "anthropic", "test-secret").unwrap();
+        assert!(response.status().is_success());
+        assert_eq!(method, Some(Header::Bearer));
+        let seen = server.join().unwrap();
+        assert!(seen[0].contains("x-api-key: test-secret\r\n"));
+        assert!(!seen[0].contains("authorization:"));
+        assert!(seen[1].contains("authorization: bearer test-secret\r\n"));
+        assert!(!seen[1].contains("x-api-key:"));
+    }
 
     #[test]
     fn conversation_model_and_reasoning_do_not_modify_registry_or_default() {

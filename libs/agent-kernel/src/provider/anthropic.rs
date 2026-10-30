@@ -488,6 +488,41 @@ impl AnthropicStream {
     }
 }
 
+
+/// Remember a successful auth header per endpoint and credential for this process. No raw
+/// credential is retained, and the bounded cache is reset when the application restarts.
+#[cfg(feature = "anthropic")]
+pub mod auth {
+    use sha2::{Digest, Sha256};
+    use std::{collections::HashMap, sync::{Mutex, OnceLock}};
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum Header { ApiKey, Bearer }
+    impl Header {
+        pub fn alternate(self) -> Self { match self { Self::ApiKey => Self::Bearer, Self::Bearer => Self::ApiKey } }
+    }
+    type Cache = HashMap<[u8; 32], Header>;
+    fn cache() -> &'static Mutex<Cache> { static CACHE: OnceLock<Mutex<Cache>> = OnceLock::new(); CACHE.get_or_init(|| Mutex::new(HashMap::new())) }
+    fn fingerprint(endpoint: &str, key: &str) -> [u8; 32] {
+        let mut hash = Sha256::new();
+        let endpoint = endpoint.trim().trim_end_matches('/');
+        hash.update((endpoint.len() as u64).to_be_bytes());
+        hash.update(endpoint.as_bytes());
+        hash.update(key.as_bytes());
+        hash.finalize().into()
+    }
+    pub fn preferred(endpoint: &str, key: &str) -> Header {
+        if key.is_empty() { return Header::ApiKey; }
+        cache().lock().unwrap_or_else(|e| e.into_inner()).get(&fingerprint(endpoint, key)).copied().unwrap_or(Header::ApiKey)
+    }
+    pub fn remember(endpoint: &str, key: &str, header: Header) {
+        if key.is_empty() { return; }
+        let mut entries = cache().lock().unwrap_or_else(|e| e.into_inner());
+        if entries.len() >= 256 { entries.clear(); }
+        entries.insert(fingerprint(endpoint, key), header);
+    }
+}
+
 #[cfg(feature = "anthropic")]
 pub use client::AnthropicMessages;
 
@@ -520,9 +555,8 @@ mod client {
         }
     }
 
-    /// Streaming Messages client. Sends `x-api-key` and `anthropic-version`; use
-    /// `ProviderProfile::extra_headers` to replace either, for example `Authorization: Bearer ...`
-    /// (with an empty `api_key`) for gateways that expect it, or `anthropic-beta`.
+    /// Streaming Messages client. Uses one auth header and retries a rejected 401 once with
+    /// the alternative, unless the host supplied an explicit authentication header.
     pub struct AnthropicMessages {
         profile: ProviderProfile,
         client: Client,
@@ -569,31 +603,48 @@ mod client {
                 profile.max_output_tokens = Some(max_tokens);
                 fit_thinking_budget(&mut profile.extra_body, max_tokens)?;
                 let body = super::super::budget::encode(&profile, request, build_request_body)?;
-                let mut headers = vec![
-                    ("Content-Type".to_string(), "application/json".to_string()),
-                    ("Accept".to_string(), "text/event-stream".to_string()),
-                    ("anthropic-version".to_string(), DEFAULT_VERSION.to_string()),
-                ];
-                let key = profile.current_api_key();
-                if !key.is_empty() {
-                    headers.push(("x-api-key".to_string(), key));
-                }
-                let call = Call { url: endpoint_url(&profile.base_url), headers: http::merge_headers(headers, &profile.extra_headers), body };
+                let mut auth_header = auth::preferred(&profile.base_url, &profile.current_api_key());
+                let custom_auth = profile.extra_headers.iter().any(|(name, _)|
+                    name.eq_ignore_ascii_case("authorization") || name.eq_ignore_ascii_case("x-api-key"));
+                let mut key_used = String::new();
                 let mut decoder = AnthropicStream::default();
-                // Anything streamed (answer or thinking) means the request was accepted: no retry with a lower limit.
                 let emitted = std::cell::Cell::new(false);
-                let result = http::post_stream_with_policy(&self.client, call, &mut decoder, &mut |text| {
-                    emitted.set(true);
-                    on_text(text);
-                }, &mut |kind, text| {
-                    emitted.set(true);
-                    on_reasoning(kind, text);
-                }, &mut |progress| {
-                    emitted.set(true);
-                    on_tool(progress);
-                }, cancel, &self.profile.timeouts);
+                let mut result = Err(HarnessError::Cancelled);
+                for auth_attempt in 0..2 {
+                    key_used = profile.current_api_key();
+                    let mut headers = vec![
+                        ("Content-Type".to_string(), "application/json".to_string()),
+                        ("Accept".to_string(), "text/event-stream".to_string()),
+                        ("anthropic-version".to_string(), DEFAULT_VERSION.to_string()),
+                    ];
+                    if !key_used.is_empty() {
+                        match auth_header {
+                            auth::Header::ApiKey => headers.push(("x-api-key".to_string(), key_used.clone())),
+                            auth::Header::Bearer => headers.push(("Authorization".to_string(), format!("Bearer {key_used}"))),
+                        }
+                    }
+                    let call = Call { url: endpoint_url(&profile.base_url), headers: http::merge_headers(headers, &profile.extra_headers), body: body.clone() };
+                    let mut error_status = None;
+                    result = http::post_stream_with_policy_status(&self.client, call, &mut decoder, &mut |text| {
+                        emitted.set(true);
+                        on_text(text);
+                    }, &mut |kind, text| {
+                        emitted.set(true);
+                        on_reasoning(kind, text);
+                    }, &mut |progress| {
+                        emitted.set(true);
+                        on_tool(progress);
+                    }, cancel, &self.profile.timeouts, &mut error_status);
+                    if auth_attempt == 0 && error_status == Some(401) && !emitted.get()
+                        && !key_used.is_empty() && !custom_auth && !cancel.load(Ordering::Relaxed) {
+                        auth_header = auth_header.alternate();
+                        continue;
+                    }
+                    break;
+                }
                 match result {
                     Ok(()) => {
+                        if !custom_auth { auth::remember(&profile.base_url, &key_used, auth_header); }
                         let mut reply = decoder.finish();
                         super::super::wire::bind_state(&mut reply.message, &self.profile);
                         if let Some(state) = reply.message.provider_state.as_mut() {
@@ -632,7 +683,7 @@ mod reliability_tests {
         let mut stream=AnthropicStream::default();
         let blocks=vec![json!({"type":"text","text":"before"}),json!({"type":"thinking","thinking":"thought","signature":"sig"}),json!({"type":"text","text":"after"})];
         for (index, block) in blocks.iter().enumerate() {stream.push_event(&json!({"type":"content_block_start","index":index,"content_block":block}),&mut |_|{}).unwrap();}
-        let mut reply=stream.finish(); reply.message.provider_state.as_mut().unwrap()["prefix"]=json!(request_prefix(&profile,&base));
+        let mut reply=stream.finish(); super::super::wire::bind_state(&mut reply.message, &profile); reply.message.provider_state.as_mut().unwrap()["prefix"]=json!(request_prefix(&profile,&base));
         let request=ChatRequest {messages:vec![base.messages[0].clone(),reply.message],tools:vec![]};
         assert_eq!(build_request_body(&profile,&request)["messages"][1]["content"],json!(blocks));
     }

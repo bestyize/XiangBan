@@ -367,6 +367,16 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
     profile.timeouts = config.model_timeouts.get(&config.active_provider).cloned().unwrap_or_default();
     profile.proxy_mode = network.mode;
     profile.proxy_url = network.proxy_url;
+    // Scope opaque provider state to the selected service, account and network route. Keep
+    // proxy credentials and API keys out of history; managed gateway access tokens rotate.
+    use sha2::{Digest, Sha256};
+    let mut route = Sha256::new();
+    let account = if config.active_provider == crate::ai_gateway::GATEWAY_ID { "" } else { &config.api_key };
+    for part in [config.active_provider.as_str(), account, profile.proxy_mode.as_str(), profile.proxy_url.as_str()] {
+        route.update((part.len() as u64).to_be_bytes());
+        route.update(part.as_bytes());
+    }
+    profile.state_scope = Some(format!("{:x}", route.finalize()));
     // Central model policy: compatible APIs use endpoint defaults; Anthropic
     // receives a required model/endpoint-specific max_tokens value.
     let capabilities = config.model_capabilities();

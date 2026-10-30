@@ -277,6 +277,63 @@ mod over_http {
     }
 
     #[test]
+    fn authentication_cache_is_scoped_to_endpoint_and_key() {
+        use agent_kernel::provider::anthropic::auth::{self, Header};
+        let endpoint = "https://auth-cache-scope.example/v1";
+        auth::remember(endpoint, "key-one", Header::Bearer);
+        assert_eq!(auth::preferred(endpoint, "key-one"), Header::Bearer);
+        assert_eq!(auth::preferred(endpoint, "key-two"), Header::ApiKey);
+        assert_eq!(auth::preferred("https://other-cache-scope.example/v1", "key-one"), Header::ApiKey);
+    }
+
+    #[test]
+    fn unauthorized_retries_with_bearer_and_reuses_the_successful_header() {
+        let (url, server) = serve(vec![
+            status("401 Unauthorized", r#"{"error":{"message":"unsupported key header"}}"#),
+            sse_events(&TEXT_REPLY), sse_events(&TEXT_REPLY),
+        ]);
+        let mut p = profile(); p.base_url = url;
+        let provider = AnthropicMessages::new(p).unwrap();
+        let req = ChatRequest { messages: vec![Message::user_text("hi")], tools: vec![] };
+        for _ in 0..2 { provider.chat(&req, &mut |_| {}, &AtomicBool::new(false)).unwrap(); }
+        let seen = server.join().unwrap();
+        assert_eq!(header_values(&seen[0], "x-api-key"), vec!["sk-ant-secret"]);
+        for req in &seen[1..] {
+            assert_eq!(header_values(req, "authorization"), vec!["Bearer sk-ant-secret"]);
+            assert!(header_values(req, "x-api-key").is_empty());
+        }
+    }
+
+    #[test]
+    fn two_rejected_credentials_stop_after_one_alternate() {
+        let (result, seen, _) = chat(profile(), vec![
+            status("401 Unauthorized", r#"{"error":{"message":"bad key"}}"#),
+            status("401 Unauthorized", r#"{"error":{"message":"bad key"}}"#),
+        ]);
+        assert!(result.is_err());
+        assert_eq!(seen.len(), 2);
+        assert_eq!(header_values(&seen[0], "x-api-key"), vec!["sk-ant-secret"]);
+        assert_eq!(header_values(&seen[1], "authorization"), vec!["Bearer sk-ant-secret"]);
+    }
+
+    #[test]
+    fn forbidden_does_not_switch_authentication() {
+        let (result, seen, _) = chat(profile(), vec![status("403 Forbidden", r#"{"error":{"message":"forbidden"}}"#)]);
+        assert!(result.is_err());
+        assert_eq!(seen.len(), 1);
+        assert_eq!(header_values(&seen[0], "x-api-key"), vec!["sk-ant-secret"]);
+    }
+
+    #[test]
+    fn explicit_authentication_headers_are_not_retried() {
+        let mut p = profile(); p.extra_headers.push(("Authorization".into(), "Bearer gateway-token".into()));
+        let (result, seen, _) = chat(p, vec![status("401 Unauthorized", r#"{"error":{"message":"bad key"}}"#)]);
+        assert!(result.is_err());
+        assert_eq!(seen.len(), 1);
+        assert_eq!(header_values(&seen[0], "authorization"), vec!["Bearer gateway-token"]);
+    }
+
+    #[test]
     fn extra_headers_replace_defaults_and_an_empty_key_sends_no_key_header() {
         let mut p = profile();
         p.extra_headers = vec![("Anthropic-Version".into(), "2099-01-01".into()), ("anthropic-beta".into(), "tools-2099".into())];
@@ -297,7 +354,8 @@ mod over_http {
     fn http_errors_are_classified_and_never_echo_the_key() {
         let error = |line: &str| status(line, r#"{"type":"error","error":{"type":"x","message":"details here"}}"#);
         for (line, retryable) in [("429 Too Many Requests", true), ("529 Overloaded", true), ("400 Bad Request", false), ("401 Unauthorized", false)] {
-            let (result, _, _) = chat(profile(), vec![error(line)]);
+            let responses = if line.starts_with("401 ") { vec![error(line), error(line)] } else { vec![error(line)] };
+            let (result, _, _) = chat(profile(), responses);
             match result {
                 Err(HarnessError::Provider { message, retryable: r }) => {
                     assert_eq!(r, retryable, "{line}");
@@ -524,6 +582,18 @@ fn thinking_streams_as_reasoning_and_goes_back_first_with_its_signature() {
     // An edited history before the reply (trimming, compaction) would be refused with the blocks: they are left out.
     let edited = request(vec![Message::user_text("改一下 a（已压缩）"), reply.message.clone(), Message::tool("t1", "内容")]);
     assert_eq!(build_request_body(&profile(), &edited)["messages"][1]["content"][0]["type"], "tool_use");
+
+    // Same endpoint and model can still be routed to a different provider/account.
+    let mut routed = profile(); routed.state_scope = Some("provider-a".into());
+    let mut scoped = req.clone();
+    scoped.messages[1].provider_state.as_mut().unwrap()["source"]["scope"] = json!("provider-a");
+    assert_eq!(build_request_body(&routed, &scoped)["messages"][1]["content"][0]["type"], "thinking");
+    routed.state_scope = Some("provider-b".into());
+    let switched = build_request_body(&routed, &scoped);
+    assert_eq!(switched["messages"][1]["content"][0]["type"], "tool_use");
+    assert_eq!(switched["messages"][2]["content"][0]["type"], "tool_result");
+    scoped.messages[1].provider_state.as_mut().unwrap().as_object_mut().unwrap().remove("source");
+    assert_eq!(build_request_body(&routed, &scoped)["messages"][1]["content"][0]["type"], "tool_use");
 
     // Another model cannot verify those signatures: its requests leave the blocks out.
     let other = ProviderProfile::new("https://api.anthropic.com", "k", "claude-other");

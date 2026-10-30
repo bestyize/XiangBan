@@ -1225,3 +1225,24 @@ fn design_schema_is_exposed_by_the_debug_keyword_in_the_assembled_agent() {
     let _=run(&ordinary,"你好");
     assert!(!ordinary.provider.requests()[0].tools.iter().any(|t|t.name==open_claude_design::NAME));
 }
+
+#[test]
+fn provider_state_scope_changes_with_provider_and_local_credential() {
+    let mut config = crate::ai_config::AiConfig::default();
+    config.active_provider = "service-a".into();
+    config.base_url = "https://gateway.example/v1".into();
+    config.protocol = "anthropic".into();
+    config.model = "same-model".into();
+    config.api_key = "first-key".into();
+    let first = provider_profile(&config).state_scope.unwrap();
+    assert!(!first.contains("first-key"));
+    config.active_provider = "service-b".into();
+    assert_ne!(provider_profile(&config).state_scope.as_ref(), Some(&first));
+    config.active_provider = "service-a".into();
+    config.api_key = "second-key".into();
+    assert_ne!(provider_profile(&config).state_scope.as_ref(), Some(&first));
+    config.active_provider = crate::ai_gateway::GATEWAY_ID.into();
+    let managed = provider_profile(&config).state_scope;
+    config.api_key = "rotated-token".into();
+    assert_eq!(provider_profile(&config).state_scope, managed);
+}

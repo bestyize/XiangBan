@@ -121,6 +121,18 @@ pub(crate) fn post_stream_with_policy(
     on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
     on_tool: &mut dyn FnMut(&super::ToolProgress), cancel: &AtomicBool, policy: &super::wire::ModelTimeouts,
 ) -> Result<(), HarnessError> {
+    post_stream_with_policy_status(client, call, decoder, on_text, on_reasoning, on_tool, cancel, policy, &mut None)
+}
+
+/// Like post_stream_with_policy, but exposes a completed HTTP error status to callers.
+/// Transport errors and errors from an already accepted stream have no status.
+pub(crate) fn post_stream_with_policy_status(
+    client: &Client, call: Call, decoder: &mut dyn Decoder,
+    on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    on_tool: &mut dyn FnMut(&super::ToolProgress), cancel: &AtomicBool, policy: &super::wire::ModelTimeouts,
+    error_status: &mut Option<u16>,
+) -> Result<(), HarnessError> {
+    *error_status = None;
     policy.validate()?;
     let rt=tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|e|HarnessError::Config(e.to_string()))?;
     rt.block_on(async {
@@ -134,6 +146,7 @@ pub(crate) fn post_stream_with_policy(
                 let chunk=wait_for_io(response.chunk(),cancel,Duration::from_secs(10),"reading error response").await?.map_err(|e|transport_error(e,"error response read"))?;
                 let Some(chunk)=chunk else{break;};let n=chunk.len().min(ERROR_BODY_LIMIT as usize-raw.len());raw.extend_from_slice(&chunk[..n]);
             }
+            *error_status = Some(status);
             return Err(HarnessError::provider(if status==413 { "HTTP 413: request_too_large: 请求体积超过服务端限制，请减少图片、降低截图尺寸或压缩会话后继续。".into() } else {format!("HTTP {status}: {}",String::from_utf8_lossy(&raw))},status_is_retryable(status)));
         }
         let mut parser=SseParser::default();let mut buffer=Vec::new();let mut total=0usize;let mut event_bytes=0usize;let mut received_event=false;let mut reported=(Instant::now(),0usize,false);
