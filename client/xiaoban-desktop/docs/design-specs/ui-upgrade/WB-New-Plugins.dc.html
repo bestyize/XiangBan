@@ -578,7 +578,7 @@ class Component extends DCLogic {
     const pos = tool
       ? 'left:auto;right:8px;' + (EXDIR === 'down' ? 'top:42px;bottom:auto' : 'bottom:calc(100% + 6px);top:auto')
       : 'left:' + (PADL - 4) + 'px;right:auto;bottom:52px;top:auto';
-    const widths = { plus: 248, skill: 340, expert: 340, conn: 320 };
+    const widths = { plus: 248, skill: 260, expert: 260, conn: 260 };
 
     const m = (name) => menu === name;
     const swatches = Object.keys(PALETTES).map((k) => ({
