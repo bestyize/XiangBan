@@ -107,6 +107,21 @@ describe('replacement widget library',()=>{
   expect(s.notify).toHaveBeenCalledWith('这个组件已不在桌面上','info');
   v.unmount();
  });
+ it('distinguishes builtin custom widgets by omitting delete button and hiding from mine filter',async()=>{
+  localStorage.setItem('xiaoban.custom_widgets.v1',JSON.stringify([
+    {schemaVersion:1,id:'pelican-bike',name:'鹈鹕骑车',html:'<p>鹈鹕</p>',source:'builtin'},
+    {schemaVersion:1,id:'my-clock',name:'我的时钟',html:'<p>时钟</p>'}
+  ]));
+  const v=mount(WidgetsPage,{props:{store:store()},attachTo:document.body});await flushPromises();
+  expect(v.find('[data-testid="custom-card-pelican-bike"]').exists()).toBe(true);
+  expect(v.find('[data-testid="delete-custom-pelican-bike"]').exists()).toBe(false);
+  expect(v.find('[data-testid="custom-card-my-clock"]').exists()).toBe(true);
+  expect(v.find('[data-testid="delete-custom-my-clock"]').exists()).toBe(true);
+  await v.get('[data-testid="widgets-filter-mine"]').trigger('click');await flushPromises();
+  expect(v.find('[data-testid="custom-card-pelican-bike"]').exists()).toBe(false);
+  expect(v.find('[data-testid="custom-card-my-clock"]').exists()).toBe(true);
+  v.unmount();
+ });
 });
 
 describe('widgets on the desktop',()=>{

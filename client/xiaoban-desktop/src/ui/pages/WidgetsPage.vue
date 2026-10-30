@@ -18,6 +18,8 @@ const client=createWidgetClient(),{layout,ready,busy,error}=client;
 const selected=ref(''),settingsOpen=ref(false),flash=ref('');
 const filter=ref<'all'|'desk'|'mine'>('all');
 const customWidgets=ref<CustomWidgetPack[]>([]);
+const userCustomWidgets=computed(()=>customWidgets.value.filter(p=>p.source!=='builtin'));
+const galleryCustomWidgets=computed(()=>filter.value==='mine'?userCustomWidgets.value:customWidgets.value);
 
 /** The widget kind or 'custom' whose add-button menu is open. */
 const layerFor=ref<WidgetKind|null>(null);
@@ -169,7 +171,7 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',onKey);observer?.disco
 
  <section v-if="filter!=='desk'" aria-label="添加组件" class="add-section">
   <div class="sec">{{ filter==='mine'?'我的组件':'全部组件' }}</div>
-   <div v-if="filter==='mine'&&!customWidgets.length" class="xb-empty" data-testid="custom-empty">
+   <div v-if="filter==='mine'&&!userCustomWidgets.length" class="xb-empty" data-testid="custom-empty">
     <span class="xb-empty-icon"><Sparkles :size="24"/></span>
     <h3>还没有自定义组件</h3>
     <p>点击右上角的“导入”导入资源包，或点击“让小伴创作”让小伴为你编写。</p>
@@ -182,14 +184,14 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',onKey);observer?.disco
       <div class="ft"><b>{{ item.title }}</b><button class="add" :class="{added:flash===item.kind}" :disabled="!ready||busy" :data-testid="`add-${item.kind}`" :aria-label="`添加${item.title}到桌面`" aria-haspopup="dialog" :aria-expanded="layerFor===item.kind" @click="askLayer(item.kind)"><Check v-if="flash===item.kind" :size="14"/><Plus v-else :size="14"/></button></div>
      </div>
     </template>
-    <div v-for="pack in customWidgets" :key="pack.id" class="gt" :data-testid="`custom-card-${pack.id}`">
+    <div v-for="pack in galleryCustomWidgets" :key="pack.id" class="gt" :data-testid="`custom-card-${pack.id}`">
      <div class="pv"><div class="stage-inner" :style="fitStyle('custom',galleryStage,pack)"><WidgetSurface :widget="customDemo(pack)" preview demo/></div>
       <div class="card-tools"><ResourceShareActions :store="store" kind="widget" :id="pack.id" icons/>
-       <NPopconfirm positive-text="删除" negative-text="取消" @positive-click="removeCustomPack(pack.id, pack.name)"><template #trigger><button class="widget-delete-btn" title="删除这个自定义组件" :aria-label="`删除组件 ${pack.name}`" :data-testid="`delete-custom-${pack.id}`" @click.stop><Trash2 :size="13"/></button></template>确定要删除自创组件「{{ pack.name }}」吗？桌面上若有该组件实例也会一并清理。</NPopconfirm></div></div>
+       <NPopconfirm v-if="pack.source !== 'builtin'" positive-text="删除" negative-text="取消" @positive-click="removeCustomPack(pack.id, pack.name)"><template #trigger><button class="widget-delete-btn" title="删除这个自定义组件" :aria-label="`删除组件 ${pack.name}`" :data-testid="`delete-custom-${pack.id}`" @click.stop><Trash2 :size="13"/></button></template>确定要删除自创组件「{{ pack.name }}」吗？桌面上若有该组件实例也会一并清理。</NPopconfirm></div></div>
      <div class="ft"><b>{{ pack.name }}</b><button class="add" :class="{added:flash===pack.id}" :disabled="!ready||busy" :data-testid="`add-custom-${pack.id}`" :aria-label="`添加${pack.name}到桌面`" @click="askCustomLayer(pack)"><Check v-if="flash===pack.id" :size="14"/><Plus v-else :size="14"/></button></div>
     </div>
    </div>
-  <p v-if="filter==='all'||customWidgets.length" class="wd-hint">添加时先选择放在哪一层 · 缩略图为示例，添加后使用真实时间、天气和行情。</p>
+  <p v-if="filter==='all'||galleryCustomWidgets.length" class="wd-hint">添加时先选择放在哪一层 · 缩略图为示例，添加后使用真实时间、天气和行情。</p>
  </section>
  </div>
 

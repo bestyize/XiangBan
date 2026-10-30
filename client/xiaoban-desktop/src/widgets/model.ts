@@ -10,7 +10,7 @@ export interface ReminderItem { id: string; title: string; at: string; done: boo
 export const validStockSymbol = (symbol:string) => /^(?:116\.\d{5}|1\.(?:000001|6\d{5})|0\.(?:39900[16]|[03]\d{5}))$/.test(symbol);
 export interface LivingData { reminders: ReminderItem[]; count: number; symbol: string; symbols?:string[]; sound?:boolean }
 export interface WidgetContent { note?: NoteData; countdown?: CountdownData; living?: LivingData }
-export interface CustomWidgetPack { schemaVersion: 1; id: string; name: string; description?: string; width?: number; height?: number; theme?: string; html: string; }
+export interface CustomWidgetPack { schemaVersion: 1; id: string; name: string; description?: string; width?: number; height?: number; theme?: string; html: string; source?: 'builtin' | 'user'; }
 export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme | string; scale: number; x: number; y: number; enabled: boolean; city: City | null; layer?: 'desktop' | 'topmost'; monitor?: string; note?: NoteData; countdown?: CountdownData; living?: LivingData; customId?: string; custom?: CustomWidgetPack; }
 export interface WidgetMonitor { id: string; name: string; width: number; height: number; primary: boolean }
 export interface WidgetLayout { version: 2; widgets: DesktopWidget[]; editing: boolean; errors: string[]; desktop?: {width:number;height:number}; monitors?: WidgetMonitor[] }

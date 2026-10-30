@@ -14,6 +14,27 @@ pub const MAX_USER_WIDGETS: usize = 40;
 /// The eight reference cards the library ships with. A custom template may not reuse these ids.
 pub const BUILTIN_KINDS: [&str; 8] = ["clock", "weather", "notes", "reminders", "stocks", "woodfish", "calendar", "countdown"];
 
+/// Official built-in HTML widget templates shipped with the desktop app.
+pub const BUILTIN_WIDGETS: [(&str, &str); 1] = [
+    ("pelican-bike", include_str!("../../public/widgets/pelican-bike.json")),
+];
+
+pub fn builtin() -> Vec<Value> {
+    BUILTIN_WIDGETS
+        .iter()
+        .filter_map(|(_, text)| serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')).ok())
+        .filter(|val| validate(val).is_ok())
+        .map(|mut pack| {
+            pack["source"] = json!("builtin");
+            pack
+        })
+        .collect()
+}
+
+pub fn is_builtin_template(id: &str) -> bool {
+    BUILTIN_WIDGETS.iter().any(|(bid, _)| *bid == id)
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomWidgetPack {
@@ -110,8 +131,8 @@ pub fn validate(pack: &Value) -> Result<(), String> {
     Ok(())
 }
 
-/// Loads all custom widget packs from `directory`, in file-name order.
-pub fn load_all(directory: &Path) -> Vec<Value> {
+/// Loads all user custom widget packs from `directory`, in file-name order.
+pub fn load_user(directory: &Path) -> Vec<Value> {
     let mut list = Vec::new();
     let Ok(entries) = fs::read_dir(directory) else {
         return list;
@@ -132,8 +153,9 @@ pub fn load_all(directory: &Path) -> Vec<Value> {
         if let Ok(metadata) = fs::symlink_metadata(&path) {
             if metadata.is_file() && metadata.len() <= MAX_WIDGET_FILE {
                 if let Ok(text) = fs::read_to_string(&path) {
-                    if let Ok(val) = serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) {
+                    if let Ok(mut val) = serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) {
                         if validate(&val).is_ok() {
+                            val["source"] = json!("user");
                             list.push(val);
                         }
                     }
@@ -144,20 +166,51 @@ pub fn load_all(directory: &Path) -> Vec<Value> {
     list
 }
 
-/// Finds a custom widget pack by id in `directory`.
+/// Loads all custom widget packs: built-ins first (with user overrides applied), then user-created widgets.
+pub fn load_all(directory: &Path) -> Vec<Value> {
+    let mut list = Vec::new();
+    let mut user_packs: std::collections::HashMap<String, Value> = std::collections::HashMap::new();
+
+    for pack in load_user(directory) {
+        if let Some(id) = pack.get("id").and_then(Value::as_str) {
+            user_packs.insert(id.to_string(), pack);
+        }
+    }
+
+    for builtin_pack in builtin() {
+        if let Some(id) = builtin_pack.get("id").and_then(Value::as_str) {
+            if let Some(user_pack) = user_packs.remove(id) {
+                list.push(user_pack);
+            } else {
+                list.push(builtin_pack);
+            }
+        }
+    }
+
+    let mut remaining: Vec<_> = user_packs.into_values().collect();
+    remaining.sort_by(|a, b| {
+        a.get("id").and_then(Value::as_str).unwrap_or_default()
+            .cmp(b.get("id").and_then(Value::as_str).unwrap_or_default())
+    });
+    list.extend(remaining);
+    list
+}
+
+/// Finds a custom widget pack by id in `directory`, falling back to built-ins.
 pub fn find(directory: &Path, id: &str) -> Option<Value> {
     if !valid_widget_id(id) {
         return None;
     }
     let path = directory.join(format!("{id}.json"));
     if let Ok(text) = fs::read_to_string(&path) {
-        if let Ok(val) = serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) {
+        if let Ok(mut val) = serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')) {
             if val.get("id").and_then(Value::as_str) == Some(id) && validate(&val).is_ok() {
+                val["source"] = json!("user");
                 return Some(val);
             }
         }
     }
-    load_all(directory).into_iter().find(|p| p.get("id").and_then(Value::as_str) == Some(id))
+    builtin().into_iter().find(|p| p.get("id").and_then(Value::as_str) == Some(id))
 }
 
 /// Atomically saves a custom widget pack into `directory`.
@@ -165,8 +218,8 @@ pub fn save(directory: &Path, pack: &Value, overwrite: bool) -> Result<PathBuf, 
     validate(pack)?;
     let id = pack["id"].as_str().unwrap_or_default();
     let path = directory.join(format!("{id}.json"));
-    if path.exists() && !overwrite {
-        return Err(format!("小组件「{id}」已经存在（{id}.json），请换个 id 或确认覆盖它"));
+    if (path.exists() || is_builtin_template(id)) && !overwrite {
+        return Err(format!("小组件「{id}」已经存在，请换个 id 或确认覆盖它"));
     }
     let text = serde_json::to_string_pretty(pack).map_err(|e| e.to_string())?;
     if text.len() as u64 > MAX_WIDGET_FILE {
@@ -191,6 +244,8 @@ pub fn remove(directory: &Path, id: &str) -> Result<(), String> {
     if path.exists() {
         fs::remove_file(&path).map_err(|e| format!("无法删除小组件：{e}"))?;
         Ok(())
+    } else if is_builtin_template(id) {
+        Err(format!("「{id}」为内置组件，不能删除"))
     } else {
         Err(format!("未找到小组件 {id}"))
     }
@@ -244,7 +299,8 @@ mod tests {
         assert!(save(&dir, &pack, false).is_err(), "the same id needs overwrite");
         let found = find(&dir, "pomodoro").expect("saved pack is readable");
         assert_eq!(pack_size(&found), (300.0, 180.0));
-        assert_eq!(load_all(&dir).len(), 1);
+        assert_eq!(load_user(&dir).len(), 1);
+        assert_eq!(load_all(&dir).len(), builtin().len() + 1);
         remove(&dir, "pomodoro").unwrap();
         assert!(find(&dir, "pomodoro").is_none());
         let _ = fs::remove_dir_all(&dir);
@@ -257,7 +313,19 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("broken.json"), "not json").unwrap();
         fs::write(dir.join("reserved.json"), r#"{"schemaVersion":1,"id":"clock","name":"冒充时钟","html":"<p>x</p>"}"#).unwrap();
-        assert!(load_all(&dir).is_empty());
+        assert!(load_user(&dir).is_empty());
+        assert_eq!(load_all(&dir).len(), builtin().len());
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn builtin_pelican_bike_is_shipped_and_found() {
+        let dir = std::env::temp_dir().join(format!("xiaoban-custom-widgets-empty-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let pelican = find(&dir, "pelican-bike").expect("pelican-bike builtin widget is found");
+        assert_eq!(pelican["name"], "鹈鹕骑车");
+        assert_eq!(pelican["source"], "builtin");
+        assert_eq!(pack_size(&pelican), (300.0, 260.0));
+        assert!(remove(&dir, "pelican-bike").is_err(), "builtin widget cannot be removed");
     }
 }

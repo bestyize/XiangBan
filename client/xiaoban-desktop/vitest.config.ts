@@ -11,5 +11,5 @@ export default defineConfig({
   clearScreen: false,
   build: { target: 'es2022', sourcemap: false },
   // Build-script checks under scripts/ use node:test and run through `npm run test:scripts`.
-  test: { exclude: [...configDefaults.exclude, 'scripts/**'] },
+  test: { exclude: [...configDefaults.exclude, 'scripts/**', 'artifacts/**'] },
 })

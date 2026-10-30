@@ -30,4 +30,15 @@ describe('custom widget isolated shell',()=>{
   const config=JSON.parse(readFileSync('src-tauri/tauri.conf.json','utf8'));
   expect(config.app.security.csp).toContain("script-src 'self';");
  });
+ it('verifies builtin pelican-bike widget pack validity and safe sandbox embedding',()=>{
+  const pelicanJson = JSON.parse(readFileSync('public/widgets/pelican-bike.json', 'utf8'));
+  expect(pelicanJson.schemaVersion).toBe(1);
+  expect(pelicanJson.id).toBe('pelican-bike');
+  expect(pelicanJson.name).toBe('鹈鹕骑车');
+  expect(pelicanJson.width).toBe(300);
+  expect(pelicanJson.height).toBe(260);
+  expect(pelicanJson.theme).toBe('transparent');
+  expect(pelicanJson.html).toContain('慢慢骑');
+  expect(pelicanJson.html).toContain('id="stage"');
+ });
 });
