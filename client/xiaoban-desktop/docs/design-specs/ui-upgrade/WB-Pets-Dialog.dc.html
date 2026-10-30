@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小伴桌面 · 伙伴设置弹窗</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+.si{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;color:#26262B;font-size:14px;border:0;background:transparent;font-family:inherit;width:100%;box-sizing:border-box;cursor:pointer;text-align:left}
+.si:hover{background:rgba(0,0,0,.045)}
+.si svg{flex-shrink:0;color:#4A4A50}
+.sub{font-size:12px;color:#6E6E73}
+.ib{width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:#55555A;display:grid;place-items:center;cursor:pointer}
+.ib:hover{background:rgba(0,0,0,.05)}
+.tt{border:0;background:transparent;font-family:inherit;font-size:20px;font-weight:600;color:#A1A1A6;cursor:pointer;padding:0}
+.bb{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 12px;border-radius:9px;border:0;font-family:inherit;font-size:13px;cursor:pointer;color:#1D1D1F;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.12),0 1px 1.5px rgba(0,0,0,.05)}
+.pb{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 14px;border-radius:9px;border:0;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)}
+.pc{display:flex;flex-direction:column;padding:8px 8px 10px;border-radius:18px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.03)}
+.pc:hover{box-shadow:0 0 0 1px rgba(0,0,0,.1),0 10px 24px rgba(0,0,0,.07)}
+.pc .st{position:relative;height:150px;border-radius:13px;background:radial-gradient(ellipse 60% 14% at 50% 88%,rgba(0,0,0,.07),transparent 70%),linear-gradient(#FAFAFB,#F3F3F5);display:grid;place-items:center;overflow:hidden}
+.pc .st img{width:138px;height:138px;object-fit:contain;margin-top:4px}
+.pc .nm{display:flex;align-items:center;gap:8px;padding:10px 6px 8px}
+.pc .nm b{font-size:14px;font-weight:600}
+.badge{position:absolute;top:8px;left:8px;height:22px;padding:0 8px;border-radius:999px;color:#fff;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:5px}
+.seg{display:inline-flex;padding:2px;border-radius:8px;background:#F2F2F4;gap:1px}
+.seg button{height:28px;padding:0 12px;border:0;border-radius:6px;font-family:inherit;font-size:12.5px;cursor:pointer}
+.tg{width:38px;height:22px;border-radius:999px;position:relative;display:inline-block;flex-shrink:0;border:0;padding:0;cursor:pointer}
+.tg::after{content:"";position:absolute;top:2px;left:18px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.fl{display:flex;flex-direction:column;gap:7px}
+.fl>span{font-size:12px;color:#6E6E73;font-weight:500}
+</style>
+</helmet>
+<div style="position:relative;width:1280px;height:800px;overflow:hidden;display:flex;font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Microsoft YaHei UI',sans-serif;color:#1D1D1F;background:{{t.tint}};-webkit-font-smoothing:antialiased">
+
+  <aside style="width:264px;flex-shrink:0;display:flex;flex-direction:column;padding:0 12px 12px;box-sizing:border-box">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding-left:6px">
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <button type="button" class="ib" aria-label="收起侧栏" style="margin-left:auto"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M9 4v16"></path></svg></button>
+      <button type="button" class="ib" aria-label="搜索"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 6px 16px">
+      <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(160deg,{{t.btnHi}},{{t.btn}});color:#fff;display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 2px 6px rgba(0,0,0,.12)">
+        <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+      </div>
+      <div style="display:flex;flex-direction:column;line-height:1.25"><strong style="font-size: 15px; font-weight: 600">小伴桌面</strong></div>
+    </div>
+    <nav aria-label="功能分区" style="display:flex;flex-direction:column;gap:1px;flex:1;min-height:0;overflow:hidden">
+      <a class="si" href="WB-New.dc.html" aria-expanded="false" style="font-weight:600">
+        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+        小伴 AI
+        <span style="margin-left:auto;width:7px;height:7px;border-radius:50%;background:{{t.dot}}"></span>
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round" style="transform:rotate(-90deg)"><path d="m6 9 6 6 6-6"></path></svg>
+      </a>
+      <div style="height:1px;background:rgba(0,0,0,.06);margin:8px 10px"></div>
+      <a class="si" href="WB-Studio.dc.html" aria-current="page" style="background:{{t.soft}};color:{{t.ink}};font-weight:500"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.9" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2.5a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 22z"></path><circle cx="7.5" cy="10.5" r="1" fill="currentColor"></circle><circle cx="12" cy="7" r="1" fill="currentColor"></circle><circle cx="16.5" cy="10.5" r="1" fill="currentColor"></circle></svg>装扮</a>
+      <a class="si" href="#"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="5"></rect><path d="M7 11v3M5.5 12.5h3"></path><circle cx="16" cy="11.5" r=".7" fill="currentColor"></circle><circle cx="18" cy="13.5" r=".7" fill="currentColor"></circle></svg>游玩</a>
+      <a class="si" href="WB-Remind.dc.html"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>提醒<span class="sub" style="margin-left:auto">15:30</span></a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px 0;border-top:1px solid rgba(0,0,0,.06)">
+      <div style="width:30px;height:30px;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);display:grid;place-items:center"><img src="/_blob/d590c6393f601ebec7f3e202245ef0cf" alt="" style="width:28px;height:28px;object-fit:contain"></div>
+      <span style="font-size:13px;font-weight:500">小伴用户</span>
+      <button type="button" class="ib" aria-label="通知" style="margin-left:auto"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg></button>
+    </div>
+  </aside>
+
+  <main style="position:relative;flex:1;min-width:0;margin:8px 8px 8px 0;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.04);display:flex;flex-direction:column;overflow:hidden">
+    <header style="display:flex;align-items:center;gap:22px;padding:22px 28px 0">
+      <div role="tablist" aria-label="装扮类型" style="display:flex;gap:22px">
+        <a role="tab" aria-selected="false" class="tt" href="WB-Studio.dc.html">壁纸</a>
+        <a role="tab" aria-selected="false" class="tt" href="WB-Effects.dc.html">特效</a>
+        <a role="tab" aria-selected="false" class="tt" href="WB-Widgets.dc.html">组件</a>
+        <button type="button" role="tab" aria-selected="true" class="tt" style="color:#1D1D1F">伙伴</button>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <button type="button" class="bb"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>导入主题</button>
+        <button type="button" class="pb" style="background:linear-gradient({{t.btnHi}},{{t.btn}})"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path></svg>让小伴创作</button>
+      </div>
+    </header>
+
+    <div style="display:flex;align-items:center;gap:10px;padding:16px 28px 0">
+      <div class="seg" role="tablist" aria-label="筛选">
+        <button type="button" role="tab" aria-selected="true" style="background:#fff;color:#1D1D1F;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.08)">全部</button>
+        <button type="button" role="tab" aria-selected="false" style="background:transparent;color:#55555A">在桌面上 <b style="font-weight:600;color:{{t.ink}}">{{deskCount}}</b></button>
+        <button type="button" role="tab" aria-selected="false" style="background:transparent;color:#55555A">我的主题</button>
+      </div>
+      <span class="sub" style="margin-left:auto">桌面伙伴</span>
+      <button type="button" class="tg" role="switch" aria-checked="true" aria-label="显示全部桌面伙伴" style="background:{{t.btn}}"></button>
+    </div>
+
+    <div style="flex:1;min-height:0;overflow-y:auto;padding:4px 28px 28px">
+      <sc-for list="{{themes}}" as="th" hint-placeholder-count="2">
+        <section aria-label="{{th.name}}" style="margin-top:22px">
+          <div style="display:flex;align-items:baseline;gap:10px">
+            <h2 style="margin:0;font-size:15px;font-weight:600">{{th.name}}</h2>
+            <span class="sub">{{th.count}} 款 · {{th.desc}}</span>
+            <a href="#" style="margin-left:auto;font-size:12.5px;font-weight:500;color:{{t.ink}}">基于此主题创作</a>
+          </div>
+          <div style="margin-top:12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px">
+            <sc-for list="{{th.pets}}" as="p" hint-placeholder-count="4">
+              <article class="pc">
+                <div class="st">
+                  <img src="{{p.img}}" alt="{{p.name}}">
+                  <sc-if value="{{p.onDesk}}" hint-placeholder-val="{{ false }}"><span class="badge" style="background:{{t.btn}}"><i style="width:6px;height:6px;border-radius:50%;background:#fff;opacity:.9"></i>在桌面 · {{p.nick}}</span></sc-if>
+                </div>
+                <div class="nm"><b>{{p.name}}</b><span class="sub">{{p.meta}}</span></div>
+                <sc-if value="{{p.onDesk}}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;gap:6px">
+                    <button type="button" class="bb" style="flex:1;height:32px" onClick="{{p.open}}" aria-haspopup="dialog"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg>设置</button>
+                    <button type="button" class="bb" aria-label="再添加一只{{p.name}}" style="width:32px;padding:0"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+                  </div>
+                </sc-if>
+                <sc-if value="{{p.offDesk}}" hint-placeholder-val="{{ true }}">
+                  <button type="button" class="bb" style="height:32px;background:{{t.soft}};color:{{t.ink}};box-shadow:none;font-weight:500"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>添加到桌面</button>
+                </sc-if>
+              </article>
+            </sc-for>
+            <sc-if value="{{th.mine}}" hint-placeholder-val="{{ false }}">
+              <button type="button" class="pc" style="border:0;font-family:inherit;cursor:pointer;background:#FAFAFB;box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.1);align-items:center;justify-content:center;gap:8px;color:#55555A;min-height:242px">
+                <span style="width:52px;height:52px;border-radius:16px;background:{{t.soft}};color:{{t.ink}};display:grid;place-items:center"><svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path></svg></span>
+                <b style="font-size:14px;font-weight:600;color:#1D1D1F">做一只自己的</b>
+                <span class="sub">描述外形，小伴帮你生成</span>
+              </button>
+            </sc-if>
+          </div>
+        </section>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{dlg}}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;background:rgba(20,20,24,.28);backdrop-filter:blur(3px);display:grid;place-items:center">
+        <div role="dialog" aria-modal="true" aria-label="伙伴设置" style="width:580px;border-radius:20px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 24px 64px rgba(0,0,0,.22),0 6px 16px rgba(0,0,0,.08)">
+          <div style="display:flex;align-items:center;gap:10px;padding:16px 16px 0 22px">
+            <h2 style="margin:0;font-size:16px;font-weight:600">{{d.nick}}</h2>
+            <span class="sub">{{d.name}} · {{d.theme}}</span>
+            <button type="button" class="ib" aria-label="关闭" style="margin-left:auto" onClick="{{close}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+          </div>
+          <div style="display:flex;gap:22px;padding:18px 22px 20px">
+            <div style="width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;align-items:center">
+              <div style="width:200px;height:220px;border-radius:16px;background:radial-gradient(ellipse 55% 10% at 50% 90%,rgba(0,0,0,.08),transparent 70%),radial-gradient(circle at 50% 40%,{{t.soft}},#F7F7F9 70%);display:flex;align-items:flex-end;justify-content:center;padding-bottom:10px;box-sizing:border-box">
+                <img src="{{d.img}}" alt="" style="width:{{d.px}};height:{{d.px}};object-fit:contain;transition:width 120ms,height 120ms">
+              </div>
+              <span class="sub" style="font-size:11.5px">戳一戳，会回应你</span>
+            </div>
+            <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:16px">
+              <label class="fl"><span>名字</span><input type="text" value="{{d.nick}}" onChange="{{d.onName}}" style="height:34px;padding:0 11px;border-radius:9px;border:0;box-shadow:inset 0 0 0 1px rgba(0,0,0,.14);font:inherit;font-size:14px;outline-color:{{t.btn}}"></label>
+              <label class="fl"><span style="display:flex;justify-content:space-between">大小<b style="font-weight:500;color:#1D1D1F;font-variant-numeric:tabular-nums">{{d.size}} px</b></span><input type="range" min="60" max="180" value="{{d.size}}" onChange="{{d.onSize}}" style="margin:0;accent-color:{{t.btn}}"></label>
+              <div class="fl"><span>心情</span>
+                <div style="position:relative">
+                  <button type="button" aria-haspopup="listbox" aria-expanded="{{d.moodOpenAttr}}" aria-label="心情：{{d.mood}}" onClick="{{d.toggleMood}}" style="width:100%;height:34px;display:flex;align-items:center;gap:8px;padding:0 10px 0 12px;border-radius:9px;border:0;background:#fff;box-shadow:{{d.moodRing}};font:inherit;font-size:14px;color:#1D1D1F;cursor:pointer;text-align:left">
+                    <span style="width:8px;height:8px;border-radius:50%;background:{{t.dot}}"></span>{{d.mood}}<span class="sub">{{d.moodGroup}}</span>
+                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round" style="margin-left:auto"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg>
+                  </button>
+                  <sc-if value="{{d.moodOpen}}" hint-placeholder-val="{{ false }}">
+                    <div role="listbox" aria-label="选择心情" style="position:absolute;left:0;right:0;top:40px;z-index:5;max-height:268px;overflow-y:auto;border-radius:12px;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 14px 36px rgba(0,0,0,.18);padding:4px 6px 6px">
+                      <sc-for list="{{d.moodGroups}}" as="g" hint-placeholder-count="3">
+                        <div style="font-size:11px;color:#8E8E93;font-weight:600;padding:8px 8px 4px">{{g.name}}</div>
+                        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px">
+                          <sc-for list="{{g.items}}" as="m" hint-placeholder-count="6">
+                            <button type="button" role="option" aria-selected="{{m.checked}}" onClick="{{m.pick}}" style="height:30px;border:0;border-radius:7px;background:{{m.bg}};color:{{m.color}};font:inherit;font-size:13px;font-weight:{{m.weight}};display:flex;align-items:center;gap:6px;padding:0 8px;cursor:pointer;text-align:left">
+                              <sc-if value="{{m.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if>{{m.label}}
+                            </button>
+                          </sc-for>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </div>
+              </div>
+              <div class="fl"><span>层级</span><div class="seg" role="radiogroup" aria-label="层级" style="align-self:flex-start">
+                <sc-for list="{{d.layers}}" as="m" hint-placeholder-count="2"><button type="button" role="radio" aria-checked="{{m.checked}}" onClick="{{m.pick}}" style="background:{{m.bg}};color:{{m.color}};box-shadow:{{m.shadow}};font-weight:{{m.weight}}">{{m.label}}</button></sc-for>
+              </div><span style="font-weight:400;font-size:11.5px">{{d.layerHint}}</span></div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;padding:12px 16px 14px 22px;border-top:1px solid rgba(0,0,0,.06);background:#FBFBFC;border-radius:0 0 20px 20px">
+            <button type="button" style="height:30px;padding:0 4px;border:0;background:transparent;color:#B42A33;font-family:inherit;font-size:13px;cursor:pointer">从桌面移除</button>
+            <button type="button" class="bb" style="margin-left:auto" onClick="{{close}}">取消</button>
+            <button type="button" class="pb" style="background:linear-gradient({{t.btnHi}},{{t.btn}})" onClick="{{close}}">完成</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"green"},"moodOpen":{"editor":"boolean","default":true},"dialog":{"editor":"boolean","default":true},"$preview":{"width":1280,"height":800}}'>
+const PALETTES = {
+  red:      { btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
+  green:    { btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
+  blue:     { btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
+  purple:   { btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9', dot: '#7C5CE6' },
+  amber:    { btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED', dot: '#E09A2B' },
+  graphite: { btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3', dot: '#55555B' }
+};
+const THEMES = [
+  { id: 'flower', name: '花朵心语', desc: '把一朵小花的心情，留在桌面上', mine: false, pets: [
+    { id: 'green-sprout', name: '绿叶小伴', img: '/_blob/af2eedfcac94c80ae91cd9bbc379a0ed' },
+    { id: 'daisy', name: '小雏菊', img: '/_blob/b1373cb4165554f599fdee58a70e0802' },
+    { id: 'sunflower', name: '向日葵', img: '/_blob/d590c6393f601ebec7f3e202245ef0cf' },
+    { id: 'tulip', name: '郁金香', img: '/_blob/d992790e1dcaa2f886f3aa9d47a4baa8' }
+  ] },
+  { id: 'succulent', name: '多肉点点', desc: '圆圆胖胖，安静生长的陪伴', mine: true, pets: [
+    { id: 'echeveria', name: '石莲小点', img: '/_blob/7c5ca5ba26803492d58c62861f704d58' },
+    { id: 'jade', name: '玉露团团', img: '/_blob/854bfc0d0aae4ddb7482a606fd3e3ba2' },
+    { id: 'bear-paw', name: '熊童子', img: '/_blob/b8ae4833cde179c3408e66c35824ee86' }
+  ] }
+];
+const MOOD_GROUPS = [
+  { name: '日常', items: ['平静', '开心', '兴奋', '大笑', '得意', '好奇', '思考', '害羞', '喜爱'] },
+  { name: '情绪', items: ['困惑', '惊讶', '难过', '担心', '生气', '不耐烦', '哭泣', '尴尬'] },
+  { name: '状态', items: ['困倦', '睡眠', '倾听', '说话', '打招呼', '等待', '离线', '充电'] }
+];
+const LAYERS = [
+  { id: 'desk', label: '贴在桌面', hint: '在桌面图标下方，不挡住窗口' },
+  { id: 'top', label: '始终置顶', hint: '浮在所有窗口上方，随时能戳到' }
+];
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = {
+      dlg: undefined,
+      desk: {
+        sunflower: { nick: '小葵', mood: '开心', size: 120, layer: 'desk' },
+        tulip: { nick: '郁郁', mood: '困倦', size: 96, layer: 'top' }
+      }
+    };
+  }
+  update(id, patch) {
+    this.setState({ desk: { ...this.state.desk, [id]: { ...this.state.desk[id], ...patch } } });
+  }
+  renderVals() {
+    const t = PALETTES[this.props.theme ?? 'green'] ?? PALETTES.green;
+    const desk = this.state.desk;
+    const themes = THEMES.map((th) => ({
+      ...th,
+      count: th.pets.length,
+      pets: th.pets.map((p) => {
+        const inst = desk[p.id];
+        return {
+          ...p,
+          onDesk: !!inst,
+          offDesk: !inst,
+          nick: inst ? inst.nick : '',
+          meta: inst ? inst.mood : '',
+          open: () => this.setState({ dlg: p.id })
+        };
+      })
+    }));
+    const dlgId = this.state.dlg !== undefined ? this.state.dlg : (this.props.dialog ? 'sunflower' : null);
+    let d = null;
+    if (dlgId && desk[dlgId]) {
+      const inst = desk[dlgId];
+      const th = THEMES.find((x) => x.pets.some((p) => p.id === dlgId));
+      const def = th.pets.find((p) => p.id === dlgId);
+      const moodOpen = this.state.moodOpen !== undefined ? this.state.moodOpen : !!this.props.moodOpen;
+      const seg = (on) => ({ bg: on ? '#fff' : 'transparent', color: on ? '#1D1D1F' : '#55555A', shadow: on ? '0 1px 2px rgba(0,0,0,.1)' : 'none', weight: on ? '500' : '400', checked: on ? 'true' : 'false' });
+      d = {
+        ...inst,
+        name: def.name,
+        theme: th.name,
+        img: def.img,
+        px: inst.size + 'px',
+        layerHint: (LAYERS.find((l) => l.id === inst.layer) || LAYERS[0]).hint,
+        onName: (e) => this.update(dlgId, { nick: e.target.value }),
+        onSize: (e) => this.update(dlgId, { size: Number(e.target.value) }),
+        moodGroup: (MOOD_GROUPS.find((g) => g.items.includes(inst.mood)) || MOOD_GROUPS[0]).name,
+        moodOpen,
+        moodOpenAttr: moodOpen ? 'true' : 'false',
+        moodRing: moodOpen ? 'inset 0 0 0 1.5px ' + t.btn + ', 0 0 0 3px ' + t.soft : 'inset 0 0 0 1px rgba(0,0,0,.14)',
+        toggleMood: () => this.setState({ moodOpen: !moodOpen }),
+        moodGroups: MOOD_GROUPS.map((g) => ({ name: g.name, items: g.items.map((m) => {
+          const on = m === inst.mood;
+          return { label: m, on, checked: on ? 'true' : 'false', bg: on ? t.soft : 'transparent', color: on ? t.ink : '#1D1D1F', weight: on ? '500' : '400', pick: () => { this.update(dlgId, { mood: m }); this.setState({ moodOpen: false }); } };
+        }) })),
+        layers: LAYERS.map((l) => ({ label: l.label, ...seg(l.id === inst.layer), pick: () => this.update(dlgId, { layer: l.id }) }))
+      };
+    }
+    return {
+      t, themes, d,
+      dlg: !!d,
+      deskCount: Object.keys(desk).length,
+      close: () => this.setState({ dlg: null })
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,753 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "AIHome.dc.html": {
+      "h": 1040,
+      "is_interactive": true,
+      "title": "5 小伴AI 首页",
+      "w": 390,
+      "x": 1880,
+      "y": 0
+    },
+    "Ability.dc.html": {
+      "h": 1180,
+      "is_interactive": true,
+      "title": "4 能力详情",
+      "w": 390,
+      "x": 1410,
+      "y": 0
+    },
+    "ChatAdjust.dc.html": {
+      "h": 852,
+      "title": "46 聊天·调整计划与迷你进度条",
+      "w": 390,
+      "x": 470,
+      "y": 12700
+    },
+    "ChatApproval.dc.html": {
+      "h": 1610,
+      "title": "48 聊天·权限申请卡与权限切换",
+      "w": 390,
+      "x": 1410,
+      "y": 12700
+    },
+    "ChatAsk.dc.html": {
+      "h": 2098,
+      "title": "47 聊天·选择卡（含各状态）",
+      "w": 390,
+      "x": 940,
+      "y": 12700
+    },
+    "ChatDone.dc.html": {
+      "h": 1323,
+      "title": "50 聊天·回复完成态（文件、操作栏、提示条）",
+      "w": 390,
+      "x": 2350,
+      "y": 12700
+    },
+    "ChatFull.dc.html": {
+      "h": 844,
+      "title": "51 聊天·完整会话示例",
+      "w": 390,
+      "x": 2820,
+      "y": 12700
+    },
+    "ChatTask.dc.html": {
+      "h": 1844,
+      "title": "45 聊天·任务执行卡（全部状态）",
+      "w": 390,
+      "x": 0,
+      "y": 12700
+    },
+    "ChatThink.dc.html": {
+      "h": 1065,
+      "title": "49 聊天·思考与工具调用",
+      "w": 390,
+      "x": 1880,
+      "y": 12700
+    },
+    "Devices.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "33 我的设备",
+      "w": 390,
+      "x": 0,
+      "y": 9200
+    },
+    "DevicesEmpty.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "34 我的设备·还没有设备",
+      "w": 390,
+      "x": 470,
+      "y": 9200
+    },
+    "Discuss.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "title": "8 社区·讨论",
+      "w": 390,
+      "x": 470,
+      "y": 1900
+    },
+    "GamePlay.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "13 游戏试玩",
+      "w": 390,
+      "x": 470,
+      "y": 3560
+    },
+    "Games.dc.html": {
+      "h": 1180,
+      "is_interactive": true,
+      "title": "12 游戏",
+      "w": 390,
+      "x": 0,
+      "y": 3560
+    },
+    "Library.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "title": "25 资料库·我的文档",
+      "w": 390,
+      "x": 0,
+      "y": 6300
+    },
+    "LibraryAdd.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "title": "27 资料库·添加资料",
+      "w": 390,
+      "x": 940,
+      "y": 6300
+    },
+    "LibrarySaved.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "title": "26 资料库·收藏",
+      "w": 390,
+      "x": 470,
+      "y": 6300
+    },
+    "Login.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "41 登录（弹窗）",
+      "w": 390,
+      "x": 1410,
+      "y": 10164
+    },
+    "Main.dc.html": {
+      "h": 1560,
+      "is_interactive": true,
+      "title": "1 社区首页",
+      "w": 390,
+      "x": 0,
+      "y": 0
+    },
+    "MainWeekly.dc.html": {
+      "h": 1180,
+      "is_interactive": true,
+      "title": "2 社区首页·周刊",
+      "w": 390,
+      "x": 470,
+      "y": 0
+    },
+    "Me.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "title": "14 我的",
+      "w": 390,
+      "x": 940,
+      "y": 3560
+    },
+    "Models.dc.html": {
+      "h": 860,
+      "is_interactive": true,
+      "title": "19 模型与额度",
+      "w": 390,
+      "x": 0,
+      "y": 4900
+    },
+    "ModelsCustom.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "title": "22 添加自定义供应商弹窗",
+      "w": 390,
+      "x": 1410,
+      "y": 4900
+    },
+    "ModelsProvider.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "title": "21 供应商配置弹窗",
+      "w": 390,
+      "x": 940,
+      "y": 4900
+    },
+    "ModelsXb.dc.html": {
+      "h": 860,
+      "is_interactive": true,
+      "title": "20 小伴AI 配置弹窗",
+      "w": 390,
+      "x": 470,
+      "y": 4900
+    },
+    "MyWorks.dc.html": {
+      "h": 900,
+      "is_interactive": true,
+      "title": "15 我的作品",
+      "w": 390,
+      "x": 1410,
+      "y": 3560
+    },
+    "NewPost.dc.html": {
+      "h": 960,
+      "is_interactive": true,
+      "title": "18 发帖",
+      "w": 390,
+      "x": 2820,
+      "y": 3560
+    },
+    "PackDetail.dc.html": {
+      "h": 1080,
+      "is_interactive": true,
+      "title": "3 装扮详情",
+      "w": 390,
+      "x": 940,
+      "y": 0
+    },
+    "PackShare.dc.html": {
+      "h": 1080,
+      "is_interactive": true,
+      "title": "30 装扮详情·分享",
+      "w": 390,
+      "x": 470,
+      "y": 7700
+    },
+    "Post.dc.html": {
+      "h": 1120,
+      "is_interactive": true,
+      "title": "9 帖子详情（求助）",
+      "w": 390,
+      "x": 940,
+      "y": 1900
+    },
+    "PostShare.dc.html": {
+      "h": 1120,
+      "is_interactive": true,
+      "title": "29 帖子详情·分享",
+      "w": 390,
+      "x": 0,
+      "y": 7700
+    },
+    "Poster.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "31 分享海报",
+      "w": 390,
+      "x": 940,
+      "y": 7700
+    },
+    "PttCancel.dc.html": {
+      "h": 844,
+      "title": "61 语音输入·上滑取消",
+      "w": 390,
+      "x": 940,
+      "y": 17600
+    },
+    "PttEntry.dc.html": {
+      "h": 872,
+      "title": "59 语音输入·入口",
+      "w": 390,
+      "x": 0,
+      "y": 17600
+    },
+    "PttNotes.dc.html": {
+      "h": 792,
+      "title": "64 语音输入·提示与异常",
+      "w": 390,
+      "x": 2350,
+      "y": 17600
+    },
+    "PttRecord.dc.html": {
+      "h": 844,
+      "title": "60 语音输入·按住录音",
+      "w": 390,
+      "x": 470,
+      "y": 17600
+    },
+    "PttResult.dc.html": {
+      "h": 560,
+      "title": "63 语音输入·松手之后",
+      "w": 390,
+      "x": 1880,
+      "y": 17600
+    },
+    "PttText.dc.html": {
+      "h": 844,
+      "title": "62 语音输入·转文字",
+      "w": 390,
+      "x": 1410,
+      "y": 17600
+    },
+    "PttToolbar.dc.html": {
+      "h": 734,
+      "title": "65 输入框工具栏·文字按钮改图标",
+      "w": 390,
+      "x": 2820,
+      "y": 17600
+    },
+    "PublishPack.dc.html": {
+      "h": 1040,
+      "is_interactive": true,
+      "title": "17 发布作品",
+      "w": 390,
+      "x": 2350,
+      "y": 3560
+    },
+    "Register.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "42 完成注册（弹窗）",
+      "w": 390,
+      "x": 1880,
+      "y": 10164
+    },
+    "RemoteApprove.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "37 遥控·审批卡片",
+      "w": 390,
+      "x": 1880,
+      "y": 9200
+    },
+    "RemoteApproveHigh.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "38 遥控·高危审批（只确认一次）",
+      "w": 390,
+      "x": 0,
+      "y": 10164
+    },
+    "RemoteChat.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "36 设备·聊天页（侧栏收起）",
+      "w": 390,
+      "x": 1410,
+      "y": 9200
+    },
+    "RemoteList.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "35 设备·项目与对话侧栏",
+      "w": 390,
+      "x": 940,
+      "y": 9200
+    },
+    "RemoteOffline.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "39 遥控·电脑离线",
+      "w": 390,
+      "x": 470,
+      "y": 10164
+    },
+    "RemoteProject.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "44 设备·新项目",
+      "w": 390,
+      "x": 470,
+      "y": 11400
+    },
+    "RemoteStates.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "40 遥控·异常状态",
+      "w": 390,
+      "x": 940,
+      "y": 10164
+    },
+    "RemoteSwitch.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "43 设备·切换设备",
+      "w": 390,
+      "x": 0,
+      "y": 11400
+    },
+    "Resources.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "title": "7 社区·资源",
+      "w": 390,
+      "x": 0,
+      "y": 1900
+    },
+    "Scheme.dc.html": {
+      "h": 1180,
+      "is_interactive": true,
+      "title": "11 桌面方案详情",
+      "w": 390,
+      "x": 1880,
+      "y": 1900
+    },
+    "Search.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "10 搜索",
+      "w": 390,
+      "x": 1410,
+      "y": 1900
+    },
+    "Settings.dc.html": {
+      "h": 960,
+      "is_interactive": true,
+      "title": "16 设置",
+      "w": 390,
+      "x": 1880,
+      "y": 3560
+    },
+    "ShareLanding.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "32 分享落地页（微信里打开）",
+      "w": 390,
+      "x": 1410,
+      "y": 7700
+    },
+    "Studio.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "6 小伴AI 对话页（含创作）",
+      "w": 390,
+      "x": 2350,
+      "y": 0
+    },
+    "StudioLevel.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "24 对话页·思考强度弹窗",
+      "w": 390,
+      "x": 2350,
+      "y": 4900
+    },
+    "StudioLib.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "28 对话页·从资料库选择",
+      "w": 390,
+      "x": 1410,
+      "y": 6300
+    },
+    "StudioModel.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "23 对话页·选择模型",
+      "w": 390,
+      "x": 1880,
+      "y": 4900
+    },
+    "VoiceEntry.dc.html": {
+      "h": 1327,
+      "title": "52 实时对话·入口与首次下载",
+      "w": 390,
+      "x": 0,
+      "y": 15200
+    },
+    "VoiceHear.dc.html": {
+      "h": 844,
+      "title": "54 实时对话·听到你说话",
+      "w": 390,
+      "x": 940,
+      "y": 15200
+    },
+    "VoiceListen.dc.html": {
+      "h": 844,
+      "title": "53 实时对话·聆听",
+      "w": 390,
+      "x": 470,
+      "y": 15200
+    },
+    "VoiceMini.dc.html": {
+      "h": 411,
+      "title": "58 实时对话·收起成胶囊",
+      "w": 390,
+      "x": 2820,
+      "y": 15200
+    },
+    "VoiceNotes.dc.html": {
+      "h": 1288,
+      "title": "57 实时对话·提示与异常",
+      "w": 390,
+      "x": 2350,
+      "y": 15200
+    },
+    "VoiceSpeak.dc.html": {
+      "h": 844,
+      "title": "56 实时对话·小伴在说",
+      "w": 390,
+      "x": 1880,
+      "y": 15200
+    },
+    "VoiceThink.dc.html": {
+      "h": 844,
+      "title": "55 实时对话·思考",
+      "w": 390,
+      "x": 1410,
+      "y": 15200
+    },
+    "SettingsTheme.dc.html": {
+      "h": 480,
+      "title": "66 设置·主题（跟随系统 / 浅色 / 深色）",
+      "w": 390,
+      "x": 3290,
+      "y": 3560,
+      "is_interactive": true
+    },
+    "SettingsAccent.dc.html": {
+      "h": 628,
+      "title": "67 设置·主题色（六套）",
+      "w": 390,
+      "x": 3760,
+      "y": 3560,
+      "is_interactive": true
+    },
+    "SettingsDark.dc.html": {
+      "h": 960,
+      "title": "68 设置·深色模式示例",
+      "w": 390,
+      "x": 4230,
+      "y": 3560
+    },
+    "SettingsVoice.dc.html": {
+      "h": 760,
+      "is_interactive": true,
+      "title": "69 设置·声音（识别、朗读、通话）",
+      "w": 390,
+      "x": 4700,
+      "y": 3560
+    },
+    "SettingsVoiceStates.dc.html": {
+      "h": 1620,
+      "title": "70 设置·声音·各状态",
+      "w": 390,
+      "x": 5170,
+      "y": 3560
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-27T12:00:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "noteOrder": [
+    "t1",
+    "t2",
+    "t3",
+    "t4",
+    "t5",
+    "t6",
+    "s1",
+    "t7",
+    "t8",
+    "t9",
+    "s3",
+    "t10",
+    "t11",
+    "t12"
+  ],
+  "notes": {
+    "s1": {
+      "fill": "orange",
+      "text": "卡片、作者、数字都是示例内容，N 表示待填的数。点击卡片和按钮可以在画板之间跳转；输入框里的内容是写好的示例，不能真的输入。\n\n配色：页面底浅灰，卡片和弹层纯白，不用浅灰描边，层次靠底灰卡白，阴影只给浮层；红色只用在主按钮、选中态和提醒上。",
+      "w": 420,
+      "x": 2830,
+      "y": 0
+    },
+    "s3": {
+      "fill": "teal",
+      "text": "项目 = 设备上的一个文件夹（待确认）。每台设备的项目和对话各自独立，可以同时有对话在执行。",
+      "w": 420,
+      "x": 1000,
+      "y": 11400
+    },
+    "t1": {
+      "kind": "title1",
+      "maxW": 2740,
+      "text": "社区与小伴AI：手机原型",
+      "w": 240,
+      "x": 0,
+      "y": -260
+    },
+    "t10": {
+      "kind": "title1",
+      "maxW": 3210,
+      "text": "聊天里的各种状态卡片（参考桌面版升级设计稿）",
+      "w": 240,
+      "x": 0,
+      "y": 12440
+    },
+    "t11": {
+      "kind": "title1",
+      "maxW": 3210,
+      "text": "实时对话（语音通话）设计稿",
+      "w": 240,
+      "x": 0,
+      "y": 14940
+    },
+    "t12": {
+      "kind": "title1",
+      "maxW": 3210,
+      "text": "语音输入：按住说话，松手发送（类似微信）",
+      "w": 240,
+      "x": 0,
+      "y": 17340
+    },
+    "t2": {
+      "kind": "title1",
+      "maxW": 2740,
+      "text": "社区子页与发布",
+      "w": 240,
+      "x": 0,
+      "y": 1640
+    },
+    "t3": {
+      "kind": "title1",
+      "maxW": 5700,
+      "text": "游戏、我的与设置",
+      "w": 240,
+      "x": 0,
+      "y": 3300
+    },
+    "t4": {
+      "kind": "title1",
+      "maxW": 2900,
+      "text": "模型与额度",
+      "w": 240,
+      "x": 0,
+      "y": 4640
+    },
+    "t5": {
+      "kind": "title1",
+      "maxW": 2000,
+      "text": "资料库",
+      "w": 240,
+      "x": 0,
+      "y": 6040
+    },
+    "t6": {
+      "kind": "title1",
+      "maxW": 1900,
+      "text": "分享",
+      "w": 240,
+      "x": 0,
+      "y": 7440
+    },
+    "t7": {
+      "kind": "title1",
+      "maxW": 2300,
+      "text": "我的设备与遥控：同一账号登录，无需配对",
+      "w": 240,
+      "x": 0,
+      "y": 8940
+    },
+    "t8": {
+      "kind": "title1",
+      "maxW": 2300,
+      "text": "遥控的审批与异常，以及登录",
+      "w": 240,
+      "x": 0,
+      "y": 9904
+    },
+    "t9": {
+      "kind": "title1",
+      "maxW": 1000,
+      "text": "多设备：每台设备有自己的项目和对话",
+      "w": 240,
+      "x": 0,
+      "y": 11140
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "MainWeekly.dc.html",
+    "PackDetail.dc.html",
+    "Ability.dc.html",
+    "AIHome.dc.html",
+    "Studio.dc.html",
+    "Resources.dc.html",
+    "Discuss.dc.html",
+    "Post.dc.html",
+    "Search.dc.html",
+    "Scheme.dc.html",
+    "Games.dc.html",
+    "GamePlay.dc.html",
+    "Me.dc.html",
+    "MyWorks.dc.html",
+    "Settings.dc.html",
+    "PublishPack.dc.html",
+    "NewPost.dc.html",
+    "Models.dc.html",
+    "ModelsXb.dc.html",
+    "ModelsProvider.dc.html",
+    "ModelsCustom.dc.html",
+    "StudioModel.dc.html",
+    "StudioLevel.dc.html",
+    "Library.dc.html",
+    "LibrarySaved.dc.html",
+    "LibraryAdd.dc.html",
+    "StudioLib.dc.html",
+    "PostShare.dc.html",
+    "PackShare.dc.html",
+    "Poster.dc.html",
+    "ShareLanding.dc.html",
+    "Devices.dc.html",
+    "DevicesEmpty.dc.html",
+    "RemoteList.dc.html",
+    "RemoteChat.dc.html",
+    "RemoteApprove.dc.html",
+    "RemoteApproveHigh.dc.html",
+    "RemoteOffline.dc.html",
+    "RemoteStates.dc.html",
+    "Login.dc.html",
+    "Register.dc.html",
+    "RemoteSwitch.dc.html",
+    "RemoteProject.dc.html",
+    "ChatTask.dc.html",
+    "ChatAdjust.dc.html",
+    "ChatAsk.dc.html",
+    "ChatApproval.dc.html",
+    "ChatThink.dc.html",
+    "ChatDone.dc.html",
+    "ChatFull.dc.html",
+    "VoiceEntry.dc.html",
+    "VoiceListen.dc.html",
+    "VoiceHear.dc.html",
+    "VoiceThink.dc.html",
+    "VoiceSpeak.dc.html",
+    "VoiceNotes.dc.html",
+    "VoiceMini.dc.html",
+    "PttEntry.dc.html",
+    "PttRecord.dc.html",
+    "PttCancel.dc.html",
+    "PttText.dc.html",
+    "PttResult.dc.html",
+    "PttNotes.dc.html",
+    "PttToolbar.dc.html",
+    "SettingsTheme.dc.html",
+    "SettingsAccent.dc.html",
+    "SettingsDark.dc.html",
+    "SettingsVoice.dc.html",
+    "SettingsVoiceStates.dc.html"
+  ],
+  "pages": [],
+  "title": "社区与小伴AI 手机原型"
+}

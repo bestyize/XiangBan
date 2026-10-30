@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小伴桌面 · 添加自定义供应商</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none}
+.sub{font-size:12px;color:#6E6E73}
+.ib{width:28px;height:28px;border-radius:8px;border:0;background:transparent;color:#55555A;display:grid;place-items:center;cursor:pointer}
+.ib:hover{background:rgba(0,0,0,.05)}
+.sec{font-size:12px;font-weight:600;color:#6E6E73;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.fd{display:flex;flex-direction:column;gap:6px}
+.fd>.lb{display:flex;align-items:center;justify-content:space-between;font-size:13px;font-weight:500;color:#1D1D1F}
+.fd>.lb a{font-size:12px;font-weight:400}
+.in{display:flex;align-items:center;gap:6px;height:34px;padding:0 6px 0 11px;border-radius:9px;background:#fff;box-sizing:border-box}
+.in input{flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:13.5px;color:#1D1D1F}
+.mono{font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12.5px}
+.seg{display:flex;padding:2px;border-radius:9px;background:#EDEDF0;gap:1px}
+.seg button{flex:1;height:30px;border:0;border-radius:7px;font-family:inherit;font-size:12.5px;cursor:pointer}
+.chip{height:28px;padding:0 10px;border-radius:8px;border:0;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.bb{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 13px;border-radius:8px;border:0;font-family:inherit;font-size:13px;cursor:pointer;color:#1D1D1F;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.13),0 1px 1.5px rgba(0,0,0,.05)}
+.pb{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:32px;padding:0 16px;border-radius:8px;border:0;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)}
+</style>
+</helmet>
+<div style="position:relative;width:1280px;height:800px;overflow:hidden;font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Microsoft YaHei UI',sans-serif;color:#1D1D1F;background:{{t.tint}};-webkit-font-smoothing:antialiased">
+
+  <div aria-hidden="true" style="position:absolute;inset:0;background:rgba(24,24,28,.32)"></div>
+  <div aria-hidden="true" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:940px;height:660px;border-radius:18px;overflow:hidden;display:flex;background:#F5F5F7;box-shadow:0 30px 80px rgba(0,0,0,.28);filter:blur(1px)">
+    <div style="width:220px;background:{{t.tint}};padding:60px 14px;box-sizing:border-box;display:flex;flex-direction:column;gap:10px">
+      <div style="height:30px;border-radius:8px;background:rgba(0,0,0,.05)"></div>
+      <div style="height:52px;border-radius:10px;background:rgba(255,255,255,.6)"></div>
+      <div style="height:12px;width:90px;border-radius:6px;background:rgba(0,0,0,.08);margin-top:8px"></div>
+      <div style="height:30px;border-radius:8px;background:rgba(0,0,0,.075)"></div>
+      <div style="height:12px;width:110px;border-radius:6px;background:rgba(0,0,0,.08)"></div>
+      <div style="height:12px;width:80px;border-radius:6px;background:rgba(0,0,0,.08)"></div>
+    </div>
+    <div style="flex:1;padding:60px 28px;display:flex;flex-direction:column;gap:14px">
+      <div style="height:76px;border-radius:12px;background:#fff"></div>
+      <div style="height:110px;border-radius:12px;background:#fff"></div>
+      <div style="height:240px;border-radius:12px;background:#fff"></div>
+    </div>
+  </div>
+  <div aria-hidden="true" style="position:absolute;inset:0;background:rgba(24,24,28,.18);backdrop-filter:blur(2px)"></div>
+
+  <div role="dialog" aria-modal="true" aria-label="{{p.title}}" style="position: absolute; left: 50%; top: 400px; transform: translate(-50%,-50%); width: 600px; max-height: 784px; border-radius: 18px; background: #F7F7F9; box-shadow: 0 0 0 1px rgba(0,0,0,.08),0 30px 80px rgba(0,0,0,.3),0 8px 20px rgba(0,0,0,.1); display: flex; flex-direction: column; overflow: hidden; height: 579px">
+    <header style="display:flex;align-items:center;gap:12px;padding:18px 14px 16px 22px;background:#fff;border-bottom:1px solid rgba(0,0,0,.06)">
+      <span style="width:40px;height:40px;border-radius:11px;background:{{p.tileBg}};color:{{p.tileInk}};display:grid;place-items:center;font-size:14px;font-weight:700;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)">{{p.mono}}</span>
+      <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+        <div style="display:flex;align-items:center;gap:8px"><h2 style="margin:0;font-size:16px;font-weight:600">{{p.title}}</h2><sc-if value="{{p.connected}}" hint-placeholder-val="{{ true }}"><span style="display:inline-flex;align-items:center;gap:5px;height:20px;padding:0 7px;border-radius:999px;background:#E6F4EC;color:#1E6A45;font-size:11px;font-weight:500"><i style="width:6px;height:6px;border-radius:50%;background:#34A36D"></i>已连接</span></sc-if></div>
+        <span class="sub" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{p.desc}}</span>
+      </div>
+      <button type="button" class="ib" aria-label="关闭" style="align-self:flex-start"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+    </header>
+
+    <div style="flex:1;min-height:0;overflow-y:auto;padding:18px 22px 6px;display:flex;flex-direction:column;gap:20px">
+      <section>
+        <p class="sec">连接</p>
+        <div style="display:flex;flex-direction:column;gap:14px;padding:16px;border-radius:12px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.06)">
+          <sc-if value="{{p.custom}}" hint-placeholder-val="{{ false }}">
+            <label class="fd"><span class="lb">供应商名称</span><span class="in" style="box-shadow:inset 0 0 0 1px rgba(0,0,0,.14)"><input type="text" placeholder="例如：公司内部模型" aria-label="供应商名称"></span></label>
+          </sc-if>
+          <div class="fd"><span class="lb">接口协议</span>
+            <div style="position:relative">
+              <button type="button" aria-haspopup="listbox" aria-expanded="{{protoOpenAttr}}" aria-label="接口协议：{{protoLabel}}" onClick="{{toggleProto}}" style="width:100%;height:34px;display:flex;align-items:center;gap:8px;padding:0 10px 0 11px;border-radius:9px;border:0;background:#fff;box-shadow:{{protoRing}};font:inherit;font-size:13.5px;color:#1D1D1F;cursor:pointer;text-align:left">
+                <span style="font-weight:500">{{protoLabel}}</span><span class="sub">{{protoHint}}</span>
+                <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.4" stroke-linecap="round" style="margin-left:auto"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg>
+              </button>
+              <sc-if value="{{protoOpen}}" hint-placeholder-val="{{ false }}">
+                <div role="listbox" aria-label="选择接口协议" style="position:absolute;left:0;right:0;top:40px;z-index:5;border-radius:12px;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 14px 36px rgba(0,0,0,.18);padding:5px">
+                  <sc-for list="{{protocols}}" as="r" hint-placeholder-count="3">
+                    <button type="button" role="option" aria-selected="{{r.checked}}" onClick="{{r.pick}}" style="width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border:0;border-radius:8px;background:{{r.optBg}};font:inherit;cursor:pointer;text-align:left">
+                      <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{r.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                      <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><span style="font-size:13.5px;font-weight:500;color:{{r.ink}}">{{r.label}}</span><span class="sub" style="font-size:11.5px">{{r.hint}} · <span class="mono" style="font-size:11px">{{r.url}}</span></span></span>
+                    </button>
+                  </sc-for>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+          <label class="fd"><span class="lb">API 地址<sc-if value="{{p.builtin}}" hint-placeholder-val="{{ true }}"><a href="#" style="color:{{t.ink}}">恢复默认</a></sc-if></span>
+            <span class="in" style="box-shadow:inset 0 0 0 1px rgba(0,0,0,.14)"><input class="mono" type="url" value="{{endpoint}}" placeholder="https://" aria-label="API 地址"></span></label>
+          <div class="fd"><span class="lb">API 密钥<sc-if value="{{p.builtin}}" hint-placeholder-val="{{ true }}"><a href="#" style="color:{{t.ink}}">{{p.consoleText}} ↗</a></sc-if></span>
+            <span class="in" style="box-shadow:0 0 0 3px {{t.soft}},inset 0 0 0 1.5px {{t.btn}}">
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"></circle><path d="m10.8 12.2 8.7-8.7M17 6l3 3M14.5 8.5l2 2"></path></svg>
+              <input class="mono" type="{{keyType}}" value="{{p.key}}" placeholder="sk-..." aria-label="API 密钥">
+              <button type="button" class="ib" aria-label="{{keyToggleLabel}}" onClick="{{toggleKey}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg></button>
+            </span>
+            <span class="sub" style="font-size:11.5px">只保存在这台电脑上，不会上传到小伴服务器</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <button type="button" class="bb" onClick="{{test}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"></path></svg>测试连接</button>
+            <span style="font-size:12.5px;color:{{testColor}};display:inline-flex;align-items:center;gap:6px">{{testText}}</span>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <p class="sec">模型<span style="font-weight:400">· {{modelCount}} 个，输入框里可切换</span></p>
+        <div style="border-radius:12px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.06)">
+          <sc-for list="{{rows}}" as="m" hint-placeholder-count="2">
+            <div style="border-top:{{m.border}}">
+              <div style="display:flex;align-items:center;gap:10px;min-height:48px;padding:7px 10px 7px 14px;box-sizing:border-box">
+                <button type="button" aria-label="设为默认模型" aria-pressed="{{m.isDefault}}" onClick="{{m.makeDefault}}" title="{{m.defaultTitle}}" style="width:22px;height:22px;border:0;padding:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:{{m.starColor}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="{{m.starFill}}" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg></button>
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px">
+                  <span style="display:flex;align-items:center;gap:7px"><span class="mono" style="font-size:13px;font-weight:500;color:#1D1D1F">{{m.id}}</span><sc-if value="{{m.def}}" hint-placeholder-val="{{ false }}"><span style="height:18px;padding:0 6px;border-radius:5px;background:{{t.soft}};color:{{t.ink}};font-size:10.5px;font-weight:600;display:inline-flex;align-items:center">默认</span></sc-if></span>
+                  <span class="sub" style="font-size:11.5px">思考等级：{{m.summary}}</span>
+                </div>
+                <button type="button" class="ib" aria-label="{{m.expandLabel}}" aria-expanded="{{m.expandedAttr}}" onClick="{{m.toggle}}" style="color:{{m.gearColor}};background:{{m.gearBg}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"></path><circle cx="15" cy="6" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="18" r="2"></circle></svg></button>
+                <button type="button" class="ib" aria-label="移除 {{m.id}}" onClick="{{m.remove}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button>
+              </div>
+              <sc-if value="{{m.expanded}}" hint-placeholder-val="{{ false }}">
+                <div style="margin:0 14px 12px 46px;padding:12px;border-radius:10px;background:#F7F7F9;display:flex;flex-direction:column;gap:9px">
+                  <div style="display:flex;align-items:center;gap:10px"><span style="font-size:12.5px;font-weight:500;width:56px">思考等级</span>
+                    <div class="seg" role="radiogroup" aria-label="思考等级声明" style="flex:1;background:#E9E9EC">
+                      <sc-for list="{{m.modes}}" as="r" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{r.checked}}" onClick="{{r.pick}}" style="height:26px;background:{{r.bg}};color:{{r.color}};font-weight:{{r.weight}};box-shadow:{{r.shadow}}">{{r.label}}</button></sc-for>
+                    </div>
+                  </div>
+                  <sc-if value="{{m.manual}}" hint-placeholder-val="{{ false }}">
+                    <div style="display:flex;gap:6px;padding-left:66px">
+                      <sc-for list="{{m.levels}}" as="l" hint-placeholder-count="5"><button type="button" class="chip" role="checkbox" aria-checked="{{l.checked}}" onClick="{{l.pick}}" style="height:26px;background:{{l.bg}};color:{{l.color}};box-shadow:{{l.shadow}};font-family:inherit"><sc-if value="{{l.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if>{{l.label}}</button></sc-for>
+                    </div>
+                  </sc-if>
+                  <span class="sub" style="font-size:11.5px;padding-left:66px">{{m.hint}}</span>
+                </div>
+              </sc-if>
+            </div>
+          </sc-for>
+          <sc-if value="{{noModels}}" hint-placeholder-val="{{ false }}">
+            <div class="sub" style="padding:18px 16px;text-align:center">还没有模型。输入模型名称，或拉取服务商的可用模型</div>
+          </sc-if>
+          <div style="border-top:1px solid rgba(0,0,0,.06);padding:12px 14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;gap:8px">
+              <span class="in" style="flex:1;box-shadow:inset 0 0 0 1px rgba(0,0,0,.14)"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg><input class="mono" type="text" value="{{draft}}" onChange="{{onDraft}}" placeholder="输入模型名称" aria-label="添加模型"></span>
+              <button type="button" class="bb" style="height:34px" onClick="{{addDraft}}">添加</button>
+              <button type="button" class="bb" style="height:34px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"></path><path d="M21 3v5h-5"></path></svg>拉取可用模型</button>
+            </div>
+            <sc-if value="{{hasSuggest}}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px"><span class="sub" style="font-size:11.5px;margin-right:2px">常用</span>
+                <sc-for list="{{suggest}}" as="s" hint-placeholder-count="2"><button type="button" class="chip mono" onClick="{{s.add}}" style="background:#F4F4F6;color:#3A3A40"><svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>{{s.id}}</button></sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <footer style="display:flex;align-items:center;gap:8px;padding:14px 18px 16px 22px;background:#fff;border-top:1px solid rgba(0,0,0,.06);margin-top:12px">
+      <sc-if value="{{p.connected}}" hint-placeholder-val="{{ true }}"><button type="button" style="height:32px;padding:0 4px;border:0;background:transparent;font-family:inherit;font-size:13px;color:#B42A33;cursor:pointer">删除此配置</button></sc-if>
+      <button type="button" class="bb" style="margin-left:auto">取消</button>
+      <button type="button" class="pb" style="background:linear-gradient({{t.btnHi}},{{t.btn}})">保存</button>
+    </footer>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"red"},"protoOpen":{"editor":"boolean","default":false},"custom":{"editor":"boolean","default":true},"$preview":{"width":1280,"height":800}}'>
+const PALETTES = {
+  red:      { btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1' },
+  green:    { btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0' },
+  blue:     { btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9' },
+  purple:   { btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9' },
+  amber:    { btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED' },
+  graphite: { btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3' }
+};
+const DEEPSEEK = {
+  title: 'DeepSeek', mono: 'DS', tileBg: '#E8EEFD', tileInk: '#3557C9', builtin: true, custom: false, connected: true,
+  desc: '深度求索最新一代大模型，默认配置 deepseek-v4-pro 旗舰大模型',
+  consoleText: '前往 DeepSeek 开放平台获取 API Key',
+  key: 'sk-7f3a9c1e5b2d48e0a6c4f19b',
+  endpoints: { chat: 'https://api.deepseek.com', responses: 'https://api.deepseek.com', anthropic: 'https://api.deepseek.com/anthropic' },
+  models: ['deepseek-v4-pro', 'deepseek-flash', 'deepseek-chat', 'deepseek-reasoner'],
+  model: 'deepseek-v4-pro'
+};
+const CUSTOM = {
+  title: '添加自定义供应商', mono: '+', tileBg: '#F1F1F3', tileInk: '#55555A', builtin: false, custom: true, connected: false,
+  desc: '任何兼容 OpenAI 或 Anthropic 接口的模型服务',
+  consoleText: '', key: '',
+  endpoints: { chat: '', responses: '', anthropic: '' },
+  models: [], model: ''
+};
+const PROTOCOLS = [
+  { id: 'chat', label: 'Chat Completions', hint: 'OpenAI 兼容，最通用' },
+  { id: 'responses', label: 'Responses', hint: '推荐，工具调用更稳定' },
+  { id: 'anthropic', label: 'Anthropic', hint: 'Anthropic Messages 格式' }
+];
+const MODES = [
+  { id: 'auto', label: '自动识别', hint: '按模型名自动判断可用的思考等级' },
+  { id: 'manual', label: '手动声明', hint: '只在输入框里显示你勾选的等级' },
+  { id: 'off', label: '不支持', hint: '这个模型不支持调节思考深度' }
+];
+const LEVELS = [['low', '低'], ['medium', '中'], ['high', '高'], ['xhigh', '更高'], ['max', '最高']];
+const INITIAL = {
+  deepseek: [
+    { id: 'deepseek-v4-pro', mode: 'auto', levels: [] },
+    { id: 'deepseek-reasoner', mode: 'manual', levels: ['low', 'high', 'max'] },
+    { id: 'deepseek-flash', mode: 'off', levels: [] }
+  ],
+  custom: []
+};
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { protocol: null, showKey: false, test: 'idle', list: null, def: null, open: undefined, draft: '' };
+  }
+  modelVals(t, p, seg) {
+    const list = this.state.list ?? INITIAL[p.custom ? 'custom' : 'deepseek'];
+    const def = this.state.def ?? (list[0] ? list[0].id : null);
+    const open = this.state.open !== undefined ? this.state.open : (p.custom ? null : 'deepseek-reasoner');
+    const set = (id, patch) => this.setState({ list: list.map((m) => (m.id === id ? { ...m, ...patch } : m)) });
+    const add = (id) => { const v = (id || '').trim(); if (!v || list.some((m) => m.id === v)) return; this.setState({ list: [...list, { id: v, mode: 'auto', levels: [] }], draft: '', open: v }); };
+    const summary = (m) => m.mode === 'auto' ? '自动识别' : m.mode === 'off' ? '不支持' : (m.levels.length ? LEVELS.filter(([k]) => m.levels.includes(k)).map(([, l]) => l).join(' / ') : '未勾选');
+    return {
+      modelCount: list.length,
+      noModels: list.length === 0,
+      draft: this.state.draft,
+      onDraft: (e) => this.setState({ draft: e.target.value }),
+      addDraft: () => add(this.state.draft),
+      suggest: p.models.filter((id) => !list.some((m) => m.id === id)).map((id) => ({ id, add: () => add(id) })),
+      hasSuggest: p.models.some((id) => !list.some((m) => m.id === id)),
+      rows: list.map((m, i) => {
+        const isDef = m.id === def, ex = m.id === open;
+        return {
+          ...m,
+          def: isDef, isDefault: isDef ? 'true' : 'false', defaultTitle: isDef ? '默认模型' : '设为默认模型',
+          starColor: isDef ? t.btn : '#C7C7CC', starFill: isDef ? t.btn : 'none',
+          border: i === 0 ? '0' : '1px solid rgba(0,0,0,.06)',
+          summary: summary(m),
+          expanded: ex, expandedAttr: ex ? 'true' : 'false', expandLabel: ex ? '收起 ' + m.id + ' 的设置' : '设置 ' + m.id,
+          gearColor: ex ? t.ink : '#55555A', gearBg: ex ? t.soft : 'transparent',
+          toggle: () => this.setState({ open: ex ? null : m.id }),
+          makeDefault: () => this.setState({ def: m.id }),
+          remove: () => this.setState({ list: list.filter((x) => x.id !== m.id), def: isDef ? null : def }),
+          manual: m.mode === 'manual',
+          hint: (MODES.find((x) => x.id === m.mode) || MODES[0]).hint,
+          modes: MODES.map((x) => ({ ...x, ...seg(x.id === m.mode), pick: () => set(m.id, { mode: x.id }) })),
+          levels: LEVELS.map(([k, label]) => {
+            const on = m.levels.includes(k);
+            return { label, on, checked: on ? 'true' : 'false', bg: on ? t.soft : '#fff', color: on ? t.ink : '#55555A', shadow: on ? 'inset 0 0 0 1.5px ' + t.btn : 'inset 0 0 0 1px rgba(0,0,0,.1)',
+              pick: () => set(m.id, { levels: on ? m.levels.filter((x) => x !== k) : [...m.levels, k] }) };
+          })
+        };
+      })
+    };
+  }
+  renderVals() {
+    const t = PALETTES[this.props.theme ?? 'red'] ?? PALETTES.red;
+    const p = this.props.custom ? CUSTOM : DEEPSEEK;
+    const protocol = this.state.protocol ?? (p.custom ? 'chat' : 'responses');
+    const seg = (on) => ({ bg: on ? '#fff' : 'transparent', color: on ? '#1D1D1F' : '#55555A', weight: on ? '500' : '400', shadow: on ? '0 1px 2px rgba(0,0,0,.1)' : 'none', checked: on ? 'true' : 'false' });
+    const proto = PROTOCOLS.find((r) => r.id === protocol);
+    const protoOpen = this.state.protoOpen !== undefined ? this.state.protoOpen : !!this.props.protoOpen;
+    const testMap = {
+      idle: { text: p.connected ? '上次测试：连接正常' : '填好地址和密钥后可以测试', color: '#6E6E73' },
+      ok: { text: '✓ 连接成功，模型可用', color: '#23784F' }
+    };
+    return {
+      t, p,
+      endpoint: p.endpoints[protocol],
+      protoHint: proto.hint,
+      protoLabel: proto.label,
+      protoOpen,
+      protoOpenAttr: protoOpen ? 'true' : 'false',
+      protoRing: protoOpen ? 'inset 0 0 0 1.5px ' + t.btn + ', 0 0 0 3px ' + t.soft : 'inset 0 0 0 1px rgba(0,0,0,.14)',
+      toggleProto: () => this.setState({ protoOpen: !protoOpen }),
+      protocols: PROTOCOLS.map((r) => {
+        const on = r.id === protocol;
+        return { ...r, on, checked: on ? 'true' : 'false', optBg: on ? t.soft : 'transparent', ink: on ? t.ink : '#1D1D1F', url: p.endpoints[r.id] || '填写服务商提供的地址', pick: () => this.setState({ protocol: r.id, protoOpen: false }) };
+      }),
+      keyType: this.state.showKey ? 'text' : 'password',
+      keyToggleLabel: this.state.showKey ? '隐藏密钥' : '显示密钥',
+      toggleKey: () => this.setState({ showKey: !this.state.showKey }),
+      test: () => this.setState({ test: 'ok' }),
+      testText: testMap[this.state.test].text,
+      testColor: testMap[this.state.test].color,
+      ...this.modelVals(t, p, seg),
+    };
+  }
+}
+</script>
+</body>
+</html>

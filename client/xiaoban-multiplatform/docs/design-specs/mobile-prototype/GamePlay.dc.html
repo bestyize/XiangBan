@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>游戏试玩</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;box-sizing:border-box;background:#F1ECE4;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+<header style="flex:none;height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 4px">
+<a href="Games.dc.html" aria-label="返回游戏" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#222222;text-decoration:none">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+</a>
+<div style="text-align:center">
+<h1 style="margin:0;font-size:16px;font-weight:600;line-height:1.3">2048</h1>
+<div style="font-size:12px;color:#666666">官方</div>
+</div>
+<span style="width:44px;height:44px"></span>
+</header>
+
+<div style="flex:none;display:flex;gap:8px;padding:4px 16px 12px">
+<div style="flex:1;background:#FFFFFF;border-radius:16px;padding:8px 12px"><div style="font-size:12px;color:#666666">得分</div><div style="font-size:20px;font-weight:600">N</div></div>
+<div style="flex:1;background:#FFFFFF;border-radius:16px;padding:8px 12px"><div style="font-size:12px;color:#666666">最高分</div><div style="font-size:20px;font-weight:600">N</div></div>
+<button type="button" style="flex:none;border:0;border-radius:16px;background:#E3203C;color:#FFFFFF;font-size:14px;font-weight:600;padding:0 16px">新游戏</button>
+</div>
+
+<main style="flex:1;min-height:0;overflow:hidden;padding:0 16px;display:flex;flex-direction:column;align-items:center">
+<div role="img" aria-label="游戏画面示意：四乘四的数字方块棋盘" style="width:358px;height:358px;box-sizing:border-box;background:#BBADA0;border-radius:16px;padding:8px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:repeat(4,minmax(0,1fr));gap:8px">
+<sc-for list="{{tiles}}" as="t" hint-placeholder-count="16">
+<div style="border-radius:8px;background:{{t.bg}};color:{{t.color}};display:flex;align-items:center;justify-content:center;font-size:{{t.size}}px;font-weight:600">{{t.text}}</div>
+</sc-for>
+</div>
+<p style="margin:14px 0 0;font-size:14px;line-height:1.6;color:#666666;text-align:center">上下左右滑动，合并相同的数字</p>
+</main>
+
+<div style="flex:none;display:flex;gap:8px;padding:8px 16px 8px">
+<button type="button" style="flex:1;height:44px;border:0;border-radius:22px;background:#FFFFFF;color:#222222;font-size:14px">收藏</button>
+<button type="button" onClick="{{openRank}}" style="flex:1;height:44px;border:0;border-radius:22px;background:#FFFFFF;color:#222222;font-size:14px">排行榜</button>
+<button type="button" onClick="{{openShare}}" style="flex:1;height:44px;border:0;border-radius:22px;background:#FFFFFF;color:#222222;font-size:14px">分享</button>
+</div>
+<div style="flex:none;padding:0 16px 20px;font-size:12px;line-height:1.6;color:#666666;text-align:center">在独立沙箱中运行，不会访问你的账号和文件。成绩只记录得分。</div>
+
+<sc-if value="{{rank}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end">
+<div role="dialog" aria-modal="true" aria-label="排行榜" style="background:#FFFFFF;border-radius:20px 20px 0 0;padding:20px 16px 24px">
+<div style="display:flex;align-items:center;justify-content:space-between">
+<h2 style="margin:0;font-size:18px;font-weight:600">本周排行榜</h2>
+<span style="font-size:12px;color:#666666">我的名次：N</span>
+</div>
+<ol style="list-style:none;margin:10px 0 0;padding:0">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+<li style="display:flex;align-items:center;gap:12px;padding:10px 0;border-top:{{r.border}}">
+<span style="flex:none;width:24px;font-size:16px;font-weight:600;color:{{r.color}}">{{r.n}}</span>
+<span style="flex:none;width:28px;height:28px;border-radius:50%;background:{{r.av}}"></span>
+<span style="flex:1;min-width:0;font-size:15px">{{r.name}}</span>
+<span style="flex:none;font-size:15px;font-weight:600">N 分</span>
+</li>
+</sc-for>
+</ol>
+<button type="button" onClick="{{closeRank}}" style="margin-top:12px;width:100%;height:48px;border:0;border-radius:24px;background:#F2F2F2;color:#222222;font-size:15px">关闭</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{shareOpen}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end">
+<div role="dialog" aria-modal="true" aria-label="分享" style="background:#FFFFFF;border-radius:20px 20px 0 0;padding:20px 0 16px">
+<h2 style="margin:0;padding:0 16px;font-size:18px;font-weight:600">分享</h2>
+<div style="margin:12px 16px 0;display:flex;gap:12px;align-items:center;background:#F7F7F7;border-radius:8px;padding:10px">
+<span style="flex:none;width:48px;height:48px;border-radius:8px;background:linear-gradient(165deg,#F1ECE4 0%,#E8C547 160%)"></span>
+<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:500;color:#222222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">2048</span><span style="display:block;margin-top:2px;font-size:12px;color:#999999">官方游戏 · 1.2万人玩过</span></span>
+</div>
+<div style="margin-top:18px;display:flex;overflow-x:auto;scrollbar-width:none;padding:0 12px"><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 4C5.9 4 3 6.3 3 9.2c0 1.6.9 3 2.3 4L4.8 15l2.2-1.2c.8.2 1.7.4 2.5.4"/><path d="M15 10c-3 0-5.5 2-5.5 4.5S12 19 15 19c.7 0 1.4-.1 2-.3l2 1-.5-1.8c1.2-.8 2-2 2-3.4C20.5 12 18 10 15 10z"/></svg></span><span style="font-size:12px;color:#666666">微信好友</span></button><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 3.5v5M20.5 12h-5M12 20.5v-5M3.5 12h5"/></svg></span><span style="font-size:12px;color:#666666">朋友圈</span></button><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><span style="font-size:16px;font-weight:600">QQ</span></span><span style="font-size:12px;color:#666666">QQ</span></button><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><span style="font-size:16px;font-weight:600">微</span></span><span style="font-size:12px;color:#666666">微博</span></button><button type="button" onClick="{{copyLink}}" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg></span><span style="font-size:12px;color:#666666">复制链接</span></button></div>
+<div style="height:0.5px;background:#EDEDED;margin:16px 16px 0"></div>
+<div style="margin-top:16px;display:flex;padding:0 12px"><a href="Poster.dc.html" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg></span><span style="font-size:12px;color:#666666">生成海报</span></a><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10a1 1 0 011 1v15l-6-4-6 4V5a1 1 0 011-1z"/></svg></span><span style="font-size:12px;color:#666666">收藏</span></button><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg></span><span style="font-size:12px;color:#666666">举报</span></button></div>
+<button type="button" onClick="{{closeShare}}" style="margin:12px 16px 0;width:calc(100% - 32px);height:48px;border:0;border-radius:24px;background:#F2F2F2;color:#222222;font-size:15px">取消</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;left:0;right:0;bottom:120px;display:flex;justify-content:center">
+<span style="background:rgba(0,0,0,.78);color:#FFFFFF;font-size:14px;padding:8px 16px;border-radius:18px">链接已复制</span>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const _sh = this.state || {};
+    const st = this.state || {};
+    const palette = {
+      0: ['#CDC1B4', '#CDC1B4'], 2: ['#EEE4DA', '#776E65'], 4: ['#EDE0C8', '#776E65'], 8: ['#F2B179', '#FFFFFF'],
+      16: ['#F59563', '#FFFFFF'], 32: ['#F67C5F', '#FFFFFF'], 64: ['#F65E3B', '#FFFFFF'], 128: ['#EDCF72', '#FFFFFF']
+    };
+    const values = [2, 0, 4, 0, 0, 8, 0, 2, 4, 0, 16, 0, 0, 2, 0, 128];
+    const tiles = values.map((v) => ({
+      text: v === 0 ? '' : String(v),
+      bg: palette[v][0],
+      color: palette[v][1],
+      size: v >= 128 ? 22 : 28
+    }));
+    const rows = [1, 2, 3, 4, 5].map((n, i) => ({
+      n,
+      name: '玩家 ' + n,
+      av: ['#E8C547', '#9FBFCF', '#F4A6A0', '#9BD1B4', '#D9C7A8'][i],
+      color: n <= 3 ? '#E3203C' : '#6B6B6B',
+      border: i === 0 ? '0' : '0.5px solid #EDEDED'
+    }));
+    return {
+      shareOpen: !!_sh.share, toast: !!_sh.toast,
+      openShare: () => this.setState({ share: true, toast: false }),
+      closeShare: () => this.setState({ share: false }),
+      copyLink: () => this.setState({ share: false, toast: true }),
+      shareToPc: () => this.setState({ share: false, sheet: true }),
+      tiles, rows,
+      rank: !!st.rank,
+      openRank: () => this.setState({ rank: true }),
+      closeRank: () => this.setState({ rank: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

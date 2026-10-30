@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>超级小伴 · 卡片</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.orb{display:grid;place-items:center;border-radius:50%;background:var(--acc);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 -2px 5px rgba(0,0,0,.12)}
+.orb .mark{display:block}
+.wave{display:flex;align-items:center;gap:2px;height:16px}
+.wave i{display:block;width:2.5px;height:7px;border-radius:2px;background:#fff;animation:bar 1s ease-in-out infinite}
+.wave i:nth-child(2){animation-delay:.15s;height:12px}.wave i:nth-child(3){animation-delay:.3s;height:15px}.wave i:nth-child(4){animation-delay:.45s;height:9px}
+@keyframes bar{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+@media (prefers-reduced-motion:reduce){.wave i{animation:none}}
+.scene{position:absolute;top:0;width:560px;height:800px;overflow:hidden;box-sizing:border-box}
+.tag{position:absolute;left:40px;top:24px;font-size:12px;font-weight:600;color:#3A3A3F}
+.tag span{font-weight:400;color:#5E5E63;margin-left:8px}
+.dark .tag{color:#D8D8DD}.dark .tag span{color:#A1A1A8}
+.stack{position:absolute;left:40px;bottom:40px;width:480px;display:flex;flex-direction:column;gap:10px}
+.card{border-radius:18px;background:rgba(255,255,255,.94);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px rgba(0,0,0,.14),0 12px 36px rgba(0,0,0,.14);overflow:hidden;color:#1D1D1F}
+.dark .card{background:rgba(38,39,44,.94);box-shadow:0 0 0 .5px rgba(255,255,255,.12),0 12px 36px rgba(0,0,0,.5);color:#F2F2F4}
+.head{display:flex;align-items:center;gap:6px;height:44px;padding:0 8px 0 10px;border-bottom:1px solid rgba(0,0,0,.06)}
+.dark .head{border-bottom-color:rgba(255,255,255,.08)}
+.title{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 8px;border:0;border-radius:8px;background:transparent;font:inherit;font-size:13px;font-weight:600;color:inherit;cursor:pointer;max-width:180px}
+.title:hover{background:rgba(0,0,0,.05)}
+.model{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:12px;background:#F2F2F4;font-size:11.5px;color:#4A4A50}
+.dark .model{background:rgba(255,255,255,.08);color:#C7C7CC}
+.hb{width:28px;height:28px;border:0;border-radius:8px;background:transparent;color:#5A5A60;display:grid;place-items:center;cursor:pointer;padding:0}
+.hb:hover{background:rgba(0,0,0,.06);color:#1D1D1F}
+.dark .hb{color:#AEAEB2}.dark .hb:hover{background:rgba(255,255,255,.08);color:#F2F2F4}
+.body{padding:14px 16px 6px;display:flex;flex-direction:column;gap:12px;font-size:13.5px;line-height:1.65;overflow:hidden}
+.you{align-self:flex-end;max-width:82%;padding:7px 12px;border-radius:14px 14px 4px 14px;font-size:13px}
+.ai p{margin:0 0 6px}
+.ai ul{margin:0 0 6px;padding-left:18px}
+.acts{display:flex;gap:2px;margin-top:2px}
+.ab{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 8px;border:0;border-radius:7px;background:transparent;font:inherit;font-size:12px;color:#5A5A60;cursor:pointer}
+.ab:hover{background:rgba(0,0,0,.05);color:#1D1D1F}
+.dark .ab{color:#AEAEB2}
+.muted{color:#6E6E73}.dark .muted{color:#A1A1A8}
+.capsule{width:480px;box-sizing:border-box;border-radius:26px;background:rgba(255,255,255,.9);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px rgba(0,0,0,.14),0 10px 30px rgba(0,0,0,.14),inset 0 1px 0 rgba(255,255,255,.95);padding:8px;display:flex;align-items:center;gap:2px}
+.dark .capsule{background:rgba(42,43,48,.9);box-shadow:0 0 0 .5px rgba(255,255,255,.14),0 10px 30px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.07)}
+.orbbtn{width:36px;height:36px;border:0;padding:0;border-radius:50%;background:transparent;display:grid;place-items:center;cursor:pointer;flex-shrink:0}
+.field{flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;font-size:14px;padding:8px 6px;color:#1D1D1F}
+.field::placeholder{color:#8A8A8F}
+.dark .field{color:#F2F2F4}.dark .field::placeholder{color:#8E8E93}
+.ib{width:32px;height:32px;border:0;border-radius:9px;background:transparent;color:#5A5A60;display:grid;place-items:center;cursor:pointer;flex-shrink:0}
+.ib:hover{background:rgba(0,0,0,.06);color:#1D1D1F}
+.dark .ib{color:#B4B4BA}
+.send{width:32px;height:32px;border:0;border-radius:50%;display:grid;place-items:center;cursor:pointer;flex-shrink:0;margin-left:4px;color:#fff}
+.send:disabled{background:#E5E5EA;color:#AEAEB2;cursor:default}
+.dark .send:disabled{background:rgba(255,255,255,.08);color:#6E6E73}
+.gate{margin:2px 0 8px;padding:12px 14px;border-radius:12px;background:#FDF6EA;box-shadow:inset 0 0 0 1px #F1DDB8}
+.gate b{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:#7A4A00}
+.gate code{display:block;margin:8px 0 10px;padding:7px 10px;border-radius:8px;background:rgba(255,255,255,.75);font:12px/1.5 'SF Mono',ui-monospace,Menlo,monospace;color:#3A3A3F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btn{height:30px;padding:0 14px;border:0;border-radius:8px;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer}
+.btn2{background:#fff;color:#1D1D1F;box-shadow:0 0 0 1px rgba(0,0,0,.12)}
+.opt{display:flex;align-items:center;gap:10px;width:100%;height:36px;padding:0 10px;border:0;border-radius:9px;background:#F5F5F7;font:inherit;font-size:13px;color:#1D1D1F;text-align:left;cursor:pointer;box-sizing:border-box}
+.opt:hover{background:#EDEDF0}
+.opt i{font-style:normal;width:20px;height:20px;border-radius:6px;display:grid;place-items:center;font-size:11px;font-weight:600;background:#fff;box-shadow:0 0 0 .5px rgba(0,0,0,.12);color:#4A4A50}
+.menu{position:absolute;width:268px;padding:5px;border-radius:12px;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 14px 36px rgba(0,0,0,.18);font-size:13px;color:#1D1D1F;box-sizing:border-box;z-index:2}
+.mi{display:flex;align-items:center;gap:9px;width:100%;height:32px;padding:0 9px;border:0;border-radius:7px;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer;box-sizing:border-box}
+.mi small{margin-left:auto;font-size:11.5px;color:#8E8E93}
+.lbl{padding:6px 9px 3px;font-size:11.5px;color:#6E6E73}
+.sep{height:1px;margin:4px 8px;background:rgba(0,0,0,.07)}
+.sessions{padding:6px 8px 8px;font-size:13px}
+</style>
+</helmet>
+<div style="--acc:{{t.btn}};position:relative;width:2240px;height:800px;overflow:hidden;font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Microsoft YaHei UI',sans-serif;color:#1D1D1F;background:#DCE3EA;-webkit-font-smoothing:antialiased">
+
+  <!-- A 多轮对话 -->
+  <section class="scene" style="left:0;background:linear-gradient(180deg,#DCE3EA,#E7E3DD)">
+    <div class="tag">多轮对话<span>卡片最高 420，内部滚动 · 悬停回答出现操作</span></div>
+    <div class="stack">
+      <section class="card" aria-label="超级小伴对话">
+        <header class="head">
+          <button class="title" type="button" aria-label="切换最近会话"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">周报整理</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <span class="model"><svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="3"></circle><circle cx="12" cy="12" r="9" fill="none" stroke="{{t.btn}}" stroke-width="3" stroke-dasharray="17 57" transform="rotate(-90 12 12)" stroke-linecap="round"></circle></svg>DeepSeek V3</span>
+          <span style="flex:1"></span>
+          <button class="hb" type="button" aria-label="新对话" title="新对话 ⌘N"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.4 2.6a1 1 0 0 1 3 3L12.4 14.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"></path></svg></button>
+          <button class="hb" type="button" aria-label="在主窗口继续" title="在主窗口继续"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg></button>
+          <button class="hb" type="button" aria-label="固定，点外面不收起" title="固定" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"></path><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"></path></svg></button>
+          <button class="hb" type="button" aria-label="收成小球" title="收成小球 Esc"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+        </header>
+        <div class="body" style="height:376px;box-sizing:border-box;position:relative">
+          <div class="you" style="background:#F2F2F4">本周做了哪些事？按项目列一下</div>
+          <div class="ai muted" style="font-size:13px">已读取 3 份日报 · 用时 6 秒</div>
+          <div class="ai">
+            <p>本周主要推进了三个项目：</p>
+            <ul><li><b>小伴桌面 UI 升级</b>：完成方案四全部页面</li><li><b>供应商配置</b>：支持一个供应商多个模型</li><li><b>标题栏</b>：macOS 与 Windows 均改为自绘</li></ul>
+          </div>
+          <div class="you" style="background:{{t.soft}};color:{{t.ink}}">改成周报格式，语气正式一点</div>
+          <div class="ai">
+            <p><b>本周工作总结</b></p>
+            <p>本周完成了桌面端界面的整体升级，统一了视觉规范与主题色体系；同时优化了模型供应商配置，支持在同一供应商下维护多个模型…</p>
+            <div class="acts">
+              <button class="ab" type="button"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="14" height="14" rx="2"></rect><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"></path></svg>复制</button>
+              <button class="ab" type="button"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 10 4 15l5 5"></path><path d="M20 4v7a4 4 0 0 1-4 4H4"></path></svg>插入到原应用</button>
+              <button class="ab" type="button"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"></path></svg>存到资料库</button>
+              <button class="ab" type="button" aria-label="重新生成"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path><path d="M21 3v5h-5"></path><path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path><path d="M3 21v-5h5"></path></svg></button>
+            </div>
+          </div>
+          <div style="position:absolute;left:0;right:0;top:0;height:20px;background:linear-gradient(rgba(255,255,255,.94),rgba(255,255,255,0))"></div>
+        </div>
+      </section>
+      <div class="capsule">
+        <button class="orbbtn" type="button" aria-label="点击开始说话"><span class="orb" style="width:30px;height:30px"><svg class="mark" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg></span></button>
+        <input class="field" type="text" aria-label="继续追问" placeholder="继续追问…">
+        <button class="ib" type="button" aria-label="添加附件"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14"></path></svg></button>
+        <button class="ib" type="button" aria-label="截图提问"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"></path></svg></button>
+        <a class="ib" href="WB-Assistant-Voice.dc.html" aria-label="实时对话" title="实时对话" style="color:{{t.ink}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"></path></svg></a>
+        <button class="send" type="button" aria-label="发送" disabled=""><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- B 等待确认 / 提问 + 会话切换菜单 -->
+  <section class="scene" style="left:560px;background:linear-gradient(180deg,#DCE3EA,#E7E3DD);box-shadow:inset 1px 0 0 rgba(0,0,0,.06)">
+    <div class="tag">需要你处理<span>许可与提问在卡片底部，此时不会自动收起</span></div>
+
+    <div class="stack">
+      <section class="card" aria-label="超级小伴对话">
+        <header class="head">
+          <button class="title" type="button" aria-label="切换最近会话">整理桌面文件<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <span class="model">DeepSeek V3</span>
+          <span style="flex:1"></span>
+          <button class="hb" type="button" aria-label="新对话"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.4 2.6a1 1 0 0 1 3 3L12.4 14.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"></path></svg></button>
+          <button class="hb" type="button" aria-label="在主窗口继续"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg></button>
+          <button class="hb" type="button" aria-label="已固定" aria-pressed="true" style="background:{{t.soft}};color:{{t.ink}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5" fill="none"></path><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"></path></svg></button>
+          <button class="hb" type="button" aria-label="收成小球"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+        </header>
+        <div class="body">
+          <div class="you" style="background:#F2F2F4">把桌面上的截图都归到一个文件夹里</div>
+          <div class="ai muted" style="font-size:13px">找到 23 张截图 · 准备移动到「~/Pictures/截图」</div>
+          <div class="gate" role="group" aria-label="需要你许可">
+            <b><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B26B00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"></path><path d="M12 17h.01"></path><circle cx="12" cy="12" r="9"></circle></svg>这一步需要你许可</b>
+            <code>move_files ~/Desktop/*.png → ~/Pictures/截图（23 个）</code>
+            <div style="display:flex;gap:8px;justify-content:flex-end">
+              <button class="btn btn2" type="button">拒绝</button>
+              <button class="btn btn2" type="button">本次会话都允许</button>
+              <button class="btn" type="button" style="color:#fff;background:linear-gradient({{t.btnHi}},{{t.btn}});box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)">允许这一次</button>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
+            <div style="font-size:13px;font-weight:600">重名的文件怎么处理？<span class="muted" style="font-weight:400;font-size:12px;margin-left:6px">按 1–3 快捷选择</span></div>
+            <button class="opt" type="button"><i>1</i>自动重命名（截图 (2).png）</button>
+            <button class="opt" type="button"><i>2</i>覆盖旧文件</button>
+            <button class="opt" type="button"><i>3</i>跳过重名文件</button>
+          </div>
+        </div>
+      </section>
+      <div class="capsule">
+        <button class="orbbtn" type="button" aria-label="点击开始说话"><span class="orb" style="width:30px;height:30px"><svg class="mark" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg></span></button>
+        <input class="field" type="text" aria-label="输入你的回答" placeholder="也可以直接输入你的回答…">
+        <button class="ib" type="button" aria-label="添加附件" disabled="" style="opacity:.4"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14"></path></svg></button>
+        <button class="ib" type="button" aria-label="截图提问" disabled="" style="opacity:.4"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"></path></svg></button>
+        <a class="ib" href="WB-Assistant-Voice.dc.html" aria-label="实时对话" title="实时对话" style="color:{{t.ink}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"></path></svg></a>
+        <button class="send" type="button" aria-label="发送" disabled=""><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- C 深色 · 生成中 -->
+  <section class="scene dark" style="left:1120px;background:linear-gradient(180deg,#1E2026,#26232A)">
+    <div class="tag">深色 · 生成中<span>回答流式写入，卡片高度不跳</span></div>
+    <div class="stack">
+      <section class="card" aria-label="超级小伴对话">
+        <header class="head">
+          <button class="title" type="button" aria-label="切换最近会话">翻译产品说明<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></button>
+          <span class="model"><svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="3"></circle><circle cx="12" cy="12" r="9" fill="none" stroke="{{t.dot}}" stroke-width="3" stroke-dasharray="30 57" transform="rotate(-90 12 12)" stroke-linecap="round"></circle></svg>Claude Sonnet</span>
+          <span style="flex:1"></span>
+          <button class="hb" type="button" aria-label="新对话"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.4 2.6a1 1 0 0 1 3 3L12.4 14.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"></path></svg></button>
+          <button class="hb" type="button" aria-label="在主窗口继续"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg></button>
+          <button class="hb" type="button" aria-label="固定"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"></path><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"></path></svg></button>
+          <button class="hb" type="button" aria-label="收成小球，后台继续生成"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+        </header>
+        <div class="body" style="height:300px;box-sizing:border-box">
+          <div class="you" style="background:rgba(255,255,255,.08)">把这段翻译成英文，保留术语</div>
+          <div style="display:flex;gap:8px;align-items:center;height:56px;width:200px;padding:6px;border-radius:10px;background:rgba(255,255,255,.06);box-sizing:border-box;align-self:flex-end">
+            <div style="width:44px;height:44px;border-radius:7px;background:linear-gradient(135deg,#3A3C44,#2E3036)"></div>
+            <div style="font-size:12px;line-height:1.4">截图 14:32<br><span class="muted">1280×720</span></div>
+          </div>
+          <div class="ai">
+            <p>XiaoBan Desktop is a <b>work companion</b> that lives on your desktop. Summon the Super Assistant with ⌥Space to ask questions, capture the screen, or hand off tasks to agents<span style="display:inline-block;width:7px;height:15px;margin-left:2px;vertical-align:-2px;border-radius:2px;background:{{t.dot}}"></span></p>
+          </div>
+        </div>
+      </section>
+      <div class="capsule">
+        <button class="orbbtn" type="button" aria-label="点击开始说话"><span class="orb" style="width:30px;height:30px"><svg class="mark" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg></span></button>
+        <input class="field" type="text" aria-label="向小伴提问" placeholder="可以继续输入，发送会排在后面…">
+        <button class="ib" type="button" aria-label="添加附件"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14"></path></svg></button>
+        <button class="ib" type="button" aria-label="截图提问"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"></path></svg></button>
+        <button class="send" type="button" aria-label="停止回答" style="background:rgba(255,255,255,.14);color:#F2F2F4"><svg width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor"></rect></svg></button>
+      </div>
+    </div>
+  </section>
+  <!-- D 切换会话 -->
+  <section class="scene" style="left:1680px;background:linear-gradient(180deg,#DCE3EA,#E7E3DD);box-shadow:inset 1px 0 0 rgba(0,0,0,.06)">
+    <div class="tag">切换会话<span>列表在卡片内取代对话，不压住输入框、不超出窗口</span></div>
+    <div class="stack">
+      <section class="card" aria-label="超级小伴对话">
+        <header class="head">
+          <button class="title" type="button" aria-label="切换最近会话" aria-expanded="true" style="background:rgba(0,0,0,.05)"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">周报整理</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="m18 15-6-6-6 6"></path></svg></button>
+          <span class="model"><svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="3"></circle><circle cx="12" cy="12" r="9" fill="none" stroke="{{t.btn}}" stroke-width="3" stroke-dasharray="17 57" transform="rotate(-90 12 12)" stroke-linecap="round"></circle></svg>DeepSeek V3</span>
+          <span style="flex:1"></span>
+          <button class="hb" type="button" aria-label="新对话" title="新对话 ⌘N"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.4 2.6a1 1 0 0 1 3 3L12.4 14.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"></path></svg></button>
+          <button class="hb" type="button" aria-label="在主窗口继续" title="在主窗口继续"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg></button>
+          <button class="hb" type="button" aria-label="固定，点外面不收起" title="固定" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"></path><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.2V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.8a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"></path></svg></button>
+          <button class="hb" type="button" aria-label="收成小球" title="收成小球 Esc"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+        </header>
+        <div class="sessions" role="menu" aria-label="最近会话">
+          <div class="lbl">最近会话</div>
+          <button class="mi" type="button" role="menuitemradio" aria-checked="true" style="background:{{t.soft}};color:{{t.ink}}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>周报整理<small>现在</small></button>
+          <button class="mi" type="button" role="menuitemradio" aria-checked="false"><span style="width:14px"></span>整理桌面文件<small>10 分钟前</small></button>
+          <button class="mi" type="button" role="menuitemradio" aria-checked="false"><span style="width:14px"></span>翻译产品说明<small>昨天</small></button>
+          <button class="mi" type="button" role="menuitemradio" aria-checked="false"><span style="width:14px"></span>帮我创作一个樱花伙伴<small>昨天</small></button>
+          <button class="mi" type="button" role="menuitemradio" aria-checked="false"><span style="width:14px"></span>明天的会议安排<small>周一</small></button>
+          <button class="mi" type="button" role="menuitemradio" aria-checked="false"><span style="width:14px"></span>写一段产品介绍<small>上周</small></button>
+          <div class="sep"></div>
+          <button class="mi" type="button" role="menuitem"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#55555A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg>在主窗口查看全部</button>
+          <button class="mi" type="button" role="menuitem"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#55555A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>超级小伴设置…</button>
+        </div>
+      </section>
+      <div class="capsule">
+        <button class="orbbtn" type="button" aria-label="点击开始说话"><span class="orb" style="width:30px;height:30px"><svg class="mark" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg></span></button>
+        <input class="field" type="text" aria-label="继续追问" placeholder="继续追问…">
+        <button class="ib" type="button" aria-label="添加附件"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14M12 5v14"></path></svg></button>
+        <button class="ib" type="button" aria-label="截图提问"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"></path></svg></button>
+        <a class="ib" href="WB-Assistant-Voice.dc.html" aria-label="实时对话" title="实时对话" style="color:{{t.ink}}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"></path></svg></a>
+        <button class="send" type="button" aria-label="发送" disabled=""><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 7-7 7 7"></path><path d="M12 19V5"></path></svg></button>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"red"},"$preview":{"width":2240,"height":800}}'>
+const PALETTES = {
+  red:      { btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
+  green:    { btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
+  blue:     { btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
+  purple:   { btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9', dot: '#7C5CE6' },
+  amber:    { btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED', dot: '#E09A2B' },
+  graphite: { btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3', dot: '#55555B' }
+};
+class Component extends DCLogic {
+  renderVals() {
+    return { t: PALETTES[this.props.theme ?? 'red'] ?? PALETTES.red };
+  }
+}
+</script>
+</body>
+</html>

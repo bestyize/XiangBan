@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>资料库·收藏</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button,input{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:1000px;box-sizing:border-box;background:#EDEDED;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+<header style="flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 4px;background:#FFFFFF">
+<a href="Me.dc.html" aria-label="返回" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#222222;text-decoration:none">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+</a>
+<h1 style="margin:0;font-size:16px;font-weight:600">资料库</h1>
+<div style="display:flex;align-items:center">
+<button type="button" onClick="{{toggleSearch}}" aria-label="搜索资料库" aria-expanded="{{searching}}" style="width:44px;height:44px;border:0;background:none;display:flex;align-items:center;justify-content:center;color:#222222">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M16 16l4.5 4.5"></path></svg>
+</button>
+<button type="button" onClick="{{openAdd}}" aria-label="添加资料" style="width:44px;height:44px;border:0;background:none;display:flex;align-items:center;justify-content:center;color:#E3203C">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+</button>
+</div>
+</header>
+
+<sc-if value="{{searching}}" hint-placeholder-val="{{false}}">
+<div style="flex:none;padding:0 16px 10px;background:#FFFFFF">
+<label for="lb-search" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">搜索资料库</label>
+<input id="lb-search" type="search" placeholder="搜索全部资料" style="width:100%;box-sizing:border-box;height:40px;border:0;border-radius:20px;background:#F2F2F2;padding:0 16px;font-size:14px;color:#222222;outline:none">
+</div>
+</sc-if>
+
+<div role="tablist" style="flex:none;display:flex;gap:28px;padding:0 16px;height:44px;background:#FFFFFF;border-bottom:0.5px solid #EDEDED">
+<sc-for list="{{tabs}}" as="t" hint-placeholder-count="2">
+<button type="button" role="tab" aria-selected="{{t.on}}" onClick="{{t.pick}}" style="flex:none;border:0;background:none;padding:3px 0 0;box-sizing:border-box;height:44px;font-size:15px;font-weight:{{t.weight}};color:{{t.color}};border-bottom:3px solid {{t.line}}">{{t.name}}</button>
+</sc-for>
+</div>
+
+<main style="flex:1;min-height:0;overflow:hidden;padding:0">
+
+
+
+<sc-if value="{{isDocs}}" hint-placeholder-val="{{true}}">
+<div style="padding:14px 16px 0;font-size:12px;font-weight:600;color:#666666">文件夹</div>
+<ul style="list-style:none;margin:6px 0 0;padding:0;background:#FFFFFF;overflow:hidden">
+<sc-for list="{{folders}}" as="f" hint-placeholder-count="3">
+<li style="border-top:{{f.border}}">
+<button type="button" style="width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px;border:0;background:none;text-align:left;color:#222222">
+<span style="flex:none;color:#999999"><svg width="20" height="20" viewBox="0 0 24 24" fill="#F2F2F2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a2 2 0 012-2h4l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H6a2 2 0 01-2-2z"></path></svg></span>
+<span style="flex:1;min-width:0;font-size:15px">{{f.name}}</span>
+<span style="flex:none;font-size:12px;color:#666666">{{f.count}}</span>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
+</button>
+</li>
+</sc-for>
+</ul>
+
+<div style="padding:16px 16px 0;font-size:12px;font-weight:600;color:#666666">最近添加</div>
+<ul style="list-style:none;margin:6px 0 0;padding:0;background:#FFFFFF;overflow:hidden">
+<sc-for list="{{docs}}" as="d" hint-placeholder-count="5">
+<li style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:{{d.border}}">
+<span style="flex:none;width:40px;height:40px;border-radius:8px;background:{{d.bg}};color:{{d.ink}};font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">{{d.ext}}</span>
+<div style="flex:1;min-width:0">
+<div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{d.name}}</div>
+<div style="margin-top:3px;display:flex;align-items:center;gap:8px;font-size:12px;color:#666666">
+<span>{{d.size}}</span><span>·</span><span>{{d.when}}</span>
+<sc-if value="{{d.status}}" hint-placeholder-val="{{false}}"><span style="font-size:12px;color:#999999">{{d.status}}</span></sc-if>
+</div>
+</div>
+<button type="button" aria-label="更多操作" style="flex:none;width:36px;height:36px;border:0;background:none;display:flex;align-items:center;justify-content:center;color:#666666">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="12" cy="19" r="1.6"></circle></svg>
+</button>
+</li>
+</sc-for>
+</ul>
+</sc-if>
+
+<sc-if value="{{isSaved}}" hint-placeholder-val="{{false}}">
+<ul style="list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{saved}}" as="s" hint-placeholder-count="4">
+<li style="background:#FFFFFF;padding:14px 16px">
+<div style="display:flex;align-items:center;gap:8px">
+<span style="font-size:12px;color:#999999;">{{s.kind}}</span>
+<span style="flex:1;min-width:0;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{s.title}}</span>
+</div>
+<div style="margin-top:8px;font-size:14px;line-height:1.6;color:#666666;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">{{s.text}}</div>
+<div style="margin-top:8px;font-size:12px;color:#666666">来自对话：{{s.from}} · {{s.when}}</div>
+</li>
+</sc-for>
+</ul>
+</sc-if>
+
+</main>
+
+<sc-if value="{{addOpen}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end">
+<div role="dialog" aria-modal="true" aria-label="添加资料" style="background:#FFFFFF;border-radius:20px 20px 0 0;padding:20px 16px 20px">
+<h2 style="margin:0;font-size:18px;font-weight:600">添加资料</h2>
+<div style="margin-top:16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">
+<button type="button" style="border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:14px;color:#222222">
+<span style="width:56px;height:56px;border-radius:16px;background:#F2F2F2;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 011 1v9a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"></path><circle cx="12" cy="13" r="3.5"></circle></svg></span>拍照
+</button>
+<button type="button" style="border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:14px;color:#222222">
+<span style="width:56px;height:56px;border-radius:16px;background:#F2F2F2;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="1.6"></circle><path d="M4 18l5-5 4 4 3-3 4 4"></path></svg></span>相册
+</button>
+<button type="button" style="border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:14px;color:#222222">
+<span style="width:56px;height:56px;border-radius:16px;background:#F2F2F2;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"></path><path d="M14 3v5h5"></path></svg></span>文件
+</button>
+<button type="button" style="border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:14px;color:#222222">
+<span style="width:56px;height:56px;border-radius:16px;background:#F2F2F2;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20l4-1 11-11a2 2 0 00-3-3L5 16l-1 4z"></path></svg></span>新建文本
+</button>
+</div>
+<div style="margin-top:14px;font-size:12px;line-height:1.6;color:#666666">添加后先在手机上读取内容；读取失败、格式不支持或文件过大的，会在列表里标出来。</div>
+<button type="button" onClick="{{closeAdd}}" style="margin-top:16px;width:100%;height:48px;border:0;border-radius:24px;background:#F2F2F2;color:#222222;font-size:15px">取消</button>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1000}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const tab = st.tab || 'saved';
+    const tabs = [['docs', '我的文档 8'], ['saved', '收藏 4']].map((t) => ({
+      name: t[1], on: tab === t[0],
+      weight: tab === t[0] ? 700 : 400,
+      color: tab === t[0] ? '#E3203C' : '#6B6B6B',
+      line: tab === t[0] ? '#E3203C' : 'transparent',
+      pick: () => this.setState({ tab: t[0] })
+    }));
+    const folders = [['工作', 4], ['学习', 3], ['照片', 1]].map((f, i) => ({ name: f[0], count: f[1], border: i === 0 ? '0' : '0.5px solid #EDEDED' }));
+    const N = { bg: '#F2F2F2', ink: '#555555' };
+    const G = N, B = N, R = N;
+    const docs = [
+      Object.assign({ ext: 'DOCX', name: '周报模板', size: '24 KB', when: '[时间]', status: '', sc: '', sbg: '' }, B),
+      Object.assign({ ext: 'PDF', name: '开题报告参考', size: '1.2 MB', when: '[时间]', status: '读取中', sc: '#6B6B6B', sbg: '#FFF4DB' }, R),
+      Object.assign({ ext: 'JPG', name: '白板照片', size: '840 KB', when: '[时间]', status: '', sc: '', sbg: '' }, G),
+      Object.assign({ ext: 'MD', name: '会议纪要', size: '6 KB', when: '[时间]', status: '', sc: '', sbg: '' }, N),
+      Object.assign({ ext: 'MP4', name: '活动录像', size: '620 MB', when: '[时间]', status: '文件过大', sc: '#444444', sbg: '#F2F2F2' }, N)
+    ].map((d, i) => Object.assign({}, d, { border: i === 0 ? '0' : '0.5px solid #EDEDED' }));
+    const saved = [
+      { kind: '回答', title: '雨夜配色建议', text: '偏冷的深蓝和灰蓝，再加一点低饱和的高光，会更安静。', from: '雨夜特效配色', when: '[时间]' },
+      { kind: '文字', title: '周报开头的三种写法', text: '先写结论，再写进展，最后写需要的支持。', from: '周报开头怎么写', when: '[时间]' },
+      { kind: '图片', title: '参考图 · 窗台雨景', text: '对话里生成的预览图，已保存到手机。', from: '雨夜特效配色', when: '[时间]' },
+      { kind: '截图', title: '整理下载文件夹的步骤', text: '先列出计划，你确认后才会移动文件。', from: '整理下载文件夹的步骤', when: '[时间]' }
+    ];
+    const addOpen = st.add === undefined ? false : !!st.add;
+    return {
+      tabs, isDocs: tab === 'docs', isSaved: tab === 'saved',
+      folders, docs, saved,
+      searching: !!st.search,
+      toggleSearch: () => this.setState({ search: !st.search }),
+      addOpen,
+      openAdd: () => this.setState({ add: true }),
+      closeAdd: () => this.setState({ add: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

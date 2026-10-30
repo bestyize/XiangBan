@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>主题色</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:628px;box-sizing:border-box;background:{{page}};color:{{text}};font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+<header style="flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:{{card}}">
+<a href="Settings.dc.html" aria-label="返回" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:{{text}};text-decoration:none"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+<h1 style="margin:0;font-size:16px;font-weight:600">主题色</h1>
+<span style="width:44px"></span>
+</header>
+<main style="flex:1;min-height:0;overflow:hidden">
+<div style="padding:16px 16px 6px;font-size:12px;color:{{sub}}">效果</div>
+<div style="margin:0;background:{{card}};padding:16px;display:flex;justify-content:space-between">
+<div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:152px;height:214px;overflow:hidden"><div style="width:165px;height:232px;transform:scale(.92);transform-origin:0 0"><div style="width:165px;height:232px;border-radius:12px;overflow:hidden;background:#EDEDED;display:flex;flex-direction:column"><div style="flex:none;height:28px;background:#FFFFFF;display:flex;align-items:center;padding:0 10px"><i style="display:block;width:48px;height:6px;border-radius:3px;background:#D9D9D9"></i><span style="margin-left:auto;width:14px;height:14px;border-radius:50%;background:{{btnL}}"></span></div><div style="flex:1;min-height:0;padding:10px;display:flex;flex-direction:column;gap:8px"><div style="align-self:flex-end;width:88px;height:26px;border-radius:8px;background:{{softL}};display:flex;align-items:center;padding:0 8px"><i style="display:block;width:56px;height:5px;border-radius:2px;background:{{inkL}}"></i></div><div style="width:116px;background:#FFFFFF;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px"><i style="display:block;width:92px;height:6px;border-radius:3px;background:#D9D9D9"></i><i style="display:block;width:64px;height:6px;border-radius:3px;background:#D9D9D9"></i><div style="display:flex;gap:6px;margin-top:2px"><span style="width:52px;height:20px;border-radius:10px;background:{{softL}};display:flex;align-items:center;justify-content:center"><i style="display:block;width:26px;height:4px;border-radius:2px;background:{{inkL}}"></i></span><span style="width:38px;height:20px;border-radius:10px;background:#F2F2F2"></span></div></div><div style="background:#FFFFFF;border-radius:8px;padding:8px;display:flex;align-items:center;justify-content:space-between"><i style="display:block;width:60px;height:6px;border-radius:3px;background:#D9D9D9"></i><span style="position:relative;width:28px;height:16px;border-radius:8px;background:{{btnL}}"><span style="position:absolute;top:2px;left:14px;width:12px;height:12px;border-radius:50%;background:#fff"></span></span></div></div><div style="flex:none;margin:0 8px 8px;height:34px;border-radius:17px;background:#FFFFFF;display:flex;align-items:center;padding:0 5px 0 12px"><i style="display:block;width:60px;height:5px;border-radius:2px;background:#D9D9D9"></i><span style="margin-left:auto;width:24px;height:24px;border-radius:50%;background:{{btnL}};color:#fff;display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span></div></div></div></div><span style="font-size:12px;color:{{sub}}">浅色</span></div>
+<div style="display:flex;flex-direction:column;align-items:center;gap:8px"><div style="width:152px;height:214px;overflow:hidden"><div style="width:165px;height:232px;transform:scale(.92);transform-origin:0 0"><div style="width:165px;height:232px;border-radius:12px;overflow:hidden;background:#111111;display:flex;flex-direction:column"><div style="flex:none;height:28px;background:#1C1C1E;display:flex;align-items:center;padding:0 10px"><i style="display:block;width:48px;height:6px;border-radius:3px;background:#3A3A3C"></i><span style="margin-left:auto;width:14px;height:14px;border-radius:50%;background:{{btnD}}"></span></div><div style="flex:1;min-height:0;padding:10px;display:flex;flex-direction:column;gap:8px"><div style="align-self:flex-end;width:88px;height:26px;border-radius:8px;background:{{softD}};display:flex;align-items:center;padding:0 8px"><i style="display:block;width:56px;height:5px;border-radius:2px;background:{{inkD}}"></i></div><div style="width:116px;background:#1C1C1E;border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px"><i style="display:block;width:92px;height:6px;border-radius:3px;background:#3A3A3C"></i><i style="display:block;width:64px;height:6px;border-radius:3px;background:#3A3A3C"></i><div style="display:flex;gap:6px;margin-top:2px"><span style="width:52px;height:20px;border-radius:10px;background:{{softD}};display:flex;align-items:center;justify-content:center"><i style="display:block;width:26px;height:4px;border-radius:2px;background:{{inkD}}"></i></span><span style="width:38px;height:20px;border-radius:10px;background:#2C2C2E"></span></div></div><div style="background:#1C1C1E;border-radius:8px;padding:8px;display:flex;align-items:center;justify-content:space-between"><i style="display:block;width:60px;height:6px;border-radius:3px;background:#3A3A3C"></i><span style="position:relative;width:28px;height:16px;border-radius:8px;background:{{btnD}}"><span style="position:absolute;top:2px;left:14px;width:12px;height:12px;border-radius:50%;background:#fff"></span></span></div></div><div style="flex:none;margin:0 8px 8px;height:34px;border-radius:17px;background:#1C1C1E;display:flex;align-items:center;padding:0 5px 0 12px"><i style="display:block;width:60px;height:5px;border-radius:2px;background:#3A3A3C"></i><span style="margin-left:auto;width:24px;height:24px;border-radius:50%;background:{{btnD}};color:#fff;display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span></div></div></div></div><span style="font-size:12px;color:{{sub}}">深色</span></div>
+</div>
+<div style="padding:16px 16px 6px;font-size:12px;color:{{sub}}">主题色</div>
+<div role="radiogroup" aria-label="主题色" style="margin:0;background:{{card}};padding:20px 8px 12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));row-gap:20px">
+<sc-for list="{{swatches}}" as="s" hint-placeholder-count="6">
+<button type="button" role="radio" aria-checked="{{s.on}}" aria-label="{{s.name}}" onClick="{{s.pick}}" style="border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;color:{{text}};font-size:14px">
+<span style="width:44px;height:44px;border-radius:50%;background:{{s.bg}};outline:2px solid {{s.ring}};outline-offset:3px;color:#fff;display:flex;align-items:center;justify-content:center"><span style="display:flex;opacity:{{s.chk}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"></path></svg></span></span>
+<span style="font-weight:{{s.w}}">{{s.name}}</span>
+</button>
+</sc-for>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":628}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ACC = [{"id": "red", "name": "小伴红", "l": {"btn": "#E3203C", "hi": "#F0506A", "soft": "#FFF3F4", "ink": "#E3203C"}, "d": {"btn": "#EE4B5F", "hi": "#F76B7D", "soft": "#3A2225", "ink": "#FF8C91"}}, {"id": "green", "name": "薄荷绿", "l": {"btn": "#2E8B5E", "hi": "#3FA172", "soft": "#E3F2E9", "ink": "#1E6A45"}, "d": {"btn": "#34A36D", "hi": "#48B981", "soft": "#1D3328", "ink": "#72D6A2"}}, {"id": "blue", "name": "海湾蓝", "l": {"btn": "#2F6FDB", "hi": "#4A84E6", "soft": "#E6EEFC", "ink": "#1D53AE"}, "d": {"btn": "#3B7BE8", "hi": "#5A92F0", "soft": "#1E2A42", "ink": "#8DB6FF"}}, {"id": "purple", "name": "暮紫", "l": {"btn": "#7152D8", "hi": "#8669E3", "soft": "#EDE8FC", "ink": "#5537B8"}, "d": {"btn": "#8466E6", "hi": "#9A80EE", "soft": "#2A2342", "ink": "#BBA8FF"}}, {"id": "amber", "name": "琥珀", "l": {"btn": "#A8640C", "hi": "#BD7A1C", "soft": "#FAEEDB", "ink": "#87500A"}, "d": {"btn": "#C27A1A", "hi": "#D69130", "soft": "#3A2C17", "ink": "#F0B65A"}}, {"id": "graphite", "name": "石墨", "l": {"btn": "#2B2B30", "hi": "#4A4A50", "soft": "#E9E9EC", "ink": "#2B2B30"}, "d": {"btn": "#636368", "hi": "#7C7C82", "soft": "#3A3A3D", "ink": "#E5E5EA"}}];
+    const st = this.state || {};
+    const id = st.acc || 'red';
+    const cur = ACC.find((a) => a.id === id) || ACC[0];
+    const swatches = ACC.map((a) => ({
+      name: a.name, on: a.id === id,
+      bg: 'linear-gradient(160deg,' + a.l.hi + ',' + a.l.btn + ')',
+      ring: a.id === id ? a.l.btn : 'transparent',
+      chk: a.id === id ? 1 : 0,
+      w: a.id === id ? 600 : 400,
+      pick: () => this.setState({ acc: a.id })
+    }));
+    return {
+      page: '#EDEDED', card: '#FFFFFF', text: '#222222', sub: '#666666',
+      btnL: cur.l.btn, softL: cur.l.soft, inkL: cur.l.ink, btnD: cur.d.btn, softD: cur.d.soft, inkD: cur.d.ink,
+      swatches
+    };
+  }
+}
+</script>
+</body>
+</html>

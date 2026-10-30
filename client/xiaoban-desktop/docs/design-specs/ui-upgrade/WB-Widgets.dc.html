@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小伴桌面 · 装扮 / 组件</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+.si{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;color:#26262B;font-size:14px;border:0;background:transparent;font-family:inherit;width:100%;box-sizing:border-box;cursor:pointer;text-align:left}
+.si:hover{background:rgba(0,0,0,.045)}
+.si svg{flex-shrink:0;color:#4A4A50}
+.sub{font-size:12px;color:#6E6E73}
+.ib{width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:#55555A;display:grid;place-items:center;cursor:pointer}
+.ib:hover{background:rgba(0,0,0,.05)}
+.tt{border:0;background:transparent;font-family:inherit;font-size:20px;font-weight:600;color:#A1A1A6;cursor:pointer;padding:0}
+.bb{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:9px;border:0;font-family:inherit;font-size:13px;cursor:pointer;color:#1D1D1F;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.12),0 1px 1.5px rgba(0,0,0,.05)}
+.pb{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:9px;border:0;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)}
+.sec{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.wd{background:linear-gradient(160deg,#FBF7F1,#F3ECE1);border-radius:18px;box-shadow:inset 0 0 0 1px rgba(120,90,50,.1),0 1px 2px rgba(80,60,30,.06),0 6px 16px rgba(80,60,30,.06);color:#3A3027;overflow:hidden;position:relative}
+.on-desk{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:8px;padding:0 2px}
+.row b{font-size:13.5px;font-weight:500}
+.lay{display:inline-flex;padding:2px;border-radius:7px;background:#F2F2F4;margin-left:auto}
+.lay button{height:22px;padding:0 8px;border:0;border-radius:5px;background:transparent;font-family:inherit;font-size:11.5px;color:#55555A;cursor:pointer}
+.lay button.on{background:#fff;color:#1D1D1F;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.gt{display:flex;flex-direction:column;gap:8px;padding:8px;border-radius:14px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.07)}
+.gt:hover{box-shadow:0 0 0 1px rgba(0,0,0,.1),0 6px 16px rgba(0,0,0,.06)}
+.gt .pv{height:96px;border-radius:10px}
+.gt .ft{display:flex;align-items:center;gap:6px;padding:0 4px 2px}
+.gt .ft b{font-size:13px;font-weight:500}
+.add{margin-left:auto;width:26px;height:26px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer}
+</style>
+</helmet>
+<div style="position:relative;width:1280px;height:800px;overflow:hidden;display:flex;font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Microsoft YaHei UI',sans-serif;color:#1D1D1F;background:{{t.tint}};-webkit-font-smoothing:antialiased">
+
+  <aside style="width:264px;flex-shrink:0;display:flex;flex-direction:column;padding:0 12px 12px;box-sizing:border-box">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding-left:6px">
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <button type="button" class="ib" aria-label="收起侧栏" style="margin-left:auto"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M9 4v16"></path></svg></button>
+      <button type="button" class="ib" aria-label="搜索"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 6px 16px">
+      <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(160deg,{{t.btnHi}},{{t.btn}});color:#fff;display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 2px 6px rgba(0,0,0,.12)">
+        <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+      </div>
+      <div style="display:flex;flex-direction:column;line-height:1.25"><strong style="font-size: 15px; font-weight: 600">小伴桌面</strong></div>
+    </div>
+    <nav aria-label="功能分区" style="display:flex;flex-direction:column;gap:1px;flex:1;min-height:0;overflow:hidden">
+      <a class="si" href="WB-New.dc.html" aria-expanded="false" style="font-weight:600">
+        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+        小伴 AI
+        <span style="margin-left:auto;width:7px;height:7px;border-radius:50%;background:{{t.dot}}"></span>
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round" style="transform:rotate(-90deg)"><path d="m6 9 6 6 6-6"></path></svg>
+      </a>
+      <div style="height:1px;background:rgba(0,0,0,.06);margin:8px 10px"></div>
+      <a class="si" href="WB-Studio.dc.html" aria-current="page" style="background:{{t.soft}};color:{{t.ink}};font-weight:500"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.9" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2.5a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 22z"></path><circle cx="7.5" cy="10.5" r="1" fill="currentColor"></circle><circle cx="12" cy="7" r="1" fill="currentColor"></circle><circle cx="16.5" cy="10.5" r="1" fill="currentColor"></circle></svg>装扮</a>
+      <a class="si" href="#"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="5"></rect><path d="M7 11v3M5.5 12.5h3"></path><circle cx="16" cy="11.5" r=".7" fill="currentColor"></circle><circle cx="18" cy="13.5" r=".7" fill="currentColor"></circle></svg>游玩</a>
+      <a class="si" href="WB-Remind.dc.html"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>提醒<span class="sub" style="margin-left:auto">15:30</span></a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px 0;border-top:1px solid rgba(0,0,0,.06)">
+      <div style="width:30px;height:30px;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);display:grid;place-items:center"><img src="/_blob/d590c6393f601ebec7f3e202245ef0cf" alt="" style="width:26px;height:26px;object-fit:contain"></div>
+      <span style="font-size:13px;font-weight:500">小伴用户</span>
+      <button type="button" class="ib" aria-label="通知" style="margin-left:auto"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg></button>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;margin:8px 8px 8px 0;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.04);display:flex;flex-direction:column;overflow:hidden;padding:22px 28px 0;box-sizing:border-box">
+    <header style="display:flex;align-items:center;gap:22px">
+      <div role="tablist" aria-label="装扮类型" style="display:flex;gap:22px">
+        <a role="tab" aria-selected="false" class="tt" href="WB-Studio.dc.html">壁纸</a>
+        <a role="tab" aria-selected="false" class="tt" href="WB-Effects.dc.html">特效</a>
+        <button type="button" role="tab" aria-selected="true" class="tt" style="color:#1D1D1F">组件</button>
+        <a role="tab" aria-selected="false" class="tt" href="WB-Pets.dc.html">伙伴</a>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <button type="button" class="bb"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"></path></svg>导入</button>
+        <button type="button" class="pb" style="background:linear-gradient({{t.btnHi}},{{t.btn}})"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path></svg>让小伴创作</button>
+      </div>
+    </header>
+
+    <section aria-label="桌面上的组件" style="margin-top:22px">
+      <div class="sec">桌面上<span class="sub" style="font-weight:400">3 个 · 拖动可在桌面上调整位置</span><a href="#" style="margin-left:auto;font-size:12.5px;font-weight:500;color:{{t.ink}}">全部隐藏</a></div>
+      <div style="margin-top:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px">
+        <div class="on-desk">
+          <div class="wd" style="height:150px;padding:16px 18px;box-sizing:border-box;display:flex;flex-direction:column">
+            <span style="font-size:12px;opacity:.7">下午好 · 新的一天，也要好好生活</span>
+            <span style="font-size:52px;font-weight:600;letter-spacing:-.02em;line-height:1.05;margin-top:8px;font-variant-numeric:tabular-nums">14:07</span>
+            <span style="font-size:13px;margin-top:auto">10 月 22 日 星期四<span style="opacity:.6;margin-left:8px">九月十三</span></span>
+            <span aria-hidden="true" style="position:absolute;right:-20px;top:30px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,#F6B98A,#F1A56E 60%,rgba(241,165,110,0) 61%);opacity:.65"></span>
+          </div>
+          <div class="row"><b>桌面时钟</b><div class="lay" role="radiogroup" aria-label="桌面时钟层级"><button type="button" role="radio" aria-checked="true" class="on">贴在桌面</button><button type="button" role="radio" aria-checked="false">始终置顶</button></div><button type="button" class="ib" aria-label="桌面时钟更多设置" style="width:26px;height:26px"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button></div>
+        </div>
+        <div class="on-desk">
+          <div class="wd" style="height:150px;padding:16px 18px;box-sizing:border-box;display:flex;flex-direction:column">
+            <span style="font-size:13px;display:flex;align-items:center;gap:5px"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"></path></svg>杭州市</span>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+              <svg aria-hidden="true" width="58" height="44" viewBox="0 0 58 44"><circle cx="38" cy="16" r="12" fill="#F8C35A"></circle><path d="M14 40h30a10 10 0 0 0 0-20 13 13 0 0 0-25 3 9 9 0 0 0-5 17z" fill="#fff" stroke="rgba(120,90,50,.15)"></path></svg>
+              <span style="font-size:42px;font-weight:600;line-height:1">16°</span>
+            </div>
+            <span style="font-size:12.5px;margin-top:auto">多云 · 空气优<span style="opacity:.65;margin-left:10px">↑21° ↓8°</span></span>
+          </div>
+          <div class="row"><b>城市天气</b><div class="lay" role="radiogroup" aria-label="城市天气层级"><button type="button" role="radio" aria-checked="true" class="on">贴在桌面</button><button type="button" role="radio" aria-checked="false">始终置顶</button></div><button type="button" class="ib" aria-label="城市天气更多设置" style="width:26px;height:26px"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button></div>
+        </div>
+        <div class="on-desk">
+          <div class="wd" style="height:150px;padding:14px 18px;box-sizing:border-box;display:flex;flex-direction:column;gap:8px">
+            <span style="font-size:14px;font-weight:600">待办事项</span>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;opacity:.55;text-decoration:line-through"><span style="width:14px;height:14px;border-radius:50%;background:#B8A58C"></span>完成产品周报<span style="margin-left:auto;font-size:11px">09:00</span></div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12.5px"><span style="width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 1.5px #B8A58C"></span>准备下周的设计评审<span style="margin-left:auto;font-size:11px;opacity:.6">14:00</span></div>
+            <div style="display:flex;align-items:center;gap:8px;font-size:12.5px"><span style="width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 1.5px #B8A58C"></span>阅读一本书<span style="margin-left:auto;font-size:11px;opacity:.6">20:00</span></div>
+          </div>
+          <div class="row"><b>待办事项</b><div class="lay" role="radiogroup" aria-label="待办事项层级"><button type="button" role="radio" aria-checked="false">贴在桌面</button><button type="button" role="radio" aria-checked="true" class="on">始终置顶</button></div><button type="button" class="ib" aria-label="待办事项更多设置" style="width:26px;height:26px"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg></button></div>
+        </div>
+      </div>
+    </section>
+
+    <section aria-label="添加组件" style="margin-top:26px">
+      <div class="sec">添加组件<div style="margin-left:auto;display:inline-flex;padding:2px;border-radius:8px;background:#F2F2F4">
+        <button type="button" style="height:24px;padding:0 10px;border:0;border-radius:6px;background:#fff;font-family:inherit;font-size:12px;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.08);cursor:pointer">官方</button>
+        <button type="button" style="height:24px;padding:0 10px;border:0;border-radius:6px;background:transparent;font-family:inherit;font-size:12px;font-weight:400;color:#55555A;cursor:pointer">我的</button>
+      </div></div>
+      <div style="margin-top:12px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px">
+        <div class="gt">
+          <div class="pv wd" style="padding:10px 12px;box-sizing:border-box;display:flex;flex-direction:column;gap:5px;border-radius:10px"><span style="font-size:11px;font-weight:600">今日日程</span><span style="height:16px;border-radius:5px;background:rgba(232,120,110,.18);font-size:10px;padding:0 6px;display:flex;align-items:center">10:00 设计方案评审</span><span style="font-size:10px;opacity:.65;padding:0 6px">14:00 同步进度</span><span style="font-size:10px;opacity:.65;padding:0 6px">19:00 健身</span></div>
+          <div class="ft"><b>今日日程</b><button type="button" class="add" aria-label="添加今日日程" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+        </div>
+        <div class="gt">
+          <div class="pv" style="background:linear-gradient(#2D2D30,#1C1C1E);padding:10px 12px;box-sizing:border-box;display:flex;flex-direction:column;color:#fff"><span style="font-size:10px;opacity:.75">上证指数</span><span style="font-size:18px;font-weight:600;margin-top:2px">3,268.1</span><svg aria-hidden="true" viewBox="0 0 100 30" preserveAspectRatio="none" style="margin-top:auto;width:100%;height:28px"><path d="M0 24 L12 20 L22 22 L34 15 L46 17 L58 10 L70 12 L82 6 L100 4" fill="none" stroke="#FF6B6B" stroke-width="2"></path></svg></div>
+          <div class="ft"><b>股票行情</b><button type="button" class="add" aria-label="添加股票行情" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+        </div>
+        <div class="gt">
+          <div class="pv wd" style="border-radius:10px;display:grid;place-items:center"><svg aria-hidden="true" width="70" height="52" viewBox="0 0 70 52"><ellipse cx="30" cy="32" rx="26" ry="18" fill="#C79A66"></ellipse><path d="M10 30 Q30 22 50 30" stroke="#8B6239" stroke-width="3" fill="none"></path><path d="M48 14 L64 4" stroke="#A47546" stroke-width="4" stroke-linecap="round"></path><circle cx="47" cy="15" r="5" fill="#B68552"></circle></svg></div>
+          <div class="ft"><b>电子木鱼</b><button type="button" class="add" aria-label="添加电子木鱼" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+        </div>
+        <div class="gt">
+          <div class="pv wd" style="border-radius:10px;padding:9px 10px;box-sizing:border-box"><span style="font-size:10.5px;font-weight:600">2026 年 10 月</span>
+            <div style="margin-top:5px;display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:8.5px;text-align:center;opacity:.8"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span><span style="background:#E8786E;color:#fff;border-radius:4px">22</span><span>23</span><span>24</span><span>25</span><span>26</span><span>27</span><span>28</span></div></div>
+          <div class="ft"><b>月历</b><button type="button" class="add" aria-label="添加月历" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+        </div>
+        <div class="gt">
+          <div class="pv wd" style="border-radius:10px;padding:10px 12px;box-sizing:border-box;display:flex;flex-direction:column"><span style="font-size:10.5px;display:flex;align-items:center;gap:4px"><svg aria-hidden="true" width="10" height="10" viewBox="0 0 24 24" fill="#E8786E"><path d="M12 21s-8-5.3-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.7-8 11-8 11z"></path></svg>纪念日</span><span style="font-size:24px;font-weight:600;margin-top:auto">128<span style="font-size:11px;font-weight:400;margin-left:3px">天</span></span><span style="font-size:10px;opacity:.6">距离 [你的纪念日]</span></div>
+          <div class="ft"><b>纪念日</b><button type="button" class="add" aria-label="添加纪念日" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"amber"},"$preview":{"width":1280,"height":800}}'>
+const PALETTES = {
+  red:      { btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
+  green:    { btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
+  blue:     { btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
+  purple:   { btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9', dot: '#7C5CE6' },
+  amber:    { btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED', dot: '#E09A2B' },
+  graphite: { btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3', dot: '#55555B' }
+};
+class Component extends DCLogic {
+  renderVals() {
+    return { t: PALETTES[this.props.theme ?? 'amber'] ?? PALETTES.amber };
+  }
+}
+</script>
+</body>
+</html>

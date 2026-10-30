@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>搜索</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button,input{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;box-sizing:border-box;background:#FFFFFF;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+<header style="flex:none;display:flex;align-items:center;gap:8px;padding:8px 8px 8px 16px">
+<div style="flex:1;min-width:0;height:40px;border-radius:20px;background:#F2F2F2;display:flex;align-items:center;gap:8px;padding:0 14px;box-sizing:border-box;border:1px solid #E3203C">
+<input type="text" aria-label="搜索作品、项目、帖子" placeholder="搜索作品、项目、帖子" style="flex:1;min-width:0;height:36px;border:0;background:transparent;font-size:14px;color:#222222;outline:none">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+</div>
+<a href="Main.dc.html" style="flex:none;height:44px;padding:0 8px;display:flex;align-items:center;font-size:15px;color:#222222;text-decoration:none">取消</a>
+</header>
+
+<main style="flex:1;min-height:0;overflow:hidden;padding:0 16px">
+
+<sc-if value="{{hasHistory}}" hint-placeholder-val="{{true}}">
+<section>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 0 10px">
+<h2 style="margin:0;font-size:15px;font-weight:600">搜索历史</h2>
+<button type="button" onClick="{{clearHistory}}" style="height:32px;padding:0 4px;border:0;background:none;font-size:14px;color:#666666">清空</button>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:8px">
+<sc-for list="{{history}}" as="h" hint-placeholder-count="4">
+<a href="Main.dc.html" style="height:32px;padding:0 14px;border-radius:16px;background:#F2F2F2;color:#222222;font-size:14px;display:flex;align-items:center;text-decoration:none">{{h}}</a>
+</sc-for>
+</div>
+</section>
+</sc-if>
+
+<section>
+<h2 style="margin:0;padding:20px 0 6px;font-size:15px;font-weight:600">热门搜索</h2>
+<ol style="list-style:none;margin:0;padding:0">
+<sc-for list="{{hot}}" as="t" hint-placeholder-count="8">
+<li style="border-top:{{t.border}}">
+<a href="Main.dc.html" style="display:flex;align-items:center;gap:12px;padding:12px 0;text-decoration:none;color:#222222">
+<span style="flex:none;width:20px;font-size:15px;font-weight:600;color:{{t.color}}">{{t.n}}</span>
+<span style="flex:1;min-width:0;font-size:15px">{{t.text}}</span>
+<sc-if value="{{t.tag}}" hint-placeholder-val="{{false}}"><span style="flex:none;font-size:12px;color:#E3203C;font-weight:600">{{t.tag}}</span></sc-if>
+</a>
+</li>
+</sc-for>
+</ol>
+</section>
+
+</main>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const cleared = !!(this.state && this.state.cleared);
+    const terms = [
+      ['桌面特效', '热'], ['番茄时钟', ''], ['周报', ''], ['MCP', '新'], ['整理下载文件夹', ''], ['动态壁纸', ''], ['本周周刊', ''], ['小游戏', '']
+    ];
+    const hot = terms.map((p, i) => ({
+      n: i + 1, text: p[0], tag: p[1],
+      color: i < 3 ? '#E3203C' : '#6B6B6B',
+      border: i === 0 ? '0' : '0.5px solid #EDEDED'
+    }));
+    return {
+      hot,
+      history: ['雨夜', '番茄时钟', '周报模板', '极简办公台'],
+      hasHistory: !cleared,
+      clearHistory: () => this.setState({ cleared: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

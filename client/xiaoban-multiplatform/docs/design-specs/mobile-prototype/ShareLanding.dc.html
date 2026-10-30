@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>分享落地页</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;box-sizing:border-box;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden;background:#FFFFFF">
+
+<header style="flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;">
+<span style="display:flex;align-items:center;gap:8px"><span style="width:28px;height:28px;border-radius:8px;background:#E3203C;color:#FFFFFF;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></svg></span><span style="font-size:16px;font-weight:800;letter-spacing:.5px">小伴</span></span>
+<a href="Main.dc.html" style="height:32px;padding:0 14px;border-radius:16px;background:#E3203C;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;text-decoration:none">打开 App</a>
+</header>
+
+<main style="flex:1;min-height:0;overflow:hidden">
+<div style="position:relative;height:250px;background:linear-gradient(165deg,#1B2A41 0%,#243B5A 100%);overflow:hidden">
+<div style="position:absolute;left:190px;top:20px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,#3E5C8A 0%,rgba(255,255,255,0) 70%);opacity:.9"></div>
+<span style="position:absolute;left:16px;top:16px;font-size:12px;color:#FFFFFF;background:rgba(0,0,0,.45);padding:2px 6px;border-radius:6px">特效</span>
+</div>
+<div style="padding:16px">
+<h1 style="margin:0;font-size:22px;font-weight:600;line-height:1.3">雨夜窗台</h1>
+<div style="margin-top:12px;display:flex;align-items:center;gap:8px;font-size:14px;color:#999999"><span style="flex:none;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#8FA9C9,#3E5C8A)"></span><span style="flex:1;color:#666666">晚风</span><span>1.2万次应用</span></div>
+<p style="margin:14px 0 0;font-size:15px;line-height:1.7;color:#222222">窗外下着细雨，偏冷色的雨丝缓慢划过桌面，不抢眼。可以在桌面特效页调整密度、速度和大小。</p>
+</div>
+<div style="margin:0 16px;padding:14px 0;border-top:0.5px solid #EDEDED;font-size:14px;line-height:1.7;color:#666666">这是小伴桌面的桌面特效。在小伴里打开，可以一键发到电脑；没有安装小伴的话，先下载。</div>
+</main>
+
+<footer style="flex:none;padding:12px 16px 24px;border-top:0.5px solid #EDEDED">
+<a href="Main.dc.html" style="display:flex;align-items:center;justify-content:center;height:48px;border-radius:24px;background:#E3203C;color:#FFFFFF;font-size:16px;font-weight:600;text-decoration:none">在小伴里打开</a>
+<div style="margin-top:10px;text-align:center;font-size:12px;color:#999999">还没有安装？<span style="color:#222222;font-weight:600">下载小伴</span></div>
+</footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

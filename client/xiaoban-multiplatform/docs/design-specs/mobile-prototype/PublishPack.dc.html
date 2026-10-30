@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>发布作品</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button,input,textarea{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:1040px;box-sizing:border-box;background:#EDEDED;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+<header style="flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:#FFFFFF">
+<a href="Main.dc.html" aria-label="关闭" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#222222;text-decoration:none">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+</a>
+<h1 style="margin:0;font-size:16px;font-weight:600">发布作品</h1>
+<span style="width:44px"></span>
+</header>
+
+<main style="flex:1;min-height:0;overflow:hidden;padding:12px 16px 0">
+
+<section style="background:#FFFFFF;border-radius:8px;padding:14px">
+<h2 style="margin:0 0 10px;font-size:15px;font-weight:600">1 资源包</h2>
+<div style="display:flex;align-items:center;gap:12px;background:#F7F7F7;border-radius:16px;padding:10px 12px">
+<span style="flex:none;width:40px;height:40px;border-radius:8px;background:#FFFFFF;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg></span>
+<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:600">雨夜窗台.zip</span><span style="display:block;font-size:12px;color:#666666">N KB</span></span>
+<button type="button" style="flex:none;height:32px;padding:0 12px;border:0;border-radius:16px;background:#FFFFFF;color:#222222;font-size:14px">更换</button>
+</div>
+<ul style="list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{checks}}" as="c" hint-placeholder-count="5">
+<li style="display:flex;align-items:center;gap:8px;font-size:14px;line-height:1.5;color:#666666">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex:none"><path d="M5 12l5 5 9-10"/></svg>
+{{c}}
+</li>
+</sc-for>
+</ul>
+</section>
+
+<section style="margin-top:12px;background:#FFFFFF;border-radius:8px;padding:14px">
+<h2 style="margin:0 0 10px;font-size:15px;font-weight:600">2 作品信息</h2>
+<label for="pk-title" style="display:block;font-size:12px;color:#666666">标题</label>
+<input id="pk-title" type="text" value="雨夜窗台" style="background:#F2F2F2;display:block;width:100%;box-sizing:border-box;height:44px;margin-top:4px;border:0;border-radius:16px;padding:0 12px;font-size:15px;color:#222222;outline:none">
+<label for="pk-desc" style="display:block;margin-top:12px;font-size:12px;color:#666666">简介</label>
+<textarea id="pk-desc" style="background:#F7F7F7;display:block;width:100%;box-sizing:border-box;height:72px;margin-top:4px;border:0;border-radius:16px;padding:10px 12px;font-size:14px;line-height:1.5;color:#222222;outline:none;resize:none">窗外下着细雨，偏冷色的雨丝缓慢划过桌面，不抢眼。</textarea>
+<div style="margin-top:12px;font-size:12px;color:#666666">标签（最多 5 个）</div>
+<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px">
+<span style="height:34px;padding:0 14px;border-radius:17px;background:#F2F2F2;font-size:14px;display:flex;align-items:center">特效</span>
+<span style="height:34px;padding:0 14px;border-radius:17px;background:#F2F2F2;font-size:14px;display:flex;align-items:center">偏冷色</span>
+<span style="height:34px;padding:0 14px;border-radius:17px;background:#F2F2F2;font-size:14px;display:flex;align-items:center">雨</span>
+<button type="button" style="height:34px;padding:0 14px;border:1px dashed #CFCFCF;border-radius:17px;background:#FFFFFF;font-size:14px;color:#666666">+ 添加</button>
+</div>
+<div style="margin-top:14px;font-size:12px;color:#666666">预览图</div>
+<div style="margin-top:6px;display:flex;align-items:center;gap:12px">
+<div style="position:relative;flex:none;width:96px;height:54px;border-radius:8px;background:#1B2A41;overflow:hidden"><div style="position:absolute;left:0;right:0;bottom:0;height:12px;background:#243B5A"></div></div>
+<div style="font-size:12px;line-height:1.5;color:#666666">已自动截取。<button type="button" style="border:0;background:none;padding:0;font-size:12px;font-weight:600;color:#222222">重新截取</button>　<button type="button" style="border:0;background:none;padding:0;font-size:12px;font-weight:600;color:#222222">上传图片</button></div>
+</div>
+</section>
+
+<section style="margin-top:12px;background:#F4FAF6;border:1px solid #D7EBDD;border-radius:16px;padding:12px 14px">
+<div style="font-size:14px;line-height:1.7;color:#666666">特效和方案提交后<strong>立即可用</strong>。组件、壁纸、游戏需要<strong>审核通过</strong>后，才能被一键应用或在线试玩。</div>
+</section>
+
+<label style="display:flex;align-items:flex-start;gap:8px;margin-top:14px;font-size:14px;line-height:1.6;color:#666666">
+<input type="checkbox" checked="{{agree}}" onChange="{{toggleAgree}}" style="flex:none;width:20px;height:20px;margin:1px 0 0;accent-color:#E3203C">
+<span>我确认拥有该作品的权利，不含侵权、违规内容，并同意社区规则。</span>
+</label>
+
+</main>
+
+<footer style="flex:none;padding:10px 16px 16px;background:#FFFFFF;border-top:0.5px solid #EDEDED">
+<button type="button" style="width:100%;height:48px;border:0;border-radius:24px;background:{{btnBg}};color:#FFFFFF;font-size:16px;font-weight:600">发布</button>
+</footer>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const agree = !!(this.state && this.state.agree);
+    return {
+      agree,
+      toggleAgree: () => this.setState({ agree: !agree }),
+      btnBg: agree ? '#E3203C' : '#CFCFCF',
+      checks: [
+        '格式校验通过：manifest.json 与 effect.json',
+        '类型识别：桌面特效（纯数据，不含代码）',
+        '大小在限制内：N KB / 32 MB',
+        '未发现外部网络请求',
+        '文字与预览图通过敏感词检查'
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

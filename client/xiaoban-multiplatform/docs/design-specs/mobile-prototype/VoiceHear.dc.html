@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>实时对话·听到你说话</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&display=swap">
+<style>
+body{margin:0}
+a{color:inherit}
+button,input{font-family:inherit}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.045)}}
+@keyframes beat{0%,100%{transform:scale(1)}50%{transform:scale(1.09)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes ripple{0%{opacity:.5;transform:scale(1)}100%{opacity:0;transform:scale(1.5)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.breathe{animation:breathe 3.4s ease-in-out infinite;transform-origin:150px 150px}
+.beat{animation:beat .9s ease-in-out infinite;transform-origin:150px 150px}
+.spin{animation:spin 4.2s linear infinite;transform-origin:150px 150px}
+.ripple{animation:ripple 2.8s ease-out infinite;transform-origin:150px 150px}
+.caret{animation:blink 1s steps(1) infinite}
+@keyframes bloom{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.06) rotate(22deg)}}
+.bloom{animation:bloom 3.2s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.breathe,.beat,.spin,.ripple,.caret,.bloom{animation:none}}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;box-sizing:border-box;background:#0F141B;color:#F3F1EC;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;overflow:hidden;">
+<div style="position:absolute;inset:0;background:radial-gradient(70% 34% at 50% 31%,rgba(217,58,68,0.23),transparent 70%),linear-gradient(180deg,rgba(255,255,255,.04) 0,rgba(255,255,255,0) 30%,rgba(0,0,0,.38) 100%)"></div><svg width="390" height="844" viewBox="0 0 390 844" style="position:absolute;left:0;top:0" aria-hidden="true"><circle cx="195" cy="262" r="120" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="1"/><circle cx="195" cy="262" r="190" fill="none" stroke="rgba(255,255,255,0.075)" stroke-width="1"/><circle cx="195" cy="262" r="270" fill="none" stroke="rgba(255,255,255,0.055)" stroke-width="1"/><circle cx="195" cy="262" r="360" fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="1"/><rect x="288" y="520" width="92" height="92" rx="26" fill="rgba(217,58,68,.12)" transform="rotate(-16 334 566)"/><g transform="translate(300 128) scale(3.4)" fill="rgba(217,58,68,.16)"><path d="M12 0 C12.6 7 17 11.4 24 12 C17 12.6 12.6 17 12 24 C11.4 17 7 12.6 0 12 C7 11.4 11.4 7 12 0Z"/></g></svg><header style="position:absolute;left:0;right:0;top:0;height:92px;padding:14px 8px 0;display:flex;align-items:flex-start;justify-content:space-between"><span role="img" aria-label="收起通话" style="width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:rgba(243,241,236,.68)"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M6 9l6 6 6-6"/></svg></span><div style="text-align:center;padding-top:4px"><b style="display:block;font-size:16px;font-weight:600;letter-spacing:.02em">办公室电脑</b><span style="display:block;margin-top:5px;font-family:'DM Mono',ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:rgba(243,241,236,.68);letter-spacing:.08em">00:19</span></div><span role="img" aria-label="外放" style="width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:rgba(243,241,236,.68)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M4 10v4h4l5 4V6L8 10zM16 9a4 4 0 010 6M18.5 6.5a8 8 0 010 11"/></svg></span></header><div style="position:absolute;left:115px;top:168px"><svg width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="小伴头像" style="display:block">
+<defs><filter id="lift" x="-50%" y="-50%" width="200%" height="220%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#D93A44" flood-opacity=".30"/></filter></defs>
+<circle cx="80.0" cy="80.0" r="35.0" fill="none" stroke="#D93A44" stroke-opacity="0.4" stroke-width="1.6" /><circle cx="80.0" cy="80.0" r="45.0" fill="none" stroke="#D93A44" stroke-opacity="0.22" stroke-width="1.3" /><circle cx="80.0" cy="80.0" r="55.0" fill="none" stroke="#D93A44" stroke-opacity="0.1" stroke-width="1.3" /><circle class="ripple" style="transform-origin:80.0px 80.0px" cx="80.0" cy="80.0" r="35.0" fill="none" stroke="#D93A44" stroke-opacity=".45" stroke-width="1.4"/>
+<g class="beat" style="transform-origin:80.0px 80.0px"><circle cx="80.0" cy="80.0" r="27.0" fill="#D93A44" filter="url(#lift)"/>
+<g transform="translate(64.88 64.88) scale(1.260)" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></g></g>
+</svg></div><div style="position:absolute;left:24px;right:24px;top:322px;text-align:center"><div style="font-size:24px;font-weight:300;letter-spacing:.14em;color:#F3F1EC">听到了…</div></div><div style="position:absolute;left:28px;right:28px;top:382px;text-align:center;font-size:22px;line-height:1.55;font-weight:400;color:#F3F1EC">帮我把下载文件夹里重复的文件<span class="caret" style="display:inline-block;width:2px;height:22px;background:#F0707A;margin-left:3px;vertical-align:-3px"></span></div><div style="position:absolute;left:0;right:0;bottom:158px;display:flex;justify-content:center"><span style="display:inline-flex;align-items:center;gap:8px;height:30px;padding:0 14px;border-radius:15px;background:rgba(255,255,255,.07);border:0.5px solid rgba(255,255,255,.12);font-size:12px;color:rgba(243,241,236,.68)"><span style="width:7px;height:7px;border-radius:50%;background:#3DBE86"></span>直接开口打断：开</span></div><div style="position:absolute;left:0;right:0;bottom:34px;display:flex;justify-content:center;align-items:flex-end;gap:30px"><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><span role="img" aria-label="静音" style="width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.07);color:#F3F1EC;border:0.5px solid rgba(255,255,255,.12)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></span><span style="font-size:12px;color:rgba(243,241,236,.68)">静音</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><span role="img" aria-label="打断" style="width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:transparent;color:#F3F1EC;border:1.5px solid rgba(243,241,236,.46)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><path d="M4 11v2M8 8v8M12 5v14M16 8v8M20 11v2"/></svg></span><span style="font-size:12px;color:rgba(243,241,236,.68)">打断</span></div><div style="display:flex;flex-direction:column;align-items:center;gap:8px"><span role="img" aria-label="挂断" style="width:68px;height:68px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#D64545;color:#fff;box-shadow:0 6px 18px rgba(214,69,69,.35)"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ><g transform="rotate(135 12 12)"><path fill="currentColor" stroke-width="1.4" d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></g></svg></span><span style="font-size:12px;color:rgba(243,241,236,.68)">挂断</span></div></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic { renderVals() { return {}; } }
+</script>
+</body>
+</html>

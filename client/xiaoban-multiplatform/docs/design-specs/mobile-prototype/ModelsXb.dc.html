@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小伴AI 配置弹窗</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button,input{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:860px;box-sizing:border-box;background:#EDEDED;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+<header style="flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:#FFFFFF">
+<a href="Me.dc.html" aria-label="返回" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#222222;text-decoration:none">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+</a>
+<h1 style="margin:0;font-size:16px;font-weight:600">模型与额度</h1>
+<span style="width:44px"></span>
+</header>
+
+<main style="flex:1;min-height:0;overflow:hidden;padding-bottom:24px">
+
+<div style="padding:16px 16px 6px;font-size:12px;color:#666666">小伴AI · 官方</div>
+<section style="margin:0 16px;background:#FFFFFF;border-radius:0;padding:16px">
+<div style="display:flex;align-items:center;gap:12px">
+<span style="flex:none;width:40px;height:40px;border-radius:16px;background:#E3203C;color:#FFFFFF;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg></span>
+<div style="flex:1;min-width:0">
+<div style="font-size:16px;font-weight:600">小伴AI</div>
+<div style="margin-top:2px;font-size:12px;line-height:1.5;color:#666666">跟着账号走，换手机、换电脑自动同步</div>
+</div>
+<span style="flex:none;font-size:12px;font-weight:{{xbSw}};color:{{xbSc}}">{{xbStatus}}</span>
+</div>
+<div style="margin-top:12px;font-size:14px;line-height:1.6;color:#666666">当前模型：<b>{{xbModel}}</b><br><span style="color:#666666">剩余额度 N · 到期 [日期]</span></div>
+<div style="margin-top:12px;display:flex;gap:8px">
+<button type="button" onClick="{{openXb}}" style="flex:1;height:40px;border:0;border-radius:20px;background:#F2F2F2;color:#222222;font-size:14px;font-weight:600">配置</button>
+<sc-if value="{{xbIdle}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{useXb}}" style="flex:1;height:40px;border:0;border-radius:20px;background:#E3203C;color:#FFFFFF;font-size:14px;font-weight:600">启用小伴AI</button>
+</sc-if>
+</div>
+</section>
+
+<div style="padding:20px 16px 6px;font-size:12px;color:#666666">自己的模型服务</div>
+<div style="margin:0 16px 8px;font-size:12px;line-height:1.6;color:#666666">密钥只保存在这部手机上，不会上传到小伴服务器，也不会同步到电脑；换手机需要重新填写。</div>
+<ul style="list-style:none;margin:0 16px;padding:0;background:#FFFFFF;border-radius:0;overflow:hidden">
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="4">
+<li style="border-top:{{r.border}}">
+<button type="button" onClick="{{r.open}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:12px 16px;border:0;background:none;text-align:left;color:#222222">
+<span style="flex:none;width:36px;height:36px;border-radius:8px;background:{{r.bg}};color:{{r.ink}};font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">{{r.mono}}</span>
+<span style="flex:1;min-width:0"><span style="display:block;font-size:15px;font-weight:600">{{r.name}}</span><span style="display:block;margin-top:2px;font-size:12px;color:#666666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{r.sub}}</span></span>
+<span style="flex:none;font-size:12px;font-weight:{{r.sw}};color:{{r.sc}}">{{r.status}}</span>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg>
+</button>
+</li>
+</sc-for>
+<li style="border-top:0.5px solid #EDEDED">
+<button type="button" onClick="{{openCustom}}" style="width:100%;display:flex;align-items:center;gap:8px;padding:14px 16px;border:0;background:none;font-size:15px;color:#222222;text-align:left">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+添加自定义供应商（OpenAI 兼容）
+</button>
+</li>
+</ul>
+
+<div style="margin:12px 16px 0;font-size:12px;line-height:1.6;color:#666666">声明模型支持哪些思考强度、单次输出上限等高级设置，请在电脑上设置。对话页输入框里的模型按钮，可以单独为每个对话换模型。</div>
+
+</main>
+
+<sc-if value="{{xbSheet}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end">
+<div role="dialog" aria-modal="true" aria-label="小伴AI" style="background:#FFFFFF;border-radius:20px 20px 0 0;display:flex;flex-direction:column;overflow:hidden">
+<div style="flex:none;display:flex;align-items:center;gap:12px;padding:16px 8px 8px 16px">
+<span style="flex:none;width:40px;height:40px;border-radius:16px;background:#E3203C;color:#FFFFFF;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path></svg></span>
+<div style="flex:1;min-width:0"><h2 style="margin:0;font-size:16px;font-weight:600">小伴AI</h2><div style="margin-top:2px;font-size:12px;color:#666666">跟着账号走，换设备自动同步</div></div>
+<button type="button" onClick="{{closeXb}}" aria-label="关闭" style="flex:none;width:44px;height:44px;border:0;background:none;display:flex;align-items:center;justify-content:center;color:#222222"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+</div>
+<div style="padding:0 16px">
+<div style="margin-top:14px;display:flex;background:#F7F7F7;border-radius:16px;padding:12px 0">
+<div style="flex:1;text-align:center"><div style="font-size:20px;font-weight:600">N</div><div style="margin-top:2px;font-size:12px;color:#666666">剩余额度</div></div>
+<div style="flex:1;text-align:center"><div style="font-size:20px;font-weight:600">[日期]</div><div style="margin-top:2px;font-size:12px;color:#666666">到期时间</div></div>
+</div>
+
+<div style="margin-top:14px;display:flex;gap:8px">
+<label for="md-code" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">兑换码</label>
+<input id="md-code" type="text" placeholder="输入兑换码" style="flex:1;min-width:0;box-sizing:border-box;height:40px;border:0;border-radius:20px;padding:0 14px;font-size:14px;color:#222222;outline:none;background:#F2F2F2">
+<button type="button" style="flex:none;height:40px;padding:0 18px;border:0;border-radius:20px;background:#E3203C;color:#FFFFFF;font-size:14px;font-weight:600">兑换</button>
+</div>
+
+<div style="margin-top:16px;font-size:14px;font-weight:600">可用模型</div>
+
+<div role="radiogroup" aria-label="小伴AI 可用模型" style="margin-top:6px">
+<sc-for list="{{tiers}}" as="t" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:8px;border-top:{{t.border}};opacity:{{t.opacity}}">
+<button type="button" role="radio" aria-checked="{{t.on}}" onClick="{{t.pick}}" style="flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:10px 0;border:0;background:none;text-align:left;color:#222222">
+<span style="flex:none;width:20px;height:20px;border-radius:50%;box-sizing:border-box;border:2px solid {{t.ring}};display:flex;align-items:center;justify-content:center"><span style="width:10px;height:10px;border-radius:50%;background:{{t.dot}}"></span></span>
+<span style="flex:1;min-width:0">
+<span style="display:flex;align-items:center;gap:8px"><span style="font-size:15px;font-weight:600">{{t.name}}</span>
+<sc-if value="{{t.isDefault}}" hint-placeholder-val="{{false}}"><span style="font-size:12px;color:#E3203C;font-weight:600">推荐</span></sc-if></span>
+<span style="display:block;margin-top:2px;font-size:12px;line-height:1.5;color:#666666">{{t.desc}}</span>
+</span>
+</button>
+<sc-if value="{{t.tunable}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{t.openLvl}}" aria-haspopup="dialog" aria-label="设置思考强度" style="flex:none;height:32px;padding:0 8px 0 12px;border:0;border-radius:16px;background:#F2F2F2;display:flex;align-items:center;gap:2px;font-size:12px;color:#666666">思考 · {{t.lvlName}}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</div>
+<div style="flex:none;padding:14px 16px 20px;border-top:0.5px solid #EDEDED;margin-top:8px">
+<button type="button" onClick="{{closeXb}}" style="width:100%;height:48px;border:0;border-radius:24px;background:#E3203C;color:#FFFFFF;font-size:16px;font-weight:600">完成</button>
+</div>
+</div>
+</div>
+<sc-if value="{{lvlOpen}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:0 32px">
+<div role="dialog" aria-modal="true" aria-label="思考强度" style="width:176px;box-sizing:border-box;background:#FFFFFF;border-radius:20px;padding:20px 16px 12px;box-shadow:0 8px 32px rgba(0,0,0,.2);height:230px">
+<div role="radiogroup" aria-label="思考强度" style="margin-top:8px;width:146px;height:176px">
+<sc-for list="{{lvlOptions}}" as="o" hint-placeholder-count="4">
+<button type="button" role="radio" aria-checked="{{o.on}}" onClick="{{o.pick}}" style="width:100%;display:flex;align-items:center;gap:12px;padding:12px 0;border:0;border-top:{{o.border}};background:none;text-align:left;color:#222222;font-size:15px">
+<span style="flex:none;width:20px;height:20px;border-radius:50%;box-sizing:border-box;border:2px solid {{o.ring}};display:flex;align-items:center;justify-content:center"><span style="width:10px;height:10px;border-radius:50%;background:{{o.dot}}"></span></span>
+<span style="flex:1;min-width:0">{{o.name}}</span>
+</button>
+</sc-for>
+</div>
+</div>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{sheetOpen}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end">
+<div role="dialog" aria-modal="true" aria-label="{{sh.title}}" style="background:#F7F7F7;border-radius:20px 20px 0 0;max-height:calc(100% - 48px);display:flex;flex-direction:column;overflow:hidden">
+
+<div style="flex:none;display:flex;align-items:center;gap:12px;padding:16px 8px 14px 16px;background:#FFFFFF">
+<span style="flex:none;width:40px;height:40px;border-radius:16px;background:{{sh.bg}};color:{{sh.ink}};font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">{{sh.mono}}</span>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:center;gap:8px"><h2 style="margin:0;font-size:16px;font-weight:600">{{sh.title}}</h2>
+<sc-if value="{{sh.connected}}" hint-placeholder-val="{{false}}"><span style="font-size:12px;color:#999999;">已连接</span></sc-if></div>
+<div style="margin-top:2px;font-size:12px;color:#666666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{sh.desc}}</div>
+</div>
+<button type="button" onClick="{{closeSheet}}" aria-label="关闭" style="flex:none;width:44px;height:44px;border:0;background:none;display:flex;align-items:center;justify-content:center;color:#222222">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+</button>
+</div>
+
+<div style="flex:1;min-height:0;overflow-y:auto;padding:4px 16px 0">
+
+<div style="padding:12px 0 6px;font-size:12px;font-weight:600;color:#666666">连接</div>
+<div style="background:#FFFFFF;border-radius:8px;padding:14px;display:flex;flex-direction:column;gap:16px">
+
+<sc-if value="{{sh.isCustom}}" hint-placeholder-val="{{false}}">
+<div>
+<label for="md-name" style="display:block;font-size:14px;font-weight:600">供应商名称</label>
+<input id="md-name" type="text" placeholder="例如：公司内部模型、家里的 Ollama" style="background:#F2F2F2;margin-top:6px;width:100%;box-sizing:border-box;height:40px;border:0;border-radius:8px;padding:0 12px;font-size:14px;color:#222222;outline:none">
+</div>
+</sc-if>
+
+<div>
+<div style="font-size:14px;font-weight:600">接口协议</div>
+<div style="background:#F2F2F2;margin-top:6px;display:flex;align-items:center;gap:8px;height:40px;box-sizing:border-box;border:0;border-radius:8px;padding:0 12px;font-size:14px">
+<span style="flex:1;min-width:0">{{sh.proto}}</span>
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10l5-5 5 5M7 14l5 5 5-5"></path></svg>
+</div>
+<div style="margin-top:4px;font-size:12px;line-height:1.5;color:#666666">不确定就选“OpenAI 兼容”，多数服务商和本地模型服务都支持。</div>
+</div>
+
+<div>
+<label for="md-url" style="display:block;font-size:14px;font-weight:600">API 地址</label>
+<input id="md-url" type="text" value="{{sh.url}}" placeholder="https://api.example.com/v1" style="background:#F2F2F2;margin-top:6px;width:100%;box-sizing:border-box;height:40px;border:0;border-radius:8px;padding:0 12px;font-size:14px;color:#222222;outline:none">
+<div style="margin-top:4px;font-size:12px;color:#666666">实际请求端点：[完整地址]</div>
+</div>
+
+<div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+<label for="md-key" style="font-size:14px;font-weight:600">API 密钥</label>
+<sc-if value="{{sh.hasConsole}}" hint-placeholder-val="{{true}}"><span style="font-size:12px;color:#222222">{{sh.console}}</span></sc-if>
+</div>
+<input id="md-key" type="password" value="{{sh.keyVal}}" placeholder="粘贴密钥" style="background:#F2F2F2;margin-top:6px;width:100%;box-sizing:border-box;height:40px;border:0;border-radius:8px;padding:0 12px;font-size:14px;color:#222222;outline:none">
+<div style="margin-top:4px;font-size:12px;line-height:1.5;color:#666666">只保存在这部手机上，不上传、不同步。<sc-if value="{{sh.hasKey}}" hint-placeholder-val="{{true}}"><span style="color:#E3203C">删除已保存的密钥</span></sc-if></div>
+</div>
+
+<div style="display:flex;align-items:center;gap:8px">
+<span role="status" style="flex:1;min-width:0;font-size:12px;line-height:1.4;color:{{testColor}}">{{testText}}</span><button type="button" onClick="{{runTest}}" style="flex:none;height:36px;padding:0 14px;border:0;border-radius:18px;background:#F2F2F2;color:#222222;font-size:14px;display:flex;align-items:center;gap:8px">
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3L5 14h6l-1 7 8-11h-6z"></path></svg>测试连接</button>
+</div>
+</div>
+
+<div style="padding:16px 0 6px;font-size:12px;font-weight:600;color:#666666">模型<span style="font-weight:400"> · {{sh.count}} 个，对话里可切换</span></div>
+<div style="background:#FFFFFF;border-radius:8px;overflow:hidden">
+<sc-if value="{{sh.noModels}}" hint-placeholder-val="{{false}}">
+<div style="padding:16px;text-align:center;font-size:12px;color:#666666">还没有模型。输入模型名称，或拉取服务商的可用模型</div>
+</sc-if>
+<sc-for list="{{sh.models}}" as="m" hint-placeholder-count="3">
+<div style="display:flex;align-items:center;gap:8px;min-height:46px;padding:6px 12px 6px 14px;border-top:{{m.border}}">
+<span style="flex:none;color:{{m.star}}"><svg width="20" height="20" viewBox="0 0 24 24" fill="{{m.fill}}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8z"></path></svg></span>
+<span style="flex:1;min-width:0;font-size:14px;font-weight:600;font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{m.id}}</span>
+<sc-if value="{{m.isDef}}" hint-placeholder-val="{{false}}"><span style="flex:none;font-size:12px;color:#E3203C;font-weight:600">默认</span></sc-if>
+</div>
+</sc-for>
+<div style="display:flex;gap:8px;padding:10px 12px;border-top:0.5px solid #EDEDED">
+<label for="md-model" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">添加模型</label>
+<input id="md-model" type="text" placeholder="输入模型名称" style="background:#F2F2F2;flex:1;min-width:0;box-sizing:border-box;height:36px;border:0;border-radius:18px;padding:0 12px;font-size:14px;color:#222222;outline:none">
+<button type="button" style="flex:none;height:36px;padding:0 14px;border:0;border-radius:18px;background:#F2F2F2;color:#222222;font-size:14px">添加</button>
+<button type="button" style="flex:none;height:36px;padding:0 12px;border:0;background:none;color:#222222;font-size:14px">拉取可用</button>
+</div>
+</div>
+
+</div>
+
+<div style="flex:none;display:flex;gap:8px;padding:14px 16px 20px;background:#FFFFFF;border-top:0.5px solid #EDEDED">
+<button type="button" onClick="{{closeSheet}}" style="flex:none;height:48px;padding:0 22px;border:0;border-radius:24px;background:#F2F2F2;color:#222222;font-size:15px">取消</button>
+<button type="button" onClick="{{saveUse}}" style="flex:1;height:48px;border:0;border-radius:24px;background:#E3203C;color:#FFFFFF;font-size:16px;font-weight:600">保存并启用</button>
+</div>
+
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":860}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const tierId = st.tier || 'a';
+    const eff = st.eff || 'default';
+    const lvlFor = st.lvlFor || '';
+    const lvlName = (v) => ({ default: '默认', low: '低', medium: '中', high: '高' }[v] || '默认');
+    const active = st.active || 'xiaoban';
+    const done = st.done || { deepseek: true };
+    const open = st.sheet === undefined ? '' : st.sheet;
+    const tested = !!st.tested;
+    const TIERS = [
+      { id: 'a', name: '[模型 A]', desc: '[一句话说明]', isDefault: true, available: true, efforts: [{ id: 'low', name: '低' }, { id: 'medium', name: '中' }, { id: 'high', name: '高' }] },
+      { id: 'b', name: '[模型 B]', desc: '[一句话说明]', isDefault: false, available: true, efforts: [] },
+      { id: 'c', name: '[模型 C]（暂不可用）', desc: '兑换付费额度后可用', isDefault: false, available: false, efforts: [] }
+    ];
+    const cur = TIERS.find((t) => t.id === tierId) || TIERS[0];
+    const P = {
+      deepseek: { name: 'DeepSeek', mono: 'DE', bg: '#E8EEFD', ink: '#3557C9', desc: '深度求索大模型，默认 deepseek-v4-pro', proto: 'OpenAI Responses', url: 'https://api.deepseek.com', console: '前往 DeepSeek 获取密钥 ›', models: ['deepseek-v4-pro', 'deepseek-flash', 'deepseek-chat'], hint: '••••a1b2' },
+      zhipu: { name: '智谱 BigModel', mono: '智', bg: '#E6F3FB', ink: '#1C6E9E', desc: '智谱大模型，默认 glm-5.3', proto: 'OpenAI Responses', url: 'https://open.bigmodel.cn/api/v1', console: '前往智谱获取密钥 ›', models: ['glm-5.3', 'glm-5.3-flash'], hint: '••••k7m2' },
+      kimi: { name: 'Kimi', mono: 'Ki', bg: '#F1F1F3', ink: '#2C2C30', desc: '月之暗面长文本模型，默认 kimi-k3', proto: 'OpenAI Responses', url: 'https://api.moonshot.cn/v1', console: '前往 Kimi 获取密钥 ›', models: ['kimi-k3', 'kimi-k2.6'], hint: '••••p4q8' },
+      minimax: { name: 'MiniMax', mono: 'Mi', bg: '#FDEEE6', ink: '#B4501C', desc: 'MiniMax 开放平台，默认 MiniMax-M3', proto: 'OpenAI Responses', url: 'https://api.minimax.cn/v1', console: '前往 MiniMax 获取密钥 ›', models: ['MiniMax-M3', 'MiniMax-M2.7'], hint: '••••x9c3' },
+      custom: { name: '自定义供应商', mono: '+', bg: '#F1F1F3', ink: '#2C2C30', desc: '第三方端点、海外服务或本地模型服务', proto: 'OpenAI 兼容（Chat Completions）', url: '', console: '', models: [], hint: '' }
+    };
+    const order = ['deepseek', 'zhipu', 'kimi', 'minimax'];
+    const rows = order.map((id, i) => {
+      const p = P[id];
+      const configured = !!done[id];
+      const inUse = active === id;
+      return {
+        name: p.name, mono: p.mono, bg: p.bg, ink: p.ink,
+        sub: configured ? p.models[0] : p.desc,
+        status: inUse ? '当前使用' : configured ? '已配置' : '待配置',
+        sc: inUse ? '#E3203C' : configured ? '#444444' : '#6B6B6B',
+        sw: inUse ? 700 : 400,
+        border: i === 0 ? '0' : '0.5px solid #EDEDED',
+        open: () => this.setState({ sheet: id, tested: false })
+      };
+    });
+    const p = P[open] || P.custom;
+    const isCustom = open === 'custom';
+    const hasKey = !!done[open] && !!p.hint;
+    const models = p.models.map((m, i) => ({
+      id: m, isDef: i === 0,
+      star: i === 0 ? '#E3203C' : '#C8C8C8',
+      fill: i === 0 ? 'currentColor' : 'none',
+      border: i === 0 ? '0' : '0.5px solid #EDEDED'
+    }));
+    const sh = {
+      title: p.name, mono: p.mono, bg: p.bg, ink: p.ink, desc: p.desc, proto: p.proto, url: p.url,
+      console: p.console, hasConsole: !!p.console,
+      keyVal: hasKey ? p.hint : '', hasKey,
+      isCustom, connected: hasKey,
+      models, count: models.length, noModels: !models.length
+    };
+    return {
+      xbIdle: active !== 'xiaoban',
+      xbStatus: active === 'xiaoban' ? '当前使用' : '可使用',
+      xbSc: active === 'xiaoban' ? '#6B6B6B' : '#444444',
+      xbSw: active === 'xiaoban' ? 700 : 400,
+      xbModel: cur.name.replace('（暂不可用）', ''),
+      xbSheet: st.xb === undefined ? true : !!st.xb,
+      openXb: () => this.setState({ xb: true }),
+      closeXb: () => this.setState({ xb: false }),
+      useXb: () => this.setState({ active: 'xiaoban' }),
+      tiers: TIERS.map((t, i) => ({ name: t.name, desc: t.desc, isDefault: t.isDefault, tunable: t.efforts.length > 0,
+        lvlName: lvlName(tierId === t.id ? eff : (st['l_' + t.id] || 'default')),
+        on: tierId === t.id, ring: tierId === t.id ? '#E3203C' : '#BDBDBD', dot: tierId === t.id ? '#E3203C' : 'transparent',
+        border: i === 0 ? '0' : '0.5px solid #EDEDED', opacity: t.available ? 1 : 0.5,
+        pick: () => { if (t.available) this.setState({ tier: t.id }); },
+        openLvl: () => this.setState({ lvlFor: t.id }) })),
+      lvlOpen: !!lvlFor,
+      closeLvl: () => this.setState({ lvlFor: '' }),
+      lvlOptions: [['default', '默认'], ['low', '低 · 更快'], ['medium', '中'], ['high', '高 · 更深入']].map((e, k) => {
+        const now = lvlFor && (tierId === lvlFor ? eff : (st['l_' + lvlFor] || 'default'));
+        return { name: e[1], on: now === e[0], border: k === 0 ? '0' : '0.5px solid #EDEDED',
+          ring: now === e[0] ? '#E3203C' : '#BDBDBD', dot: now === e[0] ? '#E3203C' : 'transparent',
+          pick: () => { const o = { tier: lvlFor, eff: e[0], lvlFor: '' }; o['l_' + lvlFor] = e[0]; this.setState(o); } };
+      }),
+      rows,
+      openCustom: () => this.setState({ sheet: 'custom', tested: false }),
+      sheetOpen: !!open, sh,
+      closeSheet: () => this.setState({ sheet: '' }),
+      runTest: () => this.setState({ tested: true }),
+      testText: tested ? '连接正常，发现 N 个可用模型' : '填好地址和密钥后可以测试；会向服务商请求一次模型列表',
+      testColor: tested ? '#6B6B6B' : '#6B6B6B',
+      saveUse: () => {
+        const d = Object.assign({}, done);
+        if (open && open !== 'custom') d[open] = true;
+        this.setState({ done: d, active: open && open !== 'custom' ? open : active, sheet: '' });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

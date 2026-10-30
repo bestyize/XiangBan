@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小伴桌面 · 输入框规范 · 技能 / 专家 / 连接器</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #2F6FDB;outline-offset:2px}
+.si{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;color:#26262B;font-size:14px;border:0;background:transparent;font-family:inherit;width:100%;box-sizing:border-box;cursor:pointer;text-align:left}
+.si:hover{background:rgba(0,0,0,.045)}
+.si svg{flex-shrink:0;color:#4A4A50}
+.sub{font-size:12px;color:#6E6E73}
+.cap{font-size:12px;color:#6E6E73;font-weight:500}
+.ib{width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:#55555A;display:grid;place-items:center;cursor:pointer}
+.ib:hover{background:rgba(0,0,0,.05)}
+.chip{height:32px;padding:0 14px;border-radius:999px;border:0;background:#fff;font-family:inherit;font-size:13px;color:#2C2C31;cursor:pointer;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04)}
+.chip:hover{box-shadow:0 0 0 1px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.06)}
+.sug{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:10px;border:0;background:transparent;font-family:inherit;font-size:13.5px;color:#2C2C31;cursor:pointer}
+.sug:hover{background:#F4F4F6}
+.sug svg{color:#8E8E93}
+.pop{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 9px;border-radius:8px;border:0;background:transparent;font-family:inherit;font-size:12.5px;color:#4A4A50;cursor:pointer}
+.pop:hover{background:#F2F2F4}
+.sw{width:18px;height:18px;border-radius:50%;border:0;padding:0;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.ses{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px 0 36px;border-radius:8px;font-size:13px;color:#3A3A40}
+.ses:hover{background:rgba(0,0,0,.045)}
+.ses span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.act{width:28px;height:28px;border-radius:7px;border:0;background:transparent;color:#6E6E73;display:grid;place-items:center;cursor:pointer}
+.act:hover{background:#F2F2F4;color:#1D1D1F}
+.xb{width:20px;height:20px;border-radius:6px;border:0;padding:0;background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer}
+.xb:hover{background:rgba(0,0,0,.09)}
+.pi{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;padding:7px 10px;border:0;border-radius:8px;background:transparent;font-family:inherit;text-align:left;cursor:pointer;color:#1D1D1F}
+.pi:hover{box-shadow:inset 0 0 0 100px rgba(0,0,0,.04)}
+.pl{font-size:13.5px;font-weight:500;flex:1;min-width:0;color:#1D1D1F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr{font-size:12px;color:#6E6E73;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds{font-size:11.5px;color:#6E6E73;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ti{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:#F2F2F4;color:#4A4A50;flex-shrink:0}
+.tag{font-size:11px;color:#55555A;background:#F2F2F4;border-radius:5px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
+.ft{font-size:12.5px;font-weight:500;padding:5px 6px;border-radius:6px}
+.ft:hover{background:rgba(0,0,0,.05)}
+.lk{height:24px;padding:0 10px;border-radius:7px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;flex-shrink:0}
+.lab{position:absolute;height:20px;padding:0 7px;border-radius:6px;background:#2B2B30;color:#fff;font-size:11px;font-weight:600;display:flex;align-items:center;white-space:nowrap}
+.av20{width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:600;display:grid;place-items:center;box-shadow:0 0 0 2px #fff}
+</style>
+</helmet>
+<div style="width:1440px;height:2080px;box-sizing:border-box;padding:56px;display:flex;flex-direction:column;gap:40px;overflow:hidden;font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Microsoft YaHei UI',sans-serif;color:#1D1D1F;background:{{t.tint}};-webkit-font-smoothing:antialiased">
+
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-.01em">输入框 · 使用技能 / 专家 / 连接器</h1>
+    <p style="margin:0;max-width:820px;font-size:14.5px;line-height:1.7;color:#55555A">新建任务和会话共用同一个输入框。三类能力各有固定位置：技能在文字上方的左侧，专家和连接器在输入框右上角，工具栏只留 + 号、权限、模型和发送。下面是构成、六种状态和四个选择器。</p>
+  </header>
+
+  <section aria-label="构成" style="background:#fff;border-radius:16px;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.04);padding:28px 32px 32px;display:flex;flex-direction:column;gap:6px">
+    <h2 style="margin:0 0 4px;font-size:16px;font-weight:600">构成</h2>
+    <div style="display:flex;gap:56px;align-items:flex-start;flex-wrap:wrap">
+      <div style="width:720px;flex-shrink:0;padding:40px 0 12px">
+        <div style="background:#fff;border-radius:18px;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.03),0 12px 32px rgba(0,0,0,.07);padding:16px 14px 10px 18px">
+          <div style="display:flex;align-items:center;margin:0 4px 10px 4px">
+            <span style="position:relative;display:inline-flex;outline:1.5px dashed {{t.ink}};outline-offset:4px;border-radius:8px">
+              <span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 9px;border-radius:8px;background:{{t.soft}};color:{{t.ink}};font-size:13px;font-weight:500"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"></path></svg>PPT 演示文稿<span class="xb" aria-hidden="true"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></span></span>
+              <span class="lab" style="background:{{t.ink}};top:-34px;left:-2px">① 技能</span>
+            </span>
+            <span style="margin-left:auto"></span>
+            <span style="position:relative;display:inline-flex;outline:1.5px dashed {{t.ink}};outline-offset:3px;border-radius:9px;margin:0 4px">
+              <span class="pop" style="font-weight:500;color:#1D1D1F;box-shadow:inset 0 0 0 1px rgba(0,0,0,.09)"><span style="width:18px;height:18px;border-radius:6px;background:#E8EEFD;color:#3557C9;display:grid;place-items:center"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 20a6 6 0 0 1 12 0M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.5a6 6 0 0 1 3 5.5"></path></svg></span>软件开发团队<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+              <span class="lab" style="background:{{t.ink}};top:-34px;left:-2px">② 专家 / 专家团</span>
+            </span>
+            <span style="position:relative;display:inline-flex;outline:1.5px dashed {{t.ink}};outline-offset:3px;border-radius:9px;margin:0 4px">
+              <span class="pop" style="padding:0 8px"><span style="display:flex;align-items:center"><span class="av20" style="background:#E8EEFD;color:#3557C9">飞</span><span class="av20" style="background:#E9E9EC;color:#2B2B30;margin-left:-6px">G</span><span class="av20" style="background:#FAEEDB;color:#87500A;margin-left:-6px">历</span></span></span>
+              <span class="lab" style="background:{{t.ink}};top:-34px;right:-2px">③ 连接器</span>
+            </span>
+            
+          </div>
+          <div style="font-size:15px;line-height:1.6;color:#1D1D1F;padding:0 0 10px">把上周飞书里的周会纪要做成一份 8 页的汇报 PPT，重点放在里程碑和风险上</div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="ib" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
+            <span style="margin-left:auto"></span>
+            <span class="pop" style="font-weight:500;color:#1D1D1F"><span style="width:16px;height:16px;border-radius:4px;background:#E8EEFD;color:#3557C9;font-size:8.5px;font-weight:700;display:grid;place-items:center">DS</span><span style="font-family:'SF Mono',Menlo,monospace;font-size:12px">deepseek-v4-pro</span></span>
+            <span aria-hidden="true" style="width:34px;height:34px;border-radius:50%;background:{{t.btn}};color:#fff;display:grid;place-items:center;margin-left:4px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></span>
+          </div>
+        </div>
+      </div>
+      <div style="flex:1;min-width:360px;display:flex;flex-direction:column;gap:20px;padding-top:36px">
+        <sc-for list="{{legend}}" as="l" hint-placeholder-count="3">
+          <div style="display:flex;gap:14px;align-items:flex-start">
+            <span aria-hidden="true" style="width:24px;height:24px;border-radius:50%;background:{{t.ink}};color:#fff;font-size:12px;font-weight:600;display:grid;place-items:center;flex-shrink:0;margin-top:1px">{{l.n}}</span>
+            <div style="display:flex;flex-direction:column;gap:4px"><b style="font-size:14.5px;font-weight:600">{{l.title}}</b><span style="font-size:13.5px;line-height:1.7;color:#55555A">{{l.desc}}</span></div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </section>
+
+  <section aria-label="状态" style="display:flex;flex-direction:column;gap:16px">
+    <h2 style="margin:0;font-size:16px;font-weight:600">状态<span style="font-size:12.5px;font-weight:400;color:#6E6E73;margin-left:10px">只画与本规范相关的控件，权限、工作区等常驻控件照旧</span></h2>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px">
+      <sc-for list="{{states}}" as="s" hint-placeholder-count="6">
+        <div style="background:#fff;border-radius:16px;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.04);padding:20px 22px 22px;display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;align-items:baseline;gap:10px"><b style="font-size:14.5px;font-weight:600">{{s.title}}</b><span class="tag">{{s.tag}}</span></div>
+          <p style="margin:0;font-size:13px;line-height:1.65;color:#55555A;min-height:43px">{{s.desc}}</p>
+          <div style="background:{{t.tint}};border-radius:12px;padding:16px">
+            <div style="background:#fff;border-radius:16px;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.03),0 8px 22px rgba(0,0,0,.06);padding:13px 12px 8px 16px">
+              <sc-if value="{{s.hasTop}}" hint-placeholder-val="{{ false }}">
+                <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;min-height:28px">
+                  <div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:6px"><sc-for list="{{s.skills}}" as="k" hint-placeholder-count="1">
+                    <span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 9px;border-radius:8px;background:{{t.soft}};color:{{t.ink}};font-size:13px;font-weight:500"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"></path></svg>{{k.name}}<span class="xb" aria-hidden="true"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></span></span>
+                  </sc-for></div>
+                  <div style="display:flex;align-items:center;gap:2px;margin-left:auto;flex-shrink:0"><sc-if value="{{s.hasExpert}}" hint-placeholder-val="{{ false }}">
+                  <span class="pop" style="font-weight:500;color:#1D1D1F;box-shadow:inset 0 0 0 1px rgba(0,0,0,.09)"><span style="width:18px;height:18px;border-radius:{{s.ex.radius}};background:{{s.ex.avBg}};color:{{s.ex.avInk}};font-size:10.5px;font-weight:600;display:grid;place-items:center">
+                    <sc-if value="{{s.ex.isTeam}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 20a6 6 0 0 1 12 0M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.5a6 6 0 0 1 3 5.5"></path></svg></sc-if>
+                    <sc-if value="{{s.ex.isPerson}}" hint-placeholder-val="{{ false }}">{{s.ex.letter}}</sc-if></span>{{s.ex.name}}<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+                </sc-if>
+                <sc-if value="{{s.hasConns}}" hint-placeholder-val="{{ false }}">
+                  <span class="pop" style="padding:0 8px"><span style="display:flex;align-items:center">
+                    <sc-for list="{{s.stack}}" as="c" hint-placeholder-count="3">
+                      <span class="av20" style="position:relative;background:{{c.bg}};color:{{c.ink}};margin-left:{{c.ml}}">{{c.letter}}<sc-if value="{{c.warn}}" hint-placeholder-val="{{ false }}"><i style="position:absolute;right:-2px;top:-2px;width:8px;height:8px;border-radius:50%;background:#C77700;box-shadow:0 0 0 1.5px #fff"></i></sc-if></span>
+                    </sc-for></span></span>
+                </sc-if>
+                </div>
+                </div>
+              </sc-if>
+              <div style="font-size:14px;line-height:1.6;padding:2px 0 8px;color:{{s.textColor}}">{{s.text}}</div>
+              <div style="display:flex;align-items:center;gap:2px">
+                <span class="ib" aria-hidden="true"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
+                <span style="margin-left:auto"></span>
+                <span class="pop" style="font-weight:500;color:#1D1D1F"><span style="width:16px;height:16px;border-radius:4px;background:#E8EEFD;color:#3557C9;font-size:8.5px;font-weight:700;display:grid;place-items:center">DS</span><span style="font-family:'SF Mono',Menlo,monospace;font-size:12px">deepseek-v4-pro</span></span>
+                <span aria-hidden="true" style="width:32px;height:32px;border-radius:50%;margin-left:4px;display:grid;place-items:center;background:{{s.sendBg}};color:{{s.sendInk}}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section aria-label="选择器" style="display:flex;flex-direction:column;gap:16px">
+    <h2 style="margin:0;font-size:16px;font-weight:600">选择器<span style="font-size:12.5px;font-weight:400;color:#6E6E73;margin-left:10px">都从输入框工具栏向上弹出，贴着触发它的按钮</span></h2>
+    <div style="display:flex;gap:24px;align-items:flex-start">
+
+      <div style="display:flex;flex-direction:column;gap:10px;width:248px;flex-shrink:0">
+        <span class="cap">+ 菜单</span>
+        <div style="border-radius:14px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 14px 36px rgba(0,0,0,.14);padding:5px;display:flex;flex-direction:column;gap:1px">
+          <div class="pi" style="cursor:default"><span class="ti"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-9.2 9.2a5.5 5.5 0 0 1-7.8-7.8L13.2 3.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6L15 6.5"></path></svg></span><span class="pl">添加文件或图片</span><span class="pr">⌘U</span></div>
+          <div style="height:1px;background:rgba(0,0,0,.07);margin:4px 6px"></div>
+          <div class="pi" style="cursor:default"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"></path></svg></span><span class="pl">技能</span><span class="pr">PPT 演示文稿</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></div>
+          <div class="pi" style="cursor:default"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"></circle><path d="M5 20a7 7 0 0 1 14 0"></path></svg></span><span class="pl">专家</span><span class="pr">软件开发团队</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></div>
+          <div class="pi" style="cursor:default"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M7 8h10v4a5 5 0 0 1-10 0z"></path><path d="M12 17v5"></path></svg></span><span class="pl">连接器</span><span class="pr">3 个已启用</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;width:340px;flex-shrink:0">
+        <span class="cap">技能（/ 也能唤起，可多选）</span>
+        <div style="height:402px;box-sizing:border-box;border-radius:14px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 14px 36px rgba(0,0,0,.14);overflow:hidden;display:flex;flex-direction:column">
+          <div style="padding:10px 10px 6px"><div style="display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:8px;background:#F4F4F6;font-size:13px;color:#6E6E73"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>搜索技能，也可以直接敲 /</div></div>
+          <div style="padding:0 5px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:1px">
+            <sc-for list="{{pSkills}}" as="o" hint-placeholder-count="6">
+              <div class="pi" style="cursor:default;background:{{o.bg}}">
+                <span class="ti" style="width:28px;height:28px;background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"></path></svg></span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">{{o.name}}</span><span class="ds">{{o.desc}}</span></span>
+                <span class="tag">{{o.tag}}</span>
+                <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{o.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;padding:6px 10px;border-top:1px solid rgba(0,0,0,.07)"><span class="ft" style="color:{{t.ink}}">浏览小伴市场</span><span style="margin-left:auto"></span><span class="ft" style="color:#55555A">管理技能…</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;width:340px;flex-shrink:0">
+        <span class="cap">专家 / 专家团（@ 也能唤起，单选）</span>
+        <div style="height:402px;box-sizing:border-box;border-radius:14px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 14px 36px rgba(0,0,0,.14);overflow:hidden;display:flex;flex-direction:column">
+          <div style="padding:10px 10px 6px"><div style="display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:8px;background:#F4F4F6;font-size:13px;color:#6E6E73"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>搜索专家，也可以直接敲 @</div></div>
+          <div style="padding:0 5px;flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:1px">
+            <div class="pi" style="cursor:default"><span class="ti" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(160deg,{{t.btnHi}},{{t.btn}});color:#fff"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path></svg></span><span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">通用小伴</span><span class="ds">不指定专家，由小伴自行判断</span></span></div>
+            <div class="cap" style="padding:8px 10px 3px">专家团</div>
+            <sc-for list="{{pTeams}}" as="o" hint-placeholder-count="3">
+              <div class="pi" style="cursor:default;background:{{o.bg}}">
+                <span class="ti" style="width:28px;height:28px;border-radius:8px;background:{{o.avBg}};color:{{o.avInk}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 20a6 6 0 0 1 12 0M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.5a6 6 0 0 1 3 5.5"></path></svg></span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">{{o.name}}</span><span class="ds">{{o.desc}}</span></span>
+                <span class="tag">{{o.meta}}</span>
+                <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{o.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+              </div>
+            </sc-for>
+            <div class="cap" style="padding:8px 10px 3px">专家</div>
+            <sc-for list="{{pPeople}}" as="o" hint-placeholder-count="3">
+              <div class="pi" style="cursor:default">
+                <span class="ti" style="width:28px;height:28px;border-radius:50%;background:{{o.avBg}};color:{{o.avInk}};font-size:12px;font-weight:600">{{o.letter}}</span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">{{o.name}}</span><span class="ds">{{o.desc}}</span></span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;padding:6px 10px;border-top:1px solid rgba(0,0,0,.07)"><span class="ft" style="color:{{t.ink}}">去市场找更多专家</span><span style="margin-left:auto"></span><span class="sub" style="font-size:11px">对话期间一直生效</span></div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;width:320px;flex-shrink:0">
+        <span class="cap">连接器（逐个开关，可多个）</span>
+        <div style="box-sizing:border-box;border-radius:14px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 14px 36px rgba(0,0,0,.14);overflow:hidden;display:flex;flex-direction:column">
+          <div style="display:flex;align-items:baseline;gap:8px;padding:12px 14px 6px"><b style="font-size:13.5px;font-weight:600">连接器</b><span class="sub">已启用 3 / 4</span></div>
+          <div style="padding:0 5px;display:flex;flex-direction:column;gap:1px">
+            <sc-for list="{{pConns}}" as="o" hint-placeholder-count="5">
+              <div class="pi" style="cursor:default">
+                <span class="ti" style="width:28px;height:28px;border-radius:50%;background:{{o.bg}};color:{{o.ink}};font-size:12px;font-weight:600">{{o.letter}}</span>
+                <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">{{o.name}}</span><span class="ds" style="color:{{o.statusColor}}">{{o.status}}</span></span>
+                <sc-if value="{{o.isOk}}" hint-placeholder-val="{{ true }}"><span style="position:relative;width:34px;height:20px;border-radius:10px;background:{{o.trackBg}};flex-shrink:0"><span style="position:absolute;top:2px;left:{{o.knob}};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25)"></span></span></sc-if>
+                <sc-if value="{{o.isExpired}}" hint-placeholder-val="{{ false }}"><span class="lk" style="color:#8A5A00;box-shadow:inset 0 0 0 1px #E3C48A">重新授权</span></sc-if>
+                <sc-if value="{{o.isOff}}" hint-placeholder-val="{{ false }}"><span class="lk" style="color:{{t.ink}};box-shadow:inset 0 0 0 1px rgba(0,0,0,.14)">去连接</span></sc-if>
+              </div>
+            </sc-for>
+          </div>
+          <div style="display:flex;align-items:center;padding:6px 10px;margin-top:5px;border-top:1px solid rgba(0,0,0,.07)"><span class="ft" style="color:#55555A">管理连接器…</span><span style="margin-left:auto"></span><span class="sub" style="font-size:11px">仅本次对话</span></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"red"},"$preview":{"width":1440,"height":2080}}'>
+const PALETTES = {
+  red:      { name: '小伴红', btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
+  green:    { name: '薄荷绿', btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
+  blue:     { name: '海湾蓝', btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
+  purple:   { name: '暮紫',   btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9', dot: '#7C5CE6' },
+  amber:    { name: '琥珀',   btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED', dot: '#E09A2B' },
+  graphite: { name: '石墨',   btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3', dot: '#55555B' }
+};
+const TONES = {
+  blue: ['#E8EEFD', '#3557C9'], green: ['#E3F2E9', '#1E6A45'], amber: ['#FAEEDB', '#87500A'],
+  purple: ['#EDE8FC', '#5537B8'], red: ['#FCEBEC', '#B42A33'], gray: ['#E9E9EC', '#2B2B30']
+};
+const toneOf = (k) => TONES[k] ?? TONES.gray;
+const byId = (list, id) => list.find((x) => x.id === id);
+const SKILLS = [
+  { id: 'ppt', name: 'PPT 演示文稿', desc: '按主题或文档生成结构清晰的演示文稿', tag: '内置' },
+  { id: 'doc', name: 'Word 文档', desc: '撰写、改写并排版正式文档', tag: '内置' },
+  { id: 'xls', name: 'Excel 表格', desc: '清洗数据、写公式、生成图表', tag: '内置' },
+  { id: 'research', name: '深度研究', desc: '多轮检索、交叉验证，输出带引用的报告', tag: '内置' },
+  { id: 'weekly', name: '周报助手', desc: '把工作记录整理成固定格式的周报', tag: '我的' },
+  { id: 'invoice', name: '发票归档', desc: '按月份和抬头归档下载的发票', tag: '市场' }
+];
+const EXPERTS = [
+  { id: 'team-dev', kind: 'team', name: '软件开发团队', desc: '产品、架构、前端、测试协同完成一个需求', meta: '4 位专家', tone: 'blue' },
+  { id: 'team-content', kind: 'team', name: '内容创作团队', desc: '选题、写作、审校一条龙', meta: '3 位专家', tone: 'amber' },
+  { id: 'team-data', kind: 'team', name: '数据分析团队', desc: '取数、建模、可视化与解读', meta: '3 位专家', tone: 'green' },
+  { id: 'pm', kind: 'person', name: '产品经理', desc: '拆需求、写文档、排优先级', letter: '产', tone: 'purple' },
+  { id: 'arch', kind: 'person', name: '架构师', desc: '评审方案、拆分模块、控制技术风险', letter: '架', tone: 'blue' },
+  { id: 'fe', kind: 'person', name: '前端工程师', desc: '写界面、查样式问题、做交互', letter: '前', tone: 'green' },
+  { id: 'copy', kind: 'person', name: '文案策划', desc: '写文案、定调性、改标题', letter: '文', tone: 'red' },
+  { id: 'analyst', kind: 'person', name: '数据分析师', desc: '清洗数据、做图表、讲结论', letter: '数', tone: 'amber' },
+  { id: 'trans', kind: 'person', name: '翻译', desc: '中英互译，保留术语与格式', letter: '译', tone: 'gray' }
+];
+const CONNS = [
+  { id: 'feishu', name: '飞书', desc: '读取文档、日历与群消息', letter: '飞', tone: 'blue', state: 'ok' },
+  { id: 'github', name: 'GitHub', desc: '查看仓库、Issue 与 PR', letter: 'G', tone: 'gray', state: 'ok' },
+  { id: 'calendar', name: '日历', desc: '读取和创建日程', letter: '历', tone: 'amber', state: 'ok' },
+  { id: 'tdoc', name: '腾讯文档', desc: '读写在线文档与表格', letter: '腾', tone: 'green', state: 'expired' },
+  { id: 'notion', name: 'Notion', desc: '搜索页面与数据库', letter: 'N', tone: 'purple', state: 'off' }
+];
+const fmtTokens = (n) => n < 1000 ? String(Math.round(n)) : (n >= 1000000 ? (Math.round(n / 100000) / 10) + 'M' : (n < 100000 ? (Math.round(n / 100) / 10) : Math.round(n / 1000)) + 'K').replace('.0', '');
+const exView = (e) => { const [bg, ink] = toneOf(e.tone); return { ...e, avBg: bg, avInk: ink, isTeam: e.kind === 'team', isPerson: e.kind !== 'team', radius: e.kind === 'team' ? '6px' : '50%' }; };
+class Component extends DCLogic {
+  renderVals() {
+    const t = PALETTES[this.props.theme ?? 'red'] ?? PALETTES.red;
+    const PH = '描述你想完成的事。@ 选专家，/ 调用技能';
+    const mk = (title, tag, desc, o) => {
+      const skills = (o.skills || []).map((id) => ({ name: byId(SKILLS, id).name }));
+      const exp = o.expert ? exView(byId(EXPERTS, o.expert)) : null;
+      const ids = o.conns || [];
+      const stack = ids.slice(0, 3).map((id, i) => { const c = byId(CONNS, id); const [bg, ink] = toneOf(c.tone); return { letter: c.letter, bg, ink, ml: i ? '-6px' : '0', warn: c.state === 'expired' }; });
+      if (ids.length > 3) stack.push({ letter: '+' + (ids.length - 3), bg: '#E9E9EC', ink: '#4A4A50', ml: '-6px', warn: false });
+      const filled = !!o.text;
+      return { title, tag, desc, skills, hasSkills: skills.length > 0, hasTop: skills.length > 0 || !!exp || ids.length > 0, hasExpert: !!exp, ex: exp || {}, hasConns: ids.length > 0, stack,
+        text: o.text || PH, textColor: filled ? '#1D1D1F' : '#8E8E93',
+        sendBg: filled ? t.btn : '#E8E8EC', sendInk: filled ? '#fff' : '#A1A1A6' };
+    };
+    const states = [
+      mk('空状态', '默认', '只有一个 +。技能、专家、连接器都从 + 菜单进入，也可以在文字里敲 / 或 @。', {}),
+      mk('技能 · 单个', '一次性', '技能 chip 放在文字上方的左侧。点 × 移除；发送后自动清除，下一条消息要重新选。', { skills: ['ppt'], text: '做一份新品发布会的汇报' }),
+      mk('技能 · 多个', '最多 3 个', '多个 chip 在同一行排开，放不下就换行。技能之间没有先后顺序。', { skills: ['research', 'ppt', 'doc'], text: '调研新能源车的现状，整理成报告和汇报稿' }),
+      mk('专家团 + 连接器', '会话级', '专家团和连接器并排放在右上角。专家团用圆角方块头像，连接器用重叠的圆形图标，整个对话里一直生效。', { expert: 'team-dev', conns: ['feishu', 'github', 'calendar'], text: '把飞书里的需求文档拆成开发任务' }),
+      mk('单个专家 + 一个连接器', '会话级', '单个专家用圆形头像。只有一个连接器时也显示图标，不额外加文字。', { expert: 'pm', conns: ['feishu'], text: '帮我写这周的产品周报' }),
+      mk('连接器溢出与异常', '最多显示 3 个', '超过 3 个折成 +N。授权过期的连接器图标右上角有琥珀色点，点开可以重新授权。', { expert: 'team-data', conns: ['feishu', 'tdoc', 'github', 'calendar'], text: '汇总各平台上季度的数据' })
+    ];
+    const pSkills = SKILLS.map((s) => ({ ...s, on: s.id === 'ppt', bg: s.id === 'ppt' ? t.soft : 'transparent' }));
+    const pTeams = EXPERTS.filter((e) => e.kind === 'team').map((e) => ({ ...exView(e), on: e.id === 'team-dev', bg: e.id === 'team-dev' ? t.soft : 'transparent' }));
+    const pPeople = EXPERTS.filter((e) => e.kind !== 'team').slice(0, 3).map(exView);
+    const pConns = CONNS.map((c) => {
+      const [bg, ink] = toneOf(c.tone);
+      const on = ['feishu', 'github', 'calendar'].includes(c.id);
+      return { ...c, bg, ink, on, isOk: c.state === 'ok', isExpired: c.state === 'expired', isOff: c.state === 'off',
+        status: c.state === 'off' ? '尚未连接' : c.state === 'expired' ? '授权已过期，需要重新授权' : c.desc,
+        statusColor: c.state === 'expired' ? '#8A5A00' : '#6E6E73', trackBg: on ? t.btn : '#8E8E93', knob: on ? '16px' : '2px' };
+    });
+    return {
+      t, states, pSkills, pTeams, pPeople, pConns,
+      legend: [
+        { n: '①', title: '技能：一次性', desc: 'chip 在文字上方的左侧，可多选；发送后清除。入口：输入 /，或 + › 技能。' },
+        { n: '②', title: '专家 / 专家团：会话级，单选', desc: '放在输入框右上角。圆形头像是单个专家，圆角方块是专家团。点击更换，选「通用小伴」恢复默认。入口：输入 @，或 + › 专家。' },
+        { n: '③', title: '连接器：会话级，可多个', desc: '紧跟在专家右边。重叠图标最多显示 3 个，其余折成 +N；点开逐个开关，未连接的跳到连接页。入口：+ › 连接器。' },
+        { n: '·', title: '工具栏放不下时', desc: '右上角空间不够时，专家名先用省略号截断，连接器图标合并成 +N；技能 chip 会自动换行。工具栏不受影响。' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>

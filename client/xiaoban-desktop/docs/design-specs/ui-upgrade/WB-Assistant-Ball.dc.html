@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>超级小伴 · 小球</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+.ball{position:relative;width:44px;height:44px;border-radius:50%;border:0;padding:0;display:grid;place-items:center;background:var(--acc);box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 6px 18px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.28),inset 0 -2px 6px rgba(0,0,0,.12);cursor:pointer}
+.dark .ball{box-shadow:0 0 0 1px rgba(255,255,255,.16),0 6px 18px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -2px 6px rgba(0,0,0,.18)}
+.ball .mark{display:block;filter:drop-shadow(0 1px 1px rgba(0,0,0,.18))}
+.ball.idle{animation:breathe 4s ease-in-out infinite}
+.ball.think .tw{animation:twinkle 1.2s ease-in-out infinite}
+.ball.think .tw2{animation:twinkle 1.2s ease-in-out .4s infinite}
+.ball.think .mark{animation:sway 2.4s ease-in-out infinite}
+.wave{display:flex;align-items:center;gap:2.5px;height:20px}
+.wave i{display:block;width:3px;height:8px;border-radius:2px;background:#fff;animation:bar 1s ease-in-out infinite}
+.wave i:nth-child(2){animation-delay:.15s;height:14px}.wave i:nth-child(3){animation-delay:.3s;height:18px}.wave i:nth-child(4){animation-delay:.45s;height:10px}
+.wave.slow i{animation-duration:1.4s}
+.ball.mute{background:#8E8E93}
+.dark .ball.mute{background:#5A5A60}
+@keyframes breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}
+@keyframes twinkle{0%,100%{opacity:1}50%{opacity:.15}}
+@keyframes sway{0%,100%{transform:rotate(0)}50%{transform:rotate(12deg)}}
+@keyframes bar{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+@media (prefers-reduced-motion:reduce){.ball,.ball *,.wave i{animation:none!important}}
+.ring{position:absolute;inset:-6px;pointer-events:none}
+.badge{position:absolute;top:-3px;right:-3px;min-width:16px;height:16px;border-radius:8px;display:grid;place-items:center;font-size:10.5px;font-weight:600;color:#fff;box-shadow:0 0 0 2px #fff}
+.dark .badge{box-shadow:0 0 0 2px #2C2D32}
+.cell{display:flex;flex-direction:column;align-items:center;gap:12px;width:112px}
+.cap{font-size:12.5px;font-weight:500;color:#1D1D1F}
+.cap small{display:block;font-size:11.5px;font-weight:400;color:#5E5E63;text-align:center;margin-top:2px}
+.dark .cap{color:#F2F2F4}.dark .cap small{color:#A1A1A8}
+.menu{width:236px;padding:5px;border-radius:12px;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 14px 36px rgba(0,0,0,.18);font-size:13px;color:#1D1D1F;box-sizing:border-box}
+.mi{display:flex;align-items:center;gap:9px;width:100%;height:30px;padding:0 9px;border:0;border-radius:7px;background:transparent;font:inherit;color:inherit;text-align:left;cursor:pointer;box-sizing:border-box}
+.mi:hover{background:rgba(0,0,0,.05)}
+.mi svg{color:#55555A;flex-shrink:0}
+.mi kbd{margin-left:auto;font:11.5px -apple-system,'SF Pro Text',sans-serif;color:#8E8E93}
+.sep{height:1px;margin:4px 8px;background:rgba(0,0,0,.07)}
+.lbl{padding:6px 9px 3px;font-size:11.5px;color:#6E6E73}
+.sect{font-size:12px;font-weight:600;letter-spacing:.02em;color:#3A3A3F}
+.dark .sect{color:#D8D8DD}
+</style>
+</helmet>
+<div style="--acc:{{t.btn}};position:relative;width:1280px;height:800px;overflow:hidden;font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Microsoft YaHei UI',sans-serif;color:#1D1D1F;background:#E9ECEF;-webkit-font-smoothing:antialiased">
+
+  <!-- 浅色桌面 -->
+  <section style="position:absolute;left:0;top:0;width:1280px;height:470px;background:linear-gradient(180deg,#DCE3EA 0%,#E9E4DD 100%)">
+    <div style="position:absolute;left:40px;top:32px" class="sect">小球状态 · 浅色（44px，主题色圆底 + 白色品牌标志；状态用标志动效、外圈与角标表达）</div>
+
+    <div style="position:absolute;left:40px;top:80px;display:flex;gap:20px">
+      <div class="cell">
+        <button class="ball idle" type="button" aria-label="超级小伴 · 空闲"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg></button>
+        <div class="cap">空闲<small>品牌标志，整体慢呼吸</small></div>
+      </div>
+      <div class="cell">
+        <button class="ball" type="button" aria-label="超级小伴 · 聆听中" style="box-shadow:0 0 0 .5px rgba(0,0,0,.14),0 0 0 5px {{t.soft}},0 0 0 10px rgba(255,255,255,.35),0 6px 18px rgba(0,0,0,.14)"><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
+        <div class="cap">聆听<small>标志变声波，随音量起伏</small></div>
+      </div>
+      <div class="cell">
+        <button class="ball think" type="button" aria-label="超级小伴 · 生成中">
+          <svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg>
+          <svg class="ring" viewBox="0 0 50 50" aria-hidden="true"><circle cx="25" cy="25" r="23" fill="none" stroke="rgba(0,0,0,.06)" stroke-width="2.5"></circle><circle cx="25" cy="25" r="23" fill="none" stroke="{{t.btn}}" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="44 101" transform="rotate(-90 25 25)"></circle></svg>
+        </button>
+        <div class="cap">思考 / 生成中<small>星芒闪烁 + 进度环</small></div>
+      </div>
+      <div class="cell">
+        <button class="ball" type="button" aria-label="超级小伴 · 朗读中"><span class="wave slow" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
+        <div class="cap">朗读<small>慢节奏声波，读完变回标志</small></div>
+      </div>
+      <div class="cell">
+        <button class="ball" type="button" aria-label="超级小伴 · 等你确认"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg><span class="badge" style="background:#D98A0B">!</span></button>
+        <div class="cap">等你确认<small>琥珀角标，轻跳一次</small></div>
+      </div>
+      <div class="cell">
+        <button class="ball" type="button" aria-label="超级小伴 · 有未读回答"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg><span class="badge" style="min-width:10px;width:10px;height:10px;top:1px;right:1px;background:{{t.dot}}"></span></button>
+        <div class="cap">答完未读<small>主题色未读点</small></div>
+      </div>
+      <div class="cell">
+        <button class="ball mute" type="button" aria-label="超级小伴 · 出错"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg><span class="badge" style="background:#D93025"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></span></button>
+        <div class="cap">出错<small>圆底转灰 + 红角标</small></div>
+      </div>
+      <div class="cell">
+        <button class="ball" type="button" aria-label="超级小伴 · 悬停" style="transform:scale(1.06)"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg></button>
+        <div class="cap">悬停<small>放大 6%，提示 ⌥Space</small></div>
+      </div>
+    </div>
+
+    <!-- 完成冒泡 -->
+    <div style="position:absolute;left:40px;top:254px" class="sect">后台完成 · 冒泡预览（3 秒后淡出，留未读点）</div>
+    <div style="position:absolute;left:40px;top:296px;display:flex;align-items:center;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:20px;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 8px 24px rgba(0,0,0,.12);font-size:13px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{t.btn}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+        <span style="font-weight:500">已完成</span>
+        <span style="color:#5E5E63;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">周报初稿整理好了，共 4 个部分…</span>
+        <button type="button" style="height:28px;padding:0 12px;border:0;border-radius:14px;background:{{t.soft}};color:{{t.ink}};font:inherit;font-size:12.5px;font-weight:500;cursor:pointer">查看</button>
+      </div>
+      <button class="ball" type="button" aria-label="超级小伴 · 有未读回答"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg><span class="badge" style="min-width:10px;width:10px;height:10px;top:1px;right:1px;background:{{t.dot}}"></span></button>
+    </div>
+    <div style="position:absolute;left:40px;top:356px;display:flex;align-items:center;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:20px;background:rgba(255,255,255,.92);box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 8px 24px rgba(0,0,0,.12);font-size:13px">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B26B00" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4"></path><path d="M12 17h.01"></path><circle cx="12" cy="12" r="9"></circle></svg>
+        <span style="font-weight:500">需要你许可</span>
+        <span style="color:#5E5E63">写入 ~/Documents/周报.md</span>
+        <button type="button" style="height:28px;padding:0 12px;border:0;border-radius:14px;background:#FBEBD0;color:#8A5300;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer">去处理</button>
+      </div>
+      <button class="ball" type="button" aria-label="超级小伴 · 等你确认"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg><span class="badge" style="background:#D98A0B">!</span></button>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div style="position:absolute;left:620px;top:254px" class="sect">右键菜单</div>
+    <div style="position:absolute;left:620px;top:290px;display:flex;gap:12px;align-items:flex-start">
+      <button class="ball" type="button" aria-label="超级小伴"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg></button>
+      <div class="menu" role="menu" aria-label="超级小伴菜单" style="margin-top:20px">
+        <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.4 2.6a1 1 0 0 1 3 3L12.4 14.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"></path></svg>新对话<kbd>⌘N</kbd></button>
+        <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"></path></svg>截图提问<kbd>⌥⇧A</kbd></button>
+        <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg>打开主窗口</button>
+        <div class="sep"></div>
+        <div class="lbl">暂时隐藏小球</div>
+        <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>隐藏 1 小时</button>
+        <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"></path></svg>隐藏到明天</button>
+        <div class="sep"></div>
+        <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg>超级小伴设置…<kbd>⌘,</kbd></button>
+      </div>
+    </div>
+
+    <!-- 贴边 -->
+    <div style="position:absolute;left:960px;top:254px" class="sect">贴边吸附</div>
+    <div style="position:absolute;left:960px;top:290px;width:320px;height:150px;border-left:1px dashed rgba(0,0,0,.12)">
+      <div style="position:absolute;left:12px;top:0;font-size:12px;color:#5E5E63;line-height:1.6">拖到屏幕边缘：只露半个<br>鼠标靠近：滑出并显示状态</div>
+      <div style="position:absolute;right:-22px;top:62px"><button class="ball" type="button" aria-label="超级小伴 · 贴边" style="opacity:.92"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg></button></div>
+      <div style="position:absolute;right:28px;top:62px"><button class="ball" type="button" aria-label="超级小伴 · 悬停滑出"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg><span class="badge" style="min-width:10px;width:10px;height:10px;top:1px;right:1px;background:{{t.dot}}"></span></button></div>
+      <svg style="position:absolute;right:-4px;top:76px" width="28" height="16" viewBox="0 0 28 16" fill="none" stroke="#8E8E93" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M26 8H4M9 3 4 8l5 5"></path></svg>
+      <div style="position:absolute;right:0;top:0;bottom:0;width:4px;background:rgba(0,0,0,.08)"></div>
+    </div>
+  </section>
+
+  <!-- 深色 -->
+  <section class="dark" style="position:absolute;left:0;top:470px;width:1280px;height:330px;background:linear-gradient(180deg,#1E2026 0%,#26232A 100%)">
+    <div style="position:absolute;left:40px;top:30px" class="sect">小球状态 · 深色</div>
+    <div style="position:absolute;left:40px;top:76px;display:flex;gap:20px">
+      <div class="cell">
+        <button class="ball idle" type="button" aria-label="超级小伴 · 空闲"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg></button>
+        <div class="cap">空闲</div>
+      </div>
+      <div class="cell">
+        <button class="ball" type="button" aria-label="超级小伴 · 聆听中" style="box-shadow:0 0 0 .5px rgba(255,255,255,.14),0 0 0 5px rgba(255,255,255,.1),0 0 0 10px rgba(255,255,255,.05),0 6px 18px rgba(0,0,0,.4)"><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
+        <div class="cap">聆听</div>
+      </div>
+      <div class="cell">
+        <button class="ball think" type="button" aria-label="超级小伴 · 生成中">
+          <svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg>
+          <svg class="ring" viewBox="0 0 50 50" aria-hidden="true"><circle cx="25" cy="25" r="23" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="2.5"></circle><circle cx="25" cy="25" r="23" fill="none" stroke="{{t.dot}}" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="44 101" transform="rotate(-90 25 25)"></circle></svg>
+        </button>
+        <div class="cap">生成中</div>
+      </div>
+      <div class="cell">
+        <button class="ball" type="button" aria-label="超级小伴 · 朗读中"><span class="wave slow" aria-hidden="true"><i></i><i></i><i></i><i></i></span></button>
+        <div class="cap">朗读</div>
+      </div>
+      <div class="cell">
+        <button class="ball" type="button" aria-label="超级小伴 · 等你确认"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg><span class="badge" style="background:#E09A2B">!</span></button>
+        <div class="cap">等你确认</div>
+      </div>
+      <div class="cell">
+        <button class="ball" type="button" aria-label="超级小伴 · 有未读回答"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg><span class="badge" style="min-width:10px;width:10px;height:10px;top:1px;right:1px;background:{{t.dot}}"></span></button>
+        <div class="cap">答完未读</div>
+      </div>
+      <div class="cell">
+        <button class="ball mute" type="button" aria-label="超级小伴 · 出错"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg><span class="badge" style="background:#E5484D"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.4" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"></path></svg></span></button>
+        <div class="cap">出错</div>
+      </div>
+    </div>
+
+    <div style="position:absolute;left:40px;top:200px;display:flex;align-items:center;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px;height:40px;padding:0 6px 0 14px;border-radius:20px;background:rgba(44,45,50,.92);box-shadow:0 0 0 .5px rgba(255,255,255,.14),0 8px 24px rgba(0,0,0,.4);font-size:13px;color:#F2F2F4">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="{{t.dot}}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>
+        <span style="font-weight:500">已完成</span>
+        <span style="color:#A1A1A8">周报初稿整理好了，共 4 个部分…</span>
+        <button type="button" style="height:28px;padding:0 12px;border:0;border-radius:14px;background:rgba(255,255,255,.1);color:#F2F2F4;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer">查看</button>
+      </div>
+      <button class="ball" type="button" aria-label="超级小伴 · 有未读回答"><svg class="mark" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"></path><path class="tw" d="M20 2v4M22 4h-4"></path><circle class="tw2" cx="4" cy="20" r="2"></circle></svg><span class="badge" style="min-width:10px;width:10px;height:10px;top:1px;right:1px;background:{{t.dot}}"></span></button>
+    </div>
+
+    <div class="menu" role="menu" aria-label="超级小伴菜单 · 深色" style="position:absolute;left:880px;top:40px;background:rgba(40,41,46,.97);box-shadow:0 0 0 1px rgba(255,255,255,.1),0 14px 36px rgba(0,0,0,.5);color:#F2F2F4">
+      <button class="mi" type="button" role="menuitem" style="background:rgba(255,255,255,.08)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.4 2.6a1 1 0 0 1 3 3L12.4 14.6a2 2 0 0 1-.9.5l-2.9.8a.5.5 0 0 1-.6-.6l.8-2.9a2 2 0 0 1 .5-.9z"></path></svg>新对话<kbd style="color:#8E8E93">⌘N</kbd></button>
+      <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 3a2 2 0 0 0-2 2M19 3a2 2 0 0 1 2 2M21 19a2 2 0 0 1-2 2M5 21a2 2 0 0 1-2-2M9 3h1M9 21h1M14 3h1M14 21h1M3 9v1M21 9v1M3 14v1M21 14v1"></path></svg>截图提问<kbd style="color:#8E8E93">⌥⇧A</kbd></button>
+      <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 7h10v10"></path><path d="M7 17 17 7"></path></svg>打开主窗口</button>
+      <div class="sep" style="background:rgba(255,255,255,.1)"></div>
+      <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>隐藏 1 小时</button>
+      <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"></path></svg>隐藏到明天</button>
+      <div class="sep" style="background:rgba(255,255,255,.1)"></div>
+      <button class="mi" type="button" role="menuitem"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C7C7CC" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"></path><circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle></svg>超级小伴设置…<kbd style="color:#8E8E93">⌘,</kbd></button>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"red"},"$preview":{"width":1280,"height":800}}'>
+const PALETTES = {
+  red:      { btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
+  green:    { btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
+  blue:     { btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
+  purple:   { btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9', dot: '#7C5CE6' },
+  amber:    { btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED', dot: '#E09A2B' },
+  graphite: { btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3', dot: '#55555B' }
+};
+class Component extends DCLogic {
+  renderVals() {
+    return { t: PALETTES[this.props.theme ?? 'red'] ?? PALETTES.red };
+  }
+}
+</script>
+</body>
+</html>
