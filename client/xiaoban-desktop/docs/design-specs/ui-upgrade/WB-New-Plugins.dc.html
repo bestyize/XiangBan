@@ -130,6 +130,12 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
                   <button type="button" class="xb" aria-label="移除技能 {{s.name}}" onClick="{{s.remove}}"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
                 </span>
               </sc-for>
+<sc-if value="{{hasTool}}" hint-placeholder-val="{{ false }}">
+                <span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 9px;border-radius:8px;background:{{t.soft}};color:{{t.ink}};font-size:13px;font-weight:500">
+                  <sc-if value="{{toolChip.isComputer}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg></sc-if><sc-if value="{{toolChip.isPhone}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"></rect><path d="M12 18h.01"></path></svg></sc-if><sc-if value="{{toolChip.isDesign}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M9 21V9"></path></svg></sc-if>{{toolChip.name}}
+                  <button type="button" class="xb" aria-label="移除工具 {{toolChip.name}}" onClick="{{toolChip.remove}}"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+                </span>
+              </sc-if>
               </div>
               <div style="display:flex;align-items:center;gap:2px;margin-left:auto;min-width:0;flex-shrink:1">
 <sc-if value="{{hasExpert}}" hint-placeholder-val="{{ true }}">
@@ -158,7 +164,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
           <textarea aria-label="描述任务" rows="3" placeholder="描述你想完成的事。@ 选专家，/ 调用技能" value="{{text}}" onInput="{{onText}}" style="width:100%;box-sizing:border-box;border:0;outline:none;resize:none;font:inherit;font-size:15px;line-height:1.6;color:#1D1D1F;background:transparent"></textarea>
           <div style="display:flex;align-items:center;gap:2px;margin-top:4px">
             <div style="display:flex;align-items:center;gap:2px;min-width:0;flex-shrink:1">
-              <button type="button" class="ib" aria-label="添加：文件、技能、专家、连接器" aria-haspopup="menu" aria-expanded="{{plusOpenAttr}}" onClick="{{togglePlus}}" style="flex-shrink:0;background:{{plusBg}}"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+              <button type="button" class="ib" aria-label="添加：文件、技能、专家、连接器、工具" aria-haspopup="menu" aria-expanded="{{plusOpenAttr}}" onClick="{{togglePlus}}" style="flex-shrink:0;background:{{plusBg}}"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
               <button type="button" class="pop" aria-haspopup="listbox" style="flex-shrink:0"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>工作区<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
               <div style="position:relative;display:flex;flex-shrink:0">
                 <button type="button" class="pop" aria-haspopup="menu" aria-expanded="{{perm.openAttr}}" onClick="{{perm.toggle}}" style="color:{{perm.color}};background:{{perm.bg}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"></path><sc-if value="{{perm.full}}" hint-placeholder-val="{{ false }}"><path d="M12 8v4M12 15.5h.01"></path></sc-if></svg>{{perm.label}}<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
@@ -212,6 +218,51 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
                   <button type="button" role="menuitem" class="pi" onClick="{{openSkillMenu}}"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"></path></svg></span><span class="pl">技能</span><span class="pr">{{skillSummary}}</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></button>
                   <button type="button" role="menuitem" class="pi" onClick="{{openExpertMenu}}"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"></circle><path d="M5 20a7 7 0 0 1 14 0"></path></svg></span><span class="pl">专家</span><span class="pr">{{expertSummary}}</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></button>
                   <button type="button" role="menuitem" class="pi" onClick="{{openConnMenu}}"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M7 8h10v4a5 5 0 0 1-10 0z"></path><path d="M12 17v5"></path></svg></span><span class="pl">连接器</span><span class="pr">{{connSummary}}</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+                  <button type="button" role="menuitem" class="pi" onClick="{{openToolMenu}}"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.4 8.4a2.1 2.1 0 0 1-3-3L12 9"></path><path d="M17.6 6.4 20 8.8l-3.5 3.5-2.4-2.4"></path><path d="M12 9l2.1-2.1a3 3 0 0 0-1.5-3.6L11 2.5h4.5l2.1 3.9"></path></svg></span><span class="pl">工具</span><span class="pr">{{toolSummary}}</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{menuTool}}" hint-placeholder-val="{{ false }}">
+                <div role="menu" aria-label="工具" style="display:flex;flex-direction:column">
+                  <div style="padding:5px;display:flex;flex-direction:column;gap:1px">
+                    <div style="display:flex;align-items:center;gap:2px">
+                      <button type="button" class="pi" aria-pressed="{{tools.computer.checked}}" onClick="{{tools.computer.pick}}" style="background:{{tools.computer.bg}};flex:1;min-width:0">
+                        <span class="ti" style="width:28px;height:28px;background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">操作电脑</span><span class="ds">{{computerState}}</span></span>
+                        <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{tools.computer.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                      </button>
+                      <button type="button" class="act" aria-label="管理电脑控制" title="管理电脑控制" onClick="{{openComputer}}" style="flex-shrink:0"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9M14 17H5"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle></svg></button>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:2px">
+                      <button type="button" class="pi" aria-pressed="{{tools.phone.checked}}" onClick="{{tools.phone.pick}}" style="background:{{tools.phone.bg}};flex:1;min-width:0">
+                        <span class="ti" style="width:28px;height:28px;background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"></rect><path d="M12 18h.01"></path></svg></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">操作手机</span><span class="ds">需要 Android ADB 和手机授权</span></span>
+                        <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{tools.phone.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                      </button>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:2px">
+                      <button type="button" class="pi" aria-pressed="{{tools.design.checked}}" onClick="{{tools.design.pick}}" style="background:{{tools.design.bg}};flex:1;min-width:0">
+                        <span class="ti" style="width:28px;height:28px;background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M9 21V9"></path></svg></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px"><span class="pl">设计画板</span><span class="ds">交给设计工作台处理设计稿</span></span>
+                        <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{tools.design.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                      </button>
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;padding:6px 10px;margin-top:5px;border-top:1px solid rgba(0,0,0,.07)">
+                    <span class="sub" style="font-size:11px">单选 · 只作用于这条消息</span>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{menuComputer}}" hint-placeholder-val="{{ false }}">
+                <div role="dialog" aria-label="电脑控制" style="padding:14px 14px 12px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;align-items:center;gap:8px"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg></span><b style="font-size:13.5px;font-weight:600">电脑控制</b><span class="tag" style="background:{{computer.tagBg}};color:{{computer.tagInk}}">{{computer.state}}</span></div>
+                  <p style="margin:0;font-size:12.5px;line-height:1.6;color:#55555A">允许小伴操作电脑上的应用。首次使用时按系统提示授权屏幕录制和辅助功能，实际权限以系统为准。</p>
+                  <sc-if value="{{computer.on}}" hint-placeholder-val="{{ false }}"><button type="button" class="ft" onClick="{{computer.check}}" style="align-self:flex-start;border:0;background:transparent;font-family:inherit;color:{{t.ink}};cursor:pointer;padding:3px 0">让小伴检查权限</button></sc-if>
+                  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+                    <button type="button" onClick="{{computer.back}}" style="height:30px;padding:0 14px;border:0;border-radius:8px;background:#F2F2F4;font-family:inherit;font-size:13px;color:#1D1D1F;cursor:pointer">返回</button>
+                    <button type="button" onClick="{{computer.toggle}}" style="height:30px;padding:0 14px;border:0;border-radius:8px;background:{{computer.btnBg}};font-family:inherit;font-size:13px;font-weight:500;color:{{computer.btnInk}};cursor:pointer">{{computer.action}}</button>
+                  </div>
                 </div>
               </sc-if>
 
@@ -325,7 +376,7 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
   </sc-if>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"red"},"preset":{"editor":"enum","options":["empty","skill","expert","conns","all","chat"],"default":"all"},"menu":{"editor":"enum","options":["none","plus","skill","expert","conn"],"default":"none"},"$preview":{"width":1280,"height":800}}'>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"red"},"preset":{"editor":"enum","options":["empty","skill","expert","conns","all","chat","tool"],"default":"all"},"menu":{"editor":"enum","options":["none","plus","skill","expert","conn","tool","computer"],"default":"none"},"$preview":{"width":1280,"height":800}}'>
 const PALETTES = {
   red:      { name: '小伴红', btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
   green:    { name: '薄荷绿', btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
@@ -376,8 +427,10 @@ const PRESETS = {
   expert: { skills: [], expert: 'team-dev', conns: [] },
   conns:  { skills: [], expert: null, conns: ['feishu', 'github'] },
   all:    { skills: ['ppt'], expert: 'team-dev', conns: ['feishu', 'github', 'calendar'] },
-  chat:   { skills: [], expert: 'pm', conns: ['feishu', 'calendar'] }
+  chat:   { skills: [], expert: 'pm', conns: ['feishu', 'calendar'] },
+  tool:   { skills: [], expert: null, conns: [], tool: 'computer' }
 };
+const TOOL_NAMES = { computer: '操作电脑', phone: '操作手机', design: '设计画板' };
 const QUICK = [
   { label: '写文档', skill: 'doc' }, { label: '做表格', skill: 'xls' }, { label: '做 PPT', skill: 'ppt' },
   { label: '深度研究', skill: 'research' }, { label: '整理文件', skill: null }, { label: '定时任务', skill: null }
@@ -432,6 +485,26 @@ class Component extends DCLogic {
     const skills = st.skills ?? preset.skills;
     const expert = st.expert !== undefined ? st.expert : preset.expert;
     const conns = st.conns ?? preset.conns;
+
+    // 内置工具：一次性，单选；操作电脑需先在工具菜单里启用
+    const selTool = st.tool !== undefined ? st.tool : (preset.tool ?? null);
+    const computerOn = st.computerOn ?? !!preset.tool;
+    const pickTool = (id) => () => {
+      if (id === 'computer' && !computerOn) { this.setState({ menu: 'computer', selectOnEnable: true }); return; }
+      this.setState({ tool: selTool === id ? null : id, menu: null });
+    };
+    const tools = {};
+    Object.keys(TOOL_NAMES).forEach((id) => { const on = selTool === id; tools[id] = { on, checked: on ? 'true' : 'false', bg: on ? t.soft : 'transparent', pick: pickTool(id) }; });
+    const computer = {
+      on: computerOn, state: computerOn ? '已启用' : '未启用',
+      tagBg: computerOn ? '#E3F2E9' : '#F2F2F4', tagInk: computerOn ? '#1E6A45' : '#55555A',
+      action: computerOn ? '停用' : '启用', btnBg: computerOn ? '#F2F2F4' : t.btn, btnInk: computerOn ? '#1D1D1F' : '#fff',
+      back: () => this.setState({ menu: 'tool', selectOnEnable: false }),
+      toggle: () => this.setState(computerOn
+        ? { computerOn: false, tool: selTool === 'computer' ? null : selTool, menu: null }
+        : { computerOn: true, tool: st.selectOnEnable ? 'computer' : selTool, menu: null, selectOnEnable: false }),
+      check: () => this.setState({ tool: 'computer', text: '请检查电脑控制所需的系统权限，并告诉我检查结果。', menu: null })
+    };
     const menu = st.menu !== undefined ? st.menu : (this.props.menu && this.props.menu !== 'none' ? this.props.menu : null);
     const from = st.from ?? 'tool';
     const mode = st.mode ?? null;
@@ -485,7 +558,7 @@ class Component extends DCLogic {
     const pos = tool
       ? 'left:auto;right:8px;' + (EXDIR === 'down' ? 'top:42px;bottom:auto' : 'bottom:calc(100% + 6px);top:auto')
       : 'left:' + (PADL - 4) + 'px;right:auto;bottom:52px;top:auto';
-    const widths = { plus: 248, skill: 340, expert: 340, conn: 320 };
+    const widths = { plus: 248, skill: 340, expert: 340, conn: 320, tool: 300, computer: 300 };
 
     const m = (name) => menu === name;
     const swatches = Object.keys(PALETTES).map((k) => ({
@@ -504,14 +577,17 @@ class Component extends DCLogic {
         else this.setState({ text: v, ...(mode ? { menu: null, mode: null, q: '' } : {}) });
       },
       sendDisabled: !canSend, sendBg: canSend ? t.btn : '#E8E8EC', sendInk: canSend ? '#fff' : '#A1A1A6',
-      hasSkills: skillChips.length > 0, skillChips, hasTopRow: skillChips.length > 0 || !!exObj || enabled.length > 0,
+      hasSkills: skillChips.length > 0, skillChips, hasTopRow: skillChips.length > 0 || !!selTool || !!exObj || enabled.length > 0,
+      hasTool: !!selTool, toolChip: selTool ? { name: TOOL_NAMES[selTool], isComputer: selTool === 'computer', isPhone: selTool === 'phone', isDesign: selTool === 'design', remove: () => this.setState({ tool: null }) } : {},
+      tools, computer, computerState: computerOn ? '已启用 · 点右侧管理' : '未启用，点一下先启用',
       hasExpert: !!exObj, ex: exObj ? { ...exObj, openAttr: m('expert') ? 'true' : 'false', toggle: toggle('expert', 'tool'), bg: m('expert') ? '#F2F2F4' : 'transparent' } : {},
       hasConns: enabled.length > 0, connStack, connLabel: '已启用 ' + enabled.length + ' 个连接器，点击管理',
       connBg: m('connector') || m('conn') ? '#F2F2F4' : 'transparent', connOpenAttr: m('conn') ? 'true' : 'false', toggleConn: toggle('conn', 'tool'),
       plusOpenAttr: m('plus') ? 'true' : 'false', plusBg: m('plus') ? '#F2F2F4' : 'transparent', togglePlus: toggle('plus', 'tool'),
-      menuOpen: !!menu, menuPlus: m('plus'), menuSkill: m('skill'), menuExpert: m('expert'), menuConn: m('conn'),
+      menuOpen: !!menu, menuPlus: m('plus'), menuSkill: m('skill'), menuExpert: m('expert'), menuConn: m('conn'), menuTool: m('tool'), menuComputer: m('computer'),
       pop: { pos, width: widths[menu] ?? 248 }, closeMenu: close,
-      pickFile: close, openSkillMenu: open('skill', 'plus'), openExpertMenu: open('expert', 'plus'), openConnMenu: open('conn', 'plus'),
+      pickFile: close, openSkillMenu: open('skill', 'plus'), openExpertMenu: open('expert', 'plus'), openConnMenu: open('conn', 'plus'), openToolMenu: open('tool', 'plus'), openComputer: () => this.setState({ menu: 'computer', selectOnEnable: false }),
+      toolSummary: selTool ? TOOL_NAMES[selTool] : '',
       skillSummary: skillChips.length === 0 ? '' : skillChips.length === 1 ? skillChips[0].name : skillChips.length + ' 个技能',
       expertSummary: exObj ? exObj.name : '', connSummary: enabled.length ? enabled.length + ' 个已启用' : '',
       q, qReadonly: !!mode, onQ: (e) => { if (!mode) this.setState({ q: e.target.value }); },
