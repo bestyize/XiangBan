@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>我的作品</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:900px;box-sizing:border-box;background:#EDEDED;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+<header style="flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:#FFFFFF">
+<a href="Me.dc.html" aria-label="返回" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#222222;text-decoration:none">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+</a>
+<h1 style="margin:0;font-size:16px;font-weight:600">我的作品</h1>
+<a href="Studio.dc.html" aria-label="新建作品" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#E3203C;text-decoration:none">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+</a>
+</header>
+
+<main style="flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column">
+
+<div role="tablist" style="flex:none;display:flex;gap:28px;padding:0 16px;height:44px;background:#FFFFFF;border-bottom:0.5px solid #EDEDED">
+<sc-for list="{{chips}}" as="ch" hint-placeholder-count="4">
+<button type="button" role="tab" aria-selected="{{ch.on}}" onClick="{{ch.pick}}" style="flex:none;border:0;background:none;padding:3px 0 0;box-sizing:border-box;height:44px;font-size:15px;font-weight:{{ch.weight}};color:{{ch.color}};border-bottom:3px solid {{ch.line}}">{{ch.name}}</button>
+</sc-for>
+</div>
+
+<ul style="flex:none;list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:8px">
+<sc-for list="{{items}}" as="it" hint-placeholder-count="4">
+<li style="background:#FFFFFF;padding:16px">
+<div style="display:flex;gap:12px">
+<div style="position:relative;flex:none;width:76px;height:76px;border-radius:8px;background:{{it.c1}};overflow:hidden">
+<div style="position:absolute;left:{{it.x}}px;top:{{it.y}}px;width:32px;height:32px;border-radius:50%;background:{{it.c2}}"></div>
+</div>
+<div style="flex:1;min-width:0">
+<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+<span style="font-size:15px;font-weight:600">{{it.title}}</span>
+<span style="font-size:12px;color:#999999;">{{it.type}}</span>
+</div>
+<div style="margin-top:6px;display:flex;align-items:center;gap:8px">
+<span style="font-size:12px;color:#999999">{{it.state}}</span>
+<span style="font-size:12px;color:#666666">{{it.meta}}</span>
+</div>
+<div style="margin-top:6px;font-size:12px;line-height:1.5;color:#666666">{{it.hint}}</div>
+</div>
+</div>
+<div style="margin-top:10px;display:flex;gap:8px">
+<a href="Studio.dc.html" style="flex:1;height:36px;border:0;border-radius:18px;background:#F2F2F2;color:#222222;font-size:14px;display:flex;align-items:center;justify-content:center;text-decoration:none">继续编辑</a>
+<a href="PackDetail.dc.html" style="flex:1;height:36px;border:0;border-radius:18px;background:#F2F2F2;color:#222222;font-size:14px;display:flex;align-items:center;justify-content:center;text-decoration:none">查看</a>
+<a href="{{it.mainHref}}" style="flex:1;height:36px;border-radius:18px;background:#E3203C;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;text-decoration:none">{{it.mainLabel}}</a>
+</div>
+</li>
+</sc-for>
+</ul>
+
+<div style="flex:none;margin:12px 16px 0;font-size:12px;line-height:1.6;color:#666666">特效和方案提交后立即可用；组件、壁纸、游戏需要审核通过后，才能被一键应用或在线试玩。</div>
+
+</main>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const f = st.filter || 'all';
+    const defs = [['all', '全部 4'], ['draft', '草稿 1'], ['review', '审核中 1'], ['live', '已发布 2']];
+    const chips = defs.map((d) => ({
+      name: d[1],
+      on: f === d[0],
+      weight: f === d[0] ? 700 : 400,
+      color: f === d[0] ? '#E3203C' : '#6B6B6B',
+      line: f === d[0] ? '#E3203C' : 'transparent',
+      pick: () => this.setState({ filter: d[0] })
+    }));
+    const S = {
+      live: { state: '已发布', stateColor: '#6B6B6B', stateBg: '#E6F4EA', mainLabel: '发到电脑', mainHref: 'PackDetail.dc.html' },
+      review: { state: '审核中', stateColor: '#6B6B6B', stateBg: '#FFF4DB', mainLabel: '发到电脑', mainHref: 'PackDetail.dc.html' },
+      draft: { state: '草稿', stateColor: '#444444', stateBg: '#F2F2F2', mainLabel: '发布', mainHref: 'PublishPack.dc.html' }
+    };
+    const W = (k, o) => Object.assign({ k }, S[k], o);
+    const all = [
+      W('live', { title: '雨夜窗台', type: '特效', c1: '#1B2A41', c2: '#3E5C8A', x: 18, y: 16, meta: 'N 次应用', hint: '纯数据，提交后已可一键应用。' }),
+      W('review', { title: '三分钟小游戏', type: '游戏', c1: '#2E4F3E', c2: '#E8C547', x: 22, y: 20, meta: '提交于 [日期]', hint: '游戏需要审核，通过后才能在线试玩。' }),
+      W('draft', { title: '落樱', type: '特效', c1: '#2B2230', c2: '#E7A8C2', x: 20, y: 18, meta: '上次编辑 [日期]', hint: '还没发布，只有你自己能看到。' }),
+      W('live', { title: '极简办公台', type: '方案', c1: '#F1ECE4', c2: '#D9C7A8', x: 16, y: 20, meta: 'N 次复刻', hint: '方案只引用已发布的内容，提交后已可复刻。' })
+    ];
+    const items = all.filter((a) => f === 'all' || a.k === f);
+    return { chips, items };
+  }
+}
+</script>
+</body>
+</html>

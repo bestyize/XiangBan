@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小伴桌面 · 设置</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none}
+.sub{font-size:12px;color:#6E6E73}
+.ib{width:28px;height:28px;border-radius:8px;border:0;background:transparent;color:#55555A;display:grid;place-items:center;cursor:pointer}
+.ib:hover{background:rgba(0,0,0,.05)}
+.nv{display:flex;align-items:center;gap:10px;height:34px;padding:0 8px;border-radius:8px;border:0;background:transparent;font-family:inherit;font-size:13.5px;color:#1D1D1F;cursor:pointer;width:100%;text-align:left}
+.nv:hover{background:rgba(0,0,0,.045)}
+.nv i{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;color:#fff;flex-shrink:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 1px 1.5px rgba(0,0,0,.12)}
+.gh{font-size:12px;font-weight:600;color:#6E6E73;margin:22px 4px 8px}
+.gh:first-child{margin-top:0}
+.gr{background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.03);overflow:visible}
+.rw{display:flex;align-items:center;gap:14px;min-height:50px;padding:9px 16px;box-sizing:border-box;border-top:1px solid rgba(0,0,0,.055)}
+.rw:first-child{border-top:0}
+.rw .l{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.rw .l b{font-size:13.5px;font-weight:500}
+.rw .l span{font-size:12px;color:#6E6E73;line-height:1.45}
+.tg{width:38px;height:22px;border-radius:999px;position:relative;display:inline-block;flex-shrink:0;border:0;padding:0;cursor:pointer}
+.tg::after{content:"";position:absolute;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tg.on::after{left:18px}.tg.off{background:#E3E3E7}.tg.off::after{left:2px}
+.pop{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 8px 0 11px;border-radius:7px;border:0;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.13),0 1px 1.5px rgba(0,0,0,.05);font-family:inherit;font-size:13px;color:#1D1D1F;cursor:pointer}
+.bb{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 12px;border-radius:7px;border:0;font-family:inherit;font-size:13px;cursor:pointer;color:#1D1D1F;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.13),0 1px 1.5px rgba(0,0,0,.05)}
+.pb{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:28px;padding:0 12px;border-radius:7px;border:0;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)}
+.kbd{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:24px;padding:0 6px;border-radius:6px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.12),0 1.5px 0 rgba(0,0,0,.1);font-size:12px;font-weight:500;color:#1D1D1F;box-sizing:border-box}
+.mono{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:12px;font-weight:700;flex-shrink:0}
+.ok{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#23784F}
+.ok::before{content:"";width:7px;height:7px;border-radius:50%;background:#34A36D}
+.mode{display:flex;flex-direction:column;align-items:center;gap:8px;border:0;background:transparent;font-family:inherit;font-size:12.5px;color:#1D1D1F;cursor:pointer;padding:0}
+.mode .pv{width:132px;height:84px;border-radius:10px;overflow:hidden;display:flex;gap:4px;padding:6px;box-sizing:border-box}
+</style>
+</helmet>
+<div style="position:relative;width:1280px;height:800px;overflow:hidden;font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Microsoft YaHei UI',sans-serif;color:#1D1D1F;background:{{t.tint}};-webkit-font-smoothing:antialiased">
+
+  <div aria-hidden="true" style="position:absolute;inset:0;display:flex;filter:blur(1.5px)">
+    <div style="width:264px;padding:70px 18px;box-sizing:border-box;display:flex;flex-direction:column;gap:12px">
+      <div style="height:34px;width:150px;border-radius:9px;background:rgba(0,0,0,.06)"></div>
+      <div style="height:12px;width:120px;border-radius:6px;background:rgba(0,0,0,.07);margin-top:14px"></div>
+      <div style="height:12px;width:96px;border-radius:6px;background:rgba(0,0,0,.06)"></div>
+      <div style="height:12px;width:132px;border-radius:6px;background:rgba(0,0,0,.06)"></div>
+      <div style="height:12px;width:108px;border-radius:6px;background:rgba(0,0,0,.06)"></div>
+    </div>
+    <div style="flex:1;margin:8px 8px 8px 0;background:#fff;border-radius:12px;display:flex;flex-direction:column;align-items:center;padding-top:150px">
+      <div style="height:26px;width:420px;border-radius:8px;background:rgba(0,0,0,.06)"></div>
+      <div style="height:130px;width:700px;border-radius:18px;background:rgba(0,0,0,.035);margin-top:60px"></div>
+    </div>
+  </div>
+  <div aria-hidden="true" style="position:absolute;inset:0;background:rgba(24,24,28,.32);backdrop-filter:blur(6px)"></div>
+
+  <div role="dialog" aria-modal="true" aria-label="设置" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:940px;height:660px;border-radius:18px;overflow:hidden;display:flex;background:#F5F5F7;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 30px 80px rgba(0,0,0,.28),0 8px 20px rgba(0,0,0,.1)">
+
+    <nav aria-label="设置分类" style="width:220px;flex-shrink:0;background:{{t.tint}};border-right:1px solid rgba(0,0,0,.07);padding:0 10px 12px;box-sizing:border-box;display:flex;flex-direction:column">
+      <div style="height:48px;display:flex;align-items:center;gap:8px;padding-left:6px" aria-hidden="true">
+        <span style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+        <span style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      </div>
+      <label style="display:flex;align-items:center;gap:6px;height:30px;padding:0 9px;border-radius:8px;background:rgba(0,0,0,.055);color:#6E6E73;margin-bottom:10px">
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <input type="search" aria-label="搜索设置" placeholder="搜索设置" style="flex:1;min-width:0;border:0;background:transparent;outline:none;font:inherit;font-size:13px;color:#1D1D1F">
+      </label>
+      <div style="display:flex;align-items:center;gap:10px;padding:8px;margin-bottom:8px;border-radius:10px;background:rgba(255,255,255,.6);box-shadow:0 0 0 1px rgba(0,0,0,.04)">
+        <div style="width:36px;height:36px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);display:grid;place-items:center"><img src="/_blob/d590c6393f601ebec7f3e202245ef0cf" alt="" style="width:34px;height:34px;object-fit:contain"></div>
+        <div style="display:flex;flex-direction:column;line-height:1.3;min-width:0"><b style="font-size:13px;font-weight:600">小伴用户</b><span class="sub" style="font-size:11px">小伴账号 · 已登录</span></div>
+      </div>
+      <sc-for list="{{tabs}}" as="n" hint-placeholder-count="7">
+        <button type="button" class="nv" aria-current="{{n.current}}" onClick="{{n.pick}}" style="background:{{n.bg}};font-weight:{{n.weight}}">
+          <i style="background:{{n.color}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="{{n.icon}}"></path></svg></i>{{n.label}}
+          <sc-if value="{{n.badge}}" hint-placeholder-val="{{ false }}"><span style="margin-left:auto;height:18px;padding:0 6px;border-radius:999px;background:{{t.btn}};color:#fff;font-size:10.5px;font-weight:600;display:inline-flex;align-items:center">新</span></sc-if>
+        </button>
+      </sc-for>
+    </nav>
+
+    <section style="flex:1;min-width:0;display:flex;flex-direction:column">
+      <header style="height:48px;flex-shrink:0;display:flex;align-items:center;padding:0 12px 0 28px">
+        <h1 style="margin:0;font-size:15px;font-weight:600">{{cur.label}}</h1>
+        <button type="button" class="ib" aria-label="关闭设置" style="margin-left:auto"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+      </header>
+      <div style="flex:1;min-height:0;overflow-y:auto;padding:8px 28px 28px">
+
+        <sc-if value="{{is.general}}" hint-placeholder-val="{{ true }}">
+          <div class="gh">启动</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>开机自动启动</b><span>登录系统后在后台启动，桌面伙伴和提醒立即可用</span></div><button type="button" class="tg on" role="switch" aria-checked="true" aria-label="开机自动启动" style="background:{{t.btn}}"></button></div>
+            <div class="rw"><div class="l"><b>关闭窗口时</b></div><button type="button" class="pop">留在菜单栏<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" stroke-linecap="round"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg></button></div>
+          </div>
+          <div class="gh">桌面动画</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>暂停桌面动画</b><span>暂停伙伴与动态壁纸，不影响提醒计时</span></div><button type="button" class="tg off" role="switch" aria-checked="false" aria-label="暂停桌面动画"></button></div>
+            <div class="rw"><div class="l"><b>动画帧率</b><span>30 帧更省资源，60 帧更流畅</span></div><button type="button" class="pop">60 帧 · 流畅<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" stroke-linecap="round"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg></button></div>
+            <div class="rw"><div class="l"><b>全屏应用时暂停</b><span>看视频、玩游戏时自动让出性能</span></div><button type="button" class="tg on" role="switch" aria-checked="true" aria-label="全屏应用时暂停" style="background:{{t.btn}}"></button></div>
+            <div class="rw"><div class="l"><b>双击桌面打开游戏</b></div><button type="button" class="tg off" role="switch" aria-checked="false" aria-label="双击桌面打开游戏"></button></div>
+          </div>
+          <div class="gh">本地数据</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>数据位置</b><span style="font-family:'SF Mono',Menlo,monospace;font-size:11.5px">~/Library/Application Support/小伴桌面</span></div><button type="button" class="bb">在访达中显示</button></div>
+            <div class="rw"><div class="l"><b>壁纸与资源缓存</b><span>删除后会在使用时重新下载</span></div><button type="button" class="bb">清理缓存</button></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{is.appearance}}" hint-placeholder-val="{{ false }}">
+          <div class="gh">外观模式</div>
+          <div class="gr" style="padding:18px 16px;display:flex;gap:22px">
+            <button type="button" class="mode" aria-pressed="true"><span class="pv" style="background:linear-gradient(90deg,#F2F2F4 50%,#1E1E20 50%);box-shadow:0 0 0 2px #fff,0 0 0 4px {{t.btn}}"><span style="width:28px;border-radius:5px;background:rgba(255,255,255,.9)"></span><span style="flex:1;border-radius:5px;background:linear-gradient(90deg,#fff 35%,#2C2C2E 35%)"></span></span>跟随系统</button>
+            <button type="button" class="mode" aria-pressed="false"><span class="pv" style="background:#ECECEF;box-shadow:0 0 0 1px rgba(0,0,0,.08)"><span style="width:28px;border-radius:5px;background:#F7F7F9"></span><span style="flex:1;border-radius:5px;background:#fff"></span></span>浅色</button>
+            <button type="button" class="mode" aria-pressed="false"><span class="pv" style="background:#151517;box-shadow:0 0 0 1px rgba(0,0,0,.08)"><span style="width:28px;border-radius:5px;background:#232326"></span><span style="flex:1;border-radius:5px;background:#2C2C2F"></span></span>深色</button>
+          </div>
+          <div class="gh">主题色</div>
+          <div class="gr">
+            <div class="rw" style="padding:14px 16px;flex-wrap:wrap;gap:18px">
+              <sc-for list="{{swatches}}" as="s" hint-placeholder-count="6">
+                <button type="button" role="radio" aria-checked="{{s.checked}}" onClick="{{s.pick}}" style="display:flex;flex-direction:column;align-items:center;gap:7px;border:0;background:transparent;font-family:inherit;font-size:12px;color:{{s.text}};font-weight:{{s.weight}};cursor:pointer;padding:0">
+                  <span style="width:30px;height:30px;border-radius:50%;background:linear-gradient(160deg,{{s.hi}},{{s.color}});box-shadow:{{s.ring}}"></span>{{s.name}}
+                </button>
+              </sc-for>
+            </div>
+            <div class="rw"><div class="l"><b>侧栏跟随主题色</b><span>侧栏底色带一点主题色调</span></div><button type="button" class="tg on" role="switch" aria-checked="true" aria-label="侧栏跟随主题色" style="background:{{t.btn}}"></button></div>
+          </div>
+          <div class="gh">文字</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>字号</b></div>
+              <div style="display:inline-flex;padding:2px;border-radius:8px;background:#EDEDF0">
+                <button type="button" style="height:26px;padding:0 12px;border:0;border-radius:6px;background:transparent;font-family:inherit;font-size:12px;color:#55555A;cursor:pointer">小</button>
+                <button type="button" style="height:26px;padding:0 12px;border:0;border-radius:6px;background:#fff;font-family:inherit;font-size:13px;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.1);cursor:pointer">标准</button>
+                <button type="button" style="height:26px;padding:0 12px;border:0;border-radius:6px;background:transparent;font-family:inherit;font-size:14px;color:#55555A;cursor:pointer">大</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{is.ai}}" hint-placeholder-val="{{ false }}">
+          <div class="gr" style="padding:16px;display:flex;align-items:center;gap:14px;background:linear-gradient(120deg,#fff 40%,{{t.soft}})">
+            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(160deg,{{t.btnHi}},{{t.btn}});display:grid;place-items:center;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg></div>
+            <div class="l" style="flex:1;display:flex;flex-direction:column;gap:2px"><b style="font-size:14px;font-weight:600">小伴 AI</b><span class="sub">登录即可使用，无需自己配置密钥</span></div>
+            <span class="ok">默认使用中</span>
+          </div>
+          <div class="gh">使用模式</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>默认模式</b><span>日常更快；深入会多想一步，适合复杂任务</span></div>
+              <div style="display:inline-flex;padding:2px;border-radius:8px;background:#EDEDF0">
+                <button type="button" style="height:26px;padding:0 14px;border:0;border-radius:6px;background:#fff;font-family:inherit;font-size:12.5px;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.1);cursor:pointer">日常</button>
+                <button type="button" style="height:26px;padding:0 14px;border:0;border-radius:6px;background:transparent;font-family:inherit;font-size:12.5px;color:#55555A;cursor:pointer">深入</button>
+              </div>
+            </div>
+            <div class="rw"><div class="l"><b>隐藏工具调用信息</b><span>回答里只保留结果，执行过程可展开查看</span></div><button type="button" class="tg off" role="switch" aria-checked="false" aria-label="隐藏工具调用信息"></button></div>
+          </div>
+          <div class="gh" style="display:flex;align-items:center">自有模型服务<span style="margin-left:auto;font-weight:400">配置后可在输入框里切换</span></div>
+          <div class="gr">
+            <div class="rw"><span class="mono" style="background:#E8EEFD;color:#3557C9">DS</span><div class="l"><b>DeepSeek</b><span>3 个模型 · 默认 deepseek-v4-pro</span></div><span class="ok">已连接</span><a class="bb" href="WB-Provider.dc.html">编辑</a></div>
+            <div class="rw"><span class="mono" style="background:#E6F3FB;color:#1C6E9E">智</span><div class="l"><b>智谱 BigModel</b></div><span class="sub">未配置</span><button type="button" class="bb">配置</button></div>
+            <div class="rw"><span class="mono" style="background:#F1F1F3;color:#2C2C30">K</span><div class="l"><b>Kimi</b></div><span class="sub">未配置</span><button type="button" class="bb">配置</button></div>
+            <div class="rw"><span class="mono" style="background:#FDEEE6;color:#B4501C">M</span><div class="l"><b>MiniMax</b></div><span class="sub">未配置</span><button type="button" class="bb">配置</button></div>
+            <div class="rw" style="min-height:44px"><a href="WB-Provider-Custom.dc.html" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;color:{{t.ink}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>添加自定义供应商（OpenAI 兼容）</a></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{is.assistant}}" hint-placeholder-val="{{ false }}">
+          <div class="gr">
+            <div class="rw"><div class="l"><b>启用超级小伴</b><span>在任何应用里随时呼出，截图提问、语音对话</span></div><button type="button" class="tg on" role="switch" aria-checked="true" aria-label="启用超级小伴" style="background:{{t.btn}}"></button></div>
+          </div>
+          <div class="gh">呼出方式</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>快捷键</b></div><span style="display:inline-flex;gap:4px"><span class="kbd">⌥</span><span class="kbd" style="min-width:52px">Space</span></span><button type="button" class="bb">修改</button></div>
+            <div class="rw"><div class="l"><b>悬浮球</b><span>停靠在屏幕边缘，点一下呼出</span></div><button type="button" class="tg on" role="switch" aria-checked="true" aria-label="悬浮球" style="background:{{t.btn}}"></button></div>
+            <div class="rw"><div class="l"><b>鼠标停留时展开</b><span>停一下就展开，不打断正在输入的应用；移开自动收起</span></div><button type="button" class="tg on" role="switch" aria-checked="true" aria-label="鼠标停留时展开" style="background:{{t.btn}}"></button></div>
+            <div class="rw"><div class="l"><b>悬浮位置</b></div><button type="button" class="pop">屏幕右侧<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" stroke-linecap="round"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg></button></div>
+          </div>
+          <div class="gh">语音对话</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>呼出后</b></div><button type="button" class="pop">先打字<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" stroke-linecap="round"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg></button></div>
+            <div class="rw"><div class="l"><b>朗读回答</b></div><button type="button" class="pop">仅按住说话和实时对话时<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" stroke-linecap="round"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg></button></div>
+          </div>
+          <div class="gh">系统权限</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>屏幕录制</b><span>区域截图与标注需要此权限</span></div><span class="ok">已授权</span></div>
+            <div class="rw"><div class="l"><b>麦克风</b><span>语音提问需要此权限</span></div><span class="sub" style="color:#9A5410">未授权</span><button type="button" class="bb">去系统设置</button></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{is.voice}}" hint-placeholder-val="{{ false }}">
+          <div class="gh">语音识别</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>识别方式</b></div><button type="button" class="pop">在线识别<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" stroke-linecap="round"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg></button></div>
+          </div>
+          <div class="gh">朗读</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>自动朗读回复</b></div><button type="button" class="tg off" role="switch" aria-checked="false" aria-label="自动朗读回复"></button></div>
+            <div class="rw"><div class="l"><b>音色</b></div><button type="button" class="pop">温柔女声<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" stroke-linecap="round"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg></button><button type="button" class="bb">试听</button></div>
+            <div class="rw"><div class="l"><b>语速</b></div><input type="range" aria-label="语速" value="50" style="width:200px;accent-color:{{t.btn}}"></div>
+            <div class="rw"><div class="l"><b>音量</b></div><input type="range" aria-label="音量" value="70" style="width:200px;accent-color:{{t.btn}}"></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{is.safety}}" hint-placeholder-val="{{ false }}">
+          <div class="gh">默认权限</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>新任务的权限</b><span>小伴读写文件、运行命令前是否询问你</span></div><button type="button" class="pop">写入前询问<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" stroke-linecap="round"><path d="m7 9 5-5 5 5M7 15l5 5 5-5"></path></svg></button></div>
+            <div class="rw"><div class="l"><b>完全信任时使用沙箱</b><span>限制在工作区内，避免误改系统文件</span></div><button type="button" class="tg on" role="switch" aria-checked="true" aria-label="完全信任时使用沙箱" style="background:{{t.btn}}"></button></div>
+          </div>
+          <div class="gh">已记住的授权</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>写入“工作”文件夹</b><span>在“周报自动化”中授权</span></div><button type="button" class="bb">撤销</button></div>
+            <div class="rw"><div class="l"><b>读取日历</b><span>在“最近任务”中授权</span></div><button type="button" class="bb">撤销</button></div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{is.about}}" hint-placeholder-val="{{ false }}">
+          <div class="gr" style="padding:24px;display:flex;align-items:center;gap:18px">
+            <div style="width:64px;height:64px;border-radius:18px;background:linear-gradient(160deg,{{t.btnHi}},{{t.btn}});display:grid;place-items:center;color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 6px 14px rgba(0,0,0,.14)"><svg aria-hidden="true" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:3px"><b style="font-size:17px;font-weight:600">小伴桌面</b><span class="sub">版本 2.1.0</span></div>
+            <button type="button" class="pb" style="background:linear-gradient({{t.btnHi}},{{t.btn}})">更新到新版本</button>
+          </div>
+          <div class="gh">更新</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>自动检查更新</b></div><button type="button" class="tg on" role="switch" aria-checked="true" aria-label="自动检查更新" style="background:{{t.btn}}"></button></div>
+          </div>
+          <div class="gh">公告</div>
+          <div class="gr">
+            <div class="rw"><div class="l"><b>[公告标题]</b><span>[公告摘要]</span></div><span class="sub">[日期]</span></div>
+          </div>
+          <div style="display:flex;gap:18px;justify-content:center;margin-top:20px;font-size:12.5px"><a href="#" style="color:{{t.ink}}">小伴官网</a><a href="#" style="color:{{t.ink}}">意见反馈</a><a href="#" style="color:{{t.ink}}">用户协议</a></div>
+        </sc-if>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"red"},"tab":{"editor":"enum","options":["general","appearance","ai","assistant","voice","safety","about"],"default":"assistant"},"$preview":{"width":1280,"height":800}}'>
+const PALETTES = {
+  red:      { name: '小伴红', btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
+  green:    { name: '薄荷绿', btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
+  blue:     { name: '海湾蓝', btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
+  purple:   { name: '暮紫',   btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9', dot: '#7C5CE6' },
+  amber:    { name: '琥珀',   btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED', dot: '#E09A2B' },
+  graphite: { name: '石墨',   btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3', dot: '#55555B' }
+};
+const TABS = [
+  { id: 'general', label: '通用', color: '#8E8E93', icon: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z' },
+  { id: 'appearance', label: '外观', color: 'THEME', icon: 'M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2.5a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 22z' },
+  { id: 'ai', label: 'AI 模型', color: '#7152D8', icon: 'M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z' },
+  { id: 'assistant', label: '超级小伴', color: '#E5484D', icon: 'M13 2 4 14h7l-1 8 9-12h-7z' },
+  { id: 'voice', label: '声音', color: '#E0457B', icon: 'M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13' },
+  { id: 'safety', label: '安全与权限', color: '#2F6FDB', icon: 'M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z' },
+  { id: 'about', label: '关于与更新', color: '#55555B', icon: 'M12 16v-5M12 8h.01M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z', badge: true }
+];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { tab: null, theme: null }; }
+  renderVals() {
+    const key = this.state.theme ?? this.props.theme ?? 'red';
+    const t = PALETTES[key] ?? PALETTES.red;
+    const tab = this.state.tab ?? this.props.tab ?? 'general';
+    const tabs = TABS.map((n) => ({
+      ...n,
+      color: n.color === 'THEME' ? t.btn : n.color,
+      badge: !!n.badge,
+      current: n.id === tab ? 'page' : 'false',
+      bg: n.id === tab ? 'rgba(0,0,0,.075)' : 'transparent',
+      weight: n.id === tab ? '500' : '400',
+      pick: () => this.setState({ tab: n.id })
+    }));
+    const is = {};
+    TABS.forEach((n) => { is[n.id] = n.id === tab; });
+    const swatches = Object.keys(PALETTES).map((k) => ({
+      name: PALETTES[k].name, color: PALETTES[k].btn, hi: PALETTES[k].btnHi,
+      checked: k === key ? 'true' : 'false',
+      ring: k === key ? '0 0 0 2px #fff, 0 0 0 4px ' + PALETTES[k].btn : 'inset 0 0 0 1px rgba(0,0,0,.1)',
+      text: k === key ? '#1D1D1F' : '#6E6E73',
+      weight: k === key ? '500' : '400',
+      pick: () => this.setState({ theme: k })
+    }));
+    return { t, tabs, is, swatches, cur: TABS.find((n) => n.id === tab) ?? TABS[0] };
+  }
+}
+</script>
+</body>
+</html>

@@ -96,9 +96,8 @@ use crate::ai_gateway::{self, KeySource};
 const MAX_INPUT_CHARS: usize = 30_000;
 /// How many images one message may carry.
 const MAX_IMAGES: usize = 8;
-/// Largest single image, measured in the encoded data URL. Base64 inflates by a third, so this is
-/// roughly 3 MiB of original bytes — enough for a screenshot without bloating the session file.
-const MAX_IMAGE_CHARS: usize = 4 * 1024 * 1024;
+/// Permit an original attachment up to 10 MiB; model-facing images are prepared separately.
+const MAX_IMAGE_CHARS: usize = (10 * 1024 * 1024 + 2) / 3 * 4 + 128;
 /// Image types the three protocols accept. SVG and friends are rejected: providers either refuse
 /// them or need them rasterised first.
 const IMAGE_MEDIA_TYPES: &[&str] = &["image/png", "image/jpeg", "image/gif", "image/webp"];
@@ -117,7 +116,7 @@ fn clean_image(raw: &str) -> Result<String, String> {
         return Err("图片内容为空".into());
     }
     if url.len() > MAX_IMAGE_CHARS {
-        return Err("这张图片太大了，请换一张小于 3MB 的".into());
+        return Err("这张图片太大了，请换一张小于 10MB 的".into());
     }
     let Some((meta, data)) = url.strip_prefix("data:").and_then(|rest| rest.split_once(',')) else {
         return Err("只支持本机粘贴或选择的图片".into());
@@ -132,6 +131,17 @@ fn clean_image(raw: &str) -> Result<String, String> {
         return Err("图片数据不完整，请重新粘贴".into());
     }
     Ok(url.to_string())
+}
+
+fn prepare_model_image(url: &str) -> Result<String, String> {
+    match agent_kernel::image_payload::prepare_data_url(url) {
+        Ok(Some(prepared)) => Ok(prepared),
+        Ok(None) => Ok(url.to_string()),
+        // Preserve compatibility with small images the decoder cannot inspect; a large
+        // undecodable image must not silently bloat the saved session.
+        Err(_) if url.len() <= (1024 * 1024usize).div_ceil(3) * 4 + 128 => Ok(url.to_string()),
+        Err(_) => Err("无法处理这张大图片，请换一张或先缩小图片".into()),
+    }
 }
 
 /// The user's parts in the order the protocols expect: text first, then images.
@@ -367,6 +377,16 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
     profile.timeouts = config.model_timeouts.get(&config.active_provider).cloned().unwrap_or_default();
     profile.proxy_mode = network.mode;
     profile.proxy_url = network.proxy_url;
+    // Scope opaque provider state to the selected service, account and network route. Keep
+    // proxy credentials and API keys out of history; managed gateway access tokens rotate.
+    use sha2::{Digest, Sha256};
+    let mut route = Sha256::new();
+    let account = if config.active_provider == crate::ai_gateway::GATEWAY_ID { "" } else { &config.api_key };
+    for part in [config.active_provider.as_str(), account, profile.proxy_mode.as_str(), profile.proxy_url.as_str()] {
+        route.update((part.len() as u64).to_be_bytes());
+        route.update(part.as_bytes());
+    }
+    profile.state_scope = Some(format!("{:x}", route.finalize()));
     // Central model policy: compatible APIs use endpoint defaults; Anthropic
     // receives a required model/endpoint-specific max_tokens value.
     let capabilities = config.model_capabilities();
@@ -552,6 +572,7 @@ fn skills_for(dirs: &Dirs, bundled: PathBuf) -> Skills {
 pub fn chat_invocable_skills(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Vec<Value>, String> {
     chat_window(&window)?;
     let dirs = Dirs::of(&app)?;
+    sync_computer_use_skill(&dirs.skills(), crate::ai_config::current(&app)?.open_computer_use);
     let skills = skills_for(&dirs, dirs.chat.join("bundled-skills"));
     Ok(skill_invocation::menu(&skills, &dirs.plugins(), &dirs.skills()))
 }
@@ -1278,6 +1299,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
         return Err(format!("一次最多发送 {MAX_IMAGES} 个附件"));
     }
     let images = images.iter().map(|raw| clean_image(raw)).collect::<Result<Vec<_>, _>>()?;
+    let model_images = images.iter().map(|raw| prepare_model_image(raw)).collect::<Result<Vec<_>, _>>()?;
     if retry && (!attachments.is_empty() || !images.is_empty()) { return Err("重试不能添加新附件".into()); }
     if !retry && text.is_empty() && images.is_empty() && attachments.is_empty() && staged_count == 0 {
         return Err("请先输入内容".into());
@@ -1384,7 +1406,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
     // Build the agent and run it entirely on a dedicated OS thread.
     // reqwest::blocking::Client internally manages its own current-thread runtime;
     // building or dropping it inside Tokio's async worker threads panics.
-    let parts = user_parts(&text, &images);
+    let parts = user_parts(&text, &model_images);
     let (handle, id, parts_owned, config_owned, workspace_owned) = (app.clone(), summary.id.clone(), parts, config, workspace);
     let from_queue = queued.is_some();
     let started = std::thread::Builder::new().name(format!("chat-{id}")).spawn(move || {

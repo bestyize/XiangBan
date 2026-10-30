@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小伴桌面 · 小伴市场接入</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+.si{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;color:#26262B;font-size:14px;border:0;background:transparent;font-family:inherit;width:100%;box-sizing:border-box;cursor:pointer;text-align:left}
+.si:hover{background:rgba(0,0,0,.045)}
+.si svg{flex-shrink:0;color:#4A4A50}
+.sub{font-size:12px;color:#6E6E73}
+.cap{font-size:12px;color:#6E6E73;font-weight:500}
+.ib{width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:#55555A;display:grid;place-items:center;cursor:pointer}
+.ib:hover{background:rgba(0,0,0,.05)}
+.ses{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px 0 36px;border-radius:8px;font-size:13px;color:#3A3A40}
+.ses:hover{background:rgba(0,0,0,.045)}
+.ses span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt{border:0;background:transparent;font-family:inherit;font-size:20px;font-weight:600;color:#A1A1A6;cursor:pointer;padding:0;display:inline-flex;align-items:center;gap:6px}
+.cat{height:30px;padding:0 12px;border-radius:8px;border:0;background:transparent;font-family:inherit;font-size:13px;color:#55555A;cursor:pointer}
+.cat:hover{background:#F4F4F6}
+.tag{height:22px;padding:0 8px;border-radius:6px;background:rgba(0,0,0,.045);color:#4A4A50;font-size:11.5px;display:inline-flex;align-items:center;white-space:nowrap}
+.bb{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:8px;border:0;font-family:inherit;font-size:13px;cursor:pointer;color:#1D1D1F;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.12),0 1px 1.5px rgba(0,0,0,.05)}
+.xc{position:relative;padding:18px 18px 14px;border-radius:18px;box-shadow:0 0 0 1px rgba(0,0,0,.065),0 1px 2px rgba(0,0,0,.03),0 6px 16px rgba(0,0,0,.025);transition:transform .18s,box-shadow .18s}
+.xc:hover{transform:translateY(-2px);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04),0 14px 30px rgba(0,0,0,.08)}
+.seg{display:inline-flex;padding:2px;border-radius:8px;background:#F2F2F4}
+.seg button{height:26px;padding:0 12px;border:0;border-radius:6px;background:transparent;font-family:inherit;font-size:12px;color:#55555A;cursor:pointer;white-space:nowrap}
+.seg button[aria-pressed=true]{background:#fff;color:#1D1D1F;font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.pill{height:30px;padding:0 14px;border-radius:999px;border:0;font-family:inherit;font-size:12.5px;font-weight:500;cursor:pointer;background:#fff;display:inline-flex;align-items:center;gap:5px}
+.pill.done{background:#F2F2F4;color:#55555A;cursor:default}
+.ovl{position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(24,24,28,.32);display:flex;align-items:center;justify-content:center;padding:36px;box-sizing:border-box}
+.dlg{background:#fff;border-radius:18px;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 30px 80px rgba(0,0,0,.28),0 8px 20px rgba(0,0,0,.1);display:flex;flex-direction:column;max-height:100%;min-height:0;overflow:hidden}
+.dh{flex:none;display:flex;gap:14px;align-items:center;padding:20px 24px 16px;border-bottom:1px solid rgba(0,0,0,.06)}
+.db{flex:1;min-height:0;overflow-y:auto;padding:4px 24px 12px}
+.df{flex:none;display:flex;gap:9px;align-items:center;justify-content:flex-end;padding:14px 24px;border-top:1px solid rgba(0,0,0,.06)}
+.h4{font-size:12.5px;font-weight:600;color:#1D1D1F;margin:20px 0 8px;display:flex;align-items:baseline;gap:8px}
+.h4 small{font-size:11.5px;font-weight:400;color:#8E8E93}
+.p{font-size:13px;line-height:1.8;color:#6E6E73;margin:10px 0}
+.pre{white-space:pre-wrap;max-height:150px;overflow:auto;padding:12px 14px;background:#F5F5F7;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06);font-size:12px;line-height:1.7;color:#1D1D1F;margin:0;font-family:inherit}
+.note{padding:12px 14px;background:#F5F5F7;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.06);font-size:12px;line-height:1.7;color:#6E6E73;margin:14px 0 0}
+.files{list-style:none;margin:0;padding:0 14px;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+.files li{padding:9px 0;border-bottom:1px solid rgba(0,0,0,.06)}
+.files li:last-child{border-bottom:0}
+.files li>div{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px}
+.files code{font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12px}
+.files small{display:block;font-size:10.5px;color:#8E8E93;word-break:break-all;margin-top:3px}
+.chk{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.7;padding:12px 14px;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.08);margin-top:16px;cursor:pointer}
+.chk input{margin-top:4px;flex-shrink:0}
+.sb{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 16px;border:0;border-radius:9px;font-family:inherit;font-size:13px;color:#1D1D1F;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.12),0 1px 1.5px rgba(0,0,0,.05);cursor:pointer}
+.sb:hover{background:#F5F5F7}
+.pbtn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:34px;padding:0 16px;border:0;border-radius:9px;font-family:inherit;font-size:13px;font-weight:500}
+.kv{display:grid;grid-template-columns:76px 1fr;gap:8px 12px;font-size:12.5px;color:#6E6E73;padding:14px;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.08);margin-top:14px}
+.kv b{font-weight:400;color:#8E8E93}
+.kv span{color:#1D1D1F;overflow-wrap:anywhere}
+.fld{display:grid;gap:6px;font-size:12px;font-weight:500;color:#6E6E73}
+.inp{box-sizing:border-box;width:100%;padding:8px 11px;border:0;border-radius:9px;background:#F2F2F4;color:#1D1D1F;font-family:inherit;font-size:13px;line-height:1.6;outline:none}
+.inp:focus{background:#fff;box-shadow:inset 0 0 0 1.5px #D93A44}
+.grp{display:grid;gap:12px;margin:14px 0;padding:14px;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+.row{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid rgba(0,0,0,.06)}
+.row:last-child{border-bottom:0}
+.row .t{font-size:13.5px;font-weight:500}
+.row .d{font-size:12px;color:#6E6E73;line-height:1.6;margin-top:2px}
+.sw{width:36px;height:22px;border-radius:999px;position:relative;flex-shrink:0;border:0;padding:0;cursor:pointer}
+.sw i{position:absolute;top:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.ok{display:inline-flex;align-items:center;gap:5px;color:#23784F;font-size:12px}
+.bar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;font-size:12.5px;line-height:1.6;margin-bottom:14px}
+.lnk{border:0;background:none;padding:0;font-family:inherit;font-size:inherit;cursor:pointer;font-weight:500}
+</style>
+</helmet>
+<div style="position:relative;width:1280px;height:800px;overflow:hidden;display:flex;font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Microsoft YaHei UI',sans-serif;color:#1D1D1F;background:{{t.tint}};-webkit-font-smoothing:antialiased">
+
+  <aside style="width:264px;flex-shrink:0;display:flex;flex-direction:column;padding:0 12px 12px;box-sizing:border-box">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding-left:6px">
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <button type="button" class="ib" aria-label="收起侧栏" style="margin-left:auto"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M9 4v16"></path></svg></button>
+      <button type="button" class="ib" aria-label="搜索"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 6px 16px">
+      <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(160deg,{{t.btnHi}},{{t.btn}});color:#fff;display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 2px 6px rgba(0,0,0,.12)">
+        <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+      </div>
+      <div style="display:flex;flex-direction:column;line-height:1.25"><strong style="font-size: 15px; font-weight: 600">小伴桌面</strong></div>
+    </div>
+    <nav aria-label="功能分区" style="display:flex;flex-direction:column;gap:1px;flex:1;min-height:0;overflow:hidden">
+      <button type="button" class="si" aria-expanded="true" style="font-weight:600">
+        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+        小伴 AI
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round" style="margin-left:auto"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <div style="display:flex;flex-direction:column;gap:1px;padding-left:10px">
+        <a class="si" href="WB-New.dc.html"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"></path><path d="M18.4 2.6a2 2 0 0 1 3 3L12 15l-4 1 1-4z"></path></svg>新建任务<span class="sub" style="margin-left:auto;font-size:11px">⌘N</span></a>
+        <a class="si" href="WB-Plugins.dc.html" aria-current="page" style="background:{{t.soft}};color:{{t.ink}};font-weight:500"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.9" stroke-linejoin="round"><path d="M19.4 13a2 2 0 1 0 0-4H18V6a2 2 0 0 0-2-2h-3V2.6a2 2 0 1 0-4 0V4H6a2 2 0 0 0-2 2v3h1.4a2 2 0 1 1 0 4H4v3a2 2 0 0 0 2 2h3v-1.4a2 2 0 1 1 4 0V18h3a2 2 0 0 0 2-2v-3z"></path></svg>AI 插件</a>
+        <a class="si" href="#"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"></path><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"></path></svg>资料库</a>
+        <div style="display:flex;align-items:center;height:30px;padding:0 4px 0 10px;margin-top:6px"><span class="cap">空间</span><button type="button" class="ib" aria-label="新建工作区" style="margin-left:auto;width:24px;height:24px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+        <a class="si" href="WB-Chat.dc.html"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"></path></svg>最近任务<span class="sub" style="margin-left:auto">2</span></a>
+        <a class="ses" href="WB-Chat.dc.html"><span>整理下周工作计划</span><i style="width:7px;height:7px;border-radius:50%;background:{{t.dot}}"></i></a>
+        <a class="ses" href="#"><span>把截图里的表格转成 Excel</span></a>
+        <a class="si" href="#"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>官网改版<span class="sub" style="margin-left:auto">4</span></a>
+        <a class="si" href="#"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>周报自动化<span class="sub" style="margin-left:auto">1</span></a>
+      </div>
+      <div style="height:1px;background:rgba(0,0,0,.06);margin:8px 10px"></div>
+      <a class="si" href="WB-Studio.dc.html"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2.5a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 22z"></path><circle cx="7.5" cy="10.5" r="1" fill="currentColor"></circle><circle cx="12" cy="7" r="1" fill="currentColor"></circle><circle cx="16.5" cy="10.5" r="1" fill="currentColor"></circle></svg>装扮</a>
+      <a class="si" href="#"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="5"></rect><path d="M7 11v3M5.5 12.5h3"></path><circle cx="16" cy="11.5" r=".7" fill="currentColor"></circle><circle cx="18" cy="13.5" r=".7" fill="currentColor"></circle></svg>游玩</a>
+      <a class="si" href="WB-Remind.dc.html"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>提醒<span class="sub" style="margin-left:auto">15:30</span></a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px 0;border-top:1px solid rgba(0,0,0,.06)">
+      <div style="width:30px;height:30px;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);display:grid;place-items:center"><img src="/_blob/d590c6393f601ebec7f3e202245ef0cf" alt="" style="width:26px;height:26px;object-fit:contain"></div>
+      <span style="font-size:13px;font-weight:500">小伴用户</span>
+      <button type="button" class="ib" aria-label="通知" style="margin-left:auto"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg></button>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;margin:8px 8px 8px 0;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.04);display:flex;flex-direction:column;overflow:hidden;padding:22px 28px 0;box-sizing:border-box">
+    <header style="display:flex;align-items:center;gap:22px">
+      <div role="tablist" aria-label="插件类型" style="display:flex;gap:22px">
+        <sc-for list="{{tabs}}" as="x" hint-placeholder-count="3">
+          <button type="button" role="tab" aria-selected="{{x.sel}}" class="tt" onClick="{{x.pick}}" style="color:{{x.color}}">{{x.label}}</button>
+        </sc-for>
+      </div>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;width:220px;height:32px;padding:0 10px;border-radius:9px;background:#F4F4F6;color:#6E6E73;box-sizing:border-box">
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+          <input type="search" aria-label="搜索" placeholder="{{searchHint}}" style="flex:1;min-width:0;border:0;background:transparent;outline:none;font:inherit;font-size:13px;color:#1D1D1F">
+        </label>
+        <button type="button" class="bb" aria-pressed="{{installedOnly}}" onClick="{{toggleInstalled}}" style="{{instStyle}}">已安装<span style="min-width:18px;height:18px;border-radius:999px;background:{{t.soft}};color:{{t.ink}};font-size:11px;font-weight:600;display:inline-grid;place-items:center;padding:0 5px;box-sizing:border-box">{{installedCount}}</span>
+          <sc-if value="{{hasUpdates}}" hint-placeholder-val="{{ true }}"><i aria-label="有可用更新" style="width:7px;height:7px;border-radius:50%;background:{{t.dot}}"></i></sc-if>
+        </button>
+        <button type="button" class="ib" aria-label="插件来源设置" onClick="{{openSettings}}" style="box-shadow:0 0 0 1px rgba(0,0,0,.12);background:#fff"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"></path><circle cx="16" cy="7" r="2"></circle><circle cx="8" cy="17" r="2"></circle></svg></button>
+      </div>
+    </header>
+
+    <div style="margin-top:18px;display:flex;align-items:center;gap:4px;padding-bottom:12px;border-bottom:1px solid rgba(0,0,0,.06)">
+      <sc-for list="{{cats}}" as="c" hint-placeholder-count="6">
+        <button type="button" class="cat" aria-pressed="{{c.pressed}}" onClick="{{c.pick}}" style="background:{{c.bg}};color:{{c.color}};font-weight:{{c.weight}}">{{c.label}}</button>
+      </sc-for>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+        <div class="seg" role="group" aria-label="内容来源">
+          <button type="button" aria-pressed="{{srcMarket}}" onClick="{{pickMarket}}">小伴市场<sc-if value="{{offline}}" hint-placeholder-val="{{ false }}"><i style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#E09A2B;margin-left:6px"></i></sc-if></button>
+          <button type="button" aria-pressed="{{srcHub}}" onClick="{{pickHub}}">SkillHub</button>
+        </div>
+        <div class="seg" role="group" aria-label="排序">
+          <button type="button" aria-pressed="true">推荐</button>
+          <button type="button" aria-pressed="false">最新</button>
+          <button type="button" aria-pressed="false">下载量</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex:1;min-height:0;overflow-y:auto;margin:0 -28px;padding:16px 28px 28px">
+      <sc-if value="{{offline}}" hint-placeholder-val="{{ false }}">
+        <div class="bar" role="status" style="background:#FFF6E5;color:#9A5410"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span style="flex:1">暂时无法连接小伴市场，已先显示 SkillHub 的内容。已安装的插件不受影响。</span><button type="button" class="lnk" onClick="{{retry}}" style="color:#9A5410">重试</button></div>
+      </sc-if>
+      <sc-if value="{{showUpdateHint}}" hint-placeholder-val="{{ false }}">
+        <div class="bar" role="status" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"></path></svg><span style="flex:1">2 个已安装技能有新版本。</span><button type="button" class="lnk" onClick="{{showInstalled}}" style="color:{{t.ink}}">查看更新</button></div>
+      </sc-if>
+      <sc-if value="{{showUpdateBar}}" hint-placeholder-val="{{ false }}">
+        <div class="bar" role="status" style="background:#F5F5F7;color:#55555A"><span style="flex:1"><b style="color:#1D1D1F;font-weight:600">2 项可更新</b> · 上次检查：刚刚。更新前会展示新版本与现有版本的文件差异。</span><button type="button" class="sb" style="height:28px;font-size:12.5px">立即检查</button></div>
+      </sc-if>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px">
+        <sc-for list="{{cards}}" as="c" hint-placeholder-count="6">
+          <article class="xc" style="background:linear-gradient(180deg,{{c.wash}} 0,rgba(255,255,255,0) 78px),#fff">
+            <div style="display:flex;gap:14px;align-items:flex-start">
+              <div style="width:50px;height:50px;border-radius:15px;flex-shrink:0;display:grid;place-items:center;color:#fff;background:linear-gradient(150deg,{{c.hi}},{{c.hue}});box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -1px 0 rgba(0,0,0,.08),0 6px 14px {{c.glow}}">
+                <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{c.icon}}"></path></svg>
+              </div>
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;padding-top:2px">
+                <div style="display:flex;align-items:center;gap:6px"><b style="font-size:15.5px;font-weight:600;letter-spacing:-.005em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{c.name}}</b>
+                  <sc-if value="{{c.official}}" hint-placeholder-val="{{ true }}"><svg role="img" aria-label="官方认证" width="14" height="14" viewBox="0 0 24 24" style="flex-shrink:0"><path d="M12 2.5l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.8 1 2.8-2.4 1.8-.9 2.9-3-.2L12 21.5l-2.4-1.8-3 .2-.9-2.9-2.4-1.8 1-2.8-1-2.8 2.4-1.8.9-2.9 3 .2z" fill="{{t.btn}}"></path><path d="m8.5 12 2.4 2.4 4.6-4.8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+                </div>
+                <span style="font-size:13px;color:#55555A;line-height:1.6;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:41px">{{c.desc}}</span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:14px;padding-top:12px;border-top:1px solid rgba(0,0,0,.055)">
+              <span class="tag" style="background:{{c.tagBg}};color:{{c.tagColor}}">{{c.tag}}</span>
+              <span style="font-size:12px;color:#6E6E73;margin-left:4px;white-space:nowrap">{{c.meta}}</span>
+              <sc-if value="{{c.isOutline}}" hint-placeholder-val="{{ true }}">
+                <button type="button" class="pill" onClick="{{c.open}}" style="margin-left:auto;color:{{t.ink}};box-shadow:inset 0 0 0 1.5px {{t.btn}}">{{c.label}}</button>
+              </sc-if>
+              <sc-if value="{{c.isFill}}" hint-placeholder-val="{{ false }}">
+                <button type="button" class="pill" onClick="{{c.open}}" style="margin-left:auto;color:#fff;background:linear-gradient({{t.btnHi}},{{t.btn}});box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)">{{c.label}}</button>
+              </sc-if>
+              <sc-if value="{{c.isDone}}" hint-placeholder-val="{{ false }}">
+                <span class="pill done" style="margin-left:auto"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg>{{c.label}}</span>
+              </sc-if>
+            </div>
+          </article>
+        </sc-for>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== 弹窗：安装审查（技能 / 单个专家） ===== -->
+  <sc-if value="{{o.review}}" hint-placeholder-val="{{ false }}">
+    <div class="ovl">
+      <div class="dlg" role="dialog" aria-modal="true" aria-label="安装审查" style="width:680px">
+        <div class="dh">
+          <div style="width:44px;height:44px;border-radius:13px;flex-shrink:0;display:grid;place-items:center;color:#fff;background:linear-gradient(150deg,{{rv.hi}},{{rv.hue}});box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 14px {{rv.glow}}"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="{{rv.icon}}"></path></svg></div>
+          <div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:600">{{rv.name}}</div>
+            <div style="display:flex;gap:7px;margin-top:6px"><span class="tag" style="background:{{t.soft}};color:{{t.ink}}">小伴市场</span><span class="tag">{{rv.kind}}</span><span class="tag">v{{rv.ver}}</span><span class="tag">{{rv.cat}}</span></div></div>
+          <button type="button" class="ib" aria-label="关闭" onClick="{{closeAll}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+        </div>
+        <div class="db">
+          <p class="p">{{rv.desc}}</p>
+          <div class="h4">技能说明</div>
+          <pre class="pre">---
+name: {{rv.slug}}
+description: {{rv.desc}}
+---
+# 使用流程
+1. 先用 scripts/probe.py 判断文件类型与页数
+2. 按用户要求读取、合并或拆分
+3. 输出到工作区，不覆盖原文件</pre>
+          <div class="h4">文件清单<small>3 个文件 · 18.4 KB</small></div>
+          <ul class="files">
+            <li><div><code>SKILL.md</code><span style="color:#6E6E73">2.1 KB</span></div><small>SHA256 3be1c0a49d7e52f08a6b13c9e47d20f5a8b1c36d94e07f2a51cb8d3e60947a12</small></li>
+            <li><div><code>scripts/probe.py</code><span style="color:#6E6E73">3.3 KB · 脚本</span></div><small>SHA256 a07d93b1c24e6f58d09a7b3c1e4f82650d9b7a31c6e48f205b1d7a93c0e64f81</small></li>
+            <li><div><code>references/formats.md</code><span style="color:#6E6E73">13.0 KB</span></div><small>SHA256 5c92e7a0b4d1386f9e2a07c5d3b84f1a60e9d27c8b53a41f06e7d92b5c1a38e4</small></li>
+          </ul>
+          <details style="margin:10px 0;font-size:12.5px"><summary style="cursor:pointer;color:#6E6E73">scripts/probe.py · 脚本预览</summary><pre class="pre" style="margin-top:8px">import sys, pathlib
+path = pathlib.Path(sys.argv[1])
+print(path.suffix.lower(), path.stat().st_size)</pre></details>
+          <div class="kv" style="margin-top:8px">
+            <b>版本锁定</b><span>清单摘要 <code style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12px">9f3c71d2…b8a71e</code></span>
+            <b>校验</b><span class="ok"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg>已逐文件重新计算，与小伴市场记录一致</span>
+          </div>
+          <p class="note">安装不会执行脚本。脚本运行时需单独确认，并使用本机账户权限；文件校验不代表安全认证。</p>
+          <label class="chk"><input type="checkbox" checked="{{confirmed}}" onChange="{{toggleConfirm}}">我已查看此版本的说明、文件清单和脚本预览，同意安装。</label>
+        </div>
+        <div class="df"><button type="button" class="sb" onClick="{{closeAll}}">取消</button><button type="button" class="pbtn" disabled="{{btnDisabled}}" style="{{priStyle}}">确认安装<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"></path></svg></button></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== 弹窗：网页唤起确认 ===== -->
+  <sc-if value="{{o.deeplink}}" hint-placeholder-val="{{ false }}">
+    <div class="ovl">
+      <div style="position:absolute;top:14px;right:16px;display:flex;align-items:center;gap:8px;font-size:12px;color:#fff"><span>状态预览</span>
+        <div class="seg" role="group" aria-label="状态预览"><sc-for list="{{dlStates}}" as="s" hint-placeholder-count="3"><button type="button" aria-pressed="{{s.pressed}}" onClick="{{s.pick}}">{{s.label}}</button></sc-for></div></div>
+      <div class="dlg" role="dialog" aria-modal="true" aria-label="来自网页的安装请求" style="width:520px">
+        <div class="dh">
+          <div style="width:40px;height:40px;border-radius:12px;flex-shrink:0;display:grid;place-items:center;background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg></div>
+          <div style="flex:1"><div style="font-size:16px;font-weight:600">来自网页的安装请求</div><div class="sub" style="margin-top:2px">小伴市场网页请求安装一个技能</div></div>
+        </div>
+        <div class="db">
+          <div style="display:flex;gap:12px;align-items:center;padding:14px;margin-top:14px;border-radius:14px;box-shadow:0 0 0 1px rgba(0,0,0,.08)">
+            <div style="width:44px;height:44px;border-radius:13px;flex-shrink:0;display:grid;place-items:center;color:#fff;background:linear-gradient(150deg,#F27A9F,#D63F6E);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 14px rgba(214,63,110,.26)"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6"></path></svg></div>
+            <div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:600">PDF 文档处理</div><div class="sub" style="margin-top:2px">读取、合并、拆分 PDF，提取文字与表格</div></div>
+          </div>
+          <div class="kv">
+            <b>类型</b><span>技能</span>
+            <b>来源</b><span>小伴市场 · 官方</span>
+            <b>链接指定</b><span>{{dl.pinned}}</span>
+            <b>清单摘要</b><span style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12px">{{dl.digest}}</span>
+          </div>
+          <sc-if value="{{dl.warn}}" hint-placeholder-val="{{ false }}">
+            <div class="bar" role="alert" style="margin:14px 0 0;background:{{dl.warnBg}};color:{{dl.warnColor}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg><span>{{dl.warnText}}</span></div>
+          </sc-if>
+          <p class="note">网页只能请求打开这个确认窗口，不会自动安装。下一步仍会展示完整的文件清单和脚本预览，由你确认。</p>
+        </div>
+        <div class="df"><button type="button" class="sb" onClick="{{closeAll}}">{{dl.cancel}}</button>
+          <sc-if value="{{dl.canGo}}" hint-placeholder-val="{{ true }}"><button type="button" class="pbtn" onClick="{{dlGo}}" style="color:#fff;background:linear-gradient({{t.btnHi}},{{t.btn}});box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)">{{dl.go}}<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></sc-if></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== 弹窗：专家团 / 技能套件 ===== -->
+  <sc-if value="{{o.team}}" hint-placeholder-val="{{ false }}">
+    <div class="ovl">
+      <div class="dlg" role="dialog" aria-modal="true" aria-label="专家团安装审查" style="width:720px">
+        <div class="dh">
+          <div style="display:flex;flex-shrink:0;padding-left:8px"><sc-for list="{{members}}" as="m" hint-placeholder-count="4"><span style="width:34px;height:34px;margin-left:-8px;border-radius:50%;display:grid;place-items:center;color:#fff;background:linear-gradient(150deg,{{m.hi}},{{m.hue}});box-shadow:0 0 0 2px #fff"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{m.icon}}"></path></svg></span></sc-for></div>
+          <div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:600">产品发布小组</div>
+            <div style="display:flex;gap:7px;margin-top:6px"><span class="tag" style="background:{{t.soft}};color:{{t.ink}}">专家团</span><span class="tag">小伴市场</span><span class="tag">4 位专家</span></div></div>
+          <button type="button" class="ib" aria-label="关闭" onClick="{{closeAll}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+        </div>
+        <div class="db">
+          <p class="p">需求、前端、测试、文案四位专家分工协作，把一张需求单做到可上线。安装后可以一次召集整个小组，也可以单独召唤其中一位。</p>
+          <div class="h4">成员<small>1 位已安装，将跳过</small></div>
+          <ul class="files">
+            <sc-for list="{{members}}" as="m" hint-placeholder-count="4">
+              <li>
+                <div><span style="display:flex;align-items:center;gap:10px"><span style="width:28px;height:28px;border-radius:9px;display:grid;place-items:center;color:#fff;background:linear-gradient(150deg,{{m.hi}},{{m.hue}})"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="{{m.icon}}"></path></svg></span><span><b style="font-weight:500;font-size:13px">{{m.name}}</b><span style="display:block;color:#8E8E93;font-size:11.5px">v{{m.ver}} · {{m.count}} 个文件</span></span></span>
+                  <span class="tag" style="background:{{m.tagBg}};color:{{m.tagColor}}">{{m.state}}</span></div>
+                <details style="margin:6px 0 0 38px;font-size:12px"><summary style="cursor:pointer;color:#6E6E73">查看文件清单</summary><div style="white-space:pre-line;margin-top:6px;color:#55555A;line-height:1.8;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:11.5px">{{m.fileText}}</div></details>
+              </li>
+            </sc-for>
+          </ul>
+          <div class="kv"><b>将安装</b><span>3 位专家 · 共 22 个文件 · 41.6 KB</span><b>校验</b><span class="ok"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg>每位成员的清单摘要均已重新计算并一致</span></div>
+          <p class="note">全部通过校验后一起生效；任何一位失败，会撤销本次新增的内容，不影响已安装的专家。安装不会执行脚本。</p>
+          <label class="chk"><input type="checkbox" checked="{{confirmed}}" onChange="{{toggleConfirm}}">我已查看 3 位待安装成员的说明、文件清单和脚本预览，同意安装。</label>
+        </div>
+        <div class="df"><button type="button" class="sb" onClick="{{closeAll}}">取消</button><button type="button" class="pbtn" disabled="{{btnDisabled}}" style="{{priStyle}}">安装专家团（3 位）<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"></path></svg></button></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== 弹窗：更新审查 ===== -->
+  <sc-if value="{{o.update}}" hint-placeholder-val="{{ false }}">
+    <div class="ovl">
+      <div class="dlg" role="dialog" aria-modal="true" aria-label="更新审查" style="width:680px">
+        <div class="dh">
+          <div style="width:44px;height:44px;border-radius:13px;flex-shrink:0;display:grid;place-items:center;color:#fff;background:linear-gradient(150deg,#5E9BFF,#2F6FDB);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 14px rgba(47,111,219,.28)"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6"></path></svg></div>
+          <div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:600">更新「Word 文档生成」</div>
+            <div style="display:flex;gap:7px;margin-top:6px;align-items:center"><span class="tag">v1.2.0</span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"></path></svg><span class="tag" style="background:{{t.soft}};color:{{t.ink}}">v1.4.0</span><span class="tag">小伴市场 · 官方</span></div></div>
+          <button type="button" class="ib" aria-label="关闭" onClick="{{closeAll}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+        </div>
+        <div class="db">
+          <div class="h4">更新说明</div>
+          <p class="p" style="margin-top:0">新增一键导出 PDF 的脚本；修复表格样式在长文档中丢失的问题；移除不再使用的旧版样式参考。</p>
+          <div class="h4">文件变化<small>1 个修改 · 1 个新增 · 1 个删除</small></div>
+          <ul class="files">
+            <li><div><span style="display:flex;align-items:center;gap:8px"><span class="tag" style="background:#FFF6E5;color:#9A5410">修改</span><code>SKILL.md</code></span><span style="color:#6E6E73">2.4 KB → 2.9 KB</span></div><small>SHA256 e41b8a09c7d3526f1a8e0b94d7c35f2a60b1e98d47c3a52f0e6b19d84a7c3f05</small></li>
+            <li><div><span style="display:flex;align-items:center;gap:8px"><span class="tag" style="background:#E3F2E9;color:#1E6A45">新增</span><code>scripts/to_pdf.py</code></span><span style="color:#6E6E73">1.8 KB · 脚本</span></div><small>SHA256 7a2d90e1b5c4386f0d9a17e2c85b4f3a61d0e7b92c58a43f1e6d07b9a4c25e18</small></li>
+            <li><div><span style="display:flex;align-items:center;gap:8px"><span class="tag" style="background:#FCEBEC;color:#B42A33">删除</span><code style="text-decoration:line-through;color:#8E8E93">references/legacy-styles.md</code></span><span style="color:#6E6E73">6.2 KB</span></div></li>
+          </ul>
+          <details style="margin:10px 0;font-size:12.5px"><summary style="cursor:pointer;color:#6E6E73">scripts/to_pdf.py · 新增脚本预览</summary><pre class="pre" style="margin-top:8px">import subprocess, sys
+subprocess.run(["soffice", "--headless", "--convert-to", "pdf", sys.argv[1]], check=True)</pre></details>
+          <div class="kv" style="margin-top:8px"><b>清单摘要</b><span style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:12px">c1d08e47…5f20a9 → 9f3c71d2…b8a71e</span><b>校验</b><span class="ok"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg>新版本已逐文件重新计算，与小伴市场记录一致</span></div>
+          <p class="note">先完整校验新版本，再替换已安装的版本；旧版本会保留为备份，更新失败时自动恢复。新增的脚本仍需在运行时单独确认。</p>
+          <label class="chk"><input type="checkbox" checked="{{confirmed}}" onChange="{{toggleConfirm}}">我已查看文件变化和新增脚本，同意更新到 v1.4.0。</label>
+        </div>
+        <div class="df"><button type="button" class="sb" onClick="{{closeAll}}">暂不更新</button><button type="button" class="pbtn" disabled="{{btnDisabled}}" style="{{priStyle}}">更新到 v1.4.0</button></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== 弹窗：连接器连接 ===== -->
+  <sc-if value="{{o.connector}}" hint-placeholder-val="{{ false }}">
+    <div class="ovl">
+      <div class="dlg" role="dialog" aria-modal="true" aria-label="连接服务" style="width:720px">
+        <div class="dh">
+          <div style="width:44px;height:44px;border-radius:13px;flex-shrink:0;display:grid;place-items:center;color:#fff;background:linear-gradient(150deg,#7C8CF8,#4A57D0);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 14px rgba(74,87,208,.28)"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"></path></svg></div>
+          <div style="flex:1;min-width:0"><div style="font-size:16px;font-weight:600">网页搜索</div>
+            <div style="display:flex;gap:7px;margin-top:6px"><span class="tag" style="background:{{t.soft}};color:{{t.ink}}">小伴市场</span><span class="tag">连接器</span><span class="tag">远程 · Streamable HTTP</span></div></div>
+          <button type="button" class="ib" aria-label="关闭" onClick="{{closeAll}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+        </div>
+        <div class="db">
+          <div class="bar" role="status" style="margin:14px 0 0;background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"></path></svg><span>网页请求连接此服务。链接不携带任何密钥，需要的凭据请在下方自行填写。</span></div>
+          <p class="p">为模型提供联网检索能力，返回网页标题、摘要和链接。</p>
+          <div class="h4">连接配置</div>
+          <div class="grp" style="margin-top:0">
+            <label class="fld">服务地址<input class="inp" type="url" value="https://mcp.example.com/mcp" aria-label="服务地址" spellcheck="false"></label>
+            <label class="fld">连接方式<select class="inp" aria-label="认证方式"><option>自动识别（推荐）</option><option>网页登录授权</option><option>填写密钥</option><option>无需授权</option></select></label>
+            <p style="margin:0;font-size:12px;color:#6E6E73">需要登录时将打开服务商的授权页面，完成后自动返回连接。</p>
+            <label class="fld">API Key<input class="inp" type="password" placeholder="请输入 API Key" aria-label="API Key" autocomplete="off"></label>
+            <details style="font-size:12px"><summary style="cursor:pointer;color:#6E6E73">高级配置 · JSON</summary></details>
+          </div>
+          <p class="note">连接后，模型可以调用这个服务提供的工具；每次调用都会先征求你的确认。配置只保存在本机。</p>
+          <label class="chk"><input type="checkbox" checked="{{confirmed}}" onChange="{{toggleConfirm}}">我了解该服务由第三方提供，同意连接并让模型调用它的工具。</label>
+        </div>
+        <div class="df"><button type="button" class="sb" onClick="{{closeAll}}">取消</button><button type="button" class="pbtn" disabled="{{btnDisabled}}" style="{{priStyle}}">连接服务<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"></path></svg></button></div>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ===== 弹窗：插件来源设置 ===== -->
+  <sc-if value="{{o.settings}}" hint-placeholder-val="{{ false }}">
+    <div class="ovl">
+      <div class="dlg" role="dialog" aria-modal="true" aria-label="插件来源设置" style="width:640px">
+        <div class="dh"><div style="flex:1"><div style="font-size:16px;font-weight:600">插件来源</div><div class="sub" style="margin-top:2px">AI 插件页从哪里获取专家、技能和连接器</div></div>
+          <button type="button" class="ib" aria-label="关闭" onClick="{{closeAll}}"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></div>
+        <div class="db">
+          <div class="row"><div style="flex:1"><div class="t">小伴市场</div><div class="d">默认来源。内容经过整理和审核，可按分类与关键词浏览。</div></div>
+            <button type="button" class="sw" role="switch" aria-checked="true" aria-label="启用小伴市场" style="background:{{t.btn}}"><i style="left:16px"></i></button></div>
+          <div style="padding:2px 0 14px;display:grid;gap:8px">
+            <label class="fld">市场地址<input class="inp" type="url" value="https://market.example.com" aria-label="市场地址" spellcheck="false"></label>
+            <span class="ok"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg>已连接 · 目录 1,284 项</span>
+          </div>
+          <div class="row" style="border-top:1px solid rgba(0,0,0,.06)"><div style="flex:1"><div class="t">SkillHub 直连</div><div class="d">作为补充来源。小伴市场不可用或没有想要的内容时，可在列表右上角切换。</div></div>
+            <button type="button" class="sw" role="switch" aria-checked="true" aria-label="启用 SkillHub 直连" style="background:{{t.btn}}"><i style="left:16px"></i></button></div>
+          <div class="row"><div style="flex:1"><div class="t">自动检查更新</div><div class="d">打开 AI 插件页时检查已安装插件是否有新版本；只提示，不会自动更新。</div></div>
+            <button type="button" class="sw" role="switch" aria-checked="true" aria-label="自动检查更新" style="background:{{t.btn}}"><i style="left:16px"></i></button></div>
+          <div class="row"><div style="flex:1"><div class="t">网页一键安装</div><div class="d">让「小伴市场」网页上的「在小伴中安装」唤起本应用。始终先弹出确认，不会静默安装。</div>
+            <div style="margin-top:6px"><span class="ok"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg>已关联 xiaoban:// 链接</span></div></div>
+            <button type="button" class="sb">重新关联</button></div>
+        </div>
+        <div class="df"><button type="button" class="pbtn" onClick="{{closeAll}}" style="color:#fff;background:linear-gradient({{t.btnHi}},{{t.btn}});box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)">完成</button></div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"red"},"screen":{"editor":"enum","options":["browse","review","deeplink","team","updates","connector","settings"],"default":"browse"},"$preview":{"width":1280,"height":800}}'>
+const PALETTES = {
+  red:      { btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
+  green:    { btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
+  blue:     { btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
+  purple:   { btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9', dot: '#7C5CE6' },
+  amber:    { btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED', dot: '#E09A2B' },
+  graphite: { btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3', dot: '#55555B' }
+};
+const HUES = {
+  amber: ['#F6A94B', '#E07A1F', 'rgba(224,122,31,.28)', '#FFF4E8'],
+  blue: ['#5E9BFF', '#2F6FDB', 'rgba(47,111,219,.28)', '#EEF4FF'],
+  green: ['#4CC08A', '#23885A', 'rgba(35,136,90,.26)', '#ECF8F1'],
+  rose: ['#F27A9F', '#D63F6E', 'rgba(214,63,110,.26)', '#FDEFF4'],
+  purple: ['#9B83F2', '#6A4BD6', 'rgba(106,75,214,.28)', '#F3F0FE'],
+  teal: ['#3FC1C9', '#17858C', 'rgba(23,133,140,.26)', '#EAF8F8'],
+  coral: ['#FF8A6B', '#E0573A', 'rgba(224,87,58,.26)', '#FFF1EC'],
+  indigo: ['#7C8CF8', '#4A57D0', 'rgba(74,87,208,.28)', '#F0F2FE']
+};
+const I = {
+  clock: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 7v5l3 2',
+  code: 'm8 9-4 3 4 3M16 9l4 3-4 3M13.5 5l-3 14',
+  table: 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 9h18M3 15h18M9 3v18',
+  mail: 'M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 7l9 6 9-6',
+  book: 'M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2zM22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z',
+  chart: 'M3 17l6-6 4 4 8-8M14 7h7v7',
+  pen: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+  slides: 'M3 4h18v12H3zM8 20h8M12 16v4',
+  file: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6',
+  users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
+  layers: 'M12 2 2 7l10 5 10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
+  plug: 'M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4',
+  globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18',
+  mic: 'M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3',
+  image: 'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM21 15l-5-5L5 21',
+  repo: 'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9',
+  list: 'M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01',
+  check: 'M9 12l2 2 4-4M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
+  monitor: 'M3 5h18v11H3zM8 21h8M12 16v5'
+};
+const TABS = ['专家', '技能', '连接器'];
+const CATS = [
+  ['全部', '办公', '开发', '创作', '金融', '学习', '生活'],
+  ['全部', '文档处理', '数据分析', '办公', '开发', '创作'],
+  ['全部', '搜索与信息', '办公协作', '开发', '设计']
+];
+// 每个条目：installed = 已装；upd = 有新版本；hub = SkillHub 里也有；variant = team / bundle（仅小伴市场）
+const DATA = [
+  [
+    { id: 'launch', name: '产品发布小组', desc: '需求、前端、测试、文案四位专家分工协作，把一张需求单做到可上线。', hue: 'indigo', icon: I.users, cat: '开发', meta: '4 位专家', variant: 'team', official: true },
+    { id: 'minutes', name: '会议纪要整理', desc: '把录音或笔记整理成纪要，自动提取待办和负责人', hue: 'amber', icon: I.clock, cat: '办公', meta: '3 个技能', official: true, hub: true },
+    { id: 'fe', name: '前端开发工程师', desc: '读懂项目结构，写组件、修样式、补测试', hue: 'blue', icon: I.code, cat: '开发', meta: '5 个技能', official: true, hub: true },
+    { id: 'excel', name: '表格数据分析', desc: '清洗 Excel 数据，做透视、出图表、写结论', hue: 'green', icon: I.table, cat: '办公', meta: '3 个技能', official: true, installed: true, hub: true },
+    { id: 'mail', name: '邮件写作', desc: '按场景起草、改写和回复邮件，语气可调', hue: 'rose', icon: I.mail, cat: '办公', meta: '2 个技能', official: true },
+    { id: 'thesis', name: '论文写作导师', desc: '选题、文献梳理、结构建议与语言润色', hue: 'purple', icon: I.book, cat: '学习', meta: '4 个技能', official: true, hub: true },
+    { id: 'ledger', name: '个人记账', desc: '从账单截图记账，每月生成消费小结', hue: 'teal', icon: I.chart, cat: '生活', meta: '2 个技能', official: false },
+    { id: 'copy', name: '文案润色', desc: '改写标题、精简长句，统一品牌语气', hue: 'coral', icon: I.pen, cat: '创作', meta: '2 个技能', official: true, installed: true }
+  ],
+  [
+    { id: 'pdf', name: 'PDF 文档处理', desc: '读取、合并、拆分 PDF，提取文字与表格，支持扫描件 OCR', hue: 'rose', icon: I.file, cat: '文档处理', ver: '1.2.0', meta: 'v1.2.0 · 1.2 万下载', official: true, hub: true },
+    { id: 'sheet', name: '表格清洗', desc: '去重、补全、统一格式，一键整理杂乱的 Excel 与 CSV', hue: 'green', icon: I.table, cat: '数据分析', ver: '2.0.1', meta: 'v2.0.1 · 8,430 下载', official: true, installed: true, hub: true },
+    { id: 'bundle', name: '办公效率套件', desc: '文档、表格、周报、会议转写等 6 个常用办公技能，一次装齐。', hue: 'amber', icon: I.layers, cat: '办公', meta: '6 个技能', variant: 'bundle', official: true },
+    { id: 'doc', name: 'Word 文档生成', desc: '按模板生成排版规范的 Word 文档，支持目录、页眉页脚与表格样式', hue: 'blue', icon: I.file, cat: '文档处理', ver: '1.4.0', meta: 'v1.2.0 → v1.4.0', official: true, installed: true, upd: true, hub: true },
+    { id: 'asr', name: '会议录音转写', desc: '本地转写会议录音，区分发言人并输出带时间戳的文字稿', hue: 'purple', icon: I.mic, cat: '办公', ver: '0.8.3', meta: 'v0.8.3 · 2,105 下载', official: false, hub: true },
+    { id: 'weekly', name: '周报生成', desc: '从本周的任务与提交记录整理出结构清晰的周报', hue: 'teal', icon: I.list, cat: '办公', ver: '1.0.0', meta: 'v0.9.0 → v1.0.0', official: true, installed: true, upd: true },
+    { id: 'img', name: '图片批量压缩', desc: '批量压缩与转换图片格式，保留关键细节，输出对比报告', hue: 'coral', icon: I.image, cat: '创作', ver: '1.1.0', meta: 'v1.1.0 · 3,266 下载', official: false, hub: true }
+  ],
+  [
+    { id: 'cgit', name: '本机电脑控制', desc: '通过截图、鼠标和键盘操作电脑上的应用', hue: 'indigo', icon: I.monitor, cat: '全部', meta: 'Computer Use', official: false, local: true },
+    { id: 'csearch', name: '网页搜索', desc: '为模型提供联网检索能力，返回网页标题、摘要和链接', hue: 'blue', icon: I.globe, cat: '搜索与信息', meta: '2 个工具', official: true, hub: true },
+    { id: 'cdoc', name: '文档协作', desc: '读取和编辑在线文档与表格，支持评论与批注', hue: 'teal', icon: I.file, cat: '办公协作', meta: '9 个工具', official: true, installed: true, hub: true },
+    { id: 'crepo', name: '代码仓库', desc: '查看仓库、提交记录与议题，辅助代码评审', hue: 'purple', icon: I.repo, cat: '开发', meta: '14 个工具', official: false, hub: true },
+    { id: 'cdesign', name: '设计稿读取', desc: '读取设计稿的图层、文案与标注，辅助还原界面', hue: 'rose', icon: I.layers, cat: '设计', meta: '5 个工具', official: false }
+  ]
+];
+const MEMBERS = [
+  { name: '需求梳理', hue: 'amber', icon: I.list, ver: '1.0.2', count: 6, state: '待安装', fileText: 'SKILL.md\nreferences/prd-template.md\nreferences/questions.md\n… 另 3 个文件' },
+  { name: '前端开发工程师', hue: 'blue', icon: I.code, ver: '2.1.0', count: 9, state: '已安装 · 跳过', fileText: '与已安装版本一致，无需重复安装' },
+  { name: '测试工程师', hue: 'green', icon: I.check, ver: '1.3.0', count: 8, state: '待安装', fileText: 'SKILL.md\nscripts/run_checks.py\nreferences/test-cases.md\n… 另 5 个文件' },
+  { name: '文案润色', hue: 'coral', icon: I.pen, ver: '1.1.4', count: 8, state: '待安装', fileText: 'SKILL.md\nreferences/tone-guide.md\n… 另 6 个文件' }
+];
+const DL = {
+  normal: { pinned: 'v1.2.0（最新）', digest: '9f3c71d2…b8a71e', warn: false, cancel: '取消', go: '查看并安装', canGo: true },
+  newer: { pinned: 'v1.1.0', digest: '5e07a4c9…12d3f6', warn: true, warnBg: '#FFF6E5', warnColor: '#9A5410', warnText: '链接指定的 v1.1.0 不是最新版本，小伴市场当前为 v1.2.0。将为你打开 v1.2.0 的审查。', cancel: '取消', go: '查看 v1.2.0 并安装', canGo: true },
+  mismatch: { pinned: 'v1.2.0', digest: '1a2b3c4d…e5f60718', warn: true, warnBg: '#FCEBEC', warnColor: '#B42A33', warnText: '链接中的摘要与小伴市场当前的记录不一致，已拒绝安装。链接可能被改动，或该版本已被替换。', cancel: '关闭', go: '', canGo: false }
+};
+const START = {
+  browse: { tab: 0 }, review: { tab: 1, ov: 'review', item: 'pdf' }, deeplink: { tab: 1, ov: 'deeplink', item: 'pdf' },
+  team: { tab: 0, ov: 'team', item: 'launch' }, updates: { tab: 1, installedOnly: true, ov: 'update', item: 'doc' },
+  connector: { tab: 2, ov: 'connector', item: 'csearch' }, settings: { tab: 0, ov: 'settings' }
+};
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const s = START[props.screen] || START.browse;
+    this.state = { tab: s.tab, src: 'market', offline: false, installedOnly: !!s.installedOnly, cat: '全部', ov: s.ov || '', item: s.item || '', confirmed: false, dl: 'normal', hint: true };
+  }
+  renderVals() {
+    const t = PALETTES[this.props.theme ?? 'red'] ?? PALETTES.red;
+    const st = this.state;
+    const src = st.offline ? 'hub' : st.src;
+    const open = (ov, id) => () => this.setState({ ov, item: id, confirmed: false });
+    const find = (id) => { for (const list of DATA) { const x = list.find((e) => e.id === id); if (x) return x; } return DATA[1][0]; };
+    const list = DATA[st.tab]
+      .filter((e) => src === 'market' || e.hub)
+      .filter((e) => !st.installedOnly || e.installed)
+      .filter((e) => st.cat === '全部' || e.cat === st.cat);
+    const cards = list.map((e) => {
+      const h = HUES[e.hue];
+      const special = e.variant === 'team' ? '专家团' : e.variant === 'bundle' ? '技能套件' : null;
+      const tag = special || (src === 'hub' ? (e.official ? 'SkillHub · 官方' : 'SkillHub · 社区') : e.cat === '全部' ? e.meta : e.cat);
+      let label = '安装'; let kind = 'outline'; let action = open(st.tab === 2 ? 'connector' : e.variant ? 'team' : 'review', e.id);
+      if (e.local) { label = '启用'; action = () => {}; }
+      else if (st.tab === 2) label = '连接 →';
+      if (e.installed && !e.upd) { kind = 'done'; label = st.tab === 2 ? '已连接' : '已安装'; }
+      if (e.upd) { kind = 'fill'; label = '更新'; action = open('update', e.id); }
+      return { ...e, hi: h[0], hue: h[1], glow: h[2], wash: h[3], tag, tagBg: special ? t.soft : 'rgba(0,0,0,.045)', tagColor: special ? t.ink : '#4A4A50',
+        meta: e.local ? '' : e.meta, label, isOutline: kind === 'outline', isFill: kind === 'fill', isDone: kind === 'done', open: action };
+    });
+    const itemsAll = DATA[st.tab];
+    const rvBase = find(st.item || 'pdf'); const rh = HUES[rvBase.hue];
+    const rv = { ...rvBase, hi: rh[0], hue: rh[1], glow: rh[2], slug: rvBase.id === 'pdf' ? 'pdf-toolkit' : rvBase.id, kind: st.tab === 0 ? '专家' : '技能', ver: rvBase.ver || '1.0.0' };
+    const dl = DL[st.dl];
+    const o = { review: st.ov === 'review', deeplink: st.ov === 'deeplink', team: st.ov === 'team', update: st.ov === 'update', connector: st.ov === 'connector', settings: st.ov === 'settings' };
+    const on = st.confirmed;
+    const priStyle = on
+      ? `color:#fff;cursor:pointer;background:linear-gradient(${t.btnHi},${t.btn});box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)`
+      : 'color:#A1A1A6;cursor:not-allowed;background:#F2F2F4;box-shadow:none';
+    return {
+      t, o, rv, dl, cards, priStyle,
+      btnDisabled: !on, confirmed: on,
+      toggleConfirm: () => this.setState({ confirmed: !on }),
+      closeAll: () => this.setState({ ov: '', confirmed: false }),
+      openSettings: () => this.setState({ ov: 'settings' }),
+      dlGo: () => this.setState({ ov: 'review', item: 'pdf', confirmed: false }),
+      dlStates: [['normal', '正常'], ['newer', '有新版本'], ['mismatch', '摘要不一致']].map(([k, label]) => ({ label, pressed: st.dl === k ? 'true' : 'false', pick: () => this.setState({ dl: k }) })),
+      members: MEMBERS.map((m) => { const h = HUES[m.hue]; const skip = m.state !== '待安装'; return { ...m, hi: h[0], hue: h[1], tagBg: skip ? '#F2F2F4' : t.soft, tagColor: skip ? '#55555A' : t.ink }; }),
+      tabs: TABS.map((label, i) => ({ label, sel: st.tab === i ? 'true' : 'false', color: st.tab === i ? '#1D1D1F' : '#A1A1A6', pick: () => this.setState({ tab: i, cat: '全部', installedOnly: false }) })),
+      cats: CATS[st.tab].map((c) => ({ label: c, pressed: c === st.cat ? 'true' : 'false', bg: c === st.cat ? t.soft : 'transparent', color: c === st.cat ? t.ink : '#55555A', weight: c === st.cat ? '600' : '400', pick: () => this.setState({ cat: c }) })),
+      searchHint: '搜索' + TABS[st.tab],
+      installedCount: itemsAll.filter((e) => e.installed).length,
+      instStyle: st.installedOnly ? `box-shadow:inset 0 0 0 1.5px ${t.btn};color:${t.ink}` : '',
+      installedOnly: st.installedOnly ? 'true' : 'false',
+      toggleInstalled: () => this.setState({ installedOnly: !st.installedOnly, cat: '全部' }),
+      showInstalled: () => this.setState({ installedOnly: true, cat: '全部' }),
+      hasUpdates: true,
+      showUpdateHint: st.tab === 1 && !st.installedOnly && st.hint && !st.offline,
+      showUpdateBar: st.tab === 1 && st.installedOnly,
+      srcMarket: src === 'market' ? 'true' : 'false', srcHub: src === 'hub' ? 'true' : 'false',
+      offline: st.offline,
+      pickMarket: () => this.setState({ src: 'market', offline: !st.offline ? false : true }),
+      pickHub: () => this.setState({ src: 'hub' }),
+      retry: () => this.setState({ offline: false, src: 'market' })
+    };
+  }
+}
+</script>
+</body>
+</html>

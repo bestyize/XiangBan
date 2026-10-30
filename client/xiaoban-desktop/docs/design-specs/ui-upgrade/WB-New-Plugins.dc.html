@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小伴桌面 · 新建任务 · 技能 / 专家 / 连接器</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid #2F6FDB;outline-offset:2px}
+.si{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;color:#26262B;font-size:14px;border:0;background:transparent;font-family:inherit;width:100%;box-sizing:border-box;cursor:pointer;text-align:left}
+.si:hover{background:rgba(0,0,0,.045)}
+.si svg{flex-shrink:0;color:#4A4A50}
+.sub{font-size:12px;color:#6E6E73}
+.cap{font-size:12px;color:#6E6E73;font-weight:500}
+.ib{width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:#55555A;display:grid;place-items:center;cursor:pointer}
+.ib:hover{background:rgba(0,0,0,.05)}
+.chip{height:32px;padding:0 14px;border-radius:999px;border:0;background:#fff;font-family:inherit;font-size:13px;color:#2C2C31;cursor:pointer;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04)}
+.chip:hover{box-shadow:0 0 0 1px rgba(0,0,0,.14),0 2px 6px rgba(0,0,0,.06)}
+.sug{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:10px;border:0;background:transparent;font-family:inherit;font-size:13.5px;color:#2C2C31;cursor:pointer}
+.sug:hover{background:#F4F4F6}
+.sug svg{color:#8E8E93}
+.pop{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 9px;border-radius:8px;border:0;background:transparent;font-family:inherit;font-size:12.5px;color:#4A4A50;cursor:pointer}
+.pop:hover{background:#F2F2F4}
+.sw{width:18px;height:18px;border-radius:50%;border:0;padding:0;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(0,0,0,.12)}
+.ses{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px 0 36px;border-radius:8px;font-size:13px;color:#3A3A40}
+.ses:hover{background:rgba(0,0,0,.045)}
+.ses span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.act{width:28px;height:28px;border-radius:7px;border:0;background:transparent;color:#6E6E73;display:grid;place-items:center;cursor:pointer}
+.act:hover{background:#F2F2F4;color:#1D1D1F}
+.xb{width:20px;height:20px;border-radius:6px;border:0;padding:0;background:transparent;color:inherit;display:grid;place-items:center;cursor:pointer}
+.xb:hover{background:rgba(0,0,0,.09)}
+.pi{display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;padding:7px 10px;border:0;border-radius:8px;background:transparent;font-family:inherit;text-align:left;cursor:pointer;color:#1D1D1F}
+.pi:hover{box-shadow:inset 0 0 0 100px rgba(0,0,0,.04)}
+.pl{font-size:13.5px;font-weight:500;flex:1;min-width:0;color:#1D1D1F;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr{font-size:12px;color:#6E6E73;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ds{font-size:11.5px;color:#6E6E73;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ti{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:#F2F2F4;color:#4A4A50;flex-shrink:0}
+.tag{font-size:11px;color:#55555A;background:#F2F2F4;border-radius:5px;padding:1px 6px;flex-shrink:0;white-space:nowrap}
+.ft{font-size:12.5px;font-weight:500;padding:5px 6px;border-radius:6px}
+.ft:hover{background:rgba(0,0,0,.05)}
+.lk{height:24px;padding:0 10px;border-radius:7px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;flex-shrink:0}
+.fly{position:absolute;z-index:8;box-sizing:border-box;padding:5px;border-radius:14px;background:rgba(255,255,255,.98);backdrop-filter:blur(20px);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 16px 40px rgba(0,0,0,.2);text-align:left;display:flex;flex-direction:column}
+.fs{display:flex;gap:7px;align-items:center;margin:3px 3px 5px;border-radius:8px;background:#F4F4F6;padding:7px 9px;color:#8E8E93}
+.fs input{background:none;border:0;outline:none;min-width:0;flex:1;color:#1D1D1F;font:inherit;font-size:12.5px}
+.fsec{font-size:11.5px;font-weight:500;color:#6E6E73;padding:8px 8px 4px}
+.fr{display:flex;align-items:center;gap:8px;width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:0;background:none;color:#1D1D1F;font:inherit;cursor:pointer;text-align:left;text-decoration:none}
+.fr:hover{background:rgba(0,0,0,.045)}
+.frt{flex:1;min-width:0;display:grid;gap:3px}
+.frt strong{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.frt small{font-size:11px;color:#6E6E73;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr>svg{flex:none;color:#8E8E93}
+.fe{padding:11px 8px;font-size:11.5px;color:#6E6E73}
+.fst{display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 5px 6px;border:0;border-top:1px solid rgba(0,0,0,.07);background:none;font:inherit;font-size:12.5px;cursor:pointer;text-decoration:none}
+.fm{display:flex;gap:10px;align-items:center;width:100%;height:34px;box-sizing:border-box;padding:0 10px;background:none;border:0;border-radius:8px;color:#1D1D1F;font:inherit;font-size:13px;text-align:left;cursor:pointer;white-space:nowrap}
+.fm:hover{background:rgba(0,0,0,.045)}
+.fm>svg{color:#55555A;flex:none}
+.fg{display:grid;place-items:center;flex:none;width:30px;height:30px;padding:0;border:0;border-radius:8px;background:none;color:#55555A;cursor:pointer}
+.fg:hover{background:rgba(0,0,0,.045)}
+</style>
+</helmet>
+<div style="position:relative;width:1280px;height:800px;overflow:hidden;display:flex;font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Microsoft YaHei UI',sans-serif;color:#1D1D1F;background:{{t.tint}};-webkit-font-smoothing:antialiased">
+
+  <aside style="width:264px;flex-shrink:0;display:flex;flex-direction:column;padding:0 12px 12px;box-sizing:border-box">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding-left:6px">
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <button type="button" class="ib" aria-label="收起侧栏" style="margin-left:auto"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M9 4v16"></path></svg></button>
+      <button type="button" class="ib" aria-label="搜索"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 6px 16px">
+      <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(160deg,{{t.btnHi}},{{t.btn}});color:#fff;display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 2px 6px rgba(0,0,0,.12)">
+        <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+      </div>
+      <div style="display:flex;flex-direction:column;line-height:1.25"><strong style="font-size: 15px; font-weight: 600">小伴桌面</strong></div>
+    </div>
+
+    <nav aria-label="功能分区" style="display:flex;flex-direction:column;gap:1px;flex:1;min-height:0;overflow:hidden">
+      <button type="button" class="si" aria-expanded="{{aiOpenAttr}}" onClick="{{toggleAi}}" style="font-weight:600">
+        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+        小伴 AI
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round" style="margin-left:auto;transform:{{aiChevron}};transition:transform 160ms"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <sc-if value="{{aiOpen}}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;gap:1px;padding-left:10px">
+          <a class="si" href="WB-New-Plugins.dc.html" aria-current="page" style="background:{{t.soft}};color:{{t.ink}};font-weight:500"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"></path><path d="M18.4 2.6a2 2 0 0 1 3 3L12 15l-4 1 1-4z"></path></svg>新建任务<span class="sub" style="margin-left:auto;font-size:11px">⌘N</span></a>
+          <a class="si" href="WB-Plugins.dc.html"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M19.4 13a2 2 0 1 0 0-4H18V6a2 2 0 0 0-2-2h-3V2.6a2 2 0 1 0-4 0V4H6a2 2 0 0 0-2 2v3h1.4a2 2 0 1 1 0 4H4v3a2 2 0 0 0 2 2h3v-1.4a2 2 0 1 1 4 0V18h3a2 2 0 0 0 2-2v-3z"></path></svg>AI 插件</a>
+          <a class="si" href="#"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"></path><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"></path></svg>资料库</a>
+          <div style="display:flex;align-items:center;height:30px;padding:0 4px 0 10px;margin-top:6px"><span class="cap">空间</span><button type="button" class="ib" aria-label="新建工作区" style="margin-left:auto;width:24px;height:24px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+          <a class="si" href="WB-Chat.dc.html"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"></path></svg>最近任务<span class="sub" style="margin-left:auto">2</span></a>
+          <a class="ses" href="WB-Chat.dc.html"><span>整理下周工作计划</span><i style="width:7px;height:7px;border-radius:50%;background:{{t.dot}}"></i></a>
+          <a class="ses" href="#"><span>把截图里的表格转成 Excel</span></a>
+          <a class="si" href="#"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>官网改版<span class="sub" style="margin-left:auto">4</span></a>
+          <a class="si" href="#"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>周报自动化<span class="sub" style="margin-left:auto">1</span></a>
+        </div>
+      </sc-if>
+      <div style="height:1px;background:rgba(0,0,0,.06);margin:8px 10px"></div>
+      <a class="si" href="WB-Studio.dc.html"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2.5a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 22z"></path><circle cx="7.5" cy="10.5" r="1" fill="currentColor"></circle><circle cx="12" cy="7" r="1" fill="currentColor"></circle><circle cx="16.5" cy="10.5" r="1" fill="currentColor"></circle></svg>装扮</a>
+      <a class="si" href="#"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="5"></rect><path d="M7 11v3M5.5 12.5h3"></path><circle cx="16" cy="11.5" r=".7" fill="currentColor"></circle><circle cx="18" cy="13.5" r=".7" fill="currentColor"></circle></svg>游玩</a>
+      <a class="si" href="WB-Remind.dc.html"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>提醒<span class="sub" style="margin-left:auto">15:30</span></a>
+    </nav>
+
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px 0;border-top:1px solid rgba(0,0,0,.06)">
+      <div style="width:30px;height:30px;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);display:grid;place-items:center"><img src="/_blob/d590c6393f601ebec7f3e202245ef0cf" alt="" style="width:26px;height:26px;object-fit:contain"></div>
+      <span style="font-size:13px;font-weight:500">小伴用户</span>
+      <button type="button" class="ib" aria-label="通知" style="margin-left:auto"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg></button>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;margin:8px 8px 8px 0;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.04);position:relative;display:flex;flex-direction:column;align-items:center;overflow:hidden">
+    <div style="position:absolute;top:14px;right:16px;display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:999px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.07),0 2px 8px rgba(0,0,0,.05)" role="radiogroup" aria-label="主题色">
+      <span class="sub" style="font-size:11.5px;margin-right:2px">主题色</span>
+      <sc-for list="{{swatches}}" as="s" hint-placeholder-count="6">
+        <button type="button" class="sw" role="radio" aria-checked="{{s.checked}}" aria-label="{{s.name}}" title="{{s.name}}" onClick="{{s.pick}}" style="background:{{s.color}};outline:{{s.ring}};outline-offset:2px"></button>
+      </sc-for>
+    </div>
+
+    <div style="width:100%;max-width:780px;padding:0 40px;box-sizing:border-box;display:flex;flex-direction:column;align-items:center;margin-top:128px">
+      <h1 style="margin:0;font-size:30px;font-weight:600;letter-spacing:-.01em">下午好，今天让小伴帮你做点什么？</h1>
+      <div role="tablist" aria-label="场景" style="margin-top:18px;display:inline-flex;padding:3px;border-radius:12px;background:#F2F2F4;gap:2px">
+        <button type="button" role="tab" aria-selected="true" style="height:30px;padding:0 14px;border:0;border-radius:9px;background:#fff;font-family:inherit;font-size:13px;font-weight:500;color:#1D1D1F;box-shadow:0 0 0 .5px rgba(0,0,0,.06),0 1px 3px rgba(0,0,0,.08);cursor:pointer">办公</button>
+        <button type="button" role="tab" aria-selected="false" style="height:30px;padding:0 14px;border:0;border-radius:9px;background:transparent;font-family:inherit;font-size:13px;color:#55555A;cursor:pointer">学习</button>
+        <button type="button" role="tab" aria-selected="false" style="height:30px;padding:0 14px;border:0;border-radius:9px;background:transparent;font-family:inherit;font-size:13px;color:#55555A;cursor:pointer">生活</button>
+        <button type="button" role="tab" aria-selected="false" style="height:30px;padding:0 14px;border:0;border-radius:9px;background:transparent;font-family:inherit;font-size:13px;color:#55555A;cursor:pointer">创作</button>
+      </div>
+
+      <div style="align-self:stretch;margin-top:44px;display:flex;flex-wrap:wrap;gap:8px">
+        <sc-for list="{{quick}}" as="c" hint-placeholder-count="6"><button type="button" class="chip" onClick="{{c.pick}}">{{c.label}}</button></sc-for>
+      </div>
+
+      <div style="align-self:stretch;position:relative;margin-top:14px">
+        <img src="/_blob/d590c6393f601ebec7f3e202245ef0cf" alt="" style="position:absolute;right:36px;top:-74px;width:92px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.12))">
+        <div style="position:relative;z-index:5;background:#fff;border-radius:18px;box-shadow:0 0 0 1px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.03),0 12px 32px rgba(0,0,0,.07);padding:14px 12px 8px 18px">
+          <sc-if value="{{hasTopRow}}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px;min-height:28px">
+              <div style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{skillChips}}" as="s" hint-placeholder-count="1">
+                <span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 9px;border-radius:8px;background:{{t.soft}};color:{{t.ink}};font-size:13px;font-weight:500">
+                  <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"></path></svg>{{s.name}}
+                  <button type="button" class="xb" aria-label="移除技能 {{s.name}}" onClick="{{s.remove}}"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+                </span>
+              </sc-for>
+<sc-if value="{{hasTool}}" hint-placeholder-val="{{ false }}">
+                <span style="display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 4px 0 9px;border-radius:8px;background:{{t.soft}};color:{{t.ink}};font-size:13px;font-weight:500">
+                  <sc-if value="{{toolChip.isComputer}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg></sc-if><sc-if value="{{toolChip.isPhone}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"></rect><path d="M12 18h.01"></path></svg></sc-if><sc-if value="{{toolChip.isDesign}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M9 21V9"></path></svg></sc-if>{{toolChip.name}}
+                  <button type="button" class="xb" aria-label="移除工具 {{toolChip.name}}" onClick="{{toolChip.remove}}"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+                </span>
+              </sc-if>
+              </div>
+              <div style="display:flex;align-items:center;gap:2px;margin-left:auto;min-width:0;flex-shrink:1">
+<sc-if value="{{hasExpert}}" hint-placeholder-val="{{ true }}">
+                <button type="button" class="pop" aria-haspopup="dialog" aria-expanded="{{ex.openAttr}}" aria-label="专家：{{ex.name}}，点击更换" title="专家：{{ex.name}}" onClick="{{ex.toggle}}" style="min-width:0;flex-shrink:1;background:{{ex.bg}};font-weight:500;color:#1D1D1F;box-shadow:inset 0 0 0 1px rgba(0,0,0,.09)">
+                  <span style="width:18px;height:18px;border-radius:{{ex.radius}};background:{{ex.avBg}};color:{{ex.avInk}};font-size:10.5px;font-weight:600;display:grid;place-items:center;flex-shrink:0">
+                    <sc-if value="{{ex.isTeam}}" hint-placeholder-val="{{ true }}"><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 20a6 6 0 0 1 12 0M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.5a6 6 0 0 1 3 5.5"></path></svg></sc-if>
+                    <sc-if value="{{ex.isPerson}}" hint-placeholder-val="{{ false }}">{{ex.letter}}</sc-if>
+                  </span>
+                  <span style="min-width:0;max-width:112px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ex.name}}</span>
+                  <svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" style="flex-shrink:0"><path d="m6 9 6 6 6-6"></path></svg>
+                </button>
+              </sc-if>
+              <sc-if value="{{hasConns}}" hint-placeholder-val="{{ true }}">
+                <button type="button" class="pop" aria-haspopup="dialog" aria-expanded="{{connOpenAttr}}" aria-label="{{connLabel}}" title="{{connLabel}}" onClick="{{toggleConn}}" style="padding:0 8px;flex-shrink:0;background:{{connBg}}">
+                  <span style="display:flex;align-items:center">
+                    <sc-for list="{{connStack}}" as="c" hint-placeholder-count="3">
+                      <span style="position:relative;width:20px;height:20px;border-radius:50%;background:{{c.bg}};color:{{c.ink}};font-size:10px;font-weight:600;display:grid;place-items:center;margin-left:{{c.ml}};box-shadow:0 0 0 2px #fff">{{c.letter}}<sc-if value="{{c.warn}}" hint-placeholder-val="{{ false }}"><i style="position:absolute;right:-2px;top:-2px;width:8px;height:8px;border-radius:50%;background:#C77700;box-shadow:0 0 0 1.5px #fff"></i></sc-if></span>
+                    </sc-for>
+                  </span>
+                </button>
+              </sc-if>
+              
+              </div>
+            </div>
+          </sc-if>
+          <textarea aria-label="描述任务" rows="3" placeholder="描述你想完成的事。@ 选专家，/ 调用技能" value="{{text}}" onInput="{{onText}}" style="width:100%;box-sizing:border-box;border:0;outline:none;resize:none;font:inherit;font-size:15px;line-height:1.6;color:#1D1D1F;background:transparent"></textarea>
+          <div style="display:flex;align-items:center;gap:2px;margin-top:4px">
+            <div style="display:flex;align-items:center;gap:2px;min-width:0;flex-shrink:1">
+              <button type="button" class="ib" aria-label="添加：截图、文件、技能、专家、连接器、工具" aria-haspopup="menu" aria-expanded="{{plusOpenAttr}}" onClick="{{togglePlus}}" style="flex-shrink:0;background:{{plusBg}}"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button>
+              <button type="button" class="pop" aria-haspopup="listbox" style="flex-shrink:0"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>工作区<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+              <div style="position:relative;display:flex;flex-shrink:0">
+                <button type="button" class="pop" aria-haspopup="menu" aria-expanded="{{perm.openAttr}}" onClick="{{perm.toggle}}" style="color:{{perm.color}};background:{{perm.bg}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"></path><sc-if value="{{perm.full}}" hint-placeholder-val="{{ false }}"><path d="M12 8v4M12 15.5h.01"></path></sc-if></svg>{{perm.label}}<svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+                <sc-if value="{{perm.open}}" hint-placeholder-val="{{ false }}">
+                  <div role="menu" aria-label="权限" style="position:absolute;left:0;bottom:36px;z-index:6;width:300px;padding:5px;border-radius:12px;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 14px 36px rgba(0,0,0,.18);text-align:left">
+                    <sc-for list="{{perm.items}}" as="o" hint-placeholder-count="2">
+                      <button type="button" role="menuitemradio" aria-checked="{{o.checked}}" onClick="{{o.pick}}" style="width:100%;display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border:0;border-radius:8px;background:{{o.bg}};font-family:inherit;cursor:pointer;text-align:left">
+                        <span style="width:28px;height:28px;border-radius:8px;flex-shrink:0;display:grid;place-items:center;background:{{o.tileBg}};color:{{o.tileInk}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"></path><path d="{{o.mark}}"></path></svg></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><span style="font-size:13.5px;font-weight:500;color:{{o.ink}}">{{o.label}}</span><span style="font-size:11.5px;color:#6E6E73;line-height:1.5">{{o.desc}}</span></span>
+                        <span style="width:14px;padding-top:3px;color:{{o.ink}}"><sc-if value="{{o.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                      </button>
+                    </sc-for>
+                    <div style="height:1px;background:rgba(0,0,0,.07);margin:4px 6px"></div>
+                    <a href="WB-Settings.dc.html" style="display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;font-size:12.5px;color:#55555A">权限与沙箱设置…</a>
+                  </div>
+                </sc-if>
+              </div>
+            </div>
+            <span style="margin-left:auto"></span>
+            <div style="position:relative;display:flex;flex-shrink:0">
+              <button type="button" aria-label="上下文已用 {{ctx.percent}}%，点击查看" aria-expanded="{{ctx.openAttr}}" onClick="{{ctx.toggle}}" title="{{ctx.title}}" style="width:30px;height:30px;padding:0;border:0;border-radius:50%;background:{{ctx.hoverBg}};display:grid;place-items:center;cursor:pointer">
+                <svg viewBox="0 0 22 22" width="22" height="22" aria-hidden="true"><circle cx="11" cy="11" r="8" fill="none" stroke="#E3E3E8" stroke-width="3"></circle><circle cx="11" cy="11" r="8" fill="none" stroke="{{ctx.color}}" stroke-width="3" stroke-linecap="round" stroke-dasharray="{{ctx.dash}}" transform="rotate(-90 11 11)" style="transition:stroke-dasharray .3s"></circle></svg>
+              </button>
+              <sc-if value="{{ctx.open}}" hint-placeholder-val="{{ false }}">
+                <div role="dialog" aria-label="上下文用量" style="position:absolute;right:-6px;bottom:40px;z-index:6;width:264px;box-sizing:border-box;padding:14px;border-radius:14px;background:rgba(255,255,255,.97);backdrop-filter:blur(20px);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 14px 36px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:14px;text-align:left">
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:#6E6E73"><span>上下文</span><b style="color:#1D1D1F;font-weight:600;font-variant-numeric:tabular-nums">{{ctx.usedText}} / {{ctx.limitText}}</b></div>
+                    <div style="height:6px;border-radius:3px;background:#EDEDF0;overflow:hidden"><div style="width:{{ctx.width}};height:100%;border-radius:3px;background:{{ctx.color}};transition:width .3s"></div></div>
+                  </div>
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <input type="range" min="16000" max="1000000" step="8000" value="{{ctx.limit}}" onChange="{{ctx.onLimit}}" aria-label="上下文上限" style="margin:0;accent-color:{{t.btn}}">
+                    <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:11px;color:#86868B;font-variant-numeric:tabular-nums"><span>16K</span><small>用到 90% 自动压缩</small><span>1M</span></div>
+                  </div>
+                  <button type="button" disabled="{{ctx.noCompact}}" title="{{ctx.reason}}" style="height:30px;border-radius:8px;border:0;background:#F2F2F4;font-family:inherit;font-size:13px;font-weight:500;color:{{ctx.btnColor}};display:inline-flex;align-items:center;justify-content:center;gap:6px;cursor:pointer"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path></svg>智能压缩</button>
+                </div>
+              </sc-if>
+            </div>
+            <button type="button" class="pop" style="font-weight:500;color:#1D1D1F;flex-shrink:0"><span style="width:16px;height:16px;border-radius:4px;background:#E8EEFD;color:#3557C9;font-size:8.5px;font-weight:700;display:grid;place-items:center">DS</span><span class="mono" style="font-family:'SF Mono',Menlo,monospace;font-size:12px">deepseek-v4-pro</span><svg aria-hidden="true" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg></button>
+            <button type="button" class="ib" aria-label="录音" title="录音：说完转成文字，留在输入框，由你确认后发送" style="flex-shrink:0"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></button>
+            <a href="WB-Chat-Voice.dc.html" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" style="width:30px;height:30px;border-radius:8px;color:{{t.ink}};display:grid;place-items:center;flex-shrink:0"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"></path></svg></a>
+            <button type="button" aria-label="发送" disabled="{{sendDisabled}}" style="width:34px;height:34px;border-radius:50%;border:0;margin-left:4px;flex-shrink:0;background:{{sendBg}};color:{{sendInk}};display:grid;place-items:center;cursor:pointer"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"></path></svg></button>
+          </div>
+
+          <sc-if value="{{menuOpen}}" hint-placeholder-val="{{ false }}">
+            <div style="position:absolute;{{pop.pos}};z-index:7;width:{{pop.width}}px;border-radius:14px;background:rgba(255,255,255,.98);backdrop-filter:blur(20px);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 16px 40px rgba(0,0,0,.2);text-align:left;overflow:hidden">
+
+              <sc-if value="{{menuPlus}}" hint-placeholder-val="{{ false }}">
+                <div role="menu" aria-label="添加" style="padding:5px;display:flex;flex-direction:column;gap:1px">
+                  <button type="button" role="menuitem" class="pi" onClick="{{pickFile}}"><span class="ti"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></span><span class="pl">截图</span></button>
+                  <button type="button" role="menuitem" class="pi" onClick="{{pickFile}}"><span class="ti"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m21 11-9.2 9.2a5.5 5.5 0 0 1-7.8-7.8L13.2 3.2a3.7 3.7 0 0 1 5.2 5.2l-9.2 9.2a1.8 1.8 0 0 1-2.6-2.6L15 6.5"></path></svg></span><span class="pl">添加文件或图片</span><span class="pr">⌘U</span></button>
+                  <div style="height:1px;background:rgba(0,0,0,.07);margin:4px 6px"></div>
+                  <button type="button" role="menuitem" class="pi" onClick="{{openSkillMenu}}" onMouseEnter="{{openSkillMenu}}" style="background:{{plusSel.skill}}"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"></path></svg></span><span class="pl">技能</span><span class="pr">{{skillSummary}}</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+                  <button type="button" role="menuitem" class="pi" onClick="{{openExpertMenu}}" onMouseEnter="{{openExpertMenu}}" style="background:{{plusSel.expert}}"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"></circle><path d="M5 20a7 7 0 0 1 14 0"></path></svg></span><span class="pl">专家</span><span class="pr">{{expertSummary}}</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+                  <button type="button" role="menuitem" class="pi" onClick="{{openConnMenu}}" onMouseEnter="{{openConnMenu}}" style="background:{{plusSel.conn}}"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2v6M15 2v6M7 8h10v4a5 5 0 0 1-10 0z"></path><path d="M12 17v5"></path></svg></span><span class="pl">连接器</span><span class="pr">{{connSummary}}</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+                  <button type="button" role="menuitem" class="pi" onClick="{{openToolMenu}}" onMouseEnter="{{openToolMenu}}" style="background:{{plusSel.tool}}"><span class="ti" style="background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="m15 12-8.4 8.4a2.1 2.1 0 0 1-3-3L12 9"></path><path d="M17.6 6.4 20 8.8l-3.5 3.5-2.4-2.4"></path><path d="M12 9l2.1-2.1a3 3 0 0 0-1.5-3.6L11 2.5h4.5l2.1 3.9"></path></svg></span><span class="pl">工具</span><span class="pr">{{toolSummary}}</span><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A1A1A6" stroke-width="2.4" stroke-linecap="round"><path d="m9 6 6 6-6 6"></path></svg></button>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{menuSkill}}" hint-placeholder-val="{{ false }}">
+                <div role="dialog" aria-label="选择技能" style="display:flex;flex-direction:column">
+                  <div style="padding:10px 10px 6px">
+                    <label style="display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:8px;background:#F4F4F6"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg><input type="text" aria-label="搜索技能" placeholder="搜索技能，也可以直接敲 /" value="{{q}}" onInput="{{onQ}}" readOnly="{{qReadonly}}" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:13px;color:#1D1D1F"></label>
+                  </div>
+                  <div style="padding:0 5px;max-height:268px;overflow-y:auto;display:flex;flex-direction:column;gap:1px">
+                    <sc-if value="{{noSkill}}" hint-placeholder-val="{{ false }}"><div class="sub" style="padding:18px;text-align:center">没有匹配的技能</div></sc-if>
+                    <sc-for list="{{skillRows}}" as="o" hint-placeholder-count="4">
+                      <button type="button" class="pi" aria-pressed="{{o.checked}}" onClick="{{o.pick}}" style="background:{{o.bg}}">
+                        <span class="ti" style="width:28px;height:28px;background:{{t.soft}};color:{{t.ink}}"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"></path></svg></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px" title="{{o.desc}}"><span class="pl">{{o.name}}</span></span>
+                        <span class="tag">{{o.tag}}</span>
+                        <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{o.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                      </button>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px;padding:6px 10px;margin-top:5px;border-top:1px solid rgba(0,0,0,.07)">
+                    <a href="Market.dc.html" class="ft" style="color:{{t.ink}}">浏览小伴市场</a>
+                    <span style="margin-left:auto"></span>
+                    <a href="WB-Plugins.dc.html" class="ft" style="color:#55555A">管理技能…</a>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{menuExpert}}" hint-placeholder-val="{{ false }}">
+                <div role="dialog" aria-label="选择专家或专家团" style="display:flex;flex-direction:column">
+                  <div style="padding:10px 10px 6px">
+                    <label style="display:flex;align-items:center;gap:8px;height:32px;padding:0 10px;border-radius:8px;background:#F4F4F6"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg><input type="text" aria-label="搜索专家" placeholder="搜索专家，也可以直接敲 @" value="{{q}}" onInput="{{onQ}}" readOnly="{{qReadonly}}" style="flex:1;min-width:0;border:0;outline:none;background:transparent;font:inherit;font-size:13px;color:#1D1D1F"></label>
+                  </div>
+                  <div style="padding:0 5px;max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:1px">
+                    <sc-if value="{{showNone}}" hint-placeholder-val="{{ true }}">
+                      <button type="button" class="pi" aria-pressed="{{exNone.checked}}" onClick="{{exNone.pick}}" style="background:{{exNone.bg}}">
+                        <span class="ti" style="width:28px;height:28px;border-radius:50%;background:linear-gradient(160deg,{{t.btnHi}},{{t.btn}});color:#fff"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path></svg></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px" title="不指定专家，由小伴自行判断"><span class="pl">通用小伴</span></span>
+                        <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{exNone.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                      </button>
+                    </sc-if>
+                    <sc-if value="{{hasTeams}}" hint-placeholder-val="{{ true }}"><div class="cap" style="padding:8px 10px 3px">专家团</div></sc-if>
+                    <sc-for list="{{teamRows}}" as="o" hint-placeholder-count="2">
+                      <button type="button" class="pi" aria-pressed="{{o.checked}}" onClick="{{o.pick}}" style="background:{{o.bg}}">
+                        <span class="ti" style="width:28px;height:28px;border-radius:8px;background:{{o.avBg}};color:{{o.avInk}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 20a6 6 0 0 1 12 0M16 5.2a3.2 3.2 0 0 1 0 5.6M18 14.5a6 6 0 0 1 3 5.5"></path></svg></span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px" title="{{o.desc}}"><span class="pl">{{o.name}}</span></span>
+                        <span class="tag">{{o.meta}}</span>
+                        <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{o.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                      </button>
+                    </sc-for>
+                    <sc-if value="{{hasPeople}}" hint-placeholder-val="{{ true }}"><div class="cap" style="padding:8px 10px 3px">专家</div></sc-if>
+                    <sc-for list="{{personRows}}" as="o" hint-placeholder-count="3">
+                      <button type="button" class="pi" aria-pressed="{{o.checked}}" onClick="{{o.pick}}" style="background:{{o.bg}}">
+                        <span class="ti" style="width:28px;height:28px;border-radius:50%;background:{{o.avBg}};color:{{o.avInk}};font-size:12px;font-weight:600">{{o.letter}}</span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px" title="{{o.desc}}"><span class="pl">{{o.name}}</span></span>
+                        <span style="width:14px;display:grid;place-items:center;color:{{t.ink}}"><sc-if value="{{o.on}}" hint-placeholder-val="{{ false }}"><svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></sc-if></span>
+                      </button>
+                    </sc-for>
+                    <sc-if value="{{noExpert}}" hint-placeholder-val="{{ false }}"><div class="sub" style="padding:18px;text-align:center">没有匹配的专家</div></sc-if>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px;padding:6px 10px;margin-top:5px;border-top:1px solid rgba(0,0,0,.07)">
+                    <a href="WB-Market-Team.dc.html" class="ft" style="color:{{t.ink}}">去市场找更多专家</a>
+                    <span style="margin-left:auto"></span>
+                    <span class="sub" style="font-size:11px">对话期间一直生效</span>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{menuConn}}" hint-placeholder-val="{{ false }}">
+                <div role="dialog" aria-label="连接器" style="display:flex;flex-direction:column">
+                  <div style="display:flex;align-items:baseline;gap:8px;padding:12px 14px 6px"><b style="font-size:13.5px;font-weight:600">连接器</b><span class="sub">已启用 {{connCount}} / {{connTotal}}</span></div>
+                  <div style="padding:0 5px;display:flex;flex-direction:column;gap:1px">
+                    <sc-for list="{{connRows}}" as="o" hint-placeholder-count="5">
+                      <div class="pi" style="cursor:default">
+                        <span class="ti" style="width:28px;height:28px;border-radius:50%;background:{{o.bg}};color:{{o.ink}};font-size:12px;font-weight:600">{{o.letter}}</span>
+                        <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:1px" title="{{o.status}}"><span class="pl">{{o.name}}</span></span>
+                        <sc-if value="{{o.isOk}}" hint-placeholder-val="{{ true }}">
+                          <button type="button" role="switch" aria-checked="{{o.checked}}" aria-label="启用 {{o.name}}" onClick="{{o.toggle}}" style="position:relative;width:34px;height:20px;border-radius:10px;border:0;padding:0;background:{{o.trackBg}};cursor:pointer;flex-shrink:0;transition:background .15s"><span style="position:absolute;top:2px;left:{{o.knob}};width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .15s"></span></button>
+                        </sc-if>
+                        <sc-if value="{{o.isExpired}}" hint-placeholder-val="{{ false }}"><a href="WB-Market-Connector.dc.html" class="lk" style="color:#8A5A00;box-shadow:inset 0 0 0 1px #E3C48A">重新授权</a></sc-if>
+                        <sc-if value="{{o.isOff}}" hint-placeholder-val="{{ false }}"><a href="WB-Market-Connector.dc.html" class="lk" style="color:{{t.ink}};box-shadow:inset 0 0 0 1px rgba(0,0,0,.14)">去连接</a></sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:4px;padding:6px 10px;margin-top:5px;border-top:1px solid rgba(0,0,0,.07)">
+                    <a href="WB-Plugins.dc.html" class="ft" style="color:#55555A">管理连接器…</a>
+                    <span style="margin-left:auto"></span>
+                    <span class="sub" style="font-size:11px">仅本次对话</span>
+                  </div>
+                </div>
+              </sc-if>
+
+            </div>
+          </sc-if>
+          <sc-if value="{{fly.list}}" hint-placeholder-val="{{ false }}">
+            <div class="fly" role="group" aria-label="{{fly.label}}" style="left:{{fly.left}}px;bottom:52px;width:280px;max-height:360px">
+                <label class="fs"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg><input type="text" aria-label="搜索{{fly.label}}" placeholder="搜索{{fly.label}}…" value="{{q}}" onInput="{{onQ}}"></label>
+                <div style="flex:1;min-height:0;overflow-y:auto;scrollbar-width:thin">
+                  <div class="fsec">已安装的{{fly.label}}</div>
+                  <sc-for list="{{flyRows}}" as="o" hint-placeholder-count="4">
+                    <sc-if value="{{o.ready}}" hint-placeholder-val="{{ true }}"><button type="button" class="fr" onClick="{{o.pick}}"><span class="frt" title="{{o.detail}}"><strong>{{o.name}}</strong></span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"></path></svg></button></sc-if>
+                    <sc-if value="{{o.notReady}}" hint-placeholder-val="{{ false }}"><a class="fr" href="WB-Plugins.dc.html"><span class="frt" title="{{o.detail}}"><strong>{{o.name}}</strong></span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"></path></svg></a></sc-if>
+                  </sc-for>
+                  <sc-if value="{{fly.empty}}" hint-placeholder-val="{{ false }}"><div class="fe">{{fly.emptyText}}</div></sc-if>
+                  <sc-if value="{{fly.searching}}" hint-placeholder-val="{{ false }}">
+                    <div class="fsec">发现更多</div>
+                    <sc-for list="{{fly.remote}}" as="r" hint-placeholder-count="1">
+                      <a class="fr" href="Market.dc.html"><span class="frt" title="{{r.desc}}"><strong>{{r.name}}</strong></span><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"></path></svg></a>
+                    </sc-for>
+                    <sc-if value="{{fly.noRemote}}" hint-placeholder-val="{{ false }}"><div class="fe">可在 AI 插件中继续查找</div></sc-if>
+                  </sc-if>
+                </div>
+                <a class="fst" href="WB-Plugins.dc.html" style="color:{{t.ink}}">打开 AI 插件 <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7M8 7h9v9"></path></svg></a>
+            </div>
+          </sc-if>
+          <sc-if value="{{fly.tools}}" hint-placeholder-val="{{ false }}">
+            <div class="fly" role="group" aria-label="工具" style="left:{{fly.left}}px;bottom:52px;width:168px">
+              <div style="display:flex;align-items:center"><button type="button" class="fm" onClick="{{tools.computer.pick}}" style="flex:1;min-width:0"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg><span>操作电脑</span></button><button type="button" class="fg" aria-label="管理电脑控制" title="管理电脑控制" onClick="{{openComputer}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9M14 17H5"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle></svg></button></div>
+              <button type="button" class="fm" onClick="{{tools.phone.pick}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"></rect><path d="M12 18h.01"></path></svg><span>操作手机</span></button>
+              <button type="button" class="fm" onClick="{{tools.design.pick}}"><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"></rect><path d="M3 9h18M9 21V9"></path></svg><span>设计画板</span></button>
+            </div>
+          </sc-if>
+          <sc-if value="{{fly.computer}}" hint-placeholder-val="{{ false }}">
+            <div class="fly" role="group" aria-label="电脑控制" style="left:{{fly.left}}px;bottom:52px;width:260px">
+              <div style="padding:8px;font-size:12px;color:#1D1D1F">
+                <strong style="font-size:13px;font-weight:500">电脑控制 · {{computer.state}}</strong>
+                <p style="margin:8px 0;line-height:1.5;color:#55555A">允许小伴操作电脑应用。首次使用时按系统提示授权屏幕录制和辅助功能，实际权限以系统为准。</p>
+                <sc-if value="{{computer.on}}" hint-placeholder-val="{{ false }}"><button type="button" onClick="{{computer.check}}" style="padding:2px 0;border:0;background:none;color:{{t.ink}};font:inherit;cursor:pointer">让小伴检查权限</button></sc-if>
+                <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
+                  <button type="button" onClick="{{computer.back}}" style="border:0;border-radius:8px;padding:6px 12px;font:inherit;background:#F2F2F4;color:#1D1D1F;cursor:pointer">返回</button>
+                  <button type="button" onClick="{{computer.toggle}}" style="border:0;border-radius:8px;padding:6px 12px;font:inherit;background:{{computer.toggleBg}};color:{{computer.toggleInk}};cursor:pointer">{{computer.action}}</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+      </div>
+
+
+      <div style="align-self:stretch;margin-top:36px;display:flex;flex-direction:column;align-items:flex-start;gap:2px">
+        <span class="cap" style="padding:0 14px 6px">试试这样问</span>
+        <button type="button" class="sug">把这周的工作记录整理成周报<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17 17 7M8 7h9v9"></path></svg></button>
+        <button type="button" class="sug">下载文件夹里的发票按月份归档<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17 17 7M8 7h9v9"></path></svg></button>
+        <button type="button" class="sug">每个工作日 9:00 提醒我看今天的日程<svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 17 17 7M8 7h9v9"></path></svg></button>
+      </div>
+    </div>
+
+    <div class="sub" style="position:absolute;bottom:12px;font-size:11px;color:#86868B">内容由 AI 生成，请核对重要信息</div>
+  </main>
+  <sc-if value="{{menuOpen}}" hint-placeholder-val="{{ false }}">
+    <button type="button" aria-label="关闭菜单" onClick="{{closeMenu}}" style="position:absolute;inset:0;z-index:4;border:0;padding:0;background:transparent;cursor:default"></button>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"red"},"preset":{"editor":"enum","options":["empty","skill","expert","conns","all","chat","tool"],"default":"all"},"menu":{"editor":"enum","options":["none","plus","skill","expert","conn","tool","computer"],"default":"none"},"$preview":{"width":1280,"height":800}}'>
+const PALETTES = {
+  red:      { name: '小伴红', btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
+  green:    { name: '薄荷绿', btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
+  blue:     { name: '海湾蓝', btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
+  purple:   { name: '暮紫',   btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9', dot: '#7C5CE6' },
+  amber:    { name: '琥珀',   btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED', dot: '#E09A2B' },
+  graphite: { name: '石墨',   btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3', dot: '#55555B' }
+};
+const TONES = {
+  blue: ['#E8EEFD', '#3557C9'], green: ['#E3F2E9', '#1E6A45'], amber: ['#FAEEDB', '#87500A'],
+  purple: ['#EDE8FC', '#5537B8'], red: ['#FCEBEC', '#B42A33'], gray: ['#E9E9EC', '#2B2B30']
+};
+const toneOf = (k) => TONES[k] ?? TONES.gray;
+const byId = (list, id) => list.find((x) => x.id === id);
+const SKILLS = [
+  { id: 'ppt', name: 'PPT 演示文稿', desc: '按主题或文档生成结构清晰的演示文稿', tag: '内置' },
+  { id: 'doc', name: 'Word 文档', desc: '撰写、改写并排版正式文档', tag: '内置' },
+  { id: 'xls', name: 'Excel 表格', desc: '清洗数据、写公式、生成图表', tag: '内置' },
+  { id: 'research', name: '深度研究', desc: '多轮检索、交叉验证，输出带引用的报告', tag: '内置' },
+  { id: 'weekly', name: '周报助手', desc: '把工作记录整理成固定格式的周报', tag: '我的' },
+  { id: 'invoice', name: '发票归档', desc: '按月份和抬头归档下载的发票', tag: '市场' }
+];
+const EXPERTS = [
+  { id: 'team-dev', kind: 'team', name: '软件开发团队', desc: '产品、架构、前端、测试协同完成一个需求', meta: '4 位专家', tone: 'blue' },
+  { id: 'team-content', kind: 'team', name: '内容创作团队', desc: '选题、写作、审校一条龙', meta: '3 位专家', tone: 'amber' },
+  { id: 'team-data', kind: 'team', name: '数据分析团队', desc: '取数、建模、可视化与解读', meta: '3 位专家', tone: 'green' },
+  { id: 'pm', kind: 'person', name: '产品经理', desc: '拆需求、写文档、排优先级', letter: '产', tone: 'purple' },
+  { id: 'arch', kind: 'person', name: '架构师', desc: '评审方案、拆分模块、控制技术风险', letter: '架', tone: 'blue' },
+  { id: 'fe', kind: 'person', name: '前端工程师', desc: '写界面、查样式问题、做交互', letter: '前', tone: 'green' },
+  { id: 'copy', kind: 'person', name: '文案策划', desc: '写文案、定调性、改标题', letter: '文', tone: 'red' },
+  { id: 'analyst', kind: 'person', name: '数据分析师', desc: '清洗数据、做图表、讲结论', letter: '数', tone: 'amber' },
+  { id: 'trans', kind: 'person', name: '翻译', desc: '中英互译，保留术语与格式', letter: '译', tone: 'gray' }
+];
+const CONNS = [
+  { id: 'feishu', name: '飞书', desc: '读取文档、日历与群消息', letter: '飞', tone: 'blue', state: 'ok' },
+  { id: 'github', name: 'GitHub', desc: '查看仓库、Issue 与 PR', letter: 'G', tone: 'gray', state: 'ok' },
+  { id: 'calendar', name: '日历', desc: '读取和创建日程', letter: '历', tone: 'amber', state: 'ok' },
+  { id: 'tdoc', name: '腾讯文档', desc: '读写在线文档与表格', letter: '腾', tone: 'green', state: 'expired' },
+  { id: 'notion', name: 'Notion', desc: '搜索页面与数据库', letter: 'N', tone: 'purple', state: 'off' }
+];
+const fmtTokens = (n) => n < 1000 ? String(Math.round(n)) : (n >= 1000000 ? (Math.round(n / 100000) / 10) + 'M' : (n < 100000 ? (Math.round(n / 100) / 10) : Math.round(n / 1000)) + 'K').replace('.0', '');
+const PADL = 18;
+const EXDIR = 'down';
+const DEFAULT_PRESET = 'all';
+const PRESETS = {
+  empty:  { skills: [], expert: null, conns: [] },
+  skill:  { skills: ['ppt'], expert: null, conns: [] },
+  expert: { skills: [], expert: 'team-dev', conns: [] },
+  conns:  { skills: [], expert: null, conns: ['feishu', 'github'] },
+  all:    { skills: ['ppt'], expert: 'team-dev', conns: ['feishu', 'github', 'calendar'] },
+  chat:   { skills: [], expert: 'pm', conns: ['feishu', 'calendar'] },
+  tool:   { skills: [], expert: null, conns: [], tool: 'computer' }
+};
+const TOOL_NAMES = { computer: '操作电脑', phone: '操作手机', design: '设计画板' };
+const FLY_LABELS = { skill: '技能', expert: '专家', conn: '连接器' };
+const FLY_REMOTE = {
+  skill: [{ name: '会议纪要', desc: '把录音整理成结构化纪要' }, { name: '合同审阅', desc: '标出风险条款并给出修改建议' }],
+  expert: [{ name: 'UI 设计师', desc: '出界面方案、整理设计规范' }],
+  conn: [{ name: '企业微信', desc: '读取群消息与日程' }]
+};
+const QUICK = [
+  { label: '写文档', skill: 'doc' }, { label: '做表格', skill: 'xls' }, { label: '做 PPT', skill: 'ppt' },
+  { label: '深度研究', skill: 'research' }, { label: '整理文件', skill: null }, { label: '定时任务', skill: null }
+];
+function contextVals(self, t, used, interactive) {
+  const limit = self.state.ctxLimit ?? 128000;
+  const pct = Math.min(100, Math.round((used / limit) * 100));
+  const level = used / limit >= 0.9 ? 'full' : used / limit >= 0.7 ? 'warn' : 'ok';
+  const color = level === 'full' ? '#D03050' : level === 'warn' ? '#F0A020' : t.btn;
+  const C = 2 * Math.PI * 8;
+  const open = interactive && (self.state.ctxOpen !== undefined ? self.state.ctxOpen : false);
+  const canCompact = used > 8000;
+  return {
+    percent: pct, color, dash: (C * pct / 100).toFixed(2) + ' ' + C.toFixed(2),
+    open, openAttr: open ? 'true' : 'false', hoverBg: open ? '#F2F2F4' : 'transparent',
+    title: used ? '' : '开始对话后显示上下文用量',
+    toggle: () => { if (interactive) self.setState({ ctxOpen: !open, menu: null }); },
+    usedText: fmtTokens(used), limitText: fmtTokens(limit), limit, width: pct + '%',
+    onLimit: (e) => self.setState({ ctxLimit: Number(e.target.value) }),
+    noCompact: !canCompact, reason: canCompact ? '' : '对话还很短，暂时不需要压缩', btnColor: canCompact ? '#1D1D1F' : '#A1A1A6'
+  };
+}
+const PERMS = [
+  { id: 'default', label: '默认权限', desc: '读写文件、运行命令前先问你，可以记住授权', mark: 'm9 12 2 2 4-4' },
+  { id: 'full', label: '完全信任', desc: '不再询问，直接执行。只在工作区沙箱内操作，适合你信得过的任务', mark: 'M12 8v4M12 15.5h.01' }
+];
+function permVals(self, t) {
+  const cur = self.state.perm ?? 'default';
+  const open = !!self.state.permOpen;
+  const full = cur === 'full';
+  return {
+    full, open, openAttr: open ? 'true' : 'false',
+    label: (PERMS.find((p) => p.id === cur) || PERMS[0]).label,
+    color: full ? '#C4313B' : '#4A4A50',
+    bg: open ? '#F2F2F4' : 'transparent',
+    toggle: () => self.setState({ permOpen: !open, menu: null }),
+    items: PERMS.map((p) => {
+      const on = p.id === cur, warn = p.id === 'full';
+      return { ...p, on, checked: on ? 'true' : 'false', bg: on ? (warn ? '#FDF0F0' : t.soft) : 'transparent',
+        tileBg: warn ? '#FDECEC' : t.soft, tileInk: warn ? '#C4313B' : t.ink, ink: warn ? '#B42A33' : '#1D1D1F',
+        pick: () => self.setState({ perm: p.id, permOpen: false }) };
+    })
+  };
+}
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { text: '', aiOpen: true }; }
+  renderVals() {
+    const st = this.state;
+    const key = st.theme ?? this.props.theme ?? 'red';
+    const t = PALETTES[key] ?? PALETTES.green;
+    const preset = PRESETS[this.props.preset ?? DEFAULT_PRESET] ?? PRESETS.all;
+    const skills = st.skills ?? preset.skills;
+    const expert = st.expert !== undefined ? st.expert : preset.expert;
+    const conns = st.conns ?? preset.conns;
+
+    // 内置工具：一次性，单选；操作电脑需先在工具菜单里启用
+    const selTool = st.tool !== undefined ? st.tool : (preset.tool ?? null);
+    const computerOn = st.computerOn ?? !!preset.tool;
+    const pickTool = (id) => () => {
+      if (id === 'computer' && !computerOn) { this.setState({ menu: 'computer', selectOnEnable: true }); return; }
+      this.setState({ tool: selTool === id ? null : id, menu: null });
+    };
+    const tools = {};
+    Object.keys(TOOL_NAMES).forEach((id) => { const on = selTool === id; tools[id] = { on, checked: on ? 'true' : 'false', bg: on ? t.soft : 'transparent', pick: pickTool(id) }; });
+    const computer = {
+      on: computerOn, state: computerOn ? '已启用' : '未启用',
+      action: computerOn ? '停用' : '启用', toggleBg: t.btn, toggleInk: '#fff',
+      back: () => this.setState({ menu: 'tool', from: 'plus', selectOnEnable: false }),
+      toggle: () => this.setState(computerOn
+        ? { computerOn: false, tool: selTool === 'computer' ? null : selTool, menu: null }
+        : { computerOn: true, tool: st.selectOnEnable ? 'computer' : selTool, menu: null, selectOnEnable: false }),
+      check: () => this.setState({ tool: 'computer', text: '请检查电脑控制所需的系统权限，并告诉我检查结果。', menu: null })
+    };
+    const menu = st.menu !== undefined ? st.menu : (this.props.menu && this.props.menu !== 'none' ? this.props.menu : null);
+    const from = st.from ?? (this.props.menu && this.props.menu !== 'none' ? 'plus' : 'tool');
+    const mode = st.mode ?? null;
+    const q = st.q ?? '';
+    const ql = q.trim().toLowerCase();
+    const text = st.text ?? '';
+    const strip = (s) => (mode ? s.replace(/(^|\s)[\/@]\S*$/, '$1') : s);
+    const hit = (o) => !ql || (o.name + o.desc).toLowerCase().includes(ql);
+    const close = () => this.setState({ menu: null, mode: null, q: '' });
+    const open = (m, f) => () => this.setState({ menu: m, from: f, q: '', mode: null, permOpen: false, ctxOpen: false });
+    const toggle = (m, f) => () => (menu === m ? close() : open(m, f)());
+
+    // 技能：一次性，可多选
+    const setSkills = (list) => this.setState({ skills: list, text: strip(text), ...(mode ? { menu: null, mode: null, q: '' } : {}) });
+    const skillChips = skills.map((id) => byId(SKILLS, id)).filter(Boolean).map((s) => ({
+      name: s.name, remove: () => this.setState({ skills: skills.filter((x) => x !== s.id) })
+    }));
+    const skillRows = SKILLS.filter(hit).map((s) => {
+      const on = skills.includes(s.id);
+      return { ...s, on, checked: on ? 'true' : 'false', bg: on ? t.soft : 'transparent',
+        pick: () => setSkills(on ? skills.filter((x) => x !== s.id) : [...skills, s.id]) };
+    });
+
+    // 专家 / 专家团：会话级，单选
+    const exView = (e) => { const [bg, ink] = toneOf(e.tone); return { ...e, avBg: bg, avInk: ink, isTeam: e.kind === 'team', isPerson: e.kind !== 'team', radius: e.kind === 'team' ? '6px' : '50%' }; };
+    const pickExpert = (id) => () => this.setState({ expert: id, text: strip(text), menu: null, mode: null, q: '' });
+    const exRows = (team) => EXPERTS.filter((e) => (e.kind === 'team') === team && hit(e)).map((e) => {
+      const on = expert === e.id;
+      return { ...exView(e), on, checked: on ? 'true' : 'false', bg: on ? t.soft : 'transparent', pick: pickExpert(e.id) };
+    });
+    const teamRows = exRows(true), personRows = exRows(false);
+    const exObj = expert ? exView(byId(EXPERTS, expert)) : null;
+    const showNone = !ql || '通用小伴'.includes(ql);
+
+    // 连接器：会话级，可多个
+    const connRows = CONNS.map((c) => {
+      const [bg, ink] = toneOf(c.tone);
+      const on = c.state !== 'off' && conns.includes(c.id);
+      return { ...c, bg, ink, on, checked: on ? 'true' : 'false', isOk: c.state === 'ok', isExpired: c.state === 'expired', isOff: c.state === 'off',
+        status: c.state === 'off' ? '尚未连接' : c.state === 'expired' ? '授权已过期，需要重新授权' : c.desc,
+        statusColor: c.state === 'expired' ? '#8A5A00' : '#6E6E73',
+        trackBg: on ? t.btn : '#8E8E93', knob: on ? '16px' : '2px',
+        toggle: () => this.setState({ conns: on ? conns.filter((x) => x !== c.id) : [...conns, c.id] }) };
+    });
+    const enabled = CONNS.filter((c) => c.state !== 'off' && conns.includes(c.id));
+    const connStack = enabled.slice(0, 3).map((c, i) => { const [bg, ink] = toneOf(c.tone); return { letter: c.letter, bg, ink, ml: i ? '-6px' : '0', warn: c.state === 'expired' }; });
+    if (enabled.length > 3) connStack.push({ letter: '+' + (enabled.length - 3), bg: '#E9E9EC', ink: '#4A4A50', ml: '-6px', warn: false });
+
+    // 选择器位置：专家/连接器从右上角的按钮弹出，其余从 + 号弹出
+    const tool = from === 'tool' && ((menu === 'expert' && !!exObj) || (menu === 'conn' && enabled.length > 0));
+    const pos = tool
+      ? 'left:auto;right:8px;' + (EXDIR === 'down' ? 'top:42px;bottom:auto' : 'bottom:calc(100% + 6px);top:auto')
+      : 'left:' + (PADL - 4) + 'px;right:auto;bottom:52px;top:auto';
+    const widths = { plus: 248, skill: 260, expert: 260, conn: 260 };
+
+    const m = (name) => menu === name;
+    const swatches = Object.keys(PALETTES).map((k) => ({
+      name: PALETTES[k].name, color: PALETTES[k].btn, checked: k === key ? 'true' : 'false',
+      ring: k === key ? '2px solid ' + PALETTES[k].btn : '2px solid transparent',
+      pick: () => this.setState({ theme: k })
+    }));
+    const canSend = text.trim().length > 0;
+    const aiOpen = st.aiOpen;
+    // + 菜单的二级菜单：一级菜单保持打开，二级菜单在右侧展开（与 ChatWorkbenchTools.vue 一致）
+    const flyKind = !!menu && ['skill', 'expert', 'conn', 'tool', 'computer'].includes(menu) && (from === 'plus' || menu === 'tool' || menu === 'computer') ? menu : null;
+    const shut = { menu: null, q: '', mode: null };
+    let flyRows = [];
+    if (flyKind === 'skill') flyRows = SKILLS.filter(hit).map((s) => ({ name: s.name, detail: s.desc, ready: true, notReady: false,
+      pick: () => this.setState({ skills: skills.includes(s.id) ? skills : [...skills, s.id], ...shut }) }));
+    if (flyKind === 'expert') flyRows = EXPERTS.filter(hit).map((e) => ({ name: e.name, detail: e.kind === 'team' ? e.meta + ' · ' + e.desc : e.desc, ready: true, notReady: false,
+      pick: () => this.setState({ expert: e.id, ...shut }) }));
+    if (flyKind === 'conn') flyRows = CONNS.filter(hit).map((c) => ({ name: c.name, ready: c.state === 'ok', notReady: c.state !== 'ok',
+      detail: c.state === 'ok' ? c.desc : c.state === 'expired' ? '授权已过期，需要重新授权' : '尚未连接或未启用',
+      pick: () => this.setState({ conns: conns.includes(c.id) ? conns : [...conns, c.id], ...shut }) }));
+    const remote = ql && FLY_REMOTE[flyKind] ? FLY_REMOTE[flyKind].filter((r) => (r.name + r.desc).toLowerCase().includes(ql)) : [];
+    const fly = {
+      list: flyKind === 'skill' || flyKind === 'expert' || flyKind === 'conn', tools: flyKind === 'tool', computer: flyKind === 'computer',
+      label: FLY_LABELS[flyKind] ?? '', left: PADL - 4 + 248 + 7,
+      empty: flyRows.length === 0, emptyText: ql ? '没有匹配的已安装能力' : '暂无已安装能力',
+      searching: !!ql, remote, noRemote: !!ql && remote.length === 0
+    };
+    const plusSel = (k) => (flyKind === k || (k === 'tool' && flyKind === 'computer') ? t.soft : 'transparent');
+    return {
+      t, swatches, text, canSend,
+      onText: (e) => {
+        const v = e.target.value;
+        const hitTok = v.match(/(?:^|\s)([\/@])(\S*)$/);
+        if (hitTok) this.setState({ text: v, menu: hitTok[1] === '/' ? 'skill' : 'expert', mode: hitTok[1], q: hitTok[2], from: 'text', permOpen: false });
+        else this.setState({ text: v, ...(mode ? { menu: null, mode: null, q: '' } : {}) });
+      },
+      sendDisabled: !canSend, sendBg: canSend ? t.btn : '#E8E8EC', sendInk: canSend ? '#fff' : '#A1A1A6',
+      hasSkills: skillChips.length > 0, skillChips, hasTopRow: skillChips.length > 0 || !!selTool || !!exObj || enabled.length > 0,
+      hasTool: !!selTool, toolChip: selTool ? { name: TOOL_NAMES[selTool], isComputer: selTool === 'computer', isPhone: selTool === 'phone', isDesign: selTool === 'design', remove: () => this.setState({ tool: null }) } : {},
+      tools, computer, computerState: computerOn ? '已启用 · 点右侧管理' : '未启用，点一下先启用',
+      hasExpert: !!exObj, ex: exObj ? { ...exObj, openAttr: m('expert') ? 'true' : 'false', toggle: toggle('expert', 'tool'), bg: m('expert') ? '#F2F2F4' : 'transparent' } : {},
+      hasConns: enabled.length > 0, connStack, connLabel: '已启用 ' + enabled.length + ' 个连接器，点击管理',
+      connBg: m('connector') || m('conn') ? '#F2F2F4' : 'transparent', connOpenAttr: m('conn') ? 'true' : 'false', toggleConn: toggle('conn', 'tool'),
+      plusOpenAttr: m('plus') ? 'true' : 'false', plusBg: m('plus') ? '#F2F2F4' : 'transparent', togglePlus: toggle('plus', 'tool'),
+      menuOpen: !!menu, menuPlus: m('plus') || !!flyKind, menuSkill: m('skill') && !flyKind, menuExpert: m('expert') && !flyKind, menuConn: m('conn') && !flyKind, fly, flyRows,
+      plusSel: { skill: plusSel('skill'), expert: plusSel('expert'), conn: plusSel('conn'), tool: plusSel('tool') },
+      pop: { pos, width: flyKind ? 248 : (widths[menu] ?? 248) }, closeMenu: close,
+      pickFile: close, openSkillMenu: open('skill', 'plus'), openExpertMenu: open('expert', 'plus'), openConnMenu: open('conn', 'plus'), openToolMenu: open('tool', 'plus'), openComputer: () => this.setState({ menu: 'computer', from: 'plus', selectOnEnable: false }),
+      toolSummary: selTool ? TOOL_NAMES[selTool] : '',
+      skillSummary: skillChips.length === 0 ? '' : skillChips.length === 1 ? skillChips[0].name : skillChips.length + ' 个技能',
+      expertSummary: exObj ? exObj.name : '', connSummary: enabled.length ? enabled.length + ' 个已启用' : '',
+      q, qReadonly: !!mode, onQ: (e) => { if (!mode) this.setState({ q: e.target.value }); },
+      skillRows, noSkill: skillRows.length === 0,
+      exNone: { on: !expert, bg: !expert ? t.soft : 'transparent', checked: !expert ? 'true' : 'false', pick: pickExpert(null) }, showNone,
+      teamRows, personRows, hasTeams: teamRows.length > 0, hasPeople: personRows.length > 0,
+      noExpert: !showNone && teamRows.length + personRows.length === 0,
+      connRows, connCount: enabled.length, connTotal: CONNS.filter((c) => c.state !== 'off').length,
+      quick: QUICK.map((c) => ({ label: c.label, pick: () => { if (c.skill && !skills.includes(c.skill)) this.setState({ skills: [...skills, c.skill] }); } })),
+      ctx: contextVals(this, t, 0, false),
+      perm: permVals(this, t),
+      aiOpen, aiOpenAttr: aiOpen ? 'true' : 'false', aiChevron: aiOpen ? 'rotate(0deg)' : 'rotate(-90deg)',
+      toggleAi: () => this.setState({ aiOpen: !this.state.aiOpen })
+    };
+  }
+}
+</script>
+</body>
+</html>

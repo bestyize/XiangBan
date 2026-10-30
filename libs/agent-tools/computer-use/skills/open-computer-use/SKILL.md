@@ -1,5 +1,6 @@
 ---
 name: open-computer-use
+user-invocable: false
 description: 操作电脑上其他应用（看窗口、点击、输入、滚动、拖拽）前必读。说明 list_apps、get_app_state、click、type_text、set_value、query 等电脑控制工具的正确用法、取不到文字或点不中时的处理，以及哪些操作要先问用户。
 ---
 

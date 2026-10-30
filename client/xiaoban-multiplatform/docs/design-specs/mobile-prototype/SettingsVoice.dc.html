@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>声音</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:760px;box-sizing:border-box;background:#EDEDED;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+<header style="flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:#FFFFFF">
+<a href="Settings.dc.html" aria-label="返回" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#222222;text-decoration:none"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+<h1 style="margin:0;font-size:16px;font-weight:600">声音</h1>
+<span style="width:44px"></span>
+</header>
+<main style="flex:1;min-height:0;overflow:hidden;padding-bottom:24px">
+<div style="padding:16px 16px 6px;font-size:12px;color:#666666">语音识别</div><ul style="list-style:none;margin:0;padding:0;background:#FFFFFF;overflow:hidden;"><li style=""><div  style="width:100%;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:14px 16px;border:0;background:none;text-align:left;color:#222222;font-family:inherit"><span style="flex:1;min-width:0"><span style="display:block;font-size:15px">本地语音识别</span><div style="margin-top:2px;font-size:12px;line-height:1.5;color:#666666">SenseVoice · 在手机上识别你说的话，不上传录音</div></span><span style="display:flex;align-items:center;gap:4px;color:#2FA36B;font-size:12px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>已就绪</span></div></li></ul>
+<div style="padding:16px 16px 6px;font-size:12px;color:#666666">朗读</div><ul style="list-style:none;margin:0;padding:0;background:#FFFFFF;overflow:hidden;"><li style=""><div  style="width:100%;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:14px 16px;border:0;background:none;text-align:left;color:#222222;font-family:inherit"><span style="flex:1;min-width:0"><span style="display:block;font-size:15px">自动朗读回复</span><div style="margin-top:2px;font-size:12px;line-height:1.5;color:#666666">回复会一边生成一边朗读；切换对话或发新消息会停止朗读。</div></span><span onClick="{{toggleAuto}}" style="cursor:pointer;display:block"><span style="flex:none;position:relative;display:block;width:48px;height:28px;border-radius:14px;background:{{autoBg}}"><span style="position:absolute;top:2px;left:{{autoLeft}}px;width:24px;height:24px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span></span></span></div></li><li style="border-top:0.5px solid #EDEDED;"><button onClick="{{openSrc}}" style="width:100%;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:14px 16px;border:0;background:none;text-align:left;color:#222222;font-family:inherit"><span style="flex:1;min-width:0"><span style="display:block;font-size:15px">语音来源</span></span><span style="font-size:12px;color:#666666;white-space:nowrap">{{srcName}}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button></li><sc-if value="{{isEdge}}" hint-placeholder-val="{{true}}"><li style="border-top:0.5px solid #EDEDED;"><button onClick="{{openVoice}}" style="width:100%;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:14px 16px;border:0;background:none;text-align:left;color:#222222;font-family:inherit"><span style="flex:1;min-width:0"><span style="display:block;font-size:15px">音色</span></span><span style="font-size:12px;color:#666666;white-space:nowrap">{{voiceName}}</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9A9A9A" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></button></li><li style="border-top:0.5px solid #EDEDED;"><div style="padding:14px 16px 12px"><div style="display:flex;align-items:center"><span style="flex:1;font-size:15px">语速</span><span style="font-size:12px;color:#666666;white-space:nowrap">{{rateName}}</span></div><div style="position:relative;height:28px;margin-top:10px"><div style="position:absolute;left:12px;right:12px;top:12px;height:4px;border-radius:2px;background:#E6E6E6"></div><div style="position:absolute;left:12px;top:12px;height:4px;border-radius:2px;background:#E3203C;width:calc((100% - 24px) * {{rateFrac}})"></div><div style="position:absolute;left:0;right:0;top:2px;display:flex;justify-content:space-between"><sc-for list="{{stops}}" as="s" hint-placeholder-count="5"><button type="button" aria-label="{{s.name}}" onClick="{{s.pick}}" style="width:24px;height:24px;border:0;background:none;padding:0;display:flex;align-items:center;justify-content:center"><i style="width:6px;height:6px;border-radius:50%;background:{{s.dot}}"></i></button></sc-for></div><span style="position:absolute;top:2px;left:calc((100% - 24px) * {{rateFrac}});width:24px;height:24px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 3px rgba(0,0,0,.3);pointer-events:none"></span></div><div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:#9A9A9A"><span>慢</span><span>快</span></div></div></li></sc-if><li style="border-top:0.5px solid #EDEDED;"><button type="button" onClick="{{toggleTry}}" style="width:100%;display:flex;height:52px;border:0;background:none;color:#E3203C;font-size:15px;font-weight:600;align-items:center;justify-content:center;gap:8px">{{tryLabel}}</button></li></ul>
+<div style="padding:16px 16px 6px;font-size:12px;color:#666666">通话</div><ul style="list-style:none;margin:0;padding:0;background:#FFFFFF;overflow:hidden;"><li style=""><div  style="width:100%;box-sizing:border-box;display:flex;align-items:center;gap:12px;padding:14px 16px;border:0;background:none;text-align:left;color:#222222;font-family:inherit"><span style="flex:1;min-width:0"><span style="display:block;font-size:15px">直接开口打断</span><div style="margin-top:2px;font-size:12px;line-height:1.5;color:#666666">小伴说话时，直接开口就能打断它；周围回声大、总被误打断时可以关掉。</div></span><span onClick="{{toggleBarge}}" style="cursor:pointer;display:block"><span style="flex:none;position:relative;display:block;width:48px;height:28px;border-radius:14px;background:{{bargeBg}}"><span style="position:absolute;top:2px;left:{{bargeLeft}}px;width:24px;height:24px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span></span></span></div></li></ul>
+</main>
+<sc-if value="{{sheetSrc}}" hint-placeholder-val="{{false}}"><div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end"><div role="dialog" aria-modal="true" aria-label="语音来源" style="background:#FFFFFF;border-radius:16px 16px 0 0;padding:16px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.08)"><h2 style="margin:0;padding:0 16px 10px;font-size:18px;font-weight:600">语音来源</h2><sc-for list="{{sources}}" as="o" hint-placeholder-count="2"><button type="button" onClick="{{o.pick}}" style="width:100%;border:0;border-top:0.5px solid #EDEDED;background:none;padding:14px 16px;display:flex;align-items:flex-start;gap:12px;text-align:left;font-family:inherit;color:#222222"><span style="flex:none;width:20px;height:20px;border-radius:50%;border:2px solid {{o.ring}};box-sizing:border-box;display:flex;align-items:center;justify-content:center"><i style="width:10px;height:10px;border-radius:50%;background:{{o.dot}}"></i></span><span style="flex:1"><b style="display:block;font-size:15px;font-weight:600;color:{{o.color}}">{{o.title}}</b><span style="display:block;margin-top:2px;font-size:12px;line-height:1.5;color:#666666">{{o.desc}}</span></span></button></sc-for><div style="height:8px;background:#EDEDED"></div><button type="button" onClick="{{closeSheet}}" style="display:block;width:100%;height:52px;border:0;background:none;color:#222222;font-size:15px;font-weight:600">取消</button></div></div></sc-if>
+<sc-if value="{{sheetVoice}}" hint-placeholder-val="{{false}}"><div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end"><div role="dialog" aria-modal="true" aria-label="音色" style="background:#FFFFFF;border-radius:16px 16px 0 0;padding:16px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,.08)"><h2 style="margin:0;padding:0 16px 10px;font-size:18px;font-weight:600">音色</h2><sc-for list="{{voices}}" as="v" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:12px;padding:0 16px;border-top:0.5px solid #EDEDED"><button type="button" onClick="{{v.pick}}" style="flex:1;border:0;background:none;padding:14px 0;display:flex;align-items:center;gap:12px;text-align:left;font-family:inherit;color:#222222"><span style="flex:none;width:20px;height:20px;border-radius:50%;border:2px solid {{v.ring}};box-sizing:border-box;display:flex;align-items:center;justify-content:center"><i style="width:10px;height:10px;border-radius:50%;background:{{v.dot}}"></i></span><span style="font-size:15px;font-weight:{{v.weight}};color:{{v.color}}">{{v.name}}<span style="margin-left:8px;font-size:12px;font-weight:400;color:#666666">{{v.gender}}</span></span></button><span style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:#666666"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h4l5 4V6L8 10zM16 9a4 4 0 010 6"/></svg></span></div></sc-for><div style="padding:14px 16px;font-size:14px;color:#666666;border-top:0.5px solid #EDEDED">刷新完整音色列表</div><div style="height:8px;background:#EDEDED"></div><button type="button" onClick="{{closeSheet}}" style="display:block;width:100%;height:52px;border:0;background:none;color:#222222;font-size:15px;font-weight:600">取消</button></div></div></sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":760}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const src = st.src || 'edge';
+    const voice = st.voice === undefined ? 0 : st.voice;
+    const rate = st.rate === undefined ? 2 : st.rate;
+    const auto = !!st.auto;
+    const barge = st.barge === undefined ? true : !!st.barge;
+    const A = '#E3203C';
+    const SOURCES = [
+      { id: 'edge', title: 'Edge 在线（默认）', desc: '微软 Edge 在线音色，免费；连不上时自动改用系统朗读。', short: 'Edge 在线' },
+      { id: 'system', title: '系统朗读（离线）', desc: '用手机自带的语音，不联网、无延迟，音色较普通。', short: '系统朗读' }
+    ];
+    const VOICES = [['晓晓', '女声'], ['晓伊', '女声'], ['云希', '男声'], ['云扬', '男声']];
+    const RATES = ['很慢', '较慢', '正常', '较快', '很快'];
+    return {
+      isEdge: src === 'edge',
+      srcName: SOURCES.find((s) => s.id === src).short,
+      voiceName: VOICES[voice][0] + ' · ' + VOICES[voice][1],
+      rateName: RATES[rate],
+      rateFrac: rate / 4,
+      autoBg: auto ? A : '#CFCFCF', autoLeft: auto ? 22 : 2,
+      bargeBg: barge ? A : '#CFCFCF', bargeLeft: barge ? 22 : 2,
+      toggleAuto: () => this.setState({ auto: !auto }),
+      toggleBarge: () => this.setState({ barge: !barge }),
+      tryLabel: st.trying ? '停止' : '试听',
+      toggleTry: () => this.setState({ trying: !st.trying }),
+      sheetSrc: st.sheet === 'src', sheetVoice: st.sheet === 'voice',
+      openSrc: () => this.setState({ sheet: 'src' }),
+      openVoice: () => this.setState({ sheet: 'voice' }),
+      closeSheet: () => this.setState({ sheet: '' }),
+      sources: SOURCES.map((o) => ({ title: o.title, desc: o.desc, ring: o.id === src ? A : '#CFCFCF', dot: o.id === src ? A : 'transparent', color: o.id === src ? A : '#222222', pick: () => this.setState({ src: o.id, sheet: '' }) })),
+      voices: VOICES.map((v, i) => ({ name: v[0], gender: v[1], ring: i === voice ? A : '#CFCFCF', dot: i === voice ? A : 'transparent', color: i === voice ? A : '#222222', weight: i === voice ? 600 : 400, pick: () => this.setState({ voice: i, sheet: '' }) })),
+      stops: RATES.map((n, i) => ({ name: n, dot: i <= rate ? '#FFFFFF' : '#CFCFCF', pick: () => this.setState({ rate: i }) }))
+    };
+  }
+}
+</script>
+</body>
+</html>

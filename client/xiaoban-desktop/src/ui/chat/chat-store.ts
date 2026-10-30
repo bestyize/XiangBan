@@ -128,6 +128,7 @@ export interface ComposerDraft {
   attachments: PendingAttachment[];
   skills: { name: string; title: string }[];
   connectors: MentionItem[];
+  tool?: import('./builtin-tools.ts').BuiltinTool | null;
 }
 
 /** Sent by the host around an automatic compaction (`chat-compacting`). */

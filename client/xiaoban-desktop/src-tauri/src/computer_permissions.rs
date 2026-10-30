@@ -22,7 +22,7 @@ pub fn diagnose(app: &tauri::AppHandle) -> Result<Value, String> {
         "host": {"bundleId": crate::assistant_capture::SCREEN_CAPTURE_BUNDLE_ID,
             "screenCapturePreflight": host_capture_access(),
             "guidance": "小伴的屏幕录制用于自身截图功能；电脑控制权限以引擎检测为准。主程序不再通过 System Events 额外申请无障碍。系统可能按责任进程归属显示小伴或引擎，应以实际授权条目为准。刚授权后进程内检查可能仍为 false，必要时退出并重新打开小伴。"},
-        "nextStep": if enabled { "参数校验失败先修正原调用。检查 engine.permissions；缺权限先引导，authorizationMismatch.services 确认旧签名冲突时，用 computer_use_repair_permissions 经用户确认定向重置，重新授权后复查。" } else { "电脑控制开关未开启，请用户在 AI 设置开启后重新发起任务。" }
+        "nextStep": if enabled { "参数校验失败先修正原调用。检查 engine.permissions；缺权限先引导，authorizationMismatch.services 确认旧签名冲突时，用 computer_use_repair_permissions 经用户确认定向重置，重新授权后复查。" } else { "电脑控制开关未开启，请用户在输入框的「+ → 工具 → 操作电脑」中启用后重新发起任务。" }
     }))
 }
 
@@ -33,7 +33,7 @@ fn host_capture_access() -> Option<bool> { None }
 
 pub fn request(app: &tauri::AppHandle) -> Result<Value, String> {
     if !crate::ai_config::current(app)?.open_computer_use {
-        return Err("请先在 AI 设置中开启电脑屏幕与应用控制，再申请引擎权限。".into());
+        return Err("请先在输入框的「+ → 工具 → 操作电脑」中启用电脑控制，再申请引擎权限。".into());
     }
     agent_computer_use_tools::permissions::request_permissions(&runtime_root(app)?)
 }

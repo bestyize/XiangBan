@@ -377,7 +377,8 @@ fn reasoning_items_survive_streaming_storage_and_the_next_tool_request() {
     stream.push_event(&json!({"type":"response.output_item.done","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"c1","name":"ping","arguments":"{}"}}), &mut |_|{}).unwrap();
     // A final response repeats the same reasoning item: it must not be duplicated.
     stream.push_event(&json!({"type":"response.completed","response":{"output":[reasoning],"status":"completed"}}), &mut |_|{}).unwrap();
-    let message = stream.finish().message;
+    let mut message = stream.finish().message;
+    message.provider_state.as_mut().unwrap()["source"] = json!({"base_url":"https://api.openai.com/v1", "model":"gpt-test"});
     assert!(text.is_empty());
     let message: Message = serde_json::from_value(serde_json::to_value(message).unwrap()).unwrap();
     let request = ChatRequest {messages:vec![Message::user_text("ping"),message,Message::tool("c1","ok")], tools:vec![]};
@@ -386,6 +387,14 @@ fn reasoning_items_survive_streaming_storage_and_the_next_tool_request() {
     assert_eq!(body["input"][2]["type"], "function_call");
     assert_eq!(body["input"][3]["type"], "function_call_output");
     assert_eq!(body["input"].as_array().unwrap().iter().filter(|v|v["type"] == "reasoning").count(), 1);
+    let mut scoped = request.clone();
+    scoped.messages[1].provider_state.as_mut().unwrap()["source"]["scope"] = json!("provider-a");
+    let mut route = profile(); route.state_scope = Some("provider-a".into());
+    assert_eq!(build_request_body(&route, &scoped)["input"][1], reasoning);
+    route.state_scope = Some("provider-b".into());
+    assert_eq!(build_request_body(&route, &scoped)["input"][1]["type"], "function_call");
+    scoped.messages[1].provider_state.as_mut().unwrap().as_object_mut().unwrap().remove("source");
+    assert_eq!(build_request_body(&route, &scoped)["input"][1]["type"], "function_call");
     let mut other = request.clone();
     other.messages[1].provider_state.as_mut().unwrap()["source"] = json!({"base_url":"https://elsewhere.example","model":"other"});
     assert_eq!(build_request_body(&profile(), &other)["input"][1]["type"], "function_call");

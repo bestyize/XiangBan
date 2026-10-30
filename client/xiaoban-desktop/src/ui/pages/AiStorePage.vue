@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NAlert, NModal, NSkeleton } from 'naive-ui';
-import { Search, RefreshCw, ArrowRight, Download, Check, Plus, Puzzle, Monitor, ChevronLeft, ChevronRight, SlidersHorizontal, Users, Layers, TriangleAlert, Zap, Plug } from 'lucide-vue-next';
-import { invoke, listen, type AiConfigView } from '../../bridge.ts';
+import { Search, RefreshCw, ArrowRight, Download, Check, Plus, Puzzle, ChevronLeft, ChevronRight, SlidersHorizontal, Users, Layers, TriangleAlert, Zap, Plug } from 'lucide-vue-next';
+import { invoke, listen } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { type Skill, type SkillPage, type SkillReview } from '../ai-store/catalog.ts';
 import RegistryCatalog from '../ai-store/RegistryCatalog.vue';
@@ -57,7 +57,6 @@ const page = ref(1);
 const loading = ref(false);
 const error = ref('');
 const localError = ref('');
-const computerEnabled = ref(false);
 const localReady = ref(false);
 const registry = ref<InstanceType<typeof RegistryCatalog> | null>(null);
 const connectorCenter = ref<InstanceType<typeof ConnectorCenter> | null>(null);
@@ -78,7 +77,6 @@ async function localPluginInstalled() {
   props.store.notify('插件包已安装', 'success');
 }
 const skill = ref<Skill | null>(null);
-const computerOpen = ref(false);
 const review = ref<SkillReview | null>(null);
 const reviewError = ref('');
 const reviewing = ref(false);
@@ -95,11 +93,10 @@ const categories = computed<{ key: string; name: string }[]>(() => {
   if (tab.value === 'skills') return installedOnly.value ? [{ key: '全部', name: '全部' }] : [{ key: '全部', name: '全部' }, ...skillCategories.value];
   const labels = tab.value === 'experts'
     ? ['全部', '开发', '办公', '创作', '金融', '学习', '生活']
-    : ['全部', '腾讯产品MCP', '搜索与信息检索', '设计与创意', '本机'];
+    : ['全部', '腾讯产品MCP', '搜索与信息检索', '设计与创意'];
   return labels.map(key => ({ key, name: key }));
 });
 const matches = (text: string) => text.toLocaleLowerCase().includes(query.value.trim().toLocaleLowerCase());
-const showComputer = computed(() => ['全部', '本机'].includes(category.value) && matches('本机电脑控制 Computer Use 截图 鼠标 键盘'));
 // 通过市场安装的专家和技能都装在技能目录里，按安装时记录的类型分开显示。
 const localForTab = computed(() => localSkills.value.filter(s => tab.value === 'experts' ? s.marketKind === 'expert' : s.marketKind !== 'expert'));
 const visibleSkills = computed(() => installedOnly.value ? localForTab.value.filter(s => matches(s.name + s.description)) : remote.value.results);
@@ -116,13 +113,8 @@ async function refreshLocal() {
   if (localLoading) return;
   localLoading = true;
   localError.value = '';
-  const [skillsResult, configResult] = await Promise.allSettled([
-    invoke<Skill[]>('ai_store_installed'), invoke<AiConfigView>('get_ai_config'),
-  ]);
-  if (skillsResult.status === 'fulfilled') { localSkills.value = skillsResult.value; localReady.value = true; }
-  else { localReady.value = false; localError.value = `无法读取已安装技能：${String(skillsResult.reason)}`; }
-  if (configResult.status === 'fulfilled') computerEnabled.value = configResult.value.openComputerUse;
-  else localError.value += `${localError.value ? '；' : ''}无法读取连接器配置：${String(configResult.reason)}`;
+  try { localSkills.value = await invoke<Skill[]>('ai_store_installed'); localReady.value = true; }
+  catch (error) { localReady.value = false; localError.value = `无法读取已安装技能：${String(error)}`; }
   localLoading = false;
 }
 async function loadSkillCategories() {
@@ -313,17 +305,6 @@ async function uninstallSkill() {
   } catch (e) { reviewError.value = String(e); }
   finally { busy.value = false; }
 }
-async function toggleComputer() {
-  if (busy.value || !props.store.desktop) return;
-  busy.value = true;
-  try {
-    const config = await invoke<AiConfigView>('save_ai_preferences', { openComputerUse: !computerEnabled.value });
-    computerEnabled.value = config.openComputerUse;
-    props.store.notify(computerEnabled.value ? '已启用电脑控制，使用时按系统提示授权' : '已停用电脑控制');
-    computerOpen.value = false;
-  } catch (e) { props.store.notify(e, 'error'); }
-  finally { busy.value = false; }
-}
 function reset() { query.value = ''; category.value = '全部'; installedOnly.value = false; skillSort.value = 'score'; marketSort.value = 'hot'; skillSource.value = ''; }
 const tagOf = (s: Skill) => installed(s.slug)?.source || (variantLabel(s.variant) || (effMarket.value ? (s.source === 'official' ? '小伴市场 · 官方' : '小伴市场') : s.source === 'official' ? 'SkillHub · 官方' : s.source === 'community' ? 'SkillHub · 社区' : 'SkillHub'));
 const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`;
@@ -406,19 +387,6 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
       </template>
       <ConnectorCenter v-if="tab === 'connectors'" :key="connectorRevision" ref="connectorCenter" :store="store" :query="query" />
       <RegistryCatalog v-if="!packageTab" ref="registry" :kind="tab as 'experts' | 'connectors'" :query="query" :category="category" :store="store" :installed-only="installedOnly" :source="effMarket ? 'market' : 'hub'" :updates="updates" @unavailable="onMarketError" @installed="marketConnectorInstalled" @changed="connectorCenter?.refresh()" @center="showConnectorCenter">
-        <template v-if="tab === 'connectors' && showComputer" #prefix>
-        <article v-if="showComputer" class="xc store-card connector-card" style="--h-hi:#7C8CF8;--h:#4A57D0">
-          <div class="xc-top">
-            <div class="xc-ic"><Monitor :size="24" :stroke-width="1.9" aria-hidden="true" /></div>
-            <div class="xc-main"><div class="xc-title"><h3>本机电脑控制</h3></div><p class="xc-desc">通过截图、鼠标和键盘操作电脑上的应用</p></div>
-          </div>
-          <div class="xc-foot">
-            <span class="xc-tag">Computer Use</span>
-            <span class="connection-status" :class="{ enabled: computerEnabled, 'xb-ok': computerEnabled }">{{ computerEnabled ? '已启用' : '未启用' }}</span>
-            <div class="xc-act"><button class="small-action xc-pill" :class="{ 'is-done': computerEnabled }" :disabled="!store.desktop || !!localError" @click="computerOpen = true">{{ computerEnabled ? '管理' : '启用' }}</button></div>
-          </div>
-        </article>
-        </template>
       </RegistryCatalog>
       <div v-if="empty && !error && (!packageTab || store.desktop)" class="xb-empty store-empty"><div class="xb-empty-icon"><Search :size="24" /></div><h3>{{ installedOnly ? `暂无匹配的已安装${noun}` : '没有找到匹配内容' }}</h3><p>试试其他关键词或分类</p><button class="xb-btn is-sm" @click="reset">清除筛选</button></div>
     </div>
@@ -438,9 +406,6 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
         <p v-if="removing" class="detail-note">确认卸载此技能？卸载后新任务将无法加载它，进行中的任务可能受影响。</p>
         <div class="dialog-actions"><template v-if="installed(skill.slug)"><button v-if="installed(skill.slug)?.removable" class="store-secondary" :disabled="busy" @click="removing ? uninstallSkill() : (removing = true)">{{ busy ? '正在卸载…' : removing ? '确认卸载' : '卸载' }}</button><button class="store-primary" :disabled="busy" @click="useSkill(skill)">{{ installed(skill.slug)?.plugin ? '召唤这位专家' : '使用技能' }} <ArrowRight :size="14" /></button></template><button v-else class="store-primary" :disabled="!review || reviewing || busy || !localReady" @click="installSkill">{{ busy ? '正在安装…' : '安装' }}<Download :size="14" /></button></div>
       </template>
-    </NModal>
-    <NModal v-model:show="computerOpen" preset="card" title="本机电脑控制" class="store-dialog" :mask-closable="!busy" :closable="!busy" style="width:460px;max-width:calc(100vw - 36px)">
-      <p>允许小伴在任务中调用内置 Computer Use 引擎，通过截图、鼠标与键盘操作应用。</p><p class="detail-note">首次使用按系统提示授予屏幕录制与辅助功能权限。开关表示能力已启用，实际权限以系统授权为准。</p><div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="computerOpen = false">取消</button><button class="store-primary" :disabled="busy" @click="toggleComputer">{{ busy ? '正在保存…' : computerEnabled ? '停用电脑控制' : '启用电脑控制' }}</button></div>
     </NModal>
     <MarketGroupDialog :item="group" :kind="tab === 'experts' ? 'experts' : 'skills'" @close="group = null" @done="groupDone" />
     <MarketUpdateDialog :pkg="updating?.pkg ?? null" :info="updating?.info ?? null" @close="updating = null" @done="updated" />

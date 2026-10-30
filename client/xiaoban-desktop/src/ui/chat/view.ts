@@ -249,6 +249,10 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
           canContinue: true, details: event.message });
         break;
       }
+      if (/request[_ -]too[_ -]large|\b413\b/i.test(event.message)) {
+        view.items.push({ kind: 'notice', id: nextId(view), tone: 'error', text: modelFailure(event.message).message, details: event.message });
+        break;
+      }
       view.items.push({ kind: 'notice', id: nextId(view), tone: 'error', text: modelFailure(event.message).message,
         canSwitchModel: true, canRetry: lastUser >= 0 && !partial, canContinue: lastUser >= 0 && partial, details: event.message });
       break;

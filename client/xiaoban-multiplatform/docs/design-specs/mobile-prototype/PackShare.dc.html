@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>装扮详情·分享</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:1080px;box-sizing:border-box;background:#FFFFFF;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+<div style="position:relative;flex:none;height:232px;background:#1B2A41;overflow:hidden">
+<div style="position:absolute;left:0;right:0;bottom:0;height:52px;background:#243B5A"></div>
+<sc-for list="{{streaks}}" as="s" hint-placeholder-count="22">
+<div style="position:absolute;left:{{s.x}}px;top:{{s.y}}px;width:2px;height:{{s.h}}px;border-radius:1px;background:rgba(170,200,240,.6);transform:rotate(12deg)"></div>
+</sc-for>
+<span style="position:absolute;left:14px;bottom:12px;font-size:12px;color:#FFFFFF;background:rgba(0,0,0,.6);padding:3px 9px;border-radius:10px">电脑桌面预览 · 16:9</span>
+<a href="Main.dc.html" aria-label="返回" style="position:absolute;left:12px;top:12px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.4);color:#FFFFFF;display:flex;align-items:center;justify-content:center;text-decoration:none">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+</a>
+<button type="button" onClick="{{openShare}}" aria-label="分享" style="position:absolute;right:60px;top:12px;width:40px;height:40px;border:0;border-radius:50%;background:rgba(0,0,0,.4);color:#FFFFFF;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6a2 2 0 002 2h10a2 2 0 002-2v-6"/></svg></button>
+<button type="button" aria-label="更多" style="position:absolute;right:12px;top:12px;width:40px;height:40px;border:0;border-radius:50%;background:rgba(0,0,0,.4);color:#FFFFFF;display:flex;align-items:center;justify-content:center">
+<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.6"></circle><circle cx="12" cy="12" r="1.6"></circle><circle cx="19" cy="12" r="1.6"></circle></svg>
+</button>
+</div>
+
+<main style="flex:1;min-height:0;overflow:hidden">
+
+<section style="padding:16px 16px 0">
+<h1 style="margin:0;font-size:22px;font-weight:600;line-height:1.3">雨夜窗台</h1>
+<div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:12px">
+<span style="font-size:12px;color:#999999;">特效</span>
+<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#999999;">
+<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
+已审核
+</span>
+<span style="font-size:12px;color:#999999;">纯数据</span>
+</div>
+</section>
+
+<section style="margin:16px 16px 0;display:flex;align-items:center;gap:8px">
+<span style="flex:none;width:36px;height:36px;border-radius:50%;background:#8FA9C9"></span>
+<div style="flex:1;min-width:0">
+<div style="font-size:14px;font-weight:600">作者 A</div>
+<div style="font-size:12px;color:#666666">发布于 [日期]</div>
+</div>
+<button type="button" style="height:32px;padding:0 16px;border:1px solid #E3203C;border-radius:16px;background:#FFFFFF;color:#E3203C;font-size:14px;font-weight:600">关注</button>
+</section>
+
+
+
+<p style="margin:16px 16px 0;font-size:15px;line-height:1.7">窗外下着细雨，偏冷色的雨丝缓慢划过桌面，不抢眼。可以在桌面特效页调整密度、速度和大小。</p>
+
+
+
+
+
+<section style="margin:24px 16px 0">
+<h2 style="margin:0;font-size:16px;font-weight:600">评论 N</h2>
+<div style="margin-top:12px;display:flex;gap:8px">
+<span style="flex:none;width:30px;height:30px;border-radius:50%;background:#D9C7A8"></span>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">用户 B　<span style="font-weight:400;color:#666666">[时间]</span></div><div style="margin-top:2px;font-size:14px;line-height:1.6">雨丝很细，开着不会分心。</div></div>
+</div>
+<div style="margin-top:12px;display:flex;gap:8px">
+<span style="flex:none;width:30px;height:30px;border-radius:50%;background:#9FBFCF"></span>
+<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">用户 C　<span style="font-weight:400;color:#666666">[时间]</span></div><div style="margin-top:2px;font-size:14px;line-height:1.6">能不能再加一个雷声的版本？</div></div>
+</div>
+</section>
+
+</main>
+
+<footer style="flex:none;display:flex;align-items:center;gap:8px;height:72px;padding:0 12px;border-top:0.5px solid #EDEDED;background:#FFFFFF">
+<button type="button" aria-label="收藏" style="flex:none;width:48px;height:48px;border:0;background:none;display:flex;align-items:center;justify-content:center;color:#222222">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10a1 1 0 011 1v15l-6-4-6 4V5a1 1 0 011-1z"></path></svg>
+</button>
+<button type="button" aria-label="评论" style="flex:none;width:48px;height:48px;border:0;background:none;display:flex;align-items:center;justify-content:center;color:#222222">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 6h14a1 1 0 011 1v9a1 1 0 01-1 1h-7l-4 3v-3H5a1 1 0 01-1-1V7a1 1 0 011-1z"></path></svg>
+</button>
+<button type="button" onClick="{{openSheet}}" style="flex:1;height:48px;border:0;border-radius:24px;background:#E3203C;color:#FFFFFF;font-size:16px;font-weight:600">发到电脑</button>
+</footer>
+
+<sc-if value="{{sheet}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end">
+<div role="dialog" aria-modal="true" aria-label="发到电脑" style="background:#FFFFFF;border-radius:20px 20px 0 0;padding:20px 16px 20px">
+<h2 style="margin:0;font-size:18px;font-weight:600">发到电脑</h2>
+<p style="margin:6px 0 0;font-size:14px;line-height:1.6;color:#666666">手机上不能直接应用桌面特效。把它导出成资源包，发到电脑上导入即可。</p>
+<ol style="list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:12px">
+<li style="display:flex;gap:12px;align-items:flex-start"><span style="flex:none;width:24px;height:24px;border-radius:50%;background:#E3203C;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">1</span><span style="font-size:14px;line-height:1.6">导出为资源包（.zip）</span></li>
+<li style="display:flex;gap:12px;align-items:flex-start"><span style="flex:none;width:24px;height:24px;border-radius:50%;background:#E3203C;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">2</span><span style="font-size:14px;line-height:1.6">用微信等发到电脑，比如“文件传输助手”</span></li>
+<li style="display:flex;gap:12px;align-items:flex-start"><span style="flex:none;width:24px;height:24px;border-radius:50%;background:#E3203C;color:#FFFFFF;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center">3</span><span style="font-size:14px;line-height:1.6">在小伴桌面的“桌面特效”页点“导入资源包”，导入后不会自动应用</span></li>
+</ol>
+<div style="margin-top:18px;display:flex;gap:8px">
+<button type="button" onClick="{{closeSheet}}" style="flex:none;height:48px;padding:0 22px;border:0;border-radius:24px;background:#F2F2F2;color:#222222;font-size:15px">取消</button>
+<button type="button" style="flex:1;height:48px;border:0;border-radius:24px;background:#E3203C;color:#FFFFFF;font-size:16px;font-weight:600">导出并分享…</button>
+</div>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{shareOpen}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;flex-direction:column;justify-content:flex-end">
+<div role="dialog" aria-modal="true" aria-label="分享" style="background:#FFFFFF;border-radius:20px 20px 0 0;padding:20px 0 16px">
+<h2 style="margin:0;padding:0 16px;font-size:18px;font-weight:600">分享</h2>
+<div style="margin:12px 16px 0;display:flex;gap:12px;align-items:center;background:#F7F7F7;border-radius:8px;padding:10px">
+<span style="flex:none;width:48px;height:48px;border-radius:8px;background:linear-gradient(165deg,#1B2A41 0%,#3E5C8A 160%)"></span>
+<span style="flex:1;min-width:0"><span style="display:block;font-size:14px;font-weight:500;color:#222222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">雨夜窗台</span><span style="display:block;margin-top:2px;font-size:12px;color:#999999">特效 · 晚风</span></span>
+</div>
+<div style="margin-top:18px;display:flex;overflow-x:auto;scrollbar-width:none;padding:0 12px"><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 4C5.9 4 3 6.3 3 9.2c0 1.6.9 3 2.3 4L4.8 15l2.2-1.2c.8.2 1.7.4 2.5.4"/><path d="M15 10c-3 0-5.5 2-5.5 4.5S12 19 15 19c.7 0 1.4-.1 2-.3l2 1-.5-1.8c1.2-.8 2-2 2-3.4C20.5 12 18 10 15 10z"/></svg></span><span style="font-size:12px;color:#666666">微信好友</span></button><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3"/><path d="M12 3.5v5M20.5 12h-5M12 20.5v-5M3.5 12h5"/></svg></span><span style="font-size:12px;color:#666666">朋友圈</span></button><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><span style="font-size:16px;font-weight:600">QQ</span></span><span style="font-size:12px;color:#666666">QQ</span></button><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><span style="font-size:16px;font-weight:600">微</span></span><span style="font-size:12px;color:#666666">微博</span></button><button type="button" onClick="{{copyLink}}" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 00-5.7 0l-3 3a4 4 0 005.7 5.7l1-1"/></svg></span><span style="font-size:12px;color:#666666">复制链接</span></button></div>
+<div style="height:0.5px;background:#EDEDED;margin:16px 16px 0"></div>
+<div style="margin-top:16px;display:flex;padding:0 12px"><a href="Poster.dc.html" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg></span><span style="font-size:12px;color:#666666">生成海报</span></a><button type="button" onClick="{{shareToPc}}" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span><span style="font-size:12px;color:#666666">发到电脑</span></button><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10a1 1 0 011 1v15l-6-4-6 4V5a1 1 0 011-1z"/></svg></span><span style="font-size:12px;color:#666666">收藏</span></button><button type="button" style="flex:none;width:68px;border:0;background:none;padding:0;display:flex;flex-direction:column;align-items:center;gap:8px;text-decoration:none"><span style="width:52px;height:52px;border-radius:50%;background:#F2F2F2;color:#222222;display:flex;align-items:center;justify-content:center"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg></span><span style="font-size:12px;color:#666666">举报</span></button></div>
+<button type="button" onClick="{{closeShare}}" style="margin:12px 16px 0;width:calc(100% - 32px);height:48px;border:0;border-radius:24px;background:#F2F2F2;color:#222222;font-size:15px">取消</button>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{toast}}" hint-placeholder-val="{{false}}">
+<div style="position:absolute;left:0;right:0;bottom:120px;display:flex;justify-content:center">
+<span style="background:rgba(0,0,0,.78);color:#FFFFFF;font-size:14px;padding:8px 16px;border-radius:18px">链接已复制</span>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1080}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const _sh = this.state || {};
+    const sheet = !!(this.state && this.state.sheet);
+    const streaks = [];
+    for (let i = 0; i < 22; i++) {
+      streaks.push({ x: (i * 37 + 14) % 372, y: (i * 53) % 170, h: 24 + ((i * 7) % 22) });
+    }
+    const related = [
+      { c1: '#2B2230', c2: '#E7A8C2', x: 14, y: 14, title: '落樱' },
+      { c1: '#243B5A', c2: '#8FA9C9', x: 54, y: 10, title: '雷雨夜' },
+      { c1: '#1F3B33', c2: '#9BD1B4', x: 30, y: 28, title: '萤火之光' }
+    ];
+    return {
+      shareOpen: _sh.share === undefined ? true : !!_sh.share, toast: !!_sh.toast,
+      openShare: () => this.setState({ share: true, toast: false }),
+      closeShare: () => this.setState({ share: false }),
+      copyLink: () => this.setState({ share: false, toast: true }),
+      shareToPc: () => this.setState({ share: false, sheet: true }),
+      sheet, streaks, related,
+      openSheet: () => this.setState({ sheet: true }),
+      closeSheet: () => this.setState({ sheet: false })
+    };
+  }
+}
+</script>
+</body>
+</html>

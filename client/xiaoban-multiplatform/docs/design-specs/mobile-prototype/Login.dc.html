@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>登录弹窗</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button,input{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:844px;box-sizing:border-box;background:#EDEDED;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+<header style="flex:none;height:52px;display:flex;align-items:center;padding:0 16px;background:#FFFFFF"><h1 style="margin:0;font-size:20px;font-weight:600">我的</h1></header>
+<div style="flex:none;background:#FFFFFF;padding:8px 16px 16px;display:flex;align-items:center;gap:16px"><span style="flex:none;width:64px;height:64px;border-radius:50%;background:#E4E4E4"></span><div style="flex:1"><div style="font-size:20px;font-weight:600">未登录</div><div style="margin-top:4px;font-size:12px;color:#666666">登录后同步作品、对话和设备</div></div><span style="background:#F2F2F2;flex:none;height:32px;padding:0 14px;border:0;border-radius:16px;display:flex;align-items:center;font-size:14px">登录</span></div>
+<ul style="flex:none;list-style:none;margin:8px 0 0;padding:0;background:#FFFFFF"><li style="padding:14px 16px;font-size:15px">资料库</li><li style="padding:14px 16px;font-size:15px;border-top:0.5px solid #EDEDED">模型与额度</li><li style="padding:14px 16px;font-size:15px;border-top:0.5px solid #EDEDED">我的设备</li><li style="padding:14px 16px;font-size:15px;border-top:0.5px solid #EDEDED">帮助与反馈</li></ul>
+<div style="position:absolute;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center">
+<div role="dialog" aria-modal="true" aria-label="登录小伴" style="width:326px;box-sizing:border-box;background:#FFFFFF;border-radius:20px;padding:16px">
+<div style="display:flex;align-items:center;gap:8px;height:44px"><span style="flex:none;color:#E3203C;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.7 1.8 1.8.7-1.8.7L19 22l-.7-1.8-1.8-.7 1.8-.7z"/></svg></span><h2 style="flex:1;margin:0;font-size:18px;font-weight:600">登录小伴</h2><a href="Me.dc.html" aria-label="关闭" style="flex:none;width:44px;height:44px;margin-right:-8px;display:flex;align-items:center;justify-content:center;color:#222222;text-decoration:none"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></a></div>
+<div role="tablist" style="margin-top:4px;display:flex;padding:3px;border-radius:22px;background:#F2F2F2">
+<button type="button" role="tab" aria-selected="{{isCode}}" onClick="{{setCode}}" style="flex:1;height:40px;border:0;border-radius:20px;background:{{codeBg}};font-size:14px;font-weight:{{codeWeight}};color:{{codeColor}}">验证码登录</button>
+<button type="button" role="tab" aria-selected="{{isPwd}}" onClick="{{setPwd}}" style="flex:1;height:40px;border:0;border-radius:20px;background:{{pwdBg}};font-size:14px;font-weight:{{pwdWeight}};color:{{pwdColor}}">密码登录</button>
+</div>
+<sc-if value="{{isCode}}" hint-placeholder-val="{{true}}">
+<div>
+<label style="display:block;margin-top:12px"><span style="display:block;font-size:14px;color:#666666">邮箱或手机号</span><span style="display:flex;align-items:center;gap:8px;height:48px;margin-top:6px;box-sizing:border-box;padding:0 14px;border:0;border-radius:16px;background:#F2F2F2"><span style="flex:none;color:#666666;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 8.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0zM5 20c.8-3.6 3.5-5.5 7-5.5s6.2 1.9 7 5.5"/></svg></span><input type="text" placeholder="请输入邮箱或手机号" style="flex:1;min-width:0;height:44px;border:0;background:transparent;padding:0;font-size:14px;color:#222222;outline:none"></span></label>
+<div style="display:flex;gap:8px;align-items:flex-end">
+<div style="flex:1;min-width:0"><label style="display:block;margin-top:12px"><span style="display:block;font-size:14px;color:#666666">验证码</span><span style="display:flex;align-items:center;gap:8px;height:48px;margin-top:6px;box-sizing:border-box;padding:0 14px;border:0;border-radius:16px;background:#F2F2F2"><span style="flex:none;color:#666666;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h10a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-5a2 2 0 0 1 2 -2zM8 11V8a4 4 0 018 0v3"/></svg></span><input type="text" placeholder="6 位数字" style="flex:1;min-width:0;height:44px;border:0;background:transparent;padding:0;font-size:14px;color:#222222;outline:none"></span></label></div>
+<button type="button" style="flex:none;height:48px;padding:0 14px;border:0;border-radius:24px;background:#F2F2F2;color:#222222;font-size:14px">获取验证码</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{isPwd}}" hint-placeholder-val="{{false}}">
+<div>
+<label style="display:block;margin-top:12px"><span style="display:block;font-size:14px;color:#666666">用户名、邮箱或手机号</span><span style="display:flex;align-items:center;gap:8px;height:48px;margin-top:6px;box-sizing:border-box;padding:0 14px;border:0;border-radius:16px;background:#F2F2F2"><span style="flex:none;color:#666666;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 8.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0 -7 0zM5 20c.8-3.6 3.5-5.5 7-5.5s6.2 1.9 7 5.5"/></svg></span><input type="text" placeholder="请输入用户名、邮箱或手机号" style="flex:1;min-width:0;height:44px;border:0;background:transparent;padding:0;font-size:14px;color:#222222;outline:none"></span></label>
+<label style="display:block;margin-top:12px"><span style="display:block;font-size:14px;color:#666666">密码</span><span style="display:flex;align-items:center;gap:8px;height:48px;margin-top:6px;box-sizing:border-box;padding:0 14px;border:0;border-radius:16px;background:#F2F2F2"><span style="flex:none;color:#666666;display:flex"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11h10a2 2 0 0 1 2 2v5a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-5a2 2 0 0 1 2 -2zM8 11V8a4 4 0 018 0v3"/></svg></span><input type="password" placeholder="请输入密码" style="flex:1;min-width:0;height:44px;border:0;background:transparent;padding:0;font-size:14px;color:#222222;outline:none"></span></label>
+</div>
+</sc-if>
+<a href="Register.dc.html" style="margin-top:16px;height:44px;border-radius:22px;background:#E3203C;color:#FFFFFF;font-size:16px;font-weight:600;display:flex;align-items:center;justify-content:center;text-decoration:none">登录</a>
+<sc-if value="{{isCode}}" hint-placeholder-val="{{true}}"><div style="margin-top:10px;font-size:12px;color:#666666;text-align:center">首次登录将引导注册</div></sc-if>
+<div style="margin-top:12px;font-size:12px;line-height:1.6;color:#666666;text-align:center">登录即表示同意用户协议与隐私政策</div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const isCode = ((this.state && this.state.mode) || 'code') === 'code';
+    const on = (v) => (v ? '#FFF3F4' : 'transparent');
+    return {
+      isCode, isPwd: !isCode,
+      setCode: () => this.setState({ mode: 'code' }),
+      setPwd: () => this.setState({ mode: 'pwd' }),
+      codeBg: on(isCode), pwdBg: on(!isCode),
+      codeColor: isCode ? '#E3203C' : '#666666', pwdColor: !isCode ? '#E3203C' : '#666666',
+      codeWeight: isCode ? 600 : 400, pwdWeight: !isCode ? 600 : 400
+    };
+  }
+}
+</script>
+</body>
+</html>

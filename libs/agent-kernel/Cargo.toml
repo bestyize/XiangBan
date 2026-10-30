@@ -8,7 +8,7 @@ publish = false
 [features]
 default = []
 openai = ["dep:reqwest", "dep:tokio"]
-anthropic = ["dep:reqwest", "dep:tokio"]
+anthropic = ["dep:reqwest", "dep:tokio", "dep:sha2"]
 native-tls = ["openai", "anthropic", "reqwest/native-tls-no-alpn"]
 fs = ["dep:encoding_rs", "dep:sha2"]
 skills = ["dep:serde_yaml_ng", "dep:sha2"]
@@ -17,6 +17,7 @@ web = ["dep:reqwest", "dep:tokio"]
 shell = ["process-tree"]
 stdio = []
 mcp = ["dep:base64", "process-tree"]
+image-payload = ["dep:base64", "dep:image"]
 process-tree = ["dep:libc", "dep:windows-sys"]
 journal = []
 process = ["dep:libc", "dep:windows-sys"]
@@ -32,6 +33,7 @@ serde_json = "1"
 serde_yaml_ng = { version = "0.10.0", optional = true }
 jsonschema = { version = "0.33", default-features = false }
 base64 = { version = "0.22", optional = true }
+image = { version = "0.25", optional = true, default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 reqwest = { version = "0.13", default-features = false, features = ["blocking"], optional = true }
 
 [dev-dependencies]

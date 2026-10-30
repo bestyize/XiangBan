@@ -153,6 +153,40 @@ describe('compact task execution cards', () => {
 });
 
 describe('chat workbench composer actions', () => {
+  it('prepares a permission check without sending or erasing the current draft', async () => {
+    const h = await open({ get_ai_config: () => ({ openComputerUse: true, model: 'coding-model', activeProvider: 'demo', providers: [{ id: 'demo', name: '演示模型' }] }), chat_invocable_skills: () => [], ai_store_experts_installed: () => [], ai_store_connector_status: () => [] });
+    await type('现有草稿'); await click('chat-add-menu'); await click('chat-add-tools'); await click('chat-tool-computer-manage');
+    await click('chat-computer-check');
+    expect(textarea().value).toContain('请检查电脑控制所需的系统权限');
+    expect(textarea().value).toContain('现有草稿');
+    expect(q('chat-selected-tool')?.textContent).toContain('操作电脑');
+    expect(h.commands()).not.toContain('chat_send');
+  });
+  it('keeps a tool selection with the draft and sends it with the task', async () => {
+    const h = await open({ ...startChat, chat_invocable_skills: () => [], ai_store_experts_installed: () => [], ai_store_connector_status: () => [] });
+    await click('chat-add-menu'); await click('chat-add-tools'); await click('chat-tool-design');
+    expect(q('chat-selected-tool')?.textContent).toContain('设计画板');
+    await type('做一个登录页面'); await click('chat-send');
+    expect(h.calls.find(([c]) => c === 'chat_send')?.[1]?.text).toBe('请使用设计画板处理以下设计稿任务：\n做一个登录页面');
+    expect(q('chat-selected-tool')).toBeNull();
+  });
+  it('restores the selected tool and task when sending fails', async () => {
+    const h = await open({ chat_new_session: () => { throw new Error('创建失败'); }, chat_invocable_skills: () => [], ai_store_experts_installed: () => [], ai_store_connector_status: () => [] });
+    await click('chat-add-menu'); await click('chat-add-tools'); await click('chat-tool-phone');
+    await type('打开相册'); await click('chat-send');
+    expect(h.chat.draft.text).toBe('打开相册');
+    expect(h.chat.draft.tool).toBe('phone');
+    expect(q('chat-selected-tool')?.textContent).toContain('操作手机');
+    await click('chat-remove-tool'); expect(q('chat-selected-tool')).toBeNull();
+  });
+  it('preserves the selected tool in a queued message', async () => {
+    const h = await open({ ...startChat, chat_enqueue: () => ({ revision: 1, paused: false, reason: '', items: [] }), chat_invocable_skills: () => [], ai_store_experts_installed: () => [], ai_store_connector_status: () => [] });
+    await type('先处理当前任务'); await click('chat-send');
+    await click('chat-add-menu'); await click('chat-add-tools'); await click('chat-tool-phone');
+    await type('打开相册'); await click('chat-send');
+    expect(h.calls.find(([c]) => c === 'chat_enqueue')?.[1]).toMatchObject({ sessionId: 's1', text: '请使用手机操作工具完成以下任务：\n打开相册', mode: 'queue' });
+    expect(q('chat-selected-tool')).toBeNull();
+  });
   it('keeps capability menus in the composer and uses the desktop AI Store inventories', async () => {
     const h = await open({
       ai_store_experts_installed: () => [{ slug: 'reviewer', name: '代码专家', description: '代码审阅', entrySkill: 'code-review', ready: true }],
@@ -1105,9 +1139,9 @@ describe('sending images', () => {
     expect(h.notify).toHaveBeenCalledWith('暂不支持这种文件，请选择图片、PDF、Office 文档或文本文件', 'error');
     expect(q('chat-attachments')).toBeNull();
 
-    const huge = new File([new Uint8Array(3 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' });
+    const huge = new File([new Uint8Array(10 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' });
     await pickFiles([huge]);
-    expect(h.notify).toHaveBeenCalledWith('这张图片太大了，请换一张小于 3MB 的', 'error');
+    expect(h.notify).toHaveBeenCalledWith('这张图片太大了，请换一张小于 10MB 的', 'error');
     expect(q('chat-attachments')).toBeNull();
   });
 

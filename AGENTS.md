@@ -55,6 +55,14 @@
 
 ---
 
+# 设计稿入库规范（Claude Artifact / Design 画布）
+
+- **设计稿源文件必须进仓库**，在线链接只用于预览和评论。桌面放 `client/xiaoban-desktop/docs/design-specs/`（单页稿放 `prototypes/`，多画板画布单独建目录，如 `ui-upgrade/`）；手机放 `client/xiaoban-multiplatform/docs/design-specs/`。
+- 新增或更新设计稿时，同步登记到 `docs/design-preview/README.md` 和对应 `design-specs/README.md`，写明用途和**在线预览链接**；后续修改发布回同一个链接，不另开新链接。
+- Design 画布导出的目录保留 `canvas.json`、`*.dc.html`、`support.js`、`_blob/` 原样，并附 README 说明内容、预览方式和同步方法；修改画板后两边都要更新，先拉取线上最新版再合并。
+
+---
+
 # 大型设置与配置窗口规范
 
 - **桌面版设置、模型/服务商配置以及后续新增的复杂编辑、审查、预览界面，默认使用原生独立窗口**；禁止用内嵌遮罩、`NModal` 或全局焦点锁替代。

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>小伴桌面 · 资料库 · 云文档</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{text-decoration:none;color:inherit}
+.si{display:flex;align-items:center;gap:9px;height:32px;padding:0 10px;border-radius:8px;color:#26262B;font-size:14px;border:0;background:transparent;font-family:inherit;width:100%;box-sizing:border-box;cursor:pointer;text-align:left}
+.si:hover{background:rgba(0,0,0,.045)}
+.si svg{flex-shrink:0;color:#4A4A50}
+.sub{font-size:12px;color:#6E6E73}
+.cap{font-size:12px;color:#6E6E73;font-weight:500}
+.ib{width:30px;height:30px;border-radius:8px;border:0;background:transparent;color:#55555A;display:grid;place-items:center;cursor:pointer;flex-shrink:0}
+.ib:hover{background:rgba(0,0,0,.05)}
+.ses{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px 0 36px;border-radius:8px;font-size:13px;color:#3A3A40}
+.ses:hover{background:rgba(0,0,0,.045)}
+.ses span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tt{font-size:20px;font-weight:600;color:#8E8E93;display:inline-flex;align-items:center;gap:6px}
+.tt:hover{color:#55555A}
+.cnt{font-size:12px;font-weight:500;color:#8E8E93}
+.cat{height:30px;padding:0 12px;border-radius:8px;border:0;background:transparent;font-family:inherit;font-size:13px;color:#55555A;cursor:pointer}
+.cat:hover{background:#F4F4F6}
+.bb{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:9px;border:0;font-family:inherit;font-size:13px;cursor:pointer;color:#1D1D1F;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.12),0 1px 1.5px rgba(0,0,0,.05);white-space:nowrap}
+.bb:hover{background:#FAFAFB}
+.pri{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 14px;border-radius:9px;border:0;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;color:#fff;white-space:nowrap}
+.lk{border:0;background:transparent;padding:0;font:inherit;font-size:12.5px;cursor:pointer}
+.pill{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:500;white-space:nowrap}
+.tag{height:22px;padding:0 8px;border-radius:6px;background:rgba(0,0,0,.045);color:#4A4A50;font-size:11.5px;display:inline-flex;align-items:center}
+.box{border-radius:14px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.03)}
+.hov:hover{box-shadow:0 0 0 1px rgba(0,0,0,.1),0 8px 20px rgba(0,0,0,.06)}
+.muted{color:#6E6E73}
+.sect{font-size:12.5px;font-weight:600;color:#3A3A3F;display:flex;align-items:center;gap:8px}
+</style>
+</helmet>
+<div style="position:relative;width:1280px;height:800px;overflow:hidden;display:flex;font-family:-apple-system,'SF Pro Text','PingFang SC','Noto Sans SC','Microsoft YaHei UI',sans-serif;color:#1D1D1F;background:{{t.tint}};-webkit-font-smoothing:antialiased">
+
+  <aside style="width:264px;flex-shrink:0;display:flex;flex-direction:column;padding:0 12px 12px;box-sizing:border-box">
+    <div style="height:52px;display:flex;align-items:center;gap:8px;padding-left:6px">
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#FF5F57;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#FEBC2E;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <span aria-hidden="true" style="width:12px;height:12px;border-radius:50%;background:#28C840;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)"></span>
+      <button type="button" class="ib" aria-label="收起侧栏" style="margin-left:auto"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M9 4v16"></path></svg></button>
+      <button type="button" class="ib" aria-label="搜索"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg></button>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 6px 16px">
+      <div style="width:34px;height:34px;border-radius:10px;background:linear-gradient(160deg,{{t.btnHi}},{{t.btn}});color:#fff;display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 2px 6px rgba(0,0,0,.12)">
+        <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+      </div>
+      <div style="display:flex;flex-direction:column;line-height:1.25"><strong style="font-size: 15px; font-weight: 600">小伴桌面</strong></div>
+    </div>
+    <nav aria-label="功能分区" style="display:flex;flex-direction:column;gap:1px;flex:1;min-height:0;overflow:hidden">
+      <button type="button" class="si" aria-expanded="true" style="font-weight:600">
+        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 4.7 4.7 1.8-4.7 1.8L12 16l-1.8-4.7-4.7-1.8 4.7-1.8z"></path><path d="M19 15l.8 2.2 2.2.8-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+        小伴 AI
+        <svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.2" stroke-linecap="round" style="margin-left:auto"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+      <div style="display:flex;flex-direction:column;gap:1px;padding-left:10px">
+        <a class="si" href="WB-New.dc.html"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"></path><path d="M18.4 2.6a2 2 0 0 1 3 3L12 15l-4 1 1-4z"></path></svg>新建任务<span class="sub" style="margin-left:auto;font-size:11px">⌘N</span></a>
+        <a class="si" href="WB-Plugins.dc.html"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M19.4 13a2 2 0 1 0 0-4H18V6a2 2 0 0 0-2-2h-3V2.6a2 2 0 1 0-4 0V4H6a2 2 0 0 0-2 2v3h1.4a2 2 0 1 1 0 4H4v3a2 2 0 0 0 2 2h3v-1.4a2 2 0 1 1 4 0V18h3a2 2 0 0 0 2-2v-3z"></path></svg>AI 插件</a>
+        <a class="si" href="WB-Library-Docs.dc.html" aria-current="page" style="background:{{t.soft}};color:{{t.ink}};font-weight:500"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="{{t.ink}}" stroke-width="1.9" stroke-linejoin="round"><path d="M2 5h6a4 4 0 0 1 4 4v11a3 3 0 0 0-3-3H2z"></path><path d="M22 5h-6a4 4 0 0 0-4 4v11a3 3 0 0 1 3-3h7z"></path></svg>资料库</a>
+        <div style="display:flex;align-items:center;height:30px;padding:0 4px 0 10px;margin-top:6px"><span class="cap">空间</span><button type="button" class="ib" aria-label="新建工作区" style="margin-left:auto;width:24px;height:24px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+        <a class="si" href="WB-Chat.dc.html"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"></path></svg>最近任务<span class="sub" style="margin-left:auto">2</span></a>
+        <a class="ses" href="WB-Chat.dc.html"><span>整理下周工作计划</span><i style="width:7px;height:7px;border-radius:50%;background:{{t.dot}}"></i></a>
+        <a class="ses" href="#"><span>把截图里的表格转成 Excel</span></a>
+        <a class="si" href="#"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>官网改版<span class="sub" style="margin-left:auto">4</span></a>
+        <a class="si" href="#"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>周报自动化<span class="sub" style="margin-left:auto">1</span></a>
+      </div>
+      <div style="height:1px;background:rgba(0,0,0,.06);margin:8px 10px"></div>
+      <a class="si" href="WB-Studio.dc.html"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 22a10 10 0 1 1 10-10c0 2.8-2.2 4-4 4h-2.5a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 22z"></path><circle cx="7.5" cy="10.5" r="1" fill="currentColor"></circle><circle cx="12" cy="7" r="1" fill="currentColor"></circle><circle cx="16.5" cy="10.5" r="1" fill="currentColor"></circle></svg>装扮</a>
+      <a class="si" href="#"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="11" rx="5"></rect><path d="M7 11v3M5.5 12.5h3"></path><circle cx="16" cy="11.5" r=".7" fill="currentColor"></circle><circle cx="18" cy="13.5" r=".7" fill="currentColor"></circle></svg>游玩</a>
+      <a class="si" href="WB-Remind.dc.html"><svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg>提醒<span class="sub" style="margin-left:auto">15:30</span></a>
+    </nav>
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 6px 0;border-top:1px solid rgba(0,0,0,.06)">
+      <div style="width:30px;height:30px;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);display:grid;place-items:center"><img src="/_blob/d590c6393f601ebec7f3e202245ef0cf" alt="" style="width:26px;height:26px;object-fit:contain"></div>
+      <span style="font-size:13px;font-weight:500">小伴用户</span>
+      <button type="button" class="ib" aria-label="通知" style="margin-left:auto"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg></button>
+    </div>
+  </aside>
+
+  <main style="flex:1;min-width:0;margin:8px 8px 8px 0;background:#fff;border-radius:12px;box-shadow:0 0 0 1px rgba(0,0,0,.05),0 4px 16px rgba(0,0,0,.04);display:flex;flex-direction:column;overflow:hidden;padding:22px 28px 0;box-sizing:border-box">
+    <header style="display:flex;align-items:center;gap:22px">
+      <nav role="tablist" aria-label="资料库分类" style="display:flex;gap:22px;align-items:baseline">
+        <a role="tab" class="tt" href="WB-Library-Docs.dc.html" aria-selected="false">我的文档<span class="cnt">8</span></a>
+        <a role="tab" class="tt" href="WB-Library-Cloud.dc.html" aria-selected="true" style="color:#1D1D1F">云文档<span class="cnt">6</span></a>
+        <a role="tab" class="tt" href="WB-Library-Saved.dc.html" aria-selected="false">收藏<span class="cnt">6</span></a>
+        <a role="tab" class="tt" href="WB-Library-Memory.dc.html" aria-selected="false">记忆<span class="cnt">10</span></a>
+      </nav>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;width:240px;height:32px;padding:0 10px;border-radius:9px;background:#F4F4F6;color:#6E6E73;box-sizing:border-box">
+          <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+          <input type="search" aria-label="搜索资料库" placeholder="搜索全部资料" style="flex:1;min-width:0;border:0;background:transparent;outline:none;font:inherit;font-size:13px;color:#1D1D1F">
+          <kbd style="font:11px -apple-system,sans-serif;color:#8E8E93">⌘K</kbd>
+        </label>
+        <button type="button" class="pri" style="background:linear-gradient({{t.btnHi}},{{t.btn}});box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>添加链接</button>
+      </div>
+    </header>
+
+    
+
+    <div style="margin-top:14px;display:flex;align-items:center;gap:4px;padding-bottom:10px;border-bottom:1px solid rgba(0,0,0,.06)">
+        <sc-for list="{{chips}}" as="c" hint-placeholder-count="5">
+          <button type="button" class="cat" aria-pressed="{{c.pressed}}" onClick="{{c.pick}}" style="background:{{c.bg}};color:{{c.color}};font-weight:{{c.weight}}">{{c.label}}</button>
+        </sc-for>
+    </div>
+
+    <div style="flex:1;min-height:0;overflow-y:auto;margin:0 -28px;padding:14px 28px 24px">
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+        <sc-for list="{{links}}" as="l" hint-placeholder-count="6">
+          <article class="box hov" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="width:32px;height:32px;border-radius:9px;flex-shrink:0;display:grid;place-items:center;background:{{l.bg}};color:{{l.ink}};font-size:12.5px;font-weight:700">{{l.letter}}</span>
+              <span style="display:flex;flex-direction:column;gap:1px;min-width:0"><b style="font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{l.title}}</b><span class="muted" style="font-size:12px">{{l.platform}} · {{l.kind}}</span></span>
+            </div>
+            <span class="muted" style="font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{l.note}}</span>
+            <div style="display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid rgba(0,0,0,.055)">
+              <span class="pill" style="background:{{l.stBg}};color:{{l.stInk}}">{{l.status}}</span>
+              <button type="button" class="ib" aria-label="复制链接" style="margin-left:auto;width:28px;height:28px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 8h12v12H8zM16 8V4H4v12h4"></path></svg></button>
+              <button type="button" class="ib" aria-label="在浏览器打开" style="width:28px;height:28px"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></button>
+              <button type="button" class="ib" aria-label="更多操作" style="width:28px;height:28px"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h.01M12 12h.01M19 12h.01"></path></svg></button>
+            </div>
+          </article>
+        </sc-for>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"theme":{"editor":"enum","options":["red","green","blue","purple","amber","graphite"],"default":"red"},"$preview":{"width":1280,"height":800}}'>
+const PALETTES = {
+  red:      { btn: '#D93A44', btnHi: '#E8565F', soft: '#FCEBEC', ink: '#B42A33', tint: '#F5F1F1', dot: '#E5484D' },
+  green:    { btn: '#2E8B5E', btnHi: '#3FA172', soft: '#E3F2E9', ink: '#1E6A45', tint: '#EEF4F0', dot: '#34A36D' },
+  blue:     { btn: '#2F6FDB', btnHi: '#4A84E6', soft: '#E6EEFC', ink: '#1D53AE', tint: '#EFF3F9', dot: '#3B7BE8' },
+  purple:   { btn: '#7152D8', btnHi: '#8669E3', soft: '#EDE8FC', ink: '#5537B8', tint: '#F3F1F9', dot: '#7C5CE6' },
+  amber:    { btn: '#A8640C', btnHi: '#BD7A1C', soft: '#FAEEDB', ink: '#87500A', tint: '#F6F3ED', dot: '#E09A2B' },
+  graphite: { btn: '#2B2B30', btnHi: '#4A4A50', soft: '#E9E9EC', ink: '#2B2B30', tint: '#F2F2F3', dot: '#55555B' }
+};
+const chipsOf = (t, list, current, pick) => list.map((c) => ({ label: c, pressed: c === current ? 'true' : 'false', bg: c === current ? t.soft : 'transparent', color: c === current ? t.ink : '#55555A', weight: c === current ? '600' : '400', pick: () => pick(c) }));
+const PLAT = {
+  feishu: ['飞书', '飞', '#E8F0FD', '#2F6FDB'], tencent: ['腾讯文档', '腾', '#E6F4FB', '#1A7FB8'],
+  baidu: ['百度网盘', '百', '#EAF0FE', '#3D5AD6'], other: ['语雀', '语', '#E6F5EC', '#23885A']
+};
+const LINKS = [
+  { p: 'feishu', title: '2026 Q4 OKR 对齐', kind: '文档', note: '工作 · 今天添加', readable: true },
+  { p: 'feishu', title: '资料库需求评审', kind: '多维表格', note: '工作 · 昨天添加', readable: true },
+  { p: 'tencent', title: '团建报名表', kind: '在线表格', note: '生活 · 10月21日添加', readable: false },
+  { p: 'baidu', title: '设计素材 2026', kind: '分享文件夹 · 12 个文件', note: '提取码已保存 · 10月19日添加', readable: false },
+  { p: 'tencent', title: '周会纪要合集', kind: '文档', note: '工作 · 10月16日添加', readable: false },
+  { p: 'other', title: '前端规范', kind: '知识库', note: '开发 · 10月10日添加', readable: false }
+];
+const CHIPS = ['全部', '飞书', '腾讯文档', '百度网盘', '其他'];
+const BY = { '飞书': 'feishu', '腾讯文档': 'tencent', '百度网盘': 'baidu', '其他': 'other' };
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { chip: '全部', connected: true }; }
+  renderVals() {
+    const t = PALETTES[this.props.theme ?? 'red'] ?? PALETTES.red;
+    const connected = this.state.connected;
+    return {
+      t,
+      chips: chipsOf(t, CHIPS, this.state.chip, (c) => this.setState({ chip: c })),
+      platforms: ['feishu', 'tencent', 'baidu'].map((k) => {
+        const p = PLAT[k], live = k === 'feishu';
+        return { name: p[0], letter: p[1], bg: p[2], ink: p[3], connected: live && connected, canConnect: live && !connected, soon: !live, connect: () => this.setState({ connected: true }) };
+      }),
+      links: LINKS.filter((l) => this.state.chip === '全部' || l.p === BY[this.state.chip]).map((l) => {
+        const p = PLAT[l.p], readable = l.readable && connected;
+        return { ...l, platform: p[0], letter: p[1], bg: p[2], ink: p[3],
+          status: readable ? '小伴可读取' : '仅保存链接', stBg: readable ? '#E6F5EC' : '#F2F2F4', stInk: readable ? '#1E6A45' : '#6E6E73' };
+      })
+    };
+  }
+}
+</script>
+</body>
+</html>

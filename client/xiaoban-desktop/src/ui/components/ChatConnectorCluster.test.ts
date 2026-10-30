@@ -25,7 +25,7 @@ describe('connector cluster', () => {
     const original=vi.mocked(invoke).getMockImplementation()!;
     vi.mocked(invoke).mockImplementation(async(command,args)=>command==='ai_connector_installed' ? [{id:'pan:main',name:'百度网盘',enabled:false,status:'disconnected',tools:[]}] : original(command,args));
     open();await wrapper.get('[data-testid=chat-connectors-toggle]').trigger('click');await flushPromises();
-    expect(wrapper.get('[data-testid="chat-connector-pan:main"]').text()).toContain('未连接');
+    expect(wrapper.get('[data-testid="chat-connector-pan:main"]').get('.row-text').attributes('title')).toContain('未连接');
     expect(wrapper.get('[data-testid="chat-connector-pan:main"] .row-link').text()).toBe('去连接');
   });
   it('shows nothing until a connector is chosen', () => {
@@ -42,12 +42,12 @@ describe('connector cluster', () => {
   it('lists the installed connectors with a switch for the ready ones and a way to connect the rest', async () => {
     open(); await wrapper.get('[data-testid=chat-connectors-toggle]').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_store_connector_status');
-    expect(wrapper.get('[data-testid=chat-connector-feishu]').text()).toContain('已连接 · 7 个工具');
+    expect(wrapper.get('[data-testid=chat-connector-feishu]').get('.row-text').attributes('title')).toContain('已连接 · 7 个工具');
     expect(wrapper.get('[aria-label="优先使用 飞书"]').attributes('aria-checked')).toBe('true');
     expect(wrapper.get('[aria-label="优先使用 GitHub"]').attributes('aria-checked')).toBe('false');
     expect(wrapper.find('[aria-label="优先使用 Notion"]').exists()).toBe(false);
-    expect(wrapper.get('[data-testid=chat-connector-notion]').text()).toContain('尚未连接');
-    expect(wrapper.get('[data-testid=chat-connector-old]').text()).toContain('已停用');
+    expect(wrapper.get('[data-testid=chat-connector-notion]').get('.row-text').attributes('title')).toContain('尚未连接');
+    expect(wrapper.get('[data-testid=chat-connector-old]').get('.row-text').attributes('title')).toContain('已停用');
   });
   it('reports a switch and a request to connect, and closes on Escape or an outside click', async () => {
     open(); await wrapper.get('[data-testid=chat-connectors-toggle]').trigger('click'); await flushPromises();
@@ -65,7 +65,7 @@ describe('connector cluster', () => {
   });
   it('keeps a chosen connector that is no longer installed so it can still be dropped', async () => {
     open([pick('gone', '已删除的服务')]); await wrapper.get('[data-testid=chat-connectors-toggle]').trigger('click'); await flushPromises();
-    expect(wrapper.get('[data-testid=chat-connector-gone]').text()).toContain('已不可用');
+    expect(wrapper.get('[data-testid=chat-connector-gone]').get('.row-text').attributes('title')).toContain('已不可用');
     expect(wrapper.get('[aria-label="优先使用 已删除的服务"]').attributes('aria-checked')).toBe('true');
   });
   it('says so when the list cannot be read, and opens upward or downward as asked', async () => {

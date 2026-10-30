@@ -1,0 +1,485 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Market.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "⑤ 插件 · 小伴市场 · 浏览与来源切换",
+      "w": 1280,
+      "x": 0,
+      "y": 6100
+    },
+    "WB-Ask-Card.dc.html": {
+      "h": 2310,
+      "radius": 12,
+      "title": "④ 选择卡 · 现状 vs 优化方案（含各状态）",
+      "w": 1440,
+      "x": 16480,
+      "y": 0
+    },
+    "WB-Assistant-Ball.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 超级小伴 · 小球状态与菜单",
+      "w": 1280,
+      "x": 0,
+      "y": 2440
+    },
+    "WB-Assistant-Capsule.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 超级小伴 · 胶囊快问",
+      "w": 1280,
+      "x": 1360,
+      "y": 2440
+    },
+    "WB-Assistant-Card.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 超级小伴 · 卡片多轮对话",
+      "w": 2240,
+      "x": 2720,
+      "y": 2440
+    },
+    "WB-Assistant-Voice.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 超级小伴 · 实时对话",
+      "w": 1280,
+      "x": 5040,
+      "y": 2440
+    },
+    "WB-Chat-Model.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 会话 · 选择模型（含思考强度）",
+      "w": 1280,
+      "x": 12240,
+      "y": 0
+    },
+    "WB-Chat-Plugins.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "⑥ 会话 · 输入框：技能 / 专家 / 连接器",
+      "w": 1280,
+      "x": 1360,
+      "y": 8000
+    },
+    "WB-Chat-Task.dc.html": {
+      "h": 800,
+      "radius": 12,
+      "title": "④ 会话 · 任务执行（优化后的任务卡片）",
+      "w": 1280,
+      "x": 13600,
+      "y": 0
+    },
+    "WB-Chat-Voice.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 会话 · 实时对话",
+      "w": 1280,
+      "x": 0,
+      "y": 4880
+    },
+    "WB-Chat.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 会话 · 头像菜单",
+      "w": 1280,
+      "x": 2720,
+      "y": 0
+    },
+    "WB-Compose-Spec.dc.html": {
+      "h": 2880,
+      "radius": 12,
+      "title": "⑥ 输入框 · 构成 / 状态 / 选择器规范",
+      "w": 1440,
+      "x": 2720,
+      "y": 8000
+    },
+    "WB-Effects.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 装扮 / 特效",
+      "w": 1280,
+      "x": 5440,
+      "y": 0
+    },
+    "WB-Library-Cloud.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 资料库 · 云文档",
+      "w": 1280,
+      "x": 1360,
+      "y": 3660
+    },
+    "WB-Library-Docs.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 资料库 · 我的文档",
+      "w": 1280,
+      "x": 0,
+      "y": 3660
+    },
+    "WB-Library-Memory.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 资料库 · 记忆",
+      "w": 1280,
+      "x": 4080,
+      "y": 3660
+    },
+    "WB-Library-Saved.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 资料库 · 收藏",
+      "w": 1280,
+      "x": 2720,
+      "y": 3660
+    },
+    "WB-Market-Connector.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "⑤ 插件 · 连接器连接",
+      "w": 1280,
+      "x": 6800,
+      "y": 6100
+    },
+    "WB-Market-DeepLink.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "⑤ 插件 · 网页唤起确认（3 种状态）",
+      "w": 1280,
+      "x": 2720,
+      "y": 6100
+    },
+    "WB-Market-Review.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "⑤ 插件 · 技能安装审查",
+      "w": 1280,
+      "x": 1360,
+      "y": 6100
+    },
+    "WB-Market-Settings.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "⑤ 插件 · 插件来源设置",
+      "w": 1280,
+      "x": 8160,
+      "y": 6100
+    },
+    "WB-Market-Team.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "⑤ 插件 · 专家团安装",
+      "w": 1280,
+      "x": 4080,
+      "y": 6100
+    },
+    "WB-Market-Updates.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "⑤ 插件 · 已安装与更新",
+      "w": 1280,
+      "x": 5440,
+      "y": 6100
+    },
+    "WB-New-Plugins.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "⑥ 新建任务 · 输入框：技能 / 专家 / 连接器",
+      "w": 1280,
+      "x": 0,
+      "y": 8000
+    },
+    "WB-New.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 新建任务 · 主题色可切换",
+      "w": 1280,
+      "x": 0,
+      "y": 0
+    },
+    "WB-Perm-Menu.dc.html": {
+      "h": 1215,
+      "radius": 12,
+      "title": "④ 权限菜单 · 现状 vs 优化方案",
+      "w": 1000,
+      "x": 18000,
+      "y": 0
+    },
+    "WB-Pets-Dialog.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 伙伴 · 设置弹窗",
+      "w": 1280,
+      "x": 9520,
+      "y": 0
+    },
+    "WB-Pets.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 装扮 / 伙伴",
+      "w": 1280,
+      "x": 8160,
+      "y": 0
+    },
+    "WB-Plugins.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ AI 插件",
+      "w": 1280,
+      "x": 1360,
+      "y": 0
+    },
+    "WB-Provider-Custom.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 设置 · 添加自定义供应商",
+      "w": 1280,
+      "x": 6800,
+      "y": 1220
+    },
+    "WB-Provider.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 设置 · 编辑供应商（DeepSeek）",
+      "w": 1280,
+      "x": 5440,
+      "y": 1220
+    },
+    "WB-Remind.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 提醒",
+      "w": 1280,
+      "x": 10880,
+      "y": 0
+    },
+    "WB-Settings-AI.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 设置 · AI 模型",
+      "w": 1280,
+      "x": 2720,
+      "y": 1220
+    },
+    "WB-Settings-Assistant.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 设置 · 超级小伴",
+      "w": 1280,
+      "x": 4080,
+      "y": 1220
+    },
+    "WB-Settings-Look.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 设置 · 外观与主题色",
+      "w": 1280,
+      "x": 1360,
+      "y": 1220
+    },
+    "WB-Settings.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 设置 · 通用",
+      "w": 1280,
+      "x": 0,
+      "y": 1220
+    },
+    "WB-Studio.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 装扮",
+      "w": 1280,
+      "x": 4080,
+      "y": 0
+    },
+    "WB-Task-Card.dc.html": {
+      "h": 2480,
+      "radius": 12,
+      "title": "④ 任务执行卡片 · 现状 vs 优化方案（含全部状态）",
+      "w": 1440,
+      "x": 14960,
+      "y": 0
+    },
+    "WB-Widgets.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "radius": 12,
+      "title": "④ 装扮 / 组件",
+      "w": 1280,
+      "x": 6800,
+      "y": 0
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-22T14:30:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "composeRules": {
+      "fill": "blue",
+      "maxH": 680,
+      "text": "输入框规则\n\n1. 技能：一次性。敲 / 或 + › 技能，chip 在文字上方，可多选（最多 3 个）；发送后清除。\n\n2. 专家 / 专家团：会话级，单选。放在输入框右上角；敲 @ 或 + › 专家选择，选「通用小伴」恢复默认。发过消息后仍保留。\n\n3. 连接器：会话级，可多个。放在专家右边（右上角），重叠图标最多 3 个，其余 +N；点开逐个开关，未连接的跳到连接页。\n\n4. 内置工具：一次性，单选。+ › 工具 › 操作电脑 / 操作手机 / 设计画板，chip 和技能并排在左侧；发送后清除。操作电脑首次点击先启用，旁边的管理按钮可停用或让小伴检查权限。\n\n5. 发送后：消息上方留一行「技能 · 专家 · 连接器」，回答头部显示专家名。\n\n6. 不新增入口：管理走 AI 插件页，找更多走小伴市场。\n\n在画板的 Tweaks 里可以切换预设状态和预览各个选择器。",
+      "w": 520,
+      "x": 4240,
+      "y": 8000
+    },
+    "marketNote": {
+      "fill": "blue",
+      "maxH": 420,
+      "text": "接入原则\n\n1. 界面沿用现有「AI 插件」页，不新增页面：只在筛选行加「小伴市场 / SkillHub」来源切换，顶部加设置入口。\n2. 安装一律先审查：说明、文件清单、逐文件 SHA256、脚本预览，勾选确认后才安装；网页链接只能唤起确认窗口，永远不会静默安装。\n3. 版本锁定：链接和审查都带清单摘要，客户端重新计算后与市场记录比对；不一致则拒绝。\n4. 小伴市场不可用时自动退到 SkillHub，已安装的不受影响。\n5. 更新只提示，不自动更新；先展示文件差异，旧版本保留为备份。",
+      "w": 520,
+      "x": 0,
+      "y": 6960
+    },
+    "rowAssistant": {
+      "kind": "title1",
+      "maxW": 6320,
+      "text": "④ 超级小伴 · 悬浮对话框（小球 → 胶囊 → 卡片 → 实时对话）",
+      "w": 240,
+      "x": 0,
+      "y": 2140
+    },
+    "rowCompose": {
+      "kind": "title1",
+      "maxW": 4160,
+      "text": "⑥ 输入框 · 使用技能 / 专家 / 连接器（新建任务 · 会话 · 规范）",
+      "w": 240,
+      "x": 0,
+      "y": 7700
+    },
+    "rowLibrary": {
+      "kind": "title1",
+      "maxW": 5200,
+      "text": "④ 资料库 · 我的文档 / 云文档 / 收藏 / 记忆（顶部 Tab）",
+      "w": 240,
+      "x": 0,
+      "y": 3360
+    },
+    "rowMarket": {
+      "kind": "title1",
+      "maxW": 8000,
+      "text": "⑤ AI 插件 · 接入小伴市场（来源切换 / 审查安装 / 网页唤起 / 专家团 / 更新 / 连接 / 设置）",
+      "w": 240,
+      "x": 0,
+      "y": 5800
+    },
+    "rowSettings": {
+      "kind": "title1",
+      "maxW": 8000,
+      "text": "④ 设置 · 头像菜单 → 设置（⌘,），弹窗式",
+      "w": 240,
+      "x": 0,
+      "y": 920
+    },
+    "rowVoice": {
+      "kind": "title1",
+      "maxW": 2560,
+      "text": "④ 会话 · 实时对话（输入框右侧按钮）",
+      "w": 240,
+      "x": 0,
+      "y": 4580
+    },
+    "rowWB": {
+      "kind": "title1",
+      "maxW": 8000,
+      "text": "小伴桌面 · 主界面（WorkBuddy 骨架 · 精致版 · 多主题色）",
+      "w": 240,
+      "x": 0,
+      "y": -300
+    },
+    "voiceSplit": {
+      "fill": "blue",
+      "maxH": 520,
+      "text": "语音入口分工\n\n录音（麦克风 / 悬浮条左侧的球）：点一下开始，识别的文字实时进输入框，再点一下结束，由你确认后发送。一次一句，不朗读，不自动发送。\n\n实时对话（声波按钮）：连续、免提、可打断，每轮自动发送并朗读，点「结束」才退出。\n\n按住快捷键说话：松手即发，是想快速问一句时的入口。\n\n自动发送只属于实时对话和按住说话，录音不会自动发送。",
+      "w": 460,
+      "x": 1360,
+      "y": 4880
+    }
+  },
+  "order": [
+    "WB-New.dc.html",
+    "WB-Plugins.dc.html",
+    "WB-Chat.dc.html",
+    "WB-Studio.dc.html",
+    "WB-Effects.dc.html",
+    "WB-Widgets.dc.html",
+    "WB-Pets.dc.html",
+    "WB-Pets-Dialog.dc.html",
+    "WB-Remind.dc.html",
+    "WB-Settings.dc.html",
+    "WB-Settings-Look.dc.html",
+    "WB-Settings-AI.dc.html",
+    "WB-Settings-Assistant.dc.html",
+    "WB-Provider.dc.html",
+    "WB-Provider-Custom.dc.html",
+    "WB-Assistant-Ball.dc.html",
+    "WB-Assistant-Capsule.dc.html",
+    "WB-Assistant-Card.dc.html",
+    "WB-Assistant-Voice.dc.html",
+    "WB-Library-Docs.dc.html",
+    "WB-Library-Cloud.dc.html",
+    "WB-Library-Saved.dc.html",
+    "WB-Library-Memory.dc.html",
+    "WB-Chat-Voice.dc.html",
+    "Market.dc.html",
+    "WB-Market-Review.dc.html",
+    "WB-Market-DeepLink.dc.html",
+    "WB-Market-Team.dc.html",
+    "WB-Market-Updates.dc.html",
+    "WB-Market-Connector.dc.html",
+    "WB-Market-Settings.dc.html",
+    "WB-New-Plugins.dc.html",
+    "WB-Chat-Plugins.dc.html",
+    "WB-Compose-Spec.dc.html",
+    "WB-Chat-Model.dc.html",
+    "WB-Chat-Task.dc.html",
+    "WB-Task-Card.dc.html",
+    "WB-Ask-Card.dc.html",
+    "WB-Perm-Menu.dc.html"
+  ],
+  "pages": [],
+  "title": "小伴桌面 UI 升级设计稿"
+}

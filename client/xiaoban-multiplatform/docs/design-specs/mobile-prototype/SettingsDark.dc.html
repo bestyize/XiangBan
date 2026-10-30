@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>设置 · 深色</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:960px;box-sizing:border-box;background:#111111;color:#ECECEC;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+<header style="flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:#1C1C1E">
+<a href="Me.dc.html" aria-label="返回" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#ECECEC;text-decoration:none">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+</a>
+<h1 style="margin:0;font-size:16px;font-weight:600">设置</h1>
+<span style="width:44px"></span>
+</header>
+
+<main style="flex:1;min-height:0;overflow:hidden;padding-bottom:24px">
+
+<div style="padding:16px 16px 6px;font-size:12px;color:#9A9AA0">账号</div>
+<ul style="list-style:none;margin:0;padding:0;background:#1C1C1E;border-radius:0;overflow:hidden">
+<li><button type="button" style="width:100%;display:flex;align-items:center;padding:14px 16px;border:0;background:none;font-size:15px;color:#ECECEC;text-align:left"><span style="flex:1">昵称与头像</span><span style="font-size:12px;color:#9A9AA0">[昵称]</span></button></li>
+<li style="border-top:0.5px solid rgba(255,255,255,.08)"><button type="button" style="width:100%;display:flex;align-items:center;padding:14px 16px;border:0;background:none;font-size:15px;color:#ECECEC;text-align:left"><span style="flex:1">绑定手机 / 邮箱</span><span style="font-size:12px;color:#9A9AA0">已绑定</span></button></li>
+</ul>
+
+
+
+
+<div style="padding:16px 16px 6px;font-size:12px;color:#9A9AA0">外观与声音</div>
+<ul style="list-style:none;margin:0;padding:0;background:#1C1C1E;border-radius:0;overflow:hidden">
+<li><a href="SettingsTheme.dc.html" style="display:flex;align-items:center;gap:12px;padding:14px 16px;text-decoration:none;color:#ECECEC"><span style="flex:1;font-size:15px">主题</span><span style="font-size:12px;color:#9A9AA0">深色</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a></li>
+<li style="border-top:0.5px solid rgba(255,255,255,.08)"><a href="SettingsAccent.dc.html" style="display:flex;align-items:center;gap:12px;padding:14px 16px;text-decoration:none;color:#ECECEC"><span style="flex:1;font-size:15px">主题色</span><span style="width:16px;height:16px;border-radius:50%;background:#3B7BE8"></span><span style="font-size:12px;color:#9A9AA0">海湾蓝</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a></li>
+<li style="border-top:0.5px solid rgba(255,255,255,.08)"><a href="SettingsVoice.dc.html" style="display:flex;align-items:center;gap:12px;padding:14px 16px;text-decoration:none;color:#ECECEC"><span style="flex:1;font-size:15px">声音</span><span style="font-size:12px;color:#9A9AA0">Edge · 晓晓</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"></path></svg></a></li>
+</ul>
+
+<div style="padding:16px 16px 6px;font-size:12px;color:#9A9AA0">同步、隐私与通知</div>
+<ul style="list-style:none;margin:0;padding:0;background:#1C1C1E;border-radius:0;overflow:hidden">
+<sc-for list="{{toggles}}" as="t" hint-placeholder-count="4">
+<li style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-top:{{t.border}}">
+<div style="flex:1;min-width:0">
+<div style="font-size:15px">{{t.label}}</div>
+<div style="margin-top:2px;font-size:12px;line-height:1.5;color:#9A9AA0">{{t.desc}}</div>
+</div>
+<button type="button" role="switch" aria-checked="{{t.on}}" aria-label="{{t.label}}" onClick="{{t.toggle}}" style="flex:none;position:relative;width:48px;height:28px;border:0;border-radius:14px;background:{{t.bg}}">
+<span style="position:absolute;top:2px;left:{{t.left}}px;width:24px;height:24px;border-radius:50%;background:#FFFFFF;box-shadow:0 1px 3px rgba(0,0,0,.3)"></span>
+</button>
+</li>
+</sc-for>
+</ul>
+
+<div style="padding:16px 16px 6px;font-size:12px;color:#9A9AA0">关于</div>
+<ul style="list-style:none;margin:0;padding:0;background:#1C1C1E;border-radius:0;overflow:hidden">
+<li><button type="button" style="width:100%;display:flex;align-items:center;padding:14px 16px;border:0;background:none;font-size:15px;color:#ECECEC;text-align:left"><span style="flex:1">版本</span><span style="font-size:12px;color:#9A9AA0">[版本号]</span></button></li>
+<li style="border-top:0.5px solid rgba(255,255,255,.08)"><button type="button" style="width:100%;display:flex;align-items:center;padding:14px 16px;border:0;background:none;font-size:15px;color:#ECECEC;text-align:left"><span style="flex:1">用户协议与隐私政策</span><span style="font-size:12px;color:#9A9AA0">›</span></button></li>
+<li style="border-top:0.5px solid rgba(255,255,255,.08)"><button type="button" style="width:100%;display:flex;align-items:center;padding:14px 16px;border:0;background:none;font-size:15px;color:#ECECEC;text-align:left"><span style="flex:1">社区规则</span><span style="font-size:12px;color:#9A9AA0">›</span></button></li>
+</ul>
+
+<div style="margin:20px 16px 0">
+<button type="button" style="width:100%;height:48px;border:0;border-radius:24px;background:#1C1C1E;color:#FF6369;font-size:15px;font-weight:600">退出登录</button>
+</div>
+
+</main>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const deep = !!st.deep;
+    const defs = [
+      { id: 'sync', label: '云端同步', desc: '同步桌面方案、收藏和自己的作品。默认关闭；助手的记忆和资料库不会同步。', on: !!st.sync },
+      { id: 'stats', label: '匿名使用统计', desc: '只记录事件和次数，不上传你的内容、文件名或窗口标题，可随时关闭。', on: st.stats === undefined ? true : !!st.stats },
+      { id: 'notify', label: '站内消息提醒', desc: '回复、@ 我的、订阅命中的新内容。', on: st.notify === undefined ? true : !!st.notify },
+      { id: 'weekly', label: '周刊更新提醒', desc: '每周一周刊发布时提醒一次，不推送其他内容。', on: !!st.weekly }
+    ];
+    const toggles = defs.map((d, i) => ({
+      label: d.label, desc: d.desc, on: d.on,
+      bg: d.on ? '#3B7BE8' : '#3A3A3C',
+      left: d.on ? 22 : 2,
+      border: i === 0 ? '0' : '0.5px solid rgba(255,255,255,.08)',
+      toggle: () => { const o = {}; o[d.id] = !d.on; this.setState(o); }
+    }));
+    return {
+      toggles,
+      isDaily: !deep, isDeep: deep,
+      setDaily: () => this.setState({ deep: false }),
+      setDeep: () => this.setState({ deep: true }),
+      dailyBg: deep ? 'transparent' : '#FFFFFF',
+      dailyColor: deep ? '#6B6B6B' : '#E3203C',
+      deepBg: deep ? '#FFFFFF' : 'transparent',
+      deepColor: deep ? '#E3203C' : '#6B6B6B'
+    };
+  }
+}
+</script>
+</body>
+</html>

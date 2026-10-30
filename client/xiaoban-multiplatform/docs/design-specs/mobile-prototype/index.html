@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>设计稿总览</title>
+<style>
+:root{--bg:#F2F2F4;--card:#fff;--ink:#1D1D1F;--mu:#6E6E73;--line:rgba(0,0,0,.08);--note:#FFF6DC}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--card:#1F1F22;--ink:#F2F2F4;--mu:#A1A1A8;--line:rgba(255,255,255,.1);--note:#2E2A1E}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif}
+header{position:sticky;top:0;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 20px;background:var(--bg);border-bottom:1px solid var(--line)}
+h1{margin:0;font-size:18px;font-weight:600}
+header span{font-size:13px;color:var(--mu)}
+header label{margin-left:auto;font-size:13px;color:var(--mu);display:flex;align-items:center;gap:6px}
+main{padding:8px 20px 60px}
+section{margin-top:28px}
+h2{margin:0 0 12px;font-size:16px;font-weight:600}
+.notes{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.note{max-width:560px;padding:10px 12px;border-radius:10px;background:var(--note);font-size:13px;line-height:1.6;white-space:pre-line}
+.row{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+figure{margin:0;display:flex;flex-direction:column;gap:6px}
+.frame{overflow:hidden;border-radius:10px;background:var(--card);box-shadow:0 0 0 1px var(--line),0 4px 14px rgba(0,0,0,.06)}
+.frame iframe{border:0;display:block;transform-origin:0 0;background:#fff}
+figcaption{display:flex;gap:8px;align-items:baseline;font-size:13px}
+figcaption a{color:inherit}
+figcaption small{color:var(--mu)}
+</style>
+</head>
+<body>
+<header><h1 id="title">设计稿总览</h1><span id="count"></span>
+<label>缩放 <select id="zoom"><option value="0.25">25%</option><option value="0.4">40%</option><option value="0.6">60%</option><option value="1">100%</option></select></label></header>
+<main id="main"></main>
+<script>
+// 读取 canvas.json，按画布上的标题便签分组，逐个用 iframe 渲染画板
+(async function () {
+  var c = await (await fetch('canvas.json')).json();
+  var main = document.getElementById('main'), zoom = document.getElementById('zoom');
+  document.title = c.title; document.getElementById('title').textContent = c.title;
+  var boards = c.order.map(function (k) { return Object.assign({ file: k }, c.boards[k]); });
+  document.getElementById('count').textContent = boards.length + ' 个画板 · 点画板名称单独打开';
+  var maxW = Math.max.apply(null, boards.map(function (b) { return b.w; }));
+  zoom.value = maxW > 800 ? '0.4' : '0.6';
+  var notes = Object.values(c.notes || {});
+  var titles = notes.filter(function (n) { return n.kind === 'title1'; }).sort(function (a, b) { return a.y - b.y; });
+  var stickies = notes.filter(function (n) { return !n.kind; });
+  // 每个画板归到它上方最近的标题
+  var groups = titles.map(function (t) { return { t: t, boards: [], notes: [] }; });
+  if (!groups.length || boards.some(function (b) { return b.y < titles[0].y; })) groups.unshift({ t: { text: '未分组', y: -Infinity }, boards: [], notes: [] });
+  function groupOf(y) { var g = groups[0]; groups.forEach(function (x) { if (x.t.y <= y) g = x; }); return g; }
+  boards.slice().sort(function (a, b) { return a.y - b.y || a.x - b.x; }).forEach(function (b) { groupOf(b.y).boards.push(b); });
+  stickies.forEach(function (n) { groupOf(n.y).notes.push(n); });
+  function render() {
+    var s = +zoom.value; main.innerHTML = '';
+    groups.forEach(function (g) {
+      if (!g.boards.length && !g.notes.length) return;
+      var sec = document.createElement('section'), h = document.createElement('h2');
+      h.textContent = g.t.text; sec.appendChild(h);
+      if (g.notes.length) {
+        var ns = document.createElement('div'); ns.className = 'notes';
+        g.notes.forEach(function (n) { var d = document.createElement('div'); d.className = 'note'; d.textContent = n.text; ns.appendChild(d); });
+        sec.appendChild(ns);
+      }
+      var row = document.createElement('div'); row.className = 'row';
+      g.boards.forEach(function (b) {
+        var f = document.createElement('figure'), fr = document.createElement('div'), ifr = document.createElement('iframe');
+        fr.className = 'frame'; fr.style.width = b.w * s + 'px'; fr.style.height = b.h * s + 'px';
+        ifr.src = b.file; ifr.loading = 'lazy'; ifr.title = b.title || b.file;
+        ifr.width = b.w; ifr.height = b.h; ifr.style.transform = 'scale(' + s + ')';
+        fr.appendChild(ifr); f.appendChild(fr);
+        var cap = document.createElement('figcaption'), a = document.createElement('a'), sm = document.createElement('small');
+        a.href = b.file; a.target = '_blank'; a.textContent = b.title || b.file; sm.textContent = b.w + '×' + b.h;
+        cap.appendChild(a); cap.appendChild(sm); f.appendChild(cap); row.appendChild(f);
+      });
+      sec.appendChild(row); main.appendChild(sec);
+    });
+  }
+  zoom.onchange = render; render();
+})();
+</script>
+</body>
+</html>

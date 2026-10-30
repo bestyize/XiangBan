@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>发帖</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+a{color:inherit}
+button,input,textarea{font-family:inherit}
+</style>
+</helmet>
+<div style="position:relative;width:390px;height:960px;box-sizing:border-box;background:#FFFFFF;color:#222222;font-family:-apple-system,'PingFang SC','Noto Sans SC','Microsoft YaHei',sans-serif;display:flex;flex-direction:column;overflow:hidden">
+
+<header style="flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 8px 0 8px;">
+<a href="Main.dc.html" aria-label="关闭" style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#222222;text-decoration:none">
+<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+</a>
+<h1 style="margin:0;font-size:16px;font-weight:600">发帖</h1>
+<button type="button" style="height:36px;padding:0 18px;border:0;border-radius:18px;background:#E3203C;color:#FFFFFF;font-size:14px;font-weight:600">发布</button>
+</header>
+
+<main style="flex:1;min-height:0;overflow:hidden;padding:12px 16px 0">
+
+<div style="font-size:12px;color:#666666">发到哪里</div>
+<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">
+<sc-for list="{{cats}}" as="c" hint-placeholder-count="6">
+<button type="button" onClick="{{c.pick}}" style="height:32px;padding:0 14px;border:1px solid {{c.border}};border-radius:16px;font-size:14px;background:{{c.bg}};color:{{c.color}}">{{c.name}}</button>
+</sc-for>
+</div>
+
+<label for="np-title" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">标题</label>
+<input id="np-title" type="text" placeholder="标题" style="display:block;width:100%;box-sizing:border-box;height:52px;margin-top:12px;border:0;border-bottom:0.5px solid #EDEDED;padding:0 2px;font-size:18px;font-weight:600;color:#222222;outline:none">
+<label for="np-body" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">正文</label>
+<textarea id="np-body" placeholder="{{bodyHint}}" style="display:block;width:100%;box-sizing:border-box;height:150px;margin-top:8px;border:0;padding:8px 2px;font-size:15px;line-height:1.7;color:#222222;outline:none;resize:none"></textarea>
+
+<div style="display:flex;gap:16px;padding:8px 0;border-top:0.5px solid #EDEDED">
+<button type="button" style="display:flex;align-items:center;gap:8px;border:0;background:none;padding:6px 0;font-size:14px;color:#666666"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>图片</button>
+<button type="button" style="display:flex;align-items:center;gap:8px;border:0;background:none;padding:6px 0;font-size:14px;color:#666666"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/></svg>附件</button>
+<button type="button" style="display:flex;align-items:center;gap:8px;border:0;background:none;padding:6px 0;font-size:14px;color:#666666"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9h14M5 15h14M10 4L8 20M16 4l-2 16"/></svg>话题</button>
+</div>
+
+<sc-if value="{{isBounty}}" hint-placeholder-val="{{true}}">
+<section style="margin-top:8px;background:#F7F7F7;border-radius:8px;padding:12px 14px">
+<div style="font-size:14px;font-weight:600;color:#666666">求助设置</div>
+<div style="margin-top:10px;display:flex;align-items:center;justify-content:space-between">
+<span style="font-size:14px">求助期限</span>
+<div role="group" aria-label="期限" style="display:flex;background:#EAEAEA;border-radius:8px;padding:3px">
+<sc-for list="{{days}}" as="d" hint-placeholder-count="3">
+<button type="button" onClick="{{d.pick}}" aria-pressed="{{d.on}}" style="height:28px;min-width:56px;border:0;border-radius:8px;font-size:14px;font-weight:600;background:{{d.bg}};color:{{d.color}}">{{d.name}}</button>
+</sc-for>
+</div>
+</div>
+<div style="margin-top:10px;font-size:12px;line-height:1.6;color:#666666">到期前，你可以随时从回答里采纳一条作为解决方案；到期未采纳，帖子标记为未解决。</div>
+</section>
+</sc-if>
+
+<sc-if value="{{isResource}}" hint-placeholder-val="{{false}}">
+<section style="margin-top:8px;background:#F7F7F7;border-radius:16px;padding:12px 14px;color:#666666">
+<div style="font-size:14px;font-weight:600">资源分享须知</div>
+<div style="margin-top:6px;font-size:12px;line-height:1.7">仅限合法来源：正版、开源、免费软件，片单影评乐评歌单，公版或授权影音，公开课程资料，自己的作品。不发破解版和盗版下载，违规内容会被下架。</div>
+</section>
+</sc-if>
+
+</main>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = this.state || {};
+    const cat = st.cat || 'bounty';
+    const day = st.day || '7';
+    const defs = [['bounty', '求助'], ['chat', '闲聊'], ['feedback', '产品反馈'], ['soft', '精品软件'], ['media', '影音推荐'], ['study', '学习资料']];
+    const cats = defs.map((d) => ({
+      name: d[1],
+      bg: cat === d[0] ? '#333333' : '#F2F2F2',
+      color: cat === d[0] ? '#FFFFFF' : '#333333',
+      border: cat === d[0] ? '#333333' : 'transparent',
+      pick: () => this.setState({ cat: d[0] })
+    }));
+    const days = ['7', '14', '30'].map((n) => ({
+      name: n + ' 天',
+      on: day === n,
+      bg: day === n ? '#FFFFFF' : 'transparent',
+      color: day === n ? '#E3203C' : '#6B6B6B',
+      pick: () => this.setState({ day: n })
+    }));
+    const isBounty = cat === 'bounty';
+    const isResource = cat === 'soft' || cat === 'media' || cat === 'study';
+    const hints = {
+      bounty: '写下“我想要一个……”：用在哪里、大概什么样子、有什么限制。',
+      chat: '想聊点什么？',
+      feedback: '遇到了什么问题，或者希望怎么改进？',
+      soft: '推荐一个好用的软件：它解决什么问题、哪里好用、有什么限制。',
+      media: '推荐一份片单、歌单，或写一段影评乐评。',
+      study: '分享一份学习资料，并注明来源。'
+    };
+    return { cats, days, isBounty, isResource, bodyHint: hints[cat] };
+  }
+}
+</script>
+</body>
+</html>
