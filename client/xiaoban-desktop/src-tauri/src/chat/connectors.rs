@@ -301,6 +301,7 @@ pub async fn ai_mentions(app: tauri::AppHandle, window: tauri::WebviewWindow) ->
     super::store::control(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let dirs = Dirs::of(&app)?;
+        super::sync_computer_use_skill(&dirs.skills(), crate::ai_config::current(&app)?.open_computer_use);
         let manager = super::connector_manager(&app)?;
         let statuses = manager.statuses();
         let mut items: Vec<Value> = Vec::new();

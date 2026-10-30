@@ -562,6 +562,7 @@ fn skills_for(dirs: &Dirs, bundled: PathBuf) -> Skills {
 pub fn chat_invocable_skills(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Vec<Value>, String> {
     chat_window(&window)?;
     let dirs = Dirs::of(&app)?;
+    sync_computer_use_skill(&dirs.skills(), crate::ai_config::current(&app)?.open_computer_use);
     let skills = skills_for(&dirs, dirs.chat.join("bundled-skills"));
     Ok(skill_invocation::menu(&skills, &dirs.plugins(), &dirs.skills()))
 }

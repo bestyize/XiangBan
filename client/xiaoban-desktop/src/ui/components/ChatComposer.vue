@@ -10,7 +10,7 @@ import { sessionModelConfig } from '../chat/session-model.ts';
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { NInput } from 'naive-ui';
-import { ArrowUp, ChevronDown, ListPlus, AudioLines, LoaderCircle, Mic, MicOff, Square, X, Zap } from 'lucide-vue-next';
+import { ArrowUp, ChevronDown, ListPlus, AudioLines, LoaderCircle, Mic, MicOff, Square, X, Zap, Monitor, Smartphone, PanelsTopLeft } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, type AiConfigView, type AiTier } from '../../bridge.ts';
 import type { ControlPage, ControlStore } from '../control-types.ts';
 import ChatWorkbenchTools from './ChatWorkbenchTools.vue';
@@ -29,6 +29,7 @@ import AsrStatus from './AsrStatus.vue';
 import { ATTACHMENT_ACCEPT, MAX_ATTACHMENTS, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment, type PendingAttachment } from '../chat/attachments.ts';
 import { isImeEnter } from '../chat/format.ts';
 import { MAX_SKILLS, dropSlash, filterSkills, slashToken, withSkills, type SlashSkill } from '../chat/slash.ts';
+import { builtinToolLabels, withBuiltinTool, type BuiltinTool } from '../chat/builtin-tools.ts';
 
 const props = withDefaults(defineProps<{
   store: ControlStore;
@@ -90,6 +91,7 @@ let attachmentVersion = 0;
 const filePicker = ref<HTMLInputElement | null>(null);
 const MAX_IMAGES = MAX_ATTACHMENTS;
 const skills = computed({ get: () => chat.draft.skills, set: value => { chat.draft.skills = value; } });
+const selectedTool = computed({ get: () => chat.draft.tool ?? null, set: (value: BuiltinTool | null) => { chat.draft.tool = value; } });
 const canSend = computed(() => chat.configured && !chat.sending && !compacting.value && !attachmentReading.value && !capturing.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0 || skills.value.length > 0));
 
 /* ── Voice ───────────────────────────────────────────────────────────── */
@@ -184,11 +186,13 @@ async function submit(mode: 'queue' | 'steer' | 'replace' = 'queue') {
   const images = [...attachments.value];
   const references = [...mentions.selected.value];
   const chosen = [...skills.value];
+  const tool = selectedTool.value;
   draft.value = '';
   attachments.value = [];
   skills.value = [];
+  selectedTool.value = null;
   emit('sending');
-  const message = withSkills(text, chosen.map(s => s.name));
+  const message = withSkills(withBuiltinTool(text, tool), chosen.map(s => s.name));
   const sent = chat.currentId
     ? await chat.enqueue(message, images, references.map(({ kind, id }) => ({ kind, id })), mode, props.designId)
     : await chat.send(message, images, undefined, references.map(({ kind, id }) => ({ kind, id })), props.designId);
@@ -197,6 +201,7 @@ async function submit(mode: 'queue' | 'steer' | 'replace' = 'queue') {
     owner.text = [text, owner.text].filter(Boolean).join('\n\n');
     owner.attachments = [...images, ...owner.attachments];
     owner.skills = [...chosen, ...owner.skills.filter(skill => !chosen.some(old => old.name === skill.name))];
+    if (!owner.tool) owner.tool = tool;
   }
   await nextTick();
   if (sent) emit('sent');
@@ -317,6 +322,9 @@ function addSkill(slug: string, title?: string) {
 }
 const useSkill = (slug: string, title?: string) => { addSkill(slug, title); void nextTick(() => input.value?.focus()); };
 const removeSkill = (slug: string) => { skills.value = skills.value.filter(s => s.name !== slug); };
+const useTool = (tool: BuiltinTool) => { selectedTool.value = tool; void nextTick(() => input.value?.focus()); };
+function checkComputerPermissions() { useTool('computer'); insertPrompt('请检查电脑控制所需的系统权限，并告诉我检查结果。'); }
+function computerDisabled() { if (selectedTool.value === 'computer') selectedTool.value = null; }
 const useConnector = (name: string, id: string) => {
   if (!mentions.selected.value.some(item => item.id === id)) mentions.selected.value.push({ kind: 'connector', id, name, description: '' });
 };
@@ -375,9 +383,10 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 个附件 · 发送时会一起交给小伴</small>
       </div>
       <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
-      <div v-if="skills.length || chat.currentExpert || mentions.selected.value.length" class="composer-top" data-testid="chat-composer-top">
-        <ul class="skill-chips" aria-label="这条消息用的技能">
+      <div v-if="skills.length || selectedTool || chat.currentExpert || mentions.selected.value.length" class="composer-top" data-testid="chat-composer-top">
+        <ul class="skill-chips" aria-label="这条消息用的技能和工具">
           <li v-for="skill in skills" :key="skill.name" class="skill-chip" :data-testid="`chat-skill-${skill.name}`"><Zap :size="14" aria-hidden="true" /><span :title="`/${skill.name}`">{{ skill.title }}</span><button type="button" class="chip-x" :aria-label="`移除技能 ${skill.title}`" @click="removeSkill(skill.name)"><X :size="11" :stroke-width="2.6" /></button></li>
+          <li v-if="selectedTool" class="skill-chip" data-testid="chat-selected-tool"><Monitor v-if="selectedTool === 'computer'" :size="14" aria-hidden="true" /><Smartphone v-else-if="selectedTool === 'phone'" :size="14" aria-hidden="true" /><PanelsTopLeft v-else :size="14" aria-hidden="true" /><span>{{ builtinToolLabels[selectedTool] }}</span><button type="button" class="chip-x" :aria-label="`移除工具 ${builtinToolLabels[selectedTool]}`" data-testid="chat-remove-tool" @click="selectedTool = null"><X :size="11" :stroke-width="2.6" /></button></li>
         </ul>
         <div class="composer-ctx">
           <ChatExpertChip v-if="chat.currentExpert" compact :expert="chat.currentExpert" :removable="!chat.currentId" :desktop="store.desktop" @clear="chat.pendingExpert = null" />
@@ -390,7 +399,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <NInput ref="input" v-model:value="draft" type="textarea" :autosize="{ minRows, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
       </div>
       <div class="composer-row">
-        <ChatWorkbenchTools :store="store" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" />
+        <ChatWorkbenchTools :store="store" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" @use-tool="useTool" @check-computer-permissions="checkComputerPermissions" @computer-disabled="computerDisabled" />
         <ChatWorkspaceMenu v-if="workspace" :chat="chat" :disabled="running || !store.desktop" />
         <ChatPermissionMenu :store="store" :disabled="!store.desktop" />
         <span class="composer-spacer" />

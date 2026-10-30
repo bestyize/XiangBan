@@ -173,18 +173,15 @@ describe('AI 商店', () => {
   it('connects registry MCP services after explicit configuration confirmation', async () => {
     const { wrapper } = setup(); await settle();
     await wrapper.get('#store-tab-connectors').trigger('click'); await settle();
-    expect(wrapper.findAll('.connector-card')).toHaveLength(2);
-    await wrapper.findAll('.connector-card')[1].get('.small-action').trigger('click'); await flushPromises();
+    expect(wrapper.findAll('.connector-card')).toHaveLength(1);
+    expect(wrapper.text()).not.toContain('本机电脑控制');
+    await wrapper.findAll('.connector-card')[0].get('.small-action').trigger('click'); await flushPromises();
     expect((wrapper.get('.test-modal textarea').element as HTMLTextAreaElement).value).toContain('https://example.com/mcp');
     expect(wrapper.get('.test-modal .store-primary').attributes('disabled')).toBeDefined();
     await wrapper.get('.test-modal .review-confirm input').setValue(true);
     await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_store_connector_connect',{id:'test-mcp',name:'测试 MCP 服务',config:{url:'https://example.com/mcp',authMode:'auto',clientId:'',scope:''},confirmed:true});
-    expect(wrapper.findAll('.connector-card')[1].text()).toContain('已连接 · 2 个工具');
-    await wrapper.get('.connector-card .small-action').trigger('click');
-    await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
-    expect(invoke).toHaveBeenCalledWith('save_ai_preferences', { openComputerUse: true });
-    expect(wrapper.get('.connection-status').text()).toBe('已启用');
+    expect(wrapper.findAll('.connector-card')[0].text()).toContain('已连接 · 2 个工具');
   });
   it('supports keyboard tab navigation', async () => {
     const { wrapper } = setup(); await flushPromises();

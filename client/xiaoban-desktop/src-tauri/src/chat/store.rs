@@ -130,7 +130,12 @@ pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWin
         sync_computer_use_skill(&dirs.skills(), config.open_computer_use);
         let skills = super::skills_for(&dirs, dirs.chat.join("bundled-skills"));
         let plugins = dirs.plugins();
-        let mut entries: Vec<Value> = skills.list().iter().map(|s| {
+        let mut entries: Vec<Value> = skills.list().iter().filter(|s| {
+            // The bundled computer-control guide is an internal companion to the tool,
+            // not a separate installable skill. Preserve user-created namesakes.
+            !(s.name == super::COMPUTER_USE_SKILL_NAME && !s.user_invocable
+                && fs::read_to_string(s.dir.join("SKILL.md")).is_ok_and(|text| text.contains(super::SKILL_ORIGIN_MARKER)))
+        }).map(|s| {
             let managed = s.writable && removable(&s.dir, &s.name);
             let lock = fs::read_to_string(s.dir.join(".skillhub-lock.json")).ok()
                 .and_then(|s| serde_json::from_str::<Value>(&s).ok()).unwrap_or(Value::Null);

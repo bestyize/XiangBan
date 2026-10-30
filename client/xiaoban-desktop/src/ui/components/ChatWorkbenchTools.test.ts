@@ -28,6 +28,69 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); });
 
 describe('add-capability menu hover interaction', () => {
+  it('shows compact builtin tools and selects an enabled computer tool', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => command === 'get_ai_config' ? { openComputerUse: true } as never : original(command, args));
+    const { wrapper } = setup();
+    await wrapper.get('[data-testid=chat-add-menu]').trigger('click');
+    await wrapper.get('[data-testid=chat-add-tools]').trigger('click');
+    expect(wrapper.get('[aria-label=工具]').text()).toContain('操作电脑操作手机设计画板');
+    expect(wrapper.find('[data-testid=chat-capability-search]').exists()).toBe(false);
+    await wrapper.get('[data-testid=chat-tool-computer]').trigger('click'); await flushPromises();
+    expect(wrapper.emitted('use-tool')).toEqual([['computer']]);
+    wrapper.unmount();
+  });
+  it('enables computer control in the tools menu before selecting it', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => command === 'get_ai_config' ? { openComputerUse: false } as never : command === 'save_ai_preferences' ? { openComputerUse: true } as never : original(command, args));
+    const { wrapper } = setup(); const store = wrapper.props('store');
+    await wrapper.get('[data-testid=chat-add-menu]').trigger('click'); await wrapper.get('[data-testid=chat-add-tools]').trigger('click');
+    await wrapper.get('[data-testid=chat-tool-computer]').trigger('click'); await flushPromises();
+    expect(wrapper.emitted('use-tool')).toBeUndefined();
+    expect(wrapper.get('[data-testid=chat-computer-settings]').text()).toContain('未启用');
+    await wrapper.get('[data-testid=chat-computer-toggle]').trigger('click'); await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('save_ai_preferences', { openComputerUse: true });
+    expect(wrapper.emitted('use-tool')).toEqual([['computer']]);
+    expect(store.navigate).not.toHaveBeenCalled(); wrapper.unmount();
+  });
+  it('manages enabled computer control and can request a permission check', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => command === 'get_ai_config' ? { openComputerUse: true } as never : command === 'save_ai_preferences' ? { openComputerUse: false } as never : original(command, args));
+    const { wrapper } = setup();
+    await wrapper.get('[data-testid=chat-add-menu]').trigger('click'); await wrapper.get('[data-testid=chat-add-tools]').trigger('click');
+    await wrapper.get('[data-testid=chat-tool-computer-manage]').trigger('click'); await flushPromises();
+    expect(wrapper.get('[data-testid=chat-computer-settings]').text()).toContain('已启用');
+    await wrapper.get('[data-testid=chat-computer-check]').trigger('click');
+    expect(wrapper.emitted('check-computer-permissions')).toHaveLength(1);
+    await wrapper.get('[data-testid=chat-add-menu]').trigger('click'); await wrapper.get('[data-testid=chat-add-tools]').trigger('click');
+    await wrapper.get('[data-testid=chat-tool-computer-manage]').trigger('click'); await flushPromises();
+    await wrapper.get('[data-testid=chat-computer-toggle]').trigger('click'); await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('save_ai_preferences', { openComputerUse: false });
+    expect(wrapper.emitted('computer-disabled')).toHaveLength(1); wrapper.unmount();
+  });
+  it('does not select computer control in another conversation when enabling finishes late', async () => {
+    let finish!: (value: unknown) => void;
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => command === 'get_ai_config' ? { openComputerUse: false } as never : command === 'save_ai_preferences' ? new Promise(resolve => { finish = resolve; }) : original(command, args));
+    const { wrapper } = setup(); const store = wrapper.props('store');
+    Object.assign(store, { chat: { draft: { text: 'first' } } });
+    await wrapper.get('[data-testid=chat-add-menu]').trigger('click'); await wrapper.get('[data-testid=chat-add-tools]').trigger('click');
+    await wrapper.get('[data-testid=chat-tool-computer]').trigger('click'); await flushPromises();
+    await wrapper.get('[data-testid=chat-computer-toggle]').trigger('click');
+    Object.assign(store.chat, { draft: { text: 'second' } }); finish({ openComputerUse: true }); await flushPromises();
+    expect(wrapper.emitted('use-tool')).toBeUndefined(); wrapper.unmount();
+  });
+  it('does not apply an asynchronous computer selection to a different conversation', async () => {
+    let finish!: (value: unknown) => void;
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => command === 'get_ai_config' ? new Promise(resolve => { finish = resolve; }) : original(command, args));
+    const { wrapper } = setup(); const store = wrapper.props('store');
+    Object.assign(store, { chat: { draft: { text: 'first' } } });
+    await wrapper.get('[data-testid=chat-add-menu]').trigger('click'); await wrapper.get('[data-testid=chat-add-tools]').trigger('click');
+    await wrapper.get('[data-testid=chat-tool-computer]').trigger('click');
+    Object.assign(store.chat, { draft: { text: 'second' } }); finish({ openComputerUse: true }); await flushPromises();
+    expect(wrapper.emitted('use-tool')).toBeUndefined(); wrapper.unmount();
+  });
   it('keeps in-flight inventory when opening a submenu or typing a search', async () => {
     let resolve!: (value: unknown) => void;
     const original=vi.mocked(invoke).getMockImplementation()!;
