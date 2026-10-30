@@ -115,7 +115,7 @@ describe('add-capability menu hover interaction', () => {
     });
     const {wrapper}=setup();await wrapper.get('[data-testid=chat-add-menu]').trigger('click');
     await wrapper.get('[data-testid=chat-add-connectors]').trigger('click');await flushPromises();
-    expect(wrapper.get('[data-testid="chat-installed-pan:main"]').text()).toContain('未连接');
+    expect(wrapper.get('[data-testid="chat-installed-pan:main"]').attributes('title')).toContain('未连接');
     expect(wrapper.findAll('[data-testid="chat-installed-repo:main"]')).toHaveLength(1);
     await wrapper.get('[data-testid="chat-installed-repo:main"]').trigger('click');
     expect(wrapper.emitted('use-connector')).toEqual([['GitHub','repo:main']]);wrapper.unmount();

@@ -81,7 +81,7 @@ function manage() { close(); emit('manage'); }
         <div v-if="warning" class="pop-empty" role="status">{{ warning }} <button type="button" class="row-link" @click="load">重试</button></div>
         <div v-for="row in rows" :key="row.id" class="pop-row" :data-testid="`chat-connector-${row.id}`">
           <span class="tile big" :style="row.style" aria-hidden="true"><img v-if="row.src" :src="row.src" alt="" /><template v-else>{{ row.name.slice(0, 1) }}</template></span>
-          <span class="row-text"><strong>{{ row.name }}</strong><small>{{ row.detail }}</small></span>
+          <span class="row-text" :title="row.detail" :aria-description="row.detail"><strong>{{ row.name }}</strong></span>
           <button v-if="row.ready || row.on" type="button" role="switch" class="switch" :class="{ on: row.on }" :aria-checked="row.on" :aria-label="`优先使用 ${row.name}`" @click="emit('toggle', { id: row.id, name: row.name })"><i /></button>
           <button v-else type="button" class="row-link" @click="manage">去连接</button>
         </div>
@@ -103,7 +103,7 @@ function manage() { close(); emit('manage'); }
 .tile img{width:100%;height:100%;object-fit:contain;display:block}
 .tile.more{background:var(--ui-control);color:var(--ui-text-secondary)}
 .tile.big{width:28px;height:28px;margin-left:0;font-size:12px;box-shadow:none}
-.cluster-pop{position:absolute;right:0;bottom:calc(100% + 6px);z-index:30;width:300px;box-sizing:border-box;border-radius:14px;background:var(--ui-surface);box-shadow:0 0 0 1px var(--ui-border),0 14px 36px rgba(0,0,0,.18);overflow:hidden}
+.cluster-pop{position:absolute;right:0;bottom:calc(100% + 6px);z-index:30;width:260px;box-sizing:border-box;border-radius:14px;background:var(--ui-surface);box-shadow:0 0 0 1px var(--ui-border),0 14px 36px rgba(0,0,0,.18);overflow:hidden}
 .cluster-pop.down{bottom:auto;top:calc(100% + 6px)}
 html[data-theme=dark] .cluster-pop{background:var(--ui-surface-alt)}
 .pop-head{display:flex;align-items:baseline;gap:8px;padding:12px 14px 6px}
@@ -115,7 +115,6 @@ html[data-theme=dark] .cluster-pop{background:var(--ui-surface-alt)}
 .pop-row:hover{background:var(--ui-surface-hover)}
 .row-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .row-text strong{font-size:13.5px;font-weight:500;color:var(--ui-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.row-text small{font-size:11.5px;color:var(--ui-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .switch{position:relative;flex:none;width:34px;height:20px;padding:0;border:0;border-radius:10px;background:var(--ui-text-tertiary);cursor:pointer;transition:background .15s}
 .switch i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:left .15s}
 .switch.on{background:var(--ui-btn)}

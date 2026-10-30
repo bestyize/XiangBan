@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { Check, ChevronRight, Camera, FilePlus2, Plus, Search, Sparkles, Wrench, Plug, ArrowUpRight, Monitor, Smartphone, PanelsTopLeft, Hammer, Settings2 } from 'lucide-vue-next';
+import { Check, ChevronRight, Camera, Paperclip, Plus, Search, UserRound, Zap, Plug, ArrowUpRight, Monitor, Smartphone, PanelsTopLeft, Hammer, Settings2 } from 'lucide-vue-next';
 import { invoke, type AiConfigView } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { Skill, SkillPage } from '../ai-store/catalog.ts';
@@ -14,7 +14,9 @@ interface CatalogEntry { slug: string; name: string; description: string }
 interface CatalogPage { results: CatalogEntry[] }
 type Entry = { id: string; title: string; detail: string; installed: boolean; ready: boolean; entrySkill?: string; expert?: Expert };
 
-const props = defineProps<{ store: ControlStore; disabled?: boolean; fileDisabled?: boolean; screenshotDisabled?: boolean }>();
+/** 一级菜单右侧显示当前选择的摘要，例如技能名、专家名、已启用的连接器数。 */
+interface Summary { skills?: string; experts?: string; connectors?: string; tools?: string }
+const props = defineProps<{ store: ControlStore; disabled?: boolean; fileDisabled?: boolean; screenshotDisabled?: boolean; summary?: Summary }>();
 const emit = defineEmits<{
   file: []; screenshot: [];
   'use-expert': [entrySkill: string, name: string, expert?: Expert];
@@ -195,13 +197,13 @@ function checkComputerPermissions() {
     <div class="wb-anchor">
       <button type="button" class="wb-tool wb-plus" data-testid="chat-add-menu" aria-label="添加附件或能力" aria-haspopup="menu" :aria-expanded="panel === 'add'" :disabled="disabled" @mouseenter="openAddMenu" @focus="openAddMenu" @click="openAddMenu"><Plus :size="18" /></button>
       <div v-show="panel === 'add'" class="wb-menu xb-menu wb-main" role="menu" aria-label="添加" @mouseenter="cancelClose">
-        <button type="button" class="wb-menu-item" data-testid="chat-add-screenshot" role="menuitem" :disabled="screenshotDisabled" @click="takeScreenshot"><Camera :size="15" /><span>截图</span></button>
-        <button type="button" class="wb-menu-item" data-testid="chat-pick-image" role="menuitem" :disabled="fileDisabled" @click="attachFile"><FilePlus2 :size="15" /><span>文件</span></button>
+        <button type="button" class="wb-menu-item" data-testid="chat-add-screenshot" role="menuitem" :disabled="screenshotDisabled" @click="takeScreenshot"><i class="wb-tile" aria-hidden="true"><Camera :size="15" /></i><span>截图</span></button>
+        <button type="button" class="wb-menu-item" data-testid="chat-pick-image" role="menuitem" :disabled="fileDisabled" @click="attachFile"><i class="wb-tile" aria-hidden="true"><Paperclip :size="15" /></i><span>添加文件或图片</span></button>
         <div class="wb-separator" />
-        <button type="button" class="wb-menu-item" data-testid="chat-add-experts" role="menuitem" :class="{ selected: kind === 'experts' }" @mouseenter="chooseKind('experts')" @focus="chooseKind('experts')" @click="chooseKind('experts')"><Sparkles :size="15" /><span>专家</span><ChevronRight :size="14" /></button>
-        <button type="button" class="wb-menu-item" data-testid="chat-add-skills" role="menuitem" :class="{ selected: kind === 'skills' }" @mouseenter="chooseKind('skills')" @focus="chooseKind('skills')" @click="chooseKind('skills')"><Wrench :size="15" /><span>技能</span><ChevronRight :size="14" /></button>
-        <button type="button" class="wb-menu-item" data-testid="chat-add-connectors" role="menuitem" :class="{ selected: kind === 'connectors' }" @mouseenter="chooseKind('connectors')" @focus="chooseKind('connectors')" @click="chooseKind('connectors')"><Plug :size="15" /><span>连接器</span><ChevronRight :size="14" /></button>
-        <button type="button" class="wb-menu-item" data-testid="chat-add-tools" role="menuitem" :class="{ selected: kind === 'tools' }" @mouseenter="chooseKind('tools')" @focus="chooseKind('tools')" @click="chooseKind('tools')"><Hammer :size="15" /><span>工具</span><ChevronRight :size="14" /></button>
+        <button type="button" class="wb-menu-item" data-testid="chat-add-skills" role="menuitem" :class="{ selected: kind === 'skills' }" @mouseenter="chooseKind('skills')" @focus="chooseKind('skills')" @click="chooseKind('skills')"><i class="wb-tile cap" aria-hidden="true"><Zap :size="15" /></i><span>技能</span><small v-if="summary?.skills" class="wb-summary">{{ summary.skills }}</small><ChevronRight :size="14" /></button>
+        <button type="button" class="wb-menu-item" data-testid="chat-add-experts" role="menuitem" :class="{ selected: kind === 'experts' }" @mouseenter="chooseKind('experts')" @focus="chooseKind('experts')" @click="chooseKind('experts')"><i class="wb-tile cap" aria-hidden="true"><UserRound :size="15" /></i><span>专家</span><small v-if="summary?.experts" class="wb-summary">{{ summary.experts }}</small><ChevronRight :size="14" /></button>
+        <button type="button" class="wb-menu-item" data-testid="chat-add-connectors" role="menuitem" :class="{ selected: kind === 'connectors' }" @mouseenter="chooseKind('connectors')" @focus="chooseKind('connectors')" @click="chooseKind('connectors')"><i class="wb-tile cap" aria-hidden="true"><Plug :size="15" /></i><span>连接器</span><small v-if="summary?.connectors" class="wb-summary">{{ summary.connectors }}</small><ChevronRight :size="14" /></button>
+        <button type="button" class="wb-menu-item" data-testid="chat-add-tools" role="menuitem" :class="{ selected: kind === 'tools' }" @mouseenter="chooseKind('tools')" @focus="chooseKind('tools')" @click="chooseKind('tools')"><i class="wb-tile cap" aria-hidden="true"><Hammer :size="15" /></i><span>工具</span><small v-if="summary?.tools" class="wb-summary">{{ summary.tools }}</small><ChevronRight :size="14" /></button>
         <div v-if="kind === 'tools'" class="wb-menu xb-menu wb-submenu wb-builtin-tools" :class="{ 'wb-computer-panel': computerPanel }" role="group" :aria-label="computerPanel ? '电脑控制' : '工具'" @mouseenter="cancelClose">
           <template v-if="!computerPanel">
             <div class="wb-computer-row"><button type="button" class="wb-menu-item" data-testid="chat-tool-computer" :disabled="computerBusy" @click="useTool('computer')"><Monitor :size="15" /><span>操作电脑</span></button><button type="button" class="wb-computer-manage" data-testid="chat-tool-computer-manage" aria-label="管理电脑控制" title="管理电脑控制" :disabled="computerBusy" @click="readComputer(false)"><Settings2 :size="15" /></button></div>
@@ -219,8 +221,8 @@ function checkComputerPermissions() {
           <label class="wb-search"><Search :size="14" /><input v-model="term" data-testid="chat-capability-search" :placeholder="`搜索${labels[kind]}…`" maxlength="80" @input="scheduleSearch" /></label>
           <div class="wb-results">
             <div class="wb-section">已安装的{{ labels[kind] }}</div>
-            <button v-for="entry in installedEntries" :key="'i-'+entry.id" type="button" class="wb-result" :data-testid="`chat-installed-${entry.id}`" @click="useEntry(entry)">
-              <span class="wb-result-text"><strong>{{ entry.title }}</strong><small>{{ entry.detail || entry.id }}</small></span>
+            <button v-for="entry in installedEntries" :key="'i-'+entry.id" type="button" class="wb-result" :data-testid="`chat-installed-${entry.id}`" :title="entry.detail || entry.id" :aria-description="entry.detail || entry.id" @click="useEntry(entry)">
+              <span class="wb-result-text"><strong>{{ entry.title }}</strong></span>
               <Check v-if="entry.ready" :size="14" /><ChevronRight v-else :size="14" />
             </button>
             <div v-if="installedLoading[kind]" class="wb-empty" role="status">正在读取已安装的{{ labels[kind] }}…</div>
@@ -229,8 +231,8 @@ function checkComputerPermissions() {
             <template v-if="term">
               <div class="wb-section">发现更多</div>
               <div v-if="loading" class="wb-empty">搜索中…</div>
-              <button v-for="entry in remoteEntries" :key="'r-'+entry.id" type="button" class="wb-result" @click="openStore">
-                <span class="wb-result-text"><strong>{{ entry.title }}</strong><small>{{ entry.detail || '前往 AI 插件查看' }}</small></span><ArrowUpRight :size="14" />
+              <button v-for="entry in remoteEntries" :key="'r-'+entry.id" type="button" class="wb-result" :title="entry.detail || '前往 AI 插件查看'" :aria-description="entry.detail || '前往 AI 插件查看'" @click="openStore">
+                <span class="wb-result-text"><strong>{{ entry.title }}</strong></span><ArrowUpRight :size="14" />
               </button>
               <div v-if="!error && !loading && !remoteEntries.length && term" class="wb-empty">可在 AI 插件中继续查找</div>
             </template>
@@ -251,9 +253,13 @@ function checkComputerPermissions() {
 .wb-tool:disabled{opacity:.5;cursor:not-allowed}
 .wb-plus{width:30px;padding:0}
 .wb-menu{position:absolute;box-sizing:border-box}
-.wb-main{left:0;bottom:calc(100% + 8px);width:170px;min-width:0}
+.wb-main{left:0;bottom:calc(100% + 8px);width:248px;min-width:0}
 .wb-menu-item{display:flex;gap:10px;align-items:center;width:100%;height:34px;padding:0 10px;background:none;border:0;border-radius:8px;color:var(--ui-text-primary);font:inherit;font-size:13px;text-align:left;cursor:pointer;white-space:nowrap}
 .wb-menu-item>svg:first-child{color:var(--ui-text-secondary)}
+.wb-main>.wb-menu-item{height:38px}
+.wb-tile{display:grid;place-items:center;flex:none;width:26px;height:26px;border-radius:7px;background:var(--ui-control);color:var(--ui-text-secondary);font-style:normal}
+.wb-tile.cap{background:var(--ui-soft);color:var(--ui-ink)}
+.wb-summary{max-width:96px;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--ui-text-tertiary)}
 .wb-menu-item:disabled{opacity:.45;cursor:not-allowed}.wb-menu-item span:first-of-type{flex:1}.wb-menu-item:hover,.wb-menu-item.selected{background:var(--ui-surface-hover)}
 .wb-menu-item.selected{background:var(--ui-soft);color:var(--ui-ink)}
 .wb-menu-item.selected>svg{color:var(--ui-ink)}
@@ -269,9 +275,8 @@ function checkComputerPermissions() {
 .wb-section{font-size:11.5px;font-weight:500;color:var(--ui-text-tertiary);padding:8px 8px 4px}
 .wb-result{display:flex;align-items:center;gap:8px;width:100%;padding:8px;border-radius:8px;border:0;background:none;color:var(--ui-text-primary);font:inherit;cursor:pointer;text-align:left}
 .wb-result:hover{background:var(--ui-surface-hover)}
-.wb-result-text{flex:1;min-width:0;display:grid;gap:3px}
+.wb-result-text{flex:1;min-width:0;display:grid}
 .wb-result-text strong{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wb-result-text small{font-size:11px;color:var(--ui-text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wb-result>svg{flex:none;color:var(--ui-text-tertiary)}
 .wb-empty{padding:11px 8px;font-size:11.5px;color:var(--ui-text-tertiary)}
 .wb-store-link{display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 5px 6px;border:0;border-top:1px solid var(--ui-line);background:none;color:var(--ui-ink);font:inherit;font-size:12.5px;cursor:pointer}

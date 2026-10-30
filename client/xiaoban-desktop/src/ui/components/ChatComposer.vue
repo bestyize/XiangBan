@@ -322,6 +322,12 @@ function addSkill(slug: string, title?: string) {
 }
 const useSkill = (slug: string, title?: string) => { addSkill(slug, title); void nextTick(() => input.value?.focus()); };
 const removeSkill = (slug: string) => { skills.value = skills.value.filter(s => s.name !== slug); };
+const addSummary = computed(() => ({
+  skills: skills.value.length > 1 ? `${skills.value.length} 个技能` : skills.value[0]?.title ?? '',
+  experts: chat.currentExpert?.name ?? '',
+  connectors: mentions.selected.value.length ? `${mentions.selected.value.length} 个已启用` : '',
+  tools: selectedTool.value ? builtinToolLabels[selectedTool.value] : '',
+}));
 const useTool = (tool: BuiltinTool) => { selectedTool.value = tool; void nextTick(() => input.value?.focus()); };
 function checkComputerPermissions() { useTool('computer'); insertPrompt('请检查电脑控制所需的系统权限，并告诉我检查结果。'); }
 function computerDisabled() { if (selectedTool.value === 'computer') selectedTool.value = null; }
@@ -399,7 +405,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <NInput ref="input" v-model:value="draft" type="textarea" :autosize="{ minRows, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
       </div>
       <div class="composer-row">
-        <ChatWorkbenchTools :store="store" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" @use-tool="useTool" @check-computer-permissions="checkComputerPermissions" @computer-disabled="computerDisabled" />
+        <ChatWorkbenchTools :store="store" :summary="addSummary" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" @use-tool="useTool" @check-computer-permissions="checkComputerPermissions" @computer-disabled="computerDisabled" />
         <ChatWorkspaceMenu v-if="workspace" :chat="chat" :disabled="running || !store.desktop" />
         <ChatPermissionMenu :store="store" :disabled="!store.desktop" />
         <span class="composer-spacer" />
