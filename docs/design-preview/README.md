@@ -8,6 +8,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
+| [小伴 AI · 多模型配置](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-model-settings.html) | 复用实际组件的独立配置窗口：搜索、限高单列模型列表、固定确认栏与折叠额度；支持 4 / 24 / 80 个模型、明暗与窄窗口。[本机在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)，需在桌面项目运行 `npm run dev`，不连接真实账户或模型服务 |
 | [小伴桌面 UI 升级设计稿](../../client/xiaoban-desktop/docs/design-specs/ui-upgrade/README.md) | 39 个画板：主界面、设置、超级小伴、资料库、实时对话、小伴市场接入、输入框与各类状态卡片；[在线画布](https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg) |
 | [工作空间检索与列表折叠](../../client/xiaoban-desktop/docs/design-specs/prototypes/workspace-search.html) | 标题、正文与工作区检索；限高滚动结果；项目和项目内会话默认各展示 6 项；点击结果自动展开并定位会话 |
 | [长期目标弹窗](../../client/xiaoban-desktop/docs/design-specs/prototypes/long-term-goal.html) | 新建、执行中与待验收状态；折叠设置；浅色、深色及窄屏预览。遮罩仅用于演示内容，桌面端窗口形式按独立窗口规范 |

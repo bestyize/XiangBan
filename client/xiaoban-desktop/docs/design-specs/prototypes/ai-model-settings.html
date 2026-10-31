@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>小伴 AI · 模型配置设计稿</title>
+  <style>
+    body{margin:0;background:var(--ui-app-bg);color:var(--ui-text-primary);font-family:var(--ui-font-family);font-size:13px}
+    .preview-tools{display:flex;align-items:center;flex-wrap:wrap;gap:12px;max-width:760px;margin:24px auto 16px;padding:0 16px}
+    .preview-tools strong{font-weight:500;margin-right:auto}
+    .preview-tools label{display:flex;gap:6px;align-items:center;color:var(--ui-text-secondary)}
+    .preview-tools select{font:inherit;background:var(--ui-surface);color:var(--ui-text-primary);border:1px solid var(--ui-border);border-radius:6px;padding:5px}
+    .preview-window{max-width:100%;margin:0 auto 28px;background:var(--ui-surface-sunken);border:1px solid var(--ui-border);border-radius:14px;overflow:hidden;box-shadow:var(--ui-shadow-panel)}
+    .preview-titlebar{height:38px;display:flex;align-items:center;padding:0 14px;gap:6px;border-bottom:1px solid var(--ui-line);color:var(--ui-text-secondary);font-size:12px;background:var(--ui-surface)}
+    .preview-titlebar i{width:10px;height:10px;border-radius:50%;background:var(--ui-border-strong)}
+    .preview-titlebar span{margin-left:10px}
+    .preview-body{height:clamp(530px,calc(100dvh - 160px),700px)}
+    .preview-window .preview-body .gw-detached{height:100%}
+    .preview-settings{height:100%;overflow:auto;padding:24px;box-sizing:border-box}
+    .preview-settings h1{margin:0 0 24px;font-size:17px;font-weight:600}
+    .preview-settings .xb-group-title{margin-top:22px}
+    .preview-toast{max-width:720px;min-height:24px;margin:0 auto;padding:0 16px;color:var(--ui-text-secondary)}
+    @media(max-width:480px){.preview-tools{margin-top:12px}.preview-window{border-radius:0;border-left:0;border-right:0}}
+  </style>
+</head>
+<body class="desktop-control" style="overflow:auto">
+  <div id="app"></div>
+  <script type="module">
+    // Preview commands are entirely local. No account, balance, redemption or model service is contacted.
+    window.__TAURI__ = {
+      core: { invoke: async (command, args = {}) => mockInvoke(command, args) },
+      event: { listen: async () => () => {}, emit: async () => {} },
+    };
+    const { createApp, h, reactive, ref, computed } = await import('vue');
+    const { NConfigProvider, darkTheme, NSwitch } = await import('naive-ui');
+    const { default: AiGatewayCard } = await import('/src/ui/components/AiGatewayCard.vue');
+    const { applyUiTokens } = await import('/src/ui/design-tokens.ts');
+    const { themeFor } = await import('/src/ui/theme.ts');
+    await import('/src/ui/control.css');
+    const dark = ref(false), view = ref('models'), count = ref(24), width = ref(640), toast = ref('');
+    const config = ref({ activeProvider: 'xiaoban-ai', gatewayTier: 'premium', gatewayEnabled: true });
+    const store = reactive({ desktop: true, account: { user: { uid: 'preview', username: 'read' } }, notify: value => { toast.value = String(value); }, openLogin: () => {} });
+    const names = ['claude-opus-5-5', 'claude-sonnet-5-5', 'deepseek-v4.1-flash', 'gemini-4-argon'];
+    const models = computed(() => Array.from({ length: count.value }, (_, index) => ({
+      tier: index === 0 ? 'premium' : `model-${index}`,
+      displayName: names[index] ?? `自定义模型 ${String(index + 1).padStart(2, '0')}`,
+      description: index < 4 ? '这里展示模型说明，实际内容由服务端配置' : '用于预览长模型列表',
+      isDefault: index === 2, requiresPaid: index > 0 && index % 7 === 0, available: index === 0 || index % 7 !== 0,
+    })));
+    async function mockInvoke(command, args) {
+      if (command === 'ai_gateway_tiers') return models.value;
+      if (command === 'ai_gateway_balance') return {
+        product: { name: '小伴桌面' }, quotaPerUnit: 500000, total: 3650000, paid: 3650000,
+        buckets: [
+          { id: 1, kind: 'topup', remaining: 3285000, total: 12500000, expiresAt: '2026-11-20T00:00:00Z' },
+          { id: 2, kind: 'topup', remaining: 365000, total: 5000000, expiresAt: '2027-10-18T00:00:00Z' },
+        ], trial: { available: false },
+      };
+      if (command === 'use_ai_gateway') return { ...config.value, activeProvider: 'xiaoban-ai', gatewayTier: args.tier };
+      if (command === 'ai_gateway_redeem') throw new Error('设计预览：不兑换真实额度');
+      if (command === 'configuration_window_open') { view.value = 'models'; return; }
+      if (command === 'configuration_window_close') { view.value = 'settings'; return; }
+      throw new Error(`Preview command not implemented: ${command}`);
+    }
+    function applyTheme(value) { dark.value = value; applyUiTokens(value, 'red'); document.documentElement.dataset.theme = value ? 'dark' : 'light'; }
+    applyTheme(false);
+    createApp({ setup: () => () => h(NConfigProvider, { theme: dark.value ? darkTheme : null, themeOverrides: themeFor(dark.value, 'red') }, { default: () => [
+      h('div', { class: 'preview-tools' }, [
+        h('strong', '设计预览 · 演示数据'),
+        h('label', ['页面', h('select', { value: view.value, onChange: e => { view.value = e.target.value; } }, [h('option', { value: 'models' }, '模型配置'), h('option', { value: 'settings' }, '设置概览')])]),
+        h('label', ['数量', h('select', { value: count.value, onChange: e => { count.value = Number(e.target.value); } }, [4, 24, 80].map(n => h('option', { value: n }, `${n} 个模型`)))]),
+        h('label', ['宽度', h('select', { value: width.value, onChange: e => { width.value = Number(e.target.value); } }, [360, 640, 760].map(n => h('option', { value: n }, `${n}px`)))]),
+        h('label', ['深色', h(NSwitch, { value: dark.value, 'onUpdate:value': applyTheme, 'aria-label': '深色预览', size: 'small' })]),
+      ]),
+      h('div', { class: 'preview-window', style: { width: `${width.value}px` } }, [
+        h('div', { class: 'preview-titlebar' }, [h('i'), h('i'), h('i'), h('span', view.value === 'models' ? '模型配置 · 小伴桌面' : '设置 · 小伴桌面')]),
+        h('div', { class: 'preview-body' }, [view.value === 'models'
+          ? h(AiGatewayCard, { key: `models-${count.value}`, store, config: config.value, detached: true, onConfig: value => { config.value = value; } })
+          : h('section', { class: 'preview-settings' }, [
+              h('h1', 'AI 模型'), h(AiGatewayCard, { store, config: config.value, onConfig: value => { config.value = value; } }),
+              h('div', { class: 'xb-group-title' }, '自有模型服务'),
+              h('div', { class: 'xb-group' }, [h('div', { class: 'xb-row' }, [h('div', { class: 'xb-row-text' }, [h('b', 'DeepSeek')]), h('span', { style: { color: 'var(--ui-text-secondary)' } }, '待配置'), h('button', { class: 'xb-btn is-sm', onClick: () => { toast.value = '此稿聚焦小伴 AI 模型配置'; } }, '配置')])]),
+            ])]),
+      ]),
+      h('p', { class: 'preview-toast', role: 'status' }, toast.value),
+    ] }) }).mount('#app');
+  </script>
+</body>
+</html>

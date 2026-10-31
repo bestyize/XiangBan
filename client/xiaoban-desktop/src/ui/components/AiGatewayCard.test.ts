@@ -121,6 +121,8 @@ describe('小伴 AI card', () => {
     expect(text('gateway-card-status')).toBe('当前使用');
     expect(text('gateway-card-fact')).toBe('深入');
     expect(wrapper!.find('[data-testid="ai-gateway-card"]').classes()).toContain('active');
+    expect(has('gateway-modes')).toBe(false);
+    expect(wrapper!.text()).not.toContain('使用模式');
   });
 
   it('does not call anything outside the desktop app', async () => {
@@ -234,6 +236,42 @@ describe('小伴 AI dialog: balance and redeem', () => {
 });
 
 describe('小伴 AI dialog: chat model', () => {
+  it('searches a long model list without switching or losing the selected model', async () => {
+    const many = Array.from({ length: 80 }, (_, i) => ({ ...standard, tier: `model-${i}`, displayName: `Model ${i}`, isDefault: i === 0 }));
+    backend({ ...defaults, ai_gateway_tiers: many });
+    mountCard(createStore(session('u1')), aiConfig({ activeProvider: 'xiaoban-ai', gatewayTier: 'model-1' }));
+    await flushPromises(); await openDialog();
+    expect(text('gateway-model-count')).toBe('80');
+    const search = q('gateway-model-search')!.querySelector('input')!;
+    search.value = '  MODEL 79  '; search.dispatchEvent(new Event('input', { bubbles: true })); await flushPromises();
+    expect(text('gateway-model-count')).toBe('1 / 80');
+    expect(has('gateway-tier-model-79')).toBe(true);
+    expect(has('gateway-tier-model-1')).toBe(false);
+    expect(text('gateway-active')).toContain('Model 1');
+    expect(q('gateway-use-btn')!.hasAttribute('disabled')).toBe(true);
+    expect(ipc).not.toHaveBeenCalledWith('use_ai_gateway', expect.anything());
+    search.value = 'not found'; search.dispatchEvent(new Event('input', { bubbles: true })); await flushPromises();
+    expect(has('gateway-search-empty')).toBe(true);
+    q('gateway-search-empty')!.querySelector('button')!.click(); await flushPromises();
+    expect(q('gateway-tier-model-1')!.getAttribute('aria-checked')).toBe('true');
+    await click('gateway-tier-model-79');
+    expect(text('gateway-use-btn')).toBe('使用此模型');
+    expect(ipc).not.toHaveBeenCalledWith('use_ai_gateway', expect.anything());
+  });
+
+  it('navigates usable models with arrow keys and keeps descriptions in tooltips', async () => {
+    backend({ ...defaults, ai_gateway_tiers: [standard, premium, { ...premiumOpen, tier: 'third', displayName: '第三个模型' }] });
+    wrapper = mount(AiGatewayCard, { props: { store: createStore(session('u1')), config: aiConfig(), detached: true }, attachTo: document.body });
+    await flushPromises();
+    expect(text('gateway-tier-standard')).not.toContain(standard.description);
+    expect(q('gateway-tier-standard')!.getAttribute('aria-description')).toBe(standard.description);
+    q('gateway-tier-standard')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await flushPromises();
+    expect(q('gateway-tier-third')!.getAttribute('aria-checked')).toBe('true');
+    expect(document.activeElement).toBe(q('gateway-tier-third'));
+    expect(ipc).not.toHaveBeenCalledWith('use_ai_gateway', expect.anything());
+  });
+
   it('lists server-defined tiers beyond two and keeps using their IDs after a refresh', async () => {
     let modes: AiTier[] = [
       { ...standard, tier: 'standrad', displayName: 'deepseek-v4.1-flash' },
@@ -250,7 +288,7 @@ describe('小伴 AI dialog: chat model', () => {
     await openDialog();
     expect(q('gateway-tier-premium')!.getAttribute('aria-checked')).toBe('true');
     for (const mode of modes) {
-      expect(text(`gateway-mode-${mode.tier}`)).toBe(mode.displayName);
+      expect(has(`gateway-mode-${mode.tier}`)).toBe(false);
       expect(text(`gateway-tier-${mode.tier}`)).toContain(mode.displayName);
     }
     expect(text('gateway-card-fact')).toBe('claude-opus-5-5');
@@ -271,8 +309,9 @@ describe('小伴 AI dialog: chat model', () => {
     expect(q('gateway-tier-standard')!.getAttribute('aria-checked')).toBe('true');
     expect(q('gateway-tier-premium')!.getAttribute('aria-checked')).toBe('false');
     expect(q('gateway-tier-premium')!.hasAttribute('disabled')).toBe(true);
-    expect(text('gateway-tier-premium')).toContain('兑换付费额度后可用');
-    expect(text('gateway-use-btn')).toBe('用小伴 AI 聊天');
+    expect(text('gateway-tier-premium')).toContain('需付费额度');
+    expect(q('gateway-tier-premium')!.getAttribute('title')).toContain('兑换付费额度后可用');
+    expect(text('gateway-use-btn')).toBe('使用此模型');
     expect(has('gateway-active')).toBe(false);
   });
 
@@ -314,7 +353,7 @@ describe('小伴 AI dialog: chat model', () => {
     expect(q('gateway-use-btn')!.hasAttribute('disabled')).toBe(true);
 
     await click('gateway-tier-standard');
-    expect(text('gateway-use-btn')).toBe('切换模式');
+    expect(text('gateway-use-btn')).toBe('使用此模型');
     expect(q('gateway-use-btn')!.hasAttribute('disabled')).toBe(false);
   });
 
@@ -325,7 +364,7 @@ describe('小伴 AI dialog: chat model', () => {
     await openDialog();
     expect(has('gateway-active')).toBe(false);
     expect(text('gateway-card-status')).toBe('可使用');
-    expect(text('gateway-use-btn')).toBe('用小伴 AI 聊天');
+    expect(text('gateway-use-btn')).toBe('使用此模型');
   });
 
   it('unlocks the paid tier once a code has been redeemed', async () => {
@@ -420,7 +459,7 @@ describe('小伴 AI card: 启用此服务商', () => {
     await wrapper!.find('[data-testid="gateway-activate"]').trigger('click');
     await flushPromises();
     expect(useCalls()).toHaveLength(0);
-    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('没有可用的模式'), 'info');
+    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('没有可用的模型'), 'info');
     expect(has('gateway-modal') || has('gateway-redeem')).toBe(true);
   });
 

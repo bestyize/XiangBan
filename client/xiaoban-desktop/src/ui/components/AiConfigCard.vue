@@ -270,7 +270,7 @@ const activeStatusText = computed(() => {
   const activeId = saved.value.activeProvider;
   if (activeId === GATEWAY_PROVIDER) {
     return gatewayOffered.value
-      ? '当前生效：小伴 AI（点“小伴 AI”卡片的“配置”可查看额度、更换模式）'
+      ? '当前生效：小伴 AI（点“小伴 AI”卡片的“配置”可查看额度、更换模型）'
       : '小伴 AI 入口已被关闭，请选择其他服务商';
   }
   if (!activeId || !isProviderFullyConfigured(activeId)) {

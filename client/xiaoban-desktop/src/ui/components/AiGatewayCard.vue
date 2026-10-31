@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 import { NAlert, NButton, NInput, NModal, NTag } from 'naive-ui';
-import { Settings, Sprout } from 'lucide-vue-next';
+import { Check, ChevronDown, Search, Settings, Sprout } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, desktop as nativeDesktop, invoke, toAccountError, type AiBalance, type AiConfigView, type AiRedeemed, type AiTier } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { closeConfigurationWindow, openModelWindow } from '../configuration/windows.ts';
@@ -23,14 +23,38 @@ const redeemError = ref('');
 const redeemDone = ref('');
 const enabling = ref(false);
 const enableError = ref('');
+const modelQuery = ref('');
+const modelList = ref<HTMLElement>();
 
 const uid = computed(() => props.store.account?.user.uid ?? '');
 const perDollar = computed(() => balance.value?.quotaPerUnit ?? 500_000);
 const gatewayActive = computed(() => props.config?.activeProvider === GATEWAY_PROVIDER);
 const activeTier = computed(() => (gatewayActive.value ? props.config?.gatewayTier ?? '' : ''));
-const activeTierName = computed(() => tiers.value.find(t => t.tier === activeTier.value)?.displayName ?? activeTier.value);
+const activeTierName = computed(() => tiers.value.find(t => t.tier === activeTier.value)?.displayName ?? (activeTier.value ? '已保存的模型' : ''));
 const pickedTier = computed(() => tiers.value.find(t => t.tier === picked.value));
 const unchanged = computed(() => gatewayActive.value && activeTier.value === picked.value);
+const filteredTiers = computed(() => {
+  const query = modelQuery.value.trim().toLocaleLowerCase();
+  return tiers.value.filter(t => !query || t.displayName.toLocaleLowerCase().includes(query));
+});
+const modelCount = computed(() => modelQuery.value.trim() ? `${filteredTiers.value.length} / ${tiers.value.length}` : String(tiers.value.length));
+const tabbableTier = computed(() => (filteredTiers.value.find(t => t.tier === picked.value && t.available) ?? filteredTiers.value.find(t => t.available))?.tier);
+const canEnable = computed(() => !!pickedTier.value?.available && !unchanged.value);
+
+/** Keep radio navigation within the visible, usable models. Searching never changes the saved selection. */
+async function moveSelection(event: KeyboardEvent) {
+  if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || enabling.value) return;
+  const usable = filteredTiers.value.filter(t => t.available);
+  if (!usable.length) return;
+  event.preventDefault();
+  const index = usable.findIndex(t => t.tier === picked.value);
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? usable.length - 1
+    : index < 0 ? (['ArrowUp', 'ArrowLeft'].includes(event.key) ? usable.length - 1 : 0)
+    : (index + (['ArrowUp', 'ArrowLeft'].includes(event.key) ? -1 : 1) + usable.length) % usable.length;
+  picked.value = usable[next].tier;
+  await nextTick();
+  modelList.value?.querySelector<HTMLButtonElement>('[aria-checked="true"]')?.focus();
+}
 
 const cardDescription = computed(() => {
   if (!props.store.desktop) return '在桌面应用中使用。';
@@ -38,7 +62,7 @@ const cardDescription = computed(() => {
   return '选择小伴 AI 提供的模型，按额度使用，可用兑换码充值。';
 });
 const cardFact = computed(() => {
-  if (gatewayActive.value && activeTierName.value) return { label: '当前模式：', value: activeTierName.value };
+  if (gatewayActive.value && activeTierName.value) return { label: '当前模型：', value: activeTierName.value };
   if (uid.value && balance.value) return { label: '可用额度：', value: money(balance.value.total, perDollar.value) };
   return null;
 });
@@ -82,7 +106,7 @@ async function redeem() {
 }
 
 async function enable() {
-  if (enabling.value || !picked.value) return;
+  if (enabling.value || !pickedTier.value?.available) return;
   enabling.value = true;
   enableError.value = '';
   try {
@@ -98,12 +122,6 @@ async function enable() {
   }
 }
 
-/** The mode switch in settings: choosing is enough once 小伴 AI is in use; otherwise it only preselects. */
-function pickMode(tier: string) {
-  picked.value = tier;
-  if (gatewayActive.value && tier !== activeTier.value) void enable();
-}
-
 /** The card's own "启用此服务商": the tier that would be preselected in the dialog, with no dialog in between. */
 async function activate() {
   if (!props.store.desktop || enabling.value) return;
@@ -114,7 +132,7 @@ async function activate() {
   }
   if (!tiers.value.length) await load();
   if (!picked.value) {
-    props.store.notify('暂时没有可用的模式，请稍后刷新再试', 'info');
+    props.store.notify('暂时没有可用的模型，请稍后刷新再试', 'info');
     openModal();
     return;
   }
@@ -124,6 +142,7 @@ async function activate() {
 function openModal() {
   if (props.store.desktop && nativeDesktop && !props.detached) { void openModelWindow(GATEWAY_PROVIDER).catch(error => props.store.notify(error, 'error')); return; }
   open.value = true;
+  modelQuery.value = '';
   redeemError.value = redeemDone.value = enableError.value = '';
   void load();
 }
@@ -138,6 +157,7 @@ watch(uid, () => {
   balance.value = null;
   tiers.value = [];
   picked.value = '';
+  modelQuery.value = '';
   loadError.value = redeemError.value = redeemDone.value = enableError.value = '';
   void load();
 }, { immediate: true });
@@ -162,21 +182,10 @@ watch(uid, () => {
     </div>
   </div>
 
-  <template v-if="tiers.length && uid">
-    <div class="xb-group-title">使用模式</div>
-    <div class="xb-group" data-testid="gateway-modes">
-      <div class="xb-row gw-modes-row">
-        <div class="xb-row-text"><b>小伴 AI 模式</b><span>{{ pickedTier?.description || '选择要使用的模型' }}{{ gatewayActive ? '' : '。选好后点“启用此服务商”生效' }}</span></div>
-        <div class="xb-seg" role="radiogroup" aria-label="小伴 AI 模式">
-          <button v-for="tier in tiers" :key="tier.tier" type="button" role="radio" :aria-checked="picked === tier.tier" :disabled="!tier.available || enabling" :title="tier.available ? undefined : '兑换付费额度后可用'" :data-testid="`gateway-mode-${tier.tier}`" @click="pickMode(tier.tier)">{{ tier.displayName }}</button>
-        </div>
-      </div>
-    </div>
   </template>
-
-  </template>
-  <component :is="detached ? 'div' : NModal" v-model:show="open" preset="card" title="小伴 AI" :style="detached ? { height: '100dvh', overflow: 'auto', padding: '20px', boxSizing: 'border-box' } : { maxWidth: '600px', width: '92vw' }" data-testid="gateway-modal">
+  <component :is="detached ? 'div' : NModal" v-model:show="open" preset="card" title="小伴 AI" :class="{ 'gw-detached': detached }" :style="detached ? undefined : { maxWidth: '640px', width: '92vw' }" data-testid="gateway-modal">
     <div class="gw-modal">
+      <header v-if="detached" class="gw-window-head"><span class="gw-logo" aria-hidden="true"><Sprout :size="20" /></span><h1>小伴 AI</h1></header>
       <div v-if="!uid" class="gw-signin" data-testid="gateway-signin">
         <p>登录小伴账号后，就能直接用小伴 AI 聊天：不用自己找模型、申请密钥，新用户还有试用额度。有兑换码的话，登录后在这里输入即可充值。</p>
         <NButton type="primary" data-testid="gateway-login" @click="signIn">登录 / 注册</NButton>
@@ -192,8 +201,9 @@ watch(uid, () => {
             <small v-if="balance.paid > 0" data-testid="gateway-paid">其中付费额度 {{ money(balance.paid, perDollar) }}</small>
             <NButton class="gw-refresh" size="tiny" quaternary :loading="loading" data-testid="gateway-refresh" @click="load">刷新</NButton>
           </div>
+          <details class="gw-credit-details">
+          <summary>额度明细<ChevronDown :size="14" aria-hidden="true" /></summary>
           <p class="gw-note" data-testid="gateway-subtitle">{{ balance.product.name }}的所有端共用这份余额</p>
-
           <ul v-if="balance.buckets.length" class="gw-buckets" data-testid="gateway-buckets">
             <li v-for="bucket in balance.buckets" :key="bucket.id">
               <NTag size="small" :bordered="false" :type="bucket.kind === 'trial' ? 'default' : 'success'">{{ bucketLabel(bucket.kind) }}</NTag>
@@ -205,53 +215,67 @@ watch(uid, () => {
             首次使用小伴 AI 时会自动发放 {{ money(balance.trial.quota, perDollar) }} 试用额度，{{ balance.trial.days }} 天内有效。
           </p>
           <p v-else class="gw-note" data-testid="gateway-empty">现在没有可用额度，输入兑换码即可充值。</p>
+          </details>
         </section>
 
-        <section class="gw-block">
-          <h4>兑换码</h4>
+        <section class="gw-block gw-redemption">
           <form class="gw-redeem" @submit.prevent="redeem">
-            <NInput v-model:value="code" placeholder="输入兑换码" :maxlength="64" :disabled="redeeming" clearable data-testid="gateway-code" />
+            <NInput v-model:value="code" placeholder="输入兑换码" aria-label="兑换码" :maxlength="64" :disabled="redeeming" clearable data-testid="gateway-code" />
             <NButton type="primary" attr-type="submit" :loading="redeeming" :disabled="!code.trim()" data-testid="gateway-redeem">兑换</NButton>
           </form>
           <p v-if="redeemError" class="gw-error" role="alert" data-testid="gateway-redeem-error">{{ redeemError }}</p>
           <p v-if="redeemDone" class="gw-done" role="status" data-testid="gateway-redeem-done">{{ redeemDone }}</p>
         </section>
 
-        <section v-if="tiers.length" class="gw-block" data-testid="gateway-use">
+        <section v-if="tiers.length" class="gw-model-section" data-testid="gateway-use">
           <div class="gw-block-head">
-            <h4>使用模式</h4>
-            <NTag v-if="gatewayActive" type="success" size="small" :bordered="false" data-testid="gateway-active">当前使用中 · {{ activeTierName }}</NTag>
+            <h4>模型<span class="gw-count" data-testid="gateway-model-count">{{ modelCount }}</span></h4>
           </div>
-          <div class="gw-tiers" role="radiogroup" aria-label="使用模式">
+          <NInput v-model:value="modelQuery" placeholder="搜索模型" aria-label="搜索模型" clearable data-testid="gateway-model-search"><template #prefix><Search :size="15" aria-hidden="true" /></template></NInput>
+          <div ref="modelList" class="gw-tiers xb-scroll" role="radiogroup" aria-label="模型" @keydown="moveSelection">
             <button
-              v-for="tier in tiers"
+              v-for="tier in filteredTiers"
               :key="tier.tier"
               type="button"
               role="radio"
               class="gw-tier"
               :class="{ on: picked === tier.tier }"
               :aria-checked="picked === tier.tier"
+              :tabindex="tier.tier === tabbableTier ? 0 : -1"
               :disabled="!tier.available || enabling"
+              :title="[tier.displayName, tier.description, !tier.available ? '兑换付费额度后可用' : ''].filter(Boolean).join('；')"
+              :aria-description="[tier.description, !tier.available ? '兑换付费额度后可用' : ''].filter(Boolean).join('；') || undefined"
               :data-testid="`gateway-tier-${tier.tier}`"
               @click="picked = tier.tier"
             >
-              <b>{{ tier.displayName }}<span v-if="tier.isDefault"> · 默认</span></b>
-              <span v-if="tier.description">{{ tier.description }}</span>
-              <em v-if="!tier.available">兑换付费额度后可用</em>
+              <span class="gw-radio" aria-hidden="true"><Check v-if="picked === tier.tier" :size="12" :stroke-width="3" /></span>
+              <b>{{ tier.displayName }}</b>
+              <span v-if="tier.tier === activeTier" class="gw-tier-state">使用中</span>
+              <span v-else-if="tier.isDefault" class="gw-tier-state">默认</span>
+              <span v-if="!tier.available" class="gw-tier-state">需付费额度</span>
             </button>
+            <div v-if="!filteredTiers.length" class="gw-empty" role="status" data-testid="gateway-search-empty">没有匹配的模型<button type="button" class="xb-link" @click="modelQuery = ''">清除搜索</button></div>
           </div>
-          <NButton type="primary" :disabled="!picked || unchanged" :loading="enabling" data-testid="gateway-use-btn" @click="enable">
-            {{ unchanged ? '当前使用中' : gatewayActive ? '切换模式' : '用小伴 AI 聊天' }}
+        </section>
+        <div v-else-if="!loading && !loadError" class="gw-empty" role="status">暂无可用模型<NButton text @click="load">刷新</NButton></div>
+        <footer v-if="tiers.length" class="gw-actions">
+          <div class="gw-selection">
+            <span v-if="gatewayActive" class="gw-current" data-testid="gateway-active" :title="activeTierName">当前使用 · {{ activeTierName }}</span>
+            <span v-else class="gw-current">尚未启用小伴 AI</span>
+            <b v-if="pickedTier && !unchanged" :title="pickedTier.displayName">已选 · {{ pickedTier.displayName }}</b>
+          </div>
+          <NButton type="primary" :disabled="!canEnable" :loading="enabling" data-testid="gateway-use-btn" @click="enable">
+            {{ unchanged ? '当前使用中' : '使用此模型' }}
           </NButton>
           <p v-if="enableError" class="gw-error" role="alert" data-testid="gateway-use-error">{{ enableError }}</p>
-        </section>
+        </footer>
       </template>
     </div>
   </component>
 </template>
 
 <style scoped>
-/* Several root nodes (card, mode group, dialog): everything here is scoped to this file. */
+/* Settings summary card and independent model configuration surface. */
 .gateway-card{background:linear-gradient(120deg,var(--ui-surface) 40%,var(--ui-soft))}
 .gw-row{padding:16px;gap:14px}
 .gw-logo{width:44px;height:44px;flex-shrink:0;border-radius:12px;display:grid;place-items:center;color:#fff;background:linear-gradient(160deg,var(--ui-btn-hi),var(--ui-btn));box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
@@ -261,10 +285,12 @@ watch(uid, () => {
 .gw-status{font-size:12px;color:var(--ui-text-secondary)}
 .gw-status.is-warn{color:var(--ui-warning-text)}
 .gw-row .xb-btn,.gw-row .xb-btn-primary{flex-shrink:0}
-.gw-modes-row{align-items:flex-start;flex-direction:column}
-.gw-modes-row .xb-seg{flex-wrap:wrap;max-width:100%;gap:4px}
-.gw-modes-row .xb-seg>button{height:auto;min-height:26px;white-space:normal;overflow-wrap:anywhere;text-align:left}
-.gw-modal { display: grid; gap: 18px; }
+.gw-detached{height:100dvh;overflow:auto;box-sizing:border-box;padding:24px;background:var(--ui-surface-sunken);color:var(--ui-text-primary)}
+.gw-modal{display:flex;flex-direction:column;gap:16px;min-height:0}
+.gw-detached .gw-modal{height:100%;min-height:480px}
+.gw-window-head{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.gw-window-head .gw-logo{width:34px;height:34px;border-radius:10px}
+.gw-window-head h1{font-size:17px;font-weight:600;margin:0}
 .gw-signin { display: grid; gap: 14px; justify-items: start; }
 .gw-signin p { margin: 0; line-height: 1.7; color: var(--ui-text-secondary); }
 .gw-balance {
@@ -301,23 +327,35 @@ watch(uid, () => {
 .gw-block-head { display: flex; align-items: center; gap: 10px; }
 .gw-redeem { display: flex; gap: 10px; width: 100%; }
 .gw-redeem .n-input { flex: 1; }
-.gw-error { margin: 0; color: var(--ui-danger, #d03050); font-size: 13px; }
-.gw-done { margin: 0; color: var(--ui-success, #18a058); font-size: 13px; }
-.gw-tiers { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; width: 100%; }
-.gw-tier {
-  display: grid;
-  gap: 4px;
-  text-align: left;
-  padding: 12px 14px;
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface-alt);
-  border-radius: 12px;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-}
-.gw-tier span, .gw-tier em { font-size: 13px; font-style: normal; color: var(--ui-muted); }
-.gw-tier.on { border-color: var(--ui-primary); background: var(--ui-primary-soft); }
-.gw-tier:disabled { cursor: not-allowed; opacity: 0.6; }
-.gw-tier:focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 2px; }
+.gw-error { margin: 0; color: var(--ui-danger); font-size: 13px; }
+.gw-done { margin: 0; color: var(--ui-success); font-size: 13px; }
+.gw-balance,.gw-redemption,.gw-actions{flex-shrink:0}
+.gw-credit-details summary{display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;font-size:12px;color:var(--ui-text-secondary);list-style:none}
+.gw-credit-details{max-height:180px;overflow:auto}
+.gw-credit-details summary::-webkit-details-marker{display:none}
+.gw-credit-details[open] summary svg{transform:rotate(180deg)}
+.gw-credit-details .gw-note,.gw-credit-details .gw-buckets{margin-top:10px}
+.gw-model-section{display:flex;flex-direction:column;gap:12px;min-height:0;flex:1}
+.gw-block-head h4{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;font-weight:600}
+.gw-count{font-weight:400;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
+.gw-tiers{display:flex;flex-direction:column;overflow:auto;min-height:132px;max-height:320px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface)}
+.gw-detached .gw-tiers{flex:1;max-height:none}
+.gw-tier{display:flex;align-items:center;gap:10px;flex-shrink:0;min-height:46px;width:100%;padding:10px 12px;border:0;border-bottom:1px solid var(--ui-line);background:transparent;text-align:left;color:var(--ui-text-primary);font:inherit;cursor:pointer}
+.gw-tier:last-child{border-bottom:0}
+.gw-tier:hover:not(:disabled){background:var(--ui-surface-hover)}
+.gw-tier.on,.gw-tier.on:hover{background:var(--ui-soft)}
+.gw-tier b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500}
+.gw-radio{display:grid;place-items:center;flex-shrink:0;width:16px;height:16px;border:1px solid var(--ui-border-strong);border-radius:50%}
+.gw-tier.on .gw-radio{border-color:var(--ui-btn);background:var(--ui-btn);color:var(--ui-text-on-btn)}
+.gw-tier-state{font-size:11px;color:var(--ui-text-secondary);white-space:nowrap}
+.gw-tier:disabled{cursor:not-allowed;color:var(--ui-text-disabled)}
+.gw-tier:focus-visible{outline:2px solid var(--ui-btn);outline-offset:-3px}
+.gw-empty{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;color:var(--ui-text-secondary);font-size:13px}
+.gw-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-top:1px solid var(--ui-border);padding-top:16px}
+.gw-selection{display:grid;gap:4px;flex:1;min-width:0}
+.gw-selection>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gw-current{font-size:12px;color:var(--ui-text-secondary)}
+.gw-selection b{font-size:13px;font-weight:500}
+.gw-actions>.gw-error{width:100%}
+@media(max-width:420px){.gw-detached{padding:16px}.gw-total{gap:8px}.gw-total small{flex-basis:100%}.gw-buckets li{gap:8px;grid-template-columns:auto 1fr}.gw-expiry{grid-column:2;font-size:12px}}
 </style>
