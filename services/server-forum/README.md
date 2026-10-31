@@ -246,3 +246,7 @@ API：
 ### 站方方案发布
 
 `POST /api/admin/schemes` 使用管理员凭据，传入已绑定的活跃站方 `author_uid`、`title`、`summary` 和 `items: [{pack_id, version}]`。复用用户方案的公开作品、版本、去重和日限额校验；发布与审计记录在同一事务中完成。手动模板的 manifest 可标记 `manualOnly: true`，网页详情提供下载和使用说明，不展示桌面安装入口。
+
+### 游戏收藏筛选（2026-11-01）
+
+`GET /api/me/content-bookmarks?kind=game&page=1` 筛选当前账号收藏的公开游戏作品，筛选先于分页和 total 统计；响应条目的 `kind` 继续为 `pack`，收藏/取消仍使用 `/content-social/pack/{id}/bookmark`。兼容原有 pack/scheme 查询，不增加收藏表或改变权限。针对性验证：`TEST_DATABASE_URL=... cargo test --locked --manifest-path services/server-forum/Cargo.toml game_bookmarks_filter`，覆盖登录限制、真实总数、分页、下架排除和原作品查询兼容。

@@ -108,3 +108,13 @@ cargo build --release --features custom-protocol   # 发布二进制（内嵌启
 社区创作中的视觉作品、能力与方案共用底栏：评论、点赞、收藏、分享。评论复用帖子编辑器和评论区，支持评论点赞及本人回复编辑；已下架/待审作品不开放互动。分享仍走真实系统分享与落地页，电脑使用链接保留为能力页的次级入口。列表有真实互动时显示赞/评论数，无数据时不加装饰数字。
 
 Android 构建与 `:common:community-core:jvmTest --tests '*WorkDiscussionTest*' --tests '*ContentSocialReplyTest*'` 验证协议、登录状态、服务端错误、兼容字段与评论点赞路由。依赖论坛新增的 `/content-social/{kind}/{id}/discussion` 接口；不能只更新 APK 而保持旧后端。iOS 未实机验证。
+
+## 社区游戏试玩与收藏（2026-11-01）
+
+Android 的社区游戏作品详情、帖子中的本站游戏链接卡片和回复作品卡支持「试玩」，无需放入「我的作品」。每次启动重新检查作品公开状态与指定版本，资源 ZIP 通过大小、SHA-256、清单和展开限制后进入原有离线沙箱；帖子回复的固定版本不自动替换为最新版。第一版支持 v1、space、无系统能力的离线文本游戏包；普通 ZIP 附件不会直接执行，iOS 显示暂不支持。
+
+游戏 ZIP 存于独立 cache 目录，最多 8 包、单包 5 MiB，清理缓存不影响收藏、存档与创作工作区。存档/运行日志按社区作品 ID 与版本隔离在独立 files 目录，避免同名游戏覆盖自己创作的游戏。试玩页的窄原生工具栏提供退出、重新开始和收藏，并为游戏保留不被覆盖的显示区域；退出回到原页面。旧的纯 HTML 游戏在资源加载成功且没有加载错误后记录游玩，协议游戏沿用 game.ready。
+
+「我的收藏」新增游戏分类及本机「最近玩过」，最近记录最多 12 项，试玩成功才加入。游戏收藏仍是已有作品收藏，跨设备同步；最近试玩不自动收藏。服务端 `/api/me/content-bookmarks?kind=game` 在分页前筛选游戏，返回对象仍为 kind=pack。不新增一级「我的游戏」，不自动收录为个人创作，不提供离线保存承诺；打开缓存仍需确认公开状态。
+
+验证：`:common:community-core:jvmTest --tests '*CommunityGameTrialTest*' --tests '*MobileGamesTest*' --tests '*GameLibraryTest*'`（17 项）与 `:androidApp:assembleDebug` 通过。社区游戏真机验证见 [试玩验收记录](../../docs/product/community-game-trial-2026-11-01.md)。
