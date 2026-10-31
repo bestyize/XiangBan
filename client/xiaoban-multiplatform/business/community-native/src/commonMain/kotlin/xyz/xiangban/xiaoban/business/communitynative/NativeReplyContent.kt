@@ -40,11 +40,16 @@ internal fun ReplyAttachments(env: CommunityEnv, attachments: List<ForumAttachme
 
 /** New-reply uploads are the only pending assets this composer may delete. */
 @Composable
-internal fun NativeReplyComposer(env: CommunityEnv, topicId: Long, onDismiss: () -> Unit, onSent: () -> Unit, panelModifier: Modifier) {
+internal fun NativeReplyComposer(env: CommunityEnv, topicId: Long, onDismiss: () -> Unit, onSent: () -> Unit, panelModifier: Modifier, editingPost: Post? = null, dismissRequest: Int = 0) {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
     val account = remember { session.accountId }
     val currentAccount by rememberUpdatedState(session.accountId)
+    var original by remember { mutableStateOf<ReplySource?>(null) }
+    var sourceError by remember { mutableStateOf<String?>(null) }
+    var sourceAttempt by remember { mutableStateOf(0) }
+    val retainedIds = original?.attachments.orEmpty().map { it.id }.toSet()
+    val loadingSource = editingPost != null && original == null
     var text by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var uploading by remember { mutableStateOf(false) }
@@ -55,15 +60,29 @@ internal fun NativeReplyComposer(env: CommunityEnv, topicId: Long, onDismiss: ()
     var selected by remember { mutableStateOf<List<SelectedWorkReference>>(emptyList()) }
     var link by remember { mutableStateOf("") }
     var showMine by remember { mutableStateOf(false) }
+    LaunchedEffect(editingPost?.id, sourceAttempt) {
+        if (editingPost == null) return@LaunchedEffect
+        sourceError = null
+        try {
+            val source = env.forum.replySource(editingPost.id)
+            if (currentAccount != account) throw ApiException(401, "账号已切换，请重新打开编辑")
+            text = source.body
+            attachments = source.attachments
+            selected = replyEditSelection(source, editingPost.workRefs)
+            original = source
+        } catch (e: CancellationException) { throw e } catch (e: Exception) { sourceError = messageOf(e) }
+    }
+    LaunchedEffect(currentAccount) { if (currentAccount != account) onDismiss() }
     val refsApi = remember(env) { ReplyReferencesApi(env.client, env.config) }
-    val locked = busy || uploading || resolving || leaving
+    val locked = busy || uploading || resolving || leaving || loadingSource
     fun dismiss() {
-        if (locked) { error = "请等待当前操作完成"; return }
+        if (busy || uploading || resolving || leaving) { error = "请等待当前操作完成"; return }
         leaving = true
-        val pending = attachments.toList()
+        val pending = attachments.filterNot { it.id in retainedIds }
         env.scope.launch { if (currentAccount == account) pending.forEach { file -> runCatching { env.forum.deletePendingAttachment(file.id) } } }
         onDismiss()
     }
+    LaunchedEffect(dismissRequest) { if (dismissRequest > 0) dismiss() }
     fun addLink(value: String) {
         if (locked) return
         if (selected.size >= 3) { error = "最多选择 3 个不同的作品或方案"; return }
@@ -81,10 +100,15 @@ internal fun NativeReplyComposer(env: CommunityEnv, topicId: Long, onDismiss: ()
     }
     BottomSheet(::dismiss, panelModifier) {
         Column(Modifier.fillMaxWidth().heightIn(max = 680.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("回复", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(if (editingPost == null) "回复" else "编辑回复", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            if (loadingSource) {
+                Text(sourceError ?: "正在读取回复原文…", fontSize = 14.sp, color = if (sourceError == null) MaterialTheme.colorScheme.onSurface else Danger)
+                if (sourceError != null) GhostPillButton("重试读取", { sourceAttempt++ }, Modifier.fillMaxWidth())
+                GhostPillButton("取消", ::dismiss, Modifier.fillMaxWidth())
+            } else {
             AreaBox(text, { text = it }, placeholder = "写下你的回复（至少 2 个字）…", minHeight = 120.dp, enabled = !locked, filled = true)
             ForumUploadControls(env, enabled = !busy && !resolving && !leaving, onImage = { text += it }, onBusy = { uploading = it }, attachments = attachments,
-                onAttachments = { next -> attachments = next.map { it.copy(price = 0) } })
+                onAttachments = { next -> attachments = next.map { if (it.id in retainedIds) it else it.copy(price = 0) } }, retainedAttachmentIds = retainedIds)
             Text("引用公开作品或方案（最多 3 个）", fontSize = 13.sp, fontWeight = FontWeight.Medium)
             AreaBox(link, { link = it }, placeholder = "粘贴社区作品或方案链接", minHeight = 55.dp, enabled = !locked)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -108,26 +132,28 @@ internal fun NativeReplyComposer(env: CommunityEnv, topicId: Long, onDismiss: ()
             }
             selected.forEach { chosen -> Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text(chosen.card.title, fontSize = 14.sp, maxLines = 2)
-                    Text(if (chosen.reference.kind == "scheme") "方案" else "发表时固定为当前版本", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    Text(chosen.card?.title ?: "${if (chosen.reference.kind == "pack") "作品" else "方案"} #${chosen.reference.id}（当前不可用）", fontSize = 14.sp, maxLines = 2)
+                    Text(if (chosen.reference.kind == "scheme") "方案" else chosen.reference.version?.let { "固定版本 v$it" } ?: "发表时固定为当前版本", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                 }
                 GhostPillButton("移除", { selected = selected.filterNot { it.reference == chosen.reference } }, enabled = !locked)
             } }
             error?.let { Text(it, fontSize = 13.sp, color = Danger) }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GhostPillButton("取消", ::dismiss, Modifier.weight(1f), enabled = !locked)
-                PillButton(if (busy) "发送中…" else if (uploading) "上传中…" else "发送", {
+                PillButton(if (busy) "发送中…" else if (uploading) "上传中…" else if (editingPost == null) "发送" else "保存修改", {
                     if (locked) return@PillButton
                     busy = true; error = null
                     scope.launch {
                         try {
                             if (currentAccount != account) throw ApiException(401, "账号已切换，请重新撰写回复")
-                            env.forum.reply(topicId, text.trim(), workRefs = selected.map { it.reference }, attachments = attachments)
+                            if (editingPost == null) env.forum.reply(topicId, text.trim(), workRefs = selected.map { it.reference }, attachments = attachments)
+                            else env.forum.editReply(editingPost.id, text.trim(), workRefs = selected.map { it.reference }, attachments = attachments)
                             onSent()
                         } catch (e: CancellationException) { throw e } catch (e: Exception) { error = messageOf(e) }
                         finally { busy = false }
                     }
                 }, Modifier.weight(1f), enabled = !locked && session.loggedIn && currentAccount == account && text.trim().length >= 2)
+            }
             }
         }
     }

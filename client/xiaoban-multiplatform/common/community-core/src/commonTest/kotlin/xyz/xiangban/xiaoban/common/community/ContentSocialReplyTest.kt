@@ -58,7 +58,7 @@ class ContentSocialReplyTest {
     }
     @Test fun `edit omits unchanged fields and explicit empty lists clear associations`() = runTest {
         val s = FakeServer(); val api = ForumApi(s.client, CommunityConfig()) { "access" }
-        s.on("/api/posts/12", body = """{"ok":true}""")
+        s.on({ it.url.encodedPath == "/api/posts/12" }, body = """{"ok":true}""")
         api.editReply(12, "只修改正文")
         assertEquals(setOf("body"), CommunityJson.parseToJsonElement((s.requests.last().body as TextContent).text).jsonObject.keys)
         api.editReply(12, "清除引用附件", workRefs = emptyList(), attachments = emptyList())
@@ -100,7 +100,7 @@ class ContentSocialReplyTest {
         val selected = api.fromUrl("https://chat.xiangban.xyz/packs/7")
         assertEquals(WorkReference("pack", 7), selected.reference)
         assertNull(selected.reference.version)
-        assertEquals("公开作品", selected.card.title)
+        assertEquals("公开作品", assertNotNull(selected.card).title)
         assertNull(s.requests.single().headers[HttpHeaders.Authorization])
         for (url in listOf("{kind:pack,id:7}", "https://evil.example/packs/7", "https://chat.xiangban.xyz/t/7", "https://chat.xiangban.xyz/packs/7?token=SECRET"))
             assertEquals(400, assertFailsWith<ApiException> { api.fromUrl(url) }.status)
@@ -120,6 +120,37 @@ class ContentSocialReplyTest {
         assertEquals(429, assertFailsWith<ApiException> { api.reply(9, "明确重试", attachments = files) }.status)
         assertEquals("Bearer renewed", s.requests.last().headers[HttpHeaders.Authorization])
         assertEquals(2, s.requests.size); assertTrue(s.requests.none { it.method.value == "DELETE" })
+        s.client.close()
+    }
+
+    @Test fun `only owned normal unaccepted replies in explicitly unlocked topics can edit`() {
+        val post = Post(12, 2, author = PublicUser("owner", "本人"), mine = true)
+        val topic = Topic(9, "帖子", category = CategoryRef(1, "test", "测试"), author = PublicUser("owner", "本人"), locked = false)
+        assertTrue(replyCanEdit(post, "owner", topic))
+        assertFalse(replyCanEdit(post, null, topic))
+        assertFalse(replyCanEdit(post, "other", topic))
+        assertFalse(replyCanEdit(post.copy(mine = false), "owner", topic))
+        assertFalse(replyCanEdit(post.copy(blocked = true), "owner", topic))
+        assertFalse(replyCanEdit(post.copy(status = "hidden"), "owner", topic))
+        assertFalse(replyCanEdit(post, "owner", topic.copy(locked = true)))
+        assertFalse(replyCanEdit(post, "owner", topic.copy(locked = null)))
+        assertFalse(replyCanEdit(post, "owner", null))
+        val accepted = CommunityJson.decodeFromString<HelpInfo>("""{"status":"open","accepted_post_id":12}""")
+        assertFalse(replyCanEdit(post, "owner", topic.copy(help = accepted)))
+    }
+    @Test fun `edit keeps fixed versions unavailable refs and original attachment prices`() = runTest {
+        val s = FakeServer(); val api = ForumApi(s.client, CommunityConfig()) { "owner" }
+        s.on("/api/posts/12/source", body = """{"body":"原文","work_refs":[{"kind":"pack","id":7,"version":3},{"kind":"scheme","id":8}],"attachments":[{"id":"$REPLY_ASSET","name":"原附件","size":10,"price":6}]}""")
+        s.on({ it.url.encodedPath == "/api/posts/12" }, body = """{"ok":true}""")
+        val source = api.replySource(12)
+        val selected = replyEditSelection(source, listOf(ResolvedWorkReference("pack", 7, 3, false)))
+        assertEquals(3, selected.first().reference.version)
+        assertTrue(selected.all { it.card == null })
+        api.editReply(12, "修改后原文", workRefs = selected.map { it.reference }, attachments = source.attachments)
+        val json = CommunityJson.parseToJsonElement((s.requests.last().body as TextContent).text).jsonObject
+        assertEquals(3, json["work_refs"]!!.jsonArray.first().jsonObject["version"]!!.jsonPrimitive.int)
+        assertEquals(6, json["attachment_prices"]!!.jsonArray.single().jsonObject["price"]!!.jsonPrimitive.int)
+        assertTrue(s.requests.none { it.method.value == "DELETE" || "share" in it.url.encodedPath })
         s.client.close()
     }
 

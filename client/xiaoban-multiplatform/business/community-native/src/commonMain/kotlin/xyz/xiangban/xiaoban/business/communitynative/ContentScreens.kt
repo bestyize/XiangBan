@@ -42,6 +42,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +68,7 @@ import xyz.xiangban.xiaoban.common.community.formatSize
 import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.kindLabel
 import xyz.xiangban.xiaoban.common.community.messageOf
+import xyz.xiangban.xiaoban.common.community.replyCanEdit
 
 // ───────────── 共用部件 ─────────────
 
@@ -244,12 +247,16 @@ internal class HelpAnswers(val acceptedPostId: Long?, val authorUid: String, val
 
 /** 作品对应的讨论帖里的评论，分页加载。[reloadKey] 变化时从头重新加载（发完回复后用）。 */
 @Composable
-internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0, hint: String = "评论和点赞请在网页端进行：", help: HelpAnswers? = null, open: ((Route) -> Unit)? = null) {
-    var posts by remember(topicId, reloadKey) { mutableStateOf<List<Post>>(emptyList()) }
-    var page by remember(topicId, reloadKey) { mutableStateOf(0) }
-    var more by remember(topicId, reloadKey) { mutableStateOf(true) }
-    var error by remember(topicId, reloadKey) { mutableStateOf<String?>(null) }
-    var busy by remember(topicId, reloadKey) { mutableStateOf(false) }
+internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0, hint: String = "评论和点赞请在网页端进行：", help: HelpAnswers? = null, open: ((Route) -> Unit)? = null, topicForEditing: Topic? = null) {
+    val session by env.session.state.collectAsState()
+    var localRevision by remember(topicId, reloadKey) { mutableStateOf(0) }
+    var editing by remember(topicId, session.accountId) { mutableStateOf<Post?>(null) }
+    var editTopic by remember(topicId, reloadKey, session.accountId) { mutableStateOf(topicForEditing) }
+    var posts by remember(topicId, reloadKey, localRevision) { mutableStateOf<List<Post>>(emptyList()) }
+    var page by remember(topicId, reloadKey, localRevision) { mutableStateOf(0) }
+    var more by remember(topicId, reloadKey, localRevision) { mutableStateOf(true) }
+    var error by remember(topicId, reloadKey, localRevision) { mutableStateOf<String?>(null) }
+    var busy by remember(topicId, reloadKey, localRevision) { mutableStateOf(false) }
     var retry by remember { mutableStateOf(0) }
 
     suspend fun load() {
@@ -268,13 +275,23 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
             busy = false
         }
     }
-    LaunchedEffect(topicId, retry, reloadKey) { load() }
+    LaunchedEffect(topicId, retry, reloadKey, localRevision) { load() }
 
+    LaunchedEffect(topicId, session.accountId, posts.any { it.mine }, topicForEditing) {
+        editTopic = topicForEditing ?: if (session.loggedIn && posts.any { it.mine }) runCatching { env.forum.topic(topicId) }.getOrNull() else null
+    }
+    editing?.let { post ->
+        var dismissRequest by remember(post.id) { mutableStateOf(0) }
+        Dialog(onDismissRequest = { dismissRequest++ }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            NativeReplyComposer(env, topicId, { editing = null }, { editing = null; localRevision++ }, Modifier, editingPost = post, dismissRequest = dismissRequest)
+        }
+    }
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp)) {
         Text("${if (help != null) "回答" else "评论"} ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         posts.forEach { post ->
             PostItem(
                 env, post, open = open, topicId = topicId,
+                onEdit = if (session.loggedIn && replyCanEdit(post, session.accountId, editTopic)) ({ editing = post }) else null,
                 accepted = help?.acceptedPostId == post.id,
                 onAccept = if (help != null && help.canAccept && post.author.uid != help.authorUid) ({ help.onAccept(post) }) else null,
             )
@@ -292,7 +309,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
 }
 
 @Composable
-internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null, open: ((Route) -> Unit)? = null, topicId: Long? = null) {
+internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null, open: ((Route) -> Unit)? = null, topicId: Long? = null, onEdit: (() -> Unit)? = null) {
     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Avatar(post.author.nickname, 30.dp, showInitial = true)
         Column(Modifier.weight(1f)) {
@@ -307,7 +324,10 @@ internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, 
                 ReplyContentCards(post.workRefs, open)
                 ReplyAttachments(env, post.attachments, topicId)
             }
-            if (!post.blocked && post.status == "normal") NativeReportAction(env, "post", post.id, open)
+            if (!post.blocked && post.status == "normal") Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (onEdit != null && !accepted) Text("编辑", Modifier.clickable(onClick = onEdit), fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
+                NativeReportAction(env, "post", post.id, open)
+            }
             if (accepted) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 XIcon(XIcons.CheckBold, tint = Success, size = 16.dp)
                 Text("已采纳。这条回答已标记为解决方案，回答保留原文。", fontSize = 12.sp, color = Success)
@@ -380,7 +400,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                 onAccept = { post -> guarded { env.forum.acceptAnswer(topic.id, post.id); toast = "已采纳"; loader.reload() } },
                             )
                         }
-                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) { CommentsSection(env, id, reloadKey, hint = "", help = answers, open = open) }
+                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) { CommentsSection(env, id, reloadKey, hint = "", help = answers, open = open, topicForEditing = topic) }
                     }
                     Hairline()
                     Row(Modifier.fillMaxWidth().height(60.dp).background(MaterialTheme.colorScheme.surface).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {

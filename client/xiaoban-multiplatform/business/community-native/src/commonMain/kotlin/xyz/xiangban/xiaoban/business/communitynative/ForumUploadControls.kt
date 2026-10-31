@@ -31,6 +31,8 @@ internal fun ForumUploadControls(
     onBusy: (Boolean) -> Unit,
     attachments: List<ForumAttachment>? = null,
     onAttachments: (List<ForumAttachment>) -> Unit = {},
+    /** Already-associated source assets may be unlinked, never deleted as pending uploads. */
+    retainedAttachmentIds: Set<String> = emptySet(),
 ) {
     val platform = env.platform
     if (platform?.forumFilePickerSupported != true) {
@@ -97,14 +99,14 @@ internal fun ForumUploadControls(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) {
                     Text(attachment.name, fontSize = 13.sp)
-                    Text("${attachment.size} 字节 · 免费下载", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    Text("${attachment.size} 字节 · ${if (attachment.price == 0) "免费下载" else "${attachment.price} 积分"}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                 }
                 GhostPillButton("移除", {
                     if (!busy && enabled) {
                         busy = true; onBusy(true); error = null
                         scope.launch {
                             try {
-                                env.forum.deletePendingAttachment(attachment.id)
+                                if (attachment.id !in retainedAttachmentIds) env.forum.deletePendingAttachment(attachment.id)
                                 onAttachments(attachments.filterNot { it.id == attachment.id })
                             } catch (e: CancellationException) { throw e }
                             catch (e: Exception) { error = messageOf(e) }

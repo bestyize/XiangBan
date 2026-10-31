@@ -43,7 +43,7 @@ internal fun JsonObjectBuilder.replyAssociations(workRefs: List<WorkReference>?,
 }
 
 /** The server snapshots an omitted pack version at publication. No arbitrary JSON is accepted. */
-data class SelectedWorkReference(val reference: WorkReference, val card: CommunityContentCard)
+data class SelectedWorkReference(val reference: WorkReference, val card: CommunityContentCard?)
 class ReplyReferencesApi(client: io.ktor.client.HttpClient, private val config: CommunityConfig) {
     private val sharing = CommunitySharingApi(client, config)
     suspend fun fromUrl(raw: String): SelectedWorkReference {
@@ -54,3 +54,14 @@ class ReplyReferencesApi(client: io.ktor.client.HttpClient, private val config: 
             CommunityContentCard(target.id.toLong(), info.title, info.summary, kind = info.packKind))
     }
 }
+
+/** Editable controls need both server ownership and current topic state; unknown context stays closed. */
+fun replyCanEdit(post: Post, accountId: String?, topic: Topic?): Boolean =
+    accountId != null && post.mine && post.author.uid == accountId && post.status == "normal" && !post.blocked &&
+        topic?.locked == false && topic.help?.acceptedPostId != post.id
+
+/** Preserve source versions even when a referenced work was removed or its public card changed. */
+fun replyEditSelection(source: ReplySource, publicRefs: List<ResolvedWorkReference>): List<SelectedWorkReference> =
+    source.workRefs.map { ref -> SelectedWorkReference(ref, publicRefs.firstOrNull {
+        it.kind == ref.kind && it.id == ref.id && it.version == ref.version
+    }?.let(::safeReferencedContent)) }
