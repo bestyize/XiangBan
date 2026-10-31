@@ -19,7 +19,7 @@
 //! - `{"type":"tool_request","id":"t1","name":"set_reminder","arguments":{..}}` run a tool the host declared
 //! - `{"type":"closed"}` once, after the engine has stopped
 
-use agent_kernel::builtin::TimeNow;
+use agent_kernel::builtin::{AskUser, TimeNow, Todo};
 use agent_kernel::provider::stream::{SseParser, StreamAccumulator};
 use agent_kernel::provider::wire::{build_request_body, ProviderProfile};
 use agent_kernel::stdio::StdioBridge;
@@ -51,6 +51,9 @@ pub struct Config {
     pub sessions_dir: String,
     #[serde(default)]
     pub system_prompt: String,
+    /// The phone's current local UTC offset, e.g. 480 for UTC+08:00. Old hosts keep UTC.
+    #[serde(default)]
+    pub utc_offset_minutes: i32,
     /// Estimated tokens kept in the conversation sent to the model.
     #[serde(default = "default_context_tokens")]
     pub context_tokens: usize,
@@ -325,12 +328,21 @@ impl Engine {
         let model = Arc::new(Mutex::new(config.model.clone()));
         let provider: Arc<dyn ModelProvider> = Arc::new(HostModel { rpc: rpc.clone(), model: model.clone() });
         let bridge = StdioBridge::new(LineWriter { tx: out_tx.clone(), buf: Vec::new() });
+        // Progress is independent of chat trimming and uses the same per-session isolation.
+        let todo = Arc::new(Todo::new().persistent(std::path::Path::new(&config.sessions_dir).join("progress")));
 
         let mut builder = Agent::builder(provider, Arc::new(JsonlStore::new(config.sessions_dir.clone())))
             .system_prompt(config.system_prompt.clone())
-            .tool(TimeNow::new())
+            .tool(TimeNow::new().utc_offset_minutes(config.utc_offset_minutes))
+            .middleware(todo.clone())
+            .tool_arc(todo)
+            .tool(AskUser::new(bridge.ask_handler()))
             .middleware(Permission::new(PermissionMode::Ask, bridge.approver()))
-            .middleware(ContextTrim::new(config.context_tokens).reserve_output(4096));
+            .middleware(RepeatGuard::new())
+            .middleware(ContextTrim::new(config.context_tokens).reserve_output(4096))
+            .middleware(ContinueGuard::new().max_per_run(8))
+            // Recover transient network/429/5xx failures, while retaining the 25-turn run limit.
+            .retry(RetryPolicy { max_retries: 2, ..Default::default() });
         for def in &config.tools {
             let risk = parse_risk(&def.risk).map_err(|e| format!("tool `{}`: {e}", def.name))?;
             let spec = ToolSpec::new(def.name.clone(), def.description.clone(), def.parameters.clone())

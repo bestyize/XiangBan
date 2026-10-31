@@ -5,6 +5,7 @@ sealed interface Route {
     data class Pack(val id: Long) : Route
     data class Ability(val id: Long) : Route
     data class Scheme(val id: Long) : Route
+    data object SchemeBackups : Route
     data object MyWorks : Route
     data object Notifications : Route
     data object Challenges : Route
@@ -46,6 +47,7 @@ sealed interface Route {
         is Pack -> "pack:$id"
         is Ability -> "ability:$id"
         is Scheme -> "scheme:$id"
+        SchemeBackups -> "schemebackups"
         MyWorks -> "myworks"
         Notifications -> "notifications"
         Challenges -> "challenges"
@@ -83,6 +85,7 @@ sealed interface Route {
                 "pack" -> value.toLongOrNull()?.let(::Pack)
                 "ability" -> value.toLongOrNull()?.takeIf { it > 0 }?.let(::Ability)
                 "scheme" -> value.toLongOrNull()?.takeIf { it > 0 }?.let(::Scheme)
+                "schemebackups" -> SchemeBackups
                 "myworks" -> MyWorks
                 "notifications" -> Notifications
                 "challenges" -> Challenges

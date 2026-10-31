@@ -38,21 +38,24 @@ private fun ManifestSection(title: String, value: String?) {
 
 @Composable
 fun AbilityDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null) {
+    var sharing by rememberSaveable(id) { mutableStateOf(false) }
     val loader = rememberLoader(env, "ability-$id") { env.forum.pack(id) }
     val state by loader.state.collectAsState()
     Column(Modifier.fillMaxSize()) {
-        ScreenBar("能力详情", onBack = back)
+        ScreenBar("能力详情", onBack = back, trailing = { IconTap(XIcons.Share, "分享", { sharing = true }) })
         Box(Modifier.weight(1f)) { LoadBox(state, loader::reload) { pack -> CapabilityDetailContent(env, pack, back, showBar = false, open = open) } }
     }
+    OverlayTransition(sharing) { panel -> CommunityShareSheet(env, env.forum.packUrl(id), "分享能力", null, { sharing = false }, {}, panel) }
 }
 
 /** 既有 Pack 入口也可委托至此，保持视觉内容的详情代码原样。 */
 @Composable
 internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> Unit, showBar: Boolean = true, open: ((Route) -> Unit)? = null) {
+    var sharing by rememberSaveable(pack.id) { mutableStateOf(false) }
     val manifest = pack.versions.firstOrNull { it.version == pack.version }?.manifest ?: JsonObject(emptyMap())
     val prompt = manifestValue(manifest, "prompt", "promptText", "systemPrompt", "system_prompt")
     Column(Modifier.fillMaxSize()) {
-        if (showBar) ScreenBar("能力详情", onBack = back, trailing = { IconTap(XIcons.Share, "分享", { env.platform?.share(pack.title, env.forum.packUrl(pack.id)) }) })
+        if (showBar) ScreenBar("能力详情", onBack = back, trailing = { IconTap(XIcons.Share, "分享", { sharing = true }) })
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = ContentSpacing) {
             WhiteCard(padding = 16.dp) {
                 Text(pack.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
@@ -61,6 +64,7 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
                 if (pack.status != "published") Text(contentWorkState(pack), Modifier.padding(top = 8.dp), color = Danger, fontSize = 13.sp)
                 if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp)
             }
+            if (pack.status == "published") ContentSocialActions(env, "pack", pack.id, open)
             ManifestSection("能做", manifestValue(manifest, "canDo", "can_do", "capabilities"))
             ManifestSection("不能做", manifestValue(manifest, "cannotDo", "cannot_do", "limitations"))
             ManifestSection("所需权限", manifestValue(manifest, "permissions", "requiredPermissions"))
@@ -75,10 +79,12 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
             pack.topicId?.let { topicId -> GhostPillButton("在网页查看讨论", { env.platform?.openUrl(env.forum.topicUrl(topicId)) }, Modifier.fillMaxWidth(), enabled = env.platform != null) }
         }
     }
+    OverlayTransition(sharing) { panel -> CommunityShareSheet(env, env.forum.packUrl(pack.id), "分享能力", null, { sharing = false }, {}, panel) }
 }
 
 @Composable
 fun SchemeDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Route) -> Unit) {
+    var sharing by rememberSaveable(id) { mutableStateOf(false) }
     val loader = rememberLoader(env, "scheme-$id") { env.content.scheme(id) }
     val state by loader.state.collectAsState()
     Column(Modifier.fillMaxSize()) {
@@ -90,6 +96,7 @@ fun SchemeDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rou
                     Text("${scheme.author.nickname ?: "作者"} · ${scheme.createdAt.take(10)}", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                     if (scheme.summary.isNotBlank()) Text(scheme.summary, Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp)
                 } }
+                item { ContentSocialActions(env, "scheme", scheme.id, open) }
                 item { Text("包含的内容", Modifier.padding(4.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
                 itemsIndexed(scheme.items, key = { index, item -> "$index-${item.packId}-${item.version}" }) { _, item -> WhiteCard(padding = 14.dp) {
                     Text(if (item.available) item.title ?: item.slug else "内容不可用", fontSize = 15.sp, fontWeight = FontWeight.Medium)
@@ -97,10 +104,11 @@ fun SchemeDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rou
                     if (item.available) GhostPillButton("查看内容", { open(if (item.kind in CapabilityPackKinds) Route.Ability(item.packId) else Route.Pack(item.packId)) }, Modifier.padding(top = 8.dp))
                 } }
                 item { FootNote("方案是一份内容清单。手机不会应用桌面内容；在电脑上打开后，逐项检查版本、可用性和权限再确认。") }
-                item { GhostPillButton("分享方案到电脑", { env.platform?.share(scheme.title, "${env.config.forumBase.trimEnd('/')}/schemes/${scheme.id}") }, Modifier.fillMaxWidth(), enabled = env.platform != null) }
+                item { GhostPillButton("分享方案到电脑", { sharing = true }, Modifier.fillMaxWidth(), enabled = env.platform != null) }
             }
         }
     }
+    OverlayTransition(sharing) { panel -> CommunityShareSheet(env, "${env.config.forumBase.trimEnd('/')}/schemes/$id", "分享方案", null, { sharing = false }, {}, panel) }
 }
 
 /** 创作栏的“方案”读取 schemes，不把它作为压缩包 kind。 */

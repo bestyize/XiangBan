@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { PostItem } from '@/api/types'
+import ReplyWorkCards from './ReplyWorkCards.vue'
+import ReplyExtrasEditor from './ReplyExtrasEditor.vue'
+import AttachmentList from './AttachmentList.vue'
+import { replyExtras, type ReplyWorkRef } from '@/api/replyContent'
+import type { Attachment } from '@/api/types'
 import UserAvatar from './UserAvatar.vue'
 import { api } from '@/api/forum'
 import { useSession } from '@/stores/session'
@@ -14,6 +19,7 @@ const toast = useToast()
 
 const editing = ref(false)
 const draft = ref('')
+const workRefs = ref<ReplyWorkRef[]>([]), files = ref<Attachment[]>([]), uploading = ref(false)
 const busy = ref(false)
 
 async function like() {
@@ -29,7 +35,8 @@ async function like() {
 
 async function startEdit() {
   try {
-    draft.value = (await api.postSource(props.post.id)).body
+    const source = await api.postSource(props.post.id)
+    draft.value = source.body; workRefs.value = source.work_refs; files.value = source.attachments
     editing.value = true
   } catch (e) {
     toast.error(e)
@@ -37,10 +44,13 @@ async function startEdit() {
 }
 
 async function saveEdit() {
+  if (busy.value || uploading.value) return
+  if (files.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) { toast.show('附件价格须为 0～10 的整数', 'error'); return }
   busy.value = true
   try {
-    const res = await api.updatePost(props.post.id, draft.value)
+    const res = await api.updatePost(props.post.id, draft.value, replyExtras(workRefs.value, files.value))
     props.post.body_html = res.body_html
+    props.post.work_refs = res.work_refs; props.post.attachments = res.attachments
     props.post.edited_at = new Date().toISOString()
     editing.value = false
   } catch (e) {
@@ -87,12 +97,13 @@ async function remove() {
       </p>
       <template v-else-if="editing">
         <textarea v-model="draft" class="textarea" rows="5" :aria-label="`编辑 #${post.floor} 楼`" />
+        <ReplyExtrasEditor v-if="session.info" v-model:work-refs="workRefs" v-model:attachments="files" :max-bytes="session.info.limits.upload_max_bytes" :disabled="busy" @uploading="uploading = $event" />
         <div class="edit-actions">
-          <button type="button" class="btn btn-sm" @click="editing = false">取消</button>
-          <button type="button" class="btn btn-primary btn-sm" :disabled="busy" @click="saveEdit">保存修改</button>
+          <button type="button" class="btn btn-sm" :disabled="busy || uploading" @click="editing = false">取消</button>
+          <button type="button" class="btn btn-primary btn-sm" :disabled="busy || uploading || draft.trim().length < 2" @click="saveEdit">保存修改</button>
         </div>
       </template>
-      <div v-else class="prose body" v-html="post.body_html" />
+      <template v-else><div class="prose body" v-html="post.body_html" /><ReplyWorkCards :items="post.work_refs ?? []" /><AttachmentList v-if="post.attachments?.length" :items="post.attachments" restricted /></template>
 
       <footer v-if="post.status === 'normal' && !editing" class="actions">
         <button type="button" class="act" :class="{ on: post.liked }" :aria-pressed="post.liked" @click="like">

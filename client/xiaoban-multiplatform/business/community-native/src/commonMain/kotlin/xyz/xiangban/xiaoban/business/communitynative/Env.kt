@@ -18,6 +18,11 @@ import xyz.xiangban.xiaoban.common.community.ReminderScheduler
 import xyz.xiangban.xiaoban.common.community.LocalSpeech
 import xyz.xiangban.xiaoban.common.community.SpeechModels
 import xyz.xiangban.xiaoban.common.community.VoicePlatform
+import xyz.xiangban.xiaoban.common.community.ChatAttachment
+import xyz.xiangban.xiaoban.common.community.MobileWorkspace
+import xyz.xiangban.xiaoban.common.community.MobileGameStore
+import xyz.xiangban.xiaoban.common.community.mobileWorkspaceTools
+import xyz.xiangban.xiaoban.common.community.mobileGameTools
 import xyz.xiangban.xiaoban.common.community.SetReminderTool
 import xyz.xiangban.xiaoban.common.community.postChatLines
 import xyz.xiangban.xiaoban.common.community.AiGatewayApi
@@ -37,6 +42,15 @@ import xyz.xiangban.xiaoban.common.link.RemoteChatController
 
 /** 各平台才能做的事：复制到剪贴板、系统分享面板、用浏览器打开链接。不提供时对应按钮不可用。 */
 interface PlatformActions : VoicePlatform {
+    /** Public community links only; consumed after explicit confirmation or dismissal. */
+    val communityLinks: kotlinx.coroutines.flow.StateFlow<String?> get() = EmptyCommunityLinks
+    fun consumeCommunityLink() {}
+    val communitySystemShareSupported: Boolean get() = true
+    val communityPosterSupported: Boolean get() = false
+    suspend fun createCommunityPoster(info: xyz.xiangban.xiaoban.common.community.CommunityShare): androidx.compose.ui.graphics.ImageBitmap? = null
+    suspend fun saveCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
+    suspend fun shareCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
+    val supportsChatAttachments: Boolean get() = false
     /** 未接系统文件选择器的平台（当前 iOS）明确降级到网页，不申请全盘访问权限。 */
     val forumFilePickerSupported: Boolean get() = false
     suspend fun pickForumFile(image: Boolean, maxBytes: Long): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = null
@@ -45,6 +59,12 @@ interface PlatformActions : VoicePlatform {
     fun openUrl(url: String)
     /** 结束应用（最外面一页按返回）；平台不支持就什么也不做。 */
     fun exitApp() {}
+    /** 在独立沙箱中试玩游戏；平台未实现时返回 false。 */
+    fun openGame(id: String): Boolean = false
+    /** 导出兼容桌面的 ZIP，由用户在系统文件选择器中保存。 */
+    suspend fun exportGame(id: String): Boolean = false
+    /** 通过系统选择器读取用户明确选择的图片或文本文件。 */
+    suspend fun pickChatAttachment(image: Boolean): ChatAttachment? = null
     /** 横屏全屏的页面（散点图）进入时锁成横屏，离开时恢复；平台不支持就什么也不做。 */
     fun setLandscape(landscape: Boolean) {}
     /** 打开系统里这个应用的设置页（让用户去开麦克风权限）；平台不支持就返回 false。 */
@@ -102,6 +122,8 @@ class CommunityEnv(
     val prefs: AppPrefs = InMemoryPrefs(),
     /** 小伴AI 的对话历史存在哪里；不提供就只在这次打开应用期间记着。 */
     val chatFiles: ChatHistoryFiles = InMemoryChatHistoryFiles(),
+    val workspace: MobileWorkspace? = null,
+    val utcOffsetMinutes: Int = 0,
 ) {
     /** 对话历史是不是会留到下次打开应用。 */
     val chatsKept: Boolean get() = chatFiles !is InMemoryChatHistoryFiles
@@ -116,14 +138,19 @@ class CommunityEnv(
     val session = SessionManager(account, storage, now = { Clock.System.now().toEpochMilliseconds() }, onAccountChanged = { old, new -> accountChanged(old, new) })
     val forum = ForumApi(client, config) { session.accessToken() }
     val content = xyz.xiangban.xiaoban.common.community.ContentPublishingApi(client, config) { session.accessToken() }
+    val contentSocial = xyz.xiangban.xiaoban.common.community.ContentSocialApi(client, config) { session.accessToken() }
     val social = xyz.xiangban.xiaoban.common.community.SocialApi(client, config) { session.accessToken() }
     val challenges = xyz.xiangban.xiaoban.common.community.ChallengesApi(client, config) { session.accessToken() }
     val ai = AiGatewayApi(client, config) { session.accessToken() }
 
+    val games: MobileGameStore? = workspace?.let(::MobileGameStore)
+
     @OptIn(ExperimentalTime::class)
     val agent: AgentRuntime? = if (agentBridge != null && agentDir != null) {
-        val tools = listOfNotNull(reminders?.let { SetReminderTool(it) { Clock.System.now().toEpochMilliseconds() } })
-        AgentRuntime(agentBridge, { body, onLine -> ai.postChatLines(body, onLine) }, tools, agentDir, AGENT_SYSTEM_PROMPT, scope)
+        val tools = listOfNotNull(reminders?.let { SetReminderTool(it) { Clock.System.now().toEpochMilliseconds() } }) +
+            workspace?.let(::mobileWorkspaceTools).orEmpty() + games?.let(::mobileGameTools).orEmpty() +
+            mobileGameActionTools(games, workspace, platform)
+        AgentRuntime(agentBridge, { body, onLine -> ai.postChatLines(body, onLine) }, tools, agentDir, AGENT_SYSTEM_PROMPT, scope, utcOffsetMinutes = utcOffsetMinutes)
     } else null
 
     val phoneLink = PhoneLink(
@@ -154,4 +181,9 @@ class CommunityEnv(
 
 private const val AGENT_SYSTEM_PROMPT =
     "你是小伴，用户随身的温和、真诚、靠谱的 AI 伙伴。回答直接清晰、重点突出，默认使用简体中文。" +
-        "你可以用工具帮用户做事；会改动手机上东西的操作，系统会先请用户确认。用户拒绝了就不要再试，直接告诉用户没有执行。"
+        "你可以用工具帮用户做事；会改动手机上东西的操作，系统会先请用户确认。用户拒绝了就不要再试，直接告诉用户没有执行。" +
+        "手机工作区内可以读写、编辑和搜索文本文件。制作游戏前先用 game_read_format 读取规范，" +
+        "用 todo 记录多步骤任务，用 ask_user 澄清影响结果的选择。逐步写草稿、校验后再安装；" +
+        "只有用户提出试玩或导出时才打开游戏或分享面板。用 game_runtime_read 查看试玩记录，" +
+        "没有实际试玩记录不能声称已测试通过。手机目前只创作独立窗口的离线文本小游戏，" +
+        "需要触控操作，也保留桌面键鼠操作。不要使用 CDN、ES module、localStorage 或系统权限。"

@@ -15,6 +15,8 @@ interface ChatHistoryFiles {
     fun delete(name: String)
     /** 智能体内核自己也存了一份对话，这里给出它的名字；删对话时一起删。没有就是 null。 */
     fun agentCopy(id: String): String? = null
+    /** 内核持久任务清单，随会话一起删除。 */
+    fun agentProgressCopy(id: String): String? = null
 }
 
 /** 不提供存放处时用它：对话只在这次打开应用期间记着。 */
@@ -97,6 +99,7 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
     fun delete(id: String): List<ChatSummary> {
         enqueue(chatName(id), null)
         files.agentCopy(id)?.let { enqueue(it, null) }
+        files.agentProgressCopy(id)?.let { enqueue(it, null) }
         index = index.filterNot { it.id == id }
         enqueue(indexName(), CommunityJson.encodeToString(index))
         return index

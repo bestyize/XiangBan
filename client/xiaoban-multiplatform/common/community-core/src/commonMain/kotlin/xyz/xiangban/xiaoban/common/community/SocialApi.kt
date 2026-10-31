@@ -57,6 +57,7 @@ fun notificationHeadline(n: CommunityNotification): String {
         "mention" -> "$who 在「${n.title}」里提到了你"
         "accepted" -> "你在「${n.title}」里的回答被采纳了"
         "pack_approved" -> "内容包「${n.title}」通过了审核"
+        "content_removed" -> "社区内容已下架"
         "pack_rejected" -> "内容包「${n.title}」未通过审核"
         else -> n.title.ifBlank { "社区消息" }
     }

@@ -120,6 +120,7 @@ data class Topic(
     val tags: List<String> = emptyList(),
     val pinned: Boolean = false,
     val featured: Boolean = false,
+    val locked: Boolean? = null,
     @SerialName("reply_count") val replyCount: Int = 0,
     @SerialName("like_count") val likeCount: Int = 0,
     @SerialName("view_count") val viewCount: Int = 0,
@@ -169,6 +170,9 @@ data class Post(
     @SerialName("created_at") val createdAt: String = "",
     /** 你屏蔽了这个作者：不返回正文 */
     val blocked: Boolean = false,
+    val mine: Boolean = false,
+    @SerialName("work_refs") val workRefs: List<ResolvedWorkReference> = emptyList(),
+    val attachments: List<ForumAttachment> = emptyList(),
 )
 
 // ───────────── 账号 ─────────────

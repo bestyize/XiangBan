@@ -1,3 +1,4 @@
+import type { ReplyExtras, ReplyContent, ReplySource } from './replyContent'
 import type {
   Attachment,
   Category,
@@ -122,11 +123,11 @@ export const api = {
   preview: (body: string) => request<{ html: string }>('POST', '/markdown/preview', { body }),
 
   posts: (topicId: number, page = 1) => request<Page<PostItem>>('GET', `/topics/${topicId}/posts${qs({ page })}`),
-  reply: (topicId: number, body: string, replyTo?: number | null) =>
-    request<{ id: number; floor: number }>('POST', `/topics/${topicId}/posts`, { body, reply_to: replyTo ?? null }),
-  updatePost: (id: number, body: string) => request<{ body_html: string }>('PATCH', `/posts/${id}`, { body }),
+  reply: (topicId: number, body: string, replyTo?: number | null, extras?: ReplyExtras) =>
+    request<{ id: number; floor: number }>('POST', `/topics/${topicId}/posts`, { body, reply_to: replyTo ?? null, ...extras }),
+  updatePost: (id: number, body: string, extras?: ReplyExtras) => request<{ body_html: string } & ReplyContent>('PATCH', `/posts/${id}`, { body, ...extras }),
   deletePost: (id: number) => request<unknown>('DELETE', `/posts/${id}`),
-  postSource: (id: number) => request<{ body: string }>('GET', `/posts/${id}/source`),
+  postSource: (id: number) => request<ReplySource>('GET', `/posts/${id}/source`),
 
   likeTopic: (id: number, on: boolean) =>
     request<{ liked: boolean; like_count: number }>(on ? 'PUT' : 'DELETE', `/topics/${id}/like`),

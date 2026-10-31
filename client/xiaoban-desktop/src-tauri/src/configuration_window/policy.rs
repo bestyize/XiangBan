@@ -1,10 +1,12 @@
 //! Only host-created configuration surfaces may request this narrow set of console operations.
 pub fn kind(label: &str) -> Option<&'static str> {
+    if label == "configuration-community" { return Some("community"); }
     if label == "configuration-settings" { return Some("settings"); }
     let suffix = label.strip_prefix("configuration-model-")?;
     (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("model")
 }
 pub fn command_allowed(role: &str, command: &str) -> bool {
+    if role == "community" { return ["get_settings","community_browse","community_schemes_status","community_schemes_save","community_schemes_remove","community_schemes_restore","community_schemes_cloud_enabled","community_schemes_cloud","open_download_url"].contains(&command); }
     const COMMON: &[&str] = &[
         "get_settings", "get_app_info", "get_account_session", "get_website_status", "get_appearance",
         "get_ai_config", "refresh_ai_providers", "save_ai_provider", "delete_ai_provider", "switch_ai_provider",
@@ -40,6 +42,11 @@ pub fn command_allowed(role: &str, command: &str) -> bool {
             assert!(!command_allowed(role, "library_remove"));
             assert!(!command_allowed(role, "configuration_window_reply"));
         }
+        assert_eq!(kind("configuration-community"),Some("community"));
+        assert!(command_allowed("community","community_schemes_status"));
+        assert!(!command_allowed("community","get_account_session"));
+        assert!(!command_allowed("community","chat_send"));
+        assert!(!command_allowed("community","save_network_config"));
         assert!(command_allowed("settings", "save_network_config"));
         assert!(!command_allowed("model", "save_network_config"));
         assert!(command_allowed("settings", "set_chat_composer_pet"));

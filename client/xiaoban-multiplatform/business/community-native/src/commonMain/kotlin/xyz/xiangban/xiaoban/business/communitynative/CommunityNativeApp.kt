@@ -80,7 +80,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                 AnimatedContent(targetState = Tab.valueOf(tab), modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) }, label = "主导航切换") { currentTab ->
                     when (currentTab) {
                         Tab.Ai -> AiHomeScreen(env, chat, ::push, { aiDrawerOpen = true })
-                        Tab.Games -> GamesScreen()
+                        Tab.Games -> GamesScreen(env, chat, ::push)
                         Tab.Community -> CommunityScreen(env, ::push)
                         Tab.Mine -> MineScreen(env, ::push)
                     }
@@ -109,6 +109,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                     }
                 }
             }
+            CommunityLinkConfirmation(env, ::push)
             OverlayTransition(publishOpen) { panel ->
                 PublishSheet(
                     env,
@@ -133,6 +134,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.Pack -> PackDetailScreen(env, route.id, pop, push)
         is Route.Ability -> AbilityDetailScreen(env, route.id, pop, push)
         is Route.Scheme -> SchemeDetailScreen(env, route.id, pop, push)
+        Route.SchemeBackups -> NativeSchemeBackupsScreen(env, pop, push)
         Route.MyWorks -> MyContentScreen(env, pop, push)
         Route.Notifications -> NativeNotificationsScreen(env, pop, push)
         Route.Challenges -> NativeChallengesScreen(env, pop, push)

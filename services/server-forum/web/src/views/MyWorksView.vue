@@ -52,7 +52,7 @@ watch(schemeTab, value => { if (!value) load() }, { immediate: true })
 <template>
   <ContentShell>
     <div class="head">
-      <h1>我的作品</h1>
+      <h1>我的作品</h1><RouterLink to="/me/content-bookmarks">作品收藏</RouterLink>
       <RouterLink class="btn btn-primary" :to="schemeTab ? '/schemes/new' : '/publish'">{{ schemeTab ? '发布方案' : '发布内容包' }}</RouterLink>
     </div>
     <nav class="works-tabs" aria-label="我的社区内容"><RouterLink to="/me/works" :class="{ active: !schemeTab }">内容包</RouterLink><RouterLink :to="{ path: '/me/works', query: { tab: 'schemes' } }" :class="{ active: schemeTab }">方案</RouterLink></nav>

@@ -59,6 +59,19 @@ fn data(chunk: Value) -> Vec<String> {
     vec![format!("data: {chunk}"), String::new()]
 }
 
+fn answer_text(engine: &Engine, request: &Value, text: &str) {
+    let mut sse = data(json!({ "choices": [{ "index": 0, "delta": { "content": text }, "finish_reason": "stop" }] }));
+    sse.extend(["data: [DONE]".to_string(), String::new()]);
+    reply_with(engine, request["id"].as_str().unwrap(), &sse);
+}
+
+fn ask_tool(engine: &Engine, request: &Value, name: &str, arguments: Value, call_id: &str) {
+    let mut sse = data(json!({ "choices": [{ "index": 0, "delta": { "tool_calls": [{ "index": 0, "id": call_id, "type": "function",
+        "function": { "name": name, "arguments": arguments.to_string() } }] }, "finish_reason": "tool_calls" }] }));
+    sse.extend(["data: [DONE]".to_string(), String::new()]);
+    reply_with(engine, request["id"].as_str().unwrap(), &sse);
+}
+
 #[test]
 fn a_run_calls_a_host_tool_after_the_user_agrees_and_answers_in_text() {
     let dir = temp_dir("tool");
@@ -199,5 +212,185 @@ fn without_a_model_the_request_leaves_the_field_out() {
     let request = next_of(&engine, "model_request");
     let body: Value = serde_json::from_str(request["body"].as_str().unwrap()).unwrap();
     assert!(body.get("model").is_none(), "{body}");
+    engine.stop();
+}
+
+#[test]
+fn todo_progress_and_handoff_are_restored_after_restarting_the_engine() {
+    let dir = temp_dir("progress");
+    let engine = Engine::start(&config(&dir)).unwrap();
+    engine.send(&json!({ "type": "run", "id": "r1", "session": "game", "input": "做一个小游戏" }).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    ask_tool(&engine, &request, "todo", json!({
+        "todos": [{ "content": "实现触控", "status": "in_progress", "evidence": "index.html 已创建" }],
+        "handoff": "下一步检查双指触控"
+    }), "plan");
+    let request = next_of(&engine, "model_request");
+    answer_text(&engine, &request, "需要你确认触控方式吗？");
+    assert_eq!(next_of(&engine, "run_end")["ok"], true);
+    engine.stop();
+
+    let engine = Engine::start(&config(&dir)).unwrap();
+    engine.send(&json!({ "type": "run", "id": "r2", "session": "game", "input": "继续" }).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    let body: Value = serde_json::from_str(request["body"].as_str().unwrap()).unwrap();
+    let checkpoint = body["messages"].as_array().unwrap().iter().find(|m| m["content"].as_str().is_some_and(|s| s.starts_with("任务进度记录"))).expect("the independent progress checkpoint is injected");
+    assert!(checkpoint["content"].as_str().unwrap().contains("下一步检查双指触控"));
+    assert!(checkpoint["content"].as_str().unwrap().contains("index.html 已创建"));
+    answer_text(&engine, &request, "已恢复进度。");
+    assert_eq!(next_of(&engine, "run_end")["ok"], true);
+
+    engine.send(&json!({ "type": "run", "id": "r3", "session": "other", "input": "你好" }).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    let body: Value = serde_json::from_str(request["body"].as_str().unwrap()).unwrap();
+    assert!(!body["messages"].to_string().contains("双指触控"), "progress is isolated by session");
+    answer_text(&engine, &request, "你好。");
+    assert_eq!(next_of(&engine, "run_end")["ok"], true);
+    engine.stop();
+}
+
+#[test]
+fn repeated_identical_host_calls_are_warned_about_and_then_blocked() {
+    let dir = temp_dir("repeat");
+    let mut settings: Value = serde_json::from_str(&config(&dir)).unwrap();
+    settings["tools"][0]["risk"] = json!("read");
+    let engine = Engine::start(&settings.to_string()).unwrap();
+    engine.send(&json!({ "type": "run", "id": "r1", "session": "s1", "input": "检查提醒状态" }).to_string()).unwrap();
+    let mut request = next_of(&engine, "model_request");
+    for count in 1..=6 {
+        ask_tool(&engine, &request, "set_reminder", json!({ "title": "相同", "minutes": 1 }), &format!("c{count}"));
+        if count <= 5 {
+            let tool = next_of(&engine, "tool_request");
+            engine.send(&json!({ "type": "tool_result", "id": tool["id"], "ok": true, "output": "same state" }).to_string()).unwrap();
+        }
+        loop {
+            let line = next(&engine, Duration::from_secs(10));
+            assert_ne!(line["type"], "tool_request", "the sixth identical call must be blocked");
+            if line["type"] == "model_request" {
+                request = line;
+                break;
+            }
+        }
+        let body: Value = serde_json::from_str(request["body"].as_str().unwrap()).unwrap();
+        if count == 3 {
+            assert!(body["messages"].to_string().contains("same result 3 times"));
+        }
+        if count == 6 {
+            assert!(body["messages"].to_string().contains("Not run:"));
+        }
+    }
+    answer_text(&engine, &request, "状态没有变化，已停止重复检查。");
+    assert_eq!(next_of(&engine, "run_end")["ok"], true);
+    engine.stop();
+}
+
+#[test]
+fn empty_answers_pause_after_three_continuations_instead_of_finishing_successfully() {
+    let dir = temp_dir("no-progress");
+    let engine = Engine::start(&config(&dir)).unwrap();
+    engine.send(&json!({ "type": "run", "id": "r1", "session": "s1", "input": "继续制作" }).to_string()).unwrap();
+    for _ in 0..4 {
+        let request = next_of(&engine, "model_request");
+        answer_text(&engine, &request, "");
+    }
+    let end = next_of(&engine, "run_end");
+    assert_eq!(end["ok"], false);
+    assert!(end["error"].as_str().unwrap().contains("no_progress"), "{end}");
+    // A real new user message may resume the same session after the pause.
+    engine.send(&json!({ "type": "run", "id": "r2", "session": "s1", "input": "先给我当前结果" }).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    answer_text(&engine, &request, "当前没有生成作品。");
+    assert_eq!(next_of(&engine, "run_end")["ok"], true);
+    engine.stop();
+}
+
+#[test]
+fn ask_user_accepts_answers_and_dismissal_through_the_existing_stdio_protocol() {
+    let dir = temp_dir("question");
+    let engine = Engine::start(&config(&dir)).unwrap();
+    for (id, answer, expected) in [("r1", Some("竖屏"), "The user answered: 竖屏"), ("r2", None, "dismissed the question")] {
+        engine.send(&json!({ "type": "run", "id": id, "session": "s1", "input": "设计游戏" }).to_string()).unwrap();
+        let request = next_of(&engine, "model_request");
+        ask_tool(&engine, &request, "ask_user", json!({ "question": "使用什么方向？", "options": ["竖屏", "横屏"] }), id);
+        let question = next_of(&engine, "question");
+        assert_eq!(question["session"], "s1");
+        assert_eq!(question["question"], "使用什么方向？");
+        assert_eq!(question["options"], json!(["竖屏", "横屏"]));
+        engine.send(&json!({ "type": "answer", "id": question["id"], "answer": answer }).to_string()).unwrap();
+        let request = next_of(&engine, "model_request");
+        let body: Value = serde_json::from_str(request["body"].as_str().unwrap()).unwrap();
+        assert!(body["messages"].to_string().contains(expected), "{body}");
+        answer_text(&engine, &request, "已收到。");
+        assert_eq!(next_of(&engine, "run_end")["ok"], true);
+    }
+    engine.stop();
+}
+
+#[test]
+fn cancelling_while_waiting_for_an_answer_releases_the_question_and_session() {
+    let dir = temp_dir("question-cancel");
+    let engine = Engine::start(&config(&dir)).unwrap();
+    engine.send(&json!({ "type": "run", "id": "r1", "session": "s1", "input": "设计游戏" }).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    ask_tool(&engine, &request, "ask_user", json!({ "question": "选哪种玩法？" }), "q1");
+    let question = next_of(&engine, "question");
+    engine.send(&json!({ "type": "cancel", "id": "r1" }).to_string()).unwrap();
+    let end = next_of(&engine, "run_end");
+    assert_eq!(end["ok"], false);
+    assert!(end["error"].as_str().unwrap().contains("cancel"), "{end}");
+    engine.send(&json!({ "type": "answer", "id": question["id"], "answer": "迟到的回答" }).to_string()).unwrap();
+    assert!(next_of(&engine, "error")["message"].as_str().unwrap().contains("no open question"));
+    engine.send(&json!({ "type": "run", "id": "r2", "session": "s1", "input": "先不用做了" }).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    answer_text(&engine, &request, "好的。");
+    assert_eq!(next_of(&engine, "run_end")["ok"], true);
+    engine.stop();
+}
+
+#[test]
+fn transient_model_failures_stop_after_two_retries() {
+    let dir = temp_dir("retry");
+    let engine = Engine::start(&config(&dir)).unwrap();
+    engine.send(&json!({ "type": "run", "id": "r1", "session": "s1", "input": "你好" }).to_string()).unwrap();
+    for _ in 0..3 {
+        let request = next_of(&engine, "model_request");
+        engine.send(&json!({ "type": "model_end", "id": request["id"], "status": 503, "body": "temporarily unavailable" }).to_string()).unwrap();
+    }
+    let end = next_of(&engine, "run_end");
+    assert_eq!(end["ok"], false);
+    assert!(end["error"].as_str().unwrap().contains("HTTP 503"), "{end}");
+    engine.stop();
+}
+
+#[test]
+fn text_and_image_parts_reach_the_host_model_request_without_changing_jni() {
+    let dir = temp_dir("image");
+    let engine = Engine::start(&config(&dir)).unwrap();
+    let image_url = "data:image/png;base64,iVBORw0KGgo=";
+    engine.send(&json!({ "type": "run", "id": "r1", "session": "s1", "parts": [
+        { "type": "text", "text": "参考这个画面" }, { "type": "image", "url": image_url }
+    ] }).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    let body: Value = serde_json::from_str(request["body"].as_str().unwrap()).unwrap();
+    let user = body["messages"].as_array().unwrap().iter().find(|m| m["role"] == "user").unwrap();
+    assert_eq!(user["content"][0], json!({ "type": "text", "text": "参考这个画面" }));
+    assert_eq!(user["content"][1], json!({ "type": "image_url", "image_url": { "url": image_url } }));
+    answer_text(&engine, &request, "参考图已收到。");
+    assert_eq!(next_of(&engine, "run_end")["ok"], true);
+    engine.stop();
+}
+
+#[test]
+fn time_now_uses_the_phones_optional_utc_offset() {
+    let dir = temp_dir("timezone");
+    let engine = Engine::start(&json!({ "sessions_dir": dir, "utc_offset_minutes": 480 }).to_string()).unwrap();
+    engine.send(&json!({ "type": "run", "id": "r1", "session": "s1", "input": "现在几点" }).to_string()).unwrap();
+    let request = next_of(&engine, "model_request");
+    ask_tool(&engine, &request, "time_now", json!({}), "time");
+    let request = next_of(&engine, "model_request");
+    let body: Value = serde_json::from_str(request["body"].as_str().unwrap()).unwrap();
+    assert!(body["messages"].to_string().contains("UTC+08:00"), "{body}");
+    answer_text(&engine, &request, "这是本地时间。");
+    assert_eq!(next_of(&engine, "run_end")["ok"], true);
     engine.stop();
 }

@@ -452,6 +452,13 @@ class CloudAssistant(private val chat: CloudChatController) : CallAssistant {
     }
 
     override fun prompt(): CallPrompt? {
+        chat.state.value.question?.let { question ->
+            return CallPrompt(
+                title = question.question, detail = if (question.options.isEmpty()) "可在对话页输入回答，或先跳过这个问题。" else "", danger = null, question = true,
+                options = question.options.mapIndexed { index, label -> CallPromptOption("answer:${question.id}:$index", label) } +
+                    CallPromptOption("dismiss:${question.id}", "跳过", CallPromptOption.Role.Deny),
+            )
+        }
         val approval = chat.state.value.approval ?: return null
         return CallPrompt(
             title = "小伴想要${toolLabel(approval.tool)}", detail = approval.detail, danger = approval.danger, question = false,
@@ -463,7 +470,16 @@ class CloudAssistant(private val chat: CloudChatController) : CallAssistant {
         )
     }
 
-    override fun answerPrompt(id: String) = chat.answerApproval(id)
+    override fun answerPrompt(id: String) {
+        val question = chat.state.value.question
+        if (question != null) {
+            if (id == "dismiss:${question.id}") chat.answerQuestion(null)
+            else if (id.startsWith("answer:${question.id}:")) {
+                val index = id.removePrefix("answer:${question.id}:").toIntOrNull() ?: return
+                question.options.getOrNull(index)?.let(chat::answerQuestion)
+            }
+        } else if (id in setOf("once", "always", "deny")) chat.answerApproval(id)
+    }
 }
 
 /**

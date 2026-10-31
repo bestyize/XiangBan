@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -107,6 +108,7 @@ data class AiRedeemed(
 data class ChatMessage(
     val role: String,
     val content: String,
+    val attachments: List<ChatAttachment> = emptyList(),
 )
 
 /** 与桌面端 `pickTier` 保持一致：优先保留当前可用选择，否则取默认档位，再退回第一个可用档位。 */
@@ -292,7 +294,8 @@ class AiGatewayApi(
                     for (m in messages) {
                         add(buildJsonObject {
                             put("role", m.role)
-                            put("content", m.content)
+                            if (m.attachments.isEmpty()) put("content", m.content)
+                            else put("content", attachmentParts(m.content, m.attachments, chatCompletions = true))
                         })
                     }
                 },
@@ -416,6 +419,7 @@ data class ChatTurn(
     val tools: List<ToolCallInfo> = emptyList(),
     /** 处理过的授权、回答过的问题留下的痕迹。 */
     val records: List<ChatRecord> = emptyList(),
+    val attachments: List<ChatAttachment> = emptyList(),
 )
 
 /** 智能体要改动东西之前问用户：同意这一次，还是拒绝。 */
@@ -425,6 +429,8 @@ data class ChatApproval(
     val detail: String = "",
     val danger: String? = null,
 )
+
+data class ChatQuestion(val id: String, val question: String, val options: List<String>)
 
 data class CloudChatState(
     val tiers: List<AiTier> = emptyList(),
@@ -438,6 +444,7 @@ data class CloudChatState(
     val redeemMessage: String? = null,
     val redeemError: String? = null,
     val approval: ChatApproval? = null,
+    val question: ChatQuestion? = null,
     /** 当前对话的编号（智能体内核也按它存对话）。 */
     val conversationId: String = "",
     /** 存下来的对话，最近的在前。 */
@@ -516,7 +523,7 @@ class CloudChatController(
         agentSession = id
         agentRun = null
         nextId = (saved.maxOfOrNull { it.id } ?: 0L) + 1
-        _state.value = _state.value.copy(messages = saved, approval = null)
+        _state.value = _state.value.copy(messages = saved, approval = null, question = null)
     }
 
     /** 删掉一个存下来的对话；删的是正在看的就换成新对话。 */
@@ -573,44 +580,51 @@ class CloudChatController(
 
     fun send(rawPrompt: String) = sendPrompt(rawPrompt, "")
 
+    fun sendWithAttachments(rawPrompt: String, attachments: List<ChatAttachment>) = sendPrompt(rawPrompt, "", attachments)
+
     fun sendVoice(rawPrompt: String, note: String) = sendPrompt(rawPrompt, note)
 
-    private fun sendPrompt(rawPrompt: String, note: String) {
-        val prompt = rawPrompt.trim()
+    private fun sendPrompt(rawPrompt: String, note: String, attachments: List<ChatAttachment> = emptyList()) {
+        val prompt = rawPrompt.trim().ifEmpty { if (attachments.isNotEmpty()) "请查看附件。" else "" }
         if (prompt.isEmpty() || _state.value.sending) return
-        val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt)
+        validateChatAttachments(attachments)
+        val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, attachments = attachments)
         val replyId = nextId++
         val assistantTurn = ChatTurn(id = replyId, role = "assistant", text = "", streaming = true)
         val history = buildList {
             if (systemPrompt.isNotBlank()) add(ChatMessage("system", systemPrompt))
             for (turn in _state.value.messages) {
                 if (turn.error == null && turn.text.isNotBlank()) {
-                    add(ChatMessage(turn.role, turn.text))
+                    add(ChatMessage(turn.role, turn.text, turn.attachments))
                 }
             }
-            add(ChatMessage("user", note + prompt))
+            add(ChatMessage("user", note + prompt, attachments))
         }
         val tier = _state.value.selectedTier.ifEmpty { null }
         _state.value = _state.value.copy(
             messages = _state.value.messages + userTurn + assistantTurn,
             sending = true,
             approval = null,
+            question = null,
         )
         persist()
         if (agent != null) {
             agentReplyId = replyId
+            val session = agentSession
             chatJob = scope.launch {
                 try {
                     agent.ensureStarted(tier ?: "")
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     // 先记下这一轮的编号再发出去，免得回来的事件比赋值还早。
                     val runId = agent.nextRunId()
                     agentRun = runId
-                    agent.run(agentSession, note + prompt, runId)
+                    agent.run(session, note + prompt, runId, attachments)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     updateTurn(replyId) { it.copy(streaming = false, error = "智能体启动失败：${e.message ?: "未知原因"}") }
-                    _state.value = _state.value.copy(sending = false)
+                    agentRun = null
+                    _state.value = _state.value.copy(sending = false, approval = null, question = null)
                     persist()
                 }
             }
@@ -653,9 +667,9 @@ class CloudChatController(
         if (current.sending) return
         val index = current.messages.indexOfLast { it.role == "user" }
         if (index < 0) return
-        val prompt = current.messages[index].text
+        val turn = current.messages[index]
         _state.value = current.copy(messages = current.messages.take(index))
-        send(prompt)
+        sendWithAttachments(turn.text, turn.attachments)
     }
 
     /** 停止正在生成的流式回复，保留已输出的部分文字。 */
@@ -663,13 +677,15 @@ class CloudChatController(
         val wasSending = _state.value.sending
         chatJob?.cancel()
         chatJob = null
-        agentRun?.let { agent?.cancel(it) }
+        val run = agentRun
+        agentRun = null
+        run?.let { agent?.cancel(it) }
         val updated = _state.value.messages.mapNotNull { turn ->
             if (!turn.streaming) turn
             else if (turn.text.isEmpty() && turn.error == null) null
             else turn.copy(streaming = false, tools = settleTools(turn.tools, false))
         }
-        _state.value = _state.value.copy(messages = updated, sending = false, approval = null)
+        _state.value = _state.value.copy(messages = updated, sending = false, approval = null, question = null)
         if (wasSending) persist()
     }
 
@@ -677,16 +693,24 @@ class CloudChatController(
         stop()
         agentSession = newSessionId()
         agentRun = null
-        _state.value = _state.value.copy(messages = emptyList(), approval = null)
+        _state.value = _state.value.copy(messages = emptyList(), approval = null, question = null)
     }
 
     /** 回答智能体的确认：`once` 允许这一次，`deny` 拒绝。 */
     fun answerApproval(decision: String) {
         val pending = _state.value.approval ?: return
-        _state.value = _state.value.copy(approval = null)
+        _state.value = _state.value.copy(approval = null, question = null)
         agent?.answerApproval(pending.id, decision)
         val record = ChatRecord("approval", toolLabel(pending.tool), if (decision == "deny") null else "已允许")
         updateTurn(agentReplyId) { it.copy(records = it.records + record) }
+        persist()
+    }
+
+    fun answerQuestion(answer: String?) {
+        val pending = _state.value.question ?: return
+        agent?.answerQuestion(pending.id, answer)
+        _state.value = _state.value.copy(question = null)
+        updateTurn(agentReplyId) { it.copy(records = it.records + ChatRecord("answer", pending.question, answer)) }
         persist()
     }
 
@@ -711,24 +735,28 @@ class CloudChatController(
                     })
                 }
             }
-            is AgentEvent.Approval -> _state.value = _state.value.copy(
+            is AgentEvent.Approval -> if (event.run == agentRun && _state.value.sending) _state.value = _state.value.copy(
                 approval = ChatApproval(event.id, event.tool, summarizeToolArguments(event.tool, event.arguments.toString()), event.danger),
             )
+            is AgentEvent.Question -> if (event.run == agentRun && event.session == agentSession && _state.value.sending) {
+                _state.value = _state.value.copy(question = ChatQuestion(event.id, event.question, event.options))
+            }
             is AgentEvent.RunEnd -> if (event.run == agentRun) {
                 val failure = if (event.ok) null else friendlyAgentError(event.error)
                 updateTurn(agentReplyId) { turn ->
                     // 只调工具、没有说话的一轮，回复里留空；失败时把原因挂在这条回复上。
                     turn.copy(streaming = false, error = failure, text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text, tools = settleTools(turn.tools, !event.ok))
                 }
-                _state.value = _state.value.copy(sending = false, approval = null)
+                _state.value = _state.value.copy(sending = false, approval = null, question = null)
                 agentRun = null
                 persist()
                 if (!event.ok && (failure.orEmpty().contains("额度") || failure.orEmpty().contains("兑换"))) refreshBalanceQuietly()
                 else if (event.ok) refreshBalanceQuietly()
             }
-            is AgentEvent.Failure -> {
+            is AgentEvent.Failure -> if (agentRun != null && _state.value.sending && (event.runs == null || agentRun in event.runs)) {
                 updateTurn(agentReplyId) { it.copy(streaming = false, error = event.message, tools = settleTools(it.tools, true)) }
-                _state.value = _state.value.copy(sending = false, approval = null)
+                agentRun = null
+                _state.value = _state.value.copy(sending = false, approval = null, question = null)
                 persist()
             }
         }

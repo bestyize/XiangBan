@@ -106,15 +106,3 @@ private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySecti
         }
     }
 }
-
-/** 游戏：小游戏的玩法和试玩还没有接入手机端，先把入口位置占住，并说清楚。 */
-@Composable
-fun GamesScreen() {
-    Column(Modifier.fillMaxSize()) {
-        HomeBar("游戏")
-        Hairline()
-        Box(Modifier.weight(1f).fillMaxWidth().padding(bottom = NavInset), contentAlignment = Alignment.Center) {
-            EmptyState(XIcons.Gamepad, "游戏还在路上", "社区里的小游戏很快就能在手机上试玩。现在可以先去社区的“首页 → 游戏”里看看别人做的游戏。")
-        }
-    }
-}

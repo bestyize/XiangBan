@@ -7,6 +7,7 @@ import { adminApi, adminAuth, clearAdminToken } from '@/api/admin'
 import AdminLogin from './AdminLogin.vue'
 import OverviewPanel from './OverviewPanel.vue'
 import ReportsPanel from './ReportsPanel.vue'
+import ContentReportsPanel from './ContentReportsPanel.vue'
 import TopicsPanel from './TopicsPanel.vue'
 import UsersPanel from './UsersPanel.vue'
 import EditorPanel from './EditorPanel.vue'
@@ -22,6 +23,7 @@ import DiscoverPanel from './DiscoverPanel.vue'
 import CollectionPanel from './CollectionPanel.vue'
 import ToolMirrorsPanel from './ToolMirrorsPanel.vue'
 import CommunityEditorialPanel from './CommunityEditorialPanel.vue'
+import CommunityOperationsPanel from './CommunityOperationsPanel.vue'
 import AuditPanel from './AuditPanel.vue'
 import AccountPanel from './AccountPanel.vue'
 import { openReports, toasts } from './shared'
@@ -33,6 +35,7 @@ const SECTIONS = [
   { key: '', label: '概览', comp: OverviewPanel },
   { key: 'metrics', label: '数据', comp: MetricsPanel },
   { key: 'reports', label: '举报', comp: ReportsPanel },
+  { key: 'content-reports', label: '作品举报', comp: ContentReportsPanel },
   { key: 'topics', label: '帖子', comp: TopicsPanel },
   { key: 'users', label: '用户', comp: UsersPanel },
   { key: 'editor-accounts', label: '编辑账号', comp: EditorAccounts },
@@ -45,6 +48,7 @@ const SECTIONS = [
   { key: 'weekly', label: '周刊', comp: WeeklyPanel },
   { key: 'discover', label: '发现页', comp: DiscoverPanel },
   { key: 'collection', label: '内容采集', comp: CollectionPanel },
+  { key: 'community-operations', label: '栏目运营', comp: CommunityOperationsPanel },
   { key: 'tool-mirrors', label: '工具镜像', comp: ToolMirrorsPanel },
   { key: 'community-editorial', label: '精选与挑战', comp: CommunityEditorialPanel },
   { key: 'audit', label: '操作日志', comp: AuditPanel },
@@ -53,11 +57,12 @@ const SECTIONS = [
 
 const GROUPS = [
   { label: '工作台', keys: ['', 'metrics'] },
-  { label: '内容运营', keys: ['discover', 'collection', 'tool-mirrors', 'community-editorial', 'packs', 'projects', 'weekly', 'editor', 'editor-accounts'] },
-  { label: '社区治理', keys: ['reports', 'moderation', 'topics', 'users', 'categories', 'words'] },
+  { label: '内容运营', keys: ['discover', 'collection', 'community-operations', 'tool-mirrors', 'community-editorial', 'packs', 'projects', 'weekly', 'editor', 'editor-accounts'] },
+  { label: '社区治理', keys: ['reports', 'content-reports', 'moderation', 'topics', 'users', 'categories', 'words'] },
   { label: '系统', keys: ['audit', 'account'] },
 ].map(group => ({...group, sections: group.keys.map(key => SECTIONS.find(section => section.key === key)!)}))
 const DESCRIPTIONS: Record<string,string> = {
+  'community-operations': '核对栏目内容与来源新鲜度，检查维护链接',
   'tool-mirrors': '核验官方安装包，管理资源镜像和下载回退',
   collection: '管理官方数据源，检查采集记录与待审内容', discover: '编排社区栏目，保存草稿并审核发布',
   'community-editorial': '选择首页作品，发起挑战并管理投稿', packs: '审核作品、版本和资源来源',

@@ -216,7 +216,8 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
                     peers.any { it.online } -> peers.first { it.online }.name + " · 在线"
                     else -> "${peers.size} 台设备 · 离线"
                 }
-                NavRow("帖子收藏", first = true) { open(if (session.loggedIn) Route.Bookmarks else Route.Login) }
+                NavRow("我的收藏", first = true) { open(if (session.loggedIn) Route.Bookmarks else Route.Login) }
+                NavRow("账号方案备份") { open(if (session.loggedIn) Route.SchemeBackups else Route.Login) }
                 NavRow("关注与粉丝") { session.accountId?.let { open(Route.User(it, "following")) } ?: open(Route.Login) }
                 NavRow("屏蔽的用户") { open(if (session.loggedIn) Route.Blocks else Route.Login) }
                 NavRow("模型与额度") { open(Route.Models) }

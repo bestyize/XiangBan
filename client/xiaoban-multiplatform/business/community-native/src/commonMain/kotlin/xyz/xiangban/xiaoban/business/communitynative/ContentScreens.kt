@@ -42,6 +42,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +68,7 @@ import xyz.xiangban.xiaoban.common.community.formatSize
 import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.kindLabel
 import xyz.xiangban.xiaoban.common.community.messageOf
+import xyz.xiangban.xiaoban.common.community.replyCanEdit
 
 // ───────────── 共用部件 ─────────────
 
@@ -122,23 +125,7 @@ fun Toast(text: String?, onGone: () -> Unit) {
 /** 分享弹层：预览卡片加“系统分享”“复制链接”。手机上分享的是网页链接，对方在电脑上打开后再用小伴桌面版。 */
 @Composable
 internal fun ShareSheet(env: CommunityEnv, title: String, sub: String, url: String, heading: String = "分享", hint: String? = null, onDismiss: () -> Unit, onCopied: () -> Unit, panelModifier: Modifier = Modifier) {
-    BottomSheet(onDismiss, panelModifier) {
-        Text(heading, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-        Row(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.background).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Brand.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) { XIcon(XIcons.Link, tint = Brand, size = 24.dp) }
-            Column(Modifier.weight(1f)) {
-                Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (sub.isNotBlank()) Text(sub, Modifier.padding(top = 2.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        if (hint != null) Text(hint, Modifier.padding(top = 12.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val platform = env.platform
-        Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GhostPillButton("复制链接", { platform?.copy(url); onDismiss(); onCopied() }, Modifier.weight(1f), enabled = platform != null)
-            PillButton("分享…", { platform?.share(title, url); onDismiss() }, Modifier.weight(1f), enabled = platform != null)
-        }
-        GhostPillButton("取消", onDismiss, Modifier.padding(top = 10.dp).fillMaxWidth())
-    }
+    CommunityShareSheet(env, url, heading, hint, onDismiss, onCopied, panelModifier)
 }
 
 @Composable
@@ -214,6 +201,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                         }
                         if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 16.dp), fontSize = 15.sp, lineHeight = 26.sp)
                         if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, Modifier.padding(top = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (pack.status == "published") ContentSocialActions(env, "pack", pack.id, open)
                         val changes = pack.versions.filter { it.changelog.isNotBlank() }
                         if (changes.isNotEmpty()) {
                             Text("更新记录", Modifier.padding(top = 24.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -259,12 +247,16 @@ internal class HelpAnswers(val acceptedPostId: Long?, val authorUid: String, val
 
 /** 作品对应的讨论帖里的评论，分页加载。[reloadKey] 变化时从头重新加载（发完回复后用）。 */
 @Composable
-internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0, hint: String = "评论和点赞请在网页端进行：", help: HelpAnswers? = null, open: ((Route) -> Unit)? = null) {
-    var posts by remember(topicId, reloadKey) { mutableStateOf<List<Post>>(emptyList()) }
-    var page by remember(topicId, reloadKey) { mutableStateOf(0) }
-    var more by remember(topicId, reloadKey) { mutableStateOf(true) }
-    var error by remember(topicId, reloadKey) { mutableStateOf<String?>(null) }
-    var busy by remember(topicId, reloadKey) { mutableStateOf(false) }
+internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0, hint: String = "评论和点赞请在网页端进行：", help: HelpAnswers? = null, open: ((Route) -> Unit)? = null, topicForEditing: Topic? = null) {
+    val session by env.session.state.collectAsState()
+    var localRevision by remember(topicId, reloadKey) { mutableStateOf(0) }
+    var editing by remember(topicId, session.accountId) { mutableStateOf<Post?>(null) }
+    var editTopic by remember(topicId, reloadKey, session.accountId) { mutableStateOf(topicForEditing) }
+    var posts by remember(topicId, reloadKey, localRevision) { mutableStateOf<List<Post>>(emptyList()) }
+    var page by remember(topicId, reloadKey, localRevision) { mutableStateOf(0) }
+    var more by remember(topicId, reloadKey, localRevision) { mutableStateOf(true) }
+    var error by remember(topicId, reloadKey, localRevision) { mutableStateOf<String?>(null) }
+    var busy by remember(topicId, reloadKey, localRevision) { mutableStateOf(false) }
     var retry by remember { mutableStateOf(0) }
 
     suspend fun load() {
@@ -283,13 +275,23 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
             busy = false
         }
     }
-    LaunchedEffect(topicId, retry, reloadKey) { load() }
+    LaunchedEffect(topicId, retry, reloadKey, localRevision) { load() }
 
+    LaunchedEffect(topicId, session.accountId, posts.any { it.mine }, topicForEditing) {
+        editTopic = topicForEditing ?: if (session.loggedIn && posts.any { it.mine }) runCatching { env.forum.topic(topicId) }.getOrNull() else null
+    }
+    editing?.let { post ->
+        var dismissRequest by remember(post.id) { mutableStateOf(0) }
+        Dialog(onDismissRequest = { dismissRequest++ }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            NativeReplyComposer(env, topicId, { editing = null }, { editing = null; localRevision++ }, Modifier, editingPost = post, dismissRequest = dismissRequest)
+        }
+    }
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp)) {
         Text("${if (help != null) "回答" else "评论"} ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         posts.forEach { post ->
             PostItem(
-                env, post, open = open,
+                env, post, open = open, topicId = topicId,
+                onEdit = if (session.loggedIn && replyCanEdit(post, session.accountId, editTopic)) ({ editing = post }) else null,
                 accepted = help?.acceptedPostId == post.id,
                 onAccept = if (help != null && help.canAccept && post.author.uid != help.authorUid) ({ help.onAccept(post) }) else null,
             )
@@ -307,7 +309,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
 }
 
 @Composable
-internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null, open: ((Route) -> Unit)? = null) {
+internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null, open: ((Route) -> Unit)? = null, topicId: Long? = null, onEdit: (() -> Unit)? = null) {
     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Avatar(post.author.nickname, 30.dp, showInitial = true)
         Column(Modifier.weight(1f)) {
@@ -319,8 +321,13 @@ internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, 
                 Text(if (post.blocked) "你已屏蔽该用户" else "该评论已被隐藏", Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp, color = LocalExtraColors.current.ink3)
             } else {
                 RichBody(env, post.bodyHtml, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp)
+                ReplyContentCards(post.workRefs, open)
+                ReplyAttachments(env, post.attachments, topicId)
             }
-            if (!post.blocked && post.status == "normal") NativeReportAction(env, "post", post.id, open)
+            if (!post.blocked && post.status == "normal") Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                if (onEdit != null && !accepted) Text("编辑", Modifier.clickable(onClick = onEdit), fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
+                NativeReportAction(env, "post", post.id, open)
+            }
             if (accepted) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 XIcon(XIcons.CheckBold, tint = Success, size = 16.dp)
                 Text("已采纳。这条回答已标记为解决方案，回答保留原文。", fontSize = 12.sp, color = Success)
@@ -393,7 +400,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                 onAccept = { post -> guarded { env.forum.acceptAnswer(topic.id, post.id); toast = "已采纳"; loader.reload() } },
                             )
                         }
-                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) { CommentsSection(env, id, reloadKey, hint = "", help = answers, open = open) }
+                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) { CommentsSection(env, id, reloadKey, hint = "", help = answers, open = open, topicForEditing = topic) }
                     }
                     Hairline()
                     Row(Modifier.fillMaxWidth().height(60.dp).background(MaterialTheme.colorScheme.surface).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -434,27 +441,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
 /** 写回复的弹层：多行输入加发送，失败时把服务端的原因显示在输入框下面。 */
 @Composable
 private fun ReplySheet(env: CommunityEnv, topicId: Long, onDismiss: () -> Unit, onSent: () -> Unit, panelModifier: Modifier) {
-    val scope = rememberCoroutineScope()
-    var text by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var uploading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    BottomSheet(onDismiss, panelModifier) {
-        Text("回复", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-        AreaBox(text, { text = it }, Modifier.padding(top = 12.dp), placeholder = "写下你的回复（至少 2 个字）…", minHeight = 120.dp, enabled = !busy, filled = true)
-        ForumUploadControls(env, enabled = !busy, onImage = { text += it }, onBusy = { uploading = it })
-        error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = Danger) }
-        Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GhostPillButton("取消", onDismiss, Modifier.weight(1f))
-            PillButton(if (busy) "发送中…" else if (uploading) "上传中…" else "发送", {
-                if (busy || uploading) return@PillButton
-                busy = true; error = null
-                scope.launch {
-                    try { env.forum.reply(topicId, text.trim()); onSent() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = messageOf(e) } finally { busy = false }
-                }
-            }, Modifier.weight(1f), enabled = !busy && !uploading && text.trim().length >= 2)
-        }
-    }
+    NativeReplyComposer(env, topicId, onDismiss, onSent, panelModifier)
 }
 
 @Composable

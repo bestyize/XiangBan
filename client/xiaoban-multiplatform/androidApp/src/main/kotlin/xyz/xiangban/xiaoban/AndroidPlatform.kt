@@ -45,6 +45,7 @@ class SharedPrefsTokenStorage(context: Context) : TokenStorage {
 class AndroidPlatformActions(
     private val context: Context,
     private val gate: () -> xyz.xiangban.xiaoban.common.community.SpeechGate? = { null },
+    private val attachments: AndroidChatAttachments? = null,
     requestMic: suspend () -> Boolean = { false },
 ) : PlatformActions {
     private val voice = AndroidVoice(context, requestMic)
@@ -131,6 +132,16 @@ class AndroidPlatformActions(
         val view = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { context.startActivity(view) }
     }
+
+    override val supportsChatAttachments: Boolean get() = attachments != null
+
+    override suspend fun pickChatAttachment(image: Boolean) = attachments?.pick(image)
+
+    override fun openGame(id: String): Boolean =
+        (context as? android.app.Activity)?.let { AndroidMobileGameHost(it).openGame(id) } ?: false
+
+    override suspend fun exportGame(id: String): Boolean =
+        (context as? android.app.Activity)?.let { AndroidMobileGameHost(it).exportGame(id) } ?: false
 
     override fun exitApp() {
         (context as? android.app.Activity)?.finish()

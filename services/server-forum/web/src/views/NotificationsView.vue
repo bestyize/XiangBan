@@ -24,12 +24,14 @@ function text(n: NotificationItem): string {
     case 'reply_to': return `${who} 回复了你在「${n.title}」里的回复`
     case 'mention': return `${who} 在「${n.title}」里提到了你`
     case 'accepted': return `你在「${n.title}」里的回答被采纳了`
+    case 'content_removed': return '你的社区内容已由管理员下架'
     case 'pack_approved': return `你的内容包「${n.title}」通过了审核`
     case 'pack_rejected': return `你的内容包「${n.title}」没有通过审核${n.excerpt ? `：${n.excerpt}` : ''}`
   }
 }
 
 function target(n: NotificationItem): string {
+  if (n.kind === 'content_removed' && !n.pack_id) return '/me/works?tab=schemes'
   if (n.pack_id) return `/packs/${n.pack_id}`
   return n.topic_id ? `/t/${n.topic_id}` : '/'
 }

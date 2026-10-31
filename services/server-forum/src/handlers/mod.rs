@@ -22,3 +22,5 @@ pub mod topics;
 
 
 pub mod editor;
+
+pub mod content_social;

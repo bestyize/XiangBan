@@ -241,6 +241,8 @@ class VoiceCallTest {
         val judging = java.util.concurrent.atomic.AtomicBoolean(false)
         val judged = java.util.concurrent.atomic.AtomicBoolean(false)
         val whileJudging = java.util.concurrent.atomic.AtomicBoolean(false)
+        val recognitionStarted = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val judgeStarted = kotlinx.coroutines.CompletableDeferred<Unit>()
         val afterJudging = AtomicInteger()
         val lateWhenAsked = AtomicInteger(-1)
         val client = HttpClient(MockEngine { request ->
@@ -255,13 +257,23 @@ class VoiceCallTest {
             override val name = "本地识别"
             override val local = true
             override suspend fun recognize(pcm: ByteArray): String {
+                recognitionStarted.complete(Unit)
+                judgeStarted.await()
                 if (judging.get()) whileJudging.set(true)
                 if (judged.get()) afterJudging.incrementAndGet()
                 delay(200)
                 return "现在几点"
             }
         }
-        val judge: suspend (ByteArray) -> Boolean? = { judging.set(true); delay(300); judging.set(false); judged.set(true); true }
+        val judge: suspend (ByteArray) -> Boolean? = {
+            judging.set(true)
+            judgeStarted.complete(Unit)
+            // Both jobs must start independently. A sequential implementation now times out,
+            // while executor scheduling order cannot cause a false failure.
+            recognitionStarted.await()
+            delay(300)
+            judging.set(false); judged.set(true); true
+        }
         val platform = BurstPlatform(frameMs = 20)
         // 0.6 秒的一句话：短于 1 秒，不会先出中间结果，只能靠停顿时的识别。
         platform.speak(30)

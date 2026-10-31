@@ -3,6 +3,7 @@ mod auth;
 mod config;
 mod collectors;
 mod community_editor;
+mod content_social;
 mod content;
 mod db;
 mod discover;
@@ -16,6 +17,9 @@ mod notifications;
 mod points;
 mod seo;
 mod state;
+mod scheme_backups;
+mod reply_content;
+mod link_health;
 mod tool_mirrors;
 mod users;
 
@@ -89,11 +93,13 @@ pub fn build_router(state: AppState) -> Router {
         .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
         .route("/attachments/{id}/purchase", post(attachments::purchase))
         .merge(packs::routes())
+        .merge(scheme_backups::routes())
+        .merge(handlers::content_social::routes())
         .merge(tool_mirrors::public_routes())
         .merge(discover_api::routes())
         .merge(handlers::model_rankings::routes())
         .merge(handlers::community_editor::public_routes())
-        .nest("/admin", admin::routes().merge(tool_mirrors::admin_routes()).merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(handlers::discover_editor::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()).nest("/collection", handlers::collection::routes()).nest("/community-editorial", handlers::community_editor::admin_routes()))
+        .nest("/admin", admin::routes().merge(link_health::admin_routes()).nest("/content-social",handlers::content_social::admin_routes()).merge(tool_mirrors::admin_routes()).merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(handlers::discover_editor::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()).nest("/collection", handlers::collection::routes()).nest("/community-editorial", handlers::community_editor::admin_routes()))
         .nest("/editor", handlers::editor::routes())
         .nest("/discover-editor", handlers::discover_editor::editor_routes());
 
@@ -146,6 +152,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         http: reqwest::Client::builder().timeout(Duration::from_secs(5)).build()?,
     };
     jobs::spawn(state.clone());
+    link_health::spawn(state.clone());
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, build_router(state).into_make_service_with_connect_info::<SocketAddr>()).await?;

@@ -12,11 +12,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import xyz.xiangban.xiaoban.common.community.AndroidMobileWorkspace
 import xyz.xiangban.xiaoban.common.community.nativeAgentBridgeOrNull
 import xyz.xiangban.xiaoban.common.link.SharedPrefsLinkStorage
 import xyz.xiangban.xiaoban.common.link.SqliteRemoteCache
 
 class MainActivity : ComponentActivity() {
+    private var sharingPlatform: CommunitySharingPlatform? = null
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        sharingPlatform?.accept(intent)
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -29,13 +36,15 @@ class MainActivity : ComponentActivity() {
             micWaiting = null
         }
         val speech = AndroidLocalSpeech(this)
-        val platform = AndroidPlatformActions(this, gate = speech::newGate) {
+        val platform = AndroidPlatformActions(this, gate = speech::newGate, attachments = AndroidChatAttachments(this)) {
             suspendCoroutine { continuation ->
                 micWaiting = continuation
                 micLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
-        val forumPlatform = ForumPickerPlatform(platform, AndroidForumPicker(this))
+        val forumPlatform = CommunitySharingPlatform(ForumPickerPlatform(platform, AndroidForumPicker(this)), this)
+        sharingPlatform = forumPlatform
+        forumPlatform.accept(intent)
         val linkStorage = SharedPrefsLinkStorage(this)
         val remoteCache = SqliteRemoteCache(this)
         // 小伴要给你设提醒时才会弹出通知权限的请求；没有内核库（本地没编 Rust 库的调试包）就只有纯云端聊天。
@@ -47,8 +56,10 @@ class MainActivity : ComponentActivity() {
         val agentDir = filesDir.resolve("agent").absolutePath
         val prefs = AndroidPrefs(this)
         val chatFiles = AndroidChatHistoryFiles(this)
+        val workspace = AndroidMobileWorkspace(filesDir.resolve("workspace"))
+        val utcOffset = java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60_000
         setContent {
-            App(storage, forumPlatform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles)
+            App(storage, forumPlatform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffset)
         }
         hideNavigationBar()
     }
