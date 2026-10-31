@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { deleteAttachment, uploadAttachment } from '@/api/forum'
 import type { Attachment } from '@/api/types'
 import { formatSize } from '@/lib/format'
@@ -7,8 +7,8 @@ import { useToast } from '@/stores/toast'
 
 const MAX_FILES = 5
 
-const props = defineProps<{ modelValue: Attachment[]; maxBytes: number }>()
-const emit = defineEmits<{ 'update:modelValue': [Attachment[]] }>()
+const props = defineProps<{ modelValue: Attachment[]; maxBytes: number; disabled?: boolean }>()
+const emit = defineEmits<{ 'update:modelValue': [Attachment[]]; uploading: [boolean] }>()
 
 const toast = useToast()
 const input = ref<HTMLInputElement | null>(null)
@@ -16,13 +16,17 @@ const uploading = ref<{ key: number; name: string; ratio: number }[]>([])
 /** 这次编辑里新传的附件。删掉时直接撤销上传；原来就挂在帖子上的，等保存时由服务端移除。 */
 const fresh = new Set<string>()
 let seq = 0
+let disposed = false
+onBeforeUnmount(() => { disposed = true })
 
 async function onPick(e: Event) {
+  if (props.disabled) return
   const el = e.target as HTMLInputElement
   const files = Array.from(el.files ?? [])
   el.value = ''
   let list = [...props.modelValue]
   for (const file of files) {
+    if (disposed) break
     if (list.length + uploading.value.length >= MAX_FILES) {
       toast.show(`一个帖子最多 ${MAX_FILES} 个附件`, 'error')
       break
@@ -37,8 +41,10 @@ async function onPick(e: Event) {
     }
     const item = { key: ++seq, name: file.name, ratio: 0 }
     uploading.value.push(item)
+    emit('uploading', true)
     try {
       const att = await uploadAttachment(file, r => (item.ratio = r))
+      if (disposed) { deleteAttachment(att.id).catch(() => {}); continue }
       fresh.add(att.id)
       list = [...props.modelValue, att]
       emit('update:modelValue', list)
@@ -46,6 +52,7 @@ async function onPick(e: Event) {
       toast.error(err)
     } finally {
       uploading.value = uploading.value.filter(u => u.key !== item.key)
+      if (!disposed) emit('uploading', uploading.value.length > 0)
     }
   }
 }
@@ -67,8 +74,8 @@ function priceChanged(att: Attachment, event: Event) {
       <li v-for="a in modelValue" :key="a.id" class="file">
         <span class="name" :title="a.name">{{ a.name }}</span>
         <span class="size">{{ formatSize(a.size) }}</span>
-        <label class="price">积分 <input type="number" min="0" max="10" step="1" :value="a.price ?? 0" :aria-label="`附件 ${a.name} 的下载积分`" @input="priceChanged(a, $event)" /></label>
-        <button type="button" class="rm" :aria-label="`移除附件 ${a.name}`" @click="remove(a)">×</button>
+        <label class="price">积分 <input type="number" :disabled="disabled" min="0" max="10" step="1" :value="a.price ?? 0" :aria-label="`附件 ${a.name} 的下载积分`" @input="priceChanged(a, $event)" /></label>
+        <button type="button" class="rm" :disabled="disabled" :aria-label="`移除附件 ${a.name}`" @click="remove(a)">×</button>
       </li>
       <li v-for="u in uploading" :key="u.key" class="file busy">
         <span class="name" :title="u.name">{{ u.name }}</span>
@@ -81,7 +88,7 @@ function priceChanged(att: Attachment, event: Event) {
       <button
         type="button"
         class="btn btn-sm"
-        :disabled="modelValue.length + uploading.length >= MAX_FILES"
+        :disabled="disabled || modelValue.length + uploading.length >= MAX_FILES"
         @click="input?.click()"
       >
         添加附件

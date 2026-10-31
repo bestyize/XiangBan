@@ -1,3 +1,4 @@
+import type { ReplyContent } from './replyContent'
 export interface PublicUser {
   uid: string
   nickname: string
@@ -129,7 +130,7 @@ export interface TopicDetail extends TopicItem {
   viewer: Viewer
 }
 
-export interface PostItem {
+export interface PostItem extends ReplyContent {
   id: number
   floor: number
   reply_to: number | null

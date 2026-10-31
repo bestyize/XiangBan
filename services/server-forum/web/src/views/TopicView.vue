@@ -2,6 +2,9 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
+import ReplyExtrasEditor from '@/components/ReplyExtrasEditor.vue'
+import { replyExtras, type ReplyWorkRef } from '@/api/replyContent'
+import type { Attachment } from '@/api/types'
 import PostEntry from '@/components/PostEntry.vue'
 import AttachmentList from '@/components/AttachmentList.vue'
 import PosterDialog from '@/components/PosterDialog.vue'
@@ -46,6 +49,7 @@ const postPage = ref(1)
 const postTotal = ref(0)
 const POST_PAGE = 50
 
+const replyRefs = ref<ReplyWorkRef[]>([]), replyFiles = ref<Attachment[]>([]), uploading = ref(false)
 const draft = ref('')
 const replyTo = ref<PostItem | null>(null)
 const sending = ref(false)
@@ -112,6 +116,7 @@ watch(
     topic.value = null
     posts.value = []
     draft.value = ''
+    replyRefs.value = []; replyFiles.value = []; uploading.value = false
     replyTo.value = null
     // 链接带了楼层锚点时，先翻到那一页。
     const floor = Number(String(route.hash).replace('#floor-', ''))
@@ -203,11 +208,13 @@ function report(target: { type: 'topic' | 'post'; id: number }) {
 }
 
 async function sendReply() {
-  if (!topic.value || draft.value.trim().length < 2) return
+  if (!topic.value || draft.value.trim().length < 2 || sending.value || uploading.value) return
+  if (replyFiles.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) { toast.show('附件价格须为 0～10 的整数', 'error'); return }
   sending.value = true
   try {
-    const res = await api.reply(topic.value.id, draft.value, replyTo.value?.id)
+    const res = await api.reply(topic.value.id, draft.value, replyTo.value?.id, replyExtras(replyRefs.value, replyFiles.value))
     draft.value = ''
+    replyRefs.value = []; replyFiles.value = []; uploading.value = false
     replyTo.value = null
     topic.value.reply_count += 1
     const lastPage = Math.ceil(res.floor / POST_PAGE)
@@ -379,9 +386,10 @@ async function closeHelp() {
             :rows="5"
             placeholder="说点有用的：你领到了吗？用的什么方法？"
           />
+          <ReplyExtrasEditor v-if="session.info" :key="topic.id" v-model:work-refs="replyRefs" v-model:attachments="replyFiles" :max-bytes="session.info.limits.upload_max_bytes" :disabled="sending" @uploading="uploading = $event" />
           <div class="send">
             <span class="muted">{{ session.user?.trust_level === 0 ? `新人每天可以回复 ${session.info?.limits.daily_posts ?? 10} 次` : '' }}</span>
-            <button type="submit" class="btn btn-primary" :disabled="sending || draft.trim().length < 2">
+            <button type="submit" class="btn btn-primary" :disabled="sending || uploading || draft.trim().length < 2">
               {{ sending ? '正在发送' : '发表回复' }}
             </button>
           </div>
