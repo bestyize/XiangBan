@@ -8,7 +8,7 @@ import type { ControlStore } from '../control-types.ts';
 import type { Overview } from '../chat/types.ts';
 
 vi.mock('../../bridge.ts', async importOriginal => ({ ...await importOriginal<typeof import('../../bridge.ts')>(), invoke: vi.fn() }));
-import { invoke as bridgeInvoke } from '../../bridge.ts';
+import { defaults, invoke as bridgeInvoke } from '../../bridge.ts';
 
 const overview = (patch: Partial<Overview> = {}): Overview => ({ configured: true, sessions: [], running: [], workspace: '/Users/me/小伴/工作区', permissionMode: 'ask', hideToolCalls: false, ...patch });
 let wrapper: VueWrapper | undefined;
@@ -42,6 +42,16 @@ beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); });
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; vi.useRealTimers(); });
 
 describe('新建任务', () => {
+  it('immediately hides and restores the shared composer pet when settings change', async () => {
+    const { store } = await open();
+    expect(wrapper!.findComponent({ name: 'ChatComposerPet' }).exists()).toBe(true);
+    store.settings = { ...defaults, chatComposerPetEnabled: false };
+    await flushPromises();
+    expect(wrapper!.findComponent({ name: 'ChatComposerPet' }).exists()).toBe(false);
+    store.settings = { ...defaults, chatComposerPetEnabled: true };
+    await flushPromises();
+    expect(wrapper!.findComponent({ name: 'ChatComposerPet' }).exists()).toBe(true);
+  });
   it('greets by the time of day', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     vi.setSystemTime(new Date(2026, 9, 22, 15, 0));

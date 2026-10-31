@@ -368,7 +368,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
   <footer class="composer" :class="[`page-${page}`]" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste" @dragover.prevent @drop.prevent="addFiles(Array.from($event.dataTransfer?.files ?? []))">
     <ChatMessageQueue :chat="chat" :running="running" />
     <div class="composer-content">
-    <ChatComposerPet v-if="pet" :size="pet" :paused="store.settings?.paused ?? false" />
+    <ChatComposerPet v-if="pet && store.settings?.chatComposerPetEnabled !== false" :size="pet" :paused="store.settings?.paused ?? false" />
     <div v-if="live && liveActive" class="composer-box live-bar" :class="{ muted: live.muted }" data-testid="chat-live">
       <span class="live-orb" :class="live.status === '在说' ? 'speak' : live.status === '在听' ? 'listen' : 'wait'" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       <div class="live-text" role="status" aria-live="polite" data-testid="chat-live-status"><b :title="live.status">{{ live.status }}</b><span :title="liveHint">{{ liveHint }}</span></div>

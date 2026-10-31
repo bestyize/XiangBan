@@ -48,6 +48,7 @@ describe('small pet above the chat composer', () => {
     await flushPromises();
     expect(wrapper.get('[data-testid="composer-pet-reply"]').text()).toContain('收到这一点温柔');
     expect(wrapper.find('.composer-pet-live').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: 'StubPetActor' }).props('size')).toBe(58);
     expect(actorPoke).toHaveBeenCalledTimes(1);
     expect(wrapper.get('.pet-art').attributes('tabindex')).toBe('-1');
 

@@ -423,6 +423,18 @@ fn request_system_permissions(app: tauri::AppHandle) -> Result<serde_json::Value
 }
 
 #[tauri::command]
+fn set_chat_composer_pet(app: tauri::AppHandle, enabled: bool) -> Result<Settings, String> {
+    let state = app.state::<DesktopState>();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
+    let mut next = settings(&app);
+    next.chat_composer_pet_enabled = enabled;
+    persist(&app, &next)?;
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next.clone();
+    publish(&app);
+    Ok(next)
+}
+
+#[tauri::command]
 fn set_companion_links(app: tauri::AppHandle, enabled: bool) -> Result<Settings, String> {
     let state = app.state::<DesktopState>();
     let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
@@ -831,7 +843,7 @@ fn main() {
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
-    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![resource_packs::export_resource_pack, resource_packs::import_resource_pack, get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_appearance, set_accent, get_appearance, set_companion_links, set_companion_skin, poke,
+    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![resource_packs::export_resource_pack, resource_packs::import_resource_pack, get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_appearance, set_accent, get_appearance, set_chat_composer_pet, set_companion_links, set_companion_skin, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
             get_startup_status, set_autostart, network::get_network_config, network::save_network_config, network::test_network_connection, content::get_wallpaper_library, content::import_wallpaper_catalog, content::delete_local_wallpaper,
             desk_game::open_desktop_game, desk_game::close_desktop_game, desk_game::desk_set_regions,
@@ -900,7 +912,7 @@ fn main() {
                 // 资料库 is managed from the console; 超级小伴 may only save into it (see float_assistant's shared list).
                 if command.starts_with("library_") { return label=="control"; }
                  if command=="ui_smoke_report" || command=="chat_screenshot" {return label=="control";}
-                if command=="set_appearance" || command=="set_accent" || command=="get_appearance" || command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
+                if command=="set_appearance" || command=="set_accent" || command=="get_appearance" || command=="set_companion_enabled" || command=="set_chat_composer_pet" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care","care_synthesize"].contains(&command); }
                 if command.contains("care") { return label=="control"; }
                 content::permitted(label,command)

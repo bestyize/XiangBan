@@ -65,15 +65,15 @@ async function poke() {
   <div v-if="image" class="composer-pet" :class="[`is-${size}`, { 'is-reacting': reacting }]">
     <button ref="button" type="button" class="composer-pet-touch" aria-label="摸摸小伴" title="点一下，摸摸小伴" data-testid="composer-pet" @click.stop="poke">
       <img :src="image" class="composer-pet-picture" :class="{ 'is-hidden': reacting && actorComponent }" alt="" aria-hidden="true" draggable="false" />
-      <component :is="actorComponent" v-if="reacting && actorComponent && definition" ref="actor" class="composer-pet-live" :definition="definition" :size="size === 'lg' ? 116 : 100" :paused="paused" :interactive="false" />
+      <component :is="actorComponent" v-if="reacting && actorComponent && definition" ref="actor" class="composer-pet-live" :definition="definition" :size="size === 'lg' ? 58 : 50" :paused="paused" :interactive="false" />
     </button>
     <CompanionReplyCard v-if="response" class="composer-pet-reply" :initial="response" data-testid="composer-pet-reply" @close="response = null" />
   </div>
 </template>
 
 <style scoped>
-.composer-pet{position:absolute;right:26px;top:-92px;width:100px;z-index:2;user-select:none}
-.composer-pet.is-lg{right:32px;top:-106px;width:116px}
+.composer-pet{position:absolute;right:8px;top:-46px;width:50px;z-index:2;user-select:none}
+.composer-pet.is-lg{right:10px;top:-53px;width:58px}
 /* Match PetActor's square viewport so still/live swaps keep the same scale and anchor. */
 .composer-pet-touch{position:relative;display:block;width:100%;aspect-ratio:1;margin:0;padding:0;border:0;background:none;color:inherit;cursor:pointer;line-height:0;appearance:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.12));transition:filter .15s ease}
 .composer-pet-touch:hover{filter:drop-shadow(0 5px 8px rgba(0,0,0,.16))}
@@ -83,7 +83,7 @@ async function poke() {
 .composer-pet-live{position:absolute!important;left:0;top:0;pointer-events:none}
 .composer-pet-live :deep(.pet-stage),.composer-pet-live :deep(.pet-art){pointer-events:none}
 .composer-pet.is-reacting .composer-pet-touch{animation:pet-touch-response .4s ease-out}
-.composer-pet-reply{position:absolute;bottom:calc(100% - 28px);right:calc(100% - 5px);width:280px;max-width:calc(100vw - 44px);z-index:3;animation:pet-reply-in .2s ease-out}
+.composer-pet-reply{position:absolute;bottom:calc(100% - 14px);right:calc(100% - 5px);width:280px;max-width:calc(100vw - 44px);z-index:3;animation:pet-reply-in .2s ease-out}
 @keyframes pet-touch-response{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-5px) rotate(-4deg)}65%{transform:translateY(-2px) rotate(3deg)}}
 @keyframes pet-reply-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.composer-pet-touch,.composer-pet.is-reacting .composer-pet-touch,.composer-pet-reply{animation:none;transition:none}}

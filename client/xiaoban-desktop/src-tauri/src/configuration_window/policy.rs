@@ -13,7 +13,7 @@ pub fn command_allowed(role: &str, command: &str) -> bool {
     ];
     const SETTINGS: &[&str] = &[
         "get_startup_status", "get_game_status", "update_settings", "set_autostart", "open_data_directory",
-        "set_appearance", "set_accent", "set_automatic_updates", "check_website", "dismiss_website_message",
+        "set_appearance", "set_accent", "set_chat_composer_pet", "set_automatic_updates", "check_website", "dismiss_website_message",
         "get_network_config", "save_network_config", "test_network_connection", "assistant_status", "assistant_configure",
         "assistant_try", "open_screen_capture_settings", "reset_screen_capture_permission",
         "chat_agent_settings", "chat_set_command_sandbox", "chat_set_sandbox_network", "chat_set_execution_limits",
@@ -42,6 +42,8 @@ pub fn command_allowed(role: &str, command: &str) -> bool {
         }
         assert!(command_allowed("settings", "save_network_config"));
         assert!(!command_allowed("model", "save_network_config"));
+        assert!(command_allowed("settings", "set_chat_composer_pet"));
+        assert!(!command_allowed("model", "set_chat_composer_pet"));
         assert!(command_allowed("model", "save_ai_provider"));
     }
 }

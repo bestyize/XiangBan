@@ -21,6 +21,8 @@ export interface Settings {
   automaticUpdates: boolean;
   gameDesktopDoubleClick: boolean;
   companionEnabled: boolean;
+  /** Show the small companion above the chat composer, independently of desktop pets. */
+  chatComposerPetEnabled: boolean;
   /** Lets the companion answer the desktop effect with expressions only; no popups or sound. */
   companionLinks: boolean;
   /** Which official shell the companion wears: pot, cat, bunny or nezha. */
@@ -305,6 +307,7 @@ export const defaults: Settings = {
   automaticUpdates: true,
   gameDesktopDoubleClick: false,
   companionEnabled: true,
+  chatComposerPetEnabled: true,
   companionLinks: true,
   companionSkin: "pot",
   assistantEnabled: true,

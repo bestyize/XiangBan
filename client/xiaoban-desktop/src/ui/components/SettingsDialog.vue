@@ -19,7 +19,7 @@ const emit = defineEmits<{ openSite: [] }>();
 /** Category list. `color: null` uses the theme colour. Keywords feed the search box. */
 const tabs: { id: SettingsTab; label: string; color: string | null; icon: Component; keywords: string }[] = [
   { id: 'general', label: '通用', color: '#8E8E93', icon: Settings, keywords: '开机 启动 动画 帧率 暂停 数据 目录' },
-  { id: 'appearance', label: '外观', color: null, icon: Palette, keywords: '深色 浅色 主题 颜色 主题色 跟随系统' },
+  { id: 'appearance', label: '外观', color: null, icon: Palette, keywords: '深色 浅色 主题 颜色 主题色 跟随系统 对话框 桌宠 小伴' },
   { id: 'ai', label: 'AI 模型', color: '#7152D8', icon: Sparkles, keywords: '模型 供应商 密钥 api deepseek 网关' },
   { id: 'agent', label: '外部 Agent', color: '#10A37F', icon: Terminal, keywords: 'agent claude codex 外部 语音编程 hooks 委派 观察 mcp' },
   { id: 'assistant', label: '超级小伴', color: '#E5484D', icon: Zap, keywords: '快捷键 悬浮球 呼出 截图' },
@@ -57,7 +57,7 @@ function pick(id: SettingsTab) { props.store.settingsTab = id; }
         <header><h1>{{ current.label }}</h1><button type="button" class="xb-icon-btn" aria-label="关闭设置" data-testid="settings-close" @click="store.closeSettings()"><X :size="15" :stroke-width="2.2" /></button></header>
         <div class="xb-settings-body xb-scroll">
           <GeneralSettings v-if="current.id === 'general'" :store="store" />
-          <AppearanceSettings v-else-if="current.id === 'appearance'" />
+          <AppearanceSettings v-else-if="current.id === 'appearance'" :store="store" />
           <div v-else-if="current.id === 'ai'" data-testid="settings-ai"><AiConfigCard :store="store" /></div>
           <div v-else-if="current.id === 'agent'" data-testid="settings-agent"><SpeechAgentSettings /></div>
           <div v-else-if="current.id === 'assistant'" data-testid="settings-assistant"><AssistantPage :store="store" embedded /></div>
