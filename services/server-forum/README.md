@@ -36,7 +36,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 | `FORUM_PUBLIC_URL` | `https://chat.xiangban.xyz` | SEO 页面的 canonical 和 sitemap |
 | `FORUM_ACCOUNT_ISSUER` | `https://account.xiangban.xyz` | 必须和账号中心 `ACCOUNT_ISSUER` 完全一致 |
 | `FORUM_ACCOUNT_CLIENT_ID` | `forum-web` | 网页的令牌 `aud`，需要先在账号中心后台登记；也是 `/api/meta` 告诉前端用的 client_id |
-| `FORUM_ACCOUNT_EXTRA_CLIENT_IDS` | `xiaoban-android` | 除网页外也接受的令牌 `aud`（逗号分隔），让小伴手机应用登录后能发帖、评论；设置后会替换默认值，要保留手机应用请写上 `xiaoban-android` |
+| `FORUM_ACCOUNT_EXTRA_CLIENT_IDS` | `xiaoban-android,xiaoban-desktop-wallpaper` | 除网页外接受手机与桌面令牌 `aud`（逗号分隔）；显式设置会替换默认值，需同时保留这两个客户端 ID |
 | `FORUM_ADMIN_USER` / `FORUM_ADMIN_PASSWORD` | 无 | 没有管理员时创建初始管理员 |
 | `FORUM_ADMIN_JWT_SECRET` | 随机 | 管理员令牌密钥，生产必须设置（≥32 位） |
 | `FORUM_WEB_DIR` | `services/server-forum/web/dist` | 前端产物；index.html 启动时读一次，换前端后要重启 |
