@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import ContentShell from '@/components/ContentShell.vue'
 import PosterDialog from '@/components/PosterDialog.vue'
 import { ApiError } from '@/api/forum'
+import ContentSocialActions from '@/components/ContentSocialActions.vue'
 import { contentApi, type PackDetail } from '@/api/content'
 import { applyLink, coverStyle, fmtSize, kindLabel, trustLabel } from '@/lib/content'
 import { timeAgo } from '@/lib/format'
@@ -96,6 +97,7 @@ async function copyLink() {
         <p v-if="!pack.one_click" class="notice">
           {{ pack.trust_level === 2 ? '这是用户发布、尚未审核的内容，不支持一键应用；' : '' }}在小伴桌面端会先展示它会做什么、需要哪些权限，由你确认后才安装。
         </p>
+        <ContentSocialActions v-if="pack.status === 'published'" kind="pack" :id="pack.id" />
         <div class="actions">
           <a class="btn btn-primary open-app" :href="open" @click="track('apply_click', pack.kind)">在小伴中打开</a>
           <button class="btn" type="button" :disabled="busy" @click="download">下载压缩包</button>

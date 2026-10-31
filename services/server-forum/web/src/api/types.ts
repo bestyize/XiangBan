@@ -148,7 +148,7 @@ export interface PostItem {
 
 export interface NotificationItem {
   id: number
-  kind: 'reply' | 'reply_to' | 'mention' | 'accepted' | 'pack_approved' | 'pack_rejected'
+  kind: 'reply' | 'reply_to' | 'mention' | 'accepted' | 'pack_approved' | 'pack_rejected' | 'content_removed'
   actor: { uid: string; nickname: string | null; avatar_url: string | null } | null
   topic_id: number | null
   post_id: number | null
