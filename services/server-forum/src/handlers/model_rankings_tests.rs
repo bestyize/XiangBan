@@ -107,3 +107,35 @@ async fn model_snapshots_only_expose_published_past_rows_and_keep_token_precisio
     assert!(board["models"][0]["metrics"]["intelligence"].is_null());
     h.finish().await
 }
+
+#[tokio::test]
+async fn scheme_backups_are_private_revisioned_and_resolve_live_references() -> Result<(),Box<dyn std::error::Error>> {
+    let Some(h)=harness().await? else{return Ok(())};
+    let owner=h.member().await?;let other=h.member().await?;
+    let (pack,):(i64,)=sqlx::query_as("INSERT INTO packs(kind,slug,title) VALUES('task','private-backup-fixture','Public task') RETURNING id").fetch_one(&h.pool).await?;
+    sqlx::query("INSERT INTO pack_versions(pack_id,version,label,file_key,sha256,size,manifest) VALUES($1,1,'1','packs/test',$2,1,'{}')").bind(pack).bind("a".repeat(64)).execute(&h.pool).await?;
+    let id=Uuid::new_v4();let path=format!("/api/me/scheme-backups/{id}");
+    let input=json!({"schema_version":1,"title":"Private choice","summary":"Selected references only","items":[{"pack_id":pack,"version":1}],"expected_revision":0});
+    assert_eq!(call(&h.app,"PUT",&path,None,input.clone()).await.0,StatusCode::UNAUTHORIZED);
+    let (status,created)=call(&h.app,"PUT",&path,Some(&owner),input.clone()).await;
+    assert_eq!(status,StatusCode::OK,"{created}");assert_eq!(created["revision"],1);
+    assert_eq!(call(&h.app,"GET",&path,Some(&other),Value::Null).await.0,StatusCode::NOT_FOUND);
+    assert_eq!(call(&h.app,"GET","/api/me/scheme-backups",Some(&other),Value::Null).await.1["total"],0);
+    assert_eq!(call(&h.app,"GET","/api/schemes",None,Value::Null).await.1["total"],0);
+    assert_eq!(call(&h.app,"PUT",&path,Some(&owner),input.clone()).await.0,StatusCode::CONFLICT);
+    let mut changed=input.clone();changed["expected_revision"]=json!(1);changed["title"]=json!("Updated");
+    assert_eq!(call(&h.app,"PUT",&path,Some(&owner),changed.clone()).await.1["revision"],2);
+    let mut extra=changed.clone();extra["secret"]=json!("never-store");
+    assert_eq!(call(&h.app,"PUT",&path,Some(&owner),extra).await.0,StatusCode::UNPROCESSABLE_ENTITY);
+    sqlx::query("UPDATE packs SET status='removed' WHERE id=$1").bind(pack).execute(&h.pool).await?;
+    let body=call(&h.app,"GET",&path,Some(&owner),Value::Null).await.1;
+    assert_eq!(body["items"][0],json!({"pack_id":pack,"version":1,"available":false}));
+    changed["expected_revision"]=json!(2);
+    assert_eq!(call(&h.app,"PUT",&path,Some(&owner),changed).await.0,StatusCode::BAD_REQUEST);
+    assert_eq!(call(&h.app,"POST",&format!("{path}/remove"),Some(&other),json!({"expected_revision":2})).await.0,StatusCode::CONFLICT);
+    assert_eq!(call(&h.app,"POST",&format!("{path}/remove"),Some(&owner),json!({"expected_revision":1})).await.0,StatusCode::CONFLICT);
+    assert_eq!(call(&h.app,"POST",&format!("{path}/remove"),Some(&owner),json!({"expected_revision":2})).await.1["revision"],3);
+    assert_eq!(call(&h.app,"GET","/api/me/scheme-backups",Some(&owner),Value::Null).await.1["total"],0);
+    assert_eq!(call(&h.app,"GET","/api/me/scheme-backups?status=removed",Some(&owner),Value::Null).await.1["total"],1);
+    h.finish().await
+}

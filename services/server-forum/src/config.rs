@@ -115,7 +115,7 @@ impl AppConfig {
             account_client_id: get("FORUM_ACCOUNT_CLIENT_ID").unwrap_or_else(|| "forum-web".into()),
             account_extra_client_ids: get("FORUM_ACCOUNT_EXTRA_CLIENT_IDS")
                 .map(|raw| raw.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
-                .unwrap_or_else(|| vec!["xiaoban-android".into()]),
+                .unwrap_or_else(|| vec!["xiaoban-android".into(), "xiaoban-desktop-wallpaper".into()]),
             cors_origins: get("FORUM_CORS_ORIGINS")
                 .map(|raw| raw.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
                 .unwrap_or_default(),
