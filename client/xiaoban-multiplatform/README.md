@@ -17,7 +17,7 @@
 | `:business:community` | 社区网页壳（MA，已不被 `:shell` 装配，保留作回退）`CommunityApp`：加载 https://chat.xiangban.xyz（周刊、资源、讨论、项目的只读浏览，分享先用网页上的“复制链接”），站内域名只有 chat.xiangban.xyz，配色取自论坛前端的品牌色与黑白灰。对应实施计划的 MA（网页壳）。 |
 | `:common:community-core` | 社区、账号与 AI 网关的网络层和状态逻辑（不依赖 Compose）：`ForumApi`、`AccountApi`（与网页同一组接口）、`AiGatewayApi`（对接 `server-ai` 的档位、余额、兑换码与 `/v1/chat/completions` 流式对话）、`SessionManager`（令牌存储、临近过期自动刷新且并发共用一次、仅服务端明确拒绝才登出）、`FeedController`/`DiscussController`/`CloudChatController`/`Loader`、`DesignTokens`（与论坛前端同一套配色圆角）。能在 JVM 上直接跑单元测试：`./gradlew :common:community-core:jvmTest`。账号中心要先登记客户端 `xiaoban-android`。 |
 | `:common:link-core` | 与桌面互联的协议、客户端与应用控制器（`PhoneLink`、`RemoteChatController`、`SharedPrefsLinkStorage`）：同账号自动发现电脑、经中转收发、会话快照与流式增量、待办审批卡片、断线重连；有对真实 server-link 与 Rust 桌面端的跨语言互通测试。`./gradlew :common:link-core:jvmTest`。详见模块 README。 |
-| `:business:community-native` | 社区、云端与遥控小伴原生界面（Compose），按设计稿[社区与小伴AI 手机原型](docs/design-specs/mobile-prototype/README.md)搭建：悬浮胶囊导航（小伴AI、游戏、发布、社区、我的）与发布弹层；小伴AI 首页和对话页（模型选择、额度与兑换）；社区按[新稿](docs/design/社区与小伴AI%20手机原型.html)改版：首页（推荐、开源热榜、排行榜、追踪、导航）、讨论（创作、学习和教程、休闲，帖子带配图和投票）、资源（AI 工具、资料、影音娱乐、求助悬赏、开源精选），以及模型天梯、横屏的“智能 vs 价格”散点图、工具详情、求助帖（悬赏、采纳）和内容包、帖子详情；发现页内容来自 server-forum 的 `/api/discover/*`，目前由后台录入，带“示例”标记的是示例数据；我的、设置、登录与完成注册；我的电脑、遥控会话列表、遥控对话页（工具进度、审批卡片、高危二次确认、离线与异常提示）。基础部件（图标、顶栏、按钮、输入框、弹层）在 `Kit.kt`，图标路径由脚本从设计稿生成在 `Icons.kt`。平台能力通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。尚未接入的页面（资料库、分享海报等）见 docs 里的进度说明。 |
+| `:business:community-native` | 社区、云端与遥控小伴原生界面（Compose），按设计稿[社区与小伴AI 手机原型](docs/design-specs/mobile-prototype/README.md)搭建：悬浮胶囊导航（小伴AI、游戏、发布、社区、我的）与发布弹层；小伴AI 首页和对话页（模型选择、额度与兑换）；社区按[新稿](docs/design/社区与小伴AI%20手机原型.html)改版：首页（推荐、开源热榜、排行榜、追踪、导航）、讨论（创作、学习和教程、休闲，帖子带配图和投票）、资源（AI 工具、资料、影音娱乐、求助悬赏、开源精选），以及模型天梯、横屏的“智能 vs 价格”散点图、工具详情、求助帖（悬赏、采纳）和内容包、帖子详情；发现页内容来自 server-forum 的 `/api/discover/*`，目前由后台录入，带“示例”标记的是示例数据；我的、设置、登录与完成注册；我的电脑、遥控会话列表、遥控对话页（工具进度、审批卡片、高危二次确认、离线与异常提示）。基础部件（图标、顶栏、按钮、输入框、弹层）在 `Kit.kt`，图标路径由脚本从设计稿生成在 `Icons.kt`。平台能力通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。尚未接入的页面（私人资料库等）见 docs 里的进度说明。 |
 | `:business:xiaban` | xiaban.xyz 入口 `XiabanApp`：地址、站内域名、与网页一致的浅色/深色配色。 |
 | `:shell` | 装配层，`App(storage, platform, linkStorage)` 渲染 `CommunityNativeApp`；Android 入口传入 `SharedPrefsTokenStorage`、`AndroidPlatformActions` 与 `SharedPrefsLinkStorage`，iOS 暂用内存存储。模板自带的 `Greeting`/`Platform` 示例与测试仍在，未使用。 |
 | `:androidApp` `iosApp/` | Android、iOS 入口。 |
@@ -81,4 +81,6 @@ cargo build --release --features custom-protocol   # 发布二进制（内嵌启
 
 上传流程使用论坛凭证直传资源机，不把论坛Bearer发给资源地址，禁重定向；只读校验最多五次，资源未配置或超时保留表单。能力权限/提示词仅展示清单真实字段，缺失明确标注。挑战点赞复用真实讨论帖接口，不生成独立投票数字。
 
-针对性JVM测试与Android模块编译已验证，系统选择器/分享/键盘/返回栈、完整资源机链路和iOS仍需实机验收。正文图片与帖子附件已接；回复附件、跨对象作品/方案收藏等协议尚未扩展。具体状态见[社区验收记录](../../docs/product/验收记录_社区全功能_2026-10-31.md)。
+针对性JVM测试与Android模块编译已验证，系统选择器/分享/键盘/返回栈、完整资源机链路和iOS仍需实机验收。正文图片、帖子/回复附件与回复作品卡已接；作品/能力包和方案支持收藏、私密举报，收藏按帖子/作品/方案分组。Android 提供真实系统分享、海报 PNG/二维码保存与安全深链；iOS 仅复制链接/网页回退，不宣称系统分享或海报已验收。账号方案备份为默认关闭的本人只读入口，开启后可读备份和回收站，不自动下载、应用或分享私有内容。具体状态见[社区验收记录](../../docs/product/验收记录_社区全功能_2026-10-31.md)。
+
+第二轮回复编辑仅对本人且服务器状态允许的回复开放，读取原文/source保留作品固定版本和原附件价格；保存失败保留输入，取消只清理本次新增待关联附件。集成验证：分享7、收藏/回复12、方案备份4、既有上传12项 JVM 测试通过，`:androidApp:assembleDebug` 成功；未操作真机。
