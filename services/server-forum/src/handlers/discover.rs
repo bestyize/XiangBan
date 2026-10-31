@@ -310,6 +310,7 @@ async fn get_tool(State(state): State<AppState>, Path(slug): Path<String>) -> Ap
         n
     };
     tool["discussion_count"] = json!(discussions);
+    crate::tool_mirrors::decorate_tool(&state.pool,&state.config.public_url,&slug,&mut tool).await?;
     Ok(Json(tool))
 }
 

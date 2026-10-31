@@ -246,6 +246,7 @@ pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     sqlx::raw_sql(DISCOVER_SCHEMA).execute(pool).await?;
     crate::collectors::schema::init(pool).await?;
     crate::community_editor::schema::init(pool).await?;
+    crate::tool_mirrors::init(pool).await?;
     // 搜索用的三元组索引是可选的：数据库没有 pg_trgm 扩展时退化为普通 ILIKE 扫描。
     if sqlx::raw_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm").execute(pool).await.is_ok() {
         let _ = sqlx::raw_sql(

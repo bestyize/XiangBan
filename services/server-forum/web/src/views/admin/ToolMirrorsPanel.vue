@@ -52,10 +52,10 @@ onUnmounted(() => { disposed = true; ++sequence })
   </div>
   <p class="muted">手动从官方 GitHub 安装包创建镜像，写入后重新开文件回读并校验 SHA-256；不解压、不执行安装包。镜像操作不会发布草稿，待审内容仍需人工审核。</p>
   <p class="muted">只有已发布的同一安装包才能公开使用镜像，官方 GitHub 下载入口始终保留。镜像暂时不可用时，下载会回退到官方来源。</p>
-  <div v-if="error" class="adm-card panel" role="alert"><p>{{ error }}</p><button class="btn" :disabled="loading" @click="load">重试</button></div>
+  <div v-if="error" class="adm-card panel mirror-panel" role="alert"><p>{{ error }}</p><button class="btn" :disabled="loading" @click="load">重试</button></div>
   <p v-if="loading && !result" role="status">正在读取工具镜像…</p>
   <template v-if="result">
-    <section class="panel adm-card">
+    <section class="panel adm-card mirror-panel">
       <h2>资源配额</h2>
       <p>单文件 {{ mib(result.max_asset_bytes) }}；总存储 {{ mib(result.max_storage_bytes) }}，最多 {{ result.max_storage_objects }} 个对象。资源机一次处理一个安装包，每次最多三分钟；相同哈希复用已验证文件。</p>
       <p v-if="result.invalid_items" role="alert">{{ result.invalid_items }} 条工具快照未通过格式或来源校验，已停止展示镜像操作，请到发现页检查。</p>
@@ -64,10 +64,10 @@ onUnmounted(() => { disposed = true; ++sequence })
       <p v-if="actionError" role="alert">{{ actionError }}</p>
     </section>
     <p v-if="!result.items.length" class="muted">暂无可镜像的官方工具安装包。请先配置工具仓库并采集正式版本。</p>
-    <section v-for="tool in result.items" :key="tool.key" class="panel adm-card">
+    <section v-for="tool in result.items" :key="tool.key" class="panel adm-card mirror-panel">
       <h2>{{ tool.name }} <small class="muted">{{ tool.version }}</small></h2>
       <p class="muted">{{ STATUS[tool.status] || tool.status }} · 草稿版本 {{ tool.revision }} · {{ tool.key }}</p>
-      <div v-for="artifact in tool.artifacts" :key="artifact.asset_id" class="adm-card">
+      <div v-for="artifact in tool.artifacts" :key="artifact.asset_id" class="mirror-asset">
         <h3>{{ artifact.filename }}</h3>
         <div class="adm-form-grid">
           <p>{{ artifact.os }} / {{ artifact.arch }} · {{ mib(artifact.size) }}</p>
@@ -82,3 +82,7 @@ onUnmounted(() => { disposed = true; ++sequence })
     </section>
   </template>
 </template>
+
+<style scoped>
+.mirror-panel{padding:24px;margin-block:20px}.mirror-panel h2{font-size:17px;margin:0 0 12px}.mirror-panel p{color:var(--ink-2);font-size:13px}.mirror-asset{padding:18px;border:1px solid var(--line);border-radius:8px;margin-top:16px;background:var(--surface-2)}.mirror-asset h3{font-size:14px;margin:0;overflow-wrap:anywhere}.mirror-asset code{overflow-wrap:anywhere;font-size:12px}.mirror-asset details{margin:8px 0 16px}.mirror-asset summary{cursor:pointer;color:var(--ink-2);font-size:12px}.mirror-asset .adm-toolbar{margin:0}@media(max-width:700px){.mirror-panel{padding:18px}.mirror-asset{padding:14px}}
+</style>

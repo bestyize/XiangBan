@@ -775,3 +775,5 @@
 .adm-table td { overflow-wrap:anywhere; }
 .adm-table-scroll .adm-table { min-width:640px; }
 @media(max-width:1023px){ .adm-table-scroll .adm-table{min-width:0} }
+
+.adm-card > .adm-toolbar:last-child { margin:0;padding:16px 20px;border-top:1px solid var(--line); }

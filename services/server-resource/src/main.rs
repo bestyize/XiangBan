@@ -1,5 +1,6 @@
 mod scan;
 mod sign;
+mod tool_mirrors;
 
 use axum::{
     body::Body,
@@ -71,6 +72,7 @@ pub fn build_router(state: AppState, cors_origins: &[String]) -> Router {
     Router::new()
         .route("/health", get(|| async { Json(json!({ "ok": true })) }))
         .route("/upload", put(upload))
+        .merge(tool_mirrors::routes())
         .route("/{*key}", get(download))
         .layer(cors)
         .layer(TraceLayer::new_for_http())
