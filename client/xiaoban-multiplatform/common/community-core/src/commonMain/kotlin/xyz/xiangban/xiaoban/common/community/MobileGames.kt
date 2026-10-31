@@ -169,6 +169,29 @@ class MobileGameStore(val workspace: MobileWorkspace) {
         return listOf(MobileGameFile("manifest.json", game.json().toString())) + files.sortedBy { it.path }
     }
 
+    /** Deletes only one user game and its private progress/logs. A failed deletion restores its files. */
+    suspend fun delete(id: String) = lock.withLock {
+        MobileGameFormat.id(id) // Also refuses every reserved official-game id.
+        read(id) // Require a matching user manifest before removing anything.
+        val roots = workspace.list().filter { it.directory }.map { it.path }.toSet()
+        val auxiliary = listOf("saves/$id.json", "logs/$id.txt").filter { path ->
+            val parent = path.substringBefore('/')
+            parent in roots && workspace.list(parent).any { it.path == path && !it.directory }
+        }
+        val files = workspace.list("games/$id", recursive = true).filterNot { it.directory }.map { it.path } + auxiliary
+        val backup = files.map { it to workspace.read(it) }
+        withContext(NonCancellable) {
+            try {
+                workspace.remove("games/$id", recursive = true)
+                auxiliary.forEach { workspace.remove(it) }
+            } catch (failure: Exception) {
+                try { backup.forEach { (path, content) -> workspace.write(path, content) } }
+                catch (rollback: Exception) { failure.addSuppressed(rollback) }
+                throw failure
+            }
+        }
+    }
+
     suspend fun createFromDirectory(game: MobileGame, sourceDir: String, overwrite: Boolean = false): MobileGame {
         MobileWorkspaceLimits.path(sourceDir)
         val entries = workspace.list(sourceDir, recursive = true)

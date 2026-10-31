@@ -140,6 +140,7 @@ class AndroidPlatformActions(
     private val creationSharing = AndroidCreationSharing(context)
     override suspend fun gamePackage(id: String) = creationSharing.gamePackage(id)
     override suspend fun shareGamePackage(id: String) = creationSharing.shareGame(id)
+    override fun forgetGame(id: String) = AndroidGameHistory.forget(context, id)
     override suspend fun creationCover(id: String) = creationSharing.cover(id)
     override suspend fun shareCreationPreview(title: String, description: String, cover: ByteArray?) = creationSharing.sharePreview(title, description, cover)
     private val gameLibrary = AndroidGameLibrary(context.applicationContext)

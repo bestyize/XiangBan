@@ -18,7 +18,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.backhandler.BackHandler
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -149,7 +155,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
     val myItems = games.map { CreationItem(it.id, it.name, it.description, "游戏", it, true) }
     val visible = (if (mine) myItems else officialItems + DesktopIdeas).filter { category == "全部" || it.kind == category }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        LazyColumn(Modifier.fillMaxSize().blur(if (detail != null || creating || remotePrompt != null) 3.dp else 0.dp).statusBarsPadding(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -225,15 +231,18 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
             }
         }
         detail?.let { entry ->
-            BottomSheet({ if (!busy && panel != "actions") panel = "actions" else close() }) {
+            CreationSheet({ if (!busy && panel != "actions") panel = "actions" else close() }) {
                 Column(Modifier.fillMaxWidth().heightIn(max = 590.dp).verticalScroll(rememberScrollState())) {
-                    Row(Modifier.padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(52.dp))
+                    if (panel in listOf("actions", "preview")) Row(Modifier.padding(bottom = 21.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(52.dp), cornerRadius = 11)
                         Column(Modifier.weight(1f)) {
                             Text(entry.name, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             Text("${entry.kind} · ${if (entry.owned) "我的作品" else if (entry.game != null) "小伴官方" else "创作灵感"}", Modifier.padding(top = 5.dp), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconTap(XIcons.Close, "关闭作品操作", { close() }, size = 18.dp)
+                        IconTap(XIcons.Close, "关闭作品操作", { close() }, Modifier.align(Alignment.Top), tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 17.dp)
+                    } else Row(Modifier.padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(when (panel) { "delete" -> "删除「${entry.name}」？"; "share" -> "分享到其他渠道"; else -> "发送到电脑" }, Modifier.weight(1f), fontSize = 19.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold)
+                        IconTap(XIcons.Close, "关闭作品操作", { close() }, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 17.dp)
                     }
                     when (panel) {
                         "actions" -> {
@@ -243,21 +252,45 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                                         if (env.platform?.openGame(entry.id) == true) close() else message = "当前平台无法打开游戏"
                                     } else panel = "preview"
                                 }
-                                CreationAction(XIcons.Pen, if (entry.owned) "继续修改" else "做一个我的版本", enabled = !busy) {
+                                CreationAction(XIcons.Pen, if (entry.owned) "继续修改" else "做一个我的版本", enabled = !busy, divider = true) {
                                     if (entry.owned) createLocal("请先读取 games/${entry.id} 中的游戏源码和试玩记录，问我想怎样修改《${entry.name}》，然后在原游戏上迭代。") else prepare(entry)
                                 }
-                                CreationAction(XIcons.Monitor, if (entry.game != null) "发送到电脑" else "在电脑上创作", enabled = !busy) {
+                                CreationAction(XIcons.Monitor, if (entry.game != null) "发送到电脑" else "在电脑上创作", enabled = !busy, divider = true) {
                                     if (entry.game == null) createOnComputer("请在电脑上参考以下想法制作小伴桌面${entry.kind}：${entry.description} 先读取规范并给出方案让我确认。") else panel = "computer"
                                 }
                             }
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(11.dp))
                             CreationActionGroup {
                                 CreationAction(XIcons.Globe, "分享到社区", enabled = !busy) {
                                     close()
                                     if (entry.owned) open(Route.PublishPack(localGameId = entry.id))
                                     else open(Route.CreationPost("分享：${entry.name}", "${entry.name}\n\n${entry.description}\n\n${if (entry.game != null) "来自小伴官方游戏，在小伴手机「创造」中游玩。" else "小伴桌面创作灵感，可连接电脑制作。"}"))
                                 }
-                                CreationAction(XIcons.Share, "分享到其他渠道", enabled = !busy) { panel = "share" }
+                                CreationAction(XIcons.Share, "分享到其他渠道", enabled = !busy, divider = true, arrow = true) { panel = "share" }
+                            }
+                            if (entry.owned) {
+                                Spacer(Modifier.height(10.dp))
+                                CreationActionGroup {
+                                    CreationAction(XIcons.Trash, "删除作品", if (cloud.sending) "创作进行中" else "", enabled = !busy && !cloud.sending, destructive = true) { panel = "delete" }
+                                }
+                            }
+                        }
+                        "delete" -> {
+                            Text("将删除这台手机上的作品文件、游戏进度和运行记录，无法撤销。已导出、分享或发布到社区的副本不受影响。", Modifier.padding(top = 2.dp, bottom = 18.dp), fontSize = 12.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (entry.owned) CreationActionGroup {
+                                CreationAction(XIcons.Trash, if (busy) "正在删除…" else "确认删除", enabled = !busy && !cloud.sending, destructive = true) {
+                                    runAction {
+                                        val store = env.games ?: error("本机作品不可用")
+                                        store.delete(entry.id)
+                                        games = games.filterNot { it.id == entry.id }
+                                        covers.remove(entry.key)
+                                        detail = null
+                                        panel = "actions"
+                                        env.platform?.forgetGame(entry.id)
+                                        reload++
+                                        message = "已删除《${entry.name}》"
+                                    }
+                                }
                             }
                         }
                         "preview" -> {
@@ -273,7 +306,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                             CreationActionGroup {
                                 if (entry.owned) {
                                     CreationAction(XIcons.Share, "分享作品包到电脑", enabled = !busy) { runAction { if (env.platform?.shareGamePackage(entry.id) != true) message = "当前平台不支持分享作品包" } }
-                                    CreationAction(XIcons.Download, "保存作品包", enabled = !busy) { runAction { if (env.platform?.exportGame(entry.id) != true) message = "当前平台不支持导出" } }
+                                    CreationAction(XIcons.Download, "保存作品包", enabled = !busy, divider = true) { runAction { if (env.platform?.exportGame(entry.id) != true) message = "当前平台不支持导出" } }
                                 } else CreationAction(XIcons.Monitor, "选择电脑", enabled = !busy) { createOnComputer("请帮我在小伴桌面的官方游戏里找到《${entry.name}》（${entry.id}），告诉我怎么开始游玩。") }
                             }
                         }
@@ -282,17 +315,17 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                             Spacer(Modifier.height(14.dp))
                             CreationActionGroup {
                                 CreationAction(XIcons.Image, "分享作品卡片", "图片", !busy) { runAction { if (env.platform?.shareCreationPreview(entry.name, entry.description, covers[entry.key]) != true) message = "当前平台不支持分享图片" } }
-                                if (entry.owned) CreationAction(XIcons.Download, "分享作品包", "可导入使用", !busy) { runAction { if (env.platform?.shareGamePackage(entry.id) != true) message = "当前平台不支持分享作品包" } }
-                                CreationAction(XIcons.Share, "分享文字介绍", enabled = !busy) { env.platform?.share(entry.name, entry.description) }
+                                if (entry.owned) CreationAction(XIcons.Download, "分享作品包", "可导入使用", !busy, divider = true) { runAction { if (env.platform?.shareGamePackage(entry.id) != true) message = "当前平台不支持分享作品包" } }
+                                CreationAction(XIcons.Share, "分享文字介绍", enabled = !busy, divider = true) { env.platform?.share(entry.name, entry.description) }
                             }
                         }
                     }
-                    if (busy) Text("正在准备作品…", Modifier.padding(top = 12.dp), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(if (panel == "actions") "取消" else "返回", Modifier.fillMaxWidth().clickable(enabled = !busy) { if (panel == "actions") close() else panel = "actions" }.padding(vertical = 16.dp), fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    if (busy && panel != "delete") Text("正在准备作品…", Modifier.padding(top = 12.dp), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (panel in listOf("actions", "delete")) "取消" else "返回", Modifier.fillMaxWidth().clickable(enabled = !busy) { if (panel == "actions") close() else panel = "actions" }.padding(top = 24.dp, bottom = 13.dp), fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
             }
         }
-        if (creating) BottomSheet({ close() }, panelModifier = Modifier.imePadding()) {
+        if (creating) CreationSheet({ close() }, panelModifier = Modifier.imePadding()) {
             Column(Modifier.fillMaxWidth().heightIn(max = 550.dp).verticalScroll(rememberScrollState())) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("让想法开始发生", Modifier.weight(1f), fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold)
@@ -313,7 +346,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
             }
         }
         remotePrompt?.let { prompt ->
-            BottomSheet({ close() }) {
+            CreationSheet({ close() }) {
                 Text("选择电脑", fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold)
                 Text("将想法带入电脑对话，由你确认发送。", Modifier.padding(vertical = 12.dp), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
@@ -354,24 +387,53 @@ private fun CreationChips(values: List<String>, value: String, select: (String) 
     }
 }
 
+/** Creation-center sheet tokens mirror create-center.html; other app sheets retain their styles. */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
-private fun CreationActionGroup(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(MaterialTheme.colorScheme.background).padding(horizontal = 14.dp), content = content)
-}
-
-@Composable
-private fun CreationAction(icon: ImageVector, title: String, trailing: String = "", enabled: Boolean = true, action: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 51.dp).clickable(enabled = enabled, role = Role.Button, onClick = action).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        XIcon(icon, size = 18.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .45f))
-        Text(title, Modifier.weight(1f), fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .45f))
-        if (trailing.isNotEmpty()) Text(trailing, fontSize = 10.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun CreationSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val dark = MaterialTheme.colorScheme.surface.luminance() < .5f
+    val colors = MaterialTheme.colorScheme.copy(
+        background = Color(if (dark) 0xff1b1d20 else 0xfffafaf9),
+        surface = Color(if (dark) 0xff26292d else 0xffffffff),
+        onSurface = Color(if (dark) 0xfff2f2ef else 0xff292a2d),
+        onSurfaceVariant = Color(if (dark) 0xffa4a7ad else 0xff83878c),
+        outlineVariant = Color(if (dark) 0xff34373b else 0xffeeefec),
+        error = Color(if (dark) 0xffff8d9d else 0xffd53b4d),
+    )
+    BackHandler(onBack = onDismiss)
+    MaterialTheme(colorScheme = colors) {
+        Box(Modifier.fillMaxSize().background(Color(0x4511131a)).clickable(indication = null, interactionSource = null) { onDismiss() }, contentAlignment = Alignment.BottomCenter) {
+            Column(panelModifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 25.dp, topEnd = 25.dp))
+                .background(colors.background).clickable(indication = null, interactionSource = null) {}
+                .navigationBarsPadding().padding(start = 20.dp, end = 20.dp, top = 15.dp, bottom = 20.dp)) {
+                Box(Modifier.align(Alignment.CenterHorizontally).size(32.dp, 4.dp).clip(CircleShape).background(colors.onSurfaceVariant.copy(alpha = .25f)))
+                Spacer(Modifier.height(22.dp))
+                content()
+            }
+        }
     }
 }
 
 @Composable
-private fun CreationCover(item: CreationItem, bytes: ByteArray?, loader: ImageLoader, modifier: Modifier) {
+private fun CreationActionGroup(content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(MaterialTheme.colorScheme.surface).padding(horizontal = 14.dp, vertical = 3.dp), content = content)
+}
+
+@Composable
+private fun CreationAction(icon: ImageVector, title: String, trailing: String = "", enabled: Boolean = true, destructive: Boolean = false, divider: Boolean = false, arrow: Boolean = false, action: () -> Unit) {
+    val line = MaterialTheme.colorScheme.outlineVariant
+    Row(Modifier.fillMaxWidth().drawBehind { if (divider) drawLine(line, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }.heightIn(min = 51.dp).clickable(enabled = enabled, role = Role.Button, onClick = action).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        XIcon(icon, size = 18.dp, tint = (if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = if (enabled) 1f else .45f))
+        Text(title, Modifier.weight(1f), fontSize = 13.sp, lineHeight = 18.sp, color = (if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface).copy(alpha = if (enabled) 1f else .45f))
+        if (trailing.isNotEmpty()) Text(trailing, fontSize = 10.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (arrow) XIcon(XIcons.ArrowRight, size = 18.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun CreationCover(item: CreationItem, bytes: ByteArray?, loader: ImageLoader, modifier: Modifier, cornerRadius: Int = 15) {
     var failed by remember(bytes) { mutableStateOf(false) }
-    Box(modifier.clip(RoundedCornerShape(15.dp)).background(when (item.id) { "jade-gomoku" -> androidx.compose.ui.graphics.Color(0xff211b13); "ink-blade" -> androidx.compose.ui.graphics.Color(0xffe7e0cd); "pro-cube" -> androidx.compose.ui.graphics.Color(0xff0a1020); else -> MaterialTheme.colorScheme.surfaceVariant }), contentAlignment = Alignment.Center) {
+    Box(modifier.clip(RoundedCornerShape(cornerRadius.dp)).background(when (item.id) { "jade-gomoku" -> androidx.compose.ui.graphics.Color(0xff211b13); "ink-blade" -> androidx.compose.ui.graphics.Color(0xffe7e0cd); "pro-cube" -> androidx.compose.ui.graphics.Color(0xff0a1020); else -> MaterialTheme.colorScheme.surfaceVariant }), contentAlignment = Alignment.Center) {
         if (bytes == null || failed) XIcon(if (item.game != null) XIcons.Gamepad else XIcons.Sparkle, size = 28.dp, tint = MaterialTheme.colorScheme.primary)
         else AsyncImage(model = bytes, imageLoader = loader, contentDescription = null, modifier = Modifier.fillMaxSize().then(if (item.kind == "伙伴") Modifier.padding(10.dp) else Modifier), contentScale = if (item.game != null || item.id == "sunflower") ContentScale.Fit else ContentScale.Crop, onError = { failed = true })
     }

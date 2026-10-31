@@ -32,6 +32,12 @@ internal object AndroidGameHistory {
         }
         return value
     }
+    @Synchronized fun forget(context: Context, id: String) {
+        flow(context)
+        val ids = value.value.filterNot { it == id }
+        context.getSharedPreferences("game_library", Context.MODE_PRIVATE).edit().putString("recent", MobileGameHistory.encode(ids)).apply()
+        value.value = ids
+    }
     @Synchronized fun opened(context: Context, id: String) {
         flow(context)
         val ids = MobileGameHistory.opened(value.value, id)

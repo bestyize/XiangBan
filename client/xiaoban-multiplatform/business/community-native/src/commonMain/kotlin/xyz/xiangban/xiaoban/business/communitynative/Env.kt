@@ -70,6 +70,7 @@ interface PlatformActions : VoicePlatform {
     /** Returns a validated local ZIP without uploading it; publishing still requires explicit submission. */
     suspend fun gamePackage(id: String): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = null
     suspend fun shareGamePackage(id: String): Boolean = false
+    fun forgetGame(id: String) {}
     suspend fun creationCover(id: String): ByteArray? = null
     suspend fun shareCreationPreview(title: String, description: String, cover: ByteArray?): Boolean = false
     /** 通过系统选择器读取用户明确选择的图片或文本文件。 */
