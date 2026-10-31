@@ -31,6 +31,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -38,6 +40,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlinx.serialization.encodeToString
+import xyz.xiangban.xiaoban.common.community.CommunityJson
+import xyz.xiangban.xiaoban.common.community.ForumAttachment
 import xyz.xiangban.xiaoban.common.community.Category
 import xyz.xiangban.xiaoban.common.community.messageOf
 import xyz.xiangban.xiaoban.common.community.parsePollOptions
@@ -45,8 +50,9 @@ import xyz.xiangban.xiaoban.common.community.pollDraftError
 
 /**
  * 发帖：选一个具体的分类，写标题和正文，发布。发成功后直接打开这个帖子。
- * 图片、附件、悬赏求助这些还在网页端发帖时才有。
+ * 图片上传成功后回填站内 Markdown；附件通过既有 attachment_ids 挂到帖子上。
  */
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, help: Boolean = false) {
     val scope = rememberCoroutineScope()
@@ -58,6 +64,19 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     var title by rememberSaveable { mutableStateOf("") }
     var body by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var uploading by remember { mutableStateOf(false) }
+    var leaving by remember { mutableStateOf(false) }
+    var attachmentsJson by rememberSaveable { mutableStateOf("[]") }
+    val attachments = remember(attachmentsJson) { CommunityJson.decodeFromString<List<ForumAttachment>>(attachmentsJson) }
+    fun cancelDraft() {
+        if (leaving) return
+        leaving = true
+        // 只撤销本次草稿上传的 pending ID，服务端再次保证关联到帖子后不可删除。
+        val pending = attachments.toList()
+        env.scope.launch { pending.forEach { attachment -> runCatching { env.forum.deletePendingAttachment(attachment.id) } } }
+        back()
+    }
+    BackHandler { if (!busy) cancelDraft() }
     var error by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableStateOf(0) }
     var bounty by rememberSaveable { mutableStateOf(0) }
@@ -93,10 +112,10 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     val isHelp = chosen?.slug == "share-help"
     val pollOptions = parsePollOptions(pollText)
     val pollError = if (pollEnabled) pollDraftError(pollOptions, pollDays.takeIf { it != 0 }) else null
-    val canPost = session.loggedIn && !busy && chosen != null && title.trim().length >= 2 && body.trim().length >= 10 && pollError == null
+    val canPost = session.loggedIn && !busy && !uploading && !leaving && chosen != null && title.trim().length >= 2 && body.trim().length >= 10 && pollError == null
 
     Column(Modifier.fillMaxSize().imePadding()) {
-        ScreenBar(if (help) "发求助" else "发帖", onBack = back, trailing = null)
+        ScreenBar(if (help) "发求助" else "发帖", onBack = { if (!busy) cancelDraft() }, trailing = null)
         if (!session.loggedIn) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(Modifier.padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -118,6 +137,15 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                 }
                 TextBox(title, { title = it }, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), placeholder = "标题（至少 2 个字）", enabled = !busy)
                 AreaBox(body, { body = it }, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), placeholder = "正文（至少 10 个字）：写清楚用在哪里、大概什么样子、有什么限制。", minHeight = 200.dp, enabled = !busy)
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    ForumUploadControls(env, enabled = !busy && !leaving, onImage = { if (!leaving) body += it }, onBusy = { uploading = it },
+                        attachments = attachments, onAttachments = { next ->
+                            if (!leaving) attachmentsJson = CommunityJson.encodeToString(next)
+                            else env.scope.launch { next.filterNot { file -> attachments.any { it.id == file.id } }.forEach { file ->
+                                runCatching { env.forum.deletePendingAttachment(file.id) }
+                            } }
+                        })
+                }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("发起投票", Modifier.weight(1f), fontSize = 14.sp)
                     Switch(checked = pollEnabled, onCheckedChange = { pollEnabled = it }, enabled = !busy)
@@ -145,18 +173,18 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                     )
                 }
                 error?.let { Text(it, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 14.sp, color = Danger) }
-                Text("需要贴图片或传附件，请到网页端发帖。", Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
             }
             Hairline()
             Box(Modifier.fillMaxWidth().height(72.dp).background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
                 PillButton(
-                    if (busy) "发布中…" else "发布",
+                    if (busy) "发布中…" else if (uploading) "上传中…" else "发布",
                     {
+                        if (busy || uploading || leaving) return@PillButton
                         busy = true; error = null
                         scope.launch {
                             try {
                                 val id = env.forum.createTopic(categoryId, title.trim(), body.trim(), bounty = if (isHelp) bounty else null, bountyDays = bountyDays,
-                                    pollOptions = if (pollEnabled) pollOptions else emptyList(), pollDays = pollDays.takeIf { pollEnabled && it != 0 })
+                                    pollOptions = if (pollEnabled) pollOptions else emptyList(), pollDays = pollDays.takeIf { pollEnabled && it != 0 }, attachments = attachments)
                                 back()
                                 open(Route.Topic(id))
                             } catch (e: kotlinx.coroutines.CancellationException) {

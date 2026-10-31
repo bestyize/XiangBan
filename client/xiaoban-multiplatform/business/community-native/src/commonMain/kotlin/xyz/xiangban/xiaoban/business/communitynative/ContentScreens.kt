@@ -369,6 +369,13 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                 }
                             }
                             RichBody(env, topic.bodyHtml, Modifier.padding(top = 12.dp), onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
+                            topic.attachments.forEach { attachment ->
+                                Column(Modifier.padding(top = 12.dp)) {
+                                    Text(attachment.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                    Text("${attachment.size} 字节 · ${if (attachment.price == 0) "免费" else "${attachment.price} 积分"}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                                    GhostPillButton("在网页查看与下载", { env.platform?.openUrl(env.forum.topicUrl(topic.id)) }, enabled = env.platform != null)
+                                }
+                            }
                             topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Amber) }
                             topic.poll?.let { PollView(env, topic, it, open) { msg -> toast = msg } }
                         }
@@ -424,19 +431,22 @@ private fun ReplySheet(env: CommunityEnv, topicId: Long, onDismiss: () -> Unit, 
     val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
+    var uploading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     BottomSheet(onDismiss, panelModifier) {
         Text("回复", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         AreaBox(text, { text = it }, Modifier.padding(top = 12.dp), placeholder = "写下你的回复（至少 2 个字）…", minHeight = 120.dp, enabled = !busy, filled = true)
+        ForumUploadControls(env, enabled = !busy, onImage = { text += it }, onBusy = { uploading = it })
         error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = Danger) }
         Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GhostPillButton("取消", onDismiss, Modifier.weight(1f))
-            PillButton(if (busy) "发送中…" else "发送", {
+            PillButton(if (busy) "发送中…" else if (uploading) "上传中…" else "发送", {
+                if (busy || uploading) return@PillButton
                 busy = true; error = null
                 scope.launch {
                     try { env.forum.reply(topicId, text.trim()); onSent() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = messageOf(e) } finally { busy = false }
                 }
-            }, Modifier.weight(1f), enabled = !busy && text.trim().length >= 2)
+            }, Modifier.weight(1f), enabled = !busy && !uploading && text.trim().length >= 2)
         }
     }
 }

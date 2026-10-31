@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
                 micLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
+        val forumPlatform = ForumPickerPlatform(platform, AndroidForumPicker(this))
         val linkStorage = SharedPrefsLinkStorage(this)
         val remoteCache = SqliteRemoteCache(this)
         // 小伴要给你设提醒时才会弹出通知权限的请求；没有内核库（本地没编 Rust 库的调试包）就只有纯云端聊天。
@@ -47,7 +48,7 @@ class MainActivity : ComponentActivity() {
         val prefs = AndroidPrefs(this)
         val chatFiles = AndroidChatHistoryFiles(this)
         setContent {
-            App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles)
+            App(storage, forumPlatform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles)
         }
         hideNavigationBar()
     }
