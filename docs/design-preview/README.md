@@ -17,7 +17,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
-| [手机创造中心](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/create-center.html) | 游戏与桌面装扮统一入口，三画面对照：发现、我的作品、作品预览；卡片移除大操作按钮，点击展开底部面板，集中修改、发送到电脑、分享到社区 / 其他渠道；发现页移除重复的新建按钮，仅我的作品页保留「＋」；交互均为模拟，支持明暗及 360 / 390px。[在线预览](http://127.0.0.1:1421/prototypes/create-center.html)。已接入 Android：游戏优先，卡片操作面板、社区发布与系统分享；电脑装扮通过遥控对话创作，作品直传暂用系统分享。 |
+| [手机创造中心](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/create-center.html) | 游戏与桌面装扮统一入口，三画面对照：发现、我的作品、作品预览；我的作品支持二次确认删除；卡片移除大操作按钮，点击展开底部面板，集中修改、发送到电脑、分享到社区 / 其他渠道；发现页移除重复的新建按钮，仅我的作品页保留「＋」；交互均为模拟，支持明暗及 360 / 390px。[在线预览](http://127.0.0.1:1421/prototypes/create-center.html)。已接入 Android：游戏优先，卡片操作面板、社区发布与系统分享；电脑装扮通过遥控对话创作，作品直传暂用系统分享。 |
 | [手机游戏中心 A / B](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/game-center.html) | A 轻量游戏库与 B 沉浸游乐场；两版并排、390 / 360px、深浅色、我的游戏、详情、创作与启动交互。[在线预览](http://127.0.0.1:1421/prototypes/game-center.html)。已选 A 版接入手机正式页面，Android 使用只读官方游戏与真实最近游玩记录；实机效果待验收 |
 | [社区与小伴AI 手机原型](../../client/xiaoban-multiplatform/docs/design-specs/mobile-prototype/README.md) | 70 个画板：社区、小伴 AI、游戏、我的与设置、分享、设备遥控、聊天状态卡片、实时语音与按住说话；[在线画布](https://claude.ai/artifact/BGtDJ7S7vGenqaY5MvyLLJ) |
 

@@ -9,6 +9,57 @@ class MobileGamesTest {
     private val files = listOf(MobileGameFile("index.html", "<!doctype html><script src='game.js'></script>"), MobileGameFile("game.js", "let score = 0;"), MobileGameFile("cover.svg", "<svg xmlns='http://www.w3.org/2000/svg'/>"))
 
     @Test
+    fun `delete removes only selected work progress and logs`() = runTest {
+        val workspace = MemoryMobileWorkspace()
+        val store = MobileGameStore(workspace)
+        store.create(game, files)
+        val other = game.copy(id = "other-game")
+        store.create(other, files)
+        for (id in listOf(game.id, other.id)) {
+            workspace.write("saves/$id.json", "{\"level\":2}")
+            workspace.write("logs/$id.txt", "runtime")
+        }
+        workspace.write("drafts/original/index.html", "draft")
+        store.delete(game.id)
+        assertEquals(listOf(other), store.list())
+        assertEquals(listOf("saves/${other.id}.json"), workspace.list("saves").map { it.path })
+        assertEquals("runtime", workspace.read("logs/${other.id}.txt"))
+        assertEquals("draft", workspace.read("drafts/original/index.html"))
+        assertEquals(listOf("logs/${other.id}.txt"), workspace.list("logs").map { it.path })
+        for (id in listOf("../other-game", "dusk-glider", "", "games")) {
+            assertFails { store.delete(id) }
+        }
+        assertEquals(other, store.validate(other.id))
+        store.delete(other.id)
+        assertTrue(store.list().isEmpty())
+    }
+
+    @Test
+    fun `delete without progress succeeds and failure restores the complete work`() = runTest {
+        val memory = MemoryMobileWorkspace()
+        var failPath: String? = null
+        val workspace = object : MobileWorkspace by memory {
+            override suspend fun remove(path: String, recursive: Boolean) {
+                if (path == failPath) { failPath = null; error("storage unavailable") }
+                memory.remove(path, recursive)
+            }
+        }
+        val store = MobileGameStore(workspace)
+        store.create(game, files)
+        store.delete(game.id)
+        assertTrue(store.list().isEmpty())
+        store.create(game, files)
+        workspace.write("saves/${game.id}.json", "{\"level\":3}")
+        workspace.write("logs/${game.id}.txt", "keep log")
+        val before = store.exportFiles(game.id)
+        failPath = "logs/${game.id}.txt"
+        assertFailsWith<IllegalStateException> { store.delete(game.id) }
+        assertEquals(before, store.exportFiles(game.id))
+        assertEquals("{\"level\":3}", workspace.read("saves/${game.id}.json"))
+        assertEquals("keep log", workspace.read("logs/${game.id}.txt"))
+    }
+
+    @Test
     fun `export has a desktop v1 resource manifest and excludes saves and runtime logs`() = runTest {
         val workspace = MemoryMobileWorkspace()
         val store = MobileGameStore(workspace)

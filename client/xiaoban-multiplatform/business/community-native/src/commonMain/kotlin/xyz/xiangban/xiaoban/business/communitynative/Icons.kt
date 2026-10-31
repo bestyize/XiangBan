@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 
 /** 设计稿里用到的线条图标（24×24，描边 1.8）。路径数据直接取自设计稿的 SVG，由脚本生成。 */
 object XIcons {
+    val Trash: ImageVector by lazy { strokeIcon("Trash", "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7") }
     val Phone: ImageVector by lazy { strokeIcon("Phone", "M8 2h8a2 2 0 012 2v16a2 2 0 01-2 2H8a2 2 0 01-2-2V4a2 2 0 012-2zM10 18h4") }
     val ArrowRight: ImageVector by lazy { strokeIcon("ArrowRight", "M5 12h13M13 6l6 6-6 6") }
     val ArrowUp: ImageVector by lazy { strokeIcon("ArrowUp", "M12 19V5M6 11l6-6 6 6") }
