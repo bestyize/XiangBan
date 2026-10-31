@@ -695,7 +695,7 @@ async fn get_scheme(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
         "items":resolved,"apply_count":apply_count,"created_at":created_at})))
 }
 
-async fn scheme_items(state: &AppState, items: &Value) -> AppResult<Vec<Value>> {
+pub(crate) async fn scheme_items(state: &AppState, items: &Value) -> AppResult<Vec<Value>> {
     let mut resolved = Vec::new();
     for item in items.as_array().into_iter().flatten().take(30) {
         let Some(pack_id) = item["pack_id"].as_i64() else { continue };
@@ -1318,3 +1318,38 @@ async fn admin_put_weekly(
 #[cfg(test)]
 #[path = "content_tests.rs"]
 mod content_tests;
+
+/// 社区收藏、回复卡与私有备份共用的公开可读快照；不返回安装包清单正文。
+/// 指定 pack 版本时还要求该版本真实存在，未知/不可读内容统一返回 None。
+pub(crate) async fn public_content_card(
+    state: &AppState,
+    kind: &str,
+    id: i64,
+    version: Option<i32>,
+) -> AppResult<Option<Value>> {
+    if id<=0 || version.is_some_and(|v|v<=0) {return Ok(None);}
+    let result=match kind {
+        "pack"=>{
+            let pack=match find_pack(state,id).await {
+                Ok(pack)=>pack,
+                Err(AppError::NotFound(_))=>return Ok(None),
+                Err(error)=>return Err(error),
+            };
+            if !visible(state,&pack,None).await? {return Ok(None);}
+            if let Some(version)=version {
+                let (exists,):(bool,)=sqlx::query_as("SELECT EXISTS(SELECT 1 FROM pack_versions WHERE pack_id=$1 AND version=$2)").bind(id).bind(version).fetch_one(&state.pool).await?;
+                if !exists {return Ok(None);}
+            }
+            let mut value=pack.json(state);
+            if let Some(version)=version {value["version"]=json!(version);}
+            Ok(Some(value))
+        },
+        "scheme" if version.is_none()=>match get_scheme(State(state.clone()),Path(id)).await {
+            Ok(Json(value))=>Ok(Some(value)),
+            Err(AppError::NotFound(_))=>Ok(None),
+            Err(error)=>Err(error),
+        },
+        _=>Err(AppError::BadRequest("内容类型只能是 pack 或 scheme，方案不支持版本参数".into())),
+    };
+    result
+}
