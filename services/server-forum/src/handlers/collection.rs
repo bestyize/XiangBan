@@ -33,6 +33,7 @@ pub fn routes() -> Router<AppState> {
 struct Source {
     id: String,
     configured: bool,
+    config: Value,
     hint: Option<String>,
     enabled: bool,
     interval_minutes: i32,
@@ -41,7 +42,7 @@ struct Source {
     next_run_at: DateTime<Utc>,
 }
 async fn sources(State(s): State<AppState>, _: AuthAdmin) -> AppResult<Json<Value>> {
-    let items:Vec<Source>=sqlx::query_as("SELECT id,credential IS NOT NULL AS configured,hint,enabled,interval_minutes,last_success_at,last_error,next_run_at FROM collection_sources ORDER BY id").fetch_all(&s.pool).await?;
+    let items:Vec<Source>=sqlx::query_as("SELECT id,credential IS NOT NULL AS configured,config,hint,enabled,interval_minutes,last_success_at,last_error,next_run_at FROM collection_sources ORDER BY id").fetch_all(&s.pool).await?;
     Ok(Json(json!({"items":items.into_iter().map(|source| {
         let title=collectors::title(&source.id).unwrap_or("未知来源");
         let mut value=serde_json::to_value(source).unwrap(); value["title"]=json!(title); value
@@ -90,6 +91,7 @@ async fn credential(
 struct Configuration {
     enabled: Option<bool>,
     interval_minutes: Option<i32>,
+    config: Option<Value>,
 }
 async fn configure(
     State(s): State<AppState>,
@@ -98,7 +100,7 @@ async fn configure(
     Json(input): Json<Configuration>,
 ) -> AppResult<Json<Value>> {
     collectors::check_source(&id)?;
-    if input.enabled.is_none() && input.interval_minutes.is_none() {
+    if input.enabled.is_none() && input.interval_minutes.is_none() && input.config.is_none() {
         return Err(AppError::BadRequest("请提供采集配置".into()));
     }
     if input
@@ -108,19 +110,28 @@ async fn configure(
         return Err(AppError::BadRequest("采集间隔应为 60–10080 分钟".into()));
     }
     let mut tx = s.pool.begin().await?;
-    let sealed: Option<(Option<Vec<u8>>,)> =
-        sqlx::query_as("SELECT credential FROM collection_sources WHERE id=$1 FOR UPDATE")
-            .bind(&id)
-            .fetch_optional(&mut *tx)
-            .await?;
+    let old: Option<(Option<Vec<u8>>, Value, bool)> = sqlx::query_as(
+        "SELECT credential,config,enabled FROM collection_sources WHERE id=$1 FOR UPDATE",
+    )
+    .bind(&id)
+    .fetch_optional(&mut *tx)
+    .await?;
+    let (sealed, old_config, old_enabled) = old.ok_or_else(|| AppError::not_found("采集来源"))?;
+    let config = match input.config {
+        Some(config) if id == "github_repos" => collectors::repo_sources::sanitize_config(config)?,
+        Some(config) if config == json!({}) => config,
+        Some(_) => return Err(AppError::BadRequest("此来源不支持额外配置".into())),
+        None => old_config,
+    };
+    if id == "github_repos" && input.enabled.unwrap_or(old_enabled) {
+        collectors::repo_sources::configured_names(&config)?;
+    }
     if input.enabled == Some(true) {
-        let sealed = sealed
-            .and_then(|r| r.0)
-            .ok_or_else(|| AppError::BadRequest("请先配置来源凭据".into()))?;
+        let sealed = sealed.ok_or_else(|| AppError::BadRequest("请先配置来源凭据".into()))?;
         credentials::decrypt(&id, &sealed)?;
     }
-    sqlx::query("UPDATE collection_sources SET enabled=COALESCE($2,enabled),interval_minutes=COALESCE($3,interval_minutes),next_run_at=CASE WHEN $3::int=1440 THEN date_trunc('day',(now()-interval '4 hours') AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'+interval '1 day 4 hours' WHEN $3::int IS NOT NULL THEN now()+make_interval(mins=>$3) ELSE next_run_at END,updated_at=now() WHERE id=$1")
-        .bind(&id).bind(input.enabled).bind(input.interval_minutes).execute(&mut *tx).await?;
+    sqlx::query("UPDATE collection_sources SET enabled=COALESCE($2,enabled),interval_minutes=COALESCE($3,interval_minutes),config=$4,next_run_at=CASE WHEN $3::int=1440 THEN date_trunc('day',(now()-interval '4 hours') AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'+interval '1 day 4 hours' WHEN $3::int IS NOT NULL THEN now()+make_interval(mins=>$3) ELSE next_run_at END,updated_at=now() WHERE id=$1")
+        .bind(&id).bind(input.enabled).bind(input.interval_minutes).bind(config).execute(&mut *tx).await?;
     audit(
         &mut tx,
         &admin,

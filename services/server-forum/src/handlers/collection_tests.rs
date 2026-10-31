@@ -317,11 +317,17 @@ async fn collection_admin_auth_configuration_and_exclusion_are_enforced(
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    assert_eq!(body["items"].as_array().unwrap().len(), 2);
+    let required = ["artificial_analysis", "openrouter", "github_repos"];
+    assert!(required.iter().all(|id| body["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|i| i["id"] == *id)));
     assert!(body["items"]
         .as_array()
         .unwrap()
         .iter()
+        .filter(|i| required.contains(&i["id"].as_str().unwrap()))
         .all(|i| i["configured"] == false && i["enabled"] == false));
     for input in [
         json!({"enabled":true}),
@@ -348,6 +354,43 @@ async fn collection_admin_auth_configuration_and_exclusion_are_enforced(
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
+    let (status, _) = request(
+        &h.app,
+        "PATCH",
+        "/api/admin/collection/sources/github_repos",
+        Some(&h.token),
+        json!({"config":{"repositories":["a/b","A/B"]}}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, body) = request(
+        &h.app,
+        "PATCH",
+        "/api/admin/collection/sources/github_repos",
+        Some(&h.token),
+        json!({"config":{"repositories":["Zed/Repo","abc/project"]}}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (_, body) = request(
+        &h.app,
+        "GET",
+        "/api/admin/collection/sources",
+        Some(&h.token),
+        Value::Null,
+    )
+    .await;
+    let github = body["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["id"] == "github_repos")
+        .unwrap();
+    assert_eq!(
+        github["config"],
+        json!({"repositories":["abc/project","zed/repo"]})
+    );
+    assert_eq!(github["enabled"], false);
     let run = h.run().await;
     assert!(matches!(
         collectors::start(h.state.clone(), "openrouter".into(), false).await,

@@ -259,6 +259,18 @@ fn validate(e: &Editor, kind: &str, key: &str, input: &mut Input) -> AppResult<(
             "调用量榜标识必须与统计日期一致".into(),
         ));
     }
+    if kind == "repo_issue"
+        && input.data["source"] == "GitHub"
+        && key
+            != format!(
+                "github-rolling-{}",
+                input.data["observation_end"].as_str().unwrap_or_default()
+            )
+    {
+        return Err(AppError::BadRequest(
+            "GitHub 榜单标识必须与观测结束日期一致".into(),
+        ));
+    }
     if input.expected_revision < 0 {
         return Err(AppError::BadRequest("版本号不能为负数".into()));
     }
@@ -401,6 +413,10 @@ async fn preview(
     };
     let preview_key = match kind.as_str() {
         "model_board" => "artificial-analysis".to_string(),
+        "repo_issue" if input.data["source"] == "GitHub" => format!(
+            "github-rolling-{}",
+            input.data["observation_end"].as_str().unwrap_or_default()
+        ),
         "model_usage" => input.data["date"].as_str().unwrap_or_default().to_string(),
         _ => "preview".to_string(),
     };
@@ -725,7 +741,7 @@ pub async fn write_collected_batch(
     }
     let mut tx = pool.begin().await?;
     // 锁住租约至写入完成，过期 worker 不得写入接替者的任务。
-    let active: Option<(Uuid,)> = sqlx::query_as("SELECT active_run FROM collection_sources WHERE id=$1 AND active_run=$2 AND lease_until>now() FOR UPDATE")
+    let active: Option<(Uuid,)> = sqlx::query_as("SELECT active_run FROM collection_sources WHERE id=$1 AND active_run=$2 AND lease_until>now() AND config=(SELECT config FROM collection_runs WHERE id=$2) FOR UPDATE")
         .bind(source).bind(run_id).fetch_optional(&mut *tx).await?;
     if active.is_none() {
         return Err(AppError::Conflict("采集租约已失效".into()));
@@ -738,6 +754,16 @@ pub async fn write_collected_batch(
             "openrouter" => {
                 item.kind == "model_usage"
                     && chrono::NaiveDate::parse_from_str(&item.key, "%Y-%m-%d").is_ok()
+            }
+            "github_repos" => {
+                item.kind == "repo_issue"
+                    && item.data["source"] == "GitHub"
+                    && item
+                        .key
+                        .strip_prefix("github-rolling-")
+                        .is_some_and(|date| {
+                            chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok()
+                        })
             }
             _ => false,
         };
