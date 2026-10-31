@@ -27,6 +27,10 @@ pub fn routes() -> Router<AppState> {
         .route("/discover/home", get(home))
         .route("/discover/home/v2", get(home_v2))
         .route("/discover/daily", get(daily))
+        .route("/discover/daily/{key}", get(super::discover_news::detail))
+        .route("/discover/daily/{key}/comments", get(super::discover_news::list).post(super::discover_news::create))
+        .route("/discover/daily/{key}/comments/{id}", axum::routing::delete(super::discover_news::delete))
+        .route("/discover/daily/{key}/comments/{id}/like", put(super::discover_news::like).delete(super::discover_news::unlike))
         .route("/discover/repos", get(repos))
         .route("/discover/repos/v2", get(repos_v2))
         .route("/discover/repos/issues", get(repo_issues))
@@ -62,7 +66,11 @@ async fn fetch(pool: &PgPool, kind: &str, order: &str, limit: i64, offset: i64) 
     .bind(offset)
     .fetch_all(pool)
     .await?;
-    Ok(rows.into_iter().map(item_json).collect())
+    Ok(rows.into_iter().map(|row| {
+        let mut item = item_json(row);
+        if kind == "news" { if let Some(obj) = item.as_object_mut() { obj.remove("body"); } }
+        item
+    }).collect())
 }
 
 fn item_json((key, _order, published_at, data): Row) -> Value {

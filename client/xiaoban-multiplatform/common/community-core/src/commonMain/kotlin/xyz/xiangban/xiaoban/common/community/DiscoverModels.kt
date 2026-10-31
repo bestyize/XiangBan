@@ -15,6 +15,8 @@ data class NewsItem(
     val title: String,
     val source: String = "",
     val url: String = "",
+    val summary: String = "",
+    @SerialName("body_html") val bodyHtml: String = "",
     @SerialName("cover_url") val coverUrl: String = "",
     /** 没有封面图时，缩略图和来源小圆点的颜色（#RRGGBB）。 */
     val accent: String = "",
@@ -22,6 +24,21 @@ data class NewsItem(
     @SerialName("source_published_at") val sourcePublishedAt: String? = null,
     @SerialName("time_basis") val timeBasis: String = "",
     val sample: Boolean = false,
+)
+
+@Serializable
+data class NewsCommentAuthor(val uid: String, val nickname: String, @SerialName("avatar_url") val avatarUrl: String? = null)
+
+@Serializable
+data class NewsComment(
+    val id: Long,
+    @SerialName("reply_to") val replyTo: Long? = null,
+    val body: String,
+    @SerialName("created_at") val createdAt: String = "",
+    val author: NewsCommentAuthor,
+    @SerialName("like_count") val likeCount: Int = 0,
+    val liked: Boolean = false,
+    val mine: Boolean = false,
 )
 
 @Serializable

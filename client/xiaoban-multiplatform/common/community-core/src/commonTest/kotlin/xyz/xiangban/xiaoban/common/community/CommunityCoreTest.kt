@@ -34,6 +34,19 @@ class ForumApiTest {
     private val config = CommunityConfig()
 
     @Test
+    fun `news detail and comments use the forum API`() = runTest {
+        val server = FakeServer()
+        server.on("/api/discover/daily/article-1", body = """{"key":"article-1","title":"标题","source":"官方","summary":"摘要","body_html":"<h2>正文</h2>"}""")
+        server.on("/api/discover/daily/article-1/comments", body = """{"items":[{"id":5,"body":"留言","author":{"uid":"u","nickname":"小伴"},"liked":true}],"page":1,"page_size":30,"total":1}""")
+        val api = ForumApi(server.client, config) { "T1" }
+        assertEquals("<h2>正文</h2>", api.news("article-1").bodyHtml)
+        val comment = api.newsComments("article-1").items.single()
+        assertEquals("小伴", comment.author.nickname)
+        assertTrue(comment.liked)
+        assertEquals("Bearer T1", server.requests.last().headers[HttpHeaders.Authorization])
+    }
+
+    @Test
     fun `packs are parsed, unknown fields ignored, and the query is built from the filters`() = runTest {
         val server = FakeServer()
         server.on("/api/packs", body = page(PACK))

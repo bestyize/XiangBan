@@ -105,6 +105,11 @@ pub struct News {
     url: String,
     #[serde(default)]
     cover_url: String,
+    /// 编辑后的站内摘要与 Markdown 正文；旧的纯链接条目允许为空。
+    #[serde(default)]
+    summary: String,
+    #[serde(default)]
+    body: String,
     /// 没有封面图时，缩略图和来源小圆点用的颜色（#RRGGBB）。
     #[serde(default)]
     accent: String,
@@ -120,6 +125,8 @@ impl Check for News {
         self.source = clean(&self.source, "来源", 30, true)?;
         self.url = web_url(&self.url, "链接", true)?;
         self.cover_url = web_url(&self.cover_url, "封面地址", false)?;
+        self.summary = clean(&self.summary, "摘要", 500, false)?;
+        self.body = clean(&self.body, "正文", 50_000, false)?;
         if !["", "source_published", "collected"].contains(&self.time_basis.as_str())
             || (self.time_basis == "source_published" && self.source_published_at.is_none())
             || (self.time_basis == "collected" && self.source_published_at.is_some()) {
@@ -774,6 +781,17 @@ mod tests {
         assert!(validate("news",data.clone()).is_err());
         data["source_published_at"] = Value::Null;
         assert!(validate("news",data).is_ok());
+    }
+
+    #[test]
+    fn news_keeps_editorial_content_and_limits_its_size() {
+        let mut data = json!({"title":"文章","source":"官方","url":"https://example.com/a",
+            "summary":"简要介绍","body":"## 标题\n\n正文 ![配图](https://example.com/image.png)"});
+        let article = validate("news", data.clone()).unwrap();
+        assert_eq!(article["summary"], "简要介绍");
+        assert!(article["body"].as_str().unwrap().contains("配图"));
+        data["body"] = json!("字".repeat(50_001));
+        assert!(validate("news", data).is_err());
     }
 
     #[test]

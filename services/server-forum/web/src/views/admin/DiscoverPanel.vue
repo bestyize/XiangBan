@@ -8,7 +8,7 @@ import DiscoverFieldsEditor from './DiscoverFieldsEditor.vue'
 
 const KINDS = [
   { key: 'banner', label: '首页头图', sample: '{"tag":"本周原创","title":"标题","byline":"小伴编辑部 · 8 分钟读完","link":"topic:12"}' },
-  { key: 'news', label: 'AI 日报', sample: '{"title":"标题","source":"来源","url":"https://example.com/a","cover_url":""}' },
+  { key: 'news', label: 'AI 日报', sample: '{"title":"标题","source":"来源","url":"https://example.com/a","cover_url":"","summary":"文章摘要","body":"## 小标题\\n\\n站内文章正文，支持 Markdown 和图片。"}' },
   { key: 'repo_issue', label: '开源热榜（按期）', sample: '{"issue_no":1,"week_start":"10.23","week_end":"10.29","total_gain":86420,"wow_pct":12,"daily_gain":[1,2,3,4,5,6,7],"ranks":[{"full_name":"owner/repo","description":"简介","language":"Python","language_color":"#3572A5","star_total":12400,"star_gain":3214,"spark":[1,2,3,4,5,6,7]}]}' },
   { key: 'vendor', label: '模型厂商', sample: '{"name":"厂商名","brand_color":"#E3203C","tint":"#FFE4E8"}' },
   { key: 'model', label: '模型榜', sample: '{"name":"模型名","vendor":"厂商 key","iq":70,"code":68,"math":66,"agent":69,"price":3.4,"speed":90,"latency":0.9,"context":"200K","open":false,"reasoning":true,"cn":false}' },
