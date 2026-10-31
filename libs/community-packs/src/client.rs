@@ -97,6 +97,9 @@ impl Community {
         let allowed = path == "/api/weekly"
             || path.starts_with("/api/weekly?")
             || path.strip_prefix("/api/weekly/").is_some_and(|w| w.len() <= 12 && w.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-'))
+            || path == "/api/schemes"
+            || path.starts_with("/api/schemes?")
+            || path.strip_prefix("/api/schemes/").is_some_and(|id| !id.is_empty() && id.bytes().all(|b|b.is_ascii_digit()))
             || path == "/api/packs"
             || path.starts_with("/api/packs?")
             || path.strip_prefix("/api/packs/").is_some_and(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()));
@@ -284,12 +287,16 @@ mod tests {
         let origin = serve(routes.clone());
         routes.lock().unwrap().push(("/api/weekly".into(), 200, br#"{"items":[]}"#.to_vec()));
         routes.lock().unwrap().push(("/api/packs?kind=effect&sort=hot".into(), 200, br#"{"items":[1]}"#.to_vec()));
+        routes.lock().unwrap().push(("/api/schemes?page=1".into(), 200, br#"{"items":[]}"#.to_vec()));
+        routes.lock().unwrap().push(("/api/schemes/12".into(), 200, br#"{"id":12}"#.to_vec()));
         let client = Community::new(&origin).unwrap();
+        assert!(client.browse("/api/schemes?page=1").is_ok());
+        assert!(client.browse("/api/schemes/12").is_ok());
         assert_eq!(client.browse("/api/weekly").unwrap()["items"].as_array().unwrap().len(), 0);
         assert!(client.browse("/api/packs?kind=effect&sort=hot").is_ok());
         for bad in [
             "/api/admin/packs", "/api/me/points", "/api/weekly/../admin", "/api/packs/abc", "/api/weekly/2026-W44/x",
-            "/api/internal/pack-uploaded", "http://evil.test/api/weekly", "/api/weeklyx", "/api/packs#x",
+            "/api/schemes/12/remove", "/api/schemes/new", "/api/schemes/../admin", "/api/internal/pack-uploaded", "http://evil.test/api/weekly", "/api/weeklyx", "/api/packs#x",
         ] {
             assert!(client.browse(bad).is_err(), "{bad}");
         }
