@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { communityEditorial, type EditorialPack, type FeaturedItem } from '@/api/communityEditorial'
+import CommunityChallengesPanel from './CommunityChallengesPanel.vue'
 import { kindLabel } from '@/lib/content'
 const items = ref<FeaturedItem[]>([])
 const candidates = ref<EditorialPack[]>([])
@@ -63,6 +64,7 @@ onMounted(load)
     <p v-if="!searching && !searchError && !candidates.length" class="adm-sub">搜索后展示可公开精选的作品。</p>
     <ul class="editorial-list"><li v-for="pack in candidates" :key="pack.id"><span>{{ pack.title }} · {{ kindLabel(pack.kind) }}</span><button class="btn" :disabled="saving || items.length >= 30 || items.some(item => item.pack_id === pack.id)" @click="add(pack)">{{ items.some(item => item.pack_id === pack.id) ? '已选择' : '加入精选' }}</button></li></ul>
   </section>
+  <CommunityChallengesPanel />
 </template>
 <style scoped>
 .editorial-panel { display: grid; gap: 12px; }

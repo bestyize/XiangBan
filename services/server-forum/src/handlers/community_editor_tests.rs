@@ -215,3 +215,359 @@ async fn editorial_featured_requires_admin_and_hides_unavailable_packs_immediate
     h.close().await?;
     Ok(())
 }
+
+fn challenge_input() -> Value {
+    json!({"title":"桌面小工具挑战","description":"分享你自己创作的公开作品。投票使用作品讨论帖点赞，不发积分。","starts_at":chrono::Utc::now()-chrono::Duration::hours(1),"ends_at":chrono::Utc::now()+chrono::Duration::days(7),"submission_tag":"desktop-challenge","topic_id":null,"expected_revision":0})
+}
+async fn create_challenge(h: &Harness, key: &str) -> Value {
+    let (status, value) = call(
+        &h.app,
+        "PUT",
+        &format!("/api/admin/community-editorial/challenges/{key}"),
+        Some(&h.admin),
+        challenge_input(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{value}");
+    value
+}
+async fn publish(h: &Harness, key: &str, revision: i64) -> Value {
+    let (status, value) = call(
+        &h.app,
+        "POST",
+        &format!("/api/admin/community-editorial/challenges/{key}/publish"),
+        Some(&h.admin),
+        json!({"expected_revision":revision}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{value}");
+    value
+}
+#[tokio::test]
+async fn editorial_challenge_manual_publication_ownership_idempotency_and_deadline_are_enforced(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else {
+        return Ok(());
+    };
+    let (uid, user) = h.user().await;
+    let (other_uid, other_user) = h.user().await;
+    let own = h.pack(uid, "我的作品", "published").await;
+    let other = h.pack(other_uid, "其他人的作品", "published").await;
+    let removed = h.pack(uid, "下架作品", "removed").await;
+    let data = create_challenge(&h, "desktop-tools").await;
+    let revision = data["challenge"]["revision"].as_i64().unwrap();
+    let (status, _) = call(
+        &h.app,
+        "GET",
+        "/api/challenges/desktop-tools",
+        None,
+        Value::Null,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (_, list) = call(&h.app, "GET", "/api/challenges", None, Value::Null).await;
+    assert_eq!(list["total"], 0);
+    let (status, _) = call(
+        &h.app,
+        "POST",
+        "/api/admin/community-editorial/challenges/desktop-tools/publish",
+        Some(&user),
+        json!({"expected_revision":revision}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let published = publish(&h, "desktop-tools", revision).await;
+    assert_eq!(published["challenge"]["status"], "open");
+    let (status, _) = call(
+        &h.app,
+        "PUT",
+        "/api/admin/community-editorial/challenges/desktop-tools",
+        Some(&h.admin),
+        challenge_input(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    for _ in 0..2 {
+        let (status, value) = call(
+            &h.app,
+            "POST",
+            "/api/challenges/desktop-tools/entries",
+            Some(&user),
+            json!({"pack_id":own}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{value}");
+    }
+    for (token, pack_id, status) in [
+        (user.as_str(), other, StatusCode::FORBIDDEN),
+        (other_user.as_str(), own, StatusCode::FORBIDDEN),
+        (user.as_str(), removed, StatusCode::BAD_REQUEST),
+    ] {
+        let (actual, value) = call(
+            &h.app,
+            "POST",
+            "/api/challenges/desktop-tools/entries",
+            Some(token),
+            json!({"pack_id":pack_id}),
+        )
+        .await;
+        assert_eq!(actual, status, "{value}");
+    }
+    let (_, detail) = call(
+        &h.app,
+        "GET",
+        "/api/challenges/desktop-tools",
+        None,
+        Value::Null,
+    )
+    .await;
+    assert_eq!(detail["entries"]["total"], 1);
+    assert_eq!(detail["challenge"]["entry_count"], 1);
+    assert!(detail["entries"]["items"][0]["vote_topic_id"].is_null());
+    assert!(detail["entries"]["items"][0]["likes"].is_null());
+    let (points,): (i32,) = sqlx::query_as("SELECT points FROM users WHERE uid=$1")
+        .bind(uid)
+        .fetch_one(&h.pool)
+        .await?;
+    assert_eq!(points, 0, "challenge submission must not award points");
+    sqlx::query("UPDATE community_challenges SET starts_at=clock_timestamp()-interval '1 day',ends_at=clock_timestamp() WHERE key='desktop-tools'").execute(&h.pool).await?;
+    let (status, _) = call(
+        &h.app,
+        "POST",
+        "/api/challenges/desktop-tools/entries",
+        Some(&user),
+        json!({"pack_id":own}),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::CONFLICT,
+        "even retries after the exact deadline are rejected"
+    );
+    let (_, detail) = call(
+        &h.app,
+        "GET",
+        "/api/challenges/desktop-tools",
+        None,
+        Value::Null,
+    )
+    .await;
+    assert_eq!(detail["challenge"]["status"], "ended");
+    h.close().await?;
+    Ok(())
+}
+#[tokio::test]
+async fn editorial_challenge_feature_audit_and_dynamic_visibility_follow_pack_and_author(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else {
+        return Ok(());
+    };
+    let (uid, user) = h.user().await;
+    let pack = h.pack(uid, "参赛作品", "published").await;
+    let (category,): (i32,) =
+        sqlx::query_as("INSERT INTO categories(slug,name) VALUES('votes','讨论') RETURNING id")
+            .fetch_one(&h.pool)
+            .await?;
+    let (topic,):(i64,)=sqlx::query_as("INSERT INTO topics(category_id,author_uid,title,body_md,body_html,like_count) VALUES($1,$2,'作品讨论','介绍','介绍',5) RETURNING id").bind(category).bind(uid).fetch_one(&h.pool).await?;
+    sqlx::query("UPDATE packs SET topic_id=$2 WHERE id=$1")
+        .bind(pack)
+        .bind(topic)
+        .execute(&h.pool)
+        .await?;
+    let draft = create_challenge(&h, "creative-day").await;
+    let published = publish(
+        &h,
+        "creative-day",
+        draft["challenge"]["revision"].as_i64().unwrap(),
+    )
+    .await;
+    let (status, value) = call(
+        &h.app,
+        "POST",
+        "/api/challenges/creative-day/entries",
+        Some(&user),
+        json!({"pack_id":pack}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{value}");
+    let (status, admin) = call(
+        &h.app,
+        "GET",
+        "/api/admin/community-editorial/challenges/creative-day",
+        Some(&h.admin),
+        Value::Null,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{admin}");
+    let revision = admin["entries"]["items"][0]["revision"].as_i64().unwrap();
+    let input = json!({"expected_revision":revision,"featured":true,"sort_order":1});
+    let path = format!("/api/admin/community-editorial/challenges/creative-day/entries/{pack}");
+    let (status, _) = call(&h.app, "PATCH", &path, Some(&user), input.clone()).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, value) = call(&h.app, "PATCH", &path, Some(&h.admin), input.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{value}");
+    let (status, _) = call(&h.app, "PATCH", &path, Some(&h.admin), input).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (_, detail) = call(
+        &h.app,
+        "GET",
+        "/api/challenges/creative-day",
+        None,
+        Value::Null,
+    )
+    .await;
+    assert_eq!(detail["entries"]["items"][0]["featured"], true);
+    assert_eq!(detail["entries"]["items"][0]["vote_topic_id"], topic);
+    assert_eq!(
+        detail["entries"]["items"][0]["likes"], 5,
+        "entry votes reuse the existing topic counter"
+    );
+    sqlx::query("UPDATE topics SET min_read_level=1 WHERE id=$1")
+        .bind(topic)
+        .execute(&h.pool)
+        .await?;
+    let (_, hidden) = call(
+        &h.app,
+        "GET",
+        "/api/challenges/creative-day",
+        None,
+        Value::Null,
+    )
+    .await;
+    assert_eq!(
+        hidden["entries"]["total"], 0,
+        "private linked discussion hides the work"
+    );
+    sqlx::query("UPDATE topics SET min_read_level=0 WHERE id=$1")
+        .bind(topic)
+        .execute(&h.pool)
+        .await?;
+
+    sqlx::query("UPDATE packs SET status='removed' WHERE id=$1")
+        .bind(pack)
+        .execute(&h.pool)
+        .await?;
+    let (_, hidden) = call(
+        &h.app,
+        "GET",
+        "/api/challenges/creative-day",
+        None,
+        Value::Null,
+    )
+    .await;
+    assert_eq!(hidden["entries"]["total"], 0);
+    assert_eq!(hidden["challenge"]["entry_count"], 0);
+    sqlx::query("UPDATE packs SET status='published' WHERE id=$1")
+        .bind(pack)
+        .execute(&h.pool)
+        .await?;
+    sqlx::query("UPDATE users SET status='banned' WHERE uid=$1")
+        .bind(uid)
+        .execute(&h.pool)
+        .await?;
+    let (_, hidden) = call(
+        &h.app,
+        "GET",
+        "/api/challenges/creative-day",
+        None,
+        Value::Null,
+    )
+    .await;
+    assert_eq!(hidden["entries"]["total"], 0);
+    let close = json!({"expected_revision":published["challenge"]["revision"]});
+    let (status, value) = call(
+        &h.app,
+        "POST",
+        "/api/admin/community-editorial/challenges/creative-day/close",
+        Some(&h.admin),
+        close,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{value}");
+    assert_eq!(value["challenge"]["status"], "closed");
+    let (logs,): (i64,) = sqlx::query_as(
+        "SELECT count(*) FROM admin_audit WHERE action='community.challenge.entry.feature'",
+    )
+    .fetch_one(&h.pool)
+    .await?;
+    assert_eq!(logs, 1);
+    h.close().await?;
+    Ok(())
+}
+#[tokio::test]
+async fn editorial_challenge_upcoming_withdrawal_and_public_discussion_permissions(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else {
+        return Ok(());
+    };
+    let (uid, user) = h.user().await;
+    let pack = h.pack(uid, "即将参赛", "published").await;
+    let (category,): (i32,) =
+        sqlx::query_as("INSERT INTO categories(slug,name) VALUES('challenge','挑战') RETURNING id")
+            .fetch_one(&h.pool)
+            .await?;
+    let (topic,):(i64,)=sqlx::query_as("INSERT INTO topics(category_id,author_uid,title,body_md,body_html) VALUES($1,$2,'挑战讨论','讨论','讨论') RETURNING id").bind(category).bind(uid).fetch_one(&h.pool).await?;
+    let mut input = challenge_input();
+    input["topic_id"] = json!(topic);
+    input["starts_at"] = json!(chrono::Utc::now() + chrono::Duration::days(1));
+    input["key"] = json!("tomorrow");
+    let (status, draft) = call(
+        &h.app,
+        "POST",
+        "/api/admin/community-editorial/challenges",
+        Some(&h.admin),
+        input.clone(),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{draft}");
+    let published = publish(
+        &h,
+        "tomorrow",
+        draft["challenge"]["revision"].as_i64().unwrap(),
+    )
+    .await;
+    let (status, _) = call(
+        &h.app,
+        "POST",
+        "/api/challenges/tomorrow/entries",
+        Some(&user),
+        json!({"pack_id":pack}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (_, detail) = call(&h.app, "GET", "/api/challenges/tomorrow", None, Value::Null).await;
+    assert_eq!(detail["challenge"]["status"], "upcoming");
+    assert_eq!(detail["challenge"]["topic_id"], topic);
+    sqlx::query("UPDATE topics SET min_read_level=1 WHERE id=$1")
+        .bind(topic)
+        .execute(&h.pool)
+        .await?;
+    let (_, detail) = call(&h.app, "GET", "/api/challenges/tomorrow", None, Value::Null).await;
+    assert!(detail["challenge"]["topic_id"].is_null());
+    let (status, draft) = call(
+        &h.app,
+        "POST",
+        "/api/admin/community-editorial/challenges/tomorrow/unpublish",
+        Some(&h.admin),
+        json!({"expected_revision":published["challenge"]["revision"]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{draft}");
+    let (status, _) = call(&h.app, "GET", "/api/challenges/tomorrow", None, Value::Null).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, _) = call(
+        &h.app,
+        "POST",
+        "/api/admin/community-editorial/challenges/tomorrow/publish",
+        Some(&h.admin),
+        json!({"expected_revision":draft["challenge"]["revision"]}),
+    )
+    .await;
+    assert_eq!(
+        status,
+        StatusCode::BAD_REQUEST,
+        "publication rechecks discussion visibility"
+    );
+    h.close().await?;
+    Ok(())
+}
