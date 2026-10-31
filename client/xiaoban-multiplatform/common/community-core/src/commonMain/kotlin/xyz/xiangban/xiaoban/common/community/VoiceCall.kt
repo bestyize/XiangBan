@@ -61,6 +61,8 @@ data class CallState(
     val userText: String = "",
     /** 这一轮小伴的回答（边生成边更新）。 */
     val replyText: String = "",
+    /** 正在念的那句在 [replyText] 里的位置；通话页像歌词一样把它滚到中间、点亮。没在念回答时为 null。 */
+    val reading: IntRange? = null,
     /** 要让你知道的事：出错原因、需要你去确认操作、好久没人说话。 */
     val notice: String? = null,
     val ended: Boolean = false,
@@ -475,7 +477,7 @@ class SpokenCall(
                 val text = hear() ?: continue
                 if (isVoiceNoise(text)) continue
                 heardSomething()
-                update { it.copy(userText = text, replyText = "", partial = "") }
+                update { it.copy(userText = text, replyText = "", reading = null, partial = "") }
                 phase(CallPhase.Thinking)
                 answer(text)
             }
@@ -539,8 +541,8 @@ class SpokenCall(
         val ackAudio = ackPhrase?.let { ackClips.value[it] }
         val ack = if (ackKind != null && ackPhrase != null) ackKind to ackPhrase else null
         if (ackPhrase != null) lastAck = ackPhrase
-        val sentences = Channel<String>(Channel.UNLIMITED)
-        val clips = Channel<Pair<String, ByteArray?>>(2)
+        val sentences = Channel<SpeechSpan>(Channel.UNLIMITED)
+        val clips = Channel<Pair<SpeechSpan, ByteArray?>>(2)
         val synth = launch {
             for (sentence in sentences) {
                 if (interrupted) continue
@@ -548,7 +550,7 @@ class SpokenCall(
                 while (audio == null && synthesizers.isNotEmpty()) {
                     val engine = synthesizers.first()
                     try {
-                        audio = engine.synthesize(sentence)
+                        audio = engine.synthesize(sentence.text)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: EngineUnavailable) {
@@ -582,11 +584,13 @@ class SpokenCall(
             ackJob?.join()
             for ((sentence, audio) in clips) {
                 if (interrupted) continue
+                update { it.copy(reading = sentence.start until sentence.end) }
                 phase(CallPhase.Speaking)
-                spokenText += sentence
+                spokenText += sentence.text
                 val ok = if (audio != null) playClip(audio, "audio/mpeg") else false
-                if (!ok && !interrupted) speakSystem(sentence)
+                if (!ok && !interrupted) speakSystem(sentence.text)
             }
+            update { it.copy(reading = null) }
         }
         try {
             val splitter = SpeechSplitter()
@@ -595,7 +599,7 @@ class SpokenCall(
                 val reply = assistant.reply()
                 if (reply.text.length > spoken) {
                     if (!ackStarted) ackJob?.cancel()
-                    for (s in splitter.feed(reply.text.substring(spoken))) sentences.send(s)
+                    for (s in splitter.feedSpans(reply.text.substring(spoken))) sentences.send(s)
                     spoken = reply.text.length
                 }
                 update { it.copy(replyText = reply.text, prompt = assistant.prompt(), notice = reply.attention ?: it.notice?.takeIf { n -> n != AttentionNotice }) }
@@ -606,7 +610,7 @@ class SpokenCall(
                 }
                 delay(80)
             }
-            for (s in splitter.flush()) sentences.send(s)
+            for (s in splitter.flushSpans()) sentences.send(s)
         } finally {
             sentences.close()
         }

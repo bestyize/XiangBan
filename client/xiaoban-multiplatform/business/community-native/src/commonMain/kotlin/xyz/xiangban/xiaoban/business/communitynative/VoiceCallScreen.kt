@@ -54,6 +54,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,6 +71,7 @@ import xyz.xiangban.xiaoban.common.community.CallPromptOption
 import xyz.xiangban.xiaoban.common.community.VoiceCall
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 
 // 实时对话的深色通话页（设计稿 52–58）：页面的主角是文字，小伴只是中间一个 54dp 的圆形品牌头像，
@@ -126,7 +131,7 @@ fun VoiceCallScreen(call: VoiceCall, title: String, seconds: Int, onMinimize: ()
                     }
                     CallPhase.Speaking -> {
                         if (state.userText.isNotBlank()) Text("你：${state.userText}", Modifier.fillMaxWidth(), color = CallFg3, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (state.replyText.isNotBlank()) ReplyWindow(state.replyText, state.userText, Modifier.padding(top = 12.dp))
+                        if (state.replyText.isNotBlank()) ReplyWindow(state.replyText, state.reading, state.userText, Modifier.padding(top = 12.dp))
                     }
                 }
             }
@@ -152,19 +157,44 @@ private fun StatusLine(text: String) {
     Text(text, color = CallFg, fontSize = 24.sp, fontWeight = FontWeight.Light, letterSpacing = 3.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
-/** 小伴的回答：最多露出三行，可以上下滑；中间一行正常显示，上下两行渐渐淡出。上下各垫一行的空白，所以第一行开始就在中间。 */
+/**
+ * 小伴的回答，像音乐播放器的歌词：露出五行，可以上下滑；念到哪句，就把那句点亮、滚到窗口中间，其余的字淡一些。
+ * 上下各垫两行空白，所以第一句和最后一句也能停在中间。
+ */
 @Composable
-private fun ReplyWindow(text: String, resetKey: String, modifier: Modifier = Modifier) {
+private fun ReplyWindow(text: String, reading: IntRange?, resetKey: String, modifier: Modifier = Modifier) {
     val scroll = rememberScrollState()
+    var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
     LaunchedEffect(resetKey) { scroll.scrollTo(0) }
-    Box(modifier.fillMaxWidth().height(ReplyLine * 3)) {
-        Text(text, Modifier.fillMaxWidth().verticalScroll(scroll).padding(vertical = ReplyLine), color = CallFg.copy(alpha = 0.86f), fontSize = 17.sp, lineHeight = 26.sp, textAlign = TextAlign.Center)
-        Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(ReplyLine).background(Brush.verticalGradient(listOf(CallBg.copy(alpha = 0.9f), Color.Transparent))))
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(ReplyLine).background(Brush.verticalGradient(listOf(Color.Transparent, CallBg.copy(alpha = 0.9f)))))
+    val lit = reading?.let { it.first.coerceIn(0, text.length) until (it.last + 1).coerceIn(0, text.length) }?.takeUnless { it.isEmpty() }
+    val shown = remember(text, lit) {
+        if (lit == null) AnnotatedString(text)
+        else AnnotatedString(text, spanStyles = listOf(AnnotatedString.Range(SpanStyle(color = CallFg), lit.first, lit.last + 1)))
+    }
+    val density = LocalDensity.current
+    val pad = with(density) { (ReplyLine * ReplyPad).toPx() }
+    val view = with(density) { (ReplyLine * ReplyLines).toPx() }
+    // 那句的上下边在滚动内容里的位置：一句占几行就取这几行的中间对准窗口中间，比窗口还高就从它第一行开始露。
+    val target = layout?.takeIf { lit != null && it.layoutInput.text.length == text.length }?.let { l ->
+        val top = pad + l.getLineTop(l.getLineForOffset(lit!!.first))
+        val bottom = pad + l.getLineBottom(l.getLineForOffset(lit.last))
+        (if (bottom - top > view) top else (top + bottom - view) / 2).roundToInt().coerceAtLeast(0)
+    }
+    LaunchedEffect(target) { if (target != null) scroll.animateScrollTo(target, tween(420, easing = FastOutSlowInEasing)) }
+    Box(modifier.fillMaxWidth().height(ReplyLine * ReplyLines)) {
+        Text(
+            shown,
+            Modifier.fillMaxWidth().verticalScroll(scroll).padding(vertical = ReplyLine * ReplyPad),
+            color = if (lit == null) CallFg.copy(alpha = 0.86f) else CallFg3,
+            fontSize = 17.sp, lineHeight = 26.sp, textAlign = TextAlign.Center,
+            onTextLayout = { layout = it },
+        )
     }
 }
 
 private val ReplyLine = 26.dp
+private const val ReplyLines = 5
+private const val ReplyPad = 2
 
 @Composable
 private fun Notice(text: String) {

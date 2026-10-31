@@ -159,6 +159,20 @@ class VoiceActivityTest {
     }
 
     @Test
+    fun `each sentence knows where it sits in the original answer`() {
+        val splitter = SpeechSplitter()
+        val spans = ArrayList<SpeechSpan>()
+        val text = "## 结果\n好的，我先看了一下这个文件夹里的内容。**一共有三个**重复文件！\n```kotlin\nval x = 1\n```\n…详见 [文档](https://a.b)，没有别的了"
+        text.chunked(5).forEach { spans += splitter.feedSpans(it) }
+        spans += splitter.flushSpans()
+        // 太短的“…”并到下一句，位置从“…”算起。
+        assertEquals(
+            listOf("## 结果", "好的，我先看了一下这个文件夹里的内容。", "**一共有三个**重复文件！", "…详见 [文档](https://a.b)，没有别的了"),
+            spans.map { text.substring(it.start, it.end) },
+        )
+    }
+
+    @Test
     fun `very long answers stop being read`() {
         val splitter = SpeechSplitter(maxChars = 30)
         val said = splitter.feed("这是一句比较长的话用来测试上限。" .repeat(10)) + splitter.flush()

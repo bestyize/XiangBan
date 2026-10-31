@@ -206,6 +206,9 @@ class EndpointDetector(
     }
 }
 
+/** 切出来要念的一句（去掉了 Markdown 符号），和它在原回答里的位置 [start, end)。 */
+data class SpeechSpan(val text: String, val start: Int, val end: Int)
+
 /**
  * 回答是一小段一小段流出来的；这里把它切成一句一句，方便边生成边念。
  * 代码块不念，Markdown 符号去掉，太碎的句子并到下一句。总共念不超过 [maxChars] 字。
@@ -214,11 +217,21 @@ class SpeechSplitter(private val maxChars: Int = 1200) {
     private var pending = StringBuilder()
     private var inCode = false
     private var carry = ""
+    private var carryStart = 0
+    private var carryEnd = 0
     private var emitted = 0
+    /** 原回答里已经切走的字数，用来算每句的位置。 */
+    private var consumed = 0
 
-    fun feed(delta: String): List<String> {
+    fun feed(delta: String): List<String> = feedSpans(delta).map { it.text }
+
+    /** 回答结束，把没切完的尾巴也吐出来。 */
+    fun flush(): List<String> = flushSpans().map { it.text }
+
+    /** 同 [feed]，但每句带上它在原回答里的位置。 */
+    fun feedSpans(delta: String): List<SpeechSpan> {
         pending.append(delta)
-        val out = ArrayList<String>()
+        val out = ArrayList<SpeechSpan>()
         while (true) {
             val cut = boundary(pending) ?: break
             val piece = pending.substring(0, cut)
@@ -228,12 +241,11 @@ class SpeechSplitter(private val maxChars: Int = 1200) {
         return out
     }
 
-    /** 回答结束，把没切完的尾巴也吐出来。 */
-    fun flush(): List<String> {
-        val out = ArrayList<String>()
+    fun flushSpans(): List<SpeechSpan> {
+        val out = ArrayList<SpeechSpan>()
         if (pending.isNotEmpty()) take(pending.toString(), out)
         pending = StringBuilder()
-        if (carry.isNotBlank() && emitted < maxChars) { out += carry; emitted += carry.length }
+        if (carry.isNotBlank() && emitted < maxChars) { out += SpeechSpan(carry, carryStart, carryEnd); emitted += carry.length }
         carry = ""
         return out
     }
@@ -249,16 +261,20 @@ class SpeechSplitter(private val maxChars: Int = 1200) {
         return null
     }
 
-    private fun take(piece: String, out: MutableList<String>) {
+    private fun take(piece: String, out: MutableList<SpeechSpan>) {
+        val start = consumed + (piece.length - piece.trimStart().length)
+        consumed += piece.length
+        val end = consumed - (piece.length - piece.trimEnd().length)
         val line = piece.trim()
         if (line.startsWith("```") || line.startsWith("~~~")) { inCode = !inCode; return }
         if (inCode || emitted >= maxChars) return
         val clean = cleanForSpeech(line)
         if (clean.isBlank()) return
+        val from = if (carry.isEmpty()) start else carryStart
         val joined = if (carry.isEmpty()) clean else "$carry$clean"
-        if (joined.length < MinSentence && !piece.endsWith("\n")) { carry = joined; return }
+        if (joined.length < MinSentence && !piece.endsWith("\n")) { carry = joined; carryStart = from; carryEnd = end; return }
         carry = ""
-        out += joined
+        out += SpeechSpan(joined, from, end)
         emitted += joined.length
     }
 

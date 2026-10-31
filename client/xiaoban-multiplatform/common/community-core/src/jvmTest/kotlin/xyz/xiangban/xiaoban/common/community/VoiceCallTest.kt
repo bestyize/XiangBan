@@ -25,6 +25,8 @@ internal class FakeVoicePlatform : VoicePlatform {
     val spoken = mutableListOf<String>()
     var systemHeard: String? = null
     var recordings = 0
+    /** 每段声音开始播放时调用，测试用它看通话状态。 */
+    var onPlay: (() -> Unit)? = null
 
     override suspend fun streamRecording(onFrame: (ByteArray) -> Unit): (() -> Unit)? {
         recordings++
@@ -60,6 +62,7 @@ internal class FakeVoicePlatform : VoicePlatform {
 
     override fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean {
         played.incrementAndGet()
+        onPlay?.invoke()
         Thread { Thread.sleep(5); onDone() }.also { it.isDaemon = true }.start()
         return true
     }
@@ -132,10 +135,15 @@ class VoiceCallTest {
         val chat = CloudChatController(api, scope)
         val platform = FakeVoicePlatform()
         val call = SpokenCall(scope, platform, CloudAssistant(chat), listOf(CloudRecognizer(api)), listOf(CloudSynthesizer(api)))
+        val lit = java.util.Collections.synchronizedList(mutableListOf<String>())
+        platform.onPlay = { call.state.value.let { s -> s.reading?.let { lit += s.replyText.substring(it.first, it.last + 1) } } }
         call.start()
         waitFor("heard") { call.state.value.userText == "现在几点" }
         waitFor("answer") { call.state.value.replyText.contains("下午三点") }
         waitFor("spoken") { platform.played.get() >= 2 }
+        // 念到哪句，通话页就点亮哪句。
+        assertEquals(listOf("现在是下午三点。", "先到这里。"), lit.toList())
+        waitFor("reading cleared") { call.state.value.reading == null }
         assertEquals("现在几点", chat.state.value.messages.first { it.role == "user" }.text)
         call.stop()
         waitFor("ended") { call.state.value.ended }
