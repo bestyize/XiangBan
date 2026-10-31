@@ -238,6 +238,9 @@ private fun CreateTab(env: CommunityEnv, open: (Route) -> Unit) {
     LaunchedEffect(kind) { if (kind != "schemes") controller.select(kind) }
     val single = kind in SingleColumnKinds
     Column(Modifier.fillMaxSize()) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
+            GhostPillButton("官方挑战 ›", { open(Route.Challenges) })
+        }
         PageChipRow(CreateChips, kind, { kind = it }, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 6.dp))
         if (kind == "schemes") { NativeSchemesFeed(env, open); return@Column }
         PullToRefreshBox(isRefreshing = state.loading && state.packs.isEmpty(), onRefresh = controller::refresh, modifier = Modifier.fillMaxSize()) {

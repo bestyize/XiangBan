@@ -135,6 +135,8 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.Scheme -> SchemeDetailScreen(env, route.id, pop, push)
         Route.MyWorks -> MyContentScreen(env, pop, push)
         Route.Notifications -> NativeNotificationsScreen(env, pop, push)
+        Route.Challenges -> NativeChallengesScreen(env, pop, push)
+        is Route.Challenge -> NativeChallengeDetailScreen(env, route.key, pop, push)
         Route.Bookmarks -> NativeBookmarksScreen(env, pop, push)
         Route.Blocks -> NativeBlocksScreen(env, pop, push)
         is Route.User -> NativeProfileScreen(env, route.uid, route.tab, pop, push)

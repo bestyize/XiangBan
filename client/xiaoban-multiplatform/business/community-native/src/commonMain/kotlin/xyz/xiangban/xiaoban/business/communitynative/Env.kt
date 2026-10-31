@@ -117,6 +117,7 @@ class CommunityEnv(
     val forum = ForumApi(client, config) { session.accessToken() }
     val content = xyz.xiangban.xiaoban.common.community.ContentPublishingApi(client, config) { session.accessToken() }
     val social = xyz.xiangban.xiaoban.common.community.SocialApi(client, config) { session.accessToken() }
+    val challenges = xyz.xiangban.xiaoban.common.community.ChallengesApi(client, config) { session.accessToken() }
     val ai = AiGatewayApi(client, config) { session.accessToken() }
 
     @OptIn(ExperimentalTime::class)

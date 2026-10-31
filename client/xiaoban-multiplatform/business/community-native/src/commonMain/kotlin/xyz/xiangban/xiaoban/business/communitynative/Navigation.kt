@@ -7,6 +7,8 @@ sealed interface Route {
     data class Scheme(val id: Long) : Route
     data object MyWorks : Route
     data object Notifications : Route
+    data object Challenges : Route
+    data class Challenge(val key: String) : Route
     data object Bookmarks : Route
     data object Blocks : Route
     data class User(val uid: String, val tab: String = "topics") : Route
@@ -46,6 +48,8 @@ sealed interface Route {
         is Scheme -> "scheme:$id"
         MyWorks -> "myworks"
         Notifications -> "notifications"
+        Challenges -> "challenges"
+        is Challenge -> "challenge:$key"
         Bookmarks -> "bookmarks"
         Blocks -> "blocks"
         is User -> "user:$uid:$tab"
@@ -81,6 +85,8 @@ sealed interface Route {
                 "scheme" -> value.toLongOrNull()?.takeIf { it > 0 }?.let(::Scheme)
                 "myworks" -> MyWorks
                 "notifications" -> Notifications
+                "challenges" -> Challenges
+                "challenge" -> value.takeIf { it.isNotEmpty() }?.let(::Challenge)
                 "bookmarks" -> Bookmarks
                 "blocks" -> Blocks
                 "user" -> value.substringBefore(':').takeIf { it.isNotEmpty() }?.let { User(it, value.substringAfter(':', "topics")) }
