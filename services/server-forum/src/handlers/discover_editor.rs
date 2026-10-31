@@ -769,6 +769,8 @@ pub async fn write_collected_batch(
                             chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok()
                         })
             }
+            "github_tools" => item.kind == "tool" && item.data["source"] == "GitHub Releases"
+                && item.data["github_repo_id"].as_i64().is_some_and(|id|item.key == format!("github-tool-{id}")),
             "official_news" => item.kind == "news" && item.key.starts_with("news-"),
             _ => false,
         };

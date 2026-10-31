@@ -123,6 +123,7 @@ async fn configure(
     let (sealed, old_config, old_enabled) = old.ok_or_else(|| AppError::not_found("采集来源"))?;
     let config = match input.config {
         Some(config) if id == "github_repos" => collectors::repo_sources::sanitize_config(config)?,
+        Some(config) if id == "github_tools" => collectors::tool_sources::sanitize_config(config)?,
         Some(config) if id == "official_news" => collectors::news_sources::sanitize_config(config)?,
         Some(config) if config == json!({}) => config,
         Some(_) => return Err(AppError::BadRequest("此来源不支持额外配置".into())),
@@ -130,6 +131,9 @@ async fn configure(
     };
     if id == "github_repos" && input.enabled.unwrap_or(old_enabled) {
         collectors::repo_sources::configured_names(&config)?;
+    }
+    if id == "github_tools" && input.enabled.unwrap_or(old_enabled) && config["repositories"].as_array().is_none_or(|v|v.is_empty()) {
+        return Err(AppError::BadRequest("请先配置至少一个工具仓库".into()));
     }
     if id == "official_news" && input.enabled.unwrap_or(old_enabled)
         && config["feed_ids"].as_array().is_none_or(|v| v.is_empty()) {

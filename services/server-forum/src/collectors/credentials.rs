@@ -76,7 +76,7 @@ pub fn http_client() -> AppResult<reqwest::Client> {
 }
 
 pub async fn validate(source: &str, secret: &str, http: &reqwest::Client) -> AppResult<()> {
-    let result = if source == "github_repos" {
+    let result = if matches!(source, "github_repos" | "github_tools") {
         super::repo_sources::verify_credential(secret, http).await
     } else {
         super::model_sources::verify_credential(source, secret, http).await

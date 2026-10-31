@@ -4,6 +4,7 @@ pub mod model_sources;
 pub mod news_sources;
 pub mod repo_sources;
 pub mod schema;
+pub mod tool_sources;
 use crate::{
     error::{AppError, AppResult},
     state::AppState,
@@ -28,6 +29,7 @@ pub fn title(source: &str) -> Option<&'static str> {
         "artificial_analysis" => Some("Artificial Analysis 能力榜"),
         "openrouter" => Some("OpenRouter 调用量榜"),
         "github_repos" => Some("GitHub 开源热榜"),
+        "github_tools" => Some("GitHub 工具版本"),
         "official_news" => Some("官方 AI 日报"),
         _ => None,
     }
@@ -58,6 +60,12 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
     if source == "github_repos" {
         repo_sources::configured_names(&config)?;
     }
+    if source == "github_tools" {
+        let clean = tool_sources::sanitize_config(config.clone())?;
+        if clean["repositories"].as_array().is_none_or(|v|v.is_empty()) {
+            return Err(AppError::BadRequest("请先配置至少一个工具仓库".into()));
+        }
+    }
     if source == "official_news" {
         let config = news_sources::sanitize_config(config.clone())?;
         if config["feed_ids"].as_array().is_none_or(|v| v.is_empty()) {
@@ -86,6 +94,8 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
         let fetched = tokio::time::timeout(std::time::Duration::from_secs(240), async {
             if source == "github_repos" {
                 repo_sources::collect(&s.pool, &secret, &http, &config, id).await
+            } else if source == "github_tools" {
+                tool_sources::collect(&http, &config, &secret).await
             } else if source == "official_news" {
                 news_sources::collect(&http, &config).await
             } else {
@@ -106,7 +116,7 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
                 }
             }
             // Adapter errors may include upstream strings; only a fixed category is persisted.
-            Ok(Err(message)) => Err(AppError::BadRequest(if source == "official_news" { message } else {
+            Ok(Err(message)) => Err(AppError::BadRequest(if matches!(source.as_str(), "official_news" | "github_tools") { message } else {
                 "来源采集失败，请检查凭据、额度和来源可用性".into()
             })),
             Err(_) => Err(AppError::BadRequest("来源采集超时".into())),
@@ -121,7 +131,7 @@ async fn finish(pool: &PgPool, source: &str, id: Uuid, result: AppResult<i32>) -
     let (count, error) = match result {
         Ok(count) => (count, None),
         Err(AppError::Conflict(_)) => (0, Some("草稿已被人工修改或审核，请处理冲突后重试")),
-        Err(AppError::BadRequest(ref message)) if source == "official_news" => (0, Some(message.as_str())),
+        Err(AppError::BadRequest(ref message)) if matches!(source, "official_news" | "github_tools") => (0, Some(message.as_str())),
         Err(AppError::BadRequest(_)) => (
             0,
             Some("采集来源返回失败、超时或无效数据，请检查来源后重试"),

@@ -506,6 +506,7 @@ pub fn validate(kind: &str, data: Value) -> AppResult<Value> {
         "quota" => go::<Quota>(data),
         "launch" => go::<Launch>(data),
         "promo" => go::<Promo>(data),
+        "tool" if data.get("github_repo_id").is_some() => crate::collectors::tool_sources::validate_tool(data),
         "tool" => go::<Tool>(data),
         "hotword" => go::<Hotword>(data),
         _ => Err(AppError::BadRequest("未知的类型".into())),
