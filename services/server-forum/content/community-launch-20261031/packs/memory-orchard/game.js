@@ -1,0 +1,8 @@
+(()=>{
+const board=document.querySelector('#board'),status=document.querySelector('#status');const faces=['◉','✦','▲','◆','☀','☾','●','✿'];let selected=[],matched=0,moves=0,locked=false,timer;
+function shuffle(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function info(){status.textContent=`已配对 ${matched}/8 · 翻牌 ${moves} 次${matched===8?' · 全部找到了！':''}`;status.classList.toggle('won',matched===8)}
+function choose(b){if(locked||b.dataset.matched==='true'||selected.includes(b))return;b.textContent=faces[Number(b.dataset.value)];b.classList.add('open');b.setAttribute('aria-label',`图案 ${Number(b.dataset.value)+1}`);selected.push(b);if(selected.length===2){moves++;locked=true;const[a,c]=selected;if(a.dataset.value===c.dataset.value){a.dataset.matched=c.dataset.matched='true';a.disabled=c.disabled=true;matched++;selected=[];locked=false;info()}else{info();timer=setTimeout(()=>{for(const x of selected){x.textContent='?';x.classList.remove('open');x.setAttribute('aria-label','未翻开的卡片')}selected=[];locked=false},700)}}}
+function reset(){clearTimeout(timer);selected=[];matched=0;moves=0;locked=false;board.replaceChildren();shuffle([...Array(8).keys(),...Array(8).keys()]).forEach((v,i)=>{const b=document.createElement('button');b.type='button';b.textContent='?';b.dataset.value=v;b.dataset.index=i;b.setAttribute('aria-label',`未翻开的卡片 ${i+1}`);b.addEventListener('click',()=>choose(b));board.append(b)});info()}
+document.querySelector('#restart').onclick=reset;reset();
+})();

@@ -46,7 +46,7 @@ data class RepoRank(
     val language: String = "",
     @SerialName("language_color") val languageColor: String = "",
     @SerialName("star_total") val starTotal: Long = 0,
-    @SerialName("star_gain") val starGain: Long = 0,
+    @SerialName("star_gain") val starGain: Long? = null,
     val spark: List<Long> = emptyList(),
     /** 图标块里的小图标：term、code、doc、mic、bolt；认不出就显示仓库名首字。 */
     val icon: String = "",
@@ -56,6 +56,8 @@ data class RepoRank(
     val complete: Boolean = false,
     @SerialName("suspected_growth") val suspectedGrowth: Boolean = false,
     @SerialName("snapshot_dates") val snapshotDates: List<String> = emptyList(),
+    @SerialName("observation_start") val observationStart: String? = null,
+    @SerialName("observation_end") val observationEnd: String? = null,
 )
 
 @Serializable
@@ -64,15 +66,23 @@ data class RepoIssue(
     @SerialName("issue_no") val issueNo: Int = 0,
     @SerialName("week_start") val weekStart: String = "",
     @SerialName("week_end") val weekEnd: String = "",
-    @SerialName("total_gain") val totalGain: Long = 0,
-    @SerialName("wow_pct") val wowPct: Double = 0.0,
+    @SerialName("total_gain") val totalGain: Long? = null,
+    @SerialName("wow_pct") val wowPct: Double? = null,
     @SerialName("daily_gain") val dailyGain: List<Long> = emptyList(),
     val ranks: List<RepoRank> = emptyList(),
     val source: String = "",
+    val metric: String = "",
+    @SerialName("as_of") val asOf: String? = null,
     @SerialName("observed_days") val observedDays: Int? = null,
     val complete: Boolean = false,
     val sample: Boolean = false,
-)
+) {
+    val isBaseline: Boolean get() = source == "GitHub" && metric == "star total baseline"
+}
+
+fun repoObservationLabel(raw: String?): String? = raw?.let {
+    runCatching { kotlin.time.Instant.parse(it).toString().take(19).replace('T', ' ') + " UTC" }.getOrNull()
+}
 
 @Serializable
 data class RepoIssueRef(val key: String, @SerialName("issue_no") val issueNo: Int, @SerialName("week_start") val weekStart: String = "", @SerialName("week_end") val weekEnd: String = "")
@@ -131,16 +141,19 @@ data class QuotaInfo(
 )
 
 @Serializable
-data class LaunchItem(val key: String, val title: String, val tags: List<String> = emptyList(), @SerialName("published_at") val publishedAt: String = "", val sample: Boolean = false)
+data class LaunchItem(val key: String, val title: String, val tags: List<String> = emptyList(), @SerialName("published_at") val publishedAt: String = "", val sample: Boolean = false,
+    val summary: String = "", @SerialName("source_url") val sourceUrl: String? = null)
 
 @Serializable
 data class PromoItem(
     val key: String,
     val text: String,
-    @SerialName("ends_at") val endsAt: String = "",
-    val pct: Int = 0,
-    @SerialName("days_left") val daysLeft: Int = 0,
+    @SerialName("ends_at") val endsAt: String? = null,
+    val pct: Int? = null,
+    @SerialName("days_left") val daysLeft: Int? = null,
     val sample: Boolean = false,
+    @SerialName("source_url") val sourceUrl: String? = null,
+    val eligibility: String = "",
 )
 
 @Serializable
@@ -298,3 +311,10 @@ data class Poll(
 
 @Serializable
 data class VoteResult(val poll: Poll)
+
+/** Source links are optional for older timed items; malformed links never reach platform openUrl. */
+fun trackerOfficialSource(raw: String?): String? {
+    if (raw.isNullOrBlank() || raw.length > 2048 || raw.any { it.isISOControl() }) return null
+    val url = runCatching { io.ktor.http.Url(raw) }.getOrNull() ?: return null
+    return raw.takeIf { url.protocol.name == "https" && url.host.isNotEmpty() && url.user.isNullOrEmpty() && url.password.isNullOrEmpty() && url.port == 443 }
+}

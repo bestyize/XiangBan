@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "widget",
+  "id": "breathing-circle",
+  "name": "呼吸留白卡",
+  "version": "1.0.0",
+  "description": "纯CSS圆环慢慢放大缩小；可勾选暂停，无计时记录或健康承诺。",
+  "author": "小伴社区原创作品",
+  "license": "MIT",
+  "width": 320,
+  "height": 340,
+  "theme": "transparent"
+}

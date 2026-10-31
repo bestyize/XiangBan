@@ -1,0 +1,43 @@
+{
+  "templateVersion": 1,
+  "title": "学习闭环四步卡",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "每次短时学习",
+  "boundary": "25分钟",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "写出本次想回答的一个问题和自己的预测",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "阅读或练习一个小段内容，并注明材料位置",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "关掉材料，用自己的话复述三个要点",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "做一个最小练习或反例，不会的地方标注出来",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "把未解决的问题移入下次学习入口",
+      "done": false
+    }
+  ],
+  "record": {
+    "问题": null,
+    "预测": null,
+    "材料": null,
+    "回忆要点": null,
+    "练习": null,
+    "未解决": null
+  }
+}

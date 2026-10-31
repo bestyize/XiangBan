@@ -1,0 +1,87 @@
+{
+  "templateVersion": 1,
+  "title": "照片归档手动工作流",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "授权 → 备份 → 分类 → 对照 → 验收",
+  "boundary": "不上传照片、不推断人物身份",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "先确认照片由自己拥有或获准整理",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "保留一份未改动原图并验证能读取",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "按拍摄时间或事件建立目录，不依赖人脸识别",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "重复候选先暂存并人工对照，不直接删除",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "抽样核对数量和文件可读性，记录整理规则",
+      "done": false
+    }
+  ],
+  "record": {
+    "输入": null,
+    "目录规则": null,
+    "保护措施": null,
+    "重复处理": null,
+    "验收": null
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "label": "先确认照片由自己拥有或获准整理",
+      "depends_on": [],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n2",
+      "label": "保留一份未改动原图并验证能读取",
+      "depends_on": [
+        "n1"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n3",
+      "label": "按拍摄时间或事件建立目录，不依赖人脸识别",
+      "depends_on": [
+        "n2"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n4",
+      "label": "重复候选先暂存并人工对照，不直接删除",
+      "depends_on": [
+        "n3"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n5",
+      "label": "抽样核对数量和文件可读性，记录整理规则",
+      "depends_on": [
+        "n4"
+      ],
+      "status": "not_started",
+      "evidence": null
+    }
+  ]
+}

@@ -320,11 +320,12 @@ async fn build_issue(
     let Some(common) = common else {
         return Ok(vec![]);
     };
-    if common.len() < 2 || !common.contains(&end) {
+    if common.is_empty() || !common.contains(&end) {
         return Ok(vec![]);
     }
     let start = *common.first().unwrap();
     let observed_days = (end - start).num_days();
+    let baseline = observed_days == 0;
     let mut complete = observed_days == 7;
     let mut ranks = Vec::new();
     let mut total_gain = 0;
@@ -352,14 +353,15 @@ async fn build_issue(
             }
         }
         ranks.push(json!({"repo_id":id.to_string(),"full_name":repo.full_name,"url":format!("https://github.com/{}",repo.full_name),"description":repo.description,"language":repo.language,
-            "language_color":"","star_total":last.1,"star_gain":gain,"spark":rows.iter().map(|r|r.1).collect::<Vec<_>>(),"snapshot_dates":rows.iter().map(|r|r.0.to_string()).collect::<Vec<_>>(),
+            "language_color":"","star_total":last.1,"star_gain":if baseline {Value::Null}else{json!(gain)},"spark":rows.iter().map(|r|r.1).collect::<Vec<_>>(),"snapshot_dates":rows.iter().map(|r|r.0.to_string()).collect::<Vec<_>>(),
             "snapshot_times":rows.iter().map(|r|r.2.to_rfc3339()).collect::<Vec<_>>(),"icon":"code","tint":"#E6F4EA","observed_days":observed_days,"complete":full,"suspected_growth":suspicious,
             "observation_start":first.2.to_rfc3339(),"observation_end":last.2.to_rfc3339()}));
     }
     ranks.sort_by(|a, b| {
-        b["star_gain"]
+        let field = if baseline { "star_total" } else { "star_gain" };
+        b[field]
             .as_i64()
-            .cmp(&a["star_gain"].as_i64())
+            .cmp(&a[field].as_i64())
             .then_with(|| a["repo_id"].as_str().cmp(&b["repo_id"].as_str()))
     });
     let key = format!("github-rolling-{end}");
@@ -368,9 +370,9 @@ async fn build_issue(
         .to_string()
         .parse::<i32>()
         .map_err(|_| bad())?;
-    let data = json!({"source":"GitHub","source_url":"https://github.com","as_of":now.to_rfc3339(),"metric":"observed net star change","issue_no":issue_no,
+    let data = json!({"source":"GitHub","source_url":"https://github.com","as_of":now.to_rfc3339(),"metric":if baseline {"star total baseline"}else{"observed net star change"},"issue_no":issue_no,
         "week_start":start.to_string(),"week_end":end.to_string(),"observation_start":start.to_string(),"observation_end":end.to_string(),"observed_days":observed_days,"complete":complete,
-        "total_gain":total_gain,"wow_pct":null,"daily_gain":if complete {total_daily}else{vec![]},"ranks":ranks});
+        "total_gain":if baseline {Value::Null}else{json!(total_gain)},"wow_pct":null,"daily_gain":if complete {total_daily}else{vec![]},"ranks":ranks});
     let data = validate_issue(data)?;
     Ok(vec![CollectedItem {
         kind: "repo_issue".into(),
@@ -392,7 +394,7 @@ fn check_issue(v: &Value) -> SourceResult<()> {
     if serde_json::to_vec(v).map_err(|_| invalid())?.len() > BODY_LIMIT
         || v["source"] != "GitHub"
         || v["source_url"] != "https://github.com"
-        || v["metric"] != "observed net star change"
+        || !matches!(v["metric"].as_str(), Some("observed net star change" | "star total baseline"))
         || !v["wow_pct"].is_null()
     {
         return Err(invalid());
@@ -408,7 +410,9 @@ fn check_issue(v: &Value) -> SourceResult<()> {
     )
     .map_err(|_| invalid())?;
     let n = (end - start).num_days();
-    if !(1..=7).contains(&n)
+    let baseline = v["metric"] == "star total baseline";
+    if !(0..=7).contains(&n)
+        || baseline != (n == 0)
         || end > Utc::now().date_naive()
         || v["observed_days"].as_i64() != Some(n)
         || v["week_start"] != start.to_string()
@@ -456,7 +460,7 @@ fn check_issue(v: &Value) -> SourceResult<()> {
             .ok_or_else(invalid)?;
         let spark = rank["spark"]
             .as_array()
-            .filter(|a| a.len() == dates.len() && (2..=8).contains(&a.len()))
+            .filter(|a| a.len() == dates.len() && if baseline { a.len() == 1 } else { (2..=8).contains(&a.len()) })
             .ok_or_else(invalid)?;
         let mut points = Vec::new();
         for ((date, time), stars) in dates.iter().zip(times).zip(spark) {
@@ -491,20 +495,21 @@ fn check_issue(v: &Value) -> SourceResult<()> {
             let gain = w[1].1 - w[0].1;
             gain < 0 || (gain >= 10000 && gain as f64 >= w[0].1.max(1) as f64 * 0.5)
         });
-        if rank["star_gain"].as_i64() != Some(gain)
+        if rank["star_gain"] != if baseline {Value::Null}else{json!(gain)}
             || rank["star_total"].as_i64() != Some(points.last().unwrap().1)
             || rank["complete"].as_bool() != Some(full)
             || rank["suspected_growth"].as_bool() != Some(suspicious)
         {
             return Err(invalid());
         }
+        let order = if baseline { points.last().unwrap().1 } else { gain };
         if let Some((prev, ref prev_id)) = previous {
             let id_str = id.to_string();
-            if gain > prev || (gain == prev && prev_id >= &id_str) {
+            if order > prev || (order == prev && prev_id >= &id_str) {
                 return Err(invalid());
             }
         }
-        previous = Some((gain, id.to_string()));
+        previous = Some((order, id.to_string()));
         total += gain;
         all_complete &= full;
         if full {
@@ -513,7 +518,7 @@ fn check_issue(v: &Value) -> SourceResult<()> {
             }
         }
     }
-    if v["total_gain"].as_i64() != Some(total)
+    if v["total_gain"] != if baseline {Value::Null}else{json!(total)}
         || v["complete"].as_bool() != Some(all_complete)
         || v["daily_gain"] != json!(if all_complete { daily } else { vec![] })
     {

@@ -40,8 +40,8 @@ private val CardShape = RoundedCornerShape(8.dp)
 
 /** 灰色页面上的白底卡片。 */
 @Composable
-fun WhiteCard(modifier: Modifier = Modifier, padding: Dp = 16.dp, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxWidth().clip(CardShape).background(MaterialTheme.colorScheme.surface).padding(padding), content = content)
+fun WhiteCard(modifier: Modifier = Modifier, padding: Dp = 16.dp, horizontalPadding: Dp = padding, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier.fillMaxWidth().clip(CardShape).background(MaterialTheme.colorScheme.surface).padding(horizontal = horizontalPadding, vertical = padding), content = content)
 }
 
 /** 卡片标题：左边标题加一行小字，右边一个「更多 ›」之类的入口。 */

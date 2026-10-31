@@ -62,6 +62,8 @@ import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.QuotaInfo
 import xyz.xiangban.xiaoban.common.community.RepoIssue
 import xyz.xiangban.xiaoban.common.community.RepoRank
+import xyz.xiangban.xiaoban.common.community.repoObservationLabel
+import xyz.xiangban.xiaoban.common.community.trackerOfficialSource
 import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.clockText
 import xyz.xiangban.xiaoban.common.community.compactCount
@@ -178,7 +180,7 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         XIcon(XIcons.Star, size = 18.dp)
-                                        Text("本周开源热榜", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(if (issue.isBaseline) "开源项目初始快照" else if (issue.source == "GitHub") "开源观测榜" else "本周开源热榜", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                     Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { switchTo(CommunitySection.Home, HomeSub.Hot.key) }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Text("完整榜单", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
@@ -286,8 +288,8 @@ private fun RepoMiniRow(r: RepoRank, onClick: () -> Unit) {
             Text(r.fullName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             LangLine(r)
         }
-        SparkBars(r.spark, height = 24.dp)
-        Text(formatGain(r.starGain), Modifier.width(52.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, maxLines = 1)
+        if (r.starGain != null && r.spark.size >= 2) SparkBars(r.spark, height = 24.dp)
+        Text(r.starGain?.let(::formatGain) ?: "${formatStars(r.starTotal)}★", Modifier.width(52.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, maxLines = 1)
     }
 }
 
@@ -322,8 +324,8 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
     WhiteCard(padding = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(if (issue.source == "GitHub") "观测榜" else "第 ${issue.issueNo} 期", Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Text(listOf(issue.weekStart, issue.weekEnd).filter { it.isNotEmpty() }.joinToString(" – "), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (issue.isBaseline) "初始快照" else if (issue.source == "GitHub") "观测榜" else "第 ${issue.issueNo} 期", Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(listOf(issue.weekStart, issue.weekEnd).filter { it.isNotEmpty() }.distinct().joinToString(" – "), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onPast).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("往期", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
@@ -332,13 +334,14 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
         }
         Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
             Column {
-                Text(if (issue.source == "GitHub") "前 ${issue.ranks.size} 名 · ${issue.observedDays ?: 0} 日观测净增 star" else "前 ${issue.ranks.size.coerceAtLeast(1)} 名本周新增 star", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                Text(formatGain(issue.totalGain).removePrefix("+"), Modifier.padding(top = 2.dp), fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                if (issue.wowPct != 0.0) Text(if (issue.wowPct > 0) "比上周多 ${formatScore(issue.wowPct)}%" else "比上周少 ${formatScore(-issue.wowPct)}%", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (issue.isBaseline) "已记录 ${issue.ranks.size} 个公开项目 · 按总 star 排序" else if (issue.source == "GitHub") "前 ${issue.ranks.size} 名 · ${issue.observedDays ?: 0} 日观测净增 star" else "前 ${issue.ranks.size.coerceAtLeast(1)} 名本周新增 star", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                Text(if (issue.isBaseline) "增量待积累" else issue.totalGain?.let { formatGain(it).removePrefix("+") } ?: "暂无增量数据", Modifier.padding(top = 2.dp), fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                issue.wowPct?.takeIf { it != 0.0 }?.let { pct -> Text(if (pct > 0) "比上周多 ${formatScore(pct)}%" else "比上周少 ${formatScore(-pct)}%", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             if (issue.dailyGain.size == 7 && issue.source != "GitHub") DayBars(issue.dailyGain, listOf("一", "二", "三", "四", "五", "六", "日"))
         }
-        Text((if (issue.source == "GitHub") "来源 GitHub · 候选仓库观测榜" + if (issue.complete) " · 已取得连续 7 日边界快照" else " · 观测尚未满 7 日或存在缺采，历史不补造" else "按 7 日新增 star 排序，只收 AI 相关项目") + if (issue.sample) " · 示例数据" else "", Modifier.padding(top = 10.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        repoObservationLabel(issue.asOf)?.let { Text("数据整理于 $it", Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3) }
+        Text((if (issue.isBaseline) "来源 GitHub · 首日真实快照，至少两次观测后才计算增量，不补造历史" else if (issue.source == "GitHub") "来源 GitHub · 候选仓库观测榜" + if (issue.complete) " · 已取得连续 7 日边界快照" else " · 观测尚未满 7 日或存在缺采，历史不补造" else "按 7 日新增 star 排序，只收 AI 相关项目") + if (issue.sample) " · 示例数据" else "", Modifier.padding(top = 10.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -361,7 +364,9 @@ private fun RepoCard(env: CommunityEnv, r: RepoRank) {
                 Text(r.fullName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = 6.dp))
                 if (r.description.isNotEmpty()) Text(r.description, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (r.suspectedGrowth) Text("增长异常 · 编辑复核后收录", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (r.observedDays != null && !r.complete) Text("实际观测 ${r.observedDays} 天，缺采日期未补值", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                if (r.starGain == null) Text("初始快照 · 增量待积累", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                else if (r.observedDays != null && !r.complete) Text("实际观测 ${r.observedDays} 天，缺采日期未补值", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                repoObservationLabel(r.observationEnd)?.let { Text("观察于 $it", Modifier.padding(top = 4.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3) }
                 Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     LangLine(r)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -371,8 +376,8 @@ private fun RepoCard(env: CommunityEnv, r: RepoRank) {
                 }
             }
             Column(Modifier.padding(top = 22.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                SparkBars(r.spark, height = 22.dp)
-                Text(formatGain(r.starGain), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                if (r.starGain != null && r.spark.size >= 2) SparkBars(r.spark, height = 22.dp)
+                r.starGain?.let { Text(formatGain(it), fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
                 Box(Modifier.size(32.dp).clip(CircleShape).background(if (fav) Brand.copy(alpha = 0.14f) else LocalExtraColors.current.fill).clickable { setFav(!fav) }, contentAlignment = Alignment.Center) {
                     XIcon(XIcons.Bookmark, tint = if (fav) Brand else MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp, description = if (fav) "取消收藏" else "收藏")
                 }
@@ -418,18 +423,21 @@ internal fun TrackTab(env: CommunityEnv) {
                 tracker.quota?.let { q -> item { QuotaCard(env, q) } }
                 item {
                     WhiteCard(padding = 14.dp) {
-                        CardTitleRow("模型上新", XIcons.Bolt)
-                        if (tracker.launches.isEmpty()) Text("最近没有新模型", Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        CardTitleRow("发布记录", XIcons.Bolt)
+                        if (tracker.launches.isEmpty()) Text("暂无已核实的发布记录", Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Column(Modifier.padding(top = 10.dp)) {
                             tracker.launches.forEachIndexed { i, l ->
+                                val source = trackerOfficialSource(l.sourceUrl)
                                 Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     Column(Modifier.width(12.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
                                         Dot(if (i == 0) DataBlue else DataBlueSoft, 10.dp, Modifier.padding(top = 5.dp))
                                         if (i < tracker.launches.lastIndex) Box(Modifier.padding(top = 2.dp).width(2.dp).weight(1f).background(LocalExtraColors.current.hairline))
                                     }
                                     Column(Modifier.weight(1f).padding(bottom = 14.dp)) {
-                                        Text(dayLabel(l.publishedAt), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                                        Text(l.publishedAt.take(10).ifBlank { "日期未提供" }, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                                         Text(l.title, Modifier.padding(top = 2.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                        if (l.summary.isNotBlank()) Text(l.summary, Modifier.padding(top = 5.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        if (source != null) LinkText("查看官方发布原文 ›", { env.platform?.openUrl(source) })
                                         if (l.tags.isNotEmpty()) Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) { l.tags.forEach { GrayTag(it) } }
                                     }
                                 }
@@ -439,16 +447,19 @@ internal fun TrackTab(env: CommunityEnv) {
                 }
                 item {
                     WhiteCard(padding = 14.dp) {
-                        CardTitleRow("限时免费", XIcons.Clock)
-                        if (tracker.promos.isEmpty()) Text("现在没有限时免费的活动", Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        CardTitleRow("优惠与试用", XIcons.Clock)
+                        if (tracker.promos.isEmpty()) Text("暂无已核实的优惠与试用", Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         tracker.promos.forEachIndexed { i, p ->
                             if (i > 0) Hairline(Modifier.padding(top = 10.dp))
                             Column(Modifier.padding(top = 10.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(p.text, Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                    Text("剩 ${p.daysLeft} 天", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    if (!p.endsAt.isNullOrBlank()) p.daysLeft?.let { Text("剩 $it 天", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                                 }
-                                HBar(p.pct / 100f, DataBlue, Modifier.padding(top = 8.dp), height = 4.dp, track = LocalExtraColors.current.fill)
+                                if (p.endsAt.isNullOrBlank()) Text("长期提供，以官方条件为准", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                                else p.pct?.let { HBar(it / 100f, DataBlue, Modifier.padding(top = 8.dp), height = 4.dp, track = LocalExtraColors.current.fill) }
+                                if (p.eligibility.isNotBlank()) Text(p.eligibility, Modifier.padding(top = 6.dp), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                trackerOfficialSource(p.sourceUrl)?.let { source -> LinkText("查看官方条件与申请入口 ›", { env.platform?.openUrl(source) }) }
                             }
                         }
                     }

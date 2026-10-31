@@ -1,0 +1,42 @@
+{
+  "templateVersion": 1,
+  "title": "小组讨论引导员提示词",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "会前准备与会后整理",
+  "boundary": "不代替参会者投票或决策",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "确认讨论目标、参与者角色和时间预算",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "将议题拆成事实、方案与决定三部分",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "为分歧准备可被证据回答的问题",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "在结束前整理已决定与未决定事项",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "输出需参与者确认的行动项，不替他们承诺",
+      "done": false
+    }
+  ],
+  "record": {
+    "会议目标": null,
+    "议程": null,
+    "分歧问题": null,
+    "行动项草稿": null,
+    "未决": null
+  }
+}

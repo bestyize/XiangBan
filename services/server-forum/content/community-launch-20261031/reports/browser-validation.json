@@ -1,0 +1,168 @@
+{
+  "browser": "Chromium headless shell 1248",
+  "effects": [
+    {
+      "slug": "amber-paper",
+      "parser": "desktop/src/effects/parse.ts",
+      "engine": "ParticleSystem + drawEffects",
+      "ok": true,
+      "counts": [
+        31,
+        10
+      ],
+      "visible": 41
+    },
+    {
+      "slug": "pond-rings",
+      "parser": "desktop/src/effects/parse.ts",
+      "engine": "ParticleSystem + drawEffects",
+      "ok": true,
+      "counts": [
+        15
+      ],
+      "visible": 7
+    },
+    {
+      "slug": "drift-motes",
+      "parser": "desktop/src/effects/parse.ts",
+      "engine": "ParticleSystem + drawEffects",
+      "ok": true,
+      "counts": [
+        28
+      ],
+      "visible": 28
+    },
+    {
+      "slug": "sail-clouds",
+      "parser": "desktop/src/effects/parse.ts",
+      "engine": "ParticleSystem + drawEffects",
+      "ok": true,
+      "counts": [
+        10
+      ],
+      "visible": 10
+    },
+    {
+      "slug": "blue-hour-trails",
+      "parser": "desktop/src/effects/parse.ts",
+      "engine": "ParticleSystem + drawEffects",
+      "ok": true,
+      "counts": [
+        61,
+        12
+      ],
+      "visible": 73
+    }
+  ],
+  "wallpapers": [
+    {
+      "slug": "tidal-silk",
+      "loaded": true,
+      "animation": true,
+      "selfContained": true
+    },
+    {
+      "slug": "contour-valley",
+      "loaded": true,
+      "animation": true,
+      "selfContained": true
+    },
+    {
+      "slug": "orbital-studio",
+      "loaded": true,
+      "animation": true,
+      "selfContained": true
+    },
+    {
+      "slug": "morning-glass",
+      "loaded": true,
+      "animation": true,
+      "selfContained": true
+    },
+    {
+      "slug": "lantern-harbor",
+      "loaded": true,
+      "animation": true,
+      "selfContained": true
+    }
+  ],
+  "widgets": [
+    {
+      "slug": "breathing-circle",
+      "csp": "script-src self",
+      "sandbox": "allow-scripts",
+      "interaction": true,
+      "noOverflow": true
+    },
+    {
+      "slug": "three-priorities",
+      "csp": "script-src self",
+      "sandbox": "allow-scripts",
+      "interaction": true,
+      "noOverflow": true
+    },
+    {
+      "slug": "decision-compass",
+      "csp": "script-src self",
+      "sandbox": "allow-scripts",
+      "interaction": true,
+      "noOverflow": true
+    },
+    {
+      "slug": "desk-reset-card",
+      "csp": "script-src self",
+      "sandbox": "allow-scripts",
+      "interaction": true,
+      "noOverflow": true
+    },
+    {
+      "slug": "focus-boundary",
+      "csp": "script-src self",
+      "sandbox": "allow-scripts",
+      "interaction": true,
+      "noOverflow": true
+    }
+  ],
+  "games": [
+    {
+      "slug": "memory-orchard",
+      "touch": true,
+      "win": true,
+      "restart": true
+    },
+    {
+      "slug": "signal-garden",
+      "touch": true,
+      "hint": true,
+      "win": true,
+      "restart": true
+    },
+    {
+      "slug": "pocket-labyrinth",
+      "keyboard": true,
+      "touch": true,
+      "reachable": true,
+      "win": true,
+      "restart": true
+    },
+    {
+      "slug": "tile-harbor",
+      "touch": true,
+      "solvable": true,
+      "win": true,
+      "restart": true,
+      "sizeSwitch": true
+    },
+    {
+      "slug": "starlight-catcher",
+      "pointer": true,
+      "win": true,
+      "restart": true,
+      "pause": true,
+      "renderBasedAutomation": true
+    }
+  ],
+  "errors": [],
+  "externalRequests": [],
+  "ok": true
+}

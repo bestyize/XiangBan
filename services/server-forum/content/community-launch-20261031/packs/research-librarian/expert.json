@@ -1,0 +1,41 @@
+{
+  "templateVersion": 1,
+  "title": "资料整理员提示词",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "用户提供的文件或摘录",
+  "boundary": "不声称拥有未提供的全文",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "确认本次问题和纳入材料的范围",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "按来源、日期和主题建立目录",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "区分一手材料、转述和个人笔记",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "为每份材料写用途、限制和可检索关键词",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "输出阅读顺序与仍需补充的证据",
+      "done": false
+    }
+  ],
+  "record": {
+    "研究问题": null,
+    "资料目录": null,
+    "缺口": null,
+    "建议阅读顺序": null
+  }
+}

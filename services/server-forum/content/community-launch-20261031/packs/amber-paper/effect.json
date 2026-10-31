@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "id": "amber-paper",
+  "name": "琥珀纸屑",
+  "description": "暖金纸片缓慢旋落，适合低密度节日桌面。",
+  "sky": [
+    "#122638",
+    "#314254"
+  ],
+  "layers": [
+    {
+      "count": 72,
+      "shape": {
+        "kind": "path",
+        "d": "M-0.7,-1 L0.7,-1 L0.7,1 L-0.7,1 Z",
+        "style": "fill"
+      },
+      "size": [
+        6,
+        17
+      ],
+      "speed": [
+        12,
+        34
+      ],
+      "direction": 96,
+      "wind": 12,
+      "spin": [
+        -1.2,
+        1.2
+      ],
+      "flip": {
+        "rate": [
+          0.2,
+          0.7
+        ],
+        "min": 0.16
+      },
+      "alpha": [
+        0.35,
+        0.8
+      ],
+      "colors": [
+        "#f4c56a",
+        "#d99a55",
+        "#ffe2a5"
+      ]
+    },
+    {
+      "count": 22,
+      "shape": {
+        "kind": "glow",
+        "core": 0.12
+      },
+      "size": [
+        6,
+        12
+      ],
+      "speed": [
+        7,
+        16
+      ],
+      "direction": 270,
+      "alpha": [
+        0.16,
+        0.4
+      ],
+      "colors": [
+        [
+          "#ffe6ae",
+          "#d69a45"
+        ]
+      ]
+    }
+  ]
+}

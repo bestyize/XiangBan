@@ -1,4 +1,4 @@
-//! 来源任务调度与草稿接入。所有网络运行在独立后台任务，仅生成待审核内容。
+//! 来源任务调度。网络请求独立后台执行；客观榜单校验后自动发布，资讯与工具保留人工审核。
 pub mod credentials;
 pub mod model_sources;
 pub mod news_sources;
@@ -108,7 +108,7 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
                 if items.is_empty() && (source == "github_repos" || source == "official_news") {
                     Ok(0)
                 } else {
-                    crate::handlers::discover_editor::write_collected_batch(
+                    crate::handlers::discover_editor::store_collection_result(
                         &s.pool, &source, id, items,
                     )
                     .await

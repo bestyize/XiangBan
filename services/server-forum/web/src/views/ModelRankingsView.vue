@@ -73,7 +73,7 @@ useHead(() => ({ title: tab.value === 'usage' ? '模型调用量榜' : '模型�
       </div>
       <p v-if="loading" role="status">加载中…</p>
       <p v-else-if="error" role="alert">{{ error }} <button @click="load">重新加载</button></p>
-      <p v-else-if="empty">{{ date ? '这一天尚无已发布榜单。' : '尚无已发布榜单，编辑审核后会在这里展示。' }} <button v-if="date" @click="setDate('')">查看最新</button></p>
+      <p v-else-if="empty">{{ date ? '这一天尚无已发布榜单。' : '尚无已发布榜单，采集校验通过后会自动展示。' }} <button v-if="date" @click="setDate('')">查看最新</button></p>
       <template v-else-if="tab === 'usage' && usage">
         <div class="controls"><label>统计日（UTC） <select :value="date || usage.date" @change="setDate(($event.target as HTMLSelectElement).value)"><option v-for="day in dates" :key="day" :value="day">{{ day }}</option></select></label></div>
         <p>按输入与输出 Token 总量排名，仅统计 OpenRouter 平台流量。</p>

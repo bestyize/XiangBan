@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "effect",
+  "id": "drift-motes",
+  "name": "浮光微尘",
+  "version": "1.0.0",
+  "description": "少量青绿光点在桌面缓缓游荡，保留大面积留白。",
+  "author": "小伴社区原创作品",
+  "license": "MIT"
+}

@@ -1,0 +1,88 @@
+{
+  "templateVersion": 1,
+  "title": "功能交接手动工作流",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "范围 → 契约 → 验证 → 限制 → 接手",
+  "boundary": "不把未执行测试写成已通过",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "明确交付功能及明确不包含的范围",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "记录入口、输入输出和必要配置名称，不记录密钥值",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "列出验证命令与实际执行结果",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "说明已知限制、失败恢复和回退方式",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "让接手者按文档完成一次操作并记录缺漏",
+      "done": false
+    }
+  ],
+  "record": {
+    "功能": null,
+    "输入输出": null,
+    "配置名称": null,
+    "验证结果": null,
+    "限制": null,
+    "接手验收": null
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "label": "明确交付功能及明确不包含的范围",
+      "depends_on": [],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n2",
+      "label": "记录入口、输入输出和必要配置名称，不记录密钥值",
+      "depends_on": [
+        "n1"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n3",
+      "label": "列出验证命令与实际执行结果",
+      "depends_on": [
+        "n2"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n4",
+      "label": "说明已知限制、失败恢复和回退方式",
+      "depends_on": [
+        "n3"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n5",
+      "label": "让接手者按文档完成一次操作并记录缺漏",
+      "depends_on": [
+        "n4"
+      ],
+      "status": "not_started",
+      "evidence": null
+    }
+  ]
+}

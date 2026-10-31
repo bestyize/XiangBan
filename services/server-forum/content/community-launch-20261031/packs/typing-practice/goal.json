@@ -1,0 +1,48 @@
+{
+  "templateVersion": 1,
+  "title": "二十一天输入练习册",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "21天",
+  "boundary": "纸面或表格手动记录",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "选一段不含私人信息的练习文字并记录起点",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "前一周先追求少改错，记录常错组合",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "第二周把常错组合做成短练习",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "第三周用相似难度的新段落对比",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "每天记录实际练习与感受，漏一天无需补双倍",
+      "done": false
+    }
+  ],
+  "record": {
+    "材料": null,
+    "起点": null,
+    "常错组合": null,
+    "里程碑": null,
+    "成功标准": null
+  },
+  "review": {
+    "current_stage": 1,
+    "completed": false,
+    "evidence": [],
+    "next_review": null
+  }
+}

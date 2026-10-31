@@ -143,7 +143,7 @@ class DiscoverApiTest {
     fun `home bundle parses banners, news, featured packs and the top repos`() = runTest {
         val server = FakeServer()
         server.on(
-            "/api/discover/home",
+            "/api/discover/home/v2",
             body = """{"banners":[{"key":"b1","tag":"本周原创","title":"标题","byline":"小伴编辑部","published_at":"2026-10-31T00:00:00Z","sample":true}],
               "news":{"date":"2026-10-31","total":3,"items":[{"key":"n1","title":"新闻","source":"来源","url":"https://x.test/a","published_at":"2026-10-31T01:00:00Z","sample":true}]},
               "featured":[{"id":7,"kind":"effect","title":"极光","version":1}],
@@ -162,7 +162,7 @@ class DiscoverApiTest {
     @Test
     fun `missing optional parts of the home bundle fall back to empty`() = runTest {
         val server = FakeServer()
-        server.on("/api/discover/home", body = """{"banners":[],"news":{"date":null,"total":0,"items":[]},"featured":[],"repos":null,"sample":false}""")
+        server.on("/api/discover/home/v2", body = """{"banners":[],"news":{"date":null,"total":0,"items":[]},"featured":[],"repos":null,"sample":false}""")
         val home = ForumApi(server.client, CONFIG) { null }.home()
         assertTrue(home.banners.isEmpty() && home.featured.isEmpty())
         assertNull(home.repos)
@@ -180,7 +180,7 @@ class DiscoverApiTest {
               "source":"Artificial Analysis","updated_at":"2026-10-31T00:00:00Z","sample":true}""",
         )
         server.on(
-            "/api/discover/tracker",
+            "/api/discover/tracker/v2",
             body = """{"quota":{"key":"codex","progress_pct":68,"next_reset_at":"2026-11-01T10:00:00Z","recent_intervals":[5,5.5],"published_at":"2026-10-31T09:55:00Z"},
               "launches":[{"key":"l","title":"上新","tags":["API"],"published_at":"2026-10-31T00:00:00Z"}],
               "promos":[{"key":"p","text":"免费","ends_at":"2026-11-03T00:00:00Z","pct":57,"days_left":3}],"now":"2026-10-31T10:00:00Z","sample":false}""",
@@ -208,7 +208,7 @@ class DiscoverApiTest {
     fun `hot search words and repo icons are parsed`() = runTest {
         val server = FakeServer()
         server.on("/api/discover/hot-search", body = """{"items":[{"key":"w1","text":"桌面特效","tag":"热"},{"key":"w2","text":"番茄时钟"}]}""")
-        server.on("/api/discover/repos", body = """{"issue_no":42,"ranks":[{"rank":1,"full_name":"a/b","star_total":1,"star_gain":2,"icon":"term","tint":"#E8EEF8"}]}""")
+        server.on("/api/discover/repos/v2", body = """{"issue_no":42,"ranks":[{"rank":1,"full_name":"a/b","star_total":1,"star_gain":2,"icon":"term","tint":"#E8EEF8"}]}""")
         val api = ForumApi(server.client, CONFIG) { null }
         val words = api.hotSearch().items
         assertEquals(listOf("桌面特效", "番茄时钟"), words.map { it.text })
@@ -222,8 +222,8 @@ class DiscoverApiTest {
     @Test
     fun `repo issue can be asked for by key and the issue list is parsed`() = runTest {
         val server = FakeServer()
-        server.on("/api/discover/repos", body = """{"key":"1","issue_no":1,"week_start":"10.23","week_end":"10.29","total_gain":86420,"wow_pct":12.5,"daily_gain":[1,2,3,4,5,6,7],"ranks":[]}""")
-        server.on("/api/discover/repos/issues", body = """{"items":[{"key":"2","issue_no":2,"week_start":"10.30","week_end":"11.05"},{"key":"1","issue_no":1}]}""")
+        server.on("/api/discover/repos/v2", body = """{"key":"1","issue_no":1,"week_start":"10.23","week_end":"10.29","total_gain":86420,"wow_pct":12.5,"daily_gain":[1,2,3,4,5,6,7],"ranks":[]}""")
+        server.on("/api/discover/repos/issues/v2", body = """{"items":[{"key":"2","issue_no":2,"week_start":"10.30","week_end":"11.05"},{"key":"1","issue_no":1}]}""")
         val api = ForumApi(server.client, CONFIG) { null }
         assertEquals(listOf(2, 1), api.repoIssues().items.map { it.issueNo })
         val issue = api.repoIssue("1")

@@ -1,0 +1,137 @@
+{
+  "checked_at": "2026-10-31T16:09:33.192875+00:00",
+  "count": 5,
+  "policy": "历史周由官方原事件日期按ISO8601计算；社区现在整理发布的时间应由真正发布动作记录，不回填过去的社区发布时间。",
+  "items": [
+    {
+      "week": "2025-W04",
+      "week_start": "2025-01-20",
+      "week_end": "2025-01-26",
+      "title": "历史回顾·DeepSeek-R1 发布",
+      "summary_zh": "DeepSeek 发布 R1 及蒸馏模型，并在官方公告说明代码与模型采用 MIT 许可、提供网页与 API 入口。此处回顾发布事实，不把当年的性能自述当作今天的模型排名。",
+      "events": [
+        {
+          "key": "deepseek-r1",
+          "provider": "DeepSeek",
+          "title": "DeepSeek-R1 发布",
+          "provider_published_date": "2025-01-20",
+          "date_precision": "day",
+          "source_url": "https://api-docs.deepseek.com/news/news250120/",
+          "summary_zh": "DeepSeek 发布 R1 及蒸馏模型，并在官方公告说明代码与模型采用 MIT 许可、提供网页与 API 入口。此处回顾发布事实，不把当年的性能自述当作今天的模型排名。",
+          "tags": [
+            "开源权重",
+            "推理"
+          ],
+          "classification": "historical_release",
+          "checked_at": "2026-10-31T16:09:33.192875+00:00"
+        }
+      ],
+      "editorial_note": "现在整理的历史回顾；原事件日期见条目。不表示社区在该周已经发布周刊。",
+      "community_published_at": null
+    },
+    {
+      "week": "2025-W18",
+      "week_start": "2025-04-28",
+      "week_end": "2025-05-04",
+      "title": "历史回顾·Qwen3 系列发布",
+      "summary_zh": "Qwen 团队发布 Qwen3，包含两款 MoE 与六款稠密模型，官方说明以 Apache 2.0 许可开放权重，并介绍思考与非思考模式。历史内容可帮助读者比较本地部署规模与许可要求。",
+      "events": [
+        {
+          "key": "qwen3",
+          "provider": "Qwen Team",
+          "title": "Qwen3 系列发布",
+          "provider_published_date": "2025-04-29",
+          "date_precision": "day",
+          "source_url": "https://qwenlm.github.io/blog/qwen3/",
+          "summary_zh": "Qwen 团队发布 Qwen3，包含两款 MoE 与六款稠密模型，官方说明以 Apache 2.0 许可开放权重，并介绍思考与非思考模式。历史内容可帮助读者比较本地部署规模与许可要求。",
+          "tags": [
+            "开源权重",
+            "本地部署"
+          ],
+          "classification": "historical_release",
+          "checked_at": "2026-10-31T16:09:33.192875+00:00"
+        }
+      ],
+      "editorial_note": "现在整理的历史回顾；原事件日期见条目。不表示社区在该周已经发布周刊。",
+      "community_published_at": null
+    },
+    {
+      "week": "2025-W25",
+      "week_start": "2025-06-16",
+      "week_end": "2025-06-22",
+      "title": "历史回顾·Gemini 2.5 Pro、Flash 稳定版与 Flash-Lite 预览",
+      "summary_zh": "Google 宣布 Gemini 2.5 Pro 与 Flash 成为稳定可用版本，同时推出 Flash-Lite 预览。官方文章介绍思考预算控制，并区分稳定版与预览版；不将当年的预览状态套用到当前服务。",
+      "events": [
+        {
+          "key": "gemini-2-5-ga",
+          "provider": "Google",
+          "title": "Gemini 2.5 Pro、Flash 稳定版与 Flash-Lite 预览",
+          "provider_published_date": "2025-06-17",
+          "date_precision": "day",
+          "source_url": "https://developers.googleblog.com/en/gemini-2-5-thinking-model-updates/",
+          "summary_zh": "Google 宣布 Gemini 2.5 Pro 与 Flash 成为稳定可用版本，同时推出 Flash-Lite 预览。官方文章介绍思考预算控制，并区分稳定版与预览版；不将当年的预览状态套用到当前服务。",
+          "tags": [
+            "API",
+            "稳定版"
+          ],
+          "classification": "historical_release",
+          "checked_at": "2026-10-31T16:09:33.192875+00:00"
+        }
+      ],
+      "editorial_note": "现在整理的历史回顾；原事件日期见条目。不表示社区在该周已经发布周刊。",
+      "community_published_at": null
+    },
+    {
+      "week": "2025-W32",
+      "week_start": "2025-08-04",
+      "week_end": "2025-08-10",
+      "title": "历史回顾·GPT-5 发布",
+      "summary_zh": "OpenAI 发布 GPT-5，介绍统一系统与根据问题选择响应或深入推理的机制。原文现已提示读者查看更新型号，因此本条明确作为历史发布回顾，不声称它仍是最新模型。",
+      "events": [
+        {
+          "key": "gpt-5",
+          "provider": "OpenAI",
+          "title": "GPT-5 发布",
+          "provider_published_date": "2025-08-07",
+          "date_precision": "day",
+          "source_url": "https://openai.com/index/introducing-gpt-5/",
+          "summary_zh": "OpenAI 发布 GPT-5，介绍统一系统与根据问题选择响应或深入推理的机制。原文现已提示读者查看更新型号，因此本条明确作为历史发布回顾，不声称它仍是最新模型。",
+          "tags": [
+            "API",
+            "历史发布"
+          ],
+          "classification": "historical_release",
+          "checked_at": "2026-10-31T16:09:33.192875+00:00"
+        }
+      ],
+      "editorial_note": "现在整理的历史回顾；原事件日期见条目。不表示社区在该周已经发布周刊。",
+      "community_published_at": null
+    },
+    {
+      "week": "2025-W40",
+      "week_start": "2025-09-29",
+      "week_end": "2025-10-05",
+      "title": "历史回顾·Claude Sonnet 4.5 与 Claude Agent SDK 发布",
+      "summary_zh": "Anthropic 发布 Claude Sonnet 4.5，并同时介绍 Claude Agent SDK、Claude Code 检查点与编辑器相关升级。适合回顾从模型调用到 Agent 开发工具链的演变，不复用当年的“最强”营销排序。",
+      "events": [
+        {
+          "key": "claude-sonnet-4-5",
+          "provider": "Anthropic",
+          "title": "Claude Sonnet 4.5 与 Claude Agent SDK 发布",
+          "provider_published_date": "2025-09-29",
+          "date_precision": "day",
+          "source_url": "https://www.anthropic.com/news/claude-sonnet-4-5",
+          "summary_zh": "Anthropic 发布 Claude Sonnet 4.5，并同时介绍 Claude Agent SDK、Claude Code 检查点与编辑器相关升级。适合回顾从模型调用到 Agent 开发工具链的演变，不复用当年的“最强”营销排序。",
+          "tags": [
+            "编程",
+            "Agent SDK"
+          ],
+          "classification": "historical_release",
+          "checked_at": "2026-10-31T16:09:33.192875+00:00"
+        }
+      ],
+      "editorial_note": "现在整理的历史回顾；原事件日期见条目。不表示社区在该周已经发布周刊。",
+      "community_published_at": null
+    }
+  ]
+}

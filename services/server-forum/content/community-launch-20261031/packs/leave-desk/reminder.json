@@ -1,0 +1,48 @@
+{
+  "templateVersion": 1,
+  "title": "离桌前五件事",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "每次较长时间离桌前",
+  "boundary": "可删减清单",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "保存当前文件并留下恢复任务的一句话",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "检查需要随身携带的物品是否齐全",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "确认不需要继续运行的设备状态",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "按自己的使用环境确认门窗与桌面物品",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "锁定电脑，并在有需要时告知同伴离开时间",
+      "done": false
+    }
+  ],
+  "record": {
+    "恢复提示": null,
+    "随身物品": null,
+    "设备确认": null,
+    "环境确认": null,
+    "预计返回": null
+  },
+  "schedule": {
+    "enabled": false,
+    "timezone": "local",
+    "configure_manually": true,
+    "time": null
+  }
+}

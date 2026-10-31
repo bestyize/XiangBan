@@ -1,0 +1,42 @@
+{
+  "templateVersion": 1,
+  "title": "技术文档编辑提示词",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "技术说明与操作指南",
+  "boundary": "不假装实际运行用户环境",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "先确认读者、目标任务与实际运行环境",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "检查术语、前置条件和步骤顺序",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "对每个操作补齐可观察的成功条件",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "把未知、计划中与已经实现分开表达",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "给出最小改稿与需要作者确认的问题",
+      "done": false
+    }
+  ],
+  "record": {
+    "读者": null,
+    "输入问题": null,
+    "编辑建议": null,
+    "需确认": null,
+    "输出": null
+  }
+}

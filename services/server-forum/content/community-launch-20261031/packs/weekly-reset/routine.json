@@ -1,0 +1,42 @@
+{
+  "templateVersion": 1,
+  "title": "周五桌面归零",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "每周最后一个工作日",
+  "boundary": "20分钟",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "记录本周三个成果与各自位置",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "仅处理桌面和下载目录中新文件，先分类不批量删除",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "把参考资料移到对应项目并写一句用途",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "逐项决定未完成待办继续、延期或取消",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "写下周一启动清单，确认重要文件已有自己的备份",
+      "done": false
+    }
+  ],
+  "record": {
+    "本周成果": null,
+    "待分类": null,
+    "保留位置": null,
+    "延期事项": null,
+    "周一启动": null
+  }
+}

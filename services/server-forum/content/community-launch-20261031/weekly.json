@@ -1,0 +1,137 @@
+[
+  {
+    "method": "PUT",
+    "path": "/api/admin/weekly/2025-W04",
+    "body": {
+      "title": "历史回顾·DeepSeek-R1 发布",
+      "summary": "2026-11-01 整理发布。回顾 2025-01-20 至 2025-01-26 的官方发布；原事件时间见条目。",
+      "items": [
+        {
+          "type": "text",
+          "title": "DeepSeek-R1 发布",
+          "note": "原事件日期：2025-01-20。DeepSeek 发布 R1 及蒸馏模型，并在官方公告说明代码与模型采用 MIT 许可、提供网页与 API 入口。此处回顾发布事实，不把当年的性能自述当作今天的模型排名。"
+        },
+        {
+          "type": "text",
+          "title": "阅读原始公告",
+          "note": "由原发布方提供，日期与正文以官方页面为准。",
+          "source_url": "https://api-docs.deepseek.com/news/news250120/"
+        },
+        {
+          "type": "text",
+          "title": "如何使用这份回顾",
+          "note": "这份历史整理帮助理解发布当时的模型与工具变化。阅读时分别记录开放权重、API、产品界面三个层面；原文中的价格、排名、预览状态与可用范围属于当时信息，实际使用前请以当前官方说明核对。"
+        }
+      ],
+      "status": "published"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/weekly/2025-W18",
+    "body": {
+      "title": "历史回顾·Qwen3 系列发布",
+      "summary": "2026-11-01 整理发布。回顾 2025-04-28 至 2025-05-04 的官方发布；原事件时间见条目。",
+      "items": [
+        {
+          "type": "text",
+          "title": "Qwen3 系列发布",
+          "note": "原事件日期：2025-04-29。Qwen 团队发布 Qwen3，包含两款 MoE 与六款稠密模型，官方说明以 Apache 2.0 许可开放权重，并介绍思考与非思考模式。历史内容可帮助读者比较本地部署规模与许可要求。"
+        },
+        {
+          "type": "text",
+          "title": "阅读原始公告",
+          "note": "由原发布方提供，日期与正文以官方页面为准。",
+          "source_url": "https://qwenlm.github.io/blog/qwen3/"
+        },
+        {
+          "type": "text",
+          "title": "如何使用这份回顾",
+          "note": "这份历史整理帮助理解发布当时的模型与工具变化。阅读时分别记录开放权重、API、产品界面三个层面；原文中的价格、排名、预览状态与可用范围属于当时信息，实际使用前请以当前官方说明核对。"
+        }
+      ],
+      "status": "published"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/weekly/2025-W25",
+    "body": {
+      "title": "历史回顾·Gemini 2.5 Pro、Flash 稳定版与 Flash-Lite 预览",
+      "summary": "2026-11-01 整理发布。回顾 2025-06-16 至 2025-06-22 的官方发布；原事件时间见条目。",
+      "items": [
+        {
+          "type": "text",
+          "title": "Gemini 2.5 Pro、Flash 稳定版与 Flash-Lite 预览",
+          "note": "原事件日期：2025-06-17。Google 宣布 Gemini 2.5 Pro 与 Flash 成为稳定可用版本，同时推出 Flash-Lite 预览。官方文章介绍思考预算控制，并区分稳定版与预览版；不将当年的预览状态套用到当前服务。"
+        },
+        {
+          "type": "text",
+          "title": "阅读原始公告",
+          "note": "由原发布方提供，日期与正文以官方页面为准。",
+          "source_url": "https://developers.googleblog.com/en/gemini-2-5-thinking-model-updates/"
+        },
+        {
+          "type": "text",
+          "title": "如何使用这份回顾",
+          "note": "这份历史整理帮助理解发布当时的模型与工具变化。阅读时分别记录开放权重、API、产品界面三个层面；原文中的价格、排名、预览状态与可用范围属于当时信息，实际使用前请以当前官方说明核对。"
+        }
+      ],
+      "status": "published"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/weekly/2025-W32",
+    "body": {
+      "title": "历史回顾·GPT-5 发布",
+      "summary": "2026-11-01 整理发布。回顾 2025-08-04 至 2025-08-10 的官方发布；原事件时间见条目。",
+      "items": [
+        {
+          "type": "text",
+          "title": "GPT-5 发布",
+          "note": "原事件日期：2025-08-07。OpenAI 发布 GPT-5，介绍统一系统与根据问题选择响应或深入推理的机制。原文现已提示读者查看更新型号，因此本条明确作为历史发布回顾，不声称它仍是最新模型。"
+        },
+        {
+          "type": "text",
+          "title": "阅读原始公告",
+          "note": "由原发布方提供，日期与正文以官方页面为准。",
+          "source_url": "https://openai.com/index/introducing-gpt-5/"
+        },
+        {
+          "type": "text",
+          "title": "如何使用这份回顾",
+          "note": "这份历史整理帮助理解发布当时的模型与工具变化。阅读时分别记录开放权重、API、产品界面三个层面；原文中的价格、排名、预览状态与可用范围属于当时信息，实际使用前请以当前官方说明核对。"
+        }
+      ],
+      "status": "published"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/weekly/2025-W40",
+    "body": {
+      "title": "历史回顾·Claude Sonnet 4.5 与 Claude Agent SDK 发布",
+      "summary": "2026-11-01 整理发布。回顾 2025-09-29 至 2025-10-05 的官方发布；原事件时间见条目。",
+      "items": [
+        {
+          "type": "text",
+          "title": "Claude Sonnet 4.5 与 Claude Agent SDK 发布",
+          "note": "原事件日期：2025-09-29。Anthropic 发布 Claude Sonnet 4.5，并同时介绍 Claude Agent SDK、Claude Code 检查点与编辑器相关升级。适合回顾从模型调用到 Agent 开发工具链的演变，不复用当年的“最强”营销排序。"
+        },
+        {
+          "type": "text",
+          "title": "阅读原始公告",
+          "note": "由原发布方提供，日期与正文以官方页面为准。",
+          "source_url": "https://www.anthropic.com/news/claude-sonnet-4-5"
+        },
+        {
+          "type": "text",
+          "title": "如何使用这份回顾",
+          "note": "这份历史整理帮助理解发布当时的模型与工具变化。阅读时分别记录开放权重、API、产品界面三个层面；原文中的价格、排名、预览状态与可用范围属于当时信息，实际使用前请以当前官方说明核对。"
+        }
+      ],
+      "status": "published"
+    }
+  }
+]

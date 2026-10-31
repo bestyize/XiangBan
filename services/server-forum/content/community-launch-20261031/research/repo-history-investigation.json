@@ -1,0 +1,36 @@
+{
+  "checked_at": "2026-10-31T16:09:33.192875+00:00",
+  "decision": "not_backfilled",
+  "verified_local_baseline_count": 8,
+  "verified_local_baseline_date": "2026-10-31",
+  "policy": "只有具有仓库稳定ID、精确总star、实际观测时间与出处的记录才可进入同一总star快照口径。禁止用star事件计数、图片近似值或当前活跃stargazer反推值制造历史净增长。",
+  "sources_checked": [
+    {
+      "name": "GH Archive",
+      "source_url": "https://www.gharchive.org/",
+      "documentation_url": "https://docs.github.com/en/rest/using-the-rest-api/github-event-types#watchevent",
+      "finding": "GH Archive按小时归档公开事件。GitHub官方说明WatchEvent只支持started动作，没有取消star的配对事件；事件计数不能替代总star净变化。",
+      "imported": false
+    },
+    {
+      "name": "Star History",
+      "source_url": "https://github.com/star-history/star-history",
+      "finding": "确认存在公开星数曲线项目，但本轮未取得各指定UTC日具有原始观察时间、精确总star的可校验快照；不把图形点或未经核实的曲线当作本地快照。",
+      "imported": false
+    },
+    {
+      "name": "Internet Archive Wayback",
+      "source_url": "https://web.archive.org/cdx/search/cdx?url=github.com/ollama/ollama&output=json&from=20261024&to=20261031",
+      "availability_url": "https://archive.org/wayback/available?url=github.com/ollama/ollama&timestamp=20261024",
+      "finding": "两种公开档案入口本次浏览均无法访问，没有拿到可核实的页面记录；这不表示历史快照一定不存在。",
+      "imported": false
+    },
+    {
+      "name": "GHTorrent",
+      "source_url": "https://ghtorrent.org/",
+      "finding": "本次域名跳转到不相关站点，拒绝作为可信历史数据下载来源。",
+      "imported": false
+    }
+  ],
+  "release_policy": "先发布明确初始快照，增量与周同比保持null，周趋势隐藏；积累至少两个真实UTC日边界后计算净变化。8连续边界才是完整7日窗口。"
+}

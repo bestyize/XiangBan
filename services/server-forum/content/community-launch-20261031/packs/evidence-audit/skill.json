@@ -1,0 +1,43 @@
+{
+  "templateVersion": 1,
+  "title": "证据与断言核对技能",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "给出待核实文本与可读来源",
+  "boundary": "不得伪造引文或假装浏览",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "把待审文本拆成可验证的单独断言",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "只从用户提供且实际可读的材料中收集对应证据",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "记录材料位置、日期与证据是否直接支持",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "将断言分类为支持、部分支持、矛盾或无法判断",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "给出最小修改建议，并保留未解决问题",
+      "done": false
+    }
+  ],
+  "record": {
+    "输入": null,
+    "断言": null,
+    "证据": null,
+    "判断": null,
+    "改写": null,
+    "未知": null
+  }
+}

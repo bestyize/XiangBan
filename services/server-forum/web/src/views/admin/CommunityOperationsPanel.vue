@@ -23,7 +23,7 @@ let summarySeq = 0
 let linksSeq = 0
 let timer: ReturnType<typeof setTimeout> | undefined
 let pollRun = ''
-const KIND: Record<string, string> = { banner: '首页横幅', vendor: '服务商', model: '模型目录', quota: '免费额度', launch: '模型上新', hotword: '热门话题', nav: 'AI 导航', doc: '学习文档', tool: 'AI 工具', news: 'AI 日报', repo_issue: '开源热榜', model_board: '模型能力榜', model_usage: '模型调用量榜', promo: '限免活动' }
+const KIND: Record<string, string> = { banner: '首页横幅', vendor: '服务商', model: '模型目录', quota: '免费额度', launch: '发布记录', hotword: '热门话题', nav: 'AI 导航', doc: '学习文档', tool: 'AI 工具', news: 'AI 日报', repo_issue: '开源热榜', model_board: '模型能力榜', model_usage: '模型调用量榜', promo: '优惠与试用' }
 const HEALTH: Record<string, string> = { unchecked: '未检查', healthy: '可访问', restricted: '访问受限', broken: '不存在或已移除', rate_limited: '来源限流', unavailable: '来源异常', blocked: '安全策略阻止', dns_error: '解析异常', network_error: '连接异常', timeout: '检查超时', attention: '需人工核对' }
 const FRESH: Record<string, string> = { fresh: '更新正常', stale: '更新过期', never: '尚未成功', disabled: '已停用' }
 const RUN: Record<string, string> = { running: '检查中', succeeded: '检查完成', partial: '部分完成', failed: '运行中断' }

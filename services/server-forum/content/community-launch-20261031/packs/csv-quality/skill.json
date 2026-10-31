@@ -1,0 +1,41 @@
+{
+  "templateVersion": 1,
+  "title": "CSV质量检查说明技能",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "粘贴脱敏CSV和列定义",
+  "boundary": "只审可见行，不声称已扫全文件",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "确认分隔符、编码、列名与每列含义",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "检查列数一致性和明显的解析问题",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "按用户定义区分允许空值与缺失数据",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "检查主键候选重复、日期和数字格式混杂",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "输出问题行号、影响和建议，不静默修改原始数据",
+      "done": false
+    }
+  ],
+  "record": {
+    "列定义": null,
+    "样例行": null,
+    "发现": null,
+    "处理建议": null
+  }
+}

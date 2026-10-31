@@ -1,0 +1,49 @@
+{
+  "templateVersion": 1,
+  "title": "个人备份巡检提醒",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "手动完成备份之后",
+  "boundary": "含抽样恢复步骤",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "选择一个需要保护的文件夹，记录本机路径",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "确认备份目标和最近完成时间",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "抽取一个小文件从备份位置打开",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "核对文件内容或你已有的校验值，记下结果",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "出现差异时停止覆盖，先保留两份并查原因",
+      "done": false
+    }
+  ],
+  "record": {
+    "来源": null,
+    "备份位置": null,
+    "最近完成": null,
+    "抽样文件": null,
+    "打开结果": null,
+    "异常处理": null
+  },
+  "schedule": {
+    "enabled": false,
+    "timezone": "local",
+    "configure_manually": true,
+    "time": null
+  }
+}

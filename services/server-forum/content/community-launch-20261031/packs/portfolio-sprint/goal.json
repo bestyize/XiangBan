@@ -1,0 +1,48 @@
+{
+  "templateVersion": 1,
+  "title": "四周作品集小冲刺",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "4周",
+  "boundary": "不承诺求职结果",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "明确目标读者与本次只展示的一个项目",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "收集能公开的过程材料并删去私人信息",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "搭出背景、决定、实现、结果四段结构",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "邀请一人试读并记录其理解偏差",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "修改一次后发布到自己选择的位置，记录待改进点",
+      "done": false
+    }
+  ],
+  "record": {
+    "读者": null,
+    "项目": null,
+    "里程碑": null,
+    "成功标准": null,
+    "边界": null
+  },
+  "review": {
+    "current_stage": 1,
+    "completed": false,
+    "evidence": [],
+    "next_review": null
+  }
+}
