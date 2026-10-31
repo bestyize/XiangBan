@@ -3,6 +3,7 @@ pub mod analytics;
 pub mod attachments;
 pub mod blocks;
 pub mod content;
+pub mod discover;
 pub mod follows;
 pub mod help;
 pub mod images;

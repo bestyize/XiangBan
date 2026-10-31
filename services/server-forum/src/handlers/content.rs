@@ -173,6 +173,18 @@ async fn list_packs(State(state): State<AppState>, Query(q): Query<ListQuery>) -
     Ok(Json(Page { items: rows.iter().map(|r| r.json(&state)).collect(), page, page_size: size, total }))
 }
 
+/// 首页精选创作：按使用次数排前面的已发布内容包。
+pub(super) async fn top_packs(state: &AppState, limit: i64) -> AppResult<Vec<Value>> {
+    let rows: Vec<PackRow> = sqlx::query_as(&format!(
+        "SELECT {PACK_COLUMNS} FROM packs p LEFT JOIN users u ON u.uid = p.author_uid
+         WHERE p.status = 'published' ORDER BY p.apply_count DESC, p.id DESC LIMIT $1"
+    ))
+    .bind(limit)
+    .fetch_all(&state.pool)
+    .await?;
+    Ok(rows.iter().map(|r| r.json(state)).collect())
+}
+
 async fn find_pack(state: &AppState, id: i64) -> AppResult<PackRow> {
     sqlx::query_as(&format!("SELECT {PACK_COLUMNS} FROM packs p LEFT JOIN users u ON u.uid = p.author_uid WHERE p.id = $1"))
         .bind(id)

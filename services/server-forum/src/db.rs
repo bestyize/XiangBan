@@ -243,6 +243,7 @@ pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     sqlx::raw_sql(POINTS_SCHEMA).execute(pool).await?;
     sqlx::raw_sql(CONTENT_SCHEMA).execute(pool).await?;
     sqlx::raw_sql(COMPLIANCE_SCHEMA).execute(pool).await?;
+    sqlx::raw_sql(DISCOVER_SCHEMA).execute(pool).await?;
     // 搜索用的三元组索引是可选的：数据库没有 pg_trgm 扩展时退化为普通 ILIKE 扫描。
     if sqlx::raw_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm").execute(pool).await.is_ok() {
         let _ = sqlx::raw_sql(
@@ -989,4 +990,37 @@ CREATE TABLE IF NOT EXISTS events_daily (
     PRIMARY KEY (day, name, dim, device)
 );
 CREATE INDEX IF NOT EXISTS events_daily_device_idx ON events_daily (device, day);
+"#;
+
+/// 手机端社区新增的内容：后台手录的发现页条目（日报、榜单、导航、工具等）、投票、话题配图。
+const DISCOVER_SCHEMA: &str = r#"
+-- 发现页条目：按 kind 区分，data 的形状由 discover.rs 里各类型的结构体校验。
+CREATE TABLE IF NOT EXISTS discover_items (
+    kind         TEXT NOT NULL,
+    key          TEXT NOT NULL,
+    sort_order   INT NOT NULL DEFAULT 0,
+    status       TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('draft', 'published')),
+    published_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    data         JSONB NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (kind, key)
+);
+CREATE INDEX IF NOT EXISTS discover_items_order_idx ON discover_items (kind, status, sort_order, published_at DESC);
+
+-- 列表卡片用的配图：发帖时从正文里取前 3 张站内图片。
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}';
+
+CREATE TABLE IF NOT EXISTS polls (
+    topic_id   BIGINT PRIMARY KEY REFERENCES topics(id) ON DELETE CASCADE,
+    options    TEXT[] NOT NULL CHECK (cardinality(options) BETWEEN 2 AND 6),
+    closes_at  TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS poll_votes (
+    topic_id   BIGINT NOT NULL REFERENCES polls(topic_id) ON DELETE CASCADE,
+    uid        UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    option_idx SMALLINT NOT NULL CHECK (option_idx >= 0),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (topic_id, uid)
+);
 "#;

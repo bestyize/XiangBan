@@ -136,6 +136,11 @@ class AndroidPlatformActions(
         (context as? android.app.Activity)?.finish()
     }
 
+    override fun setLandscape(landscape: Boolean) {
+        (context as? android.app.Activity)?.requestedOrientation =
+            if (landscape) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+    }
+
     override fun openAppSettings(): Boolean {
         val settings = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return runCatching { context.startActivity(settings) }.isSuccess

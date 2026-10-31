@@ -6,9 +6,19 @@ sealed interface Route {
     data class Topic(val id: Long) : Route
     data class Weekly(val week: String) : Route
     data class Project(val slug: String) : Route
+    /** AI 工具的详情页，[key] 是后台里的工具标识。 */
+    data class Tool(val key: String) : Route
+    /** 往期 AI 日报。 */
+    data object Daily : Route
+    /** 模型天梯。 */
+    data object Leaderboard : Route
+    /** 智能 vs 价格的横屏全屏散点图。 */
+    data object Scatter : Route
     data object Login : Route
     data object Search : Route
     data object NewPost : Route
+    /** 发求助：和发帖同一页，一打开就选好「资源求助」并显示悬赏设置。 */
+    data object NewHelp : Route
     data object Settings : Route
     data object Models : Route
     /** 设置里的外观（跟随系统 / 浅色 / 深色）和主题色。 */
@@ -27,9 +37,14 @@ sealed interface Route {
         is Topic -> "topic:$id"
         is Weekly -> "weekly:$week"
         is Project -> "project:$slug"
+        is Tool -> "tool:$key"
+        Daily -> "daily"
+        Leaderboard -> "leaderboard"
+        Scatter -> "scatter"
         Login -> "login"
         Search -> "search"
         NewPost -> "newpost"
+        NewHelp -> "newhelp"
         Settings -> "settings"
         Models -> "models"
         Appearance -> "appearance"
@@ -49,9 +64,14 @@ sealed interface Route {
                 "topic" -> value.toLongOrNull()?.let(::Topic)
                 "weekly" -> value.takeIf { it.isNotEmpty() }?.let(::Weekly)
                 "project" -> value.takeIf { it.isNotEmpty() }?.let(::Project)
+                "tool" -> value.takeIf { it.isNotEmpty() }?.let(::Tool)
+                "daily" -> Daily
+                "leaderboard" -> Leaderboard
+                "scatter" -> Scatter
                 "login" -> Login
                 "search" -> Search
                 "newpost" -> NewPost
+                "newhelp" -> NewHelp
                 "settings" -> Settings
                 "models" -> Models
                 "appearance" -> Appearance

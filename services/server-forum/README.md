@@ -92,6 +92,16 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 后台（管理员令牌）：`GET/POST /admin/packs`（POST 是官方直接登记 T0/T1，文件已由运维放进资源机，可带魔搭等 https 镜像）、`POST /admin/packs/{id}/mirrors`（给某个版本补官方镜像，同名替换，最多 5 个；镜像地址不需要被信任，客户端对每个来源都校验 sha256）、`POST /admin/packs/{id}/review`（`approve|reject|remove|restore`）、`GET /admin/moderation`（待审队列）、`PUT /admin/projects/{slug}`、`PUT /admin/weekly/{week}`（草稿不对外，周刊条目只存引用，下架的内容包读取时自动隐去）。
 - 集成测试：`TEST_DATABASE_URL=postgres://… cargo test content_tests` 覆盖凭证、回调、发布、版本、审核、下载签名、配额、周刊和分享。
 
+## 手机端社区的发现页
+
+手机端社区（首页五个栏目、AI 工具、资料、求助悬赏）用的接口，实现在 `src/discover.rs`（内容校验与示例种子）和 `src/handlers/discover.rs`。内容都是后台手录，统一存在 `discover_items`（`kind` + `key` + JSON `data`），写入时按类型校验、只保留已知字段，草稿不对外。
+
+- 前台：`GET /discover/home`（头图、当天日报、精选创作、热榜前三，一次返回）、`/discover/daily`（往期日报，分页）、`/discover/repos[?issue=]` 与 `/discover/repos/issues`（开源热榜及往期）、`/discover/models`（模型榜，分档阈值 `tiers` 由后端给）、`/discover/tracker`（额度重置、模型上新、限时免费，进度和剩余天数服务端算）、`/discover/nav`、`/discover/docs`、`GET /tools[/{key}]`（AI 工具与按系统的安装包、更新记录）、`GET /help/stats`（进行中、本周已解决、悬赏积分合计，全站值）、`PUT /topics/{id}/poll/vote {option}`（每人一票）。
+- 帖子：发帖可带 `poll: {options: [2～6 项], days?}`；列表与详情返回 `images`（正文里前 3 张站内图）、`poll`（票数、总数、自己投的项）、`view_count`；`GET /topics?category=a,b` 可以同时指定几个分类。
+- 后台：`GET /admin/discover/{kind}`、`PUT /admin/discover/{kind}/{key}`（`{data, sort_order?, status?, published_at?, sample?}`）、`DELETE`。类型：`banner news nav doc vendor model repo_issue quota launch promo tool`。管理台「发现页」是 JSON 编辑。`sample: true` 的条目手机端会标「示例数据」；第一次启动会写入一批示例（模型榜、热榜、日报等，导航和资料是真实官方入口），录入真实内容后删掉示例即可。
+- 模型榜与开源热榜目前靠后台录入，没有自动同步。接 Artificial Analysis、GitHub 时在 `jobs.rs` 里加定时任务，密钥放环境变量，失败时保留上一期数据。
+- 集成测试：`TEST_DATABASE_URL=postgres://… cargo test discover`。
+
 ## 合规项：敏感词与待审队列
 
 - 敏感词由管理员在后台维护（`/admin/words`），**不内置任何词**。词表在发帖、编辑、回复、发布内容包与新版本、发布方案时检查：命中“拦截”的直接 400，且不告诉用户是哪个词；命中“复核”的先发布并进入待审队列。匹配前先归一化（转小写、去掉空白和标点），所以“违 禁-词”也命中“违禁词”；每个词 2～40 个字。实现见 `src/moderation.rs`。

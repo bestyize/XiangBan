@@ -79,6 +79,21 @@ pub struct HelpInfo {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct PollOption {
+    pub text: String,
+    pub votes: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PollInfo {
+    pub options: Vec<PollOption>,
+    pub total: i64,
+    pub closes_at: Option<DateTime<Utc>>,
+    /// 当前读者投的选项；没登录或没投过是 None。
+    pub my_vote: Option<i16>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct TopicItem {
     pub id: i64,
     pub title: String,
@@ -100,6 +115,9 @@ pub struct TopicItem {
     pub last_reply_at: DateTime<Utc>,
     pub edited_at: Option<DateTime<Utc>>,
     pub help: Option<HelpInfo>,
+    /// 正文里的前几张站内图片，列表卡片用作配图。
+    pub images: Vec<String>,
+    pub poll: Option<PollInfo>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -130,6 +148,7 @@ struct TopicRow {
     help_status: Option<String>,
     accepted_post_id: Option<i64>,
     help_expires_at: Option<DateTime<Utc>>,
+    images: Vec<String>,
 }
 
 impl TopicRow {
@@ -165,6 +184,8 @@ impl TopicRow {
             last_reply_at: self.last_reply_at,
             edited_at: self.edited_at,
             help,
+            images: self.images,
+            poll: None,
         }
     }
 }
@@ -173,7 +194,7 @@ const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.pin
         t.reply_count, t.like_count, t.view_count, t.min_read_level, t.created_at, t.last_reply_at, t.edited_at,
         c.id AS category_id, c.slug AS category_slug, c.name AS category_name,
         u.uid AS author_uid, u.nickname AS author_nickname, u.avatar_url AS author_avatar, u.trust_level AS author_level,
-        h.bounty, h.status AS help_status, h.accepted_post_id, h.expires_at AS help_expires_at
+        h.bounty, h.status AS help_status, h.accepted_post_id, h.expires_at AS help_expires_at, t.images
     FROM topics t
     JOIN categories c ON c.id = t.category_id
     JOIN users u ON u.uid = t.author_uid
@@ -236,11 +257,13 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
             .push(" AND b.blocked = t.author_uid)");
     }
     if let Some(slug) = f.category.as_deref().filter(|s| !s.is_empty()) {
-        qb.push(" AND (c.slug = ")
-            .push_bind(slug.to_string())
-            .push(" OR c.parent_id = (SELECT id FROM categories WHERE slug = ")
-            .push_bind(slug.to_string())
-            .push("))");
+        // 可以用逗号同时指定几个分类（如电影和音乐），一级分类仍然包含它的子分类。
+        let slugs: Vec<String> = slug.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+        qb.push(" AND (c.slug = ANY(")
+            .push_bind(slugs.clone())
+            .push(") OR c.parent_id IN (SELECT id FROM categories WHERE slug = ANY(")
+            .push_bind(slugs)
+            .push(")))");
     }
     if let Some(tag) = f.tag.as_deref().filter(|s| !s.is_empty()) {
         qb.push(" AND t.id IN (SELECT tt.topic_id FROM topic_tags tt JOIN tags g ON g.id = tt.tag_id WHERE g.name = ")
@@ -318,7 +341,7 @@ pub async fn list_topics(pool: &PgPool, f: &ListFilter) -> Result<Page<TopicItem
         .push_bind((f.page() - 1) * f.page_size());
     let rows: Vec<TopicRow> = qb.build_query_as().fetch_all(pool).await?;
 
-    let items = attach_tags(pool, rows).await?;
+    let items = attach_tags(pool, rows, f.reader.uid).await?;
     Ok(Page { items, page: f.page(), page_size: f.page_size(), total })
 }
 
@@ -327,12 +350,12 @@ pub async fn get_topic(pool: &PgPool, id: i64) -> Result<Option<TopicItem>, AppE
     let row: Option<TopicRow> =
         sqlx::query_as(&format!("{SELECT} WHERE t.id = $1")).bind(id).fetch_optional(pool).await?;
     Ok(match row {
-        Some(row) => attach_tags(pool, vec![row]).await?.pop(),
+        Some(row) => attach_tags(pool, vec![row], None).await?.pop(),
         None => None,
     })
 }
 
-async fn attach_tags(pool: &PgPool, rows: Vec<TopicRow>) -> Result<Vec<TopicItem>, AppError> {
+async fn attach_tags(pool: &PgPool, rows: Vec<TopicRow>, viewer: Option<Uuid>) -> Result<Vec<TopicItem>, AppError> {
     let ids: Vec<i64> = rows.iter().map(|r| r.id).collect();
     let pairs: Vec<(i64, String)> = if ids.is_empty() {
         vec![]
@@ -349,10 +372,56 @@ async fn attach_tags(pool: &PgPool, rows: Vec<TopicRow>) -> Result<Vec<TopicItem
     for (id, name) in pairs {
         by_topic.entry(id).or_default().push(name);
     }
+    let mut polls = load_polls(pool, &ids, viewer).await?;
     Ok(rows.into_iter().map(|r| {
         let tags = by_topic.remove(&r.id).unwrap_or_default();
-        r.into_item(tags)
+        let poll = polls.remove(&r.id);
+        let mut item = r.into_item(tags);
+        item.poll = poll;
+        item
     }).collect())
+}
+
+/// 读一批帖子的投票：每个选项的票数、总票数，以及 `viewer` 自己投的是哪一项。
+pub async fn load_polls(pool: &PgPool, ids: &[i64], viewer: Option<Uuid>) -> Result<HashMap<i64, PollInfo>, AppError> {
+    if ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let polls: Vec<(i64, Vec<String>, Option<DateTime<Utc>>)> =
+        sqlx::query_as("SELECT topic_id, options, closes_at FROM polls WHERE topic_id = ANY($1)").bind(ids).fetch_all(pool).await?;
+    if polls.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let counts: Vec<(i64, i16, i64)> = sqlx::query_as(
+        "SELECT topic_id, option_idx, count(*) FROM poll_votes WHERE topic_id = ANY($1) GROUP BY topic_id, option_idx",
+    )
+    .bind(ids)
+    .fetch_all(pool)
+    .await?;
+    let mine: Vec<(i64, i16)> = match viewer {
+        Some(uid) => sqlx::query_as("SELECT topic_id, option_idx FROM poll_votes WHERE topic_id = ANY($1) AND uid = $2")
+            .bind(ids)
+            .bind(uid)
+            .fetch_all(pool)
+            .await?,
+        None => vec![],
+    };
+    Ok(polls
+        .into_iter()
+        .map(|(topic_id, options, closes_at)| {
+            let options: Vec<PollOption> = options
+                .into_iter()
+                .enumerate()
+                .map(|(i, text)| {
+                    let votes = counts.iter().find(|(t, idx, _)| *t == topic_id && *idx as usize == i).map_or(0, |c| c.2);
+                    PollOption { text, votes }
+                })
+                .collect();
+            let total = options.iter().map(|o| o.votes).sum();
+            let my_vote = mine.iter().find(|(t, _)| *t == topic_id).map(|m| m.1);
+            (topic_id, PollInfo { options, total, closes_at, my_vote })
+        })
+        .collect())
 }
 
 /// 热度：(点赞×2 + 回复) / (发帖小时数 + 2)^1.5

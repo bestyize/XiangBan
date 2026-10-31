@@ -105,8 +105,18 @@ class FeedController(private val api: ForumApi, private val scope: CoroutineScop
 /** 讨论列表。 */
 data class DiscussState(val topics: List<Topic> = emptyList(), val loading: Boolean = false, val error: String? = null, val hasMore: Boolean = false, val sort: String = "latest")
 
-/** [category] 不为空时只看这个分类（含子分类）的帖子，如资源分享用 `share`。 */
-class DiscussController(private val api: ForumApi, private val scope: CoroutineScope, private val category: String? = null) {
+/**
+ * [category] 不为空时只看这个分类（含子分类）的帖子，如资源分享用 `share`，多个用逗号分隔；
+ * [tag] 再按标签筛，[helpStatus] 只看求助的某种状态，[home] 为 false 时连不上首页的板块也包含。
+ */
+class DiscussController(
+    private val api: ForumApi,
+    private val scope: CoroutineScope,
+    private val category: String? = null,
+    private val tag: String? = null,
+    private val helpStatus: String? = null,
+    private val home: Boolean = true,
+) {
     private val _state = MutableStateFlow(DiscussState())
     val state: StateFlow<DiscussState> = _state.asStateFlow()
     private var page = 1
@@ -134,7 +144,7 @@ class DiscussController(private val api: ForumApi, private val scope: CoroutineS
         _state.value = _state.value.copy(loading = true, error = null)
         scope.launch {
             try {
-                val p = api.topics(sort = sort, category = category, page = requested)
+                val p = api.topics(sort = sort, category = category, page = requested, tag = tag, helpStatus = helpStatus, home = home)
                 if (mine == generation) _state.value = _state.value.copy(topics = (if (replace) emptyList() else _state.value.topics) + p.items, hasMore = p.hasMore, loading = false)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

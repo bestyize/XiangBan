@@ -45,7 +45,7 @@ import xyz.xiangban.xiaoban.common.community.messageOf
  * 图片、附件、悬赏求助这些还在网页端发帖时才有。
  */
 @Composable
-fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
+fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, help: Boolean = false) {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
     var categories by remember { mutableStateOf<List<Category>?>(null) }
@@ -57,13 +57,19 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableStateOf(0) }
+    var bounty by rememberSaveable { mutableStateOf(0) }
+    var bountyDays by rememberSaveable { mutableStateOf(7) }
 
     LaunchedEffect(attempt) {
         loadError = null
         try {
             val all = env.forum.categories()
             categories = all
-            if (parentId < 0) {
+            val helpBoard = all.firstOrNull { it.slug == "share-help" }
+            if (help && helpBoard != null && categoryId < 0) {
+                parentId = helpBoard.parentId ?: parentId
+                categoryId = helpBoard.id
+            } else if (parentId < 0) {
                 val firstParent = all.firstOrNull { it.parentId == null && !it.adminOnly && all.any { c -> c.parentId == it.id } }
                 if (firstParent != null) parentId = firstParent.id
             }
@@ -78,10 +84,11 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     val parents = all.filter { it.parentId == null && !it.adminOnly && all.any { c -> c.parentId == it.id } }
     val children = all.filter { it.parentId == parentId && !it.adminOnly }
     val chosen = all.firstOrNull { it.id == categoryId }
+    val isHelp = chosen?.slug == "share-help"
     val canPost = session.loggedIn && !busy && chosen != null && title.trim().length >= 2 && body.trim().length >= 10
 
     Column(Modifier.fillMaxSize().imePadding()) {
-        ScreenBar("发帖", onBack = back, trailing = null)
+        ScreenBar(if (help) "发求助" else "发帖", onBack = back, trailing = null)
         if (!session.loggedIn) {
             Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Column(Modifier.padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -103,6 +110,16 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 }
                 TextBox(title, { title = it }, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), placeholder = "标题（至少 2 个字）", enabled = !busy)
                 AreaBox(body, { body = it }, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), placeholder = "正文（至少 10 个字）：写清楚用在哪里、大概什么样子、有什么限制。", minHeight = 200.dp, enabled = !busy)
+                if (isHelp) {
+                    Text("悬赏积分", Modifier.padding(start = 16.dp, top = 16.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ChipRow(listOf(0, 10, 30, 50, 100).map { it to if (it == 0) "不悬赏" else "$it 分" }, bounty) { bounty = it }
+                    Text("有效期", Modifier.padding(start = 16.dp, top = 12.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ChipRow(listOf(7, 14, 30).map { it to "$it 天" }, bountyDays) { bountyDays = it }
+                    Text(
+                        "悬赏积分发布时先扣下，采纳回答后发给回答者；到期没有采纳或求助关闭，会退还给你。",
+                        Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3,
+                    )
+                }
                 if (chosen != null && chosen.slug.startsWith("share")) {
                     Text(
                         "资源分享须知：仅限合法来源——正版、开源、免费软件，片单影评乐评歌单，公版或授权影音，公开课程资料，自己的作品。不发破解版和盗版下载，违规内容会被下架。",
@@ -110,7 +127,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                     )
                 }
                 error?.let { Text(it, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 14.sp, color = Danger) }
-                Text("需要贴图片、传附件或发悬赏求助，请到网页端发帖。", Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                Text("需要贴图片或传附件，请到网页端发帖。", Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
             }
             Hairline()
             Box(Modifier.fillMaxWidth().height(72.dp).background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
@@ -120,7 +137,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                         busy = true; error = null
                         scope.launch {
                             try {
-                                val id = env.forum.createTopic(categoryId, title.trim(), body.trim())
+                                val id = env.forum.createTopic(categoryId, title.trim(), body.trim(), bounty = if (isHelp) bounty else null, bountyDays = bountyDays)
                                 back()
                                 open(Route.Topic(id))
                             } catch (e: kotlinx.coroutines.CancellationException) {

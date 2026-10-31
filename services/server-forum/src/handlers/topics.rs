@@ -46,7 +46,10 @@ pub struct Viewer {
 }
 
 pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path(id): Path<i64>) -> AppResult<Json<TopicDetail>> {
-    let topic = models::get_topic(&state.pool, id).await?.ok_or_else(|| AppError::not_found("帖子"))?;
+    let mut topic = models::get_topic(&state.pool, id).await?.ok_or_else(|| AppError::not_found("帖子"))?;
+    if topic.poll.is_some() {
+        topic.poll = models::load_polls(&state.pool, &[id], user.as_ref().map(|u| u.uid)).await?.remove(&id);
+    }
     let is_author = user.as_ref().is_some_and(|u| u.uid == topic.author.uid);
     if topic.status != "normal" && !is_author {
         return Err(AppError::not_found("帖子"));
@@ -106,6 +109,37 @@ pub struct TopicInput {
     pub attachment_ids: Option<Vec<Uuid>>,
     pub attachment_prices: Option<Vec<attachments::AttachmentPriceInput>>,
     pub help: Option<super::help::HelpInput>,
+    /// 只能在发帖时创建，之后不能改选项。
+    pub poll: Option<PollInput>,
+}
+
+#[derive(Deserialize)]
+pub struct PollInput {
+    pub options: Vec<String>,
+    /// 投票持续几天；不传表示一直开放。
+    pub days: Option<i64>,
+}
+
+fn clean_poll(input: &PollInput) -> AppResult<(Vec<String>, Option<chrono::DateTime<chrono::Utc>>)> {
+    let options: Vec<String> = input.options.iter().map(|o| o.trim().to_string()).collect();
+    if !(2..=6).contains(&options.len()) {
+        return Err(AppError::BadRequest("投票需要 2～6 个选项".into()));
+    }
+    if options.iter().any(|o| o.is_empty() || o.chars().count() > 40) {
+        return Err(AppError::BadRequest("每个选项需要 1～40 个字".into()));
+    }
+    let mut unique = options.clone();
+    unique.sort();
+    unique.dedup();
+    if unique.len() != options.len() {
+        return Err(AppError::BadRequest("选项不能重复".into()));
+    }
+    let closes_at = match input.days {
+        Some(d) if (1..=30).contains(&d) => Some(chrono::Utc::now() + chrono::Duration::days(d)),
+        Some(_) => return Err(AppError::BadRequest("投票时长为 1～30 天".into())),
+        None => None,
+    };
+    Ok((options, closes_at))
 }
 
 /// 守护者（站务人员）的信任等级。
@@ -248,11 +282,13 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     let trusted = user.trust_level >= 1;
     let html = markdown::render(&body, trusted);
     let excerpt = markdown::excerpt(&body, 140);
+    let images = markdown::site_images(&body, 3);
+    let poll = input.poll.as_ref().map(clean_poll).transpose()?;
 
     let mut tx = state.pool.begin().await?;
     let (id,): (i64,) = sqlx::query_as(
-        "INSERT INTO topics (category_id, author_uid, title, body_md, body_html, excerpt, min_read_level)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
+        "INSERT INTO topics (category_id, author_uid, title, body_md, body_html, excerpt, min_read_level, images)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
     )
     .bind(cat.id)
     .bind(user.uid)
@@ -261,8 +297,17 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     .bind(&html)
     .bind(&excerpt)
     .bind(read_level)
+    .bind(&images)
     .fetch_one(&mut *tx)
     .await?;
+    if let Some((options, closes_at)) = &poll {
+        sqlx::query("INSERT INTO polls (topic_id, options, closes_at) VALUES ($1, $2, $3)")
+            .bind(id)
+            .bind(options)
+            .bind(closes_at)
+            .execute(&mut *tx)
+            .await?;
+    }
     if let Some(ids) = &input.attachment_ids {
         attachments::set_for_topic(&mut tx, id, user.uid, ids).await?;
     }
@@ -323,7 +368,7 @@ pub async fn update(
     let mut tx = state.pool.begin().await?;
     sqlx::query(
         "UPDATE topics SET category_id = $2, title = $3, body_md = $4, body_html = $5, excerpt = $6, min_read_level = $7,
-            edited_at = now()
+            images = $8, edited_at = now()
          WHERE id = $1",
     )
     .bind(id)
@@ -333,6 +378,7 @@ pub async fn update(
     .bind(&html)
     .bind(&excerpt)
     .bind(read_level)
+    .bind(markdown::site_images(&body, 3))
     .execute(&mut *tx)
     .await?;
     super::help::ensure_category(&mut tx, id, cat.id).await?;

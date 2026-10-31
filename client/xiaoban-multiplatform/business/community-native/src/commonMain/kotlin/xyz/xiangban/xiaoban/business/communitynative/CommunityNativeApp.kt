@@ -130,6 +130,11 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         Route.Login -> Unit // 登录作为弹窗显示在当前页面之上。
         Route.Search -> SearchScreen(env, back = pop, open = push)
         Route.NewPost -> NewPostScreen(env, back = pop, open = push)
+        Route.NewHelp -> NewPostScreen(env, back = pop, open = push, help = true)
+        is Route.Tool -> ToolDetailScreen(env, route.key, pop)
+        Route.Daily -> DailyScreen(env, pop)
+        Route.Leaderboard -> LeaderboardScreen(env, pop)
+        Route.Scatter -> ScatterScreen(env, pop, push)
         Route.Settings -> SettingsScreen(env, back = pop, open = push)
         Route.Models -> ModelsScreen(env, chat, back = pop, open = push)
         Route.Appearance -> AppearanceScreen(back = pop, open = push)

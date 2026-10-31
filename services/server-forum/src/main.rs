@@ -3,6 +3,7 @@ mod auth;
 mod config;
 mod content;
 mod db;
+mod discover;
 mod error;
 mod handlers;
 mod jobs;
@@ -22,7 +23,7 @@ use axum::{
     Router,
 };
 use config::AppConfig;
-use handlers::{admin, analytics as metrics, attachments, blocks, content as packs, follows, help, images, interact, me, meta, moderation as review, notifications as inbox, posts, topics};
+use handlers::{admin, analytics as metrics, attachments, blocks, content as packs, discover as discover_api, follows, help, images, interact, me, meta, moderation as review, notifications as inbox, posts, topics};
 use state::AppState;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::{
@@ -85,7 +86,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
         .route("/attachments/{id}/purchase", post(attachments::purchase))
         .merge(packs::routes())
-        .nest("/admin", admin::routes().merge(packs::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()))
+        .merge(discover_api::routes())
+        .nest("/admin", admin::routes().merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()))
         .nest("/editor", handlers::editor::routes());
 
     // 凭证只走 Authorization 头，不用 Cookie，跨域放开不构成 CSRF 面。
@@ -117,6 +119,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = db::connect(&config.database_url, None).await?;
     db::migrate(&pool).await?;
     db::seed(&pool).await?;
+    discover::seed(&pool).await?;
+    discover::backfill_topic_images(&pool).await?;
     admin::seed_admin(&pool, &config).await?;
 
     let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;

@@ -62,8 +62,8 @@ import xyz.xiangban.xiaoban.common.community.Project
 import xyz.xiangban.xiaoban.common.community.Topic
 import xyz.xiangban.xiaoban.common.community.VisualKinds
 import xyz.xiangban.xiaoban.common.community.WeeklyEntry
-import xyz.xiangban.xiaoban.common.community.WeeklyIssue
 import xyz.xiangban.xiaoban.common.community.formatSize
+import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.htmlToPlain
 import xyz.xiangban.xiaoban.common.community.kindLabel
 import xyz.xiangban.xiaoban.common.community.messageOf
@@ -99,7 +99,7 @@ fun TabStrip(tabs: List<Pair<String, String>>, selected: String, onSelect: (Stri
 }
 
 @Composable
-private fun LoadMoreFooter(hasMore: Boolean, error: String?, count: Int, onMore: () -> Unit, onRetry: () -> Unit) {
+internal fun LoadMoreFooter(hasMore: Boolean, error: String?, count: Int, onMore: () -> Unit, onRetry: () -> Unit) {
     when {
         error != null -> Text("加载失败，点这里重试", Modifier.fillMaxWidth().clickable(onClick = onRetry).padding(16.dp), color = Danger, fontSize = 14.sp)
         hasMore -> {
@@ -122,7 +122,7 @@ fun Toast(text: String?, onGone: () -> Unit) {
 
 /** 分享弹层：预览卡片加“系统分享”“复制链接”。手机上分享的是网页链接，对方在电脑上打开后再用小伴桌面版。 */
 @Composable
-private fun ShareSheet(env: CommunityEnv, title: String, sub: String, url: String, heading: String = "分享", hint: String? = null, onDismiss: () -> Unit, onCopied: () -> Unit, panelModifier: Modifier = Modifier) {
+internal fun ShareSheet(env: CommunityEnv, title: String, sub: String, url: String, heading: String = "分享", hint: String? = null, onDismiss: () -> Unit, onCopied: () -> Unit, panelModifier: Modifier = Modifier) {
     BottomSheet(onDismiss, panelModifier) {
         Text(heading, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Row(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.background).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -143,7 +143,7 @@ private fun ShareSheet(env: CommunityEnv, title: String, sub: String, url: Strin
 }
 
 @Composable
-private fun <T> rememberLoader(env: CommunityEnv, key: Any, fetch: suspend () -> T): Loader<T> {
+internal fun <T> rememberLoader(env: CommunityEnv, key: Any, fetch: suspend () -> T): Loader<T> {
     val scope = rememberCoroutineScope()
     val loader = remember(env, key) { Loader(scope, fetch) }
     LaunchedEffect(loader) { loader.reload() }
@@ -152,43 +152,14 @@ private fun <T> rememberLoader(env: CommunityEnv, key: Any, fetch: suspend () ->
 
 // ───────────── 社区首页（信息流） ─────────────
 
-private val FeedTabs: List<Pair<String, String>> = listOf("" to "全部", "weekly" to "周刊", "projects" to "项目") + PackKinds
-
 internal fun packMeta(pack: Pack): String =
     listOfNotNull(kindLabel(pack.kind), pack.author?.nickname, pack.trustLabel.takeIf { pack.trustLevel < 2 }, "${pack.applyCount} 次应用".takeIf { pack.applyCount > 0 }).joinToString(" · ")
 
-private val FeedState.isEmptyList: Boolean get() = packs.isEmpty() && weekly.isEmpty() && projects.isEmpty()
-
-/** 社区首页：栏目条加信息流。图片优先的类型用双列封面卡，文字为主的占满一行。 */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeedScreen(env: CommunityEnv, open: (Route) -> Unit) {
-    val scope = rememberCoroutineScope()
-    val controller = remember(env) { FeedController(env.forum, scope) }
-    val state by controller.state.collectAsState()
-    var tab by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(tab) { controller.select(tab) }
-
-    Column(Modifier.fillMaxSize()) {
-        TabStrip(FeedTabs, tab) { tab = it }
-        PullToRefreshBox(isRefreshing = state.loading && state.isEmptyList, onRefresh = controller::refresh, modifier = Modifier.fillMaxSize()) {
-            when {
-                state.loading && state.isEmptyList -> Spinner()
-                state.error != null && state.isEmptyList -> CenterMessage(state.error.orEmpty(), "重试", controller::refresh)
-                state.isEmpty -> CenterMessage("这里还没有内容")
-                tab == "weekly" -> WeeklyList(state, open, controller::loadMore, controller::refresh)
-                tab == "projects" -> ProjectList(state.projects, open)
-                else -> PackGrid(state, open, controller::loadMore, controller::refresh)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PackGrid(state: FeedState, open: (Route) -> Unit, onMore: () -> Unit, onRetry: () -> Unit) {
+internal fun PackGrid(state: FeedState, open: (Route) -> Unit, onMore: () -> Unit, onRetry: () -> Unit, bottomPadding: androidx.compose.ui.unit.Dp = 8.dp) {
     LazyVerticalGrid(
         GridCells.Fixed(2), Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = bottomPadding), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         gridItems(state.packs, key = { it.id }, span = { pack -> GridItemSpan(if (pack.kind in VisualKinds) 1 else 2) }) { pack ->
             if (pack.kind in VisualKinds) VisualCard(pack) { open(Route.Pack(pack.id)) } else TextCard(pack) { open(Route.Pack(pack.id)) }
@@ -198,11 +169,12 @@ private fun PackGrid(state: FeedState, open: (Route) -> Unit, onMore: () -> Unit
 }
 
 @Composable
-private fun VisualCard(pack: Pack, onClick: () -> Unit) {
+internal fun VisualCard(pack: Pack, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
         Box {
             Cover(pack.coverUrl, pack.id, Modifier.fillMaxWidth().aspectRatio(4f / 3f))
             Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp)
+            if (pack.kind == "game") Text("可试玩", Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(8.dp)).background(Brand).padding(horizontal = 6.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
         }
         Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 10.dp)) {
             Text(pack.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -216,11 +188,12 @@ private fun VisualCard(pack: Pack, onClick: () -> Unit) {
 }
 
 @Composable
-private fun TextCard(pack: Pack, onClick: () -> Unit) {
+internal fun TextCard(pack: Pack, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
         Text(kindLabel(pack.kind), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
         Text(pack.title, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp)
         if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (!pack.pureData) Text("运行前需确认权限", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = Amber)
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             Avatar(pack.author?.nickname ?: "?")
             Text(listOfNotNull(pack.author?.nickname, pack.trustLabel.takeIf { pack.trustLevel < 2 }, "${pack.applyCount} 次应用".takeIf { pack.applyCount > 0 }).joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -228,67 +201,7 @@ private fun TextCard(pack: Pack, onClick: () -> Unit) {
     }
 }
 
-@Composable
-private fun WeeklyList(state: FeedState, open: (Route) -> Unit, onMore: () -> Unit, onRetry: () -> Unit) {
-    LazyColumn(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        items(state.weekly, key = { it.week }) { issue -> WeeklyRow(issue) { open(Route.Weekly(issue.week)) }; Hairline(Modifier.padding(start = 16.dp)) }
-        item { LoadMoreFooter(state.hasMore, state.error, state.weekly.size, onMore, onRetry) }
-    }
-}
-
-@Composable
-private fun WeeklyRow(issue: WeeklyIssue, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(issue.week, Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            Text(issue.publishedAt?.take(10).orEmpty(), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Text(issue.title, Modifier.padding(top = 8.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp)
-        if (issue.summary.isNotBlank()) Text(issue.summary, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun ProjectList(projects: List<Project>, open: (Route) -> Unit) {
-    LazyColumn(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        items(projects, key = { it.slug }) { project ->
-            Column(Modifier.fillMaxWidth().clickable { open(Route.Project(project.slug)) }.padding(16.dp)) {
-                Text(project.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                if (project.summary.isNotBlank()) Text(project.summary, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-            Hairline(Modifier.padding(start = 16.dp))
-        }
-    }
-}
-
-// ───────────── 讨论 / 资源 ─────────────
-
-private val Sorts = listOf("latest" to "最新回复", "new" to "最新发布", "hot" to "热门")
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun DiscussScreen(env: CommunityEnv, open: (Route) -> Unit, category: String? = null, emptyText: String = "还没有帖子") {
-    val scope = rememberCoroutineScope()
-    val controller = remember(env, category) { DiscussController(env.forum, scope, category) }
-    val state by controller.state.collectAsState()
-    var sort by rememberSaveable { mutableStateOf("latest") }
-    LaunchedEffect(sort) { controller.select(sort) }
-
-    Column(Modifier.fillMaxSize()) {
-        TabStrip(Sorts, sort) { sort = it }
-        PullToRefreshBox(isRefreshing = state.loading && state.topics.isEmpty(), onRefresh = controller::refresh, modifier = Modifier.fillMaxSize()) {
-            when {
-                state.loading && state.topics.isEmpty() -> Spinner()
-                state.error != null && state.topics.isEmpty() -> CenterMessage(state.error.orEmpty(), "重试", controller::refresh)
-                state.topics.isEmpty() -> CenterMessage(emptyText)
-                else -> LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp).background(MaterialTheme.colorScheme.surface)) {
-                    items(state.topics, key = { it.id }) { topic -> TopicRow(topic) { open(Route.Topic(topic.id)) }; Hairline(Modifier.padding(start = 16.dp)) }
-                    item { LoadMoreFooter(state.hasMore, state.error, state.topics.size, controller::loadMore, controller::loadMore) }
-                }
-            }
-        }
-    }
-}
+// ───────────── 帖子行 ─────────────
 
 @Composable
 internal fun TopicRow(topic: Topic, onClick: () -> Unit) {
@@ -461,15 +374,18 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
 }
 
 @Composable
-private fun CircleOverlayButton(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun CircleOverlayButton(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(modifier.size(40.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
         XIcon(icon, tint = Color.White, size = 22.dp, description = description)
     }
 }
 
+/** 求助帖的回答区需要的信息：被采纳的是哪条、谁是题主、当前读者能不能采纳，以及采纳的动作。 */
+internal class HelpAnswers(val acceptedPostId: Long?, val authorUid: String, val canAccept: Boolean, val onAccept: (Post) -> Unit)
+
 /** 作品对应的讨论帖里的评论，分页加载。[reloadKey] 变化时从头重新加载（发完回复后用）。 */
 @Composable
-private fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0, hint: String = "评论和点赞请在网页端进行：") {
+internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0, hint: String = "评论和点赞请在网页端进行：", help: HelpAnswers? = null) {
     var posts by remember(topicId, reloadKey) { mutableStateOf<List<Post>>(emptyList()) }
     var page by remember(topicId, reloadKey) { mutableStateOf(0) }
     var more by remember(topicId, reloadKey) { mutableStateOf(true) }
@@ -496,12 +412,18 @@ private fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0
     LaunchedEffect(topicId, retry, reloadKey) { load() }
 
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp)) {
-        Text("评论 ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        posts.forEach { post -> PostItem(post) }
+        Text("${if (help != null) "回答" else "评论"} ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        posts.forEach { post ->
+            PostItem(
+                post,
+                accepted = help?.acceptedPostId == post.id,
+                onAccept = if (help != null && help.canAccept && post.author.uid != help.authorUid) ({ help.onAccept(post) }) else null,
+            )
+        }
         when {
             error != null -> Text("评论加载失败，点这里重试", Modifier.padding(top = 12.dp).clickable { retry += 1 }, color = Danger, fontSize = 14.sp)
             more -> { LaunchedEffect(posts.size) { load() }; Spinner(Modifier.fillMaxWidth().height(48.dp)) }
-            posts.isEmpty() -> Text("还没有评论", Modifier.padding(top = 12.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+            posts.isEmpty() -> Text(if (help != null) "还没有人回答" else "还没有评论", Modifier.padding(top = 12.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
         }
         if (hint.isNotBlank()) {
             Text(hint, Modifier.padding(top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
@@ -511,7 +433,7 @@ private fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0
 }
 
 @Composable
-private fun PostItem(post: Post) {
+internal fun PostItem(post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null) {
     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Avatar(post.author.nickname, 30.dp, showInitial = true)
         Column(Modifier.weight(1f)) {
@@ -525,6 +447,11 @@ private fun PostItem(post: Post) {
                 else -> htmlToPlain(post.bodyHtml)
             }
             Text(body, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp, color = if (post.blocked || post.status != "normal") LocalExtraColors.current.ink3 else MaterialTheme.colorScheme.onSurface)
+            if (accepted) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                XIcon(XIcons.CheckBold, tint = Success, size = 16.dp)
+                Text("已采纳。这条回答已标记为解决方案，回答保留原文。", fontSize = 12.sp, color = Success)
+            }
+            if (onAccept != null) PillButton("采纳这个回答", onAccept, Modifier.padding(top = 10.dp).fillMaxWidth(), height = 40.dp)
         }
     }
 }
@@ -554,21 +481,37 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                 Column(Modifier.fillMaxSize()) {
                     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
                         Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 if (topic.pinned) Text("置顶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
-                                Text(topic.category.name, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (topic.help != null) {
+                                    Text("求助", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Brand)
+                                    HelpStatusTag(topic.help!!)
+                                    Text(helpRemain(topic.help!!), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                } else {
+                                    Text(topic.category.name, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
                             }
                             Text(topic.title, Modifier.padding(top = 10.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 28.sp)
                             Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Avatar(topic.author.nickname, 32.dp, showInitial = true)
                                 Column {
                                     Text(topic.author.nickname, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                    Text("发布于 ${topic.createdAt.take(10)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text("发布于 ${agoText(topic.createdAt)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                             Text(htmlToPlain(topic.bodyHtml), Modifier.padding(top = 12.dp), fontSize = 15.sp, lineHeight = 26.sp)
+                            topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Amber) }
+                            topic.poll?.let { PollView(env, topic, it, open) { msg -> toast = msg } }
                         }
-                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) { CommentsSection(env, id, reloadKey, hint = "") }
+                        val help = topic.help
+                        val answers = help?.let {
+                            HelpAnswers(
+                                acceptedPostId = it.acceptedPostId, authorUid = topic.author.uid,
+                                canAccept = topic.viewer?.canEdit == true && it.status == "open",
+                                onAccept = { post -> guarded { env.forum.acceptAnswer(topic.id, post.id); toast = "已采纳"; loader.reload() } },
+                            )
+                        }
+                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) { CommentsSection(env, id, reloadKey, hint = "", help = answers) }
                     }
                     Hairline()
                     Row(Modifier.fillMaxWidth().height(60.dp).background(MaterialTheme.colorScheme.surface).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -576,7 +519,9 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             Modifier.weight(1f).height(40.dp).padding(horizontal = 4.dp).clip(CircleShape).background(LocalExtraColors.current.fill).clickable { if (session.loggedIn) replying = true else open(Route.Login) }.padding(horizontal = 16.dp),
                             contentAlignment = Alignment.CenterStart,
                         ) { Text(if (session.loggedIn) "写回复…" else "登录后回复", fontSize = 14.sp, color = LocalExtraColors.current.ink3) }
-                        Row(Modifier.clip(CircleShape).clickable {
+                        if (topic.help != null) {
+                            PillButton("用 AI 做一个", { open(Route.AiChat) }, Modifier.padding(start = 4.dp), height = 40.dp, icon = XIcons.Sparkle)
+                        } else Row(Modifier.clip(CircleShape).clickable {
                             guarded {
                                 val next = !liked
                                 env.forum.setTopicLiked(topic.id, next)
@@ -586,7 +531,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             XIcon(XIcons.Heart, tint = if (liked) Brand else MaterialTheme.colorScheme.onSurface, description = if (liked) "取消点赞" else "点赞")
                             Text("$likeCount", fontSize = 14.sp, color = if (liked) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconTap(XIcons.Bookmark, if (bookmarked) "取消收藏" else "收藏", {
+                        if (topic.help == null) IconTap(XIcons.Bookmark, if (bookmarked) "取消收藏" else "收藏", {
                             guarded { val next = !bookmarked; env.forum.setTopicBookmarked(topic.id, next); bookmarked = next; toast = if (next) "已收藏" else "已取消收藏" }
                         }, tint = if (bookmarked) Brand else MaterialTheme.colorScheme.onSurface)
                     }

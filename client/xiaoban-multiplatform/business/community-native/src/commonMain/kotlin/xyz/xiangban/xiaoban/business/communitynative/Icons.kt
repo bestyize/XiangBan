@@ -22,6 +22,14 @@ object XIcons {
     val ChevronDown: ImageVector by lazy { strokeIcon("ChevronDown", "M6 9l6 6 6-6") }
     val ChevronLeft: ImageVector by lazy { strokeIcon("ChevronLeft", "M15 5l-7 7 7 7") }
     val ChevronRight: ImageVector by lazy { strokeIcon("ChevronRight", "M9 5l7 7-7 7") }
+    val ChevronUp: ImageVector by lazy { strokeIcon("ChevronUp", "M6 15l6-6 6 6") }
+    val Download: ImageVector by lazy { strokeIcon("Download", "M12 4v11M8 11l4 4 4-4M5 15v3a2 2 0 002 2h10a2 2 0 002-2v-3") }
+    val Eye: ImageVector by lazy { strokeIcon("Eye", "M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM9.2 12a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0 -5.6 0z") }
+    val ExternalLink: ImageVector by lazy { strokeIcon("ExternalLink", "M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5") }
+    val Fullscreen: ImageVector by lazy { strokeIcon("Fullscreen", "M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5") }
+    val Info: ImageVector by lazy { strokeIcon("Info", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM12 11v5M12 7.8v.4") }
+    val Coin: ImageVector by lazy { strokeIcon("Coin", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM14.5 9.5h-3.2a1.5 1.5 0 000 3h1.4a1.5 1.5 0 010 3H9.5M12 7.5v1.5M12 15.5V17") }
+    val Pin: ImageVector by lazy { strokeIcon("Pin", "M9 4h6l-1 6 3 3H7l3-3zM12 13v7") }
     val Clock: ImageVector by lazy { strokeIcon("Clock", "M3.5 12a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0zM12 7.5V12l3 2") }
     val Copy: ImageVector by lazy { strokeIcon("Copy", "M11 9h7a2 2 0 012 2v7a2 2 0 01-2 2h-7a2 2 0 01-2-2v-7a2 2 0 012-2zM5 15V6a2 2 0 012-2h9") }
     val Cpu: ImageVector by lazy { strokeIcon("Cpu", "M9 7h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2zM10 3v3M14 3v3M10 18v3M14 18v3M3 10h3M3 14h3M18 10h3M18 14h3") }

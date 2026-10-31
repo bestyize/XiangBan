@@ -54,6 +54,28 @@ pub fn excerpt(md: &str, max_chars: usize) -> String {
     }
 }
 
+/// 正文里引用的站内图片地址（`/api/images/{id}`），按出现顺序去重，最多 `max` 张，用作列表卡片的配图。
+pub fn site_images(md: &str, max: usize) -> Vec<String> {
+    const PREFIX: &str = "/api/images/";
+    let mut found: Vec<String> = Vec::new();
+    let mut rest = md;
+    while let Some(pos) = rest.find(PREFIX) {
+        let after = &rest[pos + PREFIX.len()..];
+        let id: String = after.chars().take(36).collect();
+        if uuid::Uuid::parse_str(&id).is_ok() {
+            let url = format!("{PREFIX}{id}");
+            if !found.contains(&url) {
+                found.push(url);
+                if found.len() >= max {
+                    break;
+                }
+            }
+        }
+        rest = after;
+    }
+    found
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -85,6 +107,16 @@ mod tests {
     fn excerpt_is_plain_and_truncated() {
         assert_eq!(excerpt("# 标题\n\n**粗体** `code`", 50), "标题 粗体 code");
         assert_eq!(excerpt(&"字".repeat(20), 5), "字字字字字…");
+    }
+
+    #[test]
+    fn site_images_are_listed_once_in_order() {
+        let a = "6f1c2d3e-0000-4000-8000-000000000001";
+        let b = "6f1c2d3e-0000-4000-8000-000000000002";
+        let md = format!("![x](/api/images/{a}) text ![y](/api/images/{b}) ![z](/api/images/{a}) /api/images/not-a-uuid");
+        assert_eq!(site_images(&md, 3), vec![format!("/api/images/{a}"), format!("/api/images/{b}")]);
+        assert_eq!(site_images(&md, 1).len(), 1);
+        assert!(site_images("no images", 3).is_empty());
     }
 
     #[test]

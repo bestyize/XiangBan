@@ -65,6 +65,8 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   'pack.restore': '恢复内容包',
   'project.put': '保存项目',
   'weekly.put': '保存周刊',
+  'discover.put': '保存发现页内容',
+  'discover.delete': '删除发现页内容',
 }
 
 export const AUDIT_TARGETS: Record<string, string> = {

@@ -40,6 +40,8 @@ interface PlatformActions : VoicePlatform {
     fun openUrl(url: String)
     /** 结束应用（最外面一页按返回）；平台不支持就什么也不做。 */
     fun exitApp() {}
+    /** 横屏全屏的页面（散点图）进入时锁成横屏，离开时恢复；平台不支持就什么也不做。 */
+    fun setLandscape(landscape: Boolean) {}
     /** 打开系统里这个应用的设置页（让用户去开麦克风权限）；平台不支持就返回 false。 */
     fun openAppSettings(): Boolean = false
     /** 朗读一段文字；平台不支持就返回 false。 */
@@ -88,7 +90,8 @@ class CommunityEnv(
     agentBridge: AgentBridge? = null,
     /** 智能体保存对话的文件夹。 */
     agentDir: String? = null,
-    reminders: ReminderScheduler? = null,
+    /** 系统闹钟提醒；智能体的“设提醒”和追踪页的“提醒我”都用它。没有就不提供提醒。 */
+    val reminders: ReminderScheduler? = null,
     /** 手机本地语音识别（安卓上是 sherpa-onnx 的 SenseVoice）；没有就只用云端和电脑上的识别。 */
     val speech: LocalSpeech? = null,
     val prefs: AppPrefs = InMemoryPrefs(),

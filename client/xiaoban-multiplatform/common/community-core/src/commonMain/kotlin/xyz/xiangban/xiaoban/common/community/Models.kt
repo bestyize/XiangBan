@@ -120,8 +120,14 @@ data class Topic(
     val featured: Boolean = false,
     @SerialName("reply_count") val replyCount: Int = 0,
     @SerialName("like_count") val likeCount: Int = 0,
+    @SerialName("view_count") val viewCount: Int = 0,
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("last_reply_at") val lastReplyAt: String = "",
+    /** 正文里的前几张站内图片（`/api/images/{id}`），列表卡片用作配图。 */
+    val images: List<String> = emptyList(),
+    /** 只有求助帖有。 */
+    val help: HelpInfo? = null,
+    val poll: Poll? = null,
     /** 详情里才有 */
     @SerialName("body_html") val bodyHtml: String = "",
     /** 详情里才有，登录后才有内容：你是否点过赞、收藏过，能不能回复。 */

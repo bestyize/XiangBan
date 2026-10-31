@@ -298,6 +298,26 @@ export const adminApi = {
   weeklyIssues: () => request<{ items: (WeeklyInput & { week: string })[] }>('GET', '/weekly'),
   putProject: (slug: string, body: ProjectInput) => request<{ slug: string }>('PUT', `/projects/${encodeURIComponent(slug)}`, body),
   putWeekly: (week: string, body: WeeklyInput) => request<{ week: string }>('PUT', `/weekly/${encodeURIComponent(week)}`, body),
+  discoverItems: (kind: string) => request<{ items: DiscoverRow[] }>('GET', `/discover/${encodeURIComponent(kind)}`),
+  putDiscover: (kind: string, key: string, body: DiscoverInput) =>
+    request<{ kind: string; key: string }>('PUT', `/discover/${encodeURIComponent(kind)}/${encodeURIComponent(key)}`, body),
+  deleteDiscover: (kind: string, key: string) =>
+    request<{ deleted: boolean }>('DELETE', `/discover/${encodeURIComponent(kind)}/${encodeURIComponent(key)}`),
+}
+
+export interface DiscoverInput {
+  data: Record<string, unknown>
+  sort_order: number
+  status: 'draft' | 'published'
+  published_at?: string
+  sample: boolean
+}
+export interface DiscoverRow {
+  key: string
+  sort_order: number
+  status: 'draft' | 'published'
+  published_at: string
+  data: Record<string, unknown> & { sample?: boolean }
 }
 
 export interface Metrics {

@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -30,22 +31,54 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private enum class CommunitySection(val label: String) { Home("首页"), Resources("资源"), Discuss("讨论") }
+internal enum class CommunitySection(val label: String) { Home("首页"), Discuss("讨论"), Resources("资源") }
 
-/** 社区：顶部是 首页 / 资源 / 讨论 三个栏目，下面是对应的内容列表。悬浮导航会盖住底部，所以内容留出一段空白。 */
+/**
+ * 社区：顶部是 首页 / 讨论 / 资源 三个栏目，每个栏目下面有自己的二级栏目。
+ * 内容可以滚到底部的悬浮导航下面，所以各列表自己在末尾留出空白。
+ */
 @Composable
 fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
     var section by rememberSaveable { mutableStateOf(CommunitySection.Home.name) }
-    Column(Modifier.fillMaxSize()) {
-        CommunityHeader(CommunitySection.valueOf(section), onSelect = { section = it.name }, onSearch = { open(Route.Search) })
-        Hairline()
-        Box(Modifier.weight(1f).fillMaxWidth().padding(bottom = NavInset)) {
-            when (CommunitySection.valueOf(section)) {
-                CommunitySection.Home -> FeedScreen(env, open)
-                CommunitySection.Resources -> DiscussScreen(env, open, category = "share", emptyText = "还没有资源分享")
-                CommunitySection.Discuss -> DiscussScreen(env, open)
+    var homeSub by rememberSaveable { mutableStateOf(HomeSub.Recommend.key) }
+    var discussSub by rememberSaveable { mutableStateOf(DiscussSub.Create.key) }
+    var resourceSub by rememberSaveable { mutableStateOf(ResourceSub.Tools.key) }
+    var toast by remember { mutableStateOf<String?>(null) }
+    val current = CommunitySection.valueOf(section)
+
+    fun switchTo(target: CommunitySection, sub: String) {
+        section = target.name
+        when (target) {
+            CommunitySection.Home -> homeSub = sub
+            CommunitySection.Discuss -> discussSub = sub
+            CommunitySection.Resources -> resourceSub = sub
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
+            Hairline()
+            when (current) {
+                CommunitySection.Home -> TabStrip(HomeSub.entries.map { it.key to it.label }, homeSub) { homeSub = it }
+                CommunitySection.Discuss -> TabStrip(DiscussSub.entries.map { it.key to it.label }, discussSub) { discussSub = it }
+                CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, resourceSub) { resourceSub = it }
+            }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                when (current) {
+                    CommunitySection.Home -> when (HomeSub.byKey(homeSub)) {
+                        HomeSub.Recommend -> RecommendTab(env, open, ::switchTo)
+                        HomeSub.Hot -> HotTab(env)
+                        HomeSub.Rank -> RankTab(env, open)
+                        HomeSub.Track -> TrackTab(env)
+                        HomeSub.Nav -> NavTab(env)
+                    }
+                    CommunitySection.Discuss -> DiscussTab(env, DiscussSub.byKey(discussSub), open) { toast = it }
+                    CommunitySection.Resources -> ResourceTab(env, ResourceSub.byKey(resourceSub), open) { toast = it }
+                }
             }
         }
+        Toast(toast) { toast = null }
     }
 }
 
