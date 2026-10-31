@@ -7,7 +7,7 @@ import { errorText, fmtTime, notify } from './shared'
 const sources = ref<CollectionSource[]>([])
 const sourceLoading = ref(false)
 const sourceError = ref('')
-const forms = reactive<Record<string, { key: string; enabled: boolean; interval: number }>>({})
+const forms = reactive<Record<string, { key: string; enabled: boolean; interval: number; repositories: string; feedIds: string[] }>>({})
 const busy = reactive<Record<string, string>>({})
 const actionErrors = reactive<Record<string, string>>({})
 const accepted = reactive<Record<string, string>>({})
@@ -35,7 +35,24 @@ let timer: ReturnType<typeof setTimeout> | undefined
 let pollsLeft = 0
 
 const STATUS: Record<string, string> = { queued: '排队中', running: '采集中', succeeded: '采集完成', failed: '采集失败' }
-const SOURCE_NAMES: Record<string, string> = { artificial_analysis: 'Artificial Analysis · 能力榜', openrouter: 'OpenRouter · 调用量榜' }
+const SOURCE_NAMES: Record<string, string> = { artificial_analysis: 'Artificial Analysis · 能力榜', openrouter: 'OpenRouter · 调用量榜', github_repos: 'GitHub · 开源热榜', official_news: '官方 AI 日报' }
+const FEEDS = [
+  { id: 'openai_news', title: 'OpenAI', url: 'https://openai.com/news/rss.xml' },
+  { id: 'google_deepmind', title: 'Google DeepMind', url: 'https://deepmind.google/blog/rss.xml' },
+  { id: 'google_research', title: 'Google Research', url: 'https://research.google/blog/rss/' },
+] as const
+const needsCredential = (s: CollectionSource) => s.credential_required !== false
+function ready(s: CollectionSource) {
+  if (needsCredential(s) && !s.configured) return false
+  if (s.id === 'github_repos') return !!s.config?.repositories?.length
+  if (s.id === 'official_news') return !!s.config?.feed_ids?.length
+  return true
+}
+function readinessHint(s: CollectionSource) {
+  if (needsCredential(s) && !s.configured) return '请先配置有效密钥。'
+  return s.id === 'github_repos' ? '请先保存至少一个候选仓库。' : '请先保存至少一个官方来源。'
+}
+const savedFeeds = (s: CollectionSource) => (s.config?.feed_ids ?? []).map(id => FEEDS.find(f => f.id === id)?.title ?? id).join('、') || '尚未选择'
 const sourceName = (id: string) => sources.value.find(s => s.id === id)?.title || SOURCE_NAMES[id] || id
 const active = (id: string) => !!accepted[id] || runs.value.some(r => r.source === id && ['queued', 'running'].includes(r.status))
 const isAuthError = (e: unknown) => e instanceof AdminApiError && e.status === 401
@@ -62,7 +79,7 @@ async function loadSources() {
     if (disposed || mine !== sourceSeq) return
     sources.value = result.items
     for (const s of result.items) {
-      if (!forms[s.id]) forms[s.id] = { key: '', enabled: s.enabled, interval: s.interval_minutes }
+      if (!forms[s.id]) forms[s.id] = { key: '', enabled: s.enabled, interval: s.interval_minutes, repositories: (s.config?.repositories ?? []).join('\n'), feedIds: [...(s.config?.feed_ids ?? [])] }
     }
   } catch (e) {
     if (!disposed && mine === sourceSeq && !isAuthError(e)) sourceError.value = errorText(e)
@@ -147,9 +164,35 @@ async function configure(s: CollectionSource) {
     actionErrors[s.id] = '采集周期须为 60–10080 分钟之间的整数'
     return
   }
+  if (form.enabled && !ready(s)) { actionErrors[s.id] = readinessHint(s); return }
   await mutate(s.id, 'config', async () => {
     await collectionApi.configure(s.id, { enabled: form.enabled, interval_minutes: form.interval })
     notify('采集设置已保存')
+    await loadSources()
+  })
+}
+async function saveSourceConfig(s: CollectionSource) {
+  const form = forms[s.id]
+  let config: { repositories?: string[]; feed_ids?: string[] }
+  if (s.id === 'github_repos') {
+    const repositories = form.repositories.split(/\r?\n/).map(r => r.trim().toLowerCase()).filter(Boolean)
+    const valid = (r: string) => {
+      const parts = r.split('/')
+      return parts.length === 2 && /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/.test(parts[0]) && /^[a-z0-9_.-]{1,100}$/.test(parts[1]) && !['.', '..'].includes(parts[1])
+    }
+    if (repositories.length > 30 || repositories.some(r => !valid(r)) || new Set(repositories).size !== repositories.length) {
+      actionErrors[s.id] = '每行填写一个 owner/repo，最多 30 个，不可重复；请勿填写 URL'
+      return
+    }
+    config = { repositories }
+  } else if (s.id === 'official_news') {
+    config = { feed_ids: [...form.feedIds] }
+  } else return
+  await mutate(s.id, 'source-config', async () => {
+    // 独立保存来源候选，避免覆盖尚未提交的周期/开关设置。
+    await collectionApi.configure(s.id, { config })
+    if (config.repositories) form.repositories = config.repositories.join('\n')
+    notify('来源配置已保存')
     await loadSources()
   })
 }
@@ -233,16 +276,28 @@ onUnmounted(() => {
       <section v-for="s in sources" :key="s.id" class="panel adm-card collection-source">
         <div class="collection-heading">
           <h2>{{ sourceName(s.id) }}</h2>
-          <span class="adm-tag" :class="s.configured ? 'valid' : 'suspect'">{{ s.configured ? '密钥已配置' : '未配置密钥' }}</span>
+          <span class="adm-tag" :class="!needsCredential(s) || s.configured ? 'valid' : 'suspect'">{{ !needsCredential(s) ? '公开来源 · 无需密钥' : s.configured ? '密钥已配置' : '未配置密钥' }}</span>
         </div>
         <p v-if="s.id === 'openrouter'" class="muted">全平台每日输入 + 输出 Token 用量榜，仅代表 OpenRouter 平台流量，数值不是请求次数。</p>
         <p v-else-if="s.id === 'artificial_analysis'" class="muted">采集模型能力、价格等官方指标；缺失指标保留为空，不以零代替。</p>
         <p v-if="s.hint" class="muted">{{ s.hint }}</p>
-        <form class="adm-form collection-key" @submit.prevent="saveKey(s)">
+        <form v-if="needsCredential(s)" class="adm-form collection-key" @submit.prevent="saveKey(s)">
           <label class="field"><span>{{ s.configured ? '更新 API key' : '配置 API key' }}</span><input v-model="forms[s.id].key" class="input" type="password" autocomplete="off" spellcheck="false" :disabled="!!busy[s.id] || approving" :aria-label="`${sourceName(s.id)} API key`" placeholder="只写入，不回显已保存密钥" /></label>
           <button class="btn" type="submit" :disabled="!!busy[s.id] || approving || !forms[s.id].key.trim()">{{ busy[s.id] === 'key' ? '验证并保存中…' : '验证并保存密钥' }}</button>
         </form>
-        <small class="muted">验证成功后更新已保存密钥，并清空输入；密钥不会保存到浏览器本地存储。</small>
+        <small v-if="needsCredential(s)" class="muted">验证成功后更新已保存密钥，并清空输入；密钥不会保存到浏览器本地存储。</small>
+        <form v-if="s.id === 'github_repos'" class="adm-form collection-source-config" @submit.prevent="saveSourceConfig(s)">
+          <label class="field"><span>候选仓库（每行 owner/repo，最多 30 个）</span><textarea v-model="forms[s.id].repositories" class="input" rows="5" spellcheck="false" :disabled="!!busy[s.id] || approving" placeholder="例如 rust-lang/rust&#10;vuejs/core" /></label>
+          <small class="muted">只跟踪明确选择的仓库，每日记录 star 快照；首日为基线，不会伪造七日增长。仓库名保存时统一为小写。</small>
+          <button class="btn" type="submit" :disabled="!!busy[s.id] || approving">{{ busy[s.id] === 'source-config' ? '保存中…' : '保存候选仓库' }}</button>
+          <p class="collection-saved muted">已保存 {{ s.config?.repositories?.length ?? 0 }} 个：{{ s.config?.repositories?.join('、') || '暂无候选' }}</p>
+        </form>
+        <form v-else-if="s.id === 'official_news'" class="adm-form collection-source-config" @submit.prevent="saveSourceConfig(s)">
+          <fieldset class="collection-feed-options" :disabled="!!busy[s.id] || approving"><legend>官方 AI 日报来源</legend><label v-for="feed in FEEDS" :key="feed.id" class="collection-check"><input v-model="forms[s.id].feedIds" type="checkbox" :value="feed.id" /> {{ feed.title }} <a :href="feed.url" target="_blank" rel="noopener noreferrer">查看官方 RSS</a></label></fieldset>
+          <small class="muted">只采集官方标题、链接与来源时间，生成待审内容；不抓取文章全文，不接受自定义地址。</small>
+          <button class="btn" type="submit" :disabled="!!busy[s.id] || approving">{{ busy[s.id] === 'source-config' ? '保存中…' : '保存日报来源' }}</button>
+          <p class="collection-saved muted">已保存来源：{{ savedFeeds(s) }}</p>
+        </form>
         <form class="collection-config" @submit.prevent="configure(s)">
           <label class="collection-check"><input v-model="forms[s.id].enabled" type="checkbox" :disabled="!!busy[s.id] || approving" /> 启用自动采集</label>
           <label class="field"><span>周期（分钟）</span><input v-model.number="forms[s.id].interval" class="input" type="number" min="60" max="10080" step="1" required :disabled="!!busy[s.id] || approving" :aria-label="`${sourceName(s.id)}采集周期`" /></label>
@@ -255,8 +310,8 @@ onUnmounted(() => {
         </dl>
         <p v-if="s.last_error" class="collection-error">最近失败：{{ s.last_error }}</p>
         <p v-if="actionErrors[s.id]" class="collection-error" role="alert">{{ actionErrors[s.id] }}</p>
-        <button class="btn btn-primary" :disabled="!!busy[s.id] || approving || !s.configured || active(s.id)" @click="run(s)">{{ active(s.id) || busy[s.id] === 'run' ? '任务已受理 / 执行中' : '立即采集到待审' }}</button>
-        <small v-if="!s.configured" class="muted"> 请先配置有效密钥。</small>
+        <button class="btn btn-primary" :disabled="!!busy[s.id] || approving || !ready(s) || active(s.id)" @click="run(s)">{{ active(s.id) || busy[s.id] === 'run' ? '任务已受理 / 执行中' : '立即采集到待审' }}</button>
+        <small v-if="!ready(s)" class="muted"> {{ readinessHint(s) }}</small>
       </section>
     </div>
 
@@ -269,7 +324,7 @@ onUnmounted(() => {
       <p v-else-if="!runs.length && !runError" class="muted">暂无运行记录，配置来源后可手动执行一次。</p>
       <div v-if="runs.length" class="collection-table" :aria-busy="runLoading">
         <table class="adm-table"><thead><tr><th>来源 / 任务</th><th>状态</th><th>开始 / 结束</th><th>条目</th><th>结果与审核</th></tr></thead><tbody>
-          <tr v-for="r in runs" :key="r.id"><td>{{ sourceName(r.source) }}<small class="collection-run-id">{{ r.id }}</small></td><td><span class="adm-tag" :class="r.status === 'failed' ? 'danger' : r.status === 'succeeded' ? 'valid' : 'suspect'">{{ STATUS[r.status] || r.status }}</span></td><td>{{ fmtTime(r.started_at) }}<br /><span class="muted">{{ fmtTime(r.finished_at) }}</span></td><td>{{ r.item_count }}</td><td><p v-if="r.error" class="collection-error">{{ r.error }}</p><button v-if="r.status === 'succeeded' && r.item_count > 0" class="btn btn-sm" :disabled="previewLoading || approving" @click="preview(r.id)">预览本次草稿</button><span v-else-if="r.status === 'succeeded'" class="muted">没有新增待审内容</span></td></tr>
+          <tr v-for="r in runs" :key="r.id"><td>{{ sourceName(r.source) }}<small class="collection-run-id">{{ r.id }}</small></td><td><span class="adm-tag" :class="r.status === 'failed' ? 'danger' : r.status === 'succeeded' ? 'valid' : 'suspect'">{{ STATUS[r.status] || r.status }}</span></td><td>{{ fmtTime(r.started_at) }}<br /><span class="muted">{{ fmtTime(r.finished_at) }}</span></td><td>{{ r.item_count }}</td><td><p v-if="r.error" class="collection-error">{{ r.error }}</p><button v-if="r.status === 'succeeded' && r.item_count > 0" class="btn btn-sm" :disabled="previewLoading || approving" @click="preview(r.id)">预览本次草稿</button><span v-else-if="r.status === 'succeeded'" class="muted">{{ r.source === 'github_repos' ? '已记录基线，正在积累每日快照；本次没有新增待审内容' : '没有新增待审内容' }}</span></td></tr>
         </tbody></table>
       </div>
       <div v-if="total > pageSize" class="collection-pagination"><button class="btn btn-sm" :disabled="page <= 1 || runLoading || approving" @click="goto(page - 1)">上一页</button><span>第 {{ page }} 页 · 共 {{ total }} 次</span><button class="btn btn-sm" :disabled="page * pageSize >= total || runLoading || approving" @click="goto(page + 1)">下一页</button></div>
@@ -303,7 +358,11 @@ onUnmounted(() => {
 .collection-source, .collection-runs, .collection-preview { min-width: 0; }
 .collection-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
 .collection-heading h2 { margin: 0 auto 0 0; font-size: 17px; }
-.collection-key { margin-top: 18px; }
+.collection-key, .collection-source-config { margin-top: 18px; }
+.collection-feed-options { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
+.collection-feed-options a { font-size: 12px; margin-left: auto; }
+.collection-saved { overflow-wrap: anywhere; margin: 0; }
+.collection-source-config .btn { align-self: start; }
 .collection-key .btn { align-self: start; }
 .collection-config { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
 .collection-config .field { flex: 1; min-width: 130px; }

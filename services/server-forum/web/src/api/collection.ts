@@ -5,6 +5,8 @@ export interface CollectionSource {
   id: string
   title: string
   configured: boolean
+  credential_required?: boolean
+  config?: { repositories?: string[]; feed_ids?: string[] }
   hint: string | null
   enabled: boolean
   interval_minutes: number
@@ -43,7 +45,7 @@ export interface CollectionBatch {
 export const collectionApi = {
   sources: () => adminRequest<{ items: CollectionSource[] }>('GET', '/collection/sources'),
   credential: (source: string, key: string) => adminRequest<unknown>('PUT', `/collection/sources/${encodeURIComponent(source)}/credential`, { key }),
-  configure: (source: string, body: { enabled?: boolean; interval_minutes?: number }) => adminRequest<unknown>('PATCH', `/collection/sources/${encodeURIComponent(source)}`, body),
+  configure: (source: string, body: { enabled?: boolean; interval_minutes?: number; config?: { repositories?: string[]; feed_ids?: string[] } }) => adminRequest<unknown>('PATCH', `/collection/sources/${encodeURIComponent(source)}`, body),
   run: (source: string) => adminRequest<{ run_id: string }>('POST', `/collection/sources/${encodeURIComponent(source)}/run`),
   runs: (source = '', page = 1) => {
     const query = new URLSearchParams({ page: String(page) })
