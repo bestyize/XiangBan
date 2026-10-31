@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,6 +40,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.Category
 import xyz.xiangban.xiaoban.common.community.messageOf
+import xyz.xiangban.xiaoban.common.community.parsePollOptions
+import xyz.xiangban.xiaoban.common.community.pollDraftError
 
 /**
  * 发帖：选一个具体的分类，写标题和正文，发布。发成功后直接打开这个帖子。
@@ -59,6 +62,9 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     var attempt by remember { mutableStateOf(0) }
     var bounty by rememberSaveable { mutableStateOf(0) }
     var bountyDays by rememberSaveable { mutableStateOf(7) }
+    var pollEnabled by rememberSaveable { mutableStateOf(false) }
+    var pollText by rememberSaveable { mutableStateOf("") }
+    var pollDays by rememberSaveable { mutableStateOf(7) }
 
     LaunchedEffect(attempt) {
         loadError = null
@@ -85,7 +91,9 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     val children = all.filter { it.parentId == parentId && !it.adminOnly }
     val chosen = all.firstOrNull { it.id == categoryId }
     val isHelp = chosen?.slug == "share-help"
-    val canPost = session.loggedIn && !busy && chosen != null && title.trim().length >= 2 && body.trim().length >= 10
+    val pollOptions = parsePollOptions(pollText)
+    val pollError = if (pollEnabled) pollDraftError(pollOptions, pollDays.takeIf { it != 0 }) else null
+    val canPost = session.loggedIn && !busy && chosen != null && title.trim().length >= 2 && body.trim().length >= 10 && pollError == null
 
     Column(Modifier.fillMaxSize().imePadding()) {
         ScreenBar(if (help) "发求助" else "发帖", onBack = back, trailing = null)
@@ -110,6 +118,16 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                 }
                 TextBox(title, { title = it }, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), placeholder = "标题（至少 2 个字）", enabled = !busy)
                 AreaBox(body, { body = it }, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), placeholder = "正文（至少 10 个字）：写清楚用在哪里、大概什么样子、有什么限制。", minHeight = 200.dp, enabled = !busy)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("发起投票", Modifier.weight(1f), fontSize = 14.sp)
+                    Switch(checked = pollEnabled, onCheckedChange = { pollEnabled = it }, enabled = !busy)
+                }
+                if (pollEnabled) {
+                    AreaBox(pollText, { pollText = it }, Modifier.padding(horizontal = 16.dp), placeholder = "每行一个选项，共 2～6 项，每项最多 40 字", minHeight = 100.dp, enabled = !busy)
+                    Text("投票时长", Modifier.padding(start = 16.dp, top = 12.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    ChipRow(listOf(0, 1, 3, 7, 14, 30).map { it to if (it == 0) "一直开放" else "$it 天" }, pollDays) { if (!busy) pollDays = it }
+                    Text(pollError ?: "投票发布后不能修改选项。", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 12.sp, color = if (pollError != null) Danger else LocalExtraColors.current.ink3)
+                }
                 if (isHelp) {
                     Text("悬赏积分", Modifier.padding(start = 16.dp, top = 16.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     ChipRow(listOf(0, 10, 30, 50, 100).map { it to if (it == 0) "不悬赏" else "$it 分" }, bounty) { bounty = it }
@@ -137,7 +155,8 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                         busy = true; error = null
                         scope.launch {
                             try {
-                                val id = env.forum.createTopic(categoryId, title.trim(), body.trim(), bounty = if (isHelp) bounty else null, bountyDays = bountyDays)
+                                val id = env.forum.createTopic(categoryId, title.trim(), body.trim(), bounty = if (isHelp) bounty else null, bountyDays = bountyDays,
+                                    pollOptions = if (pollEnabled) pollOptions else emptyList(), pollDays = pollDays.takeIf { pollEnabled && it != 0 })
                                 back()
                                 open(Route.Topic(id))
                             } catch (e: kotlinx.coroutines.CancellationException) {
