@@ -309,7 +309,10 @@ internal fun HotTab(env: CommunityEnv) {
                 }
             }
         }
-        OverlayTransition(picking) { panel -> IssuePicker(env, issueKey, { issueKey = it; picking = false }, { picking = false }, panel) }
+        // 弹层要盖住底部悬浮导航，所以放在独立的全屏窗口里，而不是页面内容里。
+        if (picking) androidx.compose.ui.window.Dialog(onDismissRequest = { picking = false }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+            IssuePicker(env, issueKey, { issueKey = it; picking = false }, { picking = false })
+        }
     }
 }
 
@@ -376,10 +379,10 @@ private fun RepoCard(env: CommunityEnv, r: RepoRank) {
 }
 
 @Composable
-private fun IssuePicker(env: CommunityEnv, current: String?, onPick: (String?) -> Unit, onDismiss: () -> Unit, panel: Modifier) {
+private fun IssuePicker(env: CommunityEnv, current: String?, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
     val loader = rememberLoader(env, "repo-issues") { env.forum.repoIssues() }
     val state by loader.state.collectAsState()
-    BottomSheet(onDismiss, panel) {
+    BottomSheet(onDismiss) {
         Text("往期热榜", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         LoadBox(state, loader::reload) { list ->
