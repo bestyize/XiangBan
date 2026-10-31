@@ -37,6 +37,8 @@ pub fn routes() -> Router<AppState> {
         .route("/me/packs", get(my_packs))
         .route("/schemes", get(list_schemes).post(create_scheme))
         .route("/schemes/{id}", get(get_scheme))
+        .route("/schemes/{id}/remove", post(remove_own_scheme))
+        .route("/me/schemes", get(my_schemes))
         .route("/projects", get(list_projects))
         .route("/projects/{slug}", get(get_project))
         .route("/weekly", get(list_weekly))
@@ -149,6 +151,8 @@ async fn list_packs(State(state): State<AppState>, Query(q): Query<ListQuery>) -
     let pattern = q.q.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(like_pattern);
     let order = if q.sort.as_deref() == Some("hot") { "p.apply_count DESC, p.id DESC" } else { "p.updated_at DESC, p.id DESC" };
     let filter = "p.status = 'published'
+        AND NOT EXISTS(SELECT 1 FROM users a WHERE a.uid=p.author_uid AND a.status='banned')
+        AND (p.topic_id IS NULL OR EXISTS(SELECT 1 FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0))
         AND ($1::text IS NULL OR p.kind = $1)
         AND ($2::text IS NULL OR p.title ILIKE $2 OR p.summary ILIKE $2)
         AND ($3::text IS NULL OR $3 = ANY(p.tags))
@@ -175,18 +179,6 @@ async fn list_packs(State(state): State<AppState>, Query(q): Query<ListQuery>) -
     Ok(Json(Page { items: rows.iter().map(|r| r.json(&state)).collect(), page, page_size: size, total }))
 }
 
-/// 首页精选创作：按使用次数排前面的已发布内容包。
-pub(super) async fn top_packs(state: &AppState, limit: i64) -> AppResult<Vec<Value>> {
-    let rows: Vec<PackRow> = sqlx::query_as(&format!(
-        "SELECT {PACK_COLUMNS} FROM packs p LEFT JOIN users u ON u.uid = p.author_uid
-         WHERE p.status = 'published' ORDER BY p.apply_count DESC, p.id DESC LIMIT $1"
-    ))
-    .bind(limit)
-    .fetch_all(&state.pool)
-    .await?;
-    Ok(rows.iter().map(|r| r.json(state)).collect())
-}
-
 async fn find_pack(state: &AppState, id: i64) -> AppResult<PackRow> {
     sqlx::query_as(&format!("SELECT {PACK_COLUMNS} FROM packs p LEFT JOIN users u ON u.uid = p.author_uid WHERE p.id = $1"))
         .bind(id)
@@ -196,13 +188,18 @@ async fn find_pack(state: &AppState, id: i64) -> AppResult<PackRow> {
 }
 
 /// 已下架或被拒的内容包只有作者本人能看到。
-fn visible(pack: &PackRow, viewer: Option<Uuid>) -> bool {
-    pack.status == "published" || (viewer.is_some() && viewer == pack.author_uid)
+async fn visible(state: &AppState, pack: &PackRow, viewer: Option<Uuid>) -> AppResult<bool> {
+    if viewer.is_some() && viewer == pack.author_uid { return Ok(true); }
+    if pack.status != "published" { return Ok(false); }
+    let (visible,): (bool,) = sqlx::query_as("SELECT NOT EXISTS(SELECT 1 FROM users WHERE uid=$1 AND status='banned')
+        AND ($2::bigint IS NULL OR EXISTS(SELECT 1 FROM topics WHERE id=$2 AND status='normal' AND min_read_level=0))")
+        .bind(pack.author_uid).bind(pack.topic_id).fetch_one(&state.pool).await?;
+    Ok(visible)
 }
 
 async fn get_pack(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
     let pack = find_pack(&state, id).await?;
-    if !visible(&pack, user.as_ref().map(|u| u.uid)) {
+    if !visible(&state, &pack, user.as_ref().map(|u| u.uid)).await? {
         return Err(AppError::not_found("内容包"));
     }
     let versions: Vec<(i32, String, String, i64, Value, String, DateTime<Utc>)> = sqlx::query_as(
@@ -233,11 +230,11 @@ async fn download(
     Path(id): Path<i64>,
     Query(q): Query<DownloadQuery>,
 ) -> AppResult<Json<Value>> {
-    let base = require_resource(&state)?;
     let pack = find_pack(&state, id).await?;
-    if !visible(&pack, user.as_ref().map(|u| u.uid)) {
+    if !visible(&state, &pack, user.as_ref().map(|u| u.uid)).await? {
         return Err(AppError::not_found("内容包"));
     }
+    let base = require_resource(&state)?;
     let version = q.version.unwrap_or(pack.current_version);
     let (label, sha256, size, storage, file_key, mirrors): (String, String, i64, String, String, Value) = sqlx::query_as(
         "SELECT label, sha256, size, storage, file_key, mirrors FROM pack_versions WHERE pack_id = $1 AND version = $2",
@@ -693,6 +690,12 @@ async fn get_scheme(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
          WHERE s.id=$1 AND s.status='published' AND u.status<>'banned'"
     ).bind(id).fetch_optional(&state.pool).await?;
     let (uid,nickname,title,summary,items,apply_count,created_at) = row.ok_or_else(|| AppError::not_found("方案"))?;
+    let resolved = scheme_items(&state, &items).await?;
+    Ok(Json(json!({"id":id,"author":{"uid":uid,"nickname":nickname},"title":title,"summary":summary,
+        "items":resolved,"apply_count":apply_count,"created_at":created_at})))
+}
+
+async fn scheme_items(state: &AppState, items: &Value) -> AppResult<Vec<Value>> {
     let mut resolved = Vec::new();
     for item in items.as_array().into_iter().flatten().take(30) {
         let Some(pack_id) = item["pack_id"].as_i64() else { continue };
@@ -708,8 +711,7 @@ async fn get_scheme(State(state): State<AppState>, Path(id): Path<i64>) -> AppRe
             None => json!({"pack_id":pack_id,"version":version,"available":false}),
         });
     }
-    Ok(Json(json!({"id":id,"author":{"uid":uid,"nickname":nickname},"title":title,"summary":summary,
-        "items":resolved,"apply_count":apply_count,"created_at":created_at})))
+    Ok(resolved)
 }
 
 async fn list_schemes(State(state): State<AppState>, Query(q): Query<ListQuery>) -> AppResult<Json<Page<Value>>> {
@@ -727,13 +729,13 @@ async fn list_schemes(State(state): State<AppState>, Query(q): Query<ListQuery>)
     .fetch_all(&state.pool)
     .await
     .map(|rows: Vec<(i64, Uuid, String, String, Value, i64, DateTime<Utc>)>| rows)?;
-    let items = rows
-        .into_iter()
-        .map(|(id, uid, nickname, title, items, apply_count, created_at)| {
-            json!({ "id": id, "author": { "uid": uid, "nickname": nickname }, "title": title, "items": items,
-                    "apply_count": apply_count, "created_at": created_at })
-        })
-        .collect();
+    let mut items_out = Vec::new();
+    for (id,uid,nickname,title,refs,apply_count,created_at) in rows {
+        let items = scheme_items(&state, &refs).await?;
+        items_out.push(json!({"id":id,"author":{"uid":uid,"nickname":nickname},"title":title,"items":items,
+            "apply_count":apply_count,"created_at":created_at}));
+    }
+    let items = items_out;
     Ok(Json(Page { items, page, page_size: size, total }))
 }
 
@@ -769,12 +771,19 @@ async fn create_scheme(State(state): State<AppState>, auth: AuthUser, Json(input
     let mut resolved = Vec::with_capacity(input.items.len());
     for item in &input.items {
         let row: Option<(String, String, i32)> =
-            sqlx::query_as("SELECT kind, slug, current_version FROM packs WHERE id = $1 AND status = 'published'")
+            sqlx::query_as("SELECT p.kind,p.slug,p.current_version FROM packs p WHERE p.id=$1 AND p.status='published'
+                AND NOT EXISTS(SELECT 1 FROM users u WHERE u.uid=p.author_uid AND u.status='banned')
+                AND (p.topic_id IS NULL OR EXISTS(SELECT 1 FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0))")
                 .bind(item.pack_id)
                 .fetch_optional(&state.pool)
                 .await?;
         let (kind, slug, current) = row.ok_or_else(|| AppError::BadRequest(format!("内容 {} 不存在或已下架", item.pack_id)))?;
-        resolved.push(json!({ "pack_id": item.pack_id, "kind": kind, "slug": slug, "version": item.version.unwrap_or(current) }));
+        let version = item.version.unwrap_or(current);
+        let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM pack_versions WHERE pack_id=$1 AND version=$2)")
+            .bind(item.pack_id).bind(version).fetch_one(&state.pool).await?;
+        if !exists { return Err(AppError::BadRequest("选择的作品版本不可用".into())); }
+        if resolved.iter().any(|v: &Value|v["pack_id"] == item.pack_id) { return Err(AppError::BadRequest("方案不能重复选择同一作品".into())); }
+        resolved.push(json!({ "pack_id": item.pack_id, "kind": kind, "slug": slug, "version": version }));
     }
     let (id,): (i64,) = sqlx::query_as("INSERT INTO schemes (author_uid, title, summary, items) VALUES ($1, $2, $3, $4) RETURNING id")
         .bind(auth.user.uid)
@@ -788,6 +797,25 @@ async fn create_scheme(State(state): State<AppState>, auth: AuthUser, Json(input
         crate::moderation::enqueue(&mut conn, "scheme", id, &format!("命中复核词：{word}")).await?;
     }
     Ok(Json(json!({ "id": id })))
+}
+
+async fn my_schemes(State(state): State<AppState>, auth: AuthUser) -> AppResult<Json<Value>> {
+    let rows: Vec<(i64,String,String,Value,i64,String,DateTime<Utc>)> = sqlx::query_as(
+        "SELECT id,title,summary,items,apply_count,status,created_at FROM schemes WHERE author_uid=$1 ORDER BY created_at DESC,id DESC LIMIT 200")
+        .bind(auth.user.uid).fetch_all(&state.pool).await?;
+    let mut items = Vec::new();
+    for (id,title,summary,refs,apply_count,status,created_at) in rows {
+        let refs = scheme_items(&state,&refs).await?;
+        items.push(json!({"id":id,"title":title,"summary":summary,"items":refs,"apply_count":apply_count,"status":status,
+            "created_at":created_at,"author":{"uid":auth.user.uid,"nickname":auth.user.nickname}}));
+    }
+    Ok(Json(json!({"items":items})))
+}
+async fn remove_own_scheme(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+    let changed = sqlx::query("UPDATE schemes SET status='removed' WHERE id=$1 AND author_uid=$2")
+        .bind(id).bind(auth.user.uid).execute(&state.pool).await?.rows_affected();
+    if changed==0 { return Err(AppError::not_found("方案")); }
+    Ok(Json(json!({"id":id,"status":"removed"})))
 }
 
 // ───────────────────────── 项目与周刊 ─────────────────────────
@@ -888,7 +916,7 @@ async fn share(State(state): State<AppState>, Path((kind, id)): Path<(String, St
     let body = match kind.as_str() {
         "pack" => {
             let pack = find_pack(&state, number()?).await?;
-            if pack.status != "published" {
+            if !visible(&state, &pack, None).await? {
                 return Err(AppError::not_found("内容包"));
             }
             json!({
@@ -907,7 +935,7 @@ async fn share(State(state): State<AppState>, Path((kind, id)): Path<(String, St
             json!({ "kind": "topic", "title": title, "summary": summary, "url": format!("{site}/t/{id}"), "app_link": format!("xiaoban://community/open/topic/{id}") })
         }
         "scheme" => {
-            let s: Option<(String, String)> = sqlx::query_as("SELECT title, summary FROM schemes WHERE id = $1 AND status = 'published'")
+            let s: Option<(String, String)> = sqlx::query_as("SELECT s.title,s.summary FROM schemes s JOIN users u ON u.uid=s.author_uid WHERE s.id=$1 AND s.status='published' AND u.status<>'banned'")
                 .bind(number()?)
                 .fetch_optional(&state.pool)
                 .await?;
