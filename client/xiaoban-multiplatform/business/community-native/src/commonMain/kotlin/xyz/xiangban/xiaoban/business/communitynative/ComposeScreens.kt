@@ -207,13 +207,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
 private fun ChipRow(items: List<Pair<Int, String>>, selected: Int, onSelect: (Int) -> Unit) {
     LazyRow(Modifier.fillMaxWidth().padding(top = 8.dp), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(items, key = { it.first }) { (id, name) ->
-            val on = id == selected
-            Text(
-                name,
-                Modifier.height(34.dp).clip(CircleShape).background(if (on) LocalExtraColors.current.brandSoft else MaterialTheme.colorScheme.surface)
-                    .clickable { onSelect(id) }.padding(horizontal = 14.dp, vertical = 7.dp),
-                fontSize = 14.sp, color = if (on) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurface, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
-            )
+            PageChip(name, id == selected) { onSelect(id) }
         }
     }
 }

@@ -188,7 +188,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
             Column(Modifier.fillMaxSize()) {
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
                     Box(Modifier.fillMaxWidth().height(232.dp)) {
-                        Cover(pack.coverUrl, pack.id, Modifier.fillMaxSize())
+                        Cover(pack.coverUrl, pack.id, Modifier.fillMaxSize(), contentScale = if (pack.kind == "game" || pack.kind == "widget") androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop)
                         CircleOverlayButton(XIcons.ChevronLeft, "返回", back, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 12.dp, top = 12.dp))
                         CircleOverlayButton(XIcons.Share, "分享", { share = true }, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 12.dp, top = 12.dp))
                     }
@@ -203,7 +203,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Avatar(pack.author?.nickname ?: "?", 36.dp, showInitial = true)
                             Column(Modifier.weight(1f)) {
-                                Text(pack.author?.nickname ?: "匿名", Modifier.clickable(enabled = open != null && pack.author != null) { pack.author?.uid?.let { open?.invoke(Route.User(it)) } }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text(pack.author?.nickname ?: "社区作品", Modifier.clickable(enabled = open != null && pack.author != null) { pack.author?.uid?.let { open?.invoke(Route.User(it)) } }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                                 Text("v${pack.version}" + (pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let { " · " + formatSize(it) } ?: "") + pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { " · 更新于 $it" }.orEmpty(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }

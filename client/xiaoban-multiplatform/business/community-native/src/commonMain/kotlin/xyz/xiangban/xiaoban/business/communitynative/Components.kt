@@ -48,7 +48,11 @@ fun Hairline(modifier: Modifier = Modifier) {
 @Composable
 fun CenterMessage(text: String, action: String? = null, onAction: (() -> Unit)? = null, modifier: Modifier = Modifier.fillMaxSize()) {
     Column(modifier.padding(16.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
+            XIcon(XIcons.File, size = 22.dp, tint = LocalExtraColors.current.ink3)
+        }
+        Text(text, Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontSize = 14.sp, lineHeight = 22.sp)
         if (action != null && onAction != null) OutlinedButton(onClick = onAction, Modifier.padding(top = 12.dp)) { Text(action) }
     }
 }
@@ -76,11 +80,11 @@ fun rememberImageLoader(): ImageLoader {
 
 /** 封面：有图就显示图，没有（或没加载出来）时垫一块按编号轮换的渐变，保证列表整齐。 */
 @Composable
-fun Cover(url: String?, id: Long, modifier: Modifier = Modifier) {
+fun Cover(url: String?, id: Long, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Crop) {
     val (from, to) = Tokens.coverGradient(id)
     Box(modifier.clip(CardShape).background(Brush.linearGradient(listOf(Color(from), Color(to))))) {
         if (!url.isNullOrBlank()) {
-            AsyncImage(model = url, contentDescription = null, imageLoader = rememberImageLoader(), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            AsyncImage(model = url, contentDescription = null, imageLoader = rememberImageLoader(), contentScale = contentScale, modifier = Modifier.fillMaxSize())
         }
     }
 }

@@ -68,7 +68,6 @@ internal fun ContentBookmarkFeed(env: CommunityEnv, kind: String, open: (Route) 
             item { GhostPillButton("刷新收藏", loader::reload, Modifier.fillMaxWidth()) }
             items(result.items, key = { "${it.kind}-${it.id}" }) { entry -> WhiteCard(padding = 14.dp) {
                 Text(entry.content.title, Modifier.fillMaxWidth().clickable { open(contentCardRoute(entry.kind, entry.content)) }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                if (entry.content.summary.isNotBlank()) Text(entry.content.summary, Modifier.padding(top = 6.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
                 if (entry.kind == "pack") entry.content.version?.let { Text("版本 v$it", fontSize = 12.sp, color = LocalExtraColors.current.ink3) }
                 GhostPillButton("取消收藏", {
                     if (busy) return@GhostPillButton

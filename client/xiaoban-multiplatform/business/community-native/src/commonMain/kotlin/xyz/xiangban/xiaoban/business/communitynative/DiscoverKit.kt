@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
@@ -25,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,7 +36,7 @@ import xyz.xiangban.xiaoban.common.community.ModelVendor
 
 // 发现页（首页五个 tab、资源、讨论）共用的小部件。
 
-private val CardShape = RoundedCornerShape(8.dp)
+private val CardShape = RoundedCornerShape(12.dp)
 
 /** 灰色页面上的白底卡片。 */
 @Composable
@@ -47,14 +47,15 @@ fun WhiteCard(modifier: Modifier = Modifier, padding: Dp = 16.dp, horizontalPadd
 /** 卡片标题：左边标题加一行小字，右边一个「更多 ›」之类的入口。 */
 @Composable
 fun SectionHeader(title: String, modifier: Modifier = Modifier, note: String? = null, action: String? = null, onAction: (() -> Unit)? = null, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (icon != null) XIcon(icon, tint = MaterialTheme.colorScheme.onSurface, size = 18.dp)
-        Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        if (note != null) Text(note, Modifier.weight(1f), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        else Box(Modifier.weight(1f))
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (!note.isNullOrBlank()) Text(note, Modifier.padding(top = 3.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
         if (action != null && onAction != null) {
-            Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAction).padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(action, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAction).padding(horizontal = 4.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(action, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 14.dp)
             }
         }
@@ -137,11 +138,12 @@ fun rememberPrefFlag(env: CommunityEnv, key: String): Pair<Boolean, (Boolean) ->
 @Composable
 fun PageChip(text: String, selected: Boolean, onClick: () -> Unit) {
     val extra = LocalExtraColors.current
-    Text(
-        text,
-        Modifier.height(30.dp).clip(RoundedCornerShape(15.dp)).background(if (selected) extra.brandSoft else MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 5.dp),
-        fontSize = 14.sp, maxLines = 1, color = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurface, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-    )
+    Box(Modifier.heightIn(min = 36.dp).clip(RoundedCornerShape(10.dp))
+        .background(if (selected) extra.brandSoft else MaterialTheme.colorScheme.surface)
+        .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
+        Text(text, fontSize = 13.sp, maxLines = 1, color = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+    }
 }
 
 /** 一行可左右滑的筛选胶囊，[items] 是（值，文字）。 */
@@ -152,7 +154,7 @@ fun PageChipRow(items: List<Pair<String, String>>, selected: String, onSelect: (
     }
 }
 
-/** 品牌图标块：有官方标志就用品牌色画在浅底上；没有就用 [fallback] 的首字。[dashed] 为真时画虚线占位框（官方图标待补）。 */
+/** 品牌图标块：有官方标志就用品牌色画在浅底上；没有就用 [fallback] 的首字。[dashed] 参数保留调用兼容，缺图统一显示首字。 */
 @Composable
 fun BrandTile(logo: BrandLogo?, fallback: String, modifier: Modifier = Modifier, size: Dp = 40.dp, corner: Dp = 10.dp, dashed: Boolean = false) {
     val shape = RoundedCornerShape(corner)
@@ -160,22 +162,33 @@ fun BrandTile(logo: BrandLogo?, fallback: String, modifier: Modifier = Modifier,
         logo != null -> Box(modifier.size(size).clip(shape).background(if (ThemeState.dark) logo.color.copy(alpha = 0.22f) else logo.tint), contentAlignment = Alignment.Center) {
             XIcon(logo.icon, tint = logo.color, size = size * 0.55f)
         }
-        dashed -> Box(
-            modifier.size(size).clip(shape).background(MaterialTheme.colorScheme.surface).dashedBorder(LocalExtraColors.current.line, corner),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                XIcon(XIcons.Image, tint = LocalExtraColors.current.ink3, size = 14.dp)
-                Text("图标", fontSize = 10.sp, lineHeight = 12.sp, color = LocalExtraColors.current.ink3)
-            }
-        }
         else -> LetterIcon(fallback, Brand, Brand.copy(alpha = 0.14f), modifier, size)
     }
 }
 
-private fun Modifier.dashedBorder(color: Color, corner: Dp): Modifier = this.drawBehind {
-    drawRoundRect(
-        color, cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner.toPx()),
-        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f))),
-    )
+/** 长说明默认三行，点按可阅读全文，避免信息流被一段文字占满。 */
+@Composable
+internal fun ExpandableDescription(text: String) {
+    var expanded by remember(text) { mutableStateOf(false) }
+    var overflows by remember(text) { mutableStateOf(false) }
+    Column(Modifier.padding(top = 6.dp)) {
+        Text(text, fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis,
+            onTextLayout = { if (!expanded) overflows = it.hasVisualOverflow })
+        if (expanded || overflows) Text(if (expanded) "收起" else "展开", Modifier.clickable { expanded = !expanded }.padding(vertical = 6.dp),
+            fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
+    }
+}
+
+/** 没有站内详情的条目，把长说明收在明确的展开入口。 */
+@Composable
+internal fun DisclosureDescription(label: String, text: String) {
+    var expanded by remember(text) { mutableStateOf(false) }
+    Column {
+        Row(Modifier.clickable { expanded = !expanded }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(if (expanded) "收起$label" else label, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            XIcon(if (expanded) XIcons.ChevronUp else XIcons.ChevronDown, size = 14.dp, tint = LocalExtraColors.current.ink3)
+        }
+        if (expanded) Text(text, fontSize = 13.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }

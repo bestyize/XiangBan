@@ -2,6 +2,7 @@ package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -66,9 +68,9 @@ internal enum class DiscussSub(val key: String, val label: String) {
     }
 }
 
-/** 白底卡片之间留 4dp、两边留 12dp；底部让出悬浮导航的高度。 */
-internal val FeedPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp + NavInset)
-private val Gap = 4.dp
+/** 白底卡片之间留 8dp、两边留 12dp；底部让出悬浮导航的高度。 */
+internal val FeedPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp + NavInset)
+private val Gap = 8.dp
 
 // ───────────── 通用帖子流 ─────────────
 
@@ -91,7 +93,7 @@ internal fun TopicFeed(
     LaunchedEffect(controller) { controller.select("latest") }
     val pinned = if (pinnedBar) state.topics.firstOrNull { it.pinned } else null
     val rows = if (pinned != null) state.topics.filter { it.id != pinned.id } else state.topics
-    PullToRefreshBox(isRefreshing = state.loading && state.topics.isEmpty(), onRefresh = controller::refresh, modifier = modifier.fillMaxSize()) {
+    PullToRefreshBox(isRefreshing = state.loading && state.topics.isNotEmpty(), onRefresh = controller::refresh, modifier = modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = FeedPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
             if (header != null) item { header() }
             if (pinned != null) item { PinnedBar(pinned) { open(Route.Topic(pinned.id)) } }
@@ -111,7 +113,7 @@ internal fun TopicFeed(
 @Composable
 private fun PinnedBar(topic: Topic, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         XIcon(XIcons.Pin, tint = Brand, size = 16.dp)
@@ -121,40 +123,25 @@ private fun PinnedBar(topic: Topic, onClick: () -> Unit) {
     }
 }
 
-/**
- * 一条帖子：作者和时间、右上角标签；标题和摘要（有一张配图时配图在文字左边，88dp 见方）；
- * 两张以上的图排成三宫格；有投票时显示各项占比；底下是 浏览 / 回复 / 点赞。
- */
+/** 帖子列表只展示标题、真实配图与轻量元信息，正文和投票在详情阅读。 */
 @Composable
 internal fun TopicCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit, onMessage: (String) -> Unit, tagLabel: String? = null) {
     val images = topic.images.map { env.forum.imageUrl(it) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Avatar(topic.author.nickname, 28.dp)
-            Column(Modifier.weight(1f)) {
-                Text(topic.author.nickname, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(agoText(topic.createdAt), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-            }
-            GrayTag(tagLabel ?: topic.tags.firstOrNull() ?: topic.category.name)
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface)
+        .clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(topic.title, Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            if (images.size == 1) Cover(images[0], topic.id, Modifier.size(64.dp))
         }
-        Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (images.size == 1) Cover(images[0], topic.id, Modifier.size(88.dp))
-            Column(Modifier.weight(1f)) {
-                Text(topic.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, lineHeight = 23.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
+        if (images.size >= 2) Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            images.take(3).forEachIndexed { i, url -> Cover(url, topic.id + i, Modifier.weight(1f).height(100.dp)) }
+            repeat(3 - images.take(3).size) { Spacer(Modifier.weight(1f)) }
         }
-        if (images.size >= 2) {
-            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                images.take(3).forEachIndexed { i, url -> Cover(url, topic.id + i, Modifier.weight(1f).height(104.dp)) }
-                repeat(3 - images.take(3).size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-        topic.poll?.let { PollView(env, topic, it, open, onMessage) }
-        Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Stat(XIcons.Eye, compactCount(topic.viewCount))
-            Stat(XIcons.Message, compactCount(topic.replyCount))
-            Stat(XIcons.Heart, compactCount(topic.likeCount))
+        Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(topic.author.nickname, Modifier.weight(1f), fontSize = 11.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (topic.poll != null) Text("投票", fontSize = 11.sp, color = LocalExtraColors.current.brandInk)
+            if (topic.replyCount > 0) Text("${compactCount(topic.replyCount)} 回复", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            Text(agoText(topic.createdAt), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
         }
     }
 }
@@ -222,9 +209,6 @@ private fun skillIcon(kind: String) = when (kind) {
     "routine" -> XIcons.Clock; "reminder" -> XIcons.Bell; "task" -> XIcons.CheckBold; "goal" -> XIcons.Target; "skill" -> XIcons.Cube; "expert" -> XIcons.User; else -> XIcons.Tool
 }
 
-/** 运行时会动手做事的类型，卡片上提示“运行前需确认权限”。 */
-private val NeedsPermission = setOf("routine", "task", "goal", "skill", "workflow")
-
 /** 作品卡的封面高度在这几个值里轮换，做出瀑布流错落的样子（取自设计稿）。 */
 private val CoverHeights = listOf(190, 140, 200, 150, 176)
 
@@ -240,13 +224,13 @@ private fun CreateTab(env: CommunityEnv, open: (Route) -> Unit) {
     Column(Modifier.fillMaxSize()) {
         PageChipRow(CreateChips, kind, { kind = it }, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 6.dp))
         if (kind == "schemes") { NativeSchemesFeed(env, open); return@Column }
-        PullToRefreshBox(isRefreshing = state.loading && state.packs.isEmpty(), onRefresh = controller::refresh, modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(isRefreshing = state.loading && state.packs.isNotEmpty(), onRefresh = controller::refresh, modifier = Modifier.fillMaxSize()) {
             when {
                 state.loading && state.packs.isEmpty() -> Spinner()
                 state.error != null && state.packs.isEmpty() -> CenterMessage(state.error.orEmpty(), "重试", controller::refresh)
                 state.isEmpty -> CenterMessage("这里还没有作品")
                 else -> LazyVerticalStaggeredGrid(
-                    StaggeredGridCells.Fixed(if (single) 1 else 2), Modifier.fillMaxSize(),
+                    if (single) StaggeredGridCells.Fixed(1) else StaggeredGridCells.Adaptive(160.dp), Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp + NavInset),
                     horizontalArrangement = Arrangement.spacedBy(Gap), verticalItemSpacing = Gap,
                 ) {
@@ -264,52 +248,42 @@ private fun CreateTab(env: CommunityEnv, open: (Route) -> Unit) {
 private fun AuthorLine(pack: Pack) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Avatar(pack.author?.nickname ?: "?", 18.dp)
-        Text(pack.author?.nickname ?: "小伴官方", Modifier.weight(1f), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        XIcon(XIcons.Heart, tint = LocalExtraColors.current.ink3, size = 14.dp)
-        Text(compactCount(pack.applyCount.toInt()), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        Text(pack.author?.nickname ?: "社区作品", Modifier.weight(1f), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (pack.applyCount > 0) Text("${compactCount(pack.applyCount.toInt())} 次应用", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
     }
 }
 
-/** 作品卡：错落高度的封面，左上黑底类型标签，游戏右上红色「可试玩」；下面是标题和作者。 */
+/** 作品卡：错落高度的封面，左上黑底类型标签；下面是标题和作者。 */
 @Composable
 internal fun LookCard(pack: Pack, single: Boolean = false, onClick: () -> Unit) {
     val h = CoverHeights[(pack.id % CoverHeights.size).toInt()] * (if (single) 1.3f else 1f)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
         Box {
-            Cover(pack.coverUrl, pack.id, Modifier.fillMaxWidth().height(h.dp))
+            val screenshot = pack.kind == "game" || pack.kind == "widget"
+            Cover(pack.coverUrl, pack.id, if (screenshot) Modifier.fillMaxWidth().aspectRatio(1.5f) else Modifier.fillMaxWidth().height(h.dp),
+                contentScale = if (screenshot) androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop)
             Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 12.sp, color = Color.White)
-            if (pack.kind == "game") Row(
-                Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(4.dp)).background(Brand).padding(horizontal = 6.dp, vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                XIcon(XIcons.Play, tint = Color.White, size = 12.dp)
-                Text("可试玩", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
-            }
+
         }
         Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 10.dp)) {
             Text(pack.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Box(Modifier.padding(top = 8.dp)) { AuthorLine(pack) }
+            if (pack.author != null || pack.applyCount > 0) Box(Modifier.padding(top = 8.dp)) { AuthorLine(pack) }
         }
     }
 }
 
-/** 能力卡：没有封面，蓝灰图标块加类型，标题、最多 4 行摘要、权限提示和作者。 */
+/** 能力卡：没有封面，显示类型、标题及可用的作者信息。 */
 @Composable
 internal fun SkillCard(pack: Pack, onClick: () -> Unit) {
     val soft = if (ThemeState.dark) Color(0xFF9FB6DC).copy(alpha = 0.18f) else Color(0xFFE8EEF8)
     val ink = if (ThemeState.dark) Color(0xFF9FB6DC) else Color(0xFF3E5C8A)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.size(24.dp).clip(RoundedCornerShape(8.dp)).background(soft), contentAlignment = Alignment.Center) { XIcon(skillIcon(pack.kind), tint = ink, size = 16.dp) }
             Text(skillTag(pack.kind), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text(pack.title, Modifier.padding(top = 8.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp)
-        if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 6.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 4, overflow = TextOverflow.Ellipsis)
-        if (pack.kind in NeedsPermission) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            XIcon(XIcons.Lock, tint = LocalExtraColors.current.ink3, size = 12.dp)
-            Text("运行前需确认权限", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-        }
-        Box(Modifier.padding(top = 10.dp)) { AuthorLine(pack) }
+        Text(pack.title, Modifier.padding(top = 8.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (pack.author != null || pack.applyCount > 0) Box(Modifier.padding(top = 10.dp)) { AuthorLine(pack) }
     }
 }
 
