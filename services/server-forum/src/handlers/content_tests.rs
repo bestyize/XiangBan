@@ -254,6 +254,29 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert_eq!(s, StatusCode::CONFLICT, "id 重复");
     let (_, od) = call(&app, "GET", &format!("/api/packs/{oid}/download"), None, Value::Null).await;
     assert_eq!(od["mirrors"][0]["name"], "modelscope");
+    // 站方方案：管理员凭据、绑定作者、公开作品、固定版本和去重仍须校验。
+    let scheme = json!({"author_uid":author,"title":"站方组合","items":[{"pack_id":oid,"version":1}]});
+    let (s, _) = call(&app, "POST", "/api/admin/schemes", None, scheme.clone()).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, _) = call(&app, "POST", "/api/admin/schemes", Some(&admin_t), scheme.clone()).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "未绑定作者不可署名");
+    sqlx::query("UPDATE users SET trust_level=3 WHERE uid=$1").bind(author).execute(&pool).await?;
+    sqlx::query("INSERT INTO editor_authors(uid) VALUES ($1)").bind(author).execute(&pool).await?;
+    for items in [json!([]),json!([{"pack_id":id}]),json!([{"pack_id":oid,"version":99}]),json!([{"pack_id":oid},{"pack_id":oid}])] {
+        let mut bad = scheme.clone(); bad["items"] = items;
+        let (s, _) = call(&app, "POST", "/api/admin/schemes", Some(&admin_t), bad).await;
+        assert_eq!(s, StatusCode::BAD_REQUEST);
+    }
+    let (s, published) = call(&app, "POST", "/api/admin/schemes", Some(&admin_t), scheme.clone()).await;
+    assert_eq!(s, StatusCode::OK, "{published}");
+    let (_, detail) = call(&app, "GET", &format!("/api/schemes/{}",published["id"]), None, Value::Null).await;
+    assert_eq!(detail["items"][0]["version"],1);
+    let (n,):(i64,) = sqlx::query_as("SELECT count(*) FROM admin_audit WHERE action='scheme.create'").fetch_one(&pool).await?;
+    assert_eq!(n,1);
+    sqlx::query("UPDATE users SET status='banned' WHERE uid=$1").bind(author).execute(&pool).await?;
+    let (s, _) = call(&app, "POST", "/api/admin/schemes", Some(&admin_t), scheme).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST);
+    sqlx::query("UPDATE users SET status='active' WHERE uid=$1").bind(author).execute(&pool).await?;
     // 补镜像：同名替换、必须 https、按版本。
     let mirror = |name: &str, url: &str| json!({"name": name, "url": url});
     let (s, _) = call(&app, "POST", &format!("/api/admin/packs/{oid}/mirrors"), Some(&admin_t), mirror("x", "http://insecure/x.zip")).await;
@@ -289,7 +312,7 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     assert!(pr["body_html"].as_str().unwrap().contains("<strong>"));
 
     let week = "2026-W44";
-    let issue = json!({"title":"第 44 期","summary":"本周精选","items":[{"type":"pack","ref":oid,"note":"推荐"},{"type":"pack","ref":id,"note":"已下架"},{"type":"text","title":"说明"}]});
+    let issue = json!({"title":"第 44 期","summary":"本周精选","items":[{"type":"pack","ref":oid,"note":"推荐"},{"type":"pack","ref":id,"note":"已下架"},{"type":"text","title":"说明","source_url":"https://example.com/release"},{"type":"text","title":"无效外链","source_url":"javascript:alert(1)"}]});
     let (s, _) = call(&app, "PUT", &format!("/api/admin/weekly/{week}"), Some(&admin_t), issue.clone()).await;
     assert_eq!(s, StatusCode::OK);
     let (s, _) = call(&app, "GET", &format!("/api/weekly/{week}"), None, Value::Null).await;
@@ -301,7 +324,9 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     call(&app, "PUT", &format!("/api/admin/weekly/{week}"), Some(&admin_t), published).await;
     let (s, w) = call(&app, "GET", &format!("/api/weekly/{week}"), None, Value::Null).await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(w["items"].as_array().unwrap().len(), 2, "下架的内容包不出现在周刊里");
+    assert_eq!(w["items"].as_array().unwrap().len(), 3, "下架的内容包不出现在周刊里");
+    assert_eq!(w["items"][1]["source_url"], "https://example.com/release");
+    assert!(w["items"][2]["source_url"].is_null());
     assert_eq!(w["items"][0]["title"], "官方壁纸");
     let (s, _) = call(&app, "PUT", "/api/admin/weekly/2026-44", Some(&admin_t), json!({"title":"x"})).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);

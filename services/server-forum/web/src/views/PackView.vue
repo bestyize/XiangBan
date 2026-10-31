@@ -41,6 +41,7 @@ watch(
 
 const isAuthor = computed(() => !!pack.value?.author && pack.value.author.uid === session.user?.uid)
 const latest = computed(() => pack.value?.versions[0])
+const manualOnly = computed(() => latest.value?.manifest.manualOnly === true)
 const open = computed(() => (pack.value && latest.value ? applyLink(pack.value, latest.value.version, latest.value.sha256) : ''))
 
 async function download() {
@@ -94,20 +95,21 @@ async function copyLink() {
         <p v-if="pack.tags.length" class="tags">
           <RouterLink v-for="t in pack.tags" :key="t" :to="`/tag/${encodeURIComponent(t)}`">{{ t }}</RouterLink>
         </p>
-        <p v-if="!pack.one_click" class="notice">
+        <p v-if="manualOnly" class="notice">这是手动使用的模板包。下载并解压后，按 README 中的步骤使用；它不会自动创建任务或运行流程。</p>
+        <p v-else-if="!pack.one_click" class="notice">
           {{ pack.trust_level === 2 ? '这是用户发布、尚未审核的内容，不支持一键应用；' : '' }}在小伴桌面端会先展示它会做什么、需要哪些权限，由你确认后才安装。
         </p>
         <ContentSocialActions v-if="pack.status === 'published'" kind="pack" :id="pack.id" />
         <div class="actions">
-          <a class="btn btn-primary open-app" :href="open" @click="track('apply_click', pack.kind)">在小伴中打开</a>
+          <a v-if="!manualOnly" class="btn btn-primary open-app" :href="open" @click="track('apply_click', pack.kind)">在小伴中打开</a>
           <button class="btn" type="button" :disabled="busy" @click="download">下载压缩包</button>
           <button class="btn" type="button" @click="copyLink">复制链接</button>
           <button class="btn" type="button" @click="posterOpen = true">生成海报</button>
           <RouterLink v-if="pack.topic_id" class="btn" :to="`/t/${pack.topic_id}`">看讨论</RouterLink>
           <RouterLink v-if="isAuthor" class="btn" :to="`/publish?pack=${pack.id}`">发布新版本</RouterLink>
         </div>
-        <p class="hint">没有安装小伴？在桌面端“社区”页里也能找到它。</p>
-        <p class="hint only-phone">在手机上请先复制链接，到电脑上打开即可应用。</p>
+        <p v-if="!manualOnly" class="hint">没有安装小伴？在桌面端“社区”页里也能找到它。</p>
+        <p class="hint only-phone">{{ manualOnly ? '在手机上可以先复制链接，到电脑上下载并阅读使用说明。' : '在手机上请先复制链接，到电脑上打开即可应用。' }}</p>
       </div>
 
       <section v-if="pack.versions.length" class="versions">

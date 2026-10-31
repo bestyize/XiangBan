@@ -95,7 +95,7 @@ export interface WeeklyIssueItem {
 export type WeeklyEntry =
   | (PackItem & { type: 'pack'; note: string })
   | { type: 'topic'; id: number; title: string; summary: string; note: string }
-  | { type: 'text'; title: string | null; note: string }
+  | { type: 'text'; title: string | null; note: string; source_url?: string | null }
 
 export interface WeeklyDetail extends WeeklyIssueItem {
   items: WeeklyEntry[]

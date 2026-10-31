@@ -25,11 +25,15 @@ use sqlx::PgPool;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/discover/home", get(home))
+        .route("/discover/home/v2", get(home_v2))
         .route("/discover/daily", get(daily))
         .route("/discover/repos", get(repos))
+        .route("/discover/repos/v2", get(repos_v2))
         .route("/discover/repos/issues", get(repo_issues))
+        .route("/discover/repos/issues/v2", get(repo_issues_v2))
         .route("/discover/models", get(models_board))
         .route("/discover/tracker", get(tracker))
+        .route("/discover/tracker/v2", get(tracker_v2))
         .route("/discover/nav", get(nav))
         .route("/discover/docs", get(docs))
         .route("/discover/hot-search", get(hot_search))
@@ -86,13 +90,19 @@ fn any_sample(items: &[Value]) -> bool {
     items.iter().any(|i| i["sample"].as_bool().unwrap_or(false))
 }
 
-async fn latest_repo_issue(pool: &PgPool, key: Option<&str>) -> AppResult<Option<Value>> {
-    let row: Option<Row> = sqlx::query_as(
+// Older apps require numeric changes and a numeric weekly comparison. Never manufacture these.
+const LEGACY_REPO_COMPAT: &str = "jsonb_typeof(data->'total_gain')='number' AND jsonb_typeof(data->'wow_pct')='number' AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(data->'ranks') r WHERE jsonb_typeof(r->'star_gain') IS DISTINCT FROM 'number' OR jsonb_typeof(r->'star_total') IS DISTINCT FROM 'number')";
+fn legacy_repo_compatible(value: &Value) -> bool {
+    value["total_gain"].as_i64().is_some() && value["wow_pct"].as_f64().is_some() &&
+        value["ranks"].as_array().is_some_and(|rows| rows.iter().all(|r| r["star_gain"].as_i64().is_some() && r["star_total"].as_i64().is_some()))
+}
+async fn latest_repo_issue(pool: &PgPool, key: Option<&str>, legacy: bool) -> AppResult<Option<Value>> {
+    let row: Option<Row> = sqlx::query_as(&format!(
         "SELECT key, sort_order, published_at, data FROM discover_items
          WHERE kind = 'repo_issue' AND status = 'published' AND published_at <= now() AND ($1::text IS NULL OR key = $1)
-         ORDER BY (data->>'issue_no')::int DESC LIMIT 1",
-    )
-    .bind(key)
+         AND (NOT $2 OR ({LEGACY_REPO_COMPAT})) ORDER BY (data->>'issue_no')::int DESC LIMIT 1"
+    ))
+    .bind(key).bind(legacy)
     .fetch_optional(pool)
     .await?;
     Ok(row.map(|r| {
@@ -107,7 +117,9 @@ async fn latest_repo_issue(pool: &PgPool, key: Option<&str>) -> AppResult<Option
 }
 
 /// 首页「推荐」：头图、当天日报、精选创作和本周热榜前三，一次返回。
-async fn home(State(state): State<AppState>) -> AppResult<Json<Value>> {
+async fn home(State(state): State<AppState>) -> AppResult<Json<Value>> { home_response(state, true).await }
+async fn home_v2(State(state): State<AppState>) -> AppResult<Json<Value>> { home_response(state, false).await }
+async fn home_response(state: AppState, legacy: bool) -> AppResult<Json<Value>> {
     let pool = &state.pool;
     let banners = fetch(pool, "banner", BY_ORDER, 5, 0).await?;
     let news = fetch(pool, "news", NEWEST, 5, 0).await?;
@@ -124,7 +136,7 @@ async fn home(State(state): State<AppState>) -> AppResult<Json<Value>> {
         pack["cover_url"] = json!(pack["cover_key"].as_str().and_then(|key|
             state.config.resource_base_url.as_ref().map(|base| format!("{}/{key}",base.trim_end_matches('/')))));
     }
-    let issue = latest_repo_issue(pool, None).await?;
+    let issue = latest_repo_issue(pool, None, false).await?.filter(|v| !legacy || legacy_repo_compatible(v));
     let repos = issue.map(|mut i| {
         if let Some(r) = i["ranks"].as_array_mut() {
             r.truncate(3);
@@ -160,24 +172,28 @@ pub struct IssueQuery {
     issue: Option<String>,
 }
 
-async fn repos(State(state): State<AppState>, Query(q): Query<IssueQuery>) -> AppResult<Json<Value>> {
-    match latest_repo_issue(&state.pool, q.issue.as_deref()).await? {
+async fn repos(State(state): State<AppState>, Query(q): Query<IssueQuery>) -> AppResult<Json<Value>> { repos_response(state, q, true).await }
+async fn repos_v2(State(state): State<AppState>, Query(q): Query<IssueQuery>) -> AppResult<Json<Value>> { repos_response(state, q, false).await }
+async fn repos_response(state: AppState, q: IssueQuery, legacy: bool) -> AppResult<Json<Value>> {
+    match latest_repo_issue(&state.pool, q.issue.as_deref(), legacy).await? {
         Some(v) => Ok(Json(v)),
         None => Err(AppError::not_found("榜单")),
     }
 }
 
-async fn repo_issues(State(state): State<AppState>) -> AppResult<Json<Value>> {
-    let rows: Vec<Row> = sqlx::query_as(
+async fn repo_issues(State(state): State<AppState>) -> AppResult<Json<Value>> { repo_issues_response(state, true).await }
+async fn repo_issues_v2(State(state): State<AppState>) -> AppResult<Json<Value>> { repo_issues_response(state, false).await }
+async fn repo_issues_response(state: AppState, legacy: bool) -> AppResult<Json<Value>> {
+    let rows: Vec<Row> = sqlx::query_as(&format!(
         "SELECT key, sort_order, published_at, data FROM discover_items
-         WHERE kind = 'repo_issue' AND status = 'published' AND published_at <= now() ORDER BY (data->>'issue_no')::int DESC LIMIT 60",
-    )
-    .fetch_all(&state.pool)
+         WHERE kind = 'repo_issue' AND status = 'published' AND published_at <= now() AND (NOT $1 OR ({LEGACY_REPO_COMPAT})) ORDER BY (data->>'issue_no')::int DESC LIMIT 60"
+    ))
+    .bind(legacy).fetch_all(&state.pool)
     .await?;
     let items: Vec<Value> = rows
         .into_iter()
         .map(|(key, _, _, d)| json!({ "key": key, "issue_no": d["issue_no"], "week_start": d["week_start"], "week_end": d["week_end"],
-            "source":d["source"],"observed_days":d["observed_days"],"complete":d["complete"],"observation_start":d["observation_start"],"observation_end":d["observation_end"] }))
+            "source":d["source"],"metric":d["metric"],"observed_days":d["observed_days"],"complete":d["complete"],"observation_start":d["observation_start"],"observation_end":d["observation_end"] }))
         .collect();
     Ok(Json(json!({ "items": items })))
 }
@@ -210,18 +226,26 @@ async fn models_board(State(state): State<AppState>) -> AppResult<Json<Value>> {
     })))
 }
 
-async fn tracker(State(state): State<AppState>) -> AppResult<Json<Value>> {
+async fn tracker(State(state): State<AppState>) -> AppResult<Json<Value>> { tracker_response(state, true).await }
+async fn tracker_v2(State(state): State<AppState>) -> AppResult<Json<Value>> { tracker_response(state, false).await }
+async fn tracker_response(state: AppState, legacy: bool) -> AppResult<Json<Value>> {
     let quota = fetch(&state.pool, "quota", BY_ORDER, 1, 0).await?.into_iter().next();
     let launches = fetch(&state.pool, "launch", NEWEST, 10, 0).await?;
     let now = Utc::now();
+    // Filter before LIMIT so expired/future campaigns cannot crowd out current ongoing benefits.
+    let rows:Vec<Row>=sqlx::query_as("SELECT key,sort_order,published_at,data FROM discover_items WHERE kind='promo' AND status='published' AND published_at<=$1 AND (NOT $2 OR ((data->>'ends_at') IS NOT NULL AND (data->>'started_at') IS NOT NULL)) AND ((data->>'started_at') IS NULL OR (data->>'started_at')::timestamptz<=$1) AND ((data->>'ends_at') IS NULL OR (data->>'ends_at')::timestamptz>$1) ORDER BY (data->>'ends_at')::timestamptz ASC NULLS LAST,sort_order,published_at DESC,key LIMIT 50")
+        .bind(now).bind(legacy).fetch_all(&state.pool).await?;
     let mut promos = Vec::new();
-    for mut p in fetch(&state.pool, "promo", "(data->>'ends_at')::timestamptz", 50, 0).await? {
-        let (Some(start), Some(end)) = (parse_time(&p["started_at"]), parse_time(&p["ends_at"])) else { continue };
-        if end <= now {
-            continue;
+    for mut p in rows.into_iter().map(item_json) {
+        if discover::validate("promo", p.clone()).is_err() { continue; }
+        match (parse_time(&p["started_at"]), parse_time(&p["ends_at"])) {
+            (Some(start), Some(end)) => {
+                p["pct"] = json!(discover::promo_progress(start, end, now));
+                p["days_left"] = json!(((end - now).num_seconds() + 86_399) / 86_400);
+            },
+            (_, None) => { p["pct"] = Value::Null; p["days_left"] = Value::Null; },
+            _ => continue,
         }
-        p["pct"] = json!(discover::promo_progress(start, end, now));
-        p["days_left"] = json!(((end - now).num_seconds() + 86_399) / 86_400);
         promos.push(p);
     }
     let sample = quota.as_ref().is_some_and(|q| q["sample"].as_bool().unwrap_or(false)) || any_sample(&launches) || any_sample(&promos);

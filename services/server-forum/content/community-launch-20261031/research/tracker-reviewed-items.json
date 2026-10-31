@@ -1,0 +1,151 @@
+{
+  "checked_at": "2026-10-31T16:15:07.276997+00:00",
+  "schema": "launch source/summary; promo nullable dates with eligibility and HTTPS source",
+  "items": [
+    {
+      "kind": "promo",
+      "key": "google-cloud-new-customer-credit",
+      "data": {
+        "text": "Google Cloud：符合条件的新客户可申请 300 美元试用额度",
+        "started_at": null,
+        "ends_at": null,
+        "source_url": "https://cloud.google.com/free",
+        "eligibility": "仅符合条件的新客户；试用、免费层与转付费分别受官方条款约束。 本次页面摘录未核实统一试用天数，按领取时官方条款确认。 所在地区、身份和可领取资格均以官方校验为准。"
+      },
+      "published_at": null,
+      "publication_note": "由实际审核发布动作写入社区发布时间。无统一起止日，不填虚构时间。"
+    },
+    {
+      "kind": "promo",
+      "key": "azure-students-credit",
+      "data": {
+        "text": "Azure for Students：符合资格的学生可申请 100 美元额度，12 个月内使用",
+        "started_at": null,
+        "ends_at": null,
+        "source_url": "https://azure.microsoft.com/en-us/free/students/",
+        "eligibility": "学生资格验证；部分免费月度服务仅针对新客户。 领取后 12 个月；符合学生条件可按官方规则续期。 所在地区、身份和可领取资格均以官方校验为准。"
+      },
+      "published_at": null,
+      "publication_note": "由实际审核发布动作写入社区发布时间。无统一起止日，不填虚构时间。"
+    },
+    {
+      "kind": "promo",
+      "key": "cloudflare-startups-credits",
+      "data": {
+        "text": "Cloudflare 初创企业额度计划：按资格与融资档位审核",
+        "started_at": null,
+        "ends_at": null,
+        "source_url": "https://www.cloudflare.com/startups/",
+        "eligibility": "须符合成立年限、融资、业务邮箱和公开网站等条件，需申请审核；不是所有人都能获得最高额度。 审核确认后一年或额度用完为止；产品有单独上限与排除项。 所在地区、身份和可领取资格均以官方校验为准。 额度有产品排除与上限；超出范围或毕业后的费用按官方条款计费。"
+      },
+      "published_at": null,
+      "publication_note": "由实际审核发布动作写入社区发布时间。无统一起止日，不填虚构时间。"
+    },
+    {
+      "kind": "promo",
+      "key": "aws-activate-credits",
+      "data": {
+        "text": "AWS Activate：自筹初创企业可申请 1000 美元起的额度，需资格审核",
+        "started_at": null,
+        "ends_at": null,
+        "source_url": "https://aws.amazon.com/startups/credits/",
+        "eligibility": "成立十年以内、Pre-Series B 等资格；需满足账户计划、历史领取与合作机构条件，非自动发放最高额度。 没有统一可直接当活动结束日的日期，以具体获批额度和条款为准。 所在地区、身份和可领取资格均以官方校验为准。"
+      },
+      "published_at": null,
+      "publication_note": "由实际审核发布动作写入社区发布时间。无统一起止日，不填虚构时间。"
+    },
+    {
+      "kind": "promo",
+      "key": "github-copilot-student",
+      "data": {
+        "text": "GitHub Copilot Student：已验证学生可用的补全、聊天与 Agent 权益，存在用量限制",
+        "started_at": null,
+        "ends_at": null,
+        "source_url": "https://education.github.com/pack",
+        "eligibility": "需通过学生资格验证；不表述为无限量付费模型或不限次数 Agent。 按当前学生资格与计划规则，不是统一截止的限时促销。 所在地区、身份和可领取资格均以官方校验为准。"
+      },
+      "published_at": null,
+      "publication_note": "由实际审核发布动作写入社区发布时间。无统一起止日，不填虚构时间。"
+    },
+    {
+      "kind": "launch",
+      "key": "deepseek-r1",
+      "data": {
+        "title": "历史回顾｜DeepSeek-R1 发布",
+        "tags": [
+          "开源权重",
+          "推理"
+        ],
+        "summary": "DeepSeek 发布 R1 及蒸馏模型，并在官方公告说明代码与模型采用 MIT 许可、提供网页与 API 入口。此处回顾发布事实，不把当年的性能自述当作今天的模型排名。",
+        "source_url": "https://api-docs.deepseek.com/news/news250120/"
+      },
+      "published_date": "2025-01-20",
+      "date_precision": "day",
+      "publication_note": "原文仅日期精度；如存00:00Z，仅用于日期排序，不代表官方精确发布时间。"
+    },
+    {
+      "kind": "launch",
+      "key": "qwen3",
+      "data": {
+        "title": "历史回顾｜Qwen3 系列发布",
+        "tags": [
+          "开源权重",
+          "本地部署"
+        ],
+        "summary": "Qwen 团队发布 Qwen3，包含两款 MoE 与六款稠密模型，官方说明以 Apache 2.0 许可开放权重，并介绍思考与非思考模式。历史内容可帮助读者比较本地部署规模与许可要求。",
+        "source_url": "https://qwenlm.github.io/blog/qwen3/"
+      },
+      "published_date": "2025-04-29",
+      "date_precision": "day",
+      "publication_note": "原文仅日期精度；如存00:00Z，仅用于日期排序，不代表官方精确发布时间。"
+    },
+    {
+      "kind": "launch",
+      "key": "gemini-2-5-ga",
+      "data": {
+        "title": "历史回顾｜Gemini 2.5 Pro、Flash 稳定版与 Flash-Lite 预览",
+        "tags": [
+          "API",
+          "稳定版"
+        ],
+        "summary": "Google 宣布 Gemini 2.5 Pro 与 Flash 成为稳定可用版本，同时推出 Flash-Lite 预览。官方文章介绍思考预算控制，并区分稳定版与预览版；不将当年的预览状态套用到当前服务。",
+        "source_url": "https://developers.googleblog.com/en/gemini-2-5-thinking-model-updates/"
+      },
+      "published_date": "2025-06-17",
+      "date_precision": "day",
+      "publication_note": "原文仅日期精度；如存00:00Z，仅用于日期排序，不代表官方精确发布时间。"
+    },
+    {
+      "kind": "launch",
+      "key": "gpt-5",
+      "data": {
+        "title": "历史回顾｜GPT-5 发布",
+        "tags": [
+          "API",
+          "历史发布"
+        ],
+        "summary": "OpenAI 发布 GPT-5，介绍统一系统与根据问题选择响应或深入推理的机制。原文现已提示读者查看更新型号，因此本条明确作为历史发布回顾，不声称它仍是最新模型。",
+        "source_url": "https://openai.com/index/introducing-gpt-5/"
+      },
+      "published_date": "2025-08-07",
+      "date_precision": "day",
+      "publication_note": "原文仅日期精度；如存00:00Z，仅用于日期排序，不代表官方精确发布时间。"
+    },
+    {
+      "kind": "launch",
+      "key": "claude-sonnet-4-5",
+      "data": {
+        "title": "历史回顾｜Claude Sonnet 4.5 与 Claude Agent SDK 发布",
+        "tags": [
+          "编程",
+          "Agent SDK"
+        ],
+        "summary": "Anthropic 发布 Claude Sonnet 4.5，并同时介绍 Claude Agent SDK、Claude Code 检查点与编辑器相关升级。适合回顾从模型调用到 Agent 开发工具链的演变，不复用当年的“最强”营销排序。",
+        "source_url": "https://www.anthropic.com/news/claude-sonnet-4-5"
+      },
+      "published_date": "2025-09-29",
+      "date_precision": "day",
+      "publication_note": "原文仅日期精度；如存00:00Z，仅用于日期排序，不代表官方精确发布时间。"
+    }
+  ]
+}

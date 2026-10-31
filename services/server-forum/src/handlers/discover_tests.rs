@@ -338,3 +338,84 @@ async fn seed_upgrade_replaces_old_samples_but_keeps_real_items() -> Result<(), 
     assert_eq!(docs, 5);
     h.finish().await
 }
+
+#[tokio::test]
+async fn tracker_promos_keep_ongoing_offers_without_countdown_and_filter_before_limit() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h)=harness().await? else {return Ok(());};
+    sqlx::query("DELETE FROM discover_items WHERE kind IN ('promo','launch')").execute(&h.pool).await?;
+    let now=chrono::Utc::now();
+    let ongoing=crate::discover::validate("promo",json!({"text":"验证学生资格后申请权益","started_at":null,"ends_at":null,"source_url":"https://education.github.com/pack","eligibility":"仅已验证学生；以官方地区与身份校验为准"}))?;
+    let timed=crate::discover::validate("promo",json!({"text":"有真实起止日期","started_at":now-chrono::Duration::days(1),"ends_at":now+chrono::Duration::days(2)}))?;
+    let future=crate::discover::validate("promo",json!({"text":"未来活动","started_at":now+chrono::Duration::days(1),"ends_at":now+chrono::Duration::days(3)}))?;
+    for (key,data) in [("ongoing",ongoing),("timed",timed),("future",future)] {
+        sqlx::query("INSERT INTO discover_items(kind,key,data,status,published_at) VALUES('promo',$1,$2,'published',now()-interval '1 minute')").bind(key).bind(data).execute(&h.pool).await?;
+    }
+    let expired=json!({"text":"已过期","started_at":now-chrono::Duration::days(3),"ends_at":now-chrono::Duration::days(1)});
+    sqlx::query("INSERT INTO discover_items(kind,key,data,status,published_at) SELECT 'promo','expired-'||n,$1,'published',now()-interval '1 minute' FROM generate_series(1,60) n").bind(expired).execute(&h.pool).await?;
+    let launch=crate::discover::validate("launch",json!({"title":"历史回顾｜2025模型发布","summary":"记录历史事件，并非今日上新","source_url":"https://qwenlm.github.io/blog/qwen3/"}))?;
+    sqlx::query("INSERT INTO discover_items(kind,key,data,status,published_at) VALUES('launch','historical',$1,'published','2025-04-29T00:00:00Z')").bind(launch).execute(&h.pool).await?;
+    let (status,body)=call(&h.app,"GET","/api/discover/tracker/v2",None,Value::Null).await;
+    assert_eq!(status,StatusCode::OK,"{body}");
+    let items=body["promos"].as_array().unwrap();assert_eq!(items.len(),2,"{body}");
+    let ongoing=items.iter().find(|p|p["key"]=="ongoing").unwrap();
+    assert!(ongoing["ends_at"].is_null() && ongoing["days_left"].is_null() && ongoing["pct"].is_null());
+    assert_eq!(ongoing["source_url"],"https://education.github.com/pack");
+    let timed=items.iter().find(|p|p["key"]=="timed").unwrap();
+    assert_eq!(timed["days_left"],2);assert!((30..=35).contains(&timed["pct"].as_i64().unwrap()));
+    assert!(body["launches"][0]["published_at"].as_str().unwrap().starts_with("2025-04-29"));
+    assert_eq!(body["launches"][0]["source_url"],"https://qwenlm.github.io/blog/qwen3/");
+    h.finish().await?;Ok(())
+}
+
+#[tokio::test]
+async fn discover_v2_preserves_nullable_truth_while_legacy_apps_decode_only_representable_data() -> Result<(), Box<dyn std::error::Error>> {
+    #[derive(serde::Deserialize)]
+    struct OldRank { star_gain:i64, star_total:i64 }
+    #[derive(serde::Deserialize)]
+    struct OldIssue { total_gain:i64, wow_pct:f64, ranks:Vec<OldRank> }
+    #[derive(serde::Deserialize)]
+    struct OldHome { repos:Option<OldIssue> }
+    #[derive(serde::Deserialize)]
+    struct OldPromo { ends_at:String, pct:u8, days_left:i64 }
+    #[derive(serde::Deserialize)]
+    struct OldTracker { promos:Vec<OldPromo> }
+    let Some(h)=harness().await? else {return Ok(());};
+    sqlx::query("DELETE FROM discover_items WHERE kind IN ('repo_issue','promo')").execute(&h.pool).await?;
+    let baseline:Value=serde_json::from_str(include_str!("../../content/community-launch-20261031/research/repo-baseline-2026-10-31.json"))?;
+    let baseline=crate::discover::validate("repo_issue",baseline)?;
+    sqlx::query("INSERT INTO discover_items(kind,key,data,status,published_at) VALUES('repo_issue','baseline',$1,'published',now()-interval '1 minute')").bind(baseline).execute(&h.pool).await?;
+    let (_,home)=call(&h.app,"GET","/api/discover/home",None,Value::Null).await;
+    assert!(serde_json::from_value::<OldHome>(home)?.repos.is_none());
+    assert_eq!(call(&h.app,"GET","/api/discover/repos",None,Value::Null).await.0,StatusCode::NOT_FOUND);
+    assert_eq!(call(&h.app,"GET","/api/discover/repos?issue=baseline",None,Value::Null).await.0,StatusCode::NOT_FOUND);
+    assert_eq!(call(&h.app,"GET","/api/discover/repos/issues",None,Value::Null).await.1["items"].as_array().unwrap().len(),0);
+    let (status,issue)=call(&h.app,"GET","/api/discover/repos/v2",None,Value::Null).await;
+    assert_eq!(status,StatusCode::OK);assert_eq!(issue["ranks"].as_array().unwrap().len(),8);
+    assert!(issue["total_gain"].is_null() && issue["ranks"][0]["star_gain"].is_null());
+    assert_eq!(call(&h.app,"GET","/api/discover/home/v2",None,Value::Null).await.1["repos"]["metric"],"star total baseline");
+    assert_eq!(call(&h.app,"GET","/api/discover/repos/issues/v2",None,Value::Null).await.1["items"].as_array().unwrap().len(),1);
+    let measured=crate::discover::validate("repo_issue",json!({"issue_no":1,"week_start":"2025-01-01","week_end":"2025-01-07","total_gain":12,"wow_pct":1.5,"daily_gain":[],"ranks":[{"full_name":"owner/repo","star_total":200,"star_gain":12}]}))?;
+    sqlx::query("INSERT INTO discover_items(kind,key,data,status,published_at) VALUES('repo_issue','numeric-old',$1,'published',now()-interval '1 minute')").bind(measured).execute(&h.pool).await?;
+    let (_,compatible)=call(&h.app,"GET","/api/discover/repos",None,Value::Null).await;
+    let old:OldIssue=serde_json::from_value(compatible)?;
+    assert_eq!(old.total_gain,12);assert_eq!(old.wow_pct,1.5);assert_eq!(old.ranks[0].star_gain,12);assert_eq!(old.ranks[0].star_total,200);
+    let (_,home)=call(&h.app,"GET","/api/discover/home",None,Value::Null).await;
+    assert!(serde_json::from_value::<OldHome>(home)?.repos.is_none(),"home must not disguise an older compatible issue as latest");
+    let (_,old_issues)=call(&h.app,"GET","/api/discover/repos/issues",None,Value::Null).await;
+    assert_eq!(old_issues["items"].as_array().unwrap().len(),1);assert_eq!(old_issues["items"][0]["key"],"numeric-old");
+    let reviewed:Value=serde_json::from_str(include_str!("../../content/community-launch-20261031/research/tracker-reviewed-items.json"))?;
+    for row in reviewed["items"].as_array().unwrap().iter().filter(|r|r["kind"]=="promo") {
+        let data=crate::discover::validate("promo",row["data"].clone())?;
+        sqlx::query("INSERT INTO discover_items(kind,key,data,status,published_at) VALUES('promo',$1,$2,'published',now()-interval '1 minute')").bind(row["key"].as_str().unwrap()).bind(data).execute(&h.pool).await?;
+    }
+    let now=chrono::Utc::now();
+    let timed=crate::discover::validate("promo",json!({"text":"真实限时活动","started_at":now-chrono::Duration::days(1),"ends_at":now+chrono::Duration::days(2)}))?;
+    sqlx::query("INSERT INTO discover_items(kind,key,data,status,published_at) VALUES('promo','timed',$1,'published',now()-interval '1 minute')").bind(timed).execute(&h.pool).await?;
+    let (_,legacy)=call(&h.app,"GET","/api/discover/tracker",None,Value::Null).await;
+    let legacy:OldTracker=serde_json::from_value(legacy)?;
+    assert_eq!(legacy.promos.len(),1);assert!(!legacy.promos[0].ends_at.is_empty());assert_eq!(legacy.promos[0].days_left,2);assert!(legacy.promos[0].pct<=100);
+    let (_,v2)=call(&h.app,"GET","/api/discover/tracker/v2",None,Value::Null).await;
+    assert_eq!(v2["promos"].as_array().unwrap().len(),6);
+    assert_eq!(v2["promos"].as_array().unwrap().iter().filter(|p|p["ends_at"].is_null() && p["pct"].is_null() && p["days_left"].is_null()).count(),5);
+    h.finish().await?;Ok(())
+}

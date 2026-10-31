@@ -234,3 +234,7 @@ API：
 账号方案备份为本人独立对象，显式保存、版本冲突保护、软删除与回收站，和公开方案分离。桌面/手机默认关闭云端入口；备份范围与客户端限制见 [私有方案备份](docs/scheme-backups.md)。显式设置 `FORUM_ACCOUNT_EXTRA_CLIENT_IDS` 时需保留 Android 与桌面客户端 ID。
 
 后台新增“栏目运营”和“作品举报”：栏目数字与采集新鲜度来自数据库，外链检查仅记录结果，不修改内容；定时检查默认关闭，最多每24小时运行，每次60条、4并发、120秒总时限，候选窗口和网络边界见 [外链与运营](docs/link-health-operations.md)。内部服务调度不使用 GitHub Actions。
+
+### 站方方案发布
+
+`POST /api/admin/schemes` 使用管理员凭据，传入已绑定的活跃站方 `author_uid`、`title`、`summary` 和 `items: [{pack_id, version}]`。复用用户方案的公开作品、版本、去重和日限额校验；发布与审计记录在同一事务中完成。手动模板的 manifest 可标记 `manualOnly: true`，网页详情提供下载和使用说明，不展示桌面安装入口。

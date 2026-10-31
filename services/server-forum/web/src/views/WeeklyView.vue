@@ -58,6 +58,7 @@ watch(
         <template v-else>
           <h3 v-if="it.title">{{ it.title }}</h3>
           <p v-if="it.note" class="note">{{ it.note }}</p>
+          <a v-if="it.source_url" :href="it.source_url" target="_blank" rel="noopener noreferrer">阅读官方原文 ↗</a>
         </template>
       </section>
     </article>

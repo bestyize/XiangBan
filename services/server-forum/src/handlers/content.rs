@@ -52,6 +52,7 @@ pub fn admin_routes() -> Router<AppState> {
         .route("/packs", get(admin_list_packs).post(admin_create_pack))
         .route("/packs/{id}/review", post(admin_review_pack))
         .route("/packs/{id}/mirrors", post(admin_add_mirror))
+        .route("/schemes", post(admin_create_scheme))
         .route("/projects", get(admin_list_projects))
         .route("/projects/{slug}", put(admin_put_project))
         .route("/weekly", get(admin_list_weekly))
@@ -755,6 +756,37 @@ pub struct CreateSchemeInput {
 
 /// 方案是一组内容包的组合，只存引用（包 id 与版本），应用时客户端逐个按各自的信任级别处理。
 async fn create_scheme(State(state): State<AppState>, auth: AuthUser, Json(input): Json<CreateSchemeInput>) -> AppResult<Json<Value>> {
+    create_scheme_for_author(&state, auth.user.uid, input, None).await
+}
+
+#[derive(Deserialize)]
+struct AdminSchemeInput {
+    author_uid: Uuid,
+    #[serde(flatten)]
+    scheme: CreateSchemeInput,
+}
+
+/// 管理员只能为已绑定、活跃的站方作者发布方案，保留真实署名与审计记录。
+async fn admin_create_scheme(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Json(input): Json<AdminSchemeInput>,
+) -> AppResult<Json<Value>> {
+    let (allowed,): (bool,) = sqlx::query_as(
+        "SELECT EXISTS(SELECT 1 FROM editor_authors e JOIN users u ON u.uid=e.uid WHERE e.uid=$1 AND u.status='active' AND u.trust_level>=1)",
+    ).bind(input.author_uid).fetch_one(&state.pool).await?;
+    if !allowed {
+        return Err(AppError::BadRequest("方案作者必须是已绑定的活跃站方作者".into()));
+    }
+    create_scheme_for_author(&state, input.author_uid, input.scheme, Some(&admin)).await
+}
+
+async fn create_scheme_for_author(
+    state: &AppState,
+    author_uid: Uuid,
+    input: CreateSchemeInput,
+    admin: Option<&crate::handlers::admin::AdminIdentity>,
+) -> AppResult<Json<Value>> {
     let title = clean_text(&input.title, "标题", 60, true)?;
     let summary = clean_text(&input.summary, "简介", 500, false)?;
     let review = crate::moderation::screen(&state.pool, &[&title, &summary]).await?;
@@ -762,7 +794,7 @@ async fn create_scheme(State(state): State<AppState>, auth: AuthUser, Json(input
         return Err(AppError::BadRequest("方案需要包含 1～20 个内容".into()));
     }
     let (today,): (i64,) = sqlx::query_as("SELECT count(*) FROM schemes WHERE author_uid = $1 AND created_at > now() - interval '1 day'")
-        .bind(auth.user.uid)
+        .bind(author_uid)
         .fetch_one(&state.pool)
         .await?;
     if today >= state.config.daily_pack_publishes * 2 {
@@ -785,17 +817,21 @@ async fn create_scheme(State(state): State<AppState>, auth: AuthUser, Json(input
         if resolved.iter().any(|v: &Value|v["pack_id"] == item.pack_id) { return Err(AppError::BadRequest("方案不能重复选择同一作品".into())); }
         resolved.push(json!({ "pack_id": item.pack_id, "kind": kind, "slug": slug, "version": version }));
     }
+    let mut tx = state.pool.begin().await?;
     let (id,): (i64,) = sqlx::query_as("INSERT INTO schemes (author_uid, title, summary, items) VALUES ($1, $2, $3, $4) RETURNING id")
-        .bind(auth.user.uid)
+        .bind(author_uid)
         .bind(&title)
         .bind(&summary)
         .bind(Value::Array(resolved))
-        .fetch_one(&state.pool)
+        .fetch_one(&mut *tx)
         .await?;
-    if let Some(word) = review {
-        let mut conn = state.pool.acquire().await?;
-        crate::moderation::enqueue(&mut conn, "scheme", id, &format!("命中复核词：{word}")).await?;
+    if let Some(admin) = admin {
+        audit(&mut tx, admin, "scheme.create", "scheme", id, format!("author={author_uid}")).await?;
     }
+    if let Some(word) = review {
+        crate::moderation::enqueue(&mut tx, "scheme", id, &format!("命中复核词：{word}")).await?;
+    }
+    tx.commit().await?;
     Ok(Json(json!({ "id": id })))
 }
 
@@ -900,7 +936,12 @@ async fn get_weekly(State(state): State<AppState>, Path(week): Path<String>) -> 
                     resolved.push(json!({ "type": "topic", "id": id, "title": t, "summary": excerpt, "note": note }));
                 }
             }
-            (Some("text"), _) => resolved.push(json!({ "type": "text", "title": item.get("title"), "note": note })),
+            (Some("text"), _) => {
+                let source = item.get("source_url").and_then(Value::as_str)
+                    .and_then(|raw| reqwest::Url::parse(raw).ok())
+                    .filter(|url| url.scheme() == "https" && url.host_str().is_some() && url.username().is_empty() && url.password().is_none());
+                resolved.push(json!({ "type": "text", "title": item.get("title"), "note": note, "source_url": source.map(|url| url.to_string()) }));
+            },
             _ => {}
         }
     }
