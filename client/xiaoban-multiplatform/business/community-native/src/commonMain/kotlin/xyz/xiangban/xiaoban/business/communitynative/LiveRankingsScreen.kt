@@ -47,6 +47,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -64,7 +65,7 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.pow
 
-private val RankingsPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 112.dp)
+private val RankingsPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 112.dp)
 
 /** 保留首页的紧凑榜单、图表与速度概览；完整指标筛选在“全部排行”中。 */
 @Composable
@@ -105,7 +106,7 @@ private fun rankingColor(name: String): Color {
 @Composable
 private fun RankingVendor(name: String) {
     val logo = BrandLogos.find(name)
-    if (logo != null) XIcon(logo.icon, tint = logo.color, size = 18.dp)
+    if (logo != null) XIcon(logo.icon, tint = if (ThemeState.dark && logo.color.luminance() < 0.18f) MaterialTheme.colorScheme.onSurface else logo.color, size = 18.dp)
     else LetterIcon(name.ifBlank { "?" }, rankingColor(name), rankingColor(name).copy(alpha = 0.12f), size = 18.dp)
 }
 
@@ -132,7 +133,7 @@ private fun LiveModelBar(row: LiveModelRank, vendor: String, metric: LiveModelMe
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 HBar(row.fraction ?: 0f, rankingColor(vendor).copy(alpha = if (ThemeState.dark) 0.32f else 0.18f),
                     height = 26.dp, track = LocalExtraColors.current.fill)
-                Text(row.model.name, Modifier.padding(horizontal = 7.dp), fontSize = 12.sp,
+                Text(row.model.name, Modifier.padding(horizontal = 7.dp), fontSize = 11.sp,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Text(value, Modifier.width(if (metric == LiveModelMetric.Speed) 46.dp else 40.dp), fontSize = 12.sp,
@@ -160,7 +161,7 @@ private fun LiveVendorLegend(vendors: List<LiveModelVendor>) {
 @Composable
 private fun LiveScatterCard(board: LiveModelBoard, vendors: Map<String, LiveModelVendor>, open: ((Route) -> Unit)?) {
     val points = remember(board) { liveScatterPoints(board) }
-    WhiteCard(padding = 14.dp) {
+    WhiteCard(padding = 14.dp, horizontalPadding = 0.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("智能 vs 价格", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -203,7 +204,7 @@ private fun AbilityRankings(env: CommunityEnv, open: ((Route) -> Unit)?, preview
                     }
                     if (preview) item {
                         val top = rows.filter { it.value != null }.take(10)
-                        WhiteCard(padding = 14.dp) {
+                        WhiteCard(padding = 14.dp, horizontalPadding = 0.dp) {
                             Row(verticalAlignment = Alignment.Top) {
                                 Column(Modifier.weight(1f)) {
                                     Text("AA 智能指数", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -223,13 +224,13 @@ private fun AbilityRankings(env: CommunityEnv, open: ((Route) -> Unit)?, preview
                         }
                     } else {
                         items(rows.chunked(25), key = { it.first().model.id }) { group ->
-                            WhiteCard(padding = 12.dp) { group.forEach { row -> LiveModelBar(row, vendors[row.model.vendorId]?.name ?: "未知厂商", metric) } }
+                            WhiteCard(padding = 12.dp, horizontalPadding = 0.dp) { group.forEach { row -> LiveModelBar(row, vendors[row.model.vendorId]?.name ?: "未知厂商", metric) } }
                         }
                     }
                     item { LiveScatterCard(board, vendors, open) }
                     if (preview) item {
                         val speed = remember(board) { rankLiveModels(board.models, LiveModelMetric.Speed).filter { it.value != null }.take(5) }
-                        WhiteCard(padding = 14.dp) {
+                        WhiteCard(padding = 14.dp, horizontalPadding = 0.dp) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("输出速度 Top 5", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                 Text("Token/秒", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
@@ -251,7 +252,7 @@ private fun AbilityRankings(env: CommunityEnv, open: ((Route) -> Unit)?, preview
 
 @Composable
 private fun UsagePreviewCard(state: Load<ModelUsageBoard>, retry: () -> Unit, open: () -> Unit) {
-    WhiteCard(Modifier.clickable(onClick = open), padding = 14.dp) {
+    WhiteCard(Modifier.clickable(onClick = open), padding = 14.dp, horizontalPadding = 0.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("调用量 Top 5", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Text("全部排行", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
@@ -276,7 +277,7 @@ private fun UsagePreviewCard(state: Load<ModelUsageBoard>, retry: () -> Unit, op
                         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                             HBar((model.sharePct / maxShare).toFloat(), rankingColor(vendor).copy(alpha = if (ThemeState.dark) 0.32f else 0.18f),
                                 height = 26.dp, track = LocalExtraColors.current.fill)
-                            Text(model.name.substringAfter('/'), Modifier.padding(horizontal = 7.dp), fontSize = 12.sp,
+                            Text(model.name.substringAfter('/'), Modifier.padding(horizontal = 7.dp), fontSize = 11.sp,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                         Text(shareText(model.sharePct, digits = 2), Modifier.width(46.dp), fontSize = 11.sp,
@@ -308,7 +309,7 @@ private fun UsageRankings(env: CommunityEnv) {
     PullToRefreshBox(state is Load.Loading, ::reload, Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             val dates = (datesState as? Load.Ready)?.value?.items?.sortedByDescending { it.date }.orEmpty()
-            LazyRow(contentPadding = PaddingValues(horizontal = 12.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            LazyRow(contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 item { PageChip("最新日榜", date == null) { date = null; env.prefs.put("community.rankings.date", "") } }
                 items(dates, key = { it.date }) { ref -> PageChip(ref.date.drop(5) + " UTC", date == ref.date) {
                     date = ref.date; env.prefs.put("community.rankings.date", ref.date)
@@ -320,7 +321,7 @@ private fun UsageRankings(env: CommunityEnv) {
                     if (board.models.isEmpty()) CenterMessage("暂无模型用量数据", "刷新", ::reload)
                     else LazyColumn(Modifier.fillMaxSize(), contentPadding = RankingsPadding, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         item {
-                            WhiteCard(padding = 14.dp) {
+                            WhiteCard(padding = 14.dp, horizontalPadding = 0.dp) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text("调用量 Top 50", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                     Text("${board.date} · UTC", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
@@ -330,7 +331,7 @@ private fun UsageRankings(env: CommunityEnv) {
                             }
                         }
                         items(board.models.sortedBy { it.rank }.chunked(10), key = { it.first().id }) { group ->
-                            WhiteCard(padding = 12.dp) { group.forEach { model -> UsageModelBar(model, board.previousDateAvailable) } }
+                            WhiteCard(padding = 12.dp, horizontalPadding = 0.dp) { group.forEach { model -> UsageModelBar(model, board.previousDateAvailable) } }
                         }
                         item { RankingSource(env, "OpenRouter", board.sourceUrl,
                             "Source: OpenRouter (openrouter.ai/rankings), as of ${board.asOf.take(10)}.\n其他模型 ${formatTokenCount(board.otherTokens)} Token；计入全天总量。排名变化与前一完整 UTC 日对比，不代表请求次数。") }
@@ -349,7 +350,7 @@ private fun UsageModelBar(model: ModelUsageEntry, previousAvailable: Boolean) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             Text(model.rank.toString(), Modifier.width(18.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
             RankingVendor(vendor)
-            Text(model.name.substringAfter('/'), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            Text(model.name.substringAfter('/'), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 11.sp, fontWeight = FontWeight.Medium)
             Text(shareText(model.sharePct, digits = 2), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
         }
         Row(Modifier.padding(start = 25.dp, top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {

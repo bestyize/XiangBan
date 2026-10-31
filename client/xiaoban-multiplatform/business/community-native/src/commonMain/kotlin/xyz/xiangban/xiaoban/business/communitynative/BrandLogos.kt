@@ -23,6 +23,7 @@ object BrandLogos {
 
     /** 按厂商或产品的名字找标志（名字里带关键词就认，不分大小写）；认不出来返回 null。 */
     fun find(name: String): BrandLogo? {
+        VendorBrandLogos.find(name)?.let { return it }
         val n = name.lowercase()
         if (n.contains("claude") || n.contains("anthropic")) return Claude
         if (n.contains("gemini") || n.contains("google") || n.contains("谷歌")) return Gemini
