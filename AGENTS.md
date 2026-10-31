@@ -24,8 +24,9 @@
 
 为防止模型过度思考、频繁自省以及调用高开销工具导致额度被快速消耗，必须严格遵守以下规则：
 
-### 1. 严格禁止滥用 GitHub MCP 工具
-- **严禁调用任何 GitHub API / MCP 工具**（包括但不限于 `github.fetch_pr`、`github.fetch_workflow_job_logs`、`github.create_pull_request`、`github.merge_pull_request` 等）。
+### 1. 按需使用 GitHub API / MCP 工具
+- 允许根据任务需要调用 GitHub API / MCP 工具，包括社区内容采集和工具版本同步；不再一律禁止调用。
+- 创建 PR、合并 PR 及监控 CI 仍遵守下一节的用户授权与执行范围约定。
 - **严禁将海量 Diff、PR 详情或远端 CI 构建日志载入对话上下文**，避免上下文膨胀导致巨额 Token 消耗。
 
 ### 2. 纯本地 Git 同步（禁止擅自提 PR 与监控 CI）
