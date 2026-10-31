@@ -43,6 +43,7 @@ impl Reader {
 
 /// 读一个帖子的权限检查：帖子不存在报 404，等级不够报 403。
 pub async fn ensure_readable(pool: &PgPool, reader: &Reader, topic_id: i64) -> AppResult<()> {
+    crate::content_social::discussion::ensure_visible(pool, topic_id).await?;
     let row: Option<(i16, Uuid)> = sqlx::query_as("SELECT min_read_level, author_uid FROM topics WHERE id = $1")
         .bind(topic_id)
         .fetch_optional(pool)
@@ -53,14 +54,9 @@ pub async fn ensure_readable(pool: &PgPool, reader: &Reader, topic_id: i64) -> A
 
 /// 同上，入口是回复 id。
 pub async fn ensure_post_readable(pool: &PgPool, reader: &Reader, post_id: i64) -> AppResult<()> {
-    let row: Option<(i16, Uuid)> = sqlx::query_as(
-        "SELECT t.min_read_level, t.author_uid FROM posts p JOIN topics t ON t.id = p.topic_id WHERE p.id = $1",
-    )
-    .bind(post_id)
-    .fetch_optional(pool)
-    .await?;
-    let (min, author) = row.ok_or_else(|| AppError::not_found("回复"))?;
-    reader.check(min, author)
+    let (topic_id,): (i64,) = sqlx::query_as("SELECT topic_id FROM posts WHERE id=$1")
+        .bind(post_id).fetch_optional(pool).await?.ok_or_else(|| AppError::not_found("回复"))?;
+    ensure_readable(pool, reader, topic_id).await
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -244,6 +240,7 @@ pub struct Page<T> {
 
 fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
     qb.push(" WHERE t.status = 'normal'");
+    qb.push(" AND NOT EXISTS(SELECT 1 FROM content_discussions d WHERE d.topic_id=t.id AND d.managed)");
     // 阅读权限：公开的、等级够的，以及读者自己发的。
     qb.push(" AND (t.min_read_level <= ").push_bind(f.reader.level);
     if let Some(uid) = f.reader.uid {
@@ -347,6 +344,7 @@ pub async fn list_topics(pool: &PgPool, f: &ListFilter) -> Result<Page<TopicItem
 
 /// 读单个帖子，不过滤状态，由调用方判断可见性。
 pub async fn get_topic(pool: &PgPool, id: i64) -> Result<Option<TopicItem>, AppError> {
+    crate::content_social::discussion::ensure_visible(pool, id).await?;
     let row: Option<TopicRow> =
         sqlx::query_as(&format!("{SELECT} WHERE t.id = $1")).bind(id).fetch_optional(pool).await?;
     Ok(match row {

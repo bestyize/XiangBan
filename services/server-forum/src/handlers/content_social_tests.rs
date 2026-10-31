@@ -61,6 +61,7 @@ impl Harness {
             .await?;
         let pool = crate::db::connect(&url, Some(&schema)).await?;
         crate::db::migrate(&pool).await?;
+        crate::db::seed(&pool).await?;
         social::schema::init(&pool).await?;
         social::schema::init(&pool).await?;
         let mut config = AppConfig::from_env();
@@ -482,4 +483,82 @@ async fn social_reports_admin_closure_revision_and_private_reasons(
     );
     h.close().await?;
     Ok(())
+}
+
+#[tokio::test]
+async fn work_discussion_reuses_posts_likes_and_notifies_creator() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else { return Ok(()); };
+    let (author, _) = h.user().await;
+    let (_, token) = h.user().await;
+    let id = h.pack(author, "测试创作者作品", "published").await;
+    let path = format!("/api/content-social/pack/{id}/discussion");
+    let (status, empty) = call(&h.app,"GET",&path,None,json!({})).await;
+    assert_eq!(status,StatusCode::OK,"{empty}");
+    assert!(empty["topic_id"].is_null());
+    assert_eq!(empty["like_count"],0);
+    assert_eq!(call(&h.app,"POST",&path,None,json!({})).await.0,StatusCode::UNAUTHORIZED);
+    let (a,b) = tokio::join!(call(&h.app,"POST",&path,Some(&token),json!({})),call(&h.app,"POST",&path,Some(&token),json!({})));
+    assert_eq!(a.0,StatusCode::OK,"{}",a.1); assert_eq!(b.0,StatusCode::OK,"{}",b.1);
+    assert_eq!(a.1["topic_id"],b.1["topic_id"]);
+    let topic = a.1["topic_id"].as_i64().unwrap();
+    let (owner,): (Uuid,) = sqlx::query_as("SELECT author_uid FROM topics WHERE id=$1").bind(topic).fetch_one(&h.pool).await?;
+    assert_eq!(owner,author);
+    let like = format!("/api/topics/{topic}/like");
+    let (a,b) = tokio::join!(call(&h.app,"PUT",&like,Some(&token),json!({})),call(&h.app,"PUT",&like,Some(&token),json!({})));
+    assert_eq!(a.0,StatusCode::OK,"{}",a.1); assert_eq!(b.1["like_count"],1);
+    call(&h.app,"DELETE",&like,Some(&token),json!({})).await;
+    assert_eq!(call(&h.app,"PUT",&like,Some(&token),json!({})).await.1["like_count"],1);
+    let (notes,): (i64,) = sqlx::query_as("SELECT count(*) FROM notifications WHERE uid=$1 AND kind='work_like'").bind(author).fetch_one(&h.pool).await?;
+    assert_eq!(notes,1,"repeated likes must not spam the creator");
+    let posts = format!("/api/topics/{topic}/posts");
+    let (status, reply) = call(&h.app,"POST",&posts,Some(&token),json!({"body":"作品很好用，期待下个版本"})).await;
+    assert!(status.is_success(),"{reply}");
+    let post = reply["id"].as_i64().unwrap();
+    assert_eq!(call(&h.app,"PUT",&format!("/api/posts/{post}/like"),Some(&token),json!({})).await.1["like_count"],1);
+    let live = call(&h.app,"GET",&path,Some(&token),json!({})).await.1;
+    assert_eq!(live["like_count"],1); assert_eq!(live["reply_count"],1); assert_eq!(live["liked"],true);
+    let (note_pack,): (Option<i64>,) = sqlx::query_as("SELECT pack_id FROM notifications WHERE uid=$1 AND kind='reply'").bind(author).fetch_one(&h.pool).await?;
+    assert_eq!(note_pack,Some(id));
+    let list = call(&h.app,"GET","/api/topics",None,json!({})).await.1;
+    assert!(!list["items"].as_array().unwrap().iter().any(|v| v["id"]==topic),"managed discussion must not duplicate the work in ordinary feeds");
+    sqlx::query("UPDATE topics SET locked=true WHERE id=$1").bind(topic).execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"GET",&path,Some(&token),json!({})).await.1["can_reply"],false);
+    assert_eq!(call(&h.app,"POST",&posts,Some(&token),json!({"body":"不能发送"})).await.0,StatusCode::FORBIDDEN);
+    sqlx::query("UPDATE packs SET status='removed' WHERE id=$1").bind(id).execute(&h.pool).await?;
+    for (method,url) in [("GET",path),("GET",format!("/api/topics/{topic}")),("GET",posts),("PUT",like),("PUT",format!("/api/posts/{post}/like"))] {
+        assert_eq!(call(&h.app,method,&url,Some(&token),json!({})).await.0,StatusCode::NOT_FOUND,"{method} {url}");
+    }
+    h.close().await?; Ok(())
+}
+
+#[tokio::test]
+async fn work_discussion_supports_imported_works_schemes_and_existing_threads() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else { return Ok(()); };
+    let (author, token) = h.user().await;
+    let id = h.pack(author,"历史作品测试","published").await;
+    sqlx::query("UPDATE packs SET author_uid=NULL WHERE id=$1").bind(id).execute(&h.pool).await?;
+    let path=format!("/api/content-social/pack/{id}/discussion");
+    let (status, first)=call(&h.app,"POST",&path,Some(&token),json!({})).await;
+    assert_eq!(status,StatusCode::OK,"{first}");
+    let topic=first["topic_id"].as_i64().unwrap();
+    let (owner,):(Uuid,)=sqlx::query_as("SELECT author_uid FROM topics WHERE id=$1").bind(topic).fetch_one(&h.pool).await?;
+    assert_ne!(owner,author,"first visitor must not become the creator");
+    // Simulate a pre-existing pack.topic_id without the new registry.
+    sqlx::query("DELETE FROM content_discussions WHERE kind='pack' AND target_id=$1").bind(id).execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"POST",&path,Some(&token),json!({})).await.1["topic_id"],topic);
+    let (scheme,):(i64,)=sqlx::query_as("INSERT INTO schemes(author_uid,title) VALUES($1,'方案互动测试') RETURNING id").bind(author).fetch_one(&h.pool).await?;
+    let path=format!("/api/content-social/scheme/{scheme}/discussion");
+    let (status,s)=call(&h.app,"POST",&path,Some(&token),json!({})).await;
+    assert_eq!(status,StatusCode::OK,"{s}");
+    let topic=s["topic_id"].as_i64().unwrap();
+    sqlx::query("UPDATE topics SET status='hidden' WHERE id=$1").bind(topic).execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"GET",&format!("/api/topics/{topic}/posts"),None,json!({})).await.0,StatusCode::NOT_FOUND);
+    sqlx::query("UPDATE topics SET status='normal' WHERE id=$1").bind(topic).execute(&h.pool).await?;
+    sqlx::query("UPDATE schemes SET status='removed' WHERE id=$1").bind(scheme).execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"GET",&format!("/api/topics/{topic}"),Some(&token),json!({})).await.0,StatusCode::NOT_FOUND);
+    let pending=h.pack(author,"待审核作品","pending").await;
+    assert_eq!(call(&h.app,"POST",&format!("/api/content-social/pack/{pending}/discussion"),Some(&token),json!({})).await.0,StatusCode::NOT_FOUND);
+    sqlx::query("UPDATE users SET status='muted',muted_until=now()+interval '1 day' WHERE uid=$1").bind(author).execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"POST",&format!("/api/content-social/pack/{id}/discussion"),Some(&token),json!({})).await.0,StatusCode::FORBIDDEN);
+    h.close().await?; Ok(())
 }

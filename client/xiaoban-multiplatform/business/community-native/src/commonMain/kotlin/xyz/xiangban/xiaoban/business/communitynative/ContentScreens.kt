@@ -172,7 +172,7 @@ internal fun TopicRow(topic: Topic, onClick: () -> Unit) {
 
 // ───────────── 详情页 ─────────────
 
-/** 作品详情：顶部封面（带返回和分享），标题、标签、作者、简介、更新记录、评论；底部“发到电脑”。 */
+/** 作品详情：顶部封面（带返回和分享），标题、标签、作者、简介、更新记录、评论；底栏与帖子一样提供评论、点赞、收藏和分享。 */
 @Composable
 fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null) {
     val loader = rememberLoader(env, id) { env.forum.pack(id) }
@@ -185,8 +185,8 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                 CapabilityDetailContent(env, pack, back, open = open)
                 return@LoadBox
             }
-            Column(Modifier.fillMaxSize()) {
-                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+            WorkInteractionLayout(env, "pack", pack.id, open, { share = true }, enabled = pack.status == "published") { comments ->
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                     Box(Modifier.fillMaxWidth().height(232.dp)) {
                         Cover(pack.coverUrl, pack.id, Modifier.fillMaxSize(), contentScale = if (pack.kind == "game" || pack.kind == "widget") androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop)
                         CircleOverlayButton(XIcons.ChevronLeft, "返回", back, Modifier.align(Alignment.TopStart).statusBarsPadding().padding(start = 12.dp, top = 12.dp))
@@ -209,7 +209,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                         }
                         if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 16.dp), fontSize = 15.sp, lineHeight = 26.sp)
                         if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, Modifier.padding(top = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (pack.status == "published") ContentSocialActions(env, "pack", pack.id, open)
+                        if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
                         val changes = pack.versions.filter { it.changelog.isNotBlank() }
                         if (changes.isNotEmpty()) {
                             Text("更新记录", Modifier.padding(top = 24.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -219,18 +219,14 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                             }
                         }
                     }
-                    pack.topicId?.let { CommentsSection(env, it, open = open) }
-                }
-                Hairline()
-                Box(Modifier.fillMaxWidth().height(72.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
-                    PillButton("发到电脑", { share = true }, Modifier.fillMaxWidth())
+                    comments()
                 }
             }
             OverlayTransition(share) { panel ->
                 ShareSheet(
                     env, pack.title, kindLabel(pack.kind) + (pack.author?.nickname?.let { " · $it" } ?: ""), env.forum.packUrl(pack.id),
-                    heading = "发到电脑",
-                    hint = "手机上不能直接应用到桌面。把链接发到电脑（比如微信的“文件传输助手”），在电脑上用浏览器打开，再用桌面版小伴一键应用。",
+                    heading = "分享作品",
+                    hint = "分享作品链接，也可以在电脑上打开查看与使用。",
                     onDismiss = { share = false }, onCopied = { toast = "链接已复制" },
                     panelModifier = panel,
                 )
@@ -260,11 +256,11 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
     var localRevision by remember(topicId, reloadKey) { mutableStateOf(0) }
     var editing by remember(topicId, session.accountId) { mutableStateOf<Post?>(null) }
     var editTopic by remember(topicId, reloadKey, session.accountId) { mutableStateOf(topicForEditing) }
-    var posts by remember(topicId, reloadKey, localRevision) { mutableStateOf<List<Post>>(emptyList()) }
-    var page by remember(topicId, reloadKey, localRevision) { mutableStateOf(0) }
-    var more by remember(topicId, reloadKey, localRevision) { mutableStateOf(true) }
-    var error by remember(topicId, reloadKey, localRevision) { mutableStateOf<String?>(null) }
-    var busy by remember(topicId, reloadKey, localRevision) { mutableStateOf(false) }
+    var posts by remember(topicId, reloadKey, localRevision, session.accountId) { mutableStateOf<List<Post>>(emptyList()) }
+    var page by remember(topicId, reloadKey, localRevision, session.accountId) { mutableStateOf(0) }
+    var more by remember(topicId, reloadKey, localRevision, session.accountId) { mutableStateOf(true) }
+    var error by remember(topicId, reloadKey, localRevision, session.accountId) { mutableStateOf<String?>(null) }
+    var busy by remember(topicId, reloadKey, localRevision, session.accountId) { mutableStateOf(false) }
     var retry by remember { mutableStateOf(0) }
 
     suspend fun load() {
@@ -283,7 +279,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
             busy = false
         }
     }
-    LaunchedEffect(topicId, retry, reloadKey, localRevision) { load() }
+    LaunchedEffect(topicId, retry, reloadKey, localRevision, session.accountId) { load() }
 
     LaunchedEffect(topicId, session.accountId, posts.any { it.mine }, topicForEditing) {
         editTopic = topicForEditing ?: if (session.loggedIn && posts.any { it.mine }) runCatching { env.forum.topic(topicId) }.getOrNull() else null
@@ -333,6 +329,7 @@ internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, 
                 ReplyAttachments(env, post.attachments, topicId)
             }
             if (!post.blocked && post.status == "normal") Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                PostLikeAction(env, post, open)
                 if (onEdit != null && !accepted) Text("编辑", Modifier.clickable(onClick = onEdit), fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
                 NativeReportAction(env, "post", post.id, open)
             }

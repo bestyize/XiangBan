@@ -44,6 +44,8 @@ data class Pack(
     val version: Int = 1,
     @SerialName("cover_url") val coverUrl: String? = null,
     @SerialName("apply_count") val applyCount: Long = 0,
+    @SerialName("like_count") val likeCount: Int = 0,
+    @SerialName("reply_count") val replyCount: Int = 0,
     @SerialName("topic_id") val topicId: Long? = null,
     @SerialName("one_click") val oneClick: Boolean = false,
     @SerialName("pure_data") val pureData: Boolean = false,
@@ -159,6 +161,9 @@ data class Category(
 )
 
 @Serializable
+data class LikeState(val liked: Boolean, @SerialName("like_count") val likeCount: Int)
+
+@Serializable
 data class Post(
     val id: Long,
     val floor: Int,
@@ -171,6 +176,7 @@ data class Post(
     /** 你屏蔽了这个作者：不返回正文 */
     val blocked: Boolean = false,
     val mine: Boolean = false,
+    val liked: Boolean = false,
     @SerialName("work_refs") val workRefs: List<ResolvedWorkReference> = emptyList(),
     val attachments: List<ForumAttachment> = emptyList(),
 )

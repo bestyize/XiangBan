@@ -1,6 +1,14 @@
 use sqlx::PgPool;
 pub async fn init(pool: &PgPool) -> Result<(), sqlx::Error> {
     sqlx::raw_sql(r#"
+CREATE TABLE IF NOT EXISTS content_discussions (
+    kind TEXT NOT NULL CHECK(kind IN ('pack','scheme')),
+    target_id BIGINT NOT NULL CHECK(target_id>0),
+    topic_id BIGINT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
+    managed BOOLEAN NOT NULL DEFAULT true,
+    PRIMARY KEY(kind,target_id)
+);
+CREATE INDEX IF NOT EXISTS content_discussions_topic_idx ON content_discussions(topic_id);
 CREATE TABLE IF NOT EXISTS content_bookmarks (
     uid UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
     kind TEXT NOT NULL CHECK(kind IN ('pack','scheme')),

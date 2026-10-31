@@ -90,7 +90,9 @@ fn like_pattern(q: &str) -> String {
 }
 
 const PACK_COLUMNS: &str = "p.id, p.kind, p.slug, p.title, p.summary, p.tags, p.author_uid, u.nickname AS author_name,
-    p.trust_level, p.status, p.current_version, p.cover_key, p.apply_count, p.topic_id, p.created_at, p.updated_at";
+    p.trust_level, p.status, p.current_version, p.cover_key, p.apply_count, p.topic_id, p.created_at, p.updated_at,
+    COALESCE((SELECT t.like_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS like_count,
+    COALESCE((SELECT t.reply_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS reply_count";
 
 #[derive(sqlx::FromRow)]
 struct PackRow {
@@ -108,6 +110,8 @@ struct PackRow {
     cover_key: Option<String>,
     apply_count: i64,
     topic_id: Option<i64>,
+    like_count: i32,
+    reply_count: i32,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -128,6 +132,8 @@ impl PackRow {
             "cover_url": cover_url(state, self.cover_key.as_deref()),
             "apply_count": self.apply_count,
             "topic_id": self.topic_id,
+            "like_count": self.like_count,
+            "reply_count": self.reply_count,
             "one_click": content::one_click_allowed(&self.kind, self.trust_level, &self.status),
             "pure_data": content::is_pure_data(&self.kind),
             "created_at": self.created_at,

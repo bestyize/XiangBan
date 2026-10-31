@@ -16,6 +16,14 @@ data class CommunityContentCard(
     val version: Int? = null, val author: PackAuthor? = null, val status: String? = null,
     val items: List<SchemePackRef> = emptyList(),
 )
+@Serializable data class ContentDiscussion(
+    @SerialName("topic_id") val topicId: Long? = null,
+    @SerialName("like_count") val likeCount: Int = 0,
+    @SerialName("reply_count") val replyCount: Int = 0,
+    val liked: Boolean = false,
+    @SerialName("can_reply") val canReply: Boolean = false,
+    val locked: Boolean = false,
+)
 @Serializable data class ContentBookmarkState(val bookmarked: Boolean)
 @Serializable data class ContentBookmark(val kind: String, val id: Long, @SerialName("created_at") val createdAt: String, val content: CommunityContentCard)
 
@@ -25,7 +33,12 @@ internal fun requireContentTarget(kind: String, id: Long) {
 
 class ContentSocialApi(client: HttpClient, config: CommunityConfig, private val token: suspend () -> String?) {
     private val http = JsonHttp(client, config.forumBase)
-    private suspend fun access() = token() ?: throw ApiException(401, "请登录后收藏或举报")
+    private suspend fun access() = token() ?: throw ApiException(401, "请登录后参与互动")
+    suspend fun discussion(kind: String, id: Long, create: Boolean = false): ContentDiscussion {
+        requireContentTarget(kind, id)
+        return http.send(if (create) HttpMethod.Post else HttpMethod.Get, "/api/content-social/$kind/$id/discussion", serializer(),
+            body = if (create) "{}" else null, token = if (create) access() else token())
+    }
     suspend fun state(kind: String, id: Long): ContentBookmarkState {
         requireContentTarget(kind, id)
         return http.send(HttpMethod.Get, "/api/content-social/$kind/$id", serializer(), token = access())

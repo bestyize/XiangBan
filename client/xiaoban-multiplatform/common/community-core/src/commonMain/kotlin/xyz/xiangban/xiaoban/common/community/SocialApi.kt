@@ -52,7 +52,8 @@ val CommunityReportReasons = linkedMapOf("spam" to "垃圾广告或私发推广"
 fun notificationHeadline(n: CommunityNotification): String {
     val who = n.actor?.nickname ?: "有人"
     return when (n.kind) {
-        "reply" -> "$who 回复了你的帖子「${n.title}」"
+        "reply" -> if (n.packId != null) "$who 评论了你的作品「${n.title}」" else "$who 回复了你的帖子「${n.title}」"
+        "work_like" -> "$who 赞了你的作品「${n.title}」"
         "reply_to" -> "$who 回复了你在「${n.title}」里的回复"
         "mention" -> "$who 在「${n.title}」里提到了你"
         "accepted" -> "你在「${n.title}」里的回答被采纳了"

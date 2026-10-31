@@ -132,6 +132,10 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     /** 求助者采纳一条回答，悬赏积分随之发给回答者。 */
     suspend fun acceptAnswer(topicId: Long, postId: Long) { write(HttpMethod.Post, "/api/topics/$topicId/help/accept", buildJsonObject { put("post_id", postId) }) }
 
+    suspend fun setPostLiked(id: Long, liked: Boolean): LikeState {
+        if (id <= 0) throw ApiException(400, "请选择有效评论")
+        return http.send(if (liked) HttpMethod.Put else HttpMethod.Delete, "/api/posts/$id/like", serializer(), body = "{}", token = token() ?: throw ApiException(401, "请先登录"))
+    }
     suspend fun setTopicLiked(id: Long, liked: Boolean) { write(if (liked) HttpMethod.Put else HttpMethod.Delete, "/api/topics/$id/like") }
     suspend fun setTopicBookmarked(id: Long, on: Boolean) { write(if (on) HttpMethod.Put else HttpMethod.Delete, "/api/topics/$id/bookmark") }
 

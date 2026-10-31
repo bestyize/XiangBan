@@ -1,5 +1,6 @@
 //! 内容包/方案的私有收藏与举报。举报理由仅对管理员开放，内容状态沿用原有发布表。
 pub mod schema;
+pub mod discussion;
 use crate::{
     error::{AppError, AppResult},
     handlers::{

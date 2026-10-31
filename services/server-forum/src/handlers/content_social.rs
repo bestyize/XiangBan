@@ -1,5 +1,5 @@
 use super::admin::AuthAdmin;
-use crate::{auth::AuthUser, content_social as social, error::AppResult, state::AppState};
+use crate::{auth::{AuthUser, MaybeUser}, content_social as social, error::AppResult, state::AppState};
 use axum::{
     extract::{Path, Query, State},
     routing::{get, post},
@@ -10,6 +10,7 @@ use serde_json::{json, Value};
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/content-social/{kind}/{id}", get(state))
+        .route("/content-social/{kind}/{id}/discussion", get(discussion).post(ensure_discussion))
         .route(
             "/content-social/{kind}/{id}/bookmark",
             axum::routing::put(bookmark).delete(unbookmark),
@@ -141,3 +142,10 @@ async fn handle(
 #[cfg(test)]
 #[path = "content_social_tests.rs"]
 mod tests;
+
+async fn discussion(State(s): State<AppState>, MaybeUser(user): MaybeUser, Path((kind,id)): Path<(String,i64)>) -> AppResult<Json<Value>> {
+    Ok(Json(social::discussion::state(&s.pool, user.as_ref(), &kind, id).await?))
+}
+async fn ensure_discussion(State(s): State<AppState>, auth: AuthUser, Path((kind,id)): Path<(String,i64)>) -> AppResult<Json<Value>> {
+    Ok(Json(social::discussion::ensure(&s.pool, &auth.user, &kind, id).await?))
+}

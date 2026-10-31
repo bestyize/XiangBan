@@ -58,7 +58,8 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
     val manualOnly = manifest["manualOnly"]?.toString() == "true"
     Column(Modifier.fillMaxSize()) {
         if (showBar) ScreenBar("能力详情", onBack = back, trailing = { IconTap(XIcons.Share, "分享", { sharing = true }) })
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = ContentSpacing) {
+        WorkInteractionLayout(env, "pack", pack.id, open, { sharing = true }, enabled = pack.status == "published") { comments ->
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = ContentSpacing) {
             WhiteCard(padding = 16.dp) {
                 Text(pack.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                 pack.author?.let { author -> Text(author.nickname ?: "作者", Modifier.padding(top = 6.dp).clickable(enabled = open != null) { open?.invoke(Route.User(author.uid)) }, fontSize = 14.sp, color = LocalExtraColors.current.brandInk) }
@@ -67,7 +68,7 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
                 if (pack.status != "published") Text(contentWorkState(pack), Modifier.padding(top = 8.dp), color = Danger, fontSize = 13.sp)
                 if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp)
             }
-            if (pack.status == "published") ContentSocialActions(env, "pack", pack.id, open)
+            if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
             ManifestSection("能做", manifestValue(manifest, "canDo", "can_do", "capabilities"))
             ManifestSection("不能做", manifestValue(manifest, "cannotDo", "cannot_do", "limitations"))
             ManifestSection("所需权限", manifestValue(manifest, "permissions", "requiredPermissions"))
@@ -79,7 +80,8 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
             if (expanded) ManifestSection("资源清单原文", CommunityJson.encodeToString(manifest))
             FootNote(if (manualOnly) "这是可下载的手动模板，按说明使用或复制提示词；不会自动执行任务。" else "手机用于浏览和分享。实际运行与授权在电脑端确认，导入不会自动执行；未提供权限说明不代表无需权限。")
             GhostPillButton("复制电脑端打开链接", { env.platform?.copy(env.forum.packUrl(pack.id)) }, Modifier.fillMaxWidth(), enabled = env.platform != null && pack.status == "published")
-            pack.topicId?.let { topicId -> GhostPillButton("在网页查看讨论", { env.platform?.openUrl(env.forum.topicUrl(topicId)) }, Modifier.fillMaxWidth(), enabled = env.platform != null) }
+            comments()
+        }
         }
     }
     OverlayTransition(sharing) { panel -> CommunityShareSheet(env, env.forum.packUrl(pack.id), "分享能力", null, { sharing = false }, {}, panel) }
@@ -93,13 +95,14 @@ fun SchemeDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rou
     Column(Modifier.fillMaxSize()) {
         ScreenBar("桌面方案", onBack = back)
         LoadBox(state, loader::reload) { scheme ->
+            WorkInteractionLayout(env, "scheme", scheme.id, open, { sharing = true }) { comments ->
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = ContentSpacing) {
                 item { WhiteCard(padding = 16.dp) {
                     Text(scheme.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                     Text("${scheme.author.nickname ?: "作者"} · ${scheme.createdAt.take(10)}", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                     if (scheme.summary.isNotBlank()) Text(scheme.summary, Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp)
                 } }
-                item { ContentSocialActions(env, "scheme", scheme.id, open) }
+                item { NativeReportAction(env, "scheme", scheme.id, open) }
                 item { Text("包含的内容", Modifier.padding(4.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
                 itemsIndexed(scheme.items, key = { index, item -> "$index-${item.packId}-${item.version}" }) { _, item -> WhiteCard(padding = 14.dp) {
                     Text(if (item.available) item.title ?: item.slug else "内容不可用", fontSize = 15.sp, fontWeight = FontWeight.Medium)
@@ -107,7 +110,8 @@ fun SchemeDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rou
                     if (item.available) GhostPillButton("查看内容", { open(if (item.kind in CapabilityPackKinds) Route.Ability(item.packId) else Route.Pack(item.packId)) }, Modifier.padding(top = 8.dp))
                 } }
                 item { FootNote("方案是一份内容清单。手机不会应用桌面内容；在电脑上打开后，逐项检查版本、可用性和权限再确认。") }
-                item { GhostPillButton("分享方案到电脑", { sharing = true }, Modifier.fillMaxWidth(), enabled = env.platform != null) }
+                item { comments() }
+            }
             }
         }
     }

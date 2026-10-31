@@ -22,9 +22,14 @@ async fn toggle_like(state: &AppState, auth: &AuthUser, target: &str, id: i64, o
     } else {
         models::ensure_post_readable(&state.pool, &reader, id).await?;
     }
-    let exists: Option<(i64,)> = sqlx::query_as(&format!("SELECT id FROM {table} WHERE id = $1 AND status = 'normal'"))
+    let mut tx = state.pool.begin().await?;
+    let topic_id = if target == "topic" { id } else {
+        sqlx::query_scalar::<_,i64>("SELECT topic_id FROM posts WHERE id=$1").bind(id).fetch_one(&mut *tx).await?
+    };
+    crate::content_social::discussion::lock_for_topic(&mut tx, topic_id).await?;
+    let exists: Option<(i64,)> = sqlx::query_as(&format!("SELECT id FROM {table} WHERE id = $1 AND status = 'normal' FOR UPDATE"))
         .bind(id)
-        .fetch_optional(&state.pool)
+        .fetch_optional(&mut *tx)
         .await?;
     if exists.is_none() {
         return Err(AppError::not_found("内容"));
@@ -37,7 +42,7 @@ async fn toggle_like(state: &AppState, auth: &AuthUser, target: &str, id: i64, o
     .bind(target)
     .bind(id)
     .bind(auth.user.uid)
-    .execute(&state.pool)
+    .execute(&mut *tx)
     .await?
     .rows_affected();
     let delta = if changed == 0 { 0 } else if on { 1 } else { -1 };
@@ -46,11 +51,21 @@ async fn toggle_like(state: &AppState, auth: &AuthUser, target: &str, id: i64, o
     ))
     .bind(id)
     .bind(delta)
-    .fetch_one(&state.pool)
+    .fetch_one(&mut *tx)
     .await?;
-    if target == "topic" && delta != 0 {
-        models::refresh_hot_scores(&state.pool, Some(id)).await?;
+    if target == "topic" && delta > 0 {
+        let work: Option<(Option<uuid::Uuid>,String,Option<i64>)> = sqlx::query_as("SELECT COALESCE(p.author_uid,s.author_uid),COALESCE(p.title,s.title),p.id FROM content_discussions d LEFT JOIN packs p ON d.kind='pack' AND p.id=d.target_id LEFT JOIN schemes s ON d.kind='scheme' AND s.id=d.target_id WHERE d.topic_id=$1 LIMIT 1")
+            .bind(id).fetch_optional(&mut *tx).await?;
+        if let Some((Some(author),title,pack_id)) = work {
+            let (notified,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM notifications WHERE uid=$1 AND actor_uid=$2 AND topic_id=$3 AND kind='work_like')")
+                .bind(author).bind(auth.user.uid).bind(id).fetch_one(&mut *tx).await?;
+            if !notified { crate::notifications::notify(&mut tx, author, &crate::notifications::Note {
+                kind: "work_like", actor: Some(auth.user.uid), topic_id: Some(id), post_id: None, pack_id, title: &title, excerpt: "喜欢了你的作品",
+            }).await?; }
+        }
     }
+    tx.commit().await?;
+    if target == "topic" && delta != 0 { models::refresh_hot_scores(&state.pool, Some(id)).await?; }
     Ok(Json(json!({ "liked": on, "like_count": count })))
 }
 

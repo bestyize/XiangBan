@@ -92,6 +92,14 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 后台（管理员令牌）：`GET/POST /admin/packs`（POST 是官方直接登记 T0/T1，文件已由运维放进资源机，可带魔搭等 https 镜像）、`POST /admin/packs/{id}/mirrors`（给某个版本补官方镜像，同名替换，最多 5 个；镜像地址不需要被信任，客户端对每个来源都校验 sha256）、`POST /admin/packs/{id}/review`（`approve|reject|remove|restore`）、`GET /admin/moderation`（待审队列）、`PUT /admin/projects/{slug}`、`PUT /admin/weekly/{week}`（草稿不对外，周刊条目只存引用，下架的内容包读取时自动隐去）。
 - 集成测试：`TEST_DATABASE_URL=postgres://… cargo test content_tests` 覆盖凭证、回调、发布、版本、审核、下载签名、配额、周刊和分享。
 
+## 创作作品互动（2026-11-01）
+
+作品与方案共用论坛 `topics` / `posts` / `likes`，评论沿用正文审核、附件、编辑、举报、每日配额与回复通知。`GET /api/content-social/{pack|scheme}/{id}/discussion` 允许游客读取真实讨论编号、赞/评论数及本人状态，不创建数据；首次主动互动由登录用户 `POST` 同一路径幂等建立关联，然后使用既有帖子回复和点赞接口。旧作品已有 `topic_id` 时直接复用；导入作品没有作者时由明确标注的“社区作品讨论”身份承载，不把首位评论者当作作者。
+
+关联表 `content_discussions` 随启动追加。自动创建的讨论不重复出现在普通帖子列表；作品下架、作者封禁或讨论被隐藏后，直接访问原帖子/回复/点赞入口也会校验作品可见性。作品点赞及计数在事务内更新，重复点赞不重复计数；同一读者对同一作品的赞只提醒作者一次，评论通知可返回作品。内容包列表增加兼容字段 `like_count` / `reply_count`，不把应用次数当点赞。
+
+针对性验证：`TEST_DATABASE_URL=… cargo test --locked --manifest-path services/server-forum/Cargo.toml content_social`；测试使用隔离 schema，覆盖游客读取不写入、首次互动并发、真实评论/点赞/通知、旧讨论复用、导入作品、方案、锁定/下架/禁言及原收藏举报。
+
 ## 手机端社区的发现页
 
 手机端社区（首页五个栏目、AI 工具、资料、求助悬赏）用的接口，实现在 `src/discover.rs`（内容校验与示例种子）、`src/handlers/discover.rs`（公开读取与兼容管理接口）、`src/handlers/discover_editor.rs`（编辑与审核）。公开内容存在 `discover_items`（`kind` + `key` + JSON `data`），编辑副本存在独立的 `discover_drafts`；保存副本不会改变线上内容。写入时按类型校验、只保留已知字段，草稿及内容日期未到的条目不对外。

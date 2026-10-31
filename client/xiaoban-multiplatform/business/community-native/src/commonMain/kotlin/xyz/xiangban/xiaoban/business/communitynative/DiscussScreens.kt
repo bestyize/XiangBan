@@ -249,7 +249,8 @@ private fun AuthorLine(pack: Pack) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Avatar(pack.author?.nickname ?: "?", 18.dp)
         Text(pack.author?.nickname ?: "社区作品", Modifier.weight(1f), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (pack.applyCount > 0) Text("${compactCount(pack.applyCount.toInt())} 次应用", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+        if (pack.likeCount > 0) Stat(XIcons.Heart, compactCount(pack.likeCount))
+        if (pack.replyCount > 0) Stat(XIcons.Message, compactCount(pack.replyCount))
     }
 }
 
@@ -267,7 +268,7 @@ internal fun LookCard(pack: Pack, single: Boolean = false, onClick: () -> Unit) 
         }
         Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 10.dp)) {
             Text(pack.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (pack.author != null || pack.applyCount > 0) Box(Modifier.padding(top = 8.dp)) { AuthorLine(pack) }
+            if (pack.author != null || pack.likeCount > 0 || pack.replyCount > 0) Box(Modifier.padding(top = 8.dp)) { AuthorLine(pack) }
         }
     }
 }
@@ -283,7 +284,7 @@ internal fun SkillCard(pack: Pack, onClick: () -> Unit) {
             Text(skillTag(pack.kind), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(pack.title, Modifier.padding(top = 8.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        if (pack.author != null || pack.applyCount > 0) Box(Modifier.padding(top = 10.dp)) { AuthorLine(pack) }
+        if (pack.author != null || pack.likeCount > 0 || pack.replyCount > 0) Box(Modifier.padding(top = 10.dp)) { AuthorLine(pack) }
     }
 }
 

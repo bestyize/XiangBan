@@ -192,8 +192,9 @@ pub async fn create(
     }
     let html = markdown::render(&body, user.trust_level >= 1);
 
-    // 锁住帖子行分配楼层号，避免并发回复撞号。
+    // 锁住作品与帖子行，避免下架后写入、并发回复撞号。
     let mut tx = state.pool.begin().await?;
+    crate::content_social::discussion::lock_for_topic(&mut tx, topic_id).await?;
     let (status, locked): (String, bool) =
         sqlx::query_as("SELECT status,locked FROM topics WHERE id=$1 FOR UPDATE")
             .bind(topic_id)
@@ -252,8 +253,9 @@ async fn notify_reply(
         .bind(topic_id)
         .fetch_one(&mut *tx)
         .await?;
+    let pack_id: Option<(i64,)> = sqlx::query_as("SELECT id FROM packs WHERE topic_id=$1 LIMIT 1").bind(topic_id).fetch_optional(&mut *tx).await?;
     let excerpt = markdown::excerpt(body, 80);
-    let note = |kind| Note { kind, actor: Some(actor), topic_id: Some(topic_id), post_id: Some(post_id), pack_id: None, title: &title, excerpt: &excerpt };
+    let note = |kind| Note { kind, actor: Some(actor), topic_id: Some(topic_id), post_id: Some(post_id), pack_id: pack_id.map(|p| p.0), title: &title, excerpt: &excerpt };
     let mut done = vec![actor];
     if let Some(rt) = reply_to {
         let target: Option<(Uuid,)> = sqlx::query_as("SELECT author_uid FROM posts WHERE id = $1").bind(rt).fetch_optional(&mut *tx).await?;
