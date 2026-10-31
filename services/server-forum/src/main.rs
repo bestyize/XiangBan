@@ -2,6 +2,7 @@ mod analytics;
 mod auth;
 mod config;
 mod collectors;
+mod community_editor;
 mod content;
 mod db;
 mod discover;
@@ -89,7 +90,8 @@ pub fn build_router(state: AppState) -> Router {
         .merge(packs::routes())
         .merge(discover_api::routes())
         .merge(handlers::model_rankings::routes())
-        .nest("/admin", admin::routes().merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(handlers::discover_editor::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()).nest("/collection", handlers::collection::routes()))
+        .merge(handlers::community_editor::public_routes())
+        .nest("/admin", admin::routes().merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(handlers::discover_editor::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()).nest("/collection", handlers::collection::routes()).nest("/community-editorial", handlers::community_editor::admin_routes()))
         .nest("/editor", handlers::editor::routes())
         .nest("/discover-editor", handlers::discover_editor::editor_routes());
 

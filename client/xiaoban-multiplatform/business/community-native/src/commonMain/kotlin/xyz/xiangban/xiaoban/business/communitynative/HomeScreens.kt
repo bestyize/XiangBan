@@ -251,7 +251,8 @@ internal fun NewsRow(item: NewsItem, onClick: () -> Unit) {
             Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 22.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Dot(accent, 16.dp)
-                Text(listOf(item.source, agoText(item.publishedAt)).filter { it.isNotEmpty() }.joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val time = agoText(item.sourcePublishedAt ?: item.publishedAt)
+                Text(listOf(item.source, if (item.timeBasis == "collected") "采集于 $time" else time).filter { it.isNotEmpty() }.joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -321,7 +322,7 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
     WhiteCard(padding = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("第 ${issue.issueNo} 期", Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (issue.source == "GitHub") "观测榜" else "第 ${issue.issueNo} 期", Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 Text(listOf(issue.weekStart, issue.weekEnd).filter { it.isNotEmpty() }.joinToString(" – "), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onPast).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -331,13 +332,13 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
         }
         Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
             Column {
-                Text("前 ${issue.ranks.size.coerceAtLeast(1)} 名本周新增 star", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                Text(if (issue.source == "GitHub") "前 ${issue.ranks.size} 名 · ${issue.observedDays ?: 0} 日观测净增 star" else "前 ${issue.ranks.size.coerceAtLeast(1)} 名本周新增 star", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                 Text(formatGain(issue.totalGain).removePrefix("+"), Modifier.padding(top = 2.dp), fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 if (issue.wowPct != 0.0) Text(if (issue.wowPct > 0) "比上周多 ${formatScore(issue.wowPct)}%" else "比上周少 ${formatScore(-issue.wowPct)}%", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (issue.dailyGain.size == 7) DayBars(issue.dailyGain, listOf("一", "二", "三", "四", "五", "六", "日"))
+            if (issue.dailyGain.size == 7 && issue.source != "GitHub") DayBars(issue.dailyGain, listOf("一", "二", "三", "四", "五", "六", "日"))
         }
-        Text("按 7 日新增 star 排序，只收 AI 相关项目" + if (issue.sample) " · 示例数据" else "", Modifier.padding(top = 10.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        Text((if (issue.source == "GitHub") "来源 GitHub · 候选仓库观测榜" + if (issue.complete) " · 已取得连续 7 日边界快照" else " · 观测尚未满 7 日或存在缺采，历史不补造" else "按 7 日新增 star 排序，只收 AI 相关项目") + if (issue.sample) " · 示例数据" else "", Modifier.padding(top = 10.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -359,6 +360,8 @@ private fun RepoCard(env: CommunityEnv, r: RepoRank) {
             Column(Modifier.weight(1f)) {
                 Text(r.fullName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = 6.dp))
                 if (r.description.isNotEmpty()) Text(r.description, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (r.suspectedGrowth) Text("增长异常 · 编辑复核后收录", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (r.observedDays != null && !r.complete) Text("实际观测 ${r.observedDays} 天，缺采日期未补值", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                 Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     LangLine(r)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -388,7 +391,7 @@ private fun IssuePicker(env: CommunityEnv, current: String?, onPick: (String?) -
         LoadBox(state, loader::reload) { list ->
             if (list.items.isEmpty()) Text("还没有往期", Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
             list.items.take(12).forEachIndexed { i, ref ->
-                RadioRow(selected = (current ?: list.items.first().key) == ref.key, title = "第 ${ref.issueNo} 期", desc = listOf(ref.weekStart, ref.weekEnd).filter { it.isNotEmpty() }.joinToString(" – ").ifEmpty { null }, onClick = { onPick(if (i == 0) null else ref.key) })
+                RadioRow(selected = (current ?: list.items.first().key) == ref.key, title = if (ref.key.startsWith("github-rolling-")) "${ref.weekEnd} 观测榜" else "第 ${ref.issueNo} 期", desc = listOf(ref.weekStart, ref.weekEnd).filter { it.isNotEmpty() }.joinToString(" – ").ifEmpty { null }, onClick = { onPick(if (i == 0) null else ref.key) })
             }
         }
         GhostPillButton("取消", onDismiss, Modifier.padding(top = 8.dp).fillMaxWidth())

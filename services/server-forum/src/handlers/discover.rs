@@ -120,7 +120,11 @@ async fn home(State(state): State<AppState>) -> AppResult<Json<Value>> {
     )
     .fetch_one(pool)
     .await?;
-    let featured = content::top_packs(&state, 8).await?;
+    let mut featured = crate::community_editor::featured(pool, 8).await?;
+    for pack in &mut featured {
+        pack["cover_url"] = json!(pack["cover_key"].as_str().and_then(|key|
+            state.config.resource_base_url.as_ref().map(|base| format!("{}/{key}",base.trim_end_matches('/')))));
+    }
     let issue = latest_repo_issue(pool, None).await?;
     let repos = issue.map(|mut i| {
         if let Some(r) = i["ranks"].as_array_mut() {
@@ -173,7 +177,8 @@ async fn repo_issues(State(state): State<AppState>) -> AppResult<Json<Value>> {
     .await?;
     let items: Vec<Value> = rows
         .into_iter()
-        .map(|(key, _, _, d)| json!({ "key": key, "issue_no": d["issue_no"], "week_start": d["week_start"], "week_end": d["week_end"] }))
+        .map(|(key, _, _, d)| json!({ "key": key, "issue_no": d["issue_no"], "week_start": d["week_start"], "week_end": d["week_end"],
+            "source":d["source"],"observed_days":d["observed_days"],"complete":d["complete"],"observation_start":d["observation_start"],"observation_end":d["observation_end"] }))
         .collect();
     Ok(Json(json!({ "items": items })))
 }

@@ -19,6 +19,8 @@ data class NewsItem(
     /** 没有封面图时，缩略图和来源小圆点的颜色（#RRGGBB）。 */
     val accent: String = "",
     @SerialName("published_at") val publishedAt: String = "",
+    @SerialName("source_published_at") val sourcePublishedAt: String? = null,
+    @SerialName("time_basis") val timeBasis: String = "",
     val sample: Boolean = false,
 )
 
@@ -50,6 +52,10 @@ data class RepoRank(
     val icon: String = "",
     /** 图标块的底色（#RRGGBB）。 */
     val tint: String = "",
+    @SerialName("observed_days") val observedDays: Int? = null,
+    val complete: Boolean = false,
+    @SerialName("suspected_growth") val suspectedGrowth: Boolean = false,
+    @SerialName("snapshot_dates") val snapshotDates: List<String> = emptyList(),
 )
 
 @Serializable
@@ -62,6 +68,9 @@ data class RepoIssue(
     @SerialName("wow_pct") val wowPct: Double = 0.0,
     @SerialName("daily_gain") val dailyGain: List<Long> = emptyList(),
     val ranks: List<RepoRank> = emptyList(),
+    val source: String = "",
+    @SerialName("observed_days") val observedDays: Int? = null,
+    val complete: Boolean = false,
     val sample: Boolean = false,
 )
 

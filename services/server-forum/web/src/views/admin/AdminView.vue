@@ -20,6 +20,7 @@ import ProjectsPanel from './ProjectsPanel.vue'
 import WeeklyPanel from './WeeklyPanel.vue'
 import DiscoverPanel from './DiscoverPanel.vue'
 import CollectionPanel from './CollectionPanel.vue'
+import CommunityEditorialPanel from './CommunityEditorialPanel.vue'
 import AuditPanel from './AuditPanel.vue'
 import AccountPanel from './AccountPanel.vue'
 import { openReports, toasts } from './shared'
@@ -41,6 +42,7 @@ const SECTIONS = [
   { key: 'weekly', label: '周刊', comp: WeeklyPanel },
   { key: 'discover', label: '发现页', comp: DiscoverPanel },
   { key: 'collection', label: '内容采集', comp: CollectionPanel },
+  { key: 'community-editorial', label: '精选与挑战', comp: CommunityEditorialPanel },
   { key: 'audit', label: '操作日志', comp: AuditPanel },
   { key: 'account', label: '账号', comp: AccountPanel },
 ] as const
