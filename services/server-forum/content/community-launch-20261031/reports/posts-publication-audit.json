@@ -1,0 +1,2747 @@
+{
+  "verified_at": "2026-11-01T00:36:17+0800",
+  "count": 105,
+  "topics": [
+    {
+      "external_id": "community-20261031-casual-chat-01",
+      "draft_id": "a36d5eee-8e39-4145-8081-9090f4e35470",
+      "topic_id": 517,
+      "url": "https://chat.xiangban.xyz/t/517",
+      "title": "给你每天会打开的小工具起个名字，你会按功能还是按性格",
+      "category": "casual-chat",
+      "path": "posts/batch-06/community-20261031-casual-chat-01.md",
+      "tags": [
+        "闲聊",
+        "工具",
+        "命名"
+      ],
+      "created_at": "2026-10-31T16:35:59.177905Z",
+      "body_sha256": "19b842c298593d25b085ab639b062d353ce5d2bef663383419fb6bdd7ed675b2",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-chat-02",
+      "draft_id": "17105798-3a02-446b-8bde-e8e76b3eb5fb",
+      "topic_id": 518,
+      "url": "https://chat.xiangban.xyz/t/518",
+      "title": "桌面上哪一个位置最容易被你留给“等会儿再整理”",
+      "category": "casual-chat",
+      "path": "posts/batch-06/community-20261031-casual-chat-02.md",
+      "tags": [
+        "闲聊",
+        "桌面整理",
+        "数字生活"
+      ],
+      "created_at": "2026-10-31T16:35:59.684129Z",
+      "body_sha256": "fa4c9d9c66b26e32d3167c0827ead250608e7560ca26c445c26dd96efb515030",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-chat-03",
+      "draft_id": "a1226d36-1236-44e3-b9d0-ca8f05777f3f",
+      "topic_id": 519,
+      "url": "https://chat.xiangban.xyz/t/519",
+      "title": "这周愿意分享的一个小发现：最好具体到一个动作",
+      "category": "casual-chat",
+      "path": "posts/batch-06/community-20261031-casual-chat-03.md",
+      "tags": [
+        "闲聊",
+        "小发现",
+        "生活交流"
+      ],
+      "created_at": "2026-10-31T16:36:00.200361Z",
+      "body_sha256": "33a661197154bd160a60bada4b38e84fe4bd899964972e5a28893dd3b2024b9e",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-chat-04",
+      "draft_id": "b0363dff-a718-4fcf-83e1-0086e005dcf7",
+      "topic_id": 520,
+      "url": "https://chat.xiangban.xyz/t/520",
+      "title": "同一篇长文，你更愿意在纸上、电脑还是手机上读",
+      "category": "casual-chat",
+      "path": "posts/batch-06/community-20261031-casual-chat-04.md",
+      "tags": [
+        "闲聊",
+        "阅读",
+        "设备习惯"
+      ],
+      "created_at": "2026-10-31T16:36:01.127948Z",
+      "body_sha256": "dbbaf60d08b1714dc675c9a49d8cfb7664297db112d3a0884705089ee776316f",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-chat-05",
+      "draft_id": "c9b64534-6ab3-45cd-bc74-55360ed3d68d",
+      "topic_id": 521,
+      "url": "https://chat.xiangban.xyz/t/521",
+      "title": "有没有一个旧习惯，你想保留而不是继续优化",
+      "category": "casual-chat",
+      "path": "posts/batch-06/community-20261031-casual-chat-05.md",
+      "tags": [
+        "闲聊",
+        "习惯",
+        "生活讨论"
+      ],
+      "created_at": "2026-10-31T16:36:02.123932Z",
+      "body_sha256": "53caee4c2cd7fe01132b0002a90f53719603c279dc3990f456f609390ac01db1",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-dream-01",
+      "draft_id": "1f3ae2ad-3aae-45b3-bed6-ee497b1f40a9",
+      "topic_id": 447,
+      "url": "https://chat.xiangban.xyz/t/447",
+      "title": "把“想做一个作品”缩成三十天能展示的小结果",
+      "category": "casual-dream",
+      "path": "posts/batch-03/community-20261031-casual-dream-01.md",
+      "tags": [
+        "梦想和人生",
+        "个人项目",
+        "创作"
+      ],
+      "created_at": "2026-10-31T16:33:00.948804Z",
+      "body_sha256": "b3fac61e50ba25ad2edaaa6f03eb86d755cdc787239297fec7d392d7f8a1c885",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-dream-02",
+      "draft_id": "c788ba96-6f55-400b-af35-2633f28652a5",
+      "topic_id": 448,
+      "url": "https://chat.xiangban.xyz/t/448",
+      "title": "不靠排行榜衡量进步：为自己的学习找三个可观察指标",
+      "category": "casual-dream",
+      "path": "posts/batch-03/community-20261031-casual-dream-02.md",
+      "tags": [
+        "梦想和人生",
+        "学习",
+        "自我记录"
+      ],
+      "created_at": "2026-10-31T16:33:02.984706Z",
+      "body_sha256": "23ccc9e2af926beda612983a1e42da3f66c48a19d342d4fbacaf39283c586a86",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-dream-03",
+      "draft_id": "ab561ac1-22ae-48ca-af8b-308dccba26db",
+      "topic_id": 449,
+      "url": "https://chat.xiangban.xyz/t/449",
+      "title": "给未来的自己写一封项目说明，而不是成功宣言",
+      "category": "casual-dream",
+      "path": "posts/batch-03/community-20261031-casual-dream-03.md",
+      "tags": [
+        "梦想和人生",
+        "写作",
+        "个人项目"
+      ],
+      "created_at": "2026-10-31T16:33:03.888762Z",
+      "body_sha256": "c45fe4fb954b0570b3a54480427cc4a9528d7a849415b50fcf8316d993386e59",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-dream-04",
+      "draft_id": "d72d4a52-9a4b-4288-b75b-30cdc05748f6",
+      "topic_id": 450,
+      "url": "https://chat.xiangban.xyz/t/450",
+      "title": "兴趣变成任务以后，还要不要给它留一块不用展示的地方",
+      "category": "casual-dream",
+      "path": "posts/batch-03/community-20261031-casual-dream-04.md",
+      "tags": [
+        "梦想和人生",
+        "兴趣",
+        "讨论"
+      ],
+      "created_at": "2026-10-31T16:33:05.285407Z",
+      "body_sha256": "dd02af3bfb6faf575a4e4b424108fac880e068e022b61885a6060f094ceb34cf",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-dream-05",
+      "draft_id": "d063d4bb-b79b-4747-be11-1a99c8c0c313",
+      "topic_id": 451,
+      "url": "https://chat.xiangban.xyz/t/451",
+      "title": "做长期计划前，先盘点哪些条件真正由自己掌握",
+      "category": "casual-dream",
+      "path": "posts/batch-03/community-20261031-casual-dream-05.md",
+      "tags": [
+        "梦想和人生",
+        "计划",
+        "讨论"
+      ],
+      "created_at": "2026-10-31T16:33:06.104344Z",
+      "body_sha256": "42c163913bc4288346e7404f4cde58030f9e471e81b9ea776cd3300c5f4c9b4a",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-fun-01",
+      "draft_id": "dee0a973-3bce-41ad-a1b3-0a4390234dcf",
+      "topic_id": 492,
+      "url": "https://chat.xiangban.xyz/t/492",
+      "title": "想试运输经营游戏，可以从 OpenTTD 的一条线路开始",
+      "category": "casual-fun",
+      "path": "posts/batch-04/community-20261031-casual-fun-01.md",
+      "tags": [
+        "吃喝玩乐",
+        "游戏",
+        "开源"
+      ],
+      "created_at": "2026-10-31T16:34:33.534763Z",
+      "body_sha256": "53d3c31a425ca75d9d393d6aa38194c885a7a65023651ce61f5aae3def529421",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-fun-02",
+      "draft_id": "2c0f3e36-d1fe-46f7-b990-20b6b0640b38",
+      "topic_id": 493,
+      "url": "https://chat.xiangban.xyz/t/493",
+      "title": "在 Lichess 做一盘慢棋练习：先解释选择，再看分析",
+      "category": "casual-fun",
+      "path": "posts/batch-04/community-20261031-casual-fun-02.md",
+      "tags": [
+        "吃喝玩乐",
+        "国际象棋",
+        "练习"
+      ],
+      "created_at": "2026-10-31T16:34:34.109948Z",
+      "body_sha256": "a7701116d4b21e29642b58f206bb399edf41e74dd7452b09d28828c57613b6cb",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-fun-03",
+      "draft_id": "963f02d5-a8ee-4a2b-a216-ef08f0070627",
+      "topic_id": 494,
+      "url": "https://chat.xiangban.xyz/t/494",
+      "title": "想找轻松的开源竞速游戏，可以看看 SuperTuxKart 官方入口",
+      "category": "casual-fun",
+      "path": "posts/batch-04/community-20261031-casual-fun-03.md",
+      "tags": [
+        "吃喝玩乐",
+        "游戏",
+        "开源"
+      ],
+      "created_at": "2026-10-31T16:34:34.818397Z",
+      "body_sha256": "79fb3f493bbf3330044006e1c27b80b70224ed02494cf8061bb9edfe8ac2bac9",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-fun-04",
+      "draft_id": "c7be3958-cfbd-4c91-8aa6-0e22a8e44333",
+      "topic_id": 495,
+      "url": "https://chat.xiangban.xyz/t/495",
+      "title": "不出远门的主题散步：选一个观察对象就够了",
+      "category": "casual-fun",
+      "path": "posts/batch-04/community-20261031-casual-fun-04.md",
+      "tags": [
+        "吃喝玩乐",
+        "休闲",
+        "观察练习"
+      ],
+      "created_at": "2026-10-31T16:34:35.407037Z",
+      "body_sha256": "9e77e4b4a310ac1b610930d89210d2d1b6a7de06ae46b3ea3c34a1d71689f3d5",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-fun-05",
+      "draft_id": "024a5102-c5b4-4da0-acb2-ba0e09e1fbe3",
+      "topic_id": 496,
+      "url": "https://chat.xiangban.xyz/t/496",
+      "title": "给朋友组织一次轻量游戏聚会：先确认规则和结束时间",
+      "category": "casual-fun",
+      "path": "posts/batch-04/community-20261031-casual-fun-05.md",
+      "tags": [
+        "吃喝玩乐",
+        "聚会",
+        "游戏讨论"
+      ],
+      "created_at": "2026-10-31T16:34:36.597131Z",
+      "body_sha256": "01cf710b9a040e6ee1b6a9e1c55b6c207420b3be7e583324142d17363f6a60a5",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-gear-01",
+      "draft_id": "86aafebc-83a5-495b-af11-2eb51451f8cb",
+      "topic_id": 452,
+      "url": "https://chat.xiangban.xyz/t/452",
+      "title": "数码装备先做资产卡：型号、接口、配件和保修凭据分开记",
+      "category": "casual-gear",
+      "path": "posts/batch-03/community-20261031-casual-gear-01.md",
+      "tags": [
+        "数码装备",
+        "设备整理",
+        "数字生活"
+      ],
+      "created_at": "2026-10-31T16:33:06.750765Z",
+      "body_sha256": "0898ed2a80082b3cf0dac0a83b7f8536416570ae24f2ebb332611c53abec3795",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-gear-02",
+      "draft_id": "a701959e-7f87-48d4-a8aa-c75db386f070",
+      "topic_id": 453,
+      "url": "https://chat.xiangban.xyz/t/453",
+      "title": "显示器体验怎么比较：用同一份文字、图片和窗口布局",
+      "category": "casual-gear",
+      "path": "posts/batch-03/community-20261031-casual-gear-02.md",
+      "tags": [
+        "数码装备",
+        "显示器",
+        "体验记录"
+      ],
+      "created_at": "2026-10-31T16:33:07.786737Z",
+      "body_sha256": "1e1f5d1ddc084d5d3f3c553681c1ad2750714f63ec928757989248eae4e5052d",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-gear-03",
+      "draft_id": "79f30ea7-d89b-4bd7-8234-81314273be9e",
+      "topic_id": 454,
+      "url": "https://chat.xiangban.xyz/t/454",
+      "title": "线材不靠颜色猜用途：给桌面连接画一张小地图",
+      "category": "casual-gear",
+      "path": "posts/batch-03/community-20261031-casual-gear-03.md",
+      "tags": [
+        "数码装备",
+        "桌面整理",
+        "连接"
+      ],
+      "created_at": "2026-10-31T16:33:10.157486Z",
+      "body_sha256": "8ac5dcdd07d9f1278b9ace0bc454892c8f9c6dea35ffe3b60a8f26402e0d3ce0",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-gear-04",
+      "draft_id": "d3d45ccc-ab01-4662-b098-20bec2340a77",
+      "topic_id": 455,
+      "url": "https://chat.xiangban.xyz/t/455",
+      "title": "旧设备还能做什么：先检查可用状态，再决定新用途",
+      "category": "casual-gear",
+      "path": "posts/batch-03/community-20261031-casual-gear-04.md",
+      "tags": [
+        "数码装备",
+        "旧设备",
+        "整理"
+      ],
+      "created_at": "2026-10-31T16:33:10.696662Z",
+      "body_sha256": "81b2ff4bf79a013ee95eadf7a84c082a74ead923a748bce2ecc6d1446443e12a",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-gear-05",
+      "draft_id": "fc28e00f-891e-4b58-9305-9da16c67e77e",
+      "topic_id": 456,
+      "url": "https://chat.xiangban.xyz/t/456",
+      "title": "存储空间突然不够：先分清文件、缓存和备份",
+      "category": "casual-gear",
+      "path": "posts/batch-03/community-20261031-casual-gear-05.md",
+      "tags": [
+        "数码装备",
+        "存储整理",
+        "数字归档"
+      ],
+      "created_at": "2026-10-31T16:33:11.198180Z",
+      "body_sha256": "39a99414a14fd441dc181ba3a958bb5f26efb02edde6ad7291fe026661123e96",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-help-01",
+      "draft_id": "abb26f54-7116-4da5-bfbc-c639cfaed5f4",
+      "topic_id": 497,
+      "url": "https://chat.xiangban.xyz/t/497",
+      "title": "求助帖怎么让别人接得住：把问题缩成最小可复现步骤",
+      "category": "casual-help",
+      "path": "posts/batch-04/community-20261031-casual-help-01.md",
+      "tags": [
+        "互助",
+        "提问方法",
+        "技术交流"
+      ],
+      "created_at": "2026-10-31T16:34:37.630585Z",
+      "body_sha256": "86828f504708b2ff0a1eed403854a6109b4918a623169d6ad93675c2cdd9633e",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-help-02",
+      "draft_id": "f4e1e9e3-d778-4447-bde7-4ca4bbc2b9a3",
+      "topic_id": 498,
+      "url": "https://chat.xiangban.xyz/t/498",
+      "title": "帮朋友整理电脑前，先确认哪些东西不能动",
+      "category": "casual-help",
+      "path": "posts/batch-04/community-20261031-casual-help-02.md",
+      "tags": [
+        "互助",
+        "电脑整理",
+        "数据保护"
+      ],
+      "created_at": "2026-10-31T16:34:38.569821Z",
+      "body_sha256": "e6838104be94a7bb9fed372f415b93ad9616fc482593a01d533f75423676a37c",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-help-03",
+      "draft_id": "323494c6-bada-4aed-a370-0578c9bd61e5",
+      "topic_id": 499,
+      "url": "https://chat.xiangban.xyz/t/499",
+      "title": "看不懂官方文档时，可以带着哪三个问题来问",
+      "category": "casual-help",
+      "path": "posts/batch-04/community-20261031-casual-help-03.md",
+      "tags": [
+        "互助",
+        "文档阅读",
+        "学习"
+      ],
+      "created_at": "2026-10-31T16:34:39.114601Z",
+      "body_sha256": "cdc732117d3c5ac5e2fb770e95def24015a7e390b48415258d8ab912ec8c3553",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-help-04",
+      "draft_id": "931bed0f-9dec-4226-aa74-897b4c115406",
+      "topic_id": 500,
+      "url": "https://chat.xiangban.xyz/t/500",
+      "title": "一起维护一份共享清单：先约定字段和谁来确认",
+      "category": "casual-help",
+      "path": "posts/batch-04/community-20261031-casual-help-04.md",
+      "tags": [
+        "互助",
+        "协作",
+        "资料整理"
+      ],
+      "created_at": "2026-10-31T16:34:39.595442Z",
+      "body_sha256": "48e937d914a91c4c6394b3f35e13a50d2c93b418d0dc0076b0e8da291ccf9c41",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-help-05",
+      "draft_id": "dd6cf4d9-d6fa-4b5e-9416-f06b336b39e0",
+      "topic_id": 501,
+      "url": "https://chat.xiangban.xyz/t/501",
+      "title": "别人来求助时，先确认他想要建议、资料还是一起排查",
+      "category": "casual-help",
+      "path": "posts/batch-04/community-20261031-casual-help-05.md",
+      "tags": [
+        "互助",
+        "沟通",
+        "社区讨论"
+      ],
+      "created_at": "2026-10-31T16:34:40.118332Z",
+      "body_sha256": "38a8dbb2a4aaef6434dd8a5d0eb4d8d36aff4cfe063b5a13ac6b8da5896a3d5e",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-indie-01",
+      "draft_id": "9c1c08fe-5a89-4e61-8f4d-fa693557fc65",
+      "topic_id": 502,
+      "url": "https://chat.xiangban.xyz/t/502",
+      "title": "独立开发的第一个演示，只需要证明一条完整路径",
+      "category": "casual-indie",
+      "path": "posts/batch-04/community-20261031-casual-indie-01.md",
+      "tags": [
+        "副业与独立开发",
+        "原型",
+        "项目方法"
+      ],
+      "created_at": "2026-10-31T16:34:40.689186Z",
+      "body_sha256": "483ff9449080b33ef7a8e6fb5f1709f43d39178f86bcf6bf700261372487fb79",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-indie-02",
+      "draft_id": "4eef9148-f816-4d5a-9064-30d80d5a0f38",
+      "topic_id": 503,
+      "url": "https://chat.xiangban.xyz/t/503",
+      "title": "收到“这里不好用”以后，怎样把反馈变成可验证的小任务",
+      "category": "casual-indie",
+      "path": "posts/batch-04/community-20261031-casual-indie-02.md",
+      "tags": [
+        "副业与独立开发",
+        "用户反馈",
+        "项目管理"
+      ],
+      "created_at": "2026-10-31T16:34:42.054295Z",
+      "body_sha256": "9091fea55788e5b0403b7e3f965653794b6db8b579f872ee2dc44602a91bee36",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-indie-03",
+      "draft_id": "6b133212-3e7c-4d51-8168-c51e80bc6375",
+      "topic_id": 504,
+      "url": "https://chat.xiangban.xyz/t/504",
+      "title": "开源仓库要补哪些说明：许可证不能由“代码公开”代替",
+      "category": "casual-indie",
+      "path": "posts/batch-04/community-20261031-casual-indie-03.md",
+      "tags": [
+        "副业与独立开发",
+        "开源",
+        "文档"
+      ],
+      "created_at": "2026-10-31T16:34:42.654009Z",
+      "body_sha256": "bc55e6ce85aaf8489f0391972b02c57009d24422cec7c041a0b2ba97e7c4b92b",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-indie-04",
+      "draft_id": "29aae9c6-6a2a-4a7a-8ac4-e61f485263d3",
+      "topic_id": 505,
+      "url": "https://chat.xiangban.xyz/t/505",
+      "title": "发布前留一张版本卡：以后排错才知道用户拿到了什么",
+      "category": "casual-indie",
+      "path": "posts/batch-04/community-20261031-casual-indie-04.md",
+      "tags": [
+        "副业与独立开发",
+        "版本管理",
+        "交付"
+      ],
+      "created_at": "2026-10-31T16:34:44.326234Z",
+      "body_sha256": "94e199b8b84c0ac8bc7d70510cc3fbac421b5691c439dd3b64064940daae31b8",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-indie-05",
+      "draft_id": "3b1c46ba-5f63-47e7-8b69-35e429ea6abe",
+      "topic_id": 506,
+      "url": "https://chat.xiangban.xyz/t/506",
+      "title": "给个人项目划维护边界：功能之外还要考虑恢复与交接",
+      "category": "casual-indie",
+      "path": "posts/batch-04/community-20261031-casual-indie-05.md",
+      "tags": [
+        "副业与独立开发",
+        "维护",
+        "项目复盘"
+      ],
+      "created_at": "2026-10-31T16:34:44.972363Z",
+      "body_sha256": "2b796f6529bcd3017b8e7f225918bbaefc339e8992a4144a29679b90f3602b06",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-loss-01",
+      "draft_id": "b6b1d406-c565-4f4d-aa0e-d98aa4a582eb",
+      "topic_id": 457,
+      "url": "https://chat.xiangban.xyz/t/457",
+      "title": "买课后没有学完，怎样复盘而不继续追加投入",
+      "category": "casual-loss",
+      "path": "posts/batch-03/community-20261031-casual-loss-01.md",
+      "tags": [
+        "亏了吗",
+        "消费复盘",
+        "学习"
+      ],
+      "created_at": "2026-10-31T16:33:11.983552Z",
+      "body_sha256": "d10c1cdd22878871c57b0439f96a401f519540e1d85f701983b485eca3d92402",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-loss-02",
+      "draft_id": "d2a8dd7e-0d3f-4392-a814-34d6eeaa3a26",
+      "topic_id": 458,
+      "url": "https://chat.xiangban.xyz/t/458",
+      "title": "订阅忘记取消怎么办：先整理续费清单，再决定保留哪些",
+      "category": "casual-loss",
+      "path": "posts/batch-03/community-20261031-casual-loss-02.md",
+      "tags": [
+        "亏了吗",
+        "订阅整理",
+        "数字生活"
+      ],
+      "created_at": "2026-10-31T16:33:12.478813Z",
+      "body_sha256": "04d35ee170d097459390eeeb194510e890d2f765b21975d182c5784ca9ac6efa",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-loss-03",
+      "draft_id": "462fbc2c-faa3-46ac-b651-bcb8175fc24e",
+      "topic_id": 459,
+      "url": "https://chat.xiangban.xyz/t/459",
+      "title": "二手物品看起来便宜，复盘时别漏掉修理和时间成本",
+      "category": "casual-loss",
+      "path": "posts/batch-03/community-20261031-casual-loss-03.md",
+      "tags": [
+        "亏了吗",
+        "消费复盘",
+        "二手经验"
+      ],
+      "created_at": "2026-10-31T16:33:13.062621Z",
+      "body_sha256": "360901306878fe75035c3b19e663fbfc1bccb84ca2cd3ae47bebbf55b98d6a70",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-loss-04",
+      "draft_id": "a642f518-3515-4f51-8f65-0eae702a8f68",
+      "topic_id": 460,
+      "url": "https://chat.xiangban.xyz/t/460",
+      "title": "小项目做完才发现低估了时间：怎样补一份估时复盘",
+      "category": "casual-loss",
+      "path": "posts/batch-03/community-20261031-casual-loss-04.md",
+      "tags": [
+        "亏了吗",
+        "项目复盘",
+        "独立开发"
+      ],
+      "created_at": "2026-10-31T16:33:14.671359Z",
+      "body_sha256": "2d9aaa1f6d3b2497c9e89746747f451d545e140e36a165d008c56cd193bc7f23",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-loss-05",
+      "draft_id": "378e51b4-dbf9-4a00-be6d-91625f8ae297",
+      "topic_id": 461,
+      "url": "https://chat.xiangban.xyz/t/461",
+      "title": "“已经花了很多”之外：给兴趣项目做一次暂停清单",
+      "category": "casual-loss",
+      "path": "posts/batch-03/community-20261031-casual-loss-05.md",
+      "tags": [
+        "亏了吗",
+        "兴趣项目",
+        "复盘"
+      ],
+      "created_at": "2026-10-31T16:33:15.525925Z",
+      "body_sha256": "8def0e82624a1ebe56b57504399d46c51e473945662c7bb06f44c847981577c9",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-media-01",
+      "draft_id": "3f92875c-7191-4a93-910a-1385c9725e63",
+      "topic_id": 507,
+      "url": "https://chat.xiangban.xyz/t/507",
+      "title": "重看《摩登时代》时，可以先观察动作怎样变成节奏",
+      "category": "casual-media",
+      "path": "posts/batch-04/community-20261031-casual-media-01.md",
+      "tags": [
+        "片单乐评",
+        "经典电影",
+        "观影笔记"
+      ],
+      "created_at": "2026-10-31T16:34:46.088496Z",
+      "body_sha256": "70fc948ba29146d74bbbc422207e237f03cee3dde37b0e7e3e76dd2a13fee7b9",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-media-02",
+      "draft_id": "5f2b0b4e-4bea-42c4-9b7e-33a0cbbbaccf",
+      "topic_id": 508,
+      "url": "https://chat.xiangban.xyz/t/508",
+      "title": "《十二怒汉》的讨论笔记：把证据、推断和态度分开记录",
+      "category": "casual-media",
+      "path": "posts/batch-04/community-20261031-casual-media-02.md",
+      "tags": [
+        "片单乐评",
+        "经典电影",
+        "观影讨论"
+      ],
+      "created_at": "2026-10-31T16:34:46.678955Z",
+      "body_sha256": "7da2f12a72867163064bc7a0e0a939738fbf51d144a489f264d85697a74d0561",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-media-03",
+      "draft_id": "44e861df-6db6-4241-a112-129e7a45358a",
+      "topic_id": 509,
+      "url": "https://chat.xiangban.xyz/t/509",
+      "title": "一份不剧透的片单，除了评分还可以告诉读者什么",
+      "category": "casual-media",
+      "path": "posts/batch-04/community-20261031-casual-media-03.md",
+      "tags": [
+        "片单乐评",
+        "片单",
+        "写作方法"
+      ],
+      "created_at": "2026-10-31T16:34:47.318925Z",
+      "body_sha256": "2917194ae730893f1a522706c8bf5ddca74ff2cac97a10343e1583339afd43f3",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-media-04",
+      "draft_id": "9283ade2-89a3-4b5f-80b0-e7fc2e2fb78e",
+      "topic_id": 510,
+      "url": "https://chat.xiangban.xyz/t/510",
+      "title": "乐评从一个可听见的变化开始：别让形容词代替描述",
+      "category": "casual-media",
+      "path": "posts/batch-04/community-20261031-casual-media-04.md",
+      "tags": [
+        "片单乐评",
+        "乐评",
+        "听音笔记"
+      ],
+      "created_at": "2026-10-31T16:34:48.137343Z",
+      "body_sha256": "5efa5a34947aabb9f7ccf4f82fd539ac80a227bfcaa20c48e3761f5695b6496c",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-media-05",
+      "draft_id": "b6bb54cb-3e8d-4dec-924f-f8d25eef6a01",
+      "topic_id": 511,
+      "url": "https://chat.xiangban.xyz/t/511",
+      "title": "原声版、现场版与改编版怎样比较：先固定同一个观察问题",
+      "category": "casual-media",
+      "path": "posts/batch-04/community-20261031-casual-media-05.md",
+      "tags": [
+        "片单乐评",
+        "音乐版本",
+        "讨论"
+      ],
+      "created_at": "2026-10-31T16:34:49.210330Z",
+      "body_sha256": "52a533c293ed662c83acdfc4578458b21b627a162a606b148ed0ba5cd2c3c875",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-offwork-01",
+      "draft_id": "6d596480-6e42-417d-8ba6-d6769b65529e",
+      "topic_id": 462,
+      "url": "https://chat.xiangban.xyz/t/462",
+      "title": "下班后的半小时不一定要高效：给自己留一个切换步骤",
+      "category": "casual-offwork",
+      "path": "posts/batch-03/community-20261031-casual-offwork-01.md",
+      "tags": [
+        "下班了",
+        "生活整理",
+        "讨论"
+      ],
+      "created_at": "2026-10-31T16:33:16.031425Z",
+      "body_sha256": "ea3fa4f0940ff25b81738dca7706136deecd61e0b4cf3590cbe669c676d0af7a",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-offwork-02",
+      "draft_id": "f26efcfd-6b25-4707-ab8e-62c475ea140c",
+      "topic_id": 463,
+      "url": "https://chat.xiangban.xyz/t/463",
+      "title": "给兴趣留一个低门槛入口：十分钟也能开始的练习",
+      "category": "casual-offwork",
+      "path": "posts/batch-03/community-20261031-casual-offwork-02.md",
+      "tags": [
+        "下班了",
+        "兴趣",
+        "小练习"
+      ],
+      "created_at": "2026-10-31T16:33:16.770128Z",
+      "body_sha256": "1254731e204ecf9a2f5ae91feaeda65ea2e3acbb513b14a370f07e21684f87d7",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-offwork-03",
+      "draft_id": "e4676c95-2050-4cf9-84eb-054b3f026839",
+      "topic_id": 464,
+      "url": "https://chat.xiangban.xyz/t/464",
+      "title": "周末不想做计划，也可以先列一张“可选菜单”",
+      "category": "casual-offwork",
+      "path": "posts/batch-03/community-20261031-casual-offwork-03.md",
+      "tags": [
+        "下班了",
+        "周末",
+        "生活讨论"
+      ],
+      "created_at": "2026-10-31T16:33:17.586258Z",
+      "body_sha256": "768495b942152d6a4d31d422ef197289ac6e2061d69889ecdc5324184106ba22",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-offwork-04",
+      "draft_id": "a275e7f5-a77c-4c70-97f3-cda2c8f20b6f",
+      "topic_id": 465,
+      "url": "https://chat.xiangban.xyz/t/465",
+      "title": "把照片整理成一次小回顾：先挑十张，而不是清空整个相册",
+      "category": "casual-offwork",
+      "path": "posts/batch-03/community-20261031-casual-offwork-04.md",
+      "tags": [
+        "下班了",
+        "照片整理",
+        "数字生活"
+      ],
+      "created_at": "2026-10-31T16:33:18.100861Z",
+      "body_sha256": "fb0a4b88cfe9617e14d85d476d7a243a4b34c9f141d9a2f6980787f979451be8",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-offwork-05",
+      "draft_id": "7cbed6dc-09ac-43ec-ae95-e4702acac7dd",
+      "topic_id": 466,
+      "url": "https://chat.xiangban.xyz/t/466",
+      "title": "不带成绩目标的阅读：读完一段，也可以只留一个问题",
+      "category": "casual-offwork",
+      "path": "posts/batch-03/community-20261031-casual-offwork-05.md",
+      "tags": [
+        "下班了",
+        "阅读",
+        "讨论"
+      ],
+      "created_at": "2026-10-31T16:33:19.578675Z",
+      "body_sha256": "eafbe290e4c922ba3c0a486e18dd40709593a503c1221b0a6793432d68b535a6",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-think-01",
+      "draft_id": "18a02a7b-9abd-4b44-bd64-bf0f3aed714a",
+      "topic_id": 512,
+      "url": "https://chat.xiangban.xyz/t/512",
+      "title": "一句话里哪些是事实，哪些是评价？从日常讨论做个小练习",
+      "category": "casual-think",
+      "path": "posts/batch-04/community-20261031-casual-think-01.md",
+      "tags": [
+        "哲思",
+        "讨论",
+        "判断"
+      ],
+      "created_at": "2026-10-31T16:34:49.849713Z",
+      "body_sha256": "33df2cb108baae1aee5c7252bd490a92435f891ddb66341a12d7bc8a412005b0",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-think-02",
+      "draft_id": "85b0c656-1891-4c21-b2c2-cabc582d8e09",
+      "topic_id": 513,
+      "url": "https://chat.xiangban.xyz/t/513",
+      "title": "选择更多就一定更自由吗？先区分拥有选项与能够行动",
+      "category": "casual-think",
+      "path": "posts/batch-04/community-20261031-casual-think-02.md",
+      "tags": [
+        "哲思",
+        "选择",
+        "讨论"
+      ],
+      "created_at": "2026-10-31T16:34:50.655175Z",
+      "body_sha256": "35bf785ecd7579d41df44c4c39378dc0df0a372282a24343a36d1ca5856ce39c",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-think-03",
+      "draft_id": "e76cade8-1dba-4335-b7f9-25460d6c3b03",
+      "topic_id": 514,
+      "url": "https://chat.xiangban.xyz/t/514",
+      "title": "AI 参与创作以后，责任应该跟着哪一个决定走",
+      "category": "casual-think",
+      "path": "posts/batch-04/community-20261031-casual-think-03.md",
+      "tags": [
+        "哲思",
+        "AI创作",
+        "责任"
+      ],
+      "created_at": "2026-10-31T16:34:52.190062Z",
+      "body_sha256": "938d8ea8128f807df0b02ec967d3bce4d875a6dcfa2e885fd6d810b24d2eced8",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-think-04",
+      "draft_id": "7a4d8c92-c2be-4de7-87dc-8a74fc2a7406",
+      "topic_id": 515,
+      "url": "https://chat.xiangban.xyz/t/515",
+      "title": "一份数字副本还是“同一个东西”吗？从文件备份谈起",
+      "category": "casual-think",
+      "path": "posts/batch-04/community-20261031-casual-think-04.md",
+      "tags": [
+        "哲思",
+        "数字生活",
+        "讨论"
+      ],
+      "created_at": "2026-10-31T16:34:52.807213Z",
+      "body_sha256": "64b3741ff8f5b0a6fb24c85e3852ab54f49c0776e097e83e414bf25d4d07532d",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-think-05",
+      "draft_id": "a1ec3585-641f-4dbf-82da-4d34eb86e045",
+      "topic_id": 516,
+      "url": "https://chat.xiangban.xyz/t/516",
+      "title": "效率提高以后省下的时间，要不要继续被填满",
+      "category": "casual-think",
+      "path": "posts/batch-04/community-20261031-casual-think-05.md",
+      "tags": [
+        "哲思",
+        "效率",
+        "生活讨论"
+      ],
+      "created_at": "2026-10-31T16:34:53.491629Z",
+      "body_sha256": "6c132b77c53548bafb85310a718b8dd83991e03101f425dae865c7bafe031e29",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-work-01",
+      "draft_id": "e5a15f9b-9023-4bb3-a0ce-f27077c5dfc9",
+      "topic_id": 467,
+      "url": "https://chat.xiangban.xyz/t/467",
+      "title": "把一项工作交接清楚：别只留下一个文件夹",
+      "category": "casual-work",
+      "path": "posts/batch-03/community-20261031-casual-work-01.md",
+      "tags": [
+        "职场",
+        "交接",
+        "协作"
+      ],
+      "created_at": "2026-10-31T16:33:20.570224Z",
+      "body_sha256": "38a650dcac1558121384923c9a4db93238dfdad87340dc094b6c071c262fa2c6",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-work-02",
+      "draft_id": "6082d6eb-cd2b-4dad-a38d-0b9076e8e81c",
+      "topic_id": 468,
+      "url": "https://chat.xiangban.xyz/t/468",
+      "title": "异步提问怎么更容易收到有效回复：给出背景，也给出判断点",
+      "category": "casual-work",
+      "path": "posts/batch-03/community-20261031-casual-work-02.md",
+      "tags": [
+        "职场",
+        "沟通",
+        "协作"
+      ],
+      "created_at": "2026-10-31T16:33:21.945972Z",
+      "body_sha256": "32fca11824a76e71b6a647f8df3e37d42fec60b69301ed8a79bbaece0a358df0",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-work-03",
+      "draft_id": "b0b2578d-c9ef-47d6-811c-43c35aa08e48",
+      "topic_id": 469,
+      "url": "https://chat.xiangban.xyz/t/469",
+      "title": "会议记录只记结论够吗？把决定、行动和待确认分开",
+      "category": "casual-work",
+      "path": "posts/batch-03/community-20261031-casual-work-03.md",
+      "tags": [
+        "职场",
+        "会议记录",
+        "工作流"
+      ],
+      "created_at": "2026-10-31T16:33:23.180911Z",
+      "body_sha256": "8fd4b34d74ba8e3c68880adf3a9caedae9649c2c843a3ff36c45056ffd57e413",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-work-04",
+      "draft_id": "42029b37-cd26-4129-948e-b3307f61ed82",
+      "topic_id": 470,
+      "url": "https://chat.xiangban.xyz/t/470",
+      "title": "工作中用了 AI，怎样说明哪些部分已经核对",
+      "category": "casual-work",
+      "path": "posts/batch-03/community-20261031-casual-work-04.md",
+      "tags": [
+        "职场",
+        "AI提效",
+        "质量检查"
+      ],
+      "created_at": "2026-10-31T16:33:25.033489Z",
+      "body_sha256": "d08122bc137f640cb755e72d7975392d85fa42aa550d74f427e306eaa7a0080b",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-casual-work-05",
+      "draft_id": "d3b24433-513d-463b-8dac-4dbb0437f0fd",
+      "topic_id": 471,
+      "url": "https://chat.xiangban.xyz/t/471",
+      "title": "每天结束前留三行状态：让明天的自己更容易继续",
+      "category": "casual-work",
+      "path": "posts/batch-03/community-20261031-casual-work-05.md",
+      "tags": [
+        "职场",
+        "时间整理",
+        "工作习惯"
+      ],
+      "created_at": "2026-10-31T16:33:25.912153Z",
+      "body_sha256": "0c0895a8acb589db9a67a6dcb1430a1629d990f74aafec9a87bdfa2c2d57134e",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-help-01",
+      "draft_id": "2da54def-8c1d-42fc-ad68-7639454e22fc",
+      "topic_id": 422,
+      "url": "https://chat.xiangban.xyz/t/422",
+      "title": "资源线索共建：寻找能离线阅读的中文编程入门资料",
+      "category": "share-help",
+      "path": "posts/batch-02/community-20261031-share-help-01.md",
+      "tags": [
+        "资源求助",
+        "学习资料",
+        "编程入门"
+      ],
+      "created_at": "2026-10-31T16:31:32.895500Z",
+      "body_sha256": "88de96c80d241d94565bf354e094f5572f2298c608832c8f879939396c588271",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-help-02",
+      "draft_id": "9848db95-0a4e-4229-aadf-e28fdaf5c678",
+      "topic_id": 423,
+      "url": "https://chat.xiangban.xyz/t/423",
+      "title": "求可核对的桌面录屏字幕资料：欢迎补充官方教程入口",
+      "category": "share-help",
+      "path": "posts/batch-02/community-20261031-share-help-02.md",
+      "tags": [
+        "资源求助",
+        "字幕",
+        "录屏"
+      ],
+      "created_at": "2026-10-31T16:31:34.129864Z",
+      "body_sha256": "f3fe7883f132d6e6724a415dbd81867af9de5be73a93c3ae066c8a832fa11c83",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-help-03",
+      "draft_id": "809923f9-daff-4b61-8a6d-a4316079321a",
+      "topic_id": 424,
+      "url": "https://chat.xiangban.xyz/t/424",
+      "title": "找公版书时怎样提供线索：一起补齐可靠的原始页面",
+      "category": "share-help",
+      "path": "posts/batch-02/community-20261031-share-help-03.md",
+      "tags": [
+        "资源求助",
+        "电子书",
+        "资料核对"
+      ],
+      "created_at": "2026-10-31T16:31:35.018366Z",
+      "body_sha256": "6ecff609ac978848c0f89a24f65edd435b83c09d14c50b00cb624ca45992d6a9",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-help-04",
+      "draft_id": "67ce3be0-b9da-4fa3-8786-5ad333992b97",
+      "topic_id": 425,
+      "url": "https://chat.xiangban.xyz/t/425",
+      "title": "模型部署资料征集：把硬件条件写清楚，答案才不会各说各话",
+      "category": "share-help",
+      "path": "posts/batch-02/community-20261031-share-help-04.md",
+      "tags": [
+        "资源求助",
+        "本地部署",
+        "ai-硬件"
+      ],
+      "created_at": "2026-10-31T16:31:36.734759Z",
+      "body_sha256": "4075151843e0ab955e7bcb6dcc637011f6fdf016225a476f306b78acf212c47a",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-help-05",
+      "draft_id": "0bd7709d-dce6-4021-b033-939c4acd1226",
+      "topic_id": 426,
+      "url": "https://chat.xiangban.xyz/t/426",
+      "title": "开放素材求助怎样不踩版权坑：请附许可页而不只发网盘",
+      "category": "share-help",
+      "path": "posts/batch-02/community-20261031-share-help-05.md",
+      "tags": [
+        "资源求助",
+        "开放素材",
+        "版权"
+      ],
+      "created_at": "2026-10-31T16:31:37.435797Z",
+      "body_sha256": "8c4ad6f1db24599c0d5f35f368e6bf9b26c900a0690b5b9df6add45917d886d2",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-learn-01",
+      "draft_id": "5aec1e76-e82f-4ead-99f0-c45c9274976f",
+      "topic_id": 397,
+      "url": "https://chat.xiangban.xyz/t/397",
+      "title": "从 Python 官方教程开始：做一个能解释清楚的小脚本",
+      "category": "share-learn",
+      "path": "posts/batch-01/community-20261031-share-learn-01.md",
+      "tags": [
+        "学习资料",
+        "Python",
+        "编程入门"
+      ],
+      "created_at": "2026-10-31T16:23:49.487966Z",
+      "body_sha256": "2fd0abef6b2fb1de36716b58c82fb0f750ac9daa1deb7c7cec2f040b06f08944",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-learn-02",
+      "draft_id": "553fce2a-861c-4bd2-8733-8d35da3affbd",
+      "topic_id": 398,
+      "url": "https://chat.xiangban.xyz/t/398",
+      "title": "CS50 与 MDN 怎么搭配：把计算机基础和网页练习分成两条线",
+      "category": "share-learn",
+      "path": "posts/batch-01/community-20261031-share-learn-02.md",
+      "tags": [
+        "学习资料",
+        "Web开发",
+        "学习计划"
+      ],
+      "created_at": "2026-10-31T16:23:50.100466Z",
+      "body_sha256": "04371fbd09585797ea746c7182f6d6aecab8ff8bf2895b4ab3e11e3db45ec0e1",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-learn-03",
+      "draft_id": "9d2fadcc-9bab-4bb2-9a2d-ebb0a8ff0b39",
+      "topic_id": 399,
+      "url": "https://chat.xiangban.xyz/t/399",
+      "title": "补工具链基础：用 Missing Semester 与 Git 文档整理一个练习仓库",
+      "category": "share-learn",
+      "path": "posts/batch-01/community-20261031-share-learn-03.md",
+      "tags": [
+        "学习资料",
+        "工作流",
+        "Git"
+      ],
+      "created_at": "2026-10-31T16:23:51.063246Z",
+      "body_sha256": "7910dcd6bb7d0eb793adcc6e475c34ecb4e73ff6b06e0e949192229324416d7e",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-learn-04",
+      "draft_id": "178493f4-0027-4cb9-b630-8a845a1ffd7e",
+      "topic_id": 400,
+      "url": "https://chat.xiangban.xyz/t/400",
+      "title": "读线性代数公开课：给矩阵运算配一组能手算的小例子",
+      "category": "share-learn",
+      "path": "posts/batch-01/community-20261031-share-learn-04.md",
+      "tags": [
+        "学习资料",
+        "数学",
+        "AI基础"
+      ],
+      "created_at": "2026-10-31T16:23:52.003310Z",
+      "body_sha256": "3dd15ceb0ded936d80c6bd323dfb83d91ade4430594a1003e055cc23dfacb12a",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-learn-05",
+      "draft_id": "8878d136-4c77-46f1-a541-02b0406ba500",
+      "topic_id": 401,
+      "url": "https://chat.xiangban.xyz/t/401",
+      "title": "资料越存越多怎么办：用 Zotero 做可回查的来源笔记",
+      "category": "share-learn",
+      "path": "posts/batch-01/community-20261031-share-learn-05.md",
+      "tags": [
+        "学习资料",
+        "知识管理",
+        "资料整理"
+      ],
+      "created_at": "2026-10-31T16:23:52.569783Z",
+      "body_sha256": "8841d65880c7326bd1732b685d28b46573753888d1a3d23399cef2c20e57c1e5",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-music-01",
+      "draft_id": "c2f863bb-1b10-4f0d-88e3-26e403221106",
+      "topic_id": 427,
+      "url": "https://chat.xiangban.xyz/t/427",
+      "title": "找乐谱先看版本：IMSLP 的作品页应该怎样读",
+      "category": "share-music",
+      "path": "posts/batch-02/community-20261031-share-music-01.md",
+      "tags": [
+        "音乐资源",
+        "乐谱",
+        "资料整理"
+      ],
+      "created_at": "2026-10-31T16:31:38.678821Z",
+      "body_sha256": "ec770029484c29123fae8dab8c82b5360328683b271bceae81262d35e50ce42a",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-music-02",
+      "draft_id": "fa8ab371-696d-4470-aee4-e2efbcadae23",
+      "topic_id": 428,
+      "url": "https://chat.xiangban.xyz/t/428",
+      "title": "一首歌有多个同名版本：用 MusicBrainz 核对录音与发行信息",
+      "category": "share-music",
+      "path": "posts/batch-02/community-20261031-share-music-02.md",
+      "tags": [
+        "音乐资源",
+        "音乐资料",
+        "信息核对"
+      ],
+      "created_at": "2026-10-31T16:31:39.235182Z",
+      "body_sha256": "fa6543acc7ad1bec6b1969a95756e9095f1cf713e1c6696f1806706a06b0d1bd",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-music-03",
+      "draft_id": "3f2d216f-9604-40a7-b5c8-af14e1adc1c4",
+      "topic_id": 429,
+      "url": "https://chat.xiangban.xyz/t/429",
+      "title": "Freesound 音效怎么选：试听之外，还要核对许可和署名",
+      "category": "share-music",
+      "path": "posts/batch-02/community-20261031-share-music-03.md",
+      "tags": [
+        "音乐资源",
+        "音效",
+        "版权"
+      ],
+      "created_at": "2026-10-31T16:31:40.593389Z",
+      "body_sha256": "6c77249956d7aff556c64c60764e98fdf514170ed8ace80023f3c1b4bcac24e0",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-music-04",
+      "draft_id": "d403426c-cf5a-4cb0-8850-290b36729627",
+      "topic_id": 430,
+      "url": "https://chat.xiangban.xyz/t/430",
+      "title": "用 MuseScore 整理八小节练习：从可播放到可阅读",
+      "category": "share-music",
+      "path": "posts/batch-02/community-20261031-share-music-04.md",
+      "tags": [
+        "音乐资源",
+        "制谱",
+        "创作练习"
+      ],
+      "created_at": "2026-10-31T16:31:41.254213Z",
+      "body_sha256": "800a890f3b8121f69fc650e5a44ba1df6b125fd814961207c945e1eb03a68595",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-share-music-05",
+      "draft_id": "4b91df9d-dab2-4ba2-abea-645ed72bcf64",
+      "topic_id": 431,
+      "url": "https://chat.xiangban.xyz/t/431",
+      "title": "给自己的音乐收藏建目录：曲目、来源和备份分开管理",
+      "category": "share-music",
+      "path": "posts/batch-02/community-20261031-share-music-05.md",
+      "tags": [
+        "音乐资源",
+        "整理",
+        "数字收藏"
+      ],
+      "created_at": "2026-10-31T16:31:42.812599Z",
+      "body_sha256": "da872f4f4aa2d727237a6f2b7a7658cba8f1790282b9186595d80f6de8815bba",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-creative-01",
+      "draft_id": "6d8a4cb4-1f99-4604-acaa-8a07835e532e",
+      "topic_id": 402,
+      "url": "https://chat.xiangban.xyz/t/402",
+      "title": "用 AI 写分镜之前，先做一张镜头约束卡",
+      "category": "tech-creative",
+      "path": "posts/batch-01/community-20261031-tech-creative-01.md",
+      "tags": [
+        "提示词",
+        "工作流",
+        "ai创意"
+      ],
+      "created_at": "2026-10-31T16:23:53.415221Z",
+      "body_sha256": "a5eb4dcf35de00051981f935e9dc5e0cea107e625cbdbac8897d3c693ed1654c",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-creative-02",
+      "draft_id": "7f9dec9c-e744-4edd-a7e8-d9b72a956ca2",
+      "topic_id": 403,
+      "url": "https://chat.xiangban.xyz/t/403",
+      "title": "AI 配图的颜色为何总不一致：用色板与固定变量做对照",
+      "category": "tech-creative",
+      "path": "posts/batch-01/community-20261031-tech-creative-02.md",
+      "tags": [
+        "提示词",
+        "ai创意",
+        "设计"
+      ],
+      "created_at": "2026-10-31T16:23:53.940084Z",
+      "body_sha256": "3f8c83f825735c491a148237522581e2f875c074ee8e48ea4714b9243d2716c5",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-creative-03",
+      "draft_id": "920aacc4-01c9-4630-80b3-47385ba3dc63",
+      "topic_id": 404,
+      "url": "https://chat.xiangban.xyz/t/404",
+      "title": "做一段教程配音：先剪句子，再处理音量",
+      "category": "tech-creative",
+      "path": "posts/batch-01/community-20261031-tech-creative-03.md",
+      "tags": [
+        "ai创意",
+        "工作流",
+        "音频制作"
+      ],
+      "created_at": "2026-10-31T16:23:54.546762Z",
+      "body_sha256": "e69dc5c79cc18dae90e635e76b1d2f54fc003dd29939cd8dbf1c14ea25e1947c",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-creative-04",
+      "draft_id": "0e4fbf93-27da-4826-9442-5780a2494ada",
+      "topic_id": 405,
+      "url": "https://chat.xiangban.xyz/t/405",
+      "title": "用 OBS 录软件教程：一段短样片比录完半小时更划算",
+      "category": "tech-creative",
+      "path": "posts/batch-01/community-20261031-tech-creative-04.md",
+      "tags": [
+        "工作流",
+        "ai创意",
+        "录屏"
+      ],
+      "created_at": "2026-10-31T16:23:55.726750Z",
+      "body_sha256": "44d77ed7daaa55244bcd40b29cd8823c7dbec2beb9d3917a6598f874faf3c0d5",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-creative-05",
+      "draft_id": "68511a58-d0f9-46e9-81fa-b2271c25e9a9",
+      "topic_id": 406,
+      "url": "https://chat.xiangban.xyz/t/406",
+      "title": "给创作素材做来源清单：字体、图片、音效分别记",
+      "category": "tech-creative",
+      "path": "posts/batch-01/community-20261031-tech-creative-05.md",
+      "tags": [
+        "ai创意",
+        "版权",
+        "工作流"
+      ],
+      "created_at": "2026-10-31T16:23:57.279853Z",
+      "body_sha256": "d5d9da68abb785e1e0ca4452b4249b043ccf4da282679c330bff10575e779752",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-hardware-01",
+      "draft_id": "af7ead70-f4ee-4203-a3a4-f35017f629f2",
+      "topic_id": 407,
+      "url": "https://chat.xiangban.xyz/t/407",
+      "title": "给本地大模型做硬件记录：别只报显卡型号",
+      "category": "tech-hardware",
+      "path": "posts/batch-01/community-20261031-tech-hardware-01.md",
+      "tags": [
+        "ai-硬件",
+        "本地部署",
+        "性能记录"
+      ],
+      "created_at": "2026-10-31T16:23:57.780548Z",
+      "body_sha256": "c5f9e710f3bc1af0bb2a64adfa070390035fd2fef96eae7d8d06b3b052c92f9d",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-hardware-02",
+      "draft_id": "37a6dc47-7659-41f2-9c14-810012ed22e4",
+      "topic_id": 408,
+      "url": "https://chat.xiangban.xyz/t/408",
+      "title": "ESP32 语音项目入门：把拾音、联网与推理分开看",
+      "category": "tech-hardware",
+      "path": "posts/batch-01/community-20261031-tech-hardware-02.md",
+      "tags": [
+        "ai-硬件",
+        "本地部署",
+        "语音交互"
+      ],
+      "created_at": "2026-10-31T16:23:58.299550Z",
+      "body_sha256": "6686e99cb199badfed982ffd738fb5f7d6fd4f0cf5dc058e7d0e1313a9498602",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-hardware-03",
+      "draft_id": "1af6df44-f414-42f7-915b-a5bc189ef707",
+      "topic_id": 409,
+      "url": "https://chat.xiangban.xyz/t/409",
+      "title": "边缘推理选型：模型能导出，不代表设备就能高效运行",
+      "category": "tech-hardware",
+      "path": "posts/batch-01/community-20261031-tech-hardware-03.md",
+      "tags": [
+        "ai-硬件",
+        "本地部署",
+        "边缘推理"
+      ],
+      "created_at": "2026-10-31T16:23:58.940716Z",
+      "body_sha256": "b1acd756c616518be6bf8ef44afbecc5acbf715ce0f21323a268b355ee1d2285",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-hardware-04",
+      "draft_id": "5c82acd2-c4c4-46fd-99b3-7df29fa85843",
+      "topic_id": 410,
+      "url": "https://chat.xiangban.xyz/t/410",
+      "title": "机器人学习先做离线数据练习：读 LeRobot 文档时看这几个对象",
+      "category": "tech-hardware",
+      "path": "posts/batch-01/community-20261031-tech-hardware-04.md",
+      "tags": [
+        "ai-硬件",
+        "本地部署",
+        "机器人"
+      ],
+      "created_at": "2026-10-31T16:23:59.637141Z",
+      "body_sha256": "51cb4747724cb379ee40184440ffc4fc06935bb02d8d3e8a675976981963e75a",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-hardware-05",
+      "draft_id": "d09a7f55-b0e9-4f71-827a-3ceb636bd115",
+      "topic_id": 411,
+      "url": "https://chat.xiangban.xyz/t/411",
+      "title": "本地 AI 工作台的温度与功耗记录：怎样让测试更公平",
+      "category": "tech-hardware",
+      "path": "posts/batch-01/community-20261031-tech-hardware-05.md",
+      "tags": [
+        "ai-硬件",
+        "本地部署",
+        "性能记录"
+      ],
+      "created_at": "2026-10-31T16:24:00.384700Z",
+      "body_sha256": "ff778f94198c86806332effd7d8fd57996dff0c080e9bf75468c1b74c2c81bc8",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-llm-01",
+      "draft_id": "8b57fa29-c5dc-4e1b-aa9b-46bf271812ae",
+      "topic_id": 412,
+      "url": "https://chat.xiangban.xyz/t/412",
+      "title": "本地模型第一次验收：先让服务回答，再接入聊天界面",
+      "category": "tech-llm",
+      "path": "posts/batch-01/community-20261031-tech-llm-01.md",
+      "tags": [
+        "本地部署",
+        "提示词",
+        "大模型"
+      ],
+      "created_at": "2026-10-31T16:24:01.012270Z",
+      "body_sha256": "5621e93500af3552f541f48635cf142625af3a8838e075a8b0b76a513bfda7e2",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-llm-02",
+      "draft_id": "e0448043-f449-4744-b92a-d0f0dc8dc942",
+      "topic_id": 413,
+      "url": "https://chat.xiangban.xyz/t/413",
+      "title": "提示词调试先建十条小样本：把“感觉更好”变成可比较结果",
+      "category": "tech-llm",
+      "path": "posts/batch-01/community-20261031-tech-llm-02.md",
+      "tags": [
+        "提示词",
+        "本地部署",
+        "大模型"
+      ],
+      "created_at": "2026-10-31T16:24:01.980739Z",
+      "body_sha256": "00aeb583fc583ccbaf0a349fe8494d29236f91543cdafc8054b0e5f849b9a8bf",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-llm-03",
+      "draft_id": "7930d972-cb7d-4002-ba3b-039c4aff7f4b",
+      "topic_id": 414,
+      "url": "https://chat.xiangban.xyz/t/414",
+      "title": "结构化输出不等于数据正确：给模型结果加三层验收",
+      "category": "tech-llm",
+      "path": "posts/batch-01/community-20261031-tech-llm-03.md",
+      "tags": [
+        "提示词",
+        "本地部署",
+        "大模型"
+      ],
+      "created_at": "2026-10-31T16:24:03.100823Z",
+      "body_sha256": "05236ab55719c6f36ed75fa4eacba81074894377cf4ff1e7817d50b64f3775d9",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-llm-04",
+      "draft_id": "4fbbcca8-5123-42c2-88b8-9b51be03661d",
+      "topic_id": 415,
+      "url": "https://chat.xiangban.xyz/t/415",
+      "title": "GGUF、上下文和内存：本地模型选型时应记录什么",
+      "category": "tech-llm",
+      "path": "posts/batch-01/community-20261031-tech-llm-04.md",
+      "tags": [
+        "本地部署",
+        "ai-硬件",
+        "大模型"
+      ],
+      "created_at": "2026-10-31T16:24:04.151838Z",
+      "body_sha256": "424ada03d1a29ea45affd7c90bb9a888026e0731e4c3e5bd8c1e96590fa5de5e",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-llm-05",
+      "draft_id": "6868f9ce-8f0e-4fd7-9759-6450e0853f0b",
+      "topic_id": 416,
+      "url": "https://chat.xiangban.xyz/t/416",
+      "title": "从单机聊天走向服务：何时才需要考虑 vLLM",
+      "category": "tech-llm",
+      "path": "posts/batch-01/community-20261031-tech-llm-05.md",
+      "tags": [
+        "本地部署",
+        "提示词",
+        "工作流"
+      ],
+      "created_at": "2026-10-31T16:24:05.567995Z",
+      "body_sha256": "0ce00c6687dba1ae42f2a43f77a5b2043c0aa9f84dede56d64af7a2f4ac5291e",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-productivity-01",
+      "draft_id": "635a984d-dd25-4cb9-bc1d-0b72cf26e7ba",
+      "topic_id": 417,
+      "url": "https://chat.xiangban.xyz/t/417",
+      "title": "给 Claude Code 和 Codex 写项目说明：把长期规则与本次任务分开",
+      "category": "tech-productivity",
+      "path": "posts/batch-01/community-20261031-tech-productivity-01.md",
+      "tags": [
+        "claude-code",
+        "codex",
+        "提示词",
+        "工作流"
+      ],
+      "created_at": "2026-10-31T16:24:06.187044Z",
+      "body_sha256": "a9464db79dc20d664d6170161feb18e51ae2b48c1aa90eb2596e0e89d1aef41c",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-productivity-02",
+      "draft_id": "ddb6d691-aa2f-4ad0-8310-a2d7987c68fe",
+      "topic_id": 418,
+      "url": "https://chat.xiangban.xyz/t/418",
+      "title": "AI 改代码前先说清权限：本地文件、命令与对外动作分别约定",
+      "category": "tech-productivity",
+      "path": "posts/batch-01/community-20261031-tech-productivity-02.md",
+      "tags": [
+        "claude-code",
+        "codex",
+        "工作流",
+        "提示词"
+      ],
+      "created_at": "2026-10-31T16:24:08.194642Z",
+      "body_sha256": "4469fc9671f36350f81eb7deb4e335d2adbf421f218e0e3e6cfd05b2e2ffb809",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-productivity-03",
+      "draft_id": "025985a7-f99b-4b58-8a8d-caa91e36dcbd",
+      "topic_id": 419,
+      "url": "https://chat.xiangban.xyz/t/419",
+      "title": "让 Claude Code 与 Codex 分步骤交付：一轮只验证一个可见结果",
+      "category": "tech-productivity",
+      "path": "posts/batch-01/community-20261031-tech-productivity-03.md",
+      "tags": [
+        "claude-code",
+        "codex",
+        "工作流",
+        "提示词"
+      ],
+      "created_at": "2026-10-31T16:24:08.787276Z",
+      "body_sha256": "883cdc8389ab23f85aaa44c4a645be00e2638dd7a01e8fbed2b7d1ed5f29769e",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-productivity-04",
+      "draft_id": "ce5c01d7-ca27-4546-847b-9bcad2ba6bb8",
+      "topic_id": 420,
+      "url": "https://chat.xiangban.xyz/t/420",
+      "title": "什么时候把重复提示词做成 Skill：以发布前检查为例",
+      "category": "tech-productivity",
+      "path": "posts/batch-01/community-20261031-tech-productivity-04.md",
+      "tags": [
+        "claude-code",
+        "codex",
+        "工作流"
+      ],
+      "created_at": "2026-10-31T16:24:09.888449Z",
+      "body_sha256": "39c3ad86c63950efb6951a476df984fbc4f1248456c0f83b0dd3134a2545d28c",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-tech-productivity-05",
+      "draft_id": "c6eea945-2a22-42c4-900a-501b27a9b32b",
+      "topic_id": 421,
+      "url": "https://chat.xiangban.xyz/t/421",
+      "title": "同时让 Claude Code 与 Codex 做事：用 worktree 隔离文件，再合并结果",
+      "category": "tech-productivity",
+      "path": "posts/batch-01/community-20261031-tech-productivity-05.md",
+      "tags": [
+        "claude-code",
+        "codex",
+        "工作流"
+      ],
+      "created_at": "2026-10-31T16:24:10.625498Z",
+      "body_sha256": "a3fce90f53577f8ac23578308c97df4fa37a0e5364a759ab064407020f20e9a1",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-app-01",
+      "draft_id": "5b6afe93-bfe7-4313-b17e-3855295a5fc9",
+      "topic_id": 432,
+      "url": "https://chat.xiangban.xyz/t/432",
+      "title": "先认清三个入口：小伴桌面、手机 App 与超级小伴社区",
+      "category": "xiaoban-app",
+      "path": "posts/batch-02/community-20261031-xiaoban-app-01.md",
+      "tags": [
+        "小伴App",
+        "使用说明",
+        "社区"
+      ],
+      "created_at": "2026-10-31T16:31:43.260103Z",
+      "body_sha256": "0ef8a22ebf268320a2cc28ac1c0dcf0407836317e0aa09278d3115d03ea7fc9f",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-app-02",
+      "draft_id": "4fe427da-66cf-44fe-ab96-44081276359a",
+      "topic_id": 433,
+      "url": "https://chat.xiangban.xyz/t/433",
+      "title": "手机与电脑功能不同步时，先核对平台和版本再反馈",
+      "category": "xiaoban-app",
+      "path": "posts/batch-02/community-20261031-xiaoban-app-02.md",
+      "tags": [
+        "小伴App",
+        "反馈",
+        "使用说明"
+      ],
+      "created_at": "2026-10-31T16:31:44.338013Z",
+      "body_sha256": "afe28820d8254db2cb1bf25d2b6f1ac4f0c043c108097fd41d9f37156f73cbad",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-app-03",
+      "draft_id": "a73b2c39-b099-4bb1-bdda-91c5973f6a2c",
+      "topic_id": 434,
+      "url": "https://chat.xiangban.xyz/t/434",
+      "title": "用手机阅读社区长帖：先收藏原帖，再整理自己的问题",
+      "category": "xiaoban-app",
+      "path": "posts/batch-02/community-20261031-xiaoban-app-03.md",
+      "tags": [
+        "小伴App",
+        "社区阅读",
+        "学习方法"
+      ],
+      "created_at": "2026-10-31T16:31:44.834865Z",
+      "body_sha256": "23277297eb36361277d9b74ccb11729f584eb43f89df18d4aa74051c664d45e1",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-app-04",
+      "draft_id": "f6b429a8-f18c-4c06-a0e2-274ad62da844",
+      "topic_id": 435,
+      "url": "https://chat.xiangban.xyz/t/435",
+      "title": "聊天中处理私人资料：先给任务所需的最小片段",
+      "category": "xiaoban-app",
+      "path": "posts/batch-02/community-20261031-xiaoban-app-04.md",
+      "tags": [
+        "小伴App",
+        "隐私",
+        "使用说明"
+      ],
+      "created_at": "2026-10-31T16:31:45.439734Z",
+      "body_sha256": "96f683e957a3b01534de89cacdc1c3a7e9b2f7fb459bdd35625267bc6eeb7cdc",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-app-05",
+      "draft_id": "32d06c35-b79a-4d39-869b-c7484e81f464",
+      "topic_id": 436,
+      "url": "https://chat.xiangban.xyz/t/436",
+      "title": "给小伴 App 提建议：先描述想完成的任务，再画按钮",
+      "category": "xiaoban-app",
+      "path": "posts/batch-02/community-20261031-xiaoban-app-05.md",
+      "tags": [
+        "小伴App",
+        "建议反馈",
+        "产品讨论"
+      ],
+      "created_at": "2026-10-31T16:31:46.281857Z",
+      "body_sha256": "4ab3c757d4c160ecb80c5518bcf23c0abc3f1b84f3bf1ebf1df5eab6c6babb9c",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-game-01",
+      "draft_id": "0787b125-1d92-4933-b5c9-7e5de6746d74",
+      "topic_id": 437,
+      "url": "https://chat.xiangban.xyz/t/437",
+      "title": "小伴游戏空间怎么用：从明确入口打开，再正常退出",
+      "category": "xiaoban-game",
+      "path": "posts/batch-02/community-20261031-xiaoban-game-01.md",
+      "tags": [
+        "小伴游戏",
+        "使用说明",
+        "游戏空间"
+      ],
+      "created_at": "2026-10-31T16:31:47.990636Z",
+      "body_sha256": "5c3eb0f8d843131fe719be7211c8dc03eba4fae2fbdcf12434543d85728bda07",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-game-02",
+      "draft_id": "4b4233db-e15a-444a-850b-a7305fd0a68b",
+      "topic_id": 438,
+      "url": "https://chat.xiangban.xyz/t/438",
+      "title": "自制小游戏先完成一局：开始、失败、重玩都要能走通",
+      "category": "xiaoban-game",
+      "path": "posts/batch-02/community-20261031-xiaoban-game-02.md",
+      "tags": [
+        "小伴游戏",
+        "创作练习",
+        "游戏设计"
+      ],
+      "created_at": "2026-10-31T16:31:48.733676Z",
+      "body_sha256": "e4e1836a94d1d443eb6132c8134e4907a64a561e1383a59ce38c3515e164b729",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-game-03",
+      "draft_id": "1ed10b34-ea27-4655-afe1-823f7985f86d",
+      "topic_id": 439,
+      "url": "https://chat.xiangban.xyz/t/439",
+      "title": "分享小游戏资源包：把操作方法和存档边界写在帖子里",
+      "category": "xiaoban-game",
+      "path": "posts/batch-02/community-20261031-xiaoban-game-03.md",
+      "tags": [
+        "小伴游戏",
+        "作品分享",
+        "资源包"
+      ],
+      "created_at": "2026-10-31T16:31:49.733605Z",
+      "body_sha256": "eb7bade837ed6cf9299deab747075ab85677c1d1eecec0b43340f7629fca0613",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-game-04",
+      "draft_id": "cef145f8-d029-4aa7-aa6a-b799af423f99",
+      "topic_id": 440,
+      "url": "https://chat.xiangban.xyz/t/440",
+      "title": "游戏反馈别只报“卡”：分清输入、画面和规则问题",
+      "category": "xiaoban-game",
+      "path": "posts/batch-02/community-20261031-xiaoban-game-04.md",
+      "tags": [
+        "小伴游戏",
+        "反馈",
+        "游戏测试"
+      ],
+      "created_at": "2026-10-31T16:31:50.598474Z",
+      "body_sha256": "20d18b4e531663542d7803c211f00e9d5db00775e207de25c5755b08196357ad",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-game-05",
+      "draft_id": "ad6552f6-c47d-4b8d-829c-a8aff3adec89",
+      "topic_id": 441,
+      "url": "https://chat.xiangban.xyz/t/441",
+      "title": "关卡难度怎么讨论：用失败原因代替“太简单或太难”",
+      "category": "xiaoban-game",
+      "path": "posts/batch-02/community-20261031-xiaoban-game-05.md",
+      "tags": [
+        "小伴游戏",
+        "游戏设计",
+        "讨论"
+      ],
+      "created_at": "2026-10-31T16:31:51.240822Z",
+      "body_sha256": "c83f18a19a05f0389c6aa613750f41924cab2f8500f446b4172360e102d21935",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-wallpaper-01",
+      "draft_id": "9dbcf92b-8dcd-4b62-96c4-a7be6112dfdf",
+      "topic_id": 442,
+      "url": "https://chat.xiangban.xyz/t/442",
+      "title": "小伴壁纸入门：预览满意后，再应用到桌面",
+      "category": "xiaoban-wallpaper",
+      "path": "posts/batch-02/community-20261031-xiaoban-wallpaper-01.md",
+      "tags": [
+        "小伴壁纸",
+        "使用说明",
+        "动态壁纸"
+      ],
+      "created_at": "2026-10-31T16:31:52.217754Z",
+      "body_sha256": "07cab13ff217cbeeb431a833ca4a6a4292363cddff29692795ba9cc104d18525",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-wallpaper-02",
+      "draft_id": "885c4eda-97a7-4c90-b345-196a0d33a53a",
+      "topic_id": 443,
+      "url": "https://chat.xiangban.xyz/t/443",
+      "title": "桌面特效与壁纸是两层：换背景时怎样检查画面",
+      "category": "xiaoban-wallpaper",
+      "path": "posts/batch-02/community-20261031-xiaoban-wallpaper-02.md",
+      "tags": [
+        "小伴壁纸",
+        "桌面特效",
+        "使用说明"
+      ],
+      "created_at": "2026-10-31T16:31:53.452564Z",
+      "body_sha256": "e4655062f81b1c989f6b452c3830c41be36862d2f21bbb3a8f7b447cd2b5417b",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-wallpaper-03",
+      "draft_id": "12c332e1-f0ce-4fd6-84e7-7391549ebe38",
+      "topic_id": 444,
+      "url": "https://chat.xiangban.xyz/t/444",
+      "title": "分享壁纸作品时，把预览、来源和资源包说明一起写清楚",
+      "category": "xiaoban-wallpaper",
+      "path": "posts/batch-02/community-20261031-xiaoban-wallpaper-03.md",
+      "tags": [
+        "小伴壁纸",
+        "作品分享",
+        "资源包"
+      ],
+      "created_at": "2026-10-31T16:31:54.930083Z",
+      "body_sha256": "1ad06ebd8b70fe2de6f6a887947fbe4374405a01069710e4b808341f5fd74a6d",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-wallpaper-04",
+      "draft_id": "cd494961-6380-4792-a0cf-bb742933f43c",
+      "topic_id": 445,
+      "url": "https://chat.xiangban.xyz/t/445",
+      "title": "动态桌面觉得太忙？先做一次低干扰搭配实验",
+      "category": "xiaoban-wallpaper",
+      "path": "posts/batch-02/community-20261031-xiaoban-wallpaper-04.md",
+      "tags": [
+        "小伴壁纸",
+        "桌面整理",
+        "使用讨论"
+      ],
+      "created_at": "2026-10-31T16:31:56.251769Z",
+      "body_sha256": "35b7136c04a0d3082785b7b7330281b7562869b60141aa458a1860697b235680",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    },
+    {
+      "external_id": "community-20261031-xiaoban-wallpaper-05",
+      "draft_id": "2dfe77c7-3b10-493f-a6cb-229a4d2ceebe",
+      "topic_id": 446,
+      "url": "https://chat.xiangban.xyz/t/446",
+      "title": "壁纸问题反馈清单：让“显示不对”变成可定位的信息",
+      "category": "xiaoban-wallpaper",
+      "path": "posts/batch-02/community-20261031-xiaoban-wallpaper-05.md",
+      "tags": [
+        "小伴壁纸",
+        "反馈",
+        "使用说明"
+      ],
+      "created_at": "2026-10-31T16:31:58.243270Z",
+      "body_sha256": "38e5c78d6e80319b31b4c06c9c288e5c110119a6549c2d280c58cc40add84b33",
+      "checks": {
+        "title_matches": true,
+        "category_matches": true,
+        "author_matches": true,
+        "normal": true,
+        "public": true,
+        "body_matches": true,
+        "tags_present": true,
+        "no_index_artifact": true
+      }
+    }
+  ],
+  "verified_tech_and_learning_tags": {
+    "claude-code": 5,
+    "codex": 5,
+    "提示词": 9,
+    "工作流": 11,
+    "本地部署": 10,
+    "ai-硬件": 6
+  }
+}

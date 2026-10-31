@@ -1,0 +1,252 @@
+[
+  {
+    "file": "community-20261031-share-help-01.md",
+    "ok": true,
+    "external_id": "community-20261031-share-help-01",
+    "title": "资源线索共建：寻找能离线阅读的中文编程入门资料",
+    "category": "share-help",
+    "image_count": 0,
+    "id": "2da54def-8c1d-42fc-ad68-7639454e22fc",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-help-02.md",
+    "ok": true,
+    "external_id": "community-20261031-share-help-02",
+    "title": "求可核对的桌面录屏字幕资料：欢迎补充官方教程入口",
+    "category": "share-help",
+    "image_count": 0,
+    "id": "9848db95-0a4e-4229-aadf-e28fdaf5c678",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-help-03.md",
+    "ok": true,
+    "external_id": "community-20261031-share-help-03",
+    "title": "找公版书时怎样提供线索：一起补齐可靠的原始页面",
+    "category": "share-help",
+    "image_count": 0,
+    "id": "809923f9-daff-4b61-8a6d-a4316079321a",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-help-04.md",
+    "ok": true,
+    "external_id": "community-20261031-share-help-04",
+    "title": "模型部署资料征集：把硬件条件写清楚，答案才不会各说各话",
+    "category": "share-help",
+    "image_count": 0,
+    "id": "67ce3be0-b9da-4fa3-8786-5ad333992b97",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-help-05.md",
+    "ok": true,
+    "external_id": "community-20261031-share-help-05",
+    "title": "开放素材求助怎样不踩版权坑：请附许可页而不只发网盘",
+    "category": "share-help",
+    "image_count": 0,
+    "id": "0bd7709d-dce6-4021-b033-939c4acd1226",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-music-01.md",
+    "ok": true,
+    "external_id": "community-20261031-share-music-01",
+    "title": "找乐谱先看版本：IMSLP 的作品页应该怎样读",
+    "category": "share-music",
+    "image_count": 0,
+    "id": "c2f863bb-1b10-4f0d-88e3-26e403221106",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-music-02.md",
+    "ok": true,
+    "external_id": "community-20261031-share-music-02",
+    "title": "一首歌有多个同名版本：用 MusicBrainz 核对录音与发行信息",
+    "category": "share-music",
+    "image_count": 0,
+    "id": "fa8ab371-696d-4470-aee4-e2efbcadae23",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-music-03.md",
+    "ok": true,
+    "external_id": "community-20261031-share-music-03",
+    "title": "Freesound 音效怎么选：试听之外，还要核对许可和署名",
+    "category": "share-music",
+    "image_count": 0,
+    "id": "3f2d216f-9604-40a7-b5c8-af14e1adc1c4",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-music-04.md",
+    "ok": true,
+    "external_id": "community-20261031-share-music-04",
+    "title": "用 MuseScore 整理八小节练习：从可播放到可阅读",
+    "category": "share-music",
+    "image_count": 0,
+    "id": "d403426c-cf5a-4cb0-8850-290b36729627",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-music-05.md",
+    "ok": true,
+    "external_id": "community-20261031-share-music-05",
+    "title": "给自己的音乐收藏建目录：曲目、来源和备份分开管理",
+    "category": "share-music",
+    "image_count": 0,
+    "id": "4b91df9d-dab2-4ba2-abea-645ed72bcf64",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-app-01.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-app-01",
+    "title": "先认清三个入口：小伴桌面、手机 App 与超级小伴社区",
+    "category": "xiaoban-app",
+    "image_count": 0,
+    "id": "5b6afe93-bfe7-4313-b17e-3855295a5fc9",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-app-02.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-app-02",
+    "title": "手机与电脑功能不同步时，先核对平台和版本再反馈",
+    "category": "xiaoban-app",
+    "image_count": 0,
+    "id": "4fe427da-66cf-44fe-ab96-44081276359a",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-app-03.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-app-03",
+    "title": "用手机阅读社区长帖：先收藏原帖，再整理自己的问题",
+    "category": "xiaoban-app",
+    "image_count": 0,
+    "id": "a73b2c39-b099-4bb1-bdda-91c5973f6a2c",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-app-04.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-app-04",
+    "title": "聊天中处理私人资料：先给任务所需的最小片段",
+    "category": "xiaoban-app",
+    "image_count": 0,
+    "id": "f6b429a8-f18c-4c06-a0e2-274ad62da844",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-app-05.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-app-05",
+    "title": "给小伴 App 提建议：先描述想完成的任务，再画按钮",
+    "category": "xiaoban-app",
+    "image_count": 0,
+    "id": "32d06c35-b79a-4d39-869b-c7484e81f464",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-game-01.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-game-01",
+    "title": "小伴游戏空间怎么用：从明确入口打开，再正常退出",
+    "category": "xiaoban-game",
+    "image_count": 0,
+    "id": "0787b125-1d92-4933-b5c9-7e5de6746d74",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-game-02.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-game-02",
+    "title": "自制小游戏先完成一局：开始、失败、重玩都要能走通",
+    "category": "xiaoban-game",
+    "image_count": 0,
+    "id": "4b4233db-e15a-444a-850b-a7305fd0a68b",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-game-03.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-game-03",
+    "title": "分享小游戏资源包：把操作方法和存档边界写在帖子里",
+    "category": "xiaoban-game",
+    "image_count": 0,
+    "id": "1ed10b34-ea27-4655-afe1-823f7985f86d",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-game-04.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-game-04",
+    "title": "游戏反馈别只报“卡”：分清输入、画面和规则问题",
+    "category": "xiaoban-game",
+    "image_count": 0,
+    "id": "cef145f8-d029-4aa7-aa6a-b799af423f99",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-game-05.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-game-05",
+    "title": "关卡难度怎么讨论：用失败原因代替“太简单或太难”",
+    "category": "xiaoban-game",
+    "image_count": 0,
+    "id": "ad6552f6-c47d-4b8d-829c-a8aff3adec89",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-wallpaper-01.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-wallpaper-01",
+    "title": "小伴壁纸入门：预览满意后，再应用到桌面",
+    "category": "xiaoban-wallpaper",
+    "image_count": 0,
+    "id": "9dbcf92b-8dcd-4b62-96c4-a7be6112dfdf",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-wallpaper-02.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-wallpaper-02",
+    "title": "桌面特效与壁纸是两层：换背景时怎样检查画面",
+    "category": "xiaoban-wallpaper",
+    "image_count": 0,
+    "id": "885c4eda-97a7-4c90-b345-196a0d33a53a",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-wallpaper-03.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-wallpaper-03",
+    "title": "分享壁纸作品时，把预览、来源和资源包说明一起写清楚",
+    "category": "xiaoban-wallpaper",
+    "image_count": 0,
+    "id": "12c332e1-f0ce-4fd6-84e7-7391549ebe38",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-wallpaper-04.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-wallpaper-04",
+    "title": "动态桌面觉得太忙？先做一次低干扰搭配实验",
+    "category": "xiaoban-wallpaper",
+    "image_count": 0,
+    "id": "cd494961-6380-4792-a0cf-bb742933f43c",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-xiaoban-wallpaper-05.md",
+    "ok": true,
+    "external_id": "community-20261031-xiaoban-wallpaper-05",
+    "title": "壁纸问题反馈清单：让“显示不对”变成可定位的信息",
+    "category": "xiaoban-wallpaper",
+    "image_count": 0,
+    "id": "2dfe77c7-3b10-493f-a6cb-229a4d2ceebe",
+    "status": "imported"
+  }
+]

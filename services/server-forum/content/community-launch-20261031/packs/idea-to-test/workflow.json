@@ -1,0 +1,87 @@
+{
+  "templateVersion": 1,
+  "title": "想法到小实验手动工作流",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "假设 → 样本 → 观察 → 记录 → 决定",
+  "boundary": "小样本不代表总体结论",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "把想法改写成一个可反驳的假设",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "定义目标参与者、任务和可观察结果",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "选择一个不需要完整开发的最小样本",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "在得到参与者同意后执行并原样记录",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "根据结果决定继续、修改或停止",
+      "done": false
+    }
+  ],
+  "record": {
+    "想法": null,
+    "假设": null,
+    "最小样本": null,
+    "记录": null,
+    "决定": null
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "label": "把想法改写成一个可反驳的假设",
+      "depends_on": [],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n2",
+      "label": "定义目标参与者、任务和可观察结果",
+      "depends_on": [
+        "n1"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n3",
+      "label": "选择一个不需要完整开发的最小样本",
+      "depends_on": [
+        "n2"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n4",
+      "label": "在得到参与者同意后执行并原样记录",
+      "depends_on": [
+        "n3"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n5",
+      "label": "根据结果决定继续、修改或停止",
+      "depends_on": [
+        "n4"
+      ],
+      "status": "not_started",
+      "evidence": null
+    }
+  ]
+}

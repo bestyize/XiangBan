@@ -1,0 +1,48 @@
+{
+  "templateVersion": 1,
+  "title": "两周数字整理计划",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "14天",
+  "boundary": "先暂存后决定",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "第一天记录需要整理的三个目录及保留原则",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "每次只选一个小批次分类，先移动不永久删除",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "为保留文件建立清楚名称，不统一覆盖旧版本",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "每隔几天验证常用链接和项目仍能打开",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "两周后回顾整理规则，按自己的备份政策处理暂存区",
+      "done": false
+    }
+  ],
+  "record": {
+    "范围": null,
+    "保留原则": null,
+    "批次上限": null,
+    "里程碑": null,
+    "成功标准": null
+  },
+  "review": {
+    "current_stage": 1,
+    "completed": false,
+    "evidence": [],
+    "next_review": null
+  }
+}

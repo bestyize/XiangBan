@@ -1,0 +1,383 @@
+{
+  "audacity": {
+    "url": "https://www.audacityteam.org/",
+    "requested_url": "https://www.audacityteam.org/",
+    "status": 200,
+    "title": "Audacity 官方网站",
+    "verified_date": "2026-10-31"
+  },
+  "blender": {
+    "url": "https://www.blender.org/",
+    "requested_url": "https://www.blender.org/",
+    "status": 200,
+    "title": "Blender 官方网站",
+    "verified_date": "2026-10-31"
+  },
+  "chaplin-modern": {
+    "url": "https://www.charliechaplin.com/en/films/6-Modern-Times",
+    "status": 200,
+    "verified_date": "2026-11-01",
+    "title": "卓别林官方网站《摩登时代》资料"
+  },
+  "claude-common": {
+    "url": "https://code.claude.com/docs/en/common-workflows",
+    "requested_url": "https://code.claude.com/docs/en/common-workflows",
+    "status": 200,
+    "title": "Claude Code 常用工作流",
+    "verified_date": "2026-10-31"
+  },
+  "claude-memory": {
+    "url": "https://code.claude.com/docs/en/memory",
+    "requested_url": "https://code.claude.com/docs/en/memory",
+    "status": 200,
+    "title": "Claude Code 项目记忆说明",
+    "verified_date": "2026-10-31"
+  },
+  "claude-permissions": {
+    "url": "https://code.claude.com/docs/en/permissions",
+    "requested_url": "https://code.claude.com/docs/en/permissions",
+    "status": 200,
+    "title": "Claude Code 权限文档",
+    "verified_date": "2026-10-31"
+  },
+  "claude-skills": {
+    "url": "https://code.claude.com/docs/en/skills",
+    "requested_url": "https://code.claude.com/docs/en/skills",
+    "status": 200,
+    "title": "Claude Code 技能文档",
+    "verified_date": "2026-10-31"
+  },
+  "codex-agents": {
+    "url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md.md",
+    "requested_url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md.md",
+    "status": 200,
+    "title": "Codex 项目规则文档",
+    "verified_date": "2026-10-31"
+  },
+  "codex-approvals": {
+    "url": "https://learn.chatgpt.com/docs/agent-approvals-security",
+    "status": 200,
+    "verified_date": "2026-11-01",
+    "title": "Codex 审批与安全说明"
+  },
+  "codex-skills": {
+    "url": "https://learn.chatgpt.com/docs/build-skills.md",
+    "requested_url": "https://learn.chatgpt.com/docs/build-skills.md",
+    "status": 200,
+    "title": "Codex 技能文档",
+    "verified_date": "2026-10-31"
+  },
+  "codex-start": {
+    "url": "https://learn.chatgpt.com/docs/quickstart.md",
+    "requested_url": "https://learn.chatgpt.com/docs/quickstart.md",
+    "status": 200,
+    "title": "Codex 官方快速开始",
+    "verified_date": "2026-10-31"
+  },
+  "codex-worktrees": {
+    "url": "https://learn.chatgpt.com/docs/environments/git-worktrees",
+    "status": 200,
+    "verified_date": "2026-11-01",
+    "title": "Codex worktree 文档"
+  },
+  "creative-commons": {
+    "url": "https://creativecommons.org/cc-licenses/",
+    "requested_url": "https://creativecommons.org/share-your-work/cclicenses/",
+    "status": 200,
+    "title": "Creative Commons 许可说明",
+    "verified_date": "2026-10-31"
+  },
+  "criterion-12": {
+    "url": "https://www.criterion.com/films/27871-12-angry-men",
+    "status": 200,
+    "verified_date": "2026-11-01",
+    "title": "Criterion《十二怒汉》版本资料"
+  },
+  "cs50": {
+    "url": "https://cs50.harvard.edu/x/",
+    "requested_url": "https://cs50.harvard.edu/x/",
+    "status": 200,
+    "title": "CS50 官方课程",
+    "verified_date": "2026-10-31"
+  },
+  "docker": {
+    "url": "https://docs.docker.com/compose/gettingstarted/",
+    "requested_url": "https://docs.docker.com/compose/gettingstarted/",
+    "status": 200,
+    "title": "Docker Compose 官方入门",
+    "verified_date": "2026-10-31"
+  },
+  "esp32": {
+    "url": "https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/index.html",
+    "requested_url": "https://docs.espressif.com/projects/esp-idf/en/stable/esp32/get-started/index.html",
+    "status": 200,
+    "title": "ESP-IDF 官方入门",
+    "verified_date": "2026-10-31"
+  },
+  "forum-privacy": {
+    "url": "https://chat.xiangban.xyz/privacy",
+    "requested_url": "https://chat.xiangban.xyz/privacy",
+    "status": 200,
+    "title": "超级小伴隐私政策",
+    "verified_date": "2026-10-31"
+  },
+  "forum-rules": {
+    "url": "https://chat.xiangban.xyz/rules",
+    "requested_url": "https://chat.xiangban.xyz/rules",
+    "status": 200,
+    "title": "超级小伴社区规则",
+    "verified_date": "2026-10-31"
+  },
+  "freesound": {
+    "url": "https://freesound.org/help/faq/",
+    "requested_url": "https://freesound.org/help/faq/",
+    "status": 200,
+    "title": "Freesound 常见问题",
+    "verified_date": "2026-10-31"
+  },
+  "gimp": {
+    "url": "https://www.gimp.org/",
+    "requested_url": "https://www.gimp.org/",
+    "status": 200,
+    "title": "GIMP 官方网站",
+    "verified_date": "2026-10-31"
+  },
+  "git-diff": {
+    "url": "https://git-scm.com/docs/git-diff",
+    "requested_url": "https://git-scm.com/docs/git-diff",
+    "status": 200,
+    "title": "Git diff 官方文档",
+    "verified_date": "2026-10-31"
+  },
+  "git-ignore": {
+    "url": "https://git-scm.com/docs/gitignore",
+    "requested_url": "https://git-scm.com/docs/gitignore",
+    "status": 200,
+    "title": "Git 忽略规则文档",
+    "verified_date": "2026-10-31"
+  },
+  "git-worktree": {
+    "url": "https://git-scm.com/docs/git-worktree",
+    "requested_url": "https://git-scm.com/docs/git-worktree",
+    "status": 200,
+    "title": "Git worktree 官方文档",
+    "verified_date": "2026-10-31"
+  },
+  "github-issues": {
+    "url": "https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/creating-an-issue",
+    "requested_url": "https://docs.github.com/en/issues/tracking-your-work-with-issues/creating-an-issue",
+    "status": 200,
+    "title": "GitHub Issue 创建说明",
+    "verified_date": "2026-10-31"
+  },
+  "github-license": {
+    "url": "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository",
+    "requested_url": "https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository",
+    "status": 200,
+    "title": "GitHub 仓库许可说明",
+    "verified_date": "2026-10-31"
+  },
+  "gutenberg": {
+    "url": "https://www.gutenberg.org/",
+    "requested_url": "https://www.gutenberg.org/",
+    "status": 200,
+    "title": "Project Gutenberg 官方目录",
+    "verified_date": "2026-10-31"
+  },
+  "iac-digital": {
+    "url": "https://www.digitalpreservation.gov/personalarchiving/",
+    "requested_url": "https://www.digitalpreservation.gov/personalarchiving/",
+    "status": 200,
+    "title": "美国国会图书馆个人数字归档资料",
+    "verified_date": "2026-10-31"
+  },
+  "imslp": {
+    "url": "https://imslp.org/",
+    "requested_url": "https://imslp.org/",
+    "status": 200,
+    "title": "IMSLP 乐谱目录",
+    "verified_date": "2026-10-31"
+  },
+  "krita": {
+    "url": "https://krita.org/en/",
+    "requested_url": "https://krita.org/en/",
+    "status": 200,
+    "title": "Krita 官方网站",
+    "verified_date": "2026-10-31"
+  },
+  "lerobot": {
+    "url": "https://huggingface.co/docs/lerobot/index",
+    "requested_url": "https://huggingface.co/docs/lerobot/index",
+    "status": 200,
+    "title": "LeRobot 官方文档",
+    "verified_date": "2026-10-31"
+  },
+  "lichess": {
+    "url": "https://lichess.org/",
+    "requested_url": "https://lichess.org/",
+    "status": 200,
+    "title": "Lichess 官方网站",
+    "verified_date": "2026-10-31"
+  },
+  "llamacpp": {
+    "url": "https://github.com/ggml-org/llama.cpp",
+    "requested_url": "https://github.com/ggml-org/llama.cpp",
+    "status": 200,
+    "title": "llama.cpp 官方仓库",
+    "verified_date": "2026-10-31"
+  },
+  "mdn": {
+    "url": "https://developer.mozilla.org/en-US/docs/Learn_web_development",
+    "requested_url": "https://developer.mozilla.org/en-US/docs/Learn_web_development",
+    "status": 200,
+    "title": "MDN 网页开发学习区",
+    "verified_date": "2026-10-31"
+  },
+  "missing-semester": {
+    "url": "https://missing.csail.mit.edu/",
+    "requested_url": "https://missing.csail.mit.edu/",
+    "status": 200,
+    "title": "MIT Missing Semester 课程",
+    "verified_date": "2026-10-31"
+  },
+  "mit-math": {
+    "url": "https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/",
+    "requested_url": "https://ocw.mit.edu/courses/18-06-linear-algebra-spring-2010/",
+    "status": 200,
+    "title": "MIT 线性代数公开课",
+    "verified_date": "2026-10-31"
+  },
+  "musescore": {
+    "url": "https://musescore.org/en",
+    "requested_url": "https://musescore.org/",
+    "status": 200,
+    "title": "MuseScore 官方网站",
+    "verified_date": "2026-10-31"
+  },
+  "musicbrainz": {
+    "url": "https://musicbrainz.org/",
+    "requested_url": "https://musicbrainz.org/",
+    "status": 200,
+    "title": "MusicBrainz 音乐资料库",
+    "verified_date": "2026-10-31"
+  },
+  "obs": {
+    "url": "https://obsproject.com/",
+    "requested_url": "https://obsproject.com/",
+    "status": 200,
+    "title": "OBS 官方网站",
+    "verified_date": "2026-10-31"
+  },
+  "ollama": {
+    "url": "https://docs.ollama.com/quickstart",
+    "requested_url": "https://docs.ollama.com/quickstart",
+    "status": 200,
+    "title": "Ollama 快速开始",
+    "verified_date": "2026-10-31"
+  },
+  "ollama-api": {
+    "url": "https://docs.ollama.com/api/introduction",
+    "requested_url": "https://docs.ollama.com/api/introduction",
+    "status": 200,
+    "title": "Ollama 接口文档",
+    "verified_date": "2026-10-31"
+  },
+  "onnx": {
+    "url": "https://onnxruntime.ai/docs/",
+    "requested_url": "https://onnxruntime.ai/docs/",
+    "status": 200,
+    "title": "ONNX Runtime 官方文档",
+    "verified_date": "2026-10-31"
+  },
+  "openlibrary": {
+    "url": "https://openlibrary.org/",
+    "requested_url": "https://openlibrary.org/",
+    "status": 200,
+    "title": "Open Library 官方目录",
+    "verified_date": "2026-10-31"
+  },
+  "openttd": {
+    "url": "https://www.openttd.org/",
+    "requested_url": "https://www.openttd.org/",
+    "status": 200,
+    "title": "OpenTTD 官方网站",
+    "verified_date": "2026-10-31"
+  },
+  "prompt": {
+    "url": "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview",
+    "requested_url": "https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/overview",
+    "status": 200,
+    "title": "Anthropic 提示词工程文档",
+    "verified_date": "2026-10-31"
+  },
+  "python-tutorial": {
+    "url": "https://docs.python.org/3/tutorial/",
+    "requested_url": "https://docs.python.org/3/tutorial/",
+    "status": 200,
+    "title": "Python 官方教程",
+    "verified_date": "2026-10-31"
+  },
+  "pytorch": {
+    "url": "https://pytorch.org/get-started/locally/",
+    "requested_url": "https://pytorch.org/get-started/locally/",
+    "status": 200,
+    "title": "PyTorch 安装说明",
+    "verified_date": "2026-10-31"
+  },
+  "stanford-philosophy": {
+    "url": "https://plato.stanford.edu/",
+    "requested_url": "https://plato.stanford.edu/",
+    "status": 200,
+    "title": "斯坦福哲学百科",
+    "verified_date": "2026-10-31"
+  },
+  "structured": {
+    "url": "https://developers.openai.com/api/docs/guides/structured-outputs",
+    "requested_url": "https://developers.openai.com/api/docs/guides/structured-outputs",
+    "status": 200,
+    "title": "OpenAI 结构化输出文档",
+    "verified_date": "2026-10-31"
+  },
+  "supertuxkart": {
+    "url": "https://supertuxkart.net/Main_Page.html",
+    "requested_url": "https://supertuxkart.net/",
+    "status": 200,
+    "title": "SuperTuxKart 官方网站",
+    "verified_date": "2026-10-31"
+  },
+  "vllm": {
+    "url": "https://docs.vllm.ai/en/latest/getting_started/quickstart/",
+    "requested_url": "https://docs.vllm.ai/en/latest/getting_started/quickstart/",
+    "status": 200,
+    "title": "vLLM 快速开始",
+    "verified_date": "2026-10-31"
+  },
+  "wikimedia": {
+    "url": "https://commons.wikimedia.org/wiki/Commons:Welcome",
+    "requested_url": "https://commons.wikimedia.org/wiki/Commons:Welcome",
+    "status": 200,
+    "title": "Wikimedia Commons 使用说明",
+    "verified_date": "2026-10-31"
+  },
+  "xb-home": {
+    "url": "https://wallpaper.xiangban.xyz/",
+    "requested_url": "https://wallpaper.xiangban.xyz/",
+    "status": 200,
+    "title": "小伴桌面官网",
+    "verified_date": "2026-10-31"
+  },
+  "xiaozhi": {
+    "url": "https://github.com/78/xiaozhi-esp32",
+    "requested_url": "https://github.com/78/xiaozhi-esp32",
+    "status": 200,
+    "title": "小智 ESP32 官方仓库",
+    "verified_date": "2026-10-31"
+  },
+  "zotero": {
+    "url": "https://www.zotero.org/",
+    "requested_url": "https://www.zotero.org/",
+    "status": 200,
+    "title": "Zotero 官方网站",
+    "verified_date": "2026-10-31"
+  }
+}

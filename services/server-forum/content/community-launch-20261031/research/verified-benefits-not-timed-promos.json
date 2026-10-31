@@ -1,0 +1,107 @@
+{
+  "checked_at": "2026-10-31T16:09:33.192875+00:00",
+  "verified_standing_benefits_count": 5,
+  "verified_timed_promos_count": 0,
+  "required_timed_promos": 5,
+  "shortfall": "尚未核实5条当前有效且具有统一结束时间的限时促销。已核实下面5项仍展示官方申请入口/资格的长期权益，可按新协议作为“优惠与试用”发布；不得冒充限时活动或伪造起止日期。",
+  "current_schema_blocker": "已实现新协议：无统一截止日可作为长期优惠与试用发布，但必须保留source_url与eligibility；仍不能冒充限时促销。",
+  "items": [
+    {
+      "key": "google-cloud-new-customer-credit",
+      "title": "Google Cloud 新客户 300 美元试用额度",
+      "source_url": "https://cloud.google.com/free",
+      "provider": "Google Cloud",
+      "benefit": "符合条件的新客户可申请 300 美元试用额度；官方页面同时列出按月限量的免费层。",
+      "eligibility": "仅符合条件的新客户；试用、免费层与转付费分别受官方条款约束。",
+      "benefit_duration": "本次页面摘录未核实统一试用天数，按领取时官方条款确认。",
+      "checked_at": "2026-10-31T16:09:33.192875+00:00",
+      "availability": "official_application_or_offer_page_live_at_check",
+      "offer_type": "standing_eligibility_benefit",
+      "started_at": null,
+      "ends_at": null,
+      "has_global_claim_deadline": false,
+      "publish_as_timed_promo": false,
+      "publishable_as_ongoing_offer_with_new_schema": true
+    },
+    {
+      "key": "azure-students-credit",
+      "title": "Azure for Students 学生额度",
+      "source_url": "https://azure.microsoft.com/en-us/free/students/",
+      "provider": "Microsoft Azure",
+      "benefit": "符合条件的全日制大学生可申请 100 美元额度，在 12 个月内使用；不需要信用卡。",
+      "eligibility": "学生资格验证；部分免费月度服务仅针对新客户。",
+      "benefit_duration": "领取后 12 个月；符合学生条件可按官方规则续期。",
+      "checked_at": "2026-10-31T16:09:33.192875+00:00",
+      "availability": "official_application_or_offer_page_live_at_check",
+      "offer_type": "standing_eligibility_benefit",
+      "started_at": null,
+      "ends_at": null,
+      "has_global_claim_deadline": false,
+      "publish_as_timed_promo": false,
+      "publishable_as_ongoing_offer_with_new_schema": true
+    },
+    {
+      "key": "cloudflare-startups-credits",
+      "title": "Cloudflare 初创企业额度计划",
+      "source_url": "https://www.cloudflare.com/startups/",
+      "provider": "Cloudflare",
+      "benefit": "按融资与合作伙伴资格提供不同额度档位，官方当前列出 1 万、10 万与最高 35 万美元档。",
+      "eligibility": "须符合成立年限、融资、业务邮箱和公开网站等条件，需申请审核；不是所有人都能获得最高额度。",
+      "benefit_duration": "审核确认后一年或额度用完为止；产品有单独上限与排除项。",
+      "checked_at": "2026-10-31T16:09:33.192875+00:00",
+      "availability": "official_application_or_offer_page_live_at_check",
+      "offer_type": "standing_eligibility_benefit",
+      "started_at": null,
+      "ends_at": null,
+      "has_global_claim_deadline": false,
+      "publish_as_timed_promo": false,
+      "publishable_as_ongoing_offer_with_new_schema": true
+    },
+    {
+      "key": "aws-activate-credits",
+      "title": "AWS Activate 初创企业额度",
+      "source_url": "https://aws.amazon.com/startups/credits/",
+      "provider": "AWS",
+      "benefit": "自筹资金 Founders 档从 1000 美元起，部分可达 5000 美元；有合作机构 Org ID 的 Portfolio 档最高 20 万美元。",
+      "eligibility": "成立十年以内、Pre-Series B 等资格；需满足账户计划、历史领取与合作机构条件，非自动发放最高额度。",
+      "benefit_duration": "没有统一可直接当活动结束日的日期，以具体获批额度和条款为准。",
+      "checked_at": "2026-10-31T16:09:33.192875+00:00",
+      "availability": "official_application_or_offer_page_live_at_check",
+      "offer_type": "standing_eligibility_benefit",
+      "started_at": null,
+      "ends_at": null,
+      "has_global_claim_deadline": false,
+      "publish_as_timed_promo": false,
+      "publishable_as_ongoing_offer_with_new_schema": true
+    },
+    {
+      "key": "github-copilot-student",
+      "title": "GitHub Copilot Student 学生权益",
+      "source_url": "https://education.github.com/pack",
+      "provider": "GitHub Education",
+      "benefit": "官方学生包列出面向已验证学生的 Copilot Student：代码补全及一定 GitHub AI Credits，聊天与 Agent 使用存在限制。",
+      "eligibility": "需通过学生资格验证；不表述为无限量付费模型或不限次数 Agent。",
+      "benefit_duration": "按当前学生资格与计划规则，不是统一截止的限时促销。",
+      "checked_at": "2026-10-31T16:09:33.192875+00:00",
+      "availability": "official_application_or_offer_page_live_at_check",
+      "offer_type": "standing_eligibility_benefit",
+      "started_at": null,
+      "ends_at": null,
+      "has_global_claim_deadline": false,
+      "publish_as_timed_promo": false,
+      "publishable_as_ongoing_offer_with_new_schema": true
+    }
+  ],
+  "excluded_candidates": [
+    {
+      "provider": "DigitalOcean",
+      "source_url": "https://www.digitalocean.com/try/free-trial-offer",
+      "reason": "本次打开跳转首页，未核实第三方所称200美元60天优惠的当前官方条款，未计数。"
+    },
+    {
+      "provider": "Cursor",
+      "source_url": "https://cursor.com/docs/models-and-pricing",
+      "reason": "搜索出现第三方关于2026-11-21模型促销价格的描述，本轮未确认完整官方条款/当前适用范围，不计作已核实活动。"
+    }
+  ]
+}

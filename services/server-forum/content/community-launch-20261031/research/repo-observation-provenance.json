@@ -1,0 +1,86 @@
+{
+  "checked_at": "2026-10-31T16:06:11.537883+00:00",
+  "access": "Read-only production PostgreSQL query via SSH; no GitHub API/MCP call",
+  "tables": [
+    "collection_github_repositories",
+    "collection_github_snapshots"
+  ],
+  "day": "2026-10-31",
+  "record_count": 8,
+  "baseline_payload": "repo-baseline-2026-10-31.json",
+  "policy": "Preserve original observed_at and exact star_total. No historical count is inferred or backdated.",
+  "snapshots": [
+    {
+      "repo_id": 658928958,
+      "full_name": "ollama/ollama",
+      "description": "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models.",
+      "language": "Go",
+      "date": "2026-10-31",
+      "star_total": 185445,
+      "observed_at": "2026-10-31T13:45:32.718978+00:00"
+    },
+    {
+      "repo_id": 626805178,
+      "full_name": "langgenius/dify",
+      "description": "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cl",
+      "language": "Python",
+      "date": "2026-10-31",
+      "star_total": 160080,
+      "observed_at": "2026-10-31T13:45:30.534013+00:00"
+    },
+    {
+      "repo_id": 701547123,
+      "full_name": "open-webui/open-webui",
+      "description": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)",
+      "language": "Python",
+      "date": "2026-10-31",
+      "star_total": 157358,
+      "observed_at": "2026-10-31T13:45:33.162679+00:00"
+    },
+    {
+      "repo_id": 589831718,
+      "full_name": "Comfy-Org/ComfyUI",
+      "description": "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local infer",
+      "language": "Python",
+      "date": "2026-10-31",
+      "star_total": 144292,
+      "observed_at": "2026-10-31T13:45:30.059449+00:00"
+    },
+    {
+      "repo_id": 965415649,
+      "full_name": "openai/codex",
+      "description": "Lightweight coding agent that runs in your terminal",
+      "language": "Rust",
+      "date": "2026-10-31",
+      "star_total": 132386,
+      "observed_at": "2026-10-31T13:45:33.689317+00:00"
+    },
+    {
+      "repo_id": 643445235,
+      "full_name": "lobehub/lobehub",
+      "description": "🤯 LobeHub is your Chief Agent Operator, organizing your agents into 7×24 operations by hiring, scheduling, and reporting",
+      "language": "TypeScript",
+      "date": "2026-10-31",
+      "star_total": 83635,
+      "observed_at": "2026-10-31T13:45:31.33272+00:00"
+    },
+    {
+      "repo_id": 824874689,
+      "full_name": "cline/cline",
+      "description": "Autonomous coding agent as an SDK, IDE extension, or CLI assistant.",
+      "language": "TypeScript",
+      "date": "2026-10-31",
+      "star_total": 71095,
+      "observed_at": "2026-10-31T13:45:29.203742+00:00"
+    },
+    {
+      "repo_id": 680120071,
+      "full_name": "microsoft/autogen",
+      "description": "A programming framework for agentic AI",
+      "language": "Python",
+      "date": "2026-10-31",
+      "star_total": 61646,
+      "observed_at": "2026-10-31T13:45:32.271395+00:00"
+    }
+  ]
+}

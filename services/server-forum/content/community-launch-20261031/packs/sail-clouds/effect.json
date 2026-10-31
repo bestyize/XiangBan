@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "id": "sail-clouds",
+  "name": "纸舟轻航",
+  "description": "小纸舟轮廓沿斜向缓行，带轻微摇摆的几何特效。",
+  "sky": [
+    "#162747",
+    "#4f647c"
+  ],
+  "layers": [
+    {
+      "count": 24,
+      "shape": {
+        "kind": "path",
+        "d": "M-1,0 L1,0 L0.55,0.6 L-0.55,0.6 Z M0,-1 L0.8,-0.1 L0,-0.1 Z",
+        "style": "both",
+        "lineWidth": 0.035
+      },
+      "size": [
+        15,
+        32
+      ],
+      "speed": [
+        9,
+        22
+      ],
+      "direction": 348,
+      "sway": {
+        "amplitude": [
+          3,
+          8
+        ],
+        "frequency": [
+          0.1,
+          0.2
+        ]
+      },
+      "pendulum": 0.18,
+      "scatter": 0,
+      "alpha": [
+        0.3,
+        0.7
+      ],
+      "colors": [
+        [
+          "#f5e6bd",
+          "#d1af76"
+        ],
+        [
+          "#dcecf0",
+          "#8aa7bc"
+        ]
+      ]
+    }
+  ]
+}

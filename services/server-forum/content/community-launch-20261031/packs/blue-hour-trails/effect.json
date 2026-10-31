@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "id": "blue-hour-trails",
+  "name": "蓝调细雨",
+  "description": "稀疏银蓝短线斜落，避免高密度遮挡桌面文字。",
+  "sky": [
+    "#11192e",
+    "#293c5b"
+  ],
+  "layers": [
+    {
+      "count": 140,
+      "shape": {
+        "kind": "streak",
+        "length": [
+          10,
+          27
+        ],
+        "width": [
+          0.45,
+          1.05
+        ],
+        "head": 0
+      },
+      "size": [
+        1,
+        2
+      ],
+      "speed": [
+        75,
+        165
+      ],
+      "direction": 101,
+      "wind": 6,
+      "alpha": [
+        0.12,
+        0.38
+      ],
+      "colors": [
+        "#abc9ed",
+        "#d2e5f1"
+      ]
+    },
+    {
+      "count": 28,
+      "shape": {
+        "kind": "glow",
+        "core": 0
+      },
+      "size": [
+        3,
+        8
+      ],
+      "speed": [
+        9,
+        17
+      ],
+      "direction": 92,
+      "alpha": [
+        0.08,
+        0.22
+      ],
+      "colors": [
+        "#8fb1db"
+      ]
+    }
+  ]
+}

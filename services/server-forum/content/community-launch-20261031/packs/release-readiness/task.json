@@ -1,0 +1,43 @@
+{
+  "templateVersion": 1,
+  "title": "小版本发布核对单",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "准备小版本交付",
+  "boundary": "证据优先",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "写出本次变更范围与明确不包含的内容",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "列出一条正常路径和两条失败路径并记录结果",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "确认版本号、产物名和校验值来自同一次构建",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "写明回退入口、责任人和需要保留的数据",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "由实际负责人决定是否发布并留下完成记录",
+      "done": false
+    }
+  ],
+  "record": {
+    "版本": null,
+    "范围": null,
+    "正常路径": null,
+    "失败路径": null,
+    "回退": null,
+    "发布决定": null
+  }
+}

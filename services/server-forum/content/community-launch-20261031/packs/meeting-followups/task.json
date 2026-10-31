@@ -1,0 +1,40 @@
+{
+  "templateVersion": 1,
+  "title": "会议行动项落地表",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "会议结束后",
+  "boundary": "不自动派发任务",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "先分开记录已决定、未决定和仅供参考的事项",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "每个行动项只保留一个主负责人",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "把完成条件写成可观察的交付物",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "让相关人确认时间而不是替别人承诺",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "到检查日记录完成、阻塞或重新约定",
+      "done": false
+    }
+  ],
+  "record": {
+    "决定": null,
+    "未决定": null,
+    "行动项": null
+  }
+}

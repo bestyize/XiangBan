@@ -1,0 +1,41 @@
+{
+  "templateVersion": 1,
+  "title": "下班收尾十分钟",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "每天结束工作前",
+  "boundary": "10分钟",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "列出今天实际完成的交付物，给每项附本地文件名或任务编号",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "记录未完成工作的当前状态及阻塞原因",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "为明天第一件事写可直接执行的一步",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "把待他人回应的事项独立列出，并写下次查看时间",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "关闭不再需要的页面，确认文档已保存后结束",
+      "done": false
+    }
+  ],
+  "record": {
+    "今日交付": null,
+    "停在": null,
+    "明日第一步": null,
+    "待回应": null
+  }
+}

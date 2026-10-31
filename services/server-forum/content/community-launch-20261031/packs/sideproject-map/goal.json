@@ -1,0 +1,48 @@
+{
+  "templateVersion": 1,
+  "title": "六周小项目航线",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "6周",
+  "boundary": "包含收尾与范围控制",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "第一周描述一个目标用户和具体使用场景",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "第二周做最小原型，列出主动不做的功能",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "第三周完成一条端到端路径",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "第四周请少量同伴试用，区分缺陷和新需求",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "第五周修关键问题，第六周补说明、归档与回顾",
+      "done": false
+    }
+  ],
+  "record": {
+    "场景": null,
+    "最小成果": null,
+    "不做": null,
+    "里程碑": null,
+    "成功标准": null
+  },
+  "review": {
+    "current_stage": 1,
+    "completed": false,
+    "evidence": [],
+    "next_review": null
+  }
+}

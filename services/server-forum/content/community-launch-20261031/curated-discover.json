@@ -1,0 +1,404 @@
+[
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/claude-code",
+    "body": {
+      "data": {
+        "product": "Claude",
+        "title": "Claude Code 快速开始",
+        "subtitle": "安装、登录与第一个项目任务",
+        "label": "guide",
+        "url": "https://code.claude.com/docs/en/quickstart"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 0
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/claude-skills",
+    "body": {
+      "data": {
+        "product": "Claude",
+        "title": "编写 Claude Code 技能",
+        "subtitle": "技能目录、SKILL.md 与调用方式",
+        "label": "guide",
+        "url": "https://code.claude.com/docs/en/skills"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 1
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/claude-memory",
+    "body": {
+      "data": {
+        "product": "Claude",
+        "title": "项目记忆与规则文件",
+        "subtitle": "组织长期项目说明和规则",
+        "label": "guide",
+        "url": "https://code.claude.com/docs/en/memory"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 2
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/claude-permissions",
+    "body": {
+      "data": {
+        "product": "Claude",
+        "title": "工具权限与授权设置",
+        "subtitle": "了解各权限模式和工具访问设置",
+        "label": "guide",
+        "url": "https://code.claude.com/docs/en/permissions"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 3
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/claude-workflows",
+    "body": {
+      "data": {
+        "product": "Claude",
+        "title": "常见开发工作流",
+        "subtitle": "按实际开发任务查找官方操作示例",
+        "label": "guide",
+        "url": "https://code.claude.com/docs/en/common-workflows"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 4
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/codex-start",
+    "body": {
+      "data": {
+        "product": "Codex",
+        "title": "Codex 命令行快速开始",
+        "subtitle": "安装、登录并从终端开始任务",
+        "label": "guide",
+        "url": "https://learn.chatgpt.com/docs/codex/cli"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 0
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/codex-quota",
+    "body": {
+      "data": {
+        "product": "Codex",
+        "title": "Codex 登录与认证方式",
+        "subtitle": "了解不同客户端的登录方式",
+        "label": "guide",
+        "url": "https://learn.chatgpt.com/docs/auth"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 1
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/codex-agents-md",
+    "body": {
+      "data": {
+        "product": "Codex",
+        "title": "用 AGENTS.md 说明项目约定",
+        "subtitle": "为编码任务提供仓库范围的规则与上下文",
+        "label": "guide",
+        "url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 2
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/codex-skills",
+    "body": {
+      "data": {
+        "product": "Codex",
+        "title": "构建可复用技能",
+        "subtitle": "技能结构、适用场景与配置",
+        "label": "guide",
+        "url": "https://learn.chatgpt.com/docs/build-skills"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 3
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/codex-config",
+    "body": {
+      "data": {
+        "product": "Codex",
+        "title": "Codex 本地配置基础",
+        "subtitle": "配置文件位置及基础设置",
+        "label": "guide",
+        "url": "https://learn.chatgpt.com/docs/config-file/config-basic"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 4
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/skillhub-publish",
+    "body": {
+      "data": {
+        "product": "SkillHub",
+        "title": "SkillHub 开放接口总览",
+        "subtitle": "腾讯 SkillHub：接口、请求约定和错误格式",
+        "label": "guide",
+        "url": "https://github.com/Tencent/skillhub/blob/main/docs/api/README.md"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 0
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/skillhub-search",
+    "body": {
+      "data": {
+        "product": "SkillHub",
+        "title": "搜索、查看和下载技能",
+        "subtitle": "按条件查找技能并获取版本包",
+        "label": "guide",
+        "url": "https://github.com/Tencent/skillhub/blob/main/docs/api/skills.md"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 1
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/skillhub-files",
+    "body": {
+      "data": {
+        "product": "SkillHub",
+        "title": "读取技能的公开文件",
+        "subtitle": "查看指定版本的文件列表和内容",
+        "label": "guide",
+        "url": "https://github.com/Tencent/skillhub/blob/main/docs/api/files.md"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 2
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/skillhub-versions",
+    "body": {
+      "data": {
+        "product": "SkillHub",
+        "title": "技能版本与差异对比",
+        "subtitle": "检查版本记录以及文件级变化",
+        "label": "guide",
+        "url": "https://github.com/Tencent/skillhub/blob/main/docs/api/versions-and-diff.md"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 3
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/doc/skillhub-evaluation",
+    "body": {
+      "data": {
+        "product": "SkillHub",
+        "title": "理解技能质量结果",
+        "subtitle": "查看公开评分维度与评估说明",
+        "label": "guide",
+        "url": "https://github.com/Tencent/skillhub/blob/main/docs/api/evaluation.md"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 4
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/tool/curated-ollama",
+    "body": {
+      "data": {
+        "name": "Ollama",
+        "developer": "Ollama",
+        "license": "open",
+        "platforms": [
+          "macos",
+          "windows",
+          "linux"
+        ],
+        "type_label": "AI 工具",
+        "description": "本地模型运行工具，提供命令行及 API。先查看官方支持的模型和设备要求，再选择适合本机的模型。",
+        "homepage_url": "https://ollama.com/",
+        "icon_url": "",
+        "discussion_tag": "ollama",
+        "releases": [],
+        "artifacts": []
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 0
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/tool/curated-lm-studio",
+    "body": {
+      "data": {
+        "name": "LM Studio",
+        "developer": "Element Labs",
+        "license": "closed",
+        "platforms": [
+          "macos",
+          "windows",
+          "linux"
+        ],
+        "type_label": "AI 工具",
+        "description": "提供本地模型下载、聊天及开发接口。安装版本和系统要求以官方下载页为准。",
+        "homepage_url": "https://lmstudio.ai/",
+        "icon_url": "",
+        "discussion_tag": "lm-studio",
+        "releases": [],
+        "artifacts": []
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 0
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/tool/curated-comfyui",
+    "body": {
+      "data": {
+        "name": "ComfyUI",
+        "developer": "Comfy Org",
+        "license": "open",
+        "platforms": [
+          "macos",
+          "windows",
+          "linux"
+        ],
+        "type_label": "AI 工具",
+        "description": "通过节点连接模型和处理步骤，构建图像等生成工作流。工作流文件、模型权重及自定义节点需要分别管理。",
+        "homepage_url": "https://www.comfy.org/",
+        "icon_url": "",
+        "discussion_tag": "comfyui",
+        "releases": [],
+        "artifacts": []
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 0
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/tool/curated-llama-cpp",
+    "body": {
+      "data": {
+        "name": "llama.cpp",
+        "developer": "ggml-org",
+        "license": "open",
+        "platforms": [
+          "macos",
+          "windows",
+          "linux"
+        ],
+        "type_label": "AI 工具",
+        "description": "C/C++ 大语言模型推理项目，提供命令行和服务端工具；使用前核对模型格式、量化方式与硬件后端。",
+        "homepage_url": "https://github.com/ggml-org/llama.cpp",
+        "icon_url": "",
+        "discussion_tag": "llama-cpp",
+        "releases": [],
+        "artifacts": []
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 0
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/tool/curated-vllm",
+    "body": {
+      "data": {
+        "name": "vLLM",
+        "developer": "vLLM Project",
+        "license": "open",
+        "platforms": [
+          "linux"
+        ],
+        "type_label": "AI 工具",
+        "description": "面向模型推理与服务部署的开源项目，提供离线推理和在线 API 服务。请按官方安装页核对硬件与运行环境。",
+        "homepage_url": "https://docs.vllm.ai/en/latest/",
+        "icon_url": "",
+        "discussion_tag": "vllm",
+        "releases": [],
+        "artifacts": []
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 0
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/nav/perplexity",
+    "body": {
+      "data": {
+        "group": "海外",
+        "name": "Perplexity",
+        "vendor": "Perplexity AI",
+        "url": "https://www.perplexity.ai/",
+        "brand_color": "#20808D",
+        "tint": "#E4F3F4"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 10
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/nav/mistral",
+    "body": {
+      "data": {
+        "group": "海外",
+        "name": "Mistral Chat",
+        "vendor": "Mistral AI",
+        "url": "https://chat.mistral.ai/",
+        "brand_color": "#F97316",
+        "tint": "#FFF0E5"
+      },
+      "status": "published",
+      "sample": false,
+      "sort_order": 10
+    }
+  }
+]

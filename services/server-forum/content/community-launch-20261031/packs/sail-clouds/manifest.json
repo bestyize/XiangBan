@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "effect",
+  "id": "sail-clouds",
+  "name": "纸舟轻航",
+  "version": "1.0.0",
+  "description": "小纸舟轮廓沿斜向缓行，带轻微摇摆的几何特效。",
+  "author": "小伴社区原创作品",
+  "license": "MIT"
+}

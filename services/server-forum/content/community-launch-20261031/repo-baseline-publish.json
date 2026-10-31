@@ -1,0 +1,237 @@
+[
+  {
+    "method": "PUT",
+    "path": "/api/admin/discover/repo_issue/github-rolling-20261031",
+    "body": {
+      "data": {
+        "source": "GitHub",
+        "source_url": "https://github.com",
+        "as_of": "2026-10-31T13:45:33.689317Z",
+        "metric": "star total baseline",
+        "issue_no": 20261031,
+        "week_start": "2026-10-31",
+        "week_end": "2026-10-31",
+        "observation_start": "2026-10-31",
+        "observation_end": "2026-10-31",
+        "observed_days": 0,
+        "complete": false,
+        "total_gain": null,
+        "wow_pct": null,
+        "daily_gain": [],
+        "ranks": [
+          {
+            "repo_id": "658928958",
+            "full_name": "ollama/ollama",
+            "url": "https://github.com/ollama/ollama",
+            "description": "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models.",
+            "language": "Go",
+            "language_color": "",
+            "star_total": 185445,
+            "star_gain": null,
+            "spark": [
+              185445
+            ],
+            "snapshot_dates": [
+              "2026-10-31"
+            ],
+            "snapshot_times": [
+              "2026-10-31T13:45:32.718978Z"
+            ],
+            "icon": "code",
+            "tint": "#E6F4EA",
+            "observed_days": 0,
+            "complete": false,
+            "suspected_growth": false,
+            "observation_start": "2026-10-31T13:45:32.718978Z",
+            "observation_end": "2026-10-31T13:45:32.718978Z"
+          },
+          {
+            "repo_id": "626805178",
+            "full_name": "langgenius/dify",
+            "url": "https://github.com/langgenius/dify",
+            "description": "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cl",
+            "language": "Python",
+            "language_color": "",
+            "star_total": 160080,
+            "star_gain": null,
+            "spark": [
+              160080
+            ],
+            "snapshot_dates": [
+              "2026-10-31"
+            ],
+            "snapshot_times": [
+              "2026-10-31T13:45:30.534013Z"
+            ],
+            "icon": "code",
+            "tint": "#E6F4EA",
+            "observed_days": 0,
+            "complete": false,
+            "suspected_growth": false,
+            "observation_start": "2026-10-31T13:45:30.534013Z",
+            "observation_end": "2026-10-31T13:45:30.534013Z"
+          },
+          {
+            "repo_id": "701547123",
+            "full_name": "open-webui/open-webui",
+            "url": "https://github.com/open-webui/open-webui",
+            "description": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)",
+            "language": "Python",
+            "language_color": "",
+            "star_total": 157358,
+            "star_gain": null,
+            "spark": [
+              157358
+            ],
+            "snapshot_dates": [
+              "2026-10-31"
+            ],
+            "snapshot_times": [
+              "2026-10-31T13:45:33.162679Z"
+            ],
+            "icon": "code",
+            "tint": "#E6F4EA",
+            "observed_days": 0,
+            "complete": false,
+            "suspected_growth": false,
+            "observation_start": "2026-10-31T13:45:33.162679Z",
+            "observation_end": "2026-10-31T13:45:33.162679Z"
+          },
+          {
+            "repo_id": "589831718",
+            "full_name": "Comfy-Org/ComfyUI",
+            "url": "https://github.com/Comfy-Org/ComfyUI",
+            "description": "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local infer",
+            "language": "Python",
+            "language_color": "",
+            "star_total": 144292,
+            "star_gain": null,
+            "spark": [
+              144292
+            ],
+            "snapshot_dates": [
+              "2026-10-31"
+            ],
+            "snapshot_times": [
+              "2026-10-31T13:45:30.059449Z"
+            ],
+            "icon": "code",
+            "tint": "#E6F4EA",
+            "observed_days": 0,
+            "complete": false,
+            "suspected_growth": false,
+            "observation_start": "2026-10-31T13:45:30.059449Z",
+            "observation_end": "2026-10-31T13:45:30.059449Z"
+          },
+          {
+            "repo_id": "965415649",
+            "full_name": "openai/codex",
+            "url": "https://github.com/openai/codex",
+            "description": "Lightweight coding agent that runs in your terminal",
+            "language": "Rust",
+            "language_color": "",
+            "star_total": 132386,
+            "star_gain": null,
+            "spark": [
+              132386
+            ],
+            "snapshot_dates": [
+              "2026-10-31"
+            ],
+            "snapshot_times": [
+              "2026-10-31T13:45:33.689317Z"
+            ],
+            "icon": "code",
+            "tint": "#E6F4EA",
+            "observed_days": 0,
+            "complete": false,
+            "suspected_growth": false,
+            "observation_start": "2026-10-31T13:45:33.689317Z",
+            "observation_end": "2026-10-31T13:45:33.689317Z"
+          },
+          {
+            "repo_id": "643445235",
+            "full_name": "lobehub/lobehub",
+            "url": "https://github.com/lobehub/lobehub",
+            "description": "🤯 LobeHub is your Chief Agent Operator, organizing your agents into 7×24 operations by hiring, scheduling, and reporting",
+            "language": "TypeScript",
+            "language_color": "",
+            "star_total": 83635,
+            "star_gain": null,
+            "spark": [
+              83635
+            ],
+            "snapshot_dates": [
+              "2026-10-31"
+            ],
+            "snapshot_times": [
+              "2026-10-31T13:45:31.332720Z"
+            ],
+            "icon": "code",
+            "tint": "#E6F4EA",
+            "observed_days": 0,
+            "complete": false,
+            "suspected_growth": false,
+            "observation_start": "2026-10-31T13:45:31.332720Z",
+            "observation_end": "2026-10-31T13:45:31.332720Z"
+          },
+          {
+            "repo_id": "824874689",
+            "full_name": "cline/cline",
+            "url": "https://github.com/cline/cline",
+            "description": "Autonomous coding agent as an SDK, IDE extension, or CLI assistant.",
+            "language": "TypeScript",
+            "language_color": "",
+            "star_total": 71095,
+            "star_gain": null,
+            "spark": [
+              71095
+            ],
+            "snapshot_dates": [
+              "2026-10-31"
+            ],
+            "snapshot_times": [
+              "2026-10-31T13:45:29.203742Z"
+            ],
+            "icon": "code",
+            "tint": "#E6F4EA",
+            "observed_days": 0,
+            "complete": false,
+            "suspected_growth": false,
+            "observation_start": "2026-10-31T13:45:29.203742Z",
+            "observation_end": "2026-10-31T13:45:29.203742Z"
+          },
+          {
+            "repo_id": "680120071",
+            "full_name": "microsoft/autogen",
+            "url": "https://github.com/microsoft/autogen",
+            "description": "A programming framework for agentic AI",
+            "language": "Python",
+            "language_color": "",
+            "star_total": 61646,
+            "star_gain": null,
+            "spark": [
+              61646
+            ],
+            "snapshot_dates": [
+              "2026-10-31"
+            ],
+            "snapshot_times": [
+              "2026-10-31T13:45:32.271395Z"
+            ],
+            "icon": "code",
+            "tint": "#E6F4EA",
+            "observed_days": 0,
+            "complete": false,
+            "suspected_growth": false,
+            "observation_start": "2026-10-31T13:45:32.271395Z",
+            "observation_end": "2026-10-31T13:45:32.271395Z"
+          }
+        ]
+      },
+      "status": "published",
+      "sample": false,
+      "published_at": "2026-10-31T13:45:33.689317Z"
+    }
+  }
+]

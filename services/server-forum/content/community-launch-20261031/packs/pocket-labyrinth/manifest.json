@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "game",
+  "id": "pocket-labyrinth",
+  "name": "口袋迷径",
+  "version": "1.0.0",
+  "description": "随机生成一张可通行迷宫，收集三颗星后抵达出口。",
+  "author": "小伴社区原创作品",
+  "license": "MIT",
+  "save": false,
+  "orientation": "portrait",
+  "layer": "space"
+}

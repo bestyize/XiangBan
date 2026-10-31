@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "game",
+  "id": "tile-harbor",
+  "name": "方块归港",
+  "version": "1.0.0",
+  "description": "通过相邻滑动还原数字次序，支持3×3与4×4两种棋盘。",
+  "author": "小伴社区原创作品",
+  "license": "MIT",
+  "save": false,
+  "orientation": "portrait",
+  "layer": "space"
+}

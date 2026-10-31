@@ -1,0 +1,252 @@
+[
+  {
+    "file": "community-20261031-share-learn-01.md",
+    "ok": true,
+    "external_id": "community-20261031-share-learn-01",
+    "title": "从 Python 官方教程开始：做一个能解释清楚的小脚本",
+    "category": "share-learn",
+    "image_count": 0,
+    "id": "5aec1e76-e82f-4ead-99f0-c45c9274976f",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-learn-02.md",
+    "ok": true,
+    "external_id": "community-20261031-share-learn-02",
+    "title": "CS50 与 MDN 怎么搭配：把计算机基础和网页练习分成两条线",
+    "category": "share-learn",
+    "image_count": 0,
+    "id": "553fce2a-861c-4bd2-8733-8d35da3affbd",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-learn-03.md",
+    "ok": true,
+    "external_id": "community-20261031-share-learn-03",
+    "title": "补工具链基础：用 Missing Semester 与 Git 文档整理一个练习仓库",
+    "category": "share-learn",
+    "image_count": 0,
+    "id": "9d2fadcc-9bab-4bb2-9a2d-ebb0a8ff0b39",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-learn-04.md",
+    "ok": true,
+    "external_id": "community-20261031-share-learn-04",
+    "title": "读线性代数公开课：给矩阵运算配一组能手算的小例子",
+    "category": "share-learn",
+    "image_count": 0,
+    "id": "178493f4-0027-4cb9-b630-8a845a1ffd7e",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-share-learn-05.md",
+    "ok": true,
+    "external_id": "community-20261031-share-learn-05",
+    "title": "资料越存越多怎么办：用 Zotero 做可回查的来源笔记",
+    "category": "share-learn",
+    "image_count": 0,
+    "id": "8878d136-4c77-46f1-a541-02b0406ba500",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-creative-01.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-creative-01",
+    "title": "用 AI 写分镜之前，先做一张镜头约束卡",
+    "category": "tech-creative",
+    "image_count": 0,
+    "id": "6d8a4cb4-1f99-4604-acaa-8a07835e532e",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-creative-02.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-creative-02",
+    "title": "AI 配图的颜色为何总不一致：用色板与固定变量做对照",
+    "category": "tech-creative",
+    "image_count": 0,
+    "id": "7f9dec9c-e744-4edd-a7e8-d9b72a956ca2",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-creative-03.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-creative-03",
+    "title": "做一段教程配音：先剪句子，再处理音量",
+    "category": "tech-creative",
+    "image_count": 0,
+    "id": "920aacc4-01c9-4630-80b3-47385ba3dc63",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-creative-04.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-creative-04",
+    "title": "用 OBS 录软件教程：一段短样片比录完半小时更划算",
+    "category": "tech-creative",
+    "image_count": 0,
+    "id": "0e4fbf93-27da-4826-9442-5780a2494ada",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-creative-05.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-creative-05",
+    "title": "给创作素材做来源清单：字体、图片、音效分别记",
+    "category": "tech-creative",
+    "image_count": 0,
+    "id": "68511a58-d0f9-46e9-81fa-b2271c25e9a9",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-hardware-01.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-hardware-01",
+    "title": "给本地大模型做硬件记录：别只报显卡型号",
+    "category": "tech-hardware",
+    "image_count": 0,
+    "id": "af7ead70-f4ee-4203-a3a4-f35017f629f2",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-hardware-02.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-hardware-02",
+    "title": "ESP32 语音项目入门：把拾音、联网与推理分开看",
+    "category": "tech-hardware",
+    "image_count": 0,
+    "id": "37a6dc47-7659-41f2-9c14-810012ed22e4",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-hardware-03.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-hardware-03",
+    "title": "边缘推理选型：模型能导出，不代表设备就能高效运行",
+    "category": "tech-hardware",
+    "image_count": 0,
+    "id": "1af6df44-f414-42f7-915b-a5bc189ef707",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-hardware-04.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-hardware-04",
+    "title": "机器人学习先做离线数据练习：读 LeRobot 文档时看这几个对象",
+    "category": "tech-hardware",
+    "image_count": 0,
+    "id": "5c82acd2-c4c4-46fd-99b3-7df29fa85843",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-hardware-05.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-hardware-05",
+    "title": "本地 AI 工作台的温度与功耗记录：怎样让测试更公平",
+    "category": "tech-hardware",
+    "image_count": 0,
+    "id": "d09a7f55-b0e9-4f71-827a-3ceb636bd115",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-llm-01.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-llm-01",
+    "title": "本地模型第一次验收：先让服务回答，再接入聊天界面",
+    "category": "tech-llm",
+    "image_count": 0,
+    "id": "8b57fa29-c5dc-4e1b-aa9b-46bf271812ae",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-llm-02.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-llm-02",
+    "title": "提示词调试先建十条小样本：把“感觉更好”变成可比较结果",
+    "category": "tech-llm",
+    "image_count": 0,
+    "id": "e0448043-f449-4744-b92a-d0f0dc8dc942",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-llm-03.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-llm-03",
+    "title": "结构化输出不等于数据正确：给模型结果加三层验收",
+    "category": "tech-llm",
+    "image_count": 0,
+    "id": "7930d972-cb7d-4002-ba3b-039c4aff7f4b",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-llm-04.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-llm-04",
+    "title": "GGUF、上下文和内存：本地模型选型时应记录什么",
+    "category": "tech-llm",
+    "image_count": 0,
+    "id": "4fbbcca8-5123-42c2-88b8-9b51be03661d",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-llm-05.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-llm-05",
+    "title": "从单机聊天走向服务：何时才需要考虑 vLLM",
+    "category": "tech-llm",
+    "image_count": 0,
+    "id": "6868f9ce-8f0e-4fd7-9759-6450e0853f0b",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-productivity-01.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-productivity-01",
+    "title": "给 Claude Code 和 Codex 写项目说明：把长期规则与本次任务分开",
+    "category": "tech-productivity",
+    "image_count": 0,
+    "id": "635a984d-dd25-4cb9-bc1d-0b72cf26e7ba",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-productivity-02.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-productivity-02",
+    "title": "AI 改代码前先说清权限：本地文件、命令与对外动作分别约定",
+    "category": "tech-productivity",
+    "image_count": 0,
+    "id": "ddb6d691-aa2f-4ad0-8310-a2d7987c68fe",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-productivity-03.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-productivity-03",
+    "title": "让 Claude Code 与 Codex 分步骤交付：一轮只验证一个可见结果",
+    "category": "tech-productivity",
+    "image_count": 0,
+    "id": "025985a7-f99b-4b58-8a8d-caa91e36dcbd",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-productivity-04.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-productivity-04",
+    "title": "什么时候把重复提示词做成 Skill：以发布前检查为例",
+    "category": "tech-productivity",
+    "image_count": 0,
+    "id": "ce5c01d7-ca27-4546-847b-9bcad2ba6bb8",
+    "status": "imported"
+  },
+  {
+    "file": "community-20261031-tech-productivity-05.md",
+    "ok": true,
+    "external_id": "community-20261031-tech-productivity-05",
+    "title": "同时让 Claude Code 与 Codex 做事：用 worktree 隔离文件，再合并结果",
+    "category": "tech-productivity",
+    "image_count": 0,
+    "id": "c6eea945-2a22-42c4-900a-501b27a9b32b",
+    "status": "imported"
+  }
+]

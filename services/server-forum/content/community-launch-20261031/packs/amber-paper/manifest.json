@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "effect",
+  "id": "amber-paper",
+  "name": "琥珀纸屑",
+  "version": "1.0.0",
+  "description": "暖金纸片缓慢旋落，适合低密度节日桌面。",
+  "author": "小伴社区原创作品",
+  "license": "MIT"
+}
