@@ -28,6 +28,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/packs", get(list_packs).post(create_pack))
         .route("/packs/upload-ticket", post(upload_ticket))
+        .route("/packs/upload-status", get(upload_status))
         .route("/packs/{id}", get(get_pack))
         .route("/packs/{id}/download", get(download))
         .route("/packs/{id}/applied", post(applied))
@@ -35,6 +36,7 @@ pub fn routes() -> Router<AppState> {
         .route("/packs/{id}/remove", post(remove_own_pack))
         .route("/me/packs", get(my_packs))
         .route("/schemes", get(list_schemes).post(create_scheme))
+        .route("/schemes/{id}", get(get_scheme))
         .route("/projects", get(list_projects))
         .route("/projects/{slug}", get(get_project))
         .route("/weekly", get(list_weekly))
@@ -675,15 +677,50 @@ async fn remove_own_pack(State(state): State<AppState>, auth: AuthUser, Path(id)
 
 // ───────────────────────── 方案 ─────────────────────────
 
+#[derive(Deserialize)]
+struct UploadStatusQuery { file_key: String }
+
+async fn upload_status(State(state): State<AppState>, auth: AuthUser, Query(q): Query<UploadStatusQuery>) -> AppResult<Json<Value>> {
+    let row: Option<(bool,bool)> = sqlx::query_as("SELECT verified,used FROM pack_uploads WHERE file_key=$1 AND uid=$2")
+        .bind(&q.file_key).bind(auth.user.uid).fetch_optional(&state.pool).await?;
+    let (verified,used) = row.ok_or_else(|| AppError::not_found("上传记录"))?;
+    Ok(Json(json!({"file_key":q.file_key,"verified":verified,"used":used})))
+}
+
+async fn get_scheme(State(state): State<AppState>, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+    let row: Option<(Uuid,String,String,String,Value,i64,DateTime<Utc>)> = sqlx::query_as(
+        "SELECT s.author_uid,u.nickname,s.title,s.summary,s.items,s.apply_count,s.created_at FROM schemes s JOIN users u ON u.uid=s.author_uid
+         WHERE s.id=$1 AND s.status='published' AND u.status<>'banned'"
+    ).bind(id).fetch_optional(&state.pool).await?;
+    let (uid,nickname,title,summary,items,apply_count,created_at) = row.ok_or_else(|| AppError::not_found("方案"))?;
+    let mut resolved = Vec::new();
+    for item in items.as_array().into_iter().flatten().take(30) {
+        let Some(pack_id) = item["pack_id"].as_i64() else { continue };
+        let version = item["version"].as_i64();
+        let pack: Option<(String,String,String)> = sqlx::query_as(
+            "SELECT p.kind,p.slug,p.title FROM packs p LEFT JOIN users u ON u.uid=p.author_uid LEFT JOIN topics t ON t.id=p.topic_id
+             WHERE p.id=$1 AND p.status='published' AND (u.uid IS NULL OR u.status<>'banned')
+             AND (p.topic_id IS NULL OR (t.status='normal' AND t.min_read_level=0))
+             AND EXISTS(SELECT 1 FROM pack_versions v WHERE v.pack_id=p.id AND v.version=COALESCE($2,p.current_version))"
+        ).bind(pack_id).bind(version.map(|v|v as i32)).fetch_optional(&state.pool).await?;
+        resolved.push(match pack {
+            Some((kind,slug,title)) => json!({"pack_id":pack_id,"version":version,"available":true,"kind":kind,"slug":slug,"title":title}),
+            None => json!({"pack_id":pack_id,"version":version,"available":false}),
+        });
+    }
+    Ok(Json(json!({"id":id,"author":{"uid":uid,"nickname":nickname},"title":title,"summary":summary,
+        "items":resolved,"apply_count":apply_count,"created_at":created_at})))
+}
+
 async fn list_schemes(State(state): State<AppState>, Query(q): Query<ListQuery>) -> AppResult<Json<Page<Value>>> {
     let (page, size) = paging(q.page, q.page_size);
-    let (total,): (i64,) = sqlx::query_as("SELECT count(*) FROM schemes WHERE status = 'published'")
+    let (total,): (i64,) = sqlx::query_as("SELECT count(*) FROM schemes s JOIN users u ON u.uid=s.author_uid WHERE s.status='published' AND u.status<>'banned'")
         .fetch_one(&state.pool)
         .await?;
     let rows: Vec<(i64, Uuid, String, String, Value, i64, DateTime<Utc>)> = sqlx::query_as(
         "SELECT s.id, s.author_uid, u.nickname, s.title, s.items, s.apply_count, s.created_at
          FROM schemes s JOIN users u ON u.uid = s.author_uid
-         WHERE s.status = 'published' ORDER BY s.created_at DESC, s.id DESC LIMIT $1 OFFSET $2",
+         WHERE s.status = 'published' AND u.status<>'banned' ORDER BY s.created_at DESC, s.id DESC LIMIT $1 OFFSET $2",
     )
     .bind(size)
     .bind((page - 1) * size)
