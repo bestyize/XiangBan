@@ -64,6 +64,7 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
                 if (pack.status != "published") Text(contentWorkState(pack), Modifier.padding(top = 8.dp), color = Danger, fontSize = 13.sp)
                 if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp)
             }
+            if (pack.status == "published") ContentSocialActions(env, "pack", pack.id, open)
             ManifestSection("能做", manifestValue(manifest, "canDo", "can_do", "capabilities"))
             ManifestSection("不能做", manifestValue(manifest, "cannotDo", "cannot_do", "limitations"))
             ManifestSection("所需权限", manifestValue(manifest, "permissions", "requiredPermissions"))
@@ -95,6 +96,7 @@ fun SchemeDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rou
                     Text("${scheme.author.nickname ?: "作者"} · ${scheme.createdAt.take(10)}", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                     if (scheme.summary.isNotBlank()) Text(scheme.summary, Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp)
                 } }
+                item { ContentSocialActions(env, "scheme", scheme.id, open) }
                 item { Text("包含的内容", Modifier.padding(4.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
                 itemsIndexed(scheme.items, key = { index, item -> "$index-${item.packId}-${item.version}" }) { _, item -> WhiteCard(padding = 14.dp) {
                     Text(if (item.available) item.title ?: item.slug else "内容不可用", fontSize = 15.sp, fontWeight = FontWeight.Medium)

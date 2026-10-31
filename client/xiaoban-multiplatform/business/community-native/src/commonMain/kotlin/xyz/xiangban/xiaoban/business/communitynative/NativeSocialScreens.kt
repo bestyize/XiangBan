@@ -66,12 +66,12 @@ fun NativeNotificationsScreen(env: CommunityEnv, back: () -> Unit, open: (Route)
                 if (result.items.isEmpty()) CenterMessage(if (page > 1) "这一页没有通知" else if (unread) "没有未读通知" else "还没有通知",
                     if (page > 1) "上一页" else "刷新", { if (page > 1) page-- else loader.reload() })
                 else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(result.items, key = { it.id }) { note -> WhiteCard(Modifier.clickable(enabled = note.packId != null || note.topicId != null) {
+                    items(result.items, key = { it.id }) { note -> WhiteCard(Modifier.clickable(enabled = note.kind == "content_removed" || note.packId != null || note.topicId != null) {
                         if (!note.read) mark(listOf(note.id), false)
-                        note.packId?.let { open(Route.Pack(it)) } ?: note.topicId?.let { open(Route.Topic(it)) }
+                        if (note.kind == "content_removed") open(Route.MyWorks) else note.packId?.let { open(Route.Pack(it)) } ?: note.topicId?.let { open(Route.Topic(it)) }
                     }, padding = 14.dp) {
                         Text((if (!note.read) "● " else "") + notificationHeadline(note), fontSize = 14.sp, lineHeight = 22.sp, fontWeight = if (note.read) FontWeight.Normal else FontWeight.SemiBold)
-                        if (note.excerpt.isNotBlank()) Text(note.excerpt, Modifier.padding(top = 6.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                        if (note.kind != "content_removed" && note.excerpt.isNotBlank()) Text(note.excerpt, Modifier.padding(top = 6.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
                         Text(agoText(note.createdAt), Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                     } }
                     item { SocialPager(page, result.hasMore) { page = it } }
@@ -83,14 +83,17 @@ fun NativeNotificationsScreen(env: CommunityEnv, back: () -> Unit, open: (Route)
 
 @Composable
 fun NativeBookmarksScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
+    var kind by rememberSaveable { mutableStateOf("topic") }
     val session by env.session.state.collectAsState()
     var page by rememberSaveable { mutableStateOf(1) }
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize()) {
-        ScreenBar("帖子收藏", onBack = back)
+        ScreenBar("我的收藏", onBack = back)
         if (!session.loggedIn) { CenterMessage("登录后查看收藏", "登录", { open(Route.Login) }); return@Column }
+        TabStrip(listOf("topic" to "帖子", "pack" to "作品", "scheme" to "方案"), kind) { kind = it; page = 1 }
+        if (kind != "topic") { ContentBookmarkFeed(env, kind, open); return@Column }
         val loader = rememberLoader(env, "bookmarks-$page-${session.accountId}") { env.social.bookmarks(page) }
         val state by loader.state.collectAsState()
         error?.let { Banner(it, Modifier.padding(12.dp), warn = true) }
@@ -238,7 +241,7 @@ internal fun NativeReportAction(env: CommunityEnv, targetType: String, id: Long,
     var submitted by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     Text(if (submitted) "已提交举报" else "举报", Modifier.clickable(enabled = !busy && !submitted) { show = true; error = null }, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-    if (show) AlertDialog(onDismissRequest = { if (!busy) show = false }, title = { Text(if (targetType == "post") "举报回复" else "举报帖子") },
+    if (show) AlertDialog(onDismissRequest = { if (!busy) show = false }, title = { Text(when (targetType) { "post" -> "举报回复"; "pack" -> "举报作品"; "scheme" -> "举报方案"; else -> "举报帖子" }) },
         text = { Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (!session.loggedIn) Text("请先登录小伴账号后举报。", fontSize = 14.sp)
             else {
@@ -252,7 +255,7 @@ internal fun NativeReportAction(env: CommunityEnv, targetType: String, id: Long,
             else PillButton(if (busy) "提交中…" else "提交举报", {
             if (busy) return@PillButton
             busy = true; error = null
-            scope.launch { try { env.social.report(targetType, id, reason, detail); submitted = true; show = false }
+            scope.launch { try { if (targetType in listOf("pack", "scheme")) env.contentSocial.report(targetType, id, reason, detail) else env.social.report(targetType, id, reason, detail); submitted = true; show = false }
                 catch (e: CancellationException) { throw e } catch (e: Exception) { error = messageOf(e) }
                 finally { busy = false } }
         }, enabled = session.loggedIn && !busy && reason.isNotEmpty() && detail.length <= 500) },
