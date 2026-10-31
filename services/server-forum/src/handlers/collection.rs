@@ -45,7 +45,8 @@ async fn sources(State(s): State<AppState>, _: AuthAdmin) -> AppResult<Json<Valu
     let items:Vec<Source>=sqlx::query_as("SELECT id,credential IS NOT NULL AS configured,config,hint,enabled,interval_minutes,last_success_at,last_error,next_run_at FROM collection_sources ORDER BY id").fetch_all(&s.pool).await?;
     Ok(Json(json!({"items":items.into_iter().map(|source| {
         let title=collectors::title(&source.id).unwrap_or("未知来源");
-        let mut value=serde_json::to_value(source).unwrap(); value["title"]=json!(title); value
+        let required = collectors::credential_required(&source.id);
+        let mut value=serde_json::to_value(source).unwrap(); value["title"]=json!(title); value["credential_required"]=json!(required); value
     }).collect::<Vec<_>>()})))
 }
 #[derive(Deserialize)]
@@ -61,6 +62,9 @@ async fn credential(
 ) -> AppResult<Json<Value>> {
     collectors::check_source(&id)?;
     let secret = input.key.trim();
+    if !collectors::credential_required(&id) {
+        return Err(AppError::BadRequest("此公开来源不需要凭据".into()));
+    }
     if !(8..=4096).contains(&secret.len()) || !secret.bytes().all(|b| b.is_ascii_graphic()) {
         return Err(AppError::BadRequest(
             "密钥应为 8–4096 个非空白 ASCII 字符".into(),
@@ -119,6 +123,7 @@ async fn configure(
     let (sealed, old_config, old_enabled) = old.ok_or_else(|| AppError::not_found("采集来源"))?;
     let config = match input.config {
         Some(config) if id == "github_repos" => collectors::repo_sources::sanitize_config(config)?,
+        Some(config) if id == "official_news" => collectors::news_sources::sanitize_config(config)?,
         Some(config) if config == json!({}) => config,
         Some(_) => return Err(AppError::BadRequest("此来源不支持额外配置".into())),
         None => old_config,
@@ -126,7 +131,11 @@ async fn configure(
     if id == "github_repos" && input.enabled.unwrap_or(old_enabled) {
         collectors::repo_sources::configured_names(&config)?;
     }
-    if input.enabled == Some(true) {
+    if id == "official_news" && input.enabled.unwrap_or(old_enabled)
+        && config["feed_ids"].as_array().is_none_or(|v| v.is_empty()) {
+        return Err(AppError::BadRequest("请先选择至少一个官方日报来源".into()));
+    }
+    if input.enabled == Some(true) && collectors::credential_required(&id) {
         let sealed = sealed.ok_or_else(|| AppError::BadRequest("请先配置来源凭据".into()))?;
         credentials::decrypt(&id, &sealed)?;
     }

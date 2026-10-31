@@ -501,6 +501,7 @@ pub fn validate(kind: &str, data: Value) -> AppResult<Value> {
         "doc" => go::<Doc>(data),
         "vendor" => go::<Vendor>(data),
         "model" => go::<Model>(data),
+        "repo_issue" if data["source"] == "GitHub" => crate::collectors::repo_sources::validate_issue(data),
         "repo_issue" => go::<RepoIssue>(data),
         "quota" => go::<Quota>(data),
         "launch" => go::<Launch>(data),

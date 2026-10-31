@@ -1,6 +1,7 @@
 //! 来源任务调度与草稿接入。所有网络运行在独立后台任务，仅生成待审核内容。
 pub mod credentials;
 pub mod model_sources;
+pub mod news_sources;
 pub mod repo_sources;
 pub mod schema;
 use crate::{
@@ -27,9 +28,11 @@ pub fn title(source: &str) -> Option<&'static str> {
         "artificial_analysis" => Some("Artificial Analysis 能力榜"),
         "openrouter" => Some("OpenRouter 调用量榜"),
         "github_repos" => Some("GitHub 开源热榜"),
+        "official_news" => Some("官方 AI 日报"),
         _ => None,
     }
 }
+pub fn credential_required(source: &str) -> bool { source != "official_news" }
 pub fn check_source(source: &str) -> AppResult<()> {
     if title(source).is_none() {
         return Err(AppError::not_found("采集来源"));
@@ -55,10 +58,16 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
     if source == "github_repos" {
         repo_sources::configured_names(&config)?;
     }
-    let secret = credentials::decrypt(
+    if source == "official_news" {
+        let config = news_sources::sanitize_config(config.clone())?;
+        if config["feed_ids"].as_array().is_none_or(|v| v.is_empty()) {
+            return Err(AppError::BadRequest("请先选择至少一个官方日报来源".into()));
+        }
+    }
+    let secret = if credential_required(&source) { credentials::decrypt(
         &source,
         &sealed.ok_or_else(|| AppError::BadRequest("请先配置来源凭据".into()))?,
-    )?;
+    )? } else { String::new() };
     let http = credentials::http_client()?;
     if let Some(old) = old_run {
         sqlx::query("UPDATE collection_runs SET status='failed',finished_at=now(),error='运行中断，租约已过期' WHERE id=$1 AND status='running'").bind(old).execute(&mut *tx).await?;
@@ -77,6 +86,8 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
         let fetched = tokio::time::timeout(std::time::Duration::from_secs(240), async {
             if source == "github_repos" {
                 repo_sources::collect(&s.pool, &secret, &http, &config, id).await
+            } else if source == "official_news" {
+                news_sources::collect(&http, &config).await
             } else {
                 model_sources::collect(&source, &secret, &http).await
             }
@@ -84,21 +95,20 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
         .await;
         let result = match fetched {
             Ok(Ok(items)) => {
-                let count = items.len() as i32;
-                if source == "github_repos" && items.is_empty() {
+                if items.is_empty() && (source == "github_repos" || source == "official_news") {
                     Ok(0)
                 } else {
                     crate::handlers::discover_editor::write_collected_batch(
                         &s.pool, &source, id, items,
                     )
                     .await
-                    .map(|_| count)
+                    .map(|count| count as i32)
                 }
             }
             // Adapter errors may include upstream strings; only a fixed category is persisted.
-            Ok(Err(_)) => Err(AppError::BadRequest(
-                "来源采集失败，请检查凭据、额度和来源可用性".into(),
-            )),
+            Ok(Err(message)) => Err(AppError::BadRequest(if source == "official_news" { message } else {
+                "来源采集失败，请检查凭据、额度和来源可用性".into()
+            })),
             Err(_) => Err(AppError::BadRequest("来源采集超时".into())),
         };
         if let Err(_) = finish(&s.pool, &source, id, result).await {
@@ -111,6 +121,7 @@ async fn finish(pool: &PgPool, source: &str, id: Uuid, result: AppResult<i32>) -
     let (count, error) = match result {
         Ok(count) => (count, None),
         Err(AppError::Conflict(_)) => (0, Some("草稿已被人工修改或审核，请处理冲突后重试")),
+        Err(AppError::BadRequest(ref message)) if source == "official_news" => (0, Some(message.as_str())),
         Err(AppError::BadRequest(_)) => (
             0,
             Some("采集来源返回失败、超时或无效数据，请检查来源后重试"),
@@ -136,7 +147,7 @@ pub fn spawn(state: AppState) {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
         loop {
             interval.tick().await;
-            let sources: Result<Vec<(String,)>,_>=sqlx::query_as("SELECT id FROM collection_sources WHERE enabled AND credential IS NOT NULL AND next_run_at<=now() AND (lease_until IS NULL OR lease_until<=now()) ORDER BY id").fetch_all(&state.pool).await;
+            let sources: Result<Vec<(String,)>,_>=sqlx::query_as("SELECT id FROM collection_sources WHERE enabled AND (credential IS NOT NULL OR id='official_news') AND next_run_at<=now() AND (lease_until IS NULL OR lease_until<=now()) ORDER BY id").fetch_all(&state.pool).await;
             match sources {
                 Ok(sources) => {
                     for (source,) in sources {

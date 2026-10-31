@@ -15,6 +15,35 @@ struct Harness {
     token: String,
     state: AppState,
 }
+
+#[tokio::test]
+async fn official_news_daily_quota_is_shared_across_runs_and_existing_items_remain_idempotent() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else { return Ok(()) };
+    async fn news_run(h: &Harness) -> Uuid {
+        let id = Uuid::new_v4();
+        sqlx::query("INSERT INTO collection_runs(id,source,status,config) SELECT $1,id,'running',config FROM collection_sources WHERE id='official_news'")
+            .bind(id).execute(&h.pool).await.unwrap();
+        sqlx::query("UPDATE collection_sources SET active_run=$1,lease_until=now()+interval '10 minutes' WHERE id='official_news'")
+            .bind(id).execute(&h.pool).await.unwrap();
+        id
+    }
+    fn news_items(range: std::ops::Range<usize>) -> Vec<CollectedItem> {
+        range.map(|i| CollectedItem {kind:"news".into(),key:format!("news-{i:04}"),data:json!({"title":format!("Official news {i}"),"source":"OpenAI","url":format!("https://openai.com/news/{i}"),"time_basis":"collected"}),
+            sort_order:0,published_at:None,source_name:"OpenAI".into(),source_url:format!("https://openai.com/news/{i}")}).collect()
+    }
+    let first = news_run(&h).await;
+    assert_eq!(discover_editor::write_collected_batch(&h.pool,"official_news",first,news_items(0..8)).await?,8);
+    let second = news_run(&h).await;
+    assert_eq!(discover_editor::write_collected_batch(&h.pool,"official_news",second,news_items(0..16)).await?,10);
+    let (count,): (i64,) = sqlx::query_as("SELECT count(*) FROM discover_drafts WHERE kind='news'").fetch_one(&h.pool).await?;
+    assert_eq!(count,10);
+    let third = news_run(&h).await;
+    assert_eq!(discover_editor::write_collected_batch(&h.pool,"official_news",third,news_items(16..18)).await?,0);
+    let (live,): (i64,) = sqlx::query_as("SELECT count(*) FROM discover_items WHERE kind='news'").fetch_one(&h.pool).await?;
+    assert_eq!(live,0,"采集不能越过人工审核自动发布");
+    h.close().await?;
+    Ok(())
+}
 async fn request(
     app: &axum::Router,
     method: &str,

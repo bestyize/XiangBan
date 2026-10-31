@@ -722,7 +722,7 @@ pub async fn write_collected_batch(
     source: &str,
     run_id: Uuid,
     mut items: Vec<crate::collectors::CollectedItem>,
-) -> AppResult<()> {
+) -> AppResult<usize> {
     if items.is_empty() || items.len() > 1000 {
         return Err(AppError::BadRequest("采集批次应含 1–1000 项".into()));
     }
@@ -746,6 +746,10 @@ pub async fn write_collected_batch(
     if active.is_none() {
         return Err(AppError::Conflict("采集租约已失效".into()));
     }
+    let (used,): (i64,) = sqlx::query_as("SELECT count(*) FROM collection_news_daily WHERE day=(now() AT TIME ZONE 'Asia/Shanghai')::date")
+        .fetch_one(&mut *tx).await?;
+    let mut news_remaining = 10i64.saturating_sub(used);
+    let mut saved_count = 0;
     for item in items {
         let allowed = match source {
             "artificial_analysis" => {
@@ -765,6 +769,7 @@ pub async fn write_collected_batch(
                             chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok()
                         })
             }
+            "official_news" => item.kind == "news" && item.key.starts_with("news-"),
             _ => false,
         };
         if !allowed {
@@ -778,6 +783,8 @@ pub async fn write_collected_batch(
         .bind(&item.key)
         .fetch_optional(&mut *tx)
         .await?;
+        let new_news = source == "official_news" && old.is_none();
+        if new_news && news_remaining <= 0 { continue; }
         let owned: Option<(String, i64)> = sqlx::query_as(
             "SELECT source,revision FROM collection_owned_items WHERE kind=$1 AND key=$2",
         )
@@ -841,9 +848,15 @@ pub async fn write_collected_batch(
         .bind(revision)
         .execute(&mut *tx)
         .await?;
+        if new_news {
+            sqlx::query("INSERT INTO collection_news_daily(day,key) VALUES((now() AT TIME ZONE 'Asia/Shanghai')::date,$1) ON CONFLICT DO NOTHING")
+                .bind(&item.key).execute(&mut *tx).await?;
+            news_remaining -= 1;
+        }
+        saved_count += 1;
     }
     tx.commit().await?;
-    Ok(())
+    Ok(saved_count)
 }
 
 #[derive(Deserialize)]
