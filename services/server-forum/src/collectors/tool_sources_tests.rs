@@ -346,6 +346,25 @@ fn helper_programs_and_source_archives_are_never_primary_installers() {
         "argument-comment-lint-x86_64-pc-windows-msvc.zip",
         "codex"
     ));
+    for name in [
+        "codex-windows-sandbox-service-x86_64-pc-windows-msvc.exe",
+        "codex-windows-sandbox-setup-aarch64-pc-windows-msvc.exe.zip",
+        "codex-v1.2.3-linux-helper-x64.tar.gz",
+    ] {
+        assert!(!main_asset(name, "codex"), "{name}");
+    }
+}
+#[tokio::test]
+async fn platform_prefixed_helpers_cannot_displace_primary_installers() {
+    let mut r = release();
+    r["assets"] = json!([
+        asset("tool-windows-sandbox-service-x64.exe"),
+        asset("tool-v1.0-linux-helper-x64.tar.gz"),
+        asset("tool-windows-x64.exe")
+    ]);
+    let tool = build_tool(repo(), r, &client(), &mut budget()).await.unwrap();
+    assert_eq!(tool.data["artifacts"].as_array().unwrap().len(), 1);
+    assert_eq!(tool.data["artifacts"][0]["filename"], "tool-windows-x64.exe");
 }
 #[tokio::test]
 async fn no_installers_under_size_limit_fails_and_cannot_publish_empty_replacement() {

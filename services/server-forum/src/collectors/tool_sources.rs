@@ -307,6 +307,13 @@ fn main_asset(filename: &str, repo_name: &str) -> bool {
     if !suffix.starts_with(['-', '_', '.']) {
         return false;
     }
+    // Platform prefixes also occur on bundled helpers (e.g. codex-windows-sandbox-service).
+    // Check the entire suffix before accepting a platform or version prefix.
+    if suffix.split(|c: char| !c.is_ascii_alphanumeric()).any(|part| {
+        matches!(part, "sandbox" | "helper" | "helpers" | "updater" | "uninstall" | "uninstaller")
+    }) || suffix.contains("app-server") || suffix.contains("mcp-server") {
+        return false;
+    }
     let token = suffix
         .trim_start_matches(['-', '_', '.'])
         .split(|c: char| !c.is_ascii_alphanumeric())
