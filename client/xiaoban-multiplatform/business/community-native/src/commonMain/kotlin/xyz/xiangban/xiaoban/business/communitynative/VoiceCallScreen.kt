@@ -48,12 +48,15 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -75,17 +78,15 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 
 // 实时对话的深色通话页（设计稿 52–58）：页面的主角是文字，小伴只是中间一个 54dp 的圆形品牌头像，
-// 状态靠头像外圈的变化表达；底下三个一样大的按钮：静音、打断、挂断。
+// 状态靠头像外圈的变化表达；底下三个一样大的按钮：静音、朗读开关、挂断。
 
 private val CallBg = Color(0xFF0F141B)
 private val CallFg = Color(0xFFF3F1EC)
 private val CallFg2 = CallFg.copy(alpha = 0.68f)
 private val CallFg3 = CallFg.copy(alpha = 0.46f)
-private val CallFg4 = CallFg.copy(alpha = 0.26f)
 private val CallGlass = Color.White.copy(alpha = 0.07f)
 private val CallLine = Color.White.copy(alpha = 0.12f)
 private val CallHang = Color(0xFFD64545)
-private val CallOk = Color(0xFF3DBE86)
 private val CallWarn = Color(0xFFF0A050)
 
 private val AvatarSize = 54.dp
@@ -97,7 +98,6 @@ fun VoiceCallScreen(call: VoiceCall, title: String, seconds: Int, onMinimize: ()
     val state by call.state.collectAsState()
     BackHandler(onBack = onMinimize)
 
-    val canInterrupt = state.phase == CallPhase.Speaking || state.phase == CallPhase.Thinking
     Box(Modifier.fillMaxSize().background(CallBg).drawBehind { drawBackdrop() }) {
         // 两颗淡淡的品牌闪光，压在背景里。
         XIcon(XIcons.SparkleSmall, Modifier.align(Alignment.TopEnd).padding(top = 104.dp, end = 12.dp), tint = Brand.copy(alpha = 0.16f), size = 84.dp)
@@ -117,7 +117,10 @@ fun VoiceCallScreen(call: VoiceCall, title: String, seconds: Int, onMinimize: ()
                     CallPromptCard(prompt, call::answerPrompt)
                 } else when (state.phase) {
                     CallPhase.Starting -> StatusLine("正在接通…")
-                    CallPhase.Listening -> {
+                    // 不念的时候回答念不完就没了，所以回答一直留着，直到你说下一句。
+                    CallPhase.Listening -> if (state.silent && state.replyText.isNotBlank()) {
+                        ReplyBlock(state.userText, state.replyText, null)
+                    } else {
                         StatusLine("请说话，我在听")
                         Text("说完停一下，我就会回答", Modifier.padding(top = 10.dp), color = CallFg3, fontSize = 13.sp)
                     }
@@ -129,21 +132,18 @@ fun VoiceCallScreen(call: VoiceCall, title: String, seconds: Int, onMinimize: ()
                         StatusLine("小伴在想…")
                         if (state.userText.isNotBlank()) Text("你：${state.userText}", Modifier.padding(top = 18.dp).fillMaxWidth(), color = CallFg3, fontSize = 15.sp, lineHeight = 24.sp, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
-                    CallPhase.Speaking -> {
-                        if (state.userText.isNotBlank()) Text("你：${state.userText}", Modifier.fillMaxWidth(), color = CallFg3, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        if (state.replyText.isNotBlank()) ReplyWindow(state.replyText, state.reading, state.userText, Modifier.padding(top = 12.dp))
-                    }
+                    CallPhase.Speaking -> ReplyBlock(state.userText, state.replyText, state.reading)
                 }
             }
             state.notice?.let { Notice(it) }
             Spacer(Modifier.weight(1.2f))
-            // 小伴说话时直接开口就能打断它；周围回声大、总被误打断时可以关掉，改用“打断”按钮。
-            BargePill(state.bargeIn) { call.setBargeIn(!state.bargeIn) }
+            // 小伴说话时直接开口就能打断它。中间的喇叭关掉朗读：小伴只显示回答，不念出来；记在声音设置里，下次打电话还是这样。
             Row(Modifier.padding(top = 20.dp, bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(30.dp), verticalAlignment = Alignment.Bottom) {
                 if (state.muted) CallControl(XIcons.MicOff, "取消静音", CallFg, CallBg, null) { call.setMuted(false) }
                 else CallControl(XIcons.Mic, "静音", CallGlass, CallFg, CallLine) { call.setMuted(true) }
-                if (canInterrupt) CallControl(XIcons.SkipNext, "打断", CallFg, CallBg, null) { call.interrupt() }
-                else CallControl(XIcons.Wave, "打断", Color.Transparent, CallFg3, CallFg3, borderWidth = 1.5f) {}
+                fun setSilent(off: Boolean) { call.setSilent(off); SpeechState.update { it.copy(callSilent = off) } }
+                if (state.silent) CallControl(VolumeOffIcon, "打开朗读", CallFg, CallBg, null) { setSilent(false) }
+                else CallControl(XIcons.Volume, "关闭朗读", CallGlass, CallFg, CallLine) { setSilent(true) }
                 CallControl(XIcons.Hangup, "挂断", CallHang, Color.White, null) { call.stop() }
             }
         }
@@ -151,6 +151,23 @@ fun VoiceCallScreen(call: VoiceCall, title: String, seconds: Int, onMinimize: ()
 }
 
 internal fun clock(seconds: Int): String = "${(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}"
+
+/** 你说的那句（一行小字）和小伴的回答。 */
+@Composable
+private fun ReplyBlock(userText: String, replyText: String, reading: IntRange?) {
+    if (userText.isNotBlank()) Text("你：$userText", Modifier.fillMaxWidth(), color = CallFg3, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    if (replyText.isNotBlank()) ReplyWindow(replyText, reading, userText, Modifier.padding(top = 12.dp))
+}
+
+/** 关了朗读的喇叭：喇叭加一个叉（图标集里没有这一个，和 [XIcons.Volume] 同样的画法）。 */
+private val VolumeOffIcon: ImageVector by lazy {
+    ImageVector.Builder(name = "VolumeOff", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
+        .addPath(
+            pathData = addPathNodes("M4 10v4h4l5 4V6L8 10zM16.5 9.5l5 5M21.5 9.5l-5 5"),
+            stroke = SolidColor(Color.Black), strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round,
+        )
+        .build()
+}
 
 @Composable
 private fun StatusLine(text: String) {
@@ -203,17 +220,6 @@ private fun Notice(text: String) {
         Modifier.padding(horizontal = 24.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(CallGlass).border(0.5.dp, CallLine, RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
         color = CallWarn, fontSize = 13.sp, lineHeight = 20.sp,
     )
-}
-
-@Composable
-private fun BargePill(on: Boolean, onToggle: () -> Unit) {
-    Row(
-        Modifier.clip(RoundedCornerShape(15.dp)).background(CallGlass).border(0.5.dp, CallLine, RoundedCornerShape(15.dp)).clickable(onClick = onToggle).padding(horizontal = 14.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(Modifier.size(7.dp).clip(CircleShape).background(if (on) CallOk else CallFg4))
-        Text(if (on) "直接开口打断：开" else "直接开口打断：关", Modifier.padding(start = 8.dp), color = CallFg2, fontSize = 12.sp)
-    }
 }
 
 /** 三个一样大（68dp）的圆按钮。[border] 为空就不画边框。 */

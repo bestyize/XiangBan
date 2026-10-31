@@ -116,6 +116,22 @@ private val AckFeeling = Regex("难过|伤心|郁闷|好烦|烦死|崩溃|焦虑
 private val AckTask = Regex("^(?:请|麻烦|能不能|能否|可以|帮我|帮忙|给我|替我|把|打开|关闭|查|搜索|搜|找|写|整理|改|修改|创建|新建|删除|生成|翻译|总结|分析|设置|设定|切换|播放|发送|下载|安装|运行|读|看看|看一下|提醒)|帮我|给我|替我")
 private val AckQuestion = Regex("[吗么呢]$|什么|怎么|为啥|如何|多少|是不是|有没有|会不会|哪(?:个|里|些|儿)|谁|区别|原理|意思")
 
+private val HangUpLead = "(?:小伴|好|好的|行|那|那就|就|嗯|先|请|麻烦|帮我|给我|你|我|我们|咱们|可以|现在)*"
+private val HangUpCore = "挂断|挂掉|挂了|挂|结束|退出|关闭|关掉|关了|不聊了|不说了"
+private val HangUpTail = "(?:电话|通话|语音|对话|实时对话|聊天|吧|了|啦|呀|啊|哦|嘛|一下|好了|就好|谢谢|再见|拜拜)*"
+private val HangUp = Regex("^$HangUpLead(?:$HangUpCore)$HangUpTail$")
+/** 光说“结束”“退出”“关闭”不够，要带上它们结束的是什么，免得把别的事当成挂断（“退出”“关掉”可能是叫小伴关别的东西）。 */
+private val HangUpBare = Regex("^$HangUpLead(?:结束|退出|关闭|关掉|关了)(?:吧|了|啦|呀|啊|哦|嘛|一下|好了|就好)*$")
+
+/**
+ * 用户是不是在让小伴挂断这通电话：“挂断”“挂了吧”“结束通话”“退出实时对话”“好，不聊了”这类整句的话。
+ * 只认整句，“不要挂断”“怎么挂断电话”“挂了吗”这种都不算；“再见”“拜拜”也不算，那是在道别，可能还要再说两句。
+ */
+fun isVoiceHangUp(text: String): Boolean {
+    val said = speechWords(text)
+    return said.isNotEmpty() && HangUp.matches(said) && !HangUpBare.matches(said)
+}
+
 /** 这句话适合先回哪一类；什么都不该说返回 null。 */
 fun voiceAckKind(text: String): VoiceAckKind? {
     val said = speechWords(text)

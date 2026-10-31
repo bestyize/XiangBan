@@ -70,6 +70,8 @@ data class CallState(
     val bargeIn: Boolean = true,
     /** 静音：麦克风的声音不再交给识别，小伴听不到你，也不会被你的声音打断。 */
     val muted: Boolean = false,
+    /** 关了朗读（通话页右上角的喇叭）：小伴照常听、照常回答，回答只显示文字，不念出来。 */
+    val silent: Boolean = false,
     /** 小伴正等你确认的操作或选择；有它时通话页显示卡片，回答之后小伴接着做。 */
     val prompt: CallPrompt? = null,
 )
@@ -82,13 +84,8 @@ class CallError(message: String) : Exception(message)
  * 子类决定一句话怎么变成回答、怎么念出来。
  */
 abstract class VoiceCall(protected val scope: CoroutineScope, protected val platform: VoicePlatform) {
-    private val bargeSafe = platform.bargeInSafe()
-    private val _state = MutableStateFlow(
-        CallState(
-            bargeIn = bargeSafe,
-            notice = if (bargeSafe) null else "这台手机的回声消除不可用，已关闭“直接开口打断”，请用“打断”按钮；戴耳机时可以在下面打开",
-        ),
-    )
+    // 默认就能开口打断；回声消除不可用的手机也一样，靠本地识别比对回声（confirmBarge）挡住小伴自己的声音。
+    private val _state = MutableStateFlow(CallState(bargeIn = true))
     val state: StateFlow<CallState> = _state.asStateFlow()
     private var job: Job? = null
     private var playback: CompletableDeferred<Boolean>? = null
@@ -148,6 +145,16 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
 
     /** 打开/关闭“小伴说话时直接开口打断”。 */
     fun setBargeIn(on: Boolean) = update { it.copy(bargeIn = on) }
+
+    /** 关掉/打开朗读。关掉时正在念的那句马上停，回答接着生成、照常显示。 */
+    fun setSilent(on: Boolean) {
+        update { it.copy(silent = on, reading = if (on) null else it.reading) }
+        if (on) {
+            platform.stopAudio()
+            platform.stopSpeaking()
+            playback?.complete(true)
+        }
+    }
 
     protected abstract suspend fun run()
 
@@ -477,6 +484,10 @@ class SpokenCall(
                 val text = hear() ?: continue
                 if (isVoiceNoise(text)) continue
                 heardSomething()
+                if (isVoiceHangUp(text)) {
+                    sayGoodbye(text)
+                    return
+                }
                 update { it.copy(userText = text, replyText = "", reading = null, partial = "") }
                 phase(CallPhase.Thinking)
                 answer(text)
@@ -484,6 +495,16 @@ class SpokenCall(
         } finally {
             warm?.cancel()
         }
+    }
+
+    /** 用户说了“挂断”：不交给小伴，说声再见（预先合成好了、也没关朗读才说）就结束通话。 */
+    private suspend fun sayGoodbye(text: String) {
+        update { it.copy(userText = text, replyText = "", reading = null, partial = "") }
+        if (state.value.silent) return
+        val phrase = VoiceAckPhrases.getValue(VoiceAckKind.Bye).firstOrNull { it in ackClips.value } ?: return
+        update { it.copy(replyText = phrase) }
+        phase(CallPhase.Speaking)
+        playClip(ackClips.value.getValue(phrase), "audio/mpeg")
     }
 
     /**
@@ -533,7 +554,7 @@ class SpokenCall(
         interrupted = false
         spokenText = ""
         // 先开口说什么要在发出去之前定下来，好告诉模型别再说一遍；声音没准备好就不说，也不告诉模型。
-        val ackKind = voiceAckKind(text)
+        val ackKind = voiceAckKind(text)?.takeUnless { state.value.silent }
         val ackPhrase = ackKind?.let { kind ->
             val ready = ackClips.value
             chooseVoiceAck(VoiceAckPhrases.getValue(kind).filter { it in ready }, lastAck)
@@ -544,26 +565,31 @@ class SpokenCall(
         val sentences = Channel<SpeechSpan>(Channel.UNLIMITED)
         val clips = Channel<Pair<SpeechSpan, ByteArray?>>(2)
         val synth = launch {
-            for (sentence in sentences) {
-                if (interrupted) continue
-                var audio: ByteArray? = null
-                while (audio == null && synthesizers.isNotEmpty()) {
-                    val engine = synthesizers.first()
-                    try {
-                        audio = engine.synthesize(sentence.text)
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: EngineUnavailable) {
-                        synthesizers.remove(engine)
-                    } catch (e: CallError) {
-                        throw e
-                    } catch (e: Exception) {
-                        break
+            try {
+                for (sentence in sentences) {
+                    // 关了朗读的就不合成了；念到一半重新打开，后面的句子接着念。
+                    if (interrupted || state.value.silent) continue
+                    var audio: ByteArray? = null
+                    while (audio == null && synthesizers.isNotEmpty()) {
+                        val engine = synthesizers.first()
+                        try {
+                            audio = engine.synthesize(sentence.text)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: EngineUnavailable) {
+                            synthesizers.remove(engine)
+                        } catch (e: CallError) {
+                            throw e
+                        } catch (e: Exception) {
+                            break
+                        }
                     }
+                    clips.send(sentence to audio)
                 }
-                clips.send(sentence to audio)
+            } finally {
+                // 合成这边无论怎么结束都要告诉播放那边，否则这一轮永远等不到头，通话既不念也不听。
+                clips.close()
             }
-            clips.close()
         }
         val watcher = watchForBarge()
         var ackStarted = false
@@ -573,7 +599,7 @@ class SpokenCall(
         val ackJob = if (ack != null && ackAudio != null) launch {
             val wait = voiceAckDelayMs(ack.first)
             if (wait > 0) delay(wait)
-            if (!interrupted && assistant.reply().busy && assistant.reply().text.isEmpty()) {
+            if (!interrupted && !state.value.silent && assistant.reply().busy && assistant.reply().text.isEmpty()) {
                 ackStarted = true
                 spokenText = ack.second
                 phase(CallPhase.Speaking)
@@ -583,7 +609,7 @@ class SpokenCall(
         val player = launch {
             ackJob?.join()
             for ((sentence, audio) in clips) {
-                if (interrupted) continue
+                if (interrupted || state.value.silent) continue
                 update { it.copy(reading = sentence.start until sentence.end) }
                 phase(CallPhase.Speaking)
                 spokenText += sentence.text
@@ -603,6 +629,8 @@ class SpokenCall(
                     spoken = reply.text.length
                 }
                 update { it.copy(replyText = reply.text, prompt = assistant.prompt(), notice = reply.attention ?: it.notice?.takeIf { n -> n != AttentionNotice }) }
+                // 不念的时候没有“开始念”这一步，回答一出来就显示。
+                if (state.value.silent && reply.text.isNotBlank() && state.value.phase == CallPhase.Thinking) phase(CallPhase.Speaking)
                 if (!reply.busy) {
                     update { it.copy(prompt = null) }
                     reply.error?.let { error -> update { it.copy(notice = error) } }

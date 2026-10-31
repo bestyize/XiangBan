@@ -50,7 +50,6 @@ fun VoiceSettingsScreen(env: CommunityEnv, back: () -> Unit) {
     val reader = env.reader
     var sheet by rememberSaveable { mutableStateOf("") }
     var modelRefresh by remember { mutableStateOf(0) }
-    val bargeSafe = env.platform?.bargeInSafe() ?: true
     DisposableEffect(reader) { onDispose { reader.stop() } }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -99,7 +98,7 @@ fun VoiceSettingsScreen(env: CommunityEnv, back: () -> Unit) {
                 }
 
                 GroupLabel("通话")
-                SwitchRow("直接开口打断", "小伴说话时，直接开口就能打断它；周围回声大、总被误打断时可以关掉。", s.bargeIn ?: bargeSafe) { on -> SpeechState.update { it.copy(bargeIn = on) } }
+                SwitchRow("直接开口打断", "小伴说话时，直接开口就能打断它；周围回声大、总被误打断时可以关掉。", s.bargeIn ?: true) { on -> SpeechState.update { it.copy(bargeIn = on) } }
                 Spacer(Modifier.height(24.dp))
             }
         }

@@ -43,6 +43,8 @@ data class SpeechSettings(
     val voice: String = EdgeVoices.Default.id,
     val rateStep: Int = SpeechRates.DefaultStep,
     val bargeIn: Boolean? = null,
+    /** 实时对话页右上角关了朗读：回答只显示文字。下次打电话还是这样。 */
+    val callSilent: Boolean = false,
 ) {
     fun encode(): Map<String, String> = buildMap {
         put("speech.source", source.id)
@@ -50,6 +52,7 @@ data class SpeechSettings(
         put("speech.voice", voice)
         put("speech.rate", rateStep.toString())
         put("speech.barge", bargeIn?.toString().orEmpty())
+        put("speech.callSilent", callSilent.toString())
     }
 
     companion object {
@@ -59,6 +62,7 @@ data class SpeechSettings(
             voice = EdgeVoices.byId(get("speech.voice")).id,
             rateStep = SpeechRates.clamp(get("speech.rate")?.toIntOrNull() ?: SpeechRates.DefaultStep),
             bargeIn = get("speech.barge")?.toBooleanStrictOrNull(),
+            callSilent = get("speech.callSilent") == "true",
         )
     }
 }

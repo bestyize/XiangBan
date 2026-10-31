@@ -257,14 +257,20 @@ class VoiceCallHost(private val env: CommunityEnv) {
             offering = true
         } else {
             minimized = false
-            call = factory().also { c -> SpeechState.settings.bargeIn?.let(c::setBargeIn) }
+            call = factory().also(::applySettings)
         }
+    }
+
+    /** 声音设置里记着的“直接开口打断”和“不朗读”，打电话时带上。 */
+    private fun applySettings(call: VoiceCall) {
+        SpeechState.settings.bargeIn?.let(call::setBargeIn)
+        if (SpeechState.settings.callSilent) call.setSilent(true)
     }
 
     fun offerFinished(downloaded: Boolean) {
         offering = false
         if (!downloaded) declined = true
-        pending?.let { make -> minimized = false; call = make().also { c -> SpeechState.settings.bargeIn?.let(c::setBargeIn) } }
+        pending?.let { make -> minimized = false; call = make().also(::applySettings) }
         pending = null
     }
 }

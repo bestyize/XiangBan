@@ -152,6 +152,82 @@ class VoiceCallTest {
         Unit
     }
 
+    private fun callWith(heard: String, asked: AtomicInteger, scope: CoroutineScope, platform: FakeVoicePlatform): SpokenCall {
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/audio/transcriptions" -> respond("""{"text":"$heard"}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+                "/v1/chat/completions" -> { asked.incrementAndGet(); respond(sse("现在是下午三点。先到这里。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream")) }
+                "/v1/audio/speech" -> respond(byteArrayOf(1, 2, 3), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "audio/mpeg"))
+                else -> respond("{}", HttpStatusCode.OK)
+            }
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        return SpokenCall(scope, platform, CloudAssistant(CloudChatController(api, scope)), listOf(CloudRecognizer(api)), listOf(CloudSynthesizer(api)))
+    }
+
+    @Test
+    fun `a speech engine that gives up with a timeout does not freeze the call`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val asked = AtomicInteger()
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/audio/transcriptions" -> respond("""{"text":"现在几点"}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+                "/v1/chat/completions" -> { asked.incrementAndGet(); respond(sse("现在是下午三点。先到这里。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream")) }
+                else -> respond("{}", HttpStatusCode.OK)
+            }
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        // withTimeout 超时抛的是取消，不是普通错误；以前它会让合成那边悄悄结束，播放那边一直等，通话卡在“正在说”。
+        val stuck = object : SynthesizerEngine {
+            override val name = "卡住的合成"
+            override suspend fun synthesize(text: String): ByteArray = throw kotlinx.coroutines.CancellationException("timed out")
+        }
+        val call = SpokenCall(scope, FakeVoicePlatform(), CloudAssistant(CloudChatController(api, scope)), listOf(CloudRecognizer(api)), listOf(stuck))
+        call.setBargeIn(false)
+        call.start()
+        waitFor("answer") { call.state.value.replyText.contains("先到这里") }
+        // 回答完接着听下一句：假麦克风会再说一句，小伴就会被问第二次。
+        waitFor("next turn", ms = 8_000) { asked.get() >= 2 }
+        assertTrue(!call.state.value.ended)
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
+    fun `saying hang up ends the call without asking the assistant`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val asked = AtomicInteger()
+        val call = callWith("好，挂断吧。", asked, scope, FakeVoicePlatform())
+        call.start()
+        waitFor("ended by voice") { call.state.value.ended }
+        assertEquals("好，挂断吧。", call.state.value.userText)
+        assertEquals(0, asked.get())
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
+    fun `with reading turned off the answer is shown but not spoken`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val asked = AtomicInteger()
+        val platform = FakeVoicePlatform()
+        val call = callWith("现在几点", asked, scope, platform)
+        call.setSilent(true)
+        call.start()
+        waitFor("answer") { call.state.value.replyText.contains("先到这里") }
+        // 回答完回到听：回答文字还留着，一个字也没念。
+        waitFor("listening again") { asked.get() >= 1 && call.state.value.phase == CallPhase.Listening && call.state.value.replyText.isNotEmpty() }
+        assertEquals(0, platform.played.get())
+        assertTrue(platform.spoken.isEmpty())
+        assertEquals(null, call.state.value.reading)
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
     @Test
     fun `when cloud recognition and speech are not open the phone's own engines are used`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -435,15 +511,13 @@ class VoiceCallTest {
     }
 
     @Test
-    fun `without echo cancellation barge in starts switched off and says why`() = runBlocking {
+    fun `barge in is on by default even without echo cancellation`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val api = AiGatewayApi(HttpClient(MockEngine { respond("{}", HttpStatusCode.OK) }), CommunityConfig()) { "tok" }
         val noEcho = object : VoicePlatform { override fun bargeInSafe() = false }
         val call = SpokenCall(scope, noEcho, CloudAssistant(CloudChatController(api, scope)), emptyList(), emptyList())
-        assertTrue(!call.state.value.bargeIn)
-        assertTrue(call.state.value.notice.orEmpty().contains("回声消除不可用"))
-        call.setBargeIn(true)
-        assertTrue(call.state.value.bargeIn, "戴耳机后可以手动打开")
+        assertTrue(call.state.value.bargeIn)
+        assertEquals(null, call.state.value.notice)
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         Unit
     }

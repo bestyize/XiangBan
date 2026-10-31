@@ -11,6 +11,14 @@ import kotlin.test.assertTrue
 
 class VoiceAlignmentTest {
     @Test
+    fun `saying hang up ends the call but talking about it does not`() {
+        for (text in listOf("挂断", "挂断吧。", "挂了", "好，挂了吧", "挂电话", "小伴挂断", "结束通话", "退出实时对话", "关掉通话吧", "好的，不聊了，拜拜", "我挂了", "那就先挂了啊"))
+            assertTrue(isVoiceHangUp(text), text)
+        for (text in listOf("不要挂断", "别挂", "怎么挂断电话", "挂了吗", "再见", "拜拜", "结束", "退出吧", "关掉", "帮我把灯关掉", "我想挂个号", "今天的会议什么时候结束"))
+            assertFalse(isVoiceHangUp(text), text)
+    }
+
+    @Test
     fun `smart turn features match desktop reference for the same audio`() {
         val pcm = ByteArray(128_000 * 2)
         for (i in 0 until 48_000) {

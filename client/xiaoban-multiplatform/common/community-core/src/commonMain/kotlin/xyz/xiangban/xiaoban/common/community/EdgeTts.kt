@@ -11,7 +11,7 @@ import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 
 // 微软 Edge “大声朗读”的语音合成，手机直接连。协议、令牌、分句都和电脑端 `src-tauri/src/tts/` 是同一套，改动要两边一起改。
 
@@ -329,9 +329,10 @@ class EdgeTtsSynthesizer(
         return all
     }
 
+    // 超时一律当作“用不了”：withTimeout 抛的是取消，往外传会被当成通话被取消，通话就卡在“正在说”不动了。
     private suspend fun one(text: String): ByteArray {
         val session = try {
-            client.webSocketSession(EdgeProtocol.wsUrl(EdgeProtocol.randomId(), now())) {
+            withTimeoutOrNull(ConnectMs) { client.webSocketSession(EdgeProtocol.wsUrl(EdgeProtocol.randomId(), now())) {
                 header("User-Agent", EdgeProtocol.UserAgent)
                 header("Origin", EdgeProtocol.Origin)
                 header("Accept", "*/*")
@@ -339,14 +340,16 @@ class EdgeTtsSynthesizer(
                 header("Pragma", "no-cache")
                 header("Cache-Control", "no-cache")
                 header("Cookie", "muid=${EdgeProtocol.randomId()};")
-            }
+            } } ?: throw EngineUnavailable("语音服务连接超时")
         } catch (e: CancellationException) {
+            throw e
+        } catch (e: EngineUnavailable) {
             throw e
         } catch (e: Exception) {
             throw EngineUnavailable("无法连接语音服务，请检查网络")
         }
         try {
-            return withTimeout(60_000) {
+            return withTimeoutOrNull(ReplyMs) {
                 session.send(Frame.Text(EdgeProtocol.config(now())))
                 session.send(Frame.Text(EdgeProtocol.ssml(EdgeProtocol.randomId(), voice, rate, 0, 100, text, now())))
                 val audio = ArrayList<ByteArray>()
@@ -375,7 +378,7 @@ class EdgeTtsSynthesizer(
                 var at = 0
                 for (a in audio) { a.copyInto(all, at); at += a.size }
                 all
-            }
+            } ?: throw EngineUnavailable("语音服务响应超时")
         } catch (e: CancellationException) {
             throw e
         } catch (e: EngineUnavailable) {
@@ -383,7 +386,14 @@ class EdgeTtsSynthesizer(
         } catch (e: Exception) {
             throw EngineUnavailable("语音合成连接中断")
         } finally {
-            runCatching { session.close() }
+            // 对方已经断开的连接，关的时候也可能等不到回应。
+            withTimeoutOrNull(1_000) { runCatching { session.close() } }
         }
+    }
+
+    private companion object {
+        const val ConnectMs = 10_000L
+        /** 一段话正常几秒内就合成完。 */
+        const val ReplyMs = 20_000L
     }
 }

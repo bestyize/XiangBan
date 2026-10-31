@@ -49,6 +49,12 @@ class MainActivity : ComponentActivity() {
         setContent {
             App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles)
         }
+        hideNavigationBar()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) hideNavigationBar()
     }
 }
 
