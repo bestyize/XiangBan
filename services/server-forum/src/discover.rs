@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::PgPool;
 
-pub const KINDS: &[&str] = &["banner", "news", "nav", "doc", "vendor", "model", "repo_issue", "quota", "launch", "promo", "tool", "hotword"];
+pub const KINDS: &[&str] = &["banner", "news", "nav", "doc", "vendor", "model", "model_board", "model_usage", "repo_issue", "quota", "launch", "promo", "tool", "hotword"];
 
 /// 模型榜分档：(档位, 名称, 下限)。阈值由后端给出，客户端只负责显示。
 pub const TIERS: &[(&str, &str, f64)] =
@@ -108,14 +108,23 @@ pub struct News {
     /// 没有封面图时，缩略图和来源小圆点用的颜色（#RRGGBB）。
     #[serde(default)]
     accent: String,
+    #[serde(default)]
+    source_published_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    time_basis: String,
 }
 
 impl Check for News {
     fn check(&mut self) -> AppResult<()> {
-        self.title = clean(&self.title, "标题", 80, true)?;
+        self.title = clean(&self.title, "标题", 300, true)?;
         self.source = clean(&self.source, "来源", 30, true)?;
         self.url = web_url(&self.url, "链接", true)?;
         self.cover_url = web_url(&self.cover_url, "封面地址", false)?;
+        if !["", "source_published", "collected"].contains(&self.time_basis.as_str())
+            || (self.time_basis == "source_published" && self.source_published_at.is_none())
+            || (self.time_basis == "collected" && self.source_published_at.is_some()) {
+            return Err(AppError::BadRequest("新闻时间口径与来源时间不一致".into()));
+        }
         if !self.accent.is_empty() {
             self.accent = color(&self.accent, "强调色")?;
         }
@@ -484,6 +493,8 @@ fn go<T: DeserializeOwned + Serialize + Check>(data: Value) -> AppResult<Value> 
 /// 校验并整理某个类型的条目内容，只保留已知字段。
 pub fn validate(kind: &str, data: Value) -> AppResult<Value> {
     match kind {
+        "model_board" => crate::collectors::model_sources::validate_model_board(data),
+        "model_usage" => crate::collectors::model_sources::validate_model_usage(data),
         "banner" => go::<Banner>(data),
         "news" => go::<News>(data),
         "nav" => go::<Nav>(data),
@@ -721,6 +732,19 @@ fn seed_items() -> Vec<SeedItem> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn news_preserves_source_time_and_does_not_relabel_observation_as_publication() {
+        let mut data = json!({"title":"x".repeat(180),"source":"Official","url":"https://example.com/news",
+            "source_published_at":"2026-10-30T09:00:00Z","time_basis":"source_published"});
+        let normalized = validate("news", data.clone()).unwrap();
+        assert_eq!(normalized["title"].as_str().unwrap().len(),180);
+        assert_eq!(normalized["time_basis"],"source_published");
+        data["time_basis"] = json!("collected");
+        assert!(validate("news",data.clone()).is_err());
+        data["source_published_at"] = Value::Null;
+        assert!(validate("news",data).is_ok());
+    }
 
     #[test]
     fn tiers_follow_thresholds() {

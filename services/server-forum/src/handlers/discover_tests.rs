@@ -14,6 +14,9 @@ use uuid::Uuid;
 #[path = "discover_editor_tests.rs"]
 mod workflow;
 
+#[path = "model_rankings_tests.rs"]
+mod model_rankings;
+
 async fn call(app: &axum::Router, method: &str, path: &str, token: Option<&str>, body: Value) -> (StatusCode, Value) {
     let mut req = Request::builder().method(method).uri(path).header("content-type", "application/json");
     if let Some(token) = token {

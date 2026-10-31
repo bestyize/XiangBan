@@ -412,6 +412,10 @@ async fn admin_put(
         return Err(AppError::BadRequest("状态只能是 draft 或 published".into()));
     }
     let mut data = discover::validate(&kind, input.data)?;
+    if (kind == "model_usage" && data["date"].as_str() != Some(key.as_str()))
+        || (kind == "model_board" && key != "artificial-analysis") {
+        return Err(AppError::BadRequest("榜单标识必须与来源和统计日期一致".into()));
+    }
     data["sample"] = Value::Bool(input.sample);
     let mut tx = state.pool.begin().await?;
     super::discover_editor::lock(&mut tx, &kind, &key).await?;

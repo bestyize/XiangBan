@@ -18,6 +18,8 @@ const KINDS = [
   { key: 'doc', label: '资料导读', sample: '{"product":"Claude","title":"标题","subtitle":"说明","label":"guide","url":"https://example.com"}' },
   { key: 'tool', label: 'AI 工具', sample: '{"name":"名称","developer":"开发者","type_label":"桌面应用","license":"open","platforms":["Windows","macOS"],"description":"简介","homepage_url":"https://github.com/owner/repo","discussion_tag":"tag","releases":[{"version":"v1.0.0","date":"10-20","items":[{"kind":"new","text":"内容"}]}],"artifacts":[{"os":"windows","desc":".msi 安装包","size":12582912,"sha256":"","mirror_url":"","github_url":"https://github.com/owner/repo/releases"}]}' },
   { key: 'hotword', label: '热门搜索', sample: '{"text":"桌面特效","tag":"热"}' },
+  { key: 'model_board', label: '真实模型能力榜', sample: '{}' },
+  { key: 'model_usage', label: 'OpenRouter 调用量榜', sample: '{}' },
 ] as const
 
 const kind = ref<string>(KINDS[0].key)
@@ -43,6 +45,7 @@ const tokens = ref<DiscoverToken[]>([])
 const issuedToken = ref('')
 const tokenForm = reactive({ name: '', days: 30, kinds: ['news'] as string[] })
 const visibleRows = computed(() => view.value === 'live' ? rows.value : drafts.value)
+const snapshotKind = computed(() => kind.value === 'model_board' || kind.value === 'model_usage')
 let loadSeq = 0
 
 async function load() {
@@ -68,7 +71,7 @@ async function load() {
 function isDraft(r: DiscoverRow | DiscoverDraft): r is DiscoverDraft { return 'revision' in r }
 function title(r: { data: Record<string, unknown> }) {
   const d = r.data
-  return String(d.title ?? d.name ?? d.text ?? (d.issue_no ? `第 ${d.issue_no} 期` : ''))
+  return String(d.title ?? d.name ?? d.text ?? (d.source ? `${d.source}${d.date ? ` · ${d.date}` : ''}` : d.issue_no ? `第 ${d.issue_no} 期` : ''))
 }
 function localTime(iso: string | null) {
   return iso ? fmtTime(iso).replace(' ', 'T') : ''
@@ -201,12 +204,13 @@ onMounted(load)
     <select v-model="kind" class="select" aria-label="内容类型" :disabled="busy"><option v-for="k in KINDS" :key="k.key" :value="k.key">{{ k.label }}</option></select>
     <select v-model="view" class="select" aria-label="内容视图" :disabled="busy"><option value="drafts">编辑与审核</option><option value="live">线上内容</option></select>
     <select v-if="view === 'drafts'" v-model="status" class="select" aria-label="草稿状态" :disabled="busy"><option value="">全部状态</option><option value="draft">待审核</option><option value="scheduled">定时发布</option><option value="published">已发布副本</option></select>
-    <button class="btn btn-primary" :disabled="busy" @click="edit()">新增草稿</button>
+    <button class="btn btn-primary" :disabled="busy || snapshotKind" @click="edit()">新增草稿</button>
     <button class="btn" :disabled="busy" @click="importOpen = !importOpen">批量导入</button>
     <button class="btn" :disabled="busy" @click="tokensOpen = !tokensOpen">采集令牌</button>
     <button class="btn" :disabled="busy || loading" @click="load">刷新</button>
   </div>
   <p class="muted">采集和编辑先保存草稿，人工预览后发布。定时发布只执行已审核版本；再次编辑需重新审核。</p>
+  <p v-if="snapshotKind" class="muted">请从 <RouterLink to="/admin/collection">内容采集</RouterLink> 创建完整榜单，再在此查看或编辑草稿。</p>
 
   <form v-if="importOpen" class="panel adm-card adm-form" @submit.prevent="importBatch">
     <label class="field"><span>JSON 数组（每批 1–100 条，可跨类型）</span><textarea v-model="importJson" class="input adm-mono" rows="8" spellcheck="false" :disabled="busy" /></label>

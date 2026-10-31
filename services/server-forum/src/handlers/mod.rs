@@ -5,6 +5,8 @@ pub mod blocks;
 pub mod content;
 pub mod discover;
 pub mod discover_editor;
+pub mod collection;
+pub mod model_rankings;
 pub mod follows;
 pub mod help;
 pub mod images;
