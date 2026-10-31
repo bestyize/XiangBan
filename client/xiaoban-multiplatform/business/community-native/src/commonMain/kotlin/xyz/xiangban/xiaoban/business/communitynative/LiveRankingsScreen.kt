@@ -62,7 +62,6 @@ import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.community.*
 import kotlin.math.ceil
 import kotlin.math.floor
-import kotlin.math.log10
 import kotlin.math.pow
 
 private val RankingsPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 112.dp)
@@ -371,8 +370,7 @@ private fun shareText(value: Double, digits: Int = 6): String {
     return "${scaled / scale}${if (decimals.isEmpty()) "" else ".$decimals"}%"
 }
 
-/** 默认突出代表模型，背景保留所有真实测量；搜索列表按需展开，避免挤占横屏图表。 */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+/** 默认突出代表模型，横屏仅保留图表和必要操作，搜索列表按需展开。 */
 @Composable
 private fun LiveIntelligenceScatter(
     points: List<LiveScatterPoint>, modifier: Modifier = Modifier,
@@ -385,7 +383,7 @@ private fun LiveIntelligenceScatter(
     var query by rememberSaveable { mutableStateOf("") }
     var showList by rememberSaveable { mutableStateOf(false) }
     var showAll by rememberSaveable { mutableStateOf(false) }
-    val activeVendorId = vendorId?.takeIf { id -> ordered.any { it.vendorId == id } }
+    val activeVendorId = vendorId?.takeIf { id -> !full && ordered.any { it.vendorId == id } }
     val visible = ordered.filter { activeVendorId == null || it.vendorId == activeVendorId }
     val current = visible.firstOrNull { it.id == selected } ?: visible.first()
     val frontier = remember(visible) { liveScatterFrontier(visible) }
@@ -398,6 +396,17 @@ private fun LiveIntelligenceScatter(
     val fill = LocalExtraColors.current.fill
     val surface = MaterialTheme.colorScheme.surface
     val vendorIds = remember(ordered) { ordered.map { it.vendorId }.distinct() }
+    val fullControls: @Composable () -> Unit = {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            ScatterFilter(if (showAll) "全部 ${visible.size}" else "精选 ${highlighted.size}/${visible.size}", showAll, null) { showAll = !showAll }
+            Box(Modifier.size(30.dp).clip(RoundedCornerShape(5.dp)).background(if (showList) fill else Color.Transparent)
+                .clickable { showList = !showList }.semantics { contentDescription = "搜索和选择模型" }, contentAlignment = Alignment.Center) {
+                XIcon(XIcons.Search, size = 18.dp)
+            }
+            if (back != null) Box(Modifier.size(30.dp).clip(RoundedCornerShape(5.dp)).clickable(onClick = back)
+                .semantics { contentDescription = "退出全屏" }, contentAlignment = Alignment.Center) { XIcon(XIcons.ChevronLeft, size = 20.dp) }
+        }
+    }
     val chart: @Composable (Modifier) -> Unit = { chartModifier ->
         Column(chartModifier) {
             if (!full) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 3.dp)) {
@@ -407,22 +416,18 @@ private fun LiveIntelligenceScatter(
                     ScatterFilter(name, activeVendorId == id, rankingColor(name)) { vendorId = if (activeVendorId == id) null else id }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("浅绿：智能高于中位数、价格低于中位数 · 虚线：帕累托前沿", Modifier.weight(1f),
+            Row(Modifier.fillMaxWidth().padding(vertical = if (full) 0.dp else 3.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(if (full) sourceNote else "浅绿：智能高于中位数、价格低于中位数 · 虚线：帕累托前沿", Modifier.weight(1f),
                     fontSize = 9.sp, lineHeight = 12.sp, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (full) Text(sourceNote, fontSize = 9.sp, lineHeight = 12.sp, color = ink)
+                if (full) fullControls()
             }
-            ScatterCanvas(visible, ordered, highlighted, frontier, current, { selected = it.id }, vendors, full,
+            ScatterCanvas(visible, highlighted, frontier, current, { selected = it.id }, vendors, full,
                 Modifier.weight(1f).fillMaxWidth())
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(fill).padding(horizontal = 8.dp, vertical = 5.dp),
+            if (!full) Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(fill).padding(horizontal = 8.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RankingVendor(vendors[current.vendorId]?.name ?: current.vendorId)
-                if (full) {
-                    Text(current.name, Modifier.weight(1f), fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text("智能 ${formatScore(current.intelligence)} · 加权价格 ${formatLivePrice(current.weightedPrice)}/百万 Token",
-                        fontSize = 11.sp, lineHeight = 15.sp, color = ink)
-                } else Column(Modifier.weight(1f)) {
+                Column(Modifier.weight(1f)) {
                     Text(current.name, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text("智能 ${formatScore(current.intelligence)} · 加权价格 ${formatLivePrice(current.weightedPrice)}/百万 Token",
                         fontSize = 11.sp, lineHeight = 15.sp, color = ink)
@@ -439,24 +444,6 @@ private fun LiveIntelligenceScatter(
         }
     }
     if (full) Column(modifier) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            androidx.compose.foundation.layout.FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                ScatterLegend("全部", activeVendorId == null, null) { vendorId = null }
-                vendorIds.forEach { id ->
-                    val name = vendors[id]?.name ?: id
-                    ScatterLegend(name, activeVendorId == id, rankingColor(name)) { vendorId = if (activeVendorId == id) null else id }
-                }
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                ScatterFilter(if (showAll) "全部 ${visible.size}" else "精选 ${highlighted.size}/${visible.size}", showAll, null) { showAll = !showAll }
-                Box(Modifier.size(30.dp).clip(RoundedCornerShape(5.dp)).background(if (showList) fill else Color.Transparent)
-                    .clickable { showList = !showList }.semantics { contentDescription = "搜索和选择模型" }, contentAlignment = Alignment.Center) {
-                    XIcon(XIcons.Search, size = 18.dp)
-                }
-                if (back != null) Box(Modifier.size(30.dp).clip(RoundedCornerShape(5.dp)).clickable(onClick = back)
-                    .semantics { contentDescription = "退出全屏" }, contentAlignment = Alignment.Center) { XIcon(XIcons.ChevronLeft, size = 20.dp) }
-            }
-        }
         Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             chart(Modifier.weight(1f).fillMaxSize())
             if (showList) Column(Modifier.width(216.dp).fillMaxSize().clip(RoundedCornerShape(8.dp)).background(fill).padding(8.dp)) {
@@ -490,17 +477,6 @@ private fun LiveIntelligenceScatter(
 }
 
 @Composable
-private fun ScatterLegend(label: String, selected: Boolean, color: Color?, onClick: () -> Unit) {
-    Row(Modifier.clip(RoundedCornerShape(3.dp)).clickable(onClick = onClick).padding(vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        if (color != null) Dot(color, 5.dp)
-        Text(label, fontSize = 10.sp, lineHeight = 13.sp, maxLines = 1,
-            color = if (selected) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurface,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
-    }
-}
-
-@Composable
 private fun ScatterFilter(label: String, selected: Boolean, color: Color?, onClick: () -> Unit) {
     Row(Modifier.clip(RoundedCornerShape(5.dp))
         .background(if (selected) (color ?: LocalExtraColors.current.brandInk).copy(alpha = 0.12f) else LocalExtraColors.current.fill)
@@ -516,15 +492,16 @@ private data class ScatterName(val point: LiveScatterPoint, val text: String, va
 
 @Composable
 private fun ScatterCanvas(
-    points: List<LiveScatterPoint>, axisPoints: List<LiveScatterPoint>, featured: List<LiveScatterPoint>, frontier: List<LiveScatterPoint>,
+    points: List<LiveScatterPoint>, featured: List<LiveScatterPoint>, frontier: List<LiveScatterPoint>,
     current: LiveScatterPoint, select: (LiveScatterPoint) -> Unit, vendors: Map<String, LiveModelVendor>, full: Boolean, modifier: Modifier,
 ) {
-    val minScore = floor(axisPoints.minOf { it.intelligence } / 5) * 5
-    val maxScore = (ceil(axisPoints.maxOf { it.intelligence } / 5) * 5).coerceAtLeast(minScore + 5)
-    val minPrice = 10.0.pow(floor(log10(axisPoints.minOf { it.weightedPrice })))
-    val maxPrice = 10.0.pow(ceil(log10(axisPoints.maxOf { it.weightedPrice }))).coerceAtLeast(minPrice * 10)
-    val medianScore = axisPoints.map { it.intelligence }.sorted().let { (it[(it.size - 1) / 2] + it[it.size / 2]) / 2 }
-    val medianPrice = axisPoints.map { it.weightedPrice }.sorted().let { (it[(it.size - 1) / 2] + it[it.size / 2]) / 2 }
+    val minScore = floor(points.minOf { it.intelligence } / 5) * 5
+    val maxScore = (ceil(points.maxOf { it.intelligence } / 5) * 5).coerceAtLeast(minScore + 5)
+    val priceRange = remember(points) { liveScatterPriceAxis(points) }
+    val minPrice = priceRange.lo
+    val maxPrice = priceRange.hi
+    val medianScore = points.map { it.intelligence }.sorted().let { (it[(it.size - 1) / 2] + it[it.size / 2]) / 2 }
+    val medianPrice = points.map { it.weightedPrice }.sorted().let { (it[(it.size - 1) / 2] + it[it.size / 2]) / 2 }
     val ink = LocalExtraColors.current.ink3
     val line = LocalExtraColors.current.line
     val surface = MaterialTheme.colorScheme.surface
@@ -534,7 +511,7 @@ private fun ScatterCanvas(
     val labelSize = if (full) 9.sp else 10.sp
     val labelStyle = LocalTextStyle.current.copy(fontSize = labelSize, lineHeight = 12.sp, letterSpacing = 0.sp)
     val featuredIds = featured.map { it.id }.toSet() + current.id
-    BoxWithConstraints(modifier.padding(start = 30.dp, end = 14.dp, bottom = 23.dp, top = 10.dp)) {
+    BoxWithConstraints(modifier.padding(start = 26.dp, end = 8.dp, bottom = 20.dp, top = 10.dp)) {
         val width = maxWidth.value; val height = maxHeight.value
         fun position(point: LiveScatterPoint) = Offset(width * logFraction(point.weightedPrice, minPrice, maxPrice),
             height * (1 - linearFraction(point.intelligence, minScore, maxScore)))
@@ -620,9 +597,13 @@ private fun ScatterCanvas(
         }
         listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { fraction ->
             Text(formatScore(minScore + (maxScore - minScore) * fraction),
-                Modifier.offset(x = (-30).dp, y = (height * (1 - fraction) - 6).dp), fontSize = 9.sp, lineHeight = 12.sp, color = ink)
+                Modifier.offset(x = (-26).dp, y = (height * (1 - fraction) - 6).dp), fontSize = 9.sp, lineHeight = 12.sp, color = ink)
         }
-        val ticks = priceTicks(AxisRange(minPrice, maxPrice)).let { if (full) it else it.filterIndexed { i, _ -> i % 2 == 0 } }
+        val ticks = liveScatterPriceTicks(priceRange).fold(mutableListOf<Double>()) { kept, price ->
+            val previous = kept.lastOrNull()
+            if (previous == null || width * (logFraction(price, minPrice, maxPrice) - logFraction(previous, minPrice, maxPrice)) >= 32f) kept += price
+            kept
+        }
         ticks.forEach { price ->
             Text(formatTick(price), Modifier.offset(x = (width * logFraction(price, minPrice, maxPrice) - 10).dp, y = (height + 3).dp),
                 fontSize = 9.sp, lineHeight = 12.sp, color = ink)
@@ -638,7 +619,7 @@ private fun ScatterCanvas(
     }
 }
 
-/** 横屏没有页面标题，只有紧凑图例、筛选和退出入口。 */
+/** 横屏没有标题、厂商栏或底部详情，主要空间用于图表。 */
 @Composable
 internal fun LiveRankingsScatterScreen(env: CommunityEnv, back: () -> Unit) {
     DisposableEffect(env) {
@@ -648,7 +629,7 @@ internal fun LiveRankingsScatterScreen(env: CommunityEnv, back: () -> Unit) {
     val loader = rememberLoader(env, "live-scatter-v2") { env.forum.liveModelBoard() }
     val state by loader.state.collectAsState()
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)
-        .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)).padding(8.dp)) {
+        .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Horizontal)).padding(4.dp)) {
         RankingLoadBox(state, loader::reload, "能力榜尚未发布，暂无法绘制图表") { board ->
             val points = remember(board) { liveScatterPoints(board) }
             if (points.isEmpty()) CenterMessage("暂无同时具备智能指数和完整价格的模型", "刷新", loader::reload)

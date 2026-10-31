@@ -79,6 +79,30 @@ class ModelRankingsTest {
     }
 
     @Test
+    fun `price axis uses nearly full width for current live range without clipping models`() {
+        val points = listOf(LiveScatterPoint("cheap", "cheap", "v", 5.5, 0.095), LiveScatterPoint("costly", "costly", "v", 55.3, 20.0))
+        val axis = liveScatterPriceAxis(points)
+        val left = logFraction(0.095, axis.lo, axis.hi)
+        val right = logFraction(20.0, axis.lo, axis.hi)
+        assertTrue(left > 0f && left < 0.05f)
+        assertTrue(right > 0.95f && right < 1f)
+        assertTrue(right - left > 0.9f)
+        assertEquals(listOf("$0.1", "$0.2", "$0.3", "$0.5", "$1", "$2", "$3", "$5", "$10", "$20"),
+            liveScatterPriceTicks(axis).map(::formatTick))
+    }
+
+    @Test
+    fun `price axis remains positive and finite for equal or missing measurements`() {
+        val point = LiveScatterPoint("same", "same", "v", 50.0, 2.0)
+        val axis = liveScatterPriceAxis(listOf(point, point))
+        assertTrue(axis.lo > 0 && axis.lo < 2.0 && axis.hi > 2.0 && axis.hi.isFinite())
+        assertTrue(kotlin.math.abs(logFraction(2.0, axis.lo, axis.hi) - 0.5f) < 0.001f)
+        assertTrue(liveScatterPriceTicks(axis).all { it in axis.lo..axis.hi })
+        assertEquals(AxisRange(0.1, 1.0), liveScatterPriceAxis(emptyList()))
+        assertEquals(AxisRange(0.1, 1.0), liveScatterPriceAxis(listOf(point.copy(weightedPrice = Double.NaN), point.copy(weightedPrice = 0.0))))
+    }
+
+    @Test
     fun `pareto line excludes dominated models and resolves equal prices and scores`() {
         fun point(id: String, score: Double, price: Double) = LiveScatterPoint(id, id, "v", score, price)
         val points = listOf(point("costly-equal-score", 40.0, 4.0), point("expensive-better", 60.0, 10.0),

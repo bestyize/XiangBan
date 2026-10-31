@@ -2,6 +2,10 @@ package xyz.xiangban.xiaoban.common.community
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.math.ceil
+import kotlin.math.floor
+import kotlin.math.log10
+import kotlin.math.pow
 
 /** v2 数据保持来源的空值、指数版本和价格单位，不借用旧榜单的四项评分。 */
 @Serializable
@@ -123,6 +127,25 @@ fun liveScatterPoints(board: LiveModelBoard): List<LiveScatterPoint> = board.mod
     val price = input * 0.75 + output * 0.25
     if (!price.isFinite() || price <= 0.0) return@mapNotNull null
     LiveScatterPoint(model.id, model.name, model.vendorId, score, price)
+}
+
+/** 对数价格轴贴合实际测量，两端各留 4% 的数据跨度，避免整十扩界浪费横向空间。 */
+fun liveScatterPriceAxis(points: List<LiveScatterPoint>): AxisRange {
+    val prices = points.map { it.weightedPrice }.filter { it.isFinite() && it > 0 }
+    if (prices.isEmpty()) return AxisRange(0.1, 1.0)
+    val lo = prices.min(); val hi = prices.max()
+    val logLo = log10(lo); val logHi = log10(hi)
+    val padding = ((logHi - logLo) * 0.04).coerceAtLeast(0.02)
+    return AxisRange(10.0.pow(logLo - padding).takeIf { it > 0 && it.isFinite() } ?: lo,
+        10.0.pow(logHi + padding).takeIf { it.isFinite() } ?: hi)
+}
+
+/** 刻度取实际坐标中的 1/2/3/5 倍，不能从非整十的轴下限开始倍乘。 */
+fun liveScatterPriceTicks(range: AxisRange): List<Double> {
+    val ticks = (floor(log10(range.lo)).toInt()..ceil(log10(range.hi)).toInt()).flatMap { exponent ->
+        listOf(1.0, 2.0, 3.0, 5.0).map { it * 10.0.pow(exponent) }
+    }.filter { it >= range.lo && it <= range.hi && it.isFinite() }.distinct()
+    return ticks.ifEmpty { listOf(range.lo, range.hi).distinct() }
 }
 
 /** 智能最大化、价格最小化的帕累托前沿；同价先取高分，同坐标只保留一个绘线点。 */
