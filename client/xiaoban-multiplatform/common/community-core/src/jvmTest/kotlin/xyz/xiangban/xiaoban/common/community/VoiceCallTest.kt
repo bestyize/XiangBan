@@ -60,10 +60,50 @@ internal class FakeVoicePlatform : VoicePlatform {
         return true
     }
 
+    val clips: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+
     override fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean {
         played.incrementAndGet()
+        clips += bytes.decodeToString()
         onPlay?.invoke()
         Thread { Thread.sleep(5); onDone() }.also { it.isDaemon = true }.start()
+        return true
+    }
+}
+
+/**
+ * 假的手机：麦克风平时安静，[speak] 一次才出一段声音；播放 5 毫秒就结束，播完调 [afterPlay]。
+ * 每 [frameMs] 毫秒送一帧（一帧算 20 毫秒的声音）：要看判停和识别谁先谁后时用 20，按真实的快慢来。
+ */
+internal class BurstPlatform(private val frameMs: Long = 1) : VoicePlatform {
+    private val burst = AtomicInteger()
+    val played = AtomicInteger()
+    var afterPlay: ((Int) -> Unit)? = null
+
+    fun speak(frames: Int) = burst.set(frames)
+
+    override suspend fun streamRecording(onFrame: (ByteArray) -> Unit): (() -> Unit) {
+        val running = java.util.concurrent.atomic.AtomicBoolean(true)
+        Thread {
+            var n = 0
+            while (running.get()) {
+                val loud = burst.getAndUpdate { if (it > 0) it - 1 else 0 } > 0
+                val frame = ByteArray(640)
+                for (i in 0 until 320) {
+                    val v = if (loud) (3000 * sin(2 * PI * (i + n * 320) * 220 / 16000)).toInt() else ((i * 7 + n) % 40 - 20)
+                    frame[2 * i] = v.toByte(); frame[2 * i + 1] = (v shr 8).toByte()
+                }
+                onFrame(frame)
+                n++
+                Thread.sleep(frameMs)
+            }
+        }.also { it.isDaemon = true }.start()
+        return { running.set(false) }
+    }
+
+    override fun playAudio(bytes: ByteArray, mime: String, onDone: () -> Unit): Boolean {
+        val count = played.incrementAndGet()
+        Thread { Thread.sleep(5); onDone(); afterPlay?.invoke(count) }.also { it.isDaemon = true }.start()
         return true
     }
 }
@@ -194,6 +234,120 @@ class VoiceCallTest {
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
         Unit
     }
+
+    @Test
+    fun `with smart turn the sentence is recognised during the pause, not after it`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val judging = java.util.concurrent.atomic.AtomicBoolean(false)
+        val judged = java.util.concurrent.atomic.AtomicBoolean(false)
+        val whileJudging = java.util.concurrent.atomic.AtomicBoolean(false)
+        val afterJudging = AtomicInteger()
+        val lateWhenAsked = AtomicInteger(-1)
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/chat/completions" -> { lateWhenAsked.compareAndSet(-1, afterJudging.get()); respond(sse("现在是下午三点。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream")) }
+                "/v1/audio/speech" -> respond(byteArrayOf(1, 2, 3), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "audio/mpeg"))
+                else -> respond("{}", HttpStatusCode.OK)
+            }
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        val local = object : RecognizerEngine {
+            override val name = "本地识别"
+            override val local = true
+            override suspend fun recognize(pcm: ByteArray): String {
+                if (judging.get()) whileJudging.set(true)
+                if (judged.get()) afterJudging.incrementAndGet()
+                delay(200)
+                return "现在几点"
+            }
+        }
+        val judge: suspend (ByteArray) -> Boolean? = { judging.set(true); delay(300); judging.set(false); judged.set(true); true }
+        val platform = BurstPlatform(frameMs = 20)
+        // 0.6 秒的一句话：短于 1 秒，不会先出中间结果，只能靠停顿时的识别。
+        platform.speak(30)
+        val call = SpokenCall(scope, platform, CloudAssistant(CloudChatController(api, scope)), listOf(local), listOf(CloudSynthesizer(api)), judge)
+        call.start()
+        waitFor("asked") { lateWhenAsked.get() >= 0 }
+        assertTrue(whileJudging.get(), "识别应该和判停同时开始")
+        assertEquals(0, lateWhenAsked.get(), "判定说完以后不该再识别一遍")
+        assertEquals("现在几点", call.state.value.userText)
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
+    fun `later sentences are synthesised while the first is playing, and played in order`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val sentences = listOf("第一句话说完了。", "第二句话说完了。", "第三句话说完了。", "第四句话说完了。", "第五句话说完了。")
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/audio/transcriptions" -> respond("""{"text":"现在几点"}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+                "/v1/chat/completions" -> respond(sse(sentences.joinToString("")), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+                else -> respond("{}", HttpStatusCode.OK)
+            }
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        val inFlight = AtomicInteger()
+        val most = AtomicInteger()
+        val slow = object : SynthesizerEngine {
+            override val name = "慢合成"
+            override suspend fun synthesize(text: String): ByteArray {
+                most.accumulateAndGet(inFlight.incrementAndGet(), ::maxOf)
+                try { delay(150); return text.encodeToByteArray() } finally { inFlight.decrementAndGet() }
+            }
+        }
+        val platform = FakeVoicePlatform()
+        val call = SpokenCall(scope, platform, CloudAssistant(CloudChatController(api, scope)), listOf(CloudRecognizer(api)), listOf(slow))
+        call.setBargeIn(false)
+        call.start()
+        waitFor("five sentences played") { platform.clips.size >= 5 }
+        assertEquals(sentences, platform.clips.take(5))
+        assertTrue(most.get() in 2..3, "同时在合成的句子数：${most.get()}")
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
+    fun `its own voice heard right after it stops talking is not taken as a question`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val asked = AtomicInteger()
+        val echoHeard = AtomicInteger()
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/chat/completions" -> { asked.incrementAndGet(); respond(sse("现在是下午三点。"), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream")) }
+                "/v1/audio/speech" -> respond(byteArrayOf(1, 2, 3), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "audio/mpeg"))
+                else -> respond("{}", HttpStatusCode.OK)
+            }
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        // 第一句是你问的；之后听到的都是小伴自己那句回答的尾音。
+        val local = object : RecognizerEngine {
+            override val name = "本地识别"
+            override val local = true
+            override suspend fun recognize(pcm: ByteArray): String =
+                if (asked.get() == 0) "现在几点" else { echoHeard.incrementAndGet(); "现在是下午三点" }
+        }
+        val platform = BurstPlatform()
+        // 回答念完的一瞬间，麦克风录到喇叭的尾音。
+        platform.afterPlay = { platform.speak(300) }
+        platform.speak(30)
+        val call = SpokenCall(scope, platform, CloudAssistant(CloudChatController(api, scope)), listOf(local), listOf(CloudSynthesizer(api)))
+        call.setBargeIn(false)
+        call.start()
+        waitFor("answered and spoken") { asked.get() == 1 && platform.played.get() >= 1 }
+        waitFor("echo recognised") { echoHeard.get() > 0 }
+        delay(1_500)
+        assertEquals(1, asked.get(), "回声不该被当成第二个问题发出去")
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
 
     @Test
     fun `saying hang up ends the call without asking the assistant`() = runBlocking {

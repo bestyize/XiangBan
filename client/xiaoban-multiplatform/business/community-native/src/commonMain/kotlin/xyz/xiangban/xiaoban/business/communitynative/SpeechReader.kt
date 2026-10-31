@@ -7,6 +7,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import kotlin.coroutines.resume
 import kotlinx.coroutines.CancellationException
@@ -137,13 +138,16 @@ private class AutoReadTrack {
 /**
  * 自动朗读回复：开着的时候，新的一条回复一边生成一边念（一句一句）。打开聊天时已经有的历史回复不念；
  * 你发了新消息，或者离开这个页面，会停止朗读。传入最后一条消息的编号、角色、文字和是否还在生成。
+ * [paused]：正在实时对话，回答由通话自己念，这里什么都不做，也不能去停声音（会把通话正在播的那句掐掉）；通话里的回答之后也不补念。
  */
 @Composable
-fun AutoRead(reader: ReplyReader, turnId: Any?, role: String?, text: String, streaming: Boolean) {
+fun AutoRead(reader: ReplyReader, turnId: Any?, role: String?, text: String, streaming: Boolean, paused: Boolean = false) {
     val track = remember(reader) { AutoReadTrack() }
-    DisposableEffect(reader) { onDispose { reader.stop() } }
-    LaunchedEffect(turnId, role, text, streaming) {
+    val inCall by rememberUpdatedState(paused)
+    DisposableEffect(reader) { onDispose { if (!inCall) reader.stop() } }
+    LaunchedEffect(turnId, role, text, streaming, paused) {
         when {
+            paused -> { track.turn = turnId; track.finished = true }
             role == "user" -> { reader.stop(); track.turn = null }
             role != "assistant" -> Unit
             streaming && track.turn != turnId -> {

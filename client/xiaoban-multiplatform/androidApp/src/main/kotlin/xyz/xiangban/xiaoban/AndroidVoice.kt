@@ -185,8 +185,13 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
 
     private val playSeq = java.util.concurrent.atomic.AtomicInteger()
 
+    /** 正在播的这段播完要告诉谁；被别人停掉也要告诉，不然等它的通话会一直等下去。只说一次。 */
+    private var finishCurrent: (() -> Unit)? = null
+
     fun play(bytes: ByteArray, onDone: () -> Unit): Boolean {
         stopPlayback()
+        var told = false
+        val finish = { if (!told) { told = true; onDone() } }
         return try {
             val file = File(context.cacheDir, "reply-voice-${playSeq.incrementAndGet() % 4}.mp3")
             file.writeBytes(bytes)
@@ -194,11 +199,12 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
             // 使用媒体流属性播放，避免电话通道硬件降噪与窄带滤波导致的破音与沙沙声
             mp.setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_SPEECH).build())
             mp.setDataSource(file.absolutePath)
-            mp.setOnCompletionListener { stopPlayback(); onDone() }
-            mp.setOnErrorListener { _, _, _ -> stopPlayback(); onDone(); true }
+            mp.setOnCompletionListener { if (player === mp) stopPlayback() else finish() }
+            mp.setOnErrorListener { _, _, _ -> if (player === mp) stopPlayback() else finish(); true }
             mp.prepare()
             mp.start()
             player = mp
+            finishCurrent = finish
             true
         } catch (e: Exception) {
             stopPlayback()
@@ -209,6 +215,7 @@ class AndroidVoice(private val context: Context, private val requestMic: suspend
     fun stopPlayback() {
         player?.let { runCatching { it.stop() }; it.release() }
         player = null
+        finishCurrent?.let { finishCurrent = null; it() }
     }
 
     private companion object {

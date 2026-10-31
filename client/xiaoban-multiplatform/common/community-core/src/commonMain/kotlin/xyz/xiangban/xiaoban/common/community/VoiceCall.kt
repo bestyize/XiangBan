@@ -3,10 +3,13 @@ package xyz.xiangban.xiaoban.common.community
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,6 +20,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeSource
 
 /** 语音对话要用到的平台能力（录音、听写、播放、朗读）。手机上由 Android 实现，不支持的默认什么也不做。 */
 interface VoicePlatform {
@@ -90,6 +95,12 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
     private var job: Job? = null
     private var playback: CompletableDeferred<Boolean>? = null
     protected var cachedRecognition: String? = null
+    /** 停顿时就开始的识别（和判停同时跑，和电脑端一样）；说话人没再开口，这就是这句话的结果。 */
+    protected var speculativeRecognition: Deferred<String?>? = null
+    /** 小伴上一次出声结束的时刻。 */
+    @Volatile private var playedAt: TimeSource.Monotonic.ValueTimeMark? = null
+    /** 刚听到的这句是在小伴说话时、或它刚说完半秒内开口的：里面可能混着它自己的声音。 */
+    protected var heardOverPlayback = false
     private val mic = Channel<ByteArray>(Channel.UNLIMITED)
     private var stopMic: (() -> Unit)? = null
     @Volatile private var pendingBarge: ByteArray? = null
@@ -186,9 +197,12 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
     protected suspend fun listenUtterance(
         judge: (suspend (ByteArray) -> Boolean)? = null,
         preview: (suspend (ByteArray) -> String)? = null,
+        speculate: Boolean = false,
     ): ByteArray? {
-        pendingBarge?.let { pendingBarge = null; interrupted = false; return it }
+        speculativeRecognition = null
+        pendingBarge?.let { pendingBarge = null; interrupted = false; heardOverPlayback = true; return it }
         interrupted = false
+        heardOverPlayback = false
         openMic()
         drainMic()
         update { it.copy(phase = CallPhase.Listening, partial = "") }
@@ -198,6 +212,9 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
         var previewJob: Job? = null
         val judges = mutableListOf<Job>()
         var latestPreview: Pair<Int, String>? = null
+        var speculation: Pair<Int, Deferred<String?>>? = null
+        var handedOver = false
+        var heard = false
         cachedRecognition = null
         try {
             var counter = 0
@@ -209,12 +226,23 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
                     if (p.second.isNotBlank() && !isVoiceNoise(p.second)) update { it.copy(partial = p.second) }
                 }
                 val result = detector.feed(frame)
+                if (result.speaking && !heard) {
+                    heard = true
+                    heardOverPlayback = playedAt?.let { it.elapsedNow() < EchoTail } == true
+                }
                 // 声音大小不用每 20ms 都刷新界面。
                 if (++counter % 5 == 0) update { it.copy(level = result.level, phase = if (result.speaking) CallPhase.Hearing else CallPhase.Listening) }
                 if (result.ask != null && judge != null) {
                     val ticket = result.askTicket
                     val audio = result.ask
                     judges += scope.launch { verdicts.trySend(ticket to (try { judge(audio) } catch (e: CancellationException) { throw e } catch (e: Exception) { false })) }
+                    // 判“说完了吗”的同时就把这段识别了：判定说完时文字已经好了，不用再等一遍识别。
+                    if (speculate && preview != null && speculation?.first != result.speechVersion) {
+                        speculation?.second?.cancel()
+                        speculation = result.speechVersion to scope.async {
+                            try { preview(audio) } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+                        }
+                    }
                 }
                 if (result.preview != null && preview != null && previewJob?.isActive != true) {
                     val audio = result.preview
@@ -225,6 +253,8 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
                 }
                 if (result.utterance != null) {
                     cachedRecognition = latestPreview?.takeIf { it.first == result.speechVersion }?.second?.takeIf { it.isNotBlank() && !isVoiceNoise(it) }
+                    // 停顿之后没再开口：停顿时识别的就是整句话。
+                    speculation?.takeIf { it.first == result.speechVersion }?.let { speculativeRecognition = it.second; handedOver = true }
                     return result.utterance
                 }
                 if (result.timedOut) return null
@@ -236,6 +266,7 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
             previews.close()
             previewJob?.cancel()
             judges.forEach { it.cancel() }
+            if (!handedOver) speculation?.second?.cancel()
         }
     }
 
@@ -305,6 +336,7 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
         } finally {
             platform.stopAudio()
             playback = null
+            playedAt = TimeSource.Monotonic.markNow()
         }
     }
 
@@ -318,6 +350,7 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
         } finally {
             platform.stopSpeaking()
             playback = null
+            playedAt = TimeSource.Monotonic.markNow()
         }
     }
 
@@ -331,6 +364,8 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
     private companion object {
         /** 连续出声这么久才算打断。 */
         const val BargeMs = 400
+        /** 喇叭停了以后还有这么久可能录到它的尾音（和电脑端一样）。 */
+        val EchoTail = 500.milliseconds
     }
 }
 
@@ -443,7 +478,8 @@ class SpokenCall(
     private val turnJudge: (suspend (ByteArray) -> Boolean?)? = null,
 ) : VoiceCall(scope, platform) {
     private val recognizers = recognizers.toMutableList()
-    private val synthesizers = synthesizers.toMutableList()
+    /** 几句话同时在合成，换引擎要一次改完。 */
+    private val synthesizers = MutableStateFlow(synthesizers)
     private var spokenText = ""
     private var interruptionNote = ""
     private var lastAck: String? = null
@@ -469,7 +505,7 @@ class SpokenCall(
     override suspend fun run() {
         assistant.unavailableReason()?.let { throw CallError(it) }
         // 只预热免费的 Edge 朗读，失败不影响正常通话。
-        val warm = (synthesizers.firstOrNull() as? EdgeTtsSynthesizer)?.let { engine ->
+        val warm = (synthesizers.value.firstOrNull() as? EdgeTtsSynthesizer)?.let { engine ->
             scope.launch {
                 for (phrase in AllVoiceAckPhrases) {
                     try {
@@ -483,6 +519,8 @@ class SpokenCall(
             while (true) {
                 val text = hear() ?: continue
                 if (isVoiceNoise(text)) continue
+                // 小伴说话时或刚说完听到的、和它刚念的一样：是它自己的声音从喇叭漏进了麦克风，不是你说的（和电脑端一样）。
+                if (heardOverPlayback && isVoiceEcho(text, spokenText)) continue
                 heardSomething()
                 if (isVoiceHangUp(text)) {
                     sayGoodbye(text)
@@ -494,6 +532,24 @@ class SpokenCall(
             }
         } finally {
             warm?.cancel()
+        }
+    }
+
+    /** 用第一个能用的引擎合成一句；用不了的引擎拿掉，换下一个。都不行返回 null（改用手机自带的朗读）。 */
+    private suspend fun synthesize(text: String): ByteArray? {
+        while (true) {
+            val engine = synthesizers.value.firstOrNull() ?: return null
+            try {
+                return engine.synthesize(text)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: EngineUnavailable) {
+                synthesizers.update { list -> list - engine }
+            } catch (e: CallError) {
+                throw e
+            } catch (e: Exception) {
+                return null
+            }
         }
     }
 
@@ -525,13 +581,17 @@ class SpokenCall(
         val pcm = listenUtterance(
             if (local != null || turnJudge != null) ::finished else null,
             local?.let { engine -> { audio -> engine.recognize(audio).trim() } },
+            // 没有 Smart Turn 时判停本身就是本地识别，不用再多识别一遍。
+            speculate = turnJudge != null,
         ) ?: return null
         phase(CallPhase.Thinking)
         update { it.copy(partial = "") }
         while (recognizers.isNotEmpty()) {
             val engine = recognizers.first()
             try {
-                val recognized = if (engine.local) cachedRecognition ?: engine.recognize(pcm) else engine.recognize(pcm)
+                val early = if (engine.local) cachedRecognition ?: speculativeRecognition?.await() else null
+                speculativeRecognition = null
+                val recognized = early ?: engine.recognize(pcm)
                 return recognized.trim().ifEmpty { null }
             } catch (e: EngineUnavailable) {
                 recognizers.remove(engine)
@@ -563,28 +623,14 @@ class SpokenCall(
         val ack = if (ackKind != null && ackPhrase != null) ackKind to ackPhrase else null
         if (ackPhrase != null) lastAck = ackPhrase
         val sentences = Channel<SpeechSpan>(Channel.UNLIMITED)
-        val clips = Channel<Pair<SpeechSpan, ByteArray?>>(2)
+        // 和电脑端一样，正在念的这句后面再提前合成两句：通道里放一句，合成这边手里再拿一句。
+        val clips = Channel<Pair<SpeechSpan, Deferred<ByteArray?>>>(1)
         val synth = launch {
             try {
                 for (sentence in sentences) {
                     // 关了朗读的就不合成了；念到一半重新打开，后面的句子接着念。
                     if (interrupted || state.value.silent) continue
-                    var audio: ByteArray? = null
-                    while (audio == null && synthesizers.isNotEmpty()) {
-                        val engine = synthesizers.first()
-                        try {
-                            audio = engine.synthesize(sentence.text)
-                        } catch (e: CancellationException) {
-                            throw e
-                        } catch (e: EngineUnavailable) {
-                            synthesizers.remove(engine)
-                        } catch (e: CallError) {
-                            throw e
-                        } catch (e: Exception) {
-                            break
-                        }
-                    }
-                    clips.send(sentence to audio)
+                    clips.send(sentence to async { synthesize(sentence.text) })
                 }
             } finally {
                 // 合成这边无论怎么结束都要告诉播放那边，否则这一轮永远等不到头，通话既不念也不听。
@@ -608,7 +654,10 @@ class SpokenCall(
         } else null
         val player = launch {
             ackJob?.join()
-            for ((sentence, audio) in clips) {
+            for ((sentence, pending) in clips) {
+                if (interrupted || state.value.silent) { pending.cancel(); continue }
+                // 合成那边自己放弃（超时之类）也是“取消”：只要这一轮还在，就当这句没合成出来，接着往下念。
+                val audio = try { pending.await() } catch (e: CancellationException) { ensureActive(); null }
                 if (interrupted || state.value.silent) continue
                 update { it.copy(reading = sentence.start until sentence.end) }
                 phase(CallPhase.Speaking)
