@@ -58,7 +58,6 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
-            Hairline()
             when (current) {
                 CommunitySection.Home -> TabStrip(HomeSub.entries.map { it.key to it.label }, homeSub) { homeSub = it }
                 CommunitySection.Discuss -> TabStrip(DiscussSub.entries.map { it.key to it.label }, discussSub) { discussSub = it }
@@ -85,7 +84,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
 @Composable
 private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySection) -> Unit, onSearch: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(72.dp)) {
                 Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) {
                     XIcon(XIcons.SparkleSmall, tint = Color.White, size = 18.dp)
@@ -94,12 +93,12 @@ private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySecti
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally)) {
                 CommunitySection.entries.forEach { s ->
                     val selected = s == current
-                    Column(Modifier.clickable { onSelect(s) }.height(52.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Column(Modifier.clickable { onSelect(s) }.height(44.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                         Text(
                             s.label, fontSize = 16.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             color = if (selected) Brand else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                        Box(Modifier.padding(top = 4.dp).size(width = 18.dp, height = 3.dp).clip(RoundedCornerShape(2.dp)).background(if (selected) Brand else Color.Transparent))
+                        Box(Modifier.padding(top = 2.dp).size(width = 18.dp, height = 3.dp).clip(RoundedCornerShape(2.dp)).background(if (selected) Brand else Color.Transparent))
                     }
                 }
             }

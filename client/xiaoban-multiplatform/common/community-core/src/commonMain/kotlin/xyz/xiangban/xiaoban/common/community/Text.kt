@@ -33,3 +33,10 @@ fun formatSize(bytes: Long): String = when {
     bytes < 1024 * 1024 -> "${(bytes * 10 / 1024) / 10.0} KB"
     else -> "${(bytes * 10 / (1024 * 1024)) / 10.0} MB"
 }
+
+/** 下载大小：MB 以上取整数（12 MB），KB 以上也取整数；不到 1 KB 写字节。 */
+fun formatDownloadSize(bytes: Long): String = when {
+    bytes < 1024 -> "$bytes B"
+    bytes < 1024 * 1024 -> "${(bytes + 512) / 1024} KB"
+    else -> "${(bytes + 512 * 1024) / (1024 * 1024)} MB"
+}

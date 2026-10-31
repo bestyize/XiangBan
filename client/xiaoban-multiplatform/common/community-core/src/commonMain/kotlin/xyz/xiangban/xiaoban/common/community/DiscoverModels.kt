@@ -16,6 +16,8 @@ data class NewsItem(
     val source: String = "",
     val url: String = "",
     @SerialName("cover_url") val coverUrl: String = "",
+    /** 没有封面图时，缩略图和来源小圆点的颜色（#RRGGBB）。 */
+    val accent: String = "",
     @SerialName("published_at") val publishedAt: String = "",
     val sample: Boolean = false,
 )
@@ -44,6 +46,10 @@ data class RepoRank(
     @SerialName("star_total") val starTotal: Long = 0,
     @SerialName("star_gain") val starGain: Long = 0,
     val spark: List<Long> = emptyList(),
+    /** 图标块里的小图标：term、code、doc、mic、bolt；认不出就显示仓库名首字。 */
+    val icon: String = "",
+    /** 图标块的底色（#RRGGBB）。 */
+    val tint: String = "",
 )
 
 @Serializable
@@ -136,6 +142,14 @@ data class Tracker(
     val now: String = "",
     val sample: Boolean = false,
 )
+
+// ───────────── 搜索 ─────────────
+
+@Serializable
+data class HotWord(val key: String = "", val text: String, val tag: String = "")
+
+@Serializable
+data class HotWords(val items: List<HotWord> = emptyList())
 
 // ───────────── 导航与资料 ─────────────
 

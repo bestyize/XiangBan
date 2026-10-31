@@ -59,6 +59,7 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     suspend fun modelBoard(): ModelBoard = get("/api/discover/models")
     suspend fun tracker(): Tracker = get("/api/discover/tracker")
     suspend fun navLinks(): NavGroups = get("/api/discover/nav")
+    suspend fun hotSearch(): HotWords = get("/api/discover/hot-search")
     suspend fun docs(): DocGroups = get("/api/discover/docs")
     suspend fun tools(): ToolList = get("/api/tools")
     suspend fun tool(key: String): ToolDetail = get("/api/tools/${key.encodeURLParameter()}")

@@ -85,7 +85,7 @@ fun Avatar(name: String, size: androidx.compose.ui.unit.Dp = 18.dp, showInitial:
 @Composable
 fun TabStrip(tabs: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
-        LazyRow(Modifier.fillMaxWidth().height(40.dp), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        LazyRow(Modifier.fillMaxWidth().height(36.dp), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
             items(tabs, key = { it.first }) { (key, label) ->
                 val on = key == selected
                 Box(Modifier.fillMaxHeight().clickable { onSelect(key) }, contentAlignment = Alignment.Center) {
@@ -150,56 +150,10 @@ internal fun <T> rememberLoader(env: CommunityEnv, key: Any, fetch: suspend () -
     return loader
 }
 
-// ───────────── 社区首页（信息流） ─────────────
+// ───────────── 作品摘要 ─────────────
 
 internal fun packMeta(pack: Pack): String =
     listOfNotNull(kindLabel(pack.kind), pack.author?.nickname, pack.trustLabel.takeIf { pack.trustLevel < 2 }, "${pack.applyCount} 次应用".takeIf { pack.applyCount > 0 }).joinToString(" · ")
-
-@Composable
-internal fun PackGrid(state: FeedState, open: (Route) -> Unit, onMore: () -> Unit, onRetry: () -> Unit, bottomPadding: androidx.compose.ui.unit.Dp = 8.dp) {
-    LazyVerticalGrid(
-        GridCells.Fixed(2), Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = bottomPadding), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        gridItems(state.packs, key = { it.id }, span = { pack -> GridItemSpan(if (pack.kind in VisualKinds) 1 else 2) }) { pack ->
-            if (pack.kind in VisualKinds) VisualCard(pack) { open(Route.Pack(pack.id)) } else TextCard(pack) { open(Route.Pack(pack.id)) }
-        }
-        item(span = { GridItemSpan(2) }) { LoadMoreFooter(state.hasMore, state.error, state.packs.size, onMore, onRetry) }
-    }
-}
-
-@Composable
-internal fun VisualCard(pack: Pack, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
-        Box {
-            Cover(pack.coverUrl, pack.id, Modifier.fillMaxWidth().aspectRatio(4f / 3f))
-            Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp)
-            if (pack.kind == "game") Text("可试玩", Modifier.align(Alignment.TopEnd).padding(8.dp).clip(RoundedCornerShape(8.dp)).background(Brand).padding(horizontal = 6.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        }
-        Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 10.dp)) {
-            Text(pack.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Avatar(pack.author?.nickname ?: "?")
-                Text(pack.author?.nickname ?: "匿名", Modifier.weight(1f), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (pack.applyCount > 0) Text("${pack.applyCount}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-            }
-        }
-    }
-}
-
-@Composable
-internal fun TextCard(pack: Pack, onClick: () -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
-        Text(kindLabel(pack.kind), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-        Text(pack.title, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp)
-        if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        if (!pack.pureData) Text("运行前需确认权限", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = Amber)
-        Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            Avatar(pack.author?.nickname ?: "?")
-            Text(listOfNotNull(pack.author?.nickname, pack.trustLabel.takeIf { pack.trustLevel < 2 }, "${pack.applyCount} 次应用".takeIf { pack.applyCount > 0 }).joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
 
 // ───────────── 帖子行 ─────────────
 
@@ -218,89 +172,6 @@ internal fun TopicRow(topic: Topic, onClick: () -> Unit) {
             Text(topic.author.nickname, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
             Text("·", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
             Text("${topic.replyCount} 回复", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-        }
-    }
-}
-
-// ───────────── 搜索 ─────────────
-
-/** 搜索作品和帖子。没有输入时显示本次打开应用以来的搜索历史。 */
-@Composable
-fun SearchScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
-    val scope = rememberCoroutineScope()
-    var query by rememberSaveable { mutableStateOf("") }
-    var history by rememberSaveable { mutableStateOf("") }
-    var packs by remember { mutableStateOf<List<Pack>>(emptyList()) }
-    var topics by remember { mutableStateOf<List<Topic>>(emptyList()) }
-    var busy by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var searched by remember { mutableStateOf(false) }
-
-    fun search(text: String) {
-        val q = text.trim()
-        if (q.isEmpty() || busy) return
-        query = q
-        history = (listOf(q) + history.split('\n').filter { it.isNotBlank() && it != q }).take(8).joinToString("\n")
-        busy = true; error = null; searched = true
-        scope.launch {
-            try {
-                val p = runCatching { env.forum.packs(q = q).items }
-                val t = runCatching { env.forum.searchTopics(q).items }
-                packs = p.getOrDefault(emptyList())
-                topics = t.getOrDefault(emptyList())
-                if (p.isFailure && t.isFailure) error = messageOf(p.exceptionOrNull() ?: t.exceptionOrNull() ?: RuntimeException())
-            } finally {
-                busy = false
-            }
-        }
-    }
-
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                TextBox(query, { query = it }, Modifier.weight(1f), placeholder = "搜索作品、帖子", keyboardType = KeyboardType.Text)
-            }
-            PillButton("搜索", { search(query) }, enabled = query.isNotBlank() && !busy, height = 40.dp)
-            Text("取消", Modifier.clickable(onClick = back).padding(horizontal = 8.dp, vertical = 12.dp), fontSize = 15.sp)
-        }
-        Hairline()
-        when {
-            busy -> Spinner()
-            error != null -> CenterMessage(error.orEmpty(), "重试", onAction = { search(query) })
-            !searched -> Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-                val items = history.split('\n').filter { it.isNotBlank() }
-                if (items.isEmpty()) {
-                    Text("输入关键词，搜索社区里的作品和帖子。", Modifier.padding(top = 20.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                } else {
-                    Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("搜索历史", Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Text("清空", Modifier.clickable { history = "" }.padding(4.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items.forEach { h -> Text(h, Modifier.clip(CircleShape).background(LocalExtraColors.current.fill).clickable { search(h) }.padding(horizontal = 14.dp, vertical = 7.dp), fontSize = 14.sp) }
-                    }
-                }
-            }
-            packs.isEmpty() && topics.isEmpty() -> CenterMessage("没有找到和“$query”相关的内容")
-            else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                if (packs.isNotEmpty()) {
-                    GroupLabel("作品")
-                    packs.forEachIndexed { i, pack ->
-                        if (i > 0) Hairline(Modifier.padding(start = 16.dp))
-                        Column(Modifier.fillMaxWidth().clickable { open(Route.Pack(pack.id)) }.padding(16.dp)) {
-                            Text(pack.title, fontSize = 15.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(packMeta(pack), Modifier.padding(top = 4.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
-                }
-                if (topics.isNotEmpty()) {
-                    GroupLabel("帖子")
-                    topics.forEachIndexed { i, topic ->
-                        if (i > 0) Hairline(Modifier.padding(start = 16.dp))
-                        TopicRow(topic) { open(Route.Topic(topic.id)) }
-                    }
-                }
-            }
         }
     }
 }

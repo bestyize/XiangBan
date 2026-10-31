@@ -137,8 +137,17 @@ class AndroidPlatformActions(
     }
 
     override fun setLandscape(landscape: Boolean) {
-        (context as? android.app.Activity)?.requestedOrientation =
+        val activity = context as? android.app.Activity ?: return
+        activity.requestedOrientation =
             if (landscape) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        // 横屏全屏时隐藏状态栏和导航栏；从屏幕边缘滑一下会临时露出来，离开时恢复。
+        val controller = androidx.core.view.WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+        if (landscape) {
+            controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     override fun openAppSettings(): Boolean {

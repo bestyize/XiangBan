@@ -331,6 +331,9 @@ const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool
     ("casual-gear", "数码装备", "键盘、显示器、NAS", "normal", Some("casual"), 1, true, false, false),
     ("casual-indie", "副业与独立开发", "", "normal", Some("casual"), 1, true, false, false),
     ("casual-fun", "吃喝玩乐", "", "normal", Some("casual"), 1, true, false, false),
+    ("casual-media", "片单乐评", "分享片单、歌单和乐评，只聊内容，不贴盗版链接", "normal", Some("casual"), 1, true, false, false),
+    ("casual-think", "哲思", "聊聊想法和观点，不吵架", "normal", Some("casual"), 1, true, false, false),
+    ("casual-help", "互助", "日常的小事，互相帮个忙", "normal", Some("casual"), 1, true, false, false),
     ("casual-chat", "闲聊灌水", "不进首页，不加积分", "normal", Some("casual"), 1, false, false, false),
     ("site", "站务", "公告、规则和反馈", "normal", None, 1, true, false, false),
     ("site-notice", "公告", "", "normal", Some("site"), 1, true, false, true),
@@ -505,6 +508,8 @@ const BOARD_MIGRATIONS: &[BoardMigration] = &[
     BoardMigration { name: "casual-loss-v1", parent: "casual", create_parent: false, boards: &["casual-loss"], moves: &[] },
     // 随便唠唠：新增"梦想和人生"，放在"亏了吗"后面
     BoardMigration { name: "casual-dream-v1", parent: "casual", create_parent: false, boards: &["casual-dream"], moves: &[] },
+    // 随便唠唠：手机端休闲栏的筛选需要 片单乐评 / 哲思 / 互助，放在“吃喝玩乐”后面
+    BoardMigration { name: "casual-boards-v2", parent: "casual", create_parent: false, boards: &["casual-media", "casual-think", "casual-help"], moves: &[] },
     // 小伴产品：新增一级分类和 小伴壁纸 / 小伴游戏 / 小伴App，放在福利羊毛之后、随便唠唠之前
     BoardMigration {
         name: "xiaoban-boards-v1",

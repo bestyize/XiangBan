@@ -33,6 +33,7 @@ pub fn routes() -> Router<AppState> {
         .route("/discover/tracker", get(tracker))
         .route("/discover/nav", get(nav))
         .route("/discover/docs", get(docs))
+        .route("/discover/hot-search", get(hot_search))
         .route("/tools", get(list_tools))
         .route("/tools/{slug}", get(get_tool))
         .route("/help/stats", get(help_stats))
@@ -248,6 +249,11 @@ async fn nav(State(state): State<AppState>) -> AppResult<Json<Value>> {
 async fn docs(State(state): State<AppState>) -> AppResult<Json<Value>> {
     let items = fetch(&state.pool, "doc", BY_ORDER, 200, 0).await?;
     Ok(Json(json!({ "groups": group_by(items, "product") })))
+}
+
+async fn hot_search(State(state): State<AppState>) -> AppResult<Json<Value>> {
+    let items = fetch(&state.pool, "hotword", BY_ORDER, 20, 0).await?;
+    Ok(Json(json!({ "items": items })))
 }
 
 fn latest_release(data: &Value) -> (Option<String>, Option<String>) {

@@ -22,6 +22,10 @@ object XIcons {
     val ChevronDown: ImageVector by lazy { strokeIcon("ChevronDown", "M6 9l6 6 6-6") }
     val ChevronLeft: ImageVector by lazy { strokeIcon("ChevronLeft", "M15 5l-7 7 7 7") }
     val ChevronRight: ImageVector by lazy { strokeIcon("ChevronRight", "M9 5l7 7-7 7") }
+    val Cube: ImageVector by lazy { strokeIcon("Cube", "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5") }
+    val Play: ImageVector by lazy { strokeIcon("Play", "M8 5v14l11-7z") }
+    val Code: ImageVector by lazy { strokeIcon("Code", "M8 8l-4 4 4 4M16 8l4 4-4 4") }
+    val Terminal: ImageVector by lazy { strokeIcon("Terminal", "M4 5h16v14H4zM7 9l3 3-3 3M12 15h5") }
     val ChevronUp: ImageVector by lazy { strokeIcon("ChevronUp", "M6 15l6-6 6 6") }
     val Download: ImageVector by lazy { strokeIcon("Download", "M12 4v11M8 11l4 4 4-4M5 15v3a2 2 0 002 2h10a2 2 0 002-2v-3") }
     val Eye: ImageVector by lazy { strokeIcon("Eye", "M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12zM9.2 12a2.8 2.8 0 1 0 5.6 0a2.8 2.8 0 1 0 -5.6 0z") }

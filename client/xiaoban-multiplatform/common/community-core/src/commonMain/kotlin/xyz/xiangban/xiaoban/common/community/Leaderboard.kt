@@ -30,19 +30,27 @@ data class RankRow(val rank: Int, val model: ModelEntry, val value: Double, val 
 
 data class TierGroup(val tier: TierDef, val rows: List<RankRow>)
 
+/** 柱子最短也留一小截，免得看不见。 */
+const val MinBarFraction = 0.04f
+
 /**
  * 按指标排序后的榜单：分数高的在前，价格低的在前。
- * 分数类的柱长按 0～100 的满分比例；速度和价格按本榜最大值比例，保证最长的柱子正好占满。
+ * 柱长和设计稿一致：越高越好的指标按本榜最大值定比例（第一名占满）；价格反过来，最便宜的占满，其余按 最低价 / 本项价格。
  */
 fun rankModels(models: List<ModelEntry>, metric: Metric, filter: ModelFilter = ModelFilter.All): List<RankRow> {
     val picked = models.filter(filter::accepts)
     val sorted = if (metric.higherIsBetter) picked.sortedByDescending { metric.value(it) } else picked.sortedBy { metric.value(it) }
-    val top = if (metric.tiered) 100.0 else max(sorted.maxOfOrNull { metric.value(it) } ?: 0.0, 1e-9)
+    val top = max(sorted.maxOfOrNull { metric.value(it) } ?: 0.0, 1e-9)
+    val cheapest = sorted.minOfOrNull { metric.value(it) } ?: 0.0
     return sorted.mapIndexed { i, m ->
         val v = metric.value(m)
-        RankRow(i + 1, m, v, (v / top).coerceIn(0.0, 1.0).toFloat())
+        val raw = if (metric.higherIsBetter) v / top else if (v <= 0.0) 1.0 else cheapest / v
+        RankRow(i + 1, m, v, raw.coerceIn(0.0, 1.0).toFloat().coerceAtLeast(MinBarFraction))
     }
 }
+
+/** 散点图标签用的短名：「模型 A」→「A」。 */
+fun shortLabel(name: String): String = name.substringAfterLast(" ").take(6)
 
 /** 把分数类榜单按服务端给的档位分组；不分档的指标返回空列表。空档不返回。 */
 fun groupByTier(rows: List<RankRow>, tiers: List<TierDef>): List<TierGroup> {

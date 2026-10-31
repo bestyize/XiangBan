@@ -45,6 +45,15 @@ class TimeTextTest {
     }
 
     @Test
+    fun `day label is today with a clock, yesterday, or a date`() {
+        assertEquals("今天 18:00", dayLabel("2026-10-31T10:00:00Z", now))
+        assertEquals("今天 08:20", dayLabel("2026-10-31T00:20:00Z", now))
+        assertEquals("昨天", dayLabel("2026-10-30T09:00:00Z", now))
+        assertEquals("10 月 27 日", dayLabel("2026-10-27T09:00:00Z", now))
+        assertEquals("今天 18:05", dayLabel("2026-10-31T10:05:00Z", now), "略微超前的时间也算今天")
+    }
+
+    @Test
     fun `counts are compact`() {
         assertEquals("88", compactCount(88))
         assertEquals("4.1千", compactCount(4100))

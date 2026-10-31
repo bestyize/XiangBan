@@ -2,7 +2,16 @@ package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.Text
+import androidx.compose.ui.unit.sp
+import xyz.xiangban.xiaoban.common.community.formatScore
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -104,4 +113,41 @@ fun ProgressRing(pct: Int, color: Color, modifier: Modifier = Modifier, size: Dp
 @Composable
 fun Dot(color: Color, size: Dp = 8.dp, modifier: Modifier = Modifier) {
     Box(modifier.size(size).clip(CircleShape).background(color))
+}
+
+/** 热榜行右边的 7 根小柱：宽 4、间距 2，高度 = 数值/100 × [height]，最后一根用深蓝。 */
+@Composable
+fun SparkBars(values: List<Long>, modifier: Modifier = Modifier, height: Dp = 22.dp) {
+    Row(modifier.height(height), horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.Bottom) {
+        values.forEachIndexed { i, v ->
+            Box(Modifier.width(4.dp).height((height * (v / 100f)).coerceAtLeast(3.dp)).clip(RoundedCornerShape(1.dp)).background(if (i == values.lastIndex) DataBlue else DataBlueSoft))
+        }
+    }
+}
+
+/** 一周每天的新增：柱宽 14，下面标周几。高度按最大值定，最高 [height]。 */
+@Composable
+fun DayBars(values: List<Long>, labels: List<String>, modifier: Modifier = Modifier, height: Dp = 56.dp) {
+    val peak = (values.maxOrNull() ?: 1L).coerceAtLeast(1L)
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
+        values.forEachIndexed { i, v ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(Modifier.width(14.dp).height((height * (v.toFloat() / peak)).coerceAtLeast(3.dp)).clip(RoundedCornerShape(3.dp)).background(if (i == values.lastIndex) DataBlue else DataBlueSoft))
+                Text(labels.getOrElse(i) { "" }, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            }
+        }
+    }
+}
+
+/** 额度重置间隔：每根柱上面写数值，柱宽 24、圆角 8，高度按 6 小时为满。 */
+@Composable
+fun IntervalBars(values: List<Double>, modifier: Modifier = Modifier, full: Double = 6.0, height: Dp = 30.dp) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+        values.forEachIndexed { i, v ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(formatScore(v), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(Modifier.width(24.dp).height((height * (v / full).toFloat()).coerceIn(4.dp, height)).clip(RoundedCornerShape(8.dp)).background(if (i == values.lastIndex) DataBlue else DataBlueSoft))
+            }
+        }
+    }
 }

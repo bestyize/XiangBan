@@ -355,6 +355,10 @@ class TextAndTokensTest {
         assertEquals("future", kindLabel("future"))
         assertEquals("512 B", formatSize(512))
         assertEquals("1.5 KB", formatSize(1536))
+        assertEquals("12 MB", formatDownloadSize(12_582_912))
+        assertEquals("14 MB", formatDownloadSize(14_680_064))
+        assertEquals("1 KB", formatDownloadSize(1024))
+        assertEquals("512 B", formatDownloadSize(512))
         assertEquals("2.0 MB", formatSize(2 * 1024 * 1024))
     }
 

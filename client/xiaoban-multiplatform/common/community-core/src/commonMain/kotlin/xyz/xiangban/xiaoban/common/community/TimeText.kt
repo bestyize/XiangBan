@@ -70,6 +70,20 @@ fun agoText(iso: String, now: Long = nowMillis()): String {
     }
 }
 
+/** 时间线上的标签：「今天 10:20」「昨天」「10 月 27 日」，按东八区。 */
+fun dayLabel(iso: String, now: Long = nowMillis()): String {
+    val t = parseIsoMillis(iso) ?: return iso.take(10)
+    val local = t + ChinaOffset
+    val diffDays = Math2.floorDiv(now + ChinaOffset, Day) - Math2.floorDiv(local, Day)
+    val hh = (local % Day / Hour).toString().padStart(2, '0')
+    val mm = (local % Hour / Minute).toString().padStart(2, '0')
+    return when {
+        diffDays <= 0L -> "今天 $hh:$mm"
+        diffDays == 1L -> "昨天"
+        else -> civilFromDays(Math2.floorDiv(local, Day)).let { (_, m, d) -> "$m 月 $d 日" }
+    }
+}
+
 /** 「3 小时 12 分」，不到一小时只写分钟，已经过了写「0 分」。 */
 fun countdownText(targetIso: String, now: Long = nowMillis()): String {
     val t = parseIsoMillis(targetIso) ?: return ""

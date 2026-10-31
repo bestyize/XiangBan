@@ -34,23 +34,28 @@ class LeaderboardTest {
     )
 
     @Test
-    fun `scores rank high to low and bar length follows the score on a 0 to 100 scale`() {
+    fun `scores rank high to low and bar length is relative to the top score`() {
         val rows = rankModels(models.shuffled(), Metric.Iq)
         assertEquals(listOf("a", "b", "c", "d"), rows.map { it.model.key })
         assertEquals(listOf(1, 2, 3, 4), rows.map { it.rank })
-        assertEquals(0.72f, rows[0].fraction, 1e-6f)
-        assertEquals(0.51f, rows[3].fraction, 1e-6f)
+        assertEquals(1f, rows[0].fraction, 1e-6f)
+        assertEquals(66f / 72f, rows[1].fraction, 1e-6f)
+        assertEquals(51f / 72f, rows[3].fraction, 1e-6f)
         assertTrue(rows.zipWithNext().all { (x, y) -> x.fraction > y.fraction })
+        assertEquals(1f, rankModels(models, Metric.Iq, ModelFilter.Cn).first().fraction, 1e-6f, "筛选后第一名重新占满")
     }
 
     @Test
-    fun `price ranks cheap first and speed ranks fast first, longest bar fills the width`() {
+    fun `price ranks cheap first with the cheapest bar full, speed ranks fast first`() {
         val price = rankModels(models, Metric.Price)
         assertEquals(listOf("d", "c", "b", "a"), price.map { it.model.key })
-        assertEquals(1f, price.last().fraction, 1e-6f)
+        assertEquals(1f, price.first().fraction, 1e-6f)
+        assertEquals(0.15f / 0.3f, price[1].fraction, 1e-6f)
+        assertEquals(MinBarFraction, price.last().fraction, 1e-6f, "太贵的柱子也留最短一截")
         val speed = rankModels(models, Metric.Speed)
         assertEquals(listOf("d", "c", "b", "a"), speed.map { it.model.key })
         assertEquals(1f, speed.first().fraction, 1e-6f)
+        assertEquals(90f / 260f, speed.last().fraction, 1e-6f)
     }
 
     @Test
@@ -105,6 +110,12 @@ class LeaderboardTest {
         assertEquals("$0.03", formatTick(0.03))
         assertEquals("$3", formatTick(3.0))
         assertEquals("$10", formatTick(10.0))
+    }
+
+    @Test
+    fun `short labels drop the model prefix`() {
+        assertEquals("A", shortLabel("模型 A"))
+        assertEquals("GPT-5", shortLabel("GPT-5"))
     }
 
     @Test
@@ -191,6 +202,21 @@ class DiscoverApiTest {
 
         assertEquals("Claude", api.navLinks().groups.single().items.single().name)
         assertEquals("索引", api.docs().groups.single().items.single().labelText)
+    }
+
+    @Test
+    fun `hot search words and repo icons are parsed`() = runTest {
+        val server = FakeServer()
+        server.on("/api/discover/hot-search", body = """{"items":[{"key":"w1","text":"桌面特效","tag":"热"},{"key":"w2","text":"番茄时钟"}]}""")
+        server.on("/api/discover/repos", body = """{"issue_no":42,"ranks":[{"rank":1,"full_name":"a/b","star_total":1,"star_gain":2,"icon":"term","tint":"#E8EEF8"}]}""")
+        val api = ForumApi(server.client, CONFIG) { null }
+        val words = api.hotSearch().items
+        assertEquals(listOf("桌面特效", "番茄时钟"), words.map { it.text })
+        assertEquals("热", words[0].tag)
+        assertEquals("", words[1].tag)
+        val rank = api.repoIssue().ranks.single()
+        assertEquals("term", rank.icon)
+        assertEquals("#E8EEF8", rank.tint)
     }
 
     @Test

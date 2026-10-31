@@ -99,9 +99,13 @@ async fn discover_pages_read_seeded_and_admin_edited_items() -> Result<(), Box<d
     let (s, home) = call(app, "GET", "/api/discover/home", None, Value::Null).await;
     assert_eq!(s, StatusCode::OK, "{home}");
     assert_eq!(home["banners"].as_array().unwrap().len(), 1);
-    assert_eq!(home["news"]["items"].as_array().unwrap().len(), 3);
-    assert_eq!(home["news"]["total"], 3);
+    assert_eq!(home["news"]["items"].as_array().unwrap().len(), 5);
+    let day_total = home["news"]["total"].as_i64().unwrap();
+    assert!((1..=5).contains(&day_total), "{day_total}");
+    assert_eq!(home["repos"]["issue_no"], 42);
+    assert_eq!(home["repos"]["ranks"].as_array().unwrap().len(), 3, "首页只放热榜前三");
     assert_eq!(home["repos"]["ranks"][0]["rank"], 1);
+    assert_eq!(home["repos"]["ranks"][0]["icon"], "term");
     assert_eq!(home["sample"], true);
 
     // 导航按分组返回，且是真实内容（不带示例标记）。
@@ -112,8 +116,13 @@ async fn discover_pages_read_seeded_and_admin_edited_items() -> Result<(), Box<d
 
     // 模型榜：按指标分档由后端给出。
     let (_, board) = call(app, "GET", "/api/discover/models", None, Value::Null).await;
+    assert_eq!(board["vendors"].as_array().unwrap().len(), 6);
+    assert_eq!(board["models"].as_array().unwrap().len(), 12);
+    assert_eq!(board["models"][0]["name"], "模型 A");
     assert_eq!(board["models"][0]["tier"], "S");
-    assert_eq!(board["models"][3]["tier"], "C");
+    assert_eq!(board["models"][2]["tier"], "S");
+    assert_eq!(board["models"][3]["tier"], "A");
+    assert_eq!(board["models"][11]["tier"], "C");
     assert_eq!(board["tiers"][0]["id"], "S");
     assert_eq!(board["tiers"][3]["min"], Value::Null);
     assert_eq!(board["sample"], true);
@@ -121,18 +130,26 @@ async fn discover_pages_read_seeded_and_admin_edited_items() -> Result<(), Box<d
     // 追踪：额度重置、上新、限时免费；进度由服务端算。
     let (_, tr) = call(app, "GET", "/api/discover/tracker", None, Value::Null).await;
     assert_eq!(tr["quota"]["progress_pct"], 68);
-    assert_eq!(tr["launches"].as_array().unwrap().len(), 2);
+    assert_eq!(tr["launches"].as_array().unwrap().len(), 3);
+    assert_eq!(tr["promos"].as_array().unwrap().len(), 2);
     let pct = tr["promos"][0]["pct"].as_u64().unwrap();
     assert!((50..=65).contains(&pct), "{pct}");
     assert_eq!(tr["promos"][0]["days_left"], 3);
 
     // 工具：列表有最新版本，详情带安装包和讨论数。
     let (_, tools) = call(app, "GET", "/api/tools", None, Value::Null).await;
-    assert_eq!(tools["items"][0]["key"], "cc-switch");
-    assert_eq!(tools["items"][0]["latest_version"], "v0.0.0");
+    assert_eq!(tools["items"].as_array().unwrap().len(), 5);
+    let cc = tools["items"].as_array().unwrap().iter().find(|t| t["key"] == "cc-switch").unwrap();
+    assert_eq!(cc["latest_version"], "v3.5.0");
+    assert_eq!(cc["license"], "open");
+    let unknown = tools["items"].as_array().unwrap().iter().find(|t| t["key"] == "deepseek-harness").unwrap();
+    assert_eq!(unknown["license"], "unknown");
+    assert_eq!(unknown["latest_version"], Value::Null);
     let (s, tool) = call(app, "GET", "/api/tools/cc-switch", None, Value::Null).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(tool["artifacts"].as_array().unwrap().len(), 3);
+    assert_eq!(tool["releases"].as_array().unwrap().len(), 3);
+    assert_eq!(tool["releases"][0]["items"][1]["kind"], "improve");
     assert_eq!(tool["discussion_count"], 0);
     let (s, _) = call(app, "GET", "/api/tools/nope", None, Value::Null).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
@@ -154,35 +171,41 @@ async fn discover_pages_read_seeded_and_admin_edited_items() -> Result<(), Box<d
     let (s, _) = call(app, "PUT", "/api/admin/discover/nope/a", Some(&h.admin_t), put.clone()).await;
     assert_eq!(s, StatusCode::BAD_REQUEST);
 
+    // 热门搜索来自后台词表。
+    let (_, hot) = call(app, "GET", "/api/discover/hot-search", None, Value::Null).await;
+    assert_eq!(hot["items"].as_array().unwrap().len(), 8);
+    assert_eq!(hot["items"][0]["text"], "桌面特效");
+    assert_eq!(hot["items"][0]["tag"], "热");
+
     // 新增后出现在日报最前面；草稿不公开；删除后消失。
     let (s, _) = call(app, "PUT", "/api/admin/discover/news/today-1", Some(&h.admin_t), put).await;
     assert_eq!(s, StatusCode::OK);
     let (_, daily) = call(app, "GET", "/api/discover/daily?page_size=2", None, Value::Null).await;
     assert_eq!(daily["items"][0]["key"], "today-1");
-    assert_eq!(daily["total"], 4);
+    assert_eq!(daily["total"], 6);
     assert_eq!(daily["items"].as_array().unwrap().len(), 2);
     let draft = json!({ "data": { "title": "草稿", "source": "s", "url": "https://example.com/d" }, "status": "draft" });
     call(app, "PUT", "/api/admin/discover/news/draft-1", Some(&h.admin_t), draft).await;
     let (_, daily) = call(app, "GET", "/api/discover/daily", None, Value::Null).await;
-    assert_eq!(daily["total"], 4);
+    assert_eq!(daily["total"], 6);
     let (_, listed) = call(app, "GET", "/api/admin/discover/news", Some(&h.admin_t), Value::Null).await;
-    assert_eq!(listed["items"].as_array().unwrap().len(), 5);
+    assert_eq!(listed["items"].as_array().unwrap().len(), 7);
     let (s, _) = call(app, "DELETE", "/api/admin/discover/news/today-1", Some(&h.admin_t), Value::Null).await;
     assert_eq!(s, StatusCode::OK);
     let (s, _) = call(app, "DELETE", "/api/admin/discover/news/today-1", Some(&h.admin_t), Value::Null).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 
     // 开源热榜：多期时默认最新一期，可按 key 取往期。
-    let issue2 = json!({ "data": { "issue_no": 2, "week_start": "10.30", "week_end": "11.05", "total_gain": 5,
+    let issue2 = json!({ "data": { "issue_no": 43, "week_start": "10.30", "week_end": "11.05", "total_gain": 5,
         "ranks": [{ "full_name": "x/low", "star_total": 1, "star_gain": 1 }, { "full_name": "y/high", "star_total": 2, "star_gain": 9 }] } });
-    call(app, "PUT", "/api/admin/discover/repo_issue/2", Some(&h.admin_t), issue2).await;
+    call(app, "PUT", "/api/admin/discover/repo_issue/43", Some(&h.admin_t), issue2).await;
     let (_, latest) = call(app, "GET", "/api/discover/repos", None, Value::Null).await;
-    assert_eq!(latest["issue_no"], 2);
+    assert_eq!(latest["issue_no"], 43);
     assert_eq!(latest["ranks"][0]["full_name"], "y/high");
-    let (_, old) = call(app, "GET", "/api/discover/repos?issue=1", None, Value::Null).await;
-    assert_eq!(old["issue_no"], 1);
+    let (_, old) = call(app, "GET", "/api/discover/repos?issue=42", None, Value::Null).await;
+    assert_eq!(old["issue_no"], 42);
     let (_, issues) = call(app, "GET", "/api/discover/repos/issues", None, Value::Null).await;
-    assert_eq!(issues["items"][0]["issue_no"], 2);
+    assert_eq!(issues["items"][0]["issue_no"], 43);
     let (s, _) = call(app, "GET", "/api/discover/repos?issue=99", None, Value::Null).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
 
@@ -200,6 +223,12 @@ async fn topics_carry_images_polls_and_help_stats() -> Result<(), Box<dyn std::e
         async move { sqlx::query_as::<_, (i32,)>("SELECT id FROM categories WHERE slug = $1").bind(slug).fetch_one(&pool).await.map(|r| r.0) }
     };
     let (fun, work, help) = (cat("casual-fun").await?, cat("casual-work").await?, cat("share-help").await?);
+
+    // 休闲板块有设计稿里的全部筛选项。
+    let (_, cats) = call(app, "GET", "/api/categories", None, Value::Null).await;
+    for slug in ["casual-work", "casual-offwork", "casual-indie", "casual-gear", "casual-loss", "casual-fun", "casual-media", "casual-think", "casual-help", "casual-chat"] {
+        assert!(cats.as_array().unwrap().iter().any(|c| c["slug"] == slug), "缺少 {slug}");
+    }
 
     // 带三宫格图片和投票的休闲帖。
     let imgs: Vec<String> = (0..4).map(|_| format!("/api/images/{}", Uuid::new_v4())).collect();
@@ -274,5 +303,32 @@ async fn topics_carry_images_polls_and_help_stats() -> Result<(), Box<dyn std::e
     assert_eq!(stats["solved_this_week"], 0);
     assert_eq!(stats["bounty_points"], 0);
 
+    h.finish().await
+}
+
+/// 线上从上一版种子升级：旧示例被清掉换成新的，后台录入的真实内容和已有的导航保留。
+#[tokio::test]
+async fn seed_upgrade_replaces_old_samples_but_keeps_real_items() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    sqlx::query("DELETE FROM data_migrations WHERE name = 'discover-seed-v2'").execute(&h.pool).await?;
+    sqlx::query("INSERT INTO discover_items (kind, key, data) VALUES ('model', 'old-sample', '{\"name\":\"旧示例\",\"vendor\":\"x\",\"iq\":50,\"price\":1,\"speed\":1,\"sample\":true}')")
+        .execute(&h.pool).await?;
+    sqlx::query("INSERT INTO discover_items (kind, key, data) VALUES ('model', 'real-one', '{\"name\":\"真实模型\",\"vendor\":\"claude\",\"iq\":80,\"price\":2,\"speed\":10,\"sample\":false}')")
+        .execute(&h.pool).await?;
+    sqlx::query("UPDATE discover_items SET data = jsonb_set(data, '{vendor}', '\"claude\"') WHERE kind = 'model' AND key = 'a'").execute(&h.pool).await?;
+    sqlx::query("DELETE FROM discover_items WHERE kind = 'doc' AND key = 'claude-skills'").execute(&h.pool).await?;
+    sqlx::query("UPDATE discover_items SET data = jsonb_set(data, '{title}', '\"Claude Code 文档\"') WHERE kind = 'doc' AND key = 'claude-code'").execute(&h.pool).await?;
+
+    crate::discover::seed(&h.pool).await?;
+
+    let keys: Vec<(String,)> = sqlx::query_as("SELECT key FROM discover_items WHERE kind = 'model' ORDER BY key").fetch_all(&h.pool).await?;
+    let keys: Vec<String> = keys.into_iter().map(|k| k.0).collect();
+    assert!(!keys.contains(&"old-sample".to_string()), "{keys:?}");
+    assert!(keys.contains(&"real-one".to_string()), "{keys:?}");
+    assert_eq!(keys.len(), 13, "12 个新示例 + 1 个真实条目");
+    let (title,): (String,) = sqlx::query_as("SELECT data->>'title' FROM discover_items WHERE kind = 'doc' AND key = 'claude-code'").fetch_one(&h.pool).await?;
+    assert_eq!(title, "Claude Code 上手导读");
+    let (docs,): (i64,) = sqlx::query_as("SELECT count(*) FROM discover_items WHERE kind = 'doc'").fetch_one(&h.pool).await?;
+    assert_eq!(docs, 5);
     h.finish().await
 }

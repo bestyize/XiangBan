@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -45,8 +46,9 @@ fun WhiteCard(modifier: Modifier = Modifier, padding: Dp = 16.dp, content: @Comp
 
 /** 卡片标题：左边标题加一行小字，右边一个「更多 ›」之类的入口。 */
 @Composable
-fun SectionHeader(title: String, modifier: Modifier = Modifier, note: String? = null, action: String? = null, onAction: (() -> Unit)? = null) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+fun SectionHeader(title: String, modifier: Modifier = Modifier, note: String? = null, action: String? = null, onAction: (() -> Unit)? = null, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        if (icon != null) XIcon(icon, tint = MaterialTheme.colorScheme.onSurface, size = 18.dp)
         Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         if (note != null) Text(note, Modifier.weight(1f), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         else Box(Modifier.weight(1f))
@@ -74,21 +76,24 @@ fun Tag(text: String, fg: Color, bg: Color, modifier: Modifier = Modifier) {
     Text(text, modifier.clip(RoundedCornerShape(6.dp)).background(bg).padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, color = fg, maxLines = 1)
 }
 
-/** 蓝色标签（进行中）。 */
+/** 蓝色标签（进行中、修复）：稿子里是 #3E5C8A 字、#E8EEF8 底。 */
 @Composable
-fun BlueTag(text: String, modifier: Modifier = Modifier) = Tag(text, DataBlue, DataBlue.copy(alpha = 0.12f), modifier)
+fun BlueTag(text: String, modifier: Modifier = Modifier) =
+    Tag(text, if (ThemeState.dark) Color(0xFF9FB6DC) else Color(0xFF3E5C8A), if (ThemeState.dark) Color(0xFF9FB6DC).copy(alpha = 0.16f) else Color(0xFFE8EEF8), modifier)
 
-/** 绿色标签（已采纳、开源）。 */
+/** 绿色标签（已采纳、开源、新增）：#2E6B47 字、#E6F4EA 底。 */
 @Composable
-fun GreenTag(text: String, modifier: Modifier = Modifier) = Tag(text, if (ThemeState.dark) Color(0xFF7BD39A) else Color(0xFF2E6B47), Success.copy(alpha = 0.14f), modifier)
+fun GreenTag(text: String, modifier: Modifier = Modifier) =
+    Tag(text, if (ThemeState.dark) Color(0xFF7BD39A) else Color(0xFF2E6B47), if (ThemeState.dark) Color(0xFF7BD39A).copy(alpha = 0.16f) else Color(0xFFE6F4EA), modifier)
 
-/** 灰色标签（已到期、闭源）。 */
+/** 灰色标签（已到期、闭源、类型）：#666 字、#F5F5F5 底。 */
 @Composable
 fun GrayTag(text: String, modifier: Modifier = Modifier) = Tag(text, MaterialTheme.colorScheme.onSurfaceVariant, LocalExtraColors.current.fill, modifier)
 
-/** 琥珀色标签（待确认）。 */
+/** 琥珀色标签（优化、待确认）：#8A5B00 字、#FBF0DA 底。 */
 @Composable
-fun AmberTag(text: String, modifier: Modifier = Modifier) = Tag(text, Amber, Amber.copy(alpha = 0.14f), modifier)
+fun AmberTag(text: String, modifier: Modifier = Modifier) =
+    Tag(text, if (ThemeState.dark) Color(0xFFE0A03A) else Color(0xFF8A5B00), if (ThemeState.dark) Color(0xFFE0A03A).copy(alpha = 0.16f) else Color(0xFFFBF0DA), modifier)
 
 /** 图标块：没有图标图片时，用名字的首字放在品牌色的浅底上。 */
 @Composable
@@ -130,7 +135,7 @@ fun PageChip(text: String, selected: Boolean, onClick: () -> Unit) {
     val extra = LocalExtraColors.current
     Text(
         text,
-        Modifier.height(34.dp).clip(RoundedCornerShape(17.dp)).background(if (selected) extra.brandSoft else MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 7.dp),
+        Modifier.height(30.dp).clip(RoundedCornerShape(15.dp)).background(if (selected) extra.brandSoft else MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 5.dp),
         fontSize = 14.sp, maxLines = 1, color = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurface, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
     )
 }
@@ -141,4 +146,32 @@ fun PageChipRow(items: List<Pair<String, String>>, selected: String, onSelect: (
     LazyRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(items, key = { it.first }) { (key, label) -> PageChip(label, key == selected) { onSelect(key) } }
     }
+}
+
+/** 品牌图标块：有官方标志就用品牌色画在浅底上；没有就用 [fallback] 的首字。[dashed] 为真时画虚线占位框（官方图标待补）。 */
+@Composable
+fun BrandTile(logo: BrandLogo?, fallback: String, modifier: Modifier = Modifier, size: Dp = 40.dp, corner: Dp = 10.dp, dashed: Boolean = false) {
+    val shape = RoundedCornerShape(corner)
+    when {
+        logo != null -> Box(modifier.size(size).clip(shape).background(if (ThemeState.dark) logo.color.copy(alpha = 0.22f) else logo.tint), contentAlignment = Alignment.Center) {
+            XIcon(logo.icon, tint = logo.color, size = size * 0.55f)
+        }
+        dashed -> Box(
+            modifier.size(size).clip(shape).background(MaterialTheme.colorScheme.surface).dashedBorder(LocalExtraColors.current.line, corner),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                XIcon(XIcons.Image, tint = LocalExtraColors.current.ink3, size = 14.dp)
+                Text("图标", fontSize = 10.sp, lineHeight = 12.sp, color = LocalExtraColors.current.ink3)
+            }
+        }
+        else -> LetterIcon(fallback, Brand, Brand.copy(alpha = 0.14f), modifier, size)
+    }
+}
+
+private fun Modifier.dashedBorder(color: Color, corner: Dp): Modifier = this.drawBehind {
+    drawRoundRect(
+        color, cornerRadius = androidx.compose.ui.geometry.CornerRadius(corner.toPx()),
+        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 1.dp.toPx(), pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 8f))),
+    )
 }

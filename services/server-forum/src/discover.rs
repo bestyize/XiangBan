@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::PgPool;
 
-pub const KINDS: &[&str] = &["banner", "news", "nav", "doc", "vendor", "model", "repo_issue", "quota", "launch", "promo", "tool"];
+pub const KINDS: &[&str] = &["banner", "news", "nav", "doc", "vendor", "model", "repo_issue", "quota", "launch", "promo", "tool", "hotword"];
 
 /// 模型榜分档：(档位, 名称, 下限)。阈值由后端给出，客户端只负责显示。
 pub const TIERS: &[(&str, &str, f64)] =
@@ -105,6 +105,9 @@ pub struct News {
     url: String,
     #[serde(default)]
     cover_url: String,
+    /// 没有封面图时，缩略图和来源小圆点用的颜色（#RRGGBB）。
+    #[serde(default)]
+    accent: String,
 }
 
 impl Check for News {
@@ -113,6 +116,9 @@ impl Check for News {
         self.source = clean(&self.source, "来源", 30, true)?;
         self.url = web_url(&self.url, "链接", true)?;
         self.cover_url = web_url(&self.cover_url, "封面地址", false)?;
+        if !self.accent.is_empty() {
+            self.accent = color(&self.accent, "强调色")?;
+        }
         Ok(())
     }
 }
@@ -242,6 +248,12 @@ pub struct RepoRank {
     star_gain: i64,
     #[serde(default)]
     spark: Vec<i64>,
+    /// 图标块里的小图标：`term`、`code`、`doc`、`mic`、`bolt`，认不出的客户端显示仓库名首字。
+    #[serde(default)]
+    icon: String,
+    /// 图标块的底色（#RRGGBB）。
+    #[serde(default)]
+    tint: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -280,6 +292,10 @@ impl Check for RepoIssue {
             }
             if r.spark.len() > 14 {
                 return Err(AppError::BadRequest("趋势最多 14 个点".into()));
+            }
+            r.icon = clean(&r.icon, "图标", 12, false)?;
+            if !r.tint.is_empty() {
+                r.tint = color(&r.tint, "图标底色")?;
             }
         }
         self.ranks.sort_by(|a, b| b.star_gain.cmp(&a.star_gain));
@@ -336,6 +352,22 @@ impl Check for Promo {
         if self.ends_at <= self.started_at {
             return Err(AppError::BadRequest("结束时间要晚于开始时间".into()));
         }
+        Ok(())
+    }
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Hotword {
+    text: String,
+    /// 右侧的小红字，如「热」「新」，可空。
+    #[serde(default)]
+    tag: String,
+}
+
+impl Check for Hotword {
+    fn check(&mut self) -> AppResult<()> {
+        self.text = clean(&self.text, "热词", 20, true)?;
+        self.tag = clean(&self.tag, "标记", 4, false)?;
         Ok(())
     }
 }
@@ -463,6 +495,7 @@ pub fn validate(kind: &str, data: Value) -> AppResult<Value> {
         "launch" => go::<Launch>(data),
         "promo" => go::<Promo>(data),
         "tool" => go::<Tool>(data),
+        "hotword" => go::<Hotword>(data),
         _ => Err(AppError::BadRequest("未知的类型".into())),
     }
 }
@@ -489,10 +522,11 @@ pub async fn backfill_topic_images(pool: &PgPool) -> AppResult<()> {
     Ok(())
 }
 
-const SEED_NAME: &str = "discover-seed-v1";
+const SEED_NAME: &str = "discover-seed-v2";
 
-/// 第一次启动时写入示例内容，让页面有东西可看。条目带 `sample: true`，客户端会标「示例数据」；
-/// 后台删改后不会再被写回，真实内容录入后把对应示例删掉即可。
+/// 第一次启动时写入示例内容（数据取自设计稿），让页面有东西可看。带 `sample: true` 的条目客户端会标「示例数据」；
+/// 导航和资料是真实的官方入口。已部署的库升级时，先清掉上一版写的示例条目再写新的；后台自己录入的真实内容不受影响。
+/// 做完记进 `data_migrations`，后台删改后不会再被写回。
 pub async fn seed(pool: &PgPool) -> AppResult<()> {
     let done: Option<(String,)> =
         sqlx::query_as("SELECT name FROM data_migrations WHERE name = $1").bind(SEED_NAME).fetch_optional(pool).await?;
@@ -500,103 +534,185 @@ pub async fn seed(pool: &PgPool) -> AppResult<()> {
         return Ok(());
     }
     let mut tx = pool.begin().await?;
-    for (kind, key, order, data) in seed_items() {
+    sqlx::query(
+        "DELETE FROM discover_items WHERE data->>'sample' = 'true'
+            OR (kind = 'doc' AND key IN ('claude-code', 'codex')) OR kind = 'hotword'",
+    )
+    .execute(&mut *tx)
+    .await?;
+    for (kind, key, order, age_minutes, data) in seed_items() {
         let mut data = validate(kind, data).map_err(|e| AppError::Internal(format!("示例 {kind}/{key} 无效：{e}")))?;
         data["sample"] = Value::Bool(sample_flag(kind));
-        sqlx::query("INSERT INTO discover_items (kind, key, sort_order, data) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING")
-            .bind(kind)
-            .bind(key)
-            .bind(order)
-            .bind(data)
-            .execute(&mut *tx)
-            .await?;
+        sqlx::query(
+            "INSERT INTO discover_items (kind, key, sort_order, published_at, data)
+             VALUES ($1, $2, $3, now() - make_interval(mins => $4), $5) ON CONFLICT DO NOTHING",
+        )
+        .bind(kind)
+        .bind(key)
+        .bind(order)
+        .bind(age_minutes)
+        .bind(data)
+        .execute(&mut *tx)
+        .await?;
     }
     sqlx::query("INSERT INTO data_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING").bind(SEED_NAME).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(())
 }
 
-/// 导航里是各家的官方入口，是真实内容，其余都是示例。
+/// 导航、资料和热词是真实内容，其余都是示例。
 fn sample_flag(kind: &str) -> bool {
-    !matches!(kind, "nav" | "doc")
+    !matches!(kind, "nav" | "doc" | "hotword")
 }
 
-fn seed_items() -> Vec<(&'static str, &'static str, i32, Value)> {
+type SeedItem = (&'static str, &'static str, i32, i32, Value);
+
+fn seed_items() -> Vec<SeedItem> {
     use serde_json::json;
     let now = Utc::now();
-    let mut v: Vec<(&'static str, &'static str, i32, Value)> = vec![
-        ("banner", "weekly-1", 0, json!({ "tag": "本周原创", "title": "示例：一周用下来，三款编程助手各适合谁", "byline": "小伴编辑部 · 8 分钟读完" })),
-        ("news", "demo-1", 0, json!({ "title": "示例：某编程助手发布新版本，支持多项目并行", "source": "示例来源", "url": "https://chat.xiangban.xyz/" })),
-        ("news", "demo-2", 1, json!({ "title": "示例：开源语音识别模型更新，中文准确率提升", "source": "示例来源", "url": "https://chat.xiangban.xyz/" })),
-        ("news", "demo-3", 2, json!({ "title": "示例：一份可复用的团队 AI 使用规范", "source": "示例来源", "url": "https://chat.xiangban.xyz/" })),
-        ("vendor", "demo-a", 0, json!({ "name": "示例厂商 A", "brand_color": "#2F6BFF", "tint": "#E4ECFF" })),
-        ("vendor", "demo-b", 1, json!({ "name": "示例厂商 B", "brand_color": "#E3203C", "tint": "#FFE4E8" })),
-        ("vendor", "demo-c", 2, json!({ "name": "示例厂商 C", "brand_color": "#2E6B47", "tint": "#E6F4EA" })),
-        ("quota", "codex", 0, json!({ "progress_pct": 68, "next_reset_at": now + chrono::Duration::hours(3), "recent_intervals": [5.0, 5.0, 4.5, 5.0, 5.5, 5.0, 5.0] })),
-        ("launch", "demo-1", 0, json!({ "title": "示例：某厂商发布新一代推理模型", "tags": ["API", "编程"] })),
-        ("launch", "demo-2", 1, json!({ "title": "示例：7B 开源模型发布", "tags": ["开源", "7B"] })),
-        ("promo", "demo-1", 0, json!({ "text": "示例：某编程助手限时免费试用", "started_at": now - chrono::Duration::days(4), "ends_at": now + chrono::Duration::days(3) })),
-        ("tool", "cc-switch", 0, json!({
-            "name": "CC Switch", "developer": "开源社区", "type_label": "桌面应用", "license": "open",
-            "platforms": ["Windows", "macOS", "Linux"],
-            "description": "在 Claude Code、Codex 等编程工具之间切换服务商配置，不用手改配置文件。",
-            "homepage_url": "https://github.com/farion1231/cc-switch", "discussion_tag": "cc-switch",
-            "releases": [{ "version": "v0.0.0", "date": "示例", "items": [{ "kind": "new", "text": "示例更新内容" }] }],
-            "artifacts": [
-                { "os": "windows", "desc": ".msi 安装包", "size": 12582912, "github_url": "https://github.com/farion1231/cc-switch/releases" },
-                { "os": "macos", "desc": ".dmg（Apple 芯片 / Intel）", "size": 14680064, "github_url": "https://github.com/farion1231/cc-switch/releases" },
-                { "os": "linux", "desc": ".AppImage / .deb", "size": 16777216, "github_url": "https://github.com/farion1231/cc-switch/releases" }
-            ]
-        })),
+    let site = "https://chat.xiangban.xyz/";
+    let mut v: Vec<SeedItem> = vec![
+        ("banner", "weekly-1", 0, 0, json!({ "tag": "本周原创", "title": "一周用下来，三款编程助手各适合谁", "byline": "小伴编辑部 · 8 分钟读完" })),
+        ("quota", "codex", 0, 5, json!({ "progress_pct": 68, "next_reset_at": now + chrono::Duration::minutes(192), "recent_intervals": [5.0, 5.5, 4.0, 5.0, 6.0, 5.0, 4.5] })),
+        ("launch", "demo-1", 0, 15, json!({ "title": "示例模型 G 发布", "tags": ["API", "编程"] })),
+        ("launch", "demo-2", 1, 28 * 60, json!({ "title": "示例模型 H 开源", "tags": ["开源", "7B"] })),
+        ("launch", "demo-3", 2, 96 * 60, json!({ "title": "示例模型 I 上线网页版", "tags": ["免费试用"] })),
+        ("promo", "demo-1", 0, 0, json!({ "text": "示例工具：免费额度翻倍", "started_at": now - chrono::Duration::days(4), "ends_at": now + chrono::Duration::days(3) })),
+        ("promo", "demo-2", 1, 0, json!({ "text": "示例模型：开放免费试用", "started_at": now - chrono::Duration::days(3), "ends_at": now + chrono::Duration::days(12) })),
     ];
-    for (i, (name, v_key, iq, price, speed)) in [
-        ("示例模型 A", "demo-a", 72.0, 4.0, 90.0),
-        ("示例模型 B", "demo-b", 66.0, 1.2, 140.0),
-        ("示例模型 C", "demo-c", 58.0, 0.3, 210.0),
-        ("示例模型 D", "demo-a", 51.0, 0.15, 260.0),
+    for (i, (title, source, accent, age)) in [
+        ("示例：某厂商发布新一代编程模型，长任务更稳定", "示例媒体", "#3E5C8A", 120),
+        ("示例：开源语音模型更新，手机上也能实时转写", "示例媒体", "#F4A6A0", 240),
+        ("示例：三家 AI 公司同日调整订阅价格", "示例媒体", "#D9C7A8", 360),
+        ("示例：新的智能体框架发布，主打本地运行", "示例媒体", "#4F7A5E", 480),
+        ("示例：国产 AI 芯片出货量季度数据公布", "示例媒体", "#9FB6DC", 26 * 60),
     ]
     .into_iter()
     .enumerate()
     {
-        let key: &'static str = ["demo-a", "demo-b", "demo-c", "demo-d"][i];
-        v.push(("model", key, i as i32, json!({
-            "name": name, "vendor": v_key, "iq": iq, "code": iq - 3.0, "math": iq - 6.0, "agent": iq - 2.0,
-            "price": price, "speed": speed, "latency": 0.9, "context": "200K", "open": i == 2, "reasoning": i < 2, "cn": i == 3,
+        let key: &'static str = ["demo-1", "demo-2", "demo-3", "demo-4", "demo-5"][i];
+        v.push(("news", key, i as i32, age, json!({ "title": title, "source": source, "url": site, "accent": accent })));
+    }
+    // 厂商和模型：设计稿里的 6 家厂商、12 个示例模型。
+    for (i, (key, name, c, t)) in [
+        ("claude", "Claude", "#D97757", "#FBEFEA"),
+        ("gemini", "Gemini", "#1A73E8", "#E8F0FE"),
+        ("deepseek", "DeepSeek", "#5786FE", "#EEF2FF"),
+        ("qwen", "Qwen", "#6950EF", "#EFECFD"),
+        ("kimi", "Kimi", "#111111", "#F0F0F0"),
+        ("minimax", "MiniMax", "#E73562", "#FDE8EE"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        v.push(("vendor", key, i as i32, 0, json!({ "name": name, "brand_color": c, "tint": t })));
+    }
+    // (id, 厂商, 智能, 编程, 数学, 智能体, 价格, 速度, 延迟, 上下文, 开源, 推理, 国产)
+    let models: [(&'static str, &'static str, f64, f64, f64, f64, f64, f64, f64, &str, bool, bool, bool); 12] = [
+        ("a", "claude", 73.0, 70.0, 92.0, 68.0, 3.4, 182.0, 0.9, "1M", false, true, false),
+        ("b", "gemini", 71.0, 72.0, 88.0, 66.0, 6.0, 95.0, 1.4, "400K", false, true, false),
+        ("c", "deepseek", 70.0, 66.0, 90.0, 61.0, 1.1, 140.0, 0.6, "256K", true, true, true),
+        ("d", "claude", 68.0, 64.0, 86.0, 63.0, 1.9, 210.0, 0.5, "1M", false, false, false),
+        ("e", "qwen", 66.0, 62.0, 84.0, 58.0, 0.6, 88.0, 1.1, "128K", true, true, true),
+        ("f", "kimi", 64.0, 60.0, 80.0, 55.0, 0.4, 120.0, 0.7, "128K", true, false, true),
+        ("g", "gemini", 62.0, 63.0, 76.0, 57.0, 2.5, 160.0, 0.6, "200K", false, false, false),
+        ("h", "minimax", 60.0, 55.0, 78.0, 50.0, 0.3, 230.0, 0.4, "128K", true, false, true),
+        ("i", "deepseek", 57.0, 52.0, 70.0, 46.0, 0.2, 300.0, 0.3, "64K", true, false, true),
+        ("j", "qwen", 55.0, 50.0, 68.0, 44.0, 0.9, 75.0, 1.5, "1M", false, true, true),
+        ("k", "kimi", 52.0, 46.0, 64.0, 40.0, 0.15, 260.0, 0.3, "32K", true, false, true),
+        ("l", "minimax", 49.0, 44.0, 58.0, 37.0, 0.1, 340.0, 0.2, "32K", true, false, true),
+    ];
+    for (i, (id, vendor, iq, code, math, agent, price, speed, latency, ctx, open, reasoning, cn)) in models.into_iter().enumerate() {
+        let name = format!("模型 {}", id.to_uppercase());
+        v.push(("model", id, i as i32, 0, json!({
+            "name": name, "vendor": vendor, "iq": iq, "code": code, "math": math, "agent": agent, "price": price,
+            "speed": speed, "latency": latency, "context": ctx, "open": open, "reasoning": reasoning, "cn": cn,
         })));
     }
-    v.push(("repo_issue", "1", 0, json!({
-        "issue_no": 1, "week_start": "示例", "week_end": "示例", "total_gain": 12345, "wow_pct": 0.0,
-        "daily_gain": [1200, 1500, 1800, 2100, 2000, 1900, 1845],
+    // 开源热榜第 42 期：(仓库, 简介, 语言, 语言色, 总 star, 周新增, 趋势, 图标, 底色)
+    v.push(("repo_issue", "42", 0, 0, json!({
+        "issue_no": 42, "week_start": "10.23", "week_end": "10.29", "total_gain": 86420, "wow_pct": 12.0,
+        "daily_gain": [62, 70, 58, 76, 88, 94, 100],
         "ranks": [
-            { "full_name": "example-org/project-a", "description": "示例项目 A", "language": "TypeScript", "language_color": "#3178C6", "star_total": 12400, "star_gain": 3214, "spark": [300, 380, 450, 500, 520, 540, 524] },
-            { "full_name": "example-org/project-b", "description": "示例项目 B", "language": "Python", "language_color": "#3572A5", "star_total": 8700, "star_gain": 2100, "spark": [200, 260, 300, 330, 340, 350, 320] },
-            { "full_name": "example-org/project-c", "description": "示例项目 C", "language": "Rust", "language_color": "#DEA584", "star_total": 5100, "star_gain": 1500, "spark": [150, 180, 210, 230, 250, 240, 240] }
+            { "full_name": "example/agent-shell", "description": "把终端里反复敲的命令，变成一句话就能调用的小工具。", "language": "Rust", "language_color": "#D9A07A", "star_total": 12400, "star_gain": 3214, "spark": [30, 42, 50, 61, 70, 86, 100], "icon": "term", "tint": "#E8EEF8" },
+            { "full_name": "example/calendar-mcp", "description": "让助手直接读写日历和待办，不用再来回复制粘贴。", "language": "TypeScript", "language_color": "#5B8DD6", "star_total": 8100, "star_gain": 2876, "spark": [55, 40, 62, 58, 80, 74, 92], "icon": "code", "tint": "#E6F4EA" },
+            { "full_name": "example/whiteboard-ocr", "description": "手机拍一张白板照片，几秒转成可编辑的表格。", "language": "Python", "language_color": "#E8C547", "star_total": 5600, "star_gain": 2105, "spark": [20, 26, 40, 66, 90, 84, 78], "icon": "doc", "tint": "#FDE4E1" },
+            { "full_name": "example/page-rag", "description": "给长文档做段落级检索，回答时标出依据的页码。", "language": "Python", "language_color": "#E8C547", "star_total": 3900, "star_gain": 1642, "spark": [60, 64, 58, 70, 66, 72, 80], "icon": "doc", "tint": "#F1ECE4" },
+            { "full_name": "example/offline-asr", "description": "在本机离线运行的语音转文字，不上传录音。", "language": "C++", "language_color": "#C27BA0", "star_total": 9700, "star_gain": 1398, "spark": [80, 70, 72, 60, 64, 70, 76], "icon": "mic", "tint": "#EDE7F6" },
+            { "full_name": "example/web-replay", "description": "把常用网页操作录成可重复运行的自动化流程。", "language": "TypeScript", "language_color": "#5B8DD6", "star_total": 2200, "star_gain": 1120, "spark": [10, 18, 30, 44, 52, 70, 88], "icon": "bolt", "tint": "#E8EEF8" }
         ]
     })));
-    for (i, (group, name, vendor, url, c, t)) in [
-        ("海外", "Claude", "Anthropic", "https://claude.ai/", "#D97757", "#FBE9E1"),
-        ("海外", "ChatGPT", "OpenAI", "https://chatgpt.com/", "#10A37F", "#DDF3EC"),
-        ("海外", "Gemini", "Google", "https://gemini.google.com/", "#4285F4", "#E4EEFF"),
-        ("国产", "DeepSeek", "深度求索", "https://chat.deepseek.com/", "#4D6BFE", "#E6EBFF"),
-        ("国产", "Kimi", "月之暗面", "https://www.kimi.com/", "#222222", "#E8E8E8"),
-        ("国产", "豆包", "字节跳动", "https://www.doubao.com/", "#2F6BFF", "#E4ECFF"),
-        ("国产", "通义", "阿里云", "https://tongyi.aliyun.com/", "#615CED", "#EAE9FD"),
-        ("国产", "智谱清言", "智谱 AI", "https://chatglm.cn/", "#3D5AFE", "#E6EAFF"),
+    // AI 工具：设计稿里的 5 个。版本号和日期是示例，CC Switch 的详情页内容取自稿子。
+    let gh = "https://github.com/farion1231/cc-switch/releases";
+    v.push(("tool", "claude-code", 0, 0, json!({
+        "name": "Claude Code Desktop", "developer": "Anthropic", "type_label": "桌面应用", "license": "closed", "platforms": ["Windows", "macOS"],
+        "description": "Anthropic 官方的编程助手桌面版。",
+        "releases": [{ "version": "示例版本", "date": "10 月 26 日", "items": [] }]
+    })));
+    v.push(("tool", "chatgpt-desktop", 1, 0, json!({
+        "name": "ChatGPT Desktop", "developer": "OpenAI", "type_label": "桌面应用", "license": "closed", "platforms": ["Windows", "macOS"],
+        "description": "OpenAI 官方的 ChatGPT 桌面版。",
+        "releases": [{ "version": "示例版本", "date": "10 月 24 日", "items": [] }]
+    })));
+    v.push(("tool", "opencode", 2, 0, json!({
+        "name": "OpenCode", "developer": "开源社区", "type_label": "命令行工具", "license": "open", "platforms": ["Windows", "macOS", "Linux"],
+        "description": "开源的终端编程助手。",
+        "releases": [{ "version": "示例版本", "date": "10 月 22 日", "items": [] }]
+    })));
+    v.push(("tool", "cc-switch", 3, 0, json!({
+        "name": "CC Switch", "developer": "开源社区", "type_label": "桌面应用", "license": "open", "platforms": ["Windows", "macOS", "Linux"],
+        "description": "在 Claude Code、Codex 等编程工具之间切换服务商配置，不用手改配置文件。",
+        "homepage_url": "https://github.com/farion1231/cc-switch", "discussion_tag": "cc-switch",
+        "releases": [
+            { "version": "v3.5.0", "date": "10 月 20 日", "items": [{ "kind": "new", "text": "支持 Codex 配置一键切换" }, { "kind": "improve", "text": "切换后自动重启终端里的会话" }, { "kind": "fix", "text": "macOS 上托盘图标偶尔不显示" }] },
+            { "version": "v3.4.2", "date": "10 月 8 日", "items": [{ "kind": "fix", "text": "导入配置时中文路径报错" }, { "kind": "improve", "text": "启动速度提升约 30%" }] },
+            { "version": "v3.4.0", "date": "9 月 26 日", "items": [{ "kind": "new", "text": "配置分组和搜索" }, { "kind": "new", "text": "深色模式" }] }
+        ],
+        "artifacts": [
+            { "os": "windows", "desc": ".msi 安装包", "size": 12582912, "github_url": gh },
+            { "os": "macos", "desc": ".dmg（Apple 芯片 / Intel）", "size": 14680064, "github_url": gh },
+            { "os": "linux", "desc": ".AppImage / .deb", "size": 16777216, "github_url": gh }
+        ]
+    })));
+    v.push(("tool", "deepseek-harness", 4, 0, json!({
+        "name": "DeepSeek harness", "developer": "深度求索", "type_label": "命令行工具", "license": "unknown", "platforms": [],
+        "description": "许可证还在核实，核实后再标注。"
+    })));
+    for (i, (key, group, name, vendor, url, c, t)) in [
+        ("claude", "海外", "Claude", "Anthropic", "https://claude.ai/", "#D97757", "#FBEFEA"),
+        ("chatgpt", "海外", "ChatGPT", "OpenAI", "https://chatgpt.com/", "#222222", "#FFFFFF"),
+        ("gemini", "海外", "Gemini", "Google", "https://gemini.google.com/", "#1A73E8", "#E8F0FE"),
+        ("deepseek", "国产", "DeepSeek", "深度求索", "https://chat.deepseek.com/", "#5786FE", "#EEF2FF"),
+        ("kimi", "国产", "Kimi", "月之暗面", "https://www.kimi.com/", "#111111", "#F0F0F0"),
+        ("doubao", "国产", "豆包", "字节跳动", "https://www.doubao.com/", "#3C8CFF", "#E8F1FF"),
+        ("tongyi", "国产", "通义", "阿里云", "https://tongyi.aliyun.com/", "#6950EF", "#EFECFD"),
+        ("chatglm", "国产", "智谱清言", "智谱", "https://chatglm.cn/", "#2D2D2D", "#F0F0F0"),
     ]
     .into_iter()
     .enumerate()
     {
-        let key: &'static str = ["claude", "chatgpt", "gemini", "deepseek", "kimi", "doubao", "tongyi", "chatglm"][i];
-        v.push(("nav", key, i as i32, json!({ "group": group, "name": name, "vendor": vendor, "url": url, "brand_color": c, "tint": t })));
+        v.push(("nav", key, i as i32, 0, json!({ "group": group, "name": name, "vendor": vendor, "url": url, "brand_color": c, "tint": t })));
     }
     for (i, (key, product, title, sub, label, url)) in [
-        ("claude-code", "Claude", "Claude Code 文档", "安装、配置和常用命令", "guide", "https://docs.claude.com/"),
-        ("codex", "Codex", "Codex 文档", "命令行与云端任务", "guide", "https://developers.openai.com/codex"),
+        ("claude-code", "Claude", "Claude Code 上手导读", "10 分钟读完", "guide", "https://docs.claude.com/"),
+        ("claude-skills", "Claude", "技能（Skills）怎么写", "附示例仓库", "guide", "https://docs.claude.com/"),
+        ("codex-start", "Codex", "Codex 命令行快速开始", "安装、登录、第一个任务", "guide", "https://developers.openai.com/codex"),
+        ("codex-quota", "Codex", "额度和计费说明", "官方页面索引", "index", "https://developers.openai.com/codex"),
+        ("skillhub-publish", "SkillHub", "如何发布一个技能", "从打包到审核", "guide", site),
     ]
     .into_iter()
     .enumerate()
     {
-        v.push(("doc", key, i as i32, json!({ "product": product, "title": title, "subtitle": sub, "label": label, "url": url })));
+        v.push(("doc", key, i as i32, 0, json!({ "product": product, "title": title, "subtitle": sub, "label": label, "url": url })));
+    }
+    for (i, (key, text, tag)) in [
+        ("w1", "桌面特效", "热"), ("w2", "番茄时钟", ""), ("w3", "周报", ""), ("w4", "MCP", "新"),
+        ("w5", "整理下载文件夹", ""), ("w6", "动态壁纸", ""), ("w7", "本周周刊", ""), ("w8", "小游戏", ""),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        v.push(("hotword", key, i as i32, 0, json!({ "text": text, "tag": tag })));
     }
     v
 }
@@ -628,7 +744,7 @@ mod tests {
 
     #[test]
     fn every_seed_item_is_valid() {
-        for (kind, key, _, data) in seed_items() {
+        for (kind, key, _, _, data) in seed_items() {
             assert!(valid_key(key), "{kind}/{key}");
             validate(kind, data).unwrap_or_else(|e| panic!("{kind}/{key}: {e}"));
         }
