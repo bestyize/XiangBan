@@ -55,6 +55,19 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     // ── 发现页 ──
     suspend fun home(): HomeBundle = get("/api/discover/home/v2")
     suspend fun dailyNews(page: Int = 1): Page<NewsItem> = get("/api/discover/daily${query("page" to page)}")
+    suspend fun news(key: String): NewsItem = get("/api/discover/daily/${key.encodeURLParameter()}")
+    suspend fun newsComments(key: String, page: Int = 1): Page<NewsComment> = get("/api/discover/daily/${key.encodeURLParameter()}/comments${query("page" to page)}")
+    suspend fun commentNews(key: String, body: String, replyTo: Long? = null) {
+        write(HttpMethod.Post, "/api/discover/daily/${key.encodeURLParameter()}/comments", buildJsonObject {
+            put("body", body); if (replyTo != null) put("reply_to", replyTo)
+        })
+    }
+    suspend fun likeNewsComment(key: String, id: Long, liked: Boolean) {
+        write(if (liked) HttpMethod.Put else HttpMethod.Delete, "/api/discover/daily/${key.encodeURLParameter()}/comments/$id/like")
+    }
+    suspend fun deleteNewsComment(key: String, id: Long) {
+        write(HttpMethod.Delete, "/api/discover/daily/${key.encodeURLParameter()}/comments/$id")
+    }
     suspend fun repoIssue(issue: String? = null): RepoIssue = get("/api/discover/repos/v2${query("issue" to issue)}")
     suspend fun repoIssues(): RepoIssueList = get("/api/discover/repos/issues/v2")
     suspend fun modelBoard(): ModelBoard = get("/api/discover/models")

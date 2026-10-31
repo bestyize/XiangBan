@@ -1020,6 +1020,23 @@ CREATE TABLE IF NOT EXISTS discover_items (
 );
 CREATE INDEX IF NOT EXISTS discover_items_order_idx ON discover_items (kind, status, sort_order, published_at DESC);
 
+CREATE TABLE IF NOT EXISTS discover_news_comments (
+    id BIGSERIAL PRIMARY KEY,
+    news_key TEXT NOT NULL,
+    author_uid UUID NOT NULL REFERENCES users(uid),
+    reply_to BIGINT REFERENCES discover_news_comments(id),
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'normal' CHECK (status IN ('normal', 'hidden', 'deleted')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS discover_news_comments_page_idx ON discover_news_comments (news_key, id);
+CREATE INDEX IF NOT EXISTS discover_news_comments_author_idx ON discover_news_comments (author_uid, created_at DESC);
+CREATE TABLE IF NOT EXISTS discover_news_comment_likes (
+    comment_id BIGINT NOT NULL REFERENCES discover_news_comments(id) ON DELETE CASCADE,
+    uid UUID NOT NULL REFERENCES users(uid),
+    PRIMARY KEY (comment_id, uid)
+);
+
 -- 编辑副本与线上条目分离；审核绑定 revision，修改会撤销定时发布。
 CREATE SEQUENCE IF NOT EXISTS discover_draft_revision_seq;
 CREATE TABLE IF NOT EXISTS discover_drafts (

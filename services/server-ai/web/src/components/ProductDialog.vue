@@ -72,8 +72,8 @@ async function submit() {
       </div>
       <div class="field">
         <label for="p-clients">关联的客户端</label>
-        <textarea id="p-clients" v-model="clients" class="textarea mono" placeholder="xiangban-wallpaper-web&#10;xiaoban-desktop-wallpaper&#10;xiaoban-mobile-wallpaper"></textarea>
-        <span class="hint">每行一个账号中心的应用标识。同一个产品的各端共用一份余额；一个客户端只能属于一个产品。</span>
+        <textarea id="p-clients" v-model="clients" class="textarea mono" placeholder="xiaoban-desktop-wallpaper&#10;xiaoban-android"></textarea>
+        <span class="hint">每行一个账号中心的应用标识。小伴电脑和手机须关联到同一个产品，共享试用、余额及兑换额度；一个客户端只能属于一个产品。</span>
       </div>
 
       <div class="pair">

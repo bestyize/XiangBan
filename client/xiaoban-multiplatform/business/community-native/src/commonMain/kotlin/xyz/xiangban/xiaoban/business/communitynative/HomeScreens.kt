@@ -155,7 +155,7 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
                     }
                 }
                 if (home.news.items.isEmpty()) item { WhiteCard { Text("今天还没有日报", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-                items(home.news.items, key = { "n-${it.key}" }) { NewsRow(it) { env.platform?.openUrl(it.url) } }
+                items(home.news.items, key = { "n-${it.key}" }) { NewsRow(it) { open(Route.News(it.key)) } }
                 if (home.featured.isNotEmpty()) item {
                     WhiteCard(padding = 0.dp) {
                         Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -237,25 +237,20 @@ private fun BannerCarousel(banners: List<HomeBanner>, onClick: (HomeBanner) -> U
     }
 }
 
-/** 日报一行：白底圆角卡，左边 96×72 缩略图，右边两行标题，底下来源小圆点和「来源 · 时间」。 */
+/** 日报图文封面卡。没有封面时使用主题色生成占位。 */
 @Composable
 internal fun NewsRow(item: NewsItem, onClick: () -> Unit) {
     val accent = hexColor(item.accent, Color(0xFF9FBFCF))
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(12.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        if (item.coverUrl.isNotEmpty()) Cover(item.coverUrl, item.key.hashCode().toLong() and 0x7fffffff, Modifier.size(width = 96.dp, height = 72.dp))
-        else Box(Modifier.size(width = 96.dp, height = 72.dp).clip(RoundedCornerShape(8.dp)).background(Brush.linearGradient(listOf(lerp(accent, Color.Black, 0.35f), accent)))) {
-            Canvas(Modifier.fillMaxSize()) { drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = 0.5f), Color.Transparent), center = Offset(size.width * 0.5f, size.height * 0.3f), radius = 40.dp.toPx()), radius = 40.dp.toPx(), center = Offset(size.width * 0.5f, size.height * 0.3f)) }
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
+        if (item.coverUrl.isNotEmpty()) Cover(item.coverUrl, item.key.hashCode().toLong() and 0x7fffffff, Modifier.fillMaxWidth().height(156.dp))
+        else Box(Modifier.fillMaxWidth().height(116.dp).background(Brush.linearGradient(listOf(lerp(accent, Color.Black, 0.48f), accent))), contentAlignment = Alignment.BottomStart) {
+            Text("AI  ·  DAILY", Modifier.padding(18.dp), color = Color.White.copy(alpha = .9f), fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 13.sp)
         }
-        Column(Modifier.weight(1f).height(72.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 22.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Dot(accent, 16.dp)
-                val time = agoText(item.sourcePublishedAt ?: item.publishedAt)
-                Text(listOf(item.source, if (item.timeBasis == "collected") "采集于 $time" else time).filter { it.isNotEmpty() }.joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(item.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 26.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            if (item.summary.isNotBlank()) Text(item.summary, fontSize = 13.sp, lineHeight = 20.sp, color = LocalExtraColors.current.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val time = agoText(item.sourcePublishedAt ?: item.publishedAt)
+            Text(listOf(item.source, if (item.timeBasis == "collected") "采集于 $time" else time).filter { it.isNotEmpty() }.joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
         }
     }
 }
@@ -569,7 +564,7 @@ internal fun NavTab(env: CommunityEnv) {
 // ───────────── 往期日报 ─────────────
 
 @Composable
-fun DailyScreen(env: CommunityEnv, back: () -> Unit) {
+fun DailyScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
     var items by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var page by remember { mutableStateOf(0) }
@@ -599,7 +594,7 @@ fun DailyScreen(env: CommunityEnv, back: () -> Unit) {
     Column(Modifier.fillMaxSize()) {
         ScreenBar("AI 日报", onBack = back)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(Gap)) {
-            items(items, key = { it.key }) { n -> NewsRow(n) { env.platform?.openUrl(n.url) } }
+            items(items, key = { it.key }) { n -> NewsRow(n) { open(Route.News(n.key)) } }
             item {
                 when {
                     error != null -> Text("加载失败，点这里重试", Modifier.fillMaxWidth().clickable { error = null; retry += 1 }.padding(16.dp), color = Danger, fontSize = 14.sp)

@@ -24,6 +24,7 @@ sealed interface Route {
     data class Tool(val key: String) : Route
     /** 往期 AI 日报。 */
     data object Daily : Route
+    data class News(val key: String) : Route
     /** 模型天梯。 */
     data object Leaderboard : Route
     /** OpenRouter 调用量 Top 50 与历史完整日榜。 */
@@ -66,6 +67,7 @@ sealed interface Route {
         is Project -> "project:$slug"
         is Tool -> "tool:$key"
         Daily -> "daily"
+        is News -> "news:${key.encodeURLParameter()}"
         Leaderboard -> "leaderboard"
         UsageLeaderboard -> "usage-leaderboard"
         Scatter -> "scatter"
@@ -105,6 +107,7 @@ sealed interface Route {
                 "project" -> value.takeIf { it.isNotEmpty() }?.let(::Project)
                 "tool" -> value.takeIf { it.isNotEmpty() }?.let(::Tool)
                 "daily" -> Daily
+                "news" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::News) }.getOrNull()
                 "leaderboard" -> Leaderboard
                 "usage-leaderboard" -> UsageLeaderboard
                 "scatter" -> Scatter

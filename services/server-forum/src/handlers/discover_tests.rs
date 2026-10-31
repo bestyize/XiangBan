@@ -97,6 +97,41 @@ impl Harness {
 }
 
 #[tokio::test]
+async fn news_article_and_comments_are_published_scoped_and_moderated() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    let payload = json!({"data":{"title":"站内文章","source":"官方","url":"https://example.com/news",
+        "summary":"摘要","body":"## 小标题\n\n正文 ![配图](https://example.com/image.png)\n\n<script>alert(1)</script>"}});
+    assert_eq!(call(&h.app, "PUT", "/api/admin/discover/news/article-test", Some(&h.admin_t), payload).await.0, StatusCode::OK);
+    let (status, detail) = call(&h.app, "GET", "/api/discover/daily/article-test", None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    let html = detail["body_html"].as_str().unwrap();
+    assert!(html.contains("<h2>") && html.contains("<img") && !html.contains("<script"), "{html}");
+    let (_, listing) = call(&h.app, "GET", "/api/discover/daily", None, Value::Null).await;
+    assert!(listing["items"].as_array().unwrap().iter().all(|v| v.get("body").is_none()));
+
+    let path = "/api/discover/daily/article-test/comments";
+    assert_eq!(call(&h.app, "POST", path, None, json!({"body":"留言"})).await.0, StatusCode::UNAUTHORIZED);
+    let author = h.member().await?;
+    let other = h.member().await?;
+    let (status, created) = call(&h.app, "POST", path, Some(&author), json!({"body":"第一条留言"})).await;
+    assert_eq!(status, StatusCode::OK, "{created}");
+    let id = created["id"].as_i64().unwrap();
+    assert_eq!(call(&h.app, "POST", path, Some(&author), json!({"body":"太快了"})).await.0, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(call(&h.app, "POST", path, Some(&other), json!({"body":"回复留言","reply_to":id})).await.0, StatusCode::OK);
+    assert_eq!(call(&h.app, "PUT", &format!("{path}/{id}/like"), Some(&other), json!({})).await.0, StatusCode::OK);
+    let (_, comments) = call(&h.app, "GET", path, Some(&other), Value::Null).await;
+    assert_eq!(comments["total"], 2);
+    assert_eq!(comments["items"][1]["like_count"], 1);
+    assert_eq!(comments["items"][1]["liked"], true);
+    assert_eq!(comments["items"][0]["reply_to"], id);
+    assert_eq!(call(&h.app, "DELETE", &format!("{path}/{id}"), Some(&other), json!({})).await.0, StatusCode::NOT_FOUND);
+    assert_eq!(call(&h.app, "DELETE", &format!("{path}/{id}"), Some(&author), json!({})).await.0, StatusCode::OK);
+    sqlx::query("UPDATE discover_items SET status='draft' WHERE kind='news' AND key='article-test'").execute(&h.pool).await?;
+    assert_eq!(call(&h.app, "GET", path, None, Value::Null).await.0, StatusCode::NOT_FOUND);
+    h.finish().await
+}
+
+#[tokio::test]
 async fn discover_pages_read_seeded_and_admin_edited_items() -> Result<(), Box<dyn std::error::Error>> {
     let Some(h) = harness().await? else { return Ok(()) };
     let app = &h.app;
