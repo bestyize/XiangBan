@@ -1,0 +1,202 @@
+[
+  {
+    "file": "community-20261031-casual-fun-01.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-fun-01",
+    "title": "想试运输经营游戏，可以从 OpenTTD 的一条线路开始",
+    "category": "casual-fun",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-fun-02.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-fun-02",
+    "title": "在 Lichess 做一盘慢棋练习：先解释选择，再看分析",
+    "category": "casual-fun",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-fun-03.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-fun-03",
+    "title": "想找轻松的开源竞速游戏，可以看看 SuperTuxKart 官方入口",
+    "category": "casual-fun",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-fun-04.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-fun-04",
+    "title": "不出远门的主题散步：选一个观察对象就够了",
+    "category": "casual-fun",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-fun-05.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-fun-05",
+    "title": "给朋友组织一次轻量游戏聚会：先确认规则和结束时间",
+    "category": "casual-fun",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-help-01.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-help-01",
+    "title": "求助帖怎么让别人接得住：把问题缩成最小可复现步骤",
+    "category": "casual-help",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-help-02.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-help-02",
+    "title": "帮朋友整理电脑前，先确认哪些东西不能动",
+    "category": "casual-help",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-help-03.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-help-03",
+    "title": "看不懂官方文档时，可以带着哪三个问题来问",
+    "category": "casual-help",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-help-04.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-help-04",
+    "title": "一起维护一份共享清单：先约定字段和谁来确认",
+    "category": "casual-help",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-help-05.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-help-05",
+    "title": "别人来求助时，先确认他想要建议、资料还是一起排查",
+    "category": "casual-help",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-indie-01.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-indie-01",
+    "title": "独立开发的第一个演示，只需要证明一条完整路径",
+    "category": "casual-indie",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-indie-02.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-indie-02",
+    "title": "收到“这里不好用”以后，怎样把反馈变成可验证的小任务",
+    "category": "casual-indie",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-indie-03.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-indie-03",
+    "title": "开源仓库要补哪些说明：许可证不能由“代码公开”代替",
+    "category": "casual-indie",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-indie-04.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-indie-04",
+    "title": "发布前留一张版本卡：以后排错才知道用户拿到了什么",
+    "category": "casual-indie",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-indie-05.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-indie-05",
+    "title": "给个人项目划维护边界：功能之外还要考虑恢复与交接",
+    "category": "casual-indie",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-media-01.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-media-01",
+    "title": "重看《摩登时代》时，可以先观察动作怎样变成节奏",
+    "category": "casual-media",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-media-02.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-media-02",
+    "title": "《十二怒汉》的讨论笔记：把证据、推断和态度分开记录",
+    "category": "casual-media",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-media-03.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-media-03",
+    "title": "一份不剧透的片单，除了评分还可以告诉读者什么",
+    "category": "casual-media",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-media-04.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-media-04",
+    "title": "乐评从一个可听见的变化开始：别让形容词代替描述",
+    "category": "casual-media",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-media-05.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-media-05",
+    "title": "原声版、现场版与改编版怎样比较：先固定同一个观察问题",
+    "category": "casual-media",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-think-01.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-think-01",
+    "title": "一句话里哪些是事实，哪些是评价？从日常讨论做个小练习",
+    "category": "casual-think",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-think-02.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-think-02",
+    "title": "选择更多就一定更自由吗？先区分拥有选项与能够行动",
+    "category": "casual-think",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-think-03.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-think-03",
+    "title": "AI 参与创作以后，责任应该跟着哪一个决定走",
+    "category": "casual-think",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-think-04.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-think-04",
+    "title": "一份数字副本还是“同一个东西”吗？从文件备份谈起",
+    "category": "casual-think",
+    "image_count": 0
+  },
+  {
+    "file": "community-20261031-casual-think-05.md",
+    "ok": true,
+    "external_id": "community-20261031-casual-think-05",
+    "title": "效率提高以后省下的时间，要不要继续被填满",
+    "category": "casual-think",
+    "image_count": 0
+  }
+]

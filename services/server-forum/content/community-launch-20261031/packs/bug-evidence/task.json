@@ -1,0 +1,44 @@
+{
+  "templateVersion": 1,
+  "title": "缺陷复现证据袋",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "提交缺陷之前",
+  "boundary": "不含真实用户数据",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "记录产品版本、系统和可公开的运行环境",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "用最少步骤从一个确定的初始状态开始复现",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "分别写期望结果与实际结果，不混入修复猜测",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "附经过脱敏的截图或日志文件名",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "在干净状态重复一次，标记发生频率及临时绕法",
+      "done": false
+    }
+  ],
+  "record": {
+    "环境": null,
+    "初始状态": null,
+    "复现步骤": null,
+    "期望": null,
+    "实际": null,
+    "频率": null,
+    "附件": null
+  }
+}

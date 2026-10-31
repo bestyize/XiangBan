@@ -1,0 +1,48 @@
+{
+  "templateVersion": 1,
+  "title": "屏幕间歇提醒文案包",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "自行安排的工作间隙",
+  "boundary": "不含自动定时",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "先选择工作日内允许提醒的时段",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "按自己的习惯决定间隔，不把示例当作健康处方",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "在系统提醒工具中手工录入一条文案",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "设置会议、演示和专注时段静音",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "试用一天后调整频率，删除让自己分心的提醒",
+      "done": false
+    }
+  ],
+  "record": {
+    "提醒标题": null,
+    "温和文案": null,
+    "建议触发": null,
+    "静音场景": null,
+    "试用记录": null
+  },
+  "schedule": {
+    "enabled": false,
+    "timezone": "local",
+    "configure_manually": true,
+    "time": null
+  }
+}

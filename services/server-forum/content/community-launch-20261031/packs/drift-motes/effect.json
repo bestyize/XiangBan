@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "id": "drift-motes",
+  "name": "浮光微尘",
+  "description": "少量青绿光点在桌面缓缓游荡，保留大面积留白。",
+  "sky": [
+    "#0d2426",
+    "#1d3f42"
+  ],
+  "layers": [
+    {
+      "count": 65,
+      "shape": {
+        "kind": "glow",
+        "core": 0.17
+      },
+      "size": [
+        5,
+        17
+      ],
+      "speed": [
+        1,
+        5
+      ],
+      "direction": 260,
+      "wander": {
+        "amplitude": [
+          7,
+          18
+        ],
+        "frequency": [
+          0.06,
+          0.18
+        ]
+      },
+      "twinkle": {
+        "rate": [
+          0.15,
+          0.5
+        ],
+        "depth": 0.75
+      },
+      "alpha": [
+        0.2,
+        0.75
+      ],
+      "blend": "add",
+      "colors": [
+        [
+          "#d7f5bf",
+          "#6ab995"
+        ],
+        [
+          "#a4ebe7",
+          "#458e9c"
+        ]
+      ]
+    }
+  ]
+}

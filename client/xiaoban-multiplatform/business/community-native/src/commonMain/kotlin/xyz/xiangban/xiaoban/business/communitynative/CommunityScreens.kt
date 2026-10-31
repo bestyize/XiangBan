@@ -59,9 +59,9 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
         Column(Modifier.fillMaxSize()) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
-                CommunitySection.Home -> TabStrip(HomeSub.entries.map { it.key to it.label }, homeSub) { homeSub = it }
-                CommunitySection.Discuss -> TabStrip(DiscussSub.entries.map { it.key to it.label }, discussSub) { discussSub = it }
-                CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, resourceSub) { resourceSub = it }
+                CommunitySection.Home -> TabStrip(HomeSub.entries.map { it.key to it.label }, homeSub, centered = true) { homeSub = it }
+                CommunitySection.Discuss -> TabStrip(DiscussSub.entries.map { it.key to it.label }, discussSub, centered = true) { discussSub = it }
+                CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, resourceSub, centered = true) { resourceSub = it }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (current) {

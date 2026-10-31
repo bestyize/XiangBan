@@ -1,0 +1,86 @@
+{
+  "templateVersion": 1,
+  "title": "反馈到复现手动工作流",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "反馈 → 环境 → 复现 → 缩小 → 交接",
+  "boundary": "不自动访问用户设备",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "收集原始反馈，去掉不应共享的身份信息",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "确认版本、起始状态与最短步骤",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "在自己的授权环境中复现并保存证据",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "缩小触发条件，分开已知与猜测",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "写交接报告，列出待验证项与临时绕法",
+      "done": false
+    }
+  ],
+  "record": {
+    "输入": null,
+    "阶段产物": null,
+    "验收": null,
+    "停止条件": null
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "label": "收集原始反馈，去掉不应共享的身份信息",
+      "depends_on": [],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n2",
+      "label": "确认版本、起始状态与最短步骤",
+      "depends_on": [
+        "n1"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n3",
+      "label": "在自己的授权环境中复现并保存证据",
+      "depends_on": [
+        "n2"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n4",
+      "label": "缩小触发条件，分开已知与猜测",
+      "depends_on": [
+        "n3"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n5",
+      "label": "写交接报告，列出待验证项与临时绕法",
+      "depends_on": [
+        "n4"
+      ],
+      "status": "not_started",
+      "evidence": null
+    }
+  ]
+}

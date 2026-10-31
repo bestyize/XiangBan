@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "effect",
+  "id": "blue-hour-trails",
+  "name": "蓝调细雨",
+  "version": "1.0.0",
+  "description": "稀疏银蓝短线斜落，避免高密度遮挡桌面文字。",
+  "author": "小伴社区原创作品",
+  "license": "MIT"
+}

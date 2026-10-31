@@ -195,10 +195,11 @@ async fn github_observation_needs_eight_boundaries_for_seven_days_and_never_fill
     let mut repos = BTreeMap::new();
     repos.insert(1, repo(1, "owner/project", 100));
     save_snapshot(&h.pool, &repos[&1], now).await?;
-    assert!(
-        build_issue(&h.pool, &repos, now).await?.is_empty(),
-        "first successful observation is only a baseline"
-    );
+    let first = build_issue(&h.pool, &repos, now).await?;
+    assert_eq!(first[0].data["metric"], "star total baseline");
+    assert!(first[0].data["total_gain"].is_null());
+    assert!(first[0].data["ranks"][0]["star_gain"].is_null());
+    assert_eq!(first[0].data["daily_gain"], json!([]));
     for ago in 1..=6 {
         save_snapshot(
             &h.pool,
@@ -275,18 +276,9 @@ async fn github_rename_keeps_identity_and_partial_failures_preserve_only_real_pr
         wire(42, "owner/original", 100),
     )])
     .await;
-    assert!(collect_at(
-        &h.pool,
-        "test-token",
-        &http,
-        &config,
-        run,
-        &api,
-        at - Duration::days(1)
-    )
-    .await
-    .unwrap()
-    .is_empty());
+    let first = collect_at(&h.pool, "test-token", &http, &config, run, &api, at - Duration::days(1)).await.unwrap();
+    assert_eq!(first[0].data["metric"], "star total baseline");
+    assert!(first[0].data["total_gain"].is_null());
     server.await?;
     // A new canonical name for the same numeric ID retains the old baseline.
     let (api, server) = mock(vec![(
@@ -436,4 +428,58 @@ async fn github_flags_negative_and_unusual_growth_without_manufacturing_daily_hi
     assert_eq!(data["ranks"][1]["star_gain"], -20);
     h.close().await?;
     Ok(())
+}
+
+#[tokio::test]
+async fn github_single_day_publishes_real_baselines_and_rejects_fake_zero_growth() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else { return Ok(()); };
+    let at = now();
+    let mut repos = BTreeMap::new();
+    for id in 1..=5 {
+        let item = repo(id, &format!("owner/repo{id}"), id * 100);
+        save_snapshot(&h.pool, &item, at).await?;
+        repos.insert(id, item);
+    }
+    let output = build_issue(&h.pool, &repos, at).await?;
+    let baseline = &output[0].data;
+    assert_eq!(baseline["observed_days"], 0);
+    assert_eq!(baseline["metric"], "star total baseline");
+    assert_eq!(baseline["complete"], false);
+    assert!(baseline["total_gain"].is_null());
+    assert_eq!(baseline["ranks"].as_array().unwrap().len(), 5);
+    assert_eq!(baseline["ranks"][0]["star_total"], 500);
+    assert_eq!(baseline["ranks"][4]["star_total"], 100);
+    for rank in baseline["ranks"].as_array().unwrap() {
+        assert!(rank["star_gain"].is_null());
+        assert_eq!(rank["spark"].as_array().unwrap().len(), 1);
+        assert_eq!(rank["snapshot_times"][0], at.to_rfc3339());
+    }
+    for mutation in 0..5 {
+        let mut wrong = baseline.clone();
+        match mutation {
+            0 => wrong["total_gain"] = json!(0),
+            1 => wrong["ranks"][0]["star_gain"] = json!(0),
+            2 => wrong["metric"] = json!("observed net star change"),
+            3 => wrong["ranks"].as_array_mut().unwrap().swap(0, 1),
+            _ => wrong["complete"] = json!(true),
+        }
+        assert!(validate_issue(wrong).is_err());
+    }
+    // Once a second actual boundary exists, the same data becomes a real net-change observation.
+    for id in 1..=5 { save_snapshot(&h.pool, &repo(id, &format!("owner/repo{id}"), id * 100 - 10), at - Duration::days(1)).await?; }
+    let next = build_issue(&h.pool, &repos, at).await?;
+    assert_eq!(next[0].data["metric"], "observed net star change");
+    assert_eq!(next[0].data["total_gain"], 50);
+    h.close().await?;
+    Ok(())
+}
+
+#[test]
+fn reviewed_production_baseline_retains_eight_exact_observations() {
+    let value:Value=serde_json::from_str(include_str!("../../content/community-launch-20261031/research/repo-baseline-2026-10-31.json")).unwrap();
+    let checked=crate::discover::validate("repo_issue",value).unwrap();
+    assert_eq!(checked["ranks"].as_array().unwrap().len(),8);
+    assert_eq!(checked["ranks"][0]["full_name"],"ollama/ollama");
+    assert_eq!(checked["ranks"][0]["star_total"],185445);
+    assert!(checked["ranks"].as_array().unwrap().iter().all(|r|r["star_gain"].is_null()));
 }

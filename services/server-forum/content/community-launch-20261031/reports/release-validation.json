@@ -1,0 +1,35 @@
+{
+  "validated_on": "2026-11-01",
+  "code_commit": "aee6b5429c1e8a39bf6582767f737376961cc8af",
+  "artifacts": {
+    "forum": {
+      "sha256": "eb1323741adba82dd266ac9a47afbb179fdd598be7e7869330c41e46f09b0765",
+      "size": 11630432
+    },
+    "resource": {
+      "sha256": "731f923e09ce649ba63522bbe69040442e1fde4dd8fe2eb094aaeb98d82a09c0",
+      "size": 4601248
+    },
+    "android": {
+      "sha256": "1fdca875fa5908bed8fcae1602f88a116187d38af820bb13045db69139aec7a5",
+      "size": 83766549
+    }
+  },
+  "deployment": {
+    "resource_health": "https://chat.xiangban.xyz/files/health",
+    "forum": "https://chat.xiangban.xyz",
+    "local_build_then_upload": true,
+    "android_installed": "Xiaomi 14"
+  },
+  "checks": [
+    "content lifecycle: bound active editorial author, admin authentication, public pack versions, duplicate prevention and audit transaction",
+    "weekly source: HTTPS link retained, javascript link omitted",
+    "repo baseline: real 8-row fixture; unknown increments remain null; later daily observations retain measured growth",
+    "tracker: ongoing benefits require official source and eligibility; no invented countdown",
+    "legacy API compatibility: hide unrepresentable rows; v2 preserves precise nullable values",
+    "Android: targeted JVM tests, compilation and debug APK install succeeded",
+    "web: vue-tsc and Vite build passed; published project/weekly/visual pack/manual template pages verified in Chromium",
+    "resource: 55 live ZIP hashes, 55 cover hashes/MIME, byte ranges and unsigned URL rejection passed",
+    "desktop: 5 effect and 5 widget definitions passed actual Rust validators; complete Tauri ZIP import was not executed"
+  ]
+}

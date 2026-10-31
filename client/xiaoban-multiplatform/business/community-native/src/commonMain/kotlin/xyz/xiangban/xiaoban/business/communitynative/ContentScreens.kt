@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -85,9 +86,16 @@ fun Avatar(name: String, size: androidx.compose.ui.unit.Dp = 18.dp, showInitial:
 
 /** 栏目条：白底、文字加红色短下划线，选中的加粗。 */
 @Composable
-fun TabStrip(tabs: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+fun TabStrip(tabs: List<Pair<String, String>>, selected: String, centered: Boolean = false, onSelect: (String) -> Unit) {
+    val scrollState = rememberLazyListState()
+    if (centered) LaunchedEffect(selected, tabs) {
+        val index = tabs.indexOfFirst { it.first == selected }
+        if (index >= 0) scrollState.animateScrollToItem(index)
+    }
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
-        LazyRow(Modifier.fillMaxWidth().height(32.dp), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        LazyRow(Modifier.fillMaxWidth().height(32.dp), state = scrollState, contentPadding = PaddingValues(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(24.dp, if (centered) Alignment.CenterHorizontally else Alignment.Start),
+            verticalAlignment = Alignment.CenterVertically) {
             items(tabs, key = { it.first }) { (key, label) ->
                 val on = key == selected
                 Box(Modifier.fillMaxHeight().clickable { onSelect(key) }, contentAlignment = Alignment.Center) {

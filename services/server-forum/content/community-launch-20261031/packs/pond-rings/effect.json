@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "id": "pond-rings",
+  "name": "夜池回环",
+  "description": "蓝青色水面圆环错落扩散，使用分组涟漪纯数据。",
+  "sky": [
+    "#071d2b",
+    "#113a43"
+  ],
+  "layers": [
+    {
+      "count": 36,
+      "shape": {
+        "kind": "ring",
+        "width": [
+          0.7,
+          1.8
+        ],
+        "aspect": 0.38
+      },
+      "size": [
+        65,
+        155
+      ],
+      "speed": 0,
+      "alpha": [
+        0.25,
+        0.7
+      ],
+      "colors": [
+        [
+          "#5ed0cb",
+          "#b5efe4"
+        ],
+        [
+          "#448cba",
+          "#91d4ed"
+        ]
+      ],
+      "burst": {
+        "duration": [
+          2.8,
+          4.4
+        ],
+        "rest": [
+          2,
+          6
+        ],
+        "x": [
+          0.08,
+          0.92
+        ],
+        "y": [
+          0.15,
+          0.9
+        ],
+        "travel": 0,
+        "group": 3,
+        "stagger": 0.45,
+        "grow": [
+          0.06,
+          1
+        ],
+        "fade": "out"
+      }
+    }
+  ]
+}

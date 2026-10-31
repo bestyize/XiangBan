@@ -53,15 +53,15 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
             .let { CommunityJson.decodeFromJsonElement(serializer<VoteResult>(), it).poll }
 
     // ── 发现页 ──
-    suspend fun home(): HomeBundle = get("/api/discover/home")
+    suspend fun home(): HomeBundle = get("/api/discover/home/v2")
     suspend fun dailyNews(page: Int = 1): Page<NewsItem> = get("/api/discover/daily${query("page" to page)}")
-    suspend fun repoIssue(issue: String? = null): RepoIssue = get("/api/discover/repos${query("issue" to issue)}")
-    suspend fun repoIssues(): RepoIssueList = get("/api/discover/repos/issues")
+    suspend fun repoIssue(issue: String? = null): RepoIssue = get("/api/discover/repos/v2${query("issue" to issue)}")
+    suspend fun repoIssues(): RepoIssueList = get("/api/discover/repos/issues/v2")
     suspend fun modelBoard(): ModelBoard = get("/api/discover/models")
     suspend fun liveModelBoard(): LiveModelBoard = get("/api/discover/models/v2")
     suspend fun modelUsage(date: String? = null): ModelUsageBoard = get("/api/discover/model-usage${query("date" to date)}")
     suspend fun modelUsageDates(): ModelUsageDates = get("/api/discover/model-usage/dates")
-    suspend fun tracker(): Tracker = get("/api/discover/tracker")
+    suspend fun tracker(): Tracker = get("/api/discover/tracker/v2")
     suspend fun navLinks(): NavGroups = get("/api/discover/nav")
     suspend fun hotSearch(): HotWords = get("/api/discover/hot-search")
     suspend fun docs(): DocGroups = get("/api/discover/docs")

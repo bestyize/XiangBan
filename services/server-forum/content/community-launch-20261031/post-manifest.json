@@ -1,0 +1,1570 @@
+{
+  "posts": [
+    {
+      "id": "community-20261031-tech-llm-01",
+      "title": "本地模型第一次验收：先让服务回答，再接入聊天界面",
+      "category": "tech-llm",
+      "tags": [
+        "本地部署",
+        "提示词",
+        "大模型"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-llm-01.md",
+      "cjk": 389,
+      "sources": [
+        "ollama",
+        "ollama-api"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-llm-02",
+      "title": "提示词调试先建十条小样本：把“感觉更好”变成可比较结果",
+      "category": "tech-llm",
+      "tags": [
+        "提示词",
+        "本地部署",
+        "大模型"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-llm-02.md",
+      "cjk": 361,
+      "sources": [
+        "prompt"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-llm-03",
+      "title": "结构化输出不等于数据正确：给模型结果加三层验收",
+      "category": "tech-llm",
+      "tags": [
+        "提示词",
+        "本地部署",
+        "大模型"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-llm-03.md",
+      "cjk": 366,
+      "sources": [
+        "structured",
+        "prompt"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-llm-04",
+      "title": "GGUF、上下文和内存：本地模型选型时应记录什么",
+      "category": "tech-llm",
+      "tags": [
+        "本地部署",
+        "ai-硬件",
+        "大模型"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-llm-04.md",
+      "cjk": 359,
+      "sources": [
+        "llamacpp"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-llm-05",
+      "title": "从单机聊天走向服务：何时才需要考虑 vLLM",
+      "category": "tech-llm",
+      "tags": [
+        "本地部署",
+        "提示词",
+        "工作流"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-llm-05.md",
+      "cjk": 353,
+      "sources": [
+        "vllm"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-productivity-01",
+      "title": "给 Claude Code 和 Codex 写项目说明：把长期规则与本次任务分开",
+      "category": "tech-productivity",
+      "tags": [
+        "claude-code",
+        "codex",
+        "提示词",
+        "工作流"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-productivity-01.md",
+      "cjk": 374,
+      "sources": [
+        "claude-memory",
+        "codex-agents"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-productivity-02",
+      "title": "AI 改代码前先说清权限：本地文件、命令与对外动作分别约定",
+      "category": "tech-productivity",
+      "tags": [
+        "claude-code",
+        "codex",
+        "工作流",
+        "提示词"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-productivity-02.md",
+      "cjk": 362,
+      "sources": [
+        "claude-permissions",
+        "codex-approvals"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-productivity-03",
+      "title": "让 Claude Code 与 Codex 分步骤交付：一轮只验证一个可见结果",
+      "category": "tech-productivity",
+      "tags": [
+        "claude-code",
+        "codex",
+        "工作流",
+        "提示词"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-productivity-03.md",
+      "cjk": 368,
+      "sources": [
+        "claude-common",
+        "codex-start"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-productivity-04",
+      "title": "什么时候把重复提示词做成 Skill：以发布前检查为例",
+      "category": "tech-productivity",
+      "tags": [
+        "claude-code",
+        "codex",
+        "工作流"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-productivity-04.md",
+      "cjk": 343,
+      "sources": [
+        "claude-skills",
+        "codex-skills"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-productivity-05",
+      "title": "同时让 Claude Code 与 Codex 做事：用 worktree 隔离文件，再合并结果",
+      "category": "tech-productivity",
+      "tags": [
+        "claude-code",
+        "codex",
+        "工作流"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-productivity-05.md",
+      "cjk": 341,
+      "sources": [
+        "git-worktree",
+        "codex-worktrees",
+        "claude-common"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-hardware-01",
+      "title": "给本地大模型做硬件记录：别只报显卡型号",
+      "category": "tech-hardware",
+      "tags": [
+        "ai-硬件",
+        "本地部署",
+        "性能记录"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-hardware-01.md",
+      "cjk": 339,
+      "sources": [
+        "llamacpp",
+        "pytorch"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-hardware-02",
+      "title": "ESP32 语音项目入门：把拾音、联网与推理分开看",
+      "category": "tech-hardware",
+      "tags": [
+        "ai-硬件",
+        "本地部署",
+        "语音交互"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-hardware-02.md",
+      "cjk": 348,
+      "sources": [
+        "esp32",
+        "xiaozhi"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-hardware-03",
+      "title": "边缘推理选型：模型能导出，不代表设备就能高效运行",
+      "category": "tech-hardware",
+      "tags": [
+        "ai-硬件",
+        "本地部署",
+        "边缘推理"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-hardware-03.md",
+      "cjk": 342,
+      "sources": [
+        "onnx"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-hardware-04",
+      "title": "机器人学习先做离线数据练习：读 LeRobot 文档时看这几个对象",
+      "category": "tech-hardware",
+      "tags": [
+        "ai-硬件",
+        "本地部署",
+        "机器人"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-hardware-04.md",
+      "cjk": 352,
+      "sources": [
+        "lerobot"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-hardware-05",
+      "title": "本地 AI 工作台的温度与功耗记录：怎样让测试更公平",
+      "category": "tech-hardware",
+      "tags": [
+        "ai-硬件",
+        "本地部署",
+        "性能记录"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-hardware-05.md",
+      "cjk": 356,
+      "sources": [
+        "pytorch",
+        "llamacpp"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-creative-01",
+      "title": "用 AI 写分镜之前，先做一张镜头约束卡",
+      "category": "tech-creative",
+      "tags": [
+        "提示词",
+        "工作流",
+        "ai创意"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-creative-01.md",
+      "cjk": 331,
+      "sources": [
+        "prompt",
+        "blender"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-creative-02",
+      "title": "AI 配图的颜色为何总不一致：用色板与固定变量做对照",
+      "category": "tech-creative",
+      "tags": [
+        "提示词",
+        "ai创意",
+        "设计"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-creative-02.md",
+      "cjk": 352,
+      "sources": [
+        "krita",
+        "prompt"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-creative-03",
+      "title": "做一段教程配音：先剪句子，再处理音量",
+      "category": "tech-creative",
+      "tags": [
+        "ai创意",
+        "工作流",
+        "音频制作"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-creative-03.md",
+      "cjk": 325,
+      "sources": [
+        "audacity"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-creative-04",
+      "title": "用 OBS 录软件教程：一段短样片比录完半小时更划算",
+      "category": "tech-creative",
+      "tags": [
+        "工作流",
+        "ai创意",
+        "录屏"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-creative-04.md",
+      "cjk": 349,
+      "sources": [
+        "obs"
+      ]
+    },
+    {
+      "id": "community-20261031-tech-creative-05",
+      "title": "给创作素材做来源清单：字体、图片、音效分别记",
+      "category": "tech-creative",
+      "tags": [
+        "ai创意",
+        "版权",
+        "工作流"
+      ],
+      "path": "posts/batch-01/community-20261031-tech-creative-05.md",
+      "cjk": 353,
+      "sources": [
+        "creative-commons",
+        "gimp"
+      ]
+    },
+    {
+      "id": "community-20261031-share-learn-01",
+      "title": "从 Python 官方教程开始：做一个能解释清楚的小脚本",
+      "category": "share-learn",
+      "tags": [
+        "学习资料",
+        "Python",
+        "编程入门"
+      ],
+      "path": "posts/batch-01/community-20261031-share-learn-01.md",
+      "cjk": 363,
+      "sources": [
+        "python-tutorial"
+      ]
+    },
+    {
+      "id": "community-20261031-share-learn-02",
+      "title": "CS50 与 MDN 怎么搭配：把计算机基础和网页练习分成两条线",
+      "category": "share-learn",
+      "tags": [
+        "学习资料",
+        "Web开发",
+        "学习计划"
+      ],
+      "path": "posts/batch-01/community-20261031-share-learn-02.md",
+      "cjk": 356,
+      "sources": [
+        "cs50",
+        "mdn"
+      ]
+    },
+    {
+      "id": "community-20261031-share-learn-03",
+      "title": "补工具链基础：用 Missing Semester 与 Git 文档整理一个练习仓库",
+      "category": "share-learn",
+      "tags": [
+        "学习资料",
+        "工作流",
+        "Git"
+      ],
+      "path": "posts/batch-01/community-20261031-share-learn-03.md",
+      "cjk": 347,
+      "sources": [
+        "missing-semester",
+        "git-diff",
+        "git-ignore"
+      ]
+    },
+    {
+      "id": "community-20261031-share-learn-04",
+      "title": "读线性代数公开课：给矩阵运算配一组能手算的小例子",
+      "category": "share-learn",
+      "tags": [
+        "学习资料",
+        "数学",
+        "AI基础"
+      ],
+      "path": "posts/batch-01/community-20261031-share-learn-04.md",
+      "cjk": 336,
+      "sources": [
+        "mit-math"
+      ]
+    },
+    {
+      "id": "community-20261031-share-learn-05",
+      "title": "资料越存越多怎么办：用 Zotero 做可回查的来源笔记",
+      "category": "share-learn",
+      "tags": [
+        "学习资料",
+        "知识管理",
+        "资料整理"
+      ],
+      "path": "posts/batch-01/community-20261031-share-learn-05.md",
+      "cjk": 357,
+      "sources": [
+        "zotero"
+      ]
+    },
+    {
+      "id": "community-20261031-share-music-01",
+      "title": "找乐谱先看版本：IMSLP 的作品页应该怎样读",
+      "category": "share-music",
+      "tags": [
+        "音乐资源",
+        "乐谱",
+        "资料整理"
+      ],
+      "path": "posts/batch-02/community-20261031-share-music-01.md",
+      "cjk": 337,
+      "sources": [
+        "imslp"
+      ]
+    },
+    {
+      "id": "community-20261031-share-music-02",
+      "title": "一首歌有多个同名版本：用 MusicBrainz 核对录音与发行信息",
+      "category": "share-music",
+      "tags": [
+        "音乐资源",
+        "音乐资料",
+        "信息核对"
+      ],
+      "path": "posts/batch-02/community-20261031-share-music-02.md",
+      "cjk": 337,
+      "sources": [
+        "musicbrainz"
+      ]
+    },
+    {
+      "id": "community-20261031-share-music-03",
+      "title": "Freesound 音效怎么选：试听之外，还要核对许可和署名",
+      "category": "share-music",
+      "tags": [
+        "音乐资源",
+        "音效",
+        "版权"
+      ],
+      "path": "posts/batch-02/community-20261031-share-music-03.md",
+      "cjk": 346,
+      "sources": [
+        "freesound",
+        "creative-commons"
+      ]
+    },
+    {
+      "id": "community-20261031-share-music-04",
+      "title": "用 MuseScore 整理八小节练习：从可播放到可阅读",
+      "category": "share-music",
+      "tags": [
+        "音乐资源",
+        "制谱",
+        "创作练习"
+      ],
+      "path": "posts/batch-02/community-20261031-share-music-04.md",
+      "cjk": 333,
+      "sources": [
+        "musescore"
+      ]
+    },
+    {
+      "id": "community-20261031-share-music-05",
+      "title": "给自己的音乐收藏建目录：曲目、来源和备份分开管理",
+      "category": "share-music",
+      "tags": [
+        "音乐资源",
+        "整理",
+        "数字收藏"
+      ],
+      "path": "posts/batch-02/community-20261031-share-music-05.md",
+      "cjk": 369,
+      "sources": [
+        "iac-digital",
+        "musicbrainz"
+      ]
+    },
+    {
+      "id": "community-20261031-share-help-01",
+      "title": "资源线索共建：寻找能离线阅读的中文编程入门资料",
+      "category": "share-help",
+      "tags": [
+        "资源求助",
+        "学习资料",
+        "编程入门"
+      ],
+      "path": "posts/batch-02/community-20261031-share-help-01.md",
+      "cjk": 357,
+      "sources": [
+        "python-tutorial",
+        "mdn"
+      ]
+    },
+    {
+      "id": "community-20261031-share-help-02",
+      "title": "求可核对的桌面录屏字幕资料：欢迎补充官方教程入口",
+      "category": "share-help",
+      "tags": [
+        "资源求助",
+        "字幕",
+        "录屏"
+      ],
+      "path": "posts/batch-02/community-20261031-share-help-02.md",
+      "cjk": 357,
+      "sources": [
+        "obs",
+        "audacity"
+      ]
+    },
+    {
+      "id": "community-20261031-share-help-03",
+      "title": "找公版书时怎样提供线索：一起补齐可靠的原始页面",
+      "category": "share-help",
+      "tags": [
+        "资源求助",
+        "电子书",
+        "资料核对"
+      ],
+      "path": "posts/batch-02/community-20261031-share-help-03.md",
+      "cjk": 325,
+      "sources": [
+        "gutenberg",
+        "openlibrary"
+      ]
+    },
+    {
+      "id": "community-20261031-share-help-04",
+      "title": "模型部署资料征集：把硬件条件写清楚，答案才不会各说各话",
+      "category": "share-help",
+      "tags": [
+        "资源求助",
+        "本地部署",
+        "ai-硬件"
+      ],
+      "path": "posts/batch-02/community-20261031-share-help-04.md",
+      "cjk": 336,
+      "sources": [
+        "ollama",
+        "llamacpp",
+        "vllm"
+      ]
+    },
+    {
+      "id": "community-20261031-share-help-05",
+      "title": "开放素材求助怎样不踩版权坑：请附许可页而不只发网盘",
+      "category": "share-help",
+      "tags": [
+        "资源求助",
+        "开放素材",
+        "版权"
+      ],
+      "path": "posts/batch-02/community-20261031-share-help-05.md",
+      "cjk": 345,
+      "sources": [
+        "wikimedia",
+        "freesound",
+        "creative-commons"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-wallpaper-01",
+      "title": "小伴壁纸入门：预览满意后，再应用到桌面",
+      "category": "xiaoban-wallpaper",
+      "tags": [
+        "小伴壁纸",
+        "使用说明",
+        "动态壁纸"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-wallpaper-01.md",
+      "cjk": 347,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-wallpaper-02",
+      "title": "桌面特效与壁纸是两层：换背景时怎样检查画面",
+      "category": "xiaoban-wallpaper",
+      "tags": [
+        "小伴壁纸",
+        "桌面特效",
+        "使用说明"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-wallpaper-02.md",
+      "cjk": 347,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-wallpaper-03",
+      "title": "分享壁纸作品时，把预览、来源和资源包说明一起写清楚",
+      "category": "xiaoban-wallpaper",
+      "tags": [
+        "小伴壁纸",
+        "作品分享",
+        "资源包"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-wallpaper-03.md",
+      "cjk": 360,
+      "sources": [
+        "xb-home",
+        "creative-commons"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-wallpaper-04",
+      "title": "动态桌面觉得太忙？先做一次低干扰搭配实验",
+      "category": "xiaoban-wallpaper",
+      "tags": [
+        "小伴壁纸",
+        "桌面整理",
+        "使用讨论"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-wallpaper-04.md",
+      "cjk": 342,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-wallpaper-05",
+      "title": "壁纸问题反馈清单：让“显示不对”变成可定位的信息",
+      "category": "xiaoban-wallpaper",
+      "tags": [
+        "小伴壁纸",
+        "反馈",
+        "使用说明"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-wallpaper-05.md",
+      "cjk": 345,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-game-01",
+      "title": "小伴游戏空间怎么用：从明确入口打开，再正常退出",
+      "category": "xiaoban-game",
+      "tags": [
+        "小伴游戏",
+        "使用说明",
+        "游戏空间"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-game-01.md",
+      "cjk": 360,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-game-02",
+      "title": "自制小游戏先完成一局：开始、失败、重玩都要能走通",
+      "category": "xiaoban-game",
+      "tags": [
+        "小伴游戏",
+        "创作练习",
+        "游戏设计"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-game-02.md",
+      "cjk": 333,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-game-03",
+      "title": "分享小游戏资源包：把操作方法和存档边界写在帖子里",
+      "category": "xiaoban-game",
+      "tags": [
+        "小伴游戏",
+        "作品分享",
+        "资源包"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-game-03.md",
+      "cjk": 342,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-game-04",
+      "title": "游戏反馈别只报“卡”：分清输入、画面和规则问题",
+      "category": "xiaoban-game",
+      "tags": [
+        "小伴游戏",
+        "反馈",
+        "游戏测试"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-game-04.md",
+      "cjk": 344,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-game-05",
+      "title": "关卡难度怎么讨论：用失败原因代替“太简单或太难”",
+      "category": "xiaoban-game",
+      "tags": [
+        "小伴游戏",
+        "游戏设计",
+        "讨论"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-game-05.md",
+      "cjk": 340,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-app-01",
+      "title": "先认清三个入口：小伴桌面、手机 App 与超级小伴社区",
+      "category": "xiaoban-app",
+      "tags": [
+        "小伴App",
+        "使用说明",
+        "社区"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-app-01.md",
+      "cjk": 346,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-app-02",
+      "title": "手机与电脑功能不同步时，先核对平台和版本再反馈",
+      "category": "xiaoban-app",
+      "tags": [
+        "小伴App",
+        "反馈",
+        "使用说明"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-app-02.md",
+      "cjk": 343,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-app-03",
+      "title": "用手机阅读社区长帖：先收藏原帖，再整理自己的问题",
+      "category": "xiaoban-app",
+      "tags": [
+        "小伴App",
+        "社区阅读",
+        "学习方法"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-app-03.md",
+      "cjk": 340,
+      "sources": [
+        "forum-rules"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-app-04",
+      "title": "聊天中处理私人资料：先给任务所需的最小片段",
+      "category": "xiaoban-app",
+      "tags": [
+        "小伴App",
+        "隐私",
+        "使用说明"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-app-04.md",
+      "cjk": 346,
+      "sources": [
+        "forum-privacy"
+      ]
+    },
+    {
+      "id": "community-20261031-xiaoban-app-05",
+      "title": "给小伴 App 提建议：先描述想完成的任务，再画按钮",
+      "category": "xiaoban-app",
+      "tags": [
+        "小伴App",
+        "建议反馈",
+        "产品讨论"
+      ],
+      "path": "posts/batch-02/community-20261031-xiaoban-app-05.md",
+      "cjk": 338,
+      "sources": [
+        "xb-home"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-work-01",
+      "title": "把一项工作交接清楚：别只留下一个文件夹",
+      "category": "casual-work",
+      "tags": [
+        "职场",
+        "交接",
+        "协作"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-work-01.md",
+      "cjk": 333,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-work-02",
+      "title": "异步提问怎么更容易收到有效回复：给出背景，也给出判断点",
+      "category": "casual-work",
+      "tags": [
+        "职场",
+        "沟通",
+        "协作"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-work-02.md",
+      "cjk": 305,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-work-03",
+      "title": "会议记录只记结论够吗？把决定、行动和待确认分开",
+      "category": "casual-work",
+      "tags": [
+        "职场",
+        "会议记录",
+        "工作流"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-work-03.md",
+      "cjk": 335,
+      "sources": [
+        "prompt"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-work-04",
+      "title": "工作中用了 AI，怎样说明哪些部分已经核对",
+      "category": "casual-work",
+      "tags": [
+        "职场",
+        "AI提效",
+        "质量检查"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-work-04.md",
+      "cjk": 325,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-work-05",
+      "title": "每天结束前留三行状态：让明天的自己更容易继续",
+      "category": "casual-work",
+      "tags": [
+        "职场",
+        "时间整理",
+        "工作习惯"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-work-05.md",
+      "cjk": 324,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-offwork-01",
+      "title": "下班后的半小时不一定要高效：给自己留一个切换步骤",
+      "category": "casual-offwork",
+      "tags": [
+        "下班了",
+        "生活整理",
+        "讨论"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-offwork-01.md",
+      "cjk": 320,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-offwork-02",
+      "title": "给兴趣留一个低门槛入口：十分钟也能开始的练习",
+      "category": "casual-offwork",
+      "tags": [
+        "下班了",
+        "兴趣",
+        "小练习"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-offwork-02.md",
+      "cjk": 314,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-offwork-03",
+      "title": "周末不想做计划，也可以先列一张“可选菜单”",
+      "category": "casual-offwork",
+      "tags": [
+        "下班了",
+        "周末",
+        "生活讨论"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-offwork-03.md",
+      "cjk": 318,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-offwork-04",
+      "title": "把照片整理成一次小回顾：先挑十张，而不是清空整个相册",
+      "category": "casual-offwork",
+      "tags": [
+        "下班了",
+        "照片整理",
+        "数字生活"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-offwork-04.md",
+      "cjk": 329,
+      "sources": [
+        "iac-digital"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-offwork-05",
+      "title": "不带成绩目标的阅读：读完一段，也可以只留一个问题",
+      "category": "casual-offwork",
+      "tags": [
+        "下班了",
+        "阅读",
+        "讨论"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-offwork-05.md",
+      "cjk": 311,
+      "sources": [
+        "gutenberg"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-loss-01",
+      "title": "买课后没有学完，怎样复盘而不继续追加投入",
+      "category": "casual-loss",
+      "tags": [
+        "亏了吗",
+        "消费复盘",
+        "学习"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-loss-01.md",
+      "cjk": 359,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-loss-02",
+      "title": "订阅忘记取消怎么办：先整理续费清单，再决定保留哪些",
+      "category": "casual-loss",
+      "tags": [
+        "亏了吗",
+        "订阅整理",
+        "数字生活"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-loss-02.md",
+      "cjk": 319,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-loss-03",
+      "title": "二手物品看起来便宜，复盘时别漏掉修理和时间成本",
+      "category": "casual-loss",
+      "tags": [
+        "亏了吗",
+        "消费复盘",
+        "二手经验"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-loss-03.md",
+      "cjk": 326,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-loss-04",
+      "title": "小项目做完才发现低估了时间：怎样补一份估时复盘",
+      "category": "casual-loss",
+      "tags": [
+        "亏了吗",
+        "项目复盘",
+        "独立开发"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-loss-04.md",
+      "cjk": 312,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-loss-05",
+      "title": "“已经花了很多”之外：给兴趣项目做一次暂停清单",
+      "category": "casual-loss",
+      "tags": [
+        "亏了吗",
+        "兴趣项目",
+        "复盘"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-loss-05.md",
+      "cjk": 320,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-dream-01",
+      "title": "把“想做一个作品”缩成三十天能展示的小结果",
+      "category": "casual-dream",
+      "tags": [
+        "梦想和人生",
+        "个人项目",
+        "创作"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-dream-01.md",
+      "cjk": 317,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-dream-02",
+      "title": "不靠排行榜衡量进步：为自己的学习找三个可观察指标",
+      "category": "casual-dream",
+      "tags": [
+        "梦想和人生",
+        "学习",
+        "自我记录"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-dream-02.md",
+      "cjk": 303,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-dream-03",
+      "title": "给未来的自己写一封项目说明，而不是成功宣言",
+      "category": "casual-dream",
+      "tags": [
+        "梦想和人生",
+        "写作",
+        "个人项目"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-dream-03.md",
+      "cjk": 299,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-dream-04",
+      "title": "兴趣变成任务以后，还要不要给它留一块不用展示的地方",
+      "category": "casual-dream",
+      "tags": [
+        "梦想和人生",
+        "兴趣",
+        "讨论"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-dream-04.md",
+      "cjk": 307,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-dream-05",
+      "title": "做长期计划前，先盘点哪些条件真正由自己掌握",
+      "category": "casual-dream",
+      "tags": [
+        "梦想和人生",
+        "计划",
+        "讨论"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-dream-05.md",
+      "cjk": 316,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-gear-01",
+      "title": "数码装备先做资产卡：型号、接口、配件和保修凭据分开记",
+      "category": "casual-gear",
+      "tags": [
+        "数码装备",
+        "设备整理",
+        "数字生活"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-gear-01.md",
+      "cjk": 315,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-gear-02",
+      "title": "显示器体验怎么比较：用同一份文字、图片和窗口布局",
+      "category": "casual-gear",
+      "tags": [
+        "数码装备",
+        "显示器",
+        "体验记录"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-gear-02.md",
+      "cjk": 330,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-gear-03",
+      "title": "线材不靠颜色猜用途：给桌面连接画一张小地图",
+      "category": "casual-gear",
+      "tags": [
+        "数码装备",
+        "桌面整理",
+        "连接"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-gear-03.md",
+      "cjk": 303,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-gear-04",
+      "title": "旧设备还能做什么：先检查可用状态，再决定新用途",
+      "category": "casual-gear",
+      "tags": [
+        "数码装备",
+        "旧设备",
+        "整理"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-gear-04.md",
+      "cjk": 310,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-gear-05",
+      "title": "存储空间突然不够：先分清文件、缓存和备份",
+      "category": "casual-gear",
+      "tags": [
+        "数码装备",
+        "存储整理",
+        "数字归档"
+      ],
+      "path": "posts/batch-03/community-20261031-casual-gear-05.md",
+      "cjk": 348,
+      "sources": [
+        "iac-digital"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-indie-01",
+      "title": "独立开发的第一个演示，只需要证明一条完整路径",
+      "category": "casual-indie",
+      "tags": [
+        "副业与独立开发",
+        "原型",
+        "项目方法"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-indie-01.md",
+      "cjk": 342,
+      "sources": [
+        "forum-rules"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-indie-02",
+      "title": "收到“这里不好用”以后，怎样把反馈变成可验证的小任务",
+      "category": "casual-indie",
+      "tags": [
+        "副业与独立开发",
+        "用户反馈",
+        "项目管理"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-indie-02.md",
+      "cjk": 317,
+      "sources": [
+        "github-issues"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-indie-03",
+      "title": "开源仓库要补哪些说明：许可证不能由“代码公开”代替",
+      "category": "casual-indie",
+      "tags": [
+        "副业与独立开发",
+        "开源",
+        "文档"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-indie-03.md",
+      "cjk": 324,
+      "sources": [
+        "github-license",
+        "forum-rules"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-indie-04",
+      "title": "发布前留一张版本卡：以后排错才知道用户拿到了什么",
+      "category": "casual-indie",
+      "tags": [
+        "副业与独立开发",
+        "版本管理",
+        "交付"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-indie-04.md",
+      "cjk": 332,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-indie-05",
+      "title": "给个人项目划维护边界：功能之外还要考虑恢复与交接",
+      "category": "casual-indie",
+      "tags": [
+        "副业与独立开发",
+        "维护",
+        "项目复盘"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-indie-05.md",
+      "cjk": 332,
+      "sources": [
+        "docker"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-fun-01",
+      "title": "想试运输经营游戏，可以从 OpenTTD 的一条线路开始",
+      "category": "casual-fun",
+      "tags": [
+        "吃喝玩乐",
+        "游戏",
+        "开源"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-fun-01.md",
+      "cjk": 317,
+      "sources": [
+        "openttd"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-fun-02",
+      "title": "在 Lichess 做一盘慢棋练习：先解释选择，再看分析",
+      "category": "casual-fun",
+      "tags": [
+        "吃喝玩乐",
+        "国际象棋",
+        "练习"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-fun-02.md",
+      "cjk": 314,
+      "sources": [
+        "lichess"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-fun-03",
+      "title": "想找轻松的开源竞速游戏，可以看看 SuperTuxKart 官方入口",
+      "category": "casual-fun",
+      "tags": [
+        "吃喝玩乐",
+        "游戏",
+        "开源"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-fun-03.md",
+      "cjk": 302,
+      "sources": [
+        "supertuxkart"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-fun-04",
+      "title": "不出远门的主题散步：选一个观察对象就够了",
+      "category": "casual-fun",
+      "tags": [
+        "吃喝玩乐",
+        "休闲",
+        "观察练习"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-fun-04.md",
+      "cjk": 289,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-fun-05",
+      "title": "给朋友组织一次轻量游戏聚会：先确认规则和结束时间",
+      "category": "casual-fun",
+      "tags": [
+        "吃喝玩乐",
+        "聚会",
+        "游戏讨论"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-fun-05.md",
+      "cjk": 314,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-media-01",
+      "title": "重看《摩登时代》时，可以先观察动作怎样变成节奏",
+      "category": "casual-media",
+      "tags": [
+        "片单乐评",
+        "经典电影",
+        "观影笔记"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-media-01.md",
+      "cjk": 336,
+      "sources": [
+        "chaplin-modern"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-media-02",
+      "title": "《十二怒汉》的讨论笔记：把证据、推断和态度分开记录",
+      "category": "casual-media",
+      "tags": [
+        "片单乐评",
+        "经典电影",
+        "观影讨论"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-media-02.md",
+      "cjk": 344,
+      "sources": [
+        "criterion-12"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-media-03",
+      "title": "一份不剧透的片单，除了评分还可以告诉读者什么",
+      "category": "casual-media",
+      "tags": [
+        "片单乐评",
+        "片单",
+        "写作方法"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-media-03.md",
+      "cjk": 315,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-media-04",
+      "title": "乐评从一个可听见的变化开始：别让形容词代替描述",
+      "category": "casual-media",
+      "tags": [
+        "片单乐评",
+        "乐评",
+        "听音笔记"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-media-04.md",
+      "cjk": 319,
+      "sources": [
+        "musicbrainz"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-media-05",
+      "title": "原声版、现场版与改编版怎样比较：先固定同一个观察问题",
+      "category": "casual-media",
+      "tags": [
+        "片单乐评",
+        "音乐版本",
+        "讨论"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-media-05.md",
+      "cjk": 306,
+      "sources": [
+        "musicbrainz"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-think-01",
+      "title": "一句话里哪些是事实，哪些是评价？从日常讨论做个小练习",
+      "category": "casual-think",
+      "tags": [
+        "哲思",
+        "讨论",
+        "判断"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-think-01.md",
+      "cjk": 327,
+      "sources": [
+        "stanford-philosophy"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-think-02",
+      "title": "选择更多就一定更自由吗？先区分拥有选项与能够行动",
+      "category": "casual-think",
+      "tags": [
+        "哲思",
+        "选择",
+        "讨论"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-think-02.md",
+      "cjk": 332,
+      "sources": [
+        "stanford-philosophy"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-think-03",
+      "title": "AI 参与创作以后，责任应该跟着哪一个决定走",
+      "category": "casual-think",
+      "tags": [
+        "哲思",
+        "AI创作",
+        "责任"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-think-03.md",
+      "cjk": 324,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-think-04",
+      "title": "一份数字副本还是“同一个东西”吗？从文件备份谈起",
+      "category": "casual-think",
+      "tags": [
+        "哲思",
+        "数字生活",
+        "讨论"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-think-04.md",
+      "cjk": 343,
+      "sources": [
+        "iac-digital"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-think-05",
+      "title": "效率提高以后省下的时间，要不要继续被填满",
+      "category": "casual-think",
+      "tags": [
+        "哲思",
+        "效率",
+        "生活讨论"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-think-05.md",
+      "cjk": 323,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-help-01",
+      "title": "求助帖怎么让别人接得住：把问题缩成最小可复现步骤",
+      "category": "casual-help",
+      "tags": [
+        "互助",
+        "提问方法",
+        "技术交流"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-help-01.md",
+      "cjk": 315,
+      "sources": [
+        "github-issues"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-help-02",
+      "title": "帮朋友整理电脑前，先确认哪些东西不能动",
+      "category": "casual-help",
+      "tags": [
+        "互助",
+        "电脑整理",
+        "数据保护"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-help-02.md",
+      "cjk": 331,
+      "sources": [
+        "iac-digital"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-help-03",
+      "title": "看不懂官方文档时，可以带着哪三个问题来问",
+      "category": "casual-help",
+      "tags": [
+        "互助",
+        "文档阅读",
+        "学习"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-help-03.md",
+      "cjk": 333,
+      "sources": [
+        "mdn",
+        "python-tutorial"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-help-04",
+      "title": "一起维护一份共享清单：先约定字段和谁来确认",
+      "category": "casual-help",
+      "tags": [
+        "互助",
+        "协作",
+        "资料整理"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-help-04.md",
+      "cjk": 325,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-help-05",
+      "title": "别人来求助时，先确认他想要建议、资料还是一起排查",
+      "category": "casual-help",
+      "tags": [
+        "互助",
+        "沟通",
+        "社区讨论"
+      ],
+      "path": "posts/batch-04/community-20261031-casual-help-05.md",
+      "cjk": 320,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-chat-01",
+      "title": "给你每天会打开的小工具起个名字，你会按功能还是按性格",
+      "category": "casual-chat",
+      "tags": [
+        "闲聊",
+        "工具",
+        "命名"
+      ],
+      "path": "posts/batch-06/community-20261031-casual-chat-01.md",
+      "cjk": 339,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-chat-02",
+      "title": "桌面上哪一个位置最容易被你留给“等会儿再整理”",
+      "category": "casual-chat",
+      "tags": [
+        "闲聊",
+        "桌面整理",
+        "数字生活"
+      ],
+      "path": "posts/batch-06/community-20261031-casual-chat-02.md",
+      "cjk": 332,
+      "sources": [
+        "iac-digital"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-chat-03",
+      "title": "这周愿意分享的一个小发现：最好具体到一个动作",
+      "category": "casual-chat",
+      "tags": [
+        "闲聊",
+        "小发现",
+        "生活交流"
+      ],
+      "path": "posts/batch-06/community-20261031-casual-chat-03.md",
+      "cjk": 323,
+      "sources": [
+        "forum-rules"
+      ]
+    },
+    {
+      "id": "community-20261031-casual-chat-04",
+      "title": "同一篇长文，你更愿意在纸上、电脑还是手机上读",
+      "category": "casual-chat",
+      "tags": [
+        "闲聊",
+        "阅读",
+        "设备习惯"
+      ],
+      "path": "posts/batch-06/community-20261031-casual-chat-04.md",
+      "cjk": 325,
+      "sources": []
+    },
+    {
+      "id": "community-20261031-casual-chat-05",
+      "title": "有没有一个旧习惯，你想保留而不是继续优化",
+      "category": "casual-chat",
+      "tags": [
+        "闲聊",
+        "习惯",
+        "生活讨论"
+      ],
+      "path": "posts/batch-06/community-20261031-casual-chat-05.md",
+      "cjk": 311,
+      "sources": []
+    }
+  ],
+  "categories": {
+    "tech-llm": 5,
+    "tech-productivity": 5,
+    "tech-hardware": 5,
+    "tech-creative": 5,
+    "share-learn": 5,
+    "share-music": 5,
+    "share-help": 5,
+    "xiaoban-wallpaper": 5,
+    "xiaoban-game": 5,
+    "xiaoban-app": 5,
+    "casual-work": 5,
+    "casual-offwork": 5,
+    "casual-loss": 5,
+    "casual-dream": 5,
+    "casual-gear": 5,
+    "casual-indie": 5,
+    "casual-fun": 5,
+    "casual-media": 5,
+    "casual-think": 5,
+    "casual-help": 5,
+    "casual-chat": 5
+  }
+}

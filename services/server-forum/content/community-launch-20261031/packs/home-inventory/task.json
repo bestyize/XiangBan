@@ -1,0 +1,42 @@
+{
+  "templateVersion": 1,
+  "title": "搬家小物盘点单",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "整理或搬家前",
+  "boundary": "可打印表格",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "先按房间建立清单，避免一次覆盖全部住处",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "为每个箱子分配简短唯一编号",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "逐件写名称、数量和放入的箱号",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "将易碎、急用或暂不打包的物品单独标记",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "到新地点按箱号核对，不在公开记录中写精确住址",
+      "done": false
+    }
+  ],
+  "record": {
+    "房间": null,
+    "箱号": null,
+    "物品": null,
+    "急用包": null,
+    "核对": null
+  }
+}

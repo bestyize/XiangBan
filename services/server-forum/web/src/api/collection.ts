@@ -1,4 +1,4 @@
-// 采集器只生成待审内容；人工终审通过后才进入公开接口。
+// 客观榜单校验后自动发布；资讯与工具版本保留人工终审。
 import { request as adminRequest, type AdminPage, type DiscoverDraft } from './admin'
 
 /** github_repos 最多 30 项；github_tools 最多 10 项，均由后端再次校验。 */

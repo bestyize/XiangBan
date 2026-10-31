@@ -1,0 +1,429 @@
+{
+  "pack": "@lobehub/icons-static-svg@1.101.0",
+  "vendors": [
+    {
+      "id": "openai",
+      "color": "10A37F",
+      "aliases": [
+        "OpenAI",
+        "ChatGPT"
+      ],
+      "file": "openai.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "meta",
+      "color": "0866FF",
+      "aliases": [
+        "Meta",
+        "Meta Llama"
+      ],
+      "file": "meta.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "xai",
+      "color": "52525B",
+      "aliases": [
+        "xAI",
+        "SpaceXAI",
+        "Grok"
+      ],
+      "file": "xai.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "nvidia",
+      "color": "76B900",
+      "aliases": [
+        "NVIDIA",
+        "Nemotron"
+      ],
+      "file": "nvidia.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "mistral",
+      "color": "F77700",
+      "aliases": [
+        "Mistral",
+        "Mistral AI"
+      ],
+      "file": "mistral.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "zai",
+      "color": "3858B5",
+      "aliases": [
+        "Z AI",
+        "Z-AI",
+        "Z.ai"
+      ],
+      "file": "zai.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "alibaba",
+      "color": "FF6A00",
+      "aliases": [
+        "Alibaba",
+        "Alibaba Cloud"
+      ],
+      "file": "alibaba.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "bytedance",
+      "color": "3C8CFF",
+      "aliases": [
+        "ByteDance",
+        "ByteDance Seed",
+        "Seed"
+      ],
+      "file": "bytedance.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "ling",
+      "color": "31A388",
+      "aliases": [
+        "InclusionAI",
+        "Inclusion AI",
+        "Ling"
+      ],
+      "file": "ling.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "xiaomimimo",
+      "color": "FF6900",
+      "aliases": [
+        "Xiaomi",
+        "Xiaomi MiMo",
+        "MiMo"
+      ],
+      "file": "xiaomimimo.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "stepfun",
+      "color": "00A6A0",
+      "aliases": [
+        "StepFun",
+        "Step Fun",
+        "阶跃星辰"
+      ],
+      "file": "stepfun.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "tencent",
+      "color": "1677FF",
+      "aliases": [
+        "Tencent",
+        "Hunyuan",
+        "腾讯"
+      ],
+      "file": "tencent.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "microsoft",
+      "color": "737373",
+      "aliases": [
+        "Microsoft",
+        "Phi"
+      ],
+      "file": "microsoft.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "aws",
+      "color": "C47C08",
+      "aliases": [
+        "Amazon",
+        "AWS",
+        "Amazon Nova"
+      ],
+      "file": "aws.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "cohere",
+      "color": "39594D",
+      "aliases": [
+        "Cohere"
+      ],
+      "file": "cohere.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "perplexity",
+      "color": "20808D",
+      "aliases": [
+        "Perplexity"
+      ],
+      "file": "perplexity.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "ibm",
+      "color": "1261FE",
+      "aliases": [
+        "IBM",
+        "Granite"
+      ],
+      "file": "ibm.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "inception",
+      "color": "3B56DC",
+      "aliases": [
+        "Inception",
+        "Inception Labs"
+      ],
+      "file": "inception.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "deepcogito",
+      "color": "C95A35",
+      "aliases": [
+        "Deep Cogito",
+        "Cogito"
+      ],
+      "file": "deepcogito.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "liquid",
+      "color": "426B5D",
+      "aliases": [
+        "Liquid AI",
+        "Liquid"
+      ],
+      "file": "liquid.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "ai21",
+      "color": "814DAB",
+      "aliases": [
+        "AI21 Labs",
+        "AI21"
+      ],
+      "file": "ai21.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "upstage",
+      "color": "6138D6",
+      "aliases": [
+        "Upstage"
+      ],
+      "file": "upstage.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "ai2",
+      "color": "F05236",
+      "aliases": [
+        "Allen Institute for AI",
+        "AI2"
+      ],
+      "file": "ai2.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "dbrx",
+      "color": "D94A38",
+      "aliases": [
+        "Databricks",
+        "DBRX"
+      ],
+      "file": "dbrx.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "nousresearch",
+      "color": "765F47",
+      "aliases": [
+        "Nous Research",
+        "NousResearch"
+      ],
+      "file": "nousresearch.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "reka",
+      "color": "3E5EB8",
+      "aliases": [
+        "Reka AI",
+        "Reka"
+      ],
+      "file": "reka.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "tii",
+      "color": "3349B8",
+      "aliases": [
+        "TII UAE",
+        "TII",
+        "Technology Innovation Institute"
+      ],
+      "file": "tii.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "openchat",
+      "color": "5668D4",
+      "aliases": [
+        "OpenChat"
+      ],
+      "file": "openchat.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "snowflake",
+      "color": "29B5E8",
+      "aliases": [
+        "Snowflake"
+      ],
+      "file": "snowflake.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "longcat",
+      "color": "D54A3C",
+      "aliases": [
+        "LongCat"
+      ],
+      "file": "longcat.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "kwaikat",
+      "color": "FF4D00",
+      "aliases": [
+        "KwaiKAT",
+        "Kwai KAT"
+      ],
+      "file": "kwaikat.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "lg",
+      "color": "A50034",
+      "aliases": [
+        "LG AI Research",
+        "LG AI",
+        "LG"
+      ],
+      "file": "lg.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "dotsstudio",
+      "color": "5570DA",
+      "aliases": [
+        "dots-studio",
+        "Dots Studio"
+      ],
+      "file": "dotsstudio.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "typesafeai",
+      "color": "5B6B9A",
+      "aliases": [
+        "typesafe",
+        "Typesafe AI"
+      ],
+      "file": "typesafeai.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "poolside",
+      "color": "2C6A58",
+      "aliases": [
+        "poolside"
+      ],
+      "file": "poolside-mark.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "celeris",
+      "color": "29271F",
+      "aliases": [
+        "Celeris"
+      ],
+      "file": "celeris.svg",
+      "source": "https://celeris.ai/favicon-48.png",
+      "license": "Brand mark; identification only",
+      "normalization": "Monochrome coverage at source icon scale; original retained"
+    },
+    {
+      "id": "reflection",
+      "color": "1B5428",
+      "aliases": [
+        "Reflection",
+        "Reflection AI"
+      ],
+      "file": "reflection.svg",
+      "source": "https://cdn-avatars.huggingface.co/v1/production/uploads/61149f7d265ca9d17ada7408/X2rIRD_H6h-JYtLVvfg6B.jpeg",
+      "license": "Brand mark; identification only",
+      "normalization": "Monochrome coverage at source icon scale; original retained"
+    },
+    {
+      "id": "thinkingmachines",
+      "color": "31373D",
+      "aliases": [
+        "Thinking Machines",
+        "Thinking Machines Lab",
+        "thinkingmachines"
+      ],
+      "file": "thinkingmachines.svg",
+      "source": "https://thinkingmachines.ai/images/favicon-32x32.png",
+      "license": "Brand mark; identification only",
+      "normalization": "Monochrome coverage at source icon scale; original retained"
+    }
+  ]
+}

@@ -1,0 +1,117 @@
+[
+  {
+    "method": "POST",
+    "path": "/api/admin/schemes",
+    "body": {
+      "author_uid": "6bb21aff-72df-430b-bc65-dd22988fe9ea",
+      "title": "安静开工桌面",
+      "summary": "等高线壁纸、今日三件事组件和轻盈微尘特效，按需逐项导入与开启。 本方案只保存版本清单，不会自动启动作品。",
+      "items": [
+        {
+          "pack_id": 42,
+          "version": 1
+        },
+        {
+          "pack_id": 47,
+          "version": 1
+        },
+        {
+          "pack_id": 38,
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/schemes",
+    "body": {
+      "author_uid": "6bb21aff-72df-430b-bc65-dd22988fe9ea",
+      "title": "下班留白桌面",
+      "summary": "潮汐壁纸、呼吸卡与夜池回环特效。适合短暂休息，组件只提供视觉节奏提示。 本方案只保存版本清单，不会自动启动作品。",
+      "items": [
+        {
+          "pack_id": 41,
+          "version": 1
+        },
+        {
+          "pack_id": 46,
+          "version": 1
+        },
+        {
+          "pack_id": 37,
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/schemes",
+    "body": {
+      "author_uid": "6bb21aff-72df-430b-bc65-dd22988fe9ea",
+      "title": "夜间解谜桌面",
+      "summary": "灯影港湾壁纸配口袋迷径与选择罗盘；游戏支持触控与键盘。 本方案只保存版本清单，不会自动启动作品。",
+      "items": [
+        {
+          "pack_id": 45,
+          "version": 1
+        },
+        {
+          "pack_id": 53,
+          "version": 1
+        },
+        {
+          "pack_id": 48,
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/schemes",
+    "body": {
+      "author_uid": "6bb21aff-72df-430b-bc65-dd22988fe9ea",
+      "title": "晨光收尾桌面",
+      "summary": "晨光玻璃壁纸、工位收尾折页和纸舟轻航特效，整理完毕后可关闭组件。 本方案只保存版本清单，不会自动启动作品。",
+      "items": [
+        {
+          "pack_id": 44,
+          "version": 1
+        },
+        {
+          "pack_id": 49,
+          "version": 1
+        },
+        {
+          "pack_id": 39,
+          "version": 1
+        }
+      ]
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/api/admin/schemes",
+    "body": {
+      "author_uid": "6bb21aff-72df-430b-bc65-dd22988fe9ea",
+      "title": "轨道游乐桌面",
+      "summary": "轨道工作室壁纸、接住星光游戏和专注门牌，工作与休闲时分别选择开启。 本方案只保存版本清单，不会自动启动作品。",
+      "items": [
+        {
+          "pack_id": 43,
+          "version": 1
+        },
+        {
+          "pack_id": 55,
+          "version": 1
+        },
+        {
+          "pack_id": 50,
+          "version": 1
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,86 @@
+{
+  "templateVersion": 1,
+  "title": "Markdown文章交付工作流",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "草稿 → 核实 → 配图 → 预览 → 交付",
+  "boundary": "不自动发布或替你授权素材",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "确认目标读者、文章目的和事实来源",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "审阅结构、断言与短引用的来源位置",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "核对图片来源与使用许可，补充替代文本",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "在本地预览标题层级、代码块和窄屏布局",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "生成交付清单，由本人在目标平台人工发布",
+      "done": false
+    }
+  ],
+  "record": {
+    "输入": null,
+    "检查项": null,
+    "产物": null,
+    "发布状态": null
+  },
+  "nodes": [
+    {
+      "id": "n1",
+      "label": "确认目标读者、文章目的和事实来源",
+      "depends_on": [],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n2",
+      "label": "审阅结构、断言与短引用的来源位置",
+      "depends_on": [
+        "n1"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n3",
+      "label": "核对图片来源与使用许可，补充替代文本",
+      "depends_on": [
+        "n2"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n4",
+      "label": "在本地预览标题层级、代码块和窄屏布局",
+      "depends_on": [
+        "n3"
+      ],
+      "status": "not_started",
+      "evidence": null
+    },
+    {
+      "id": "n5",
+      "label": "生成交付清单，由本人在目标平台人工发布",
+      "depends_on": [
+        "n4"
+      ],
+      "status": "not_started",
+      "evidence": null
+    }
+  ]
+}

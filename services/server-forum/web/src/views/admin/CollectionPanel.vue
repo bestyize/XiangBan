@@ -4,6 +4,7 @@ import { AdminApiError } from '@/api/admin'
 import { collectionApi, type CollectionBatch, type CollectionRun, type CollectionSource, type CollectionSourceConfig } from '@/api/collection'
 import { errorText, fmtTime, notify } from './shared'
 
+const autoPublishes = (source: string) => ['artificial_analysis', 'openrouter', 'github_repos'].includes(source)
 const sources = ref<CollectionSource[]>([])
 const sourceLoading = ref(false)
 const sourceError = ref('')
@@ -137,7 +138,7 @@ function pollAgain() {
   if (disposed || pollsLeft <= 0 || !Object.keys(accepted).length) {
     const pending = Object.keys(accepted).length > 0
     stopPolling()
-    refreshNotice.value = pending ? '自动刷新已暂停，任务仍在后台执行。请稍后刷新查看结果，不要重复启动。' : '当前任务已结束，请查看运行记录并审核待审内容。'
+    refreshNotice.value = pending ? '自动刷新已暂停，任务仍在后台执行。请稍后刷新查看结果，不要重复启动。' : '当前任务已结束。客观榜单已按自动发布策略处理；其他来源请查看待审内容。'
     return
   }
   timer = setTimeout(async () => {
@@ -227,8 +228,8 @@ async function run(s: CollectionSource) {
     clearPreview()
     filter.value = ''
     page.value = 1
-    refreshNotice.value = '任务已受理，结果先进入待审。接下来最多自动刷新 30 秒。'
-    notify('已启动采集，完成后请预览并人工审核')
+    refreshNotice.value = autoPublishes(s.id) ? '任务已受理，校验通过后自动发布。接下来最多自动刷新 30 秒。' : '任务已受理，结果先进入待审。接下来最多自动刷新 30 秒。'
+    notify(autoPublishes(s.id) ? '已启动采集，校验通过后自动发布' : '已启动采集，完成后请预览并人工审核')
     await Promise.all([loadSources(), loadRuns()])
     stopPolling()
     pollsLeft = 10
@@ -288,12 +289,12 @@ onUnmounted(() => {
 <template>
   <div class="collection-panel">
     <div class="collection-intro">
-      <div><p class="adm-eyebrow">数据来源与审核</p><h2>让社区内容持续更新</h2><p class="muted">配置来源、采集到草稿，核对后整批发布。每一步都有记录。</p></div>
+      <div><p class="adm-eyebrow">数据来源与审核</p><h2>让社区内容持续更新</h2><p class="muted">客观榜单校验后自动发布；资讯与工具版本核对后整批发布。每一步都有记录。</p></div>
       <div class="adm-actions"><button class="btn" :disabled="sourceLoading || runLoading || approving" @click="refresh">刷新状态</button>
       <RouterLink class="btn" to="/admin/discover">发现页编辑与审核</RouterLink></div>
     </div>
-    <div class="collection-summary"><div><span>可用来源</span><strong>{{ readyCount }}<small> / {{ sources.length }}</small></strong></div><div><span>自动采集</span><strong>{{ sources.filter(s => s.enabled).length }}<small> 个来源</small></strong></div><div><span>发布方式</span><strong class="collection-summary-text">人工终审</strong></div></div>
-    <p class="adm-callout">采集只生成待审草稿。单个来源失败会保留上一版线上内容。</p>
+    <div class="collection-summary"><div><span>可用来源</span><strong>{{ readyCount }}<small> / {{ sources.length }}</small></strong></div><div><span>自动采集</span><strong>{{ sources.filter(s => s.enabled).length }}<small> 个来源</small></strong></div><div><span>发布方式</span><strong class="collection-summary-text">榜单自动发布</strong></div></div>
+    <p class="adm-callout">能力榜、调用量榜和开源热榜每天采集，校验通过后自动发布。采集或校验失败时保留上一版；资讯与工具版本仍需人工审核。</p>
     <div v-if="sourceError" class="collection-error" role="alert">来源配置读取失败：{{ sourceError }} <button class="btn btn-sm" :disabled="sourceLoading" @click="loadSources">重试</button></div>
     <p v-if="sourceLoading && !sources.length" role="status">正在读取采集来源…</p>
     <p v-else-if="!sources.length && !sourceError" class="muted">暂无可用采集来源。</p>
@@ -342,7 +343,7 @@ onUnmounted(() => {
         </dl>
         <p v-if="s.last_error" class="collection-error">最近失败：{{ s.last_error }}</p>
         <p v-if="actionErrors[s.id]" class="collection-error" role="alert">{{ actionErrors[s.id] }}</p>
-        <button class="btn btn-primary" :disabled="!!busy[s.id] || approving || !ready(s) || active(s.id)" @click="run(s)">{{ active(s.id) || busy[s.id] === 'run' ? '任务已受理 / 执行中' : '立即采集到待审' }}</button>
+        <button class="btn btn-primary" :disabled="!!busy[s.id] || approving || !ready(s) || active(s.id)" @click="run(s)">{{ active(s.id) || busy[s.id] === 'run' ? '任务已受理 / 执行中' : autoPublishes(s.id) ? '立即采集并自动发布' : '立即采集到待审' }}</button>
         <small v-if="!ready(s)" class="muted"> {{ readinessHint(s) }}</small>
         </aside></div>
       </section>
@@ -357,7 +358,7 @@ onUnmounted(() => {
       <p v-else-if="!runs.length && !runError" class="muted">暂无运行记录，配置来源后可手动执行一次。</p>
       <div v-if="runs.length" class="collection-table" :aria-busy="runLoading">
         <table class="adm-table"><thead><tr><th>来源 / 任务</th><th>状态</th><th>开始 / 结束</th><th>条目</th><th>结果与审核</th></tr></thead><tbody>
-          <tr v-for="r in runs" :key="r.id"><td data-label="来源 / 任务">{{ sourceName(r.source) }}<small class="collection-run-id">{{ r.id }}</small></td><td data-label="状态"><span class="adm-tag" :class="r.status === 'failed' ? 'danger' : r.status === 'succeeded' ? 'valid' : 'suspect'">{{ STATUS[r.status] || r.status }}</span></td><td data-label="开始 / 结束">{{ fmtTime(r.started_at) }}<br /><span class="muted">{{ fmtTime(r.finished_at) }}</span></td><td data-label="条目">{{ r.item_count }}</td><td data-label="结果与审核"><p v-if="r.error" class="collection-error">{{ r.error }}</p><button v-if="r.status === 'succeeded' && r.item_count > 0" class="btn btn-sm" :disabled="previewLoading || approving" @click="preview(r.id)">预览本次草稿</button><span v-else-if="r.status === 'succeeded'" class="muted">{{ r.source === 'github_repos' ? '已记录基线，正在积累每日快照；本次没有新增待审内容' : '没有新增待审内容' }}</span></td></tr>
+          <tr v-for="r in runs" :key="r.id"><td data-label="来源 / 任务">{{ sourceName(r.source) }}<small class="collection-run-id">{{ r.id }}</small></td><td data-label="状态"><span class="adm-tag" :class="r.status === 'failed' ? 'danger' : r.status === 'succeeded' ? 'valid' : 'suspect'">{{ STATUS[r.status] || r.status }}</span></td><td data-label="开始 / 结束">{{ fmtTime(r.started_at) }}<br /><span class="muted">{{ fmtTime(r.finished_at) }}</span></td><td data-label="条目">{{ r.item_count }}</td><td data-label="结果与审核"><p v-if="r.error" class="collection-error">{{ r.error }}</p><button v-if="r.status === 'succeeded' && r.item_count > 0" class="btn btn-sm" :disabled="previewLoading || approving" @click="preview(r.id)">{{ autoPublishes(r.source) ? '查看本次榜单' : '预览本次草稿' }}</button><span v-else-if="r.status === 'succeeded'" class="muted">{{ r.source === 'github_repos' ? '已记录基线，正在积累每日快照；本次没有新增待审内容' : '没有新增待审内容' }}</span></td></tr>
         </tbody></table>
       </div>
       <div v-if="total > pageSize" class="collection-pagination"><button class="btn btn-sm" :disabled="page <= 1 || runLoading || approving" @click="goto(page - 1)">上一页</button><span>第 {{ page }} 页 · 共 {{ total }} 次</span><button class="btn btn-sm" :disabled="page * pageSize >= total || runLoading || approving" @click="goto(page + 1)">下一页</button></div>
@@ -369,7 +370,7 @@ onUnmounted(() => {
       <p v-if="previewLoading" role="status">正在读取完整批次…</p>
       <p v-if="previewError" class="collection-error" role="alert">{{ previewError }}</p>
       <template v-if="batch">
-        <p v-if="batch.reviewed_at" class="muted">本批次已于 {{ fmtTime(batch.reviewed_at) }} 终审发布。</p>
+        <p v-if="batch.reviewed_at" class="muted">本批次已于 {{ fmtTime(batch.reviewed_at) }} 发布（{{ autoPublishes(batch.source) ? '自动校验' : '人工审核' }}）。</p>
         <p v-else-if="!batch.items.length" class="muted">本次没有新增草稿。</p>
         <p v-else-if="!canReview" class="collection-error" role="alert">本批次存在版本冲突或不可审核状态。请到发现页核对内容并重新采集，不能使用旧版本覆盖。</p>
         <details v-for="item in batch.items" :key="itemId(item.kind, item.key)" class="collection-draft" @toggle="markRead($event, item.kind, item.key)">

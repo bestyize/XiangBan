@@ -1,0 +1,492 @@
+[
+  {
+    "name": "论坛/tech-llm",
+    "count": 6,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=tech-llm&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/tech-productivity",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=tech-productivity&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/tech-hardware",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=tech-hardware&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/tech-creative",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=tech-creative&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/share-software",
+    "count": 34,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=share-software&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/share-movies",
+    "count": 354,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=share-movies&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/share-music",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=share-music&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/share-learn",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=share-learn&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/share-help",
+    "count": 6,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=share-help&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/xiaoban-wallpaper",
+    "count": 8,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=xiaoban-wallpaper&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/xiaoban-game",
+    "count": 6,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=xiaoban-game&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/xiaoban-app",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=xiaoban-app&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-work",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-work&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-offwork",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-offwork&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-loss",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-loss&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-dream",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-dream&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-gear",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-gear&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-indie",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-indie&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-fun",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-fun&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-media",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-media&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-think",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-think&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-help",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-help&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/casual-chat",
+    "count": 6,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=casual-chat&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/site-notice",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=site-notice&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/site-rules",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=site-rules&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/site-feedback",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=site-feedback&home=false&page_size=1"
+  },
+  {
+    "name": "论坛/site-reports",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=site-reports&home=false&page_size=1"
+  },
+  {
+    "name": "创作/effect",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=effect&page_size=1"
+  },
+  {
+    "name": "创作/wallpaper",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=wallpaper&page_size=1"
+  },
+  {
+    "name": "创作/widget",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=widget&page_size=1"
+  },
+  {
+    "name": "创作/game",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=game&page_size=1"
+  },
+  {
+    "name": "创作/routine",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=routine&page_size=1"
+  },
+  {
+    "name": "创作/reminder",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=reminder&page_size=1"
+  },
+  {
+    "name": "创作/task",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=task&page_size=1"
+  },
+  {
+    "name": "创作/goal",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=goal&page_size=1"
+  },
+  {
+    "name": "创作/skill",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=skill&page_size=1"
+  },
+  {
+    "name": "创作/expert",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=expert&page_size=1"
+  },
+  {
+    "name": "创作/workflow",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "packs?kind=workflow&page_size=1"
+  },
+  {
+    "name": "学习/claude-code",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=tech%2Cshare-learn&tag=claude-code&home=false&page_size=1"
+  },
+  {
+    "name": "学习/codex",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=tech%2Cshare-learn&tag=codex&home=false&page_size=1"
+  },
+  {
+    "name": "学习/提示词",
+    "count": 9,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=tech%2Cshare-learn&tag=%E6%8F%90%E7%A4%BA%E8%AF%8D&home=false&page_size=1"
+  },
+  {
+    "name": "学习/工作流",
+    "count": 11,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=tech%2Cshare-learn&tag=%E5%B7%A5%E4%BD%9C%E6%B5%81&home=false&page_size=1"
+  },
+  {
+    "name": "学习/本地部署",
+    "count": 10,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=tech%2Cshare-learn&tag=%E6%9C%AC%E5%9C%B0%E9%83%A8%E7%BD%B2&home=false&page_size=1"
+  },
+  {
+    "name": "学习/ai-硬件",
+    "count": 6,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=tech%2Cshare-learn&tag=ai-%E7%A1%AC%E4%BB%B6&home=false&page_size=1"
+  },
+  {
+    "name": "资源/开源精选",
+    "count": 28,
+    "minimum": 5,
+    "pass_": true,
+    "path": "topics?category=share-software&tag=%E5%BC%80%E6%BA%90&home=false&page_size=1"
+  },
+  {
+    "name": "创作/方案",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "schemes?page_size=1"
+  },
+  {
+    "name": "资源/AI工具",
+    "count": 6,
+    "minimum": 5,
+    "pass_": true,
+    "path": "tools"
+  },
+  {
+    "name": "网页/项目",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "projects"
+  },
+  {
+    "name": "网页/周刊",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "weekly?page_size=1"
+  },
+  {
+    "name": "导航/海外",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/nav"
+  },
+  {
+    "name": "导航/国产",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/nav"
+  },
+  {
+    "name": "资料/Claude",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/docs"
+  },
+  {
+    "name": "资料/Codex",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/docs"
+  },
+  {
+    "name": "资料/SkillHub",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/docs"
+  },
+  {
+    "name": "首页/开源热榜",
+    "count": 8,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/repos/v2"
+  },
+  {
+    "name": "追踪/发布记录",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/tracker/v2"
+  },
+  {
+    "name": "追踪/优惠与试用",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/tracker/v2"
+  },
+  {
+    "name": "首页/推荐新闻",
+    "count": 5,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/home/v2"
+  },
+  {
+    "name": "首页/精选作品",
+    "count": 8,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/home/v2"
+  },
+  {
+    "name": "模型榜/intelligence",
+    "count": 89,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/models/v2"
+  },
+  {
+    "name": "模型榜/finance_and_accounting",
+    "count": 102,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/models/v2"
+  },
+  {
+    "name": "模型榜/strategy_and_ops",
+    "count": 107,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/models/v2"
+  },
+  {
+    "name": "模型榜/legal",
+    "count": 102,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/models/v2"
+  },
+  {
+    "name": "模型榜/healthcare_and_medical",
+    "count": 86,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/models/v2"
+  },
+  {
+    "name": "模型榜/engineering",
+    "count": 89,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/models/v2"
+  },
+  {
+    "name": "模型榜/economics",
+    "count": 102,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/models/v2"
+  },
+  {
+    "name": "模型榜/input",
+    "count": 443,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/models/v2"
+  },
+  {
+    "name": "模型榜/output",
+    "count": 443,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/models/v2"
+  },
+  {
+    "name": "模型榜/output_tokens_per_second",
+    "count": 373,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/models/v2"
+  },
+  {
+    "name": "模型榜/调用量",
+    "count": 50,
+    "minimum": 5,
+    "pass_": true,
+    "path": "discover/model-usage"
+  }
+]

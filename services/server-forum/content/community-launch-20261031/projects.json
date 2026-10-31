@@ -1,0 +1,107 @@
+[
+  {
+    "method": "PUT",
+    "path": "/api/admin/projects/ollama",
+    "body": {
+      "name": "Ollama：从本地对话到 API",
+      "summary": "整理本地模型运行的官方入口、第一次验收方法与常见边界。",
+      "body_md": "适合想把模型运行在自己电脑上，并通过命令行或应用接口使用的人。先从一个适合本机内存的模型开始，比一次装入多个大模型更容易定位问题。\n\n## 建议的第一次实践\n\n1. 按官方快速开始安装适合系统的版本；记录操作系统、内存和可用磁盘。\n2. 从官方模型库选择一款模型，记录模型标识和量化信息，完成一次短对话。\n3. 使用同一组问题核对回答质量，再尝试官方 API 的最小请求。\n4. 保留请求内容、模型名和运行环境，便于后续比较。只看单次输出速度不能代表所有任务的表现。\n\n## 验收\n\n命令行能输出结果、服务端能返回一次完整请求、重启后模型仍可识别。需要局域网访问时再单独配置监听地址和访问控制。模型权重的许可证与运行工具的许可证应分别核对。\n\n## 官方入口\n\n- [官方文档](https://docs.ollama.com/quickstart)\n- [项目仓库](https://github.com/ollama/ollama)\n\n整理日期：2026-11-01。",
+      "links": [
+        {
+          "title": "官方文档",
+          "url": "https://docs.ollama.com/quickstart"
+        },
+        {
+          "title": "项目仓库",
+          "url": "https://github.com/ollama/ollama"
+        }
+      ],
+      "status": "published",
+      "sort_order": 0
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/projects/llama-cpp",
+    "body": {
+      "name": "llama.cpp：理解本地推理的参数",
+      "summary": "从 GGUF 模型、硬件后端到一次可重复的推理实验。",
+      "body_md": "这个项目提供 C/C++ 模型推理工具。它适合需要了解模型文件、量化、上下文长度和设备后端如何共同影响本地运行的人。\n\n## 建议的实践路径\n\n先读仓库 README 中适合自己平台的安装方法，再确认所选模型是否受支持。记录模型文件来源与校验值，避免仅凭相似文件名认定两个模型相同。第一次运行使用较短输入，确认结果正常后再逐步增大上下文。\n\n建立一个小实验表：固定模型和提示词，每次只调整一个参数，记录耗时、内存、输出是否完整。不要把不同量化、不同输入长度的结果直接当成速度排名。\n\n## 项目使用边界\n\n仓库会持续变化，命令参数以本次安装版本的帮助信息为准。服务器模式应先在本机验证；向外提供服务时，需要另行考虑鉴权、并发、超时和日志中的隐私信息。\n\n## 官方入口\n\n- [官方文档](https://github.com/ggml-org/llama.cpp/blob/master/README.md)\n- [项目仓库](https://github.com/ggml-org/llama.cpp)\n\n整理日期：2026-11-01。",
+      "links": [
+        {
+          "title": "官方文档",
+          "url": "https://github.com/ggml-org/llama.cpp/blob/master/README.md"
+        },
+        {
+          "title": "项目仓库",
+          "url": "https://github.com/ggml-org/llama.cpp"
+        }
+      ],
+      "status": "published",
+      "sort_order": 1
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/projects/comfyui",
+    "body": {
+      "name": "ComfyUI：把生成过程保存成工作流",
+      "summary": "理解节点、模型文件和工作流之间的关系，建立可复现的小流程。",
+      "body_md": "ComfyUI 用节点描述生成步骤。保存工作流只是复现的一部分：模型文件、节点版本和输入素材也会影响输出。\n\n## 第一个可复现作品\n\n从官方入门流程开始，尽量先用内置节点。记录工作流需要的模型、模型文件位置、输入图和关键参数。完成一次生成后保存工作流，再关闭页面重新载入，检查是否能重现同一条处理路径。\n\n如果出现缺失节点，先确认原工作流依赖了哪些自定义扩展；如果缺失模型，先核对文件名和路径。不要在尚未跑通基本流程时一次安装大量扩展。\n\n## 分享时提供什么\n\n附上工作流文件、依赖清单、输入素材许可说明和结果预览。预览图应明确实际使用的模型与参数。这里提供官方项目入口，不转存无法确认再分发许可的模型权重。\n\n## 官方入口\n\n- [官方文档](https://docs.comfy.org/)\n- [项目仓库](https://github.com/Comfy-Org/ComfyUI)\n\n整理日期：2026-11-01。",
+      "links": [
+        {
+          "title": "官方文档",
+          "url": "https://docs.comfy.org/"
+        },
+        {
+          "title": "项目仓库",
+          "url": "https://github.com/Comfy-Org/ComfyUI"
+        }
+      ],
+      "status": "published",
+      "sort_order": 2
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/projects/vllm",
+    "body": {
+      "name": "vLLM：部署一个可验证的模型接口",
+      "summary": "围绕环境兼容、请求结果和并发测试组织推理服务实验。",
+      "body_md": "vLLM 面向模型推理和服务部署。选择它之前，先核对官方支持的设备、驱动、运行环境以及模型架构，避免把安装成功等同于模型一定可运行。\n\n## 分三步验收\n\n第一步只启动一个模型，检查启动日志，记录模型版本、精度、上下文配置与资源占用。第二步在本机发起一个短请求，确认状态码、响应结构和输出都符合预期。第三步再逐步增加输入长度及并发，记录成功率和延迟。\n\n压测要固定请求集，并区分首次加载和服务稳定后的请求。遇到内存不足时，先保存错误信息与配置，不要同时改动多个限制后失去比较依据。\n\n## 发布前检查\n\n给外部应用使用时，需要为接口配置访问控制、请求限额与超时。应用层还应处理取消、重试和不完整输出；它们并不会因底层推理加速而自动解决。\n\n## 官方入口\n\n- [官方文档](https://docs.vllm.ai/en/latest/getting_started/quickstart/)\n- [项目仓库](https://github.com/vllm-project/vllm)\n\n整理日期：2026-11-01。",
+      "links": [
+        {
+          "title": "官方文档",
+          "url": "https://docs.vllm.ai/en/latest/getting_started/quickstart/"
+        },
+        {
+          "title": "项目仓库",
+          "url": "https://github.com/vllm-project/vllm"
+        }
+      ],
+      "status": "published",
+      "sort_order": 3
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/api/admin/projects/codex-cli",
+    "body": {
+      "name": "Codex CLI：从仓库规则到可审查改动",
+      "summary": "用官方文档建立项目上下文、任务验收与差异检查习惯。",
+      "body_md": "Codex CLI 在终端中读取项目文件、编辑代码并运行工具。第一次使用时，选择一个范围清楚的小改动，写明期望行为和验证命令，会更容易判断结果是否达标。\n\n## 一次完整的小任务\n\n先确认工作目录与 Git 状态，在 AGENTS.md 中说明项目结构、约定和必要的验证方式。给任务提供一个具体输入与期望输出，例如“空列表显示说明文字，并保留加载失败状态”。完成后检查差异，运行涉及模块的验证，再决定是否提交。\n\n## 复用与协作\n\n稳定的重复流程可以整理成技能；不同任务使用 worktree 时，要确认依赖、端口和生成目录是否共享。工具权限按当前客户端设置配置，不应把无需审查所有命令当作项目默认约定。\n\n本站项目页是整理入口，安装和功能说明以链接中的官方当前文档为准。\n\n## 官方入口\n\n- [官方文档](https://learn.chatgpt.com/docs/codex/cli)\n- [项目仓库](https://github.com/openai/codex)\n\n整理日期：2026-11-01。",
+      "links": [
+        {
+          "title": "官方文档",
+          "url": "https://learn.chatgpt.com/docs/codex/cli"
+        },
+        {
+          "title": "项目仓库",
+          "url": "https://github.com/openai/codex"
+        }
+      ],
+      "status": "published",
+      "sort_order": 4
+    }
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "effect",
+  "id": "pond-rings",
+  "name": "夜池回环",
+  "version": "1.0.0",
+  "description": "蓝青色水面圆环错落扩散，使用分组涟漪纯数据。",
+  "author": "小伴社区原创作品",
+  "license": "MIT"
+}

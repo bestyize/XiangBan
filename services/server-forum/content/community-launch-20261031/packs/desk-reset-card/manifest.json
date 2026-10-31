@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "widget",
+  "id": "desk-reset-card",
+  "name": "工位收尾折页",
+  "version": "1.0.0",
+  "description": "三个可展开的收尾提示，纯HTML交互，适合作为离桌前检查卡。",
+  "author": "小伴社区原创作品",
+  "license": "MIT",
+  "width": 340,
+  "height": 340,
+  "theme": "transparent"
+}

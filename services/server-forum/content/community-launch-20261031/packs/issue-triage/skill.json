@@ -1,0 +1,42 @@
+{
+  "templateVersion": 1,
+  "title": "问题分诊技能",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "提供一组用户反馈",
+  "boundary": "不替团队承诺排期",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "逐条保留反馈原文和可公开的上下文",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "按实际行为与预期差异判断是否为缺陷",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "区分用户目标与其提出的实现方案",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "用影响范围和阻塞程度说明优先级依据",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "为每项输出下一步收集证据或负责人待确认",
+      "done": false
+    }
+  ],
+  "record": {
+    "原始反馈": null,
+    "分类": null,
+    "缺失信息": null,
+    "优先级依据": null,
+    "下一步": null
+  }
+}

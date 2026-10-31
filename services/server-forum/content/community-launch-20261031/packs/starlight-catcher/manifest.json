@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "game",
+  "id": "starlight-catcher",
+  "name": "接住星光",
+  "version": "1.0.0",
+  "description": "移动接盘收集金色星光，避开紫色碎片，15颗即赢一局。",
+  "author": "小伴社区原创作品",
+  "license": "MIT",
+  "save": false,
+  "orientation": "portrait",
+  "layer": "space"
+}

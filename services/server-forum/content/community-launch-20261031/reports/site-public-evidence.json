@@ -1,0 +1,84 @@
+{
+  "/api/packs?page_size=1": {
+    "total": 55,
+    "keys": [
+      "items",
+      "page",
+      "page_size",
+      "total"
+    ]
+  },
+  "/api/schemes?page_size=1": {
+    "total": 5,
+    "keys": [
+      "items",
+      "page",
+      "page_size",
+      "total"
+    ]
+  },
+  "/api/discover/docs": {
+    "total": null,
+    "keys": [
+      "groups"
+    ],
+    "groups": [
+      {
+        "name": "Claude",
+        "count": 5
+      },
+      {
+        "name": "Codex",
+        "count": 5
+      },
+      {
+        "name": "SkillHub",
+        "count": 5
+      }
+    ]
+  },
+  "/api/discover/models/v2": {
+    "total": null,
+    "keys": [
+      "as_of",
+      "index_version",
+      "models",
+      "price_unit",
+      "sample",
+      "schema_version",
+      "source",
+      "source_url",
+      "tier",
+      "updated_at",
+      "vendors"
+    ],
+    "models": 719,
+    "as_of": "2026-10-31T15:27:22.046094630+00:00",
+    "date": null
+  },
+  "/api/discover/model-usage": {
+    "total": null,
+    "keys": [
+      "as_of",
+      "date",
+      "models",
+      "other_tokens",
+      "period",
+      "previous_date_available",
+      "sample",
+      "source",
+      "source_url",
+      "timezone",
+      "token_unit",
+      "total_tokens",
+      "updated_at",
+      "version"
+    ],
+    "models": 50,
+    "as_of": "2026-10-31T13:48:36.758+00:00",
+    "date": "2026-10-30"
+  },
+  "/api/discover/repos": {
+    "error": "HTTP Error 404: Not Found"
+  }
+}

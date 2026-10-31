@@ -1,0 +1,160 @@
+[
+  {
+    "url": "https://code.claude.com/docs/en/quickstart",
+    "verified_url": "https://code.claude.com/docs/en/quickstart",
+    "status": 200,
+    "bytes": 431187,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://code.claude.com/docs/en/skills",
+    "verified_url": "https://code.claude.com/docs/en/skills",
+    "status": 200,
+    "bytes": 926882,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://code.claude.com/docs/en/memory",
+    "verified_url": "https://code.claude.com/docs/en/memory",
+    "status": 200,
+    "bytes": 540118,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://code.claude.com/docs/en/permissions",
+    "verified_url": "https://code.claude.com/docs/en/permissions",
+    "status": 200,
+    "bytes": 608107,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://code.claude.com/docs/en/common-workflows",
+    "verified_url": "https://code.claude.com/docs/en/common-workflows",
+    "status": 200,
+    "bytes": 580925,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://learn.chatgpt.com/docs/codex/cli",
+    "verified_url": "https://learn.chatgpt.com/docs/codex/cli.md",
+    "status": 200,
+    "bytes": 6710,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://learn.chatgpt.com/docs/auth",
+    "verified_url": "https://learn.chatgpt.com/docs/auth.md",
+    "status": 200,
+    "bytes": 17334,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+    "verified_url": "https://learn.chatgpt.com/docs/agent-configuration/agents-md.md",
+    "status": 200,
+    "bytes": 9149,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://learn.chatgpt.com/docs/build-skills",
+    "verified_url": "https://learn.chatgpt.com/docs/build-skills.md",
+    "status": 200,
+    "bytes": 11035,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://learn.chatgpt.com/docs/config-file/config-basic",
+    "verified_url": "https://learn.chatgpt.com/docs/config-file/config-basic.md",
+    "status": 200,
+    "bytes": 12673,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://github.com/Tencent/skillhub/blob/main/docs/api/README.md",
+    "verified_url": "https://raw.githubusercontent.com/Tencent/skillhub/main/docs/api/README.md",
+    "status": 200,
+    "bytes": 4231,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://github.com/Tencent/skillhub/blob/main/docs/api/skills.md",
+    "verified_url": "https://raw.githubusercontent.com/Tencent/skillhub/main/docs/api/skills.md",
+    "status": 200,
+    "bytes": 10380,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://github.com/Tencent/skillhub/blob/main/docs/api/files.md",
+    "verified_url": "https://raw.githubusercontent.com/Tencent/skillhub/main/docs/api/files.md",
+    "status": 200,
+    "bytes": 3837,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://github.com/Tencent/skillhub/blob/main/docs/api/versions-and-diff.md",
+    "verified_url": "https://raw.githubusercontent.com/Tencent/skillhub/main/docs/api/versions-and-diff.md",
+    "status": 200,
+    "bytes": 6634,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://github.com/Tencent/skillhub/blob/main/docs/api/evaluation.md",
+    "verified_url": "https://raw.githubusercontent.com/Tencent/skillhub/main/docs/api/evaluation.md",
+    "status": 200,
+    "bytes": 4349,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://ollama.com/",
+    "verified_url": "https://ollama.com/",
+    "status": 200,
+    "bytes": 16315,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://lmstudio.ai/",
+    "verified_url": "https://lmstudio.ai/",
+    "status": 200,
+    "bytes": 87917,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://www.comfy.org/",
+    "verified_url": "https://comfy.org/",
+    "status": 200,
+    "bytes": 256090,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://github.com/ggml-org/llama.cpp",
+    "verified_url": "https://github.com/ggml-org/llama.cpp",
+    "status": 200,
+    "bytes": 395680,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://docs.vllm.ai/en/latest/",
+    "verified_url": "https://docs.vllm.ai/en/latest/",
+    "status": 200,
+    "bytes": 187107,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://www.perplexity.ai/",
+    "verified_url": "https://www.perplexity.ai/",
+    "status": 200,
+    "bytes": 19120,
+    "checked_date": "2026-11-01"
+  },
+  {
+    "url": "https://chat.mistral.ai/",
+    "error": "HTTP Error 403: Forbidden",
+    "browser_verification": {
+      "status": "reachable",
+      "final_url": "https://chat.mistral.ai/chat",
+      "title": "Vibe Chat",
+      "method": "web open",
+      "checked_date": "2026-11-01"
+    }
+  }
+]

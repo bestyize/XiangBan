@@ -1,0 +1,41 @@
+{
+  "templateVersion": 1,
+  "title": "面向用户的更新说明技能",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "提供真实变更与验证结果",
+  "boundary": "不虚构发布版本或测试通过",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "从输入中找出用户可观察的变化",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "将变更按新增、修复和使用注意整理",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "每条说明写清触发场景与现在的结果",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "删去没有证据支持的性能或稳定性夸张描述",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "列出实际验证范围和尚未确认的限制",
+      "done": false
+    }
+  ],
+  "record": {
+    "技术输入": null,
+    "用户说明": null,
+    "验证范围": null,
+    "尚未确认": null
+  }
+}

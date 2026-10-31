@@ -1,0 +1,49 @@
+{
+  "templateVersion": 1,
+  "title": "订阅到期自查表",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "自己选定的每月核查日",
+  "boundary": "不代为取消或付款",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "仅记录服务名称，不抄录账号密码和支付凭据",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "从服务自己的账单页面确认下次日期与金额",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "区分必需、偶尔使用、准备取消三类",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "想取消时前往该服务官方设置自行确认",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "保存取消确认信息，并安排下次手动核查",
+      "done": false
+    }
+  ],
+  "record": {
+    "服务名称": null,
+    "下次日期": null,
+    "金额": null,
+    "使用判断": null,
+    "动作": null,
+    "确认材料": null
+  },
+  "schedule": {
+    "enabled": false,
+    "timezone": "local",
+    "configure_manually": true,
+    "time": null
+  }
+}

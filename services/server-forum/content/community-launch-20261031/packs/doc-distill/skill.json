@@ -1,0 +1,43 @@
+{
+  "templateVersion": 1,
+  "title": "长文结构提炼技能",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "提供完整可见的目标文本",
+  "boundary": "遗漏材料必须明确说明",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "确定目标读者和需要回答的问题",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "标出材料中明确结论与仅为假设的内容",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "按主题归并重复信息，不改变原始立场",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "给结论关联章节或摘录位置",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "输出简明摘要、行动项和未解决问题",
+      "done": false
+    }
+  ],
+  "record": {
+    "材料": null,
+    "结论": null,
+    "依据位置": null,
+    "行动项": null,
+    "未决": null,
+    "摘要口径": null
+  }
+}

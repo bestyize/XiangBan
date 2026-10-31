@@ -1,0 +1,6 @@
+(()=>{
+const board=document.querySelector('#board'),status=document.querySelector('#status');let cells=[],moves=0,solution=new Set(),hint=-1;
+function toggle(i){const x=i%4,y=Math.floor(i/4);for(const [dx,dy] of [[0,0],[1,0],[-1,0],[0,1],[0,-1]]){let a=x+dx,b=y+dy;if(a>=0&&a<4&&b>=0&&b<4)cells[b*4+a]=!cells[b*4+a]}}
+function draw(){const won=cells.every(v=>!v);status.textContent=won?`花园安静了 · 用了 ${moves} 步`:`还亮着 ${cells.filter(Boolean).length} 盏 · 已走 ${moves} 步`;status.classList.toggle('won',won);board.replaceChildren();cells.forEach((v,i)=>{const b=document.createElement('button');b.type='button';b.dataset.index=i;b.dataset.lit=String(v);b.className=(v?'lit ':'')+(hint===i?'hint':'');b.textContent=v?'●':'○';b.setAttribute('aria-label',`第${Math.floor(i/4)+1}行第${i%4+1}列，${v?'亮':'灭'}${hint===i?'，提示位置':''}`);b.disabled=won;b.onclick=()=>{toggle(i);solution.has(i)?solution.delete(i):solution.add(i);moves++;hint=-1;draw()};board.append(b)})}
+function reset(){cells=Array(16).fill(false);solution=new Set();moves=0;hint=-1;for(let i=0;i<8;i++){const n=Math.floor(Math.random()*16);toggle(n);solution.has(n)?solution.delete(n):solution.add(n)}if(cells.every(v=>!v)){toggle(0);solution.add(0)}draw()}
+document.querySelector('#hint').onclick=()=>{hint=solution.values().next().value??-1;draw()};document.querySelector('#restart').onclick=reset;reset();})();

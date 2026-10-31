@@ -330,16 +330,33 @@ impl Check for Quota {
     }
 }
 
+/// Optional editorial source must be a public HTTPS link, never a credential-bearing URL.
+fn official_source(raw: &Option<String>) -> AppResult<Option<String>> {
+    let Some(raw) = raw.as_deref().map(str::trim).filter(|v| !v.is_empty()) else { return Ok(None); };
+    let url = reqwest::Url::parse(raw).map_err(|_| AppError::BadRequest("官方来源链接无效".into()))?;
+    if raw.len() > 2048 || raw.chars().any(char::is_control) || url.scheme() != "https" || url.host_str().is_none()
+        || !url.username().is_empty() || url.password().is_some() || url.port().is_some_and(|p| p != 443) {
+        return Err(AppError::BadRequest("官方来源必须是无凭据的 https 链接".into()));
+    }
+    Ok(Some(raw.to_owned()))
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct Launch {
     title: String,
     #[serde(default)]
     tags: Vec<String>,
+    #[serde(default)]
+    summary: String,
+    #[serde(default)]
+    source_url: Option<String>,
 }
 
 impl Check for Launch {
     fn check(&mut self) -> AppResult<()> {
         self.title = clean(&self.title, "标题", 80, true)?;
+        self.summary = clean(&self.summary, "摘要", 500, false)?;
+        self.source_url = official_source(&self.source_url)?;
         check_len(&self.tags, "标签", 5)?;
         for t in &mut self.tags {
             *t = clean(t, "标签", 12, true)?;
@@ -351,15 +368,26 @@ impl Check for Launch {
 #[derive(Deserialize, Serialize)]
 pub struct Promo {
     text: String,
-    started_at: DateTime<Utc>,
-    ends_at: DateTime<Utc>,
+    #[serde(default)]
+    started_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    ends_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    source_url: Option<String>,
+    #[serde(default)]
+    eligibility: String,
 }
 
 impl Check for Promo {
     fn check(&mut self) -> AppResult<()> {
         self.text = clean(&self.text, "说明", 80, true)?;
-        if self.ends_at <= self.started_at {
-            return Err(AppError::BadRequest("结束时间要晚于开始时间".into()));
+        self.source_url = official_source(&self.source_url)?;
+        self.eligibility = clean(&self.eligibility, "适用资格", 500, false)?;
+        match (self.started_at, self.ends_at) {
+            (Some(start), Some(end)) if end > start => {},
+            (_, None) if self.source_url.is_some() && !self.eligibility.is_empty() => {},
+            (_, None) => return Err(AppError::BadRequest("长期权益必须填写官方来源与适用资格，不能承诺所有人适用".into())),
+            _ => return Err(AppError::BadRequest("限时活动须填写真实开始时间，结束时间要晚于开始时间".into())),
         }
         Ok(())
     }
@@ -806,4 +834,28 @@ mod tests {
         assert!(out.get("evil").is_none());
         assert_eq!(out["brand_color"], "#ABCDEF");
     }
+    #[test]
+    fn promo_and_launch_sources_accept_truthful_ongoing_benefits_without_invented_dates() {
+        let ongoing=json!({"text":"学生优惠","started_at":null,"ends_at":null,"source_url":"https://education.github.com/pack","eligibility":"须通过学生资格验证，地区与领取资格以官方条件为准"});
+        let out=validate("promo",ongoing.clone()).unwrap();
+        assert!(out["started_at"].is_null() && out["ends_at"].is_null());
+        assert_eq!(out["source_url"],"https://education.github.com/pack");
+        for key in ["source_url","eligibility"] {
+            let mut bad=ongoing.clone();bad.as_object_mut().unwrap().remove(key);
+            assert!(validate("promo",bad).is_err());
+        }
+        for url in ["http://official.example", "javascript:alert(1)", "https://user:secret@official.example", "https://official.example:8443/path"] {
+            let mut bad=ongoing.clone();bad["source_url"]=json!(url);
+            assert!(validate("promo",bad).is_err());
+            assert!(validate("launch",json!({"title":"历史发布","source_url":url})).is_err());
+        }
+        assert!(validate("promo",json!({"text":"限时","ends_at":"2026-12-01T00:00:00Z"})).is_err());
+        assert!(validate("promo",json!({"text":"限时","started_at":"2026-12-01T00:00:00Z","ends_at":"2026-11-01T00:00:00Z"})).is_err());
+        assert!(validate("promo",json!({"text":"旧协议限时","started_at":"2025-01-01T00:00:00Z","ends_at":"2025-02-01T00:00:00Z"})).is_ok());
+        let launch=validate("launch",json!({"title":"历史回顾｜模型发布","summary":"官方原始发布记录","source_url":"https://www.anthropic.com/news/claude-sonnet-4-5"})).unwrap();
+        assert_eq!(launch["summary"],"官方原始发布记录");
+        assert!(launch["source_url"].as_str().unwrap().starts_with("https://"));
+        assert!(validate("launch",json!({"title":"旧条目","tags":[]})).is_ok());
+    }
+
 }

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "widget",
+  "id": "three-priorities",
+  "name": "今日三件事",
+  "version": "1.0.0",
+  "description": "可勾选、可填写的三项优先事项卡，刷新后恢复空白，不会保存输入。",
+  "author": "小伴社区原创作品",
+  "license": "MIT",
+  "width": 340,
+  "height": 290,
+  "theme": "transparent"
+}

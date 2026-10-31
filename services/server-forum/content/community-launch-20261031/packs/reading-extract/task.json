@@ -1,0 +1,42 @@
+{
+  "templateVersion": 1,
+  "title": "一篇文章三张卡",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "读完一篇材料之后",
+  "boundary": "附明确来源栏",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "先写文章标题、作者和你实际读到的来源位置",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "用一句话复述作者的核心观点",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "摘录必要的短证据并区分转述与原话",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "写一个与你当前工作相关的应用场景",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "记录不认同或尚不能验证的部分",
+      "done": false
+    }
+  ],
+  "record": {
+    "来源": null,
+    "观点卡": null,
+    "证据卡": null,
+    "应用卡": null,
+    "未验证": null
+  }
+}

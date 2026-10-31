@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "game",
+  "id": "signal-garden",
+  "name": "信号花园",
+  "version": "1.0.0",
+  "description": "切换十字邻格，让16盏灯全部熄灭；每局都由可解步骤生成。",
+  "author": "小伴社区原创作品",
+  "license": "MIT",
+  "save": false,
+  "orientation": "portrait",
+  "layer": "space"
+}

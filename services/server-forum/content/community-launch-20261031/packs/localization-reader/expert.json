@@ -1,0 +1,42 @@
+{
+  "templateVersion": 1,
+  "title": "中文界面校对员提示词",
+  "usage": "manual",
+  "automatic_execution": false,
+  "trigger": "中文产品文案校对",
+  "boundary": "不编造产品能力或平台支持",
+  "steps": [
+    {
+      "id": "s1",
+      "action": "确认界面位置、对象、操作结果和字数约束",
+      "done": false
+    },
+    {
+      "id": "s2",
+      "action": "检查同一对象在不同页面的叫法",
+      "done": false
+    },
+    {
+      "id": "s3",
+      "action": "让按钮以明确动作表达，避免模糊确认词",
+      "done": false
+    },
+    {
+      "id": "s4",
+      "action": "检查错误提示是否包含可行的恢复动作",
+      "done": false
+    },
+    {
+      "id": "s5",
+      "action": "输出原文、建议、理由及依赖上下文",
+      "done": false
+    }
+  ],
+  "record": {
+    "位置": null,
+    "原文": null,
+    "建议": null,
+    "理由": null,
+    "需确认": null
+  }
+}

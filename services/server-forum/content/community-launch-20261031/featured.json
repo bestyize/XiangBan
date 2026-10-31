@@ -1,0 +1,43 @@
+[
+  {
+    "method": "PUT",
+    "path": "/api/admin/community-editorial/featured",
+    "body": {
+      "expected_revision": 1,
+      "items": [
+        {
+          "pack_id": 42,
+          "sort_order": 0
+        },
+        {
+          "pack_id": 51,
+          "sort_order": 1
+        },
+        {
+          "pack_id": 47,
+          "sort_order": 2
+        },
+        {
+          "pack_id": 37,
+          "sort_order": 3
+        },
+        {
+          "pack_id": 52,
+          "sort_order": 4
+        },
+        {
+          "pack_id": 44,
+          "sort_order": 5
+        },
+        {
+          "pack_id": 1,
+          "sort_order": 6
+        },
+        {
+          "pack_id": 29,
+          "sort_order": 7
+        }
+      ]
+    }
+  }
+]
