@@ -116,8 +116,8 @@ fun HomeBar(title: String, modifier: Modifier = Modifier, trailing: (@Composable
 private data class NavSlot(val tab: Tab?, val icon: ImageVector, val label: String)
 
 private val NavSlots = listOf(
-    NavSlot(Tab.Ai, XIcons.Sparkle, "小伴AI"),
-    NavSlot(Tab.Games, XIcons.Gamepad, "游戏"),
+    NavSlot(Tab.Ai, XIcons.Message, "小伴AI"),
+    NavSlot(Tab.Games, XIcons.Sparkle, "创造"),
     NavSlot(null, XIcons.Plus, "发布"),
     NavSlot(Tab.Community, XIcons.Grid, "社区"),
     NavSlot(Tab.Mine, XIcons.User, "我的"),

@@ -137,6 +137,11 @@ class AndroidPlatformActions(
 
     override suspend fun pickChatAttachment(image: Boolean) = attachments?.pick(image)
 
+    private val creationSharing = AndroidCreationSharing(context)
+    override suspend fun gamePackage(id: String) = creationSharing.gamePackage(id)
+    override suspend fun shareGamePackage(id: String) = creationSharing.shareGame(id)
+    override suspend fun creationCover(id: String) = creationSharing.cover(id)
+    override suspend fun shareCreationPreview(title: String, description: String, cover: ByteArray?) = creationSharing.sharePreview(title, description, cover)
     private val gameLibrary = AndroidGameLibrary(context.applicationContext)
     override val gamesSupported = true
     override val recentGames get() = AndroidGameHistory.flow(context)

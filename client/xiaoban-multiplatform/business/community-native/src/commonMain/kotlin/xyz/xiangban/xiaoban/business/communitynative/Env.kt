@@ -67,6 +67,11 @@ interface PlatformActions : VoicePlatform {
     suspend fun builtinGameCover(id: String): ByteArray? = null
     /** 导出兼容桌面的 ZIP，由用户在系统文件选择器中保存。 */
     suspend fun exportGame(id: String): Boolean = false
+    /** Returns a validated local ZIP without uploading it; publishing still requires explicit submission. */
+    suspend fun gamePackage(id: String): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = null
+    suspend fun shareGamePackage(id: String): Boolean = false
+    suspend fun creationCover(id: String): ByteArray? = null
+    suspend fun shareCreationPreview(title: String, description: String, cover: ByteArray?): Boolean = false
     /** 通过系统选择器读取用户明确选择的图片或文本文件。 */
     suspend fun pickChatAttachment(image: Boolean): ChatAttachment? = null
     /** 横屏全屏的页面（散点图）进入时锁成横屏，离开时恢复；平台不支持就什么也不做。 */

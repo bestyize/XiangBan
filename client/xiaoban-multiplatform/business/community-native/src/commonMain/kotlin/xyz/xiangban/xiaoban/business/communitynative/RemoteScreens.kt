@@ -183,14 +183,14 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: (Route) -> Unit) {
+fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: (Route) -> Unit, initialDraft: String = "") {
     val session by env.session.state.collectAsState()
     val remote by env.remoteChat.state.collectAsState()
     // 侧栏里可以换设备；换了以后页面跟着新设备走，返回仍回到“我的设备”。
     var activePeer by rememberSaveable(peerId) { mutableStateOf(peerId) }
     val peer = remote.peers.firstOrNull { it.id == activePeer }
     val online = peer?.online == true
-    var input by rememberSaveable { mutableStateOf("") }
+    var input by rememberSaveable(peerId, initialDraft) { mutableStateOf(initialDraft) }
     var drawer by rememberSaveable { mutableStateOf(false) }
     var attach by rememberSaveable { mutableStateOf(false) }
     // 0 关着，1 选权限，2 确认开启完全信任

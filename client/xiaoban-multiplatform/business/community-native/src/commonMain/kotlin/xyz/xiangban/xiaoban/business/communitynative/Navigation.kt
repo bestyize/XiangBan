@@ -1,5 +1,8 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import io.ktor.http.encodeURLParameter
+import io.ktor.http.decodeURLPart
+
 /** 页面栈里的一页。编码成字符串，方便旋转屏幕后恢复。 */
 sealed interface Route {
     data class Pack(val id: Long) : Route
@@ -13,7 +16,7 @@ sealed interface Route {
     data object Bookmarks : Route
     data object Blocks : Route
     data class User(val uid: String, val tab: String = "topics") : Route
-    data class PublishPack(val packId: Long? = null) : Route
+    data class PublishPack(val packId: Long? = null, val localGameId: String? = null) : Route
     data class Topic(val id: Long) : Route
     data class Weekly(val week: String) : Route
     data class Project(val slug: String) : Route
@@ -28,6 +31,7 @@ sealed interface Route {
     data object Login : Route
     data object Search : Route
     data object NewPost : Route
+    data class CreationPost(val title: String, val body: String) : Route
     /** 发求助：和发帖同一页，一打开就选好「资源求助」并显示悬赏设置。 */
     data object NewHelp : Route
     data object Settings : Route
@@ -40,7 +44,7 @@ sealed interface Route {
     data object AiChat : Route
     data object Devices : Route
     /** 某台设备上的聊天页：左侧栏是这台设备的项目和对话，具体打开哪个对话由遥控控制器记着。 */
-    data class RemoteChat(val peer: String) : Route
+    data class RemoteChat(val peer: String, val draft: String = "") : Route
 
     fun encode(): String = when (this) {
         is Pack -> "pack:$id"
@@ -54,7 +58,7 @@ sealed interface Route {
         Bookmarks -> "bookmarks"
         Blocks -> "blocks"
         is User -> "user:$uid:$tab"
-        is PublishPack -> packId?.let { "publishpack:$it" } ?: "publishpack"
+        is PublishPack -> localGameId?.let { "publishgame:$it" } ?: packId?.let { "publishpack:$it" } ?: "publishpack"
         is Topic -> "topic:$id"
         is Weekly -> "weekly:$week"
         is Project -> "project:$slug"
@@ -65,6 +69,7 @@ sealed interface Route {
         Login -> "login"
         Search -> "search"
         NewPost -> "newpost"
+        is CreationPost -> "creationpost:${title.encodeURLParameter()}:${body.encodeURLParameter()}"
         NewHelp -> "newhelp"
         Settings -> "settings"
         Models -> "models"
@@ -72,7 +77,7 @@ sealed interface Route {
         Voice -> "voice"
         AiChat -> "aichat"
         Devices -> "devices"
-        is RemoteChat -> "rchat:$peer"
+        is RemoteChat -> "rchat:$peer" + if (draft.isNotBlank()) ":${draft.encodeURLParameter()}" else ""
     }
 
     companion object {
@@ -102,6 +107,8 @@ sealed interface Route {
                 "login" -> Login
                 "search" -> Search
                 "newpost" -> NewPost
+                "creationpost" -> runCatching { CreationPost(value.substringBefore(':').decodeURLPart(), value.substringAfter(':', "").decodeURLPart()) }.getOrNull()
+                "publishgame" -> value.takeIf { it.matches(Regex("[a-z0-9][a-z0-9-]{1,39}")) }?.let { PublishPack(localGameId = it) }
                 "newhelp" -> NewHelp
                 "settings" -> Settings
                 "models" -> Models
@@ -109,7 +116,7 @@ sealed interface Route {
                 "voice" -> Voice
                 "aichat" -> AiChat
                 "devices" -> Devices
-                "rchat" -> value.takeIf { it.isNotEmpty() }?.let(::RemoteChat)
+                "rchat" -> value.substringBefore(':').takeIf { it.isNotEmpty() }?.let { peer -> runCatching { RemoteChat(peer, value.substringAfter(':', "").decodeURLPart()) }.getOrNull() }
                 else -> null
             }
         }
@@ -126,4 +133,4 @@ sealed interface Route {
 }
 
 /** 悬浮导航里的四个去处（中间的“发布”是弹层，不是页面）。 */
-enum class Tab(val label: String) { Ai("小伴AI"), Games("游戏"), Community("社区"), Mine("我的") }
+enum class Tab(val label: String) { Ai("小伴AI"), Games("创造"), Community("社区"), Mine("我的") }

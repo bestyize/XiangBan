@@ -184,10 +184,10 @@ fun MyContentScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) 
 }
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, open: (Route) -> Unit) {
+fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, open: (Route) -> Unit, localGameId: String? = null) {
     val session by env.session.state.collectAsState()
     val scope = rememberCoroutineScope()
-    var kind by rememberSaveable(packId, session.accountId) { mutableStateOf("effect") }
+    var kind by rememberSaveable(packId, session.accountId) { mutableStateOf(if (localGameId != null) "game" else "effect") }
     var title by rememberSaveable(packId, session.accountId) { mutableStateOf("") }
     var summary by rememberSaveable(packId, session.accountId) { mutableStateOf("") }
     var tags by rememberSaveable(packId, session.accountId) { mutableStateOf("") }
@@ -199,6 +199,19 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
     var step by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var published by rememberSaveable(packId, session.accountId) { mutableStateOf<Long?>(null) }
+    var importedGame by rememberSaveable(localGameId, session.accountId) { mutableStateOf(false) }
+    LaunchedEffect(localGameId, session.accountId) {
+        if (localGameId != null && session.loggedIn && file == null && fileKey.isEmpty()) {
+            busy = true; step = "正在读取本地作品…"
+            try {
+                val game = env.games?.read(localGameId) ?: error("本地作品不可用")
+                file = env.platform?.gamePackage(localGameId) ?: error("当前平台不支持作品打包")
+                if (!importedGame) { kind = "game"; title = game.name; summary = game.description; importedGame = true }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { error = e.message ?: "读取本地作品失败" }
+            finally { busy = false; step = "" }
+        }
+    }
     BackHandler(enabled = busy) { /* 提交中避免退出导致状态不明；系统选择器仍可自行取消。 */ }
     Column(Modifier.fillMaxSize().imePadding()) {
         ScreenBar(if (packId == null) "发布内容包" else "发布新版本", onBack = { if (!busy) back() })
@@ -215,7 +228,8 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (packId == null) {
                 Text("资源类型", fontSize = 13.sp, color = LocalExtraColors.current.ink3)
-                PageChipRow(ContentPackLimits.keys.map { it to kindLabel(it) }, actualKind, { if (!busy) { kind = it; fileKey = "" } })
+                if (localGameId != null) Text("游戏 · 本机作品", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                else PageChipRow(ContentPackLimits.keys.map { it to kindLabel(it) }, actualKind, { if (!busy) { kind = it; fileKey = "" } })
             } else {
                 when (val state = existingState) {
                     Load.Loading -> Text("正在读取原作品…", fontSize = 14.sp)

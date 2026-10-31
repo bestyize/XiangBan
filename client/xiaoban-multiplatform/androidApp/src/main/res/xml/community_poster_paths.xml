@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="community-posters" path="community-posters/" />
+    <cache-path name="creation-share" path="creation-share/" />
 </paths>

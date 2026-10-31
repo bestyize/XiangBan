@@ -143,13 +143,14 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         Route.Bookmarks -> NativeBookmarksScreen(env, pop, push)
         Route.Blocks -> NativeBlocksScreen(env, pop, push)
         is Route.User -> NativeProfileScreen(env, route.uid, route.tab, pop, push)
-        is Route.PublishPack -> PublishContentScreen(env, route.packId, pop, push)
+        is Route.PublishPack -> PublishContentScreen(env, route.packId, pop, push, route.localGameId)
         is Route.Topic -> TopicDetailScreen(env, route.id, pop, push)
         is Route.Weekly -> WeeklyDetailScreen(env, route.week, push, pop)
         is Route.Project -> ProjectDetailScreen(env, route.slug, pop)
         Route.Login -> Unit // 登录作为弹窗显示在当前页面之上。
         Route.Search -> SearchScreen(env, back = pop, open = push)
         Route.NewPost -> NewPostScreen(env, back = pop, open = push)
+        is Route.CreationPost -> NewPostScreen(env, back = pop, open = push, initialTitle = route.title, initialBody = route.body)
         Route.NewHelp -> NewPostScreen(env, back = pop, open = push, help = true)
         is Route.Tool -> ToolDetailScreen(env, route.key, pop)
         Route.Daily -> DailyScreen(env, pop)
@@ -161,7 +162,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         Route.Voice -> VoiceSettingsScreen(env, back = pop)
         Route.AiChat -> AiChatPage(env, chat, back = pop, open = push)
         Route.Devices -> DevicesScreen(env, back = pop, open = push)
-        is Route.RemoteChat -> RemoteChatScreen(env, route.peer, back = pop, open = push)
+        is Route.RemoteChat -> RemoteChatScreen(env, route.peer, back = pop, open = push, initialDraft = route.draft)
     }
 }
 

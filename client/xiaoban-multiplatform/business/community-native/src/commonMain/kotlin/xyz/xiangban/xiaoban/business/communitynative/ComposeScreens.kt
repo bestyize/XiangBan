@@ -54,15 +54,15 @@ import xyz.xiangban.xiaoban.common.community.pollDraftError
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, help: Boolean = false) {
+fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, help: Boolean = false, initialTitle: String = "", initialBody: String = "") {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
     var categories by remember { mutableStateOf<List<Category>?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var parentId by rememberSaveable { mutableStateOf(-1) }
     var categoryId by rememberSaveable { mutableStateOf(-1) }
-    var title by rememberSaveable { mutableStateOf("") }
-    var body by rememberSaveable { mutableStateOf("") }
+    var title by rememberSaveable { mutableStateOf(initialTitle) }
+    var body by rememberSaveable { mutableStateOf(initialBody) }
     var busy by remember { mutableStateOf(false) }
     var uploading by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }

@@ -14,6 +14,18 @@ class RouteTest {
     }
 
     @Test
+    fun creationDraftsSurviveStackRestoreWithoutSplittingOnNewlines() {
+        val routes = listOf(
+            Route.PublishPack(localGameId = "pixel-adventure"),
+            Route.CreationPost("分享：小猫 + 星星", "第一行\n第二行：100% & hello?"),
+            Route.RemoteChat("dsk_1", "请制作壁纸：山丘\n保留 + % 与中文"),
+        )
+        assertEquals(routes, Route.decodeStack(Route.encodeStack(routes)))
+        assertNull(Route.decode("publishgame:../private"))
+        assertNull(Route.decode("publishgame:"))
+    }
+
+    @Test
     fun garbageIsDroppedInsteadOfCrashing() {
         assertNull(Route.decode("pack:abc"))
         assertNull(Route.decode("weekly:"))

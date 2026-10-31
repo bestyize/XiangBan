@@ -17,8 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -34,54 +36,89 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.svg.SvgDecoder
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
-import xyz.xiangban.xiaoban.common.community.BuiltinMobileGames
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.MobileGame
-import xyz.xiangban.xiaoban.common.community.MobileGameHistory
 
-private data class LibraryGame(val game: MobileGame, val builtin: Boolean)
+private val CreationTypes = listOf("全部", "游戏", "壁纸", "小组件", "特效", "伙伴")
+private data class CreationItem(val id: String, val name: String, val description: String, val kind: String,
+    val game: MobileGame? = null, val owned: Boolean = false) {
+    val key get() = (if (owned) "mine:" else "builtin:") + id
+    val device get() = if (game != null) "手机可玩" else "电脑创作灵感"
+}
+// These are reference ideas, not installed mobile desktop resources. Actual creation runs on the selected desktop.
+private val DesktopIdeas = listOf(
+    CreationItem("soft-hills", "柔软山丘", "制作一张层层山丘随光线缓慢变化的动画壁纸，色调柔和，适合长时间工作。", "壁纸"),
+    CreationItem("daylight-clock", "日光时钟", "制作一个简洁的桌面时钟小组件，显示真实时间与日期，配温暖的日光色调。", "小组件"),
+    CreationItem("fireflies", "流萤之夜", "制作一个夜间桌面萤火特效，光点缓慢浮动，不影响点击和正常工作。", "特效"),
+    CreationItem("sunflower", "向日葵小伴", "制作一位向日葵桌面伙伴，工作时安静陪伴，点击时轻轻摇摆回应。", "伙伴"),
+)
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit, onOverlayChanged: (Boolean) -> Unit = {}) {
-    val supported = env.platform?.gamesSupported == true
     var official by remember { mutableStateOf(emptyList<MobileGame>()) }
     var games by remember { mutableStateOf(emptyList<MobileGame>()) }
     var errors by remember { mutableStateOf(emptyList<String>()) }
     var loading by remember { mutableStateOf(true) }
-    var message by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableStateOf(0) }
-    var mine by rememberSaveable { mutableStateOf(!supported) }
-    var genre by rememberSaveable { mutableStateOf("全部") }
-    var detail by remember { mutableStateOf<LibraryGame?>(null) }
+    var mine by rememberSaveable { mutableStateOf(false) }
+    var category by rememberSaveable { mutableStateOf("全部") }
+    var detail by remember { mutableStateOf<CreationItem?>(null) }
+    // One sheet at a time; submenus retain the selected work without stacking focus locks.
+    var panel by remember { mutableStateOf("actions") }
     var creating by remember { mutableStateOf(false) }
+    var createKind by rememberSaveable { mutableStateOf("游戏") }
     var idea by rememberSaveable { mutableStateOf("") }
-    var exporting by remember { mutableStateOf(false) }
-    LaunchedEffect(detail != null, creating) { onOverlayChanged(detail != null || creating) }
-    DisposableEffect(Unit) { onDispose { onOverlayChanged(false) } }
+    var remotePrompt by remember { mutableStateOf<String?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
-    val history by (env.platform?.recentGames ?: remember { MutableStateFlow(emptyList<String>()) }).collectAsState()
+    val remote by env.remoteChat.state.collectAsState()
     val context = LocalPlatformContext.current
-    // Local bytes only: no network fetcher and no file URL is exposed to the games.
     val imageLoader = remember(context) { ImageLoader.Builder(context).components { add(SvgDecoder.Factory()) }.build() }
     DisposableEffect(imageLoader) { onDispose { imageLoader.shutdown() } }
     val covers = remember { mutableStateMapOf<String, ByteArray>() }
-    fun create(prompt: String) {
+    val overlay = detail != null || creating || remotePrompt != null
+    LaunchedEffect(overlay) { onOverlayChanged(overlay) }
+    DisposableEffect(Unit) { onDispose { onOverlayChanged(false) } }
+    fun close() { if (!busy) { detail = null; creating = false; remotePrompt = null; panel = "actions" } }
+    BackHandler(enabled = overlay) { if (!busy && detail != null && panel != "actions") panel = "actions" else close() }
+    fun createLocal(prompt: String) {
         if (!session.loggedIn) { open(Route.Login); return }
-        if (env.agent == null) { message = "当前安装包不支持本地游戏创作"; return }
-        if (cloud.sending) { message = "先结束当前任务，再开始游戏创作"; return }
-        creating = false
-        detail = null
+        if (env.agent == null) { message = "当前安装包不支持手机本地创作，可连接电脑创作。"; return }
+        if (cloud.sending) { message = "先结束当前任务，再开始新作品"; return }
+        close()
         chat.clearConversation()
         open(Route.AiChat)
         chat.send(prompt)
     }
-    fun play(game: MobileGame) {
-        if (env.platform?.openGame(game.id) == true) detail = null
-        else message = "当前平台无法打开游戏"
+    fun createOnComputer(prompt: String) {
+        if (!session.loggedIn) { open(Route.Login); return }
+        creating = false; detail = null; remotePrompt = prompt
+        scope.launch { env.remoteChat.refreshPeers() }
+    }
+    fun startCreation() {
+        if (createKind == "游戏") createLocal("帮我设计并制作一款支持手机触控和电脑键鼠的离线小游戏。我的想法：${idea.trim()}。先给出简短玩法方案让我确认，再按小伴游戏格式制作。")
+        else createOnComputer("请在这台电脑上帮我创作小伴桌面的${createKind}。我的想法：${idea.trim()}。先读取对应的资源规范，给出简短方案让我确认，再制作并预览。")
+    }
+    fun prepare(item: CreationItem? = null) {
+        detail = null
+        createKind = item?.kind ?: category.takeUnless { it == "全部" } ?: "游戏"
+        idea = item?.description.orEmpty()
+        creating = true
+    }
+    fun runAction(action: suspend () -> Unit) {
+        if (busy) return
+        busy = true
+        scope.launch {
+            try { action() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { message = e.message ?: "操作失败，请重试" }
+            finally { busy = false }
+        }
     }
     LaunchedEffect(env.games, reload) {
         loading = true
@@ -89,149 +126,210 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
         try {
             try { official = env.platform?.builtinGames().orEmpty() }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { failures += "官方游戏读取失败，请重试" }
+            catch (_: Exception) { failures += "官方游戏读取失败，请重试" }
             try { val scan = env.games?.scan(); games = scan?.games.orEmpty(); failures += scan?.errors.orEmpty() }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { failures += "我的游戏读取失败，请重试" }
+            catch (_: Exception) { failures += "本机作品读取失败，请重试" }
             covers.clear()
-            for (game in official) {
-                try { env.platform?.builtinGameCover(game.id)?.let { covers[game.id] = it } }
-                catch (e: CancellationException) { throw e }
-                catch (_: Exception) { /* The title artwork remains usable when a cover is absent. */ }
+            official.forEach { game ->
+                try { env.platform?.builtinGameCover(game.id)?.let { covers["builtin:${game.id}"] = it } }
+                catch (e: CancellationException) { throw e } catch (_: Exception) { }
             }
-            for (game in games) {
-                try { env.games?.readFile(game.id, "cover.svg")?.encodeToByteArray()?.takeIf { it.size <= 1024 * 1024 }?.let { covers[game.id] = it } }
-                catch (e: CancellationException) { throw e }
-                catch (_: Exception) { }
+            games.forEach { game ->
+                try { env.games?.readFile(game.id, "cover.svg")?.encodeToByteArray()?.takeIf { it.size <= 1024 * 1024 }?.let { covers["mine:${game.id}"] = it } }
+                catch (e: CancellationException) { throw e } catch (_: Exception) { }
+            }
+            DesktopIdeas.forEach { item ->
+                try { env.platform?.creationCover(item.id)?.let { covers[item.key] = it } }
+                catch (e: CancellationException) { throw e } catch (_: Exception) { }
             }
         } finally { errors = failures; loading = false }
     }
-    val all = official.map { LibraryGame(it, true) } + games.map { LibraryGame(it, false) }
-    val visible = if (mine) all.filter { !it.builtin } else all.filter { it.builtin && (genre == "全部" || BuiltinMobileGames.genre(it.game.id) == genre) }
-    val recent = MobileGameHistory.available(history, all.map { it.game }).firstOrNull()
+    val officialItems = official.map { CreationItem(it.id, it.name, it.description, "游戏", it) }
+    val myItems = games.map { CreationItem(it.id, it.name, it.description, "游戏", it, true) }
+    val visible = (if (mine) myItems else officialItems + DesktopIdeas).filter { category == "全部" || it.kind == category }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 8.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        LazyColumn(Modifier.fillMaxSize().statusBarsPadding(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                        listOf(false to "发现游戏", true to "我的游戏").forEach { (value, label) ->
-                            Column(Modifier.semantics { selected = mine == value }.clickable(role = Role.Tab) { mine = value }.padding(top = 4.dp, bottom = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(label, fontSize = 15.sp, fontWeight = if (mine == value) FontWeight.SemiBold else FontWeight.Normal, color = if (mine == value) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                                Box(Modifier.padding(top = 10.dp).width(18.dp).height(3.dp).background(if (mine == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background, CircleShape))
+                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        listOf(false to "发现", true to "我的作品").forEach { (value, label) ->
+                            Column(Modifier.semantics { selected = mine == value }.clickable(role = Role.Tab) { mine = value; category = "全部" }.padding(vertical = 7.dp)) {
+                                Text(label, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = if (mine == value) FontWeight.SemiBold else FontWeight.Normal, color = if (mine == value) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                                Box(Modifier.padding(top = 8.dp).width(20.dp).height(3.dp).background(if (mine == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background, CircleShape))
                             }
                         }
                     }
-                    IconTap(XIcons.Refresh, "刷新游戏", { if (!loading) reload++ }, size = 19.dp)
-                    IconTap(XIcons.Sparkle, "让小伴创作游戏", { creating = true }, Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = .09f), CircleShape), tint = MaterialTheme.colorScheme.primary)
+                    if (mine) IconTap(XIcons.Plus, "新建作品", { prepare() }, Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = .09f), CircleShape), tint = MaterialTheme.colorScheme.primary, size = 21.dp)
                 }
             }
-            if (!mine && recent != null) item {
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.surface).clickable { play(recent) }.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    GameCover(recent, covers[recent.id], imageLoader, Modifier.size(62.dp), false)
+            if (!mine) item {
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).background(MaterialTheme.colorScheme.surface).clickable { prepare() }.padding(15.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                    XIcon(XIcons.Sparkle, tint = MaterialTheme.colorScheme.primary, size = 27.dp)
                     Column(Modifier.weight(1f)) {
-                        Text("再来一局 ${recent.name}", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("最近玩过", Modifier.padding(top = 6.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("你想创造什么？", fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
+                        Text("一个游戏，一片风景，一位小伙伴…", Modifier.padding(top = 5.dp), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    XIcon(XIcons.Play, Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = .09f), CircleShape).padding(11.dp), tint = MaterialTheme.colorScheme.primary, size = 16.dp, description = "继续游玩")
+                    XIcon(XIcons.ArrowRight, tint = MaterialTheme.colorScheme.primary, size = 18.dp)
                 }
+            } else item {
+                Text("本机作品 · 电脑创作的装扮保存在对应电脑", fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (mine) "我的小宇宙" else "挑一款，放松一下", Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${visible.size} 款游戏", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                if (!mine) Row(Modifier.padding(top = 14.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("全部", "益智", "解压", "冒险").forEach { value ->
-                        val active = genre == value
-                        Text(value, Modifier.clip(RoundedCornerShape(6.dp)).background(if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.surfaceVariant).semantics { selected = active }.clickable(role = Role.Button) { genre = value }.padding(horizontal = 8.dp, vertical = 4.dp), fontSize = 12.sp, color = if (active) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            if (loading && visible.isEmpty()) item { Box(Modifier.fillMaxWidth().height(160.dp)) { Spinner() } }
+            item { CreationChips(CreationTypes, category) { category = it } }
             if (errors.isNotEmpty()) item {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(errors.joinToString("\n"), fontSize = 12.sp, color = MaterialTheme.colorScheme.error)
-                    LinkText("重新读取", { reload++ })
-                }
+                Text(errors.joinToString("\n"), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.error)
+                LinkText("重新读取", { reload++ })
             }
+            if (loading && visible.isEmpty()) item { Box(Modifier.fillMaxWidth().height(120.dp)) { Spinner() } }
             if (!loading && visible.isEmpty()) item {
-                EmptyState(XIcons.Gamepad, if (mine) "想玩的，自己创造" else "暂时没有可用游戏", if (!supported) "当前平台暂不支持本地游戏，请使用 Android 版。" else if (mine) "告诉小伴一个点子，一起做成小游戏。" else "试试其他分类，或刷新游戏列表。")
+                EmptyState(XIcons.Sparkle, "还没有${if (category == "全部") "" else category}作品", if (category !in listOf("全部", "游戏")) "桌面装扮在电脑上创作与使用，手机可遥控电脑继续创作。" else "从一个小小的想法开始吧。")
+                GhostPillButton("创作第一件作品", { prepare() }, Modifier.fillMaxWidth())
             }
-            items(visible.chunked(2), key = { row -> row.joinToString { it.game.id } }) { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    row.forEach { entry ->
+            if (mine) {
+                item { CreationSection("本机作品", "刷新", { if (!loading) reload++ }) }
+                items(visible, key = { it.key }) { entry ->
+                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface).clickable(role = Role.Button) { detail = entry; panel = "actions" }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(68.dp))
                         Column(Modifier.weight(1f)) {
-                            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(role = Role.Button) { detail = entry }.semantics { contentDescription = "查看${entry.game.name}" }) {
-                                GameCover(entry.game, covers[entry.game.id], imageLoader, Modifier.fillMaxWidth().aspectRatio(1f), true)
-                                Text(entry.game.name, Modifier.padding(top = 11.dp), fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text((if (entry.builtin) BuiltinMobileGames.genre(entry.game.id) else "我的作品") + " · " + if (entry.game.orientation == "portrait") "竖屏" else "横屏", Modifier.padding(top = 5.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            if (!entry.builtin) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                Text("可游玩", Modifier.weight(1f), fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                IconTap(XIcons.More, "管理${entry.game.name}", { detail = entry }, size = 18.dp)
+                            Text(entry.name, fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("${entry.kind} · ${entry.device}", Modifier.padding(top = 6.dp), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("保存在这台手机上", Modifier.padding(top = 6.dp), fontSize = 10.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        XIcon(XIcons.More, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
+                    }
+                }
+            } else {
+                // Games deliberately precede every desktop decoration, including the all-types view.
+                listOf("游戏", "桌面装扮").forEach { group ->
+                    val groupItems = visible.filter { (it.kind == "游戏") == (group == "游戏") }
+                    if (groupItems.isNotEmpty()) {
+                        item(key = "heading-$group") { CreationSection(if (group == "游戏") "给自己几分钟好玩" else "让桌面有点不一样", if (group == "游戏") "${groupItems.size} 款" else "电脑创作灵感") }
+                        items(groupItems.chunked(2), key = { row -> row.joinToString { it.key } }) { row ->
+                            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                row.forEach { entry ->
+                                    Column(Modifier.weight(1f).clip(RoundedCornerShape(15.dp)).clickable(role = Role.Button) { detail = entry; panel = "actions" }.semantics { contentDescription = "${entry.name}，打开作品操作" }) {
+                                        CreationCover(entry, covers[entry.key], imageLoader, Modifier.fillMaxWidth().aspectRatio(1.12f))
+                                        Text(entry.name, Modifier.padding(top = 9.dp), fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                                            Text(entry.kind, Modifier.weight(1f), fontSize = 10.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            XIcon(if (entry.game != null) XIcons.Phone else XIcons.Monitor, size = 11.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(entry.device, Modifier.padding(start = 3.dp), fontSize = 10.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                    }
+                                }
+                                if (row.size == 1) Spacer(Modifier.weight(1f))
                             }
                         }
                     }
-                    if (row.size == 1) Spacer(Modifier.weight(1f))
-                }
-            }
-            item {
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).background(MaterialTheme.colorScheme.primary.copy(alpha = .08f)).clickable { creating = true }.padding(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("有个好玩的点子？", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = MaterialTheme.colorScheme.primary)
-                        Text("和小伴一起，把它做出来", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    XIcon(XIcons.Sparkle, tint = MaterialTheme.colorScheme.primary)
                 }
             }
         }
         detail?.let { entry ->
-            val game = entry.game
-            BottomSheet({ if (!exporting) detail = null }) {
-                Column(Modifier.fillMaxWidth().heightIn(max = 560.dp).verticalScroll(rememberScrollState())) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        GameCover(game, covers[game.id], imageLoader, Modifier.size(72.dp), false)
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(game.name, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text((if (entry.builtin) "小伴官方" else "我的作品") + " · " + if (game.orientation == "portrait") "竖屏游玩" else "横屏游玩", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            BottomSheet({ if (!busy && panel != "actions") panel = "actions" else close() }) {
+                Column(Modifier.fillMaxWidth().heightIn(max = 590.dp).verticalScroll(rememberScrollState())) {
+                    Row(Modifier.padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(52.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(entry.name, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text("${entry.kind} · ${if (entry.owned) "我的作品" else if (entry.game != null) "小伴官方" else "创作灵感"}", Modifier.padding(top = 5.dp), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        IconTap(XIcons.Close, "关闭游戏详情", { if (!exporting) detail = null }, Modifier.align(Alignment.Top), size = 18.dp)
+                        IconTap(XIcons.Close, "关闭作品操作", { close() }, size = 18.dp)
                     }
-                    Text(game.description, Modifier.fillMaxWidth().padding(vertical = 16.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (game.save) Text("进度保存在这台手机上", Modifier.padding(bottom = 16.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    PillButton("开始游玩", { play(game) }, Modifier.fillMaxWidth(), enabled = supported && !exporting, icon = XIcons.Play)
-                    if (!entry.builtin) {
-                        Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            GhostPillButton("继续修改", { create("请先读取 games/${game.id} 中的游戏源码和试玩记录，问我想怎样修改《${game.name}》，然后在原游戏上迭代。") }, Modifier.weight(1f), enabled = !exporting, height = 44.dp, fontSize = 13)
-                            GhostPillButton(if (exporting) "导出中…" else "导出游戏包", {
-                                if (!exporting) scope.launch {
-                                    exporting = true
-                                    try { if (env.platform?.exportGame(game.id) != true) message = "当前平台无法导出游戏" }
-                                    catch (e: CancellationException) { throw e }
-                                    catch (e: Exception) { message = e.message ?: "导出失败" }
-                                    finally { exporting = false }
+                    when (panel) {
+                        "actions" -> {
+                            CreationActionGroup {
+                                CreationAction(if (entry.game != null) XIcons.Play else XIcons.Eye, if (entry.game != null) "开始游玩" else "预览灵感", if (entry.game != null) "手机可玩" else "电脑装扮", !busy) {
+                                    if (entry.game != null) {
+                                        if (env.platform?.openGame(entry.id) == true) close() else message = "当前平台无法打开游戏"
+                                    } else panel = "preview"
                                 }
-                            }, Modifier.weight(1f), enabled = !exporting, height = 44.dp, fontSize = 13)
+                                CreationAction(XIcons.Pen, if (entry.owned) "继续修改" else "做一个我的版本", enabled = !busy) {
+                                    if (entry.owned) createLocal("请先读取 games/${entry.id} 中的游戏源码和试玩记录，问我想怎样修改《${entry.name}》，然后在原游戏上迭代。") else prepare(entry)
+                                }
+                                CreationAction(XIcons.Monitor, if (entry.game != null) "发送到电脑" else "在电脑上创作", enabled = !busy) {
+                                    if (entry.game == null) createOnComputer("请在电脑上参考以下想法制作小伴桌面${entry.kind}：${entry.description} 先读取规范并给出方案让我确认。") else panel = "computer"
+                                }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            CreationActionGroup {
+                                CreationAction(XIcons.Globe, "分享到社区", enabled = !busy) {
+                                    close()
+                                    if (entry.owned) open(Route.PublishPack(localGameId = entry.id))
+                                    else open(Route.CreationPost("分享：${entry.name}", "${entry.name}\n\n${entry.description}\n\n${if (entry.game != null) "来自小伴官方游戏，在小伴手机「创造」中游玩。" else "小伴桌面创作灵感，可连接电脑制作。"}"))
+                                }
+                                CreationAction(XIcons.Share, "分享到其他渠道", enabled = !busy) { panel = "share" }
+                            }
+                        }
+                        "preview" -> {
+                            CreationCover(entry, covers[entry.key], imageLoader, Modifier.fillMaxWidth().height(220.dp))
+                            Text(entry.description, Modifier.padding(vertical = 16.dp), fontSize = 13.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("这是创作参考图。动画与互动效果需要在电脑上制作并预览。", fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(14.dp))
+                            CreationActionGroup { CreationAction(XIcons.Sparkle, "做一个我的版本", enabled = !busy) { prepare(entry) } }
+                        }
+                        "computer" -> {
+                            Text(if (entry.owned) "将作品包通过系统分享发送给电脑，或保存后自行传输。在电脑的小伴中导入即可使用；不会自动覆盖已有作品。" else "这款官方游戏已内置于小伴桌面。可打开电脑对话，让小伴找到它。", fontSize = 13.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(16.dp))
+                            CreationActionGroup {
+                                if (entry.owned) {
+                                    CreationAction(XIcons.Share, "分享作品包到电脑", enabled = !busy) { runAction { if (env.platform?.shareGamePackage(entry.id) != true) message = "当前平台不支持分享作品包" } }
+                                    CreationAction(XIcons.Download, "保存作品包", enabled = !busy) { runAction { if (env.platform?.exportGame(entry.id) != true) message = "当前平台不支持导出" } }
+                                } else CreationAction(XIcons.Monitor, "选择电脑", enabled = !busy) { createOnComputer("请帮我在小伴桌面的官方游戏里找到《${entry.name}》（${entry.id}），告诉我怎么开始游玩。") }
+                            }
+                        }
+                        "share" -> {
+                            Text("选择分享形式，再选择接收应用", fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Spacer(Modifier.height(14.dp))
+                            CreationActionGroup {
+                                CreationAction(XIcons.Image, "分享作品卡片", "图片", !busy) { runAction { if (env.platform?.shareCreationPreview(entry.name, entry.description, covers[entry.key]) != true) message = "当前平台不支持分享图片" } }
+                                if (entry.owned) CreationAction(XIcons.Download, "分享作品包", "可导入使用", !busy) { runAction { if (env.platform?.shareGamePackage(entry.id) != true) message = "当前平台不支持分享作品包" } }
+                                CreationAction(XIcons.Share, "分享文字介绍", enabled = !busy) { env.platform?.share(entry.name, entry.description) }
+                            }
                         }
                     }
+                    if (busy) Text("正在准备作品…", Modifier.padding(top = 12.dp), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (panel == "actions") "取消" else "返回", Modifier.fillMaxWidth().clickable(enabled = !busy) { if (panel == "actions") close() else panel = "actions" }.padding(vertical = 16.dp), fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
             }
         }
-        if (creating) BottomSheet({ creating = false }, panelModifier = Modifier.imePadding()) {
-            Column(Modifier.fillMaxWidth().heightIn(max = 500.dp).verticalScroll(rememberScrollState())) {
+        if (creating) BottomSheet({ close() }, panelModifier = Modifier.imePadding()) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 550.dp).verticalScroll(rememberScrollState())) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("想玩什么，你说了算", Modifier.weight(1f), fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                    IconTap(XIcons.Close, "关闭游戏创作", { creating = false })
+                    Text("让想法开始发生", Modifier.weight(1f), fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold)
+                    IconTap(XIcons.Close, "关闭创作", { close() }, size = 18.dp)
                 }
-                Box(Modifier.padding(top = 18.dp, bottom = 12.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.background).padding(16.dp)) {
-                    if (idea.isEmpty()) Text("比如：一只小猫在云朵间跳跃，收集星星…", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().heightIn(min = 100.dp).semantics { contentDescription = "游戏想法" }, textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, lineHeight = 23.sp), cursorBrush = Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)))
+                Text("告诉小伴你想做什么，一起把它变成作品。", Modifier.padding(top = 8.dp, bottom = 16.dp), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                CreationChips(CreationTypes.drop(1), createKind) { createKind = it }
+                Box(Modifier.padding(vertical = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.background).padding(14.dp)) {
+                    if (idea.isEmpty()) Text(if (createKind == "游戏") "例如：做一个小猫跳跃收集星星的游戏" else "描述你想要的${createKind}，小伴会在电脑上制作", fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().heightIn(min = 110.dp).semantics { contentDescription = "创作想法" }, textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, lineHeight = 22.sp), cursorBrush = Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)))
                 }
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf("治愈系消除", "像素小冒险", "我的专属2048").forEach { prompt -> Text(prompt, Modifier.clip(RoundedCornerShape(9.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { idea = prompt }.padding(11.dp), fontSize = 12.sp) }
+                val hints = if (createKind == "游戏") listOf("星星跳跃游戏", "像素小冒险", "治愈系消除") else DesktopIdeas.filter { it.kind == createKind }.map { it.description }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    hints.forEach { hint -> Text(hint.take(14), Modifier.clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { idea = hint }.padding(9.dp), fontSize = 11.sp) }
                 }
-                Spacer(Modifier.height(22.dp))
-                PillButton("和小伴一起创作", { create("帮我设计并制作一款支持手机触控和电脑键鼠的离线小游戏。我的想法：${idea.trim()}。先给出简短玩法方案让我确认，再按小伴游戏格式制作。") }, Modifier.fillMaxWidth(), enabled = idea.isNotBlank())
+                Text(if (createKind == "游戏") "在手机上制作，进入对话后先确认方案。" else "选择已连接电脑后进入对话，作品保存在电脑上。", Modifier.padding(vertical = 16.dp), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                PillButton(if (createKind == "游戏") "和小伴一起创作" else "选择电脑继续创作", { startCreation() }, Modifier.fillMaxWidth(), enabled = idea.isNotBlank())
+            }
+        }
+        remotePrompt?.let { prompt ->
+            BottomSheet({ close() }) {
+                Text("选择电脑", fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold)
+                Text("将想法带入电脑对话，由你确认发送。", Modifier.padding(vertical = 12.dp), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+                    remote.peers.forEach { peer ->
+                        CreationAction(XIcons.Monitor, peer.name, if (peer.online) "在线" else "离线", enabled = peer.online && !remote.sending) {
+                            env.remoteChat.selectPeer(peer.id)
+                            env.remoteChat.newSession()
+                            close()
+                            open(Route.RemoteChat(peer.id, prompt))
+                        }
+                    }
+                }
+                if (remote.peers.isEmpty()) Text("还没有连接的电脑，请在电脑上登录同一小伴账号并开启手机遥控。", fontSize = 13.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (remote.sending) Text("电脑正在执行任务，请结束当前任务后再创建。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                Spacer(Modifier.height(12.dp))
+                GhostPillButton("管理我的电脑", { close(); open(Route.Devices) }, Modifier.fillMaxWidth())
             }
         }
         Toast(message) { message = null }
@@ -239,13 +337,42 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
 }
 
 @Composable
-private fun GameCover(game: MobileGame, bytes: ByteArray?, loader: ImageLoader, modifier: Modifier, play: Boolean) {
+private fun CreationSection(title: String, trailing: String, action: (() -> Unit)? = null) {
+    Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(title, Modifier.weight(1f), fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text(trailing, Modifier.then(if (action != null) Modifier.clickable { action() }.padding(6.dp) else Modifier), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun CreationChips(values: List<String>, value: String, select: (String) -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        values.forEach { item ->
+            val active = value == item
+            Text(item, Modifier.clip(RoundedCornerShape(6.dp)).background(if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.background).semantics { selected = active }.clickable(role = Role.Button) { select(item) }.padding(horizontal = 9.dp, vertical = 5.dp), fontSize = 11.sp, lineHeight = 16.sp, color = if (active) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun CreationActionGroup(content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(15.dp)).background(MaterialTheme.colorScheme.background).padding(horizontal = 14.dp), content = content)
+}
+
+@Composable
+private fun CreationAction(icon: ImageVector, title: String, trailing: String = "", enabled: Boolean = true, action: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 51.dp).clickable(enabled = enabled, role = Role.Button, onClick = action).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        XIcon(icon, size = 18.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .45f))
+        Text(title, Modifier.weight(1f), fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .45f))
+        if (trailing.isNotEmpty()) Text(trailing, fontSize = 10.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun CreationCover(item: CreationItem, bytes: ByteArray?, loader: ImageLoader, modifier: Modifier) {
     var failed by remember(bytes) { mutableStateOf(false) }
-    Box(modifier.clip(RoundedCornerShape(17.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
-        if (bytes == null || failed) Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            XIcon(XIcons.Gamepad, size = 32.dp, tint = MaterialTheme.colorScheme.primary)
-            Text(game.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        } else AsyncImage(model = bytes, imageLoader = loader, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = if (game.id == "jade-gomoku") ContentScale.Fit else ContentScale.Crop, onError = { failed = true })
-        if (play) Box(Modifier.align(Alignment.BottomEnd).padding(10.dp).size(28.dp).background(MaterialTheme.colorScheme.surface.copy(alpha = .92f), CircleShape), contentAlignment = Alignment.Center) { XIcon(XIcons.Play, size = 13.dp) }
+    Box(modifier.clip(RoundedCornerShape(15.dp)).background(when (item.id) { "jade-gomoku" -> androidx.compose.ui.graphics.Color(0xff211b13); "ink-blade" -> androidx.compose.ui.graphics.Color(0xffe7e0cd); "pro-cube" -> androidx.compose.ui.graphics.Color(0xff0a1020); else -> MaterialTheme.colorScheme.surfaceVariant }), contentAlignment = Alignment.Center) {
+        if (bytes == null || failed) XIcon(if (item.game != null) XIcons.Gamepad else XIcons.Sparkle, size = 28.dp, tint = MaterialTheme.colorScheme.primary)
+        else AsyncImage(model = bytes, imageLoader = loader, contentDescription = null, modifier = Modifier.fillMaxSize().then(if (item.kind == "伙伴") Modifier.padding(10.dp) else Modifier), contentScale = if (item.game != null || item.id == "sunflower") ContentScale.Fit else ContentScale.Crop, onError = { failed = true })
     }
 }
