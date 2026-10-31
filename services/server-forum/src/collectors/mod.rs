@@ -64,7 +64,7 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
         .bind(&source)
         .execute(&mut *tx)
         .await?;
-    sqlx::query("UPDATE collection_sources SET active_run=$2,lease_until=now()+interval '10 minutes',next_run_at=now()+make_interval(mins=>interval_minutes) WHERE id=$1")
+    sqlx::query("UPDATE collection_sources SET active_run=$2,lease_until=now()+interval '10 minutes',next_run_at=CASE WHEN interval_minutes=1440 THEN date_trunc('day',(now()-interval '4 hours') AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'+interval '1 day 4 hours' ELSE now()+make_interval(mins=>interval_minutes) END WHERE id=$1")
         .bind(&source).bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
     tokio::spawn(async move {
@@ -103,6 +103,11 @@ async fn finish(pool: &PgPool, source: &str, id: Uuid, result: AppResult<i32>) -
         Err(_) => (0, Some("采集存储失败，请稍后重试")),
     };
     let mut tx = pool.begin().await?;
+    // 与领取/草稿落库保持相同锁序，过期接替与完成写入不会形成循环等待。
+    sqlx::query("SELECT id FROM collection_sources WHERE id=$1 FOR UPDATE")
+        .bind(source)
+        .execute(&mut *tx)
+        .await?;
     sqlx::query("UPDATE collection_runs SET status=$2,finished_at=now(),item_count=$3,error=$4 WHERE id=$1 AND status='running'")
         .bind(id).bind(if error.is_none(){"succeeded"}else{"failed"}).bind(count).bind(error).execute(&mut *tx).await?;
     sqlx::query("UPDATE collection_sources SET active_run=NULL,lease_until=NULL,last_error=$3,last_success_at=CASE WHEN $3::text IS NULL THEN now() ELSE last_success_at END WHERE id=$1 AND active_run=$2")

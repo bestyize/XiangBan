@@ -119,7 +119,7 @@ async fn configure(
             .ok_or_else(|| AppError::BadRequest("请先配置来源凭据".into()))?;
         credentials::decrypt(&id, &sealed)?;
     }
-    sqlx::query("UPDATE collection_sources SET enabled=COALESCE($2,enabled),interval_minutes=COALESCE($3,interval_minutes),next_run_at=CASE WHEN $3::int IS NOT NULL THEN now()+make_interval(mins=>$3) ELSE next_run_at END,updated_at=now() WHERE id=$1")
+    sqlx::query("UPDATE collection_sources SET enabled=COALESCE($2,enabled),interval_minutes=COALESCE($3,interval_minutes),next_run_at=CASE WHEN $3::int=1440 THEN date_trunc('day',(now()-interval '4 hours') AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'+interval '1 day 4 hours' WHEN $3::int IS NOT NULL THEN now()+make_interval(mins=>$3) ELSE next_run_at END,updated_at=now() WHERE id=$1")
         .bind(&id).bind(input.enabled).bind(input.interval_minutes).execute(&mut *tx).await?;
     audit(
         &mut tx,
