@@ -207,7 +207,7 @@ async fn staged_mirrors_stay_private_until_same_asset_is_published_and_revision_
         .await
         .unwrap();
     let pool = crate::db::connect(&url, Some(&schema)).await.unwrap();
-    sqlx::raw_sql("CREATE TABLE discover_drafts(kind TEXT,key TEXT,revision BIGINT,status TEXT DEFAULT 'draft',data JSONB);CREATE TABLE discover_items(kind TEXT,key TEXT,data JSONB);").execute(&pool).await.unwrap();
+    sqlx::raw_sql("CREATE TABLE discover_drafts(kind TEXT,key TEXT,revision BIGINT,status TEXT DEFAULT 'draft',data JSONB);CREATE TABLE discover_items(kind TEXT,key TEXT,data JSONB,status TEXT NOT NULL DEFAULT 'published',published_at TIMESTAMPTZ NOT NULL DEFAULT now());").execute(&pool).await.unwrap();
     init(&pool).await.unwrap();
     let work_pool = pool.clone();
     let task = tokio::spawn(async move {
@@ -331,6 +331,34 @@ async fn staged_mirrors_stay_private_until_same_asset_is_published_and_revision_
             .await
             .unwrap();
         assert_eq!(count, 1);
+        for visibility in ["removed", "future"] {
+            if visibility == "removed" {
+                sqlx::query("UPDATE discover_items SET status='removed'")
+                    .execute(&work_pool)
+                    .await
+                    .unwrap();
+            } else {
+                sqlx::query("UPDATE discover_items SET status='published',published_at=now()+interval '1 day'").execute(&work_pool).await.unwrap();
+            }
+            let mut hidden = data.clone();
+            decorate_tool(
+                &work_pool,
+                "https://chat.example",
+                "github-tool-1",
+                &mut hidden,
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                hidden["artifacts"][0]["mirror_url"], "",
+                "{visibility} must not expose a mirror"
+            );
+            assert_eq!(
+                app.clone().oneshot(get()).await.unwrap().status(),
+                StatusCode::NOT_FOUND,
+                "{visibility} must not be downloadable"
+            );
+        }
         sqlx::query("DELETE FROM discover_items")
             .execute(&work_pool)
             .await

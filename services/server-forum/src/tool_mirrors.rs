@@ -341,7 +341,7 @@ pub async fn decorate_tool(
         return Ok(());
     }
     let live: Option<(Value,)> =
-        sqlx::query_as("SELECT data FROM discover_items WHERE kind='tool' AND key=$1")
+        sqlx::query_as("SELECT data FROM discover_items WHERE kind='tool' AND key=$1 AND status='published' AND published_at<=now()")
             .bind(key)
             .fetch_optional(pool)
             .await?;
@@ -412,7 +412,7 @@ async fn download(
         return Err(AppError::not_found("工具镜像"));
     }
     let live: Option<(Value,)> =
-        sqlx::query_as("SELECT data FROM discover_items WHERE kind='tool' AND key=$1")
+        sqlx::query_as("SELECT data FROM discover_items WHERE kind='tool' AND key=$1 AND status='published' AND published_at<=now()")
             .bind(&key)
             .fetch_optional(&s.pool)
             .await?;
