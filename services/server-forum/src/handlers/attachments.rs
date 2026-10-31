@@ -214,6 +214,7 @@ pub async fn download(
     .await?
     .ok_or_else(|| AppError::not_found("附件"))?;
 
+    crate::reply_content::ensure_attachment_visible(&state.pool, id, user.as_ref().map(|u| u.uid)).await?;
     match (row.topic_id, row.author_uid) {
         (Some(_), Some(author)) => {
             // 和读帖子同一套规则：不可见的帖子对外是 404，等级不够是 403。
@@ -275,7 +276,7 @@ pub async fn list_for_topic(pool: &PgPool, topic_id: i64, viewer: Option<Uuid>) 
     Ok(sqlx::query_as(
         "SELECT a.id, a.filename AS name, a.size, a.created_at, a.price,
                 (a.uploader_uid = $2 OR EXISTS(SELECT 1 FROM attachment_purchases p WHERE p.attachment_id = a.id AND p.buyer_uid = $2)) IS TRUE AS purchased
-         FROM attachments a WHERE a.topic_id = $1 ORDER BY a.created_at, a.id",
+         FROM attachments a WHERE a.topic_id = $1 AND a.post_id IS NULL ORDER BY a.created_at, a.id",
     )
     .bind(topic_id)
     .bind(viewer)
@@ -296,7 +297,7 @@ pub async fn set_prices(tx: &mut Transaction<'_, Postgres>, topic: i64, uid: Uui
         if !seen.insert(item.id) || !(0..=points::MAX_ATTACHMENT_PRICE).contains(&item.price) {
             return Err(AppError::BadRequest("附件定价必须为 0～10 的整数，且不能重复指定附件".into()));
         }
-        let changed = sqlx::query("UPDATE attachments SET price = $4 WHERE id = $1 AND topic_id = $2 AND uploader_uid = $3")
+        let changed = sqlx::query("UPDATE attachments SET price = $4 WHERE id = $1 AND topic_id = $2 AND post_id IS NULL AND uploader_uid = $3")
             .bind(item.id).bind(topic).bind(uid).bind(item.price).execute(&mut **tx).await?.rows_affected();
         if changed != 1 { return Err(AppError::BadRequest("只能设置自己在当前帖子中的附件价格".into())); }
     }
@@ -317,6 +318,7 @@ pub async fn purchase(
     ).bind(id).fetch_optional(&mut *tx).await?.ok_or_else(|| AppError::not_found("附件"))?;
     if row.topic_status.as_deref() != Some("normal") { return Err(AppError::not_found("附件")); }
     Reader::from_user(Some(&auth.user)).check(row.min_read_level.unwrap_or(0), row.author_uid.unwrap())?;
+    crate::reply_content::ensure_attachment_visible(&state.pool, id, Some(auth.user.uid)).await?;
     // 文件不存在时不收费；解锁后下载失败可以凭购买记录重试。
     File::open(state.config.upload_dir.join(id.to_string())).await.map_err(|_| AppError::not_found("附件"))?;
     let buyer = auth.user.uid;
@@ -360,18 +362,18 @@ pub async fn set_for_topic(
         return Err(AppError::BadRequest(format!("一个帖子最多 {MAX_PER_TOPIC} 个附件")));
     }
     let removed: Vec<(Uuid,)> =
-        sqlx::query_as("DELETE FROM attachments WHERE topic_id = $1 AND NOT (id = ANY($2)) RETURNING id")
+        sqlx::query_as("DELETE FROM attachments WHERE topic_id = $1 AND post_id IS NULL AND NOT (id = ANY($2)) RETURNING id")
             .bind(topic_id)
             .bind(&ids)
             .fetch_all(&mut **tx)
             .await?;
-    sqlx::query("UPDATE attachments SET topic_id = $1 WHERE id = ANY($2) AND topic_id IS NULL AND uploader_uid = $3")
+    sqlx::query("UPDATE attachments SET topic_id = $1 WHERE id = ANY($2) AND topic_id IS NULL AND post_id IS NULL AND uploader_uid = $3")
         .bind(topic_id)
         .bind(&ids)
         .bind(uid)
         .execute(&mut **tx)
         .await?;
-    let (attached,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM attachments WHERE topic_id = $1 AND id = ANY($2)")
+    let (attached,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM attachments WHERE topic_id = $1 AND post_id IS NULL AND id = ANY($2)")
         .bind(topic_id)
         .bind(&ids)
         .fetch_one(&mut **tx)

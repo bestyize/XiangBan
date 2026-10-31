@@ -32,6 +32,8 @@ pub struct PostItem {
     pub mine: bool,
     /// 读者屏蔽了这个作者：正文不返回，前端折叠成一行，可以点开看。
     pub blocked: bool,
+    pub work_refs: Vec<Value>,
+    pub attachments: Vec<super::attachments::AttachmentItem>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -41,6 +43,7 @@ struct PostRow {
     reply_to: Option<i64>,
     reply_to_floor: Option<i32>,
     author_uid: Uuid,
+    author_status: String,
     nickname: String,
     avatar_url: Option<String>,
     trust_level: i16,
@@ -74,7 +77,7 @@ pub async fn list(
         .fetch_one(&state.pool)
         .await?;
     let rows: Vec<PostRow> = sqlx::query_as(
-        "SELECT p.id, p.floor, p.reply_to, r.floor AS reply_to_floor, p.author_uid, u.nickname, u.avatar_url, u.trust_level,
+        "SELECT p.id, p.floor, p.reply_to, r.floor AS reply_to_floor, p.author_uid, u.status AS author_status, u.nickname, u.avatar_url, u.trust_level,
                 p.body_html, p.status, p.like_count, p.created_at, p.edited_at,
                 ($4::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM likes l WHERE l.target_type = 'post' AND l.target_id = p.id AND l.uid = $4)) AS liked,
                 ($4::uuid IS NOT NULL AND EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker = $4 AND b.blocked = p.author_uid)) AS blocked
@@ -87,35 +90,53 @@ pub async fn list(
     .bind(viewer)
     .fetch_all(&state.pool)
     .await?;
-    let items: Vec<PostItem> = rows
-        .into_iter()
-        .map(|r| {
-            // 被删除或隐藏的楼层保留位置，只显示占位文字。
-            let visible = r.status == "normal" && !r.blocked;
-            PostItem {
-                id: r.id,
-                floor: r.floor,
-                reply_to: r.reply_to,
-                reply_to_floor: r.reply_to_floor,
-                mine: viewer == Some(r.author_uid),
-                author: PublicUser { uid: r.author_uid, nickname: r.nickname, avatar_url: r.avatar_url, trust_level: r.trust_level },
-                body_html: if visible { r.body_html } else { String::new() },
-                status: r.status,
-                like_count: r.like_count,
-                created_at: r.created_at,
-                edited_at: r.edited_at,
-                liked: r.liked,
-                blocked: r.blocked,
-            }
-        })
-        .collect();
-    Ok(Json(json!({ "items": items, "page": page, "page_size": size, "total": total })))
+    let mut items = Vec::new();
+    for r in rows {
+        let visible = r.status == "normal" && !r.blocked && r.author_status != "banned";
+        let (work_refs, attachments) = if visible {
+            crate::reply_content::resolve(&state, r.id, viewer).await?
+        } else {
+            (Vec::new(), Vec::new())
+        };
+        items.push(PostItem {
+            id: r.id,
+            floor: r.floor,
+            reply_to: r.reply_to,
+            reply_to_floor: r.reply_to_floor,
+            mine: viewer == Some(r.author_uid),
+            author: PublicUser {
+                uid: r.author_uid,
+                nickname: r.nickname,
+                avatar_url: r.avatar_url,
+                trust_level: r.trust_level,
+            },
+            body_html: if visible { r.body_html } else { String::new() },
+            status: if r.author_status == "banned" {
+                "hidden".into()
+            } else {
+                r.status
+            },
+            like_count: r.like_count,
+            created_at: r.created_at,
+            edited_at: r.edited_at,
+            liked: r.liked,
+            blocked: r.blocked,
+            work_refs,
+            attachments,
+        });
+    }
+    Ok(Json(
+        json!({ "items": items, "page": page, "page_size": size, "total": total }),
+    ))
 }
 
 #[derive(Deserialize)]
 pub struct PostInput {
     pub body: String,
     pub reply_to: Option<i64>,
+    pub work_refs: Option<Vec<crate::reply_content::WorkRef>>,
+    pub attachment_ids: Option<Vec<Uuid>>,
+    pub attachment_prices: Option<Vec<super::attachments::AttachmentPriceInput>>,
 }
 
 fn clean_reply(raw: &str) -> AppResult<String> {
@@ -136,25 +157,35 @@ pub async fn create(
     let user = &auth.user;
     users::ensure_can_write(user)?;
     models::ensure_readable(&state.pool, &Reader::from_user(Some(user)), topic_id).await?;
-    let topic: Option<(String, bool)> = sqlx::query_as("SELECT status, locked FROM topics WHERE id = $1")
-        .bind(topic_id)
-        .fetch_optional(&state.pool)
-        .await?;
+    let topic: Option<(String, bool)> =
+        sqlx::query_as("SELECT status, locked FROM topics WHERE id = $1")
+            .bind(topic_id)
+            .fetch_optional(&state.pool)
+            .await?;
     match topic {
         Some((status, _)) if status != "normal" => return Err(AppError::not_found("帖子")),
         Some((_, true)) => return Err(AppError::Forbidden("帖子已锁定，不能回复".into())),
         None => return Err(AppError::not_found("帖子")),
         _ => {}
     }
-    users::ensure_daily_quota(&state.pool, user, "posts", &state.config.trust.daily_posts, "回复").await?;
+    users::ensure_daily_quota(
+        &state.pool,
+        user,
+        "posts",
+        &state.config.trust.daily_posts,
+        "回复",
+    )
+    .await?;
+    let refs = crate::reply_content::prepare(&state, input.work_refs).await?;
     let body = clean_reply(&input.body)?;
     let review = crate::moderation::screen(&state.pool, &[&body]).await?;
     if let Some(reply_to) = input.reply_to {
-        let ok: Option<(i64,)> = sqlx::query_as("SELECT id FROM posts WHERE id = $1 AND topic_id = $2")
-            .bind(reply_to)
-            .bind(topic_id)
-            .fetch_optional(&state.pool)
-            .await?;
+        let ok: Option<(i64,)> =
+            sqlx::query_as("SELECT id FROM posts WHERE id = $1 AND topic_id = $2")
+                .bind(reply_to)
+                .bind(topic_id)
+                .fetch_optional(&state.pool)
+                .await?;
         if ok.is_none() {
             return Err(AppError::BadRequest("回复的楼层不存在".into()));
         }
@@ -163,7 +194,17 @@ pub async fn create(
 
     // 锁住帖子行分配楼层号，避免并发回复撞号。
     let mut tx = state.pool.begin().await?;
-    sqlx::query("SELECT id FROM topics WHERE id = $1 FOR UPDATE").bind(topic_id).execute(&mut *tx).await?;
+    let (status, locked): (String, bool) =
+        sqlx::query_as("SELECT status,locked FROM topics WHERE id=$1 FOR UPDATE")
+            .bind(topic_id)
+            .fetch_one(&mut *tx)
+            .await?;
+    if status != "normal" {
+        return Err(AppError::not_found("帖子"));
+    }
+    if locked {
+        return Err(AppError::Forbidden("帖子已锁定，不能回复".into()));
+    }
     let (id, floor): (i64, i32) = sqlx::query_as(
         "INSERT INTO posts (topic_id, author_uid, floor, reply_to, body_md, body_html)
          VALUES ($1, $2, (SELECT COALESCE(MAX(floor), 0) + 1 FROM posts WHERE topic_id = $1), $3, $4, $5)
@@ -175,6 +216,16 @@ pub async fn create(
     .bind(&body)
     .bind(&html)
     .fetch_one(&mut *tx)
+    .await?;
+    crate::reply_content::set(
+        &mut tx,
+        id,
+        topic_id,
+        user.uid,
+        refs.as_deref(),
+        input.attachment_ids.as_deref(),
+        input.attachment_prices.as_deref(),
+    )
     .await?;
     sqlx::query(
         "UPDATE topics SET reply_count = reply_count + 1, last_reply_at = now(), last_reply_uid = $2 WHERE id = $1",
@@ -225,6 +276,7 @@ pub async fn update(
     Json(input): Json<PostInput>,
 ) -> AppResult<Json<Value>> {
     users::ensure_can_write(&auth.user)?;
+    let refs = crate::reply_content::prepare_edit(&state, id, auth.user.uid, input.work_refs).await?;
     let body = clean_reply(&input.body)?;
     let review = crate::moderation::screen(&state.pool, &[&body]).await?;
     let html = markdown::render(&body, auth.user.trust_level >= 1);
@@ -244,13 +296,34 @@ pub async fn update(
     .await?
     .rows_affected();
     if done == 0 {
-        return Err(AppError::Forbidden("只能编辑自己的未采纳回复，已采纳回答保留原文".into()));
+        return Err(AppError::Forbidden(
+            "只能编辑自己的未采纳回复，已采纳回答保留原文".into(),
+        ));
     }
     if let Some(word) = &review {
         crate::moderation::enqueue(&mut tx, "post", id, &format!("命中复核词：{word}")).await?;
     }
+    let (topic_id,): (i64,) = sqlx::query_as("SELECT topic_id FROM posts WHERE id=$1")
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+    let removed = crate::reply_content::set(
+        &mut tx,
+        id,
+        topic_id,
+        auth.user.uid,
+        refs.as_deref(),
+        input.attachment_ids.as_deref(),
+        input.attachment_prices.as_deref(),
+    )
+    .await?;
     tx.commit().await?;
-    Ok(Json(json!({ "ok": true, "body_html": html })))
+    super::attachments::remove_files(&state.config.upload_dir, &removed).await;
+    let (work_refs, attachments) =
+        crate::reply_content::resolve(&state, id, Some(auth.user.uid)).await?;
+    Ok(Json(
+        json!({ "ok": true, "body_html": html,"work_refs":work_refs,"attachments":attachments }),
+    ))
 }
 
 pub async fn delete(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
@@ -283,12 +356,22 @@ pub(super) async fn lock_topic_for_post(tx: &mut sqlx::Transaction<'_, sqlx::Pos
 }
 
 /// 编辑回复时取原文。
-pub async fn source(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
-    let row: Option<(String,)> = sqlx::query_as("SELECT body_md FROM posts WHERE id = $1 AND author_uid = $2 AND status = 'normal'")
-        .bind(id)
-        .bind(auth.user.uid)
-        .fetch_optional(&state.pool)
-        .await?;
+pub async fn source(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(id): Path<i64>,
+) -> AppResult<Json<Value>> {
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT body_md FROM posts WHERE id = $1 AND author_uid = $2 AND status = 'normal'",
+    )
+    .bind(id)
+    .bind(auth.user.uid)
+    .fetch_optional(&state.pool)
+    .await?;
     let (body,) = row.ok_or_else(|| AppError::not_found("回复"))?;
-    Ok(Json(json!({ "body": body })))
+    let (work_refs, attachments) =
+        crate::reply_content::source(&state.pool, id, Some(auth.user.uid)).await?;
+    Ok(Json(
+        json!({ "body": body,"work_refs":work_refs,"attachments":attachments }),
+    ))
 }
