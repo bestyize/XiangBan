@@ -1,18 +1,7 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -20,7 +9,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.Switch
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -35,7 +28,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,7 +68,15 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
         env.scope.launch { pending.forEach { attachment -> runCatching { env.forum.deletePendingAttachment(attachment.id) } } }
         back()
     }
-    BackHandler { if (!busy) cancelDraft() }
+    var choosingCategory by remember { mutableStateOf(false) }
+    var confirmingLeave by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
+    fun requestBack() {
+        if (busy || uploading || leaving) return
+        focus.clearFocus()
+        if (title.isNotBlank() || body.isNotBlank() || attachments.isNotEmpty()) confirmingLeave = true else cancelDraft()
+    }
+    BackHandler { requestBack() }
     var error by remember { mutableStateOf<String?>(null) }
     var attempt by remember { mutableStateOf(0) }
     var bounty by rememberSaveable { mutableStateOf(0) }
@@ -112,100 +112,133 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     val isHelp = chosen?.slug == "share-help"
     val pollOptions = parsePollOptions(pollText)
     val pollError = if (pollEnabled) pollDraftError(pollOptions, pollDays.takeIf { it != 0 }) else null
-    val canPost = session.loggedIn && !busy && !uploading && !leaving && chosen != null && title.trim().length >= 2 && body.trim().length >= 10 && pollError == null
+    val titleLength = title.trim().split(Regex("\\s+")).joinToString(" ").count { !it.isLowSurrogate() }
+    val bodyLength = body.trim().count { !it.isLowSurrogate() }
+    val canPost = session.loggedIn && !busy && !uploading && !leaving && chosen != null && titleLength in 4..80 && bodyLength in 10..20_000 && pollError == null
+    fun publish() {
+        if (!canPost) return
+        focus.clearFocus(); busy = true; error = null
+        scope.launch {
+            try {
+                val id = env.forum.createTopic(categoryId, title.trim(), body.trim(), bounty = if (isHelp) bounty else null, bountyDays = bountyDays,
+                    pollOptions = if (pollEnabled) pollOptions else emptyList(), pollDays = pollDays.takeIf { pollEnabled && it != 0 }, attachments = attachments)
+                back(); open(Route.Topic(id))
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { error = messageOf(e) }
+            finally { busy = false }
+        }
+    }
 
-    Column(Modifier.fillMaxSize().imePadding()) {
-        ScreenBar(if (help) "发求助" else "发帖", onBack = { if (!busy) cancelDraft() }, trailing = null)
-        if (!session.loggedIn) {
-            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Column(Modifier.padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    EmptyState(XIcons.Pen, "登录后才能发帖", "用小伴账号登录，在讨论或资源里发一个帖子。")
-                    PillButton("登录小伴账号", { open(Route.Login) }, Modifier.padding(top = 20.dp).fillMaxWidth())
-                }
-            }
-        } else {
-            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).background(MaterialTheme.colorScheme.surface).padding(top = 12.dp, bottom = 16.dp)) {
-                Text("发到哪里", Modifier.padding(horizontal = 16.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                when {
-                    loadError != null -> Banner(loadError.orEmpty(), Modifier.padding(horizontal = 16.dp, vertical = 8.dp), warn = true, actionText = "重试", onAction = { attempt += 1 })
-                    categories == null -> Text("读取分类中…", Modifier.padding(16.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
-                    else -> {
-                        ChipRow(parents.map { it.id to it.name }, parentId) { parentId = it; categoryId = -1 }
-                        ChipRow(children.map { it.id to it.name }, categoryId) { categoryId = it }
-                        chosen?.description?.takeIf { it.isNotBlank() }?.let { Text(it, Modifier.padding(horizontal = 16.dp, vertical = 4.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3) }
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.fillMaxSize().imePadding()) {
+            ScreenBar(if (help) "发求助" else "发帖", onBack = ::requestBack, trailing = {
+                if (session.loggedIn) PillButton(if (busy) "发布中" else "发布", ::publish,
+                    Modifier.padding(end = 8.dp), enabled = canPost, height = 36.dp)
+            })
+            if (!session.loggedIn) {
+                CenterMessage("登录后分享你的想法", "登录", { open(Route.Login) }, Modifier.weight(1f).fillMaxWidth())
+            } else {
+                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+                    Row(Modifier.padding(top = 8.dp, bottom = 20.dp).clip(CircleShape).background(LocalExtraColors.current.fill)
+                        .clickable(enabled = !busy && !uploading) { focus.clearFocus(); choosingCategory = true }
+                        .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        XIcon(XIcons.Hash, size = 16.dp, tint = if (chosen != null) Brand else LocalExtraColors.current.ink3)
+                        Text(chosen?.name ?: "选择发布版块", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        XIcon(XIcons.ChevronDown, size = 14.dp, tint = LocalExtraColors.current.ink3)
                     }
-                }
-                TextBox(title, { title = it }, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), placeholder = "标题（至少 2 个字）", enabled = !busy)
-                AreaBox(body, { body = it }, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), placeholder = "正文（至少 10 个字）：写清楚用在哪里、大概什么样子、有什么限制。", minHeight = 200.dp, enabled = !busy)
-                Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    ForumUploadControls(env, enabled = !busy && !leaving, onImage = { if (!leaving) body += it }, onBusy = { uploading = it },
-                        attachments = attachments, onAttachments = { next ->
-                            if (!leaving) attachmentsJson = CommunityJson.encodeToString(next)
-                            else env.scope.launch { next.filterNot { file -> attachments.any { it.id == file.id } }.forEach { file ->
-                                runCatching { env.forum.deletePendingAttachment(file.id) }
-                            } }
+                    BasicTextField(title, { title = it }, Modifier.fillMaxWidth().padding(vertical = 8.dp), enabled = !busy,
+                        textStyle = TextStyle(fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface),
+                        cursorBrush = SolidColor(Brand), decorationBox = { inner ->
+                            Box { if (title.isEmpty()) Text("添加标题", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = LocalExtraColors.current.ink3); inner() }
                         })
+                    if (titleLength > 70) Text("$titleLength / 80", Modifier.align(Alignment.End), fontSize = 11.sp, color = if (titleLength > 80) Danger else LocalExtraColors.current.ink3)
+                    Hairline(Modifier.padding(top = 12.dp, bottom = 20.dp))
+                    BasicTextField(body, { body = it }, Modifier.fillMaxWidth().heightIn(min = 240.dp), enabled = !busy,
+                        textStyle = TextStyle(fontSize = 16.sp, lineHeight = 27.sp, color = MaterialTheme.colorScheme.onSurface),
+                        cursorBrush = SolidColor(Brand), decorationBox = { inner ->
+                            Box { if (body.isEmpty()) Text(if (isHelp) "描述你遇到的问题，以及已经尝试的方法…" else "分享你的想法、经验或新发现…", fontSize = 16.sp, lineHeight = 27.sp, color = LocalExtraColors.current.ink3); inner() }
+                        })
+                    if (pollEnabled) {
+                        Hairline(Modifier.padding(vertical = 16.dp))
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text("投票", Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            IconTap(XIcons.Close, "移除投票", { if (!busy) pollEnabled = false })
+                        }
+                        AreaBox(pollText, { pollText = it }, placeholder = "每行一个选项，填写 2～6 项", minHeight = 108.dp, enabled = !busy, filled = true)
+                        Text("截止时间", Modifier.padding(top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                        ChipRow(listOf(0, 1, 3, 7, 14, 30).map { it to if (it == 0) "不限时" else "$it 天" }, pollDays) { if (!busy) pollDays = it }
+                        Text(pollError ?: "发布后不能修改选项", Modifier.padding(vertical = 10.dp), fontSize = 12.sp, color = if (pollError != null) Danger else LocalExtraColors.current.ink3)
+                    }
+                    if (isHelp) {
+                        Hairline(Modifier.padding(vertical = 16.dp))
+                        Text("悬赏积分", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        ChipRow(listOf(0, 10, 30, 50, 100).map { it to if (it == 0) "不悬赏" else "$it 分" }, bounty) { if (!busy) bounty = it }
+                        if (bounty > 0) {
+                            Text("有效期", Modifier.padding(top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                            ChipRow(listOf(7, 14, 30).map { it to "$it 天" }, bountyDays) { if (!busy) bountyDays = it }
+                            Text("发布时扣除，采纳后发给回答者；到期未采纳或关闭求助时退还。", Modifier.padding(top = 8.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
+                        }
+                    }
+                    if (chosen?.slug?.startsWith("share") == true) Text("请分享原创、开源或已获授权的资源。", Modifier.padding(top = 16.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    Spacer(Modifier.height(24.dp))
                 }
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("发起投票", Modifier.weight(1f), fontSize = 14.sp)
-                    Switch(checked = pollEnabled, onCheckedChange = { pollEnabled = it }, enabled = !busy)
+                error?.let { Banner(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), warn = true) }
+                Hairline()
+                Column(Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    ForumUploadControls(env, enabled = !busy && !leaving, compact = true,
+                        onImage = { if (!leaving) body += it }, onBusy = { uploading = it }, attachments = attachments,
+                        onAttachments = { next ->
+                            if (!leaving) attachmentsJson = CommunityJson.encodeToString(next)
+                            else env.scope.launch { next.filterNot { file -> attachments.any { it.id == file.id } }.forEach { file -> runCatching { env.forum.deletePendingAttachment(file.id) } } }
+                        }, trailing = {
+                            EditorTool(XIcons.Poll, "投票", enabled = !busy && !uploading, selected = pollEnabled) { focus.clearFocus(); pollEnabled = !pollEnabled }
+                        })
+                    Text(when {
+                        uploading -> "正在上传，请稍候…"
+                        chosen == null -> "先选择发布版块"
+                        titleLength !in 4..80 -> "标题需要 4～80 个字"
+                        bodyLength < 10 -> "正文至少 10 个字"
+                        bodyLength > 20_000 -> "正文最多 20,000 个字"
+                        else -> "$bodyLength 字"
+                    }, Modifier.padding(top = 6.dp, bottom = 2.dp), fontSize = 11.sp, color = if (bodyLength > 20_000) Danger else LocalExtraColors.current.ink3)
                 }
-                if (pollEnabled) {
-                    AreaBox(pollText, { pollText = it }, Modifier.padding(horizontal = 16.dp), placeholder = "每行一个选项，共 2～6 项，每项最多 40 字", minHeight = 100.dp, enabled = !busy)
-                    Text("投票时长", Modifier.padding(start = 16.dp, top = 12.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    ChipRow(listOf(0, 1, 3, 7, 14, 30).map { it to if (it == 0) "一直开放" else "$it 天" }, pollDays) { if (!busy) pollDays = it }
-                    Text(pollError ?: "投票发布后不能修改选项。", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 12.sp, color = if (pollError != null) Danger else LocalExtraColors.current.ink3)
-                }
-                if (isHelp) {
-                    Text("悬赏积分", Modifier.padding(start = 16.dp, top = 16.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    ChipRow(listOf(0, 10, 30, 50, 100).map { it to if (it == 0) "不悬赏" else "$it 分" }, bounty) { bounty = it }
-                    Text("有效期", Modifier.padding(start = 16.dp, top = 12.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    ChipRow(listOf(7, 14, 30).map { it to "$it 天" }, bountyDays) { bountyDays = it }
-                    Text(
-                        "悬赏积分发布时先扣下，采纳回答后发给回答者；到期没有采纳或求助关闭，会退还给你。",
-                        Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3,
-                    )
-                }
-                if (chosen != null && chosen.slug.startsWith("share")) {
-                    Text(
-                        "资源分享须知：仅限合法来源——正版、开源、免费软件，片单影评乐评歌单，公版或授权影音，公开课程资料，自己的作品。不发破解版和盗版下载，违规内容会被下架。",
-                        Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                error?.let { Text(it, Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp), fontSize = 14.sp, color = Danger) }
             }
-            Hairline()
-            Box(Modifier.fillMaxWidth().height(72.dp).background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
-                PillButton(
-                    if (busy) "发布中…" else if (uploading) "上传中…" else "发布",
-                    {
-                        if (busy || uploading || leaving) return@PillButton
-                        busy = true; error = null
-                        scope.launch {
-                            try {
-                                val id = env.forum.createTopic(categoryId, title.trim(), body.trim(), bounty = if (isHelp) bounty else null, bountyDays = bountyDays,
-                                    pollOptions = if (pollEnabled) pollOptions else emptyList(), pollDays = pollDays.takeIf { pollEnabled && it != 0 }, attachments = attachments)
-                                back()
-                                open(Route.Topic(id))
-                            } catch (e: kotlinx.coroutines.CancellationException) {
-                                throw e
-                            } catch (e: Exception) {
-                                error = messageOf(e)
-                            } finally {
-                                busy = false
+        }
+        OverlayTransition(choosingCategory) { panel ->
+            BottomSheet({ choosingCategory = false }, panel) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("选择版块", Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    IconTap(XIcons.Close, "关闭分类", { choosingCategory = false })
+                }
+                when {
+                    loadError != null -> Banner(loadError.orEmpty(), warn = true, actionText = "重试", onAction = { attempt++ })
+                    categories == null -> Spinner(Modifier.fillMaxWidth().height(100.dp))
+                    else -> Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                        ChipRow(parents.map { it.id to it.name }, parentId) { parentId = it }
+                        children.forEach { category ->
+                            Row(Modifier.fillMaxWidth().clickable { categoryId = category.id; choosingCategory = false }.padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(category.name, Modifier.weight(1f), fontSize = 15.sp, color = if (categoryId == category.id) Brand else MaterialTheme.colorScheme.onSurface)
+                                if (categoryId == category.id) XIcon(XIcons.Check, size = 18.dp, tint = Brand)
                             }
                         }
-                    },
-                    Modifier.fillMaxWidth(), enabled = canPost,
-                )
+                        if (children.isEmpty()) Text("这个分类暂时没有可发布的版块", Modifier.padding(vertical = 20.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                    }
+                }
             }
+        }
+        if (confirmingLeave) CenterDialog({ confirmingLeave = false }) {
+            Text("放弃这次编辑？", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text("尚未发布的内容不会保留。", Modifier.padding(top = 8.dp, bottom = 20.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+            PillButton("继续编辑", { confirmingLeave = false }, Modifier.fillMaxWidth())
+            GhostPillButton("放弃编辑", { confirmingLeave = false; cancelDraft() }, Modifier.fillMaxWidth().padding(top = 8.dp), textColor = Danger)
         }
     }
 }
 
 @Composable
 private fun ChipRow(items: List<Pair<Int, String>>, selected: Int, onSelect: (Int) -> Unit) {
-    LazyRow(Modifier.fillMaxWidth().padding(top = 8.dp), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyRow(Modifier.fillMaxWidth().padding(top = 8.dp), contentPadding = PaddingValues(vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(items, key = { it.first }) { (id, name) ->
             PageChip(name, id == selected) { onSelect(id) }
         }

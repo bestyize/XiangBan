@@ -62,6 +62,7 @@ object XIcons {
     val More: ImageVector by lazy { strokeIcon("More", "M3.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM17.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0z") }
     val MoreVertical: ImageVector by lazy { strokeIcon("MoreVertical", "M10.4 5a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 12a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0zM10.4 19a1.6 1.6 0 1 0 3.2 0a1.6 1.6 0 1 0 -3.2 0z") }
     val NewChat: ImageVector by lazy { strokeIcon("NewChat", "M12 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-6M17.5 3.5a2 2 0 013 3L12 15l-4 1 1-4z") }
+    val Poll: ImageVector by lazy { strokeIcon("Poll", "M4 20h16M7 16V9M12 16V4M17 16v-5") }
     val Pen: ImageVector by lazy { strokeIcon("Pen", "M4 20l4-1 11-11a2 2 0 00-3-3L5 16l-1 4z") }
     val Pause: ImageVector by lazy { strokeIcon("Pause", "M9 6v12M15 6v12") }
     val Plan: ImageVector by lazy { strokeIcon("Plan", "M5 4v16M5 5h12l-2.5 4 2.5 4H5") }

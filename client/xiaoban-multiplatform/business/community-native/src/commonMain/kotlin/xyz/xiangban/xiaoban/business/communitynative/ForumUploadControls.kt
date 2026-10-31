@@ -1,10 +1,10 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,11 +33,15 @@ internal fun ForumUploadControls(
     onAttachments: (List<ForumAttachment>) -> Unit = {},
     /** Already-associated source assets may be unlinked, never deleted as pending uploads. */
     retainedAttachmentIds: Set<String> = emptySet(),
+    compact: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
+    var showLimits by remember { mutableStateOf(false) }
     val platform = env.platform
     if (platform?.forumFilePickerSupported != true) {
         Text(if (attachments == null) "当前设备请在网页版回复中插图。" else "当前设备请到网页版插图或添加附件。",
             Modifier.padding(vertical = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        if (compact) trailing?.invoke()
         return
     }
     val session by env.session.state.collectAsState()
@@ -86,11 +90,19 @@ internal fun ForumUploadControls(
             is Load.Failed -> Banner(state.message, warn = true, actionText = "重试", onAction = loader::reload)
             else -> Unit
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            GhostPillButton(if (busy) "处理中…" else "插图", { start(true) }, Modifier.weight(1f), enabled = enabled && !busy && (limits?.imageMaxBytes ?: 0) > 0)
-            if (attachments != null) GhostPillButton("添加附件", { start(false) }, Modifier.weight(1f), enabled = enabled && !busy && limits != null && attachments.size < 5)
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (compact) {
+                EditorTool(XIcons.Image, if (busy) "上传中" else "图片", enabled && !busy && (limits?.imageMaxBytes ?: 0) > 0) { start(true) }
+                if (attachments != null) EditorTool(XIcons.File, "附件", enabled && !busy && limits != null && attachments.size < 5) { start(false) }
+                trailing?.invoke()
+                Spacer(Modifier.weight(1f))
+                IconTap(XIcons.Info, "上传说明", { showLimits = !showLimits }, tint = LocalExtraColors.current.ink3)
+            } else {
+                GhostPillButton(if (busy) "处理中…" else "插图", { start(true) }, Modifier.weight(1f), enabled = enabled && !busy && (limits?.imageMaxBytes ?: 0) > 0)
+                if (attachments != null) GhostPillButton("添加附件", { start(false) }, Modifier.weight(1f), enabled = enabled && !busy && limits != null && attachments.size < 5)
+            }
         }
-        limits?.let {
+        if (!compact || showLimits) limits?.let {
             Text(if (it.imageMaxBytes <= 0) "升级为成员后可插图。" else "支持 PNG、JPEG、GIF、WebP，图片不超过 ${minOf(it.imageMaxBytes, FORUM_IMAGE_MAX_BYTES) / 1024 / 1024} MB。",
                 fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
             if (attachments != null) Text("最多 5 个附件，每个不超过 ${minOf(it.uploadMaxBytes, FORUM_MEMORY_MAX_BYTES) / 1024 / 1024} MB。", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
@@ -98,8 +110,8 @@ internal fun ForumUploadControls(
         attachments?.forEach { attachment ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text(attachment.name, fontSize = 13.sp)
-                    Text("${attachment.size} 字节 · ${if (attachment.price == 0) "免费下载" else "${attachment.price} 积分"}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    Text(attachment.name, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${formatSize(attachment.size)} · ${if (attachment.price == 0) "免费下载" else "${attachment.price} 积分"}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                 }
                 GhostPillButton("移除", {
                     if (!busy && enabled) {
@@ -123,5 +135,16 @@ internal fun ForumUploadControls(
                 GhostPillButton("取消上传", { retryFile = null; error = null }, Modifier.weight(1f), enabled = !busy)
             }
         }
+    }
+}
+
+/** Quiet inline actions for the writing toolbar. */
+@Composable
+internal fun EditorTool(icon: ImageVector, label: String, enabled: Boolean = true, selected: Boolean = false, onClick: () -> Unit) {
+    val ink = if (selected) Brand else if (enabled) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.ink3
+    Row(Modifier.clickable(enabled = enabled, onClick = onClick).heightIn(min = 44.dp).padding(horizontal = 6.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        XIcon(icon, size = 20.dp, tint = ink)
+        Text(label, fontSize = 13.sp, color = ink)
     }
 }
