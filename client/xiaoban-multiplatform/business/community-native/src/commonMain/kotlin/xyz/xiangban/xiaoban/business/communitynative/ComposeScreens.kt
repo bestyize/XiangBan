@@ -20,6 +20,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -35,6 +36,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import xyz.xiangban.xiaoban.common.community.CommunityJson
 import xyz.xiangban.xiaoban.common.community.ForumAttachment
+import xyz.xiangban.xiaoban.common.community.ForumImage
+import xyz.xiangban.xiaoban.common.community.FORUM_IMAGE_MAX_BYTES
+import xyz.xiangban.xiaoban.common.community.forumImageMarkdown
 import xyz.xiangban.xiaoban.common.community.Category
 import xyz.xiangban.xiaoban.common.community.messageOf
 import xyz.xiangban.xiaoban.common.community.parsePollOptions
@@ -58,6 +62,12 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     var busy by remember { mutableStateOf(false) }
     var uploading by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
+    var cover by remember(session.accountId) { mutableStateOf<ForumCoverImage?>(null) }
+    var coverSpec by remember(session.accountId) { mutableStateOf<ForumCoverSpec?>(null) }
+    var uploadedCover by remember(cover, session.accountId) { mutableStateOf<ForumImage?>(null) }
+    var choosingCover by remember { mutableStateOf(false) }
+    var editingCover by remember { mutableStateOf(false) }
+    val currentAccount by rememberUpdatedState(session.accountId)
     var attachmentsJson by rememberSaveable { mutableStateOf("[]") }
     val attachments = remember(attachmentsJson) { CommunityJson.decodeFromString<List<ForumAttachment>>(attachmentsJson) }
     fun cancelDraft() {
@@ -74,7 +84,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     fun requestBack() {
         if (busy || uploading || leaving) return
         focus.clearFocus()
-        if (title.isNotBlank() || body.isNotBlank() || attachments.isNotEmpty()) confirmingLeave = true else cancelDraft()
+        if (title.isNotBlank() || body.isNotBlank() || attachments.isNotEmpty() || cover != null) confirmingLeave = true else cancelDraft()
     }
     BackHandler { requestBack() }
     var error by remember { mutableStateOf<String?>(null) }
@@ -120,7 +130,17 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
         focus.clearFocus(); busy = true; error = null
         scope.launch {
             try {
-                val id = env.forum.createTopic(categoryId, title.trim(), body.trim(), bounty = if (isHelp) bounty else null, bountyDays = bountyDays,
+                val account = session.accountId
+                val selectedCover = cover
+                if (selectedCover != null && uploadedCover == null) {
+                    val limits = env.forum.uploadSession().limits
+                    check(currentAccount == account) { "账号已切换，请重新编辑" }
+                    uploadedCover = env.forum.uploadImage(selectedCover.file, minOf(limits.imageMaxBytes, FORUM_IMAGE_MAX_BYTES))
+                }
+                check(currentAccount == account) { "账号已切换，请重新编辑" }
+                val postBody = uploadedCover?.let { forumImageMarkdown(it, "封面").trim() + "\n\n" + body.trim() } ?: body.trim()
+                require(postBody.count { !it.isLowSurrogate() } <= 20_000) { "加上封面后正文超过字数上限，请精简正文" }
+                val id = env.forum.createTopic(categoryId, title.trim(), postBody, bounty = if (isHelp) bounty else null, bountyDays = bountyDays,
                     pollOptions = if (pollEnabled) pollOptions else emptyList(), pollDays = pollDays.takeIf { pollEnabled && it != 0 }, attachments = attachments)
                 back(); open(Route.Topic(id))
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }
@@ -147,6 +167,8 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                         Text(chosen?.name ?: "选择发布版块", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                         XIcon(XIcons.ChevronDown, size = 14.dp, tint = LocalExtraColors.current.ink3)
                     }
+                    if (env.platform?.forumCoverSupported == true) ForumCoverEntry(cover, !busy && !uploading,
+                        onChoose = { focus.clearFocus(); choosingCover = true }, onRemove = { cover = null; coverSpec = null })
                     BasicTextField(title, { title = it }, Modifier.fillMaxWidth().padding(vertical = 8.dp), enabled = !busy,
                         textStyle = TextStyle(fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface),
                         cursorBrush = SolidColor(Brand), decorationBox = { inner ->
@@ -186,7 +208,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                 error?.let { Banner(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), warn = true) }
                 Hairline()
                 Column(Modifier.fillMaxWidth().heightIn(max = 220.dp).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 8.dp)) {
-                    ForumUploadControls(env, enabled = !busy && !leaving, compact = true,
+                    ForumUploadControls(env, enabled = !busy && !uploading && !leaving, compact = true,
                         onImage = { if (!leaving) body += it }, onBusy = { uploading = it }, attachments = attachments,
                         onAttachments = { next ->
                             if (!leaving) attachmentsJson = CommunityJson.encodeToString(next)
@@ -226,6 +248,32 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                     }
                 }
             }
+        }
+        OverlayTransition(choosingCover) { panel ->
+            BottomSheet({ choosingCover = false }, panel) {
+                Text("帖子封面", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                SheetAction(XIcons.Image, "从相册选择", "使用自己的图片") {
+                    choosingCover = false
+                    val platform = env.platform ?: return@SheetAction
+                    val account = session.accountId
+                    uploading = true; error = null
+                    scope.launch {
+                        try {
+                            val file = platform.pickForumFile(true, FORUM_IMAGE_MAX_BYTES) ?: return@launch
+                            val preview = platform.previewForumCover(file) ?: kotlin.error("无法读取封面")
+                            check(currentAccount == account) { "账号已切换，请重新选择" }
+                            cover = preview; coverSpec = null
+                        } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                        catch (e: Exception) { error = messageOf(e) }
+                        finally { uploading = false }
+                    }
+                }
+                SheetAction(XIcons.File, "文字封面", "选择模板，用文字做封面") { choosingCover = false; editingCover = true }
+            }
+        }
+        if (editingCover) env.platform?.let { platform ->
+            ForumCoverEditor(platform, coverSpec ?: ForumCoverSpec(title), onDismiss = { editingCover = false },
+                onUse = { spec, image -> coverSpec = spec; cover = image; editingCover = false })
         }
         if (confirmingLeave) CenterDialog({ confirmingLeave = false }) {
             Text("放弃这次编辑？", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)

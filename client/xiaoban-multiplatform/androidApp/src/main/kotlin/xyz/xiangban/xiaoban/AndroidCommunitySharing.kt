@@ -53,6 +53,9 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
         }
     }
     override val communityPosterSupported = true
+    override val forumCoverSupported = true
+    override suspend fun renderForumCover(spec: xyz.xiangban.xiaoban.business.communitynative.ForumCoverSpec, thumbnail: Boolean) = renderLocalForumCover(spec, thumbnail)
+    override suspend fun previewForumCover(file: xyz.xiangban.xiaoban.common.community.ForumUploadFile) = previewLocalForumCover(file)
     private var waiting: CancellableContinuation<Uri?>? = null
     private val saveDocument = activity.registerForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri ->
         val current = waiting; waiting = null

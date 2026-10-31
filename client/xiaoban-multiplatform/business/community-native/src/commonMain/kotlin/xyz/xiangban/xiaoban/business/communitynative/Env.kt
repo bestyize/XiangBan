@@ -54,6 +54,9 @@ interface PlatformActions : VoicePlatform {
     /** 未接系统文件选择器的平台（当前 iOS）明确降级到网页，不申请全盘访问权限。 */
     val forumFilePickerSupported: Boolean get() = false
     suspend fun pickForumFile(image: Boolean, maxBytes: Long): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = null
+    val forumCoverSupported: Boolean get() = false
+    suspend fun renderForumCover(spec: ForumCoverSpec, thumbnail: Boolean = false): ForumCoverImage? = null
+    suspend fun previewForumCover(file: xyz.xiangban.xiaoban.common.community.ForumUploadFile): ForumCoverImage? = null
     fun copy(text: String)
     fun share(title: String, url: String)
     fun openUrl(url: String)
