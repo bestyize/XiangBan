@@ -134,11 +134,15 @@ pub fn save_game_save(app: tauri::AppHandle, game_id: String, data: Value, host_
 }
 /// Without a game there is nothing to run full screen, so the game space page in the console is shown instead.
 pub async fn open(app: &tauri::AppHandle) -> Result<(), String> { show_space_page(app) }
-/// Small windowed sizes: the same 30% × 30% area as before, shaped 16:9 for landscape packs and 9:16 for portrait ones.
+/// Landscape games open at twice the previous width and height, fitting within 90% of the screen.
+/// Portrait games keep their original 9:16 size.
 pub fn game_window_size(screen_width: f64, screen_height: f64, landscape: bool) -> (f64, f64) {
     let area = screen_width * screen_height * 0.3 * 0.3;
     let long_side = (area * 16.0 / 9.0).sqrt();
-    if landscape { (long_side, long_side * 9.0 / 16.0) } else { (long_side * 9.0 / 16.0, long_side) }
+    if landscape {
+        let width = (long_side * 2.0).min(screen_width * 0.9).min(screen_height * 0.9 * 16.0 / 9.0);
+        (width, width * 9.0 / 16.0)
+    } else { (long_side * 9.0 / 16.0, long_side) }
 }
 pub(crate) fn show_space_page(app: &tauri::AppHandle) -> Result<(), String> {
     crate::present_control(app)?;
@@ -162,9 +166,8 @@ async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Resul
     let scale = monitor.scale_factor();
     let screen_width = monitor.size().width as f64 / scale;
     let screen_height = monitor.size().height as f64 / scale;
-    // Keep the same on-screen share as the previous 30% × 30% window, but in the game's own shape:
-    // landscape packs open at 16:9, portrait packs (the default) at 9:16. The player can still resize,
-    // maximize, or go full screen from the system title bar.
+    // Landscape packs open at 16:9 with double the previous width and height; portrait packs keep
+    // their original 9:16 size. The player can still resize, maximize, or go full screen.
     let (width, height) = game_window_size(screen_width, screen_height, landscape);
     let left = monitor.position().x as f64 / scale + (screen_width - width) / 2.0;
     let top = monitor.position().y as f64 / scale + (screen_height - height) / 2.0;
@@ -313,15 +316,20 @@ async fn wait_gone(app:&tauri::AppHandle,labels:&[&str])->Result<(),String>{
 #[cfg(test)] mod tests {
     use super::*;
     #[test] fn all_seven_local_manifests_are_valid() { let items=builtin_catalog().unwrap(); assert_eq!(items.len(),9); assert_eq!(items.iter().filter(|v|v["save"]==true).count(),1); assert!(items.iter().all(|v|v["source"]=="builtin" && v["base"]==format!("/game-packs/{}/",v["id"].as_str().unwrap()))); }
-    #[test] fn the_game_window_takes_the_pack_shape_at_the_same_area() {
+    #[test] fn the_game_window_doubles_landscape_dimensions_and_preserves_pack_shape() {
         let (landscape_w, landscape_h) = game_window_size(1440.0, 900.0, true);
         let (portrait_w, portrait_h) = game_window_size(1440.0, 900.0, false);
         assert!((landscape_w / landscape_h - 16.0 / 9.0).abs() < 1e-9);
         assert!((portrait_h / portrait_w - 16.0 / 9.0).abs() < 1e-9);
         let expected = 1440.0 * 900.0 * 0.09;
-        assert!((landscape_w * landscape_h - expected).abs() < 1e-6);
+        assert!((landscape_w * landscape_h - expected * 4.0).abs() < 1e-6);
         assert!((portrait_w * portrait_h - expected).abs() < 1e-6);
+        assert!((landscape_w - portrait_h * 2.0).abs() < 1e-9);
+        assert!((landscape_h - portrait_w * 2.0).abs() < 1e-9);
         assert!(portrait_w < portrait_h && landscape_h < landscape_w);
+        let (width, height) = game_window_size(900.0, 1440.0, true);
+        assert!(width <= 900.0 * 0.9 && height <= 1440.0 * 0.9);
+        assert!((width / height - 16.0 / 9.0).abs() < 1e-9);
     }
     fn temp_root(tag:&str)->std::path::PathBuf{ let p=std::env::temp_dir().join(format!("xiaoban-games-{tag}-{}",std::process::id())); let _=fs::remove_dir_all(&p); fs::create_dir_all(&p).unwrap(); p }
     fn user_game(root:&std::path::Path,id:&str,save:bool){ let files=vec![("index.html".to_string(),"<html><head></head></html>".to_string())]; crate::game_packs::create_pack(root,id,"测试","一个游戏",&files,save,false).unwrap(); }
