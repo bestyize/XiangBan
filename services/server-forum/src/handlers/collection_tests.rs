@@ -32,13 +32,13 @@ async fn official_news_daily_quota_is_shared_across_runs_and_existing_items_rema
             sort_order:0,published_at:None,source_name:"OpenAI".into(),source_url:format!("https://openai.com/news/{i}")}).collect()
     }
     let first = news_run(&h).await;
-    assert_eq!(discover_editor::write_collected_batch(&h.pool,"official_news",first,news_items(0..8)).await?,8);
+    assert_eq!(discover_editor::store_collection_result(&h.pool,"official_news",first,news_items(0..8)).await?,8);
     let second = news_run(&h).await;
-    assert_eq!(discover_editor::write_collected_batch(&h.pool,"official_news",second,news_items(0..16)).await?,10);
+    assert_eq!(discover_editor::store_collection_result(&h.pool,"official_news",second,news_items(0..16)).await?,10);
     let (count,): (i64,) = sqlx::query_as("SELECT count(*) FROM discover_drafts WHERE kind='news'").fetch_one(&h.pool).await?;
     assert_eq!(count,10);
     let third = news_run(&h).await;
-    assert_eq!(discover_editor::write_collected_batch(&h.pool,"official_news",third,news_items(16..18)).await?,0);
+    assert_eq!(discover_editor::store_collection_result(&h.pool,"official_news",third,news_items(16..18)).await?,0);
     let (live,): (i64,) = sqlx::query_as("SELECT count(*) FROM discover_items WHERE kind='news'").fetch_one(&h.pool).await?;
     assert_eq!(live,0,"采集不能越过人工审核自动发布");
     h.close().await?;
@@ -177,6 +177,47 @@ async fn revisions(pool: &PgPool, run: Uuid) -> Vec<discover_editor::BatchReview
             },
         )
         .collect()
+}
+
+#[tokio::test]
+async fn objective_rankings_auto_publish_atomically_and_keep_last_good_snapshot() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else { return Ok(()) };
+    let run = h.run().await;
+    discover_editor::store_collection_result(&h.pool, "openrouter", run,
+        vec![usage("2026-10-28", "10"), usage("2026-10-29", "20")]).await?;
+    let (status, board) = request(&h.app, "GET", "/api/discover/model-usage", None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(board["total_tokens"], "20");
+    let (reviewer,): (Option<String>,) = sqlx::query_as("SELECT reviewed_by FROM collection_runs WHERE id=$1")
+        .bind(run).fetch_one(&h.pool).await?;
+    assert_eq!(reviewer.as_deref(), Some("collector:openrouter"));
+    let first = revisions(&h.pool, run).await;
+    let repeat = h.run().await;
+    discover_editor::store_collection_result(&h.pool, "openrouter", repeat,
+        vec![usage("2026-10-28", "10"), usage("2026-10-29", "20")]).await?;
+    assert_eq!(first[0].expected_revision, revisions(&h.pool, repeat).await[0].expected_revision);
+    // Later invalid item must roll back an earlier valid replacement in the same batch.
+    let failed = h.run().await;
+    let mut invalid = usage("2026-10-29", "30");
+    invalid.data["total_tokens"] = json!("invalid");
+    assert!(discover_editor::store_collection_result(&h.pool, "openrouter", failed,
+        vec![usage("2026-10-28", "99"), invalid]).await.is_err());
+    let (_, old) = request(&h.app, "GET", "/api/discover/model-usage?date=2026-10-28", None, Value::Null).await;
+    assert_eq!(old["total_tokens"], "10");
+    assert!(revisions(&h.pool, failed).await.is_empty());
+    // A subsequent valid refresh replaces the snapshot without any review request.
+    let next = h.run().await;
+    discover_editor::store_collection_result(&h.pool, "openrouter", next,
+        vec![usage("2026-10-29", "30")]).await?;
+    let (_, updated) = request(&h.app, "GET", "/api/discover/model-usage", None, Value::Null).await;
+    assert_eq!(updated["total_tokens"], "30");
+    sqlx::query("UPDATE discover_drafts SET status='scheduled',publish_after=now()+interval '1 day' WHERE kind='model_usage' AND key='2026-10-29'")
+        .execute(&h.pool).await?;
+    let scheduled = h.run().await;
+    assert!(discover_editor::store_collection_result(&h.pool, "openrouter", scheduled,
+        vec![usage("2026-10-29", "30")]).await.is_err(), "auto publish must not bypass a scheduled draft");
+    h.close().await?;
+    Ok(())
 }
 
 #[tokio::test]

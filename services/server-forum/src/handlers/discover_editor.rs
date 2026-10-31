@@ -721,7 +721,28 @@ pub async fn write_collected_batch(
     pool: &PgPool,
     source: &str,
     run_id: Uuid,
+    items: Vec<crate::collectors::CollectedItem>,
+) -> AppResult<usize> {
+    store_collected_batch(pool, source, run_id, items, false).await
+}
+
+/// 客观榜单验证与发布共用一个事务，任何条目失败都保留上一份线上快照。
+pub async fn store_collection_result(
+    pool: &PgPool,
+    source: &str,
+    run_id: Uuid,
+    items: Vec<crate::collectors::CollectedItem>,
+) -> AppResult<usize> {
+    let auto_publish = matches!(source, "artificial_analysis" | "openrouter" | "github_repos");
+    store_collected_batch(pool, source, run_id, items, auto_publish).await
+}
+
+async fn store_collected_batch(
+    pool: &PgPool,
+    source: &str,
+    run_id: Uuid,
     mut items: Vec<crate::collectors::CollectedItem>,
+    auto_publish: bool,
 ) -> AppResult<usize> {
     if items.is_empty() || items.len() > 1000 {
         return Err(AppError::BadRequest("采集批次应含 1–1000 项".into()));
@@ -816,7 +837,7 @@ pub async fn write_collected_batch(
             let owner_matches = owned.as_ref().is_some_and(|(owner, revision)| {
                 owner == source && (*revision == d.revision || d.status == "published")
             });
-            if !owner_matches || d.updated_by != operator || (!same && d.status == "scheduled") {
+            if !owner_matches || d.updated_by != operator || ((auto_publish || !same) && d.status == "scheduled") {
                 return Err(AppError::Conflict("草稿已被人工修改或审核".into()));
             }
         } else {
@@ -832,13 +853,20 @@ pub async fn write_collected_batch(
                 ));
             }
         }
-        let revision = if same {
+        let mut revision = if same {
             old.as_ref().unwrap().revision
         } else {
             write(&mut tx, &e, &item.kind, &item.key, input)
                 .await?
                 .revision
         };
+        if auto_publish && !(same && old.as_ref().is_some_and(|d| d.status == "published")) {
+            sqlx::query("UPDATE discover_drafts SET reviewed_by=$3,reviewed_at=now(),status='published',publish_after=NULL,revision=nextval('discover_draft_revision_seq'),updated_at=clock_timestamp() WHERE kind=$1 AND key=$2")
+                .bind(&item.kind).bind(&item.key).bind(&operator).execute(&mut *tx).await?;
+            let draft = read(&mut tx, &item.kind, &item.key).await?;
+            publish(&mut tx, &draft, &operator).await?;
+            revision = draft.revision;
+        }
         sqlx::query("INSERT INTO collection_owned_items(source,kind,key,revision) VALUES($1,$2,$3,$4) ON CONFLICT(kind,key) DO UPDATE SET revision=$4")
             .bind(source).bind(&item.kind).bind(&item.key).bind(revision).execute(&mut *tx).await?;
         sqlx::query(
@@ -856,6 +884,10 @@ pub async fn write_collected_batch(
             news_remaining -= 1;
         }
         saved_count += 1;
+    }
+    if auto_publish {
+        sqlx::query("UPDATE collection_runs SET reviewed_by=$2,reviewed_at=now() WHERE id=$1")
+            .bind(run_id).bind(&operator).execute(&mut *tx).await?;
     }
     tx.commit().await?;
     Ok(saved_count)

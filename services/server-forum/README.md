@@ -100,7 +100,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 帖子：发帖可带 `poll: {options: [2～6 项], days?}`；列表与详情返回 `images`（正文里前 3 张站内图）、`poll`（票数、总数、自己投的项）、`view_count`；`GET /topics?category=a,b` 可以同时指定几个分类。
 - 兼容后台接口：`GET /admin/discover/{kind}`、`PUT /admin/discover/{kind}/{key}`（`{data, sort_order?, status?, published_at?, sample?}`）、`DELETE`，仍允许管理员直接编辑线上内容。新管理台统一走下述草稿流程。类型：`banner news nav doc vendor model repo_issue quota launch promo tool hotword`，管理台已提供热门搜索编辑。`sample: true` 的条目手机端会标「示例数据」；第一次启动会写入一批示例（模型榜、热榜、日报等，导航和资料是真实官方入口），录入真实内容后可删除示例。
 - 已实现服务端自动采集与管理台 `/admin/collection`：Artificial Analysis 能力榜、OpenRouter 每日 Token 用量榜、GitHub 候选仓库每日快照、官方 RSS 日报、GitHub Releases 工具版本。各来源独立开关，默认停用；第三方 key 在后台验证后用独立主密钥加密入库，只返回配置状态与尾号。`FORUM_COLLECTION_MASTER_KEY` 是部署用主密钥，不是第三方 API key。
-- 自动采集只生成草稿；管理员可查看完整运行批次与线上版本，人工终审后原子发布。失败保留上一版；人工编辑与定时稿不被覆盖。来源配置、运行、批次预览/审核接口在 `/api/admin/collection`；采集令牌不能进入该管理入口。
+- 能力榜、调用量榜和开源热榜每天北京时间 12:00 采集，验证通过后原子自动发布，无需人工审核；公开接口始终读取数据库快照，页面刷新不会请求原厂。资讯与工具版本仍生成草稿，管理员核对后整批发布。失败保留上一版；人工编辑与定时稿不被覆盖。来源配置、运行、批次预览/审核接口在 `/api/admin/collection`；采集令牌不能进入该管理入口。
 - OpenRouter 每天北京时间 12:00 采集最近三个完整 UTC 日的 Token 用量快照，公开读接口 `/discover/model-usage[?date=]` 与 `/discover/model-usage/dates`，精确整数以字符串传输。能力榜 v2 为 `/discover/models/v2`，缺失指标为 null；旧模型接口兼容保留。
 - 开源热榜只记录明确配置的最多 30 个仓库；第一天是基线，满八个连续日边界才能形成完整七日净增，缺采样标明观测天数。日报仅采 OpenAI/DeepMind/Google Research 固定官方 RSS 标题、来源、链接和时间，北京时间每天最多十个新候选，不抓正文。
 - 工具来源最多十个 GitHub 仓库，只收正式版本与可识别主程序资产。官方摘要优先，缺摘要才在后台有界流式下载核验；128 MiB/文件、累计 256 MiB/次，不执行文件。未识别架构与超限资产提示人工维护。模型上新、限免、额度重置、导航与资料继续人工编辑，不推断全局实时额度。
