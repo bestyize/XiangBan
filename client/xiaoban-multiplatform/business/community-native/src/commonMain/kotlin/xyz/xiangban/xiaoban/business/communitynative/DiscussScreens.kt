@@ -209,7 +209,7 @@ internal fun PollView(env: CommunityEnv, topic: Topic, initial: Poll, open: (Rou
 // ───────────── 创作 ─────────────
 
 /** 创作栏的筛选：和设计稿一致的顺序，值是内容包类型。 */
-private val CreateChips = listOf("" to "全部", "effect" to "特效", "wallpaper" to "壁纸", "widget" to "组件", "game" to "游戏", "routine" to "例行", "reminder" to "提醒", "task" to "任务", "goal" to "目标", "skill" to "技能", "expert" to "专家")
+private val CreateChips = listOf("" to "全部", "effect" to "特效", "wallpaper" to "壁纸", "widget" to "组件", "game" to "游戏", "routine" to "例行", "reminder" to "提醒", "task" to "任务", "goal" to "目标", "skill" to "技能", "expert" to "专家", "workflow" to "工作流", "schemes" to "方案")
 
 /** 这些类型没有封面，卡片是文字和图标；选中它们时改成一列。 */
 private val SingleColumnKinds = setOf("routine", "reminder", "task", "goal", "skill", "expert")
@@ -235,10 +235,11 @@ private fun CreateTab(env: CommunityEnv, open: (Route) -> Unit) {
     val controller = remember(env) { FeedController(env.forum, scope) }
     val state by controller.state.collectAsState()
     var kind by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(kind) { controller.select(kind) }
+    LaunchedEffect(kind) { if (kind != "schemes") controller.select(kind) }
     val single = kind in SingleColumnKinds
     Column(Modifier.fillMaxSize()) {
         PageChipRow(CreateChips, kind, { kind = it }, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 6.dp))
+        if (kind == "schemes") { NativeSchemesFeed(env, open); return@Column }
         PullToRefreshBox(isRefreshing = state.loading && state.packs.isEmpty(), onRefresh = controller::refresh, modifier = Modifier.fillMaxSize()) {
             when {
                 state.loading && state.packs.isEmpty() -> Spinner()
@@ -250,7 +251,7 @@ private fun CreateTab(env: CommunityEnv, open: (Route) -> Unit) {
                     horizontalArrangement = Arrangement.spacedBy(Gap), verticalItemSpacing = Gap,
                 ) {
                     staggeredItems(state.packs, key = { it.id }) { pack ->
-                        if (pack.kind in VisualKinds) LookCard(pack, single) { open(Route.Pack(pack.id)) } else SkillCard(pack) { open(Route.Pack(pack.id)) }
+                        if (pack.kind in VisualKinds) LookCard(pack, single) { open(Route.Pack(pack.id)) } else SkillCard(pack) { open(Route.Ability(pack.id)) }
                     }
                     item(span = StaggeredGridItemSpan.FullLine) { LoadMoreFooter(state.hasMore, state.error, state.packs.size, controller::loadMore, controller::refresh) }
                 }

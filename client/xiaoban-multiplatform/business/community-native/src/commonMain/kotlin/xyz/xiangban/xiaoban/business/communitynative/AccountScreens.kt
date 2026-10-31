@@ -201,7 +201,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
             }
 
             Row(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(vertical = 14.dp, horizontal = 4.dp)) {
-                QuickTile(XIcons.Folder, "我的作品", Modifier.weight(1f)) { env.platform?.openUrl("$site/me/works") }
+                QuickTile(XIcons.Folder, "我的作品", Modifier.weight(1f)) { open(if (session.loggedIn) Route.MyWorks else Route.Login) }
                 QuickTile(XIcons.Message, if (unread > 0) "通知 · $unread" else "通知", Modifier.weight(1f)) { env.platform?.openUrl("$site/notifications") }
                 QuickTile(XIcons.Monitor, "创作", Modifier.weight(1f)) { open(Route.AiChat) }
             }

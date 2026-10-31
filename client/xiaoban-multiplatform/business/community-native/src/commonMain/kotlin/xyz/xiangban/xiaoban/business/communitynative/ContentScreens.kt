@@ -186,6 +186,10 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
     var toast by remember { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         LoadBox(state, loader::reload) { pack ->
+            if (pack.kind in xyz.xiangban.xiaoban.common.community.CapabilityPackKinds) {
+                CapabilityDetailContent(env, pack, back)
+                return@LoadBox
+            }
             Column(Modifier.fillMaxSize()) {
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
                     Box(Modifier.fillMaxWidth().height(232.dp)) {
