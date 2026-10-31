@@ -31,6 +31,7 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
         get("/api/packs${query("kind" to kind, "sort" to sort, "q" to q, "page" to page)}")
 
     suspend fun pack(id: Long): Pack = get("/api/packs/$id")
+    suspend fun gameDownload(id: Long, version: Int): CommunityGameDownload = get("/api/packs/$id/download?version=$version")
     suspend fun weeklyIssues(page: Int = 1): Page<WeeklyIssue> = get("/api/weekly${query("page" to page)}")
     suspend fun weekly(week: String): WeeklyDetail = get("/api/weekly/${week.encodeURLParameter()}")
     suspend fun projects(): ProjectList = get("/api/projects")

@@ -68,7 +68,11 @@ class MobileGameActivity : Activity() {
     private var snapshot: GameSnapshot? = null
     private var exportBytes: ByteArray? = null
     private var gameId = ""
+    private var trialKey: String? = null
+    private var trial: AndroidCommunityGames.PlaySession? = null
     private var ready = false
+    private var restartFresh = false
+    private var historyRecorded = false
     private var playing = false
     private var lastLogAt = 0L
     private var logsThisSecond = 0
@@ -86,6 +90,9 @@ class MobileGameActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         gameId = intent.getStringExtra(EXTRA_GAME_ID).orEmpty()
+        trialKey = intent.getStringExtra(EXTRA_COMMUNITY_SESSION)
+        trial = AndroidCommunityGames.session(trialKey)
+        if (trialKey != null && trial == null) { showMessage("请返回作品页重新点击试玩", closeButton = true); return }
         if (!MOBILE_GAME_ID.matches(gameId)) { finish(); return }
         showMessage("正在检查游戏…")
         scope.launch {
@@ -107,6 +114,11 @@ class MobileGameActivity : Activity() {
     }
 
     private suspend fun loadSnapshot(id: String): GameSnapshot {
+        trial?.let { session ->
+            require(!intent.getBooleanExtra(EXTRA_EXPORT, false))
+            val game = session.archive.game
+            return GameSnapshot(id, session.recent.title, game.orientation, game.save, if (game.save) readSave() else null, session.archive.files)
+        }
         if (id in BuiltinMobileGames.ids) {
             require(!intent.getBooleanExtra(EXTRA_EXPORT, false)) { "官方游戏无需导出" }
             val root = "game-packs/$id"
@@ -222,11 +234,12 @@ class MobileGameActivity : Activity() {
         ViewCompat.setOnApplyWindowInsetsListener(container) { root, insets ->
             // Shrink the actual WebView viewport so fixed-position HUDs and canvases
             // also stay clear of the camera cutout, even while system bars are hidden.
-            val cutout = if (game.orientation != "landscape") insets.displayCutout else null
+            val cutout = if (game.orientation != "landscape" || trial != null) insets.displayCutout else null
             root.setPadding(cutout?.safeInsetLeft ?: 0, cutout?.safeInsetTop ?: 0,
                 cutout?.safeInsetRight ?: 0, cutout?.safeInsetBottom ?: 0)
             WindowInsetsCompat.CONSUMED
         }
+        if (trial != null) addTrialControls(container)
         setContentView(container)
         enterImmersiveMode()
         ViewCompat.requestApplyInsets(container)
@@ -238,11 +251,62 @@ class MobileGameActivity : Activity() {
         }
     }
 
+    /** A slim native toolbar reserves its own space so it never covers game controls. */
+    private fun addTrialControls(container: FrameLayout) {
+        val session = trial ?: return
+        val density = resources.displayMetrics.density
+        fun dp(n: Int) = (n * density).toInt()
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(4), 0, dp(4), 0)
+            background = android.graphics.drawable.GradientDrawable().apply { setColor(0xE6222222.toInt()); cornerRadius = dp(24).toFloat() }
+        }
+        fun control(label: String, action: () -> Unit) = TextView(this).apply {
+            text = label; textSize = 12f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
+            setPadding(dp(12), 0, dp(12), 0); minHeight = dp(44); contentDescription = label
+            setOnClickListener { action() }; row.addView(this)
+        }
+        control("退出试玩") { finish() }
+        control("重新开始") {
+            flushPendingSave(); ready = false; playing = false; restartFresh = true
+            webView?.reload()
+        }
+        var bookmarked: Boolean? = null
+        var busy = false
+        lateinit var collect: TextView
+        fun updateLabel() { collect.text = if (bookmarked == true) "已收藏" else "收藏"; collect.contentDescription = collect.text }
+        collect = control("收藏") {
+            if (!busy) {
+                busy = true
+                scope.launch {
+                    try {
+                        val old = bookmarked ?: session.bookmark(null)
+                        bookmarked = session.bookmark(!old); updateLabel()
+                    } catch (e: kotlinx.coroutines.CancellationException) { throw e
+                    } catch (e: Exception) {
+                        if (e is xyz.xiangban.xiaoban.common.community.ApiException && e.status == 401) {
+                            finish(); session.login()
+                        } else Toast.makeText(this@MobileGameActivity, e.message ?: "收藏失败，请重试", Toast.LENGTH_SHORT).show()
+                    } finally { busy = false }
+                }
+            }
+        }
+        scope.launch {
+            try { bookmarked = session.bookmark(null); updateLabel() }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (_: Exception) { /* Retry on explicit click. */ }
+        }
+        (webView?.layoutParams as? FrameLayout.LayoutParams)?.let { params ->
+            params.topMargin = dp(44)
+            webView?.layoutParams = params
+        }
+        container.addView(row, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(44), Gravity.TOP or Gravity.END))
+    }
+
+
     private fun resourceResponse(request: WebResourceRequest, game: GameSnapshot): WebResourceResponse {
         val uri = request.url
         if (request.method != "GET" || uri.scheme != "https" || uri.host != HOST_NAME || uri.port != -1 || uri.userInfo != null) return blocked()
         if (uri.path == HOST_PATH && request.isForMainFrame && uri.query == null) {
-            return response("text/html", hostHtml(game).toByteArray(), HOST_CSP.replace("%NONCE%", nonce))
+            return response("text/html", hostHtml(if (restartFresh) game.copy(save = null) else game).toByteArray(), HOST_CSP.replace("%NONCE%", nonce))
         }
         if (request.isForMainFrame) return blocked()
         val prefix = "/games/${game.id}/"
@@ -280,7 +344,7 @@ class MobileGameActivity : Activity() {
                 const t=Date.now();if(t-lastError>1000){lastError=t;errorCount=0;}if(++errorCount>5)return;
                 report({type:'runtime.error',message:String(m.message||'').slice(0,1600),source:String(m.source||'').slice(0,160),line:Number(m.line)||0});return;
               }
-              if(m.type==='game.ready'){if(!ready){ready=true;report({type:'game.ready'});}return;}
+              if(m.type==='game.ready'||(m.type==='game.document.ready'&&${trial != null})){if(!ready){ready=true;report({type:'game.ready'});}return;}
               // Closing this frame grants no capability and also works for games without a handshake.
               if(m.type==='game.exit'){report({type:'game.exit'});return;}
               if(!ready)return;
@@ -302,7 +366,9 @@ class MobileGameActivity : Activity() {
 
     private fun instrumentHtml(html: String): String {
         val bootstrap = """<script>(()=>{'use strict';const nonce=new URLSearchParams(location.search).get('hostNonce');
-            const report=(message,source,line)=>parent.postMessage({channel:'xiaban.game-pack',protocol:1,nonce,type:'runtime.error',message:String(message).slice(0,1600),source:String(source||'').slice(0,160),line:Number(line)||0},'*');
+            let failed=false;const report=(message,source,line)=>{failed=true;parent.postMessage({channel:'xiaban.game-pack',protocol:1,nonce,type:'runtime.error',message:String(message).slice(0,1600),source:String(source||'').slice(0,160),line:Number(line)||0},'*');};
+            // Legacy offline HTML games have no host handshake. Count a successful document load, never a click/download.
+            if(${trial != null})window.addEventListener('load',()=>setTimeout(()=>{if(!failed)parent.postMessage({channel:'xiaban.game-pack',protocol:1,nonce,type:'game.document.ready'},'*');},0));
             window.addEventListener('error',e=>report(e.message||'资源加载失败',e.filename||e.target&&e.target.src,e.lineno),true);
             window.addEventListener('unhandledrejection',e=>report(e.reason&&e.reason.message||e.reason||'Promise rejected','',0));
             window.addEventListener('keydown',e=>{if(e.key==='Escape')parent.postMessage({channel:'xiaban.game-pack',protocol:1,nonce,type:'game.exit'},'*');});
@@ -317,7 +383,13 @@ class MobileGameActivity : Activity() {
         val type = event.optString("type")
         when (type) {
             "host.loaded" -> { ready = false; playing = false }
-            "game.ready" -> { ready = true; AndroidGameHistory.opened(this, gameId) }
+            "game.ready" -> {
+                ready = true
+                if (!historyRecorded) {
+                    trial?.let { AndroidCommunityGames.opened(this, it) } ?: AndroidGameHistory.opened(this, gameId)
+                    historyRecorded = true
+                }
+            }
             "game.exit" -> { finish(); return }
             "game.save" -> {
                 if (!ready || snapshot?.saveEnabled != true) return
@@ -396,7 +468,7 @@ class MobileGameActivity : Activity() {
 
     /** Reject symlinks component by component, including games, saves and logs. */
     private fun privateFile(relative: String): File {
-        var current = File(filesDir.canonicalFile, "workspace")
+        var current = File(filesDir.canonicalFile, if (trialKey != null) "community-game-data" else "workspace")
         require(!isSymbolic(current) && current.canonicalFile == current.absoluteFile) { "工作区路径不能是符号链接" }
         if (relative.isNotEmpty()) for (part in relative.split('/')) {
             require(part.isNotEmpty() && part != "." && part != ".." && !part.contains('\\')) { "无效路径" }
@@ -503,6 +575,7 @@ class MobileGameActivity : Activity() {
         flushPendingSave()
         saveHandler.removeCallbacks(saveRunnable)
         scope.cancel()
+        if (isFinishing) AndroidCommunityGames.forget(trialKey)
         webView?.apply {
             resumeTimers()
             stopLoading()
@@ -538,6 +611,7 @@ class MobileGameActivity : Activity() {
 
     companion object {
         const val EXTRA_GAME_ID = "mobile.game.id"
+        const val EXTRA_COMMUNITY_SESSION = "mobile.game.community.session"
         const val EXTRA_EXPORT = "mobile.game.export"
         private const val EXPORT_REQUEST = 4201
         private const val MAX_SAVE_BYTES = 32 * 1024

@@ -562,3 +562,29 @@ async fn work_discussion_supports_imported_works_schemes_and_existing_threads() 
     assert_eq!(call(&h.app,"POST",&format!("/api/content-social/pack/{id}/discussion"),Some(&token),json!({})).await.0,StatusCode::FORBIDDEN);
     h.close().await?; Ok(())
 }
+
+#[tokio::test]
+async fn game_bookmarks_filter_before_pagination_and_keep_pack_identity() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else { return Ok(()) };
+    let (uid, token) = h.user().await;
+    let effect = h.pack(uid, "effect", "published").await;
+    let game = h.pack(uid, "game", "published").await;
+    let removed = h.pack(uid, "removed game", "published").await;
+    sqlx::query("UPDATE packs SET kind='game' WHERE id=ANY($1)").bind(vec![game,removed]).execute(&h.pool).await?;
+    for id in [effect, game, removed] {
+        let (status, _) = call(&h.app,"PUT",&format!("/api/content-social/pack/{id}/bookmark"),Some(&token),json!({})).await;
+        assert_eq!(status,StatusCode::OK);
+    }
+    sqlx::query("UPDATE packs SET status='removed' WHERE id=$1").bind(removed).execute(&h.pool).await?;
+    let (status, body) = call(&h.app,"GET","/api/me/content-bookmarks?kind=game",Some(&token),Value::Null).await;
+    assert_eq!(status,StatusCode::OK,"{body}");
+    assert_eq!(body["total"],1); assert_eq!(body["items"][0]["id"],game);
+    assert_eq!(body["items"][0]["kind"],"pack"); assert_eq!(body["items"][0]["content"]["kind"],"game");
+    let (_, all) = call(&h.app,"GET","/api/me/content-bookmarks?kind=pack",Some(&token),Value::Null).await;
+    assert_eq!(all["total"],2);
+    let (_, next) = call(&h.app,"GET","/api/me/content-bookmarks?kind=game&page=2",Some(&token),Value::Null).await;
+    assert_eq!(next["total"],1); assert_eq!(next["items"].as_array().unwrap().len(),0);
+    let (status, _) = call(&h.app,"GET","/api/me/content-bookmarks?kind=game",None,Value::Null).await;
+    assert_eq!(status,StatusCode::UNAUTHORIZED);
+    h.close().await?; Ok(())
+}

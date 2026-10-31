@@ -56,19 +56,21 @@ internal fun ContentSocialActions(env: CommunityEnv, kind: String, id: Long, ope
 internal fun ContentBookmarkFeed(env: CommunityEnv, kind: String, open: (Route) -> Unit) {
     val session by env.session.state.collectAsState()
     var page by rememberSaveable(kind) { mutableStateOf(1) }
-    val loader = rememberLoader(env, "content-bookmarks-$kind-$page-${session.accountId}") { env.contentSocial.bookmarks(kind, page) }
+    val revision by env.contentBookmarkRevision.collectAsState()
+    val loader = rememberLoader(env, "content-bookmarks-$kind-$page-${session.accountId}-$revision") { env.contentSocial.bookmarks(kind, page) }
     val state by loader.state.collectAsState()
     val scope = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     error?.let { Banner(it, Modifier.padding(12.dp), warn = true) }
     Box(Modifier.fillMaxSize()) { LoadBox(state, loader::reload) { result ->
-        if (result.items.isEmpty()) CenterMessage(if (page > 1) "这一页没有收藏" else "还没有收藏${if (kind == "pack") "作品" else "方案"}", if (page > 1) "上一页" else "刷新", { if (page > 1) page-- else loader.reload() })
+        if (result.items.isEmpty()) CenterMessage(if (page > 1) "这一页没有收藏" else "还没有收藏${when (kind) { "pack" -> "作品"; "game" -> "游戏"; else -> "方案" }}", if (page > 1) "上一页" else "刷新", { if (page > 1) page-- else loader.reload() })
         else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { GhostPillButton("刷新收藏", loader::reload, Modifier.fillMaxWidth()) }
             items(result.items, key = { "${it.kind}-${it.id}" }) { entry -> WhiteCard(padding = 14.dp) {
                 Text(entry.content.title, Modifier.fillMaxWidth().clickable { open(contentCardRoute(entry.kind, entry.content)) }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                 if (entry.kind == "pack") entry.content.version?.let { Text("版本 v$it", fontSize = 12.sp, color = LocalExtraColors.current.ink3) }
+                if (entry.content.kind == "game") GameTrialButton(env, entry.id, open = open, modifier = Modifier.padding(top = 8.dp))
                 GhostPillButton("取消收藏", {
                     if (busy) return@GhostPillButton
                     busy = true; error = null

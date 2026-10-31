@@ -97,6 +97,23 @@ private fun MobileGame.json(): JsonObject = buildJsonObject {
     put("save", save); put("orientation", orientation); put("layer", layer)
 }
 
+fun readMobileGameManifest(text: String): MobileGame {
+    require(text.encodeToByteArray().size <= 64 * 1024) { "manifest.json 不能超过 64 KB" }
+    val json = MobileGameJson.parseToJsonElement(text) as? JsonObject ?: throw IllegalArgumentException("manifest.json 需要是 JSON 对象")
+    require((json["schemaVersion"] as? JsonPrimitive)?.let { !it.isString && it.intOrNull == 1 } == true && json.gameString("kind") == "game") {
+        "手机当前只支持 schemaVersion=1、kind=game 的文本游戏包"
+    }
+    val capabilities = json["capabilities"]?.let { value ->
+        val array = value as? JsonArray ?: throw IllegalArgumentException("capabilities 必须是列表")
+        array.map { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content ?: throw IllegalArgumentException("capabilities 必须是字符串列表") }
+    } ?: emptyList()
+    val game = MobileGameFormat.metadata(MobileGame(
+        json.gameString("id"), json.gameString("name"), json.gameString("description"), json.gameBoolean("save"),
+        json.gameString("orientation", "portrait"), json.gameString("layer", "space"), capabilities,
+    ))
+    return game
+}
+
 /** Keeps the desktop ZIP manifest in games/<id>/; saves and host logs belong outside that folder. */
 class MobileGameStore(val workspace: MobileWorkspace) {
     private val lock = Mutex()
@@ -122,19 +139,7 @@ class MobileGameStore(val workspace: MobileWorkspace) {
     suspend fun read(id: String): MobileGame {
         MobileGameFormat.id(id)
         val text = workspace.read("games/$id/manifest.json")
-        require(text.encodeToByteArray().size <= 64 * 1024) { "manifest.json 不能超过 64 KB" }
-        val json = MobileGameJson.parseToJsonElement(text) as? JsonObject ?: throw IllegalArgumentException("manifest.json 需要是 JSON 对象")
-        require((json["schemaVersion"] as? JsonPrimitive)?.let { !it.isString && it.intOrNull == 1 } == true && json.gameString("kind") == "game") {
-            "手机当前只支持 schemaVersion=1、kind=game 的文本游戏包"
-        }
-        val capabilities = json["capabilities"]?.let { value ->
-            val array = value as? JsonArray ?: throw IllegalArgumentException("capabilities 必须是列表")
-            array.map { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content ?: throw IllegalArgumentException("capabilities 必须是字符串列表") }
-        } ?: emptyList()
-        val game = MobileGameFormat.metadata(MobileGame(
-            json.gameString("id"), json.gameString("name"), json.gameString("description"), json.gameBoolean("save"),
-            json.gameString("orientation", "portrait"), json.gameString("layer", "space"), capabilities,
-        ))
+        val game = readMobileGameManifest(text)
         require(game.id == id) { "manifest id 与游戏目录不一致" }
         return game
     }

@@ -61,6 +61,10 @@ interface PlatformActions : VoicePlatform {
     fun exitApp() {}
     /** 在独立沙箱中试玩游戏；平台未实现时返回 false。 */
     fun openGame(id: String): Boolean = false
+    val communityGamesSupported: Boolean get() = false
+    val recentCommunityGames: kotlinx.coroutines.flow.StateFlow<List<xyz.xiangban.xiaoban.common.community.RecentCommunityGame>> get() = EmptyRecentCommunityGames
+    suspend fun playCommunityGame(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, title: String,
+        bookmark: suspend (Boolean?) -> Boolean, login: () -> Unit): Boolean = false
     val gamesSupported: Boolean get() = false
     val recentGames: kotlinx.coroutines.flow.StateFlow<List<String>> get() = EmptyRecentGames
     suspend fun builtinGames(): List<xyz.xiangban.xiaoban.common.community.MobileGame> = emptyList()
@@ -145,6 +149,8 @@ class CommunityEnv(
 
     @OptIn(ExperimentalTime::class)
     private var accountChanged: (String?, String?) -> Unit = { _, _ -> }
+    val communityGameBusy = kotlinx.coroutines.flow.MutableStateFlow(false)
+    val contentBookmarkRevision = kotlinx.coroutines.flow.MutableStateFlow(0)
     val session = SessionManager(account, storage, now = { Clock.System.now().toEpochMilliseconds() }, onAccountChanged = { old, new -> accountChanged(old, new) })
     val forum = ForumApi(client, config) { session.accessToken() }
     val content = xyz.xiangban.xiaoban.common.community.ContentPublishingApi(client, config) { session.accessToken() }
@@ -198,4 +204,5 @@ private const val AGENT_SYSTEM_PROMPT =
         "没有实际试玩记录不能声称已测试通过。手机目前只创作独立窗口的离线文本小游戏，" +
         "需要触控操作，也保留桌面键鼠操作。不要使用 CDN、ES module、localStorage 或系统权限。"
 
+private val EmptyRecentCommunityGames = kotlinx.coroutines.flow.MutableStateFlow<List<xyz.xiangban.xiaoban.common.community.RecentCommunityGame>>(emptyList())
 private val EmptyRecentGames = kotlinx.coroutines.flow.MutableStateFlow<List<String>>(emptyList())

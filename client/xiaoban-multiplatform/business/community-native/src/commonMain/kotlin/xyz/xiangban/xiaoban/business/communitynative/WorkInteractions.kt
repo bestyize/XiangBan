@@ -34,7 +34,8 @@ internal fun WorkInteractionLayout(
     var bookmarkError by remember(kind, id, session.accountId) { mutableStateOf(false) }
     var toast by remember(kind, id) { mutableStateOf<String?>(null) }
     val discussion = (state as? Load.Ready)?.value
-    LaunchedEffect(kind, id, session.accountId, revision) {
+    val bookmarkRevision by env.contentBookmarkRevision.collectAsState()
+    LaunchedEffect(kind, id, session.accountId, revision, bookmarkRevision) {
         if (session.loggedIn) {
             try { bookmarked = env.contentSocial.state(kind, id).bookmarked; bookmarkError = false }
             catch (e: CancellationException) { throw e }

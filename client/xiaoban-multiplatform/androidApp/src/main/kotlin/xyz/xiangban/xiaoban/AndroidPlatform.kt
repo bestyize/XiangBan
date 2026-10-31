@@ -144,6 +144,11 @@ class AndroidPlatformActions(
     override suspend fun creationCover(id: String) = creationSharing.cover(id)
     override suspend fun shareCreationPreview(title: String, description: String, cover: ByteArray?) = creationSharing.sharePreview(title, description, cover)
     private val gameLibrary = AndroidGameLibrary(context.applicationContext)
+    override val communityGamesSupported = true
+    override val recentCommunityGames get() = AndroidCommunityGames.recent(context)
+    override suspend fun playCommunityGame(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, title: String,
+        bookmark: suspend (Boolean?) -> Boolean, login: () -> Unit): Boolean =
+        (context as? android.app.Activity)?.let { AndroidCommunityGames.play(it, download, title, bookmark, login) } ?: false
     override val gamesSupported = true
     override val recentGames get() = AndroidGameHistory.flow(context)
     override suspend fun builtinGames() = gameLibrary.games()

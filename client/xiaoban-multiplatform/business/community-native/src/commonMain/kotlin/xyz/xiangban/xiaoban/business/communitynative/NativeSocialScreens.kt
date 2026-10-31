@@ -91,8 +91,9 @@ fun NativeBookmarksScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> 
     var error by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize()) {
         ScreenBar("我的收藏", onBack = back)
+        TabStrip(listOf("topic" to "帖子", "pack" to "作品", "game" to "游戏", "scheme" to "方案"), kind) { kind = it; page = 1 }
+        if (kind == "game") { CommunityGameBookmarks(env, open); return@Column }
         if (!session.loggedIn) { CenterMessage("登录后查看收藏", "登录", { open(Route.Login) }); return@Column }
-        TabStrip(listOf("topic" to "帖子", "pack" to "作品", "scheme" to "方案"), kind) { kind = it; page = 1 }
         if (kind != "topic") { ContentBookmarkFeed(env, kind, open); return@Column }
         val loader = rememberLoader(env, "bookmarks-$page-${session.accountId}") { env.social.bookmarks(page) }
         val state by loader.state.collectAsState()

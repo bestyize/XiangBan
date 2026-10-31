@@ -16,14 +16,24 @@ import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.*
 
 @Composable
-internal fun ReplyContentCards(refs: List<ResolvedWorkReference>, open: ((Route) -> Unit)?) {
+internal fun ReplyContentCards(env: CommunityEnv, refs: List<ResolvedWorkReference>, open: ((Route) -> Unit)?) {
     refs.take(3).forEach { ref ->
         val card = safeReferencedContent(ref)
         WhiteCard(Modifier.padding(top = 8.dp).fillMaxWidth().clickable(enabled = card != null && open != null) { card?.let { open?.invoke(contentCardRoute(ref.kind, it)) } }, padding = 12.dp) {
-            Text(if (card == null) "引用内容已不可用" else card.title, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-            if (card != null) {
-                Text(if (ref.kind == "scheme") "社区方案" else "${kindLabel(card.kind.orEmpty())}${ref.version?.let { " · v$it" }.orEmpty()}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                if (card.summary.isNotBlank()) Text(card.summary, Modifier.padding(top = 4.dp), fontSize = 12.sp, maxLines = 2, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (card != null && ref.kind == "pack" && card.kind == "game") {
+                Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Cover(card.coverUrl, card.id, Modifier.size(64.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(card.title, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        GameTrialButton(env, card.id, ref.version, open, Modifier.padding(top = 6.dp))
+                    }
+                }
+            } else {
+                Text(if (card == null) "引用内容已不可用" else card.title, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                if (card != null) {
+                    Text(if (ref.kind == "scheme") "社区方案" else "${kindLabel(card.kind.orEmpty())}${ref.version?.let { " · v$it" }.orEmpty()}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    if (card.summary.isNotBlank()) Text(card.summary, Modifier.padding(top = 4.dp), fontSize = 12.sp, maxLines = 2, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }

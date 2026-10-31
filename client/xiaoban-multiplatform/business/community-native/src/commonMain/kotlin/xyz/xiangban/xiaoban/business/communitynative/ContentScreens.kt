@@ -207,6 +207,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                                 Text("v${pack.version}" + (pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let { " · " + formatSize(it) } ?: "") + pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { " · 更新于 $it" }.orEmpty(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
+                        if (pack.kind == "game" && pack.status == "published") GameTrialButton(env, pack.id, open = open, modifier = Modifier.padding(top = 16.dp))
                         if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 16.dp), fontSize = 15.sp, lineHeight = 26.sp)
                         if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, Modifier.padding(top = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
@@ -325,7 +326,8 @@ internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, 
                 Text(if (post.blocked) "你已屏蔽该用户" else "该评论已被隐藏", Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp, color = LocalExtraColors.current.ink3)
             } else {
                 RichBody(env, post.bodyHtml, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp)
-                ReplyContentCards(post.workRefs, open)
+                ReplyContentCards(env, post.workRefs, open)
+                LinkedGameCards(env, post.bodyHtml, open, post.workRefs.map { it.id })
                 ReplyAttachments(env, post.attachments, topicId)
             }
             if (!post.blocked && post.status == "normal") Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -386,6 +388,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                 }
                             }
                             RichBody(env, topic.bodyHtml, Modifier.padding(top = 12.dp), onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
+                            LinkedGameCards(env, topic.bodyHtml, open)
                             topic.attachments.forEach { attachment ->
                                 Column(Modifier.padding(top = 12.dp)) {
                                     Text(attachment.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)

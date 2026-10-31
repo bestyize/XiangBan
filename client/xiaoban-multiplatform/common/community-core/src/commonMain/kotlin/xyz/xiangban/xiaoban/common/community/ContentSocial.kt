@@ -15,6 +15,7 @@ data class CommunityContentCard(
     val id: Long, val title: String, val summary: String = "", val kind: String? = null,
     val version: Int? = null, val author: PackAuthor? = null, val status: String? = null,
     val items: List<SchemePackRef> = emptyList(),
+    @SerialName("cover_url") val coverUrl: String? = null,
 )
 @Serializable data class ContentDiscussion(
     @SerialName("topic_id") val topicId: Long? = null,
@@ -48,9 +49,10 @@ class ContentSocialApi(client: HttpClient, config: CommunityConfig, private val 
         return http.send(if (on) HttpMethod.Put else HttpMethod.Delete, "/api/content-social/$kind/$id/bookmark", serializer(), body = "{}", token = access())
     }
     suspend fun bookmarks(kind: String, page: Int = 1): Page<ContentBookmark> {
-        requireContentTarget(kind, 1)
+        if (kind != "game") requireContentTarget(kind, 1)
+        val targetKind = if (kind == "game") "pack" else kind
         val result: Page<ContentBookmark> = http.send(HttpMethod.Get, "/api/me/content-bookmarks?kind=$kind&page=${page.coerceAtLeast(1)}", serializer(), token = access())
-        if (result.items.any { it.kind != kind || it.id != it.content.id || it.id <= 0 }) throw ApiException(200, "收藏内容暂不可用，请刷新")
+        if (result.items.any { it.kind != targetKind || it.id != it.content.id || it.id <= 0 || (kind == "game" && it.content.kind != "game") }) throw ApiException(200, "收藏内容暂不可用，请刷新")
         return result
     }
     suspend fun report(kind: String, id: Long, reason: String, detail: String) {

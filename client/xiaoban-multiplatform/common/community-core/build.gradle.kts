@@ -31,6 +31,8 @@ kotlin {
     }
 
     sourceSets {
+        androidMain { kotlin.srcDir("src/androidJvmMain/kotlin") }
+        jvmMain { kotlin.srcDir("src/androidJvmMain/kotlin") }
         commonMain.dependencies {
             api(libs.kotlinx.coroutines.core)
             api(libs.kotlinx.serialization.json)

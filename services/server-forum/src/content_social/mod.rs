@@ -84,11 +84,11 @@ pub async fn bookmark(pool: &PgPool, uid: Uuid, kind: &str, id: i64, on: bool) -
 }
 pub async fn bookmarks(s: &AppState, uid: Uuid, kind: Option<&str>, page: i64) -> AppResult<Value> {
     if let Some(kind) = kind {
-        check_kind(kind)?;
+        if kind != "game" { check_kind(kind)?; }
     }
     let page = page.clamp(1, 100000);
     let size = 20;
-    let filter=format!("FROM content_bookmarks b JOIN ({VISIBLE_TARGETS}) v ON v.kind=b.kind AND v.id=b.target_id WHERE b.uid=$1 AND ($2::text IS NULL OR b.kind=$2)");
+    let filter=format!("FROM content_bookmarks b JOIN ({VISIBLE_TARGETS}) v ON v.kind=b.kind AND v.id=b.target_id WHERE b.uid=$1 AND ($2::text IS NULL OR b.kind=$2 OR ($2='game' AND b.kind='pack' AND EXISTS(SELECT 1 FROM packs g WHERE g.id=b.target_id AND g.kind='game')))");
     let (total,): (i64,) = sqlx::query_as(&format!("SELECT count(*) {filter}"))
         .bind(uid)
         .bind(kind)
