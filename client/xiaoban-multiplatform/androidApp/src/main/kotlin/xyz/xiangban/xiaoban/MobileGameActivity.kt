@@ -4,10 +4,12 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.net.http.SslError
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.Message
@@ -16,6 +18,11 @@ import android.system.Os
 import android.system.OsConstants
 import android.view.Gravity
 import android.view.ViewGroup
+import android.view.WindowManager
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import android.webkit.ConsoleMessage
 import android.webkit.GeolocationPermissions
 import android.webkit.JsPromptResult
@@ -30,6 +37,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -42,6 +50,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import xyz.xiangban.xiaoban.common.community.AndroidMobileWorkspace
 import xyz.xiangban.xiaoban.common.community.MobileGameStore
+import xyz.xiangban.xiaoban.common.community.BuiltinMobileGames
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -98,6 +107,25 @@ class MobileGameActivity : Activity() {
     }
 
     private suspend fun loadSnapshot(id: String): GameSnapshot {
+        if (id in BuiltinMobileGames.ids) {
+            require(!intent.getBooleanExtra(EXTRA_EXPORT, false)) { "官方游戏无需导出" }
+            val root = "game-packs/$id"
+            val game = BuiltinMobileGames.read(id, assets.open("$root/manifest.json").bufferedReader().use { it.readText() })
+            val contents = linkedMapOf<String, ByteArray>()
+            fun collect(directory: String) {
+                for (name in assets.list("$root/$directory").orEmpty()) {
+                    val path = if (directory.isEmpty()) name else "$directory/$name"
+                    if (!assets.list("$root/$path").isNullOrEmpty()) collect(path)
+                    else {
+                        require(safeGamePath(path)) { "内置游戏资源路径无效" }
+                        contents[path] = assets.open("$root/$path").use { it.readBytes() }
+                    }
+                }
+            }
+            collect("")
+            require(contents.containsKey("index.html")) { "内置游戏缺少入口" }
+            return GameSnapshot(id, game.name, game.orientation, game.save, if (game.save) readSave() else null, contents)
+        }
         privateFile("games/$id").also { require(it.isDirectory) { "游戏不存在" } }
         val store = MobileGameStore(AndroidMobileWorkspace(privateFile("")))
         store.validate(id)
@@ -128,12 +156,6 @@ class MobileGameActivity : Activity() {
     private fun showGame(game: GameSnapshot) {
         requestedOrientation = if (game.orientation == "landscape") ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             else ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-        val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(Color.BLACK) }
-        val bar = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        bar.addView(Button(this).apply { text = "退出"; setOnClickListener { finish() } })
-        bar.addView(TextView(this).apply { text = game.name; setTextColor(Color.WHITE); textSize = 16f },
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        layout.addView(bar)
         val view = WebView(this)
         webView = view
         view.setBackgroundColor(Color.BLACK)
@@ -193,8 +215,21 @@ class MobileGameActivity : Activity() {
                 return true
             }
         }
-        layout.addView(view, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
-        setContentView(layout)
+        val container = FrameLayout(this).apply {
+            setBackgroundColor(Color.BLACK)
+            addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(container) { root, insets ->
+            // Shrink the actual WebView viewport so fixed-position HUDs and canvases
+            // also stay clear of the camera cutout, even while system bars are hidden.
+            val cutout = if (game.orientation != "landscape") insets.displayCutout else null
+            root.setPadding(cutout?.safeInsetLeft ?: 0, cutout?.safeInsetTop ?: 0,
+                cutout?.safeInsetRight ?: 0, cutout?.safeInsetBottom ?: 0)
+            WindowInsetsCompat.CONSUMED
+        }
+        setContentView(container)
+        enterImmersiveMode()
+        ViewCompat.requestApplyInsets(container)
         view.loadUrl(HOST_URL)
         // Validation may finish after the user backgrounds this activity.
         if (!activityResumed) {
@@ -282,7 +317,7 @@ class MobileGameActivity : Activity() {
         val type = event.optString("type")
         when (type) {
             "host.loaded" -> { ready = false; playing = false }
-            "game.ready" -> ready = true
+            "game.ready" -> { ready = true; AndroidGameHistory.opened(this, gameId) }
             "game.exit" -> { finish(); return }
             "game.save" -> {
                 if (!ready || snapshot?.saveEnabled != true) return
@@ -436,6 +471,32 @@ class MobileGameActivity : Activity() {
         activityResumed = true
         webView?.resumeTimers()
         webView?.onResume()
+        enterImmersiveMode()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) enterImmersiveMode()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        enterImmersiveMode()
+    }
+
+    private fun enterImmersiveMode() {
+        // Export and validation/error screens keep normal system navigation.
+        if (webView == null) return
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     override fun onDestroy() {

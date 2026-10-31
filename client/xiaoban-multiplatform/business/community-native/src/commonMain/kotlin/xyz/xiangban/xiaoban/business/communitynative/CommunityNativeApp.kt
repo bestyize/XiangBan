@@ -62,6 +62,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
         var stackText by rememberSaveable { mutableStateOf("") }
         var publishOpen by rememberSaveable { mutableStateOf(false) }
         var aiDrawerOpen by rememberSaveable { mutableStateOf(false) }
+        var gameOverlayOpen by remember { mutableStateOf(false) }
         val stack = Route.decodeStack(stackText)
         // 回调可能在异步操作（如登录）结束后才调用，所以每次都读最新的栈，而不是组合时捕获的那份。
         fun push(route: Route) { stackText = Route.encodeStack(Route.decodeStack(stackText) + route) }
@@ -80,12 +81,12 @@ fun CommunityNativeApp(env: CommunityEnv) {
                 AnimatedContent(targetState = Tab.valueOf(tab), modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) }, label = "主导航切换") { currentTab ->
                     when (currentTab) {
                         Tab.Ai -> AiHomeScreen(env, chat, ::push, { aiDrawerOpen = true })
-                        Tab.Games -> GamesScreen(env, chat, ::push)
+                        Tab.Games -> GamesScreen(env, chat, ::push, onOverlayChanged = { gameOverlayOpen = it })
                         Tab.Community -> CommunityScreen(env, ::push)
                         Tab.Mine -> MineScreen(env, ::push)
                     }
                 }
-                FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
+                if (!gameOverlayOpen || tab != Tab.Games.name) FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
                 AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
             }
             val pages = stack.filter { it != Route.Login }

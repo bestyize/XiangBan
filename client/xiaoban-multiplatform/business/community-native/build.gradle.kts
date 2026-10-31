@@ -41,6 +41,7 @@ kotlin {
             implementation(libs.compose.ui)
             implementation(libs.compose.uiBackhandler)
             implementation(libs.coil.compose)
+            implementation("io.coil-kt.coil3:coil-svg:3.3.0")
             implementation(libs.coil.network.ktor)
         }
         androidMain.dependencies {

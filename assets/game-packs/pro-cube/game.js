@@ -273,7 +273,7 @@
 
   const camera = new THREE.PerspectiveCamera(
     38,
-    window.innerWidth / window.innerHeight,
+    container.clientWidth / Math.max(1, container.clientHeight),
     0.1,
     100
   );
@@ -283,7 +283,7 @@
     alpha: true,
     powerPreference: 'high-performance'
   });
-  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setSize(container.clientWidth, container.clientHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -549,10 +549,10 @@
   };
 
   function fitCameraToScreen() {
-    const aspect = window.innerWidth / window.innerHeight;
+    const aspect = container.clientWidth / Math.max(1, container.clientHeight);
     camera.aspect = aspect;
     camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(container.clientWidth, container.clientHeight);
     const baseRadius = aspect < 0.75 ? 10.8 : aspect < 1.0 ? 9.6 : 8.4;
     camState.targetRadius = baseRadius;
   }
@@ -577,6 +577,7 @@
   }
 
   window.addEventListener('resize', fitCameraToScreen);
+  new ResizeObserver(fitCameraToScreen).observe(container);
 
   // ==========================================
   // 6. 魔方旋转动画队列、计时器与复原检测
@@ -995,9 +996,10 @@
 
   function projectToScreen(worldVec) {
     const v = worldVec.clone().project(camera);
+    const rect = renderer.domElement.getBoundingClientRect();
     return {
-      x: ((v.x + 1) * window.innerWidth) / 2,
-      y: ((-v.y + 1) * window.innerHeight) / 2
+      x: rect.left + ((v.x + 1) * rect.width) / 2,
+      y: rect.top + ((-v.y + 1) * rect.height) / 2
     };
   }
 
@@ -1061,6 +1063,7 @@
     { passive: false }
   );
 
+  domElem.addEventListener('touchcancel', onPointerUp);
   domElem.addEventListener('touchend', () => {
     onPointerUp();
   });
@@ -1070,6 +1073,12 @@
   // ==========================================
   let isCounterClockwise = false;
   const btnDirToggle = document.getElementById('btn-dir-toggle');
+  const layerToggle = document.getElementById('btn-layer-toggle');
+  layerToggle.addEventListener('click', () => {
+    const expanded = document.getElementById('layer-pad').classList.toggle('expanded');
+    layerToggle.setAttribute('aria-expanded', String(expanded));
+    layerToggle.textContent = expanded ? '收起逐层操作' : '展开逐层操作';
+  });
 
   function getFaceSpec(face, depth, order) {
     const d = Math.max(1, Math.min(Math.floor(order / 2), depth)) - 1;

@@ -61,6 +61,10 @@ interface PlatformActions : VoicePlatform {
     fun exitApp() {}
     /** 在独立沙箱中试玩游戏；平台未实现时返回 false。 */
     fun openGame(id: String): Boolean = false
+    val gamesSupported: Boolean get() = false
+    val recentGames: kotlinx.coroutines.flow.StateFlow<List<String>> get() = EmptyRecentGames
+    suspend fun builtinGames(): List<xyz.xiangban.xiaoban.common.community.MobileGame> = emptyList()
+    suspend fun builtinGameCover(id: String): ByteArray? = null
     /** 导出兼容桌面的 ZIP，由用户在系统文件选择器中保存。 */
     suspend fun exportGame(id: String): Boolean = false
     /** 通过系统选择器读取用户明确选择的图片或文本文件。 */
@@ -187,3 +191,5 @@ private const val AGENT_SYSTEM_PROMPT =
         "只有用户提出试玩或导出时才打开游戏或分享面板。用 game_runtime_read 查看试玩记录，" +
         "没有实际试玩记录不能声称已测试通过。手机目前只创作独立窗口的离线文本小游戏，" +
         "需要触控操作，也保留桌面键鼠操作。不要使用 CDN、ES module、localStorage 或系统权限。"
+
+private val EmptyRecentGames = kotlinx.coroutines.flow.MutableStateFlow<List<String>>(emptyList())

@@ -17,6 +17,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
+| [手机游戏中心 A / B](../../client/xiaoban-multiplatform/docs/design-specs/prototypes/game-center.html) | A 轻量游戏库与 B 沉浸游乐场；两版并排、390 / 360px、深浅色、我的游戏、详情、创作与启动交互。[在线预览](http://127.0.0.1:1421/prototypes/game-center.html)。已选 A 版接入手机正式页面，Android 使用只读官方游戏与真实最近游玩记录；实机效果待验收 |
 | [社区与小伴AI 手机原型](../../client/xiaoban-multiplatform/docs/design-specs/mobile-prototype/README.md) | 70 个画板：社区、小伴 AI、游戏、我的与设置、分享、设备遥控、聊天状态卡片、实时语音与按住说话；[在线画布](https://claude.ai/artifact/BGtDJ7S7vGenqaY5MvyLLJ) |
 
 两份 Claude Design 画布导出的设计稿由多个 `*.dc.html` 画板组成，需在各自目录运行 `python3 -m http.server` 后打开 `index.html` 总览；其余单个 HTML 设计稿均自包含，可直接用浏览器打开，展示数据为模拟内容。设计稿源文件统一保留在客户端设计目录，避免多份副本产生差异。

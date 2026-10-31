@@ -137,6 +137,11 @@ class AndroidPlatformActions(
 
     override suspend fun pickChatAttachment(image: Boolean) = attachments?.pick(image)
 
+    private val gameLibrary = AndroidGameLibrary(context.applicationContext)
+    override val gamesSupported = true
+    override val recentGames get() = AndroidGameHistory.flow(context)
+    override suspend fun builtinGames() = gameLibrary.games()
+    override suspend fun builtinGameCover(id: String) = gameLibrary.cover(id)
     override fun openGame(id: String): Boolean =
         (context as? android.app.Activity)?.let { AndroidMobileGameHost(it).openGame(id) } ?: false
 
@@ -150,7 +155,7 @@ class AndroidPlatformActions(
     override fun setLandscape(landscape: Boolean) {
         val activity = context as? android.app.Activity ?: return
         activity.requestedOrientation =
-            if (landscape) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            if (landscape) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         // 横屏全屏时连状态栏也隐藏；从屏幕边缘滑一下会临时露出来，离开时只放回状态栏，导航栏整个应用都不显示（见 hideNavigationBar）。
         val controller = androidx.core.view.WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         if (landscape) {

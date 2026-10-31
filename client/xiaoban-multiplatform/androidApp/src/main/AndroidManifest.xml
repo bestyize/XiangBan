@@ -22,6 +22,7 @@
         <activity
             android:exported="true"
             android:launchMode="singleTop"
+            android:screenOrientation="portrait"
             android:configChanges="colorMode|density|fontScale|fontWeightAdjustment|grammaticalGender|keyboard|keyboardHidden|layoutDirection|locale|mcc|mnc|navigation|orientation|screenLayout|screenSize|smallestScreenSize|touchscreen|uiMode"
             android:windowSoftInputMode="adjustResize"
             android:name=".MainActivity">

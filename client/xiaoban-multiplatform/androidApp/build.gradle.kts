@@ -74,3 +74,26 @@ android {
         compose = true
     }
 }
+
+// Package the same reviewed offline games as desktop; never copy the rest of its public directory.
+abstract class SyncMobileGameAssets : DefaultTask() {
+    @get:InputDirectory abstract val sourceDirectory: org.gradle.api.file.DirectoryProperty
+    @get:OutputDirectory abstract val outputDirectory: org.gradle.api.file.DirectoryProperty
+    @get:javax.inject.Inject abstract val files: org.gradle.api.file.FileSystemOperations
+    @TaskAction fun copyGames() {
+        files.sync {
+            from(sourceDirectory) {
+                include("**/*.html", "**/*.js", "**/*.css", "**/*.json", "**/*.svg")
+                exclude("**/*.test.*")
+            }
+            into(outputDirectory.dir("game-packs"))
+        }
+    }
+}
+val mobileGameAssets = tasks.register<SyncMobileGameAssets>("syncMobileGameAssets") {
+    sourceDirectory.set(rootProject.layout.projectDirectory.dir("../xiaoban-desktop/public/game-packs"))
+    outputDirectory.set(layout.buildDirectory.dir("generated/mobile-games"))
+}
+androidComponents.onVariants { variant ->
+    variant.sources.assets?.addGeneratedSourceDirectory(mobileGameAssets) { it.outputDirectory }
+}

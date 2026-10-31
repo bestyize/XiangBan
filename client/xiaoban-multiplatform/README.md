@@ -31,6 +31,14 @@ Android 在内置 `agent_mobile` 原生库时支持私有文本工作区、文�
 
 第一阶段只支持普通离线文本游戏包（v1、`layer: space`）；ZIP 导入、v2 二进制素材、通用 Shell、技能/连接器及系统终止后自动续跑尚未接入。iOS 尚无对应原生实现。模块分工、限制、后续阶段和针对性验证见 [手机 Agent 基础能力接入](docs/agent-foundation.md)。
 
+## 游戏中心 A 版（2026-10-31）
+
+手机版游戏页接入[轻量游戏库设计](docs/design-specs/prototypes/game-center.html)：双列封面、玩法筛选、最近游玩、我的作品、详情及创作弹层。Android 构建从桌面 `public/game-packs/` 打包 9 款只读官方游戏，仍使用离线沙箱与原有消息/存档协议；不写入用户创作工作区，不放宽自定义游戏保留 ID、网络或权限限制。官方排序优先暮色滑翔、水墨剑客、雅韵五子棋与 3D 全阶魔方。
+
+最近游玩只在沙箱收到有效 `game.ready` 后持久保存，读取失败或仅点击启动不会产生记录。自创游戏优先显示本地 `cover.svg`，缺少或解码失败时显示名称封面；试玩、修改、ZIP 导出沿用原平台能力。iOS 仍未接入游戏运行和本地创作，显示平台不可用状态。
+
+针对性验证：`:common:community-core:jvmTest --tests '*GameLibraryTest*' --tests '*MobileGamesTest*'`、`:business:community-native:compileAndroidMain`、`:androidApp:compileDebugKotlin` 与 `:androidApp:mergeDebugAssets`。本轮未安装到手机，触控、横竖屏和各机型 WebView 的实际效果仍需实机验收。
+
 ## 安卓实时语音
 
 手机通话沿用桌面的级联方式：本地 Silero 检测人声、Smart Turn v3 判断是否说完、SenseVoice 转文字，再请求聊天模型并按句朗读。说话期间显示本地识别的中间字幕；可在小伴回答时开口打断，本地识别可用时会过滤语气词和朗读回声，下一轮带上已播放内容的说明。通话不会因安静自动挂断，用户可随时静音或结束；后台任务仍按原有权限运行。
