@@ -95,6 +95,7 @@ function go(p: number) {
         {{ t.label }}
       </button>
     </div>
+    <div class="community-entry"><RouterLink to="/challenges">参与主题挑战</RouterLink></div>
     <div v-if="tab !== 'schemes' && !feedTab" class="sortbar">
       <button type="button" :class="{ on: sort === 'new' }" @click="setSort('new')">最新</button>
       <button type="button" :class="{ on: sort === 'hot' }" @click="setSort('hot')">最多使用</button>
@@ -119,6 +120,7 @@ function go(p: number) {
 </template>
 
 <style scoped>
+.community-entry { padding: 12px 16px 0; font-size: var(--fs-sm); }
 .scheme-toolbar { display: flex; gap: 16px; align-items: center; padding: 16px; }
 .subtabs {
   display: flex;
