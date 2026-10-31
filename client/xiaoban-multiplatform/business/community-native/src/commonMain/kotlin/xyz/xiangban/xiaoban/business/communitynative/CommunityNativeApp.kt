@@ -130,10 +130,14 @@ fun CommunityNativeApp(env: CommunityEnv) {
 @Composable
 private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Route, push: (Route) -> Unit, pop: () -> Unit) {
     when (route) {
-        is Route.Pack -> PackDetailScreen(env, route.id, pop)
-        is Route.Ability -> AbilityDetailScreen(env, route.id, pop)
+        is Route.Pack -> PackDetailScreen(env, route.id, pop, push)
+        is Route.Ability -> AbilityDetailScreen(env, route.id, pop, push)
         is Route.Scheme -> SchemeDetailScreen(env, route.id, pop, push)
         Route.MyWorks -> MyContentScreen(env, pop, push)
+        Route.Notifications -> NativeNotificationsScreen(env, pop, push)
+        Route.Bookmarks -> NativeBookmarksScreen(env, pop, push)
+        Route.Blocks -> NativeBlocksScreen(env, pop, push)
+        is Route.User -> NativeProfileScreen(env, route.uid, route.tab, pop, push)
         is Route.PublishPack -> PublishContentScreen(env, route.packId, pop, push)
         is Route.Topic -> TopicDetailScreen(env, route.id, pop, push)
         is Route.Weekly -> WeeklyDetailScreen(env, route.week, push, pop)

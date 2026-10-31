@@ -179,7 +179,7 @@ internal fun TopicRow(topic: Topic, onClick: () -> Unit) {
 
 /** 作品详情：顶部封面（带返回和分享），标题、标签、作者、简介、更新记录、评论；底部“发到电脑”。 */
 @Composable
-fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
+fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null) {
     val loader = rememberLoader(env, id) { env.forum.pack(id) }
     val state by loader.state.collectAsState()
     var share by remember { mutableStateOf(false) }
@@ -187,7 +187,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         LoadBox(state, loader::reload) { pack ->
             if (pack.kind in xyz.xiangban.xiaoban.common.community.CapabilityPackKinds) {
-                CapabilityDetailContent(env, pack, back)
+                CapabilityDetailContent(env, pack, back, open = open)
                 return@LoadBox
             }
             Column(Modifier.fillMaxSize()) {
@@ -208,7 +208,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
                         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Avatar(pack.author?.nickname ?: "?", 36.dp, showInitial = true)
                             Column(Modifier.weight(1f)) {
-                                Text(pack.author?.nickname ?: "匿名", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text(pack.author?.nickname ?: "匿名", Modifier.clickable(enabled = open != null && pack.author != null) { pack.author?.uid?.let { open?.invoke(Route.User(it)) } }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                                 Text("v${pack.version}" + (pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let { " · " + formatSize(it) } ?: "") + pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { " · 更新于 $it" }.orEmpty(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
@@ -223,7 +223,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
                             }
                         }
                     }
-                    pack.topicId?.let { CommentsSection(env, it) }
+                    pack.topicId?.let { CommentsSection(env, it, open = open) }
                 }
                 Hairline()
                 Box(Modifier.fillMaxWidth().height(72.dp).padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
@@ -259,7 +259,7 @@ internal class HelpAnswers(val acceptedPostId: Long?, val authorUid: String, val
 
 /** 作品对应的讨论帖里的评论，分页加载。[reloadKey] 变化时从头重新加载（发完回复后用）。 */
 @Composable
-internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0, hint: String = "评论和点赞请在网页端进行：", help: HelpAnswers? = null) {
+internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 0, hint: String = "评论和点赞请在网页端进行：", help: HelpAnswers? = null, open: ((Route) -> Unit)? = null) {
     var posts by remember(topicId, reloadKey) { mutableStateOf<List<Post>>(emptyList()) }
     var page by remember(topicId, reloadKey) { mutableStateOf(0) }
     var more by remember(topicId, reloadKey) { mutableStateOf(true) }
@@ -289,7 +289,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
         Text("${if (help != null) "回答" else "评论"} ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         posts.forEach { post ->
             PostItem(
-                env, post,
+                env, post, open = open,
                 accepted = help?.acceptedPostId == post.id,
                 onAccept = if (help != null && help.canAccept && post.author.uid != help.authorUid) ({ help.onAccept(post) }) else null,
             )
@@ -307,12 +307,12 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
 }
 
 @Composable
-internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null) {
+internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null, open: ((Route) -> Unit)? = null) {
     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Avatar(post.author.nickname, 30.dp, showInitial = true)
         Column(Modifier.weight(1f)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(post.author.nickname, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(post.author.nickname, Modifier.clickable(enabled = open != null) { open?.invoke(Route.User(post.author.uid)) }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Text("${post.floor} 楼 · ${post.createdAt.take(10)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (post.blocked || post.status != "normal") {
@@ -320,6 +320,7 @@ internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, 
             } else {
                 RichBody(env, post.bodyHtml, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp)
             }
+            if (!post.blocked && post.status == "normal") NativeReportAction(env, "post", post.id, open)
             if (accepted) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 XIcon(XIcons.CheckBold, tint = Success, size = 16.dp)
                 Text("已采纳。这条回答已标记为解决方案，回答保留原文。", fontSize = 12.sp, color = Success)
@@ -368,7 +369,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Avatar(topic.author.nickname, 32.dp, showInitial = true)
                                 Column {
-                                    Text(topic.author.nickname, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                    Text(topic.author.nickname, Modifier.clickable { open(Route.User(topic.author.uid)) }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                                     Text("发布于 ${agoText(topic.createdAt)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
@@ -380,6 +381,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                     GhostPillButton("在网页查看与下载", { env.platform?.openUrl(env.forum.topicUrl(topic.id)) }, enabled = env.platform != null)
                                 }
                             }
+                            Box(Modifier.padding(top = 10.dp)) { NativeReportAction(env, "topic", topic.id, open) }
                             topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Amber) }
                             topic.poll?.let { PollView(env, topic, it, open) { msg -> toast = msg } }
                         }
@@ -391,7 +393,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                 onAccept = { post -> guarded { env.forum.acceptAnswer(topic.id, post.id); toast = "已采纳"; loader.reload() } },
                             )
                         }
-                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) { CommentsSection(env, id, reloadKey, hint = "", help = answers) }
+                        Column(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) { CommentsSection(env, id, reloadKey, hint = "", help = answers, open = open) }
                     }
                     Hairline()
                     Row(Modifier.fillMaxWidth().height(60.dp).background(MaterialTheme.colorScheme.surface).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {

@@ -6,6 +6,10 @@ sealed interface Route {
     data class Ability(val id: Long) : Route
     data class Scheme(val id: Long) : Route
     data object MyWorks : Route
+    data object Notifications : Route
+    data object Bookmarks : Route
+    data object Blocks : Route
+    data class User(val uid: String, val tab: String = "topics") : Route
     data class PublishPack(val packId: Long? = null) : Route
     data class Topic(val id: Long) : Route
     data class Weekly(val week: String) : Route
@@ -41,6 +45,10 @@ sealed interface Route {
         is Ability -> "ability:$id"
         is Scheme -> "scheme:$id"
         MyWorks -> "myworks"
+        Notifications -> "notifications"
+        Bookmarks -> "bookmarks"
+        Blocks -> "blocks"
+        is User -> "user:$uid:$tab"
         is PublishPack -> packId?.let { "publishpack:$it" } ?: "publishpack"
         is Topic -> "topic:$id"
         is Weekly -> "weekly:$week"
@@ -72,6 +80,10 @@ sealed interface Route {
                 "ability" -> value.toLongOrNull()?.takeIf { it > 0 }?.let(::Ability)
                 "scheme" -> value.toLongOrNull()?.takeIf { it > 0 }?.let(::Scheme)
                 "myworks" -> MyWorks
+                "notifications" -> Notifications
+                "bookmarks" -> Bookmarks
+                "blocks" -> Blocks
+                "user" -> value.substringBefore(':').takeIf { it.isNotEmpty() }?.let { User(it, value.substringAfter(':', "topics")) }
                 "publishpack" -> if (value.isEmpty()) PublishPack() else value.toLongOrNull()?.takeIf { it > 0 }?.let(::PublishPack)
                 "topic" -> value.toLongOrNull()?.let(::Topic)
                 "weekly" -> value.takeIf { it.isNotEmpty() }?.let(::Weekly)

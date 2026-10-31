@@ -37,18 +37,18 @@ private fun ManifestSection(title: String, value: String?) {
 }
 
 @Composable
-fun AbilityDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit) {
+fun AbilityDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null) {
     val loader = rememberLoader(env, "ability-$id") { env.forum.pack(id) }
     val state by loader.state.collectAsState()
     Column(Modifier.fillMaxSize()) {
         ScreenBar("能力详情", onBack = back)
-        Box(Modifier.weight(1f)) { LoadBox(state, loader::reload) { pack -> CapabilityDetailContent(env, pack, back, showBar = false) } }
+        Box(Modifier.weight(1f)) { LoadBox(state, loader::reload) { pack -> CapabilityDetailContent(env, pack, back, showBar = false, open = open) } }
     }
 }
 
 /** 既有 Pack 入口也可委托至此，保持视觉内容的详情代码原样。 */
 @Composable
-internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> Unit, showBar: Boolean = true) {
+internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> Unit, showBar: Boolean = true, open: ((Route) -> Unit)? = null) {
     val manifest = pack.versions.firstOrNull { it.version == pack.version }?.manifest ?: JsonObject(emptyMap())
     val prompt = manifestValue(manifest, "prompt", "promptText", "systemPrompt", "system_prompt")
     Column(Modifier.fillMaxSize()) {
@@ -56,6 +56,7 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = ContentSpacing) {
             WhiteCard(padding = 16.dp) {
                 Text(pack.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
+                pack.author?.let { author -> Text(author.nickname ?: "作者", Modifier.padding(top = 6.dp).clickable(enabled = open != null) { open?.invoke(Route.User(author.uid)) }, fontSize = 14.sp, color = LocalExtraColors.current.brandInk) }
                 Text("${kindLabel(pack.kind)} · ${pack.trustLabel} · v${pack.version}", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                 if (pack.status != "published") Text(contentWorkState(pack), Modifier.padding(top = 8.dp), color = Danger, fontSize = 13.sp)
                 if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp)
