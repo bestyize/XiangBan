@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -242,8 +243,8 @@ private fun BannerCarousel(banners: List<HomeBanner>, onClick: (HomeBanner) -> U
 internal fun NewsRow(item: NewsItem, onClick: () -> Unit) {
     val accent = hexColor(item.accent, Color(0xFF9FBFCF))
     Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
-        if (item.coverUrl.isNotEmpty()) Cover(item.coverUrl, item.key.hashCode().toLong() and 0x7fffffff, Modifier.fillMaxWidth().height(156.dp))
-        else Box(Modifier.fillMaxWidth().height(116.dp).background(Brush.linearGradient(listOf(lerp(accent, Color.Black, 0.48f), accent))), contentAlignment = Alignment.BottomStart) {
+        if (item.coverUrl.isNotEmpty()) Cover(item.coverUrl, item.key.hashCode().toLong() and 0x7fffffff, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+        else Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Brush.linearGradient(listOf(lerp(accent, Color.Black, 0.48f), accent))), contentAlignment = Alignment.BottomStart) {
             Text("AI  ·  DAILY", Modifier.padding(18.dp), color = Color.White.copy(alpha = .9f), fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 13.sp)
         }
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -107,7 +107,7 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
                         Text(listOf(news.source, if (news.timeBasis == "collected") "采集于 $whenText" else whenText, if (news.sample) "示例" else "").filter { it.isNotBlank() }.joinToString(" · "), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
                         if (news.coverUrl.isNotBlank()) {
                             Spacer(Modifier.height(22.dp))
-                            Cover(news.coverUrl, news.key.hashCode().toLong() and 0x7fffffff, Modifier.fillMaxWidth().height(200.dp))
+                            Cover(news.coverUrl, news.key.hashCode().toLong() and 0x7fffffff, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                         }
                         if (news.summary.isNotBlank()) {
                             Spacer(Modifier.height(24.dp))
