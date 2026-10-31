@@ -349,6 +349,61 @@ class VoiceCallTest {
     }
 
 
+    private fun fiveSentenceCall(scope: CoroutineScope, platform: FakeVoicePlatform, engine: SynthesizerEngine, sentences: List<String>): SpokenCall {
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/v1/audio/transcriptions" -> respond("""{"text":"现在几点"}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+                "/v1/chat/completions" -> respond(sse(sentences.joinToString("")), HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "text/event-stream"))
+                else -> respond("{}", HttpStatusCode.OK)
+            }
+        })
+        val api = AiGatewayApi(client, CommunityConfig()) { "tok" }
+        return SpokenCall(scope, platform, CloudAssistant(CloudChatController(api, scope)), listOf(CloudRecognizer(api)), listOf(engine)).also { it.setBargeIn(false) }
+    }
+
+    @Test
+    fun `one failed sentence uses the phone's voice and the next one tries the online voice again`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val sentences = listOf("第一句话说完了。", "第二句话说完了。", "第三句话说完了。", "第四句话说完了。", "第五句话说完了。")
+        val flaky = object : SynthesizerEngine {
+            override val name = "Edge 语音合成"
+            override suspend fun synthesize(text: String): ByteArray =
+                if (text == sentences[1]) throw EngineUnavailable("无法连接语音服务，请检查网络") else text.encodeToByteArray()
+        }
+        val platform = FakeVoicePlatform()
+        val call = fiveSentenceCall(scope, platform, flaky, sentences)
+        call.start()
+        waitFor("all five read") { platform.clips.size + platform.spoken.size >= 5 }
+        assertEquals(listOf(sentences[1]), platform.spoken.toList(), "只有没合成出来的那句用手机自带的声音")
+        assertEquals(sentences - sentences[1], platform.clips.take(4), "后面的句子还是在线的声音")
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
+    @Test
+    fun `an online voice that keeps failing is given up after a few sentences`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val sentences = (1..8).map { "第${it}句话说完了。" }
+        val calls = AtomicInteger()
+        val down = object : SynthesizerEngine {
+            override val name = "Edge 语音合成"
+            override suspend fun synthesize(text: String): ByteArray { calls.incrementAndGet(); throw EngineUnavailable("语音服务连接超时") }
+        }
+        val platform = FakeVoicePlatform()
+        val call = fiveSentenceCall(scope, platform, down, sentences)
+        call.start()
+        waitFor("all read by the phone") { platform.spoken.size >= 8 }
+        assertEquals(sentences, platform.spoken.take(8))
+        // 连着四句失败就不再用它；那时已经开始合成的最多还有两句。
+        assertTrue(calls.get() in 4..6, "在线合成被试了 ${calls.get()} 次")
+        call.stop()
+        waitFor("ended") { call.state.value.ended }
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
     @Test
     fun `saying hang up ends the call without asking the assistant`() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

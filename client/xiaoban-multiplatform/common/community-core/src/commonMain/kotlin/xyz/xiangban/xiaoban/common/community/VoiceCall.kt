@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -369,8 +370,8 @@ abstract class VoiceCall(protected val scope: CoroutineScope, protected val plat
     }
 }
 
-/** 这个引擎现在用不了（没装模型、没开通、没联网……）；通话里会换下一个。 */
-class EngineUnavailable(message: String) : Exception(message)
+/** 这个引擎现在用不了（没装模型、没开通、没联网……）；通话里会换下一个。[cause] 是底下真正的错，排查用。 */
+class EngineUnavailable(message: String, cause: Throwable? = null) : Exception(message, cause)
 
 /** 把一句话的录音（16kHz、单声道、16 位小端 PCM）识别成文字。 */
 interface RecognizerEngine {
@@ -480,6 +481,8 @@ class SpokenCall(
     private val recognizers = recognizers.toMutableList()
     /** 几句话同时在合成，换引擎要一次改完。 */
     private val synthesizers = MutableStateFlow(synthesizers)
+    /** 每个合成引擎连着失败了几句；合成成一句就清零。 */
+    private val synthFailures = MutableStateFlow<Map<SynthesizerEngine, Int>>(emptyMap())
     private var spokenText = ""
     private var interruptionNote = ""
     private var lastAck: String? = null
@@ -535,22 +538,34 @@ class SpokenCall(
         }
     }
 
-    /** 用第一个能用的引擎合成一句；用不了的引擎拿掉，换下一个。都不行返回 null（改用手机自带的朗读）。 */
+    /**
+     * 合成一句：按顺序试每个引擎，第一个合成出来的算数；都不行返回 null，这一句改用手机自带的朗读。
+     * 下一句还是先试原来的引擎（和电脑端一样）：一次没连上，不该让后面整通电话都换了声音。
+     * 一个引擎连着 [DropAfter] 句都失败，才在这通电话里不再用它，免得每句都白等它超时。
+     */
     private suspend fun synthesize(text: String): ByteArray? {
-        while (true) {
-            val engine = synthesizers.value.firstOrNull() ?: return null
+        for (engine in synthesizers.value) {
             try {
-                return engine.synthesize(text)
+                val audio = engine.synthesize(text)
+                synthFailures.update { it - engine }
+                return audio
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: EngineUnavailable) {
-                synthesizers.update { list -> list - engine }
             } catch (e: CallError) {
                 throw e
             } catch (e: Exception) {
-                return null
+                val count = synthFailures.updateAndGet { it + (engine to (it[engine] ?: 0) + 1) }[engine] ?: 0
+                val detail = e.cause?.let { "（${it::class.simpleName}: ${it.message}）" }.orEmpty()
+                println("小伴语音：${engine.name}这句没合成出来，改用手机自带的朗读；连续第 $count 句：${e.message}$detail")
+                if (count >= DropAfter) synthesizers.update { list -> list - engine }
             }
         }
+        return null
+    }
+
+    private companion object {
+        /** 比同时在合成的句子（3 句）多一句：一次网络抖动让手上的几句一起失败，不至于就换掉声音。 */
+        const val DropAfter = 4
     }
 
     /** 用户说了“挂断”：不交给小伴，说声再见（预先合成好了、也没关朗读才说）就结束通话。 */

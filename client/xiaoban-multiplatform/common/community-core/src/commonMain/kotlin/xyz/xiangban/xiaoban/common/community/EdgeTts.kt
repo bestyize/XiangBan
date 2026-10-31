@@ -346,7 +346,7 @@ class EdgeTtsSynthesizer(
         } catch (e: EngineUnavailable) {
             throw e
         } catch (e: Exception) {
-            throw EngineUnavailable("无法连接语音服务，请检查网络")
+            throw EngineUnavailable("无法连接语音服务，请检查网络", e)
         }
         try {
             return withTimeoutOrNull(ReplyMs) {
@@ -384,7 +384,7 @@ class EdgeTtsSynthesizer(
         } catch (e: EngineUnavailable) {
             throw e
         } catch (e: Exception) {
-            throw EngineUnavailable("语音合成连接中断")
+            throw EngineUnavailable("语音合成连接中断", e)
         } finally {
             // 对方已经断开的连接，关的时候也可能等不到回应。
             withTimeoutOrNull(1_000) { runCatching { session.close() } }
