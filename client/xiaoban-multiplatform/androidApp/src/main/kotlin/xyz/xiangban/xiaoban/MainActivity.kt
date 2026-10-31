@@ -12,6 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import xyz.xiangban.xiaoban.common.community.AndroidMobileWorkspace
 import xyz.xiangban.xiaoban.common.community.nativeAgentBridgeOrNull
 import xyz.xiangban.xiaoban.common.link.SharedPrefsLinkStorage
 import xyz.xiangban.xiaoban.common.link.SqliteRemoteCache
@@ -29,7 +30,7 @@ class MainActivity : ComponentActivity() {
             micWaiting = null
         }
         val speech = AndroidLocalSpeech(this)
-        val platform = AndroidPlatformActions(this, gate = speech::newGate) {
+        val platform = AndroidPlatformActions(this, gate = speech::newGate, attachments = AndroidChatAttachments(this)) {
             suspendCoroutine { continuation ->
                 micWaiting = continuation
                 micLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -46,8 +47,10 @@ class MainActivity : ComponentActivity() {
         val agentDir = filesDir.resolve("agent").absolutePath
         val prefs = AndroidPrefs(this)
         val chatFiles = AndroidChatHistoryFiles(this)
+        val workspace = AndroidMobileWorkspace(filesDir.resolve("workspace"))
+        val utcOffset = java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60_000
         setContent {
-            App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles)
+            App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffset)
         }
         hideNavigationBar()
     }

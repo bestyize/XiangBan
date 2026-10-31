@@ -58,6 +58,9 @@ import xyz.xiangban.xiaoban.common.community.SpokenCall
 import xyz.xiangban.xiaoban.common.community.toolLabel
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalOption
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.launch
+import xyz.xiangban.xiaoban.common.community.ChatAttachment
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import xyz.xiangban.xiaoban.common.community.ChatSummary
@@ -288,6 +291,8 @@ private fun DrawerLink(icon: androidx.compose.ui.graphics.vector.ImageVector, te
 fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, open: (Route) -> Unit) {
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
+    var attachments by remember(cloud.conversationId) { mutableStateOf(emptyList<ChatAttachment>()) }
+    val attachmentScope = rememberCoroutineScope()
     var input by rememberSaveable { mutableStateOf("") }
     var modelSheet by rememberSaveable { mutableStateOf(false) }
     var drawer by rememberSaveable { mutableStateOf(false) }
@@ -330,6 +335,12 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                         CloudMessages(cloud.messages, cloud.sending, env.platform, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) })
                     }
                 }
+                cloud.question?.let { question ->
+                    AskCard(RemoteApprovalRequest(
+                        approvalId = question.id, session = cloud.conversationId, title = "小伴想问你",
+                        kind = "question", question = question.question, choices = question.options, freeText = true,
+                    ), { answer -> chat.answerQuestion(answer.takeUnless { it == "__dismiss__" }) }, Modifier.padding(horizontal = 12.dp))
+                }
                 cloud.approval?.let { pending -> ApprovalCard(pending.toRequest(), { chat.answerApproval(it) }, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp)) }
                 if (cloud.messages.isEmpty()) {
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -338,6 +349,9 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                 }
                 Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
                     PressTip(env, voiceMode, Modifier.padding(bottom = 8.dp))
+                    if (attachments.isNotEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        attachments.forEachIndexed { index, item -> ChipPill("${item.name} ×", onClick = { attachments = attachments.filterIndexed { i, _ -> i != index } }) }
+                    }
                     ChatComposer(
                         input, { input = it }, "问点什么，或描述想要的装扮、游戏…",
                         onModel = { modelSheet = true },
@@ -356,14 +370,40 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                                 }
                             }
                         },
-                        onSend = { val text = input.trim(); if (text.isNotEmpty()) { input = ""; chat.send(text) } },
+                        onSend = {
+                            if (!cloud.sending && (input.isNotBlank() || attachments.isNotEmpty())) {
+                                try { chat.sendWithAttachments(input, attachments); input = ""; attachments = emptyList() }
+                                catch (e: Exception) { toast = e.message ?: "附件无法发送" }
+                            }
+                        },
+                        hasAttachments = attachments.isNotEmpty(),
                         sending = cloud.sending, onStop = chat::stop,
                     )
                 }
             }
         }
         OverlayTransition(attach) { panel ->
-            AttachSheet({ attach = false }, { attach = false; toast = "$it 即将支持" }, panel)
+            AttachSheet({ attach = false }, { label ->
+                attach = false
+                if (label == "相册" || label == "文件") {
+                    if (env.platform?.supportsChatAttachments != true) toast = "当前平台尚未接入附件选择"
+                    else if (attachments.size >= 3) toast = "每条消息最多添加 3 个附件"
+                    else {
+                        val conversation = cloud.conversationId
+                        attachmentScope.launch {
+                            try {
+                                val item = env.platform?.pickChatAttachment(label == "相册")
+                                if (item != null && chat.state.value.conversationId == conversation) {
+                                    val next = attachments + item
+                                    xyz.xiangban.xiaoban.common.community.validateChatAttachments(next)
+                                    attachments = next
+                                }
+                            } catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { toast = e.message ?: "无法读取附件" }
+                        }
+                    }
+                } else toast = "$label 尚未接入，请从相册或文件选择"
+            }, panel)
         }
         AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
         Toast(toast) { toast = null }
@@ -416,7 +456,7 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
     LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items(messages, key = { it.id }) { turn ->
             if (turn.role == "user") {
-                UserBubble(turn.text)
+                UserBubble(turn.text + turn.attachments.joinToString("") { "\n📎 ${it.name}" })
             } else {
                 AssistantRow {
                     AssistantTurnCards(

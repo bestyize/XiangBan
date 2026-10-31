@@ -28,6 +28,7 @@ private class AgentAwareFiles : ChatHistoryFiles {
     override fun write(name: String, text: String) { texts[name] = text }
     override fun delete(name: String) { texts.remove(name) }
     override fun agentCopy(id: String): String = "agent/s-$id.jsonl"
+    override fun agentProgressCopy(id: String): String = "agent/progress/s-$id.jsonl"
 }
 
 private suspend fun <T> StateFlow<T>.await(predicate: (T) -> Boolean): T =
@@ -109,13 +110,14 @@ class ChatHistoryTest {
         chat.state.await { !it.sending && it.messages.size == 2 }
         val id = chat.state.value.conversationId
         files.texts["agent/s-$id.jsonl"] = "{}"
+        files.texts["agent/progress/s-$id.jsonl"] = "{\"handoff\":\"恢复这一步\"}"
         eventually { "chats/u1/$id.json" in files.texts }
 
         chat.deleteConversation(id)
         assertTrue(chat.state.value.conversations.isEmpty())
         assertTrue(chat.state.value.messages.isEmpty())
         assertNotEquals(id, chat.state.value.conversationId)
-        eventually { "chats/u1/$id.json" !in files.texts && "agent/s-$id.jsonl" !in files.texts }
+        eventually { "chats/u1/$id.json" !in files.texts && "agent/s-$id.jsonl" !in files.texts && "agent/progress/s-$id.jsonl" !in files.texts }
         assertNull(ChatHistory(files, scope()).apply { useAccount("u1") }.load(id))
     }
 

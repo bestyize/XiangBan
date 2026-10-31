@@ -592,6 +592,27 @@ pub fn create_pack_with_assets(
     save: bool,
     overwrite: bool,
 ) -> Result<Value, String> {
+    create_oriented_pack_with_assets(root, id, name, description, files, assets, layer, save, overwrite, None)
+}
+
+/// Resource imports may carry a preferred orientation; older creators retain their default.
+pub fn create_oriented_pack_with_assets(
+    root: &Path,
+    id: &str,
+    name: &str,
+    description: &str,
+    files: &[(String, String)],
+    assets: &[(String, Vec<u8>)],
+    layer: &Layer,
+    save: bool,
+    overwrite: bool,
+    orientation: Option<&str>,
+) -> Result<Value, String> {
+    if let Some(value) = orientation {
+        if !matches!(value, "portrait" | "landscape") {
+            return Err("orientation 需要是 landscape 或 portrait".into());
+        }
+    }
     validate_request(id, name, description, files)?;
     if assets.len() > MAX_ASSETS {
         return Err(format!("资源文件最多 {MAX_ASSETS} 个"));
@@ -642,6 +663,9 @@ pub fn create_pack_with_assets(
             "id": id, "name": name, "description": description, "entry": "index.html",
             "runtimeProtocol": 1, "save": save,
         });
+        if let Some(orientation) = orientation {
+            manifest["orientation"] = json!(orientation);
+        }
         if files.iter().any(|(p, _)| p == "cover.svg") {
             manifest["cover"] = json!("cover.svg");
         }

@@ -80,7 +80,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                 AnimatedContent(targetState = Tab.valueOf(tab), modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) }, label = "主导航切换") { currentTab ->
                     when (currentTab) {
                         Tab.Ai -> AiHomeScreen(env, chat, ::push, { aiDrawerOpen = true })
-                        Tab.Games -> GamesScreen()
+                        Tab.Games -> GamesScreen(env, chat, ::push)
                         Tab.Community -> CommunityScreen(env, ::push)
                         Tab.Mine -> MineScreen(env, ::push)
                     }

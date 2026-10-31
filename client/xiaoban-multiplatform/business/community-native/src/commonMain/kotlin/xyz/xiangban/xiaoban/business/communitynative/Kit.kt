@@ -515,6 +515,7 @@ fun ChatComposer(
     onPermission: (() -> Unit)? = null,
     fullTrust: Boolean = false,
     sending: Boolean = false,
+    hasAttachments: Boolean = false,
     onStop: (() -> Unit)? = null,
     onLive: (() -> Unit)? = null,
 ) {
@@ -538,7 +539,7 @@ fun ChatComposer(
             if (sending) {
                 RoundIconButton(XIcons.Stop, if (onStop != null) "停止" else "正在处理", onStop ?: {}, Brand.copy(alpha = if (onStop != null) 1f else 0.35f), Color.White, enabled = onStop != null)
             } else {
-                val canSend = enabled && value.trim().isNotEmpty()
+                val canSend = enabled && (value.trim().isNotEmpty() || hasAttachments)
                 RoundIconButton(XIcons.ArrowRight, "发送", onSend, if (canSend) Brand else extra.line, Color.White, enabled = canSend)
             }
         }

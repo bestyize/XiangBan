@@ -7,6 +7,7 @@ import xyz.xiangban.xiaoban.business.communitynative.CommunityEnv
 import xyz.xiangban.xiaoban.business.communitynative.InMemoryPrefs
 import xyz.xiangban.xiaoban.business.communitynative.CommunityNativeApp
 import xyz.xiangban.xiaoban.business.communitynative.PlatformActions
+import xyz.xiangban.xiaoban.common.community.MobileWorkspace
 import xyz.xiangban.xiaoban.common.community.AgentBridge
 import xyz.xiangban.xiaoban.common.community.ChatHistoryFiles
 import xyz.xiangban.xiaoban.common.community.InMemoryChatHistoryFiles
@@ -32,9 +33,11 @@ fun App(
     speech: LocalSpeech? = null,
     prefs: AppPrefs = InMemoryPrefs(),
     chatFiles: ChatHistoryFiles = InMemoryChatHistoryFiles(),
+    workspace: MobileWorkspace? = null,
+    utcOffsetMinutes: Int = 0,
 ) {
-    val env = remember(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles) {
-        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech, prefs = prefs, chatFiles = chatFiles)
+    val env = remember(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffsetMinutes) {
+        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech, prefs = prefs, chatFiles = chatFiles, workspace = workspace, utcOffsetMinutes = utcOffsetMinutes)
     }
     CommunityNativeApp(env)
 }

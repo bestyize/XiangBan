@@ -17,13 +17,19 @@
 | `:business:community` | 社区网页壳（MA，已不被 `:shell` 装配，保留作回退）`CommunityApp`：加载 https://chat.xiangban.xyz（周刊、资源、讨论、项目的只读浏览，分享先用网页上的“复制链接”），站内域名只有 chat.xiangban.xyz，配色取自论坛前端的品牌色与黑白灰。对应实施计划的 MA（网页壳）。 |
 | `:common:community-core` | 社区、账号与 AI 网关的网络层和状态逻辑（不依赖 Compose）：`ForumApi`、`AccountApi`（与网页同一组接口）、`AiGatewayApi`（对接 `server-ai` 的档位、余额、兑换码与 `/v1/chat/completions` 流式对话）、`SessionManager`（令牌存储、临近过期自动刷新且并发共用一次、仅服务端明确拒绝才登出）、`FeedController`/`DiscussController`/`CloudChatController`/`Loader`、`DesignTokens`（与论坛前端同一套配色圆角）。能在 JVM 上直接跑单元测试：`./gradlew :common:community-core:jvmTest`。账号中心要先登记客户端 `xiaoban-android`。 |
 | `:common:link-core` | 与桌面互联的协议、客户端与应用控制器（`PhoneLink`、`RemoteChatController`、`SharedPrefsLinkStorage`）：同账号自动发现电脑、经中转收发、会话快照与流式增量、待办审批卡片、断线重连；有对真实 server-link 与 Rust 桌面端的跨语言互通测试。`./gradlew :common:link-core:jvmTest`。详见模块 README。 |
-| `:business:community-native` | 社区、云端与遥控小伴原生界面（Compose），按设计稿[社区与小伴AI 手机原型](docs/design-specs/mobile-prototype/README.md)搭建：悬浮胶囊导航（小伴AI、游戏、发布、社区、我的）与发布弹层；小伴AI 首页和对话页（模型选择、额度与兑换）；社区按[新稿](docs/design/社区与小伴AI%20手机原型.html)改版：首页（推荐、开源热榜、排行榜、追踪、导航）、讨论（创作、学习和教程、休闲，帖子带配图和投票）、资源（AI 工具、资料、影音娱乐、求助悬赏、开源精选），以及模型天梯、横屏的“智能 vs 价格”散点图、工具详情、求助帖（悬赏、采纳）和内容包、帖子详情；发现页内容来自 server-forum 的 `/api/discover/*`，目前由后台录入，带“示例”标记的是示例数据；我的、设置、登录与完成注册；我的电脑、遥控会话列表、遥控对话页（工具进度、审批卡片、高危二次确认、离线与异常提示）。基础部件（图标、顶栏、按钮、输入框、弹层）在 `Kit.kt`，图标路径由脚本从设计稿生成在 `Icons.kt`。平台能力通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。尚未接入的页面（游戏、资料库、分享海报等）见 docs 里的进度说明。 |
+| `:business:community-native` | 社区、云端与遥控小伴原生界面（Compose），按设计稿[社区与小伴AI 手机原型](docs/design-specs/mobile-prototype/README.md)搭建：悬浮胶囊导航（小伴AI、游戏、发布、社区、我的）与发布弹层；小伴AI 首页和对话页（模型选择、额度与兑换）；社区按[新稿](docs/design/社区与小伴AI%20手机原型.html)改版：首页（推荐、开源热榜、排行榜、追踪、导航）、讨论（创作、学习和教程、休闲，帖子带配图和投票）、资源（AI 工具、资料、影音娱乐、求助悬赏、开源精选），以及模型天梯、横屏的“智能 vs 价格”散点图、工具详情、求助帖（悬赏、采纳）和内容包、帖子详情；发现页内容来自 server-forum 的 `/api/discover/*`，目前由后台录入，带“示例”标记的是示例数据；我的、设置、登录与完成注册；我的电脑、遥控会话列表、遥控对话页（工具进度、审批卡片、高危二次确认、离线与异常提示）。基础部件（图标、顶栏、按钮、输入框、弹层）在 `Kit.kt`，图标路径由脚本从设计稿生成在 `Icons.kt`。平台能力通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。尚未接入的页面（资料库、分享海报等）见 docs 里的进度说明。 |
 | `:business:xiaban` | xiaban.xyz 入口 `XiabanApp`：地址、站内域名、与网页一致的浅色/深色配色。 |
 | `:shell` | 装配层，`App(storage, platform, linkStorage)` 渲染 `CommunityNativeApp`；Android 入口传入 `SharedPrefsTokenStorage`、`AndroidPlatformActions` 与 `SharedPrefsLinkStorage`，iOS 暂用内存存储。模板自带的 `Greeting`/`Platform` 示例与测试仍在，未使用。 |
 | `:androidApp` `iosApp/` | Android、iOS 入口。 |
 | `desktopApp/` | 桌面壳（Rust，Tauri 2）：`src/main.rs` 建窗口与外链处理，`src/links.rs` 是站内/站外/拦截的判定与单元测试，`ui/index.html` 是启动页（先测网络，通了再进站，不通显示「连不上相伴」和重试按钮）。 |
 
 新增业务壳放 `business/`，可复用的能力放 `common/`，`shell` 只做装配。
+
+## 手机 Agent 与游戏创作
+
+Android 在内置 `agent_mobile` 原生库时支持私有文本工作区、文件读写/编辑/搜索、游戏草稿安装与校验、游戏列表、独立沙箱试玩、运行错误读取和桌面兼容 ZIP 导出。聊天可以选择相册图片或 UTF-8 文本文件作为模型参考；Agent 支持持久任务清单、结构化提问、防重复和无进展暂停。原生库缺失时保持纯云端聊天降级。
+
+第一阶段只支持普通离线文本游戏包（v1、`layer: space`）；ZIP 导入、v2 二进制素材、通用 Shell、技能/连接器及系统终止后自动续跑尚未接入。iOS 尚无对应原生实现。模块分工、限制、后续阶段和针对性验证见 [手机 Agent 基础能力接入](docs/agent-foundation.md)。
 
 ## 安卓实时语音
 
