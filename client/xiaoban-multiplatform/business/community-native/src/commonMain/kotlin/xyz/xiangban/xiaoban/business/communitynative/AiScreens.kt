@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -59,7 +60,9 @@ import xyz.xiangban.xiaoban.common.link.RemoteApprovalOption
 import xyz.xiangban.xiaoban.common.link.RemoteApprovalRequest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import xyz.xiangban.xiaoban.common.community.ChatSummary
 import xyz.xiangban.xiaoban.common.community.ChatTurn
+import xyz.xiangban.xiaoban.common.community.chatTitle
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.CloudChatState
 import xyz.xiangban.xiaoban.common.community.formatAiMoney
@@ -79,10 +82,7 @@ private fun quotaText(balance: AiBalance?): String = when {
 
 private fun CloudChatState.modelName(): String = activeTier?.displayName ?: tiers.firstOrNull()?.displayName ?: "小伴AI"
 
-private fun CloudChatState.title(): String {
-    val first = messages.firstOrNull { it.role == "user" }?.text?.trim().orEmpty()
-    return if (first.isEmpty()) "新对话" else if (first.length > 14) first.take(14) + "…" else first
-}
+private fun CloudChatState.title(): String = chatTitle(messages)
 
 /** 没登录时的整页提示。 */
 @Composable
@@ -169,16 +169,22 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
                     }
                 }
 
-                if (cloud.messages.isNotEmpty()) {
+                val recent = cloud.conversations.take(3)
+                if (session.loggedIn && recent.isNotEmpty()) {
                     Text("最近对话", Modifier.padding(top = 22.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Row(
-                        Modifier.padding(top = 6.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.AiChat) }.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text(cloud.title(), Modifier.weight(1f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
+                    Column(Modifier.padding(top = 6.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface)) {
+                        recent.forEachIndexed { i, item ->
+                            if (i > 0) Hairline(Modifier.padding(start = 14.dp))
+                            Row(
+                                Modifier.fillMaxWidth().clickable { chat.openConversation(item.id); open(Route.AiChat) }.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text(item.title, Modifier.weight(1f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
+                            }
+                        }
                     }
-                    Text("对话只保存在这次打开应用期间。", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!env.chatsKept) Text("对话只保存在这次打开应用期间。", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(NavInset))
             }
@@ -190,17 +196,29 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
 @Composable
 fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> Unit, open: (Route) -> Unit) {
     val cloud by chat.state.collectAsState()
-    BackHandler(enabled = visible, onBack = onClose)
+    var deleting by remember { mutableStateOf<ChatSummary?>(null) }
+    BackHandler(enabled = visible && deleting == null, onBack = onClose)
     OverlayTransition(visible, direction = "left") { panel ->
         AiDrawer(
             cloud = cloud,
             onClose = onClose,
             onNew = { onClose(); chat.clearConversation(); open(Route.AiChat) },
-            onOpenCurrent = { onClose(); open(Route.AiChat) },
+            onOpen = { id -> onClose(); chat.openConversation(id); open(Route.AiChat) },
+            onDelete = { deleting = it },
             onModels = { onClose(); open(Route.Models) },
             onSettings = { onClose(); open(Route.Settings) },
             panelModifier = panel,
         )
+    }
+    deleting?.let { item ->
+        CenterDialog({ deleting = null }) {
+            Text("删除这个对话？", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+            Text("“${item.title}”会从这台手机上删掉，删了就找不回来了。", Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(Modifier.padding(top = 18.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GhostPillButton("取消", { deleting = null }, Modifier.weight(1f), height = 44.dp)
+                PillButton("删除", { chat.deleteConversation(item.id); deleting = null }, Modifier.weight(1f), height = 44.dp)
+            }
+        }
     }
 }
 
@@ -218,24 +236,36 @@ private fun FeatureTile(icon: androidx.compose.ui.graphics.vector.ImageVector, t
     }
 }
 
-/** 左侧对话列表抽屉：新对话、当前对话、模型与额度、设置。 */
+/** 左侧对话列表抽屉：新对话、存下来的对话（最近的在前，正在看的那个底色加深，长按删除）、模型与额度、设置。 */
 @Composable
-private fun AiDrawer(cloud: CloudChatState, onClose: () -> Unit, onNew: () -> Unit, onOpenCurrent: () -> Unit, onModels: () -> Unit, onSettings: () -> Unit, panelModifier: Modifier) {
+private fun AiDrawer(
+    cloud: CloudChatState, onClose: () -> Unit, onNew: () -> Unit, onOpen: (String) -> Unit, onDelete: (ChatSummary) -> Unit,
+    onModels: () -> Unit, onSettings: () -> Unit, panelModifier: Modifier,
+) {
     Row(Modifier.fillMaxSize()) {
         Column(panelModifier.width(300.dp).fillMaxHeight().background(MaterialTheme.colorScheme.surface).statusBarsPadding().navigationBarsPadding().padding(vertical = 16.dp)) {
             Text("小伴AI", Modifier.padding(horizontal = 16.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
             PillButton("新对话", onNew, Modifier.padding(start = 16.dp, end = 16.dp, top = 14.dp).fillMaxWidth(), height = 44.dp, icon = XIcons.Plus)
             Text("最近", Modifier.padding(start = 16.dp, top = 14.dp, bottom = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (cloud.messages.isNotEmpty()) {
-                Text(
-                    cloud.title(),
-                    Modifier.padding(horizontal = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).clickable(onClick = onOpenCurrent).padding(horizontal = 8.dp, vertical = 11.dp),
-                    fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
-            } else {
+            if (cloud.conversations.isEmpty()) {
                 Text("还没有对话", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+                Spacer(Modifier.weight(1f))
+            } else {
+                LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+                    items(cloud.conversations, key = { it.id }) { item ->
+                        val current = item.id == cloud.conversationId
+                        Text(
+                            item.title,
+                            Modifier.padding(horizontal = 8.dp, vertical = 1.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp))
+                                .let { if (current) it.background(LocalExtraColors.current.fill) else it }
+                                .combinedClickable(onLongClick = { onDelete(item) }) { if (current) onClose() else onOpen(item.id) }
+                                .padding(horizontal = 8.dp, vertical = 11.dp),
+                            fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
+                        )
+                    }
+                }
             }
-            Spacer(Modifier.weight(1f))
             Hairline()
             DrawerLink(XIcons.Star, "模型与额度", onModels)
             DrawerLink(XIcons.Sliders, "设置", onSettings)

@@ -21,6 +21,8 @@ import xyz.xiangban.xiaoban.common.community.VoicePlatform
 import xyz.xiangban.xiaoban.common.community.SetReminderTool
 import xyz.xiangban.xiaoban.common.community.postChatLines
 import xyz.xiangban.xiaoban.common.community.AiGatewayApi
+import xyz.xiangban.xiaoban.common.community.ChatHistoryFiles
+import xyz.xiangban.xiaoban.common.community.InMemoryChatHistoryFiles
 import xyz.xiangban.xiaoban.common.community.CommunityConfig
 import xyz.xiangban.xiaoban.common.community.ForumApi
 import xyz.xiangban.xiaoban.common.community.InMemoryTokenStorage
@@ -95,7 +97,12 @@ class CommunityEnv(
     /** 手机本地语音识别（安卓上是 sherpa-onnx 的 SenseVoice）；没有就只用云端和电脑上的识别。 */
     val speech: LocalSpeech? = null,
     val prefs: AppPrefs = InMemoryPrefs(),
+    /** 小伴AI 的对话历史存在哪里；不提供就只在这次打开应用期间记着。 */
+    val chatFiles: ChatHistoryFiles = InMemoryChatHistoryFiles(),
 ) {
+    /** 对话历史是不是会留到下次打开应用。 */
+    val chatsKept: Boolean get() = chatFiles !is InMemoryChatHistoryFiles
+
     /** 朗读回复：回复下面的“朗读”、自动朗读和设置里的试听都走这一个，来源、音色、语速按声音设置。 */
     val reader: ReplyReader by lazy { ReplyReader(this) }
 

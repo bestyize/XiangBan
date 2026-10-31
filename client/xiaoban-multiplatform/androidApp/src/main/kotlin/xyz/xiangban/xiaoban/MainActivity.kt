@@ -45,8 +45,9 @@ class MainActivity : ComponentActivity() {
         val agentBridge = nativeAgentBridgeOrNull()
         val agentDir = filesDir.resolve("agent").absolutePath
         val prefs = AndroidPrefs(this)
+        val chatFiles = AndroidChatHistoryFiles(this)
         setContent {
-            App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs)
+            App(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles)
         }
     }
 }

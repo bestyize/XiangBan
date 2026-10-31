@@ -405,6 +405,7 @@ private fun extractSingleReply(body: String): String {
 
 // ───────────── 云端纯聊天状态控制器 ─────────────
 
+@Serializable
 data class ChatTurn(
     val id: Long,
     val role: String,
@@ -437,11 +438,16 @@ data class CloudChatState(
     val redeemMessage: String? = null,
     val redeemError: String? = null,
     val approval: ChatApproval? = null,
+    /** 当前对话的编号（智能体内核也按它存对话）。 */
+    val conversationId: String = "",
+    /** 存下来的对话，最近的在前。 */
+    val conversations: List<ChatSummary> = emptyList(),
 ) {
     val activeTier: AiTier? get() = tiers.firstOrNull { it.tier == selectedTier }
 }
 
-private var nextConversation = 1L
+@OptIn(ExperimentalTime::class)
+private fun systemNowMs(): Long = Clock.System.now().toEpochMilliseconds()
 
 /** 内核报的错带着“HTTP 402: ”这样的前缀，给人看时去掉。 */
 internal fun friendlyAgentError(raw: String?): String =
@@ -471,7 +477,10 @@ class CloudChatController(
     private val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
     /** 手机里的智能体内核；为空就是原来的纯云端聊天。 */
     private val agent: AgentRuntime? = null,
-    private val newSessionId: () -> String = { "c${nextConversation++}" },
+    /** 对话存在哪里；为空就只在这次打开应用期间记着。 */
+    private val history: ChatHistory? = null,
+    private val clock: () -> Long = ::systemNowMs,
+    private val newSessionId: () -> String = { newChatId(clock()) },
 ) {
     private val _state = MutableStateFlow(CloudChatState())
     val state: StateFlow<CloudChatState> = _state.asStateFlow()
@@ -479,11 +488,49 @@ class CloudChatController(
     private var metaJob: Job? = null
     private var chatJob: Job? = null
     private var agentSession = newSessionId()
+        set(value) { field = value; _state.value = _state.value.copy(conversationId = value) }
     private var agentRun: String? = null
     private var agentReplyId: Long = 0
 
     init {
+        _state.value = _state.value.copy(conversationId = agentSession)
         agent?.let { runtime -> scope.launch { runtime.events.collect(::onAgentEvent) } }
+    }
+
+    /** 换到某个账号（登录后、换号后调用）：读出这个账号存下的对话列表，当前对话从头开始。 */
+    fun useAccount(account: String?) {
+        val list = history?.useAccount(account) ?: emptyList()
+        clearConversation()
+        _state.value = _state.value.copy(conversations = list)
+    }
+
+    /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
+    fun openConversation(id: String) {
+        if (id == agentSession && _state.value.messages.isNotEmpty()) return
+        val saved = history?.load(id)
+        if (saved == null) {
+            _state.value = _state.value.copy(conversations = history?.list().orEmpty())
+            return
+        }
+        stop()
+        agentSession = id
+        agentRun = null
+        nextId = (saved.maxOfOrNull { it.id } ?: 0L) + 1
+        _state.value = _state.value.copy(messages = saved, approval = null)
+    }
+
+    /** 删掉一个存下来的对话；删的是正在看的就换成新对话。 */
+    fun deleteConversation(id: String) {
+        val store = history ?: return
+        // 先离开这个对话（会把没说完的存一下），再删，免得删完又被存回来。
+        if (id == agentSession) clearConversation()
+        _state.value = _state.value.copy(conversations = store.delete(id))
+    }
+
+    /** 把当前对话存一下（发出提问、回答结束、停止时）。 */
+    private fun persist() {
+        val list = history?.save(agentSession, _state.value.messages, clock()) ?: return
+        _state.value = _state.value.copy(conversations = list)
     }
 
     /** 加载档位与余额，并按桌面端同一规则选定可用默认档位。 */
@@ -549,6 +596,7 @@ class CloudChatController(
             sending = true,
             approval = null,
         )
+        persist()
         if (agent != null) {
             agentReplyId = replyId
             chatJob = scope.launch {
@@ -563,6 +611,7 @@ class CloudChatController(
                 } catch (e: Exception) {
                     updateTurn(replyId) { it.copy(streaming = false, error = "智能体启动失败：${e.message ?: "未知原因"}") }
                     _state.value = _state.value.copy(sending = false)
+                    persist()
                 }
             }
             return
@@ -574,6 +623,7 @@ class CloudChatController(
                 }
                 updateTurn(replyId) { it.copy(streaming = false) }
                 _state.value = _state.value.copy(sending = false)
+                persist()
                 refreshBalanceQuietly()
             } catch (e: CancellationException) {
                 updateTurn(replyId) { it.copy(streaming = false) }
@@ -582,6 +632,7 @@ class CloudChatController(
             } catch (e: Exception) {
                 updateTurn(replyId) { it.copy(streaming = false, error = messageOf(e)) }
                 _state.value = _state.value.copy(sending = false)
+                persist()
                 if (e is ApiException && (e.code == "insufficient_quota" || e.code == "paid_required")) {
                     refreshBalanceQuietly()
                 }
@@ -609,6 +660,7 @@ class CloudChatController(
 
     /** 停止正在生成的流式回复，保留已输出的部分文字。 */
     fun stop() {
+        val wasSending = _state.value.sending
         chatJob?.cancel()
         chatJob = null
         agentRun?.let { agent?.cancel(it) }
@@ -618,6 +670,7 @@ class CloudChatController(
             else turn.copy(streaming = false, tools = settleTools(turn.tools, false))
         }
         _state.value = _state.value.copy(messages = updated, sending = false, approval = null)
+        if (wasSending) persist()
     }
 
     fun clearConversation() {
@@ -634,6 +687,7 @@ class CloudChatController(
         agent?.answerApproval(pending.id, decision)
         val record = ChatRecord("approval", toolLabel(pending.tool), if (decision == "deny") null else "已允许")
         updateTurn(agentReplyId) { it.copy(records = it.records + record) }
+        persist()
     }
 
     @OptIn(ExperimentalTime::class)
@@ -668,12 +722,14 @@ class CloudChatController(
                 }
                 _state.value = _state.value.copy(sending = false, approval = null)
                 agentRun = null
+                persist()
                 if (!event.ok && (failure.orEmpty().contains("额度") || failure.orEmpty().contains("兑换"))) refreshBalanceQuietly()
                 else if (event.ok) refreshBalanceQuietly()
             }
             is AgentEvent.Failure -> {
                 updateTurn(agentReplyId) { it.copy(streaming = false, error = event.message, tools = settleTools(it.tools, true)) }
                 _state.value = _state.value.copy(sending = false, approval = null)
+                persist()
             }
         }
     }
@@ -707,9 +763,9 @@ class CloudChatController(
         metaJob?.cancel()
         chatJob?.cancel()
         agentRun?.let { agent?.cancel(it) }
-        agentSession = newSessionId()
         agentRun = null
         _state.value = CloudChatState()
+        agentSession = newSessionId()
     }
 
     private fun updateTurn(id: Long, transform: (ChatTurn) -> ChatTurn) {

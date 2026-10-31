@@ -8,6 +8,8 @@ import xyz.xiangban.xiaoban.business.communitynative.InMemoryPrefs
 import xyz.xiangban.xiaoban.business.communitynative.CommunityNativeApp
 import xyz.xiangban.xiaoban.business.communitynative.PlatformActions
 import xyz.xiangban.xiaoban.common.community.AgentBridge
+import xyz.xiangban.xiaoban.common.community.ChatHistoryFiles
+import xyz.xiangban.xiaoban.common.community.InMemoryChatHistoryFiles
 import xyz.xiangban.xiaoban.common.community.InMemoryTokenStorage
 import xyz.xiangban.xiaoban.common.community.LocalSpeech
 import xyz.xiangban.xiaoban.common.community.ReminderScheduler
@@ -29,9 +31,10 @@ fun App(
     reminders: ReminderScheduler? = null,
     speech: LocalSpeech? = null,
     prefs: AppPrefs = InMemoryPrefs(),
+    chatFiles: ChatHistoryFiles = InMemoryChatHistoryFiles(),
 ) {
-    val env = remember(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs) {
-        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech, prefs = prefs)
+    val env = remember(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles) {
+        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech, prefs = prefs, chatFiles = chatFiles)
     }
     CommunityNativeApp(env)
 }
