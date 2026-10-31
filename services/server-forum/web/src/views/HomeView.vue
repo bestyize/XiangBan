@@ -83,6 +83,7 @@ function go(p: number) {
 <template>
   <ContentShell>
     <h1 class="sr-only">超级小伴</h1>
+    <p class="model-rank-entry"><RouterLink to="/models">模型能力榜</RouterLink> · <RouterLink to="/models?board=usage">模型调用量榜</RouterLink></p>
     <div class="subtabs" role="tablist" aria-label="内容类型">
       <button v-for="t in TABS" :key="t.key" type="button" role="tab" :aria-selected="tab === t.key" :class="{ on: tab === t.key }" @click="setTab(t.key)">
         {{ t.label }}

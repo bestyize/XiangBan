@@ -7,6 +7,7 @@ import { trackRoute } from '@/lib/analytics'
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
   { path: '/discuss', name: 'discuss', component: DiscussView },
+  { path: '/models', name: 'model-rankings', component: () => import('@/views/ModelRankingsView.vue') },
   // 旧入口：资源、周刊、项目列表都并进了首页的二级 Tab。
   { path: '/resources', redirect: '/' },
   { path: '/packs/:id(\\d+)', name: 'pack', component: () => import('@/views/PackView.vue') },
