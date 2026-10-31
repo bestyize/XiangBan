@@ -54,7 +54,6 @@ const shown = computed(() => props.store.page === props.page);
 /* ── Model label ─────────────────────────────────────────────────────── */
 const modelLabel = ref('编程模型');
 const modelProvider = ref('');
-const modelGateway = ref(false);
 let modelLabelGeneration = 0;
 async function readModelLabel() {
   if (!props.store.desktop) return;
@@ -63,7 +62,7 @@ async function readModelLabel() {
     const config = sessionModelConfig(await invoke<AiConfigView>('get_ai_config'), chat.model)!;
     if (generation !== modelLabelGeneration) return;
     if (config.activeProvider === GATEWAY_PROVIDER) {
-      modelLabel.value = '小伴 AI'; modelProvider.value = '小伴 AI'; modelGateway.value = true;
+      modelLabel.value = '小伴 AI'; modelProvider.value = '小伴 AI';
       try {
         const tiers = await invoke<AiTier[]>('ai_gateway_tiers');
         if (generation !== modelLabelGeneration) return;
@@ -73,7 +72,6 @@ async function readModelLabel() {
       return;
     }
     const provider = config.providers?.find(p => p.id === config.activeProvider);
-    modelGateway.value = false;
     modelProvider.value = provider?.name ?? '';
     modelLabel.value = provider?.models?.find(m => m.id === config.model)?.name || config.model || '编程模型';
   } catch { /* Preserve the last known label while preferences are unavailable. */ }
@@ -410,7 +408,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <ChatPermissionMenu :store="store" :disabled="!store.desktop" />
         <span class="composer-spacer" />
         <ChatContextRing :session-id="chat.currentId" v-if="store.desktop" :inert="!chat.currentId && page === 'new-task'" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="(tokens, id) => chat.setContextSize(tokens, id)" />
-        <ChatComposerModel :chat="chat" :label="modelLabel" :provider="modelProvider" :gateway="modelGateway" :disabled="!store.desktop || running || chat.sending" @switched="modelSwitched" @settings="emit('settings')" />
+        <ChatComposerModel :chat="chat" :label="modelLabel" :provider="modelProvider" :disabled="!store.desktop || running || chat.sending" @switched="modelSwitched" @settings="emit('settings')" />
         <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在转写</button>
         <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束录音' : '取消准备' }}</button>
         <button v-else-if="asr" type="button" class="xb-icon-btn voice" data-testid="chat-asr-toggle" aria-label="开始录音" aria-pressed="false" title="录音：说完转成文字，留在输入框，由你确认后发送" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><Mic :size="17" /></button>

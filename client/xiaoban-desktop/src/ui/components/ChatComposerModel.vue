@@ -1,18 +1,17 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Check, ChevronDown, ChevronRight, Settings } from 'lucide-vue-next';
+import { Brain, Check, ChevronRight, Settings } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, toAccountError, type AiConfigView, type AiReplyPreference, type AiTier, type ProviderConfigView } from '../../bridge.ts';
 import type { ChatStore } from '../chat/chat-store.ts';
 import { sessionModelConfig } from '../chat/session-model.ts';
 import { providerReasoningLevels, preferenceOptions } from '../ai-config.ts';
 
-const props = defineProps<{ chat: ChatStore; label: string; disabled?: boolean; /** The service the model comes from, for the small badge; empty when unknown. */ provider?: string; /** The model is 小伴 AI. */ gateway?: boolean }>();
-/** Two letters of the service's name (or its first character), like a tiny logo. */
-const badge = computed(() => {
-  if (props.gateway) return '伴';
-  const name = (props.provider || props.label || '').trim();
-  const latin = name.replace(/[^A-Za-z0-9]/g, '');
-  return latin ? latin.slice(0, 2).toUpperCase() : name.slice(0, 1) || 'AI';
+const props = defineProps<{ chat: ChatStore; label: string; disabled?: boolean; /** The service name shown with the model in the tooltip. */ provider?: string }>();
+const modelTitle = computed(() => {
+  const provider = props.provider?.trim();
+  const label = props.label.trim();
+  const name = provider && label !== provider && !label.startsWith(`${provider} · `) ? `${provider} / ${label}` : label;
+  return name ? `切换模型 · ${name}` : '切换模型';
 });
 const providerBadge = (name: string) => { const latin = name.replace(/[^A-Za-z0-9]/g, ''); return latin ? latin.slice(0, 2).toUpperCase() : name.slice(0, 1); };
 const emit = defineEmits<{ switched: []; settings: [] }>();
@@ -178,7 +177,7 @@ function settings() { close(); emit('settings'); }
 
 <template>
   <div ref="root" class="model-anchor">
-    <button type="button" class="composer-model" data-testid="chat-workbench-model" :title="provider ? `${provider} · ${label}` : label" :disabled="disabled" :aria-expanded="open" aria-haspopup="menu" @click="toggle"><i class="model-badge" :class="{ brand: gateway }" aria-hidden="true">{{ badge }}</i><span>{{ label }}</span><ChevronDown :size="11" :stroke-width="2.4" /></button>
+    <button type="button" class="composer-model" data-testid="chat-workbench-model" :title="modelTitle" :aria-label="modelTitle" :disabled="disabled" :aria-expanded="open" aria-haspopup="menu" @click="toggle"><Brain :size="18" :stroke-width="1.8" aria-hidden="true" /></button>
     <div v-if="open" class="model-panel xb-menu" role="menu" aria-label="选择模型" @scroll="hideReasoning">
       <div class="model-heading">选择模型</div>
       <div v-if="loading && !config" class="model-state">读取已配置模型…</div>
@@ -213,11 +212,11 @@ function settings() { close(); emit('settings'); }
 
 <style scoped>
 .model-anchor{position:relative;display:flex;flex:none;min-width:0}
-.composer-model{display:flex;align-items:center;gap:6px;min-width:0;max-width:200px;height:28px;padding:0 8px;border:0;border-radius:8px;background:none;color:var(--ui-text-primary);cursor:pointer;font:inherit;font-size:12px;font-weight:500}
+.composer-model{display:grid;place-items:center;flex:none;width:32px;height:32px;padding:0;border:0;border-radius:8px;background:none;color:var(--ui-text-primary);cursor:pointer}
 .composer-model:hover,.composer-model[aria-expanded="true"]{background:var(--ui-control)}
+.composer-model[aria-expanded="true"]{color:var(--ui-ink)}
 .composer-model:disabled{opacity:.5;cursor:not-allowed}
-.composer-model span{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--ui-font-mono);font-size:12px}
-.composer-model svg{flex:none;color:var(--ui-text-secondary)}
+.composer-model:focus-visible{outline:2px solid var(--ui-btn);outline-offset:2px}
 .model-badge{flex:none;width:16px;height:16px;border-radius:4px;background:var(--ui-soft);color:var(--ui-ink);font-style:normal;font-size:8.5px;font-weight:600;line-height:16px;text-align:center;letter-spacing:-.02em;font-family:var(--ui-font-family)}
 .model-badge.brand{background:linear-gradient(160deg,var(--ui-btn-hi),var(--ui-btn));color:var(--ui-text-on-btn);font-size:9px}
 .model-panel{position:absolute;bottom:calc(100% + 8px);right:0;width:max-content;min-width:230px;max-width:min(320px,calc(100vw - 20px));max-height:360px;overflow-y:auto;box-sizing:border-box;scrollbar-width:thin}
@@ -236,5 +235,4 @@ function settings() { close(); emit('settings'); }
 .reasoning-panel{position:fixed;z-index:1000;overflow-y:auto;box-sizing:border-box}
 .model-settings{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:0 10px;margin-top:4px;border:0;border-top:1px solid var(--ui-line);border-radius:0 0 8px 8px;background:none;color:var(--ui-text-secondary);cursor:pointer;font:inherit;font-size:12.5px}
 .model-settings:hover{color:var(--ui-text-primary)}
-@media(max-width:680px){.composer-model{max-width:110px}.composer-model span{max-width:60px}}
 </style>

@@ -317,7 +317,10 @@ describe('chat workbench composer actions', () => {
     }] };
     const h = await open({ get_ai_config: () => config, refresh_ai_providers: () => config,
       chat_set_model: args => args?.selection });
-    expect(q('chat-workbench-model')!.textContent).toContain('Coding Model');
+    expect(q('chat-workbench-model')!.textContent).toBe('');
+    expect(q('chat-workbench-model')!.querySelector('.lucide-brain')).not.toBeNull();
+    expect(q('chat-workbench-model')!.getAttribute('title')).toBe('切换模型 · 演示供应商 / Coding Model');
+    expect(q('chat-workbench-model')!.getAttribute('aria-label')).toBe('切换模型 · 演示供应商 / Coding Model');
     await click('chat-workbench-model');
     expect(wrapper!.element.textContent).toContain('演示供应商');
     await click('chat-model-demo-reasoning');
@@ -333,12 +336,12 @@ describe('chat workbench composer actions', () => {
     ];
     const h = await open({ get_ai_config: () => config, refresh_ai_providers: () => config, ai_gateway_tiers: () => tiers,
       chat_set_model: args => args?.selection });
-    expect(q('chat-workbench-model')!.textContent).toContain('小伴 AI · 日常');
+    expect(q('chat-workbench-model')!.getAttribute('title')).toBe('切换模型 · 小伴 AI · 日常');
     await click('chat-workbench-model');
     await click('chat-model-xiaoban-ai-advanced');
     expect(h.calls).toContainEqual(['chat_set_model', { sessionId: null, selection: { providerId: 'xiaoban-ai', model: 'advanced', replyPreference: 'default' } }]);
     expect(config.model).toBe('standard');
-    expect(q('chat-workbench-model')!.textContent).toContain('小伴 AI · 深入');
+    expect(q('chat-workbench-model')!.getAttribute('title')).toBe('切换模型 · 小伴 AI · 深入');
   });
 });
 
