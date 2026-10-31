@@ -23,6 +23,8 @@ sealed interface Route {
     data object Daily : Route
     /** 模型天梯。 */
     data object Leaderboard : Route
+    /** OpenRouter 调用量 Top 50 与历史完整日榜。 */
+    data object UsageLeaderboard : Route
     /** 智能 vs 价格的横屏全屏散点图。 */
     data object Scatter : Route
     data object Login : Route
@@ -62,6 +64,7 @@ sealed interface Route {
         is Tool -> "tool:$key"
         Daily -> "daily"
         Leaderboard -> "leaderboard"
+        UsageLeaderboard -> "usage-leaderboard"
         Scatter -> "scatter"
         Login -> "login"
         Search -> "search"
@@ -100,6 +103,7 @@ sealed interface Route {
                 "tool" -> value.takeIf { it.isNotEmpty() }?.let(::Tool)
                 "daily" -> Daily
                 "leaderboard" -> Leaderboard
+                "usage-leaderboard" -> UsageLeaderboard
                 "scatter" -> Scatter
                 "login" -> Login
                 "search" -> Search

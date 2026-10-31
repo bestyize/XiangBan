@@ -125,6 +125,15 @@ fun liveScatterPoints(board: LiveModelBoard): List<LiveScatterPoint> = board.mod
     LiveScatterPoint(model.id, model.name, model.vendorId, score, price)
 }
 
+/** 智能最大化、价格最小化的帕累托前沿；同价先取高分，同坐标只保留一个绘线点。 */
+fun liveScatterFrontier(points: List<LiveScatterPoint>): List<LiveScatterPoint> {
+    var best = Double.NEGATIVE_INFINITY
+    return points.sortedWith(compareBy<LiveScatterPoint> { it.weightedPrice }.thenByDescending { it.intelligence }.thenBy { it.id })
+        .filter { point ->
+            if (point.intelligence > best) { best = point.intelligence; true } else false
+        }
+}
+
 @Serializable
 data class ModelUsageBoard(
     val source: String,

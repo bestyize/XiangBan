@@ -79,6 +79,19 @@ class ModelRankingsTest {
     }
 
     @Test
+    fun `pareto line excludes dominated models and resolves equal prices and scores`() {
+        fun point(id: String, score: Double, price: Double) = LiveScatterPoint(id, id, "v", score, price)
+        val points = listOf(point("costly-equal-score", 40.0, 4.0), point("expensive-better", 60.0, 10.0),
+            point("same-price-worse", 20.0, 1.0), point("cheap", 30.0, 0.1), point("mid", 40.0, 1.0),
+            point("duplicate-mid", 40.0, 1.0), point("dominated", 25.0, 0.5))
+        val frontier = liveScatterFrontier(points)
+        assertEquals(listOf(0.1, 1.0, 10.0), frontier.map { it.weightedPrice })
+        assertEquals(listOf(30.0, 40.0, 60.0), frontier.map { it.intelligence })
+        assertEquals(frontier, liveScatterFrontier(points.reversed()))
+        assertEquals(emptyList(), liveScatterFrontier(emptyList()))
+    }
+
+    @Test
     fun `small measured prices retain their precision and never display as free`() {
         assertEquals("$0.001", formatLivePrice(0.001))
         assertEquals("$0", formatLivePrice(0.0))

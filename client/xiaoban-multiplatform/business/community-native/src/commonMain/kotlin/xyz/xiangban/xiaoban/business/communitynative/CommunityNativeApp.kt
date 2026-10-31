@@ -153,6 +153,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.Tool -> ToolDetailScreen(env, route.key, pop)
         Route.Daily -> DailyScreen(env, pop)
         Route.Leaderboard -> LeaderboardScreen(env, pop)
+        Route.UsageLeaderboard -> LiveUsageRankingsScreen(env, pop)
         Route.Scatter -> ScatterScreen(env, pop, push)
         Route.Settings -> SettingsScreen(env, back = pop, open = push)
         Route.Models -> ModelsScreen(env, chat, back = pop, open = push)
