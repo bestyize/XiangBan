@@ -83,14 +83,7 @@ impl Harness {
             http: reqwest::Client::new(),
         };
         let saved_state = state.clone();
-        let app = crate::build_router(state.clone()).merge(
-            Router::new()
-                .nest(
-                    "/api",
-                    routes().nest("/admin/content-social", admin_routes()),
-                )
-                .with_state(state),
-        );
+        let app = crate::build_router(state);
         let (status, login) = call(
             &app,
             "POST",
