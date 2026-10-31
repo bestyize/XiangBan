@@ -198,6 +198,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                         }
                         if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 16.dp), fontSize = 15.sp, lineHeight = 26.sp)
                         if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, Modifier.padding(top = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (pack.status == "published") ContentSocialActions(env, "pack", pack.id, open)
                         val changes = pack.versions.filter { it.changelog.isNotBlank() }
                         if (changes.isNotEmpty()) {
                             Text("更新记录", Modifier.padding(top = 24.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -273,7 +274,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
         Text("${if (help != null) "回答" else "评论"} ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         posts.forEach { post ->
             PostItem(
-                env, post, open = open,
+                env, post, open = open, topicId = topicId,
                 accepted = help?.acceptedPostId == post.id,
                 onAccept = if (help != null && help.canAccept && post.author.uid != help.authorUid) ({ help.onAccept(post) }) else null,
             )
@@ -291,7 +292,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
 }
 
 @Composable
-internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null, open: ((Route) -> Unit)? = null) {
+internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null, open: ((Route) -> Unit)? = null, topicId: Long? = null) {
     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Avatar(post.author.nickname, 30.dp, showInitial = true)
         Column(Modifier.weight(1f)) {
@@ -303,6 +304,8 @@ internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, 
                 Text(if (post.blocked) "你已屏蔽该用户" else "该评论已被隐藏", Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp, color = LocalExtraColors.current.ink3)
             } else {
                 RichBody(env, post.bodyHtml, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp)
+                ReplyContentCards(post.workRefs, open)
+                ReplyAttachments(env, post.attachments, topicId)
             }
             if (!post.blocked && post.status == "normal") NativeReportAction(env, "post", post.id, open)
             if (accepted) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -418,27 +421,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
 /** 写回复的弹层：多行输入加发送，失败时把服务端的原因显示在输入框下面。 */
 @Composable
 private fun ReplySheet(env: CommunityEnv, topicId: Long, onDismiss: () -> Unit, onSent: () -> Unit, panelModifier: Modifier) {
-    val scope = rememberCoroutineScope()
-    var text by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var uploading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    BottomSheet(onDismiss, panelModifier) {
-        Text("回复", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-        AreaBox(text, { text = it }, Modifier.padding(top = 12.dp), placeholder = "写下你的回复（至少 2 个字）…", minHeight = 120.dp, enabled = !busy, filled = true)
-        ForumUploadControls(env, enabled = !busy, onImage = { text += it }, onBusy = { uploading = it })
-        error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = Danger) }
-        Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GhostPillButton("取消", onDismiss, Modifier.weight(1f))
-            PillButton(if (busy) "发送中…" else if (uploading) "上传中…" else "发送", {
-                if (busy || uploading) return@PillButton
-                busy = true; error = null
-                scope.launch {
-                    try { env.forum.reply(topicId, text.trim()); onSent() } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (e: Exception) { error = messageOf(e) } finally { busy = false }
-                }
-            }, Modifier.weight(1f), enabled = !busy && !uploading && text.trim().length >= 2)
-        }
-    }
+    NativeReplyComposer(env, topicId, onDismiss, onSent, panelModifier)
 }
 
 @Composable
