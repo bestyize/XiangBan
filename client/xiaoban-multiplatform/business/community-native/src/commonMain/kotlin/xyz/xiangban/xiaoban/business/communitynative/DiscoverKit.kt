@@ -72,8 +72,12 @@ fun FootNote(text: String, modifier: Modifier = Modifier) {
 
 /** 小标签：状态（进行中、已采纳）、许可证、类型。 */
 @Composable
-fun Tag(text: String, fg: Color, bg: Color, modifier: Modifier = Modifier) {
-    Text(text, modifier.clip(RoundedCornerShape(6.dp)).background(bg).padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, color = fg, maxLines = 1)
+fun Tag(text: String, fg: Color, bg: Color, modifier: Modifier = Modifier, compact: Boolean = false) {
+    Text(
+        text,
+        modifier.clip(RoundedCornerShape(if (compact) 4.dp else 6.dp)).background(bg).padding(horizontal = if (compact) 4.dp else 8.dp, vertical = if (compact) 0.dp else 2.dp),
+        fontSize = 12.sp, color = fg, maxLines = 1,
+    )
 }
 
 /** 蓝色标签（进行中、修复）：稿子里是 #3E5C8A 字、#E8EEF8 底。 */
@@ -88,7 +92,7 @@ fun GreenTag(text: String, modifier: Modifier = Modifier) =
 
 /** 灰色标签（已到期、闭源、类型）：#666 字、#F5F5F5 底。 */
 @Composable
-fun GrayTag(text: String, modifier: Modifier = Modifier) = Tag(text, MaterialTheme.colorScheme.onSurfaceVariant, LocalExtraColors.current.fill, modifier)
+fun GrayTag(text: String, modifier: Modifier = Modifier, compact: Boolean = false) = Tag(text, MaterialTheme.colorScheme.onSurfaceVariant, LocalExtraColors.current.fill, modifier, compact)
 
 /** 琥珀色标签（优化、待确认）：#8A5B00 字、#FBF0DA 底。 */
 @Composable

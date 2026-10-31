@@ -84,7 +84,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
 @Composable
 private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySection) -> Unit, onSearch: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
-        Row(Modifier.fillMaxWidth().height(44.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.width(72.dp)) {
                 Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) {
                     XIcon(XIcons.SparkleSmall, tint = Color.White, size = 18.dp)
@@ -93,7 +93,7 @@ private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySecti
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally)) {
                 CommunitySection.entries.forEach { s ->
                     val selected = s == current
-                    Column(Modifier.clickable { onSelect(s) }.height(44.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                    Column(Modifier.clickable { onSelect(s) }.height(40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                         Text(
                             s.label, fontSize = 16.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             color = if (selected) Brand else MaterialTheme.colorScheme.onSurfaceVariant,

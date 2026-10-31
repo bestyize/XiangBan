@@ -28,6 +28,50 @@ fun htmlToPlain(html: String): String =
         .replace(blankLines, "\n\n")
         .trim()
 
+/** 正文里的一块：一段文字，或一张图片。 */
+sealed interface BodyBlock {
+    data class Text(val text: String) : BodyBlock
+    data class Image(val src: String, val alt: String = "") : BodyBlock
+}
+
+private val imgTag = Regex("(?is)<img\\b[^>]*>")
+private val srcAttr = Regex("(?is)\\bsrc\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')")
+private val altAttr = Regex("(?is)\\balt\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)')")
+
+private fun decodeEntities(s: String) = s.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")
+
+/**
+ * 把服务端的 HTML 正文拆成“文字块 + 图片块”，按出现顺序排好，方便原生界面逐块渲染。
+ * 图片地址只收站内相对路径（`/api/...`）和 http(s) 链接，别的（`javascript:`、`data:` 等）一律丢掉；相对路径用 [siteBase] 补成完整地址。
+ */
+fun parseBody(html: String, siteBase: String): List<BodyBlock> {
+    val base = siteBase.trimEnd('/')
+    val blocks = mutableListOf<BodyBlock>()
+    fun addText(chunk: String) {
+        val t = htmlToPlain(chunk)
+        if (t.isNotEmpty()) blocks += BodyBlock.Text(t)
+    }
+    var last = 0
+    for (m in imgTag.findAll(html)) {
+        addText(html.substring(last, m.range.first))
+        val src = srcAttr.find(m.value)?.let { it.groupValues[1].ifEmpty { it.groupValues[2] } }?.let(::decodeEntities)?.trim().orEmpty()
+        val alt = altAttr.find(m.value)?.let { it.groupValues[1].ifEmpty { it.groupValues[2] } }?.let(::decodeEntities).orEmpty()
+        val url = when {
+            src.startsWith("http://") || src.startsWith("https://") -> src
+            src.startsWith("/") && !src.startsWith("//") -> base + src
+            else -> null
+        }
+        if (url != null) blocks += BodyBlock.Image(url, alt)
+        last = m.range.last + 1
+    }
+    addText(html.substring(last))
+    return blocks
+}
+
+/** 正文里的所有文字拼起来（复制全文用）；图片用「[图片]」占位。 */
+fun bodyPlainText(blocks: List<BodyBlock>): String =
+    blocks.joinToString("\n\n") { if (it is BodyBlock.Text) it.text else "[图片]" }
+
 fun formatSize(bytes: Long): String = when {
     bytes < 1024 -> "$bytes B"
     bytes < 1024 * 1024 -> "${(bytes * 10 / 1024) / 10.0} KB"

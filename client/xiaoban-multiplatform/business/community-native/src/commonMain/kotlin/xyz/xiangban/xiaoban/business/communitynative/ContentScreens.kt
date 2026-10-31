@@ -64,7 +64,6 @@ import xyz.xiangban.xiaoban.common.community.VisualKinds
 import xyz.xiangban.xiaoban.common.community.WeeklyEntry
 import xyz.xiangban.xiaoban.common.community.formatSize
 import xyz.xiangban.xiaoban.common.community.agoText
-import xyz.xiangban.xiaoban.common.community.htmlToPlain
 import xyz.xiangban.xiaoban.common.community.kindLabel
 import xyz.xiangban.xiaoban.common.community.messageOf
 
@@ -85,12 +84,12 @@ fun Avatar(name: String, size: androidx.compose.ui.unit.Dp = 18.dp, showInitial:
 @Composable
 fun TabStrip(tabs: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
-        LazyRow(Modifier.fillMaxWidth().height(36.dp), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
+        LazyRow(Modifier.fillMaxWidth().height(32.dp), contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp), verticalAlignment = Alignment.CenterVertically) {
             items(tabs, key = { it.first }) { (key, label) ->
                 val on = key == selected
                 Box(Modifier.fillMaxHeight().clickable { onSelect(key) }, contentAlignment = Alignment.Center) {
-                    Text(label, fontSize = 14.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                    Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 3.dp).size(width = 18.dp, height = 3.dp).clip(RoundedCornerShape(2.dp)).background(if (on) Brand else Color.Transparent))
+                    Text(label, Modifier.padding(bottom = 3.dp), fontSize = 14.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp).size(width = 18.dp, height = 3.dp).clip(RoundedCornerShape(2.dp)).background(if (on) Brand else Color.Transparent))
                 }
             }
         }
@@ -286,7 +285,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
         Text("${if (help != null) "回答" else "评论"} ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         posts.forEach { post ->
             PostItem(
-                post,
+                env, post,
                 accepted = help?.acceptedPostId == post.id,
                 onAccept = if (help != null && help.canAccept && post.author.uid != help.authorUid) ({ help.onAccept(post) }) else null,
             )
@@ -304,7 +303,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
 }
 
 @Composable
-internal fun PostItem(post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null) {
+internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null) {
     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Avatar(post.author.nickname, 30.dp, showInitial = true)
         Column(Modifier.weight(1f)) {
@@ -312,12 +311,11 @@ internal fun PostItem(post: Post, accepted: Boolean = false, onAccept: (() -> Un
                 Text(post.author.nickname, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Text("${post.floor} 楼 · ${post.createdAt.take(10)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            val body = when {
-                post.blocked -> "你已屏蔽该用户"
-                post.status != "normal" -> "该评论已被隐藏"
-                else -> htmlToPlain(post.bodyHtml)
+            if (post.blocked || post.status != "normal") {
+                Text(if (post.blocked) "你已屏蔽该用户" else "该评论已被隐藏", Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp, color = LocalExtraColors.current.ink3)
+            } else {
+                RichBody(env, post.bodyHtml, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp)
             }
-            Text(body, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp, color = if (post.blocked || post.status != "normal") LocalExtraColors.current.ink3 else MaterialTheme.colorScheme.onSurface)
             if (accepted) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 XIcon(XIcons.CheckBold, tint = Success, size = 16.dp)
                 Text("已采纳。这条回答已标记为解决方案，回答保留原文。", fontSize = 12.sp, color = Success)
@@ -370,7 +368,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                     Text("发布于 ${agoText(topic.createdAt)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            Text(htmlToPlain(topic.bodyHtml), Modifier.padding(top = 12.dp), fontSize = 15.sp, lineHeight = 26.sp)
+                            RichBody(env, topic.bodyHtml, Modifier.padding(top = 12.dp), onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
                             topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Amber) }
                             topic.poll?.let { PollView(env, topic, it, open) { msg -> toast = msg } }
                         }
@@ -511,8 +509,7 @@ fun ProjectDetailScreen(env: CommunityEnv, slug: String, back: () -> Unit) {
                     project.links.forEach { link ->
                         GhostPillButton(link.title, { env.platform?.openUrl(link.url) }, Modifier.padding(top = 12.dp).fillMaxWidth(), enabled = env.platform != null)
                     }
-                    val body = htmlToPlain(project.bodyHtml)
-                    if (body.isNotBlank()) Text(body, Modifier.padding(top = 16.dp), fontSize = 15.sp, lineHeight = 26.sp)
+                    RichBody(env, project.bodyHtml, Modifier.padding(top = 16.dp))
                 }
                 OverlayTransition(share) { panel -> ShareSheet(env, project.name, "项目", env.forum.projectUrl(project.slug), onDismiss = { share = false }, onCopied = { toast = "链接已复制" }, panelModifier = panel) }
             }

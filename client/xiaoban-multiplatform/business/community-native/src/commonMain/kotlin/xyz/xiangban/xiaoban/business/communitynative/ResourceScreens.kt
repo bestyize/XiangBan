@@ -204,10 +204,12 @@ private fun MediaTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (Strin
         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Cover(topic.images.firstOrNull()?.let { env.forum.imageUrl(it) }, topic.id, Modifier.size(width = 72.dp, height = 96.dp))
             Column(Modifier.weight(1f).heightIn(min = 96.dp)) {
-                GrayTag(topic.tags.firstOrNull() ?: topic.category.name)
-                Text(topic.title, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(topic.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(topic.author.nickname, Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1)
+                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GrayTag(topic.tags.firstOrNull() ?: topic.category.name, compact = true)
+                    Text(topic.author.nickname, fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
     }

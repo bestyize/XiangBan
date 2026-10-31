@@ -579,3 +579,45 @@ class AiGatewayAndCloudChatTest {
     }
 }
 
+class BodyBlocksTest {
+    private val site = "https://chat.xiangban.xyz/"
+
+    @Test
+    fun `text and images keep their order`() {
+        val blocks = parseBody("""<p>第一段</p><p><img src="/api/images/abc" alt="夕阳"></p><p>第二段</p><img src="https://cdn.test/x.png">""", site)
+        assertEquals(
+            listOf(
+                BodyBlock.Text("第一段"),
+                BodyBlock.Image("https://chat.xiangban.xyz/api/images/abc", "夕阳"),
+                BodyBlock.Text("第二段"),
+                BodyBlock.Image("https://cdn.test/x.png", ""),
+            ),
+            blocks,
+        )
+    }
+
+    @Test
+    fun `unsafe or unusable image sources are dropped`() {
+        val html = """<img src="javascript:alert(1)"><img src="data:image/png;base64,AAAA"><img src="//evil.test/x.png"><img alt="没有地址"><p>正文</p>"""
+        assertEquals(listOf<BodyBlock>(BodyBlock.Text("正文")), parseBody(html, site))
+    }
+
+    @Test
+    fun `entities in the address are decoded and single quotes work`() {
+        val blocks = parseBody("""<img src='/api/images/a?x=1&amp;y=2' alt='a &amp; b'>""", site)
+        assertEquals(listOf<BodyBlock>(BodyBlock.Image("https://chat.xiangban.xyz/api/images/a?x=1&y=2", "a & b")), blocks)
+    }
+
+    @Test
+    fun `text only and empty bodies`() {
+        assertEquals(listOf<BodyBlock>(BodyBlock.Text("a\n\nb")), parseBody("<p>a</p><p>b</p>", site))
+        assertTrue(parseBody("", site).isEmpty())
+        assertTrue(parseBody("<p> </p>", site).isEmpty())
+    }
+
+    @Test
+    fun `plain text for copying uses a placeholder for images`() {
+        val blocks = parseBody("<p>前</p><img src=\"/api/images/a\"><p>后</p>", site)
+        assertEquals("前\n\n[图片]\n\n后", bodyPlainText(blocks))
+    }
+}
