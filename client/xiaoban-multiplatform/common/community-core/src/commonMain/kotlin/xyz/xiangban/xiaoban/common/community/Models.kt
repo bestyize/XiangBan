@@ -132,6 +132,7 @@ data class Topic(
     @SerialName("body_html") val bodyHtml: String = "",
     /** 详情里才有，登录后才有内容：你是否点过赞、收藏过，能不能回复。 */
     val viewer: TopicViewer? = null,
+    val attachments: List<ForumAttachment> = emptyList(),
 )
 
 @Serializable

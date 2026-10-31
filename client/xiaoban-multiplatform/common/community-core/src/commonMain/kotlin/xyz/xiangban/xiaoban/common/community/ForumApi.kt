@@ -17,6 +17,7 @@ import kotlinx.serialization.serializer
 class ForumApi(client: HttpClient, config: CommunityConfig, private val token: suspend () -> String?) {
     private val http = JsonHttp(client, config.forumBase)
     private val site = config.forumBase.trimEnd('/')
+    private val uploads = ForumUploads(client, config, token)
 
     private fun query(vararg pairs: Pair<String, Any?>): String =
         pairs.filter { it.second != null && it.second.toString().isNotEmpty() }
@@ -90,11 +91,19 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
         /** 2～6 个选项就带一个投票，[pollDays] 为空表示一直开放。 */
         pollOptions: List<String> = emptyList(),
         pollDays: Int? = null,
+        attachments: List<ForumAttachment> = emptyList(),
     ): Long {
+        validateTopicAttachments(attachments)
         val resp = write(HttpMethod.Post, "/api/topics", buildJsonObject {
             put("category_id", categoryId); put("title", title); put("body", body)
             if (tags.isNotEmpty()) put("tags", buildJsonArray { tags.forEach { add(JsonPrimitive(it)) } })
             if (bounty != null) put("help", buildJsonObject { put("bounty", bounty); put("days", bountyDays) })
+            if (attachments.isNotEmpty()) {
+                put("attachment_ids", buildJsonArray { attachments.forEach { add(JsonPrimitive(it.id)) } })
+                put("attachment_prices", buildJsonArray { attachments.forEach { attachment -> add(buildJsonObject {
+                    put("id", attachment.id); put("price", attachment.price)
+                }) } })
+            }
             if (pollOptions.isNotEmpty()) put("poll", buildJsonObject {
                 put("options", buildJsonArray { pollOptions.forEach { add(JsonPrimitive(it)) } })
                 if (pollDays != null) put("days", pollDays)
@@ -115,6 +124,13 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     suspend fun setTopicBookmarked(id: Long, on: Boolean) { write(if (on) HttpMethod.Put else HttpMethod.Delete, "/api/topics/$id/bookmark") }
 
     // ── 登录态 ──
+    suspend fun uploadSession(): ForumUploadSession = http.send(HttpMethod.Post, "/api/session", serializer(), body = "{}", token = token())
+    suspend fun uploadImage(file: ForumUploadFile, maxBytes: Long): ForumImage = uploads.image(file, maxBytes)
+    suspend fun uploadAttachment(file: ForumUploadFile, maxBytes: Long): ForumAttachment = uploads.attachment(file, maxBytes)
+    suspend fun deletePendingAttachment(id: String) {
+        if (!ForumAssetId.matches(id)) throw ApiException(400, "附件编号无效")
+        write(HttpMethod.Delete, "/api/attachments/$id")
+    }
     suspend fun session(): SessionInfo = http.send(HttpMethod.Post, "/api/session", serializer(), body = "{}", token = token())
     suspend fun unreadCount(): Int = get<Unread>("/api/me/notifications/unread").unread
 
