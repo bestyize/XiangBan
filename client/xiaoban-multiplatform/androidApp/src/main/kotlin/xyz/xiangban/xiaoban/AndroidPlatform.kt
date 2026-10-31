@@ -140,13 +140,13 @@ class AndroidPlatformActions(
         val activity = context as? android.app.Activity ?: return
         activity.requestedOrientation =
             if (landscape) android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        // 横屏全屏时隐藏状态栏和导航栏；从屏幕边缘滑一下会临时露出来，离开时恢复。
+        // 横屏全屏时连状态栏也隐藏；从屏幕边缘滑一下会临时露出来，离开时只放回状态栏，导航栏整个应用都不显示（见 hideNavigationBar）。
         val controller = androidx.core.view.WindowCompat.getInsetsController(activity.window, activity.window.decorView)
         if (landscape) {
             controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
         } else {
-            controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
         }
     }
 
