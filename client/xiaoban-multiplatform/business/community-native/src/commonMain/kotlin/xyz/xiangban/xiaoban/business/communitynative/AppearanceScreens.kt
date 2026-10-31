@@ -33,10 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import xyz.xiangban.xiaoban.common.community.DesignTokens as Tokens
 
-/** 设置 → 主题：跟随系统 / 浅色 / 深色，三张迷你界面预览，选中的描边加对号。 */
+/** 设置 → 主题：选择外观模式和主题色，并在迷你界面中预览。 */
 @Composable
-fun AppearanceScreen(back: () -> Unit, open: (Route) -> Unit) {
+fun AppearanceScreen(back: () -> Unit) {
     val mode = ThemeState.mode
+    val current = ThemeState.accent
     Column(Modifier.fillMaxSize()) {
         ScreenBar("主题", onBack = back)
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
@@ -46,14 +47,12 @@ fun AppearanceScreen(back: () -> Unit, open: (Route) -> Unit) {
             }
             Text("跟随系统时，随手机的深浅色设置自动切换。", Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             GroupLabel("主题色")
-            Row(
-                Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).clickable { open(Route.AccentColor) }.padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text("主题色", Modifier.weight(1f), fontSize = 15.sp)
-                Box(Modifier.size(16.dp).clip(CircleShape).background(Brand))
-                Text(ThemeState.accent.name, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
+            Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 8.dp, end = 8.dp, top = 20.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                Tokens.Accents.chunked(3).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { accent -> Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Swatch(accent, accent.id == current.id) { ThemeState.select(accent) } } }
+                    }
+                }
             }
         }
     }
@@ -83,34 +82,6 @@ private fun ModeCard(mode: AppearanceMode, selected: Boolean, onClick: () -> Uni
     }
 }
 
-/** 设置 → 主题色：上面是浅色和深色两个迷你界面预览，下面六个色点（2 行 3 列），点哪个预览就跟着换。 */
-@Composable
-fun AccentScreen(back: () -> Unit) {
-    val current = ThemeState.accent
-    Column(Modifier.fillMaxSize()) {
-        ScreenBar("主题色", onBack = back)
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-            GroupLabel("效果")
-            Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf(false to "浅色", true to "深色").forEach { (dark, label) ->
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.size(152.dp, 214.dp).clip(RoundedCornerShape(12.dp))) { MiniPhone(dark = dark, scale = 0.92f, accent = current) }
-                        Text(label, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                }
-            }
-            GroupLabel("主题色")
-            Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 8.dp, end = 8.dp, top = 20.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                Tokens.Accents.chunked(3).forEach { row ->
-                    Row(Modifier.fillMaxWidth()) {
-                        row.forEach { accent -> Box(Modifier.weight(1f), contentAlignment = Alignment.Center) { Swatch(accent, accent.id == current.id) { ThemeState.select(accent) } } }
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun Swatch(accent: Tokens.Accent, selected: Boolean, onClick: () -> Unit) {
     val p = accent.light
@@ -127,7 +98,7 @@ private fun Swatch(accent: Tokens.Accent, selected: Boolean, onClick: () -> Unit
 
 /**
  * 迷你手机界面：顶栏、用户气泡、带按钮的卡片、开关、输入框。尺寸按设计稿 165×232 乘 [scale]，
- * 颜色是这个外观下的固定配色，主题色跟着 [accent] 走，用来在主题页和主题色页里预览效果。
+ * 颜色是这个外观下的固定配色，主题色跟着 [accent] 走，用来在主题页里预览效果。
  */
 @Composable
 private fun MiniPhone(dark: Boolean, scale: Float, modifier: Modifier = Modifier, accent: Tokens.Accent = ThemeState.accent) {

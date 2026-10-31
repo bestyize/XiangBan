@@ -34,7 +34,6 @@ sealed interface Route {
     data object Models : Route
     /** 设置里的外观（跟随系统 / 浅色 / 深色）和主题色。 */
     data object Appearance : Route
-    data object AccentColor : Route
     /** 设置里的声音：语音识别、朗读（来源、音色、语速）、通话。 */
     data object Voice : Route
     /** 云端小伴的对话页。 */
@@ -70,7 +69,6 @@ sealed interface Route {
         Settings -> "settings"
         Models -> "models"
         Appearance -> "appearance"
-        AccentColor -> "accent"
         Voice -> "voice"
         AiChat -> "aichat"
         Devices -> "devices"
@@ -107,8 +105,7 @@ sealed interface Route {
                 "newhelp" -> NewHelp
                 "settings" -> Settings
                 "models" -> Models
-                "appearance" -> Appearance
-                "accent" -> AccentColor
+                "appearance", "accent" -> Appearance
                 "voice" -> Voice
                 "aichat" -> AiChat
                 "devices" -> Devices
@@ -118,7 +115,12 @@ sealed interface Route {
         }
 
         /** 栈用换行分隔存成一个字符串。周刊期号、项目标识、设备编号里不会有换行。 */
-        fun decodeStack(text: String): List<Route> = text.split('\n').mapNotNull { if (it.isEmpty()) null else decode(it) }
+        fun decodeStack(text: String): List<Route> = buildList {
+            text.split('\n').forEach { encoded ->
+                val route = if (encoded.isEmpty()) null else decode(encoded)
+                if (route != null && !(encoded == "accent" && lastOrNull() == Appearance)) add(route)
+            }
+        }
         fun encodeStack(stack: List<Route>): String = stack.joinToString("\n") { it.encode() }
     }
 }

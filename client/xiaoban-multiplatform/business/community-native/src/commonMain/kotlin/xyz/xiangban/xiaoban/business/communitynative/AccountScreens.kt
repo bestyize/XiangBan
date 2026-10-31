@@ -253,7 +253,6 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
             }
             GroupLabel("外观与声音")
             NavRow("主题", ThemeState.mode.label, first = true) { open(Route.Appearance) }
-            NavRow("主题色", ThemeState.accent.name) { open(Route.AccentColor) }
             NavRow("声音", SpeechState.settings.let { if (it.source == SpeechSource.Edge) "Edge · ${EdgeVoices.byId(it.voice).name}" else it.source.label }) { open(Route.Voice) }
             GroupLabel("关于")
             NavRow("用户协议", first = true) { env.platform?.openUrl("$site/terms") }

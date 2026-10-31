@@ -30,4 +30,11 @@ class RouteTest {
     fun valuesMayContainColons() {
         assertEquals(Route.Weekly("a:b"), Route.decode(Route.Weekly("a:b").encode()))
     }
+
+    @Test
+    fun oldAccentRouteRestoresThemeWithoutDuplicatePage() {
+        assertEquals(Route.Appearance, Route.decode("accent"))
+        assertEquals(listOf(Route.Settings, Route.Appearance), Route.decodeStack("settings\naccent"))
+        assertEquals(listOf(Route.Settings, Route.Appearance), Route.decodeStack("settings\nappearance\naccent"))
+    }
 }
