@@ -36,3 +36,5 @@
 小伴 AI 配置窗口默认宽度与最小宽度调整为 360px，高度仍为 620px；窗口尺寸单独记忆，避免继承第三方配置页的宽度。[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)同步默认显示 360px，仍可手动调整尺寸。
 
 游戏库卡片重设计（待确认）：[设计稿源码](../../client/xiaoban-desktop/docs/design-specs/prototypes/game-library.html)，最少三列（宽窗口四列）、统一方形封面、无外框卡片、单行标题、低调横竖屏与存档图标，悬停/键盘聚焦展开“开始游戏”。支持明暗、主题色、窄窗口与自定义游戏示意，全部操作仅本地提示，不启动或删除真实游戏。[在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/game-library.html)。正式游戏页尚未修改。
+
+组件与伙伴卡片设计稿（待确认）：[源码](../../client/xiaoban-desktop/docs/design-specs/prototypes/decor-library.html)，组件默认四列，放大真实组件预览，保留添加层级选择；伙伴采用无外框卡片、轻量实例数量、固定位置的管理/添加操作，主题导出收进更多菜单。支持页签、明暗、窄窗口、模拟添加与实例管理，均不改变真实桌面。[组件预览](http://127.0.0.1:1420/docs/design-specs/prototypes/decor-library.html?view=widgets) / [伙伴预览](http://127.0.0.1:1420/docs/design-specs/prototypes/decor-library.html?view=pets)。正式页面未修改。

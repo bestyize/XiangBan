@@ -5,11 +5,11 @@ import {defaults} from '../bridge.ts';
 import type {PetDefinition} from './model.ts';
 import type {ExpressionName} from '../companion/expressions.ts';
 import {presenceBeats,isPresenceKind} from '../companion/presence.ts';
-const props=withDefaults(defineProps<{definition:PetDefinition;size?:number;expression?:ExpressionName;paused?:boolean;fps?:30|60;links?:boolean;interactive?:boolean}>(),{size:200,expression:'idle',paused:false,fps:30,links:true,interactive:true});
+const props=withDefaults(defineProps<{definition:PetDefinition;size?:number;expression?:ExpressionName;paused?:boolean;fps?:30|60;links?:boolean;interactive?:boolean;gallery?:boolean}>(),{size:200,expression:'idle',paused:false,fps:30,links:true,interactive:true});
 const host=ref<HTMLElement>();let pet:PetView|undefined;
 let active=true;
 const settings=()=>({...defaults,size:props.size,expression:props.expression,paused:props.paused||!active,fps:props.fps});
-function configure(){if(!pet)return;pet.setDefinition(props.definition);pet.update(settings());pet.reactions.setEnabled(props.links);pet.reactions.setPaused(props.paused||!active);}
+function configure(){if(!pet)return;pet.setDefinition(props.definition);pet.update(settings());pet.reactions.setEnabled(props.links);pet.reactions.setPaused(props.paused||!active);if(props.gallery)host.value?.querySelector('svg')?.setAttribute('viewBox','0 -72 320 352');}
 onMounted(()=>{if(host.value){pet=new PetView(host.value,settings(),undefined,props.definition);configure();}});
 onActivated(()=>{active=true;configure();});
 onDeactivated(()=>{active=false;configure();});

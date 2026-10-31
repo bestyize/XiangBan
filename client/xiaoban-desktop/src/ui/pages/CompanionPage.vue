@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import {computed,onDeactivated,onMounted,onBeforeUnmount,ref,watch} from 'vue';
 import {NAlert,NModal,NPopconfirm,NSelect,NSwitch} from 'naive-ui';
-import {Download,HeartHandshake,Monitor,Pin,Plus,Settings2,Sparkles,Trash2,X} from 'lucide-vue-next';
+import {MoreHorizontal,Download,HeartHandshake,Monitor,Pin,Plus,Settings2,Sparkles,Trash2,X} from 'lucide-vue-next';
 import type {ControlStore} from '../control-types.ts';
-import {EXPRESSIONS} from '../../companion/expressions.ts';
+import {EXPRESSIONS,stillFrame} from '../../companion/expressions.ts';
 import StudioActions from '../components/StudioActions.vue';
 import PetSettingsDialog,{type PetSettingsPatch} from '../components/PetSettingsDialog.vue';
 import ResourceShareActions from '../components/ResourceShareActions.vue';
 import PetActor from '../../pets/PetActor.vue';
 import {createPetClient} from '../../pets/client.ts';
-import {definitionOf,type PetTheme,type PetInstance} from '../../pets/model.ts';
-import {petImage} from '../../pets/render.ts';
+import {definitionOf,type PetDefinition,type PetTheme,type PetInstance} from '../../pets/model.ts';
+import {petMarkup} from '../../pets/render.ts';
+const images=new WeakMap<PetDefinition,string>();
+function petImage(pet:PetDefinition){let image=images.get(pet);if(!image){image=`data:image/svg+xml;charset=utf-8,${encodeURIComponent(petMarkup(pet,stillFrame('happy'),'gallery').replace(/viewBox="[^"]+"/,'viewBox="0 -72 320 352"'))}`;images.set(pet,image);}return image;}
 import {invoke} from '../../bridge.ts';
 const props=defineProps<{store:ControlStore;settingsRequest?:{id:string}|null}>();
 const emit=defineEmits<{settingsOpened:[]}>();
@@ -19,7 +21,10 @@ const client=createPetClient(),{catalog,ready,busy,error}=client;
 const filter=ref<'all'|'desk'|'mine'>('all'),hover=ref(''),editing=ref<string|null>(null);
 const adding=ref<{themeId:string;petId:string;name:string}|null>(null),proactivityOpen=ref(false);
 const themes=computed(()=>filter.value==='mine'?catalog.value.themes.filter(t=>t.source==='custom'):catalog.value.themes);
-const lastTheme=computed(()=>themes.value[themes.value.length-1]?.id);
+const themeMenu=ref(''),manageMenu=ref('');
+function managePet(themeId:string,petId:string){const items=onDeskOf(themeId,petId);if(items.length===1)openManage(items[0].id);else manageMenu.value=manageMenu.value===`${themeId}/${petId}`?'':`${themeId}/${petId}`;}
+function closeMenus(){themeMenu.value='';manageMenu.value='';}
+function onKey(e:KeyboardEvent){if(e.key==='Escape')closeMenus();}
 const instances=computed(()=>catalog.value.layout.instances);
 const current=computed(()=>instances.value.find(p=>p.id===editing.value));
 const currentTheme=computed(()=>catalog.value.themes.find(t=>t.id===current.value?.themeId));
@@ -73,21 +78,22 @@ function centerCurrent(){update({x:.5,y:.5});}
 function createFromCurrent(){const theme=currentTheme.value;editing.value=null;create(theme);}
 watch(()=>props.settingsRequest,async request=>{if(!request)return;await client.load();if(props.settingsRequest!==request)return;openManage(request.id);emit('settingsOpened');},{immediate:true});
 function manage(e:Event){const id=(e as CustomEvent<{id:string}>).detail?.id;void client.load().then(()=>{if(id)openManage(id);});}
-onMounted(()=>{void client.load();void loadGreeting();window.addEventListener('pets-manage',manage);});
-onDeactivated(()=>{hover.value='';editing.value=null;adding.value=null;proactivityOpen.value=false;});
-onBeforeUnmount(()=>{client.dispose();window.removeEventListener('pets-manage',manage);});
+onMounted(()=>{void client.load();void loadGreeting();window.addEventListener('pets-manage',manage);window.addEventListener('keydown',onKey);});
+onDeactivated(()=>{closeMenus();hover.value='';editing.value=null;adding.value=null;proactivityOpen.value=false;});
+onBeforeUnmount(()=>{client.dispose();window.removeEventListener('pets-manage',manage);window.removeEventListener('keydown',onKey);});
 </script>
 <template>
-<section class="pets-page" data-testid="companion-page">
+<section class="pets-page" data-testid="companion-page" @keydown.esc.capture="closeMenus()">
+ <div v-if="themeMenu||manageMenu" class="menu-dismiss" @click="closeMenus()"/>
  <StudioActions>
   <ResourceShareActions :store="store" kind="pet" variant="xb" import-label="导入" :disabled="!ready||busy" @imported="async()=>{await client.load();filter='mine';}"/>
   <button type="button" class="xb-btn-primary" data-testid="pet-create" @click="create()"><Sparkles :size="14"/>让小伴创作</button>
  </StudioActions>
  <div class="pt-toolbar">
   <div class="xb-seg" role="group" aria-label="筛选">
-   <button type="button" :aria-pressed="filter==='all'" data-testid="pet-filter-all" @click="filter='all'">全部</button>
-   <button type="button" :aria-pressed="filter==='desk'" data-testid="pet-filter-desk" @click="filter='desk'">在桌面上 <b class="cnt">{{ instances.length }}</b></button>
-   <button type="button" :aria-pressed="filter==='mine'" data-testid="pet-filter-mine" @click="filter='mine'">我的</button>
+   <button type="button" :aria-pressed="filter==='all'" data-testid="pet-filter-all" @click="closeMenus();filter='all'">全部</button>
+   <button type="button" :aria-pressed="filter==='desk'" data-testid="pet-filter-desk" @click="closeMenus();filter='desk'">在桌面上 <b class="cnt">{{ instances.length }}</b></button>
+   <button type="button" :aria-pressed="filter==='mine'" data-testid="pet-filter-mine" @click="closeMenus();filter='mine'">我的</button>
   </div>
   <div class="pt-tools">
    <button v-if="store.desktop" type="button" class="xb-btn-ghost" aria-haspopup="dialog" data-testid="pet-proactivity-open" @click="proactivityOpen=true"><HeartHandshake :size="14"/>主动陪伴</button>
@@ -102,37 +108,38 @@ onBeforeUnmount(()=>{client.dispose();window.removeEventListener('pets-manage',m
 
   <template v-if="filter!=='desk'">
    <section v-for="theme in themes" :key="theme.id" class="pet-theme-detail" :aria-label="theme.name" :data-testid="`pet-theme-${theme.id}`">
-    <header class="th-head"><h2>{{ theme.name }}</h2><span class="sub">{{ theme.pets.length }} 款 · {{ theme.description }}</span>
-     <div class="theme-actions"><button type="button" class="xb-link" @click="create(theme)">基于此主题创作</button>
-      <button v-if="theme.source==='builtin'" type="button" class="xb-link muted" :disabled="busy" title="导出参考 JSON" data-testid="pet-export-reference" @click="act(()=>client.exportTheme(theme.id))"><Download :size="13"/>导出参考 JSON</button>
+    <header class="th-head" :title="theme.description" :aria-description="theme.description"><h2>{{ theme.name }}</h2><span class="sub">{{ theme.pets.length }} 款</span>
+     <div class="theme-actions"><button type="button" class="xb-icon-btn is-sm" :aria-label="`${theme.name}更多操作`" :aria-expanded="themeMenu===theme.id" @click="themeMenu=themeMenu===theme.id?'':theme.id"><MoreHorizontal :size="17"/></button><div v-if="themeMenu===theme.id" class="theme-menu xb-menu"><button type="button" class="xb-menu-item" @click="closeMenus();create(theme)">基于此主题创作</button>
+      <button v-if="theme.source==='builtin'" type="button" class="xb-menu-item" :disabled="busy" title="导出参考 JSON" data-testid="pet-export-reference" @click="act(()=>client.exportTheme(theme.id))"><Download :size="13"/>导出参考 JSON</button>
       <ResourceShareActions v-if="theme.source==='custom'" :store="store" kind="pet" :id="theme.id" :disabled="busy"/>
-      <NPopconfirm v-if="theme.source==='custom'" @positive-click="act(()=>client.deleteTheme(theme.id))"><template #trigger><button type="button" class="xb-icon-btn is-sm" :disabled="busy" title="删除主题" aria-label="删除主题"><Trash2 :size="14"/></button></template>删除这个自定义主题？已添加的宠物需先移除。</NPopconfirm></div></header>
-    <p v-if="theme.source==='custom'" class="pet-theme-export-note" data-testid="pet-theme-export-note">导出或分享整套主题（含 {{ theme.pets.length }} 款形象），不包含桌面位置、昵称或心情。</p>
+      <NPopconfirm v-if="theme.source==='custom'" @positive-click="act(()=>client.deleteTheme(theme.id))"><template #trigger><button type="button" class="xb-menu-item is-danger" :disabled="busy" title="删除主题" aria-label="删除主题"><Trash2 :size="14"/>删除主题</button></template>删除这个自定义主题？已添加的宠物需先移除。</NPopconfirm></div></div></header>
+    <p v-if="theme.source==='custom'&&themeMenu===theme.id" class="pet-theme-export-note" data-testid="pet-theme-export-note">导出或分享整套主题（含 {{ theme.pets.length }} 款形象），不包含桌面位置、昵称或心情。</p>
     <div class="pet-cards">
      <article v-for="p in theme.pets" :key="p.id" class="pc pet-card" :data-testid="`pet-card-${p.id}`" @pointerenter="hover=`${theme.id}/${p.id}`" @pointerleave="hover=''">
-      <div class="st" :style="{'--theme-color':theme.color}"><PetActor v-if="hover===`${theme.id}/${p.id}`" :definition="p" :size="150" :paused="store.settings.paused"/><img v-else :src="petImage(p)" :alt="p.name" width="150" height="150"/>
-       <span v-if="onDeskOf(theme.id,p.id).length" class="badge"><i></i>在桌面 · {{ onDeskOf(theme.id,p.id)[0].name }}{{ onDeskOf(theme.id,p.id).length>1?` 等 ${onDeskOf(theme.id,p.id).length} 只`:'' }}</span></div>
-      <div class="nm"><b :title="p.description">{{ p.name }}</b><span class="sub">{{ onDeskOf(theme.id,p.id).length?EXPRESSIONS[onDeskOf(theme.id,p.id)[0].expression].label:'' }}</span></div>
-      <div v-if="onDeskOf(theme.id,p.id).length" class="btns"><button type="button" class="xb-btn pc-set" aria-haspopup="dialog" :data-testid="`pet-manage-${onDeskOf(theme.id,p.id)[0].id}`" @click="editing=onDeskOf(theme.id,p.id)[0].id"><Settings2 :size="14"/>设置</button><button type="button" class="xb-btn pc-plus" :disabled="!ready||busy" :aria-label="`再添加一只${p.name}`" aria-haspopup="dialog" :aria-expanded="adding?.themeId===theme.id&&adding?.petId===p.id" :data-testid="`pet-add-${p.id}`" @click="requestAdd(theme.id,p.id,p.name)"><Plus :size="14"/></button></div>
+      <div class="st" :style="{'--theme-color':theme.color}"><PetActor v-if="hover===`${theme.id}/${p.id}`" :definition="p" :size="180" gallery :paused="store.settings.paused"/><img v-else :src="petImage(p)" :alt="p.name" width="150" height="150"/>
+      </div>
+      <div class="nm"><b :title="p.description" :aria-description="p.description">{{ p.name }}</b><span v-if="onDeskOf(theme.id,p.id).length" class="pet-status" :title="`桌面上有 ${onDeskOf(theme.id,p.id).length} 只${p.name}`"><i/>{{ onDeskOf(theme.id,p.id).length }} 只</span></div>
+      <div v-if="onDeskOf(theme.id,p.id).length" class="btns"><button type="button" class="xb-btn pc-set" aria-haspopup="dialog" :data-testid="`pet-manage-${onDeskOf(theme.id,p.id)[0].id}`" @click="managePet(theme.id,p.id)"><Settings2 :size="14"/>管理</button><button type="button" class="xb-btn pc-plus" :disabled="!ready||busy" :aria-label="`再添加一只${p.name}`" aria-haspopup="dialog" :aria-expanded="adding?.themeId===theme.id&&adding?.petId===p.id" :data-testid="`pet-add-${p.id}`" @click="requestAdd(theme.id,p.id,p.name)"><Plus :size="14"/></button></div>
       <button v-else type="button" class="xb-btn add-desk" :disabled="!ready||busy" aria-haspopup="dialog" :aria-expanded="adding?.themeId===theme.id&&adding?.petId===p.id" :data-testid="`pet-add-${p.id}`" @click="requestAdd(theme.id,p.id,p.name)"><Plus :size="14"/>添加到桌面</button>
+      <div v-if="manageMenu===`${theme.id}/${p.id}`" class="instance-menu xb-menu" :aria-label="`管理${p.name}`"><button v-for="instance in onDeskOf(theme.id,p.id)" :key="instance.id" type="button" class="xb-menu-item" @click="closeMenus();openManage(instance.id)"><Settings2 :size="14"/>{{ instance.name }}<span class="xb-menu-hint">{{ instance.enabled?'':'已隐藏' }}</span></button></div>
      </article>
-     <button v-if="theme.id===lastTheme" type="button" class="pc make-own" data-testid="pet-make-own" @click="create(theme.source==='custom'?theme:undefined)"><span class="mk"><Sparkles :size="24"/></span><b>做一只自己的</b><span class="sub">描述外形，小伴帮你生成</span></button>
+
     </div>
    </section>
   </template>
 
   <section v-else class="desktop-pets" data-testid="desktop-pets">
-   <div v-if="!instances.length" class="desktop-pets-empty">还没有小伙伴，挑一只喜欢的添加到桌面吧。<button type="button" class="xb-link" @click="filter='all'">去挑选伙伴</button></div>
+   <div v-if="!instances.length" class="desktop-pets-empty">还没有小伙伴，挑一只喜欢的添加到桌面吧。<button type="button" class="xb-link" @click="closeMenus();filter='all'">去挑选伙伴</button></div>
    <section v-for="group in deskGroups" :key="group.theme?.id??'orphans'" class="pet-theme-detail">
     <header class="th-head"><h2>{{ group.theme?.name??'作品暂不可用' }}</h2><span class="sub">{{ group.items.length }} 只在桌面上</span></header>
     <div class="pet-cards">
      <article v-for="p in group.items" :key="p.id" class="pc pet-card instance" :class="{off:!p.enabled}" :data-testid="`pet-instance-${p.id}`" @contextmenu.prevent.stop="openManage(p.id)" @pointerenter="hover=p.id" @pointerleave="hover=''">
       <div class="st" :style="{'--theme-color':group.theme?.color}">
-       <template v-if="definitionOf(catalog.themes,p)"><PetActor v-if="hover===p.id" :definition="definitionOf(catalog.themes,p)!" :size="150" :expression="p.expression" :links="p.links" :paused="store.settings.paused"/><img v-else :src="petImage(definitionOf(catalog.themes,p)!)" :alt="p.name" width="150" height="150"/></template>
+       <template v-if="definitionOf(catalog.themes,p)"><PetActor v-if="hover===p.id" :definition="definitionOf(catalog.themes,p)!" :size="180" gallery :expression="p.expression" :links="p.links" :paused="store.settings.paused"/><img v-else :src="petImage(definitionOf(catalog.themes,p)!)" :alt="p.name" width="150" height="150"/></template>
        <span v-else class="gone">作品暂不可用</span>
-       <span class="badge"><i></i>在桌面 · {{ p.name }}</span></div>
-      <div class="nm"><b>{{ definitionOf(catalog.themes,p)?.name??p.name }}</b><span class="sub">{{ EXPRESSIONS[p.expression].label }} · {{ p.size }}px · {{ p.layer==='desktop'?'贴在桌面':'始终置顶' }}</span><NSwitch :value="p.enabled" size="small" :disabled="busy" :aria-label="`显示${p.name}`" :data-testid="`pet-visible-${p.id}`" @update:value="enabled=>act(()=>client.update(p.id,{enabled}))"/></div>
-      <div class="btns"><button type="button" class="xb-btn pc-set" aria-haspopup="dialog" :data-testid="`pet-manage-${p.id}`" @click="editing=p.id"><Settings2 :size="14"/>设置</button><button v-if="definitionOf(catalog.themes,p)" type="button" class="xb-btn pc-plus" :disabled="!ready||busy" :aria-label="`再添加一只${p.name}`" @click="requestAdd(p.themeId,p.petId,definitionOf(catalog.themes,p)!.name)"><Plus :size="14"/></button></div>
+       </div>
+      <div class="nm"><b :title="definitionOf(catalog.themes,p)?.name">{{ p.name }}</b><span class="sub">{{ EXPRESSIONS[p.expression].label }} · {{ p.size }}px · {{ p.layer==='desktop'?'贴在桌面':'始终置顶' }}</span><NSwitch :value="p.enabled" size="small" :disabled="busy" :aria-label="`显示${p.name}`" :data-testid="`pet-visible-${p.id}`" @update:value="enabled=>act(()=>client.update(p.id,{enabled}))"/></div>
+      <div class="btns"><button type="button" class="xb-btn pc-set" aria-haspopup="dialog" :data-testid="`pet-manage-${p.id}`" @click="editing=p.id"><Settings2 :size="14"/>管理</button><button v-if="definitionOf(catalog.themes,p)" type="button" class="xb-btn pc-plus" :disabled="!ready||busy" :aria-label="`再添加一只${p.name}`" @click="requestAdd(p.themeId,p.petId,definitionOf(catalog.themes,p)!.name)"><Plus :size="14"/></button></div>
      </article>
     </div>
    </section>
@@ -167,7 +174,7 @@ onBeforeUnmount(()=>{client.dispose();window.removeEventListener('pets-manage',m
 </section>
 </template>
 <style scoped>
-.pets-page{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.pets-page{container-type:inline-size;height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden}
 .pt-toolbar{flex:none;display:flex;align-items:center;gap:10px;padding:16px 28px 0}
 .pt-toolbar .cnt{font-weight:600;color:var(--ui-ink)}
 .pt-tools{margin-left:auto;display:flex;align-items:center;gap:10px}
@@ -182,21 +189,21 @@ onBeforeUnmount(()=>{client.dispose();window.removeEventListener('pets-manage',m
 .theme-actions .xb-link{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:500}
 .theme-actions .xb-link.muted{color:var(--ui-text-secondary);font-weight:400}
 .pet-theme-export-note{margin:4px 0 0;font-size:11.5px;color:var(--ui-text-tertiary)}
-.pet-cards{margin-top:12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-.pc{min-width:0;display:flex;flex-direction:column;gap:9px;padding:10px 10px 12px;border-radius:16px;background:var(--ui-surface);box-shadow:0 0 0 1px var(--ui-line),var(--ui-shadow-card)}
-.pc.off .st img{opacity:.45;filter:grayscale(.5)}
-.st{position:relative;height:172px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 70%,color-mix(in srgb,var(--theme-color,var(--ui-btn)) 16%,transparent),transparent 70%),var(--ui-surface-sunken);overflow:hidden}
-.st img{display:block;flex:none}
+.pet-cards{margin-top:12px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:25px 20px}
+.pc{position:relative;min-width:0;display:flex;flex-direction:column;gap:9px;background:transparent}
+.pc.off .st{opacity:.45;filter:grayscale(.5)}
+.st{position:relative;aspect-ratio:1.13;border-radius:13px;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 80%,var(--ui-soft),var(--ui-configuration-canvas) 70%);overflow:hidden}
+.st img,.st :deep(.pet-actor){position:absolute!important;inset:10px;width:calc(100% - 20px)!important;height:calc(100% - 20px)!important;object-fit:contain}
 .st .gone{font-size:12px;color:var(--ui-text-tertiary)}
 .badge{position:absolute;top:8px;left:8px;max-width:calc(100% - 16px);height:20px;padding:0 8px;border-radius:6px;background:var(--ui-btn);color:#fff;font-size:11px;font-weight:500;display:inline-flex;align-items:center;gap:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badge i{width:6px;height:6px;border-radius:50%;background:#fff;opacity:.9;flex:none}
-.nm{display:flex;align-items:baseline;gap:8px;padding:0 4px;min-width:0}
-.nm b{font-size:14px;font-weight:500;white-space:nowrap}
+.nm{display:flex;align-items:baseline;gap:8px;padding:0;min-width:0}
+.nm b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:13px;font-weight:500;white-space:nowrap}
 .nm .sub{flex:1;min-width:0;font-size:12px;color:var(--ui-text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nm .n-switch{align-self:center;flex:none}
 .btns{display:flex;gap:6px}
-.pc-set{flex:1;height:32px}
-.pc-plus{width:32px;height:32px;padding:0}
+.pc-set{flex:1;height:30px;border:0;box-shadow:none;background:var(--ui-control);color:var(--ui-text-secondary);font-size:12px}.pc-set:hover{background:var(--ui-control-hover)}
+.pc-plus{width:30px;height:30px;padding:0;border:0;box-shadow:none;background:transparent;color:var(--ui-text-secondary)}.pc-plus:hover{background:var(--ui-soft);color:var(--ui-ink)}
 .add-desk{height:32px;background:var(--ui-soft);color:var(--ui-ink);box-shadow:none;font-weight:500}
 .add-desk:hover:not(:disabled){background:var(--ui-soft);filter:brightness(.97)}
 .make-own{border:0;cursor:pointer;align-items:center;justify-content:center;gap:8px;min-height:242px;color:var(--ui-text-secondary);background:var(--ui-surface-sunken);box-shadow:inset 0 0 0 1.5px var(--ui-border-strong);font-family:inherit}
@@ -225,6 +232,9 @@ onBeforeUnmount(()=>{client.dispose();window.removeEventListener('pets-manage',m
 .proactivity-dialog>p{margin:0 0 14px;font-size:12px;line-height:1.7;color:var(--ui-text-secondary)}
 .pet-context-preview{margin-top:12px;display:flex;align-items:center;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--ui-text-secondary)}
 .pet-context-preview span{flex:1;min-width:200px}
-@media(max-width:1000px){.pet-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@container(max-width:760px){.pet-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.pet-status{font-size:11px;color:var(--ui-text-secondary);display:flex;align-items:center;gap:4px;white-space:nowrap}.pet-status i{width:5px;height:5px;border-radius:50%;background:var(--ui-success)}
+.theme-actions{position:relative}.theme-menu,.instance-menu{position:absolute;z-index:31;right:0;top:32px;width:210px;max-height:260px;overflow:auto}.instance-menu{top:100%;left:0;right:auto;width:100%;min-width:160px}.menu-dismiss{position:fixed;inset:0;z-index:30}.theme-menu .xb-menu-item{font-size:12px}.pet-card button:focus-visible{outline:2px solid var(--ui-btn);outline-offset:3px}
+.theme-menu :deep(.resource-share-actions){display:flex;flex-direction:column;align-items:stretch;gap:2px}.theme-menu :deep(.n-button){width:100%;justify-content:flex-start;height:33px;background:transparent;border-radius:6px}.theme-menu :deep(.n-button:hover){background:var(--ui-surface-hover)}
 </style>
 
