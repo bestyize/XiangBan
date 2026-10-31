@@ -169,6 +169,8 @@ data class Post(
     @SerialName("created_at") val createdAt: String = "",
     /** 你屏蔽了这个作者：不返回正文 */
     val blocked: Boolean = false,
+    @SerialName("work_refs") val workRefs: List<ResolvedWorkReference> = emptyList(),
+    val attachments: List<ForumAttachment> = emptyList(),
 )
 
 // ───────────── 账号 ─────────────

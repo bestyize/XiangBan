@@ -113,8 +113,20 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     }
 
     /** 回复帖子；[replyTo] 是被回复的评论编号。 */
-    suspend fun reply(topicId: Long, body: String, replyTo: Long? = null) {
-        write(HttpMethod.Post, "/api/topics/$topicId/posts", buildJsonObject { put("body", body); if (replyTo != null) put("reply_to", replyTo) })
+    suspend fun reply(topicId: Long, body: String, replyTo: Long? = null, workRefs: List<WorkReference>? = null, attachments: List<ForumAttachment>? = null) {
+        if (topicId <= 0 || body.trim().length < 2) throw ApiException(400, "请输入至少 2 个字的回复")
+        write(HttpMethod.Post, "/api/topics/$topicId/posts", buildJsonObject {
+            put("body", body); if (replyTo != null) put("reply_to", replyTo)
+            replyAssociations(workRefs, attachments)
+        })
+    }
+    suspend fun replySource(postId: Long): ReplySource {
+        if (postId <= 0) throw ApiException(400, "回复编号无效")
+        return get("/api/posts/$postId/source")
+    }
+    suspend fun editReply(postId: Long, body: String, workRefs: List<WorkReference>? = null, attachments: List<ForumAttachment>? = null) {
+        if (postId <= 0 || body.trim().length < 2) throw ApiException(400, "请输入至少 2 个字的回复")
+        write(HttpMethod.Patch, "/api/posts/$postId", buildJsonObject { put("body", body); replyAssociations(workRefs, attachments) })
     }
 
     /** 求助者采纳一条回答，悬赏积分随之发给回答者。 */
