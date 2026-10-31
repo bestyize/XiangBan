@@ -17,7 +17,9 @@ watch(()=>[props.definition,props.size,props.expression,props.paused,props.fps,p
 onBeforeUnmount(()=>pet?.destroy());
 defineExpose({poke:()=>pet?.poke(),hit:(x:number,y:number)=>pet?.hit(x,y)??false,look:(x:number,y:number)=>pet?.look(x,y),presence:(kind:unknown)=>{if(props.links&&isPresenceKind(kind))pet?.playBeats(presenceBeats(kind));},effect:(selected:string)=>pet?.reactions.setEffect(selected)});
 </script>
-<template><div ref="host" class="pet-actor" :style="{width:`${size}px`,height:`${size}px`}" @pointermove="interactive&&pet?.look($event.clientX,$event.clientY)" @click="interactive&&pet?.poke()"/></template>
+<template><div ref="host" class="pet-actor" :class="{'is-gallery':gallery}" :style="{width:`${size}px`,height:`${size}px`}" @pointermove="interactive&&pet?.look($event.clientX,$event.clientY)" @click="interactive&&pet?.poke()"/></template>
 <style scoped>
 .pet-actor{position:relative;flex:none;user-select:none;touch-action:none}.pet-actor :deep(.pet-stage),.pet-actor :deep(.pet-art){width:100%;height:100%;position:relative;display:block}.pet-actor :deep(svg){width:100%;height:100%;display:block;overflow:visible}.pet-actor :deep(.pet-art:focus-visible){outline:2px solid var(--ui-primary,#bd8c70);outline-offset:4px;border-radius:30px}
+/* PetView sets an inline pixel height for desktop windows. Gallery previews must fit their responsive host. */
+.pet-actor.is-gallery :deep(.pet-stage){width:100%!important;height:100%!important}
 </style>
