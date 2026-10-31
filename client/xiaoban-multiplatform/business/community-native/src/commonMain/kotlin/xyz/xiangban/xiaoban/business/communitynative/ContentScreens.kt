@@ -1,5 +1,9 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import xyz.xiangban.xiaoban.common.community.isCasual
+import xyz.xiangban.xiaoban.common.community.cardTitle
+import xyz.xiangban.xiaoban.common.community.casualArticle
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -159,7 +163,7 @@ internal fun TopicRow(topic: Topic, onClick: () -> Unit) {
             if (topic.featured) Text("精华", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
             Text(topic.category.name, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
         }
-        Text(topic.title, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 22.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(topic.cardTitle, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 22.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Avatar(topic.author.nickname, 16.dp)
@@ -368,8 +372,12 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                 }
                 Column(Modifier.fillMaxSize()) {
                     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+                        if (topic.isCasual) {
+                            val article = remember(topic.bodyHtml) { casualArticle(topic.bodyHtml, env.config.forumBase) }
+                            CasualGallery(env, article.images)
+                        }
                         Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (!topic.isCasual) Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 if (topic.pinned) Text("置顶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
                                 if (topic.help != null) {
                                     Text("求助", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Brand)
@@ -379,7 +387,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                     Text(topic.category.name, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            Text(topic.title, Modifier.padding(top = 10.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 28.sp)
+                            if (topic.title.isNotBlank()) Text(topic.title, Modifier.padding(top = if (topic.isCasual) 0.dp else 10.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 28.sp)
                             Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Avatar(topic.author.nickname, 32.dp, showInitial = true)
                                 Column {
@@ -387,7 +395,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                                     Text("发布于 ${agoText(topic.createdAt)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            RichBody(env, topic.bodyHtml, Modifier.padding(top = 12.dp), onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
+                            RichBody(env, topic.bodyHtml, Modifier.padding(top = 12.dp), hideImages = topic.isCasual, onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
                             LinkedGameCards(env, topic.bodyHtml, open)
                             topic.attachments.forEach { attachment ->
                                 Column(Modifier.padding(top = 12.dp)) {
@@ -440,7 +448,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
         }
         OverlayTransition(share) { panel ->
             val topic = (state as? xyz.xiangban.xiaoban.common.community.Load.Ready<Topic>)?.value
-            ShareSheet(env, topic?.title ?: "帖子", topic?.category?.name.orEmpty(), env.forum.topicUrl(id), onDismiss = { share = false }, onCopied = { toast = "链接已复制" }, panelModifier = panel)
+            ShareSheet(env, topic?.cardTitle ?: "帖子", topic?.category?.name.orEmpty(), env.forum.topicUrl(id), onDismiss = { share = false }, onCopied = { toast = "链接已复制" }, panelModifier = panel)
         }
         Toast(toast) { toast = null }
     }

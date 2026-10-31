@@ -74,6 +74,8 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 | `POST /attachments`、`GET/DELETE /attachments/{id}` | 上传附件（multipart，字段 `file`）、下载、撤销还没挂到帖子上的上传 |
 | `GET /users/{uid}`、`/users/{uid}/topics`、`/users/{uid}/posts`、`/me/bookmarks` | 用户主页、我的收藏 |
 
+休闲一级板块下的帖子支持省略 `title`（或传空串），填写时最多 80 个 Unicode 字符；创建、编辑及移动分类均按目标分类校验，其他板块仍要求 4～80 字。列表/详情的 `category.parent_slug` 标识所属一级板块，分享信息在标题为空时使用正文摘要。详情 `body_html` 保留全部图片，列表 `images` 仍只提供前三张缩略图。
+
 管理接口在 `/api/admin/*`（`src/handlers/admin.rs`）：管理员独立建表，HS256 令牌带 `token_version`，改密码后旧令牌失效，连续输错 5 次锁 15 分钟；包括概览、举报处理、帖子与回复管理、用户等级和禁言封禁、分类维护、操作日志，所有写操作都记审计。
 
 ## 社区内容层（内容包、方案、项目、周刊）

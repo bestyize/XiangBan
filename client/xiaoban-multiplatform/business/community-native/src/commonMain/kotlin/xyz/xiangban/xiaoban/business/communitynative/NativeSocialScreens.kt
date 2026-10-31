@@ -1,5 +1,7 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import xyz.xiangban.xiaoban.common.community.cardTitle
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -104,7 +106,7 @@ fun NativeBookmarksScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> 
             else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { GhostPillButton("刷新收藏", loader::reload, Modifier.fillMaxWidth()) }
                 items(result.items, key = { it.id }) { topic -> WhiteCard(padding = 14.dp) {
-                    Text(topic.title, Modifier.fillMaxWidth().clickable { open(Route.Topic(topic.id)) }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text(topic.cardTitle, Modifier.fillMaxWidth().clickable { open(Route.Topic(topic.id)) }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                     GhostPillButton("取消收藏", {
                         if (busy) return@GhostPillButton
                         busy = true; error = null
@@ -176,7 +178,7 @@ private fun ProfileTopics(env: CommunityEnv, uid: String, open: (Route) -> Unit)
         if (result.items.isEmpty()) CenterMessage("暂无可见帖子", if (page > 1) "上一页" else "刷新", { if (page > 1) page-- else loader.reload() })
         else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(result.items, key = { it.id }) { topic -> WhiteCard(Modifier.clickable { open(Route.Topic(topic.id)) }, padding = 14.dp) {
-                Text(topic.title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                Text(topic.cardTitle, fontSize = 15.sp, fontWeight = FontWeight.Medium)
             } }
             item { SocialPager(page, result.hasMore) { page = it } }
         }

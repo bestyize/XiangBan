@@ -588,3 +588,36 @@ async fn game_bookmarks_filter_before_pagination_and_keep_pack_identity() -> Res
     assert_eq!(status,StatusCode::UNAUTHORIZED);
     h.close().await?; Ok(())
 }
+
+#[tokio::test]
+async fn casual_notes_allow_no_title_and_keep_sharing_and_board_rules() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else { return Ok(()); };
+    let (_, author) = h.user().await;
+    let (parent,): (i32,) = sqlx::query_as("INSERT INTO categories(slug,name) VALUES('casual','休闲') ON CONFLICT(slug) DO UPDATE SET name=EXCLUDED.name RETURNING id").fetch_one(&h.pool).await?;
+    let (casual,): (i32,) = sqlx::query_as("INSERT INTO categories(slug,name,parent_id) VALUES('living-note-test','生活记录',$1) RETURNING id").bind(parent).fetch_one(&h.pool).await?;
+    let (other,): (i32,) = sqlx::query_as("INSERT INTO categories(slug,name) VALUES('ordinary-note-test','普通讨论') RETURNING id").fetch_one(&h.pool).await?;
+    let body = "周末出去走走，记录今天看到的风景。";
+    let markdown = format!("![封面](/api/images/6f1c2d3e-0000-4000-8000-000000000001)\n\n{body}");
+    let (status, created) = call(&h.app, "POST", "/api/topics", Some(&author), json!({"category_id":casual,"body":markdown})).await;
+    assert_eq!(status, StatusCode::OK, "{created}");
+    let id = created["id"].as_i64().unwrap();
+    let path = format!("/api/topics/{id}");
+    let (status, detail) = call(&h.app, "GET", &path, None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(detail["title"], "");
+    assert_eq!(detail["category"]["parent_slug"], "casual");
+    assert!(detail["body_html"].as_str().unwrap().contains(body));
+    let (status, share) = call(&h.app, "GET", &format!("/api/share/topic/{id}"), None, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(share["title"], body);
+    let (status, reply) = call(&h.app, "PATCH", &path, Some(&author), json!({"category_id":casual,"title":"","body":body})).await;
+    assert_eq!(status, StatusCode::OK, "{reply}");
+    let (status, _) = call(&h.app, "PATCH", &path, Some(&author), json!({"category_id":other,"title":"","body":body})).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = call(&h.app, "POST", "/api/topics", Some(&author), json!({"category_id":other,"title":"","body":body})).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, reply) = call(&h.app, "PATCH", &path, Some(&author), json!({"category_id":other,"title":"一次周末出游","body":body})).await;
+    assert_eq!(status, StatusCode::OK, "{reply}");
+    h.close().await?;
+    Ok(())
+}

@@ -979,6 +979,10 @@ async fn share(State(state): State<AppState>, Path((kind, id)): Path<(String, St
                 .fetch_optional(&state.pool)
                 .await?;
             let (title, summary) = t.ok_or_else(|| AppError::not_found("帖子"))?;
+            let title = if title.trim().is_empty() {
+                let excerpt: String = summary.chars().take(80).collect();
+                if excerpt.trim().is_empty() { "分享生活".to_string() } else { excerpt }
+            } else { title };
             json!({ "kind": "topic", "title": title, "summary": summary, "url": format!("{site}/t/{id}"), "app_link": format!("xiaoban://community/open/topic/{id}") })
         }
         "scheme" => {

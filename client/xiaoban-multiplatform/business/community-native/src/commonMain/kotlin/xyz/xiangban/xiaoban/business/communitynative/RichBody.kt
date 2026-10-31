@@ -37,9 +37,9 @@ import xyz.xiangban.xiaoban.common.community.parseBody
  * [onCopy] 不为空时，底下多一个“复制全文”。
  */
 @Composable
-fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp, lineHeight: TextUnit = 26.sp, onCopy: ((String) -> Unit)? = null) {
+fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fontSize: TextUnit = 15.sp, lineHeight: TextUnit = 26.sp, onCopy: ((String) -> Unit)? = null, hideImages: Boolean = false) {
     val site = env.config.forumBase
-    val blocks = remember(html, site) { parseBody(html, site) }
+    val blocks = remember(html, site, hideImages) { parseBody(html, site).filter { !hideImages || it !is BodyBlock.Image } }
     var zoom by remember { mutableStateOf<String?>(null) }
     if (blocks.isEmpty()) return
     Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {

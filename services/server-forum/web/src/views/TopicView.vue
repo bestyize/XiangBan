@@ -71,7 +71,7 @@ watch(() => topic.value?.help, (help, _, cleanup) => {
 }, { immediate: true })
 const helpOpen = computed(() => topic.value?.help?.status === 'open' && !helpExpired.value)
 
-useHead(() => ({ title: topic.value?.title ?? '' }))
+useHead(() => ({ title: topic.value?.title || topic.value?.excerpt || '社区分享' }))
 
 watch(topic, current => {
   if (current && current.pin_scope !== 'none') pinScopeDraft.value = current.pin_scope
@@ -283,7 +283,7 @@ async function closeHelp() {
         <RouterLink v-if="parentCategory" :to="`/c/${parentCategory.slug}`">{{ parentCategory.name }}</RouterLink>
         <RouterLink :to="`/c/${topic.category.slug}`">{{ topic.category.name }}</RouterLink>
       </nav>
-      <h1 class="title"><span v-if="topic.pinned" class="pin-badge">{{ pinScopeLabel(topic.pin_scope) }}</span>{{ topic.title }}</h1>
+      <h1 v-if="topic.title || topic.pinned" class="title"><span v-if="topic.pinned" class="pin-badge">{{ pinScopeLabel(topic.pin_scope) }}</span>{{ topic.title }}</h1>
       <div class="byline">
         <RouterLink :to="`/u/${topic.author.uid}`" class="who">
           <UserAvatar :name="topic.author.nickname" :src="topic.author.avatar_url" :size="28" />

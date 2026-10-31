@@ -98,6 +98,7 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
 #[derive(Deserialize)]
 pub struct TopicInput {
     pub category_id: i32,
+    #[serde(default)]
     pub title: String,
     pub body: String,
     #[serde(default)]
@@ -170,12 +171,14 @@ struct CategoryRules {
     min_post_level: i16,
     admin_only: bool,
     has_children: bool,
+    casual: bool,
 }
 
 async fn category_rules(pool: &PgPool, id: i32) -> AppResult<CategoryRules> {
     sqlx::query_as(
         "SELECT c.id, c.min_post_level, c.admin_only,
-                EXISTS(SELECT 1 FROM categories k WHERE k.parent_id = c.id) AS has_children
+                EXISTS(SELECT 1 FROM categories k WHERE k.parent_id = c.id) AS has_children,
+                (c.slug = 'casual' OR EXISTS(SELECT 1 FROM categories p WHERE p.id = c.parent_id AND p.slug = 'casual')) AS casual
          FROM categories c WHERE c.id = $1",
     )
     .bind(id)
@@ -189,6 +192,16 @@ pub(super) fn clean_title(raw: &str) -> AppResult<String> {
     let len = title.chars().count();
     if !(4..=80).contains(&len) {
         return Err(AppError::BadRequest("标题需要 4-80 个字".into()));
+    }
+    Ok(title)
+}
+
+/// Only casual notes allow an absent or short headline. Moving to another board revalidates it.
+fn clean_topic_title(raw: &str, casual: bool) -> AppResult<String> {
+    if !casual { return clean_title(raw); }
+    let title = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if title.chars().count() > 80 {
+        return Err(AppError::BadRequest("标题最多 80 个字".into()));
     }
     Ok(title)
 }
@@ -274,14 +287,14 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     }
     users::ensure_daily_quota(&state.pool, user, "topics", &state.config.trust.daily_topics, "发帖").await?;
 
-    let title = clean_title(&input.title)?;
+    let title = clean_topic_title(&input.title, cat.casual)?;
     let body = clean_body(&input.body, 10)?;
     let tags = clean_tags(&input.tags)?;
     let read_level = clean_read_level(input.min_read_level, user.trust_level, None)?;
     let review = crate::moderation::screen(&state.pool, &[&title, &body]).await?;
     let trusted = user.trust_level >= 1;
     let html = markdown::render(&body, trusted);
-    let excerpt = markdown::excerpt(&body, 140);
+    let excerpt = if cat.casual { markdown::article_excerpt(&body, 140) } else { markdown::excerpt(&body, 140) };
     let images = markdown::site_images(&body, 3);
     let poll = input.poll.as_ref().map(clean_poll).transpose()?;
 
@@ -357,13 +370,13 @@ pub async fn update(
             return Err(level_error(cat.admin_only, need));
         }
     }
-    let title = clean_title(&input.title)?;
+    let title = clean_topic_title(&input.title, cat.casual)?;
     let body = clean_body(&input.body, 10)?;
     let tags = clean_tags(&input.tags)?;
     let read_level = clean_read_level(input.min_read_level, user.trust_level, Some(topic.min_read_level))?;
     let review = crate::moderation::screen(&state.pool, &[&title, &body]).await?;
     let html = markdown::render(&body, user.trust_level >= 1);
-    let excerpt = markdown::excerpt(&body, 140);
+    let excerpt = if cat.casual { markdown::article_excerpt(&body, 140) } else { markdown::excerpt(&body, 140) };
 
     let mut tx = state.pool.begin().await?;
     sqlx::query(
@@ -497,6 +510,18 @@ pub async fn preview(auth: AuthUser, Json(input): Json<PreviewInput>) -> AppResu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn casual_titles_are_optional_without_relaxing_other_boards() {
+        assert_eq!(clean_topic_title("  \n", true).unwrap(), "");
+        assert_eq!(clean_topic_title("雨", true).unwrap(), "雨");
+        assert_eq!(clean_topic_title("  周末  出游 ", true).unwrap(), "周末 出游");
+        assert!(clean_topic_title(&"😀".repeat(80), true).is_ok());
+        assert!(clean_topic_title(&"字".repeat(81), true).is_err());
+        assert!(clean_topic_title("", false).is_err());
+        assert!(clean_topic_title("雨", false).is_err());
+        assert_eq!(clean_topic_title("完整的标题", false).unwrap(), "完整的标题");
+    }
 
     #[test]
     fn read_level_cannot_exceed_own_trust_level() {

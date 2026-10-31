@@ -31,10 +31,28 @@ pub fn render(md: &str, trusted: bool) -> String {
 
 /// 纯文本摘要，用于列表和 SEO description。
 pub fn excerpt(md: &str, max_chars: usize) -> String {
+    excerpt_impl(md, max_chars, false)
+}
+
+/// Untitled image notes use article text, not image alt text, as their feed/share label.
+pub fn article_excerpt(md: &str, max_chars: usize) -> String {
+    excerpt_impl(md, max_chars, true)
+}
+
+fn excerpt_impl(md: &str, max_chars: usize, skip_images: bool) -> String {
+    let mut image_depth = 0usize;
     let parser = Parser::new(md);
     let mut text = String::new();
     for event in parser {
         use pulldown_cmark::Event::*;
+        if skip_images {
+            match &event {
+                Start(pulldown_cmark::Tag::Image { .. }) => { image_depth += 1; continue; }
+                End(pulldown_cmark::TagEnd::Image) => { image_depth = image_depth.saturating_sub(1); text.push(' '); continue; }
+                _ if image_depth > 0 => continue,
+                _ => {}
+            }
+        }
         match event {
             Text(t) | Code(t) => text.push_str(&t),
             SoftBreak | HardBreak | End(_) => text.push(' '),
@@ -107,6 +125,14 @@ mod tests {
     fn excerpt_is_plain_and_truncated() {
         assert_eq!(excerpt("# 标题\n\n**粗体** `code`", 50), "标题 粗体 code");
         assert_eq!(excerpt(&"字".repeat(20), 5), "字字字字字…");
+    }
+
+    #[test]
+    fn article_excerpt_excludes_cover_alt_but_preserves_links_and_text() {
+        let md = "![封面](/api/images/id)\n\n今天的 **生活** [记录](https://example.com)";
+        assert_eq!(article_excerpt(md, 80), "今天的 生活 记录");
+        assert!(excerpt(md, 80).starts_with("封面"));
+        assert_eq!(article_excerpt(&"字".repeat(81), 80).chars().count(), 81);
     }
 
     #[test]

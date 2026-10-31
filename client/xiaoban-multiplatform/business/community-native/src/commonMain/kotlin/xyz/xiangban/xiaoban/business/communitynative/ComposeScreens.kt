@@ -120,11 +120,13 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     val children = all.filter { it.parentId == parentId && !it.adminOnly }
     val chosen = all.firstOrNull { it.id == categoryId }
     val isHelp = chosen?.slug == "share-help"
+    val isCasual = chosen?.let { category -> all.any { it.id == category.parentId && it.slug == "casual" } } == true
     val pollOptions = parsePollOptions(pollText)
     val pollError = if (pollEnabled) pollDraftError(pollOptions, pollDays.takeIf { it != 0 }) else null
     val titleLength = title.trim().split(Regex("\\s+")).joinToString(" ").count { !it.isLowSurrogate() }
     val bodyLength = body.trim().count { !it.isLowSurrogate() }
-    val canPost = session.loggedIn && !busy && !uploading && !leaving && chosen != null && titleLength in 4..80 && bodyLength in 10..20_000 && pollError == null
+    val validTitle = if (isCasual) titleLength <= 80 else titleLength in 4..80
+    val canPost = session.loggedIn && !busy && !uploading && !leaving && chosen != null && validTitle && bodyLength in 10..20_000 && pollError == null
     fun publish() {
         if (!canPost) return
         focus.clearFocus(); busy = true; error = null
@@ -172,7 +174,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                     BasicTextField(title, { title = it }, Modifier.fillMaxWidth().padding(vertical = 8.dp), enabled = !busy,
                         textStyle = TextStyle(fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface),
                         cursorBrush = SolidColor(Brand), decorationBox = { inner ->
-                            Box { if (title.isEmpty()) Text("添加标题", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = LocalExtraColors.current.ink3); inner() }
+                            Box { if (title.isEmpty()) Text(if (isCasual) "添加标题（可选）" else "添加标题", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = LocalExtraColors.current.ink3); inner() }
                         })
                     if (titleLength > 70) Text("$titleLength / 80", Modifier.align(Alignment.End), fontSize = 11.sp, color = if (titleLength > 80) Danger else LocalExtraColors.current.ink3)
                     Hairline(Modifier.padding(top = 12.dp, bottom = 20.dp))
@@ -219,7 +221,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                     Text(when {
                         uploading -> "正在上传，请稍候…"
                         chosen == null -> "先选择发布版块"
-                        titleLength !in 4..80 -> "标题需要 4～80 个字"
+                        !validTitle -> if (isCasual) "标题最多 80 个字" else "标题需要 4～80 个字"
                         bodyLength < 10 -> "正文至少 10 个字"
                         bodyLength > 20_000 -> "正文最多 20,000 个字"
                         else -> "$bodyLength 字"

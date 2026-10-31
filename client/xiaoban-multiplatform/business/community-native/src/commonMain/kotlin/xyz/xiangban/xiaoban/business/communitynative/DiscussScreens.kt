@@ -52,6 +52,7 @@ import xyz.xiangban.xiaoban.common.community.FeedController
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.Poll
+import xyz.xiangban.xiaoban.common.community.cardTitle
 import xyz.xiangban.xiaoban.common.community.Topic
 import xyz.xiangban.xiaoban.common.community.VisualKinds
 import xyz.xiangban.xiaoban.common.community.agoText
@@ -118,7 +119,7 @@ private fun PinnedBar(topic: Topic, onClick: () -> Unit) {
     ) {
         XIcon(XIcons.Pin, tint = Brand, size = 16.dp)
         Text("置顶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
-        Text(topic.title, Modifier.weight(1f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(topic.cardTitle, Modifier.weight(1f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
     }
 }
@@ -130,7 +131,7 @@ internal fun TopicCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit, o
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface)
         .clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(topic.title, Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text(topic.cardTitle, Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
             if (images.size == 1) Cover(images[0], topic.id, Modifier.size(64.dp))
         }
         if (images.size >= 2) Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -321,8 +322,7 @@ private fun CasualTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (Stri
     val existing = (loaded as? Load.Ready<List<Category>>)?.value.orEmpty().map { it.slug }.toSet()
     val chips = listOf("casual" to "全部") + CasualChips.filter { it.first in existing }
     val controller = remember(env, slug) { DiscussController(env.forum, scope, category = slug, home = false) }
-    val labels = remember { CasualChips.toMap() }
-    TopicFeed(controller, "这里还没有帖子", open, pinnedBar = true, header = {
+    CasualWaterfall(env, controller, open, header = {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 6.dp)) {
             PageChipRow(chips, slug, { slug = it })
             if (slug == "casual-chat") Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(horizontal = 2.dp, vertical = 4.dp)) {
@@ -330,7 +330,7 @@ private fun CasualTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (Stri
                 Text("闲聊灌水不进首页，也不加积分", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
             }
         }
-    }) { TopicCard(env, it, open, onMessage, tagLabel = it.tags.firstOrNull() ?: labels[it.category.slug] ?: it.category.name) }
+    })
 }
 
 /** 讨论栏目。[onMessage] 用来把投票失败之类的提示交给外层统一显示。 */

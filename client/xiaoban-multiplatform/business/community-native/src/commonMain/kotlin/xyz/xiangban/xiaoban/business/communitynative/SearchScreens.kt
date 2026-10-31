@@ -1,5 +1,7 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import xyz.xiangban.xiaoban.common.community.cardTitle
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -255,7 +257,7 @@ private fun TopicResult(env: CommunityEnv, topic: Topic, query: String, onClick:
     val thumb = topic.images.firstOrNull()?.let { env.forum.imageUrl(it) }
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f)) {
-            Text(highlight(topic.title, query, Brand), fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(highlight(topic.cardTitle, query, Brand), fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (topic.excerpt.isNotBlank()) Text(highlight(topic.excerpt, query, Brand), Modifier.padding(top = 2.dp), fontSize = 13.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GrayTag(topic.category.name)

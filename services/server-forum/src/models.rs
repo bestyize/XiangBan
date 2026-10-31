@@ -64,6 +64,7 @@ pub struct CategoryRef {
     pub id: i32,
     pub slug: String,
     pub name: String,
+    pub parent_slug: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -136,6 +137,7 @@ struct TopicRow {
     category_id: i32,
     category_slug: String,
     category_name: String,
+    category_parent_slug: Option<String>,
     author_uid: Uuid,
     author_nickname: String,
     author_avatar: Option<String>,
@@ -159,7 +161,7 @@ impl TopicRow {
             id: self.id,
             title: self.title,
             excerpt: self.excerpt,
-            category: CategoryRef { id: self.category_id, slug: self.category_slug, name: self.category_name },
+            category: CategoryRef { id: self.category_id, slug: self.category_slug, name: self.category_name, parent_slug: self.category_parent_slug },
             author: PublicUser {
                 uid: self.author_uid,
                 nickname: self.author_nickname,
@@ -189,6 +191,7 @@ impl TopicRow {
 const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.pin_scope, t.featured, t.locked,
         t.reply_count, t.like_count, t.view_count, t.min_read_level, t.created_at, t.last_reply_at, t.edited_at,
         c.id AS category_id, c.slug AS category_slug, c.name AS category_name,
+        (SELECT p.slug FROM categories p WHERE p.id = c.parent_id) AS category_parent_slug,
         u.uid AS author_uid, u.nickname AS author_nickname, u.avatar_url AS author_avatar, u.trust_level AS author_level,
         h.bounty, h.status AS help_status, h.accepted_post_id, h.expires_at AS help_expires_at, t.images
     FROM topics t

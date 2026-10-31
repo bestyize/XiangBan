@@ -84,3 +84,13 @@ fun formatDownloadSize(bytes: Long): String = when {
     bytes < 1024 * 1024 -> "${(bytes + 512) / 1024} KB"
     else -> "${(bytes + 512 * 1024) / (1024 * 1024)} MB"
 }
+
+/** Casual notes keep a genuinely optional title; feeds and share labels use an excerpt when absent. */
+val Topic.isCasual: Boolean get() = category.slug == "casual" || (category.parentSlug?.let { it == "casual" } ?: category.slug.startsWith("casual-"))
+val Topic.cardTitle: String get() = title.ifBlank { excerpt.trim().take(80).ifBlank { "分享生活" } }
+
+data class CasualArticle(val images: List<BodyBlock.Image>, val paragraphs: List<BodyBlock.Text>)
+fun casualArticle(html: String, siteBase: String): CasualArticle {
+    val blocks = parseBody(html, siteBase)
+    return CasualArticle(blocks.filterIsInstance<BodyBlock.Image>().distinctBy { it.src }, blocks.filterIsInstance<BodyBlock.Text>())
+}

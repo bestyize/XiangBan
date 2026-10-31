@@ -17,7 +17,7 @@ withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { show
         <span v-if="topic.pinned" class="flag pin">{{ pinScopeLabel(topic.pin_scope) }}</span>
         <span v-if="topic.featured" class="flag feat">精选</span>
         <span v-if="topic.min_read_level > 0" class="flag lock">{{ readLevelBadge(topic.min_read_level) }}</span>
-        <RouterLink :to="`/t/${topic.id}`">{{ topic.title }}</RouterLink>
+        <RouterLink :to="`/t/${topic.id}`">{{ topic.title || topic.excerpt || '分享生活' }}</RouterLink>
       </h3>
       <div class="meta">
         <RouterLink v-if="showCategory" :to="`/c/${topic.category.slug}`" class="cat">{{ topic.category.name }}</RouterLink>

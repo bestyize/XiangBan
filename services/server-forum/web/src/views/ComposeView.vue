@@ -57,6 +57,7 @@ const roots = computed(() =>
 const root = computed(() => roots.value.find(r => r.id === form.rootId))
 const leaves = computed(() => root.value?.children ?? [])
 const leaf = computed(() => leaves.value.find(l => l.id === form.categoryId))
+const isCasual = computed(() => root.value?.slug === 'casual')
 const isHelp = computed(() => leaf.value?.slug === 'share-help')
 /** 选中的二级分类上的内置标签；已经加到帖子上的也留着，方便点第二次取消。 */
 const presetTags = computed(() => leaf.value?.preset_tags ?? [])
@@ -149,12 +150,12 @@ function readLevelDisabled(level: number) {
 
 const titleLen = computed(() => Array.from(form.title.trim()).length)
 
-const titleHint = '一句话说清楚你想讨论什么'
+const titleHint = computed(() => isCasual.value ? '添加标题（可选）' : '一句话说清楚你想讨论什么')
 
 async function submit() {
   error.value = ''
   if (!form.categoryId) return (error.value = '请选择分类')
-  if (titleLen.value < 4) return (error.value = '标题至少 4 个字')
+  if (!isCasual.value && titleLen.value < 4) return (error.value = '标题至少 4 个字')
   if (attachments.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) return (error.value = '附件下载积分必须为 0～10 的整数')
   if (isHelp.value && !editId.value && (!Number.isInteger(form.bounty) || form.bounty < 0 || form.bounty > 1000)) return (error.value = '悬赏积分必须为 0～1000 的整数')
   addTag()

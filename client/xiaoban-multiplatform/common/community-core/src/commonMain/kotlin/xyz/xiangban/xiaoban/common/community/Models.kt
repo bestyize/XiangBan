@@ -107,7 +107,7 @@ data class ProjectList(val items: List<Project> = emptyList())
 // ───────────── 帖子 ─────────────
 
 @Serializable
-data class CategoryRef(val id: Int, val slug: String, val name: String)
+data class CategoryRef(val id: Int, val slug: String, val name: String, @SerialName("parent_slug") val parentSlug: String? = null)
 
 @Serializable
 data class PublicUser(val uid: String, val nickname: String, @SerialName("avatar_url") val avatarUrl: String? = null, @SerialName("trust_level") val trustLevel: Int = 0)
