@@ -18,6 +18,12 @@ import xyz.xiangban.xiaoban.common.link.SharedPrefsLinkStorage
 import xyz.xiangban.xiaoban.common.link.SqliteRemoteCache
 
 class MainActivity : ComponentActivity() {
+    private var sharingPlatform: CommunitySharingPlatform? = null
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        sharingPlatform?.accept(intent)
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -36,7 +42,9 @@ class MainActivity : ComponentActivity() {
                 micLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
         }
-        val forumPlatform = ForumPickerPlatform(platform, AndroidForumPicker(this))
+        val forumPlatform = CommunitySharingPlatform(ForumPickerPlatform(platform, AndroidForumPicker(this)), this)
+        sharingPlatform = forumPlatform
+        forumPlatform.accept(intent)
         val linkStorage = SharedPrefsLinkStorage(this)
         val remoteCache = SqliteRemoteCache(this)
         // 小伴要给你设提醒时才会弹出通知权限的请求；没有内核库（本地没编 Rust 库的调试包）就只有纯云端聊天。

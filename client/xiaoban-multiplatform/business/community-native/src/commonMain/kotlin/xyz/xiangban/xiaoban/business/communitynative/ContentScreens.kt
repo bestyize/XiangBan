@@ -122,23 +122,7 @@ fun Toast(text: String?, onGone: () -> Unit) {
 /** 分享弹层：预览卡片加“系统分享”“复制链接”。手机上分享的是网页链接，对方在电脑上打开后再用小伴桌面版。 */
 @Composable
 internal fun ShareSheet(env: CommunityEnv, title: String, sub: String, url: String, heading: String = "分享", hint: String? = null, onDismiss: () -> Unit, onCopied: () -> Unit, panelModifier: Modifier = Modifier) {
-    BottomSheet(onDismiss, panelModifier) {
-        Text(heading, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-        Row(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.background).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)).background(Brand.copy(alpha = 0.12f)), contentAlignment = Alignment.Center) { XIcon(XIcons.Link, tint = Brand, size = 24.dp) }
-            Column(Modifier.weight(1f)) {
-                Text(title, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (sub.isNotBlank()) Text(sub, Modifier.padding(top = 2.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        if (hint != null) Text(hint, Modifier.padding(top = 12.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        val platform = env.platform
-        Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GhostPillButton("复制链接", { platform?.copy(url); onDismiss(); onCopied() }, Modifier.weight(1f), enabled = platform != null)
-            PillButton("分享…", { platform?.share(title, url); onDismiss() }, Modifier.weight(1f), enabled = platform != null)
-        }
-        GhostPillButton("取消", onDismiss, Modifier.padding(top = 10.dp).fillMaxWidth())
-    }
+    CommunityShareSheet(env, url, heading, hint, onDismiss, onCopied, panelModifier)
 }
 
 @Composable

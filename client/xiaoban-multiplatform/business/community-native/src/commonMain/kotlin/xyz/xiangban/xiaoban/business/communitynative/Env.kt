@@ -42,6 +42,14 @@ import xyz.xiangban.xiaoban.common.link.RemoteChatController
 
 /** 各平台才能做的事：复制到剪贴板、系统分享面板、用浏览器打开链接。不提供时对应按钮不可用。 */
 interface PlatformActions : VoicePlatform {
+    /** Public community links only; consumed after explicit confirmation or dismissal. */
+    val communityLinks: kotlinx.coroutines.flow.StateFlow<String?> get() = EmptyCommunityLinks
+    fun consumeCommunityLink() {}
+    val communitySystemShareSupported: Boolean get() = true
+    val communityPosterSupported: Boolean get() = false
+    suspend fun createCommunityPoster(info: xyz.xiangban.xiaoban.common.community.CommunityShare): androidx.compose.ui.graphics.ImageBitmap? = null
+    suspend fun saveCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
+    suspend fun shareCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
     val supportsChatAttachments: Boolean get() = false
     /** 未接系统文件选择器的平台（当前 iOS）明确降级到网页，不申请全盘访问权限。 */
     val forumFilePickerSupported: Boolean get() = false

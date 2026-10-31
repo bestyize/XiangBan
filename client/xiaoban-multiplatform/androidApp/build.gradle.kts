@@ -20,6 +20,8 @@ dependencies {
     implementation(project(":shell"))
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.core.ktx)
+    implementation("com.google.zxing:core:3.5.4")
     implementation(libs.onnxruntime.android)
 
     implementation(libs.compose.uiToolingPreview)

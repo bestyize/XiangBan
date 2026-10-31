@@ -109,6 +109,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                     }
                 }
             }
+            CommunityLinkConfirmation(env, ::push)
             OverlayTransition(publishOpen) { panel ->
                 PublishSheet(
                     env,
