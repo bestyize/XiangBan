@@ -25,6 +25,7 @@ data class PackVersion(
     val sha256: String = "",
     val size: Long = 0,
     val changelog: String = "",
+    val manifest: JsonObject = JsonObject(emptyMap()),
     @SerialName("created_at") val createdAt: String = "",
 )
 
@@ -48,6 +49,7 @@ data class Pack(
     @SerialName("pure_data") val pureData: Boolean = false,
     @SerialName("updated_at") val updatedAt: String = "",
     val versions: List<PackVersion> = emptyList(),
+    @SerialName("in_review") val inReview: Boolean = false,
 ) {
     /** 手机上不能应用内容包，只能看、复制链接或下载，应用要回到电脑上的小伴。 */
     val trustLabel: String get() = when (trustLevel) { 0 -> "官方"; 1 -> "已审核"; else -> "未审核" }
