@@ -1246,3 +1246,10 @@ fn provider_state_scope_changes_with_provider_and_local_credential() {
     config.api_key = "rotated-token".into();
     assert_eq!(provider_profile(&config).state_scope, managed);
 }
+
+#[test]
+fn gateway_probe_is_exactly_one_hi_without_tools_or_history() {
+    let request = probe_request();
+    assert_eq!(request.messages, vec![Message::user_text("hi")]);
+    assert!(request.tools.is_empty());
+}

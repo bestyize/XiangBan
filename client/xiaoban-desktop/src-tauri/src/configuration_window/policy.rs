@@ -9,7 +9,7 @@ pub fn command_allowed(role: &str, command: &str) -> bool {
         "get_settings", "get_app_info", "get_account_session", "get_website_status", "get_appearance",
         "get_ai_config", "refresh_ai_providers", "save_ai_provider", "delete_ai_provider", "switch_ai_provider",
         "save_ai_preferences", "fetch_ai_models", "pick_workspace", "open_download_url",
-        "ai_gateway_balance", "ai_gateway_tiers", "ai_gateway_redeem", "use_ai_gateway",
+        "ai_gateway_balance", "ai_gateway_tiers", "ai_gateway_redeem", "ai_gateway_probe", "use_ai_gateway",
     ];
     const SETTINGS: &[&str] = &[
         "get_startup_status", "get_game_status", "update_settings", "set_autostart", "open_data_directory",

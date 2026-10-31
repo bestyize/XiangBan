@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onDeactivated, onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import '../configuration/surfaces.css';
 import { NAlert, NInput, NModal, NPopconfirm, NSelect, NSwitch } from 'naive-ui';
-import { Check, ChevronsUpDown, ExternalLink, FolderOpen, Plus, RefreshCw, SlidersHorizontal, Star, Trash2, X, Zap } from 'lucide-vue-next';
+import { Check, ChevronsUpDown, Cpu, ExternalLink, FolderOpen, Plus, RefreshCw, SlidersHorizontal, Star, Trash2, X, Zap } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, desktop as nativeDesktop, invoke, listen, type AiConfigView, type AiProtocol, type AiReplyPreference, type AiReasoningEffort, type ProviderConfigView } from '../../bridge.ts';
 import AiGatewayCard from './AiGatewayCard.vue';
-import { closeConfigurationWindow, openModelWindow } from '../configuration/windows.ts';
+import WindowChrome from '../configuration/WindowChrome.vue';
+import { closeConfigurationWindow, dragConfigurationWindow, zoomConfigurationWindow, openModelWindow } from '../configuration/windows.ts';
 import { modelFacts, modelFactsPayload, type ModelFacts } from '../model-capabilities.ts';
 import type { ControlStore } from '../control-types.ts';
 import {
@@ -148,6 +150,7 @@ const modalLevels = computed(() => defaultDraft.value ? levelsOf(defaultDraft.va
 const canSetReplyPreference = computed(() => modalLevels.value.length > 0);
 const replyPreferenceOptions = computed(() => preferenceOptions(modalLevels.value));
 watch(replyPreferenceOptions, options => { if (!options.some(o => o.value === modalReplyPreference.value)) modalReplyPreference.value = 'default'; });
+const protocolDisplayNames: Record<string, string> = { chat: 'OpenAI Chat', responses: 'OpenAI Responses', anthropic: 'Anthropic Messages' };
 const modalOption = computed(() => protocolOption(modalProtocol.value));
 const modalPreview = computed(() => validateBaseUrl(modalBaseUrl.value) ? '' : endpointPreview(modalProtocol.value, modalBaseUrl.value));
 const thinkingEditable = computed(() => !isManaged.value);
@@ -193,9 +196,6 @@ function setThinkingMode(draft: ModelDraft, value: string) {
   draft.facts.thinkingMode = value === 'auto' ? undefined
     : value === 'enabled' ? { type: 'enabled', budget_tokens: 4096 }
       : { type: value as 'adaptive' | 'disabled' };
-}
-function setReasoningSummary(draft: ModelDraft, value: string) {
-  draft.facts.reasoningSummary = value === 'auto' ? undefined : value === 'on';
 }
 function setRecommended(value: boolean) {
   modalSelectionMode.value = value ? 'recommended' : 'manual';
@@ -353,7 +353,6 @@ const editingConfigured = computed(() => isProviderFullyConfigured(editingId.val
 const editingInUse = computed(() => isProviderInUse(editingId.value));
 const modalTitle = computed(() => isEditingCustom.value ? (getProviderSaved(editingId.value) ? modalName.value || '自定义供应商' : '添加自定义供应商') : currentMeta.value.name);
 const modalDesc = computed(() => isEditingCustom.value ? '任何兼容 OpenAI 或 Anthropic 接口的模型服务' : currentMeta.value.desc);
-const modalTile = computed(() => isEditingCustom.value && !getProviderSaved(editingId.value) ? { mono: '+', hue: 'gray' } : providerTile(editingId.value, modalTitle.value));
 
 function fill(view: AiConfigView) {
   saved.value = view;
@@ -657,15 +656,15 @@ function openExternal(url?: string) {
 
     <div class="xb-group-title list-title">
       <span>自有模型服务</span>
-      <span class="list-note">配置后可在输入框里切换</span>
+
       <button type="button" class="xb-link" :disabled="!store.desktop || !!busy" data-testid="ai-refresh-catalogue" @click="refreshCatalogue"><RefreshCw :size="12" :class="{ spinning: busy === 'catalogue' }" />刷新供应商</button>
     </div>
     <div class="xb-group providers-list">
       <div v-for="row in providerRows" :key="row.id" class="xb-row provider-row" :class="{ 'is-active': isProviderInUse(row.id) }" :data-testid="`ai-provider-card-${row.id}`">
         <span class="ptile" :class="`hue-${row.hue}`" aria-hidden="true">{{ row.mono }}</span>
-        <div class="xb-row-text">
+        <div class="xb-row-text" :title="rowSummary(row)" :aria-description="rowSummary(row)">
           <b>{{ row.name }}<em v-if="row.kind" class="pkind">{{ row.kind }}</em></b>
-          <span>{{ rowSummary(row) }}</span>
+          <span v-if="isProviderFullyConfigured(row.id)">{{ rowSummary(row) }}</span>
         </div>
         <span v-if="isProviderInUse(row.id)" class="xb-ok">当前使用</span>
         <span v-else-if="isProviderFullyConfigured(row.id)" class="pstate">已配置</span>
@@ -688,57 +687,60 @@ function openExternal(url?: string) {
     <!-- Provider dialog -->
     <component :is="detached ? 'div' : NModal" v-model:show="modalVisible" :close-on-esc="false" :mask-closable="false" data-testid="ai-provider-modal" transform-origin="center">
       <div class="xb-provider" role="dialog" :aria-modal="detached ? undefined : true" :aria-label="modalTitle" data-testid="ai-provider-dialog">
-        <header class="pv-head">
-          <span class="ptile is-lg" :class="`hue-${modalTile.hue}`" aria-hidden="true">{{ modalTile.mono }}</span>
+        <div class="provider-workspace">
+          <aside class="provider-sidebar" aria-label="连接设置">
+            <WindowChrome v-if="detached" :platform="store.info?.platform" />
+        <div class="provider-identity" :title="modalDesc" :aria-description="modalDesc">
+          <Cpu class="provider-symbol" :size="24" :stroke-width="1.5" aria-hidden="true" />
           <div class="pv-title">
             <div class="pv-name"><h2>{{ modalTitle }}</h2><span v-if="editingConfigured" class="pill-ok" data-testid="ai-provider-connected"><i></i>已连接</span></div>
-            <span class="pv-desc">{{ modalDesc }}</span>
-          </div>
-          <button type="button" class="xb-icon-btn" aria-label="关闭" data-testid="ai-provider-close" @click="modalVisible = false"><X :size="15" :stroke-width="2.2" /></button>
-        </header>
 
-        <div class="pv-body xb-scroll">
+          </div>
+
+        </div>
+
+            <div class="provider-connection xb-scroll">
           <section>
-            <p class="pv-sec">连接</p>
+            <p class="pv-sec">服务连接</p>
             <div class="pv-card">
               <div v-if="isEditingCustom" class="fd">
                 <label for="ai-provider-name" class="lb">供应商名称</label>
-                <NInput v-model:value="modalName" placeholder="例如：公司内部模型、本地 Ollama" :disabled="!store.desktop || !!busy" data-testid="ai-provider-name" :input-props="{ id: 'ai-provider-name', autocomplete: 'off', spellcheck: false }" />
+                <NInput :bordered="false" v-model:value="modalName" placeholder="例如：公司内部模型、本地 Ollama" :disabled="!store.desktop || !!busy" data-testid="ai-provider-name" :input-props="{ id: 'ai-provider-name', autocomplete: 'off', spellcheck: false }" />
               </div>
 
               <div class="fd">
-                <span class="lb" id="ai-protocol-label">接口协议</span>
+                <span class="lb" id="ai-protocol-label" title="切换协议会自动换成该服务商对应的接口地址；手动改过的地址不会被覆盖" aria-description="切换协议会自动换成该服务商对应的接口地址；手动改过的地址不会被覆盖">接口协议</span>
                 <div ref="protocolRef" class="proto">
-                  <button type="button" class="proto-trigger" :class="{ open: protoOpen }" aria-haspopup="listbox" :aria-expanded="protoOpen" aria-labelledby="ai-protocol-label" :disabled="!store.desktop || !!busy || isManaged" data-testid="ai-protocol" @click="protoOpen = !protoOpen">
-                    <b>{{ modalOption.label }}</b><span class="sub">{{ modalOption.hint }}</span>
+                  <button type="button" class="proto-trigger" :class="{ open: protoOpen }" aria-haspopup="listbox" :aria-expanded="protoOpen" aria-labelledby="ai-protocol-label" :disabled="!store.desktop || !!busy || isManaged" :title="modalOption.label" data-testid="ai-protocol" @click="protoOpen = !protoOpen">
+                    <b>{{ protocolDisplayNames[modalProtocol] ?? modalOption.label }}</b>
                     <ChevronsUpDown :size="12" :stroke-width="2.4" class="chev" />
                   </button>
                   <div v-if="protoOpen" class="xb-menu proto-menu" role="listbox" aria-label="选择接口协议" data-testid="ai-protocol-menu">
                     <button v-for="option in protocolChoices" :key="option.value" type="button" role="option" class="xb-menu-item proto-option" :class="{ 'is-active': option.value === modalProtocol }" :aria-selected="option.value === modalProtocol" :data-testid="`ai-protocol-${option.value}`" @click="onProtocolChange(option.value)">
                       <span class="tick"><Check v-if="option.value === modalProtocol" :size="13" :stroke-width="3" /></span>
-                      <span class="opt-text"><b>{{ option.label }}</b><span>{{ option.hint.replace(/[。.]$/, '') }} · <code>{{ option.url }}</code></span></span>
+                      <span class="opt-text" :title="`${option.label} · ${option.hint} · ${option.url}`" :aria-description="`${option.label} · ${option.hint} · ${option.url}`"><b>{{ protocolDisplayNames[option.value] ?? option.label }}</b></span>
                     </button>
                   </div>
                 </div>
-                <small v-if="!isEditingCustom && !isManaged" class="muted" data-testid="ai-protocol-endpoint-hint">切换协议会自动换成该服务商对应的接口地址；手动改过的地址不会被覆盖。</small>
+
               </div>
 
               <div class="fd">
                 <div class="lb-row"><label for="ai-base-url" class="lb">API 地址</label>
                   <button v-if="canResetAddress" type="button" class="xb-link" data-testid="ai-base-url-reset" @click="resetAddress">恢复默认</button></div>
-                <NInput v-model:value="modalBaseUrl" class="mono" :placeholder="modalOption.placeholder" :disabled="!store.desktop || !!busy || isManaged" data-testid="ai-base-url" :input-props="{ id: 'ai-base-url', autocomplete: 'off', spellcheck: false }" />
-                <small v-if="modalPreview" class="muted" data-testid="ai-endpoint-preview">实际请求端点：<code>{{ modalPreview }}</code></small>
+                <NInput :bordered="false" v-model:value="modalBaseUrl" class="mono" :placeholder="modalOption.placeholder" :disabled="!store.desktop || !!busy || isManaged" data-testid="ai-base-url" :input-props="{ id: 'ai-base-url', autocomplete: 'off', spellcheck: false }" />
+                <span v-if="modalPreview" class="endpoint-preview" :title="`实际请求端点：${modalPreview}`" :aria-description="`实际请求端点：${modalPreview}`" data-testid="ai-endpoint-preview">查看请求端点</span>
                 <NAlert v-if="insecureRemote(modalBaseUrl)" type="warning" :show-icon="false" data-testid="ai-http-warning">
                   http 地址不加密，密钥和内容会明文传输，建议仅用于本机或可信内网。
                 </NAlert>
               </div>
 
               <div v-if="!isManaged" class="fd">
-                <div class="lb-row"><label for="ai-api-key" class="lb">API 密钥</label>
-                  <button v-if="currentMeta.consoleUrl && !isEditingCustom" type="button" class="xb-link" data-testid="ai-console-link" @click="openExternal(currentMeta.consoleUrl)">{{ currentMeta.consoleText || '前往获取 API Key' }}<ExternalLink :size="11" /></button></div>
-                <NInput v-model:value="modalApiKey" class="mono" type="password" show-password-on="click" :placeholder="modalKeyPlaceholder" :disabled="!store.desktop || !!busy" data-testid="ai-api-key" :input-props="{ id: 'ai-api-key', autocomplete: 'off', spellcheck: false }" />
+                <div class="lb-row"><label for="ai-api-key" class="lb" title="密钥仅保存在这台电脑上，不会上传到小伴服务器" aria-description="密钥仅保存在这台电脑上，不会上传到小伴服务器">API 密钥</label>
+                  <button v-if="currentMeta.consoleUrl && !isEditingCustom" type="button" class="xb-link" :title="currentMeta.consoleText || '前往服务商获取 API Key'" :aria-description="currentMeta.consoleText || '前往服务商获取 API Key'" data-testid="ai-console-link" @click="openExternal(currentMeta.consoleUrl)">获取密钥<ExternalLink :size="11" /></button></div>
+                <NInput :bordered="false" v-model:value="modalApiKey" class="mono" type="password" show-password-on="click" :placeholder="modalKeyPlaceholder" :disabled="!store.desktop || !!busy" data-testid="ai-api-key" :input-props="{ id: 'ai-api-key', autocomplete: 'off', spellcheck: false }" />
                 <small class="muted key-actions">
-                  <span>只保存在这台电脑上，不会上传到小伴服务器</span>
+
                   <template v-if="modalHasKey">
                     <template v-if="!confirmingClear">
                       <button type="button" class="xb-link" data-testid="ai-clear-key" :disabled="!store.desktop || !!busy" @click="confirmingClear = true"><Trash2 :size="12" />删除已保存的密钥</button>
@@ -752,56 +754,25 @@ function openExternal(url?: string) {
                 </small>
               </div>
 
-              <div v-if="!isManaged" class="test-row">
+              <div v-if="!isManaged" class="test-row" title="向服务商请求模型列表，验证地址与密钥；不发送聊天消息" aria-description="向服务商请求模型列表，验证地址与密钥；不发送聊天消息">
                 <button type="button" class="xb-btn" :disabled="!store.desktop || !!busy || !modalBaseUrl.trim()" data-testid="ai-test-connection" @click="fetchModels('test')"><Zap :size="14" />测试连接</button>
-                <span class="test-text" :class="`is-${testState.kind}`" role="status" data-testid="ai-test-result">{{ testState.text || '填好地址和密钥后可以测试；会向服务商请求一次模型列表' }}</span>
+                <span class="test-text" :class="`is-${testState.kind}`" role="status" data-testid="ai-test-result">{{ testState.text }}</span>
               </div>
             </div>
           </section>
 
+            </div>
+          </aside>
+          <div class="provider-main">
+            <header class="pv-head" @mousedown="detached && dragConfigurationWindow($event)" @dblclick="detached && zoomConfigurationWindow($event)"><h2>模型</h2><span class="pv-model-count">{{ modalModels.length }} 个模型</span><button v-if="!isManaged" type="button" class="xb-btn model-fetch" :disabled="!store.desktop || !!busy || !modalBaseUrl.trim()" data-testid="ai-fetch-models" @click="fetchModels('fetch')"><RefreshCw :size="14" :class="{ spinning: busy === 'models' }" />获取模型</button><button v-if="!detached" type="button" class="xb-icon-btn" aria-label="关闭" data-testid="ai-provider-close" @click="modalVisible = false"><X :size="15" /></button></header>
+            <div class="pv-body xb-scroll">
           <section>
-            <p class="pv-sec">模型<span>· {{ modalModels.length }} 个，输入框里可切换</span></p>
-            <div class="pv-card is-flush">
-              <p v-if="!modalModels.length" class="empty">还没有模型。输入模型名称，或拉取服务商的可用模型</p>
-              <div v-for="model in modalModels" :key="model.id" class="mrow" :class="{ 'is-open': expandedModel === model.id }" :data-testid="`ai-model-row-${model.id}`">
-                <div class="mrow-main">
-                  <button type="button" class="star" :class="{ on: model.id === modalModel }" :aria-pressed="model.id === modalModel" :title="model.id === modalModel ? '默认模型' : '设为默认模型'" aria-label="设为默认模型" :disabled="!store.desktop || !!busy" :data-testid="`ai-model-default-${model.id}`" @click="makeDefault(model.id)"><Star :size="15" :stroke-width="1.8" /></button>
-                  <div class="mname">
-                    <span class="mid"><code>{{ model.id }}</code><em v-if="model.id === modalModel" class="def-tag">默认</em></span>
-                    <span class="msub">思考等级：{{ summaryOf(model) }}</span>
-                  </div>
-                  <button v-if="thinkingEditable" type="button" class="xb-icon-btn" :class="{ on: expandedModel === model.id }" :aria-expanded="expandedModel === model.id" :aria-label="expandedModel === model.id ? `收起 ${model.id} 的设置` : `设置 ${model.id}`" :data-testid="`ai-model-expand-${model.id}`" @click="expandedModel = expandedModel === model.id ? null : model.id"><SlidersHorizontal :size="15" /></button>
-                  <button v-if="!isManaged" type="button" class="xb-icon-btn" :aria-label="`移除 ${model.id}`" :disabled="!!busy" :data-testid="`ai-model-remove-${model.id}`" @click="removeModel(model.id)"><Trash2 :size="15" /></button>
-                </div>
-                <div v-if="thinkingEditable && expandedModel === model.id" class="mpanel">
-                  <div class="mpanel-row"><span class="mpanel-label">思考等级</span>
-                    <div class="xb-seg" role="radiogroup" aria-label="思考等级声明" data-testid="ai-reasoning-mode">
-                      <button v-for="mode in reasoningModes" :key="mode.value" type="button" role="radio" :aria-checked="model.mode === mode.value" :data-testid="`ai-reasoning-mode-${mode.value}`" @click="model.mode = mode.value">{{ mode.label }}</button>
-                    </div>
-                  </div>
-                  <div v-if="model.mode === 'manual'" class="mpanel-row levels" role="group" aria-label="支持的思考等级" data-testid="ai-reasoning-levels">
-                    <button v-for="level in reasoningEfforts" :key="level" type="button" role="checkbox" class="xb-chip level" :class="{ on: model.levels.includes(level) }" :aria-checked="model.levels.includes(level)" :data-testid="`ai-reasoning-level-${level}`" @click="toggleLevel(model, level)"><Check v-if="model.levels.includes(level)" :size="10" :stroke-width="3" />{{ reasoningLevelLabels[level] }}</button>
-                  </div>
-                  <div v-if="modalProtocol === 'responses'" class="mpanel-row"><label class="mpanel-label">思考摘要</label>
-                    <select :value="model.facts.reasoningSummary == null ? 'auto' : model.facts.reasoningSummary ? 'on' : 'off'" aria-label="思考摘要能力" @change="setReasoningSummary(model, ($event.target as HTMLSelectElement).value)">
-                      <option value="auto">自动</option><option value="on">支持摘要</option><option value="off">不请求摘要</option>
-                    </select>
-                  </div>
-                  <div v-if="modalProtocol === 'anthropic'" class="mpanel-row"><label class="mpanel-label">思考模式</label>
-                    <select :value="model.facts.thinkingMode?.type ?? 'auto'" aria-label="Messages 思考模式" @change="setThinkingMode(model, ($event.target as HTMLSelectElement).value)">
-                      <option value="auto">自动</option><option value="adaptive">自适应</option><option value="enabled">预算模式</option><option value="disabled">关闭</option>
-                    </select>
-                    <input v-if="model.facts.thinkingMode?.type === 'enabled'" v-model.number="model.facts.thinkingMode.budget_tokens" type="number" min="1024" :max="(model.facts.maxOutputTokens ?? 2000000) - 1" aria-label="思考预算 token" />
-                  </div>
-                  <span class="mpanel-hint">{{ reasoningModes.find(m => m.value === model.mode)?.hint }}</span>
-                </div>
-              </div>
 
+            <div class="pv-card is-flush">
               <div v-if="!isManaged" class="addbar">
                 <div class="addline">
-                  <NInput v-model:value="modelDraft" class="mono" placeholder="输入模型名称" :disabled="!store.desktop || !!busy" data-testid="ai-model" :input-props="{ id: 'ai-model', 'aria-label': '添加模型', autocomplete: 'off', spellcheck: false }" @keydown.enter.prevent="commitDraft()" />
-                  <button type="button" class="xb-btn" :disabled="!store.desktop || !!busy || !modelDraft.trim()" data-testid="ai-model-add" @click="commitDraft()">添加</button>
-                  <button type="button" class="xb-btn" :disabled="!store.desktop || !!busy || !modalBaseUrl.trim()" data-testid="ai-fetch-models" @click="fetchModels('fetch')"><RefreshCw :size="14" :class="{ spinning: busy === 'models' }" />拉取可用模型</button>
+                  <NInput :bordered="false" v-model:value="modelDraft" class="mono" placeholder="输入模型名称" :disabled="!store.desktop || !!busy" data-testid="ai-model" :input-props="{ id: 'ai-model', 'aria-label': '添加模型', autocomplete: 'off', spellcheck: false }" @keydown.enter.prevent="commitDraft()" />
+                  <button type="button" class="xb-btn" :disabled="!store.desktop || !!busy || !modelDraft.trim()" data-testid="ai-model-add" @click="commitDraft()"><Plus :size="14" />添加</button>
                 </div>
                 <div v-if="modelChips.fetched.length || modelChips.common.length" class="chips" data-testid="ai-model-select-wrapper">
                   <template v-if="modelChips.common.length">
@@ -816,14 +787,50 @@ function openExternal(url?: string) {
                   </template>
                 </div>
               </div>
+
+              <div class="provider-model-list">
+              <p v-if="!modalModels.length" class="empty">还没有模型。输入模型名称，或拉取服务商的可用模型</p>
+              <div v-for="model in modalModels" :key="model.id" class="mrow" :class="{ 'is-open': expandedModel === model.id }" :data-testid="`ai-model-row-${model.id}`">
+                <div class="mrow-main">
+                  <button type="button" class="star" :class="{ on: model.id === modalModel }" :aria-pressed="model.id === modalModel" :title="model.id === modalModel ? '默认模型' : '设为默认模型'" aria-label="设为默认模型" :disabled="!store.desktop || !!busy" :data-testid="`ai-model-default-${model.id}`" @click="makeDefault(model.id)"><Star :size="15" :stroke-width="1.8" /></button>
+                  <div class="mname" :title="`思考等级：${summaryOf(model)}`" :aria-description="`思考等级：${summaryOf(model)}`">
+                    <span class="mid"><code>{{ model.id }}</code><em v-if="model.id === modalModel" class="def-tag">默认</em></span>
+
+                  </div>
+                  <button v-if="thinkingEditable" type="button" class="xb-icon-btn" :class="{ on: expandedModel === model.id }" :aria-expanded="expandedModel === model.id" :aria-label="expandedModel === model.id ? `收起 ${model.id} 的设置` : `设置 ${model.id}`" :data-testid="`ai-model-expand-${model.id}`" @click="expandedModel = expandedModel === model.id ? null : model.id"><SlidersHorizontal :size="15" /></button>
+                  <button v-if="!isManaged" type="button" class="xb-icon-btn" :aria-label="`移除 ${model.id}`" :disabled="!!busy" :data-testid="`ai-model-remove-${model.id}`" @click="removeModel(model.id)"><Trash2 :size="15" /></button>
+                </div>
+                <div v-if="thinkingEditable && expandedModel === model.id" class="mpanel">
+                  <div class="mpanel-row"><span class="mpanel-label">思考等级</span>
+                    <div class="xb-seg" role="radiogroup" aria-label="思考等级声明" data-testid="ai-reasoning-mode">
+                      <button v-for="mode in reasoningModes" :key="mode.value" type="button" role="radio" :aria-checked="model.mode === mode.value" :title="mode.hint" :aria-description="mode.hint" :data-testid="`ai-reasoning-mode-${mode.value}`" @click="model.mode = mode.value">{{ mode.label }}</button>
+                    </div>
+                  </div>
+                  <div v-if="model.mode === 'manual'" class="mpanel-row levels" role="group" aria-label="支持的思考等级" data-testid="ai-reasoning-levels">
+                    <button v-for="level in reasoningEfforts" :key="level" type="button" role="checkbox" class="xb-chip level" :class="{ on: model.levels.includes(level) }" :aria-checked="model.levels.includes(level)" :data-testid="`ai-reasoning-level-${level}`" @click="toggleLevel(model, level)"><Check v-if="model.levels.includes(level)" :size="10" :stroke-width="3" />{{ reasoningLevelLabels[level] }}</button>
+                  </div>
+                  <div v-if="modalProtocol === 'anthropic'" class="mpanel-row"><label class="mpanel-label">思考模式</label>
+                    <select :value="model.facts.thinkingMode?.type ?? 'auto'" aria-label="Messages 思考模式" @change="setThinkingMode(model, ($event.target as HTMLSelectElement).value)">
+                      <option value="auto">自动</option><option value="adaptive">自适应</option><option value="enabled">预算模式</option><option value="disabled">关闭</option>
+                    </select>
+                    <input v-if="model.facts.thinkingMode?.type === 'enabled'" v-model.number="model.facts.thinkingMode.budget_tokens" type="number" min="1024" :max="(model.facts.maxOutputTokens ?? 2000000) - 1" aria-label="思考预算 token" />
+                  </div>
+                </div>
+              </div>
+
+              </div>
+
+              <section v-if="(currentMeta.defaultModel && !isEditingCustom) || (modalModels.length && (!isManaged || canSetReplyPreference))" class="provider-preferences" aria-label="使用偏好">
+              <h3>使用偏好</h3>
               <div v-if="currentMeta.defaultModel && !isEditingCustom" class="mfoot">
-                <div class="xb-row-text"><b>跟随推荐模型 · {{ currentMeta.defaultModel }}</b><span>手动选择的模型不会被推荐更新覆盖。</span></div>
+                <div class="xb-row-text"><b>跟随推荐模型 · {{ currentMeta.defaultModel }}</b></div>
                 <NSwitch :value="modalSelectionMode === 'recommended'" aria-label="跟随推荐模型" data-testid="ai-follow-recommended" @update:value="setRecommended" />
               </div>
               <div v-if="modalModels.length && (!isManaged || canSetReplyPreference)" class="mfoot" data-testid="ai-reply-advanced">
-                <div class="xb-row-text"><b>回答偏好</b><span>{{ canSetReplyPreference ? '默认模型的思考深度；更深入可能耗时更久、消耗更多额度。' : '默认模型不支持调节思考深度（可在上方为它声明思考等级）。' }}</span></div>
+                <div class="xb-row-text"><b>回答偏好</b></div>
                 <NSelect v-if="canSetReplyPreference" v-model:value="modalReplyPreference" :options="replyPreferenceOptions" :disabled="!store.desktop || !!busy" style="width:150px" data-testid="ai-reply-preference" />
               </div>
+              </section>
             </div>
           </section>
 
@@ -840,6 +847,8 @@ function openExternal(url?: string) {
           <button v-if="!editingInUse" type="button" class="xb-btn-primary" :disabled="!store.desktop || !!modalFormError || !!busy" data-testid="ai-save-and-activate" @click="saveProvider(true)">保存并启用</button>
           <button v-else type="button" class="xb-btn-primary" :disabled="!store.desktop || !!modalFormError || !!busy" data-testid="ai-save" @click="saveProvider(false)">保存</button>
         </footer>
+          </div>
+        </div>
       </div>
     </component>
     <template v-if="!detached">
@@ -917,6 +926,7 @@ html[data-theme=dark] .hue-pink{--tile-bg:rgba(238,143,179,.16);--tile-ink:#F095
 .fd{display:flex;flex-direction:column;gap:6px;min-width:0}
 .lb{font-size:13px;font-weight:500}
 .lb-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.lb-row .lb{flex-shrink:0}
 .lb-row .xb-link{display:inline-flex;align-items:center;gap:3px;font-size:12px}
 .mono :deep(input),.mono :deep(.n-input__input-el){font-family:var(--ui-font-mono);font-size:12.5px}
 .muted{font-size:11.5px;line-height:1.6;color:var(--ui-text-secondary)}
@@ -927,11 +937,11 @@ html[data-theme=dark] .hue-pink{--tile-bg:rgba(238,143,179,.16);--tile-ink:#F095
 .sub{font-size:12px;color:var(--ui-text-secondary);font-weight:400}
 
 .proto{position:relative}
-.proto-trigger{width:100%;height:34px;display:flex;align-items:center;gap:8px;padding:0 10px 0 11px;border:0;border-radius:9px;background:var(--ui-surface);box-shadow:inset 0 0 0 1px var(--ui-border-strong);color:var(--ui-text-primary);font:inherit;font-size:13.5px;text-align:left;cursor:pointer}
+.proto-trigger{width:100%;height:34px;display:flex;align-items:center;gap:8px;padding:0 10px 0 11px;border:0;border-radius:9px;background:var(--ui-surface);box-shadow:none;color:var(--ui-text-primary);font:inherit;font-size:13.5px;text-align:left;cursor:pointer}
 .proto-trigger b{font-weight:500;white-space:nowrap}
 .proto-trigger .sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .proto-trigger .chev{margin-left:auto;flex-shrink:0;color:var(--ui-text-tertiary)}
-.proto-trigger.open{box-shadow:inset 0 0 0 1.5px var(--ui-btn),0 0 0 3px var(--ui-soft)}
+.proto-trigger.open{box-shadow:none;outline:2px solid var(--ui-soft)}
 .proto-trigger:disabled{opacity:.6;cursor:not-allowed}
 .proto-menu{position:absolute;left:0;right:0;top:40px;z-index:5}
 .proto-option{align-items:center;padding:8px 10px;min-height:0}
@@ -952,7 +962,7 @@ html[data-theme=dark] .hue-pink{--tile-bg:rgba(238,143,179,.16);--tile-ink:#F095
 .mrow{border-top:1px solid var(--ui-line)}
 .mrow:first-child{border-top:0}
 .mrow-main{display:flex;align-items:center;gap:10px;min-height:48px;padding:7px 10px 7px 14px}
-.star{width:22px;height:22px;border:0;padding:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--ui-text-disabled)}
+.star{width:22px;height:22px;border:0;padding:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--ui-text-tertiary)}
 .star:hover:not(.on){color:var(--ui-text-tertiary)}
 .star.on{color:var(--ui-btn)}
 .star.on :deep(svg){fill:currentColor}
@@ -993,5 +1003,60 @@ html[data-theme=dark] .hue-pink{--tile-bg:rgba(238,143,179,.16);--tile-ink:#F095
 .workspace-row{align-items:flex-start}
 .ws-actions{display:flex;flex-direction:column;align-items:stretch;gap:6px;flex-shrink:0}
 .ai-note{margin:14px 4px 0;font-size:12px;line-height:1.7;color:var(--ui-text-tertiary)}
-.ai-config.is-detached{height:100%;margin:0;overflow:hidden}.ai-config.is-detached .xb-provider{width:100%;height:100dvh;max-width:none;max-height:none;border-radius:0;box-shadow:none}.ai-config.is-detached .pv-head,.ai-config.is-detached .pv-foot{flex-shrink:0}.ai-config.is-detached .pv-body{min-height:0}
+.ai-config.is-detached{display:flex;flex-direction:column;height:100%;margin:0;overflow:hidden}.ai-config.is-detached>[data-testid="ai-provider-modal"]{flex:1;min-height:0;height:100%}.ai-config.is-detached .xb-provider{width:100%;height:100%;max-width:none;max-height:none;border-radius:0;box-shadow:none}.ai-config.is-detached .pv-head,.ai-config.is-detached .pv-foot{flex-shrink:0}.ai-config.is-detached .pv-body{min-height:0}
+</style>
+
+<style scoped>
+/* The connection rail and model workspace share one drawn window frame. */
+.xb-provider{container-type:inline-size;width:900px;height:720px;background:var(--ui-configuration-canvas);box-shadow:var(--ui-shadow-dialog)}
+.provider-workspace{display:flex;flex:1;min-height:0;overflow:hidden}
+.provider-sidebar{width:260px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;background:var(--ui-configuration-sidebar)}
+html:not([data-theme=dark]) .provider-sidebar{background:var(--ui-tint)}
+.provider-sidebar>.configuration-chrome{min-height:54px}
+.provider-identity{display:flex;align-items:center;gap:12px;padding:9px 24px 32px;flex-shrink:0}
+.provider-symbol{flex-shrink:0;color:var(--ui-ink)}
+.provider-identity .pv-name{flex-direction:column;align-items:flex-start;gap:6px}.provider-identity .pv-name h2{font-size:18px;line-height:1.25;letter-spacing:-.4px}
+.provider-identity .pill-ok{background:transparent;padding:0;font-size:10px;height:16px}
+.provider-connection{flex:1;min-height:0;padding:0 24px 24px;overflow-y:auto}
+.provider-connection .pv-sec{font-size:11px;font-weight:400;color:var(--ui-text-tertiary);margin-bottom:14px}
+.provider-connection .pv-card{background:transparent;box-shadow:none;padding:0;gap:22px}
+.provider-connection .lb{font-size:12px;color:var(--ui-text-secondary)}
+.provider-connection .n-input{min-height:38px;align-items:center}
+.provider-connection .n-input :deep(.n-input-wrapper){padding-inline:12px}
+.provider-main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+.pv-head{height:88px;min-height:88px;padding:0 32px;align-items:center;gap:10px;border:0;background:transparent;user-select:none}
+.pv-head h2{margin:0;font-size:20px;line-height:1.2;font-weight:600;letter-spacing:-.4px}
+.pv-head .model-fetch{margin-left:auto;font-size:12px;color:var(--ui-text-secondary)}.pv-head .xb-icon-btn{margin-left:auto;align-self:center}
+.pv-model-count{font-size:11px;line-height:22px;color:var(--ui-text-tertiary)}
+.pv-body{padding:0 32px 24px;gap:18px;overflow-y:auto}
+.pv-card.is-flush{background:transparent;box-shadow:none}
+.pv-foot{position:relative;flex-wrap:wrap;gap:8px;padding:20px 32px 24px;border:0;background:transparent}
+.pv-foot::before{content:'';position:absolute;top:0;left:32px;right:32px;height:1px;background:var(--ui-line)}
+.proto-trigger{height:38px;font-size:12px;background:var(--ui-surface)}.proto-trigger .sub{display:none}
+.proto-option{height:34px;min-height:34px;padding:0 8px;white-space:nowrap}.proto-option .opt-text{flex:1;overflow:hidden}.proto-option .opt-text b{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.proto-trigger b{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.endpoint-preview{font-size:11px;color:var(--ui-text-tertiary);cursor:help;align-self:flex-start}
+.test-row{align-items:stretch;flex-direction:column;gap:8px}.test-row>.xb-btn{height:36px;background:var(--ui-surface);color:var(--ui-text-primary)}.test-text{font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.test-text:empty,.key-actions:empty{display:none}
+.provider-model-list{padding:6px;background:var(--ui-configuration-group);border-radius:12px}
+.mrow{border:0;border-radius:10px;margin:0 0 4px}.mrow.is-open{background:var(--ui-configuration-canvas)}.mrow-main{min-height:50px;padding:8px 10px;gap:10px}
+.mrow-main{border-radius:8px}.mrow-main:hover{background:var(--ui-surface-hover)}.mrow:has(.star.on):not(.is-open)>.mrow-main{background:var(--ui-soft)}
+.mid code{font-family:var(--ui-font-family);font-size:13px}.def-tag{background:var(--ui-soft);color:var(--ui-ink);font-size:10px;padding:0 6px;font-weight:500}
+.mpanel{margin:0;padding:8px 16px 18px 42px;border-radius:0;background:transparent;gap:14px}
+.mpanel-label{width:60px;font-size:12px;color:var(--ui-text-secondary)}
+.mpanel .xb-seg{min-width:0;flex:0 1 auto;margin-left:auto;flex-wrap:wrap;box-shadow:none}
+.mpanel-row select{margin-left:auto;min-width:128px}
+.mpanel .xb-seg>button{min-width:60px;white-space:nowrap;box-shadow:none}
+.mpanel-row.levels{padding-left:70px;justify-content:flex-end}
+.addbar{margin:0 0 26px;padding:0;border:0;gap:12px}.addline{flex-wrap:nowrap;gap:4px;padding:4px 5px 4px 8px;background:var(--ui-configuration-group);border-radius:10px}.addline .n-input{margin-bottom:0;min-height:34px;align-items:center;background:transparent}.addline .n-input :deep(.n-input-wrapper){padding-inline:4px}.addline>.xb-btn{flex-shrink:0;color:var(--ui-ink)}
+.model-chip{background:transparent;box-shadow:none;color:var(--ui-text-secondary);padding-inline:6px;font-family:var(--ui-font-family);max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.provider-preferences{margin-top:30px}
+.provider-preferences h3{margin:0 0 8px 4px;font-size:11px;font-weight:500;color:var(--ui-text-tertiary)}
+.mfoot{border:0;padding:12px 4px;min-height:50px;gap:12px}.mfoot+.mfoot{border-top:1px solid var(--ui-line)}.mfoot .xb-row-text b{font-size:12px;font-weight:400}
+.mpanel select,.mpanel input{min-width:0;min-height:30px;border:0;background:var(--ui-control);color:var(--ui-text-primary);border-radius:6px;padding:5px 10px;font:inherit}
+.xb-chip.level.on{box-shadow:none;background:var(--ui-soft);color:var(--ui-ink)}
+@media(max-width:760px){.addline .n-input{flex:1;min-width:0}.provider-sidebar{width:230px}.provider-identity{padding-inline:18px}.provider-connection{padding-inline:18px}.pv-head{padding-inline:20px}.pv-body{padding-inline:16px}.pv-foot{padding-inline:16px}.pv-foot::before{left:16px;right:16px}}
+@media(max-width:600px){.provider-workspace{flex-direction:column}.provider-sidebar{width:100%;max-height:48%;flex-shrink:0}.provider-identity{padding-block:4px 12px}.provider-connection{padding-bottom:16px}.provider-main{flex:1}.pv-head{height:60px;min-height:60px;padding-block:0}.pv-foot{padding-block:12px}}
+@container(max-width:760px){.addline .n-input{flex:1;min-width:0}.provider-sidebar{width:230px}.provider-identity{padding-inline:18px}.provider-connection{padding-inline:18px}.pv-head{padding-inline:20px}.pv-body{padding-inline:16px}.pv-foot{padding-inline:16px}.pv-foot::before{left:16px;right:16px}}
+@container(max-width:600px){.provider-workspace{flex-direction:column}.provider-sidebar{width:100%;max-height:48%;flex-shrink:0}.provider-identity{padding-block:4px 12px}.provider-connection{padding-bottom:16px}.provider-main{flex:1}.pv-head{height:60px;min-height:60px;padding-block:0}.pv-foot{padding-block:12px}}
 </style>

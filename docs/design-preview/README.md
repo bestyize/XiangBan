@@ -8,7 +8,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
-| [小伴 AI · 多模型配置](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-model-settings.html) | 复用实际组件的独立配置窗口：搜索、限高单列模型列表、固定确认栏与折叠额度；支持 4 / 24 / 80 个模型、明暗与窄窗口。[本机在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)，需在桌面项目运行 `npm run dev`，不连接真实账户或模型服务 |
+| [小伴 AI · 多模型配置](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-model-settings.html) | macOS 白与浅灰轻毛玻璃视觉提案：统一白色内容面、轻量额度概览、细条兑换区、无搜索框的灰阶列表与无边框兑换码输入框、无边框按钮与品牌色确认操作，“兑换”右侧新增可配置链接的“获取额度”入口，每行模型支持发送 `hi` 的检测交互演示；可对照现行界面，支持 4 / 24 / 80 个模型、明暗与窄窗口。已应用到产品独立窗口，支持真实模型检测与后台下发额度链接；同一预览加入第三方模型配置、完整设置页及左栏顶部自绘窗口控件，移除系统顶部标题栏；Windows 原生效果尚未实机验收。[本机在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)沿用原链接，需在桌面项目运行 `npm run dev`，不连接真实账户或模型服务 |
 | [小伴桌面 UI 升级设计稿](../../client/xiaoban-desktop/docs/design-specs/ui-upgrade/README.md) | 39 个画板：主界面、设置、超级小伴、资料库、实时对话、小伴市场接入、输入框与各类状态卡片；[在线画布](https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg) |
 | [工作空间检索与列表折叠](../../client/xiaoban-desktop/docs/design-specs/prototypes/workspace-search.html) | 标题、正文与工作区检索；限高滚动结果；项目和项目内会话默认各展示 6 项；点击结果自动展开并定位会话 |
 | [长期目标弹窗](../../client/xiaoban-desktop/docs/design-specs/prototypes/long-term-goal.html) | 新建、执行中与待验收状态；折叠设置；浅色、深色及窄屏预览。遮罩仅用于演示内容，桌面端窗口形式按独立窗口规范 |
@@ -22,3 +22,15 @@
 两份 Claude Design 画布导出的设计稿由多个 `*.dc.html` 画板组成，需在各自目录运行 `python3 -m http.server` 后打开 `index.html` 总览；其余单个 HTML 设计稿均自包含，可直接用浏览器打开，展示数据为模拟内容。设计稿源文件统一保留在客户端设计目录，避免多份副本产生差异。
 
 完整设计规范与其他设计稿见[小伴桌面设计资源索引](../../client/xiaoban-desktop/docs/design-specs/README.md)。
+
+设置页重设计（2026-10-31）：三组单色导航、底部账号、白色内容面与浅灰设置组，窗口控件固定在左栏顶部；深色模式增强正文、辅助文字和控件对比度。沿用[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)，默认展示新版设置，支持所有分类与明暗切换；前端代码已更新，本轮未重新打包原生应用。
+
+设置侧栏细化：浅色背景跟随主页面的 `--ui-tint` 次要主题色；一级菜单使用无底色线性图标。账号区仅展示状态，不跳转、不响应点击；无头像时显示主题色 Sparkles 图标，替代猫脸占位图。沿用[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)。
+
+模型配置 UI 升级：协议菜单保持单行，模型展开设置采用平整布局，蓝色选中态仅作用于标题行；第三方配置采用主题色连接侧栏、25px 标题、浅灰模型列表与主题色默认行；小伴 AI 统一标题、额度明细、兑换条和模型选择样式，保持同页布局及逐模型检测。沿用[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)，切换「小伴 AI · 新版 / 第三方模型 · 新版」查看，初版提案另保留为参考；代码已更新，尚未重新打包。
+
+模型页精修：统一紧凑标题、添加入口和展开设置对齐，移除“思考摘要”控件；沿用[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)中的「第三方模型 · 新版」。
+
+参考风格调整与小伴 AI 结构重排（2026-10-31）：配置页统一为轻主题色画布与白色分组卡片，设置页收小分类标题并移除侧栏重复标题。小伴 AI 将账户身份放在页头，余额、额度明细、兑换与获取额度合并为一张卡片，模型另设独立滚动列表，确认操作固定在底部。保留无描边控件、单页布局、模型检测与键盘选择；深色使用独立高对比表面。沿用[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)，默认查看「小伴 AI · 新版」。本轮更新了实际组件代码，通过类型检查及 63 项相关测试，核对了 360px 窄窗口、明暗与长列表；尚未重新打包原生应用。
+
+小伴 AI 配置窗口默认宽度与最小宽度调整为 360px，高度仍为 620px；窗口尺寸单独记忆，避免继承第三方配置页的宽度。[原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)同步默认显示 360px，仍可手动调整尺寸。

@@ -51,6 +51,8 @@ pub struct ProductInfo {
 #[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct Balance {
     pub product: ProductInfo,
+    #[serde(default)]
+    pub credit_purchase_url: String,
     /// 1 美元对应的额度点数，界面据此换算成美元。
     pub quota_per_unit: i64,
     pub total: i64,
@@ -184,6 +186,48 @@ fn select(config: &mut AiConfig, tier: &str, base_url: &str) {
     config.base_url = base_url.into();
     config.model = tier.into();
     config.api_key.clear();
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProbeResult { elapsed_ms: u64, reply: String }
+
+/// One tool-free hi, with a temporary configuration. Never saves a model selection or chat history.
+#[tauri::command]
+pub async fn ai_gateway_probe(app: tauri::AppHandle, tier: String) -> Result<ProbeResult, String> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static PROBE: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(1);
+    let permit = PROBE.try_acquire().map_err(|_| "已有模型正在检测，请稍后再试")?;
+    let tier = clean_tier(&tier)?;
+    // Read directly: probing must not persist even the gateway reasoning metadata.
+    let mut value = call(&app, reqwest::Method::GET, "/api/ai/tiers", None).await.map_err(|e| e.message)?;
+    let tiers: Vec<Tier> = serde_json::from_value(value["tiers"].take()).map_err(|_| "模型列表格式不正确")?;
+    let selected = tiers.iter().find(|t| t.tier == tier && t.available).ok_or("该模型暂不可用，请刷新后重试")?;
+    let token = account::fresh_access_token(&app).await.map_err(|e| e.message)?;
+    let mut config = {
+        let state = app.state::<ai_config::AiConfigState>();
+        let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
+        ai_config::load(&ai_config::path(&app)?).map_err(|e| e.to_string())?
+    };
+    if !config.gateway_enabled { return Err("小伴 AI 入口已被关闭".into()); }
+    if config.gateway_tier != tier { config.gateway_reply_preference = Default::default(); }
+    config.gateway_reasoning_efforts = selected.reasoning_efforts.clone();
+    select(&mut config, &tier, &format!("{}/v1", ai_base_url()));
+    config.api_key = token;
+    let cancel = Arc::new(AtomicBool::new(false));
+    let signal = cancel.clone();
+    let started = std::time::Instant::now();
+    let mut task = tauri::async_runtime::spawn_blocking(move || {
+        let _permit = permit;
+        crate::chat::probe_model(&config, &signal)
+    });
+    match tokio::time::timeout(Duration::from_secs(45), &mut task).await {
+        Ok(result) => {
+            let reply = result.map_err(|e| e.to_string())?.map_err(|e| readable_error(&e))?;
+            Ok(ProbeResult { elapsed_ms: started.elapsed().as_millis() as u64, reply })
+        }
+        Err(_) => { cancel.store(true, Ordering::Relaxed); Err("检测超时（45 秒），请稍后重试".into()) }
+    }
 }
 
 #[tauri::command]

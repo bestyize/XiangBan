@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue';
-import { NAlert, NButton, NInput, NModal, NTag } from 'naive-ui';
-import { Check, ChevronDown, Search, Settings, Sprout } from 'lucide-vue-next';
-import { GATEWAY_PROVIDER, desktop as nativeDesktop, invoke, toAccountError, type AiBalance, type AiConfigView, type AiRedeemed, type AiTier } from '../../bridge.ts';
+import { computed, nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue';
+import { NAlert, NButton, NModal } from 'naive-ui';
+import { ArrowUpRight, Check, CircleAlert, CircleCheck, LoaderCircle, RefreshCw, Settings, Sparkles, Sprout, UserRound } from 'lucide-vue-next';
+import { GATEWAY_PROVIDER, desktop as nativeDesktop, invoke, toAccountError, type AiBalance, type AiConfigView, type AiRedeemed, type AiProbeResult, type AiTier } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { closeConfigurationWindow, openModelWindow } from '../configuration/windows.ts';
 import { bucketLabel, expiryText, money, pickTier } from '../ai-gateway.ts';
@@ -23,7 +23,47 @@ const redeemError = ref('');
 const redeemDone = ref('');
 const enabling = ref(false);
 const enableError = ref('');
-const modelQuery = ref('');
+const probes = reactive<Record<string, { state: 'checking' | 'success' | 'failure'; message: string }>>({});
+let disposed = false;
+onBeforeUnmount(() => { disposed = true; });
+const probing = computed(() => Object.values(probes).some(p => p.state === 'checking'));
+const purchaseUrl = computed(() => {
+  try {
+    const url = new URL(balance.value?.creditPurchaseUrl ?? '');
+    return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password ? url.href : '';
+  } catch { return ''; }
+});
+async function purchase() {
+  if (!purchaseUrl.value) return;
+  try { await invoke('open_download_url', { url: purchaseUrl.value }); }
+  catch (error) { props.store.notify(toAccountError(error).message, 'error'); }
+}
+async function probe(tier: AiTier) {
+  if (!uid.value || !tier.available || probing.value) return;
+  const owner = uid.value;
+  const state = { state: 'checking' as const, message: `正在向 ${tier.displayName} 发送 hi` };
+  probes[tier.tier] = state;
+  try {
+    const result = await invoke<AiProbeResult>('ai_gateway_probe', { tier: tier.tier });
+    if (disposed || uid.value !== owner || probes[tier.tier]?.state !== 'checking') return;
+    probes[tier.tier] = { state: 'success', message: `检测成功 · ${(result.elapsedMs / 1000).toFixed(2)} 秒 · 回复：${result.reply}` };
+  } catch (error) {
+    if (disposed || uid.value !== owner || probes[tier.tier]?.state !== 'checking') return;
+    probes[tier.tier] = { state: 'failure', message: `检测失败：${toAccountError(error).message}` };
+  }
+}
+function mark(tier: AiTier) {
+  const name = tier.displayName.toLowerCase();
+  return name.startsWith('claude') ? 'A' : name.startsWith('deepseek') ? 'D' : name.startsWith('gemini') ? 'G' : 'M';
+}
+function cancel() { picked.value = pickTier(tiers.value, activeTier.value, ''); open.value = false; }
+function shortExpiry(value: string | null) {
+  if (!value) return '长期有效';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return expiryText(value);
+  const day = `${date.getMonth() + 1}/${date.getDate()}`;
+  return date.getFullYear() === new Date().getFullYear() ? `${day} 到期` : `${date.getFullYear()}/${day}`;
+}
 const modelList = ref<HTMLElement>();
 
 const uid = computed(() => props.store.account?.user.uid ?? '');
@@ -33,18 +73,14 @@ const activeTier = computed(() => (gatewayActive.value ? props.config?.gatewayTi
 const activeTierName = computed(() => tiers.value.find(t => t.tier === activeTier.value)?.displayName ?? (activeTier.value ? '已保存的模型' : ''));
 const pickedTier = computed(() => tiers.value.find(t => t.tier === picked.value));
 const unchanged = computed(() => gatewayActive.value && activeTier.value === picked.value);
-const filteredTiers = computed(() => {
-  const query = modelQuery.value.trim().toLocaleLowerCase();
-  return tiers.value.filter(t => !query || t.displayName.toLocaleLowerCase().includes(query));
-});
-const modelCount = computed(() => modelQuery.value.trim() ? `${filteredTiers.value.length} / ${tiers.value.length}` : String(tiers.value.length));
-const tabbableTier = computed(() => (filteredTiers.value.find(t => t.tier === picked.value && t.available) ?? filteredTiers.value.find(t => t.available))?.tier);
+const tabbableTier = computed(() => (tiers.value.find(t => t.tier === picked.value && t.available) ?? tiers.value.find(t => t.available))?.tier);
 const canEnable = computed(() => !!pickedTier.value?.available && !unchanged.value);
 
-/** Keep radio navigation within the visible, usable models. Searching never changes the saved selection. */
+/** Arrow keys select usable models without moving focus from a detection button. */
 async function moveSelection(event: KeyboardEvent) {
+  if ((event.target as HTMLElement).closest('.probe-button')) return;
   if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || enabling.value) return;
-  const usable = filteredTiers.value.filter(t => t.available);
+  const usable = tiers.value.filter(t => t.available);
   if (!usable.length) return;
   event.preventDefault();
   const index = usable.findIndex(t => t.tier === picked.value);
@@ -142,7 +178,6 @@ async function activate() {
 function openModal() {
   if (props.store.desktop && nativeDesktop && !props.detached) { void openModelWindow(GATEWAY_PROVIDER).catch(error => props.store.notify(error, 'error')); return; }
   open.value = true;
-  modelQuery.value = '';
   redeemError.value = redeemDone.value = enableError.value = '';
   void load();
 }
@@ -154,10 +189,10 @@ function signIn() {
 }
 
 watch(uid, () => {
+  for (const key of Object.keys(probes)) delete probes[key];
   balance.value = null;
   tiers.value = [];
   picked.value = '';
-  modelQuery.value = '';
   loadError.value = redeemError.value = redeemDone.value = enableError.value = '';
   void load();
 }, { immediate: true });
@@ -168,9 +203,8 @@ watch(uid, () => {
   <div class="xb-group gateway-card" :class="{ active: gatewayActive }" data-testid="ai-gateway-card">
     <div class="xb-row gw-row">
       <span class="gw-logo" aria-hidden="true"><Sprout :size="22" :stroke-width="2" /></span>
-      <div class="xb-row-text">
+      <div class="xb-row-text" :title="cardDescription" :aria-description="cardDescription">
         <b>小伴 AI</b>
-        <span>{{ cardDescription }}</span>
         <span v-if="cardFact" class="gw-fact">{{ cardFact.label }}<strong data-testid="gateway-card-fact">{{ cardFact.value }}</strong></span>
       </div>
       <span v-if="gatewayActive" class="xb-ok" data-testid="gateway-card-status">当前使用</span>
@@ -184,90 +218,50 @@ watch(uid, () => {
 
   </template>
   <component :is="detached ? 'div' : NModal" v-model:show="open" preset="card" title="小伴 AI" :class="{ 'gw-detached': detached }" :style="detached ? undefined : { maxWidth: '640px', width: '92vw' }" data-testid="gateway-modal">
-    <div class="gw-modal">
-      <header v-if="detached" class="gw-window-head"><span class="gw-logo" aria-hidden="true"><Sprout :size="20" /></span><h1>小伴 AI</h1></header>
+    <div class="mac-config">
       <div v-if="!uid" class="gw-signin" data-testid="gateway-signin">
-        <p>登录小伴账号后，就能直接用小伴 AI 聊天：不用自己找模型、申请密钥，新用户还有试用额度。有兑换码的话，登录后在这里输入即可充值。</p>
-        <NButton type="primary" data-testid="gateway-login" @click="signIn">登录 / 注册</NButton>
+        <h1>小伴 AI</h1>
+        <p>登录小伴账号即可使用模型与共享额度，新用户还有试用额度。</p>
+        <button type="button" class="native-button primary" data-testid="gateway-login" @click="signIn">登录 / 注册</button>
       </div>
-
       <template v-else>
-        <NAlert v-if="loadError" type="warning" :show-icon="false" data-testid="gateway-load-error">{{ loadError }}</NAlert>
-
-        <section v-if="balance" class="gw-balance">
-          <div class="gw-total">
-            <span>当前可用</span>
-            <strong data-testid="gateway-total">{{ money(balance.total, perDollar) }}</strong>
-            <small v-if="balance.paid > 0" data-testid="gateway-paid">其中付费额度 {{ money(balance.paid, perDollar) }}</small>
-            <NButton class="gw-refresh" size="tiny" quaternary :loading="loading" data-testid="gateway-refresh" @click="load">刷新</NButton>
+        <NAlert v-if="loadError" class="gw-load-error" type="warning" :show-icon="false" data-testid="gateway-load-error">{{ loadError }}</NAlert>
+          <div class="gateway-heading"><h1 class="gateway-page-title"><Sparkles :size="22" :stroke-width="1.7" aria-hidden="true" />小伴 AI</h1><div class="account-actions"><span class="account-name"><UserRound :size="12" aria-hidden="true" />{{ store.account?.user.username }}</span><button type="button" class="refresh-button" :disabled="loading" aria-label="刷新额度" title="刷新额度" data-testid="gateway-refresh" @click="load"><RefreshCw :size="13" :class="{ 'probe-spinner': loading }" aria-hidden="true" /></button></div></div>
+        <section class="credit-pane" aria-label="账户与额度">
+          <div v-if="balance" class="credit-overview" :title="`${balance.product.name}的所有端共用这份余额；其中付费额度 ${money(balance.paid, perDollar)}`">
+            <div class="credit-balance"><div class="section-label credit-label">可用额度</div><strong class="credit-total" data-testid="gateway-total"><span class="currency">$</span>{{ money(balance.total, perDollar).slice(1) }}</strong></div>
+            <span class="sr-only" data-testid="gateway-paid">其中付费额度 {{ money(balance.paid, perDollar) }}</span>
+            <span class="sr-only" data-testid="gateway-subtitle">{{ balance.product.name }}的所有端共用这份余额</span>
+            <ul v-if="balance.buckets.length" class="credit-packages" aria-label="额度明细" data-testid="gateway-buckets">
+              <li v-for="bucket in balance.buckets" :key="bucket.id" class="credit-package" :title="expiryText(bucket.expiresAt)">
+                <span class="package-kind">{{ bucketLabel(bucket.kind) }}</span><span class="package-money">{{ money(bucket.remaining, perDollar) }} <em>/ {{ money(bucket.total, perDollar) }}</em></span><time>{{ shortExpiry(bucket.expiresAt) }}</time>
+              </li>
+            </ul>
+            <p v-else-if="balance.trial.available" class="gw-note" data-testid="gateway-trial-hint">首次使用自动发放 {{ money(balance.trial.quota, perDollar) }} 试用额度，{{ balance.trial.days }} 天内有效。</p>
+            <p v-else class="gw-note" data-testid="gateway-empty">暂无可用额度，可兑换或获取额度。</p>
           </div>
-          <details class="gw-credit-details">
-          <summary>额度明细<ChevronDown :size="14" aria-hidden="true" /></summary>
-          <p class="gw-note" data-testid="gateway-subtitle">{{ balance.product.name }}的所有端共用这份余额</p>
-          <ul v-if="balance.buckets.length" class="gw-buckets" data-testid="gateway-buckets">
-            <li v-for="bucket in balance.buckets" :key="bucket.id">
-              <NTag size="small" :bordered="false" :type="bucket.kind === 'trial' ? 'default' : 'success'">{{ bucketLabel(bucket.kind) }}</NTag>
-              <span class="gw-amount">{{ money(bucket.remaining, perDollar) }} <em>/ {{ money(bucket.total, perDollar) }}</em></span>
-              <span class="gw-expiry">{{ expiryText(bucket.expiresAt) }}</span>
-            </li>
-          </ul>
-          <p v-else-if="balance.trial.available" class="gw-note" data-testid="gateway-trial-hint">
-            首次使用小伴 AI 时会自动发放 {{ money(balance.trial.quota, perDollar) }} 试用额度，{{ balance.trial.days }} 天内有效。
-          </p>
-          <p v-else class="gw-note" data-testid="gateway-empty">现在没有可用额度，输入兑换码即可充值。</p>
-          </details>
-        </section>
-
-        <section class="gw-block gw-redemption">
-          <form class="gw-redeem" @submit.prevent="redeem">
-            <NInput v-model:value="code" placeholder="输入兑换码" aria-label="兑换码" :maxlength="64" :disabled="redeeming" clearable data-testid="gateway-code" />
-            <NButton type="primary" attr-type="submit" :loading="redeeming" :disabled="!code.trim()" data-testid="gateway-redeem">兑换</NButton>
-          </form>
+          <div v-else class="credit-overview gw-note" role="status">{{ loading ? '正在加载额度…' : '额度暂不可用' }}</div>
+          <form class="redeem-form" @submit.prevent="redeem"><span class="code-field" data-testid="gateway-code"><input v-model="code" aria-label="兑换码" placeholder="输入兑换码" maxlength="64" :disabled="redeeming" /></span><button type="submit" class="native-button" :disabled="redeeming || !code.trim()" data-testid="gateway-redeem"><LoaderCircle v-if="redeeming" class="probe-spinner" :size="12" aria-hidden="true" />兑换</button><button type="button" class="native-button credit-purchase" :disabled="!purchaseUrl" :title="purchaseUrl ? '打开额度获取页面' : '暂未开放'" data-testid="gateway-purchase" @click="purchase">获取额度<ArrowUpRight :size="12" aria-hidden="true" /></button></form>
           <p v-if="redeemError" class="gw-error" role="alert" data-testid="gateway-redeem-error">{{ redeemError }}</p>
           <p v-if="redeemDone" class="gw-done" role="status" data-testid="gateway-redeem-done">{{ redeemDone }}</p>
         </section>
-
-        <section v-if="tiers.length" class="gw-model-section" data-testid="gateway-use">
-          <div class="gw-block-head">
-            <h4>模型<span class="gw-count" data-testid="gateway-model-count">{{ modelCount }}</span></h4>
-          </div>
-          <NInput v-model:value="modelQuery" placeholder="搜索模型" aria-label="搜索模型" clearable data-testid="gateway-model-search"><template #prefix><Search :size="15" aria-hidden="true" /></template></NInput>
-          <div ref="modelList" class="gw-tiers xb-scroll" role="radiogroup" aria-label="模型" @keydown="moveSelection">
-            <button
-              v-for="tier in filteredTiers"
-              :key="tier.tier"
-              type="button"
-              role="radio"
-              class="gw-tier"
-              :class="{ on: picked === tier.tier }"
-              :aria-checked="picked === tier.tier"
-              :tabindex="tier.tier === tabbableTier ? 0 : -1"
-              :disabled="!tier.available || enabling"
-              :title="[tier.displayName, tier.description, !tier.available ? '兑换付费额度后可用' : ''].filter(Boolean).join('；')"
-              :aria-description="[tier.description, !tier.available ? '兑换付费额度后可用' : ''].filter(Boolean).join('；') || undefined"
-              :data-testid="`gateway-tier-${tier.tier}`"
-              @click="picked = tier.tier"
-            >
-              <span class="gw-radio" aria-hidden="true"><Check v-if="picked === tier.tier" :size="12" :stroke-width="3" /></span>
-              <b>{{ tier.displayName }}</b>
-              <span v-if="tier.tier === activeTier" class="gw-tier-state">使用中</span>
-              <span v-else-if="tier.isDefault" class="gw-tier-state">默认</span>
-              <span v-if="!tier.available" class="gw-tier-state">需付费额度</span>
-            </button>
-            <div v-if="!filteredTiers.length" class="gw-empty" role="status" data-testid="gateway-search-empty">没有匹配的模型<button type="button" class="xb-link" @click="modelQuery = ''">清除搜索</button></div>
+        <section class="model-pane" aria-label="模型" data-testid="gateway-use">
+          <div class="pane-heading"><div class="heading-title"><h2>模型</h2><span class="model-count" data-testid="gateway-model-count">{{ tiers.length }} 个</span></div></div>
+          <div ref="modelList" class="model-list" role="radiogroup" aria-label="选择模型" @keydown="moveSelection">
+            <div v-for="tier in tiers" :key="tier.tier" class="model-row" :class="{ selected: picked === tier.tier }">
+              <button type="button" role="radio" class="model-choice" :aria-checked="picked === tier.tier" :tabindex="tier.tier === tabbableTier ? 0 : -1" :disabled="!tier.available || enabling" :title="[tier.displayName, tier.description, !tier.available ? '兑换付费额度后可用' : ''].filter(Boolean).join('；')" :aria-description="[tier.description, !tier.available ? '兑换付费额度后可用' : ''].filter(Boolean).join('；') || undefined" :data-testid="`gateway-tier-${tier.tier}`" @click="picked = tier.tier">
+                <span class="model-mark" aria-hidden="true">{{ mark(tier) }}</span><span class="model-name">{{ tier.displayName }}</span><span v-if="tier.tier === activeTier" class="model-state">使用中</span><span v-else-if="!tier.available" class="model-state">需付费额度</span><span v-else-if="tier.isDefault" class="model-state">默认</span><span class="selection-mark" aria-hidden="true"><Check v-if="picked === tier.tier" :size="14" :stroke-width="2.6" /></span>
+              </button>
+              <span v-if="probes[tier.tier] && probes[tier.tier].state !== 'checking'" class="probe-status" :class="probes[tier.tier].state" role="status" :title="probes[tier.tier].message" :aria-label="probes[tier.tier].message" :data-testid="`gateway-probe-status-${tier.tier}`"><CircleCheck v-if="probes[tier.tier].state === 'success'" :size="14" aria-hidden="true" /><CircleAlert v-else :size="14" aria-hidden="true" /></span>
+              <button type="button" class="native-button probe-button" :disabled="!tier.available || probing" :aria-label="`检测 ${tier.displayName}`" :title="probes[tier.tier]?.message ?? `向 ${tier.displayName} 发送 hi，检测是否可用；会消耗少量额度`" :aria-busy="probes[tier.tier]?.state === 'checking'" :data-testid="`gateway-probe-${tier.tier}`" @click="probe(tier)"><LoaderCircle v-if="probes[tier.tier]?.state === 'checking'" class="probe-spinner" :size="12" aria-hidden="true" />{{ probes[tier.tier]?.state === 'checking' ? '检测中' : '检测' }}</button>
+            </div>
+            <div v-if="!tiers.length" class="model-empty" role="status">{{ loading ? '正在加载模型…' : '暂无可用模型' }}</div>
           </div>
         </section>
-        <div v-else-if="!loading && !loadError" class="gw-empty" role="status">暂无可用模型<NButton text @click="load">刷新</NButton></div>
-        <footer v-if="tiers.length" class="gw-actions">
-          <div class="gw-selection">
-            <span v-if="gatewayActive" class="gw-current" data-testid="gateway-active" :title="activeTierName">当前使用 · {{ activeTierName }}</span>
-            <span v-else class="gw-current">尚未启用小伴 AI</span>
-            <b v-if="pickedTier && !unchanged" :title="pickedTier.displayName">已选 · {{ pickedTier.displayName }}</b>
-          </div>
-          <NButton type="primary" :disabled="!canEnable" :loading="enabling" data-testid="gateway-use-btn" @click="enable">
-            {{ unchanged ? '当前使用中' : '使用此模型' }}
-          </NButton>
-          <p v-if="enableError" class="gw-error" role="alert" data-testid="gateway-use-error">{{ enableError }}</p>
+        <p v-if="enableError" class="gw-error gw-use-error" role="alert" data-testid="gateway-use-error">{{ enableError }}</p>
+        <footer class="window-actions">
+          <div class="selection-summary" :title="pickedTier?.displayName"><span>{{ canEnable ? '已选' : '当前模型' }}</span><b>{{ pickedTier?.displayName ?? '请选择模型' }}</b><span v-if="gatewayActive" class="sr-only" data-testid="gateway-active">当前使用 · {{ activeTierName }}</span></div>
+          <div class="action-buttons"><button type="button" class="native-button" :disabled="enabling" data-testid="gateway-cancel" @click="cancel">取消</button><button type="button" class="native-button primary" :disabled="!canEnable || enabling" data-testid="gateway-use-btn" @click="enable"><LoaderCircle v-if="enabling" class="probe-spinner" :size="12" aria-hidden="true" />{{ unchanged ? '当前使用中' : '使用此模型' }}</button></div>
         </footer>
       </template>
     </div>
@@ -285,77 +279,81 @@ watch(uid, () => {
 .gw-status{font-size:12px;color:var(--ui-text-secondary)}
 .gw-status.is-warn{color:var(--ui-warning-text)}
 .gw-row .xb-btn,.gw-row .xb-btn-primary{flex-shrink:0}
-.gw-detached{height:100dvh;overflow:auto;box-sizing:border-box;padding:24px;background:var(--ui-surface-sunken);color:var(--ui-text-primary)}
-.gw-modal{display:flex;flex-direction:column;gap:16px;min-height:0}
-.gw-detached .gw-modal{height:100%;min-height:480px}
-.gw-window-head{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.gw-window-head .gw-logo{width:34px;height:34px;border-radius:10px}
-.gw-window-head h1{font-size:17px;font-weight:600;margin:0}
-.gw-signin { display: grid; gap: 14px; justify-items: start; }
-.gw-signin p { margin: 0; line-height: 1.7; color: var(--ui-text-secondary); }
-.gw-balance {
-  display: grid;
-  gap: 10px;
-  padding: 16px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--ui-primary-soft), var(--ui-surface-alt));
-  border: 1px solid var(--ui-border);
-}
-.gw-total { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-.gw-total > span { color: var(--ui-text-secondary); }
-.gw-total strong { font-size: 32px; line-height: 1.1; font-variant-numeric: tabular-nums; }
-.gw-total small { color: var(--ui-text-secondary); }
-.gw-refresh { margin-left: auto; }
-.gw-note { margin: 0; font-size: 12px; color: var(--ui-text-secondary); }
-.gw-buckets { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.gw-buckets li {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 12px;
-  border-radius: 10px;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-}
-.gw-amount { font-variant-numeric: tabular-nums; }
-.gw-amount em { font-style: normal; color: var(--ui-muted); }
-.gw-expiry { font-size: 13px; color: var(--ui-muted); }
+/* The custom window controls stay above the single-page configuration surface. */
+.gw-detached{height:100dvh;overflow:hidden}
+.gw-signin{padding:32px;display:grid;gap:16px;justify-items:start}.gw-signin p{color:var(--ui-text-secondary);line-height:1.7}
+.gw-load-error{margin:16px 32px 0;flex-shrink:0}
+.gw-note{font-size:12px;color:var(--ui-text-secondary);line-height:1.6;margin:0}
+.gw-error,.gw-done{font-size:12px;line-height:1.5;margin:8px 0 0}.gw-error{color:var(--ui-danger)}.gw-done{color:var(--ui-success-text)}.gw-use-error{padding:0 32px 12px}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.code-field{display:flex;flex:1;min-width:0}.redeem-form .code-field input{width:100%}
+.credit-packages{list-style:none;margin:0;padding:0;max-height:108px;overflow:auto}
+.mac-config{min-height:430px;max-height:min(680px,80vh)}.gw-detached .mac-config{min-height:0;max-height:none}
 
-.gw-block { display: grid; gap: 10px; justify-items: start; }
-.gw-block h4 { margin: 0; font-size: 13px; font-weight: 650; }
-.gw-block-head { display: flex; align-items: center; gap: 10px; }
-.gw-redeem { display: flex; gap: 10px; width: 100%; }
-.gw-redeem .n-input { flex: 1; }
-.gw-error { margin: 0; color: var(--ui-danger); font-size: 13px; }
-.gw-done { margin: 0; color: var(--ui-success); font-size: 13px; }
-.gw-balance,.gw-redemption,.gw-actions{flex-shrink:0}
-.gw-credit-details summary{display:flex;align-items:center;justify-content:space-between;gap:6px;cursor:pointer;font-size:12px;color:var(--ui-text-secondary);list-style:none}
-.gw-credit-details{max-height:180px;overflow:auto}
-.gw-credit-details summary::-webkit-details-marker{display:none}
-.gw-credit-details[open] summary svg{transform:rotate(180deg)}
-.gw-credit-details .gw-note,.gw-credit-details .gw-buckets{margin-top:10px}
-.gw-model-section{display:flex;flex-direction:column;gap:12px;min-height:0;flex:1}
-.gw-block-head h4{display:flex;align-items:center;gap:8px;margin:0;font-size:13px;font-weight:600}
-.gw-count{font-weight:400;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
-.gw-tiers{display:flex;flex-direction:column;overflow:auto;min-height:132px;max-height:320px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface)}
-.gw-detached .gw-tiers{flex:1;max-height:none}
-.gw-tier{display:flex;align-items:center;gap:10px;flex-shrink:0;min-height:46px;width:100%;padding:10px 12px;border:0;border-bottom:1px solid var(--ui-line);background:transparent;text-align:left;color:var(--ui-text-primary);font:inherit;cursor:pointer}
-.gw-tier:last-child{border-bottom:0}
-.gw-tier:hover:not(:disabled){background:var(--ui-surface-hover)}
-.gw-tier.on,.gw-tier.on:hover{background:var(--ui-soft)}
-.gw-tier b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;font-weight:500}
-.gw-radio{display:grid;place-items:center;flex-shrink:0;width:16px;height:16px;border:1px solid var(--ui-border-strong);border-radius:50%}
-.gw-tier.on .gw-radio{border-color:var(--ui-btn);background:var(--ui-btn);color:var(--ui-text-on-btn)}
-.gw-tier-state{font-size:11px;color:var(--ui-text-secondary);white-space:nowrap}
-.gw-tier:disabled{cursor:not-allowed;color:var(--ui-text-disabled)}
-.gw-tier:focus-visible{outline:2px solid var(--ui-btn);outline-offset:-3px}
-.gw-empty{display:flex;flex:1;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px;color:var(--ui-text-secondary);font-size:13px}
-.gw-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-top:1px solid var(--ui-border);padding-top:16px}
-.gw-selection{display:grid;gap:4px;flex:1;min-width:0}
-.gw-selection>*{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gw-current{font-size:12px;color:var(--ui-text-secondary)}
-.gw-selection b{font-size:13px;font-weight:500}
-.gw-actions>.gw-error{width:100%}
-@media(max-width:420px){.gw-detached{padding:16px}.gw-total{gap:8px}.gw-total small{flex-basis:100%}.gw-buckets li{gap:8px;grid-template-columns:auto 1fr}.gw-expiry{grid-column:2;font-size:12px}}
+.mac-config{display:flex;flex-direction:column;height:100%;min-height:0;background:var(--ui-configuration-canvas);color:var(--ui-text-primary);font-family:var(--ui-font-family);font-size:13px;-webkit-font-smoothing:antialiased;container-type:inline-size}
+.mac-config *{box-sizing:border-box}
+button,input{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed;color:var(--ui-text-disabled)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--ui-btn);outline-offset:2px}
+.gateway-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;padding:6px 28px 20px}
+.credit-pane{position:relative;flex-shrink:0;margin:0 24px 24px;padding:20px;background:var(--ui-configuration-group);border-radius:14px}
+.credit-heading,.account-actions{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.section-label{font-size:12px;color:var(--ui-text-secondary)}
+.gateway-page-title{display:flex;align-items:center;gap:10px;margin:0;font-size:19px;font-weight:600;letter-spacing:-.3px;line-height:1.3}
+.gateway-page-title svg{color:var(--ui-ink)}
+.credit-label{margin:0 0 8px}.credit-balance{flex-shrink:0;min-width:140px}
+.account-name{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-text-secondary)}
+.refresh-button{display:grid;place-items:center;width:24px;height:24px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--ui-text-tertiary)}
+.refresh-button:hover{background:var(--ui-surface-hover);color:var(--ui-text-primary)}
+.credit-overview{display:flex;align-items:center;gap:24px;margin:0 0 20px}
+.credit-total{display:flex;align-items:baseline;flex-shrink:0;min-width:140px;font-size:36px;line-height:1.15;letter-spacing:-1.5px;font-weight:550;font-variant-numeric:tabular-nums}
+.credit-total .currency{font-size:26px;margin-right:3px;letter-spacing:-.6px;font-weight:400;color:var(--ui-text-secondary)}
+.credit-packages{flex:1;min-width:0;display:grid;gap:3px}
+.credit-package{display:flex;align-items:center;gap:10px;min-height:32px;padding:0;border-radius:0;background:transparent;font-size:12px}
+.package-kind{color:var(--ui-text-secondary);white-space:nowrap;font-size:11px}
+.package-money{flex:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.package-money em{font-style:normal;color:var(--ui-text-tertiary);font-size:11px}
+.credit-package time{color:var(--ui-text-tertiary);font-size:11px;white-space:nowrap}
+.redeem-form{display:flex;align-items:center;gap:5px;min-height:46px;padding:5px;background:var(--ui-configuration-canvas);border-radius:10px}
+.redeem-form input{flex:1;min-width:0;height:36px;padding:0 12px;border:0;border-radius:7px;background:var(--ui-surface);color:var(--ui-text-primary);font-size:12px;box-shadow:none}
+.redeem-form input::placeholder{color:var(--ui-text-tertiary)}
+.native-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;height:32px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-secondary);box-shadow:none;font-size:12px;font-weight:400;white-space:nowrap}
+.native-button:hover:not(:disabled){background:var(--ui-surface-hover);color:var(--ui-text-primary)}
+.native-button:active:not(:disabled){transform:translateY(.5px)}
+.native-button:disabled{background:transparent;box-shadow:none;color:var(--ui-text-disabled)}
+.credit-purchase{color:var(--ui-ink)}
+.model-pane{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 24px 0;gap:10px;background:transparent}
+.pane-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-shrink:0;padding:0 2px}
+.heading-title{display:flex;align-items:baseline;gap:9px}
+.heading-title h2{margin:0;font-size:12px;line-height:1.5;font-weight:500;color:var(--ui-text-secondary)}
+.model-count{font-size:11px;padding:0;border-radius:0;background:transparent;color:var(--ui-text-secondary);font-variant-numeric:tabular-nums}
+.model-list{position:relative;flex:1;min-height:0;overflow-y:auto;scrollbar-gutter:stable;padding:6px;background:var(--ui-configuration-group);border-radius:14px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent}
+.model-list::-webkit-scrollbar{width:4px}.model-list::-webkit-scrollbar-thumb{border-radius:5px;background:var(--ui-scrollbar)}
+.model-row{position:relative;display:flex;align-items:center;gap:8px;min-height:50px;width:100%;margin-bottom:2px;padding:0 12px;border-radius:9px;background:transparent;color:var(--ui-text-primary)}
+.model-choice{display:flex;align-items:center;gap:11px;flex:1;min-width:0;min-height:47px;padding:8px 0;border:0;background:transparent;color:inherit;text-align:left}
+.model-row:hover{background:color-mix(in srgb,var(--ui-text-primary) 2.5%,transparent)}
+.model-row.selected{background:var(--ui-soft)}
+.model-row.selected .model-name{font-weight:550}
+.model-row.selected .model-mark{color:var(--ui-ink)}
+.model-mark{display:grid;place-items:center;flex-shrink:0;width:28px;height:28px;border-radius:8px;box-shadow:none;background:transparent;font-size:12px;font-weight:500;color:var(--ui-text-secondary)}
+.model-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;letter-spacing:-.15px}
+.model-state{font-size:11px;color:var(--ui-text-tertiary);white-space:nowrap}
+.selection-mark{display:grid;place-items:center;width:16px;height:16px;flex-shrink:0;color:var(--ui-ink)}
+.model-choice:disabled .model-mark{opacity:.45}.model-choice:disabled .model-state{color:var(--ui-text-disabled)}
+.probe-button{height:26px;padding:0 7px;flex-shrink:0;font-size:11px;color:var(--ui-text-secondary)}
+.probe-status{display:flex;flex-shrink:0}.probe-status.success{color:var(--ui-success-text)}.probe-status.failure{color:var(--ui-danger)}
+.probe-spinner{animation:probe-spin 1s linear infinite}@keyframes probe-spin{to{transform:rotate(360deg)}}
+.window-actions{position:relative;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-shrink:0;min-height:72px;padding:18px 28px 20px;background:transparent}
+
+.selection-summary{display:flex;align-items:center;gap:8px;min-width:0;font-size:11px;color:var(--ui-text-tertiary)}
+.selection-summary>span{flex-shrink:0}.selection-summary b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400;font-size:12px;color:var(--ui-text-secondary)}
+.action-buttons{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.native-button.primary{height:34px;padding:0 17px;border-radius:9px;background:var(--ui-btn);color:var(--ui-text-on-btn);box-shadow:none;font-weight:500}
+.native-button.primary:hover:not(:disabled){background:var(--ui-btn-hi);color:var(--ui-text-on-btn)}
+.native-button.primary:disabled{background:var(--ui-control);color:var(--ui-text-disabled)}
+.model-empty{display:grid;place-items:center;min-height:100%;padding:30px;color:var(--ui-text-secondary);font-size:13px}
+@container(max-width:480px){.gateway-heading{padding:4px 20px 16px}.gateway-page-title{font-size:18px}.credit-pane{margin:0 16px 20px;padding:16px}.credit-overview{gap:14px;flex-wrap:wrap;margin:0 0 14px}.credit-total{min-width:0;font-size:32px}.credit-total .currency{font-size:22px}.credit-packages{flex-basis:100%;gap:0;max-height:66px}.credit-package{min-height:28px;gap:10px}.redeem-form{gap:2px}.redeem-form input{padding-inline:8px}.redeem-form .native-button{padding-inline:7px;font-size:11px}.model-pane{padding:0 16px;gap:10px}.model-row{gap:4px;padding-inline:6px}.model-choice{gap:6px}.model-mark{width:20px}.model-name{font-size:12px}.window-actions{padding:14px 20px 18px;flex-wrap:wrap;gap:10px;min-height:74px}.selection-summary{flex-basis:100%}.action-buttons{margin-left:auto}}
+@media(max-height:560px){.gateway-heading{padding-bottom:12px}.credit-pane{flex-shrink:1;min-height:100px;overflow-y:auto;margin-bottom:16px}.model-pane{min-height:90px}.window-actions{min-height:60px;padding-block:12px}}
+@media(prefers-reduced-motion:no-preference){button{transition:background-color .15s,color .15s,box-shadow .15s}}
+@media(prefers-reduced-motion:reduce){.probe-spinner{animation:none}}
+
 </style>

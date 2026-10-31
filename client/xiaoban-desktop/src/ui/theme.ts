@@ -89,3 +89,15 @@ export function themeFor(dark: boolean, id: AccentId = currentAccent.value): Glo
   } as GlobalThemeOverrides;
 }
 export const theme = themeFor(false);
+
+/** Shared by independent settings/model windows and their design preview. */
+export function configurationThemeFor(dark: boolean, id: AccentId = currentAccent.value): GlobalThemeOverrides {
+  const theme = themeFor(dark, id), t = tokensFor(dark, id);
+  return {
+    ...theme,
+    common: { ...theme.common, textColor2: t.configurationTextSecondary, textColor3: t.configurationTextTertiary, placeholderColor: t.configurationTextTertiary, cardColor: t.configurationSurface, modalColor: t.configurationSurface, inputColor: t.configurationControl },
+    Button: { ...theme.Button, border: 'none', borderHover: 'none', borderPressed: 'none', borderFocus: 'none', borderDisabled: 'none' },
+    Input: { ...theme.Input, color: t.configurationControl, colorFocus: t.configurationControl },
+    InternalSelection: { ...theme.InternalSelection, color: t.configurationControl, colorActive: t.configurationControl },
+  };
+}

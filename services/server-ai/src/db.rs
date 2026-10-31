@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS products (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE products ADD COLUMN IF NOT EXISTS credit_purchase_url TEXT NOT NULL DEFAULT '';
+
 CREATE TABLE IF NOT EXISTS product_tiers (
     product_id    TEXT NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
     tier          TEXT NOT NULL,

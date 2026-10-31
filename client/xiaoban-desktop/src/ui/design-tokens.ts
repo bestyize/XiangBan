@@ -14,6 +14,8 @@ export const lightTokens = {
   surfaceRaised: 'rgba(255,255,255,.97)', control: '#F2F2F4', controlHover: '#EAEAED',
   border: 'rgba(0,0,0,.08)', borderStrong: 'rgba(0,0,0,.13)', line: 'rgba(0,0,0,.06)',
   textPrimary: '#1D1D1F', textSecondary: '#6E6E73', textTertiary: '#8E8E93', textDisabled: '#A1A1A6', textOnBtn: '#FFFFFF',
+  windowClose: '#FF5F57', windowMinimize: '#FEBC2E', windowExpand: '#28C840', windowSymbol: '#3B301F',
+  configurationCanvas: '#F6F7F8', configurationSurface: '#FFFFFF', configurationSidebar: '#F5F5F7', configurationGroup: '#FFFFFF', configurationControl: '#F0F1F3', configurationTextSecondary: '#66666E', configurationTextTertiary: '#686871',
   // Status colours. `accent` is the old name of the "running / ok" green and stays green.
   accent: '#34A36D', success: '#34A36D', successText: '#23784F', warning: '#E09A2B', warningText: '#9A5410', danger: '#D93A44', error: '#D93A44',
   bgSecondary: '#F2F2F4',
@@ -41,6 +43,7 @@ export const darkTokens: UiTokens = {
   border: 'rgba(255,255,255,.10)', borderStrong: 'rgba(255,255,255,.16)', line: 'rgba(255,255,255,.07)',
   textPrimary: '#F5F5F7', textSecondary: '#A1A1A6', textTertiary: '#7C7C82', textDisabled: '#5E5E63',
   accent: '#3FB87A', success: '#3FB87A', successText: '#6FD6A0', warning: '#F0A93A', warningText: '#F0B65A', danger: '#E5484D', error: '#E5484D',
+  configurationCanvas: '#202126', configurationSurface: '#292B31', configurationSidebar: '#1D1E23', configurationGroup: '#2E3036', configurationControl: '#3A3C44', configurationTextSecondary: '#C0C1CB', configurationTextTertiary: '#ADB0BC',
   bgSecondary: '#2C2C2E',
   scrollbar: 'rgba(255,255,255,.2)', shadowHover: 'rgba(0,0,0,.5)', shadowPop: 'rgba(0,0,0,.6)',
   shadowPanel: '0 0 0 1px rgba(255,255,255,.06),0 4px 16px rgba(0,0,0,.3)',
@@ -61,6 +64,8 @@ export function tokensFor(dark = false, id: AccentId = currentAccent.value): UiT
     btn: p.btn, btnHi: p.btnHi, soft: p.soft, ink: p.ink, tint: p.tint, dot: p.dot,
     primary: p.btn, primaryHover: p.btnHi, primaryPressed: p.ink, primarySoft: p.soft, primaryText: p.ink,
     appBg: p.tint, sidebarBg: p.tint,
+    // Keep configuration canvases close to white while following the selected accent.
+    configurationCanvas: dark ? base.configurationCanvas : `#${[1, 3, 5].map(start => Math.round(parseInt(p.tint.slice(start, start + 2), 16) * .4 + 250 * .6).toString(16).padStart(2, '0')).join('')}`,
   };
 }
 /** @deprecated read CSS variables instead; kept for older imports. */

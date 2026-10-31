@@ -15,6 +15,9 @@ struct Pending { label: String, request: Request, taken: bool, sender: mpsc::Sen
 pub struct ConfigurationState { pending: Mutex<HashMap<String, Pending>> }
 static SEQUENCE: AtomicU64 = AtomicU64::new(1);
 static OPEN_LOCK: Mutex<()> = Mutex::new(());
+pub fn is_gateway(label: &str) -> bool {
+    label == &format!("configuration-model-{:x}", Sha256::digest(crate::ai_gateway::GATEWAY_ID.as_bytes()))[..44]
+}
 #[derive(Clone, Default, Serialize, Deserialize)]
 struct Placement { x: i32, y: i32, width: u32, height: u32 }
 fn placement_path(app: &tauri::AppHandle, role: &str) -> Option<std::path::PathBuf> {
@@ -27,7 +30,7 @@ fn keep_visible(window: &tauri::WebviewWindow, fallback: Option<tauri::Monitor>)
         let area = monitor.work_area(); let scale = monitor.scale_factor();
         let width = (area.size.width as f64 / scale - 32.).max(1.);
         let height = (area.size.height as f64 / scale - 64.).max(1.);
-        let minimum = if kind(window.label()) == Some("settings") { 560f64 } else { 400f64 };
+        let minimum = if kind(window.label()) == Some("settings") { 560f64 } else if is_gateway(window.label()) { 360f64 } else { 640f64 };
         window.set_min_size(Some(tauri::LogicalSize::new(minimum.min(width), 360f64.min(height)))).map_err(|e|e.to_string())?;
     }
     crate::design_window::keep_visible(window, fallback)
@@ -37,7 +40,7 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
         return Some(match command {
             "configuration_window_open" => label == "control" || kind(label) == Some("settings"),
             "configuration_window_take" | "configuration_window_reply" => label == "control",
-            "configuration_window_invoke" | "configuration_window_close" | "configuration_window_login" => kind(label).is_some(),
+            "configuration_window_invoke" | "configuration_window_close" | "configuration_window_login" | "configuration_window_action" | "configuration_window_resize" => kind(label).is_some(),
             _ => false,
         });
     }
@@ -60,17 +63,19 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
         existing.show().map_err(|e| e.to_string())?;
         return existing.set_focus().map_err(|e| e.to_string());
     }
-    let path = placement_path(&app, &target);
+    let gateway = target == "model" && provider == crate::ai_gateway::GATEWAY_ID;
+    // Gateway sizing is independent from the wider third-party provider editor.
+    let path = placement_path(&app, if gateway { "gateway" } else { &target });
     let placement = path.as_ref().and_then(|p| std::fs::read(p).ok()).and_then(|b| serde_json::from_slice::<Placement>(&b).ok()).unwrap_or_default();
     let query = url::form_urlencoded::Serializer::new(String::new()).append_pair("scene", "configuration").append_pair("kind", &target).append_pair("tab", tab.as_deref().unwrap_or("general")).append_pair("provider", &provider).finish();
     let appearance = crate::settings(&app).appearance;
     let theme = match appearance.as_str() { "dark" => Some(tauri::Theme::Dark), "light" => Some(tauri::Theme::Light), _ => None };
-    let (width, height, min_width) = if target == "settings" { (940f64, 700f64, 560f64) } else { (640., 820., 400.) };
+    let (width, height, min_width) = if target == "settings" { (940f64, 700f64, 560f64) } else if gateway { (360., 620., 360.) } else { (900., 720., 640.) };
     let (max_w, max_h) = monitor.as_ref().map(|m| { let a=m.work_area(); let s=m.scale_factor(); ((a.size.width as f64/s-32.).max(1.), (a.size.height as f64/s-64.).max(1.)) }).unwrap_or((width, height));
     let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(format!("index.html?{query}").into()))
         .title(if target == "settings" { "设置 · 小伴桌面" } else { "模型配置 · 小伴桌面" })
         .inner_size(width.min(max_w), height.min(max_h)).min_inner_size(min_width.min(max_w), 360f64.min(max_h))
-        .resizable(true).decorations(true).theme(theme).visible(false);
+        .resizable(true).decorations(false).transparent(true).shadow(true).theme(theme).visible(false);
     // Restore only onto a currently connected display, then fit the full native frame inside its work area.
     let restore = app.available_monitors().map_err(|e| e.to_string())?.into_iter().find(|m| { let a=m.work_area(); placement.width>0 && placement.height>0 && i64::from(placement.x)+i64::from(placement.width)>i64::from(a.position.x) && i64::from(placement.y)+i64::from(placement.height)>i64::from(a.position.y) && i64::from(placement.x)<i64::from(a.position.x)+i64::from(a.size.width) && i64::from(placement.y)<i64::from(a.position.y)+i64::from(a.size.height) });
     if let Some(m) = restore {
@@ -82,12 +87,18 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
     } else { builder=builder.center(); }
     let child=builder.build().map_err(|e|e.to_string())?;
     #[cfg(target_os="macos")] let _=crate::macos::apply_control_appearance(&child,&appearance);
+    // Configuration pages paint their own rounded, opaque canvas. A native
+    // backdrop extends behind the WebView's clipped corners and leaves square
+    // patches around the frameless window, so keep the host transparent.
     keep_visible(&child,monitor)?;
     let own=child.clone();
     child.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Resized(_) | tauri::WindowEvent::Focused(_)) {
+            if let Ok(state) = frame_state(&own) { let _ = own.emit("configuration-window-state", state); }
+        }
         if matches!(event,tauri::WindowEvent::CloseRequested{..}) {
             if let (Some(path),Ok(p),Ok(s))=(&path,own.outer_position(),own.inner_size()) {
-                if !own.is_maximized().unwrap_or(false) && !own.is_minimized().unwrap_or(false) {
+                if !own.is_maximized().unwrap_or(false) && !own.is_minimized().unwrap_or(false) && !own.is_fullscreen().unwrap_or(false) {
                     let state=Placement{x:p.x,y:p.y,width:s.width,height:s.height};
                     let _=crate::library::save_json(path,&state);
                 }
@@ -104,6 +115,49 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
 pub fn configuration_window_close(window: tauri::WebviewWindow) -> Result<(), String> {
     if kind(window.label()).is_none() { return Err("只能关闭当前配置窗口".into()); }
     window.close().map_err(|e|e.to_string())
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FrameState { maximized: bool, fullscreen: bool, focused: bool }
+fn frame_state(window: &tauri::WebviewWindow) -> Result<FrameState, String> {
+    Ok(FrameState { maximized: window.is_maximized().map_err(|e| e.to_string())?, fullscreen: window.is_fullscreen().map_err(|e| e.to_string())?, focused: window.is_focused().map_err(|e| e.to_string())? })
+}
+#[tauri::command]
+pub fn configuration_window_action(window: tauri::WebviewWindow, action: String) -> Result<FrameState, String> {
+    if kind(window.label()).is_none() { return Err("只能操作当前配置窗口".into()); }
+    match action.as_str() {
+        "state" => {},
+        "drag" => window.start_dragging().map_err(|e| e.to_string())?,
+        "minimize" => window.minimize().map_err(|e| e.to_string())?,
+        "fullscreen" => window.set_fullscreen(!window.is_fullscreen().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?,
+        "double-click" => {
+            #[cfg(target_os="macos")]
+            crate::macos::configuration_title_double_click(&window)?;
+            #[cfg(not(target_os="macos"))]
+            if window.is_maximized().map_err(|e| e.to_string())? { window.unmaximize() } else { window.maximize() }.map_err(|e| e.to_string())?;
+        },
+        "maximize" => { if window.is_maximized().map_err(|e| e.to_string())? { window.unmaximize() } else { window.maximize() }.map_err(|e| e.to_string())?; },
+        _ => return Err("未知窗口操作".into()),
+    }
+    frame_state(&window)
+}
+#[tauri::command]
+pub fn configuration_window_resize(window: tauri::Window, direction: String) -> Result<(), String> {
+    if kind(window.label()).is_none() { return Err("只能调整当前配置窗口".into()); }
+    if window.is_fullscreen().map_err(|e| e.to_string())? || window.is_maximized().map_err(|e| e.to_string())? { return Ok(()); }
+    let _edge = match direction.as_str() {
+        "n" => "North", "s" => "South", "e" => "East", "w" => "West",
+        "ne" => "NorthEast", "nw" => "NorthWest", "se" => "SouthEast", "sw" => "SouthWest",
+        _ => return Err("窗口缩放方向无效".into()),
+    };
+    #[cfg(target_os="macos")]
+    {
+        let view = window.app_handle().get_webview_window(window.label()).ok_or("窗口已关闭")?;
+        return crate::macos::configuration_resize(view, direction);
+    }
+    #[cfg(not(target_os="macos"))]
+    window.start_resize_dragging(serde_json::from_value(json!(_edge)).map_err(|e| e.to_string())?).map_err(|e| e.to_string())
 }
 #[tauri::command]
 pub fn configuration_window_login(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {

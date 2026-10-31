@@ -28,7 +28,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 export type TierInput = Omit<Tier, 'product_id' | 'tier'>;
 export type MediaInput = Pick<MediaSetting, 'model' | 'enabled' | 'requires_paid' | 'voices' | 'sizes' | 'max_secs'>;
-export type ProductInput = Pick<Product, 'name' | 'client_ids' | 'trial_quota' | 'trial_days' | 'enabled'>;
+export type ProductInput = Pick<Product, 'name' | 'client_ids' | 'trial_quota' | 'trial_days' | 'enabled' | 'credit_purchase_url'>;
 
 export const api = {
   login: (username: string, password: string) =>

@@ -66,6 +66,7 @@ pub async fn balance(State(state): State<AppState>, auth: AuthUser) -> Result<Js
     let product = &auth.product;
     let mut body = json!({
         "product": { "product_id": product.product_id, "name": product.name },
+        "credit_purchase_url": product.credit_purchase_url,
         "quota_per_unit": state.config.quota_per_unit,
         "total": 0,
         "paid": 0,

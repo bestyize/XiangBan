@@ -473,7 +473,67 @@ pub fn apply_control_appearance(window: &tauri::WebviewWindow, appearance: &str)
                 ns.setBackgroundColor(Some(&bg));
             }
         }
+        if crate::configuration_window::kind(window.label()).is_some() {
+            ns.setOpaque(false);
+            ns.setBackgroundColor(Some(&NSColor::clearColor()));
+            ns.setExcludedFromWindowsMenu(false);
+            NSApplication::sharedApplication(_mtm).addWindowsItem_title_filename(&ns, &ns.title(), false);
+        }
         Ok(())
     })
 }
 
+
+/// Honor the user's macOS titlebar double-click preference even with drawn chrome.
+pub fn configuration_title_double_click(window: &tauri::WebviewWindow) -> Result<(), String> {
+    let action = on_main(window.app_handle(), move |_| {
+        use objc2_foundation::{ns_string, NSUserDefaults};
+        Ok(NSUserDefaults::standardUserDefaults().stringForKey(ns_string!("AppleActionOnDoubleClick")).map(|v| v.to_string()))
+    })?;
+    match action.as_deref() {
+        Some("None") => Ok(()),
+        Some("Minimize") => window.minimize().map_err(|e| e.to_string()),
+        _ => if window.is_maximized().map_err(|e| e.to_string())? { window.unmaximize() } else { window.maximize() }.map_err(|e| e.to_string()),
+    }
+}
+
+/// Tao has no macOS start_resize_dragging implementation. Track only the pressed left
+/// button during this explicit edge gesture; all AppKit reads/writes stay on the main thread.
+pub fn configuration_resize(window: tauri::WebviewWindow, direction: String) -> Result<(), String> {
+    use objc2_foundation::{NSPoint, NSRect, NSSize};
+    let initial = window.clone();
+    let (frame, mouse, minimum, area) = on_main(window.app_handle(), move |_| {
+        let ns = native(&initial)?;
+        let area = ns.screen().map(|s| s.visibleFrame()).unwrap_or_else(|| ns.frame());
+        Ok((ns.frame(), NSEvent::mouseLocation(), ns.minSize(), area))
+    })?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let start = std::time::Instant::now();
+        while start.elapsed() < Duration::from_secs(120) {
+            let own = window.clone();
+            let direction = direction.clone();
+            let result = on_main(window.app_handle(), move |_| {
+                if NSEvent::pressedMouseButtons() & 1 == 0 { return Ok(false); }
+                let ns = native(&own)?;
+                let point = NSEvent::mouseLocation();
+                let (dx, dy) = (point.x - mouse.x, point.y - mouse.y);
+                let (mut x, mut y, mut w, mut h) = (frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
+                if direction.contains('e') { w += dx; }
+                if direction.contains('w') { w -= dx; }
+                if direction.contains('n') { h += dy; }
+                if direction.contains('s') { h -= dy; }
+                w = w.clamp(minimum.width.min(area.size.width), area.size.width);
+                h = h.clamp(minimum.height.min(area.size.height), area.size.height);
+                if direction.contains('w') { x += frame.size.width - w; }
+                if direction.contains('s') { y += frame.size.height - h; }
+                x = x.clamp(area.origin.x, area.origin.x + area.size.width - w);
+                y = y.clamp(area.origin.y, area.origin.y + area.size.height - h);
+                ns.setFrame_display(NSRect::new(NSPoint::new(x, y), NSSize::new(w, h)), true);
+                Ok(true)
+            });
+            if !matches!(result, Ok(true)) { break; }
+            std::thread::sleep(Duration::from_millis(16));
+        }
+    });
+    Ok(())
+}

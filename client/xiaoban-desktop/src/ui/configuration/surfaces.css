@@ -1,0 +1,48 @@
+/* Configuration controls: quiet text actions, flat primary actions, no grey keylines. */
+.xb-settings .xb-btn,.xb-provider .xb-btn{border:0;background:transparent;box-shadow:none;color:var(--ui-text-secondary);font-weight:400}
+.xb-settings .xb-btn:hover:not(:disabled),.xb-provider .xb-btn:hover:not(:disabled){background:var(--ui-surface-hover);color:var(--ui-text-primary)}
+.xb-settings .xb-btn-primary,.xb-provider .xb-btn-primary{border:0;background:var(--ui-btn);box-shadow:none;color:var(--ui-text-on-btn)}
+.xb-settings .xb-btn-primary:hover:not(:disabled),.xb-provider .xb-btn-primary:hover:not(:disabled){background:var(--ui-btn-hi);filter:none}
+.xb-settings .xb-btn:disabled,.xb-provider .xb-btn:disabled{background:transparent;color:var(--ui-text-disabled);cursor:not-allowed}
+.xb-settings .xb-btn-primary:disabled,.xb-provider .xb-btn-primary:disabled{background:var(--ui-control);color:var(--ui-text-disabled);box-shadow:none}
+.xb-settings .xb-btn.is-danger,.xb-provider .xb-btn.is-danger{color:var(--ui-danger)}
+.xb-settings .n-button .n-button__border,.xb-settings .n-button .n-button__state-border,.xb-provider .n-button .n-button__border,.xb-provider .n-button .n-button__state-border{border:0;box-shadow:none}
+.xb-settings button:focus-visible,.xb-provider button:focus-visible{outline:2px solid var(--ui-btn);outline-offset:2px}
+.xb-settings .xb-settings-account{box-shadow:none;background:var(--ui-control)}
+.xb-settings .xb-group{box-shadow:none;background:var(--ui-surface-sunken)}
+.xb-settings .gateway-card{background:var(--ui-surface-sunken)}
+.xb-provider .n-input{background:var(--ui-surface);border-radius:8px}
+.xb-provider .n-input:focus-within{outline:2px solid var(--ui-soft);outline-offset:1px}
+.xb-provider .provider-main .n-input{background:var(--ui-control)}
+.xb-provider .n-base-selection .n-base-selection__border,.xb-provider .n-base-selection .n-base-selection__state-border{border:0;box-shadow:none}
+.xb-provider .n-base-selection{background:var(--ui-control);border-radius:8px}
+
+/* Configuration surfaces remain legible independently of desktop wallpaper or accent. */
+.xb-settings,.xb-provider,.gw-detached,.mac-config{
+  --ui-surface:var(--ui-configuration-surface);
+  --ui-control:var(--ui-configuration-control);
+  --ui-text-secondary:var(--ui-configuration-text-secondary);
+  --ui-text-tertiary:var(--ui-configuration-text-tertiary);
+}
+.xb-settings .xb-group{background:var(--ui-configuration-group);border-radius:12px;overflow:hidden}
+.xb-settings .xb-group-title{margin:24px 2px 10px;font-size:12px;font-weight:500;color:var(--ui-text-secondary)}
+.xb-settings .xb-group-title:first-child{margin-top:0}
+.xb-settings .xb-row{padding:17px 18px;min-height:58px;gap:12px}
+.xb-settings .xb-row-text>b{font-size:13px;font-weight:500}
+.xb-settings .xb-row-text>span{color:var(--ui-text-secondary);line-height:1.65}
+.xb-settings .gateway-card.gateway-card{background:var(--ui-configuration-group)}
+.xb-settings .gateway-card .gw-row{padding:22px 20px;flex-wrap:wrap}
+.xb-settings .gateway-card .gw-logo{background:var(--ui-soft);color:var(--ui-ink);box-shadow:none}
+.xb-settings .provider-row.is-active{background:var(--ui-soft)}
+.xb-settings .n-base-selection .n-base-selection__border,.xb-settings .n-base-selection .n-base-selection__state-border{border:0;box-shadow:none}
+.xb-settings .n-input .n-input__border,.xb-settings .n-input .n-input__state-border{border:0;box-shadow:none}
+.xb-settings .n-input,.xb-settings .n-base-selection{background:var(--ui-control);border-radius:8px}
+.xb-settings .n-input:focus-within,.xb-settings .n-base-selection:focus-within{outline:2px solid var(--ui-btn);outline-offset:2px}
+.xb-settings .list-title{flex-wrap:wrap}
+.xb-settings .settings-appearance .mode-group{display:flex;gap:18px;padding:20px;flex-wrap:wrap}
+.xb-settings .settings-appearance .mode-card{flex:1;min-width:80px}
+.xb-settings .settings-appearance .mode-preview{width:100%;max-width:150px;height:88px;box-sizing:border-box;box-shadow:none}
+.xb-settings .settings-appearance .swatch-row{gap:24px;padding:22px;flex-wrap:wrap}
+@media(max-width:760px){.xb-settings .xb-row{padding:14px 12px;flex-wrap:wrap}.xb-settings .xb-row-text{min-width:100px}.xb-settings .gateway-card .gw-row{padding:18px 14px}}
+
+html[data-theme=dark] .xb-settings button:disabled,html[data-theme=dark] .xb-provider button:disabled,html[data-theme=dark] .gw-detached button:disabled{opacity:.7}

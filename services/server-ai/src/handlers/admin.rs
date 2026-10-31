@@ -219,6 +219,8 @@ pub async fn list_products(State(state): State<AppState>, _admin: AuthAdmin) -> 
 #[derive(Deserialize)]
 pub struct ProductReq {
     name: String,
+    #[serde(default)]
+    credit_purchase_url: Option<String>,
     client_ids: Vec<String>,
     trial_quota: i64,
     trial_days: i32,
@@ -235,6 +237,10 @@ pub async fn upsert_product(
         return Err(AppError::BadRequest("产品标识需为小写字母开头，由小写字母、数字、连字符或下划线组成，最长 40 位".into()));
     }
     let name = req.name.trim().to_string();
+    let credit_purchase_url = req.credit_purchase_url.as_deref().map(str::trim);
+    if credit_purchase_url.is_some_and(|url| !products::valid_credit_purchase_url(url)) {
+        return Err(AppError::BadRequest("额度获取链接需为 http(s) 网址，不能包含账号密码；留空可关闭入口".into()));
+    }
     if name.is_empty() || name.chars().count() > 40 {
         return Err(AppError::BadRequest("产品名称需为 1-40 个字符".into()));
     }
@@ -259,8 +265,8 @@ pub async fn upsert_product(
     }
 
     sqlx::query(
-        "INSERT INTO products (product_id, name, client_ids, trial_quota, trial_days, enabled) VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (product_id) DO UPDATE SET name = $2, client_ids = $3, trial_quota = $4, trial_days = $5, enabled = $6, updated_at = now()",
+        "INSERT INTO products (product_id, name, client_ids, trial_quota, trial_days, enabled, credit_purchase_url) VALUES ($1, $2, $3, $4, $5, $6, COALESCE($7, ''))
+         ON CONFLICT (product_id) DO UPDATE SET name = $2, client_ids = $3, trial_quota = $4, trial_days = $5, enabled = $6, credit_purchase_url = COALESCE($7, products.credit_purchase_url), updated_at = now()",
     )
     .bind(&product_id)
     .bind(&name)
@@ -268,6 +274,7 @@ pub async fn upsert_product(
     .bind(req.trial_quota)
     .bind(req.trial_days)
     .bind(req.enabled)
+    .bind(credit_purchase_url)
     .execute(&state.pool)
     .await?;
     audit(
