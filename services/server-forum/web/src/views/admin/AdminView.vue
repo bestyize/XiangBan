@@ -25,6 +25,8 @@ import AuditPanel from './AuditPanel.vue'
 import AccountPanel from './AccountPanel.vue'
 import { openReports, toasts } from './shared'
 import './admin.css'
+import { useTheme, THEME_LABEL } from '@/lib/theme'
+const { preference, cycleTheme } = useTheme()
 
 const SECTIONS = [
   { key: '', label: '概览', comp: OverviewPanel },
@@ -47,6 +49,17 @@ const SECTIONS = [
   { key: 'account', label: '账号', comp: AccountPanel },
 ] as const
 
+const GROUPS = [
+  { label: '工作台', keys: ['', 'metrics'] },
+  { label: '内容运营', keys: ['discover', 'collection', 'community-editorial', 'packs', 'projects', 'weekly', 'editor', 'editor-accounts'] },
+  { label: '社区治理', keys: ['reports', 'moderation', 'topics', 'users', 'categories', 'words'] },
+  { label: '系统', keys: ['audit', 'account'] },
+].map(group => ({...group, sections: group.keys.map(key => SECTIONS.find(section => section.key === key)!)}))
+const DESCRIPTIONS: Record<string,string> = {
+  collection: '管理官方数据源，检查采集记录与待审内容', discover: '编排社区栏目，保存草稿并审核发布',
+  'community-editorial': '选择首页作品，发起挑战并管理投稿', packs: '审核作品、版本和资源来源',
+  projects: '维护项目介绍与讨论入口', weekly: '组织本期内容，发布社区周刊',
+}
 const route = useRoute()
 
 const current = computed(() => {
@@ -90,15 +103,18 @@ function to(key: string) {
         <span>超级小伴 <small>管理后台</small></span>
       </div>
       <nav class="adm-nav" aria-label="后台导航">
-        <RouterLink v-for="s in SECTIONS" :key="s.key" :to="to(s.key)" :class="{ 'is-active': s.key === current.key }">
-          {{ s.label }}
-          <span v-if="s.key === 'reports' && openReports > 0" class="adm-badge">{{ openReports }}</span>
-        </RouterLink>
+        <div v-for="group in GROUPS" :key="group.label" class="adm-nav-group">
+          <span class="adm-nav-label">{{ group.label }}</span>
+          <RouterLink v-for="s in group.sections" :key="s.key" :to="to(s.key)" :class="{ 'is-active': s.key === current.key }" :aria-current="s.key === current.key ? 'page' : undefined">
+            {{ s.label }}<span v-if="s.key === 'reports' && openReports > 0" class="adm-badge">{{ openReports }}</span>
+          </RouterLink>
+        </div>
       </nav>
       <div class="adm-side-foot">
         <span class="adm-who">登录为 <b>{{ adminAuth.username || '管理员' }}</b></span>
         <div class="adm-side-links">
           <RouterLink class="btn btn-ghost btn-sm" to="/">打开论坛</RouterLink>
+          <button class="btn btn-ghost btn-sm" type="button" aria-label="切换后台主题" @click="cycleTheme">{{ THEME_LABEL[preference] }}外观</button>
           <button class="btn btn-ghost btn-sm" @click="logout">退出登录</button>
         </div>
       </div>
@@ -106,9 +122,9 @@ function to(key: string) {
 
     <main class="adm-main">
       <div class="adm-head">
-        <h1>{{ current.label }}</h1>
+        <div><p class="adm-breadcrumb">超级小伴 <span>/</span> 管理后台</p><h1>{{ current.label }}</h1><p v-if="DESCRIPTIONS[current.key]" class="adm-page-description">{{ DESCRIPTIONS[current.key] }}</p></div>
       </div>
-      <component :is="current.comp" :key="current.key" />
+      <div class="adm-content"><component :is="current.comp" :key="current.key" /></div>
     </main>
 
     <div class="adm-toasts" aria-live="polite">

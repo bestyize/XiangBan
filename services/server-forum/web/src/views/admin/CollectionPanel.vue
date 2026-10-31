@@ -12,6 +12,9 @@ const busy = reactive<Record<string, string>>({})
 const actionErrors = reactive<Record<string, string>>({})
 const accepted = reactive<Record<string, string>>({})
 const filter = ref('')
+const selectedSource = ref('')
+const displayedSources = computed(() => sources.value.filter(s => s.id === (selectedSource.value || sources.value[0]?.id)))
+const readyCount = computed(() => sources.value.filter(ready).length)
 const runs = ref<CollectionRun[]>([])
 const page = ref(1)
 const pageSize = ref(30)
@@ -60,6 +63,14 @@ const itemId = (kind: string, key: string) => JSON.stringify([kind, key])
 const canReview = computed(() => !!batch.value && batch.value.status === 'succeeded' && !batch.value.reviewed_at && batch.value.items.length > 0 && batch.value.items.every(i => !i.conflict && i.draft !== null && ['draft', 'published'].includes(i.draft.status)))
 const allRead = computed(() => !!batch.value?.items.length && batch.value.items.every(i => read.value.includes(itemId(i.kind, i.key))))
 
+function selectNext(event: KeyboardEvent, id: string) {
+  if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return
+  event.preventDefault()
+  const index = sources.value.findIndex(source => source.id === id)
+  const next = event.key === 'Home' ? 0 : event.key === 'End' ? sources.value.length-1 : (index+(event.key === 'ArrowRight' ? 1 : -1)+sources.value.length)%sources.value.length
+  const source = sources.value[next]
+  if (source) { selectedSource.value=source.id; document.getElementById(`source-tab-${source.id}`)?.focus() }
+}
 function clearPreview() {
   ++previewSeq
   previewRun.value = ''
@@ -77,9 +88,18 @@ async function loadSources() {
   try {
     const result = await collectionApi.sources()
     if (disposed || mine !== sourceSeq) return
+    const previous = sources.value
     sources.value = result.items
     for (const s of result.items) {
-      if (!forms[s.id]) forms[s.id] = { key: '', enabled: s.enabled, interval: s.interval_minutes, repositories: (s.config?.repositories ?? []).join('\n'), feedIds: [...(s.config?.feed_ids ?? [])] }
+      const old = previous.find(item => item.id === s.id)
+      const form = forms[s.id]
+      if (form && old) {
+        if (form.enabled === old.enabled) form.enabled = s.enabled
+        if (form.interval === old.interval_minutes) form.interval = s.interval_minutes
+        if (form.repositories === (old.config?.repositories ?? []).join("\n")) form.repositories = (s.config?.repositories ?? []).join("\n")
+        if (JSON.stringify([...form.feedIds].sort()) === JSON.stringify([...(old.config?.feed_ids ?? [])].sort())) form.feedIds = [...(s.config?.feed_ids ?? [])]
+      }
+      if (!form) forms[s.id] = { key: '', enabled: s.enabled, interval: s.interval_minutes, repositories: (s.config?.repositories ?? []).join('\n'), feedIds: [...(s.config?.feed_ids ?? [])] }
     }
   } catch (e) {
     if (!disposed && mine === sourceSeq && !isAuthError(e)) sourceError.value = errorText(e)
@@ -166,7 +186,9 @@ async function configure(s: CollectionSource) {
   }
   if (form.enabled && !ready(s)) { actionErrors[s.id] = readinessHint(s); return }
   await mutate(s.id, 'config', async () => {
-    await collectionApi.configure(s.id, { enabled: form.enabled, interval_minutes: form.interval })
+    const changes = { ...(form.enabled !== s.enabled ? { enabled: form.enabled } : {}), ...(form.interval !== s.interval_minutes ? { interval_minutes: form.interval } : {}) }
+    if (!Object.keys(changes).length) { notify("当前采集设置已保存"); return }
+    await collectionApi.configure(s.id, changes)
     notify('采集设置已保存')
     await loadSources()
   })
@@ -265,20 +287,28 @@ onUnmounted(() => {
 
 <template>
   <div class="collection-panel">
-    <div class="adm-toolbar">
-      <button class="btn" :disabled="sourceLoading || runLoading || approving" @click="refresh">刷新状态</button>
-      <RouterLink class="btn" to="/admin/discover">发现页编辑与审核</RouterLink>
+    <div class="collection-intro">
+      <div><p class="adm-eyebrow">数据来源与审核</p><h2>让社区内容持续更新</h2><p class="muted">配置来源、采集到草稿，核对后整批发布。每一步都有记录。</p></div>
+      <div class="adm-actions"><button class="btn" :disabled="sourceLoading || runLoading || approving" @click="refresh">刷新状态</button>
+      <RouterLink class="btn" to="/admin/discover">发现页编辑与审核</RouterLink></div>
     </div>
-    <p class="muted">采集只生成待审草稿，不会自动发布。请预览本次完整批次，人工终审后再发布；失败会保留上一版线上内容。</p>
+    <div class="collection-summary"><div><span>可用来源</span><strong>{{ readyCount }}<small> / {{ sources.length }}</small></strong></div><div><span>自动采集</span><strong>{{ sources.filter(s => s.enabled).length }}<small> 个来源</small></strong></div><div><span>发布方式</span><strong class="collection-summary-text">人工终审</strong></div></div>
+    <p class="adm-callout">采集只生成待审草稿。单个来源失败会保留上一版线上内容。</p>
     <div v-if="sourceError" class="collection-error" role="alert">来源配置读取失败：{{ sourceError }} <button class="btn btn-sm" :disabled="sourceLoading" @click="loadSources">重试</button></div>
     <p v-if="sourceLoading && !sources.length" role="status">正在读取采集来源…</p>
     <p v-else-if="!sources.length && !sourceError" class="muted">暂无可用采集来源。</p>
+    <div class="collection-source-tabs" role="tablist" aria-label="采集来源">
+      <button v-for="s in sources" :id="`source-tab-${s.id}`" :key="s.id" type="button" role="tab" :aria-selected="s.id === (selectedSource || sources[0]?.id)" :aria-controls="`source-panel-${s.id}`" :tabindex="s.id === (selectedSource || sources[0]?.id) ? 0 : -1" @keydown="selectNext($event,s.id)" :class="{active:s.id === (selectedSource || sources[0]?.id)}" @click="selectedSource=s.id">
+        <span>{{ sourceName(s.id) }}</span><small><i :class="{ready:ready(s)}" />{{ active(s.id) ? '正在采集' : ready(s) ? s.enabled ? '自动采集已开启' : '可手动采集' : '待配置' }}</small>
+      </button>
+    </div>
     <div class="collection-sources" :aria-busy="sourceLoading">
-      <section v-for="s in sources" :key="s.id" class="panel adm-card collection-source">
+      <section v-for="s in displayedSources" :id="`source-panel-${s.id}`" role="tabpanel" :aria-labelledby="`source-tab-${s.id}`" :key="s.id" class="panel adm-card collection-source">
         <div class="collection-heading">
           <h2>{{ sourceName(s.id) }}</h2>
           <span class="adm-tag" :class="!needsCredential(s) || s.configured ? 'valid' : 'suspect'">{{ !needsCredential(s) ? '公开来源 · 无需密钥' : s.configured ? '密钥已配置' : '未配置密钥' }}</span>
         </div>
+        <div class="collection-source-layout"><div class="collection-editor">
         <p v-if="s.id === 'openrouter'" class="muted">全平台每日输入 + 输出 Token 用量榜，仅代表 OpenRouter 平台流量，数值不是请求次数。</p>
         <p v-else-if="s.id === 'artificial_analysis'" class="muted">采集模型能力、价格等官方指标；缺失指标保留为空，不以零代替。</p>
         <p v-if="s.hint" class="muted">{{ s.hint }}</p>
@@ -299,6 +329,7 @@ onUnmounted(() => {
           <button class="btn" type="submit" :disabled="!!busy[s.id] || approving">{{ busy[s.id] === 'source-config' ? '保存中…' : '保存日报来源' }}</button>
           <p class="collection-saved muted">已保存来源：{{ savedFeeds(s) }}</p>
         </form>
+        </div><aside class="collection-schedule"><p class="adm-eyebrow">执行计划</p>
         <form class="collection-config" @submit.prevent="configure(s)">
           <label class="collection-check"><input v-model="forms[s.id].enabled" type="checkbox" :disabled="!!busy[s.id] || approving" /> 启用自动采集</label>
           <label class="field"><span>周期（分钟）</span><input v-model.number="forms[s.id].interval" class="input" type="number" min="60" max="10080" step="1" required :disabled="!!busy[s.id] || approving" :aria-label="`${sourceName(s.id)}采集周期`" /></label>
@@ -313,6 +344,7 @@ onUnmounted(() => {
         <p v-if="actionErrors[s.id]" class="collection-error" role="alert">{{ actionErrors[s.id] }}</p>
         <button class="btn btn-primary" :disabled="!!busy[s.id] || approving || !ready(s) || active(s.id)" @click="run(s)">{{ active(s.id) || busy[s.id] === 'run' ? '任务已受理 / 执行中' : '立即采集到待审' }}</button>
         <small v-if="!ready(s)" class="muted"> {{ readinessHint(s) }}</small>
+        </aside></div>
       </section>
     </div>
 
@@ -325,7 +357,7 @@ onUnmounted(() => {
       <p v-else-if="!runs.length && !runError" class="muted">暂无运行记录，配置来源后可手动执行一次。</p>
       <div v-if="runs.length" class="collection-table" :aria-busy="runLoading">
         <table class="adm-table"><thead><tr><th>来源 / 任务</th><th>状态</th><th>开始 / 结束</th><th>条目</th><th>结果与审核</th></tr></thead><tbody>
-          <tr v-for="r in runs" :key="r.id"><td>{{ sourceName(r.source) }}<small class="collection-run-id">{{ r.id }}</small></td><td><span class="adm-tag" :class="r.status === 'failed' ? 'danger' : r.status === 'succeeded' ? 'valid' : 'suspect'">{{ STATUS[r.status] || r.status }}</span></td><td>{{ fmtTime(r.started_at) }}<br /><span class="muted">{{ fmtTime(r.finished_at) }}</span></td><td>{{ r.item_count }}</td><td><p v-if="r.error" class="collection-error">{{ r.error }}</p><button v-if="r.status === 'succeeded' && r.item_count > 0" class="btn btn-sm" :disabled="previewLoading || approving" @click="preview(r.id)">预览本次草稿</button><span v-else-if="r.status === 'succeeded'" class="muted">{{ r.source === 'github_repos' ? '已记录基线，正在积累每日快照；本次没有新增待审内容' : '没有新增待审内容' }}</span></td></tr>
+          <tr v-for="r in runs" :key="r.id"><td data-label="来源 / 任务">{{ sourceName(r.source) }}<small class="collection-run-id">{{ r.id }}</small></td><td data-label="状态"><span class="adm-tag" :class="r.status === 'failed' ? 'danger' : r.status === 'succeeded' ? 'valid' : 'suspect'">{{ STATUS[r.status] || r.status }}</span></td><td data-label="开始 / 结束">{{ fmtTime(r.started_at) }}<br /><span class="muted">{{ fmtTime(r.finished_at) }}</span></td><td data-label="条目">{{ r.item_count }}</td><td data-label="结果与审核"><p v-if="r.error" class="collection-error">{{ r.error }}</p><button v-if="r.status === 'succeeded' && r.item_count > 0" class="btn btn-sm" :disabled="previewLoading || approving" @click="preview(r.id)">预览本次草稿</button><span v-else-if="r.status === 'succeeded'" class="muted">{{ r.source === 'github_repos' ? '已记录基线，正在积累每日快照；本次没有新增待审内容' : '没有新增待审内容' }}</span></td></tr>
         </tbody></table>
       </div>
       <div v-if="total > pageSize" class="collection-pagination"><button class="btn btn-sm" :disabled="page <= 1 || runLoading || approving" @click="goto(page - 1)">上一页</button><span>第 {{ page }} 页 · 共 {{ total }} 次</span><button class="btn btn-sm" :disabled="page * pageSize >= total || runLoading || approving" @click="goto(page + 1)">下一页</button></div>
@@ -355,36 +387,62 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-.collection-sources { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 16px; margin-top: 18px; }
-.collection-source, .collection-runs, .collection-preview { min-width: 0; }
-.collection-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px; }
-.collection-heading h2 { margin: 0 auto 0 0; font-size: 17px; }
-.collection-key, .collection-source-config { margin-top: 18px; }
-.collection-feed-options { margin: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; }
-.collection-feed-options a { font-size: 12px; margin-left: auto; }
-.collection-saved { overflow-wrap: anywhere; margin: 0; }
-.collection-source-config .btn { align-self: start; }
-.collection-key .btn { align-self: start; }
-.collection-config { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
-.collection-config .field { flex: 1; min-width: 130px; }
-.collection-config .input { width: 100%; }
-.collection-check { display: flex; align-items: center; gap: 8px; min-height: 36px; }
-.collection-meta { display: grid; gap: 8px; margin: 18px 0; font-size: 13px; }
-.collection-meta > div { display: flex; gap: 12px; }
-.collection-meta dt { min-width: 65px; color: var(--ink-3); }
-.collection-meta dd { margin: 0; }
-.collection-error { color: var(--danger); overflow-wrap: anywhere; white-space: pre-wrap; }
-.collection-runs, .collection-preview { margin-top: 20px; }
-.collection-table { overflow-x: auto; }
-.collection-table td { vertical-align: top; }
-.collection-run-id { display: block; font-size: 11px; color: var(--ink-3); overflow-wrap: anywhere; max-width: 280px; }
-.collection-pagination { display: flex; align-items: center; justify-content: end; gap: 12px; margin-top: 16px; }
-.collection-draft { border: 1px solid var(--line); padding: 12px; margin: 12px 0; border-radius: 8px; }
-.collection-draft summary { cursor: pointer; overflow-wrap: anywhere; }
-.collection-diff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.collection-diff h3 { font-size: 13px; }
-.collection-diff pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 460px; overflow: auto; font-size: 12px; }
-.collection-ack { margin: 18px 0 10px; }
-.collection-preview > .btn-primary { margin-top: 12px; }
-@media (max-width: 700px) { .collection-diff { grid-template-columns: 1fr; } }
+.collection-panel { display:grid; gap:24px; }
+.collection-intro { display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.collection-intro h2 { font-size:24px; letter-spacing:-.5px; margin:4px 0 6px; line-height:1.4; }
+.collection-intro p { margin:0; }
+.collection-summary { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+.collection-summary > div { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:20px 24px; }
+.collection-summary > div+div { border-left:1px solid var(--line); }
+.collection-summary span { color:var(--ink-2); }
+.collection-summary strong { font-size:26px; font-variant-numeric:tabular-nums; line-height:1.3; }
+.collection-summary strong small { font-size:12px; color:var(--ink-3); font-weight:400; }
+.collection-summary .collection-summary-text { font-size:17px; }
+.collection-source-tabs { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; }
+.collection-source-tabs button { display:grid; gap:8px; border:1px solid var(--line-strong); border-radius:10px; padding:16px; text-align:left; background:var(--surface); min-width:0; }
+.collection-source-tabs button>span { font-weight:600; font-size:13px; }
+.collection-source-tabs button.active { border-color:var(--brand); background:color-mix(in srgb,var(--brand) 4%,var(--surface)); box-shadow:inset 0 0 0 1px var(--brand); }
+.collection-source-tabs small { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-3); }
+.collection-source-tabs i { width:6px; height:6px; border-radius:50%; background:var(--ink-3); }
+.collection-source-tabs i.ready { background:var(--ink); }
+.collection-source, .collection-runs, .collection-preview { min-width:0; padding:24px; border-radius:12px; }
+.collection-heading { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:20px; }
+.collection-heading h2 { margin:0 auto 0 0; font-size:17px; }
+.collection-source-layout { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:32px; }
+.collection-editor { min-width:0; }
+.collection-editor > p:first-child { margin-top:0; }
+.collection-key, .collection-source-config { margin:0; padding:0; gap:12px; }
+.collection-key { grid-template-columns:minmax(0,1fr) auto; align-items:end; margin-top:16px; }
+.collection-key + small { display:block; margin:10px 0 20px; font-size:12px; }
+.collection-source-config .btn { justify-self:start; }
+.collection-key .btn { align-self:end; }
+.collection-source-config textarea.input { min-height:140px; }
+.collection-feed-options { margin:0; padding:8px 16px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); }
+.collection-feed-options legend { font-weight:600; padding:0 6px; }
+.collection-feed-options label+label { border-top:1px solid var(--line); }
+.collection-feed-options a { font-size:12px; margin-left:auto; color:var(--ink-2); text-decoration:underline; text-underline-offset:3px; }
+.collection-saved { overflow-wrap:anywhere; margin:0; font-size:12px; }
+.collection-schedule { border-left:1px solid var(--line); padding-left:28px; }
+.collection-config { display:grid; gap:14px; margin:12px 0 20px; }
+.collection-config .field { display:grid; gap:6px; }
+.collection-check { display:flex; align-items:center; gap:8px; min-height:44px; }
+.collection-meta { display:grid; gap:12px; margin:20px 0; padding-top:18px; border-top:1px solid var(--line); font-size:12px; }
+.collection-meta > div { display:grid; grid-template-columns:64px minmax(0,1fr); gap:12px; }
+.collection-meta dt { color:var(--ink-3); }
+.collection-meta dd { margin:0; overflow-wrap:anywhere; }
+.collection-schedule > small { display:block; margin-top:8px; font-size:12px; }
+.collection-error { color:var(--danger); overflow-wrap:anywhere; white-space:pre-wrap; }
+.collection-table { overflow-x:auto; margin:0 -24px; }
+.collection-table td { vertical-align:top; }
+.collection-run-id { display:block; font-size:11px; color:var(--ink-3); overflow-wrap:anywhere; max-width:280px; margin-top:4px; }
+.collection-pagination { display:flex; align-items:center; justify-content:end; gap:12px; margin-top:16px; }
+.collection-draft { border:1px solid var(--line); margin:12px 0; border-radius:8px; overflow:hidden; }
+.collection-draft summary { padding:14px 16px; cursor:pointer; overflow-wrap:anywhere; background:var(--surface-2); font-size:12px; }
+.collection-diff { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; padding:16px; }
+.collection-diff h3 { font-size:12px; margin:0 0 10px; color:var(--ink-2); }
+.collection-diff pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:460px; overflow:auto; font-size:12px; margin:0; }
+.collection-ack { margin:18px 0 10px; }
+@media (min-width:701px) and (max-width:1100px) { .collection-source-tabs { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+@media (max-width:1100px) { .collection-source-layout { grid-template-columns:minmax(0,1fr) 250px; gap:20px; }.collection-schedule{padding-left:20px}.collection-key{grid-template-columns:1fr}.collection-key .btn{justify-self:start} }
+@media (max-width:700px) { .collection-intro{align-items:flex-start;flex-direction:column;gap:16px}.collection-intro h2{font-size:21px}.collection-summary>div{padding:16px;flex-direction:column;align-items:flex-start;gap:8px}.collection-summary strong{font-size:22px}.collection-source-tabs{display:flex;overflow-x:auto;padding-bottom:4px}.collection-source-tabs button{flex:0 0 190px}.collection-source-layout,.collection-diff{grid-template-columns:1fr}.collection-schedule{border-left:0;border-top:1px solid var(--line);padding:20px 0 0}.collection-source,.collection-runs,.collection-preview{padding:18px}.collection-table{margin:0 -18px}.collection-pagination{flex-wrap:wrap;justify-content:start} }
 </style>
