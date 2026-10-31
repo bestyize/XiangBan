@@ -68,3 +68,11 @@ cargo build --release --features custom-protocol   # 发布二进制（内嵌启
 桌面壳不给网页任何 Tauri 能力：`tauri.conf.json` 没有 capability，远程页面不能调用本地命令。站内只放行 `https://xiaban.xyz` 及其子域（默认端口），其他 http/https 链接、`mailto:`、`tel:` 交给系统打开，其余协议（`file:`、`javascript:`、`data:`、`blob:` 等）一律拦截。窗口数据（登录令牌所在的 localStorage）由系统 WebView 按应用标识 `xyz.xiangban.xiaoban` 持久化。
 
 桌面曾试过 Compose 的 KCEF（Chromium），macOS 上内核目录结构与库的加载路径对不上，启动即原生崩溃，且要下载约 500MB，所以桌面改用 Rust。
+
+## 社区本轮补齐（2026-10-31）
+
+`community-core` 新增独立的模型榜、上传、内容发布、社交与挑战协议模块；`community-native` 接入能力榜/调用量榜、精确Token用量、来源时间与开源榜实际观测天数、投票/图文和帖子附件、能力清单/方案详情、我的作品与zip/新版本发布、通知/帖子收藏/关注/屏蔽/举报、官方挑战与本人作品投稿。调用量表示OpenRouter平台Token用量，不是请求次数或能力评分；未审核数据不公开。
+
+上传流程使用论坛凭证直传资源机，不把论坛Bearer发给资源地址，禁重定向；只读校验最多五次，资源未配置或超时保留表单。能力权限/提示词仅展示清单真实字段，缺失明确标注。挑战点赞复用真实讨论帖接口，不生成独立投票数字。
+
+针对性JVM测试与Android模块编译已验证，系统选择器/分享/键盘/返回栈、完整资源机链路和iOS仍需实机验收。正文图片与帖子附件已接；回复附件、跨对象作品/方案收藏等协议尚未扩展。具体状态见[社区验收记录](../../docs/product/验收记录_社区全功能_2026-10-31.md)。
