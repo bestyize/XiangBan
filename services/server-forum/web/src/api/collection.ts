@@ -1,12 +1,15 @@
 // 采集器只生成待审内容；人工终审通过后才进入公开接口。
 import { request as adminRequest, type AdminPage, type DiscoverDraft } from './admin'
 
+/** github_repos 最多 30 项；github_tools 最多 10 项，均由后端再次校验。 */
+export interface CollectionSourceConfig { repositories?: string[]; feed_ids?: string[] }
+
 export interface CollectionSource {
   id: string
   title: string
   configured: boolean
   credential_required?: boolean
-  config?: { repositories?: string[]; feed_ids?: string[] }
+  config?: CollectionSourceConfig
   hint: string | null
   enabled: boolean
   interval_minutes: number
@@ -45,7 +48,7 @@ export interface CollectionBatch {
 export const collectionApi = {
   sources: () => adminRequest<{ items: CollectionSource[] }>('GET', '/collection/sources'),
   credential: (source: string, key: string) => adminRequest<unknown>('PUT', `/collection/sources/${encodeURIComponent(source)}/credential`, { key }),
-  configure: (source: string, body: { enabled?: boolean; interval_minutes?: number; config?: { repositories?: string[]; feed_ids?: string[] } }) => adminRequest<unknown>('PATCH', `/collection/sources/${encodeURIComponent(source)}`, body),
+  configure: (source: string, body: { enabled?: boolean; interval_minutes?: number; config?: CollectionSourceConfig }) => adminRequest<unknown>('PATCH', `/collection/sources/${encodeURIComponent(source)}`, body),
   run: (source: string) => adminRequest<{ run_id: string }>('POST', `/collection/sources/${encodeURIComponent(source)}/run`),
   runs: (source = '', page = 1) => {
     const query = new URLSearchParams({ page: String(page) })
