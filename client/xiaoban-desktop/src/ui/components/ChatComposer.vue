@@ -373,10 +373,10 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
     <ChatComposerPet v-if="pet" :size="pet" :paused="store.settings?.paused ?? false" />
     <div v-if="live && liveActive" class="composer-box live-bar" :class="{ muted: live.muted }" data-testid="chat-live">
       <span class="live-orb" :class="live.status === '在说' ? 'speak' : live.status === '在听' ? 'listen' : 'wait'" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-      <div class="live-text" role="status" aria-live="polite" data-testid="chat-live-status"><b>{{ live.status }}</b><span>{{ liveHint }}</span></div>
+      <div class="live-text" role="status" aria-live="polite" data-testid="chat-live-status"><b :title="live.status">{{ live.status }}</b><span :title="liveHint">{{ liveHint }}</span></div>
       <span class="live-clock" aria-label="通话时长">{{ liveClock }}</span>
       <button type="button" class="live-mute" :class="{ on: live.muted }" :aria-label="live.muted ? '取消静音' : '静音'" :title="live.muted ? '取消静音' : '静音'" :aria-pressed="live.muted" data-testid="chat-live-mute" @click="live.toggleMute()"><MicOff v-if="live.muted" :size="16" /><Mic v-else :size="16" /></button>
-      <button type="button" class="live-end" data-testid="chat-live-end" @click="live.end()"><Square :size="10" fill="currentColor" />结束</button>
+      <button type="button" class="live-end" aria-label="结束通话" title="结束通话" data-testid="chat-live-end" @click="live.end()"><Square :size="10" fill="currentColor" aria-hidden="true" /><span class="live-end-label">结束</span></button>
     </div>
     <div v-else class="composer-box" :class="{ 'voice-active': asr?.listening }">
       <AsrStatus v-if="asr" :asr="asr" chat />
@@ -434,7 +434,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 <style scoped>
 .delivery-control{position:relative;display:flex;align-items:center;gap:2px}.delivery-toggle{display:grid;place-items:center;border:0;border-radius:5px;background:none;color:var(--ui-text-secondary);width:16px;height:28px;padding:0;cursor:pointer}.delivery-toggle:disabled{opacity:.35;cursor:default}.delivery-toggle:hover:not(:disabled){background:var(--ui-surface-hover)}.delivery-menu{position:absolute;bottom:44px;right:0;width:205px;padding:5px;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.12);z-index:35}.delivery-menu button{display:block;width:100%;border:0;border-radius:8px;padding:9px 10px;text-align:left;background:none;color:var(--ui-text-primary);font:inherit;font-size:12px;cursor:pointer}.delivery-menu button:hover{background:var(--ui-surface-hover)}.delivery-menu span{display:block;margin-top:3px;color:var(--ui-text-tertiary);font-size:10px}.stop-run{flex:none}
 
-.composer-content{position:relative}
+.composer-content{position:relative;container:chat-composer / inline-size}
 .composer{position:relative;width:100%;box-sizing:border-box}
 .composer-box{position:relative;display:flex;flex-direction:column;gap:4px;background:var(--ui-surface);border-radius:18px;box-shadow:0 0 0 1px var(--ui-border),0 2px 4px rgba(0,0,0,.03),0 12px 32px rgba(0,0,0,.07);padding:14px 12px 8px 16px;transition:box-shadow .15s}
 html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:0 0 0 1px var(--ui-border-strong),0 12px 32px rgba(0,0,0,.35)}
@@ -499,15 +499,24 @@ html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:
 @keyframes live-speak{50%{height:22px}}
 @keyframes live-wait{50%{opacity:.3}}
 .live-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.live-text b{font-size:14.5px;font-weight:600;color:var(--ui-text-primary)}
+.live-text b{font-size:14.5px;font-weight:600;color:var(--ui-text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .live-text span{font-size:12px;color:var(--ui-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .live-clock{flex:none;font:12.5px 'SF Mono',Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--ui-text-secondary)}
 .live-mute{flex:none;width:40px;height:40px;border:0;border-radius:50%;display:grid;place-items:center;background:var(--ui-control);color:var(--ui-text-primary);cursor:pointer}
 .live-mute:hover{background:var(--ui-control-hover)}
 .live-mute.on{background:var(--ui-text-primary);color:var(--ui-surface)}
-.live-end{flex:none;display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 16px;border:0;border-radius:20px;background:var(--ui-text-primary);color:var(--ui-surface);font:inherit;font-size:13.5px;font-weight:500;cursor:pointer}
+.live-end{flex:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 16px;border:0;border-radius:20px;background:var(--ui-text-primary);color:var(--ui-surface);font:inherit;font-size:13.5px;font-weight:500;white-space:nowrap;cursor:pointer}
 .live-end:hover{filter:brightness(1.1)}
 .live-mute:focus-visible,.live-end:focus-visible{outline:2px solid var(--ui-btn);outline-offset:2px}
+/* Split views shrink the composer without changing the window width. */
+@container chat-composer (max-width:360px){
+  .composer-box.live-bar{gap:8px;padding:10px}
+  .live-orb{width:32px;height:32px}
+  .live-mute,.live-end{width:36px;height:36px;padding:0}
+  .live-end-label{display:none}
+}
+@container chat-composer (max-width:260px){.live-orb{display:none}}
+@container chat-composer (max-width:200px){.live-clock{display:none}}
 @media(max-width:620px){.composer-pet{display:none}}
 @media(prefers-reduced-motion:reduce){.spin,.recording-dot,.live-orb i{animation:none}}
 </style>
