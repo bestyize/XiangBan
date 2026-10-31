@@ -8,6 +8,7 @@ use crate::{
 use std::time::Duration;
 
 pub fn spawn(state: AppState) {
+    crate::collectors::spawn(state.clone());
     let publisher = state.clone();
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(Duration::from_secs(30));

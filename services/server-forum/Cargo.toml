@@ -19,7 +19,7 @@ uuid = { version = "1.10", features = ["v4", "serde"] }
 dotenvy = "0.15"
 base64 = "0.22"
 
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "gzip"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "chrono", "uuid"] }
 
 argon2 = "=0.6.0"
@@ -31,6 +31,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2.0"
 ring = "0.17"
+roxmltree = "0.21.2"
 
 [profile.dev]
 debug = false

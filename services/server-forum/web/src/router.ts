@@ -7,8 +7,14 @@ import { trackRoute } from '@/lib/analytics'
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
   { path: '/discuss', name: 'discuss', component: DiscussView },
+  { path: '/models', name: 'model-rankings', component: () => import('@/views/ModelRankingsView.vue') },
   // 旧入口：资源、周刊、项目列表都并进了首页的二级 Tab。
   { path: '/resources', redirect: '/' },
+  { path: '/challenges', name: 'challenges', component: () => import('@/views/ChallengesView.vue') },
+  { path: '/challenges/:key', name: 'challenge', component: () => import('@/views/ChallengeView.vue') },
+  { path: '/schemes', name: 'schemes', component: () => import('@/views/SchemesView.vue') },
+  { path: '/schemes/new', name: 'scheme-publish', component: () => import('@/views/SchemePublishView.vue'), meta: { auth: true } },
+  { path: '/schemes/:id(\\d+)', name: 'scheme', component: () => import('@/views/SchemeView.vue') },
   { path: '/packs/:id(\\d+)', name: 'pack', component: () => import('@/views/PackView.vue') },
   { path: '/weekly', redirect: { path: '/', query: { tab: 'weekly' } } },
   { path: '/publish', name: 'publish', component: () => import('@/views/PublishView.vue'), meta: { auth: true } },

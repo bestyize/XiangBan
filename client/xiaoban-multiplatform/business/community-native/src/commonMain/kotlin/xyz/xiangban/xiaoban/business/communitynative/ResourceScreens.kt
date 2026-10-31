@@ -359,8 +359,8 @@ private fun shortDate(date: String): String {
 @Composable
 private fun ToolDetailBody(env: CommunityEnv, tool: ToolDetail, onMessage: (String) -> Unit) {
     var source by rememberSaveable { mutableStateOf(if (tool.hasMirror) "mirror" else "github") }
-    var os by rememberSaveable { mutableStateOf(tool.artifacts.firstOrNull()?.os.orEmpty()) }
-    val artifact = tool.artifacts.firstOrNull { it.os == os } ?: tool.artifacts.firstOrNull()
+    var selectedArtifact by rememberSaveable(tool.key) { mutableStateOf(tool.artifacts.firstOrNull()?.selectionId.orEmpty()) }
+    val artifact = tool.artifacts.firstOrNull { it.selectionId == selectedArtifact } ?: tool.artifacts.firstOrNull()
     fun urlOf(a: ToolArtifact) = (if (source == "mirror") a.mirrorUrl else a.githubUrl).ifEmpty { a.githubUrl.ifEmpty { a.mirrorUrl } }
 
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(Gap)) {
@@ -404,22 +404,22 @@ private fun ToolDetailBody(env: CommunityEnv, tool: ToolDetail, onMessage: (Stri
                     horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically,
                 ) {
                     XIcon(XIcons.Download, tint = Color.White, size = 20.dp)
-                    Text("下载 ${artifact.osLabel} 版 · ${formatDownloadSize(artifact.size)}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Text("下载 ${artifact.osLabel} ${artifact.archLabel} · ${formatDownloadSize(artifact.size)}", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                 }
                 Text(
-                    (if (source == "mirror" && tool.hasMirror) "从小伴镜像下载，国内更快" else "从 GitHub Releases 下载") + " · 手机上下载后需要传到电脑再安装",
+                    (if (source == "mirror" && artifact.mirrorUrl.isNotEmpty()) "从小伴镜像下载" else "从 GitHub Releases 下载") + " · 手机上下载后需要传到电脑再安装",
                     Modifier.padding(top = 6.dp).fillMaxWidth(), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 )
                 Column(Modifier.padding(top = 12.dp)) {
                     tool.artifacts.forEach { a ->
                         Hairline()
-                        Row(Modifier.fillMaxWidth().clickable { os = a.os }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth().clickable { selectedArtifact = a.selectionId }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Box(Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
                                 XIcon(XIcons.Monitor, size = 18.dp)
                             }
                             Column(Modifier.weight(1f)) {
-                                Text(a.osLabel, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                Text(listOf(a.desc, formatDownloadSize(a.size)).filter { it.isNotEmpty() }.joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                                Text("${a.osLabel} · ${a.archLabel}" + if (a.selectionId == artifact.selectionId) " · 已选" else "", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text(listOf(a.filename.ifEmpty { a.desc }, formatDownloadSize(a.size)).filter { it.isNotEmpty() }.joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                             }
                             Box(Modifier.size(36.dp).clip(CircleShape).background(LocalExtraColors.current.fill).clickable { val u = urlOf(a); if (u.isNotEmpty()) env.platform?.openUrl(u) else onMessage("这个安装包还没有下载地址") }, contentAlignment = Alignment.Center) {
                                 XIcon(XIcons.Download, size = 18.dp, description = "下载 ${a.osLabel} 版")
@@ -450,6 +450,10 @@ private fun ToolDetailBody(env: CommunityEnv, tool: ToolDetail, onMessage: (Stri
                 if (tool.discussionCount > 0) InfoRow("相关讨论", "${tool.discussionCount} 篇教程和讨论")
             }
         }
+        if (tool.source.isNotEmpty()) FootNote("来源：${tool.source}" + if (tool.asOf.isNotEmpty()) " · 采集于 ${tool.asOf}" else "")
+        tool.collectionNotes.forEach { FootNote(it) }
+        if (tool.releaseUrl.isNotEmpty()) Text("查看官方版本与更新说明", Modifier.clickable { env.platform?.openUrl(tool.releaseUrl) }.padding(8.dp), color = Brand)
+        if (tool.licenseSourceUrl.isNotEmpty()) Text("查看许可证 ${tool.licenseSpdx.orEmpty()}", Modifier.clickable { env.platform?.openUrl(tool.licenseSourceUrl) }.padding(8.dp), color = Brand)
         if (tool.sample) FootNote("版本号、日期、大小和更新内容为示例数据。")
     }
 }

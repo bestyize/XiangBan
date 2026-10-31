@@ -82,10 +82,10 @@ export const SUPPORTED_KINDS = ['effect', 'reminder', 'routine', 'task', 'goal']
  */
 export const schemeFlow = reactive<{ title: string; queue: ApplyRequest[]; total: number; skipped: number }>({ title: '', queue: [], total: 0, skipped: 0 });
 
-export interface SchemeItem { pack_id: number; kind: string; version?: number }
+export interface SchemeItem { pack_id: number; kind?: string; version?: number; available?: boolean }
 
 export function startScheme(title: string, items: SchemeItem[]): number {
-  const supported = items.filter(i => SUPPORTED_KINDS.includes(i.kind));
+  const supported = items.filter(i => i.available !== false && SUPPORTED_KINDS.includes(i.kind ?? ''));
   trackEvent('desktop_scheme_replicate');
   schemeFlow.title = title;
   schemeFlow.total = supported.length;

@@ -4,6 +4,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { adminApi, AdminApiError, type DiscoverRow, type DiscoverDraft, type DiscoverToken, type DiscoverDraftInput } from '@/api/admin'
 import { perform, fmtTime, notify } from './shared'
+import DiscoverFieldsEditor from './DiscoverFieldsEditor.vue'
 
 const KINDS = [
   { key: 'banner', label: '首页头图', sample: '{"tag":"本周原创","title":"标题","byline":"小伴编辑部 · 8 分钟读完","link":"topic:12"}' },
@@ -18,6 +19,8 @@ const KINDS = [
   { key: 'doc', label: '资料导读', sample: '{"product":"Claude","title":"标题","subtitle":"说明","label":"guide","url":"https://example.com"}' },
   { key: 'tool', label: 'AI 工具', sample: '{"name":"名称","developer":"开发者","type_label":"桌面应用","license":"open","platforms":["Windows","macOS"],"description":"简介","homepage_url":"https://github.com/owner/repo","discussion_tag":"tag","releases":[{"version":"v1.0.0","date":"10-20","items":[{"kind":"new","text":"内容"}]}],"artifacts":[{"os":"windows","desc":".msi 安装包","size":12582912,"sha256":"","mirror_url":"","github_url":"https://github.com/owner/repo/releases"}]}' },
   { key: 'hotword', label: '热门搜索', sample: '{"text":"桌面特效","tag":"热"}' },
+  { key: 'model_board', label: '真实模型能力榜', sample: '{}' },
+  { key: 'model_usage', label: 'OpenRouter 调用量榜', sample: '{}' },
 ] as const
 
 const kind = ref<string>(KINDS[0].key)
@@ -43,6 +46,8 @@ const tokens = ref<DiscoverToken[]>([])
 const issuedToken = ref('')
 const tokenForm = reactive({ name: '', days: 30, kinds: ['news'] as string[] })
 const visibleRows = computed(() => view.value === 'live' ? rows.value : drafts.value)
+const structuredKind = computed(() => ["banner","news","nav","doc","launch","promo","hotword","vendor","quota"].includes(kind.value))
+const snapshotKind = computed(() => kind.value === 'model_board' || kind.value === 'model_usage')
 let loadSeq = 0
 
 async function load() {
@@ -68,7 +73,7 @@ async function load() {
 function isDraft(r: DiscoverRow | DiscoverDraft): r is DiscoverDraft { return 'revision' in r }
 function title(r: { data: Record<string, unknown> }) {
   const d = r.data
-  return String(d.title ?? d.name ?? d.text ?? (d.issue_no ? `第 ${d.issue_no} 期` : ''))
+  return String(d.title ?? d.name ?? d.text ?? (d.source ? `${d.source}${d.date ? ` · ${d.date}` : ''}` : d.issue_no ? `第 ${d.issue_no} 期` : ''))
 }
 function localTime(iso: string | null) {
   return iso ? fmtTime(iso).replace(' ', 'T') : ''
@@ -201,12 +206,13 @@ onMounted(load)
     <select v-model="kind" class="select" aria-label="内容类型" :disabled="busy"><option v-for="k in KINDS" :key="k.key" :value="k.key">{{ k.label }}</option></select>
     <select v-model="view" class="select" aria-label="内容视图" :disabled="busy"><option value="drafts">编辑与审核</option><option value="live">线上内容</option></select>
     <select v-if="view === 'drafts'" v-model="status" class="select" aria-label="草稿状态" :disabled="busy"><option value="">全部状态</option><option value="draft">待审核</option><option value="scheduled">定时发布</option><option value="published">已发布副本</option></select>
-    <button class="btn btn-primary" :disabled="busy" @click="edit()">新增草稿</button>
+    <button class="btn btn-primary" :disabled="busy || snapshotKind" @click="edit()">新增草稿</button>
     <button class="btn" :disabled="busy" @click="importOpen = !importOpen">批量导入</button>
     <button class="btn" :disabled="busy" @click="tokensOpen = !tokensOpen">采集令牌</button>
     <button class="btn" :disabled="busy || loading" @click="load">刷新</button>
   </div>
   <p class="muted">采集和编辑先保存草稿，人工预览后发布。定时发布只执行已审核版本；再次编辑需重新审核。</p>
+  <p v-if="snapshotKind" class="muted">请从 <RouterLink to="/admin/collection">内容采集</RouterLink> 创建完整榜单，再在此查看或编辑草稿。</p>
 
   <form v-if="importOpen" class="panel adm-card adm-form" @submit.prevent="importBatch">
     <label class="field"><span>JSON 数组（每批 1–100 条，可跨类型）</span><textarea v-model="importJson" class="input adm-mono" rows="8" spellcheck="false" :disabled="busy" /></label>
@@ -214,7 +220,7 @@ onMounted(load)
     <button class="btn btn-primary" :disabled="busy" type="submit">导入草稿</button>
   </form>
 
-  <div v-if="tokensOpen" class="panel adm-card">
+  <div v-if="tokensOpen" class="panel adm-card discover-token-panel">
     <h3>采集令牌</h3><p class="muted">仅能读写勾选类型的草稿。令牌只显示一次，请保存到本地安全位置。</p>
     <form class="adm-form" @submit.prevent="createToken">
       <div class="adm-form-grid">
@@ -225,10 +231,11 @@ onMounted(load)
       <button class="btn" type="submit" :disabled="busy || !tokenForm.kinds.length">创建令牌</button>
     </form>
     <div v-if="issuedToken" class="field"><textarea class="input adm-mono" :value="issuedToken" readonly rows="3" aria-label="新建的采集令牌" /><button class="btn" @click="copyToken">复制令牌</button></div>
-    <table v-if="tokens.length" class="adm-table"><thead><tr><th>名称</th><th>类型</th><th>到期</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="t in tokens" :key="t.id"><td>{{ t.name }}</td><td>{{ t.kinds.join(', ') }}</td><td>{{ fmtTime(t.expires_at) }}</td><td>{{ t.revoked_at ? '已撤销' : new Date(t.expires_at).getTime() <= Date.now() ? '已过期' : '有效' }}</td><td><button v-if="!t.revoked_at" class="btn btn-sm" :disabled="busy" @click="revokeToken(t)">撤销</button></td></tr></tbody></table>
+    <table v-if="tokens.length" class="adm-table"><thead><tr><th>名称</th><th>类型</th><th>到期</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="t in tokens" :key="t.id"><td data-label="名称">{{ t.name }}</td><td data-label="类型">{{ t.kinds.join(', ') }}</td><td data-label="到期">{{ fmtTime(t.expires_at) }}</td><td data-label="状态">{{ t.revoked_at ? '已撤销' : new Date(t.expires_at).getTime() <= Date.now() ? '已过期' : '有效' }}</td><td data-label="操作"><button v-if="!t.revoked_at" class="btn btn-sm" :disabled="busy" @click="revokeToken(t)">撤销</button></td></tr></tbody></table>
   </div>
 
   <form v-if="editing !== null" class="panel adm-card adm-form" @submit.prevent="save">
+    <div class="adm-editor-heading"><h2>{{ editing ? '编辑草稿' : '新增草稿' }}</h2><span class="adm-tag line">{{ KINDS.find(k => k.key === kind)?.label }}</span></div>
     <fieldset :disabled="busy" class="editor-fields">
       <div class="adm-form-grid">
         <label class="field"><span>key</span><input v-model="form.key" class="input" required pattern="[a-z0-9_\-]{1,60}" :disabled="!!editing" /><small>来源与周期使用稳定 key，重复导入不会增加条目</small></label>
@@ -237,7 +244,8 @@ onMounted(load)
         <label class="field"><span>来源名称</span><input v-model="form.source_name" class="input" maxlength="100" /></label>
         <label class="field wide"><span>一手来源地址</span><input v-model="form.source_url" class="input" type="url" placeholder="https://" /></label>
         <label class="field"><span><input v-model="form.sample" type="checkbox" /> 示例数据</span></label>
-        <label class="field wide"><span>内容（JSON）</span><textarea v-model="form.json" class="input adm-mono" rows="14" spellcheck="false" /></label>
+        <DiscoverFieldsEditor v-model="form.json" :kind="kind" />
+        <details class="wide adm-advanced" :open="!structuredKind"><summary>高级 JSON 编辑</summary><label class="field"><span>内容 JSON（与字段表单同步）</span><textarea v-model="form.json" class="input adm-mono" rows="10" spellcheck="false" /></label></details>
       </div>
       <div class="adm-form-actions"><button class="btn btn-primary" type="submit">保存草稿</button><button class="btn" type="button" @click="preview">校验并预览</button><button class="btn btn-ghost" type="button" @click="editing = null">关闭</button></div>
     </fieldset>
@@ -254,15 +262,15 @@ onMounted(load)
     <p v-if="loading" class="adm-empty">加载中…</p>
     <p v-else-if="loadError" class="adm-empty error" role="alert">{{ loadError }}<button class="btn btn-sm" :disabled="busy" @click="load">重新加载</button></p>
     <p v-else-if="!visibleRows.length" class="adm-empty">还没有内容</p>
-    <table v-else class="adm-table"><thead><tr><th>key</th><th>标题</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>
+    <div v-else class="adm-table-scroll"><table class="adm-table"><thead><tr><th>key</th><th>标题</th><th>排序</th><th>状态</th><th>操作</th></tr></thead><tbody>
       <tr v-for="r in visibleRows" :key="r.key">
         <td data-label="key" class="adm-mono">{{ r.key }}</td>
         <td data-label="标题">{{ title(r) }}<span v-if="r.data.sample"> · 示例</span><small v-if="isDraft(r) && r.last_error" class="error">{{ r.last_error }}</small></td>
         <td data-label="排序">{{ r.sort_order }}</td>
         <td data-label="状态">{{ r.status === 'published' ? '已发布' : r.status === 'scheduled' ? '定时发布' : '待审核' }}<small v-if="isDraft(r) && r.publish_after">{{ fmtTime(r.publish_after) }}</small></td>
-        <td data-label="操作" class="adm-actions"><button class="btn btn-sm" :disabled="busy" @click="edit(r)">编辑与预览</button><button v-if="isDraft(r) && r.status === 'scheduled'" class="btn btn-sm" :disabled="busy" @click="cancel(r)">取消定时</button><button class="btn btn-sm" :disabled="busy" @click="remove(r)">{{ isDraft(r) ? '丢弃副本' : '删除线上' }}</button></td>
+        <td data-label="操作"><div class="adm-actions"><button class="btn btn-sm" :disabled="busy" @click="edit(r)">编辑与预览</button><button v-if="isDraft(r) && r.status === 'scheduled'" class="btn btn-sm" :disabled="busy" @click="cancel(r)">取消定时</button><button class="btn btn-sm" :disabled="busy" @click="remove(r)">{{ isDraft(r) ? '丢弃副本' : '删除线上' }}</button></div></td>
       </tr>
-    </tbody></table>
+    </tbody></table></div>
     <div v-if="view === 'drafts'" class="adm-toolbar"><button class="btn btn-sm" :disabled="busy || loading || page <= 1" @click="page--">上一页</button><span>第 {{ page }} 页 · 共 {{ total }} 条</span><button class="btn btn-sm" :disabled="busy || loading || page * 50 >= total" @click="page++">下一页</button></div>
   </div>
 </template>

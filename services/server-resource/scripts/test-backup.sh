@@ -4,14 +4,26 @@ set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-mkdir -p "$work/data/packs/effect" "$work/data/covers"
+mkdir -p "$work/data/packs/effect" "$work/data/covers" "$work/data/tools"
 printf 'pack one' > "$work/data/packs/effect/a.zip"
+printf 'installer' > "$work/data/tools/a.bin"
+printf 'partial' > "$work/data/tools/interrupted.part"
+printf 'lock' > "$work/data/tools/.quota.lock"
 printf 'cover' > "$work/data/covers/c1"
 export RESOURCE_DATA_DIR="$work/data" BACKUP_TARGET="$work/backup"
 
 "$here/backup.sh"
 "$here/backup.sh" verify
 [ "$(cat "$work/backup/packs/effect/a.zip")" = "pack one" ]
+
+[ "$(cat "$work/backup/tools/a.bin")" = "installer" ]
+[ ! -e "$work/backup/tools/interrupted.part" ]
+[ ! -e "$work/backup/tools/.quota.lock" ]
+# 实际恢复到第三个空目录并用备份清单验证。
+mkdir "$work/restored"
+rsync -a "$work/backup/" "$work/restored/"
+(cd "$work/restored" && sha256sum --quiet -c SHA256SUMS)
+[ "$(cat "$work/restored/tools/a.bin")" = "installer" ]
 
 # 主机上删掉文件，再备份：备份里的副本还在（只增不删）。
 rm "$work/data/packs/effect/a.zip"

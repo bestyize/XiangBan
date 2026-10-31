@@ -66,14 +66,7 @@ export interface DownloadInfo {
   one_click: boolean
 }
 
-export interface SchemeItem {
-  id: number
-  author: PackAuthor
-  title: string
-  items: { pack_id: number; kind: string; slug: string; version: number }[]
-  apply_count: number
-  created_at: string
-}
+export type SchemeItem = import('./schemes').CommunityScheme
 
 export interface ProjectLink {
   title: string

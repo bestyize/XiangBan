@@ -19,6 +19,8 @@ data class NewsItem(
     /** 没有封面图时，缩略图和来源小圆点的颜色（#RRGGBB）。 */
     val accent: String = "",
     @SerialName("published_at") val publishedAt: String = "",
+    @SerialName("source_published_at") val sourcePublishedAt: String? = null,
+    @SerialName("time_basis") val timeBasis: String = "",
     val sample: Boolean = false,
 )
 
@@ -50,6 +52,10 @@ data class RepoRank(
     val icon: String = "",
     /** 图标块的底色（#RRGGBB）。 */
     val tint: String = "",
+    @SerialName("observed_days") val observedDays: Int? = null,
+    val complete: Boolean = false,
+    @SerialName("suspected_growth") val suspectedGrowth: Boolean = false,
+    @SerialName("snapshot_dates") val snapshotDates: List<String> = emptyList(),
 )
 
 @Serializable
@@ -62,6 +68,9 @@ data class RepoIssue(
     @SerialName("wow_pct") val wowPct: Double = 0.0,
     @SerialName("daily_gain") val dailyGain: List<Long> = emptyList(),
     val ranks: List<RepoRank> = emptyList(),
+    val source: String = "",
+    @SerialName("observed_days") val observedDays: Int? = null,
+    val complete: Boolean = false,
     val sample: Boolean = false,
 )
 
@@ -207,23 +216,35 @@ data class ToolList(val items: List<ToolSummary> = emptyList())
 data class ReleaseItem(val kind: String = "new", val text: String)
 
 @Serializable
-data class ToolRelease(val version: String, val date: String = "", val items: List<ReleaseItem> = emptyList())
+data class ToolRelease(val version: String, val date: String = "", val items: List<ReleaseItem> = emptyList(), val url: String = "")
 
 @Serializable
 data class ToolArtifact(
     val os: String,
+    val arch: String = "unknown",
+    val filename: String = "",
+    @SerialName("asset_id") val assetId: Long? = null,
+    @SerialName("hash_source") val hashSource: String = "",
     val desc: String = "",
     val size: Long = 0,
     val sha256: String = "",
     @SerialName("mirror_url") val mirrorUrl: String = "",
     @SerialName("github_url") val githubUrl: String = "",
 ) {
-    val osLabel: String get() = when (os) { "windows" -> "Windows"; "macos" -> "macOS"; else -> "Linux" }
+    val osLabel: String get() = when (os) { "windows" -> "Windows"; "macos" -> "macOS"; "linux" -> "Linux"; else -> os }
+    val selectionId: String get() = assetId?.toString() ?: listOf(os, arch, filename, githubUrl, sha256).joinToString("|")
+    val archLabel: String get() = when (arch) { "aarch64" -> "ARM64"; "x86_64" -> "x64"; "x86" -> "x86"; "universal" -> "通用"; "armv7" -> "ARMv7"; else -> "架构待确认" }
 }
 
 @Serializable
 data class ToolDetail(
     val key: String,
+    val source: String = "",
+    @SerialName("as_of") val asOf: String = "",
+    @SerialName("release_url") val releaseUrl: String = "",
+    @SerialName("license_spdx") val licenseSpdx: String? = null,
+    @SerialName("license_source_url") val licenseSourceUrl: String = "",
+    @SerialName("collection_notes") val collectionNotes: List<String> = emptyList(),
     val name: String,
     val developer: String = "",
     @SerialName("type_label") val typeLabel: String = "",

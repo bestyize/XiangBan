@@ -1,6 +1,8 @@
 mod analytics;
 mod auth;
 mod config;
+mod collectors;
+mod community_editor;
 mod content;
 mod db;
 mod discover;
@@ -14,6 +16,7 @@ mod notifications;
 mod points;
 mod seo;
 mod state;
+mod tool_mirrors;
 mod users;
 
 use axum::{
@@ -86,8 +89,11 @@ pub fn build_router(state: AppState) -> Router {
         .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
         .route("/attachments/{id}/purchase", post(attachments::purchase))
         .merge(packs::routes())
+        .merge(tool_mirrors::public_routes())
         .merge(discover_api::routes())
-        .nest("/admin", admin::routes().merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(handlers::discover_editor::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()))
+        .merge(handlers::model_rankings::routes())
+        .merge(handlers::community_editor::public_routes())
+        .nest("/admin", admin::routes().merge(tool_mirrors::admin_routes()).merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(handlers::discover_editor::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()).nest("/collection", handlers::collection::routes()).nest("/community-editorial", handlers::community_editor::admin_routes()))
         .nest("/editor", handlers::editor::routes())
         .nest("/discover-editor", handlers::discover_editor::editor_routes());
 

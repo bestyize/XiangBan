@@ -81,12 +81,12 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 接口都在 `/api` 下，实现见 `src/handlers/content.rs`，纯逻辑（体积上限、清单检查、签名）见 `src/content.rs`。
 
 - 内容包类型与体积上限：effect/reminder/routine/task/goal ≤ 1MB，widget/game/skill/workflow ≤ 8MB，expert ≤ 1MB，wallpaper ≤ 32MB。信任分级 T0 官方、T1 已审核、T2 用户未审；T2 只有 effect、scheme、reminder 返回 `one_click: true`，其余类型需要桌面端二次确认。
-- 前台：`GET /packs`（`kind`、`q`、`tag`、`author`、`sort=new|hot`、分页）、`GET /packs/{id}`（含版本与清单）、`GET /packs/{id}/download?version=`（返回签名地址、`sha256`、`size`、官方镜像 `mirrors`；客户端每个来源都要校验 sha256）、`POST /packs/{id}/applied`（应用计数，匿名可调）、`GET/POST /schemes`、`GET /projects[/{slug}]`、`GET /weekly[/{week}]`、`GET /share/{kind}/{id}`（`pack|topic|scheme|project|weekly`，返回落地页地址与 `xiaoban://community/...` 深链接）。
+- 前台：`GET /packs`（`kind`、`q`、`tag`、`author`、`sort=new|hot`、分页）、`GET /packs/{id}`（含版本与清单）、`GET /packs/{id}/download?version=`（返回签名地址、`sha256`、`size`、官方镜像 `mirrors`；客户端每个来源都要校验 sha256）、`POST /packs/{id}/applied`（应用计数，匿名可调）、`GET/POST /schemes`、`GET /schemes/{id}`、`GET /me/schemes`、`POST /schemes/{id}/remove`、`GET /projects[/{slug}]`、`GET /weekly[/{week}]`、`GET /share/{kind}/{id}`（`pack|topic|scheme|project|weekly`，返回落地页地址与 `xiaoban://community/...` 深链接）。
 - 用户发布流程（文件不经过本服务）：
   1. `POST /packs/upload-ticket {kind,size,sha256}`（需登录）→ `{ticket, upload_url, file_key}`；
   2. 客户端把文件和 `ticket` 直传 `upload_url`（资源机校验凭证、大小、哈希）；
   3. 资源机落盘并重算哈希后，回调 `POST /api/internal/pack-uploaded`，请求体 `{file_key,size,sha256,manifest}`（`manifest` 是资源机从压缩包根目录读出的 `manifest.json`，内容包必带，封面不带；本服务会按上传类型再校验一遍），头 `X-Signature` 为请求体的 HMAC-SHA256（十六进制，密钥同 `FORUM_RESOURCE_SECRET`）；
-  4. `POST /packs {kind,title,summary,tags,file_key,cover_key?}` 发布，清单以资源机回调里的为准，客户端不再自报。封面同样先申请 `kind:"cover"` 的凭证（≤ 2MB，键为 `covers/{id}`，公开可读，不签名），`cover_key` 必须是自己上传并已确认的封面。只认已被资源机确认、属于该用户、没用过的上传；发布后是 T2 并进审核队列。`POST /packs/{id}/versions {file_key,changelog}` 发新版本（id 必须一致，已审核的会降回未审并重新入队）。
+  4. 可用 `GET /packs/upload-status?file_key=` 查询自己的验证状态（其他用户和不存在的 key 均返回 404）；验证完成后 `POST /packs {kind,title,summary,tags,file_key,cover_key?}` 发布，清单以资源机回调里的为准，客户端不再自报。封面同样先申请 `kind:"cover"` 的凭证（≤ 2MB，键为 `covers/{id}`，公开可读，不签名），`cover_key` 必须是自己上传并已确认的封面。只认已被资源机确认、属于该用户、没用过的上传；发布后是 T2 并进审核队列。`POST /packs/{id}/versions {file_key,changelog}` 发新版本（id 必须一致，已审核的会降回未审并重新入队）。
 - 资源机侧约定：下载地址 `{base}/{file_key}?exp=&sig=`，`sig = hex(HMAC-SHA256(secret, "GET\n{file_key}\n{exp}"))`；上传凭证是 `base64url(JSON声明).hex(HMAC-SHA256(secret, "PUT\n{base64url部分}"))`，声明含 `uid, kind, size, sha256, file_key, exp`。`src/content.rs` 里的 `verify_download`、`verify_upload_ticket`、`sign_callback` 是资源机实现的参考，有单元测试。
 - 我的作品：`GET /me/packs`（自己发布的全部内容包，含下架、被拒与是否在审核中）、`POST /packs/{id}/remove`（作者自己下架）。发布时必须带 `rights_ack: true`（权利声明）。网页入口是 `/publish`（上传 zip 与封面、填信息、勾选声明；`?pack=编号` 发新版本）和 `/me/works`。
 - 后台（管理员令牌）：`GET/POST /admin/packs`（POST 是官方直接登记 T0/T1，文件已由运维放进资源机，可带魔搭等 https 镜像）、`POST /admin/packs/{id}/mirrors`（给某个版本补官方镜像，同名替换，最多 5 个；镜像地址不需要被信任，客户端对每个来源都校验 sha256）、`POST /admin/packs/{id}/review`（`approve|reject|remove|restore`）、`GET /admin/moderation`（待审队列）、`PUT /admin/projects/{slug}`、`PUT /admin/weekly/{week}`（草稿不对外，周刊条目只存引用，下架的内容包读取时自动隐去）。
@@ -99,7 +99,11 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 前台：`GET /discover/home`（头图、当天日报、精选创作、热榜前三，一次返回）、`/discover/daily`（往期日报，分页）、`/discover/repos[?issue=]` 与 `/discover/repos/issues`（开源热榜及往期）、`/discover/models`（模型榜，分档阈值 `tiers` 由后端给）、`/discover/tracker`（额度重置、模型上新、限时免费，进度和剩余天数服务端算）、`/discover/nav`、`/discover/docs`、`GET /tools[/{key}]`（AI 工具与按系统的安装包、更新记录）、`GET /help/stats`（进行中、本周已解决、悬赏积分合计，全站值）、`PUT /topics/{id}/poll/vote {option}`（每人一票）。
 - 帖子：发帖可带 `poll: {options: [2～6 项], days?}`；列表与详情返回 `images`（正文里前 3 张站内图）、`poll`（票数、总数、自己投的项）、`view_count`；`GET /topics?category=a,b` 可以同时指定几个分类。
 - 兼容后台接口：`GET /admin/discover/{kind}`、`PUT /admin/discover/{kind}/{key}`（`{data, sort_order?, status?, published_at?, sample?}`）、`DELETE`，仍允许管理员直接编辑线上内容。新管理台统一走下述草稿流程。类型：`banner news nav doc vendor model repo_issue quota launch promo tool hotword`，管理台已提供热门搜索编辑。`sample: true` 的条目手机端会标「示例数据」；第一次启动会写入一批示例（模型榜、热榜、日报等，导航和资料是真实官方入口），录入真实内容后可删除示例。
-- 模型榜、开源热榜、日报、追踪和工具版本的自动采集尚未实现。后续本地采集工具通过发现页采集令牌导入草稿，人工终审再发布。第三方 API key 的验证、加密存库和后台只写设置尚待建设；接入时按交接文档要求实现，不放 `.env`，采集失败保留上一版内容。
+- 已实现服务端自动采集与管理台 `/admin/collection`：Artificial Analysis 能力榜、OpenRouter 每日 Token 用量榜、GitHub 候选仓库每日快照、官方 RSS 日报、GitHub Releases 工具版本。各来源独立开关，默认停用；第三方 key 在后台验证后用独立主密钥加密入库，只返回配置状态与尾号。`FORUM_COLLECTION_MASTER_KEY` 是部署用主密钥，不是第三方 API key。
+- 自动采集只生成草稿；管理员可查看完整运行批次与线上版本，人工终审后原子发布。失败保留上一版；人工编辑与定时稿不被覆盖。来源配置、运行、批次预览/审核接口在 `/api/admin/collection`；采集令牌不能进入该管理入口。
+- OpenRouter 每天北京时间 12:00 采集最近三个完整 UTC 日的 Token 用量快照，公开读接口 `/discover/model-usage[?date=]` 与 `/discover/model-usage/dates`，精确整数以字符串传输。能力榜 v2 为 `/discover/models/v2`，缺失指标为 null；旧模型接口兼容保留。
+- 开源热榜只记录明确配置的最多 30 个仓库；第一天是基线，满八个连续日边界才能形成完整七日净增，缺采样标明观测天数。日报仅采 OpenAI/DeepMind/Google Research 固定官方 RSS 标题、来源、链接和时间，北京时间每天最多十个新候选，不抓正文。
+- 工具来源最多十个 GitHub 仓库，只收正式版本与可识别主程序资产。官方摘要优先，缺摘要才在后台有界流式下载核验；128 MiB/文件、累计 256 MiB/次，不执行文件。未识别架构与超限资产提示人工维护。模型上新、限免、额度重置、导航与资料继续人工编辑，不推断全局实时额度。
 - 集成测试：`TEST_DATABASE_URL=postgres://… cargo test --locked --manifest-path services/server-forum/Cargo.toml discover`。未设置 `TEST_DATABASE_URL` 会跳过数据库测试；测试使用独立 schema，覆盖原有接口、草稿隔离、批量事务、作用域与撤销、并发版本冲突、审核和定时发布。
 
 ### 发现页编辑与发布
@@ -210,3 +214,15 @@ API：
 结构化导入包含 `author_uid/external_id/title/category/body/tags/images`，其中 `images` 是 `{path,data_base64}` 列表（仅用于传输，正式 Markdown 仍是站内 URL）。更新需传 `overwrite:true`，后台编辑还带 `expected_updated_at` 防止覆盖并发修改。单请求上限 30 MiB。生产 Nginx 应给 `/api/editor/drafts` 放宽 `client_max_body_size 31m`，否则图文包可能被代理拒绝；其他上传接口限制不变。
 
 验证：`npm --prefix services/server-forum/web run test:post-bundle`、`python -m unittest discover -s tools/claude-skills/forum-post-studio/scripts -p 'test_*.py'`。数据库回归：设置隔离的 `TEST_DATABASE_URL` 后执行 `cargo test --locked --manifest-path services/server-forum/Cargo.toml handlers::editor`，涵盖作者隔离、令牌撤销、待发布图片私有性、图片保留及重复发布；账号创建回归在账号服务 `admin_and_scoped_service_create_real_users_without_fake_verified_identities` 测试中。
+
+### 精选与官方挑战
+
+管理台 `/admin/community-editorial` 支持人工选择首页精选作品、排序和挑战草稿的保存/终审发布/撤回/关闭。精选、参赛作品、内容包详情/分享及方案引用联动作者封禁、作品下架与关联讨论阅读权限；不可用引用只返回 id/版本/available=false，不返回旧标题和路径。
+
+公开 `GET /api/challenges[/{key}]`；登录后 `POST /api/challenges/{key}/entries {pack_id}` 仅能提交自己的已发布作品，按服务端开始/截止时间判定，重复投稿幂等。人工精选与顺序更新记审计，点赞沿用作品原讨论帖的真实计数，不创造挑战票数或积分。
+
+方案详情、列表与作者下架已补齐，网页 `/schemes`、`/schemes/{id}`、`/schemes/new` 可浏览和组装 1～20 个已发布作品的固定版本；`/me/works?tab=schemes` 管理自己的方案。分享链接匿名可读，下架后不可访问。方案只存社区对象引用，不上传私人资料、Agent 记忆或密钥。
+
+本次实施、本地验证及未完成的生产/真机验收见 [社区验收记录](../../docs/product/验收记录_社区全功能_2026-10-31.md)。未配置真实第三方凭据的来源不能记为线上已接通。
+
+工具镜像管理台 `/admin/tool-mirrors` 从已采集草稿按精确版本选择资产，资源机完成签名回执与回读核验后登记；登记不改变草稿或发布状态。公开 `/api/discover/tool-mirrors/{key}/{asset_id}/{sha}` 只接受已发布且发布时间已到的精确资产，资源故障回退官方来源。接入及反向代理超时见[镜像协议](../server-resource/docs/tool-mirrors.md)。

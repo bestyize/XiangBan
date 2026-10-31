@@ -170,14 +170,17 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
     var nickname by remember { mutableStateOf<String?>(null) }
     var points by remember { mutableStateOf<Int?>(null) }
     var unread by remember { mutableStateOf(0) }
+    val notificationRevision by env.social.notificationRevision.collectAsState()
     val site = env.config.forumBase.trimEnd('/')
 
     // 登录后向论坛确认一次身份，顺便取昵称、积分和未读数；失败不影响页面。
-    LaunchedEffect(session.loggedIn) {
+    LaunchedEffect(session.loggedIn, session.accountId) {
         if (!session.loggedIn) { nickname = null; points = null; unread = 0; return@LaunchedEffect }
         runCatching { env.forum.session().user }.onSuccess { nickname = it.nickname; points = it.points }
-        runCatching { env.forum.unreadCount() }.onSuccess { unread = it }
         env.remoteChat.refreshPeers()
+    }
+    LaunchedEffect(session.loggedIn, session.accountId, notificationRevision) {
+        if (session.loggedIn) runCatching { env.forum.unreadCount() }.onSuccess { unread = it }
     }
 
     Column(Modifier.fillMaxSize()) {
@@ -201,8 +204,8 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
             }
 
             Row(Modifier.padding(top = 8.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(vertical = 14.dp, horizontal = 4.dp)) {
-                QuickTile(XIcons.Folder, "我的作品", Modifier.weight(1f)) { env.platform?.openUrl("$site/me/works") }
-                QuickTile(XIcons.Message, if (unread > 0) "通知 · $unread" else "通知", Modifier.weight(1f)) { env.platform?.openUrl("$site/notifications") }
+                QuickTile(XIcons.Folder, "我的作品", Modifier.weight(1f)) { open(if (session.loggedIn) Route.MyWorks else Route.Login) }
+                QuickTile(XIcons.Message, if (unread > 0) "通知 · $unread" else "通知", Modifier.weight(1f)) { open(if (session.loggedIn) Route.Notifications else Route.Login) }
                 QuickTile(XIcons.Monitor, "创作", Modifier.weight(1f)) { open(Route.AiChat) }
             }
 
@@ -213,7 +216,10 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
                     peers.any { it.online } -> peers.first { it.online }.name + " · 在线"
                     else -> "${peers.size} 台设备 · 离线"
                 }
-                NavRow("模型与额度", first = true) { open(Route.Models) }
+                NavRow("帖子收藏", first = true) { open(if (session.loggedIn) Route.Bookmarks else Route.Login) }
+                NavRow("关注与粉丝") { session.accountId?.let { open(Route.User(it, "following")) } ?: open(Route.Login) }
+                NavRow("屏蔽的用户") { open(if (session.loggedIn) Route.Blocks else Route.Login) }
+                NavRow("模型与额度") { open(Route.Models) }
                 NavRow("我的设备", computers) { open(Route.Devices) }
                 NavRow("帮助与反馈") { env.platform?.openUrl("$site/c/site-feedback") }
             }

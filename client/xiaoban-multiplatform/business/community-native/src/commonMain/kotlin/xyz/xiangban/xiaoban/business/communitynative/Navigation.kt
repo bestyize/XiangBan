@@ -3,6 +3,16 @@ package xyz.xiangban.xiaoban.business.communitynative
 /** 页面栈里的一页。编码成字符串，方便旋转屏幕后恢复。 */
 sealed interface Route {
     data class Pack(val id: Long) : Route
+    data class Ability(val id: Long) : Route
+    data class Scheme(val id: Long) : Route
+    data object MyWorks : Route
+    data object Notifications : Route
+    data object Challenges : Route
+    data class Challenge(val key: String) : Route
+    data object Bookmarks : Route
+    data object Blocks : Route
+    data class User(val uid: String, val tab: String = "topics") : Route
+    data class PublishPack(val packId: Long? = null) : Route
     data class Topic(val id: Long) : Route
     data class Weekly(val week: String) : Route
     data class Project(val slug: String) : Route
@@ -34,6 +44,16 @@ sealed interface Route {
 
     fun encode(): String = when (this) {
         is Pack -> "pack:$id"
+        is Ability -> "ability:$id"
+        is Scheme -> "scheme:$id"
+        MyWorks -> "myworks"
+        Notifications -> "notifications"
+        Challenges -> "challenges"
+        is Challenge -> "challenge:$key"
+        Bookmarks -> "bookmarks"
+        Blocks -> "blocks"
+        is User -> "user:$uid:$tab"
+        is PublishPack -> packId?.let { "publishpack:$it" } ?: "publishpack"
         is Topic -> "topic:$id"
         is Weekly -> "weekly:$week"
         is Project -> "project:$slug"
@@ -61,6 +81,16 @@ sealed interface Route {
             val value = text.substringAfter(':', "")
             return when (key) {
                 "pack" -> value.toLongOrNull()?.let(::Pack)
+                "ability" -> value.toLongOrNull()?.takeIf { it > 0 }?.let(::Ability)
+                "scheme" -> value.toLongOrNull()?.takeIf { it > 0 }?.let(::Scheme)
+                "myworks" -> MyWorks
+                "notifications" -> Notifications
+                "challenges" -> Challenges
+                "challenge" -> value.takeIf { it.isNotEmpty() }?.let(::Challenge)
+                "bookmarks" -> Bookmarks
+                "blocks" -> Blocks
+                "user" -> value.substringBefore(':').takeIf { it.isNotEmpty() }?.let { User(it, value.substringAfter(':', "topics")) }
+                "publishpack" -> if (value.isEmpty()) PublishPack() else value.toLongOrNull()?.takeIf { it > 0 }?.let(::PublishPack)
                 "topic" -> value.toLongOrNull()?.let(::Topic)
                 "weekly" -> value.takeIf { it.isNotEmpty() }?.let(::Weekly)
                 "project" -> value.takeIf { it.isNotEmpty() }?.let(::Project)

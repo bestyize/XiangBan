@@ -251,7 +251,8 @@ internal fun NewsRow(item: NewsItem, onClick: () -> Unit) {
             Text(item.title, fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 22.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Dot(accent, 16.dp)
-                Text(listOf(item.source, agoText(item.publishedAt)).filter { it.isNotEmpty() }.joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val time = agoText(item.sourcePublishedAt ?: item.publishedAt)
+                Text(listOf(item.source, if (item.timeBasis == "collected") "采集于 $time" else time).filter { it.isNotEmpty() }.joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -321,7 +322,7 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
     WhiteCard(padding = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("第 ${issue.issueNo} 期", Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (issue.source == "GitHub") "观测榜" else "第 ${issue.issueNo} 期", Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 Text(listOf(issue.weekStart, issue.weekEnd).filter { it.isNotEmpty() }.joinToString(" – "), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onPast).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -331,13 +332,13 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
         }
         Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
             Column {
-                Text("前 ${issue.ranks.size.coerceAtLeast(1)} 名本周新增 star", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                Text(if (issue.source == "GitHub") "前 ${issue.ranks.size} 名 · ${issue.observedDays ?: 0} 日观测净增 star" else "前 ${issue.ranks.size.coerceAtLeast(1)} 名本周新增 star", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                 Text(formatGain(issue.totalGain).removePrefix("+"), Modifier.padding(top = 2.dp), fontSize = 28.sp, fontWeight = FontWeight.Bold)
                 if (issue.wowPct != 0.0) Text(if (issue.wowPct > 0) "比上周多 ${formatScore(issue.wowPct)}%" else "比上周少 ${formatScore(-issue.wowPct)}%", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (issue.dailyGain.size == 7) DayBars(issue.dailyGain, listOf("一", "二", "三", "四", "五", "六", "日"))
+            if (issue.dailyGain.size == 7 && issue.source != "GitHub") DayBars(issue.dailyGain, listOf("一", "二", "三", "四", "五", "六", "日"))
         }
-        Text("按 7 日新增 star 排序，只收 AI 相关项目" + if (issue.sample) " · 示例数据" else "", Modifier.padding(top = 10.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        Text((if (issue.source == "GitHub") "来源 GitHub · 候选仓库观测榜" + if (issue.complete) " · 已取得连续 7 日边界快照" else " · 观测尚未满 7 日或存在缺采，历史不补造" else "按 7 日新增 star 排序，只收 AI 相关项目") + if (issue.sample) " · 示例数据" else "", Modifier.padding(top = 10.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -359,6 +360,8 @@ private fun RepoCard(env: CommunityEnv, r: RepoRank) {
             Column(Modifier.weight(1f)) {
                 Text(r.fullName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = 6.dp))
                 if (r.description.isNotEmpty()) Text(r.description, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (r.suspectedGrowth) Text("增长异常 · 编辑复核后收录", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (r.observedDays != null && !r.complete) Text("实际观测 ${r.observedDays} 天，缺采日期未补值", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                 Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     LangLine(r)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -388,7 +391,7 @@ private fun IssuePicker(env: CommunityEnv, current: String?, onPick: (String?) -
         LoadBox(state, loader::reload) { list ->
             if (list.items.isEmpty()) Text("还没有往期", Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
             list.items.take(12).forEachIndexed { i, ref ->
-                RadioRow(selected = (current ?: list.items.first().key) == ref.key, title = "第 ${ref.issueNo} 期", desc = listOf(ref.weekStart, ref.weekEnd).filter { it.isNotEmpty() }.joinToString(" – ").ifEmpty { null }, onClick = { onPick(if (i == 0) null else ref.key) })
+                RadioRow(selected = (current ?: list.items.first().key) == ref.key, title = if (ref.key.startsWith("github-rolling-")) "${ref.weekEnd} 观测榜" else "第 ${ref.issueNo} 期", desc = listOf(ref.weekStart, ref.weekEnd).filter { it.isNotEmpty() }.joinToString(" – ").ifEmpty { null }, onClick = { onPick(if (i == 0) null else ref.key) })
             }
         }
         GhostPillButton("取消", onDismiss, Modifier.padding(top = 8.dp).fillMaxWidth())
@@ -397,72 +400,9 @@ private fun IssuePicker(env: CommunityEnv, current: String?, onPick: (String?) -
 
 // ───────────── 排行榜 ─────────────
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RankTab(env: CommunityEnv, open: (Route) -> Unit) {
-    val loader = rememberLoader(env, "models") { env.forum.modelBoard() }
-    val state by loader.state.collectAsState()
-    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
-        LoadBox(state, loader::reload) { board ->
-            val iqRows = remember(board) { rankModels(board.models, Metric.Iq).take(10) }
-            val speedRows = remember(board) { rankModels(board.models, Metric.Speed).take(5) }
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = ListPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
-                item { IqCard(board, iqRows, open) }
-                item {
-                    WhiteCard(padding = 14.dp) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("智能 vs 价格", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                Text("左上角最划算", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                            }
-                            IconTap(XIcons.Fullscreen, "全屏查看", { open(Route.Scatter) }, Modifier.offset(x = 6.dp, y = (-4).dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        ScatterPlot(board.models, board.vendors, Modifier.padding(top = 12.dp).fillMaxWidth().height(200.dp))
-                        Text("横轴：综合价格（美元/百万 token，对数刻度）", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                    }
-                }
-                item {
-                    WhiteCard(padding = 14.dp) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("输出速度 Top 5", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                            Text("token/秒", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                        }
-                        Column(Modifier.padding(top = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            speedRows.forEach { row ->
-                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    Text(row.model.name, Modifier.width(48.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
-                                    HBar(row.fraction, vendorColor(board.vendor(row.model.vendor)), Modifier.weight(1f), height = 14.dp, track = LocalExtraColors.current.fill)
-                                    Text("${row.value.toInt()}", Modifier.width(32.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End)
-                                }
-                            }
-                        }
-                    }
-                }
-                item { FootNote(listOf("数据来源 ${board.source.ifEmpty { "Artificial Analysis" }}", if (board.sample) "示例数据" else "").filter { it.isNotEmpty() }.joinToString(" · ")) }
-            }
-        }
-    }
-}
-
-/** AA 智能指数前 10 名：从上到下，分数高的在上；每行 厂商标志 + 模型名 + 一条从左往右的柱子（厂商品牌色，长度按分数）+ 分数。 */
-@Composable
-private fun IqCard(board: ModelBoard, rows: List<xyz.xiangban.xiaoban.common.community.RankRow>, open: (Route) -> Unit) {
-    WhiteCard(padding = 14.dp) {
-        Row(verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f)) {
-                Text("AA 智能指数", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text("综合推理、知识、数学、编程等 10 项评测 · 越高越好", Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
-            }
-            Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { open(Route.Leaderboard) }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("全部排行", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
-                XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
-            }
-        }
-        Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            rows.forEach { row -> ModelBarRow(row, board.vendor(row.model.vendor), formatScore(row.value)) }
-        }
-        VendorLegend(board.vendors, Modifier.padding(top = 12.dp))
-    }
+    LiveRankingsContent(env, open, preview = true)
 }
 
 // ───────────── 追踪 ─────────────

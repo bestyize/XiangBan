@@ -176,61 +176,9 @@ internal fun sourceNote(board: ModelBoard): String =
 /** 模型天梯：顶部是指标和筛选标签，下面一张白卡里按分数从高到低排成一个列表，样式和排行榜首页的卡片一样。 */
 @Composable
 fun LeaderboardScreen(env: CommunityEnv, back: () -> Unit) {
-    val loader = rememberLoader(env, "models") { env.forum.modelBoard() }
-    val state by loader.state.collectAsState()
-    var metricName by rememberSaveable { mutableStateOf(Metric.Iq.name) }
-    var filterName by rememberSaveable { mutableStateOf(ModelFilter.All.name) }
-    var help by remember { mutableStateOf(false) }
-    val metric = Metric.valueOf(metricName)
-    val filter = ModelFilter.valueOf(filterName)
-
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            ScreenBar("模型天梯", onBack = back, trailing = {
-                Text("指标说明", Modifier.clip(RoundedCornerShape(8.dp)).clickable { help = true }.padding(8.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            })
-            TabStrip(Metric.entries.map { it.name to it.label }, metricName) { metricName = it }
-            LoadBox(state, loader::reload) { board ->
-                val rows = remember(board, metric, filter) { rankModels(board.models, metric, filter) }
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(Gap)) {
-                    item {
-                        LazyRow(Modifier.padding(top = 10.dp, bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(ModelFilter.entries) { f -> PageChip(f.label, f == filter) { filterName = f.name } }
-                        }
-                    }
-                    item {
-                        WhiteCard(padding = 14.dp) {
-                            Row(verticalAlignment = Alignment.Top) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(metric.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                    Text(metric.unitText, Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
-                                }
-                                Text("${rows.size} 个模型", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                            }
-                            if (rows.isEmpty()) {
-                                Text("没有符合筛选的模型", Modifier.padding(vertical = 24.dp).fillMaxWidth(), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                            } else {
-                                Column(Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    rows.forEach { row -> ModelBarRow(row, board.vendor(row.model.vendor), metric.valueText(row.model), nameWidth = 64.dp, valueWidth = 40.dp) }
-                                }
-                            }
-                            VendorLegend(board.vendors, Modifier.padding(top = 12.dp))
-                        }
-                    }
-                    item { FootNote(sourceNote(board)) }
-                }
-            }
-        }
-        OverlayTransition(help, direction = "center") {
-            CenterDialog({ help = false }) {
-                Text("指标说明", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Metric.entries.forEach { m ->
-                    Text(m.title, Modifier.padding(top = 12.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text(m.help, Modifier.padding(top = 2.dp), fontSize = 13.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                GhostPillButton("知道了", { help = false }, Modifier.padding(top = 16.dp).fillMaxWidth())
-            }
-        }
+    Column(Modifier.fillMaxSize()) {
+        ScreenBar("模型排行榜", onBack = back)
+        LiveRankingsContent(env)
     }
 }
 
@@ -338,70 +286,5 @@ fun ScatterPlot(
 /** 横屏全屏的「智能 vs 价格」：左边大图，右边是选中模型的详情和厂商图例。进入时锁横屏，离开恢复。 */
 @Composable
 fun ScatterScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
-    DisposableEffect(env) {
-        env.platform?.setLandscape(true)
-        onDispose { env.platform?.setLandscape(false) }
-    }
-    val loader = rememberLoader(env, "models") { env.forum.modelBoard() }
-    val state by loader.state.collectAsState()
-    var filterName by rememberSaveable { mutableStateOf(ModelFilter.All.name) }
-    var selected by rememberSaveable { mutableStateOf<String?>(null) }
-    val filter = ModelFilter.valueOf(filterName)
-
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.statusBars))) {
-        Row(Modifier.fillMaxWidth().height(44.dp).background(MaterialTheme.colorScheme.surface).padding(start = 4.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            IconTap(XIcons.ChevronLeft, "退出全屏", back)
-            Text("智能 vs 价格", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text("纵轴 AA 智能指数 · 横轴综合价格（美元/百万 token，对数刻度）", Modifier.weight(1f), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf(ModelFilter.All to "全部", ModelFilter.Reasoning to "推理", ModelFilter.Open to "开源", ModelFilter.Cn to "国产").forEach { (f, label) ->
-                    val on = f == filter
-                    Text(
-                        label,
-                        Modifier.height(28.dp).clip(RoundedCornerShape(14.dp)).background(if (on) LocalExtraColors.current.brandSoft else LocalExtraColors.current.fill).clickable { filterName = f.name }.padding(horizontal = 12.dp, vertical = 4.dp),
-                        fontSize = 13.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, color = if (on) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
-        LoadBox(state, loader::reload) { board ->
-            val current = board.models.firstOrNull { it.key == selected && filter.accepts(it) } ?: board.models.firstOrNull { filter.accepts(it) }
-            Row(Modifier.fillMaxSize().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(Gap)) {
-                Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).padding(start = 8.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)) {
-                    ScatterPlot(board.models, board.vendors, Modifier.fillMaxSize(), ScatterMode.Full, filter, current?.key, onSelect = { selected = it })
-                }
-                Column(Modifier.width(228.dp).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Gap)) {
-                    WhiteCard(padding = 12.dp) {
-                        if (current != null) {
-                            val vendor = board.vendor(current.vendor)
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                VendorTile(vendor)
-                                Column {
-                                    Text(current.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                    Text(listOfNotNull(vendor?.name, "推理".takeIf { current.reasoning }, if (current.open) "开源" else "闭源").joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                                }
-                            }
-                            Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(Gap)) {
-                                StatBlock("智能", formatScore(current.iq), Modifier.weight(1f), tight = true)
-                                StatBlock("价格", "$" + formatScore(current.price), Modifier.weight(1f), tight = true)
-                                StatBlock("速度", "${current.speed.toInt()}", Modifier.weight(1f), tight = true)
-                            }
-                            Box(Modifier.padding(top = 10.dp)) { SubBars(current, vendorColor(vendor), 48.dp, 6.dp, 5.dp, 12) }
-                            Text(
-                                "在天梯中查看",
-                                Modifier.padding(top = 10.dp).fillMaxWidth().height(30.dp).clip(RoundedCornerShape(15.dp)).background(LocalExtraColors.current.fill).clickable { open(Route.Leaderboard) }.padding(top = 6.dp),
-                                fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            )
-                        } else {
-                            Text("没有符合筛选的模型", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    WhiteCard(padding = 12.dp) {
-                        VendorLegend(board.vendors)
-                        Text("点圆点看详情${if (board.sample) " · 示例数据" else ""}", Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                    }
-                }
-            }
-        }
-    }
+    LiveRankingsScatterScreen(env, back)
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 资源机异地备份：把 packs/ 和 covers/ 追加式同步到备份机，并核对校验清单。
+# 资源机异地备份：把 packs/、covers/ 和 tools/ 追加式同步到备份机，并核对校验清单。
 #
 # 内容包和封面的文件键不会复用，所以备份只增不删：主机上误删文件不会连带删掉备份。
 # 用法：
@@ -26,11 +26,23 @@ backup() {
   [ -d "$DATA_DIR" ] || { echo "数据目录不存在：$DATA_DIR" >&2; exit 1; }
   sums="$(mktemp)"
   # 先生成本机清单：之后在备份端按它核对，才能发现传输中的损坏。
-  (cd "$DATA_DIR" && find packs covers -type f 2>/dev/null | LC_ALL=C sort | xargs -r sha256sum) > "$sums"
+  (cd "$DATA_DIR" && {
+    for tree in packs covers tools; do
+      if [ -d "$tree" ]; then
+        if [ "$tree" = tools ]; then find "$tree" -type f -name '*.bin'; else find "$tree" -type f; fi
+      fi
+    done
+  } | LC_ALL=C sort | xargs -r sha256sum) > "$sums"
   remote_run "mkdir -p '$(target_path)'"
   # 不带 --delete：只增不删。
-  rsync -a --partial --ignore-existing --relative "$DATA_DIR/./packs" "$DATA_DIR/./covers" "$TARGET/" 2>/dev/null \
-    || rsync -a --partial --ignore-existing --relative "$DATA_DIR/./packs" "$TARGET/"
+  local tree destination
+  destination="$TARGET"
+  if ! is_remote; then destination="$(cd "$TARGET" && pwd)"; fi
+  for tree in packs covers tools; do
+    if [ -d "$DATA_DIR/$tree" ]; then
+      (cd "$DATA_DIR" && rsync -a --partial --ignore-existing --relative --exclude='*.part' --exclude='.quota.lock' "$tree" "$destination/")
+    fi
+  done
   # 备份端的清单只增不删：和旧清单按路径合并（新的覆盖旧的），主机上删掉的文件仍然在清单里被核对。
   local old merged
   old="$(mktemp)"; merged="$(mktemp)"
@@ -38,7 +50,7 @@ backup() {
   awk '{ path = substr($0, 67); lines[path] = $0 } END { for (p in lines) print lines[p] }' "$old" "$sums" | LC_ALL=C sort -k2 > "$merged"
   rsync -a "$merged" "$TARGET/$MANIFEST"
   rm -f "$old" "$merged"
-  echo "已备份 $(wc -l < "$sums") 个文件到 $TARGET，清单共 $(remote_run "wc -l < '$(target_path)/$MANIFEST'") 项"
+  echo "已备份 $(wc -l < "$sums") 个文件到 ${TARGET}，清单共 $(remote_run "wc -l < '$(target_path)/$MANIFEST'") 项"
 }
 
 verify() {

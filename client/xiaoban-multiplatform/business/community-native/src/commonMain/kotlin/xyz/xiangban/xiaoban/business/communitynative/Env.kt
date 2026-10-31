@@ -43,6 +43,9 @@ import xyz.xiangban.xiaoban.common.link.RemoteChatController
 /** 各平台才能做的事：复制到剪贴板、系统分享面板、用浏览器打开链接。不提供时对应按钮不可用。 */
 interface PlatformActions : VoicePlatform {
     val supportsChatAttachments: Boolean get() = false
+    /** 未接系统文件选择器的平台（当前 iOS）明确降级到网页，不申请全盘访问权限。 */
+    val forumFilePickerSupported: Boolean get() = false
+    suspend fun pickForumFile(image: Boolean, maxBytes: Long): xyz.xiangban.xiaoban.common.community.ForumUploadFile? = null
     fun copy(text: String)
     fun share(title: String, url: String)
     fun openUrl(url: String)
@@ -126,6 +129,9 @@ class CommunityEnv(
     private var accountChanged: (String?, String?) -> Unit = { _, _ -> }
     val session = SessionManager(account, storage, now = { Clock.System.now().toEpochMilliseconds() }, onAccountChanged = { old, new -> accountChanged(old, new) })
     val forum = ForumApi(client, config) { session.accessToken() }
+    val content = xyz.xiangban.xiaoban.common.community.ContentPublishingApi(client, config) { session.accessToken() }
+    val social = xyz.xiangban.xiaoban.common.community.SocialApi(client, config) { session.accessToken() }
+    val challenges = xyz.xiangban.xiaoban.common.community.ChallengesApi(client, config) { session.accessToken() }
     val ai = AiGatewayApi(client, config) { session.accessToken() }
 
     val games: MobileGameStore? = workspace?.let(::MobileGameStore)

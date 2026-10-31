@@ -111,6 +111,8 @@ async function submit() {
     <form class="publish" novalidate @submit.prevent="submit">
       <h1>{{ packId ? `发布新版本${existing ? `：${existing.title}` : ''}` : '发布内容包' }}</h1>
 
+      <p v-if="!packId" class="hint"><RouterLink to="/schemes/new">用自己的已上架作品组合发布方案</RouterLink></p>
+
       <label v-if="!packId" class="field">
         <span>类型</span>
         <select v-model="form.kind" class="select">

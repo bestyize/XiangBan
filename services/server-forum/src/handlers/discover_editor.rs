@@ -244,6 +244,33 @@ fn validate(e: &Editor, kind: &str, key: &str, input: &mut Input) -> AppResult<(
             "key 只能用小写字母、数字、连字符和下划线".into(),
         ));
     }
+    if kind == "model_board" && key != "artificial-analysis" {
+        return Err(AppError::BadRequest(
+            "能力榜标识必须为 artificial-analysis".into(),
+        ));
+    }
+    if kind == "model_usage"
+        && (input.data["date"].as_str() != Some(key)
+            || chrono::NaiveDate::parse_from_str(key, "%Y-%m-%d")
+                .map(|d| d.to_string() != key)
+                .unwrap_or(true))
+    {
+        return Err(AppError::BadRequest(
+            "调用量榜标识必须与统计日期一致".into(),
+        ));
+    }
+    if kind == "repo_issue"
+        && input.data["source"] == "GitHub"
+        && key
+            != format!(
+                "github-rolling-{}",
+                input.data["observation_end"].as_str().unwrap_or_default()
+            )
+    {
+        return Err(AppError::BadRequest(
+            "GitHub 榜单标识必须与观测结束日期一致".into(),
+        ));
+    }
     if input.expected_revision < 0 {
         return Err(AppError::BadRequest("版本号不能为负数".into()));
     }
@@ -384,7 +411,16 @@ async fn preview(
         source_url: String::new(),
         expected_revision: 0,
     };
-    validate(&e, &kind, "preview", &mut input)?;
+    let preview_key = match kind.as_str() {
+        "model_board" => "artificial-analysis".to_string(),
+        "repo_issue" if input.data["source"] == "GitHub" => format!(
+            "github-rolling-{}",
+            input.data["observation_end"].as_str().unwrap_or_default()
+        ),
+        "model_usage" => input.data["date"].as_str().unwrap_or_default().to_string(),
+        _ => "preview".to_string(),
+    };
+    validate(&e, &kind, &preview_key, &mut input)?;
     if kind == "model" {
         input.data["tier"] = json!(discover::tier_for(input.data["iq"].as_f64().unwrap_or(0.0)));
     }
@@ -669,4 +705,279 @@ async fn revoke_token(
     .await?;
     tx.commit().await?;
     Ok(Json(json!({"ok":true})))
+}
+
+/// 采集/来源快照时刻不构成内容变化；保留第一次待审的 as_of，实质数据变化才出新版本。
+fn collected_content(value: &Value) -> Value {
+    let mut value = value.clone();
+    if let Some(object) = value.as_object_mut() {
+        object.remove("as_of");
+    }
+    value
+}
+
+/// 采集批次以相同草稿锁和序列写入；任何条目冲突使整批回滚。
+pub async fn write_collected_batch(
+    pool: &PgPool,
+    source: &str,
+    run_id: Uuid,
+    mut items: Vec<crate::collectors::CollectedItem>,
+) -> AppResult<usize> {
+    if items.is_empty() || items.len() > 1000 {
+        return Err(AppError::BadRequest("采集批次应含 1–1000 项".into()));
+    }
+    let operator = format!("collector:{source}");
+    let e = Editor {
+        kinds: discover::KINDS.iter().map(|s| s.to_string()).collect(),
+        operator: operator.clone(),
+        admin: false,
+    };
+    items.sort_by(|a, b| (&a.kind, &a.key).cmp(&(&b.kind, &b.key)));
+    if items
+        .windows(2)
+        .any(|w| w[0].kind == w[1].kind && w[0].key == w[1].key)
+    {
+        return Err(AppError::BadRequest("采集批次出现重复标识".into()));
+    }
+    let mut tx = pool.begin().await?;
+    // 锁住租约至写入完成，过期 worker 不得写入接替者的任务。
+    let active: Option<(Uuid,)> = sqlx::query_as("SELECT active_run FROM collection_sources WHERE id=$1 AND active_run=$2 AND lease_until>now() AND config=(SELECT config FROM collection_runs WHERE id=$2) FOR UPDATE")
+        .bind(source).bind(run_id).fetch_optional(&mut *tx).await?;
+    if active.is_none() {
+        return Err(AppError::Conflict("采集租约已失效".into()));
+    }
+    let (used,): (i64,) = sqlx::query_as("SELECT count(*) FROM collection_news_daily WHERE day=(now() AT TIME ZONE 'Asia/Shanghai')::date")
+        .fetch_one(&mut *tx).await?;
+    let mut news_remaining = 10i64.saturating_sub(used);
+    let mut saved_count = 0;
+    for item in items {
+        let allowed = match source {
+            "artificial_analysis" => {
+                item.kind == "model_board" && item.key == "artificial-analysis"
+            }
+            "openrouter" => {
+                item.kind == "model_usage"
+                    && chrono::NaiveDate::parse_from_str(&item.key, "%Y-%m-%d").is_ok()
+            }
+            "github_repos" => {
+                item.kind == "repo_issue"
+                    && item.data["source"] == "GitHub"
+                    && item
+                        .key
+                        .strip_prefix("github-rolling-")
+                        .is_some_and(|date| {
+                            chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d").is_ok()
+                        })
+            }
+            "github_tools" => item.kind == "tool" && item.data["source"] == "GitHub Releases"
+                && item.data["github_repo_id"].as_i64().is_some_and(|id|item.key == format!("github-tool-{id}")),
+            "official_news" => item.kind == "news" && item.key.starts_with("news-"),
+            _ => false,
+        };
+        if !allowed {
+            return Err(AppError::BadRequest("采集来源越过内容边界".into()));
+        }
+        lock(&mut tx, &item.kind, &item.key).await?;
+        let old: Option<Draft> = sqlx::query_as(&format!(
+            "SELECT {COLS} FROM discover_drafts WHERE kind=$1 AND key=$2"
+        ))
+        .bind(&item.kind)
+        .bind(&item.key)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let new_news = source == "official_news" && old.is_none();
+        if new_news && news_remaining <= 0 { continue; }
+        let owned: Option<(String, i64)> = sqlx::query_as(
+            "SELECT source,revision FROM collection_owned_items WHERE kind=$1 AND key=$2",
+        )
+        .bind(&item.kind)
+        .bind(&item.key)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let mut input = Input {
+            data: item.data,
+            sort_order: item.sort_order,
+            published_at: item.published_at,
+            source_name: item.source_name,
+            source_url: item.source_url,
+            sample: false,
+            expected_revision: old.as_ref().map_or(0, |d| d.revision),
+        };
+        validate(&e, &item.kind, &item.key, &mut input)?;
+        let same = old.as_ref().is_some_and(|d| {
+            collected_content(&d.data) == collected_content(&input.data)
+                && d.sort_order == input.sort_order
+                && d.published_at == input.published_at
+                && d.source_name == input.source_name
+                && d.source_url == input.source_url
+        });
+        if let Some(d) = &old {
+            check_base(&mut tx, d).await?;
+            let owner_matches = owned.as_ref().is_some_and(|(owner, revision)| {
+                owner == source && (*revision == d.revision || d.status == "published")
+            });
+            if !owner_matches || d.updated_by != operator || (!same && d.status == "scheduled") {
+                return Err(AppError::Conflict("草稿已被人工修改或审核".into()));
+            }
+        } else {
+            let live: Option<(bool,)> =
+                sqlx::query_as("SELECT true FROM discover_items WHERE kind=$1 AND key=$2")
+                    .bind(&item.kind)
+                    .bind(&item.key)
+                    .fetch_optional(&mut *tx)
+                    .await?;
+            if live.is_some() {
+                return Err(AppError::Conflict(
+                    "已有手录线上内容，不允许采集覆盖".into(),
+                ));
+            }
+        }
+        let revision = if same {
+            old.as_ref().unwrap().revision
+        } else {
+            write(&mut tx, &e, &item.kind, &item.key, input)
+                .await?
+                .revision
+        };
+        sqlx::query("INSERT INTO collection_owned_items(source,kind,key,revision) VALUES($1,$2,$3,$4) ON CONFLICT(kind,key) DO UPDATE SET revision=$4")
+            .bind(source).bind(&item.kind).bind(&item.key).bind(revision).execute(&mut *tx).await?;
+        sqlx::query(
+            "INSERT INTO collection_run_items(run_id,kind,key,revision) VALUES($1,$2,$3,$4)",
+        )
+        .bind(run_id)
+        .bind(&item.kind)
+        .bind(&item.key)
+        .bind(revision)
+        .execute(&mut *tx)
+        .await?;
+        if new_news {
+            sqlx::query("INSERT INTO collection_news_daily(day,key) VALUES((now() AT TIME ZONE 'Asia/Shanghai')::date,$1) ON CONFLICT DO NOTHING")
+                .bind(&item.key).execute(&mut *tx).await?;
+            news_remaining -= 1;
+        }
+        saved_count += 1;
+    }
+    tx.commit().await?;
+    Ok(saved_count)
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BatchReviewItem {
+    pub kind: String,
+    pub key: String,
+    pub expected_revision: i64,
+}
+
+/// 整批按预览过的 revision 立即发布；复用单条发布校验及审计。
+pub async fn review_collected_batch(
+    pool: &PgPool,
+    run_id: Uuid,
+    operator: &str,
+    mut items: Vec<BatchReviewItem>,
+) -> AppResult<usize> {
+    let mut tx = pool.begin().await?;
+    let run: Option<(String, Option<DateTime<Utc>>)> =
+        sqlx::query_as("SELECT status,reviewed_at FROM collection_runs WHERE id=$1 FOR UPDATE")
+            .bind(run_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let (status, reviewed) = run.ok_or_else(|| AppError::not_found("采集批次"))?;
+    if status != "succeeded" || reviewed.is_some() {
+        return Err(AppError::Conflict("此批次尚未成功或已审核".into()));
+    }
+    let manifest: Vec<(String, String, i64)> = sqlx::query_as(
+        "SELECT kind,key,revision FROM collection_run_items WHERE run_id=$1 ORDER BY kind,key",
+    )
+    .bind(run_id)
+    .fetch_all(&mut *tx)
+    .await?;
+    items.sort_by(|a, b| (&a.kind, &a.key).cmp(&(&b.kind, &b.key)));
+    if manifest.is_empty()
+        || manifest.len() != items.len()
+        || !manifest
+            .iter()
+            .zip(items.iter())
+            .all(|(a, b)| a.0 == b.kind && a.1 == b.key && a.2 == b.expected_revision)
+    {
+        return Err(AppError::Conflict("请重新读取并完整审核本批次草稿".into()));
+    }
+    for item in &items {
+        lock(&mut tx, &item.kind, &item.key).await?;
+    }
+    for item in &items {
+        let d = read(&mut tx, &item.kind, &item.key).await?;
+        check_revision(&d, item.expected_revision)?;
+        if d.status == "scheduled" {
+            return Err(AppError::Conflict(
+                "此批次有单独定时的草稿，请先取消定时".into(),
+            ));
+        }
+        check_base(&mut tx, &d).await?;
+    }
+    for item in &items {
+        let mut d = read(&mut tx, &item.kind, &item.key).await?;
+        if d.status == "published" {
+            continue;
+        }
+        sqlx::query("UPDATE discover_drafts SET reviewed_by=$3,reviewed_at=now(),status='published',publish_after=NULL,revision=nextval('discover_draft_revision_seq'),updated_at=clock_timestamp() WHERE kind=$1 AND key=$2")
+            .bind(&item.kind).bind(&item.key).bind(operator).execute(&mut *tx).await?;
+        d = read(&mut tx, &item.kind, &item.key).await?;
+        log(
+            &mut tx,
+            operator,
+            "discover.review",
+            &item.kind,
+            &item.key,
+            &format!("batch={run_id}; revision={}", d.revision),
+        )
+        .await?;
+        publish(&mut tx, &d, operator).await?;
+    }
+    sqlx::query("UPDATE collection_runs SET reviewed_by=$2,reviewed_at=now() WHERE id=$1")
+        .bind(run_id)
+        .bind(operator)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+    Ok(items.len())
+}
+
+/// 一个一致性快照内返回批次版本、当前草稿与线上内容，供逐项预览。
+pub async fn collected_batch_preview(pool: &PgPool, run_id: Uuid) -> AppResult<Value> {
+    let mut tx = pool.begin().await?;
+    sqlx::query("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        .execute(&mut *tx)
+        .await?;
+    let run: Option<(String, String, Option<DateTime<Utc>>)> =
+        sqlx::query_as("SELECT source,status,reviewed_at FROM collection_runs WHERE id=$1")
+            .bind(run_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let (source, status, reviewed_at) = run.ok_or_else(|| AppError::not_found("采集批次"))?;
+    let manifest: Vec<(String, String, i64)> = sqlx::query_as(
+        "SELECT kind,key,revision FROM collection_run_items WHERE run_id=$1 ORDER BY kind,key",
+    )
+    .bind(run_id)
+    .fetch_all(&mut *tx)
+    .await?;
+    let mut items = Vec::new();
+    for (kind, key, revision) in manifest {
+        let draft: Option<Draft> = sqlx::query_as(&format!(
+            "SELECT {COLS} FROM discover_drafts WHERE kind=$1 AND key=$2"
+        ))
+        .bind(&kind)
+        .bind(&key)
+        .fetch_optional(&mut *tx)
+        .await?;
+        let live:Option<(Value,i32,DateTime<Utc>,DateTime<Utc>,String)>=sqlx::query_as("SELECT data,sort_order,published_at,updated_at,status FROM discover_items WHERE kind=$1 AND key=$2")
+            .bind(&kind).bind(&key).fetch_optional(&mut *tx).await?;
+        let conflict = draft.as_ref().is_none_or(|d| d.revision != revision);
+        items.push(json!({"kind":kind,"key":key,"expected_revision":revision,"draft":draft,"conflict":conflict,
+            "live":live.map(|(data,sort_order,published_at,updated_at,status)|json!({"data":data,"sort_order":sort_order,"published_at":published_at,"updated_at":updated_at,"status":status}))}));
+    }
+    tx.commit().await?;
+    Ok(
+        json!({"run_id":run_id,"source":source,"status":status,"reviewed_at":reviewed_at,"items":items}),
+    )
 }

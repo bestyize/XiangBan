@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import ContentShell from '@/components/ContentShell.vue'
+import MySchemesPanel from '@/components/MySchemesPanel.vue'
 import { contentApi, type MyPack } from '@/api/content'
 import { kindLabel, trustLabel } from '@/lib/content'
 import { timeAgo } from '@/lib/format'
@@ -9,6 +11,8 @@ import { useToast } from '@/stores/toast'
 
 useHead(() => ({ title: '我的作品' }))
 const toast = useToast()
+const route = useRoute()
+const schemeTab = computed(() => route.query.tab === 'schemes')
 const items = ref<MyPack[]>([])
 const loading = ref(true)
 
@@ -42,15 +46,17 @@ async function remove(p: MyPack) {
   }
 }
 
-onMounted(load)
+watch(schemeTab, value => { if (!value) load() }, { immediate: true })
 </script>
 
 <template>
   <ContentShell>
     <div class="head">
       <h1>我的作品</h1>
-      <RouterLink class="btn btn-primary" to="/publish">发布内容包</RouterLink>
+      <RouterLink class="btn btn-primary" :to="schemeTab ? '/schemes/new' : '/publish'">{{ schemeTab ? '发布方案' : '发布内容包' }}</RouterLink>
     </div>
+    <nav class="works-tabs" aria-label="我的社区内容"><RouterLink to="/me/works" :class="{ active: !schemeTab }">内容包</RouterLink><RouterLink :to="{ path: '/me/works', query: { tab: 'schemes' } }" :class="{ active: schemeTab }">方案</RouterLink></nav>
+    <template v-if="!schemeTab">
     <p v-if="loading" class="state">加载中</p>
     <p v-else-if="!items.length" class="state">还没有发布过内容。</p>
     <ul v-else class="works">
@@ -72,10 +78,15 @@ onMounted(load)
         </div>
       </li>
     </ul>
+    </template>
+    <MySchemesPanel v-else />
   </ContentShell>
 </template>
 
 <style scoped>
+.works-tabs { display: flex; gap: 20px; padding: 8px 16px 12px; border-bottom: 1px solid var(--line); }
+.works-tabs a { color: var(--ink-3); }
+.works-tabs .active { color: var(--brand); font-weight: 600; }
 .head {
   display: flex;
   justify-content: space-between;
