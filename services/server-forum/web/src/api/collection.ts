@@ -27,7 +27,7 @@ export interface CollectionDraft {
   kind: string
   key: string
   expected_revision: number
-  draft: DiscoverDraft
+  draft: DiscoverDraft | null
   live: { data: Record<string, unknown>; sort_order: number; published_at: string | null; updated_at: string; status: string } | null
   conflict: boolean
 }
