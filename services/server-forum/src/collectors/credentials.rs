@@ -76,9 +76,12 @@ pub fn http_client() -> AppResult<reqwest::Client> {
 }
 
 pub async fn validate(source: &str, secret: &str, http: &reqwest::Client) -> AppResult<()> {
-    super::model_sources::verify_credential(source, secret, http)
-        .await
-        .map_err(|_| AppError::BadRequest("来源凭据验证失败，请检查密钥、权限或稍后重试".into()))
+    let result = if source == "github_repos" {
+        super::repo_sources::verify_credential(secret, http).await
+    } else {
+        super::model_sources::verify_credential(source, secret, http).await
+    };
+    result.map_err(|_| AppError::BadRequest("来源凭据验证失败，请检查密钥、权限或稍后重试".into()))
 }
 
 #[cfg(test)]

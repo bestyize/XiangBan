@@ -16,7 +16,9 @@ CREATE TABLE IF NOT EXISTS collection_sources (
     active_run UUID,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE collection_sources ADD COLUMN IF NOT EXISTS config JSONB NOT NULL DEFAULT '{}'::jsonb;
 INSERT INTO collection_sources(id) VALUES ('artificial_analysis'),('openrouter') ON CONFLICT DO NOTHING;
+INSERT INTO collection_sources(id,config) VALUES ('github_repos','{"repositories":[]}'::jsonb) ON CONFLICT DO NOTHING;
 CREATE TABLE IF NOT EXISTS collection_runs (
     id UUID PRIMARY KEY,
     source TEXT NOT NULL REFERENCES collection_sources(id),
@@ -28,6 +30,7 @@ CREATE TABLE IF NOT EXISTS collection_runs (
     reviewed_by TEXT,
     reviewed_at TIMESTAMPTZ
 );
+ALTER TABLE collection_runs ADD COLUMN IF NOT EXISTS config JSONB NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS collection_runs_source_date ON collection_runs(source,started_at DESC);
 CREATE TABLE IF NOT EXISTS collection_run_items (
     run_id UUID NOT NULL REFERENCES collection_runs(id) ON DELETE CASCADE,
@@ -35,6 +38,21 @@ CREATE TABLE IF NOT EXISTS collection_run_items (
     key TEXT NOT NULL,
     revision BIGINT NOT NULL,
     PRIMARY KEY(run_id,kind,key)
+);
+CREATE TABLE IF NOT EXISTS collection_github_repositories (
+    repo_id BIGINT PRIMARY KEY CHECK(repo_id>0),
+    full_name TEXT NOT NULL,
+    description TEXT NOT NULL,
+    language TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collection_github_snapshots (
+    repo_id BIGINT NOT NULL REFERENCES collection_github_repositories(repo_id),
+    day DATE NOT NULL,
+    star_total BIGINT NOT NULL CHECK(star_total>=0),
+    observed_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY(repo_id,day),
+    CHECK((observed_at AT TIME ZONE 'UTC')::date=day)
 );
 CREATE TABLE IF NOT EXISTS collection_owned_items (
     source TEXT NOT NULL REFERENCES collection_sources(id),

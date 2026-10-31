@@ -1,6 +1,7 @@
 //! 来源任务调度与草稿接入。所有网络运行在独立后台任务，仅生成待审核内容。
 pub mod credentials;
 pub mod model_sources;
+pub mod repo_sources;
 pub mod schema;
 use crate::{
     error::{AppError, AppResult},
@@ -25,6 +26,7 @@ pub fn title(source: &str) -> Option<&'static str> {
     match source {
         "artificial_analysis" => Some("Artificial Analysis 能力榜"),
         "openrouter" => Some("OpenRouter 调用量榜"),
+        "github_repos" => Some("GitHub 开源热榜"),
         _ => None,
     }
 }
@@ -39,16 +41,19 @@ pub fn check_source(source: &str) -> AppResult<()> {
 pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uuid> {
     check_source(&source)?;
     let mut tx = s.pool.begin().await?;
-    let row: Option<(Option<Vec<u8>>,bool,DateTime<Utc>,Option<DateTime<Utc>>,Option<Uuid>)>=sqlx::query_as(
-        "SELECT credential,enabled,next_run_at,lease_until,active_run FROM collection_sources WHERE id=$1 FOR UPDATE")
+    let row: Option<(Option<Vec<u8>>,bool,DateTime<Utc>,Option<DateTime<Utc>>,Option<Uuid>,Value)>=sqlx::query_as(
+        "SELECT credential,enabled,next_run_at,lease_until,active_run,config FROM collection_sources WHERE id=$1 FOR UPDATE")
         .bind(&source).fetch_optional(&mut *tx).await?;
-    let (sealed, enabled, next, lease, old_run) =
+    let (sealed, enabled, next, lease, old_run, config) =
         row.ok_or_else(|| AppError::not_found("采集来源"))?;
     if lease.is_some_and(|t| t > Utc::now()) {
         return Err(AppError::Conflict("此来源已有采集任务运行中".into()));
     }
     if scheduled && (!enabled || next > Utc::now()) {
         return Err(AppError::Conflict("此来源尚未到执行时间".into()));
+    }
+    if source == "github_repos" {
+        repo_sources::configured_names(&config)?;
     }
     let secret = credentials::decrypt(
         &source,
@@ -59,26 +64,36 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
         sqlx::query("UPDATE collection_runs SET status='failed',finished_at=now(),error='运行中断，租约已过期' WHERE id=$1 AND status='running'").bind(old).execute(&mut *tx).await?;
     }
     let id = Uuid::new_v4();
-    sqlx::query("INSERT INTO collection_runs(id,source,status) VALUES($1,$2,'running')")
+    sqlx::query("INSERT INTO collection_runs(id,source,status,config) VALUES($1,$2,'running',$3)")
         .bind(id)
         .bind(&source)
+        .bind(&config)
         .execute(&mut *tx)
         .await?;
     sqlx::query("UPDATE collection_sources SET active_run=$2,lease_until=now()+interval '10 minutes',next_run_at=CASE WHEN interval_minutes=1440 THEN date_trunc('day',(now()-interval '4 hours') AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'+interval '1 day 4 hours' ELSE now()+make_interval(mins=>interval_minutes) END WHERE id=$1")
         .bind(&source).bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
     tokio::spawn(async move {
-        let fetched = tokio::time::timeout(
-            std::time::Duration::from_secs(240),
-            model_sources::collect(&source, &secret, &http),
-        )
+        let fetched = tokio::time::timeout(std::time::Duration::from_secs(240), async {
+            if source == "github_repos" {
+                repo_sources::collect(&s.pool, &secret, &http, &config, id).await
+            } else {
+                model_sources::collect(&source, &secret, &http).await
+            }
+        })
         .await;
         let result = match fetched {
             Ok(Ok(items)) => {
                 let count = items.len() as i32;
-                crate::handlers::discover_editor::write_collected_batch(&s.pool, &source, id, items)
+                if source == "github_repos" && items.is_empty() {
+                    Ok(0)
+                } else {
+                    crate::handlers::discover_editor::write_collected_batch(
+                        &s.pool, &source, id, items,
+                    )
                     .await
                     .map(|_| count)
+                }
             }
             // Adapter errors may include upstream strings; only a fixed category is persisted.
             Ok(Err(_)) => Err(AppError::BadRequest(
