@@ -9,7 +9,10 @@ import io.ktor.websocket.readBytes
 import io.ktor.websocket.readText
 import kotlin.random.Random
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
+import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -304,6 +307,28 @@ internal object EdgeProtocol {
     }
 }
 
+/**
+ * 很快就失败的（连接被拒、握手没成）多半是一下子的事，马上再试一次；等了很久才失败的（超时）不再试，
+ * 免得这一句要等上两倍的时间。取消照常往外传，第二次的失败也照常往外传。
+ */
+internal suspend fun <T> retryQuickFailure(
+    quick: Duration = 3.seconds,
+    time: TimeSource = TimeSource.Monotonic,
+    onRetry: (Exception) -> Unit = {},
+    block: suspend () -> T,
+): T {
+    val started = time.markNow()
+    return try {
+        block()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        if (started.elapsedNow() >= quick) throw e
+        onRetry(e)
+        block()
+    }
+}
+
 /** 手机直接连 Edge 朗读合成语音（和电脑上同一个服务、同一个默认音色）。网络不通、服务拒绝连接都当作“用不了”，通话会换下一个引擎。 */
 @OptIn(ExperimentalTime::class)
 class EdgeTtsSynthesizer(
@@ -318,7 +343,7 @@ class EdgeTtsSynthesizer(
         val output = ArrayList<ByteArray>()
         var total = 0
         for (part in EdgeProtocol.chunks(text)) {
-            val audio = one(part)
+            val audio = retryQuickFailure(onRetry = { e -> println("小伴语音：Edge 很快就失败了，马上再试一次：${e.message}") }) { one(part) }
             total += audio.size
             if (total > EdgeProtocol.MaxAudio) throw EngineUnavailable("合成音频过长")
             output += audio

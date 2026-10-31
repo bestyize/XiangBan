@@ -1,12 +1,52 @@
 package xyz.xiangban.xiaoban.common.community
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TestTimeSource
 
 class EdgeTtsTest {
+    @Test
+    fun `a quick failure is tried once more and the second try counts`() = runTest {
+        var tries = 0
+        val audio = retryQuickFailure(time = TestTimeSource()) {
+            tries++
+            if (tries == 1) throw EngineUnavailable("无法连接语音服务，请检查网络") else byteArrayOf(1, 2, 3)
+        }
+        assertEquals(2, tries)
+        assertContentEquals(byteArrayOf(1, 2, 3), audio)
+    }
+
+    @Test
+    fun `a slow failure is not tried again, and neither is a second failure`() = runTest {
+        val time = TestTimeSource()
+        var slow = 0
+        assertFailsWith<EngineUnavailable> {
+            retryQuickFailure(time = time) { slow++; time += 10.seconds; throw EngineUnavailable("语音服务连接超时") }
+        }
+        assertEquals(1, slow, "超时的不再试")
+        var twice = 0
+        assertFailsWith<EngineUnavailable> {
+            retryQuickFailure(time = time) { twice++; throw EngineUnavailable("无法连接语音服务，请检查网络") }
+        }
+        assertEquals(2, twice, "只多试一次")
+    }
+
+    @Test
+    fun `stopping the reading is not retried`() = runTest {
+        var tries = 0
+        assertFailsWith<CancellationException> {
+            retryQuickFailure(time = TestTimeSource()) { tries++; throw CancellationException("stopped") }
+        }
+        assertEquals(1, tries)
+    }
+
     @Test
     fun `the access token matches the one the computer computes`() {
         // 向量取自电脑端 tts/drm.rs 的测试。
