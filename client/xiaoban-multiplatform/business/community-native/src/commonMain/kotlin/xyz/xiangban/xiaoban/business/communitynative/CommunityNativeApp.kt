@@ -134,6 +134,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.Pack -> PackDetailScreen(env, route.id, pop, push)
         is Route.Ability -> AbilityDetailScreen(env, route.id, pop, push)
         is Route.Scheme -> SchemeDetailScreen(env, route.id, pop, push)
+        Route.SchemeBackups -> NativeSchemeBackupsScreen(env, pop, push)
         Route.MyWorks -> MyContentScreen(env, pop, push)
         Route.Notifications -> NativeNotificationsScreen(env, pop, push)
         Route.Challenges -> NativeChallengesScreen(env, pop, push)
