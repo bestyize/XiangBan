@@ -180,6 +180,75 @@ impl AttachmentStore {
         }
         result
     }
+    /// Copies attachments of one session into another session's own folder and returns them with the new paths.
+    /// A file that is gone, or that is not inside `from`'s folder, is returned unchanged.
+    pub fn copy_to_session(
+        &self,
+        from: &str,
+        to: &str,
+        items: &[Attachment],
+    ) -> Result<Vec<Attachment>, String> {
+        let Some(source_dir) = self.existing_session_dir(from).and_then(|d| fs::canonicalize(d).ok()) else {
+            return Ok(items.to_vec());
+        };
+        let mut plan = Vec::new();
+        for item in items {
+            let source = fs::canonicalize(&item.path)
+                .ok()
+                .filter(|p| p.parent() == Some(source_dir.as_path()) && p.is_file());
+            plan.push(source);
+        }
+        if plan.iter().all(Option::is_none) {
+            return Ok(items.to_vec());
+        }
+        let dir = self.root.join(session_key(to)?);
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        if fs::symlink_metadata(&dir)
+            .map_err(|e| e.to_string())?
+            .file_type()
+            .is_symlink()
+        {
+            return Err("attachment directory is a symlink".into());
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&dir, fs::Permissions::from_mode(0o700))
+                .map_err(|e| e.to_string())?;
+        }
+        let mut saved = Vec::new();
+        let result = (|| {
+            let mut out = Vec::new();
+            for (item, source) in items.iter().zip(&plan) {
+                let Some(source) = source else {
+                    out.push(item.clone());
+                    continue;
+                };
+                let target = dir.join(source.file_name().ok_or("附件文件名无效")?);
+                let mut options = OpenOptions::new();
+                options.write(true).create_new(true);
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::OpenOptionsExt;
+                    options.mode(0o600);
+                }
+                let mut output = options.open(&target).map_err(|e| e.to_string())?;
+                let copy = Attachment {
+                    path: target.to_string_lossy().into_owned(),
+                    ..item.clone()
+                };
+                saved.push(copy.clone());
+                let mut input = fs::File::open(source).map_err(|e| e.to_string())?;
+                std::io::copy(&mut input, &mut output).map_err(|e| e.to_string())?;
+                out.push(copy);
+            }
+            Ok(out)
+        })();
+        if result.is_err() {
+            self.rollback(&saved);
+        }
+        result
+    }
     pub fn rollback(&self, items: &[Attachment]) {
         for item in items {
             let _ = fs::remove_file(&item.path);

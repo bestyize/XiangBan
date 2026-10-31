@@ -20,6 +20,7 @@ mod mentions;
 mod widget_content;
 mod broker;
 mod checkpoints;
+mod fork;
 mod git_command;
 mod git_snapshot;
 mod community;
@@ -1214,6 +1215,37 @@ pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, per
     }
     if !folder.is_empty() {
         workspace::remember(&app, &folder);
+    }
+    Ok(summary)
+}
+
+/// 从某一句话分叉出新对话：复制这句话之前的历史，原对话不动。`before_turn` 是第几条用户消息（从 0 数起），
+/// 等于用户消息总数时复制全部。运行记录、目标、检查点和“本次对话允许”的授权不复制；附件复制一份给新对话。
+#[tauri::command]
+pub fn chat_fork_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, before_turn: usize) -> Result<SessionSummary, String> {
+    chat_window(&window)?;
+    checked_session_id(&session_id)?;
+    let state = app.state::<ChatState>();
+    // The same order chat_send and chat_compact take: no answer can start while the history is being copied.
+    let _delivery = lock(&state.delivery);
+    if lock(&state.runs).contains_key(&session_id) {
+        return Err("这个对话正在回答，请先停止再分叉".into());
+    }
+    let dirs = Dirs::of(&app)?;
+    let store = JsonlStore::new(dirs.sessions());
+    let mut history = store.load(&session_id).map_err(|e| e.to_string())?;
+    let cut = fork::cut_before_turn(&history, before_turn)?;
+    history.truncate(cut);
+    let (seconds, millis) = now();
+    let summary = mutate(&app, |index| index.fork(&session_id, seconds, millis))??;
+    let attachments = AttachmentStore::new(dirs.chat.join("attachments"));
+    let written = fork::rewrite_attachments(&mut history, |items| attachments.copy_to_session(&session_id, &summary.id, items))
+        .and_then(|()| store.append(&summary.id, &history).map_err(|e| e.to_string()));
+    if let Err(error) = written {
+        let _ = store.remove(&summary.id);
+        let _ = attachments.remove_session(&summary.id);
+        let _ = mutate(&app, |index| index.remove(&summary.id));
+        return Err(format!("无法分叉对话：{error}"));
     }
     Ok(summary)
 }

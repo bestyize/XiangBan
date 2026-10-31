@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NButton, NInput, NModal } from 'naive-ui';
-import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, FolderOpen, GripVertical, LoaderCircle, PanelRight, Plus, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
+import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, FolderOpen, GitBranch, GripVertical, LoaderCircle, PanelRight, Plus, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 import DesignPicker from '../design/DesignPicker.vue';
 import DesignWorkbench from '../design/DesignWorkbench.vue';
@@ -304,6 +304,23 @@ function regenerate(block: ReplyBlock) {
   void chat.send(text);
 }
 
+/** A message of the user's that can be edited into a branch; queued ones are not saved in the conversation yet. */
+function editableMessage(block: ReplyBlock) {
+  const item = block.items[0];
+  return item?.kind === 'user' && item.delivery !== 'queue' ? item.id : '';
+}
+const replyEnd = (block: ReplyBlock) => (block.items.at(-1) ?? block.calls.at(-1))?.id ?? '';
+/** Opens a copy of this conversation: up to just before the message (to edit it) or up to the end of the reply. */
+async function fork(itemId: string, edit: boolean) {
+  const current = view.value;
+  if (!current || !itemId || running.value) return;
+  const id = await chat.fork(current.id, itemId, edit);
+  if (!id) return;
+  stick.value = true;
+  props.store.notify(edit ? '已打开分支对话，改好后发送即可，原对话不变' : '已打开分支对话，原对话不变', 'success');
+  if (edit) composer.value?.setDraft(chat.draftFor(id).text);
+}
+
 /* ── Title bar: more menu, rename, delete ────────────────────────────── */
 const moreRoot = ref<HTMLElement | null>(null);
 const moreOpen = ref(false);
@@ -498,6 +515,9 @@ async function openLink(href: string) {
                     <template v-if="item.text">{{ item.text }}</template>
                   </template>
                 </div>
+                <div v-if="!running && editableMessage(block)" class="user-actions">
+                  <button type="button" class="act" data-testid="chat-fork-edit" aria-label="编辑并分叉" title="编辑这句话并分叉出新对话，原对话不变" @click="fork(editableMessage(block), true)"><GitBranch :size="15" /></button>
+                </div>
               </div>
               <section v-else class="reply" data-testid="chat-reply">
                 <header v-if="speaks(block)" class="reply-head"><span class="brand-mark" aria-hidden="true"><Sprout :size="14" :stroke-width="2.2" /></span><b>小伴</b></header>
@@ -542,6 +562,7 @@ async function openLink(href: string) {
                   <button type="button" class="act" :class="{ 'is-on': savedReplies.has(block.id) }" :disabled="!store.desktop" :aria-label="savedReplies.has(block.id) ? '已存到资料库' : '存到资料库'" :title="savedReplies.has(block.id) ? '已存到资料库' : '存到资料库'" data-testid="chat-save-reply" @click="saveReply(block)"><Star :size="15" :fill="savedReplies.has(block.id) ? 'currentColor' : 'none'" /></button>
                   <button v-if="store.speech" type="button" class="act" :class="{ 'is-on': store.speech.currentKey === speechKey(block) }" :disabled="!store.desktop" :aria-label="store.speech.currentKey === speechKey(block) ? '停止朗读' : '朗读'" :title="store.speech.currentKey === speechKey(block) ? (store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读') : '朗读'" data-testid="chat-read-reply" @click="speakReply(block)"><Volume2 :size="15" /></button>
                   <button v-if="block.id === lastBlockId && questionBefore(block)" type="button" class="act" data-testid="chat-regenerate" aria-label="重新生成" title="重新生成：把上一个问题再发一次" :disabled="running || !chat.configured" @click="regenerate(block)"><RefreshCw :size="15" /></button>
+                  <button type="button" class="act" data-testid="chat-fork-reply" aria-label="从这里分叉" title="从这里分叉：新开一个对话，带上到这里为止的内容，原对话不变" :disabled="running" @click="fork(replyEnd(block), false)"><GitBranch :size="15" /></button>
                   <small v-if="replyUsage(block)" class="usage" data-testid="msg-usage" title="这一轮所有模型调用的合计，输入含重复发送的上下文与缓存">输入 {{ formatTokens(replyUsage(block)!.prompt) }} · 输出 {{ formatTokens(replyUsage(block)!.completion) }} tokens</small>
                 </div>
               </section>
@@ -710,6 +731,9 @@ async function openLink(href: string) {
 .act:hover:not(:disabled){background:var(--ui-surface-hover);color:var(--ui-text-primary)}
 .act.is-on{color:var(--ui-ink);background:var(--ui-soft)}
 .act:disabled{opacity:.4;cursor:not-allowed}
+.user-actions{display:flex;gap:2px;margin-top:2px;opacity:0}
+.msg.user:hover .user-actions,.user-actions:focus-within{opacity:1}
+@media (hover:none){.user-actions{opacity:1}}
 .usage{margin-left:8px;font-size:11.5px;color:var(--ui-text-tertiary);font-variant-numeric:tabular-nums}
 .notice{container:notice / inline-size;min-width:0;font-size:13px;padding:8px 12px;border-radius:10px;background:var(--ui-surface-sunken);color:var(--ui-text-secondary);display:flex;flex-wrap:wrap;gap:12px;align-items:center;line-height:1.6}
 .notice.outcome-details{padding:0;background:none;font-size:12px;color:var(--ui-text-tertiary)}

@@ -1138,7 +1138,7 @@ fn research_runs_a_read_only_helper_and_returns_only_its_findings() {
 #[test]
 fn the_window_filter_keeps_conversation_commands_where_they_belong() {
     let decide = |label: &str, command: &str| crate::float_assistant::permitted(label, command).unwrap_or_else(|| crate::content::permitted(label, command));
-    for command in ["chat_send", "chat_set_permission_mode", "chat_undo_run", "chat_save_hooks", "chat_revoke_grant", "chat_set_sandbox_network", "chat_set_command_sandbox", "chat_agent_settings", "chat_delete_session"] {
+    for command in ["chat_send", "chat_set_permission_mode", "chat_undo_run", "chat_save_hooks", "chat_revoke_grant", "chat_set_sandbox_network", "chat_set_command_sandbox", "chat_agent_settings", "chat_delete_session", "chat_fork_session"] {
         assert!(decide("control", command), "{command} in the control window");
         for label in ["widget-1", "pet-1", "games", "deskgame", "effects", "media-a", "care", "ritual"] {
             assert!(!decide(label, command), "{command} must not reach {label}");
@@ -1147,7 +1147,7 @@ fn the_window_filter_keeps_conversation_commands_where_they_belong() {
     for command in ["chat_send", "chat_cancel", "chat_answer_approval", "chat_load_session"] {
         assert!(decide("assistant", command), "{command} in the floating assistant");
     }
-    for command in ["chat_set_permission_mode", "chat_undo_run", "chat_save_hooks", "chat_revoke_grant", "chat_delete_session"] {
+    for command in ["chat_set_permission_mode", "chat_undo_run", "chat_save_hooks", "chat_revoke_grant", "chat_delete_session", "chat_fork_session"] {
         assert!(!decide("assistant", command), "{command} is for the control window only");
     }
 }

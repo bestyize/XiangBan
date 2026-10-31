@@ -857,6 +857,75 @@ describe('undoing an answer\'s file changes', () => {
   });
 });
 
+describe('forking a conversation from one message', () => {
+  const said = (role: 'user' | 'assistant', value: string, extra: Record<string, unknown> = {}): WireMessage => ({ role, parts: [{ type: 'text', text: value }], ...extra });
+  const history = (): WireMessage[] => [said('user', '一'), said('assistant', '答一'), said('user', '二', { parts: [{ type: 'text', text: '二' }, { type: 'image', url: 'data:image/png;base64,AA==' }] }), said('assistant', '答二')];
+  async function opened(responders: Record<string, Responder> = {}) {
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('s1', '原来的')] }),
+      chat_load_session: args => (args?.sessionId === 's1' ? history() : history().slice(0, 2)),
+      chat_fork_session: () => summary('s2', '原来的（分支）'),
+      ...responders,
+    });
+    await h.store.init(); await h.store.select('s1');
+    return h;
+  }
+
+  it('copies up to just before the edited message, opens the copy and leaves the text and pictures to be sent again', async () => {
+    const h = await opened();
+    const second = h.store.current()!.items.filter(i => i.kind === 'user')[1];
+    expect(await h.store.fork('s1', second.id, true)).toBe('s2');
+    expect(h.calls.find(([c]) => c === 'chat_fork_session')?.[1]).toEqual({ sessionId: 's1', beforeTurn: 1 });
+    expect(h.store.currentId).toBe('s2');
+    expect(h.store.sessions.map(s => s.id)).toEqual(['s2', 's1']);
+    expect(h.store.draftFor('s2')).toMatchObject({ text: '二', attachments: ['data:image/png;base64,AA=='] });
+    expect(h.store.views.s1.items, 'the original is untouched').toHaveLength(4);
+    h.store.dispose();
+  });
+
+  it('copies through the end of a reply when asked to continue from it, with nothing put in the input box', async () => {
+    const h = await opened();
+    const replies = h.store.current()!.items.filter(i => i.kind === 'assistant');
+    expect(await h.store.fork('s1', replies[0].id, false)).toBe('s2');
+    expect(h.calls.find(([c]) => c === 'chat_fork_session')?.[1]).toEqual({ sessionId: 's1', beforeTurn: 1 });
+    expect(h.store.draftFor('s2').text).toBe('');
+    await h.store.select('s1');
+    await h.store.fork('s1', replies[1].id, false);
+    expect(h.calls.filter(([c]) => c === 'chat_fork_session').at(-1)?.[1]).toEqual({ sessionId: 's1', beforeTurn: 2 });
+    h.store.dispose();
+  });
+
+  it('does nothing while the conversation is answering or when the item is not a message to edit', async () => {
+    const h = await opened();
+    const [first] = h.store.current()!.items;
+    const reply = h.store.current()!.items.find(i => i.kind === 'assistant')!;
+    expect(await h.store.fork('s1', reply.id, true), 'only a message of the user can be edited').toBeNull();
+    expect(await h.store.fork('s1', 'missing', false)).toBeNull();
+    h.store.current()!.running = true;
+    expect(await h.store.fork('s1', first.id, true)).toBeNull();
+    expect(h.calls.some(([c]) => c === 'chat_fork_session')).toBe(false);
+    h.store.dispose();
+  });
+
+  it('stays in the original and tells the user why when the host refuses', async () => {
+    const h = await opened({ chat_fork_session: () => { throw '陪伴对话不能分叉'; } });
+    const [first] = h.store.current()!.items;
+    expect(await h.store.fork('s1', first.id, true)).toBeNull();
+    expect(h.store.currentId).toBe('s1');
+    expect(h.deps.notify).toHaveBeenCalledWith('陪伴对话不能分叉', 'error');
+    h.store.dispose();
+  });
+
+  it('says that file attachments are not carried back into the input box', async () => {
+    const withFile = [said('user', '看附件', { structured_content: { attachments: [{ name: '预算.csv', size: 9, mime: 'text/csv' }] } }), said('assistant', '好')];
+    const h = await opened({ chat_load_session: () => withFile });
+    const [first] = h.store.current()!.items;
+    await h.store.fork('s1', first.id, true);
+    expect(h.deps.notify).toHaveBeenCalledWith('文件附件没有带回输入框，需要的话请重新添加。', 'info');
+    h.store.dispose();
+  });
+});
+
 describe('each conversation works in its own folder', () => {
   const folders = [{ path: '/p/site', name: 'site', exists: true, wide: false }, { path: '/p/gone', name: 'gone', exists: false, wide: false }];
   const withHistory: WireMessage[] = [{ role: 'user', parts: [{ type: 'text', text: '改一下首页' }] }];

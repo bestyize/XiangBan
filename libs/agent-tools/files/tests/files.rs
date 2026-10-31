@@ -71,6 +71,36 @@ fn imports_session_copies_and_preserves_display_names() {
     assert!(!PathBuf::from(&items[0].path).exists());
 }
 #[test]
+fn copies_attachments_into_another_session_and_survives_deleting_the_first() {
+    let temp = Temp::new();
+    let store = AttachmentStore::new(temp.0.join("attachments"));
+    let items = store.import("old", &[input("预算.txt", b"20")]).unwrap();
+    let copies = store.copy_to_session("old", "new", &items).unwrap();
+    assert_eq!(copies[0].id, items[0].id);
+    assert_eq!(copies[0].name, "预算.txt");
+    assert_ne!(copies[0].path, items[0].path);
+    assert!(PathBuf::from(&copies[0].path).starts_with(store.existing_session_dir("new").unwrap()));
+    store.remove_session("old").unwrap();
+    assert_eq!(fs::read_to_string(&copies[0].path).unwrap(), "20");
+}
+#[test]
+fn copying_leaves_missing_or_foreign_files_as_they_were() {
+    let temp = Temp::new();
+    let store = AttachmentStore::new(temp.0.join("attachments"));
+    let items = store.import("old", &[input("a.txt", b"a")]).unwrap();
+    let outside = temp.0.join("outside.txt");
+    fs::write(&outside, "x").unwrap();
+    let mut foreign = items[0].clone();
+    foreign.path = outside.to_string_lossy().into_owned();
+    let mut gone = items[0].clone();
+    fs::remove_file(&gone.path).unwrap();
+    gone.id = "gone".into();
+    let copies = store.copy_to_session("old", "new", &[foreign.clone(), gone.clone()]).unwrap();
+    assert_eq!(copies[0].path, foreign.path);
+    assert_eq!(copies[1].path, gone.path);
+    assert!(store.existing_session_dir("new").is_none());
+}
+#[test]
 fn invalid_batch_never_leaves_partial_files() {
     let temp = Temp::new();
     let store = AttachmentStore::new(&temp.0);

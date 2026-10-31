@@ -120,6 +120,12 @@ export interface ChatStore {
   answerQuestion(request: QuestionRequest, answer: string | null): Promise<void>;
   /** Puts back the files the answer behind a checkpoint notice changed. Returns whether it was done. */
   undoRun(session: string, itemId: string): Promise<boolean>;
+  /**
+   * Opens a new conversation that starts with a copy of this one, leaving this one as it is. With `edit`, `itemId` is
+   * a message of the user's: the copy stops just before it and its text and pictures wait in the new conversation's
+   * input box. Without, the copy stops at the end of the reply `itemId` belongs to. Returns the new id, or null.
+   */
+  fork(session: string, itemId: string, edit: boolean): Promise<string | null>;
   current(): SessionView | null;
 }
 
@@ -732,6 +738,31 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       } catch (error) {
         deps.notify(error, 'error');
         return false;
+      }
+    },
+
+    async fork(session, itemId, edit) {
+      const view = store.views[session];
+      const at = view?.items.findIndex(i => i.id === itemId) ?? -1;
+      const item = at < 0 ? undefined : view.items[at];
+      if (!view || !item || view.running) return null;
+      if (edit && (item.kind !== 'user' || item.delivery === 'queue')) return null;
+      // The host counts the messages the user wrote; the page shows exactly those as 'user' items.
+      const beforeTurn = view.items.slice(0, at).filter(i => i.kind === 'user').length;
+      try {
+        const created = await deps.invoke<SessionSummary>('chat_fork_session', { sessionId: session, beforeTurn });
+        upsert(created);
+        await store.select(created.id);
+        if (edit && item.kind === 'user') {
+          const draft = store.draftFor(created.id);
+          draft.text = item.text;
+          draft.attachments = [...item.images];
+          if (item.files?.length) deps.notify('文件附件没有带回输入框，需要的话请重新添加。', 'info');
+        }
+        return created.id;
+      } catch (error) {
+        deps.notify(error, 'error');
+        return null;
       }
     },
 

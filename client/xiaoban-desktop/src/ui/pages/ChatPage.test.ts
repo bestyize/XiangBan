@@ -795,6 +795,30 @@ describe('a conversation in the page', () => {
     expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', text: '早' }]);
   });
 
+  it('branches a new conversation from a message to edit, or from the end of a reply', async () => {
+    const branch = { ...summary('s3', '整理文件（分支）'), workspace: '/work' };
+    const h = await open({ ...listed, chat_fork_session: () => branch });
+    await openSession('s1');
+    await click('chat-fork-edit');
+    expect(h.calls.find(([command]) => command === 'chat_fork_session')).toEqual(['chat_fork_session', { sessionId: 's1', beforeTurn: 0 }]);
+    expect(h.chat.currentId).toBe('s3');
+    expect(textarea().value, 'the message waits in the input box of the branch').toBe('早');
+    expect(h.notify).toHaveBeenCalledWith('已打开分支对话，改好后发送即可，原对话不变', 'success');
+
+    await openSession('s1');
+    await click('chat-fork-reply');
+    expect(h.calls.filter(([command]) => command === 'chat_fork_session').at(-1)).toEqual(['chat_fork_session', { sessionId: 's1', beforeTurn: 1 }]);
+  });
+
+  it('offers no branching while the conversation is answering', async () => {
+    const h = await open({ ...listed, chat_send: () => summary('s1', '整理文件') });
+    await openSession('s1');
+    h.chat.current()!.running = true;
+    await flushPromises();
+    expect(q('chat-fork-edit')).toBeNull();
+    expect(q('chat-fork-reply')?.hasAttribute('disabled') ?? true).toBe(true);
+  });
+
   it('saves a reply to 资料库 with the conversation it came from', async () => {
     const h = await open({ ...listed, library_save: () => 'saved-1' });
     await openSession('s1');

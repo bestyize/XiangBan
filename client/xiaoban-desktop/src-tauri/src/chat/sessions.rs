@@ -137,6 +137,20 @@ pub fn title_from(text: &str) -> String {
     }
 }
 
+const FORK_SUFFIX: &str = "（分支）";
+
+/// The name a fork starts with: the original's, marked as a branch. A conversation that has no name yet stays unnamed.
+pub fn fork_title(title: &str) -> String {
+    if title == DEFAULT_TITLE || title.ends_with(FORK_SUFFIX) {
+        return title.to_string();
+    }
+    let room = MAX_NAME_CHARS - FORK_SUFFIX.chars().count() - 1;
+    match title.char_indices().nth(room) {
+        Some((cut, _)) => format!("{}…{FORK_SUFFIX}", &title[..cut]),
+        None => format!("{title}{FORK_SUFFIX}"),
+    }
+}
+
 pub struct Index {
     path: PathBuf,
     sessions: Vec<SessionSummary>,
@@ -289,6 +303,27 @@ impl Index {
         let summary = SessionSummary {
             id: new_id(now_millis), created_at: now, updated_at: now, permission_mode: permission_mode.into(), workspace: workspace.into(),
             ..SessionSummary::default()
+        };
+        self.sessions.push(summary.clone());
+        Ok(summary)
+    }
+
+    /// A new conversation with the settings of `from` (model, mode, folder, group, expert), for a fork whose
+    /// messages the caller copies next. A conversation in a worktree is forked into that same folder without
+    /// the link: the worktree stays owned by the conversation that made it, so merging or discarding it is
+    /// still decided in one place.
+    pub fn fork(&mut self, from: &str, now: i64, now_millis: u128) -> Result<SessionSummary, String> {
+        if self.sessions.len() >= MAX_SESSIONS {
+            return Err(format!("对话最多保存 {MAX_SESSIONS} 个，请先删除一些旧对话"));
+        }
+        let source = self.get(from).ok_or("这个对话已经不存在")?.clone();
+        if !source.companion_id.is_empty() {
+            return Err("陪伴对话不能分叉".into());
+        }
+        let workspace = source.worktree.as_ref().map_or_else(|| source.workspace.clone(), |link| link.path.clone());
+        let summary = SessionSummary {
+            id: new_id(now_millis), title: fork_title(&source.title), created_at: now, updated_at: now,
+            workspace, worktree: None, ..source
         };
         self.sessions.push(summary.clone());
         Ok(summary)
@@ -720,5 +755,58 @@ mod tests {
         assert_eq!(index.get("a").unwrap().group, "g1");
         assert_eq!(index.get("b").unwrap().group, "", "a conversation pointing at a group that is gone goes back to the top level");
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_fork_keeps_the_settings_gets_its_own_id_and_marks_the_title() {
+        let dir = temp("fork");
+        let (mut index, _) = open(&dir);
+        let source = index.create_in(100, 1, "auto", "/work").unwrap();
+        index.name_from_first_message(&source.id, "整理下载文件夹");
+        let group = index.create_group(5, "项目").unwrap();
+        index.move_session(&source.id, Some(&group.id)).unwrap();
+        index.set_options(&source.id, None, Some(300_000), Some(vec!["repo".into()]));
+        let fork = index.fork(&source.id, 900, 2).unwrap();
+        assert_ne!(fork.id, source.id);
+        assert_eq!(fork.title, "整理下载文件夹（分支）");
+        assert_eq!((fork.permission_mode.as_str(), fork.workspace.as_str(), fork.group.as_str()), ("auto", "/work", group.id.as_str()));
+        assert_eq!((fork.context_tokens, fork.connectors.clone(), fork.created_at, fork.updated_at), (Some(300_000), vec!["repo".to_string()], 900, 900));
+        assert_eq!(index.get(&source.id).unwrap().title, "整理下载文件夹", "the original is untouched");
+        assert_eq!(index.list().len(), 2);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_fork_of_a_worktree_conversation_works_in_the_copy_without_owning_it() {
+        let dir = temp("fork-worktree");
+        let (mut index, _) = open(&dir);
+        let source = index.create_in(100, 1, "ask", "/origin").unwrap();
+        index.set_worktree(&source.id, "/copy", Some(WorktreeLink { origin: "/origin".into(), path: "/copy".into(), branch: "b".into(), base: "c0".into() }));
+        let fork = index.fork(&source.id, 200, 2).unwrap();
+        assert_eq!(fork.workspace, "/copy");
+        assert!(fork.worktree.is_none());
+        assert!(index.get(&source.id).unwrap().worktree.is_some());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn companion_conversations_and_missing_ones_cannot_be_forked() {
+        let dir = temp("fork-refused");
+        let (mut index, _) = open(&dir);
+        let companion = index.create(100, 1, "ask").unwrap();
+        index.set_companion(&companion.id, "key", "小伴", 3);
+        assert!(index.fork(&companion.id, 200, 2).is_err());
+        assert!(index.fork("c-nothing", 200, 3).is_err());
+        assert_eq!(index.list().len(), 1);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn fork_titles_stay_within_the_name_limit_and_are_marked_once() {
+        assert_eq!(fork_title(DEFAULT_TITLE), DEFAULT_TITLE);
+        assert_eq!(fork_title("写周报（分支）"), "写周报（分支）");
+        let long = fork_title(&"字".repeat(60));
+        assert_eq!(long.chars().count(), MAX_NAME_CHARS);
+        assert!(long.ends_with("…（分支）"));
     }
 }
