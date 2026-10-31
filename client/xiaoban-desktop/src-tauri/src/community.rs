@@ -8,7 +8,7 @@ use xiaoban_community as community;
 
 const DEFAULT_ORIGIN: &str = "https://chat.xiangban.xyz";
 
-fn origin() -> String {
+pub(crate) fn origin() -> String {
     // Debug builds may point at a local forum while developing; release builds cannot be redirected.
     #[cfg(debug_assertions)]
     if let Ok(url) = std::env::var("XIAOBAN_COMMUNITY_URL") { return url; }

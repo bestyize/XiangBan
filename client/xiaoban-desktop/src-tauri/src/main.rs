@@ -23,6 +23,7 @@ mod ai_catalogue;
 mod ai_gateway;
 mod chat;
 mod community;
+mod community_schemes;
 mod phone_link;
 mod phone_voice;
 mod phone_wire;
@@ -882,6 +883,7 @@ fn main() {
             chat::store_market::ai_market_take_link, chat::store_market::ai_market_info, chat::store_market::ai_market_browse, chat::store_market::ai_market_categories, chat::store_market::ai_market_detail,
             chat::store_market::ai_market_inspect, chat::store_market::ai_market_install, chat::store_market::ai_market_group_inspect, chat::store_market::ai_market_group_install,
             chat::store_market::ai_market_updates, chat::store_market::ai_market_update,
+            community_schemes::community_schemes_status, community_schemes::community_schemes_save, community_schemes::community_schemes_remove, community_schemes::community_schemes_restore, community_schemes::community_schemes_cloud_enabled, community_schemes::community_schemes_cloud,
             community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
             community::community_analytics_get, community::community_analytics_set, community::community_track,
             phone_link::phone_link_status, phone_link::phone_link_set_enabled, phone_link::phone_link_remove_peer,

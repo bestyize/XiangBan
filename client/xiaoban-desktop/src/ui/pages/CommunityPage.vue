@@ -68,7 +68,7 @@ onActivated(refresh);
 
 <template>
   <section class="community-page">
-    <h1>社区</h1>
+    <div class="community-page-head"><h1>社区</h1><NButton v-if="store.desktop" size="small" @click="invoke('configuration_window_open', { target: 'community', tab: null, provider: null }).catch(store.notify)">我的桌面方案</NButton></div>
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">社区内容需要在桌面应用中浏览。</NAlert>
 
     <template v-else>
@@ -124,6 +124,7 @@ onActivated(refresh);
 
 <style scoped>
 .community-page { padding: 20px 24px; max-width: 880px; margin: 0 auto; }
+.community-page-head {display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
 h1 { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
 .community-weekly { margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--xb-line, #eee); }
 .community-weekly h2 { margin: 2px 0 0; font-size: 16px; font-weight: 600; }

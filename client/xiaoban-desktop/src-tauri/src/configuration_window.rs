@@ -46,12 +46,12 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
 #[tauri::command]
 pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::WebviewWindow, target: String, tab: Option<String>, provider: Option<String>) -> Result<(), String> {
     if window.label() != "control" && kind(window.label()) != Some("settings") { return Err("只能从控制台或设置打开配置窗口".into()); }
-    if !matches!(target.as_str(), "settings" | "model") { return Err("配置窗口类型无效".into()); }
+    if !matches!(target.as_str(), "settings" | "model" | "community") { return Err("配置窗口类型无效".into()); }
     if tab.as_deref().is_some_and(|t| !["general", "appearance", "ai", "assistant", "voice", "network", "safety", "about"].contains(&t)) { return Err("设置分类无效".into()); }
     let provider = provider.unwrap_or_else(|| "__new__".into());
     if target == "model" && (provider.is_empty() || provider.len() > 200 || provider.chars().any(char::is_control)) { return Err("服务商编号无效".into()); }
     let _lock = OPEN_LOCK.lock().map_err(|_| "配置窗口锁不可用")?;
-    let label = if target == "settings" { "configuration-settings".into() } else { format!("configuration-model-{:x}", Sha256::digest(provider.as_bytes()))[..44].to_string() };
+    let label = if target == "community" { "configuration-community".into() } else if target == "settings" { "configuration-settings".into() } else { format!("configuration-model-{:x}", Sha256::digest(provider.as_bytes()))[..44].to_string() };
     let monitor = window.current_monitor().map_err(|e| e.to_string())?.or(app.primary_monitor().map_err(|e| e.to_string())?);
     if let Some(existing) = app.get_webview_window(&label) {
         existing.unminimize().map_err(|e| e.to_string())?;
@@ -65,10 +65,10 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
     let query = url::form_urlencoded::Serializer::new(String::new()).append_pair("scene", "configuration").append_pair("kind", &target).append_pair("tab", tab.as_deref().unwrap_or("general")).append_pair("provider", &provider).finish();
     let appearance = crate::settings(&app).appearance;
     let theme = match appearance.as_str() { "dark" => Some(tauri::Theme::Dark), "light" => Some(tauri::Theme::Light), _ => None };
-    let (width, height, min_width) = if target == "settings" { (940f64, 700f64, 560f64) } else { (640., 820., 400.) };
+    let (width, height, min_width) = if target == "community" { (960f64,760f64,540f64) } else if target == "settings" { (940f64, 700f64, 560f64) } else { (640., 820., 400.) };
     let (max_w, max_h) = monitor.as_ref().map(|m| { let a=m.work_area(); let s=m.scale_factor(); ((a.size.width as f64/s-32.).max(1.), (a.size.height as f64/s-64.).max(1.)) }).unwrap_or((width, height));
     let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(format!("index.html?{query}").into()))
-        .title(if target == "settings" { "设置 · 小伴桌面" } else { "模型配置 · 小伴桌面" })
+        .title(if target == "settings" { "设置 · 小伴桌面" } else if target == "community" { "我的桌面方案 · 小伴桌面" } else { "模型配置 · 小伴桌面" })
         .inner_size(width.min(max_w), height.min(max_h)).min_inner_size(min_width.min(max_w), 360f64.min(max_h))
         .resizable(true).decorations(true).theme(theme).visible(false);
     // Restore only onto a currently connected display, then fit the full native frame inside its work area.
