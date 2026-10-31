@@ -7,14 +7,19 @@ import type { SettingsTab } from '../control-types.ts';
 import SettingsDialog from '../components/SettingsDialog.vue';
 import AiConfigCard from '../components/AiConfigCard.vue';
 import AiGatewayCard from '../components/AiGatewayCard.vue';
+import WindowChrome from './WindowChrome.vue';
+import WindowResizeEdges from './WindowResizeEdges.vue';
 import LoginModal from '../components/LoginModal.vue';
 import { accent, followAccent, followHost, isDark, publishAccentTo, publishAppearanceTo } from '../appearance.ts';
 import { applyUiTokens } from '../design-tokens.ts';
-import { themeFor } from '../theme.ts';
+import { configurationThemeFor } from '../theme.ts';
 import { closeConfigurationWindow } from './windows.ts';
 const query = new URLSearchParams(location.search);
 const role = query.get('kind') === 'model' ? 'model' : 'settings';
 const provider = query.get('provider') ?? '__new__';
+const gateway = role === 'model' && provider === GATEWAY_PROVIDER;
+document.documentElement.classList.toggle('gateway-window', gateway);
+document.documentElement.classList.add('configuration-frameless');
 const toast = ref(''), ready = ref(false), error = ref(''), config = ref<AiConfigView | null>(null);
 let timer: ReturnType<typeof setTimeout> | undefined, disposed = false;
 const offs: (() => void)[] = [];
@@ -28,7 +33,7 @@ store.closeSettings = () => { void closeConfigurationWindow().catch(notify); };
 store.openSettings = tab => { pickTab(tab); };
 if (role === 'model') store.openLogin = () => { void invoke('configuration_window_login').then(closeConfigurationWindow).catch(notify); };
 const naiveTheme = computed(() => isDark.value ? darkTheme : null);
-const overrides = computed(() => themeFor(isDark.value, accent.value));
+const overrides = computed(() => configurationThemeFor(isDark.value, accent.value));
 watchEffect(() => { applyUiTokens(isDark.value, accent.value); document.documentElement.dataset.theme = isDark.value ? 'dark' : 'light'; });
 function follow(value: { appearance?: string; accent?: string }) { followHost(value.appearance); followAccent(value.accent); }
 publishAppearanceTo(mode => { void invoke('set_appearance', { mode }).catch(notify); });
@@ -68,24 +73,30 @@ onBeforeUnmount(() => { disposed = true; offs.forEach(off => off()); clearTimeou
 <template>
   <NConfigProvider :theme="naiveTheme" :theme-overrides="overrides" :locale="zhCN" :date-locale="dateZhCN">
     <NMessageProvider><NDialogProvider>
-      <main class="configuration-window" :class="`configuration-${role}`">
+      <main class="configuration-window" :class="[`configuration-${role}`, { 'configuration-gateway': gateway }]">
         <template v-if="ready">
           <SettingsDialog v-if="role === 'settings'" :store="store" detached @open-site="invoke('open_download_url', { url: 'https://wallpaper.xiangban.xyz' }).catch(notify)" />
-          <AiGatewayCard v-else-if="provider === GATEWAY_PROVIDER" :store="store" :config="config" detached @config="config = $event" />
+          <div v-else-if="gateway" class="configuration-gateway-body"><WindowChrome :platform="store.info.platform" /><AiGatewayCard :store="store" :config="config" detached @config="config = $event" /></div>
           <AiConfigCard v-else :store="store" detached :initial-provider="provider" />
           <LoginModal :store="store" />
         </template>
         <section v-else class="configuration-loading" role="status">
+          <WindowChrome />
           <p>{{ error || '正在加载…' }}</p><button v-if="error" type="button" class="xb-btn" @click="closeConfigurationWindow()">关闭窗口</button>
         </section>
         <p v-if="toast" class="configuration-toast" role="status">{{ toast }}</p>
+        <WindowResizeEdges />
       </main>
     </NDialogProvider></NMessageProvider>
   </NConfigProvider>
 </template>
 <style>
 html,body,#app{height:100%;margin:0}
-.configuration-window{height:100dvh;width:100%;overflow:hidden;background:var(--ui-surface-sunken);color:var(--ui-text-primary);font-family:var(--ui-font-family)}
+html.configuration-frameless,html.configuration-frameless body,html.configuration-frameless #app,.configuration-window.configuration-gateway{background:transparent}
+.configuration-window{height:100dvh;width:100%;overflow:hidden;border-radius:12px;background:var(--ui-surface-sunken);color:var(--ui-text-primary);font-family:var(--ui-font-family)}
+html.configuration-expanded .configuration-window{border-radius:0}
+.configuration-gateway-body{height:100%;display:flex;flex-direction:column;border-radius:inherit;overflow:hidden;background:var(--ui-configuration-canvas)}
+.configuration-gateway-body>.gw-detached{height:auto;flex:1;min-height:0}.configuration-gateway-body .mac-config{background:transparent}
 .configuration-loading{height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;font-size:13px}
 .configuration-toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);max-width:calc(100% - 48px);padding:10px 16px;background:var(--ui-surface-raised);color:var(--ui-text-primary);border:1px solid var(--ui-line);border-radius:10px;box-shadow:var(--ui-shadow-menu);font-size:13px;z-index:2000;overflow-wrap:anywhere}
 </style>

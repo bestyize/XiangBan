@@ -370,6 +370,25 @@ pub(crate) fn provider(config: &AiConfig) -> Result<Arc<dyn ModelProvider>, Stri
     provider_with(config, None)
 }
 
+pub(crate) fn probe_model(config: &AiConfig, cancel: &AtomicBool) -> Result<String, String> {
+    let mut profile = provider_profile(config);
+    profile.supports_tools = false;
+    profile.max_output_tokens = Some(1024);
+    profile.timeouts = agent_kernel::provider::wire::ModelTimeouts {
+        response_header_seconds: 15, first_event_seconds: 30, stream_idle_seconds: 15,
+    };
+    // The managed gateway uses Responses, just like ordinary chats through it.
+    let provider = OpenAiResponses::new(profile).map_err(|e| e.to_string())?;
+    let reply = provider.chat(&probe_request(), &mut |_| {}, cancel).map_err(|e| e.to_string())?;
+    let text = reply.message.text();
+    if text.trim().is_empty() { return Err("模型没有返回有效文本，请重新检测".into()); }
+    Ok(text.trim().chars().take(512).collect())
+}
+
+fn probe_request() -> agent_kernel::provider::ChatRequest {
+    agent_kernel::provider::ChatRequest { messages: vec![Message::user_text("hi")], tools: vec![] }
+}
+
 fn provider_profile(config: &AiConfig) -> ProviderProfile {
     let mut profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
     profile.extra_body = config.reasoning_body();

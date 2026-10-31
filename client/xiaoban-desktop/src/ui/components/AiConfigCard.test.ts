@@ -171,7 +171,7 @@ describe('AI model settings card and provider templates', () => {
     expect(q('ai-model-row-model-a')).not.toBeNull();
     expect(field('ai-api-key').value).toBe('');
     expect(field('ai-api-key').placeholder).toContain('••••9876');
-    expect(q('ai-endpoint-preview')!.textContent).toContain('https://api.example.com/v1/chat/completions');
+    expect(q('ai-endpoint-preview')!.getAttribute('title')).toContain('https://api.example.com/v1/chat/completions');
     expect(document.body.textContent).not.toContain(KEY);
   });
 
@@ -315,13 +315,13 @@ describe('AI model settings card and provider templates', () => {
     await type('ai-base-url', 'https://api.anthropic.com');
     await pickProtocol('chat');
     expect(field('ai-base-url').value).toBe('https://api.openai.com/v1');
-    expect(q('ai-endpoint-preview')!.textContent).toContain('https://api.openai.com/v1/chat/completions');
+    expect(q('ai-endpoint-preview')!.getAttribute('title')).toContain('https://api.openai.com/v1/chat/completions');
 
     // An address the user typed is theirs: switching protocol leaves it alone.
     await type('ai-base-url', 'https://gw.example.com/proxy/anthropic');
     await pickProtocol('responses');
     expect(field('ai-base-url').value).toBe('https://gw.example.com/proxy/anthropic');
-    expect(q('ai-endpoint-preview')!.textContent).toContain('https://gw.example.com/proxy/anthropic/responses');
+    expect(q('ai-endpoint-preview')!.getAttribute('title')).toContain('https://gw.example.com/proxy/anthropic/responses');
   });
 
   it('switches a built-in vendor to the address that serves the chosen protocol', async () => {
@@ -331,11 +331,11 @@ describe('AI model settings card and provider templates', () => {
 
     await pickProtocol('anthropic');
     expect(field('ai-base-url').value).toBe('https://api.deepseek.com/anthropic');
-    expect(q('ai-endpoint-preview')!.textContent).toContain('https://api.deepseek.com/anthropic/v1/messages');
+    expect(q('ai-endpoint-preview')!.getAttribute('title')).toContain('https://api.deepseek.com/anthropic/v1/messages');
 
     await pickProtocol('responses');
     expect(field('ai-base-url').value).toBe('https://api.deepseek.com');
-    expect(q('ai-endpoint-preview')!.textContent).toContain('https://api.deepseek.com/responses');
+    expect(q('ai-endpoint-preview')!.getAttribute('title')).toContain('https://api.deepseek.com/responses');
 
     // 智谱 puts each protocol on its own path.
     await openModal('zhipu');
@@ -510,7 +510,7 @@ describe('reply preferences', () => {
     await expandModel('private-alias');
     await click('ai-reasoning-mode-manual');
     for (const level of ['low', 'max', 'medium']) await click(`ai-reasoning-level-${level}`); // default low/high/max -> medium/high
-    expect(q('ai-model-row-private-alias')!.textContent).toContain('思考等级：中 / 高');
+    expect(q('ai-model-row-private-alias')!.querySelector('.mname')!.getAttribute('title')).toContain('思考等级：中 / 高');
     expect(select('ai-reply-preference').props('options')).toEqual([
       {value:'default',label:'默认'}, {value:'medium',label:'中'}, {value:'deeper',label:'高 · 更深入'},
     ]);

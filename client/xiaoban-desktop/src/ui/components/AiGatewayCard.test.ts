@@ -236,27 +236,61 @@ describe('小伴 AI dialog: balance and redeem', () => {
 });
 
 describe('小伴 AI dialog: chat model', () => {
-  it('searches a long model list without switching or losing the selected model', async () => {
+  it('shows a long scrollable list without search and saves only after explicit confirmation', async () => {
     const many = Array.from({ length: 80 }, (_, i) => ({ ...standard, tier: `model-${i}`, displayName: `Model ${i}`, isDefault: i === 0 }));
     backend({ ...defaults, ai_gateway_tiers: many });
     mountCard(createStore(session('u1')), aiConfig({ activeProvider: 'xiaoban-ai', gatewayTier: 'model-1' }));
     await flushPromises(); await openDialog();
-    expect(text('gateway-model-count')).toBe('80');
-    const search = q('gateway-model-search')!.querySelector('input')!;
-    search.value = '  MODEL 79  '; search.dispatchEvent(new Event('input', { bubbles: true })); await flushPromises();
-    expect(text('gateway-model-count')).toBe('1 / 80');
-    expect(has('gateway-tier-model-79')).toBe(true);
-    expect(has('gateway-tier-model-1')).toBe(false);
-    expect(text('gateway-active')).toContain('Model 1');
-    expect(q('gateway-use-btn')!.hasAttribute('disabled')).toBe(true);
-    expect(ipc).not.toHaveBeenCalledWith('use_ai_gateway', expect.anything());
-    search.value = 'not found'; search.dispatchEvent(new Event('input', { bubbles: true })); await flushPromises();
-    expect(has('gateway-search-empty')).toBe(true);
-    q('gateway-search-empty')!.querySelector('button')!.click(); await flushPromises();
+    expect(text('gateway-model-count')).toBe('80 个');
+    expect(has('gateway-model-search')).toBe(false);
+    expect(document.body.querySelectorAll('[role="radio"]')).toHaveLength(80);
     expect(q('gateway-tier-model-1')!.getAttribute('aria-checked')).toBe('true');
     await click('gateway-tier-model-79');
+    expect(text('gateway-active')).toContain('Model 1');
     expect(text('gateway-use-btn')).toBe('使用此模型');
     expect(ipc).not.toHaveBeenCalledWith('use_ai_gateway', expect.anything());
+  });
+
+  it('probes the clicked model without switching the selected or saved model, and exposes the reply', async () => {
+    let finish!: (value: unknown) => void;
+    backend({ ...defaults, ai_gateway_tiers: [standard, premiumOpen], ai_gateway_probe: () => new Promise(resolve => { finish = resolve; }) });
+    mountCard(createStore(session('u1')), aiConfig({ activeProvider: 'xiaoban-ai', gatewayTier: 'standard' }));
+    await flushPromises(); await openDialog();
+    await click('gateway-probe-premium');
+    expect(text('gateway-probe-premium')).toBe('检测中');
+    expect(q('gateway-probe-standard')!.hasAttribute('disabled')).toBe(true);
+    expect(ipc).toHaveBeenCalledWith('ai_gateway_probe', { tier: 'premium' });
+    finish({ elapsedMs: 820, reply: '你好！' }); await flushPromises();
+    expect(q('gateway-probe-status-premium')!.getAttribute('title')).toContain('0.82 秒 · 回复：你好！');
+    expect(q('gateway-tier-standard')!.getAttribute('aria-checked')).toBe('true');
+    expect(ipc).not.toHaveBeenCalledWith('use_ai_gateway', expect.anything());
+  });
+
+  it('keeps a failed probe retryable and discards results from the previous account', async () => {
+    let finish!: (value: unknown) => void;
+    backend({ ...defaults, ai_gateway_probe: new AccountError('额度不足') });
+    const store = createStore(session('u1'));
+    mountCard(store); await flushPromises(); await openDialog();
+    await click('gateway-probe-standard');
+    expect(q('gateway-probe-status-standard')!.getAttribute('title')).toContain('额度不足');
+    expect(q('gateway-probe-standard')!.hasAttribute('disabled')).toBe(false);
+    backend({ ...defaults, ai_gateway_probe: () => new Promise(resolve => { finish = resolve; }) });
+    await click('gateway-probe-standard');
+    store.account = session('u2'); await flushPromises();
+    finish({ elapsedMs: 10, reply: 'old account' }); await flushPromises();
+    expect(has('gateway-probe-status-standard')).toBe(false);
+  });
+
+  it('opens only the configured web credit link and disables an absent or invalid link', async () => {
+    backend({ ...defaults, open_download_url: null });
+    mountCard(createStore(session('u1'))); await flushPromises(); await openDialog();
+    expect(q('gateway-purchase')!.hasAttribute('disabled')).toBe(true);
+    backend({ ...defaults, ai_gateway_balance: { ...trialOnly, creditPurchaseUrl: 'https://pay.example.com/credits' }, open_download_url: null });
+    await click('gateway-refresh'); await click('gateway-purchase');
+    expect(ipc).toHaveBeenCalledWith('open_download_url', { url: 'https://pay.example.com/credits' });
+    backend({ ...defaults, ai_gateway_balance: { ...trialOnly, creditPurchaseUrl: 'javascript:alert(1)' } });
+    await click('gateway-refresh');
+    expect(q('gateway-purchase')!.hasAttribute('disabled')).toBe(true);
   });
 
   it('navigates usable models with arrow keys and keeps descriptions in tooltips', async () => {
@@ -400,7 +434,7 @@ describe('小伴 AI dialog: chat model', () => {
     await flushPromises();
     await openDialog();
     expect(text('gateway-total')).toBe('$0.50');
-    expect(has('gateway-use')).toBe(false);
+    expect(document.body.querySelectorAll('[role="radio"]')).toHaveLength(0);
     expect(text('gateway-load-error')).toContain('暂时不可用');
   });
 });

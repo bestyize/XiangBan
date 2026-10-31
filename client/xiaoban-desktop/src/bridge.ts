@@ -168,6 +168,7 @@ export interface AiBucket {
 
 export interface AiBalance {
   product: { name: string };
+  creditPurchaseUrl?: string;
   /** Points that make one US dollar. */
   quotaPerUnit: number;
   total: number;
@@ -175,6 +176,8 @@ export interface AiBalance {
   buckets: AiBucket[];
   trial: { available: boolean; quota: number; days: number };
 }
+
+export interface AiProbeResult { elapsedMs: number; reply: string }
 
 /** A model level the gateway offers. The real model behind it is never sent to the client. */
 export interface AiTier {

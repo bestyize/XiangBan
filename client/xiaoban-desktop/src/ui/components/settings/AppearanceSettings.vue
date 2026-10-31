@@ -14,13 +14,6 @@ async function setChatPet(enabled: boolean) {
 </script>
 <template>
   <div class="settings-appearance" data-testid="settings-appearance">
-    <div class="xb-group-title">对话界面</div>
-    <div class="xb-group">
-      <div class="xb-row" title="显示输入框右上角的小伴，点击可互动" aria-description="显示输入框右上角的小伴，点击可互动">
-        <div class="xb-row-text"><b>对话框桌宠</b></div>
-        <NSwitch :value="store.settings.chatComposerPetEnabled !== false" aria-label="对话框桌宠" data-testid="settings-chat-composer-pet" :loading="savingPet" :disabled="savingPet" @update:value="setChatPet" />
-      </div>
-    </div>
     <div class="xb-group-title">外观模式</div>
     <div class="xb-group mode-group" role="group" aria-label="外观模式" data-testid="appearance-mode">
       <button v-for="mode in appearanceModes" :key="mode.value" type="button" class="mode-card" :class="{ on: appearanceMode === mode.value }" :aria-pressed="appearanceMode === mode.value" :data-testid="`appearance-${mode.value}`" @click="setAppearance(mode.value)">
@@ -33,6 +26,13 @@ async function setChatPet(enabled: boolean) {
         <button v-for="item in accents" :key="item.id" type="button" role="radio" class="swatch" :class="{ on: accent === item.id }" :aria-checked="accent === item.id" :data-testid="`settings-accent-${item.id}`" @click="setAccent(item.id)">
           <span :style="{ background: `linear-gradient(160deg, ${(isDark ? item.dark : item.light).btnHi}, ${(isDark ? item.dark : item.light).btn})`, '--ring': (isDark ? item.dark : item.light).btn }"></span>{{ item.name }}
         </button>
+      </div>
+    </div>
+    <div class="xb-group-title">对话界面</div>
+    <div class="xb-group">
+      <div class="xb-row" title="显示输入框右上角的小伴，点击可互动" aria-description="显示输入框右上角的小伴，点击可互动">
+        <div class="xb-row-text"><b>对话框桌宠</b></div>
+        <NSwitch :value="store.settings.chatComposerPetEnabled !== false" aria-label="对话框桌宠" data-testid="settings-chat-composer-pet" :loading="savingPet" :disabled="savingPet" @update:value="setChatPet" />
       </div>
     </div>
   </div>

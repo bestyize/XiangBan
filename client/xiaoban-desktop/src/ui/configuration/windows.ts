@@ -9,6 +9,15 @@ export function openModelWindow(provider: string) {
   return invoke<void>('configuration_window_open', { target: 'model', tab: null, provider });
 }
 export function closeConfigurationWindow() { return invoke<void>('configuration_window_close'); }
+export function dragConfigurationWindow(event: MouseEvent) {
+  if (event.button || event.detail > 1 || (event.target as HTMLElement).closest('button,input,select,a')) return;
+  event.preventDefault();
+  void invoke('configuration_window_action', { action: 'drag' }).catch(() => {});
+}
+export function zoomConfigurationWindow(event: MouseEvent) {
+  if ((event.target as HTMLElement).closest('button,input,select,a')) return;
+  void invoke('configuration_window_action', { action: 'double-click' }).catch(() => {});
+}
 /** The event is only a wake-up. Command and arguments must be taken from the native queue,
  * never from an event payload that another webview could forge. */
 export function serveConfigurationWindows() {

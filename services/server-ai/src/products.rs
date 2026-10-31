@@ -9,6 +9,7 @@ use sqlx::{FromRow, PgPool};
 pub struct Product {
     pub product_id: String,
     pub name: String,
+    pub credit_purchase_url: String,
     pub client_ids: Vec<String>,
     pub trial_quota: i64,
     pub trial_days: i32,
@@ -31,7 +32,7 @@ pub struct Tier {
     pub enabled: bool,
 }
 
-const PRODUCT_COLUMNS: &str = "product_id, name, client_ids, trial_quota, trial_days, enabled, created_at, updated_at";
+const PRODUCT_COLUMNS: &str = "product_id, name, credit_purchase_url, client_ids, trial_quota, trial_days, enabled, created_at, updated_at";
 const TIER_COLUMNS: &str = "product_id, tier, display_name, description, model, requires_paid, is_default, sort_order, enabled, reasoning_efforts";
 
 /// 令牌 `aud` 属于哪个已启用的产品；一个客户端只能属于一个产品。
@@ -164,9 +165,24 @@ pub fn valid_slug(value: &str) -> bool {
         && value.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '-' | '_'))
 }
 
+pub fn valid_credit_purchase_url(value: &str) -> bool {
+    value.is_empty() || (value.len() <= 2048 && !value.chars().any(char::is_control) && reqwest::Url::parse(value).is_ok_and(|u|
+        matches!(u.scheme(), "https" | "http") && u.host_str().is_some() && u.username().is_empty() && u.password().is_none()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn credit_links_allow_an_unconfigured_value_or_a_web_page() {
+        for value in ["", "https://pay.example.com/credits?product=desktop", "http://localhost:8080/pay"] {
+            assert!(valid_credit_purchase_url(value));
+        }
+        for value in ["javascript:alert(1)", "file:///tmp/pay", "https://user:secret@example.com", "not a url", "https://example.com/\n"] {
+            assert!(!valid_credit_purchase_url(value));
+        }
+    }
 
     fn tier(name: &str, is_default: bool, enabled: bool) -> Tier {
         Tier {

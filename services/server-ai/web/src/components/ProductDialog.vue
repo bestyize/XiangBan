@@ -14,6 +14,7 @@ useModal(root, () => emit('close'));
 const isNew = computed(() => props.product === null);
 const productId = ref(props.product?.product_id ?? '');
 const name = ref(props.product?.name ?? '');
+const creditPurchaseUrl = ref(props.product?.credit_purchase_url ?? '');
 const clients = ref((props.product?.client_ids ?? []).join('\n'));
 const trialDollars = ref(props.product ? toDollars(props.product.trial_quota) : 0.5);
 const trialDays = ref(props.product?.trial_days ?? 7);
@@ -31,6 +32,7 @@ async function submit() {
   try {
     await api.saveProduct(productId.value.trim(), {
       name: name.value.trim(),
+      credit_purchase_url: creditPurchaseUrl.value.trim(),
       client_ids: clientList.value,
       trial_quota: toPoints(Number(trialDollars.value) || 0),
       trial_days: Number(trialDays.value),
@@ -62,6 +64,11 @@ async function submit() {
       <div class="field">
         <label for="p-name">产品名称</label>
         <input id="p-name" v-model="name" class="input" maxlength="40" placeholder="小伴壁纸" required />
+      </div>
+      <div class="field">
+        <label for="p-credit-link">额度获取链接</label>
+        <input id="p-credit-link" v-model="creditPurchaseUrl" class="input" type="url" maxlength="2048" placeholder="https://…" />
+        <span class="hint">客户端“获取额度”打开此页面，可配置在线支付链接；留空时入口不可用。</span>
       </div>
       <div class="field">
         <label for="p-clients">关联的客户端</label>

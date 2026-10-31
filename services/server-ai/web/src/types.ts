@@ -1,5 +1,6 @@
 export interface Product {
   product_id: string;
+  credit_purchase_url?: string;
   name: string;
   client_ids: string[];
   trial_quota: number;
