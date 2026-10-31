@@ -188,26 +188,31 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
         detail?.let { entry ->
             val game = entry.game
             BottomSheet({ if (!exporting) detail = null }) {
-                Column(Modifier.fillMaxWidth().heightIn(max = 560.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { IconTap(XIcons.Close, "关闭游戏详情", { if (!exporting) detail = null }) }
-                    GameCover(game, covers[game.id], imageLoader, Modifier.size(100.dp), false)
-                    Text(game.name, Modifier.padding(top = 17.dp), fontSize = 23.sp, fontWeight = FontWeight.SemiBold)
-                    Text((if (entry.builtin) "小伴官方" else "我的作品") + " · " + if (game.orientation == "portrait") "竖屏游玩" else "横屏游玩", Modifier.padding(top = 9.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(game.description, Modifier.fillMaxWidth().padding(vertical = 22.dp), fontSize = 14.sp, lineHeight = 23.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (game.save) Text("进度保存在这台手机上", Modifier.padding(bottom = 16.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Column(Modifier.fillMaxWidth().heightIn(max = 560.dp).verticalScroll(rememberScrollState())) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        GameCover(game, covers[game.id], imageLoader, Modifier.size(72.dp), false)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(game.name, fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text((if (entry.builtin) "小伴官方" else "我的作品") + " · " + if (game.orientation == "portrait") "竖屏游玩" else "横屏游玩", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconTap(XIcons.Close, "关闭游戏详情", { if (!exporting) detail = null }, Modifier.align(Alignment.Top), size = 18.dp)
+                    }
+                    Text(game.description, Modifier.fillMaxWidth().padding(vertical = 16.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (game.save) Text("进度保存在这台手机上", Modifier.padding(bottom = 16.dp), fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     PillButton("开始游玩", { play(game) }, Modifier.fillMaxWidth(), enabled = supported && !exporting, icon = XIcons.Play)
                     if (!entry.builtin) {
-                        Spacer(Modifier.height(10.dp))
-                        GhostPillButton("让小伴继续修改", { create("请先读取 games/${game.id} 中的游戏源码和试玩记录，问我想怎样修改《${game.name}》，然后在原游戏上迭代。") }, Modifier.fillMaxWidth(), enabled = !exporting)
-                        GhostPillButton(if (exporting) "正在准备导出…" else "导出游戏包", {
-                            if (!exporting) scope.launch {
-                                exporting = true
-                                try { if (env.platform?.exportGame(game.id) != true) message = "当前平台无法导出游戏" }
-                                catch (e: CancellationException) { throw e }
-                                catch (e: Exception) { message = e.message ?: "导出失败" }
-                                finally { exporting = false }
-                            }
-                        }, Modifier.fillMaxWidth())
+                        Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            GhostPillButton("继续修改", { create("请先读取 games/${game.id} 中的游戏源码和试玩记录，问我想怎样修改《${game.name}》，然后在原游戏上迭代。") }, Modifier.weight(1f), enabled = !exporting, height = 44.dp, fontSize = 13)
+                            GhostPillButton(if (exporting) "导出中…" else "导出游戏包", {
+                                if (!exporting) scope.launch {
+                                    exporting = true
+                                    try { if (env.platform?.exportGame(game.id) != true) message = "当前平台无法导出游戏" }
+                                    catch (e: CancellationException) { throw e }
+                                    catch (e: Exception) { message = e.message ?: "导出失败" }
+                                    finally { exporting = false }
+                                }
+                            }, Modifier.weight(1f), enabled = !exporting, height = 44.dp, fontSize = 13)
+                        }
                     }
                 }
             }

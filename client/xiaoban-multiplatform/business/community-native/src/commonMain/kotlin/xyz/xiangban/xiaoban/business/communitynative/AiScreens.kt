@@ -261,7 +261,7 @@ private fun AiDrawer(
                             item.title,
                             Modifier.padding(horizontal = 8.dp, vertical = 1.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp))
                                 .let { if (current) it.background(LocalExtraColors.current.fill) else it }
-                                .combinedClickable(onLongClick = { onDelete(item) }) { if (current) onClose() else onOpen(item.id) }
+                                .combinedClickable(onLongClick = { onDelete(item) }) { onOpen(item.id) }
                                 .padding(horizontal = 8.dp, vertical = 11.dp),
                             fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                             fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal,
