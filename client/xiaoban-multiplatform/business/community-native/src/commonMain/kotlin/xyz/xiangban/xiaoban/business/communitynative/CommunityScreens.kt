@@ -55,7 +55,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.background, 0.45f))) {
         Column(Modifier.fillMaxSize()) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
@@ -85,9 +85,9 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
 private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySection) -> Unit, onSearch: () -> Unit) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(40.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(72.dp)) {
-                Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) {
-                    XIcon(XIcons.SparkleSmall, tint = Color.White, size = 18.dp)
+            Box(Modifier.width(44.dp)) {
+                Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.brandSoft), contentAlignment = Alignment.Center) {
+                    XIcon(XIcons.SparkleSmall, tint = Brand, size = 18.dp)
                 }
             }
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally)) {
@@ -102,7 +102,7 @@ private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySecti
                     }
                 }
             }
-            Box(Modifier.width(72.dp), contentAlignment = Alignment.CenterEnd) { IconTap(XIcons.Search, "搜索", onSearch) }
+            Box(Modifier.width(44.dp), contentAlignment = Alignment.CenterEnd) { IconTap(XIcons.Search, "搜索", onSearch) }
         }
     }
 }

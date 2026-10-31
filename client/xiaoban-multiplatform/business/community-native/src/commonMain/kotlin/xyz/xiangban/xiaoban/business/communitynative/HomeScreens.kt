@@ -85,9 +85,9 @@ internal enum class HomeSub(val key: String, val label: String) {
     }
 }
 
-/** 白底卡片之间留 4dp，两边留 12dp；底部让出悬浮导航的高度。 */
-private val ListPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 24.dp + NavInset)
-private val Gap = 4.dp
+/** 白底卡片之间留 8dp，两边留 12dp；底部让出悬浮导航的高度。 */
+private val ListPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp + NavInset)
+private val Gap = 8.dp
 
 /** 「2026-10-31」→「10 月 31 日」。 */
 internal fun dayText(date: String?): String {
@@ -144,7 +144,7 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
                             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 XIcon(XIcons.Message, size = 18.dp)
                                 Text("AI 日报", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                val note = listOf(dayText(home.news.date), "${home.news.total} 条").filter { it.isNotEmpty() }.joinToString(" · ")
+                                val note = listOf(dayText(home.news.date), "更新").filter { it.isNotEmpty() }.joinToString(" · ")
                                 if (home.news.total > 0) Text(note, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                             }
                             Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { open(Route.Daily) }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -250,7 +250,12 @@ internal fun NewsRow(item: NewsItem, onClick: () -> Unit) {
             Text(item.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 26.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
             if (item.summary.isNotBlank()) Text(item.summary, fontSize = 13.sp, lineHeight = 20.sp, color = LocalExtraColors.current.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
             val time = agoText(item.sourcePublishedAt ?: item.publishedAt)
-            Text(listOf(item.source, if (item.timeBasis == "collected") "采集于 $time" else time).filter { it.isNotEmpty() }.joinToString(" · "), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val logo = BrandLogos.find(item.source)
+                if (logo != null) XIcon(logo.icon, tint = logo.color, size = 14.dp)
+                Text(listOf(item.source, if (item.timeBasis == "collected") "采集于 $time" else time).filter { it.isNotEmpty() }.joinToString(" · "),
+                    fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }
@@ -266,9 +271,8 @@ private fun PickCard(pack: Pack, onClick: () -> Unit) {
         Text(pack.title, Modifier.padding(top = 6.dp), fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Avatar(pack.author?.nickname ?: "?", 14.dp)
-            Text(pack.author?.nickname ?: "匿名", Modifier.weight(1f), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            XIcon(XIcons.Heart, tint = LocalExtraColors.current.ink3, size = 12.dp)
-            Text(compactCount(pack.applyCount.toInt()), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Text(pack.author?.nickname ?: "社区作品", Modifier.weight(1f), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (pack.applyCount > 0) Text("${compactCount(pack.applyCount.toInt())} 次应用", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
         }
     }
 }
@@ -316,27 +320,24 @@ internal fun HotTab(env: CommunityEnv) {
 
 @Composable
 private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
+    var details by rememberSaveable(issue.key) { mutableStateOf(false) }
     WhiteCard(padding = 14.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(if (issue.isBaseline) "初始快照" else if (issue.source == "GitHub") "观测榜" else "第 ${issue.issueNo} 期", Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                Text(listOf(issue.weekStart, issue.weekEnd).filter { it.isNotEmpty() }.distinct().joinToString(" – "), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onPast).padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("往期", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
-                XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
-            }
+        SectionHeader(if (issue.isBaseline) "开源项目快照" else "开源观测榜", action = "往期", onAction = onPast,
+            note = listOf(issue.weekStart, issue.weekEnd).filter { it.isNotEmpty() }.distinct().joinToString(" – "))
+        Text(if (issue.isBaseline) "${issue.ranks.size} 个项目 · 按总 Star 排序 · 增量待积累"
+            else "${issue.ranks.size} 个项目 · ${issue.observedDays?.let { "$it 日观测" } ?: "本期观测"} · 净增 ${issue.totalGain?.let(::formatGain) ?: "暂无数据"}",
+            Modifier.padding(top = 8.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Row(Modifier.fillMaxWidth().clickable { details = !details }.padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(issue.source.ifBlank { "数据来源" } + " · " + if (details) "收起数据说明" else "口径与更新时间", Modifier.weight(1f), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            XIcon(if (details) XIcons.ChevronUp else XIcons.ChevronDown, size = 14.dp, tint = LocalExtraColors.current.ink3)
         }
-        Row(Modifier.padding(top = 14.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
-            Column {
-                Text(if (issue.isBaseline) "已记录 ${issue.ranks.size} 个公开项目 · 按总 star 排序" else if (issue.source == "GitHub") "前 ${issue.ranks.size} 名 · ${issue.observedDays ?: 0} 日观测净增 star" else "前 ${issue.ranks.size.coerceAtLeast(1)} 名本周新增 star", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                Text(if (issue.isBaseline) "增量待积累" else issue.totalGain?.let { formatGain(it).removePrefix("+") } ?: "暂无增量数据", Modifier.padding(top = 2.dp), fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                issue.wowPct?.takeIf { it != 0.0 }?.let { pct -> Text(if (pct > 0) "比上周多 ${formatScore(pct)}%" else "比上周少 ${formatScore(-pct)}%", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
+        if (details) {
+            repoObservationLabel(issue.asOf)?.let { Text("整理于 $it", Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3) }
+            Text((if (issue.isBaseline) "当前为首次观测，至少两次快照后计算净增量。"
+                else if (issue.complete) "已取得连续 7 日边界快照。" else "观测不足 7 日或存在缺采，未补造缺失数据。") + if (issue.sample) " · 示例数据" else "",
+                Modifier.padding(top = 4.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
             if (issue.dailyGain.size == 7 && issue.source != "GitHub") DayBars(issue.dailyGain, listOf("一", "二", "三", "四", "五", "六", "日"))
         }
-        repoObservationLabel(issue.asOf)?.let { Text("数据整理于 $it", Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3) }
-        Text((if (issue.isBaseline) "来源 GitHub · 首日真实快照，至少两次观测后才计算增量，不补造历史" else if (issue.source == "GitHub") "来源 GitHub · 候选仓库观测榜" + if (issue.complete) " · 已取得连续 7 日边界快照" else " · 观测尚未满 7 日或存在缺采，历史不补造" else "按 7 日新增 star 排序，只收 AI 相关项目") + if (issue.sample) " · 示例数据" else "", Modifier.padding(top = 10.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -344,40 +345,22 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
 @Composable
 private fun RepoCard(env: CommunityEnv, r: RepoRank) {
     val (fav, setFav) = rememberPrefFlag(env, "fav_repo:${r.fullName}")
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable { env.platform?.openUrl("https://github.com/${r.fullName}") }) {
-        Box(
-            Modifier.align(Alignment.TopEnd).defaultMinSize(minWidth = 36.dp).height(22.dp)
-                .clip(RoundedCornerShape(topStart = 0.dp, topEnd = 8.dp, bottomEnd = 0.dp, bottomStart = 8.dp))
-                .background(if (r.rank <= 3) Brand else LocalExtraColors.current.fill).padding(horizontal = 8.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("No.${r.rank}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (r.rank <= 3) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+    WhiteCard(Modifier.clickable { env.platform?.openUrl("https://github.com/${r.fullName}") }, padding = 14.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(r.rank.toString().padStart(2, '0'), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = if (r.rank <= 3) Brand else LocalExtraColors.current.ink3)
+            RepoTile(r, 32.dp, 8.dp)
+            Text(r.fullName, Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            IconTap(XIcons.Bookmark, if (fav) "取消收藏 ${r.fullName}" else "收藏 ${r.fullName}", { setFav(!fav) }, size = 19.dp, tint = if (fav) Brand else LocalExtraColors.current.ink3)
         }
-        Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            RepoTile(r, 40.dp, 10.dp)
-            Column(Modifier.weight(1f)) {
-                Text(r.fullName, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(end = 6.dp))
-                if (r.description.isNotEmpty()) Text(r.description, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (r.suspectedGrowth) Text("增长异常 · 编辑复核后收录", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (r.starGain == null) Text("初始快照 · 增量待积累", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                else if (r.observedDays != null && !r.complete) Text("实际观测 ${r.observedDays} 天，缺采日期未补值", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                repoObservationLabel(r.observationEnd)?.let { Text("观察于 $it", Modifier.padding(top = 4.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3) }
-                Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    LangLine(r)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        XIcon(XIcons.Star, tint = LocalExtraColors.current.ink3, size = 14.dp)
-                        Text(formatStars(r.starTotal), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                    }
-                }
-            }
-            Column(Modifier.padding(top = 22.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (r.starGain != null && r.spark.size >= 2) SparkBars(r.spark, height = 22.dp)
-                r.starGain?.let { Text(formatGain(it), fontSize = 14.sp, fontWeight = FontWeight.SemiBold) }
-                Box(Modifier.size(32.dp).clip(CircleShape).background(if (fav) Brand.copy(alpha = 0.14f) else LocalExtraColors.current.fill).clickable { setFav(!fav) }, contentAlignment = Alignment.Center) {
-                    XIcon(XIcons.Bookmark, tint = if (fav) Brand else MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp, description = if (fav) "取消收藏" else "收藏")
-                }
-            }
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LangLine(r)
+            Text("☆ ${formatStars(r.starTotal)}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Spacer(Modifier.weight(1f))
+            r.starGain?.let { Text("${formatGain(it)} Star", fontSize = 12.sp, fontWeight = FontWeight.Medium) }
+            if (r.starGain != null && r.spark.size >= 2) SparkBars(r.spark, height = 20.dp)
         }
+        if (r.suspectedGrowth) Text("增长异常 · 编辑复核后收录", Modifier.padding(top = 6.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+        if (r.starGain != null && r.observedDays != null && !r.complete) Text("实际观测 ${r.observedDays} 天", Modifier.padding(top = 6.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -410,13 +393,15 @@ internal fun RankTab(env: CommunityEnv, open: (Route) -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun TrackTab(env: CommunityEnv) {
+    var section by rememberSaveable { mutableStateOf("launches") }
     val loader = rememberLoader(env, "tracker") { env.forum.tracker() }
     val state by loader.state.collectAsState()
     PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
         LoadBox(state, loader::reload) { tracker ->
             LazyColumn(Modifier.fillMaxSize(), contentPadding = ListPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
+                item { PageChipRow(listOf("launches" to "发布记录", "promos" to "优惠与试用"), section, { section = it }) }
                 tracker.quota?.let { q -> item { QuotaCard(env, q) } }
-                item {
+                if (section == "launches") item {
                     WhiteCard(padding = 14.dp) {
                         CardTitleRow("发布记录", XIcons.Bolt)
                         if (tracker.launches.isEmpty()) Text("暂无已核实的发布记录", Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -431,16 +416,18 @@ internal fun TrackTab(env: CommunityEnv) {
                                     Column(Modifier.weight(1f).padding(bottom = 14.dp)) {
                                         Text(l.publishedAt.take(10).ifBlank { "日期未提供" }, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                                         Text(l.title, Modifier.padding(top = 2.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                        if (l.summary.isNotBlank()) Text(l.summary, Modifier.padding(top = 5.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        if (source != null) LinkText("查看官方发布原文 ›", { env.platform?.openUrl(source) })
-                                        if (l.tags.isNotEmpty()) Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) { l.tags.forEach { GrayTag(it) } }
+                                        if (l.summary.isNotBlank()) DisclosureDescription("发布说明", l.summary)
+                                        if (source != null) Row(Modifier.clickable { env.platform?.openUrl(source) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Text("官方原文", fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
+                                            XIcon(XIcons.ExternalLink, size = 13.dp, tint = LocalExtraColors.current.brandInk)
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-                item {
+                if (section == "promos") item {
                     WhiteCard(padding = 14.dp) {
                         CardTitleRow("优惠与试用", XIcons.Clock)
                         if (tracker.promos.isEmpty()) Text("暂无已核实的优惠与试用", Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -535,20 +522,22 @@ internal fun NavTab(env: CommunityEnv) {
                 if (groups.groups.isEmpty()) item { CenterMessage("还没有导航", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)) }
                 groups.groups.forEach { group ->
                     item(key = "g-${group.name}") {
-                        Column(Modifier.padding(start = 2.dp, end = 2.dp, top = 10.dp)) { CardTitleRow(group.name, XIcons.Globe) }
-                    }
-                    items(group.items, key = { "l-${it.key}" }) { link ->
-                        val logo = BrandLogos.find(link.name) ?: BrandLogos.find(link.vendor)
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable { env.platform?.openUrl(link.url) }.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            BrandTile(logo, link.name, size = 40.dp, corner = 10.dp, dashed = logo == null)
-                            Column(Modifier.weight(1f)) {
-                                Text(link.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                Text(link.vendor, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                        WhiteCard(padding = 14.dp) {
+                            SectionHeader(group.name, note = "${group.items.size} 个官方入口")
+                            group.items.chunked(2).forEach { row ->
+                                Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    row.forEach { link ->
+                                        Row(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).clickable { env.platform?.openUrl(link.url) }.padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            BrandTile(BrandLogos.find(link.name) ?: BrandLogos.find(link.vendor), link.name, size = 34.dp, corner = 9.dp)
+                                            Column(Modifier.weight(1f)) {
+                                                Text(link.name, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            }
+                                        }
+                                    }
+                                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                                }
                             }
-                            XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
                         }
                     }
                 }

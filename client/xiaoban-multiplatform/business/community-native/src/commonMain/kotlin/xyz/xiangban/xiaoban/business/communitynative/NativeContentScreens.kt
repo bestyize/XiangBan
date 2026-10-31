@@ -29,10 +29,11 @@ import xyz.xiangban.xiaoban.common.community.*
 private val ContentSpacing = Arrangement.spacedBy(8.dp)
 
 @Composable
-private fun ManifestSection(title: String, value: String?) {
+private fun ManifestSection(title: String, value: String?, collapsible: Boolean = false) {
     WhiteCard(padding = 14.dp) {
         Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        SelectionContainer { Text(value ?: "发布者未提供此项说明", Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (collapsible && value != null) ExpandableDescription(value)
+        else SelectionContainer { Text(value ?: "发布者未提供此项说明", Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
@@ -54,12 +55,14 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
     var sharing by rememberSaveable(pack.id) { mutableStateOf(false) }
     val manifest = pack.versions.firstOrNull { it.version == pack.version }?.manifest ?: JsonObject(emptyMap())
     val prompt = manifestValue(manifest, "prompt", "promptText", "systemPrompt", "system_prompt")
+    val manualOnly = manifest["manualOnly"]?.toString() == "true"
     Column(Modifier.fillMaxSize()) {
         if (showBar) ScreenBar("能力详情", onBack = back, trailing = { IconTap(XIcons.Share, "分享", { sharing = true }) })
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = ContentSpacing) {
             WhiteCard(padding = 16.dp) {
                 Text(pack.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
                 pack.author?.let { author -> Text(author.nickname ?: "作者", Modifier.padding(top = 6.dp).clickable(enabled = open != null) { open?.invoke(Route.User(author.uid)) }, fontSize = 14.sp, color = LocalExtraColors.current.brandInk) }
+                if (manualOnly) BlueTag("手动模板 · 不自动执行", Modifier.padding(top = 8.dp))
                 Text("${kindLabel(pack.kind)} · ${pack.trustLabel} · v${pack.version}", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                 if (pack.status != "published") Text(contentWorkState(pack), Modifier.padding(top = 8.dp), color = Danger, fontSize = 13.sp)
                 if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp)
@@ -69,12 +72,12 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
             ManifestSection("不能做", manifestValue(manifest, "cannotDo", "cannot_do", "limitations"))
             ManifestSection("所需权限", manifestValue(manifest, "permissions", "requiredPermissions"))
             ManifestSection("运行位置", manifestValue(manifest, "runLocation", "run_location", "runtime", "executionLocation"))
-            ManifestSection("完整提示词", prompt)
+            ManifestSection("完整提示词", prompt, collapsible = true)
             if (prompt != null) GhostPillButton("复制提示词", { env.platform?.copy(prompt) }, Modifier.fillMaxWidth(), enabled = env.platform != null)
             var expanded by rememberSaveable { mutableStateOf(false) }
             GhostPillButton(if (expanded) "收起完整清单" else "查看完整清单", { expanded = !expanded }, Modifier.fillMaxWidth())
             if (expanded) ManifestSection("资源清单原文", CommunityJson.encodeToString(manifest))
-            FootNote("手机用于浏览和分享。内容的实际运行与授权在电脑端确认，导入内容不会自动执行。未提供的权限说明不能视为没有权限。")
+            FootNote(if (manualOnly) "这是可下载的手动模板，按说明使用或复制提示词；不会自动执行任务。" else "手机用于浏览和分享。实际运行与授权在电脑端确认，导入不会自动执行；未提供权限说明不代表无需权限。")
             GhostPillButton("复制电脑端打开链接", { env.platform?.copy(env.forum.packUrl(pack.id)) }, Modifier.fillMaxWidth(), enabled = env.platform != null && pack.status == "published")
             pack.topicId?.let { topicId -> GhostPillButton("在网页查看讨论", { env.platform?.openUrl(env.forum.topicUrl(topicId)) }, Modifier.fillMaxWidth(), enabled = env.platform != null) }
         }

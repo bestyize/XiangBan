@@ -104,7 +104,6 @@ fun NativeBookmarksScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> 
                 item { GhostPillButton("刷新收藏", loader::reload, Modifier.fillMaxWidth()) }
                 items(result.items, key = { it.id }) { topic -> WhiteCard(padding = 14.dp) {
                     Text(topic.title, Modifier.fillMaxWidth().clickable { open(Route.Topic(topic.id)) }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 6.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
                     GhostPillButton("取消收藏", {
                         if (busy) return@GhostPillButton
                         busy = true; error = null
@@ -177,7 +176,6 @@ private fun ProfileTopics(env: CommunityEnv, uid: String, open: (Route) -> Unit)
         else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(result.items, key = { it.id }) { topic -> WhiteCard(Modifier.clickable { open(Route.Topic(topic.id)) }, padding = 14.dp) {
                 Text(topic.title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                Text(topic.excerpt, Modifier.padding(top = 6.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
             } }
             item { SocialPager(page, result.hasMore) { page = it } }
         }

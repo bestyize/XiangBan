@@ -78,7 +78,7 @@ internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> U
     }
 }
 
-private val Gap = 4.dp
+private val Gap = 8.dp
 
 /** 栏目顶部的灰色说明，前面带一个小 i。 */
 @Composable
@@ -128,13 +128,12 @@ private fun ToolsTab(env: CommunityEnv, open: (Route) -> Unit) {
 @Composable
 private fun ToolRow(tool: ToolSummary, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ToolIcon(tool.name, tool.developer)
         Column(Modifier.weight(1f)) {
             Text(tool.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(tool.developer, Modifier.padding(top = 1.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
             Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 LicenseChip(tool.license, tool.licenseText)
                 val meta = when {
@@ -162,29 +161,24 @@ private fun DocsTab(env: CommunityEnv) {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = FeedPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
                 item { TabNote("官方文档的索引和导读，原文一律跳转官网。") }
                 if (groups.groups.isEmpty()) item { CenterMessage("还没有收录的资料", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)) }
-                groups.groups.forEachIndexed { gi, group ->
+                groups.groups.forEach { group ->
                     item(key = "g-${group.name}") {
-                        Row(Modifier.fillMaxWidth().padding(start = 2.dp, end = 2.dp, top = 8.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            val logo = BrandLogos.find(group.name)
-                            Box(Modifier.size(28.dp).clip(RoundedCornerShape(6.dp)).background(if (ThemeState.dark) DocTints[gi % 3].copy(alpha = 0.2f) else DocTints[gi % 3]), contentAlignment = Alignment.Center) {
-                                if (logo != null) XIcon(logo.icon, tint = logo.color, size = 16.dp) else XIcon(XIcons.Book, size = 16.dp)
+                        WhiteCard(padding = 14.dp) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                BrandTile(BrandLogos.find(group.name), group.name, size = 28.dp, corner = 8.dp)
+                                Text(group.name, Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                Text("${group.items.size} 篇", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
                             }
-                            Text(group.name, Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                            Text("官方原文", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
-                            XIcon(XIcons.ExternalLink, tint = LocalExtraColors.current.ink3, size = 14.dp)
-                        }
-                    }
-                    items(group.items, key = { "d-${it.key}" }) { doc ->
-                        Row(
-                            Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable { env.platform?.openUrl(doc.url) }.padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            XIcon(XIcons.File, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
-                            Column(Modifier.weight(1f)) {
-                                Text(doc.title, fontSize = 15.sp)
-                                if (doc.subtitle.isNotEmpty()) Text(doc.subtitle, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                            group.items.forEachIndexed { index, doc ->
+                                if (index > 0) Hairline()
+                                Row(Modifier.fillMaxWidth().clickable { env.platform?.openUrl(doc.url) }.padding(vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Column(Modifier.weight(1f)) {
+                                        Text(doc.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 21.sp)
+                                    }
+                                    XIcon(XIcons.ExternalLink, size = 15.dp, tint = LocalExtraColors.current.ink3)
+                                }
                             }
-                            GrayTag(doc.labelText)
                         }
                     }
                 }
@@ -201,11 +195,10 @@ private fun MediaTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (Strin
     val controller = remember(env) { DiscussController(env.forum, scope, category = "share-movies,share-music", home = false) }
     TopicFeed(controller, "还没有影音分享", open, header = { TabNote("只收片单、影评、乐评和公版或授权内容，不提供盗版下载。") }) { topic ->
         // 72×96 的竖封面在左，右边是类型标签、标题、摘要，底下是作者。
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Cover(topic.images.firstOrNull()?.let { env.forum.imageUrl(it) }, topic.id, Modifier.size(width = 72.dp, height = 96.dp))
-            Column(Modifier.weight(1f).heightIn(min = 96.dp)) {
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            topic.images.firstOrNull()?.let { Cover(env.forum.imageUrl(it), topic.id, Modifier.size(width = 72.dp, height = 96.dp)) }
+            Column(Modifier.weight(1f)) {
                 Text(topic.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     GrayTag(topic.tags.firstOrNull() ?: topic.category.name, compact = true)
                     Text(topic.author.nickname, fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -220,16 +213,15 @@ private fun OpenTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (String
     val scope = rememberCoroutineScope()
     val controller = remember(env) { DiscussController(env.forum, scope, category = "share-software", tag = "开源", home = false) }
     TopicFeed(controller, "还没有开源精选", open, header = { TabNote("只收开源、免费软件和可免费使用的设计素材。") }) { topic ->
-        // 88×88 的缩略图在左，右边是标题、摘要，底下是来源标签、浏览数和作者。
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Cover(topic.images.firstOrNull()?.let { env.forum.imageUrl(it) }, topic.id, Modifier.size(88.dp))
-            Column(Modifier.weight(1f).heightIn(min = 88.dp)) {
+        // 有真实配图时显示缩略图，保留标题、来源标签、浏览数和作者。
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            topic.images.firstOrNull()?.let { Cover(env.forum.imageUrl(it), topic.id, Modifier.size(88.dp)) }
+            Column(Modifier.weight(1f)) {
                 Text(topic.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     GrayTag(topic.tags.firstOrNull { it in setOf("开源", "免费", "免费可商用") } ?: "开源")
                     Stat(XIcons.Eye, compactCount(topic.viewCount))
-                    Text(topic.author.nickname, fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1)
+                    Text(topic.author.nickname, Modifier.weight(1f), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -265,7 +257,7 @@ private fun HelpTab(env: CommunityEnv, open: (Route) -> Unit) {
     val stats = rememberLoader(env, "help-stats") { env.forum.helpStats() }
     val statsState by stats.state.collectAsState()
     TopicFeed(controller, "还没有人发求助", open, header = {
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             val s = (statsState as? Load.Ready<HelpStats>)?.value
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 StatNumber(s?.open?.toString() ?: "–", "进行中")
@@ -297,7 +289,7 @@ private fun StatNumber(value: String, label: String) {
 @Composable
 private fun HelpCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit) {
     val help = topic.help
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
+    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
         if (help != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
@@ -318,7 +310,6 @@ private fun HelpCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit) {
             }
             Column(Modifier.weight(1f)) {
                 Text(topic.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, lineHeight = 23.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -356,6 +347,7 @@ private fun shortDate(date: String): String {
     return "${m.groupValues[1]}-${m.groupValues[2]}"
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun ToolDetailBody(env: CommunityEnv, tool: ToolDetail, onMessage: (String) -> Unit) {
     var source by rememberSaveable { mutableStateOf(if (tool.hasMirror) "mirror" else "github") }
@@ -371,17 +363,22 @@ private fun ToolDetailBody(env: CommunityEnv, tool: ToolDetail, onMessage: (Stri
                     Column(Modifier.weight(1f)) {
                         Text(tool.name, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
                         Text(listOf(tool.developer, tool.typeLabel).filter { it.isNotEmpty() }.joinToString(" · "), Modifier.padding(top = 2.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                        Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        androidx.compose.foundation.layout.FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             LicenseChip(tool.license, tool.licenseText)
                             tool.platforms.forEach { GrayTag(it) }
                         }
                     }
                 }
                 if (tool.description.isNotEmpty()) Text(tool.description, Modifier.padding(top = 12.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    InfoTile(tool.latestVersion ?: "–", "最新版本", Modifier.weight(1f))
-                    InfoTile(tool.latestDate?.takeIf { it.isNotEmpty() }?.let(::shortDate) ?: "–", "更新日期", Modifier.weight(1f))
-                    InfoTile(artifact?.size?.takeIf { it > 0 }?.let(::formatDownloadSize) ?: "–", "安装包", Modifier.weight(1f))
+                if (tool.latestVersion != null || !tool.latestDate.isNullOrBlank() || (artifact?.size ?: 0) > 0) {
+                    Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        tool.latestVersion?.let { InfoTile(it, "最新版本", Modifier.weight(1f)) }
+                        tool.latestDate?.takeIf { it.isNotBlank() }?.let { InfoTile(shortDate(it), "更新日期", Modifier.weight(1f)) }
+                        artifact?.size?.takeIf { it > 0 }?.let { InfoTile(formatDownloadSize(it), "安装包", Modifier.weight(1f)) }
+                    }
+                }
+                if (tool.artifacts.isEmpty() && tool.homepageUrl.isNotBlank()) {
+                    GhostPillButton("前往官方网站", { env.platform?.openUrl(tool.homepageUrl) }, Modifier.padding(top = 14.dp).fillMaxWidth())
                 }
             }
         }

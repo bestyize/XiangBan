@@ -161,7 +161,7 @@ private fun LiveVendorLegend(vendors: List<LiveModelVendor>) {
 @Composable
 private fun LiveScatterCard(board: LiveModelBoard, vendors: Map<String, LiveModelVendor>, open: ((Route) -> Unit)?) {
     val points = remember(board) { liveScatterPoints(board) }
-    WhiteCard(padding = 14.dp, horizontalPadding = 0.dp) {
+    WhiteCard(padding = 14.dp, horizontalPadding = 8.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("智能 vs 价格", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -190,7 +190,7 @@ private fun AbilityRankings(env: CommunityEnv, open: ((Route) -> Unit)?, preview
                 val metric = if (preview) LiveModelMetric.Intelligence else available.firstOrNull { it.name == metricName } ?: available.first()
                 val rows = remember(board, metric) { rankLiveModels(board.models, metric) }
                 val vendors = remember(board) { board.vendors.associateBy { it.id } }
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = RankingsPadding, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                LazyColumn(Modifier.fillMaxSize(), contentPadding = RankingsPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (!preview) {
                         item {
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
@@ -204,7 +204,7 @@ private fun AbilityRankings(env: CommunityEnv, open: ((Route) -> Unit)?, preview
                     }
                     if (preview) item {
                         val top = rows.filter { it.value != null }.take(10)
-                        WhiteCard(padding = 14.dp, horizontalPadding = 0.dp) {
+                        WhiteCard(padding = 14.dp, horizontalPadding = 8.dp) {
                             Row(verticalAlignment = Alignment.Top) {
                                 Column(Modifier.weight(1f)) {
                                     Text("AA 智能指数", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
@@ -224,13 +224,13 @@ private fun AbilityRankings(env: CommunityEnv, open: ((Route) -> Unit)?, preview
                         }
                     } else {
                         items(rows.chunked(25), key = { it.first().model.id }) { group ->
-                            WhiteCard(padding = 12.dp, horizontalPadding = 0.dp) { group.forEach { row -> LiveModelBar(row, vendors[row.model.vendorId]?.name ?: "未知厂商", metric) } }
+                            WhiteCard(padding = 12.dp, horizontalPadding = 8.dp) { group.forEach { row -> LiveModelBar(row, vendors[row.model.vendorId]?.name ?: "未知厂商", metric) } }
                         }
                     }
                     item { LiveScatterCard(board, vendors, open) }
                     if (preview) item {
                         val speed = remember(board) { rankLiveModels(board.models, LiveModelMetric.Speed).filter { it.value != null }.take(5) }
-                        WhiteCard(padding = 14.dp, horizontalPadding = 0.dp) {
+                        WhiteCard(padding = 14.dp, horizontalPadding = 8.dp) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("输出速度 Top 5", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                 Text("Token/秒", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
@@ -252,7 +252,7 @@ private fun AbilityRankings(env: CommunityEnv, open: ((Route) -> Unit)?, preview
 
 @Composable
 private fun UsagePreviewCard(state: Load<ModelUsageBoard>, retry: () -> Unit, open: () -> Unit) {
-    WhiteCard(Modifier.clickable(onClick = open), padding = 14.dp, horizontalPadding = 0.dp) {
+    WhiteCard(Modifier.clickable(onClick = open), padding = 14.dp, horizontalPadding = 8.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("调用量 Top 5", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
             Text("全部排行", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
@@ -319,9 +319,9 @@ private fun UsageRankings(env: CommunityEnv) {
             Box(Modifier.weight(1f)) {
                 RankingLoadBox(state, ::reload, "这一天的调用量榜尚未发布\n可切换统计日或稍后刷新") { board ->
                     if (board.models.isEmpty()) CenterMessage("暂无模型用量数据", "刷新", ::reload)
-                    else LazyColumn(Modifier.fillMaxSize(), contentPadding = RankingsPadding, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    else LazyColumn(Modifier.fillMaxSize(), contentPadding = RankingsPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         item {
-                            WhiteCard(padding = 14.dp, horizontalPadding = 0.dp) {
+                            WhiteCard(padding = 14.dp, horizontalPadding = 8.dp) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text("调用量 Top 50", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                     Text("${board.date} · UTC", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
@@ -331,7 +331,7 @@ private fun UsageRankings(env: CommunityEnv) {
                             }
                         }
                         items(board.models.sortedBy { it.rank }.chunked(10), key = { it.first().id }) { group ->
-                            WhiteCard(padding = 12.dp, horizontalPadding = 0.dp) { group.forEach { model -> UsageModelBar(model, board.previousDateAvailable) } }
+                            WhiteCard(padding = 12.dp, horizontalPadding = 8.dp) { group.forEach { model -> UsageModelBar(model, board.previousDateAvailable) } }
                         }
                         item { RankingSource(env, "OpenRouter", board.sourceUrl,
                             "Source: OpenRouter (openrouter.ai/rankings), as of ${board.asOf.take(10)}.\n其他模型 ${formatTokenCount(board.otherTokens)} Token；计入全天总量。排名变化与前一完整 UTC 日对比，不代表请求次数。") }
