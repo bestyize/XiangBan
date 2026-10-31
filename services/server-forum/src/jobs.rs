@@ -8,6 +8,19 @@ use crate::{
 use std::time::Duration;
 
 pub fn spawn(state: AppState) {
+    let publisher = state.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(Duration::from_secs(30));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tick.tick().await;
+            match crate::handlers::discover_editor::publish_due(&publisher.pool).await {
+                Ok(n) if n > 0 => tracing::info!("发布了 {n} 条已审核的发现页内容"),
+                Ok(_) => {},
+                Err(e) => tracing::warn!("发布发现页内容失败: {e}"),
+            }
+        }
+    });
     tokio::spawn(async move {
         let mut tick = tokio::time::interval(Duration::from_secs(600));
         let mut round: u32 = 0;

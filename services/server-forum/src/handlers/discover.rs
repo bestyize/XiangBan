@@ -52,7 +52,7 @@ type Row = (String, i32, DateTime<Utc>, Value);
 async fn fetch(pool: &PgPool, kind: &str, order: &str, limit: i64, offset: i64) -> AppResult<Vec<Value>> {
     let rows: Vec<Row> = sqlx::query_as(&format!(
         "SELECT key, sort_order, published_at, data FROM discover_items
-         WHERE kind = $1 AND status = 'published' ORDER BY {order} LIMIT $2 OFFSET $3"
+         WHERE kind = $1 AND status = 'published' AND published_at <= now() ORDER BY {order} LIMIT $2 OFFSET $3"
     ))
     .bind(kind)
     .bind(limit)
@@ -73,7 +73,7 @@ fn item_json((key, _order, published_at, data): Row) -> Value {
 }
 
 async fn count(pool: &PgPool, kind: &str) -> AppResult<i64> {
-    let (n,): (i64,) = sqlx::query_as("SELECT count(*) FROM discover_items WHERE kind = $1 AND status = 'published'")
+    let (n,): (i64,) = sqlx::query_as("SELECT count(*) FROM discover_items WHERE kind = $1 AND status = 'published' AND published_at <= now()")
         .bind(kind)
         .fetch_one(pool)
         .await?;
@@ -90,7 +90,7 @@ fn any_sample(items: &[Value]) -> bool {
 async fn latest_repo_issue(pool: &PgPool, key: Option<&str>) -> AppResult<Option<Value>> {
     let row: Option<Row> = sqlx::query_as(
         "SELECT key, sort_order, published_at, data FROM discover_items
-         WHERE kind = 'repo_issue' AND status = 'published' AND ($1::text IS NULL OR key = $1)
+         WHERE kind = 'repo_issue' AND status = 'published' AND published_at <= now() AND ($1::text IS NULL OR key = $1)
          ORDER BY (data->>'issue_no')::int DESC LIMIT 1",
     )
     .bind(key)
@@ -115,8 +115,8 @@ async fn home(State(state): State<AppState>) -> AppResult<Json<Value>> {
     let (day, total): (Option<chrono::NaiveDate>, i64) = sqlx::query_as(
         "SELECT max((published_at AT TIME ZONE 'Asia/Shanghai')::date),
                 count(*) FILTER (WHERE (published_at AT TIME ZONE 'Asia/Shanghai')::date =
-                    (SELECT max((published_at AT TIME ZONE 'Asia/Shanghai')::date) FROM discover_items WHERE kind = 'news' AND status = 'published'))
-         FROM discover_items WHERE kind = 'news' AND status = 'published'",
+                    (SELECT max((published_at AT TIME ZONE 'Asia/Shanghai')::date) FROM discover_items WHERE kind = 'news' AND status = 'published' AND published_at <= now()))
+         FROM discover_items WHERE kind = 'news' AND status = 'published' AND published_at <= now()",
     )
     .fetch_one(pool)
     .await?;
@@ -167,7 +167,7 @@ async fn repos(State(state): State<AppState>, Query(q): Query<IssueQuery>) -> Ap
 async fn repo_issues(State(state): State<AppState>) -> AppResult<Json<Value>> {
     let rows: Vec<Row> = sqlx::query_as(
         "SELECT key, sort_order, published_at, data FROM discover_items
-         WHERE kind = 'repo_issue' AND status = 'published' ORDER BY (data->>'issue_no')::int DESC LIMIT 60",
+         WHERE kind = 'repo_issue' AND status = 'published' AND published_at <= now() ORDER BY (data->>'issue_no')::int DESC LIMIT 60",
     )
     .fetch_all(&state.pool)
     .await?;
@@ -283,7 +283,7 @@ async fn list_tools(State(state): State<AppState>) -> AppResult<Json<Value>> {
 
 async fn get_tool(State(state): State<AppState>, Path(slug): Path<String>) -> AppResult<Json<Value>> {
     let row: Option<Row> = sqlx::query_as(
-        "SELECT key, sort_order, published_at, data FROM discover_items WHERE kind = 'tool' AND key = $1 AND status = 'published'",
+        "SELECT key, sort_order, published_at, data FROM discover_items WHERE kind = 'tool' AND key = $1 AND status = 'published' AND published_at <= now()",
     )
     .bind(&slug)
     .fetch_optional(&state.pool)
@@ -414,11 +414,12 @@ async fn admin_put(
     let mut data = discover::validate(&kind, input.data)?;
     data["sample"] = Value::Bool(input.sample);
     let mut tx = state.pool.begin().await?;
+    super::discover_editor::lock(&mut tx, &kind, &key).await?;
     sqlx::query(
         "INSERT INTO discover_items (kind, key, sort_order, status, published_at, data)
          VALUES ($1, $2, $3, $4, COALESCE($5, now()), $6)
          ON CONFLICT (kind, key) DO UPDATE SET sort_order = $3, status = $4,
-             published_at = COALESCE($5, discover_items.published_at), data = $6, updated_at = now()",
+             published_at = COALESCE($5, discover_items.published_at), data = $6, updated_at = clock_timestamp()",
     )
     .bind(&kind)
     .bind(&key)
@@ -428,6 +429,7 @@ async fn admin_put(
     .bind(data)
     .execute(&mut *tx)
     .await?;
+    super::discover_editor::invalidate(&mut tx, &kind, &key).await?;
     audit(&mut tx, &admin, "discover.put", &kind, &key, status).await?;
     tx.commit().await?;
     Ok(Json(json!({ "kind": kind, "key": key })))
@@ -439,6 +441,7 @@ async fn admin_delete(
     Path((kind, key)): Path<(String, String)>,
 ) -> AppResult<Json<Value>> {
     let mut tx = state.pool.begin().await?;
+    super::discover_editor::lock(&mut tx, &kind, &key).await?;
     let gone = sqlx::query("DELETE FROM discover_items WHERE kind = $1 AND key = $2")
         .bind(&kind)
         .bind(&key)
@@ -448,6 +451,7 @@ async fn admin_delete(
     if gone == 0 {
         return Err(AppError::not_found("条目"));
     }
+    super::discover_editor::invalidate(&mut tx, &kind, &key).await?;
     audit(&mut tx, &admin, "discover.delete", &kind, &key, "").await?;
     tx.commit().await?;
     Ok(Json(json!({ "deleted": true })))

@@ -94,13 +94,47 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 ## 手机端社区的发现页
 
-手机端社区（首页五个栏目、AI 工具、资料、求助悬赏）用的接口，实现在 `src/discover.rs`（内容校验与示例种子）和 `src/handlers/discover.rs`。内容都是后台手录，统一存在 `discover_items`（`kind` + `key` + JSON `data`），写入时按类型校验、只保留已知字段，草稿不对外。
+手机端社区（首页五个栏目、AI 工具、资料、求助悬赏）用的接口，实现在 `src/discover.rs`（内容校验与示例种子）、`src/handlers/discover.rs`（公开读取与兼容管理接口）、`src/handlers/discover_editor.rs`（编辑与审核）。公开内容存在 `discover_items`（`kind` + `key` + JSON `data`），编辑副本存在独立的 `discover_drafts`；保存副本不会改变线上内容。写入时按类型校验、只保留已知字段，草稿及内容日期未到的条目不对外。
 
 - 前台：`GET /discover/home`（头图、当天日报、精选创作、热榜前三，一次返回）、`/discover/daily`（往期日报，分页）、`/discover/repos[?issue=]` 与 `/discover/repos/issues`（开源热榜及往期）、`/discover/models`（模型榜，分档阈值 `tiers` 由后端给）、`/discover/tracker`（额度重置、模型上新、限时免费，进度和剩余天数服务端算）、`/discover/nav`、`/discover/docs`、`GET /tools[/{key}]`（AI 工具与按系统的安装包、更新记录）、`GET /help/stats`（进行中、本周已解决、悬赏积分合计，全站值）、`PUT /topics/{id}/poll/vote {option}`（每人一票）。
 - 帖子：发帖可带 `poll: {options: [2～6 项], days?}`；列表与详情返回 `images`（正文里前 3 张站内图）、`poll`（票数、总数、自己投的项）、`view_count`；`GET /topics?category=a,b` 可以同时指定几个分类。
-- 后台：`GET /admin/discover/{kind}`、`PUT /admin/discover/{kind}/{key}`（`{data, sort_order?, status?, published_at?, sample?}`）、`DELETE`。类型：`banner news nav doc vendor model repo_issue quota launch promo tool`。管理台「发现页」是 JSON 编辑。`sample: true` 的条目手机端会标「示例数据」；第一次启动会写入一批示例（模型榜、热榜、日报等，导航和资料是真实官方入口），录入真实内容后删掉示例即可。
-- 模型榜与开源热榜目前靠后台录入，没有自动同步。接 Artificial Analysis、GitHub 时在 `jobs.rs` 里加定时任务，密钥放环境变量，失败时保留上一期数据。
-- 集成测试：`TEST_DATABASE_URL=postgres://… cargo test discover`。
+- 兼容后台接口：`GET /admin/discover/{kind}`、`PUT /admin/discover/{kind}/{key}`（`{data, sort_order?, status?, published_at?, sample?}`）、`DELETE`，仍允许管理员直接编辑线上内容。新管理台统一走下述草稿流程。类型：`banner news nav doc vendor model repo_issue quota launch promo tool hotword`，管理台已提供热门搜索编辑。`sample: true` 的条目手机端会标「示例数据」；第一次启动会写入一批示例（模型榜、热榜、日报等，导航和资料是真实官方入口），录入真实内容后可删除示例。
+- 模型榜、开源热榜、日报、追踪和工具版本的自动采集尚未实现。后续本地采集工具通过发现页采集令牌导入草稿，人工终审再发布。第三方 API key 的验证、加密存库和后台只写设置尚待建设；接入时按交接文档要求实现，不放 `.env`，采集失败保留上一版内容。
+- 集成测试：`TEST_DATABASE_URL=postgres://… cargo test --locked --manifest-path services/server-forum/Cargo.toml discover`。未设置 `TEST_DATABASE_URL` 会跳过数据库测试；测试使用独立 schema，覆盖原有接口、草稿隔离、批量事务、作用域与撤销、并发版本冲突、审核和定时发布。
+
+### 发现页编辑与发布
+
+管理台「发现页」提供编辑与审核、线上内容、批量导入、采集令牌四个入口，JSON 校验预览显示服务端规范化的内容，并可对照线上内容；手机页面的最终排版仍在客户端负责。来源名称和 HTTPS 一手来源链接保存在草稿中，便于终审，日报仍只存标题、来源和链接。
+
+下表所有管理路径前缀为 `/api/admin/discover-workflow`。采集工具使用 `/api/discover-editor` 前缀，只允许前四项；其他操作要求管理员令牌。
+
+| 方法和路径 | 说明 |
+| --- | --- |
+| `GET /drafts?kind=&status=&page=` | 列出副本（每页 50 条）；状态 `draft`、`scheduled`、`published` |
+| `GET /drafts/{kind}/{key}`、`PUT /drafts/{kind}/{key}` | 读取副本及当前线上内容、保存草稿；PUT 体见下例 |
+| `POST /drafts/import` | `{items:[{kind,key,...草稿字段}]}`，每批 1–100 条，可跨类型；校验、权限或版本冲突导致整批回滚 |
+| `PUT /preview/{kind}` | `{data,sample?}`，只校验并返回规范化预览，不写库 |
+| `POST /drafts/{kind}/{key}/review` | `{expected_revision,publish_after?}`；人工终审后立即发布，或指定未来时间 |
+| `POST /drafts/{kind}/{key}/cancel` | `{expected_revision}`，取消定时计划并退回待审 |
+| `POST /drafts/{kind}/{key}/discard` | `{expected_revision}`，丢弃编辑副本，线上内容保留 |
+| `GET/POST /tokens`、`DELETE /tokens/{id}` | 生成、查看元数据、撤销发现页采集令牌；POST 为 `{name,kinds:[...],days}` |
+
+草稿请求示例（新建 `expected_revision: 0`，更新必须用读取到的 `revision`）：
+
+```json
+{
+  "data": {"title": "官方公告标题", "source": "官方", "url": "https://example.com/announcement"},
+  "expected_revision": 0,
+  "sort_order": 0,
+  "sample": false,
+  "source_name": "官方公告",
+  "source_url": "https://example.com/announcement"
+}
+```
+
+`published_at` 可选，表示内容日期；不填时新条目取发布时刻、已有条目沿用线上日期。`publish_after` 是审核后的实际发布时间，两者独立。调度器每 30 秒检查一次，到期执行已终审版本；重启后继续执行，多实例和重试不会重复发布。重新保存会撤销此前审核与定时计划，版本号不会因丢弃重建而复用。线上内容在保存草稿之后变化会阻止发布；旧管理接口改动会立即撤销定时计划，其他修改导致的冲突在到期时退回待审并记录原因。管理员须对照最新线上内容合并后重新保存、审核。
+
+采集令牌按 `kinds` 限定读写范围，强制只写草稿，禁止标为示例，不能发布、删除或操作其他管理接口。有效期 1–365 天，明文只在生成时返回，数据库仅保存元数据；修改 `FORUM_ADMIN_JWT_SECRET` 会使所有采集令牌失效。所有草稿、终审、发布、撤销和凭据管理写入审计，审计不记录令牌或内容正文。
 
 ## 合规项：敏感词与待审队列
 

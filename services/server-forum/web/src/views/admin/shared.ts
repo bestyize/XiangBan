@@ -67,6 +67,14 @@ export const AUDIT_ACTIONS: Record<string, string> = {
   'weekly.put': '保存周刊',
   'discover.put': '保存发现页内容',
   'discover.delete': '删除发现页内容',
+  'discover.draft.save': '保存发现页草稿',
+  'discover.draft.discard': '丢弃发现页草稿',
+  'discover.review': '审核发现页内容',
+  'discover.publish': '发布发现页内容',
+  'discover.publish.failed': '发现页发布失败',
+  'discover.cancel': '取消发现页定时发布',
+  'discover.token.create': '创建发现页采集令牌',
+  'discover.token.revoke': '撤销发现页采集令牌',
 }
 
 export const AUDIT_TARGETS: Record<string, string> = {
@@ -82,6 +90,8 @@ export const AUDIT_TARGETS: Record<string, string> = {
   words: '敏感词',
   project: '项目',
   weekly: '周刊',
+  discover: '发现页',
+  discover_token: '发现页采集令牌',
 }
 
 export function trustName(level: number): string {

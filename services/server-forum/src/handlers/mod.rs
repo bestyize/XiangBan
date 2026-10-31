@@ -4,6 +4,7 @@ pub mod attachments;
 pub mod blocks;
 pub mod content;
 pub mod discover;
+pub mod discover_editor;
 pub mod follows;
 pub mod help;
 pub mod images;

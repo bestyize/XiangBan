@@ -303,6 +303,26 @@ export const adminApi = {
     request<{ kind: string; key: string }>('PUT', `/discover/${encodeURIComponent(kind)}/${encodeURIComponent(key)}`, body),
   deleteDiscover: (kind: string, key: string) =>
     request<{ deleted: boolean }>('DELETE', `/discover/${encodeURIComponent(kind)}/${encodeURIComponent(key)}`),
+  discoverDrafts: (params: { kind?: string; status?: string; page?: number }) =>
+    request<AdminPage<DiscoverDraft>>('GET', `/discover-workflow/drafts${qs(params)}`),
+  discoverDraft: (kind: string, key: string) =>
+    request<{ draft: DiscoverDraft; live: { data: Record<string, unknown>; updated_at: string } | null }>('GET', `/discover-workflow/drafts/${encodeURIComponent(kind)}/${encodeURIComponent(key)}`),
+  saveDiscoverDraft: (kind: string, key: string, body: DiscoverDraftInput) =>
+    request<DiscoverDraft>('PUT', `/discover-workflow/drafts/${encodeURIComponent(kind)}/${encodeURIComponent(key)}`, body),
+  previewDiscover: (kind: string, body: { data: Record<string, unknown>; sample: boolean }) =>
+    request<{ kind: string; data: Record<string, unknown> }>('PUT', `/discover-workflow/preview/${encodeURIComponent(kind)}`, body),
+  importDiscoverDrafts: (items: (DiscoverDraftInput & { kind: string; key: string })[]) =>
+    request<{ items: DiscoverDraft[] }>('POST', '/discover-workflow/drafts/import', { items }),
+  reviewDiscover: (kind: string, key: string, expected_revision: number, publish_after?: string) =>
+    request<{ status: string }>('POST', `/discover-workflow/drafts/${encodeURIComponent(kind)}/${encodeURIComponent(key)}/review`, { expected_revision, ...(publish_after ? { publish_after } : {}) }),
+  cancelDiscover: (kind: string, key: string, expected_revision: number) =>
+    request<{ ok: boolean }>('POST', `/discover-workflow/drafts/${encodeURIComponent(kind)}/${encodeURIComponent(key)}/cancel`, { expected_revision }),
+  discardDiscover: (kind: string, key: string, expected_revision: number) =>
+    request<{ ok: boolean }>('POST', `/discover-workflow/drafts/${encodeURIComponent(kind)}/${encodeURIComponent(key)}/discard`, { expected_revision }),
+  discoverTokens: () => request<{ items: DiscoverToken[] }>('GET', '/discover-workflow/tokens'),
+  createDiscoverToken: (body: { name: string; kinds: string[]; days: number }) =>
+    request<{ id: string; token: string; expires_at: string }>('POST', '/discover-workflow/tokens', body),
+  revokeDiscoverToken: (id: string) => request<{ ok: boolean }>('DELETE', `/discover-workflow/tokens/${encodeURIComponent(id)}`),
 }
 
 export interface DiscoverInput {
@@ -318,6 +338,40 @@ export interface DiscoverRow {
   status: 'draft' | 'published'
   published_at: string
   data: Record<string, unknown> & { sample?: boolean }
+}
+
+export interface DiscoverDraftInput {
+  data: Record<string, unknown>
+  sort_order?: number
+  published_at?: string
+  sample?: boolean
+  source_name?: string
+  source_url?: string
+  expected_revision: number
+}
+
+export interface DiscoverDraft extends Omit<DiscoverRow, 'status' | 'published_at'> {
+  kind: string
+  status: 'draft' | 'scheduled' | 'published'
+  published_at: string | null
+  source_name: string
+  source_url: string
+  revision: number
+  base_updated_at: string | null
+  publish_after: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  last_error: string | null
+  updated_by: string
+  updated_at: string
+}
+
+export interface DiscoverToken {
+  id: string
+  name: string
+  kinds: string[]
+  expires_at: string
+  revoked_at: string | null
 }
 
 export interface Metrics {

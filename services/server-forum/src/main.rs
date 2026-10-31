@@ -87,8 +87,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/attachments/{id}/purchase", post(attachments::purchase))
         .merge(packs::routes())
         .merge(discover_api::routes())
-        .nest("/admin", admin::routes().merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()))
-        .nest("/editor", handlers::editor::routes());
+        .nest("/admin", admin::routes().merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(handlers::discover_editor::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()))
+        .nest("/editor", handlers::editor::routes())
+        .nest("/discover-editor", handlers::discover_editor::editor_routes());
 
     // 凭证只走 Authorization 头，不用 Cookie，跨域放开不构成 CSRF 面。
     let origins: Vec<HeaderValue> = state.config.cors_origins.iter().filter_map(|o| o.parse().ok()).collect();

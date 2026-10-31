@@ -1013,6 +1013,41 @@ CREATE TABLE IF NOT EXISTS discover_items (
 );
 CREATE INDEX IF NOT EXISTS discover_items_order_idx ON discover_items (kind, status, sort_order, published_at DESC);
 
+-- 编辑副本与线上条目分离；审核绑定 revision，修改会撤销定时发布。
+CREATE SEQUENCE IF NOT EXISTS discover_draft_revision_seq;
+CREATE TABLE IF NOT EXISTS discover_drafts (
+    kind TEXT NOT NULL,
+    key TEXT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    data JSONB NOT NULL,
+    published_at TIMESTAMPTZ,
+    source_name TEXT NOT NULL DEFAULT '',
+    source_url TEXT NOT NULL DEFAULT '',
+    revision BIGINT NOT NULL DEFAULT nextval('discover_draft_revision_seq'),
+    base_updated_at TIMESTAMPTZ,
+    status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'published')),
+    publish_after TIMESTAMPTZ,
+    reviewed_by TEXT,
+    reviewed_at TIMESTAMPTZ,
+    last_error TEXT,
+    updated_by TEXT NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (kind, key),
+    CHECK ((status = 'scheduled') = (publish_after IS NOT NULL)),
+    CHECK (status = 'draft' OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS discover_drafts_due_idx ON discover_drafts (publish_after) WHERE status = 'scheduled';
+
+-- 本地采集凭据：仅允许读写指定类型的草稿，不具有发布或管理权限。
+CREATE TABLE IF NOT EXISTS discover_tokens (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    kinds TEXT[] NOT NULL CHECK (cardinality(kinds) > 0),
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- 列表卡片用的配图：发帖时从正文里取前 3 张站内图片。
 ALTER TABLE topics ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}';
 
