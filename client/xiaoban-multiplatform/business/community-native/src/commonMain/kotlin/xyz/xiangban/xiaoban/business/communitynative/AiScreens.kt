@@ -30,6 +30,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -569,11 +572,20 @@ private fun ChatApproval.toRequest(): RemoteApprovalRequest = RemoteApprovalRequ
 
 // ───────────── 模型与额度 ─────────────
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, open: (Route) -> Unit) {
     val session by env.session.state.collectAsState()
     val cloud by chat.state.collectAsState()
     var sheet by rememberSaveable { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sheetScope = rememberCoroutineScope()
+    val dismissSheet: () -> Unit = {
+        sheetScope.launch {
+            sheetState.hide()
+            if (!sheetState.isVisible) sheet = false
+        }
+    }
     var code by remember { mutableStateOf("") }
 
     LaunchedEffect(cloud.redeemMessage) { if (cloud.redeemMessage != null) code = "" }
@@ -612,16 +624,22 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                 }
             }
         }
-        OverlayTransition(sheet) { panel ->
+        if (sheet) {
             BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
-            BottomSheet({ sheet = false }, panel.heightIn(max = maxHeight * 0.85f)) {
+                val contentHeight = (maxHeight * 0.85f - 48.dp).coerceAtLeast(1.dp)
+                ModalBottomSheet(
+                    onDismissRequest = { sheet = false },
+                    sheetState = sheetState,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ) {
+                Column(Modifier.fillMaxWidth().heightIn(max = contentHeight).padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
                     Column(Modifier.weight(1f)) {
                         Text("小伴AI", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
                         Text("跟着账号走，换设备自动同步", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    IconTap(XIcons.Close, "关闭", { sheet = false })
+                    IconTap(XIcons.Close, "关闭", dismissSheet)
                 }
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                 Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.background).padding(vertical = 12.dp)) {
@@ -652,7 +670,8 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                     )
                 }
                 }
-                PillButton("完成", { sheet = false }, Modifier.padding(top = 14.dp).fillMaxWidth())
+                PillButton("完成", dismissSheet, Modifier.padding(top = 14.dp).fillMaxWidth())
+                }
             }
             }
         }
