@@ -58,7 +58,7 @@ onMounted(()=>void act(load));onBeforeUnmount(()=>{disposed=true;++generation})
   </article>
   <header class="archive"><h2>历史期刊</h2><button class="btn" :disabled="busy" @click="act(load)">刷新</button></header>
   <p class="hint">发送失败与等待重试也会保留记录。结果待核实的邮件不会自动重发。</p>
-  <button v-for="item in history" :key="item.id" class="edition" @click="openEdition(item.id)"><span>{{item.title}}<small>{{stamp(item.created_at)}}<template v-if="item.error"> · {{item.error}}</template></small></span><span>{{labels[item.status]||item.status}}</span></button>
+  <button v-for="item in history" :key="item.id" class="edition" @click="openEdition(item.id)"><span>{{item.title}}<small>{{stamp(item.created_at)}}<template v-if="item.error"> · {{item.error}}</template><template v-if="item.accounting_status==='review'"> · 额度结算待核实</template></small></span><span>{{labels[item.status]||item.status}}</span></button>
   <button v-if="more" class="btn" :disabled="busy" @click="nextPage">更早期刊</button>
   <section v-if="selected" class="panel reader"><header><h2>{{selected.title}}</h2><div><button class="btn" @click="download">导出文本</button><button class="btn" @click="selected=null">关闭</button></div></header><pre>{{selected.plaintext||'本期尚未生成内容。'}}</pre><a v-for="source in selected.sources||[]" :key="source.url" :href="source.url" target="_blank" rel="noopener noreferrer">{{source.title}}</a></section>
  </main>

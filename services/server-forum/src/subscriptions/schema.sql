@@ -28,3 +28,6 @@ CREATE TABLE IF NOT EXISTS information_limits (
  owner UUID NOT NULL, day DATE NOT NULL, creates INT NOT NULL DEFAULT 0, verifications INT NOT NULL DEFAULT 0,
  PRIMARY KEY(owner,day)
 );
+
+ALTER TABLE information_editions ADD COLUMN IF NOT EXISTS accounting_status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE information_editions ADD COLUMN IF NOT EXISTS accounting_after TIMESTAMPTZ NOT NULL DEFAULT now();

@@ -109,42 +109,222 @@ impl Harness {
     }
 }
 
-fn input(id:Uuid)->Value {json!({"id":id,"revision":0,"title":"城市骑行","interests":"杭州骑行与周末户外活动","recipient":"reader@example.test","schedule":{"kind":"daily","time":"08:00"},"timezone":"Asia/Shanghai","active":true,"confirmed":true})}
+fn input(id: Uuid) -> Value {
+    json!({"id":id,"revision":0,"title":"城市骑行","interests":"杭州骑行与周末户外活动","recipient":"reader@example.test","schedule":{"kind":"daily","time":"08:00"},"timezone":"Asia/Shanghai","active":true,"confirmed":true})
+}
 #[tokio::test]
 async fn ownership_verification_edits_and_history() {
- let Some(h)=Harness::new().await.unwrap() else{return};
- let (uid,token)=h.user().await;let (_,other)=h.user().await;let id=Uuid::new_v4();
- let path=format!("/api/me/information-subscriptions/{id}");
- assert_eq!(call(&h.app,"POST","/api/me/information-subscriptions",None,input(id)).await.0,StatusCode::UNAUTHORIZED);
- let (status,row)=call(&h.app,"POST","/api/me/information-subscriptions",Some(&token),input(id)).await;assert_eq!(status,StatusCode::OK);assert_eq!(row["status"],"unverified");
- assert_eq!(call(&h.app,"POST","/api/me/information-subscriptions",Some(&token),input(id)).await.1["revision"],1);
- assert_eq!(call(&h.app,"PUT",&path,Some(&other),input(id)).await.0,StatusCode::NOT_FOUND);
- let code="test-verification-code";
- sqlx::query("INSERT INTO information_verifications(subscription_id,digest,expires_at) VALUES($1,$2,now()+interval '30 minutes')").bind(id).bind(digest(id,code)).execute(&h.pool).await.unwrap();
- assert_eq!(call(&h.app,"POST",&format!("{path}/verify"),Some(&token),json!({"code":"wrong"})).await.0,StatusCode::BAD_REQUEST);
- assert_eq!(call(&h.app,"POST",&format!("{path}/verify"),Some(&token),json!({"code":code})).await.0,StatusCode::OK);
- assert_eq!(call(&h.app,"POST",&format!("{path}/verify"),Some(&token),json!({"code":code})).await.0,StatusCode::BAD_REQUEST);
- // Both ticks race over the same due occurrence. Only one edition survives.
- sqlx::query("UPDATE information_subscriptions SET next_run=now()-interval '1 minute' WHERE id=$1").bind(id).execute(&h.pool).await.unwrap();
- let now=Utc::now();let (a,b)=tokio::join!(super::worker::enqueue(&h.pool,now),super::worker::enqueue(&h.pool,now));a.unwrap();b.unwrap();
- let editions:i64=sqlx::query_scalar("SELECT count(*) FROM information_editions").fetch_one(&h.pool).await.unwrap();assert_eq!(editions,1);
- let (a,b)=tokio::join!(super::worker::claim(&h.pool),super::worker::claim(&h.pool));assert_eq!(usize::from(a.unwrap().is_some())+usize::from(b.unwrap().is_some()),1);
- let history=call(&h.app,"GET","/api/me/information-editions",Some(&token),Value::Null).await.1;let edition=history["items"][0]["id"].as_str().unwrap();
- assert_eq!(call(&h.app,"GET",&format!("/api/me/information-editions/{edition}"),Some(&other),Value::Null).await.0,StatusCode::NOT_FOUND);
- let mut update=input(id);update["revision"]=json!(2);update["active"]=json!(false);
- assert_eq!(call(&h.app,"PUT",&path,Some(&token),update.clone()).await.0,StatusCode::OK);
- assert_eq!(call(&h.app,"PUT",&path,Some(&token),update).await.0,StatusCode::CONFLICT);
- let status:String=sqlx::query_scalar("SELECT status FROM information_editions").fetch_one(&h.pool).await.unwrap();assert_eq!(status,"cancelled");
- let mut update=input(id);update["revision"]=json!(3);update["recipient"]=json!("new@example.test");
- let row=call(&h.app,"PUT",&path,Some(&token),update).await.1;assert_eq!(row["status"],"unverified");assert!(row["verified_at"].is_null());
- assert_eq!(call(&h.app,"DELETE",&path,Some(&token),json!({"revision":4})).await.0,StatusCode::OK);
- assert_eq!(call(&h.app,"GET","/api/me/information-subscriptions",Some(&token),Value::Null).await.1["items"],json!([]));
- assert_eq!(call(&h.app,"GET","/api/me/information-editions",Some(&token),Value::Null).await.1["items"].as_array().unwrap().len(),1);
- let owners:i64=sqlx::query_scalar("SELECT count(*) FROM information_editions WHERE owner=$1").bind(uid).fetch_one(&h.pool).await.unwrap();assert_eq!(owners,1);
- h.close().await.unwrap();
+    let Some(h) = Harness::new().await.unwrap() else {
+        return;
+    };
+    let (uid, token) = h.user().await;
+    let (_, other) = h.user().await;
+    let id = Uuid::new_v4();
+    let path = format!("/api/me/information-subscriptions/{id}");
+    assert_eq!(
+        call(
+            &h.app,
+            "POST",
+            "/api/me/information-subscriptions",
+            None,
+            input(id)
+        )
+        .await
+        .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let (status, row) = call(
+        &h.app,
+        "POST",
+        "/api/me/information-subscriptions",
+        Some(&token),
+        input(id),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(row["status"], "unverified");
+    assert_eq!(
+        call(
+            &h.app,
+            "POST",
+            "/api/me/information-subscriptions",
+            Some(&token),
+            input(id)
+        )
+        .await
+        .1["revision"],
+        1
+    );
+    assert_eq!(
+        call(&h.app, "PUT", &path, Some(&other), input(id)).await.0,
+        StatusCode::NOT_FOUND
+    );
+    let code = "test-verification-code";
+    sqlx::query("INSERT INTO information_verifications(subscription_id,digest,expires_at) VALUES($1,$2,now()+interval '30 minutes')").bind(id).bind(digest(id,code)).execute(&h.pool).await.unwrap();
+    assert_eq!(
+        call(
+            &h.app,
+            "POST",
+            &format!("{path}/verify"),
+            Some(&token),
+            json!({"code":"wrong"})
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        call(
+            &h.app,
+            "POST",
+            &format!("{path}/verify"),
+            Some(&token),
+            json!({"code":code})
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(
+            &h.app,
+            "POST",
+            &format!("{path}/verify"),
+            Some(&token),
+            json!({"code":code})
+        )
+        .await
+        .0,
+        StatusCode::BAD_REQUEST
+    );
+    // Both ticks race over the same due occurrence. Only one edition survives.
+    sqlx::query(
+        "UPDATE information_subscriptions SET next_run=now()-interval '1 minute' WHERE id=$1",
+    )
+    .bind(id)
+    .execute(&h.pool)
+    .await
+    .unwrap();
+    let now = Utc::now();
+    let (a, b) = tokio::join!(
+        super::worker::enqueue(&h.pool, now),
+        super::worker::enqueue(&h.pool, now)
+    );
+    a.unwrap();
+    b.unwrap();
+    let editions: i64 = sqlx::query_scalar("SELECT count(*) FROM information_editions")
+        .fetch_one(&h.pool)
+        .await
+        .unwrap();
+    assert_eq!(editions, 1);
+    let (a, b) = tokio::join!(super::worker::claim(&h.pool), super::worker::claim(&h.pool));
+    assert_eq!(
+        usize::from(a.unwrap().is_some()) + usize::from(b.unwrap().is_some()),
+        1
+    );
+    let history = call(
+        &h.app,
+        "GET",
+        "/api/me/information-editions",
+        Some(&token),
+        Value::Null,
+    )
+    .await
+    .1;
+    let edition = history["items"][0]["id"].as_str().unwrap();
+    assert_eq!(
+        call(
+            &h.app,
+            "GET",
+            &format!("/api/me/information-editions/{edition}"),
+            Some(&other),
+            Value::Null
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    let mut update = input(id);
+    update["revision"] = json!(2);
+    update["active"] = json!(false);
+    assert_eq!(
+        call(&h.app, "PUT", &path, Some(&token), update.clone())
+            .await
+            .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(&h.app, "PUT", &path, Some(&token), update).await.0,
+        StatusCode::CONFLICT
+    );
+    let status: String = sqlx::query_scalar("SELECT status FROM information_editions")
+        .fetch_one(&h.pool)
+        .await
+        .unwrap();
+    assert_eq!(status, "cancelled");
+    let mut update = input(id);
+    update["revision"] = json!(3);
+    update["recipient"] = json!("new@example.test");
+    let row = call(&h.app, "PUT", &path, Some(&token), update).await.1;
+    assert_eq!(row["status"], "unverified");
+    assert!(row["verified_at"].is_null());
+    assert_eq!(
+        call(&h.app, "DELETE", &path, Some(&token), json!({"revision":4}))
+            .await
+            .0,
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(
+            &h.app,
+            "GET",
+            "/api/me/information-subscriptions",
+            Some(&token),
+            Value::Null
+        )
+        .await
+        .1["items"],
+        json!([])
+    );
+    assert_eq!(
+        call(
+            &h.app,
+            "GET",
+            "/api/me/information-editions",
+            Some(&token),
+            Value::Null
+        )
+        .await
+        .1["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let owners: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM information_editions WHERE owner=$1")
+            .bind(uid)
+            .fetch_one(&h.pool)
+            .await
+            .unwrap();
+    assert_eq!(owners, 1);
+    h.close().await.unwrap();
 }
-#[test] fn rejects_unconfirmed_and_credentials(){
- let mut v=input(Uuid::new_v4());v["confirmed"]=json!(false);assert!(serde_json::from_value::<Input>(v).unwrap().validate().is_err());
- let mut v=input(Uuid::new_v4());v["api_key"]=json!("never-accept");assert!(serde_json::from_value::<Input>(v).is_err());
- let mut v=input(Uuid::new_v4());v["recipient"]=json!("a@b.test\r\nBcc:attacker@evil.test");assert!(serde_json::from_value::<Input>(v).unwrap().validate().is_err());
+#[test]
+fn rejects_unconfirmed_and_credentials() {
+    let mut v = input(Uuid::new_v4());
+    v["confirmed"] = json!(false);
+    assert!(serde_json::from_value::<Input>(v)
+        .unwrap()
+        .validate()
+        .is_err());
+    let mut v = input(Uuid::new_v4());
+    v["api_key"] = json!("never-accept");
+    assert!(serde_json::from_value::<Input>(v).is_err());
+    let mut v = input(Uuid::new_v4());
+    v["recipient"] = json!("a@b.test\r\nBcc:attacker@evil.test");
+    assert!(serde_json::from_value::<Input>(v)
+        .unwrap()
+        .validate()
+        .is_err());
 }

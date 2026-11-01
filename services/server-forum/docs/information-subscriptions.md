@@ -21,14 +21,15 @@
 | INFORMATION_MAIL_ENABLED | 仅 `true` 开启邮件，默认关闭 |
 | INFORMATION_SMTP_HOST / PORT / USER / PASSWORD | 平台 SMTP，587 STARTTLS / 465 TLS |
 | INFORMATION_MAIL_FROM | 已验证的发件人邮箱，遵守供应商发信域认证 |
-| INFORMATION_SEARCH_URL / SEARCH_KEY | 独立检索端点及平台凭据；兼容现有 server-ai 规范 |
-| INFORMATION_MODEL_URL / MODEL_KEY / MODEL | 平台模型端点、凭据、管理员选择的模型；无默认模型 |
+| INFORMATION_EXECUTION_URL | server-ai `/api/internal/information-execution` 完整 URL；分别调用 search 与 summary |
+| AI_INFORMATION_MODEL_BASE_URL / MODEL_KEY / MODEL_PROTOCOL | server-ai 的平台模型地址、凭据、协议（`chat_completions` 或 `messages`）；模型由计费策略指定，无默认模型 |
+| AI_INFORMATION_SEARCH_GATEWAY_KEY | 可选的平台 New API 搜索凭据；否则沿用 `AI_SEARCH_PROVIDERS` 的直连平台配置 |
 | INFORMATION_ACCOUNTING_URL | server-ai `/api/internal/information-jobs` 完整 URL |
 | INFORMATION_SERVICE_TOKEN | 与 AI_INFORMATION_SERVICE_TOKEN 相同的专用服务凭据 |
 | AI_INFORMATION_SERVICE_TOKEN | server-ai 专用服务凭据，至少32字符；不使用账号令牌 |
 | AI_INFORMATION_POLICY | server-ai JSON 策略，未设置时拒绝预约；不提供生产价格 |
 
-Policy 字段：`product_id`（现有统一产品）、`reserve_units`（单任务上限）、`model`、`input_per_million`、`output_per_million`、`search_units`、`email_units`。以上均是现有额度单位，不是人民币价格。模型/搜索分别计量；原始 usage 保留供核对。月卡与资源包沿用现有 quota_buckets，不建立新钱包、不实现新支付。预约按现有最早到期顺序冻结桶额度、写共同流水，成功后按快照策略结算、释放差额，终止失败释放；同一期重复调用幂等。过期或被撤销的原桶不会因退款复活。超出预约上限或缺少计量保持待核对，不偷偷追加扣款。现有 New API 对账有延迟，仍需上线前验证跨交互调用的限额边界。
+Policy 字段：`product_id`（现有统一产品）、`reserve_units`（单任务上限）、`model`、`input_per_million`、`output_per_million`、`search_units`、`email_units`。以上均是现有额度单位，不是人民币价格。模型/搜索/邮件分别计量；原始 usage 保留供核对。DeepSeek/OpenAI 使用现有 Chat Completions 路径，Claude 使用 Messages 路径与原生响应归一化；搜索直接复用 server-ai 的 Search 提供商链，不创建另一个检索系统。模型与检索配置分离，平台密钥仅在 server-ai。月卡与资源包沿用现有 quota_buckets，不建立新钱包、不实现新支付。预约按现有最早到期顺序冻结桶额度、写共同流水，成功后按快照策略结算、释放差额，终止失败释放；同一期重复调用幂等。过期或被撤销的原桶不会因退款复活。超出预约上限或缺少计量保持待核对，不偷偷追加扣款。现有 New API 对账有延迟，仍需上线前验证跨交互调用的限额边界。
 
 **未确定的商业规则**：价格、额度换算、月费包含量、缓存 token 规则、扣费时点和退信/不确定投递处理。代码的“SMTP 接受后结算”是待审阅实现策略，不代表已确认商业条款。不得在这些规则确认前开启生产计费。未配置服务时保存订阅并展示不可投递状态，不伪装已经运行。
 
@@ -42,3 +43,12 @@ DeepSeek 检索端点核对（2026-11-01）：https://api-docs.deepseek.com/guid
 - `npm --prefix services/server-forum/web run build`
 
 不发真实测试邮件、不运行生产迁移、不部署。发布前还需原生设备入口与登录、真实供应商沙箱投递、退信/投诉与退订运营、邮件域名信誉、队列/数据库备份监控验收。
+
+
+## 本地验收记录
+
+2026-11-01，基线 `9598e7e4`，独立功能分支 `feat/information-email-subscriptions`，草稿 PR https://github.com/bestyize/XiangBan/pull/142 。使用隔离的本机 PostgreSQL 17 schema，不访问线上库。
+
+已覆盖：时区日界/DST、一次性/每周、真实归属鉴权与历史隔离、确认码失败/重放、并发 tick 与领取、过期租约不能投递、生成失败后重试、重复发送调用、SMTP 结果不明隔离、暂停/修改/删除、转义和来源引用；额度测试覆盖共享月卡与资源包的分配、并发预约、幂等结算/释放、取消先于预约的竞争、余额不足、账号隔离与流水守恒。供应商协议使用纯数据/mock 验证，没有真实模型/搜索/SMTP 调用。
+
+真实 Windows/macOS/Android/iOS 包及设备尚未验收。手机为浏览器入口，不声称原生订阅编辑或已实现自动 SSO；网页登录账号必须与客户端一致。后续上线前需完善不确定投递的运维核对入口及用户可见预算/计量说明，确定价格与收费时点，并验证现有网关同步延迟下的跨服务余额边界。

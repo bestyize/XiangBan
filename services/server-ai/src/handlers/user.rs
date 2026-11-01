@@ -107,6 +107,7 @@ struct LedgerSource {
     balance_after: i64,
     created_at: DateTime<Utc>,
     source: Option<String>,
+    job_reference: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -117,6 +118,7 @@ struct LedgerView {
     delta: i64,
     balance_after: i64,
     created_at: DateTime<Utc>,
+    job_reference: Option<String>,
 }
 
 /// 流水的标题由类型和来源推出，不使用管理员写的备注（里面可能有订单号等内部信息）。
@@ -127,6 +129,7 @@ fn ledger_title(kind: &str, source: Option<&str>) -> &'static str {
         ("grant", _) => "额度补发",
         ("job_reserve", _) => "定时任务额度预约",
         ("job_release", _) => "定时任务额度释放",
+        ("job_cancel", _) => "定时任务已取消",
         ("job_settle", _) => "定时任务结算",
         ("consume" | "consume_overdraft", _) => "AI 对话消耗",
         ("expire", _) => "额度到期作废",
@@ -140,7 +143,7 @@ pub async fn ledger(State(state): State<AppState>, auth: AuthUser, Query(query):
         return Ok(Json(json!({ "items": [] })));
     };
     let rows: Vec<LedgerSource> = sqlx::query_as(
-        "SELECT l.id, l.kind, l.delta, l.balance_after, l.created_at, b.source
+        "SELECT l.id, l.kind, l.delta, l.balance_after, l.created_at, b.source, CASE WHEN l.kind IN ('job_reserve','job_release','job_settle','job_cancel') THEN l.note ELSE NULL END AS job_reference
          FROM quota_ledger l LEFT JOIN quota_buckets b ON b.id = l.bucket_id
          WHERE l.binding_id = $1 AND ($2::BIGINT IS NULL OR l.id < $2) ORDER BY l.id DESC LIMIT $3",
     )
@@ -153,6 +156,7 @@ pub async fn ledger(State(state): State<AppState>, auth: AuthUser, Query(query):
         .into_iter()
         .map(|r| LedgerView {
             title: ledger_title(&r.kind, r.source.as_deref()).to_string(),
+            job_reference: r.job_reference.and_then(|s| uuid::Uuid::parse_str(&s).ok()).map(|id| id.to_string()),
             id: r.id,
             kind: r.kind,
             delta: r.delta,
