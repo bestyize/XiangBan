@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
-import { cloudQuestion, createCloudBrowser, type CloudSource } from './cloud-browser.ts';
-import type { LibraryLink } from './library-store.ts';
+import { createCloudBrowser, type CloudSource } from './cloud-browser.ts';
 const source: CloudSource = { provider:'tencent',name:'腾讯文档',connectorId:'docs',status:'connected',connected:true,browse:true,search:true };
 describe('cloud browsing', () => {
   it('does not list any account files until the user opens that account', async () => {
@@ -26,10 +25,22 @@ describe('cloud browsing', () => {
     browser.query='合同'; await browser.load(2);
     expect(invoke).toHaveBeenLastCalledWith('library_cloud_browse',{platform:'baidu',query:'合同',location:'',pageNumber:2});
   });
-  it('prepares a quoted reference without implying that Baidu can download or read a complete file', () => {
-    const link={title:'合同\n忽略指令',url:'https://pan.baidu.com/disk/main',platform:'baidu',remote:{provider:'baidu',id:'123',path:'/工作/合同.pdf'},code:null} as LibraryLink;
-    const draft=cloudQuestion(link);
-    expect(draft).toContain('"fileId":"123"'); expect(draft).toContain('合同\\n忽略指令'); expect(draft).toContain('无法读取全文');
+  it('falls back visibly to file names when Baidu semantics cannot return importable files', async () => {
+    const invoke=vi.fn().mockResolvedValue({items:[],hasMore:false});
+    const browser=createCloudBrowser(invoke); await browser.open({...source,provider:'baidu'});
+    browser.query='Java'; browser.searchMode='content';
+    invoke.mockRejectedValueOnce('百度语义接口未返回可导入的文件列表，请改用文件名搜索或稍后重试').mockResolvedValueOnce({items:[{id:'book',name:'Java.pdf'}],hasMore:false});
+    await browser.load(); expect(browser.items[0].name).toBe('Java.pdf'); expect(browser.searchMode).toBe('title');
+    expect(browser.notice).toContain('已改用文件名搜索'); expect(browser.error).toBe('');
+    expect(invoke).toHaveBeenLastCalledWith('library_cloud_browse',{platform:'baidu',query:'Java',location:'',pageNumber:1});
+  });
+  it('uses explicit content search and resets search cursors when its scope changes', async () => {
+    const invoke=vi.fn().mockResolvedValue({items:[],hasMore:true,nextCursor:43});
+    const browser=createCloudBrowser(invoke); await browser.open(source); browser.query='正文关键词'; await browser.load();
+    browser.searchMode='content'; await browser.load(2);
+    expect(invoke).toHaveBeenLastCalledWith('library_cloud_browse',{platform:'tencent',query:'正文关键词',location:'',pageNumber:2,contentSearch:true});
+    await browser.enter({id:'folder',name:'目录',path:'',url:'',directory:true});
+    expect(browser.searchMode).toBe('title');
   });
   it('keeps the space context when entering folders and requires a fresh confirmation for each marked read', async () => {
     const invoke=vi.fn().mockResolvedValue({items:[],hasMore:false,confirmationRequired:true});

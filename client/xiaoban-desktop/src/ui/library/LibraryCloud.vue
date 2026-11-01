@@ -5,7 +5,8 @@ import { NButton, NInput, NModal } from 'naive-ui';
 import { ArrowLeft, Copy, ExternalLink, FileText, Folder, KeyRound, Link2, MessageCircle, Pencil, RefreshCw, Search, Trash2 } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 import { openStoreWindow } from '../ai-store/store-window.ts';
-import { cloudQuestion, createCloudBrowser, type CloudEntry, type CloudSource } from './cloud-browser.ts';
+import { openCloudDocument } from './cloud-document.ts';
+import { createCloudBrowser, type CloudEntry, type CloudSource } from './cloud-browser.ts';
 import type { LibraryData } from './library-store.ts';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import { folderPath, folderTree, formatWhen, guessPlatform, PLATFORMS, searchText, type LibraryLink, type LibraryStore, type Platform } from './library-store.ts';
@@ -15,7 +16,6 @@ const emit = defineEmits<{ notify: [message: string, type?: 'success' | 'error' 
 const confirm = useConfirm();
 const browser = createCloudBrowser(invoke);
 const activeSource = computed(() => browser.sources.find(source => source.provider === browser.active));
-const sourceFor = (platform: string) => browser.sources.find(source => source.provider === platform);
 let disposed = false, off: (() => void) | undefined, refreshTimer: ReturnType<typeof setTimeout> | undefined;
 async function refreshSources() {
   if (!props.desktop || disposed) return;
@@ -45,10 +45,12 @@ function alreadyAdded(entry: CloudEntry) { return props.library.data.links.some(
 async function importEntry(entry: CloudEntry) {
   if (!browser.active || importing.value || alreadyAdded(entry)) return;
   importing.value = entry.id;
-  try { props.library.data = await invoke<LibraryData>('library_cloud_add', { platform: browser.active, entry, folder: folder.value || null }); emit('notify', `已将「${entry.name}」加入资料库`); }
+  try { props.library.data = await invoke<LibraryData>('library_cloud_add', { platform: browser.active, entry, folder: folder.value || null }); const link = props.library.data.links.find(link => link.remote?.provider === browser.active && link.remote.id === entry.id); if (link) await preview(link); else emit('notify', '已加入资料库'); }
   catch (e) { emit('notify', String(e), 'error'); }
   finally { importing.value = ''; }
 }
+
+async function preview(link: LibraryLink) { try { await openCloudDocument(link.id); } catch(e) { emit('notify', String(e), 'error'); } }
 
 const FILTERS: { label: string; match: (p: Platform) => boolean }[] = [
   { label: '全部', match: () => true },
@@ -60,7 +62,7 @@ const FILTERS: { label: string; match: (p: Platform) => boolean }[] = [
 const filter = ref('全部');
 const folders = computed(() => props.library.data.folders);
 const links = computed(() => props.library.data.links.filter(l => (FILTERS.find(f => f.label === filter.value)?.match ?? (() => true))(l.platform)
-  && searchText(props.query, l.title, l.url, l.kind, PLATFORMS[l.platform]?.name)));
+  && searchText(props.query, l.title, l.url, l.kind, l.content?.preview, PLATFORMS[l.platform]?.name)));
 const info = (link: LibraryLink) => PLATFORMS[link.platform] ?? PLATFORMS.other;
 
 /* ── 添加链接 ── */
@@ -95,13 +97,14 @@ defineExpose({ openAdd });
     <p v-if="browser.sourceError" role="alert" class="cloud-error">{{ browser.sourceError }} <button class="lib-link" @click="refreshSources">重试连接状态</button></p>
     <section v-if="browser.active" class="cloud-browser" aria-label="账号文件浏览">
       <div class="cloud-browser-heading"><button class="lib-icon-btn" aria-label="返回云文档" @click="browser.close"><ArrowLeft :size="16" /></button><h3>{{ activeSource?.name }}</h3><button class="xb-btn" :disabled="browser.loading || !browser.history.length" @click="browser.back">上一级</button><button class="lib-icon-btn" aria-label="刷新账号文件" :disabled="browser.loading" @click="browser.load(browser.page)"><RefreshCw :size="15" /></button></div>
-      <form v-if="activeSource?.search" class="cloud-search" @submit.prevent="browser.load()"><Search :size="16" /><input v-model="browser.query" maxlength="80" :placeholder="`搜索${activeSource?.name}文件`" aria-label="搜索账号文件" /><button class="xb-btn" :disabled="browser.loading || (!browser.query.trim() && !activeSource?.browse)" type="submit">搜索</button></form>
+      <form v-if="activeSource?.search" class="cloud-search" @submit.prevent="browser.load()"><Search :size="16" /><select v-model="browser.searchMode" aria-label="云文档搜索范围"><option value="title">文件名</option><option value="content">{{ browser.active === 'baidu' ? '语义搜索' : '正文内容' }}</option></select><input v-model="browser.query" maxlength="80" :placeholder="`搜索${activeSource?.name}文件`" aria-label="搜索账号文件" /><button class="xb-btn" :disabled="browser.loading || (!browser.query.trim() && !activeSource?.browse)" type="submit">搜索</button></form>
       <div class="cloud-browser-location"><span :title="browser.locationLabel">{{ browser.locationLabel || (browser.active === 'tencent' ? '选择一个空间' : '全部文件') }}</span><label>加入到<select v-model="folder" aria-label="云文档保存位置"><option v-for="option in folderOptions" :key="option.id" :value="option.id">{{ option.name }}</option></select></label></div>
+      <p v-if="browser.notice" class="lib-muted" role="status">{{ browser.notice }}</p>
       <p v-if="browser.loading" role="status" class="lib-muted">正在读取云端文件…</p>
       <div v-else-if="browser.confirmationRequired" class="cloud-read-confirm"><p>读取{{ activeSource?.name }}的文件列表？本次只查询文件名与位置。</p><button class="xb-btn-primary" @click="browser.load(browser.page, true)">确认读取</button></div>
       <div v-else-if="browser.error" role="alert" class="cloud-error">{{ browser.error }}<button class="lib-link" @click="browser.load(browser.page)">重试</button></div>
       <p v-else-if="!browser.items.length" class="lib-muted nothing">{{ !activeSource?.browse && !browser.query ? '输入关键词搜索账号文件' : '没有找到文件' }}</p>
-      <div v-else class="cloud-file-list"><div v-for="entry in browser.items" :key="entry.id" class="cloud-file"><Folder v-if="entry.directory" :size="18" /><FileText v-else :size="18" /><button v-if="entry.directory" class="cloud-file-name" @click="browser.enter(entry)">{{ entry.name }}</button><span v-else class="cloud-file-name" :title="entry.path || entry.name">{{ entry.name }}</span><button v-if="!entry.directory" class="xb-btn" :disabled="!!importing || alreadyAdded(entry)" @click="importEntry(entry)">{{ alreadyAdded(entry) ? '已加入' : importing === entry.id ? '加入中…' : '加入资料库' }}</button><button v-else class="xb-btn" @click="browser.enter(entry)">打开</button></div></div>
+      <div v-else class="cloud-file-list"><div v-for="entry in browser.items" :key="entry.id" class="cloud-file"><Folder v-if="entry.directory" :size="18" /><FileText v-else :size="18" /><button v-if="entry.directory" class="cloud-file-name" @click="browser.enter(entry)">{{ entry.name }}</button><span v-else class="cloud-file-name" :title="entry.path || entry.name">{{ entry.name }}</span><button v-if="!entry.directory" class="xb-btn" :disabled="!!importing || alreadyAdded(entry)" @click="importEntry(entry)">{{ alreadyAdded(entry) ? '已加入' : importing === entry.id ? '加入中…' : '读取并加入' }}</button><button v-else class="xb-btn" @click="browser.enter(entry)">打开</button></div></div>
       <div class="cloud-pagination"><button class="xb-btn" :disabled="browser.loading || browser.page <= 1" @click="browser.load(browser.page - 1)">上一页</button><span>第 {{ browser.page }} 页</span><button class="xb-btn" :disabled="browser.loading || !browser.hasMore" @click="browser.load(browser.page + 1)">下一页</button></div>
     </section>
     <template v-else>
@@ -123,13 +126,13 @@ defineExpose({ openAdd });
         <article v-for="link in links" :key="link.id" class="lib-card card" :data-testid="`library-link-${link.id}`">
           <div class="card-head">
             <span class="lib-badge badge" :style="{ background: info(link).hue }">{{ info(link).letter }}</span>
-            <span class="card-title"><b :title="link.title">{{ link.title }}</b><span class="lib-muted">{{ info(link).name }} · {{ link.kind }}</span></span>
+            <span class="card-title"><button v-if="link.remote" class="cloud-title-button" :title="link.title" @click="preview(link)">{{ link.title }}</button><b v-else :title="link.title">{{ link.title }}</b><span class="lib-muted">{{ info(link).name }} · {{ link.kind }}</span></span>
           </div>
           <span class="lib-muted note">{{ folderPath(folders, link.folder) }} · {{ formatWhen(link.addedMs) }}添加</span>
           <span v-if="link.code" class="code"><KeyRound :size="12" />提取码 <b>{{ link.code }}</b><button type="button" class="lib-link" @click="copy(link.code!, '提取码')">复制</button></span>
           <div class="card-foot">
-            <span class="lib-pill">{{ sourceFor(link.platform)?.connected ? link.platform === 'baidu' ? '可检索' : '已连接' : '仅保存链接' }}</span>
-            <button v-if="sourceFor(link.platform)?.connected" type="button" class="lib-icon-btn" aria-label="用这份云文档提问" title="用这份云文档提问" @click="emit('ask', cloudQuestion(link))"><MessageCircle :size="14" /></button>
+            <span class="lib-pill">{{ link.content ? link.content.coverage === 'full' ? '正文已保存' : link.content.coverage === 'partial' ? '摘要／部分内容' : '暂无正文' : link.remote ? '待读取正文' : '仅保存链接' }}</span>
+            <button v-if="link.remote" type="button" class="lib-icon-btn" aria-label="预览云文档与提问" title="预览云文档与提问" @click="preview(link)"><MessageCircle :size="14" /></button>
             <button type="button" class="lib-icon-btn push" aria-label="重命名" @click="renaming = link"><Pencil :size="14" /></button>
             <button type="button" class="lib-icon-btn" aria-label="复制链接" @click="copy(link.url, '链接')"><Copy :size="14" /></button>
             <button type="button" class="lib-icon-btn" aria-label="在浏览器打开" :data-testid="`library-open-${link.id}`" @click="openUrl(link.url)"><ExternalLink :size="14" /></button>
@@ -162,7 +165,7 @@ defineExpose({ openAdd });
 
 <style scoped>
 .cloud{flex:1;min-height:0;display:flex;flex-direction:column;margin-top:14px}
-.cloud-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;flex:none;margin-bottom:14px}.cloud-source{display:flex;align-items:center;gap:8px;padding:14px;background:var(--ui-control);border-radius:12px}.cloud-source>div{display:flex;flex:1;align-items:center;gap:10px;min-width:0}.cloud-source b{font-size:13px}.cloud-source .lib-muted{font-size:12px}.cloud-source .xb-btn{padding:4px 7px;white-space:nowrap}.cloud-browser{display:flex;flex-direction:column;min-height:0;flex:1;gap:12px}.cloud-browser-heading,.cloud-search,.cloud-browser-location,.cloud-file,.cloud-pagination{display:flex;align-items:center;gap:10px}.cloud-browser-heading h3{flex:1;margin:0;font-size:15px}.cloud-search{padding:5px 10px;background:var(--ui-control);border-radius:9px}.cloud-search input,.cloud-error input{flex:1;min-width:0;border:0;background:transparent;color:var(--ui-text-primary);font:inherit;outline:none}.cloud-browser-location{justify-content:space-between;color:var(--ui-text-secondary);font-size:12px}.cloud-browser-location>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cloud-browser-location label{display:flex;align-items:center;gap:8px;flex:none}.cloud-browser-location select{max-width:160px;padding:5px;border:0;border-radius:6px;background:var(--ui-control);color:var(--ui-text-primary)}.cloud-file-list{flex:1;min-height:0;overflow:auto}.cloud-file{padding:10px 4px;border-bottom:1px solid var(--ui-line);color:var(--ui-text-secondary)}.cloud-file-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;border:0;background:transparent;color:var(--ui-text-primary);font:inherit;font-size:13px}.cloud-file>button{cursor:pointer}.cloud-pagination{justify-content:center;font-size:12px}.cloud-error{font-size:13px;color:var(--ui-danger)}.cloud-error .lib-link{margin-left:10px}@media(max-width:760px){.cloud-sources{grid-template-columns:1fr}.cloud-source>div{flex-wrap:wrap}}
+.cloud-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;flex:none;margin-bottom:14px}.cloud-source{display:flex;align-items:center;gap:8px;padding:14px;background:var(--ui-control);border-radius:12px}.cloud-source>div{display:flex;flex:1;align-items:center;gap:10px;min-width:0}.cloud-source b{font-size:13px}.cloud-source .lib-muted{font-size:12px}.cloud-source .xb-btn{padding:4px 7px;white-space:nowrap}.cloud-browser{display:flex;flex-direction:column;min-height:0;flex:1;gap:12px}.cloud-browser-heading,.cloud-search,.cloud-browser-location,.cloud-file,.cloud-pagination{display:flex;align-items:center;gap:10px}.cloud-browser-heading h3{flex:1;margin:0;font-size:15px}.cloud-search{padding:5px 10px;background:var(--ui-control);border-radius:9px}.cloud-search select{border:0;background:var(--ui-control);color:var(--ui-text-primary);font:inherit;font-size:12px}.cloud-search input,.cloud-error input{flex:1;min-width:0;border:0;background:transparent;color:var(--ui-text-primary);font:inherit;outline:none}.cloud-browser-location{justify-content:space-between;color:var(--ui-text-secondary);font-size:12px}.cloud-browser-location>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cloud-browser-location label{display:flex;align-items:center;gap:8px;flex:none}.cloud-browser-location select{max-width:160px;padding:5px;border:0;border-radius:6px;background:var(--ui-control);color:var(--ui-text-primary)}.cloud-file-list{flex:1;min-height:0;overflow:auto}.cloud-file{padding:10px 4px;border-bottom:1px solid var(--ui-line);color:var(--ui-text-secondary)}.cloud-file-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;border:0;background:transparent;color:var(--ui-text-primary);font:inherit;font-size:13px}.cloud-file>button{cursor:pointer}.cloud-pagination{justify-content:center;font-size:12px}.cloud-error{font-size:13px;color:var(--ui-danger)}.cloud-error .lib-link{margin-left:10px}@media(max-width:760px){.cloud-sources{grid-template-columns:1fr}.cloud-source>div{flex-wrap:wrap}}
 .right{margin-left:auto}
 .grid-wrap{margin:0 -28px;padding:14px 28px 24px}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
@@ -171,7 +174,7 @@ defineExpose({ openAdd });
 .badge{width:32px;height:32px;border-radius:9px;font-size:12.5px}
 .badge.sm{width:22px;height:22px;border-radius:6px;font-size:10.5px}
 .card-title{display:flex;flex-direction:column;gap:1px;min-width:0}
-.card-title b{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cloud-title-button{border:0;background:none;color:var(--ui-text-primary);text-align:left;cursor:pointer;padding:0}.card-title b,.cloud-title-button{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .note{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .code{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ui-text-secondary)}
 .code b{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ui-text-primary)}

@@ -10,9 +10,9 @@
 
 ## 资料库云文档
 
-「资料库 → 云文档」复用腾讯文档与百度网盘的 MCP 登录，提供账号文件浏览、文件夹、关键词搜索、分页和保存云端引用；腾讯文档先列空间，百度网盘支持中文目录；连接 / 管理打开已有插件原生窗口，凭据仅在本机保险箱中。选中文件加入资料库后可准备提问草稿，由用户补充并发送，正文再通过 MCP 按需读取；百度网盘当前以内容检索片段为主，不保证全文读取和下载。界面不后台扫描账号，不修改云端文件，移除仅删本机引用。
+「资料库 → 云文档」复用腾讯文档与百度网盘的 MCP 登录，支持账号浏览、目录、分页，以及文件名搜索、腾讯正文搜索和百度语义搜索（腾讯正文搜索受账号套餐权限限制；百度语义接口按自然语言查找文件，不保证全文命中；接口无法返回文件列表时会明确提示并回退文件名搜索）。选中“读取并加入”后，在原生独立窗口读取、预览并保存正文快照；已保存的内容可离线查看、刷新，并作为真实文字附件带入提问或准备总结，由用户发送。腾讯优先使用正文接口，智能文档分页读取为兼容路径；百度使用所选文件 ID 读取摘要／内容片段，始终标记为部分内容，不保证全文和下载。图片、扫描件或服务尚未解析的文件可能没有可读文字，此时禁用正文提问。刷新失败保留旧快照，移除仅清理本机引用和正文，不修改云端文件。连接管理复用插件原生窗口，凭据保存在本机保险箱，不进入预览窗口。
 
-验证：`npx vitest run src/ui/library/cloud-browser.test.ts src/ui/library/LibraryCloud.test.ts src/ui/library/library.test.ts`、`npx vue-tsc --noEmit`；原生 `cargo test --offline --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop data_library::cloud::tests`。已用真实账号核对连接恢复、腾讯空间、文档列表与搜索、百度中文目录与文件名搜索，并验证保存引用和提问草稿交接。桌面统一为工具调用提供 45 秒下限，较长声明仍保留；接口库默认不改变调用方时限。
+验证：`npx vitest run src/ui/library/cloud-browser.test.ts src/ui/library/LibraryCloud.test.ts src/ui/library/library.test.ts src/ui/library/cloud-document.test.ts src/ui/configuration/windows.test.ts`、`npx vue-tsc --noEmit`；原生 `cargo test --offline --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop data_library::cloud::`。已用真实账号核对连接恢复、腾讯空间、文档列表与搜索、百度中文目录与文件名搜索，并验证腾讯正文预览与实际正文附件交接；百度读取范围按实际返回内容标注。桌面统一为工具调用提供 45 秒下限，较长声明仍保留；接口库默认不改变调用方时限。
 
 ## 会话延续与工具发现
 

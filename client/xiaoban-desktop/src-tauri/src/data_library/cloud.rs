@@ -1,6 +1,8 @@
 //! Read-only cloud browser. Credentials and transport stay in the existing MCP manager.
 use super::*;
+pub mod content;
 use agent_kernel::{Tool, ToolCtx};
+pub use content::ContentState;
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
@@ -44,7 +46,10 @@ fn read_confirmation_required(platform: &str, operation: &str, flagged: bool) ->
     flagged
         && !matches!(
             (platform, operation),
-            ("baidu", "file_list" | "file_keyword_search")
+            (
+                "baidu",
+                "file_list" | "file_keyword_search" | "file_meta" | "file_semantics_search"
+            )
         )
 }
 fn matches_tool(name: &str, allowed: &[&str]) -> bool {
@@ -174,6 +179,9 @@ fn array(value: &Value) -> Option<&Vec<Value>> {
         "nodeList",
         "file_list",
         "fileList",
+        "wenku_mcp_tool_result",
+        "tool_result",
+        "results",
         "data",
         "result",
     ] {
@@ -269,6 +277,57 @@ fn page(platform: &str, value: &Value, location: &str, spaces: bool) -> Result<V
         .unwrap_or(list.len() >= 20);
     Ok(json!({"items":entries,"hasMore":more,"nextCursor":next}))
 }
+fn service_code(value: &Value, key: &str) -> Option<i64> {
+    value[key]
+        .as_i64()
+        .or_else(|| value[key].as_str().and_then(|s| s.parse().ok()))
+}
+fn baidu_empty_search(value: &Value) -> bool {
+    let success =
+        service_code(value, "errno") == Some(0) || service_code(value, "error_no") == Some(0);
+    success
+        && ["errno", "error_no", "newno"]
+            .iter()
+            .all(|key| value.get(*key).is_none() || service_code(value, key) == Some(0))
+        && value.get("data").is_some_and(|data| {
+            data.is_null()
+                || data.as_str().is_some_and(|s| s.trim().is_empty())
+                || data
+                    .as_object()
+                    .is_some_and(|v| v.is_empty() || v.get("list").is_some_and(Value::is_null))
+        })
+}
+#[cfg(debug_assertions)]
+fn response_shape(value: &Value, depth: usize) -> Value {
+    match value {
+        Value::Object(v) if depth > 0 => Value::Object(
+            v.iter()
+                .take(25)
+                .map(|(k, v)| (k.clone(), response_shape(v, depth - 1)))
+                .collect(),
+        ),
+        Value::Array(v) if depth > 0 => {
+            json!({"arrayLength":v.len(),"firstShape":v.first().map(|v|response_shape(v,depth-1))})
+        }
+        Value::Null => json!("null"),
+        Value::String(v) => json!(format!("string:{}", v.len())),
+        Value::Number(_) => json!("number"),
+        Value::Bool(_) => json!("boolean"),
+        _ => json!("container"),
+    }
+}
+fn unpack_search(mut value: Value) -> Value {
+    for key in ["data", "wenku_mcp_tool_result"] {
+        if let Some(raw) = value[key].as_str() {
+            if let Ok(decoded) = serde_json::from_str::<Value>(raw) {
+                if decoded.is_object() || decoded.is_array() {
+                    value[key] = decoded;
+                }
+            }
+        }
+    }
+    value
+}
 fn valid_url(platform: &str, value: &str) -> bool {
     url::Url::parse(value).is_ok_and(|url| {
         url.scheme() == "https"
@@ -309,6 +368,7 @@ pub async fn library_cloud_browse(
     page_number: u32,
     confirmed: Option<bool>,
     cursor: Option<u32>,
+    content_search: Option<bool>,
 ) -> Result<Value, String> {
     control_only(&window)?;
     provider(&platform)?;
@@ -320,6 +380,9 @@ pub async fn library_cloud_browse(
     {
         return Err("查询范围无效".into());
     }
+    if content_search == Some(true) && query.trim().is_empty() {
+        return Err("请输入正文搜索关键词".into());
+    }
     let items = crate::chat::connectors::ai_connector_installed(app.clone(), window).await?;
     let item = source(&items, &platform)
         .filter(|item| item["status"] == "connected")
@@ -328,7 +391,9 @@ pub async fn library_cloud_browse(
     tauri::async_runtime::spawn_blocking(move || {
         let manager = crate::chat::connector_manager(&app)?;
         let spaces = platform == "tencent" && location.is_empty() && query.trim().is_empty();
-        let names: &[&str] = if spaces {
+        let names: &[&str] = if platform == "baidu" && content_search == Some(true) {
+            &["file_semantics_search"]
+        } else if spaces {
             &["query_space_list", "space_list"]
         } else {
             allowed(&platform, !query.trim().is_empty())
@@ -345,8 +410,11 @@ pub async fn library_cloud_browse(
             })
             .ok_or("当前连接器未提供此只读浏览功能")?;
         let tool: &Arc<dyn Tool> = tools.first().ok_or("当前连接器未提供此只读浏览功能")?;
-        if read_confirmation_required(&platform, operation, tool.spec().confirmation_reason.is_some())
-            && confirmed != Some(true)
+        if read_confirmation_required(
+            &platform,
+            operation,
+            tool.spec().confirmation_reason.is_some(),
+        ) && confirmed != Some(true)
         {
             return Ok(json!({"items":[],"hasMore":false,"confirmationRequired":true}));
         }
@@ -357,6 +425,15 @@ pub async fn library_cloud_browse(
             location.trim(),
             page_number,
         )?;
+        if platform == "tencent" && content_search == Some(true) {
+            if tool.spec().schema["properties"]
+                .get("search_type")
+                .is_none()
+            {
+                return Err("当前腾讯文档连接器不支持正文搜索，请更新后重试".into());
+            }
+            args["search_type"] = json!("content");
+        }
         if args.get("from").is_some() {
             if let Some(cursor) = cursor {
                 args["from"] = json!(cursor);
@@ -389,7 +466,39 @@ pub async fn library_cloud_browse(
             Some(value) => value,
             None => serde_json::from_str(&result.output).map_err(|_| "服务未返回结构化文件列表")?,
         };
-        page(&platform, &value, &location, spaces)
+        let value = if platform == "baidu" {
+            unpack_search(value)
+        } else {
+            value
+        };
+        if platform == "baidu" && array(&value).is_none() {
+            if let Some(code) = ["errno", "error_no", "newno"]
+                .iter()
+                .find_map(|key| service_code(&value, key).filter(|n| *n != 0))
+            {
+                return Err(format!(
+                    "百度检索暂不可用（服务错误码 {code}），请使用文件名搜索或稍后重试"
+                ));
+            }
+            if baidu_empty_search(&value) {
+                return Ok(json!({"items":[],"hasMore":false}));
+            }
+            #[cfg(debug_assertions)]
+            eprintln!("cloud-search-shape {}", response_shape(&value, 4));
+            if content_search == Some(true) {
+                return Err(
+                    "百度语义接口未返回可导入的文件列表，请改用文件名搜索或稍后重试".into(),
+                );
+            }
+        }
+        let mut result = page(&platform, &value, &location, spaces)?;
+        if !["page", "page_num", "num", "from", "offset", "cursor"]
+            .iter()
+            .any(|key| tool.spec().schema["properties"].get(*key).is_some())
+        {
+            result["hasMore"] = json!(false);
+        }
+        Ok(result)
     })
     .await
     .map_err(|e| e.to_string())?
@@ -435,6 +544,7 @@ pub fn library_cloud_add(
                 code: None,
                 folder,
                 added_ms: now_ms(),
+                content: None,
                 remote: Some(Reference {
                     provider: platform,
                     id: entry.id,
@@ -447,17 +557,57 @@ pub fn library_cloud_add(
     .map(|(_, library)| library)
 }
 
+pub(super) fn remove_snapshot(root: &Path, id: &str) {
+    let _ = fs::remove_file(content::snapshot_path(root, id));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
+    fn baidu_success_with_no_search_data_is_empty_but_errors_are_not() {
+        assert!(baidu_empty_search(&json!({"errno":0,"data":null})));
+        assert!(baidu_empty_search(
+            &json!({"error_no":"0","newno":"0","data":null})
+        ));
+        assert!(baidu_empty_search(
+            &json!({"error_no":0,"newno":0,"data":null,"wenku_mcp_tool_result":""})
+        ));
+        assert!(!baidu_empty_search(
+            &json!({"error_no":1,"newno":0,"data":null})
+        ));
+        let result = unpack_search(json!({"wenku_mcp_tool_result":"{\"list\":[]}"}));
+        assert!(array(&result).unwrap().is_empty());
+        assert!(baidu_empty_search(&json!({"errno":0,"data":{"list":null}})));
+        assert!(!baidu_empty_search(&json!({"errno":-6,"data":null})));
+        assert!(!baidu_empty_search(
+            &json!({"errno":0,"newno":1,"data":null})
+        ));
+    }
+    #[test]
     fn baidu_library_reads_do_not_prompt_but_other_operations_keep_confirmation() {
         assert!(!read_confirmation_required("baidu", "file_list", true));
-        assert!(!read_confirmation_required("baidu", "file_keyword_search", true));
+        assert!(!read_confirmation_required(
+            "baidu",
+            "file_keyword_search",
+            true
+        ));
         assert!(read_confirmation_required("baidu", "file_del", true));
-        assert!(read_confirmation_required("baidu", "file_sharelink_set", true));
-        assert!(read_confirmation_required("tencent", "query_space_node", true));
-        assert!(!read_confirmation_required("tencent", "query_space_node", false));
+        assert!(read_confirmation_required(
+            "baidu",
+            "file_sharelink_set",
+            true
+        ));
+        assert!(read_confirmation_required(
+            "tencent",
+            "query_space_node",
+            true
+        ));
+        assert!(!read_confirmation_required(
+            "tencent",
+            "query_space_node",
+            false
+        ));
     }
     #[test]
     fn only_named_read_operations_are_available_and_no_credentials_are_exposed() {

@@ -8,7 +8,7 @@ export interface LibraryDoc {
   designId?: string | null; origin: string; status: DocStatus; note: string; preview: string; tags: string[];
 }
 export type Platform = 'feishu' | 'tencent' | 'baidu' | 'shimo' | 'yuque' | 'wps' | 'other';
-export interface LibraryLink { id: string; url: string; title: string; platform: Platform; kind: string; code: string | null; folder: string | null; addedMs: number; remote?: { provider: string; id: string; path: string } | null }
+export interface LibraryLink { content?: import('./cloud-document.ts').CloudContentState | null; id: string; url: string; title: string; platform: Platform; kind: string; code: string | null; folder: string | null; addedMs: number; remote?: { provider: string; id: string; path: string } | null }
 export type SavedKind = 'answer' | 'text' | 'file' | 'image' | 'shot';
 export interface LibrarySaved { id: string; kind: SavedKind; title: string; text: string; sessionId: string | null; sessionTitle: string; source: 'main' | 'assistant'; savedMs: number }
 export interface LibraryData { folders: LibraryFolder[]; docs: LibraryDoc[]; links: LibraryLink[]; saved: LibrarySaved[] }

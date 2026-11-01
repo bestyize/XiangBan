@@ -23,14 +23,15 @@ afterEach(()=>wrapper?.unmount());
 async function open(){wrapper=mount(LibraryCloud,{props:{library,desktop:true,query:'',openUrl:vi.fn()}});await flushPromises();}
 async function click(text:string){await wrapper.findAll('button').find(button=>button.text()===text)!.trigger('click');await flushPromises();}
 describe('cloud library integration',()=>{
-  it('browses an already connected account, saves a selected reference, and prepares a question without sending it',async()=>{
+  it('browses an already connected account, saves a selected reference and opens its scoped native reader',async()=>{
     await open(); expect(wrapper.text()).toContain('已连接');
     await click('浏览文件'); expect(wrapper.text()).toContain('会议纪要');
-    await click('加入资料库'); expect(invoke).toHaveBeenCalledWith('library_cloud_add',{platform:'tencent',entry,folder:null});
+    await click('读取并加入'); expect(invoke).toHaveBeenCalledWith('library_cloud_add',{platform:'tencent',entry,folder:null});
     expect(wrapper.text()).toContain('已加入');
     await wrapper.get('[aria-label="返回云文档"]').trigger('click');
-    await wrapper.get('[aria-label="用这份云文档提问"]').trigger('click');
-    expect(wrapper.emitted('ask')?.[0][0]).toContain('"fileId":"file-1"');
+    await wrapper.get('[aria-label="预览云文档与提问"]').trigger('click');
+    expect(invoke).toHaveBeenCalledWith('configuration_window_open', {target:'cloud',provider:'saved',tab:null});
+    expect(wrapper.emitted('ask')).toBeUndefined();
     expect(invoke).not.toHaveBeenCalledWith('chat_send',expect.anything());
   });
   it('reuses the existing native connection window and does not request credentials in the library',async()=>{

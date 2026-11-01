@@ -13,6 +13,7 @@ import CommunityApplyDialog from './community/CommunityApplyDialog.vue';
 import WorkspaceSearchDialog from './components/WorkspaceSearchDialog.vue';
 import { useWorkspaceSort } from './workspace-sort.ts';
 import { serveConfigurationWindows } from './configuration/windows.ts';
+import { acceptCloudTask } from './library/cloud-document.ts';
 import { acceptStoreTask } from './ai-store/store-window.ts';
 const pageLoaders = {
   'new-task': () => import('./pages/NewTaskPage.vue'),
@@ -474,7 +475,7 @@ onMounted(() => {
     };
   }
   if (store.desktop) void listen('configuration-login', () => store.openLogin()).then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); });
-  if (store.desktop) void serveConfigurationWindows(args => acceptStoreTask(store, args)).then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); }).catch(error => store.notify(error, 'error'));
+  if (store.desktop) void serveConfigurationWindows(args => acceptStoreTask(store, args), args => acceptCloudTask(store, args)).then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); }).catch(error => store.notify(error, 'error'));
   void store.initialize().then(async () => { if (store.info.uiSmoke) await (await import('./ui-smoke.ts')).runUiSmoke(store); });
   window.addEventListener('focus', focus);
   window.addEventListener('widgets-manage', manageWidgets);

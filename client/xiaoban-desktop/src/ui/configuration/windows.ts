@@ -20,7 +20,7 @@ export function zoomConfigurationWindow(event: MouseEvent) {
 }
 /** The event is only a wake-up. Command and arguments must be taken from the native queue,
  * never from an event payload that another webview could forge. */
-export function serveConfigurationWindows(openStoreTask?: (args: Record<string, unknown>) => Promise<void>) {
+export function serveConfigurationWindows(openStoreTask?: (args: Record<string, unknown>) => Promise<void>, openCloudTask?: (args: Record<string, unknown>) => Promise<void>) {
   return listen<{ id: string }>('configuration-command', async ({ id }) => {
     let request: { id: string; command: string; args: Record<string, unknown> };
     try { request = await invoke('configuration_window_take', { id }); } catch { return; }
@@ -29,6 +29,9 @@ export function serveConfigurationWindows(openStoreTask?: (args: Record<string, 
       if (request.command === 'ai_store_open_task') {
         if (!openStoreTask) throw new Error('插件任务入口尚未就绪');
         await openStoreTask(request.args);
+      } else if (request.command === 'library_cloud_open_task') {
+        if (!openCloudTask) throw new Error('云文档任务入口尚未就绪');
+        await openCloudTask(request.args);
       } else value = await invoke(request.command, request.args);
       if (value instanceof ArrayBuffer) value = Array.from(new Uint8Array(value));
       const mutation = /^ai_(market_(install|update|group_install)|store_(install|uninstall|expert_install|expert_remove|connector_(connect|disconnect|reconnect))|connector_(configure|unbind|set_enabled))$/.test(request.command);

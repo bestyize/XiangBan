@@ -74,6 +74,7 @@ pub struct Link {
     pub folder: Option<String>,
     pub added_ms: u64,
     pub remote: Option<cloud::Reference>,
+    pub content: Option<cloud::ContentState>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -542,6 +543,7 @@ pub fn library_remove(app: tauri::AppHandle, window: tauri::WebviewWindow, ids: 
             else { let _ = fs::remove_dir_all(root.join("files").join(&doc.id)); }
         }
         library.docs.retain(|d| !ids.contains(&d.id));
+        for link in library.links.iter().filter(|l| ids.contains(&l.id)) { cloud::remove_snapshot(root, &link.id); }
         library.links.retain(|l| !ids.contains(&l.id));
         library.saved.retain(|s| !ids.contains(&s.id));
         Ok(())
@@ -590,7 +592,7 @@ pub fn library_add_link(app: tauri::AppHandle, window: tauri::WebviewWindow, url
         let url = url.trim().to_string();
         if library.links.iter().any(|l| l.url == url) { return Err("这个链接已经在资料库里了".into()); }
         let title = if title.is_empty() { kind.clone() } else { title.to_string() };
-        library.links.insert(0, Link { id: new_id(&app), url, title, platform, kind, code, folder, added_ms: now_ms(), remote: None });
+        library.links.insert(0, Link { id: new_id(&app), url, title, platform, kind, code, folder, added_ms: now_ms(), remote: None, content: None });
         Ok(())
     }).map(|(_, library)| library)
 }

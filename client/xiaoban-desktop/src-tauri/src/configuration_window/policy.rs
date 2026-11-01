@@ -3,12 +3,14 @@ pub fn kind(label: &str) -> Option<&'static str> {
     if let Some(suffix) = label.strip_prefix("configuration-store-") {
         return (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("store");
     }
+    if let Some(suffix) = label.strip_prefix("configuration-cloud-") { return (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("cloud"); }
     if label == "configuration-community" { return Some("community"); }
     if label == "configuration-settings" { return Some("settings"); }
     let suffix = label.strip_prefix("configuration-model-")?;
     (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("model")
 }
 pub fn command_allowed(role: &str, command: &str) -> bool {
+    if role == "cloud" { return ["get_settings", "library_cloud_item", "library_cloud_open_source", "library_cloud_read", "library_cloud_open_task"].contains(&command); }
     if role == "store" { return [
         "get_settings", "get_app_info", "open_download_url", "ai_store_open_task",
         "ai_store_installed", "ai_store_inspect", "ai_store_install", "ai_store_uninstall",
@@ -100,5 +102,26 @@ pub fn store_identity(raw: &str) -> Result<String, String> {
         assert!(command_allowed("settings", "set_chat_composer_pet"));
         assert!(!command_allowed("model", "set_chat_composer_pet"));
         assert!(command_allowed("model", "save_ai_provider"));
+    }
+}
+
+/// A document window may only request its own saved document.
+pub fn cloud_label(id: &str) -> String {
+    use sha2::{Digest, Sha256};
+    format!("configuration-cloud-{:x}", Sha256::digest(id.as_bytes()))[..44].into()
+}
+pub fn cloud_scope(label: &str, command: &str, args: &serde_json::Value) -> bool {
+    kind(label) != Some("cloud") || command == "get_settings" || args["id"].as_str().is_some_and(|id| cloud_label(id) == label)
+}
+#[cfg(test)] mod cloud_tests {
+    use super::*;
+    #[test] fn document_windows_cannot_cross_scope_or_send_chat() {
+        let label=cloud_label("one");
+        assert_eq!(kind(&label),Some("cloud"));
+        assert!(command_allowed("cloud","library_cloud_read"));
+        assert!(!command_allowed("cloud","chat_send"));
+        assert!(!command_allowed("cloud","open_download_url"));
+        assert!(cloud_scope(&label,"library_cloud_read",&serde_json::json!({"id":"one"})));
+        assert!(!cloud_scope(&label,"library_cloud_read",&serde_json::json!({"id":"two"})));
     }
 }
