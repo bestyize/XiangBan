@@ -27,6 +27,16 @@
 普通「导入文档」、文件夹导入和拖入文件也会按内容识别 Claude HTML 与带 canvas.json 的源码 ZIP；普通网页、图片 ZIP 仍按文档保存。旧 HTML/ZIP 文档可用「转为设计稿」从本机副本转换，保留原件、分组和标签，成功后打开独立画布。设计导入已取消 2 MiB 单文件和 16 MiB 项目限制；源文件与素材按内容摘要独立存储，原生预览按需加载素材，历史共用未变化的对象。保存有版本检查和恢复草稿，保留 30 个历史版本，支持重命名、创建独立副本与历史恢复。聊天及排队消息固定发送时选中的设计稿，避免切换作品后改错项目。兼容 v3 boards/order 与旧版 artboards；已补齐官方 name 组件引用、本地 React/JSX/TSX、二进制素材源包、画布便签与部分焦点/键盘交互；39 个原始画板纳入回归。尚不等于全面复刻，远程模块、动态元素逐实例编辑、PDF 矢量/Flow 分页、PPTX 与云端协作等差距见 [复刻验收矩阵](../../docs/agent/open-claude-design-compatibility.md)。详见 [模块说明](../../libs/agent-tools/open-claude-design/README.md) 与 [实施和验证记录](../../docs/agent/open-claude-design.md)。
 
 
+## 外部客户端设计协作（本机 MCP）
+
+画板标题栏「协作」打开原生设置的「外部 Agent」。设计 MCP 默认关闭；「启动并连接」启动 `127.0.0.1:58140/mcp`，按客户端分别授权读取和编辑资料库设计稿，并增量写入 Codex / 共用该主机配置的 ChatGPT 桌面、Claude Code、Claude Desktop 的用户配置。Claude Desktop 同时兼容已存在的 `Claude` 与 `Claude-3p`（第三方网关模式）配置目录。其他配置保留，变更前备份；同名非小伴连接拒绝覆盖。使用小伴可执行文件的 `--design-mcp-stdio` 桥接模式，无 Node/Python 依赖；令牌仅保存在本机私有配置，不写进启动参数。应用重启恢复已开启服务，停止服务关闭监听，移除连接撤销其令牌。客户端需按提示重连或重启；「已配置」不等于连接成功，初始化握手成功与实际工具调用分别显示，尚未调用不会再误报为未连接。
+
+MCP 提供 `xiaoban_design_read`（格式、搜索、读源文件、设计令牌）和 `xiaoban_design_edit`（创建、增量保存、完成校验、复制）及 `xiaoban_design_open`（按设计稿 ID 打开或聚焦原生画板窗口，不改变项目内容），复用项目版本检查与画布事件，不开放系统命令或删除项目。配置位于数据目录 `config/design-mcp.json`，默认允许该客户端访问全部本机设计稿。小伴正常退出后，stdio 桥接会在下一次请求前按需后台启动同一安装位置的小伴，最多等待 30 秒；跨客户端启动使用系统文件锁去重。用户手动停用 MCP 或撤销授权时不会自动启动。就绪探测仅重试 ping，实际读写请求不自动重放；画板窗口仍由 `xiaoban_design_open` 显示。
+
+ChatGPT 网页入口准备本地 stdio 连接并提供官方 Secure MCP Tunnel 引导和启动命令；用户仍须在 OpenAI 账户创建/关联隧道、配置运行密钥、运行 tunnel-client，并在 ChatGPT 添加连接。没有自动创建云端账户授权，也未将本机地址冒充公网可连接地址。参考：[ChatGPT MCP](https://developers.openai.com/api/docs/guides/custom-mcp-server)、[Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)、[Codex MCP](https://developers.openai.com/codex/mcp)、[Claude Code MCP](https://code.claude.com/docs/en/mcp)。
+
+定向验证：`cargo test --offline --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop design_mcp`，`npx vitest run src/ui/components/settings/DesignMcpSettings.test.ts src/ui/design/DesignWorkbench.test.ts`。真实客户端账户连接与 Windows 实机需分别验收。
+
 ## 社区内容包（xiaoban://community）
 
 侧栏「社区」保留周刊、热门内容包与「我的桌面方案」；「打开社区」在独立窗口浏览社区网页，网页登录与桌面账号分开。独立窗口使用可信本地自绘标题栏；远程网页不获得原生桌面命令权限，仅限同源导航，外部链接交给系统浏览器。页面内容随论坛服务更新，本轮网页修改需部署后才会在线显示。调试版可将 `XIAOBAN_COMMUNITY_URL` 设为本机 HTTP(S) 来源，正式版固定官方来源。网页上的「在小伴中打开」通过 `xiaoban://community/apply/{kind}/{pack_id}?version=&sha256=` 唤起本应用。流程固定为：**下载 → SHA-256 与大小校验（主地址失败回退官方镜像）→ 压缩包结构检查 → 展示内容 → 用户确认 → 才应用**；链接带的 `sha256` 会锁定网页上看到的那一版，版本已更新则拒绝。支持 `effect`（沿用特效包校验，写入特效文件夹）、`reminder`（提醒规则）、`routine`（例行事项：按时只读执行的任务，添加后**默认不启用**，到提醒页确认后再打开）、`task`（任务模板：完整展示提示词、场景和风险，确认后放进新对话的输入框，**不自动发送**）、`goal`（目标模板：确认后填入长期目标表单，由用户自己保存；不携带验证命令）。社区页的「方案」Tab 可以“复刻”别人分享的方案：把里面的内容逐项走同一条确认流程，一次一项，桌面端暂不支持的类型会跳过，已下架的会提示。尚未做：把当前桌面保存成方案并分享。其他类型先提示去网页查看。

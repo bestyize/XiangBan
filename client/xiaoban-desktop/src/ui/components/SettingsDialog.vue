@@ -14,6 +14,7 @@ const AiConfigCard = defineAsyncComponent(() => import('./AiConfigCard.vue'));
 const AssistantPage = defineAsyncComponent(() => import('../pages/AssistantPage.vue'));
 const VoiceSettingsCard = defineAsyncComponent(() => import('./VoiceSettingsCard.vue'));
 const AgentSafetyCard = defineAsyncComponent(() => import('./AgentSafetyCard.vue'));
+const DesignMcpSettings = defineAsyncComponent(() => import('./settings/DesignMcpSettings.vue'));
 const SpeechAgentSettings = defineAsyncComponent(() => import('./settings/SpeechAgentSettings.vue'));
 
 const props = defineProps<{ store: ControlStore; detached?: boolean }>();
@@ -24,7 +25,7 @@ const tabs: { id: SettingsTab; label: string; icon: Component; keywords: string 
   { id: 'general', label: '通用', icon: Settings, keywords: '开机 启动 动画 帧率 暂停 数据 目录' },
   { id: 'appearance', label: '外观', icon: Palette, keywords: '深色 浅色 主题 颜色 主题色 跟随系统 对话框 桌宠 小伴' },
   { id: 'ai', label: 'AI 模型', icon: Sparkles, keywords: '模型 供应商 密钥 api deepseek 网关' },
-  { id: 'agent', label: '外部 Agent', icon: Terminal, keywords: 'agent claude codex 外部 语音编程 hooks 委派 观察 mcp' },
+  { id: 'agent', label: '外部 Agent', icon: Terminal, keywords: 'agent claude codex chatgpt 设计 画板 协作 外部 语音编程 hooks 委派 观察 mcp' },
   { id: 'assistant', label: '超级小伴', icon: Zap, keywords: '快捷键 悬浮球 呼出 截图' },
   { id: 'voice', label: '声音', icon: Volume2, keywords: '语音 朗读 识别 麦克风 音色' },
   { id: 'network', label: '连接与网络', icon: Wifi, keywords: '代理 proxy 网络 连接 socks5 http https VPN 测试 手机 扫码 配对 遥控 互联' },
@@ -74,7 +75,7 @@ function pick(id: SettingsTab) { props.store.settingsTab = id; }
           <GeneralSettings v-if="current.id === 'general'" :store="store" />
           <AppearanceSettings v-else-if="current.id === 'appearance'" :store="store" />
           <div v-else-if="current.id === 'ai'" data-testid="settings-ai"><AiConfigCard :store="store" /></div>
-          <div v-else-if="current.id === 'agent'" data-testid="settings-agent"><SpeechAgentSettings /></div>
+          <div v-else-if="current.id === 'agent'" data-testid="settings-agent"><DesignMcpSettings /><SpeechAgentSettings /></div>
           <div v-else-if="current.id === 'assistant'" data-testid="settings-assistant"><AssistantPage :store="store" embedded /></div>
           <div v-else-if="current.id === 'voice'" data-testid="settings-voice"><VoiceSettingsCard v-if="store.speech" :store="store" /></div>
           <NetworkSettings v-else-if="current.id === 'network'" />

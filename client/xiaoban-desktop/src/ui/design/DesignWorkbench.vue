@@ -366,6 +366,7 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
       <button class="xb-menu-item" role="menuitem" @click="copyMarkdown"><ClipboardCopy :size="12"/> 复制 Markdown</button>
     </div>
   </details>
+  <button title="与 Codex、ChatGPT、Claude 协作" aria-label="设计画板协作" @click="invoke('design_mcp_open_settings').catch(report)">协作</button>
   <button v-if="detached" title="窗口全屏 (F11)" @click="invoke('design_window_fullscreen',{id:projectId}).catch(report)"><Maximize2 :size="14"/></button>
   <button :title="detached?'回到分屏':'独立窗口'" @click="handoff"><ExternalLink :size="14"/></button>
   <button aria-label="关闭设计画布" @click="close"><X :size="15"/></button>

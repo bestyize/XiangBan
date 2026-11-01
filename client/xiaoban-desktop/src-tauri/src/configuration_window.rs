@@ -50,7 +50,7 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
 pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::WebviewWindow, target: String, tab: Option<String>, provider: Option<String>) -> Result<(), String> {
     if window.label() != "control" && kind(window.label()) != Some("settings") { return Err("只能从控制台或设置打开配置窗口".into()); }
     if !matches!(target.as_str(), "settings" | "model" | "community") { return Err("配置窗口类型无效".into()); }
-    if tab.as_deref().is_some_and(|t| !["general", "appearance", "ai", "assistant", "voice", "network", "safety", "about"].contains(&t)) { return Err("设置分类无效".into()); }
+    if tab.as_deref().is_some_and(|t| !["general", "appearance", "ai", "agent", "assistant", "voice", "network", "safety", "about"].contains(&t)) { return Err("设置分类无效".into()); }
     let provider = provider.unwrap_or_else(|| "__new__".into());
     if target == "model" && (provider.is_empty() || provider.len() > 200 || provider.chars().any(char::is_control)) { return Err("服务商编号无效".into()); }
     let _lock = OPEN_LOCK.lock().map_err(|_| "配置窗口锁不可用")?;

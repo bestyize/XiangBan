@@ -5346,6 +5346,7 @@ dependencies = [
  "indexmap 2.14.2",
  "toml_datetime 1.1.1+spec-1.1.0",
  "toml_parser",
+ "toml_writer",
  "winnow 1.0.4",
 ]
 
@@ -6509,6 +6510,7 @@ dependencies = [
  "agent-proactivity",
  "agent-skill-discovery",
  "async-trait",
+ "axum",
  "base64 0.22.1",
  "chrono",
  "dirs 6.0.0",
@@ -6532,6 +6534,7 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-single-instance",
  "tokio",
+ "toml_edit 0.25.15+spec-1.1.0",
  "tungstenite 0.28.0",
  "url",
  "windows",

@@ -64,6 +64,7 @@ mod data_library;
 mod design;
 mod window_control;
 mod design_window;
+mod design_mcp;
 mod configuration_window;
 mod voice_turn;
 mod inference;
@@ -795,6 +796,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 }
 
 fn main() {
+    if let Some(code)=design_mcp::stdio_main(){std::process::exit(code);}
     // Started as the sandbox launcher for one command (Windows, experimental): run it and leave, before anything
     // of the app starts.
     if let Some(code) = agent_kernel::sandbox::windows_launcher_main() {
@@ -840,7 +842,7 @@ fn main() {
                     route_link(app, clean);
                 }
             }
-            if !arguments.iter().any(|arg| arg == "--autostart") { let _ = present_control(app); }
+            if !design_mcp::autostart::background(&arguments) { let _ = present_control(app); }
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
@@ -889,6 +891,7 @@ fn main() {
             phone_link::phone_link_status, phone_link::phone_link_set_enabled, phone_link::phone_link_remove_peer,
             speech_agent::speech_agent_env, speech_agent::speech_agent_install_guides, speech_agent::speech_agent_hooks_status, speech_agent::speech_agent_hooks_install, speech_agent::speech_agent_hooks_uninstall, speech_agent::speech_agent_inject,
             speech_agent::speech_agent_delegate, speech_agent::speech_agent_task_status, speech_agent::speech_agent_task_cancel, speech_agent::speech_agent_task_list,
+            design_mcp::design_mcp_status, design_mcp::design_mcp_set_enabled, design_mcp::design_mcp_configure, design_mcp::design_mcp_open_settings,
             voice_service::voice_service_status, voice_service::voice_service_set_enabled, voice_service::voice_service_reset_token,
             chat::plugins::ai_plugin_installed, chat::connectors::ai_connector_installed, chat::connectors::ai_connector_configure, chat::connectors::ai_connector_set_enabled, chat::connectors::ai_connector_unbind, chat::connectors::ai_connector_reauthorize, chat::connectors::ai_mentions, chat::plugins::ai_plugin_pick_file, chat::plugins::ai_plugin_inspect_file, chat::plugins::ai_plugin_install_file, chat::plugins::ai_plugin_remove, chat::plugins::ai_plugin_avatar,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
@@ -897,7 +900,7 @@ fn main() {
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
             float_assistant::assistant_reanchor_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(configuration_window::ConfigurationState::default()).manage(window_control::WindowState::default()).manage(chat::store_market::PendingLink::default()).manage(community::CommunityState::default()).manage(phone_link::PhoneLinkState::default()).manage(voice_service::VoiceServiceState::default()).manage(voice_turn::VoiceTurnState::default())
+        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(configuration_window::ConfigurationState::default()).manage(window_control::WindowState::default()).manage(chat::store_market::PendingLink::default()).manage(community::CommunityState::default()).manage(phone_link::PhoneLinkState::default()).manage(voice_service::VoiceServiceState::default()).manage(design_mcp::DesignMcpState::default()).manage(voice_turn::VoiceTurnState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("design-preview", |context, request| design::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
@@ -948,6 +951,7 @@ fn main() {
             chat::goals::resume_pending(app.handle());
             phone_link::start(app.handle());
             voice_service::start(app.handle());
+            design_mcp::start(app.handle());
             float_assistant::start(app.handle());
             asr::start(app.handle());
             games::start(app.handle());
@@ -970,7 +974,7 @@ fn main() {
             widgets::start(app.handle());
             proactivity::start(app.handle());
             reminders::start(app.handle());
-            if !std::env::args().any(|argument| argument == "--autostart") {
+            if !design_mcp::autostart::background(std::env::args()) {
                 present_control(app.handle()).map_err(std::io::Error::other)?;
             }
             account::activated(app.handle());

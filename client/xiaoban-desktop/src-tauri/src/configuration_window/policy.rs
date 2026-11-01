@@ -27,6 +27,7 @@ pub fn command_allowed(role: &str, command: &str) -> bool {
         "phone_link_status", "phone_link_set_enabled", "phone_link_remove_peer",
         "speech_agent_env", "speech_agent_install_guides", "speech_agent_hooks_status", "speech_agent_hooks_install", "speech_agent_hooks_uninstall", "speech_agent_inject",
         "speech_agent_delegate", "speech_agent_task_status", "speech_agent_task_cancel", "speech_agent_task_list",
+        "design_mcp_status", "design_mcp_set_enabled", "design_mcp_configure",
         "voice_service_status", "voice_service_set_enabled", "voice_service_reset_token",
     ];
     matches!(role, "settings" | "model") && (COMMON.contains(&command) || role == "settings" && SETTINGS.contains(&command))
@@ -47,6 +48,9 @@ pub fn command_allowed(role: &str, command: &str) -> bool {
         assert!(!command_allowed("community","get_account_session"));
         assert!(!command_allowed("community","chat_send"));
         assert!(!command_allowed("community","save_network_config"));
+        assert!(command_allowed("settings", "design_mcp_configure"));
+        assert!(!command_allowed("model", "design_mcp_configure"));
+        assert!(!command_allowed("community", "design_mcp_configure"));
         assert!(command_allowed("settings", "save_network_config"));
         assert!(!command_allowed("model", "save_network_config"));
         assert!(command_allowed("settings", "set_chat_composer_pet"));
