@@ -2,8 +2,8 @@
 import BuiltinEffectPreview from './BuiltinEffectPreview.vue'
 import BuiltinWidgetPreview from './BuiltinWidgetPreview.vue'
 import BuiltinPetPreview from './BuiltinPetPreview.vue'
-defineProps<{ item:{ id:string; name:string; cover?:string; description:string; kind:string }; wide?:boolean; active?:boolean }>()
-defineEmits<{ play:[] }>()
+defineProps<{ item:{ id:string; name:string; cover?:string; description:string; kind:string }; wide?:boolean; active?:boolean; gameReady?:boolean; gameError?:string }>()
+defineEmits<{ play:[]; retry:[] }>()
 const labels:Record<string,string>={game:'游戏',wallpaper:'壁纸',widget:'小组件',effect:'特效',pet:'伙伴'}
 </script>
 <template>
@@ -18,7 +18,7 @@ const labels:Record<string,string>={game:'游戏',wallpaper:'壁纸',widget:'小
       <p class="detail-kind">{{ labels[item.kind] }}<span>·</span>{{ item.kind === 'wallpaper' ? '创作灵感' : '小伴官方' }}</p>
       <h2 v-if="wide">{{ item.name }}</h2>
       <p class="description">{{ item.description }}</p>
-      <button v-if="item.kind === 'game'" type="button" class="btn btn-primary" @click="$emit('play')">开始游玩 <span aria-hidden="true">↗</span></button>
+      <template v-if="item.kind === 'game'"><button type="button" class="btn btn-primary" :disabled="!gameReady && !gameError" :aria-busy="!gameReady && !gameError" @click="gameError ? $emit('retry') : $emit('play')">{{ gameError ? '重新加载' : gameReady ? '开始游玩' : '准备游戏…' }} <span v-if="gameReady" aria-hidden="true">↗</span></button><p v-if="gameError" role="alert">{{ gameError }}</p></template>
       <p class="detail-note">{{ item.kind === 'game' ? '直接在网页游玩，本次试玩不保存进度。' : item.kind === 'wallpaper' ? '这是桌面装扮的灵感预览。' : item.kind === 'pet' ? '轻点伙伴，看看它的表情；移动鼠标，它也会看向你。' : item.kind === 'widget' ? '官方组件外观预览；示例内容不代表你的个人数据，天气与行情不是实时数据。' : '官方内置内容的网页预览。' }}</p>
       <p v-if="wide" class="browse-note">选择下方作品，继续探索。</p>
     </div>
