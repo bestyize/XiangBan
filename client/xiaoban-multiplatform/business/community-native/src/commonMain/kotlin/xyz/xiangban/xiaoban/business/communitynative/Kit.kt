@@ -220,6 +220,13 @@ fun IconBox(icon: ImageVector, box: Dp = 44.dp, corner: Dp = 16.dp, tint: Color 
     }
 }
 
+/** 页面底很浅时，白色卡片靠一圈细描边和底色分开。 */
+@Composable
+fun Modifier.outlinedCard(corner: Dp): Modifier {
+    val shape = RoundedCornerShape(corner)
+    return clip(shape).background(MaterialTheme.colorScheme.surface).border(1.dp, LocalExtraColors.current.hairline, shape)
+}
+
 // ───────────── 按钮 ─────────────
 
 /** 品牌红实心胶囊按钮。 */

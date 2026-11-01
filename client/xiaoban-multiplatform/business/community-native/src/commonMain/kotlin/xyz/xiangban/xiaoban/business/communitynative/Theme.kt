@@ -83,7 +83,7 @@ val DangerSoft: Color get() = Color(if (ThemeState.dark) 0xFF3A2225L else 0xFFFF
 /** 步骤完成、“已完成”的绿色。 */
 val Success = Color(Tokens.Success)
 
-/** 页面底浅灰、卡片纯白（深色下 #111111 和 #1C1C1E），主题色可换。 */
+/** 页面底 #FAFAFA、卡片纯白（深色下 #111111 和 #1C1C1E），主题色可换。 */
 @Composable
 fun XiaobanTheme(dark: Boolean = when (ThemeState.mode) {
     AppearanceMode.System -> isSystemInDarkTheme()

@@ -114,7 +114,7 @@ internal fun TopicFeed(
 @Composable
 private fun PinnedBar(topic: Topic, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         XIcon(XIcons.Pin, tint = Brand, size = 16.dp)
@@ -128,7 +128,7 @@ private fun PinnedBar(topic: Topic, onClick: () -> Unit) {
 @Composable
 internal fun TopicCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit, onMessage: (String) -> Unit, tagLabel: String? = null) {
     val images = topic.images.map { env.forum.imageUrl(it) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface)
+    Column(Modifier.fillMaxWidth().outlinedCard(12.dp)
         .clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(topic.cardTitle, Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -259,7 +259,7 @@ private fun AuthorLine(pack: Pack) {
 @Composable
 internal fun LookCard(pack: Pack, single: Boolean = false, onClick: () -> Unit) {
     val h = CoverHeights[(pack.id % CoverHeights.size).toInt()] * (if (single) 1.3f else 1f)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
+    Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick)) {
         Box {
             val screenshot = pack.kind == "game" || pack.kind == "widget"
             Cover(pack.coverUrl, pack.id, if (screenshot) Modifier.fillMaxWidth().aspectRatio(1.5f) else Modifier.fillMaxWidth().height(h.dp),
@@ -279,7 +279,7 @@ internal fun LookCard(pack: Pack, single: Boolean = false, onClick: () -> Unit) 
 internal fun SkillCard(pack: Pack, onClick: () -> Unit) {
     val soft = if (ThemeState.dark) Color(0xFF9FB6DC).copy(alpha = 0.18f) else Color(0xFFE8EEF8)
     val ink = if (ThemeState.dark) Color(0xFF9FB6DC) else Color(0xFF3E5C8A)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
+    Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick).padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.size(24.dp).clip(RoundedCornerShape(8.dp)).background(soft), contentAlignment = Alignment.Center) { XIcon(skillIcon(pack.kind), tint = ink, size = 16.dp) }
             Text(skillTag(pack.kind), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)

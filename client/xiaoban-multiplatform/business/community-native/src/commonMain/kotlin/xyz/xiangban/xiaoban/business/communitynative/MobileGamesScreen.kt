@@ -170,7 +170,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                 }
             }
             if (!mine) item {
-                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(17.dp)).background(MaterialTheme.colorScheme.surface).clickable { prepare() }.padding(15.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                Row(Modifier.fillMaxWidth().outlinedCard(17.dp).clickable { prepare() }.padding(15.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                     XIcon(XIcons.Sparkle, tint = MaterialTheme.colorScheme.primary, size = 27.dp)
                     Column(Modifier.weight(1f)) {
                         Text("你想创造什么？", fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
@@ -194,7 +194,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
             if (mine) {
                 item { CreationSection("本机作品", "刷新", { if (!loading) reload++ }) }
                 items(visible, key = { it.key }) { entry ->
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface).clickable(role = Role.Button) { detail = entry; panel = "actions" }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable(role = Role.Button) { detail = entry; panel = "actions" }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(68.dp))
                         Column(Modifier.weight(1f)) {
                             Text(entry.name, fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
