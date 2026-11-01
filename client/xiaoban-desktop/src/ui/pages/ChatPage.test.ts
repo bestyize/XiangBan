@@ -23,11 +23,11 @@ async function open(responders: Record<string, Responder> = {}, options: { deskt
   const handlers = new Map<string, (payload: never) => void>();
   const calls: [string, Record<string, unknown> | undefined][] = [];
   const bridgeHandlers = new Map<string, Set<(payload: never) => void>>();
-  const table: Record<string, Responder> = { design_link:()=>({}), design_window_status:()=>false, design_view_read:()=>null, design_view_save:()=>null, design_list: () => [], chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
+  const table: Record<string, Responder> = { chat_assets_list:()=>[], design_window_open:()=>undefined, design_link:()=>({}), design_window_status:()=>false, design_view_read:()=>null, design_view_save:()=>null, design_list: () => [], chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
   // Background model/context/design reads have their own assertions; chat command order stays focused on sending and loading.
   const contextCalls: (Record<string, unknown> | undefined)[] = [];
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
-    if (command === 'chat_context') contextCalls.push(args); else if (!['get_ai_config', 'refresh_ai_providers', 'ai_gateway_tiers', 'design_list'].includes(command)) calls.push([command, args]);
+    if (command === 'chat_context') contextCalls.push(args); else if (!['get_ai_config', 'refresh_ai_providers', 'ai_gateway_tiers', 'design_list', 'chat_assets_list'].includes(command)) calls.push([command, args]);
     if (command === 'get_ai_config' && !table[command]) return { model: 'coding-model', activeProvider: 'demo', providers: [{ id: 'demo', name: '演示模型', models: [{ id: 'coding-model', name: 'Coding Model' }] }] } as never;
     const respond = table[command];
     if (!respond) throw new Error(`unexpected ${command}`);
@@ -52,7 +52,12 @@ async function open(responders: Record<string, Responder> = {}, options: { deskt
 const q = <T extends Element = HTMLElement>(id: string) => wrapper!.element.querySelector(`[data-testid="${id}"]`) as T | null;
 const all = (selector: string) => [...wrapper!.element.querySelectorAll(selector)] as HTMLElement[];
 const textarea = () => wrapper!.element.querySelector('[data-testid="chat-input"] textarea') as HTMLTextAreaElement;
-async function click(id: string) { q<HTMLButtonElement>(id)!.click(); await flushPromises(); }
+async function click(id: string) {
+  const element=q<HTMLButtonElement>(id)!;
+  // Installed capabilities are rows with a switch; selecting the row itself has no action.
+  (id.startsWith('chat-installed-') ? element.querySelector<HTMLButtonElement>('[role="switch"]')??element : element).click();
+  await flushPromises();
+}
 // Menus and dialogs are teleported out of the page, so they are looked up on the whole document.
 const inBody = <T extends HTMLElement = HTMLElement>(id: string) => document.body.querySelector(`[data-testid="${id}"]`) as T | null;
 async function clickBody(id: string) { const el = inBody(id); if (!el) throw new Error(`missing ${id}`); el.click(); await flushPromises(); }
@@ -1369,18 +1374,18 @@ describe('design deliveries in the original conversation', () => {
     const project = { id: 'design-012345678901234567890123', title: '界面设计', sessionId: 's1', revision: 1, updatedMs: 1, canvas: { v: 3, boards: { 'Main.dc.html': { w: 390, h: 844 }, 'More.dc.html': { w: 390, h: 844, x: 450 } }, order: ['Main.dc.html', 'More.dc.html'] }, files: { 'Main.dc.html': '<x-dc>首页</x-dc>', 'More.dc.html': '<x-dc>更多</x-dc>' } };
     const h = await open({ chat_overview: () => overview({ sessions: [summary('s1', '设计')] }), chat_load_session: () => [], design_list: () => [{ ...project, artboards: 2 }], design_read: () => ({ project, origin: 'design-preview://localhost' }) });
     await openSession('s1');
-    expect(wrapper!.find('.design-deliveries').text()).toContain('2 个画板');
+    await click('chat-assets-toggle');expect(q('chat-assets')?.textContent).toContain('2 画板');
     expect(wrapper!.findAll('.artboard')).toHaveLength(2);
     await wrapper!.get('[role="separator"]').trigger('keydown', { key: 'ArrowLeft' });
     expect(wrapper!.get('[role="separator"]').attributes('aria-valuenow')).toBe('66');
     await wrapper!.get('[aria-label="关闭设计画布"]').trigger('click'); await flushPromises();
     expect(wrapper!.find('[data-testid="design-workbench"]').exists()).toBe(false);
-    await wrapper!.get('.design-deliveries button').trigger('click'); await flushPromises();
-    expect(wrapper!.findAll('.artboard')).toHaveLength(2);
+    await wrapper!.get('[aria-label="打开界面设计"]').trigger('click'); await flushPromises();
+    expect(h.invoke).toHaveBeenCalledWith('design_window_open', { id: project.id });
     expect(h.invoke).toHaveBeenCalledWith('design_read', { id: project.id });
     expect(h.invoke.mock.calls.some(([command]) => command === 'design_save')).toBe(false);
     await h.chat.select(null); await flushPromises();
-    expect(wrapper!.find('.design-deliveries').exists()).toBe(false);
+    expect(q('chat-assets')).toBeNull();
   });
 });
 
@@ -1389,9 +1394,9 @@ describe('library design continuation in a new conversation', () => {
     const project = { id: 'design-012345678901234567890123', title: '继续设计', sessionId: 'deleted', sessionIds: ['s1'], revision: 2, updatedMs: 2, canvas: { v: 3, boards: { 'Main.dc.html': { w: 390, h: 844 } }, order: ['Main.dc.html'] }, files: { 'Main.dc.html': '<x-dc>同一份源文件</x-dc>' } };
     const h = await open({ chat_overview: () => overview({ sessions: [summary('s1', '继续修改')] }), chat_load_session: () => [], design_read: () => ({ project, origin: 'design-preview://localhost' }) });
     await openSession('s1');
-    expect(wrapper!.find('.design-deliveries').exists()).toBe(false);
+    expect(q('chat-assets-toggle')?.textContent).toContain('0');
     h.emit('design-changed', { ...project, artboards: 1 }); await flushPromises();
-    expect(wrapper!.find('.design-deliveries').text()).toContain('继续设计');
+    await click('chat-assets-toggle');expect(q('chat-assets')?.textContent).toContain('继续设计');
     expect(h.invoke).toHaveBeenCalledWith('design_read', { id: project.id });
     expect(wrapper!.findAll('.artboard')).toHaveLength(1);
   });

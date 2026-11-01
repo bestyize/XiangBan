@@ -82,6 +82,8 @@ export interface ChatStore {
   refresh(): Promise<void>;
   dispose(): void;
   select(id: string | null): Promise<void>;
+  /** Save an empty conversation for asset imports, preserving its draft and pending model/expert settings. */
+  ensureSession(): Promise<string | null>;
   /**
    * Returns false when nothing was sent, so the caller can give the text back to the user.
    * `note` goes to the model at the front of the message and is not shown (see `voice/interruption.ts`).
@@ -486,6 +488,33 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       return store.currentId ? store.views[store.currentId] ?? null : null;
     },
 
+    async ensureSession() {
+      if (store.currentId) return store.currentId;
+      if (!deps.desktop || draftSending.value) return null;
+      const revision = selectionRevision, owner = store.draft;
+      const workspace = store.pendingWorkspace, expert = store.pendingExpert, model = store.pendingModel, context = store.pendingContextTokens;
+      draftSending.value = true;
+      try {
+        const summary = await deps.invoke<SessionSummary>('chat_new_session', {
+          permissionMode: store.permissionMode, ...(workspace ? { workspace } : {}),
+          ...(expert ? { expert: expert.workflow ? { workflow: expert.workflow } : { plugin: expert.plugin, ...(expert.agent ? { agent: expert.agent } : {}) } } : {}),
+          ...(model ? { model } : {}), ...(context ? { contextTokens: context } : {}),
+          ...(owner.connectors.length ? { connectors: owner.connectors.map(c => c.id) } : {}),
+        });
+        if (disposed) return null;
+        upsert(summary); store.views[summary.id] = newView(summary.id, true); store.drafts[summary.id] = owner;
+        if (selectionRevision === revision && store.currentId === null) store.currentId = summary.id;
+        if (store.drafts.$new === owner) delete store.drafts.$new;
+        if (store.pendingWorkspace === workspace) store.pendingWorkspace = '';
+        if (store.pendingExpert === expert) store.pendingExpert = null;
+        if (store.pendingModel === model) store.pendingModel = null;
+        if (store.pendingContextTokens === context) store.pendingContextTokens = null;
+        if (selectionRevision === revision) pendingPermissionMode.value = defaultPermissionMode.value;
+        void store.refreshContext();
+        return summary.id;
+      } catch (error) { deps.notify(error, 'error'); return null; }
+      finally { draftSending.value = false; }
+    },
     async select(id) {
       ++selectionRevision;
       deps.onActivity?.();

@@ -6,6 +6,14 @@
 
 针对性验证：`npx vitest run src/ui/library/library.test.ts`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop local_open`。macOS 已实机验证图片打开；Windows 系统文件关联需在 Windows 验收。
 
+## 对话资产
+
+聊天右上角「资产」统一展示当前对话的设计稿、生成图片、交付文件和文件夹，可搜索、分类、固定为侧栏以及定位交付消息。设计稿打开原生独立画布，图片与文件使用系统默认应用打开；图片、文件可另存为，文件夹可逐级浏览。自动从成功的 `write_file` / `edit_file` 和回答里的本机 Markdown 交付链接整理工作区内的成果，切换过工作区的旧成果也保留；读取过的文件和上传提问附件不会自动混入。Shell 产物需在回答中提供本机交付链接，工作区外文件可手动导入。已移动或删除的原文件显示失效，不自动重新生成。
+
+资产面板「＋」可导入本机文件、文件夹和设计源文件，也可关联已有设计稿或新建。普通文件 / 文件夹只保存原位置的本机关联，不复制、不移动原件、不自动加入模型上下文；设计 HTML / ZIP 走现有设计稿导入。每段对话最多手动关联 500 份资产，文件夹内文件不重复计入顶层数量，单目录最多展示 500 项。新对话导入会先保存空对话，保留输入草稿、模型与专家设置。取消选择不添加资产；删除对话只清理关联记录，保留用户原文件。
+
+验证：`npx vitest run src/ui/chat/ChatAssets.test.ts src/ui/chat/chat-store.test.ts src/ui/pages/ChatPage.test.ts src/ui/chat/ChatGeneratedImages.test.ts`、`npx vue-tsc --noEmit`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::assets::tests`。浏览器用实际组件与模拟桥接核对展示和导入刷新；系统选择器、文件关联和 Windows 原生效果需桌面实机验收，尚未重新打包。设计稿沿用 [原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/conversation-assets.html)。
+
 ## 聊天图片生成
 
 直接在聊天中描述想生成的图片，或选择「＋ → 工具 → 生成图片」。内置 `image_generate` 通过小伴 AI 网关调用独立的生图模型，当前聊天模型无需切换，但须支持工具调用。使用前登录小伴账号并有可用额度；管理员须在 `server-ai` 的「产品与档位 → 媒体能力」配置并启用图片渠道、模型和可选尺寸，付费要求由服务端执行。桌面不接收生图模型名或上游密钥。

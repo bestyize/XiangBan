@@ -8,6 +8,7 @@
 
 | 设计稿 | 内容 |
 | --- | --- |
+| [对话资产](../../client/xiaoban-desktop/docs/design-specs/prototypes/conversation-assets.html) | 右上角统一入口，包含设计稿、生成图片、交付文件 / 文件夹；轻量浮层与常驻侧栏两版，可搜索、预览图片、展开目录、定位消息与导入资产。支持明暗、主题色、空状态和文件失效预览，稿中系统操作均为模拟。正式聊天页已接入轻量浮层、固定侧栏与本机文件 / 文件夹 / 设计源文件导入，普通导入保留原件；尚未重新打包。[在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/conversation-assets.html)，需在桌面项目运行 `npm run dev`；[可编辑源码](../../client/xiaoban-desktop/docs/design-specs/prototypes/conversation-assets.fragment.html) |
 | [小伴 AI · 多模型配置](../../client/xiaoban-desktop/docs/design-specs/prototypes/ai-model-settings.html) | macOS 白与浅灰轻毛玻璃视觉提案：统一白色内容面、轻量额度概览、细条兑换区、无搜索框的灰阶列表与无边框兑换码输入框、无边框按钮与品牌色确认操作，“兑换”右侧新增可配置链接的“获取额度”入口，每行模型支持发送 `hi` 的检测交互演示；可对照现行界面，支持 4 / 24 / 80 个模型、明暗与窄窗口。已应用到产品独立窗口，支持真实模型检测与后台下发额度链接；同一预览加入第三方模型配置、完整设置页及左栏顶部自绘窗口控件，移除系统顶部标题栏；Windows 原生效果尚未实机验收。[本机在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/ai-model-settings.html)沿用原链接，需在桌面项目运行 `npm run dev`，不连接真实账户或模型服务 |
 | [小伴桌面 UI 升级设计稿](../../client/xiaoban-desktop/docs/design-specs/ui-upgrade/README.md) | 39 个画板：主界面、设置、超级小伴、资料库、实时对话、小伴市场接入、输入框与各类状态卡片；[在线画布](https://claude.ai/artifact/GzhNp5y7ehkzSrWWExkqzg) |
 | [工作空间检索与列表折叠](../../client/xiaoban-desktop/docs/design-specs/prototypes/workspace-search.html) | 标题、正文与工作区检索；限高滚动结果；项目和项目内会话默认各展示 6 项；点击结果自动展开并定位会话 |
