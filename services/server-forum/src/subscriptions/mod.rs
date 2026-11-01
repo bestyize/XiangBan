@@ -54,6 +54,10 @@ pub struct Subscription {
     title: String,
     interests: String,
     recipient: String,
+    #[serde(default)]
+    budget_per_run: Option<i64>,
+    #[serde(default)]
+    budget_per_month: Option<i64>,
     schedule: Value,
     timezone: String,
     next_run: Option<DateTime<Utc>>,
@@ -70,6 +74,10 @@ struct Input {
     title: String,
     interests: String,
     recipient: String,
+    #[serde(default)]
+    budget_per_run: Option<i64>,
+    #[serde(default)]
+    budget_per_month: Option<i64>,
     schedule: Schedule,
     timezone: String,
     active: bool,
@@ -95,6 +103,15 @@ impl Input {
             || self.recipient.parse::<lettre::Address>().is_err()
         {
             return Err(AppError::BadRequest("请填写有效的收件邮箱".into()));
+        }
+        match (self.budget_per_run, self.budget_per_month) {
+            (Some(run), Some(month)) if run > 0 && run <= month && month <= 1_000_000_000_000 => {}
+            (None, None) if self.revision == 0 || !self.active => {}
+            _ => {
+                return Err(AppError::BadRequest(
+                    "请设置正整数额度预算，每月上限须不小于单次上限".into(),
+                ))
+            }
         }
         let next = self.schedule.next(&self.timezone, Utc::now())?;
         if self.active && next.is_none() {
@@ -153,8 +170,8 @@ async fn create(
     if used.rows_affected() == 0 {
         return Err(limit());
     }
-    let row=sqlx::query_as::<_,Subscription>("INSERT INTO information_subscriptions(id,owner,title,interests,recipient,schedule,timezone,next_run,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'unverified') RETURNING *")
-        .bind(input.id).bind(auth.user.uid).bind(input.title).bind(input.interests).bind(input.recipient).bind(json!(input.schedule)).bind(input.timezone).bind(next).fetch_one(&mut *tx).await?;
+    let row=sqlx::query_as::<_,Subscription>("INSERT INTO information_subscriptions(id,owner,title,interests,recipient,schedule,timezone,next_run,status,budget_per_run,budget_per_month) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'unverified',$9,$10) RETURNING *")
+        .bind(input.id).bind(auth.user.uid).bind(input.title).bind(input.interests).bind(input.recipient).bind(json!(input.schedule)).bind(input.timezone).bind(next).bind(input.budget_per_run).bind(input.budget_per_month).fetch_one(&mut *tx).await?;
     tx.commit().await?;
     Ok(Json(row))
 }
@@ -193,8 +210,8 @@ async fn update(
     } else {
         "paused"
     };
-    let row=sqlx::query_as::<_,Subscription>("UPDATE information_subscriptions SET title=$2,interests=$3,recipient=$4,schedule=$5,timezone=$6,next_run=$7,status=$8,verified_at=$9,revision=revision+1,updated_at=now() WHERE id=$1 RETURNING *")
-        .bind(id).bind(input.title).bind(input.interests).bind(input.recipient).bind(json!(input.schedule)).bind(input.timezone).bind(next).bind(status).bind(verified).fetch_one(&mut *tx).await?;
+    let row=sqlx::query_as::<_,Subscription>("UPDATE information_subscriptions SET title=$2,interests=$3,recipient=$4,schedule=$5,timezone=$6,next_run=$7,status=$8,verified_at=$9,budget_per_run=$10,budget_per_month=$11,revision=revision+1,updated_at=now() WHERE id=$1 RETURNING *")
+        .bind(id).bind(input.title).bind(input.interests).bind(input.recipient).bind(json!(input.schedule)).bind(input.timezone).bind(next).bind(status).bind(verified).bind(input.budget_per_run).bind(input.budget_per_month).fetch_one(&mut *tx).await?;
     cancel(&mut tx, id).await?;
     sqlx::query("DELETE FROM information_verifications WHERE subscription_id=$1")
         .bind(id)
@@ -313,7 +330,7 @@ async fn verify(
     let schedule: Schedule = serde_json::from_value(sub.schedule)
         .map_err(|_| AppError::Internal("invalid stored schedule".into()))?;
     let next = schedule.next(&sub.timezone, Utc::now())?;
-    sqlx::query("UPDATE information_subscriptions SET verified_at=now(),status=$2,next_run=$3,revision=revision+1,updated_at=now() WHERE id=$1").bind(id).bind(if next.is_some(){"active"}else{"completed"}).bind(next).execute(&mut *tx).await?;
+    sqlx::query("UPDATE information_subscriptions SET verified_at=now(),status=$2,next_run=$3,revision=revision+1,updated_at=now() WHERE id=$1").bind(id).bind(if next.is_none(){"completed"}else if sub.budget_per_run.is_some() && sub.budget_per_month.is_some(){"active"}else{"paused"}).bind(next).execute(&mut *tx).await?;
     sqlx::query("DELETE FROM information_verifications WHERE subscription_id=$1")
         .bind(id)
         .execute(&mut *tx)
@@ -324,6 +341,7 @@ async fn verify(
 #[derive(Deserialize)]
 struct Page {
     before: Option<DateTime<Utc>>,
+    before_id: Option<Uuid>,
     subscription_id: Option<Uuid>,
 }
 async fn history(
@@ -331,9 +349,19 @@ async fn history(
     auth: AuthUser,
     Query(q): Query<Page>,
 ) -> AppResult<Json<Value>> {
-    let items:Vec<(Value,)>=sqlx::query_as("SELECT jsonb_build_object('id',id,'subscription_id',subscription_id,'title',snapshot->>'title','status',status,'error',error,'accounting_status',accounting_status,'created_at',created_at,'sent_at',sent_at,'due_at',due_at) FROM information_editions WHERE owner=$1 AND ($2::timestamptz IS NULL OR created_at<$2) AND ($3::uuid IS NULL OR subscription_id=$3) ORDER BY created_at DESC LIMIT 30").bind(auth.user.uid).bind(q.before).bind(q.subscription_id).fetch_all(&s.pool).await?;
+    if q.before.is_some() != q.before_id.is_some() {
+        return Err(AppError::BadRequest("分页游标不完整".into()));
+    }
+    let items:Vec<(Value,)>=sqlx::query_as("SELECT jsonb_build_object('id',id,'subscription_id',subscription_id,'title',snapshot->>'title','status',status,'error',error,'accounting_status',accounting_status,'created_at',created_at,'sent_at',sent_at,'due_at',due_at) FROM information_editions WHERE owner=$1 AND ($2::timestamptz IS NULL OR (created_at,id)<($2,$4::uuid)) AND ($3::uuid IS NULL OR subscription_id=$3) ORDER BY created_at DESC,id DESC LIMIT 30").bind(auth.user.uid).bind(q.before).bind(q.subscription_id).bind(q.before_id).fetch_all(&s.pool).await?;
+    let next_cursor = if items.len() == 30 {
+        items
+            .last()
+            .map(|r| json!({"created_at":r.0["created_at"],"id":r.0["id"]}))
+    } else {
+        None
+    };
     Ok(Json(
-        json!({"items":items.into_iter().map(|x|x.0).collect::<Vec<_>>()}),
+        json!({"items":items.into_iter().map(|x|x.0).collect::<Vec<_>>(),"next_cursor":next_cursor}),
     ))
 }
 async fn edition(

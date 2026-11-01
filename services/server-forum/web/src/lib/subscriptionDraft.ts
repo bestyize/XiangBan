@@ -14,7 +14,7 @@ export function parseSubscriptionDraft(text:string):{recipient?:string;schedule?
 
 /** Project the write contract; server metadata must never enter a deny_unknown_fields request. */
 export function subscriptionInput(
- source: Pick<Subscription, 'id'|'revision'|'title'|'interests'|'recipient'|'schedule'|'timezone'>,
+ source: Pick<Subscription, 'id'|'revision'|'title'|'interests'|'recipient'|'schedule'|'timezone'|'budget_per_run'|'budget_per_month'>,
  active: boolean,
  confirmed: boolean,
 ): SubscriptionInput {
@@ -24,11 +24,13 @@ export function subscriptionInput(
    ? {kind:'weekly', time:source.schedule.time, weekday:source.schedule.weekday}
    : {kind:'daily', time:source.schedule.time}
  return {id:source.id, revision:source.revision, title:source.title, interests:source.interests,
-  recipient:source.recipient, schedule, timezone:source.timezone, active, confirmed}
+  recipient:source.recipient, schedule, timezone:source.timezone,
+  budget_per_run:typeof source.budget_per_run==='number'?source.budget_per_run:null,
+  budget_per_month:typeof source.budget_per_month==='number'?source.budget_per_month:null, active, confirmed}
 }
 
 export function newSubscriptionDraft(): SubscriptionInput {
  return {id:crypto.randomUUID(),revision:0,title:'',interests:'',recipient:'',
   schedule:{kind:'daily',time:'08:00'},timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',
-  active:true,confirmed:false}
+  budget_per_run:null,budget_per_month:null,active:true,confirmed:false}
 }

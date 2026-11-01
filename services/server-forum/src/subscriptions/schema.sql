@@ -31,3 +31,7 @@ CREATE TABLE IF NOT EXISTS information_limits (
 
 ALTER TABLE information_editions ADD COLUMN IF NOT EXISTS accounting_status TEXT NOT NULL DEFAULT 'pending';
 ALTER TABLE information_editions ADD COLUMN IF NOT EXISTS accounting_after TIMESTAMPTZ NOT NULL DEFAULT now();
+
+ALTER TABLE information_subscriptions ADD COLUMN IF NOT EXISTS budget_per_run BIGINT;
+ALTER TABLE information_subscriptions ADD COLUMN IF NOT EXISTS budget_per_month BIGINT;
+UPDATE information_subscriptions SET status='paused' WHERE status='active' AND (budget_per_run IS NULL OR budget_per_month IS NULL);

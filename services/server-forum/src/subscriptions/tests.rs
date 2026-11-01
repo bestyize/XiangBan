@@ -110,7 +110,7 @@ impl Harness {
 }
 
 fn input(id: Uuid) -> Value {
-    json!({"id":id,"revision":0,"title":"城市骑行","interests":"杭州骑行与周末户外活动","recipient":"reader@example.test","schedule":{"kind":"daily","time":"08:00"},"timezone":"Asia/Shanghai","active":true,"confirmed":true})
+    json!({"id":id,"revision":0,"title":"城市骑行","interests":"杭州骑行与周末户外活动","recipient":"reader@example.test","schedule":{"kind":"daily","time":"08:00"},"timezone":"Asia/Shanghai","active":true,"confirmed":true,"budget_per_run":150,"budget_per_month":300})
 }
 #[tokio::test]
 async fn ownership_verification_edits_and_history() {
@@ -327,4 +327,86 @@ fn rejects_unconfirmed_and_credentials() {
         .unwrap()
         .validate()
         .is_err());
+}
+
+#[tokio::test]
+async fn archive_cursor_keeps_every_row_with_identical_timestamp() {
+    let Some(h) = Harness::new().await.unwrap() else {
+        return;
+    };
+    let (owner, token) = h.user().await;
+    let id = Uuid::new_v4();
+    assert_eq!(
+        call(
+            &h.app,
+            "POST",
+            "/api/me/information-subscriptions",
+            Some(&token),
+            input(id)
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let at = Utc::now();
+    for i in 0..65 {
+        sqlx::query("INSERT INTO information_editions(id,subscription_id,owner,revision,due_at,snapshot,created_at) VALUES($1,$2,$3,1,$4,$5,$6)")
+            .bind(Uuid::new_v4()).bind(id).bind(owner).bind(at+Duration::seconds(i)).bind(json!({"title":"同批期刊"})).bind(at).execute(&h.pool).await.unwrap();
+    }
+    let mut path = "/api/me/information-editions".to_string();
+    let mut seen = std::collections::HashSet::new();
+    let mut sizes = Vec::new();
+    loop {
+        let (status, page) = call(&h.app, "GET", &path, Some(&token), Value::Null).await;
+        assert_eq!(status, StatusCode::OK);
+        let rows = page["items"].as_array().unwrap();
+        sizes.push(rows.len());
+        for row in rows {
+            assert!(
+                seen.insert(row["id"].as_str().unwrap().to_string()),
+                "duplicate page row"
+            );
+        }
+        if page["next_cursor"].is_null() {
+            break;
+        }
+        let cursor = &page["next_cursor"];
+        path = format!(
+            "/api/me/information-editions?before={}&before_id={}",
+            cursor["created_at"].as_str().unwrap().replace('+', "%2B"),
+            cursor["id"].as_str().unwrap()
+        );
+    }
+    assert_eq!(sizes, vec![30, 30, 5]);
+    assert_eq!(seen.len(), 65);
+    h.close().await.unwrap();
+}
+
+#[test]
+fn validates_explicit_subscription_budgets_without_price_defaults() {
+    let mut v = input(Uuid::new_v4());
+    v["budget_per_run"] = json!(0);
+    assert!(serde_json::from_value::<Input>(v)
+        .unwrap()
+        .validate()
+        .is_err());
+    let mut v = input(Uuid::new_v4());
+    v["budget_per_month"] = json!(100);
+    assert!(serde_json::from_value::<Input>(v)
+        .unwrap()
+        .validate()
+        .is_err());
+    let mut v = input(Uuid::new_v4());
+    v["budget_per_run"] = Value::Null;
+    v["budget_per_month"] = Value::Null;
+    v["revision"] = json!(2);
+    assert!(serde_json::from_value::<Input>(v.clone())
+        .unwrap()
+        .validate()
+        .is_err());
+    v["active"] = json!(false);
+    assert!(serde_json::from_value::<Input>(v)
+        .unwrap()
+        .validate()
+        .is_ok());
 }

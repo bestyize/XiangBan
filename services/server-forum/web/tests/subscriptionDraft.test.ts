@@ -12,12 +12,12 @@ import { subscriptionInput, newSubscriptionDraft } from '../src/lib/subscription
 const listResponse = {
  items: [{id:'4d9962bb-7572-412b-b15a-a2643f1eae68',owner:'a13eb3d7-7e8d-45d5-8289-d566f9c64e04',revision:2,
   title:'城市骑行',interests:'杭州骑行与周末活动',recipient:'reader@example.test',
-  schedule:{kind:'weekly' as const,time:'08:00',weekday:0},timezone:'Asia/Shanghai',
+  schedule:{kind:'weekly' as const,time:'08:00',weekday:0},timezone:'Asia/Shanghai',budget_per_run:150,budget_per_month:300,
   next_run:'2026-11-02T00:00:00Z',status:'active',verified_at:'2026-11-01T18:00:00Z',
   created_at:'2026-11-01T17:00:00Z',updated_at:'2026-11-01T18:00:00Z'}],
  delivery_configured:false,worker_enabled:false,
 }
-const inputKeys=['id','revision','title','interests','recipient','schedule','timezone','active','confirmed'].sort()
+const inputKeys=['id','revision','title','interests','recipient','schedule','timezone','active','confirmed','budget_per_run','budget_per_month'].sort()
 function assertWriteContract(value:unknown){assert.deepEqual(Object.keys(JSON.parse(JSON.stringify(value))).sort(),inputKeys)}
 test('edit and save project the full list response without mutating it',()=>{
  const row=listResponse.items[0], draft=subscriptionInput(row,row.status==='active',false)
