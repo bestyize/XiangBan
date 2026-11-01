@@ -115,8 +115,8 @@ private fun RankingSource(env: CommunityEnv, source: String, url: String, note: 
     Column(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Text("数据来源 $source", Modifier.clip(RoundedCornerShape(6.dp)).clickable(enabled = env.platform != null) {
             env.platform?.openUrl(url)
-        }.padding(vertical = 4.dp), fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
-        Text(note, fontSize = 11.sp, lineHeight = 16.sp, color = LocalExtraColors.current.ink3)
+        }.padding(vertical = 4.dp), style = XType.Caption, color = LocalExtraColors.current.brandInk)
+        Text(note, style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -128,19 +128,19 @@ private fun LiveModelBar(row: LiveModelRank, vendor: String, metric: LiveModelMe
     } ?: "—"
     Column(Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(vertical = 3.dp)) {
         Row(Modifier.height(28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(row.rank?.toString() ?: "—", Modifier.width(18.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            Text(row.rank?.toString() ?: "—", Modifier.width(18.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
             RankingVendor(vendor)
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                 HBar(row.fraction ?: 0f, rankingColor(vendor).copy(alpha = if (ThemeState.dark) 0.32f else 0.18f),
                     height = 26.dp, track = LocalExtraColors.current.fill)
-                Text(row.model.name, Modifier.padding(horizontal = 7.dp), fontSize = 11.sp,
+                Text(row.model.name, Modifier.padding(horizontal = 7.dp), style = XType.Caption,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Text(value, Modifier.width(if (metric == LiveModelMetric.Speed) 46.dp else 40.dp), fontSize = 12.sp,
+            Text(value, Modifier.width(if (metric == LiveModelMetric.Speed) 46.dp else 40.dp), style = XType.Caption,
                 fontWeight = FontWeight.SemiBold, maxLines = 1, textAlign = androidx.compose.ui.text.style.TextAlign.End)
         }
         if (expanded) Text("${row.model.name}\n$vendor · ${metric.label} $value · 输入 ${formatLivePrice(row.model.pricing.input)} / 输出 ${formatLivePrice(row.model.pricing.output)}",
-            Modifier.padding(start = 25.dp, top = 5.dp, bottom = 7.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
+            Modifier.padding(start = 25.dp, top = 5.dp, bottom = 7.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -152,7 +152,7 @@ private fun LiveVendorLegend(vendors: List<LiveModelVendor>) {
         vendors.forEach { vendor ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Dot(rankingColor(vendor.name), 6.dp)
-                Text(vendor.name, fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+                Text(vendor.name, style = XType.Caption, color = LocalExtraColors.current.ink3)
             }
         }
     }
@@ -164,14 +164,14 @@ private fun LiveScatterCard(board: LiveModelBoard, vendors: Map<String, LiveMode
     WhiteCard(padding = 14.dp, horizontalPadding = 8.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("智能 vs 价格", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text("左上角：较高智能、较低价格", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                Text("智能 vs 价格", style = XType.Section, fontWeight = FontWeight.SemiBold)
+                Text("左上角：较高智能、较低价格", Modifier.padding(top = 2.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
             }
             if (points.isNotEmpty() && open != null) IconTap(XIcons.Fullscreen, "全屏查看", { open(Route.Scatter) })
         }
-        if (points.isEmpty()) Text("暂无同时具备智能指数和完整价格的模型", Modifier.padding(vertical = 16.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+        if (points.isEmpty()) Text("暂无同时具备智能指数和完整价格的模型", Modifier.padding(vertical = 16.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
         else LiveIntelligenceScatter(points, Modifier.padding(top = 8.dp).fillMaxWidth().height(370.dp), vendors)
-        Text("加权价格：输入 × 75% + 输出 × 25%，美元/百万 Token", Modifier.padding(top = 6.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+        Text("加权价格：输入 × 75% + 输出 × 25%，美元/百万 Token", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -200,27 +200,27 @@ private fun AbilityRankings(env: CommunityEnv, open: ((Route) -> Unit)?, preview
                             }
                         }
                         item { Text("${metric.unit} · ${if (metric.higherIsBetter) "越高越好" else "越低越好"} · 缺失测量不参与排名",
-                            Modifier.padding(horizontal = 2.dp, vertical = 6.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3) }
+                            Modifier.padding(horizontal = 2.dp, vertical = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3) }
                     }
                     if (preview) item {
                         val top = rows.filter { it.value != null }.take(10)
                         WhiteCard(padding = 14.dp, horizontalPadding = 8.dp) {
                             Row(verticalAlignment = Alignment.Top) {
                                 Column(Modifier.weight(1f)) {
-                                    Text("AA 智能指数", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                    Text("指数 v${board.indexVersion} · ${rows.count { it.value != null }} 个已测模型", Modifier.padding(top = 3.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+                                    Text("AA 智能指数", style = XType.Section, fontWeight = FontWeight.SemiBold)
+                                    Text("指数 v${board.indexVersion} · ${rows.count { it.value != null }} 个已测模型", Modifier.padding(top = 3.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                                 }
                                 if (open != null) Row(Modifier.clip(RoundedCornerShape(6.dp)).clickable { open(Route.Leaderboard) }.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text("全部排行", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                                    Text("全部排行", style = XType.Caption, color = LocalExtraColors.current.ink3)
                                     XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 14.dp)
                                 }
                             }
                             Column(Modifier.padding(top = 10.dp)) {
                                 top.forEach { row -> LiveModelBar(row, vendors[row.model.vendorId]?.name ?: "未知厂商", metric) }
                             }
-                            if (top.isEmpty()) Text("暂无智能指数测量", Modifier.padding(vertical = 16.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                            if (top.isEmpty()) Text("暂无智能指数测量", Modifier.padding(vertical = 16.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
                             LiveVendorLegend(top.mapNotNull { vendors[it.model.vendorId] }.distinctBy { it.id })
-                            Text("${dayLabel(board.asOf)}更新 · 北京时间 · 点模型查看完整名称", Modifier.padding(top = 8.dp), fontSize = 10.sp, color = LocalExtraColors.current.ink3)
+                            Text("${dayLabel(board.asOf)}更新 · 北京时间 · 点模型查看完整名称", Modifier.padding(top = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                         }
                     } else {
                         items(rows.chunked(25), key = { it.first().model.id }) { group ->
@@ -232,8 +232,8 @@ private fun AbilityRankings(env: CommunityEnv, open: ((Route) -> Unit)?, preview
                         val speed = remember(board) { rankLiveModels(board.models, LiveModelMetric.Speed).filter { it.value != null }.take(5) }
                         WhiteCard(padding = 14.dp, horizontalPadding = 8.dp) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text("输出速度 Top 5", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                Text("Token/秒", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+                                Text("输出速度 Top 5", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.SemiBold)
+                                Text("Token/秒", style = XType.Caption, color = LocalExtraColors.current.ink3)
                             }
                             Column(Modifier.padding(top = 10.dp)) { speed.forEach { row -> LiveModelBar(row, vendors[row.model.vendorId]?.name ?: "未知厂商", LiveModelMetric.Speed) } }
                         }
@@ -254,33 +254,33 @@ private fun AbilityRankings(env: CommunityEnv, open: ((Route) -> Unit)?, preview
 private fun UsagePreviewCard(state: Load<ModelUsageBoard>, retry: () -> Unit, open: () -> Unit) {
     WhiteCard(Modifier.clickable(onClick = open), padding = 14.dp, horizontalPadding = 8.dp) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("调用量 Top 5", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text("全部排行", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Text("调用量 Top 5", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.SemiBold)
+            Text("全部排行", style = XType.Caption, color = LocalExtraColors.current.ink3)
             XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 14.dp)
         }
         when (state) {
-            Load.Loading -> Text("正在加载 OpenRouter 日榜…", Modifier.padding(vertical = 16.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Load.Loading -> Text("正在加载 OpenRouter 日榜…", Modifier.padding(vertical = 16.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
             is Load.Failed -> Text("调用量暂时无法加载，点此重试", Modifier.clickable(onClick = retry).padding(vertical = 16.dp),
-                fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
+                style = XType.Caption, color = LocalExtraColors.current.brandInk)
             is Load.Ready -> {
                 val top = state.value.models.sortedBy { it.rank }.take(5)
                 Text("OpenRouter · ${state.value.date} UTC · 按 Token 用量", Modifier.padding(top = 3.dp, bottom = 10.dp),
-                    fontSize = 11.sp, lineHeight = 15.sp, color = LocalExtraColors.current.ink3)
-                if (top.isEmpty()) Text("暂无已发布的调用量排行", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    style = XType.Caption, color = LocalExtraColors.current.ink3)
+                if (top.isEmpty()) Text("暂无已发布的调用量排行", style = XType.Caption, color = LocalExtraColors.current.ink3)
                 val maxShare = top.maxOfOrNull { it.sharePct }?.takeIf { it.isFinite() && it > 0 } ?: 1.0
                 top.forEach { model ->
                     val vendor = model.id.substringBefore('/')
                     Row(Modifier.fillMaxWidth().height(34.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                        Text(model.rank.toString(), Modifier.width(18.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+                        Text(model.rank.toString(), Modifier.width(18.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                         RankingVendor(vendor)
                         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
                             HBar((model.sharePct / maxShare).toFloat(), rankingColor(vendor).copy(alpha = if (ThemeState.dark) 0.32f else 0.18f),
                                 height = 26.dp, track = LocalExtraColors.current.fill)
-                            Text(model.name.substringAfter('/'), Modifier.padding(horizontal = 7.dp), fontSize = 11.sp,
+                            Text(model.name.substringAfter('/'), Modifier.padding(horizontal = 7.dp), style = XType.Caption,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        Text(shareText(model.sharePct, digits = 2), Modifier.width(46.dp), fontSize = 11.sp,
+                        Text(shareText(model.sharePct, digits = 2), Modifier.width(46.dp), style = XType.Caption,
                             textAlign = androidx.compose.ui.text.style.TextAlign.End)
                     }
                 }
@@ -315,7 +315,7 @@ private fun UsageRankings(env: CommunityEnv) {
                     date = ref.date; env.prefs.put("community.rankings.date", ref.date)
                 } }
             }
-            if (datesState is Load.Failed) Text("日期加载失败，点此重试", Modifier.clickable { datesLoader.reload() }.padding(horizontal = 16.dp, vertical = 5.dp), fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
+            if (datesState is Load.Failed) Text("日期加载失败，点此重试", Modifier.clickable { datesLoader.reload() }.padding(horizontal = 16.dp, vertical = 5.dp), style = XType.Caption, color = LocalExtraColors.current.brandInk)
             Box(Modifier.weight(1f)) {
                 RankingLoadBox(state, ::reload, "这一天的调用量榜尚未发布\n可切换统计日或稍后刷新") { board ->
                     if (board.models.isEmpty()) CenterMessage("暂无模型用量数据", "刷新", ::reload)
@@ -323,11 +323,11 @@ private fun UsageRankings(env: CommunityEnv) {
                         item {
                             WhiteCard(padding = 14.dp, horizontalPadding = 8.dp) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("调用量 Top 50", Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                    Text("${board.date} · UTC", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+                                    Text("调用量 Top 50", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.SemiBold)
+                                    Text("${board.date} · UTC", style = XType.Caption, color = LocalExtraColors.current.ink3)
                                 }
-                                Text("OpenRouter · 输入与输出 Token 总量", Modifier.padding(top = 4.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
-                                Text("全天 ${formatTokenCount(board.totalTokens)} Token", Modifier.padding(top = 8.dp), fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                Text("OpenRouter · 输入与输出 Token 总量", Modifier.padding(top = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                                Text("全天 ${formatTokenCount(board.totalTokens)} Token", Modifier.padding(top = 8.dp), style = XType.Secondary, fontWeight = FontWeight.Medium)
                             }
                         }
                         items(board.models.sortedBy { it.rank }.chunked(10), key = { it.first().id }) { group ->
@@ -348,17 +348,17 @@ private fun UsageModelBar(model: ModelUsageEntry, previousAvailable: Boolean) {
     val vendor = model.id.substringBefore('/')
     Column(Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(vertical = 7.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            Text(model.rank.toString(), Modifier.width(18.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            Text(model.rank.toString(), Modifier.width(18.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
             RankingVendor(vendor)
-            Text(model.name.substringAfter('/'), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-            Text(shareText(model.sharePct, digits = 2), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            Text(model.name.substringAfter('/'), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, style = XType.Caption, fontWeight = FontWeight.Medium)
+            Text(shareText(model.sharePct, digits = 2), style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
         Row(Modifier.padding(start = 25.dp, top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             HBar((model.sharePct / 100.0).toFloat().coerceIn(0f, 1f), rankingColor(vendor), Modifier.weight(1f), height = 5.dp, track = LocalExtraColors.current.fill)
-            Text(modelUsageMovement(model, previousAvailable), Modifier.width(48.dp), fontSize = 10.sp, color = LocalExtraColors.current.ink3, textAlign = androidx.compose.ui.text.style.TextAlign.End)
+            Text(modelUsageMovement(model, previousAvailable), Modifier.width(48.dp), style = XType.Caption, color = LocalExtraColors.current.ink3, textAlign = androidx.compose.ui.text.style.TextAlign.End)
         }
         if (expanded) Text("${model.name}\n${formatTokenCount(model.tokens)} Token · ${shareText(model.sharePct)}",
-            Modifier.padding(start = 25.dp, top = 6.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
+            Modifier.padding(start = 25.dp, top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -420,7 +420,7 @@ private fun LiveIntelligenceScatter(
             Row(Modifier.fillMaxWidth().padding(vertical = if (full) 0.dp else 3.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(if (full) sourceNote else "浅绿：智能高于中位数、价格低于中位数 · 虚线：帕累托前沿", Modifier.weight(1f),
-                    fontSize = 9.sp, lineHeight = 12.sp, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    style = XType.Caption, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (full) fullControls()
             }
             ScatterCanvas(visible, highlighted, frontier, current, { selected = it.id }, vendors, full,
@@ -429,9 +429,9 @@ private fun LiveIntelligenceScatter(
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 RankingVendor(vendors[current.vendorId]?.name ?: current.vendorId)
                 Column(Modifier.weight(1f)) {
-                    Text(current.name, fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(current.name, style = XType.Caption, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text("智能 ${formatScore(current.intelligence)} · 加权价格 ${formatLivePrice(current.weightedPrice)}/百万 Token",
-                        fontSize = 11.sp, lineHeight = 15.sp, color = ink)
+                        style = XType.Caption, color = ink)
                 }
             }
             if (!full) {
@@ -440,7 +440,7 @@ private fun LiveIntelligenceScatter(
                         ScatterFilter(point.name, current.id == point.id, rankingColor(vendors[point.vendorId]?.name ?: point.vendorId)) { selected = point.id }
                     }
                 }
-                Text("点名称或圆点定位模型 · 重叠圆点可连续点选", Modifier.padding(top = 4.dp), fontSize = 10.sp, lineHeight = 14.sp, color = ink)
+                Text("点名称或圆点定位模型 · 重叠圆点可连续点选", Modifier.padding(top = 4.dp), style = XType.Caption, color = ink)
             }
         }
     }
@@ -450,12 +450,12 @@ private fun LiveIntelligenceScatter(
             if (showList) Column(Modifier.width(216.dp).fillMaxSize().clip(RoundedCornerShape(8.dp)).background(fill).padding(8.dp)) {
                 BasicTextField(query, { query = it }, Modifier.fillMaxWidth().clip(RoundedCornerShape(5.dp)).background(surface).padding(8.dp)
                     .semantics { contentDescription = "搜索图中模型" }, singleLine = true,
-                    textStyle = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurface),
-                    decorationBox = { input -> Box { if (query.isEmpty()) Text("搜索图中模型", fontSize = 12.sp, lineHeight = 16.sp, color = ink); input() } })
+                    textStyle = XType.Caption.copy(color = MaterialTheme.colorScheme.onSurface),
+                    decorationBox = { input -> Box { if (query.isEmpty()) Text("搜索图中模型", style = XType.Caption, color = ink); input() } })
                 val matches = visible.filter { query.isBlank() || it.name.contains(query.trim(), ignoreCase = true) ||
                     (vendors[it.vendorId]?.name ?: it.vendorId).contains(query.trim(), ignoreCase = true) }
-                Text("${matches.size} 个模型 · 点选后图中高亮", Modifier.padding(vertical = 5.dp), fontSize = 10.sp, lineHeight = 14.sp, color = ink)
-                if (matches.isEmpty()) Text("没有匹配模型，可清空搜索或切换厂商", fontSize = 12.sp, lineHeight = 16.sp, color = ink)
+                Text("${matches.size} 个模型 · 点选后图中高亮", Modifier.padding(vertical = 5.dp), style = XType.Caption, color = ink)
+                if (matches.isEmpty()) Text("没有匹配模型，可清空搜索或切换厂商", style = XType.Caption, color = ink)
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     items(matches, key = { it.id }) { point ->
                         val color = rankingColor(vendors[point.vendorId]?.name ?: point.vendorId)
@@ -465,9 +465,9 @@ private fun LiveIntelligenceScatter(
                             horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
                             Dot(color, 7.dp)
                             Column(Modifier.weight(1f)) {
-                                Text(point.name, fontSize = 12.sp, lineHeight = 16.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                Text(point.name, style = XType.Caption, maxLines = 2, overflow = TextOverflow.Ellipsis,
                                     fontWeight = if (current.id == point.id) FontWeight.SemiBold else FontWeight.Normal)
-                                Text("${formatScore(point.intelligence)} 分 · ${formatLivePrice(point.weightedPrice)}", fontSize = 10.sp, lineHeight = 14.sp, color = ink)
+                                Text("${formatScore(point.intelligence)} 分 · ${formatLivePrice(point.weightedPrice)}", style = XType.Caption, color = ink)
                             }
                         }
                     }
@@ -484,7 +484,7 @@ private fun ScatterFilter(label: String, selected: Boolean, color: Color?, onCli
         .clickable(onClick = onClick).padding(horizontal = 8.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         if (color != null) Dot(color, 6.dp)
-        Text(label, fontSize = 11.sp, lineHeight = 15.sp, maxLines = 1, color = if (selected) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.ink3,
+        Text(label, style = XType.Caption, maxLines = 1, color = if (selected) MaterialTheme.colorScheme.onSurface else LocalExtraColors.current.ink3,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
@@ -598,7 +598,7 @@ private fun ScatterCanvas(
         }
         listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { fraction ->
             Text(formatScore(minScore + (maxScore - minScore) * fraction),
-                Modifier.offset(x = (-26).dp, y = (height * (1 - fraction) - 6).dp), fontSize = 9.sp, lineHeight = 12.sp, color = ink)
+                Modifier.offset(x = (-26).dp, y = (height * (1 - fraction) - 6).dp), style = XType.Caption, color = ink)
         }
         val ticks = liveScatterPriceTicks(priceRange).fold(mutableListOf<Double>()) { kept, price ->
             val previous = kept.lastOrNull()
@@ -607,7 +607,7 @@ private fun ScatterCanvas(
         }
         ticks.forEach { price ->
             Text(formatTick(price), Modifier.offset(x = (width * logFraction(price, minPrice, maxPrice) - 10).dp, y = (height + 3).dp),
-                fontSize = 9.sp, lineHeight = 12.sp, color = ink)
+                style = XType.Caption, color = ink)
         }
         names.forEach { name ->
             Text(name.text, Modifier.offset(name.bounds.left.dp, name.bounds.top.dp).width(name.bounds.width.dp)

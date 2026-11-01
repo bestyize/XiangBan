@@ -52,7 +52,7 @@ fun CenterMessage(text: String, action: String? = null, onAction: (() -> Unit)? 
             XIcon(XIcons.File, size = 22.dp, tint = LocalExtraColors.current.ink3)
         }
         Text(text, Modifier.padding(top = 12.dp), color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontSize = 14.sp, lineHeight = 22.sp)
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center, style = XType.Secondary)
         if (action != null && onAction != null) OutlinedButton(onClick = onAction, Modifier.padding(top = 12.dp)) { Text(action) }
     }
 }

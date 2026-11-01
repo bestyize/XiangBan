@@ -31,9 +31,9 @@ private val ContentSpacing = Arrangement.spacedBy(8.dp)
 @Composable
 private fun ManifestSection(title: String, value: String?, collapsible: Boolean = false) {
     WhiteCard(padding = 14.dp) {
-        Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Text(title, style = XType.Body, fontWeight = FontWeight.SemiBold)
         if (collapsible && value != null) ExpandableDescription(value)
-        else SelectionContainer { Text(value ?: "发布者未提供此项说明", Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        else SelectionContainer { Text(value ?: "发布者未提供此项说明", Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 
@@ -61,12 +61,12 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
         WorkInteractionLayout(env, "pack", pack.id, open, { sharing = true }, enabled = pack.status == "published") { comments ->
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp), verticalArrangement = ContentSpacing) {
             WhiteCard(padding = 16.dp) {
-                Text(pack.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                pack.author?.let { author -> Text(author.nickname ?: "作者", Modifier.padding(top = 6.dp).clickable(enabled = open != null) { open?.invoke(Route.User(author.uid)) }, fontSize = 14.sp, color = LocalExtraColors.current.brandInk) }
+                Text(pack.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                pack.author?.let { author -> Text(author.nickname ?: "作者", Modifier.padding(top = 6.dp).clickable(enabled = open != null) { open?.invoke(Route.User(author.uid)) }, style = XType.Body, color = LocalExtraColors.current.brandInk) }
                 if (manualOnly) BlueTag("手动模板 · 不自动执行", Modifier.padding(top = 8.dp))
-                Text("${kindLabel(pack.kind)} · ${pack.trustLabel} · v${pack.version}", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                if (pack.status != "published") Text(contentWorkState(pack), Modifier.padding(top = 8.dp), color = Danger, fontSize = 13.sp)
-                if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp)
+                Text("${kindLabel(pack.kind)} · ${pack.trustLabel} · v${pack.version}", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                if (pack.status != "published") Text(contentWorkState(pack), Modifier.padding(top = 8.dp), color = Danger, style = XType.Secondary)
+                if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 10.dp), style = XType.Body)
             }
             if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
             ManifestSection("能做", manifestValue(manifest, "canDo", "can_do", "capabilities"))
@@ -98,15 +98,15 @@ fun SchemeDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rou
             WorkInteractionLayout(env, "scheme", scheme.id, open, { sharing = true }) { comments ->
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = ContentSpacing) {
                 item { WhiteCard(padding = 16.dp) {
-                    Text(scheme.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${scheme.author.nickname ?: "作者"} · ${scheme.createdAt.take(10)}", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                    if (scheme.summary.isNotBlank()) Text(scheme.summary, Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp)
+                    Text(scheme.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                    Text("${scheme.author.nickname ?: "作者"} · ${scheme.createdAt.take(10)}", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                    if (scheme.summary.isNotBlank()) Text(scheme.summary, Modifier.padding(top = 10.dp), style = XType.Body)
                 } }
                 item { NativeReportAction(env, "scheme", scheme.id, open) }
-                item { Text("包含的内容", Modifier.padding(4.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+                item { Text("包含的内容", Modifier.padding(4.dp), style = XType.Section, fontWeight = FontWeight.SemiBold) }
                 itemsIndexed(scheme.items, key = { index, item -> "$index-${item.packId}-${item.version}" }) { _, item -> WhiteCard(padding = 14.dp) {
-                    Text(if (item.available) item.title ?: item.slug else "内容不可用", fontSize = 15.sp, fontWeight = FontWeight.Medium)
-                    Text(if (item.available) "${kindLabel(item.kind)} · 方案版本 v${item.version}" else "此项已下架或当前不可访问", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    Text(if (item.available) item.title ?: item.slug else "内容不可用", style = XType.Body, fontWeight = FontWeight.Medium)
+                    Text(if (item.available) "${kindLabel(item.kind)} · 方案版本 v${item.version}" else "此项已下架或当前不可访问", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                     if (item.available) GhostPillButton("查看内容", { open(if (item.kind in CapabilityPackKinds) Route.Ability(item.packId) else Route.Pack(item.packId)) }, Modifier.padding(top = 8.dp))
                 } }
                 item { FootNote("方案是一份内容清单。手机不会应用桌面内容；在电脑上打开后，逐项检查版本、可用性和权限再确认。") }
@@ -128,8 +128,8 @@ internal fun NativeSchemesFeed(env: CommunityEnv, open: (Route) -> Unit) {
         if (result.items.isEmpty()) CenterMessage("这里还没有桌面方案", "刷新", loader::reload)
         else LazyColumn(Modifier.fillMaxSize(), contentPadding = FeedPadding, verticalArrangement = ContentSpacing) {
             items(result.items, key = { it.id }) { scheme -> WhiteCard(Modifier.clickable { open(Route.Scheme(scheme.id)) }, padding = 14.dp) {
-                Text(scheme.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Text("${scheme.items.size} 项内容 · ${scheme.author.nickname ?: "作者"}", Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                Text(scheme.title, style = XType.Section, fontWeight = FontWeight.SemiBold)
+                Text("${scheme.items.size} 项内容 · ${scheme.author.nickname ?: "作者"}", Modifier.padding(top = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
             } }
             item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GhostPillButton("上一页", { page-- }, Modifier.weight(1f), enabled = page > 1)
@@ -157,9 +157,9 @@ fun MyContentScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) 
                 else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = ContentSpacing) {
                     item { GhostPillButton("刷新作品状态", loader::reload, Modifier.fillMaxWidth()) }
                     items(result.items, key = { it.id }) { pack -> WhiteCard(padding = 14.dp) {
-                        Text(pack.title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                        Text("${kindLabel(pack.kind)} · v${pack.version} · ${contentWorkState(pack)}", Modifier.padding(top = 6.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
-                        Text("更新于 ${pack.updatedAt.take(10)}", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                        Text(pack.title, style = XType.Section, fontWeight = FontWeight.SemiBold)
+                        Text("${kindLabel(pack.kind)} · v${pack.version} · ${contentWorkState(pack)}", Modifier.padding(top = 6.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                        Text("更新于 ${pack.updatedAt.take(10)}", Modifier.padding(top = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             GhostPillButton("查看", { open(if (pack.kind in CapabilityPackKinds) Route.Ability(pack.id) else Route.Pack(pack.id)) }, Modifier.weight(1f))
                             if (pack.status != "removed") GhostPillButton("新版本", { open(Route.PublishPack(pack.id)) }, Modifier.weight(1f))
@@ -170,9 +170,9 @@ fun MyContentScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) 
             }
             OverlayTransition(removing != null, direction = "center") {
                 CenterDialog({ if (!busy) removing = null }) {
-                    Text("下架「${removing?.title.orEmpty()}」？", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Text("下架后不再出现在公开入口，已经应用过的内容不受影响。", Modifier.padding(top = 10.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
-                    error?.let { Text(it, Modifier.padding(top = 8.dp), color = Danger, fontSize = 13.sp) }
+                    Text("下架「${removing?.title.orEmpty()}」？", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                    Text("下架后不再出现在公开入口，已经应用过的内容不受影响。", Modifier.padding(top = 10.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                    error?.let { Text(it, Modifier.padding(top = 8.dp), color = Danger, style = XType.Secondary) }
                     Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         GhostPillButton("取消", { removing = null }, Modifier.weight(1f), enabled = !busy)
                         PillButton(if (busy) "处理中…" else "确认下架", {
@@ -234,20 +234,20 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
         }
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (packId == null) {
-                Text("资源类型", fontSize = 13.sp, color = LocalExtraColors.current.ink3)
-                if (localGameId != null) Text("游戏 · 本机作品", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Text("资源类型", style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                if (localGameId != null) Text("游戏 · 本机作品", style = XType.Body, fontWeight = FontWeight.Medium)
                 else PageChipRow(ContentPackLimits.keys.map { it to kindLabel(it) }, actualKind, { if (!busy) { kind = it; fileKey = "" } })
             } else {
                 when (val state = existingState) {
-                    Load.Loading -> Text("正在读取原作品…", fontSize = 14.sp)
+                    Load.Loading -> Text("正在读取原作品…", style = XType.Body)
                     is Load.Failed -> Banner(state.message, warn = true, actionText = "重试", onAction = existingLoader::reload)
-                    is Load.Ready -> Text(existing?.title ?: "作品不可用", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    is Load.Ready -> Text(existing?.title ?: "作品不可用", style = XType.Title, fontWeight = FontWeight.SemiBold)
                 }
-                if (existing != null && !versionReady) Text("只有作者可以发布新版本", color = Danger, fontSize = 14.sp)
+                if (existing != null && !versionReady) Text("只有作者可以发布新版本", color = Danger, style = XType.Body)
             }
             val platform = env.platform
             if (platform?.forumFilePickerSupported != true) {
-                Text("当前设备请在网页版发布内容包。", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+                Text("当前设备请在网页版发布内容包。", style = XType.Secondary, color = LocalExtraColors.current.ink3)
                 GhostPillButton("打开网页版", { platform?.openUrl("${env.config.forumBase.trimEnd('/')}/publish${packId?.let { "?pack=$it" }.orEmpty()}") }, enabled = platform != null)
             } else {
                 GhostPillButton(if (file == null) "选择内容包 .zip" else "更换内容包", {
@@ -261,8 +261,8 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
                         finally { busy = false }
                     }
                 }, Modifier.fillMaxWidth(), enabled = !busy && versionReady)
-                file?.let { Text("${it.name} · ${formatSize(it.bytes.size.toLong())}", fontSize = 13.sp) }
-                Text("${kindLabel(actualKind)}上限 ${formatSize(ContentPackLimits[actualKind] ?: 0)}，ZIP 根目录需包含 manifest.json；由服务器检查内容清单。", fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
+                file?.let { Text("${it.name} · ${formatSize(it.bytes.size.toLong())}", style = XType.Secondary) }
+                Text("${kindLabel(actualKind)}上限 ${formatSize(ContentPackLimits[actualKind] ?: 0)}，ZIP 根目录需包含 manifest.json；由服务器检查内容清单。", style = XType.Caption, color = LocalExtraColors.current.ink3)
             }
             if (packId == null) {
                 TextBox(title, { title = it }, placeholder = "标题（最多 60 字）", enabled = !busy)
@@ -271,12 +271,12 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
             } else AreaBox(changelog, { changelog = it }, placeholder = "新版本更新说明（最多 500 字）", minHeight = 120.dp, enabled = !busy)
             Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Checkbox(rights, { rights = it }, enabled = !busy)
-                Text("我确认这是我的原创或已获授权，并同意按社区规则发布。", fontSize = 13.sp, lineHeight = 20.sp)
+                Text("我确认这是我的原创或已获授权，并同意按社区规则发布。", style = XType.Secondary)
             }
-            if (fileKey.isNotEmpty()) Text("文件已上传，可继续校验与发布。", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-            Text("上传和导入不会执行内容。新版本会重新进入审核，实际状态以我的作品为准。", fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
-            error?.let { Text(it, color = Danger, fontSize = 14.sp) }
-            if (busy) Text(step.ifEmpty { "正在选择文件…" }, fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+            if (fileKey.isNotEmpty()) Text("文件已上传，可继续校验与发布。", style = XType.Caption, color = LocalExtraColors.current.ink3)
+            Text("上传和导入不会执行内容。新版本会重新进入审核，实际状态以我的作品为准。", style = XType.Caption, color = LocalExtraColors.current.ink3)
+            error?.let { Text(it, color = Danger, style = XType.Body) }
+            if (busy) Text(step.ifEmpty { "正在选择文件…" }, style = XType.Secondary, color = LocalExtraColors.current.ink3)
             PillButton(if (busy) "处理中…" else if (fileKey.isEmpty()) "上传并提交发布" else "继续校验并发布", {
                 if (busy) return@PillButton
                 val draft = ContentPublishDraft(actualKind, title, summary, tags.split(Regex("[,，、\\s]+")).filter { it.isNotBlank() }, rights, changelog)

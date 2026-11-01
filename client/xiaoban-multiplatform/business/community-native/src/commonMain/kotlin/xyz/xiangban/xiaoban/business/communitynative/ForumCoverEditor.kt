@@ -66,13 +66,13 @@ internal fun ForumCoverEditor(platform: PlatformActions, initial: ForumCoverSpec
                 }
                 CoverTemplates(platform, template) { template = it }
                 CoverChoices(listOf(true to "竖版 3:4", false to "方形 1:1"), portrait) { portrait = it }
-                Text("封面标题 · 可换行调整排版", fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                Text("封面标题 · 可换行调整排版", style = XType.Secondary, color = LocalExtraColors.current.ink3)
                 AreaBox(title, { title = it }, placeholder = "一句话，让人想点进来", minHeight = 80.dp, filled = true)
-                Text("${title.length} / 80", fontSize = 11.sp, color = if (title.length > 80) Danger else LocalExtraColors.current.ink3)
+                Text("${title.length} / 80", style = XType.Caption, color = if (title.length > 80) Danger else LocalExtraColors.current.ink3)
                 AreaBox(highlight, { highlight = it }, placeholder = "重点词（选填，最多 16 字）", minHeight = 48.dp, filled = true)
-                Text("留空时自动强调最后一行", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+                Text("留空时自动强调最后一行", style = XType.Caption, color = LocalExtraColors.current.ink3)
                 AreaBox(subtitle, { subtitle = it }, placeholder = "副标题（选填）", minHeight = 64.dp, filled = true)
-                Text("${subtitle.length} / 100", fontSize = 11.sp, color = if (subtitle.length > 100) Danger else LocalExtraColors.current.ink3)
+                Text("${subtitle.length} / 100", style = XType.Caption, color = if (subtitle.length > 100) Danger else LocalExtraColors.current.ink3)
                 error?.let { Banner(it, warn = true) }
             }
         }
@@ -87,8 +87,8 @@ internal fun ForumCoverEntry(cover: ForumCoverImage?, enabled: Boolean, onChoose
         if (cover != null) Image(cover.preview, "帖子封面", Modifier.size(60.dp, 80.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Fit)
         else XIcon(XIcons.Image, size = 24.dp, tint = LocalExtraColors.current.ink3)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(if (cover == null) "添加封面" else "更换封面", fontSize = 14.sp)
-            Text(if (cover == null) "相册 · 文字模板" else "将作为帖子首图展示", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            Text(if (cover == null) "添加封面" else "更换封面", style = XType.Body)
+            Text(if (cover == null) "相册 · 文字模板" else "将作为帖子首图展示", style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
         if (cover != null) IconTap(XIcons.Close, "移除封面", { if (enabled) onRemove() })
         else XIcon(XIcons.ChevronRight, size = 16.dp, tint = LocalExtraColors.current.ink3)
@@ -122,7 +122,7 @@ private fun CoverTemplates(platform: PlatformActions, selected: ForumCoverTempla
                         if (selected == template) Brand else LocalExtraColors.current.line, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
                     previews[template]?.let { Image(it, null, Modifier.fillMaxSize().padding(3.dp), contentScale = ContentScale.Fit) }
                 }
-                Text(template.label, fontSize = 11.sp, color = if (selected == template) Brand else LocalExtraColors.current.ink3)
+                Text(template.label, style = XType.Caption, color = if (selected == template) Brand else LocalExtraColors.current.ink3)
             }
         }
     }

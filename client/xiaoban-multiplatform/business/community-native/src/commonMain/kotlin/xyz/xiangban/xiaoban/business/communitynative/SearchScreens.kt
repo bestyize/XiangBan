@@ -136,11 +136,11 @@ fun SearchScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
             ) {
                 BasicTextField(
                     query, { query = it; if (it.isEmpty()) searched = false }, Modifier.weight(1f), singleLine = true,
-                    textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(Brand),
+                    textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(Brand),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { search(query) }),
                     decorationBox = { inner ->
                         Box(contentAlignment = Alignment.CenterStart) {
-                            if (query.isEmpty()) Text("搜索作品、项目、帖子", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+                            if (query.isEmpty()) Text("搜索作品、项目、帖子", style = XType.Secondary, color = LocalExtraColors.current.ink3)
                             inner()
                         }
                     },
@@ -148,7 +148,7 @@ fun SearchScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 if (query.isNotEmpty()) XIcon(XIcons.Close, tint = LocalExtraColors.current.ink3, size = 18.dp, description = "清空输入", modifier = Modifier.clip(RoundedCornerShape(9.dp)).clickable { query = ""; searched = false })
                 XIcon(XIcons.Search, size = 20.dp, description = "搜索", modifier = Modifier.clickable { search(query) })
             }
-            Text("取消", Modifier.clickable(onClick = back).padding(horizontal = 8.dp, vertical = 12.dp), fontSize = 15.sp)
+            Text("取消", Modifier.clickable(onClick = back).padding(horizontal = 8.dp, vertical = 12.dp), style = XType.Body)
         }
         when {
             busy -> Spinner()
@@ -158,32 +158,32 @@ fun SearchScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 if (history.isNotEmpty()) WhiteCard(padding = 14.dp) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         XIcon(XIcons.Clock, size = 18.dp)
-                        Text("搜索历史", Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                        Text("清空", Modifier.clip(RoundedCornerShape(8.dp)).clickable { env.prefs.put(HistoryKey, ""); history = emptyList() }.padding(horizontal = 6.dp, vertical = 4.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("搜索历史", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
+                        Text("清空", Modifier.clip(RoundedCornerShape(8.dp)).clickable { env.prefs.put(HistoryKey, ""); history = emptyList() }.padding(horizontal = 6.dp, vertical = 4.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     FlowRow(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         history.forEach { h ->
-                            Text(h, Modifier.height(32.dp).clip(RoundedCornerShape(16.dp)).background(LocalExtraColors.current.fill).clickable { search(h) }.padding(horizontal = 14.dp, vertical = 6.dp), fontSize = 14.sp, maxLines = 1)
+                            Text(h, Modifier.height(32.dp).clip(RoundedCornerShape(16.dp)).background(LocalExtraColors.current.fill).clickable { search(h) }.padding(horizontal = 14.dp, vertical = 6.dp), style = XType.Body, maxLines = 1)
                         }
                     }
                 }
                 if (words.isNotEmpty()) WhiteCard(padding = 0.dp) {
                     Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         XIcon(XIcons.Bolt, tint = Brand, size = 18.dp)
-                        Text("热门搜索", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("热门搜索", style = XType.Body, fontWeight = FontWeight.SemiBold)
                     }
                     words.forEachIndexed { i, w ->
                         if (i > 0) Hairline(Modifier.padding(start = 50.dp))
                         Row(Modifier.fillMaxWidth().clickable { search(w.text) }.padding(horizontal = 14.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             // 前三名是红色方块白字，其余灰字。
                             Box(Modifier.size(22.dp).clip(RoundedCornerShape(6.dp)).background(if (i < 3) Brand else Color.Transparent), contentAlignment = Alignment.Center) {
-                                Text("${i + 1}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = if (i < 3) Color.White else LocalExtraColors.current.ink3)
+                                Text("${i + 1}", style = XType.Secondary, fontWeight = FontWeight.Bold, color = if (i < 3) Color.White else LocalExtraColors.current.ink3)
                             }
-                            Text(w.text, Modifier.weight(1f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(w.text, Modifier.weight(1f), style = XType.Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             when (w.tag) {
                                 "" -> {}
                                 "新" -> BlueTag(w.tag)
-                                else -> Text(w.tag, Modifier.clip(RoundedCornerShape(6.dp)).background(LocalExtraColors.current.brandSoft).padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = LocalExtraColors.current.brandInk)
+                                else -> Text(w.tag, Modifier.clip(RoundedCornerShape(6.dp)).background(LocalExtraColors.current.brandSoft).padding(horizontal = 8.dp, vertical = 2.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = LocalExtraColors.current.brandInk)
                             }
                         }
                     }
@@ -198,8 +198,8 @@ fun SearchScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 val tab = ResultTab.valueOf(tabName)
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("“$shown”", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Brand)
-                        Text(" 共 ${packs.size + topics.size} 个结果", fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                        Text("“$shown”", style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Brand)
+                        Text(" 共 ${packs.size + topics.size} 个结果", style = XType.Secondary, color = LocalExtraColors.current.ink3)
                     }
                     PageChipRow(
                         ResultTab.entries.map { it.name to (if (it == ResultTab.All) it.label else "${it.label} ${if (it == ResultTab.Packs) packs.size else topics.size}") },
@@ -229,8 +229,8 @@ fun SearchScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
 private fun ResultHeader(title: String, count: Int, icon: ImageVector) {
     Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         XIcon(icon, size = 18.dp)
-        Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-        Text("$count", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        Text(title, style = XType.Body, fontWeight = FontWeight.SemiBold)
+        Text("$count", style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -240,12 +240,12 @@ private fun PackResult(pack: Pack, query: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Cover(pack.coverUrl, pack.id, Modifier.size(64.dp))
         Column(Modifier.weight(1f)) {
-            Text(highlight(pack.title, query, Brand), fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (pack.summary.isNotBlank()) Text(highlight(pack.summary, query, Brand), Modifier.padding(top = 2.dp), fontSize = 13.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(highlight(pack.title, query, Brand), style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (pack.summary.isNotBlank()) Text(highlight(pack.summary, query, Brand), Modifier.padding(top = 2.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GrayTag(kindLabel(pack.kind))
-                Text(pack.author?.nickname ?: "小伴官方", Modifier.weight(1f, fill = false), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (pack.applyCount > 0) Text("${pack.applyCount} 次应用", fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1)
+                Text(pack.author?.nickname ?: "小伴官方", Modifier.weight(1f, fill = false), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (pack.applyCount > 0) Text("${pack.applyCount} 次应用", style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1)
             }
         }
     }
@@ -257,12 +257,12 @@ private fun TopicResult(env: CommunityEnv, topic: Topic, query: String, onClick:
     val thumb = topic.images.firstOrNull()?.let { env.forum.imageUrl(it) }
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f)) {
-            Text(highlight(topic.cardTitle, query, Brand), fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (topic.excerpt.isNotBlank()) Text(highlight(topic.excerpt, query, Brand), Modifier.padding(top = 2.dp), fontSize = 13.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(highlight(topic.cardTitle, query, Brand), style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (topic.excerpt.isNotBlank()) Text(highlight(topic.excerpt, query, Brand), Modifier.padding(top = 2.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GrayTag(topic.category.name)
-                Text(topic.author.nickname, Modifier.weight(1f, fill = false), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(agoText(topic.createdAt), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1)
+                Text(topic.author.nickname, Modifier.weight(1f, fill = false), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(agoText(topic.createdAt), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1)
                 Stat(XIcons.Message, compactCount(topic.replyCount))
             }
         }

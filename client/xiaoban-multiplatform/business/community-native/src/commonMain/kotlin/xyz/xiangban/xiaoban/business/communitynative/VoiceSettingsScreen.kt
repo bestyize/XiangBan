@@ -61,18 +61,18 @@ fun VoiceSettingsScreen(env: CommunityEnv, back: () -> Unit) {
                     val ready = modelRefresh >= 0 && models.ready
                     Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(Modifier.weight(1f)) {
-                            Text("本地语音识别", fontSize = 15.sp)
-                            Text(if (ready) "SenseVoice · 在手机上识别你说的话，不上传录音" else "SenseVoice · 约 242MB，下好后手机上就能识别", Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("本地语音识别", style = XType.Body)
+                            Text(if (ready) "SenseVoice · 在手机上识别你说的话，不上传录音" else "SenseVoice · 约 242MB，下好后手机上就能识别", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (ready) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 XIcon(XIcons.Check, tint = Success, size = 16.dp)
-                                Text("已就绪", fontSize = 12.sp, color = Success)
+                                Text("已就绪", style = XType.Caption, color = Success)
                             }
                         } else {
                             Text(
                                 "下载", Modifier.height(34.dp).clip(CircleShape).background(LocalExtraColors.current.brandSoft).clickable { sheet = "model" }.padding(horizontal = 16.dp, vertical = 7.dp),
-                                color = LocalExtraColors.current.brandInk, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                                color = LocalExtraColors.current.brandInk, style = XType.Body, fontWeight = FontWeight.SemiBold,
                             )
                         }
                     }
@@ -93,7 +93,7 @@ fun VoiceSettingsScreen(env: CommunityEnv, back: () -> Unit) {
                         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically,
                     ) {
                         XIcon(if (reader.speaking) XIcons.Stop else XIcons.Volume, tint = Brand, size = 18.dp)
-                        Text(if (reader.speaking) "停止" else "试听", color = Brand, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text(if (reader.speaking) "停止" else "试听", color = Brand, style = XType.Body, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -106,8 +106,8 @@ fun VoiceSettingsScreen(env: CommunityEnv, back: () -> Unit) {
             OptionSheet("语音来源", { sheet = "" }, panel) {
                 SpeechSource.entries.forEach { source ->
                     OptionRow(source == s.source, { SpeechState.update { it.copy(source = source) }; sheet = "" }) {
-                        Text(source.label + if (source == SpeechSource.Edge) "（默认）" else "（离线）", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = if (source == s.source) Brand else MaterialTheme.colorScheme.onSurface)
-                        Text(source.desc, Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(source.label + if (source == SpeechSource.Edge) "（默认）" else "（离线）", style = XType.Body, fontWeight = FontWeight.SemiBold, color = if (source == s.source) Brand else MaterialTheme.colorScheme.onSurface)
+                        Text(source.desc, Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -123,8 +123,8 @@ fun VoiceSettingsScreen(env: CommunityEnv, back: () -> Unit) {
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             RadioMark(on)
-                            Text(voice.name, fontSize = 15.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, color = if (on) Brand else MaterialTheme.colorScheme.onSurface)
-                            Text(voice.gender, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(voice.name, style = XType.Body, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, color = if (on) Brand else MaterialTheme.colorScheme.onSurface)
+                            Text(voice.gender, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconTap(XIcons.Volume, "试听${voice.name}", { reader.speak(SampleText, voice.id) }, size = 20.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
@@ -144,8 +144,8 @@ private fun SwitchRow(title: String, desc: String, checked: Boolean, onChange: (
         Hairline(Modifier.padding(start = 16.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Column(Modifier.weight(1f)) {
-                Text(title, fontSize = 15.sp)
-                Text(desc, Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = XType.Body)
+                Text(desc, Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Toggle(checked, onChange)
         }
@@ -158,8 +158,8 @@ private fun RateRow(step: Int, onChange: (Int) -> Unit) {
     val extra = LocalExtraColors.current
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("语速", Modifier.weight(1f), fontSize = 15.sp)
-            Text(SpeechRates.Names[step], fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("语速", Modifier.weight(1f), style = XType.Body)
+            Text(SpeechRates.Names[step], style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Box(Modifier.padding(top = 10.dp).fillMaxWidth().height(28.dp), contentAlignment = Alignment.CenterStart) {
             Box(Modifier.padding(horizontal = 12.dp).fillMaxWidth().height(4.dp).clip(CircleShape).background(extra.fill)) {
@@ -175,8 +175,8 @@ private fun RateRow(step: Int, onChange: (Int) -> Unit) {
             }
         }
         Row(Modifier.padding(top = 4.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("慢", fontSize = 12.sp, color = extra.ink3)
-            Text("快", fontSize = 12.sp, color = extra.ink3)
+            Text("慢", style = XType.Caption, color = extra.ink3)
+            Text("快", style = XType.Caption, color = extra.ink3)
         }
     }
 }
@@ -185,11 +185,11 @@ private fun RateRow(step: Int, onChange: (Int) -> Unit) {
 @Composable
 private fun OptionSheet(title: String, onDismiss: () -> Unit, panel: Modifier, options: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
     BottomSheet(onDismiss, panel, flush = true) {
-        Text(title, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Text(title, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp), style = XType.Title, fontWeight = FontWeight.SemiBold)
         options()
         Box(Modifier.fillMaxWidth().height(8.dp).background(MaterialTheme.colorScheme.background))
         Box(Modifier.fillMaxWidth().height(52.dp).clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
-            Text("取消", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text("取消", style = XType.Body, fontWeight = FontWeight.SemiBold)
         }
     }
 }

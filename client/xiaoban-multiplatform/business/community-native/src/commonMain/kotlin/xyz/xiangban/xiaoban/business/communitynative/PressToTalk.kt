@@ -80,7 +80,7 @@ fun PressBar(voice: VoiceInputController, enabled: Boolean, idleText: String = "
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically,
     ) {
         XIcon(icon, tint = fg, size = 20.dp)
-        Text(label, color = fg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(label, color = fg, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -94,7 +94,7 @@ fun PressOverlay(voice: VoiceInputController, modifier: Modifier = Modifier) {
     val left = Ptt.secondsLeft(voice.elapsedMs)
     Box(modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f))) {
         Column(Modifier.align(Alignment.Center).padding(bottom = 96.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(Ptt.clock(voice.elapsedMs), color = Color.White, fontSize = 16.sp, fontFamily = FontFamily.Monospace)
+            Text(Ptt.clock(voice.elapsedMs), color = Color.White, style = XType.Section, fontFamily = FontFamily.Monospace)
             Box(
                 Modifier.width(176.dp).height(76.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surface),
                 contentAlignment = Alignment.Center,
@@ -102,10 +102,10 @@ fun PressOverlay(voice: VoiceInputController, modifier: Modifier = Modifier) {
                 when {
                     action == PttAction.Cancel -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         XIcon(XIcons.Close, size = 18.dp)
-                        Text("取消发送", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("取消发送", style = XType.Body, fontWeight = FontWeight.SemiBold)
                     }
                     left != null -> Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text("还能说 $left 秒", color = Danger, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text("还能说 $left 秒", color = Danger, style = XType.Body, fontWeight = FontWeight.SemiBold)
                         Waveform(if (action == PttAction.Send) Brand else LocalExtraColors.current.ink3)
                     }
                     else -> Waveform(if (action == PttAction.Send) Brand else LocalExtraColors.current.ink3)
@@ -113,7 +113,7 @@ fun PressOverlay(voice: VoiceInputController, modifier: Modifier = Modifier) {
             }
             Text(
                 when (action) { PttAction.Send -> "松开发送，上滑取消"; PttAction.Cancel -> "松开手指，取消发送"; PttAction.Text -> "松开，转成文字放进输入框" },
-                color = Color.White.copy(alpha = 0.8f), fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.8f), style = XType.Body,
             )
         }
         Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = 40.dp, end = 40.dp, bottom = 160.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
@@ -130,7 +130,7 @@ private fun PressTarget(icon: androidx.compose.ui.graphics.vector.ImageVector, l
             Modifier.size(if (active) 76.dp else 60.dp).clip(CircleShape).background(if (active) MaterialTheme.colorScheme.surface else Color.White.copy(alpha = 0.25f)),
             contentAlignment = Alignment.Center,
         ) { XIcon(icon, tint = if (active) MaterialTheme.colorScheme.onSurface else Color.White, size = 24.dp) }
-        Text(label, color = Color.White, fontSize = 12.sp)
+        Text(label, color = Color.White, style = XType.Caption)
     }
 }
 
@@ -152,10 +152,10 @@ private fun Waveform(color: Color) {
 fun MicPermissionLayer(env: CommunityEnv, voice: VoiceInputController, onNotice: (String) -> Unit) {
     OverlayTransition(voice.micDenied) { panel ->
         BottomSheet({ voice.micDenied = false }, panel) {
-            Text("需要使用麦克风", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text("需要使用麦克风", style = XType.Title, fontWeight = FontWeight.SemiBold)
             Text(
                 "按住说话要用麦克风。声音只用来识别，不会保存录音。你可以在系统设置里打开。",
-                Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 GhostPillButton("以后再说", { voice.micDenied = false }, Modifier.weight(1f))
@@ -179,8 +179,8 @@ fun PressTip(env: CommunityEnv, visible: Boolean, modifier: Modifier = Modifier)
     ) {
         Box(Modifier.size(32.dp).clip(CircleShape).background(LocalExtraColors.current.brandSoft), contentAlignment = Alignment.Center) { XIcon(XIcons.Mic, tint = LocalExtraColors.current.brandInk, size = 18.dp) }
         Column(Modifier.weight(1f)) {
-            Text("按住说话，松开发送", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Text("上滑取消，滑到右边转成文字再改。", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("按住说话，松开发送", style = XType.Body, fontWeight = FontWeight.SemiBold)
+            Text("上滑取消，滑到右边转成文字再改。", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         IconTap(XIcons.Close, "知道了", { seen = true; env.prefs.put(TipKey, "1") }, size = 18.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }

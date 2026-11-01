@@ -161,7 +161,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                         listOf(false to "发现", true to "我的作品").forEach { (value, label) ->
                             Column(Modifier.semantics { selected = mine == value }.clickable(role = Role.Tab) { mine = value; category = "全部" }.padding(vertical = 7.dp)) {
-                                Text(label, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = if (mine == value) FontWeight.SemiBold else FontWeight.Normal, color = if (mine == value) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(label, style = XType.Title, fontWeight = if (mine == value) FontWeight.SemiBold else FontWeight.Normal, color = if (mine == value) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                                 Box(Modifier.padding(top = 8.dp).width(20.dp).height(3.dp).background(if (mine == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background, CircleShape))
                             }
                         }
@@ -173,17 +173,17 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                 Row(Modifier.fillMaxWidth().outlinedCard(17.dp).clickable { prepare() }.padding(15.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                     XIcon(XIcons.Sparkle, tint = MaterialTheme.colorScheme.primary, size = 27.dp)
                     Column(Modifier.weight(1f)) {
-                        Text("你想创造什么？", fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold)
-                        Text("一个游戏，一片风景，一位小伙伴…", Modifier.padding(top = 5.dp), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("你想创造什么？", style = XType.Body, fontWeight = FontWeight.SemiBold)
+                        Text("一个游戏，一片风景，一位小伙伴…", Modifier.padding(top = 5.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     XIcon(XIcons.ArrowRight, tint = MaterialTheme.colorScheme.primary, size = 18.dp)
                 }
             } else item {
-                Text("本机作品 · 电脑创作的装扮保存在对应电脑", fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("本机作品 · 电脑创作的装扮保存在对应电脑", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             item { CreationChips(CreationTypes, category) { category = it } }
             if (errors.isNotEmpty()) item {
-                Text(errors.joinToString("\n"), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.error)
+                Text(errors.joinToString("\n"), style = XType.Caption, color = MaterialTheme.colorScheme.error)
                 LinkText("重新读取", { reload++ })
             }
             if (loading && visible.isEmpty()) item { Box(Modifier.fillMaxWidth().height(120.dp)) { Spinner() } }
@@ -197,9 +197,9 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                     Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable(role = Role.Button) { detail = entry; panel = "actions" }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(68.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(entry.name, fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${entry.kind} · ${entry.device}", Modifier.padding(top = 6.dp), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("保存在这台手机上", Modifier.padding(top = 6.dp), fontSize = 10.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(entry.name, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text("${entry.kind} · ${entry.device}", Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("保存在这台手机上", Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         XIcon(XIcons.More, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
                     }
@@ -215,11 +215,11 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                                 row.forEach { entry ->
                                     Column(Modifier.weight(1f).clip(RoundedCornerShape(15.dp)).clickable(role = Role.Button) { detail = entry; panel = "actions" }.semantics { contentDescription = "${entry.name}，打开作品操作" }) {
                                         CreationCover(entry, covers[entry.key], imageLoader, Modifier.fillMaxWidth().aspectRatio(1.12f))
-                                        Text(entry.name, Modifier.padding(top = 9.dp), fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(entry.name, Modifier.padding(top = 9.dp), style = XType.Secondary, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Text(entry.kind, Modifier.weight(1f), fontSize = 10.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(entry.kind, Modifier.weight(1f), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                             XIcon(if (entry.game != null) XIcons.Phone else XIcons.Monitor, size = 11.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text(entry.device, Modifier.padding(start = 3.dp), fontSize = 10.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(entry.device, Modifier.padding(start = 3.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
                                 }
@@ -236,12 +236,12 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                     if (panel in listOf("actions", "preview")) Row(Modifier.padding(bottom = 21.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(52.dp), cornerRadius = 11)
                         Column(Modifier.weight(1f)) {
-                            Text(entry.name, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            Text("${entry.kind} · ${if (entry.owned) "我的作品" else if (entry.game != null) "小伴官方" else "创作灵感"}", Modifier.padding(top = 5.dp), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(entry.name, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text("${entry.kind} · ${if (entry.owned) "我的作品" else if (entry.game != null) "小伴官方" else "创作灵感"}", Modifier.padding(top = 5.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconTap(XIcons.Close, "关闭作品操作", { close() }, Modifier.align(Alignment.Top), tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 17.dp)
                     } else Row(Modifier.padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(when (panel) { "delete" -> "删除「${entry.name}」？"; "share" -> "分享到其他渠道"; else -> "发送到电脑" }, Modifier.weight(1f), fontSize = 19.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold)
+                        Text(when (panel) { "delete" -> "删除「${entry.name}」？"; "share" -> "分享到其他渠道"; else -> "发送到电脑" }, Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
                         IconTap(XIcons.Close, "关闭作品操作", { close() }, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 17.dp)
                     }
                     when (panel) {
@@ -276,7 +276,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                             }
                         }
                         "delete" -> {
-                            Text("将删除这台手机上的作品文件、游戏进度和运行记录，无法撤销。已导出、分享或发布到社区的副本不受影响。", Modifier.padding(top = 2.dp, bottom = 18.dp), fontSize = 12.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("将删除这台手机上的作品文件、游戏进度和运行记录，无法撤销。已导出、分享或发布到社区的副本不受影响。", Modifier.padding(top = 2.dp, bottom = 18.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (entry.owned) CreationActionGroup {
                                 CreationAction(XIcons.Trash, if (busy) "正在删除…" else "确认删除", enabled = !busy && !cloud.sending, destructive = true) {
                                     runAction {
@@ -295,13 +295,13 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                         }
                         "preview" -> {
                             CreationCover(entry, covers[entry.key], imageLoader, Modifier.fillMaxWidth().height(220.dp))
-                            Text(entry.description, Modifier.padding(vertical = 16.dp), fontSize = 13.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("这是创作参考图。动画与互动效果需要在电脑上制作并预览。", fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(entry.description, Modifier.padding(vertical = 16.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("这是创作参考图。动画与互动效果需要在电脑上制作并预览。", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(14.dp))
                             CreationActionGroup { CreationAction(XIcons.Sparkle, "做一个我的版本", enabled = !busy) { prepare(entry) } }
                         }
                         "computer" -> {
-                            Text(if (entry.owned) "将作品包通过系统分享发送给电脑，或保存后自行传输。在电脑的小伴中导入即可使用；不会自动覆盖已有作品。" else "这款官方游戏已内置于小伴桌面。可打开电脑对话，让小伴找到它。", fontSize = 13.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if (entry.owned) "将作品包通过系统分享发送给电脑，或保存后自行传输。在电脑的小伴中导入即可使用；不会自动覆盖已有作品。" else "这款官方游戏已内置于小伴桌面。可打开电脑对话，让小伴找到它。", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(16.dp))
                             CreationActionGroup {
                                 if (entry.owned) {
@@ -311,7 +311,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                             }
                         }
                         "share" -> {
-                            Text("选择分享形式，再选择接收应用", fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("选择分享形式，再选择接收应用", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Spacer(Modifier.height(14.dp))
                             CreationActionGroup {
                                 CreationAction(XIcons.Image, "分享作品卡片", "图片", !busy) { runAction { if (env.platform?.shareCreationPreview(entry.name, entry.description, covers[entry.key]) != true) message = "当前平台不支持分享图片" } }
@@ -320,35 +320,35 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                             }
                         }
                     }
-                    if (busy && panel != "delete") Text("正在准备作品…", Modifier.padding(top = 12.dp), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(if (panel in listOf("actions", "delete")) "取消" else "返回", Modifier.fillMaxWidth().clickable(enabled = !busy) { if (panel == "actions") close() else panel = "actions" }.padding(top = 24.dp, bottom = 13.dp), fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                    if (busy && panel != "delete") Text("正在准备作品…", Modifier.padding(top = 12.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (panel in listOf("actions", "delete")) "取消" else "返回", Modifier.fillMaxWidth().clickable(enabled = !busy) { if (panel == "actions") close() else panel = "actions" }.padding(top = 24.dp, bottom = 13.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 }
             }
         }
         if (creating) CreationSheet({ close() }, panelModifier = Modifier.imePadding()) {
             Column(Modifier.fillMaxWidth().heightIn(max = 550.dp).verticalScroll(rememberScrollState())) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("让想法开始发生", Modifier.weight(1f), fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold)
+                    Text("让想法开始发生", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
                     IconTap(XIcons.Close, "关闭创作", { close() }, size = 18.dp)
                 }
-                Text("告诉小伴你想做什么，一起把它变成作品。", Modifier.padding(top = 8.dp, bottom = 16.dp), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("告诉小伴你想做什么，一起把它变成作品。", Modifier.padding(top = 8.dp, bottom = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 CreationChips(CreationTypes.drop(1), createKind) { createKind = it }
                 Box(Modifier.padding(vertical = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.background).padding(14.dp)) {
-                    if (idea.isEmpty()) Text(if (createKind == "游戏") "例如：做一个小猫跳跃收集星星的游戏" else "描述你想要的${createKind}，小伴会在电脑上制作", fontSize = 13.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().heightIn(min = 110.dp).semantics { contentDescription = "创作想法" }, textStyle = TextStyle(color = MaterialTheme.colorScheme.onSurface, fontSize = 13.sp, lineHeight = 22.sp), cursorBrush = Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)))
+                    if (idea.isEmpty()) Text(if (createKind == "游戏") "例如：做一个小猫跳跃收集星星的游戏" else "描述你想要的${createKind}，小伴会在电脑上制作", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    BasicTextField(idea, { idea = it.take(2000) }, Modifier.fillMaxWidth().heightIn(min = 110.dp).semantics { contentDescription = "创作想法" }, textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = Brush.verticalGradient(listOf(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primary)))
                 }
                 val hints = if (createKind == "游戏") listOf("星星跳跃游戏", "像素小冒险", "治愈系消除") else DesktopIdeas.filter { it.kind == createKind }.map { it.description }
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    hints.forEach { hint -> Text(hint.take(14), Modifier.clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { idea = hint }.padding(9.dp), fontSize = 11.sp) }
+                    hints.forEach { hint -> Text(hint.take(14), Modifier.clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { idea = hint }.padding(9.dp), style = XType.Caption) }
                 }
-                Text(if (createKind == "游戏") "在手机上制作，进入对话后先确认方案。" else "选择已连接电脑后进入对话，作品保存在电脑上。", Modifier.padding(vertical = 16.dp), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (createKind == "游戏") "在手机上制作，进入对话后先确认方案。" else "选择已连接电脑后进入对话，作品保存在电脑上。", Modifier.padding(vertical = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 PillButton(if (createKind == "游戏") "和小伴一起创作" else "选择电脑继续创作", { startCreation() }, Modifier.fillMaxWidth(), enabled = idea.isNotBlank())
             }
         }
         remotePrompt?.let { prompt ->
             CreationSheet({ close() }) {
-                Text("选择电脑", fontSize = 20.sp, lineHeight = 25.sp, fontWeight = FontWeight.SemiBold)
-                Text("将想法带入电脑对话，由你确认发送。", Modifier.padding(vertical = 12.dp), fontSize = 12.sp, lineHeight = 17.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("选择电脑", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                Text("将想法带入电脑对话，由你确认发送。", Modifier.padding(vertical = 12.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Column(Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
                     remote.peers.forEach { peer ->
                         CreationAction(XIcons.Monitor, peer.name, if (peer.online) "在线" else "离线", enabled = peer.online && !remote.sending) {
@@ -359,8 +359,8 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                         }
                     }
                 }
-                if (remote.peers.isEmpty()) Text("还没有连接的电脑，请在电脑上登录同一小伴账号并开启手机遥控。", fontSize = 13.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (remote.sending) Text("电脑正在执行任务，请结束当前任务后再创建。", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                if (remote.peers.isEmpty()) Text("还没有连接的电脑，请在电脑上登录同一小伴账号并开启手机遥控。", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (remote.sending) Text("电脑正在执行任务，请结束当前任务后再创建。", color = MaterialTheme.colorScheme.onSurfaceVariant, style = XType.Caption)
                 Spacer(Modifier.height(12.dp))
                 GhostPillButton("管理我的电脑", { close(); open(Route.Devices) }, Modifier.fillMaxWidth())
             }
@@ -372,8 +372,8 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
 @Composable
 private fun CreationSection(title: String, trailing: String, action: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, Modifier.weight(1f), fontSize = 15.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
-        Text(trailing, Modifier.then(if (action != null) Modifier.clickable { action() }.padding(6.dp) else Modifier), fontSize = 11.sp, lineHeight = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(title, Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
+        Text(trailing, Modifier.then(if (action != null) Modifier.clickable { action() }.padding(6.dp) else Modifier), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -382,7 +382,7 @@ private fun CreationChips(values: List<String>, value: String, select: (String) 
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         values.forEach { item ->
             val active = value == item
-            Text(item, Modifier.clip(RoundedCornerShape(6.dp)).background(if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.background).semantics { selected = active }.clickable(role = Role.Button) { select(item) }.padding(horizontal = 9.dp, vertical = 5.dp), fontSize = 11.sp, lineHeight = 16.sp, color = if (active) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(item, Modifier.clip(RoundedCornerShape(6.dp)).background(if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.background).semantics { selected = active }.clickable(role = Role.Button) { select(item) }.padding(horizontal = 9.dp, vertical = 5.dp), style = XType.Caption, color = if (active) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -424,8 +424,8 @@ private fun CreationAction(icon: ImageVector, title: String, trailing: String = 
     val line = MaterialTheme.colorScheme.outlineVariant
     Row(Modifier.fillMaxWidth().drawBehind { if (divider) drawLine(line, Offset.Zero, Offset(size.width, 0f), 1.dp.toPx()) }.heightIn(min = 51.dp).clickable(enabled = enabled, role = Role.Button, onClick = action).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         XIcon(icon, size = 18.dp, tint = (if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant).copy(alpha = if (enabled) 1f else .45f))
-        Text(title, Modifier.weight(1f), fontSize = 13.sp, lineHeight = 18.sp, color = (if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface).copy(alpha = if (enabled) 1f else .45f))
-        if (trailing.isNotEmpty()) Text(trailing, fontSize = 10.sp, lineHeight = 15.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(title, Modifier.weight(1f), style = XType.Secondary, color = (if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface).copy(alpha = if (enabled) 1f else .45f))
+        if (trailing.isNotEmpty()) Text(trailing, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (arrow) XIcon(XIcons.ArrowRight, size = 18.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

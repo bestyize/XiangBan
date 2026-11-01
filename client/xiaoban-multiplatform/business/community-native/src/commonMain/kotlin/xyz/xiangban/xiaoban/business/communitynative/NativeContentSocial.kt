@@ -46,9 +46,9 @@ internal fun ContentSocialActions(env: CommunityEnv, kind: String, id: Long, ope
                 Box(Modifier.padding(top = 14.dp)) { NativeReportAction(env, kind, id, open) }
             }
             is Load.Failed -> Banner(if (current.notFound) "内容已不可用，无法收藏或举报" else current.message, warn = true, actionText = "重试", onAction = loader::reload)
-            else -> Text("正在读取收藏状态…", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            else -> Text("正在读取收藏状态…", style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
-        error?.let { Text(it, color = Danger, fontSize = 13.sp) }
+        error?.let { Text(it, color = Danger, style = XType.Secondary) }
     }
 }
 
@@ -68,8 +68,8 @@ internal fun ContentBookmarkFeed(env: CommunityEnv, kind: String, open: (Route) 
         else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { GhostPillButton("刷新收藏", loader::reload, Modifier.fillMaxWidth()) }
             items(result.items, key = { "${it.kind}-${it.id}" }) { entry -> WhiteCard(padding = 14.dp) {
-                Text(entry.content.title, Modifier.fillMaxWidth().clickable { open(contentCardRoute(entry.kind, entry.content)) }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                if (entry.kind == "pack") entry.content.version?.let { Text("版本 v$it", fontSize = 12.sp, color = LocalExtraColors.current.ink3) }
+                Text(entry.content.title, Modifier.fillMaxWidth().clickable { open(contentCardRoute(entry.kind, entry.content)) }, style = XType.Section, fontWeight = FontWeight.SemiBold)
+                if (entry.kind == "pack") entry.content.version?.let { Text("版本 v$it", style = XType.Caption, color = LocalExtraColors.current.ink3) }
                 if (entry.content.kind == "game") GameTrialButton(env, entry.id, open = open, modifier = Modifier.padding(top = 8.dp))
                 GhostPillButton("取消收藏", {
                     if (busy) return@GhostPillButton
@@ -81,7 +81,7 @@ internal fun ContentBookmarkFeed(env: CommunityEnv, kind: String, open: (Route) 
             } }
             item { Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GhostPillButton("上一页", { page-- }, Modifier.weight(1f), enabled = page > 1)
-                Text("第 $page 页", Modifier.padding(top = 10.dp), fontSize = 12.sp)
+                Text("第 $page 页", Modifier.padding(top = 10.dp), style = XType.Caption)
                 GhostPillButton("下一页", { page++ }, Modifier.weight(1f), enabled = result.hasMore)
             } }
         }

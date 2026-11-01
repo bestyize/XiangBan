@@ -62,8 +62,8 @@ internal fun WorkInteractionLayout(
                             val topic = current.value.topicId
                             if (topic != null) CommentsSection(env, topic, revision, hint = "", open = open)
                             else Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                                Text("评论 0", fontSize = 16.sp)
-                                Text("还没有评论，聊聊你的体验吧", Modifier.padding(top = 12.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                                Text("评论 0", style = XType.Section)
+                                Text("还没有评论，聊聊你的体验吧", Modifier.padding(top = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
                             }
                         }
                         is Load.Failed -> Banner(current.message, Modifier.padding(12.dp), warn = true, actionText = "重试", onAction = loader::reload)
@@ -86,7 +86,7 @@ internal fun WorkInteractionLayout(
                         !session.loggedIn -> "登录后评论"
                         !discussion.canReply -> "暂不能评论"
                         else -> "写评论…"
-                    }, fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                    }, style = XType.Secondary, color = LocalExtraColors.current.ink3)
                 }
                 Row(Modifier.clip(CircleShape).clickable(enabled = discussion != null && !busy) { act {
                     val current = env.contentSocial.discussion(kind, id, create = true)
@@ -95,7 +95,7 @@ internal fun WorkInteractionLayout(
                     loader.reload()
                 } }.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     XIcon(XIcons.Heart, tint = if (discussion?.liked == true) Brand else MaterialTheme.colorScheme.onSurface, description = if (discussion?.liked == true) "取消点赞" else "点赞")
-                    Text(discussion?.likeCount?.toString() ?: "—", fontSize = 13.sp)
+                    Text(discussion?.likeCount?.toString() ?: "—", style = XType.Secondary)
                 }
                 IconTap(XIcons.Bookmark, if (bookmarked == true) "取消收藏" else "收藏", { act {
                     val current = bookmarked ?: env.contentSocial.state(kind, id).bookmarked
@@ -104,7 +104,7 @@ internal fun WorkInteractionLayout(
                 } }, tint = if (bookmarked == true) Brand else MaterialTheme.colorScheme.onSurface)
                 IconTap(XIcons.Share, "分享作品", onShare)
             }
-            if (bookmarkError) Text("收藏状态读取失败，点击收藏可重试", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            if (bookmarkError) Text("收藏状态读取失败，点击收藏可重试", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
         OverlayTransition(replyTopic != null) { panel ->
             replyTopic?.let { topic -> NativeReplyComposer(env, topic, { replyTopic = null }, {
@@ -135,8 +135,8 @@ internal fun PostLikeAction(env: CommunityEnv, post: Post, open: ((Route) -> Uni
             }
         }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             XIcon(XIcons.Heart, tint = if (liked) Brand else LocalExtraColors.current.ink3, size = 14.dp, description = if (liked) "取消评论点赞" else "点赞评论")
-            Text(if (count > 0) "$count" else "赞", fontSize = 12.sp, color = if (liked) Brand else LocalExtraColors.current.ink3)
+            Text(if (count > 0) "$count" else "赞", style = XType.Caption, color = if (liked) Brand else LocalExtraColors.current.ink3)
         }
-        error?.let { Text(it, fontSize = 11.sp, color = Danger) }
+        error?.let { Text(it, style = XType.Caption, color = Danger) }
     }
 }

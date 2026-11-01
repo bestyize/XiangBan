@@ -166,45 +166,45 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                         .padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         XIcon(XIcons.Hash, size = 16.dp, tint = if (chosen != null) Brand else LocalExtraColors.current.ink3)
-                        Text(chosen?.name ?: "选择发布版块", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(chosen?.name ?: "选择发布版块", style = XType.Secondary, fontWeight = FontWeight.Medium)
                         XIcon(XIcons.ChevronDown, size = 14.dp, tint = LocalExtraColors.current.ink3)
                     }
                     if (env.platform?.forumCoverSupported == true) ForumCoverEntry(cover, !busy && !uploading,
                         onChoose = { focus.clearFocus(); choosingCover = true }, onRemove = { cover = null; coverSpec = null })
                     BasicTextField(title, { title = it }, Modifier.fillMaxWidth().padding(vertical = 8.dp), enabled = !busy,
-                        textStyle = TextStyle(fontSize = 22.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface),
+                        textStyle = XType.Headline.copy(fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface),
                         cursorBrush = SolidColor(Brand), decorationBox = { inner ->
-                            Box { if (title.isEmpty()) Text(if (isCasual) "添加标题（可选）" else "添加标题", fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = LocalExtraColors.current.ink3); inner() }
+                            Box { if (title.isEmpty()) Text(if (isCasual) "添加标题（可选）" else "添加标题", style = XType.Headline, fontWeight = FontWeight.SemiBold, color = LocalExtraColors.current.ink3); inner() }
                         })
-                    if (titleLength > 70) Text("$titleLength / 80", Modifier.align(Alignment.End), fontSize = 11.sp, color = if (titleLength > 80) Danger else LocalExtraColors.current.ink3)
+                    if (titleLength > 70) Text("$titleLength / 80", Modifier.align(Alignment.End), style = XType.Caption, color = if (titleLength > 80) Danger else LocalExtraColors.current.ink3)
                     Hairline(Modifier.padding(top = 12.dp, bottom = 20.dp))
                     BasicTextField(body, { body = it }, Modifier.fillMaxWidth().heightIn(min = 240.dp), enabled = !busy,
-                        textStyle = TextStyle(fontSize = 16.sp, lineHeight = 27.sp, color = MaterialTheme.colorScheme.onSurface),
+                        textStyle = XType.Section.copy(color = MaterialTheme.colorScheme.onSurface),
                         cursorBrush = SolidColor(Brand), decorationBox = { inner ->
-                            Box { if (body.isEmpty()) Text(if (isHelp) "描述你遇到的问题，以及已经尝试的方法…" else "分享你的想法、经验或新发现…", fontSize = 16.sp, lineHeight = 27.sp, color = LocalExtraColors.current.ink3); inner() }
+                            Box { if (body.isEmpty()) Text(if (isHelp) "描述你遇到的问题，以及已经尝试的方法…" else "分享你的想法、经验或新发现…", style = XType.Section, color = LocalExtraColors.current.ink3); inner() }
                         })
                     if (pollEnabled) {
                         Hairline(Modifier.padding(vertical = 16.dp))
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text("投票", Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                            Text("投票", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
                             IconTap(XIcons.Close, "移除投票", { if (!busy) pollEnabled = false })
                         }
                         AreaBox(pollText, { pollText = it }, placeholder = "每行一个选项，填写 2～6 项", minHeight = 108.dp, enabled = !busy, filled = true)
-                        Text("截止时间", Modifier.padding(top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                        Text("截止时间", Modifier.padding(top = 12.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                         ChipRow(listOf(0, 1, 3, 7, 14, 30).map { it to if (it == 0) "不限时" else "$it 天" }, pollDays) { if (!busy) pollDays = it }
-                        Text(pollError ?: "发布后不能修改选项", Modifier.padding(vertical = 10.dp), fontSize = 12.sp, color = if (pollError != null) Danger else LocalExtraColors.current.ink3)
+                        Text(pollError ?: "发布后不能修改选项", Modifier.padding(vertical = 10.dp), style = XType.Caption, color = if (pollError != null) Danger else LocalExtraColors.current.ink3)
                     }
                     if (isHelp) {
                         Hairline(Modifier.padding(vertical = 16.dp))
-                        Text("悬赏积分", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                        Text("悬赏积分", style = XType.Body, fontWeight = FontWeight.SemiBold)
                         ChipRow(listOf(0, 10, 30, 50, 100).map { it to if (it == 0) "不悬赏" else "$it 分" }, bounty) { if (!busy) bounty = it }
                         if (bounty > 0) {
-                            Text("有效期", Modifier.padding(top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                            Text("有效期", Modifier.padding(top = 12.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                             ChipRow(listOf(7, 14, 30).map { it to "$it 天" }, bountyDays) { if (!busy) bountyDays = it }
-                            Text("发布时扣除，采纳后发给回答者；到期未采纳或关闭求助时退还。", Modifier.padding(top = 8.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
+                            Text("发布时扣除，采纳后发给回答者；到期未采纳或关闭求助时退还。", Modifier.padding(top = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                         }
                     }
-                    if (chosen?.slug?.startsWith("share") == true) Text("请分享原创、开源或已获授权的资源。", Modifier.padding(top = 16.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    if (chosen?.slug?.startsWith("share") == true) Text("请分享原创、开源或已获授权的资源。", Modifier.padding(top = 16.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                     Spacer(Modifier.height(24.dp))
                 }
                 error?.let { Banner(it, Modifier.padding(horizontal = 16.dp, vertical = 8.dp), warn = true) }
@@ -225,14 +225,14 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                         bodyLength < 10 -> "正文至少 10 个字"
                         bodyLength > 20_000 -> "正文最多 20,000 个字"
                         else -> "$bodyLength 字"
-                    }, Modifier.padding(top = 6.dp, bottom = 2.dp), fontSize = 11.sp, color = if (bodyLength > 20_000) Danger else LocalExtraColors.current.ink3)
+                    }, Modifier.padding(top = 6.dp, bottom = 2.dp), style = XType.Caption, color = if (bodyLength > 20_000) Danger else LocalExtraColors.current.ink3)
                 }
             }
         }
         OverlayTransition(choosingCategory) { panel ->
             BottomSheet({ choosingCategory = false }, panel) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("选择版块", Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("选择版块", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
                     IconTap(XIcons.Close, "关闭分类", { choosingCategory = false })
                 }
                 when {
@@ -242,18 +242,18 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                         ChipRow(parents.map { it.id to it.name }, parentId) { parentId = it }
                         children.forEach { category ->
                             Row(Modifier.fillMaxWidth().clickable { categoryId = category.id; choosingCategory = false }.padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(category.name, Modifier.weight(1f), fontSize = 15.sp, color = if (categoryId == category.id) Brand else MaterialTheme.colorScheme.onSurface)
+                                Text(category.name, Modifier.weight(1f), style = XType.Body, color = if (categoryId == category.id) Brand else MaterialTheme.colorScheme.onSurface)
                                 if (categoryId == category.id) XIcon(XIcons.Check, size = 18.dp, tint = Brand)
                             }
                         }
-                        if (children.isEmpty()) Text("这个分类暂时没有可发布的版块", Modifier.padding(vertical = 20.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                        if (children.isEmpty()) Text("这个分类暂时没有可发布的版块", Modifier.padding(vertical = 20.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
                     }
                 }
             }
         }
         OverlayTransition(choosingCover) { panel ->
             BottomSheet({ choosingCover = false }, panel) {
-                Text("帖子封面", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text("帖子封面", style = XType.Title, fontWeight = FontWeight.SemiBold)
                 SheetAction(XIcons.Image, "从相册选择", "使用自己的图片") {
                     choosingCover = false
                     val platform = env.platform ?: return@SheetAction
@@ -278,8 +278,8 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                 onUse = { spec, image -> coverSpec = spec; cover = image; editingCover = false })
         }
         if (confirmingLeave) CenterDialog({ confirmingLeave = false }) {
-            Text("放弃这次编辑？", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Text("尚未发布的内容不会保留。", Modifier.padding(top = 8.dp, bottom = 20.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+            Text("放弃这次编辑？", style = XType.Title, fontWeight = FontWeight.SemiBold)
+            Text("尚未发布的内容不会保留。", Modifier.padding(top = 8.dp, bottom = 20.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
             PillButton("继续编辑", { confirmingLeave = false }, Modifier.fillMaxWidth())
             GhostPillButton("放弃编辑", { confirmingLeave = false; cancelDraft() }, Modifier.fillMaxWidth().padding(top = 8.dp), textColor = Danger)
         }
