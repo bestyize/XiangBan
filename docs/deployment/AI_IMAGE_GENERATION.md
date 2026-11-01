@@ -39,6 +39,23 @@ sudo systemctl restart 9router
 
 补丁直接修正已安装的 JavaScript 产物，未在云服务器执行构建。9Router 升级或重装会覆盖这些修改，届时应检查上游是否已修复，再按新版本复核；不可向未知版本强行应用。
 
+## GPT Image 2.5 后台可选模型
+
+2026-11-01 追加登记 `gpt-image-2.5`，供 AI 后台的图片模型下拉框选择；产品当前默认仍为 Vertex Gemini，没有切换用户的默认生图模型。
+
+- New API 新增 `9Router Images` 渠道（ID 6，OpenAI 兼容类型 1），复用现有 9Router 地址与凭据，模型 `gpt-image-2.5` 映射为 `cx/gpt-image-2.5`。为该模型登记 `default`、`vip`、`svip` 三个分组的能力。原 9Router 聊天渠道（ID 4）的模型、映射和高级路由保持原配置。
+- 按用户在本次配置中明确选择的方案，将此模型 `ModelPrice` 设为 `0.0672` 美元/张，即当前默认分组每张 `33,600` 点，与本站 Gemini 生图价格一致。这是本站固定价格，并非 OpenAI 官方单张价格。
+- [OpenAI 官方价格](https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst)按 token 计算。现有 9Router Images 响应只返回图片，不转发 Responses 的 `tool_usage.image_gen`；聊天模型自己的 token 不能代替图像用量计费，因此本次使用明确的按张定价，不把缺失的图像用量记为免费。
+- `gpt-image-2.5` 是本次实测被 9Router/Codex 接受的兼容名称；官方 Images API 当前列出的 2.5 名称为 `gpt-image-2.5-sunburst` 和 `gpt-image-2.5-flare`，详见 [官方接口](https://developers.openai.com/api/reference/resources/images/methods/generate)。当前登记不承诺裸别名绑定某个固定变体；需要锁定变体时应使用明确的变体名并单独验证。
+- 直接经 9Router 的 `cx/gpt-image-2.5` 已实测 HTTP 200，返回一张图片（1,183,315 字节，约 18.6 秒）。
+- 使用当前桌面账号绑定的独立 New API Key 调用 New API `/v1/images/generations`，指定 `gpt-image-2.5`，HTTP 200，约 19.1 秒返回一张 PNG（1,009,165 字节；请求尺寸 `1024x1024`，实际输出 `1254x1254`）。消费记录 ID `6420`、渠道 6、扣除 `33,600` 点。响应没有图像用量，本次按张价格正常结算。
+
+原 9Router 渠道是高级自定义类型 58，其路由只声明聊天、Responses、Messages、Gemini 等路径，没有 Images 路径。仅在原渠道登记模型会被请求路径过滤器排除，返回 503 `No available channel`；这是本次另建图片兼容渠道的原因。渠道内存缓存按现有 60 秒周期同步数据库，价格列表可见不代表图片路由已经通过验证。
+
+配置快照保存在 `/opt/server-ai/backups/gpt-image-25-20261101/configuration.before.json`，只包含模型、映射、能力、原价格键和产品媒体配置，不含密钥；`registration.json` 记录新增图片渠道 ID 与价格。变更写入 `admin_audit`，操作来源 `ops:ssh`，动作 `newapi.model.register`，最终目标 `gpt-image-2.5`。
+
+撤销登记时先停用新增渠道 6，再移除该渠道的三组同名能力和渠道行，以及 `ModelPrice` 的 `gpt-image-2.5` 键；如渠道后来新增了其他模型，应只移除本次模型与能力，不整行删除。不要用完整旧渠道或旧价格覆盖之后新增的配置。产品默认媒体配置无需回滚。
+
 ## 备份与回滚
 
 服务器备份目录：`/opt/server-ai/backups/image-enable-20261101-140312/`，仅服务器管理员可访问。
