@@ -33,7 +33,7 @@ fn cached(root: &Path, id: &str) -> Option<Snapshot> {
         && ["full", "partial", "empty"].contains(&data.state.coverage.as_str()))
     .then_some(data)
 }
-fn snapshot(text: String, partial: bool, note: &str) -> Snapshot {
+pub(super) fn snapshot(text: String, partial: bool, note: &str) -> Snapshot {
     let truncated = text.len() > MAX_TEXT;
     let mut end = text.len().min(MAX_TEXT);
     while !text.is_char_boundary(end) {
@@ -66,7 +66,7 @@ fn snapshot(text: String, partial: bool, note: &str) -> Snapshot {
         text,
     }
 }
-fn saved(app: &tauri::AppHandle, id: &str) -> Result<Link, String> {
+pub(super) fn saved(app: &tauri::AppHandle, id: &str) -> Result<Link, String> {
     load(&root(app)?)
         .links
         .into_iter()
@@ -373,7 +373,8 @@ pub fn library_cloud_item(
     control_only(&window)?;
     let link = saved(&app, &id)?;
     let content = cached(&root(&app)?, &id);
-    Ok(json!({"link":link,"content":content}))
+    let local_doc = super::download::local_document(&load(&root(&app)?), &link);
+    Ok(json!({"link":link,"content":content,"localDoc":local_doc}))
 }
 #[tauri::command]
 pub fn library_cloud_open_source(
@@ -444,7 +445,7 @@ pub async fn library_cloud_read(
     .await
     .map_err(|e| e.to_string())?
 }
-fn question(link: &Link, content: &Snapshot, mode: &str) -> Result<Value, String> {
+pub(super) fn question(link: &Link, content: &Snapshot, mode: &str) -> Result<Value, String> {
     if content.text.trim().is_empty() {
         return Err("尚未读取到正文，请先读取内容后再提问".into());
     }

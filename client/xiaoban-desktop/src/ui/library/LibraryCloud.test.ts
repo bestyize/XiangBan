@@ -34,6 +34,22 @@ describe('cloud library integration',()=>{
     expect(wrapper.emitted('ask')).toBeUndefined();
     expect(invoke).not.toHaveBeenCalledWith('chat_send',expect.anything());
   });
+  it('downloads a Baidu original into My Documents and selects the saved document',async()=>{
+    const original={...entry,url:'https://pan.baidu.com/disk/main#/index?fileid=123',id:'123',name:'原文.pdf'};
+    const local={id:'local',name:'原文.pdf',origin:original.url};
+    library.refresh=vi.fn(async()=>{library.data.docs=[local as never];});
+    vi.mocked(invoke).mockImplementation(async command=>{
+      if(command==='library_cloud_sources')return[{...source,provider:'baidu',name:'百度网盘'}];
+      if(command==='library_cloud_browse')return{items:[original],hasMore:false};
+      if(command==='library_cloud_add')return{...emptyLibrary(),links:[{id:'saved',url:original.url,title:original.name,platform:'baidu',remote:{provider:'baidu',id:'123',path:''}}]};
+      if(command==='library_cloud_download')return local;
+      return null;
+    });
+    await open();await click('浏览文件');await click('下载到资料库');
+    expect(invoke).toHaveBeenCalledWith('library_cloud_download',{id:'saved'});
+    expect(library.refresh).toHaveBeenCalled();expect(wrapper.emitted('imported')?.[0]).toEqual(['local']);
+    expect(invoke).not.toHaveBeenCalledWith('library_cloud_read',expect.anything());
+  });
   it('reuses the existing native connection window and does not request credentials in the library',async()=>{
     await open(); await click('管理');
     expect(invoke).toHaveBeenCalledWith('configuration_window_open',expect.objectContaining({target:'store'}));

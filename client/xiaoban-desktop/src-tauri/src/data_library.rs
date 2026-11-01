@@ -305,7 +305,8 @@ fn read_all(app: &tauri::AppHandle) {
         let Ok(root) = root(app) else { return };
         let Some(doc) = load(&root).docs.into_iter().find(|d| d.status == "reading") else { return };
         let path = root.join("files").join(&doc.id).join(&doc.name);
-        let (status, note, preview) = read_text(&path, &doc.ext);
+        let (status, mut note, preview) = read_text(&path, &doc.ext);
+        if status == "ready" && cloud::download::needs_text_attachment(&doc) { note="提问时使用提取文字，不包含原文件的图片、图表或扫描页".into(); }
         let result = change(app, |library, _| {
             if let Some(entry) = library.docs.iter_mut().find(|d| d.id == doc.id) {
                 entry.status = status.into(); entry.note = note; entry.preview = preview;
@@ -561,11 +562,13 @@ pub fn library_reveal(app: tauri::AppHandle, window: tauri::WebviewWindow, id: S
 
 /// The document as a chat attachment, for "用这份资料提问".
 #[tauri::command]
-pub fn library_attachment(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<Value, String> {
+pub async fn library_attachment(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<Value, String> {
     control_only(&window)?;
+    tauri::async_runtime::spawn_blocking(move || {
     let root = root(&app)?;
     let doc = load(&root).docs.into_iter().find(|d| d.id == id).ok_or("这份文档已经不在了")?;
     if doc.design_id.is_some() { return Err("请打开设计画布继续修改这份作品".into()); }
+    if cloud::download::needs_text_attachment(&doc) { return cloud::download::text_attachment(&doc, &root.join("files").join(&doc.id).join(&doc.name)); }
     if let Some((_, note)) = readable_kind(&doc.ext, doc.size) { return Err(note.into()); }
     let bytes = fs::read(root.join("files").join(&doc.id).join(&doc.name)).map_err(|e| format!("读取失败：{e}"))?;
     let image = IMAGES.contains(&doc.ext.as_str());
@@ -579,6 +582,7 @@ pub fn library_attachment(app: tauri::AppHandle, window: tauri::WebviewWindow, i
     };
     let data = format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes));
     Ok(if image { json!({ "image": data }) } else { json!({ "name": doc.name, "size": doc.size, "mime": mime, "dataUrl": data }) })
+    }).await.map_err(|_| "读取附件已中断".to_string())?
 }
 
 #[tauri::command]

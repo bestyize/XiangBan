@@ -2,9 +2,10 @@
 import { useConfirm } from './confirm.ts';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NButton, NInput, NModal } from 'naive-ui';
-import { ArrowLeft, Copy, ExternalLink, FileText, Folder, KeyRound, Link2, MessageCircle, Pencil, RefreshCw, Search, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, Download, Copy, ExternalLink, FileText, Folder, KeyRound, Link2, MessageCircle, Pencil, RefreshCw, Search, Trash2 } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 import { openStoreWindow } from '../ai-store/store-window.ts';
+import { createCloudDownloader, type DownloadProgress } from './cloud-download.ts';
 import { openCloudDocument } from './cloud-document.ts';
 import { createCloudBrowser, type CloudEntry, type CloudSource } from './cloud-browser.ts';
 import type { LibraryData } from './library-store.ts';
@@ -12,8 +13,13 @@ import ChatNameDialog from '../components/ChatNameDialog.vue';
 import { folderPath, folderTree, formatWhen, guessPlatform, PLATFORMS, searchText, type LibraryLink, type LibraryStore, type Platform } from './library-store.ts';
 
 const props = defineProps<{ library: LibraryStore; query: string; desktop: boolean; openUrl: (url: string) => void }>();
-const emit = defineEmits<{ notify: [message: string, type?: 'success' | 'error' | 'info']; ask: [draft: string] }>();
+const emit = defineEmits<{ notify: [message: string, type?: 'success' | 'error' | 'info']; ask: [draft: string]; imported: [id: string] }>();
 const confirm = useConfirm();
+const downloader = createCloudDownloader(invoke, async doc => { await props.library.refresh(); emit('notify', `已将「${doc.name}」下载到我的文档`); emit('imported', doc.id); });
+let offProgress: (() => void) | undefined;
+async function download(link: LibraryLink) { await downloader.download(link.id); if(downloader.error) emit('notify',downloader.error,'error'); }
+function localDoc(link: LibraryLink) { return props.library.data.docs.find(doc => doc.origin === link.url); }
+
 const browser = createCloudBrowser(invoke);
 const activeSource = computed(() => browser.sources.find(source => source.provider === browser.active));
 let disposed = false, off: (() => void) | undefined, refreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -23,8 +29,8 @@ async function refreshSources() {
   clearTimeout(refreshTimer);
   if (!disposed && browser.sources.some(source => source.status === 'connecting')) refreshTimer = setTimeout(refreshSources, 1500);
 }
-onMounted(async () => { void refreshSources(); if (props.desktop) { const stop = await listen('ai-store-changed', () => void refreshSources()); if (disposed) stop(); else off = stop; } });
-onBeforeUnmount(() => { disposed = true; browser.close(); clearTimeout(refreshTimer); off?.(); });
+onMounted(async () => { void refreshSources(); if (props.desktop) { const progressStop = await listen<DownloadProgress>('library-cloud-download-progress', event => downloader.progress(event)); if (disposed) progressStop(); else offProgress = progressStop; const stop = await listen('ai-store-changed', () => void refreshSources()); if (disposed) stop(); else off = stop; } });
+onBeforeUnmount(() => { disposed = true; browser.close(); clearTimeout(refreshTimer); off?.(); offProgress?.(); });
 const managing = ref(''), importing = ref('');
 async function manage(source: CloudSource) {
   if (managing.value) return;
@@ -43,10 +49,14 @@ async function manage(source: CloudSource) {
 }
 function alreadyAdded(entry: CloudEntry) { return props.library.data.links.some(link => link.url === entry.url || (link.remote?.provider === browser.active && link.remote.id === entry.id)); }
 async function importEntry(entry: CloudEntry) {
-  if (!browser.active || importing.value || alreadyAdded(entry)) return;
+  if (!browser.active || importing.value || downloader.id) return;
   importing.value = entry.id;
-  try { props.library.data = await invoke<LibraryData>('library_cloud_add', { platform: browser.active, entry, folder: folder.value || null }); const link = props.library.data.links.find(link => link.remote?.provider === browser.active && link.remote.id === entry.id); if (link) await preview(link); else emit('notify', '已加入资料库'); }
-  catch (e) { emit('notify', String(e), 'error'); }
+  try {
+    let link = props.library.data.links.find(link => link.remote?.provider === browser.active && link.remote.id === entry.id);
+    if (!link) { props.library.data = await invoke<LibraryData>('library_cloud_add', { platform: browser.active, entry, folder: folder.value || null }); link = props.library.data.links.find(link => link.remote?.provider === browser.active && link.remote.id === entry.id); }
+    if (!link) throw new Error('无法读取已保存的云端文件，请刷新重试');
+    if (browser.active === 'baidu') await download(link); else await preview(link);
+  } catch (e) { emit('notify', String(e), 'error'); }
   finally { importing.value = ''; }
 }
 
@@ -104,10 +114,12 @@ defineExpose({ openAdd });
       <div v-else-if="browser.confirmationRequired" class="cloud-read-confirm"><p>读取{{ activeSource?.name }}的文件列表？本次只查询文件名与位置。</p><button class="xb-btn-primary" @click="browser.load(browser.page, true)">确认读取</button></div>
       <div v-else-if="browser.error" role="alert" class="cloud-error">{{ browser.error }}<button class="lib-link" @click="browser.load(browser.page)">重试</button></div>
       <p v-else-if="!browser.items.length" class="lib-muted nothing">{{ !activeSource?.browse && !browser.query ? '输入关键词搜索账号文件' : '没有找到文件' }}</p>
-      <div v-else class="cloud-file-list"><div v-for="entry in browser.items" :key="entry.id" class="cloud-file"><Folder v-if="entry.directory" :size="18" /><FileText v-else :size="18" /><button v-if="entry.directory" class="cloud-file-name" @click="browser.enter(entry)">{{ entry.name }}</button><span v-else class="cloud-file-name" :title="entry.path || entry.name">{{ entry.name }}</span><button v-if="!entry.directory" class="xb-btn" :disabled="!!importing || alreadyAdded(entry)" @click="importEntry(entry)">{{ alreadyAdded(entry) ? '已加入' : importing === entry.id ? '加入中…' : '读取并加入' }}</button><button v-else class="xb-btn" @click="browser.enter(entry)">打开</button></div></div>
+      <div v-else class="cloud-file-list"><div v-for="entry in browser.items" :key="entry.id" class="cloud-file"><Folder v-if="entry.directory" :size="18" /><FileText v-else :size="18" /><button v-if="entry.directory" class="cloud-file-name" @click="browser.enter(entry)">{{ entry.name }}</button><span v-else class="cloud-file-name" :title="entry.path || entry.name">{{ entry.name }}</span><button v-if="!entry.directory" class="xb-btn" :disabled="!!importing || !!downloader.id || (browser.active !== 'baidu' && alreadyAdded(entry))" @click="importEntry(entry)">{{ importing === entry.id ? (downloader.id ? downloader.label() : '加入中…') : browser.active === 'baidu' ? '下载到资料库' : alreadyAdded(entry) ? '已加入' : '读取并加入' }}</button><button v-else class="xb-btn" @click="browser.enter(entry)">打开</button></div></div>
+      <p v-if="downloader.id" class="lib-muted" role="status">{{ downloader.label() }}<button class="lib-link" :disabled="downloader.cancelling" @click="downloader.cancel">取消下载</button></p>
       <div class="cloud-pagination"><button class="xb-btn" :disabled="browser.loading || browser.page <= 1" @click="browser.load(browser.page - 1)">上一页</button><span>第 {{ browser.page }} 页</span><button class="xb-btn" :disabled="browser.loading || !browser.hasMore" @click="browser.load(browser.page + 1)">下一页</button></div>
     </section>
     <template v-else>
+    <p v-if="downloader.id" class="lib-muted" role="status">{{ downloader.label() }}<button class="lib-link" :disabled="downloader.cancelling" @click="downloader.cancel">取消下载</button></p>
     <div class="lib-toolbar">
       <div class="lib-chips" aria-label="按平台筛选">
         <button v-for="f in FILTERS" :key="f.label" type="button" :class="{ active: filter === f.label }" :aria-pressed="filter === f.label" @click="filter = f.label">{{ f.label }}</button>
@@ -131,7 +143,8 @@ defineExpose({ openAdd });
           <span class="lib-muted note">{{ folderPath(folders, link.folder) }} · {{ formatWhen(link.addedMs) }}添加</span>
           <span v-if="link.code" class="code"><KeyRound :size="12" />提取码 <b>{{ link.code }}</b><button type="button" class="lib-link" @click="copy(link.code!, '提取码')">复制</button></span>
           <div class="card-foot">
-            <span class="lib-pill">{{ link.content ? link.content.coverage === 'full' ? '正文已保存' : link.content.coverage === 'partial' ? '摘要／部分内容' : '暂无正文' : link.remote ? '待读取正文' : '仅保存链接' }}</span>
+            <span class="lib-pill">{{ localDoc(link) ? '原文件已保存' : link.content ? link.content.coverage === 'full' ? '正文已保存' : link.content.coverage === 'partial' ? '摘要／部分内容' : '暂无正文' : link.remote ? '待读取正文' : '仅保存链接' }}</span>
+            <button v-if="link.remote?.provider === 'baidu'" type="button" class="lib-icon-btn" :disabled="!!downloader.id" :aria-label="localDoc(link) ? '查看已下载的原文件' : '下载原文件到资料库'" :title="localDoc(link) ? '查看已下载的原文件' : '下载原文件到资料库'" @click="download(link)"><Download :size="14" /></button>
             <button v-if="link.remote" type="button" class="lib-icon-btn" aria-label="预览云文档与提问" title="预览云文档与提问" @click="preview(link)"><MessageCircle :size="14" /></button>
             <button type="button" class="lib-icon-btn push" aria-label="重命名" @click="renaming = link"><Pencil :size="14" /></button>
             <button type="button" class="lib-icon-btn" aria-label="复制链接" @click="copy(link.url, '链接')"><Copy :size="14" /></button>

@@ -106,6 +106,14 @@ fn handle_callback(app: tauri::AppHandle, flow: Arc<Flow>, label: String, url: &
     });
     true
 }
+/// Host-only reuse of the existing personal authorization. Never expose this through IPC.
+pub(crate) fn download_access_token(app: &tauri::AppHandle) -> Result<String, String> {
+    let entry=super::entries(&Dirs::of(app)?.plugins()).into_iter().find(|e|e.plugin.name=="baidu-netdisk" && e.plugin.server(&e.server).is_ok_and(|s|s.is_baidu_netdisk_personal())).ok_or("请先安装并连接百度网盘")?;
+    let manager=super::super::connector_manager(app)?;
+    let state=manager.plugin_state(&entry.id);
+    if !state.enabled || state.user_disabled { return Err("请先启用百度网盘连接器".into()); }
+    agent_connector_tools::vault::Vault::open(Dirs::of(app)?.chat.join("connectors/vault"))?.get(&entry.id,TOKEN_KEY)?.filter(|s|!s.is_empty()).ok_or("百度下载授权不可用，请在连接器中重新连接".into())
+}
 #[tauri::command]
 pub async fn ai_connector_baidu_start(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<Value, String> {
     super::super::store::control(&window)?;
