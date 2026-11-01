@@ -205,6 +205,7 @@ pub fn configuration_window_login(app: tauri::AppHandle, window: tauri::WebviewW
 pub async fn configuration_window_invoke(app: tauri::AppHandle, window: tauri::WebviewWindow, command: String, args: Option<Value>) -> Result<Value, Value> {
     let role=kind(window.label()).ok_or_else(||json!("配置窗口无权限"))?;
     if !policy::command_allowed(role,&command) { return Err(json!("此配置窗口不能执行该操作")); }
+    if command == "open_application_skins" { crate::present_control(&app).map_err(|e| json!(e))?; }
     let args=args.unwrap_or_else(||json!({}));
     if !args.is_object() || args.to_string().len()>1_000_000 { return Err(json!("配置参数无效或过大")); }
     if !policy::cloud_scope(window.label(), &command, &args) { return Err(json!("此窗口只能读取当前云文档")); }

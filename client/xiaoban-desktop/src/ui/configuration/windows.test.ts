@@ -36,6 +36,15 @@ describe('native configuration handoff', () => {
     await subscribe.mock.calls[0][1]({ id: 'changed' });
     expect(emit).toHaveBeenCalledWith('ai-store-changed');
   });
+  it('opens only the application skin page via the authenticated command queue', async () => {
+    const openSkins = vi.fn();
+    ipc.mockImplementation(async command => command === 'configuration_window_take' ? { id: 'skin', command: 'open_application_skins', args: {} } as never : null);
+    await serveConfigurationWindows(undefined, undefined, openSkins);
+    await subscribe.mock.calls[0][1]({ id: 'skin' });
+    expect(openSkins).toHaveBeenCalledOnce();
+    expect(ipc).not.toHaveBeenCalledWith('open_application_skins', expect.anything());
+    expect(ipc).toHaveBeenCalledWith('configuration_window_reply', { id: 'skin', ok: true, value: null });
+  });
   it('passes only the selected category or provider identity to window creation', async () => {
     await openSettingsWindow('network'); await openModelWindow('custom_test');
     expect(ipc.mock.calls).toEqual([

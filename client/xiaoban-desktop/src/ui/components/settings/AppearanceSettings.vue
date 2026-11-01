@@ -1,10 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { NSwitch } from 'naive-ui';
+import { invoke } from '../../../bridge.ts';
+import { configurationScene } from '../../configuration/windows.ts';
 import type { ControlStore } from '../../control-types.ts';
 import { accent, accents, isDark, appearanceMode, appearanceModes, setAccent, setAppearance } from '../../appearance.ts';
 const props = defineProps<{ store: ControlStore }>();
 const savingPet = ref(false);
+async function openSkins() {
+  if (configurationScene()) {
+    try { await invoke('open_application_skins'); }
+    catch (error) { props.store.notify(error, 'error'); }
+  } else {
+    props.store.studioTab = 'skins';
+    props.store.closeSettings();
+    props.store.navigate('studio');
+  }
+}
 async function setChatPet(enabled: boolean) {
   savingPet.value = true;
   try { await props.store.setChatComposerPet(enabled); }
@@ -28,6 +40,8 @@ async function setChatPet(enabled: boolean) {
         </button>
       </div>
     </div>
+    <div class="xb-group-title">皮肤</div>
+    <div class="xb-group"><div class="xb-row"><div class="xb-row-text"><b>皮肤</b></div><button class="xb-btn" type="button" data-testid="settings-open-skins" @click="openSkins">管理皮肤</button></div></div>
     <div class="xb-group-title">对话界面</div>
     <div class="xb-group">
       <div class="xb-row" title="显示输入框右上角的小伴，点击可互动" aria-description="显示输入框右上角的小伴，点击可互动">

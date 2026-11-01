@@ -9,11 +9,12 @@ import type { ControlStore, StudioTab } from '../control-types.ts';
 const WallpaperPage = defineAsyncComponent(() => import('./WallpaperPage.vue'));
 const EffectsPage = defineAsyncComponent(() => import('./EffectsPage.vue'));
 const WidgetsPage = defineAsyncComponent(() => import('./WidgetsPage.vue'));
+const SkinsPage = defineAsyncComponent(() => import('./SkinsPage.vue'));
 const CompanionPage = defineAsyncComponent(() => import('./CompanionPage.vue'));
 defineProps<{ store: ControlStore; widgetSettingsRequest?: { id: string } | null; petSettingsRequest?: { id: string } | null }>();
 const emit = defineEmits<{ widgetSettingsOpened: []; petSettingsOpened: [] }>();
 const tabs: { id: StudioTab; label: string }[] = [
-  { id: 'wallpapers', label: '壁纸' }, { id: 'effects', label: '特效' }, { id: 'widgets', label: '组件' }, { id: 'pets', label: '伙伴' },
+  { id: 'wallpapers', label: '壁纸' }, { id: 'effects', label: '特效' }, { id: 'widgets', label: '组件' }, { id: 'pets', label: '伙伴' }, { id: 'skins', label: '皮肤' },
 ];
 </script>
 <template>
@@ -29,6 +30,7 @@ const tabs: { id: StudioTab; label: string }[] = [
         <WallpaperPage v-if="store.studioTab === 'wallpapers'" :store="store" />
         <EffectsPage v-else-if="store.studioTab === 'effects'" :store="store" />
         <WidgetsPage v-else-if="store.studioTab === 'widgets'" :store="store" :settings-request="widgetSettingsRequest" @settings-opened="emit('widgetSettingsOpened')" />
+        <SkinsPage v-else-if="store.studioTab === 'skins'" :store="store" />
         <CompanionPage v-else :store="store" :settings-request="petSettingsRequest" @settings-opened="emit('petSettingsOpened')" />
       </KeepAlive>
     </div>
