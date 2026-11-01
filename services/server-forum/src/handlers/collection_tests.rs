@@ -179,6 +179,46 @@ async fn revisions(pool: &PgPool, run: Uuid) -> Vec<discover_editor::BatchReview
         .collect()
 }
 
+fn trending_item(gain: i64) -> CollectedItem {
+    let end = chrono::Utc::now().date_naive();
+    let start = end - chrono::Duration::days(7);
+    CollectedItem {
+        kind: "repo_issue".into(),
+        key: format!("github-rolling-{end}"),
+        sort_order: 0,
+        published_at: None,
+        source_name: "GitHub Trending".into(),
+        source_url: "https://github.com/trending".into(),
+        data: json!({"source":"GitHub","source_url":"https://github.com/trending","as_of":(chrono::Utc::now() - chrono::Duration::minutes(1)).to_rfc3339(),
+            "metric":"github trending weekly stars","issue_no":end.format("%Y%m%d").to_string().parse::<i64>().unwrap(),
+            "week_start":start.to_string(),"week_end":end.to_string(),"observation_start":start.to_string(),"observation_end":end.to_string(),
+            "observed_days":7,"complete":true,"total_gain":gain,"wow_pct":null,"daily_gain":[],
+            "ranks":[{"full_name":"owner/repo","url":"https://github.com/owner/repo","description":"A trending project","language":"Rust","language_color":"#dea584",
+                "star_total":50000,"star_gain":gain,"spark":[],"icon":"code","tint":"#E6F4EA"}]}),
+    }
+}
+
+#[tokio::test]
+async fn github_trending_issue_auto_publishes_and_is_served_by_v2_endpoints() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = Harness::new().await? else { return Ok(()) };
+    for gain in [1200, 1500] {
+        let run = Uuid::new_v4();
+        sqlx::query("INSERT INTO collection_runs(id,source,status) VALUES($1,'github_repos','running')").bind(run).execute(&h.pool).await?;
+        sqlx::query("UPDATE collection_sources SET active_run=$1,lease_until=now()+interval '10 minutes' WHERE id='github_repos'").bind(run).execute(&h.pool).await?;
+        assert_eq!(discover_editor::store_collection_result(&h.pool, "github_repos", run, vec![trending_item(gain)]).await?, 1);
+        let (status, issue) = request(&h.app, "GET", "/api/discover/repos/v2", None, Value::Null).await;
+        assert_eq!(status, StatusCode::OK, "{issue}");
+        assert_eq!((issue["metric"].as_str(), issue["total_gain"].as_i64()), (Some("github trending weekly stars"), Some(gain)));
+        assert_eq!((issue["ranks"][0]["full_name"].as_str(), issue["ranks"][0]["rank"].as_i64()), (Some("owner/repo"), Some(1)));
+    }
+    let (_, home) = request(&h.app, "GET", "/api/discover/home/v2", None, Value::Null).await;
+    assert_eq!(home["repos"]["ranks"][0]["star_gain"], 1500);
+    let (count,): (i64,) = sqlx::query_as("SELECT count(*) FROM discover_drafts WHERE kind='repo_issue'").fetch_one(&h.pool).await?;
+    assert_eq!(count, 1);
+    h.close().await?;
+    Ok(())
+}
+
 #[tokio::test]
 async fn objective_rankings_auto_publish_atomically_and_keep_last_good_snapshot() -> Result<(), Box<dyn std::error::Error>> {
     let Some(h) = Harness::new().await? else { return Ok(()) };
@@ -429,7 +469,16 @@ async fn collection_admin_auth_configuration_and_exclusion_are_enforced(
         "PATCH",
         "/api/admin/collection/sources/github_repos",
         Some(&h.token),
-        json!({"config":{"repositories":["a/b","A/B"]}}),
+        json!({"config":{"repositories":["a/b"]}}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (status, _) = request(
+        &h.app,
+        "PUT",
+        "/api/admin/collection/sources/github_repos/credential",
+        Some(&h.token),
+        json!({"key":"ghp_public_trending_needs_no_key"}),
     )
     .await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
@@ -438,7 +487,7 @@ async fn collection_admin_auth_configuration_and_exclusion_are_enforced(
         "PATCH",
         "/api/admin/collection/sources/github_repos",
         Some(&h.token),
-        json!({"config":{"repositories":["Zed/Repo","abc/project"]}}),
+        json!({"config":{}}),
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{body}");
@@ -456,10 +505,8 @@ async fn collection_admin_auth_configuration_and_exclusion_are_enforced(
         .iter()
         .find(|s| s["id"] == "github_repos")
         .unwrap();
-    assert_eq!(
-        github["config"],
-        json!({"repositories":["abc/project","zed/repo"]})
-    );
+    assert_eq!(github["config"], json!({}));
+    assert_eq!(github["credential_required"], false);
     assert_eq!(github["enabled"], false);
     let run = h.run().await;
     assert!(matches!(

@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS collection_sources (
 );
 ALTER TABLE collection_sources ADD COLUMN IF NOT EXISTS config JSONB NOT NULL DEFAULT '{}'::jsonb;
 INSERT INTO collection_sources(id) VALUES ('artificial_analysis'),('openrouter') ON CONFLICT DO NOTHING;
-INSERT INTO collection_sources(id,config) VALUES ('github_repos','{"repositories":[]}'::jsonb) ON CONFLICT DO NOTHING;
+INSERT INTO collection_sources(id,config) VALUES ('github_repos','{}'::jsonb) ON CONFLICT DO NOTHING;
+UPDATE collection_sources SET config='{}'::jsonb WHERE id='github_repos' AND config<>'{}'::jsonb;
 INSERT INTO collection_sources(id,config,interval_minutes) VALUES ('github_tools','{"repositories":[]}'::jsonb,360) ON CONFLICT DO NOTHING;
 INSERT INTO collection_sources(id,config,interval_minutes) VALUES ('official_news','{"feed_ids":[]}'::jsonb,360) ON CONFLICT DO NOTHING;
 CREATE TABLE IF NOT EXISTS collection_news_daily (

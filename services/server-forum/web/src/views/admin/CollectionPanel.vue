@@ -48,13 +48,13 @@ const FEEDS = [
 const needsCredential = (s: CollectionSource) => s.credential_required !== false
 function ready(s: CollectionSource) {
   if (needsCredential(s) && !s.configured) return false
-  if (['github_repos', 'github_tools'].includes(s.id)) return !!s.config?.repositories?.length
+  if (s.id === 'github_tools') return !!s.config?.repositories?.length
   if (s.id === 'official_news') return !!s.config?.feed_ids?.length
   return true
 }
 function readinessHint(s: CollectionSource) {
   if (needsCredential(s) && !s.configured) return '请先配置有效密钥。'
-  return ['github_repos', 'github_tools'].includes(s.id) ? '请先保存至少一个候选仓库。' : '请先保存至少一个官方来源。'
+  return s.id === 'github_tools' ? '请先保存至少一个候选仓库。' : '请先保存至少一个官方来源。'
 }
 const savedFeeds = (s: CollectionSource) => (s.config?.feed_ids ?? []).map(id => FEEDS.find(f => f.id === id)?.title ?? id).join('、') || '尚未选择'
 const sourceName = (id: string) => sources.value.find(s => s.id === id)?.title || SOURCE_NAMES[id] || id
@@ -197,15 +197,14 @@ async function configure(s: CollectionSource) {
 async function saveSourceConfig(s: CollectionSource) {
   const form = forms[s.id]
   let config: CollectionSourceConfig
-  if (['github_repos', 'github_tools'].includes(s.id)) {
+  if (s.id === 'github_tools') {
     const repositories = form.repositories.split(/\r?\n/).map(r => r.trim().toLowerCase()).filter(Boolean)
     const valid = (r: string) => {
       const parts = r.split('/')
       return parts.length === 2 && /^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$/.test(parts[0]) && /^[a-z0-9_.-]{1,100}$/.test(parts[1]) && !['.', '..'].includes(parts[1])
     }
-    const limit = s.id === 'github_tools' ? 10 : 30
-    if (repositories.length > limit || repositories.some(r => !valid(r)) || new Set(repositories).size !== repositories.length) {
-      actionErrors[s.id] = `每行填写一个 owner/repo，最多 ${limit} 个，不可重复；请勿填写 URL`
+    if (repositories.length > 10 || repositories.some(r => !valid(r)) || new Set(repositories).size !== repositories.length) {
+      actionErrors[s.id] = '每行填写一个 owner/repo，最多 10 个，不可重复；请勿填写 URL'
       return
     }
     config = { repositories }
@@ -318,9 +317,10 @@ onUnmounted(() => {
           <button class="btn" type="submit" :disabled="!!busy[s.id] || approving || !forms[s.id].key.trim()">{{ busy[s.id] === 'key' ? '验证并保存中…' : '验证并保存密钥' }}</button>
         </form>
         <small v-if="needsCredential(s)" class="muted">验证成功后更新已保存密钥，并清空输入；密钥不会保存到浏览器本地存储。</small>
-        <form v-if="['github_repos', 'github_tools'].includes(s.id)" class="adm-form collection-source-config" @submit.prevent="saveSourceConfig(s)">
-          <label class="field"><span>候选仓库（每行 owner/repo，最多 {{ s.id === 'github_tools' ? 10 : 30 }} 个）</span><textarea v-model="forms[s.id].repositories" class="input" rows="5" spellcheck="false" :disabled="!!busy[s.id] || approving" placeholder="例如 rust-lang/rust&#10;vuejs/core" /></label>
-          <small v-if="s.id === 'github_repos'" class="muted">只跟踪明确选择的仓库，每日记录 star 快照；首日为基线，不会伪造七日增长。仓库名保存时统一为小写。</small><small v-else class="muted">仅同步正式版本及可识别的主程序安装包；单文件上限 128 MiB。缺摘要时下载校验，单次下载总量上限 256 MiB；不执行文件。架构未知、命名或体积超限需要人工维护，镜像地址暂留空。</small>
+        <p v-if="s.id === 'github_repos'" class="muted">抓取 GitHub 官方 Trending 周榜（github.com/trending?since=weekly），按页面顺序收录前 30 个项目，新增 Star 取自 GitHub 公布值；无需密钥与候选仓库，校验通过后自动发布。页面结构变化时整批失败并保留上一期。</p>
+        <form v-else-if="s.id === 'github_tools'" class="adm-form collection-source-config" @submit.prevent="saveSourceConfig(s)">
+          <label class="field"><span>候选仓库（每行 owner/repo，最多 10 个）</span><textarea v-model="forms[s.id].repositories" class="input" rows="5" spellcheck="false" :disabled="!!busy[s.id] || approving" placeholder="例如 rust-lang/rust&#10;vuejs/core" /></label>
+          <small class="muted">仅同步正式版本及可识别的主程序安装包；单文件上限 128 MiB。缺摘要时下载校验，单次下载总量上限 256 MiB；不执行文件。架构未知、命名或体积超限需要人工维护，镜像地址暂留空。</small>
           <button class="btn" type="submit" :disabled="!!busy[s.id] || approving">{{ busy[s.id] === 'source-config' ? '保存中…' : '保存候选仓库' }}</button>
           <p class="collection-saved muted">已保存 {{ s.config?.repositories?.length ?? 0 }} 个：{{ s.config?.repositories?.join('、') || '暂无候选' }}</p>
         </form>

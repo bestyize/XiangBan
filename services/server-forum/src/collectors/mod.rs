@@ -34,7 +34,7 @@ pub fn title(source: &str) -> Option<&'static str> {
         _ => None,
     }
 }
-pub fn credential_required(source: &str) -> bool { source != "official_news" }
+pub fn credential_required(source: &str) -> bool { !matches!(source, "official_news" | "github_repos") }
 pub fn check_source(source: &str) -> AppResult<()> {
     if title(source).is_none() {
         return Err(AppError::not_found("采集来源"));
@@ -56,9 +56,6 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
     }
     if scheduled && (!enabled || next > Utc::now()) {
         return Err(AppError::Conflict("此来源尚未到执行时间".into()));
-    }
-    if source == "github_repos" {
-        repo_sources::configured_names(&config)?;
     }
     if source == "github_tools" {
         let clean = tool_sources::sanitize_config(config.clone())?;
@@ -93,7 +90,7 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
     tokio::spawn(async move {
         let fetched = tokio::time::timeout(std::time::Duration::from_secs(240), async {
             if source == "github_repos" {
-                repo_sources::collect(&s.pool, &secret, &http, &config, id).await
+                repo_sources::collect(&http).await
             } else if source == "github_tools" {
                 tool_sources::collect(&http, &config, &secret).await
             } else if source == "official_news" {
@@ -116,7 +113,7 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
                 }
             }
             // Adapter errors may include upstream strings; only a fixed category is persisted.
-            Ok(Err(message)) => Err(AppError::BadRequest(if matches!(source.as_str(), "official_news" | "github_tools") { message } else {
+            Ok(Err(message)) => Err(AppError::BadRequest(if matches!(source.as_str(), "official_news" | "github_tools" | "github_repos") { message } else {
                 "来源采集失败，请检查凭据、额度和来源可用性".into()
             })),
             Err(_) => Err(AppError::BadRequest("来源采集超时".into())),
@@ -131,7 +128,7 @@ async fn finish(pool: &PgPool, source: &str, id: Uuid, result: AppResult<i32>) -
     let (count, error) = match result {
         Ok(count) => (count, None),
         Err(AppError::Conflict(_)) => (0, Some("草稿已被人工修改或审核，请处理冲突后重试")),
-        Err(AppError::BadRequest(ref message)) if matches!(source, "official_news" | "github_tools") => (0, Some(message.as_str())),
+        Err(AppError::BadRequest(ref message)) if matches!(source, "official_news" | "github_tools" | "github_repos") => (0, Some(message.as_str())),
         Err(AppError::BadRequest(_)) => (
             0,
             Some("采集来源返回失败、超时或无效数据，请检查来源后重试"),
@@ -157,7 +154,7 @@ pub fn spawn(state: AppState) {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
         loop {
             interval.tick().await;
-            let sources: Result<Vec<(String,)>,_>=sqlx::query_as("SELECT id FROM collection_sources WHERE enabled AND (credential IS NOT NULL OR id='official_news') AND next_run_at<=now() AND (lease_until IS NULL OR lease_until<=now()) ORDER BY id").fetch_all(&state.pool).await;
+            let sources: Result<Vec<(String,)>,_>=sqlx::query_as("SELECT id FROM collection_sources WHERE enabled AND (credential IS NOT NULL OR id IN ('official_news','github_repos')) AND next_run_at<=now() AND (lease_until IS NULL OR lease_until<=now()) ORDER BY id").fetch_all(&state.pool).await;
             match sources {
                 Ok(sources) => {
                     for (source,) in sources {

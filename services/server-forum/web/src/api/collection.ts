@@ -1,7 +1,7 @@
 // 客观榜单校验后自动发布；资讯与工具版本保留人工终审。
 import { request as adminRequest, type AdminPage, type DiscoverDraft } from './admin'
 
-/** github_repos 最多 30 项；github_tools 最多 10 项，均由后端再次校验。 */
+/** github_tools 最多 10 项，由后端再次校验；github_repos 抓取 Trending 周榜，无配置。 */
 export interface CollectionSourceConfig { repositories?: string[]; feed_ids?: string[] }
 
 export interface CollectionSource {

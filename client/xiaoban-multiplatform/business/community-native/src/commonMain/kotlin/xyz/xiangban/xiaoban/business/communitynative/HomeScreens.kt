@@ -181,7 +181,7 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         XIcon(XIcons.Star, size = 18.dp)
-                                        Text(if (issue.isBaseline) "开源项目初始快照" else if (issue.source == "GitHub") "开源观测榜" else "本周开源热榜", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(if (issue.isBaseline) "开源项目初始快照" else if (issue.isTrending) "GitHub 开源热榜" else if (issue.source == "GitHub") "开源观测榜" else "本周开源热榜", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
                                     }
                                     Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { switchTo(CommunitySection.Home, HomeSub.Hot.key) }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
                                         Text("完整榜单", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
@@ -323,9 +323,10 @@ internal fun HotTab(env: CommunityEnv) {
 private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
     var details by rememberSaveable(issue.key) { mutableStateOf(false) }
     WhiteCard(padding = 14.dp) {
-        SectionHeader(if (issue.isBaseline) "开源项目快照" else "开源观测榜", action = "往期", onAction = onPast,
+        SectionHeader(if (issue.isBaseline) "开源项目快照" else if (issue.isTrending) "GitHub 开源热榜" else "开源观测榜", action = "往期", onAction = onPast,
             note = listOf(issue.weekStart, issue.weekEnd).filter { it.isNotEmpty() }.distinct().joinToString(" – "))
         Text(if (issue.isBaseline) "${issue.ranks.size} 个项目 · 按总 Star 排序 · 增量待积累"
+            else if (issue.isTrending) "${issue.ranks.size} 个项目 · 近 7 天新增 Star 合计 ${issue.totalGain?.let(::formatGain) ?: "暂无数据"}"
             else "${issue.ranks.size} 个项目 · ${issue.observedDays?.let { "$it 日观测" } ?: "本期观测"} · 净增 ${issue.totalGain?.let(::formatGain) ?: "暂无数据"}",
             Modifier.padding(top = 8.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().clickable { details = !details }.padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -335,6 +336,7 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
         if (details) {
             repoObservationLabel(issue.asOf)?.let { Text("整理于 $it", Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3) }
             Text((if (issue.isBaseline) "当前为首次观测，至少两次快照后计算净增量。"
+                else if (issue.isTrending) "取自 GitHub Trending 周榜，按 GitHub 页面顺序排列；新增 Star 为 GitHub 公布的近 7 天数据。"
                 else if (issue.complete) "已取得连续 7 日边界快照。" else "观测不足 7 日或存在缺采，未补造缺失数据。") + if (issue.sample) " · 示例数据" else "",
                 Modifier.padding(top = 4.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
             if (issue.dailyGain.size == 7 && issue.source != "GitHub") DayBars(issue.dailyGain, listOf("一", "二", "三", "四", "五", "六", "日"))

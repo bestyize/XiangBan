@@ -4,474 +4,175 @@ use tokio::{
     net::TcpListener,
     task::JoinHandle,
 };
-struct Harness {
-    pool: PgPool,
-    root: PgPool,
-    schema: String,
-}
-impl Harness {
-    async fn new() -> Result<Option<Self>, Box<dyn std::error::Error>> {
-        let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
-            eprintln!("skipped: TEST_DATABASE_URL is not set");
-            return Ok(None);
-        };
-        let root = crate::db::connect(&url, None).await?;
-        let schema = format!("github_test_{}", Uuid::new_v4().simple());
-        sqlx::query(&format!("CREATE SCHEMA {schema}"))
-            .execute(&root)
-            .await?;
-        let pool = crate::db::connect(&url, Some(&schema)).await?;
-        crate::db::migrate(&pool).await?;
-        super::super::schema::init(&pool).await?;
-        Ok(Some(Self { pool, root, schema }))
-    }
-    async fn run(&self, config: &Value) -> Uuid {
-        let id = Uuid::new_v4();
-        sqlx::query("UPDATE collection_sources SET config=$1,active_run=$2,lease_until=now()+interval '10 minutes' WHERE id='github_repos'").bind(config).bind(id).execute(&self.pool).await.unwrap();
-        sqlx::query("INSERT INTO collection_runs(id,source,status,config) VALUES($1,'github_repos','running',$2)").bind(id).bind(config).execute(&self.pool).await.unwrap();
-        id
-    }
-    async fn close(self) -> Result<(), sqlx::Error> {
-        self.pool.close().await;
-        sqlx::query(&format!("DROP SCHEMA {} CASCADE", self.schema))
-            .execute(&self.root)
-            .await?;
-        self.root.close().await;
-        Ok(())
-    }
-}
-async fn mock(
-    responses: Vec<(&'static str, u16, Option<String>, Value)>,
-) -> (String, JoinHandle<()>) {
+
+async fn mock(path: &'static str, status: u16, value: Value) -> (String, JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let origin = format!("http://{}", listener.local_addr().unwrap());
-    let mock_origin = origin.clone();
     let handle = tokio::spawn(async move {
-        for (path, status, location, value) in responses {
-            let (mut stream, _) =
-                tokio::time::timeout(std::time::Duration::from_secs(5), listener.accept())
-                    .await
-                    .unwrap()
-                    .unwrap();
-            let mut buffer = vec![0u8; 16384];
-            let n = stream.read(&mut buffer).await.unwrap();
-            let request = String::from_utf8_lossy(&buffer[..n]);
-            assert_eq!(
-                request.lines().next().unwrap().split_whitespace().nth(1),
-                Some(path)
-            );
-            assert!(request
-                .to_ascii_lowercase()
-                .contains("authorization: bearer test-token"));
-            let body = value.to_string();
-            let location = location
-                .map(|v| format!("Location: {}\r\n", v.replace("{origin}", &mock_origin)))
-                .unwrap_or_default();
-            let response=format!("HTTP/1.1 {status} Response\r\n{location}Content-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len());
-            stream.write_all(response.as_bytes()).await.unwrap();
-        }
+        let (mut stream, _) =
+            tokio::time::timeout(std::time::Duration::from_secs(5), listener.accept())
+                .await
+                .unwrap()
+                .unwrap();
+        let mut buffer = vec![0u8; 16384];
+        let n = stream.read(&mut buffer).await.unwrap();
+        let request = String::from_utf8_lossy(&buffer[..n]);
+        assert_eq!(request.lines().next().unwrap().split_whitespace().nth(1), Some(path));
+        assert!(request.to_ascii_lowercase().contains("authorization: bearer test-token"));
+        let body = value.to_string();
+        let response = format!("HTTP/1.1 {status} Response\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+        stream.write_all(response.as_bytes()).await.unwrap();
     });
     (origin, handle)
 }
-fn repo(id: i64, name: &str, stars: i64) -> Repository {
-    Repository {
-        id,
-        full_name: name.into(),
-        description: "A public project".into(),
-        language: "Rust".into(),
-        stars,
-    }
+
+fn row(name: &str, description: &str, language: &str, color: &str, total: &str, gain: &str) -> String {
+    let desc = if description.is_empty() {
+        String::new()
+    } else {
+        format!(r#"<p class="col-9 color-fg-muted my-1 tmp-pr-4">
+      {description}
+    </p>"#)
+    };
+    let lang = if language.is_empty() {
+        String::new()
+    } else {
+        format!(r#"<span class="tmp-mr-3 d-inline-block ml-0"><span class="repo-language-color" style="background-color: {color}"></span>
+  <span itemprop="programmingLanguage">{language}</span></span>"#)
+    };
+    let (owner, repo) = name.split_once('/').unwrap();
+    format!(r#"<article class="Box-row">
+  <div class="float-right d-flex"><a href="/login?return_to=%2F{owner}%2F{repo}" class="btn-sm btn">Star</a>
+    <a href="/sponsors/{owner}" class="btn">Sponsor</a></div>
+  <h2 class="h3 lh-condensed"><a data-hydro-click="{{&quot;record_id&quot;:1}}" href="/{name}" class="Link"><svg class="octicon"><path d="M2 2.5Z"></path></svg>
+      <span class="text-normal">
+        {owner} /
+</span>
+      {repo}</a></h2>
+  {desc}
+  <div class="f6 color-fg-muted mt-2">{lang}
+      <a href="/{name}/stargazers" class="Link"><svg class="octicon"><path d="M8 .25Z"></path></svg>
+        {total}</a>
+      <a href="/{name}/forks" class="Link"><svg><path d="M1Z"></path></svg>
+        5,837</a>
+      <span class="d-inline-block float-sm-right"><svg><path d="M8Z"></path></svg>
+        {gain} stars this week
+      </span></div>
+</article>"#)
 }
-fn wire(id: i64, name: &str, stars: i64) -> Value {
-    json!({"id":id,"full_name":name,"stargazers_count":stars,"private":false,"visibility":"public","description":"A public project","language":"Rust"})
+fn page(rows: &[String]) -> String {
+    format!("<html><body><div class=\"Box\">{}</div></body></html>", rows.join("\n"))
 }
-fn now() -> DateTime<Utc> {
-    Utc::now() - Duration::minutes(1)
+fn sample() -> String {
+    page(&[
+        row("Nutlope/hallmark", "Anti-AI-slop design skill for Claude Code, Cursor, &amp; Codex.", "TypeScript", "#3178c6", "110,001", "12,062"),
+        row("pbakaus/impeccable", "The &quot;design&quot; vocabulary &lt;for&gt; agents", "Rust", "#dea584", "98,898", "12,031"),
+        row("ghostty-org/ghostty", "", "", "", "30,500", "556"),
+        row("a-b/c.d_e", "Plain", "Go", "#00ADD8", "7", "7"),
+        row("anthropics/skills", "Agent skills", "Python", "#3572A5", "2,389", "2,389"),
+    ])
 }
 
 #[test]
-fn github_config_enforces_small_unique_public_name_allowlist() {
-    assert_eq!(
-        sanitize_config(json!({"repositories":["Zed/Example","abc/repo.name"]})).unwrap(),
-        json!({"repositories":["abc/repo.name","zed/example"]})
-    );
-    assert!(sanitize_config(json!({"repositories":["a/b","A/B"]})).is_err());
-    for name in [
-        "https://github.com/a/b",
-        "a/b/c",
-        "../repo",
-        "a/..",
-        "a/b?token=test-token",
-        "a/%2e",
-        "a/",
-        "/b",
-        "-owner/repo",
-    ] {
-        assert!(
-            sanitize_config(json!({"repositories":[name]})).is_err(),
-            "{name}"
-        );
+fn trending_rows_use_heading_link_not_sponsor_button_and_decode_text() {
+    let ranks = parse_trending(&sample()).unwrap();
+    let names = ranks.iter().map(|r| r["full_name"].as_str().unwrap()).collect::<Vec<_>>();
+    assert_eq!(names, ["Nutlope/hallmark", "pbakaus/impeccable", "ghostty-org/ghostty", "a-b/c.d_e", "anthropics/skills"]);
+    assert_eq!(ranks[0]["description"], "Anti-AI-slop design skill for Claude Code, Cursor, & Codex.");
+    assert_eq!(ranks[1]["description"], "The \"design\" vocabulary <for> agents");
+    assert_eq!((ranks[0]["star_total"].as_i64(), ranks[0]["star_gain"].as_i64()), (Some(110001), Some(12062)));
+    assert_eq!((ranks[1]["language"].as_str(), ranks[1]["language_color"].as_str()), (Some("Rust"), Some("#dea584")));
+    assert_eq!((ranks[2]["language"].as_str(), ranks[2]["description"].as_str()), (Some(""), Some("")));
+}
+
+#[test]
+fn trending_gain_larger_than_total_is_dropped_and_structure_change_fails_whole_batch() {
+    let mut rows = vec![row("bad/gain", "x", "Go", "#00ADD8", "10", "99")];
+    rows.extend((0..6).map(|i| row(&format!("ok/repo{i}"), "x", "Go", "#00ADD8", "1,000", "10")));
+    let ranks = parse_trending(&page(&rows)).unwrap();
+    assert_eq!(ranks.len(), 6);
+    assert!(ranks.iter().all(|r| r["full_name"] != "bad/gain"));
+    let renamed = sample().replace("stars this week", "stars recently");
+    assert!(parse_trending(&renamed).is_err());
+    assert!(parse_trending("<html>blocked</html>").is_err());
+    assert!(parse_trending(&page(&rows[..3])).is_err());
+}
+
+#[test]
+fn trending_issue_is_a_valid_rolling_issue_with_page_order_and_total() {
+    let now = Utc::now() - Duration::minutes(1);
+    let item = build_issue(&sample(), now).unwrap().remove(0);
+    let end = now.date_naive();
+    assert_eq!((item.kind.as_str(), item.key.as_str()), ("repo_issue", format!("github-rolling-{end}").as_str()));
+    assert_eq!(item.data["metric"], TRENDING_METRIC);
+    assert_eq!(item.data["total_gain"], 12062 + 12031 + 556 + 7 + 2389);
+    assert_eq!(item.data["observed_days"], 7);
+    assert_eq!(item.data["week_start"], (end - Duration::days(7)).to_string());
+    assert_eq!(item.data["ranks"][0]["full_name"], "Nutlope/hallmark");
+    assert!(crate::discover::validate("repo_issue", item.data).is_ok());
+}
+
+#[test]
+fn trending_validation_rejects_tampered_or_inconsistent_issues() {
+    let now = Utc::now() - Duration::minutes(1);
+    let good = build_issue(&sample(), now).unwrap().remove(0).data;
+    let mutations: Vec<(&str, Box<dyn Fn(&mut Value)>)> = vec![
+        ("total", Box::new(|v| v["total_gain"] = json!(1))),
+        ("wow", Box::new(|v| v["wow_pct"] = json!(1.5))),
+        ("source_url", Box::new(|v| v["source_url"] = json!("https://github.com"))),
+        ("days", Box::new(|v| v["observed_days"] = json!(6))),
+        ("future", Box::new(|v| {
+            let next = (Utc::now() + Duration::days(2)).date_naive();
+            v["observation_end"] = json!(next.to_string());
+            v["week_end"] = json!(next.to_string());
+        })),
+        ("daily", Box::new(|v| v["daily_gain"] = json!([1, 2, 3, 4, 5, 6, 7]))),
+        ("spark", Box::new(|v| v["ranks"][0]["spark"] = json!([1, 2]))),
+        ("url", Box::new(|v| v["ranks"][0]["url"] = json!("https://evil.invalid/x"))),
+        ("gain>total", Box::new(|v| v["ranks"][0]["star_total"] = json!(1))),
+        ("negative", Box::new(|v| v["ranks"][0]["star_gain"] = json!(-1))),
+        ("duplicate", Box::new(|v| v["ranks"][1]["full_name"] = json!("nutlope/HALLMARK"))),
+        ("color", Box::new(|v| v["ranks"][0]["language_color"] = json!("red"))),
+        ("empty", Box::new(|v| v["ranks"] = json!([]))),
+        ("too many", Box::new(|v| {
+            let first = v["ranks"][0].clone();
+            v["ranks"] = json!((0..31).map(|_| first.clone()).collect::<Vec<_>>());
+        })),
+    ];
+    for (name, mutate) in mutations {
+        let mut value = good.clone();
+        mutate(&mut value);
+        assert!(validate_issue(value).is_err(), "{name}");
     }
-    assert!(sanitize_config(json!({"repositories":[],"token":"test-token"})).is_err());
-    assert!(configured_names(&json!({"repositories":[]})).is_err());
-    assert!(sanitize_config(
-        json!({"repositories":(0..31).map(|i|format!("owner/repo{i}")).collect::<Vec<_>>()})
-    )
-    .is_err());
+}
+
+#[test]
+fn trending_sample_page_from_environment_parses_when_provided() {
+    let Ok(path) = std::env::var("TRENDING_SAMPLE_HTML") else {
+        eprintln!("skipped: TRENDING_SAMPLE_HTML is not set");
+        return;
+    };
+    let html = std::fs::read_to_string(path).unwrap();
+    let ranks = parse_trending(&html).unwrap();
+    assert!(ranks.len() >= 5);
+    assert!(build_issue(&html, Utc::now() - Duration::minutes(1)).is_ok());
 }
 
 #[tokio::test]
-async fn github_network_auth_failure_private_repo_and_untrusted_redirect_are_sanitized() {
+async fn github_auth_check_rejects_failure_and_anonymous_limits_without_leaking_the_token() {
     let http = super::super::credentials::http_client().unwrap();
-    let (api, server) = mock(vec![(
-        "/rate_limit",
-        200,
-        None,
-        json!({"resources":{"core":{"limit":5000,"remaining":4999}}}),
-    )])
-    .await;
+    let (api, server) = mock("/rate_limit", 200, json!({"resources":{"core":{"limit":5000,"remaining":4999}}})).await;
     verify_at(&api, "test-token", &http).await.unwrap();
     server.await.unwrap();
     for (status, value) in [
         (401, json!({"message":"test-token"})),
-        (
-            200,
-            json!({"resources":{"core":{"limit":60,"remaining":59}}}),
-        ),
+        (200, json!({"resources":{"core":{"limit":60,"remaining":59}}})),
     ] {
-        let (api, server) = mock(vec![("/rate_limit", status, None, value)]).await;
+        let (api, server) = mock("/rate_limit", status, value).await;
         let error = verify_at(&api, "test-token", &http).await.err().unwrap();
         assert!(!error.contains("test-token"));
         server.await.unwrap();
     }
-    let (api, server) = mock(vec![(
-        "/repos/owner/repo",
-        301,
-        Some("https://attacker.invalid/repositories/1".into()),
-        Value::Null,
-    )])
-    .await;
-    assert!(fetch(&api, "owner/repo", "test-token", &http)
-        .await
-        .is_err());
-    server.await.unwrap();
-    let (api, server) = mock(vec![
-        (
-            "/repos/owner/repo",
-            301,
-            Some("{origin}/repositories/42".into()),
-            Value::Null,
-        ),
-        (
-            "/repositories/42",
-            200,
-            None,
-            wire(42, "renamed/project", 100),
-        ),
-    ])
-    .await;
-    let relocated = fetch(&api, "owner/repo", "test-token", &http)
-        .await
-        .unwrap();
-    assert_eq!(relocated.id, 42);
-    assert_eq!(relocated.full_name, "renamed/project");
-    server.await.unwrap();
-    let mut private = wire(1, "owner/repo", 1);
-    private["private"] = json!(true);
-    let (api, server) = mock(vec![("/repos/owner/repo", 200, None, private)]).await;
-    assert!(fetch(&api, "owner/repo", "test-token", &http)
-        .await
-        .is_err());
-    server.await.unwrap();
-}
-
-#[tokio::test]
-async fn github_observation_needs_eight_boundaries_for_seven_days_and_never_fills_gaps(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let Some(h) = Harness::new().await? else {
-        return Ok(());
-    };
-    let now = now();
-    let mut repos = BTreeMap::new();
-    repos.insert(1, repo(1, "owner/project", 100));
-    save_snapshot(&h.pool, &repos[&1], now).await?;
-    let first = build_issue(&h.pool, &repos, now).await?;
-    assert_eq!(first[0].data["metric"], "star total baseline");
-    assert!(first[0].data["total_gain"].is_null());
-    assert!(first[0].data["ranks"][0]["star_gain"].is_null());
-    assert_eq!(first[0].data["daily_gain"], json!([]));
-    for ago in 1..=6 {
-        save_snapshot(
-            &h.pool,
-            &repo(1, "owner/project", 100 - ago * 5),
-            now - Duration::days(ago),
-        )
-        .await?;
-    }
-    let seven = build_issue(&h.pool, &repos, now).await?;
-    assert_eq!(seven[0].data["observed_days"], 6);
-    assert_eq!(seven[0].data["complete"], false);
-    assert_eq!(seven[0].data["daily_gain"], json!([]));
-    save_snapshot(
-        &h.pool,
-        &repo(1, "owner/project", 65),
-        now - Duration::days(7),
-    )
-    .await?;
-    let eight = build_issue(&h.pool, &repos, now).await?;
-    assert_eq!(eight[0].data["observed_days"], 7);
-    assert_eq!(eight[0].data["complete"], true);
-    assert_eq!(eight[0].data["total_gain"], 35);
-    assert_eq!(eight[0].data["daily_gain"], json!([5, 5, 5, 5, 5, 5, 5]));
-    assert!(eight[0].data["wow_pct"].is_null());
-    assert_eq!(
-        eight[0].data["ranks"][0]["snapshot_times"]
-            .as_array()
-            .unwrap()
-            .len(),
-        8
-    );
-    // Same-day re-execution keeps the exact first observed time and star count.
-    save_snapshot(
-        &h.pool,
-        &repo(1, "owner/project", 999),
-        now + Duration::seconds(1),
-    )
-    .await?;
-    let retry = build_issue(&h.pool, &repos, now + Duration::seconds(1)).await?;
-    assert_eq!(retry[0].data["ranks"], eight[0].data["ranks"]);
-    sqlx::query("DELETE FROM collection_github_snapshots WHERE repo_id=1 AND day=$1")
-        .bind((now - Duration::days(3)).date_naive())
-        .execute(&h.pool)
-        .await?;
-    let gap = build_issue(&h.pool, &repos, now).await?;
-    assert_eq!(gap[0].data["observed_days"], 7);
-    assert_eq!(gap[0].data["complete"], false);
-    assert_eq!(gap[0].data["daily_gain"], json!([]));
-    assert_eq!(
-        gap[0].data["ranks"][0]["spark"].as_array().unwrap().len(),
-        7
-    );
-    let mut forged = gap[0].data.clone();
-    forged["complete"] = json!(true);
-    assert!(validate_issue(forged).is_err());
-    h.close().await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn github_rename_keeps_identity_and_partial_failures_preserve_only_real_progress(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let Some(h) = Harness::new().await? else {
-        return Ok(());
-    };
-    let http = super::super::credentials::http_client()?;
-    let at = now();
-    let config = json!({"repositories":["owner/original"]});
-    let run = h.run(&config).await;
-    let (api, server) = mock(vec![(
-        "/repos/owner/original",
-        200,
-        None,
-        wire(42, "owner/original", 100),
-    )])
-    .await;
-    let first = collect_at(&h.pool, "test-token", &http, &config, run, &api, at - Duration::days(1)).await.unwrap();
-    assert_eq!(first[0].data["metric"], "star total baseline");
-    assert!(first[0].data["total_gain"].is_null());
-    server.await?;
-    // A new canonical name for the same numeric ID retains the old baseline.
-    let (api, server) = mock(vec![(
-        "/repos/owner/original",
-        200,
-        None,
-        wire(42, "new-owner/renamed", 110),
-    )])
-    .await;
-    let output = collect_at(&h.pool, "test-token", &http, &config, run, &api, at)
-        .await
-        .unwrap();
-    server.await?;
-    assert_eq!(output[0].data["ranks"][0]["repo_id"], "42");
-    assert_eq!(output[0].data["ranks"][0]["star_gain"], 10);
-    assert_eq!(output[0].data["ranks"][0]["full_name"], "new-owner/renamed");
-    crate::handlers::discover_editor::write_collected_batch(
-        &h.pool,
-        "github_repos",
-        run,
-        output.clone(),
-    )
-    .await?;
-    let (visible,): (i64,) =
-        sqlx::query_as("SELECT count(*) FROM discover_items WHERE kind='repo_issue'")
-            .fetch_one(&h.pool)
-            .await?;
-    assert_eq!(
-        visible, 0,
-        "GitHub snapshots cannot publish without a human review"
-    );
-    sqlx::query("UPDATE collection_runs SET status='succeeded' WHERE id=$1")
-        .bind(run)
-        .execute(&h.pool)
-        .await?;
-    let manifest: Vec<(String, String, i64)> =
-        sqlx::query_as("SELECT kind,key,revision FROM collection_run_items WHERE run_id=$1")
-            .bind(run)
-            .fetch_all(&h.pool)
-            .await?;
-    let review = manifest
-        .into_iter()
-        .map(
-            |(kind, key, expected_revision)| crate::handlers::discover_editor::BatchReviewItem {
-                kind,
-                key,
-                expected_revision,
-            },
-        )
-        .collect();
-    assert_eq!(
-        crate::handlers::discover_editor::review_collected_batch(&h.pool, run, "test", review)
-            .await?,
-        1
-    );
-    let (visible,): (i64,) = sqlx::query_as(
-        "SELECT count(*) FROM discover_items WHERE kind='repo_issue' AND status='published'",
-    )
-    .fetch_one(&h.pool)
-    .await?;
-    assert_eq!(visible, 1);
-    let partial = json!({"repositories":["a/valid","b/deleted"]});
-    let run = h.run(&partial).await;
-    let (api, server) = mock(vec![
-        ("/repos/a/valid", 200, None, wire(99, "a/valid", 5)),
-        (
-            "/repos/b/deleted",
-            404,
-            None,
-            json!({"message":"test-token"}),
-        ),
-    ])
-    .await;
-    let error = collect_at(&h.pool, "test-token", &http, &partial, run, &api, at)
-        .await
-        .err()
-        .unwrap();
-    assert!(!error.contains("test-token"));
-    server.await?;
-    let (count,): (i64,) =
-        sqlx::query_as("SELECT count(*) FROM collection_github_snapshots WHERE repo_id=99")
-            .fetch_one(&h.pool)
-            .await?;
-    assert_eq!(
-        count, 1,
-        "successful partial progress is kept without producing a partial candidate batch"
-    );
-    sqlx::query("UPDATE collection_sources SET config=$1 WHERE id='github_repos'")
-        .bind(json!({"repositories":[]}))
-        .execute(&h.pool)
-        .await?;
-    let (api, server) = mock(vec![("/repos/a/valid", 200, None, wire(99, "a/valid", 8))]).await;
-    assert!(collect_at(
-        &h.pool,
-        "test-token",
-        &http,
-        &partial,
-        run,
-        &api,
-        at + Duration::days(1)
-    )
-    .await
-    .is_err());
-    server.await?;
-    let (count,): (i64,) =
-        sqlx::query_as("SELECT count(*) FROM collection_github_snapshots WHERE repo_id=99")
-            .fetch_one(&h.pool)
-            .await?;
-    assert_eq!(
-        count, 1,
-        "changed configuration invalidates the old run snapshot"
-    );
-    h.close().await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn github_flags_negative_and_unusual_growth_without_manufacturing_daily_history(
-) -> Result<(), Box<dyn std::error::Error>> {
-    let Some(h) = Harness::new().await? else {
-        return Ok(());
-    };
-    let at = now();
-    let mut repos = BTreeMap::new();
-    for (id, start, end) in [(1, 100, 80), (2, 10000, 25000)] {
-        let repository = repo(id, &format!("owner/repo{id}"), end);
-        save_snapshot(
-            &h.pool,
-            &repo(id, &repository.full_name, start),
-            at - Duration::days(2),
-        )
-        .await?;
-        save_snapshot(&h.pool, &repository, at).await?;
-        repos.insert(id, repository);
-    }
-    let output = build_issue(&h.pool, &repos, at).await?;
-    let data = &output[0].data;
-    assert_eq!(data["observed_days"], 2);
-    assert_eq!(data["complete"], false);
-    assert_eq!(data["total_gain"], 14980);
-    assert_eq!(data["daily_gain"], json!([]));
-    assert!(data["ranks"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .all(|rank| rank["suspected_growth"] == true));
-    assert_eq!(data["ranks"][1]["star_gain"], -20);
-    h.close().await?;
-    Ok(())
-}
-
-#[tokio::test]
-async fn github_single_day_publishes_real_baselines_and_rejects_fake_zero_growth() -> Result<(), Box<dyn std::error::Error>> {
-    let Some(h) = Harness::new().await? else { return Ok(()); };
-    let at = now();
-    let mut repos = BTreeMap::new();
-    for id in 1..=5 {
-        let item = repo(id, &format!("owner/repo{id}"), id * 100);
-        save_snapshot(&h.pool, &item, at).await?;
-        repos.insert(id, item);
-    }
-    let output = build_issue(&h.pool, &repos, at).await?;
-    let baseline = &output[0].data;
-    assert_eq!(baseline["observed_days"], 0);
-    assert_eq!(baseline["metric"], "star total baseline");
-    assert_eq!(baseline["complete"], false);
-    assert!(baseline["total_gain"].is_null());
-    assert_eq!(baseline["ranks"].as_array().unwrap().len(), 5);
-    assert_eq!(baseline["ranks"][0]["star_total"], 500);
-    assert_eq!(baseline["ranks"][4]["star_total"], 100);
-    for rank in baseline["ranks"].as_array().unwrap() {
-        assert!(rank["star_gain"].is_null());
-        assert_eq!(rank["spark"].as_array().unwrap().len(), 1);
-        assert_eq!(rank["snapshot_times"][0], at.to_rfc3339());
-    }
-    for mutation in 0..5 {
-        let mut wrong = baseline.clone();
-        match mutation {
-            0 => wrong["total_gain"] = json!(0),
-            1 => wrong["ranks"][0]["star_gain"] = json!(0),
-            2 => wrong["metric"] = json!("observed net star change"),
-            3 => wrong["ranks"].as_array_mut().unwrap().swap(0, 1),
-            _ => wrong["complete"] = json!(true),
-        }
-        assert!(validate_issue(wrong).is_err());
-    }
-    // Once a second actual boundary exists, the same data becomes a real net-change observation.
-    for id in 1..=5 { save_snapshot(&h.pool, &repo(id, &format!("owner/repo{id}"), id * 100 - 10), at - Duration::days(1)).await?; }
-    let next = build_issue(&h.pool, &repos, at).await?;
-    assert_eq!(next[0].data["metric"], "observed net star change");
-    assert_eq!(next[0].data["total_gain"], 50);
-    h.close().await?;
-    Ok(())
 }
 
 #[test]

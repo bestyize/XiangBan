@@ -19,6 +19,14 @@ class RepoBaselineTest {
         assertEquals(0L, issue.totalGain); assertEquals(0L, issue.ranks.single().starGain)
         assertEquals(2, issue.ranks.single().spark.size)
     }
+    @Test fun `trending weekly issue is recognised and carries GitHub published gains without a spark`() {
+        val issue = CommunityJson.decodeFromString<RepoIssue>("""{"source":"GitHub","metric":"github trending weekly stars","observed_days":7,"complete":true,"total_gain":12062,"ranks":[{"full_name":"owner/project","star_total":110001,"star_gain":12062,"spark":[],"language":"Rust","language_color":"#dea584"}]}""")
+        assertTrue(issue.isTrending)
+        assertFalse(issue.isBaseline)
+        assertEquals(12062L, issue.totalGain); assertEquals(12062L, issue.ranks.single().starGain)
+        assertTrue(issue.ranks.single().spark.isEmpty())
+        assertNull(issue.ranks.single().observedDays)
+    }
     @Test fun `observation labels normalize offsets to UTC and hide malformed times`() {
         assertEquals("2026-10-31 13:45:33 UTC", repoObservationLabel("2026-10-31T21:45:33+08:00"))
         assertNull(repoObservationLabel(null)); assertNull(repoObservationLabel("not a timestamp"))

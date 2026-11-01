@@ -95,6 +95,7 @@ data class RepoIssue(
     val sample: Boolean = false,
 ) {
     val isBaseline: Boolean get() = source == "GitHub" && metric == "star total baseline"
+    val isTrending: Boolean get() = source == "GitHub" && metric == "github trending weekly stars"
 }
 
 fun repoObservationLabel(raw: String?): String? = raw?.let {
