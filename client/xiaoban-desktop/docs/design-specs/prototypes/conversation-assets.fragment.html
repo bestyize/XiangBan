@@ -42,7 +42,6 @@
 #xb-conversation-assets .xb-crumb strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #xb-conversation-assets .xb-crumb svg { width: 12px; height: 12px; color: var(--ui-muted); flex: none; }
 #xb-conversation-assets .xb-head-actions { display: flex; align-items: center; gap: 3px; flex: none; }
-#xb-conversation-assets .xb-head .xb-assets-toggle { background: var(--ui-soft); color: var(--ui-ink); white-space: nowrap; }
 #xb-conversation-assets .xb-count { font-size: 11px; background: var(--ui-surface); color: var(--ui-muted); border-radius: 4px; padding: 0 5px; }
 #xb-conversation-assets .xb-main { flex: 1; display: grid; grid-template-columns: minmax(0,1fr); min-width: 0; position: relative; }
 #xb-conversation-assets .xb-chat { padding: 27px 34px 18px; display: flex; flex-direction: column; min-width: 0; gap: 25px; }
@@ -230,7 +229,7 @@
         <div class="xb-account"><span class="xb-avatar">${icon('sparkles')}</span><span>我的小伴</span></div>
       </aside>
       <div class="xb-work"><header class="xb-head"><div class="xb-crumb"><span class="xb-muted">品牌工作区</span>${icon('chevron-right')}<strong>山野露营 · 品牌视觉</strong></div>
-        <div class="xb-head-actions"><button class="cursor-interaction xb-assets-toggle" data-action="toggle" aria-label="打开对话资产" aria-expanded="true">${icon('files')}<span>资产</span><span class="xb-count">8</span></button><button class="cursor-interaction xb-icon" aria-label="搜索对话" data-demo="搜索对话">${icon('search')}</button><button class="cursor-interaction xb-icon" aria-label="执行面板" data-demo="执行面板">${icon('panel-right')}</button><button class="cursor-interaction xb-icon" aria-label="更多对话操作" data-demo="更多对话操作">${icon('ellipsis')}</button></div>
+        <div class="xb-head-actions"><button class="cursor-interaction xb-icon xb-assets-toggle" data-action="toggle" data-tooltip="对话资产" aria-label="打开对话资产" aria-expanded="true">${icon('files')}</button><button class="cursor-interaction xb-icon" aria-label="搜索对话" data-demo="搜索对话">${icon('search')}</button><button class="cursor-interaction xb-icon" aria-label="执行面板" data-demo="执行面板">${icon('panel-right')}</button><button class="cursor-interaction xb-icon" aria-label="更多对话操作" data-demo="更多对话操作">${icon('ellipsis')}</button></div>
       </header><div class="xb-main">
         <main class="xb-chat"><div class="xb-date">今天 · 14:32</div><div class="xb-user">帮我做一套山野露营的品牌视觉，包含活动页、配图和可以交付的文件。</div>
           <div class="xb-answer"><span class="xb-avatar">${icon('sparkles')}</span><div class="xb-answer-body"><div><div class="xb-answer-name">小伴</div><p>做好了，整体采用自然绿与暖沙色，让画面保留一点山野的松弛感。</p></div>
@@ -264,7 +263,7 @@
       app.classList.toggle('xb-rail-open',s.pinned&&s.open);
       panel.hidden=!s.open;
       const total=s.empty?0:8;
-      app.querySelectorAll('.xb-head .xb-count,.xb-panel-head .xb-count').forEach(x=>x.textContent=total);
+      app.querySelectorAll('.xb-panel-head .xb-count').forEach(x=>x.textContent=total);
       app.querySelector('[data-action=toggle]').setAttribute('aria-expanded',String(s.open));
       const pin=app.querySelector('[data-action=pin]');
       pin.setAttribute('aria-label',s.pinned?'切换为浮层':'固定为侧栏');

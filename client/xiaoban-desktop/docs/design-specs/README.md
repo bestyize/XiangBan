@@ -30,7 +30,7 @@
 | 文件 | 用途 |
 | --- | --- |
 | [聊天输入框规范](chat-composer.md) | 技能 / 专家 / 连接器在输入框里的位置、作用范围、入口与代码位置 |
-| [对话资产交互设计稿](prototypes/conversation-assets.html) | 右上角统一收纳设计稿、生成图片、交付文件与文件夹；轻量浮层 / 常驻侧栏两版，可搜索、预览、浏览目录、定位消息与导入资产。[在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/conversation-assets.html)，需运行桌面项目 `npm run dev`；演示数据，正式聊天页已接入轻量浮层与固定侧栏，尚未重新打包 |
+| [对话资产交互设计稿](prototypes/conversation-assets.html) | 右上角以单个图标统一收纳设计稿、生成图片、交付文件与文件夹；轻量浮层 / 常驻侧栏两版，可搜索、预览、浏览目录、定位消息与导入资产。[在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/conversation-assets.html)，需运行桌面项目 `npm run dev`；演示数据，正式聊天页已接入轻量浮层与固定侧栏，尚未重新打包 |
 
 对话资产稿的可编辑源文件为 [conversation-assets.fragment.html](prototypes/conversation-assets.fragment.html)，独立浏览器预览为同目录 `conversation-assets.html`，两者应同步更新并沿用上述预览地址。独立预览使用 visualize 的 `scripts/render.py` 生成，并补入从项目 `lucide-vue-next` 离线导出的同名图标；对话内预览由宿主提供图标与设计选项。设计选项支持外观、主题色、空对话和文件失效状态。大型预览采用独立窗口外观，浏览器稿以内嵌无蒙层方式演示；实际接入须使用原生独立窗口。资产计数按顶层成果计算，文件夹内文件不重复计数；仅收纳当前对话成果，上传附件不混入此入口。打开系统应用、另存为、复制路径等均只显示演示反馈，不读写真实文件。
 
