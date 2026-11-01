@@ -53,6 +53,27 @@ class ChatHistoryTest {
     }
 
     @Test
+    fun `workspace survives replies and account switching and deletion keeps chats`() {
+        val store = ChatHistory(InMemoryChatHistoryFiles(), scope())
+        store.useAccount("a")
+        store.addWorkspace("工作")
+        val turns = listOf(ChatTurn(id = 1, role = "user", text = "你好"))
+        store.save("one", turns, 1)
+        store.move("one", "工作")
+        store.save("one", turns, 2)
+        assertEquals("工作", store.list().single().workspace)
+        store.useAccount("b")
+        assertTrue(store.workspaces().isEmpty())
+        store.useAccount("a")
+        assertEquals(listOf("工作"), store.workspaces())
+        store.renameWorkspace("工作", "学习")
+        assertEquals("学习", store.list().single().workspace)
+        store.deleteWorkspace("学习")
+        assertNull(store.list().single().workspace)
+        assertEquals(turns, store.load("one"))
+    }
+
+    @Test
     fun `new conversation ids do not repeat across launches`() {
         val a = newChatId(1_700_000_000_000, Random(1))
         val b = newChatId(1_700_000_000_000, Random(2))
