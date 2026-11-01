@@ -16,6 +16,10 @@ struct External { id: String, uuid: String }
 struct Bundle { manifest: BTreeMap<String, Entry>, template: String, pages: Vec<String>, external: Vec<External> }
 
 fn scripts() -> Regex { Regex::new(r#"(?is)<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>(.*?)</script\s*>"#).unwrap() }
+/// Content detection for ordinary document imports; plain HTML stays a document.
+pub fn recognizes(source:&str)->bool {
+    scripts().captures_iter(source).any(|c|attrs(&c[1]).get("type").is_some_and(|t|t=="__bundler/manifest"))
+}
 fn attrs(tag: &str) -> BTreeMap<String, String> {
     let re=Regex::new(r#"([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))"#).unwrap();
     re.captures_iter(tag).map(|c|(c[1].to_ascii_lowercase(),unescape(c.get(2).or(c.get(3)).or(c.get(4)).unwrap().as_str()))).collect()

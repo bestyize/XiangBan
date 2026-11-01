@@ -23,5 +23,5 @@ function save(){if(props.readonly||!props.writable)return;if(original.value!==pr
 </form>
 </template>
 <style scoped>
-.element-code label{display:block!important}.element-code textarea{display:block;box-sizing:border-box;width:100%;min-height:140px;margin-top:6px;padding:8px;resize:vertical;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-control);color:var(--ui-text-primary);font:11px/1.6 monospace}.code-actions{display:flex;justify-content:flex-end;gap:8px}.element-code p{color:var(--ui-text-secondary);font-size:11px}
+.element-code label{display:block!important}.element-code textarea{display:block;box-sizing:border-box;width:100%;min-height:140px;margin-top:6px;padding:8px;resize:vertical;border:1px solid var(--ui-line);border-radius:6px;background:var(--ui-control);color:var(--ui-text-primary);font:13px/1.6 monospace}.code-actions{display:flex;justify-content:flex-end;gap:8px}.element-code p{color:var(--ui-text-secondary);font-size:13px}
 </style>

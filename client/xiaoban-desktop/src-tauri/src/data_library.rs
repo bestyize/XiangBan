@@ -213,6 +213,24 @@ fn add_folder(app: &tauri::AppHandle, library: &mut Library, name: &str, parent:
 }
 
 /// Copies one file in. The copy keeps the original name so 小伴 and the file manager show it as the user knows it.
+fn import_design_document(store:&open_claude_design::Store,library:&mut Library,name:&str,bytes:&[u8],folder:Option<String>,origin:String,explicit:bool)->Result<Option<String>,String>{
+    use open_claude_design::{archive,html_import};
+    let ext=ext_of(name);
+    let (canvas,files)=if ext=="zip" {
+        if !explicit&&!archive::contains_source_index(bytes){return Ok(None)}
+        archive::from_zip(bytes)?
+    }else if matches!(ext.as_str(),"html"|"htm") {
+        let source=match std::str::from_utf8(bytes){Ok(s)=>s,Err(_) if !explicit=>return Ok(None),Err(_)=>return Err("HTML 需要使用 UTF-8 编码".into())};
+        if !explicit&&!html_import::recognizes(source)&&!(name.to_ascii_lowercase().ends_with(".dc.html")&&source.contains("<x-dc")){return Ok(None)}
+        html_import::from_html(source)?
+    }else{return Ok(None)};
+    let title=Path::new(name).file_stem().and_then(|v|v.to_str()).unwrap_or(name).chars().take(120).collect();
+    let p=store.import(title,"",canvas,files,bytes,name)?;
+    let id=p.id.clone();
+    library.docs.push(Doc{id:id.clone(),name:p.title.clone(),folder,ext:"design".into(),size:bytes.len() as u64,imported_ms:p.updated_ms,origin,status:"ready".into(),note:String::new(),preview:design_preview(&p),tags:vec!["设计稿".into()],design_id:Some(id.clone())});
+    Ok(Some(id))
+}
+
 fn copy_in(app: &tauri::AppHandle, library: &mut Library, root: &Path, name: &str, bytes: Option<&[u8]>, source: Option<&Path>, folder: Option<String>) -> Result<String, String> {
     let name = clean_name(name)?;
     let size = match (bytes, source) {
@@ -220,6 +238,12 @@ fn copy_in(app: &tauri::AppHandle, library: &mut Library, root: &Path, name: &st
         (None, Some(path)) => fs::metadata(path).map_err(|e| format!("{name}：{e}"))?.len(),
         _ => return Err("没有文件内容".into()),
     };
+    // Detect before ordinary document limits; every import entry reaches this path.
+    if matches!(ext_of(&name).as_str(),"html"|"htm"|"zip") {
+        let loaded;
+        let content=if let Some(bytes)=bytes {bytes}else{loaded=fs::read(source.ok_or("没有文件内容")?).map_err(|e|e.to_string())?;&loaded};
+        if let Some(id)=import_design_document(&crate::design::store(app)?,library,&name,content,folder.clone(),source.map(|p|p.display().to_string()).unwrap_or_default(),false)? {return Ok(id)}
+    }
     if size > MAX_IMPORT { return Err(format!("{name} 超过 200MB，没有导入")); }
     let id = new_id(app);
     let dir = root.join("files").join(&id);
@@ -370,6 +394,7 @@ pub async fn library_pick_import(app: tauri::AppHandle, window: tauri::WebviewWi
         }
     }).await.map_err(|e| e.to_string())?;
     if paths.is_empty() { return Ok(json!({ "library": load(&root(&app)?), "imported": 0, "errors": [] })); }
+    tauri::async_runtime::spawn_blocking(move || {
     let mut errors = Vec::new();
     let (before, library) = change(&app, |library, root| {
         folder_exists(library, &folder)?;
@@ -379,12 +404,14 @@ pub async fn library_pick_import(app: tauri::AppHandle, window: tauri::WebviewWi
     })?;
     read_pending(&app);
     Ok(json!({ "imported": library.docs.len() - before, "errors": errors, "library": library }))
+    }).await.map_err(|e|e.to_string())?
 }
 
 /// A file dropped onto the page: the page has its bytes but not its path.
 #[tauri::command]
-pub fn library_import_data(app: tauri::AppHandle, window: tauri::WebviewWindow, name: String, data_url: String, folder: Option<String>) -> Result<Library, String> {
+pub async fn library_import_data(app: tauri::AppHandle, window: tauri::WebviewWindow, name: String, data_url: String, folder: Option<String>) -> Result<Library, String> {
     control_only(&window)?;
+    tauri::async_runtime::spawn_blocking(move || {
     let encoded = data_url.split_once(',').map(|(_, data)| data).ok_or("文件内容不对")?;
     let bytes = base64::engine::general_purpose::STANDARD.decode(encoded.trim()).map_err(|_| "文件内容不对")?;
     let (_, library) = change(&app, |library, root| {
@@ -393,6 +420,27 @@ pub fn library_import_data(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     })?;
     read_pending(&app);
     Ok(library)
+    }).await.map_err(|e|e.to_string())?
+}
+
+/// Upgrade an existing document without requiring access to the original download.
+#[tauri::command]
+pub async fn library_convert_design(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{
+    control_only(&window)?;
+    tauri::async_runtime::spawn_blocking(move||{
+        let (design_id,library)=change(&app,|library,root|{
+            let doc=library.docs.iter().find(|d|d.id==id).cloned().ok_or("这份文档已经不在了")?;
+            if let Some(id)=doc.design_id{return Ok(id)}
+            let bytes=fs::read(root.join("files").join(&doc.id).join(&doc.name)).map_err(|e|format!("读取失败：{e}"))?;
+            let design_id=import_design_document(&crate::design::store(&app)?,library,&doc.name,&bytes,doc.folder,doc.origin,true)?.ok_or("请选择 HTML 或设计源码 ZIP")?;
+            let converted=library.docs.iter_mut().find(|d|d.id==design_id).unwrap();
+            for tag in doc.tags{if !converted.tags.contains(&tag){converted.tags.push(tag);}}
+            library.docs.retain(|d|d.id!=id);
+            Ok(design_id)
+        })?;
+        // The old copied file remains untouched; the design also preserves its own original.
+        Ok(json!({"id":design_id,"library":library}))
+    }).await.map_err(|e|e.to_string())?
 }
 
 #[tauri::command]
@@ -596,6 +644,34 @@ fn save_item(app: &tauri::AppHandle, source: &str, item: SaveInput) -> Result<St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ordinary_documents_stay_documents_and_design_content_is_auto_imported(){
+        let dir=std::env::temp_dir().join(format!("xiaoban-design-detection-{}-{}",std::process::id(),now_ms()));
+        let store=open_claude_design::Store::new(&dir);let mut library=Library::default();
+        assert!(import_design_document(&store,&mut library,"普通.html",b"<html>ordinary document</html>",None,String::new(),false).unwrap().is_none());
+        assert!(import_design_document(&store,&mut library,"images.zip",b"not a source bundle",None,String::new(),false).unwrap().is_none());
+        let html=br#"<script type='__bundler/manifest'>{}</script><script type='__bundler/template'>"<x-dc>Official board</x-dc>"</script>"#;
+        let id=import_design_document(&store,&mut library,"official.html",html,Some("work".into()),"download.html".into(),false).unwrap().unwrap();
+        assert_eq!(library.docs.len(),1);assert_eq!(library.docs[0].ext,"design");assert_eq!(library.docs[0].folder.as_deref(),Some("work"));
+        assert_eq!(library.docs[0].design_id.as_deref(),Some(id.as_str()));assert_eq!(store.original(&id).unwrap().1,html);
+        let p=store.load(&id).unwrap();assert_eq!(open_claude_design::boards(&p.canvas).unwrap().len(),1);
+        let zip=open_claude_design::archive::to_zip(&p).unwrap();
+        assert!(import_design_document(&store,&mut library,"source.zip",&zip,None,String::new(),false).unwrap().is_some());
+        let corrupt=br#"<script type='__bundler/manifest'>{broken}</script>"#;
+        assert!(import_design_document(&store,&mut library,"broken.html",corrupt,None,String::new(),false).is_err());assert_eq!(library.docs.len(),2);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn explicit_conversion_accepts_plain_html_and_preserves_its_original(){
+        let dir=std::env::temp_dir().join(format!("xiaoban-design-conversion-{}-{}",std::process::id(),now_ms()));
+        let store=open_claude_design::Store::new(&dir);let mut library=Library::default();let html=b"<html>Original page</html>";
+        let id=import_design_document(&store,&mut library,"page.html",html,None,String::new(),true).unwrap().unwrap();
+        assert_eq!(store.original(&id).unwrap().1,html);assert_eq!(library.docs[0].name,"page");
+        assert!(import_design_document(&store,&mut library,"images.zip",b"invalid",None,String::new(),true).is_err());
+        fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn links_are_recognised_by_service_and_kind_and_keep_the_extraction_code() {

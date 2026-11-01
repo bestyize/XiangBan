@@ -289,6 +289,22 @@ describe('资料库 page', () => {
 
 
 describe('design documents in My Documents', () => {
+  it.each([false,true])('converts an existing HTML document and preserves it on failure (failure=%s)',async failed=>{
+    localStorage.clear();const {wrapper,store}=setup();await flushPromises();const original=invoke.getMockImplementation()!;
+    const doc={...data().docs[0],id:'old-html',name:'official.html',ext:'html',folder:null,tags:['参考']};
+    const converted={...doc,id:'design-converted',designId:'design-converted',ext:'design',name:'official'};
+    invoke.mockImplementation(async(command,args)=>{
+      if(command==='library_state')return {...data(),docs:[doc]};
+      if(command==='library_convert_design'){if(failed)throw Error('HTML 数据损坏');return {id:converted.id,library:{...data(),docs:[converted]}};}
+      return original(command,args);
+    });
+    await wrapper.findComponent(LibraryDocs).props('library').refresh();await flushPromises();
+    await wrapper.get('[data-testid="library-convert-design"]').trigger('click');await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('library_convert_design',{id:doc.id});
+    if(failed){expect(wrapper.find('[data-testid="library-doc-old-html"]').exists()).toBe(true);expect(store.notify).toHaveBeenCalledWith(expect.any(Error),'error');}
+    else{expect(wrapper.find('[data-testid="library-doc-old-html"]').exists()).toBe(false);expect(invoke).toHaveBeenCalledWith('design_window_open',{id:converted.id});expect(wrapper.find('[data-testid="library-open-design"]').exists()).toBe(true);}
+    wrapper.unmount();
+  });
   it.each(['button', 'double-click'])('opens the original project in a standalone window via %s', async how => {
     localStorage.clear();const { wrapper } = setup();await flushPromises();
     const original = invoke.getMockImplementation()!;

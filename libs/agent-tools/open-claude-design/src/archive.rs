@@ -199,6 +199,11 @@ pub fn to_zip(project: &Project) -> Result<Vec<u8>, String> {
     Ok(writer.finish().map_err(|e| e.to_string())?.into_inner())
 }
 
+/// Detect a design source bundle without inflating its files (image ZIPs return false).
+pub fn contains_source_index(bytes:&[u8])->bool {
+    zip::ZipArchive::new(Cursor::new(bytes)).is_ok_and(|archive|archive.file_names().any(|name|name.is_ok_and(|name|name=="canvas.json"||name.ends_with("/canvas.json"))))
+}
+
 /// Convert one source file to the JSON store representation.
 /// Text remains unchanged; recognized media is encoded losslessly as a data URL.
 pub fn source_from_bytes(name: &str, bytes: Vec<u8>) -> Result<String, String> {
@@ -325,6 +330,8 @@ mod tests {
     }
     #[test]
     fn rejects_unsafe_or_incomplete_archives_before_import() {
+        let images=zip_files(vec![("page.png", b"\x89PNG\r\n\x1a\nfixture".to_vec())]);
+        assert!(!contains_source_index(&images));assert!(from_zip(&images).unwrap_err().contains("图片 ZIP"));
         assert!(from_zip(&zip_files(vec![("../escape.dc.html", b"x".to_vec())])).is_err());
         assert!(from_zip(&zip_files(vec![("asset.png", vec![0, 255])])).unwrap_err().contains("二进制"));
         let index = br#"{"v":3,"boards":{"Main.dc.html":{"w":100,"h":200}},"order":["Main.dc.html"]}"#.to_vec();

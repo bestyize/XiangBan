@@ -160,6 +160,11 @@ export function createLibraryStore(deps: LibraryDeps) {
     async importFile(name: string, dataUrl: string, folder: string | null) {
       await run(async () => { store.data = asLibrary(await deps.invoke<LibraryData>('library_import_data', { name, dataUrl, folder })); });
     },
+    async convertDesign(id:string) {
+      let designId:string|null=null;
+      await run(async()=>{const result=await deps.invoke<{id:string;library:LibraryData}>('library_convert_design',{id});store.data=asLibrary(result.library);designId=result.id;});
+      return designId;
+    },
     async createDocument(name: string, text: string, folder: string | null) {
       const previous = new Set(store.data.docs.map(doc => doc.id));
       const bytes = new TextEncoder().encode(text);
