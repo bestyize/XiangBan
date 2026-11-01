@@ -7,6 +7,8 @@ use agent_skill_discovery::plugin;
 use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool as Flag;
 
+pub mod baidu;
+
 /// 图标最大读取字节数；更大的不显示。
 const MAX_ICON_BYTES: u64 = 512 * 1024;
 /// 启动后第一次看连接器列表时，在后台把已启用的连接器恢复起来（可能要拉起本地命令或联网），只做一次。
@@ -97,7 +99,8 @@ fn entry_json(manager: &agent_connector_tools::ConnectorManager, e: &Entry, stat
     let skills: Vec<String> = e.plugin.skills_dir.as_ref().and_then(|dir| fs::read_dir(dir).ok()).into_iter().flatten().flatten()
         .filter(|f| f.path().join("SKILL.md").is_file()).filter_map(|f| f.file_name().to_str().map(String::from)).collect();
     let browser_auth = spec.browser_auth_config().is_some();
-    let auth = if browser_auth { "oauth" } else { match &spec.auth {
+    let baidu_personal = e.plugin.name == "baidu-netdisk" && spec.is_baidu_netdisk_personal();
+    let auth = if baidu_personal { "token" } else if browser_auth { "oauth" } else { match &spec.auth {
         AuthSpec::None if spec.transport != Transport::Stdio => "auto",
         AuthSpec::None => "none",
         AuthSpec::Token { .. } => "token",
@@ -114,7 +117,7 @@ fn entry_json(manager: &agent_connector_tools::ConnectorManager, e: &Entry, stat
         "namespace": e.namespace,
         "iconUrl": icon_data_url(&e.plugin),
         "transport": spec.transport, "command": spec.command, "args": spec.args,
-        "auth": { "type": auth, "browser": browser_auth, "schema": schema_json(spec), "configured": manager.configured_plugin_fields(&e.id).unwrap_or_default() },
+        "auth": { "type": auth, "browser": browser_auth, "personalAuth": if baidu_personal { Some("baidu-netdisk") } else { None }, "schema": schema_json(spec), "configured": manager.configured_plugin_fields(&e.id).unwrap_or_default() },
         "status": state, "enabled": enabled, "error": error,
         "tools": manager.tool_list(&e.id).into_iter().map(|(name, description)| json!({"name": name, "description": description})).collect::<Vec<_>>(),
         "examples": examples, "skills": skills,

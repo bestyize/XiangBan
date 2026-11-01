@@ -62,6 +62,49 @@ fn fixture(root: &Path, mcp: Value, policy: Value) -> ConnectorPlugin {
     ConnectorPlugin::load(root).unwrap()
 }
 #[test]
+fn baidu_personal_adapter_requires_the_exact_official_service_and_encodes_token() {
+    let tmp = Temp::new();
+    let root = tmp.0.join("baidu");
+    fs::create_dir_all(root.join(".codebuddy-plugin")).unwrap();
+    fs::write(root.join(".codebuddy-plugin/plugin.json"), json!({"name":"baidu-netdisk","version":"1"}).to_string()).unwrap();
+    let path = root.join("mcp.json");
+    let write_server = |url: &str, transport: &str, name: &str| {
+        fs::write(&path, json!({"mcpServers":{name:{"type":transport,"url":url}}}).to_string()).unwrap();
+    };
+    write_server("https://mcp-pan.baidu.com/sse", "sse", "baidu-netdisk");
+    let plugin = ConnectorPlugin::load(&root).unwrap();
+    let spec = &plugin.servers[0];
+    assert!(spec.is_baidu_netdisk_personal());
+    let field = &spec.schema().unwrap().fields[0];
+    assert_eq!(field.key, "BAIDU_NETDISK_ACCESS_TOKEN");
+    assert!(field.required);
+    assert_eq!(field.field_type, "password");
+    assert!(plugin.build_config("baidu-netdisk", &BTreeMap::new()).is_err());
+    let token = "private +&=#token";
+    let config = plugin.build_config("baidu-netdisk", &BTreeMap::from([(field.key.clone(), token.into())])).unwrap();
+    let url = reqwest::Url::parse(config["url"].as_str().unwrap()).unwrap();
+    assert_eq!(url.query_pairs().collect::<Vec<_>>(), vec![("access_token".into(), token.into())]);
+    assert_eq!(url.host_str(), Some("mcp-pan.baidu.com"));
+    assert!(!serde_json::to_string(&plugin).unwrap().contains(token));
+    for (url, transport, name) in [
+        ("https://mcp-pan.baidu.com.evil.example/sse", "sse", "baidu-netdisk"),
+        ("https://mcp-pan.baidu.com/sse?forward=evil", "sse", "baidu-netdisk"),
+        ("https://user@mcp-pan.baidu.com/sse", "sse", "baidu-netdisk"),
+        ("https://mcp-pan.baidu.com:444/sse", "sse", "baidu-netdisk"),
+        ("https://mcp-pan.baidu.com/sse#fragment", "sse", "baidu-netdisk"),
+        ("https://mcp-pan.baidu.com/sse", "streamable-http", "baidu-netdisk"),
+        ("https://mcp-pan.baidu.com/sse", "sse", "other"),
+    ] {
+        write_server(url, transport, name);
+        let other = ConnectorPlugin::load(&root).unwrap();
+        assert!(!other.servers[0].is_baidu_netdisk_personal());
+        assert!(other.servers[0].schema().is_none());
+    }
+    fs::write(root.join(".codebuddy-plugin/plugin.json"), json!({"name":"impostor","version":"1"}).to_string()).unwrap();
+    write_server("https://mcp-pan.baidu.com/sse", "sse", "baidu-netdisk");
+    assert!(ConnectorPlugin::load(&root).unwrap().servers[0].schema().is_none());
+}
+#[test]
 fn templates_schema_auth_and_safe_paths() {
     let tmp = Temp::new();
     let plugin_dir = tmp.0.join("plugin");

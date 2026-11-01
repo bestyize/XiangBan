@@ -59,6 +59,8 @@ ChatGPT 网页入口准备本地 stdio 连接并提供官方 Secure MCP Tunnel �
 
 MCP 连接器使用服务 README 中的标准配置，支持本机 stdio、远程 Streamable HTTP 与旧式 HTTP+SSE。市场插件审查并按摘要锁定后，可选择“安装并连接”：无需填写的远程服务自动试连，需要令牌时在当前安装窗口填写，需要标准 MCP OAuth 时直接打开浏览器授权（PKCE、本机回调与自动刷新）。本地命令展示后仍需点击“运行并连接”；运行环境需本机提供。连接器中心复用同一套表单和授权流程，不再要求额外勾选连接确认框；手工 MCP 配置的 JSON 仍在高级配置中。WorkBuddy 私有身份及服务专属登录仍需独立接入。初始化与工具发现成功才显示已连接。配置保存在本机，退出关闭连接，下次使用时恢复已启用配置；断开后旧任务中的工具也会失效。
 
+百度网盘个人体验授权使用隔离的百度授权窗口接收授权结果，不向网页开放小伴命令；严格核对授权来源与随机状态，连接验证成功后才替换旧凭据。百度个人体验凭据可能失效；无法自动接收时仍可手动输入授权结果。macOS 开发版已实际验证授权后自动连接，Windows 尚需实机验证；此流程依赖百度个人体验应用的行为。
+
 对话支持 `connector_search` 搜索已安装服务及小伴市场，`connector_request` 展示最多三个连接卡片并等待用户安装或授权；凭据在配置窗口填写，不进入聊天或模型上下文。完成后返回当前可用工具及 schema，可通过 `connector_call` 在同一任务继续调用，无需重开聊天。外部工具调用保持逐次确认，断开后的旧工具仍会失效；不自动重放超时或结果未知的操作。针对性验证：`npx vitest run src/ui/ai-store/ConnectorConnection.test.ts src/ui/ai-store/ConnectorCenter.test.ts src/ui/ai-store/RegistryMarketConnector.test.ts src/ui/chat/ChatConnectorRequest.test.ts`。
 
 运行时分别位于 [skill-discovery](../../libs/agent-tools/skill-discovery/README.md) 与 [connectors](../../libs/agent-tools/connectors/README.md)。针对性验证：`cargo test --manifest-path libs/agent-tools/skill-discovery/Cargo.toml`、`cargo test --manifest-path libs/agent-tools/connectors/Cargo.toml`（仓库根目录），以及本目录 `npx vitest run src/ui/pages/AiStorePage.test.ts src/ui/ai-store/RegistryCatalog.test.ts`。真实目录及临时安装联调：`cargo run --manifest-path libs/agent-tools/skill-discovery/Cargo.toml --example catalog-smoke -- tech-test-automation --install`，不执行包内脚本。

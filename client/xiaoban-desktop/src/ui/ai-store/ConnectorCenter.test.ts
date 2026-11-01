@@ -78,6 +78,21 @@ describe('installed connector center', () => {
     await form.get('form').trigger('submit'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_connector_configure', { id: 'repo', values: {}, confirmed: true });
   });
+  it('opens the official personal authorization page and submits the token only to the connector', async () => {
+    const baiduSchema = { title: '百度网盘个人授权', fields: [{ key: 'BAIDU_NETDISK_ACCESS_TOKEN', label: 'Access Token', type: 'password' as const, required: true }] };
+    await open({ plugin: 'baidu-netdisk', auth: { type: 'token', personalAuth: 'baidu-netdisk', configured: [], schema: baiduSchema } });
+    await click('手动输入授权信息');
+    await click('打开百度授权页面');
+    expect(invoke).toHaveBeenCalledWith('open_download_url', { url: 'https://openapi.baidu.com/oauth/2.0/authorize?client_id=QHOuRXiepJBMjtk0esLhrPoNlQyYd0mF&redirect_uri=oob&response_type=token&scope=basic%2Cnetdisk' });
+    const form = wrapper.getComponent(ConnectorTokenForm);
+    const token = form.get('[aria-label="Access Token"]');
+    expect(token.attributes('type')).toBe('password');
+    await token.setValue('https://openapi.baidu.com/oauth/2.0/login_success#access_token=test-token&expires_in=3600');
+    await form.get('form').trigger('submit'); await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('ai_connector_configure', { id: 'repo', values: { BAIDU_NETDISK_ACCESS_TOKEN: 'test-token' }, confirmed: true });
+    expect((token.element as HTMLInputElement).value).toBe('');
+    expect(wrapper.html()).not.toContain('test-token');
+  });
   it('clears credentials after a failed submit and keeps an actionable error', async () => {
     await open({ auth: { type: 'token', schema, configured: ['HOST'] } });
     vi.mocked(invoke).mockRejectedValueOnce('服务不可用');

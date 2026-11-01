@@ -101,6 +101,95 @@ mod browser_auth_tests {
         spec.command = Some("npx".into()); spec.args = vec!["@other/server-github".into()];
         assert!(spec.browser_auth_config().is_none());
     }
+
+    #[test]
+    fn baidu_personal_token_stays_in_vault_and_only_enters_transient_official_url() {
+        let root = std::env::temp_dir().join(format!("baidu-vault-{}", crate::oauth::random().unwrap()));
+        let plugin_root = root.join("plugin");
+        std::fs::create_dir_all(plugin_root.join(".codebuddy-plugin")).unwrap();
+        std::fs::write(plugin_root.join(".codebuddy-plugin/plugin.json"), json!({"name":"baidu-netdisk","version":"1"}).to_string()).unwrap();
+        std::fs::write(plugin_root.join("mcp.json"), json!({"mcpServers":{"baidu-netdisk":{"type":"sse","url":"https://mcp-pan.baidu.com/sse"}}}).to_string()).unwrap();
+        let plugin = ConnectorPlugin::load(&plugin_root).unwrap();
+        let manager = ConnectorManager::new(root.clone(), root.clone()).unwrap();
+        let id = plugin.connection_id("baidu-netdisk");
+        let token = "private-baidu-token-83422";
+        manager.plugin_vault().unwrap().set(&id, "BAIDU_NETDISK_ACCESS_TOKEN", token).unwrap();
+        let binding = json!({"connectorPlugin":Binding { plugin, server:"baidu-netdisk".into() }});
+        assert!(!binding.to_string().contains(token));
+        let (effective, _, _) = manager.resolve_plugin_config(&id, &binding).unwrap();
+        assert_eq!(effective["transport"], "sse");
+        assert!(effective["url"].as_str().unwrap().contains(token));
+        for entry in std::fs::read_dir(root.join("vault")).unwrap() {
+            let data = std::fs::read(entry.unwrap().path()).unwrap();
+            assert!(!String::from_utf8_lossy(&data).contains(token));
+        }
+        manager.shutdown(); std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn baidu_credential_update_preserves_existing_connection_until_commit() {
+        use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+        let root = std::env::temp_dir().join(format!("baidu-transaction-{}", crate::oauth::random().unwrap()));
+        let plugin_root = root.join("plugin");
+        std::fs::create_dir_all(plugin_root.join(".codebuddy-plugin")).unwrap();
+        std::fs::write(plugin_root.join(".codebuddy-plugin/plugin.json"), json!({"name":"baidu-netdisk","version":"1"}).to_string()).unwrap();
+        std::fs::write(plugin_root.join("mcp.json"), json!({"mcpServers":{"baidu-netdisk":{"type":"sse","url":"https://mcp-pan.baidu.com/sse"}}}).to_string()).unwrap();
+        let script = root.join("server.py");
+        std::fs::write(&script, r#"import sys,json
+for line in sys.stdin:
+ r=json.loads(line)
+ if 'id' not in r: continue
+ if r['method']=='initialize': v={'protocolVersion':'2024-11-05','capabilities':{'tools':{}},'serverInfo':{'name':'test','version':'1'}}
+ elif r['method']=='tools/list': v={'tools':[{'name':'read','inputSchema':{'type':'object'}}]}
+ else: v={'content':[{'type':'text','text':'ok'}]}
+ print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':v}),flush=True)
+"#).unwrap();
+        let plugin = ConnectorPlugin::load(&plugin_root).unwrap();
+        let manager = ConnectorManager::new(root.join("config"), root.clone()).unwrap();
+        let id = plugin.connection_id("baidu-netdisk");
+        let values = |s: &str| BTreeMap::from([("BAIDU_NETDISK_ACCESS_TOKEN".into(), s.into())]);
+        let mock = |id: &str, _: &Value, disabled: Vec<String>, timeout: Duration, cancel: Arc<AtomicBool>| {
+            manager.start_resolved(id, &json!({"command":if cfg!(windows) {"python"} else {"python3"},"args":[script]}), disabled, timeout, cancel)
+        };
+        manager.connect_plugin_transactional_with(&plugin, "baidu-netdisk", &values("old-token"), true, Arc::new(AtomicBool::new(false)), &mock).unwrap();
+        let old_tool = manager.tools()[0].clone();
+        let old_config = std::fs::read(root.join("config/connections.json")).unwrap();
+        let vault = manager.plugin_vault().unwrap();
+        let failed = manager.connect_plugin_transactional_with(&plugin, "baidu-netdisk", &values("new-token"), true, Arc::new(AtomicBool::new(false)), |_, config, _, _, _| {
+            assert!(config["url"].as_str().unwrap().contains("new-token"));
+            Err("sensitive remote error".into())
+        }).unwrap_err();
+        assert!(!failed.contains("sensitive"));
+        let cancelled = Arc::new(AtomicBool::new(false));
+        assert!(manager.connect_plugin_transactional_with(&plugin, "baidu-netdisk", &values("new-token"), true, cancelled.clone(), |id, config, disabled, timeout, cancel| {
+            let active = mock(id, config, disabled, timeout, cancel)?;
+            cancelled.store(true, Ordering::SeqCst);
+            Ok(active)
+        }).is_err());
+        assert!(manager.connect_plugin_transactional_with(&plugin, "baidu-netdisk", &values("new-token"), true, Arc::new(AtomicBool::new(false)), |id, config, disabled, timeout, cancel| {
+            let active = mock(id, config, disabled, timeout, cancel)?;
+            manager.generation.fetch_add(1, Ordering::SeqCst);
+            Ok(active)
+        }).is_err());
+        assert_eq!(vault.get(&id, "BAIDU_NETDISK_ACCESS_TOKEN").unwrap().as_deref(), Some("old-token"));
+        assert_eq!(std::fs::read(root.join("config/connections.json")).unwrap(), old_config);
+        assert!(old_tool.execute(json!({}), &agent_kernel::ToolCtx::detached("test")).is_ok());
+        // Persistence failure must not replace the validated old credential or tools.
+        let path = root.join("config/connections.json");
+        std::fs::rename(&path, root.join("config/connections.backup")).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(manager.connect_plugin_transactional_with(&plugin, "baidu-netdisk", &values("new-token"), true, Arc::new(AtomicBool::new(false)), &mock).is_err());
+        std::fs::remove_dir(&path).unwrap();
+        std::fs::rename(root.join("config/connections.backup"), &path).unwrap();
+        assert_eq!(vault.get(&id, "BAIDU_NETDISK_ACCESS_TOKEN").unwrap().as_deref(), Some("old-token"));
+        assert!(old_tool.execute(json!({}), &agent_kernel::ToolCtx::detached("test")).is_ok());
+        manager.connect_plugin_transactional_with(&plugin, "baidu-netdisk", &values("new-token"), true, Arc::new(AtomicBool::new(false)), &mock).unwrap();
+        assert_eq!(vault.get(&id, "BAIDU_NETDISK_ACCESS_TOKEN").unwrap().as_deref(), Some("new-token"));
+        assert!(old_tool.execute(json!({}), &agent_kernel::ToolCtx::detached("test")).is_err());
+        assert_eq!(manager.tools().len(), 1);
+        assert!(!std::fs::read_to_string(root.join("config/connections.json")).unwrap().contains("new-token"));
+        manager.shutdown(); std::fs::remove_dir_all(root).unwrap();
+    }
 }
 impl Default for ConnectorState {
     fn default() -> Self {
@@ -247,6 +336,87 @@ impl ConnectorManager {
             true,
         )
     }
+    /// Validate a new personal Baidu credential against MCP before replacing
+    /// either the saved token or the currently active connection.
+    pub fn connect_plugin_transactional(
+        &self, plugin: &ConnectorPlugin, server: &str,
+        values: &BTreeMap<String, String>, confirmed: bool,
+        cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    ) -> Result<Value, String> {
+        self.connect_plugin_transactional_with(plugin, server, values, confirmed, cancel,
+            |id, config, disabled, timeout, cancel| self.start_resolved(id, config, disabled, timeout, cancel))
+    }
+    fn connect_plugin_transactional_with<F>(
+        &self, plugin: &ConnectorPlugin, server: &str,
+        values: &BTreeMap<String, String>, confirmed: bool,
+        cancel: std::sync::Arc<std::sync::atomic::AtomicBool>, start: F,
+    ) -> Result<Value, String>
+    where F: FnOnce(&str, &Value, Vec<String>, Duration, std::sync::Arc<std::sync::atomic::AtomicBool>) -> Result<super::Active, String> {
+        use std::sync::atomic::Ordering;
+        if !confirmed { return Err("连接插件前需要用户明确确认配置".into()); }
+        let _operation = self.plugin_operations.lock().unwrap_or_else(|e| e.into_inner());
+        let spec = plugin.server(server)?;
+        if plugin.name != "baidu-netdisk" || !spec.is_baidu_netdisk_personal()
+            || values.len() != 1 || !values.contains_key("BAIDU_NETDISK_ACCESS_TOKEN") {
+            return Err("仅支持更新百度网盘个人授权凭据".into());
+        }
+        spec.validate_values(values, false)?;
+        let id = plugin.connection_id(server);
+        let binding = json!({"connectorPlugin":Binding { plugin: plugin.clone(), server: server.into() }});
+        let (config, disabled, timeout) = self.resolve_plugin_config_with_values(&id, &binding, Some(values), true)?;
+        let generation = {
+            let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            if cancel.load(Ordering::SeqCst) || self.shutting_down.load(Ordering::SeqCst) { return Err("授权已取消".into()); }
+            if state.records.len() >= 16 && !state.records.iter().any(|r| r.id == id) { return Err("最多配置 16 个连接器".into()); }
+            self.generation.fetch_add(1, Ordering::SeqCst) + 1
+        };
+        // Keep transport diagnostics generic: URLs may contain the new token.
+        let active = start(&id, &config, disabled, timeout, cancel.clone())
+            .map_err(|_| if cancel.load(Ordering::SeqCst) { "授权已取消" } else { "百度网盘连接验证失败，请检查授权或网络" }.to_string())?;
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if cancel.load(Ordering::SeqCst) || self.shutting_down.load(Ordering::SeqCst)
+            || self.generation.load(Ordering::SeqCst) != generation {
+            return Err("授权已取消或连接配置已变化，请重试".into());
+        }
+        let old_records = state.records.clone();
+        let old_plugin_state = self.plugin_state(&id);
+        let mut records = old_records.clone();
+        let record = super::Record { id: id.clone(), name: plugin.display.name.chars().take(100).collect(), config: binding, enabled: true };
+        if let Some(existing) = records.iter_mut().find(|r| r.id == id) { *existing = record; } else { records.push(record); }
+        let mut enabled = old_plugin_state.clone();
+        enabled.enabled = true;
+        enabled.user_disabled = false;
+        let vault = self.plugin_vault()?;
+        self.save(&records)?;
+        if let Err(error) = self.store_plugin_state(&id, enabled) {
+            self.save(&old_records).map_err(|_| "无法恢复连接器配置")?;
+            return Err(error);
+        }
+        // This is the commit boundary. Cancellation before it leaves the old
+        // credential and live tools intact; after it the new connection wins.
+        let commit = if cancel.load(Ordering::SeqCst) || self.shutting_down.load(Ordering::SeqCst) {
+            Err("授权已取消".to_string())
+        } else {
+            vault.set(&id, "BAIDU_NETDISK_ACCESS_TOKEN", &values["BAIDU_NETDISK_ACCESS_TOKEN"])
+        };
+        if let Err(error) = commit {
+            let restored_records = self.save(&old_records);
+            let restored_state = self.store_plugin_state(&id, old_plugin_state);
+            if restored_records.is_err() || restored_state.is_err() { return Err("无法恢复连接器配置".into()); }
+            return Err(error);
+        }
+        if let Some(key) = old_records.iter().find(|r| r.id == id).and_then(|r| r.config["oauthSession"].as_str()) {
+            if let Ok(path) = super::oauth::token_path(&self.root, &id, key) { super::oauth::retire_credentials(&path); }
+        }
+        if let Some(old) = state.active.remove(&id) {
+            if let Some(session) = &old.oauth { session.retire(); }
+            old.close();
+        }
+        state.records = records;
+        state.errors.remove(&id);
+        state.active.insert(id.clone(), active);
+        Ok(super::status(&state, &id))
+    }
     /// OAuth discovery reuses the existing browser flow; only references enter connections.json.
     pub fn begin_connect_plugin(
         self: &std::sync::Arc<Self>,
@@ -309,6 +479,15 @@ impl ConnectorManager {
         id: &str,
         config: &Value,
     ) -> Result<(Value, Vec<String>, Duration), String> {
+        self.resolve_plugin_config_with_values(id, config, None, false)
+    }
+    fn resolve_plugin_config_with_values(
+        &self,
+        id: &str,
+        config: &Value,
+        supplied: Option<&BTreeMap<String, String>>,
+        allow_disabled: bool,
+    ) -> Result<(Value, Vec<String>, Duration), String> {
         let Some(binding) = config.get("connectorPlugin") else {
             return Ok((config.clone(), vec![], Duration::from_secs(45)));
         };
@@ -318,7 +497,7 @@ impl ConnectorManager {
             return Err("插件连接标识不匹配".into());
         }
         let state = self.plugin_state(id);
-        if !state.enabled || state.user_disabled {
+        if !allow_disabled && (!state.enabled || state.user_disabled) {
             return Err("连接器已停用".into());
         }
         let spec = binding.plugin.server(&binding.server)?;
@@ -327,7 +506,8 @@ impl ConnectorManager {
         let mut built = if browser {
             spec.browser_auth_config().ok_or("此连接器不支持内置网页登录，请使用原有配置连接")?
         } else {
-            let values = self.plugin_values(&binding.plugin, &binding.server, id, &vault)?;
+            let mut values = self.plugin_values(&binding.plugin, &binding.server, id, &vault)?;
+            if let Some(supplied) = supplied { values.extend(supplied.clone()); }
             binding.plugin.build_config(&binding.server, &values)?
         };
         for (target, overrides) in [

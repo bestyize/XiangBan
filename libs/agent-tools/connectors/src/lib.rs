@@ -297,6 +297,9 @@ impl ConnectorManager {
     }
     fn start(&self, id: &str, config: &Value,cancel:Arc<AtomicBool>) -> Result<Active, String> {
         let (config, disabled_tools, timeout) = self.resolve_plugin_config(id, config)?;
+        self.start_resolved(id, &config, disabled_tools, timeout, cancel)
+    }
+    fn start_resolved(&self, id: &str, config: &Value, disabled_tools: Vec<String>, timeout: Duration, cancel: Arc<AtomicBool>) -> Result<Active, String> {
         let config = normalized_config(&config)?;
         let prefix = format!("mcp_ext_{}_", id.replace('-', "_"));
         let mut session = None;
@@ -477,9 +480,9 @@ impl ConnectorManager {
         self.connect(id, &record.name, record.config, true)
     }
     pub fn disconnect(&self, id: &str) -> Result<(), String> {
-        self.generation.fetch_add(1,Ordering::SeqCst);
         self.cancel_for_connector(id);
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        self.generation.fetch_add(1,Ordering::SeqCst);
         let mut records = state.records.clone();
         let record = records
             .iter_mut()

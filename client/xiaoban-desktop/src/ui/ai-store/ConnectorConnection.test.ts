@@ -30,6 +30,37 @@ async function setup(patch: Partial<InstalledConnector> = {}, autoConnect = fals
 }
 async function click(text: string) { await wrapper.findAll('button').find(b => b.text() === text)!.trigger('click'); await flushPromises(); }
 describe('connection and authorization in place', () => {
+  const baiduAuth: InstalledConnector['auth'] = { type: 'token', personalAuth: 'baidu-netdisk', configured: [],
+    schema: { title: '百度网盘个人授权', fields: [{ key: 'BAIDU_NETDISK_ACCESS_TOKEN', label: 'Access Token', type: 'password', required: true }] } };
+  it('opens the isolated Baidu authorization flow and refreshes after successful connection', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => {
+      if (command === 'ai_connector_baidu_start') return { flowId: 'baidu-flow' };
+      if (command === 'ai_connector_baidu_status') { current = { ...current, status: 'connected', enabled: true }; return { status: 'connected' }; }
+      return original(command, args);
+    });
+    await setup({ plugin: 'baidu-netdisk', auth: baiduAuth });
+    expect(wrapper.find('form').exists()).toBe(false);
+    await click('百度登录并连接');
+    expect(invoke).toHaveBeenCalledWith('ai_connector_baidu_start', { id: current.id });
+    expect(wrapper.text()).toContain('请在百度授权窗口');
+    await vi.advanceTimersByTimeAsync(1000); await flushPromises();
+    expect(wrapper.text()).toContain('已连接，可在任务中使用');
+    expect(wrapper.findComponent(ConnectorConnection).emitted('connected')).toHaveLength(1);
+  });
+  it('retains manual fallback after an incomplete Baidu authorization', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => {
+      if (command === 'ai_connector_baidu_start') return { flowId: 'baidu-flow' };
+      if (command === 'ai_connector_baidu_status') return { status: 'error', error: '百度授权未完成，请重试。' };
+      return original(command, args);
+    });
+    await setup({ plugin: 'baidu-netdisk', auth: baiduAuth });
+    await click('百度登录并连接'); await vi.advanceTimersByTimeAsync(1000); await flushPromises();
+    expect(wrapper.text()).toContain('百度授权未完成');
+    await click('手动输入授权信息');
+    expect(wrapper.get('[aria-label="Access Token"]').attributes('type')).toBe('password');
+  });
   const githubAuth: InstalledConnector['auth'] = { type: 'oauth', browser: true, configured: [],
     schema: { title: 'GitHub Token', fields: [{ key: 'TOKEN', label: 'Token', type: 'password', required: true }] } };
   it('logs in GitHub without the legacy required token form, including stdio packages', async () => {
