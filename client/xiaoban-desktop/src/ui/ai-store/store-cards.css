@@ -22,7 +22,6 @@
 .xc-link{border:0;background:transparent;padding:4px;font:inherit;font-size:12px;color:var(--ui-text-secondary);cursor:pointer}.xc-link:hover{color:var(--ui-ink)}
 .xc button:focus-visible,.store-dialog button:focus-visible,.registry-dialog button:focus-visible{outline:2px solid var(--ui-btn);outline-offset:3px}
 @container(min-width:1000px){.connector-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@container(max-width:640px){.xc-grid{grid-template-columns:minmax(0,1fr)}}
 @media(prefers-reduced-motion:reduce){.xc{transition:none}}
 
 /* Shared detail surfaces: flat controls and grouped content. */
