@@ -4,6 +4,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ControlShell from './ControlShell.vue';
 import { invoke, listen } from '../bridge.ts';
 import LoginModal from './components/LoginModal.vue';
+import { activeSkin, builtinSkin } from './skins/store.ts';
+import { appearanceMode } from './appearance.ts';
+import SkinScene from './application-skins/SkinScene.vue';
 
 vi.mock('naive-ui', async (importOriginal) => {
   const actual = await importOriginal<typeof import('naive-ui')>();
@@ -50,6 +53,40 @@ describe('ControlShell sidebar', () => {
   });
   afterEach(() => { document.body.innerHTML = ''; });
   const storeOf = (wrapper: ReturnType<typeof mount>) => wrapper.findComponent(LoginModal).props('store');
+
+  it('keeps the selected skin across pages without blocking their controls', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation((command, args) => command === 'skin_list'
+      ? Promise.resolve({ skins: [], activeId: builtinSkin.id })
+      : original(command, args));
+    const oldMode = appearanceMode.value;
+    appearanceMode.value = 'light';
+    const wrapper = mount(ControlShell, { attachTo: document.body, global: { stubs: {
+      ChatPage: { name: 'ChatPage', template: `<div data-testid="chat-stub"><button data-testid="chat-action" @click="$event.target.textContent = 'clicked'">click</button></div>` },
+    } } });
+    try {
+      await flushPromises();
+      expect(activeSkin.value?.id).toBe(builtinSkin.id);
+      expect(wrapper.find('[data-testid="skin-scene"]').exists()).toBe(true);
+      expect(wrapper.get('.control-app').classes()).toContain('has-application-skin');
+      expect(wrapper.getComponent(SkinScene).props('interactive')).toBe(true);
+      const store = storeOf(wrapper);
+      store.navigate('chat');
+      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="chat-stub"]').exists()).toBe(true); });
+      expect(wrapper.find('[data-testid="skin-scene"]').exists()).toBe(true);
+      expect(wrapper.getComponent(SkinScene).props('interactive')).toBe(false);
+      expect(wrapper.getComponent(SkinScene).props('paused')).toBe(true);
+      await wrapper.get('[data-testid="chat-action"]').trigger('click');
+      expect(wrapper.get('[data-testid="chat-action"]').text()).toBe('clicked');
+      appearanceMode.value = 'dark'; await flushPromises();
+      expect(wrapper.find('[data-testid="skin-scene"]').exists()).toBe(true);
+      store.navigate('new-task'); await flushPromises();
+      expect(wrapper.find('[data-testid="skin-scene"]').exists()).toBe(true);
+    } finally {
+      wrapper.unmount(); activeSkin.value = null; appearanceMode.value = oldMode;
+      vi.mocked(invoke).mockImplementation(original);
+    }
+  });
 
   it('lists 小伴 AI (new task, AI plugins, library) above 装扮, 游玩 and 提醒, and keeps the AI store tab', async () => {
     const wrapper = mount(ControlShell, { attachTo: document.body });
