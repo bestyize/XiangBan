@@ -44,10 +44,17 @@ watch(() => session.loggedIn, v => {
 </template>
 <style>
 :root{--mobile-nav-offset:calc(84px + env(safe-area-inset-bottom));--brand-soft:color-mix(in srgb,var(--brand) 8%,var(--surface))}
-.site-layout{padding-left:216px;min-height:100dvh}.community-layout{background:color-mix(in srgb,var(--surface) 55%,var(--paper))}.app-main{max-width:var(--page-w);margin:0 auto;padding:8px 24px 40px;min-height:calc(100dvh - 180px)}
+.site-layout{padding-left:216px;min-height:100dvh;--page-w:1000px}.community-layout{background:color-mix(in srgb,var(--surface) 55%,var(--paper))}.app-main{container:page / inline-size;max-width:var(--page-w);margin:0 auto;padding:8px 24px 40px;min-height:calc(100dvh - 180px)}
 .app-footer{max-width:var(--page-w);margin:0 auto;padding:16px 24px 28px;color:var(--ink-3);font-size:12px}.app-footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}.app-footer p{margin:8px 0 0}.app-footer a:hover{color:var(--ink)}
 .skip-link{position:fixed;left:232px;top:-80px;z-index:100;padding:12px 20px;background:var(--surface);border-radius:12px}.skip-link:focus{top:8px}
 @media(max-width:1023px){.site-layout{padding-left:0;padding-bottom:var(--mobile-nav-offset)}.skip-link{left:12px}.app-main{padding:4px 20px 24px}.app-footer{padding:16px 20px 20px}}
 @media(max-width:767px){.creation-layout .site-header{display:none}.app-main{padding:0 12px 20px}.app-main.focus-main{padding-bottom:0}.community-layout .app-main{padding-left:8px;padding-right:8px}.app-footer{padding:16px 12px 12px}}
+@media(min-width:1100px){
+  .site-layout{padding-left:200px;--page-w:1000px}
+  .app-main{padding:12px 32px 48px}
+  .app-footer{padding:20px 32px 28px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:20px;font-size:12px}
+  .app-footer p{margin:0}.app-footer nav{gap:16px}
+}
+@media(min-width:1600px){.app-main{padding-left:40px;padding-right:40px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 </style>

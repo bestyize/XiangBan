@@ -31,3 +31,11 @@
 .community-page .community-meta{font-variant-numeric:tabular-nums}
 .community-page .community-back{gap:6px;margin:2px 0 8px;padding:0 4px}
 @media(max-width:767px){.community-page>.community-tabs:first-of-type{position:sticky;top:48px;z-index:20;margin:0 -8px 12px;padding:0 16px}.community-page .community-detail{padding:18px 16px}.community-page .community-detail h1{font-size:23px}}
+
+@media(min-width:1100px){
+.community-page{max-width:1240px}
+.community-page>.community-tabs+.community-tabs{border-bottom:0;gap:8px;margin-bottom:12px;padding-top:0}
+.community-page>.community-tabs+.community-tabs button{min-height:36px;padding:6px 14px;font-size:13px;border-radius:20px}
+.community-page>.community-tabs+.community-tabs button.on{background:var(--brand-soft);color:var(--brand)}
+.community-page>.community-tabs+.community-tabs button.on:after{display:none}
+}
