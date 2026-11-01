@@ -6,4 +6,7 @@ defineEmits<{ change: [key: string] }>()
 <style scoped>
 .community-tabs{display:flex;justify-content:safe center;gap:clamp(14px,4vw,24px);overflow-x:auto;padding:0 12px;margin-bottom:12px;background:var(--surface);scrollbar-width:none;border-bottom:1px solid color-mix(in srgb,var(--line) 65%,transparent)}
 button{position:relative;flex:none;min-height:44px;padding:8px 0 10px;border:0;background:none;color:var(--ink-2);font-size:14px;cursor:pointer}button.on{color:var(--ink);font-weight:650}button.on:after{content:'';position:absolute;left:50%;bottom:3px;transform:translateX(-50%);height:3px;width:18px;border-radius:2px;background:var(--brand)}
+@media(min-width:1100px){
+.community-tabs{justify-content:flex-start;gap:28px;background:none;padding:0 12px;margin-bottom:18px;border-bottom:1px solid var(--line-strong)}button{font-size:15px;min-height:48px;padding-bottom:14px}button.on:after{bottom:0;width:24px}
+}
 </style>

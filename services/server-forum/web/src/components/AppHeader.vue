@@ -73,3 +73,10 @@ watch(() => route.fullPath, () => { searchOpen.value = false })
   .detail-header .header-login{display:none}
 }
 </style>
+
+<style scoped>
+@media(min-width:1100px){
+.site-header{background:color-mix(in srgb,var(--surface) 90%,transparent);border-bottom:1px solid var(--line)}.header-inner{height:64px;padding:0 32px}.community-navigation{flex:none;justify-content:flex-start;gap:32px;height:64px}.community-navigation a{font-size:15px}.community-navigation a.on:after{bottom:0;width:24px}.header-context{font-size:14px;font-weight:500}.header-icon{width:38px;height:38px}.header-login{height:36px;font-size:13px;border:1px solid var(--line)}.header-actions{gap:8px}.header-search{padding-top:8px}
+}
+@media(min-width:1600px){.header-inner{padding-left:40px;padding-right:40px}}
+</style>
