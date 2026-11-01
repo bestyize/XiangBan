@@ -6,6 +6,8 @@
 //! the user asks with it ("小伴可参考"), and the first lines become its preview.
 
 use base64::Engine;
+pub mod cloud;
+pub(crate) mod generated_images;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -72,6 +74,8 @@ pub struct Link {
     pub code: Option<String>,
     pub folder: Option<String>,
     pub added_ms: u64,
+    pub remote: Option<cloud::Reference>,
+    pub content: Option<cloud::ContentState>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -96,6 +100,8 @@ pub struct Library {
     pub docs: Vec<Doc>,
     pub links: Vec<Link>,
     pub saved: Vec<Saved>,
+    /// Includes removed images, so recovery respects the user's decision to delete a copy.
+    pub generated_image_imports: Vec<String>,
 }
 
 /// Serializes every change to `library.json`.
@@ -213,6 +219,24 @@ fn add_folder(app: &tauri::AppHandle, library: &mut Library, name: &str, parent:
 }
 
 /// Copies one file in. The copy keeps the original name so 小伴 and the file manager show it as the user knows it.
+fn import_design_document(store:&open_claude_design::Store,library:&mut Library,name:&str,bytes:&[u8],folder:Option<String>,origin:String,explicit:bool)->Result<Option<String>,String>{
+    use open_claude_design::{archive,html_import};
+    let ext=ext_of(name);
+    let (canvas,files)=if ext=="zip" {
+        if !explicit&&!archive::contains_source_index(bytes){return Ok(None)}
+        archive::from_zip(bytes)?
+    }else if matches!(ext.as_str(),"html"|"htm") {
+        let source=match std::str::from_utf8(bytes){Ok(s)=>s,Err(_) if !explicit=>return Ok(None),Err(_)=>return Err("HTML 需要使用 UTF-8 编码".into())};
+        if !explicit&&!html_import::recognizes(source)&&!(name.to_ascii_lowercase().ends_with(".dc.html")&&source.contains("<x-dc")){return Ok(None)}
+        html_import::from_html(source)?
+    }else{return Ok(None)};
+    let title=Path::new(name).file_stem().and_then(|v|v.to_str()).unwrap_or(name).chars().take(120).collect();
+    let p=store.import(title,"",canvas,files,bytes,name)?;
+    let id=p.id.clone();
+    library.docs.push(Doc{id:id.clone(),name:p.title.clone(),folder,ext:"design".into(),size:bytes.len() as u64,imported_ms:p.updated_ms,origin,status:"ready".into(),note:String::new(),preview:design_preview(&p),tags:vec!["设计稿".into()],design_id:Some(id.clone())});
+    Ok(Some(id))
+}
+
 fn copy_in(app: &tauri::AppHandle, library: &mut Library, root: &Path, name: &str, bytes: Option<&[u8]>, source: Option<&Path>, folder: Option<String>) -> Result<String, String> {
     let name = clean_name(name)?;
     let size = match (bytes, source) {
@@ -220,6 +244,12 @@ fn copy_in(app: &tauri::AppHandle, library: &mut Library, root: &Path, name: &st
         (None, Some(path)) => fs::metadata(path).map_err(|e| format!("{name}：{e}"))?.len(),
         _ => return Err("没有文件内容".into()),
     };
+    // Detect before ordinary document limits; every import entry reaches this path.
+    if matches!(ext_of(&name).as_str(),"html"|"htm"|"zip") {
+        let loaded;
+        let content=if let Some(bytes)=bytes {bytes}else{loaded=fs::read(source.ok_or("没有文件内容")?).map_err(|e|e.to_string())?;&loaded};
+        if let Some(id)=import_design_document(&crate::design::store(app)?,library,&name,content,folder.clone(),source.map(|p|p.display().to_string()).unwrap_or_default(),false)? {return Ok(id)}
+    }
     if size > MAX_IMPORT { return Err(format!("{name} 超过 200MB，没有导入")); }
     let id = new_id(app);
     let dir = root.join("files").join(&id);
@@ -278,7 +308,8 @@ fn read_all(app: &tauri::AppHandle) {
         let Ok(root) = root(app) else { return };
         let Some(doc) = load(&root).docs.into_iter().find(|d| d.status == "reading") else { return };
         let path = root.join("files").join(&doc.id).join(&doc.name);
-        let (status, note, preview) = read_text(&path, &doc.ext);
+        let (status, mut note, preview) = read_text(&path, &doc.ext);
+        if status == "ready" && cloud::download::needs_text_attachment(&doc) { note="提问时使用提取文字，不包含原文件的图片、图表或扫描页".into(); }
         let result = change(app, |library, _| {
             if let Some(entry) = library.docs.iter_mut().find(|d| d.id == doc.id) {
                 entry.status = status.into(); entry.note = note; entry.preview = preview;
@@ -348,6 +379,7 @@ pub fn library_state(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Res
     let root = root(&app)?;
     // Recover a source commit whose indexing was interrupted, without duplicating documents.
     for p in crate::design::store(&app)?.list("*")? { upsert_design(&app,&p)?; }
+    generated_images::recover(&app)?;
     let library = load(&root);
     // A reading interrupted by quitting picks up where it stopped.
     if library.docs.iter().any(|d| d.status == "reading") { read_pending(&app); }
@@ -370,6 +402,7 @@ pub async fn library_pick_import(app: tauri::AppHandle, window: tauri::WebviewWi
         }
     }).await.map_err(|e| e.to_string())?;
     if paths.is_empty() { return Ok(json!({ "library": load(&root(&app)?), "imported": 0, "errors": [] })); }
+    tauri::async_runtime::spawn_blocking(move || {
     let mut errors = Vec::new();
     let (before, library) = change(&app, |library, root| {
         folder_exists(library, &folder)?;
@@ -379,12 +412,14 @@ pub async fn library_pick_import(app: tauri::AppHandle, window: tauri::WebviewWi
     })?;
     read_pending(&app);
     Ok(json!({ "imported": library.docs.len() - before, "errors": errors, "library": library }))
+    }).await.map_err(|e|e.to_string())?
 }
 
 /// A file dropped onto the page: the page has its bytes but not its path.
 #[tauri::command]
-pub fn library_import_data(app: tauri::AppHandle, window: tauri::WebviewWindow, name: String, data_url: String, folder: Option<String>) -> Result<Library, String> {
+pub async fn library_import_data(app: tauri::AppHandle, window: tauri::WebviewWindow, name: String, data_url: String, folder: Option<String>) -> Result<Library, String> {
     control_only(&window)?;
+    tauri::async_runtime::spawn_blocking(move || {
     let encoded = data_url.split_once(',').map(|(_, data)| data).ok_or("文件内容不对")?;
     let bytes = base64::engine::general_purpose::STANDARD.decode(encoded.trim()).map_err(|_| "文件内容不对")?;
     let (_, library) = change(&app, |library, root| {
@@ -393,6 +428,27 @@ pub fn library_import_data(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     })?;
     read_pending(&app);
     Ok(library)
+    }).await.map_err(|e|e.to_string())?
+}
+
+/// Upgrade an existing document without requiring access to the original download.
+#[tauri::command]
+pub async fn library_convert_design(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{
+    control_only(&window)?;
+    tauri::async_runtime::spawn_blocking(move||{
+        let (design_id,library)=change(&app,|library,root|{
+            let doc=library.docs.iter().find(|d|d.id==id).cloned().ok_or("这份文档已经不在了")?;
+            if let Some(id)=doc.design_id{return Ok(id)}
+            let bytes=fs::read(root.join("files").join(&doc.id).join(&doc.name)).map_err(|e|format!("读取失败：{e}"))?;
+            let design_id=import_design_document(&crate::design::store(&app)?,library,&doc.name,&bytes,doc.folder,doc.origin,true)?.ok_or("请选择 HTML 或设计源码 ZIP")?;
+            let converted=library.docs.iter_mut().find(|d|d.id==design_id).unwrap();
+            for tag in doc.tags{if !converted.tags.contains(&tag){converted.tags.push(tag);}}
+            library.docs.retain(|d|d.id!=id);
+            Ok(design_id)
+        })?;
+        // The old copied file remains untouched; the design also preserves its own original.
+        Ok(json!({"id":design_id,"library":library}))
+    }).await.map_err(|e|e.to_string())?
 }
 
 #[tauri::command]
@@ -492,10 +548,28 @@ pub fn library_remove(app: tauri::AppHandle, window: tauri::WebviewWindow, ids: 
             else { let _ = fs::remove_dir_all(root.join("files").join(&doc.id)); }
         }
         library.docs.retain(|d| !ids.contains(&d.id));
+        for link in library.links.iter().filter(|l| ids.contains(&l.id)) { cloud::remove_snapshot(root, &link.id); }
         library.links.retain(|l| !ids.contains(&l.id));
         library.saved.retain(|s| !ids.contains(&s.id));
         Ok(())
     }).map(|(_, library)| library)
+}
+
+fn local_document_path(root: &Path, id: &str) -> Result<PathBuf, String> {
+    let doc = load(root).docs.into_iter().find(|d| d.id == id).ok_or("这份文档已经不在了")?;
+    if doc.design_id.is_some() { return Err("请在设计画布中打开这份作品".into()); }
+    let files = root.join("files").canonicalize().map_err(|_| "资料库文件目录已不存在")?;
+    let path = root.join("files").join(&doc.id).join(&doc.name).canonicalize().map_err(|_| "本地文件已不存在或无法访问")?;
+    if !path.starts_with(&files) || !path.is_file() { return Err("这份资料没有有效的本地文件副本".into()); }
+    Ok(path)
+}
+
+/// Open the library's own copy with the system default app, independently of AI attachment limits.
+#[tauri::command]
+pub fn library_open(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<(), String> {
+    control_only(&window)?;
+    let path = local_document_path(&root(&app)?, &id)?;
+    crate::storage::show_in_file_manager(&path).map_err(|_| "无法打开文件，请检查系统默认应用关联".into())
 }
 
 /// Shows the copy in Finder or Explorer.
@@ -509,11 +583,13 @@ pub fn library_reveal(app: tauri::AppHandle, window: tauri::WebviewWindow, id: S
 
 /// The document as a chat attachment, for "用这份资料提问".
 #[tauri::command]
-pub fn library_attachment(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<Value, String> {
+pub async fn library_attachment(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<Value, String> {
     control_only(&window)?;
+    tauri::async_runtime::spawn_blocking(move || {
     let root = root(&app)?;
     let doc = load(&root).docs.into_iter().find(|d| d.id == id).ok_or("这份文档已经不在了")?;
     if doc.design_id.is_some() { return Err("请打开设计画布继续修改这份作品".into()); }
+    if cloud::download::needs_text_attachment(&doc) { return cloud::download::text_attachment(&doc, &root.join("files").join(&doc.id).join(&doc.name)); }
     if let Some((_, note)) = readable_kind(&doc.ext, doc.size) { return Err(note.into()); }
     let bytes = fs::read(root.join("files").join(&doc.id).join(&doc.name)).map_err(|e| format!("读取失败：{e}"))?;
     let image = IMAGES.contains(&doc.ext.as_str());
@@ -527,6 +603,7 @@ pub fn library_attachment(app: tauri::AppHandle, window: tauri::WebviewWindow, i
     };
     let data = format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes));
     Ok(if image { json!({ "image": data }) } else { json!({ "name": doc.name, "size": doc.size, "mime": mime, "dataUrl": data }) })
+    }).await.map_err(|_| "读取附件已中断".to_string())?
 }
 
 #[tauri::command]
@@ -540,7 +617,7 @@ pub fn library_add_link(app: tauri::AppHandle, window: tauri::WebviewWindow, url
         let url = url.trim().to_string();
         if library.links.iter().any(|l| l.url == url) { return Err("这个链接已经在资料库里了".into()); }
         let title = if title.is_empty() { kind.clone() } else { title.to_string() };
-        library.links.insert(0, Link { id: new_id(&app), url, title, platform, kind, code, folder, added_ms: now_ms() });
+        library.links.insert(0, Link { id: new_id(&app), url, title, platform, kind, code, folder, added_ms: now_ms(), remote: None, content: None });
         Ok(())
     }).map(|(_, library)| library)
 }
@@ -596,6 +673,66 @@ fn save_item(app: &tauri::AppHandle, source: &str, item: SaveInput) -> Result<St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_open_uses_the_library_copy_regardless_of_attachment_status() {
+        let dir = std::env::temp_dir().join(format!("xiaoban-library-open-{}", std::process::id()));
+        let folder = dir.join("files/large-image"); fs::create_dir_all(&folder).unwrap();
+        let copy = folder.join("我的 图片.png"); fs::write(&copy, b"library copy").unwrap();
+        let mut library = Library::default();
+        library.docs.push(Doc { id: "large-image".into(), name: "我的 图片.png".into(), origin: "/not/the/copy.png".into(), status: "tooLarge".into(), ..Doc::default() });
+        save(&dir, &library).unwrap();
+        assert_eq!(local_document_path(&dir, "large-image").unwrap(), copy.canonicalize().unwrap());
+        assert!(local_document_path(&dir, "missing").unwrap_err().contains("已经不在"));
+        library.docs[0].design_id = Some("design-1".into()); save(&dir, &library).unwrap();
+        assert!(local_document_path(&dir, "large-image").unwrap_err().contains("设计画布"));
+        library.docs[0].design_id = None; save(&dir, &library).unwrap(); fs::remove_file(copy).unwrap();
+        assert!(local_document_path(&dir, "large-image").unwrap_err().contains("已不存在"));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn local_open_rejects_directories_and_symlinks_outside_the_library() {
+        let dir = std::env::temp_dir().join(format!("xiaoban-library-open-bounds-{}", std::process::id()));
+        let folder = dir.join("files/doc"); fs::create_dir_all(folder.join("directory")).unwrap();
+        let mut library = Library::default(); library.docs.push(Doc { id: "doc".into(), name: "directory".into(), ..Doc::default() });
+        save(&dir, &library).unwrap(); assert!(local_document_path(&dir, "doc").is_err());
+        #[cfg(unix)] {
+            fs::write(dir.join("outside.txt"), b"outside").unwrap();
+            std::os::unix::fs::symlink(dir.join("outside.txt"), folder.join("linked.txt")).unwrap();
+            library.docs[0].name = "linked.txt".into(); save(&dir, &library).unwrap();
+            assert!(local_document_path(&dir, "doc").is_err());
+        }
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn ordinary_documents_stay_documents_and_design_content_is_auto_imported(){
+        let dir=std::env::temp_dir().join(format!("xiaoban-design-detection-{}-{}",std::process::id(),now_ms()));
+        let store=open_claude_design::Store::new(&dir);let mut library=Library::default();
+        assert!(import_design_document(&store,&mut library,"普通.html",b"<html>ordinary document</html>",None,String::new(),false).unwrap().is_none());
+        assert!(import_design_document(&store,&mut library,"images.zip",b"not a source bundle",None,String::new(),false).unwrap().is_none());
+        let html=br#"<script type='__bundler/manifest'>{}</script><script type='__bundler/template'>"<x-dc>Official board</x-dc>"</script>"#;
+        let id=import_design_document(&store,&mut library,"official.html",html,Some("work".into()),"download.html".into(),false).unwrap().unwrap();
+        assert_eq!(library.docs.len(),1);assert_eq!(library.docs[0].ext,"design");assert_eq!(library.docs[0].folder.as_deref(),Some("work"));
+        assert_eq!(library.docs[0].design_id.as_deref(),Some(id.as_str()));assert_eq!(store.original(&id).unwrap().1,html);
+        let p=store.load(&id).unwrap();assert_eq!(open_claude_design::boards(&p.canvas).unwrap().len(),1);
+        let zip=open_claude_design::archive::to_zip(&p).unwrap();
+        assert!(import_design_document(&store,&mut library,"source.zip",&zip,None,String::new(),false).unwrap().is_some());
+        let corrupt=br#"<script type='__bundler/manifest'>{broken}</script>"#;
+        assert!(import_design_document(&store,&mut library,"broken.html",corrupt,None,String::new(),false).is_err());assert_eq!(library.docs.len(),2);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn explicit_conversion_accepts_plain_html_and_preserves_its_original(){
+        let dir=std::env::temp_dir().join(format!("xiaoban-design-conversion-{}-{}",std::process::id(),now_ms()));
+        let store=open_claude_design::Store::new(&dir);let mut library=Library::default();let html=b"<html>Original page</html>";
+        let id=import_design_document(&store,&mut library,"page.html",html,None,String::new(),true).unwrap().unwrap();
+        assert_eq!(store.original(&id).unwrap().1,html);assert_eq!(library.docs[0].name,"page");
+        assert!(import_design_document(&store,&mut library,"images.zip",b"invalid",None,String::new(),true).is_err());
+        fs::remove_dir_all(dir).unwrap();
+    }
 
     #[test]
     fn links_are_recognised_by_service_and_kind_and_keep_the_extraction_code() {

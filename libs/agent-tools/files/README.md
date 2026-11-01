@@ -4,6 +4,7 @@ Optional file capabilities for agent-kernel hosts. The dependency goes from this
 
 The model receives one extended `read_file` tool rather than a tool per file type:
 - Text/code/CSV/logs: delegate to the kernel's existing bounded text reader.
+- JSON text: `json_pointer` selects an array or value; `json_fields`, `json_offset` / `json_limit` and `json_group_by` delegate to the kernel's bounded projection and counting, including for spilled tool results. Grouping alone returns counts without item data and covers only the selected array, not other API pages. Missing projected fields become null; grouping reports missing fields separately.
 - PNG/JPEG/GIF/WebP: return `Part::Image` for a vision-capable model.
 - PDF: extract the text layer; scanned pages and illustrations may be missing. No OCR.
 - DOCX/PPTX: extract body/slide text with source markers; no visual/layout fidelity.

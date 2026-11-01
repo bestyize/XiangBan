@@ -265,12 +265,19 @@
       node.replaceWith(fragment); return;
     }
     if (node.localName === 'dc-import') { expandImport(node, scope, ctx); return; }
+    // Official standalone exports encode case-sensitive DOM attributes this way.
+    // Keep component props above intact; restore DOM names (including SVG viewBox).
+    for (const attr of [...node.attributes]) if (attr.name.startsWith('sc-camel-')) {
+      node.removeAttribute(attr.name);
+      node.setAttribute(camel(attr.name.slice(9)), attr.value);
+    }
     for (const attr of [...node.attributes]) {
-      if (attr.name.startsWith('on')) {
+      if (attr.name.toLowerCase().startsWith('on')) {
         node.removeAttribute(attr.name);
         const handler = expr(attr.value, scope);
         if (typeof handler === 'function') {
-          const capture = attr.name.endsWith('capture'), raw = attr.name.slice(2).replace(/capture$/, '');
+          const eventName = attr.name.toLowerCase();
+          const capture = eventName.endsWith('capture'), raw = eventName.slice(2).replace(/capture$/, '');
           const event = raw === 'doubleclick' ? 'dblclick' : raw === 'change' && (node.localName === 'textarea' || node.localName === 'input' && !['checkbox','radio','file'].includes(node.type)) ? 'input' : raw;
           node.addEventListener(event, e => { if (!editing) try { handler(e); } catch (error) { report(error); } }, capture);
         }

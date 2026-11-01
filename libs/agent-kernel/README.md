@@ -31,6 +31,8 @@
 
 ## 0.2 接入与迁移
 
+MCP 的 stdio、Streamable HTTP 和旧式 SSE 连接统一使用 `mcp::INITIALIZATION_TIMEOUT`（45 秒）作为初始化总预算；启动 / 建立传输、握手和工具分页发现共用同一截止时间。`McpConfig.timeout` / `HttpMcpConfig.timeout` 仅控制工具调用，短调用预算不再提前取消初始化；HTTP 响应体读取也使用对应阶段剩余的预算。HTTP / SSE 初始化超时与用户主动取消分别报告。
+
 - `ToolSpec::new` 默认 `Risk::Exec`、串行。已核实的只读工具显式加 `.risk(Risk::Read)`，确认能并行的再加 `.parallel()`。风险声明不代替权限执行：宿主仍需安装 `Permission` 或自己的中间件。内置工具与桌面业务工具已迁移。
 - 工具 Schema 在 `build` 时编译，调用前先验证参数为 JSON 对象并通过 Schema，再进入权限确认和执行。采用 `jsonschema` 0.33，关闭文件/HTTP 解析并显式拒绝外部引用；本地 `$defs`/`$ref`、类型、必填、枚举、边界、数组和组合规则由库校验。`format` 遵循库的草案默认规则；未知自定义关键字不视为安全策略。参数错误包含 JSON Pointer，不执行工具，不弹批准框。
 - 原有 `Tool::execute -> Result<String, String>` 继续可用；框架改为调用 `execute_result -> ToolResult`，默认适配旧实现。返回图片或 JSON 的工具覆盖新入口，可用 `with_part`、`with_structured_content`。`output` 仍是可供中间件编辑/落盘的文本；附加文本会合并到它。结构化 JSON 受工具 `max_output` 字节限制，附加媒体合计最多 6 MiB；超过上限返回明确错误，不截断二进制或 JSON。错误发生时动作可能已经执行，不能盲目重试。
@@ -130,7 +132,7 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 `Arc<T>` 也实现了 `Middleware`，宿主可留一个句柄，例如运行中切换权限模式。建议顺序：`Permission`、`RepeatGuard`、`SpillOutput`、`ContextTrim`、`ContinueGuard`。
 
 - `ContextTrim`：预算包含工具定义和 `reserve_output`。先把旧工具输出与结构化数据换成占位，仍超再按用户消息边界丢掉最旧的整轮；当前轮无法容纳则返回错误。不调用模型，只改本次请求，不改已存会话。token 是粗估值，预算要留余量。
-- `SpillOutput`：大输出存成文件，只给模型头尾预览和路径。目录由宿主提供并清理，要让模型读到需把它加进文件工具的根目录。写失败时退回普通截断。
+- `SpillOutput`：大输出存成文件，只给模型头尾预览和路径。目录由宿主提供并清理，要让模型读到需把它加进文件工具的根目录。写失败时退回普通截断。对常见大 JSON 数组，提示可用 `read_file` 的 JSON 模式分页、选择字段与统计，保存的原始内容不变。
 - `ContinueGuard`：模型没调工具就结束时，检测本次运行 `todo` 还有 `pending` 项、最后一句只宣布下一步（如冒号结尾、“让我／我先／let me…”）、空回复或长度截断，补合成用户消息续跑并发出 `Event::Continuing`。默认不限制整轮累计续跑次数，改为最多 3 次无新进展的续跑（`max_without_progress`）；首次成功执行的工具名 + 解析后的 JSON 参数组合恢复额度，参数键序不影响比较，失败、拒绝、重复调用及 `todo` / `ask_user` / `time_now` 不恢复。这是进展启发式，不保证工作正确；`max_turns` 仍限制总运行量，可用 `max_per_run` 另设累计上限（0 禁用）。
 - `before_stop` 返回 `StopDecision::Finish` / `Continue(Nudge)` / `Pause(reason)`，第一个非 Finish 决策生效。需要续跑但额度已耗尽时返回 `HarnessError::Paused`（`no_progress` 或 `continuation_limit`），经 Error 事件通知宿主，不能当作 Done；最后一轮仍有工作则返回 MaxTurns。正常回答、询问用户、安全结束不会强制续跑；催过后模型明确完成或受阻也可结束，但再次空答或只宣布动作仍受保护。合成消息应在界面隐藏；宿主应对暂停提供原因和继续入口。
 - `RepeatGuard`：同一工具、同样参数、同样结果连续出现时，从第 3 次起在结果后附提醒，第 6 次起直接拒绝执行（`warn_after`、`block_after` 可调）；换参数、换结果或新的用户消息都会重新计数。可用 `ignore_tool` 排除合法轮询。要放在 `SpillOutput` 前面，否则比较的是每次文件名都不同的预览。
@@ -141,7 +143,7 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 
 宿主用 `AgentBuilder::deferred_tool_arc(tool)` 注册低频工具，其余工具继续用 `tool` / `tool_arc`。没有延后加载工具时行为不变；有延后加载工具时，内核提供 `tool_search(query, limit?)` 和 `tool_load(names)`，并在每次模型请求的系统上下文中加入有体积预算的名称/用途目录。目录放不下的工具仍可检索；查找范围仅为当前 Agent 已注册的工具，不搜索商店，不安装软件，不发起连接或授权。
 
-搜索命中或按准确名称加载后，下一次模型请求携带对应工具的原始函数定义；后续仍以真实工具名称调用，经原有参数校验、权限、hook、超时、取消与日志处理，不使用通用执行代理，不依赖某家服务商的 tool-search 协议。任务内保留加载状态；成功、失败、取消均清理，状态不跨会话共享。检索采用名称和描述的本地词项匹配，支持中文片段；没有语义向量检索，未命中时应尝试简短关键词或准确名称，不能直接断定能力不存在。
+搜索覆盖当前 Agent 注册的直接可用和延迟加载工具，结果区分两者；延迟工具搜索命中或按准确名称加载后，下一次模型请求携带对应工具的原始函数定义。后续仍以真实工具名称调用，经原有参数校验、权限、hook、超时、取消与日志处理，不使用通用执行代理，不依赖某家服务商的 tool-search 协议。运行结束清理内存状态，同一会话继续时从成功的历史工具调用恢复已加载定义，不跨会话共享。检索采用名称和描述的本地词项匹配，支持中文片段；没有语义向量检索，未命中只表示本次查询没有结果，应尝试简短关键词或准确名称，不能直接断定能力不存在。用户指定的工具或交付方式确实不可用时，应说明受阻并在更换交付方式前征询用户。
 
 `tool_schemas()` 仍返回完整注册表，供兼容旧宿主及诊断；`initial_tool_schemas()` 返回冷启动可见定义，`tool_catalog()` 返回简短目录。首次开销估算需同时计入两者；运行时的 ContextTrim 在按需过滤后计入实际已加载定义。
 
@@ -162,6 +164,8 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 | `shell` | `shell` | Exec | 不是沙箱。环境变量清空（宿主的密钥不外泄）、stdin 关闭、输出有上限、超时或取消时杀整个进程组。Windows 路径未运行验证 |
 | `load_skill` `skill_manage` | `skills` | Read、Write | 见下 |
 | `memory_read` `memory_write` | `memory` | Read、Write | 每条笔记一个 Markdown 文件，最多 100 条、每条 20 KB，不跟随符号链接 |
+
+`read_file` 可传 `json_pointer`（如 `/items`，空字符串表示根节点）读取 JSON。数组可用 `json_fields` 选择字段、`json_offset` / `json_limit` 分页，并用 `json_group_by` 统计所选数组中的标量字段；只指定分组时仅返回计数。统计范围不包含其他 API 页，缺失的投影字段显示为 null，分组额外报告缺失数。单个输入最多 16 MiB，结果过大时需减少字段或每页数量，沿用同一文件根目录和权限检查。
 
 Skills：`<根>/<name>/SKILL.md`，开头 `---` 块含 `name`、`description`，提示里只放名称和描述，正文由 `load_skill` 按需读取。多个根时靠前的根优先，符号链接目录被忽略。`skill_manage`（只在配置了可写根时提供）可 create、patch、delete：只能动自己写入的（`origin: agent`）且在可写根里的 skill，用户手写的和随包的只读；修改前备份到 `.history/`（不自动清理）；删除只删 `SKILL.md`，目录里有别的文件则保留。
 

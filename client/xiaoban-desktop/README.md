@@ -1,5 +1,32 @@
 # 小伴桌面：桌宠、动态壁纸与 Agent
 
+## 资料库本地文件
+
+「资料库 → 我的文档」中，单击查看详情，双击或按 Enter 使用系统默认应用打开资料库里的文件副本；设计稿继续打开独立设计画布。图片、PDF、Office 和文本文件均不受 AI 提问的大小或文字读取状态限制；本机副本缺失或系统没有关联应用时显示错误。
+
+针对性验证：`npx vitest run src/ui/library/library.test.ts`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop local_open`。macOS 已实机验证图片打开；Windows 系统文件关联需在 Windows 验收。
+
+
+## 资料库云文档
+
+「资料库 → 云文档」复用腾讯文档与百度网盘的 MCP 登录，支持账号浏览、目录、分页、文件名搜索、腾讯正文搜索和百度语义搜索。腾讯选“读取并加入”后在原生窗口保存正文快照，可离线查看并带入提问／准备总结。百度选“下载到资料库”后通过开放平台下载原文件，保存在“我的文档”，复用文件分组、后台解析、预览与附件提问；已有云端引用也可下载原文件，重复操作定位已有本机副本，删除本机副本后可以重新下载。下载提供进度与取消，失败或取消清理临时文件，不把半个文件加入资料库。保留源站链接，访问令牌和临时下载链接仅在原生端使用，不返回窗口或写入索引。原文件保留资料库 200MB 导入限制；超过 10MB 的已下载 PDF／Office 文件提问时改用提取文字附件（最多约 600KB，明确标注覆盖范围），不把整个大文件塞入聊天。扫描件、加密文件或无文字层的文件仍可能无法提取文字，原文件保留并显示明确提示，不提供 OCR。图片仍沿用 3MB 附件限制。单次下载最长 10 分钟，网络无响应 30 秒失败；MCP 内容查询保持原时限。MCP 摘要／片段仍可预览，不当作全文；百度语义接口异常时明确提示并回退文件名搜索，腾讯正文搜索受账号权限限制。移除云端引用不删除已下载的原文件，也不修改云端文件。
+
+验证：`npx vitest run src/ui/library/cloud-browser.test.ts src/ui/library/LibraryCloud.test.ts src/ui/library/library.test.ts src/ui/library/cloud-document.test.ts src/ui/library/cloud-download.test.ts src/ui/configuration/windows.test.ts`、`npx vue-tsc --noEmit`；原生 `cargo test --offline --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop data_library::cloud::`。已用真实账号核对连接恢复、腾讯空间、文档列表与搜索、百度中文目录与文件名搜索，并验证腾讯正文预览与实际正文附件交接；百度原文件下载和重复定位已用 12.1MB PDF 实测；该样本没有可提取文字，扫描件提示正确。大文件文字附件以真实文字 PDF 夹具验证，取消以悬挂网络请求与临时文件清理测试验证。桌面统一为工具调用提供 45 秒下限，较长声明仍保留；接口库默认不改变调用方时限。
+
+## 聊天图片生成
+
+直接在聊天中描述想生成的图片，或选择「＋ → 工具 → 生成图片」。内置 `image_generate` 通过小伴 AI 网关调用独立的生图模型，当前聊天模型无需切换，但须支持工具调用。使用前登录小伴账号并有可用额度；管理员须在 `server-ai` 的「产品与档位 → 媒体能力」配置并启用图片渠道、模型和可选尺寸，付费要求由服务端执行。桌面不接收生图模型名或上游密钥。
+
+支持文生图，一次 1–4 张；未指定尺寸时使用后台首选尺寸。聊天显示生成状态与图片预览（隐藏执行过程时也保留），可在系统图片查看器打开原图，或通过原生文件对话框另存为。原图和缩略图保存在数据根的 `chat/generated-images/`，会话仅保存文件引用，重开聊天仍可查看；删除对话暂不自动清理这些图片。生成成功后，原图自动复制到「资料库 → 我的文档 → AI 生成图片」，可用“图片”筛选；按图片内容去重，保留改名、移动和标签。打开资料库会补入旧版生成的图片及此前入库失败的本机原图，不重发生成请求；从资料库删除后不会再次自动补入，也不影响聊天原图。超过资料库 3MB 提问上限的图片仍完整保存，但不能直接作为提问附件。仅接受有界且经解码验证的 PNG/JPEG/WebP；图片下载不携带账号令牌。取消、超时或上游结果未知不会自动重发，避免重复计费；成功保存的部分图片仍保留。暂不支持参考图编辑与自定义生图服务配置。
+
+验证：本目录运行 `npx vitest run src/ui/chat/generated-images.test.ts src/ui/chat/ChatGeneratedImages.test.ts src/ui/chat/view.test.ts src/ui/components/ChatWorkbenchTools.test.ts src/ui/pages/ChatPage.test.ts`、`npx vue-tsc --noEmit`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::image_generation`。使用本机模拟网关与临时图片，不产生真实生图费用；线上模型效果、额度扣费及 Windows/macOS 图片查看器和保存对话框需实机验收。
+
+## 会话延续与工具发现
+
+对话中追加“继续”等简短消息时，设计任务会继承最近的设计请求；设计画板始终可通过工具目录按需发现，不依赖最新消息重复出现“设计稿”。用户明确指定工具或交付方式时，无法使用应先说明并征询，不擅自换成交付形式不同的结果。对话摘要按时间顺序记录用户请求、图片附件数量、工具结果和后续更正，并区分草稿、已保存与已验证状态；原始用户消息优先于摘要。极限上下文或请求大小限制仍可能省略旧图片，不能保证历史图片始终进入模型。
+
+针对性验证：`cargo test --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::compact::tests` 和同命令筛选 `design_tool_can_be_discovered_after_a_continue_message`；设计工具与通用工具发现各自的测试见对应库 README。测试使用模拟模型，实际理解效果仍受所选模型和上下文限制影响。
+
 ## Android 手机操作（基础与本地工作流）
 
 对话按需发现 `phone_` 工具，可通过本机 ADB 操作 USB / 无线 Android 设备；应用包以包名保存 `skill.md + basic/ + patch/`，支持 ZIP 导入 / HTTPS 下载、版本化补丁及分层页面路由。工具及种子包在 [phone-use](../../libs/agent-tools/phone-use/README.md)，方案见 [Android 手机操作](../../docs/agent/android-phone-use.md)。数据放在用户聊天目录的 `phone-packs/`；不与普通 Skill 混用目录。
@@ -16,10 +43,20 @@
 
 ## 内置设计工具：open-claude-design
 
-真实用户消息提到设计、画板、原型或准确 design- 编号时可发现设计工具；聊天顶部「设计稿」入口支持全局搜索、打开与新建。支持草稿立即落盘、逐页生成、完成校验与受阻恢复；一份作品支持多个 DC HTML 画板。聊天右侧画布支持拖动分屏、弹出独立窗口（复用、最大化、系统全屏、窗口位置记忆、回到分屏），支持以指针为中心的 Ctrl/⌘ 滚轮缩放、触控板捏合、Space/中键平移、选择/Play、属性与源码编辑、批注交给小伴修改、撤销重做和历史恢复。作品保存在「资料库 → 我的文档」，聊天与资料库读取同一份源数据；可导入 ZIP / HTML，导出 ZIP 源包、独立 HTML、PNG 1×/2× 和单画板/全部画板栅格 PDF（按画布位置排序，支持取消）。
+真实用户消息提到设计、画板、原型或准确 design- 编号时可发现设计工具；聊天顶部「设计稿」入口支持全局搜索、打开与新建。支持草稿立即落盘、逐页生成、完成校验与受阻恢复；一份作品支持多个 DC HTML 画板。聊天右侧画布支持拖动分屏、弹出独立窗口（复用、最大化、系统全屏、窗口位置记忆、回到分屏），支持以指针为中心的 Ctrl/⌘ 滚轮缩放、触控板捏合、Space/中键平移、选择/Play、属性与源码编辑、批注交给小伴修改、撤销重做和历史恢复。作品保存在「资料库 → 我的文档」，聊天与资料库读取同一份源数据；可导入完整源包 ZIP / 官方单 HTML（自动展开多画板，保留原件并列出缺失引用；图片 ZIP / PDF 不属于可编辑源码），导出导入原件、ZIP 源包、独立 HTML、PNG 1×/2× 和单画板/全部画板栅格 PDF（按画布位置排序，支持取消）。
 
-保存有版本检查和恢复草稿，保留 30 个历史版本，支持重命名、创建独立副本与历史恢复。聊天及排队消息固定发送时选中的设计稿，避免切换作品后改错项目。兼容 v3 boards/order 与旧版 artboards；已补齐官方 name 组件引用、本地 React/JSX/TSX、二进制素材源包、画布便签与部分焦点/键盘交互；39 个原始画板纳入回归。尚不等于全面复刻，远程模块、动态元素逐实例编辑、PDF 矢量/Flow 分页、PPTX 与云端协作等差距见 [复刻验收矩阵](../../docs/agent/open-claude-design-compatibility.md)。详见 [模块说明](../../libs/agent-tools/open-claude-design/README.md) 与 [实施和验证记录](../../docs/agent/open-claude-design.md)。
+普通「导入文档」、文件夹导入和拖入文件也会按内容识别 Claude HTML 与带 canvas.json 的源码 ZIP；普通网页、图片 ZIP 仍按文档保存。旧 HTML/ZIP 文档可用「转为设计稿」从本机副本转换，保留原件、分组和标签，成功后打开独立画布。设计导入已取消 2 MiB 单文件和 16 MiB 项目限制；源文件与素材按内容摘要独立存储，原生预览按需加载素材，历史共用未变化的对象。保存有版本检查和恢复草稿，保留 30 个历史版本，支持重命名、创建独立副本与历史恢复。聊天及排队消息固定发送时选中的设计稿，避免切换作品后改错项目。兼容 v3 boards/order 与旧版 artboards；已补齐官方 name 组件引用、本地 React/JSX/TSX、二进制素材源包、画布便签与部分焦点/键盘交互；39 个原始画板纳入回归。尚不等于全面复刻，远程模块、动态元素逐实例编辑、PDF 矢量/Flow 分页、PPTX 与云端协作等差距见 [复刻验收矩阵](../../docs/agent/open-claude-design-compatibility.md)。详见 [模块说明](../../libs/agent-tools/open-claude-design/README.md) 与 [实施和验证记录](../../docs/agent/open-claude-design.md)。
 
+
+## 外部客户端设计协作（本机 MCP）
+
+画板标题栏「协作」打开原生设置的「外部 Agent」。设计 MCP 默认关闭；「启动并连接」启动 `127.0.0.1:58140/mcp`，按客户端分别授权读取和编辑资料库设计稿，并增量写入 Codex / 共用该主机配置的 ChatGPT 桌面、Claude Code、Claude Desktop 的用户配置。Claude Desktop 同时兼容已存在的 `Claude` 与 `Claude-3p`（第三方网关模式）配置目录。其他配置保留，变更前备份；同名非小伴连接拒绝覆盖。使用小伴可执行文件的 `--design-mcp-stdio` 桥接模式，无 Node/Python 依赖；令牌仅保存在本机私有配置，不写进启动参数。应用重启恢复已开启服务，停止服务关闭监听，移除连接撤销其令牌。客户端需按提示重连或重启；「已配置」不等于连接成功，初始化握手成功与实际工具调用分别显示，尚未调用不会再误报为未连接。
+
+MCP 提供 `xiaoban_design_read`（格式、搜索、读源文件、设计令牌）和 `xiaoban_design_edit`（创建、增量保存、完成校验、复制）及 `xiaoban_design_open`（按设计稿 ID 打开或聚焦原生画板窗口，不改变项目内容），复用项目版本检查与画布事件，不开放系统命令或删除项目。配置位于数据目录 `config/design-mcp.json`，默认允许该客户端访问全部本机设计稿。小伴正常退出后，stdio 桥接会在下一次请求前按需后台启动同一安装位置的小伴，最多等待 30 秒；跨客户端启动使用系统文件锁去重。用户手动停用 MCP 或撤销授权时不会自动启动。就绪探测仅重试 ping，实际读写请求不自动重放；画板窗口仍由 `xiaoban_design_open` 显示。
+
+ChatGPT 网页入口准备本地 stdio 连接并提供官方 Secure MCP Tunnel 引导和启动命令；用户仍须在 OpenAI 账户创建/关联隧道、配置运行密钥、运行 tunnel-client，并在 ChatGPT 添加连接。没有自动创建云端账户授权，也未将本机地址冒充公网可连接地址。参考：[ChatGPT MCP](https://developers.openai.com/api/docs/guides/custom-mcp-server)、[Secure MCP Tunnel](https://developers.openai.com/api/docs/guides/secure-mcp-tunnels)、[Codex MCP](https://developers.openai.com/codex/mcp)、[Claude Code MCP](https://code.claude.com/docs/en/mcp)。
+
+定向验证：`cargo test --offline --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop design_mcp`，`npx vitest run src/ui/components/settings/DesignMcpSettings.test.ts src/ui/design/DesignWorkbench.test.ts`。真实客户端账户连接与 Windows 实机需分别验收。
 
 ## 社区内容包（xiaoban://community）
 
@@ -41,7 +78,9 @@
 
 专家包和连接器目录读取 SkillHub 实际数据，支持搜索与分页；请求失败显示错误与重试。专家包按工作流审查、固定各依赖的发布者、版本和文件哈希，确认后事务安装，不运行脚本。已安装工作流可带入新聊天，移除时保留共用技能；WorkBuddy 专属注册与调度包暂不兼容。
 
-MCP 连接器使用服务 README 中的标准配置，支持本机 stdio、远程 Streamable HTTP 与旧式 HTTP+SSE。市场插件审查并按摘要锁定后，可选择“安装并连接”：无需填写的远程服务自动试连，需要令牌时在当前安装窗口填写，需要标准 MCP OAuth 时直接打开浏览器授权（PKCE、本机回调与自动刷新）。本地命令展示后仍需点击“运行并连接”；运行环境需本机提供。连接器中心复用同一套表单和授权流程，不再要求额外勾选连接确认框；手工 MCP 配置的 JSON 仍在高级配置中。WorkBuddy 私有身份及服务专属登录仍需独立接入。初始化与工具发现成功才显示已连接。配置保存在本机，退出关闭连接，下次使用时恢复已启用配置；断开后旧任务中的工具也会失效。
+MCP 连接器使用服务 README 中的标准配置，支持本机 stdio、远程 Streamable HTTP 与旧式 HTTP+SSE。市场插件审查并按摘要锁定后，可选择“安装并连接”：无需填写的远程服务自动试连，需要令牌时在当前安装窗口填写，需要标准 MCP OAuth 时直接打开浏览器授权（PKCE、本机回调与自动刷新）。本地命令展示后仍需点击“运行并连接”；运行环境需本机提供。专家、技能与连接器使用统一的平面卡片；说明放在悬停提示中。详情、安装审查与连接配置在桌面打开可缩放的原生独立窗口，重复打开聚焦已有窗口，浏览器保留内嵌预览；窗口关闭会取消未完成的授权。连接页参照 WorkBuddy，先展示服务与“连接”入口；网页登录直接进入授权，已有凭据直接复用，缺少必填密钥时才展示表单，并保留插件提供的获取密钥链接。窗口随连接、授权和配置内容调整高度，验证码复制、重试与取消入口保留。连接器中心复用同一套表单和授权流程，不再要求额外勾选连接确认框；手工 MCP 配置的 JSON 仍在高级配置中。WorkBuddy 私有身份及服务专属登录仍需独立接入。初始化与工具发现成功才显示已连接。配置保存在本机，退出关闭连接，下次使用时恢复已启用配置；断开后旧任务中的工具也会失效。
+
+百度网盘个人体验授权使用隔离的百度授权窗口接收授权结果，不向网页开放小伴命令；严格核对授权来源与随机状态，连接验证成功后才替换旧凭据。百度个人体验凭据可能失效；无法自动接收时仍可手动输入授权结果。macOS 开发版已实际验证授权后自动连接，Windows 尚需实机验证；此流程依赖百度个人体验应用的行为。
 
 对话支持 `connector_search` 搜索已安装服务及小伴市场，`connector_request` 展示最多三个连接卡片并等待用户安装或授权；凭据在配置窗口填写，不进入聊天或模型上下文。完成后返回当前可用工具及 schema，可通过 `connector_call` 在同一任务继续调用，无需重开聊天。外部工具调用保持逐次确认，断开后的旧工具仍会失效；不自动重放超时或结果未知的操作。针对性验证：`npx vitest run src/ui/ai-store/ConnectorConnection.test.ts src/ui/ai-store/ConnectorCenter.test.ts src/ui/ai-store/RegistryMarketConnector.test.ts src/ui/chat/ChatConnectorRequest.test.ts`。
 

@@ -102,6 +102,43 @@ fn a_long_dropped_question_is_kept_only_at_its_start_so_the_conversation_still_f
 }
 
 #[test]
+fn dropped_image_request_keeps_the_fact_and_bounded_attachment_path_without_image_bytes() {
+    let mut image = Message::user(vec![
+        Part::Text { text: format!("recreate this {}", "字".repeat(4_000)) },
+        Part::Image { url: format!("data:image/png;base64,{}", "A".repeat(100_000)) },
+    ]);
+    image.structured_content = Some(serde_json::json!({"attachments":[
+        {"mime":"image/png", "path":"/session/reference.png"},
+        {"mime":"image/png", "path":"data:image/png;base64,SECRET"},
+        {"mime":"image/png", "path":"x".repeat(10_000)}
+    ]}));
+    let mut t = turn(vec![image, Message::assistant("working", vec![]), Message::user_text("continue")]);
+    ContextTrim::new(3_000).before_model(&mut t).unwrap();
+    let pinned = t.messages[0].text();
+    assert!(pinned.contains("User supplied image content omitted"));
+    assert!(pinned.contains("/session/reference.png"));
+    assert!(pinned.contains("availability is not verified"));
+    assert!(!pinned.contains("data:image"));
+    assert!(!pinned.contains(&"x".repeat(1_000)));
+    assert!(estimate_tokens(&t.messages) <= 3_000);
+}
+
+#[test]
+fn image_fact_survives_when_its_older_pinned_request_is_omitted() {
+    let mut messages = vec![Message::user(vec![Part::Image { url: "data:image/png;base64,AAAA".into() }]), Message::assistant("ok", vec![])];
+    for n in 0..40 {
+        messages.extend([Message::user_text(format!("request {n} {}", "字".repeat(350))), Message::assistant("ok", vec![])]);
+    }
+    messages.push(Message::user_text("continue"));
+    let mut t = turn(messages);
+    ContextTrim::new(9_000).keep_recent(1000).before_model(&mut t).unwrap();
+    let pinned = t.messages[0].text();
+    assert!(pinned.contains("earlier requests omitted"));
+    assert!(pinned.contains("User supplied image content omitted"));
+    assert!(estimate_tokens(&t.messages) <= 9_000);
+}
+
+#[test]
 fn many_dropped_questions_keep_the_newest_and_say_how_many_were_left_out() {
     let mut messages = Vec::new();
     for n in 1..=60 {
@@ -171,6 +208,23 @@ fn spill_saves_big_output_and_leaves_a_preview_with_the_path() {
     assert_eq!(std::fs::read_to_string(path).unwrap(), body);
     assert!(std::path::Path::new(path).starts_with(&dir));
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn spill_suggests_structured_reading_for_large_json_without_changing_the_saved_data() {
+    let dir = temp_dir("spill-json");
+    let body = serde_json::json!({"items": [{"name":"first", "description":"x".repeat(20_000)}]}).to_string();
+    let copy = body.clone();
+    let h = harness(vec![Step::tool_call("a", "big", "{}"), Step::text("ok")], |b| {
+        b.tool(FnTool::new(spec("big").max_output(100_000), move |_, _| Ok(copy.clone())))
+            .middleware(SpillOutput::new(&dir))
+    });
+    run(&h.agent, "inspect").0.unwrap();
+    let output = &tool_messages(&h)[0].1;
+    assert!(output.contains("json_pointer=\"/items\"") && output.contains("json_group_by"));
+    let path = output.split("is saved at ").nth(1).unwrap().split(". Read it").next().unwrap();
+    assert_eq!(std::fs::read_to_string(path).unwrap(), body);
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]

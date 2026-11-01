@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import StoreDialog from './StoreDialog.vue';
 // 更新审查：先看新版本与已安装版本的文件差异，再确认；旧版本保留为备份。
 import { computed, ref, watch } from 'vue';
-import { NAlert, NModal } from 'naive-ui';
+import { NAlert } from 'naive-ui';
 import { ArrowRight, RefreshCw } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { SkillReview } from './catalog.ts';
@@ -48,7 +49,7 @@ function close() { if (!busy.value) emit('close'); }
 </script>
 
 <template>
-  <NModal :show="!!pkg && !!info" preset="card" :title="`更新「${pkg?.name}」`" class="store-dialog update-dialog" :mask-closable="!busy" :closable="!busy" style="width:680px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
+  <StoreDialog :show="!!pkg && !!info" preset="card" :title="`更新「${pkg?.name}」`" class="store-dialog update-dialog" :mask-closable="!busy" :closable="!busy" style="width:680px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
     <template v-if="pkg && info">
       <div class="detail-tags"><span class="store-tag">v{{ pkg.version }}</span><ArrowRight :size="14" class="to" /><span class="store-tag now">v{{ info.latest }}</span><span class="store-tag">小伴市场</span></div>
       <div v-if="loading" class="review-loading"><RefreshCw :size="17" />正在读取新版本的文件与脚本…</div>
@@ -65,7 +66,7 @@ function close() { if (!busy.value) emit('close'); }
       </template>
       <div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="close">暂不更新</button><button class="store-primary" :disabled="!review || busy" @click="update">{{ busy ? '正在更新…' : `更新到 v${info.latest}` }}</button></div>
     </template>
-  </NModal>
+  </StoreDialog>
 </template>
 
 <style scoped>

@@ -12,7 +12,19 @@ use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 pub struct Request { id: String, command: String, args: Value }
 struct Pending { label: String, request: Request, taken: bool, sender: mpsc::Sender<Result<Value, Value>> }
 #[derive(Default)]
-pub struct ConfigurationState { pending: Mutex<HashMap<String, Pending>> }
+pub struct ConfigurationState {
+    pending: Mutex<HashMap<String, Pending>>,
+    authorizations: Mutex<HashMap<String, (String, bool)>>,
+}
+fn cancel_store_authorization(app: &tauri::AppHandle, flow_id: String, baidu: bool) {
+    let Some(control) = app.get_webview_window("control") else { return; };
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        if baidu { let _ = crate::chat::connectors::baidu::ai_connector_baidu_cancel(app.clone(), control, flow_id).await; }
+        else { let _ = crate::chat::store::ai_store_connector_auth_cancel(app.clone(), control, flow_id).await; }
+        let _ = app.emit("ai-store-changed", ());
+    });
+}
 static SEQUENCE: AtomicU64 = AtomicU64::new(1);
 static OPEN_LOCK: Mutex<()> = Mutex::new(());
 pub fn is_gateway(label: &str) -> bool {
@@ -30,7 +42,7 @@ fn keep_visible(window: &tauri::WebviewWindow, fallback: Option<tauri::Monitor>)
         let area = monitor.work_area(); let scale = monitor.scale_factor();
         let width = (area.size.width as f64 / scale - 32.).max(1.);
         let height = (area.size.height as f64 / scale - 64.).max(1.);
-        let minimum = if kind(window.label()) == Some("community") { 540f64 } else if kind(window.label()) == Some("settings") { 560f64 } else if is_gateway(window.label()) { 360f64 } else { 640f64 };
+        let minimum = if kind(window.label()) == Some("store") { 420f64 } else if kind(window.label()) == Some("community") { 540f64 } else if kind(window.label()) == Some("settings") { 560f64 } else if is_gateway(window.label()) { 360f64 } else { 640f64 };
         window.set_min_size(Some(tauri::LogicalSize::new(minimum.min(width), 360f64.min(height)))).map_err(|e|e.to_string())?;
     }
     crate::design_window::keep_visible(window, fallback)
@@ -49,12 +61,15 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
 #[tauri::command]
 pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::WebviewWindow, target: String, tab: Option<String>, provider: Option<String>) -> Result<(), String> {
     if window.label() != "control" && kind(window.label()) != Some("settings") { return Err("只能从控制台或设置打开配置窗口".into()); }
-    if !matches!(target.as_str(), "settings" | "model" | "community") { return Err("配置窗口类型无效".into()); }
-    if tab.as_deref().is_some_and(|t| !["general", "appearance", "ai", "assistant", "voice", "network", "safety", "about"].contains(&t)) { return Err("设置分类无效".into()); }
+    if !matches!(target.as_str(), "settings" | "model" | "community" | "store" | "cloud") { return Err("配置窗口类型无效".into()); }
+    if tab.as_deref().is_some_and(|t| !["general", "appearance", "ai", "agent", "assistant", "voice", "network", "safety", "about"].contains(&t)) { return Err("设置分类无效".into()); }
     let provider = provider.unwrap_or_else(|| "__new__".into());
+    let store_identity = if target == "store" { Some(policy::store_identity(&provider)?) } else { None };
+    let connector_surface = target == "store" && serde_json::from_str::<Value>(&provider).is_ok_and(|v| v["kind"] == "connectors");
     if target == "model" && (provider.is_empty() || provider.len() > 200 || provider.chars().any(char::is_control)) { return Err("服务商编号无效".into()); }
+    if target == "cloud" && (provider.is_empty() || provider.len() > 200 || provider.chars().any(char::is_control)) { return Err("云文档编号无效".into()); }
     let _lock = OPEN_LOCK.lock().map_err(|_| "配置窗口锁不可用")?;
-    let label = if target == "community" { "configuration-community".into() } else if target == "settings" { "configuration-settings".into() } else { format!("configuration-model-{:x}", Sha256::digest(provider.as_bytes()))[..44].to_string() };
+    let label = if target == "cloud" { policy::cloud_label(&provider) } else if let Some(identity) = store_identity { format!("configuration-store-{:x}", Sha256::digest(identity.as_bytes()))[..44].to_string() } else if target == "community" { "configuration-community".into() } else if target == "settings" { "configuration-settings".into() } else { format!("configuration-model-{:x}", Sha256::digest(provider.as_bytes()))[..44].to_string() };
     let monitor = window.current_monitor().map_err(|e| e.to_string())?.or(app.primary_monitor().map_err(|e| e.to_string())?);
     if let Some(existing) = app.get_webview_window(&label) {
         existing.unminimize().map_err(|e| e.to_string())?;
@@ -65,15 +80,15 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
     }
     let gateway = target == "model" && provider == crate::ai_gateway::GATEWAY_ID;
     // Gateway sizing is independent from the wider third-party provider editor.
-    let path = placement_path(&app, if gateway { "gateway" } else { &target });
+    let path = placement_path(&app, if connector_surface { "store-connection" } else if gateway { "gateway" } else { &target });
     let placement = path.as_ref().and_then(|p| std::fs::read(p).ok()).and_then(|b| serde_json::from_slice::<Placement>(&b).ok()).unwrap_or_default();
     let query = url::form_urlencoded::Serializer::new(String::new()).append_pair("scene", "configuration").append_pair("kind", &target).append_pair("tab", tab.as_deref().unwrap_or("general")).append_pair("provider", &provider).finish();
     let appearance = crate::settings(&app).appearance;
     let theme = match appearance.as_str() { "dark" => Some(tauri::Theme::Dark), "light" => Some(tauri::Theme::Light), _ => None };
-    let (width, height, min_width) = if target == "community" { (960f64, 760f64, 540f64) } else if target == "settings" { (940f64, 700f64, 560f64) } else if gateway { (360., 620., 360.) } else { (900., 720., 640.) };
+    let (width, height, min_width) = if connector_surface { (600f64, 420f64, 420f64) } else if target == "store" { (680f64, 720f64, 420f64) } else if target == "community" { (960f64, 760f64, 540f64) } else if target == "settings" { (940f64, 700f64, 560f64) } else if gateway { (360., 620., 360.) } else { (900., 720., 640.) };
     let (max_w, max_h) = monitor.as_ref().map(|m| { let a=m.work_area(); let s=m.scale_factor(); ((a.size.width as f64/s-32.).max(1.), (a.size.height as f64/s-64.).max(1.)) }).unwrap_or((width, height));
     let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(format!("index.html?{query}").into()))
-        .title(if target == "settings" { "设置 · 小伴桌面" } else if target == "community" { "我的桌面方案 · 小伴桌面" } else { "模型配置 · 小伴桌面" })
+        .title(if target == "cloud" { "云文档 · 小伴桌面" } else if target == "store" { "插件配置 · 小伴桌面" } else if target == "settings" { "设置 · 小伴桌面" } else if target == "community" { "我的桌面方案 · 小伴桌面" } else { "模型配置 · 小伴桌面" })
         .inner_size(width.min(max_w), height.min(max_h)).min_inner_size(min_width.min(max_w), 360f64.min(max_h))
         .resizable(true).decorations(target == "community").transparent(target != "community").shadow(true).theme(theme).visible(false);
     // Restore only onto a currently connected display, then fit the full native frame inside its work area.
@@ -105,7 +120,16 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
             }
         }
         if matches!(event,tauri::WindowEvent::Destroyed) {
-            own.state::<ConfigurationState>().pending.lock().unwrap_or_else(|e|e.into_inner()).retain(|_,p|p.label!=own.label());
+            let state = own.state::<ConfigurationState>();
+            // Taken requests may still return a browser flow after this webview is gone.
+            state.pending.lock().unwrap_or_else(|e|e.into_inner()).retain(|_,p|p.label!=own.label() || p.taken);
+            let flows = {
+                let mut owners = state.authorizations.lock().unwrap_or_else(|e|e.into_inner());
+                let flows: Vec<_> = owners.iter().filter(|(_, (label, _))| label == own.label()).map(|(flow, (_, baidu))| (flow.clone(), *baidu)).collect();
+                for (flow, _) in &flows { owners.remove(flow); }
+                flows
+            };
+            for (flow, baidu) in flows { cancel_store_authorization(own.app_handle(), flow, baidu); }
         }
     });
     child.show().map_err(|e|e.to_string())?;
@@ -124,10 +148,22 @@ fn frame_state(window: &tauri::WebviewWindow) -> Result<FrameState, String> {
     Ok(FrameState { maximized: window.is_maximized().map_err(|e| e.to_string())?, fullscreen: window.is_fullscreen().map_err(|e| e.to_string())?, focused: window.is_focused().map_err(|e| e.to_string())? })
 }
 #[tauri::command]
-pub fn configuration_window_action(window: tauri::WebviewWindow, action: String) -> Result<FrameState, String> {
+pub fn configuration_window_action(window: tauri::WebviewWindow, action: String, height: Option<f64>) -> Result<FrameState, String> {
     if kind(window.label()).is_none() { return Err("只能操作当前配置窗口".into()); }
     match action.as_str() {
         "state" => {},
+        "fit-content" => {
+            if kind(window.label()) != Some("store") { return Err("只能调整插件连接窗口内容高度".into()); }
+            let height = height.filter(|v| v.is_finite() && *v > 0. && *v <= 4096.).ok_or("窗口内容高度无效")?;
+            if !window.is_fullscreen().map_err(|e|e.to_string())? && !window.is_maximized().map_err(|e|e.to_string())? {
+                let monitor = window.current_monitor().map_err(|e|e.to_string())?;
+                let scale = window.scale_factor().map_err(|e|e.to_string())?;
+                let maximum = monitor.as_ref().map(|m| (m.work_area().size.height as f64 / m.scale_factor() - 64.).max(1.)).unwrap_or(900.);
+                let width = window.inner_size().map_err(|e|e.to_string())?.width as f64 / scale;
+                window.set_size(tauri::LogicalSize::new(width, height.max(360f64.min(maximum)).min(maximum))).map_err(|e|e.to_string())?;
+                keep_visible(&window, monitor)?;
+            }
+        },
         "drag" => window.start_dragging().map_err(|e| e.to_string())?,
         "minimize" => window.minimize().map_err(|e| e.to_string())?,
         "fullscreen" => window.set_fullscreen(!window.is_fullscreen().map_err(|e| e.to_string())?).map_err(|e| e.to_string())?,
@@ -171,6 +207,8 @@ pub async fn configuration_window_invoke(app: tauri::AppHandle, window: tauri::W
     if !policy::command_allowed(role,&command) { return Err(json!("此配置窗口不能执行该操作")); }
     let args=args.unwrap_or_else(||json!({}));
     if !args.is_object() || args.to_string().len()>1_000_000 { return Err(json!("配置参数无效或过大")); }
+    if !policy::cloud_scope(window.label(), &command, &args) { return Err(json!("此窗口只能读取当前云文档")); }
+    let wait_timeout=Duration::from_secs(if role == "cloud" && command == "library_cloud_download" { 660 } else { 180 });
     let id=SEQUENCE.fetch_add(1,Ordering::Relaxed).to_string(); let (tx,rx)=mpsc::channel();
     {
         let state=app.state::<ConfigurationState>();
@@ -179,7 +217,7 @@ pub async fn configuration_window_invoke(app: tauri::AppHandle, window: tauri::W
         pending.insert(id.clone(),Pending{label:window.label().into(),request:Request{id:id.clone(),command,args},taken:false,sender:tx});
     }
     let result=match app.emit_to("control","configuration-command",json!({"id":id})) {
-        Ok(()) => tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(Duration::from_secs(180)).unwrap_or_else(|_|Err(json!("配置操作超时，请检查主窗口是否仍在运行")))).await.unwrap_or_else(|_|Err(json!("配置操作已中断"))),
+        Ok(()) => tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(wait_timeout).unwrap_or_else(|_|Err(json!("配置操作超时，请检查主窗口是否仍在运行")))).await.unwrap_or_else(|_|Err(json!("配置操作已中断"))),
         Err(_) => Err(json!("主窗口不可用，无法保存配置")),
     };
     app.state::<ConfigurationState>().pending.lock().unwrap_or_else(|e|e.into_inner()).remove(&id);
@@ -198,5 +236,20 @@ pub fn configuration_window_reply(app: tauri::AppHandle, window: tauri::WebviewW
     if window.label()!="control" { return Err("只能由主窗口返回配置结果".into()); }
     let p=app.state::<ConfigurationState>().pending.lock().map_err(|_|"配置请求锁不可用")?.remove(&id).ok_or("配置请求已过期")?;
     if !p.taken { return Err("配置请求尚未处理".into()); }
+    if ok && kind(&p.label) == Some("store") {
+        if let Some(flow) = value.get("flowId").and_then(Value::as_str) {
+            let baidu = p.request.command == "ai_connector_baidu_start";
+            let state = app.state::<ConfigurationState>();
+            let mut owners = state.authorizations.lock().unwrap_or_else(|e|e.into_inner());
+            // Keep registration and window-existence checking under the same lock as destruction.
+            if app.get_webview_window(&p.label).is_some() { owners.insert(flow.into(), (p.label.clone(), baidu)); }
+            else { cancel_store_authorization(&app, flow.into(), baidu); }
+        }
+        if matches!(p.request.command.as_str(), "ai_store_connector_auth_cancel" | "ai_connector_baidu_cancel") || value.get("status").and_then(Value::as_str).is_some_and(|s| ["connected", "cancelled", "error"].contains(&s)) {
+            if let Some(flow) = p.request.args.get("flowId").and_then(Value::as_str) {
+                app.state::<ConfigurationState>().authorizations.lock().unwrap_or_else(|e|e.into_inner()).remove(flow);
+            }
+        }
+    }
     let _=p.sender.send(if ok {Ok(value)} else {Err(value)}); Ok(())
 }

@@ -10,7 +10,7 @@ import { sessionModelConfig } from '../chat/session-model.ts';
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { NInput } from 'naive-ui';
-import { ArrowUp, ChevronDown, ListPlus, AudioLines, LoaderCircle, Mic, MicOff, Square, X, Zap, Monitor, Smartphone, PanelsTopLeft } from 'lucide-vue-next';
+import { ArrowUp, ChevronDown, ListPlus, AudioLines, LoaderCircle, Mic, MicOff, Square, X, Zap, Monitor, Smartphone, PanelsTopLeft, ImagePlus } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, type AiConfigView, type AiTier } from '../../bridge.ts';
 import type { ControlPage, ControlStore } from '../control-types.ts';
 import ChatWorkbenchTools from './ChatWorkbenchTools.vue';
@@ -320,6 +320,10 @@ function addSkill(slug: string, title?: string) {
 }
 const useSkill = (slug: string, title?: string) => { addSkill(slug, title); void nextTick(() => input.value?.focus()); };
 const removeSkill = (slug: string) => { skills.value = skills.value.filter(s => s.name !== slug); };
+function toggleSkill(slug: string, title: string) {
+  if (skills.value.some(skill => skill.name === slug)) removeSkill(slug);
+  else useSkill(slug, title);
+}
 const addSummary = computed(() => ({
   skills: skills.value.length > 1 ? `${skills.value.length} 个技能` : skills.value[0]?.title ?? '',
   experts: chat.currentExpert?.name ?? '',
@@ -390,7 +394,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
       <div v-if="skills.length || selectedTool || chat.currentExpert || mentions.selected.value.length" class="composer-top" data-testid="chat-composer-top">
         <ul class="skill-chips" aria-label="这条消息用的技能和工具">
           <li v-for="skill in skills" :key="skill.name" class="skill-chip" :data-testid="`chat-skill-${skill.name}`"><Zap :size="14" aria-hidden="true" /><span :title="`/${skill.name}`">{{ skill.title }}</span><button type="button" class="chip-x" :aria-label="`移除技能 ${skill.title}`" @click="removeSkill(skill.name)"><X :size="11" :stroke-width="2.6" /></button></li>
-          <li v-if="selectedTool" class="skill-chip" data-testid="chat-selected-tool"><Monitor v-if="selectedTool === 'computer'" :size="14" aria-hidden="true" /><Smartphone v-else-if="selectedTool === 'phone'" :size="14" aria-hidden="true" /><PanelsTopLeft v-else :size="14" aria-hidden="true" /><span>{{ builtinToolLabels[selectedTool] }}</span><button type="button" class="chip-x" :aria-label="`移除工具 ${builtinToolLabels[selectedTool]}`" data-testid="chat-remove-tool" @click="selectedTool = null"><X :size="11" :stroke-width="2.6" /></button></li>
+          <li v-if="selectedTool" class="skill-chip" data-testid="chat-selected-tool"><Monitor v-if="selectedTool === 'computer'" :size="14" aria-hidden="true" /><Smartphone v-else-if="selectedTool === 'phone'" :size="14" aria-hidden="true" /><ImagePlus v-else-if="selectedTool === 'image'" :size="14" aria-hidden="true" /><PanelsTopLeft v-else :size="14" aria-hidden="true" /><span>{{ builtinToolLabels[selectedTool] }}</span><button type="button" class="chip-x" :aria-label="`移除工具 ${builtinToolLabels[selectedTool]}`" data-testid="chat-remove-tool" @click="selectedTool = null"><X :size="11" :stroke-width="2.6" /></button></li>
         </ul>
         <div class="composer-ctx">
           <ChatExpertChip v-if="chat.currentExpert" compact :expert="chat.currentExpert" :removable="!chat.currentId" :desktop="store.desktop" @clear="chat.pendingExpert = null" />
@@ -403,7 +407,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <NInput ref="input" v-model:value="draft" type="textarea" :autosize="{ minRows, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
       </div>
       <div class="composer-row">
-        <ChatWorkbenchTools :store="store" :summary="addSummary" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" @use-tool="useTool" @check-computer-permissions="checkComputerPermissions" @computer-disabled="computerDisabled" />
+        <ChatWorkbenchTools :store="store" :summary="addSummary" :selected-connector-ids="mentions.selected.value.map(item => item.id)" :selected-skill-ids="skills.map(skill => skill.name)" :selected-expert="chat.currentExpert" :expert-locked="!!chat.currentId" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @clear-expert="chat.pendingExpert = null" @toggle-skill="toggleSkill" @toggle-connector="toggleConnector" @use-tool="useTool" @check-computer-permissions="checkComputerPermissions" @computer-disabled="computerDisabled" />
         <ChatWorkspaceMenu v-if="workspace" :chat="chat" :disabled="running || !store.desktop" />
         <ChatPermissionMenu :store="store" :disabled="!store.desktop" />
         <span class="composer-spacer" />

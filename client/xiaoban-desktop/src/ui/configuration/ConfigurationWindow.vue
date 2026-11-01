@@ -26,7 +26,7 @@ const offs: (() => void)[] = [];
 function notify(message: unknown) { toast.value = String(message); clearTimeout(timer); timer = setTimeout(() => toast.value = '', 5000); }
 const store = createControlStore(notify, { configuration: true });
 store.settingsOpen = true;
-const tabs: SettingsTab[] = ['general', 'appearance', 'ai', 'assistant', 'voice', 'network', 'safety', 'about'];
+const tabs: SettingsTab[] = ['general', 'appearance', 'ai', 'agent', 'assistant', 'voice', 'network', 'safety', 'about'];
 function pickTab(value: unknown) { if (tabs.includes(value as SettingsTab)) store.settingsTab = value as SettingsTab; }
 pickTab(query.get('tab'));
 store.closeSettings = () => { void closeConfigurationWindow().catch(notify); };

@@ -272,7 +272,14 @@ pub fn readable_error(raw: &str) -> String {
     let Some(start) = raw.find('{') else { return raw.to_string() };
     serde_json::from_str::<Value>(&raw[start..])
         .ok()
-        .and_then(|body| body.pointer("/error/message").or_else(|| body.get("message")).and_then(Value::as_str).filter(|m| !m.trim().is_empty()).map(str::to_string))
+        .and_then(|body| {
+            let code = body.pointer("/error/code").or_else(|| body.get("code")).and_then(Value::as_str);
+            let message = body.pointer("/error/message").or_else(|| body.get("message")).and_then(Value::as_str).filter(|m| !m.trim().is_empty())?;
+            if code == Some("model_not_found") && message == "未知的模型档位" {
+                return Some("小伴 AI 当前模式不可用或已更改，请在聊天输入框的模型菜单中重新选择模式后重试。".to_string());
+            }
+            Some(message.to_string())
+        })
         .unwrap_or_else(|| raw.to_string())
 }
 
@@ -373,6 +380,7 @@ mod tests {
         let raw = r#"HTTP 402: {"error":true,"code":"insufficient_quota","message":"额度已用完，请兑换额度后继续使用"}"#;
         assert_eq!(readable_error(raw), "额度已用完，请兑换额度后继续使用");
         assert_eq!(readable_error(r#"provider error: HTTP 400: {"error":{"message":"请压缩会话","code":"context_length_exceeded"}}"#), "请压缩会话");
+        assert_eq!(readable_error(r#"provider error: HTTP 400: {"error":{"message":"未知的模型档位","code":"model_not_found"}}"#), "小伴 AI 当前模式不可用或已更改，请在聊天输入框的模型菜单中重新选择模式后重试。");
     }
 
     #[test]

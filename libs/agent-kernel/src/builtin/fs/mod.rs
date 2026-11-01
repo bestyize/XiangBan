@@ -136,6 +136,63 @@ fn clip_chars(text: &str, max: usize) -> String {
     }
 }
 
+fn read_json(path: &Path, pointer: &str, args: &Value, ctx: &ToolCtx) -> Result<String, String> {
+    const MAX_JSON_BYTES: u64 = 16 * 1024 * 1024;
+    if !pointer.is_empty() && !pointer.starts_with('/') { return Err("json_pointer must be empty or start with /".into()); }
+    if args.get("offset").is_some() || args.get("limit").is_some() { return Err("use json_offset and json_limit for JSON instead of line offsets".into()); }
+    let file = File::open(path).map_err(|e| format!("cannot open file: {e}"))?;
+    let mut bytes = Vec::new();
+    file.take(MAX_JSON_BYTES + 1).read_to_end(&mut bytes).map_err(|e| format!("cannot read file: {e}"))?;
+    if bytes.len() as u64 > MAX_JSON_BYTES { return Err("JSON file exceeds the 16 MiB inspection limit".into()); }
+    if ctx.is_cancelled() { return Err("cancelled".into()); }
+    let value: Value = serde_json::from_slice(&bytes).map_err(|_| "file is not valid UTF-8 JSON")?;
+    let selected = value.pointer(pointer).ok_or("JSON pointer does not exist")?;
+    let result = if let Some(items) = selected.as_array() {
+        let offset = opt_uint_arg(args, "json_offset")?.unwrap_or(0).min(items.len() as u64) as usize;
+        let limit = opt_uint_arg(args, "json_limit")?.unwrap_or(50).clamp(1, 100) as usize;
+        let fields = args.get("json_fields").map(|value| {
+            value.as_array().ok_or("json_fields must be an array")?.iter().map(|field| field.as_str().ok_or("json_fields must contain strings")).collect::<Result<Vec<_>, _>>()
+        }).transpose()?;
+        if fields.as_ref().is_some_and(|fields| fields.len() > 30) { return Err("json_fields may contain at most 30 fields".into()); }
+        let group_only = args.get("json_group_by").is_some() && fields.is_none()
+            && args.get("json_offset").is_none() && args.get("json_limit").is_none();
+        let page = items.iter().skip(offset).take(if group_only { 0 } else { limit }).map(|item| {
+            if let Some(fields) = &fields {
+                let object = item.as_object().ok_or("json_fields requires an array of objects")?;
+                Ok(Value::Object(fields.iter().map(|field| ((*field).to_string(), object.get(*field).cloned().unwrap_or(Value::Null))).collect()))
+            } else { Ok(item.clone()) }
+        }).collect::<Result<Vec<_>, &str>>()?;
+        let mut result = json!({"total":items.len(), "offset":offset, "items":page,
+            "next_offset": if !group_only && offset + page.len() < items.len() { Some(offset + page.len()) } else { None }});
+        if group_only { result["items_omitted"] = json!(true); }
+        if let Some(field) = opt_str_arg(args, "json_group_by")? {
+            let mut groups: std::collections::BTreeMap<String, (Value, usize)> = std::collections::BTreeMap::new();
+            let mut missing = 0usize;
+            for item in items {
+                if ctx.is_cancelled() { return Err("cancelled".into()); }
+                let object = item.as_object().ok_or("json_group_by requires an array of objects")?;
+                let Some(group) = object.get(field) else { missing += 1; continue };
+                if group.is_array() || group.is_object() { return Err("json_group_by supports scalar fields only".into()); }
+                let key = serde_json::to_string(group).map_err(|e| e.to_string())?;
+                groups.entry(key).or_insert_with(|| (group.clone(), 0)).1 += 1;
+                if groups.len() > 200 { return Err("too many distinct JSON groups; select a narrower array".into()); }
+            }
+            result["groups"] = Value::Array(groups.into_values().map(|(value, count)| json!({"value":value,"count":count})).collect());
+            result["missing_group_fields"] = json!(missing);
+            result["count_scope"] = json!("selected JSON array only; other API pages are not included");
+        }
+        result
+    } else {
+        if ["json_fields", "json_offset", "json_limit", "json_group_by"].iter().any(|key| args.get(*key).is_some()) {
+            return Err("JSON paging, fields and grouping require an array".into());
+        }
+        json!({"value": selected})
+    };
+    let output = serde_json::to_string(&result).map_err(|e| e.to_string())?;
+    if output.len() > READ_OUTPUT_LIMIT { return Err("JSON result is too large; choose fewer fields or a smaller json_limit".into()); }
+    Ok(output)
+}
+
 struct ReadFile {
     spec: ToolSpec,
     roots: Arc<Roots>,
@@ -148,12 +205,16 @@ impl ReadFile {
             "properties": {
                 "path": { "type": "string" },
                 "offset": { "type": "integer", "description": "First line to read, starting at 1." },
-                "limit": { "type": "integer", "description": "Maximum number of lines." }
+                "limit": { "type": "integer", "description": "Maximum number of lines." },
+                "json_pointer": { "type": "string", "description": "Read a JSON value using an RFC 6901 pointer, e.g. /items; empty string selects the root. Arrays support projection and paging." },
+                "json_fields": { "type": "array", "items": { "type": "string" }, "maxItems": 30, "description": "For a JSON array of objects, select these direct fields; missing fields are returned as null." },
+                "json_offset": { "type": "integer", "minimum": 0, "description": "First JSON array item, starting at 0." },
+                "json_limit": { "type": "integer", "minimum": 1, "maximum": 100, "description": "Maximum JSON array items; default 50." },
+                "json_group_by": { "type": "string", "description": "Count scalar field values across the complete JSON array, separately reporting objects where the field is missing. With no json_fields or paging options, returns counts only." }
             },
             "required": ["path"]
         });
-        let description = "Read a text file with line numbers. Long files are returned in parts; the result \
-                           says which offset to use for the next part.";
+        let description = "Read a text file with line numbers, or use json_pointer to page and project JSON arrays and count groups. Long files are returned in parts; the result says which offset to use for the next part.";
         Self { spec: ToolSpec::new("read_file", description, schema).risk(Risk::Read).parallel().max_output(READ_OUTPUT_LIMIT * 2), roots }
     }
 }
@@ -194,6 +255,12 @@ impl Tool for ReadFile {
 
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         let path = self.roots.resolve(str_arg(&args, "path")?)?;
+        if let Some(pointer) = opt_str_arg(&args, "json_pointer")? {
+            return read_json(&path, pointer, &args, ctx);
+        }
+        if ["json_fields", "json_offset", "json_limit", "json_group_by"].iter().any(|key| args.get(*key).is_some()) {
+            return Err("JSON options require json_pointer (use an empty string for the root)".into());
+        }
         let offset = opt_uint_arg(&args, "offset")?.unwrap_or(1).max(1);
         let limit = opt_uint_arg(&args, "limit")?.unwrap_or(READ_DEFAULT_LINES).clamp(1, READ_MAX_LINES);
         // Windows cannot open directories as ordinary files; return the same

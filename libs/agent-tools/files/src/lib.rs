@@ -32,10 +32,14 @@ pub struct ReadFile {
 impl ReadFile {
     pub fn new(roots: Vec<PathBuf>, attachments: AttachmentStore) -> Result<Self, HarnessError> {
         // Validate host roots using the same implementation as the kernel's text reader.
-        fs_tools(roots.clone())?;
+        let reader = fs_tools(roots.clone())?.into_iter().find(|tool| tool.spec().name == "read_file")
+            .ok_or_else(|| HarnessError::Config("text reader unavailable".into()))?;
+        let mut schema = reader.spec().schema.clone();
+        schema["properties"]["offset"]["minimum"] = json!(1);
+        schema["properties"]["limit"]["minimum"] = json!(1);
+        schema["properties"]["limit"]["maximum"] = json!(500);
         Ok(Self {
-            spec: ToolSpec::new("read_file", "Read a file. Text, PDF, DOCX, PPTX and XLSX return numbered extracted lines; offset/limit page through them. PNG/JPEG/GIF/WebP return visual content. Extraction is not OCR or spreadsheet calculation; use file-analysis skill and shell for complex work.",
-                json!({"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"integer","minimum":1},"limit":{"type":"integer","minimum":1,"maximum":500}},"required":["path"]}))
+            spec: ToolSpec::new("read_file", "Read a file. Text, PDF, DOCX, PPTX and XLSX return numbered extracted lines; offset/limit page through them. For JSON use json_pointer, json_fields, json_offset/json_limit and json_group_by to page, project and count array items. PNG/JPEG/GIF/WebP return visual content. Extraction is not OCR or spreadsheet calculation; use file-analysis skill and shell for complex work.", schema)
                 .risk(Risk::Read).untrusted_output().max_output(48_000),
             roots, attachments, file_authorizer: None,
         })
@@ -89,6 +93,9 @@ impl ReadFile {
             .take(12)
             .read_to_end(&mut header)
             .map_err(|e| e.to_string())?;
+        if args.get("json_pointer").is_some() && (storage::image_mime(&header).is_some() || matches!(ext.as_str(), "pdf" | "docx" | "pptx" | "xlsx")) {
+            return Err("JSON inspection requires a UTF-8 JSON text file".into());
+        }
         if let Some(mime) = storage::image_mime(&header) {
             if meta.len() > MAX_FILE_BYTES as u64 {
                 return Err("image exceeds 10 MiB; resize before viewing".into());

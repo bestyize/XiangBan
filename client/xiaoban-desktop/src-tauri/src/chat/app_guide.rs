@@ -22,6 +22,9 @@ pub(super) const SETTINGS_TABS: &[&str] = &["general", "appearance", "ai", "assi
 const NONE: &[&str] = &[];
 
 pub(super) const FEATURES: &[Feature] = &[
+    Feature { id: "image-generation", name: "图片生成 / 文生图", path: "对话输入框「+」→「工具」→「生成图片」，或直接描述想画的图片", page: Some(("new-task", None)),
+        does: "通过 image_generate 调用小伴 AI 生图，与当前聊天模型独立；支持一次生成 1–4 张图片，聊天显示进度、预览、查看原图和另存为，本机保留图片以便重开会话查看。仅文生图，暂不支持参考图编辑。",
+        by_hand: "需要登录小伴账号及可用额度；生图模型、尺寸与付费要求由服务后台配置。生成结果未知时不要自动重试，避免重复计费。", tools: &["image_generate"] },
     Feature { id: "android-phone", name: "Android 手机操作", path: "对话中使用，暂无独立管理页面", page: None,
         does: "通过本机 ADB 连接 USB / 无线 Android 手机；查看截图和固定快照 UI 树、按精确文字或描述定位控件、执行输入与手势、传输图片。应用操作包以包名管理 skill.md、basic/、patch/，按需发现任务与分层路由。小米17 Android16已验证小红书9.51.0的图文准备和中文输入，以及消消乐1.162第4181关的两次交换；发布和通关尚未验收。消消乐只有普通三消局部评分，没有完整视觉识别器或通关保证。不支持 iOS。",
         by_hand: "用户在手机开启调试并授权，预先安装本机 Android Platform Tools；无线配对需手机显示的配对码。登录、系统权限及中文输入所需 ADB Keyboard 由用户配置。",
@@ -145,6 +148,7 @@ fn line(f: &Feature, detail: bool) -> String {
 /// What users say for each feature, space separated; matched in the request so the right facts reach the model without
 /// it having to think of looking them up. A new way of asking that was missed becomes a word here and a row in the test.
 const ALIASES: &[(&str, &str)] = &[
+    ("image-generation", "生成图片 图片生成 文生图 生图 画一张 画张 画个 画一幅 绘画 插画 image_generate"),
     ("android-phone", "手机操作 操作手机 安卓 android adb 无线调试 小红书 开心消消乐 操作包"),
     ("chat", ""),
     ("ai-store-experts", "专家 专家角色"),
@@ -295,6 +299,7 @@ mod tests {
             ("检查更新", &["settings-about"]),
             ("分享到论坛", &["community"]),
             ("连接器怎么用", &["ai-store-connectors"]),
+            ("帮我画一张猫咪图片", &["image-generation"]),
         ];
         for (request, expected) in cases {
             let found: Vec<&str> = related(request, 3).iter().map(|f| f.id).collect();

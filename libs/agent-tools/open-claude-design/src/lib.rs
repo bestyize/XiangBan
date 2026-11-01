@@ -7,13 +7,13 @@ use std::{collections::BTreeMap, fs, path::{Component, Path, PathBuf}, sync::{Ar
 pub const NAME: &str = "open-claude-design";
 pub const RUNTIME: &str = concat!(include_str!("../runtime/vendor/react-bridge.js"),"\n",include_str!("../runtime/support.js"),"\n",include_str!("../runtime/editor.js"),"\n",include_str!("../runtime/vendor/capture.js"));
 pub mod archive;
+pub mod html_import;
 pub mod rendered_export;
-mod assets;
+pub mod assets;
+mod file_store;
 pub const FORMAT: &str = include_str!("../FORMAT.md");
 /// Quality guidance returned with the format: tokens first, real content, complete states, a check before complete.
 pub const CRAFT: &str = include_str!("../CRAFT.md");
-const MAX_FILE: usize = 2 * 1024 * 1024;
-const MAX_PROJECT: usize = 16 * 1024 * 1024;
 // Separate Store handles (UI commands and agent runs) share mutation ownership.
 static STORAGE_LOCK: Mutex<()> = Mutex::new(());
 
@@ -150,14 +150,12 @@ pub fn validate(project: &Project) -> Result<(), String> {
     for (name, text) in &project.files {
         if !file_name(name) { return Err(format!("不支持的设计文件路径：{name}")); }
         if assets::is_asset(name) { assets::decode(text).map_err(|e| format!("{name}: {e}"))?; }
-        else if text.len() > MAX_FILE { return Err(format!("{name} 超过 2MiB")); }
     }
     boards(&project.canvas)?;
     if project.status == ProjectStatus::Ready {
         let issues = diagnostics(project);
         if !issues.is_empty() { return Err(format!("设计稿尚未完成：{}。使用 status=generating 分批保存，补齐后 complete。", issues.join("；"))); }
     }
-    if serde_json::to_vec(project).map_err(|e| e.to_string())?.len() > MAX_PROJECT { return Err("设计稿超过 16MiB".into()); }
     Ok(())
 }
 
@@ -194,8 +192,8 @@ impl Store {
     }
     pub fn load(&self, id: &str) -> Result<Project, String> {
         let path = self.dir(id)?.join("project.json");
-        if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink() || m.len() > MAX_PROJECT as u64) { return Err("设计文件无效或过大".into()); }
-        let project: Project = serde_json::from_slice(&fs::read(path).map_err(|e| if e.kind()==std::io::ErrorKind::NotFound { "设计稿不存在，可能已被删除".into() } else { format!("设计稿无法读取：{e}") })?).map_err(|e| format!("设计稿内容损坏：{e}"))?;
+        if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) { return Err("设计文件不能是符号链接".into()); }
+        let project = file_store::read(&self.dir(id)?, &path)?;
         if project.id != id { return Err("设计稿编号不匹配".into()); }
         validate(&project)?;
         Ok(project)
@@ -232,7 +230,14 @@ impl Store {
         let mut p=self.load(id)?; p.id=format!("design-{}",nonce()?); p.revision=0; p.updated_ms=0;
         p.session_id=session.into(); p.session_ids.clear(); p.request_id.clear();
         p.title=title.map(str::to_string).unwrap_or_else(||format!("{} 副本",p.title.chars().take(116).collect::<String>()));
-        self.save(p,0)
+        let copied=self.save(p,0)?;
+        let original=self.dir(id)?.join("original.json");
+        if original.exists(){
+            let (name,bytes)=self.original(id)?;let dir=self.dir(&copied.id)?;
+            let hash=file_store::put(&dir,&bytes)?;
+            fs::write(dir.join("original.json"),serde_json::to_vec(&json!({"filename":name,"sha256":hash})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+        }
+        Ok(copied)
     }
     /// Small UI metadata is separate from design revisions and cannot follow symlinks.
     pub fn read_view(&self,id:&str,name:&str)->Result<Option<Value>,String>{
@@ -281,11 +286,12 @@ impl Store {
         validate(&project)?;
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let temp = dir.join(format!("{}.tmp", nonce()?));
-        fs::write(&temp, serde_json::to_vec_pretty(&project).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        file_store::write(&dir, &temp, &project)?;
         // Keep the previous complete revision for recovery; never overwrite it with a partial write.
         if let Some(old) = current {
+            file_store::regular(&dir.join("history"))?;
             fs::create_dir_all(dir.join("history")).map_err(|e| e.to_string())?;
-            fs::write(dir.join("history").join(format!("{}.json", old.revision)), serde_json::to_vec(&old).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+            file_store::write(&dir, &dir.join("history").join(format!("{}.json", old.revision)), &old)?;
         }
         if let Err(e) = fs::rename(&temp, path) { let _ = fs::remove_file(temp); return Err(e.to_string()); }
         // Bound history to 30 complete revisions. Never touch the current snapshot.
@@ -303,15 +309,15 @@ impl Store {
         let _lock=STORAGE_LOCK.lock().map_err(|_|"设计存储锁不可用")?;
         self.load(&project.id)?;let mut check=project.clone();check.status=ProjectStatus::Draft;validate(&check)?;
         let dir=self.dir(&project.id)?;let temp=dir.join(format!("{}.tmp",nonce()?));
-        fs::write(&temp,serde_json::to_vec(project).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+        file_store::write(&dir, &temp, project)?;
         fs::rename(&temp,dir.join("draft.json")).map_err(|e|e.to_string())
     }
     pub fn draft(&self, id: &str) -> Result<Option<Project>, String> {
         self.load(id)?;let path=self.dir(id)?.join("draft.json");
         if !path.exists(){return Ok(None)}
         let meta=fs::symlink_metadata(&path).map_err(|e|e.to_string())?;
-        if meta.file_type().is_symlink()||meta.len()>MAX_PROJECT as u64{return Err("恢复草稿无效或过大".into())}
-        let p:Project=serde_json::from_slice(&fs::read(path).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+        if meta.file_type().is_symlink(){return Err("恢复草稿不能是符号链接".into())}
+        let p=file_store::read(&self.dir(id)?, &path)?;
         if p.id!=id{return Err("草稿编号不匹配".into())}let mut check=p.clone();check.status=ProjectStatus::Draft;validate(&check)?;Ok(Some(p))
     }
     pub fn clear_draft(&self, expected: &Project) -> Result<(), String> {
@@ -327,8 +333,8 @@ impl Store {
         let mut out=Vec::new();
         if let Ok(entries)=fs::read_dir(self.dir(id)?.join("history")) {
             for e in entries.flatten() {
-                if e.file_type().map_err(|e|e.to_string())?.is_file() && e.metadata().map_err(|e|e.to_string())?.len()<=MAX_PROJECT as u64 {
-                    if let Ok(p)=serde_json::from_slice::<Project>(&fs::read(e.path()).map_err(|e|e.to_string())?) { if p.id==id { out.push(p); } }
+                if e.file_type().map_err(|e|e.to_string())?.is_file() {
+                    if let Ok(p)=file_store::read(&self.dir(id)?, &e.path()) { if p.id==id { out.push(p); } }
                 }
             }
         }
@@ -345,7 +351,7 @@ static CREATE_LOCK: Mutex<()> = Mutex::new(());
 impl DesignTool {
     pub fn new(store: Store, saved: impl Fn(&Project) -> Result<(), String> + Send + Sync + 'static) -> Self {
         Self { spec: ToolSpec::new(NAME,
-            "Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax and the quality guide (craft). create allocates a durable id even with missing boards (draft). save merges changed files and canvas fields, preserving omitted boards and metadata (remove_boards explicitly removes boards), with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list defaults to all projects; scope=session restricts it. query searches title, exact id or request_id; since_ms/before_ms filter updated time (epoch milliseconds). open links the same project; copy creates an independent project. Does not publish or install anything.",
+            "内置设计画板：创建和编辑多画板设计稿、界面原型。 Create and edit multi-artboard design projects in My Documents. Call action=format first for DC HTML syntax and the quality guide (craft). create allocates a durable id even with missing boards (draft). save merges changed files and canvas fields, preserving omitted boards and metadata (remove_boards explicitly removes boards), with status=generating; complete validates all sources and references before marking ready. Never deliver an incomplete project. save/complete require expected_revision. read returns canvas, design system manifest and optional file contents; manifest returns compiled @dsCard cards and tokens; list defaults to all projects; scope=session restricts it. query searches title, exact id or request_id; since_ms/before_ms filter updated time (epoch milliseconds). open links the same project; copy creates an independent project. Does not publish or install anything.",
             json!({"type":"object","properties":{
                 "action":{"type":"string","enum":["format","list","read","manifest","create","save","complete","open","copy","delete"]},
                 "scope":{"type":"string","enum":["all","session"]},"query":{"type":"string"},"since_ms":{"type":"integer","minimum":0},"before_ms":{"type":"integer","minimum":0},"status":{"type":"string","enum":["draft","generating","ready","failed"]},"id":{"type":"string"},"title":{"type":"string"},"expected_revision":{"type":"integer","minimum":1},
@@ -430,20 +436,53 @@ impl Tool for DesignTool {
 pub fn design_intent(text: &str) -> bool {
     ["设计", "画板", "原型", "design-", "open-claude-design"].iter().any(|word|text.to_lowercase().contains(word))
 }
-/// Debug trigger: only a real user's message containing 设计稿 starts a design task.
+/// Recognize only generic continuation requests; task-specific text is left to the model.
+fn generic_continuation(text: &str) -> bool {
+    let normalized: String = text.chars().filter(|c| !c.is_whitespace() && !"，。！？,.!?".contains(*c)).collect();
+    let text = normalized.strip_prefix('请').unwrap_or(&normalized);
+    matches!(text, "继续" | "继续做" | "继续写" | "继续写完" | "继续完成" | "接着做" | "接着写" | "接着写完" | "接着完成" | "接着上面的内容继续写完" | "接着上面的内容继续完成" | "继续上面的内容" | "继续之前的任务" | "接着上面的内容" | "接着之前的任务")
+}
+
+// A short, visual edit can refer to the session's existing project even without a
+// design keyword. Require both an element and an edit verb to avoid ordinary chat.
+fn visual_edit(text: &str) -> bool {
+    let text = text.trim();
+    text.chars().count() <= 40
+        && ["颜色", "配色", "背景", "字体", "字号", "按钮", "布局", "间距", "圆角", "画面", "页面", "首页"].iter().any(|word| text.contains(word))
+        && ["改", "调整", "调成", "变", "加", "去掉", "删除", "缩小", "放大"].iter().any(|word| text.contains(word))
+}
+
+/// Supplies design-specific instructions without changing tool availability or permissions.
 pub struct DesignContext(pub Store);
 impl Middleware for DesignContext {
     fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
         let Some(at) = turn.messages.iter().rposition(|m| m.role == Role::User && !m.synthetic) else { return Ok(()) };
-        let projects = self.0.list(&turn.session).map_err(HarnessError::Middleware)?;
         let selected=turn.messages[at].structured_content.as_ref().and_then(|v|v["designId"].as_str()).filter(|id|self.0.load(id).is_ok()).map(str::to_string);
-        if !design_intent(&turn.messages[at].text()) && projects.is_empty() && selected.is_none() {
-            turn.tools.retain(|t|t.name!=NAME); return Ok(())
-        }
+        let current_text = turn.messages[at].text();
+        let continuing = generic_continuation(&current_text);
+        let mut saw_visual_edit = false;
+        let prior_task = turn.messages[..at].iter().rev()
+            .filter(|m| m.role == Role::User && !m.synthetic)
+            .find(|m| {
+                let text = m.text();
+                if generic_continuation(&text) { return false }
+                if visual_edit(&text) && !design_intent(&text) && m.structured_content.as_ref().and_then(|v| v["designId"].as_str()).is_none() {
+                    saw_visual_edit = true;
+                    return false
+                }
+                true
+            });
+        let prior_design = prior_task.is_some_and(|m| design_intent(&m.text()) || m.structured_content.as_ref()
+                .and_then(|v| v["designId"].as_str()).is_some_and(|id| self.0.load(id).is_ok()));
+        let inherited_design = continuing && prior_design;
+        let existing_edit = (visual_edit(&current_text) || (continuing && saw_visual_edit)) && (prior_task.is_none() || prior_design);
+        if !design_intent(&current_text) && selected.is_none() && !inherited_design && !existing_edit { return Ok(()) }
+        let projects = self.0.list(&turn.session).map_err(HarnessError::Middleware)?;
+        if existing_edit && !design_intent(&current_text) && selected.is_none() && !inherited_design && projects.is_empty() { return Ok(()) }
         let active=selected.or_else(||self.0.active(&turn.session));
         let current = projects.iter().map(summary).collect::<Vec<_>>();
         turn.messages.insert(at + 1, Message::reminder(format!(
-            "设计工作台：用户消息含‘设计稿’时使用内置 open-claude-design。先 action=format，create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。无需请用户审批设计方案，但 create 前先按 format 返回的 craft 定好风格方向并写入 designSystems tokens，complete 前按其中的清单自查。作品自动保存到资料库→我的文档。跨会话只给 design- 编号也能 read/open；按标题或时间查找先 list（默认全局，query/since_ms/before_ms），多个匹配先让用户选择。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前打开项目（数据）：{}；当前会话作品（数据）：{}", json!(active), json!(current))));
+            "设计工作台：用户要求使用设计画板时使用内置 open-claude-design；参数未加载时先用 tool_load 加载该名称。先 action=format，create 携带稳定 request_id 和计划画板清单，允许 files 为空。必须用返回的正式 id 逐页 save（status=generating），每次用最新 revision；缺失源文件由你继续生成，无需用户提供。所有页面保存后 complete 校验，失败就按全部 issues 补齐后重试，只有 ready 才能交付；中断后 read 原 id 继续，禁止重复 create。request_id 只用于去重，不能打开项目。除非用户要求先确认设计方案，否则无需审批；create 前先按 format 返回的 craft 定好风格方向并写入 designSystems tokens，complete 前按其中的清单自查。作品自动保存到资料库→我的文档。跨会话只给 design- 编号也能 read/open；按标题或时间查找先 list（默认全局，query/since_ms/before_ms），多个匹配先让用户选择。已有作品时继续修改同一 id，先 read，保留其他画板、未知索引字段与用户手改，save 必须携带最新 expected_revision。不要只在回答里输出代码或承诺已保存。当前打开项目（数据）：{}；当前会话作品（数据）：{}", json!(active), json!(current))));
         Ok(())
     }
     fn before_stop(&self,stop:&Stop<'_>)->StopDecision{
@@ -495,8 +534,30 @@ mod tests {
         let mut t=Turn{session:"s".into(),index:0,messages:vec![Message::user_text("你好"),Message::tool("t","设计稿")],tools:vec![]};
         mid.before_model(&mut t).unwrap(); assert_eq!(t.messages.len(),2);
         t.messages=vec![Message::user_text("做个设计稿")];mid.before_model(&mut t).unwrap();assert!(t.messages[1].synthetic);
-        store.create("x".into(),"s",canvas(),files()).unwrap(); t.messages=vec![Message::user_text("颜色改浅")];mid.before_model(&mut t).unwrap();assert!(t.messages[1].synthetic);
+        store.create("x".into(),"s",canvas(),files()).unwrap(); t.messages=vec![Message::user_text("你好")];mid.before_model(&mut t).unwrap();assert_eq!(t.messages.len(),1);
+        t.messages=vec![Message::user_text("颜色改浅")];mid.before_model(&mut t).unwrap();assert!(t.messages[1].synthetic);
+        t.messages=vec![Message::user_text("写一个网页"),Message::user_text("颜色改浅")];mid.before_model(&mut t).unwrap();assert_eq!(t.messages.len(),2);
         fs::remove_dir_all(root).unwrap();
+    }
+    #[test] fn generic_followups_inherit_only_the_latest_real_task_without_hiding_tools() {
+        use agent_kernel::{Part, ToolSchema};
+        let (store,root)=fixture(); let mid=DesignContext(store.clone());
+        let schema=ToolSchema{name:NAME.into(),description:String::new(),parameters:json!({})};
+        let request=Message::user(vec![Part::Text{text:"请使用设计画板还原截图".into()},Part::Image{url:"attachment://screenshot".into()}]);
+        let mut t=Turn{session:"s".into(),index:0,messages:vec![request,Message::assistant("",vec![]),Message::user_text("请接着上面的内容继续写完")],tools:vec![schema.clone()]};
+        mid.before_model(&mut t).unwrap();assert!(t.messages.last().unwrap().synthetic);assert_eq!(t.tools,vec![schema.clone()]);
+        t.messages=vec![Message::user_text("做设计稿"),Message::user_text("讲个笑话"),Message::user_text("继续")];
+        mid.before_model(&mut t).unwrap();assert_eq!(t.messages.len(),3);assert_eq!(t.tools,vec![schema.clone()]);
+        t.messages=vec![Message::user_text("做设计稿"),Message::user_text("颜色改浅"),Message::user_text("继续")];
+        mid.before_model(&mut t).unwrap();assert!(t.messages.last().unwrap().synthetic);
+        store.create("x".into(),"s",canvas(),files()).unwrap();
+        t.messages=vec![Message::user_text("颜色改浅"),Message::user_text("背景改深"),Message::user_text("继续")];
+        mid.before_model(&mut t).unwrap();assert!(t.messages.last().unwrap().synthetic);
+        t.messages=vec![Message::user_text("做设计稿"),Message::user_text("写一个网页"),Message::user_text("颜色改浅"),Message::user_text("继续")];
+        mid.before_model(&mut t).unwrap();assert_eq!(t.messages.len(),4);
+        t.messages=vec![Message::user_text("你好"),Message::tool("id","设计画板"),Message::user_text("继续")];
+        mid.before_model(&mut t).unwrap();assert_eq!(t.messages.len(),3);assert_eq!(t.tools,vec![schema]);
+        let _=fs::remove_dir_all(root);
     }
     #[test] fn retries_reuse_project_and_save_preserves_manual_source() {
         let (store,root)=fixture();let tool=DesignTool::new(store.clone(), |_|Ok(()));let ctx=ToolCtx::detached("s");

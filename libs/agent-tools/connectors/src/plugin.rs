@@ -34,6 +34,10 @@ pub struct TokenSchema {
     pub description: String,
     #[serde(default)]
     pub description_en: String,
+    #[serde(default, rename = "docUrl", alias = "doc_url")]
+    pub doc_url: Option<String>,
+    #[serde(default, rename = "docLabel", alias = "doc_label")]
+    pub doc_label: Option<String>,
     #[serde(default)]
     pub fields: Vec<TokenField>,
 }
@@ -90,6 +94,12 @@ pub struct ServerSpec {
     pub timeout_ms: Option<u64>,
 }
 impl ServerSpec {
+    /// Only the official SSE endpoint receives a personal Baidu token.
+    pub fn is_baidu_netdisk_personal(&self) -> bool {
+        self.name == "baidu-netdisk" && self.transport == Transport::Sse
+            && self.url.as_deref() == Some("https://mcp-pan.baidu.com/sse")
+    }
+
     /// Recognize the official GitHub service by endpoint or executable, never by
     /// a marketplace title. Legacy token/stdio packages can use the remote login
     /// without executing a local command or changing their stable connection ID.
@@ -283,7 +293,7 @@ impl ConnectorPlugin {
                     None if setup["preAuth"] == "cli" => AuthSpec::Cli,
                     None => AuthSpec::None, // Remote None uses authMode:auto to discover OAuth on 401.
                 };
-                let spec = ServerSpec {
+                let mut spec = ServerSpec {
                     name: server.clone(),
                     transport,
                     url: text(config, "url"),
@@ -306,6 +316,21 @@ impl ConnectorPlugin {
                             || spec.command.is_some()))
                 {
                     return Err("连接器地址或命令无效".into());
+                }
+                if name == "baidu-netdisk" && spec.is_baidu_netdisk_personal() {
+                    spec.auth = AuthSpec::Token {
+                        schema: TokenSchema {
+                            title: "百度网盘个人授权".into(),
+                            description: "在百度官方授权页面获取 Access Token，粘贴到此处。个人体验可能限时，令牌过期后需重新授权。".into(),
+                            fields: vec![TokenField {
+                                key: "BAIDU_NETDISK_ACCESS_TOKEN".into(),
+                                label: "Access Token".into(), label_en: "Access Token".into(),
+                                field_type: "password".into(), required: true,
+                                placeholder: String::new(), placeholder_en: String::new(),
+                                description: String::new(), description_en: String::new(),
+                            }], ..TokenSchema::default()
+                        }, headers: vec![],
+                    };
                 }
                 servers.push(spec);
             }
@@ -367,6 +392,17 @@ impl ConnectorPlugin {
                     map.insert(header.clone(), json!(format!("{prefix}{value}")));
                 }
             }
+        }
+        if self.name == "baidu-netdisk" && spec.is_baidu_netdisk_personal() {
+            let token = values.get("BAIDU_NETDISK_ACCESS_TOKEN")
+                .filter(|v| !v.trim().is_empty()).ok_or("缺少百度网盘 Access Token")?;
+            // This URL exists only in the transient effective configuration. The
+            // persisted plugin binding contains the original endpoint and the
+            // token is stored separately in the encrypted connector vault.
+            let mut url = reqwest::Url::parse("https://mcp-pan.baidu.com/sse")
+                .map_err(|_| "百度网盘服务地址无效")?;
+            url.query_pairs_mut().append_pair("access_token", token);
+            config["url"] = json!(url.as_str());
         }
         let config = super::normalized_config(&config)?;
         for (header, value) in &super::string_map(config.get("headers"))? {

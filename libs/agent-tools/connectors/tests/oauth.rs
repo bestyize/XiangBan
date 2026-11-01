@@ -30,6 +30,7 @@ struct State {
     post_auth: bool,
     device_polls: usize,
     unauthenticated_probes: usize,
+    challenge_delay: Duration,
     stream: Option<TcpStream>,
 }
 struct Server {
@@ -142,6 +143,9 @@ fn handle(mut stream: TcpStream, base: &str, state: &Mutex<State>) {
     let mut bytes = vec![0; length];
     reader.read_exact(&mut bytes).unwrap();
     let mut state = state.lock().unwrap();
+    if auth.is_empty() && matches!((method, path), ("GET", "/mcp") | ("POST", "/mcp" | "/messages")) {
+        std::thread::sleep(state.challenge_delay);
+    }
     match (method, path) {
         ("GET", "/mcp") => {
             assert!(state.legacy);
@@ -572,6 +576,7 @@ fn refuses_resource_metadata_for_another_service() {
 fn plugin_oauth_encrypts_rotates_restores_and_unbinds_credentials() {
     use agent_connector_tools::plugin::{AuthSpec, ConnectorPlugin, Display, ServerSpec, Transport};
     let server = Server::new();
+    server.state.lock().unwrap().challenge_delay = Duration::from_millis(250);
     let root = root();
     let plugin = ConnectorPlugin {
         name: "oauth-plugin".into(), version: "1".into(),
@@ -580,7 +585,7 @@ fn plugin_oauth_encrypts_rotates_restores_and_unbinds_credentials() {
             name: "service".into(), transport: Transport::StreamableHttp,
             url: Some(format!("{}/mcp",server.base)), command: None, args: vec![],
             env: Default::default(), headers: Default::default(), auth: AuthSpec::None,
-            disabled_tools: vec![], timeout_ms: Some(2000),
+            disabled_tools: vec![], timeout_ms: Some(120),
         }], skills_dir: None, icon: None,
     };
     let id = plugin.connection_id("service");

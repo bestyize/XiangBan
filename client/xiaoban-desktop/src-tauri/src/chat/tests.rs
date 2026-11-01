@@ -34,6 +34,10 @@ struct FakeDesktop {
 }
 
 impl Desktop for FakeDesktop {
+    fn generate_images(&self, args: Value, _ctx: &ToolCtx) -> Result<Value, String> {
+        lock(&self.calls).push(format!("generate-image {}", args["prompt"].as_str().unwrap_or_default()));
+        Ok(json!({"generated_images":[{"id":format!("{}.png", "a".repeat(64)),"name":"mock.png","mime":"image/png","width":1024,"height":1024}],"warnings":[]}))
+    }
     fn status(&self) -> Result<Value, String> { Ok(json!({"mode": "floating"})) }
     fn wallpapers(&self) -> Result<Value, String> { Ok(json!({"activeId": "companion", "items": []})) }
     fn apply_wallpaper(&self, id: &str) -> Result<(), String> {
@@ -1217,13 +1221,44 @@ fn two_conversations_in_different_folders_are_each_checked_against_their_own() {
 
 
 #[test]
-fn design_schema_is_exposed_by_the_debug_keyword_in_the_assembled_agent() {
-    let triggered=rig("design-trigger",vec![Step::text("ready")],Approval::Once);
-    let _=run(&triggered,"请做一份设计稿");
-    assert!(triggered.provider.requests()[0].tools.iter().any(|t|t.name==open_claude_design::NAME));
-    let ordinary=rig("design-no-trigger",vec![Step::text("hello")],Approval::Once);
-    let _=run(&ordinary,"你好");
-    assert!(!ordinary.provider.requests()[0].tools.iter().any(|t|t.name==open_claude_design::NAME));
+fn design_tool_can_be_discovered_after_a_continue_message() {
+    let rig = rig("design-continue-discovery", vec![
+        call("find", "tool_search", json!({"query":"设计画板"})),
+        call("format", open_claude_design::NAME, json!({"action":"format"})),
+        Step::text("ready"),
+    ], Approval::Once);
+    agent_kernel::SessionStore::append(&JsonlStore::new(rig.dirs.sessions()), "s1", &[Message::user(vec![
+        Part::Text { text: "请使用设计画板还原截图".into() },
+        Part::Image { url: PNG.into() },
+    ])]).unwrap();
+    run(&rig, "请接着上面的内容继续写完。").0.unwrap();
+    let requests = rig.provider.requests();
+    assert!(!requests[0].tools.iter().any(|t| t.name == open_claude_design::NAME), "full schema is deferred");
+    assert!(requests[0].messages.iter().any(|m| m.synthetic && m.text().contains("设计工作台")), "the original design request survives the continuation");
+    assert!(requests[0].messages.iter().any(|m| m.parts.iter().any(|p| matches!(p, Part::Image { .. }))), "the original image remains in context");
+    assert!(requests[1].tools.iter().any(|t| t.name == open_claude_design::NAME), "search exposes the schema");
+    let results = tool_results(&rig);
+    assert!(results.iter().any(|text| text.contains(open_claude_design::NAME)), "search finds the registered tool");
+    assert!(results.iter().any(|text| text.contains("authoring contract")), "the discovered tool executes");
+}
+
+#[test]
+fn image_generation_is_discoverable_persisted_and_requires_permission() {
+    for (tag, answer, allowed) in [("image-allowed", Approval::Once, true), ("image-denied", Approval::Deny, false)] {
+        let rig = rig(tag, vec![
+            call("find-image", "tool_search", json!({"query":"生成图片"})),
+            call("generate", "image_generate", json!({"prompt":"一只猫"})),
+            Step::text("处理完成"),
+        ], answer);
+        let _ = run(&rig, "帮我画一张猫咪图片");
+        let requests = rig.provider.requests();
+        assert!(!requests[0].tools.iter().any(|tool| tool.name == "image_generate"));
+        assert!(requests[1].tools.iter().any(|tool| tool.name == "image_generate"));
+        assert!(lock(&rig.asked).iter().any(|(name, risk)| name == "image_generate" && risk == "write"));
+        assert_eq!(lock(&rig.desktop.calls).iter().any(|call| call == "generate-image 一只猫"), allowed);
+        let history = JsonlStore::new(rig.dirs.sessions()).load("s1").unwrap();
+        assert_eq!(history.iter().any(|message| message.structured_content.as_ref().is_some_and(|value| value["generated_images"].is_array())), allowed);
+    }
 }
 
 #[test]

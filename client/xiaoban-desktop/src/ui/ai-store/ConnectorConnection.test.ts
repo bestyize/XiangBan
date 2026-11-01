@@ -30,6 +30,48 @@ async function setup(patch: Partial<InstalledConnector> = {}, autoConnect = fals
 }
 async function click(text: string) { await wrapper.findAll('button').find(b => b.text() === text)!.trigger('click'); await flushPromises(); }
 describe('connection and authorization in place', () => {
+  it('starts with a simple connection preview and asks for a key only after Connect', async () => {
+    await setup({ description: '读取团队文档', auth: { type: 'token', configured: [], schema: { title: '服务配置', fields: [{ key: 'TOKEN', label: '密钥', type: 'password', required: true }] } } });
+    expect(wrapper.find('form').exists()).toBe(false);
+    expect(wrapper.text()).toContain('读取团队文档');
+    expect(wrapper.find('.connection-steps').exists()).toBe(false);
+    await click('连接');
+    expect(wrapper.get('[aria-label="密钥"]').attributes('type')).toBe('password');
+    expect(invoke).not.toHaveBeenCalledWith('ai_connector_configure', expect.anything());
+    await click('取消');
+    expect(wrapper.find('form').exists()).toBe(false);
+  });
+  const baiduAuth: InstalledConnector['auth'] = { type: 'token', personalAuth: 'baidu-netdisk', configured: [],
+    schema: { title: '百度网盘个人授权', fields: [{ key: 'BAIDU_NETDISK_ACCESS_TOKEN', label: 'Access Token', type: 'password', required: true }] } };
+  it('opens the isolated Baidu authorization flow and refreshes after successful connection', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => {
+      if (command === 'ai_connector_baidu_start') return { flowId: 'baidu-flow' };
+      if (command === 'ai_connector_baidu_status') { current = { ...current, status: 'connected', enabled: true }; return { status: 'connected' }; }
+      return original(command, args);
+    });
+    await setup({ plugin: 'baidu-netdisk', auth: baiduAuth });
+    expect(wrapper.find('form').exists()).toBe(false);
+    await click('连接');
+    expect(invoke).toHaveBeenCalledWith('ai_connector_baidu_start', { id: current.id });
+    expect(wrapper.text()).toContain('请在百度授权窗口');
+    await vi.advanceTimersByTimeAsync(1000); await flushPromises();
+    expect(wrapper.text()).toContain('已连接，可在任务中使用');
+    expect(wrapper.findComponent(ConnectorConnection).emitted('connected')).toHaveLength(1);
+  });
+  it('retains manual fallback after an incomplete Baidu authorization', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => {
+      if (command === 'ai_connector_baidu_start') return { flowId: 'baidu-flow' };
+      if (command === 'ai_connector_baidu_status') return { status: 'error', error: '百度授权未完成，请重试。' };
+      return original(command, args);
+    });
+    await setup({ plugin: 'baidu-netdisk', auth: baiduAuth });
+    await click('连接'); await vi.advanceTimersByTimeAsync(1000); await flushPromises();
+    expect(wrapper.text()).toContain('百度授权未完成');
+    await click('手动输入授权信息');
+    expect(wrapper.get('[aria-label="Access Token"]').attributes('type')).toBe('password');
+  });
   const githubAuth: InstalledConnector['auth'] = { type: 'oauth', browser: true, configured: [],
     schema: { title: 'GitHub Token', fields: [{ key: 'TOKEN', label: 'Token', type: 'password', required: true }] } };
   it('logs in GitHub without the legacy required token form, including stdio packages', async () => {
@@ -71,7 +113,7 @@ describe('connection and authorization in place', () => {
     expect(wrapper.find('input[type=checkbox]').exists()).toBe(false);
     await wrapper.get('[aria-label="密钥"]').setValue('secret'); await wrapper.get('form').trigger('submit'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_connector_configure', { id: current.id, values: { TOKEN: 'secret' }, confirmed: true });
-    expect((wrapper.get('[aria-label="密钥"]').element as HTMLInputElement).value).toBe('');
+    expect(wrapper.find('form').exists()).toBe(false); expect(wrapper.html()).not.toContain('secret');
   });
   it('opens discovered OAuth and finishes the same connection after browser authorization', async () => {
     vi.mocked(invoke).mockResolvedValueOnce(flow);

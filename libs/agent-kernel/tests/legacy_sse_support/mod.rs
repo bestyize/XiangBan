@@ -18,6 +18,7 @@ pub struct Options {
     pub drop_call: bool,
     pub stall_call: bool,
     pub stall_endpoint: bool,
+    pub endpoint_delay: Duration,
     pub oversized: bool,
     pub token: Option<String>,
     pub reject_get_once: bool,
@@ -134,6 +135,7 @@ impl Server {
                         }
                     });
                     if !options.stall_endpoint {
+                        std::thread::sleep(options.endpoint_delay);
                         write!(socket, ": comment\nevent: endpoint\ndata: {endpoint}\n\n").unwrap();
                     }
                     socket.set_nonblocking(true).unwrap();

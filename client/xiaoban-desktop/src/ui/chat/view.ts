@@ -1,4 +1,5 @@
 import { attachmentCards } from './attachments.ts';
+import { generatedImages } from './generated-images.ts';
 import { modelFailure, retryNotice, toolInputNotice } from './model-errors.ts';
 import { withoutVoiceNotes } from '../../voice/interruption.ts';
 import type { ChatItem, KernelEvent, SessionView, WireMessage } from './types.ts';
@@ -84,7 +85,10 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
       }
     } else if (message.role === 'tool' && message.tool_call_id) {
       const item = tools.get(message.tool_call_id);
-      if (item) { item.output = toolOutput(textOf(message), message.structured_content); item.status = message.is_error ? 'error' : 'done'; }
+      if (item) {
+        item.output = toolOutput(textOf(message), message.structured_content); item.status = message.is_error ? 'error' : 'done';
+        if (item.name === 'image_generate' && !message.is_error) item.generatedImages = generatedImages(message.structured_content);
+      }
     }
   }
   // A call that never got an answer was cut short, for example by closing the app.
@@ -183,6 +187,7 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
         if (item.waitingFor) view.status = '';
         delete item.waitingFor;
         item.output = output; item.status = event.is_error ? 'error' : 'done';
+        if (item.name === 'image_generate' && !event.is_error) item.generatedImages = generatedImages(event.structured_content);
       }
       else view.items.push({ kind: 'tool', id: event.id, name: '', arguments: '', output, status: event.is_error ? 'error' : 'done' });
       if (!event.is_error) clearRecoveredCutoff(view);

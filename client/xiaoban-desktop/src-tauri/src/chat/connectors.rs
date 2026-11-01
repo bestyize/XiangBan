@@ -7,10 +7,13 @@ use agent_skill_discovery::plugin;
 use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool as Flag;
 
+pub mod baidu;
+
 /// 图标最大读取字节数；更大的不显示。
 const MAX_ICON_BYTES: u64 = 512 * 1024;
 /// 启动后第一次看连接器列表时，在后台把已启用的连接器恢复起来（可能要拉起本地命令或联网），只做一次。
 static RESTORE_STARTED: Flag = Flag::new(false);
+static RESTORE_RUNNING: Flag = Flag::new(false);
 
 fn icon_data_url(plugin: &ConnectorPlugin) -> Option<String> {
     use base64::Engine;
@@ -32,6 +35,7 @@ fn schema_json(spec: &ServerSpec) -> Option<Value> {
     let schema = spec.schema()?;
     Some(json!({
         "title": schema.title, "titleEn": schema.title_en, "description": schema.description, "descriptionEn": schema.description_en,
+        "docUrl": schema.doc_url, "docLabel": schema.doc_label,
         "fields": schema.fields.iter().map(|f| json!({
             "key": f.key, "label": f.label, "labelEn": f.label_en,
             "type": if f.field_type == "password" { "password" } else { "text" },
@@ -97,7 +101,8 @@ fn entry_json(manager: &agent_connector_tools::ConnectorManager, e: &Entry, stat
     let skills: Vec<String> = e.plugin.skills_dir.as_ref().and_then(|dir| fs::read_dir(dir).ok()).into_iter().flatten().flatten()
         .filter(|f| f.path().join("SKILL.md").is_file()).filter_map(|f| f.file_name().to_str().map(String::from)).collect();
     let browser_auth = spec.browser_auth_config().is_some();
-    let auth = if browser_auth { "oauth" } else { match &spec.auth {
+    let baidu_personal = e.plugin.name == "baidu-netdisk" && spec.is_baidu_netdisk_personal();
+    let auth = if baidu_personal { "token" } else if browser_auth { "oauth" } else { match &spec.auth {
         AuthSpec::None if spec.transport != Transport::Stdio => "auto",
         AuthSpec::None => "none",
         AuthSpec::Token { .. } => "token",
@@ -114,7 +119,7 @@ fn entry_json(manager: &agent_connector_tools::ConnectorManager, e: &Entry, stat
         "namespace": e.namespace,
         "iconUrl": icon_data_url(&e.plugin),
         "transport": spec.transport, "command": spec.command, "args": spec.args,
-        "auth": { "type": auth, "browser": browser_auth, "schema": schema_json(spec), "configured": manager.configured_plugin_fields(&e.id).unwrap_or_default() },
+        "auth": { "type": auth, "browser": browser_auth, "personalAuth": if baidu_personal { Some("baidu-netdisk") } else { None }, "schema": schema_json(spec), "configured": manager.configured_plugin_fields(&e.id).unwrap_or_default() },
         "status": state, "enabled": enabled, "error": error,
         "tools": manager.tool_list(&e.id).into_iter().map(|(name, description)| json!({"name": name, "description": description})).collect::<Vec<_>>(),
         "examples": examples, "skills": skills,
@@ -210,15 +215,20 @@ pub async fn ai_connector_installed(app: tauri::AppHandle, window: tauri::Webvie
         let manager = super::connector_manager(&app)?;
         let list = entries(&Dirs::of(&app)?.plugins());
         // 恢复在后台做；第一次列出时界面显示“连接中”，之后读到的是真实状态。
-        let restoring = !list.is_empty() && !RESTORE_STARTED.swap(true, Ordering::SeqCst);
-        if restoring {
+        let start_restore = !list.is_empty() && !RESTORE_STARTED.swap(true, Ordering::SeqCst);
+        if start_restore {
+            RESTORE_RUNNING.store(true, Ordering::SeqCst);
             let manager = manager.clone();
+            let app = app.clone();
             std::thread::spawn(move || {
                 if let Err(error) = manager.restore(Arc::new(AtomicBool::new(false))) {
                     eprintln!("部分连接器暂不可用：{error}");
                 }
+                RESTORE_RUNNING.store(false, Ordering::SeqCst);
+                let _ = app.emit("ai-store-changed", ());
             });
         }
+        let restoring = RESTORE_RUNNING.load(Ordering::SeqCst);
         let statuses = manager.statuses();
         Ok(Value::Array(list.iter().map(|e| entry_json(&manager, e, &statuses, restoring)).collect()))
     })

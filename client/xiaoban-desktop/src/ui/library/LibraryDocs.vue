@@ -17,6 +17,12 @@ const view = ref<FolderView>('all');
 const filter = ref('全部');
 const sort = ref<'recent' | 'name'>('recent');
 const selected = ref<string | null>(null);
+const converting=ref(false);
+async function convertDesign(doc:LibraryDoc){
+  if(converting.value)return;converting.value=true;
+  try{const id=await props.library.convertDesign(doc.id);if(id){selected.value=id;emit('design',id);}}
+  finally{converting.value=false;}
+}
 const data = computed(() => props.library.data);
 const folders = computed(() => data.value.folders);
 const realFolder = computed(() => folders.value.some(f => f.id === view.value) ? view.value : null);
@@ -51,6 +57,10 @@ const kind = (doc: LibraryDoc) => KINDS[doc.ext] ?? [(doc.ext || 'FILE').slice(0
 const status = (doc: LibraryDoc) => DOC_STATUS[doc.status] ?? DOC_STATUS.unsupported;
 
 function open(id: FolderView) { view.value = id; selected.value = null; }
+function openDocument(doc: LibraryDoc) {
+  if (doc.designId) emit('design', doc.designId);
+  else if (props.desktop) void props.library.openFile(doc.id);
+}
 
 /* ── Folders ── */
 const naming = ref<null | { mode: 'create' | 'rename-folder' | 'rename-doc'; id?: string; initial: string }>(null);
@@ -107,7 +117,7 @@ async function dropFiles(event: DragEvent) {
   if (!files.length) return;
   event.preventDefault();
   for (const file of files) {
-    if (file.size > MAX_DROP) { emit('notify', `${file.name} 超过 50MB，请用「导入文档」选择`, 'error'); continue; }
+    if (file.size > MAX_DROP && !/\.(html?|zip)$/i.test(file.name)) { emit('notify', `${file.name} 超过 50MB，请用「导入文档」选择`, 'error'); continue; }
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('读取失败'));
@@ -178,7 +188,8 @@ defineExpose({ importFrom, newFolder: () => { naming.value = { mode: 'create', i
             <span class="lib-muted">打开 ›</span>
           </button>
           <button v-for="doc in docs" :key="doc.id" type="button" role="listitem" class="row" :class="{ selected: current?.id === doc.id }" :aria-pressed="current?.id === doc.id" draggable="true" :data-testid="`library-doc-${doc.id}`"
-            @click="selected = doc.id" @dblclick="doc.designId && emit('design', doc.designId)" @dragstart="dragDoc($event, doc)">
+            :title="doc.designId ? '双击或按 Enter 打开设计画布' : desktop ? '双击或按 Enter 使用系统默认应用打开' : '请在小伴桌面中打开本地文件'"
+            @click="selected = doc.id" @dblclick="openDocument(doc)" @keydown.enter.prevent="openDocument(doc)" @dragstart="dragDoc($event, doc)">
             <span class="row-main">
               <span class="file-icon" :style="{ background: kind(doc)[1], color: kind(doc)[2] }">{{ kind(doc)[0] }}</span>
               <span class="row-text"><b>{{ doc.name }}</b><span class="lib-muted">{{ kind(doc)[0] }} · {{ formatSize(doc.size) }} · {{ formatWhen(doc.importedMs) }}<template v-if="showWhere"> · {{ folderPath(folders, doc.folder) }}</template></span></span>
@@ -213,6 +224,7 @@ defineExpose({ importFrom, newFolder: () => { naming.value = { mode: 'create', i
       <div class="detail-actions">
         <button v-if="current.designId" type="button" class="xb-btn-primary" :disabled="!desktop" data-testid="library-open-design" @click="emit('design', current.designId)"><FileText :size="14" />打开设计画布</button>
         <button v-else type="button" class="xb-btn-primary" :disabled="!desktop || !['ready', 'reading'].includes(current.status)" :title="['ready', 'reading'].includes(current.status) ? '' : current.note" data-testid="library-ask" @click="emit('ask', current)"><AtSign :size="14" />用这份资料提问</button>
+        <button v-if="!current.designId && ['html','htm','zip'].includes(current.ext)" type="button" class="xb-btn" :disabled="!desktop || converting" data-testid="library-convert-design" title="从已保存的 HTML 或源码 ZIP 创建可编辑画布，并保留原件；图片 ZIP 不支持" aria-description="从已保存的 HTML 或源码 ZIP 创建可编辑画布，并保留原件；图片 ZIP 不支持" @click="convertDesign(current)"><FileText :size="14" />{{converting?'正在转换…':'转为设计稿'}}</button>
         <div class="pair">
           <button type="button" class="xb-btn" :disabled="!desktop" @click="library.reveal(current.id)"><FolderOpen :size="14" />{{ isMac ? '在访达中显示' : '在文件夹中显示' }}</button>
           <button type="button" class="xb-btn is-danger" aria-label="从资料库删除" @click="removeDoc(current)"><Trash2 :size="14" /></button>

@@ -6,6 +6,7 @@ import AiStorePage from './AiStorePage.vue';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { Skill } from '../ai-store/catalog.ts';
+import type { StoreSelection } from '../ai-store/store-window.ts';
 
 vi.mock('../../bridge.ts', () => ({ invoke: vi.fn(), listen: vi.fn().mockResolvedValue(() => {}) }));
 vi.mock('naive-ui', async () => {
@@ -30,10 +31,10 @@ let connected: boolean;
 const remotePack = {slug:'tech-test-automation',name:'自动化测试专家包',description:'真实测试工作流',category:'tech',skillCount:1};
 const remoteConnector = {slug:'test-mcp',name:'测试 MCP 服务',description:'真实 MCP 目录',category:'开发'};
 const wrappers: ReturnType<typeof mount>[] = [];
-function setup() {
+function setup(detail?: StoreSelection) {
   const store = reactive({ desktop: true, chat: { select: vi.fn().mockResolvedValue(undefined) },
     creationDraft: null, navigate: vi.fn(), notify: vi.fn() }) as unknown as ControlStore;
-  const wrapper = mount(AiStorePage, { props: { store } });
+  const wrapper = mount(AiStorePage, { props: { store, detail } });
   wrappers.push(wrapper);
   return { wrapper, store };
 }
@@ -64,6 +65,7 @@ beforeEach(() => {
     if (command === 'ai_store_inspect') return review;
     if (command === 'ai_store_install') { local = [{ ...remoteSkill, removable: true, source: 'SkillHub' }]; return; }
     if (command === 'ai_store_uninstall') { local = []; return; }
+    if (command === 'ai_store_expert_remove') { local = []; return; }
     if (command === 'save_ai_preferences') { enabled = !!args?.openComputerUse; return { openComputerUse: enabled }; }
     throw new Error(`Unexpected command ${command}`);
   });
@@ -163,12 +165,38 @@ describe('AI 商店', () => {
     const { wrapper } = setup(); await skills(wrapper);
     await wrapper.get('.installed-filter').trigger('click'); await flushPromises();
     await wrapper.findAll('.skill-card')[1].get('.small-action').trigger('click');
-    expect(wrapper.find('.test-modal .store-secondary').exists()).toBe(false);
+    expect(wrapper.find('.test-modal .store-remove-entry').exists()).toBe(false);
     await wrapper.findAll('.skill-card')[0].get('.small-action').trigger('click');
-    await wrapper.get('.test-modal .store-secondary').trigger('click');
+    await wrapper.get('.test-modal .store-remove-entry').trigger('click');
     expect(invoke).not.toHaveBeenCalledWith('ai_store_uninstall', expect.anything());
-    await wrapper.get('.test-modal .store-secondary').trigger('click'); await flushPromises();
+    await wrapper.get('.test-modal .store-remove-confirm').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_store_uninstall', { slug: 'demo-skill' });
+  });
+  it.each([
+    { kind: 'skills' as const, extra: {} },
+    { kind: 'experts' as const, extra: { plugin: true, marketKind: 'expert' as const } },
+    { kind: 'experts' as const, extra: { market: true, marketKind: 'expert' as const } },
+    { kind: 'skills' as const, extra: { ownerPlugin: 'github', removable: false } },
+    { kind: 'skills' as const, extra: { ownerExpertPack: 'test-expert', removable: false } },
+  ])('supports cancelling and retrying removal in an installed $kind detail', async ({ kind, extra }) => {
+    local = [{ ...remoteSkill, removable: true, ...extra }];
+    const command = local[0].ownerExpertPack ? 'ai_store_expert_remove' : 'ai_store_uninstall';
+    const slug = local[0].ownerPlugin || local[0].ownerExpertPack || remoteSkill.slug;
+    // The window URL contains public metadata only; removability must come from the installed list.
+    const { wrapper } = setup({ view: 'skill', kind, source: 'hub', item: remoteSkill });
+    await flushPromises();
+    await wrapper.get('.store-remove-entry').trigger('click');
+    expect(wrapper.find('.store-removal-primary').exists()).toBe(false);
+    await wrapper.get('.store-removal .store-secondary').trigger('click');
+    expect(invoke).not.toHaveBeenCalledWith(command, expect.anything());
+    await wrapper.get('.store-remove-entry').trigger('click');
+    vi.mocked(invoke).mockRejectedValueOnce(new Error('文件被占用'));
+    await wrapper.get('.store-remove-confirm').trigger('click'); await flushPromises();
+    expect(wrapper.text()).toContain('文件被占用');
+    expect(wrapper.find('.store-remove-confirm').exists()).toBe(true);
+    await wrapper.get('.store-remove-confirm').trigger('click'); await flushPromises();
+    expect(invoke).toHaveBeenCalledWith(command, { slug });
+    expect(wrapper.find('.test-modal').exists()).toBe(false);
   });
   it('connects registry MCP services after explicit configuration confirmation', async () => {
     const { wrapper } = setup(); await settle();

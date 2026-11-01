@@ -64,6 +64,7 @@ mod data_library;
 mod design;
 mod window_control;
 mod design_window;
+mod design_mcp;
 mod configuration_window;
 mod voice_turn;
 mod inference;
@@ -795,6 +796,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 }
 
 fn main() {
+    if let Some(code)=design_mcp::stdio_main(){std::process::exit(code);}
     // Started as the sandbox launcher for one command (Windows, experimental): run it and leave, before anything
     // of the app starts.
     if let Some(code) = agent_kernel::sandbox::windows_launcher_main() {
@@ -840,7 +842,7 @@ fn main() {
                     route_link(app, clean);
                 }
             }
-            if !arguments.iter().any(|arg| arg == "--autostart") { let _ = present_control(app); }
+            if !design_mcp::autostart::background(&arguments) { let _ = present_control(app); }
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
@@ -877,6 +879,7 @@ fn main() {
             chat::goals::chat_goal_get, chat::goals::chat_goal_set, chat::goals::chat_goal_start, chat::goals::chat_goal_pause, chat::goals::chat_goal_acknowledge, chat::goals::chat_goal_finish, chat::goals::chat_goal_delete, chat::chat_run_history, chat::chat_verify_file_outcome, chat::chat_reflect_run, chat::chat_review_experience,
             chat::chat_context, chat::chat_compact, chat::chat_set_model, chat::chat_set_session_options, chat::chat_rename_session, chat::chat_move_session, chat::chat_create_group, chat::chat_rename_group, chat::chat_delete_group,
             chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode, chat::workspace::chat_set_workspace, chat::worktree::chat_worktree_status, chat::worktree::chat_worktree_start, chat::worktree::chat_worktree_finish, chat::workspace::chat_reveal_workspace, chat::chat_checkpoints, chat::chat_undo_run, chat::chat_agent_settings, chat::chat_set_execution_limits, chat::chat_set_sandbox_network, chat::chat_set_command_sandbox, chat::chat_save_hooks, chat::chat_revoke_grant, chat::chat_set_windows_sandbox,
+            chat::image_generation::chat_generated_image_read, chat::image_generation::chat_generated_image_save, chat::image_generation::chat_generated_image_open,
             chat::store::ai_store_installed, chat::store::ai_store_browse, chat::store::ai_store_skill_categories, chat::store::ai_store_inspect, chat::store::ai_store_install, chat::store::ai_store_uninstall,
             chat::store::ai_store_catalog, chat::store::ai_store_experts_installed, chat::store::ai_store_expert_review, chat::store::ai_store_expert_install, chat::store::ai_store_expert_remove, chat::store::ai_store_connector_detail, chat::store::ai_store_connector_status, chat::store::ai_store_connector_connect, chat::store::ai_store_connector_disconnect, chat::store::ai_store_connector_reconnect,
             chat::store::ai_store_connector_auth_status, chat::store::ai_store_connector_auth_cancel,
@@ -889,20 +892,22 @@ fn main() {
             phone_link::phone_link_status, phone_link::phone_link_set_enabled, phone_link::phone_link_remove_peer,
             speech_agent::speech_agent_env, speech_agent::speech_agent_install_guides, speech_agent::speech_agent_hooks_status, speech_agent::speech_agent_hooks_install, speech_agent::speech_agent_hooks_uninstall, speech_agent::speech_agent_inject,
             speech_agent::speech_agent_delegate, speech_agent::speech_agent_task_status, speech_agent::speech_agent_task_cancel, speech_agent::speech_agent_task_list,
+            design_mcp::design_mcp_status, design_mcp::design_mcp_set_enabled, design_mcp::design_mcp_configure, design_mcp::design_mcp_open_settings,
             voice_service::voice_service_status, voice_service::voice_service_set_enabled, voice_service::voice_service_reset_token,
-            chat::plugins::ai_plugin_installed, chat::connectors::ai_connector_installed, chat::connectors::ai_connector_configure, chat::connectors::ai_connector_set_enabled, chat::connectors::ai_connector_unbind, chat::connectors::ai_connector_reauthorize, chat::connectors::ai_mentions, chat::plugins::ai_plugin_pick_file, chat::plugins::ai_plugin_inspect_file, chat::plugins::ai_plugin_install_file, chat::plugins::ai_plugin_remove, chat::plugins::ai_plugin_avatar,
+            chat::plugins::ai_plugin_installed, chat::connectors::ai_connector_installed, chat::connectors::ai_connector_configure, chat::connectors::ai_connector_set_enabled, chat::connectors::ai_connector_unbind, chat::connectors::ai_connector_reauthorize, chat::connectors::baidu::ai_connector_baidu_start, chat::connectors::baidu::ai_connector_baidu_status, chat::connectors::baidu::ai_connector_baidu_cancel, chat::connectors::ai_mentions, chat::plugins::ai_plugin_pick_file, chat::plugins::ai_plugin_inspect_file, chat::plugins::ai_plugin_install_file, chat::plugins::ai_plugin_remove, chat::plugins::ai_plugin_avatar,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
-            configuration_window::configuration_window_action, configuration_window::configuration_window_resize, configuration_window::configuration_window_login, configuration_window::configuration_window_open, configuration_window::configuration_window_close, configuration_window::configuration_window_invoke, configuration_window::configuration_window_take, configuration_window::configuration_window_reply, assistant_hit_test::assistant_set_regions, design_window::design_window_fullscreen, design_window::design_window_open, design_window::design_window_status, design_window::design_window_return, design_window::design_window_close, design_window::design_window_request, design::design_view_read, design::design_view_save, design::design_list, design::design_link, design::design_create, design::design_copy, design::design_read, design::design_save, design::design_draft_save, design::design_draft_clear, design::design_history, design::design_restore, design::design_import, design::design_export, data_library::library_state, data_library::library_pick_import, data_library::library_import_data, data_library::library_create_folder, data_library::library_rename_folder, data_library::library_delete_folder, data_library::library_move, data_library::library_update_doc, data_library::library_remove, data_library::library_reveal, data_library::library_attachment, data_library::library_add_link, data_library::library_rename_link, data_library::library_save, chat::memory_center::chat_memory_overview, chat::memory_center::chat_memory_set_remembering, chat::memory_center::chat_memory_edit_experience, chat::memory_center::chat_memory_forget_experience, chat::memory_center::chat_memory_write_note, chat::memory_center::chat_memory_delete_note, chat::memory_center::chat_memory_clear, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
+            configuration_window::configuration_window_action, configuration_window::configuration_window_resize, configuration_window::configuration_window_login, configuration_window::configuration_window_open, configuration_window::configuration_window_close, configuration_window::configuration_window_invoke, configuration_window::configuration_window_take, configuration_window::configuration_window_reply, assistant_hit_test::assistant_set_regions, design_window::design_window_fullscreen, design_window::design_window_open, design_window::design_window_status, design_window::design_window_return, design_window::design_window_close, design_window::design_window_request, design::design_view_read, design::design_view_save, design::design_list, design::design_link, design::design_create, design::design_copy, design::design_read, design::design_save, design::design_draft_save, design::design_draft_clear, design::design_history, design::design_restore, design::design_import, design::design_export, data_library::cloud::content::library_cloud_open_source, data_library::cloud::content::library_cloud_item, data_library::cloud::content::library_cloud_read, data_library::cloud::content::library_cloud_question, data_library::cloud::download::library_cloud_download, data_library::cloud::download::library_cloud_download_cancel, data_library::cloud::library_cloud_sources, data_library::cloud::library_cloud_browse, data_library::cloud::library_cloud_add, data_library::library_state, data_library::library_pick_import, data_library::library_import_data, data_library::library_convert_design, data_library::library_create_folder, data_library::library_rename_folder, data_library::library_delete_folder, data_library::library_move, data_library::library_update_doc, data_library::library_remove, data_library::library_reveal, data_library::library_open, data_library::library_attachment, data_library::library_add_link, data_library::library_rename_link, data_library::library_save, chat::memory_center::chat_memory_overview, chat::memory_center::chat_memory_set_remembering, chat::memory_center::chat_memory_edit_experience, chat::memory_center::chat_memory_forget_experience, chat::memory_center::chat_memory_write_note, chat::memory_center::chat_memory_delete_note, chat::memory_center::chat_memory_clear, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
             chat_screenshot, float_assistant::assistant_screenshot, float_assistant::assistant_drag, float_assistant::assistant_unfold, float_assistant::assistant_focus,
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
             float_assistant::assistant_reanchor_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(configuration_window::ConfigurationState::default()).manage(window_control::WindowState::default()).manage(chat::store_market::PendingLink::default()).manage(community::CommunityState::default()).manage(phone_link::PhoneLinkState::default()).manage(voice_service::VoiceServiceState::default()).manage(voice_turn::VoiceTurnState::default())
+        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(configuration_window::ConfigurationState::default()).manage(window_control::WindowState::default()).manage(chat::store_market::PendingLink::default()).manage(community::CommunityState::default()).manage(phone_link::PhoneLinkState::default()).manage(voice_service::VoiceServiceState::default()).manage(design_mcp::DesignMcpState::default()).manage(voice_turn::VoiceTurnState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("design-preview", |context, request| design::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
+            if label.starts_with("baidu-auth-") { invoke.resolver.reject("授权页面没有原生命令权限"); return true; }
             if community::invocation_permission(label, command) == Some(false) { invoke.resolver.reject("社区视图没有此原生命令权限"); return true; }
             if command.starts_with("design_") && design_window::permitted(label,command)!=Some(true) { invoke.resolver.reject("只能在主窗口访问设计稿"); return true; }
             if command.starts_with("asr_") && label != "control" && label != float_assistant::LABEL {
@@ -948,6 +953,7 @@ fn main() {
             chat::goals::resume_pending(app.handle());
             phone_link::start(app.handle());
             voice_service::start(app.handle());
+            design_mcp::start(app.handle());
             float_assistant::start(app.handle());
             asr::start(app.handle());
             games::start(app.handle());
@@ -970,7 +976,7 @@ fn main() {
             widgets::start(app.handle());
             proactivity::start(app.handle());
             reminders::start(app.handle());
-            if !std::env::args().any(|argument| argument == "--autostart") {
+            if !design_mcp::autostart::background(std::env::args()) {
                 present_control(app.handle()).map_err(std::io::Error::other)?;
             }
             account::activated(app.handle());

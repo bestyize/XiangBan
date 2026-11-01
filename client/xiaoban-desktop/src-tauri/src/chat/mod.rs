@@ -27,6 +27,7 @@ mod community;
 mod compact;
 mod danger;
 mod desktop_tools;
+pub mod image_generation;
 mod tool_discovery;
 mod game_draft;
 pub mod delegation_tools;
@@ -664,7 +665,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
             let workspace = workspace.to_path_buf();
             move || project_rules::section(&workspace)
         })
-        .tool(open_claude_design::DesignTool::new(design_store.clone(), move |project| design_desktop.design_saved(project)).on_remove(move|id|design_remove_desktop.design_removed(id)))
+        .deferred_trusted_tool_arc(Arc::new(open_claude_design::DesignTool::new(design_store.clone(), move |project| design_desktop.design_saved(project)).on_remove(move|id|design_remove_desktop.design_removed(id))))
         .middleware(open_claude_design::DesignContext(design_store))
         .tool(TimeNow::new().utc_offset_minutes(utc_offset_minutes))
         .middleware(todo.clone())
@@ -672,6 +673,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .tool(ask)
         .tool(Shell::new(workspace).sandbox(sandbox_gate::hook(permission.clone(), workspace)))
         .tool(WebFetch::new())
+        .deferred_trusted_tool_arc(image_generation::tool(desktop.clone()))
         .tool(learning::Recall::new(dirs.learning_db()).paused(!remember))
         .middleware(discovery.acquisition_policy())
         // The user's own checks run first: a call they stop is never put to them for approval.
@@ -795,13 +797,13 @@ fn research_subagent(
     })
 }
 
-fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_connector_tools::ConnectorManager>, String> {
+pub(crate) fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_connector_tools::ConnectorManager>, String> {
     let state=app.state::<ChatState>();
     let mut slot=lock(&state.connectors);
     if let Some(manager)=slot.as_ref(){return Ok(manager.clone());}
     let config=ai_config::current(app)?;
     let default=ai_config::default_workspace(app)?;
-    let manager=Arc::new(agent_connector_tools::ConnectorManager::new_lazy(Dirs::of(app)?.chat.join("connectors"),config.workspace_or(&default).to_path_buf())?);
+    let manager=Arc::new(agent_connector_tools::ConnectorManager::new_lazy(Dirs::of(app)?.chat.join("connectors"),config.workspace_or(&default).to_path_buf())?.with_tool_timeout_floor(Duration::from_secs(45)));
     *slot=Some(manager.clone());
     Ok(manager)
 }

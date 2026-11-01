@@ -1,0 +1,6 @@
+{
+  "identifier": "cloud-document",
+  "description": "Native cloud document preview follows theme and window state. Content requests are scoped to its saved document in the native queue.",
+  "windows": ["configuration-cloud-*"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

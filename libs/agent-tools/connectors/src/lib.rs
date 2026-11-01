@@ -99,6 +99,7 @@ pub struct ConnectorManager {
     restoring:Mutex<()>,
     plugin_states: Mutex<std::collections::BTreeMap<String, ConnectorState>>,
     plugin_operations: Mutex<()>,
+    tool_timeout_floor: Duration,
 }
 fn valid_id(id: &str) -> bool {
     !id.is_empty()
@@ -227,6 +228,8 @@ fn string_map(value: Option<&Value>) -> Result<std::collections::BTreeMap<String
 }
 impl ConnectorManager {
     pub fn new(root:PathBuf,workspace:PathBuf)->Result<Self,String>{let this=Self::new_lazy(root,workspace)?;this.restore(Arc::new(AtomicBool::new(false)))?;Ok(this)}
+    /// Optional host policy; library callers keep the declared per-tool timeout by default.
+    pub fn with_tool_timeout_floor(mut self, floor: Duration) -> Self { self.tool_timeout_floor = floor; self }
     pub fn new_lazy(root: PathBuf, workspace: PathBuf) -> Result<Self, String> {
         fs::create_dir_all(&root).map_err(|e| e.to_string())?;
         if fs::symlink_metadata(&root)
@@ -267,6 +270,7 @@ impl ConnectorManager {
         let this = Self {
             plugin_states: Mutex::new(plugin_manager::load_states(&root)?),
             plugin_operations: Mutex::new(()),
+            tool_timeout_floor: Duration::ZERO,
             root,
             workspace,
             state: Mutex::new(State {
@@ -297,6 +301,10 @@ impl ConnectorManager {
     }
     fn start(&self, id: &str, config: &Value,cancel:Arc<AtomicBool>) -> Result<Active, String> {
         let (config, disabled_tools, timeout) = self.resolve_plugin_config(id, config)?;
+        self.start_resolved(id, &config, disabled_tools, timeout, cancel)
+    }
+    fn start_resolved(&self, id: &str, config: &Value, disabled_tools: Vec<String>, timeout: Duration, cancel: Arc<AtomicBool>) -> Result<Active, String> {
+        let timeout = timeout.max(self.tool_timeout_floor);
         let config = normalized_config(&config)?;
         let prefix = format!("mcp_ext_{}_", id.replace('-', "_"));
         let mut session = None;
@@ -477,9 +485,9 @@ impl ConnectorManager {
         self.connect(id, &record.name, record.config, true)
     }
     pub fn disconnect(&self, id: &str) -> Result<(), String> {
-        self.generation.fetch_add(1,Ordering::SeqCst);
         self.cancel_for_connector(id);
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        self.generation.fetch_add(1,Ordering::SeqCst);
         let mut records = state.records.clone();
         let record = records
             .iter_mut()
@@ -511,7 +519,7 @@ impl ConnectorManager {
         Arc::new(StatusTool{manager:self.clone(),spec:ToolSpec::new("connector_status",format!("Inspect configured MCP availability and initialization errors. {unavailable} enabled connector(s) currently unavailable. Do not assume unavailable tools can be called."),json!({"type":"object","properties":{},"additionalProperties":false})).risk(Risk::Read).untrusted_output()})
     }
     pub fn tools(&self) -> Vec<Arc<dyn Tool>> {
-        self.selected_tools(None)
+        self.selected_tools(None, None)
     }
 
     /// Direct host entry point. Agent dispatchers resolve the pinned target before acquiring resources.
@@ -531,17 +539,32 @@ impl ConnectorManager {
     }
     /// Current, gated tools for the chosen connections, including connections added during a run.
     pub fn tools_for(&self, ids: &[String]) -> Vec<Arc<dyn Tool>> {
-        self.selected_tools(Some(ids))
+        self.selected_tools(Some(ids), None)
     }
-    fn selected_tools(&self, ids: Option<&[String]>) -> Vec<Arc<dyn Tool>> {
+    /// Resolve server names before isolation/truncation. Policy and revocation gates stay intact.
+    /// Hosts must still authorize the concrete action before executing these tools.
+    pub fn tools_named_for(&self, id: &str, names: &[&str]) -> Vec<Arc<dyn Tool>> {
+        self.selected_tools(Some(&[id.to_string()]), Some(names))
+    }
+    fn selected_tools(&self, ids: Option<&[String]>, names: Option<&[&str]>) -> Vec<Arc<dyn Tool>> {
         let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         state
             .active
             .iter()
             .filter(|(id, a)| a.client.is_connected() && ids.is_none_or(|ids| ids.contains(id)))
             .flat_map(|(id, a)| {
-                a.tools(id).into_iter().map(move |tool| {
+                let service = state.records.iter().find(|record| record.id == *id)
+                    .map(|record| record.name.split_whitespace().collect::<Vec<_>>().join(" "))
+                    .unwrap_or_default();
+                let prefix = format!("mcp_ext_{}_", id.replace('-', "_"));
+                a.tools(id).into_iter().filter(move |tool| names.is_none_or(|names| names.contains(&tool.spec().name.strip_prefix(&prefix).unwrap_or(&tool.spec().name)))).map(move |tool| {
                     let mut spec = tool.spec().clone().always_ask().untrusted_output();
+                    let prefix = format!("mcp_ext_{}_", id.replace('-', "_"));
+                    let original = spec.name.strip_prefix(&prefix).unwrap_or(&spec.name)
+                        .chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+                        .take(80).collect::<String>();
+                    let service: String = service.chars().take(80).collect();
+                    spec.description = format!("Connector {service}, tool {original}: {}", spec.description);
                     let hash = format!(
                         "{:x}",
                         Sha256::digest(format!("{id}\0{}", spec.name).as_bytes())
@@ -666,21 +689,34 @@ for line in sys.stdin:
  else: v={'content':[{'type':'text','text':'called'}],'structuredContent':{'ok':True}}
  print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':v}),flush=True)
 "#).unwrap();
-        let manager = ConnectorManager::new(root.join("config"), root.clone()).unwrap();
+        let manager = ConnectorManager::new_lazy(root.join("config"), root.clone()).unwrap().with_tool_timeout_floor(Duration::from_secs(60));
         let python = if cfg!(windows) { "python" } else { "python3" };
+        let id = format!("plugin-{}", "a".repeat(48));
         let config = json!({"command":python,"args":[script.to_str().unwrap()],"env":{"TEST_TOKEN":"must-not-be-in-status"}});
         assert!(manager
-            .connect("test", "Test", config.clone(), false)
+            .connect(&id, "Test", config.clone(), false)
             .is_err());
-        manager.connect("test", "Test", config, true).unwrap();
+        manager.connect(&id, "Test", config, true).unwrap();
         let tools = manager.tools();
         assert_eq!(tools.len(), 1);
-        assert_eq!(manager.tools_for(&["test".into()])[0].spec().name, tools[0].spec().name);
+        assert_eq!(tools[0].spec().timeout, Duration::from_secs(60));
+        assert_eq!(manager.tools_for(&[id.clone()])[0].spec().name, tools[0].spec().name);
         assert!(manager.tools_for(&["another-service".into()]).is_empty());
+        let named = manager.tools_named_for(&id, &["echo.with.dot"]);
+        assert_eq!(named.len(), 1);
+        assert_eq!(named[0].spec().name, tools[0].spec().name);
+        assert!(named[0].spec().always_ask);
+        assert!(manager.tools_named_for(&id, &["echo"]).is_empty());
+        assert!(manager.tools_named_for("another-service", &["echo.with.dot"]).is_empty());
         assert!(tools[0].spec().always_ask && tools[0].spec().untrusted_output);
         assert!(tools[0].spec().name.starts_with("mcp_ext_"));
         assert!(tools[0].spec().name.len() <= 64);
         assert!(!tools[0].spec().name.contains('.'));
+        assert!(tools[0].spec().description.contains("Connector Test, tool echo.with.dot"));
+        let raw = format!("mcp_ext_{}_echo.with.dot", id.replace('-', "_"));
+        let hash = format!("{:x}", Sha256::digest(format!("{id}\0{raw}").as_bytes()));
+        let safe: String = raw.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' }).take(30).collect();
+        assert_eq!(tools[0].spec().name, format!("mcp_ext_{}_{safe}", &hash[..12]), "existing tool identifiers remain stable");
         let result = tools[0].execute_result(json!({}), &ToolCtx::detached("test"));
         assert!(!result.is_error);
         assert_eq!(result.structured_content.unwrap()["ok"], true);
@@ -700,15 +736,17 @@ for line in sys.stdin:
                 0o600
             );
         }
-        manager.disconnect("test").unwrap();
+        manager.disconnect(&id).unwrap();
         assert!(manager.tools().is_empty());
+        assert!(named[0].execute_result(json!({}), &ToolCtx::detached("test")).is_error);
+        assert!(manager.tools_named_for(&id, &["echo.with.dot"]).is_empty());
         assert!(tools[0]
             .execute(json!({}), &ToolCtx::detached("test"))
             .is_err());
         drop(manager);
         let restored = ConnectorManager::new(root.join("config"), root.clone()).unwrap();
         assert!(restored.tools().is_empty());
-        restored.reconnect("test").unwrap();
+        restored.reconnect(&id).unwrap();
         assert_eq!(restored.tools().len(), 1);
         restored.shutdown();
         fs::remove_dir_all(root).unwrap();

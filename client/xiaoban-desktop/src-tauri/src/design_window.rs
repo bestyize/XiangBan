@@ -15,7 +15,7 @@ pub fn guard(window:&tauri::WebviewWindow,id:&str)->Result<(),String>{
 }
 pub fn permitted(label:&str,command:&str)->Option<bool>{
     if command.starts_with("design_"){return Some(label=="control"||project_id(label).is_some()&&[
-        "design_read","design_save","design_view_read","design_view_save","design_draft_save","design_draft_clear","design_history","design_restore","design_export","design_copy","design_window_return","design_window_close","design_window_request","design_window_fullscreen"
+        "design_mcp_open_settings","design_read","design_save","design_view_read","design_view_save","design_draft_save","design_draft_clear","design_history","design_restore","design_export","design_copy","design_window_return","design_window_close","design_window_request","design_window_fullscreen"
     ].contains(&command))}
     if project_id(label).is_some(){return Some(command=="get_appearance")}
     None

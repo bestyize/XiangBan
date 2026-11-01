@@ -8,7 +8,7 @@ export interface LibraryDoc {
   designId?: string | null; origin: string; status: DocStatus; note: string; preview: string; tags: string[];
 }
 export type Platform = 'feishu' | 'tencent' | 'baidu' | 'shimo' | 'yuque' | 'wps' | 'other';
-export interface LibraryLink { id: string; url: string; title: string; platform: Platform; kind: string; code: string | null; folder: string | null; addedMs: number }
+export interface LibraryLink { content?: import('./cloud-document.ts').CloudContentState | null; id: string; url: string; title: string; platform: Platform; kind: string; code: string | null; folder: string | null; addedMs: number; remote?: { provider: string; id: string; path: string } | null }
 export type SavedKind = 'answer' | 'text' | 'file' | 'image' | 'shot';
 export interface LibrarySaved { id: string; kind: SavedKind; title: string; text: string; sessionId: string | null; sessionTitle: string; source: 'main' | 'assistant'; savedMs: number }
 export interface LibraryData { folders: LibraryFolder[]; docs: LibraryDoc[]; links: LibraryLink[]; saved: LibrarySaved[] }
@@ -160,6 +160,11 @@ export function createLibraryStore(deps: LibraryDeps) {
     async importFile(name: string, dataUrl: string, folder: string | null) {
       await run(async () => { store.data = asLibrary(await deps.invoke<LibraryData>('library_import_data', { name, dataUrl, folder })); });
     },
+    async convertDesign(id:string) {
+      let designId:string|null=null;
+      await run(async()=>{const result=await deps.invoke<{id:string;library:LibraryData}>('library_convert_design',{id});store.data=asLibrary(result.library);designId=result.id;});
+      return designId;
+    },
     async createDocument(name: string, text: string, folder: string | null) {
       const previous = new Set(store.data.docs.map(doc => doc.id));
       const bytes = new TextEncoder().encode(text);
@@ -186,6 +191,7 @@ export function createLibraryStore(deps: LibraryDeps) {
     setTags: (id: string, tags: string[]) => update('library_update_doc', { id, patch: { tags } }),
     remove: (ids: string[]) => update('library_remove', { ids }),
     reveal: (id: string) => run(() => deps.invoke('library_reveal', { id })),
+    openFile: (id: string) => run(() => deps.invoke('library_open', { id })),
     addLink: (url: string, title: string, folder: string | null) => update('library_add_link', { url, title, folder }),
     renameLink: (id: string, title: string) => update('library_rename_link', { id, title }),
     /** The document as a chat attachment: a data URL for an image, a file record otherwise. */

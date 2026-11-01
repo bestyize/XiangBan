@@ -48,7 +48,7 @@ fn fixture(root: &Path, mcp: Value, policy: Value) -> ConnectorPlugin {
     }).to_string()).unwrap();
     fs::write(
         root.join("ai.workbuddy/token-schema.json"),
-        json!({"title":"Token","fields":[
+        json!({"title":"Token","docUrl":"https://provider.example/settings/mcp","docLabel":"获取服务密钥","fields":[
             {"key":"TOKEN","type":"password","required":true}, {"key":"OPTIONAL","type":"text"}
         ]})
         .to_string(),
@@ -62,6 +62,49 @@ fn fixture(root: &Path, mcp: Value, policy: Value) -> ConnectorPlugin {
     ConnectorPlugin::load(root).unwrap()
 }
 #[test]
+fn baidu_personal_adapter_requires_the_exact_official_service_and_encodes_token() {
+    let tmp = Temp::new();
+    let root = tmp.0.join("baidu");
+    fs::create_dir_all(root.join(".codebuddy-plugin")).unwrap();
+    fs::write(root.join(".codebuddy-plugin/plugin.json"), json!({"name":"baidu-netdisk","version":"1"}).to_string()).unwrap();
+    let path = root.join("mcp.json");
+    let write_server = |url: &str, transport: &str, name: &str| {
+        fs::write(&path, json!({"mcpServers":{name:{"type":transport,"url":url}}}).to_string()).unwrap();
+    };
+    write_server("https://mcp-pan.baidu.com/sse", "sse", "baidu-netdisk");
+    let plugin = ConnectorPlugin::load(&root).unwrap();
+    let spec = &plugin.servers[0];
+    assert!(spec.is_baidu_netdisk_personal());
+    let field = &spec.schema().unwrap().fields[0];
+    assert_eq!(field.key, "BAIDU_NETDISK_ACCESS_TOKEN");
+    assert!(field.required);
+    assert_eq!(field.field_type, "password");
+    assert!(plugin.build_config("baidu-netdisk", &BTreeMap::new()).is_err());
+    let token = "private +&=#token";
+    let config = plugin.build_config("baidu-netdisk", &BTreeMap::from([(field.key.clone(), token.into())])).unwrap();
+    let url = reqwest::Url::parse(config["url"].as_str().unwrap()).unwrap();
+    assert_eq!(url.query_pairs().collect::<Vec<_>>(), vec![("access_token".into(), token.into())]);
+    assert_eq!(url.host_str(), Some("mcp-pan.baidu.com"));
+    assert!(!serde_json::to_string(&plugin).unwrap().contains(token));
+    for (url, transport, name) in [
+        ("https://mcp-pan.baidu.com.evil.example/sse", "sse", "baidu-netdisk"),
+        ("https://mcp-pan.baidu.com/sse?forward=evil", "sse", "baidu-netdisk"),
+        ("https://user@mcp-pan.baidu.com/sse", "sse", "baidu-netdisk"),
+        ("https://mcp-pan.baidu.com:444/sse", "sse", "baidu-netdisk"),
+        ("https://mcp-pan.baidu.com/sse#fragment", "sse", "baidu-netdisk"),
+        ("https://mcp-pan.baidu.com/sse", "streamable-http", "baidu-netdisk"),
+        ("https://mcp-pan.baidu.com/sse", "sse", "other"),
+    ] {
+        write_server(url, transport, name);
+        let other = ConnectorPlugin::load(&root).unwrap();
+        assert!(!other.servers[0].is_baidu_netdisk_personal());
+        assert!(other.servers[0].schema().is_none());
+    }
+    fs::write(root.join(".codebuddy-plugin/plugin.json"), json!({"name":"impostor","version":"1"}).to_string()).unwrap();
+    write_server("https://mcp-pan.baidu.com/sse", "sse", "baidu-netdisk");
+    assert!(ConnectorPlugin::load(&root).unwrap().servers[0].schema().is_none());
+}
+#[test]
 fn templates_schema_auth_and_safe_paths() {
     let tmp = Temp::new();
     let plugin_dir = tmp.0.join("plugin");
@@ -72,6 +115,8 @@ fn templates_schema_auth_and_safe_paths() {
     );
     let spec = &mut plugin.servers[0];
     assert_eq!(spec.transport, Transport::StreamableHttp);
+    assert_eq!(spec.schema().unwrap().doc_url.as_deref(), Some("https://provider.example/settings/mcp"));
+    assert_eq!(spec.schema().unwrap().doc_label.as_deref(), Some("获取服务密钥"));
     if let AuthSpec::Token { headers, .. } = &mut spec.auth {
         headers.push(("authorization".into(), "TOKEN".into(), "Bearer ".into()));
     }
@@ -317,7 +362,7 @@ fn real_workbuddy_marketplace_oracle() {
 }
 
 #[test]
-fn http_plugin_uses_token_headers_and_call_timeout() {
+fn http_plugin_initialization_is_independent_from_token_tool_call_timeout() {
     use std::io::{BufRead, BufReader, Read, Write};
     let tmp = Temp::new();
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -355,6 +400,7 @@ fn http_plugin_uses_token_headers_and_call_timeout() {
             let request: Value = serde_json::from_slice(&bytes).unwrap();
             let result = match step {
                 0 => {
+                    std::thread::sleep(Duration::from_millis(250));
                     json!({"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"test","version":"1"}})
                 }
                 1 => {
@@ -362,6 +408,7 @@ fn http_plugin_uses_token_headers_and_call_timeout() {
                     continue;
                 }
                 2 => {
+                    std::thread::sleep(Duration::from_millis(250));
                     json!({"tools":[{"name":"read","inputSchema":{"type":"object"}},{"name":"write","inputSchema":{"type":"object"}}]})
                 }
                 _ => {
@@ -403,19 +450,19 @@ fn http_plugin_uses_token_headers_and_call_timeout() {
 fn legacy_sse_plugin_connects_with_vault_token_policy_and_revocation() {
     let tmp = Temp::new();
     let server = legacy_sse_support::Server::new(legacy_sse_support::Options {
-        token: Some(values()["TOKEN"].clone()), ..Default::default()
+        token: Some(values()["TOKEN"].clone()), endpoint_delay: Duration::from_millis(250), ..Default::default()
     });
     let plugin = fixture(
         &tmp.0.join("plugin"),
         json!({"type":"sse","url":server.url(),"headers":{"Authorization":"Bearer ${TOKEN}"}}),
-        json!({"disabledTools":["write"],"timeout":2000}),
+        json!({"disabledTools":["write"],"timeout":120}),
     );
     let root = tmp.0.join("config");
     let manager = ConnectorManager::new(root.clone(), tmp.0.clone()).unwrap();
     manager.connect_plugin(&plugin, "service", &values(), true).unwrap();
     let tools = manager.tools();
     assert_eq!(tools.len(), 1);
-    assert_eq!(tools[0].spec().timeout, Duration::from_millis(2000));
+    assert_eq!(tools[0].spec().timeout, Duration::from_millis(120));
     assert_eq!(tools[0].execute(json!({"text":"legacy result"}), &ToolCtx::detached("sse")).unwrap(), "legacy result");
     assert!(!fs::read_to_string(root.join("connections.json")).unwrap().contains(&values()["TOKEN"]));
     assert!(!manager.statuses().to_string().contains(&values()["TOKEN"]));

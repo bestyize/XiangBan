@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import StoreDialog from './StoreDialog.vue';
+import StoreRemoveAction from './StoreRemoveAction.vue';
 // 专家团 / 技能套件：一次审查全部成员，整组安装或整组撤销。
 import { computed, ref, watch } from 'vue';
-import { NAlert, NModal } from 'naive-ui';
+import { NAlert } from 'naive-ui';
 import { Check, Download, RefreshCw } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { Skill } from './catalog.ts';
@@ -9,11 +11,12 @@ import { shortDigest, variantLabel, type GroupReview } from './market.ts';
 import './store-cards.css';
 
 const props = defineProps<{ item: Skill | null; kind: 'skills' | 'experts' }>();
-const emit = defineEmits<{ close: []; done: [message: string] }>();
+const emit = defineEmits<{ close: []; done: [message: string]; changed: [] }>();
 const review = ref<GroupReview | null>(null);
 const loading = ref(false), busy = ref(false), error = ref('');
 let token = 0;
 const pending = computed(() => review.value?.members.filter(m => m.state === 'pending') ?? []);
+const installed = computed(() => review.value?.members.filter(m => m.state === 'installed') ?? []);
 const files = computed(() => pending.value.reduce((n, m) => n + m.manifest.fileCount, 0));
 const bytes = (n: number) => n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`;
 const total = computed(() => pending.value.reduce((n, m) => n + m.manifest.totalBytes, 0));
@@ -42,16 +45,41 @@ async function install() {
   } catch (e) { error.value = String(e); }
   finally { busy.value = false; }
 }
+async function remove() {
+  const item = props.item, members = [...installed.value];
+  if (!item || busy.value || !members.length) return;
+  busy.value = true; error.value = '';
+  let removed = 0;
+  function markRemoved(slug: string) {
+    if (review.value) review.value = { ...review.value, members: review.value.members.map(member => member.slug === slug ? { ...member, state: 'pending' } : member) };
+  }
+  try {
+    const local = await invoke<Skill[]>('ai_store_installed');
+    // Review pins ownership and version. A package replaced since the preview
+    // must not be removed merely because its slug is the same.
+    for (const member of members) {
+      const saved = local.find(skill => skill.slug === member.slug);
+      if (!saved) { markRemoved(member.slug); continue; }
+      if (!saved.removable || !saved.market || saved.namespace !== member.namespace || saved.version !== member.manifest.version || saved.manifestSha256 !== member.sha256) throw new Error(`「${member.name || member.slug}」的安装来源或版本已变化，请重新读取后再移除。`);
+    }
+    for (const member of members) {
+      if (!local.some(skill => skill.slug === member.slug)) continue;
+      await invoke('ai_store_uninstall', { slug: member.slug });
+      removed++; markRemoved(member.slug);
+    }
+    emit('done', `已移除「${item.name}」的 ${removed} ${unit.value}`);
+  } catch (e) { error.value = `${removed ? `已移除 ${removed} ${unit.value}；` : ''}移除失败：${String(e)}`; }
+  finally { busy.value = false; emit('changed'); }
+}
 function close() { if (!busy.value) emit('close'); }
 </script>
 
 <template>
-  <NModal :show="!!item" preset="card" :title="item?.name" class="store-dialog group-dialog" :mask-closable="!busy" :closable="!busy" style="width:720px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
+  <StoreDialog :show="!!item" preset="card" :title="item?.name" class="store-dialog group-dialog" :mask-closable="!busy" :closable="!busy" style="width:720px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
     <template v-if="item">
-      <div class="detail-tags"><span class="store-tag">{{ variantLabel(item.variant) || '组合' }}</span><span class="store-tag">小伴市场</span><span v-if="review" class="store-tag">{{ review.members.length }} {{ unit }}</span></div>
-      <p>{{ item.description }}</p>
+      <div class="detail-tags" :title="item.description" :aria-description="item.description"><span class="store-tag">{{ variantLabel(item.variant) || '组合' }}</span><span class="store-tag">小伴市场</span><span v-if="review" class="store-tag">{{ review.members.length }} {{ unit }}</span></div>
       <div v-if="loading" class="review-loading"><RefreshCw :size="17" />正在逐个读取成员的文件与脚本…</div>
-      <NAlert v-if="error" type="error" :show-icon="false">{{ error }} <button v-if="!review" class="text-action" :disabled="busy" @click="load">重试</button></NAlert>
+      <NAlert v-if="error" type="error" :show-icon="false">{{ error }} <button class="text-action" :disabled="busy" @click="load">重新读取</button></NAlert>
       <template v-if="review">
         <h4>成员 <small>{{ review.members.length - pending.length }} 个已安装，将跳过</small></h4>
         <ul class="review-files group-members">
@@ -68,9 +96,12 @@ function close() { if (!busy.value) emit('close'); }
         <p class="detail-note">全部通过校验后一起生效；任何一个失败，会撤销本次新增的内容，不影响已安装的。安装不会执行脚本；脚本运行时需单独确认，并使用本机账户权限。</p>
         <div v-if="!pending.length" class="installed-detail"><Check :size="17" /><p>这个组合的成员都已安装。</p></div>
       </template>
-      <div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="close">取消</button><button class="store-primary" :disabled="!review || !pending.length || busy" @click="install">{{ busy ? '正在安装…' : `安装${variantLabel(item.variant) || '组合'}（${pending.length}）` }}<Download :size="14" /></button></div>
+      <StoreRemoveAction :name="item.name" :label="`移除已安装成员（${installed.length}）`" :removable="!!installed.length" :description="`将移除以下 ${installed.length} 个已安装成员，使用它们的其他专家工作流和进行中的任务可能受影响。之后可以重新安装。`" :busy="busy" @confirm="remove">
+        <template #details><ul class="group-remove-members"><li v-for="member in installed" :key="member.slug">{{ member.name || member.slug }}</li></ul></template>
+        <button class="store-secondary" :disabled="busy" @click="close">取消</button><button v-if="pending.length || !review" class="store-primary" :disabled="!review || !pending.length || busy" @click="install">{{ busy ? '正在安装…' : `安装${variantLabel(item.variant) || '组合'}（${pending.length}）` }}<Download :size="14" /></button>
+      </StoreRemoveAction>
     </template>
-  </NModal>
+  </StoreDialog>
 </template>
 
 <style scoped>
@@ -82,4 +113,5 @@ function close() { if (!busy.value) emit('close'); }
 .group-members .inner{margin-top:8px;box-shadow:none;background:var(--ui-surface-sunken)}
 .group-summary{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:14px;padding:12px 14px;border-radius:12px;box-shadow:0 0 0 1px var(--ui-border);font-size:12px;color:var(--ui-text-secondary)}
 .group-summary code{font-size:11.5px}
+.group-remove-members{margin:0 0 16px;padding-left:20px;color:var(--ui-text-secondary);font-size:13px;line-height:1.8}
 </style>

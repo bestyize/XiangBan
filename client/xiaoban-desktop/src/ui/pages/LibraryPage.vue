@@ -108,6 +108,11 @@ onMounted(() => window.addEventListener('keydown', focusSearch, true));
 onBeforeUnmount(() => window.removeEventListener('keydown', focusSearch, true));
 
 /* ── Into a conversation ── */
+async function showDownloaded(id: string) {
+  query.value = ''; pick('docs'); await nextTick();
+  const doc = library.data.docs.find(doc => doc.id === id);
+  if (doc) docsTab.value?.showCreated(id, doc.folder);
+}
 async function startTask(draft: string, attachments: NonNullable<ControlStore['creationAttachments']> = []) {
   await props.store.chat.select(null);
   props.store.creationAttachments = attachments.length ? attachments : null;
@@ -142,7 +147,7 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
           <button v-if="query" type="button" class="xb-icon-btn is-sm" aria-label="清空搜索" title="清空搜索" @click="query = ''; searchBox?.focus()"><X :size="12" /></button>
         </label>
         <template v-if="tab === 'docs'">
-          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || designImporting" aria-label="导入设计稿" title="导入设计稿（ZIP / HTML）" @click="importDesign"><FileText :size="17" /></button>
+          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || designImporting" aria-label="导入设计稿" title="导入 Claude 官方 HTML 或含 canvas.json 的源码 ZIP；图片 ZIP 请作为参考文档导入" @click="importDesign"><FileText :size="17" /></button>
           <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="导入文件夹" title="导入文件夹" data-testid="library-import-folder" @click="docsTab?.importFrom(true)"><FolderDown :size="17" /></button>
           <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="导入文档" title="导入文档" data-testid="library-import" @click="docsTab?.importFrom(false)"><Download :size="17" /></button>
           <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || library.busy" aria-label="新建文档" title="新建文档" data-testid="library-create-doc" @click="openCreate('doc')"><Plus :size="17" /></button>
@@ -154,7 +159,7 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
     </header>
     <div :id="`library-panel-${tab}`" class="library-body" role="tabpanel" :aria-labelledby="`library-tab-${tab}`">
       <LibraryDocs v-if="tab === 'docs'" ref="docsTab" :library="library" :query="query" :desktop="store.desktop" @ask="askWith" @design="openDesign" @notify="notify" />
-      <LibraryCloud v-else-if="tab === 'cloud'" ref="cloudTab" :library="library" :query="query" :desktop="store.desktop" :open-url="openUrl" @notify="notify" />
+      <LibraryCloud v-else-if="tab === 'cloud'" ref="cloudTab" :library="library" :query="query" :desktop="store.desktop" :open-url="openUrl" @notify="notify" @ask="startTask" @imported="showDownloaded" />
       <LibrarySavedTab v-else-if="tab === 'saved'" ref="savedTab" :library="library" :query="query" @open="item => item.sessionId && openSession(item.sessionId)" @ask="askAbout" @notify="notify" />
       <LibraryMemory v-else ref="memoryTab" :library="library" :query="query" :desktop="store.desktop" :session-title="sessionTitle" @open-session="openSession" @created="query = ''" />
     </div>

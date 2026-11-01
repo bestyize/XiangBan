@@ -50,7 +50,7 @@ function setup(page = false) {
 }
 async function settle() { await vi.advanceTimersByTimeAsync(300); await flushPromises(); }
 async function open(wrapper: ReturnType<typeof mount>) { await wrapper.findAll('.registry .small-action').at(-1)!.trigger('click'); await flushPromises(); }
-async function inspect(wrapper: ReturnType<typeof mount>) { await open(wrapper); await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises(); }
+async function inspect(wrapper: ReturnType<typeof mount>) { await open(wrapper); await flushPromises(); }
 beforeEach(() => {
   vi.useFakeTimers(); localStorage.clear(); listed = [structuredClone(entry)]; local = [];
   vi.mocked(invoke).mockReset().mockImplementation(async (c, a) => {
@@ -79,17 +79,17 @@ describe('市场连接器插件', () => {
     const card = wrapper.get('.registry .connector-card');
     expect(card.text()).toContain('文档连接器'); expect(card.text()).toContain('令牌认证');
     expect(card.text()).toContain('网页登录授权'); expect(card.text()).toContain('环境变量'); expect(card.text()).toContain('无需填写凭据');
-    expect(card.text()).toContain('1 个随包技能');
+    expect(card.attributes('title')).toBe(entry.connector.displayDescription.zh);
     await open(wrapper);
     const modal = wrapper.get('.test-modal');
-    for (const text of ['连接团队文档', '查找团队周报', '访问令牌 · 必填', '组织名称 · 选填', 'streamable-http、stdio', '被策略禁用的工具：3 个', 'docs-search']) expect(modal.text()).toContain(text);
-    expect(modal.text()).not.toContain('never-show'); expect(modal.find('input').exists()).toBe(false);
-    expect(modal.find('textarea').exists()).toBe(false); expect(invoke).not.toHaveBeenCalledWith('ai_market_inspect', expect.anything());
+    for (const text of ['查找团队周报', '访问令牌 · 必填', '组织名称 · 选填', 'streamable-http、stdio', '被策略禁用的工具：3 个', 'docs-search']) expect(modal.text()).toContain(text);
+    expect(modal.text()).not.toContain('never-show'); expect(modal.find('input[type=password]').exists()).toBe(false);
+    expect(modal.find('textarea').exists()).toBe(false); expect(invoke).not.toHaveBeenCalledWith('ai_market_install', expect.anything());
   });
   it('uses English when Chinese presentation is missing and handles no-token plugins', async () => {
     Object.assign(listed[0].connector, { displayName: { en: 'English Docs' }, displayDescription: { en: 'English description' }, examples: { en: ['Find docs'] }, tokenFields: [] });
     const { wrapper } = setup(); await settle(); await open(wrapper);
-    expect(wrapper.get('.test-modal').text()).toContain('English Docs'); expect(wrapper.text()).toContain('English description');
+    expect(wrapper.get('.test-modal').text()).toContain('English Docs'); expect(wrapper.get('.connection-description').text()).toBe('English description');
     expect(wrapper.text()).toContain('Find docs'); expect(wrapper.text()).toContain('无需填写令牌字段');
   });
   it('reviews servers, commands, key names, warnings, files and scripts, then installs on click without an acknowledgement', async () => {
@@ -102,30 +102,30 @@ describe('市场连接器插件', () => {
     expect(invoke).not.toHaveBeenCalledWith('ai_market_install', expect.anything());
     await modal.get('.store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_install', { kind: 'connectors', namespace: 'acme', slug: entry.slug, version: '1.2.0', sha256: sha });
-    expect(wrapper.text()).toContain('已安装，在此完成连接即可使用');
+    expect(wrapper.find('.market-connector-detail input[type=password]').exists()).toBe(true);
     expect(store.notify).not.toHaveBeenCalled();
-    expect(wrapper.get('.registry .small-action').text()).toBe('已安装');
+    expect(wrapper.get('.registry .small-action').text()).toBe('管理');
     expect(invoke).not.toHaveBeenCalledWith('ai_connector_configure', expect.anything());
     expect(invoke).not.toHaveBeenCalledWith('ai_store_connector_connect', expect.anything());
-    await modal.get('.store-secondary').trigger('click'); expect(wrapper.emitted('center')).toEqual([[entry.slug]]);
+    await modal.get('.market-center-link').trigger('click'); expect(wrapper.emitted('center')).toEqual([[entry.slug]]);
   });
   it('matches installed services by plugin slug and shows updates only with matching market update information', async () => {
     local = [{ ...installedItem, version: '1.0.0' }, { ...installedItem, id: 'docs-plugin:second' }];
     const { wrapper } = setup(); await settle();
-    expect(wrapper.get('.small-action').text()).toBe('已安装'); await open(wrapper);
-    expect(wrapper.find('.market-connector-detail .store-primary').exists()).toBe(false);
+    expect(wrapper.get('.small-action').text()).toBe('管理'); await open(wrapper);
+    expect(wrapper.get('.market-connector-detail .store-primary').text()).toBe('管理');
     const updates = { [entry.slug]: { kind: 'connectors', namespace: 'acme', slug: entry.slug, installed: '1.0.0', latest: '1.2.0', hasUpdate: true } };
     await wrapper.setProps({ updates });
     expect(wrapper.get('.small-action').text()).toBe('更新');
-    await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises();
+    await flushPromises();
     await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_install', expect.objectContaining({ kind: 'connectors', version: '1.2.0', sha256: sha }));
   });
   it('ignores updates from another namespace or kind', async () => {
     local = [installedItem]; const { wrapper } = setup(); await settle();
     const info = { kind: 'skills', namespace: 'acme', slug: entry.slug, installed: '1.0.0', latest: '2.0.0', hasUpdate: true };
-    await wrapper.setProps({ updates: { [entry.slug]: info } }); expect(wrapper.get('.small-action').text()).toBe('已安装');
-    await wrapper.setProps({ updates: { [entry.slug]: { ...info, kind: 'connectors', namespace: 'other' } } }); expect(wrapper.get('.small-action').text()).toBe('已安装');
+    await wrapper.setProps({ updates: { [entry.slug]: info } }); expect(wrapper.get('.small-action').text()).toBe('管理');
+    await wrapper.setProps({ updates: { [entry.slug]: { ...info, kind: 'connectors', namespace: 'other' } } }); expect(wrapper.get('.small-action').text()).toBe('管理');
   });
   it.each(['listing', 'review'])('installs SSE from the %s after review without an acknowledgement', async source => {
     if (source === 'listing') listed[0].connector.transports = ['sse'];
@@ -141,7 +141,7 @@ describe('市场连接器插件', () => {
 
     await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_install', { kind: 'connectors', namespace: 'acme', slug: entry.slug, version: '1.2.0', sha256: sha });
-    expect(wrapper.text()).toContain('已安装，在此完成连接即可使用');
+    expect(wrapper.find('.market-connector-detail input[type=password]').exists()).toBe(true);
     expect(invoke).not.toHaveBeenCalledWith('ai_connector_configure', expect.anything());
     expect(invoke).not.toHaveBeenCalledWith('ai_store_connector_connect', expect.anything());
   });
@@ -153,7 +153,7 @@ describe('市场连接器插件', () => {
     expect(wrapper.text()).toContain('操作失败'); expect(store.notify).not.toHaveBeenCalled();
     fail = false; await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises();
     if (command === 'ai_market_inspect') expect(wrapper.find('.review-confirm').exists()).toBe(false);
-    else expect(wrapper.text()).toContain('已安装，在此完成连接即可使用');
+    else expect(wrapper.find('.market-connector-detail input[type=password]').exists()).toBe(true);
   });
   it.each([{ sha256: '' }, { manifest: { ...review.manifest, version: '9.9.9' } }])('rejects an incomplete digest or a different reviewed version', async invalid => {
     const original = vi.mocked(invoke).getMockImplementation()!;
@@ -175,7 +175,7 @@ describe('市场连接器插件', () => {
     let resolveLocal!: (value: InstalledConnector[]) => void;
     vi.mocked(invoke).mockImplementation((c, a) => c === 'ai_connector_installed' ? new Promise(resolve => { resolveLocal = resolve; }) : original(c, a));
     const { wrapper } = setup(); await settle(); expect(wrapper.get('.small-action').attributes('disabled')).toBeDefined();
-    resolveLocal([installedItem]); await flushPromises(); expect(wrapper.get('.small-action').text()).toBe('已安装');
+    resolveLocal([installedItem]); await flushPromises(); expect(wrapper.get('.small-action').text()).toBe('管理');
     expect(wrapper.get('.small-action').attributes('disabled')).toBeUndefined();
   });
   it('discards a review that completes after closing the detail', async () => {
@@ -195,7 +195,7 @@ describe('市场连接器插件', () => {
     await wrapper.setProps({ updates: { [entry.slug]: { ...info, latest: '1.3.0' } } });
     expect(wrapper.find('.review-confirm').exists()).toBe(false);
     await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises();
-    expect(invoke).toHaveBeenLastCalledWith('ai_market_inspect', expect.objectContaining({ version: '1.3.0' }));
+    expect(invoke).toHaveBeenCalledWith('ai_market_inspect', expect.objectContaining({ version: '1.3.0' }));
     expect(invoke).not.toHaveBeenCalledWith('ai_market_install', expect.anything());
   });
   it('does not install when no version is available', async () => {
@@ -224,11 +224,13 @@ describe('市场连接器插件', () => {
     const { wrapper } = setup(true); await settle(); await wrapper.get('#store-tab-connectors').trigger('click'); await settle();
     await wrapper.get('input[aria-label="搜索专家、技能或连接器"]').setValue('Docs'); await settle();
     await inspect(wrapper); await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises();
-    await wrapper.get('.market-connector-detail .store-secondary').trigger('click'); await flushPromises();
+    await wrapper.get('.market-connector-detail .market-center-link').trigger('click'); await flushPromises();
     expect(wrapper.find('.market-connector-detail').exists()).toBe(false);
     expect(wrapper.get('#store-tab-connectors').attributes('aria-selected')).toBe('true');
     expect(wrapper.get('input[aria-label="搜索专家、技能或连接器"]').element).toHaveProperty('value', '');
-    expect(wrapper.get('.connector-center .test-modal').text()).toContain('文档令牌');
+    expect(wrapper.get('.connector-center .test-modal').text()).toContain('连接 文档连接器');
+    const connect = wrapper.findAll('.connector-center .test-modal button').find(b => b.text() === '连接')!;
+    await connect.trigger('click'); await flushPromises();
     expect(wrapper.get('.connector-center input[type="password"]').element).toHaveProperty('value', '');
     expect(invoke).not.toHaveBeenCalledWith('ai_connector_configure', expect.anything());
   });
@@ -241,9 +243,9 @@ describe('市场连接器插件', () => {
     });
     const { wrapper } = setup(true); await settle(); await wrapper.get('#store-tab-connectors').trigger('click'); await settle();
     await inspect(wrapper); await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises();
-    expect(wrapper.get('.market-connector-detail .store-secondary').attributes('disabled')).toBeDefined();
+    expect(wrapper.get('.market-connector-detail .market-center-link').attributes('disabled')).toBeDefined();
     delay = false; resolvers.forEach(resolve => resolve([installedItem])); await flushPromises();
-    await wrapper.get('.market-connector-detail .store-secondary').trigger('click'); await flushPromises();
-    expect(wrapper.get('.connector-center .test-modal').text()).toContain('文档令牌');
+    await wrapper.get('.market-connector-detail .market-center-link').trigger('click'); await flushPromises();
+    expect(wrapper.get('.connector-center .test-modal').text()).toContain('连接 文档连接器');
   });
 });

@@ -44,6 +44,15 @@ describe('Claude Design source compatibility',()=>{
   const {w,errors}=await preview('<x-dc><dc-import name="parts/Card"></dc-import></x-dc>',{base:'Main.dc.html',files:{'parts/Card.dc.html':`<x-dc><helmet><style>.card{color:blue}</style></helmet><img src="{{image}}"/><div style="background-image:url(../_blob/a)">Card</div></x-dc><script type="text/x-dc" data-dc-script>class Component extends DCLogic{renderVals(){return {image:'/_blob/a'}}}</script>`},assets:{'_blob/a':image}});
   expect(errors()).toEqual([]);expect(w.document.querySelector('img')!.getAttribute('src')).toBe(image);expect(w.document.head.textContent).toContain('.card{color:blue}');expect(w.document.querySelector('[style*="background-image"]')!.getAttribute('style')).toContain(image);
  });
+ it('restores serialized official HTML events, controlled inputs and SVG attribute casing',async()=>{
+  const {w,errors}=await preview(`<x-dc><button sc-camel-on-click="{{() => set('clicked')}}">{{value}}</button><input value="{{value}}" sc-camel-on-change="{{e => set(e.target.value)}}"/><svg sc-camel-view-box="0 0 24 24" sc-camel-on-click="{{() => set('svg')}}"></svg></x-dc><script type="text/x-dc" data-dc-script>class Component extends DCLogic{state={value:'start'};renderVals(){return {value:this.state.value,set:value=>this.setState({value})}}}</script>`);
+  w.document.querySelector('button')!.click();expect(w.document.querySelector('button')!.textContent).toBe('start');
+  play(w);w.document.querySelector('button')!.click();expect(w.document.querySelector('button')!.textContent).toBe('clicked');
+  const input=w.document.querySelector('input')!;input.value='typed';input.dispatchEvent(new w.Event('input',{bubbles:true}));
+  expect(w.document.querySelector('button')!.textContent).toBe('typed');
+  const svg=w.document.querySelector('svg')!;expect(svg.getAttribute('viewBox')).toBe('0 0 24 24');
+  svg.dispatchEvent(new w.Event('click'));expect(w.document.querySelector('button')!.textContent).toBe('svg');expect(errors()).toEqual([]);
+ });
  it('keeps a real imported market screen interactive',async()=>{
   const {w,errors}=await preview(sources['WB-Market-Review.dc.html'],{base:'WB-Market-Review.dc.html',files:sources});play(w);
   const checkbox=w.document.querySelector('input[type="checkbox"]');expect(checkbox).not.toBeNull();(checkbox as unknown as {click():void}).click();

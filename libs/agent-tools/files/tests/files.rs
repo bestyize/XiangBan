@@ -8,18 +8,21 @@ use std::{
     fs,
     io::{Cursor, Write},
     path::PathBuf,
+    sync::atomic::{AtomicU64, Ordering},
     time::{SystemTime, UNIX_EPOCH},
 };
 struct Temp(PathBuf);
 impl Temp {
     fn new() -> Self {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
         let p = std::env::temp_dir().join(format!(
-            "agent-files-{}-{}",
+            "agent-files-{}-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_nanos()
+                .as_nanos(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir_all(&p).unwrap();
         Self(p)
@@ -380,6 +383,30 @@ fn extracts_real_pdf_text_and_warns_about_visual_coverage() {
     assert!(r.output.contains("Revenue 125"));
     assert!(r.output.contains("text only"));
 }
+#[test]
+fn desktop_reader_exposes_json_paging_and_keeps_workspace_checks() {
+    use agent_kernel::{provider::scripted::{ScriptedProvider, Step}, Agent, Role};
+    use std::sync::{atomic::AtomicBool, Arc};
+    let temp = Temp::new();
+    let work = temp.0.join("work");
+    fs::create_dir_all(&work).unwrap();
+    fs::write(work.join("repos.json"), r#"{"items":[{"name":"one","private":true},{"name":"two","private":false}]}"#).unwrap();
+    let reader = ReadFile::new(vec![work], AttachmentStore::new(temp.0.join("attachments"))).unwrap();
+    assert!(reader.spec().schema["properties"].get("json_pointer").is_some());
+    let provider = Arc::new(ScriptedProvider::new(vec![
+        Step::tool_call("read", "read_file", &json!({"path":"repos.json","json_pointer":"/items","json_fields":["name","language"],"json_group_by":"private"}).to_string()),
+        Step::text("done"),
+    ]));
+    let agent = Agent::builder(provider.clone(), Arc::new(MemoryStore::new())).tool(reader).build().unwrap();
+    agent.run("s", "inspect", &mut |_| {}, &Arc::new(AtomicBool::new(false))).unwrap();
+    let requests = provider.requests();
+    let message = requests[1].messages.iter().find(|m| m.role == Role::Tool).unwrap();
+    let result: serde_json::Value = serde_json::from_str(&message.text()).unwrap();
+    assert_eq!(result["total"], 2);
+    assert_eq!(result["items"][0], json!({"name":"one","language":null}));
+    assert_eq!(result["groups"], json!([{"value":false,"count":1},{"value":true,"count":1}]));
+}
+
 #[test]
 fn attachment_reaches_model_and_tool_result_without_changing_kernel_messages() {
     use agent_kernel::{

@@ -1,25 +1,29 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { NAlert, NModal, NSkeleton } from 'naive-ui';
+import StoreDialog from './StoreDialog.vue';
+import StoreRemoveAction from './StoreRemoveAction.vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { NAlert, NSkeleton } from 'naive-ui';
 import { Plug, ArrowRight, Download, Check, Plus, Sparkles, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { SkillReview } from './catalog.ts';
 import ConnectorConfig from './ConnectorConfig.vue';
+import ConnectionJourney from './ConnectionJourney.vue';
 import MarketConnectorDetail from './MarketConnectorDetail.vue';
-import { connectorAuth, type InstalledConnector, type MarketConnector } from './connector-plugins.ts';
+import { connectorAuth, connectorStatus, type InstalledConnector, type MarketConnector } from './connector-plugins.ts';
+import { openStoreTask, openStoreWindow, storeWindowScene, useNativeStoreWindow, type StoreEntry } from './store-window.ts';
 import type { UpdateInfo } from './market.ts';
-import { categoryIcon, hueStyle } from './hues.ts';
+import { categoryIcon } from './hues.ts';
 import './store-cards.css';
 
 interface Entry { slug: string; name: string; description: string; category?: string; iconUrl?: string | null; skillCount?: number; namespace?: string; version?: string; connector?: MarketConnector }
 interface Page { results: Entry[]; page: number; total: number; hasMore: boolean }
-interface Pack { slug: string; name: string; description: string; entrySkill: string; ready: boolean; sha256: string; dependencies: { slug: string; namespace?: string; version: string; sha256: string }[] }
+interface Pack { slug: string; name: string; description: string; entrySkill: string; ready: boolean; sha256: string; plugin?: string; dependencies: { slug: string; namespace?: string; version: string; sha256: string }[] }
 interface PackReview extends Pack { content: string; skills: SkillReview[] }
 interface Connection { id: string; name: string; connected: boolean; enabled: boolean; toolCount: number; error?: string }
 interface ConnectorDetail { readme: string; configs: { name: string; config: Record<string, unknown> }[]; connector?: MarketConnector; version?: string }
 interface ConnectionResult { status?:string; connected?:boolean; flowId?:string; authorizationUrl?:string; userCode?:string }
-const props = withDefaults(defineProps<{ kind: 'experts' | 'connectors'; query: string; category: string; store: ControlStore; installedOnly?: boolean; source?: 'market' | 'hub'; updates?: Record<string, UpdateInfo> }>(), { installedOnly: false, source: 'hub' });
+const props = withDefaults(defineProps<{ kind: 'experts' | 'connectors'; query: string; category: string; store: ControlStore; installedOnly?: boolean; source?: 'market' | 'hub'; updates?: Record<string, UpdateInfo>; detail?: StoreEntry }>(), { installedOnly: false, source: 'hub' });
 const emit = defineEmits<{ unavailable: [message: string]; installed: []; changed: []; center: [plugin: string] }>();
 const fromMarket = () => props.source === 'market' && props.kind === 'connectors';
 const data = ref<Page>({ results: [], page: 1, total: 0, hasMore: false });
@@ -38,7 +42,7 @@ const pluginUpdate = (entry: Entry) => {
 };
 const selected = ref<Entry | null>(null), packReview = ref<PackReview | null>(null), connectorDetail = ref<ConnectorDetail | null>(null);
 const marketPlugin = computed(() => fromMarket() ? connectorDetail.value?.connector || selected.value?.connector : undefined);
-const detailLoading = ref(false), detailError = ref(''), confirmed = ref(false), busy = ref(false), removing = ref(false);
+const detailLoading = ref(false), detailError = ref(''), confirmed = ref(false), busy = ref(false);
 const configText = ref(''), configIndex = ref(0);
 const configValid=ref(false), authorization=ref<{flowId:string;authorizationUrl:string;userCode?:string}|null>(null);
 const codeCopied=ref(false);
@@ -106,6 +110,7 @@ async function refresh() {
   finally { if (id === requestId) loading.value = false; }
 }
 watch(() => [props.kind, props.query, props.category, installedOnly.value, props.source], () => {
+  if (props.detail) return;
   ++requestId; page.value = 1; clearTimeout(timer); error.value = '';
   data.value = { results: [], page: 1, total: 0, hasMore: false };
   loading.value = props.store.desktop && !installedOnly.value && props.category !== '本机';
@@ -113,6 +118,7 @@ watch(() => [props.kind, props.query, props.category, installedOnly.value, props
 }, { immediate: true });
 watch(page, () => { void refresh(); });
 watch(() => [props.kind, props.source], () => {
+  if (props.detail) return;
   abandonAuthorization();
   ++detailId; selected.value = null; configText.value = '';
   void refreshLocal();
@@ -120,9 +126,16 @@ watch(() => [props.kind, props.source], () => {
 onBeforeUnmount(() => { abandonAuthorization();clearTimeout(timer); ++requestId; ++detailId; ++localId; configText.value = ''; });
 async function close() { if (!busy.value) {if(authorization.value&&!await cancelAuthorization())return;selected.value = null; configText.value = ''; ++detailId; } }
 async function open(entry: Entry) {
+  if (useNativeStoreWindow()) {
+    const installed = isPlugin(entry) && !pluginUpdate(entry) ? plugin(entry.slug) : undefined;
+    await openStoreWindow(installed
+      ? { view: 'connector', kind: 'connectors', source: props.source, item: { slug: installed.id, name: installed.name, description: installed.description } }
+      : { view: 'registry', kind: props.kind, source: props.source, item: entry }).catch(props.store.notify);
+    return;
+  }
   if (busy.value) return;
   selected.value = entry; packReview.value = null; connectorDetail.value = null;
-  confirmed.value = false; removing.value = false; configText.value = ''; detailError.value = '';
+  confirmed.value = false; configText.value = ''; detailError.value = '';
   const id = ++detailId, kind = props.kind;
   if (kind === 'experts' && pack(entry.slug)) { detailLoading.value = false; return; }
   detailLoading.value = true;
@@ -150,7 +163,15 @@ function pluginConnectionChanged() { void refreshLocal(); emit('changed'); }
 function goToCenter() {
   if (!selected.value || busy.value) return;
   const slug = selected.value.slug;
-  void close(); emit('center', slug);
+  if (!storeWindowScene()) void close();
+  emit('center', slug);
+}
+async function useConnectorExample(item: InstalledConnector, example: number) {
+  if (storeWindowScene()) { await openStoreTask({ kind: 'example', id: item.id, example }).catch(props.store.notify); return; }
+  await props.store.chat.select(null);
+  props.store.creationDraft = item.examples[example];
+  props.store.navigate('new-task');
+  await close();
 }
 function chooseConfig() {
   configText.value = JSON.stringify(connectorDetail.value?.configs[configIndex.value]?.config || { url: '' }, null, 2);
@@ -206,16 +227,20 @@ async function installPack() {
   finally { busy.value = false; }
 }
 async function removePack() {
-  if (!selected.value || busy.value) return;
-  if (!removing.value) { removing.value = true; return; }
-  busy.value = true;
+  const installed = selected.value && pack(selected.value.slug);
+  if (!installed || busy.value) return;
+  busy.value = true; detailError.value = '';
   try {
-    await invoke('ai_store_expert_remove', { slug: selected.value.slug });
-    await refreshLocal(); selected.value = null; props.store.notify('已移除专家工作流，共用技能保留');
+    // Persona plugins and market workflows use their package slug; legacy packs own
+    // a separate expert-* workflow and retain their shared dependency skills.
+    const packaged = installed.plugin || installed.entrySkill === installed.slug;
+    await invoke(packaged ? 'ai_store_uninstall' : 'ai_store_expert_remove', { slug: installed.slug });
+    await refreshLocal(); selected.value = null; props.store.notify(packaged ? `已移除「${installed.name}」` : '已移除专家工作流，共用技能保留');
   } catch (e) { detailError.value = String(e); }
   finally { busy.value = false; }
 }
 async function usePack(entry: Entry) {
+  if (storeWindowScene()) { await openStoreTask({ kind: 'pack', id: entry.slug }).catch(props.store.notify); return; }
   const installed = pack(entry.slug);
   if (!installed?.ready || busy.value || localError.value) return;
   busy.value = true;
@@ -250,32 +275,34 @@ async function connectionAction(action: 'disconnect' | 'reconnect') {
   finally { busy.value = false; }
 }
 defineExpose({ refresh, refreshLocal, installedCount, open });
+onMounted(async () => { if (props.detail) { await refreshLocal(); await open({ ...props.detail, category: props.detail.category ?? undefined }); } });
 </script>
 
 <template>
   <div class="registry">
+    <template v-if="!detail">
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">请在小伴桌面客户端中浏览和安装。</NAlert>
     <NAlert v-if="error" type="error" :show-icon="false">{{ error }} <button class="text-action" @click="refresh">重试</button></NAlert>
     <NAlert v-if="localError" type="warning" :show-icon="false">{{ localError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
     <NAlert v-if="fromMarket() && pluginError" type="warning" :show-icon="false">{{ pluginError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
-    <div v-if="loading" class="xc-grid" aria-busy="true"><NSkeleton v-for="n in 6" :key="n" height="170px" :sharp="false" /></div>
-    <div v-else class="xc-grid">
+    <div v-if="loading" class="xc-grid" aria-busy="true"><NSkeleton v-for="n in 6" :key="n" height="126px" :sharp="false" /></div>
+    <div v-else class="xc-grid" :class="{ 'connector-grid': kind === 'connectors' }">
       <slot name="prefix" />
-      <article v-for="entry in entries" :key="entry.slug" class="xc store-card" :class="[kind === 'experts' ? 'expert-card' : 'connector-card', { 'market-plugin-card': isPlugin(entry) }]" :style="hueStyle(entry.category, entry.slug)">
+      <article v-for="entry in entries" :key="entry.slug" class="xc store-card" :class="[kind === 'experts' ? 'expert-card' : 'connector-card', { 'market-plugin-card': isPlugin(entry) }]" :title="entry.connector?.displayDescription.zh || entry.connector?.displayDescription.en || entry.description" :aria-description="entry.connector?.displayDescription.zh || entry.connector?.displayDescription.en || entry.description">
         <div class="xc-top">
           <div class="xc-ic" :class="{ 'has-img': icon(entry), 'is-contain': icon(entry) && kind === 'connectors' }"><img v-if="icon(entry)" :src="icon(entry)!" alt="" referrerpolicy="no-referrer" @error="brokenIcons[entry.slug] = true" /><component :is="categoryIcon(kind === 'experts' ? entry.category : undefined)" v-else-if="kind === 'experts'" :size="24" :stroke-width="1.9" aria-hidden="true" /><Plug v-else :size="24" :stroke-width="1.9" aria-hidden="true" /></div>
-          <div class="xc-main"><div class="xc-title"><h3>{{ isPlugin(entry) ? entry.connector?.displayName.zh || entry.connector?.displayName.en || entry.name : entry.name }}</h3></div><p class="xc-desc">{{ isPlugin(entry) ? entry.connector?.displayDescription.zh || entry.connector?.displayDescription.en || entry.description : entry.description }}</p></div>
+          <div class="xc-main"><div class="xc-title"><h3><button type="button" class="xc-title-button" @click="open(entry)">{{ isPlugin(entry) ? entry.connector?.displayName.zh || entry.connector?.displayName.en || entry.name : entry.name }}</button></h3></div><span class="xc-kind">{{ kind === 'experts' ? '专家工作流' : authLabel(entry) || 'MCP 连接器' }}</span></div>
         </div>
         <div class="xc-foot">
           <span class="xc-tag">{{ entry.category || (source === 'market' && kind === 'connectors' ? '小伴市场' : 'SkillHub') }}</span>
           <span v-if="kind === 'experts' && entry.skillCount !== undefined" class="xc-meta"><Sparkles :size="13" aria-hidden="true" />{{ entry.skillCount }} 个技能</span>
-          <template v-if="isPlugin(entry)"><span class="xc-meta">{{ authLabel(entry) }}</span><span class="xc-meta">{{ entry.connector?.skillCount }} 个随包技能</span><span class="connection-status">{{ plugin(entry.slug) ? '已安装' : '未安装' }}</span></template>
+          <template v-if="isPlugin(entry)"><span class="connection-status" :class="{ 'xb-ok': plugin(entry.slug)?.status === 'connected' }">{{ plugin(entry.slug) ? connectorStatus[plugin(entry.slug)!.status] : '未安装' }}</span></template>
           <span v-else-if="kind === 'connectors'" class="connection-status" :class="{ 'xb-ok': connection(entry.slug)?.connected }">{{ connection(entry.slug)?.connected ? '已连接 · ' + connection(entry.slug)?.toolCount + ' 个工具' : connection(entry.slug) ? '未连接' : '未配置' }}</span>
           <div class="xc-act">
             <button v-if="kind === 'experts' && pack(entry.slug)" class="xc-link" aria-label="管理专家包" @click="open(entry)">管理</button>
             <button class="small-action xc-pill" :class="{ 'is-done': kind === 'experts' ? !!pack(entry.slug) : isPlugin(entry) ? !!plugin(entry.slug) : !!connection(entry.slug) }" :disabled="busy || !store.desktop || (isPlugin(entry) ? !pluginReady || !!pluginError : !!localError)" @click="kind === 'experts' && pack(entry.slug)?.ready ? usePack(entry) : open(entry)">
               <template v-if="kind === 'experts'"><template v-if="pack(entry.slug)?.ready"><Check :size="12" :stroke-width="3" />使用专家</template><template v-else-if="pack(entry.slug)">依赖缺失</template><template v-else><Plus :size="12" :stroke-width="2.6" />安装</template></template>
-              <template v-else-if="isPlugin(entry)">{{ pluginUpdate(entry) ? '更新' : plugin(entry.slug) ? '已安装' : '安装' }}</template>
+              <template v-else-if="isPlugin(entry)">{{ pluginUpdate(entry) ? '更新' : plugin(entry.slug) ? '管理' : '连接' }}</template>
               <template v-else>{{ connection(entry.slug) ? '管理' : '连接' }}<ArrowRight v-if="!connection(entry.slug)" :size="12" /></template>
             </button>
           </div>
@@ -284,9 +311,11 @@ defineExpose({ refresh, refreshLocal, installedCount, open });
     </div>
     <div v-if="!loading && !error && store.desktop && !entries.length && category !== '本机'" class="xb-empty store-empty"><p>没有找到匹配的{{ kind === 'experts' ? '专家包' : '连接器' }}</p></div>
     <div v-if="!installedOnly && !loading && !error && (page > 1 || data.hasMore)" class="pagination"><button :disabled="page <= 1" aria-label="上一页" @click="page--"><ChevronLeft :size="16" /></button><span>第 {{ page }} 页</span><button :disabled="!data.hasMore" aria-label="下一页" @click="page++"><ChevronRight :size="16" /></button></div>
-    <NModal :show="!!selected" preset="card" :title="marketPlugin?.displayName.zh || marketPlugin?.displayName.en || selected?.name" class="registry-dialog" :class="{ 'store-dialog': !!marketPlugin }" :closable="!busy" :mask-closable="!busy" style="width:720px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
+    </template>
+    <StoreDialog :show="!!selected" preset="card" :title="marketPlugin?.displayName.zh || marketPlugin?.displayName.en || selected?.name" :hide-title="kind === 'connectors' && !!marketPlugin" class="registry-dialog" :class="{ 'store-dialog': !!marketPlugin, 'connector-connect-dialog': !!marketPlugin }" :closable="!busy" :mask-closable="!busy" style="width:720px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
       <template v-if="selected">
-        <p>{{ marketPlugin?.displayDescription.zh || marketPlugin?.displayDescription.en || selected.description }}</p>
+        <NAlert v-if="detail && (localError || pluginError)" type="error" :show-icon="false">{{ localError || pluginError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
+        <div v-if="!marketPlugin" class="store-identity" :title="selected.description" :aria-description="selected.description"><div class="xc-ic"><Plug v-if="kind === 'connectors'" :size="28" /><Sparkles v-else :size="28" /></div><span>{{ kind === 'connectors' ? 'MCP 连接器' : '专家工作流' }}</span></div>
         <div v-if="detailLoading" class="review-loading">正在读取说明与依赖…</div>
         <NAlert v-if="detailError" type="error" :show-icon="false">{{ detailError }} <button v-if="!busy&&!authorization" class="text-action" @click="open(selected)">重新读取</button></NAlert>
         <template v-if="kind === 'experts'">
@@ -294,7 +323,7 @@ defineExpose({ refresh, refreshLocal, installedCount, open });
             <p>{{ pack(selected.slug)?.ready ? '工作流与依赖技能已就绪。' : '依赖缺失或版本发生变化，请移除工作流后重新安装。' }}</p>
             <ul><li v-for="dep in pack(selected.slug)?.dependencies" :key="dep.slug">{{ dep.namespace ? '@' + dep.namespace + '/' : '' }}{{ dep.slug }} · {{ dep.version }}</li></ul>
             <p class="detail-note">这是技能工作流。依赖服务、凭据及本机环境仍需满足；不代表拥有独立成长的多智能体专家团。</p>
-            <div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="removePack">{{ removing ? '确认移除（保留共用技能）' : '移除工作流' }}</button><button class="store-primary" :disabled="busy || !pack(selected.slug)?.ready || !!localError" @click="usePack(selected)">使用专家 <ArrowRight :size="14" /></button></div>
+            <StoreRemoveAction :key="selected.slug" :name="selected.name" :description="pack(selected.slug)?.plugin ? '将卸载此专家包及随包技能。之后可以重新安装。' : '将移除此专家工作流，保留其他专家可能共用的依赖技能。之后可以重新安装。'" :busy="busy" @confirm="removePack"><button class="store-primary" :disabled="busy || !pack(selected.slug)?.ready || !!localError" @click="usePack(selected)">使用专家 <ArrowRight :size="14" /></button></StoreRemoveAction>
           </template>
           <template v-else-if="packReview">
             <h4>工作流</h4><pre class="review-content">{{ packReview.content }}</pre>
@@ -305,11 +334,11 @@ defineExpose({ refresh, refreshLocal, installedCount, open });
           </template>
         </template>
         <template v-else-if="marketPlugin">
-          <MarketConnectorDetail v-if="connectorDetail && !detailLoading" :key="selected.slug + (selected.version || '')" :connector="marketPlugin" :slug="selected.slug" :namespace="selected.namespace" :version="connectorDetail.version" :installed="!!plugin(selected.slug)" :update-version="pluginUpdate(selected)" :local-error="pluginError || (!pluginReady ? '正在读取已安装连接器…' : '')" @busy="busy = $event" @installed="pluginInstalled" @changed="pluginConnectionChanged" @center="goToCenter" />
+          <MarketConnectorDetail v-if="connectorDetail && !detailLoading" :key="selected.slug + (selected.version || '')" :connector="marketPlugin" :icon-url="selected.iconUrl" :slug="selected.slug" :namespace="selected.namespace" :version="connectorDetail.version" :installed="!!plugin(selected.slug)" :update-version="pluginUpdate(selected)" :local-error="pluginError || (!pluginReady ? '正在读取已安装连接器…' : '')" @busy="busy = $event" @installed="pluginInstalled" @changed="pluginConnectionChanged" @center="goToCenter" @example="useConnectorExample" />
         </template>
         <template v-else>
           <div v-if="authorization" class="authorization-wait" role="status">
-            <h4>等待网页授权</h4>
+            <ConnectionJourney :name="selected.name" stage="authorizing" />
             <div v-if="authorization.userCode" class="device-code-inline">
               <p>请在已打开的网页中输入下方验证码：</p>
               <div class="code-row">
@@ -334,7 +363,7 @@ defineExpose({ refresh, refreshLocal, installedCount, open });
           </template>
         </template>
       </template>
-    </NModal>
+    </StoreDialog>
   </div>
 </template>
 
@@ -350,7 +379,7 @@ defineExpose({ refresh, refreshLocal, installedCount, open });
 .connection-status{display:inline-flex;align-items:center;margin-left:4px;font-size:12px;color:var(--ui-text-secondary);white-space:nowrap}
 .device-code-inline{background:var(--ui-control);padding:10px 12px;border-radius:8px;margin:8px 0}
 .code-row{display:flex;align-items:center;gap:10px;margin-top:6px}
-.user-code{font-size:18px;letter-spacing:2px;font-family:monospace;background:rgba(0,0,0,0.15);padding:4px 10px;border-radius:6px}
+.user-code{font-size:18px;letter-spacing:2px;font-family:monospace;background:var(--ui-control);padding:4px 10px;border-radius:6px}
 .connection-status.xb-ok{color:var(--ui-success-text)}
 .store-empty{min-height:200px}
 </style>
