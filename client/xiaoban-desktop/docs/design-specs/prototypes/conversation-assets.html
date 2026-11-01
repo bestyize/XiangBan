@@ -1862,7 +1862,6 @@ window.Tweak=class {
 #xb-conversation-assets .xb-crumb strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #xb-conversation-assets .xb-crumb svg { width: 12px; height: 12px; color: var(--ui-muted); flex: none; }
 #xb-conversation-assets .xb-head-actions { display: flex; align-items: center; gap: 3px; flex: none; }
-#xb-conversation-assets .xb-head .xb-assets-toggle { background: var(--ui-soft); color: var(--ui-ink); white-space: nowrap; }
 #xb-conversation-assets .xb-count { font-size: 11px; background: var(--ui-surface); color: var(--ui-muted); border-radius: 4px; padding: 0 5px; }
 #xb-conversation-assets .xb-main { flex: 1; display: grid; grid-template-columns: minmax(0,1fr); min-width: 0; position: relative; }
 #xb-conversation-assets .xb-chat { padding: 27px 34px 18px; display: flex; flex-direction: column; min-width: 0; gap: 25px; }
@@ -2050,7 +2049,7 @@ window.Tweak=class {
         &lt;div class=&quot;xb-account&quot;&gt;&lt;span class=&quot;xb-avatar&quot;&gt;${icon(&#x27;sparkles&#x27;)}&lt;/span&gt;&lt;span&gt;我的小伴&lt;/span&gt;&lt;/div&gt;
       &lt;/aside&gt;
       &lt;div class=&quot;xb-work&quot;&gt;&lt;header class=&quot;xb-head&quot;&gt;&lt;div class=&quot;xb-crumb&quot;&gt;&lt;span class=&quot;xb-muted&quot;&gt;品牌工作区&lt;/span&gt;${icon(&#x27;chevron-right&#x27;)}&lt;strong&gt;山野露营 · 品牌视觉&lt;/strong&gt;&lt;/div&gt;
-        &lt;div class=&quot;xb-head-actions&quot;&gt;&lt;button class=&quot;cursor-interaction xb-assets-toggle&quot; data-action=&quot;toggle&quot; aria-label=&quot;打开对话资产&quot; aria-expanded=&quot;true&quot;&gt;${icon(&#x27;files&#x27;)}&lt;span&gt;资产&lt;/span&gt;&lt;span class=&quot;xb-count&quot;&gt;8&lt;/span&gt;&lt;/button&gt;&lt;button class=&quot;cursor-interaction xb-icon&quot; aria-label=&quot;搜索对话&quot; data-demo=&quot;搜索对话&quot;&gt;${icon(&#x27;search&#x27;)}&lt;/button&gt;&lt;button class=&quot;cursor-interaction xb-icon&quot; aria-label=&quot;执行面板&quot; data-demo=&quot;执行面板&quot;&gt;${icon(&#x27;panel-right&#x27;)}&lt;/button&gt;&lt;button class=&quot;cursor-interaction xb-icon&quot; aria-label=&quot;更多对话操作&quot; data-demo=&quot;更多对话操作&quot;&gt;${icon(&#x27;ellipsis&#x27;)}&lt;/button&gt;&lt;/div&gt;
+        &lt;div class=&quot;xb-head-actions&quot;&gt;&lt;button class=&quot;cursor-interaction xb-icon xb-assets-toggle&quot; data-action=&quot;toggle&quot; data-tooltip=&quot;对话资产&quot; aria-label=&quot;打开对话资产&quot; aria-expanded=&quot;true&quot;&gt;${icon(&#x27;files&#x27;)}&lt;/button&gt;&lt;button class=&quot;cursor-interaction xb-icon&quot; aria-label=&quot;搜索对话&quot; data-demo=&quot;搜索对话&quot;&gt;${icon(&#x27;search&#x27;)}&lt;/button&gt;&lt;button class=&quot;cursor-interaction xb-icon&quot; aria-label=&quot;执行面板&quot; data-demo=&quot;执行面板&quot;&gt;${icon(&#x27;panel-right&#x27;)}&lt;/button&gt;&lt;button class=&quot;cursor-interaction xb-icon&quot; aria-label=&quot;更多对话操作&quot; data-demo=&quot;更多对话操作&quot;&gt;${icon(&#x27;ellipsis&#x27;)}&lt;/button&gt;&lt;/div&gt;
       &lt;/header&gt;&lt;div class=&quot;xb-main&quot;&gt;
         &lt;main class=&quot;xb-chat&quot;&gt;&lt;div class=&quot;xb-date&quot;&gt;今天 · 14:32&lt;/div&gt;&lt;div class=&quot;xb-user&quot;&gt;帮我做一套山野露营的品牌视觉，包含活动页、配图和可以交付的文件。&lt;/div&gt;
           &lt;div class=&quot;xb-answer&quot;&gt;&lt;span class=&quot;xb-avatar&quot;&gt;${icon(&#x27;sparkles&#x27;)}&lt;/span&gt;&lt;div class=&quot;xb-answer-body&quot;&gt;&lt;div&gt;&lt;div class=&quot;xb-answer-name&quot;&gt;小伴&lt;/div&gt;&lt;p&gt;做好了，整体采用自然绿与暖沙色，让画面保留一点山野的松弛感。&lt;/p&gt;&lt;/div&gt;
@@ -2084,7 +2083,7 @@ window.Tweak=class {
       app.classList.toggle(&#x27;xb-rail-open&#x27;,s.pinned&amp;&amp;s.open);
       panel.hidden=!s.open;
       const total=s.empty?0:8;
-      app.querySelectorAll(&#x27;.xb-head .xb-count,.xb-panel-head .xb-count&#x27;).forEach(x=&gt;x.textContent=total);
+      app.querySelectorAll(&#x27;.xb-panel-head .xb-count&#x27;).forEach(x=&gt;x.textContent=total);
       app.querySelector(&#x27;[data-action=toggle]&#x27;).setAttribute(&#x27;aria-expanded&#x27;,String(s.open));
       const pin=app.querySelector(&#x27;[data-action=pin]&#x27;);
       pin.setAttribute(&#x27;aria-label&#x27;,s.pinned?&#x27;切换为浮层&#x27;:&#x27;固定为侧栏&#x27;);

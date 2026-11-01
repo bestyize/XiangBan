@@ -1394,7 +1394,6 @@ describe('library design continuation in a new conversation', () => {
     const project = { id: 'design-012345678901234567890123', title: '继续设计', sessionId: 'deleted', sessionIds: ['s1'], revision: 2, updatedMs: 2, canvas: { v: 3, boards: { 'Main.dc.html': { w: 390, h: 844 } }, order: ['Main.dc.html'] }, files: { 'Main.dc.html': '<x-dc>同一份源文件</x-dc>' } };
     const h = await open({ chat_overview: () => overview({ sessions: [summary('s1', '继续修改')] }), chat_load_session: () => [], design_read: () => ({ project, origin: 'design-preview://localhost' }) });
     await openSession('s1');
-    expect(q('chat-assets-toggle')?.textContent).toContain('0');
     h.emit('design-changed', { ...project, artboards: 1 }); await flushPromises();
     await click('chat-assets-toggle');expect(q('chat-assets')?.textContent).toContain('继续设计');
     expect(h.invoke).toHaveBeenCalledWith('design_read', { id: project.id });

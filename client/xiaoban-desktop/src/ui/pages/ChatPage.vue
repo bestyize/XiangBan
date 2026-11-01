@@ -39,7 +39,7 @@ const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
 const designs = ref<DesignSummary[]>([]), designId = ref(''), designContextId=ref(''), designClosed = ref(false), designWidth = ref(64);
 const designPicker=ref(false);
-const assetsOpen=ref(false),assetCount=ref(0),assetAnchor=ref<HTMLElement|null>(null);
+const assetsOpen=ref(false),assetAnchor=ref<HTMLElement|null>(null);
 const ASSET_PIN_KEY='xiaoban.chat.assets-pinned';
 const assetsPinned=ref((()=>{try{return localStorage.getItem(ASSET_PIN_KEY)==='1';}catch{return false;}})());
 const locatedAssetBlock=ref('');let assetLocateTimer:ReturnType<typeof setTimeout>|undefined;
@@ -463,7 +463,7 @@ async function openLink(href: string) {
         </nav>
         <div class="head-actions">
           <div v-if="store.desktop" class="design-anchor">
-            <button ref="assetAnchor" type="button" class="assets-trigger" data-testid="chat-assets-toggle" title="当前对话的设计稿、图片和文件" aria-label="打开对话资产" :aria-expanded="assetsOpen" @click="toggleAssets"><Files :size="15"/><span>资产</span><small>{{assetCount}}</small></button>
+            <button ref="assetAnchor" type="button" class="xb-icon-btn" :class="{'is-active':assetsOpen}" data-testid="chat-assets-toggle" title="对话资产" aria-description="当前对话的设计稿、图片和文件" aria-label="打开对话资产" :aria-expanded="assetsOpen" @click="toggleAssets"><Files :size="16"/></button>
             <DesignPicker v-if="designPicker" :session="chat.currentId" :notify="store.notify" @close="designPicker=false" @open="openDesign" />
           </div>
           <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="head-link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
@@ -644,7 +644,7 @@ async function openLink(href: string) {
       <img :src="preview" alt="图片预览" />
       <button type="button" class="lightbox-close" data-testid="chat-image-preview-close" aria-label="关闭预览" @click="preview = null"><X :size="18" /></button>
     </div>
-    <ChatAssets v-if="store.desktop" :session="chat.currentId" :designs="designs" :blocks="blocks" :open="assetsOpen" :pinned="assetsPinned" :anchor="assetAnchor" :ensure-session="chat.ensureSession" :notify="store.notify" @count="assetCount=$event" @close="assetsOpen=false" @pin="pinAssets" @design="openAssetDesign" @locate="locateAsset" @browse-designs="assetsOpen=false;designPicker=true" />
+    <ChatAssets v-if="store.desktop" :session="chat.currentId" :designs="designs" :blocks="blocks" :open="assetsOpen" :pinned="assetsPinned" :anchor="assetAnchor" :ensure-session="chat.ensureSession" :notify="store.notify" @close="assetsOpen=false" @pin="pinAssets" @design="openAssetDesign" @locate="locateAsset" @browse-designs="assetsOpen=false;designPicker=true" />
     <div v-if="designId" class="design-splitter" role="separator" tabindex="0" aria-label="调整聊天和画布宽度" aria-orientation="vertical" :aria-valuenow="Math.round(designWidth)" :aria-valuemin="35" :aria-valuemax="85" @pointerdown="startDesignSplit" @pointermove="moveDesignSplit" @pointerup="finishDesignSplit" @pointercancel="finishDesignSplit" @keydown="designSplitKey" />
     <aside v-if="designId" :style="{ width: designWidth + '%' }" class="design-dock" aria-label="设计工作台"><DesignWorkbench :project-id="designId" :notify="store.notify" @close="closeDesign" @detach="detachDesign" @copied="openDesign" @request="designRequest" /></aside>
     <SelectionCopyMenu :scope="scroller" />
@@ -656,7 +656,7 @@ async function openLink(href: string) {
 
 .delivered-follow-up{display:block;margin-bottom:5px;font-size:10px;opacity:.7}
 
-.chat-page{position:relative}.assets-trigger{display:inline-flex;align-items:center;gap:6px;flex:none;padding:6px 8px;border:0;border-radius:7px;background:var(--ui-soft);color:var(--ui-ink);font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}.assets-trigger small{font-size:11px;min-width:16px;padding:0 4px;border-radius:4px;background:var(--ui-surface);color:var(--ui-text-secondary)}.assets-trigger:focus-visible{outline:2px solid var(--ui-btn);outline-offset:2px}.reply.asset-located{outline:2px solid var(--ui-btn);outline-offset:6px;border-radius:8px}
+.reply.asset-located{outline:2px solid var(--ui-btn);outline-offset:6px;border-radius:8px}
 .design-splitter{width:4px;flex:none;cursor:col-resize;touch-action:none;background:transparent}.design-splitter:hover,.design-splitter:focus-visible{background:var(--ui-soft);outline:0}
 .design-dock{width:64%;min-width:420px;max-width:calc(100% - 250px);border-left:1px solid var(--ui-line);flex:none;min-height:0;display:flex}@media(max-width:900px){.design-splitter{display:none}.design-dock{position:absolute;inset:0;width:100%!important;min-width:0;max-width:none;z-index:8;background:var(--ui-surface)}}
 .plan-steps{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
