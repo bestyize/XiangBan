@@ -38,6 +38,15 @@ fn allowed(provider: &str, search: bool) -> &'static [&'static str] {
         _ => &[],
     }
 }
+fn read_confirmation_required(platform: &str, operation: &str, flagged: bool) -> bool {
+    // The library's explicit browse/search action authorizes these named Baidu reads.
+    // Its MCP server also flags them; that blanket flag must not prompt on every page.
+    flagged
+        && !matches!(
+            (platform, operation),
+            ("baidu", "file_list" | "file_keyword_search")
+        )
+}
 fn matches_tool(name: &str, allowed: &[&str]) -> bool {
     allowed
         .iter()
@@ -324,19 +333,21 @@ pub async fn library_cloud_browse(
         } else {
             allowed(&platform, !query.trim().is_empty())
         };
-        let tools = names
+        let (operation, tools) = names
             .iter()
             .find_map(|name| {
                 let tools = manager.tools_named_for(&id, &[*name]);
                 if tools.is_empty() {
                     None
                 } else {
-                    Some(tools)
+                    Some((*name, tools))
                 }
             })
-            .unwrap_or_default();
+            .ok_or("当前连接器未提供此只读浏览功能")?;
         let tool: &Arc<dyn Tool> = tools.first().ok_or("当前连接器未提供此只读浏览功能")?;
-        if tool.spec().confirmation_reason.is_some() && confirmed != Some(true) {
+        if read_confirmation_required(&platform, operation, tool.spec().confirmation_reason.is_some())
+            && confirmed != Some(true)
+        {
             return Ok(json!({"items":[],"hasMore":false,"confirmationRequired":true}));
         }
         let mut args = provider_arguments(
@@ -439,6 +450,15 @@ pub fn library_cloud_add(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn baidu_library_reads_do_not_prompt_but_other_operations_keep_confirmation() {
+        assert!(!read_confirmation_required("baidu", "file_list", true));
+        assert!(!read_confirmation_required("baidu", "file_keyword_search", true));
+        assert!(read_confirmation_required("baidu", "file_del", true));
+        assert!(read_confirmation_required("baidu", "file_sharelink_set", true));
+        assert!(read_confirmation_required("tencent", "query_space_node", true));
+        assert!(!read_confirmation_required("tencent", "query_space_node", false));
+    }
     #[test]
     fn only_named_read_operations_are_available_and_no_credentials_are_exposed() {
         assert!(matches_tool(
