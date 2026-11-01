@@ -125,11 +125,11 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                         if (i > 0) Hairline()
                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Box(Modifier.size(28.dp).clip(CircleShape).background(MaterialTheme.colorScheme.onSurface), contentAlignment = Alignment.Center) {
-                                Text("${i + 1}", color = MaterialTheme.colorScheme.surface, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text("${i + 1}", color = MaterialTheme.colorScheme.surface, style = XType.Body, fontWeight = FontWeight.SemiBold)
                             }
                             Column(Modifier.weight(1f)) {
-                                Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                                Text(desc, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(title, style = XType.Body, fontWeight = FontWeight.SemiBold)
+                                Text(desc, Modifier.padding(top = 2.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -138,7 +138,7 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 GhostPillButton("先用云端小伴聊聊", { open(Route.AiChat) }, Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp).fillMaxWidth(), height = 44.dp, onPage = true)
             }
             else -> Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 12.dp, bottom = 24.dp)) {
-                Text("登录同一个账号的设备会自动出现在这里，不需要扫码。点一台在线的设备，进入它上面的小伴聊天；每台设备有自己的项目和对话，可以同时进行。", Modifier.padding(horizontal = 16.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("登录同一个账号的设备会自动出现在这里，不需要扫码。点一台在线的设备，进入它上面的小伴聊天；每台设备有自己的项目和对话，可以同时进行。", Modifier.padding(horizontal = 16.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Column(Modifier.padding(top = 12.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
                     remote.peers.forEachIndexed { i, peer ->
                         if (i > 0) Hairline(Modifier.padding(start = 16.dp))
@@ -148,8 +148,8 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                         ) {
                             IconBox(XIcons.Monitor, 44.dp, 12.dp)
                             Column(Modifier.weight(1f)) {
-                                Text(peer.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(if (peer.online) "点一下进入聊天" else "不在线，上线后自动恢复", Modifier.padding(top = 3.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(peer.name, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(if (peer.online) "点一下进入聊天" else "不在线，上线后自动恢复", Modifier.padding(top = 3.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                             StatusDot(peer.online, peer.statusText())
                             IconTap(XIcons.More, "管理这台设备", { lastManage = peer; manage = peer })
@@ -157,18 +157,18 @@ fun DevicesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                     }
                 }
                 Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).padding(horizontal = 14.dp, vertical = 12.dp)) {
-                    Text("没看到你的设备？", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    Text("1. 设备上的小伴已登录同一个账号\n2. 设备上小伴里“设置 → 手机遥控”已打开（默认关闭）\n3. 设备已联网，小伴正在运行", Modifier.padding(top = 6.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("没看到你的设备？", style = XType.Body, fontWeight = FontWeight.SemiBold)
+                    Text("1. 设备上的小伴已登录同一个账号\n2. 设备上小伴里“设置 → 手机遥控”已打开（默认关闭）\n3. 设备已联网，小伴正在运行", Modifier.padding(top = 6.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     LinkText(if (searching) "查找中…" else "重新查找 ›", refresh, Modifier.padding(top = 4.dp))
                 }
-                Text("当前账号：${session.user?.username ?: ""}。手机和设备之间的消息经中转服务转发。", Modifier.padding(horizontal = 16.dp, vertical = 16.dp), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("当前账号：${session.user?.username ?: ""}。手机和设备之间的消息经中转服务转发。", Modifier.padding(horizontal = 16.dp, vertical = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
     OverlayTransition(manage != null) { panel ->
         lastManage?.let { peer ->
             BottomSheet({ manage = null }, panel) {
-                Text(peer.name, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(peer.name, style = XType.Title, fontWeight = FontWeight.SemiBold)
                 SheetAction(XIcons.Close, "从账号中移除这台设备", "它再次启动并开启手机遥控后会重新出现") {
                     manage = null
                     env.remoteChat.removePeer(peer.id)
@@ -265,8 +265,8 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
                 trailing = { IconTap(XIcons.NewChat, "新对话", { env.remoteChat.newSession() }, size = 22.dp) },
                 subtitleContent = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(listOfNotNull(peer?.name ?: "设备", projectName).joinToString(" · ") + " · ", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        StatusDot(online, if (online) "在线" else "离线", fontSize = 11)
+                        Text(listOfNotNull(peer?.name ?: "设备", projectName).joinToString(" · ") + " · ", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        StatusDot(online, if (online) "在线" else "离线")
                     }
                 },
             )
@@ -330,18 +330,18 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
         OverlayTransition(permissionStep != 0) { panel ->
             BottomSheet({ permissionStep = 0 }, panel) {
                 if (permissionStep == 2) {
-                    Text("开启完全信任？", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("开启完全信任？", style = XType.Title, fontWeight = FontWeight.SemiBold)
                     Text(
                         "开启后，这个对话里小伴在“${peer?.name ?: "设备"}”上读写文件、运行命令都不再逐步问你，会直接执行。\n删除文件、危险命令这类高风险操作仍然每次都问你。\n只在你信任这次任务时开启，随时可以关掉。",
-                        Modifier.padding(top = 10.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Modifier.padding(top = 10.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         GhostPillButton("取消", { permissionStep = 0 }, Modifier.weight(1f))
                         PillButton("开启完全信任", { permissionStep = 0; env.remoteChat.setPermission("auto") }, Modifier.weight(1f))
                     }
                 } else {
-                    Text("这个对话的权限", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Text("只对当前这个对话生效，和电脑上的开关是同一个。", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("这个对话的权限", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                    Text("只对当前这个对话生效，和电脑上的开关是同一个。", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     RadioRow(
                         selected = !remote.fullTrust, title = "默认权限", desc = "改动文件、运行命令之前先问你",
                         onClick = { permissionStep = 0; env.remoteChat.setPermission("ask") },
@@ -356,11 +356,11 @@ fun RemoteChatScreen(env: CommunityEnv, peerId: String, back: () -> Unit, open: 
         }
         OverlayTransition(modelSheet) { panel ->
             BottomSheet({ modelSheet = false }, panel) {
-                Text("这个对话用的模型", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Text("只对当前这个对话生效，模型来自${peer?.name ?: "设备"}上已经配置好的服务。", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("这个对话用的模型", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                Text("只对当前这个对话生效，模型来自${peer?.name ?: "设备"}上已经配置好的服务。", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
                     if (remote.models.isEmpty()) {
-                        Text("还没有读到可选的模型。请确认设备在线，并且在设备上配置过模型服务。", Modifier.padding(vertical = 12.dp), fontSize = 14.sp, lineHeight = 20.sp, color = LocalExtraColors.current.ink3)
+                        Text("还没有读到可选的模型。请确认设备在线，并且在设备上配置过模型服务。", Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
                     }
                     remote.models.forEach { model ->
                         RadioRow(
@@ -432,7 +432,7 @@ private fun RemoteMessages(
         Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
             Text(
                 if (!online) "设备上线后，这里会显示对话。" else if (isNew) "新对话：发一条消息，电脑上的小伴会开始处理。" else "这个对话还没有内容，直接发消息开始。",
-                fontSize = 14.sp, lineHeight = 21.sp, color = LocalExtraColors.current.ink3, textAlign = TextAlign.Center,
+                style = XType.Secondary, color = LocalExtraColors.current.ink3, textAlign = TextAlign.Center,
             )
         }
         return
@@ -512,10 +512,10 @@ private fun RemoteDrawer(
                 ) {
                     IconBox(XIcons.Monitor, 36.dp, 10.dp, iconSize = 20.dp)
                     Column(Modifier.weight(1f)) {
-                        Text(peer?.name ?: "设备", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(peer?.name ?: "设备", style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
                             (if (peer?.online == true) "● 在线" else "○ 离线") + " · ${bar.projects.size} 个项目",
-                            Modifier.padding(top = 1.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            Modifier.padding(top = 1.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                     }
                     XIcon(XIcons.ChevronDown, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp, modifier = Modifier.rotate(if (switchOpen) 180f else 0f))
@@ -528,13 +528,13 @@ private fun RemoteDrawer(
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             IconBox(XIcons.Monitor, 32.dp, 9.dp, iconSize = 18.dp)
-                            Text(other.name, Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(other.name, Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             StatusDot(other.online, other.statusText())
                         }
                     }
                     Hairline()
                     Row(Modifier.fillMaxWidth().clickable(onClick = onAllDevices).padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("全部设备", Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text("全部设备", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
                         XIcon(XIcons.ChevronRight, tint = extra.ink3, size = 16.dp)
                     }
                 }
@@ -542,14 +542,14 @@ private fun RemoteDrawer(
             PillButton("新对话", onNewChat, Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp).fillMaxWidth(), height = 44.dp, icon = XIcons.Plus)
             TextBox(query, { query = it }, Modifier.padding(start = 12.dp, end = 12.dp, top = 10.dp), placeholder = "搜索这台设备上的对话", filled = true)
             Row(Modifier.padding(start = 16.dp, end = 12.dp, top = 12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("项目", Modifier.weight(1f), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("项目", Modifier.weight(1f), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 ChipPill("新项目", icon = XIcons.Plus, onClick = { onLoadProjects(); newProject = true })
             }
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(top = 4.dp, bottom = 8.dp)) {
                 if (remote.loadingSessions && remote.sessions.isEmpty()) {
-                    Text("读取设备上的对话…", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 14.sp, color = extra.ink3)
+                    Text("读取设备上的对话…", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = XType.Secondary, color = extra.ink3)
                 } else if (bar.projects.isEmpty() && bar.loose.isEmpty()) {
-                    Text("这台设备上还没有对话。点“新项目”选一个文件夹，或直接点“新对话”。", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), fontSize = 14.sp, lineHeight = 20.sp, color = extra.ink3)
+                    Text("这台设备上还没有对话。点“新项目”选一个文件夹，或直接点“新对话”。", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = XType.Secondary, color = extra.ink3)
                 }
                 bar.projects.forEach { group ->
                     val chats = group.sessions.matching()
@@ -563,10 +563,10 @@ private fun RemoteDrawer(
                             XIcon(XIcons.ChevronDown, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp, modifier = Modifier.rotate(if (open) 0f else -90f))
                             XIcon(XIcons.Folder, size = 18.dp)
                             Column(Modifier.weight(1f)) {
-                                Text(group.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(group.path, Modifier.padding(top = 1.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(group.name, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(group.path, Modifier.padding(top = 1.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                            Text(group.sessions.size.toString(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(group.sessions.size.toString(), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconTap(XIcons.NewChat, "在这个项目里新对话", { onNewChatIn(group.path) }, size = 18.dp)
                     }
@@ -574,14 +574,14 @@ private fun RemoteDrawer(
                 }
                 val loose = bar.loose.matching()
                 if (loose.isNotEmpty()) {
-                    Text("没有项目的对话", Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("没有项目的对话", Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     loose.forEach { DrawerSession(it, selected = it.id == remote.selectedSessionId, indent = 8.dp) { onOpenSession(it.id) } }
                 }
             }
             Hairline()
             Row(Modifier.fillMaxWidth().height(44.dp).clickable(onClick = onAllDevices).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 XIcon(XIcons.ChevronLeft, size = 22.dp)
-                Text("返回我的设备", fontSize = 15.sp)
+                Text("返回我的设备", style = XType.Body)
             }
             Spacer(Modifier.navigationBarsPadding())
         }
@@ -597,11 +597,11 @@ private fun DrawerSession(s: RemoteSessionSummary, selected: Boolean, indent: Dp
             .background(if (selected) LocalExtraColors.current.fill else Color.Transparent).clickable(onClick = onClick).padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(s.title.ifBlank { "未命名对话" }, Modifier.weight(1f), fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(s.title.ifBlank { "未命名对话" }, Modifier.weight(1f), style = XType.Body, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (s.state == "running") {
-            Text("执行中", Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.onSurface).padding(horizontal = 7.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.surface, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            Text("执行中", Modifier.clip(CircleShape).background(MaterialTheme.colorScheme.onSurface).padding(horizontal = 7.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.surface, style = XType.Caption, fontWeight = FontWeight.SemiBold)
         } else {
-            Text(relativeTime(s.updatedAt * 1000), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(relativeTime(s.updatedAt * 1000), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -611,11 +611,11 @@ private fun DrawerSession(s: RemoteSessionSummary, selected: Boolean, indent: Dp
 private fun NewProjectSheet(remote: RemoteChatState, onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: Modifier) {
     val have = remote.sidebar.projects.map { it.path.trimEnd('/', '\\') }.toSet()
     BottomSheet(onDismiss, panelModifier) {
-        Text("新项目", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-        Text("项目是${remote.selectedPeer?.name ?: "设备"}上的一个文件夹，这个项目里的对话都在这个文件夹里干活。", Modifier.padding(top = 6.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("设备上最近用过的文件夹", Modifier.padding(top = 14.dp, bottom = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("新项目", style = XType.Title, fontWeight = FontWeight.SemiBold)
+        Text("项目是${remote.selectedPeer?.name ?: "设备"}上的一个文件夹，这个项目里的对话都在这个文件夹里干活。", Modifier.padding(top = 6.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("设备上最近用过的文件夹", Modifier.padding(top = 14.dp, bottom = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (remote.recentProjects.isEmpty()) {
-            Text("还没有读到。请确认设备在线，并且在设备上的小伴里打开过文件夹。", Modifier.padding(vertical = 8.dp), fontSize = 14.sp, lineHeight = 20.sp, color = LocalExtraColors.current.ink3)
+            Text("还没有读到。请确认设备在线，并且在设备上的小伴里打开过文件夹。", Modifier.padding(vertical = 8.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
         }
         remote.recentProjects.forEachIndexed { i, project ->
             if (i > 0) Hairline()
@@ -626,13 +626,13 @@ private fun NewProjectSheet(remote: RemoteChatState, onDismiss: () -> Unit, onPi
             ) {
                 IconBox(XIcons.Folder, 40.dp, 12.dp, iconSize = 22.dp)
                 Column(Modifier.weight(1f)) {
-                    Text(project.name, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(project.path, Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(project.name, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(project.path, Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                if (added) Text("已添加", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (added) Text("已添加", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        Text("手机不能浏览设备上的文件，所以只列出最近用过的文件夹。其他文件夹请在设备小伴里先打开一次。", Modifier.padding(top = 12.dp), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("手机不能浏览设备上的文件，所以只列出最近用过的文件夹。其他文件夹请在设备小伴里先打开一次。", Modifier.padding(top = 12.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         GhostPillButton("取消", onDismiss, Modifier.padding(top = 14.dp).fillMaxWidth())
     }
 }

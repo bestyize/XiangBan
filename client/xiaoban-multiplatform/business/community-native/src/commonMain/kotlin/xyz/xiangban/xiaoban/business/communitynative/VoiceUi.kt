@@ -79,19 +79,19 @@ fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Bo
     var error by remember { mutableStateOf<String?>(null) }
     var job by remember { mutableStateOf<Job?>(null) }
     BottomSheet({ job?.cancel(); onFinished(false) }, panelModifier) {
-        Text("在手机上识别语音", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Text("在手机上识别语音", style = XType.Title, fontWeight = FontWeight.SemiBold)
         Text(
             "下载语音模型（SenseVoice 识别、Silero 人声检测和 Smart Turn 判停，共约 ${(total / 1_000_000)} MB，和电脑上用的是同一套）；已下载的文件会复用。之后识别和判断你说完没有都在手机上完成。建议在 Wi-Fi 下载。",
-            Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (running || done > 0) {
             val fraction = if (total > 0) (done.toFloat() / total).coerceIn(0f, 1f) else 0f
             Box(Modifier.padding(top = 14.dp).fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)).background(LocalExtraColors.current.line)) {
                 Box(Modifier.fillMaxWidth(fraction).height(6.dp).background(Brand))
             }
-            Text("${(fraction * 100).toInt()}%  ${done / 1_000_000} / ${total / 1_000_000} MB", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Text("${(fraction * 100).toInt()}%  ${done / 1_000_000} / ${total / 1_000_000} MB", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
-        error?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = Danger) }
+        error?.let { Text(it, Modifier.padding(top = 8.dp), style = XType.Body, color = Danger) }
         Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GhostPillButton(if (running) "取消" else "先不用", { job?.cancel(); onFinished(false) }, Modifier.weight(1f))
             PillButton(if (running) "下载中…" else if (error != null) "重试" else "下载", {

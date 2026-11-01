@@ -45,7 +45,7 @@ fun AppearanceScreen(back: () -> Unit) {
             Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 16.dp, vertical = 20.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                 AppearanceMode.entries.forEach { m -> ModeCard(m, selected = mode == m) { ThemeState.select(m) } }
             }
-            Text("跟随系统时，随手机的深浅色设置自动切换。", Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("跟随系统时，随手机的深浅色设置自动切换。", Modifier.padding(start = 16.dp, end = 16.dp, top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
             GroupLabel("主题色")
             Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 8.dp, end = 8.dp, top = 20.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
                 Tokens.Accents.chunked(3).forEach { row ->
@@ -74,7 +74,7 @@ private fun ModeCard(mode: AppearanceMode, selected: Boolean, onClick: () -> Uni
                 }
             }
         }
-        Text(mode.label, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        Text(mode.label, style = XType.Body, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
         Box(
             Modifier.size(20.dp).clip(CircleShape).let { if (selected) it.background(Brand) else it.border(1.5.dp, LocalExtraColors.current.line, CircleShape) },
             contentAlignment = Alignment.Center,
@@ -92,7 +92,7 @@ private fun Swatch(accent: Tokens.Accent, selected: Boolean, onClick: () -> Unit
                 if (selected) XIcon(XIcons.CheckBold, tint = Color.White, size = 20.dp)
             }
         }
-        Text(accent.name, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+        Text(accent.name, style = XType.Body, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
 

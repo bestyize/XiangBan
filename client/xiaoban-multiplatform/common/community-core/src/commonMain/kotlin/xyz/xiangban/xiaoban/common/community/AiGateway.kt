@@ -282,11 +282,13 @@ class AiGatewayApi(
     suspend fun streamChat(
         messages: List<ChatMessage>,
         tier: String? = null,
+        reasoningEffort: String? = null,
         onDelta: (String) -> Unit = {},
     ): String {
         val token = requireToken()
         val payload = buildJsonObject {
             if (!tier.isNullOrBlank()) put("model", tier.trim())
+            reasoningEffort?.let { put("reasoning_effort", it) }
             put("stream", true)
             put(
                 "messages",
@@ -435,6 +437,7 @@ data class ChatQuestion(val id: String, val question: String, val options: List<
 data class CloudChatState(
     val tiers: List<AiTier> = emptyList(),
     val selectedTier: String = "",
+    val reasoningByTier: Map<String, String> = emptyMap(),
     val balance: AiBalance? = null,
     val loadingMeta: Boolean = false,
     val metaError: String? = null,
@@ -509,7 +512,7 @@ class CloudChatController(
     fun useAccount(account: String?) {
         val list = history?.useAccount(account) ?: emptyList()
         clearConversation()
-        _state.value = _state.value.copy(conversations = list, workspaces = history?.workspaces().orEmpty())
+        _state.value = _state.value.copy(reasoningByTier = emptyMap(), conversations = list, workspaces = history?.workspaces().orEmpty())
     }
 
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
@@ -581,6 +584,15 @@ class CloudChatController(
         }
     }
 
+    fun selectReasoning(tier: String, effort: String?) {
+        val found = _state.value.tiers.firstOrNull { it.tier == tier } ?: return
+        if (!found.available || _state.value.sending) return
+        if (effort != null && effort !in found.reasoningEfforts) return
+        val choices = _state.value.reasoningByTier - tier
+        _state.value = _state.value.copy(selectedTier = tier,
+            reasoningByTier = if (effort == null) choices else choices + (tier to effort))
+    }
+
     fun selectTier(tier: String) {
         val found = _state.value.tiers.firstOrNull { it.tier == tier }
         if (found != null && !found.available) return
@@ -610,6 +622,7 @@ class CloudChatController(
             add(ChatMessage("user", note + prompt, attachments))
         }
         val tier = _state.value.selectedTier.ifEmpty { null }
+        val reasoning = _state.value.reasoningByTier[tier]?.takeIf { it in _state.value.activeTier?.reasoningEfforts.orEmpty() }
         _state.value = _state.value.copy(
             messages = _state.value.messages + userTurn + assistantTurn,
             sending = true,
@@ -622,7 +635,7 @@ class CloudChatController(
             val session = agentSession
             chatJob = scope.launch {
                 try {
-                    agent.ensureStarted(tier ?: "")
+                    agent.ensureStarted(tier ?: "", reasoning)
                     kotlinx.coroutines.currentCoroutineContext().ensureActive()
                     // 先记下这一轮的编号再发出去，免得回来的事件比赋值还早。
                     val runId = agent.nextRunId()
@@ -641,7 +654,7 @@ class CloudChatController(
         }
         chatJob = scope.launch {
             try {
-                api.streamChat(history, tier) { delta ->
+                api.streamChat(history, tier, reasoning) { delta ->
                     updateTurn(replyId) { it.copy(text = it.text + delta) }
                 }
                 updateTurn(replyId) { it.copy(streaming = false) }

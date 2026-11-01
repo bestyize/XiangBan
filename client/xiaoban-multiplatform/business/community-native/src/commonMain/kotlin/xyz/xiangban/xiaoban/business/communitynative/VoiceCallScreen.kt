@@ -106,8 +106,8 @@ fun VoiceCallScreen(call: VoiceCall, title: String, seconds: Int, onMinimize: ()
             XIcon(XIcons.ChevronDown, tint = CallFg2, size = 24.dp, description = "收起")
         }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, Modifier.padding(top = 18.dp, start = 24.dp, end = 24.dp), color = CallFg, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(clock(seconds), Modifier.padding(top = 5.dp), color = CallFg2, fontSize = 12.sp, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
+            Text(title, Modifier.padding(top = 18.dp, start = 24.dp, end = 24.dp), color = CallFg, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(clock(seconds), Modifier.padding(top = 5.dp), color = CallFg2, style = XType.Caption, fontFamily = FontFamily.Monospace, letterSpacing = 1.sp)
             Spacer(Modifier.weight(0.8f))
             CallAvatar(state.phase, state.level)
             Column(Modifier.fillMaxWidth().let { if (state.prompt != null) it.heightIn(min = 190.dp) else it.height(190.dp) }.padding(horizontal = 28.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -122,7 +122,7 @@ fun VoiceCallScreen(call: VoiceCall, title: String, seconds: Int, onMinimize: ()
                         ReplyBlock(state.userText, state.replyText, null)
                     } else {
                         StatusLine("请说话，我在听")
-                        Text("说完停一下，我就会回答", Modifier.padding(top = 10.dp), color = CallFg3, fontSize = 13.sp)
+                        Text("说完停一下，我就会回答", Modifier.padding(top = 10.dp), color = CallFg3, style = XType.Secondary)
                     }
                     CallPhase.Hearing -> {
                         StatusLine("听到了…")
@@ -130,7 +130,7 @@ fun VoiceCallScreen(call: VoiceCall, title: String, seconds: Int, onMinimize: ()
                     }
                     CallPhase.Thinking -> {
                         StatusLine("小伴在想…")
-                        if (state.userText.isNotBlank()) Text("你：${state.userText}", Modifier.padding(top = 18.dp).fillMaxWidth(), color = CallFg3, fontSize = 15.sp, lineHeight = 24.sp, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (state.userText.isNotBlank()) Text("你：${state.userText}", Modifier.padding(top = 18.dp).fillMaxWidth(), color = CallFg3, style = XType.Body, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     CallPhase.Speaking -> ReplyBlock(state.userText, state.replyText, state.reading)
                 }
@@ -155,7 +155,7 @@ internal fun clock(seconds: Int): String = "${(seconds / 60).toString().padStart
 /** 你说的那句（一行小字）和小伴的回答。 */
 @Composable
 private fun ReplyBlock(userText: String, replyText: String, reading: IntRange?) {
-    if (userText.isNotBlank()) Text("你：$userText", Modifier.fillMaxWidth(), color = CallFg3, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    if (userText.isNotBlank()) Text("你：$userText", Modifier.fillMaxWidth(), color = CallFg3, style = XType.Caption, textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis)
     if (replyText.isNotBlank()) ReplyWindow(replyText, reading, userText, Modifier.padding(top = 12.dp))
 }
 
@@ -218,7 +218,7 @@ private fun Notice(text: String) {
     Text(
         text,
         Modifier.padding(horizontal = 24.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(CallGlass).border(0.5.dp, CallLine, RoundedCornerShape(16.dp)).padding(horizontal = 14.dp, vertical = 12.dp),
-        color = CallWarn, fontSize = 13.sp, lineHeight = 20.sp,
+        color = CallWarn, style = XType.Secondary,
     )
 }
 
@@ -230,7 +230,7 @@ private fun CallControl(icon: ImageVector, label: String, background: Color, tin
         Box(Modifier.size(68.dp).clip(CircleShape).background(background).then(ring).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
             XIcon(icon, tint = tint, size = 28.dp, description = label)
         }
-        Text(label, Modifier.padding(top = 8.dp), color = CallFg2, fontSize = 12.sp)
+        Text(label, Modifier.padding(top = 8.dp), color = CallFg2, style = XType.Caption)
     }
 }
 
@@ -355,8 +355,8 @@ fun CallCapsule(call: VoiceCall, seconds: Int, onExpand: () -> Unit, modifier: M
                 Box(Modifier.size(3.dp, (18f * h).dp).clip(CircleShape).background(Brand))
             }
         }
-        Text("通话中 · ${phaseLabel(state.phase)}", Modifier.weight(1f), color = CallFg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(clock(seconds), color = CallFg2, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+        Text("通话中 · ${phaseLabel(state.phase)}", Modifier.weight(1f), color = CallFg, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(clock(seconds), color = CallFg2, style = XType.Caption, fontFamily = FontFamily.Monospace)
         Box(Modifier.size(36.dp).clip(CircleShape).background(CallHang).clickable { call.stop() }, contentAlignment = Alignment.Center) {
             XIcon(XIcons.Hangup, tint = Color.White, size = 18.dp, description = "挂断")
         }
@@ -369,9 +369,9 @@ fun CallCapsule(call: VoiceCall, seconds: Int, onExpand: () -> Unit, modifier: M
 @Composable
 private fun CallPromptCard(prompt: CallPrompt, onChoose: (String) -> Unit) {
     Column(Modifier.padding(top = 18.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(CallGlass).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(prompt.title, color = CallFg, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-        prompt.danger?.let { Text("高风险操作：$it。每次都要你确认。", color = CallWarn, fontSize = 12.sp, lineHeight = 18.sp) }
-        if (prompt.detail.isNotBlank()) Text(prompt.detail, color = CallFg3, fontSize = 12.sp, lineHeight = 18.sp, fontFamily = FontFamily.Monospace, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Text(prompt.title, color = CallFg, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        prompt.danger?.let { Text("高风险操作：$it。每次都要你确认。", color = CallWarn, style = XType.Caption) }
+        if (prompt.detail.isNotBlank()) Text(prompt.detail, color = CallFg3, style = XType.Caption, fontFamily = FontFamily.Monospace, maxLines = 3, overflow = TextOverflow.Ellipsis)
         if (prompt.question) {
             Column(Modifier.heightIn(max = 220.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 prompt.options.forEach { option -> PromptButton(option, Modifier.fillMaxWidth(), onChoose) }
@@ -392,6 +392,6 @@ private fun PromptButton(option: CallPromptOption, modifier: Modifier, onChoose:
         CallPromptOption.Role.Deny -> Color.Transparent to CallFg2
     }
     Box(modifier.height(44.dp).clip(CircleShape).background(bg).clickable { onChoose(option.id) }.padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
-        Text(option.label, color = fg, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(option.label, color = fg, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

@@ -21,7 +21,7 @@ import xyz.xiangban.xiaoban.common.community.*
 private fun ChallengePager(page: Int, more: Boolean, select: (Int) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         GhostPillButton("上一页", { select(page - 1) }, Modifier.weight(1f), enabled = page > 1)
-        Text("第 $page 页", Modifier.padding(top = 10.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        Text("第 $page 页", Modifier.padding(top = 10.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         GhostPillButton("下一页", { select(page + 1) }, Modifier.weight(1f), enabled = more)
     }
 }
@@ -38,10 +38,10 @@ fun NativeChallengesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) ->
             else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { GhostPillButton("刷新挑战", loader::reload, Modifier.fillMaxWidth()) }
                 items(result.items, key = { it.key }) { challenge -> WhiteCard(Modifier.clickable { open(Route.Challenge(challenge.key)) }, padding = 14.dp) {
-                    Text(challenge.title, fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${challengePhase(challenge)} · ${challenge.entryCount} 件投稿", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                    if (challenge.description.isNotBlank()) Text(challenge.description, Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp, maxLines = 3)
-                    Text("截止 ${challenge.endsAt}", Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    Text(challenge.title, style = XType.Section, fontWeight = FontWeight.SemiBold)
+                    Text("${challengePhase(challenge)} · ${challenge.entryCount} 件投稿", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                    if (challenge.description.isNotBlank()) Text(challenge.description, Modifier.padding(top = 8.dp), style = XType.Body, maxLines = 3)
+                    Text("截止 ${challenge.endsAt}", Modifier.padding(top = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                 } }
                 item { ChallengePager(page, result.hasMore) { page = it } }
             }
@@ -63,28 +63,28 @@ fun NativeChallengeDetailScreen(env: CommunityEnv, key: String, back: () -> Unit
         Box(Modifier.weight(1f)) { LoadBox(state, loader::reload) { detail ->
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 item { WhiteCard(padding = 16.dp) {
-                    Text(detail.challenge.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${challengePhase(detail.challenge)} · ${detail.challenge.entryCount} 件投稿", Modifier.padding(top = 6.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
-                    Text("开始 ${detail.challenge.startsAt}\n截止 ${detail.challenge.endsAt}", Modifier.padding(top = 10.dp), fontSize = 12.sp, lineHeight = 20.sp, color = LocalExtraColors.current.ink3)
-                    Text(detail.challenge.description, Modifier.padding(top = 12.dp), fontSize = 14.sp, lineHeight = 23.sp)
-                    Text("投稿标签 #${detail.challenge.submissionTag}", Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    Text(detail.challenge.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                    Text("${challengePhase(detail.challenge)} · ${detail.challenge.entryCount} 件投稿", Modifier.padding(top = 6.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                    Text("开始 ${detail.challenge.startsAt}\n截止 ${detail.challenge.endsAt}", Modifier.padding(top = 10.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                    Text(detail.challenge.description, Modifier.padding(top = 12.dp), style = XType.Body)
+                    Text("投稿标签 #${detail.challenge.submissionTag}", Modifier.padding(top = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         GhostPillButton("刷新状态", loader::reload, Modifier.weight(1f))
                         PillButton(if (!challengeCanSubmit(detail.challenge)) challengePhase(detail.challenge) else if (!session.loggedIn) "登录后投稿" else "选择我的作品投稿", {
                             if (!session.loggedIn) open(Route.Login) else choose = true
                         }, Modifier.weight(1f), enabled = challengeCanSubmit(detail.challenge))
                     }
-                    if (!challengeCanSubmit(detail.challenge)) Text("当前不接受新投稿，以挑战最新状态为准。", Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    if (!challengeCanSubmit(detail.challenge)) Text("当前不接受新投稿，以挑战最新状态为准。", Modifier.padding(top = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                     detail.challenge.topicId?.let { id -> GhostPillButton("查看挑战讨论", { open(Route.Topic(id)) }, Modifier.padding(top = 8.dp)) }
                 } }
                 notice?.let { message -> item { Banner(message) } }
-                item { Text("投稿作品", Modifier.padding(4.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold) }
+                item { Text("投稿作品", Modifier.padding(4.dp), style = XType.Section, fontWeight = FontWeight.SemiBold) }
                 if (detail.entries.items.isEmpty()) item { CenterMessage("当前没有可见投稿", modifier = Modifier.fillMaxWidth().height(120.dp)) }
                 items(detail.entries.items, key = { it.packId }) { entry -> WhiteCard(padding = 14.dp) {
-                    if (entry.featured) Text("官方精选", fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
-                    Text(entry.pack.title, Modifier.fillMaxWidth().padding(top = 4.dp).clickable { open(if (entry.pack.kind in CapabilityPackKinds) Route.Ability(entry.packId) else Route.Pack(entry.packId)) }, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Text("${kindLabel(entry.pack.kind)} · ${entry.pack.author?.nickname ?: "作者"} · v${entry.pack.version}", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                    if (entry.pack.summary.isNotBlank()) Text(entry.pack.summary, Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp)
+                    if (entry.featured) Text("官方精选", style = XType.Caption, color = LocalExtraColors.current.brandInk)
+                    Text(entry.pack.title, Modifier.fillMaxWidth().padding(top = 4.dp).clickable { open(if (entry.pack.kind in CapabilityPackKinds) Route.Ability(entry.packId) else Route.Pack(entry.packId)) }, style = XType.Section, fontWeight = FontWeight.SemiBold)
+                    Text("${kindLabel(entry.pack.kind)} · ${entry.pack.author?.nickname ?: "作者"} · v${entry.pack.version}", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                    if (entry.pack.summary.isNotBlank()) Text(entry.pack.summary, Modifier.padding(top = 8.dp), style = XType.Body)
                     ChallengeEntryLikes(env, entry, open)
                 } }
                 item { ChallengePager(page, detail.entries.hasMore) { page = it } }
@@ -111,11 +111,11 @@ private fun ChallengeSubmissionDialog(env: CommunityEnv, challenge: CommunityCha
     val scope = rememberCoroutineScope()
     AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { Text("选择已上架的本人作品") },
         text = { Column(Modifier.heightIn(max = 420.dp)) {
-            Text("每件作品只记录一次投稿；受限阅读、已下架或非本人作品不能投稿。", fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
+            Text("每件作品只记录一次投稿；受限阅读、已下架或非本人作品不能投稿。", style = XType.Caption, color = LocalExtraColors.current.ink3)
             when (val result = state) {
                 Load.Loading -> Spinner(Modifier.fillMaxWidth().height(100.dp))
                 is Load.Failed -> Banner(result.message, warn = true, actionText = "重试", onAction = loader::reload)
-                is Load.Ready -> if (owned.isEmpty()) Text("没有已上架的本人作品，请先从“我的作品”发布。", Modifier.padding(vertical = 16.dp), fontSize = 14.sp)
+                is Load.Ready -> if (owned.isEmpty()) Text("没有已上架的本人作品，请先从“我的作品”发布。", Modifier.padding(vertical = 16.dp), style = XType.Body)
                 else LazyColumn(Modifier.weight(1f, fill = false).padding(top = 8.dp)) {
                     items(owned, key = { it.id }) { pack ->
                         RadioRow(selected == pack.id, pack.title, desc = if (pack.id in submitted) "已提交当前挑战" else "${kindLabel(pack.kind)} · v${pack.version}", onClick = {
@@ -124,7 +124,7 @@ private fun ChallengeSubmissionDialog(env: CommunityEnv, challenge: CommunityCha
                     }
                 }
             }
-            error?.let { Text(it, Modifier.padding(top = 8.dp), color = Danger, fontSize = 13.sp) }
+            error?.let { Text(it, Modifier.padding(top = 8.dp), color = Danger, style = XType.Secondary) }
         } },
         confirmButton = { PillButton(if (busy) "投稿中…" else "提交作品", {
             if (busy) return@PillButton
@@ -144,7 +144,7 @@ private fun ChallengeSubmissionDialog(env: CommunityEnv, challenge: CommunityCha
 @Composable
 private fun ChallengeEntryLikes(env: CommunityEnv, entry: CommunityChallengeEntry, open: (Route) -> Unit) {
     val topicId = challengeVoteTopic(entry)
-    if (topicId == null) { Text("此作品暂无可点赞的公开讨论", Modifier.padding(top = 10.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3); return }
+    if (topicId == null) { Text("此作品暂无可点赞的公开讨论", Modifier.padding(top = 10.dp), style = XType.Caption, color = LocalExtraColors.current.ink3); return }
     val session by env.session.state.collectAsState()
     val scope = rememberCoroutineScope()
     var topic by remember(topicId, session.accountId) { mutableStateOf<Topic?>(null) }
@@ -160,7 +160,7 @@ private fun ChallengeEntryLikes(env: CommunityEnv, entry: CommunityChallengeEntr
         }
     }
     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text((topic?.likeCount?.toLong() ?: entry.likes)?.let { "$it 赞" } ?: "暂无点赞数据", Modifier.weight(1f).padding(top = 10.dp), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+        Text((topic?.likeCount?.toLong() ?: entry.likes)?.let { "$it 赞" } ?: "暂无点赞数据", Modifier.weight(1f).padding(top = 10.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
         GhostPillButton(when { busy -> "处理中…"; !session.loggedIn -> "登录后点赞"; topic == null -> "重试读取"; topic?.viewer?.liked == true -> "取消点赞"; else -> "点赞" }, {
             if (!session.loggedIn) { open(Route.Login); return@GhostPillButton }
             if (busy) return@GhostPillButton
@@ -174,5 +174,5 @@ private fun ChallengeEntryLikes(env: CommunityEnv, entry: CommunityChallengeEntr
             }
         }, enabled = !busy)
     }
-    error?.let { Text(it, Modifier.padding(top = 4.dp), color = Danger, fontSize = 12.sp) }
+    error?.let { Text(it, Modifier.padding(top = 4.dp), color = Danger, style = XType.Caption) }
 }

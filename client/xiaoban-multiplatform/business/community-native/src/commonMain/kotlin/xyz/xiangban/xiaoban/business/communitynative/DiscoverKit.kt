@@ -48,12 +48,12 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, note: String? = 
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (icon != null) XIcon(icon, tint = MaterialTheme.colorScheme.onSurface, size = 18.dp)
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (!note.isNullOrBlank()) Text(note, Modifier.padding(top = 3.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (!note.isNullOrBlank()) Text(note, Modifier.padding(top = 3.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (action != null && onAction != null) {
             Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onAction).padding(horizontal = 4.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(action, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(action, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 14.dp)
             }
         }
@@ -65,7 +65,7 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, note: String? = 
 fun FootNote(text: String, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         XIcon(XIcons.Info, tint = LocalExtraColors.current.ink3, size = 14.dp, modifier = Modifier.padding(top = 2.dp))
-        Text(text, fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
+        Text(text, style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -75,7 +75,7 @@ fun Tag(text: String, fg: Color, bg: Color, modifier: Modifier = Modifier, compa
     Text(
         text,
         modifier.clip(RoundedCornerShape(if (compact) 4.dp else 6.dp)).background(bg).padding(horizontal = if (compact) 4.dp else 8.dp, vertical = if (compact) 0.dp else 2.dp),
-        fontSize = 12.sp, color = fg, maxLines = 1,
+        style = XType.Caption, color = fg, maxLines = 1,
     )
 }
 
@@ -139,7 +139,7 @@ fun PageChip(text: String, selected: Boolean, onClick: () -> Unit) {
     Box(Modifier.heightIn(min = 36.dp).clip(RoundedCornerShape(10.dp))
         .background(if (selected) extra.brandSoft else MaterialTheme.colorScheme.surface)
         .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
-        Text(text, fontSize = 13.sp, maxLines = 1, color = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
+        Text(text, style = XType.Secondary, maxLines = 1, color = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
     }
 }
@@ -170,11 +170,11 @@ internal fun ExpandableDescription(text: String) {
     var expanded by remember(text) { mutableStateOf(false) }
     var overflows by remember(text) { mutableStateOf(false) }
     Column(Modifier.padding(top = 6.dp)) {
-        Text(text, fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Text(text, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = if (expanded) Int.MAX_VALUE else 3, overflow = TextOverflow.Ellipsis,
             onTextLayout = { if (!expanded) overflows = it.hasVisualOverflow })
         if (expanded || overflows) Text(if (expanded) "收起" else "展开", Modifier.clickable { expanded = !expanded }.padding(vertical = 6.dp),
-            fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
+            style = XType.Caption, color = LocalExtraColors.current.brandInk)
     }
 }
 
@@ -184,9 +184,9 @@ internal fun DisclosureDescription(label: String, text: String) {
     var expanded by remember(text) { mutableStateOf(false) }
     Column {
         Row(Modifier.clickable { expanded = !expanded }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(if (expanded) "收起$label" else label, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Text(if (expanded) "收起$label" else label, style = XType.Caption, color = LocalExtraColors.current.ink3)
             XIcon(if (expanded) XIcons.ChevronUp else XIcons.ChevronDown, size = 14.dp, tint = LocalExtraColors.current.ink3)
         }
-        if (expanded) Text(text, fontSize = 13.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (expanded) Text(text, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

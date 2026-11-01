@@ -449,7 +449,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 </template>
 
 <style scoped>
-.ai-store-page{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;padding-bottom:0;color:var(--ui-text-primary);background:var(--ui-surface-sunken);container-type:inline-size}
+.ai-store-page{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;padding-bottom:0;color:var(--ui-text-primary);background:var(--ui-surface);container-type:inline-size}
 .store-header{flex:none}
 .store-tabs{flex:none}
 .store-tabs>button{white-space:nowrap}
@@ -458,7 +458,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 .store-search .clear{border:0;background:none;color:var(--ui-text-tertiary);font-size:16px;line-height:1;cursor:pointer;padding:0}
 .installed-filter .count{min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--ui-soft);color:var(--ui-ink);font-size:11px;font-weight:600;display:inline-grid;place-items:center}
 .installed-filter.selected{box-shadow:inset 0 0 0 1.5px var(--ui-btn);color:var(--ui-ink)}
-.store-toolbar{flex:none;margin-top:18px;display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--ui-line);flex-wrap:wrap}
+.store-toolbar{flex:none;margin-top:18px;display:flex;align-items:center;gap:12px;padding-bottom:12px;flex-wrap:wrap}
 .store-filters{display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-width:0}
 .store-filters button{height:30px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-secondary);font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}
 .store-filters button:hover{background:var(--ui-control)}

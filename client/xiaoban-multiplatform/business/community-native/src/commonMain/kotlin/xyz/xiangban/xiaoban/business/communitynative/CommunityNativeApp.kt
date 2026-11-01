@@ -173,7 +173,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
 private fun PublishSheet(env: CommunityEnv, onDismiss: () -> Unit, onAiCreate: () -> Unit, onNewPost: () -> Unit, onPublishPack: () -> Unit, panelModifier: Modifier) {
     val site = env.config.forumBase.trimEnd('/')
     BottomSheet(onDismiss, panelModifier) {
-        Text("发布", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+        Text("发布", style = XType.Title, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
         SheetAction(XIcons.Sparkle, "用 AI 创作", "一句话生成特效、壁纸、组件或小游戏", onAiCreate)
         SheetAction(XIcons.Upload, "发布已有作品", "选择资源包（.zip），发布到社区", onPublishPack)
         SheetAction(XIcons.Pen, "发帖", "在讨论或资源里发一个帖子", onNewPost)

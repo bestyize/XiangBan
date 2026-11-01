@@ -15,6 +15,8 @@ import { useWorkspaceSort } from './workspace-sort.ts';
 import { serveConfigurationWindows } from './configuration/windows.ts';
 import { acceptCloudTask } from './library/cloud-document.ts';
 import { acceptStoreTask } from './ai-store/store-window.ts';
+import SkinScene from './application-skins/SkinScene.vue';
+import { activeSkin, refreshSkins } from './skins/store.ts';
 const pageLoaders = {
   'new-task': () => import('./pages/NewTaskPage.vue'),
   chat: () => import('./pages/ChatPage.vue'),
@@ -475,14 +477,14 @@ onMounted(() => {
     };
   }
   if (store.desktop) void listen('configuration-login', () => store.openLogin()).then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); });
-  if (store.desktop) void serveConfigurationWindows(args => acceptStoreTask(store, args), args => acceptCloudTask(store, args)).then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); }).catch(error => store.notify(error, 'error'));
+  if (store.desktop) void serveConfigurationWindows(args => acceptStoreTask(store, args), args => acceptCloudTask(store, args), () => { store.studioTab = 'skins'; navigate('studio'); }).then(off => { if (configurationDisposed) off(); else assistantListeners.push(off); }).catch(error => store.notify(error, 'error'));
   void store.initialize().then(async () => { if (store.info.uiSmoke) await (await import('./ui-smoke.ts')).runUiSmoke(store); });
   window.addEventListener('focus', focus);
   window.addEventListener('widgets-manage', manageWidgets);
   window.addEventListener('pets-manage', managePets);
   window.addEventListener('keydown', onKeydown);
   document.addEventListener('pointerdown', onPointerDown, true);
-  if (store.desktop) { void listenForAssistant(); void introduceAssistant(); void shareAppearance(); }
+  if (store.desktop) { void refreshSkins().catch(error => store.notify(error, 'error')); void listenForAssistant(); void introduceAssistant(); void shareAppearance(); }
 });
 onBeforeUnmount(() => {
   configurationDisposed = true;
@@ -493,7 +495,8 @@ onBeforeUnmount(() => {
 const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'];
 </script>
 <template>
-  <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-mac': mac && store.desktop, 'is-win': win }">
+  <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-mac': mac && store.desktop, 'is-win': win, 'has-application-skin': !!activeSkin, 'skin-new-task': store.page === 'new-task' && !!activeSkin }">
+    <SkinScene v-if="activeSkin" :scene="activeSkin.scene" :paused="store.page !== 'new-task'" :interactive="store.page === 'new-task'" />
     <div class="window-drag" data-tauri-drag-region aria-hidden="true"></div>
     <div v-if="win" class="window-controls" data-testid="window-controls">
       <button type="button" aria-label="最小化" title="最小化" @click="windowAction('minimize')"><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><path d="M0 5h10" stroke="currentColor" stroke-width="1"/></svg></button>
@@ -647,6 +650,15 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 <style>
 .workspace-tools{display:flex;align-items:center;gap:3px}
 .workspace-more{box-sizing:border-box;display:flex;align-items:center;gap:6px;min-height:28px;width:calc(100% - 28px);margin:4px 0 4px 22px;padding:5px 9px;border:0;border-radius:6px;background:none;color:var(--ui-text-secondary);font:inherit;font-size:11px;text-align:left;cursor:pointer}.workspace-more>span{white-space:nowrap}.workspace-more:hover{background:var(--ui-surface);color:var(--ui-text-primary)}.workspace-more svg{flex:none;color:var(--ui-text-tertiary)}.workspace-more[aria-expanded=true] svg{transform:rotate(180deg)}.workspace-more small{margin-left:auto;white-space:nowrap;font-size:10px;color:var(--ui-text-tertiary)}.sessions-more{margin-left:35px;width:calc(100% - 41px)}
+/* The scene spans the shell; existing controls remain above it. */
+.has-application-skin .control-sidebar{background:color-mix(in srgb,var(--ui-surface) 84%,transparent)}
+.has-application-skin .control-main{background:color-mix(in srgb,var(--ui-surface) 94%,transparent)}
+.control-app.has-application-skin .chat-page,.control-app.has-application-skin .ai-store-page,.control-app.has-application-skin .library-page,.control-app.has-application-skin .studio-head{background:transparent}
+.skin-new-task .control-sidebar{pointer-events:none}
+.skin-new-task .control-sidebar>*{pointer-events:auto}
+.skin-new-task .control-main{background:transparent;pointer-events:none}
+.control-app.skin-new-task .control-workspace,.control-app.skin-new-task .new-task-page{background:transparent;pointer-events:none}
+.skin-new-task .new-task-page .hero,.skin-new-task .new-task-page .disclaimer{pointer-events:auto}
 /* Sidebar (方案四): tint background, 264 wide, soft + ink selection. */
 .control-sidebar{container:sidebar / inline-size;position:relative;display:flex;flex-direction:column;min-height:0;padding:0 12px 12px;background:var(--ui-tint);color:var(--ui-text-primary)}
 .sidebar-top{height:48px;flex-shrink:0;display:flex;align-items:center;justify-content:flex-end;gap:2px}

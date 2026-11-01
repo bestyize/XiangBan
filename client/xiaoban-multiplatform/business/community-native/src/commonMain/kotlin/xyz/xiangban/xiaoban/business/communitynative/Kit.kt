@@ -44,6 +44,12 @@ import androidx.compose.ui.backhandler.BackHandler
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -63,8 +69,8 @@ import androidx.compose.ui.unit.sp
  * 所有页面都用这些，样式只在这里改。
  */
 
-/** 悬浮导航占用的底部高度（导航 60 + 底边距 14 + 余量）。滚动列表要在底部留出这么多。 */
-val NavInset = 96.dp
+/** 底部导航占用的高度（导航 56 + 系统手势条余量）。滚动列表要在底部留出这么多。 */
+val NavInset = 72.dp
 
 // ───────────── 图标 ─────────────
 
@@ -91,9 +97,9 @@ fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifie
             if (leading != null) Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) { leading() }
             else if (onBack != null) IconTap(XIcons.ChevronLeft, "返回", onBack) else Spacer(Modifier.width(44.dp))
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (subtitleContent != null) subtitleContent()
-                else if (subtitle != null) Text(subtitle, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                else if (subtitle != null) Text(subtitle, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (trailing != null) Box(Modifier.widthIn(min = 44.dp).height(44.dp), contentAlignment = Alignment.Center) { trailing() } else Spacer(Modifier.width(44.dp))
         }
@@ -105,7 +111,7 @@ fun ScreenBar(title: String, onBack: (() -> Unit)?, modifier: Modifier = Modifie
 fun HomeBar(title: String, modifier: Modifier = Modifier, trailing: (@Composable () -> Unit)? = null) {
     Column(modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).statusBarsPadding()) {
         Row(Modifier.fillMaxWidth().height(52.dp).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, Modifier.weight(1f), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+            Text(title, Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
             trailing?.invoke()
         }
     }
@@ -123,30 +129,31 @@ private val NavSlots = listOf(
     NavSlot(Tab.Mine, XIcons.User, "我的"),
 )
 
-/** 底部悬浮胶囊导航：当前项展开成红色胶囊并带文字，其余只有图标；中间的“发布”打开发布弹层。 */
+/** 底部导航：通栏白底、顶部细线，每项上图标下文字，位置固定；当前项深色加粗，其余浅灰。中间的“发布”是唯一的品牌色小方块，打开发布弹层。 */
 @Composable
 fun FloatingNav(current: Tab, publishOpen: Boolean, onSelect: (Tab) -> Unit, onPublish: () -> Unit, modifier: Modifier = Modifier) {
+    val extra = LocalExtraColors.current
     Row(
-        modifier.padding(horizontal = 20.dp).padding(bottom = 14.dp).navigationBarsPadding().fillMaxWidth().height(60.dp)
-            .shadow(14.dp, RoundedCornerShape(30.dp)).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(30.dp)).padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+        modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)
+            .drawBehind { drawLine(extra.hairline, Offset.Zero, Offset(size.width, 0f), 0.5.dp.toPx()) }
+            .navigationBarsPadding().height(56.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         NavSlots.forEach { slot ->
             val target = slot.tab
-            val selected = if (target == null) publishOpen else (!publishOpen && target == current)
             val click: () -> Unit = if (target == null) onPublish else ({ onSelect(target) })
-            if (selected) {
-                Row(
-                    Modifier.height(44.dp).clip(RoundedCornerShape(22.dp)).background(Brand).clickable(onClick = click).padding(horizontal = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    XIcon(slot.icon, tint = Color.White, size = 22.dp)
-                    Text(slot.label, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                }
-            } else {
-                Box(Modifier.width(48.dp).height(44.dp).clip(RoundedCornerShape(22.dp)).clickable(onClick = click), contentAlignment = Alignment.Center) {
-                    XIcon(slot.icon, tint = MaterialTheme.colorScheme.onSurfaceVariant, description = slot.label)
+            Box(Modifier.weight(1f).fillMaxHeight().clickable(indication = null, interactionSource = null, role = Role.Tab, onClick = click), contentAlignment = Alignment.Center) {
+                if (target == null) {
+                    Box(Modifier.size(width = 44.dp, height = 32.dp).clip(RoundedCornerShape(10.dp)).background(Brand), contentAlignment = Alignment.Center) {
+                        XIcon(slot.icon, tint = Color.White, size = 20.dp, description = slot.label)
+                    }
+                } else {
+                    val selected = !publishOpen && target == current
+                    val tint = if (selected) MaterialTheme.colorScheme.onSurface else extra.ink3
+                    Column(Modifier.semantics { this.selected = selected }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        XIcon(slot.icon, tint = tint, size = 23.dp)
+                        Text(slot.label, color = tint, style = XType.Nav, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1)
+                    }
                 }
             }
         }
@@ -207,8 +214,8 @@ fun SheetAction(icon: ImageVector, title: String, desc: String, onClick: () -> U
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         IconBox(icon, 44.dp, 16.dp)
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-            Text(desc, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+            Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold)
+            Text(desc, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }
@@ -237,7 +244,7 @@ fun PillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) XIcon(icon, tint = Color.White, size = 20.dp)
-        Text(text, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Text(text, color = Color.White, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 
@@ -256,7 +263,7 @@ fun GhostPillButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
 /** 文字链接样式的小按钮（“全部 ›”这类）。 */
 @Composable
 fun LinkText(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Text(text, modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 6.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    Text(text, modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(horizontal = 4.dp, vertical = 6.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
 }
 
 // ───────────── 输入与开关 ─────────────
@@ -276,7 +283,7 @@ fun TextBox(
     fontSize: Int = 16,
 ) {
     Column(modifier) {
-        if (label != null) Text(label, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
+        if (label != null) Text(label, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 6.dp))
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
@@ -315,14 +322,14 @@ fun AreaBox(value: String, onValueChange: (String) -> Unit, modifier: Modifier =
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
-        textStyle = TextStyle(fontSize = 15.sp, lineHeight = 24.sp, color = MaterialTheme.colorScheme.onSurface),
+        textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface),
         cursorBrush = SolidColor(Brand),
         decorationBox = { inner ->
             Box(
                 Modifier.fillMaxWidth().heightIn(min = minHeight).clip(RoundedCornerShape(8.dp)).background(if (filled) LocalExtraColors.current.fill else MaterialTheme.colorScheme.surface)
                     .padding(horizontal = 14.dp, vertical = 12.dp),
             ) {
-                if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 15.sp, lineHeight = 24.sp)
+                if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, style = XType.Body)
                 inner()
             }
         },
@@ -379,8 +386,8 @@ fun Banner(title: String, modifier: Modifier = Modifier, desc: String? = null, i
     ) {
         if (icon != null) XIcon(icon, size = 22.dp)
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = if (desc != null) 14.sp else 14.sp, fontWeight = if (desc != null) FontWeight.SemiBold else FontWeight.Normal, lineHeight = 19.sp)
-            if (desc != null) Text(desc, fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+            Text(title, style = XType.Body, fontWeight = if (desc != null) FontWeight.SemiBold else FontWeight.Normal)
+            if (desc != null) Text(desc, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
         if (actionText != null && onAction != null) GhostPillButton(actionText, onAction, height = 32.dp, fontSize = 14)
     }
@@ -389,7 +396,7 @@ fun Banner(title: String, modifier: Modifier = Modifier, desc: String? = null, i
 /** 一组白底列表的小标题（“账号”“关于”）。 */
 @Composable
 fun GroupLabel(text: String, modifier: Modifier = Modifier) {
-    Text(text, modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 6.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(text, modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 /** 白底通栏的一行：标题、右侧说明、箭头；[first] 为真时不画上边线。 */
@@ -398,8 +405,8 @@ fun NavRow(title: String, note: String? = null, first: Boolean = false, onClick:
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
         if (!first) Hairline(Modifier.padding(start = 16.dp))
         Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(title, Modifier.weight(1f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (note != null) Text(note, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp))
+            Text(title, Modifier.weight(1f), style = XType.Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (note != null) Text(note, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp))
             XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
         }
     }
@@ -412,8 +419,8 @@ fun EmptyState(icon: ImageVector, title: String, desc: String, modifier: Modifie
         Box(Modifier.size(72.dp).background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp)), contentAlignment = Alignment.Center) {
             XIcon(icon, size = 32.dp)
         }
-        Text(title, Modifier.padding(top = 16.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-        Text(desc, Modifier.padding(top = 6.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(title, Modifier.padding(top = 16.dp), style = XType.Title, fontWeight = FontWeight.SemiBold)
+        Text(desc, Modifier.padding(top = 6.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
     }
 }
 
@@ -430,10 +437,10 @@ fun UserBubble(text: String, modifier: Modifier = Modifier, images: Int = 0) {
             if (images > 0) {
                 Row(Modifier.padding(bottom = if (text.isNotBlank()) 6.dp else 0.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     XIcon(XIcons.Image, tint = ink, size = 16.dp)
-                    Text("$images 张图片", color = ink, fontSize = 14.sp)
+                    Text("$images 张图片", color = ink, style = XType.Body)
                 }
             }
-            if (text.isNotBlank()) Text(text, color = ink, fontSize = 15.sp, lineHeight = 22.sp)
+            if (text.isNotBlank()) Text(text, color = ink, style = XType.Body)
         }
     }
 }
@@ -456,7 +463,7 @@ fun AssistantBubble(text: String, modifier: Modifier = Modifier, muted: Boolean 
     Text(
         text,
         modifier.clip(AssistantBubbleShape).background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 10.dp),
-        fontSize = 14.sp, lineHeight = 22.sp, color = if (muted) LocalExtraColors.current.ink3 else MaterialTheme.colorScheme.onSurface,
+        style = XType.Secondary, color = if (muted) LocalExtraColors.current.ink3 else MaterialTheme.colorScheme.onSurface,
     )
 }
 
@@ -480,12 +487,12 @@ fun ComposerCard(
                 onValueChange = onValueChange,
                 modifier = Modifier.fillMaxWidth(),
                 enabled = enabled,
-                textStyle = TextStyle(fontSize = 15.sp, color = MaterialTheme.colorScheme.onSurface),
+                textStyle = XType.Body.copy(color = MaterialTheme.colorScheme.onSurface),
                 maxLines = 4,
                 cursorBrush = SolidColor(Brand),
                 decorationBox = { inner ->
                     Box(Modifier.fillMaxWidth().height(32.dp), contentAlignment = Alignment.CenterStart) {
-                        if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, fontSize = 15.sp, maxLines = 1)
+                        if (value.isEmpty()) Text(placeholder, color = LocalExtraColors.current.ink3, style = XType.Body, maxLines = 1)
                         inner()
                     }
                 },
@@ -515,7 +522,7 @@ fun ChatComposer(
     /** 按下说话条时先做的事（比如小伴正在回答就先停下）。 */
     onVoicePress: () -> Unit = {},
     /** 模型图标：云端小伴是芯片，跟随电脑的设备聊天是电脑。 */
-    modelIcon: ImageVector = XIcons.Cpu,
+    modelIcon: ImageVector = XIcons.Brain,
     /** 指定了模型时图标右上角一个小红点。 */
     modelPinned: Boolean = false,
     /** 不为空就显示权限（锁）图标；[fullTrust] 为真时锁变红。 */
@@ -565,12 +572,12 @@ private fun ToolbarIcon(icon: ImageVector, description: String, onClick: () -> U
 @Composable
 fun AttachSheet(onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: Modifier = Modifier) {
     BottomSheet(onDismiss, panelModifier) {
-        Text("添加内容", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Text("添加内容", style = XType.Title, fontWeight = FontWeight.SemiBold)
         Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             listOf(XIcons.Camera to "相机", XIcons.Image to "相册", XIcons.File to "文件", XIcons.Book to "资料库").forEach { (icon, label) ->
                 Column(Modifier.weight(1f).clickable { onPick(label) }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     IconBox(icon, 56.dp, 16.dp)
-                    Text(label, fontSize = 14.sp)
+                    Text(label, style = XType.Body)
                 }
             }
         }
@@ -598,7 +605,7 @@ fun ChipPill(text: String, modifier: Modifier = Modifier, icon: ImageVector? = n
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (icon != null) XIcon(icon, tint = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
-        Text(text, fontSize = 14.sp, color = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
+        Text(text, style = XType.Body, color = if (selected) extra.brandInk else MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 160.dp))
         if (trailingIcon != null) XIcon(trailingIcon, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
     }
 }
@@ -611,8 +618,8 @@ fun RadioRow(selected: Boolean, title: String, desc: String?, onClick: () -> Uni
             if (selected) Box(Modifier.size(10.dp).clip(CircleShape).background(Brand))
         }
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-            if (desc != null) Text(desc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
+            Text(title, style = XType.Body, fontWeight = FontWeight.SemiBold)
+            if (desc != null) Text(desc, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
         }
     }
 }

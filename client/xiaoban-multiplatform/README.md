@@ -128,3 +128,9 @@ Android 的社区游戏作品详情、帖子中的本站游戏链接卡片和回
 针对性验证：`:common:community-core:jvmTest --tests '*ChatHistoryTest*'` 与 `:business:community-native:compileAndroidMain`，以及 `:androidApp:assembleDebug` 均通过。2026-11-01 在小米 14（23127PN0CC）覆盖安装调试版，验证创建空间、长按移动对话、重启后保留分组、折叠空间以及删除空间后对话回到未分组；测试空间已清理。重命名交互与 iOS 仍需实机验收。
 
 侧栏支持横向拖动收起，位置与遮罩随手指变化，松手按距离与速度回弹或关闭；已在小米 14 验证短拖回弹与长拖关闭，Android 调试包构建通过。关闭时仍通过菜单按钮打开。
+
+## 聊天模型思考等级
+
+对话输入栏模型按钮采用与桌面相同的 Lucide Brain 图标。模型选择列表右侧可打开思考等级菜单，仅展示网关声明的等级；选择等级同时选中该模型，默认不传 reasoning_effort。普通流式聊天与手机 Agent 均携带所选等级。当前按模型在应用运行期间记住选择，切换账号清空；尚未按对话持久化。
+
+验证：community-core JVM 测试及 community-native Android 编译通过，新增 ReasoningTest 覆盖请求参数与默认值清除；本轮尚未安装到手机验收。

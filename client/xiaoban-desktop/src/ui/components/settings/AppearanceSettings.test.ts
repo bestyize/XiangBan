@@ -28,4 +28,11 @@ describe('chat pet appearance setting', () => {
     expect(toggle.props('disabled')).toBe(false);
     wrapper.unmount();
   });
+  it('opens the application skin tab in a browser preview', async () => {
+    const store = reactive({ settings: { ...defaults }, notify: vi.fn(), closeSettings: vi.fn(), navigate: vi.fn(), studioTab: 'wallpapers' });
+    const wrapper = mount(AppearanceSettings, { props: { store: store as unknown as ControlStore } });
+    await wrapper.get('[data-testid=settings-open-skins]').trigger('click');
+    expect(store.studioTab).toBe('skins'); expect(store.closeSettings).toHaveBeenCalledOnce(); expect(store.navigate).toHaveBeenCalledWith('studio');
+    wrapper.unmount();
+  });
 });

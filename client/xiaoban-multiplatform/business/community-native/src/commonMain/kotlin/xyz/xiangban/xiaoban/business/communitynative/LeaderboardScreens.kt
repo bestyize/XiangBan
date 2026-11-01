@@ -125,8 +125,8 @@ internal fun VendorTile(vendor: ModelVendor?, size: Dp = 36.dp, corner: Dp = 8.d
 @Composable
 private fun StatBlock(label: String, value: String, modifier: Modifier = Modifier, tight: Boolean = false) {
     Column(modifier.clip(RoundedCornerShape(8.dp)).background(LocalExtraColors.current.fill).padding(vertical = if (tight) 6.dp else 8.dp, horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-        Text(label, Modifier.padding(top = 2.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        Text(value, style = XType.Body, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(label, Modifier.padding(top = 2.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -150,9 +150,9 @@ private fun SubBars(m: ModelEntry, barColor: Color, labelWidth: Dp, gap: Dp, bar
 internal fun ModelBarRow(row: RankRow, vendor: ModelVendor?, valueText: String, nameWidth: Dp = 52.dp, valueWidth: Dp = 28.dp) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(Modifier.width(18.dp)) { VendorTile(vendor, 18.dp, 4.dp) }
-        Text(row.model.name, Modifier.width(nameWidth), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(row.model.name, Modifier.width(nameWidth), style = XType.Caption, color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
         HBar(row.fraction, vendorColor(vendor), Modifier.weight(1f), height = 14.dp, track = LocalExtraColors.current.fill)
-        Text(valueText, Modifier.width(valueWidth), fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End, maxLines = 1)
+        Text(valueText, Modifier.width(valueWidth), style = XType.Caption, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.End, maxLines = 1)
     }
 }
 
@@ -164,7 +164,7 @@ internal fun VendorLegend(vendors: List<ModelVendor>, modifier: Modifier = Modif
             val logo = BrandLogos.find(v.name)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (logo != null) XIcon(logo.icon, tint = vendorColor(v), size = 14.dp) else Dot(vendorColor(v), 8.dp)
-                Text(v.name, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(v.name, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -222,7 +222,7 @@ fun ScatterPlot(
                 BoxWithConstraints(Modifier.fillMaxSize()) {
                     val labels = if (full) ticksY else listOf(sAxis.hi, (sAxis.lo + sAxis.hi) / 2, sAxis.lo)
                     labels.forEach { v ->
-                        Text(formatScore(v), Modifier.align(Alignment.TopEnd).offset(y = maxHeight * (1f - fy(v)) - 8.dp).padding(end = if (full) 6.dp else 4.dp), fontSize = 12.sp, color = ink3)
+                        Text(formatScore(v), Modifier.align(Alignment.TopEnd).offset(y = maxHeight * (1f - fy(v)) - 8.dp).padding(end = if (full) 6.dp else 4.dp), style = XType.Caption, color = ink3)
                     }
                 }
             }
@@ -245,7 +245,7 @@ fun ScatterPlot(
                     drawLine(axisLine, Offset(0f, 0f), Offset(0f, size.height), 1f)
                     drawLine(axisLine, Offset(0f, size.height), Offset(size.width, size.height), 1f)
                 }
-                Text("高智能 · 低价格", Modifier.offset(if (full) 8.dp else 6.dp, if (full) 6.dp else 4.dp), fontSize = 12.sp, color = greenText)
+                Text("高智能 · 低价格", Modifier.offset(if (full) 8.dp else 6.dp, if (full) 6.dp else 4.dp), style = XType.Caption, color = greenText)
                 models.forEach { m ->
                     val on = filter.accepts(m)
                     val isSel = m.key == selected
@@ -267,7 +267,7 @@ fun ScatterPlot(
                     Text(
                         if (full) m.name else shortLabel(m.name),
                         Modifier.offset(x + (if (full) 13.dp else 7.dp), y - (if (full) 20.dp else 18.dp)).alpha(if (on) 1f else 0.18f),
-                        fontSize = 12.sp, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
+                        style = XType.Caption, fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal, color = MaterialTheme.colorScheme.onSurface, maxLines = 1,
                     )
                 }
             }
@@ -277,7 +277,7 @@ fun ScatterPlot(
             val labels = if (full) ticksX else listOf(pAxis.lo, 1.0, pAxis.hi).filter { it in pAxis.lo..pAxis.hi }.distinct()
             labels.forEach { p ->
                 val x = maxWidth * fx(p)
-                Text(formatTick(p), Modifier.offset(x - 14.dp, 4.dp), fontSize = 12.sp, color = ink3, maxLines = 1)
+                Text(formatTick(p), Modifier.offset(x - 14.dp, 4.dp), style = XType.Caption, color = ink3, maxLines = 1)
             }
         }
     }
