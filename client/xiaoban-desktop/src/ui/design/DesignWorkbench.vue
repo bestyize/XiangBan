@@ -14,6 +14,7 @@ import {
   type Board,type Comment,type Project,type Summary,type DsCard
 } from './model.ts';
 import {colorHex,contrast} from './colors.ts';
+import {exportOrder,validatePng,pdfImage,makePdf} from './raster-export.ts';
 import {clampScale,zoomAt,wheelPixels,type CanvasView} from './viewport.ts';
 import {createDesignStore} from './design-store.ts';
 const props=defineProps<{projectId:string;detached?:boolean;notify:(message:unknown,type?:'success'|'error'|'info')=>void}>();
@@ -49,7 +50,43 @@ const tokens=computed(()=>project.value?tokensOf(project.value.canvas):{});
 const dsCards=computed<DsCard[]>(()=>project.value?dsCardsOf(project.value):[]);
 const minX=computed(()=>Math.min(0,...boards.value.map(b=>b.x),...notes.value.map(n=>n.x))),minY=computed(()=>Math.min(0,...boards.value.map(b=>b.y),...notes.value.map(n=>n.y)));
 const extent=computed(()=>({w:Math.max(600,...boards.value.map(b=>b.x+b.w),...notes.value.map(n=>n.x+n.w))-minX.value+96,h:Math.max(500,...boards.value.map(b=>b.y+b.h),...notes.value.map(n=>n.y+n.maxH))-minY.value+140}));
-const canEdit=computed(()=>!!project.value&&!ds.busy&&!ds.conflict);
+type CaptureView={capture:(options:{width:number;height:number;scale:1|2})=>Promise<string>;cancelCapture:()=>void};
+const previews=new Map<string,CaptureView>(),captureWorker=ref<CaptureView|null>(null),captureBoard=ref<{board:Board;src:string}|null>(null);
+const rendering=ref(false),renderProgress=ref('');let cancelled=false;
+const canEdit=computed(()=>!!project.value&&!ds.busy&&!ds.conflict&&!rendering.value);
+function bindPreview(file:string,value:unknown){if(value)previews.set(file,value as CaptureView);else previews.delete(file);}
+function cancelRendering(){cancelled=true;for(const view of previews.values())view.cancelCapture();captureWorker.value?.cancelCapture();}
+async function exportRaster(format:'png'|'pdf',board?:Board,scale:1|2=1){
+ if(!project.value||rendering.value||ds.exporting)return;
+ if(ds.dirty||ds.busy||ds.conflict){props.notify('请先保存当前修改再导出图片或 PDF','info');return;}
+ const snapshot=clone(project.value),items=board?[clone(board)]:exportOrder(boardsOf(snapshot.canvas));
+ if(!items.length)return;
+ rendering.value=true;cancelled=false;
+ try{
+  const pages:Awaited<ReturnType<typeof pdfImage>>[]=[];let data='';
+  for(const [index,item] of items.entries()){
+   if(cancelled)throw Error('导出已取消');
+   if(project.value?.id!==snapshot.id||project.value.revision!==snapshot.revision)throw Error('设计稿已更新，请重新导出');
+   renderProgress.value=`正在导出 ${index+1}/${items.length}：${item.title}`;
+   let view=previews.get(item.file);
+   if(!view){captureBoard.value={board:item,src:previewUrl(ds.origin,snapshot,item.file,token.value)};await nextTick();view=captureWorker.value??undefined;}
+   if(!view)throw Error('画板预览尚未就绪');
+   const png=await view.capture({width:item.w,height:item.h,scale});validatePng(png,item,scale);
+   if(format==='png')data=png;else pages.push(await pdfImage(png,item));
+   captureBoard.value=null;await nextTick();
+  }
+  if(cancelled)throw Error('导出已取消');
+  if(project.value?.id!==snapshot.id||project.value.revision!==snapshot.revision)throw Error('设计稿已更新，请重新导出');
+  if(format==='pdf')data=await makePdf(pages);
+  if(cancelled)throw Error('导出已取消');
+  renderProgress.value='请选择保存位置';
+  const path=await invoke<string|null>('design_export',{id:snapshot.id,format,project:null,rendered:{revision:snapshot.revision,file:board?.file??null,data}});
+  if(path)props.notify('设计稿已导出','success');
+ }catch(e){if(!cancelled)report(e);}
+ finally{rendering.value=false;renderProgress.value='';captureBoard.value=null;}
+}
+onBeforeUnmount(cancelRendering);
+watch(()=>`${project.value?.id}:${project.value?.revision}`,()=>{if(rendering.value){cancelRendering();props.notify('设计稿已更新，导出已取消','info');}});
 
 function boardPins(file:string){
   return allComments.value
@@ -148,7 +185,7 @@ async function elementCommand(command:string){
  if(command==='focusNext'||command==='focusPrevious'){focusArea(command==='focusPrevious');return;}
  if(command==='guides'){guides.value=!guides.value;return;}
  if(command==='undo'){await undo();return;}if(command==='redo'){await redo();return;}
- if(command==='leaveArtboard'){clearElements();viewport.value?.querySelector<HTMLElement>(`[data-board="${CSS.escape(current.value?.file??'')}"] .board-title`)?.focus();return;}
+ if(command==='leaveArtboard'){clearElements();viewport.value?.querySelector<HTMLElement>(`[data-board="${CSS.escape(current.value?.file??'')}"] .board-title b`)?.focus();return;}
  if(command==='clear'){clearElements();return;}
  if(command==='editText'||command==='selectAll'||command.startsWith('align:')){sendEditor(command);return;}
  if(!canEdit.value||mode.value!=='select')return;
@@ -318,13 +355,14 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
   </button>
   <button title="历史版本" @click="showVersions"><RotateCcw :size="14"/></button>
   <button :aria-expanded="properties" title="属性面板" @click="elementCommand('properties')"><PanelRight :size="14"/></button>
-  <details class="export">
+  <details class="export" @keydown="menuKey">
     <summary><Download :size="14"/>导出</summary>
-    <div>
-      <button @click="ds.export('zip')">ZIP 源文件</button>
-      <button @click="ds.export('html')">独立 HTML</button>
-      <button @click="ds.export('md')">Markdown 规范 (.md)</button>
-      <button @click="copyMarkdown"><ClipboardCopy :size="12"/> 复制 Markdown</button>
+    <div class="xb-menu" role="menu" aria-label="导出设计稿" @click="closeMenu">
+      <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="ds.export('zip')">ZIP 源文件</button>
+      <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting||!allBoards.length" @click="exportRaster('pdf')">全部画板 PDF</button>
+      <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="ds.export('html')">独立 HTML</button>
+      <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="ds.export('md')">Markdown 规范 (.md)</button>
+      <button class="xb-menu-item" role="menuitem" @click="copyMarkdown"><ClipboardCopy :size="12"/> 复制 Markdown</button>
     </div>
   </details>
   <button v-if="detached" title="窗口全屏 (F11)" @click="invoke('design_window_fullscreen',{id:projectId}).catch(report)"><Maximize2 :size="14"/></button>
@@ -368,6 +406,7 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
   </details>
   <button title="放大" @click="zoom(scale*1.2)"><Plus :size="12"/></button>
 </div>
+<div v-if="rendering" class="export-progress" role="status"><span>{{renderProgress}}</span><button @click="cancelRendering">取消导出</button></div>
 <div v-if="ds.error" class="errorbar" role="alert">
   {{ds.error}}<small v-if="ds.dirty"> · 草稿未写入预览，可先导出保留</small>
   <button :disabled="ds.busy||ds.conflict" @click="ds.save()">重试保存</button>
@@ -380,19 +419,28 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
     <button v-for="[label,command] in [['复制','copy'],['剪切','cut'],['粘贴','paste'],['创建副本','duplicate'],['删除','delete'],['编组','group'],['解组','ungroup'],['移到最前','front'],['移到最后','back'],['锁定','lock'],['解锁','unlock']]" :key="command" class="xb-menu-item" role="menuitem" :disabled="!canEdit" @click="elementCommand(command)">{{label}}</button>
   </div>
 
-  <div ref="viewport" class="viewport" tabindex="0" :class="{hand:mode==='hand'||spaceHeld}" @wheel.prevent="wheel" @scroll.passive="scheduleView" @gesturestart.prevent="gestureStart" @gesturechange.prevent="gestureChange" @pointerdown="down($event)" @pointermove="move" @pointerup="up" @pointercancel="cancelDrag">
+  <div ref="viewport" class="viewport" :aria-busy="rendering" tabindex="0" :class="{hand:mode==='hand'||spaceHeld}" @wheel.prevent="wheel" @scroll.passive="scheduleView" @gesturestart.prevent="gestureStart" @gesturechange.prevent="gestureChange" @pointerdown="down($event)" @pointermove="move" @pointerup="up" @pointercancel="cancelDrag">
     <div class="scroll-space" :style="{width:extent.w*scale+'px',height:extent.h*scale+'px'}" @pointerdown.self.stop="down($event)">
       <div class="canvas" :style="{width:extent.w+'px',height:extent.h+'px',transform:`scale(${scale})`}" @pointerdown.self.stop="down($event)">
         <CanvasNoteView v-for="note in notes" :key="note.id" :note="note" :selected="selectedNote===note.id" :writable="canEdit&&mode==='select'" :scale="scale" :offset-x="32-minX" :offset-y="40-minY" @select="selectNote(note.id)" @patch="editNote(note.id,$event)" @remove="removeNote(note.id)" @duplicate="copyNote(note)"/>
         <section v-for="b in boards" :key="b.file" class="artboard" :data-board="b.file" :class="{selected:selected===b.file}" :style="position(b)">
-          <div class="board-title" tabindex="0" role="button" :aria-label="'画板 '+b.title+'，第 '+(allBoards.findIndex(item=>item.file===b.file)+1)+' 个，共 '+allBoards.length+' 个'" @keydown.enter.stop.prevent="select(b);sendEditor('enter')" @keydown.space.stop.prevent="select(b)" @pointerdown.stop="down($event,b)">
-            <b>{{b.title}} <small>{{b.w}}×{{b.h}}</small></b>
+          <div class="board-title" @pointerdown.stop="down($event,b)">
+            <b tabindex="0" role="checkbox" :aria-checked="selected===b.file" :aria-label="'画板 '+b.title+'，第 '+(allBoards.findIndex(item=>item.file===b.file)+1)+' 个，共 '+allBoards.length+' 个'" @keydown.enter.stop.prevent="select(b);sendEditor('enter')" @keydown.space.stop.prevent="select(b)">{{b.title}} <small>{{b.w}}×{{b.h}}</small></b>
             <button :aria-label="'调整画板参数 '+b.title" :aria-pressed="selected===b.file&&properties&&activeTab==='tweaks'" title="Tweaks" @pointerdown.stop @click="openTweaks(b)"><SlidersHorizontal :size="13"/></button>
+            <details class="board-export zoom-menu" @pointerdown.stop @keydown="menuKey">
+              <summary :aria-label="'导出画板 '+b.title" title="导出画板"><Download :size="13"/></summary>
+              <div class="xb-menu" role="menu" :style="{transform:`scale(${1/scale})`,transformOrigin:'top right'}" @click="closeMenu">
+                <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="exportRaster('png',b,1)">PNG 1×</button>
+                <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="exportRaster('png',b,2)">PNG 2×</button>
+                <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="exportRaster('pdf',b)">PDF</button>
+                <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="exportRaster('pdf')">全部画板 PDF</button>
+              </div>
+            </details>
             <button @pointerdown.stop @click="select(b);mode='play';focus(b)"><Play :size="13"/> Play</button>
           </div>
           <div class="surface" :style="{height:(dragging?.file===b.file&&dragging.h?dragging.h:b.h)+'px'}">
             <div v-if="!project?.files[b.file]?.trim()" class="pending-board">画板尚未生成，可让小伴继续完成</div>
-            <BoardPreview v-else :src="project?previewUrl(ds.origin,project,b.file,token):''" :title="b.title" :editing="mode!=='play'" :commenting="commentTool" :writable="canEdit" :zoom="scale" :guides="guides" :selection="selectionFile===b.file?selectedIds:[]" :editor-command="selected===b.file?editorCommand:undefined" :key="b.file+':'+project?.revision+':'+previewEpoch" :theme="theme" :pins="boardPins(b.file)" :token="token" @message="onPreview(b,$event)" @error="renderErrors[b.file]=$event"/>
+            <BoardPreview v-else :ref="value=>bindPreview(b.file,value)" :src="project?previewUrl(ds.origin,project,b.file,token):''" :title="b.title" :editing="mode!=='play'" :commenting="commentTool" :writable="canEdit" :zoom="scale" :guides="guides" :selection="selectionFile===b.file?selectedIds:[]" :editor-command="selected===b.file?editorCommand:undefined" :key="b.file+':'+project?.revision+':'+previewEpoch" :theme="theme" :pins="boardPins(b.file)" :token="token" @message="onPreview(b,$event)" @error="renderErrors[b.file]=$event"/>
             <div v-if="mode==='hand'||spaceHeld" class="pan-shield" @pointerdown.stop="down($event)"/>
             <div v-if="renderErrors[b.file]" class="render-error" role="alert">预览错误：{{renderErrors[b.file]}}<button @click="select(b);openSource()">查看源代码</button></div>
           </div>
@@ -513,6 +561,9 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
     </template>
   </aside>
 </div>
+<div v-if="captureBoard" class="capture-worker" :style="{width:captureBoard.board.w+'px',height:captureBoard.board.h+'px'}" aria-hidden="true">
+  <BoardPreview ref="captureWorker" :key="captureBoard.board.file" :src="captureBoard.src" :title="captureBoard.board.title" :editing="false" :writable="false" :token="token" :theme="theme"/>
+</div>
 <footer>
   <span>open-claude-design</span><span>版本 {{project?.revision??'—'}}</span>
   <span class="spacer"/>
@@ -537,6 +588,10 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
 </section>
 </template>
 <style scoped>
+.export>div{min-width:176px!important}.export .xb-menu-item{white-space:nowrap;min-height:32px}
+
+.export-progress{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;background:var(--ui-soft);color:var(--ui-text-primary)}.export-progress span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.capture-worker{position:fixed;left:-100000px;top:0;pointer-events:none}.board-export[open]{z-index:10}.viewport[aria-busy=true] .surface{pointer-events:none}.board-export summary{display:flex;align-items:center}
+
 .zoom-menu{position:relative}.zoom-menu summary{cursor:pointer;list-style:none;padding:5px}.zoom-menu>.xb-menu{position:absolute;right:0;top:100%;z-index:15;min-width:176px;background:var(--ui-surface);border:1px solid var(--ui-line);border-radius:8px;padding:4px;box-shadow:0 6px 20px var(--ui-overlay)}.zoom-menu .xb-menu-item{width:100%;min-height:32px;justify-content:flex-start;white-space:nowrap}.zoom-menu .xb-menu-check{margin-left:auto}.zoom-menu .xb-menu-sep{height:1px;background:var(--ui-line);margin:4px 0}
 .properties .rail{width:auto;max-height:220px;overflow:auto;padding:0 0 8px;border-right:0;border-bottom:1px solid var(--ui-line);margin-bottom:12px;resize:vertical;min-height:100px}.properties{width:288px!important}.prop-tabs button{white-space:nowrap}.prop-tabs{position:sticky;top:-13px;background:var(--ui-surface);z-index:2;padding-top:8px}.board-title b{flex:1}.viewport{background-image:none!important}
 

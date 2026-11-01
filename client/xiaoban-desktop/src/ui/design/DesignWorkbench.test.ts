@@ -13,6 +13,21 @@ async function click(title:string){await wrapper!.get(`[title="${title}"]`).trig
 beforeEach(()=>{vi.resetAllMocks();vi.stubGlobal('IntersectionObserver',undefined);mocks.listen.mockResolvedValue(()=>{});mocks.invoke.mockImplementation(async(command,args)=>{if(command==='design_read')return {project:fixture(),origin:'design-preview://localhost'};if(command==='design_save')return {project:{...args.project,revision:args.expectedRevision+1},origin:'design-preview://localhost'};});});
 afterEach(()=>{wrapper?.unmount();wrapper=undefined;vi.unstubAllGlobals();});
 describe('compact design workbench',()=>{
+ it('cancels a pending raster export without opening the save dialog and allows retry',async()=>{
+  const w=await open(),png=w.findAll('button').find(b=>b.text()==='PNG 1×')!;
+  await png.trigger('click');await flushPromises();expect(w.get('[role="status"]').text()).toContain('1/1');
+  await w.get('.export-progress button').trigger('click');await flushPromises();
+  expect(w.find('.export-progress').exists()).toBe(false);expect(mocks.invoke.mock.calls.some(([cmd])=>cmd==='design_export')).toBe(false);
+  await png.trigger('click');await flushPromises();expect(w.find('.export-progress').exists()).toBe(true);
+  await w.get('.export-progress button').trigger('click');await flushPromises();
+ });
+ it('discards an unfinished raster export when an AI update replaces the revision',async()=>{
+  const w=await open();await w.findAll('button').find(b=>b.text()==='PNG 2×')!.trigger('click');await flushPromises();
+  mocks.invoke.mockImplementation(async(command)=>command==='design_read'?{project:{...fixture(),revision:2},origin:'design-preview://localhost'}:undefined);
+  const changed=mocks.listen.mock.calls.find(([event])=>event==='design-changed')![1];changed({...fixture(),artboards:2,revision:2});await flushPromises();
+  expect(w.find('.export-progress').exists()).toBe(false);expect(mocks.invoke.mock.calls.some(([cmd])=>cmd==='design_export')).toBe(false);
+  expect(notify).toHaveBeenCalledWith('设计稿已更新，导出已取消','info');
+ });
  it('opens element properties on double-click requests and keeps them open on repeated requests',async()=>{
   const w=await open(),preview=w.findAllComponents(BoardPreview)[1];
   preview.vm.$emit('message',{type:'select',node:'n0',tag:'P',text:'另一屏',nodes:[{node:'n0'}]});await flushPromises();

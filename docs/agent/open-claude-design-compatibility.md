@@ -24,6 +24,7 @@
 | React 组件 | x-import 不渲染，也没有明确提示 | 隔离 iframe 内置 React 18.3.1 + ReactDOM + Sucrase；本地 JS/JSX/TS/TSX、相对模块、JSON/CSS/媒体依赖、Hooks、错误边界和卸载；不依赖桌面安装 Node，不访问宿主 require |
 | 中文预览 | 大型注入脚本把 charset 挤到浏览器编码探测范围外 | 生成预览将 UTF-8 声明放在前部；真实浏览器复查中文与导入组件正常 |
 | 独立 HTML | 每个画板重复打包全部资源和运行时 | 导出文件共用资源字典与运行时，实例化时构造隔离 iframe；39 画板参考包导出小于 8 MiB |
+| PNG / PDF 导出 | Edge 实测有 PNG 1×/2×、单画板 PDF、位置排序的全部画板 PDF | 新增同名菜单、sandbox 内截图、取消/进度、按 y/x 排序的多页 PDF；过滤编辑覆盖层。版本变化中止导出，原生端复核版本、格式与大小。PDF 使用 96dpi 栅格图，每画板一页、尺寸按 96px = 72pt；不等同于官方矢量/文本和 Flow 分页 |
 | 原始画布便签/分组标题 | notes 只保留数据、不显示 | 渲染 title/maxW/maxH、负坐标；支持选择、拖动、宽度调整、编辑、复制、删除、撤销重做，并保留未知字段 |
 | 属性与键盘焦点 | 属性面板展开时仍显示浮动工具栏；关闭后焦点未返回；清空选择后方向键仍移动首个画板 | 属性打开隐藏工具栏；关闭返回属性按钮；工具栏方向键/Home/End/Escape；清空选择后不移动或删除无关画板 |
 | 官方面板布局 | Edge 实测：关闭属性时没有常驻图层栏，图层位于右侧；Tweaks 独立展示参数 | 图层移入右侧 Properties / Code 顶部，关闭面板一起隐藏；画板标题增加 Tweaks 入口，参数修改写回 data-props，支持撤销 |
@@ -44,7 +45,7 @@ React 的标准生命周期实现参考 [React createRoot](https://react.dev/ref
 | 动态内容直接编辑 | 循环生成内容、导入组件内部和 React 输出仍通过批注改源程序；尚无官方式逐实例覆盖和所有动态层的直接编辑 |
 | 任意模块环境 | 远程 CDN/包下载、任意 npm 依赖、Node 内建模块、原生 ES module script、特定专有扩展仍不等价。外部依赖必须随源包提供，缺失时报告错误 |
 | 动画与高级模板 | 原始运行时中可观察到的 data-keyframes-* 等扩展尚无完整样例验收；不能据此声明支持全部动画、WebGL 或高级组件 |
-| PNG、PDF、PPTX、Google Slides | Edge 画板菜单实测 PNG 1×/2×、单画板 PDF、位置排序的全部画板 PDF、HTML ZIP；官方文档另有 PPTX/Google Slides。本地导出仍为 ZIP、独立 HTML、Markdown，尚未实现其余格式 |
+| 导出高级能力 | PNG 1×/2×、单画板及全部画板栅格 PDF 已实现；PDF 可选择文字、矢量保真、Flow 分页、PPTX、Google Slides 和官方 HTML ZIP 打包形式尚未对齐。截图单边最多 8192 CSS px、总输出最多 16,777,216 px；文件上限约 48MiB。高级滤镜/WebGL/视频不承诺像素保真 |
 | 云端共享与多人协作 | 无 Claude 账号/组织权限、多人实时协作及其云端分享服务；本地多窗口同源与版本冲突保护不能替代这些能力 |
 | 组织设计系统与连接器 | 已有本地 tokens、@dsCard、组件引用；组织发布、从 Figma/代码库自动抽取、design-sync 双向同步和第三方发布尚未复刻 |
 | 完整数据兼容 | 目前基准为已入库的 v3 与现有 legacy 测试；新版本私有字段保留但不保证理解所有语义。严格保持项目/文件/画板上限，不承诺任意体积源包 |
@@ -83,6 +84,10 @@ cargo run --locked --manifest-path libs/agent-tools/open-claude-design/Cargo.tom
 python3 -m http.server 4177 --bind 127.0.0.1 --directory /tmp/ocd-reference-preview
 ```
 
-打开 `http://127.0.0.1:4177/index.html` 检查本模块导出的独立 HTML。该命令不会修改参考稿或真实用户作品。浏览器工作台验收使用模拟存储；原生文件对话框、Tauri 协议与真实模型全流程不能用它替代。本轮未运行全桌面打包、未推送、未触发工作流。
+打开 `http://127.0.0.1:4177/index.html` 检查本模块导出的独立 HTML。该命令不会修改参考稿或真实用户作品。浏览器工作台验收使用模拟存储；原生文件对话框、Tauri 协议与真实模型全流程不能用它替代。首批兼容修改已提交并推送 main（f8db49f7）；后续导出实现单独验证。未运行全桌面打包、未触发工作流。
 
 本轮结果：完整桌面相关回归此前 214 项通过；Edge 对照后变更相关回归 97 项通过，TypeScript 检查通过；Rust 23 项通过。随后新增的 Code 草稿保护 2 项、多目录共享运行时 1 项定向回归均通过（累计本轮变更相关前端 99 项、Rust 24 项）。工作台浏览器确认右侧 Tweaks 和无常驻左图层栏，独立 HTML 浏览器确认 39 画板文件的中文/图片渲染。
+
+导出续作验收：BoardPreview / DesignWorkbench / raster-export 定向回归 34 项通过，TypeScript 检查通过；共享 Rust 模块当前 27 项通过（包含同期任务新增测试）。真实浏览器输出 PNG 2× 为 2560×1600；单画板 PDF 为 960×600 pt；全部画板 PDF 为 39 页、5,747,219 字节。用 Poppler 渲染并检查首页、第 23 页宽画板（1680×600 pt）、第 39 页长画板（1080×2160 pt），中文、图片、背景与页面边界正常。批量导出经过离屏 iframe 回归；升级截图库时必须复验。新测试覆盖 token/来源/请求匹配、立即取消/卸载、AI 更新取消、PNG 尺寸拒绝、PDF 混合方向尺寸与顺序。原生保存对话框和打包后 WebView 导出仍未端到端验证。
+
+截图实现使用 [html-to-image](https://github.com/bubkoo/html-to-image) 的 SVG foreignObject 绘制，PDF 组装使用 [jsPDF addImage](https://parallax.github.io/jsPDF/docs/module-addImage.html)。本地固定版本、离屏适配及开源许可证记录在 runtime/README.md 和 runtime/vendor/LICENSES.txt。

@@ -62,13 +62,19 @@ pub fn design_restore(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String
     let p=s.save(p,expected_revision)?;saved(&app,&p)?;Ok(payload(p))
 }
 #[tauri::command]
-pub async fn design_export(window:tauri::WebviewWindow,id:String,format:String,project:Option<Project>)->Result<Option<String>,String>{
+pub async fn design_export(window:tauri::WebviewWindow,id:String,format:String,project:Option<Project>,rendered:Option<open_claude_design::rendered_export::RenderedExport>)->Result<Option<String>,String>{
     crate::design_window::guard(&window,&id)?;let app=window.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move||{
         let saved=store(&app)?.load(&id)?;
+        if rendered.as_ref().is_some_and(|r|r.revision!=saved.revision){return Err("设计稿已更新，请重新导出".into());}
         let p=project.unwrap_or(saved);if p.id!=id{return Err("设计稿编号不一致".into());}open_claude_design::validate(&p)?;
-        let (ext,bytes)=match format.as_str(){"zip"=>("zip",open_claude_design::archive::to_zip(&p)?),"html"=>("html",open_claude_design::archive::standalone(&p)?.into_bytes()),"md"=>("md",open_claude_design::archive::markdown(&p)?.into_bytes()),_=>return Err("不支持的导出格式".into())};
-        let name=p.title.chars().filter(|c|!"/\\:*?\"<>|".contains(*c)&&!c.is_control()).collect::<String>();
+        let mut title=p.title.clone();
+        let (ext,bytes)=match format.as_str(){"zip"=>("zip",open_claude_design::archive::to_zip(&p)?),"html"=>("html",open_claude_design::archive::standalone(&p)?.into_bytes()),"md"=>("md",open_claude_design::archive::markdown(&p)?.into_bytes()),"png"|"pdf"=>{
+            let rendered=rendered.ok_or("缺少渲染结果")?;
+            if let Some(file)=&rendered.file {if !p.files.contains_key(file)||!file.ends_with(".dc.html"){return Err("导出画板不存在".into());}title=format!("{}-{}",p.title,file.rsplit('/').next().unwrap_or(file).trim_end_matches(".dc.html"));}
+            (if format=="png"{"png"}else{"pdf"},open_claude_design::rendered_export::decode(&format,&rendered.data)?)
+        },_=>return Err("不支持的导出格式".into())};
+        let name=title.chars().filter(|c|!"/\\:*?\"<>|".contains(*c)&&!c.is_control()).collect::<String>();
         let Some(file)=app.dialog().file().set_title("导出设计稿").set_file_name(format!("{name}.{ext}")).add_filter("设计稿",&[ext]).blocking_save_file() else{return Ok(None)};
         let path=file.into_path().map_err(|_|"请选择本机文件")?;fs::write(&path,bytes).map_err(|e|e.to_string())?;Ok(Some(path.display().to_string()))
     }).await.map_err(|e|e.to_string())?
