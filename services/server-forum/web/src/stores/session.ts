@@ -4,6 +4,7 @@ import { AccountError, accountApi, needsRegistration, type LoginResponse, type T
 import { api, configureAuth } from '@/api/forum'
 import type { SessionInfo } from '@/api/types'
 import { clearInvite } from '@/lib/invite'
+import { SessionScope } from '@/lib/sessionScope'
 
 const STORAGE_KEY = 'chat.xiangban.session'
 /** 访问令牌到期前这么久就换新，避免请求途中过期。 */
@@ -19,7 +20,8 @@ function readTokens(): Tokens | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     const parsed = raw ? (JSON.parse(raw) as Tokens) : null
-    return parsed?.accessToken && parsed.refreshToken ? parsed : null
+    return parsed && typeof parsed.accessToken === 'string' && parsed.accessToken && typeof parsed.refreshToken === 'string' && parsed.refreshToken
+      ? { ...parsed, expiresAt:Number.isFinite(parsed.expiresAt) ? parsed.expiresAt : 0 } : null
   } catch {
     return null
   }
@@ -42,7 +44,10 @@ export const useSession = defineStore('session', () => {
   const tokens = ref<Tokens | null>(readTokens())
   const info = ref<SessionInfo | null>(null)
   const loginOpen = ref(false)
+  const loginReturnTo = ref('')
   const restoring = ref(false)
+  const scope = new SessionScope()
+  let restoreSequence = 0
 
   const user = computed(() => info.value?.user ?? null)
   const loggedIn = computed(() => tokens.value !== null)
@@ -55,77 +60,91 @@ export const useSession = defineStore('session', () => {
     if (!next) info.value = null
   }
 
-  let refreshing: Promise<string | null> | null = null
+  function changeIdentity(next: Tokens | null) {
+    scope.advance()
+    restoring.value = false
+    info.value = null
+    save(next)
+  }
 
   async function accessToken(): Promise<string | null> {
     const current = tokens.value
     if (!current) return null
     if (current.expiresAt - REFRESH_MARGIN_MS > Date.now()) return current.accessToken
-    // 刷新令牌只能用一次，并发请求共用同一次刷新。
-    refreshing ??= accountApi
-      .refresh(current.refreshToken)
-      .then(pair => {
+    // Refresh remains shared within one identity; an old completion cannot change a new login.
+    return scope.refresh(async active => {
+      const valid = () => active() && tokens.value?.refreshToken === current.refreshToken
+      try {
+        const pair = await accountApi.refresh(current.refreshToken)
+        if (!valid()) return null
         save(fromPair(pair))
         return pair.access_token
-      })
-      .catch(error => {
-        if (error instanceof AccountError && error.status !== 0) save(null)
+      } catch (error) {
+        if (valid() && error instanceof AccountError && error.status !== 0) changeIdentity(null)
         return null
-      })
-      .finally(() => {
-        refreshing = null
-      })
-    return refreshing
+      }
+    })
   }
 
-  configureAuth(accessToken, () => {
-    // 令牌被服务端拒绝：强制下次刷新，刷新也失败就退出。
-    if (tokens.value) tokens.value = { ...tokens.value, expiresAt: 0 }
+  configureAuth(accessToken, rejectedToken => {
+    // A 401 from an earlier token must not expire a different account or a newer refresh result.
+    if (rejectedToken && tokens.value?.accessToken === rejectedToken) tokens.value = { ...tokens.value, expiresAt: 0 }
   })
 
   async function loadSession() {
     if (!tokens.value) return
+    const active = scope.profileRequest()
     try {
-      info.value = await api.session()
+      const result = await api.session()
+      if (!active()) return
+      info.value = result
       clearInvite()
     } catch (error) {
-      if (error instanceof Error && 'status' in error && (error as { status: number }).status === 401) save(null)
+      if (active() && error instanceof Error && 'status' in error && (error as { status: number }).status === 401) changeIdentity(null)
     }
   }
 
   async function restore() {
+    const generation = scope.capture(), request = ++restoreSequence
     restoring.value = true
     try {
       await loadSession()
     } finally {
-      restoring.value = false
+      if (scope.current(generation) && request === restoreSequence) restoring.value = false
     }
   }
 
-  async function signedIn(res: LoginResponse) {
-    save(fromPair(res))
+  async function signedIn(res: LoginResponse, active:() => boolean) {
+    if (!active()) throw new Error('登录操作已结束，请重新尝试。')
+    changeIdentity(fromPair(res))
+    const generation = scope.capture()
     await loadSession()
+    if (!scope.current(generation)) throw new Error('登录操作已结束，请重新尝试。')
     return { isNewUser: res.is_new_user, username: res.user.username }
   }
 
   /** 已有账号直接登录；新的邮箱 / 手机号返回注册凭证，由调用方收集用户名和密码后调用 register。 */
   async function loginWithCode(identifier: string, code: string) {
+    const active = scope.loginAttempt()
     const res = await accountApi.loginWithCode(identifier, code)
+    if (!active()) throw new Error('登录操作已结束，请重新尝试。')
     if (needsRegistration(res)) return { registrationToken: res.registration_token } as const
-    return signedIn(res)
+    return signedIn(res, active)
   }
 
   async function loginWithPassword(identifier: string, password: string) {
-    return signedIn(await accountApi.loginWithPassword(identifier, password))
+    const active = scope.loginAttempt()
+    return signedIn(await accountApi.loginWithPassword(identifier, password), active)
   }
 
   async function register(registrationToken: string, username: string, password: string) {
-    return signedIn(await accountApi.register(registrationToken, username, password))
+    const active = scope.loginAttempt()
+    return signedIn(await accountApi.register(registrationToken, username, password), active)
   }
 
   async function logout() {
     const current = tokens.value
-    save(null)
+    changeIdentity(null)
     if (current) await accountApi.logout(current.refreshToken).catch(() => undefined)
   }
 
@@ -144,6 +163,7 @@ export const useSession = defineStore('session', () => {
     level,
     canPost,
     loginOpen,
+    loginReturnTo,
     restoring,
     accessToken,
     restore,

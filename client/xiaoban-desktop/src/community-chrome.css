@@ -1,0 +1,5 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; background: #ededed; color: #222; }
+@media (prefers-color-scheme: dark) { :root { background: #1c1c1e; color: #ececec; } }
+* { box-sizing: border-box; } body { margin: 0; } .titlebar { height:44px; display:flex; align-items:center; gap:12px; padding:0 8px; user-select:none; font-size:14px; }
+.controls { display:flex; gap:4px; } button { border:0; background:transparent; color:inherit; width:32px; height:32px; border-radius:8px; font-size:18px; cursor:pointer; } button:hover { background:rgba(128,128,128,.2); } button:focus-visible { outline:2px solid #e3203c; } .fullscreen { margin-left:auto; }
+.edge { position:fixed; z-index:2; } .n,.s { height:5px; left:5px; right:5px; cursor:ns-resize; } .n { top:0; } .s { bottom:0; } .e,.w { width:5px; top:5px; bottom:5px; cursor:ew-resize; } .e { right:0; } .w { left:0; } .ne,.nw,.se,.sw { width:10px; height:10px; } .ne { right:0; top:0; cursor:nesw-resize; } .nw { left:0; top:0; cursor:nwse-resize; } .se { right:0; bottom:0; cursor:nwse-resize; } .sw { left:0; bottom:0; cursor:nesw-resize; }

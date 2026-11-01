@@ -1,321 +1,75 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSession } from '@/stores/session'
-import UserAvatar from './UserAvatar.vue'
-import BrandMark from './BrandMark.vue'
-import { useTheme, THEME_LABEL } from '@/lib/theme'
-import { sectionOf } from '@/lib/sections'
 import { useNotifications } from '@/stores/notifications'
-
-const session = useSession()
-const { preference, resolved, cycleTheme } = useTheme()
-const route = useRoute()
-const router = useRouter()
-
-const inbox = useNotifications()
+import { areaOf, sectionOf } from '@/lib/sections'
+import { useTheme, THEME_LABEL } from '@/lib/theme'
+import BrandMark from './BrandMark.vue'
+import AppIcon from './AppIcon.vue'
+const route = useRoute(), router = useRouter(), session = useSession(), inbox = useNotifications()
+const { preference, resolved, openAppearance } = useTheme()
+const titles = { community: '社区', ai: '小伴 AI', create: '创造', me: '我的' }
+const title = computed(() => titles[areaOf(route)])
+const roots = ['home','discuss','resources','ai','create','me']
+const communityRoot = computed(() => ['home','discuss','resources'].includes(String(route.name)))
 const section = computed(() => sectionOf(route))
-
-const q = ref(typeof route.query.q === 'string' ? route.query.q : '')
-const searchOpen = ref(false)
-const menuOpen = ref(false)
-
-watch(
-  () => route.fullPath,
-  () => {
-    menuOpen.value = false
-    searchOpen.value = false
-    if (route.name !== 'search') q.value = ''
-  },
-)
-
-function submit() {
-  const text = q.value.trim()
-  if (!text) return
-  router.push({ name: 'search', query: { q: text } })
-}
-
-function compose() {
-  if (!session.requireLogin()) return
-  router.push({ name: 'new' })
-}
-
-async function logout() {
-  menuOpen.value = false
-  await session.logout()
-}
+const destinations = ref({ home:'/', discuss:'/discuss', resources:'/resources' })
+watch(() => route.fullPath, path => { if (communityRoot.value) destinations.value[section.value] = path }, {immediate:true})
+const detail = computed(() => !roots.includes(String(route.name)))
+const searchOpen = ref(false), query = ref(''), searchInput = ref<HTMLInputElement>()
+async function search() { searchOpen.value = !searchOpen.value; if (searchOpen.value) { await nextTick(); searchInput.value?.focus() } }
+function submit() { if (query.value.trim()) router.push({ name: 'search', query: { q: query.value.trim() } }) }
+function back() { if (window.history.state?.back) router.back(); else router.push(areaOf(route) === 'create' ? '/create' : areaOf(route) === 'me' ? '/me' : '/') }
+watch(() => route.fullPath, () => { searchOpen.value = false })
 </script>
-
 <template>
-  <header class="header">
-    <div class="inner">
-      <RouterLink to="/" class="brand" aria-label="超级小伴首页">
-        <BrandMark />
-        <span class="wordmark">超级小伴</span>
-      </RouterLink>
-
-      <nav class="nav" aria-label="主导航">
-        <RouterLink to="/" :class="{ on: section === 'home' }">首页</RouterLink>
-        <RouterLink to="/c/share" :class="{ on: section === 'resources' }">资源</RouterLink>
-        <RouterLink to="/discuss" :class="{ on: section === 'discuss' }">讨论</RouterLink>
-      </nav>
-
-      <form class="search" :class="{ open: searchOpen }" role="search" @submit.prevent="submit">
-        <label class="sr-only" for="site-search">搜索</label>
-        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="M13.5 13.5 17 17" /></svg>
-        <input id="site-search" v-model="q" type="search" placeholder="搜索帖子" maxlength="50" enterkeyhint="search" />
-      </form>
-
-      <div class="actions">
-        <button class="theme-toggle" type="button" aria-label="切换日间或夜间模式" title="点击切换：自动 → 日间 → 夜间 → 自动" @click="cycleTheme">
-          <svg v-if="resolved === 'dark'" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" /></svg>
-          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 15.4A8.4 8.4 0 0 1 8.6 3.7 8.5 8.5 0 1 0 20.3 15.4Z" /></svg>
-          <span class="theme-label">外观 · {{ THEME_LABEL[preference] }}</span>
-        </button>
-        <button class="icon-btn only-mobile" type="button" aria-label="搜索" @click="searchOpen = !searchOpen">
-          <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="M13.5 13.5 17 17" /></svg>
-        </button>
-        <button class="btn btn-primary compose only-desktop" type="button" @click="compose">发帖</button>
-
-        <template v-if="session.loggedIn">
-          <RouterLink to="/notifications" class="bell" :aria-label="inbox.unread ? `通知，${inbox.unread} 条未读` : '通知'">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17V11a6 6 0 0 1 12 0v6l1.5 2h-15zM10 21h4" /></svg>
-            <span v-if="inbox.unread" class="badge">{{ inbox.unread > 99 ? '99+' : inbox.unread }}</span>
-          </RouterLink>
-          <RouterLink to="/points" class="points-entry" aria-label="积分与签到">积分 {{ session.user?.points ?? '…' }}</RouterLink>
-          <div class="me">
-            <button class="me-btn" type="button" :aria-expanded="menuOpen" aria-haspopup="menu" @click="menuOpen = !menuOpen">
-              <UserAvatar :name="session.user?.nickname ?? '我'" :src="session.user?.avatar_url" :size="32" />
-              <span class="sr-only">我的菜单</span>
-            </button>
-            <div v-if="menuOpen" class="menu panel" role="menu" @keydown.esc="menuOpen = false">
-              <div class="menu-head">
-                <strong>{{ session.user?.nickname ?? '加载中' }}</strong>
-              </div>
-              <RouterLink v-if="session.user" role="menuitem" :to="`/u/${session.user.uid}`">我的主页</RouterLink>
-              <RouterLink role="menuitem" to="/me/works">我的作品</RouterLink>
-              <RouterLink role="menuitem" to="/publish">发布内容包</RouterLink>
-              <RouterLink role="menuitem" to="/settings">收藏与设置</RouterLink>
-              <RouterLink role="menuitem" to="/points">积分、签到与邀请</RouterLink>
-              <button role="menuitem" type="button" @click="logout">退出登录</button>
-            </div>
-          </div>
-        </template>
-        <button v-else class="btn" type="button" @click="session.loginOpen = true">登录</button>
+  <header class="site-header" :class="{'community-header':communityRoot,'detail-header':detail}">
+    <div class="header-inner">
+      <button v-if="detail" class="header-icon" aria-label="返回上一页" @click="back"><AppIcon name="back" /></button>
+      <RouterLink v-else class="header-brand" to="/" aria-label="超级小伴首页"><BrandMark /><span>超级小伴</span></RouterLink>
+      <nav v-if="communityRoot" class="community-navigation" aria-label="社区栏目"><RouterLink v-for="item in [{key:'home' as const,label:'首页'},{key:'discuss' as const,label:'讨论'},{key:'resources' as const,label:'资源'}]" :key="item.key" :to="destinations[item.key]" :class="{on:section===item.key}" :aria-current="section===item.key?'page':undefined">{{ item.label }}</RouterLink></nav>
+      <span v-else class="header-context">{{ title }}</span>
+      <div class="header-actions">
+        <button class="header-icon" :aria-expanded="searchOpen" aria-label="搜索社区" @click="search"><AppIcon name="search" /></button>
+        <button class="header-icon theme-switch" :title="`外观：${THEME_LABEL[preference]}`" :aria-label="`外观与配色，当前${THEME_LABEL[preference]}`" @click="openAppearance"><AppIcon :name="resolved === 'dark' ? 'moon' : 'sun'" :size="20" /></button>
+        <RouterLink v-if="session.loggedIn" class="header-icon notification" to="/notifications" :aria-label="inbox.unread ? `通知，${inbox.unread}条未读` : '通知'"><AppIcon name="bell" /><i v-if="inbox.unread" /></RouterLink>
+        <button v-else class="header-login" @click="session.loginOpen = true">登录</button>
       </div>
     </div>
+    <form v-if="searchOpen" class="header-search" role="search" @submit.prevent="submit">
+      <label class="sr-only" for="site-search">搜索帖子、作品和内容</label>
+      <input id="site-search" ref="searchInput" v-model="query" type="search" placeholder="搜索社区内容" maxlength="100" enterkeyhint="search" @keydown.esc="searchOpen = false" />
+      <button class="btn btn-primary" type="submit">搜索</button>
+    </form>
   </header>
-  <div v-if="menuOpen" class="scrim" @click="menuOpen = false" />
 </template>
+<style scoped>
+.site-header{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--paper) 94%,transparent);backdrop-filter:blur(16px)}
+.header-inner{height:64px;max-width:var(--page-w);margin:auto;display:flex;align-items:center;gap:12px;padding:0 24px}
+.header-brand{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:750;letter-spacing:.02em}.header-brand :deep(svg){width:28px;height:28px}
+.community-navigation{display:flex;justify-content:center;align-items:stretch;gap:28px;min-width:0;flex:1;height:48px}.community-navigation a{display:flex;align-items:center;position:relative;font-size:16px;color:var(--ink-2);white-space:nowrap}.community-navigation a.on{color:var(--brand);font-weight:650}.community-navigation a.on:after{content:"";position:absolute;bottom:4px;left:50%;transform:translateX(-50%);height:3px;width:18px;border-radius:2px;background:var(--brand)}
+.header-context{font-size:16px;font-weight:650;color:var(--ink-2)}.header-brand+.header-context{display:none}
+.header-actions{margin-left:auto;display:flex;align-items:center;gap:4px}
+.header-icon{border:0;background:none;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--ink-2)}.header-icon:hover{background:var(--surface)}
+.header-login{background:var(--surface);border:0;border-radius:22px;padding:0 18px;height:40px;font-size:14px;font-weight:600}
+.notification{position:relative}.notification i{position:absolute;right:10px;top:9px;width:6px;height:6px;border-radius:50%;background:var(--brand)}
+.header-search{display:flex;gap:8px;padding:0 16px 12px;max-width:760px;margin:auto}.header-search input{min-width:0;flex:1;border:0;border-radius:12px;background:var(--surface);height:44px;padding:0 14px;font-size:16px}
+@media(min-width:1024px){.header-brand{display:none}.header-brand+.header-context{display:block}}
+@media(max-width:767px){.header-inner{height:56px;padding:0 12px}.header-brand{font-size:16px}.header-actions{gap:0}.header-icon{width:40px}.header-login{padding:0 14px}.theme-switch{display:none}}
+</style>
 
 <style scoped>
-.bell { position: relative; width: 36px; height: 36px; display: grid; place-items: center; }
-.bell svg { width: 21px; height: 21px; fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.badge { position: absolute; top: 2px; right: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--brand); color: var(--brand-ink); font-size: 10px; line-height: 16px; text-align: center; font-weight: 600; }
-@media (max-width: 767px) { .points-entry { display: none; } }
-
-.points-entry { white-space: nowrap; color: var(--ink-2); font-size: var(--fs-xs); }
-.points-entry:hover { color: var(--brand); }
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 30;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: saturate(1.4) blur(10px);
-  -webkit-backdrop-filter: saturate(1.4) blur(10px);
-  border-bottom: 1px solid var(--line);
+@media(max-width:767px){
+  .community-header,.detail-header{background:var(--surface);backdrop-filter:none}
+  .community-header .header-inner{height:48px;gap:0;padding:0 12px}
+  .community-header .header-brand{width:44px;justify-content:flex-start;flex:none}
+  .community-header .header-brand span{display:none}
+  .community-header .header-brand :deep(svg){width:26px;height:26px}
+  .community-header .header-actions{width:44px;justify-content:flex-end;flex:none;margin-left:0}
+  .community-header .header-login,.community-header .notification{display:none}
+  .community-navigation{gap:28px;height:48px}
+  .detail-header .header-inner{height:48px}
+  .detail-header .header-login{display:none}
 }
-.inner {
-  max-width: var(--page-w);
-  margin: 0 auto;
-  height: var(--header-h);
-  padding: 0 20px;
-  display: flex;
-  align-items: center;
-  gap: 22px;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  flex: none;
-}
-.wordmark {
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-}
-.nav {
-  display: flex;
-  gap: 4px;
-}
-.nav a {
-  padding: 6px 10px;
-  border-radius: var(--r-sm);
-  color: var(--ink-2);
-  font-weight: 600;
-  font-size: var(--fs-md);
-}
-.nav a:hover {
-  color: var(--ink);
-  background: var(--surface-2);
-}
-.nav a.on {
-  color: var(--ink);
-  box-shadow: inset 0 -2px 0 var(--brand);
-  border-radius: 0;
-}
-.search {
-  flex: 1;
-  max-width: 380px;
-  margin-left: auto;
-  position: relative;
-}
-.search svg {
-  position: absolute;
-  left: 11px;
-  top: 50%;
-  width: 16px;
-  height: 16px;
-  transform: translateY(-50%);
-  fill: none;
-  stroke: var(--ink-3);
-  stroke-width: 1.8;
-  stroke-linecap: round;
-}
-.search input {
-  width: 100%;
-  height: 36px;
-  border: 1px solid var(--line);
-  background: var(--surface);
-  border-radius: 18px;
-  padding: 0 14px 0 34px;
-  font-size: var(--fs-sm);
-}
-.search input:focus {
-  outline: none;
-  border-color: var(--focus);
-}
-.actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: none;
-}
-.icon-btn {
-  width: 36px;
-  height: 36px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  background: transparent;
-  border-radius: 50%;
-}
-.icon-btn svg {
-  width: 19px;
-  height: 19px;
-  fill: none;
-  stroke: var(--ink);
-  stroke-width: 1.8;
-  stroke-linecap: round;
-}
-.me {
-  position: relative;
-}
-.me-btn {
-  border: 0;
-  padding: 0;
-  background: none;
-  border-radius: 50%;
-  display: flex;
-}
-.menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 8px);
-  min-width: 180px;
-  padding: 6px;
-  z-index: 40;
-  box-shadow: var(--shadow);
-  display: grid;
-}
-.menu-head {
-  padding: 8px 10px 10px;
-  border-bottom: 1px solid var(--line);
-  margin-bottom: 4px;
-  font-size: var(--fs-sm);
-}
-.menu a,
-.menu button {
-  text-align: left;
-  padding: 8px 10px;
-  border-radius: var(--r-sm);
-  border: 0;
-  background: none;
-  font-size: var(--fs-sm);
-}
-.menu a:hover,
-.menu button:hover {
-  background: var(--surface-2);
-}
-.scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 25;
-}
-.only-mobile {
-  display: none;
-}
-@media (max-width: 767px) {
-  .inner {
-    padding: 0 12px;
-    gap: 10px;
-    height: 52px;
-  }
-  .only-desktop {
-    display: none;
-  }
-  /* 手机上首页、资源、讨论与标识、搜索图标在同一行：只留标识，不放字样。 */
-  .wordmark {
-    display: none;
-  }
-  .nav {
-    flex: 1;
-    justify-content: center;
-    gap: 0;
-  }
-  .nav a {
-    padding: 6px 9px;
-    font-size: var(--fs-sm);
-  }
-  .only-mobile {
-    display: grid;
-  }
-  .search {
-    display: none;
-    position: absolute;
-    left: 0;
-    right: 0;
-    top: 52px;
-    max-width: none;
-    padding: 8px 12px 10px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--line);
-  }
-  .search.open {
-    display: block;
-  }
-  .search svg {
-    left: 23px;
-  }
-  .actions {
-    margin-left: auto;
-    gap: 6px;
-  }
-}
-.theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 38px; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); transition: background-color .15s, border-color .15s, color .15s; }
-.theme-toggle:hover { border-color: var(--brand); color: var(--brand); background: var(--surface-2); }
-.theme-toggle svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.theme-label { font-size: var(--fs-xs); font-weight: 650; }
-@media (max-width: 767px) { .theme-toggle { width: 36px; min-width: 36px; padding: 0; } .theme-label { display: none; } }
 </style>

@@ -42,6 +42,7 @@ const pinActionLabel = computed(() => {
   return topic.value.pin_scope === pinScopeDraft.value ? '取消置顶' : '更新置顶范围'
 })
 const missing = ref(false)
+const loadError = ref('')
 /** 没有阅读权限时服务端返回的说明，比如「这个帖子仅「老用户」及以上等级可见」。 */
 const forbidden = ref('')
 const posts = ref<PostItem[]>([])
@@ -85,6 +86,7 @@ const parentCategory = computed(() => {
 async function loadTopic() {
   missing.value = false
   forbidden.value = ''
+  loadError.value = ''
   try {
     topic.value = await api.topic(id.value)
   } catch (e) {
@@ -94,7 +96,7 @@ async function loadTopic() {
       forbidden.value = e.message
       topic.value = null
       posts.value = []
-    } else toast.error(e)
+    } else { topic.value = null; loadError.value = e instanceof Error ? e.message : '加载失败' }
   }
 }
 
@@ -257,7 +259,7 @@ async function closeHelp() {
 </script>
 
 <template>
-  <ForumShell :active="topic?.category.slug" :rail="false">
+  <ForumShell class="topic-shell" :active="topic?.category.slug" :rail="false">
     <div v-if="missing" class="panel missing">
       <h1>帖子不存在</h1>
       <p class="muted">可能已经被作者删除，或者因为违反社区规则被隐藏。</p>
@@ -270,6 +272,8 @@ async function closeHelp() {
       <button v-if="!session.loggedIn" type="button" class="btn btn-primary" @click="session.loginOpen = true">登录</button>
       <RouterLink v-else to="/" class="btn">回到首页</RouterLink>
     </div>
+
+    <div v-else-if="loadError" class="panel missing" role="alert"><h1>帖子加载失败</h1><p class="muted">{{ loadError }}</p><button type="button" class="btn" @click="loadTopic">重试</button></div>
 
     <div v-else-if="!topic" class="panel loading" aria-busy="true">
       <div class="bar w60" />
@@ -406,8 +410,17 @@ async function closeHelp() {
 .accepted { color: var(--brand); font-size: var(--fs-sm); font-weight: 600; padding-top: 12px; }
 .accept-control { display: flex; justify-content: flex-end; padding: 0 0 12px; }
 .topic {
-  max-width: 820px;
+  max-width: 760px;
+  margin:0 auto;
+  min-width:0;
 }
+.topic-shell { display:block; max-width:820px; margin:0 auto; }
+.topic-shell :deep(.left), .topic-shell :deep(.chips) { display:none; }
+.topic-shell :deep(.center) { margin:0; padding:20px 22px 28px; border-radius:16px; }
+.body { overflow-wrap:anywhere; }
+.body :deep(img) { max-width:100%; height:auto; }
+.body :deep(pre), .body :deep(table) { max-width:100%; overflow:auto; }
+.body :deep(table) { display:block; }
 .crumbs {
   display: flex;
   gap: 8px;
@@ -427,7 +440,7 @@ async function closeHelp() {
   margin: 0 0 10px;
   font-size: 26px;
   line-height: 1.35;
-  font-weight: 800;
+  font-weight: 650;
   overflow-wrap: anywhere;
 }
 .pin-badge {
@@ -435,7 +448,7 @@ async function closeHelp() {
   margin-right: 8px;
   padding: 0 7px;
   border-radius: 4px;
-  background: var(--brand);
+  background: var(--brand-fill);
   color: var(--brand-ink);
   font-size: var(--fs-sm);
   line-height: 22px;
@@ -496,7 +509,8 @@ async function closeHelp() {
   padding: 2px 9px;
   border-radius: 12px;
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 0;
+  background: var(--surface-2);
 }
 .tag:hover {
   border-color: var(--line-strong);
@@ -602,9 +616,10 @@ async function closeHelp() {
   width: 40%;
 }
 @media (max-width: 767px) {
-  .title {
-    font-size: 21px;
-  }
+  .topic-shell :deep(.center) { padding:16px 16px 24px; }
+  .title { font-size:20px; line-height:1.4; font-weight:600; }
+  .actions .btn, .note .btn { min-height:44px; }
+  .replies { padding-top:16px; border-top:8px solid var(--surface-2); }
   .note {
     flex-direction: column;
     align-items: flex-start;

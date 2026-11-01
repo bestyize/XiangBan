@@ -1,0 +1,233 @@
+{
+ "schemaVersion": 1,
+ "id": "aurora",
+ "name": "流光溢彩",
+ "description": "绿紫色的光幕在星空下缓缓飘动、明灭",
+ "sky": [
+  "#030814",
+  "#0b1f3a",
+  "#0f3a4a",
+  "#103c3a"
+ ],
+ "layers": [
+  {
+   "count": 160,
+   "shape": {
+    "kind": "circle"
+   },
+   "size": [
+    1.5,
+    3
+   ],
+   "band": {
+    "offset": -0.3,
+    "width": 0.8,
+    "falloff": "even"
+   },
+   "twinkle": {
+    "rate": [
+     0.2,
+     0.7
+    ],
+    "depth": 0.7
+   },
+   "alpha": [
+    0.3,
+    0.8
+   ],
+   "colors": [
+    "#ffffff",
+    "#dfe8ff"
+   ]
+  },
+  {
+   "count": 90,
+   "shape": {
+    "kind": "beam",
+    "length": [
+     300,
+     520
+    ],
+    "focus": 0.35
+   },
+   "size": [
+    40,
+    80
+   ],
+   "speed": [
+    4,
+    9
+   ],
+   "direction": 0,
+   "band": {
+    "angle": 0,
+    "offset": -0.3,
+    "width": 0.05,
+    "wave": {
+     "amplitude": 0.06,
+     "count": 0.9,
+     "speed": -0.015
+    }
+   },
+   "sway": {
+    "amplitude": [
+     4,
+     10
+    ],
+    "frequency": [
+     0.05,
+     0.12
+    ]
+   },
+   "scatter": 0,
+   "twinkle": {
+    "rate": [
+     0.08,
+     0.25
+    ],
+    "depth": 0.6
+   },
+   "alpha": [
+    0.08,
+    0.18
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#ff6ad5",
+     "#8f7bff"
+    ],
+    [
+     "#c76bff",
+     "#5cc8ff"
+    ]
+   ]
+  },
+  {
+   "count": 170,
+   "shape": {
+    "kind": "beam",
+    "length": [
+     220,
+     420
+    ],
+    "focus": 0.65
+   },
+   "size": [
+    26,
+    54
+   ],
+   "speed": [
+    6,
+    14
+   ],
+   "direction": 0,
+   "band": {
+    "angle": 0,
+    "offset": -0.2,
+    "width": 0.04,
+    "wave": {
+     "amplitude": 0.07,
+     "count": 1.3,
+     "speed": 0.02
+    }
+   },
+   "sway": {
+    "amplitude": [
+     4,
+     10
+    ],
+    "frequency": [
+     0.05,
+     0.12
+    ]
+   },
+   "scatter": 0,
+   "twinkle": {
+    "rate": [
+     0.08,
+     0.25
+    ],
+    "depth": 0.6
+   },
+   "alpha": [
+    0.2,
+    0.4
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#3fe0a0",
+     "#8affb8"
+    ],
+    [
+     "#38c9c0",
+     "#9dffc4"
+    ],
+    [
+     "#6a8cff",
+     "#5dff9e"
+    ]
+   ]
+  },
+  {
+   "count": 80,
+   "shape": {
+    "kind": "beam",
+    "length": [
+     140,
+     260
+    ],
+    "focus": 0.65
+   },
+   "size": [
+    18,
+    34
+   ],
+   "speed": [
+    8,
+    16
+   ],
+   "direction": 0,
+   "band": {
+    "angle": 0,
+    "offset": -0.08,
+    "width": 0.03,
+    "wave": {
+     "amplitude": 0.05,
+     "count": 1.8,
+     "speed": 0.03
+    }
+   },
+   "sway": {
+    "amplitude": [
+     4,
+     10
+    ],
+    "frequency": [
+     0.05,
+     0.12
+    ]
+   },
+   "scatter": 0,
+   "twinkle": {
+    "rate": [
+     0.08,
+     0.25
+    ],
+    "depth": 0.6
+   },
+   "alpha": [
+    0.12,
+    0.24
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#4ad9ff",
+     "#59ffb0"
+    ]
+   ]
+  }
+ ]
+}

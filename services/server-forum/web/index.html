@@ -3,19 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#f5f5f5" />
+    <meta name="theme-color" content="#ededed" />
     <script>
       (() => {
         let preference = 'system'
         try { preference = localStorage.getItem('forum-theme') || 'system' } catch {}
         const dark = preference === 'dark' || (preference !== 'light' && matchMedia('(prefers-color-scheme: dark)').matches)
         document.documentElement.dataset.theme = dark ? 'dark' : 'light'
-        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#111111' : '#f5f5f5')
+        document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#3b3e45' : '#ededed')
       })()
     </script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>超级小伴</title>
-    <meta name="description" content="超级小伴：开发者和 AI 用户的社区。技术交流、桌面装扮与助手能力的资源分享、周刊和随便唠唠。" />
+    <meta name="description" content="超级小伴：发现 AI 与开源好内容，在线体验有趣作品，和小伴 AI 聊聊。创作自己的游戏与桌面作品，从小伴客户端开始。" />
   </head>
   <body>
     <div id="app"></div>

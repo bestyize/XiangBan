@@ -76,7 +76,7 @@ withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { show
   margin-right: 6px;
 }
 .pin {
-  background: var(--brand);
+  background: var(--brand-fill);
   color: var(--brand-ink);
   padding: 0 5px;
   border-radius: 3px;

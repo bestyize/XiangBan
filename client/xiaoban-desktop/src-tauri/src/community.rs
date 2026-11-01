@@ -2,8 +2,8 @@
 //! The pack is downloaded, hash-checked and described first; nothing is applied until the user confirms in the console.
 //! Download, hash and archive checks live in the `xiaoban-community` crate; this file only stages the result and applies it.
 use serde_json::{json, Value};
-use std::sync::Mutex;
-use tauri::{Emitter, Manager};
+use std::sync::{Mutex, Arc, atomic::{AtomicU64, Ordering}};
+use tauri::{Emitter, Manager, WebviewUrl, webview::WebviewBuilder, window::WindowBuilder};
 use xiaoban_community as community;
 
 const DEFAULT_ORIGIN: &str = "https://chat.xiangban.xyz";
@@ -13,6 +13,153 @@ pub(crate) fn origin() -> String {
     #[cfg(debug_assertions)]
     if let Ok(url) = std::env::var("XIAOBAN_COMMUNITY_URL") { return url; }
     DEFAULT_ORIGIN.into()
+}
+
+const COMMUNITY_WINDOW: &str = "community-window";
+const COMMUNITY_CHROME: &str = "community-chrome";
+const COMMUNITY_CONTENT: &str = "community-web";
+const TITLE_HEIGHT: f64 = 44.;
+const EDGE: f64 = 5.;
+static COMMUNITY_OPEN_LOCK: Mutex<()> = Mutex::new(());
+
+/// Production is fixed; development may only use a loopback web server.
+fn validate_web_origin(configured: &str, debug: bool) -> Result<url::Url, String> {
+    let parsed = url::Url::parse(configured).map_err(|_| "社区地址无效")?;
+    let local = matches!(parsed.host_str(), Some("localhost" | "127.0.0.1" | "[::1]"));
+    if !(parsed.origin() == url::Url::parse(DEFAULT_ORIGIN).expect("fixed origin").origin() || (debug && local && matches!(parsed.scheme(), "http" | "https")))
+        || !parsed.username().is_empty() || parsed.password().is_some()
+        || parsed.path() != "/" || parsed.query().is_some() || parsed.fragment().is_some() {
+        return Err("社区地址必须是官方地址或调试时的本机地址".into());
+    }
+    Ok(parsed)
+}
+
+fn web_origin() -> Result<url::Url, String> {
+    validate_web_origin(&if cfg!(debug_assertions) { origin() } else { DEFAULT_ORIGIN.into() }, cfg!(debug_assertions))
+}
+
+fn same_origin(url: &url::Url, origin: &url::Url) -> bool {
+    url.origin() == origin.origin() && url.username().is_empty() && url.password().is_none()
+}
+
+/// The remote site has no native permissions and does not receive the desktop account token.
+#[tauri::command]
+pub async fn community_web_open(app: tauri::AppHandle, caller: tauri::WebviewWindow) -> Result<(), String> {
+    control(&caller)?;
+    let _guard = COMMUNITY_OPEN_LOCK.lock().map_err(|_| "社区窗口暂不可用")?;
+    if let Some(existing) = app.get_window(COMMUNITY_WINDOW) {
+        existing.unminimize().map_err(|e| e.to_string())?;
+        if let Some(monitor) = existing.current_monitor().map_err(|e| e.to_string())?.or(caller.current_monitor().map_err(|e| e.to_string())?) {
+            let area = monitor.work_area(); let factor = monitor.scale_factor();
+            let size = existing.outer_size().map_err(|e| e.to_string())?;
+            let position = existing.outer_position().map_err(|e| e.to_string())?;
+            let width = size.width.min(area.size.width).max(1); let height = size.height.min(area.size.height).max(1);
+            existing.set_min_size(Some(tauri::LogicalSize::new(360f64.min(area.size.width as f64 / factor), 480f64.min(area.size.height as f64 / factor)))).map_err(|e| e.to_string())?;
+            if size.width != width || size.height != height { existing.set_size(tauri::PhysicalSize::new(width, height)).map_err(|e| e.to_string())?; }
+            let right = i64::from(area.position.x) + i64::from(area.size.width) - i64::from(width);
+            let bottom = i64::from(area.position.y) + i64::from(area.size.height) - i64::from(height);
+            existing.set_position(tauri::PhysicalPosition::new(i64::from(position.x).clamp(i64::from(area.position.x), right) as i32, i64::from(position.y).clamp(i64::from(area.position.y), bottom) as i32)).map_err(|e| e.to_string())?;
+        }
+        existing.show().map_err(|e| e.to_string())?;
+        return existing.set_focus().map_err(|e| e.to_string());
+    }
+    let origin = web_origin()?;
+    let nav_origin = origin.clone();
+    let nav_app = app.clone();
+    let new_origin = origin.clone();
+    let new_app = app.clone();
+    let monitor = caller.current_monitor().map_err(|e| e.to_string())?.or(app.primary_monitor().map_err(|e| e.to_string())?);
+    let (width, height) = monitor.as_ref().map(|m| {
+        let area = m.work_area(); let scale = m.scale_factor();
+        (1100f64.min((area.size.width as f64 / scale - 32.).max(1.)), 760f64.min((area.size.height as f64 / scale - 64.).max(1.)))
+    }).unwrap_or((1100., 760.));
+    let mut builder = WindowBuilder::new(&app, COMMUNITY_WINDOW).title("小伴社区")
+        .inner_size(width, height).min_inner_size(360f64.min(width), 480f64.min(height))
+        .decorations(false).resizable(true).visible(false);
+    if let Some(m) = &monitor {
+        let a = m.work_area(); let f = m.scale_factor();
+        builder = builder.position(a.position.x as f64 / f + (a.size.width as f64 / f - width) / 2., a.position.y as f64 / f + (a.size.height as f64 / f - height) / 2.);
+    } else { builder = builder.center(); }
+    let window = builder.build().map_err(|e| e.to_string())?;
+    let result = (|| -> Result<(), String> {
+        window.add_child(WebviewBuilder::new(COMMUNITY_CHROME, WebviewUrl::App("community-chrome.html".into())).auto_resize(),
+            tauri::LogicalPosition::new(0., 0.), tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
+        let content = WebviewBuilder::new(COMMUNITY_CONTENT, WebviewUrl::External(origin))
+            .on_navigation(move |url| {
+                if same_origin(url, &nav_origin) { return true; }
+                if url.scheme() == "xiaoban" && url.host_str() == Some("community") {
+                    let app = nav_app.clone(); let link = url.to_string();
+                    std::thread::spawn(move || receive_link(&app, &link));
+                } else if matches!(url.scheme(), "http" | "https") {
+                    let link = url.to_string();
+                    std::thread::spawn(move || { let _ = crate::content::open_download_url(link); });
+                }
+                false
+            })
+            .on_new_window(move |url, _| {
+                let app = new_app.clone();
+                if same_origin(&url, &new_origin) {
+                    std::thread::spawn(move || { if let Some(view) = app.get_webview(COMMUNITY_CONTENT) { let _ = view.navigate(url); } });
+                } else if url.scheme() == "xiaoban" && url.host_str() == Some("community") {
+                    std::thread::spawn(move || receive_link(&app, url.as_str()));
+                } else if matches!(url.scheme(), "http" | "https") {
+                    std::thread::spawn(move || { let _ = crate::content::open_download_url(url.to_string()); });
+                }
+                tauri::webview::NewWindowResponse::Deny
+            });
+        let content = window.add_child(content, tauri::LogicalPosition::new(EDGE, TITLE_HEIGHT),
+            tauri::LogicalSize::new((width - EDGE * 2.).max(1.), (height - TITLE_HEIGHT - EDGE).max(1.))).map_err(|e| e.to_string())?;
+        // Tauri's auto_resize scales offsets proportionally; the titlebar and resize edges
+        // must remain fixed logical pixels, including when a window changes DPI.
+        let scale = Arc::new(AtomicU64::new(window.scale_factor().map_err(|e| e.to_string())?.to_bits()));
+        window.on_window_event(move |event| {
+            let size = match event {
+                tauri::WindowEvent::Resized(size) => Some(*size),
+                tauri::WindowEvent::ScaleFactorChanged { scale_factor, new_inner_size, .. } => {
+                    scale.store(scale_factor.to_bits(), Ordering::Relaxed); Some(*new_inner_size)
+                }
+                _ => None,
+            };
+            if let Some(size) = size {
+                let factor = f64::from_bits(scale.load(Ordering::Relaxed));
+                let logical = size.to_logical::<f64>(factor);
+                let _ = content.set_position(tauri::LogicalPosition::new(EDGE, TITLE_HEIGHT));
+                let _ = content.set_size(tauri::LogicalSize::new((logical.width - 2. * EDGE).max(1.), (logical.height - TITLE_HEIGHT - EDGE).max(1.)));
+            }
+        });
+        window.show().map_err(|e| e.to_string())?;
+        window.set_focus().map_err(|e| e.to_string())
+    })();
+    if result.is_err() { let _ = window.close(); }
+    result
+}
+
+pub fn invocation_permission(label: &str, command: &str) -> Option<bool> {
+    match label {
+        COMMUNITY_CONTENT => Some(false),
+        COMMUNITY_CHROME => Some(command == "community_chrome_action"),
+        _ => None,
+    }
+}
+
+fn chrome_action_allowed(view: &str, window: &str) -> bool { view == COMMUNITY_CHROME && window == COMMUNITY_WINDOW }
+
+/// Only the bundled chrome can operate its own parent window.
+#[tauri::command]
+pub fn community_chrome_action(view: tauri::Webview, window: tauri::Window, action: String) -> Result<(), String> {
+    if !chrome_action_allowed(view.label(), window.label()) { return Err("无权操作社区窗口".into()); }
+    match action.as_str() {
+        "close" => window.close(),
+        "minimize" => window.minimize(),
+        "maximize" => if window.is_maximized().map_err(|e| e.to_string())? { window.unmaximize() } else { window.maximize() },
+        "fullscreen" => window.set_fullscreen(!window.is_fullscreen().map_err(|e| e.to_string())?),
+        "drag" => window.start_dragging(),
+        "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw" => {
+            let edge = match action.as_str() { "n" => "North", "s" => "South", "e" => "East", "w" => "West", "ne" => "NorthEast", "nw" => "NorthWest", "se" => "SouthEast", _ => "SouthWest" };
+            window.start_resize_dragging(serde_json::from_value(json!(edge)).map_err(|e| e.to_string())?)
+        }
+        _ => return Err("未知窗口操作".into()),
+    }.map_err(|e| e.to_string())
 }
 
 /// What the console is waiting to show: a link that arrived, and the one pack that was checked and is waiting for a yes.
@@ -261,5 +408,34 @@ mod tests {
         assert_eq!(taken["kind"], "reminder");
         assert_eq!(taken["packId"], 12);
         assert!(state.link.lock().unwrap().is_none(), "take 之后清空暂存");
+    }
+}
+
+#[cfg(test)]
+mod web_window_tests {
+    use super::*;
+    #[test]
+    fn only_local_chrome_controls_its_parent() {
+        assert_eq!(invocation_permission("community-web", "community_chrome_action"), Some(false));
+        assert_eq!(invocation_permission("community-web", "get_diagnostics"), Some(false));
+        assert_eq!(invocation_permission("community-chrome", "community_chrome_action"), Some(true));
+        assert_eq!(invocation_permission("community-chrome", "get_diagnostics"), Some(false));
+        assert_eq!(invocation_permission("control", "community_web_open"), None);
+        assert!(chrome_action_allowed("community-chrome", "community-window"));
+        assert!(!chrome_action_allowed("community-web", "community-window"));
+        assert!(!chrome_action_allowed("community-chrome", "control"));
+    }
+    #[test]
+    fn origin_is_fixed_in_release_and_loopback_only_in_debug() {
+        assert!(validate_web_origin(DEFAULT_ORIGIN, false).is_ok());
+        assert!(validate_web_origin("http://localhost:5173", true).is_ok());
+        assert!(validate_web_origin("http://localhost:5173", false).is_err());
+        assert!(validate_web_origin("https://evil.example", true).is_err());
+        assert!(validate_web_origin("https://chat.xiangban.xyz.evil.example", true).is_err());
+        assert!(validate_web_origin("https://user@chat.xiangban.xyz", true).is_err());
+        assert!(validate_web_origin("https://chat.xiangban.xyz/path", true).is_err());
+        let base = validate_web_origin(DEFAULT_ORIGIN, false).unwrap();
+        assert!(same_origin(&url::Url::parse("https://chat.xiangban.xyz/topics/1").unwrap(), &base));
+        assert!(!same_origin(&url::Url::parse("https://chat.xiangban.xyz:444/topics/1").unwrap(), &base));
     }
 }

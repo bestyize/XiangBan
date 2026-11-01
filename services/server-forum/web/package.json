@@ -4,6 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "sync:builtins": "node scripts/sync-builtin-games.mjs && node scripts/sync-builtin-widget-preview.mjs && node --experimental-strip-types scripts/sync-builtin-pets.mjs",
+    "predev": "npm run sync:builtins",
+    "prebuild": "npm run sync:builtins",
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",

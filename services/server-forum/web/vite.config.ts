@@ -12,7 +12,7 @@ export default defineConfig({
   server: {
     port,
     strictPort: true,
-    proxy: { '/api': api },
+    proxy: { '/api': { target: api, changeOrigin: true }, '/files': { target: api, changeOrigin: true } },
   },
   build: { chunkSizeWarningLimit: 600 },
 })

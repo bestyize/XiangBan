@@ -6,10 +6,15 @@ import { trackRoute } from '@/lib/analytics'
 
 const routes: RouteRecordRaw[] = [
   { path: '/', name: 'home', component: HomeView },
+  { path: '/ai', name: 'ai', component: () => import('@/views/AiChatView.vue'), meta: { focus: true } },
+  { path: '/create', name: 'create', component: () => import('@/views/CreateView.vue') },
+  { path: '/me', name: 'me', component: () => import('@/views/MeView.vue') },
+  { path: '/daily', name: 'daily', component: () => import('@/views/DailyView.vue') },
+  { path: '/daily/:key', name: 'daily-detail', component: () => import('@/views/DailyView.vue') },
+  { path: '/tools/:key', name: 'tool-detail', component: () => import('@/views/ToolView.vue') },
   { path: '/discuss', name: 'discuss', component: DiscussView },
   { path: '/models', name: 'model-rankings', component: () => import('@/views/ModelRankingsView.vue') },
-  // 旧入口：资源、周刊、项目列表都并进了首页的二级 Tab。
-  { path: '/resources', redirect: '/' },
+  { path: '/resources', name: 'resources', component: () => import('@/views/ResourcesView.vue') },
   { path: '/challenges', name: 'challenges', component: () => import('@/views/ChallengesView.vue') },
   { path: '/challenges/:key', name: 'challenge', component: () => import('@/views/ChallengeView.vue') },
   { path: '/schemes', name: 'schemes', component: () => import('@/views/SchemesView.vue') },
@@ -47,18 +52,29 @@ export const router = createRouter({
   scrollBehavior(to, from, saved) {
     if (saved) return saved
     if (to.hash) return { el: to.hash, top: 80 }
-    if (to.path === from.path) return undefined
+    if (to.path === from.path) {
+      if (['/', '/discuss', '/resources', '/models', '/daily'].includes(to.path) && to.fullPath !== from.fullPath) return { top:0 }
+      return undefined
+    }
     return { top: 0 }
   },
 })
 
 router.afterEach(to => trackRoute(to.name, to.query))
 
-// 需要登录的页面：没登录就弹登录框，停在原页面（直接打开时回首页）。
+// 需要登录的页面：没登录就弹登录框，停在原页面（直接打开时回我的页）。
 router.beforeEach((to, from) => {
+  if (to.path === '/') {
+    const kind = String(to.query.kind || to.query.tab || '')
+    if (kind === 'schemes') return { path: '/schemes', query: {...to.query, tab: undefined, kind: undefined} }
+    if (['game','widget','wallpaper','effect','pet','skill','expert','workflow','reminder','routine','task','goal'].includes(kind)) {
+      return {path:'/discuss', query:{...to.query, filter:kind, kind:undefined, tab:'create'}}
+    }
+  }
   if (!to.meta.auth) return
   const session = useSession()
   if (session.loggedIn) return
+  session.loginReturnTo = to.fullPath
   session.loginOpen = true
-  return from.name ? false : { name: 'home' }
+  return from.name ? false : { name: 'me' }
 })

@@ -1,0 +1,17 @@
+{
+ "version": 1,
+ "effects": [
+  "lanterns",
+  "maple",
+  "galaxy",
+  "butterfly-dream",
+  "fireworks",
+  "snow",
+  "rain",
+  "fireflies",
+  "petals",
+  "meteors",
+  "stars",
+  "aurora"
+ ]
+}

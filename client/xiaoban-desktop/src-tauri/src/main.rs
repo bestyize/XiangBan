@@ -884,7 +884,7 @@ fn main() {
             chat::store_market::ai_market_inspect, chat::store_market::ai_market_install, chat::store_market::ai_market_group_inspect, chat::store_market::ai_market_group_install,
             chat::store_market::ai_market_updates, chat::store_market::ai_market_update,
             community_schemes::community_schemes_status, community_schemes::community_schemes_save, community_schemes::community_schemes_remove, community_schemes::community_schemes_restore, community_schemes::community_schemes_cloud_enabled, community_schemes::community_schemes_cloud,
-            community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
+            community::community_web_open, community::community_chrome_action, community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
             community::community_analytics_get, community::community_analytics_set, community::community_track,
             phone_link::phone_link_status, phone_link::phone_link_set_enabled, phone_link::phone_link_remove_peer,
             speech_agent::speech_agent_env, speech_agent::speech_agent_install_guides, speech_agent::speech_agent_hooks_status, speech_agent::speech_agent_hooks_install, speech_agent::speech_agent_hooks_uninstall, speech_agent::speech_agent_inject,
@@ -903,12 +903,13 @@ fn main() {
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
+            if community::invocation_permission(label, command) == Some(false) { invoke.resolver.reject("社区视图没有此原生命令权限"); return true; }
             if command.starts_with("design_") && design_window::permitted(label,command)!=Some(true) { invoke.resolver.reject("只能在主窗口访问设计稿"); return true; }
             if command.starts_with("asr_") && label != "control" && label != float_assistant::LABEL {
                 invoke.resolver.reject("只能在聊天和声音设置中使用语音识别");
                 return true;
             }
-            let allowed=configuration_window::permitted(label,command).or_else(||design_window::permitted(label,command)).or_else(||capture_editor::permitted(label,command)).or_else(||companion_dialogue::permitted(label,command)).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
+            let allowed=community::invocation_permission(label,command).or_else(||configuration_window::permitted(label,command)).or_else(||design_window::permitted(label,command)).or_else(||capture_editor::permitted(label,command)).or_else(||companion_dialogue::permitted(label,command)).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if matches!(command, "get_network_config" | "save_network_config" | "test_network_connection") { return label=="control"; }
                 if matches!(command, "reset_screen_capture_permission" | "open_screen_capture_settings") { return label=="control"; }
                 // 资料库 is managed from the console; 超级小伴 may only save into it (see float_assistant's shared list).

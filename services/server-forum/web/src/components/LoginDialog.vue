@@ -4,6 +4,8 @@ import ModalDialog from './ModalDialog.vue'
 import { accountApi, AccountError } from '@/api/account'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
+import { useRouter } from 'vue-router'
+import { safeReturnPath } from '@/lib/sections'
 
 type Mode = 'password' | 'code' | 'reset'
 type Step = 'identify' | 'verify' | 'setup'
@@ -11,6 +13,7 @@ type Availability = { kind: 'idle' } | { kind: 'checking' } | { kind: 'ok' } | {
 
 const session = useSession()
 const toast = useToast()
+const router = useRouter()
 
 const mode = ref<Mode>('password')
 const step = ref<Step>('identify')
@@ -114,7 +117,7 @@ function changeIdentifier() {
 watch(
   () => session.loginOpen,
   open => {
-    if (!open) return
+    if (!open) { if (!session.loggedIn) session.loginReturnTo = ''; return }
     void accountApi.signupMethods().then(value => { methods.value = value })
     switchMode('password')
     username.value = ''
@@ -170,6 +173,9 @@ async function sendCode() {
 
 function welcome(result: { isNewUser: boolean; username: string }) {
   session.loginOpen = false
+  const target = session.loginReturnTo
+  session.loginReturnTo = ''
+  if (safeReturnPath(target)) void router.push(target)
   toast.show(result.isNewUser ? `欢迎来到超级小伴，${result.username}` : `已登录，${result.username}`)
 }
 
@@ -308,13 +314,13 @@ async function submit() {
   font-size: var(--fs-md);
 }
 .wide.btn-primary {
-  background: var(--brand);
-  border-color: var(--brand);
+  background: var(--brand-fill);
+  border-color: var(--brand-fill);
   color: var(--brand-ink);
 }
 .wide.btn-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--brand) 88%, #000);
-  border-color: color-mix(in srgb, var(--brand) 88%, #000);
+  background: color-mix(in srgb, var(--brand-fill) 88%, #000);
+  border-color: color-mix(in srgb, var(--brand-fill) 88%, #000);
 }
 .code {
   font-family: var(--font-display);
@@ -376,7 +382,7 @@ async function submit() {
   font-size: var(--fs-sm);
 }
 .tabs button.on {
-  background: var(--brand);
+  background: var(--brand-fill);
   color: var(--brand-ink);
   font-weight: 600;
 }

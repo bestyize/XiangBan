@@ -45,9 +45,9 @@ export function siteConfig(): Promise<SiteConfig> {
 
 /** 由会话 store 注入：返回当前可用的访问令牌。 */
 let tokenProvider: () => Promise<string | null> = async () => null
-let onUnauthorized: () => void = () => {}
+let onUnauthorized: (token?: string) => void = () => {}
 
-export function configureAuth(provider: () => Promise<string | null>, unauthorized: () => void) {
+export function configureAuth(provider: () => Promise<string | null>, unauthorized: (token?: string) => void) {
   tokenProvider = provider
   onUnauthorized = unauthorized
 }
@@ -80,7 +80,7 @@ export async function request<T>(method: string, path: string, body?: unknown, a
   }
   const data = await res.json().catch(() => null)
   if (!res.ok) {
-    if (res.status === 401 && headers.Authorization) onUnauthorized()
+    if (res.status === 401 && headers.Authorization) onUnauthorized(headers.Authorization.slice(7))
     throw new ApiError(res.status, data?.message ?? `请求失败（${res.status}）`)
   }
   return data as T
@@ -173,7 +173,7 @@ async function uploadFile<T>(path: string, file: File, onProgress?: (ratio: numb
         data = null
       }
       if (xhr.status >= 200 && xhr.status < 300) return resolve(data as unknown as T)
-      if (xhr.status === 401 && token) onUnauthorized()
+      if (xhr.status === 401 && token) onUnauthorized(token)
       const fallback = xhr.status === 413 ? '文件太大，被服务器拒绝了' : `上传失败（${xhr.status}）`
       reject(new ApiError(xhr.status, data?.message ?? fallback))
     }

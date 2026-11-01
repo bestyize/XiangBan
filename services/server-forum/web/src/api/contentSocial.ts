@@ -5,6 +5,7 @@ import type { CommunityScheme } from './schemes'
 import type { Page } from './types'
 export type ContentKind = 'pack' | 'scheme'
 export type ContentBookmark = { kind: 'pack'; id: number; created_at: string; content: PackItem } | { kind: 'scheme'; id: number; created_at: string; content: CommunityScheme }
+export interface WorkDiscussion { topic_id: number | null; like_count: number; reply_count: number; liked: boolean; can_reply: boolean; locked: boolean }
 export interface ContentReport {
   id: number; kind: ContentKind; target_id: number; reason: string; detail: string
   status: 'open' | 'resolved' | 'dismissed'; revision: number; created_at: string
@@ -14,6 +15,8 @@ export interface ContentReport {
 }
 const path = (kind: ContentKind, id: number) => `/content-social/${kind}/${id}`
 export const contentSocialApi = {
+  discussion: (kind: ContentKind, id: number) => request<WorkDiscussion>('GET', `${path(kind, id)}/discussion`),
+  ensureDiscussion: (kind: ContentKind, id: number) => request<WorkDiscussion>('POST', `${path(kind, id)}/discussion`, {}),
   state: (kind: ContentKind, id: number) => request<{ bookmarked: boolean }>('GET', path(kind, id)),
   bookmark: (kind: ContentKind, id: number, on: boolean) => request<{ bookmarked: boolean }>(on ? 'PUT' : 'DELETE', `${path(kind, id)}/bookmark`),
   report: (kind: ContentKind, id: number, reason: string, detail: string) => request<{ ok: boolean }>('POST', `${path(kind, id)}/report`, { reason, detail }),

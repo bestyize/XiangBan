@@ -74,7 +74,7 @@ const root = computed(() => meta.tree.find(n => n.slug === meta.parentOf(current
   padding: 4px 10px;
 }
 .sub .chip.on {
-  background: var(--brand);
+  background: var(--brand-fill);
   border-color: var(--brand);
   color: var(--brand-ink);
 }

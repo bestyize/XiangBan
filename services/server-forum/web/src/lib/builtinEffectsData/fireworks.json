@@ -1,0 +1,502 @@
+{
+ "schemaVersion": 1,
+ "id": "fireworks",
+ "name": "火树银花",
+ "description": "牡丹、菊花、金柳、光环与银花轮番升空绽放",
+ "sky": [
+  "#070a1c",
+  "#141a3a",
+  "#2b1f3f"
+ ],
+ "layers": [
+  {
+   "count": 220,
+   "shape": {
+    "kind": "streak",
+    "length": [
+     16,
+     30
+    ],
+    "width": [
+     2,
+     3.2
+    ],
+    "head": 1.6
+   },
+   "size": [
+    3,
+    4
+   ],
+   "direction": [
+    0,
+    360
+   ],
+   "alpha": [
+    0.88,
+    1
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#fff6d0",
+     "#ffb52e"
+    ],
+    [
+     "#ffe8a6",
+     "#f08a24"
+    ],
+    [
+     "#fff1bd",
+     "#ffc94a"
+    ],
+    [
+     "#ffffff",
+     "#cfdcff"
+    ],
+    [
+     "#ffe1e6",
+     "#ff4f6d"
+    ],
+    [
+     "#e2f3ff",
+     "#3f9bff"
+    ],
+    [
+     "#f3e4ff",
+     "#a86bff"
+    ],
+    [
+     "#e4ffee",
+     "#3fd68a"
+    ]
+   ],
+   "burst": {
+    "group": 110,
+    "spread": 360,
+    "launch": [
+     1,
+     1.5
+    ],
+    "duration": [
+     2,
+     2.6
+    ],
+    "rest": [
+     0.4,
+     1.8
+    ],
+    "x": [
+     0.12,
+     0.88
+    ],
+    "y": [
+     0.12,
+     0.42
+    ],
+    "travel": [
+     200,
+     280
+    ],
+    "gravity": 50,
+    "ease": "out",
+    "fade": "out",
+    "fill": 1,
+    "flash": 0.3,
+    "mix": 0.35
+   },
+   "twinkle": {
+    "rate": [
+     3,
+     6
+    ],
+    "depth": 0.25
+   }
+  },
+  {
+   "count": 140,
+   "shape": {
+    "kind": "streak",
+    "length": [
+     52,
+     88
+    ],
+    "width": [
+     1.1,
+     1.8
+    ],
+    "head": 1.0
+   },
+   "size": [
+    3,
+    4
+   ],
+   "direction": [
+    0,
+    360
+   ],
+   "alpha": [
+    0.88,
+    1
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#ffe1e6",
+     "#ff4f6d"
+    ],
+    [
+     "#e2f3ff",
+     "#3f9bff"
+    ],
+    [
+     "#f3e4ff",
+     "#a86bff"
+    ],
+    [
+     "#e4ffee",
+     "#3fd68a"
+    ],
+    [
+     "#ffffff",
+     "#cfdcff"
+    ]
+   ],
+   "burst": {
+    "group": 70,
+    "spread": 360,
+    "launch": [
+     1,
+     1.5
+    ],
+    "duration": [
+     2,
+     2.6
+    ],
+    "rest": [
+     1,
+     2.8
+    ],
+    "x": [
+     0.12,
+     0.88
+    ],
+    "y": [
+     0.12,
+     0.42
+    ],
+    "travel": [
+     230,
+     320
+    ],
+    "gravity": 60,
+    "ease": "out",
+    "fade": "out",
+    "fill": 1,
+    "flash": 0.3,
+    "mix": 0.25
+   }
+  },
+  {
+   "count": 220,
+   "shape": {
+    "kind": "streak",
+    "length": [
+     30,
+     56
+    ],
+    "width": [
+     0.9,
+     1.4
+    ],
+    "head": 0.8
+   },
+   "size": [
+    3,
+    4
+   ],
+   "direction": [
+    0,
+    360
+   ],
+   "alpha": [
+    0.88,
+    1
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#fff6d0",
+     "#ffb52e"
+    ],
+    [
+     "#ffe8a6",
+     "#f08a24"
+    ]
+   ],
+   "burst": {
+    "group": 110,
+    "spread": 360,
+    "launch": [
+     1,
+     1.5
+    ],
+    "duration": [
+     3.6,
+     4.4
+    ],
+    "rest": [
+     2,
+     4.5
+    ],
+    "x": [
+     0.12,
+     0.88
+    ],
+    "y": [
+     0.12,
+     0.42
+    ],
+    "travel": [
+     180,
+     250
+    ],
+    "gravity": 120,
+    "ease": "out",
+    "fade": "out",
+    "fill": 1,
+    "flash": 0.35
+   },
+   "twinkle": {
+    "rate": [
+     4,
+     8
+    ],
+    "depth": 0.3
+   }
+  },
+  {
+   "count": 200,
+   "shape": {
+    "kind": "glow",
+    "core": 0.5
+   },
+   "size": [
+    2.5,
+    4.5
+   ],
+   "direction": [
+    0,
+    360
+   ],
+   "alpha": [
+    0.88,
+    1
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#fff6d0",
+     "#ffb52e"
+    ],
+    [
+     "#ffe8a6",
+     "#f08a24"
+    ],
+    [
+     "#fff1bd",
+     "#ffc94a"
+    ]
+   ],
+   "burst": {
+    "group": 100,
+    "spread": 360,
+    "launch": [
+     1,
+     1.5
+    ],
+    "duration": [
+     3.6,
+     4.4
+    ],
+    "rest": [
+     2,
+     4.5
+    ],
+    "x": [
+     0.12,
+     0.88
+    ],
+    "y": [
+     0.12,
+     0.42
+    ],
+    "travel": [
+     170,
+     240
+    ],
+    "gravity": 115,
+    "ease": "out",
+    "fade": "out",
+    "fill": 1,
+    "flash": 0.3
+   },
+   "twinkle": {
+    "rate": [
+     8,
+     14
+    ],
+    "depth": 1
+   }
+  },
+  {
+   "count": 60,
+   "shape": {
+    "kind": "glow",
+    "core": 0.5
+   },
+   "size": [
+    6,
+    9
+   ],
+   "direction": [
+    0,
+    360
+   ],
+   "alpha": [
+    0.88,
+    1
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#ffe1e6",
+     "#ff4f6d"
+    ],
+    [
+     "#e2f3ff",
+     "#3f9bff"
+    ],
+    [
+     "#f3e4ff",
+     "#a86bff"
+    ],
+    [
+     "#fff6d0",
+     "#ffb52e"
+    ]
+   ],
+   "burst": {
+    "group": 60,
+    "spread": 360,
+    "launch": [
+     1,
+     1.5
+    ],
+    "duration": [
+     1.8,
+     2.3
+    ],
+    "rest": [
+     3,
+     6
+    ],
+    "x": [
+     0.12,
+     0.88
+    ],
+    "y": [
+     0.12,
+     0.42
+    ],
+    "travel": [
+     170,
+     230
+    ],
+    "gravity": 40,
+    "ease": "out",
+    "fade": "out",
+    "fill": 0,
+    "flash": 0.25,
+    "mix": 0.5,
+    "flatten": [
+     0.25,
+     0.55
+    ]
+   }
+  },
+  {
+   "count": 240,
+   "shape": {
+    "kind": "glow",
+    "core": 0.6
+   },
+   "size": [
+    5,
+    9
+   ],
+   "direction": [
+    0,
+    360
+   ],
+   "alpha": [
+    0.9,
+    1
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#ffffff",
+     "#cfdcff"
+    ],
+    [
+     "#f4f8ff",
+     "#a9bdf0"
+    ],
+    [
+     "#fffdf2",
+     "#ffe9b8"
+    ]
+   ],
+   "burst": {
+    "group": 120,
+    "spread": 360,
+    "launch": [
+     1,
+     1.5
+    ],
+    "duration": [
+     1.8,
+     2.4
+    ],
+    "rest": [
+     1,
+     3.5
+    ],
+    "x": [
+     0.12,
+     0.88
+    ],
+    "y": [
+     0.12,
+     0.42
+    ],
+    "travel": [
+     130,
+     200
+    ],
+    "gravity": 45,
+    "ease": "out",
+    "fade": "out",
+    "fill": 1,
+    "flash": 0.25
+   },
+   "twinkle": {
+    "rate": [
+     9,
+     14
+    ],
+    "depth": 0.8
+   }
+  }
+ ]
+}

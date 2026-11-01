@@ -1,105 +1,54 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import ContentShell from '@/components/ContentShell.vue'
 import { useHead } from '@/lib/head'
-
-interface UsageRow { id: string; name: string; tokens: string; rank: number; share_pct: number; rank_change?: number | null; new_entry?: boolean }
-interface Usage { source: string; date: string; as_of: string; total_tokens: string; other_tokens: string; previous_date_available: boolean; models: UsageRow[] }
-interface Model { id: string; name: string; vendor_id: string; metrics: Record<string, number | null>; pricing: { input: number | null; output: number | null }; performance: { output_tokens_per_second: number | null } }
-interface Board { source: string; as_of: string; index_version: string; models: Model[]; vendors: { id: string; name: string }[] }
-const route = useRoute()
-const router = useRouter()
+import { availableMetrics, METRICS, rankModels, formatTokens, type Board, type Usage } from '@/lib/modelRankings'
+import { useCommunityResource } from '@/components/community/resource'
+import RequestState from '@/components/community/RequestState.vue'
+import ModelRankRows from '@/components/community/ModelRankRows.vue'
+import UsageRankRows from '@/components/community/UsageRankRows.vue'
+import ModelScatter from '@/components/community/ModelScatter.vue'
+import { request } from '@/api/forum'
+const route = useRoute(), router = useRouter()
 const tab = computed(() => route.query.board === 'usage' ? 'usage' : 'capability')
 const date = computed(() => typeof route.query.date === 'string' ? route.query.date : '')
-const board = ref<Board | null>(null)
-const usage = ref<Usage | null>(null)
-const dates = ref<string[]>([])
-const loading = ref(false)
-const error = ref('')
-const empty = ref(false)
-const metric = ref('intelligence')
-let sequence = 0
-const metrics = [{ id: 'intelligence', label: '智能指数' }, { id: 'speed', label: '输出速度' }, { id: 'input', label: '输入价格' }, { id: 'output', label: '输出价格' }]
-function value(m: Model) { return metric.value === 'speed' ? m.performance.output_tokens_per_second : metric.value === 'input' ? m.pricing.input : metric.value === 'output' ? m.pricing.output : m.metrics.intelligence ?? null }
-const models = computed(() => [...(board.value?.models ?? [])].sort((a, b) => {
-  const x = value(a), y = value(b)
-  if (x == null) return y == null ? a.id.localeCompare(b.id) : 1
-  if (y == null) return -1
-  return (metric.value === 'input' || metric.value === 'output' ? x - y : y - x) || a.id.localeCompare(b.id)
-}))
-function number(v: number | null | undefined) { return v == null ? '暂无数据' : v.toLocaleString('zh-CN', { maximumFractionDigits: 10 }) }
-function tokens(v: string) { return BigInt(v).toLocaleString('zh-CN') }
-function time(v: string) { return new Date(v).toLocaleString('zh-CN') }
-function setTab(value: string) { void router.replace({ path: '/models', query: { board: value } }) }
-function setDate(value: string) { void router.replace({ path: '/models', query: { board: 'usage', ...(value ? { date: value } : {}) } }) }
-async function get<T>(path: string): Promise<T> {
-  const response = await fetch(path)
-  if (response.status === 404) throw new Error('unpublished')
-  if (!response.ok) throw new Error(`读取榜单失败（${response.status}），请重试`)
-  return response.json()
-}
-async function load() {
-  const mine = ++sequence
-  loading.value = true; error.value = ''; empty.value = false
-  try {
-    if (tab.value === 'usage') {
-      const [data, history] = await Promise.all([
-        get<Usage>(`/api/discover/model-usage${date.value ? `?date=${encodeURIComponent(date.value)}` : ''}`),
-        get<{ items: { date: string }[] }>('/api/discover/model-usage/dates'),
-      ])
-      if (mine === sequence) { usage.value = data; dates.value = history.items.map(d => d.date) }
-    } else {
-      const data = await get<Board>('/api/discover/models/v2')
-      if (mine === sequence) board.value = data
-    }
-  } catch (e) {
-    if (mine !== sequence) return
-    if (e instanceof Error && e.message === 'unpublished') empty.value = true
-    else error.value = e instanceof TypeError ? '网络连接失败，请重试' : e instanceof Error ? e.message : '读取失败，请重试'
-  } finally { if (mine === sequence) loading.value = false }
-}
-watch([tab, date], load, { immediate: true })
-useHead(() => ({ title: tab.value === 'usage' ? '模型调用量榜' : '模型能力榜' }))
+function readMetric() { try { return localStorage.getItem('forum-ranking-metric') || 'intelligence' } catch { return 'intelligence' } }
+const metric = ref(readMetric())
+const ability = useCommunityResource(() => request<Board>('GET','/discover/models/v2',undefined,false))
+const usage = useCommunityResource(() => request<Usage>('GET',`/discover/model-usage${date.value ? `?date=${encodeURIComponent(date.value)}`:''}`,undefined,false))
+const history = useCommunityResource(() => request<{items:{date:string}[]}>('GET','/discover/model-usage/dates',undefined,false))
+const options = computed(() => ability.data.value ? availableMetrics(ability.data.value) : [METRICS[0]!])
+const selectedMetric = computed(() => options.value.find(item=>item.id===metric.value) ?? options.value[0]!)
+const rows = computed(() => rankModels(ability.data.value?.models ?? [],selectedMetric.value.id))
+const usageRows = computed(() => [...(usage.data.value?.models ?? [])].sort((a,b)=>a.rank-b.rank))
+const dates = computed(() => [...new Set(history.data.value?.items.map(item=>item.date) ?? [])].sort().reverse())
+function groups<T>(items:T[], size:number):T[][] { return Array.from({length:Math.ceil(items.length/size)},(_,index)=>items.slice(index*size,(index+1)*size)) }
+function selectMetric(id:string) { metric.value=id; try {localStorage.setItem('forum-ranking-metric',id)} catch {} }
+function setTab(value:string) { void router.push({path:'/models',query:value==='usage'?{board:'usage'}:{}}) }
+function setDate(value:string) { void router.replace({path:'/models',query:{board:'usage',...(value?{date:value}:{})}}) }
+function reload() { if(tab.value==='usage'){void usage.load();void history.load()}else void ability.load() }
+watch([tab,date],reload,{immediate:true})
+onMounted(() => { if(tab.value!=='usage') void history.load() })
+function updated(value:string) { const date=new Date(value);return Number.isNaN(date.getTime())?'更新时间未知':date.toLocaleString('zh-CN',{timeZone:'Asia/Shanghai'}) }
+useHead(() => ({title:tab.value==='usage'?'模型调用量榜':'模型能力榜'}))
 </script>
-
-<template>
-  <ContentShell>
-    <section class="rankings">
-      <h1>模型排行榜</h1>
-      <div class="controls" role="tablist" aria-label="排行榜类型">
-        <button v-for="item in [{ id: 'capability', label: '能力榜' }, { id: 'usage', label: '调用量榜' }]" :key="item.id" role="tab" :aria-selected="tab === item.id" :class="{ selected: tab === item.id }" @click="setTab(item.id)">{{ item.label }}</button>
-        <button :disabled="loading" @click="load">刷新</button>
-      </div>
-      <p v-if="loading" role="status">加载中…</p>
-      <p v-else-if="error" role="alert">{{ error }} <button @click="load">重新加载</button></p>
-      <p v-else-if="empty">{{ date ? '这一天尚无已发布榜单。' : '尚无已发布榜单，采集校验通过后会自动展示。' }} <button v-if="date" @click="setDate('')">查看最新</button></p>
-      <template v-else-if="tab === 'usage' && usage">
-        <div class="controls"><label>统计日（UTC） <select :value="date || usage.date" @change="setDate(($event.target as HTMLSelectElement).value)"><option v-for="day in dates" :key="day" :value="day">{{ day }}</option></select></label></div>
-        <p>按输入与输出 Token 总量排名，仅统计 OpenRouter 平台流量。</p>
-        <p class="note">全平台当日 {{ tokens(usage.total_tokens) }} Token · 其他模型 {{ tokens(usage.other_tokens) }} Token</p>
-        <div class="table-scroll"><table><thead><tr><th>排名</th><th>模型</th><th>Token 用量</th><th>占比</th><th>日排名变化</th></tr></thead><tbody>
-          <tr v-for="m in usage.models" :key="m.id"><td>{{ m.rank }}</td><td>{{ m.name }}</td><td class="numeric">{{ tokens(m.tokens) }}</td><td>{{ m.share_pct > 0 && m.share_pct < 0.01 ? '&lt;0.01' : m.share_pct.toFixed(2) }}%</td><td>{{ !usage.previous_date_available ? '暂无对比' : m.new_entry ? '新上榜' : m.rank_change == null ? '暂无对比' : m.rank_change > 0 ? `↑${m.rank_change}` : m.rank_change < 0 ? `↓${-m.rank_change}` : '持平' }}</td></tr>
-        </tbody></table></div>
-        <p class="note">Source: <a href="https://openrouter.ai/rankings" target="_blank" rel="noopener noreferrer">OpenRouter</a>, as of {{ usage.as_of }} · 本地时间 {{ time(usage.as_of) }}</p>
-      </template>
-      <template v-else-if="board">
-        <div class="controls"><label>排序指标 <select v-model="metric"><option v-for="m in metrics" :key="m.id" :value="m.id">{{ m.label }}</option></select></label></div>
-        <p class="note">智能指数版本 {{ board.index_version }} · 价格单位：美元/百万 Token · 速度单位：Token/秒。缺失指标不参与排名。</p>
-        <div class="table-scroll"><table><thead><tr><th>排名</th><th>模型</th><th>厂商</th><th>智能指数</th><th>输入价格</th><th>输出价格</th><th>速度</th></tr></thead><tbody>
-          <tr v-for="(m, index) in models" :key="m.id"><td>{{ value(m) == null ? '—' : index + 1 }}</td><td>{{ m.name }}</td><td>{{ board.vendors.find(v => v.id === m.vendor_id)?.name ?? m.vendor_id }}</td><td>{{ number(m.metrics.intelligence) }}</td><td>{{ number(m.pricing.input) }}</td><td>{{ number(m.pricing.output) }}</td><td>{{ number(m.performance.output_tokens_per_second) }}</td></tr>
-        </tbody></table></div>
-        <p class="note">数据来源 <a href="https://artificialanalysis.ai/" target="_blank" rel="noopener noreferrer">Artificial Analysis</a> · 采集于 {{ time(board.as_of) }}</p>
-      </template>
-    </section>
-  </ContentShell>
-</template>
-
+<template><div class="rankings">
+  <header class="rankings-header"><div><RouterLink class="back" to="/?tab=rankings">‹ 排行榜概览</RouterLink><h1>{{ tab==='usage'?'模型调用量榜':'模型能力榜' }}</h1></div><button type="button" class="refresh" :disabled="tab==='usage'?usage.loading.value:ability.loading.value" @click="reload">刷新</button></header>
+  <nav class="rank-tabs" aria-label="排行榜类型"><button type="button" :aria-pressed="tab==='capability'" :class="{on:tab==='capability'}" @click="setTab('capability')">能力榜</button><button type="button" :aria-pressed="tab==='usage'" :class="{on:tab==='usage'}" @click="setTab('usage')">调用量榜</button></nav>
+  <template v-if="tab==='capability'">
+    <div class="filters" aria-label="排序指标"><button v-for="option in options" :key="option.id" :aria-pressed="selectedMetric.id===option.id" :class="{on:selectedMetric.id===option.id}" @click="selectMetric(option.id)">{{ option.label }}</button></div>
+    <p class="note">{{ selectedMetric.unit }} · {{ selectedMetric.higherIsBetter?'越高越好':'越低越好' }} · 缺失测量不参与排名</p>
+    <RequestState :loading="ability.loading.value" :error="ability.error.value" @retry="ability.load"/>
+    <template v-if="ability.data.value"><p v-if="ability.data.value.sample" class="note">示例数据</p><RequestState :empty="!rows.length" message="暂无模型数据"/><section v-for="(group,index) in groups(rows,25)" :key="index" class="rank-card" :aria-label="`模型列表第 ${index+1} 组`"><ModelRankRows :rows="group" :vendors="ability.data.value.vendors" :metric="selectedMetric.id"/></section><ModelScatter :board="ability.data.value"/><p class="note source">数据来源 <a href="https://artificialanalysis.ai/" target="_blank" rel="noopener noreferrer">{{ ability.data.value.source }}</a><br>智能指数 v{{ ability.data.value.index_version }} · {{ updated(ability.data.value.as_of) }} 更新（北京时间）。暂无数据表示未测量，不计入排名。</p></template>
+  </template>
+  <template v-else>
+    <div class="filters" aria-label="统计日期"><button :class="{on:!date}" :aria-pressed="!date" @click="setDate('')">最新日榜</button><button v-for="day in dates" :key="day" :class="{on:date===day}" :aria-pressed="date===day" @click="setDate(day)">{{ day.slice(5) }} UTC</button></div>
+    <p v-if="history.error.value" class="note" role="alert">日期加载失败 <button class="text-button" @click="history.load">重试</button></p>
+    <RequestState :loading="usage.loading.value" :error="usage.error.value" @retry="usage.load"/>
+    <button v-if="usage.error.value && date" class="refresh" @click="setDate('')">查看最新日榜</button>
+    <template v-if="usage.data.value"><section class="rank-card usage-summary"><header><h2>调用量 Top {{ usageRows.length }}</h2><span>{{ usage.data.value.date }} · UTC</span></header><p class="note">OpenRouter · 输入与输出 Token 总量<span v-if="usage.data.value.sample"> · 示例数据</span></p><p>全天 {{ formatTokens(usage.data.value.total_tokens) }} Token</p></section><RequestState :empty="!usageRows.length" message="暂无模型用量数据"/><section v-for="(group,index) in groups(usageRows,10)" :key="index" class="rank-card"><UsageRankRows :rows="group" :previous-available="usage.data.value.previous_date_available"/></section><p class="note source">数据来源 <a href="https://openrouter.ai/rankings" target="_blank" rel="noopener noreferrer">OpenRouter</a> · {{ updated(usage.data.value.as_of) }} 更新（北京时间）<br>其他模型 {{ formatTokens(usage.data.value.other_tokens) }} Token，计入全天总量。排名变化与前一完整 UTC 日对比，不代表请求次数。</p></template>
+  </template>
+</div></template>
 <style scoped>
-.rankings { padding: 20px 16px; } h1 { font-size: var(--fs-xl); margin: 0 0 16px; }
-.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0; }
-button, select { border: 1px solid var(--line, #ddd); border-radius: 8px; padding: 8px 12px; background: var(--surface, #fff); color: inherit; font: inherit; cursor: pointer; }
-button.selected { color: var(--brand, #e3203c); border-color: currentColor; } button:disabled { opacity: .5; cursor: default; }
-.note { color: var(--ink-3); font-size: 13px; line-height: 1.7; } .table-scroll { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; font-size: 13px; } th, td { text-align: left; border-bottom: 1px solid var(--line, #eee); padding: 12px 8px; } th { white-space: nowrap; } .numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rankings{max-width:960px;margin:auto;min-width:0}.rankings-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}h1{font-size:21px;margin:6px 0 0}h2{font-size:16px;margin:0}.back{font-size:12px;color:var(--ink-3);display:inline-flex;min-height:32px;align-items:center}.refresh{border:1px solid var(--line);border-radius:10px;padding:8px 16px;min-height:44px;background:var(--surface)}button:disabled{opacity:.5}.rank-tabs{display:flex;gap:20px;border-bottom:1px solid var(--line);margin-bottom:8px}.rank-tabs button{background:none;border:0;padding:10px 2px;min-height:44px;color:var(--ink-3);font-size:15px}.rank-tabs .on{color:var(--ink);border-bottom:3px solid var(--brand);font-weight:650}.filters{display:flex;gap:7px;overflow-x:auto;padding:6px 1px;scrollbar-width:thin}.filters button{white-space:nowrap;flex:none;border:0;border-radius:9px;background:var(--surface);color:var(--ink-2);padding:8px 12px;min-height:44px;font-size:12px}.filters .on{background:var(--ink);color:var(--paper)}.note{font-size:11px;line-height:1.7;color:var(--ink-3);margin:8px 2px 12px}.rank-card{background:var(--surface);border-radius:14px;padding:12px 14px;margin:0 0 10px}.usage-summary header{display:flex;justify-content:space-between;gap:12px;align-items:center}.usage-summary header>span{font-size:11px;color:var(--ink-3)}.usage-summary p:last-child{margin:6px 0 0;font-size:13px;overflow-wrap:anywhere}.source a,.text-button{color:var(--brand)}.text-button{background:none;border:0;min-height:44px;padding:0 10px}.source{padding:8px 2px}@media(min-width:900px){.rankings{max-width:900px}.rank-card{padding:16px 22px}}
 </style>

@@ -26,6 +26,17 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 本地联调登录需要同时跑一个账号中心：`ACCOUNT_ISSUER=http://localhost:55009`、`ACCOUNT_SENDER=console`（验证码写进日志）、`ACCOUNT_CLIENTS` 里包含 `forum-web`、`ACCOUNT_CORS_ORIGINS` 包含前端开发地址；论坛这边设 `FORUM_ACCOUNT_ISSUER=http://localhost:55009`。想跳过新人限制，可以设 `FORUM_TL1_DAYS=0 FORUM_TL1_READS=0`。
 
+## 移动优先网页版（2026-11-01，本地实现）
+
+范围及验收见 [实施计划](../../docs/product/实施计划_小伴网页版_2026-11-01.md)。网页浏览社区、体验公开作品、进行基础文字对话；生成/修改作品引导官网下载客户端。Android 仅承诺已支持的游戏创作，iOS 不宣称支持本地创作。桌面社区通过独立原生窗口访问本站，账号在网页独立登录，不注入桌面令牌。
+
+- 创造发现页与小米 14 对齐：9 款官方内置游戏按手机顺序展示，其后是柔软山丘壁纸灵感、9 款官方小组件（含鹈鹕骑车）、12 款官方特效及 7 位官方伙伴。分类为全部/游戏/壁纸/小组件/特效/伙伴。卡片打开预览与游戏试玩，只有「你想创造什么？」触发客户端下载提示；「我的作品」通往账号已发布作品，不冒充手机本机文件同步。社区作品继续在社区讨论的创作栏目展示。
+- `npm run dev/build` 的前置脚本从仓库 `client/xiaoban-desktop/public/game-packs/` 同步这 9 款官方资源到忽略提交的 `web/public/builtin-games/`，构建产物包含它们；构建需完整本仓库。官方游戏无需社区 API 或独立试玩域名，在不允许同源访问的 iframe 内运行，以来源和 nonce 校验就绪/退出消息，本次试玩不持久保存进度。`npm run sync:builtins` 同时同步桌面小组件的纯视觉实现与完整伙伴 SVG；特效复用桌面粒子引擎和官方数据。小组件天气/行情明确标记为演示数据，特效只在详情可见时播放，伙伴预览保留完整花盆与表情，详情按需加载客户端原有动画引擎，支持点击/键盘表情反馈、自然眨眼和视线跟随；离屏、后台及关闭详情时停止绘制。网页预览不会安装桌面装扮。
+- AI 默认连接 `https://ai.xiangban.xyz`，构建时可设 `VITE_AI_BASE_URL`（HTTPS；本地联调允许 localhost HTTP）。AI 产品 `client_ids` 必须接收论坛令牌的 `aud=forum-web`，`AI_CORS_ORIGINS` 必须包含本站实际 origin。前端不包含服务商密钥。对话历史按账号保存在当前浏览器，最多 30 对话、每个 100 消息，不代表跨端同步。
+- 游戏试玩仅接受公开 T0/T1、当前指定版本且完整性检查通过的离线 v1 游戏包。构建时配置 `VITE_GAME_SANDBOX_URL` 为独立 HTTPS origin，部署 `web/game-sandbox/`，并让资源服务允许网页跨域读取签名下载 URL。未配置时如实显示不可用。独立域名、CSP、内部 sandbox 和父子消息校验详见 [试玩宿主说明](web/game-sandbox/README.md)。不向作品提供账号令牌或桌面能力。
+- 本地只读联调可设 `FORUM_API=https://chat.xiangban.xyz`；试玩同时需独立本地宿主及 `VITE_GAME_RESOURCE_ORIGIN=https://chat.xiangban.xyz`，后者仅在 DEV 生效，用于匹配 `/files/` 代理。生产构建不启用开发代理。
+- 前端验收：`npm --prefix services/server-forum/web run build`；行为测试：在 `web/` 执行 `node --experimental-strip-types --test tests/*.test.ts`。本轮没有部署生产、登记 AI 产品或修改真实账号数据。
+
 ## 配置
 
 见 [.env.example](.env.example)。关键项：
@@ -52,7 +63,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 ## 页面与接口
 
-前台路由：`/` 首页、`/` 首页（内容包卡片流，二级 Tab：全部、周刊、项目、各类型、方案；`/resources`、`/weekly`、`/projects` 跳到对应 Tab）、`/packs/{id}` 内容包、`/weekly/{week}` 周刊、`/projects/{slug}` 项目、`/discuss` 讨论、`/c/{slug}` 分类、`/t/{id}` 帖子、`/new` 发帖、`/tag/{name}`、`/search`、`/u/{uid}`、`/settings`（收藏、昵称、等级说明）、`/rules` `/terms` `/privacy`，后台在 `/admin`。
+前台路由：`/` 社区发现（推荐、开源热榜、排行榜、追踪、导航）、`/discuss` 讨论、`/resources` 资源、`/daily[/{key}]` 日报、`/tools/{key}` 工具详情；`/create` 官方内置创造体验、`/ai` 小伴 AI、`/me` 我的。手机底栏与 PC 侧栏统一四个模块，发布入口提供发帖与上传已有作品。保留 `/packs/{id}`、`/schemes`、`/weekly/{week}`、`/projects/{slug}`、帖子、分类、搜索、收藏、积分、设置及 `/admin`。旧首页社区作品类型链接转到 `/discuss?tab=create&filter=…`，周刊/项目旧 Tab 继续有效。
 
 服务端对 `/`、`/t/{id}`、`/c/{slug}`、`/tag/{name}` 直接输出带标题、摘要、正文和 JSON-LD 的 HTML（填进 `#app`，Vue 挂载时替换），另有 `/sitemap.xml`、`/robots.txt`。实现在 `src/seo.rs`，依赖 `web/index.html` 保留 `<title>`、`<meta name="description">` 和空的 `<div id="app"></div>`。
 
@@ -77,6 +88,10 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 休闲一级板块下的帖子支持省略 `title`（或传空串），填写时最多 80 个 Unicode 字符；创建、编辑及移动分类均按目标分类校验，其他板块仍要求 4～80 字。列表/详情的 `category.parent_slug` 标识所属一级板块，分享信息在标题为空时使用正文摘要。详情 `body_html` 保留全部图片，列表 `images` 仍只提供前三张缩略图。
 
 管理接口在 `/api/admin/*`（`src/handlers/admin.rs`）：管理员独立建表，HS256 令牌带 `token_version`，改密码后旧令牌失效，连续输错 5 次锁 15 分钟；包括概览、举报处理、帖子与回复管理、用户等级和禁言封禁、分类维护、操作日志，所有写操作都记审计。
+
+网页版外观支持客户端同款小伴红、薄荷绿、海湾蓝、暮紫、琥珀、石墨六套配色，在「我的 → 外观」、PC 外观入口及账户设置中选择。主题色与日夜模式独立保存于当前浏览器，跨标签同步；夜间保留提亮后的中深灰底色，强调文字根据网页背景调整对比度。
+
+排行榜概览 `/?tab=rankings` 按手机版顺序展示 AA 智能指数 Top 10、智能 vs 价格散点图、输出速度 Top 5、调用量 Top 5。`/models` 与调用量榜使用可展开的条形排行，支持快照实际提供的能力指标及 UTC 历史日榜。散点图沿用输入/输出 3:1 加权报价、对数价格轴、前沿与中位数优势区，支持厂商筛选、模型定位及全屏搜索。厂商图标来自手机本地资源（附原许可），不请求外部图片。相关验证：`node --experimental-strip-types --test tests/modelRankings.test.ts tests/discover.test.ts tests/navigation.test.ts`（在 web 目录运行）。
 
 ## 社区内容层（内容包、方案、项目、周刊）
 

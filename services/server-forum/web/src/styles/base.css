@@ -1,22 +1,24 @@
-/* 小红书配色：品牌红 + 黑白灰；日夜间共用同一品牌色。 */
+/* 中性明暗底色；主题色由 theme.ts 应用客户端官方配色。 */
 :root {
-  --paper: #f5f5f5;
+  --paper: #ededed;
   --surface: #ffffff;
-  --surface-2: #fafafa;
-  --ink: #333333;
+  --surface-2: #f2f2f2;
+  --ink: #222222;
   --ink-2: #666666;
   --ink-3: #737373;
   --line: #ebebeb;
   --line-strong: #d6d6d6;
-  --brand: #ff2442;
+  --brand: #B42A33;
+  --brand-fill: #D93A44;
+  --brand-hover: #E8565F;
   --brand-ink: #ffffff;
   --valid: var(--ink-2);
   --valid-soft: var(--surface-2);
-  --suspect: var(--brand);
+  --suspect: var(--danger);
   --suspect-soft: var(--surface-2);
   --expired: var(--ink-3);
   --expired-soft: var(--surface-2);
-  --danger: var(--brand);
+  --danger: #B42A33;
   --focus: var(--brand);
   --shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 6px 18px -10px rgba(0, 0, 0, 0.18);
 
@@ -26,8 +28,8 @@
   --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
 
   --fs-xs: 12px;
-  --fs-sm: 13px;
-  --fs-md: 15px;
+  --fs-sm: 14px;
+  --fs-md: 14px;
   --fs-lg: 17px;
   --fs-xl: 20px;
   --fs-2xl: 26px;
@@ -42,15 +44,16 @@
 }
 
 :root[data-theme="dark"] {
-  --paper: #111111;
-  --surface: #1b1b1b;
-  --surface-2: #252525;
-  --ink: #f5f5f5;
-  --ink-2: #cccccc;
-  --ink-3: #a3a3a3;
-  --line: #333333;
-  --line-strong: #4d4d4d;
-  --shadow: 0 1px 0 rgba(0, 0, 0, 0.24), 0 8px 22px -12px rgba(0, 0, 0, 0.68);
+  --danger: #ff9da4;
+  --paper: #3b3e45;
+  --surface: #464a53;
+  --surface-2: #50555f;
+  --ink: #f1f2f5;
+  --ink-2: #dce0e7;
+  --ink-3: #c8cdd7;
+  --line: #5d626e;
+  --line-strong: #7b8290;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 22px -12px rgba(0, 0, 0, 0.2);
   color-scheme: dark;
 }
 
@@ -138,13 +141,13 @@ img {
   cursor: not-allowed;
 }
 .btn-primary {
-  background: var(--brand);
-  border-color: var(--brand);
+  background: var(--brand-fill);
+  border-color: var(--brand-fill);
   color: var(--brand-ink);
 }
 .btn-primary:hover {
-  background: color-mix(in srgb, var(--brand) 88%, #000);
-  border-color: color-mix(in srgb, var(--brand) 88%, #000);
+  background: color-mix(in srgb, var(--brand-fill) 88%, #000);
+  border-color: color-mix(in srgb, var(--brand-fill) 88%, #000);
 }
 .btn-ghost {
   border-color: transparent;
@@ -325,3 +328,9 @@ img {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* Mobile web controls remain comfortable when browser chrome or the keyboard changes. */
+button,a,input,textarea{ -webkit-tap-highlight-color:transparent }
+textarea,input,select{max-width:100%}
+.prose{overflow-wrap:anywhere}
+@media(max-width:767px){input,textarea,select{font-size:16px}.btn{min-height:44px;height:auto}.btn-sm{min-height:40px}}

@@ -1,22 +1,22 @@
-import type { RouteLocationNormalizedLoaded } from 'vue-router'
-
 export type Section = 'home' | 'resources' | 'discuss'
-
-/** 顶栏三个一级栏目：首页（内容流）、资源（论坛里的资源分享板块）、讨论（其余板块和帖子）。 */
-export function sectionOf(route: Pick<RouteLocationNormalizedLoaded, 'name' | 'params'>): Section {
-  switch (route.name) {
-    case 'home':
-    case 'pack':
-    case 'weekly-issue':
-    case 'project':
-    case 'publish':
-    case 'works':
-      return 'home'
-    case 'category': {
-      const slug = String(route.params.slug ?? '')
-      return slug === 'share' || slug.startsWith('share-') ? 'resources' : 'discuss'
-    }
-    default:
-      return 'discuss'
+export type Area = 'community' | 'ai' | 'create' | 'me'
+type Route = { name?: unknown; params: Record<string, unknown> }
+export function sectionOf(route: Route): Section {
+  if (['home', 'daily', 'daily-detail', 'model-rankings', 'weekly-issue', 'project'].includes(String(route.name))) return 'home'
+  if (['resources', 'tool-detail'].includes(String(route.name))) return 'resources'
+  if (route.name === 'category') {
+    const slug = String(route.params.slug ?? '')
+    return slug === 'share' || slug.startsWith('share-') ? 'resources' : 'discuss'
   }
+  return 'discuss'
+}
+export function areaOf(route: Route): Area {
+  const name = String(route.name)
+  if (name === 'ai') return 'ai'
+  if (['create', 'pack', 'schemes', 'scheme', 'scheme-publish', 'publish'].includes(name)) return 'create'
+  if (['me', 'works', 'content-bookmarks', 'scheme-backups', 'settings', 'notifications', 'points', 'user'].includes(name)) return 'me'
+  return 'community'
+}
+export function safeReturnPath(path: string): boolean {
+  return path.startsWith('/') && !path.startsWith('//') && !/[\\\r\n]/.test(path)
 }

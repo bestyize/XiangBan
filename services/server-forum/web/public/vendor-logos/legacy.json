@@ -1,0 +1,79 @@
+[
+  {
+    "name": "Claude",
+    "file": "legacy-claude.svg",
+    "color": "D97757",
+    "aliases": [
+      "claude",
+      "anthropic"
+    ]
+  },
+  {
+    "name": "Gemini",
+    "file": "legacy-gemini.svg",
+    "color": "1A73E8",
+    "aliases": [
+      "gemini",
+      "google",
+      "谷歌"
+    ]
+  },
+  {
+    "name": "DeepSeek",
+    "file": "legacy-deepseek.svg",
+    "color": "5786FE",
+    "aliases": [
+      "deepseek",
+      "深度求索"
+    ]
+  },
+  {
+    "name": "Qwen",
+    "file": "legacy-qwen.svg",
+    "color": "6950EF",
+    "aliases": [
+      "qwen",
+      "通义",
+      "千问",
+      "阿里"
+    ]
+  },
+  {
+    "name": "Kimi",
+    "file": "legacy-kimi.svg",
+    "color": "111111",
+    "aliases": [
+      "kimi",
+      "月之暗面",
+      "moonshot"
+    ]
+  },
+  {
+    "name": "MiniMax",
+    "file": "legacy-minimax.svg",
+    "color": "E73562",
+    "aliases": [
+      "minimax"
+    ]
+  },
+  {
+    "name": "Doubao",
+    "file": "legacy-doubao.svg",
+    "color": "3C8CFF",
+    "aliases": [
+      "豆包",
+      "doubao",
+      "字节"
+    ]
+  },
+  {
+    "name": "Zhipu",
+    "file": "legacy-zhipu.svg",
+    "color": "2D2D2D",
+    "aliases": [
+      "智谱",
+      "zhipu",
+      "glm"
+    ]
+  }
+]

@@ -1,0 +1,1 @@
+These four pure rendering/simulation modules are copied from `client/xiaoban-desktop/src/effects/` and the effect JSON from `client/xiaoban-desktop/public/effects/`. They run locally in the forum browser without Tauri. When updating, synchronize the desktop sources and run the forum built-in effects tests.

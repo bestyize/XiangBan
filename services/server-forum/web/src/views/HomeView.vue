@@ -1,184 +1,61 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import ContentShell from '@/components/ContentShell.vue'
-import PackCard from '@/components/PackCard.vue'
-import SchemeCard from '@/components/SchemeCard.vue'
-import PagerNav from '@/components/PagerNav.vue'
+import { discoverApi } from '@/api/discover'
+import CommunityTabs from '@/components/community/CommunityTabs.vue'
+import NewsRow from '@/components/community/NewsRow.vue'
+import RequestState from '@/components/community/RequestState.vue'
+import RepoBoard from '@/components/community/RepoBoard.vue'
+import ModelPreview from '@/components/community/ModelPreview.vue'
+import TrackerPanel from '@/components/community/TrackerPanel.vue'
+import NavDirectory from '@/components/community/NavDirectory.vue'
+import { useCommunityResource } from '@/components/community/resource'
+import { repoMetric, webLink } from '@/components/community/contract'
+import DiscoverGlyph from '@/components/community/DiscoverGlyph.vue'
+import DiscoverRepoRow from '@/components/community/DiscoverRepoRow.vue'
+import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
 import WeeklyFeed from '@/components/WeeklyFeed.vue'
 import ProjectFeed from '@/components/ProjectFeed.vue'
-import { contentApi, type PackItem, type SchemeItem } from '@/api/content'
-import { PACK_KINDS, VISUAL_KINDS } from '@/lib/content'
 import { useHead } from '@/lib/head'
-import { useToast } from '@/stores/toast'
-
-useHead(() => ({ title: '' }))
-
-const route = useRoute()
-const router = useRouter()
-const toast = useToast()
-
-/** 二级 Tab：类型、周刊、项目。周刊与项目是整页列表，其余是内容包卡片流。 */
-const TABS = [{ key: '', label: '全部' }, { key: 'weekly', label: '周刊' }, { key: 'projects', label: '项目' }, ...PACK_KINDS, { key: 'schemes', label: '方案' }]
+import '@/components/community/community.css'
+const route = useRoute(), router = useRouter()
+const tabs = [{ key: 'recommend', label: '推荐' }, { key: 'repos', label: '开源热榜' }, { key: 'rankings', label: '排行榜' }, { key: 'tracker', label: '追踪' }, { key: 'nav', label: '导航' }]
 const tab = computed(() => {
-  const k = String(route.query.tab ?? route.query.kind ?? '')
-  return TABS.some(t => t.key === k) ? k : ''
+  const raw = String(route.query.tab || 'recommend')
+  return tabs.some(t => t.key === raw) || raw === 'weekly' || raw === 'projects' ? raw : 'recommend'
 })
-const sort = computed<'new' | 'hot'>(() => (route.query.sort === 'hot' ? 'hot' : 'new'))
-const feedTab = computed(() => tab.value === 'weekly' || tab.value === 'projects')
-const wide = computed(() => tab.value !== '' && !VISUAL_KINDS.includes(tab.value))
-
-const packs = ref<PackItem[]>([])
-const schemes = ref<SchemeItem[]>([])
-const page = ref(1)
-const total = ref(0)
-const pageSize = ref(20)
-const loading = ref(false)
-const schemeError = ref('')
-let seq = 0
-
-async function load(p = 1) {
-  if (feedTab.value) {
-    packs.value = []
-    schemes.value = []
-    total.value = 0
-    return
-  }
-  const mine = ++seq
-  loading.value = true
-  schemeError.value = ''
-  if (tab.value === 'schemes') packs.value = []
-  try {
-    if (tab.value === 'schemes') {
-      const res = await contentApi.schemes(p)
-      if (mine !== seq) return
-      schemes.value = res.items
-      packs.value = []
-      ;({ page: page.value, total: total.value, page_size: pageSize.value } = res)
-    } else {
-      const res = await contentApi.packs({ kind: tab.value || undefined, sort: sort.value, page: p })
-      if (mine !== seq) return
-      packs.value = res.items
-      schemes.value = []
-      ;({ page: page.value, total: total.value, page_size: pageSize.value } = res)
-    }
-  } catch (e) {
-    if (mine === seq) {
-      if (tab.value === 'schemes') { schemeError.value = e instanceof Error ? e.message : '方案加载失败'; schemes.value = []; total.value = 0 }
-      else toast.error(e)
-    }
-  } finally {
-    if (mine === seq) loading.value = false
-  }
-}
-
-watch([tab, sort], () => load(1), { immediate: true })
-
-function setTab(key: string) {
-  router.replace({ query: { ...(key ? { tab: key } : {}), ...(sort.value === 'hot' && key !== 'weekly' && key !== 'projects' ? { sort: 'hot' } : {}) } })
-}
-function setSort(s: 'new' | 'hot') {
-  router.replace({ query: { ...(tab.value ? { tab: tab.value } : {}), ...(s === 'hot' ? { sort: 'hot' } : {}) } })
-}
-function go(p: number) {
-  load(p)
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
+const { data, loading, error, load } = useCommunityResource(discoverApi.home)
+watch(tab, current => { if (current === 'recommend') void load() }, { immediate: true })
+function setTab(key: string) { void router.replace({ query: { ...(key === 'recommend' ? {} : { tab: key }) } }) }
+const banners = computed(() => (data.value?.banners || []).map(banner => {
+  const link = banner.link || ''
+  const match = /^(topic|pack|tool|weekly):(.+)$/.exec(link)
+  const paths:Record<string,string> = {topic:'/t/',pack:'/packs/',tool:'/tools/',weekly:'/weekly/'}
+  const validReference = match && (!['topic','pack'].includes(match[1]!) || /^\d+$/.test(match[2]!))
+  const href = validReference ? paths[match[1]!] + encodeURIComponent(match[2]!) : webLink(link)
+  return {...banner,href}
+}).filter(banner => banner.href))
+useHead(() => ({ title: '社区' }))
 </script>
-
-<template>
-  <ContentShell>
-    <h1 class="sr-only">超级小伴</h1>
-    <p class="model-rank-entry"><RouterLink to="/models">模型能力榜</RouterLink> · <RouterLink to="/models?board=usage">模型调用量榜</RouterLink></p>
-    <div class="subtabs" role="tablist" aria-label="内容类型">
-      <button v-for="t in TABS" :key="t.key" type="button" role="tab" :aria-selected="tab === t.key" :class="{ on: tab === t.key }" @click="setTab(t.key)">
-        {{ t.label }}
-      </button>
+<template><main class="community-page">
+  <h1 class="sr-only">小伴社区</h1>
+  <CommunityTabs :items="tabs" :active="tab" label="首页栏目" @change="setTab" />
+  <template v-if="tab === 'weekly' || tab === 'projects'"><RouterLink to="/" class="community-back">← 返回推荐</RouterLink><WeeklyFeed v-if="tab === 'weekly'" /><ProjectFeed v-else /></template>
+  <template v-else-if="tab === 'recommend'">
+    <RequestState :loading="loading" :error="error" @retry="load" />
+    <div v-if="data" class="recommend-feed">
+      <div v-if="banners.length" class="banner-strip" aria-label="社区推荐"><a v-for="banner in banners" :key="banner.key" :href="banner.href" class="banner-card"><div class="banner-top"><span v-if="banner.tag" class="banner-tag">{{ banner.tag }}</span><DiscoverGlyph name="sparkle" :size="20"/></div><h2>{{ banner.title }}</h2><div class="banner-bottom"><p v-if="banner.byline">{{ banner.byline }}</p><span v-if="banner.sample" class="sample">示例</span><DiscoverGlyph name="arrow" :size="18"/></div></a></div>
+      <section class="daily-section"><div class="section-heading"><div><DiscoverGlyph name="news" :size="18"/><h2>AI 日报</h2><span v-if="data.news.date&&data.news.total>0" class="update-date">{{ data.news.date.slice(5).replace('-',' / ') }} 更新</span></div><RouterLink to="/daily">往期<DiscoverGlyph name="arrow" :size="14"/></RouterLink></div><div class="news-grid"><NewsRow v-for="item in data.news.items" :key="item.key" :item="item"/></div><RequestState :empty="!data.news.items.length" message="暂无已发布日报。"/></section>
+      <section v-if="data.featured.length" class="home-card"><div class="section-heading"><div><DiscoverGlyph name="sparkle" :size="18"/><h2>精选创作</h2></div><RouterLink to="/discuss?tab=create">更多<DiscoverGlyph name="arrow" :size="14"/></RouterLink></div><div class="featured-strip"><CommunityPackCard v-for="pack in data.featured" :key="pack.id" :pack="pack"/></div></section>
+      <section v-if="data.repos&&data.repos.ranks.length" class="home-card repo-preview"><div class="section-heading"><div><DiscoverGlyph name="star" :size="18"/><h2>{{ data.repos.metric==='star total baseline'?'开源项目快照':'开源热榜' }}</h2></div><button type="button" @click="setTab('repos')">完整榜单<DiscoverGlyph name="arrow" :size="14"/></button></div><p class="repo-note">{{ repoMetric(data.repos) }} · {{ data.repos.source }}<span v-if="data.repos.sample"> · 示例数据</span></p><DiscoverRepoRow v-for="repo in data.repos.ranks.slice(0,3)" :key="repo.full_name" :repo="repo" :baseline="data.repos.metric==='star total baseline'" compact/></section>
+      <p v-if="data.sample" class="sample-note"><DiscoverGlyph name="info" :size="14"/>带「示例」字样的条目为示例数据。</p>
     </div>
-    <div class="community-entry"><RouterLink to="/challenges">参与主题挑战</RouterLink></div>
-    <div v-if="tab !== 'schemes' && !feedTab" class="sortbar">
-      <button type="button" :class="{ on: sort === 'new' }" @click="setSort('new')">最新</button>
-      <button type="button" :class="{ on: sort === 'hot' }" @click="setSort('hot')">最多使用</button>
-    </div>
-
-    <WeeklyFeed v-if="tab === 'weekly'" />
-    <ProjectFeed v-else-if="tab === 'projects'" />
-
-    <p v-else-if="loading && !packs.length && !schemes.length" class="state">加载中</p>
-    <p v-else-if="tab === 'schemes' && schemeError" class="state" role="alert">{{ schemeError }} <button class="btn" @click="load(page)">重试</button></p>
-    <p v-else-if="!loading && !packs.length && !schemes.length" class="state">这里还没有内容。</p>
-
-    <div v-if="packs.length" :class="wide ? 'list' : 'grid'">
-      <PackCard v-for="p in packs" :key="p.id" :pack="p" :wide="wide" />
-    </div>
-
-    <div v-if="tab === 'schemes'" class="scheme-toolbar"><RouterLink class="btn btn-primary" to="/schemes/new">发布方案</RouterLink><RouterLink to="/schemes">查看全部方案</RouterLink></div>
-    <div v-if="schemes.length"><SchemeCard v-for="scheme in schemes" :key="scheme.id" :scheme="scheme" /></div>
-
-    <PagerNav v-if="!feedTab" :page="page" :page-size="pageSize" :total="total" @go="go" />
-  </ContentShell>
-</template>
-
+  </template>
+  <RepoBoard v-else-if="tab === 'repos'" />
+  <ModelPreview v-else-if="tab === 'rankings'" />
+  <TrackerPanel v-else-if="tab === 'tracker'" />
+  <NavDirectory v-else />
+</main></template>
 <style scoped>
-.community-entry { padding: 12px 16px 0; font-size: var(--fs-sm); }
-.scheme-toolbar { display: flex; gap: 16px; align-items: center; padding: 16px; }
-.subtabs {
-  display: flex;
-  gap: 18px;
-  padding: 10px 16px 0;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.subtabs::-webkit-scrollbar {
-  display: none;
-}
-.subtabs button {
-  flex: none;
-  border: 0;
-  background: none;
-  padding: 4px 0 8px;
-  font-size: var(--fs-sm);
-  color: var(--ink-3);
-  border-bottom: 2px solid transparent;
-}
-.subtabs button.on {
-  color: var(--ink);
-  font-weight: 600;
-  border-bottom-color: var(--brand);
-}
-.sortbar {
-  display: flex;
-  gap: 14px;
-  padding: 10px 16px 4px;
-  font-size: var(--fs-xs);
-}
-.sortbar button {
-  border: 0;
-  background: none;
-  padding: 0;
-  color: var(--ink-3);
-}
-.sortbar button.on {
-  color: var(--ink);
-  font-weight: 600;
-}
-.state {
-  padding: 40px 16px;
-  text-align: center;
-  color: var(--ink-3);
-}
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px 12px;
-  padding: 8px 16px;
-}
-.list {
-  padding: 0 16px;
-}
-@media (min-width: 768px) {
-  .grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
+.recommend-feed{display:grid;gap:12px;padding-top:8px;min-width:0}.banner-strip{display:flex;gap:8px;overflow:auto;scroll-snap-type:x mandatory;scrollbar-width:none}.banner-card{flex:0 0 88%;display:flex;flex-direction:column;min-height:128px;padding:16px;border-radius:16px;background:var(--surface);scroll-snap-align:start;box-sizing:border-box}.banner-card:only-child{flex-basis:100%}.banner-top,.banner-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px}.banner-top{color:var(--brand)}.banner-tag{font-size:12px;font-weight:500;padding:3px 8px;border-radius:6px;background:color-mix(in srgb,var(--brand) 8%,var(--surface))}.banner-card h2{font-size:16px;line-height:1.6;margin:12px 0;overflow-wrap:anywhere}.banner-bottom{margin-top:auto;color:var(--ink-3);font-size:12px}.banner-bottom p{margin:0;flex:1}.sample{color:var(--brand)}.section-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:48px}.section-heading>div{display:flex;align-items:center;flex-wrap:wrap;gap:6px;min-width:0}.section-heading h2{margin:0;font-size:16px;font-weight:600}.section-heading>a,.section-heading>button{display:flex;align-items:center;justify-content:flex-end;gap:3px;flex:none;font-size:12px;color:var(--ink-3);min-height:44px;background:none;border:0;padding:0;cursor:pointer}.daily-section>.section-heading{padding:0 4px 4px}.update-date{font-size:12px;color:var(--ink-3);font-weight:400;margin-left:4px}.news-grid{display:grid;gap:8px;min-width:0}.home-card{background:var(--surface);border-radius:16px;padding:8px 14px 12px;min-width:0}.featured-strip{display:flex;gap:8px;overflow:auto;scroll-snap-type:x proximity;padding:8px 0 2px}.featured-strip :deep(.pack-card){flex:0 0 140px;scroll-snap-align:start;background:var(--surface-2)}.featured-strip :deep(.copy){padding:10px}.featured-strip :deep(h3){font-size:14px}.repo-note{font-size:12px;line-height:1.6;margin:0 0 4px;color:var(--ink-3)}.sample-note{display:flex;gap:6px;align-items:center;color:var(--ink-3);font-size:12px;margin:0;padding:4px}.sample-note svg{flex:none}@media(min-width:768px){.recommend-feed{gap:16px}.banner-card{flex-basis:calc(50% - 4px);min-height:144px}.banner-card:only-child{flex-basis:100%}.news-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.news-grid>:last-child:nth-child(odd){grid-column:1/-1}.home-card{padding:12px 20px 16px}.featured-strip{gap:12px}.featured-strip :deep(.pack-card){flex-basis:180px}}
 </style>
