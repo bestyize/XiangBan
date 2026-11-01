@@ -1,6 +1,11 @@
 import { test } from 'node:test'
 import { strict as assert } from 'node:assert'
 import { fitGameViewport } from '../src/lib/gameViewport.ts'
+test('landscape games fill desktop windows, including ultrawide and square layouts',()=>{
+  for (const [width,height] of [[1098,1000],[1920,1080],[2560,1080],[900,900]]) {
+    assert.deepEqual(fitGameViewport(width,height,'landscape',true),{width,height})
+  }
+})
 test('a narrow desktop window keeps landscape gameplay upright',()=>{
   const box=fitGameViewport(670,1043,'landscape',true)
   assert.deepEqual(box,{width:670,height:376})
