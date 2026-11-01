@@ -92,6 +92,56 @@ pub fn image_reply(value: &Value) -> Option<Value> {
     Some(json!({ "created": value.get("created").and_then(Value::as_i64).unwrap_or_default(), "data": data }))
 }
 
+fn native_gemini_image(model: &str) -> bool {
+    matches!(model, "gemini-3.1-flash-image" | "gemini-3-pro-image" | "gemini-3.1-flash-lite-image" | "gemini-nano-banana-2.1")
+}
+
+fn gemini_image_payload(payload: &Value) -> Result<Value, AppError> {
+    let aspect = match payload["size"].as_str().unwrap_or("auto") {
+        "auto" | "1024x1024" => "1:1",
+        "1536x1024" => "3:2", "1024x1536" => "2:3",
+        "1792x1024" => "16:9", "1024x1792" => "9:16",
+        _ => return Err(AppError::BadRequest("当前 Gemini 生图不支持这个尺寸，请使用后台配置的标准尺寸".into())),
+    };
+    Ok(json!({
+        "contents":[{"role":"user","parts":[{"text":payload["prompt"]}]}],
+        "generationConfig":{"candidateCount":1,"responseModalities":["TEXT","IMAGE"],"imageConfig":{"aspectRatio":aspect,"imageSize":"1K"}}
+    }))
+}
+
+fn gemini_image_reply(value: &Value) -> Option<Value> {
+    let data: Vec<Value> = value.get("candidates")?.as_array()?.iter()
+        .filter_map(|candidate| candidate.get("content")?.get("parts")?.as_array())
+        .flatten().filter(|part| part["thought"].as_bool() != Some(true))
+        .filter_map(|part| {
+            let image = part.get("inlineData").or_else(|| part.get("inline_data"))?;
+            let mime = image.get("mimeType").or_else(|| image.get("mime_type"))?.as_str()?;
+            if !matches!(mime, "image/png" | "image/jpeg" | "image/webp") { return None; }
+            let data = image.get("data")?.as_str().filter(|s| !s.is_empty())?;
+            Some(json!({"b64_json":data}))
+        }).take(IMAGE_MAX_COUNT as usize).collect();
+    if data.is_empty() { return None; }
+    Some(json!({"created":chrono::Utc::now().timestamp(),"data":data}))
+}
+
+async fn image_upstream(state: &AppState, key: &str, path: &str, payload: &Value) -> Result<Value, AppError> {
+    let payload = serde_json::to_vec(payload).map_err(|e| AppError::Internal(e.to_string()))?;
+    let mut upstream = state.newapi.relay(path, key, payload, &[]).await?;
+    let status = upstream.status();
+    if upstream.content_length().is_some_and(|size| size > IMAGE_MAX_REPLY as u64) { return Err(AppError::BadGateway("生成的图片太大".into())); }
+    let mut reply = Vec::new();
+    while let Some(chunk) = upstream.chunk().await.map_err(|_| AppError::BadGateway("图片生成响应中断，结果可能已生成，请勿自动重试".into()))? {
+        if reply.len().saturating_add(chunk.len()) > IMAGE_MAX_REPLY { return Err(AppError::BadGateway("生成的图片太大".into())); }
+        reply.extend_from_slice(&chunk);
+    }
+    if !status.is_success() {
+        let text = String::from_utf8_lossy(&reply);
+        tracing::warn!("图片上游返回 {status}: {}", text.chars().take(300).collect::<String>());
+        return Err(map_upstream_error(status, &text));
+    }
+    serde_json::from_slice(&reply).map_err(|_| AppError::BadGateway("图片生成返回异常".into()))
+}
+
 /// `POST /v1/images/generations`.
 pub async fn image_generations(State(state): State<AppState>, auth: Result<AuthUser, AppError>, body: Result<Bytes, BytesRejection>) -> Response {
     let result = async {
@@ -99,19 +149,36 @@ pub async fn image_generations(State(state): State<AppState>, auth: Result<AuthU
         let auth = auth?;
         let setting = setting(&state, &auth, Capability::Image).await?;
         let payload = image_payload(&setting.model, &setting.sizes, &body)?;
+        let native = native_gemini_image(&setting.model);
+        // Validate before any billable call. Gemini image models accept one candidate per request.
+        let gemini_payload = if native { Some(gemini_image_payload(&payload)?) } else { None };
         let active = caller(&state, auth, &setting).await?;
-        let payload = serde_json::to_vec(&payload).map_err(|e| AppError::Internal(e.to_string()))?;
-        let upstream = state.newapi.relay("/v1/images/generations", &active.key, payload, &[]).await?;
-        let status = upstream.status();
-        let reply = upstream.bytes().await.map_err(|_| AppError::BadGateway("图片生成暂时不可用".into()))?;
-        if !status.is_success() {
-            let text = String::from_utf8_lossy(&reply);
-            tracing::warn!("图片上游返回 {status}: {}", text.chars().take(300).collect::<String>());
-            return Err(map_upstream_error(status, &text));
-        }
-        if reply.len() > IMAGE_MAX_REPLY { return Err(AppError::BadGateway("生成的图片太大".into())); }
-        let value: Value = serde_json::from_slice(&reply).map_err(|_| AppError::BadGateway("图片生成返回异常".into()))?;
-        let images = image_reply(&value).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片".into()))?;
+        let images = if let Some(gemini_payload) = gemini_payload {
+            let path = format!("/v1beta/models/{}:generateContent", setting.model);
+            let wanted = payload["n"].as_u64().unwrap_or(1) as usize;
+            let mut data = Vec::new();
+            let mut encoded_bytes = 0usize;
+            for _ in 0..wanted {
+                // No retries: each native request is charged by New API through this caller's own key.
+                let generated = match image_upstream(&state, &active.key, &path, &gemini_payload).await
+                    .and_then(|value| gemini_image_reply(&value).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片".into()))) {
+                    Ok(value) => value,
+                    Err(error) if data.is_empty() => return Err(error),
+                    Err(_) => break, // Keep images already generated; the desktop reports partial delivery.
+                };
+                for image in generated["data"].as_array().into_iter().flatten().take(wanted - data.len()) {
+                    encoded_bytes += image["b64_json"].as_str().map_or(0, str::len);
+                    if encoded_bytes > IMAGE_MAX_REPLY - 4096 { break; }
+                    data.push(image.clone());
+                }
+                if data.len() >= wanted || encoded_bytes > IMAGE_MAX_REPLY - 4096 { break; }
+            }
+            if data.is_empty() { return Err(AppError::BadGateway("生成的图片太大".into())); }
+            json!({"created":chrono::Utc::now().timestamp(),"data":data})
+        } else {
+            let value = image_upstream(&state, &active.key, "/v1/images/generations", &payload).await?;
+            image_reply(&value).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片".into()))?
+        };
         Ok::<_, AppError>(Json(images).into_response())
     }
     .await;
@@ -346,6 +413,36 @@ async fn pump(
 #[cfg(test)]
 mod unit {
     use super::*;
+
+    #[test]
+    fn gemini_images_use_native_modalities_without_exposing_the_model() {
+        let payload = image_payload("gemini-3.1-flash-image", &["1024x1024".into(),"1536x1024".into()], br#"{"prompt":"cat","n":4,"size":"1536x1024"}"#).unwrap();
+        assert!(native_gemini_image("gemini-3.1-flash-image"));
+        assert!(!native_gemini_image("gpt-image-1.5"));
+        assert!(!native_gemini_image("gemini-4-argon"));
+        let native = gemini_image_payload(&payload).unwrap();
+        assert_eq!(native["contents"][0]["parts"][0]["text"], "cat");
+        assert_eq!(native["generationConfig"]["candidateCount"], 1);
+        assert_eq!(native["generationConfig"]["imageConfig"]["aspectRatio"], "3:2");
+        assert_eq!(native["generationConfig"]["responseModalities"], json!(["TEXT","IMAGE"]));
+        assert!(native.get("model").is_none() && native.get("n").is_none());
+        assert!(gemini_image_payload(&json!({"prompt":"cat","size":"8x8"})).is_err());
+    }
+
+    #[test]
+    fn gemini_image_replies_exclude_thoughts_text_usage_and_non_images() {
+        let value = json!({"modelVersion":"private-model","usageMetadata":{"totalTokenCount":99},"candidates":[{"content":{"parts":[
+            {"thought":true,"inlineData":{"mimeType":"image/png","data":"hidden-thought"}},
+            {"text":"private explanatory text"},
+            {"inlineData":{"mimeType":"image/png","data":"visible-image"}},
+            {"inline_data":{"mime_type":"image/jpeg","data":"second-image"}},
+            {"inlineData":{"mimeType":"text/html","data":"not-an-image"}}
+        ]}}]});
+        let reply = gemini_image_reply(&value).unwrap();
+        assert_eq!(reply["data"], json!([{"b64_json":"visible-image"},{"b64_json":"second-image"}]));
+        assert!(reply.get("modelVersion").is_none() && reply.get("usageMetadata").is_none());
+        assert!(gemini_image_reply(&json!({"candidates":[{"content":{"parts":[{"text":"blocked"}]}}]})).is_none());
+    }
 
     #[test]
     fn images_ask_only_for_what_the_gateway_offers() {
