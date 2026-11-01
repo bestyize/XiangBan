@@ -69,6 +69,7 @@ describe('small pet above the chat composer', () => {
     expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(true);
     expect(wrapper.findComponent({ name: 'StubPetActor' }).props('size')).toBe(75);
     await wrapper.setProps({ attention: true });
+    expect(wrapper.get('.composer-pet').classes()).toContain('is-attention');
     expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(false);
     await wrapper.get('[data-testid="composer-pet"]').trigger('click'); await flushPromises();
     expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(false);

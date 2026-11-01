@@ -683,6 +683,7 @@ async function openLink(href: string) {
 
 /* Messages */
 .chat-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
+.chat-column>*{position:relative;z-index:3}
 .chat-column{width:100%;max-width:760px;margin:0 auto;padding:12px 40px 24px;display:flex;flex-direction:column;gap:20px;box-sizing:border-box;min-width:0}
 .state-line{text-align:center;padding:40px 0;margin:0;color:var(--ui-text-tertiary);font-size:13px}
 .info-card,.welcome{text-align:center;padding:48px 16px;display:grid;gap:10px;justify-items:center}

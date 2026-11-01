@@ -65,7 +65,7 @@ async function poke() {
 </script>
 
 <template>
-  <div v-if="image" class="composer-pet" :class="[`is-${size}`, { 'is-reacting': reacting }]">
+  <div v-if="image" class="composer-pet" :class="[`is-${size}`, { 'is-reacting': reacting, 'is-attention': attention }]">
     <button ref="button" type="button" class="composer-pet-touch" aria-label="摸摸小伴" title="点一下，摸摸小伴" data-testid="composer-pet" @click.stop="poke">
       <img :src="image" class="composer-pet-picture" :class="{ 'is-hidden': reacting && actorComponent }" alt="" aria-hidden="true" draggable="false" />
       <component :is="actorComponent" v-if="reacting && actorComponent && definition" ref="actor" class="composer-pet-live" :definition="definition" :size="size === 'lg' ? 87 : 75" :paused="paused" :interactive="false" />
@@ -85,6 +85,7 @@ async function poke() {
 .composer-pet-picture.is-hidden{visibility:hidden}
 .composer-pet-live{position:absolute!important;left:0;top:0;pointer-events:none}
 .composer-pet-live :deep(.pet-stage),.composer-pet-live :deep(.pet-art){pointer-events:none}
+.composer-pet.is-attention{visibility:hidden;pointer-events:none}
 .composer-pet.is-reacting .composer-pet-touch{animation:pet-touch-response .4s ease-out}
 .composer-pet-reply{position:absolute;bottom:calc(100% - 14px);right:calc(100% - 5px);width:280px;max-width:calc(100vw - 44px);z-index:3;animation:pet-reply-in .2s ease-out}
 @keyframes pet-touch-response{0%,100%{transform:translateY(0) rotate(0)}30%{transform:translateY(-5px) rotate(-4deg)}65%{transform:translateY(-2px) rotate(3deg)}}
