@@ -6,13 +6,6 @@
 
 针对性验证：`npx vitest run src/ui/library/library.test.ts`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop local_open`。macOS 已实机验证图片打开；Windows 系统文件关联需在 Windows 验收。
 
-
-## 资料库云文档
-
-「资料库 → 云文档」复用腾讯文档与百度网盘的 MCP 登录，支持账号浏览、目录、分页、文件名搜索、腾讯正文搜索和百度语义搜索。腾讯选“读取并加入”后在原生窗口保存正文快照，可离线查看并带入提问／准备总结。百度选“下载到资料库”后通过开放平台下载原文件，保存在“我的文档”，复用文件分组、后台解析、预览与附件提问；已有云端引用也可下载原文件，重复操作定位已有本机副本，删除本机副本后可以重新下载。下载提供进度与取消，失败或取消清理临时文件，不把半个文件加入资料库。保留源站链接，访问令牌和临时下载链接仅在原生端使用，不返回窗口或写入索引。原文件保留资料库 200MB 导入限制；超过 10MB 的已下载 PDF／Office 文件提问时改用提取文字附件（最多约 600KB，明确标注覆盖范围），不把整个大文件塞入聊天。扫描件、加密文件或无文字层的文件仍可能无法提取文字，原文件保留并显示明确提示，不提供 OCR。图片仍沿用 3MB 附件限制。单次下载最长 10 分钟，网络无响应 30 秒失败；MCP 内容查询保持原时限。MCP 摘要／片段仍可预览，不当作全文；百度语义接口异常时明确提示并回退文件名搜索，腾讯正文搜索受账号权限限制。移除云端引用不删除已下载的原文件，也不修改云端文件。
-
-验证：`npx vitest run src/ui/library/cloud-browser.test.ts src/ui/library/LibraryCloud.test.ts src/ui/library/library.test.ts src/ui/library/cloud-document.test.ts src/ui/library/cloud-download.test.ts src/ui/configuration/windows.test.ts`、`npx vue-tsc --noEmit`；原生 `cargo test --offline --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop data_library::cloud::`。已用真实账号核对连接恢复、腾讯空间、文档列表与搜索、百度中文目录与文件名搜索，并验证腾讯正文预览与实际正文附件交接；百度原文件下载和重复定位已用 12.1MB PDF 实测；该样本没有可提取文字，扫描件提示正确。大文件文字附件以真实文字 PDF 夹具验证，取消以悬挂网络请求与临时文件清理测试验证。桌面统一为工具调用提供 45 秒下限，较长声明仍保留；接口库默认不改变调用方时限。
-
 ## 聊天图片生成
 
 直接在聊天中描述想生成的图片，或选择「＋ → 工具 → 生成图片」。内置 `image_generate` 通过小伴 AI 网关调用独立的生图模型，当前聊天模型无需切换，但须支持工具调用。使用前登录小伴账号并有可用额度；管理员须在 `server-ai` 的「产品与档位 → 媒体能力」配置并启用图片渠道、模型和可选尺寸，付费要求由服务端执行。桌面不接收生图模型名或上游密钥。
@@ -20,6 +13,12 @@
 支持文生图，一次 1–4 张；未指定尺寸时使用后台首选尺寸。聊天显示生成状态与图片预览（隐藏执行过程时也保留），可在系统图片查看器打开原图，或通过原生文件对话框另存为。原图和缩略图保存在数据根的 `chat/generated-images/`，会话仅保存文件引用，重开聊天仍可查看；删除对话暂不自动清理这些图片。生成成功后，原图自动复制到「资料库 → 我的文档 → AI 生成图片」，可用“图片”筛选；按图片内容去重，保留改名、移动和标签。打开资料库会补入旧版生成的图片及此前入库失败的本机原图，不重发生成请求；从资料库删除后不会再次自动补入，也不影响聊天原图。超过资料库 3MB 提问上限的图片仍完整保存，但不能直接作为提问附件。仅接受有界且经解码验证的 PNG/JPEG/WebP；图片下载不携带账号令牌。取消、超时或上游结果未知不会自动重发，避免重复计费；成功保存的部分图片仍保留。暂不支持参考图编辑与自定义生图服务配置。
 
 验证：本目录运行 `npx vitest run src/ui/chat/generated-images.test.ts src/ui/chat/ChatGeneratedImages.test.ts src/ui/chat/view.test.ts src/ui/components/ChatWorkbenchTools.test.ts src/ui/pages/ChatPage.test.ts`、`npx vue-tsc --noEmit`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::image_generation`。使用本机模拟网关与临时图片，不产生真实生图费用；线上模型效果、额度扣费及 Windows/macOS 图片查看器和保存对话框需实机验收。
+
+## 资料库云文档
+
+「资料库 → 云文档」复用腾讯文档与百度网盘的 MCP 登录，支持账号浏览、目录、分页、文件名搜索、腾讯正文搜索和百度语义搜索。腾讯选“读取并加入”后在原生窗口保存正文快照，可离线查看并带入提问／准备总结。百度选“下载到资料库”后通过开放平台下载原文件，保存在“我的文档”，复用文件分组、后台解析、预览与附件提问；已有云端引用也可下载原文件，重复操作定位已有本机副本，删除本机副本后可以重新下载。下载提供进度与取消，失败或取消清理临时文件，不把半个文件加入资料库。保留源站链接，访问令牌和临时下载链接仅在原生端使用，不返回窗口或写入索引。原文件保留资料库 200MB 导入限制；超过 10MB 的已下载 PDF／Office 文件提问时改用提取文字附件（最多约 600KB，明确标注覆盖范围），不把整个大文件塞入聊天。扫描件、加密文件或无文字层的文件仍可能无法提取文字，原文件保留并显示明确提示，不提供 OCR。图片仍沿用 3MB 附件限制。单次下载最长 10 分钟，网络无响应 30 秒失败；MCP 内容查询保持原时限。MCP 摘要／片段仍可预览，不当作全文；百度语义接口异常时明确提示并回退文件名搜索，腾讯正文搜索受账号权限限制。移除云端引用不删除已下载的原文件，也不修改云端文件。
+
+验证：`npx vitest run src/ui/library/cloud-browser.test.ts src/ui/library/LibraryCloud.test.ts src/ui/library/library.test.ts src/ui/library/cloud-document.test.ts src/ui/library/cloud-download.test.ts src/ui/configuration/windows.test.ts`、`npx vue-tsc --noEmit`；原生 `cargo test --offline --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop data_library::cloud::`。已用真实账号核对连接恢复、腾讯空间、文档列表与搜索、百度中文目录与文件名搜索，并验证腾讯正文预览与实际正文附件交接；百度原文件下载和重复定位已用 12.1MB PDF 实测；该样本没有可提取文字，扫描件提示正确。大文件文字附件以真实文字 PDF 夹具验证，取消以悬挂网络请求与临时文件清理测试验证。桌面统一为工具调用提供 45 秒下限，较长声明仍保留；接口库默认不改变调用方时限。
 
 ## 会话延续与工具发现
 

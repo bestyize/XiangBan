@@ -1243,25 +1243,6 @@ fn design_tool_can_be_discovered_after_a_continue_message() {
 }
 
 #[test]
-fn image_generation_is_discoverable_persisted_and_requires_permission() {
-    for (tag, answer, allowed) in [("image-allowed", Approval::Once, true), ("image-denied", Approval::Deny, false)] {
-        let rig = rig(tag, vec![
-            call("find-image", "tool_search", json!({"query":"生成图片"})),
-            call("generate", "image_generate", json!({"prompt":"一只猫"})),
-            Step::text("处理完成"),
-        ], answer);
-        let _ = run(&rig, "帮我画一张猫咪图片");
-        let requests = rig.provider.requests();
-        assert!(!requests[0].tools.iter().any(|tool| tool.name == "image_generate"));
-        assert!(requests[1].tools.iter().any(|tool| tool.name == "image_generate"));
-        assert!(lock(&rig.asked).iter().any(|(name, risk)| name == "image_generate" && risk == "write"));
-        assert_eq!(lock(&rig.desktop.calls).iter().any(|call| call == "generate-image 一只猫"), allowed);
-        let history = JsonlStore::new(rig.dirs.sessions()).load("s1").unwrap();
-        assert_eq!(history.iter().any(|message| message.structured_content.as_ref().is_some_and(|value| value["generated_images"].is_array())), allowed);
-    }
-}
-
-#[test]
 fn provider_state_scope_changes_with_provider_and_local_credential() {
     let mut config = crate::ai_config::AiConfig::default();
     config.active_provider = "service-a".into();
@@ -1287,4 +1268,23 @@ fn gateway_probe_is_exactly_one_hi_without_tools_or_history() {
     let request = probe_request();
     assert_eq!(request.messages, vec![Message::user_text("hi")]);
     assert!(request.tools.is_empty());
+}
+
+#[test]
+fn image_generation_is_discoverable_persisted_and_requires_permission() {
+    for (tag, answer, allowed) in [("image-allowed", Approval::Once, true), ("image-denied", Approval::Deny, false)] {
+        let rig = rig(tag, vec![
+            call("find-image", "tool_search", json!({"query":"生成图片"})),
+            call("generate", "image_generate", json!({"prompt":"一只猫"})),
+            Step::text("处理完成"),
+        ], answer);
+        let _ = run(&rig, "帮我画一张猫咪图片");
+        let requests = rig.provider.requests();
+        assert!(!requests[0].tools.iter().any(|tool| tool.name == "image_generate"));
+        assert!(requests[1].tools.iter().any(|tool| tool.name == "image_generate"));
+        assert!(lock(&rig.asked).iter().any(|(name, risk)| name == "image_generate" && risk == "write"));
+        assert_eq!(lock(&rig.desktop.calls).iter().any(|call| call == "generate-image 一只猫"), allowed);
+        let history = JsonlStore::new(rig.dirs.sessions()).load("s1").unwrap();
+        assert_eq!(history.iter().any(|message| message.structured_content.as_ref().is_some_and(|value| value["generated_images"].is_array())), allowed);
+    }
 }

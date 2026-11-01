@@ -1,6 +1,6 @@
 # server-ai：相伴 AI 网关与额度系统
 
-状态：一期、二期（兑换码）已实现；当前线上部署状态需核实。为产品矩阵提供统一的 AI 调用入口：身份只认[账号中心](../server-account/README.md)，上游模型经 New API 网关调用，额度按「账号 × 产品」隔离。设计取舍见 [docs/architecture/ai-gateway.md](../../docs/architecture/ai-gateway.md)。
+状态：一期、二期（兑换码）已实现并部署；2026-11-01 已核实香港服务器上的 `server-ai.service`，并接通桌面聊天生图。为产品矩阵提供统一的 AI 调用入口：身份只认[账号中心](../server-account/README.md)，上游模型经 New API 网关调用，额度按「账号 × 产品」隔离。设计取舍见 [docs/architecture/ai-gateway.md](../../docs/architecture/ai-gateway.md)，本次生图上线配置与回滚见 [AI 图片生成部署记录](../../docs/deployment/AI_IMAGE_GENERATION.md)。
 
 技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），管理后台为 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。默认端口 55010。
 
@@ -36,6 +36,14 @@
 - 真实模型在后台「媒体能力」里设置（New API 里 OpenAI 兼容的图片渠道），客户端传的 `model` 和其他字段一律不转发；尺寸只能从后台列出的里选，不传用第一个。
 - 返回只保留图片本身（`b64_json` 或 `url`、`revised_prompt`），不带模型名和用量。上游返回超过 48 MiB 视为失败。
 - 鉴权、额度检查与对话接口相同，价格按 New API 里该模型的倍率，用量随对账结算。未开放时返回 503 `image_unavailable`。
+
+Gemini 原生生图模型（`gemini-3.1-flash-image`、`gemini-3-pro-image`、`gemini-3.1-flash-lite-image`、`gemini-nano-banana-2.1`）仍通过上述统一接口调用：后台会转换为 New API 的 `/v1beta/models/{model}:generateContent`，由已配置的 Gemini / Vertex 渠道处理，用户令牌、钱包和额度对账沿用原路径。需要在 New API 渠道中登记同名模型，并配置正确的图像计费。标准尺寸支持 `1024x1024`、`1536x1024`、`1024x1536`、`1792x1024`、`1024x1792` 和 `auto`，映射为相应画幅比例，使用 1K 输出；实际像素尺寸由模型决定。一次请求多张时按张顺序调用，不自动重试；后续调用失败时返回已成功生成的图片。响应只保留最终图片，不返回思考内容、文本说明、模型名或用量，且累计图片响应仍受 48 MiB 限制。
+
+GPT 生图模型（`gpt-image-1.5`、`gpt-image-2`、`gpt-image-2.5` 及其 Flare / Sunburst 变体）转换为 New API `/v1/responses` 的 `image_generation` 工具请求，支持 ChatGPT Subscription（Codex）渠道。New API 中必须登记图片模型别名，并将外层模型映射到支持生图工具的聊天模型；工具内仍使用所选图片模型。当前实测配置为渠道 7 的 `gpt-image-2.5 → gpt-6.1-sol`，同时保留图片模型的按次计费。须将 `tool_price_setting.prices` 的 `image_generation:gpt-image-2.5*` 设为 0，避免在本站固定图片价格外重复加收工具费；不改变普通 GPT 聊天的工具定价。其他图片型号仍需各自核实授权、映射和计费。
+
+GPT 请求支持 `auto`、`1024x1024`、`1536x1024`、`1024x1536`；每张单独请求，无自动重试，只收集已完成的图片结果并排除 SSE 部分图片、文本与用量。Codex 订阅端点不接受 `max_tool_calls`，使用单一图片工具、关闭并行工具调用并要求单张输出。客户端接口仍为 `/v1/images/generations`；New API 原生 Codex 渠道本身没有因此新增 Images 端点。
+
+针对性验证：`cargo test --offline --locked --manifest-path services/server-ai/Cargo.toml media::unit`（仓库根目录）。
 
 ## 语音识别
 
