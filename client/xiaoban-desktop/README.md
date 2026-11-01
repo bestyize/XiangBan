@@ -16,9 +16,9 @@
 
 ## 资料库云文档
 
-「资料库 → 云文档」复用腾讯文档与百度网盘的 MCP 登录，支持账号浏览、目录、分页，以及文件名搜索、腾讯正文搜索和百度语义搜索（腾讯正文搜索受账号套餐权限限制；百度语义接口按自然语言查找文件，不保证全文命中；接口无法返回文件列表时会明确提示并回退文件名搜索）。选中“读取并加入”后，在原生独立窗口读取、预览并保存正文快照；已保存的内容可离线查看、刷新，并作为真实文字附件带入提问或准备总结，由用户发送。腾讯优先使用正文接口，智能文档分页读取为兼容路径；百度使用所选文件 ID 读取摘要／内容片段，始终标记为部分内容，不保证全文和下载。图片、扫描件或服务尚未解析的文件可能没有可读文字，此时禁用正文提问。刷新失败保留旧快照，移除仅清理本机引用和正文，不修改云端文件。连接管理复用插件原生窗口，凭据保存在本机保险箱，不进入预览窗口。
+「资料库 → 云文档」复用腾讯文档与百度网盘的 MCP 登录，支持账号浏览、目录、分页、文件名搜索、腾讯正文搜索和百度语义搜索。腾讯选“读取并加入”后在原生窗口保存正文快照，可离线查看并带入提问／准备总结。百度选“下载到资料库”后通过开放平台下载原文件，保存在“我的文档”，复用文件分组、后台解析、预览与附件提问；已有云端引用也可下载原文件，重复操作定位已有本机副本，删除本机副本后可以重新下载。下载提供进度与取消，失败或取消清理临时文件，不把半个文件加入资料库。保留源站链接，访问令牌和临时下载链接仅在原生端使用，不返回窗口或写入索引。原文件保留资料库 200MB 导入限制；超过 10MB 的已下载 PDF／Office 文件提问时改用提取文字附件（最多约 600KB，明确标注覆盖范围），不把整个大文件塞入聊天。扫描件、加密文件或无文字层的文件仍可能无法提取文字，原文件保留并显示明确提示，不提供 OCR。图片仍沿用 3MB 附件限制。单次下载最长 10 分钟，网络无响应 30 秒失败；MCP 内容查询保持原时限。MCP 摘要／片段仍可预览，不当作全文；百度语义接口异常时明确提示并回退文件名搜索，腾讯正文搜索受账号权限限制。移除云端引用不删除已下载的原文件，也不修改云端文件。
 
-验证：`npx vitest run src/ui/library/cloud-browser.test.ts src/ui/library/LibraryCloud.test.ts src/ui/library/library.test.ts src/ui/library/cloud-document.test.ts src/ui/configuration/windows.test.ts`、`npx vue-tsc --noEmit`；原生 `cargo test --offline --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop data_library::cloud::`。已用真实账号核对连接恢复、腾讯空间、文档列表与搜索、百度中文目录与文件名搜索，并验证腾讯正文预览与实际正文附件交接；百度读取范围按实际返回内容标注。桌面统一为工具调用提供 45 秒下限，较长声明仍保留；接口库默认不改变调用方时限。
+验证：`npx vitest run src/ui/library/cloud-browser.test.ts src/ui/library/LibraryCloud.test.ts src/ui/library/library.test.ts src/ui/library/cloud-document.test.ts src/ui/library/cloud-download.test.ts src/ui/configuration/windows.test.ts`、`npx vue-tsc --noEmit`；原生 `cargo test --offline --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop data_library::cloud::`。已用真实账号核对连接恢复、腾讯空间、文档列表与搜索、百度中文目录与文件名搜索，并验证腾讯正文预览与实际正文附件交接；百度原文件下载和重复定位已用 12.1MB PDF 实测；该样本没有可提取文字，扫描件提示正确。大文件文字附件以真实文字 PDF 夹具验证，取消以悬挂网络请求与临时文件清理测试验证。桌面统一为工具调用提供 45 秒下限，较长声明仍保留；接口库默认不改变调用方时限。
 
 ## 会话延续与工具发现
 

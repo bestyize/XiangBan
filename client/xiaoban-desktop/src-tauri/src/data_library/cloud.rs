@@ -1,6 +1,7 @@
 //! Read-only cloud browser. Credentials and transport stay in the existing MCP manager.
 use super::*;
 pub mod content;
+pub mod download;
 use agent_kernel::{Tool, ToolCtx};
 pub use content::ContentState;
 use std::sync::Arc;

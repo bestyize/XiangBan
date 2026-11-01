@@ -108,6 +108,11 @@ onMounted(() => window.addEventListener('keydown', focusSearch, true));
 onBeforeUnmount(() => window.removeEventListener('keydown', focusSearch, true));
 
 /* ── Into a conversation ── */
+async function showDownloaded(id: string) {
+  query.value = ''; pick('docs'); await nextTick();
+  const doc = library.data.docs.find(doc => doc.id === id);
+  if (doc) docsTab.value?.showCreated(id, doc.folder);
+}
 async function startTask(draft: string, attachments: NonNullable<ControlStore['creationAttachments']> = []) {
   await props.store.chat.select(null);
   props.store.creationAttachments = attachments.length ? attachments : null;
@@ -154,7 +159,7 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
     </header>
     <div :id="`library-panel-${tab}`" class="library-body" role="tabpanel" :aria-labelledby="`library-tab-${tab}`">
       <LibraryDocs v-if="tab === 'docs'" ref="docsTab" :library="library" :query="query" :desktop="store.desktop" @ask="askWith" @design="openDesign" @notify="notify" />
-      <LibraryCloud v-else-if="tab === 'cloud'" ref="cloudTab" :library="library" :query="query" :desktop="store.desktop" :open-url="openUrl" @notify="notify" @ask="startTask" />
+      <LibraryCloud v-else-if="tab === 'cloud'" ref="cloudTab" :library="library" :query="query" :desktop="store.desktop" :open-url="openUrl" @notify="notify" @ask="startTask" @imported="showDownloaded" />
       <LibrarySavedTab v-else-if="tab === 'saved'" ref="savedTab" :library="library" :query="query" @open="item => item.sessionId && openSession(item.sessionId)" @ask="askAbout" @notify="notify" />
       <LibraryMemory v-else ref="memoryTab" :library="library" :query="query" :desktop="store.desktop" :session-title="sessionTitle" @open-session="openSession" @created="query = ''" />
     </div>

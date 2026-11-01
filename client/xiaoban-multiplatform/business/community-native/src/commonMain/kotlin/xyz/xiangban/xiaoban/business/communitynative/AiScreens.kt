@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -411,30 +413,34 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         MicPermissionLayer(env, voiceInput) { toast = it }
         VoiceCallLayer(env, callHost, "小伴AI") { toast = it }
         OverlayTransition(modelSheet) { panel ->
-            BottomSheet({ modelSheet = false }, panel) {
-                Text("选择模型", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                Text("只对当前这个对话生效。", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text("小伴AI · 官方", Modifier.padding(top = 12.dp), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (cloud.tiers.isEmpty()) {
-                    Text(if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"), Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                BottomSheet({ modelSheet = false }, panel.heightIn(max = maxHeight * 0.8f)) {
+                    Text("选择模型", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                    Text("只对当前这个对话生效。", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("小伴AI · 官方", Modifier.padding(top = 12.dp), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                        if (cloud.tiers.isEmpty()) {
+                            Text(if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"), Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+                        }
+                        cloud.tiers.forEach { tier ->
+                            RadioRow(
+                                selected = cloud.selectedTier == tier.tier,
+                                title = tier.displayName,
+                                desc = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description,
+                                enabled = tier.available,
+                                onClick = { if (tier.available) { chat.selectTier(tier.tier); modelSheet = false } else { modelSheet = false; open(Route.Models) } },
+                            )
+                        }
+                    }
+                    Row(
+                        Modifier.padding(top = 8.dp).fillMaxWidth().clickable { modelSheet = false; open(Route.Models) }.padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text("模型与额度（余额、兑换）", Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        XIcon(XIcons.ChevronRight, size = 16.dp)
+                    }
+                    GhostPillButton("取消", { modelSheet = false }, Modifier.padding(top = 4.dp).fillMaxWidth())
                 }
-                cloud.tiers.forEach { tier ->
-                    RadioRow(
-                        selected = cloud.selectedTier == tier.tier,
-                        title = tier.displayName,
-                        desc = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description,
-                        enabled = tier.available,
-                        onClick = { if (tier.available) { chat.selectTier(tier.tier); modelSheet = false } else { modelSheet = false; open(Route.Models) } },
-                    )
-                }
-                Row(
-                    Modifier.padding(top = 8.dp).fillMaxWidth().clickable { modelSheet = false; open(Route.Models) }.padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("模型与额度（余额、兑换）", Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                    XIcon(XIcons.ChevronRight, size = 16.dp)
-                }
-                GhostPillButton("取消", { modelSheet = false }, Modifier.padding(top = 4.dp).fillMaxWidth())
             }
         }
     }

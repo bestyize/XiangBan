@@ -10,7 +10,7 @@ pub fn kind(label: &str) -> Option<&'static str> {
     (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("model")
 }
 pub fn command_allowed(role: &str, command: &str) -> bool {
-    if role == "cloud" { return ["get_settings", "library_cloud_item", "library_cloud_open_source", "library_cloud_read", "library_cloud_open_task"].contains(&command); }
+    if role == "cloud" { return ["get_settings", "library_cloud_item", "library_cloud_open_source", "library_cloud_download", "library_cloud_download_cancel", "library_cloud_read", "library_cloud_open_task"].contains(&command); }
     if role == "store" { return [
         "get_settings", "get_app_info", "open_download_url", "ai_store_open_task",
         "ai_store_installed", "ai_store_inspect", "ai_store_install", "ai_store_uninstall",
@@ -119,6 +119,9 @@ pub fn cloud_scope(label: &str, command: &str, args: &serde_json::Value) -> bool
         let label=cloud_label("one");
         assert_eq!(kind(&label),Some("cloud"));
         assert!(command_allowed("cloud","library_cloud_read"));
+        assert!(command_allowed("cloud","library_cloud_download"));
+        assert!(!command_allowed("store","library_cloud_download"));
+        assert!(!cloud_scope(&label,"library_cloud_download",&serde_json::json!({"id":"two"})));
         assert!(!command_allowed("cloud","chat_send"));
         assert!(!command_allowed("cloud","open_download_url"));
         assert!(cloud_scope(&label,"library_cloud_read",&serde_json::json!({"id":"one"})));

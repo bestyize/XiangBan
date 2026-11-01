@@ -208,6 +208,7 @@ pub async fn configuration_window_invoke(app: tauri::AppHandle, window: tauri::W
     let args=args.unwrap_or_else(||json!({}));
     if !args.is_object() || args.to_string().len()>1_000_000 { return Err(json!("配置参数无效或过大")); }
     if !policy::cloud_scope(window.label(), &command, &args) { return Err(json!("此窗口只能读取当前云文档")); }
+    let wait_timeout=Duration::from_secs(if role == "cloud" && command == "library_cloud_download" { 660 } else { 180 });
     let id=SEQUENCE.fetch_add(1,Ordering::Relaxed).to_string(); let (tx,rx)=mpsc::channel();
     {
         let state=app.state::<ConfigurationState>();
@@ -216,7 +217,7 @@ pub async fn configuration_window_invoke(app: tauri::AppHandle, window: tauri::W
         pending.insert(id.clone(),Pending{label:window.label().into(),request:Request{id:id.clone(),command,args},taken:false,sender:tx});
     }
     let result=match app.emit_to("control","configuration-command",json!({"id":id})) {
-        Ok(()) => tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(Duration::from_secs(180)).unwrap_or_else(|_|Err(json!("配置操作超时，请检查主窗口是否仍在运行")))).await.unwrap_or_else(|_|Err(json!("配置操作已中断"))),
+        Ok(()) => tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(wait_timeout).unwrap_or_else(|_|Err(json!("配置操作超时，请检查主窗口是否仍在运行")))).await.unwrap_or_else(|_|Err(json!("配置操作已中断"))),
         Err(_) => Err(json!("主窗口不可用，无法保存配置")),
     };
     app.state::<ConfigurationState>().pending.lock().unwrap_or_else(|e|e.into_inner()).remove(&id);
