@@ -7,6 +7,7 @@
 
 use base64::Engine;
 pub mod cloud;
+pub(crate) mod generated_images;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -99,6 +100,8 @@ pub struct Library {
     pub docs: Vec<Doc>,
     pub links: Vec<Link>,
     pub saved: Vec<Saved>,
+    /// Includes removed images, so recovery respects the user's decision to delete a copy.
+    pub generated_image_imports: Vec<String>,
 }
 
 /// Serializes every change to `library.json`.
@@ -375,6 +378,7 @@ pub fn library_state(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Res
     let root = root(&app)?;
     // Recover a source commit whose indexing was interrupted, without duplicating documents.
     for p in crate::design::store(&app)?.list("*")? { upsert_design(&app,&p)?; }
+    generated_images::recover(&app)?;
     let library = load(&root);
     // A reading interrupted by quitting picks up where it stopped.
     if library.docs.iter().any(|d| d.status == "reading") { read_pending(&app); }

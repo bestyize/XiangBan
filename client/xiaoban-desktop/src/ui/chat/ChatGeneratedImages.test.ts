@@ -50,6 +50,14 @@ describe('image generation delivery', () => {
     expect(vi.mocked(invoke).mock.calls.map(([name]) => name)).toEqual(['chat_generated_image_read', 'chat_generated_image_save', 'chat_generated_image_read']);
     wrapper.unmount();
   });
+  it('keeps the generated image visible when library indexing needs recovery', async () => {
+    const wrapper = mount(ChatGeneratedImages, { props: { calls: [{ ...call(), output: '图片已保存在本机，部分资料库入库未完成。' }] } });
+    await flushPromises();
+    expect(wrapper.get('img').exists()).toBe(true);
+    expect(wrapper.get('[role=status]').text()).toContain('入库未完成');
+    expect(vi.mocked(invoke).mock.calls.map(([name]) => name)).toEqual(['chat_generated_image_read']);
+    wrapper.unmount();
+  });
   it('keeps failed generations visible and ignores arbitrary remote preview URLs', async () => {
     const wrapper = mount(ChatGeneratedImages, { props: { calls: [{ ...call('error'), output: '需要先兑换付费额度' }] } });
     expect(wrapper.get('[role=alert]').text()).toContain('兑换付费额度');

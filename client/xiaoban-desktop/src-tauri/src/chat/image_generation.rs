@@ -74,7 +74,7 @@ impl Tool for Generate {
         match self.desktop.generate_images(args, ctx) {
             Ok(value) => {
                 let partial = value["warnings"].as_array().is_some_and(|warnings| !warnings.is_empty());
-                ToolResult::ok(if partial { "部分图片已生成并保存在本机，部分图片未能保存。请检查结果，勿自动重复生成。" } else { "图片已生成并保存在本机，聊天中可预览和另存为。" })
+                ToolResult::ok(if partial { "图片已保存在本机，部分生成、保存或资料库入库未完成。请检查结果，勿自动重复生成。" } else { "图片已生成并自动存入资料库，聊天中可预览和另存为。" })
                     .with_structured_content(value)
             }
             Err(error) if error.contains(UNKNOWN) => ToolResult::error(error)
@@ -186,13 +186,21 @@ fn checked_path(root: &Path, id: &str) -> Result<PathBuf, String> {
 pub(super) fn generate(app: &tauri::AppHandle, args: Value, ctx: &ToolCtx) -> Result<Value, String> {
     let request = Request::checked(args)?;
     let directory = root(app)?;
-    tauri::async_runtime::block_on(async {
+    let mut result = tauri::async_runtime::block_on(async {
         let token = cancellable(ctx, async { crate::account::fresh_access_token(app).await.map_err(|_| "请先登录小伴账号，再使用图片生成".into()) }).await?;
         let client = crate::network::async_builder(reqwest::Client::builder().connect_timeout(Duration::from_secs(10))
             .timeout(Duration::from_secs(180)).redirect(reqwest::redirect::Policy::none()))?.build().map_err(|_| "无法创建生图连接")?;
         let base = crate::ai_gateway::ai_base_url();
         generate_request(&client, &base, &token, &directory, &request, ctx).await
-    })
+    })?;
+    let ids = result["generated_images"].as_array().into_iter().flatten()
+        .filter_map(|image| image["id"].as_str().map(str::to_owned)).collect::<Vec<_>>();
+    // Preserve successful generation even when indexing fails. Opening the library retries
+    // the local copy only; it must never send another paid generation request.
+    let warnings = crate::data_library::generated_images::register(app, &ids)
+        .unwrap_or_else(|error| vec![format!("图片已保存在聊天中，资料库入库未完成：{error}")]);
+    result["warnings"].as_array_mut().ok_or("生图结果无法读取")?.extend(warnings.into_iter().map(Value::String));
+    Ok(result)
 }
 
 async fn generate_request(client: &reqwest::Client, base: &str, token: &str, directory: &Path, request: &Request, ctx: &ToolCtx) -> Result<Value, String> {

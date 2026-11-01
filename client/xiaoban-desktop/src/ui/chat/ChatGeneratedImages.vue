@@ -46,7 +46,7 @@ async function action(image: GeneratedImage, save: boolean) {
       <LoaderCircle v-if="call.status === 'running'" :size="15" class="spin" />
       <span>{{ call.status === 'running' ? awaitingApproval ? '等待生图确认…' : '正在生成图片…' : !call.output || ['已中断', '没有执行完就中断了'].includes(call.output) ? '图片生成已中断；结果可能已生成并计费，请勿自动重试。' : call.output.split('\n{')[0] }}</span>
     </p>
-    <p v-for="call in calls.filter(item => item.status === 'done' && item.output.includes('部分'))" :key="`${call.id}-warning`" class="generation-state" role="status">部分图片未能保存，请检查执行结果，避免重复生成。</p>
+    <p v-for="call in calls.filter(item => item.status === 'done' && item.output.includes('部分'))" :key="`${call.id}-warning`" class="generation-state" role="status">部分图片生成、保存或入库未完成，请检查执行结果，避免重复生成。</p>
     <div v-if="images.length" class="image-grid">
       <figure v-for="image in images" :key="image.id" class="image-card" data-testid="generated-image-card">
         <button v-if="previews[image.id]" type="button" class="image-preview" :aria-label="`查看原图：${image.name}`" title="在系统图片查看器中查看原图" :disabled="busy[image.id]" @click="action(image, false)">
