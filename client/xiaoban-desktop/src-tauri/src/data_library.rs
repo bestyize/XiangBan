@@ -554,6 +554,23 @@ pub fn library_remove(app: tauri::AppHandle, window: tauri::WebviewWindow, ids: 
     }).map(|(_, library)| library)
 }
 
+fn local_document_path(root: &Path, id: &str) -> Result<PathBuf, String> {
+    let doc = load(root).docs.into_iter().find(|d| d.id == id).ok_or("这份文档已经不在了")?;
+    if doc.design_id.is_some() { return Err("请在设计画布中打开这份作品".into()); }
+    let files = root.join("files").canonicalize().map_err(|_| "资料库文件目录已不存在")?;
+    let path = root.join("files").join(&doc.id).join(&doc.name).canonicalize().map_err(|_| "本地文件已不存在或无法访问")?;
+    if !path.starts_with(&files) || !path.is_file() { return Err("这份资料没有有效的本地文件副本".into()); }
+    Ok(path)
+}
+
+/// Open the library's own copy with the system default app, independently of AI attachment limits.
+#[tauri::command]
+pub fn library_open(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<(), String> {
+    control_only(&window)?;
+    let path = local_document_path(&root(&app)?, &id)?;
+    crate::storage::show_in_file_manager(&path).map_err(|_| "无法打开文件，请检查系统默认应用关联".into())
+}
+
 /// Shows the copy in Finder or Explorer.
 #[tauri::command]
 pub fn library_reveal(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<(), String> {
@@ -652,6 +669,38 @@ fn save_item(app: &tauri::AppHandle, source: &str, item: SaveInput) -> Result<St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_open_uses_the_library_copy_regardless_of_attachment_status() {
+        let dir = std::env::temp_dir().join(format!("xiaoban-library-open-{}", std::process::id()));
+        let folder = dir.join("files/large-image"); fs::create_dir_all(&folder).unwrap();
+        let copy = folder.join("我的 图片.png"); fs::write(&copy, b"library copy").unwrap();
+        let mut library = Library::default();
+        library.docs.push(Doc { id: "large-image".into(), name: "我的 图片.png".into(), origin: "/not/the/copy.png".into(), status: "tooLarge".into(), ..Doc::default() });
+        save(&dir, &library).unwrap();
+        assert_eq!(local_document_path(&dir, "large-image").unwrap(), copy.canonicalize().unwrap());
+        assert!(local_document_path(&dir, "missing").unwrap_err().contains("已经不在"));
+        library.docs[0].design_id = Some("design-1".into()); save(&dir, &library).unwrap();
+        assert!(local_document_path(&dir, "large-image").unwrap_err().contains("设计画布"));
+        library.docs[0].design_id = None; save(&dir, &library).unwrap(); fs::remove_file(copy).unwrap();
+        assert!(local_document_path(&dir, "large-image").unwrap_err().contains("已不存在"));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn local_open_rejects_directories_and_symlinks_outside_the_library() {
+        let dir = std::env::temp_dir().join(format!("xiaoban-library-open-bounds-{}", std::process::id()));
+        let folder = dir.join("files/doc"); fs::create_dir_all(folder.join("directory")).unwrap();
+        let mut library = Library::default(); library.docs.push(Doc { id: "doc".into(), name: "directory".into(), ..Doc::default() });
+        save(&dir, &library).unwrap(); assert!(local_document_path(&dir, "doc").is_err());
+        #[cfg(unix)] {
+            fs::write(dir.join("outside.txt"), b"outside").unwrap();
+            std::os::unix::fs::symlink(dir.join("outside.txt"), folder.join("linked.txt")).unwrap();
+            library.docs[0].name = "linked.txt".into(); save(&dir, &library).unwrap();
+            assert!(local_document_path(&dir, "doc").is_err());
+        }
+        let _ = fs::remove_dir_all(dir);
+    }
 
     #[test]
     fn ordinary_documents_stay_documents_and_design_content_is_auto_imported(){

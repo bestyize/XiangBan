@@ -1,5 +1,11 @@
 # 小伴桌面：桌宠、动态壁纸与 Agent
 
+## 资料库本地文件
+
+「资料库 → 我的文档」中，单击查看详情，双击或按 Enter 使用系统默认应用打开资料库里的文件副本；设计稿继续打开独立设计画布。图片、PDF、Office 和文本文件均不受 AI 提问的大小或文字读取状态限制；本机副本缺失或系统没有关联应用时显示错误。
+
+针对性验证：`npx vitest run src/ui/library/library.test.ts`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop local_open`。macOS 已实机验证图片打开；Windows 系统文件关联需在 Windows 验收。
+
 ## 聊天图片生成
 
 直接在聊天中描述想生成的图片，或选择「＋ → 工具 → 生成图片」。内置 `image_generate` 通过小伴 AI 网关调用独立的生图模型，当前聊天模型无需切换，但须支持工具调用。使用前登录小伴账号并有可用额度；管理员须在 `server-ai` 的「产品与档位 → 媒体能力」配置并启用图片渠道、模型和可选尺寸，付费要求由服务端执行。桌面不接收生图模型名或上游密钥。

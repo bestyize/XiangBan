@@ -53,7 +53,7 @@ describe('image generation delivery', () => {
   it('keeps the generated image visible when library indexing needs recovery', async () => {
     const wrapper = mount(ChatGeneratedImages, { props: { calls: [{ ...call(), output: '图片已保存在本机，部分资料库入库未完成。' }] } });
     await flushPromises();
-    expect(wrapper.get('img').exists()).toBe(true);
+    expect(wrapper.find('img').exists()).toBe(true);
     expect(wrapper.get('[role=status]').text()).toContain('入库未完成');
     expect(vi.mocked(invoke).mock.calls.map(([name]) => name)).toEqual(['chat_generated_image_read']);
     wrapper.unmount();

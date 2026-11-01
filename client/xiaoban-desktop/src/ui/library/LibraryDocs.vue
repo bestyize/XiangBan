@@ -57,6 +57,10 @@ const kind = (doc: LibraryDoc) => KINDS[doc.ext] ?? [(doc.ext || 'FILE').slice(0
 const status = (doc: LibraryDoc) => DOC_STATUS[doc.status] ?? DOC_STATUS.unsupported;
 
 function open(id: FolderView) { view.value = id; selected.value = null; }
+function openDocument(doc: LibraryDoc) {
+  if (doc.designId) emit('design', doc.designId);
+  else if (props.desktop) void props.library.openFile(doc.id);
+}
 
 /* ── Folders ── */
 const naming = ref<null | { mode: 'create' | 'rename-folder' | 'rename-doc'; id?: string; initial: string }>(null);
@@ -184,7 +188,8 @@ defineExpose({ importFrom, newFolder: () => { naming.value = { mode: 'create', i
             <span class="lib-muted">打开 ›</span>
           </button>
           <button v-for="doc in docs" :key="doc.id" type="button" role="listitem" class="row" :class="{ selected: current?.id === doc.id }" :aria-pressed="current?.id === doc.id" draggable="true" :data-testid="`library-doc-${doc.id}`"
-            @click="selected = doc.id" @dblclick="doc.designId && emit('design', doc.designId)" @dragstart="dragDoc($event, doc)">
+            :title="doc.designId ? '双击或按 Enter 打开设计画布' : desktop ? '双击或按 Enter 使用系统默认应用打开' : '请在小伴桌面中打开本地文件'"
+            @click="selected = doc.id" @dblclick="openDocument(doc)" @keydown.enter.prevent="openDocument(doc)" @dragstart="dragDoc($event, doc)">
             <span class="row-main">
               <span class="file-icon" :style="{ background: kind(doc)[1], color: kind(doc)[2] }">{{ kind(doc)[0] }}</span>
               <span class="row-text"><b>{{ doc.name }}</b><span class="lib-muted">{{ kind(doc)[0] }} · {{ formatSize(doc.size) }} · {{ formatWhen(doc.importedMs) }}<template v-if="showWhere"> · {{ folderPath(folders, doc.folder) }}</template></span></span>

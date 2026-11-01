@@ -191,6 +191,7 @@ export function createLibraryStore(deps: LibraryDeps) {
     setTags: (id: string, tags: string[]) => update('library_update_doc', { id, patch: { tags } }),
     remove: (ids: string[]) => update('library_remove', { ids }),
     reveal: (id: string) => run(() => deps.invoke('library_reveal', { id })),
+    openFile: (id: string) => run(() => deps.invoke('library_open', { id })),
     addLink: (url: string, title: string, folder: string | null) => update('library_add_link', { url, title, folder }),
     renameLink: (id: string, title: string) => update('library_rename_link', { id, title }),
     /** The document as a chat attachment: a data URL for an image, a file record otherwise. */
