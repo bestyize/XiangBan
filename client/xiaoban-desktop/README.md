@@ -8,6 +8,12 @@
 
 验证：本目录运行 `npx vitest run src/ui/chat/generated-images.test.ts src/ui/chat/ChatGeneratedImages.test.ts src/ui/chat/view.test.ts src/ui/components/ChatWorkbenchTools.test.ts src/ui/pages/ChatPage.test.ts`、`npx vue-tsc --noEmit`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::image_generation`。使用本机模拟网关与临时图片，不产生真实生图费用；线上模型效果、额度扣费及 Windows/macOS 图片查看器和保存对话框需实机验收。
 
+## 资料库云文档
+
+「资料库 → 云文档」复用腾讯文档与百度网盘的 MCP 登录，提供账号文件浏览、文件夹、关键词搜索、分页和保存云端引用；腾讯文档先列空间，百度网盘支持中文目录；连接 / 管理打开已有插件原生窗口，凭据仅在本机保险箱中。选中文件加入资料库后可准备提问草稿，由用户补充并发送，正文再通过 MCP 按需读取；百度网盘当前以内容检索片段为主，不保证全文读取和下载。界面不后台扫描账号，不修改云端文件，移除仅删本机引用。
+
+验证：`npx vitest run src/ui/library/cloud-browser.test.ts src/ui/library/LibraryCloud.test.ts src/ui/library/library.test.ts`、`npx vue-tsc --noEmit`；原生 `cargo test --offline --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop data_library::cloud::tests`。已用真实账号核对连接恢复、腾讯空间、文档列表与搜索、百度中文目录与文件名搜索，并验证保存引用和提问草稿交接。桌面统一为工具调用提供 45 秒下限，较长声明仍保留；接口库默认不改变调用方时限。
+
 ## 会话延续与工具发现
 
 对话中追加“继续”等简短消息时，设计任务会继承最近的设计请求；设计画板始终可通过工具目录按需发现，不依赖最新消息重复出现“设计稿”。用户明确指定工具或交付方式时，无法使用应先说明并征询，不擅自换成交付形式不同的结果。对话摘要按时间顺序记录用户请求、图片附件数量、工具结果和后续更正，并区分草稿、已保存与已验证状态；原始用户消息优先于摘要。极限上下文或请求大小限制仍可能省略旧图片，不能保证历史图片始终进入模型。

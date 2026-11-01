@@ -797,13 +797,13 @@ fn research_subagent(
     })
 }
 
-fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_connector_tools::ConnectorManager>, String> {
+pub(crate) fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_connector_tools::ConnectorManager>, String> {
     let state=app.state::<ChatState>();
     let mut slot=lock(&state.connectors);
     if let Some(manager)=slot.as_ref(){return Ok(manager.clone());}
     let config=ai_config::current(app)?;
     let default=ai_config::default_workspace(app)?;
-    let manager=Arc::new(agent_connector_tools::ConnectorManager::new_lazy(Dirs::of(app)?.chat.join("connectors"),config.workspace_or(&default).to_path_buf())?);
+    let manager=Arc::new(agent_connector_tools::ConnectorManager::new_lazy(Dirs::of(app)?.chat.join("connectors"),config.workspace_or(&default).to_path_buf())?.with_tool_timeout_floor(Duration::from_secs(45)));
     *slot=Some(manager.clone());
     Ok(manager)
 }

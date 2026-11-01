@@ -6,6 +6,7 @@
 //! the user asks with it ("小伴可参考"), and the first lines become its preview.
 
 use base64::Engine;
+pub mod cloud;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -72,6 +73,7 @@ pub struct Link {
     pub code: Option<String>,
     pub folder: Option<String>,
     pub added_ms: u64,
+    pub remote: Option<cloud::Reference>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -588,7 +590,7 @@ pub fn library_add_link(app: tauri::AppHandle, window: tauri::WebviewWindow, url
         let url = url.trim().to_string();
         if library.links.iter().any(|l| l.url == url) { return Err("这个链接已经在资料库里了".into()); }
         let title = if title.is_empty() { kind.clone() } else { title.to_string() };
-        library.links.insert(0, Link { id: new_id(&app), url, title, platform, kind, code, folder, added_ms: now_ms() });
+        library.links.insert(0, Link { id: new_id(&app), url, title, platform, kind, code, folder, added_ms: now_ms(), remote: None });
         Ok(())
     }).map(|(_, library)| library)
 }
