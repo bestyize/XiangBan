@@ -27,6 +27,7 @@ mod community;
 mod compact;
 mod danger;
 mod desktop_tools;
+pub mod image_generation;
 mod tool_discovery;
 mod game_draft;
 pub mod delegation_tools;
@@ -672,6 +673,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .tool(ask)
         .tool(Shell::new(workspace).sandbox(sandbox_gate::hook(permission.clone(), workspace)))
         .tool(WebFetch::new())
+        .deferred_trusted_tool_arc(image_generation::tool(desktop.clone()))
         .tool(learning::Recall::new(dirs.learning_db()).paused(!remember))
         .middleware(discovery.acquisition_policy())
         // The user's own checks run first: a call they stop is never put to them for approval.

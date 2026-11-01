@@ -28,6 +28,15 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); });
 
 describe('add-capability menu hover interaction', () => {
+  it('selects image generation without switching or configuring the chat model', async () => {
+    const { wrapper } = setup();
+    await wrapper.get('[data-testid=chat-add-menu]').trigger('click');
+    await wrapper.get('[data-testid=chat-add-tools]').trigger('click');
+    await wrapper.get('[data-testid=chat-tool-image]').trigger('click'); await flushPromises();
+    expect(wrapper.emitted('use-tool')).toEqual([['image']]);
+    expect(vi.mocked(invoke).mock.calls.some(([command]) => ['save_ai_config', 'ai_gateway_use'].includes(command))).toBe(false);
+    wrapper.unmount();
+  });
   it('shows compact builtin tools and selects an enabled computer tool', async () => {
     const original = vi.mocked(invoke).getMockImplementation()!;
     vi.mocked(invoke).mockImplementation(async (command, args) => command === 'get_ai_config' ? { openComputerUse: true } as never : original(command, args));

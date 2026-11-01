@@ -1,5 +1,13 @@
 # 小伴桌面：桌宠、动态壁纸与 Agent
 
+## 聊天图片生成
+
+直接在聊天中描述想生成的图片，或选择「＋ → 工具 → 生成图片」。内置 `image_generate` 通过小伴 AI 网关调用独立的生图模型，当前聊天模型无需切换，但须支持工具调用。使用前登录小伴账号并有可用额度；管理员须在 `server-ai` 的「产品与档位 → 媒体能力」配置并启用图片渠道、模型和可选尺寸，付费要求由服务端执行。桌面不接收生图模型名或上游密钥。
+
+支持文生图，一次 1–4 张；未指定尺寸时使用后台首选尺寸。聊天显示生成状态与图片预览（隐藏执行过程时也保留），可在系统图片查看器打开原图，或通过原生文件对话框另存为。原图和缩略图保存在数据根的 `chat/generated-images/`，会话仅保存文件引用，重开聊天仍可查看；删除对话暂不自动清理这些图片。仅接受有界且经解码验证的 PNG/JPEG/WebP；图片下载不携带账号令牌。取消、超时或上游结果未知不会自动重发，避免重复计费；成功保存的部分图片仍保留。暂不支持参考图编辑与自定义生图服务配置。
+
+验证：本目录运行 `npx vitest run src/ui/chat/generated-images.test.ts src/ui/chat/ChatGeneratedImages.test.ts src/ui/chat/view.test.ts src/ui/components/ChatWorkbenchTools.test.ts src/ui/pages/ChatPage.test.ts`、`npx vue-tsc --noEmit`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::image_generation`。使用本机模拟网关与临时图片，不产生真实生图费用；线上模型效果、额度扣费及 Windows/macOS 图片查看器和保存对话框需实机验收。
+
 ## 会话延续与工具发现
 
 对话中追加“继续”等简短消息时，设计任务会继承最近的设计请求；设计画板始终可通过工具目录按需发现，不依赖最新消息重复出现“设计稿”。用户明确指定工具或交付方式时，无法使用应先说明并征询，不擅自换成交付形式不同的结果。对话摘要按时间顺序记录用户请求、图片附件数量、工具结果和后续更正，并区分草稿、已保存与已验证状态；原始用户消息优先于摘要。极限上下文或请求大小限制仍可能省略旧图片，不能保证历史图片始终进入模型。

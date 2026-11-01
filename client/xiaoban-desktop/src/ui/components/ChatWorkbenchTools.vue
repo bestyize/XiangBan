@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { Check, ChevronRight, Camera, Paperclip, Plus, Search, UserRound, Zap, Plug, ArrowUpRight, Monitor, Smartphone, PanelsTopLeft, Hammer, Settings2 } from 'lucide-vue-next';
+import { Check, ChevronRight, Camera, Paperclip, Plus, Search, UserRound, Zap, Plug, ArrowUpRight, Monitor, Smartphone, PanelsTopLeft, ImagePlus, Hammer, Settings2 } from 'lucide-vue-next';
 import { invoke, type AiConfigView } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { Skill, SkillPage } from '../ai-store/catalog.ts';
@@ -209,6 +209,7 @@ function checkComputerPermissions() {
             <div class="wb-computer-row"><button type="button" class="wb-menu-item" data-testid="chat-tool-computer" :disabled="computerBusy" @click="useTool('computer')"><Monitor :size="15" /><span>操作电脑</span></button><button type="button" class="wb-computer-manage" data-testid="chat-tool-computer-manage" aria-label="管理电脑控制" title="管理电脑控制" :disabled="computerBusy" @click="readComputer(false)"><Settings2 :size="15" /></button></div>
             <button type="button" class="wb-menu-item" data-testid="chat-tool-phone" @click="useTool('phone')"><Smartphone :size="15" /><span>操作手机</span></button>
             <button type="button" class="wb-menu-item" data-testid="chat-tool-design" @click="useTool('design')"><PanelsTopLeft :size="15" /><span>设计画板</span></button>
+            <button type="button" class="wb-menu-item" data-testid="chat-tool-image" title="使用小伴 AI 生成图片，需要登录及可用额度" aria-description="使用小伴 AI 生成图片，需要登录及可用额度" @click="useTool('image')"><ImagePlus :size="15" /><span>生成图片</span></button>
           </template>
           <div v-else class="wb-computer-info" data-testid="chat-computer-settings">
             <strong>电脑控制 · {{ computerEnabled ? '已启用' : '未启用' }}</strong>

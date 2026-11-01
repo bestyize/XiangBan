@@ -13,6 +13,7 @@ import ChatWorkspaceMenu from '../components/ChatWorkspaceMenu.vue';
 import ChatExpertChip from '../components/ChatExpertChip.vue';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatActivity from '../chat/ChatActivity.vue';
+import ChatGeneratedImages from '../chat/ChatGeneratedImages.vue';
 import ChatTaskCard from '../chat/ChatTaskCard.vue';
 import ChatReasoning from '../chat/ChatReasoning.vue';
 import ChatReasoningGroup from '../chat/ChatReasoningGroup.vue';
@@ -524,6 +525,7 @@ async function openLink(href: string) {
                 <ChatTaskCard v-if="progressOf(block)" :progress="progressOf(block)!" :calls="block.calls" :current="block.id === lastBlockId" :show-logs="!chat.hideToolCalls" :disabled="planRevisionBusy" :configured="chat.configured" @logs="showTaskProcess(block)" @adjust="adjustPlan(block)" @resume="resumeTask" @stop="chat.cancel()" @attention="showTaskAttention" />
                 <ChatActivity v-else-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === lastBlockId" :waiting="waiting && block.id === lastBlockId" :status="block.id === lastBlockId ? statusLine : ''" />
                 <ChatAnswered v-for="record in askRecords(block.calls)" :key="record.id" :record="record" />
+                <ChatGeneratedImages :calls="block.calls" :awaiting-approval="block.id === lastBlockId && view.approvals.some(request => request.tool === 'image_generate')" />
                 <template v-for="item in groupReasoning(block.items)" :key="item.id">
                   <ChatReasoningGroup v-if="item.kind === 'reasoning-group'" :group="item" />
                   <ChatReasoning v-else-if="item.kind === 'reasoning'" :text="item.text" :reasoning-kind="item.reasoningKind" :streaming="item.streaming" />

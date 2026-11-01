@@ -20,6 +20,7 @@ pub struct CompanionChange {
 }
 
 pub trait Desktop: Send + Sync {
+    fn generate_images(&self, _args: Value, _ctx: &ToolCtx) -> Result<Value, String> { Err("当前宿主不支持图片生成".into()) }
     fn design_removed(&self,_id:&str)->Result<(),String>{Ok(())}
     fn design_saved(&self, _project: &open_claude_design::Project) -> Result<(), String> { Ok(()) }
     fn connector_search(&self, _keyword: &str) -> Result<Value, String> { Err("当前宿主不支持连接器目录".into()) }
@@ -95,6 +96,7 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn generate_images(&self, args: Value, ctx: &ToolCtx) -> Result<Value, String> { super::image_generation::generate(&self.app, args, ctx) }
     fn connector_target(&self, name: &str) -> Result<Option<Arc<dyn Tool>>, String> {
         super::connector_manager(&self.app)?.tools().into_iter().find(|tool| tool.spec().name == name)
             .map(Some).ok_or_else(|| "连接器工具当前不可用，请检查连接状态".into())

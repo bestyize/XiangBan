@@ -5,7 +5,7 @@ const TOOL_LABELS: Record<string, string> = {
   connector_search: '查找连接器', connector_request: '连接服务', connector_call: '调用连接器工具',
   skill_review_read: '读取技能审查详情',
   shell: '运行命令', read_file: '读取文件', write_file: '写入文件', edit_file: '修改文件', list_dir: '查看文件夹', grep: '搜索文件',
-  web_fetch: '打开网页', web_search: '搜索网页', todo: '任务清单', ask_user: '向你提问', time_now: '查看时间',
+  web_fetch: '打开网页', web_search: '搜索网页', image_generate: '生成图片', todo: '任务清单', ask_user: '向你提问', time_now: '查看时间',
   memory_read: '读取笔记', memory_write: '保存笔记', load_skill: '读取技能', skill_manage: '管理技能',
   app_guide: '查看功能指南', open_page: '打开控制台页面', desktop_settings_set: '调整外观与动画', desktop_status: '查看桌面状态', desktop_windows: '查看小伴窗口', desktop_window_set: '调整小伴窗口', wallpaper_list: '查看壁纸', wallpaper_apply: '更换壁纸', wallpaper_create: '创作壁纸', wallpaper_delete: '删除壁纸',
   effect_list: '查看特效', effect_set: '切换特效', effect_monitor_set: '设置特效显示器', effect_read_format: '读取特效格式', effect_create: '创作特效', effect_delete: '删除特效',
@@ -67,6 +67,8 @@ const str = (value: unknown) => (typeof value === 'string' ? value : '');
 export function approvalPreview(request: Pick<ApprovalRequest, 'tool' | 'arguments'>): string {
   const args = request.arguments && typeof request.arguments === 'object' ? request.arguments as Record<string, unknown> : {};
   switch (request.tool) {
+    case 'image_generate':
+      return `使用小伴 AI 生图额度生成 ${typeof args.n === 'number' ? args.n : 1} 张图片${args.size ? `（${str(args.size)}）` : ''}\n\n${cut(str(args.prompt), 1500)}`;
     case 'read_file':
     case 'list_dir':
       return str(args.path) || '（当前工作区）';
