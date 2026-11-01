@@ -317,7 +317,7 @@ export const defaults: Settings = {
   assistantShortcut: "Alt+Space",
   assistantBall: true,
   assistantHover: true,
-  assistantOpen: "voice",
+  assistantOpen: "type",
   assistantRead: "voice",
   effects: { selected: "", params: {} },
 };

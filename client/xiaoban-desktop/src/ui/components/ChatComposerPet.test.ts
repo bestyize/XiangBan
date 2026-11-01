@@ -48,7 +48,7 @@ describe('small pet above the chat composer', () => {
     await flushPromises();
     expect(wrapper.get('[data-testid="composer-pet-reply"]').text()).toContain('收到这一点温柔');
     expect(wrapper.find('.composer-pet-live').exists()).toBe(true);
-    expect(wrapper.findComponent({ name: 'StubPetActor' }).props('size')).toBe(58);
+    expect(wrapper.findComponent({ name: 'StubPetActor' }).props('size')).toBe(87);
     expect(actorPoke).toHaveBeenCalledTimes(1);
     expect(wrapper.get('.pet-art').attributes('tabindex')).toBe('-1');
 
@@ -59,6 +59,19 @@ describe('small pet above the chat composer', () => {
     vi.advanceTimersByTime(9600); await flushPromises();
     expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(false);
     expect(wrapper.get('.composer-pet-picture').classes()).not.toContain('is-hidden');
+    wrapper.unmount();
+  });
+
+  it('clears the reply and keeps it closed while approval or a question needs attention', async () => {
+    const wrapper = mount(ChatComposerPet, { props: { size: 'sm' }, attachTo: document.body });
+    await flushPromises();
+    await wrapper.get('[data-testid="composer-pet"]').trigger('click'); await flushPromises();
+    expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(true);
+    expect(wrapper.findComponent({ name: 'StubPetActor' }).props('size')).toBe(75);
+    await wrapper.setProps({ attention: true });
+    expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="composer-pet"]').trigger('click'); await flushPromises();
+    expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(false);
     wrapper.unmount();
   });
 

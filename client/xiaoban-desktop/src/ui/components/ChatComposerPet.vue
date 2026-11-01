@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import type { PetDefinition } from '../../pets/model.ts';
 import type PetActor from '../../pets/PetActor.vue';
 import { desktop, invoke } from '../../bridge.ts';
 import CompanionReplyCard from '../../companion-dialogue/CompanionReplyCard.vue';
 import { previewReply, type CompanionReply } from '../../companion-dialogue/dialogue.ts';
 
-const props = withDefaults(defineProps<{ size: 'sm' | 'lg'; paused?: boolean }>(), { paused: false });
+const props = withDefaults(defineProps<{ size: 'sm' | 'lg'; paused?: boolean; attention?: boolean }>(), { paused: false });
 const image = ref('');
 const definition = shallowRef<PetDefinition | null>(null);
 const actorComponent = shallowRef<typeof PetActor | null>(null);
@@ -30,6 +30,9 @@ onMounted(async () => {
     if (sunflower) { definition.value = sunflower; image.value = petImage(sunflower); }
   } catch { /* The composer remains fully usable without optional pet assets. */ }
 });
+watch(() => props.attention, attention => {
+  if (attention) { response.value = null; ++responseVersion; clearTimeout(dialogueTimer); clearTimeout(resetTimer); reacting.value = false; }
+});
 onBeforeUnmount(() => { mounted = false; ++responseVersion; clearTimeout(resetTimer); clearTimeout(dialogueTimer); });
 
 async function poke() {
@@ -37,8 +40,8 @@ async function poke() {
   const version = ++responseVersion;
   clearTimeout(resetTimer);
   clearTimeout(dialogueTimer);
-  if (!desktop) response.value = previewReply();
-  else dialogueTimer = setTimeout(() => {
+  if (!props.attention && !desktop) response.value = previewReply();
+  else if (!props.attention) dialogueTimer = setTimeout(() => {
     void invoke<CompanionReply>('companion_dialogue_click').then(value => {
       if (mounted && version === responseVersion && value) response.value = value;
     }).catch(() => { if (mounted && version === responseVersion) response.value = previewReply(); });
@@ -65,15 +68,15 @@ async function poke() {
   <div v-if="image" class="composer-pet" :class="[`is-${size}`, { 'is-reacting': reacting }]">
     <button ref="button" type="button" class="composer-pet-touch" aria-label="摸摸小伴" title="点一下，摸摸小伴" data-testid="composer-pet" @click.stop="poke">
       <img :src="image" class="composer-pet-picture" :class="{ 'is-hidden': reacting && actorComponent }" alt="" aria-hidden="true" draggable="false" />
-      <component :is="actorComponent" v-if="reacting && actorComponent && definition" ref="actor" class="composer-pet-live" :definition="definition" :size="size === 'lg' ? 58 : 50" :paused="paused" :interactive="false" />
+      <component :is="actorComponent" v-if="reacting && actorComponent && definition" ref="actor" class="composer-pet-live" :definition="definition" :size="size === 'lg' ? 87 : 75" :paused="paused" :interactive="false" />
     </button>
     <CompanionReplyCard v-if="response" class="composer-pet-reply" :initial="response" data-testid="composer-pet-reply" @close="response = null" />
   </div>
 </template>
 
 <style scoped>
-.composer-pet{position:absolute;right:8px;top:-46px;width:50px;z-index:2;user-select:none}
-.composer-pet.is-lg{right:10px;top:-53px;width:58px}
+.composer-pet{position:absolute;right:8px;top:-71px;width:75px;z-index:2;user-select:none}
+.composer-pet.is-lg{right:10px;top:-82px;width:87px}
 /* Match PetActor's square viewport so still/live swaps keep the same scale and anchor. */
 .composer-pet-touch{position:relative;display:block;width:100%;aspect-ratio:1;margin:0;padding:0;border:0;background:none;color:inherit;cursor:pointer;line-height:0;appearance:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.12));transition:filter .15s ease}
 .composer-pet-touch:hover{filter:drop-shadow(0 5px 8px rgba(0,0,0,.16))}

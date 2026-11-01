@@ -8,7 +8,7 @@ import type { AsrActivationOptions, TranscriptContext } from '../ui/asr/store.ts
 import { createAsrStore } from '../ui/asr/store.ts';
 import { createSpeechStore, speechDefaults } from '../ui/speech/store.ts';
 
-function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open: string; read: string; appearance?: string }; storage?: Pick<Storage,'getItem'|'setItem'|'removeItem'> } = {}) {
+function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open: string; read: string; appearance?: string }; storage?: Pick<Storage,'getItem'|'setItem'|'removeItem'>; defaultPrefs?: boolean } = {}) {
   let clock = 1_000_000;
   const timers: { id: number; at: number; run: () => void }[] = [];
   let nextId = 1;
@@ -63,6 +63,7 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
     setTimer: (run, ms) => { const timer = { id: nextId++, at: clock + ms, run }; timers.push(timer); return timer.id; },
     clearTimer: id => { const at = timers.findIndex(timer => timer.id === id); if (at >= 0) timers.splice(at, 1); },
   });
+  if (!options.defaultPrefs) store.prefs.open = 'voice';
   return { store, chat, asr, speech, invoke, advance, say: (text: string, context?: TranscriptContext) => heard(text, context), preview: (text: string, playbackText = captureOptions.playbackText?.() ?? '') => captureOptions.onPreview?.(text, {playbackText}), playback: () => captureOptions.playbackText?.() ?? '', emit: (event: string, payload?: unknown) => handlers.get(event)?.(payload), appearance };
 }
 const finishAnswer = (chat: ReturnType<typeof setup>['chat'], text = '好的，已经处理完了。') => {
@@ -630,6 +631,20 @@ describe('floating assistant', () => {
     expect(invoke).toHaveBeenCalledWith('assistant_reanchor_ready', { id: 3 });
     emit('assistant-reanchor-done', { id: 3 });
     expect(store.reanchoring).toBe(0);
+  });
+
+  it('does not start recording when saved preferences cannot be read', async () => {
+    const { store, asr, invoke } = setup({ defaultPrefs: true });
+    invoke.mockImplementation(async command => {
+      if (command === 'assistant_prefs') throw new Error('unavailable');
+      return undefined as never;
+    });
+    await store.init(); await store.opened();
+    expect(store.prefs.open).toBe('type');
+    expect(asr.activate).not.toHaveBeenCalled();
+    await store.toggleListening();
+    expect(asr.activate).toHaveBeenCalledTimes(1);
+    store.dispose();
   });
 
   it('waits for typing when the user chose to type first, and listens when they tap the ball', async () => {

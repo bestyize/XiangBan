@@ -418,7 +418,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   }
 
   const store: AssistantStore = reactive({
-    open: false, ball: false, prefs: { open: 'voice', read: 'voice', hover: true }, input: '', attachments: [], hint: '', hintTab: '',
+    open: false, ball: false, prefs: { open: 'type', read: 'voice', hover: true }, input: '', attachments: [], hint: '', hintTab: '',
     layout: { ball: null, right: true }, peek: false, hovering: false, reanchoring: 0,
     reanchorReady(id) { if (store.reanchoring === id) void deps.invoke('assistant_reanchor_ready', { id }).catch(() => {}); },
     live: false, muted: false, liveSince: 0,

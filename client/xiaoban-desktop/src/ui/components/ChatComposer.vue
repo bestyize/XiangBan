@@ -42,6 +42,7 @@ const props = withDefaults(defineProps<{
   minRows?: number;
   /** The companion peeking over the top edge of the box. */
   pet?: 'lg' | 'sm' | false;
+  attention?: boolean;
 }>(), { workspace: false, placeholder: '', minRows: 1, pet: 'sm' });
 const emit = defineEmits<{ sending: []; sent: []; settings: []; preview: [url: string] }>();
 
@@ -371,8 +372,8 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 <template>
   <footer class="composer" :class="[`page-${page}`]" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste" @dragover.prevent @drop.prevent="addFiles(Array.from($event.dataTransfer?.files ?? []))">
     <ChatMessageQueue :chat="chat" :running="running" />
-    <div class="composer-content">
-    <ChatComposerPet v-if="pet && store.settings?.chatComposerPetEnabled !== false" :size="pet" :paused="store.settings?.paused ?? false" />
+    <div class="composer-content" :class="{ 'has-chat-pet': page === 'chat' && pet && store.settings?.chatComposerPetEnabled !== false }">
+    <ChatComposerPet v-if="pet && store.settings?.chatComposerPetEnabled !== false" :size="pet" :paused="store.settings?.paused ?? false" :attention="attention" />
     <div v-if="live && liveActive" class="composer-box live-bar" :class="{ muted: live.muted }" data-testid="chat-live">
       <span class="live-orb" :class="live.status === '在说' ? 'speak' : live.status === '在听' ? 'listen' : 'wait'" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
       <div class="live-text" role="status" aria-live="polite" data-testid="chat-live-status"><b :title="live.status">{{ live.status }}</b><span :title="liveHint">{{ liveHint }}</span></div>
@@ -519,6 +520,7 @@ html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:
 }
 @container chat-composer (max-width:260px){.live-orb{display:none}}
 @container chat-composer (max-width:200px){.live-clock{display:none}}
+@media(min-width:621px){.composer-content.has-chat-pet{margin-top:71px}}
 @media(max-width:620px){.composer-pet{display:none}}
 @media(prefers-reduced-motion:reduce){.spin,.recording-dot,.live-orb i{animation:none}}
 </style>

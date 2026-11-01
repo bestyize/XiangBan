@@ -593,7 +593,7 @@ async function openLink(href: string) {
       <button v-if="!stick && view?.items.length" type="button" class="to-bottom" data-testid="chat-bottom" aria-label="回到最新" @click="stick = true; toBottom()"><ArrowDown :size="16" /></button>
 
       <div class="composer-wrap">
-        <ChatComposer ref="composer" :design-id="designContextId||undefined" :store="store" page="chat" pet="sm" placeholder="发送消息给小伴" @sending="stick = true" @sent="toBottom" @settings="openAiSettings" @preview="preview = $event" />
+        <ChatComposer ref="composer" :design-id="designContextId||undefined" :store="store" page="chat" pet="sm" :attention="waiting" placeholder="发送消息给小伴" @sending="stick = true" @sent="toBottom" @settings="openAiSettings" @preview="preview = $event" />
         <p class="disclaimer">内容由 AI 生成，请核对重要信息</p>
       </div>
     </div>
@@ -830,7 +830,5 @@ async function openLink(href: string) {
   .bubble{max-width:90%}
   .head-search input{width:100px}
 }
-/* The visible composer pet extends 92px upward; keep the last message above it. */
-@media(min-width:621px){.chat-column.has-messages{padding-bottom:112px}}
 @media(prefers-reduced-motion:reduce){.spin,.cursor{animation:none}}
 </style>
