@@ -56,7 +56,7 @@ fun RichBody(env: CommunityEnv, html: String, modifier: Modifier = Modifier, fon
         if (onCopy != null) Text(
             "复制全文",
             Modifier.clip(RoundedCornerShape(14.dp)).background(LocalExtraColors.current.fill).clickable { onCopy(bodyPlainText(blocks)) }.padding(horizontal = 12.dp, vertical = 5.dp),
-            fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
     zoom?.let { ImageViewer(env, it) { zoom = null } }

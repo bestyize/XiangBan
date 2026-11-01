@@ -40,7 +40,7 @@ internal fun ForumUploadControls(
     val platform = env.platform
     if (platform?.forumFilePickerSupported != true) {
         Text(if (attachments == null) "当前设备请在网页版回复中插图。" else "当前设备请到网页版插图或添加附件。",
-            Modifier.padding(vertical = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Modifier.padding(vertical = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         if (compact) trailing?.invoke()
         return
     }
@@ -86,7 +86,7 @@ internal fun ForumUploadControls(
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         when (val state = limitsState) {
-            Load.Loading -> Text("正在读取上传额度…", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Load.Loading -> Text("正在读取上传额度…", style = XType.Caption, color = LocalExtraColors.current.ink3)
             is Load.Failed -> Banner(state.message, warn = true, actionText = "重试", onAction = loader::reload)
             else -> Unit
         }
@@ -104,14 +104,14 @@ internal fun ForumUploadControls(
         }
         if (!compact || showLimits) limits?.let {
             Text(if (it.imageMaxBytes <= 0) "升级为成员后可插图。" else "支持 PNG、JPEG、GIF、WebP，图片不超过 ${minOf(it.imageMaxBytes, FORUM_IMAGE_MAX_BYTES) / 1024 / 1024} MB。",
-                fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
-            if (attachments != null) Text("最多 5 个附件，每个不超过 ${minOf(it.uploadMaxBytes, FORUM_MEMORY_MAX_BYTES) / 1024 / 1024} MB。", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                style = XType.Caption, color = LocalExtraColors.current.ink3)
+            if (attachments != null) Text("最多 5 个附件，每个不超过 ${minOf(it.uploadMaxBytes, FORUM_MEMORY_MAX_BYTES) / 1024 / 1024} MB。", style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
         attachments?.forEach { attachment ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Column(Modifier.weight(1f)) {
-                    Text(attachment.name, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${formatSize(attachment.size)} · ${if (attachment.price == 0) "免费下载" else "${attachment.price} 积分"}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    Text(attachment.name, style = XType.Secondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${formatSize(attachment.size)} · ${if (attachment.price == 0) "免费下载" else "${attachment.price} 积分"}", style = XType.Caption, color = LocalExtraColors.current.ink3)
                 }
                 GhostPillButton("移除", {
                     if (!busy && enabled) {
@@ -128,7 +128,7 @@ internal fun ForumUploadControls(
                 }, enabled = !busy && enabled)
             }
         }
-        error?.let { Text(it, fontSize = 13.sp, color = Danger) }
+        error?.let { Text(it, style = XType.Secondary, color = Danger) }
         retryFile?.let { file ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 GhostPillButton("重试上传", { start(retryImage, file) }, Modifier.weight(1f), enabled = enabled && !busy)
@@ -145,6 +145,6 @@ internal fun EditorTool(icon: ImageVector, label: String, enabled: Boolean = tru
     Row(Modifier.clickable(enabled = enabled, onClick = onClick).heightIn(min = 44.dp).padding(horizontal = 6.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         XIcon(icon, size = 20.dp, tint = ink)
-        Text(label, fontSize = 13.sp, color = ink)
+        Text(label, style = XType.Secondary, color = ink)
     }
 }

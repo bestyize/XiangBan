@@ -24,7 +24,7 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
     var error by remember(id, version) { mutableStateOf<String?>(null) }
     Column(modifier) {
         if (env.platform?.communityGamesSupported != true) {
-            Text("当前平台暂不支持试玩，可在 Android 或电脑上打开", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Text("当前平台暂不支持试玩，可在 Android 或电脑上打开", style = XType.Caption, color = LocalExtraColors.current.ink3)
             return@Column
         }
         PillButton(if (loading) "正在准备试玩…" else "试玩", {
@@ -49,7 +49,7 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
                 finally { loading = false; env.communityGameBusy.value = false }
             }
         }, enabled = !busy)
-        error?.let { Text(it, Modifier.padding(top = 6.dp), fontSize = 12.sp, color = Danger) }
+        error?.let { Text(it, Modifier.padding(top = 6.dp), style = XType.Caption, color = Danger) }
     }
 }
 
@@ -65,7 +65,7 @@ internal fun LinkedGameCards(env: CommunityEnv, html: String, open: ((Route) -> 
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Cover(pack.coverUrl, pack.id, Modifier.size(64.dp).clickable { open?.invoke(Route.Pack(id)) })
                 Column(Modifier.weight(1f)) {
-                    Text(pack.title, Modifier.clickable { open?.invoke(Route.Pack(id)) }, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text(pack.title, Modifier.clickable { open?.invoke(Route.Pack(id)) }, style = XType.Body, fontWeight = FontWeight.Medium)
                     GameTrialButton(env, id, open = open, modifier = Modifier.padding(top = 6.dp))
                 }
             }
@@ -78,8 +78,8 @@ internal fun CommunityGameBookmarks(env: CommunityEnv, open: (Route) -> Unit) {
     var recent by rememberSaveable { mutableStateOf(false) }
     val session by env.session.state.collectAsState()
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-        Text("已收藏", Modifier.clickable { recent = false }.padding(vertical = 8.dp), fontSize = 13.sp, color = if (!recent) Brand else LocalExtraColors.current.ink3)
-        Text("最近玩过", Modifier.clickable { recent = true }.padding(vertical = 8.dp), fontSize = 13.sp, color = if (recent) Brand else LocalExtraColors.current.ink3)
+        Text("已收藏", Modifier.clickable { recent = false }.padding(vertical = 8.dp), style = XType.Secondary, color = if (!recent) Brand else LocalExtraColors.current.ink3)
+        Text("最近玩过", Modifier.clickable { recent = true }.padding(vertical = 8.dp), style = XType.Secondary, color = if (recent) Brand else LocalExtraColors.current.ink3)
     }
     if (!recent) {
         if (session.loggedIn) ContentBookmarkFeed(env, "game", open)
@@ -91,9 +91,9 @@ internal fun CommunityGameBookmarks(env: CommunityEnv, open: (Route) -> Unit) {
     val games by platform.recentCommunityGames.collectAsState()
     if (games.isEmpty()) { CenterMessage("还没有试玩记录"); return }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        item { Text("本机最近试玩", fontSize = 12.sp, color = LocalExtraColors.current.ink3) }
+        item { Text("本机最近试玩", style = XType.Caption, color = LocalExtraColors.current.ink3) }
         items(games, key = { it.packId }) { game -> WhiteCard(padding = 14.dp) {
-            Text(game.title, Modifier.fillMaxWidth().clickable { open(Route.Pack(game.packId)) }, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Text(game.title, Modifier.fillMaxWidth().clickable { open(Route.Pack(game.packId)) }, style = XType.Body, fontWeight = FontWeight.Medium)
             GameTrialButton(env, game.packId, game.version, open, Modifier.padding(top = 8.dp))
         } }
     }

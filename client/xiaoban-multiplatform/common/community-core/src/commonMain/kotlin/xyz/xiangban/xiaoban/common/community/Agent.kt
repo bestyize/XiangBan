@@ -96,6 +96,7 @@ class AgentRuntime(
     private var pump: Job? = null
     private var workers: Job? = null
     private var currentModel = ""
+    @Volatile private var currentReasoning: String? = null
     private val requests = HashMap<Pair<Long, String>, Job>()
     private val requestsLock = Mutex()
     private var nextRun = 0L
@@ -111,7 +112,8 @@ class AgentRuntime(
     }
 
     /** 引擎没在跑就启动它，已经在跑就只换模型。 */
-    suspend fun ensureStarted(modelName: String) = lock.withLock {
+    suspend fun ensureStarted(modelName: String, reasoningEffort: String? = null) = lock.withLock {
+        currentReasoning = reasoningEffort
         check(scope.isActive) { "智能体运行环境已关闭" }
         if (handle == 0L) {
             val config = buildJsonObject {
@@ -274,7 +276,7 @@ class AgentRuntime(
         when (obj["type"].str()) {
             "model_request" -> {
                 val id = obj["id"].str() ?: return
-                val body = obj["body"].str() ?: return
+                val body = withReasoningEffort(obj["body"].str() ?: return, currentReasoning)
                 val affected = activeRuns.value.values.map { it.id }.toSet()
                 request(id, epoch, requestScope) {
                     val result = try {
@@ -356,4 +358,11 @@ class AgentRuntime(
             "error" -> _events.emit(AgentEvent.Failure(obj["message"].str() ?: "智能体引擎出错", activeRuns.value.values.map { it.id }.toSet()))
         }
     }
+}
+
+/** Host-owned gateway option; leave the native kernel protocol unchanged. */
+internal fun withReasoningEffort(body: String, effort: String?): String {
+    val payload = AgentJson.parseToJsonElement(body) as JsonObject
+    return JsonObject((payload - "reasoning_effort") +
+        (effort?.let { mapOf("reasoning_effort" to JsonPrimitive(it)) } ?: emptyMap())).toString()
 }

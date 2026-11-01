@@ -44,13 +44,13 @@ internal fun CommunityShareSheet(env: CommunityEnv, url: String, heading: String
     }
     BottomSheet(onDismiss, panelModifier) {
         Column(Modifier.fillMaxWidth().heightIn(max = 680.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(heading, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(heading, style = XType.Title, fontWeight = FontWeight.SemiBold)
             when (val current = state) {
                 is Load.Ready -> {
                     val info = current.value
-                    Text(info.title, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-                    if (info.summary.isNotBlank()) Text(info.summary, maxLines = 3, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(hint ?: "分享公开网页链接，未安装小伴也能在浏览器查看。", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(info.title, style = XType.Section, fontWeight = FontWeight.Medium)
+                    if (info.summary.isNotBlank()) Text(info.summary, maxLines = 3, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(hint ?: "分享公开网页链接，未安装小伴也能在浏览器查看。", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         GhostPillButton("复制链接", { perform { platform?.copy(info.url); onCopied(); "链接已复制" } }, Modifier.weight(1f), enabled = platform != null && !busy)
                         PillButton("系统分享", { perform { platform?.share(info.title, info.url); "已打开系统分享，可选择可用的应用" } }, Modifier.weight(1f), enabled = platform?.communitySystemShareSupported == true && !busy)
@@ -66,15 +66,15 @@ internal fun CommunityShareSheet(env: CommunityEnv, url: String, heading: String
                                 PillButton("分享海报", { perform { posterNotice(platform.shareCommunityPoster(image)) } }, Modifier.weight(1f), enabled = !busy)
                             }
                         }
-                    } else Text("当前平台暂不支持海报保存，可复制链接或在浏览器打开。", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else Text("当前平台暂不支持海报保存，可复制链接或在浏览器打开。", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 is Load.Failed -> {
-                    Text(if (current.notFound) "此内容未公开或已下架，暂不能分享。" else "分享信息加载失败，请重试。", fontSize = 14.sp)
+                    Text(if (current.notFound) "此内容未公开或已下架，暂不能分享。" else "分享信息加载失败，请重试。", style = XType.Body)
                     GhostPillButton("重试", loader::reload, Modifier.fillMaxWidth())
                 }
-                else -> Text("正在读取公开分享信息…", fontSize = 14.sp)
+                else -> Text("正在读取公开分享信息…", style = XType.Body)
             }
-            notice?.let { Text(it, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary) }
+            notice?.let { Text(it, style = XType.Secondary, color = MaterialTheme.colorScheme.primary) }
             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             GhostPillButton("关闭", onDismiss, Modifier.fillMaxWidth())
         }

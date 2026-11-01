@@ -55,7 +55,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.background, 0.45f))) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(Modifier.fillMaxSize()) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
@@ -95,7 +95,7 @@ private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySecti
                     val selected = s == current
                     Column(Modifier.clickable { onSelect(s) }.height(40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                         Text(
-                            s.label, fontSize = 16.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            s.label, style = XType.Section, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
                             color = if (selected) Brand else MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Box(Modifier.padding(top = 2.dp).size(width = 18.dp, height = 3.dp).clip(RoundedCornerShape(2.dp)).background(if (selected) Brand else Color.Transparent))

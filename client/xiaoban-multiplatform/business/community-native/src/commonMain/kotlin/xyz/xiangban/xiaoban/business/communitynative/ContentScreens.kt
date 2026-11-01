@@ -103,7 +103,7 @@ fun TabStrip(tabs: List<Pair<String, String>>, selected: String, centered: Boole
             items(tabs, key = { it.first }) { (key, label) ->
                 val on = key == selected
                 Box(Modifier.fillMaxHeight().clickable { onSelect(key) }, contentAlignment = Alignment.Center) {
-                    Text(label, Modifier.padding(bottom = 3.dp), fontSize = 14.sp, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(label, Modifier.padding(bottom = 3.dp), style = XType.Secondary, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal, color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
                     Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp).size(width = 18.dp, height = 3.dp).clip(RoundedCornerShape(2.dp)).background(if (on) Brand else Color.Transparent))
                 }
             }
@@ -115,7 +115,7 @@ fun TabStrip(tabs: List<Pair<String, String>>, selected: String, centered: Boole
 @Composable
 internal fun LoadMoreFooter(hasMore: Boolean, error: String?, count: Int, onMore: () -> Unit, onRetry: () -> Unit) {
     when {
-        error != null -> Text("加载失败，点这里重试", Modifier.fillMaxWidth().clickable(onClick = onRetry).padding(16.dp), color = Danger, fontSize = 14.sp)
+        error != null -> Text("加载失败，点这里重试", Modifier.fillMaxWidth().clickable(onClick = onRetry).padding(16.dp), color = Danger, style = XType.Body)
         hasMore -> {
             // 这一项滚到可见才会进入组合，以此触发下一页；条数变化后再次触发。
             LaunchedEffect(count) { onMore() }
@@ -130,7 +130,7 @@ fun Toast(text: String?, onGone: () -> Unit) {
     if (text == null) return
     LaunchedEffect(text) { delay(1600); onGone() }
     Box(Modifier.fillMaxSize().padding(bottom = 120.dp), contentAlignment = Alignment.BottomCenter) {
-        Text(text, Modifier.clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(alpha = 0.78f)).padding(horizontal = 16.dp, vertical = 8.dp), color = Color.White, fontSize = 14.sp)
+        Text(text, Modifier.clip(RoundedCornerShape(18.dp)).background(Color.Black.copy(alpha = 0.78f)).padding(horizontal = 16.dp, vertical = 8.dp), color = Color.White, style = XType.Body)
     }
 }
 
@@ -159,17 +159,17 @@ internal fun packMeta(pack: Pack): String =
 internal fun TopicRow(topic: Topic, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (topic.pinned) Text("置顶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
-            if (topic.featured) Text("精华", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
-            Text(topic.category.name, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            if (topic.pinned) Text("置顶", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Brand)
+            if (topic.featured) Text("精华", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Brand)
+            Text(topic.category.name, style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
-        Text(topic.cardTitle, Modifier.padding(top = 6.dp), fontSize = 15.sp, fontWeight = FontWeight.Medium, lineHeight = 22.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(topic.cardTitle, Modifier.padding(top = 6.dp), style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (topic.excerpt.isNotBlank()) Text(topic.excerpt, Modifier.padding(top = 4.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Avatar(topic.author.nickname, 16.dp)
-            Text(topic.author.nickname, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-            Text("·", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-            Text("${topic.replyCount} 回复", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Text(topic.author.nickname, style = XType.Caption, color = LocalExtraColors.current.ink3)
+            Text("·", style = XType.Caption, color = LocalExtraColors.current.ink3)
+            Text("${topic.replyCount} 回复", style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
     }
 }
@@ -197,30 +197,30 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                         CircleOverlayButton(XIcons.Share, "分享", { share = true }, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(end = 12.dp, top = 12.dp))
                     }
                     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp)) {
-                        Text(pack.title, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, lineHeight = 29.sp)
+                        Text(pack.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
                         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text(kindLabel(pack.kind), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                            Text(pack.trustLabel, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                            if (pack.pureData) Text("纯数据", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                            if (pack.applyCount > 0) Text("${pack.applyCount} 次应用", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                            Text(kindLabel(pack.kind), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                            Text(pack.trustLabel, style = XType.Caption, color = LocalExtraColors.current.ink3)
+                            if (pack.pureData) Text("纯数据", style = XType.Caption, color = LocalExtraColors.current.ink3)
+                            if (pack.applyCount > 0) Text("${pack.applyCount} 次应用", style = XType.Caption, color = LocalExtraColors.current.ink3)
                         }
                         Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Avatar(pack.author?.nickname ?: "?", 36.dp, showInitial = true)
                             Column(Modifier.weight(1f)) {
-                                Text(pack.author?.nickname ?: "社区作品", Modifier.clickable(enabled = open != null && pack.author != null) { pack.author?.uid?.let { open?.invoke(Route.User(it)) } }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Text("v${pack.version}" + (pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let { " · " + formatSize(it) } ?: "") + pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { " · 更新于 $it" }.orEmpty(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(pack.author?.nickname ?: "社区作品", Modifier.clickable(enabled = open != null && pack.author != null) { pack.author?.uid?.let { open?.invoke(Route.User(it)) } }, style = XType.Body, fontWeight = FontWeight.SemiBold)
+                                Text("v${pack.version}" + (pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let { " · " + formatSize(it) } ?: "") + pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { " · 更新于 $it" }.orEmpty(), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         if (pack.kind == "game" && pack.status == "published") GameTrialButton(env, pack.id, open = open, modifier = Modifier.padding(top = 16.dp))
-                        if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 16.dp), fontSize = 15.sp, lineHeight = 26.sp)
-                        if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, Modifier.padding(top = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 16.dp), style = XType.Body)
+                        if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, Modifier.padding(top = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)
                         val changes = pack.versions.filter { it.changelog.isNotBlank() }
                         if (changes.isNotEmpty()) {
-                            Text("更新记录", Modifier.padding(top = 24.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Text("更新记录", Modifier.padding(top = 24.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
                             changes.sortedByDescending { it.version }.forEach { v ->
-                                Text(v.label.ifBlank { "v${v.version}" }, Modifier.padding(top = 10.dp), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                Text(v.changelog, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(v.label.ifBlank { "v${v.version}" }, Modifier.padding(top = 10.dp), style = XType.Body, fontWeight = FontWeight.Medium)
+                                Text(v.changelog, Modifier.padding(top = 2.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     }
@@ -296,7 +296,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
         }
     }
     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp)) {
-        Text("${if (help != null) "回答" else "评论"} ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text("${if (help != null) "回答" else "评论"} ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", style = XType.Section, fontWeight = FontWeight.SemiBold)
         posts.forEach { post ->
             PostItem(
                 env, post, open = open, topicId = topicId,
@@ -306,12 +306,12 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
             )
         }
         when {
-            error != null -> Text("评论加载失败，点这里重试", Modifier.padding(top = 12.dp).clickable { retry += 1 }, color = Danger, fontSize = 14.sp)
+            error != null -> Text("评论加载失败，点这里重试", Modifier.padding(top = 12.dp).clickable { retry += 1 }, color = Danger, style = XType.Body)
             more -> { LaunchedEffect(posts.size) { load() }; Spinner(Modifier.fillMaxWidth().height(48.dp)) }
-            posts.isEmpty() -> Text(if (help != null) "还没有人回答" else "还没有评论", Modifier.padding(top = 12.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+            posts.isEmpty() -> Text(if (help != null) "还没有人回答" else "还没有评论", Modifier.padding(top = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
         }
         if (hint.isNotBlank()) {
-            Text(hint, Modifier.padding(top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Text(hint, Modifier.padding(top = 12.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
             LinkText("在网页打开讨论 ›", { env.platform?.openUrl(env.forum.topicUrl(topicId)) })
         }
     }
@@ -323,25 +323,25 @@ internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, 
         Avatar(post.author.nickname, 30.dp, showInitial = true)
         Column(Modifier.weight(1f)) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(post.author.nickname, Modifier.clickable(enabled = open != null) { open?.invoke(Route.User(post.author.uid)) }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text("${post.floor} 楼 · ${post.createdAt.take(10)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(post.author.nickname, Modifier.clickable(enabled = open != null) { open?.invoke(Route.User(post.author.uid)) }, style = XType.Body, fontWeight = FontWeight.SemiBold)
+                Text("${post.floor} 楼 · ${post.createdAt.take(10)}", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (post.blocked || post.status != "normal") {
-                Text(if (post.blocked) "你已屏蔽该用户" else "该评论已被隐藏", Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp, color = LocalExtraColors.current.ink3)
+                Text(if (post.blocked) "你已屏蔽该用户" else "该评论已被隐藏", Modifier.padding(top = 2.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
             } else {
-                RichBody(env, post.bodyHtml, Modifier.padding(top = 2.dp), fontSize = 14.sp, lineHeight = 22.sp)
+                RichBody(env, post.bodyHtml, Modifier.padding(top = 2.dp), fontSize = XType.Body.fontSize, lineHeight = XType.Body.lineHeight)
                 ReplyContentCards(env, post.workRefs, open)
                 LinkedGameCards(env, post.bodyHtml, open, post.workRefs.map { it.id })
                 ReplyAttachments(env, post.attachments, topicId)
             }
             if (!post.blocked && post.status == "normal") Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 PostLikeAction(env, post, open)
-                if (onEdit != null && !accepted) Text("编辑", Modifier.clickable(onClick = onEdit), fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
+                if (onEdit != null && !accepted) Text("编辑", Modifier.clickable(onClick = onEdit), style = XType.Caption, color = LocalExtraColors.current.brandInk)
                 NativeReportAction(env, "post", post.id, open)
             }
             if (accepted) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 XIcon(XIcons.CheckBold, tint = Success, size = 16.dp)
-                Text("已采纳。这条回答已标记为解决方案，回答保留原文。", fontSize = 12.sp, color = Success)
+                Text("已采纳。这条回答已标记为解决方案，回答保留原文。", style = XType.Caption, color = Success)
             }
             if (onAccept != null) PillButton("采纳这个回答", onAccept, Modifier.padding(top = 10.dp).fillMaxWidth(), height = 40.dp)
         }
@@ -378,34 +378,34 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                         }
                         Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)) {
                             if (!topic.isCasual) Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (topic.pinned) Text("置顶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
+                                if (topic.pinned) Text("置顶", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Brand)
                                 if (topic.help != null) {
-                                    Text("求助", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Brand)
+                                    Text("求助", style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Brand)
                                     HelpStatusTag(topic.help!!)
-                                    Text(helpRemain(topic.help!!), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(helpRemain(topic.help!!), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 } else {
-                                    Text(topic.category.name, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(topic.category.name, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            if (topic.title.isNotBlank()) Text(topic.title, Modifier.padding(top = if (topic.isCasual) 0.dp else 10.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 28.sp)
+                            if (topic.title.isNotBlank()) Text(topic.title, Modifier.padding(top = if (topic.isCasual) 0.dp else 10.dp), style = XType.Headline, fontWeight = FontWeight.SemiBold)
                             Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                 Avatar(topic.author.nickname, 32.dp, showInitial = true)
                                 Column {
-                                    Text(topic.author.nickname, Modifier.clickable { open(Route.User(topic.author.uid)) }, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                    Text("发布于 ${agoText(topic.createdAt)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(topic.author.nickname, Modifier.clickable { open(Route.User(topic.author.uid)) }, style = XType.Body, fontWeight = FontWeight.SemiBold)
+                                    Text("发布于 ${agoText(topic.createdAt)}", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                             RichBody(env, topic.bodyHtml, Modifier.padding(top = 12.dp), hideImages = topic.isCasual, onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
                             LinkedGameCards(env, topic.bodyHtml, open)
                             topic.attachments.forEach { attachment ->
                                 Column(Modifier.padding(top = 12.dp)) {
-                                    Text(attachment.name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                    Text("${attachment.size} 字节 · ${if (attachment.price == 0) "免费" else "${attachment.price} 积分"}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                                    Text(attachment.name, style = XType.Body, fontWeight = FontWeight.Medium)
+                                    Text("${attachment.size} 字节 · ${if (attachment.price == 0) "免费" else "${attachment.price} 积分"}", style = XType.Caption, color = LocalExtraColors.current.ink3)
                                     GhostPillButton("在网页查看与下载", { env.platform?.openUrl(env.forum.topicUrl(topic.id)) }, enabled = env.platform != null)
                                 }
                             }
                             Box(Modifier.padding(top = 10.dp)) { NativeReportAction(env, "topic", topic.id, open) }
-                            topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = Amber) }
+                            topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Amber) }
                             topic.poll?.let { PollView(env, topic, it, open) { msg -> toast = msg } }
                         }
                         val help = topic.help
@@ -423,7 +423,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                         Box(
                             Modifier.weight(1f).height(40.dp).padding(horizontal = 4.dp).clip(CircleShape).background(LocalExtraColors.current.fill).clickable { if (session.loggedIn) replying = true else open(Route.Login) }.padding(horizontal = 16.dp),
                             contentAlignment = Alignment.CenterStart,
-                        ) { Text(if (session.loggedIn) "写回复…" else "登录后回复", fontSize = 14.sp, color = LocalExtraColors.current.ink3) }
+                        ) { Text(if (session.loggedIn) "写回复…" else "登录后回复", style = XType.Secondary, color = LocalExtraColors.current.ink3) }
                         if (topic.help != null) {
                             PillButton("用 AI 做一个", { open(Route.AiChat) }, Modifier.padding(start = 4.dp), height = 40.dp, icon = XIcons.Sparkle)
                         } else Row(Modifier.clip(CircleShape).clickable {
@@ -434,7 +434,7 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                             }
                         }.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             XIcon(XIcons.Heart, tint = if (liked) Brand else MaterialTheme.colorScheme.onSurface, description = if (liked) "取消点赞" else "点赞")
-                            Text("$likeCount", fontSize = 14.sp, color = if (liked) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("$likeCount", style = XType.Secondary, color = if (liked) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (topic.help == null) IconTap(XIcons.Bookmark, if (bookmarked) "取消收藏" else "收藏", {
                             guarded { val next = !bookmarked; env.forum.setTopicBookmarked(topic.id, next); bookmarked = next; toast = if (next) "已收藏" else "已取消收藏" }
@@ -472,9 +472,9 @@ fun WeeklyDetailScreen(env: CommunityEnv, week: String, open: (Route) -> Unit, b
             LoadBox(state, loader::reload) { detail ->
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).background(MaterialTheme.colorScheme.surface)) {
                     Column(Modifier.padding(16.dp)) {
-                        Text(detail.week, Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Text(detail.title, Modifier.padding(top = 10.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, lineHeight = 28.sp)
-                        if (detail.summary.isNotBlank()) Text(detail.summary, Modifier.padding(top = 6.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(detail.week, Modifier.clip(RoundedCornerShape(10.dp)).background(Brand).padding(horizontal = 10.dp, vertical = 2.dp), color = Color.White, style = XType.Caption, fontWeight = FontWeight.SemiBold)
+                        Text(detail.title, Modifier.padding(top = 10.dp), style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                        if (detail.summary.isNotBlank()) Text(detail.summary, Modifier.padding(top = 6.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Hairline()
                     detail.entries().forEachIndexed { i, entry ->
@@ -502,12 +502,12 @@ private fun WeeklyEntryRow(rank: Int, entry: WeeklyEntry, open: (Route) -> Unit)
 private fun EntryColumn(rank: Int, title: String, summary: String, note: String, label: String?, onClick: (() -> Unit)? = {}) {
     val base = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
     Row(base.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("$rank", Modifier.width(24.dp), fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = if (rank <= 3) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("$rank", Modifier.width(24.dp), style = XType.Title, fontWeight = FontWeight.SemiBold, color = if (rank <= 3) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
         Column(Modifier.weight(1f)) {
-            if (title.isNotBlank()) Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, lineHeight = 22.sp)
-            if (summary.isNotBlank()) Text(summary, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (note.isNotBlank()) Text(note, Modifier.padding(top = 4.dp), fontSize = 14.sp, lineHeight = 22.sp)
-            if (label != null) Text(label, Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            if (title.isNotBlank()) Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold)
+            if (summary.isNotBlank()) Text(summary, Modifier.padding(top = 4.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (note.isNotBlank()) Text(note, Modifier.padding(top = 4.dp), style = XType.Body)
+            if (label != null) Text(label, Modifier.padding(top = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
     }
 }
@@ -523,8 +523,8 @@ fun ProjectDetailScreen(env: CommunityEnv, slug: String, back: () -> Unit) {
             ScreenBar("项目", onBack = back, trailing = { IconTap(XIcons.Share, "分享", { share = true }) })
             LoadBox(state, loader::reload) { project ->
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).background(MaterialTheme.colorScheme.surface).padding(16.dp)) {
-                    Text(project.name, fontSize = 22.sp, fontWeight = FontWeight.SemiBold)
-                    if (project.summary.isNotBlank()) Text(project.summary, Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(project.name, style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                    if (project.summary.isNotBlank()) Text(project.summary, Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     project.links.forEach { link ->
                         GhostPillButton(link.title, { env.platform?.openUrl(link.url) }, Modifier.padding(top = 12.dp).fillMaxWidth(), enabled = env.platform != null)
                     }

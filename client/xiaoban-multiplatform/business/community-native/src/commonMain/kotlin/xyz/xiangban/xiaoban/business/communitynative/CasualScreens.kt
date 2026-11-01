@@ -70,7 +70,7 @@ private fun CasualCard(env: CommunityEnv, topic: Topic, onClick: () -> Unit) {
             if (url == null || failed) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.width(24.dp).height(3.dp).background(Brand))
-                    Text(title, fontSize = 19.sp, fontWeight = FontWeight.Bold, lineHeight = 28.sp, maxLines = 6, overflow = TextOverflow.Ellipsis)
+                    Text(title, style = XType.Title, fontWeight = FontWeight.Bold, maxLines = 6, overflow = TextOverflow.Ellipsis)
                 }
             }
             if (url != null && !failed) AsyncImage(url, "${title}的封面", imageLoader = rememberImageLoader(), contentScale = ContentScale.Crop,
@@ -78,15 +78,15 @@ private fun CasualCard(env: CommunityEnv, topic: Topic, onClick: () -> Unit) {
                     val image = it.result.image
                     if (image.width > 0 && image.height > 0) ratio = (image.width.toFloat() / image.height).coerceIn(.65f, 1.5f)
                 }, onError = { failed = true })
-            if (topic.pinned) Text("置顶", Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(4.dp)).background(Brand).padding(horizontal = 6.dp, vertical = 3.dp), color = Color.White, fontSize = 10.sp)
+            if (topic.pinned) Text("置顶", Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(4.dp)).background(Brand).padding(horizontal = 6.dp, vertical = 3.dp), color = Color.White, style = XType.Caption)
         }
         Column(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Text(title, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(title, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 Avatar(topic.author.nickname, 18.dp, showInitial = true)
-                Text(topic.author.nickname, Modifier.weight(1f), fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, color = LocalExtraColors.current.ink3)
+                Text(topic.author.nickname, Modifier.weight(1f), style = XType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis, color = LocalExtraColors.current.ink3)
                 XIcon(XIcons.Heart, size = 13.dp, tint = LocalExtraColors.current.ink3)
-                Text(compactCount(topic.likeCount), fontSize = 10.sp, color = LocalExtraColors.current.ink3)
+                Text(compactCount(topic.likeCount), style = XType.Caption, color = LocalExtraColors.current.ink3)
             }
         }
     }
@@ -104,7 +104,7 @@ internal fun CasualGallery(env: CommunityEnv, images: List<BodyBlock.Image>) {
             HorizontalPager(pager, Modifier.fillMaxSize(), key = { images[it].src }) { index ->
                 var failed by remember(images[index].src) { mutableStateOf(false) }
                 Box(Modifier.fillMaxSize().clickable { zoom = index }, contentAlignment = Alignment.Center) {
-                    if (failed) Text("图片暂时无法加载", color = LocalExtraColors.current.ink3, fontSize = 13.sp)
+                    if (failed) Text("图片暂时无法加载", color = LocalExtraColors.current.ink3, style = XType.Secondary)
                     AsyncImage(images[index].src, images[index].alt.ifBlank { "图片 ${index + 1}" }, imageLoader = rememberImageLoader(),
                         modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Fit, onError = { failed = true }, onSuccess = {
                             failed = false
@@ -113,7 +113,7 @@ internal fun CasualGallery(env: CommunityEnv, images: List<BodyBlock.Image>) {
                 }
             }
             if (images.size > 1) Text("${pager.currentPage + 1} / ${images.size}", Modifier.align(Alignment.BottomEnd).padding(12.dp)
-                .clip(CircleShape).background(Color.Black.copy(alpha = .48f)).padding(horizontal = 10.dp, vertical = 4.dp), color = Color.White, fontSize = 12.sp)
+                .clip(CircleShape).background(Color.Black.copy(alpha = .48f)).padding(horizontal = 10.dp, vertical = 4.dp), color = Color.White, style = XType.Caption)
         }
     }
     zoom?.let { initial ->
@@ -123,7 +123,7 @@ internal fun CasualGallery(env: CommunityEnv, images: List<BodyBlock.Image>) {
                 HorizontalPager(fullPager, Modifier.fillMaxSize()) { index ->
                     AsyncImage(images[index].src, "图片 ${index + 1}", imageLoader = rememberImageLoader(), contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
                 }
-                Text("${fullPager.currentPage + 1} / ${images.size}", Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(18.dp), color = Color.White, fontSize = 14.sp)
+                Text("${fullPager.currentPage + 1} / ${images.size}", Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(18.dp), color = Color.White, style = XType.Body)
                 Box(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(8.dp)) { IconTap(XIcons.Close, "关闭图片", { zoom = null }, tint = Color.White) }
             }
         }

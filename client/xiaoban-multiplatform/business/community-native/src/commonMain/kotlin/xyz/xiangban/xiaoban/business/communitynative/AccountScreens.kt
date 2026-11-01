@@ -91,7 +91,7 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
                 XIcon(XIcons.Sparkle, tint = Brand, size = 22.dp)
                 Spacer(Modifier.size(8.dp))
             }
-            Text(if (registering) "完成注册" else "登录小伴", Modifier.weight(1f), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+            Text(if (registering) "完成注册" else "登录小伴", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold)
             IconTap(XIcons.Close, "关闭", back)
         }
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 4.dp)) {
@@ -105,7 +105,7 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
                                 .clickable { mode = m; error = null },
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(m.label, fontSize = 14.sp, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(m.label, style = XType.Secondary, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal, color = if (selected) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -122,7 +122,7 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
                 } else {
                     TextBox(password, { password = it }, Modifier.padding(top = 12.dp), label = "密码", placeholder = "请输入密码", password = true, keyboardType = KeyboardType.Password, leadingIcon = XIcons.Lock, filled = true, fontSize = 14)
                 }
-                error?.let { Text(it, Modifier.padding(top = 10.dp), color = Danger, fontSize = 14.sp) }
+                error?.let { Text(it, Modifier.padding(top = 10.dp), color = Danger, style = XType.Body) }
                 PillButton(
                     if (busy) "登录中…" else "登录",
                     {
@@ -142,13 +142,13 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
                     enabled = !busy && identifier.isNotBlank() && (if (mode == LoginMode.Code) code.isNotBlank() else password.isNotBlank()),
                     height = 44.dp,
                 )
-                if (mode == LoginMode.Code) Text("首次登录将引导注册", Modifier.padding(top = 10.dp).fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                Text("登录即表示同意用户协议与隐私政策", Modifier.padding(top = 12.dp).fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                if (mode == LoginMode.Code) Text("首次登录将引导注册", Modifier.padding(top = 10.dp).fillMaxWidth(), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text("登录即表示同意用户协议与隐私政策", Modifier.padding(top = 12.dp).fillMaxWidth(), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             } else {
                 TextBox(username, { username = it.trim() }, Modifier.padding(top = 8.dp), label = "用户名", placeholder = "2–20 个字", leadingIcon = XIcons.User, filled = true, fontSize = 14)
-                Text("用户名不能修改，可用字母、数字、汉字和下划线", Modifier.padding(top = 6.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("用户名不能修改，可用字母、数字、汉字和下划线", Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 TextBox(password, { password = it }, Modifier.padding(top = 12.dp), label = "密码", placeholder = "至少 8 位", password = true, keyboardType = KeyboardType.Password, leadingIcon = XIcons.Lock, filled = true, fontSize = 14)
-                error?.let { Text(it, Modifier.padding(top = 10.dp), color = Danger, fontSize = 14.sp) }
+                error?.let { Text(it, Modifier.padding(top = 10.dp), color = Danger, style = XType.Body) }
                 PillButton(
                     if (busy) "提交中…" else "完成注册并登录",
                     { run { env.session.register(registrationToken.orEmpty(), username, password); done() } },
@@ -156,7 +156,7 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
                     enabled = !busy && username.isNotBlank() && password.length >= 8,
                     height = 44.dp,
                 )
-                Text("登录即表示同意用户协议与隐私政策", Modifier.padding(top = 12.dp).fillMaxWidth(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                Text("登录即表示同意用户协议与隐私政策", Modifier.padding(top = 12.dp).fillMaxWidth(), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }
@@ -189,15 +189,15 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
             Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 val name = nickname ?: session.user?.username
                 Box(Modifier.size(64.dp).clip(CircleShape).background(Brand), contentAlignment = Alignment.Center) {
-                    Text(name?.take(1)?.uppercase() ?: "?", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+                    Text(name?.take(1)?.uppercase() ?: "?", color = Color.White, style = XType.Headline, fontWeight = FontWeight.SemiBold)
                 }
                 Column(Modifier.weight(1f)) {
                     if (session.loggedIn) {
-                        Text(name ?: "已登录", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                        points?.let { Text("$it 积分", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        Text(name ?: "已登录", style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                        points?.let { Text("$it 积分", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     } else {
-                        Text("未登录", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                        Text("登录后同步你在社区的身份", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("未登录", style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                        Text("登录后同步你在社区的身份", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 if (!session.loggedIn) PillButton("登录", { open(Route.Login) }, height = 36.dp)
@@ -233,7 +233,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
 private fun QuickTile(icon: ImageVector, label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Column(modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         IconBox(icon, 44.dp, 16.dp)
-        Text(label, fontSize = 12.sp)
+        Text(label, style = XType.Caption)
     }
 }
 

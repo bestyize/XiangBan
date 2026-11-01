@@ -126,20 +126,20 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
             Column(Modifier.fillMaxWidth().statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconTap(XIcons.Menu, "对话列表", onOpenDrawer)
-                    Text("小伴AI", Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+                    Text("小伴AI", Modifier.weight(1f), style = XType.Title, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
                     Spacer(Modifier.width(44.dp))
                 }
             }
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 12.dp)) {
-                Text("你好，想做点什么？", fontSize = 24.sp, fontWeight = FontWeight.SemiBold, lineHeight = 31.sp)
-                Text("问问题、办点事，或者遥控电脑上的小伴", Modifier.padding(top = 6.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("你好，想做点什么？", style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                Text("问问题、办点事，或者遥控电脑上的小伴", Modifier.padding(top = 6.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                 // 输入卡片：整张卡片是进入对话页的入口，真正的输入在对话页。
                 Column(
-                    Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surface)
+                    Modifier.padding(top = 16.dp).fillMaxWidth().outlinedCard(20.dp)
                         .clickable { if (session.loggedIn) open(Route.AiChat) else open(Route.Login) }.padding(horizontal = 16.dp, vertical = 14.dp),
                 ) {
-                    Text("问点什么，或描述想要的内容…", fontSize = 15.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("问点什么，或描述想要的内容…", style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                         ChipPill(cloud.modelName(), trailingIcon = XIcons.ChevronDown)
                         Spacer(Modifier.weight(1f))
@@ -149,7 +149,7 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
                     }
                 }
 
-                Text("功能", Modifier.padding(top = 22.dp, bottom = 10.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("功能", Modifier.padding(top = 22.dp, bottom = 10.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
                 val peers = remote.peers
                 val computerDesc = when {
                     !session.loggedIn -> "登录后可用"
@@ -162,8 +162,8 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
                     FeatureTile(XIcons.Star, "模型与额度", if (session.loggedIn) quotaText(cloud.balance) else "登录后可用", Modifier.weight(1f)) { open(Route.Models) }
                 }
 
-                Text("试试这样问我", Modifier.padding(top = 22.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Column(Modifier.padding(top = 6.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface)) {
+                Text("试试这样问我", Modifier.padding(top = 22.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
+                Column(Modifier.padding(top = 6.dp).fillMaxWidth().outlinedCard(8.dp)) {
                     StarterPrompts.forEachIndexed { i, prompt ->
                         if (i > 0) Hairline(Modifier.padding(start = 14.dp))
                         Row(
@@ -172,7 +172,7 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
                             }.padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Text(prompt, Modifier.weight(1f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(prompt, Modifier.weight(1f), style = XType.Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
                         }
                     }
@@ -180,20 +180,20 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
 
                 val recent = cloud.conversations.take(3)
                 if (session.loggedIn && recent.isNotEmpty()) {
-                    Text("最近对话", Modifier.padding(top = 22.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Column(Modifier.padding(top = 6.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface)) {
+                    Text("最近对话", Modifier.padding(top = 22.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
+                    Column(Modifier.padding(top = 6.dp).fillMaxWidth().outlinedCard(8.dp)) {
                         recent.forEachIndexed { i, item ->
                             if (i > 0) Hairline(Modifier.padding(start = 14.dp))
                             Row(
                                 Modifier.fillMaxWidth().clickable { chat.openConversation(item.id); open(Route.AiChat) }.padding(14.dp),
                                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
-                                Text(item.title, Modifier.weight(1f), fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(item.title, Modifier.weight(1f), style = XType.Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
                             }
                         }
                     }
-                    if (!env.chatsKept) Text("对话只保存在这次打开应用期间。", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (!env.chatsKept) Text("对话只保存在这次打开应用期间。", Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(NavInset))
             }
@@ -226,8 +226,8 @@ fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> 
         )
     }
     if (editing) CenterDialog({ editing = false }) {
-        Text(if (original == null) "新建工作空间" else "管理工作空间", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-        Text("把相关的聊天收在一起", Modifier.padding(top = 6.dp, bottom = 16.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if (original == null) "新建工作空间" else "管理工作空间", style = XType.Title, fontWeight = FontWeight.SemiBold)
+        Text("把相关的聊天收在一起", Modifier.padding(top = 6.dp, bottom = 16.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         OutlinedTextField(name, { name = it.take(40) }, label = { Text("名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         val valid = name.trim().isNotEmpty() && (name.trim() == original || name.trim() !in cloud.workspaces)
         Row(Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -238,22 +238,22 @@ fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> 
             }, Modifier.weight(1f))
         }
         original?.let { group ->
-            Text("删除分组后，对话保留在未分组中。", fontSize = 12.sp)
+            Text("删除分组后，对话保留在未分组中。", style = XType.Caption)
             GhostPillButton("删除工作空间", { chat.deleteWorkspace(group); editing = false })
         }
     }
     moving?.let { item ->
         BottomSheet({ moving = null }) {
-            Text(item.title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text("移动到工作空间", Modifier.padding(top = 8.dp, bottom = 12.dp), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(item.title, style = XType.Title, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text("移动到工作空间", Modifier.padding(top = 8.dp, bottom = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
                 (listOf<String?>(null) + cloud.workspaces).forEach { group ->
                     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable {
                         chat.moveConversation(item.id, group); moving = null
                     }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         XIcon(if (group == null) XIcons.Message else XIcons.Folder, size = 20.dp)
-                        Text(group ?: "未分组", Modifier.weight(1f), fontSize = 15.sp)
-                        if (group == item.workspace) Text("当前", fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+                        Text(group ?: "未分组", Modifier.weight(1f), style = XType.Body)
+                        if (group == item.workspace) Text("当前", style = XType.Caption, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -264,8 +264,8 @@ fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> 
     }
     deleting?.let { item ->
         CenterDialog({ deleting = null }) {
-            Text("删除这个对话？", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            Text("“${item.title}”会从这台手机上删掉，删了就找不回来了。", Modifier.padding(top = 8.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("删除这个对话？", style = XType.Title, fontWeight = FontWeight.SemiBold)
+            Text("“${item.title}”会从这台手机上删掉，删了就找不回来了。", Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(Modifier.padding(top = 18.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GhostPillButton("取消", { deleting = null }, Modifier.weight(1f), height = 44.dp)
                 PillButton("删除", { chat.deleteConversation(item.id); deleting = null }, Modifier.weight(1f), height = 44.dp)
@@ -277,13 +277,13 @@ fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> 
 @Composable
 private fun FeatureTile(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, desc: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
-        modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(12.dp),
+        modifier.outlinedCard(8.dp).clickable(onClick = onClick).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         IconBox(icon, 40.dp, 12.dp)
         Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(desc, Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(desc, Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -302,14 +302,14 @@ private fun AiDrawer(
                 Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconBox(XIcons.Message, 40.dp, 14.dp, tint = MaterialTheme.colorScheme.primary)
                     Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                        Text("小伴 AI", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        Text("你的想法，都在这里", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("小伴 AI", style = XType.Title, fontWeight = FontWeight.Bold)
+                        Text("你的想法，都在这里", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconTap(XIcons.ChevronLeft, "收起侧栏", onClose)
                 }
                 PillButton("开启新对话", onNew, Modifier.padding(horizontal = 16.dp).fillMaxWidth(), height = 48.dp, icon = XIcons.Plus)
                 Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 20.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("工作空间", Modifier.weight(1f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("工作空间", Modifier.weight(1f), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     IconTap(XIcons.Plus, "新建工作空间", onCreateWorkspace, size = 20.dp)
                 }
                 LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)) {
@@ -322,8 +322,8 @@ private fun AiDrawer(
                                     collapsed = if (group in collapsed) collapsed - group else collapsed + group
                                 }.padding(start = 12.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                     XIcon(if (group == null) XIcons.Message else XIcons.Folder, size = 18.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(group ?: "未分组", Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(chats.size.toString(), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(group ?: "未分组", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(chats.size.toString(), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     XIcon(if (group in collapsed) XIcons.ChevronRight else XIcons.ChevronDown, size = 16.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                     if (group == null) Spacer(Modifier.width(12.dp))
                                 }
@@ -332,7 +332,7 @@ private fun AiDrawer(
                         }
                         if (group !in collapsed) {
                             if (chats.isEmpty()) item {
-                                Text(if (group == null) "新的对话会出现在这里" else "在对话菜单中移入聊天", Modifier.padding(start = 40.dp, top = 12.dp, bottom = 16.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(if (group == null) "新的对话会出现在这里" else "在对话菜单中移入聊天", Modifier.padding(start = 40.dp, top = 12.dp, bottom = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             items(chats, key = { it.id }) { item ->
                                 val current = item.id == cloud.conversationId
@@ -341,7 +341,7 @@ private fun AiDrawer(
                                     .combinedClickable(onLongClick = { onDelete(item) }) { onOpen(item.id) }, verticalAlignment = Alignment.CenterVertically) {
                                     Box(Modifier.padding(start = 14.dp, end = 12.dp).size(5.dp).clip(CircleShape)
                                         .background(if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)))
-                                    Text(item.title, Modifier.weight(1f).padding(vertical = 14.dp), fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                                    Text(item.title, Modifier.weight(1f).padding(vertical = 14.dp), style = XType.Body, maxLines = 2, overflow = TextOverflow.Ellipsis,
                                         color = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                                         fontWeight = if (current) FontWeight.SemiBold else FontWeight.Normal)
                                     IconTap(XIcons.More, "对话操作", { onDelete(item) }, size = 18.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -362,7 +362,7 @@ private fun AiDrawer(
 private fun DrawerLink(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().height(44.dp).clickable(onClick = onClick).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         XIcon(icon, size = 22.dp)
-        Text(text, fontSize = 15.sp)
+        Text(text, style = XType.Body)
     }
 }
 
@@ -494,28 +494,43 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         OverlayTransition(modelSheet) { panel ->
             BoxWithConstraints(Modifier.fillMaxSize()) {
                 BottomSheet({ modelSheet = false }, panel.heightIn(max = maxHeight * 0.8f)) {
-                    Text("选择模型", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    Text("只对当前这个对话生效。", Modifier.padding(top = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("小伴AI · 官方", Modifier.padding(top = 12.dp), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("选择模型", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                    Text("选择模型，右侧可调整思考等级。", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("小伴AI · 官方", Modifier.padding(top = 12.dp), style = XType.Caption, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                         if (cloud.tiers.isEmpty()) {
-                            Text(if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"), Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+                            Text(if (cloud.loadingMeta) "读取中…" else (cloud.metaError ?: "暂时没有可选的模型"), Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
                         }
                         cloud.tiers.forEach { tier ->
-                            RadioRow(
-                                selected = cloud.selectedTier == tier.tier,
-                                title = tier.displayName,
-                                desc = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description,
-                                enabled = tier.available,
-                                onClick = { if (tier.available) { chat.selectTier(tier.tier); modelSheet = false } else { modelSheet = false; open(Route.Models) } },
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                RadioRow(
+                                    selected = cloud.selectedTier == tier.tier,
+                                    title = tier.displayName,
+                                    desc = (if (!tier.available && tier.requiresPaid) "需要充值后使用　" else "") + tier.description,
+                                    modifier = Modifier.weight(1f),
+                                    enabled = tier.available && !cloud.sending,
+                                    onClick = { if (tier.available && !cloud.sending) { chat.selectTier(tier.tier); modelSheet = false } },
+                                )
+                                if (tier.available && tier.reasoningEfforts.isNotEmpty()) {
+                                    ReasoningMenu(
+                                        modelName = tier.displayName,
+                                        levels = tier.reasoningEfforts,
+                                        selected = cloud.reasoningByTier[tier.tier],
+                                        enabled = !cloud.sending,
+                                        onSelect = { effort ->
+                                            chat.selectReasoning(tier.tier, effort)
+                                            modelSheet = false
+                                        },
+                                    )
+                                }
+                            }
                         }
                     }
                     Row(
                         Modifier.padding(top = 8.dp).fillMaxWidth().clickable { modelSheet = false; open(Route.Models) }.padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("模型与额度（余额、兑换）", Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text("模型与额度（余额、兑换）", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
                         XIcon(XIcons.ChevronRight, size = 16.dp)
                     }
                     GhostPillButton("取消", { modelSheet = false }, Modifier.padding(top = 4.dp).fillMaxWidth())
@@ -606,20 +621,20 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
                             Column(Modifier.weight(1f)) {
-                                Text("小伴AI", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                                Text("跟着账号走，换手机、换电脑自动同步", Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("小伴AI", style = XType.Section, fontWeight = FontWeight.SemiBold)
+                                Text("跟着账号走，换手机、换电脑自动同步", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         Text(
                             "当前模型：${cloud.modelName()}\n${quotaText(cloud.balance)}" + (expiryText(cloud.balance)?.let { " · 到期 $it" } ?: ""),
-                            Modifier.padding(top = 12.dp), fontSize = 14.sp, lineHeight = 21.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Modifier.padding(top = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         GhostPillButton("配置", { sheet = true; chat.clearRedeemFeedback() }, Modifier.padding(top = 12.dp).fillMaxWidth(), height = 40.dp, fontSize = 14)
                     }
                     GroupLabel("自己的模型服务")
                     Text(
                         "用自己的密钥接入 DeepSeek、OpenAI 兼容服务等，目前只能在电脑版的“设置”里添加；手机上的填写入口会在后续版本提供。",
-                        Modifier.padding(horizontal = 16.dp), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        Modifier.padding(horizontal = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
@@ -636,30 +651,30 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(Brand), contentAlignment = Alignment.Center) { XIcon(XIcons.SparkleSmall, tint = Color.White, size = 22.dp) }
                     Column(Modifier.weight(1f)) {
-                        Text("小伴AI", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                        Text("跟着账号走，换设备自动同步", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("小伴AI", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                        Text("跟着账号走，换设备自动同步", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     IconTap(XIcons.Close, "关闭", dismissSheet)
                 }
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                 Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.background).padding(vertical = 12.dp)) {
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(cloud.balance?.let { formatAiMoney(it.total, it.quotaPerUnit) } ?: "—", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                        Text("剩余额度", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(cloud.balance?.let { formatAiMoney(it.total, it.quotaPerUnit) } ?: "—", style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                        Text("剩余额度", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(expiryText(cloud.balance) ?: "—", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
-                        Text("到期时间", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(expiryText(cloud.balance) ?: "—", style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                        Text("到期时间", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
                 Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextBox(code, { code = it }, Modifier.weight(1f), placeholder = "输入兑换码", filled = true)
                     PillButton(if (cloud.redeeming) "兑换中…" else "兑换", { chat.redeem(code) }, enabled = !cloud.redeeming && code.isNotBlank(), height = 48.dp)
                 }
-                cloud.redeemMessage?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, fontWeight = FontWeight.Medium) }
-                cloud.redeemError?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 14.sp, color = Danger) }
-                Text("可用模型", Modifier.padding(top = 16.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                Text("选择聊天使用的模型，也可以在对话页切换。", Modifier.padding(top = 2.dp), fontSize = 12.sp, lineHeight = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                cloud.redeemMessage?.let { Text(it, Modifier.padding(top = 8.dp), style = XType.Body, fontWeight = FontWeight.Medium) }
+                cloud.redeemError?.let { Text(it, Modifier.padding(top = 8.dp), style = XType.Body, color = Danger) }
+                Text("可用模型", Modifier.padding(top = 16.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
+                Text("选择聊天使用的模型，也可以在对话页切换。", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 cloud.tiers.forEach { tier ->
                     RadioRow(
                         selected = cloud.selectedTier == tier.tier,
@@ -681,3 +696,4 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
 /** 取额度里最早到期的一项，只显示日期；没有到期时间返回 null。 */
 private fun expiryText(balance: AiBalance?): String? =
     balance?.buckets?.filter { it.remaining > 0 }?.mapNotNull { it.expiresAt }?.minOrNull()?.take(10)
+

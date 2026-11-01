@@ -1,14 +1,14 @@
 package xyz.xiangban.xiaoban.common.community
 
 /**
- * 设计规范变量（见 docs/product/手机端设计规范.md）：页面底浅灰、卡片纯白不描边，红色只给主按钮、选中态和提醒；
+ * 设计规范变量（见 docs/product/手机端设计规范.md）：页面底是接近白色的 #FAFAFA，卡片纯白、放在页面底上时加细描边，红色只给主按钮、选中态和提醒；
  * 深色页面 #111111、卡片 #1C1C1E、卡片里的次要块 #2C2C2E。主题色可换（[Accents]），成功绿和危险红固定不跟主题色走。
  * 颜色用 ARGB 的 Long，避免核心模块依赖 Compose；界面层再转成 Color。
  */
 object DesignTokens {
     // 颜色（浅色 / 深色）
     const val Brand = 0xFFE3203CL
-    const val PaperLight = 0xFFEDEDEDL
+    const val PaperLight = 0xFFFAFAFAL
     const val SurfaceLight = 0xFFFFFFFFL
     const val InkLight = 0xFF222222L
     const val Ink2Light = 0xFF666666L

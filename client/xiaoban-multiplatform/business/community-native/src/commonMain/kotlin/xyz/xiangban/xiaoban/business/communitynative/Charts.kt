@@ -133,7 +133,7 @@ fun DayBars(values: List<Long>, labels: List<String>, modifier: Modifier = Modif
         values.forEachIndexed { i, v ->
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Box(Modifier.width(14.dp).height((height * (v.toFloat() / peak)).coerceAtLeast(3.dp)).clip(RoundedCornerShape(3.dp)).background(if (i == values.lastIndex) DataBlue else DataBlueSoft))
-                Text(labels.getOrElse(i) { "" }, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                Text(labels.getOrElse(i) { "" }, style = XType.Caption, color = LocalExtraColors.current.ink3)
             }
         }
     }
@@ -145,7 +145,7 @@ fun IntervalBars(values: List<Double>, modifier: Modifier = Modifier, full: Doub
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
         values.forEachIndexed { i, v ->
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(formatScore(v), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(formatScore(v), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Box(Modifier.width(24.dp).height((height * (v / full).toFloat()).coerceIn(4.dp, height)).clip(RoundedCornerShape(8.dp)).background(if (i == values.lastIndex) DataBlue else DataBlueSoft))
             }
         }

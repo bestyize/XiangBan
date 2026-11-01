@@ -10,6 +10,8 @@ import androidx.compose.ui.unit.dp
 
 /** 设计稿里用到的线条图标（24×24，描边 1.8）。路径数据直接取自设计稿的 SVG，由脚本生成。 */
 object XIcons {
+    // Lucide Brain (ISC), same path and 1.8 stroke as desktop.
+    val Brain: ImageVector by lazy { strokeIcon("Brain", "M12 18V5 M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4 M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5 M17.997 5.125a4 4 0 0 1 2.526 5.77 M18 18a4 4 0 0 0 2-7.464 M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517 M6 18a4 4 0 0 1-2-7.464 M6.003 5.125a4 4 0 0 0-2.526 5.77") }
     val Trash: ImageVector by lazy { strokeIcon("Trash", "M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7") }
     val Phone: ImageVector by lazy { strokeIcon("Phone", "M8 2h8a2 2 0 012 2v16a2 2 0 01-2 2H8a2 2 0 01-2-2V4a2 2 0 012-2zM10 18h4") }
     val ArrowRight: ImageVector by lazy { strokeIcon("ArrowRight", "M5 12h13M13 6l6 6-6 6") }

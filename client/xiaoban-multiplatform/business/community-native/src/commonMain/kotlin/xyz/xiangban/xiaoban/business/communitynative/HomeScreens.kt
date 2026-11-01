@@ -103,7 +103,7 @@ internal fun dayText(date: String?): String {
 private fun CardTitleRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         if (icon != null) XIcon(icon, size = 18.dp)
-        Text(title, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -125,7 +125,7 @@ internal fun LangLine(r: RepoRank) {
     if (r.language.isEmpty()) return
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Dot(hexColor(r.languageColor), 8.dp)
-        Text(r.language, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        Text(r.language, style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -145,28 +145,28 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 XIcon(XIcons.Message, size = 18.dp)
-                                Text("AI 日报", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                Text("AI 日报", style = XType.Section, fontWeight = FontWeight.SemiBold)
                                 val note = listOf(dayText(home.news.date), "更新").filter { it.isNotEmpty() }.joinToString(" · ")
-                                if (home.news.total > 0) Text(note, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                                if (home.news.total > 0) Text(note, style = XType.Caption, color = LocalExtraColors.current.ink3)
                             }
                             Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { open(Route.Daily) }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("往期", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+                                Text("往期", style = XType.Secondary, color = LocalExtraColors.current.ink3)
                                 XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
                             }
                         }
                     }
                 }
-                if (home.news.items.isEmpty()) item { WhiteCard { Text("今天还没有日报", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                if (home.news.items.isEmpty()) item { WhiteCard { Text("今天还没有日报", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                 items(home.news.items, key = { "n-${it.key}" }) { NewsRow(it) { open(Route.News(it.key)) } }
                 if (home.featured.isNotEmpty()) item {
                     WhiteCard(padding = 0.dp) {
                         Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 XIcon(XIcons.Sparkle, size = 18.dp)
-                                Text("精选创作", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                Text("精选创作", style = XType.Section, fontWeight = FontWeight.SemiBold)
                             }
                             Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { switchTo(CommunitySection.Discuss, DiscussSub.Create.key) }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("更多", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+                                Text("更多", style = XType.Secondary, color = LocalExtraColors.current.ink3)
                                 XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
                             }
                         }
@@ -182,10 +182,10 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                         XIcon(XIcons.Star, size = 18.dp)
-                                        Text(if (issue.isBaseline) "开源项目初始快照" else if (issue.isTrending) "GitHub 开源热榜" else if (issue.source == "GitHub") "开源观测榜" else "本周开源热榜", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(if (issue.isBaseline) "开源项目初始快照" else if (issue.isTrending) "GitHub 开源热榜" else if (issue.source == "GitHub") "开源观测榜" else "本周开源热榜", style = XType.Section, fontWeight = FontWeight.SemiBold)
                                     }
                                     Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { switchTo(CommunitySection.Home, HomeSub.Hot.key) }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Text("完整榜单", fontSize = 14.sp, color = LocalExtraColors.current.ink3)
+                                        Text("完整榜单", style = XType.Secondary, color = LocalExtraColors.current.ink3)
                                         XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
                                     }
                                 }
@@ -221,11 +221,11 @@ private fun BannerCarousel(banners: List<HomeBanner>, onClick: (HomeBanner) -> U
                 Column(Modifier.align(Alignment.BottomStart).padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
                     if (b.tag.isNotEmpty()) Row(Modifier.clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         XIcon(XIcons.Sparkle, tint = Color.White, size = 12.dp)
-                        Text(b.tag, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Text(b.tag, style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Color.White)
                     }
-                    Text(b.title, Modifier.padding(top = 8.dp), fontSize = 18.sp, fontWeight = FontWeight.SemiBold, lineHeight = 25.sp, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(b.title, Modifier.padding(top = 8.dp), style = XType.Title, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Row(Modifier.padding(top = 4.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(b.byline, Modifier.weight(1f), fontSize = 12.sp, color = Color.White.copy(alpha = 0.85f), maxLines = 1)
+                        Text(b.byline, Modifier.weight(1f), style = XType.Caption, color = Color.White.copy(alpha = 0.85f), maxLines = 1)
                         if (banners.size > 1) Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                             repeat(banners.size) { i ->
                                 val on = i == pager.currentPage
@@ -243,20 +243,20 @@ private fun BannerCarousel(banners: List<HomeBanner>, onClick: (HomeBanner) -> U
 @Composable
 internal fun NewsRow(item: NewsItem, onClick: () -> Unit) {
     val accent = hexColor(item.accent, Color(0xFF9FBFCF))
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
+    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).outlinedCard(16.dp).clickable(onClick = onClick)) {
         if (item.coverUrl.isNotEmpty()) Cover(item.coverUrl, item.key.hashCode().toLong() and 0x7fffffff, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
         else Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Brush.linearGradient(listOf(lerp(accent, Color.Black, 0.48f), accent))), contentAlignment = Alignment.BottomStart) {
-            Text("AI  ·  DAILY", Modifier.padding(18.dp), color = Color.White.copy(alpha = .9f), fontWeight = FontWeight.Bold, letterSpacing = 2.sp, fontSize = 13.sp)
+            Text("AI  ·  DAILY", Modifier.padding(18.dp), color = Color.White.copy(alpha = .9f), fontWeight = FontWeight.Bold, letterSpacing = 2.sp, style = XType.Secondary)
         }
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(item.title, fontSize = 18.sp, fontWeight = FontWeight.Bold, lineHeight = 26.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            if (item.summary.isNotBlank()) Text(item.summary, fontSize = 13.sp, lineHeight = 20.sp, color = LocalExtraColors.current.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(item.title, style = XType.Section, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            if (item.summary.isNotBlank()) Text(item.summary, style = XType.Secondary, color = LocalExtraColors.current.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
             val time = agoText(item.sourcePublishedAt ?: item.publishedAt)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 val logo = BrandLogos.find(item.source)
                 if (logo != null) XIcon(logo.icon, tint = logo.color, size = 14.dp)
                 Text(listOf(item.source, if (item.timeBasis == "collected") "采集于 $time" else time).filter { it.isNotEmpty() }.joinToString(" · "),
-                    fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -268,13 +268,13 @@ private fun PickCard(pack: Pack, onClick: () -> Unit) {
     Column(Modifier.width(132.dp).clickable(onClick = onClick)) {
         Box {
             Cover(pack.coverUrl, pack.id, Modifier.fillMaxWidth().height(104.dp))
-            Text(kindLabel(pack.kind), Modifier.padding(6.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 1.dp), fontSize = 12.sp, color = Color.White)
+            Text(kindLabel(pack.kind), Modifier.padding(6.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 1.dp), style = XType.Caption, color = Color.White)
         }
-        Text(pack.title, Modifier.padding(top = 6.dp), fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(pack.title, Modifier.padding(top = 6.dp), style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             Avatar(pack.author?.nickname ?: "?", 14.dp)
-            Text(pack.author?.nickname ?: "社区作品", Modifier.weight(1f), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (pack.applyCount > 0) Text("${compactCount(pack.applyCount.toInt())} 次应用", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            Text(pack.author?.nickname ?: "社区作品", Modifier.weight(1f), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (pack.applyCount > 0) Text("${compactCount(pack.applyCount.toInt())} 次应用", style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
     }
 }
@@ -283,14 +283,14 @@ private fun PickCard(pack: Pack, onClick: () -> Unit) {
 @Composable
 private fun RepoMiniRow(r: RepoRank, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text("${r.rank}", Modifier.width(16.dp), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+        Text("${r.rank}", Modifier.width(16.dp), style = XType.Section, fontWeight = FontWeight.Bold)
         RepoTile(r, 36.dp, 8.dp)
         Column(Modifier.weight(1f)) {
-            Text(r.fullName, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(r.fullName, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             LangLine(r)
         }
         if (r.starGain != null && r.spark.size >= 2) SparkBars(r.spark, height = 24.dp)
-        Text(r.starGain?.let(::formatGain) ?: "${formatStars(r.starTotal)}★", Modifier.width(52.dp), fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, maxLines = 1)
+        Text(r.starGain?.let(::formatGain) ?: "${formatStars(r.starTotal)}★", Modifier.width(52.dp), style = XType.Body, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.End, maxLines = 1)
     }
 }
 
@@ -308,7 +308,7 @@ internal fun HotTab(env: CommunityEnv, open: (Route) -> Unit) {
             LoadBox(state, loader::reload) { issue ->
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = ListPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
                     item { PeriodCard(issue) { picking = true } }
-                    if (issue.ranks.isEmpty()) item { WhiteCard { Text("这一期还没有榜单", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+                    if (issue.ranks.isEmpty()) item { WhiteCard { Text("这一期还没有榜单", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                     items(issue.ranks, key = { it.fullName }) { r -> RepoCard(env, r, open) }
                 }
             }
@@ -329,17 +329,17 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
         Text(if (issue.isBaseline) "${issue.ranks.size} 个项目 · 按总 Star 排序 · 增量待积累"
             else if (issue.isTrending) "${issue.ranks.size} 个项目 · 近 7 天新增 Star 合计 ${issue.totalGain?.let(::formatGain) ?: "暂无数据"}"
             else "${issue.ranks.size} 个项目 · ${issue.observedDays?.let { "$it 日观测" } ?: "本期观测"} · 净增 ${issue.totalGain?.let(::formatGain) ?: "暂无数据"}",
-            Modifier.padding(top = 8.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().clickable { details = !details }.padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(issue.source.ifBlank { "数据来源" } + " · " + if (details) "收起数据说明" else "口径与更新时间", Modifier.weight(1f), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            Text(issue.source.ifBlank { "数据来源" } + " · " + if (details) "收起数据说明" else "口径与更新时间", Modifier.weight(1f), style = XType.Caption, color = LocalExtraColors.current.ink3)
             XIcon(if (details) XIcons.ChevronUp else XIcons.ChevronDown, size = 14.dp, tint = LocalExtraColors.current.ink3)
         }
         if (details) {
-            repoObservationLabel(issue.asOf)?.let { Text("整理于 $it", Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3) }
+            repoObservationLabel(issue.asOf)?.let { Text("整理于 $it", Modifier.padding(top = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3) }
             Text((if (issue.isBaseline) "当前为首次观测，至少两次快照后计算净增量。"
                 else if (issue.isTrending) "取自 GitHub Trending 周榜，按 GitHub 页面顺序排列；新增 Star 为 GitHub 公布的近 7 天数据。"
                 else if (issue.complete) "已取得连续 7 日边界快照。" else "观测不足 7 日或存在缺采，未补造缺失数据。") + if (issue.sample) " · 示例数据" else "",
-                Modifier.padding(top = 4.dp), fontSize = 12.sp, lineHeight = 18.sp, color = LocalExtraColors.current.ink3)
+                Modifier.padding(top = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
             if (issue.dailyGain.size == 7 && issue.source != "GitHub") DayBars(issue.dailyGain, listOf("一", "二", "三", "四", "五", "六", "日"))
         }
     }
@@ -351,21 +351,21 @@ private fun RepoCard(env: CommunityEnv, r: RepoRank, open: (Route) -> Unit) {
     val (fav, setFav) = rememberPrefFlag(env, "fav_repo:${r.fullName}")
     WhiteCard(Modifier.clickable { openRepo(env, r, open) }, padding = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(r.rank.toString().padStart(2, '0'), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = if (r.rank <= 3) Brand else LocalExtraColors.current.ink3)
+            Text(r.rank.toString().padStart(2, '0'), style = XType.Secondary, fontWeight = FontWeight.Medium, color = if (r.rank <= 3) Brand else LocalExtraColors.current.ink3)
             RepoTile(r, 32.dp, 8.dp)
-            Text(r.fullName, Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(r.fullName, Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             IconTap(XIcons.Bookmark, if (fav) "取消收藏 ${r.fullName}" else "收藏 ${r.fullName}", { setFav(!fav) }, size = 19.dp, tint = if (fav) Brand else LocalExtraColors.current.ink3)
         }
         if (r.shownDescription.isNotBlank()) Text(r.shownDescription, Modifier.padding(top = 8.dp), fontSize = 13.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LangLine(r)
-            Text("☆ ${formatStars(r.starTotal)}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Text("☆ ${formatStars(r.starTotal)}", style = XType.Caption, color = LocalExtraColors.current.ink3)
             Spacer(Modifier.weight(1f))
-            r.starGain?.let { Text("${formatGain(it)} Star", fontSize = 12.sp, fontWeight = FontWeight.Medium) }
+            r.starGain?.let { Text("${formatGain(it)} Star", style = XType.Caption, fontWeight = FontWeight.Medium) }
             if (r.starGain != null && r.spark.size >= 2) SparkBars(r.spark, height = 20.dp)
         }
-        if (r.suspectedGrowth) Text("增长异常 · 编辑复核后收录", Modifier.padding(top = 6.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
-        if (r.starGain != null && r.observedDays != null && !r.complete) Text("实际观测 ${r.observedDays} 天", Modifier.padding(top = 6.dp), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+        if (r.suspectedGrowth) Text("增长异常 · 编辑复核后收录", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+        if (r.starGain != null && r.observedDays != null && !r.complete) Text("实际观测 ${r.observedDays} 天", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -374,7 +374,7 @@ private fun IssuePicker(env: CommunityEnv, current: String?, onPick: (String?) -
     val loader = rememberLoader(env, "repo-issues") { env.forum.repoIssues() }
     val state by loader.state.collectAsState()
     BottomSheet(onDismiss) {
-        Text("往期热榜", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        Text("往期热榜", style = XType.Title, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
         LoadBox(state, loader::reload) { list ->
             if (list.items.isEmpty()) Text("还没有往期", Modifier.padding(vertical = 16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -409,7 +409,7 @@ internal fun TrackTab(env: CommunityEnv) {
                 if (section == "launches") item {
                     WhiteCard(padding = 14.dp) {
                         CardTitleRow("发布记录", XIcons.Bolt)
-                        if (tracker.launches.isEmpty()) Text("暂无已核实的发布记录", Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (tracker.launches.isEmpty()) Text("暂无已核实的发布记录", Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Column(Modifier.padding(top = 10.dp)) {
                             tracker.launches.forEachIndexed { i, l ->
                                 val source = trackerOfficialSource(l.sourceUrl)
@@ -419,11 +419,11 @@ internal fun TrackTab(env: CommunityEnv) {
                                         if (i < tracker.launches.lastIndex) Box(Modifier.padding(top = 2.dp).width(2.dp).weight(1f).background(LocalExtraColors.current.hairline))
                                     }
                                     Column(Modifier.weight(1f).padding(bottom = 14.dp)) {
-                                        Text(l.publishedAt.take(10).ifBlank { "日期未提供" }, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                                        Text(l.title, Modifier.padding(top = 2.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                                        Text(l.publishedAt.take(10).ifBlank { "日期未提供" }, style = XType.Caption, color = LocalExtraColors.current.ink3)
+                                        Text(l.title, Modifier.padding(top = 2.dp), style = XType.Body, fontWeight = FontWeight.SemiBold)
                                         if (l.summary.isNotBlank()) DisclosureDescription("发布说明", l.summary)
                                         if (source != null) Row(Modifier.clickable { env.platform?.openUrl(source) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                            Text("官方原文", fontSize = 12.sp, color = LocalExtraColors.current.brandInk)
+                                            Text("官方原文", style = XType.Caption, color = LocalExtraColors.current.brandInk)
                                             XIcon(XIcons.ExternalLink, size = 13.dp, tint = LocalExtraColors.current.brandInk)
                                         }
                                     }
@@ -435,17 +435,17 @@ internal fun TrackTab(env: CommunityEnv) {
                 if (section == "promos") item {
                     WhiteCard(padding = 14.dp) {
                         CardTitleRow("优惠与试用", XIcons.Clock)
-                        if (tracker.promos.isEmpty()) Text("暂无已核实的优惠与试用", Modifier.padding(vertical = 12.dp), fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (tracker.promos.isEmpty()) Text("暂无已核实的优惠与试用", Modifier.padding(vertical = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         tracker.promos.forEachIndexed { i, p ->
                             if (i > 0) Hairline(Modifier.padding(top = 10.dp))
                             Column(Modifier.padding(top = 10.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(p.text, Modifier.weight(1f), fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                    if (!p.endsAt.isNullOrBlank()) p.daysLeft?.let { Text("剩 $it 天", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                    Text(p.text, Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.Medium)
+                                    if (!p.endsAt.isNullOrBlank()) p.daysLeft?.let { Text("剩 $it 天", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                                 }
-                                if (p.endsAt.isNullOrBlank()) Text("长期提供，以官方条件为准", Modifier.padding(top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                                if (p.endsAt.isNullOrBlank()) Text("长期提供，以官方条件为准", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                                 else p.pct?.let { HBar(it / 100f, DataBlue, Modifier.padding(top = 8.dp), height = 4.dp, track = LocalExtraColors.current.fill) }
-                                if (p.eligibility.isNotBlank()) Text(p.eligibility, Modifier.padding(top = 6.dp), fontSize = 12.sp, lineHeight = 19.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (p.eligibility.isNotBlank()) Text(p.eligibility, Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 trackerOfficialSource(p.sourceUrl)?.let { source -> LinkText("查看官方条件与申请入口 ›", { env.platform?.openUrl(source) }) }
                             }
                         }
@@ -466,22 +466,22 @@ private fun QuotaCard(env: CommunityEnv, q: QuotaInfo) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 XIcon(XIcons.Refresh, size = 18.dp)
-                Text("Codex 额度重置", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Codex 额度重置", style = XType.Section, fontWeight = FontWeight.SemiBold)
             }
-            if (q.updatedAt.isNotEmpty()) Text("${agoText(q.updatedAt)}更新", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            if (q.updatedAt.isNotEmpty()) Text("${agoText(q.updatedAt)}更新", style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
         Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             Box(contentAlignment = Alignment.Center) {
                 ProgressRing(q.progressPct, DataBlue, size = 96.dp, stroke = 8.dp)
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("${q.progressPct}%", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                    Text("本轮已过", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    Text("${q.progressPct}%", style = XType.Headline, fontWeight = FontWeight.Bold)
+                    Text("本轮已过", style = XType.Caption, color = LocalExtraColors.current.ink3)
                 }
             }
             Column(Modifier.weight(1f)) {
-                Text("距离下次重置", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
-                Text(countdownText(q.nextResetAt), Modifier.padding(top = 2.dp), fontSize = 24.sp, fontWeight = FontWeight.Bold)
-                Text("预计${clockText(q.nextResetAt)}", Modifier.padding(top = 2.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("距离下次重置", style = XType.Caption, color = LocalExtraColors.current.ink3)
+                Text(countdownText(q.nextResetAt), Modifier.padding(top = 2.dp), style = XType.Headline, fontWeight = FontWeight.Bold)
+                Text("预计${clockText(q.nextResetAt)}", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val at = parseIsoMillis(q.nextResetAt)
                 if (env.reminders != null && at != null) {
                     if (remind) Row(
@@ -489,7 +489,7 @@ private fun QuotaCard(env: CommunityEnv, q: QuotaInfo) {
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         XIcon(XIcons.Check, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 16.dp)
-                        Text("已开启提醒", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("已开启提醒", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else Row(
                         Modifier.padding(top = 10.dp).height(34.dp).clip(RoundedCornerShape(17.dp)).background(Brand).clickable {
                             scope.launch {
@@ -500,15 +500,15 @@ private fun QuotaCard(env: CommunityEnv, q: QuotaInfo) {
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         XIcon(XIcons.Bell, tint = Color.White, size = 16.dp)
-                        Text("提醒我", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Text("提醒我", style = XType.Body, fontWeight = FontWeight.SemiBold, color = Color.White)
                     }
                 }
             }
         }
-        note?.let { Text(it, Modifier.padding(top = 8.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3) }
+        note?.let { Text(it, Modifier.padding(top = 8.dp), style = XType.Caption, color = LocalExtraColors.current.ink3) }
         if (q.recentIntervals.isNotEmpty()) {
             Hairline(Modifier.padding(top = 14.dp))
-            Text("最近 ${q.recentIntervals.size} 次重置间隔（小时）", Modifier.padding(top = 12.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+            Text("最近 ${q.recentIntervals.size} 次重置间隔（小时）", Modifier.padding(top = 12.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
             IntervalBars(q.recentIntervals, Modifier.padding(top = 8.dp))
         }
     }
@@ -536,7 +536,7 @@ internal fun NavTab(env: CommunityEnv) {
                                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                             BrandTile(BrandLogos.find(link.name) ?: BrandLogos.find(link.vendor), link.name, size = 34.dp, corner = 9.dp)
                                             Column(Modifier.weight(1f)) {
-                                                Text(link.name, fontSize = 14.sp, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                                Text(link.name, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                             }
                                         }
                                     }
@@ -548,7 +548,7 @@ internal fun NavTab(env: CommunityEnv) {
                 }
                 item { Row(Modifier.padding(horizontal = 6.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                     XIcon(XIcons.Info, tint = LocalExtraColors.current.ink3, size = 14.dp)
-                    Text("只放各家官方入口，点开会离开小伴", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                    Text("只放各家官方入口，点开会离开小伴", style = XType.Caption, color = LocalExtraColors.current.ink3)
                 } }
             }
         }
@@ -591,7 +591,7 @@ fun DailyScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
             items(items, key = { it.key }) { n -> NewsRow(n) { open(Route.News(n.key)) } }
             item {
                 when {
-                    error != null -> Text("加载失败，点这里重试", Modifier.fillMaxWidth().clickable { error = null; retry += 1 }.padding(16.dp), color = Danger, fontSize = 14.sp)
+                    error != null -> Text("加载失败，点这里重试", Modifier.fillMaxWidth().clickable { error = null; retry += 1 }.padding(16.dp), color = Danger, style = XType.Body)
                     more -> { LaunchedEffect(items.size) { load() }; Spinner(Modifier.fillMaxWidth().height(48.dp)) }
                     items.isEmpty() -> CenterMessage("还没有日报", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp))
                 }

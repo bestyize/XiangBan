@@ -43,7 +43,7 @@ private fun EditorialBody(env: CommunityEnv, html: String) {
     }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         parts.forEach { (heading, content) ->
-            if (heading) Text(htmlToPlain(content), Modifier.padding(top = 8.dp), fontSize = 20.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold)
+            if (heading) Text(htmlToPlain(content), Modifier.padding(top = 8.dp), style = XType.Title, fontWeight = FontWeight.Bold)
             else RichBody(env, content, fontSize = 16.sp, lineHeight = 29.sp)
         }
     }
@@ -101,68 +101,68 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
             article?.let { news ->
                 item {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 20.dp)) {
-                        Text(news.title, fontSize = 26.sp, lineHeight = 36.sp, fontWeight = FontWeight.Bold)
+                        Text(news.title, style = XType.Headline, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(14.dp))
                         val whenText = agoText(news.sourcePublishedAt ?: news.publishedAt)
-                        Text(listOf(news.source, if (news.timeBasis == "collected") "采集于 $whenText" else whenText, if (news.sample) "示例" else "").filter { it.isNotBlank() }.joinToString(" · "), fontSize = 13.sp, color = LocalExtraColors.current.ink3)
+                        Text(listOf(news.source, if (news.timeBasis == "collected") "采集于 $whenText" else whenText, if (news.sample) "示例" else "").filter { it.isNotBlank() }.joinToString(" · "), style = XType.Secondary, color = LocalExtraColors.current.ink3)
                         if (news.coverUrl.isNotBlank()) {
                             Spacer(Modifier.height(22.dp))
                             Cover(news.coverUrl, news.key.hashCode().toLong() and 0x7fffffff, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
                         }
                         if (news.summary.isNotBlank()) {
                             Spacer(Modifier.height(24.dp))
-                            Text(news.summary, Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(LocalExtraColors.current.fill).padding(16.dp), fontSize = 15.sp, lineHeight = 25.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(news.summary, Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(LocalExtraColors.current.fill).padding(16.dp), style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Spacer(Modifier.height(26.dp))
                         if (news.bodyHtml.isNotBlank()) EditorialBody(env, news.bodyHtml)
-                        else Text("这篇内容暂未整理站内正文。", fontSize = 15.sp, lineHeight = 25.sp, color = LocalExtraColors.current.ink3)
-                        if (news.url.isNotBlank()) Text("查看原始来源 ↗", Modifier.padding(top = 24.dp).clickable { env.platform?.openUrl(news.url) }.padding(vertical = 6.dp), color = Brand, fontSize = 13.sp)
+                        else Text("这篇内容暂未整理站内正文。", style = XType.Body, color = LocalExtraColors.current.ink3)
+                        if (news.url.isNotBlank()) Text("查看原始来源 ↗", Modifier.padding(top = 24.dp).clickable { env.platform?.openUrl(news.url) }.padding(vertical = 6.dp), color = Brand, style = XType.Secondary)
                         Spacer(Modifier.height(28.dp))
                         Hairline()
-                        Text("留言", Modifier.padding(top = 22.dp, bottom = 8.dp), fontSize = 19.sp, fontWeight = FontWeight.Bold)
+                        Text("留言", Modifier.padding(top = 22.dp, bottom = 8.dp), style = XType.Section, fontWeight = FontWeight.Bold)
                     }
                 }
                 if (comments.isEmpty() && !loadingComments && commentsError == null) item {
-                    Text("还没有留言，来分享你的想法吧。", Modifier.padding(horizontal = 22.dp, vertical = 14.dp), color = LocalExtraColors.current.ink3, fontSize = 14.sp)
+                    Text("还没有留言，来分享你的想法吧。", Modifier.padding(horizontal = 22.dp, vertical = 14.dp), color = LocalExtraColors.current.ink3, style = XType.Secondary)
                 }
                 items(comments, key = { it.id }) { comment ->
                     Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Avatar(comment.author.nickname, 32.dp, showInitial = true)
                             Column(Modifier.weight(1f)) {
-                                Text(comment.author.nickname, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Text(agoText(comment.createdAt), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                                Text(comment.author.nickname, style = XType.Body, fontWeight = FontWeight.SemiBold)
+                                Text(agoText(comment.createdAt), style = XType.Caption, color = LocalExtraColors.current.ink3)
                             }
                             Text("${if (comment.liked) "♥" else "♡"} ${comment.likeCount}", Modifier.clickable {
                                 if (!session.loggedIn) open(Route.Login) else scope.launch {
                                     try { env.forum.likeNewsComment(key, comment.id, !comment.liked); loadComments(true) }
                                     catch (e: CancellationException) { throw e } catch (e: Exception) { commentsError = messageOf(e) }
                                 }
-                            }.padding(5.dp), color = if (comment.liked) Brand else LocalExtraColors.current.ink3, fontSize = 13.sp)
+                            }.padding(5.dp), color = if (comment.liked) Brand else LocalExtraColors.current.ink3, style = XType.Secondary)
                         }
                         if (comment.replyTo != null) {
                             val parent = comments.firstOrNull { it.id == comment.replyTo }
-                            Text("回复 ${parent?.author?.nickname ?: "留言 #${comment.replyTo}"}", Modifier.padding(start = 42.dp, top = 6.dp), fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                            Text("回复 ${parent?.author?.nickname ?: "留言 #${comment.replyTo}"}", Modifier.padding(start = 42.dp, top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                         }
-                        Text(comment.body, Modifier.padding(start = 42.dp, top = 6.dp), fontSize = 15.sp, lineHeight = 24.sp)
+                        Text(comment.body, Modifier.padding(start = 42.dp, top = 6.dp), style = XType.Body)
                         Row(Modifier.padding(start = 42.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                            Text("回复", Modifier.clickable { if (!session.loggedIn) open(Route.Login) else replyTo = comment }, color = LocalExtraColors.current.ink3, fontSize = 12.sp)
-                            if (comment.mine) Text("删除", Modifier.clickable { deleteTarget = comment }, color = LocalExtraColors.current.ink3, fontSize = 12.sp)
+                            Text("回复", Modifier.clickable { if (!session.loggedIn) open(Route.Login) else replyTo = comment }, color = LocalExtraColors.current.ink3, style = XType.Caption)
+                            if (comment.mine) Text("删除", Modifier.clickable { deleteTarget = comment }, color = LocalExtraColors.current.ink3, style = XType.Caption)
                         }
                     }
                 }
                 item {
-                    if (commentsError != null) Text("留言加载或操作失败：$commentsError · 重试", Modifier.clickable { loadComments(true) }.padding(22.dp), color = Danger, fontSize = 13.sp)
-                    else if (commentsMore) Text("加载更多留言", Modifier.clickable { loadComments() }.padding(22.dp), color = Brand, fontSize = 14.sp)
+                    if (commentsError != null) Text("留言加载或操作失败：$commentsError · 重试", Modifier.clickable { loadComments(true) }.padding(22.dp), color = Danger, style = XType.Secondary)
+                    else if (commentsMore) Text("加载更多留言", Modifier.clickable { loadComments() }.padding(22.dp), color = Brand, style = XType.Body)
                     if (loadingComments) Spinner(Modifier.fillMaxWidth().height(48.dp))
                 }
             }
         }
         if (article != null) {
             Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).imePadding().padding(horizontal = 14.dp, vertical = 8.dp)) {
-                replyTo?.let { Text("回复 ${it.author.nickname} · 取消", Modifier.clickable { replyTo = null }.padding(bottom = 6.dp), color = Brand, fontSize = 12.sp) }
+                replyTo?.let { Text("回复 ${it.author.nickname} · 取消", Modifier.clickable { replyTo = null }.padding(bottom = 6.dp), color = Brand, style = XType.Caption) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(value = draft, onValueChange = { if (it.length <= 2000) draft = it }, modifier = Modifier.weight(1f), placeholder = { Text("写留言…", fontSize = 14.sp) }, maxLines = 3, shape = RoundedCornerShape(20.dp))
+                    OutlinedTextField(value = draft, onValueChange = { if (it.length <= 2000) draft = it }, modifier = Modifier.weight(1f), placeholder = { Text("写留言…", style = XType.Body) }, maxLines = 3, shape = RoundedCornerShape(20.dp))
                     TextButton(enabled = !sending && draft.trim().length >= 2, onClick = {
                         if (!session.loggedIn) open(Route.Login) else {
                             sending = true

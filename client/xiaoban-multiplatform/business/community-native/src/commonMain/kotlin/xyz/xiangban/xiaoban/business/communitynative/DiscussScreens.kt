@@ -114,12 +114,12 @@ internal fun TopicFeed(
 @Composable
 private fun PinnedBar(topic: Topic, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         XIcon(XIcons.Pin, tint = Brand, size = 16.dp)
-        Text("置顶", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Brand)
-        Text(topic.cardTitle, Modifier.weight(1f), fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text("置顶", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Brand)
+        Text(topic.cardTitle, Modifier.weight(1f), style = XType.Body, maxLines = 1, overflow = TextOverflow.Ellipsis)
         XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
     }
 }
@@ -128,10 +128,10 @@ private fun PinnedBar(topic: Topic, onClick: () -> Unit) {
 @Composable
 internal fun TopicCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit, onMessage: (String) -> Unit, tagLabel: String? = null) {
     val images = topic.images.map { env.forum.imageUrl(it) }
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface)
+    Column(Modifier.fillMaxWidth().outlinedCard(12.dp)
         .clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(topic.cardTitle, Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.Medium, lineHeight = 24.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Text(topic.cardTitle, Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.Medium, maxLines = 3, overflow = TextOverflow.Ellipsis)
             if (images.size == 1) Cover(images[0], topic.id, Modifier.size(64.dp))
         }
         if (images.size >= 2) Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -139,10 +139,10 @@ internal fun TopicCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit, o
             repeat(3 - images.take(3).size) { Spacer(Modifier.weight(1f)) }
         }
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(topic.author.nickname, Modifier.weight(1f), fontSize = 11.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (topic.poll != null) Text("投票", fontSize = 11.sp, color = LocalExtraColors.current.brandInk)
-            if (topic.replyCount > 0) Text("${compactCount(topic.replyCount)} 回复", fontSize = 11.sp, color = LocalExtraColors.current.ink3)
-            Text(agoText(topic.createdAt), fontSize = 11.sp, color = LocalExtraColors.current.ink3)
+            Text(topic.author.nickname, Modifier.weight(1f), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (topic.poll != null) Text("投票", style = XType.Caption, color = LocalExtraColors.current.brandInk)
+            if (topic.replyCount > 0) Text("${compactCount(topic.replyCount)} 回复", style = XType.Caption, color = LocalExtraColors.current.ink3)
+            Text(agoText(topic.createdAt), style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
     }
 }
@@ -151,7 +151,7 @@ internal fun TopicCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit, o
 internal fun Stat(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         XIcon(icon, tint = LocalExtraColors.current.ink3, size = 16.dp)
-        Text(text, fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        Text(text, style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -185,12 +185,12 @@ internal fun PollView(env: CommunityEnv, topic: Topic, initial: Poll, open: (Rou
             ) {
                 if (pct > 0) Box(Modifier.fillMaxHeight().fillMaxWidth(pct / 100f).background(if (on) fillOn else fillOff))
                 Row(Modifier.fillMaxSize().padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(option.text, Modifier.weight(1f), fontSize = 14.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("$pct%", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(option.text, Modifier.weight(1f), style = XType.Body, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("$pct%", style = XType.Body, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
-        Text("${poll.total} 人参与投票", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+        Text("${poll.total} 人参与投票", style = XType.Caption, color = LocalExtraColors.current.ink3)
     }
 }
 
@@ -249,7 +249,7 @@ private fun CreateTab(env: CommunityEnv, open: (Route) -> Unit) {
 private fun AuthorLine(pack: Pack) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Avatar(pack.author?.nickname ?: "?", 18.dp)
-        Text(pack.author?.nickname ?: "社区作品", Modifier.weight(1f), fontSize = 12.sp, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(pack.author?.nickname ?: "社区作品", Modifier.weight(1f), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (pack.likeCount > 0) Stat(XIcons.Heart, compactCount(pack.likeCount))
         if (pack.replyCount > 0) Stat(XIcons.Message, compactCount(pack.replyCount))
     }
@@ -259,16 +259,16 @@ private fun AuthorLine(pack: Pack) {
 @Composable
 internal fun LookCard(pack: Pack, single: Boolean = false, onClick: () -> Unit) {
     val h = CoverHeights[(pack.id % CoverHeights.size).toInt()] * (if (single) 1.3f else 1f)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
+    Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick)) {
         Box {
             val screenshot = pack.kind == "game" || pack.kind == "widget"
             Cover(pack.coverUrl, pack.id, if (screenshot) Modifier.fillMaxWidth().aspectRatio(1.5f) else Modifier.fillMaxWidth().height(h.dp),
                 contentScale = if (screenshot) androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop)
-            Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 2.dp), fontSize = 12.sp, color = Color.White)
+            Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 2.dp), style = XType.Caption, color = Color.White)
 
         }
         Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 10.dp)) {
-            Text(pack.title, fontSize = 14.sp, fontWeight = FontWeight.Medium, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(pack.title, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (pack.author != null || pack.likeCount > 0 || pack.replyCount > 0) Box(Modifier.padding(top = 8.dp)) { AuthorLine(pack) }
         }
     }
@@ -279,12 +279,12 @@ internal fun LookCard(pack: Pack, single: Boolean = false, onClick: () -> Unit) 
 internal fun SkillCard(pack: Pack, onClick: () -> Unit) {
     val soft = if (ThemeState.dark) Color(0xFF9FB6DC).copy(alpha = 0.18f) else Color(0xFFE8EEF8)
     val ink = if (ThemeState.dark) Color(0xFF9FB6DC) else Color(0xFF3E5C8A)
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
+    Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick).padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.size(24.dp).clip(RoundedCornerShape(8.dp)).background(soft), contentAlignment = Alignment.Center) { XIcon(skillIcon(pack.kind), tint = ink, size = 16.dp) }
-            Text(skillTag(pack.kind), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(skillTag(pack.kind), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Text(pack.title, Modifier.padding(top = 8.dp), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(pack.title, Modifier.padding(top = 8.dp), style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
         if (pack.author != null || pack.likeCount > 0 || pack.replyCount > 0) Box(Modifier.padding(top = 10.dp)) { AuthorLine(pack) }
     }
 }
@@ -327,7 +327,7 @@ private fun CasualTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (Stri
             PageChipRow(chips, slug, { slug = it })
             if (slug == "casual-chat") Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(horizontal = 2.dp, vertical = 4.dp)) {
                 XIcon(XIcons.Info, tint = LocalExtraColors.current.ink3, size = 14.dp)
-                Text("闲聊灌水不进首页，也不加积分", fontSize = 12.sp, color = LocalExtraColors.current.ink3)
+                Text("闲聊灌水不进首页，也不加积分", style = XType.Caption, color = LocalExtraColors.current.ink3)
             }
         }
     })
