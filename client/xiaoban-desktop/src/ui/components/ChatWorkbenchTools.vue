@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { Check, ChevronRight, Camera, Paperclip, Plus, Search, UserRound, Zap, Plug, ArrowUpRight, Monitor, Smartphone, PanelsTopLeft, ImagePlus, Hammer, Settings2 } from 'lucide-vue-next';
+import { ChevronRight, Camera, Paperclip, Plus, Search, UserRound, Zap, Plug, ArrowUpRight, Monitor, Smartphone, PanelsTopLeft, ImagePlus, Hammer, Settings2 } from 'lucide-vue-next';
 import { invoke, type AiConfigView } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { Skill, SkillPage } from '../ai-store/catalog.ts';
@@ -16,12 +16,13 @@ type Entry = { id: string; title: string; detail: string; installed: boolean; re
 
 /** 一级菜单右侧显示当前选择的摘要，例如技能名、专家名、已启用的连接器数。 */
 interface Summary { skills?: string; experts?: string; connectors?: string; tools?: string }
-const props = defineProps<{ store: ControlStore; disabled?: boolean; fileDisabled?: boolean; screenshotDisabled?: boolean; summary?: Summary }>();
+const props = defineProps<{ store: ControlStore; disabled?: boolean; fileDisabled?: boolean; screenshotDisabled?: boolean; summary?: Summary; selectedConnectorIds?: string[]; selectedSkillIds?: string[]; selectedExpert?: { plugin: string; workflow?: string | null; agent?: string | null } | null; expertLocked?: boolean }>();
 const emit = defineEmits<{
   file: []; screenshot: [];
   'use-expert': [entrySkill: string, name: string, expert?: Expert];
-  'use-skill': [slug: string, name: string];
-  'use-connector': [name: string, id: string];
+  'toggle-skill': [slug: string, name: string];
+  'clear-expert': [];
+  'toggle-connector': [item: { name: string; id: string }];
   'use-tool': [tool: BuiltinTool];
   'check-computer-permissions': [];
   'computer-disabled': [];
@@ -139,12 +140,18 @@ function scheduleSearch() {
     } finally { if (id === requestId) loading.value = false; }
   }, 250);
 }
+function expertSelected(e: Entry) {
+  const current = props.selectedExpert;
+  return !!current && (e.expert?.plugin ? current.plugin === e.expert.plugin && (current.agent ?? null) === (e.expert.agent ?? null) : !!current.workflow && current.workflow === (e.entrySkill || e.id));
+}
+function toggleExpert(e: Entry) {
+  if (expertSelected(e) && !props.expertLocked) emit('clear-expert');
+  else if (!expertSelected(e)) useEntry(e);
+}
 function useEntry(e: Entry) {
   if (!e.installed) { openStore(); return; }
   if (!e.ready) { props.store.notify('该能力尚未就绪，请先到 AI 插件完成配置', 'info'); openStore(); return; }
   if (kind.value === 'experts') emit('use-expert', e.entrySkill || e.id, e.title, e.expert);
-  if (kind.value === 'skills') emit('use-skill', e.id, e.title);
-  if (kind.value === 'connectors') emit('use-connector', e.title, e.id);
   close();
 }
 function openStore() { close(); props.store.navigate('ai-store'); }
@@ -222,10 +229,15 @@ function checkComputerPermissions() {
           <label class="wb-search"><Search :size="14" /><input v-model="term" data-testid="chat-capability-search" :placeholder="`搜索${labels[kind]}…`" maxlength="80" @input="scheduleSearch" /></label>
           <div class="wb-results">
             <div class="wb-section">已安装的{{ labels[kind] }}</div>
-            <button v-for="entry in installedEntries" :key="'i-'+entry.id" type="button" class="wb-result" :data-testid="`chat-installed-${entry.id}`" :title="entry.detail || entry.id" :aria-description="entry.detail || entry.id" @click="useEntry(entry)">
+            <template v-for="entry in installedEntries" :key="'i-'+entry.id">
+            <div class="wb-result wb-connector" :data-testid="`chat-installed-${entry.id}`" :title="entry.detail || entry.id" :aria-description="entry.detail || entry.id">
               <span class="wb-result-text"><strong>{{ entry.title }}</strong></span>
-              <Check v-if="entry.ready" :size="14" /><ChevronRight v-else :size="14" />
-            </button>
+              <button v-if="kind === 'connectors' && (entry.ready || selectedConnectorIds?.includes(entry.id))" type="button" role="switch" class="wb-switch" :class="{ on: selectedConnectorIds?.includes(entry.id) }" :aria-checked="!!selectedConnectorIds?.includes(entry.id)" :aria-label="`优先使用 ${entry.title}`" @click="emit('toggle-connector', { name: entry.title, id: entry.id })"><i /></button>
+              <button v-else-if="kind === 'skills'" type="button" role="switch" class="wb-switch" :class="{ on: selectedSkillIds?.includes(entry.id) }" :aria-checked="!!selectedSkillIds?.includes(entry.id)" :aria-label="`使用技能 ${entry.title}`" @click="emit('toggle-skill', entry.id, entry.title)"><i /></button>
+              <button v-else-if="kind === 'experts' && (entry.ready || expertSelected(entry))" type="button" role="switch" class="wb-switch" :class="{ on: expertSelected(entry) }" :aria-checked="expertSelected(entry)" :aria-label="`使用专家 ${entry.title}`" :disabled="expertSelected(entry) && expertLocked" :title="expertSelected(entry) && expertLocked ? '当前对话的专家不能中途更换' : undefined" @click="toggleExpert(entry)"><i /></button>
+              <button v-else type="button" class="wb-connect" @click="useEntry(entry)">{{ kind === 'connectors' ? '去连接' : '去配置' }}</button>
+            </div>
+            </template>
             <div v-if="installedLoading[kind]" class="wb-empty" role="status">正在读取已安装的{{ labels[kind] }}…</div>
             <div v-else-if="!installedEntries.length && !installedErrors[kind]" class="wb-empty">{{ term ? '没有匹配的已安装能力' : '暂无已安装能力' }}</div>
             <div v-if="error" class="wb-empty" role="alert">{{ error }} <button v-if="installedErrors[kind]" type="button" class="wb-store-link" @click="refreshInstalled">重试</button></div>
@@ -276,6 +288,13 @@ function checkComputerPermissions() {
 .wb-section{font-size:11.5px;font-weight:500;color:var(--ui-text-tertiary);padding:8px 8px 4px}
 .wb-result{display:flex;align-items:center;gap:8px;width:100%;padding:8px;border-radius:8px;border:0;background:none;color:var(--ui-text-primary);font:inherit;cursor:pointer;text-align:left}
 .wb-result:hover{background:var(--ui-surface-hover)}
+.wb-connector{cursor:default;min-height:34px;box-sizing:border-box}
+.wb-switch{position:relative;flex:none;width:34px;height:20px;padding:0;border:0;border-radius:10px;background:var(--ui-text-tertiary);cursor:pointer}
+.wb-switch i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--ui-surface);transition:left .15s}
+.wb-switch:disabled{opacity:.55;cursor:not-allowed}
+.wb-switch.on{background:var(--ui-btn)}.wb-switch.on i{left:16px}
+.wb-switch:focus-visible,.wb-connect:focus-visible{outline:2px solid var(--ui-btn);outline-offset:2px}
+.wb-connect{border:0;background:none;color:var(--ui-ink);font:inherit;font-size:12px;cursor:pointer}
 .wb-result-text{flex:1;min-width:0;display:grid}
 .wb-result-text strong{font-size:12.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wb-result>svg{flex:none;color:var(--ui-text-tertiary)}

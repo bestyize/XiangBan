@@ -112,8 +112,35 @@ describe('add-capability menu hover interaction', () => {
     await wrapper.get('[data-testid=chat-capability-search]').setValue('健康');
     resolve([{slug:'health-report',name:'健康报告',description:'报告解读',entrySkill:'health-report',ready:true}]);await flushPromises();
     expect(wrapper.get('[data-testid=chat-installed-health-report]').text()).toContain('健康报告');
-    await wrapper.get('[data-testid=chat-installed-health-report]').trigger('click');
+    await wrapper.get('[data-testid=chat-installed-health-report] [role=switch]').trigger('click');
     expect(wrapper.emitted('use-expert')).toEqual([['health-report','健康报告',undefined]]);wrapper.unmount();
+  });
+  it('reflects skill and expert selections and toggles them', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command, args) => {
+      if (command === 'chat_invocable_skills') return [{ name: 'writing', displayName: '写作', description: '' }];
+      if (command === 'ai_store_experts_installed') return [{ slug: 'expert', name: '专家', description: '', entrySkill: 'expert' }];
+      return original(command, args);
+    });
+    const { wrapper } = setup();
+    await wrapper.get('[data-testid=chat-add-menu]').trigger('click');
+    await wrapper.get('[data-testid=chat-add-skills]').trigger('click'); await flushPromises();
+    const skill = wrapper.get('[data-testid=chat-installed-writing] [role=switch]');
+    expect(skill.attributes('aria-checked')).toBe('false');
+    await skill.trigger('click'); expect(wrapper.emitted('toggle-skill')).toEqual([['writing', '写作']]);
+    await wrapper.setProps({ selectedSkillIds: ['writing'] }); expect(skill.attributes('aria-checked')).toBe('true');
+    await skill.trigger('click'); expect(wrapper.emitted('toggle-skill')).toHaveLength(2);
+    await wrapper.get('[data-testid=chat-add-experts]').trigger('click');
+    const expert = wrapper.get('[data-testid=chat-installed-expert] [role=switch]');
+    await expert.trigger('click'); expect(wrapper.emitted('use-expert')).toHaveLength(1);
+    await wrapper.get('[data-testid=chat-add-menu]').trigger('click');
+    await wrapper.get('[data-testid=chat-add-experts]').trigger('click'); await flushPromises();
+    await wrapper.setProps({ selectedExpert: { plugin: '', workflow: 'expert' } });
+    const selected = wrapper.get('[data-testid=chat-installed-expert] [role=switch]');
+    expect(selected.attributes('aria-checked')).toBe('true');
+    await selected.trigger('click'); expect(wrapper.emitted('clear-expert')).toHaveLength(1);
+    await wrapper.setProps({ expertLocked: true }); expect(selected.attributes('disabled')).toBeDefined();
+    wrapper.unmount();
   });
   it('shows installed unconfigured plugins and deduplicates configured plugin services',async()=>{
     const original=vi.mocked(invoke).getMockImplementation()!;
@@ -126,8 +153,14 @@ describe('add-capability menu hover interaction', () => {
     await wrapper.get('[data-testid=chat-add-connectors]').trigger('click');await flushPromises();
     expect(wrapper.get('[data-testid="chat-installed-pan:main"]').attributes('title')).toContain('未连接');
     expect(wrapper.findAll('[data-testid="chat-installed-repo:main"]')).toHaveLength(1);
-    await wrapper.get('[data-testid="chat-installed-repo:main"]').trigger('click');
-    expect(wrapper.emitted('use-connector')).toEqual([['GitHub','repo:main']]);wrapper.unmount();
+    const toggle = wrapper.get('[data-testid="chat-installed-repo:main"] [role="switch"]');
+    expect(toggle.attributes('aria-checked')).toBe('false');
+    await toggle.trigger('click');
+    expect(wrapper.emitted('toggle-connector')).toEqual([[{name:'GitHub',id:'repo:main'}]]);
+    await wrapper.setProps({ selectedConnectorIds: ['repo:main'] });
+    expect(toggle.attributes('aria-checked')).toBe('true');
+    await toggle.trigger('click');
+    expect(wrapper.emitted('toggle-connector')).toHaveLength(2);wrapper.unmount();
   });
   it('reports a category failure even when other inventories succeed and supports retry',async()=>{
     const original=vi.mocked(invoke).getMockImplementation()!;let fail=true;

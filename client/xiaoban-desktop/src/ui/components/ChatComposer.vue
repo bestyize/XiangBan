@@ -320,6 +320,10 @@ function addSkill(slug: string, title?: string) {
 }
 const useSkill = (slug: string, title?: string) => { addSkill(slug, title); void nextTick(() => input.value?.focus()); };
 const removeSkill = (slug: string) => { skills.value = skills.value.filter(s => s.name !== slug); };
+function toggleSkill(slug: string, title: string) {
+  if (skills.value.some(skill => skill.name === slug)) removeSkill(slug);
+  else useSkill(slug, title);
+}
 const addSummary = computed(() => ({
   skills: skills.value.length > 1 ? `${skills.value.length} 个技能` : skills.value[0]?.title ?? '',
   experts: chat.currentExpert?.name ?? '',
@@ -403,7 +407,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <NInput ref="input" v-model:value="draft" type="textarea" :autosize="{ minRows, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
       </div>
       <div class="composer-row">
-        <ChatWorkbenchTools :store="store" :summary="addSummary" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" @use-tool="useTool" @check-computer-permissions="checkComputerPermissions" @computer-disabled="computerDisabled" />
+        <ChatWorkbenchTools :store="store" :summary="addSummary" :selected-connector-ids="mentions.selected.value.map(item => item.id)" :selected-skill-ids="skills.map(skill => skill.name)" :selected-expert="chat.currentExpert" :expert-locked="!!chat.currentId" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeScreenshot" @use-expert="useExpert" @clear-expert="chat.pendingExpert = null" @toggle-skill="toggleSkill" @toggle-connector="toggleConnector" @use-tool="useTool" @check-computer-permissions="checkComputerPermissions" @computer-disabled="computerDisabled" />
         <ChatWorkspaceMenu v-if="workspace" :chat="chat" :disabled="running || !store.desktop" />
         <ChatPermissionMenu :store="store" :disabled="!store.desktop" />
         <span class="composer-spacer" />
