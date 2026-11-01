@@ -128,7 +128,7 @@ private fun ToolsTab(env: CommunityEnv, open: (Route) -> Unit) {
 @Composable
 private fun ToolRow(tool: ToolSummary, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ToolIcon(tool.name, tool.developer)
@@ -195,7 +195,7 @@ private fun MediaTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (Strin
     val controller = remember(env) { DiscussController(env.forum, scope, category = "share-movies,share-music", home = false) }
     TopicFeed(controller, "还没有影音分享", open, header = { TabNote("只收片单、影评、乐评和公版或授权内容，不提供盗版下载。") }) { topic ->
         // 72×96 的竖封面在左，右边是类型标签、标题、摘要，底下是作者。
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             topic.images.firstOrNull()?.let { Cover(env.forum.imageUrl(it), topic.id, Modifier.size(width = 72.dp, height = 96.dp)) }
             Column(Modifier.weight(1f)) {
                 Text(topic.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -214,7 +214,7 @@ private fun OpenTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (String
     val controller = remember(env) { DiscussController(env.forum, scope, category = "share-software", tag = "开源", home = false) }
     TopicFeed(controller, "还没有开源精选", open, header = { TabNote("只收开源、免费软件和可免费使用的设计素材。") }) { topic ->
         // 有真实配图时显示缩略图，保留标题、来源标签、浏览数和作者。
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             topic.images.firstOrNull()?.let { Cover(env.forum.imageUrl(it), topic.id, Modifier.size(88.dp)) }
             Column(Modifier.weight(1f)) {
                 Text(topic.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, lineHeight = 21.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -257,7 +257,7 @@ private fun HelpTab(env: CommunityEnv, open: (Route) -> Unit) {
     val stats = rememberLoader(env, "help-stats") { env.forum.helpStats() }
     val statsState by stats.state.collectAsState()
     TopicFeed(controller, "还没有人发求助", open, header = {
-        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.fillMaxWidth().outlinedCard(12.dp).padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             val s = (statsState as? Load.Ready<HelpStats>)?.value
             Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 StatNumber(s?.open?.toString() ?: "–", "进行中")
@@ -289,7 +289,7 @@ private fun StatNumber(value: String, label: String) {
 @Composable
 private fun HelpCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit) {
     val help = topic.help
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
+    Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
         if (help != null) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {

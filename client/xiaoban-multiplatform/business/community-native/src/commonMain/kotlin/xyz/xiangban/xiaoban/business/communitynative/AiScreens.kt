@@ -136,7 +136,7 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
 
                 // 输入卡片：整张卡片是进入对话页的入口，真正的输入在对话页。
                 Column(
-                    Modifier.padding(top = 16.dp).fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surface)
+                    Modifier.padding(top = 16.dp).fillMaxWidth().outlinedCard(20.dp)
                         .clickable { if (session.loggedIn) open(Route.AiChat) else open(Route.Login) }.padding(horizontal = 16.dp, vertical = 14.dp),
                 ) {
                     Text("问点什么，或描述想要的内容…", fontSize = 15.sp, lineHeight = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -163,7 +163,7 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
                 }
 
                 Text("试试这样问我", Modifier.padding(top = 22.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                Column(Modifier.padding(top = 6.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface)) {
+                Column(Modifier.padding(top = 6.dp).fillMaxWidth().outlinedCard(8.dp)) {
                     StarterPrompts.forEachIndexed { i, prompt ->
                         if (i > 0) Hairline(Modifier.padding(start = 14.dp))
                         Row(
@@ -181,7 +181,7 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
                 val recent = cloud.conversations.take(3)
                 if (session.loggedIn && recent.isNotEmpty()) {
                     Text("最近对话", Modifier.padding(top = 22.dp), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                    Column(Modifier.padding(top = 6.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface)) {
+                    Column(Modifier.padding(top = 6.dp).fillMaxWidth().outlinedCard(8.dp)) {
                         recent.forEachIndexed { i, item ->
                             if (i > 0) Hairline(Modifier.padding(start = 14.dp))
                             Row(
@@ -277,7 +277,7 @@ fun AiDrawerOverlay(chat: CloudChatController, visible: Boolean, onClose: () -> 
 @Composable
 private fun FeatureTile(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, desc: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
-        modifier.clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick).padding(12.dp),
+        modifier.outlinedCard(8.dp).clickable(onClick = onClick).padding(12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         IconBox(icon, 40.dp, 12.dp)

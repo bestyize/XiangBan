@@ -55,7 +55,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.lerp(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.background, 0.45f))) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Column(Modifier.fillMaxSize()) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {

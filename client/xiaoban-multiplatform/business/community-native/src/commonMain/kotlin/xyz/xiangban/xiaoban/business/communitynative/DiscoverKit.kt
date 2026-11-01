@@ -36,12 +36,10 @@ import xyz.xiangban.xiaoban.common.community.ModelVendor
 
 // 发现页（首页五个 tab、资源、讨论）共用的小部件。
 
-private val CardShape = RoundedCornerShape(12.dp)
-
-/** 灰色页面上的白底卡片。 */
+/** 页面底上的白底卡片，带一圈细描边。 */
 @Composable
 fun WhiteCard(modifier: Modifier = Modifier, padding: Dp = 16.dp, horizontalPadding: Dp = padding, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.fillMaxWidth().clip(CardShape).background(MaterialTheme.colorScheme.surface).padding(horizontal = horizontalPadding, vertical = padding), content = content)
+    Column(modifier.fillMaxWidth().outlinedCard(12.dp).padding(horizontal = horizontalPadding, vertical = padding), content = content)
 }
 
 /** 卡片标题：左边标题加一行小字，右边一个「更多 ›」之类的入口。 */
