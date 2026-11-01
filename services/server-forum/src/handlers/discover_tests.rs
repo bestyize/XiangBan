@@ -17,6 +17,9 @@ mod workflow;
 #[path = "model_rankings_tests.rs"]
 mod model_rankings;
 
+#[path = "discover_repo_tests.rs"]
+mod repo_detail;
+
 async fn call(app: &axum::Router, method: &str, path: &str, token: Option<&str>, body: Value) -> (StatusCode, Value) {
     let mut req = Request::builder().method(method).uri(path).header("content-type", "application/json");
     if let Some(token) = token {
@@ -30,6 +33,7 @@ async fn call(app: &axum::Router, method: &str, path: &str, token: Option<&str>,
 
 struct Harness {
     app: axum::Router,
+    state: AppState,
     pool: sqlx::PgPool,
     admin_pool: sqlx::PgPool,
     schema: String,
@@ -75,11 +79,11 @@ async fn harness() -> Result<Option<Harness>, Box<dyn std::error::Error>> {
     });
 
     let state = AppState { pool: pool.clone(), config: Arc::new(config), verifier: Arc::new(verifier), http: reqwest::Client::new() };
-    let app = crate::build_router(state);
+    let app = crate::build_router(state.clone());
     let (s, login) = call(&app, "POST", "/api/admin/login", None, json!({"username":"root","password":"correct-horse-battery"})).await;
     assert_eq!(s, StatusCode::OK, "{login}");
     let admin_t = login["token"].as_str().unwrap().to_string();
-    Ok(Some(Harness { app, pool, admin_pool, schema, admin_t, make_token }))
+    Ok(Some(Harness { app, state, pool, admin_pool, schema, admin_t, make_token }))
 }
 
 impl Harness {

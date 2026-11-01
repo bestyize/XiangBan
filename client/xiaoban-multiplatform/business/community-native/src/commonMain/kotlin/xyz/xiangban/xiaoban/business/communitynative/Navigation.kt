@@ -25,6 +25,8 @@ sealed interface Route {
     /** 往期 AI 日报。 */
     data object Daily : Route
     data class News(val key: String) : Route
+    /** 开源热榜项目的站内详情：仓库卡片、中文 README、评论。 */
+    data class Repo(val owner: String, val repo: String) : Route
     /** 模型天梯。 */
     data object Leaderboard : Route
     /** OpenRouter 调用量 Top 50 与历史完整日榜。 */
@@ -68,6 +70,7 @@ sealed interface Route {
         is Tool -> "tool:$key"
         Daily -> "daily"
         is News -> "news:${key.encodeURLParameter()}"
+        is Repo -> "repo:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
         Leaderboard -> "leaderboard"
         UsageLeaderboard -> "usage-leaderboard"
         Scatter -> "scatter"
@@ -108,6 +111,11 @@ sealed interface Route {
                 "tool" -> value.takeIf { it.isNotEmpty() }?.let(::Tool)
                 "daily" -> Daily
                 "news" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::News) }.getOrNull()
+                "repo" -> runCatching {
+                    val owner = value.substringBefore('/').decodeURLPart()
+                    val repo = value.substringAfter('/', "").decodeURLPart()
+                    if (owner.isNotBlank() && repo.isNotBlank() && '/' !in owner && '/' !in repo) Repo(owner, repo) else null
+                }.getOrNull()
                 "leaderboard" -> Leaderboard
                 "usage-leaderboard" -> UsageLeaderboard
                 "scatter" -> Scatter

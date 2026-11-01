@@ -27,6 +27,22 @@ class RepoBaselineTest {
         assertTrue(issue.ranks.single().spark.isEmpty())
         assertNull(issue.ranks.single().observedDays)
     }
+    @Test fun `repo detail decodes the server payload and prefers the Chinese readme and description`() {
+        val json = """{"full_name":"Owner/Repo","owner":"Owner","repo":"Repo","url":"https://github.com/Owner/Repo","description":"A project","description_zh":"一个项目","language":"Rust","language_color":"#dea584","star_total":5000,"star_gain":120,"rank":3,"is_latest":true,"unknown_field":1,
+            "readme":{"status":"ok","blocks":[{"t":"p","x":"body"},{"t":"li","x":"item","d":1,"n":2},{"t":"code","x":"run","lang":"bash"},{"t":"table","rows":[["a","b"],["1","2"]]},{"t":"hr"}],"zh_blocks":[{"t":"h","l":2,"x":"标题"}],"zh_truncated":true}}"""
+        val d = CommunityJson.decodeFromString<RepoDetail>(json)
+        assertEquals(3, d.rank); assertEquals(120L, d.starGain); assertTrue(d.isLatest)
+        assertTrue(d.hasZhReadme); assertTrue(d.readme.zhTruncated)
+        assertEquals(listOf("p", "li", "code", "table", "hr"), d.readme.blocks.map { it.t })
+        assertEquals(1, d.readme.blocks[1].d); assertEquals(2, d.readme.blocks[1].n); assertNull(d.readme.blocks[0].n)
+        assertEquals(listOf(listOf("a", "b"), listOf("1", "2")), d.readme.blocks[3].rows)
+        assertEquals("bash", d.readme.blocks[2].lang)
+        val missing = CommunityJson.decodeFromString<RepoDetail>("""{"full_name":"A/B","readme":{"status":"none","blocks":[],"zh_blocks":null}}""")
+        assertFalse(missing.hasZhReadme); assertEquals("none", missing.readme.status)
+        val rank = CommunityJson.decodeFromString<RepoRank>("""{"full_name":"A/B","description":"English","description_zh":"中文"}""")
+        assertEquals("中文", rank.shownDescription)
+        assertEquals("English", rank.copy(descriptionZh = "").shownDescription)
+    }
     @Test fun `observation labels normalize offsets to UTC and hide malformed times`() {
         assertEquals("2026-10-31 13:45:33 UTC", repoObservationLabel("2026-10-31T21:45:33+08:00"))
         assertNull(repoObservationLabel(null)); assertNull(repoObservationLabel("not a timestamp"))

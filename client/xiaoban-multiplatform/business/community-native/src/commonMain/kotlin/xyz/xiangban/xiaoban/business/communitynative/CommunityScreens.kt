@@ -67,7 +67,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
                 when (current) {
                     CommunitySection.Home -> when (HomeSub.byKey(homeSub)) {
                         HomeSub.Recommend -> RecommendTab(env, open, ::switchTo)
-                        HomeSub.Hot -> HotTab(env)
+                        HomeSub.Hot -> HotTab(env, open)
                         HomeSub.Rank -> RankTab(env, open)
                         HomeSub.Track -> TrackTab(env)
                         HomeSub.Nav -> NavTab(env)

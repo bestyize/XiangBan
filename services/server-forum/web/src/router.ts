@@ -12,6 +12,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/daily', name: 'daily', component: () => import('@/views/DailyView.vue') },
   { path: '/daily/:key', name: 'daily-detail', component: () => import('@/views/DailyView.vue') },
   { path: '/tools/:key', name: 'tool-detail', component: () => import('@/views/ToolView.vue') },
+  { path: '/repo/:owner/:repo', name: 'repo-detail', component: () => import('@/views/RepoView.vue') },
   { path: '/discuss', name: 'discuss', component: DiscussView },
   { path: '/models', name: 'model-rankings', component: () => import('@/views/ModelRankingsView.vue') },
   { path: '/resources', name: 'resources', component: () => import('@/views/ResourcesView.vue') },

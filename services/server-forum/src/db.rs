@@ -1037,6 +1037,56 @@ CREATE TABLE IF NOT EXISTS discover_news_comment_likes (
     PRIMARY KEY (comment_id, uid)
 );
 
+CREATE TABLE IF NOT EXISTS translation_settings (
+    id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+    base_url TEXT NOT NULL,
+    model TEXT NOT NULL,
+    credential BYTEA NOT NULL,
+    hint TEXT NOT NULL,
+    options JSONB NOT NULL DEFAULT '{}'::jsonb,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS translation_log (
+    id BIGSERIAL PRIMARY KEY,
+    at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    repo TEXT NOT NULL DEFAULT '',
+    kind TEXT NOT NULL,
+    ok BOOLEAN NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    millis INT NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS repo_details (
+    key TEXT PRIMARY KEY,
+    full_name TEXT NOT NULL,
+    desc_en TEXT NOT NULL DEFAULT '',
+    desc_zh TEXT NOT NULL DEFAULT '',
+    readme_status TEXT NOT NULL DEFAULT 'unavailable' CHECK (readme_status IN ('ok', 'none', 'unavailable')),
+    readme_md TEXT NOT NULL DEFAULT '',
+    readme_hash TEXT NOT NULL DEFAULT '',
+    readme_zh TEXT NOT NULL DEFAULT '',
+    readme_zh_hash TEXT NOT NULL DEFAULT '',
+    readme_zh_truncated BOOLEAN NOT NULL DEFAULT false,
+    translating_until TIMESTAMPTZ,
+    fetched_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS repo_comments (
+    id BIGSERIAL PRIMARY KEY,
+    repo_key TEXT NOT NULL,
+    author_uid UUID NOT NULL REFERENCES users(uid),
+    reply_to BIGINT REFERENCES repo_comments(id),
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'normal' CHECK (status IN ('normal', 'hidden', 'deleted')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS repo_comments_page_idx ON repo_comments (repo_key, id);
+CREATE INDEX IF NOT EXISTS repo_comments_author_idx ON repo_comments (author_uid, created_at DESC);
+CREATE TABLE IF NOT EXISTS repo_comment_likes (
+    comment_id BIGINT NOT NULL REFERENCES repo_comments(id) ON DELETE CASCADE,
+    uid UUID NOT NULL REFERENCES users(uid),
+    PRIMARY KEY (comment_id, uid)
+);
+
 -- 编辑副本与线上条目分离；审核绑定 revision，修改会撤销定时发布。
 CREATE SEQUENCE IF NOT EXISTS discover_draft_revision_seq;
 CREATE TABLE IF NOT EXISTS discover_drafts (

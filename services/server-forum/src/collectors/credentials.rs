@@ -6,7 +6,15 @@ use ring::{
     rand::{SecureRandom, SystemRandom},
 };
 
+/// 测试进程内固定的主密钥，免得靠修改环境变量（多线程下不安全）。
+#[cfg(test)]
+pub(crate) static TEST_MASTER_KEY: std::sync::OnceLock<[u8; 32]> = std::sync::OnceLock::new();
+
 fn master_key() -> AppResult<aead::LessSafeKey> {
+    #[cfg(test)]
+    if let Some(raw) = TEST_MASTER_KEY.get() {
+        return key(raw);
+    }
     let raw = std::env::var("FORUM_COLLECTION_MASTER_KEY")
         .ok()
         .and_then(|s| STANDARD.decode(s.trim()).ok())

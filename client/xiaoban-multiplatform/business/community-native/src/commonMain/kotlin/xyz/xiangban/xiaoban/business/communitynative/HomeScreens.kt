@@ -63,6 +63,7 @@ import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.QuotaInfo
 import xyz.xiangban.xiaoban.common.community.RepoIssue
 import xyz.xiangban.xiaoban.common.community.RepoRank
+import xyz.xiangban.xiaoban.common.community.shownDescription
 import xyz.xiangban.xiaoban.common.community.repoObservationLabel
 import xyz.xiangban.xiaoban.common.community.trackerOfficialSource
 import xyz.xiangban.xiaoban.common.community.agoText
@@ -112,7 +113,7 @@ private fun repoGlyph(key: String) = when (key) {
 }
 
 @Composable
-private fun RepoTile(r: RepoRank, size: Dp, corner: Dp) {
+internal fun RepoTile(r: RepoRank, size: Dp, corner: Dp) {
     val glyph = repoGlyph(r.icon)
     val tint = if (ThemeState.dark) hexColor(r.tint, Color(0xFF3A3A3C)).copy(alpha = 0.3f) else hexColor(r.tint, Color(0xFFF2F2F2))
     if (glyph != null) Box(Modifier.size(size).clip(RoundedCornerShape(corner)).background(tint), contentAlignment = Alignment.Center) { XIcon(glyph, size = size * 0.55f) }
@@ -120,7 +121,7 @@ private fun RepoTile(r: RepoRank, size: Dp, corner: Dp) {
 }
 
 @Composable
-private fun LangLine(r: RepoRank) {
+internal fun LangLine(r: RepoRank) {
     if (r.language.isEmpty()) return
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Dot(hexColor(r.languageColor), 8.dp)
@@ -190,7 +191,7 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
                                 }
                                 issue.ranks.take(3).forEachIndexed { i, r ->
                                     if (i > 0) Hairline()
-                                    RepoMiniRow(r) { env.platform?.openUrl("https://github.com/${r.fullName}") }
+                                    RepoMiniRow(r) { openRepo(env, r, open) }
                                 }
                             }
                         }
@@ -297,7 +298,7 @@ private fun RepoMiniRow(r: RepoRank, onClick: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun HotTab(env: CommunityEnv) {
+internal fun HotTab(env: CommunityEnv, open: (Route) -> Unit) {
     var issueKey by rememberSaveable { mutableStateOf<String?>(null) }
     var picking by remember { mutableStateOf(false) }
     val loader = rememberLoader(env, issueKey ?: "latest") { env.forum.repoIssue(issueKey) }
@@ -308,7 +309,7 @@ internal fun HotTab(env: CommunityEnv) {
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = ListPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
                     item { PeriodCard(issue) { picking = true } }
                     if (issue.ranks.isEmpty()) item { WhiteCard { Text("这一期还没有榜单", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-                    items(issue.ranks, key = { it.fullName }) { r -> RepoCard(env, r) }
+                    items(issue.ranks, key = { it.fullName }) { r -> RepoCard(env, r, open) }
                 }
             }
         }
@@ -346,15 +347,16 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
 
 /** 热榜卡：右上角贴边的名次角标，左边图标块、仓库名、简介、语言和星数，右边小柱、新增、收藏圆钮。 */
 @Composable
-private fun RepoCard(env: CommunityEnv, r: RepoRank) {
+private fun RepoCard(env: CommunityEnv, r: RepoRank, open: (Route) -> Unit) {
     val (fav, setFav) = rememberPrefFlag(env, "fav_repo:${r.fullName}")
-    WhiteCard(Modifier.clickable { env.platform?.openUrl("https://github.com/${r.fullName}") }, padding = 14.dp) {
+    WhiteCard(Modifier.clickable { openRepo(env, r, open) }, padding = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(r.rank.toString().padStart(2, '0'), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = if (r.rank <= 3) Brand else LocalExtraColors.current.ink3)
             RepoTile(r, 32.dp, 8.dp)
             Text(r.fullName, Modifier.weight(1f), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             IconTap(XIcons.Bookmark, if (fav) "取消收藏 ${r.fullName}" else "收藏 ${r.fullName}", { setFav(!fav) }, size = 19.dp, tint = if (fav) Brand else LocalExtraColors.current.ink3)
         }
+        if (r.shownDescription.isNotBlank()) Text(r.shownDescription, Modifier.padding(top = 8.dp), fontSize = 13.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             LangLine(r)
             Text("☆ ${formatStars(r.starTotal)}", fontSize = 12.sp, color = LocalExtraColors.current.ink3)

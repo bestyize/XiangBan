@@ -90,7 +90,7 @@ pub async fn start(s: AppState, source: String, scheduled: bool) -> AppResult<Uu
     tokio::spawn(async move {
         let fetched = tokio::time::timeout(std::time::Duration::from_secs(240), async {
             if source == "github_repos" {
-                repo_sources::collect(&http).await
+                repo_sources::collect(&s.pool, &http).await
             } else if source == "github_tools" {
                 tool_sources::collect(&http, &config, &secret).await
             } else if source == "official_news" {

@@ -13,6 +13,7 @@ const TRENDING_SOURCE_URL: &str = "https://github.com/trending";
 const TRENDING_METRIC: &str = "github trending weekly stars";
 const BODY_LIMIT: usize = 256 * 1024;
 const PAGE_LIMIT: usize = 2 * 1024 * 1024;
+const DESCRIPTION_MAX: usize = 300;
 type SourceResult<T> = Result<T, String>;
 fn invalid() -> String {
     "GitHub 仓库响应或快照数据无效".into()
@@ -168,13 +169,14 @@ fn parse_row(row: &str) -> Option<Value> {
     if !valid_name(name) {
         return None;
     }
-    let description: String = between(row, "<p class=\"col-9", "</p>")
-        .and_then(|p| p.split_once('>'))
-        .map(|(_, text)| plain_text(text))
-        .unwrap_or_default()
-        .chars()
-        .take(120)
-        .collect();
+    let description = {
+        let full = between(row, "<p class=\"col-9", "</p>").and_then(|p| p.split_once('>')).map(|(_, text)| plain_text(text)).unwrap_or_default();
+        if full.chars().count() > DESCRIPTION_MAX {
+            format!("{}…", full.chars().take(DESCRIPTION_MAX - 1).collect::<String>().trim_end())
+        } else {
+            full
+        }
+    };
     let language: String = between(row, "itemprop=\"programmingLanguage\">", "</span>")
         .map(plain_text)
         .unwrap_or_default()
@@ -220,12 +222,18 @@ fn parse_trending(html: &str) -> SourceResult<Vec<Value>> {
     Ok(ranks)
 }
 
-pub async fn collect(http: &Client) -> SourceResult<Vec<CollectedItem>> {
+pub async fn collect(pool: &sqlx::PgPool, http: &Client) -> SourceResult<Vec<CollectedItem>> {
     let html = fetch_page(http, TRENDING_URL).await?;
-    build_issue(&html, Utc::now())
+    let mut ranks = parse_trending(&html)?;
+    // README 与中文简介是附加信息，整理失败不影响榜单发布。
+    crate::repo_details::enrich(pool, http, &mut ranks).await;
+    issue_from(ranks, Utc::now())
 }
+#[cfg(test)]
 fn build_issue(html: &str, now: DateTime<Utc>) -> SourceResult<Vec<CollectedItem>> {
-    let ranks = parse_trending(html)?;
+    issue_from(parse_trending(html)?, now)
+}
+fn issue_from(ranks: Vec<Value>, now: DateTime<Utc>) -> SourceResult<Vec<CollectedItem>> {
     let end = now.date_naive();
     let start = end - Duration::days(7);
     let total_gain = ranks.iter().filter_map(|r| r["star_gain"].as_i64()).sum::<i64>();
@@ -293,10 +301,11 @@ fn check_trending(v: &Value) -> SourceResult<()> {
             || rank["url"] != format!("https://github.com/{name}")
             || !(0..=1_000_000_000).contains(&gain)
             || !(gain..=1_000_000_000).contains(&stars)
-            || rank["description"].as_str().is_none_or(|d| d.chars().count() > 120 || d.chars().any(char::is_control))
+            || rank["description"].as_str().is_none_or(|d| d.chars().count() > DESCRIPTION_MAX || d.chars().any(char::is_control))
             || rank["language"].as_str().is_none_or(|l| l.chars().count() > 40)
             || rank["language_color"].as_str().is_none_or(|c| !c.is_empty() && !hex_color(c))
             || rank["spark"] != json!([])
+            || rank.get("description_zh").is_some_and(|d| d.as_str().is_none_or(|t| t.chars().count() > 240 || t.chars().any(char::is_control)))
         {
             return Err(invalid());
         }

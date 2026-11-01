@@ -60,6 +60,7 @@ data class RepoRank(
     val rank: Int = 0,
     @SerialName("full_name") val fullName: String,
     val description: String = "",
+    @SerialName("description_zh") val descriptionZh: String = "",
     val language: String = "",
     @SerialName("language_color") val languageColor: String = "",
     @SerialName("star_total") val starTotal: Long = 0,
@@ -96,6 +97,50 @@ data class RepoIssue(
 ) {
     val isBaseline: Boolean get() = source == "GitHub" && metric == "star total baseline"
     val isTrending: Boolean get() = source == "GitHub" && metric == "github trending weekly stars"
+}
+
+/** 榜单卡片和详情页优先显示中文简介，没有就用 GitHub 原文。 */
+val RepoRank.shownDescription: String get() = descriptionZh.ifBlank { description }
+
+/** README 的一个排版块；服务端只给纯文本，不含 HTML、图片和链接。 */
+@Serializable
+data class ReadmeBlock(
+    val t: String,
+    val x: String = "",
+    val l: Int = 0,
+    val d: Int = 0,
+    val n: Int? = null,
+    val lang: String = "",
+    val rows: List<List<String>> = emptyList(),
+)
+
+@Serializable
+data class ReadmeContent(
+    val status: String = "unavailable",
+    val blocks: List<ReadmeBlock> = emptyList(),
+    @SerialName("zh_blocks") val zhBlocks: List<ReadmeBlock>? = null,
+    @SerialName("zh_truncated") val zhTruncated: Boolean = false,
+)
+
+/** 榜单项目的站内详情：仓库卡片 + README（中文/原文）。评论走单独接口。 */
+@Serializable
+data class RepoDetail(
+    @SerialName("full_name") val fullName: String,
+    val owner: String = "",
+    val repo: String = "",
+    val url: String = "",
+    val description: String = "",
+    @SerialName("description_zh") val descriptionZh: String = "",
+    val language: String = "",
+    @SerialName("language_color") val languageColor: String = "",
+    @SerialName("star_total") val starTotal: Long = 0,
+    @SerialName("star_gain") val starGain: Long? = null,
+    val rank: Int = 0,
+    @SerialName("is_latest") val isLatest: Boolean = true,
+    @SerialName("as_of") val asOf: String? = null,
+    val readme: ReadmeContent = ReadmeContent(),
+) {
+    val hasZhReadme: Boolean get() = !readme.zhBlocks.isNullOrEmpty()
 }
 
 fun repoObservationLabel(raw: String?): String? = raw?.let {

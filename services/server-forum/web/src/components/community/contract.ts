@@ -7,6 +7,14 @@ export const discoverPaths = {
   article: (key: string) => `/discover/daily/${encodeURIComponent(key)}`,
   tool: (key: string) => `/tools/${encodeURIComponent(key)}`,
   comments: (key: string) => `/discover/daily/${encodeURIComponent(key)}/comments`,
+  repo: (owner: string, repo: string) => `/discover/repo/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`,
+  repoComments: (owner: string, repo: string) => `/discover/repo/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/comments`,
+}
+
+/** 榜单项目在站内详情页的地址；名称不合法时返回 undefined。 */
+export function repoPage(fullName: string): string | undefined {
+  const [owner, repo, ...rest] = fullName.split('/')
+  return owner && repo && !rest.length && /^[A-Za-z0-9-]{1,39}$/.test(owner) && /^[A-Za-z0-9._-]{1,100}$/.test(repo) ? `/repo/${owner}/${repo}` : undefined
 }
 
 /** Only web links or same-origin paths can become links/images in editorial data. */

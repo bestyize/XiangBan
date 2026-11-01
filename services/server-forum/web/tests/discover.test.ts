@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createRequestGate, discoverPaths, officialSource, repoGrowth, repoMetric, webLink } from '../src/components/community/contract.ts'
+import { createRequestGate, discoverPaths, officialSource, repoGrowth, repoMetric, repoPage, webLink } from '../src/components/community/contract.ts'
+
+test('repo detail paths escape each segment and only valid GitHub names get an in-site page', () => {
+  assert.equal(discoverPaths.repo('own er', 'a/b'), '/discover/repo/own%20er/a%2Fb')
+  assert.equal(discoverPaths.repoComments('o', 'r'), '/discover/repo/o/r/comments')
+  assert.equal(repoPage('Nutlope/hallmark'), '/repo/Nutlope/hallmark')
+  assert.equal(repoPage('a-b/c.d_e'), '/repo/a-b/c.d_e')
+  for (const bad of ['', 'owner', 'a/b/c', '/b', 'a/', 'a b/c', 'a/../b', 'a/b?x=1', 'a/b#h', 'a%2Fb/c', 'x'.repeat(40) + '/r']) assert.equal(repoPage(bad), undefined, bad)
+})
 
 test('discover paths match the versioned mobile contract and escape keys once', () => {
   assert.equal(discoverPaths.home, '/discover/home/v2')

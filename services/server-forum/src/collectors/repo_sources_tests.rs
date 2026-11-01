@@ -86,6 +86,25 @@ fn trending_rows_use_heading_link_not_sponsor_button_and_decode_text() {
 }
 
 #[test]
+fn long_descriptions_are_cut_at_a_fixed_length_with_an_ellipsis_and_still_validate() {
+    let long = "word ".repeat(120);
+    let page = page(&[
+        row("a/one", &long, "Go", "#00ADD8", "1,000", "10"),
+        row("a/two", &"字".repeat(DESCRIPTION_MAX), "Go", "#00ADD8", "1,000", "10"),
+        row("a/three", "short", "Go", "#00ADD8", "1,000", "10"),
+        row("a/four", "x", "Go", "#00ADD8", "1,000", "10"),
+        row("a/five", "x", "Go", "#00ADD8", "1,000", "10"),
+    ]);
+    let ranks = parse_trending(&page).unwrap();
+    let cut = ranks[0]["description"].as_str().unwrap();
+    assert!(cut.chars().count() <= DESCRIPTION_MAX && cut.chars().count() > DESCRIPTION_MAX - 6, "{cut}");
+    assert!(cut.ends_with('…') && !cut.trim_end_matches('…').ends_with(' '), "{cut}");
+    assert_eq!(ranks[1]["description"].as_str().unwrap().chars().count(), DESCRIPTION_MAX, "刚好等于上限的不加省略号");
+    assert!(!ranks[1]["description"].as_str().unwrap().ends_with('…'));
+    assert!(build_issue(&page, Utc::now() - Duration::minutes(1)).is_ok());
+}
+
+#[test]
 fn trending_gain_larger_than_total_is_dropped_and_structure_change_fails_whole_batch() {
     let mut rows = vec![row("bad/gain", "x", "Go", "#00ADD8", "10", "99")];
     rows.extend((0..6).map(|i| row(&format!("ok/repo{i}"), "x", "Go", "#00ADD8", "1,000", "10")));

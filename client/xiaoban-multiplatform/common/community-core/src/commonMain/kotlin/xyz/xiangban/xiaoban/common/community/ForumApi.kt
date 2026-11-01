@@ -69,6 +69,20 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     suspend fun deleteNewsComment(key: String, id: Long) {
         write(HttpMethod.Delete, "/api/discover/daily/${key.encodeURLParameter()}/comments/$id")
     }
+    private fun repoPath(owner: String, repo: String) = "/api/discover/repo/${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
+    suspend fun repoDetail(owner: String, repo: String): RepoDetail = get(repoPath(owner, repo))
+    suspend fun repoComments(owner: String, repo: String, page: Int = 1): Page<NewsComment> = get("${repoPath(owner, repo)}/comments${query("page" to page)}")
+    suspend fun commentRepo(owner: String, repo: String, body: String, replyTo: Long? = null) {
+        write(HttpMethod.Post, "${repoPath(owner, repo)}/comments", buildJsonObject {
+            put("body", body); if (replyTo != null) put("reply_to", replyTo)
+        })
+    }
+    suspend fun likeRepoComment(owner: String, repo: String, id: Long, liked: Boolean) {
+        write(if (liked) HttpMethod.Put else HttpMethod.Delete, "${repoPath(owner, repo)}/comments/$id/like")
+    }
+    suspend fun deleteRepoComment(owner: String, repo: String, id: Long) {
+        write(HttpMethod.Delete, "${repoPath(owner, repo)}/comments/$id")
+    }
     suspend fun repoIssue(issue: String? = null): RepoIssue = get("/api/discover/repos/v2${query("issue" to issue)}")
     suspend fun repoIssues(): RepoIssueList = get("/api/discover/repos/issues/v2")
     suspend fun modelBoard(): ModelBoard = get("/api/discover/models")

@@ -5,6 +5,8 @@ pub mod blocks;
 pub mod content;
 pub mod discover;
 pub mod discover_news;
+pub mod discover_repo;
+pub mod translation_admin;
 pub mod discover_editor;
 pub mod collection;
 pub mod community_editor;

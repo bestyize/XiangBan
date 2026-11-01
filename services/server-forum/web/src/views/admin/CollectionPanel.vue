@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { AdminApiError } from '@/api/admin'
 import { collectionApi, type CollectionBatch, type CollectionRun, type CollectionSource, type CollectionSourceConfig } from '@/api/collection'
 import { errorText, fmtTime, notify } from './shared'
+import TranslationPanel from './TranslationPanel.vue'
 
 const autoPublishes = (source: string) => ['artificial_analysis', 'openrouter', 'github_repos'].includes(source)
 const sources = ref<CollectionSource[]>([])
@@ -14,6 +15,8 @@ const actionErrors = reactive<Record<string, string>>({})
 const accepted = reactive<Record<string, string>>({})
 const filter = ref('')
 const selectedSource = ref('')
+const TRANSLATION = 'translation'
+const showTranslation = computed(() => selectedSource.value === TRANSLATION)
 const displayedSources = computed(() => sources.value.filter(s => s.id === (selectedSource.value || sources.value[0]?.id)))
 const readyCount = computed(() => sources.value.filter(ready).length)
 const runs = ref<CollectionRun[]>([])
@@ -70,6 +73,7 @@ function selectNext(event: KeyboardEvent, id: string) {
   const index = sources.value.findIndex(source => source.id === id)
   const next = event.key === 'Home' ? 0 : event.key === 'End' ? sources.value.length-1 : (index+(event.key === 'ArrowRight' ? 1 : -1)+sources.value.length)%sources.value.length
   const source = sources.value[next]
+  if (showTranslation.value) { selectedSource.value=source?.id ?? ''; return }
   if (source) { selectedSource.value=source.id; document.getElementById(`source-tab-${source.id}`)?.focus() }
 }
 function clearPreview() {
@@ -301,8 +305,10 @@ onUnmounted(() => {
       <button v-for="s in sources" :id="`source-tab-${s.id}`" :key="s.id" type="button" role="tab" :aria-selected="s.id === (selectedSource || sources[0]?.id)" :aria-controls="`source-panel-${s.id}`" :tabindex="s.id === (selectedSource || sources[0]?.id) ? 0 : -1" @keydown="selectNext($event,s.id)" :class="{active:s.id === (selectedSource || sources[0]?.id)}" @click="selectedSource=s.id">
         <span>{{ sourceName(s.id) }}</span><small><i :class="{ready:ready(s)}" />{{ active(s.id) ? '正在采集' : ready(s) ? s.enabled ? '自动采集已开启' : '可手动采集' : '待配置' }}</small>
       </button>
+      <button id="source-tab-translation" type="button" role="tab" :aria-selected="showTranslation" aria-controls="source-panel-translation" :tabindex="showTranslation ? 0 : -1" :class="{active:showTranslation}" @click="selectedSource=TRANSLATION"><span>翻译服务</span><small><i />榜单中文化</small></button>
     </div>
-    <div class="collection-sources" :aria-busy="sourceLoading">
+    <TranslationPanel v-if="showTranslation" id="source-panel-translation" role="tabpanel" aria-labelledby="source-tab-translation" />
+    <div v-else class="collection-sources" :aria-busy="sourceLoading">
       <section v-for="s in displayedSources" :id="`source-panel-${s.id}`" role="tabpanel" :aria-labelledby="`source-tab-${s.id}`" :key="s.id" class="panel adm-card collection-source">
         <div class="collection-heading">
           <h2>{{ sourceName(s.id) }}</h2>
@@ -349,7 +355,7 @@ onUnmounted(() => {
       </section>
     </div>
 
-    <section class="panel adm-card collection-runs">
+    <section v-if="!showTranslation" class="panel adm-card collection-runs">
       <div class="collection-heading"><h2>采集运行记录</h2><button class="btn btn-sm" :disabled="runLoading || approving" @click="clearPreview(); loadRuns()">刷新记录</button></div>
       <div class="adm-toolbar"><label>来源 <select v-model="filter" class="select" :disabled="approving" @change="search"><option value="">全部来源</option><option v-for="s in sources" :key="s.id" :value="s.id">{{ sourceName(s.id) }}</option></select></label><span v-if="polling" class="muted" role="status">正在短暂自动刷新…</span></div>
       <p v-if="refreshNotice" class="muted" role="status">{{ refreshNotice }}</p>
