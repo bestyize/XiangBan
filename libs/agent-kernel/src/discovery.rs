@@ -14,7 +14,7 @@ pub(crate) fn relevance(query: &str, name: &str, description: &str) -> usize {
     if query.is_empty() { return 0; }
     let name = name.to_lowercase();
     let description = description.to_lowercase();
-    if name == query { return 10_000; }
+    if name == query { return usize::MAX; }
     let mut terms = HashSet::new();
     for word in query.split(|c: char| !c.is_alphanumeric()).filter(|s| !s.is_empty()) {
         if word.chars().any(|c| ('\u{3400}'..='\u{9fff}').contains(&c)) {
@@ -24,7 +24,11 @@ pub(crate) fn relevance(query: &str, name: &str, description: &str) -> usize {
         } else { terms.insert(word.to_string()); }
     }
     let score = terms.iter().map(|t| {
-        if name.contains(t.as_str()) { 6 } else if description.contains(t.as_str()) { 2 } else { 0 }
+        let field_score = if name.contains(t.as_str()) { 6 } else if description.contains(t.as_str()) { 2 } else { return 0 };
+        // Generic action words must not outweigh the service and object in a
+        // multi-word query ("GitHub list repositories" versus "list apps").
+        let weight = if matches!(t.as_str(), "list" | "get" | "find" | "search" | "show") { 10 } else { 100 };
+        weight + field_score
     }).sum::<usize>();
     score + if name.contains(&query) || description.contains(&query) { 10 } else { 0 }
 }

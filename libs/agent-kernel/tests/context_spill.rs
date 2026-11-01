@@ -211,6 +211,23 @@ fn spill_saves_big_output_and_leaves_a_preview_with_the_path() {
 }
 
 #[test]
+fn spill_suggests_structured_reading_for_large_json_without_changing_the_saved_data() {
+    let dir = temp_dir("spill-json");
+    let body = serde_json::json!({"items": [{"name":"first", "description":"x".repeat(20_000)}]}).to_string();
+    let copy = body.clone();
+    let h = harness(vec![Step::tool_call("a", "big", "{}"), Step::text("ok")], |b| {
+        b.tool(FnTool::new(spec("big").max_output(100_000), move |_, _| Ok(copy.clone())))
+            .middleware(SpillOutput::new(&dir))
+    });
+    run(&h.agent, "inspect").0.unwrap();
+    let output = &tool_messages(&h)[0].1;
+    assert!(output.contains("json_pointer=\"/items\"") && output.contains("json_group_by"));
+    let path = output.split("is saved at ").nth(1).unwrap().split(". Read it").next().unwrap();
+    assert_eq!(std::fs::read_to_string(path).unwrap(), body);
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
 fn spill_falls_back_to_plain_truncation_when_the_directory_is_unusable() {
     let dir = temp_dir("spill-bad");
     std::fs::create_dir_all(dir.parent().unwrap()).unwrap();

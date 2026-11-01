@@ -156,6 +156,18 @@ fn search_includes_already_visible_tools_without_loading_them() {
 }
 
 #[test]
+fn multiword_service_search_prioritizes_the_requested_service_and_object() {
+    let h = harness(vec![Step::tool_call("s", "tool_search", r#"{"query":"GitHub list repositories"}"#), Step::text("done")], |b| {
+        b.tool(FnTool::new(ToolSpec::new("list_apps", "List apps on this computer", json!({"type":"object"})).risk(Risk::Read), |_, _| Ok("ok".into())))
+            .deferred_tool_arc(Arc::new(FnTool::new(ToolSpec::new("mcp_ext_hash_opaque", "Connector GitHub, tool search_repositories: Find GitHub repositories by name", json!({"type":"object"})).risk(Risk::Read), |_, _| Ok("ok".into()))))
+    });
+    run(&h.agent, "find repositories").0.unwrap();
+    let result: serde_json::Value = serde_json::from_str(&tool_messages(&h)[0].1).unwrap();
+    assert_eq!(result["matches"][0]["name"], "mcp_ext_hash_opaque");
+    assert_eq!(result["loaded"], json!(["mcp_ext_hash_opaque"]));
+}
+
+#[test]
 fn eager_only_agents_are_unchanged_and_discovery_names_cannot_collide() {
     let h = harness(vec![Step::text("done")], |b| b.tool(FnTool::new(spec("read_file"), |_, _| Ok("ok".into()))));
     assert_eq!(h.agent.tool_schemas(), h.agent.initial_tool_schemas());

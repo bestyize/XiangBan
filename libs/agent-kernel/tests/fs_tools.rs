@@ -80,6 +80,51 @@ fn read_file_caps_long_lines_and_large_output() {
 }
 
 #[test]
+fn read_file_projects_pages_and_counts_one_line_json_without_shell() {
+    let ws = Workspace::new("json-page");
+    std::fs::write(ws.root.join("repos.json"), r#"{"items":[{"name":"one","private":false,"language":"Rust"},{"name":"two","private":true},{"name":"three","private":false,"language":null}]}"#).unwrap();
+    let output = ws.call("read_file", r#"{"path":"repos.json","json_pointer":"/items","json_fields":["name","language"],"json_offset":1,"json_limit":1,"json_group_by":"private"}"#);
+    let value: serde_json::Value = serde_json::from_str(&output).unwrap();
+    assert_eq!(value["total"], 3);
+    assert_eq!(value["offset"], 1);
+    assert_eq!(value["next_offset"], 2);
+    assert_eq!(value["items"], serde_json::json!([{"name":"two","language":null}]));
+    assert_eq!(value["groups"], serde_json::json!([{"value":false,"count":2},{"value":true,"count":1}]));
+    assert_eq!(value["missing_group_fields"], 0);
+    let groups: serde_json::Value = serde_json::from_str(&ws.call("read_file", r#"{"path":"repos.json","json_pointer":"/items","json_limit":1,"json_group_by":"language"}"#)).unwrap();
+    assert_eq!(groups["missing_group_fields"], 1);
+    assert_eq!(groups["groups"], serde_json::json!([{"value":"Rust","count":1},{"value":null,"count":1}]));
+    let count_only: serde_json::Value = serde_json::from_str(&ws.call("read_file", r#"{"path":"repos.json","json_pointer":"/items","json_group_by":"private"}"#)).unwrap();
+    assert_eq!(count_only["items"], serde_json::json!([]));
+    assert_eq!(count_only["items_omitted"], true);
+    assert_eq!(count_only["count_scope"], "selected JSON array only; other API pages are not included");
+    assert_eq!(count_only["groups"], serde_json::json!([{"value":false,"count":2},{"value":true,"count":1}]));
+    assert!(ws.call("read_file", r#"{"path":"repos.json","json_pointer":"/missing"}"#).contains("pointer does not exist"));
+    assert!(ws.call("read_file", r#"{"path":"repos.json","json_fields":["name"]}"#).contains("require json_pointer"));
+    let outside = ws.outside.join("secret.txt").display().to_string().replace('\\', "\\\\");
+    assert!(ws.call("read_file", &format!(r#"{{"path":"{outside}","json_pointer":""}}"#)).contains("outside the allowed"));
+}
+
+#[test]
+fn spilled_json_can_be_summarized_through_the_file_tool() {
+    use agent_kernel::{Middleware, SpillOutput, ToolCall, ToolResult};
+    let ws = Workspace::new("spilled-json");
+    let items: Vec<_> = (0..52).map(|n| serde_json::json!({"name":format!("repo-{n}"),"private":n % 2 == 0,"description":"x".repeat(500)})).collect();
+    let original = serde_json::json!({"items":items}).to_string();
+    let mut result = ToolResult::ok(original.clone());
+    SpillOutput::new(&ws.root).after_tool("s", &ToolCall { id:"c".into(), name:"search".into(), arguments:"{}".into() }, &mut result);
+    assert!(result.output.contains("json_pointer=\"/items\""));
+    let path = result.output.split("is saved at ").nth(1).unwrap().split(". Read it").next().unwrap();
+    assert_eq!(std::fs::read_to_string(path).unwrap(), original);
+    let args = serde_json::json!({"path":path,"json_pointer":"/items","json_fields":["name","private","language"],"json_group_by":"private","json_limit":100});
+    let response: serde_json::Value = serde_json::from_str(&ws.call("read_file", &args.to_string())).unwrap();
+    assert_eq!(response["total"], 52);
+    assert_eq!(response["groups"], serde_json::json!([{"value":false,"count":26},{"value":true,"count":26}]));
+    assert!(response["items"].as_array().unwrap().iter().all(|item| item["language"].is_null()));
+    assert!(response["next_offset"].is_null());
+}
+
+#[test]
 fn paths_outside_the_roots_are_refused() {
     let ws = Workspace::new("confine");
     let secret = ws.outside.join("secret.txt").display().to_string().replace('\\', "\\\\");

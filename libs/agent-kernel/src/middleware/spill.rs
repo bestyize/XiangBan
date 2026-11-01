@@ -57,6 +57,12 @@ impl Middleware for SpillOutput {
         };
         let head = nearest_boundary(output, PREVIEW, false);
         let tail = nearest_boundary(output, output.len() - PREVIEW, true);
+        // Compact JSON is often one long line, so offer structured paging.
+        let json_pointer = if output.len() <= 4 * 1024 * 1024 {
+            serde_json::from_str::<serde_json::Value>(output).ok().and_then(|value| {
+                if value.is_array() { Some("") } else if value.get("items").is_some_and(serde_json::Value::is_array) { Some("/items") } else { None }
+            })
+        } else { None };
         result.output = format!(
             "{}\n[... {} bytes omitted ...]\n{}\n[The full output ({} bytes) is saved at {}. Read it in parts with a file tool, or search it.]",
             &output[..head],
@@ -65,5 +71,8 @@ impl Middleware for SpillOutput {
             output.len(),
             path.display()
         );
+        if let Some(pointer) = json_pointer {
+            result.output.push_str(&format!("\n[This JSON contains an array. Use read_file with json_pointer={pointer:?}, json_fields, json_offset/json_limit to inspect it without shell; json_group_by counts a field across the saved array only, not other API pages. Check the original API total and fetch remaining pages if needed. Missing projected fields are null.]"));
+        }
     }
 }

@@ -32,7 +32,7 @@ mod browser_auth_tests {
                     key: "TOKEN".into(), label: "Token".into(), label_en: String::new(), field_type: "password".into(),
                     required: true, placeholder: String::new(), placeholder_en: String::new(), description: String::new(), description_en: String::new(),
                 }], ..TokenSchema::default() }, headers: vec![("Authorization".into(), "TOKEN".into(), "Bearer ".into())] },
-                disabled_tools: vec!["delete_repository".into()], timeout_ms: Some(1234),
+                disabled_tools: vec!["delete_repository".into()], timeout_ms: Some(600),
             }] }
     }
     #[test]
@@ -59,9 +59,11 @@ mod browser_auth_tests {
         assert!(!config.to_string().contains("secret"));
         assert!(!config.to_string().contains("saved-pat"));
         assert_eq!(disabled, vec!["delete_repository"]);
-        assert_eq!(timeout, Duration::from_millis(1234));
+        assert_eq!(timeout, Duration::from_secs(45));
         // Manual fallback still resolves the original package and saved PATs.
-        assert_eq!(manager.resolve_plugin_config(&id, &legacy).unwrap().0["headers"]["Authorization"], "Bearer override-secret");
+        let (manual, _, manual_timeout) = manager.resolve_plugin_config(&id, &legacy).unwrap();
+        assert_eq!(manual["headers"]["Authorization"], "Bearer override-secret");
+        assert_eq!(manual_timeout, Duration::from_millis(600));
         assert_eq!(manager.plugin_vault().unwrap().get(&id, "TOKEN").unwrap().as_deref(), Some("saved-pat"));
         assert!(manager.begin_connect_plugin_with_auth(&plugin, "github", &BTreeMap::new(), false, true).is_err());
         let mut authenticated = snapshot; authenticated["oauthSession"] = json!(crate::oauth::random().unwrap());
@@ -69,6 +71,17 @@ mod browser_auth_tests {
         let (effective, _, _) = manager.resolve_plugin_config(&id, &config).unwrap();
         assert_eq!(effective["authMode"], "oauth");
         assert_eq!(effective["oauthSession"], config["oauthSession"]);
+        manager.shutdown(); std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn github_browser_timeout_keeps_longer_plugin_limit() {
+        let root = std::env::temp_dir().join(format!("github-timeout-{}", crate::oauth::random().unwrap()));
+        let manager = ConnectorManager::new(root.clone(), root.clone()).unwrap();
+        let mut plugin = github();
+        plugin.servers[0].timeout_ms = Some(60_000);
+        let id = plugin.connection_id("github");
+        let binding = json!({"connectorPlugin":Binding { plugin, server:"github".into() }, "browserAuth":true});
+        assert_eq!(manager.resolve_plugin_config(&id, &binding).unwrap().2, Duration::from_secs(60));
         manager.shutdown(); std::fs::remove_dir_all(root).unwrap();
     }
     #[test]
@@ -344,10 +357,15 @@ impl ConnectorManager {
             built["oauthSession"] = session.clone();
             built["authMode"] = json!("oauth");
         }
+        // Some imported GitHub packages specify a sub-second timeout. Keep the
+        // original policy for manual connections, but allow the official remote
+        // browser adapter enough time for initialization and real API calls.
+        let timeout_ms = spec.timeout_ms.unwrap_or(45_000);
+        let timeout_ms = if browser { timeout_ms.max(45_000) } else { timeout_ms };
         Ok((
             built,
             spec.disabled_tools.clone(),
-            Duration::from_millis(spec.timeout_ms.unwrap_or(45_000)),
+            Duration::from_millis(timeout_ms),
         ))
     }
     pub fn set_plugin_enabled(&self, id: &str, enabled: bool) -> Result<(), String> {

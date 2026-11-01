@@ -130,7 +130,7 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 `Arc<T>` 也实现了 `Middleware`，宿主可留一个句柄，例如运行中切换权限模式。建议顺序：`Permission`、`RepeatGuard`、`SpillOutput`、`ContextTrim`、`ContinueGuard`。
 
 - `ContextTrim`：预算包含工具定义和 `reserve_output`。先把旧工具输出与结构化数据换成占位，仍超再按用户消息边界丢掉最旧的整轮；当前轮无法容纳则返回错误。不调用模型，只改本次请求，不改已存会话。token 是粗估值，预算要留余量。
-- `SpillOutput`：大输出存成文件，只给模型头尾预览和路径。目录由宿主提供并清理，要让模型读到需把它加进文件工具的根目录。写失败时退回普通截断。
+- `SpillOutput`：大输出存成文件，只给模型头尾预览和路径。目录由宿主提供并清理，要让模型读到需把它加进文件工具的根目录。写失败时退回普通截断。对常见大 JSON 数组，提示可用 `read_file` 的 JSON 模式分页、选择字段与统计，保存的原始内容不变。
 - `ContinueGuard`：模型没调工具就结束时，检测本次运行 `todo` 还有 `pending` 项、最后一句只宣布下一步（如冒号结尾、“让我／我先／let me…”）、空回复或长度截断，补合成用户消息续跑并发出 `Event::Continuing`。默认不限制整轮累计续跑次数，改为最多 3 次无新进展的续跑（`max_without_progress`）；首次成功执行的工具名 + 解析后的 JSON 参数组合恢复额度，参数键序不影响比较，失败、拒绝、重复调用及 `todo` / `ask_user` / `time_now` 不恢复。这是进展启发式，不保证工作正确；`max_turns` 仍限制总运行量，可用 `max_per_run` 另设累计上限（0 禁用）。
 - `before_stop` 返回 `StopDecision::Finish` / `Continue(Nudge)` / `Pause(reason)`，第一个非 Finish 决策生效。需要续跑但额度已耗尽时返回 `HarnessError::Paused`（`no_progress` 或 `continuation_limit`），经 Error 事件通知宿主，不能当作 Done；最后一轮仍有工作则返回 MaxTurns。正常回答、询问用户、安全结束不会强制续跑；催过后模型明确完成或受阻也可结束，但再次空答或只宣布动作仍受保护。合成消息应在界面隐藏；宿主应对暂停提供原因和继续入口。
 - `RepeatGuard`：同一工具、同样参数、同样结果连续出现时，从第 3 次起在结果后附提醒，第 6 次起直接拒绝执行（`warn_after`、`block_after` 可调）；换参数、换结果或新的用户消息都会重新计数。可用 `ignore_tool` 排除合法轮询。要放在 `SpillOutput` 前面，否则比较的是每次文件名都不同的预览。
@@ -162,6 +162,8 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 | `shell` | `shell` | Exec | 不是沙箱。环境变量清空（宿主的密钥不外泄）、stdin 关闭、输出有上限、超时或取消时杀整个进程组。Windows 路径未运行验证 |
 | `load_skill` `skill_manage` | `skills` | Read、Write | 见下 |
 | `memory_read` `memory_write` | `memory` | Read、Write | 每条笔记一个 Markdown 文件，最多 100 条、每条 20 KB，不跟随符号链接 |
+
+`read_file` 可传 `json_pointer`（如 `/items`，空字符串表示根节点）读取 JSON。数组可用 `json_fields` 选择字段、`json_offset` / `json_limit` 分页，并用 `json_group_by` 统计所选数组中的标量字段；只指定分组时仅返回计数。统计范围不包含其他 API 页，缺失的投影字段显示为 null，分组额外报告缺失数。单个输入最多 16 MiB，结果过大时需减少字段或每页数量，沿用同一文件根目录和权限检查。
 
 Skills：`<根>/<name>/SKILL.md`，开头 `---` 块含 `name`、`description`，提示里只放名称和描述，正文由 `load_skill` 按需读取。多个根时靠前的根优先，符号链接目录被忽略。`skill_manage`（只在配置了可写根时提供）可 create、patch、delete：只能动自己写入的（`origin: agent`）且在可写根里的 skill，用户手写的和随包的只读；修改前备份到 `.history/`（不自动清理）；删除只删 `SKILL.md`，目录里有别的文件则保留。
 

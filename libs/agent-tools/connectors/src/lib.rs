@@ -540,8 +540,17 @@ impl ConnectorManager {
             .iter()
             .filter(|(id, a)| a.client.is_connected() && ids.is_none_or(|ids| ids.contains(id)))
             .flat_map(|(id, a)| {
+                let service = state.records.iter().find(|record| record.id == *id)
+                    .map(|record| record.name.split_whitespace().collect::<Vec<_>>().join(" "))
+                    .unwrap_or_default();
                 a.tools(id).into_iter().map(move |tool| {
                     let mut spec = tool.spec().clone().always_ask().untrusted_output();
+                    let prefix = format!("mcp_ext_{}_", id.replace('-', "_"));
+                    let original = spec.name.strip_prefix(&prefix).unwrap_or(&spec.name)
+                        .chars().filter(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+                        .take(80).collect::<String>();
+                    let service: String = service.chars().take(80).collect();
+                    spec.description = format!("Connector {service}, tool {original}: {}", spec.description);
                     let hash = format!(
                         "{:x}",
                         Sha256::digest(format!("{id}\0{}", spec.name).as_bytes())
@@ -668,19 +677,25 @@ for line in sys.stdin:
 "#).unwrap();
         let manager = ConnectorManager::new(root.join("config"), root.clone()).unwrap();
         let python = if cfg!(windows) { "python" } else { "python3" };
+        let id = format!("plugin-{}", "a".repeat(48));
         let config = json!({"command":python,"args":[script.to_str().unwrap()],"env":{"TEST_TOKEN":"must-not-be-in-status"}});
         assert!(manager
-            .connect("test", "Test", config.clone(), false)
+            .connect(&id, "Test", config.clone(), false)
             .is_err());
-        manager.connect("test", "Test", config, true).unwrap();
+        manager.connect(&id, "Test", config, true).unwrap();
         let tools = manager.tools();
         assert_eq!(tools.len(), 1);
-        assert_eq!(manager.tools_for(&["test".into()])[0].spec().name, tools[0].spec().name);
+        assert_eq!(manager.tools_for(&[id.clone()])[0].spec().name, tools[0].spec().name);
         assert!(manager.tools_for(&["another-service".into()]).is_empty());
         assert!(tools[0].spec().always_ask && tools[0].spec().untrusted_output);
         assert!(tools[0].spec().name.starts_with("mcp_ext_"));
         assert!(tools[0].spec().name.len() <= 64);
         assert!(!tools[0].spec().name.contains('.'));
+        assert!(tools[0].spec().description.contains("Connector Test, tool echo.with.dot"));
+        let raw = format!("mcp_ext_{}_echo.with.dot", id.replace('-', "_"));
+        let hash = format!("{:x}", Sha256::digest(format!("{id}\0{raw}").as_bytes()));
+        let safe: String = raw.chars().map(|c| if c.is_ascii_alphanumeric() || c == '_' { c } else { '_' }).take(30).collect();
+        assert_eq!(tools[0].spec().name, format!("mcp_ext_{}_{safe}", &hash[..12]), "existing tool identifiers remain stable");
         let result = tools[0].execute_result(json!({}), &ToolCtx::detached("test"));
         assert!(!result.is_error);
         assert_eq!(result.structured_content.unwrap()["ok"], true);
@@ -700,7 +715,7 @@ for line in sys.stdin:
                 0o600
             );
         }
-        manager.disconnect("test").unwrap();
+        manager.disconnect(&id).unwrap();
         assert!(manager.tools().is_empty());
         assert!(tools[0]
             .execute(json!({}), &ToolCtx::detached("test"))
@@ -708,7 +723,7 @@ for line in sys.stdin:
         drop(manager);
         let restored = ConnectorManager::new(root.join("config"), root.clone()).unwrap();
         assert!(restored.tools().is_empty());
-        restored.reconnect("test").unwrap();
+        restored.reconnect(&id).unwrap();
         assert_eq!(restored.tools().len(), 1);
         restored.shutdown();
         fs::remove_dir_all(root).unwrap();
