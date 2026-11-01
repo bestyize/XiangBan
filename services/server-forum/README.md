@@ -32,10 +32,10 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 - 创造发现页与小米 14 对齐：9 款官方内置游戏按手机顺序展示，其后是柔软山丘壁纸灵感、9 款官方小组件（含鹈鹕骑车）、12 款官方特效及 7 位官方伙伴。分类为全部/游戏/壁纸/小组件/特效/伙伴。卡片打开预览与游戏试玩，只有「你想创造什么？」触发客户端下载提示；「我的作品」通往账号已发布作品，不冒充手机本机文件同步。社区作品继续在社区讨论的创作栏目展示。
 - `npm run dev/build` 的前置脚本从仓库 `client/xiaoban-desktop/public/game-packs/` 同步这 9 款官方资源到忽略提交的 `web/public/builtin-games/`，构建产物包含它们；构建需完整本仓库。官方游戏无需社区 API 或独立试玩域名，在不允许同源访问的 iframe 内运行，以来源和 nonce 校验就绪/退出消息，本次试玩不持久保存进度。`npm run sync:builtins` 同时同步桌面小组件的纯视觉实现与完整伙伴 SVG；特效复用桌面粒子引擎和官方数据。小组件天气/行情明确标记为演示数据，特效只在详情可见时播放，伙伴预览保留完整花盆与表情，详情按需加载客户端原有动画引擎，支持点击/键盘表情反馈、自然眨眼和视线跟随；离屏、后台及关闭详情时停止绘制。网页预览不会安装桌面装扮。
-- AI 默认连接 `https://ai.xiangban.xyz`，构建时可设 `VITE_AI_BASE_URL`（HTTPS；本地联调允许 localhost HTTP）。AI 产品 `client_ids` 必须接收论坛令牌的 `aud=forum-web`，`AI_CORS_ORIGINS` 必须包含本站实际 origin。前端不包含服务商密钥。对话历史按账号保存在当前浏览器，最多 30 对话、每个 100 消息，不代表跨端同步。
+- AI 默认连接 `https://ai.xiangban.xyz`，构建时可设 `VITE_AI_BASE_URL`（HTTPS；本地联调允许 localhost HTTP）。论坛令牌的 `aud=forum-web` 须与桌面、手机一起关联到同一个已启用的 AI 产品，使同一账号共享试用、额度、兑换与流水；如果配置了 `AI_CORS_ORIGINS`，还须包含本站实际 origin。前端不包含服务商密钥。对话历史按账号保存在当前浏览器，最多 30 对话、每个 100 消息，不代表跨端同步。
 - 游戏试玩仅接受公开 T0/T1、当前指定版本且完整性检查通过的离线 v1 游戏包。构建时配置 `VITE_GAME_SANDBOX_URL` 为独立 HTTPS origin，部署 `web/game-sandbox/`，并让资源服务允许网页跨域读取签名下载 URL。未配置时如实显示不可用。独立域名、CSP、内部 sandbox 和父子消息校验详见 [试玩宿主说明](web/game-sandbox/README.md)。不向作品提供账号令牌或桌面能力。
 - 本地只读联调可设 `FORUM_API=https://chat.xiangban.xyz`；试玩同时需独立本地宿主及 `VITE_GAME_RESOURCE_ORIGIN=https://chat.xiangban.xyz`，后者仅在 DEV 生效，用于匹配 `/files/` 代理。生产构建不启用开发代理。
-- 前端验收：`npm --prefix services/server-forum/web run build`；行为测试：在 `web/` 执行 `node --experimental-strip-types --test tests/*.test.ts`。本轮没有部署生产、登记 AI 产品或修改真实账号数据。
+- 前端验收：`npm --prefix services/server-forum/web run build`；行为测试：在 `web/` 执行 `node --experimental-strip-types --test tests/*.test.ts`。
 
 ## 配置
 

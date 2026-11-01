@@ -30,6 +30,7 @@ const ISSUER: &str = "https://account.test";
 const CLIENT: &str = "xiangban-wallpaper-web";
 const DESKTOP_CLIENT: &str = "xiaoban-desktop-wallpaper";
 const MOBILE_CLIENT: &str = "xiaoban-android";
+const WEB_CLIENT: &str = "forum-web";
 const ADMIN_PASSWORD: &str = "admin-pass-123";
 const ADMIN_TOKEN: &str = "test-admin-token";
 const TRIAL: i64 = 250_000;
@@ -1100,34 +1101,47 @@ async fn trial_is_not_granted_when_the_product_has_no_trial_quota() {
 const TOPUP: i64 = 1_000_000;
 
 #[tokio::test]
-async fn desktop_and_mobile_share_trial_redemption_and_consumption() {
+async fn desktop_mobile_and_web_share_trial_redemption_and_consumption() {
     let h = harness!();
     h.seed_wallpaper().await;
+    let admin = h.admin_token().await;
+    let (status, body) = h.call(
+        Method::PUT,
+        "/api/admin/products/wallpaper",
+        Some(&admin),
+        json!({ "name": "小伴壁纸", "client_ids": [CLIENT, DESKTOP_CLIENT, MOBILE_CLIENT, WEB_CLIENT, "xiaoban-mobile-wallpaper"], "trial_quota": TRIAL, "trial_days": 7, "enabled": true }),
+    ).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
     let codes = h.make_batch("topup", TOPUP, 365, 1).await;
     let uid = Uuid::new_v4();
     let desktop = h.token(uid, DESKTOP_CLIENT);
     let mobile = h.token(uid, MOBILE_CLIENT);
+    let web = h.token(uid, WEB_CLIENT);
 
     let (status, _) = h.call(Method::POST, "/v1/chat/completions", Some(&desktop), json!({ "messages": [] })).await;
     assert_eq!(status, StatusCode::OK);
-    let (status, balance) = h.call(Method::GET, "/api/ai/balance", Some(&mobile), Value::Null).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(balance["total"], TRIAL);
-    assert_eq!(balance["trial"]["available"], false);
+    for token in [&mobile, &web] {
+        let (status, balance) = h.call(Method::GET, "/api/ai/balance", Some(token), Value::Null).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(balance["total"], TRIAL);
+        assert_eq!(balance["trial"]["available"], false);
+    }
 
-    let (status, _) = h.redeem(uid, MOBILE_CLIENT, &codes[0]).await;
+    let (status, _) = h.redeem(uid, WEB_CLIENT, &codes[0]).await;
     assert_eq!(status, StatusCode::OK);
-    let (status, balance) = h.call(Method::GET, "/api/ai/balance", Some(&desktop), Value::Null).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(balance["total"], TRIAL + TOPUP);
-    assert_eq!(balance["paid"], TOPUP);
+    for token in [&desktop, &mobile, &web] {
+        let (status, balance) = h.call(Method::GET, "/api/ai/balance", Some(token), Value::Null).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(balance["total"], TRIAL + TOPUP);
+        assert_eq!(balance["paid"], TOPUP);
+    }
 
     h.mock.0.lock().unwrap().chat_cost = 40_000;
-    let (status, _) = h.call(Method::POST, "/v1/chat/completions", Some(&mobile), json!({ "messages": [] })).await;
+    let (status, _) = h.call(Method::POST, "/v1/chat/completions", Some(&web), json!({ "messages": [] })).await;
     assert_eq!(status, StatusCode::OK);
     let binding_id = h.only_binding().await;
     sync::sync_binding(&h.state, binding_id).await.unwrap();
-    for token in [&desktop, &mobile] {
+    for token in [&desktop, &mobile, &web] {
         let (status, balance) = h.call(Method::GET, "/api/ai/balance", Some(token), Value::Null).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(balance["total"], TRIAL + TOPUP - 40_000);
@@ -1140,6 +1154,11 @@ async fn desktop_and_mobile_share_trial_redemption_and_consumption() {
     let (trials,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM quota_buckets WHERE kind = 'trial'")
         .fetch_one(&h.state.pool).await.unwrap();
     assert_eq!(trials, 1);
+    let other = h.token(Uuid::new_v4(), WEB_CLIENT);
+    let (status, balance) = h.call(Method::GET, "/api/ai/balance", Some(&other), Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(balance["total"], 0);
+    assert_eq!(balance["trial"]["available"], true);
     h.cleanup().await;
 }
 
