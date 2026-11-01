@@ -2,7 +2,9 @@
 
 2026-11-01（北京时间）核实并配置。AI 网关与 New API 的实际生产部署都在香港服务器，历史设计里的首尔同机部署设想不代表当前部署位置。服务器与密钥清单仍按本机 SSH 运维记录核实；不要为连接旧地址而忽略 SSH 主机指纹校验。
 
-## 线上配置
+## 初次上线配置
+
+本节记录最初的 Vertex 上线状态；当前路由以本文后面的「订阅接管后的当前配置」为准。
 
 - AI 网关：`server-ai.service`，目录 `/opt/server-ai`，监听 `127.0.0.1:55012`，对外地址 `https://ai.xiangban.xyz`。
 - 上游：现有 `new-api.service`，监听 `127.0.0.1:3000`；复用现有 Vertex AI 渠道（ID 2、`default` 分组），不新增或下发上游密钥。
@@ -27,7 +29,7 @@
 - `ag/gemini-3.1-flash-image`：经原有 Antigravity 账户与代理，HTTP 200，返回一张图片（463,593 字节，约 11.7 秒）。
 - `cx/gpt-image-1.5`：经原有 Codex Plus 账户与代理，HTTP 200，返回一张图片（1,026,495 字节，约 16.7 秒）。
 - 账户刷新后同时保存访问/刷新令牌、有效期及刷新时间，沿用现有凭据持久化函数。凭据不进入脚本、仓库或终端输出。
-- 产品当前默认图片模型仍为前述 Vertex Gemini；上述测试验证的是 9Router 上游接口，没有给桌面增加模型选择项或自动重试链。
+- 当时产品默认图片模型为前述 Vertex Gemini；上述测试验证的是 9Router 上游接口，没有给桌面增加模型选择项或自动重试链。
 
 可重复应用的运维补丁为 [patch_9router_image_proxy.py](patch_9router_image_proxy.py)。它仅支持当前安装版本与已核对的编译产物结构，先做精确匹配和 `node --check`；默认只检查，显式 `--apply` 才备份并替换文件，重复运行会跳过已安装的补丁。应用后重启 `9router.service`。例如在服务器上：
 
@@ -39,9 +41,9 @@ sudo systemctl restart 9router
 
 补丁直接修正已安装的 JavaScript 产物，未在云服务器执行构建。9Router 升级或重装会覆盖这些修改，届时应检查上游是否已修复，再按新版本复核；不可向未知版本强行应用。
 
-## GPT Image 2.5 后台可选模型
+## GPT Image 2.5 首次登记（已迁移）
 
-2026-11-01 追加登记 `gpt-image-2.5`，供 AI 后台的图片模型下拉框选择；产品当前默认仍为 Vertex Gemini，没有切换用户的默认生图模型。
+2026-11-01 首次登记 `gpt-image-2.5`，供 AI 后台的图片模型下拉框选择；当时产品默认仍为 Vertex Gemini。
 
 - New API 新增 `9Router Images` 渠道（ID 6，OpenAI 兼容类型 1），复用现有 9Router 地址与凭据，模型 `gpt-image-2.5` 映射为 `cx/gpt-image-2.5`。为该模型登记 `default`、`vip`、`svip` 三个分组的能力。原 9Router 聊天渠道（ID 4）的模型、映射和高级路由保持原配置。
 - 按用户在本次配置中明确选择的方案，将此模型 `ModelPrice` 设为 `0.0672` 美元/张，即当前默认分组每张 `33,600` 点，与本站 Gemini 生图价格一致。这是本站固定价格，并非 OpenAI 官方单张价格。
@@ -54,7 +56,41 @@ sudo systemctl restart 9router
 
 配置快照保存在 `/opt/server-ai/backups/gpt-image-25-20261101/configuration.before.json`，只包含模型、映射、能力、原价格键和产品媒体配置，不含密钥；`registration.json` 记录新增图片渠道 ID 与价格。变更写入 `admin_audit`，操作来源 `ops:ssh`，动作 `newapi.model.register`，最终目标 `gpt-image-2.5`。
 
-撤销登记时先停用新增渠道 6，再移除该渠道的三组同名能力和渠道行，以及 `ModelPrice` 的 `gpt-image-2.5` 键；如渠道后来新增了其他模型，应只移除本次模型与能力，不整行删除。不要用完整旧渠道或旧价格覆盖之后新增的配置。产品默认媒体配置无需回滚。
+该初始 GPT 路由现已迁出渠道 6，渠道 6 改为 Antigravity 图片渠道。不要再按初始 GPT 登记整行删除渠道 6；当前回滚方式见下一节。
+
+## 订阅接管后的当前配置
+
+用户自行创建并启用 `ChatGPT Subscription (Codex)` 渠道 7，并把 `wallpaper/image` 默认模型改成 `gpt-image-2.5`。本次保留这份订阅凭据、代理、GPT 模型和默认图片选择，按用户要求把 GPT 路由全部归到该渠道。
+
+| 后台模型名 | 实际通路 | 处理方式 |
+| --- | --- | --- |
+| `gpt-image-2.5` | 自建 Codex 订阅渠道 7 | AI 网关 Images 请求转为 Responses 图片工具；New API 外层模型映射至 `gpt-6.1-sol`，工具仍指定 `gpt-image-2.5` |
+| `ag/gemini-3.1-flash-image` | 渠道 6 → 9Router → Antigravity | OpenAI Images 兼容请求，按已启用账户与代理调用 |
+| `gemini-3.1-flash-image` | 原有 Vertex 渠道 2 | 保留原生 Gemini 通路，仍可供后台选择 |
+
+- 渠道 4、6 均移除 GPT 条目和 GPT 映射；渠道 6 只登记本次验证成功的 Antigravity 图片模型。旧 `cx/gpt-6.1-sol`、`cx/gpt-6-astra`、`cx/gpt-6-luna[1m]` 名称迁至渠道 7 作为模型名兼容别名，不再经过 9Router。协议能力以 Codex 的 Responses 接口为准，别名不增加 Chat Completions 支持。
+- `gpt-image-2.5` 和 `ag/gemini-3.1-flash-image` 的本站固定价格均为 `0.0672` 美元/张（默认分组 `33,600` 点），沿用当前图片价格与已有钱包对账。产品默认仍是用户选择的 GPT；没有把默认切回 Gemini。
+- 原生 Codex 渠道未实现 `/v1/images/generations`，转换在 **server-ai** 内完成。客户端接口不变，New API 仍收到当前调用者自己的 Key，模型映射、钱包和消费日志均经 New API。
+- 每张 GPT 图片独立请求，不自动重试，后续失败保留已完成图片。响应累计上限 48 MiB；仅返回完成的图片，过滤 SSE 部分图片、重复图片、解释文本、模型名和用量。订阅上游实测拒绝 `max_tool_calls`，不发送该参数。
+- New API 的图片工具原本另有 `150` 美元/千次附加价格。为防止与已选固定图片价格重复收取，新增 `tool_price_setting.prices` 的 **`image_generation:gpt-image-2.5* = 0`** 模型前缀覆盖，只对独立 GPT 图片别名生效。普通 GPT 聊天调用图片工具的现有计费不变。
+
+其他供应商检查结果：
+
+- Antigravity：`gemini-3.1-flash-image` 实测成功；`gemini-3-pro-image` 和 `gemini-3.1-flash-lite-image` 均返回 404，未登记为可用模型。
+- OpenRouter：当前账号经现有图片适配调用返回 403，未登记。不能据此把公开模型目录里的全部图片模型当作此账号可用。
+- Gemini API 账号在 9Router 中停用，未擅自启用。GitHub Copilot、Kiro、DeepSeek、CodeBuddy、Qoder 的当前 9Router 适配未声明独立生图能力，不添加空壳模型。
+
+官方订阅的多媒体范围：已配置的 GPT 6 系列可处理图片输入；订阅生图已通过 Responses 工具验证。图片编辑上游支持，但当前桌面 `image_generate` 仍只有文生图入口。此 Codex 渠道没有音频、Realtime、视频的专用接口，不能直接把 TTS、转录、实时语音或 Sora 模型名填入就当作已经接通。参考 [GPT-6.1 Sol 的模态说明](https://developers.openai.com/api/docs/models/gpt-6.1-sol)、[订阅图片能力](https://learn.chatgpt.com/docs/image-generation)及 [当前 New API Codex 适配](https://github.com/QuantumNous/new-api/blob/2bf48ab92/relay/channel/codex/adaptor.go)。
+
+验证与备份：
+
+- 官方订阅 Responses 图片工具探测：HTTP 200，约 19.8 秒出图，消费记录 `6422` 确认渠道 7。此探测使用聊天模型原有价格与附加工具费，不作为最终独立图片接口价格。
+- 最终用真实桌面登录令牌调用小伴 AI `/v1/images/generations`（客户端不传模型），HTTP 200，约 20.5 秒返回一张 PNG（1,030,227 字节，1254×1254）。消费记录 `6435` 确认 `gpt-image-2.5`、渠道 7、扣除 `33,600` 点、无额外 `tool_surcharges`；响应仅含 `created` 和 `data`。
+- Antigravity 经 New API 出图：HTTP 200，约 11.3 秒，消费记录 `6426`、渠道 6、扣除 `33,600` 点。
+- `media::unit` 九项通过，包括 GPT 请求转换、尺寸校验、SSE 部分结果过滤、重复事件去重、完成图片保留、Gemini 与原有媒体行为。本地编译 Linux 产物后上传，未在云服务器编译。
+- `/opt/server-ai/backups/media-routing-20261101/` 包含 `configuration.before.json`、`billing.before.json`、`configuration.after.json` 和原始 `server-ai.before`；配置快照不包含渠道密钥。路由变更写入 `admin_audit`。
+
+回滚先恢复匹配的服务端二进制与渠道模型/映射，再恢复受影响的能力登记。仅撤销本次新增的 Antigravity 价格键与 GPT 图片工具费覆盖；保留其他新增设置、用户自行管理的 OAuth 凭据、既有消费记录和钱包。不要把整份旧价格或旧渠道配置覆盖回去。
 
 ## 备份与回滚
 

@@ -96,6 +96,54 @@ fn native_gemini_image(model: &str) -> bool {
     matches!(model, "gemini-3.1-flash-image" | "gemini-3-pro-image" | "gemini-3.1-flash-lite-image" | "gemini-nano-banana-2.1")
 }
 
+fn native_gpt_image(model: &str) -> bool {
+    matches!(model, "gpt-image-1.5" | "gpt-image-2" | "gpt-image-2.5" | "gpt-image-2.5-flare" | "gpt-image-2.5-sunburst")
+}
+
+/// New API maps the outer image-model alias to a Responses-capable coordinator.
+/// The tool retains the image model; billing remains attached to the original alias.
+fn responses_image_payload(payload: &Value) -> Result<Value, AppError> {
+    let size = payload["size"].as_str().unwrap_or("auto");
+    if !matches!(size, "auto" | "1024x1024" | "1536x1024" | "1024x1536") {
+        return Err(AppError::BadRequest("当前 GPT 生图不支持这个尺寸，请使用后台配置的标准尺寸".into()));
+    }
+    Ok(json!({
+        "model":payload["model"], "instructions":"Generate exactly one image for the prompt. Use the image_generation tool once.", "store":false, "stream":true,
+        "input":[{"role":"user","content":[{"type":"input_text","text":payload["prompt"]}]}],
+        "tools":[{"type":"image_generation","model":payload["model"],"action":"generate","size":size,"output_format":"png"}],
+        "tool_choice":{"type":"image_generation"}, "parallel_tool_calls":false
+    }))
+}
+
+fn responses_image_reply(reply: &[u8]) -> Option<Value> {
+    fn collect(item: &Value, data: &mut Vec<Value>) {
+        if item["type"] != "image_generation_call" || item["status"] != "completed" || data.len() >= IMAGE_MAX_COUNT as usize { return; }
+        let Some(image) = item["result"].as_str().filter(|v| !v.is_empty()) else { return; };
+        if !data.iter().any(|v| v["b64_json"].as_str() == Some(image)) {
+            data.push(json!({"b64_json":image}));
+        }
+    }
+    fn event(value: &Value, data: &mut Vec<Value>) {
+        if value["type"] == "response.output_item.done" { collect(&value["item"], data); }
+        let response = value.get("response").unwrap_or(value);
+        if let Some(output) = response["output"].as_array() {
+            for item in output { collect(item, data); }
+        }
+    }
+    let mut data = Vec::new();
+    if let Ok(value) = serde_json::from_slice::<Value>(reply) {
+        event(&value, &mut data);
+    } else {
+        let text = std::str::from_utf8(reply).ok()?.replace("\r\n", "\n");
+        for frame in text.split("\n\n") {
+            let json = frame.lines().filter_map(|line| line.strip_prefix("data:").map(str::trim_start)).collect::<Vec<_>>().join("\n");
+            if let Ok(value) = serde_json::from_str::<Value>(&json) { event(&value, &mut data); }
+        }
+    }
+    if data.is_empty() { return None; }
+    Some(json!({"created":chrono::Utc::now().timestamp(),"data":data}))
+}
+
 fn gemini_image_payload(payload: &Value) -> Result<Value, AppError> {
     let aspect = match payload["size"].as_str().unwrap_or("auto") {
         "auto" | "1024x1024" => "1:1",
@@ -124,7 +172,7 @@ fn gemini_image_reply(value: &Value) -> Option<Value> {
     Some(json!({"created":chrono::Utc::now().timestamp(),"data":data}))
 }
 
-async fn image_upstream(state: &AppState, key: &str, path: &str, payload: &Value) -> Result<Value, AppError> {
+async fn image_upstream_bytes(state: &AppState, key: &str, path: &str, payload: &Value) -> Result<Vec<u8>, AppError> {
     let payload = serde_json::to_vec(payload).map_err(|e| AppError::Internal(e.to_string()))?;
     let mut upstream = state.newapi.relay(path, key, payload, &[]).await?;
     let status = upstream.status();
@@ -139,6 +187,11 @@ async fn image_upstream(state: &AppState, key: &str, path: &str, payload: &Value
         tracing::warn!("图片上游返回 {status}: {}", text.chars().take(300).collect::<String>());
         return Err(map_upstream_error(status, &text));
     }
+    Ok(reply)
+}
+
+async fn image_upstream(state: &AppState, key: &str, path: &str, payload: &Value) -> Result<Value, AppError> {
+    let reply = image_upstream_bytes(state, key, path, payload).await?;
     serde_json::from_slice(&reply).map_err(|_| AppError::BadGateway("图片生成返回异常".into()))
 }
 
@@ -149,19 +202,26 @@ pub async fn image_generations(State(state): State<AppState>, auth: Result<AuthU
         let auth = auth?;
         let setting = setting(&state, &auth, Capability::Image).await?;
         let payload = image_payload(&setting.model, &setting.sizes, &body)?;
-        let native = native_gemini_image(&setting.model);
-        // Validate before any billable call. Gemini image models accept one candidate per request.
-        let gemini_payload = if native { Some(gemini_image_payload(&payload)?) } else { None };
+        let gpt = native_gpt_image(&setting.model);
+        // Validate before any billable call. Native image tools produce one image per request.
+        let native_payload = if gpt { Some(responses_image_payload(&payload)?) }
+            else if native_gemini_image(&setting.model) { Some(gemini_image_payload(&payload)?) } else { None };
         let active = caller(&state, auth, &setting).await?;
-        let images = if let Some(gemini_payload) = gemini_payload {
-            let path = format!("/v1beta/models/{}:generateContent", setting.model);
+        let images = if let Some(native_payload) = native_payload {
+            let path = if gpt { "/v1/responses".into() } else { format!("/v1beta/models/{}:generateContent", setting.model) };
             let wanted = payload["n"].as_u64().unwrap_or(1) as usize;
             let mut data = Vec::new();
             let mut encoded_bytes = 0usize;
             for _ in 0..wanted {
                 // No retries: each native request is charged by New API through this caller's own key.
-                let generated = match image_upstream(&state, &active.key, &path, &gemini_payload).await
-                    .and_then(|value| gemini_image_reply(&value).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片".into()))) {
+                let generated = if gpt {
+                    image_upstream_bytes(&state, &active.key, &path, &native_payload).await
+                        .and_then(|reply| responses_image_reply(&reply).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片，结果可能未知，请勿自动重试".into())))
+                } else {
+                    image_upstream(&state, &active.key, &path, &native_payload).await
+                        .and_then(|value| gemini_image_reply(&value).ok_or_else(|| AppError::BadGateway("图片生成没有返回图片".into())))
+                };
+                let generated = match generated {
                     Ok(value) => value,
                     Err(error) if data.is_empty() => return Err(error),
                     Err(_) => break, // Keep images already generated; the desktop reports partial delivery.
@@ -413,6 +473,52 @@ async fn pump(
 #[cfg(test)]
 mod unit {
     use super::*;
+
+    #[test]
+    fn gpt_images_use_a_single_responses_tool_and_validate_size_before_billing() {
+        let payload = image_payload("gpt-image-2.5", &["1024x1024".into()], br#"{"prompt":"cat","n":4,"model":"ignore-client-model"}"#).unwrap();
+        let native = responses_image_payload(&payload).unwrap();
+        assert!(native_gpt_image("gpt-image-2.5"));
+        assert!(!native_gpt_image("ag/gemini-3.1-flash-image"));
+        assert_eq!(native["model"], "gpt-image-2.5");
+        assert_eq!(native["tools"][0]["model"], "gpt-image-2.5");
+        assert_eq!(native["input"][0]["content"][0]["text"], "cat");
+        assert_eq!(native["tools"].as_array().unwrap().len(), 1);
+        assert_eq!(native["parallel_tool_calls"], false);
+        // Codex subscription endpoints reject max_tool_calls even though the API supports it.
+        assert!(native.get("max_tool_calls").is_none());
+        assert_eq!(native["stream"], true);
+        assert_eq!(native["store"], false);
+        assert!(native.get("n").is_none());
+        assert!(responses_image_payload(&json!({"prompt":"cat","size":"1792x1024"})).is_err());
+    }
+
+    #[test]
+    fn responses_images_ignore_partial_events_and_deduplicate_completed_images() {
+        let item = json!({"type":"image_generation_call","status":"completed","id":"image-1","result":"final-image","revised_prompt":"private","model":"private"});
+        let events = [
+            json!({"type":"response.image_generation_call.partial_image","partial_image_b64":"partial"}),
+            json!({"type":"response.output_item.done","item":{"type":"image_generation_call","status":"in_progress","result":"incomplete"}}),
+            json!({"type":"response.output_item.done","item":item}),
+            json!({"type":"response.completed","response":{"model":"private","usage":{"input_tokens":100},"output":[item,{"type":"message","content":[{"text":"private"}]}]}}),
+        ];
+        let sse = events.iter().map(|event| format!("event: message\r\ndata: {event}\r\n\r\n")).collect::<String>();
+        let reply = responses_image_reply(sse.as_bytes()).unwrap();
+        assert_eq!(reply["data"], json!([{"b64_json":"final-image"}]));
+        assert!(reply.get("model").is_none() && reply.get("usage").is_none());
+        assert!(responses_image_reply(b"data: {\"type\":\"response.failed\"}\n\n").is_none());
+        assert!(responses_image_reply(b"data: {\"type\":\"response.output_item.done\",\"item\":").is_none());
+    }
+
+    #[test]
+    fn responses_images_accept_json_and_preserve_an_already_completed_image() {
+        let item = json!({"type":"image_generation_call","status":"completed","result":"image"});
+        let json = serde_json::to_vec(&json!({"output":[item]})).unwrap();
+        assert_eq!(responses_image_reply(&json).unwrap()["data"], json!([{"b64_json":"image"}]));
+        let stream = format!("data: {}\n\ndata: {{\"type\":\"response.failed\"}}\n\n", json!({"type":"response.output_item.done","item":item}));
+        assert_eq!(responses_image_reply(stream.as_bytes()).unwrap()["data"].as_array().unwrap().len(), 1);
+        assert!(responses_image_reply(br#"{"output":[{"type":"message","text":"no image"}]}"#).is_none());
+    }
 
     #[test]
     fn gemini_images_use_native_modalities_without_exposing_the_model() {
