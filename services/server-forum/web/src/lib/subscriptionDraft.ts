@@ -1,4 +1,4 @@
-import type { Schedule } from '../api/subscriptions'
+import type { Schedule, Subscription, SubscriptionInput } from '../api/subscriptions'
 /** Conservative convenience parser. A visible form is always confirmed before persistence. */
 export function parseSubscriptionDraft(text:string):{recipient?:string;schedule?:Schedule} {
  const recipient=text.match(/[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0]
@@ -10,4 +10,25 @@ export function parseSubscriptionDraft(text:string):{recipient?:string;schedule?
  const time=`${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`
  const weekly=text.match(/每周([一二三四五六日天])/)
  return {recipient,schedule:weekly?{kind:'weekly',weekday:Math.min('一二三四五六日天'.indexOf(weekly[1]),6),time}:{kind:'daily',time}}
+}
+
+/** Project the write contract; server metadata must never enter a deny_unknown_fields request. */
+export function subscriptionInput(
+ source: Pick<Subscription, 'id'|'revision'|'title'|'interests'|'recipient'|'schedule'|'timezone'>,
+ active: boolean,
+ confirmed: boolean,
+): SubscriptionInput {
+ const schedule: Schedule = source.schedule.kind === 'once'
+  ? {kind:'once', at:source.schedule.at}
+  : source.schedule.kind === 'weekly'
+   ? {kind:'weekly', time:source.schedule.time, weekday:source.schedule.weekday}
+   : {kind:'daily', time:source.schedule.time}
+ return {id:source.id, revision:source.revision, title:source.title, interests:source.interests,
+  recipient:source.recipient, schedule, timezone:source.timezone, active, confirmed}
+}
+
+export function newSubscriptionDraft(): SubscriptionInput {
+ return {id:crypto.randomUUID(),revision:0,title:'',interests:'',recipient:'',
+  schedule:{kind:'daily',time:'08:00'},timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',
+  active:true,confirmed:false}
 }

@@ -1,23 +1,22 @@
 <script setup lang="ts">
-import { onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { subscriptions, type Subscription, type SubscriptionInput, type Edition } from '@/api/subscriptions'
-import { parseSubscriptionDraft } from '@/lib/subscriptionDraft'
+import { onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { subscriptions, type Subscription, type Edition } from '@/api/subscriptions'
+import { parseSubscriptionDraft, subscriptionInput, newSubscriptionDraft } from '@/lib/subscriptionDraft'
 import { useSession } from '@/stores/session'
 import { useHead } from '@/lib/head'
 useHead(()=>({title:'资讯订阅'}))
 const session=useSession(), rows=ref<Subscription[]>([]), history=ref<Edition[]>([]), selected=ref<Edition|null>(null)
 const busy=ref(false), error=ref(''), message=ref(''), editor=ref(false), confirmed=ref(false), configured=ref(false), enabled=ref(false), code=ref(''), verifyId=ref(''), more=ref(false)
 let generation=0,disposed=false
-const empty=():SubscriptionInput=>({id:crypto.randomUUID(),revision:0,title:'',interests:'',recipient:'',schedule:{kind:'daily',time:'08:00'},timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC',active:true,confirmed:false})
-const draft=reactive(empty()), kind=ref<'daily'|'weekly'|'once'>('daily'), time=ref('08:00'), weekday=ref(0), once=ref('')
+const draft=ref(newSubscriptionDraft()), kind=ref<'daily'|'weekly'|'once'>('daily'), time=ref('08:00'), weekday=ref(0), once=ref('')
 const labels:Record<string,string>={active:'运行中',unverified:'待验证邮箱',paused:'已暂停',quota:'额度不足',completed:'已完成',queued:'等待整理',building:'正在整理',retry:'等待重试',sent:'已发送',uncertain:'发送结果待核实',cancelled:'已取消',failed:'失败',sending:'正在发送'}
 const stamp=(v:string|null)=>v?new Date(v).toLocaleString():'—'
-function edit(row?:Subscription){Object.assign(draft,row?{...row,active:row.status==='active',confirmed:false}:empty());kind.value=draft.schedule.kind;time.value=draft.schedule.kind==='once'?'08:00':draft.schedule.time;weekday.value=draft.schedule.kind==='weekly'?draft.schedule.weekday:0;once.value=draft.schedule.kind==='once'?draft.schedule.at:'';confirmed.value=false;editor.value=true}
-function parse(){const p=parseSubscriptionDraft(draft.interests);if(p.recipient)draft.recipient=p.recipient;if(p.schedule){kind.value=p.schedule.kind;time.value=p.schedule.kind==='once'?'08:00':p.schedule.time;weekday.value=p.schedule.kind==='weekly'?p.schedule.weekday:0}confirmed.value=false;message.value=p.schedule?'已填入识别的时间，请核对时区和收件人。':'请在下面选择发送周期与时间。'}
+function edit(row?:Subscription){draft.value=row?subscriptionInput(row,row.status==='active',false):newSubscriptionDraft();kind.value=draft.value.schedule.kind;time.value=draft.value.schedule.kind==='once'?'08:00':draft.value.schedule.time;weekday.value=draft.value.schedule.kind==='weekly'?draft.value.schedule.weekday:0;once.value=draft.value.schedule.kind==='once'?draft.value.schedule.at:'';confirmed.value=false;editor.value=true}
+function parse(){const p=parseSubscriptionDraft(draft.value.interests);if(p.recipient)draft.value.recipient=p.recipient;if(p.schedule){kind.value=p.schedule.kind;time.value=p.schedule.kind==='once'?'08:00':p.schedule.time;weekday.value=p.schedule.kind==='weekly'?p.schedule.weekday:0}confirmed.value=false;message.value=p.schedule?'已填入识别的时间，请核对时区和收件人。':'请在下面选择发送周期与时间。'}
 async function load(){const mine=++generation;const [a,b]=await Promise.all([subscriptions.list(),subscriptions.history()]);if(disposed||mine!==generation)return;rows.value=a.items;configured.value=a.delivery_configured;enabled.value=a.worker_enabled;history.value=b.items;more.value=b.items.length===30}
 async function act(fn:()=>Promise<void>){if(busy.value)return;busy.value=true;error.value='';message.value='';try{await fn()}catch(e){error.value=e instanceof Error?e.message:String(e)}finally{busy.value=false}}
-async function save(){if(!confirmed.value)return;await act(async()=>{draft.schedule=kind.value==='once'?{kind:'once',at:once.value}:kind.value==='weekly'?{kind:'weekly',time:time.value,weekday:weekday.value}:{kind:'daily',time:time.value};const saved=await subscriptions.save({...draft,confirmed:true});editor.value=false;await load();message.value=saved.verified_at?'订阅已保存。':'订阅已保存，请验证收件邮箱后启动。'})}
-async function toggle(row:Subscription){await act(async()=>{await subscriptions.save({...row,active:row.status!=='active',confirmed:true});await load()})}
+async function save(){if(!confirmed.value)return;await act(async()=>{draft.value.schedule=kind.value==='once'?{kind:'once',at:once.value}:kind.value==='weekly'?{kind:'weekly',time:time.value,weekday:weekday.value}:{kind:'daily',time:time.value};const saved=await subscriptions.save(subscriptionInput(draft.value,draft.value.active,true));editor.value=false;await load();message.value=saved.verified_at?'订阅已保存。':'订阅已保存，请验证收件邮箱后启动。'})}
+async function toggle(row:Subscription){await act(async()=>{await subscriptions.save(subscriptionInput(row,row.status!=='active',true));await load()})}
 async function remove(row:Subscription){if(!window.confirm(`删除「${row.title}」？停止后续发送，历史期刊仍保留。`))return;await act(async()=>{await subscriptions.remove(row);await load()})}
 async function requestCode(row:Subscription){await act(async()=>{await subscriptions.verification(row.id);verifyId.value=row.id;code.value='';message.value='确认邮件已提交，请在邮箱中复制确认码。'})}
 async function verify(){await act(async()=>{await subscriptions.verify(verifyId.value,code.value);verifyId.value='';code.value='';await load();message.value='邮箱已确认，订阅已启动。'})}
