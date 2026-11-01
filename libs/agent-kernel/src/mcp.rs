@@ -31,6 +31,9 @@ mod sse;
 pub use sse::SseMcpClient;
 
 pub const DEFAULT_PROTOCOL_VERSION: &str = "2024-11-05";
+/// Shared startup budget for process launch / transport setup, handshake and tool discovery.
+/// Per-tool timeouts are configured independently and never shorten initialization.
+pub const INITIALIZATION_TIMEOUT: Duration = Duration::from_secs(45);
 const MAX_FRAME_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_IMAGE_BYTES: usize = 4 * 1024 * 1024;
 
@@ -274,7 +277,7 @@ impl McpClient {
             closed,
         });
 
-        let c=client.clone();let deadline=std::time::Instant::now()+Duration::from_secs(45);
+        let c=client.clone();let deadline=std::time::Instant::now()+INITIALIZATION_TIMEOUT;
         let watch=crate::StopWatch::new(move||cancel.load(Ordering::SeqCst)||std::time::Instant::now()>=deadline,move||c.close());
         // 1. Handshake: initialize
         let init_params = json!({
@@ -285,7 +288,7 @@ impl McpClient {
                 "version": env!("CARGO_PKG_VERSION")
             }
         });
-        let init_res = client.send_request("initialize", init_params, Duration::from_secs(15))
+        let init_res = client.send_request("initialize", init_params, deadline.saturating_duration_since(std::time::Instant::now()))
             .map_err(|e| HarnessError::Config(format!("MCP initialize handshake failed: {e}")))?;
         let _ = init_res;
 
@@ -299,7 +302,7 @@ impl McpClient {
         let mut names = std::collections::HashSet::new();
         for page in 0..20 {
             let params=cursor.as_ref().map_or_else(||json!({}),|c|json!({"cursor":c}));
-            let result=client.send_request("tools/list",params,Duration::from_secs(15)).map_err(HarnessError::Config)?;
+            let result=client.send_request("tools/list",params,deadline.saturating_duration_since(std::time::Instant::now())).map_err(HarnessError::Config)?;
             let tools=result["tools"].as_array().ok_or_else(||HarnessError::Config("invalid MCP catalog".into()))?;
             for t in tools {
                 let name=t["name"].as_str().filter(|n|!n.is_empty()).ok_or_else(||HarnessError::Config("missing MCP name".into()))?;

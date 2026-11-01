@@ -42,7 +42,7 @@ async function open(patch: Partial<InstalledConnector> = {}) {
   await click('管理');
 }
 async function click(text: string) {
-  const button = wrapper.findAll('button').find(b => b.text() === text);
+  const button = wrapper.findAll('button').find(b => b.text() === text || b.text() === `“${text}”`);
   if (!button) throw new Error(`Missing ${text}`);
   await button.trigger('click'); await flushPromises();
 }
@@ -51,28 +51,37 @@ describe('installed connector center', () => {
     await open({ status: 'connected', enabled: true });
     expect(wrapper.text()).toContain('已连接'); expect(wrapper.text()).toContain('v1.2');
     expect(wrapper.text()).toContain('令牌认证'); expect(wrapper.text()).toContain('1 个工具');
-    expect(wrapper.text()).toContain('搜索代码'); expect(wrapper.text()).toContain('review');
+    expect(wrapper.get('.store-tool-list li').attributes('title')).toBe('搜索代码'); expect(wrapper.text()).toContain('review');
     await click('找出最近的提交');
     expect(store.chat.select).toHaveBeenCalledWith(null); expect(store.creationDraft).toBe('找出最近的提交'); expect(store.navigate).toHaveBeenCalledWith('new-task');
   });
   it('renders the schema and validates required fields before explicit confirmation', async () => {
     await open();
+    if (!wrapper.findComponent(ConnectorTokenForm).exists()) {
+      if (current.status === 'connected') await click('重新配置');
+      else await click('连接');
+    }
     const form = wrapper.getComponent(ConnectorTokenForm);
-    expect(form.text()).toContain('服务令牌'); expect(form.text()).toContain('在服务商获取令牌');
+    expect(form.text()).toContain('服务令牌'); expect(wrapper.find('.connection-steps').exists()).toBe(false);
     expect(form.get('[aria-label="令牌"]').attributes('type')).toBe('password');
     expect(form.get('[aria-label="令牌"]').attributes('placeholder')).toBe('填入令牌');
-    expect(form.get('button').attributes('disabled')).toBeDefined();
+    expect(form.get('button[type=submit]').attributes('disabled')).toBeDefined();
     await form.get('[aria-label="令牌"]').setValue('secret');
     expect(form.find('input[type=checkbox]').exists()).toBe(false); await form.get('form').trigger('submit');
     expect(invoke).not.toHaveBeenCalledWith('ai_connector_configure', expect.anything());
     await form.get('[aria-label="主机"]').setValue('api.example');
     await form.get('form').trigger('submit'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_connector_configure', { id: 'repo', values: { TOKEN: 'secret', HOST: 'api.example' }, confirmed: true });
-    expect((form.get('[aria-label="令牌"]').element as HTMLInputElement).value).toBe('');
-    expect(form.text()).toContain('已保存'); expect(wrapper.html()).not.toContain('secret');
+    expect(wrapper.findComponent(ConnectorTokenForm).exists()).toBe(false);
+    expect(wrapper.text()).toContain('已连接'); expect(wrapper.html()).not.toContain('secret');
   });
   it('keeps saved credentials opaque and omits unchanged fields', async () => {
     await open({ auth: { type: 'token', schema, configured: ['TOKEN', 'HOST'] } });
+    expect(wrapper.findComponent(ConnectorTokenForm).exists()).toBe(false);
+    await click('连接');
+    expect(invoke).toHaveBeenCalledWith('ai_connector_configure', { id: 'repo', values: {}, confirmed: true });
+    expect(wrapper.findComponent(ConnectorTokenForm).exists()).toBe(false);
+    await click('重新配置');
     const form = wrapper.getComponent(ConnectorTokenForm);
     expect(form.findAll('input:not([type=checkbox])').every(i => (i.element as HTMLInputElement).value === '')).toBe(true);
     await form.get('form').trigger('submit'); await flushPromises();
@@ -84,6 +93,10 @@ describe('installed connector center', () => {
     await click('手动输入授权信息');
     await click('打开百度授权页面');
     expect(invoke).toHaveBeenCalledWith('open_download_url', { url: 'https://openapi.baidu.com/oauth/2.0/authorize?client_id=QHOuRXiepJBMjtk0esLhrPoNlQyYd0mF&redirect_uri=oob&response_type=token&scope=basic%2Cnetdisk' });
+    if (!wrapper.findComponent(ConnectorTokenForm).exists()) {
+      if (current.status === 'connected') await click('重新配置');
+      else await click('连接');
+    }
     const form = wrapper.getComponent(ConnectorTokenForm);
     const token = form.get('[aria-label="Access Token"]');
     expect(token.attributes('type')).toBe('password');
@@ -96,6 +109,10 @@ describe('installed connector center', () => {
   it('clears credentials after a failed submit and keeps an actionable error', async () => {
     await open({ auth: { type: 'token', schema, configured: ['HOST'] } });
     vi.mocked(invoke).mockRejectedValueOnce('服务不可用');
+    if (!wrapper.findComponent(ConnectorTokenForm).exists()) {
+      if (current.status === 'connected') await click('重新配置');
+      else await click('连接');
+    }
     const form = wrapper.getComponent(ConnectorTokenForm);
     await form.get('[aria-label="令牌"]').setValue('secret');
     await form.get('form').trigger('submit'); await flushPromises();
@@ -108,6 +125,44 @@ describe('installed connector center', () => {
     await click('断开并清除凭据'); expect(invoke).not.toHaveBeenCalledWith('ai_connector_unbind', expect.anything());
     await click('确认断开并清除凭据'); expect(invoke).toHaveBeenCalledWith('ai_connector_unbind', { id: 'repo' });
   });
+  it('offers removal outside collapsed management and allows cancelling without uninstalling', async () => {
+    await open({ plugin: 'repo-plugin' });
+    expect(wrapper.get('.connector-management').attributes('open')).toBeUndefined();
+    expect(wrapper.get('.connector-remove').element.closest('details')).toBeNull();
+    await click('移除');
+    expect(wrapper.text()).toContain('卸载插件及随包技能');
+    expect(invoke).not.toHaveBeenCalledWith('ai_store_uninstall', expect.anything());
+    await click('取消');
+    expect(wrapper.find('.connector-remove-confirm').exists()).toBe(false);
+    expect(invoke).not.toHaveBeenCalledWith('ai_store_uninstall', expect.anything());
+  });
+  it('uninstalls the plugin rather than its service id and removes all related cards', async () => {
+    await open({ plugin: 'repo-plugin', status: 'connected', enabled: true });
+    vi.mocked(invoke).mockResolvedValueOnce([
+      current, connector({ id: 'issues', plugin: 'repo-plugin', name: '问题追踪' }), connector({ id: 'other', plugin: 'other-plugin', name: '其他服务' }),
+    ]);
+    await click('刷新');
+    await click('移除');
+    expect(wrapper.text()).toContain('包含 2 项服务');
+    expect(wrapper.text()).toContain('问题追踪');
+    await click('确认移除');
+    expect(invoke).toHaveBeenCalledWith('ai_store_uninstall', { slug: 'repo-plugin' });
+    expect(invoke).not.toHaveBeenCalledWith('ai_connector_unbind', expect.anything());
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+    expect(wrapper.findAll('.connector-card')).toHaveLength(1);
+    expect(wrapper.text()).toContain('其他服务');
+  });
+  it('keeps the confirmation and installed card on failure and supports retry', async () => {
+    await open({ plugin: 'repo-plugin' });
+    await click('移除');
+    vi.mocked(invoke).mockRejectedValueOnce('文件被占用');
+    await click('确认移除');
+    expect(wrapper.text()).toContain('移除失败：文件被占用');
+    expect(wrapper.findAll('.connector-card')).toHaveLength(1);
+    await click('确认移除');
+    expect(wrapper.find('[role="dialog"]').exists()).toBe(false);
+    expect(wrapper.findAll('.connector-card')).toHaveLength(0);
+  });
   it('displays unsupported transports without allowing connection', async () => {
     await open({ unsupported: '未知传输暂不可用' });
     expect(wrapper.text()).toContain('暂不支持'); expect(wrapper.findComponent(ConnectorTokenForm).exists()).toBe(false);
@@ -116,7 +171,7 @@ describe('installed connector center', () => {
   it('opens OAuth in the browser and polls the existing flow commands', async () => {
     vi.useFakeTimers(); await open({ auth: { type: 'oauth', configured: [] } });
     vi.mocked(invoke).mockResolvedValueOnce({ status: 'authorization_required', flowId: 'flow', authorizationUrl: 'https://auth.example/authorize' });
-    await click('登录并连接'); expect(invoke).toHaveBeenCalledWith('open_download_url', { url: 'https://auth.example/authorize' });
+    await click('连接'); expect(invoke).toHaveBeenCalledWith('open_download_url', { url: 'https://auth.example/authorize' });
     await vi.advanceTimersByTimeAsync(1000); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_store_connector_auth_status', { flowId: 'flow' }); expect(wrapper.text()).toContain('已连接');
   });
@@ -125,11 +180,11 @@ describe('installed connector center', () => {
     const original = vi.mocked(invoke).getMockImplementation()!;
     vi.mocked(invoke).mockImplementation(async (command, args) => command === 'ai_store_connector_auth_status' ? { status: 'cancelled' } : original(command, args));
     vi.mocked(invoke).mockResolvedValueOnce({ status: 'authorization_required', flowId: 'flow', authorizationUrl: 'https://auth.example/authorize' });
-    await click('登录并连接'); await click('取消授权');
+    await click('连接'); await click('取消授权');
     expect(invoke).toHaveBeenCalledWith('ai_store_connector_auth_cancel', { flowId: 'flow' });
     await vi.advanceTimersByTimeAsync(2000); expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === 'ai_store_connector_auth_status')).toHaveLength(1);
     vi.mocked(invoke).mockResolvedValueOnce({ status: 'authorization_required', flowId: 'flow', authorizationUrl: 'https://auth.example/authorize' });
-    await click('登录并连接'); wrapper.unmount(); expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === 'ai_store_connector_auth_cancel')).toHaveLength(2);
+    await click('连接'); wrapper.unmount(); expect(vi.mocked(invoke).mock.calls.filter(([c]) => c === 'ai_store_connector_auth_cancel')).toHaveLength(2);
   });
   it('shows load errors and can retry', async () => {
     vi.mocked(invoke).mockRejectedValueOnce('读取失败');

@@ -59,7 +59,7 @@ mod browser_auth_tests {
         assert!(!config.to_string().contains("secret"));
         assert!(!config.to_string().contains("saved-pat"));
         assert_eq!(disabled, vec!["delete_repository"]);
-        assert_eq!(timeout, Duration::from_secs(45));
+        assert_eq!(timeout, Duration::from_millis(600), "browser login preserves the per-tool policy; startup has its own budget");
         // Manual fallback still resolves the original package and saved PATs.
         let (manual, _, manual_timeout) = manager.resolve_plugin_config(&id, &legacy).unwrap();
         assert_eq!(manual["headers"]["Authorization"], "Bearer override-secret");
@@ -537,11 +537,9 @@ impl ConnectorManager {
             built["oauthSession"] = session.clone();
             built["authMode"] = json!("oauth");
         }
-        // Some imported GitHub packages specify a sub-second timeout. Keep the
-        // original policy for manual connections, but allow the official remote
-        // browser adapter enough time for initialization and real API calls.
+        // This is the per-tool policy only. Every transport has the same separate
+        // initialization budget, including OAuth probes and restored sessions.
         let timeout_ms = spec.timeout_ms.unwrap_or(45_000);
-        let timeout_ms = if browser { timeout_ms.max(45_000) } else { timeout_ms };
         Ok((
             built,
             spec.disabled_tools.clone(),

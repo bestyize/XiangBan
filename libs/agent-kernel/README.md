@@ -31,6 +31,8 @@
 
 ## 0.2 接入与迁移
 
+MCP 的 stdio、Streamable HTTP 和旧式 SSE 连接统一使用 `mcp::INITIALIZATION_TIMEOUT`（45 秒）作为初始化总预算；启动 / 建立传输、握手和工具分页发现共用同一截止时间。`McpConfig.timeout` / `HttpMcpConfig.timeout` 仅控制工具调用，短调用预算不再提前取消初始化；HTTP 响应体读取也使用对应阶段剩余的预算。HTTP / SSE 初始化超时与用户主动取消分别报告。
+
 - `ToolSpec::new` 默认 `Risk::Exec`、串行。已核实的只读工具显式加 `.risk(Risk::Read)`，确认能并行的再加 `.parallel()`。风险声明不代替权限执行：宿主仍需安装 `Permission` 或自己的中间件。内置工具与桌面业务工具已迁移。
 - 工具 Schema 在 `build` 时编译，调用前先验证参数为 JSON 对象并通过 Schema，再进入权限确认和执行。采用 `jsonschema` 0.33，关闭文件/HTTP 解析并显式拒绝外部引用；本地 `$defs`/`$ref`、类型、必填、枚举、边界、数组和组合规则由库校验。`format` 遵循库的草案默认规则；未知自定义关键字不视为安全策略。参数错误包含 JSON Pointer，不执行工具，不弹批准框。
 - 原有 `Tool::execute -> Result<String, String>` 继续可用；框架改为调用 `execute_result -> ToolResult`，默认适配旧实现。返回图片或 JSON 的工具覆盖新入口，可用 `with_part`、`with_structured_content`。`output` 仍是可供中间件编辑/落盘的文本；附加文本会合并到它。结构化 JSON 受工具 `max_output` 字节限制，附加媒体合计最多 6 MiB；超过上限返回明确错误，不截断二进制或 JSON。错误发生时动作可能已经执行，不能盲目重试。

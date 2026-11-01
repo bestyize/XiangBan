@@ -34,6 +34,10 @@ pub struct TokenSchema {
     pub description: String,
     #[serde(default)]
     pub description_en: String,
+    #[serde(default, rename = "docUrl", alias = "doc_url")]
+    pub doc_url: Option<String>,
+    #[serde(default, rename = "docLabel", alias = "doc_label")]
+    pub doc_label: Option<String>,
     #[serde(default)]
     pub fields: Vec<TokenField>,
 }

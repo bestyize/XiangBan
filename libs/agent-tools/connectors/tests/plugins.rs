@@ -48,7 +48,7 @@ fn fixture(root: &Path, mcp: Value, policy: Value) -> ConnectorPlugin {
     }).to_string()).unwrap();
     fs::write(
         root.join("ai.workbuddy/token-schema.json"),
-        json!({"title":"Token","fields":[
+        json!({"title":"Token","docUrl":"https://provider.example/settings/mcp","docLabel":"获取服务密钥","fields":[
             {"key":"TOKEN","type":"password","required":true}, {"key":"OPTIONAL","type":"text"}
         ]})
         .to_string(),
@@ -115,6 +115,8 @@ fn templates_schema_auth_and_safe_paths() {
     );
     let spec = &mut plugin.servers[0];
     assert_eq!(spec.transport, Transport::StreamableHttp);
+    assert_eq!(spec.schema().unwrap().doc_url.as_deref(), Some("https://provider.example/settings/mcp"));
+    assert_eq!(spec.schema().unwrap().doc_label.as_deref(), Some("获取服务密钥"));
     if let AuthSpec::Token { headers, .. } = &mut spec.auth {
         headers.push(("authorization".into(), "TOKEN".into(), "Bearer ".into()));
     }
@@ -360,7 +362,7 @@ fn real_workbuddy_marketplace_oracle() {
 }
 
 #[test]
-fn http_plugin_uses_token_headers_and_call_timeout() {
+fn http_plugin_initialization_is_independent_from_token_tool_call_timeout() {
     use std::io::{BufRead, BufReader, Read, Write};
     let tmp = Temp::new();
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
@@ -398,6 +400,7 @@ fn http_plugin_uses_token_headers_and_call_timeout() {
             let request: Value = serde_json::from_slice(&bytes).unwrap();
             let result = match step {
                 0 => {
+                    std::thread::sleep(Duration::from_millis(250));
                     json!({"protocolVersion":"2025-06-18","capabilities":{"tools":{}},"serverInfo":{"name":"test","version":"1"}})
                 }
                 1 => {
@@ -405,6 +408,7 @@ fn http_plugin_uses_token_headers_and_call_timeout() {
                     continue;
                 }
                 2 => {
+                    std::thread::sleep(Duration::from_millis(250));
                     json!({"tools":[{"name":"read","inputSchema":{"type":"object"}},{"name":"write","inputSchema":{"type":"object"}}]})
                 }
                 _ => {
@@ -446,19 +450,19 @@ fn http_plugin_uses_token_headers_and_call_timeout() {
 fn legacy_sse_plugin_connects_with_vault_token_policy_and_revocation() {
     let tmp = Temp::new();
     let server = legacy_sse_support::Server::new(legacy_sse_support::Options {
-        token: Some(values()["TOKEN"].clone()), ..Default::default()
+        token: Some(values()["TOKEN"].clone()), endpoint_delay: Duration::from_millis(250), ..Default::default()
     });
     let plugin = fixture(
         &tmp.0.join("plugin"),
         json!({"type":"sse","url":server.url(),"headers":{"Authorization":"Bearer ${TOKEN}"}}),
-        json!({"disabledTools":["write"],"timeout":2000}),
+        json!({"disabledTools":["write"],"timeout":120}),
     );
     let root = tmp.0.join("config");
     let manager = ConnectorManager::new(root.clone(), tmp.0.clone()).unwrap();
     manager.connect_plugin(&plugin, "service", &values(), true).unwrap();
     let tools = manager.tools();
     assert_eq!(tools.len(), 1);
-    assert_eq!(tools[0].spec().timeout, Duration::from_millis(2000));
+    assert_eq!(tools[0].spec().timeout, Duration::from_millis(120));
     assert_eq!(tools[0].execute(json!({"text":"legacy result"}), &ToolCtx::detached("sse")).unwrap(), "legacy result");
     assert!(!fs::read_to_string(root.join("connections.json")).unwrap().contains(&values()["TOKEN"]));
     assert!(!manager.statuses().to_string().contains(&values()["TOKEN"]));

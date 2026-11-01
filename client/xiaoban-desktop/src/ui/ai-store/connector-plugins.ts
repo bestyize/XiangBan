@@ -12,6 +12,8 @@ export interface TokenSchema {
   titleEn?: string;
   description?: string;
   descriptionEn?: string;
+  docUrl?: string | null;
+  docLabel?: string | null;
   fields: TokenField[];
 }
 export interface InstalledConnector {

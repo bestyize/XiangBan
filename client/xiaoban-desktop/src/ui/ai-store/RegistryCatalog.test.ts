@@ -38,6 +38,29 @@ beforeEach(() => {
 });
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); vi.useRealTimers(); });
 describe('SkillHub registry integration', () => {
+  it.each([
+    { entrySkill: 'expert-real-pack', plugin: undefined, command: 'ai_store_expert_remove' },
+    { entrySkill: 'real-pack', plugin: undefined, command: 'ai_store_uninstall' },
+    { entrySkill: '', plugin: 'real-pack', command: 'ai_store_uninstall' },
+  ])('removes an installed expert with $command after confirmation', async ({ entrySkill, plugin, command }) => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    let installed = true;
+    vi.mocked(invoke).mockImplementation(async (c, a) => {
+      if (c === 'ai_store_experts_installed') return installed ? [{ ...review, entrySkill, plugin, ready: true }] : [];
+      if (c === command) { installed = false; return; }
+      return original(c, a);
+    });
+    const { wrapper } = setup(); await settle();
+    await wrapper.get('.expert-card [aria-label="管理专家包"]').trigger('click'); await flushPromises();
+    await wrapper.get('.store-remove-entry').trigger('click');
+    expect(invoke).not.toHaveBeenCalledWith(command, expect.anything());
+    await wrapper.get('.store-removal .store-secondary').trigger('click');
+    expect(wrapper.find('.store-remove-confirm').exists()).toBe(false);
+    await wrapper.get('.store-remove-entry').trigger('click');
+    await wrapper.get('.store-remove-confirm').trigger('click'); await flushPromises();
+    expect(invoke).toHaveBeenCalledWith(command, { slug: entry.slug });
+    expect(wrapper.find('.test-modal').exists()).toBe(false);
+  });
   it('opens browser authorization and waits for verified connection status',async()=>{
     const original=vi.mocked(invoke).getMockImplementation()!;let checks=0,connected=false;
     vi.mocked(invoke).mockImplementation(async(c,a)=>{
@@ -48,7 +71,7 @@ describe('SkillHub registry integration', () => {
       return original(c,a);
     });
     const {wrapper,store}=setup('connectors');await settle();await wrapper.get('.connector-card .small-action').trigger('click');await flushPromises();await wrapper.get('.review-confirm input').setValue(true);await wrapper.get('.store-primary').trigger('click');await flushPromises();
-    expect(invoke).toHaveBeenCalledWith('open_download_url',{url:'https://login.example.com/authorize'});expect(wrapper.text()).toContain('等待网页授权');expect(wrapper.get('.connection-status').text()).toBe('未配置');expect(store.notify).not.toHaveBeenCalled();
+    expect(invoke).toHaveBeenCalledWith('open_download_url',{url:'https://login.example.com/authorize'});expect(wrapper.text()).toContain('正在连接');expect(wrapper.get('.connection-status').text()).toBe('未配置');expect(store.notify).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1000);await flushPromises();expect(wrapper.get('.connection-status').text()).toBe('未配置');
     await vi.advanceTimersByTimeAsync(1000);await flushPromises();expect(wrapper.get('.connection-status').text()).toContain('已连接');expect(store.notify).toHaveBeenCalledWith('授权完成，连接成功');
   });

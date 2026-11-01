@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import StoreDialog from '../ai-store/StoreDialog.vue';
+import StoreRemoveAction from '../ai-store/StoreRemoveAction.vue';
 import { computed, nextTick, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { NAlert, NModal, NSkeleton } from 'naive-ui';
+import { NAlert, NSkeleton } from 'naive-ui';
 import { Search, RefreshCw, ArrowRight, Download, Check, Plus, Puzzle, ChevronLeft, ChevronRight, SlidersHorizontal, Users, Layers, TriangleAlert, Zap, Plug } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -8,7 +10,7 @@ import { type Skill, type SkillPage, type SkillReview } from '../ai-store/catalo
 import RegistryCatalog from '../ai-store/RegistryCatalog.vue';
 import ConnectorCenter from '../ai-store/ConnectorCenter.vue';
 import LocalPluginInstaller from '../ai-store/LocalPluginInstaller.vue';
-import { hueStyle } from '../ai-store/hues.ts';
+import { categoryIcon } from '../ai-store/hues.ts';
 import MarketGroupDialog from '../ai-store/MarketGroupDialog.vue';
 import MarketUpdateDialog, { type InstalledPackage } from '../ai-store/MarketUpdateDialog.vue';
 import MarketLinkDialog from '../ai-store/MarketLinkDialog.vue';
@@ -18,8 +20,9 @@ import {
   type MarketDetail, type MarketItem, type MarketLink, type UpdateInfo,
 } from '../ai-store/market.ts';
 import '../ai-store/store-cards.css';
+import { openStoreTask, openStoreWindow, storeWindowScene, useNativeStoreWindow, type StoreSelection } from '../ai-store/store-window.ts';
 
-const props = defineProps<{ store: ControlStore }>();
+const props = defineProps<{ store: ControlStore; detail?: StoreSelection }>();
 type Tab = 'experts' | 'skills' | 'connectors';
 const tabs = [{ id: 'experts', label: '专家', icon: Users }, { id: 'skills', label: '技能', icon: Zap }, { id: 'connectors', label: '连接器', icon: Plug }] as const;
 const tab = ref<Tab>('experts');
@@ -80,7 +83,6 @@ const skill = ref<Skill | null>(null);
 const review = ref<SkillReview | null>(null);
 const reviewError = ref('');
 const reviewing = ref(false);
-const removing = ref(false);
 const busy = ref(false);
 let browseId = 0;
 let categoryRequestId = 0;
@@ -103,6 +105,14 @@ const visibleSkills = computed(() => installedOnly.value ? localForTab.value.fil
 const sourceName = computed(() => effMarket.value ? '小伴市场' : 'SkillHub');
 const updatable = computed(() => localForTab.value.filter(s => updates.value[s.slug]));
 const installed = (slug: string) => localSkills.value.find(s => s.slug === slug);
+const removalTarget = computed(() => {
+  const item = skill.value && installed(skill.value.slug);
+  if (!item) return null;
+  if (item.ownerPlugin) return { slug: item.ownerPlugin, name: item.ownerPlugin, command: 'ai_store_uninstall', label: '移除所属插件', description: '此技能随插件安装。将一并卸载所属插件及随包技能，断开其服务并清除本机凭据。之后可以重新安装。' };
+  if (item.ownerExpertPack) return { slug: item.ownerExpertPack, name: item.ownerExpertPack, command: 'ai_store_expert_remove', label: '移除所属专家包', description: '此技能是专家包的入口工作流。将移除所属专家包，保留其他专家可能共用的依赖技能。之后可以重新安装。' };
+  if (!item.removable) return null;
+  return { slug: item.slug, name: skill.value!.name || item.name, command: 'ai_store_uninstall', label: '移除', description: item.plugin ? '将卸载此专家包及随包技能，新任务将无法再召唤它。之后可以重新安装。' : reviewKind.value === 'experts' ? '将移除此专家工作流，进行中的任务可能受影响。之后可以重新安装。' : '将卸载此技能，使用它的专家工作流和进行中的任务可能受影响。之后可以重新安装。' };
+});
 const noun = computed(() => tab.value === 'experts' ? '专家' : '技能');
 const heading = computed(() => installedOnly.value ? `已安装${noun.value}` : `发现${noun.value}`);
 const description = computed(() => installedOnly.value ? visibleSkills.value.length + ` 项${noun.value}` : remote.value.total === null ? `来自 ${sourceName.value}` : `共 ${remote.value.total.toLocaleString('zh-CN')} 项匹配${noun.value} · ${sourceName.value}`);
@@ -130,6 +140,7 @@ async function loadSkillCategories() {
   }
 }
 async function loadMarketCategories(kind: string) {
+  if (props.detail) return;
   if (!props.store.desktop || !effMarket.value || marketCategories.value[kind]) return;
   try {
     const response = await invoke<{ results: { key: string; name: string }[] }>('ai_market_categories', { kind });
@@ -144,6 +155,7 @@ function onMarketError(e: unknown): boolean {
 }
 function retryMarket() { marketDown.value = false; }
 async function browse() {
+  if (props.detail) return;
   clearTimeout(timer);
   const id = ++browseId;
   if (!props.store.desktop || !packageTab.value || installedOnly.value) { loading.value = false; return; }
@@ -163,6 +175,7 @@ async function browse() {
   finally { if (id === browseId) loading.value = false; }
 }
 function scheduleBrowse() {
+  if (props.detail) return;
   clearTimeout(timer); ++browseId; loading.value = false; error.value = '';
   if (packageTab.value && !installedOnly.value) {
     remote.value = { results: [], page: page.value, total: null, hasMore: false };
@@ -190,21 +203,31 @@ watch([query, category, installedOnly, skillSort, marketSort, skillSource], () =
 watch(tab, () => { scheduleBrowse(); if (effMarket.value) void loadMarketCategories(tab.value); });
 watch(effMarket, () => { category.value = '全部'; page.value = 1; scheduleBrowse(); if (effMarket.value) void loadMarketCategories(tab.value); });
 watch(page, () => { scheduleBrowse(); });
-function loadCategories() { if (effMarket.value) void loadMarketCategories(tab.value); else void loadSkillCategories(); }
+function loadCategories() { if (props.detail) return; if (effMarket.value) void loadMarketCategories(tab.value); else void loadSkillCategories(); }
 onActivated(() => {
+  if (props.detail) return;
   void refreshLocal(); void checkUpdates(); void takeLink(); loadCategories();
   if (packageTab.value) void browse(); else { void registry.value?.refresh(); void registry.value?.refreshLocal(); }
 });
-let unlisten: (() => void) | undefined;
-onMounted(() => {
+let unlisten: (() => void) | undefined, unlistenChanges: (() => void) | undefined, disposed = false;
+onMounted(async () => {
+  if (props.detail) {
+    tab.value = props.detail.kind;
+    await refreshLocal();
+    if (disposed) return;
+    await openSkill(props.detail.item as Skill, props.detail.source, props.detail.kind === 'experts' ? 'experts' : 'skills');
+    return;
+  }
   void refreshLocal(); loadCategories(); void checkUpdates(); void takeLink();
   if (packageTab.value) scheduleBrowse();
-  void listen('market-link', () => void takeLink()).then(stop => { unlisten = stop; });
+  void listen('market-link', () => void takeLink()).then(stop => { if (disposed) stop(); else unlisten = stop; });
+  void listen('ai-store-changed', () => { void refreshLocal(); void checkUpdates(); void registry.value?.refreshLocal(); void connectorCenter.value?.refresh(); }).then(stop => { if (disposed) stop(); else unlistenChanges = stop; });
 });
-onBeforeUnmount(() => { clearTimeout(timer); ++browseId; ++reviewId; ++categoryRequestId; unlisten?.(); });
+onBeforeUnmount(() => { disposed = true; clearTimeout(timer); ++browseId; ++reviewId; ++categoryRequestId; unlisten?.(); unlistenChanges?.(); });
 
 // ---- 更新 ----
 async function checkUpdates(manual = false) {
+  if (props.detail) return;
   if (!props.store.desktop || (!manual && !autoUpdates.value)) return;
   try {
     const response = await invoke<{ results: UpdateInfo[] }>('ai_market_updates');
@@ -215,6 +238,7 @@ async function checkUpdates(manual = false) {
 function openUpdate(s: Skill) {
   const info = updates.value[s.slug];
   if (!info || !s.namespace) return;
+  if (useNativeStoreWindow()) { void openStoreWindow({ view: 'update', kind: tab.value, source: 'market', item: s }).catch(props.store.notify); return; }
   updating.value = { info, pkg: { slug: s.slug, name: s.name, namespace: s.namespace, version: s.version, marketKind: s.marketKind, sha256: s.manifestSha256 ?? undefined, files: s.files ?? undefined } };
 }
 async function updated(message: string) { updating.value = null; props.store.notify(message); await refreshLocal(); await checkUpdates(); }
@@ -236,7 +260,7 @@ async function followLink(detail: MarketDetail, version: string | null) {
   const item: MarketItem = { ...detail.item, version: version ?? detail.item.version };
   if (request.kind === 'connectors') { await nextTick(); void registry.value?.open({ ...item, category: item.category ?? undefined }); return; }
   const entry: Skill = { ...item, source: item.source, variant: item.variant };
-  if (item.variant && item.variant !== 'single') { group.value = entry; return; }
+  if (item.variant && item.variant !== 'single') { openGroup(entry); return; }
   void openSkill(entry, 'market', request.kind);
 }
 
@@ -265,11 +289,13 @@ async function summon(s: Skill) {
   props.store.navigate('new-task');
 }
 function useSkill(s: Skill) {
+  if (storeWindowScene()) return openStoreTask({ kind: 'skill', id: s.slug }).catch(props.store.notify);
   if (installed(s.slug)?.plugin || installed(s.slug)?.marketKind === 'expert') return summon(s);
   return startConversation(`请读取已安装的技能「${s.slug}」，按其中的流程帮助我完成以下任务：`);
 }
 async function openSkill(s: Skill, via: 'market' | 'hub' = effMarket.value ? 'market' : 'hub', kind: 'skills' | 'experts' = tab.value === 'experts' ? 'experts' : 'skills') {
-  skill.value = s; review.value = null; reviewError.value = ''; removing.value = false;
+  if (useNativeStoreWindow()) { await openStoreWindow({ view: 'skill', kind, source: via, item: s }).catch(props.store.notify); return; }
+  skill.value = s; review.value = null; reviewError.value = '';
   reviewVia.value = via; reviewKind.value = kind;
   const id = ++reviewId;
   if (installed(s.slug)) { reviewing.value = false; return; }
@@ -282,6 +308,10 @@ async function openSkill(s: Skill, via: 'market' | 'hub' = effMarket.value ? 'ma
     if (id === reviewId) review.value = result;
   } catch (e) { if (id === reviewId) reviewError.value = String(e); }
   finally { if (id === reviewId) reviewing.value = false; }
+}
+function openGroup(s: Skill) {
+  if (useNativeStoreWindow()) { void openStoreWindow({ view: 'group', kind: tab.value, source: 'market', item: s }).catch(props.store.notify); return; }
+  group.value = s;
 }
 async function installSkill() {
   if (!skill.value || !review.value || busy.value || !localReady.value) return;
@@ -297,11 +327,12 @@ async function installSkill() {
   finally { busy.value = false; }
 }
 async function uninstallSkill() {
-  if (!skill.value || !installed(skill.value.slug)?.removable || !removing.value || busy.value) return;
-  busy.value = true;
+  const target = removalTarget.value;
+  if (!target || busy.value) return;
+  busy.value = true; reviewError.value = '';
   try {
-    await invoke('ai_store_uninstall', { slug: skill.value.slug });
-    await refreshLocal(); skill.value = null; props.store.notify('已卸载技能');
+    await invoke(target.command, { slug: target.slug });
+    await refreshLocal(); skill.value = null; props.store.notify(`已移除「${target.name}」`);
   } catch (e) { reviewError.value = String(e); }
   finally { busy.value = false; }
 }
@@ -312,6 +343,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 
 <template>
   <section class="ai-store-page xb-page" data-testid="ai-store-page" aria-label="AI 插件">
+    <template v-if="!detail">
     <header class="xb-page-head store-header" data-tauri-drag-region>
       <div class="xb-tabs-lg store-tabs" role="tablist" aria-label="插件类型" @keydown="tabKey">
         <button v-for="t in tabs" :id="`store-tab-${t.id}`" :key="t.id" type="button" role="tab" :aria-label="t.label" :title="t.label" :aria-controls="`store-panel-${t.id}`" :aria-selected="tab === t.id" :tabindex="tab === t.id ? 0 : -1" @click="switchTab(t.id)"><component :is="t.icon" class="store-tab-icon" :size="20" aria-hidden="true" /><span class="store-tab-label">{{ t.label }}</span></button>
@@ -361,14 +393,14 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
       <NAlert v-if="error && packageTab && !installedOnly" class="store-alert" type="error" :show-icon="false">{{ error }} <button class="text-action" @click="browse">重试</button></NAlert>
 
       <template v-if="packageTab">
-        <div v-if="loading" class="xc-grid" aria-label="正在加载技能" aria-busy="true"><NSkeleton v-for="n in 6" :key="n" height="170px" :sharp="false" /></div>
+        <div v-if="loading" class="xc-grid" aria-label="正在加载技能" aria-busy="true"><NSkeleton v-for="n in 6" :key="n" height="126px" :sharp="false" /></div>
         <div v-else class="xc-grid skill-grid">
-          <article v-for="s in visibleSkills" :key="s.slug" class="xc store-card skill-card" :style="hueStyle(undefined, s.slug)">
+          <article v-for="s in visibleSkills" :key="s.slug" class="xc store-card skill-card" :title="s.description" :aria-description="s.description" >
             <div class="xc-top">
-              <div class="xc-ic" :class="{ 'has-img': skillIcon(s) }"><img v-if="skillIcon(s)" :src="skillIcon(s)!" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="brokenIcons[skillIcon(s)!] = true" /><Users v-else-if="s.variant === 'team'" :size="24" :stroke-width="1.9" aria-hidden="true" /><Layers v-else-if="s.variant === 'bundle'" :size="24" :stroke-width="1.9" aria-hidden="true" /><Puzzle v-else :size="24" :stroke-width="1.9" aria-hidden="true" /></div>
+              <div class="xc-ic" :class="{ 'has-img': skillIcon(s) }"><img v-if="skillIcon(s)" :src="skillIcon(s)!" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="brokenIcons[skillIcon(s)!] = true" /><Users v-else-if="s.variant === 'team'" :size="24" :stroke-width="1.9" aria-hidden="true" /><Layers v-else-if="s.variant === 'bundle'" :size="24" :stroke-width="1.9" aria-hidden="true" /><Users v-else-if="tab === 'experts'" :size="24" :stroke-width="1.9" aria-hidden="true" /><component :is="categoryIcon(s.category ?? undefined)" v-else :size="24" :stroke-width="1.9" aria-hidden="true" /></div>
               <div class="xc-main">
-                <div class="xc-title"><h3>{{ s.name || s.slug }}</h3><svg v-if="s.source === 'official'" class="xc-verified" role="img" aria-label="官方认证" width="14" height="14" viewBox="0 0 24 24"><path d="M12 2.5l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.8 1 2.8-2.4 1.8-.9 2.9-3-.2L12 21.5l-2.4-1.8-3 .2-.9-2.9-2.4-1.8 1-2.8-1-2.8 2.4-1.8.9-2.9 3 .2z" fill="currentColor" /><path d="m8.5 12 2.4 2.4 4.6-4.8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
-                <p class="xc-desc">{{ s.description || (tab === 'experts' ? '查看专家说明与使用方法' : '查看技能说明与使用方法') }}</p>
+                <div class="xc-title"><h3><button class="xc-title-button" type="button" :title="s.description" :aria-description="s.description" @click="s.variant && s.variant !== 'single' ? openGroup(s) : openSkill(s)">{{ s.name || s.slug }}</button></h3><svg v-if="s.source === 'official'" class="xc-verified" role="img" aria-label="官方认证" width="14" height="14" viewBox="0 0 24 24"><path d="M12 2.5l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.8 1 2.8-2.4 1.8-.9 2.9-3-.2L12 21.5l-2.4-1.8-3 .2-.9-2.9-2.4-1.8 1-2.8-1-2.8 2.4-1.8.9-2.9 3 .2z" fill="currentColor" /><path d="m8.5 12 2.4 2.4 4.6-4.8" fill="none" stroke="var(--ui-text-on-btn)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
+                <span class="xc-kind">{{ tab === 'experts' ? '专家' : '技能' }}</span>
               </div>
             </div>
             <div class="xc-foot">
@@ -378,7 +410,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
               <span v-else-if="s.version" class="xc-meta">v{{ s.version }}</span>
               <div class="xc-act">
                 <button v-if="updates[s.slug] && installed(s.slug)" class="small-action xc-pill xc-pill-fill" :disabled="!store.desktop || !localReady" @click="openUpdate(installed(s.slug)!)">更新</button>
-                <button v-else class="small-action xc-pill" :class="{ installed: installed(s.slug), 'is-done': installed(s.slug) }" :disabled="!store.desktop || !localReady" @click="s.variant && s.variant !== 'single' ? (group = s) : openSkill(s)"><Check v-if="installed(s.slug)" :size="12" :stroke-width="3" /><Plus v-else :size="12" :stroke-width="2.6" />{{ installed(s.slug) ? '已安装' : '安装' }}</button>
+                <button v-else class="small-action xc-pill" :class="{ installed: installed(s.slug), 'is-done': installed(s.slug) }" :disabled="!store.desktop || !localReady" @click="s.variant && s.variant !== 'single' ? openGroup(s) : openSkill(s)"><Check v-if="installed(s.slug)" :size="12" :stroke-width="3" /><Plus v-else :size="12" :stroke-width="2.6" />{{ installed(s.slug) ? '已安装' : '安装' }}</button>
               </div>
             </div>
           </article>
@@ -391,8 +423,10 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
       <div v-if="empty && !error && (!packageTab || store.desktop)" class="xb-empty store-empty"><div class="xb-empty-icon"><Search :size="24" /></div><h3>{{ installedOnly ? `暂无匹配的已安装${noun}` : '没有找到匹配内容' }}</h3><p>试试其他关键词或分类</p><button class="xb-btn is-sm" @click="reset">清除筛选</button></div>
     </div>
 
-    <NModal :show="!!skill" preset="card" :title="skill?.name || skill?.slug" class="store-dialog skill-dialog" :mask-closable="!busy" :closable="!busy" style="width:680px;max-width:calc(100vw - 36px)" @update:show="!$event && !busy && (skill = null)">
-      <template v-if="skill"><p>{{ skill.description }}</p><div class="detail-tags"><span class="store-tag">{{ installed(skill.slug)?.source || (reviewVia === 'market' ? '小伴市场' : 'SkillHub') }}</span><span v-if="skill.version" class="store-tag">v{{ skill.version }}</span></div>
+    </template>
+    <StoreDialog :show="!!skill" preset="card" :title="skill?.name || skill?.slug" class="store-dialog skill-dialog" :mask-closable="!busy" :closable="!busy" style="width:680px;max-width:calc(100vw - 36px)" @update:show="!$event && !busy && (skill = null)">
+      <template v-if="skill"><div class="store-identity" :title="skill.description" :aria-description="skill.description"><div class="xc-ic"><Puzzle :size="28" /></div><span>{{ reviewKind === 'experts' ? '专家' : '技能' }}</span></div><div class="detail-tags"><span class="store-tag">{{ installed(skill.slug)?.source || (reviewVia === 'market' ? '小伴市场' : 'SkillHub') }}</span><span v-if="skill.version" class="store-tag">v{{ skill.version }}</span></div>
+        <NAlert v-if="detail && localError" type="error" :show-icon="false">{{ localError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
         <div v-if="reviewing" class="review-loading"><RefreshCw :size="17" />正在读取固定版本的文件与脚本…</div>
         <NAlert v-if="reviewError" type="error" :show-icon="false">{{ reviewError }} <button v-if="!installed(skill.slug)" class="text-action" :disabled="busy" @click="openSkill(skill, reviewVia, reviewKind)">重试</button></NAlert>
         <template v-if="review && !installed(skill.slug)">
@@ -402,12 +436,12 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
           <details v-for="script in review.scripts" :key="script.path" class="script-preview"><summary>{{ script.path }} · 脚本预览{{ script.previewTruncated ? '（已截断）' : '' }}</summary><pre>{{ script.preview || '此脚本暂无文本预览，请在确认来源后再安装。' }}</pre></details>
           <p class="detail-note">安装不会执行脚本。脚本运行时需单独确认，并使用本机账户权限；文件校验不代表安全认证。</p>
         </template>
-        <div v-if="installed(skill.slug)" class="installed-detail"><Check :size="17" /><p>{{ installed(skill.slug)?.plugin ? '这位专家已安装，召唤后会开一个由 TA 负责的新对话。' : '此技能已安装，可在聊天中新建任务使用。' }}</p></div>
-        <p v-if="removing" class="detail-note">确认卸载此技能？卸载后新任务将无法加载它，进行中的任务可能受影响。</p>
-        <div class="dialog-actions"><template v-if="installed(skill.slug)"><button v-if="installed(skill.slug)?.removable" class="store-secondary" :disabled="busy" @click="removing ? uninstallSkill() : (removing = true)">{{ busy ? '正在卸载…' : removing ? '确认卸载' : '卸载' }}</button><button class="store-primary" :disabled="busy" @click="useSkill(skill)">{{ installed(skill.slug)?.plugin ? '召唤这位专家' : '使用技能' }} <ArrowRight :size="14" /></button></template><button v-else class="store-primary" :disabled="!review || reviewing || busy || !localReady" @click="installSkill">{{ busy ? '正在安装…' : '安装' }}<Download :size="14" /></button></div>
+        <div v-if="installed(skill.slug)" class="installed-detail"><Check :size="17" /><p>{{ installed(skill.slug)?.plugin ? '这位专家已安装，召唤后会开一个由 TA 负责的新对话。' : installed(skill.slug)?.marketKind === 'expert' ? '此专家已安装，可在聊天中新建任务使用。' : '此技能已安装，可在聊天中新建任务使用。' }}</p></div>
+        <StoreRemoveAction v-if="installed(skill.slug)" :key="skill.slug" :name="removalTarget?.name || skill.name || skill.slug" :label="removalTarget?.label" :removable="!!removalTarget" :description="removalTarget?.description || ''" :busy="busy" @confirm="uninstallSkill"><button class="store-primary" :disabled="busy" @click="useSkill(skill)">{{ installed(skill.slug)?.plugin ? '召唤这位专家' : installed(skill.slug)?.marketKind === 'expert' ? '使用专家' : '使用技能' }} <ArrowRight :size="14" /></button></StoreRemoveAction>
+        <div v-else class="dialog-actions"><button class="store-primary" :disabled="!review || reviewing || busy || !localReady" @click="installSkill">{{ busy ? '正在安装…' : '安装' }}<Download :size="14" /></button></div>
       </template>
-    </NModal>
-    <MarketGroupDialog :item="group" :kind="tab === 'experts' ? 'experts' : 'skills'" @close="group = null" @done="groupDone" />
+    </StoreDialog>
+    <MarketGroupDialog :item="group" :kind="tab === 'experts' ? 'experts' : 'skills'" @close="group = null" @done="groupDone" @changed="marketConnectorInstalled" />
     <MarketUpdateDialog :pkg="updating?.pkg ?? null" :info="updating?.info ?? null" @close="updating = null" @done="updated" />
     <MarketLinkDialog :link="link" @close="link = null" @go="followLink" />
     <MarketSettingsDialog :show="settingsOpen" v-model:skillhub="skillhubOn" v-model:auto-updates="autoUpdates" @close="settingsOpen = false" />
@@ -415,7 +449,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 </template>
 
 <style scoped>
-.ai-store-page{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;padding-bottom:0;color:var(--ui-text-primary);background:var(--ui-surface);container-type:inline-size}
+.ai-store-page{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;padding-bottom:0;color:var(--ui-text-primary);background:var(--ui-surface-sunken);container-type:inline-size}
 .store-header{flex:none}
 .store-tabs{flex:none}
 .store-tabs>button{white-space:nowrap}
@@ -448,9 +482,9 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 .update-dot{background:var(--ui-dot)}
 .down-dot{background:var(--ui-warning);margin-left:6px}
 .source-switch{margin-right:2px}
-.source-settings{border-radius:8px;box-shadow:0 0 0 1px var(--ui-border)}
+.source-settings{border-radius:8px}
 .market-down :deep(.n-alert-body),.market-down{display:flex;align-items:center;gap:8px}
-.xc-pill-fill{color:#fff!important;background:linear-gradient(var(--ui-btn-hi),var(--ui-btn))!important;box-shadow:var(--ui-shadow-btn)!important}
+.xc-pill-fill{color:var(--ui-text-on-btn)!important;background:var(--ui-btn)!important;box-shadow:none!important}
 .xc-tag-group{background:var(--ui-soft);color:var(--ui-ink)}
 .version-lock{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;padding:11px 14px;border-radius:12px;box-shadow:0 0 0 1px var(--ui-border);font-size:12px;color:var(--ui-text-secondary)}
 .version-lock code{color:var(--ui-text-primary)}

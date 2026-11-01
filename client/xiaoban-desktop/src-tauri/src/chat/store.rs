@@ -118,6 +118,14 @@ fn removable(path: &Path, slug: &str) -> bool {
             .and_then(|s| serde_json::from_str::<Value>(&s).ok())
             .is_some_and(|v| v["provider"] == "skillhub" && v["slug"] == slug)
 }
+fn plugin_owner(plugins: &Path, skill: &Path) -> Option<String> {
+    let relative = skill.strip_prefix(plugins).ok()?;
+    let mut parts = relative.components();
+    let name = parts.next()?.as_os_str().to_str()?;
+    if parts.next()?.as_os_str() != "skills" || parts.next().is_none() { return None; }
+    agent_skill_discovery::plugin::read_receipt(plugins, name).ok()?;
+    Some(name.to_string())
+}
 
 #[tauri::command]
 pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Value, String> {
@@ -130,6 +138,7 @@ pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWin
         sync_computer_use_skill(&dirs.skills(), config.open_computer_use);
         let skills = super::skills_for(&dirs, dirs.chat.join("bundled-skills"));
         let plugins = dirs.plugins();
+        let packs = agent_skill_discovery::packs::installed(&dirs.skills(), &dirs.chat.join("expert-packs")).unwrap_or(Value::Null);
         let mut entries: Vec<Value> = skills.list().iter().filter(|s| {
             // The bundled computer-control guide is an internal companion to the tool,
             // not a separate installable skill. Preserve user-created namesakes.
@@ -140,8 +149,11 @@ pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWin
             let lock = fs::read_to_string(s.dir.join(".skillhub-lock.json")).ok()
                 .and_then(|s| serde_json::from_str::<Value>(&s).ok()).unwrap_or(Value::Null);
             let market = managed && super::store_market::lock_summary(&lock)["market"] == true;
+            let owner_plugin = plugin_owner(&plugins, &s.dir);
+            let owner_pack = packs.as_array().into_iter().flatten().find(|pack| pack["entrySkill"].as_str() == Some(s.name.as_str())).and_then(|pack| pack["slug"].as_str());
             json!({"slug":s.name,"name":s.name,"description":s.description,
                 "version":lock["version"].as_str().unwrap_or(""),"namespace":lock["namespace"],"iconUrl":lock["iconUrl"],"removable":managed,
+                "ownerPlugin":owner_plugin,"ownerExpertPack":owner_pack,
                 "market":market,"marketKind":if market {lock["origin"]["kind"].clone()} else {Value::Null},"files":if market {lock["files"].clone()} else {Value::Null},"manifestSha256":if market {lock["manifestSha256"].clone()} else {Value::Null},
                 "source":if market {"小伴市场".to_string()} else if managed {"SkillHub".to_string()} else if s.agent_created {"自建".to_string()}
                     else if let Some(owner) = s.dir.strip_prefix(&plugins).ok().and_then(|r| r.components().next()) {format!("插件 · {}", owner.as_os_str().to_string_lossy())} else {"本地".to_string()}})
@@ -253,6 +265,18 @@ mod tests {
         assert!(removable(&root, "demo-skill"));
         assert!(!removable(&root, "xiaoban-community"));
         assert!(!removable(&root, "other-skill"));
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    fn bundled_skill_removal_requires_a_valid_owning_plugin_receipt() {
+        let root = std::env::temp_dir().join(format!("xiaoban-skill-owner-{}", std::process::id()));
+        let dir = root.join("demo-plugin"); fs::create_dir_all(&dir).unwrap();
+        let skill = dir.join("skills/demo-skill");
+        assert_eq!(plugin_owner(&root, &skill), None);
+        fs::write(dir.join(agent_skill_discovery::plugin::RECEIPT), r#"{"name":"demo-plugin"}"#).unwrap();
+        assert_eq!(plugin_owner(&root, &skill).as_deref(), Some("demo-plugin"));
+        assert_eq!(plugin_owner(&root, &dir.join("other/demo-skill")), None);
+        assert_eq!(plugin_owner(&root, &root.join("../skills/demo-skill")), None);
         fs::remove_dir_all(root).unwrap();
     }
 }

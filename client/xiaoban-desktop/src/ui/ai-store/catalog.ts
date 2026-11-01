@@ -6,6 +6,8 @@ export interface Skill {
   market?: boolean; marketKind?: 'skill' | 'expert' | null; manifestSha256?: string | null; files?: { path: string; sha256: string }[] | null;
   /** Installed WorkBuddy-style expert (an agent persona): using it summons it for a new conversation. */
   plugin?: boolean; profession?: string; agent?: string | null; quickPrompts?: string[]; tags?: string[]; hasAvatar?: boolean; pluginKind?: 'agent' | 'team';
+  /** Bundled skills are removed with their owning package, never as individual files. */
+  ownerPlugin?: string | null; ownerExpertPack?: string | null;
 }
 export interface SkillPage { results: Skill[]; page: number; total: number | null; hasMore: boolean }
 export interface SkillReview {

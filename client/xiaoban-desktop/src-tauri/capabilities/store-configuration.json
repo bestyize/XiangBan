@@ -1,0 +1,6 @@
+{
+  "identifier": "store-configuration",
+  "description": "Host-created plugin detail windows can follow theme and native window state. Catalog, credentials and tasks use only the authenticated configuration request queue.",
+  "windows": ["configuration-store-*"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

@@ -34,6 +34,7 @@ fn schema_json(spec: &ServerSpec) -> Option<Value> {
     let schema = spec.schema()?;
     Some(json!({
         "title": schema.title, "titleEn": schema.title_en, "description": schema.description, "descriptionEn": schema.description_en,
+        "docUrl": schema.doc_url, "docLabel": schema.doc_label,
         "fields": schema.fields.iter().map(|f| json!({
             "key": f.key, "label": f.label, "labelEn": f.label_en,
             "type": if f.field_type == "password" { "password" } else { "text" },

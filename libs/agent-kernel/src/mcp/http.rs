@@ -19,6 +19,7 @@ pub struct HttpMcpConfig {
     pub url: String,
     pub headers: Vec<(String, String)>,
     pub tool_prefix: String,
+    /// Per-tool call budget. Startup uses the shared MCP initialization budget.
     pub timeout: Duration,
 }
 /// Host-owned credentials. Tokens never enter tool schemas or the model context.
@@ -46,6 +47,13 @@ pub struct HttpMcpClient {
     // resource ownership until the user explicitly closes/reconnects this service.
     uncertain: Mutex<Option<crate::RunControl>>,
     revoked: AtomicBool,
+}
+fn startup_error(error: String, cancel: &Option<Arc<AtomicBool>>, deadline: std::time::Instant) -> String {
+    if cancel.as_ref().is_some_and(|cancel| cancel.load(Ordering::SeqCst)) {
+        "MCP 连接已取消".into()
+    } else if std::time::Instant::now() >= deadline {
+        format!("MCP 连接初始化超时（{} 秒），请检查网络或服务状态后重试", super::INITIALIZATION_TIMEOUT.as_secs())
+    } else { error }
 }
 impl HttpMcpClient {
     pub fn connect(config: HttpMcpConfig) -> Result<Arc<Self>, String> {
@@ -110,10 +118,11 @@ impl HttpMcpClient {
             headers.remove("authorization");
         }
         let closed = Arc::new(AtomicBool::new(false));
-        let deadline = std::time::Instant::now() + config.timeout.min(Duration::from_secs(45));
+        let deadline = std::time::Instant::now() + super::INITIALIZATION_TIMEOUT;
         let stream = if legacy {
-            Some(super::sse::Stream::open(client.clone(), url, headers.clone(), authorization.clone(), closed.clone(), config.timeout,
-                || startup_cancel.as_ref().is_some_and(|c| c.load(Ordering::SeqCst)) || std::time::Instant::now() >= deadline)? )
+            Some(super::sse::Stream::open(client.clone(), url, headers.clone(), authorization.clone(), closed.clone(), super::INITIALIZATION_TIMEOUT,
+                || startup_cancel.as_ref().is_some_and(|c| c.load(Ordering::SeqCst)) || std::time::Instant::now() >= deadline)
+                .map_err(|error| startup_error(error, &startup_cancel, deadline))? )
         } else { None };
         let mut this = Self {
             client,
@@ -189,7 +198,7 @@ impl HttpMcpClient {
         if self.closed.load(Ordering::SeqCst) {
             return Err("MCP 已断开".into());
         }
-        let deadline = std::time::Instant::now() + self.timeout;
+        let deadline = self.startup_deadline.unwrap_or_else(|| std::time::Instant::now() + self.timeout);
         let id = self.next.fetch_add(1, Ordering::Relaxed);
         let mut request = json!({"jsonrpc":"2.0","method":method,"params":params});
         if !notification {
@@ -197,7 +206,7 @@ impl HttpMcpClient {
         }
         let body = serde_json::to_vec(&request).map_err(|_| "MCP 请求序列化失败")?;
         let runtime=tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|e|e.to_string())?;
-        let cancelled=||self.startup_deadline.is_some_and(|d|std::time::Instant::now()>=d)||self.closed.load(Ordering::SeqCst)||self.startup_cancel.as_ref().is_some_and(|c|c.load(Ordering::SeqCst))||ctx.is_some_and(ToolCtx::is_cancelled);
+        let cancelled=||self.closed.load(Ordering::SeqCst)||self.startup_cancel.as_ref().is_some_and(|c|c.load(Ordering::SeqCst))||ctx.is_some_and(ToolCtx::is_cancelled);
         let receiver = if !notification { self.legacy.as_ref().map(|s| s.register(id)).transpose()? } else { None };
         let result = (|| {
             // Authorization may use a blocking HTTP client. Resolve/refresh credentials
@@ -264,7 +273,7 @@ impl HttpMcpClient {
                 if let (Some(stream), Some(receiver)) = (&self.legacy, &receiver) {
                     return stream.wait(receiver, &cancelled, deadline);
                 }
-                return runtime.block_on(read_response(response, id, &cancelled));
+                return runtime.block_on(read_response(response, id, &cancelled, deadline));
             }
             Err("MCP 授权失效，请重新连接并授权".into())
         })();
@@ -274,7 +283,9 @@ impl HttpMcpClient {
                 self.closed.store(true, Ordering::SeqCst);
             }
         }
-        result
+        result.map_err(|error| {
+            if self.startup_deadline.is_some() { startup_error(error, &self.startup_cancel, deadline) } else { error }
+        })
     }
 
     pub fn is_connected(&self) -> bool {
@@ -342,11 +353,11 @@ pub(super) fn rpc_result(value: Value, id: u64) -> Result<Value, String> {
         .cloned()
         .ok_or("MCP 响应缺少结果".into())
 }
-async fn read_response(mut response:Response,id:u64,cancel:impl Fn()->bool)->Result<Value,String>{
+async fn read_response(mut response:Response,id:u64,cancel:impl Fn()->bool,deadline:std::time::Instant)->Result<Value,String>{
  let sse=response.headers().get("content-type").and_then(|v|v.to_str().ok()).is_some_and(|v|v.starts_with("text/event-stream"));
  let mut bytes=Vec::new();let mut total=0u64;let mut event=String::new();
  loop{
-  let chunk=crate::net::wait(response.chunk(),&cancel,Duration::from_secs(30)).await.map_err(|e|e.to_string())?.map_err(|_|"MCP response read failed")?;
+  let chunk=crate::net::wait(response.chunk(),&cancel,deadline.saturating_duration_since(std::time::Instant::now())).await.map_err(|e|e.to_string())?.map_err(|_|"MCP response read failed")?;
   let Some(chunk)=chunk else{break;};total+=chunk.len() as u64;if total>MAX_FRAME_BYTES{return Err("MCP response exceeds 8 MiB".into());}bytes.extend_from_slice(&chunk);
   if sse{while let Some(end)=bytes.iter().position(|b|*b==b'\n'){
    let line:Vec<_>=bytes.drain(..=end).collect();let line=std::str::from_utf8(&line).map_err(|_|"invalid MCP UTF-8")?;
