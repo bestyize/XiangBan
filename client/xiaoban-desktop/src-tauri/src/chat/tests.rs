@@ -1217,13 +1217,25 @@ fn two_conversations_in_different_folders_are_each_checked_against_their_own() {
 
 
 #[test]
-fn design_schema_is_exposed_by_the_debug_keyword_in_the_assembled_agent() {
-    let triggered=rig("design-trigger",vec![Step::text("ready")],Approval::Once);
-    let _=run(&triggered,"请做一份设计稿");
-    assert!(triggered.provider.requests()[0].tools.iter().any(|t|t.name==open_claude_design::NAME));
-    let ordinary=rig("design-no-trigger",vec![Step::text("hello")],Approval::Once);
-    let _=run(&ordinary,"你好");
-    assert!(!ordinary.provider.requests()[0].tools.iter().any(|t|t.name==open_claude_design::NAME));
+fn design_tool_can_be_discovered_after_a_continue_message() {
+    let rig = rig("design-continue-discovery", vec![
+        call("find", "tool_search", json!({"query":"设计画板"})),
+        call("format", open_claude_design::NAME, json!({"action":"format"})),
+        Step::text("ready"),
+    ], Approval::Once);
+    agent_kernel::SessionStore::append(&JsonlStore::new(rig.dirs.sessions()), "s1", &[Message::user(vec![
+        Part::Text { text: "请使用设计画板还原截图".into() },
+        Part::Image { url: PNG.into() },
+    ])]).unwrap();
+    run(&rig, "请接着上面的内容继续写完。").0.unwrap();
+    let requests = rig.provider.requests();
+    assert!(!requests[0].tools.iter().any(|t| t.name == open_claude_design::NAME), "full schema is deferred");
+    assert!(requests[0].messages.iter().any(|m| m.synthetic && m.text().contains("设计工作台")), "the original design request survives the continuation");
+    assert!(requests[0].messages.iter().any(|m| m.parts.iter().any(|p| matches!(p, Part::Image { .. }))), "the original image remains in context");
+    assert!(requests[1].tools.iter().any(|t| t.name == open_claude_design::NAME), "search exposes the schema");
+    let results = tool_results(&rig);
+    assert!(results.iter().any(|text| text.contains(open_claude_design::NAME)), "search finds the registered tool");
+    assert!(results.iter().any(|text| text.contains("authoring contract")), "the discovered tool executes");
 }
 
 #[test]

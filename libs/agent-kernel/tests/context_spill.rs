@@ -102,6 +102,43 @@ fn a_long_dropped_question_is_kept_only_at_its_start_so_the_conversation_still_f
 }
 
 #[test]
+fn dropped_image_request_keeps_the_fact_and_bounded_attachment_path_without_image_bytes() {
+    let mut image = Message::user(vec![
+        Part::Text { text: format!("recreate this {}", "字".repeat(4_000)) },
+        Part::Image { url: format!("data:image/png;base64,{}", "A".repeat(100_000)) },
+    ]);
+    image.structured_content = Some(serde_json::json!({"attachments":[
+        {"mime":"image/png", "path":"/session/reference.png"},
+        {"mime":"image/png", "path":"data:image/png;base64,SECRET"},
+        {"mime":"image/png", "path":"x".repeat(10_000)}
+    ]}));
+    let mut t = turn(vec![image, Message::assistant("working", vec![]), Message::user_text("continue")]);
+    ContextTrim::new(3_000).before_model(&mut t).unwrap();
+    let pinned = t.messages[0].text();
+    assert!(pinned.contains("User supplied image content omitted"));
+    assert!(pinned.contains("/session/reference.png"));
+    assert!(pinned.contains("availability is not verified"));
+    assert!(!pinned.contains("data:image"));
+    assert!(!pinned.contains(&"x".repeat(1_000)));
+    assert!(estimate_tokens(&t.messages) <= 3_000);
+}
+
+#[test]
+fn image_fact_survives_when_its_older_pinned_request_is_omitted() {
+    let mut messages = vec![Message::user(vec![Part::Image { url: "data:image/png;base64,AAAA".into() }]), Message::assistant("ok", vec![])];
+    for n in 0..40 {
+        messages.extend([Message::user_text(format!("request {n} {}", "字".repeat(350))), Message::assistant("ok", vec![])]);
+    }
+    messages.push(Message::user_text("continue"));
+    let mut t = turn(messages);
+    ContextTrim::new(9_000).keep_recent(1000).before_model(&mut t).unwrap();
+    let pinned = t.messages[0].text();
+    assert!(pinned.contains("earlier requests omitted"));
+    assert!(pinned.contains("User supplied image content omitted"));
+    assert!(estimate_tokens(&t.messages) <= 9_000);
+}
+
+#[test]
 fn many_dropped_questions_keep_the_newest_and_say_how_many_were_left_out() {
     let mut messages = Vec::new();
     for n in 1..=60 {

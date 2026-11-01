@@ -137,6 +137,22 @@ fn catalog_overflow_remains_searchable_and_no_match_is_explicit() {
     assert!(h.provider.requests()[1].tools.iter().any(|s| s.name == "tool_149"));
     let no_match: serde_json::Value = serde_json::from_str(&tool_messages(&h)[1].1).unwrap();
     assert_eq!(no_match["total"], 0);
+    assert!(no_match["hint"].as_str().unwrap().contains("only means this query"));
+}
+
+#[test]
+fn search_includes_already_visible_tools_without_loading_them() {
+    let h = harness(vec![
+        Step::tool_call("s", "tool_search", r#"{"query":"read_file"}"#),
+        Step::text("done"),
+    ], |b| b.tool(FnTool::new(spec("read_file"), |_, _| Ok("file".into())))
+        .deferred_tool_arc(deferred(Arc::new(AtomicUsize::new(0)))));
+    run(&h.agent, "find file tool").0.unwrap();
+    let result: serde_json::Value = serde_json::from_str(&tool_messages(&h)[0].1).unwrap();
+    assert_eq!(result["matches"][0]["name"], "read_file");
+    assert_eq!(result["matches"][0]["schema"], "already_available");
+    assert_eq!(result["loaded"], json!([]));
+    assert!(!h.provider.requests()[1].tools.iter().any(|s| s.name == "mcp_ext_calendar_list"));
 }
 
 #[test]

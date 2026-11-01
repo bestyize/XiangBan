@@ -187,11 +187,11 @@ impl AgentBuilder {
 
     pub fn build(mut self) -> Result<Agent, HarnessError> {
         let discovery = if self.deferred.is_empty() { None } else {
-            let schemas = self.tools.iter().filter(|t| self.deferred.contains(&t.spec().name)).map(|t| {
+            let schemas = self.tools.iter().map(|t| {
                 let s = t.spec();
                 ToolSchema { name: s.name.clone(), description: s.description.clone(), parameters: s.schema.clone() }
             }).collect();
-            let discovery = Arc::new(crate::discovery::ToolDiscovery::new(schemas, std::mem::take(&mut self.auto_load)));
+            let discovery = Arc::new(crate::discovery::ToolDiscovery::new(schemas, std::mem::take(&mut self.deferred), std::mem::take(&mut self.auto_load)));
             self.tools.extend(discovery.tools());
             // Filter and add the directory before hooks, compaction and ContextTrim.
             self.middleware.insert(0, discovery.clone());

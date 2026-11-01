@@ -664,7 +664,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
             let workspace = workspace.to_path_buf();
             move || project_rules::section(&workspace)
         })
-        .tool(open_claude_design::DesignTool::new(design_store.clone(), move |project| design_desktop.design_saved(project)).on_remove(move|id|design_remove_desktop.design_removed(id)))
+        .deferred_trusted_tool_arc(Arc::new(open_claude_design::DesignTool::new(design_store.clone(), move |project| design_desktop.design_saved(project)).on_remove(move|id|design_remove_desktop.design_removed(id))))
         .middleware(open_claude_design::DesignContext(design_store))
         .tool(TimeNow::new().utc_offset_minutes(utc_offset_minutes))
         .middleware(todo.clone())

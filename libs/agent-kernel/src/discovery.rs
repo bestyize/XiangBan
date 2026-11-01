@@ -39,8 +39,7 @@ pub(crate) struct ToolDiscovery {
 }
 
 impl ToolDiscovery {
-    pub fn new(schemas: Vec<ToolSchema>, auto_load: HashSet<String>) -> Self {
-        let names = schemas.iter().map(|s| s.name.clone()).collect();
+    pub fn new(schemas: Vec<ToolSchema>, names: HashSet<String>, auto_load: HashSet<String>) -> Self {
         Self { schemas, names, auto_load, loaded: Mutex::new(HashMap::new()) }
     }
 
@@ -49,9 +48,9 @@ impl ToolDiscovery {
     }
 
     pub fn catalog(&self) -> String {
-        let mut out = String::from("## Additional tools\nThese tools are registered but their argument schemas are deferred. Before claiming a capability is unavailable or using a workaround, check this directory or call tool_search. Search only the tools available to this agent; this does not search a store, install software or connect accounts. tool_search loads matching schemas for the next model call. If you know the exact name, use tool_load. Then call the real named tool normally; all existing permissions still apply. Loaded schemas remain available for this task.\n");
+        let mut out = String::from("## Additional tools\nThese tools are registered but their argument schemas are deferred. Before claiming a capability is unavailable, check this directory or call tool_search. Search covers tools registered with this agent; it does not search a store, install software or connect accounts. An empty search only means that query found no match. tool_search loads matching deferred schemas for the next model call. If you know the exact deferred name, use tool_load. Then call the real named tool normally; all existing permissions still apply. Loaded schemas remain available for this task. If the user explicitly requested a tool or delivery method and it is unavailable, explain the blockage and ask before substituting a different delivery method.\n");
         let mut unsummarized = Vec::new();
-        for schema in &self.schemas {
+        for schema in self.schemas.iter().filter(|s| self.names.contains(&s.name)) {
             // Only a short, single-line summary, never full schemas or credentials.
             let summary: String = schema.description.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(72).collect();
             let line = format!("- {}: {}\n", schema.name, summary);
@@ -149,7 +148,7 @@ impl DiscoveryTool {
         let (name, description, schema) = if exact {
             ("tool_load", "Load full schemas for 1–10 exact names from the Additional tools directory; then call the real tools directly. Does not execute, install or connect anything.", json!({"type":"object","properties":{"names":{"type":"array","items":{"type":"string"},"minItems":1,"maxItems":10}},"required":["names"],"additionalProperties":false}))
         } else {
-            ("tool_search", "Find registered desktop or connected MCP tools by capability, service or tool name and load matching schemas. This is a local catalog, not an online store. Try concise keywords; an empty result is not proof that all capabilities are absent.", json!({"type":"object","properties":{"query":{"type":"string","minLength":1,"maxLength":200},"limit":{"type":"integer","minimum":1,"maximum":10}},"required":["query"],"additionalProperties":false}))
+            ("tool_search", "Find tools registered with this agent by capability, service or tool name and load matching deferred schemas. This is a local catalog, not an online store. Try concise keywords; an empty result is not proof that all capabilities are absent.", json!({"type":"object","properties":{"query":{"type":"string","minLength":1,"maxLength":200},"limit":{"type":"integer","minimum":1,"maximum":10}},"required":["query"],"additionalProperties":false}))
         };
         Self { spec: ToolSpec::new(name, description, schema).risk(Risk::Read).max_output(12_000), discovery, exact }
     }
@@ -174,9 +173,9 @@ impl Tool for DiscoveryTool {
         matches.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.name.cmp(&b.1.name)));
         let total = matches.len();
         matches.truncate(limit);
-        let names: Vec<_> = matches.iter().map(|(_, s)| s.name.clone()).collect();
+        let names: Vec<_> = matches.iter().filter(|(_, s)| self.discovery.names.contains(&s.name)).map(|(_, s)| s.name.clone()).collect();
         if !names.is_empty() { self.discovery.load(ctx.session(), &names)?; }
-        Ok(json!({"matches": matches.iter().map(|(_, s)| json!({"name":s.name,"description":s.description.chars().take(160).collect::<String>()})).collect::<Vec<_>>(), "total":total,"loaded":names,"hint":"Matched schemas are available on the next model call. If no match, try a shorter keyword, the service name or an exact name from the directory before concluding a capability is unavailable."}).to_string())
+        Ok(json!({"matches": matches.iter().map(|(_, s)| json!({"name":s.name,"description":s.description.chars().take(160).collect::<String>(), "schema": if self.discovery.names.contains(&s.name) { "deferred" } else { "already_available" }})).collect::<Vec<_>>(), "total":total,"loaded":names,"hint":"Matched schemas are available on the next model call. An empty result only means this query found no match among tools registered with this agent; try a shorter keyword, service name or exact name from the directory. If the user explicitly requested an unavailable tool or delivery method, explain the blockage and ask before using a substitute."}).to_string())
     }
 
     fn on_run_end(&self, end: &RunEnd) -> Result<(), String> {

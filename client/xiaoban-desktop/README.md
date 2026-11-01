@@ -1,5 +1,11 @@
 # 小伴桌面：桌宠、动态壁纸与 Agent
 
+## 会话延续与工具发现
+
+对话中追加“继续”等简短消息时，设计任务会继承最近的设计请求；设计画板始终可通过工具目录按需发现，不依赖最新消息重复出现“设计稿”。用户明确指定工具或交付方式时，无法使用应先说明并征询，不擅自换成交付形式不同的结果。对话摘要按时间顺序记录用户请求、图片附件数量、工具结果和后续更正，并区分草稿、已保存与已验证状态；原始用户消息优先于摘要。极限上下文或请求大小限制仍可能省略旧图片，不能保证历史图片始终进入模型。
+
+针对性验证：`cargo test --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::compact::tests` 和同命令筛选 `design_tool_can_be_discovered_after_a_continue_message`；设计工具与通用工具发现各自的测试见对应库 README。测试使用模拟模型，实际理解效果仍受所选模型和上下文限制影响。
+
 ## Android 手机操作（基础与本地工作流）
 
 对话按需发现 `phone_` 工具，可通过本机 ADB 操作 USB / 无线 Android 设备；应用包以包名保存 `skill.md + basic/ + patch/`，支持 ZIP 导入 / HTTPS 下载、版本化补丁及分层页面路由。工具及种子包在 [phone-use](../../libs/agent-tools/phone-use/README.md)，方案见 [Android 手机操作](../../docs/agent/android-phone-use.md)。数据放在用户聊天目录的 `phone-packs/`；不与普通 Skill 混用目录。

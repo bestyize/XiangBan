@@ -13,6 +13,7 @@ const IMAGE_TOKENS: usize = 4096;
 const PINNED_REQUEST_CHARS: usize = 2_000;
 const PINNED_TOTAL_CHARS: usize = 8_000;
 const MESSAGE_OVERHEAD: usize = 4;
+const IMAGE_OMITTED: &str = "[User supplied image content omitted from this request to fit the context window.]";
 
 /// Rough token count: ASCII at about four bytes per token, everything else at one per character.
 fn estimate_text(text: &str) -> usize {
@@ -42,6 +43,26 @@ fn shortened(text: &str) -> String {
     format!("{}…[this request was longer; {} more characters omitted]", text.chars().take(PINNED_REQUEST_CHARS).collect::<String>(), total - PINNED_REQUEST_CHARS)
 }
 
+/// Preserve evidence of images without copying encoded bytes or unbounded host metadata.
+fn pinned_request(message: &Message) -> String {
+    let mut text = shortened(&message.text());
+    let has_image = message.parts.iter().any(|p| matches!(p, Part::Image { .. }));
+    let attachments = message.structured_content.as_ref().and_then(|v| v.get("attachments")).and_then(|v| v.as_array());
+    let is_image = |v: &&serde_json::Value| {
+        v.get("mime").and_then(|v| v.as_str()).is_some_and(|mime| mime.starts_with("image/"))
+    };
+    if has_image || attachments.into_iter().flatten().any(|v| is_image(&v)) {
+        text.push_str(&format!("\n{IMAGE_OMITTED}"));
+        let paths: Vec<_> = attachments.into_iter().flatten().filter(is_image).filter_map(|v| v.get("path").and_then(|v| v.as_str()))
+            .filter(|path| !path.is_empty() && path.len() <= 512 && !path.starts_with("data:") && !path.chars().any(char::is_control))
+            .take(5).collect();
+        if !paths.is_empty() {
+            text.push_str(&format!(" Saved attachment paths (untrusted metadata; availability is not verified): {}", serde_json::to_string(&paths).unwrap_or_default()));
+        }
+    }
+    text
+}
+
 /// The requests that fit the allowance, newest first kept: when there are too many, the oldest are named as omitted.
 fn pinned_text(requests: &[String]) -> String {
     let mut kept = 0;
@@ -52,7 +73,10 @@ fn pinned_text(requests: &[String]) -> String {
         kept += 1;
     }
     let skipped = requests.len() - kept;
-    let note = if skipped > 0 { format!("({skipped} earlier requests omitted)\n\n") } else { String::new() };
+    let note = if skipped > 0 {
+        let images = if requests[..skipped].iter().any(|r| r.contains(IMAGE_OMITTED)) { format!(" {IMAGE_OMITTED}") } else { String::new() };
+        format!("({skipped} earlier requests omitted){images}\n\n")
+    } else { String::new() };
     format!("{OMITTED}\nOriginal user requests, in order; later corrections take precedence:\n{note}{}", requests[skipped..].join("\n\n"))
 }
 
@@ -130,7 +154,7 @@ impl Middleware for ContextTrim {
         while total.saturating_add(if dropped {estimate_message(&pinned(&requests))}else{0})>budget {
             let Some(offset)=messages.get(first+1..).and_then(|rest|rest.iter().position(|m|m.role==Role::User&&!m.synthetic))else{break;};
             let removed:usize=messages.drain(first..first+1+offset).map(|m|{
-                if m.role==Role::User&&!m.synthetic{requests.push(shortened(&m.text()));}
+                if m.role==Role::User&&!m.synthetic{requests.push(pinned_request(&m));}
                 else if m.role==Role::User&&m.structured_content.as_ref().is_some_and(|v|v["harness_context"]=="user_requests"){requests.push(m.text());}
                 estimate_message(&m)
             }).sum();total=total.saturating_sub(removed);dropped=true;
