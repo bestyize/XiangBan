@@ -28,6 +28,7 @@ mod compact;
 mod danger;
 mod desktop_tools;
 pub mod image_generation;
+pub mod assets;
 mod tool_discovery;
 mod game_draft;
 pub mod delegation_tools;
@@ -1788,10 +1789,12 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     }
     state.todo.remove_session(&session_id).map_err(|e| e.to_string())?;
     state.auto_compact.forget(&session_id);
-    mutate(&app, |index| {
+    let sessions = mutate(&app, |index| {
         index.remove(&session_id);
         index.list()
-    })
+    })?;
+    assets::forget(&chat_dir, &session_id)?;
+    Ok(sessions)
 }
 
 /// Conservative cold-start allowance until assembly measures eager definitions plus the

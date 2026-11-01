@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NButton, NInput, NModal } from 'naive-ui';
-import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, FolderOpen, GitBranch, GripVertical, LoaderCircle, PanelRight, Plus, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
+import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, Files, FileText, FolderOpen, GitBranch, GripVertical, LoaderCircle, PanelRight, Plus, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 import DesignPicker from '../design/DesignPicker.vue';
 import DesignWorkbench from '../design/DesignWorkbench.vue';
@@ -14,6 +14,7 @@ import ChatExpertChip from '../components/ChatExpertChip.vue';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatActivity from '../chat/ChatActivity.vue';
 import ChatGeneratedImages from '../chat/ChatGeneratedImages.vue';
+import ChatAssets from '../chat/ChatAssets.vue';
 import ChatTaskCard from '../chat/ChatTaskCard.vue';
 import ChatReasoning from '../chat/ChatReasoning.vue';
 import ChatReasoningGroup from '../chat/ChatReasoningGroup.vue';
@@ -38,6 +39,21 @@ const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
 const designs = ref<DesignSummary[]>([]), designId = ref(''), designContextId=ref(''), designClosed = ref(false), designWidth = ref(64);
 const designPicker=ref(false);
+const assetsOpen=ref(false),assetCount=ref(0),assetAnchor=ref<HTMLElement|null>(null);
+const ASSET_PIN_KEY='xiaoban.chat.assets-pinned';
+const assetsPinned=ref((()=>{try{return localStorage.getItem(ASSET_PIN_KEY)==='1';}catch{return false;}})());
+const locatedAssetBlock=ref('');let assetLocateTimer:ReturnType<typeof setTimeout>|undefined;
+function toggleAssets(){assetsOpen.value=!assetsOpen.value;designPicker.value=false;if(assetsOpen.value&&assetsPinned.value){closeDesign();panelOpen.value=false;}}
+function pinAssets(){assetsPinned.value=!assetsPinned.value;if(assetsPinned.value){closeDesign();panelOpen.value=false;}try{localStorage.setItem(ASSET_PIN_KEY,assetsPinned.value?'1':'0');}catch{/* memory only */}}
+async function openAssetDesign(id:string){
+  const session=chat.currentId;
+  try{await invoke('design_window_open',{id});if(session===chat.currentId){designContextId.value=id;closeDesign();}}
+  catch(e){props.store.notify(e,'error');}
+}
+async function locateAsset(block:string){stick.value=false;locatedAssetBlock.value=block;await nextTick();scroller.value?.querySelector<HTMLElement>('[data-asset-located="true"]')?.scrollIntoView?.({block:'center',behavior:'smooth'});clearTimeout(assetLocateTimer);assetLocateTimer=setTimeout(()=>locatedAssetBlock.value='',3500);}
+watch(()=>chat.currentId,(_id,before)=>{if(before)assetsOpen.value=false;locatedAssetBlock.value='';});
+watch(designId,id=>{if(id&&assetsPinned.value)assetsOpen.value=false;});
+onBeforeUnmount(()=>clearTimeout(assetLocateTimer));
 let designOpenEpoch=0,detachBusy=false;
 async function openDesign(id:string){
   const epoch=++designOpenEpoch,session=chat.currentId;
@@ -390,7 +406,7 @@ const PANEL_KEY = 'xiaoban.chat.exec-panel';
 function savedPanel() { try { return localStorage.getItem(PANEL_KEY) === '1'; } catch { return false; } }
 const panelOpen = ref(savedPanel());
 const processBlockId = ref<string | null>(null);
-function togglePanel() { panelOpen.value = !panelOpen.value; processBlockId.value = null; try { localStorage.setItem(PANEL_KEY, panelOpen.value ? '1' : '0'); } catch { /* remembered for this visit only */ } }
+function togglePanel() { panelOpen.value = !panelOpen.value;if(panelOpen.value&&assetsPinned.value)assetsOpen.value=false; processBlockId.value = null; try { localStorage.setItem(PANEL_KEY, panelOpen.value ? '1' : '0'); } catch { /* remembered for this visit only */ } }
 const allCalls = computed(() => (view.value?.items ?? []).filter((item): item is ToolCall => item.kind === 'tool'));
 const panelCalls = computed(() => processBlockId.value ? blocks.value.find(block => block.id === processBlockId.value)?.calls ?? [] : allCalls.value);
 const panelFiles = computed(() => filesOf(panelCalls.value));
@@ -447,7 +463,7 @@ async function openLink(href: string) {
         </nav>
         <div class="head-actions">
           <div v-if="store.desktop" class="design-anchor">
-            <button class="xb-icon-btn" title="设计稿" aria-label="打开设计稿列表" :aria-expanded="designPicker" @click="designPicker=!designPicker"><FileText :size="16"/></button>
+            <button ref="assetAnchor" type="button" class="assets-trigger" data-testid="chat-assets-toggle" title="当前对话的设计稿、图片和文件" aria-label="打开对话资产" :aria-expanded="assetsOpen" @click="toggleAssets"><Files :size="15"/><span>资产</span><small>{{assetCount}}</small></button>
             <DesignPicker v-if="designPicker" :session="chat.currentId" :notify="store.notify" @close="designPicker=false" @open="openDesign" />
           </div>
           <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="head-link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
@@ -474,9 +490,6 @@ async function openLink(href: string) {
           </div>
         </div>
       </header>
-      <div v-if="designs.length" class="design-deliveries" aria-label="设计交付物">
-        <button v-for="d in designs" :key="d.id" type="button" :class="{ active: designId === d.id }" @click="openDesign(d.id)"><FileText :size="13" /><b>{{ d.title }}</b><small>{{ d.artboards }} 个画板 · 我的文档</small></button>
-      </div>
       <div v-if="confirmingDelete" class="delete-bar" data-testid="chat-delete-confirm" role="alertdialog" aria-label="删除对话">
         <span>删除“{{ title }}”？删除后无法恢复。</span>
         <button type="button" class="xb-btn is-sm" @click="confirmingDelete = ''">取消</button>
@@ -520,7 +533,7 @@ async function openLink(href: string) {
                   <button type="button" class="act" data-testid="chat-fork-edit" aria-label="编辑并分叉" title="编辑这句话并分叉出新对话，原对话不变" @click="fork(editableMessage(block), true)"><GitBranch :size="15" /></button>
                 </div>
               </div>
-              <section v-else class="reply" data-testid="chat-reply">
+              <section v-else class="reply" data-testid="chat-reply" :data-asset-located="locatedAssetBlock===block.id" :class="{'asset-located':locatedAssetBlock===block.id}">
                 <header v-if="speaks(block)" class="reply-head"><span class="brand-mark" aria-hidden="true"><Sprout :size="14" :stroke-width="2.2" /></span><b>小伴</b></header>
                 <ChatTaskCard v-if="progressOf(block)" :progress="progressOf(block)!" :calls="block.calls" :current="block.id === lastBlockId" :show-logs="!chat.hideToolCalls" :disabled="planRevisionBusy" :configured="chat.configured" @logs="showTaskProcess(block)" @adjust="adjustPlan(block)" @resume="resumeTask" @stop="chat.cancel()" @attention="showTaskAttention" />
                 <ChatActivity v-else-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === lastBlockId" :waiting="waiting && block.id === lastBlockId" :status="block.id === lastBlockId ? statusLine : ''" />
@@ -631,6 +644,7 @@ async function openLink(href: string) {
       <img :src="preview" alt="图片预览" />
       <button type="button" class="lightbox-close" data-testid="chat-image-preview-close" aria-label="关闭预览" @click="preview = null"><X :size="18" /></button>
     </div>
+    <ChatAssets v-if="store.desktop" :session="chat.currentId" :designs="designs" :blocks="blocks" :open="assetsOpen" :pinned="assetsPinned" :anchor="assetAnchor" :ensure-session="chat.ensureSession" :notify="store.notify" @count="assetCount=$event" @close="assetsOpen=false" @pin="pinAssets" @design="openAssetDesign" @locate="locateAsset" @browse-designs="assetsOpen=false;designPicker=true" />
     <div v-if="designId" class="design-splitter" role="separator" tabindex="0" aria-label="调整聊天和画布宽度" aria-orientation="vertical" :aria-valuenow="Math.round(designWidth)" :aria-valuemin="35" :aria-valuemax="85" @pointerdown="startDesignSplit" @pointermove="moveDesignSplit" @pointerup="finishDesignSplit" @pointercancel="finishDesignSplit" @keydown="designSplitKey" />
     <aside v-if="designId" :style="{ width: designWidth + '%' }" class="design-dock" aria-label="设计工作台"><DesignWorkbench :project-id="designId" :notify="store.notify" @close="closeDesign" @detach="detachDesign" @copied="openDesign" @request="designRequest" /></aside>
     <SelectionCopyMenu :scope="scroller" />
@@ -642,7 +656,7 @@ async function openLink(href: string) {
 
 .delivered-follow-up{display:block;margin-bottom:5px;font-size:10px;opacity:.7}
 
-.design-deliveries{display:flex;gap:6px;overflow:auto;padding:4px 18px 8px;flex:none}.design-deliveries button{display:flex;align-items:center;gap:6px;padding:6px 9px;background:var(--ui-control);border:1px solid var(--ui-line);border-radius:7px;color:var(--ui-text-secondary);font-size:11px;cursor:pointer;white-space:nowrap}.design-deliveries b{font-weight:500}.design-deliveries small{font-size:10px;color:var(--ui-text-tertiary)}.design-deliveries .active{border-color:var(--ui-ink);color:var(--ui-ink)}
+.chat-page{position:relative}.assets-trigger{display:inline-flex;align-items:center;gap:6px;flex:none;padding:6px 8px;border:0;border-radius:7px;background:var(--ui-soft);color:var(--ui-ink);font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}.assets-trigger small{font-size:11px;min-width:16px;padding:0 4px;border-radius:4px;background:var(--ui-surface);color:var(--ui-text-secondary)}.assets-trigger:focus-visible{outline:2px solid var(--ui-btn);outline-offset:2px}.reply.asset-located{outline:2px solid var(--ui-btn);outline-offset:6px;border-radius:8px}
 .design-splitter{width:4px;flex:none;cursor:col-resize;touch-action:none;background:transparent}.design-splitter:hover,.design-splitter:focus-visible{background:var(--ui-soft);outline:0}
 .design-dock{width:64%;min-width:420px;max-width:calc(100% - 250px);border-left:1px solid var(--ui-line);flex:none;min-height:0;display:flex}@media(max-width:900px){.design-splitter{display:none}.design-dock{position:absolute;inset:0;width:100%!important;min-width:0;max-width:none;z-index:8;background:var(--ui-surface)}}
 .plan-steps{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
@@ -830,6 +844,9 @@ async function openLink(href: string) {
   .composer-wrap{padding:0 12px 8px}
   .bubble{max-width:90%}
   .head-search input{width:100px}
+  .chat-head{padding-left:12px;gap:6px}
+  .crumb-space{max-width:90px}
 }
+@media(max-width:500px){.crumb-space,.crumb-sep,.head-expert{display:none}}
 @media(prefers-reduced-motion:reduce){.spin,.cursor{animation:none}}
 </style>

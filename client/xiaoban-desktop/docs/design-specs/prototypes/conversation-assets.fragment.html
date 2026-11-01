@@ -1,0 +1,386 @@
+<style>
+#xb-conversation-assets { color-scheme: light dark; font: 13px/1.5 -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+#xb-conversation-assets * { box-sizing: border-box; }
+#xb-conversation-assets [hidden] { display: none !important; }
+#xb-conversation-assets .xb-app {
+  --ui-surface: light-dark(#fff, #232325); --ui-tint: light-dark(#f5f1f1, #1c1c1e);
+  --ui-soft: light-dark(#fcebec, #41262b); --ui-btn: light-dark(#d93a44, #ed7480); --ui-ink: light-dark(#b42a33, #ffa7af);
+  --ui-text: light-dark(#1d1d1f, #f5f5f7); --ui-muted: light-dark(#6e6e73, #b5b5bd);
+  --ui-control: light-dark(#f2f2f4, #303033); --ui-hover: light-dark(#f7f7f8, #2d2d30);
+  --ui-border: light-dark(#eaeaec, #3b3b3e); --ui-shadow: light-dark(#1d1d1f20, #00000070);
+  --ui-on-btn: light-dark(#fff, #201315); --ui-success: light-dark(#23784f, #79d9a7);
+  --ui-canvas: light-dark(#efefed, #1b1b1d); --art-paper: #f3efe4; --art-ink: #243e34; --art-sun: #e7c286; --art-hill: #708774; --art-deep: #274c43;
+  display: grid; grid-template-columns: 166px minmax(0,1fr); min-height: 756px; position: relative;
+  color: var(--ui-text); background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 14px; overflow: clip;
+}
+#xb-conversation-assets button, #xb-conversation-assets input, #xb-conversation-assets textarea { font: inherit; color: inherit; }
+#xb-conversation-assets button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 0; background: transparent; padding: 7px 9px; border-radius: 7px; line-height: 1.35; text-align: left; }
+#xb-conversation-assets button:hover { background: var(--ui-control); }
+#xb-conversation-assets button:disabled { opacity: .45; }
+#xb-conversation-assets button:focus-visible, #xb-conversation-assets input:focus-visible, #xb-conversation-assets textarea:focus-visible { outline: 2px solid var(--ui-btn); outline-offset: 2px; }
+#xb-conversation-assets button svg { width: 15px; height: 15px; flex: none; }
+#xb-conversation-assets .xb-icon { padding: 8px; flex: none; }
+#xb-conversation-assets .xb-muted { color: var(--ui-muted); }
+#xb-conversation-assets .xb-side { padding: 18px 12px; background: var(--ui-tint); display: flex; flex-direction: column; gap: 22px; }
+#xb-conversation-assets .xb-traffic { display: flex; gap: 7px; padding: 0 8px; height: 14px; }
+#xb-conversation-assets .xb-traffic span { width: 11px; height: 11px; border-radius: 50%; background: #ff5f57; }
+#xb-conversation-assets .xb-traffic span:nth-child(2) { background: #febc2e; }
+#xb-conversation-assets .xb-traffic span:nth-child(3) { background: #28c840; }
+#xb-conversation-assets .xb-brand { display: flex; gap: 8px; align-items: center; padding: 1px 8px; font-size: 16px; font-weight: 500; }
+#xb-conversation-assets .xb-brand i, #xb-conversation-assets .xb-brand svg { color: var(--ui-btn); width: 20px; height: 20px; }
+#xb-conversation-assets .xb-side nav { display: grid; gap: 5px; }
+#xb-conversation-assets .xb-side nav button { justify-content: flex-start; }
+#xb-conversation-assets .xb-side nav .is-active { background: var(--ui-surface); }
+#xb-conversation-assets .xb-side-label { padding: 0 8px; color: var(--ui-muted); font-size: 11px; margin: 5px 0 9px; }
+#xb-conversation-assets .xb-session { font-size: 12px; width: 100%; }
+#xb-conversation-assets .xb-account { margin-top: auto; display: flex; align-items: center; gap: 9px; padding: 8px; }
+#xb-conversation-assets .xb-avatar { width: 27px; height: 27px; border-radius: 9px; background: var(--ui-soft); color: var(--ui-ink); display: grid; place-items: center; }
+#xb-conversation-assets .xb-work { min-width: 0; position: relative; display: flex; flex-direction: column; }
+#xb-conversation-assets .xb-head { min-height: 58px; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 18px; border-bottom: 1px solid var(--ui-border); }
+#xb-conversation-assets .xb-crumb { display: flex; align-items: center; gap: 7px; min-width: 0; }
+#xb-conversation-assets .xb-crumb .xb-muted { font-size: 12px; white-space: nowrap; }
+#xb-conversation-assets .xb-crumb strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#xb-conversation-assets .xb-crumb svg { width: 12px; height: 12px; color: var(--ui-muted); flex: none; }
+#xb-conversation-assets .xb-head-actions { display: flex; align-items: center; gap: 3px; flex: none; }
+#xb-conversation-assets .xb-head .xb-assets-toggle { background: var(--ui-soft); color: var(--ui-ink); white-space: nowrap; }
+#xb-conversation-assets .xb-count { font-size: 11px; background: var(--ui-surface); color: var(--ui-muted); border-radius: 4px; padding: 0 5px; }
+#xb-conversation-assets .xb-main { flex: 1; display: grid; grid-template-columns: minmax(0,1fr); min-width: 0; position: relative; }
+#xb-conversation-assets .xb-chat { padding: 27px 34px 18px; display: flex; flex-direction: column; min-width: 0; gap: 25px; }
+#xb-conversation-assets .xb-date { align-self: center; font-size: 11px; color: var(--ui-muted); }
+#xb-conversation-assets .xb-user { align-self: flex-end; background: var(--ui-control); border-radius: 13px 13px 3px 13px; padding: 12px 15px; max-width: 88%; font-size: 13px; }
+#xb-conversation-assets .xb-answer { display: flex; gap: 10px; align-items: flex-start; }
+#xb-conversation-assets .xb-answer .xb-avatar { flex: none; width: 24px; height: 24px; background: transparent; color: var(--ui-btn); }
+#xb-conversation-assets .xb-answer-body { flex: 1; min-width: 0; display: grid; gap: 14px; }
+#xb-conversation-assets p { margin: 0; }
+#xb-conversation-assets .xb-answer-name { font-weight: 500; font-size: 12px; margin-bottom: 6px; }
+#xb-conversation-assets .xb-message { border-radius: 8px; outline: 0 solid transparent; outline-offset: 6px; transition: outline .2s; }
+#xb-conversation-assets .xb-message.is-located { outline: 2px solid var(--ui-btn); }
+#xb-conversation-assets .xb-inline-design { display: grid; width: 100%; max-width: 310px; padding: 0; overflow: hidden; background: var(--ui-hover); border: 1px solid var(--ui-border); border-radius: 10px; }
+#xb-conversation-assets .xb-inline-design:hover { background: var(--ui-hover); }
+#xb-conversation-assets .xb-inline-caption { display: flex; width: 100%; gap: 8px; padding: 10px 12px; align-items: center; justify-content: space-between; }
+#xb-conversation-assets .xb-inline-caption span { display: flex; align-items: center; gap: 6px; }
+#xb-conversation-assets .xb-design-art { position: relative; display: grid; grid-template-columns: 1fr 1fr; background: var(--art-paper); color: var(--art-ink); width: 100%; min-height: 120px; overflow: hidden; }
+#xb-conversation-assets .xb-design-copy { padding: 17px 13px; text-align: left; display: flex; flex-direction: column; gap: 10px; }
+#xb-conversation-assets .xb-design-copy small { font: 8px/1.2 Georgia, serif; letter-spacing: 2px; }
+#xb-conversation-assets .xb-design-copy b { font: 500 21px/1.2 Georgia, 'Songti SC', serif; }
+#xb-conversation-assets .xb-design-copy em { font-style: normal; font-size: 8px; width: fit-content; color: var(--art-paper); background: var(--art-ink); border-radius: 3px; padding: 4px 6px; }
+#xb-conversation-assets .xb-art { position: relative; min-height: 100px; overflow: hidden; background: linear-gradient(165deg,#ead9bb 0%,#eddfc5 48%,#a9b6a0 49%,#648171 100%); }
+#xb-conversation-assets .xb-art::before { content: ''; position: absolute; width: 64%; aspect-ratio: 1; top: 8%; left: 43%; border-radius: 50%; background: var(--art-sun); }
+#xb-conversation-assets .xb-art::after { content: ''; position: absolute; width: 160%; height: 65%; bottom: -18%; left: -22%; border-radius: 45% 70% 0 0; transform: rotate(-15deg); background: var(--art-deep); box-shadow: 60px -22px 0 var(--art-hill); }
+#xb-conversation-assets .xb-art.night { background: linear-gradient(160deg,#253a50,#6c8191 60%,#a2aca3); --art-sun: #e7e2c9; --art-deep: #182e33; --art-hill: #3e5c60; }
+#xb-conversation-assets .xb-art.pine { background: linear-gradient(130deg,#ced0b6,#92a691); --art-sun: #daddb8; --art-deep: #284f3f; --art-hill: #54775b; }
+#xb-conversation-assets .xb-mini-files { display: flex; gap: 7px; flex-wrap: wrap; }
+#xb-conversation-assets .xb-mini-files button { padding: 8px 10px; background: var(--ui-control); font-size: 12px; }
+#xb-conversation-assets .xb-reply-tools { display: flex; color: var(--ui-muted); gap: 3px; }
+#xb-conversation-assets .xb-composer { margin-top: auto; padding-top: 14px; }
+#xb-conversation-assets .xb-compose-box { background: var(--ui-hover); border: 1px solid var(--ui-border); border-radius: 13px; padding: 12px; }
+#xb-conversation-assets textarea { display: block; width: 100%; height: 37px; border: 0; resize: vertical; background: transparent; outline-offset: 0; }
+#xb-conversation-assets .xb-compose-tools { display: flex; align-items: center; gap: 4px; }
+#xb-conversation-assets .xb-model { font-size: 11px; color: var(--ui-muted); margin-left: auto; }
+#xb-conversation-assets .xb-send { background: var(--ui-btn); color: var(--ui-on-btn); }
+#xb-conversation-assets .xb-assets { position: absolute; top: 8px; right: 14px; width: 300px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 12px; z-index: 3; box-shadow: 0 15px 40px var(--ui-shadow); }
+#xb-conversation-assets .xb-panel-head { display: flex; align-items: center; gap: 7px; padding: 12px 12px 7px; }
+#xb-conversation-assets .xb-panel-head strong { font-weight: 500; }
+#xb-conversation-assets .xb-panel-head .xb-spacer { margin-left: auto; }
+#xb-conversation-assets .xb-panel-head .xb-icon { padding: 5px; }
+#xb-conversation-assets .xb-panel-search { display: flex; align-items: center; gap: 7px; margin: 3px 12px 10px; background: var(--ui-control); padding: 7px 9px; border-radius: 7px; color: var(--ui-muted); }
+#xb-conversation-assets .xb-panel-search input { border: 0; background: transparent; width: 100%; min-width: 0; outline-offset: 4px; font-size: 12px; }
+#xb-conversation-assets .xb-panel-search svg { width: 13px; height: 13px; flex: none; }
+#xb-conversation-assets .xb-tabs { display: flex; border-bottom: 1px solid var(--ui-border); gap: 4px; padding: 0 11px; }
+#xb-conversation-assets .xb-tabs button { border-radius: 0; padding: 7px 6px 9px; font-size: 12px; color: var(--ui-muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+#xb-conversation-assets .xb-tabs button[aria-selected=true] { color: var(--ui-ink); border-bottom-color: var(--ui-btn); }
+#xb-conversation-assets .xb-tab-count { font-size: 11px; color: var(--ui-muted); }
+#xb-conversation-assets .xb-assets-content { padding: 10px 10px 8px; min-height: 395px; }
+#xb-conversation-assets .xb-section-head { display: flex; justify-content: space-between; align-items: center; color: var(--ui-muted); font-size: 11px; padding: 2px 4px 6px; }
+#xb-conversation-assets .xb-section + .xb-section { margin-top: 13px; }
+#xb-conversation-assets .xb-asset-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#xb-conversation-assets .xb-asset-open { justify-content: flex-start; flex: 1; min-width: 0; font-size: 12px; padding: 7px 4px; }
+#xb-conversation-assets .xb-file-icon { width: 27px; height: 27px; background: var(--ui-control); border-radius: 6px; flex: none; display: grid; place-items: center; color: var(--ui-muted); }
+#xb-conversation-assets .xb-file-icon.design { background: var(--ui-soft); color: var(--ui-ink); }
+#xb-conversation-assets .xb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+#xb-conversation-assets .xb-row-meta { margin-left: auto; color: var(--ui-muted); font-size: 11px; white-space: nowrap; }
+#xb-conversation-assets .xb-row-more { padding: 5px 3px; color: var(--ui-muted); }
+#xb-conversation-assets .xb-images { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+#xb-conversation-assets .xb-images.is-large { grid-template-columns: repeat(2,minmax(0,1fr)); }
+#xb-conversation-assets .xb-image-item { min-width: 0; position: relative; }
+#xb-conversation-assets .xb-image-item > button { display: grid; padding: 0; gap: 6px; width: 100%; background: transparent; }
+#xb-conversation-assets .xb-image-item .xb-art { min-height: 0; aspect-ratio: 1.2; width: 100%; border-radius: 6px; }
+#xb-conversation-assets .xb-image-item .xb-name { max-width: 100%; display: block; font-size: 11px; padding-bottom: 3px; }
+#xb-conversation-assets .xb-panel-foot { border-top: 1px solid var(--ui-border); padding: 9px 14px; color: var(--ui-muted); font-size: 11px; display: flex; justify-content: space-between; }
+#xb-conversation-assets .xb-rail-open .xb-main { grid-template-columns: minmax(0,1fr) 300px; }
+#xb-conversation-assets .xb-rail-open .xb-assets { position: relative; top: auto; right: auto; width: auto; border: 0; border-left: 1px solid var(--ui-border); border-radius: 0; box-shadow: none; }
+#xb-conversation-assets .xb-rail-open .xb-chat { padding: 27px 22px 18px; }
+#xb-conversation-assets .xb-rail-open .xb-user { max-width: 100%; }
+#xb-conversation-assets .xb-menu { position: absolute; z-index: 12; right: 10px; width: 180px; background: var(--ui-surface); border-radius: 10px; box-shadow: 0 8px 30px var(--ui-shadow); border: 1px solid var(--ui-border); padding: 5px; }
+#xb-conversation-assets .xb-menu button { height: 33px; width: 100%; justify-content: flex-start; font-size: 12px; }
+#xb-conversation-assets .xb-window { position: absolute; top: 78px; left: 22px; right: 22px; z-index: 8; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 12px; box-shadow: 0 20px 65px var(--ui-shadow); overflow: clip; }
+#xb-conversation-assets .xb-window-bar { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-bottom: 1px solid var(--ui-border); }
+#xb-conversation-assets .xb-window-bar strong { font-weight: 500; font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
+#xb-conversation-assets .xb-window-bar .xb-traffic { padding: 0; height: auto; gap: 5px; flex: none; }
+#xb-conversation-assets .xb-window-bar .xb-traffic button { width: 11px; height: 11px; padding: 0; background: #ff5f57; border-radius: 50%; }
+#xb-conversation-assets .xb-window-bar .xb-traffic span { width: 11px; height: 11px; }
+#xb-conversation-assets .xb-window-close { margin-left: auto; }
+#xb-conversation-assets .xb-window-body { padding: 25px; min-height: 320px; background: var(--ui-canvas); display: grid; align-items: center; }
+#xb-conversation-assets .xb-preview-art { min-height: 280px; max-width: 500px; width: 100%; margin: auto; border-radius: 5px; aspect-ratio: 1.7; }
+#xb-conversation-assets .xb-window .xb-design-art { min-height: 270px; border-radius: 5px; }
+#xb-conversation-assets .xb-window .xb-design-copy { padding: 35px 22px; gap: 22px; }
+#xb-conversation-assets .xb-window .xb-design-copy b { font-size: 32px; }
+#xb-conversation-assets .xb-window .xb-design-copy small { font-size: 10px; }
+#xb-conversation-assets .xb-window .xb-design-copy em { font-size: 11px; }
+#xb-conversation-assets .xb-window-foot { padding: 11px 14px; display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+#xb-conversation-assets .xb-window-foot .xb-muted { font-size: 11px; margin-right: auto; }
+#xb-conversation-assets .xb-primary { background: var(--ui-btn); color: var(--ui-on-btn); }
+#xb-conversation-assets .xb-primary:hover { background: var(--ui-ink); }
+#xb-conversation-assets .xb-document { background: var(--ui-surface); padding: 25px; max-width: 500px; width: 100%; margin: auto; border-radius: 4px; }
+#xb-conversation-assets .xb-document h2 { font-size: 20px; font-weight: 500; margin: 0 0 15px; }
+#xb-conversation-assets .xb-document p { margin: 10px 0; }
+#xb-conversation-assets .xb-doc-line { height: 5px; border-radius: 3px; background: var(--ui-control); margin-top: 12px; }
+#xb-conversation-assets .xb-folder-head { display: flex; align-items: center; gap: 4px; margin: 0 0 12px; font-size: 12px; }
+#xb-conversation-assets .xb-folder-head button { padding: 4px; }
+#xb-conversation-assets .xb-empty { padding: 80px 15px; text-align: center; display: grid; justify-items: center; gap: 11px; color: var(--ui-muted); font-size: 12px; }
+#xb-conversation-assets .xb-empty svg { width: 26px; height: 26px; }
+#xb-conversation-assets .xb-toast { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 15; width: max-content; max-width: calc(100% - 30px); background: var(--ui-text); color: var(--ui-surface); box-shadow: 0 5px 20px var(--ui-shadow); border-radius: 8px; padding: 9px 14px; font-size: 12px; }
+#xb-conversation-assets .xb-missing { color: var(--ui-ink); font-size: 11px; }
+@media(max-width:900px) {
+  #xb-conversation-assets .xb-app { grid-template-columns: 132px minmax(0,1fr); }
+  #xb-conversation-assets .xb-crumb > .xb-muted, #xb-conversation-assets .xb-crumb > i, #xb-conversation-assets .xb-crumb > svg { display:none; }
+  #xb-conversation-assets .xb-chat { padding-left: 24px; padding-right: 24px; }
+}
+@media(max-width:760px) {
+  #xb-conversation-assets .xb-app { grid-template-columns: minmax(0,1fr); }
+  #xb-conversation-assets .xb-side { display: none; }
+  #xb-conversation-assets .xb-head { padding: 12px; gap: 5px; }
+  #xb-conversation-assets .xb-rail-open .xb-chat { padding-left: 15px; padding-right: 15px; }
+  #xb-conversation-assets .xb-window { left: 10px; right: 10px; }
+}
+@media(max-width:560px) {
+  #xb-conversation-assets .xb-app { min-height: 756px; }
+  #xb-conversation-assets .xb-head { flex-wrap: wrap; }
+  #xb-conversation-assets .xb-crumb { flex: 1 1 100%; padding: 0 4px; }
+  #xb-conversation-assets .xb-head-actions { margin-left: auto; }
+  #xb-conversation-assets .xb-main, #xb-conversation-assets .xb-rail-open .xb-main { display: flex; flex-direction: column-reverse; }
+  #xb-conversation-assets .xb-assets, #xb-conversation-assets .xb-rail-open .xb-assets { position: relative; top: auto; right: auto; width: auto; border: 0; border-bottom: 1px solid var(--ui-border); border-radius: 0; box-shadow: none; }
+  #xb-conversation-assets .xb-assets-content { min-height: 0; padding-bottom: 17px; }
+  #xb-conversation-assets .xb-chat { padding: 22px 18px 16px; }
+  #xb-conversation-assets .xb-date { display: none; }
+  #xb-conversation-assets .xb-window { top: 110px; }
+  #xb-conversation-assets .xb-window-body { padding: 12px; min-height: 220px; }
+  #xb-conversation-assets .xb-preview-art { min-height: 210px; }
+  #xb-conversation-assets .xb-window .xb-design-art { min-height: 220px; }
+  #xb-conversation-assets .xb-window .xb-design-copy { padding: 22px 12px; }
+  #xb-conversation-assets .xb-window .xb-design-copy b { font-size: 24px; }
+  #xb-conversation-assets .xb-window-foot .xb-muted { flex: 1 1 100%; }
+}
+@media(pointer:coarse) {
+  #xb-conversation-assets button { min-height: 44px; }
+  #xb-conversation-assets .xb-asset-row { min-height: 44px; }
+  #xb-conversation-assets input, #xb-conversation-assets textarea { font-size: 16px; }
+  #xb-conversation-assets .xb-window-bar .xb-traffic { display: none; }
+}
+@media(prefers-reduced-motion:reduce) { #xb-conversation-assets .xb-message { transition: none; } }
+</style>
+<div id="xb-conversation-assets">
+  <div class="viz-carousel" aria-label="对话资产入口设计" data-previous-label="上一个方案" data-next-label="下一个方案">
+    <section data-variant="轻量浮层" aria-label="轻量浮层方案"></section>
+    <section data-variant="常驻侧栏" aria-label="常驻侧栏方案" hidden></section>
+  </div>
+</div>
+<script>
+(() => {
+  const root = document.getElementById('xb-conversation-assets');
+  const icon = name => `<i data-lucide="${name}" aria-hidden="true"></i>`;
+  const escape = text => String(text).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const assets = [
+    {id:'design-landing',type:'design',name:'山野露营 · 活动页',meta:'3 画板',icon:'panels-top-left',message:'design',path:'设计稿 / 山野露营 · 活动页'},
+    {id:'design-brand',type:'design',name:'山野露营 · 视觉规范',meta:'2 画板',icon:'panels-top-left',message:'design',path:'设计稿 / 山野露营 · 视觉规范'},
+    {id:'image-main',type:'image',name:'山野主视觉.png',meta:'1536 × 1024 · 2.4 MB',art:'day',message:'images',path:'生成图片 / 山野主视觉.png'},
+    {id:'image-night',type:'image',name:'营地夜色.png',meta:'1536 × 1024 · 1.8 MB',art:'night',message:'images',path:'生成图片 / 营地夜色.png'},
+    {id:'image-pine',type:'image',name:'松林细节.png',meta:'1024 × 1024 · 1.2 MB',art:'pine',message:'images',path:'生成图片 / 松林细节.png'},
+    {id:'file-brand',type:'file',name:'露营品牌手册.pdf',meta:'4.6 MB',icon:'file-text',message:'files',path:'交付文件 / 露营品牌手册.pdf'},
+    {id:'folder-site',type:'file',name:'露营活动页源码',meta:'文件夹',icon:'folder',message:'files',folder:true,path:'交付文件 / 露营活动页源码'},
+    {id:'file-readme',type:'file',name:'交付说明.md',meta:'2 KB',icon:'file-text',message:'files',path:'交付文件 / 交付说明.md'}
+  ];
+  const folderFiles = [
+    {id:'child-index',type:'file',name:'index.html',meta:'18 KB',icon:'file-code',message:'files',path:'交付文件 / 露营活动页源码 / index.html'},
+    {id:'child-style',type:'file',name:'styles.css',meta:'6 KB',icon:'file-code',message:'files',path:'交付文件 / 露营活动页源码 / styles.css'},
+    {id:'child-assets',type:'file',name:'assets',meta:'3 张图片',icon:'folder',folder:true,message:'files',path:'交付文件 / 露营活动页源码 / assets'}
+  ];
+  const byId = id => [...assets,...folderFiles].find(a => a.id === id);
+  const art = (kind='day',extra='') => `<div class="xb-art ${kind} ${extra}" role="img" aria-label="${kind==='night'?'月光下的山野':kind==='pine'?'松林与远山':'夕阳下的山野'}演示图片"></div>`;
+  const designArt = (brand=false) => `<div class="xb-design-art"><div class="xb-design-copy"><small>WILD CAMP · ${brand?'BRAND BOOK':'EST. 2026'}</small><b>${brand?'在自然里，<br>找到自己。':'把周末，<br>交给山野。'}</b><em>${brand?'视觉识别规范':'探索秋日营地 ↗'}</em></div>${art(brand?'pine':'day')}</div>`;
+  let saved = window.openai?.widgetState?.privateContent || {};
+  let stateRevision = Number(saved.__revision)||0;
+  const states = {};
+  const restore = {};
+  const persist = () => {
+    const prefs = Object.fromEntries(Object.entries(states).map(([k,s]) => [k,{tab:s.tab,pinned:s.pinned,open:s.open}]));
+    prefs.__revision=++stateRevision;
+    const chosen = Object.values(states).find(s => s.preview);
+    if (window.openai?.setWidgetState) window.openai.setWidgetState({modelContent:{selectedAsset:chosen?.preview || null},privateContent:prefs}).catch(()=>{});
+  };
+  const refreshIcons = () => { if (globalThis.lucide) lucide.createIcons({root,attrs:{width:16,height:16}}); };
+  root.querySelectorAll('[data-variant]').forEach((variant,index) => {
+    const key = index?'rail':'popover';
+    const old = saved[key] || {};
+    const s = states[key] = {tab:old.tab||'all',pinned:old.pinned??Boolean(index),open:old.open??true,query:'',folder:'',preview:'',menu:'',empty:false,missing:false};
+    variant.innerHTML = `<div class="xb-app" aria-label="小伴桌面对话">
+      <aside class="xb-side"><div class="xb-traffic" aria-hidden="true"><span></span><span></span><span></span></div><div class="xb-brand">${icon('sparkles')}小伴</div>
+        <nav aria-label="主导航"><button class="cursor-interaction" data-demo="新建任务">${icon('plus')}新建任务</button><button class="cursor-interaction" data-demo="资料库">${icon('library')}资料库</button><button class="cursor-interaction" data-demo="装扮">${icon('palette')}装扮</button></nav>
+        <div><div class="xb-side-label">工作区</div><nav aria-label="工作区对话"><button class="cursor-interaction xb-session" data-demo="品牌工作区">${icon('folder-closed')}品牌工作区</button><button class="cursor-interaction xb-session is-active" data-demo="当前对话">山野露营 · 品牌视觉</button><button class="cursor-interaction xb-session" data-demo="秋日活动文案">秋日活动文案</button></nav></div>
+        <div class="xb-account"><span class="xb-avatar">${icon('sparkles')}</span><span>我的小伴</span></div>
+      </aside>
+      <div class="xb-work"><header class="xb-head"><div class="xb-crumb"><span class="xb-muted">品牌工作区</span>${icon('chevron-right')}<strong>山野露营 · 品牌视觉</strong></div>
+        <div class="xb-head-actions"><button class="cursor-interaction xb-assets-toggle" data-action="toggle" aria-label="打开对话资产" aria-expanded="true">${icon('files')}<span>资产</span><span class="xb-count">8</span></button><button class="cursor-interaction xb-icon" aria-label="搜索对话" data-demo="搜索对话">${icon('search')}</button><button class="cursor-interaction xb-icon" aria-label="执行面板" data-demo="执行面板">${icon('panel-right')}</button><button class="cursor-interaction xb-icon" aria-label="更多对话操作" data-demo="更多对话操作">${icon('ellipsis')}</button></div>
+      </header><div class="xb-main">
+        <main class="xb-chat"><div class="xb-date">今天 · 14:32</div><div class="xb-user">帮我做一套山野露营的品牌视觉，包含活动页、配图和可以交付的文件。</div>
+          <div class="xb-answer"><span class="xb-avatar">${icon('sparkles')}</span><div class="xb-answer-body"><div><div class="xb-answer-name">小伴</div><p>做好了，整体采用自然绿与暖沙色，让画面保留一点山野的松弛感。</p></div>
+            <div class="xb-message" data-message="design"><button class="cursor-interaction xb-inline-design" data-open="design-landing" aria-label="预览山野露营活动页">${designArt()}<span class="xb-inline-caption"><span>${icon('panels-top-left')}山野露营 · 活动页</span>${icon('arrow-up-right')}</span></button></div>
+            <div class="xb-message" data-message="images"><p>3 张配图已生成，主视觉、夜景和松林可以搭配使用。</p></div>
+            <div class="xb-message" data-message="files"><p style="margin-bottom:9px">品牌手册和页面源码也整理好了：</p><div class="xb-mini-files"><button class="cursor-interaction" data-open="file-brand">${icon('file-text')}品牌手册.pdf</button><button class="cursor-interaction" data-open="folder-site">${icon('folder')}活动页源码</button></div></div>
+            <div class="xb-reply-tools"><button class="cursor-interaction xb-icon" data-demo="复制回答" aria-label="复制回答">${icon('copy')}</button><button class="cursor-interaction xb-icon" data-demo="重新生成" aria-label="重新生成">${icon('rotate-ccw')}</button></div>
+          </div></div>
+          <div class="xb-composer"><div class="xb-compose-box"><textarea aria-label="发送消息给小伴" placeholder="继续调整，或聊点别的…"></textarea><div class="xb-compose-tools"><button class="cursor-interaction xb-icon" data-demo="添加附件" aria-label="添加附件">${icon('plus')}</button><span class="xb-model">小伴 AI</span><button class="cursor-interaction xb-icon xb-send" data-demo="发送消息" aria-label="发送消息">${icon('arrow-up')}</button></div></div></div>
+        </main>
+        <aside class="xb-assets" aria-label="对话资产"><div class="xb-panel-head"><strong>对话资产</strong><span class="xb-count">8</span><span class="xb-spacer"></span><button class="cursor-interaction xb-icon" data-action="pin" data-tooltip="固定为侧栏" aria-label="固定为侧栏">${icon('panel-right-open')}</button><button class="cursor-interaction xb-icon" data-action="import" data-tooltip="导入文件、文件夹或设计源文件" aria-label="导入资产">${icon('plus')}</button><button class="cursor-interaction xb-icon" data-action="close" aria-label="收起对话资产">${icon('x')}</button></div>
+          <label class="xb-panel-search">${icon('search')}<input type="search" placeholder="搜索资产" aria-label="搜索当前对话资产"></label>
+          <div class="xb-tabs" role="tablist" aria-label="资产类型">${[['all','全部',8],['design','设计稿',2],['image','图片',3],['file','文件',3]].map(([id,label,count])=>`<button class="cursor-interaction" type="button" role="tab" id="${key}-tab-${id}" aria-controls="${key}-assets-list" aria-selected="${id===s.tab}" data-tab="${id}">${label}<span class="xb-tab-count">${count}</span></button>`).join('')}</div>
+          <div class="xb-assets-content" id="${key}-assets-list" role="tabpanel" aria-labelledby="${key}-tab-${s.tab}"></div><div class="xb-panel-foot"><span>当前对话</span><span>最近更新优先</span></div>
+        </aside>
+      </div><section class="xb-window" hidden aria-label="资产独立预览窗口"></section><div class="xb-menu" hidden aria-label="资产操作"></div></div><div class="xb-toast" role="status" aria-live="polite" hidden></div>
+    </div>`;
+    const app = variant.querySelector('.xb-app');
+    const panel = app.querySelector('.xb-assets');
+    const content = app.querySelector('.xb-assets-content');
+    const win = app.querySelector('.xb-window');
+    const menu = app.querySelector('.xb-menu');
+    const toastBox = app.querySelector('.xb-toast');
+    let toastTimer;
+    function toast(text) { toastBox.textContent=text; toastBox.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>toastBox.hidden=true,2600); }
+    function row(a) {
+      const missing = s.missing && a.id==='file-brand';
+      return `<div class="xb-asset-row"><button class="cursor-interaction xb-asset-open" data-open="${a.id}" data-tooltip="${escape(a.path)}" aria-description="${escape(a.path)}"><span class="xb-file-icon ${a.type}">${icon(a.icon)}</span><span class="xb-name">${escape(a.name)}</span><span class="${missing?'xb-missing':'xb-row-meta'}">${missing?'已失效':a.meta}</span></button><button class="cursor-interaction xb-row-more" data-more="${a.id}" aria-label="${escape(a.name)}的更多操作">${icon('ellipsis')}</button></div>`;
+    }
+    function render() {
+      app.classList.toggle('xb-rail-open',s.pinned&&s.open);
+      panel.hidden=!s.open;
+      const total=s.empty?0:8;
+      app.querySelectorAll('.xb-head .xb-count,.xb-panel-head .xb-count').forEach(x=>x.textContent=total);
+      app.querySelector('[data-action=toggle]').setAttribute('aria-expanded',String(s.open));
+      const pin=app.querySelector('[data-action=pin]');
+      pin.setAttribute('aria-label',s.pinned?'切换为浮层':'固定为侧栏');
+      pin.setAttribute('data-tooltip',s.pinned?'切换为浮层':'固定为侧栏');
+      pin.innerHTML=icon(s.pinned?'panel-right-close':'panel-right-open');
+      app.querySelectorAll('[data-tab]').forEach(b=>{b.setAttribute('aria-selected',String(b.dataset.tab===s.tab));b.querySelector('.xb-tab-count').textContent=s.empty?0:({all:8,design:2,image:3,file:3}[b.dataset.tab]);});
+      content.setAttribute('aria-labelledby',`${key}-tab-${s.tab}`);
+      const query=s.query.trim().toLowerCase();
+      const list=(s.empty?[]:assets).filter(a=>(s.tab==='all'||a.type===s.tab)&&(!query||a.name.toLowerCase().includes(query)));
+      if(s.folder&&!s.empty) {
+        const nested=s.folder==='child-assets';
+        content.innerHTML=`<div class="xb-folder-head"><button class="cursor-interaction" data-action="back" aria-label="返回上一层">${icon('arrow-left')}</button><span>${nested?'源码 / assets':'露营活动页源码'}</span></div>`+(nested?`<div class="xb-images is-large">${assets.filter(a=>a.type==='image').map(a=>`<div class="xb-image-item"><button class="cursor-interaction" data-open="${a.id}">${art(a.art)}<span class="xb-name">${a.name}</span></button></div>`).join('')}</div>`:folderFiles.map(row).join(''));
+      } else if(!list.length) {
+        content.innerHTML=`<div class="xb-empty">${icon(s.empty?'files':'search')}<span>${s.empty?'这段对话还没有资产':'没有找到相关资产'}</span>${query?'<button class="cursor-interaction" data-action="clear-search">清除搜索</button>':''}</div>`;
+      } else {
+        content.innerHTML=['design','image','file'].map(type=>{
+          const items=list.filter(a=>a.type===type);if(!items.length)return '';
+          return `<section class="xb-section"><div class="xb-section-head"><span>${{design:'设计稿',image:'生成图片',file:'交付文件'}[type]}</span><span>${items.length}</span></div>${type==='image'?`<div class="xb-images ${s.tab==='image'?'is-large':''}">${items.map(a=>`<div class="xb-image-item"><button class="cursor-interaction" data-open="${a.id}" data-tooltip="${a.name} · ${a.meta}">${art(a.art)}<span class="xb-name">${a.name}</span></button></div>`).join('')}</div>`:items.map(row).join('')}</section>`;
+        }).join('');
+      }
+      refreshIcons();
+    }
+    function preview(a) {
+      if(a.folder) {s.folder=a.id;s.open=true;s.tab='file';s.query='';app.querySelector('input').value='';render();persist();return;}
+      s.preview=a.id;s.menu='';menu.hidden=true;
+      const missing=s.missing&&a.id==='file-brand';
+      const body=missing?`<div class="xb-empty">${icon('file-warning')}<span>原文件已移动或删除</span><button class="cursor-interaction" data-action="locate">定位交付消息</button></div>`:a.type==='design'?designArt(a.id==='design-brand'):a.type==='image'?art(a.art,'xb-preview-art'):`<article class="xb-document"><h2>${a.id==='file-brand'?'山野露营':escape(a.name)}</h2><p class="xb-muted">${a.id==='file-brand'?'品牌视觉指南 · 2026 秋季':'交付说明'}</p><p>${a.id==='child-index'?'&lt;main class="wild-camp"&gt;':a.id==='child-style'?'.wild-camp { color: #243e34; }':'让每一次出发，都更接近自然。'}</p><div class="xb-doc-line"></div><div class="xb-doc-line" style="width:90%"></div><div class="xb-doc-line" style="width:65%"></div><p style="margin-top:25px">${a.id==='file-brand'?'01 / 品牌色彩与视觉语言':'活动页面、品牌手册与配图已整理完成。'}</p></article>`;
+      win.innerHTML=`<div class="xb-window-bar"><div class="xb-traffic"><button class="cursor-interaction" data-action="preview-close" aria-label="关闭预览窗口"></button><span></span><span></span></div><strong>${escape(a.name)}</strong><button class="cursor-interaction xb-icon xb-window-close" data-action="preview-close" aria-label="关闭预览">${icon('x')}</button></div><div class="xb-window-body">${body}</div><div class="xb-window-foot"><span class="xb-muted">${missing?'文件不可用':a.type==='design'?`${a.meta} · 设计画布`:a.meta}</span>${a.type==='image'?`<button class="cursor-interaction xb-icon" data-action="previous-image" aria-label="上一张图片">${icon('chevron-left')}</button><button class="cursor-interaction xb-icon" data-action="next-image" aria-label="下一张图片">${icon('chevron-right')}</button>`:''}<button class="cursor-interaction" data-action="locate">${icon('message-square')}定位消息</button>${missing?'':`<button class="cursor-interaction xb-primary" data-action="${a.type==='design'?'edit-design':'save'}">${icon(a.type==='design'?'arrow-up-right':'download')}${a.type==='design'?'打开画布':'另存为'}</button>`}</div>`;
+      win.hidden=false;refreshIcons();persist();
+      win.querySelector('[data-action=preview-close]').focus({preventScroll:true});
+    }
+    function locate(a) {
+      win.hidden=true;s.preview='';menu.hidden=true;s.menu='';
+      if(!s.pinned) {s.open=false;render();}
+      app.querySelectorAll('.is-located').forEach(x=>x.classList.remove('is-located'));
+      const message=app.querySelector(`[data-message="${a.message}"]`);message.classList.add('is-located');
+      toast('已定位到对应消息');setTimeout(()=>message.classList.remove('is-located'),3500);persist();
+    }
+    app.addEventListener('click',event=>{
+      const b=event.target.closest('button');if(!b)return;
+      if(b.dataset.demo) {toast(`${b.dataset.demo} · 原型演示`);return;}
+      if(b.dataset.open) {preview(byId(b.dataset.open));return;}
+      if(b.dataset.tab) {s.tab=b.dataset.tab;s.folder='';s.menu='';menu.hidden=true;render();persist();return;}
+      if(b.dataset.more) {
+        const a=byId(b.dataset.more);s.menu=a.id;
+        menu.innerHTML=`<button class="cursor-interaction" data-action="menu-open">${icon(a.folder?'folder-open':'external-link')}${a.folder?'打开文件夹':'打开'}</button><button class="cursor-interaction" data-action="locate">${icon('message-square')}定位消息</button><button class="cursor-interaction" data-action="copy-path">${icon('copy')}复制路径</button><button class="cursor-interaction" data-action="reveal">${icon('folder-open')}在文件夹中显示</button>`;
+        const rect=b.getBoundingClientRect(), parent=app.querySelector('.xb-work').getBoundingClientRect();
+        menu.style.top=`${Math.min(rect.bottom-parent.top+3,460)}px`;menu.hidden=false;refreshIcons();return;
+      }
+      const action=b.dataset.action;
+      if(action==='import') {s.menu='';menu.style.top='48px';menu.innerHTML=`<button class="cursor-interaction" data-demo="导入文件">${icon('file-text')}导入文件</button><button class="cursor-interaction" data-demo="导入文件夹">${icon('folder')}导入文件夹</button><button class="cursor-interaction" data-demo="导入设计源文件">${icon('panels-top-left')}导入设计源文件</button>`;menu.hidden=false;refreshIcons();}
+      if(action==='toggle') {s.open=!s.open;menu.hidden=true;render();persist();}
+      if(action==='close') {s.open=false;menu.hidden=true;render();persist();app.querySelector('[data-action=toggle]').focus({preventScroll:true});}
+      if(action==='pin') {s.pinned=!s.pinned;render();persist();}
+      if(action==='back') {s.folder=s.folder==='child-assets'?'folder-site':'';render();}
+      if(action==='clear-search') {s.query='';app.querySelector('input').value='';render();}
+      if(action==='preview-close') {win.hidden=true;s.preview='';persist();app.querySelector('[data-action=toggle]').focus({preventScroll:true});}
+      if(action==='menu-open')preview(byId(s.menu));
+      if(action==='locate')locate(byId(s.menu||s.preview));
+      if(action==='copy-path') {menu.hidden=true;toast('路径已复制 · 演示');}
+      if(action==='reveal') {menu.hidden=true;toast('在系统文件管理器中显示 · 演示');}
+      if(action==='save')toast('另存为… · 演示，不会写入本机文件');
+      if(action==='edit-design')toast('打开独立设计画布 · 演示');
+      if(action==='previous-image'||action==='next-image') {
+        const images=assets.filter(a=>a.type==='image'),current=images.findIndex(a=>a.id===s.preview);
+        preview(images[(current+(action==='next-image'?1:2))%3]);
+      }
+    });
+    app.querySelector('input').addEventListener('input',event=>{s.query=event.target.value;s.folder='';render();});
+    app.addEventListener('keydown',event=>{
+      if(event.key==='Escape') {
+        if(!menu.hidden) {menu.hidden=true;s.menu='';return;}
+        if(!win.hidden) {win.hidden=true;s.preview='';persist();return;}
+        s.open=false;render();persist();app.querySelector('[data-action=toggle]').focus({preventScroll:true});
+      }
+      const tab=event.target.closest('[data-tab]');
+      if(tab&&['ArrowRight','ArrowLeft','Home','End'].includes(event.key)) {
+        event.preventDefault();const tabs=[...app.querySelectorAll('[data-tab]')],pos=tabs.indexOf(tab);
+        const next=event.key==='Home'?0:event.key==='End'?3:(pos+(event.key==='ArrowRight'?1:3))%4;
+        tabs[next].click();tabs[next].focus();
+      }
+    });
+    app.addEventListener('pointerdown',event=>{
+      if(!event.target.closest('.xb-menu')&&!event.target.closest('[data-more]')) {menu.hidden=true;s.menu='';}
+      if(!s.pinned&&s.open&&!event.target.closest('.xb-assets')&&!event.target.closest('[data-action=toggle]')&&!event.target.closest('.xb-window')&&!event.target.closest('.xb-menu')&&!event.target.closest('[data-open]')) {s.open=false;render();persist();}
+    });
+    render();
+    restore[key] = incoming => {
+      if (!incoming) return;
+      let changed=false;
+      if (['all','design','image','file'].includes(incoming.tab)&&s.tab!==incoming.tab) {s.tab=incoming.tab;changed=true;}
+      if (typeof incoming.pinned==='boolean'&&s.pinned!==incoming.pinned) {s.pinned=incoming.pinned;changed=true;}
+      if (typeof incoming.open==='boolean'&&s.open!==incoming.open) {s.open=incoming.open;changed=true;}
+      if(changed)render();
+    };
+    if(globalThis.Tweak) {
+      const options={appearance:'跟随系统',scenario:'完整资产',accent:'小伴红'};
+      const tweak=new Tweak({container:app,onChange:()=>{
+        app.style.colorScheme=options.appearance==='浅色'?'light':options.appearance==='深色'?'dark':'light dark';
+        s.empty=options.scenario==='空对话';s.missing=options.scenario==='文件失效';
+        if(options.accent==='松林绿') {app.style.setProperty('--ui-btn','light-dark(#2b7658,#70cfa5)');app.style.setProperty('--ui-soft','light-dark(#e8f2ec,#233e31)');app.style.setProperty('--ui-ink','light-dark(#225d45,#a0e3be)');}
+        else {['--ui-btn','--ui-soft','--ui-ink'].forEach(p=>app.style.removeProperty(p));}
+        render();if(s.preview)preview(byId(s.preview));
+      }});
+      tweak.addSelect(options,'appearance',{label:'外观',options:['跟随系统','浅色','深色']});
+      tweak.addSelect(options,'scenario',{label:'资产状态',options:['完整资产','空对话','文件失效']});
+      tweak.addSelect(options,'accent',{label:'主题色',options:['小伴红','松林绿']});
+    }
+  });
+  window.addEventListener('openai:set_globals', event => {
+    const incoming=event.detail?.globals?.widgetState?.privateContent;
+    if(incoming&&(Number(incoming.__revision)||0)>=stateRevision) {
+      stateRevision=Number(incoming.__revision)||0;
+      Object.entries(restore).forEach(([key,apply])=>apply(incoming[key]));
+    }
+  });
+  refreshIcons();
+})();
+</script>

@@ -12,6 +12,18 @@ const question = (id: string, session = 's1'): QuestionRequest => ({ id, session
 
 type Responder = (args: Record<string, unknown> | undefined) => unknown;
 
+it('creates an asset-only conversation without sending, losing its draft, or dropping pending settings',async()=>{
+  const model={providerId:'custom',model:'m'};
+  const h=harness({chat_new_session:()=>({...summary('asset-session'),model,workspace:'/selected'})});
+  await h.store.init();h.store.pendingWorkspace='/selected';h.store.pendingModel=model;h.store.pendingContextTokens=64000;
+  h.store.pendingExpert={plugin:'',workflow:'review',name:'审查',profession:''};h.store.draft.text='保留的草稿';
+  expect(await h.store.ensureSession()).toBe('asset-session');expect(await h.store.ensureSession()).toBe('asset-session');
+  expect(h.calls.filter(([c])=>c==='chat_new_session')).toHaveLength(1);expect(h.commands()).not.toContain('chat_send');
+  expect(h.store.draft.text).toBe('保留的草稿');expect(h.store.currentId).toBe('asset-session');
+  expect(h.calls.find(([c])=>c==='chat_new_session')?.[1]).toMatchObject({workspace:'/selected',model,contextTokens:64000,expert:{workflow:'review'}});
+  h.store.dispose();
+});
+
 it('does not turn ordinary unverified execution outcomes into warnings', async () => {
   const h = harness({chat_overview:()=>overview({sessions:[summary('s1')]}),chat_load_session:()=>[]});
   await h.store.init(); await h.store.select('s1');
