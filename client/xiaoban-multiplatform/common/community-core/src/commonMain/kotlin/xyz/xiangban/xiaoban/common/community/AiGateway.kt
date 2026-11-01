@@ -449,6 +449,7 @@ data class CloudChatState(
     val conversationId: String = "",
     /** 存下来的对话，最近的在前。 */
     val conversations: List<ChatSummary> = emptyList(),
+    val workspaces: List<String> = emptyList(),
 ) {
     val activeTier: AiTier? get() = tiers.firstOrNull { it.tier == selectedTier }
 }
@@ -508,7 +509,7 @@ class CloudChatController(
     fun useAccount(account: String?) {
         val list = history?.useAccount(account) ?: emptyList()
         clearConversation()
-        _state.value = _state.value.copy(conversations = list)
+        _state.value = _state.value.copy(conversations = list, workspaces = history?.workspaces().orEmpty())
     }
 
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
@@ -527,6 +528,14 @@ class CloudChatController(
     }
 
     /** 删掉一个存下来的对话；删的是正在看的就换成新对话。 */
+    fun addWorkspace(name: String) { history?.addWorkspace(name); refreshWorkspaces() }
+    fun renameWorkspace(old: String, name: String) { history?.renameWorkspace(old, name); refreshWorkspaces() }
+    fun deleteWorkspace(name: String) { history?.deleteWorkspace(name); refreshWorkspaces() }
+    fun moveConversation(id: String, workspace: String?) { history?.move(id, workspace); refreshWorkspaces() }
+    private fun refreshWorkspaces() {
+        _state.value = _state.value.copy(conversations = history?.list().orEmpty(), workspaces = history?.workspaces().orEmpty())
+    }
+
     fun deleteConversation(id: String) {
         val store = history ?: return
         // 先离开这个对话（会把没说完的存一下），再删，免得删完又被存回来。
@@ -537,7 +546,7 @@ class CloudChatController(
     /** 把当前对话存一下（发出提问、回答结束、停止时）。 */
     private fun persist() {
         val list = history?.save(agentSession, _state.value.messages, clock()) ?: return
-        _state.value = _state.value.copy(conversations = list)
+        _state.value = _state.value.copy(conversations = list, workspaces = history?.workspaces().orEmpty())
     }
 
     /** 加载档位与余额，并按桌面端同一规则选定可用默认档位。 */

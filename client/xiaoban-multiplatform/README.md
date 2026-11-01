@@ -120,3 +120,11 @@ Android 的社区游戏作品详情、帖子中的本站游戏链接卡片和回
 「我的收藏」新增游戏分类及本机「最近玩过」，最近记录最多 12 项，试玩成功才加入。游戏收藏仍是已有作品收藏，跨设备同步；最近试玩不自动收藏。服务端 `/api/me/content-bookmarks?kind=game` 在分页前筛选游戏，返回对象仍为 kind=pack。不新增一级「我的游戏」，不自动收录为个人创作，不提供离线保存承诺；打开缓存仍需确认公开状态。
 
 验证：`:common:community-core:jvmTest --tests '*CommunityGameTrialTest*' --tests '*MobileGamesTest*' --tests '*GameLibraryTest*'`（17 项）与 `:androidApp:assembleDebug` 通过。社区游戏真机验证见 [试玩验收记录](../../docs/product/community-game-trial-2026-11-01.md)。
+
+## 对话工作空间
+
+小伴 AI 左侧栏支持创建、重命名、删除和折叠工作空间；长按对话可移动到工作空间或未分组。删除空间保留全部对话，继续聊天保留分组。Android 随本机历史按账号保存，iOS 沿用内存存储；不提供电脑目录绑定或跨设备同步。新对话默认未分组。
+
+针对性验证：`:common:community-core:jvmTest --tests '*ChatHistoryTest*'` 与 `:business:community-native:compileAndroidMain`，以及 `:androidApp:assembleDebug` 均通过。2026-11-01 在小米 14（23127PN0CC）覆盖安装调试版，验证创建空间、长按移动对话、重启后保留分组、折叠空间以及删除空间后对话回到未分组；测试空间已清理。重命名交互与 iOS 仍需实机验收。
+
+侧栏支持横向拖动收起，位置与遮罩随手指变化，松手按距离与速度回弹或关闭；已在小米 14 验证短拖回弹与长拖关闭，Android 调试包构建通过。关闭时仍通过菜单按钮打开。

@@ -29,7 +29,7 @@ class InMemoryChatHistoryFiles : ChatHistoryFiles {
 
 /** 对话列表里的一条。 */
 @Serializable
-data class ChatSummary(val id: String, val title: String, val updatedAtMs: Long)
+data class ChatSummary(val id: String, val title: String, val updatedAtMs: Long, val workspace: String? = null)
 
 @Serializable
 private data class StoredChat(val id: String, val messages: List<ChatTurn>)
@@ -51,6 +51,7 @@ fun chatTitle(messages: List<ChatTurn>): String {
 class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
     private var folder = ""
     private var index: List<ChatSummary> = emptyList()
+    private var groups: List<String> = emptyList()
     /** 已经交给后台、还没写完的内容；这时读要以它为准。 */
     private val pending = mutableMapOf<String, String?>()
     private val writes = Channel<Pair<String, String?>>(Channel.UNLIMITED)
@@ -70,7 +71,44 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
         folder = "chats/" + (account ?: "default").map { if (it.isLetterOrDigit() || it == '-' || it == '_') it else '_' }.joinToString("")
         index = read(indexName())?.let { runCatching { CommunityJson.decodeFromString<List<ChatSummary>>(it) }.getOrNull() }.orEmpty()
             .sortedByDescending { it.updatedAtMs }
+        groups = read("$folder/workspaces.json")?.let {
+            runCatching { CommunityJson.decodeFromString<List<String>>(it) }.getOrNull()
+        }.orEmpty()
         return index
+    }
+
+    fun workspaces(): List<String> = groups
+
+    fun addWorkspace(name: String) {
+        val clean = name.trim().take(40)
+        if (clean.isEmpty() || clean in groups) return
+        groups = groups + clean
+        persistGroups()
+    }
+
+    fun renameWorkspace(old: String, name: String) {
+        val clean = name.trim().take(40)
+        if (old !in groups || clean.isEmpty() || clean in groups) return
+        groups = groups.map { if (it == old) clean else it }
+        index = index.map { if (it.workspace == old) it.copy(workspace = clean) else it }
+        persistGroups()
+    }
+
+    fun deleteWorkspace(name: String) {
+        groups = groups - name
+        index = index.map { if (it.workspace == name) it.copy(workspace = null) else it }
+        persistGroups()
+    }
+
+    fun move(id: String, workspace: String?) {
+        if (workspace != null && workspace !in groups) return
+        index = index.map { if (it.id == id) it.copy(workspace = workspace) else it }
+        enqueue(indexName(), CommunityJson.encodeToString(index))
+    }
+
+    private fun persistGroups() {
+        enqueue("$folder/workspaces.json", CommunityJson.encodeToString(groups))
+        enqueue(indexName(), CommunityJson.encodeToString(index))
     }
 
     fun list(): List<ChatSummary> = index
@@ -91,7 +129,7 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
             .map { if (it.streaming) it.copy(streaming = false) else it }
         if (kept.none { it.role == "user" }) return index
         enqueue(chatName(id), CommunityJson.encodeToString(StoredChat(id, kept)))
-        index = listOf(ChatSummary(id, chatTitle(kept), nowMs)) + index.filterNot { it.id == id }
+        index = listOf(ChatSummary(id, chatTitle(kept), nowMs, index.firstOrNull { it.id == id }?.workspace)) + index.filterNot { it.id == id }
         enqueue(indexName(), CommunityJson.encodeToString(index))
         return index
     }
