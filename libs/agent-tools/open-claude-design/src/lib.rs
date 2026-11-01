@@ -5,8 +5,9 @@ use serde_json::{json, Value};
 use std::{collections::BTreeMap, fs, path::{Component, Path, PathBuf}, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 
 pub const NAME: &str = "open-claude-design";
-pub const RUNTIME: &str = concat!(include_str!("../runtime/vendor/react-bridge.js"),"\n",include_str!("../runtime/support.js"),"\n",include_str!("../runtime/editor.js"));
+pub const RUNTIME: &str = concat!(include_str!("../runtime/vendor/react-bridge.js"),"\n",include_str!("../runtime/support.js"),"\n",include_str!("../runtime/editor.js"),"\n",include_str!("../runtime/vendor/capture.js"));
 pub mod archive;
+pub mod rendered_export;
 mod assets;
 pub const FORMAT: &str = include_str!("../FORMAT.md");
 /// Quality guidance returned with the format: tokens first, real content, complete states, a check before complete.

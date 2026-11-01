@@ -12,6 +12,7 @@
 
 - `src/lib.rs`：工具、设计任务上下文、项目校验、版本检查、创建去重、会话关联、历史与恢复草稿。
 - `src/archive.rs`：有大小限制的 ZIP 源包导入导出、独立 HTML 预览导出。
+- `runtime/capture.js` 与 `src/rendered_export.rs`：隔离预览截图及 PNG/PDF 落盘前校验；桌面支持 PNG 1×/2×、单画板及按位置排序的全部画板栅格 PDF。
 - `runtime/support.js`：独立实现的 DC HTML 兼容运行时子集，不使用 Anthropic 的 support.js。
 - `client/xiaoban-desktop/src-tauri/src/design.rs`：主窗口命令、原生文件选择、专用预览响应。
 - `client/xiaoban-desktop/src/ui/design/`：多画板画布、选择/抓手/Play、属性、源码、批注、撤销重做、历史和冲突处理。
@@ -30,7 +31,7 @@
 
 支持 x-dc、helmet、表达式、sc-if/sc-for、DCLogic 状态和事件、参数默认值、画板间相对链接。支持原始 `_blob` 图片及常见媒体/字体的 ZIP 导入与字节保真导出；存储使用 data URL，预览解析项目内相对/根路径。CSS（含相对素材与 @import）和普通本地 JS 在预览中内联；原始文件保持不变。
 
-已支持按名称的 dc-import、本地 x-import React/JSX/TSX、组件状态/生命周期与画布便签。React 适配器的构建和开源许可证见 [runtime](runtime/README.md)。远程 CDN、任意 npm/Node 环境、原生 module script 和未验证的专有扩展尚未完整兼容；PDF/PPTX、云端协作等差距见验收报告，不保证任意 Claude Design 项目无损运行。保存源包不会转换原程序，独立 HTML 使用本模块运行时。sandbox/CSP 提供权限隔离，不提供独立进程或无限循环中断能力。
+已支持按名称的 dc-import、本地 x-import React/JSX/TSX、组件状态/生命周期与画布便签。React 适配器的构建和开源许可证见 [runtime](runtime/README.md)。远程 CDN、任意 npm/Node 环境、原生 module script 和未验证的专有扩展尚未完整兼容；PDF 矢量/Flow 分页、PPTX、云端协作等差距见验收报告，不保证任意 Claude Design 项目无损运行。保存源包不会转换原程序，独立 HTML 使用本模块运行时。sandbox/CSP 提供权限隔离，不提供独立进程或无限循环中断能力。
 
 限制：100 个画板、300 个源文件（包含素材）（自动生成的 support.js 不计入，含运行时总计不超过 400 个文件）、2 MiB/文件、16 MiB/项目、最多 64 个附加会话。
 
