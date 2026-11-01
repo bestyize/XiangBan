@@ -1,9 +1,23 @@
 // @vitest-environment happy-dom
 import {mount,flushPromises} from '@vue/test-utils';
+import {reactive} from 'vue';
 import {describe,it,expect,vi,afterEach} from 'vitest';
 import BoardPreview from './BoardPreview.vue';
 afterEach(()=>vi.unstubAllGlobals());
 describe('sandbox capture protocol',()=>{
+ it('sends cloneable selection and pins from reactive project state',async()=>{
+  vi.stubGlobal('IntersectionObserver',undefined);
+  const selection=reactive(['node-1']),pins=reactive([{num:1,node:'node-1',text:'保留批注'}]);
+  const w=mount(BoardPreview,{attachTo:document.body,props:{src:'about:blank',title:'a',editing:true,token:'secret',selection,pins}});await flushPromises();
+  const frame=w.get('iframe').element as HTMLIFrameElement;
+  const post=vi.spyOn(frame.contentWindow!,'postMessage').mockImplementation((data:any)=>{structuredClone(data);});
+  window.dispatchEvent(new MessageEvent('message',{source:frame.contentWindow,data:{channel:'open-claude-design',token:'secret',type:'ready'}}));
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({type:'editor-selection',ids:['node-1']}),'*');
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({type:'pins',pins:[{num:1,node:'node-1',text:'保留批注'}]}),'*');
+  selection.push('node-2');pins[0].text='修改批注';await flushPromises();
+  expect(post).toHaveBeenCalledWith(expect.objectContaining({type:'editor-selection',ids:['node-1','node-2']}),'*');
+  w.unmount();
+ });
  it('waits for readiness and only accepts the matching frame, token and request',async()=>{
   vi.stubGlobal('IntersectionObserver',undefined);
   const w=mount(BoardPreview,{attachTo:document.body,props:{src:'about:blank',title:'a',editing:true,token:'secret'}});await flushPromises();

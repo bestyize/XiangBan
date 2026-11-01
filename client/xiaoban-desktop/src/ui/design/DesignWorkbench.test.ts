@@ -13,6 +13,14 @@ async function click(title:string){await wrapper!.get(`[title="${title}"]`).trig
 beforeEach(()=>{vi.resetAllMocks();vi.stubGlobal('IntersectionObserver',undefined);mocks.listen.mockResolvedValue(()=>{});mocks.invoke.mockImplementation(async(command,args)=>{if(command==='design_read')return {project:fixture(),origin:'design-preview://localhost'};if(command==='design_save')return {project:{...args.project,revision:args.expectedRevision+1},origin:'design-preview://localhost'};});});
 afterEach(()=>{wrapper?.unmount();wrapper=undefined;vi.unstubAllGlobals();});
 describe('compact design workbench',()=>{
+ it('shows import losses and exports the preserved original separately from editable sources',async()=>{
+  const p=fixture();p.canvas.xiaoban={import:{format:'claude-bundled-html',originalFile:'official.html',notice:'官方导出没有原画布坐标',issues:['缺少页面目标']}};
+  mocks.invoke.mockImplementation(async(command)=>command==='design_read'?{project:p,origin:'design-preview://localhost'}:null);
+  const w=await open();expect(w.get('.import-report').text()).toContain('缺少页面目标');expect(w.get('.import-report').text()).toContain('官方导出没有原画布坐标');
+  await w.findAll('.export button').find(b=>b.text()==='导入原件')!.trigger('click');await flushPromises();
+  expect(mocks.invoke).toHaveBeenCalledWith('design_export',expect.objectContaining({format:'original',id:p.id}));
+ });
+
  it('cancels a pending raster export without opening the save dialog and allows retry',async()=>{
   const w=await open(),png=w.findAll('button').find(b=>b.text()==='PNG 1×')!;
   await png.trigger('click');await flushPromises();expect(w.get('[role="status"]').text()).toContain('1/1');

@@ -65,6 +65,11 @@ pub fn design_restore(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String
 pub async fn design_export(window:tauri::WebviewWindow,id:String,format:String,project:Option<Project>,rendered:Option<open_claude_design::rendered_export::RenderedExport>)->Result<Option<String>,String>{
     crate::design_window::guard(&window,&id)?;let app=window.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move||{
+        let (title,ext,bytes)=if format=="original" {
+            let (name,bytes)=store(&app)?.original(&id)?;
+            let ext=if name.to_ascii_lowercase().ends_with(".zip"){"zip"}else{"html"};
+            (name.rsplit_once('.').map(|(stem,_)|stem).unwrap_or(&name).to_string(),ext,bytes)
+        }else{
         let saved=store(&app)?.load(&id)?;
         if rendered.as_ref().is_some_and(|r|r.revision!=saved.revision){return Err("设计稿已更新，请重新导出".into());}
         let p=project.unwrap_or(saved);if p.id!=id{return Err("设计稿编号不一致".into());}open_claude_design::validate(&p)?;
@@ -74,6 +79,8 @@ pub async fn design_export(window:tauri::WebviewWindow,id:String,format:String,p
             if let Some(file)=&rendered.file {if !p.files.contains_key(file)||!file.ends_with(".dc.html"){return Err("导出画板不存在".into());}title=format!("{}-{}",p.title,file.rsplit('/').next().unwrap_or(file).trim_end_matches(".dc.html"));}
             (if format=="png"{"png"}else{"pdf"},open_claude_design::rendered_export::decode(&format,&rendered.data)?)
         },_=>return Err("不支持的导出格式".into())};
+        (title,ext,bytes)
+        };
         let name=title.chars().filter(|c|!"/\\:*?\"<>|".contains(*c)&&!c.is_control()).collect::<String>();
         let Some(file)=app.dialog().file().set_title("导出设计稿").set_file_name(format!("{name}.{ext}")).add_filter("设计稿",&[ext]).blocking_save_file() else{return Ok(None)};
         let path=file.into_path().map_err(|_|"请选择本机文件")?;fs::write(&path,bytes).map_err(|e|e.to_string())?;Ok(Some(path.display().to_string()))
@@ -85,29 +92,41 @@ pub async fn design_import(window:tauri::WebviewWindow,session:String)->Result<O
     tauri::async_runtime::spawn_blocking(move||{
         let Some(file)=app.dialog().file().set_title("导入设计稿").add_filter("设计源包或画板",&["zip","html"]).blocking_pick_file()else{return Ok(None)};
         let path=file.into_path().map_err(|_|"请选择本机文件")?;
-        let bytes=fs::File::open(&path).map_err(|e|e.to_string())?.take(16*1024*1024+1).bytes().collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?;
-        if bytes.len()>16*1024*1024{return Err("设计源包超过 16MiB".into());}
+        let mut bytes=Vec::new();fs::File::open(&path).map_err(|e|e.to_string())?.read_to_end(&mut bytes).map_err(|e|e.to_string())?;
         let (canvas,files)=if path.extension().and_then(|e|e.to_str()).is_some_and(|e|e.eq_ignore_ascii_case("zip")) {open_claude_design::archive::from_zip(&bytes)?}else{
-            let source=String::from_utf8(bytes).map_err(|_|"HTML 需要使用 UTF-8 编码")?;
-            (json!({"v":3,"boards":{"Main.dc.html":{"title":"导入画板","x":0,"y":0,"w":1280,"h":800}},"order":["Main.dc.html"],"notes":{}}),BTreeMap::from([("Main.dc.html".into(),source)]))
+            let source=std::str::from_utf8(&bytes).map_err(|_|"HTML 需要使用 UTF-8 编码")?;
+            open_claude_design::html_import::from_html(source)?
         };
         let title=path.file_stem().and_then(|s|s.to_str()).unwrap_or("导入设计稿").chars().take(120).collect();
-        let p=store(&app)?.create(title,&session,canvas,files)?;saved(&app,&p)?;Ok(Some(payload(p)))
+        let filename=path.file_name().and_then(|s|s.to_str()).unwrap_or("import.html");
+        let p=store(&app)?.import(title,&session,canvas,files,&bytes,filename)?;saved(&app,&p)?;Ok(Some(payload(p)))
     }).await.map_err(|e|e.to_string())?
 }
 fn decode(s:&str)->Option<String>{let b=s.as_bytes();let(mut i,mut out)=(0,Vec::new());while i<b.len(){if b[i]==b'%'{out.push(u8::from_str_radix(std::str::from_utf8(b.get(i+1..i+3)?).ok()?,16).ok()?);i+=3;}else{out.push(b[i]);i+=1;}}String::from_utf8(out).ok()}
 /// This CSP applies only to the opaque preview origin, never the privileged control UI.
-pub fn csp()->&'static str{"default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline' https://fonts.googleapis.com; img-src data: blob:; font-src data: https://fonts.gstatic.com; media-src data: blob:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"}
+pub fn csp(asset_root:Option<&str>)->String{
+    let assets=asset_root.unwrap_or("");let connect=asset_root.unwrap_or("'none'");
+    format!("default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline' https://fonts.googleapis.com; img-src data: blob: {assets}; font-src data: https://fonts.gstatic.com {assets}; media-src data: blob: {assets}; connect-src {connect}; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'")
+}
 pub fn serve(app:&tauri::AppHandle,request:tauri::http::Request<Vec<u8>>)->tauri::http::Response<Vec<u8>>{
-    let result=(||->Result<Vec<u8>,String>{
+    let mut preview_assets=None;
+    let result=(||->Result<(Vec<u8>,String),String>{
         let path=decode(request.uri().path()).ok_or("路径编码无效")?;let mut parts=path.trim_start_matches('/').splitn(3,'/');
         let id=parts.next().ok_or("缺少 id")?;let revision=parts.next().ok_or("缺少版本")?.parse::<u64>().map_err(|_|"版本无效")?;let name=parts.next().ok_or("缺少画板")?;
-        let p=store(app)?.load(id)?;if revision!=p.revision{return Err("预览版本已更新，请刷新".into());}
+        if let Some(asset)=name.strip_prefix("_asset/"){
+            let bytes=store(app)?.read_asset(id,revision,asset)?;
+            let mime=open_claude_design::assets::mime(&bytes).ok_or("预览资源类型无效")?.to_string();
+            return Ok((bytes,mime));
+        }
+        let origin=if cfg!(windows){"http://design-preview.localhost"}else{"design-preview://localhost"};
+        let asset_root=format!("{origin}/{id}/{revision}/_asset/");
+        let p=store(app)?.preview_project(id,revision,&asset_root)?;
+        preview_assets=Some(asset_root);
         if !p.files.contains_key(name){return Err("设计文件不存在".into());}if !name.ends_with(".dc.html"){return Err("此预览仅允许画板".into());}
-        Ok(open_claude_design::archive::preview_in_project(&p,name)?.into_bytes())
+        Ok((open_claude_design::archive::preview_in_project(&p,name)?.into_bytes(),"text/html; charset=utf-8".into()))
     })();
-    let (status,body)=match result{Ok(b)=>(200,b),Err(e)=>(400,format!("<!doctype html><meta charset=utf-8><p>预览未就绪：{}</p>",e.replace('&',"&amp;").replace('<',"&lt;")).into_bytes())};
-    tauri::http::Response::builder().status(status).header("Content-Type","text/html; charset=utf-8").header("Content-Security-Policy",csp()).header("X-Content-Type-Options","nosniff").header("Referrer-Policy","no-referrer").header("Cache-Control","no-store").body(body).unwrap_or_default()
+    let (status,body,mime)=match result{Ok((b,mime))=>(200,b,mime),Err(e)=>(400,format!("<!doctype html><meta charset=utf-8><p>预览未就绪：{}</p>",e.replace('&',"&amp;").replace('<',"&lt;")).into_bytes(),"text/html; charset=utf-8".into())};
+    tauri::http::Response::builder().status(status).header("Content-Type",mime).header("Access-Control-Allow-Origin","*").header("Content-Security-Policy",csp(preview_assets.as_deref())).header("X-Content-Type-Options","nosniff").header("Referrer-Policy","no-referrer").header("Cache-Control","no-store").body(body).unwrap_or_default()
 }
 
 pub fn removed(app:&tauri::AppHandle,id:&str)->Result<(),String>{crate::data_library::forget_design(app,id)?;let _=app.emit("design-deleted",json!({"id":id}));Ok(())}

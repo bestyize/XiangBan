@@ -22,9 +22,9 @@ function sync(){
   const win=frame.value?.contentWindow;if(!win)return;
   win.postMessage({channel:'open-claude-design',type:'mode',editing:props.editing,commenting:Boolean(props.commenting),writable:props.writable!==false,zoom:props.zoom??1,guides:props.guides!==false},'*');
   if(props.theme)win.postMessage({channel:'open-claude-design',type:'theme',theme:props.theme},'*');
-  if(props.pins)win.postMessage({channel:'open-claude-design',type:'pins',pins:props.pins},'*');
+  if(props.pins)win.postMessage({channel:'open-claude-design',type:'pins',pins:props.pins.map(({num,node,text})=>({num,node,text}))},'*');
 }
-function select(){frame.value?.contentWindow?.postMessage({channel:'open-claude-design',type:'editor-selection',ids:props.selection??[]},'*');}
+function select(){frame.value?.contentWindow?.postMessage({channel:'open-claude-design',type:'editor-selection',ids:[...(props.selection??[])]},'*');}
 function message(e:MessageEvent){if(e.source!==frame.value?.contentWindow||e.data?.channel!=='open-claude-design'||e.data.token!==props.token)return;if(e.data.type==='ready'||e.data.type==='editor-ready'){sync();select();}if(e.data.type==='ready'){ready=true;waitingReady?.();waitingReady=undefined;}if(e.data.type==='capture-result'){const pending=captureRequest;if(!pending||pending.id!==e.data.requestId)return;captureRequest=undefined;clearTimeout(pending.timer);if(e.data.error)pending.reject(Error(String(e.data.error)));else if(typeof e.data.png==='string'&&e.data.png.length<=64*1024*1024)pending.resolve(e.data.png);else pending.reject(Error('画板图片无效'));return;}if(e.data.type==='error')emit('error',String(e.data.message));emit('message',e.data);}
 onMounted(()=>{window.addEventListener('message',message);if(typeof IntersectionObserver==='undefined')visible.value=true;else{observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){visible.value=true;observer?.disconnect();}},{rootMargin:'300px'});if(host.value)observer.observe(host.value);}});
 onBeforeUnmount(()=>{disposed=true;cancelCapture();observer?.disconnect();window.removeEventListener('message',message);});

@@ -142,7 +142,7 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
           <button v-if="query" type="button" class="xb-icon-btn is-sm" aria-label="清空搜索" title="清空搜索" @click="query = ''; searchBox?.focus()"><X :size="12" /></button>
         </label>
         <template v-if="tab === 'docs'">
-          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || designImporting" aria-label="导入设计稿" title="导入设计稿（ZIP / HTML）" @click="importDesign"><FileText :size="17" /></button>
+          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || designImporting" aria-label="导入设计稿" title="导入 Claude 官方 HTML 或含 canvas.json 的源码 ZIP；图片 ZIP 请作为参考文档导入" @click="importDesign"><FileText :size="17" /></button>
           <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="导入文件夹" title="导入文件夹" data-testid="library-import-folder" @click="docsTab?.importFrom(true)"><FolderDown :size="17" /></button>
           <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="导入文档" title="导入文档" data-testid="library-import" @click="docsTab?.importFrom(false)"><Download :size="17" /></button>
           <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || library.busy" aria-label="新建文档" title="新建文档" data-testid="library-create-doc" @click="openCreate('doc')"><Plus :size="17" /></button>

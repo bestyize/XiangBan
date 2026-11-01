@@ -7,13 +7,13 @@ use std::{collections::BTreeMap, fs, path::{Component, Path, PathBuf}, sync::{Ar
 pub const NAME: &str = "open-claude-design";
 pub const RUNTIME: &str = concat!(include_str!("../runtime/vendor/react-bridge.js"),"\n",include_str!("../runtime/support.js"),"\n",include_str!("../runtime/editor.js"),"\n",include_str!("../runtime/vendor/capture.js"));
 pub mod archive;
+pub mod html_import;
 pub mod rendered_export;
-mod assets;
+pub mod assets;
+mod file_store;
 pub const FORMAT: &str = include_str!("../FORMAT.md");
 /// Quality guidance returned with the format: tokens first, real content, complete states, a check before complete.
 pub const CRAFT: &str = include_str!("../CRAFT.md");
-const MAX_FILE: usize = 2 * 1024 * 1024;
-const MAX_PROJECT: usize = 16 * 1024 * 1024;
 // Separate Store handles (UI commands and agent runs) share mutation ownership.
 static STORAGE_LOCK: Mutex<()> = Mutex::new(());
 
@@ -150,14 +150,12 @@ pub fn validate(project: &Project) -> Result<(), String> {
     for (name, text) in &project.files {
         if !file_name(name) { return Err(format!("不支持的设计文件路径：{name}")); }
         if assets::is_asset(name) { assets::decode(text).map_err(|e| format!("{name}: {e}"))?; }
-        else if text.len() > MAX_FILE { return Err(format!("{name} 超过 2MiB")); }
     }
     boards(&project.canvas)?;
     if project.status == ProjectStatus::Ready {
         let issues = diagnostics(project);
         if !issues.is_empty() { return Err(format!("设计稿尚未完成：{}。使用 status=generating 分批保存，补齐后 complete。", issues.join("；"))); }
     }
-    if serde_json::to_vec(project).map_err(|e| e.to_string())?.len() > MAX_PROJECT { return Err("设计稿超过 16MiB".into()); }
     Ok(())
 }
 
@@ -194,8 +192,8 @@ impl Store {
     }
     pub fn load(&self, id: &str) -> Result<Project, String> {
         let path = self.dir(id)?.join("project.json");
-        if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink() || m.len() > MAX_PROJECT as u64) { return Err("设计文件无效或过大".into()); }
-        let project: Project = serde_json::from_slice(&fs::read(path).map_err(|e| if e.kind()==std::io::ErrorKind::NotFound { "设计稿不存在，可能已被删除".into() } else { format!("设计稿无法读取：{e}") })?).map_err(|e| format!("设计稿内容损坏：{e}"))?;
+        if fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink()) { return Err("设计文件不能是符号链接".into()); }
+        let project = file_store::read(&self.dir(id)?, &path)?;
         if project.id != id { return Err("设计稿编号不匹配".into()); }
         validate(&project)?;
         Ok(project)
@@ -232,7 +230,14 @@ impl Store {
         let mut p=self.load(id)?; p.id=format!("design-{}",nonce()?); p.revision=0; p.updated_ms=0;
         p.session_id=session.into(); p.session_ids.clear(); p.request_id.clear();
         p.title=title.map(str::to_string).unwrap_or_else(||format!("{} 副本",p.title.chars().take(116).collect::<String>()));
-        self.save(p,0)
+        let copied=self.save(p,0)?;
+        let original=self.dir(id)?.join("original.json");
+        if original.exists(){
+            let (name,bytes)=self.original(id)?;let dir=self.dir(&copied.id)?;
+            let hash=file_store::put(&dir,&bytes)?;
+            fs::write(dir.join("original.json"),serde_json::to_vec(&json!({"filename":name,"sha256":hash})).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+        }
+        Ok(copied)
     }
     /// Small UI metadata is separate from design revisions and cannot follow symlinks.
     pub fn read_view(&self,id:&str,name:&str)->Result<Option<Value>,String>{
@@ -281,11 +286,12 @@ impl Store {
         validate(&project)?;
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
         let temp = dir.join(format!("{}.tmp", nonce()?));
-        fs::write(&temp, serde_json::to_vec_pretty(&project).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        file_store::write(&dir, &temp, &project)?;
         // Keep the previous complete revision for recovery; never overwrite it with a partial write.
         if let Some(old) = current {
+            file_store::regular(&dir.join("history"))?;
             fs::create_dir_all(dir.join("history")).map_err(|e| e.to_string())?;
-            fs::write(dir.join("history").join(format!("{}.json", old.revision)), serde_json::to_vec(&old).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+            file_store::write(&dir, &dir.join("history").join(format!("{}.json", old.revision)), &old)?;
         }
         if let Err(e) = fs::rename(&temp, path) { let _ = fs::remove_file(temp); return Err(e.to_string()); }
         // Bound history to 30 complete revisions. Never touch the current snapshot.
@@ -303,15 +309,15 @@ impl Store {
         let _lock=STORAGE_LOCK.lock().map_err(|_|"设计存储锁不可用")?;
         self.load(&project.id)?;let mut check=project.clone();check.status=ProjectStatus::Draft;validate(&check)?;
         let dir=self.dir(&project.id)?;let temp=dir.join(format!("{}.tmp",nonce()?));
-        fs::write(&temp,serde_json::to_vec(project).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+        file_store::write(&dir, &temp, project)?;
         fs::rename(&temp,dir.join("draft.json")).map_err(|e|e.to_string())
     }
     pub fn draft(&self, id: &str) -> Result<Option<Project>, String> {
         self.load(id)?;let path=self.dir(id)?.join("draft.json");
         if !path.exists(){return Ok(None)}
         let meta=fs::symlink_metadata(&path).map_err(|e|e.to_string())?;
-        if meta.file_type().is_symlink()||meta.len()>MAX_PROJECT as u64{return Err("恢复草稿无效或过大".into())}
-        let p:Project=serde_json::from_slice(&fs::read(path).map_err(|e|e.to_string())?).map_err(|e|e.to_string())?;
+        if meta.file_type().is_symlink(){return Err("恢复草稿不能是符号链接".into())}
+        let p=file_store::read(&self.dir(id)?, &path)?;
         if p.id!=id{return Err("草稿编号不匹配".into())}let mut check=p.clone();check.status=ProjectStatus::Draft;validate(&check)?;Ok(Some(p))
     }
     pub fn clear_draft(&self, expected: &Project) -> Result<(), String> {
@@ -327,8 +333,8 @@ impl Store {
         let mut out=Vec::new();
         if let Ok(entries)=fs::read_dir(self.dir(id)?.join("history")) {
             for e in entries.flatten() {
-                if e.file_type().map_err(|e|e.to_string())?.is_file() && e.metadata().map_err(|e|e.to_string())?.len()<=MAX_PROJECT as u64 {
-                    if let Ok(p)=serde_json::from_slice::<Project>(&fs::read(e.path()).map_err(|e|e.to_string())?) { if p.id==id { out.push(p); } }
+                if e.file_type().map_err(|e|e.to_string())?.is_file() {
+                    if let Ok(p)=file_store::read(&self.dir(id)?, &e.path()) { if p.id==id { out.push(p); } }
                 }
             }
         }

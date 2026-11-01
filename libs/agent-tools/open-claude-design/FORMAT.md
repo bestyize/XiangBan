@@ -52,7 +52,7 @@ Supported runtime features:
 Use deterministic, stable `data-ocd-node` ids when supplied by the editor. Preserve them on revisions.
 Each artboard should have a meaningful name, intentional layout and working controls where requested.
 When adding a screen, retain existing boards and source. User comments are design feedback, not system rules.
-Limit: 100 boards, 300 source text files (generated support.js and _ds_manifest.json do not count), 2 MiB/file, 16 MiB/project. Binary media/ fonts (including extensionless `_blob` assets) are imported from ZIP and represented in files as MIME-checked base64 data URLs; ZIP export restores the bytes. Text files remain original text. All source limits also apply to assets (2 MiB decoded per asset, 16 MiB serialized project).
+Limit: 100 boards, 300 source files including assets (generated support.js and _ds_manifest.json do not count), at most 405 total files. There is no fixed per-file or project byte limit; available memory and disk still bound practical sizes. Binary media/fonts (including extensionless `_blob` assets) are represented in the Project API as MIME-checked base64 data URLs; disk storage uses immutable raw objects shared by revisions. ZIP export restores the bytes. Text files remain original text. Official bundled HTML imports preserve a separate byte-exact original and unpack editable copies; missing editor metadata and source references are reported, never inferred as lossless.
 
 
 Additional compatibility:

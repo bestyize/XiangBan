@@ -359,6 +359,7 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
     <summary><Download :size="14"/>导出</summary>
     <div class="xb-menu" role="menu" aria-label="导出设计稿" @click="closeMenu">
       <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="ds.export('zip')">ZIP 源文件</button>
+      <button v-if="project?.canvas.xiaoban?.import?.originalFile" class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" title="保存导入时的原文件，不含后续编辑" @click="ds.export('original')">导入原件</button>
       <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting||!allBoards.length" @click="exportRaster('pdf')">全部画板 PDF</button>
       <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="ds.export('html')">独立 HTML</button>
       <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="ds.export('md')">Markdown 规范 (.md)</button>
@@ -406,6 +407,12 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
   </details>
   <button title="放大" @click="zoom(scale*1.2)"><Plus :size="12"/></button>
 </div>
+<details v-if="project?.canvas.xiaoban?.import?.originalFile" class="import-report">
+ <summary>已保留导入原件<span v-if="project.canvas.xiaoban.import.issues?.length"> · {{project.canvas.xiaoban.import.issues.length}} 项引用待补齐</span></summary>
+ <p>{{project.canvas.xiaoban.import.notice || '原文件独立保留，可通过导出菜单取回；当前编辑不会覆盖原件。'}}</p>
+ <p v-if="project.canvas.xiaoban.import.issues?.length">以下引用未包含在导出文件中，已保留原引用，没有猜测或替换其目标：</p>
+ <ul><li v-for="issue in project.canvas.xiaoban.import.issues" :key="issue">{{issue}}</li></ul>
+</details>
 <div v-if="rendering" class="export-progress" role="status"><span>{{renderProgress}}</span><button @click="cancelRendering">取消导出</button></div>
 <div v-if="ds.error" class="errorbar" role="alert">
   {{ds.error}}<small v-if="ds.dirty"> · 草稿未写入预览，可先导出保留</small>
@@ -588,6 +595,8 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
 </section>
 </template>
 <style scoped>
+.import-report{flex:none;max-height:180px;overflow:auto;padding:6px 12px;font-size:12px;background:var(--ui-soft);color:var(--ui-ink)}.import-report summary{cursor:pointer}.import-report p{margin:6px 0}.import-report ul{padding-left:20px;margin:6px 0}
+
 .export>div{min-width:176px!important}.export .xb-menu-item{white-space:nowrap;min-height:32px}
 
 .export-progress{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 12px;background:var(--ui-soft);color:var(--ui-text-primary)}.export-progress span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.capture-worker{position:fixed;left:-100000px;top:0;pointer-events:none}.board-export[open]{z-index:10}.viewport[aria-busy=true] .surface{pointer-events:none}.board-export summary{display:flex;align-items:center}

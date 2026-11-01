@@ -1,4 +1,4 @@
-//! Bounded source archives. No extraction to arbitrary filesystem paths.
+//! Source archives. No extraction to arbitrary filesystem paths.
 use super::*;
 use std::io::{Cursor, Read, Write};
 use regex::Regex;
@@ -199,33 +199,30 @@ pub fn to_zip(project: &Project) -> Result<Vec<u8>, String> {
     Ok(writer.finish().map_err(|e| e.to_string())?.into_inner())
 }
 
-/// Convert one bounded source file to the JSON store representation.
+/// Convert one source file to the JSON store representation.
 /// Text remains unchanged; recognized media is encoded losslessly as a data URL.
 pub fn source_from_bytes(name: &str, bytes: Vec<u8>) -> Result<String, String> {
     if !file_name(name) { return Err(format!("不支持的设计文件路径：{name}")); }
-    if bytes.len() > MAX_FILE { return Err(format!("{name} 超过 2MiB")); }
     if assets::is_asset(name) { assets::encode(&bytes).map_err(|e|format!("{name}: {e}")) }
     else { String::from_utf8(bytes).map_err(|_|format!("{name} 不是 UTF-8 文本")) }
 }
 
 pub fn from_zip(bytes: &[u8]) -> Result<(Value, BTreeMap<String, String>), String> {
-    if bytes.len() > MAX_PROJECT { return Err("ZIP 超过 16MiB".into()); }
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| e.to_string())?;
     if archive.len() > 500 { return Err("ZIP 文件数量过多".into()); }
-    let mut all = BTreeMap::new(); let mut total = 0;
+    let mut all = BTreeMap::new();
     for i in 0..archive.len() {
         let mut f = archive.by_index(i).map_err(|e| e.to_string())?;
         if f.is_dir() { continue; }
         if f.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000) { return Err("拒绝符号链接".into()); }
         let name = f.name().map_err(|e| e.to_string())?.into_owned();
         if !file_name(&name) { return Err(format!("暂不支持的归档资源：{name}。资源路径或类型无效。")); }
-        if f.size() > MAX_FILE as u64 { return Err(format!("{name} 超过 2MiB")); }
-        let mut buf = Vec::new(); f.by_ref().take(MAX_FILE as u64 + 1).read_to_end(&mut buf).map_err(|e| e.to_string())?;
-        total += buf.len(); if buf.len() > MAX_FILE || total > MAX_PROJECT { return Err("ZIP 解压内容过大".into()); }
+        let mut buf = Vec::new(); f.read_to_end(&mut buf).map_err(|e| e.to_string())?;
         let text = source_from_bytes(&name,buf)?;
         if all.insert(name, text).is_some() { return Err("ZIP 中有重复文件路径".into()); }
     }
     let indexes: Vec<_> = all.keys().filter(|n| n.as_str() == "canvas.json" || n.ends_with("/canvas.json")).cloned().collect();
+    if indexes.is_empty() && all.keys().all(|name| assets::is_asset(name)) { return Err("这是图片 ZIP，不含可编辑设计源码；请从 Claude 导出 HTML 后导入".into()); }
     if indexes.len() != 1 { return Err("源包必须含唯一的 canvas.json".into()); }
     let index = &indexes[0]; let prefix = index.strip_suffix("canvas.json").unwrap();
     let canvas = serde_json::from_str(all.get(index).unwrap()).map_err(|e| format!("索引无效：{e}"))?;
@@ -333,7 +330,7 @@ mod tests {
         let index = br#"{"v":3,"boards":{"Main.dc.html":{"w":100,"h":200}},"order":["Main.dc.html"]}"#.to_vec();
         assert!(from_zip(&zip_files(vec![("canvas.json", index.clone())])).unwrap_err().contains("缺少画板"));
         assert!(from_zip(&zip_files(vec![("canvas.json", index.clone()), ("other/canvas.json", index.clone())])).unwrap_err().contains("唯一"));
-        assert!(from_zip(&zip_files(vec![("canvas.json", index.clone()), ("Main.dc.html", vec![b'x'; MAX_FILE + 1])])).unwrap_err().contains("2MiB"));
+        assert!(from_zip(&zip_files(vec![("canvas.json", index.clone()), ("Main.dc.html", vec![b'x'; 3*1024*1024])])).is_ok());
     }
     #[test]
     fn maximum_source_count_roundtrips_with_generated_runtime() {

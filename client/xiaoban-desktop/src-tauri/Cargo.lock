@@ -3256,10 +3256,12 @@ version = "0.1.0"
 dependencies = [
  "agent-kernel",
  "base64 0.22.1",
+ "flate2",
  "getrandom 0.3.4",
  "regex",
  "serde",
  "serde_json",
+ "sha2",
  "zip 9.0.4",
 ]
 

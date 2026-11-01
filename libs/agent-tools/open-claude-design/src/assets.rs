@@ -2,13 +2,13 @@
 //! while previews resolve them inside their opaque sandbox (never through IPC).
 use base64::{engine::general_purpose::STANDARD, Engine};
 
-pub(crate) fn is_asset(name: &str) -> bool {
+pub fn is_asset(name: &str) -> bool {
     name.split('/').any(|p| p == "_blob") ||
     ["png", "jpg", "jpeg", "gif", "webp", "avif", "ico", "woff", "woff2", "ttf", "otf", "mp3", "wav", "ogg", "mp4", "webm"]
         .iter().any(|ext| name.to_ascii_lowercase().ends_with(&format!(".{ext}")))
 }
 
-fn mime(bytes: &[u8]) -> Option<&'static str> {
+pub fn mime(bytes: &[u8]) -> Option<&'static str> {
     if bytes.starts_with(b"\x89PNG\r\n\x1a\n") { Some("image/png") }
     else if bytes.starts_with(b"\xff\xd8\xff") { Some("image/jpeg") }
     else if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") { Some("image/gif") }
@@ -36,11 +36,9 @@ pub(crate) fn encode(bytes: &[u8]) -> Result<String, String> {
     Ok(format!("data:{mime};base64,{}", STANDARD.encode(bytes)))
 }
 
-pub(crate) fn decode(text: &str) -> Result<Vec<u8>, String> {
-    if text.len() > super::MAX_FILE.div_ceil(3) * 4 + 100 { return Err("素材超过 2MiB".into()); }
+pub fn decode(text: &str) -> Result<Vec<u8>, String> {
     let (header, body) = text.split_once(",").ok_or("素材需要 base64 data URL")?;
     let bytes = STANDARD.decode(body).map_err(|_| "素材 base64 无效")?;
-    if bytes.len() > super::MAX_FILE { return Err("素材超过 2MiB".into()); }
     let detected = mime(&bytes).ok_or("不支持或无效的二进制素材类型")?;
     if header != format!("data:{detected};base64") { return Err("素材 MIME 与内容不一致".into()); }
     Ok(bytes)
