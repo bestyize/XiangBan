@@ -269,3 +269,7 @@ API：
 ### 游戏收藏筛选（2026-11-01）
 
 `GET /api/me/content-bookmarks?kind=game&page=1` 筛选当前账号收藏的公开游戏作品，筛选先于分页和 total 统计；响应条目的 `kind` 继续为 `pack`，收藏/取消仍使用 `/content-social/pack/{id}/bookmark`。兼容原有 pack/scheme 查询，不增加收藏表或改变权限。针对性验证：`TEST_DATABASE_URL=... cargo test --locked --manifest-path services/server-forum/Cargo.toml game_bookmarks_filter`，覆盖登录限制、真实总数、分页、下架排除和原作品查询兼容。
+
+## 资讯订阅（开发中，默认关闭）
+
+账号私有订阅、周期任务及期刊档案，桌面/手机/网页统一管理入口。配置、计费边界、投递不确定状态和验证范围见 [资讯订阅](docs/information-subscriptions.md)。未部署，不读取收件箱，不接收用户本地 API Key。

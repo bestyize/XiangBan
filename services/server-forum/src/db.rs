@@ -249,6 +249,7 @@ pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     crate::community_editor::schema::init(pool).await?;
     crate::tool_mirrors::init(pool).await?;
     crate::scheme_backups::init(pool).await?;
+    crate::subscriptions::init(pool).await?;
     crate::content_social::schema::init(pool).await?;
     crate::reply_content::schema::init(pool).await?;
     // 搜索用的三元组索引是可选的：数据库没有 pg_trgm 扩展时退化为普通 ILIKE 扫描。

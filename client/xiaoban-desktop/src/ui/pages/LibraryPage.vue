@@ -135,6 +135,7 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
 </script>
 
 <template>
+  <NButton v-if="store.desktop" size="small" title="查看账号订阅与历史期刊" aria-description="查看账号订阅与历史期刊" @click="invoke('community_web_open', { subscriptions: true }).catch(store.notify)">资讯订阅与期刊</NButton>
   <section class="library-page xb-page" data-testid="library-page" aria-label="资料库">
     <header class="xb-page-head library-head" data-tauri-drag-region>
       <div class="xb-tabs-lg" role="tablist" aria-label="资料库分类" @keydown="tabKey">

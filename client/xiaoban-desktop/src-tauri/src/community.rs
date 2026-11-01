@@ -44,7 +44,7 @@ fn same_origin(url: &url::Url, origin: &url::Url) -> bool {
 
 /// The remote site has no native permissions and does not receive the desktop account token.
 #[tauri::command]
-pub async fn community_web_open(app: tauri::AppHandle, caller: tauri::WebviewWindow) -> Result<(), String> {
+pub async fn community_web_open(app: tauri::AppHandle, caller: tauri::WebviewWindow, subscriptions: Option<bool>) -> Result<(), String> {
     control(&caller)?;
     let _guard = COMMUNITY_OPEN_LOCK.lock().map_err(|_| "社区窗口暂不可用")?;
     if let Some(existing) = app.get_window(COMMUNITY_WINDOW) {
@@ -60,10 +60,17 @@ pub async fn community_web_open(app: tauri::AppHandle, caller: tauri::WebviewWin
             let bottom = i64::from(area.position.y) + i64::from(area.size.height) - i64::from(height);
             existing.set_position(tauri::PhysicalPosition::new(i64::from(position.x).clamp(i64::from(area.position.x), right) as i32, i64::from(position.y).clamp(i64::from(area.position.y), bottom) as i32)).map_err(|e| e.to_string())?;
         }
+        if subscriptions == Some(true) {
+            if let Some(view) = app.get_webview(COMMUNITY_CONTENT) {
+                let mut destination = web_origin()?; destination.set_path("/me/subscriptions");
+                view.navigate(destination).map_err(|e| e.to_string())?;
+            }
+        }
         existing.show().map_err(|e| e.to_string())?;
         return existing.set_focus().map_err(|e| e.to_string());
     }
-    let origin = web_origin()?;
+    let mut origin = web_origin()?;
+    if subscriptions == Some(true) { origin.set_path("/me/subscriptions"); }
     let nav_origin = origin.clone();
     let nav_app = app.clone();
     let new_origin = origin.clone();

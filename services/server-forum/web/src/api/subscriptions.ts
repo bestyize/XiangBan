@@ -1,0 +1,14 @@
+import { request } from './forum'
+export type Schedule = {kind:'daily';time:string}|{kind:'weekly';time:string;weekday:number}|{kind:'once';at:string}
+export interface Subscription {id:string;revision:number;title:string;interests:string;recipient:string;schedule:Schedule;timezone:string;next_run:string|null;status:string;verified_at:string|null}
+export interface SubscriptionInput {id:string;revision:number;title:string;interests:string;recipient:string;schedule:Schedule;timezone:string;active:boolean;confirmed:boolean}
+export interface Edition {id:string;subscription_id:string;title:string;status:string;error:string|null;created_at:string;sent_at:string|null;due_at:string;plaintext?:string;html?:string;sources?:{title:string;url:string}[]}
+export const subscriptions = {
+ list:()=>request<{items:Subscription[];delivery_configured:boolean;worker_enabled:boolean}>('GET','/me/information-subscriptions'),
+ save:(input:SubscriptionInput)=>request<Subscription>(input.revision?'PUT':'POST',`/me/information-subscriptions${input.revision?'/'+input.id:''}`,input),
+ remove:(s:Subscription)=>request('DELETE',`/me/information-subscriptions/${s.id}`,{revision:s.revision}),
+ verification:(id:string)=>request('POST',`/me/information-subscriptions/${id}/verification`),
+ verify:(id:string,code:string)=>request('POST',`/me/information-subscriptions/${id}/verify`,{code}),
+ history:(before?:string)=>request<{items:Edition[]}>('GET','/me/information-editions'+(before?'?before='+encodeURIComponent(before):'')),
+ edition:(id:string)=>request<Edition>('GET',`/me/information-editions/${id}`),
+}
