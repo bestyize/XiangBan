@@ -6,6 +6,7 @@ export type ElementAction =
  | {type:'delete'|'duplicate'|'group'|'ungroup';ids:string[]}
  | {type:'style';patches:{id:string;style:Record<string,string>}[]}
  | {type:'text';id:string;text:string}
+ | {type:'code';id:string;style:string;overrides:string;attributes:Record<string,string>}
  | {type:'reorder';ids:string[];before?:string;direction?:'previous'|'next'|'front'|'back'}
  | {type:'paste';fragment:Fragment;parent?:string}
  | {type:'insert';kind:'text'|'rectangle'|'ellipse'|'note';parent?:string}
@@ -17,7 +18,7 @@ const uid=()=>`ocd-${crypto.randomUUID()}`;
 function read(source:string){const d=sourceDoc(source);assignNodeIds(d);return d;}
 function serialize(d:Document){return '<!doctype html>\n'+[...d.childNodes].filter(n=>n.nodeType!==10).map(n=>n.nodeType===8?`<!--${n.textContent}-->`:n instanceof Element?n.outerHTML:n.textContent??'').join('');}
 function find(d:Document,id:string){const els=[...rootOf(d).querySelectorAll('[data-ocd-node]')].filter(n=>n.getAttribute('data-ocd-node')===id);if(els.length!==1)throw Error('元素标识已变化或重复，请重新选择');return els[0] as HTMLElement;}
-function generated(el:Element){return !!el.closest('sc-for,dc-import');}
+function generated(el:Element){return !!el.closest('sc-for,dc-import,x-import');}
 function editable(el:Element,structural=true){
  if(protectedTags.has(el.localName))throw Error('不能直接修改设计程序或模板节点');
  if(generated(el))throw Error('循环或组件生成的元素请通过批注修改源模板');
@@ -48,8 +49,13 @@ export function layersOf(source:string):ElementLayer[]{const d=read(source),root
  return {id:el.getAttribute('data-ocd-node')!,parent:el.parentElement?.getAttribute('data-ocd-node')??undefined,depth,tag:el.tagName,label:el.getAttribute('aria-label')||el.id||(el.textContent??'').trim().slice(0,32)||el.localName,locked:!!el.closest('[data-ocd-locked="true"]'),hidden:!!el.closest('[data-ocd-hidden="true"]'),generated:generated(el)};
 });}
 export function copyElements(source:string,ids:string[]):Fragment{const d=read(source);return {kind:'open-claude-design/elements',html:selection(d,ids).map(el=>el.outerHTML)};}
+const codeAttribute=/^(id|class|title|alt|src|href|role|aria-[\w-]+|data-(?!ocd-)[\w-]+)$/;
+export function elementCode(source:string,id:string){
+ const el=find(read(source),id);
+ return {style:el.getAttribute('style')??'',overrides:el.getAttribute('data-ocd-style')??'',attributes:Object.fromEntries([...el.attributes].filter(a=>codeAttribute.test(a.name)).map(a=>[a.name,a.value]))};
+}
 export function mutateElements(source:string,action:ElementAction):Mutation{
- if(!action||!['delete','duplicate','group','ungroup','style','text','reorder','paste','insert','lock','hide'].includes(action.type))throw Error('不支持的画布指令');
+ if(!action||!['delete','duplicate','group','ungroup','style','text','code','reorder','paste','insert','lock','hide'].includes(action.type))throw Error('不支持的画布指令');
  const d=read(source),root=rootOf(d);let selected:Element[]=[];
  if('ids' in action)selected=selection(d,action.ids,action.type!=='lock'&&action.type!=='hide');
  let ids=selected.map(el=>el.getAttribute('data-ocd-node')!);
@@ -62,6 +68,16 @@ export function mutateElements(source:string,action:ElementAction):Mutation{
  if(action.type==='ungroup'){ids=[];const groups=new Set(selected.map(el=>el.getAttribute('data-ocd-group')).filter((group):group is string=>!!group&&group!=='true'));if(!groups.size&&!selected.some(el=>el.getAttribute('data-ocd-group')==='true'))throw Error('只能解散通过画布创建的编组');for(const el of selected.filter(el=>el.getAttribute('data-ocd-group')==='true')){ids.push(...[...el.children].map(n=>n.getAttribute('data-ocd-node')!).filter(Boolean));el.replaceWith(...el.childNodes);}for(const el of root.querySelectorAll('[data-ocd-group]'))if(groups.has(el.getAttribute('data-ocd-group')??'')){ids.push(el.getAttribute('data-ocd-node')!);el.removeAttribute('data-ocd-group');}}
  if(action.type==='style'){if(!action.patches.length||action.patches.length>500)throw Error('修改元素过多');ids=[];for(const patch of action.patches){const el=find(d,patch.id);editable(el,false);overrides(el,patch.style);ids.push(patch.id);}}
  if(action.type==='text'){const el=find(d,action.id);editable(el,false);if(el.children.length||el.textContent?.includes('{{')&&el.getAttribute('data-ocd-literal')!=='true')throw Error('动态文字或组合元素请通过批注修改');if(typeof action.text!=='string'||action.text.length>50000)throw Error('文字过长');el.textContent=action.text;el.setAttribute('data-ocd-literal','true');ids=[action.id];}
+ if(action.type==='code'){
+  const el=find(d,action.id);editable(el,false);
+  if(typeof action.style!=='string'||typeof action.overrides!=='string'||action.style.length+action.overrides.length>50000)throw Error('样式内容过长');
+  if(!action.attributes||Object.entries(action.attributes).some(([key,value])=>!codeAttribute.test(key)||typeof value!=='string'||value.length>10000))throw Error('不支持的元素属性');
+  // Keep template expressions verbatim; DOM setters escape HTML, and execution stays in the preview sandbox.
+  el.setAttribute('style',action.style);if(action.overrides)el.setAttribute('data-ocd-style',action.overrides);else el.removeAttribute('data-ocd-style');
+  for(const attr of [...el.attributes])if(codeAttribute.test(attr.name)&&!(attr.name in action.attributes))el.removeAttribute(attr.name);
+  for(const [key,value] of Object.entries(action.attributes))el.setAttribute(key,value);
+  ids=[action.id];
+ }
  if(action.type==='reorder'){
   const parent=selected[0].parentElement!;if(selected.some(el=>el.parentElement!==parent))throw Error('排序需要在同一容器内进行');
   if(action.direction==='front')parent.append(...selected);else if(action.direction==='back')parent.prepend(...selected);

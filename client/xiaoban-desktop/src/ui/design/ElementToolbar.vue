@@ -2,8 +2,15 @@
 import {Copy,Trash2,Group,Lock,Type,MousePointer2} from 'lucide-vue-next';
 defineProps<{count:number;disabled:boolean;readonly?:boolean}>();
 const emit=defineEmits<{command:[command:string]}>();
+function key(e:KeyboardEvent){
+ const root=e.currentTarget as HTMLElement,items=[...root.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled)')],index=items.indexOf(e.target as HTMLElement);
+ if(e.key==='Escape'){e.preventDefault();e.stopPropagation();emit('command','focusCanvas');return;}
+ // Native selects retain their arrow-key behavior while open.
+ if((e.target as HTMLElement).tagName==='SELECT')return;
+ if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'].includes(e.key)){e.preventDefault();e.stopPropagation();const next=e.key==='Home'?0:e.key==='End'?items.length-1:(index+(['ArrowLeft','ArrowUp'].includes(e.key)?-1:1)+items.length)%items.length;items[next]?.focus();}
+}
 </script>
-<template><div class="element-toolbar" role="toolbar" aria-label="选中元素操作">
+<template><div class="element-toolbar" role="toolbar" aria-label="选中元素操作" @keydown="key">
 <span>{{count}} 个元素</span>
 <button :disabled="disabled||readonly" title="编辑文字 (Enter)" aria-label="编辑文字" @click="emit('command','editText')"><Type :size="14"/></button>
 <button :disabled="disabled||readonly" title="复制元素 (⌘/Ctrl+D)" aria-label="复制元素" @click="emit('command','duplicate')"><Copy :size="14"/></button>

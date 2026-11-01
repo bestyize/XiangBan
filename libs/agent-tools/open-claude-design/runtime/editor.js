@@ -14,7 +14,7 @@
     const candidates=()=>[...document.querySelectorAll('[data-ocd-node]')].filter(el=>sourceMap.has(id(el))&&!['script','style','helmet','sc-for','sc-if','sc-else','sc-else-if'].includes(el.localName)&&!el.closest('[data-ocd-hidden="true"]'));
     const resolve=key=>candidates().find(el=>id(el)===key);
     const locked=el=>!!el.closest('[data-ocd-locked="true"]');
-    const generated=el=>{const original=sourceMap.get(id(el));return !!el.closest('[data-ocd-imported]')||!original||!!original.closest('sc-for,dc-import');};
+    const generated=el=>{const original=sourceMap.get(id(el));return !!el.closest('[data-ocd-imported]')||!original||!!original.closest('sc-for,dc-import,x-import');};
     const notice=message=>send('editor-notice',{message});
     function rect(el){
       let r=el.getBoundingClientRect();
@@ -26,9 +26,11 @@
     function operands(){return active().flatMap(el=>el.getAttribute('data-ocd-group')==='true'?[...el.children]:[el]);}
     function info(el){
       const computed=getComputedStyle(el),styles={};for(const key of ['color','background-color','font-size','font-weight','text-align','padding','margin','border-radius','border-color','border-width','gap','width','height','opacity','display','flex-direction','align-items','justify-content'])styles[key]=computed.getPropertyValue(key);
+      let background=el;while(background){const color=getComputedStyle(background).backgroundColor;if(color&&color!=='transparent'&&!/^rgba\([^)]*,\s*0\s*\)$/.test(color)){styles['contrast-background']=color;break;}background=background.parentElement;}
       return {node:id(el),tag:el.tagName,text:el.children.length?'':el.textContent,path:el.localName+(el.id?'#'+el.id:''),quote:(el.textContent||'').trim().slice(0,160),styles,rect:rect(el),readonly:locked(el)||generated(el),group:el.hasAttribute('data-ocd-group')};
     }
-    function announce(){const list=active();if(!list.length)send('select',{nodes:[],node:null});else send('select',{...info(list.at(-1)),nodes:list.map(info),commenting});draw();}
+    const live=document.createElement('span');live.setAttribute('data-ocd-editor','');live.setAttribute('aria-live','polite');live.style.cssText='position:fixed;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)';document.body.append(live);
+    function announce(){live.textContent=active().length?`已选择 ${active().length} 个图层：${(active().at(-1).textContent||active().at(-1).localName).trim().slice(0,80)}`:'已清除图层选择';const list=active();if(!list.length)send('select',{nodes:[],node:null});else send('select',{...info(list.at(-1)),nodes:list.map(info),commenting});draw();}
     function choose(els,add=false,individual=false){
       if(!individual){const keys=new Set(els.map(el=>el?.getAttribute('data-ocd-group')).filter(k=>k&&k!=='true'));if(keys.size)els=[...new Set([...els,...candidates().filter(el=>keys.has(el.getAttribute('data-ocd-group')))])];}
       if(textEdit)finishText(false);let list=add?[...active()]:[];

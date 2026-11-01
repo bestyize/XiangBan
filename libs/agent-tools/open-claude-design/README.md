@@ -1,6 +1,6 @@
 # open-claude-design
 
-小伴的内置设计工具，独立于模型厂商和外部 CLI。依赖 agent-kernel，内核不反向依赖本模块。桌面宿主已接入，当前为首版功能实现。
+小伴的内置设计工具，独立于模型厂商和外部 CLI。依赖 agent-kernel，内核不反向依赖本模块。桌面宿主已接入，当前以复刻 Claude Design 的格式与编辑交互为目标；[逐项验收与剩余差距](../../../docs/agent/open-claude-design-compatibility.md)。
 
 ## 使用
 
@@ -28,11 +28,11 @@
 
 详见 [FORMAT.md](FORMAT.md)：支持 v3 boards/order 与旧版 artboards 索引，保留未知索引字段和原始 DC 程序。选择文字或样式时修改源模板，不用渲染后的 DOM 覆盖程序；动态文字通过批注修改。
 
-支持 x-dc、helmet、表达式、sc-if/sc-for、DCLogic 状态和事件、参数默认值、画板间相对链接。图片使用内嵌 data URL，CSS 使用内联样式；本地 CSS/SVG/JS 等文本可在源包中保留，但不会作为外部资源加载。
+支持 x-dc、helmet、表达式、sc-if/sc-for、DCLogic 状态和事件、参数默认值、画板间相对链接。支持原始 `_blob` 图片及常见媒体/字体的 ZIP 导入与字节保真导出；存储使用 data URL，预览解析项目内相对/根路径。CSS（含相对素材与 @import）和普通本地 JS 在预览中内联；原始文件保持不变。
 
-当前不是 Anthropic 专有运行时的完整替代：React、其他专有组件/编辑器扩展和二进制素材 ZIP 暂不支持；不保证任意 Claude Design 项目无损运行。保存源包不会转换原程序，独立 HTML 使用本模块运行时。sandbox/CSP 提供权限隔离，不提供独立进程或无限循环中断能力。
+已支持按名称的 dc-import、本地 x-import React/JSX/TSX、组件状态/生命周期与画布便签。React 适配器的构建和开源许可证见 [runtime](runtime/README.md)。远程 CDN、任意 npm/Node 环境、原生 module script 和未验证的专有扩展尚未完整兼容；PDF/PPTX、云端协作等差距见验收报告，不保证任意 Claude Design 项目无损运行。保存源包不会转换原程序，独立 HTML 使用本模块运行时。sandbox/CSP 提供权限隔离，不提供独立进程或无限循环中断能力。
 
-限制：100 个画板、300 个源文本文件（自动生成的 support.js 不计入，含运行时总计不超过 400 个文件）、2 MiB/文件、16 MiB/项目、最多 64 个附加会话。
+限制：100 个画板、300 个源文件（包含素材）（自动生成的 support.js 不计入，含运行时总计不超过 400 个文件）、2 MiB/文件、16 MiB/项目、最多 64 个附加会话。
 
 ## 验证
 

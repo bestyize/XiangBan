@@ -91,7 +91,7 @@ pub async fn design_import(window:tauri::WebviewWindow,session:String)->Result<O
 }
 fn decode(s:&str)->Option<String>{let b=s.as_bytes();let(mut i,mut out)=(0,Vec::new());while i<b.len(){if b[i]==b'%'{out.push(u8::from_str_radix(std::str::from_utf8(b.get(i+1..i+3)?).ok()?,16).ok()?);i+=3;}else{out.push(b[i]);i+=1;}}String::from_utf8(out).ok()}
 /// This CSP applies only to the opaque preview origin, never the privileged control UI.
-pub fn csp()->&'static str{"default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline' https://fonts.googleapis.com; img-src data: blob:; font-src data: https://fonts.gstatic.com; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"}
+pub fn csp()->&'static str{"default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline' https://fonts.googleapis.com; img-src data: blob:; font-src data: https://fonts.gstatic.com; media-src data: blob:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"}
 pub fn serve(app:&tauri::AppHandle,request:tauri::http::Request<Vec<u8>>)->tauri::http::Response<Vec<u8>>{
     let result=(||->Result<Vec<u8>,String>{
         let path=decode(request.uri().path()).ok_or("路径编码无效")?;let mut parts=path.trim_start_matches('/').splitn(3,'/');

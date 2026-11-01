@@ -5,8 +5,9 @@ use serde_json::{json, Value};
 use std::{collections::BTreeMap, fs, path::{Component, Path, PathBuf}, sync::{Arc, Mutex}, time::{SystemTime, UNIX_EPOCH}};
 
 pub const NAME: &str = "open-claude-design";
-pub const RUNTIME: &str = concat!(include_str!("../runtime/support.js"),"\n",include_str!("../runtime/editor.js"));
+pub const RUNTIME: &str = concat!(include_str!("../runtime/vendor/react-bridge.js"),"\n",include_str!("../runtime/support.js"),"\n",include_str!("../runtime/editor.js"));
 pub mod archive;
+mod assets;
 pub const FORMAT: &str = include_str!("../FORMAT.md");
 /// Quality guidance returned with the format: tokens first, real content, complete states, a check before complete.
 pub const CRAFT: &str = include_str!("../CRAFT.md");
@@ -53,9 +54,36 @@ pub fn diagnostics(p: &Project) -> Vec<String> {
     let refs = regex::Regex::new(r#"(?i)(?:href|src)\s*=\s*["']([^"']+)["']"#).unwrap();
     for (name, source) in &p.files {
         if !name.ends_with(".html") { continue; }
+        let imports = regex::Regex::new(r#"(?is)<dc-import\b([^>]*)>"#).unwrap();
+        let attrs = regex::Regex::new(r#"(?i)\b(name|component|src|file)\s*=\s*["']([^"']+)["']"#).unwrap();
+        for tag in imports.captures_iter(source) {
+            let attributes: BTreeMap<_,_> = attrs.captures_iter(&tag[1]).map(|a|(a[1].to_ascii_lowercase(),a[2].to_string())).collect();
+            if attributes.contains_key("src") || attributes.contains_key("file") { continue; }
+            if let Some(component) = attributes.get("name").or_else(||attributes.get("component")) {
+                let rel = if component.ends_with(".html") {component.clone()} else {format!("{component}.dc.html")};
+                if !archive::resolve_rel(name,&rel).is_some_and(|target|p.files.contains_key(&target)) && !p.files.contains_key(&rel) {
+                    errors.push(format!("{name} 缺少 dc-import 组件：{rel}"));
+                }
+            }
+        }
+
+        let external = regex::Regex::new(r#"(?is)<x-import\b([^>]*)>"#).unwrap();
+        let module_attr = regex::Regex::new(r#"(?i)\b(from|src|import)\s*=\s*["']([^"']+)["']"#).unwrap();
+        for tag in external.captures_iter(source) {
+            if let Some(attr)=module_attr.captures(&tag[1]) {
+                for path in attr[2].split_whitespace() {
+                    if path.contains("{{") || path.contains(':') || path.starts_with("//") {errors.push(format!("{name} 需要项目内静态模块路径：{path}"));continue;}
+                    let Some(base)=archive::resolve_rel(name,path) else {errors.push(format!("{name} 模块路径无效：{path}"));continue;};
+                    if !["", ".js", ".jsx", ".ts", ".tsx", ".mjs", "/index.js", "/index.jsx", "/index.ts", "/index.tsx"].iter().any(|ext|p.files.contains_key(&format!("{base}{ext}"))) {
+                        errors.push(format!("{name} 缺少本地 React 模块：{path}"));
+                    }
+                }
+            }
+        }
+        if regex::Regex::new(r#"(?i)<script\b[^>]*type\s*=\s*["']module["']"#).unwrap().is_match(source) { errors.push(format!("{name} 使用尚未支持的 ES module 脚本")); }
         for cap in refs.captures_iter(source) {
             let href = cap[1].split(['?', '#']).next().unwrap_or("");
-            if href.is_empty() || href.contains(':') || href.starts_with('/') || href.contains("{{") { continue; }
+            if href.is_empty() || href.contains(':') || href.starts_with("//") || href.contains("{{") { continue; }
             let Some(target) = archive::resolve_rel(name, href) else { continue };
             if target.ends_with("support.js") { continue; }
             if !p.files.contains_key(&target) { errors.push(format!("{name} 引用的文件不存在：{target}")); }
@@ -78,7 +106,7 @@ fn file_name(name: &str) -> bool {
     !name.is_empty() && name.len() <= 240 && !name.contains(['\\', '\0', ':']) &&
     !name.starts_with('/') && name.split('/').all(|s| !s.is_empty() && s != "." && s != "..") &&
     Path::new(name).components().all(|c| matches!(c, Component::Normal(_))) &&
-    [".dc.html", ".html", ".css", ".js", ".json", ".svg"].iter().any(|ext| name.ends_with(ext))
+    ([".dc.html", ".html", ".css", ".js", ".mjs", ".jsx", ".tsx", ".ts", ".json", ".svg", ".md", ".txt"].iter().any(|ext| name.ends_with(ext)) || assets::is_asset(name))
 }
 
 /// Normalize either observed canvas index without dropping source metadata.
@@ -120,7 +148,8 @@ pub fn validate(project: &Project) -> Result<(), String> {
     if source_count > 300 || project.files.len()>405 { return Err("设计稿文件过多".into()); }
     for (name, text) in &project.files {
         if !file_name(name) { return Err(format!("不支持的设计文件路径：{name}")); }
-        if text.len() > MAX_FILE { return Err(format!("{name} 超过 2MiB")); }
+        if assets::is_asset(name) { assets::decode(text).map_err(|e| format!("{name}: {e}"))?; }
+        else if text.len() > MAX_FILE { return Err(format!("{name} 超过 2MiB")); }
     }
     boards(&project.canvas)?;
     if project.status == ProjectStatus::Ready {

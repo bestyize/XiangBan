@@ -38,3 +38,13 @@ describe('editing safety and clipboard semantics',()=>{
   expect(()=>mutateElements(source,{type:'not-real'} as never)).toThrow('不支持');expect(()=>mutateElements(source,{type:'paste',fragment:{kind:'open-claude-design/elements',html:['<script>alert(1)</script>']}})).toThrow('程序节点');expect(()=>mutateElements(source,{type:'hide',ids:[id(source,'span')],value:true})).toThrow('模板');
  });
 });
+
+describe('element Code panel',()=>{
+ it('edits CSS and attributes without flattening expressions, handlers or identity',()=>{
+  const source='<x-dc><button id="button" style="color:{{theme}}" onclick="{{submit}}" data-ocd-node="stable" data-ocd-style="width: 90px">送出</button></x-dc>';
+  const changed=mutateElements(source,{type:'code',id:'stable',style:'color:{{theme}}; padding: 20px',overrides:'width: 120px',attributes:{id:'button',title:'引号 " <tag>',role:'button'}});
+  const el=sourceDoc(changed.source).querySelector('button')!;
+  expect(el.getAttribute('style')).toContain('{{theme}}');expect(el.getAttribute('onclick')).toBe('{{submit}}');expect(el.getAttribute('data-ocd-node')).toBe('stable');expect(el.getAttribute('title')).toBe('引号 " <tag>');expect(el.getAttribute('data-ocd-style')).toBe('width: 120px');
+  expect(()=>mutateElements(changed.source,{type:'code',id:'stable',style:'',overrides:'',attributes:{'data-ocd-node':'other'}})).toThrow('属性');
+ });
+});

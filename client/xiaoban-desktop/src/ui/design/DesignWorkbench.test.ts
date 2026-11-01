@@ -135,7 +135,7 @@ describe('compact design workbench',()=>{
   const w=await open();await click('画板源代码');await w.get('.source-dialog textarea').trigger('keydown',{key:'Delete'});expect(mocks.invoke.mock.calls.some(([cmd])=>cmd==='design_save')).toBe(false);await w.get('.source-dialog .actions button').trigger('click');await click('演示原型');w.findComponent(BoardPreview).vm.$emit('message',{type:'element-edit',action:{type:'delete',ids:['n0']}});await flushPromises();expect(mocks.invoke.mock.calls.some(([cmd])=>cmd==='design_save')).toBe(false);
  });
  it('inserts source-backed text and selects its stable id after save',async()=>{
-  const w=await open();await w.get('[aria-label="插入元素"]').setValue('text');await flushPromises();const save=mocks.invoke.mock.calls.find(([cmd])=>cmd==='design_save')![1];expect(save.project.files['Main.dc.html']).toContain('双击编辑文字');expect(w.findComponent(BoardPreview).props('selection')?.[0]).toMatch(/^ocd-/);expect(w.findAll('.layer-row')).toHaveLength(2);
+  const w=await open();await w.get('[aria-label="插入元素"]').setValue('text');await flushPromises();const save=mocks.invoke.mock.calls.find(([cmd])=>cmd==='design_save')![1];expect(save.project.files['Main.dc.html']).toContain('双击编辑文字');expect(w.findComponent(BoardPreview).props('selection')?.[0]).toMatch(/^ocd-/);await click('属性面板');expect(w.findAll('.layer-row')).toHaveLength(2);
  });
 
  it('resizes an artboard directly with one versioned save',async()=>{
@@ -143,16 +143,59 @@ describe('compact design workbench',()=>{
  });
  it('keeps an asynchronous cut attached to its original artboard when selection changes',async()=>{
   const w=await open();let finish:()=>void=()=>{};Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:vi.fn(()=>new Promise<void>(r=>{finish=r;})),readText:vi.fn()}});
-  w.findComponent(BoardPreview).vm.$emit('message',{type:'select',node:'n0',tag:'H1',text:'源标题'});await flushPromises();w.findComponent(BoardPreview).vm.$emit('message',{type:'editor-command',command:'cut'});await flushPromises();await w.findAll('.rail>button')[1].trigger('click');finish();await flushPromises();const save=mocks.invoke.mock.calls.find(([c])=>c==='design_save')![1];expect(save.project.files['Main.dc.html']).not.toContain('源标题');expect(save.project.files['More.dc.html']).toBe(fixture().files['More.dc.html']);expect(w.findComponent(BoardPreview).props('selection')).toEqual([]);
+  w.findComponent(BoardPreview).vm.$emit('message',{type:'select',node:'n0',tag:'H1',text:'源标题'});await flushPromises();w.findComponent(BoardPreview).vm.$emit('message',{type:'editor-command',command:'cut'});await flushPromises();await click('属性面板');await w.findAll('.rail>button')[1].trigger('click');finish();await flushPromises();const save=mocks.invoke.mock.calls.find(([c])=>c==='design_save')![1];expect(save.project.files['Main.dc.html']).not.toContain('源标题');expect(save.project.files['More.dc.html']).toBe(fixture().files['More.dc.html']);expect(w.findComponent(BoardPreview).props('selection')).toEqual([]);
  });
  it('pastes plain OS text as literal content, including text that looks like a template',async()=>{
   const w=await open();Object.defineProperty(navigator,'clipboard',{configurable:true,value:{readText:vi.fn(async()=>'<b>{{literal}}</b>')}});await w.get('[data-testid="design-workbench"]').trigger('keydown',{key:'v',ctrlKey:true});await flushPromises();const save=mocks.invoke.mock.calls.find(([c])=>c==='design_save')![1];expect(save.project.files['Main.dc.html']).toContain('&lt;b&gt;{{literal}}&lt;/b&gt;');expect(save.project.files['Main.dc.html']).toContain('data-ocd-literal="true"');
  });
  it('navigates layer hierarchy and does not submit edits during IME composition',async()=>{
-  const p=fixture();p.files['Main.dc.html']='<x-dc><main><h1>标题</h1><p>正文</p></main></x-dc>';mocks.invoke.mockImplementation(async command=>command==='design_read'?{project:p,origin:'preview:'}:undefined);const w=await open();const row=w.get('.layer-row');await row.get('.layer-select').trigger('keydown',{key:'ArrowLeft'});await flushPromises();expect(w.findAll('.layer-row')).toHaveLength(1);await w.get('.layer-select').trigger('keydown',{key:'ArrowRight'});await flushPromises();expect(w.findAll('.layer-row')).toHaveLength(3);await w.get('[data-testid="design-workbench"]').trigger('keydown',{key:'Delete',isComposing:true});expect(mocks.invoke.mock.calls.some(([c])=>c==='design_save')).toBe(false);
+  const p=fixture();p.files['Main.dc.html']='<x-dc><main><h1>标题</h1><p>正文</p></main></x-dc>';mocks.invoke.mockImplementation(async command=>command==='design_read'?{project:p,origin:'preview:'}:undefined);const w=await open();await click('属性面板');const row=w.get('.layer-row');await row.get('.layer-select').trigger('keydown',{key:'ArrowLeft'});await flushPromises();expect(w.findAll('.layer-row')).toHaveLength(1);await w.get('.layer-select').trigger('keydown',{key:'ArrowRight'});await flushPromises();expect(w.findAll('.layer-row')).toHaveLength(3);await w.get('[data-testid="design-workbench"]').trigger('keydown',{key:'Delete',isComposing:true});expect(mocks.invoke.mock.calls.some(([c])=>c==='design_save')).toBe(false);
  });
  it('ignores the legacy WebView IME confirmation key without deleting a board',async()=>{
   const w=await open();await w.get('[data-testid="design-workbench"]').trigger('keydown',{key:'Delete',keyCode:229});await flushPromises();expect(mocks.invoke.mock.calls.some(([c])=>c==='design_save')).toBe(false);
  });
 
+});
+
+
+describe('Claude Design interaction parity',()=>{
+ it('shows original canvas notes and saves note edits with the same undo history',async()=>{
+  const p=fixture();p.canvas.notes={title:{kind:'title1',text:'流程标题',x:0,y:-120,w:240,maxW:1200,vendor:42}};
+  mocks.invoke.mockImplementation(async(command,args)=>command==='design_read'?{project:p,origin:'design-preview://localhost'}:command==='design_save'?{project:{...args.project,revision:args.expectedRevision+1},origin:'design-preview://localhost'}:undefined);
+  const w=await open();expect(w.find('.canvas-note').text()).toContain('流程标题');expect(w.find('.canvas-note').attributes('style')).toContain('width: 1200px');
+  await click('新增画布便签');expect(w.findAll('.canvas-note')).toHaveLength(2);await click('撤销');expect(w.findAll('.canvas-note')).toHaveLength(1);expect(w.text()).toContain('流程标题');
+ });
+ it('hides the floating toolbar while properties are open and restores it when closed',async()=>{
+  const w=await open();w.findComponent(BoardPreview).vm.$emit('message',{type:'select',node:'n0',tag:'H1',text:'源标题'});await flushPromises();expect(w.find('[role="toolbar"]').exists()).toBe(true);
+  await click('属性面板');expect(w.find('[role="toolbar"]').exists()).toBe(false);await click('属性面板');expect(w.find('[role="toolbar"]').exists()).toBe(true);
+ });
+ it('does not move or delete an unrelated artboard after clearing selection',async()=>{
+  const w=await open();await w.trigger('keydown',{key:'Escape'});mocks.invoke.mockClear();await w.trigger('keydown',{key:'ArrowRight'});await w.trigger('keydown',{key:'Delete'});await flushPromises();expect(mocks.invoke.mock.calls.some(([cmd])=>cmd==='design_save')).toBe(false);
+ });
+});
+
+describe('observed Edge canvas behavior',()=>{
+ it('keeps layers inside the closed-by-default properties panel and separates Tweaks',async()=>{
+  const p=fixture();p.files['Main.dc.html']+='<script data-dc-script data-props=\'{"theme":{"editor":"enum","default":"red","options":["red","blue"]}}\'></script>';
+  mocks.invoke.mockImplementation(async(command,args)=>command==='design_read'?{project:p,origin:'preview:'}:command==='design_save'?{project:{...args.project,revision:args.expectedRevision+1},origin:'preview:'}:undefined);
+  const w=await open();expect(w.find('.rail').exists()).toBe(false);
+  await w.get('[aria-label="调整画板参数 首页"]').trigger('click');await flushPromises();
+  expect(w.get('[role="tab"][aria-selected="true"]').text()).toBe('Tweaks');expect(w.find('.rail').exists()).toBe(false);
+  const select=w.get('.properties label select');await select.setValue('blue');await flushPromises();
+  expect(mocks.invoke.mock.calls.filter(([c])=>c==='design_save').at(-1)![1].project.files['Main.dc.html']).toContain('&quot;blue&quot;');
+  await w.get('[aria-label="关闭属性面板"]').trigger('click');expect(w.find('.rail').exists()).toBe(false);
+ });
+ it('saves selected element CSS in the Code panel and rejects stale drafts',async()=>{
+  const w=await open();w.findComponent(BoardPreview).vm.$emit('message',{type:'select',node:'n0',tag:'H1',text:'源标题'});await flushPromises();await click('属性面板');await w.findAll('[role="tab"]').find(t=>t.text()==='Code')!.trigger('click');
+  await w.get('[aria-label="元素 CSS"]').setValue('color: red; display: grid;');await w.get('form.element-code').trigger('submit');await flushPromises();
+  expect(mocks.invoke.mock.calls.filter(([c])=>c==='design_save').at(-1)![1].project.files['Main.dc.html']).toContain('display: grid');
+  await w.get('[aria-label="元素 CSS"]').setValue('color: blue');
+  mocks.invoke.mockImplementation(async command=>command==='design_read'?{project:{...fixture(),revision:9},origin:'preview:'}:undefined);
+  const changed=mocks.listen.mock.calls.find(([event])=>event==='design-changed')![1];changed({...fixture(),revision:9,artboards:2});await flushPromises();
+  expect(mocks.invoke.mock.calls.filter(([c])=>c==='design_save')).toHaveLength(1);
+ });
+ it('offers the observed fixed zoom levels without changing document content',async()=>{
+  const w=await open();await w.get('[role="menuitemradio"]').trigger('click');await flushPromises();expect(w.get('.zoom').text()).toBe('25%');
+  expect(w.get('[role="menuitemradio"]').attributes('aria-checked')).toBe('true');expect(mocks.invoke.mock.calls.some(([cmd])=>cmd==='design_save')).toBe(false);
+ });
 });

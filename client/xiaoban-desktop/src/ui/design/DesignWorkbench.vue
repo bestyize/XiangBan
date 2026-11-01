@@ -1,25 +1,30 @@
 <script setup lang="ts">
 import {computed,onBeforeUnmount,onMounted,nextTick,ref,watch} from 'vue';
-import {Check,Copy,Download,Hand,ExternalLink,Pencil,Maximize2,MessageSquare,Minus,MousePointer2,PanelRight,Play,Plus,RotateCcw,RotateCw,Send,Sun,Moon,Trash2,X,ClipboardCopy,Palette,Layers} from 'lucide-vue-next';
+import {Check,Copy,Download,Hand,ExternalLink,Pencil,Maximize2,MessageSquare,Minus,MousePointer2,PanelRight,Play,Plus,RotateCcw,RotateCw,Send,Sun,Moon,Trash2,X,ClipboardCopy,Palette,Layers,SlidersHorizontal} from 'lucide-vue-next';
 import {invoke} from '../../bridge.ts';
 import BoardPreview from './BoardPreview.vue';
 import ElementToolbar from './ElementToolbar.vue';
+import ElementCode from './ElementCode.vue';
+import CanvasNoteView from './CanvasNote.vue';
+import {notesOf,addNote,patchNote,type CanvasNote} from './canvas-notes.ts';
 import {mutateElements,copyElements,layersOf,textFragment,fragmentNeedsContext,type ElementAction,type Fragment} from './element-commands.ts';
 import {
   statusLabel,addBoard,boardsOf,changeBoard,clone,patchNode,patchProp,previewUrl,propsOf,removeBoard,targetFile,
   tokensOf,setToken,dsCardsOf,insertComponentImport,formatCommentPrompt,toMarkdownSpec,DEVICE_PRESETS,
   type Board,type Comment,type Project,type Summary,type DsCard
 } from './model.ts';
+import {colorHex,contrast} from './colors.ts';
 import {clampScale,zoomAt,wheelPixels,type CanvasView} from './viewport.ts';
 import {createDesignStore} from './design-store.ts';
 const props=defineProps<{projectId:string;detached?:boolean;notify:(message:unknown,type?:'success'|'error'|'info')=>void}>();
 const emit=defineEmits<{close:[];detach:[];dock:[];copied:[id:string];request:[message:string,session:string]}>();
 const ds=createDesignStore(props.notify),selected=ref(''),page=ref(''),mode=ref<'select'|'play'|'hand'>('select'),scale=ref(.4),properties=ref(false),spaceHeld=ref(false),viewport=ref<HTMLElement|null>(null);
 const theme=ref<'light'|'dark'>('light'),hideResolved=ref(false),renameOpen=ref(false),projectTitle=ref('');let offDeleted:(()=>void)|undefined,unmounted=false;
-const activeTab=ref<'properties'|'design-system'>('properties');
+const activeTab=ref<'properties'|'code'|'tweaks'|'design-system'>('properties');
 const selectedIds=ref<string[]>([]),selectionFile=ref(''),commentTool=ref(false),guides=ref(true),editorCommand=ref<{seq:number;command:string}>(),previewEpoch=ref(0),context=ref<{x:number;y:number}|null>(null);
 let commandSeq=0,preserveSelection=false,clipboard:Fragment|undefined;
 const node=ref<{readonly?:boolean;group?:boolean;id:string;text:string;tag:string;path?:string;quote?:string;styles?:Record<string,string>}|null>(null);
+const contrastRatio=computed(()=>contrast(node.value?.styles?.color??'',node.value?.styles?.['contrast-background']??node.value?.styles?.['background-color']??''));
 const nodeText=ref(''),commentText=ref(''),sendComment=ref(true),commentOpen=ref(false),sourceOpen=ref(false),source=ref(''),renderErrors=ref<Record<string,string>>({});
 const history=ref<Project[]>([]),future=ref<Project[]>([]),versions=ref<Summary[]>([]),versionsOpen=ref(false);
 const newTokenKey=ref(''),newTokenValue=ref('');
@@ -28,20 +33,22 @@ const token=ref(crypto.randomUUID());const project=computed(()=>ds.project);
 const allBoards=computed(()=>project.value?boardsOf(project.value.canvas):[]),pages=computed(()=>project.value?.canvas.pages??[]);
 const boards=computed(()=>allBoards.value.filter(b=>!page.value||b.page===page.value));
 const current=computed(()=>allBoards.value.find(b=>b.file===selected.value)??allBoards.value[0]);
+const selectedNote=ref('');
+const notes=computed(()=>project.value?notesOf(project.value.canvas).filter(n=>!page.value||n.page===page.value):[]);
 const collapsedLayers=ref(new Set<string>());
 const layers=computed(()=>project.value&&current.value?layersOf(project.value.files[current.value.file]??''):[]);
 const layerParents=computed(()=>new Map(layers.value.map(n=>[n.id,n.parent])));
 const layerContainers=computed(()=>new Set(layers.value.map(n=>n.parent).filter(Boolean)));
 const visibleLayers=computed(()=>layers.value.filter(n=>{let p=n.parent;while(p){if(collapsedLayers.value.has(p))return false;p=layerParents.value.get(p);}return true;}));
 function toggleLayer(id:string){if(collapsedLayers.value.has(id))collapsedLayers.value.delete(id);else collapsedLayers.value.add(id);}
-const config=computed(()=>project.value&&current.value?Object.entries(propsOf(project.value.files[current.value.file]??'')).filter(([key,c])=>key!=='$preview'&&c&&typeof c==='object'):[]);
+const config=computed(()=>project.value&&current.value&&selected.value?Object.entries(propsOf(project.value.files[current.value.file]??'')).filter(([key,c])=>key!=='$preview'&&c&&typeof c==='object'):[]);
 const allComments=computed<Comment[]>(()=>project.value?.canvas.xiaoban?.comments??[]);
 const comments=computed<Comment[]>(()=>hideResolved.value?allComments.value.filter(c=>c.status!=='resolved'):allComments.value);
 const pendingComments=computed(()=>allComments.value.filter(c=>c.status!=='resolved'));
 const tokens=computed(()=>project.value?tokensOf(project.value.canvas):{});
 const dsCards=computed<DsCard[]>(()=>project.value?dsCardsOf(project.value):[]);
-const minX=computed(()=>Math.min(0,...boards.value.map(b=>b.x))),minY=computed(()=>Math.min(0,...boards.value.map(b=>b.y)));
-const extent=computed(()=>({w:Math.max(600,...boards.value.map(b=>b.x+b.w))-minX.value+96,h:Math.max(500,...boards.value.map(b=>b.y+b.h))-minY.value+140}));
+const minX=computed(()=>Math.min(0,...boards.value.map(b=>b.x),...notes.value.map(n=>n.x))),minY=computed(()=>Math.min(0,...boards.value.map(b=>b.y),...notes.value.map(n=>n.y)));
+const extent=computed(()=>({w:Math.max(600,...boards.value.map(b=>b.x+b.w),...notes.value.map(n=>n.x+n.w))-minX.value+96,h:Math.max(500,...boards.value.map(b=>b.y+b.h),...notes.value.map(n=>n.y+n.maxH))-minY.value+140}));
 const canEdit=computed(()=>!!project.value&&!ds.busy&&!ds.conflict);
 
 function boardPins(file:string){
@@ -102,12 +109,22 @@ async function edit(fn:(p:Project)=>void,record=true){
 async function undo(){if(!project.value||!canEdit.value||!history.value.length)return;const before=clone(project.value),old=clone(history.value.at(-1)!),epoch=remoteEpoch;old.revision=before.revision;if(await ds.commit(p=>Object.assign(p,old))&&epoch===remoteEpoch){history.value.pop();future.value.push(before);}}
 async function redo(){if(!project.value||!canEdit.value||!future.value.length)return;const before=clone(project.value),next=clone(future.value.at(-1)!),epoch=remoteEpoch;next.revision=before.revision;if(await ds.commit(p=>Object.assign(p,next))&&epoch===remoteEpoch){future.value.pop();history.value.push(before);}}
 
-function select(b:Board){selected.value=b.file;clearElements();}
+function saveElementCode(file:string,payload:{expectedSource:string;action:ElementAction}){if(project.value?.files[file]!==payload.expectedSource){props.notify('源文件已有新版本，请重新读取','error');return;}void elementEdit(payload.action,file).catch(report);}
+function panelKey(e:KeyboardEvent){if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;const tabs=[...(e.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('[role=tab]')],index=tabs.indexOf(e.target as HTMLButtonElement);if(index<0)return;e.preventDefault();e.stopPropagation();const tab=tabs[e.key==='Home'?0:e.key==='End'?tabs.length-1:(index+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length];tab.click();tab.focus();}
+function openTweaks(b:Board){select(b);properties.value=true;activeTab.value='tweaks';}
+function menuKey(e:KeyboardEvent){const menu=e.currentTarget as HTMLElement,items=[...menu.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')],index=items.indexOf(document.activeElement as HTMLButtonElement);if(e.key==='Escape'){e.preventDefault();e.stopPropagation();const details=menu.closest('details');if(details){details.open=false;details.querySelector('summary')?.focus();}}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();e.stopPropagation();items[e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowUp'?-1:1)+items.length)%items.length]?.focus();}}
+function closeMenu(e:MouseEvent){const menu=(e.currentTarget as HTMLElement).closest('details');if(menu){menu.open=false;menu.querySelector('summary')?.focus();}}
+function select(b:Board){selectedNote.value='';selected.value=b.file;clearElements();}
 function add(copy=false){void edit(p=>{selected.value=addBoard(p,copy?current.value:undefined);if(page.value)changeBoard(p,selected.value,{page:page.value});});}
 async function remove(){if(!current.value)return;const file=current.value.file;try{await edit(p=>removeBoard(p,file));}catch(e){report(e);}}
 function patchBoard(patch:Partial<Board>){if(current.value)void edit(p=>changeBoard(p,current.value!.file,patch));}
 function applyPreset(preset:{w:number;h:number}){patchBoard({w:preset.w,h:preset.h});}
 
+function selectNote(id:string){clearElements();selected.value='';selectedNote.value=id;}
+function newNote(){if(!project.value)return;const el=viewport.value;void edit(p=>{const id=addNote(p,Math.round((el?.scrollLeft??0)/scale.value+minX.value+60),Math.round((el?.scrollTop??0)/scale.value+minY.value+60),page.value);selectNote(id);});}
+function editNote(id:string,patch:Partial<CanvasNote>){void edit(p=>patchNote(p,id,patch));}
+function removeNote(id:string){void edit(p=>{delete p.canvas.notes[id];if(selectedNote.value===id)selectedNote.value='';});}
+function copyNote(note:CanvasNote){void edit(p=>{selectNote(addNote(p,note.x,note.y,note.page,note));});}
 function clearElements(){node.value=null;selectedIds.value=[];selectionFile.value='';context.value=null;}
 function sendEditor(command:string){editorCommand.value={seq:++commandSeq,command};}
 function chooseElements(ids:string[]){mode.value='select';selectionFile.value=current.value?.file??'';selectedIds.value=ids;context.value=null;}
@@ -126,7 +143,8 @@ function layerKey(e:KeyboardEvent){const row=(e.target as HTMLElement).closest<H
 }
 async function elementCommand(command:string){
  context.value=null;
- if(command==='properties'){properties.value=!properties.value;await nextTick();if(properties.value)viewport.value?.closest('.design-workbench')?.querySelector<HTMLElement>('.properties input,.properties button')?.focus();return;}
+ if(command==='properties'){properties.value=!properties.value;await nextTick();viewport.value?.closest('.design-workbench')?.querySelector<HTMLElement>(properties.value?'.properties input,.properties button':'[title="属性面板"]')?.focus();return;}
+ if(command==='focusCanvas'){viewport.value?.focus();return;}
  if(command==='focusNext'||command==='focusPrevious'){focusArea(command==='focusPrevious');return;}
  if(command==='guides'){guides.value=!guides.value;return;}
  if(command==='undo'){await undo();return;}if(command==='redo'){await redo();return;}
@@ -150,7 +168,7 @@ async function elementCommand(command:string){
   if(fragment&&fragmentNeedsContext(fragment)&&(fragment.origin?.project!==identity||fragment.origin?.file!==file)){props.notify('动态元素依赖原画板的程序，请通过批注跨画板复制','info');return;}
   if(!stillCurrent()){props.notify('设计稿已变化，未执行粘贴，请重试','info');return;}if(fragment)await elementEdit({type:'paste',fragment},file);else props.notify('请先复制画布中的元素','info');return;
  }
- if(!ids.length){if(command==='delete')await remove();else if(command==='duplicate')add(true);return;}
+ if(!ids.length){if(!selected.value)return;if(command==='delete')await remove();else if(command==='duplicate')add(true);return;}
  if(['delete','duplicate','group','ungroup'].includes(command))await elementEdit({type:command as 'delete',ids});
  else if(command==='lock'||command==='unlock')await elementEdit({type:'lock',ids,value:command==='lock'});
  else if(command==='front'||command==='back')await elementEdit({type:'reorder',ids,direction:command});
@@ -284,7 +302,7 @@ function move(e:PointerEvent){if(!drag)return;drag.dx=(e.clientX-drag.x)/scale.v
 function cancelDrag(){drag=null;dragging.value=null;}
 function up(){if(!drag)return;const d=drag,size=dragging.value;drag=null;dragging.value=null;if(d.type==='resize-board'&&size?.w&&size?.h)void edit(p=>changeBoard(p,d.board!.file,{w:size.w,h:size.h}));else if(d.type==='board'&&(Math.abs(d.dx)>1||Math.abs(d.dy)>1))void edit(p=>changeBoard(p,d.board!.file,{x:Math.round(d.board!.x+d.dx),y:Math.round(d.board!.y+d.dy)}));}
 function position(b:Board){const moving=dragging.value?.file===b.file?dragging.value:null;return {left:((moving?.x??b.x)-minX.value+32)+'px',top:((moving?.y??b.y)-minY.value+40)+'px',width:(moving?.w??b.w)+'px',height:((moving?.h??b.h)+28)+'px'};}
-function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.metaKey||e.ctrlKey)&&e.key==='\\'){e.preventDefault();void elementCommand('properties');return;}if(e.key==='F6'){e.preventDefault();focusArea(e.shiftKey);return;}if(props.detached&&e.key==='F11'){e.preventDefault();void invoke('design_window_fullscreen',{id:props.projectId}).catch(report);return;}if((e.target as HTMLElement).matches('input,textarea,select,[contenteditable]'))return;if(e.key==='Escape'){clearElements();sourceOpen.value=false;commentOpen.value=false;versionsOpen.value=false;releaseSpace();}if(e.key===' '){e.preventDefault();spaceHeld.value=true;}if(['+','=','-','0','1'].includes(e.key)){e.preventDefault();canvasKey(e.key);}if((e.metaKey||e.ctrlKey)&&['z','y','d','c','x','v','g','a','\\'].includes(e.key.toLowerCase())){e.preventDefault();const k=e.key.toLowerCase();void elementCommand(k==='z'?(e.shiftKey?'redo':'undo'):k==='y'?'redo':k==='d'?'duplicate':k==='c'?'copy':k==='x'?'cut':k==='v'?'paste':k==='g'?(e.shiftKey?'ungroup':'group'):k==='a'?'selectAll':'properties');}else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();void elementCommand('delete');}else if(e.key==='Enter'&&selectedIds.value.length){e.preventDefault();sendEditor('editText');}else if(!selectedIds.value.length&&e.key.startsWith('Arrow')&&current.value){e.preventDefault();const d=e.shiftKey?10:1;patchBoard({x:current.value.x+(e.key==='ArrowLeft'?-d:e.key==='ArrowRight'?d:0),y:current.value.y+(e.key==='ArrowUp'?-d:e.key==='ArrowDown'?d:0)});}}
+function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.metaKey||e.ctrlKey)&&e.key==='\\'){e.preventDefault();void elementCommand('properties');return;}if(e.key==='F6'){e.preventDefault();focusArea(e.shiftKey);return;}if(props.detached&&e.key==='F11'){e.preventDefault();void invoke('design_window_fullscreen',{id:props.projectId}).catch(report);return;}if((e.target as HTMLElement).matches('input,textarea,select,[contenteditable]'))return;if(e.key==='Escape'){if(!selectedIds.value.length)selected.value='';selectedNote.value='';clearElements();sourceOpen.value=false;commentOpen.value=false;versionsOpen.value=false;releaseSpace();}if(e.key===' '){e.preventDefault();spaceHeld.value=true;}if(['+','=','-','0','1'].includes(e.key)){e.preventDefault();canvasKey(e.key);}if((e.metaKey||e.ctrlKey)&&['z','y','d','c','x','v','g','a','\\'].includes(e.key.toLowerCase())){e.preventDefault();const k=e.key.toLowerCase();void elementCommand(k==='z'?(e.shiftKey?'redo':'undo'):k==='y'?'redo':k==='d'?'duplicate':k==='c'?'copy':k==='x'?'cut':k==='v'?'paste':k==='g'?(e.shiftKey?'ungroup':'group'):k==='a'?'selectAll':'properties');}else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();void elementCommand('delete');}else if(e.key==='Enter'&&selectedIds.value.length){e.preventDefault();sendEditor('editText');}else if(selected.value&&!selectedIds.value.length&&e.key.startsWith('Arrow')&&current.value){e.preventDefault();const d=e.shiftKey?10:1;patchBoard({x:current.value.x+(e.key==='ArrowLeft'?-d:e.key==='ArrowRight'?d:0),y:current.value.y+(e.key==='ArrowUp'?-d:e.key==='ArrowDown'?d:0)});}}
 </script>
 <template>
 <section class="design-workbench" tabindex="0" aria-label="设计工作台" data-testid="design-workbench" @keydown="key">
@@ -299,7 +317,7 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
     <Moon v-if="theme==='light'" :size="14"/><Sun v-else :size="14"/>
   </button>
   <button title="历史版本" @click="showVersions"><RotateCcw :size="14"/></button>
-  <button :aria-expanded="properties" title="属性面板" @click="properties=!properties"><PanelRight :size="14"/></button>
+  <button :aria-expanded="properties" title="属性面板" @click="elementCommand('properties')"><PanelRight :size="14"/></button>
   <details class="export">
     <summary><Download :size="14"/>导出</summary>
     <div>
@@ -320,6 +338,8 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
   <button :class="{on:mode==='hand'}" title="抓手" @click="mode='hand'"><Hand :size="14"/></button>
   <button :class="{on:mode==='play'}" title="演示原型" @click="mode='play'"><Play :size="13"/></button>
   <i/>
+  <button :disabled="!canEdit" title="新增画布便签" @click="newNote"><MessageSquare :size="14"/></button>
+  <button :disabled="!current" title="画板源代码" @click="openSource">&lt;/&gt;</button>
   <button :disabled="!canEdit" title="新增画板" @click="add()"><Plus :size="14"/></button>
   <button :disabled="!canEdit||!current" title="添加批注" :class="{on:commentTool}" @click="selectedIds.length?commentOpen=true:commentTool=!commentTool"><MessageSquare :size="14"/></button>
   <select :disabled="!canEdit" aria-label="插入元素" value="" @change="elementEdit({type:'insert',kind:($event.target as HTMLSelectElement).value as 'text'});($event.target as HTMLSelectElement).value=''">
@@ -332,7 +352,20 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
   <i/>
   <button title="适应全部画板 (0)" @click="fit">适合</button><button title="适应当前画板" @click="fitCurrent">当前</button>
   <button title="缩小" @click="zoom(scale/1.2)"><Minus :size="12"/></button>
-  <span class="zoom" title="双击恢复 100% (1)" @dblclick="zoom(1)">{{Math.round(scale*100)}}%</span>
+  <details class="zoom-menu" @keydown="menuKey">
+    <summary class="zoom" aria-label="缩放菜单" title="缩放">{{Math.round(scale*100)}}%</summary>
+    <div class="xb-menu" role="menu" aria-label="缩放" @click="closeMenu">
+      <button class="xb-menu-item" role="menuitem" @click="zoom(scale*1.2)">放大</button>
+      <button class="xb-menu-item" role="menuitem" @click="zoom(scale/1.2)">缩小</button>
+      <button class="xb-menu-item" role="menuitem" @click="fit">适应全部画板</button>
+      <div class="xb-menu-sep"/>
+      <button v-for="value in [.25,.5,.75,1,1.5,2]" :key="value" class="xb-menu-item" role="menuitemradio" :aria-checked="Math.abs(scale-value)<.001" @click="zoom(value)">{{value*100}}%<Check v-if="Math.abs(scale-value)<.001" :size="12" class="xb-menu-check"/></button>
+      <div class="xb-menu-sep"/>
+      <button class="xb-menu-item" role="menuitemcheckbox" :aria-checked="guides" @click="guides=!guides">布局参考线<Check v-if="guides" :size="12" class="xb-menu-check"/></button>
+      <button class="xb-menu-item" role="menuitem" :disabled="!canEdit||!history.length" @click="undo">撤销</button>
+      <button class="xb-menu-item" role="menuitem" :disabled="!canEdit||!future.length" @click="redo">重做</button>
+    </div>
+  </details>
   <button title="放大" @click="zoom(scale*1.2)"><Plus :size="12"/></button>
 </div>
 <div v-if="ds.error" class="errorbar" role="alert">
@@ -342,34 +375,19 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
   <button @click="ds.discard()">放弃草稿并读取新版</button>
 </div>
 <div class="editor" @pointerdown.self="context=null">
-  <ElementToolbar v-if="selectedIds.length&&mode==='select'" :count="selectedIds.length" :disabled="!canEdit" :readonly="node?.readonly" @command="elementCommand"/>
+  <ElementToolbar v-if="selectedIds.length&&mode==='select'&&!properties" :count="selectedIds.length" :disabled="!canEdit" :readonly="node?.readonly" @command="elementCommand"/>
   <div v-if="context" class="xb-menu element-context" :style="{left:context.x+'px',top:context.y+'px'}" role="menu" aria-label="元素菜单">
     <button v-for="[label,command] in [['复制','copy'],['剪切','cut'],['粘贴','paste'],['创建副本','duplicate'],['删除','delete'],['编组','group'],['解组','ungroup'],['移到最前','front'],['移到最后','back'],['锁定','lock'],['解锁','unlock']]" :key="command" class="xb-menu-item" role="menuitem" :disabled="!canEdit" @click="elementCommand(command)">{{label}}</button>
   </div>
-  <nav class="rail" aria-label="画板列表">
-    <div class="rail-head">画板 <small>{{allBoards.length}}</small></div>
-    <button v-for="b in allBoards" :key="b.file" :class="{active:selected===b.file}" @click="page=b.page??'';select(b);focus(b)" @dblclick="properties=true">
-      <span>▣</span><span>{{b.title}}</span>
-    </button>
-    <div class="layer-head">图层 <small>{{layers.length}}</small></div>
-    <div class="layers" role="tree" aria-label="图层列表" @keydown="layerKey"><div v-for="layer in visibleLayers" :key="layer.id" :data-layer-id="layer.id" role="treeitem" :aria-selected="selectedIds.includes(layer.id)" :aria-level="layer.depth+1" :aria-expanded="layerContainers.has(layer.id)?!collapsedLayers.has(layer.id):undefined" class="layer-row" :class="{active:selectedIds.includes(layer.id)}" :style="{paddingLeft:Math.min(32,layer.depth*8)+'px'}">
-      <button v-if="layerContainers.has(layer.id)" :aria-label="(collapsedLayers.has(layer.id)?'展开':'收起')+layer.label" @click="toggleLayer(layer.id)">{{collapsedLayers.has(layer.id)?'›':'⌄'}}</button>
-      <button class="layer-select" :title="layer.label" :aria-label="'选择图层 '+layer.label" @click="chooseElements([layer.id])">{{layer.tag.toLowerCase()}} · {{layer.label}}</button>
-      <button :disabled="!canEdit||layer.generated" :title="layer.hidden?'显示图层':'隐藏图层'" :aria-label="(layer.hidden?'显示':'隐藏')+layer.label" @click="elementEdit({type:'hide',ids:[layer.id],value:!layer.hidden})">{{layer.hidden?'○':'◉'}}</button>
-      <button :disabled="!canEdit||layer.generated" :title="layer.locked?'解锁图层':'锁定图层'" :aria-label="(layer.locked?'解锁':'锁定')+layer.label" @click="elementEdit({type:'lock',ids:[layer.id],value:!layer.locked})">{{layer.locked?'◆':'◇'}}</button>
-    </div></div>
-    <div class="rail-actions">
-      <button :disabled="!canEdit||!current" title="复制画板" @click="add(true)"><Copy :size="13"/></button>
-      <button :disabled="!canEdit||allBoards.length<2" title="删除画板" @click="remove"><Trash2 :size="13"/></button>
-      <button :disabled="!current" title="画板源代码" @click="openSource">&lt;/&gt;</button>
-    </div>
-  </nav>
+
   <div ref="viewport" class="viewport" tabindex="0" :class="{hand:mode==='hand'||spaceHeld}" @wheel.prevent="wheel" @scroll.passive="scheduleView" @gesturestart.prevent="gestureStart" @gesturechange.prevent="gestureChange" @pointerdown="down($event)" @pointermove="move" @pointerup="up" @pointercancel="cancelDrag">
     <div class="scroll-space" :style="{width:extent.w*scale+'px',height:extent.h*scale+'px'}" @pointerdown.self.stop="down($event)">
       <div class="canvas" :style="{width:extent.w+'px',height:extent.h+'px',transform:`scale(${scale})`}" @pointerdown.self.stop="down($event)">
+        <CanvasNoteView v-for="note in notes" :key="note.id" :note="note" :selected="selectedNote===note.id" :writable="canEdit&&mode==='select'" :scale="scale" :offset-x="32-minX" :offset-y="40-minY" @select="selectNote(note.id)" @patch="editNote(note.id,$event)" @remove="removeNote(note.id)" @duplicate="copyNote(note)"/>
         <section v-for="b in boards" :key="b.file" class="artboard" :data-board="b.file" :class="{selected:selected===b.file}" :style="position(b)">
-          <div class="board-title" tabindex="0" role="button" :aria-label="'画板 '+b.title" @keydown.enter.stop.prevent="select(b);sendEditor('enter')" @keydown.space.stop.prevent="select(b)" @pointerdown.stop="down($event,b)">
+          <div class="board-title" tabindex="0" role="button" :aria-label="'画板 '+b.title+'，第 '+(allBoards.findIndex(item=>item.file===b.file)+1)+' 个，共 '+allBoards.length+' 个'" @keydown.enter.stop.prevent="select(b);sendEditor('enter')" @keydown.space.stop.prevent="select(b)" @pointerdown.stop="down($event,b)">
             <b>{{b.title}} <small>{{b.w}}×{{b.h}}</small></b>
+            <button :aria-label="'调整画板参数 '+b.title" :aria-pressed="selected===b.file&&properties&&activeTab==='tweaks'" title="Tweaks" @pointerdown.stop @click="openTweaks(b)"><SlidersHorizontal :size="13"/></button>
             <button @pointerdown.stop @click="select(b);mode='play';focus(b)"><Play :size="13"/> Play</button>
           </div>
           <div class="surface" :style="{height:(dragging?.file===b.file&&dragging.h?dragging.h:b.h)+'px'}">
@@ -385,11 +403,38 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
     <p v-if="project&&!boards.length" class="empty">暂无画板，点击 ＋ 创建，或继续告诉小伴设计需求。</p>
   </div>
   <aside v-if="properties&&current&&project" class="properties">
-    <div class="prop-tabs">
-      <button :class="{active:activeTab==='properties'}" @click="activeTab='properties'">属性 & 批注</button>
-      <button :class="{active:activeTab==='design-system'}" @click="activeTab='design-system'">设计系统</button>
+    <div class="prop-tabs" role="tablist" aria-label="属性视图" @keydown="panelKey">
+      <button role="tab" :aria-selected="activeTab==='properties'" :class="{active:activeTab==='properties'}" @click="activeTab='properties'">属性</button>
+      <button role="tab" :aria-selected="activeTab==='code'" :class="{active:activeTab==='code'}" @click="activeTab='code'">Code</button>
+      <button role="tab" :aria-selected="activeTab==='tweaks'" :class="{active:activeTab==='tweaks'}" @click="activeTab='tweaks'">Tweaks</button>
+      <button role="tab" :aria-selected="activeTab==='design-system'" :class="{active:activeTab==='design-system'}" @click="activeTab='design-system'">设计系统</button>
+      <button aria-label="关闭属性面板" @click="elementCommand('properties')"><X :size="14"/></button>
     </div>
-    <template v-if="activeTab==='properties'">
+  <nav v-if="activeTab==='properties'||activeTab==='code'" class="rail" aria-label="画板列表">
+    <div class="rail-head">画板 <small>{{allBoards.length}}</small></div>
+    <button v-for="b in allBoards" :key="b.file" :class="{active:selected===b.file}" @click="page=b.page??'';select(b);focus(b)" @dblclick="properties=true">
+      <span>▣</span><span>{{b.title}}</span>
+    </button>
+    <div class="layer-head">图层 <small>{{layers.length}}</small></div>
+    <div class="layers" role="tree" aria-label="图层列表" @keydown="layerKey"><div v-for="layer in visibleLayers" :key="layer.id" :data-layer-id="layer.id" role="treeitem" :aria-selected="selectedIds.includes(layer.id)" :aria-level="layer.depth+1" :aria-expanded="layerContainers.has(layer.id)?!collapsedLayers.has(layer.id):undefined" class="layer-row" :class="{active:selectedIds.includes(layer.id)}" :style="{paddingLeft:Math.min(32,layer.depth*8)+'px'}">
+      <button v-if="layerContainers.has(layer.id)" :aria-label="(collapsedLayers.has(layer.id)?'展开':'收起')+layer.label" @click="toggleLayer(layer.id)">{{collapsedLayers.has(layer.id)?'›':'⌄'}}</button>
+      <button class="layer-select" :title="layer.label" :aria-label="'选择图层 '+layer.label" @click="chooseElements([layer.id])">{{layer.tag.toLowerCase()}} · {{layer.label}}</button>
+      <button :disabled="!canEdit||layer.generated" :title="layer.hidden?'显示图层':'隐藏图层'" :aria-label="(layer.hidden?'显示':'隐藏')+layer.label" @click="elementEdit({type:'hide',ids:[layer.id],value:!layer.hidden})">{{layer.hidden?'○':'◉'}}</button>
+      <button :disabled="!canEdit||layer.generated" :title="layer.locked?'解锁图层':'锁定图层'" :aria-label="(layer.locked?'解锁':'锁定')+layer.label" @click="elementEdit({type:'lock',ids:[layer.id],value:!layer.locked})">{{layer.locked?'◆':'◇'}}</button>
+    </div></div>
+    <div class="rail-actions">
+      <button :disabled="!canEdit||!current" title="复制画板" @click="add(true)"><Copy :size="13"/></button>
+      <button :disabled="!canEdit||allBoards.length<2" title="删除画板" @click="remove"><Trash2 :size="13"/></button>
+    </div>
+  </nav>
+    <template v-if="activeTab==='code'&&selectedIds.length===1">
+      <h3>{{node?.tag.toLowerCase()??'元素'}}</h3>
+      <ElementCode :key="current.file+selectedIds[0]" :source="project.files[current.file]??''" :node-id="selectedIds[0]" :writable="canEdit&&mode==='select'" :readonly="node?.readonly" @save="saveElementCode(current.file,$event)" @notice="props.notify($event,'error')"/>
+    </template>
+    <template v-else-if="(activeTab==='properties'||activeTab==='code')&&!selected&&!selectedIds.length">
+      <p class="empty-note" role="status">{{selectedNote?'双击画布便签编辑文字。':'未选择元素。点击画板或图层查看属性。'}}</p>
+    </template>
+    <template v-else-if="activeTab==='properties'||activeTab==='code'">
       <h3>{{node?node.tag.toLowerCase():'画板属性'}}</h3>
       <label>名称<input :value="current.title" :disabled="!canEdit" @change="patchBoard({title:($event.target as HTMLInputElement).value})"/></label>
       <div class="dimensions">
@@ -403,8 +448,9 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
         <h4>选中元素</h4>
         <div v-if="node.path" class="node-path" :title="node.path">{{node.path}}</div>
         <label>文字<input v-model="nodeText" :disabled="!canEdit" @change="patchText"/></label>
-        <label>文字颜色<input type="color" :value="styleVal('color','#000000')" :disabled="!canEdit" @change="patchStyle('color',($event.target as HTMLInputElement).value)"/></label>
-        <label>背景颜色<input type="color" :value="styleVal('background-color','#ffffff')" :disabled="!canEdit" @change="patchStyle('background-color',($event.target as HTMLInputElement).value)"/></label>
+        <label>文字颜色<input type="color" :value="colorHex(styleVal('color','#000000'))" :disabled="!canEdit" @change="patchStyle('color',($event.target as HTMLInputElement).value)"/></label>
+        <output v-if="contrastRatio!==null" class="contrast-hint" aria-live="polite">文字对比度 {{contrastRatio.toFixed(2)}}:1 · {{contrastRatio>=4.5?'良好':'偏低'}}</output>
+        <label>背景颜色<input type="color" :value="colorHex(styleVal('background-color','#ffffff'),'#ffffff')" :disabled="!canEdit" @change="patchStyle('background-color',($event.target as HTMLInputElement).value)"/></label>
         <label>字号<input type="number" min="1" max="300" :value="numStyleVal('font-size',14)" :disabled="!canEdit" @change="patchStyle('font-size',($event.target as HTMLInputElement).value+'px')"/></label>
         <label>圆角<input type="number" min="0" max="1000" :value="numStyleVal('border-radius',0)" :disabled="!canEdit" @change="patchStyle('border-radius',($event.target as HTMLInputElement).value+'px')"/></label>
         <label>间距<input type="number" min="0" max="1000" :value="numStyleVal('padding',0)" :disabled="!canEdit" @change="patchStyle('padding',($event.target as HTMLInputElement).value+'px')"/></label>
@@ -416,15 +462,7 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
           </select>
         </label>
       </template>
-      <template v-if="config.length">
-        <h4>可调参数</h4>
-        <label v-for="[key,c] in config" :key="key">{{c.label??key}}
-          <select v-if="c.editor==='enum'" :disabled="!canEdit" :value="c.default" @change="propChange(key,c,$event)"><option v-for="v in c.options" :key="String(v)" :value="v">{{v}}</option></select>
-          <input v-else-if="c.editor==='boolean'" type="checkbox" :disabled="!canEdit" :checked="c.default" @change="propChange(key,c,$event)"/>
-          <input v-else-if="['color','number','range','string','text'].includes(c.editor)" :type="c.editor==='string'||c.editor==='text'?'text':c.editor" :min="c.min" :max="c.max" :step="c.step" :disabled="!canEdit" :value="c.default" @change="propChange(key,c,$event)"/>
-          <small v-else>此参数只读保留</small>
-        </label>
-      </template>
+
       <div class="comment-head">
         <h4>批注 <small>{{comments.length}}</small></h4>
         <button class="mini-btn" @click="hideResolved=!hideResolved">{{hideResolved?'显示全部':'隐藏已解决'}}</button>
@@ -443,6 +481,15 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
       </article>
       <button :disabled="!canEdit" class="text-btn" @click="commentOpen=true">＋ 添加批注</button>
     </template>
+      <template v-else-if="activeTab==='tweaks'">
+        <h3>Tweaks</h3><p v-if="!config.length" class="empty-note">当前画板没有可调参数。</p>
+        <label v-for="[key,c] in config" :key="key">{{c.label??key}}
+          <select v-if="c.editor==='enum'" :disabled="!canEdit" :value="c.default" @change="propChange(key,c,$event)"><option v-for="v in c.options" :key="String(v)" :value="v">{{v}}</option></select>
+          <input v-else-if="c.editor==='boolean'" type="checkbox" :disabled="!canEdit" :checked="c.default" @change="propChange(key,c,$event)"/>
+          <input v-else-if="['color','number','range','string','text'].includes(c.editor)" :type="c.editor==='string'||c.editor==='text'?'text':c.editor" :min="c.min" :max="c.max" :step="c.step" :disabled="!canEdit" :value="c.default" @change="propChange(key,c,$event)"/>
+          <small v-else>此参数只读保留</small>
+        </label>
+      </template>
     <template v-else>
       <h3>设计系统 (Design System)</h3>
       <h4>设计令牌 (Tokens)</h4>
@@ -490,6 +537,9 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
 </section>
 </template>
 <style scoped>
+.zoom-menu{position:relative}.zoom-menu summary{cursor:pointer;list-style:none;padding:5px}.zoom-menu>.xb-menu{position:absolute;right:0;top:100%;z-index:15;min-width:176px;background:var(--ui-surface);border:1px solid var(--ui-line);border-radius:8px;padding:4px;box-shadow:0 6px 20px var(--ui-overlay)}.zoom-menu .xb-menu-item{width:100%;min-height:32px;justify-content:flex-start;white-space:nowrap}.zoom-menu .xb-menu-check{margin-left:auto}.zoom-menu .xb-menu-sep{height:1px;background:var(--ui-line);margin:4px 0}
+.properties .rail{width:auto;max-height:220px;overflow:auto;padding:0 0 8px;border-right:0;border-bottom:1px solid var(--ui-line);margin-bottom:12px;resize:vertical;min-height:100px}.properties{width:288px!important}.prop-tabs button{white-space:nowrap}.prop-tabs{position:sticky;top:-13px;background:var(--ui-surface);z-index:2;padding-top:8px}.board-title b{flex:1}.viewport{background-image:none!important}
+
 .board-size-handle{position:absolute;right:0;bottom:0;transform:translate(50%,50%);background:var(--ui-btn)!important;border:1px solid var(--ui-surface)!important;min-height:0!important;min-width:0!important;padding:0!important;border-radius:2px!important;cursor:nwse-resize!important;touch-action:none;z-index:3}
 .element-context{position:absolute;z-index:30;max-height:calc(100% - 16px);overflow:auto;box-sizing:border-box;width:104px;min-width:0;max-width:calc(100% - 16px)}.design-workbench .element-context .xb-menu-item{display:flex;justify-content:flex-start;min-height:32px;padding:0 10px;font-size:12px;white-space:nowrap}.layer-head{padding:12px 6px 5px;color:var(--ui-text-tertiary);font-size:10px}.layers{border-top:1px solid var(--ui-line);margin-top:6px;padding-top:4px}.layer-row{display:flex;align-items:center;gap:0;min-width:0;font-size:9px}.layer-row.active{background:var(--ui-soft);color:var(--ui-ink)}.layer-row .layer-select{flex:1;min-width:0;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;padding:3px}.layer-row>button:not(.layer-select){padding:2px;min-width:15px;opacity:.45}.layer-row:hover>button,.layer-row.active>button{opacity:1}
 

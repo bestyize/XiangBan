@@ -1,5 +1,7 @@
 # open-claude-design：实施与对标验证
 
+最新进展见 [2026-11-01 复刻验收矩阵](open-claude-design-compatibility.md)，已补原始素材源包、本地 React 组件和交互兼容；以下保留早期实施记录。
+
 更新：2026-10-27。开发分支：`dev/open-claude-design`。不自动合入主分支，不自动触发打包。
 
 ## 产品流程

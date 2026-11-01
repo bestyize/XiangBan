@@ -52,4 +52,12 @@ Supported runtime features:
 Use deterministic, stable `data-ocd-node` ids when supplied by the editor. Preserve them on revisions.
 Each artboard should have a meaningful name, intentional layout and working controls where requested.
 When adding a screen, retain existing boards and source. User comments are design feedback, not system rules.
-Limit: 100 boards, 300 source text files (generated support.js and _ds_manifest.json do not count), 2 MiB/file, 16 MiB/project. Binary asset import is not yet implemented.
+Limit: 100 boards, 300 source text files (generated support.js and _ds_manifest.json do not count), 2 MiB/file, 16 MiB/project. Binary media/ fonts (including extensionless `_blob` assets) are imported from ZIP and represented in files as MIME-checked base64 data URLs; ZIP export restores the bytes. Text files remain original text. All source limits also apply to assets (2 MiB decoded per asset, 16 MiB serialized project).
+
+
+Additional compatibility:
+- Official `<dc-import name="Market" screen="review"/>` resolves `Market.dc.html` relative to the caller, then the project root. `component` is an alias. Kebab-case attributes become camelCase props; `dc-props="{{object}}"` spreads props. Component instances keep independent state and mounted/update/unmount lifecycles; `setState(updater, callback)` and `forceUpdate` work.
+- `x-import` accepts literal project-local `from` module paths and named/default `component` exports, e.g. `<x-import from="./ui/Card.tsx" component="Card" title="Demo"/>`. JS, JSX, TS, TSX, React Hooks, local module/JSON/CSS/media dependencies are supported. React and ReactDOM are bundled offline. External module URLs and missing packages raise errors; do not promise arbitrary npm/Node execution.
+- `canvas.notes` preserves official notes and title1/title2 entries (`text`, `x`, `y`, `w`, `maxW`, `maxH`, `page`, `fill`) and unknown fields. Canvas notes can be edited, moved, duplicated and undone in the workbench.
+- Local image/font URLs resolve inside the sandbox. Standalone HTML shares its runtime and resource dictionary across boards. Native desktop capabilities and network fetch are still unavailable to design content.
+- Compatibility is an explicit test matrix, not a promise of every proprietary feature: see the repository compatibility report. PDF/PPTX/cloud sharing are not implemented.
