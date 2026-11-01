@@ -42,7 +42,10 @@ onBeforeUnmount(() => contentObserver?.disconnect())
 const featured = computed<Preview>(() => preview.value || (category.value && category.value !== 'game' ? decorationSections.value[0]?.items[0] : null) || {...BUILTIN_GAMES[0]!,kind:'game'})
 watch(category,() => { preview.value=null })
 function choose(item:Preview) { preview.value=item; if (wide.value) showcase.value?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'}) }
-function play() { const item=wide.value ? featured.value : preview.value; if (!item) return; playing.value=item.id; if (!wide.value) preview.value=null }
+const gamePlayer=ref<InstanceType<typeof BuiltinGamePlayer>>(), gameSession=ref(0)
+const preparedGame=computed(() => playing.value || ((wide.value ? featured.value : preview.value)?.kind === 'game' ? (wide.value ? featured.value : preview.value)!.id : ''))
+function closeGame() { playing.value=''; gameSession.value++ }
+function play() { if (!gamePlayer.value?.start()) return; playing.value=preparedGame.value; if (!wide.value) preview.value=null }
 </script>
 <template>
   <div ref="content" class="creation-home">
@@ -52,7 +55,7 @@ function play() { const item=wide.value ? featured.value : preview.value; if (!i
       <AppIcon name="ai" :size="29" /><span><strong>你想创造什么？</strong><small>一个游戏，一片风景，一位小伙伴…</small></span><AppIcon name="arrow" :size="20" />
     </button>
     <nav class="creation-filters" aria-label="作品分类"><button v-for="item in categories" :key="item.key" type="button" :class="{active:category === item.key}" :aria-pressed="category === item.key" @click="select(item.key)">{{ item.label }}</button></nav>
-    <section v-if="wide" ref="showcase" class="desktop-showcase" aria-label="作品预览"><CreationPreviewContent :item="featured" wide :active="!playing" @play="play" /></section>
+    <section v-if="wide" ref="showcase" class="desktop-showcase" aria-label="作品预览"><CreationPreviewContent :item="featured" :game-ready="gamePlayer?.readyToPlay" :game-error="gamePlayer?.error" @retry="gamePlayer?.restart()" wide :active="!playing" @play="play" /></section>
     <section v-if="games.length" aria-labelledby="builtin-games-heading">
       <header class="creation-section"><h2 id="builtin-games-heading">给自己几分钟好玩</h2><span>{{ games.length }} 款</span></header>
       <div class="creation-grid"><button v-for="game in games" :key="game.id" class="creation-card" type="button" :aria-label="`查看${game.name}`" :class="{selected:wide && featured.id === game.id}" :aria-pressed="wide ? featured.id === game.id : undefined" @click="choose({...game,kind:'game'})">
@@ -70,8 +73,8 @@ function play() { const item=wide.value ? featured.value : preview.value; if (!i
         </div><h3>{{ item.name }}</h3><div class="creation-meta"><span>{{ label(item.kind) }}</span><span><svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="3" width="16" height="11" rx="1.5"/><path d="M10 14v3M6 17h8"/></svg>{{ item.kind === 'wallpaper' ? '创作灵感' : '官方内置' }}</span></div>
       </button></div>
     </section>
-    <ModalDialog :open="!wide && preview !== null" :title="preview?.name || '作品预览'" :width="640" @close="preview = null"><CreationPreviewContent v-if="!wide && preview" :item="preview" @play="play" /></ModalDialog>
-    <BuiltinGamePlayer v-if="playing" :game-id="playing" @close="playing = ''" />
+    <ModalDialog :open="!wide && preview !== null" :title="preview?.name || '作品预览'" :width="640" @close="preview = null"><CreationPreviewContent v-if="!wide && preview" :item="preview" :game-ready="gamePlayer?.readyToPlay" :game-error="gamePlayer?.error" @retry="gamePlayer?.restart()" @play="play" /></ModalDialog>
+    <BuiltinGamePlayer v-if="preparedGame" :key="`${preparedGame}:${gameSession}`" ref="gamePlayer" :game-id="preparedGame" @close="closeGame" />
     <ClientCreationPrompt v-model:show="promptOpen" />
   </div>
 </template>
