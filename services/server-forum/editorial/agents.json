@@ -551,21 +551,31 @@
       "name": "休闲 / 梦想和人生",
       "destination": "topic",
       "enabled": true,
-      "brief": "围绕人生选择和个人学习目标，给出明确标为示例的计划写法。只依据现有目标模板字段和限制，不承诺成功、不作心理诊断、不虚构个人经历。",
+      "brief": "围绕学习目标、行动计划和复盘整理真实来源；可以提供明确标为示例的规划，不虚构真实用户经历。补充GitLab公开学习与发展手册，明确这些是该公司的做法，不将员工福利、发展规则当成普适承诺，不承诺学习或就业效果，不作心理诊断。外部方法不是小伴新增能力。",
       "category": "casual-dream",
       "tags": [],
       "hosts": [
-        "chat.xiangban.xyz"
+        "chat.xiangban.xyz",
+        "handbook.gitlab.com"
       ],
       "sources": [
         {
           "type": "catalog"
+        },
+        {
+          "type": "index",
+          "url": "https://handbook.gitlab.com/handbook/people-group/learning-and-development/",
+          "prefixes": [
+            "/handbook/people-group/learning-and-development/"
+          ],
+          "limit": 100
         }
       ],
       "native_destination": "topic",
       "count_by_category": true,
       "bootstrap_daily_limit": 20,
-      "daily_limit": 2
+      "daily_limit": 2,
+      "source_max_bytes": 8388608
     },
     {
       "id": "casual-gear",
@@ -815,17 +825,49 @@
       "name": "创作 / 壁纸",
       "destination": "topic",
       "enabled": true,
-      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。 补充Krita官方手册的图像制作导读，围绕壁纸创作的画布、图层、选区、颜色和导出。明确是Krita中的操作，不冒充小伴界面或已经做好的可安装作品，不把社区方案导入协议套到壁纸。",
       "kind": "wallpaper",
       "native_destination": "pack",
       "category": "create-wallpaper",
       "count_by_category": true,
       "hosts": [
-        "chat.xiangban.xyz"
+        "chat.xiangban.xyz",
+        "docs.krita.org"
       ],
       "sources": [
         {
           "type": "catalog"
+        },
+        {
+          "type": "index",
+          "url": "https://docs.krita.org/en/user_manual.html",
+          "prefixes": [
+            "/en/user_manual/"
+          ],
+          "limit": 100,
+          "keywords": [
+            "image",
+            "layer",
+            "mask",
+            "select",
+            "color",
+            "colour",
+            "vector",
+            "canvas",
+            "paint",
+            "save",
+            "export",
+            "transform",
+            "basic",
+            "draw",
+            "mirror",
+            "assistant",
+            "snapp",
+            "template",
+            "brush",
+            "gamut",
+            "animation"
+          ]
         }
       ],
       "bootstrap_daily_limit": 20,
@@ -836,17 +878,28 @@
       "name": "创作 / 组件",
       "destination": "topic",
       "enabled": true,
-      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。 补充GNOME官方人机界面指南中的桌面组件设计原则，明确属于GNOME规范的参考导读。不能声称小伴已支持GNOME、GTK或其中任意控件/API；参考建议与小伴已实现能力分开，不把其他类型的导入协议套给组件。",
       "kind": "widget",
       "native_destination": "pack",
       "category": "create-widget",
       "count_by_category": true,
       "hosts": [
-        "chat.xiangban.xyz"
+        "chat.xiangban.xyz",
+        "developer.gnome.org"
       ],
       "sources": [
         {
           "type": "catalog"
+        },
+        {
+          "type": "index",
+          "url": "https://developer.gnome.org/hig/patterns/controls.html",
+          "prefixes": [
+            "/hig/guidelines/",
+            "/hig/patterns/",
+            "/hig/reference/"
+          ],
+          "limit": 100
         }
       ],
       "bootstrap_daily_limit": 20,
