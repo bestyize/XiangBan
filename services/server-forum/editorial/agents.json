@@ -1326,17 +1326,50 @@
       "name": "创作 / 工作流",
       "destination": "topic",
       "enabled": true,
-      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
+      "brief": "整理真实工作流结构、触发条件、分支、数据传递、执行与调试说明。可补充n8n官方文档，但必须明确n8n的平台与版本边界，不能说成小伴已经支持其节点、凭据、代码执行或导入格式；例子不是已部署的自动化，不虚构实测、服务承诺或用户案例。",
       "kind": "workflow",
       "native_destination": "pack",
       "category": "create-workflow",
       "count_by_category": true,
       "hosts": [
-        "chat.xiangban.xyz"
+        "chat.xiangban.xyz",
+        "docs.n8n.io"
       ],
       "sources": [
         {
           "type": "catalog"
+        },
+        {
+          "type": "index",
+          "url": "https://docs.n8n.io/build/understand-workflows",
+          "prefixes": [
+            "/build/understand-workflows/"
+          ],
+          "limit": 100
+        },
+        {
+          "type": "index",
+          "url": "https://docs.n8n.io/build/manage-workflows",
+          "prefixes": [
+            "/build/manage-workflows/"
+          ],
+          "limit": 100
+        },
+        {
+          "type": "index",
+          "url": "https://docs.n8n.io/build/flow-logic",
+          "prefixes": [
+            "/build/flow-logic/"
+          ],
+          "limit": 100
+        },
+        {
+          "type": "index",
+          "url": "https://docs.n8n.io/build/work-with-data",
+          "prefixes": [
+            "/build/work-with-data/"
+          ],
+          "limit": 100
         }
       ],
       "bootstrap_daily_limit": 20,
