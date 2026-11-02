@@ -31,7 +31,6 @@ function toolBrand(tool:ToolSummary) { return knownBrand(tool.name) ? tool.name 
 const tabs = RESOURCE_TABS
 const tab = computed(() => tabs.some(t => t.key === route.query.tab) ? String(route.query.tab) : 'tools')
 const sectionTitle = computed(() => tabs.find(item => item.key === tab.value)?.label || '资源')
-const sectionIntro = computed(() => ({ tools:'发现适合自己的 AI 工具', docs:'查阅官方文档和学习资料', media:'分享片单、影评和乐评', help:'提出问题，也帮助他人', open:'发现开源软件与免费素材' }[tab.value] || ''))
 const page = computed(() => Math.max(1, Math.floor(Number(route.query.page) || 1)))
 const filter = computed(() => String(route.query.filter || ''))
 type ResourceData = { kind:'tools'; items:ToolSummary[] } | { kind:'docs'; groups:Group<DocItem>[] } | { kind:'topics'; result:Page<TopicItem> }
@@ -51,7 +50,7 @@ useHead(() => ({ title:'资源' }))
 </script>
 <template>
   <main class="community-page resource-page">
-    <header class="desktop-heading"><div><p>社区 / 资源</p><h1>资源</h1><span>{{ sectionIntro }}</span></div></header><h1 class="sr-only mobile-heading">社区资源</h1>
+    <h1 class="sr-only">社区资源</h1>
     <CommunityTabs :items="tabs" :active="tab" label="资源栏目" @change="setTab" />
     <CommunityTabs v-if="tab === 'media' || tab === 'help'" :items="filters" :active="filter" label="资源筛选" @change="setFilter" />
     <HelpStats v-if="tab === 'help'" />
@@ -66,10 +65,9 @@ useHead(() => ({ title:'资源' }))
   </main>
 </template>
 <style scoped>
-.desktop-heading,.desktop-feed-heading{display:none}.resource-feed{display:grid;gap:8px;padding:8px 12px}.resource-note{margin:8px 12px 0;font-size:12px;color:var(--ink-3);line-height:1.6}.tool-card{display:flex;align-items:center;gap:12px;min-width:0;background:var(--surface);border-radius:12px;padding:12px 14px}.tool-icon{width:48px;height:48px;flex:none;display:grid;place-items:center;border-radius:12px;background:var(--surface-2)}.tool-icon img{width:100%;height:100%;object-fit:contain;border-radius:12px}.tool-icon :deep(.ranking-vendor){transform:scale(1.5)}.tool-body{display:grid;gap:4px;min-width:0;flex:1}.tool-body strong{font-size:15px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.tool-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:var(--ink-3);font-size:12px}.license{padding:1px 6px;border-radius:5px;background:var(--surface-2)}.sample{font-size:12px;color:var(--brand);font-weight:400}.arrow{font-size:20px;color:var(--ink-3)}.doc-group{background:var(--surface);border-radius:12px;padding:14px}.doc-group header{display:flex;align-items:center;gap:8px;margin-bottom:4px}.doc-group header h2{font-size:16px;margin:0;flex:1}.doc-group header>span:last-child{font-size:12px;color:var(--ink-3)}.doc-icon{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:var(--surface-2)}.doc-row{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:52px;padding:12px 0;font-size:14px;border-top:.5px solid var(--line)}.doc-row>span:first-child{min-width:0;overflow-wrap:anywhere}.doc-row>span:last-child{color:var(--ink-3)}@media(min-width:768px){.resource-feed{gap:10px}.tool-card{padding:14px 16px}}
+.desktop-feed-heading{display:none}.resource-feed{display:grid;gap:8px;padding:8px 12px}.resource-note{margin:8px 12px 0;font-size:12px;color:var(--ink-3);line-height:1.6}.tool-card{display:flex;align-items:center;gap:12px;min-width:0;background:var(--surface);border-radius:12px;padding:12px 14px}.tool-icon{width:48px;height:48px;flex:none;display:grid;place-items:center;border-radius:12px;background:var(--surface-2)}.tool-icon img{width:100%;height:100%;object-fit:contain;border-radius:12px}.tool-icon :deep(.ranking-vendor){transform:scale(1.5)}.tool-body{display:grid;gap:4px;min-width:0;flex:1}.tool-body strong{font-size:15px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.tool-meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap;color:var(--ink-3);font-size:12px}.license{padding:1px 6px;border-radius:5px;background:var(--surface-2)}.sample{font-size:12px;color:var(--brand);font-weight:400}.arrow{font-size:20px;color:var(--ink-3)}.doc-group{background:var(--surface);border-radius:12px;padding:14px}.doc-group header{display:flex;align-items:center;gap:8px;margin-bottom:4px}.doc-group header h2{font-size:16px;margin:0;flex:1}.doc-group header>span:last-child{font-size:12px;color:var(--ink-3)}.doc-icon{width:28px;height:28px;display:grid;place-items:center;border-radius:8px;background:var(--surface-2)}.doc-row{display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:52px;padding:12px 0;font-size:14px;border-top:.5px solid var(--line)}.doc-row>span:first-child{min-width:0;overflow-wrap:anywhere}.doc-row>span:last-child{color:var(--ink-3)}@media(min-width:768px){.resource-feed{gap:10px}.tool-card{padding:14px 16px}}
 @media(min-width:1100px){
- .mobile-heading{display:none}
- .resource-page{max-width:1120px}.desktop-heading{display:flex;align-items:end;justify-content:space-between;gap:24px;padding:26px 12px 22px}.desktop-heading p{margin:0 0 6px;color:var(--ink-3);font-size:12px}.desktop-heading h1{font-size:28px;line-height:1.2;margin:0 0 8px;letter-spacing:-.02em}.desktop-heading div>span,.heading-section{color:var(--ink-3);font-size:14px}.heading-section{font-size:13px}
+ .resource-page{max-width:1120px}
  .desktop-feed-heading{display:flex;align-items:baseline;justify-content:space-between;padding:20px 12px 2px}.desktop-feed-heading h2{font-size:17px;margin:0}.desktop-feed-heading span{font-size:12px;color:var(--ink-3)}
  .resource-feed{gap:12px}.tool-grid,.doc-grid,.topic-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.tool-card{min-height:96px;padding:16px 18px}.doc-group{padding:18px}.doc-group header{margin-bottom:8px}.topic-grid :deep(.topic-card){height:100%;padding:18px}.resource-note{margin-top:14px}
 }
