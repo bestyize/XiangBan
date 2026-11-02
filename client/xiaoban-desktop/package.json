@@ -6,6 +6,8 @@
   "scripts": {
     "computer-use:prepare": "node ../../libs/agent-tools/computer-use/scripts/prepare-runtime.mjs --output src-tauri/resources/computer-use",
     "test:computer-use": "node --test ../../libs/agent-tools/computer-use/scripts/prepare-runtime.test.mjs ../../.github/signing/identity.test.mjs",
+    "design:figma-codec": "node scripts/build-design-figma-codec.mjs",
+    "test:design-export:browser": "node scripts/verify-design-export.mjs",
     "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "build": "node scripts/check-builtin-assets.mjs && node scripts/check-game-assets.mjs && vue-tsc --noEmit && vite build",
     "desktop": "node scripts/desktop.mjs dev",
@@ -29,9 +31,13 @@
     "vue-tsc": "3.3.12"
   },
   "dependencies": {
+    "fflate": "0.8.2",
     "jspdf": "4.2.1",
+    "kiwi-schema": "0.5.0",
     "lucide-vue-next": "0.577.0",
     "naive-ui": "2.45.3",
+    "openfig-core": "0.4.1",
+    "pptxgenjs": "4.0.1",
     "vue": "3.5.43"
   }
 }

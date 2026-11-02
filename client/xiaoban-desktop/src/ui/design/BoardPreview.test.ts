@@ -33,4 +33,17 @@ describe('sandbox capture protocol',()=>{
   vi.stubGlobal('IntersectionObserver',undefined);const w=mount(BoardPreview,{attachTo:document.body,props:{src:'about:blank',title:'a',editing:true,token:'s'}});await flushPromises();
   const pending=(w.vm as any).capture({width:100,height:80,scale:1});const rejected=expect(pending).rejects.toThrow('取消');w.unmount();await rejected;
  });
+ it('validates editable scene replies using the same authenticated capture channel',async()=>{
+  vi.stubGlobal('IntersectionObserver',undefined);
+  const w=mount(BoardPreview,{attachTo:document.body,props:{src:'about:blank',title:'a',editing:true,token:'secret'}});await flushPromises();
+  const frame=w.get('iframe').element as HTMLIFrameElement,post=vi.spyOn(frame.contentWindow!,'postMessage');
+  const send=(data:any)=>window.dispatchEvent(new MessageEvent('message',{source:frame.contentWindow,data:{channel:'open-claude-design',token:'secret',...data}}));
+  send({type:'ready'});
+  const result=(w.vm as any).captureScene({width:100,height:80});await flushPromises();
+  const request=post.mock.calls.find(([data])=>(data as any).scene)![0] as any;
+  expect(request.scale).toBe(1);
+  const rejected=expect(result).rejects.toThrow('无效');
+  send({type:'capture-result',requestId:request.requestId,scene:{version:1,width:100,height:80,nodes:[{kind:'image',image:'file:///private'}],warnings:[]}});
+  await rejected;w.unmount();
+ });
 });
