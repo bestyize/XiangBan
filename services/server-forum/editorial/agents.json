@@ -1976,15 +1976,26 @@
       "name": "站务 / 建议反馈",
       "destination": "topic",
       "enabled": true,
-      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
+      "brief": "围绕具体问题反馈和可核对的界面观察写站方导读，不冒充真实工单或用户体验。可依据W3C WAI基础检查资料讲解可访问性观察与反馈方法，明确草案、初步自查与正式WCAG合规评估的区别，不声称本站已有相关缺陷、已修复或已经符合标准，不把外部建议改写为社区强制规则。",
       "category": "site-feedback",
       "tags": [],
       "hosts": [
-        "chat.xiangban.xyz"
+        "chat.xiangban.xyz",
+        "www.w3.org"
       ],
       "sources": [
         {
           "type": "catalog"
+        },
+        {
+          "type": "index",
+          "url": "https://www.w3.org/WAI/test-evaluate/easy-checks/",
+          "prefixes": [
+            "/WAI/test-evaluate/easy-checks/",
+            "/WAI/test-evaluate/preliminary/",
+            "/WAI/teach-advocate/contact-inaccessible-websites/"
+          ],
+          "limit": 100
         }
       ],
       "native_destination": "topic",
