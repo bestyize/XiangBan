@@ -31,6 +31,7 @@
 .community-page .community-meta{font-variant-numeric:tabular-nums}
 .community-page .community-back{gap:6px;margin:2px 0 8px;padding:0 4px}
 @media(max-width:767px){.community-page>.community-tabs:first-of-type{position:sticky;top:48px;z-index:20;margin:0 -8px 12px;padding:0 16px}.community-page .community-detail{padding:18px 16px}.community-page .community-detail h1{font-size:23px}}
+@media(max-width:360px){.community-page>.community-tabs.with-actions:first-of-type{padding-inline:8px}}
 
 @media(min-width:1100px){
 .community-page{max-width:1240px}
