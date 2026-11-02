@@ -172,6 +172,18 @@ class EditorialTests(unittest.TestCase):
         self.assertIn('print(1)',text)
         self.assertNotIn('NOT_SOURCE_SECRET',text)
 
+    def test_versioned_guide_indexes_only_enqueue_selected_platform(self):
+        page='<a href="/guide/tool/first/ios">Current</a><a href="/guide/tool/first/ios/18">Old version</a><a href="/guide/tool/first/mac">Other platform</a>'
+        with patch('worker.cached_source',return_value=page):
+            w.collect_index(self.db,{}, {'id':'learn-a','hosts':['docs.example']}, {'url':'https://docs.example/guide/tool/welcome/ios','prefixes':['/guide/tool/'],'path_suffixes':['/ios']})
+        self.assertEqual([r['url'] for r in self.db.execute('SELECT url FROM jobs')],['https://docs.example/guide/tool/first/ios'])
+
+    def test_context_only_query_parameters_do_not_duplicate_sources(self):
+        page='<a href="/answer/1?hl=en&amp;ref_topic=2">First</a><a href="/answer/1?hl=en&amp;ref_topic=3">Same source</a>'
+        with patch('worker.cached_source',return_value=page):
+            w.collect_index(self.db,{}, {'id':'learn-a','hosts':['docs.example']}, {'url':'https://docs.example/help','prefixes':['/answer/'],'drop_query':['ref_topic']})
+        self.assertEqual([r['url'] for r in self.db.execute('SELECT url FROM jobs')],['https://docs.example/answer/1?hl=en'])
+
     def test_content_gate_rejects_short_copy_and_unapproved_assets(self):
         a = {'title': '正文标题', 'summary': '摘要', 'body': '实' * 1300, 'image_prompt': 'illustration'}
         w.validate_article(a)

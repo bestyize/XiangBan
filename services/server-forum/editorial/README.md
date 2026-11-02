@@ -43,3 +43,5 @@ Nginx 的 `/api/discover-editor/articles/` 与旧 `/api/discover-editor/frontier
 初始补稿在229篇时累计1517次调用，按实际审校与修订比例将每日请求次数阈值校准为6000次；每日及整轮4500万点的费用阈值、250万点保留额度继续约束所有调用。小游戏补充MDN官方游戏开发资料，标准Web能力不等于小伴已支持的沙箱能力。
 
 技能补充Anthropic官方公开技能示例，按具体SKILL文档说明结构与依赖；公开可读不等于统一开源或可商用，也不代表已经安装在小伴或能够直接导入。
+
+目标按实际浏览到的Atlassian Team Playbook规划条目补充，任务接入GitHub Projects官方文档，提醒接入Google Calendar/Tasks官方帮助，例行接入Apple快捷指令用户指南。外部产品和小伴的能力始终分开。Apple索引只选当前iOS路径，Google帮助去除ref_topic导航上下文后再计算来源身份，避免把版本或导航参数当新选题。
