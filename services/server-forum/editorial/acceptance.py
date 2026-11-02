@@ -7,6 +7,7 @@ private state directory; only the aggregate report is suitable for the repositor
 import argparse
 from collections import Counter, defaultdict
 import hashlib
+from html.parser import HTMLParser
 import json
 from pathlib import Path
 import re
@@ -20,6 +21,25 @@ import worker as w
 
 def load(path):
     return json.loads(path.read_text())
+
+
+def visible_body_key(value, html=False):
+    """Compare the entire visible text, allowing Markdown rendering punctuation."""
+    if html:
+        class Text(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.parts = []
+            def handle_data(self, data):
+                self.parts.append(data)
+        parser = Text()
+        parser.feed(value)
+        value = ''.join(parser.parts)
+    else:
+        value = re.sub(r'^ {0,3}(?:`{3,}|~{3,})[^\n]*$', '', value, flags=re.M)
+        value = re.sub(r'^ {0,3}\d+[.)]\s+', '', value, flags=re.M)
+        value = re.sub(r'\[([^\]]*)\]\([^)]*\)', r'\1', value)
+    return re.sub(r'[\W_]+', '', value)
 
 
 def check(root, config):
@@ -73,9 +93,10 @@ def check(root, config):
                 assert public['title'] == article['title'] and public['summary'] == imported['summary'], 'public metadata changed'
                 assert public['url'] == evidence['url'] and public['cover_url'] == imported['cover_url'], 'public source/cover changed'
                 assert len(public['body_html']) >= 1200, 'missing public body'
+                assert visible_body_key(imported['body']) == visible_body_key(public['body_html'], html=True), 'public article text differs from approved import'
                 assert article['body'].strip() in imported['body'], 'approved article differs from import'
-                if evidence.get('source_published_at'):
-                    assert w.discover_matches({'source_published_at': public['source_published_at']}, {'source_published_at': evidence['source_published_at']}), 'source date changed'
+                assert evidence.get('source_published_at'), 'missing source publication date'
+                assert w.discover_matches({'source_published_at': public['source_published_at']}, {'source_published_at': evidence['source_published_at']}), 'source date changed'
                 cover = public['cover_url']
             url = urllib.parse.urljoin(config['forum_url'], cover)
             assert urllib.parse.urlsplit(url).netloc == urllib.parse.urlsplit(config['forum_url']).netloc, 'off-site cover'
