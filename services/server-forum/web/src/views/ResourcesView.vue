@@ -32,16 +32,15 @@ const tabs = RESOURCE_TABS
 const tab = computed(() => tabs.some(t => t.key === route.query.tab) ? String(route.query.tab) : 'tools')
 const sectionTitle = computed(() => tabs.find(item => item.key === tab.value)?.label || '资源')
 const page = computed(() => Math.max(1, Math.floor(Number(route.query.page) || 1)))
-const filter = computed(() => String(route.query.filter || ''))
+const filter = computed(() => tab.value === 'media' ? String(route.query.filter || '') : '')
 type ResourceData = { kind:'tools'; items:ToolSummary[] } | { kind:'docs'; groups:Group<DocItem>[] } | { kind:'topics'; result:Page<TopicItem> }
 const { data, loading, error, load } = useCommunityResource<ResourceData>(async () => {
   if (tab.value === 'tools') return { kind:'tools', ...(await discoverApi.tools()) }
   if (tab.value === 'docs') return { kind:'docs', ...(await discoverApi.docs()) }
-  const help_status = tab.value === 'help' && ['open','solved','bounty'].includes(filter.value) ? filter.value as 'open'|'solved'|'bounty' : undefined
   const category = resourceTopicCategory(tab.value, filter.value)
-  return { kind:'topics', result: await api.topics({ category, help_status, page:page.value, sort:'new' }) }
+  return { kind:'topics', result: await api.topics({ category, page:page.value, sort:'new' }) }
 })
-const filters = computed(() => tab.value === 'help' ? [{key:'',label:'全部'},{key:'open',label:'进行中'},{key:'solved',label:'已采纳'},{key:'bounty',label:'有悬赏'}] : [{key:'',label:'全部'},{key:'movies',label:'影视'},{key:'music',label:'音乐'}])
+const mediaFilters = [{key:'',label:'全部'},{key:'movies',label:'影视'},{key:'music',label:'音乐'}]
 watch([tab,page,filter], load, { immediate:true })
 function setTab(tab:string) { void router.replace({ query: tab === 'tools' ? {} : { tab } }) }
 function setFilter(filter:string) { void router.replace({ query:{ tab:tab.value, ...(filter ? {filter} : {}) } }) }
@@ -52,12 +51,10 @@ useHead(() => ({ title:'资源' }))
   <main class="community-page resource-page">
     <h1 class="sr-only">社区资源</h1>
     <CommunityTabs :items="tabs" :active="tab" label="资源栏目" @change="setTab" />
-    <CommunityTabs v-if="tab === 'media' || tab === 'help'" :items="filters" :active="filter" label="资源筛选" @change="setFilter" />
+    <CommunityTabs v-if="tab === 'media'" :items="mediaFilters" :active="filter" label="资源筛选" @change="setFilter" />
     <HelpStats v-if="tab === 'help'" />
     <EditorialArticles v-if="tab === 'tools' || tab === 'docs'" :category="resourceTopicCategory(tab,filter)" :title="tab === 'tools' ? '工具导读' : '资料导读'" />
     <p v-if="tab === 'docs'" class="resource-note">官方文档的索引和导读，原文一律跳转官网。</p>
-    <p v-else-if="tab === 'media'" class="resource-note">只收片单、影评、乐评和公版或授权内容。</p>
-    <p v-else-if="tab === 'open'" class="resource-note">只收开源、免费软件和可免费使用的设计素材。</p>
     <RequestState :loading="loading" :error="error" @retry="load" />
     <template v-if="data?.kind === 'tools'"><div class="desktop-feed-heading meta-only"><h2 class="sr-only">AI 工具</h2><span>{{ data.items.length }} 款工具</span></div><div class="resource-feed tool-grid"><RouterLink v-for="tool in data.items" :key="tool.key" :to="`/tools/${encodeURIComponent(tool.key)}`" class="tool-card"><span class="tool-icon"><img v-if="webLink(tool.icon_url) && !brokenIcons.includes(tool.key)" :src="webLink(tool.icon_url)" alt="" loading="lazy" @error="brokenIcons.push(tool.key)"><ResourceToolIcon v-else :name="tool.name" :fallback="toolBrand(tool)" /></span><span class="tool-body"><strong>{{ tool.name }} <span v-if="tool.sample" class="sample">示例</span></strong><span class="tool-meta"><span class="license">{{ licenseLabel(tool.license) }}</span><span v-if="tool.latest_version">{{ tool.latest_version }}</span><span v-if="tool.latest_date">{{ tool.latest_date }} 更新</span><span v-if="tool.type_label">{{ tool.type_label }}</span></span></span><span class="arrow" aria-hidden="true">›</span></RouterLink></div><RequestState :empty="!data.items.length" /></template>
     <template v-else-if="data?.kind === 'docs'"><div class="desktop-feed-heading meta-only"><h2 class="sr-only">资料索引</h2><span>{{ data.groups.length }} 个文档分组</span></div><div class="resource-feed doc-grid"><section v-for="group in data.groups" :key="group.name" class="doc-group"><header><span class="doc-icon"><RankingVendor :name="group.name" /></span><h2>{{ group.name || '资料' }}</h2><span>{{ group.items.length }} 篇</span></header><template v-for="doc in group.items" :key="doc.key"><a v-if="webLink(doc.url)" :href="webLink(doc.url)" class="doc-row" target="_blank" rel="noopener noreferrer"><span>{{ doc.title }} <span v-if="doc.sample" class="sample">示例</span></span><span aria-hidden="true">↗</span></a></template></section></div><RequestState :empty="!data.groups.length" /></template>
