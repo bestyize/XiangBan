@@ -178,6 +178,10 @@ class AndroidLocalSpeech(context: Context) : LocalSpeech {
     override val files: ModelFiles = AndroidModelFiles(context)
     override val runtimeFiles = SpeechNativeLoader.configure(context, files)
     override val recognizer: RecognizerEngine = SherpaRecognizer(files)
+    private var downloader: xyz.xiangban.xiaoban.common.community.SpeechModels? = null
+    @Synchronized
+    override fun downloads(client: io.ktor.client.HttpClient): xyz.xiangban.xiaoban.common.community.SpeechModels =
+        downloader ?: super<LocalSpeech>.downloads(client).also { downloader = it }
     private val turnLock = kotlinx.coroutines.sync.Mutex()
     private var turnSession: OrtSession? = null
 

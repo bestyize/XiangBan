@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,7 @@ fun VoiceSettingsScreen(env: CommunityEnv, back: () -> Unit) {
             Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
                 val models = env.speechModels
                 if (models != null) {
+                    val downloadState by models.state.collectAsState()
                     GroupLabel("语音识别")
                     val ready = modelRefresh >= 0 && models.ready
                     Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -69,6 +71,8 @@ fun VoiceSettingsScreen(env: CommunityEnv, back: () -> Unit) {
                                 XIcon(XIcons.Check, tint = Success, size = 16.dp)
                                 Text("已就绪", style = XType.Caption, color = Success)
                             }
+                        } else if (downloadState.running) {
+                            Text("${(downloadState.downloaded * 100 / downloadState.total.coerceAtLeast(1)).toInt()}%", Modifier.clickable { sheet = "model" }, color = Brand, style = XType.Caption)
                         } else {
                             Text(
                                 "下载", Modifier.height(34.dp).clip(CircleShape).background(LocalExtraColors.current.brandSoft).clickable { sheet = "model" }.padding(horizontal = 16.dp, vertical = 7.dp),

@@ -10,6 +10,10 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -51,11 +55,13 @@ class ModelDownloadException(message: String) : Exception(message)
 object SenseVoiceModel {
     /** 魔搭上的模型仓库，电脑端也从这里下载。 */
     const val Source = "https://modelscope.cn/api/v1/models/bestyize/xiaoban-asr/repo?Revision=master&FilePath="
+    // 上游 Sherpa 适配发布，已核对两个文件的大小和 SHA-256；不能替换为不兼容的原始 PyTorch 模型。
+    const val Upstream = "https://modelscope.cn/api/v1/models/pengzhendong/sherpa-onnx-sense-voice-zh-en-ja-ko-yue/repo?Revision=73eca47697f980daa3d16112404174b6b950b514&FilePath="
     const val ModelName = "model.int8.onnx"
     const val TokensName = "tokens.txt"
     val Files = listOf(
-        ModelSpec(ModelName, 239_233_841, "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51"),
-        ModelSpec(TokensName, 315_894, "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"),
+        ModelSpec(ModelName, 239_233_841, "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51", listOf(Upstream + ModelName, Source + ModelName)),
+        ModelSpec(TokensName, 315_894, "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc", listOf(Upstream + TokensName, Source + TokensName)),
     )
     val TotalBytes: Long = Files.sumOf { it.bytes }
 
@@ -82,6 +88,8 @@ interface LocalSpeech {
     val recognizer: RecognizerEngine
     /** 与当前 App 配套的可下载原生运行库；无需原生组件的平台保持为空。 */
     val runtimeFiles: List<ModelSpec> get() = emptyList()
+    /** Android 的启动预下载与设置页复用同一个下载器，避免争写 .part 文件。 */
+    fun downloads(client: HttpClient): SpeechModels = SpeechModels(client, files, specs = VoiceModels.Files + runtimeFiles)
     /** 未准备好时返回 null，通话改用原有的判停方式。 */
     suspend fun turnComplete(pcm: ByteArray): Boolean? = null
 }
@@ -97,6 +105,8 @@ object VoiceModels {
 }
 
 /** 管理本地语音识别模型：是否齐了、下载并校验。 */
+data class SpeechDownloadState(val running: Boolean = false, val downloaded: Long = 0, val total: Long = 0, val ready: Boolean = false, val error: String? = null)
+
 class SpeechModels(
     private val client: HttpClient,
     val files: ModelFiles,
@@ -106,19 +116,51 @@ class SpeechModels(
     private val downloadLock = Mutex()
     val totalBytes: Long get() = specs.sumOf { it.bytes }
     val ready: Boolean get() = specs.all { files.size(it.name) == it.bytes }
+    private val _state = MutableStateFlow(SpeechDownloadState(total = totalBytes, ready = ready))
+    val state: StateFlow<SpeechDownloadState> = _state.asStateFlow()
+
+    /** 冷启动后延迟预下载，不弹窗；失败有限退避，进程结束后下次启动继续。 */
+    suspend fun prefetchSilently(initialDelayMillis: Long = 2_000, retryDelays: List<Long> = listOf(15_000, 60_000, 300_000)): Boolean {
+        delay(initialDelayMillis)
+        for (attempt in 0..retryDelays.size) {
+            try {
+                download { _, _ -> }
+                return true
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                if (attempt == retryDelays.size) return false
+                delay(retryDelays[attempt])
+            }
+        }
+        return false
+    }
 
     /** 下载缺的文件。[onProgress] 给（已下载字节, 总字节），按所有文件合计。失败时留下已完成的文件，下次接着下缺的。 */
     suspend fun download(onProgress: (Long, Long) -> Unit) = downloadLock.withLock {
         val total = totalBytes
         var done = specs.filter { files.size(it.name) == it.bytes }.sumOf { it.bytes }
-        onProgress(done, total)
-        for (spec in specs) {
-            if (files.size(spec.name) == spec.bytes) continue
-            val base = done
-            onProgress(base + files.partialSize(spec.name).coerceAtMost(spec.bytes), total)
-            fetch(spec) { received -> onProgress(base + received, total) }
-            done += spec.bytes
-            onProgress(done, total)
+        fun progress(bytes: Long) {
+            _state.value = SpeechDownloadState(running = true, downloaded = bytes, total = total)
+            onProgress(bytes, total)
+        }
+        try {
+            progress(done)
+            for (spec in specs) {
+                if (files.size(spec.name) == spec.bytes) continue
+                val base = done
+                progress(base + files.partialSize(spec.name).coerceAtMost(spec.bytes))
+                fetch(spec) { received -> progress(base + received) }
+                done += spec.bytes
+                progress(done)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            _state.value = _state.value.copy(error = e.message)
+            throw e
+        } finally {
+            _state.value = _state.value.copy(running = false, ready = ready)
         }
     }
 

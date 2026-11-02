@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Prepare pinned, prebuilt arm64 speech libraries for on-demand delivery (no native compilation).
 
-assets/voice-runtime.json is embedded in the APK; downloads/* is published beside the APK.
-Mirror downloads/* to bestyize/xiaoban-asr on ModelScope under android-voice/.
+assets/voice-runtime.json is embedded in the APK. Publish downloads/* to
+bestyize/xiaoban-asr on ModelScope under android-voice/ before publishing the APK.
 """
 import argparse
 import hashlib
@@ -11,7 +11,6 @@ import shutil
 import subprocess
 import tarfile
 import tomllib
-import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -86,7 +85,7 @@ def prepare_native(output, sherpa_archive=None, ort_aar=None):
     return native
 
 
-def publish_files(native, output, release_tag):
+def publish_files(native, output):
     libraries = []
     downloads = output / "downloads"
     downloads.mkdir(parents=True, exist_ok=True)
@@ -99,7 +98,7 @@ def publish_files(native, output, release_tag):
         shutil.copyfile(source, downloads / filename)
         libraries.append({
             "name": name, "bytes": source.stat().st_size, "sha256": digest,
-            "sources": [MODEL_SOURCE + filename, f"https://github.com/bestyize/XiangBan/releases/download/{urllib.parse.quote(release_tag, safe='')}/{filename}"],
+            "sources": [MODEL_SOURCE + filename],
         })
     version = hashlib.sha256("".join(item["sha256"] for item in libraries).encode()).hexdigest()
     manifest = {"format": 1, "abi": ABI, "version": version, "libraries": libraries}
@@ -112,7 +111,6 @@ def publish_files(native, output, release_tag):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--release-tag", default="xiaoban-wallpaper-v3.0.0")
     parser.add_argument("--sherpa-archive")
     parser.add_argument("--onnx-aar")
     args = parser.parse_args()
@@ -120,7 +118,7 @@ def main():
     if tomllib.loads(versions.read_text())["versions"]["onnxruntime"] != ORT_VERSION:
         raise ValueError("Update the pinned ORT version and checksum together with libs.versions.toml")
     native = prepare_native(args.output, args.sherpa_archive, args.onnx_aar)
-    publish_files(native, args.output, args.release_tag)
+    publish_files(native, args.output)
 
 
 if __name__ == "__main__":

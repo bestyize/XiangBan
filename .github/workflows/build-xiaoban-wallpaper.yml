@@ -341,10 +341,8 @@ jobs:
           path: client/xiaoban-multiplatform/androidApp/build/voice-runtime
           key: android-voice-${{ runner.os }}-${{ hashFiles('client/xiaoban-multiplatform/androidApp/scripts/prepare-voice-runtime.py') }}
       - name: Prepare on-demand speech runtime
-        env:
-          XIAOBAN_VOICE_RELEASE_TAG: ${{ needs.release.outputs.tag }}
         run: |
-          command -v patchelf >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y patchelf)
+          python3 -m pip install --disable-pip-version-check patchelf==0.19.1.0
           ./gradlew :androidApp:prepareVoiceRuntime --no-configuration-cache
       # 配了下面几个密钥就用发布密钥签名；没配就打 debug 包（未签名的 release 包装不上手机）。
       - name: Prepare signing key
@@ -362,7 +360,6 @@ jobs:
           fi
       - name: Build the APK
         env:
-          XIAOBAN_VOICE_RELEASE_TAG: ${{ needs.release.outputs.tag }}
           KEYSTORE_PASSWORD: ${{ secrets.XIAOBAN_ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.XIAOBAN_ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.XIAOBAN_ANDROID_KEY_PASSWORD }}
@@ -386,6 +383,12 @@ jobs:
           fi
           rm -f "$RUNNER_TEMP/release.jks"
           ls -lh out
+      - name: Publish and verify ModelScope speech runtime
+        env:
+          MODELSCOPE_API_TOKEN: ${{ secrets.MODELSCOPE_API_TOKEN }}
+        run: |
+          python3 -m pip install --disable-pip-version-check modelscope-hub==0.6.1
+          python3 androidApp/scripts/publish-voice-runtime.py --directory androidApp/build/voice-runtime
       - name: Upload to release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -397,14 +400,6 @@ jobs:
           gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^XiaoBanWallpaper-.*-Android-arm64-v8a(-unsigned)?\.apk$' | while read -r name; do
             gh release delete-asset "$TAG" "$name" --yes
           done || true
-          # 先发布带内容哈希的组件，再公开依赖它的 APK；旧组件保留供旧客户端使用。
-          gh release view "$TAG" --json assets --jq '.assets[].name' > "$RUNNER_TEMP/voice-release-assets.txt"
-          for runtime in androidApp/build/voice-runtime/downloads/*.so; do
-            name=$(basename "$runtime")
-            if ! grep -Fxq "$name" "$RUNNER_TEMP/voice-release-assets.txt"; then
-              gh release upload "$TAG" "$runtime"
-            fi
-          done
           gh release upload "$TAG" out/* --clobber
 
   # ───────────── 服务端镜像：单独的 Release，供服务器上拉取更新 ─────────────

@@ -105,12 +105,10 @@ abstract class SpeechOrtLoaderTransform : AsmClassVisitorFactory<Instrumentation
 val voiceRuntimeDirectory = layout.buildDirectory.dir("voice-runtime")
 val prepareVoiceRuntime = tasks.register<Exec>("prepareVoiceRuntime") {
     val script = layout.projectDirectory.file("scripts/prepare-voice-runtime.py")
-    val releaseTag = providers.environmentVariable("XIAOBAN_VOICE_RELEASE_TAG").getOrElse("xiaoban-wallpaper-v3.0.0")
     inputs.file(script)
     inputs.file(rootProject.layout.projectDirectory.file("gradle/libs.versions.toml"))
-    inputs.property("releaseTag", releaseTag)
     outputs.dir(voiceRuntimeDirectory)
-    commandLine("python3", script.asFile.absolutePath, "--output", voiceRuntimeDirectory.get().asFile.absolutePath, "--release-tag", releaseTag)
+    commandLine("python3", script.asFile.absolutePath, "--output", voiceRuntimeDirectory.get().asFile.absolutePath)
 }
 
 abstract class SyncMobileVoiceAssets : DefaultTask() {

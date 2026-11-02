@@ -10,6 +10,13 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.async
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 
 private class MemoryFiles : ModelFiles {
     val stored = mutableMapOf<String, ByteArray>()
@@ -187,5 +194,91 @@ class SpeechModelsTest {
             SpeechModels(client, MemoryFiles(), specs = listOf(runtime)).download { _, _ -> }
         }
         assertEquals(listOf("primary"), requests)
+    }
+
+    @Test
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    fun `cold start prefetch waits then downloads without another request when ready`() = runTest {
+        val files = MemoryFiles()
+        var requests = 0
+        val client = HttpClient(MockEngine { requests++; respond(body, HttpStatusCode.OK) })
+        val models = SpeechModels(client, files, "https://x/", listOf(spec))
+        val startup = async { models.prefetchSilently(2_000, emptyList()) }
+        runCurrent()
+        advanceTimeBy(1_999)
+        assertEquals(0, requests)
+        assertTrue(startup.await())
+        assertTrue(models.state.value.ready)
+        assertFalse(models.state.value.running)
+        assertEquals(spec.bytes, models.state.value.downloaded)
+        assertTrue(models.prefetchSilently(0, emptyList()))
+        assertEquals(1, requests)
+    }
+
+    @Test
+    fun `silent retries resume a partial download and stop after success`() = runTest {
+        val ranges = mutableListOf<String?>()
+        val client = HttpClient(MockEngine { request ->
+            ranges += request.headers[io.ktor.http.HttpHeaders.Range]
+            if (ranges.size == 1) respond(body.take(10), HttpStatusCode.OK)
+            else respond(body.drop(10), HttpStatusCode.PartialContent)
+        })
+        val models = SpeechModels(client, MemoryFiles(), "https://x/", listOf(spec))
+        assertTrue(models.prefetchSilently(0, listOf(10, 20)))
+        assertEquals(listOf(null, "bytes=10-"), ranges)
+        assertTrue(models.state.value.ready)
+        assertEquals(null, models.state.value.error)
+    }
+
+    @Test
+    fun `silent download failure is bounded and reported only as state`() = runTest {
+        var requests = 0
+        val client = HttpClient(MockEngine { requests++; respond("", HttpStatusCode.NotFound) })
+        val models = SpeechModels(client, MemoryFiles(), "https://x/", listOf(spec))
+        assertFalse(models.prefetchSilently(0, listOf(10, 20)))
+        assertEquals(3, requests)
+        assertFalse(models.state.value.running)
+        assertFalse(models.state.value.ready)
+        assertTrue(models.state.value.error != null)
+    }
+
+    @Test
+    fun `startup and settings downloads share one transfer`() = runTest {
+        val started = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var requests = 0
+        val client = HttpClient(MockEngine {
+            requests++
+            started.complete(Unit)
+            release.await()
+            respond(body, HttpStatusCode.OK)
+        })
+        val models = SpeechModels(client, MemoryFiles(), "https://x/", listOf(spec))
+        val startup = async { models.prefetchSilently(0, emptyList()) }
+        started.await()
+        val settings = async { models.download { _, _ -> } }
+        release.complete(Unit)
+        assertTrue(startup.await())
+        settings.await()
+        assertEquals(1, requests)
+        assertTrue(models.ready)
+    }
+
+    @Test
+    fun `cancellation of startup download stops retries and clears running state`() = runTest {
+        val started = CompletableDeferred<Unit>()
+        var requests = 0
+        val client = HttpClient(MockEngine {
+            requests++
+            started.complete(Unit)
+            awaitCancellation()
+        })
+        val models = SpeechModels(client, MemoryFiles(), "https://x/", listOf(spec))
+        val startup = launch { models.prefetchSilently(0, listOf(1, 2)) }
+        started.await()
+        startup.cancelAndJoin()
+        assertEquals(1, requests)
+        assertFalse(models.state.value.running)
+        assertEquals(null, models.state.value.error)
     }
 }
