@@ -59,9 +59,11 @@ Android 冷启动后延迟约 2 秒，在后台静默下载本地语音组件及
 
 资源未齐时保留电脑/云端语音及原有停顿判定，不弹下载询问阻断通话。模型在手机运行，聊天请求仍发到所选服务。Edge 朗读可用时会预备少量简短接话，失败不阻塞对话。
 
-安卓构建保留 `onnxruntime-android` 的 Java 接口，四个语音 `.so` 从 APK 排除。`prepareVoiceRuntime` 使用 Python 3.11+、`patchelf` 准备固定版本的预编译库，不编译 Sherpa/ORT；Sherpa 使用独立 SONAME 避免版本冲突。构建输出为 `androidApp/build/voice-runtime/assets/voice-runtime.json`（随 APK 打包）和 `downloads/*.so`（独立分发）。组件按内容哈希命名，客户端下载到私有目录、在加载前核对大小和 SHA-256，再按依赖顺序加载；下载失败可切换备用源、取消或续传。
+安卓构建保留 `onnxruntime-android` 的 Java 接口，四个语音 `.so` 从 APK 排除。`prepareVoiceRuntime` 使用 Python 3.11+、`patchelf` 准备固定版本的预编译库，不编译 Sherpa/ORT；Sherpa 使用独立 SONAME 避免版本冲突。构建输出为 `androidApp/build/voice-runtime/assets/voice-runtime.json`（随 APK 打包）和 `downloads/*.so`（独立分发）。公开文件名只保留原始库名，不添加 voice、版本或哈希前缀；大小和 SHA-256 保留在清单中。客户端下载到私有缓存，在加载前校验，再按依赖顺序加载；下载失败可取消或续传。
 
-分发方式沿用桌面端：把 `downloads/*.so` 原名上传到魔搭 `bestyize/xiaoban-asr` 的 `android-voice/` 目录。手动 APK 打包工作流通过官方 `modelscope-hub==0.6.1` SDK 发布缺少的组件；配置仓库 Secret `MODELSCOPE_API_TOKEN`（该魔搭仓库的写权限）。也可事先手动上传；已有文件匹配时跳过上传。`publish-voice-runtime.py` 检查本地完整哈希及魔搭公开元数据，缺授权或文件校验失败则停止 APK 发布，避免发布带失效链接的客户端。旧哈希文件保留供旧客户端使用；客户端清单不含 GitHub 下载源。
+分发方式沿用桌面端：把 `downloads/*.so` 原名上传到魔搭 `bestyize/xiaoban-asr` 的仓库根目录，文件为 `libonnxruntime.so`、`libonnxruntime4j_jni.so`、`libort_sherpa.so`、`libsherpa-onnx-jni.so`。手动 APK 打包工作流通过官方 `modelscope-hub==0.6.1` SDK 同步缺少或不一致的组件；配置仓库 Secret `MODELSCOPE_API_TOKEN`（该魔搭仓库的写权限）。也可事先手动上传；已有文件匹配时跳过上传，无需写入授权。
+
+`publish-voice-runtime.py` 在构建 APK 前核对本地完整哈希及魔搭公开元数据，并记录已验证文件的 Git 提交到 `published-revisions.json`。随后生成的 APK 下载地址固定到对应提交，同名更新不影响旧客户端；保留魔搭仓库的 Git 历史即可，无需在文件名中暴露版本。缺文件、缺写入授权或无法核验提交时停止 APK 发布；客户端清单不含 GitHub 下载源。
 
 组件准备有本地增量检查和 Actions 缓存；Agent Rust 库仍在 APK 内，仍用 Cargo 缓存增量编译。ORT Android 的加载调用由构建时的局部字节码转换接入私有目录加载器，其余推理接口保持上游版本。
 

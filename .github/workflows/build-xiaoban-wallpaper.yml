@@ -344,6 +344,12 @@ jobs:
         run: |
           python3 -m pip install --disable-pip-version-check patchelf==0.19.1.0
           ./gradlew :androidApp:prepareVoiceRuntime --no-configuration-cache
+      - name: Publish and verify ModelScope speech runtime
+        env:
+          MODELSCOPE_API_TOKEN: ${{ secrets.MODELSCOPE_API_TOKEN }}
+        run: |
+          python3 -m pip install --disable-pip-version-check modelscope-hub==0.6.1
+          python3 androidApp/scripts/publish-voice-runtime.py --directory androidApp/build/voice-runtime
       # 配了下面几个密钥就用发布密钥签名；没配就打 debug 包（未签名的 release 包装不上手机）。
       - name: Prepare signing key
         env:
@@ -383,12 +389,6 @@ jobs:
           fi
           rm -f "$RUNNER_TEMP/release.jks"
           ls -lh out
-      - name: Publish and verify ModelScope speech runtime
-        env:
-          MODELSCOPE_API_TOKEN: ${{ secrets.MODELSCOPE_API_TOKEN }}
-        run: |
-          python3 -m pip install --disable-pip-version-check modelscope-hub==0.6.1
-          python3 androidApp/scripts/publish-voice-runtime.py --directory androidApp/build/voice-runtime
       - name: Upload to release
         env:
           GH_TOKEN: ${{ github.token }}

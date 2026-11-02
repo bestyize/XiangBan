@@ -2,11 +2,12 @@
 """Prepare pinned, prebuilt arm64 speech libraries for on-demand delivery (no native compilation).
 
 assets/voice-runtime.json is embedded in the APK. Publish downloads/* to
-bestyize/xiaoban-asr on ModelScope under android-voice/ before publishing the APK.
+bestyize/xiaoban-asr on ModelScope at the repository root before publishing the APK.
 """
 import argparse
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import tarfile
@@ -21,7 +22,7 @@ ORT_VERSION = "1.30.0"
 ORT_SHA256 = "e7fb945e402205f6db858d65bb78d2bdb0812317b383976c9e3bceb4862c73f1"
 ABI = "arm64-v8a"
 NAMES = ("libort_sherpa.so", "libsherpa-onnx-jni.so", "libonnxruntime.so", "libonnxruntime4j_jni.so")
-MODEL_SOURCE = "https://modelscope.cn/api/v1/models/bestyize/xiaoban-asr/repo?Revision=master&FilePath=android-voice/"
+MODEL_SOURCE = "https://modelscope.cn/api/v1/models/bestyize/xiaoban-asr/repo?Revision=master&FilePath="
 
 
 def sha(path):
@@ -87,6 +88,10 @@ def prepare_native(output, sherpa_archive=None, ort_aar=None):
 
 def publish_files(native, output):
     libraries = []
+    try:
+        published = json.loads((output / "published-revisions.json").read_text())
+    except (OSError, ValueError):
+        published = {}
     downloads = output / "downloads"
     downloads.mkdir(parents=True, exist_ok=True)
     for old in downloads.glob("*.so"):
@@ -94,11 +99,15 @@ def publish_files(native, output):
     for name in NAMES:
         source = native / name
         digest = sha(source)
-        filename = f"android-voice-arm64-{digest}-{name}"
+        filename = name
         shutil.copyfile(source, downloads / filename)
+        pinned = published.get(name, {})
+        revision = pinned.get("revision", "")
+        if pinned.get("sha256") != digest or not re.fullmatch("[a-f0-9]{40}", revision):
+            revision = "master"
         libraries.append({
             "name": name, "bytes": source.stat().st_size, "sha256": digest,
-            "sources": [MODEL_SOURCE + filename],
+            "sources": [MODEL_SOURCE.replace("Revision=master", "Revision=" + revision) + filename],
         })
     version = hashlib.sha256("".join(item["sha256"] for item in libraries).encode()).hexdigest()
     manifest = {"format": 1, "abi": ABI, "version": version, "libraries": libraries}
