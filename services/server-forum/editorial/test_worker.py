@@ -76,6 +76,31 @@ class EditorialTests(unittest.TestCase):
             publish.assert_called_once_with(job['id'], 'draft')
             source.assert_not_called()
 
+    def test_draft_recovery_uses_exact_id_and_rejects_unfiltered_old_servers(self):
+        worker=object.__new__(w.Worker);worker.forum='https://forum.example';worker.editor_token='private'
+        with patch('worker.api',return_value={'items':[{'external_id':'ed-123','id':'draft'}]}) as request:
+            self.assertEqual(worker.existing_draft('ed-123')['id'],'draft')
+            self.assertEqual(request.call_args.args[1],'/api/editor/drafts?external_id=ed-123')
+        with patch('worker.api',return_value={'items':[{'external_id':'different'}]}):
+            with self.assertRaises(w.Stop):worker.existing_draft('ed-123')
+
+    def test_discover_comparison_accepts_equivalent_timestamp_only(self):
+        a={'title':'标题','source_published_at':'2026-10-22T07:51:31+00:00','body':'正文'}
+        self.assertTrue(w.discover_matches(dict(a,source_published_at='2026-10-22T07:51:31Z'),a))
+        self.assertFalse(w.discover_matches(dict(a,source_published_at='2026-10-23T07:51:31Z'),a))
+        self.assertFalse(w.discover_matches(dict(a,body='被他人修改'),a))
+
+    def test_transient_reads_retry_but_paid_posts_do_not(self):
+        error=w.urllib.error.HTTPError('https://forum.example',502,'unavailable',{},None)
+        from unittest.mock import MagicMock
+        response=MagicMock();response.__enter__.return_value.read.return_value=b'{"ok":true}'
+        with patch.object(w.HTTP,'open',side_effect=[error,response]) as request,patch('worker.time.sleep'):
+            self.assertTrue(w.api('https://forum.example','/api/categories')['ok'])
+            self.assertEqual(request.call_count,2)
+        with patch.object(w.HTTP,'open',side_effect=error) as request,patch('worker.time.sleep'):
+            with self.assertRaises(w.HTTPFailure):w.api('https://ai.example','/v1/images/generations',data={'prompt':'example'})
+            self.assertEqual(request.call_count,1)
+
     def test_budget_blocks_paid_call_before_reservation(self):
         worker = object.__new__(w.Worker)
         worker.db, worker.gateway = self.db, 'https://ai.example'
@@ -84,6 +109,45 @@ class EditorialTests(unittest.TestCase):
             with self.assertRaises(w.Stop):
                 worker.model('job', 'chat/completions', {})
         self.assertEqual(self.db.execute('SELECT count(*) FROM calls').fetchone()[0], 0)
+
+    def test_parallel_calls_cannot_exceed_the_reserved_call_limit(self):
+        def request(base,path,*args,**kwargs):return {'total':1000} if path=='/api/ai/balance' else {}
+        def invoke(i):
+            worker=object.__new__(w.Worker);worker.root=self.root;worker.db=w.connect(self.root);worker.gateway='https://ai.example'
+            worker.config={'reserve_points':0,'daily_spend_points':10000,'daily_call_limit':2}
+            try:
+                with patch.object(worker,'ai_token',return_value='private'):worker.model(str(i),'chat/completions',{})
+                return True
+            except w.Stop:return False
+            finally:worker.db.close()
+        with patch('worker.api',side_effect=request), w.concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
+            results=list(pool.map(invoke,range(3)))
+        self.assertEqual(sum(results),2)
+        self.assertEqual(self.db.execute('SELECT count(*) FROM calls').fetchone()[0],2)
+
+    def test_duplicate_gate_ignores_changed_titles(self):
+        worker=object.__new__(w.Worker);worker.db=self.db
+        original='可核对的具体步骤和实际功能限制。'*100
+        self.db.execute('INSERT INTO article_signatures(job_id,signature) VALUES(?,?)',('old',json.dumps(w.article_signature(original))));self.db.commit()
+        with self.assertRaises(w.Reject):worker.check_duplicate('new',original)
+        worker.check_duplicate('different','一份完全不同的电影档案与作品背景说明。'*100)
+
+    def test_index_follows_observed_pagination_and_preserves_source_scope(self):
+        pages = {
+            'https://docs.example/guides/': '<a href="one">One</a><a href="?page=2">Next</a><a href="https://evil.example/guides/injected">bad</a>',
+            'https://docs.example/guides/?page=2': '<a href="two">Two</a><a href="?page=3">Next</a>',
+        }
+        with patch('worker.cached_source', side_effect=lambda db,url,*args: pages[url]) as fetch:
+            w.collect_index(self.db, {}, {'id':'learn-a','hosts':['docs.example']}, {'url':'https://docs.example/guides/','prefixes':['/guides/'],'max_pages':2})
+        self.assertEqual(fetch.call_count,2)
+        self.assertEqual({r['url'] for r in self.db.execute('SELECT url FROM jobs')}, {'https://docs.example/guides/one','https://docs.example/guides/two'})
+
+    def test_notebook_evidence_excludes_embedded_execution_outputs(self):
+        raw=json.dumps({'cells':[{'cell_type':'markdown','source':['Verified documentation. '*50]}, {'cell_type':'code','source':['print(1)'],'outputs':[{'text':['NOT_SOURCE_SECRET']}]}]})
+        text,_=w.plain_page(raw)
+        self.assertIn('Verified documentation.',text)
+        self.assertIn('print(1)',text)
+        self.assertNotIn('NOT_SOURCE_SECRET',text)
 
     def test_content_gate_rejects_short_copy_and_unapproved_assets(self):
         a = {'title': '正文标题', 'summary': '摘要', 'body': '实' * 1300, 'image_prompt': 'illustration'}
@@ -133,7 +197,7 @@ class EditorialTests(unittest.TestCase):
         worker.root = self.root
         with patch.object(worker, 'frontier_draft', return_value={'status': 'published'}), patch.object(worker, 'verify_frontier') as verify, patch('worker.fetch_source') as source:
             worker.process(job, {'id': 'discover-frontier', 'destination': 'frontier'})
-            verify.assert_called_once_with(job['id'])
+            verify.assert_called_once_with(job['id'],'frontier')
             source.assert_not_called()
 
     def test_bounded_runs_do_not_starve_later_agents(self):

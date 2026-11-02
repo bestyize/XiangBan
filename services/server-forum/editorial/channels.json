@@ -1,0 +1,284 @@
+{
+  "version": 1,
+  "parents": [
+    {
+      "id": "create",
+      "label": "创作"
+    },
+    {
+      "id": "learn",
+      "label": "学习和教程"
+    },
+    {
+      "id": "casual",
+      "label": "休闲"
+    },
+    {
+      "id": "resources",
+      "label": "资源"
+    },
+    {
+      "id": "site",
+      "label": "站务"
+    }
+  ],
+  "channels": [
+    {
+      "id": "learn-claude-code",
+      "parent": "learn",
+      "label": "Claude Code",
+      "description": "交流Claude Code的教程、实践与限制"
+    },
+    {
+      "id": "learn-codex",
+      "parent": "learn",
+      "label": "Codex",
+      "description": "交流Codex的教程、实践与限制"
+    },
+    {
+      "id": "learn-prompts",
+      "parent": "learn",
+      "label": "提示词",
+      "description": "交流提示词的教程、实践与限制"
+    },
+    {
+      "id": "learn-workflows",
+      "parent": "learn",
+      "label": "工作流",
+      "description": "交流工作流的教程、实践与限制"
+    },
+    {
+      "id": "learn-local",
+      "parent": "learn",
+      "label": "本地部署",
+      "description": "交流本地部署的教程、实践与限制"
+    },
+    {
+      "id": "learn-hardware",
+      "parent": "learn",
+      "label": "AI 硬件",
+      "description": "交流AI 硬件的教程、实践与限制"
+    },
+    {
+      "id": "casual-work",
+      "parent": "casual",
+      "label": "职场",
+      "description": "围绕职场交流真实见闻与公开资料"
+    },
+    {
+      "id": "casual-offwork",
+      "parent": "casual",
+      "label": "下班了",
+      "description": "围绕下班了交流真实见闻与公开资料"
+    },
+    {
+      "id": "casual-loss",
+      "parent": "casual",
+      "label": "亏了吗",
+      "description": "围绕亏了吗交流真实见闻与公开资料"
+    },
+    {
+      "id": "casual-dream",
+      "parent": "casual",
+      "label": "梦想和人生",
+      "description": "围绕梦想和人生交流真实见闻与公开资料"
+    },
+    {
+      "id": "casual-gear",
+      "parent": "casual",
+      "label": "数码装备",
+      "description": "围绕数码装备交流真实见闻与公开资料"
+    },
+    {
+      "id": "casual-indie",
+      "parent": "casual",
+      "label": "副业与独立开发",
+      "description": "围绕副业与独立开发交流真实见闻与公开资料"
+    },
+    {
+      "id": "casual-fun",
+      "parent": "casual",
+      "label": "吃喝玩乐",
+      "description": "围绕吃喝玩乐交流真实见闻与公开资料"
+    },
+    {
+      "id": "casual-media",
+      "parent": "casual",
+      "label": "片单乐评",
+      "description": "围绕片单乐评交流真实见闻与公开资料"
+    },
+    {
+      "id": "casual-think",
+      "parent": "casual",
+      "label": "哲思",
+      "description": "围绕哲思交流真实见闻与公开资料"
+    },
+    {
+      "id": "casual-help",
+      "parent": "casual",
+      "label": "互助",
+      "description": "围绕互助交流真实见闻与公开资料"
+    },
+    {
+      "id": "casual-chat",
+      "parent": "casual",
+      "label": "闲聊灌水",
+      "description": "围绕闲聊灌水交流真实见闻与公开资料"
+    },
+    {
+      "id": "create-effect",
+      "parent": "create",
+      "label": "特效",
+      "description": "分享特效的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-wallpaper",
+      "parent": "create",
+      "label": "壁纸",
+      "description": "分享壁纸的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-widget",
+      "parent": "create",
+      "label": "组件",
+      "description": "分享组件的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-game",
+      "parent": "create",
+      "label": "游戏",
+      "description": "分享游戏的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-reminder",
+      "parent": "create",
+      "label": "提醒",
+      "description": "分享提醒的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-routine",
+      "parent": "create",
+      "label": "例行",
+      "description": "分享例行的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-task",
+      "parent": "create",
+      "label": "任务",
+      "description": "分享任务的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-goal",
+      "parent": "create",
+      "label": "目标",
+      "description": "分享目标的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-skill",
+      "parent": "create",
+      "label": "技能",
+      "description": "分享技能的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-expert",
+      "parent": "create",
+      "label": "专家",
+      "description": "分享专家的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-workflow",
+      "parent": "create",
+      "label": "工作流",
+      "description": "分享工作流的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "create-schemes",
+      "parent": "create",
+      "label": "方案",
+      "description": "分享方案的真实作品、使用方法和创作技巧"
+    },
+    {
+      "id": "resource-tools",
+      "parent": "resources",
+      "label": "AI 工具",
+      "description": "分享AI 工具的合法来源、图文导读和使用方法"
+    },
+    {
+      "id": "resource-docs",
+      "parent": "resources",
+      "label": "资料",
+      "description": "分享资料的合法来源、图文导读和使用方法"
+    },
+    {
+      "id": "resource-movies",
+      "parent": "resources",
+      "label": "影视",
+      "description": "分享影视的合法来源、图文导读和使用方法"
+    },
+    {
+      "id": "resource-music",
+      "parent": "resources",
+      "label": "音乐",
+      "description": "分享音乐的合法来源、图文导读和使用方法"
+    },
+    {
+      "id": "resource-help",
+      "parent": "resources",
+      "label": "求助悬赏",
+      "description": "分享求助悬赏的合法来源、图文导读和使用方法"
+    },
+    {
+      "id": "resource-open",
+      "parent": "resources",
+      "label": "开源精选",
+      "description": "分享开源精选的合法来源、图文导读和使用方法"
+    },
+    {
+      "id": "site-notice",
+      "parent": "site",
+      "label": "公告",
+      "description": "公告的站方说明和实用指引"
+    },
+    {
+      "id": "site-rules",
+      "parent": "site",
+      "label": "规则",
+      "description": "规则的站方说明和实用指引"
+    },
+    {
+      "id": "site-feedback",
+      "parent": "site",
+      "label": "建议反馈",
+      "description": "建议反馈的站方说明和实用指引"
+    },
+    {
+      "id": "site-reports",
+      "parent": "site",
+      "label": "举报处理公示",
+      "description": "举报处理公示的站方说明和实用指引"
+    },
+    {
+      "id": "create-guides",
+      "parent": "create",
+      "label": "产品使用",
+      "description": "分享产品使用的真实作品、使用方法和创作技巧"
+    }
+  ],
+  "aliases": {
+    "tech": "learn",
+    "share": "resources",
+    "xiaoban": "create",
+    "tech-llm": "learn-local",
+    "tech-productivity": "learn-workflows",
+    "tech-hardware": "learn-hardware",
+    "tech-creative": "learn-prompts",
+    "share-software": "resource-open",
+    "share-movies": "resource-movies",
+    "share-music": "resource-music",
+    "share-learn": "resource-docs",
+    "share-help": "resource-help",
+    "xiaoban-wallpaper": "create-wallpaper",
+    "xiaoban-game": "create-game",
+    "xiaoban-app": "create-guides"
+  }
+}

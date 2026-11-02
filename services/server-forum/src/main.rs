@@ -9,6 +9,7 @@ mod db;
 mod discover;
 mod error;
 mod handlers;
+mod handbook;
 mod jobs;
 mod markdown;
 mod models;
@@ -17,6 +18,7 @@ mod notifications;
 mod points;
 mod seo;
 mod state;
+mod taxonomy;
 mod scheme_backups;
 mod reply_content;
 mod link_health;
@@ -101,6 +103,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(discover_api::routes())
         .merge(handlers::model_rankings::routes())
         .merge(handlers::community_editor::public_routes())
+        .merge(handbook::api_routes())
         .nest("/admin", admin::routes().merge(link_health::admin_routes()).nest("/content-social",handlers::content_social::admin_routes()).merge(tool_mirrors::admin_routes()).merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(handlers::discover_editor::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()).merge(handlers::translation_admin::routes()).nest("/collection", handlers::collection::routes()).nest("/community-editorial", handlers::community_editor::admin_routes()))
         .nest("/editor", handlers::editor::routes())
         .nest("/discover-editor", handlers::discover_editor::editor_routes());
@@ -115,6 +118,7 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .nest("/api", api)
         .merge(seo::routes(&state))
+        .merge(handbook::page_routes())
         .layer(cors)
         .layer(CompressionLayer::new())
         .layer(TraceLayer::new_for_http())
@@ -134,6 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let pool = db::connect(&config.database_url, None).await?;
     db::migrate(&pool).await?;
     db::seed(&pool).await?;
+    taxonomy::migrate(&pool).await?;
     discover::seed(&pool).await?;
     discover::backfill_topic_images(&pool).await?;
     discover::backfill_editor_topic_images(&pool).await?;

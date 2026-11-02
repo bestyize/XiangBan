@@ -22,7 +22,7 @@ struct Request {
 pub async fn create_for_topic(
     tx: &mut Transaction<'_, Postgres>, id: i64, uid: Uuid, category: i32, input: Option<&HelpInput>,
 ) -> AppResult<()> {
-    let (is_help,): (bool,) = sqlx::query_as("SELECT slug = 'share-help' FROM categories WHERE id = $1")
+    let (is_help,): (bool,) = sqlx::query_as("SELECT slug IN ('share-help','resource-help') FROM categories WHERE id = $1")
         .bind(category).fetch_one(&mut **tx).await?;
     if !is_help {
         if input.is_some() { return Err(AppError::BadRequest("只有资源求助板块可以设置悬赏".into())); }
@@ -43,11 +43,12 @@ pub async fn create_for_topic(
 
 pub async fn ensure_category(tx: &mut Transaction<'_, Postgres>, id: i64, category: i32) -> AppResult<()> {
     let (is_help, has_help, author): (bool, bool, Uuid) = sqlx::query_as(
-        "SELECT c.slug = 'share-help', EXISTS(SELECT 1 FROM help_requests WHERE topic_id = $1), t.author_uid
+        "SELECT c.slug IN ('share-help','resource-help'), EXISTS(SELECT 1 FROM help_requests WHERE topic_id = $1), t.author_uid
          FROM categories c CROSS JOIN topics t WHERE c.id = $2 AND t.id = $1",
     ).bind(id).bind(category).fetch_one(&mut **tx).await?;
     if has_help && !is_help { return Err(AppError::BadRequest("求助帖子不能移出资源求助板块，请保留求助记录".into())); }
-    if is_help && !has_help { create_for_topic(tx, id, author, category, None).await?; }
+    let (editorial,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM editor_drafts WHERE topic_id=$1)").bind(id).fetch_one(&mut **tx).await?;
+    if is_help && !has_help && !editorial { create_for_topic(tx, id, author, category, None).await?; }
     Ok(())
 }
 

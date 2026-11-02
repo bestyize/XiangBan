@@ -100,7 +100,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
         try {
             val all = env.forum.categories()
             categories = all
-            val helpBoard = all.firstOrNull { it.slug == "share-help" }
+            val helpBoard = all.firstOrNull { it.slug in setOf("share-help", "resource-help") }
             if (help && helpBoard != null && categoryId < 0) {
                 parentId = helpBoard.parentId ?: parentId
                 categoryId = helpBoard.id
@@ -119,7 +119,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     val parents = all.filter { it.parentId == null && !it.adminOnly && all.any { c -> c.parentId == it.id } }
     val children = all.filter { it.parentId == parentId && !it.adminOnly }
     val chosen = all.firstOrNull { it.id == categoryId }
-    val isHelp = chosen?.slug == "share-help"
+    val isHelp = chosen?.slug in setOf("share-help", "resource-help")
     val isCasual = chosen?.let { category -> all.any { it.id == category.parentId && it.slug == "casual" } } == true
     val pollOptions = parsePollOptions(pollText)
     val pollError = if (pollEnabled) pollDraftError(pollOptions, pollDays.takeIf { it != 0 }) else null

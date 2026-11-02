@@ -58,7 +58,7 @@ const root = computed(() => roots.value.find(r => r.id === form.rootId))
 const leaves = computed(() => root.value?.children ?? [])
 const leaf = computed(() => leaves.value.find(l => l.id === form.categoryId))
 const isCasual = computed(() => root.value?.slug === 'casual')
-const isHelp = computed(() => leaf.value?.slug === 'share-help')
+const isHelp = computed(() => ['share-help','resource-help'].includes(leaf.value?.slug || ''))
 /** 选中的二级分类上的内置标签；已经加到帖子上的也留着，方便点第二次取消。 */
 const presetTags = computed(() => leaf.value?.preset_tags ?? [])
 
