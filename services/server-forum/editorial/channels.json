@@ -261,6 +261,7 @@
       "id": "create-guides",
       "parent": "create",
       "label": "产品使用",
+      "legacy_only": true,
       "description": "分享产品使用的真实作品、使用方法和创作技巧"
     }
   ],

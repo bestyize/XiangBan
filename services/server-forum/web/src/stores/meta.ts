@@ -2,7 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/forum'
 import type { Category } from '@/api/types'
-import { CATEGORY_ALIASES } from '@/lib/communityStructure'
+import { CATEGORY_ALIASES, isLegacyCategory } from '@/lib/communityStructure'
 
 export interface CategoryNode extends Category {
   children: Category[]
@@ -16,8 +16,9 @@ export const useMeta = defineStore('meta', () => {
   let loading: Promise<void> | null = null
 
   const tree = computed<CategoryNode[]>(() => {
-    const roots = categories.value.filter(c => c.parent_id === null)
-    return roots.map(r => ({ ...r, children: categories.value.filter(c => c.parent_id === r.id) }))
+    const current = categories.value.filter(c => !isLegacyCategory(c.slug))
+    const roots = current.filter(c => c.parent_id === null)
+    return roots.map(r => ({ ...r, children: current.filter(c => c.parent_id === r.id) }))
   })
 
   const bySlug = computed(() => {
