@@ -112,8 +112,15 @@ def main():
              '公开入口已经实际核对：/c/tech永久转向/c/learn，/c/share永久转向/c/resources，/c/xiaoban永久转向/c/create，/c/tech-llm永久转向/c/learn-local。这些旧入口的响应是308永久重定向，旧书签仍可带读者到达对应的当前分类。旧名称的分类查询也有兼容处理。当前公开分类列表共有45条记录，已经没有tech、share、xiaoban系列旧slug作为重复分类；这个记录数量包含一级分类及历史兼容记录，不等于45个当前采编话题。\n\n'
              '旧/c/xiaoban-app入口转向/c/create-guides，保留“产品使用”历史分类的访问兼容。当前侧栏、分类标签和新发帖分类树已经不再把这一历史兼容项列成独立当前栏目；浏览器已确认移除后正常显示创作及特效文章列表。保留历史链接和从当前导航移除，是两个同时实施的动作，不表示原链接失效或历史文章已被删除。\n\n'
              '读者可以继续从已有书签打开旧入口，也可以从当前分类名浏览。新发帖应在当前栏目中选择适合的分类。分类名称或位置变化不能当作文章删除、账号处分、内容变为公开或客户端新增能力的证据。本文档只记录此次已完成的分类整理和核对，不构造用户举报、处理案件或新产品功能。')
+    docs['format-correction'] = dict(
+        title='2026-11-02图标导读格式更正记录', url='https://chat.xiangban.xyz/t/737',
+        text='2026年11月2日，站方在文章格式巡检中，对737号《GNOME应用图标怎么画：官方规则逐条拆成可执行步骤》完成一处格式更正。原稿在一个小标题后独立出现一个没有上下文的小写字母d；此次修订移除了这一行。核对修订前后正文，仅删除这一处字符行，没有改动图标规范的尺寸、操作步骤或技术结论。标题、原链接、原封面以及GNOME官方资料来源均保留。\n\n'
+             '更正稿重新独立审校并获批准，公开正文已经回读核对。更正前的原稿、原公开正文、更正稿及复审记录均由站方留档。当前原链接为https://chat.xiangban.xyz/t/737，读者仍可在同一位置阅读图标导读及其资料来源。\n\n'
+             '这是本轮站方主动采编巡检中的实际动作，不是接到用户举报的宣告，也不涉及账号处分。此处被删字符是原文中没有上下文的独立行，不能据此推导出“正文中的单个英文字母都应删除”的通用规则；技术文章中的变量名、SVG属性或代码片段需要结合上下文理解。\n\n'
+             '本次是格式修订，并没有新增或撤回一项产品能力。原文仍介绍GNOME人机界面指南中的应用图标设计，仍明确GNOME规范与小伴组件能力的边界，未声称小伴支持GNOME、GTK或其中的控件，也未提供亲身运行结果。更正一个字符不等于新增平台兼容、完成产品实测或对所有内容作出正确性保证。\n\n'
+             '读者核对这类更正时，可关注具体改动范围、文章当前主题和原始资料是否仍对应；这是阅读建议，不是新站规。若对技术结论本身有异议，仍应指出相关段落与依据，不能把一次格式更正当作全部技术结论已经被推翻或被重新实测。')
     topics['site-notice'] += '|'+'|'.join(value[0] for value in interface.values())
-    topics['site-reports'] += '|五篇站方导读的公开更正记录|键盘焦点反馈指南的补源与更正记录|旧分类迁移与入口兼容的实际核对记录'
+    topics['site-reports'] += '|五篇站方导读的公开更正记录|键盘焦点反馈指南的补源与更正记录|旧分类迁移与入口兼容的实际核对记录|图标导读的一处格式更正与技术结论边界'
     entries=[]
     for channel, raw in topics.items():
         for i,title in enumerate(raw.split('|'),1):
@@ -121,7 +128,7 @@ def main():
     for entry, key in zip([e for e in entries if e['channel']=='site-notice'][30:], interface):
         entry['documents']=['interface-'+key, 'community']
     next(e for e in entries if e['id']=='site-feedback-26')['documents']=['keyboard-focus','community','privacy']
-    for ident, doc in [('site-reports-31','guide-corrections'),('site-reports-32','keyboard-correction'),('site-reports-33','category-migration')]:
+    for ident, doc in [('site-reports-31','guide-corrections'),('site-reports-32','keyboard-correction'),('site-reports-33','category-migration'),('site-reports-34','format-correction')]:
         entry=next(e for e in entries if e['id']==ident)
         entry['documents']=[doc]
         entry['boundary']='这是站方自身已完成的真实采编更正或分类整理记录。只陈述已核实的文章、分类和处理动作，不虚构用户举报、处罚、受影响人数、服务时限或新功能；不要把教学场景当成真实工单。'
