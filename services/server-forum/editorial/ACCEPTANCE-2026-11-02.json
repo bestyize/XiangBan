@@ -1,0 +1,616 @@
+{
+  "generated_at": "2026-11-02T05:05:40.411868+00:00",
+  "total_published": 820,
+  "total_accepted": 820,
+  "all_targets_accepted": true,
+  "targets": [
+    {
+      "id": "learn-claude-code",
+      "name": "学习和教程 / Claude Code",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/learn-claude-code",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1109",
+        "https://chat.xiangban.xyz/t/1043"
+      ]
+    },
+    {
+      "id": "learn-codex",
+      "name": "学习和教程 / Codex",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/learn-codex",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1134",
+        "https://chat.xiangban.xyz/t/624"
+      ]
+    },
+    {
+      "id": "learn-prompts",
+      "name": "学习和教程 / 提示词",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/learn-prompts",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/992",
+        "https://chat.xiangban.xyz/t/1108"
+      ]
+    },
+    {
+      "id": "learn-workflows",
+      "name": "学习和教程 / 工作流",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/learn-workflows",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/918",
+        "https://chat.xiangban.xyz/t/1230"
+      ]
+    },
+    {
+      "id": "learn-local",
+      "name": "学习和教程 / 本地部署",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/learn-local",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/527",
+        "https://chat.xiangban.xyz/t/764"
+      ]
+    },
+    {
+      "id": "learn-hardware",
+      "name": "学习和教程 / AI 硬件",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/learn-hardware",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/685",
+        "https://chat.xiangban.xyz/t/881"
+      ]
+    },
+    {
+      "id": "casual-work",
+      "name": "休闲 / 职场",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-work",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1020",
+        "https://chat.xiangban.xyz/t/658"
+      ]
+    },
+    {
+      "id": "casual-offwork",
+      "name": "休闲 / 下班了",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-offwork",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/619",
+        "https://chat.xiangban.xyz/t/698"
+      ]
+    },
+    {
+      "id": "casual-loss",
+      "name": "休闲 / 亏了吗",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-loss",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1058",
+        "https://chat.xiangban.xyz/t/1178"
+      ]
+    },
+    {
+      "id": "casual-dream",
+      "name": "休闲 / 梦想和人生",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-dream",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1082",
+        "https://chat.xiangban.xyz/t/1218"
+      ]
+    },
+    {
+      "id": "casual-gear",
+      "name": "休闲 / 数码装备",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-gear",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/825",
+        "https://chat.xiangban.xyz/t/1024"
+      ]
+    },
+    {
+      "id": "casual-indie",
+      "name": "休闲 / 副业与独立开发",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-indie",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/942",
+        "https://chat.xiangban.xyz/t/981"
+      ]
+    },
+    {
+      "id": "casual-fun",
+      "name": "休闲 / 吃喝玩乐",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-fun",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/626",
+        "https://chat.xiangban.xyz/t/985"
+      ]
+    },
+    {
+      "id": "casual-media",
+      "name": "休闲 / 片单乐评",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-media",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/950",
+        "https://chat.xiangban.xyz/t/707"
+      ]
+    },
+    {
+      "id": "casual-think",
+      "name": "休闲 / 哲思",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-think",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/589",
+        "https://chat.xiangban.xyz/t/864"
+      ]
+    },
+    {
+      "id": "casual-help",
+      "name": "休闲 / 互助",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-help",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/551",
+        "https://chat.xiangban.xyz/t/1065"
+      ]
+    },
+    {
+      "id": "casual-chat",
+      "name": "休闲 / 闲聊灌水",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/casual-chat",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/811",
+        "https://chat.xiangban.xyz/t/1143"
+      ]
+    },
+    {
+      "id": "create-effect",
+      "name": "创作 / 特效",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-effect",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1208",
+        "https://chat.xiangban.xyz/t/988"
+      ]
+    },
+    {
+      "id": "create-wallpaper",
+      "name": "创作 / 壁纸",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-wallpaper",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/593",
+        "https://chat.xiangban.xyz/t/1113"
+      ]
+    },
+    {
+      "id": "create-widget",
+      "name": "创作 / 组件",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-widget",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1196",
+        "https://chat.xiangban.xyz/t/1008"
+      ]
+    },
+    {
+      "id": "create-game",
+      "name": "创作 / 游戏",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-game",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1197",
+        "https://chat.xiangban.xyz/t/754"
+      ]
+    },
+    {
+      "id": "create-reminder",
+      "name": "创作 / 提醒",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-reminder",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/594",
+        "https://chat.xiangban.xyz/t/880"
+      ]
+    },
+    {
+      "id": "create-routine",
+      "name": "创作 / 例行",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-routine",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/867",
+        "https://chat.xiangban.xyz/t/836"
+      ]
+    },
+    {
+      "id": "create-task",
+      "name": "创作 / 任务",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-task",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1125",
+        "https://chat.xiangban.xyz/t/1052"
+      ]
+    },
+    {
+      "id": "create-goal",
+      "name": "创作 / 目标",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-goal",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/595",
+        "https://chat.xiangban.xyz/t/909"
+      ]
+    },
+    {
+      "id": "create-skill",
+      "name": "创作 / 技能",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-skill",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/934",
+        "https://chat.xiangban.xyz/t/678"
+      ]
+    },
+    {
+      "id": "create-expert",
+      "name": "创作 / 专家",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-expert",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1145",
+        "https://chat.xiangban.xyz/t/870"
+      ]
+    },
+    {
+      "id": "create-workflow",
+      "name": "创作 / 工作流",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-workflow",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/639",
+        "https://chat.xiangban.xyz/t/1172"
+      ]
+    },
+    {
+      "id": "create-schemes",
+      "name": "创作 / 方案",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/create-schemes",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1129",
+        "https://chat.xiangban.xyz/t/1087"
+      ]
+    },
+    {
+      "id": "discover-frontier",
+      "name": "发现 / 小伴前沿",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/frontier",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/frontier/ed-24f50db3e043ed4cfdba86a179d5df20e51a",
+        "https://chat.xiangban.xyz/frontier/ed-27c0a5d3fc2551345d330c6f02626366a02c"
+      ]
+    },
+    {
+      "id": "discover-daily",
+      "name": "发现 / AI 日报",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/daily",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/daily/ed-1c5b51464767c2ad29498f22c3230eb67bc2",
+        "https://chat.xiangban.xyz/daily/ed-1d6c5c59e46e52b936cbc7b983785a69d62a"
+      ]
+    },
+    {
+      "id": "resource-tools",
+      "name": "资源 / AI 工具",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/resource-tools",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/642",
+        "https://chat.xiangban.xyz/t/914"
+      ]
+    },
+    {
+      "id": "resource-docs",
+      "name": "资源 / 资料",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/resource-docs",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/689",
+        "https://chat.xiangban.xyz/t/882"
+      ]
+    },
+    {
+      "id": "resource-movies",
+      "name": "资源 / 影视",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/resource-movies",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1188",
+        "https://chat.xiangban.xyz/t/1228"
+      ]
+    },
+    {
+      "id": "resource-music",
+      "name": "资源 / 音乐",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/resource-music",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/536",
+        "https://chat.xiangban.xyz/t/582"
+      ]
+    },
+    {
+      "id": "resource-help",
+      "name": "资源 / 求助悬赏",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/resource-help",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/692",
+        "https://chat.xiangban.xyz/t/773"
+      ]
+    },
+    {
+      "id": "resource-open",
+      "name": "资源 / 开源精选",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/resource-open",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/768",
+        "https://chat.xiangban.xyz/t/574"
+      ]
+    },
+    {
+      "id": "site-notice",
+      "name": "站务 / 公告",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/site-notice",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/733",
+        "https://chat.xiangban.xyz/t/1051"
+      ]
+    },
+    {
+      "id": "site-rules",
+      "name": "站务 / 规则",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/site-rules",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/1247",
+        "https://chat.xiangban.xyz/t/770"
+      ]
+    },
+    {
+      "id": "site-feedback",
+      "name": "站务 / 建议反馈",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/site-feedback",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/622",
+        "https://chat.xiangban.xyz/t/1209"
+      ]
+    },
+    {
+      "id": "site-reports",
+      "name": "站务 / 举报处理公示",
+      "accepted": 20,
+      "target": 20,
+      "url": "https://chat.xiangban.xyz/c/site-reports",
+      "sample_urls": [
+        "https://chat.xiangban.xyz/t/579",
+        "https://chat.xiangban.xyz/t/849"
+      ]
+    }
+  ],
+  "issues": [],
+  "checks": [
+    "version-bound independent review",
+    "source evidence",
+    "public title/category/body",
+    "public cover type and size",
+    "complete local PNG chunks and checksums",
+    "unique titles and cover bytes",
+    "no synthetic help requests",
+    "source publication dates for news and frontier"
+  ],
+  "migration_acceptance": {
+    "checked_at": "2026-11-02T13:06:10+0800",
+    "aliases_checked": 15,
+    "public_category_records": 45,
+    "old_slugs_remaining": [],
+    "active_category_records": 44,
+    "legacy_navigation_links": 0,
+    "checks": [
+      {
+        "old": "tech",
+        "current": "learn",
+        "status": 308,
+        "location": "/c/learn",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "share",
+        "current": "resources",
+        "status": 308,
+        "location": "/c/resources",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "xiaoban",
+        "current": "create",
+        "status": 308,
+        "location": "/c/create",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "tech-llm",
+        "current": "learn-local",
+        "status": 308,
+        "location": "/c/learn-local",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "tech-productivity",
+        "current": "learn-workflows",
+        "status": 308,
+        "location": "/c/learn-workflows",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "tech-hardware",
+        "current": "learn-hardware",
+        "status": 308,
+        "location": "/c/learn-hardware",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "tech-creative",
+        "current": "learn-prompts",
+        "status": 308,
+        "location": "/c/learn-prompts",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "share-software",
+        "current": "resource-open",
+        "status": 308,
+        "location": "/c/resource-open",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "share-movies",
+        "current": "resource-movies",
+        "status": 308,
+        "location": "/c/resource-movies",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "share-music",
+        "current": "resource-music",
+        "status": 308,
+        "location": "/c/resource-music",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "share-learn",
+        "current": "resource-docs",
+        "status": 308,
+        "location": "/c/resource-docs",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "share-help",
+        "current": "resource-help",
+        "status": 308,
+        "location": "/c/resource-help",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "xiaoban-wallpaper",
+        "current": "create-wallpaper",
+        "status": 308,
+        "location": "/c/create-wallpaper",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "xiaoban-game",
+        "current": "create-game",
+        "status": 308,
+        "location": "/c/create-game",
+        "same_query_total": true,
+        "original_id_preserved": true
+      },
+      {
+        "old": "xiaoban-app",
+        "current": "create-guides",
+        "status": 308,
+        "location": "/c/create-guides",
+        "same_query_total": true,
+        "original_id_preserved": true
+      }
+    ],
+    "issues": []
+  },
+  "browser_acceptance": [
+    {
+      "url": "https://chat.xiangban.xyz/discuss?tab=create&filter=effect",
+      "article_cards": 20,
+      "cover_elements": 20,
+      "legacy_navigation_links": 0
+    },
+    {
+      "url": "https://chat.xiangban.xyz/resources",
+      "article_cards": 20,
+      "cover_elements": 20,
+      "loaded_covers": 20
+    }
+  ],
+  "count_basis": "本轮逐篇核验的已发表文章：39个当前分类话题与日报、前沿2个文章流，共41个目标。"
+}
