@@ -10,7 +10,9 @@ const active=ref(0), paused=ref(false), hovered=ref(false), focused=ref(false), 
 const broken=ref<string[]>([])
 let timer:ReturnType<typeof setInterval>|undefined, media:MediaQueryList|undefined
 let startX=0,startY=0
-const suggestions=computed(()=>props.items.length>1 ? [1,2].slice(0,props.items.length-1).map(offset=>props.items[carouselIndex(active.value,offset,props.items.length)]!) : [])
+// Keep these nodes stable: article assets are no-store, so rebuilding them on
+// every slide would repeatedly download the same images.
+const suggestions=computed(()=>props.items.slice(1,3))
 watch(()=>props.items.map(item=>item.key),(keys,old)=>{
   const index=keys.indexOf(old?.[active.value] || '')
   active.value=index<0?0:index
