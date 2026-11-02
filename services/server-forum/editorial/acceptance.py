@@ -12,9 +12,11 @@ import json
 from pathlib import Path
 import re
 import sqlite3
+import struct
 import time
 import urllib.parse
 import urllib.request
+import zlib
 
 import worker as w
 
@@ -42,16 +44,51 @@ def visible_body_key(value, html=False):
     return re.sub(r'[\W_]+', '', value)
 
 
-def check(root, config):
+def check_png_integrity(raw):
+    w.validate_image(raw)
+    offset, image_data = 8, False
+    while offset < len(raw):
+        assert offset + 12 <= len(raw), 'truncated PNG chunk'
+        length = struct.unpack('>I', raw[offset:offset + 4])[0]
+        end = offset + 8 + length
+        assert end + 4 <= len(raw), 'truncated PNG payload'
+        assert zlib.crc32(raw[offset + 4:end]) & 0xffffffff == struct.unpack('>I', raw[end:end + 4])[0], 'PNG checksum mismatch'
+        image_data |= raw[offset + 4:offset + 8] == b'IDAT'
+        offset = end + 4
+    assert image_data, 'PNG has no image data'
+
+
+def published_jobs(root):
     db = sqlite3.connect('file:' + str(root / 'editorial.sqlite3') + '?mode=ro', uri=True)
     db.row_factory = sqlite3.Row
     jobs = [dict(x) for x in db.execute("SELECT * FROM jobs WHERE status='published' ORDER BY agent,id")]
     db.close()
+    return jobs
+
+
+def check(root, config, follow=False):
+    jobs = published_jobs(root)
     agents = {a['id']: a for a in config['agents'] if a.get('enabled')}
     counts = Counter()
     issues = []
     titles, covers = defaultdict(list), defaultdict(list)
-    for index, job in enumerate(jobs, 1):
+    index = 0
+    deadline, last_wait = time.monotonic() + 1800, 0
+    while True:
+        if index >= len(jobs):
+            known = {j['id'] for j in jobs}
+            jobs.extend(j for j in published_jobs(root) if j['id'] not in known)
+            if index >= len(jobs):
+                published = Counter(j['agent'] for j in jobs)
+                if not follow or all(published[k] >= 20 for k in agents) or time.monotonic() >= deadline:
+                    break
+                if time.monotonic() - last_wait >= 55:
+                    print(json.dumps({'checked': index, 'waiting_for_remaining_publications': sum(max(0, 20-published[k]) for k in agents)}), flush=True)
+                    last_wait = time.monotonic()
+                time.sleep(5)
+                continue
+        job = jobs[index]
+        index += 1
         # Cover HEAD requests also consume the public site's IP quota. Leave
         # capacity for real readers and the independently running publisher.
         time.sleep(0.7)
@@ -65,7 +102,7 @@ def check(root, config):
             assert review.get('article_sha256') == digest, 'review version mismatch'
             assert evidence['url'] == job['url'] and len(evidence['text']) >= 500, 'missing source evidence'
             raw = (folder / 'cover.png').read_bytes()
-            w.validate_image(raw)
+            check_png_integrity(raw)
             covers[hashlib.sha256(raw).hexdigest()].append(key)
             titles[article['title'].strip()].append(key)
             prose = re.sub(r'```[^\n]*\n.*?```', '', article['body'], flags=re.S)
@@ -75,6 +112,7 @@ def check(root, config):
                 public = w.api(config['forum_url'], '/api/topics/' + str(job['topic_id']))
                 imported = load(folder / 'import.json')
                 assert public['title'] == article['title'], 'public title changed'
+                assert public['author']['uid'] == imported['author_uid'], 'public author changed'
                 assert public['category']['slug'] == w.canonical_category(agent['category']), 'wrong public category'
                 assert public['min_read_level'] == 0 and public.get('status') == 'normal', 'not public'
                 assert public['images'] and public['body_html'], 'missing public image/body'
@@ -100,9 +138,16 @@ def check(root, config):
                 cover = public['cover_url']
             url = urllib.parse.urljoin(config['forum_url'], cover)
             assert urllib.parse.urlsplit(url).netloc == urllib.parse.urlsplit(config['forum_url']).netloc, 'off-site cover'
-            with w.HTTP.open(urllib.request.Request(url, method='HEAD'), timeout=30) as response:
-                assert response.headers.get_content_type().startswith('image/'), 'cover not an image'
-                assert int(response.headers.get('Content-Length', 0)) == len(raw), 'public cover size mismatch'
+            for attempt in range(3):
+                try:
+                    with w.HTTP.open(urllib.request.Request(url, method='HEAD'), timeout=30) as response:
+                        assert response.headers.get_content_type().startswith('image/'), 'cover not an image'
+                        assert int(response.headers.get('Content-Length', 0)) == len(raw), 'public cover size mismatch'
+                    break
+                except w.urllib.error.HTTPError as exc:
+                    if exc.code not in (429, 502, 503, 504) or attempt == 2:
+                        raise
+                    time.sleep((2, 5)[attempt])
             counts[agent['id']] += 1
         except (AssertionError, OSError, ValueError, KeyError, w.Stop) as exc:
             issues.append({'job_id': key, 'agent': agent['id'], 'public_url': job['public_url'], 'issue': str(exc)[:250]})
@@ -123,7 +168,7 @@ def check(root, config):
               'all_targets_accepted': len(agents) == 41 and all(counts[k] >= 20 for k in agents) and not issues,
               'targets': rows, 'issues': issues,
               'checks': ['version-bound independent review', 'source evidence', 'public title/category/body',
-                         'public cover type and size', 'valid local PNG', 'unique titles and cover bytes',
+                         'public cover type and size', 'complete local PNG chunks and checksums', 'unique titles and cover bytes',
                          'no synthetic help requests', 'source publication dates for news and frontier']}
     w.atomic(root / 'acceptance.json', result)
     return result
@@ -133,8 +178,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path('/var/lib/xiaoban-editorial'))
     parser.add_argument('--config', type=Path, default=Path(__file__).with_name('agents.json'))
+    parser.add_argument('--follow', action='store_true', help='Include newly published articles and wait up to 30 minutes for the campaign')
     args = parser.parse_args()
-    result = check(args.root, load(args.config))
+    result = check(args.root, load(args.config), follow=args.follow)
     print(json.dumps({k: v for k, v in result.items() if k not in ('targets', 'issues')}, ensure_ascii=False))
     print(json.dumps({'issues': result['issues'][:15]}, ensure_ascii=False))
     raise SystemExit(0 if result['all_targets_accepted'] else 1)
