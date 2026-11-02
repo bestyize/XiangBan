@@ -22,6 +22,50 @@ mod repo_detail;
 #[path = "open_source_tests.rs"]
 mod open_source_system;
 
+#[tokio::test]
+async fn navigation_catalog_additions_preserve_edits_and_do_not_restore_removals() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    sqlx::query("DELETE FROM data_migrations WHERE name='navigation-catalog-20261103-v2'").execute(&h.pool).await?;
+    sqlx::query("UPDATE discover_items SET data=jsonb_set(jsonb_set(data - 'category' - 'summary' - 'logo','{name}','\"Claude 已编辑\"'),'{url}','\"https://example.com/custom\"'),status='draft' WHERE kind='nav' AND key='claude'").execute(&h.pool).await?;
+    sqlx::query("DELETE FROM discover_items WHERE kind='nav' AND key='grok'").execute(&h.pool).await?;
+    crate::navigation_catalog::seed(&h.pool).await?;
+    let (name,status):(String,String)=sqlx::query_as("SELECT data->>'name',status FROM discover_items WHERE kind='nav' AND key='claude'").fetch_one(&h.pool).await?;
+    assert_eq!((name,status),("Claude 已编辑".into(),"draft".into()));
+    let (url,category,group):(String,String,String)=sqlx::query_as("SELECT data->>'url',data->>'category',data->>'group' FROM discover_items WHERE kind='nav' AND key='claude'").fetch_one(&h.pool).await?;
+    assert_eq!((url,category,group),("https://example.com/custom".into(),"harness".into(),"Harness".into()));
+    let (_,nav)=call(&h.app,"GET","/api/discover/nav",None,Value::Null).await;
+    assert_eq!(nav["catalog_version"],2);
+    let entries:Vec<_>=nav["groups"].as_array().unwrap().iter().flat_map(|g|g["items"].as_array().unwrap()).collect();
+    assert!(entries.iter().any(|item|item["key"]=="grok"));
+    assert!(!entries.iter().any(|item|item["key"]=="claude"));
+    sqlx::query("DELETE FROM discover_items WHERE kind='nav' AND key='grok'").execute(&h.pool).await?;
+    crate::discover::seed(&h.pool).await?;
+    let (count,):(i64,)=sqlx::query_as("SELECT count(*) FROM discover_items WHERE kind='nav' AND key='grok'").fetch_one(&h.pool).await?;
+    assert_eq!(count,0,"a later startup must not resurrect an editorial removal");
+    h.finish().await
+}
+
+#[tokio::test]
+async fn navigation_catalog_v1_deletions_survive_v2_upgrade() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()) };
+    sqlx::query("DELETE FROM data_migrations WHERE name='navigation-catalog-20261103-v2'").execute(&h.pool).await?;
+    sqlx::query("INSERT INTO data_migrations(name) VALUES('navigation-catalog-20261103-v1') ON CONFLICT DO NOTHING").execute(&h.pool).await?;
+    sqlx::query("DELETE FROM discover_items WHERE kind='nav' AND key IN ('grok','hermes-agent')").execute(&h.pool).await?;
+    crate::discover::seed(&h.pool).await?;
+    let keys:Vec<(String,)>=sqlx::query_as("SELECT key FROM discover_items WHERE kind='nav' AND key IN ('grok','hermes-agent')").fetch_all(&h.pool).await?;
+    assert_eq!(keys,vec![("hermes-agent".to_string(),)],"add new v2 entries without restoring a removed v1 product");
+    h.finish().await
+}
+
+#[test]
+fn navigation_catalog_validates_category_metadata() {
+    let mut item=crate::navigation_catalog::catalog()["items"].as_array().unwrap().iter().find(|i|i["key"]=="openrouter-api").unwrap().clone();
+    let normalized=crate::discover::validate("nav",item.clone()).unwrap();
+    assert_eq!(normalized["category"],"api");assert_eq!(normalized["subtype"],"router");assert!(!normalized["summary"].as_str().unwrap().is_empty());
+    item["category"]=json!("models");assert!(crate::discover::validate("nav",item.clone()).is_err());
+    item["category"]=json!("api");item["region"]=json!("invalid");assert!(crate::discover::validate("nav",item).is_err());
+}
+
 async fn call(app: &axum::Router, method: &str, path: &str, token: Option<&str>, body: Value) -> (StatusCode, Value) {
     let mut req = Request::builder().method(method).uri(path).header("content-type", "application/json");
     if let Some(token) = token {
@@ -157,8 +201,7 @@ async fn discover_pages_read_seeded_and_admin_edited_items() -> Result<(), Box<d
 
     // 导航按分组返回，且是真实内容（不带示例标记）。
     let (_, nav) = call(app, "GET", "/api/discover/nav", None, Value::Null).await;
-    assert_eq!(nav["groups"][0]["name"], "海外");
-    assert_eq!(nav["groups"][1]["name"], "国产");
+    assert_eq!(nav["groups"].as_array().unwrap().iter().map(|g|g["name"].as_str().unwrap()).collect::<Vec<_>>(), vec!["大模型", "Harness", "Skill", "API"]);
     assert_eq!(nav["groups"][0]["items"][0]["sample"], false);
 
     // 模型榜：按指标分档由后端给出。

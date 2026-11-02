@@ -8,6 +8,7 @@ mod content_social;
 mod content;
 mod db;
 mod discover;
+mod navigation_catalog;
 mod error;
 mod handlers;
 mod handbook;

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { navigationCategories } from '@/lib/navigationDirectory'
 const props = defineProps<{ kind: string; modelValue: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
-type Field = { key: string; label: string; type?: 'number' | 'datetime' | 'list' | 'url' | 'color'; required?: boolean; max?: number }
+type Field = { key: string; label: string; type?: 'number' | 'datetime' | 'list' | 'url' | 'color'; required?: boolean; max?: number; options?: {key:string;label:string}[] }
 const fields: Record<string, Field[]> = {
   banner: [{key:'tag',label:'标签',max:12},{key:'title',label:'标题',required:true,max:60},{key:'byline',label:'署名',max:40},{key:'link',label:'目标（如 topic:12）'}],
   news: [{key:'title',label:'新闻标题',required:true,max:300},{key:'source',label:'来源',required:true,max:30},{key:'url',label:'官方原文',type:'url',required:true},{key:'cover_url',label:'封面地址',type:'url'},{key:'source_published_at',label:'来源发布时间（本地时区，未知留空）',type:'datetime'}],
-  nav: [{key:'group',label:'分组',required:true,max:10},{key:'name',label:'名称',required:true,max:20},{key:'vendor',label:'厂商',required:true,max:20},{key:'url',label:'官方入口',type:'url',required:true},{key:'brand_color',label:'品牌色 #RRGGBB',required:true},{key:'tint',label:'底色 #RRGGBB',required:true}],
+  nav: [{key:'category',label:'导航分类',required:true,options:[{key:'',label:'请选择分类'},...navigationCategories.map(c=>({key:c.key,label:c.label}))]},{key:'subtype',label:'入口类型',options:[]},{key:'region',label:'地区',options:[{key:'',label:'不标注'},{key:'cn',label:'国产'},{key:'global',label:'海外'}]},{key:'summary',label:'一句话用途',max:120},{key:'logo',label:'图标品牌名',max:60},{key:'name',label:'名称',required:true,max:20},{key:'vendor',label:'厂商',required:true,max:20},{key:'url',label:'官方入口',type:'url',required:true},{key:'brand_color',label:'品牌色 #RRGGBB',required:true},{key:'tint',label:'底色 #RRGGBB',required:true}],
   doc: [{key:'product',label:'产品',required:true,max:20},{key:'title',label:'资料标题',required:true,max:60},{key:'subtitle',label:'说明',max:80},{key:'label',label:'类型（guide 导读 / index 索引）',required:true},{key:'url',label:'官方原文',type:'url',required:true}],
   launch: [{key:'title',label:'发布记录标题（历史内容须标注回顾）',required:true,max:80},{key:'summary',label:'已核实摘要',max:500},{key:'source_url',label:'官方发布原文（https）',type:'url'},{key:'tags',label:'标签（每行一个，最多 5 个）',type:'list'}],
   promo: [{key:'text',label:'优惠或试用说明',required:true,max:80},{key:'source_url',label:'官方来源（https；长期权益必填）',type:'url'},{key:'eligibility',label:'地区、身份等适用资格（长期权益必填）',max:500},{key:'started_at',label:'真实开始时间（未知留空；本地时区）',type:'datetime'},{key:'ends_at',label:'真实截止时间（长期提供留空；本地时区）',type:'datetime'}],
@@ -14,7 +15,12 @@ const fields: Record<string, Field[]> = {
   vendor: [{key:'name',label:'厂商名',required:true,max:20},{key:'brand_color',label:'品牌色 #RRGGBB',required:true},{key:'tint',label:'底色 #RRGGBB',required:true}],
   quota: [{key:'progress_pct',label:'手工确认的已用比例（0–100）',type:'number',required:true},{key:'next_reset_at',label:'手工确认的下次重置（本地时区）',type:'datetime',required:true}],
 }
-const selected = computed(() => fields[props.kind] ?? [])
+const selected = computed(() => (fields[props.kind] ?? []).map(field => {
+  if (props.kind !== 'nav' || field.key !== 'subtype') return field
+  const category = String(parsed.value?.category || '')
+  const options = category === 'models' ? [] : category === 'api' ? [{key:'original',label:'原厂 API'},{key:'router',label:'聚合路由'},{key:'inference',label:'推理服务'},{key:'cloud',label:'云平台'}] : navigationCategories.find(c=>c.key===category)?.filters || []
+  return {...field,options:[{key:'',label:'不标注'},...options]}
+}))
 const parsed = computed<Record<string, unknown> | null>(() => {
   try { const v: unknown = JSON.parse(props.modelValue); return v && typeof v === 'object' && !Array.isArray(v) ? v as Record<string, unknown> : null } catch { return null }
 })
@@ -35,6 +41,7 @@ function update(field: Field, event: Event) {
   if (field.type === 'list') next = raw.split('\n').map(x => x.trim()).filter(Boolean)
   if (field.type === 'datetime') next = raw ? new Date(raw).toISOString() : null
   const data = {...parsed.value, [field.key]:next}
+  if (props.kind === 'nav' && field.key === 'category') { data.group = navigationCategories.find(c=>c.key===raw)?.label || ''; data.subtype = '' }
   if (props.kind === 'news' && field.key === 'source_published_at') data.time_basis = raw ? 'source_published' : 'collected'
   emit('update:modelValue',JSON.stringify(data,null,2))
 }
@@ -49,7 +56,8 @@ function update(field: Field, event: Event) {
       <div class="adm-form-grid">
         <label v-for="field in selected" :key="field.key" class="field">
           <span>{{ field.label }}</span>
-          <textarea v-if="field.type === 'list'" class="input" :value="value(field)" rows="3" @change="update(field,$event)" />
+          <select v-if="field.options" class="input" :value="value(field)" :required="field.required" @change="update(field,$event)"><option v-for="option in field.options" :key="option.key" :value="option.key">{{ option.label }}</option></select>
+          <textarea v-else-if="field.type === 'list'" class="input" :value="value(field)" rows="3" @change="update(field,$event)" />
           <input v-else class="input" :type="field.type === 'datetime' ? 'datetime-local' : field.type ?? 'text'" :value="value(field)" :required="field.required" :maxlength="field.max" :min="field.type === 'number' ? 0 : undefined" :max="field.type === 'number' ? 100 : undefined" @change="update(field,$event)" />
         </label>
       </div>

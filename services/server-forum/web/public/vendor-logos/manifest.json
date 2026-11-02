@@ -424,6 +424,159 @@
       "source": "https://thinkingmachines.ai/images/favicon-32x32.png",
       "license": "Brand mark; identification only",
       "normalization": "Monochrome coverage at source icon scale; original retained"
+    },
+    {
+      "id": "baidu",
+      "color": "2932E1",
+      "aliases": [
+        "Baidu",
+        "百度"
+      ],
+      "file": "baidu.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "spark",
+      "color": "4176FF",
+      "aliases": [
+        "讯飞星火",
+        "科大讯飞",
+        "Spark"
+      ],
+      "file": "spark.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "openclaw",
+      "color": "61748C",
+      "aliases": [
+        "OpenClaw"
+      ],
+      "file": "openclaw.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "opencode",
+      "color": "61748C",
+      "aliases": [
+        "OpenCode"
+      ],
+      "file": "opencode.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "cursor",
+      "color": "61748C",
+      "aliases": [
+        "Cursor"
+      ],
+      "file": "cursor.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "trae",
+      "color": "61748C",
+      "aliases": [
+        "TRAE"
+      ],
+      "file": "trae.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "qoder",
+      "color": "61748C",
+      "aliases": [
+        "Qoder"
+      ],
+      "file": "qoder.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "workbuddy",
+      "color": "61748C",
+      "aliases": [
+        "WorkBuddy"
+      ],
+      "file": "workbuddy.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "modelscope",
+      "color": "61748C",
+      "aliases": [
+        "ModelScope"
+      ],
+      "file": "modelscope.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "vercel",
+      "color": "61748C",
+      "aliases": [
+        "Vercel"
+      ],
+      "file": "vercel.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "openrouter",
+      "color": "61748C",
+      "aliases": [
+        "OpenRouter"
+      ],
+      "file": "openrouter.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "siliconcloud",
+      "color": "61748C",
+      "aliases": [
+        "SiliconCloud"
+      ],
+      "file": "siliconcloud.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "together",
+      "color": "61748C",
+      "aliases": [
+        "Together"
+      ],
+      "file": "together.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "fireworks",
+      "color": "61748C",
+      "aliases": [
+        "Fireworks"
+      ],
+      "file": "fireworks.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
+    },
+    {
+      "id": "groq",
+      "color": "61748C",
+      "aliases": [
+        "Groq"
+      ],
+      "file": "groq.svg",
+      "source": "https://github.com/lobehub/lobe-icons",
+      "license": "MIT"
     }
   ]
 }

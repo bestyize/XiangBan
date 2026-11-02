@@ -107,6 +107,18 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 排行榜概览 `/?tab=rankings` 按手机版顺序展示 AA 智能指数 Top 10、智能 vs 价格散点图、输出速度 Top 5、调用量 Top 5。`/models` 与调用量榜使用可展开的条形排行，支持快照实际提供的能力指标及 UTC 历史日榜。散点图沿用输入/输出 3:1 加权报价、对数价格轴、前沿与中位数优势区，支持厂商筛选、模型定位及全屏搜索。厂商图标来自手机本地资源（附原许可），不请求外部图片。相关验证：`node --experimental-strip-types --test tests/modelRankings.test.ts tests/discover.test.ts tests/navigation.test.ts`（在 web 目录运行）。
 
+### AI 导航（2026-11-03，本地实现）
+
+导航主分类按用途分为大模型（原厂）、Harness（AI 助手与智能体）、Skill（技能平台与官方技能库）、API（模型调用服务）。首批目录 `editorial/navigation.json` 为 v2，共 66 个入口：18 家模型原厂、25 个助手与 Agent、5 个技能平台/官方技能库、18 个 API 服务。同一厂商按不同目的链接到不同入口，例如 Anthropic 原厂、Claude Desktop、Claude Code 和 Claude Platform；产品入口不混进原厂分类。大模型按国产/海外筛选，Harness 按综合助手/编程 Agent/个人智能体筛选，Skill 按技能市场/官方技能库筛选，API 按原厂 API/聚合与推理/云平台筛选。筛选与主分类记录在 `/?tab=nav&nav_category=...&nav_filter=...`，刷新、返回和分享保留状态，换主分类自动清空筛选。
+
+卡片提供 Logo、名称、所属厂商、一句话用途和类型标签；宽屏补充域名。按实际内容区宽度使用两、三、四列，保持社区主题、边框与字号规范，不使用封面图或卡片阴影。Hermes Agent 使用项目官网 favicon，其他新增图标延用同版本 Lobe Icons；来源与许可在 `web/public/vendor-logos/README.md`。导航仅链接官方入口，不承诺地区可用性或服务方案。
+
+服务启动执行一次性 `navigation-catalog-20261103-v2` 迁移。缺失条目按目录补齐；未分类的历史内置入口按用途迁移，保留编辑后的名称、URL、状态、排序和自定义说明，只有仍与原始 v1 默认值一致的名称/URL 才更新为新入口。已经显式分类的编辑不覆盖；已完成 v1 的目录不会在 v2 升级中恢复已删除的旧入口。完成 v2 后，管理员删除的条目不会在后续启动时恢复。后台“发现页 → 导航”可维护分类、入口类型、地区、用途说明和图标品牌名，服务端校验元数据组合。
+
+`/api/discover/nav` 保留 `groups` 协议并返回 `catalog_version:2`，四个分组按主分类固定顺序排列，手机可继续读取；更新的网页以 v2 已发布数据为准，允许主动清空。旧接口版本低于 2 时，网页用同一清单做分类兼容与补齐；v1 中被管理员删除的旧条目仍保留删除结果。按分类内 key/地址去重，原厂官网与 API 控制台可以作为不同目的入口共存，接口加载错误如实呈现。
+
+验证：网页 `npm run build`、`node --experimental-strip-types --test tests/navigationDirectory.test.ts`；隔离库 `TEST_DATABASE_URL=postgres://… cargo test --manifest-path services/server-forum/Cargo.toml navigation_catalog` 检查字段校验、分类迁移、编辑/下架/删除保留。本轮未部署线上。
+
 ### 精选（2026-11-03，本地实现）
 
 精选仅在首页提供入口，资源页不再重复设置精选子 TAB（旧 `/resources?tab=open` 跳转首页精选）；原「开源热榜」合并为第二个子 TAB「热榜」，旧 `/?tab=repos` 携带往期期数跳转新入口；`/open-source` 跳转首页精选。推荐、热榜与 11 个用途分类支持跨分类收录、标签筛选，项目卡片与专题卡链接独立导读页；搜索统一进入顶栏，收藏操作仅在项目详情显示。列表封面包含项目 Logo 与名称，下方仅展示推荐标题和标签，不重复名称、收藏状态或使用门槛。历史图文保留在「社区分享」。

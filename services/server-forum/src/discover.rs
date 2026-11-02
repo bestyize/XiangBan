@@ -147,6 +147,11 @@ pub struct Nav {
     url: String,
     brand_color: String,
     tint: String,
+    #[serde(default)] category: String,
+    #[serde(default)] subtype: String,
+    #[serde(default)] region: String,
+    #[serde(default)] summary: String,
+    #[serde(default)] logo: String,
 }
 
 impl Check for Nav {
@@ -157,6 +162,25 @@ impl Check for Nav {
         self.url = web_url(&self.url, "官方入口", true)?;
         self.brand_color = color(&self.brand_color, "品牌色")?;
         self.tint = color(&self.tint, "底色")?;
+        self.category = clean(&self.category, "导航分类", 20, false)?;
+        self.subtype = clean(&self.subtype, "入口类型", 20, false)?;
+        self.region = clean(&self.region, "地区", 10, false)?;
+        self.summary = clean(&self.summary, "一句话用途", 120, false)?;
+        self.logo = clean(&self.logo, "厂商图标", 60, false)?;
+        let categories = crate::navigation_catalog::catalog()["categories"].as_array().unwrap();
+        if self.category.is_empty() {
+            self.category = categories.iter().find(|c| c["label"] == self.group).and_then(|c|c["key"].as_str()).unwrap_or_default().to_string();
+        }
+        if !self.category.is_empty() {
+            let category = categories.iter().find(|c|c["key"] == self.category).ok_or_else(||AppError::BadRequest("导航分类无效".into()))?;
+            self.group = category["label"].as_str().unwrap().to_string();
+            let allowed = match self.category.as_str() {
+                "models" => vec![""], "harness" => vec!["", "assistant", "coding", "personal"],
+                "skills" => vec!["", "market", "official"], "api" => vec!["", "original", "router", "inference", "cloud"], _ => vec![]
+            };
+            if !allowed.contains(&self.subtype.as_str()) { return Err(AppError::BadRequest("入口类型不属于这个导航分类".into())); }
+        }
+        if !["", "cn", "global"].contains(&self.region.as_str()) { return Err(AppError::BadRequest("导航地区无效".into())); }
         Ok(())
     }
 }
@@ -592,6 +616,7 @@ const SEED_NAME: &str = "discover-seed-v2";
 /// 导航和资料是真实的官方入口。已部署的库升级时，先清掉上一版写的示例条目再写新的；后台自己录入的真实内容不受影响。
 /// 做完记进 `data_migrations`，后台删改后不会再被写回。
 pub async fn seed(pool: &PgPool) -> AppResult<()> {
+    crate::navigation_catalog::seed(pool).await?;
     let done: Option<(String,)> =
         sqlx::query_as("SELECT name FROM data_migrations WHERE name = $1").bind(SEED_NAME).fetch_optional(pool).await?;
     if done.is_some() {

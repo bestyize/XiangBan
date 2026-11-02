@@ -310,7 +310,10 @@ fn group_by(items: Vec<Value>, field: &str) -> Vec<Value> {
 
 async fn nav(State(state): State<AppState>) -> AppResult<Json<Value>> {
     let items = fetch(&state.pool, "nav", BY_ORDER, 200, 0).await?;
-    Ok(Json(json!({ "groups": group_by(items, "group") })))
+    let mut groups = group_by(items, "group");
+    let labels: Vec<_> = crate::navigation_catalog::catalog()["categories"].as_array().unwrap().iter().filter_map(|c|c["label"].as_str()).collect();
+    groups.sort_by_key(|g|labels.iter().position(|label|Some(*label)==g["name"].as_str()).unwrap_or(usize::MAX));
+    Ok(Json(json!({ "groups": groups, "catalog_version": crate::navigation_catalog::catalog()["version"] })))
 }
 
 async fn docs(State(state): State<AppState>) -> AppResult<Json<Value>> {

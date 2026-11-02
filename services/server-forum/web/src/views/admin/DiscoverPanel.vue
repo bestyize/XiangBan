@@ -16,7 +16,7 @@ const KINDS = [
   { key: 'quota', label: 'Codex 额度重置', sample: '{"progress_pct":68,"next_reset_at":"2026-11-01T10:00:00Z","recent_intervals":[5,5,4.5,5,5.5,5,5]}' },
   { key: 'launch', label: '发布记录', sample: '{"title":"标题","tags":["API","编程"]}' },
   { key: 'promo', label: '优惠与试用', sample: '{"text":"说明","started_at":"2026-10-28T00:00:00Z","ends_at":"2026-11-04T00:00:00Z"}' },
-  { key: 'nav', label: '导航', sample: '{"group":"海外","name":"名称","vendor":"厂商","url":"https://example.com","brand_color":"#D97757","tint":"#FBE9E1"}' },
+  { key: 'nav', label: '导航', sample: '{"category":"models","group":"大模型","region":"cn","summary":"一句话用途","name":"名称","vendor":"厂商","url":"https://example.com","brand_color":"#D97757","tint":"#FBE9E1"}' },
   { key: 'doc', label: '资料导读', sample: '{"product":"Claude","title":"标题","subtitle":"说明","label":"guide","url":"https://example.com"}' },
   { key: 'tool', label: 'AI 工具', sample: '{"name":"名称","developer":"开发者","type_label":"桌面应用","license":"open","platforms":["Windows","macOS"],"description":"简介","homepage_url":"https://github.com/owner/repo","discussion_tag":"tag","releases":[{"version":"v1.0.0","date":"10-20","items":[{"kind":"new","text":"内容"}]}],"artifacts":[{"os":"windows","desc":".msi 安装包","size":12582912,"sha256":"","mirror_url":"","github_url":"https://github.com/owner/repo/releases"}]}' },
   { key: 'hotword', label: '热门搜索', sample: '{"text":"桌面特效","tag":"热"}' },

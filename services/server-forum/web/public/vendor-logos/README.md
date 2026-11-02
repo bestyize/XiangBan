@@ -17,3 +17,7 @@ python3 client/xiaoban-multiplatform/business/community-native/tools/generate-ve
 生成器不访问网络，也不依赖第三方 Python 库。新增复杂 SVG 需先人工归一化；不接受忽略变换或遮罩后直接生成。
 
 网页附带的 `legacy-*.svg` 从 `client/xiaoban-multiplatform/business/community-native/src/commonMain/kotlin/xyz/xiangban/xiaoban/business/communitynative/BrandLogos.kt` 的原始画布 SVG 路径生成；`legacy.json` 记录别名与配色。商标仅用于标识来源。
+
+2026-11-03：网页导航补充 `baidu.svg` 与 `spark.svg`，来自同版本 `@lobehub/icons-static-svg@1.101.0` 的原始单色 SVG（MIT），别名与来源登记在网页 manifest.json。
+
+导航四分类新增的 OpenClaw、OpenCode、Cursor、TRAE、Qoder、WorkBuddy、ModelScope、Vercel、OpenRouter、SiliconCloud、Together、Fireworks、Groq 图标继续取自同版 Lobe Icons（MIT）。Hermes Agent 使用其官网声明的 favicon，原始来源：https://web-assets.nousresearch.com/marketing/1a978bb815e9d8b6e75e2320c4cf5e1313d7d684/assets/hermes-agent/icon.png；仅用于识别对应官方项目。

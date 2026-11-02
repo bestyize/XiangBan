@@ -1,46 +1,71 @@
 <script setup lang="ts">
-import { computed,onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { discoverApi } from '@/api/discover'
 import { useCommunityResource } from './resource'
 import RequestState from './RequestState.vue'
+import CommunityTabs from './CommunityTabs.vue'
 import RankingVendor from './RankingVendor.vue'
 import DiscoverGlyph from './DiscoverGlyph.vue'
 import { webLink } from './contract'
-const {data,loading,error,load}=useCommunityResource(discoverApi.nav)
-const groups=computed(()=>(data.value?.groups||[]).map(group=>({...group,items:group.items.filter(item=>webLink(item.url))})).filter(group=>group.items.length))
-function domain(url:string){try{return new URL(url).hostname.replace(/^www\./,'')}catch{return ''}}
+import { navigationCategories, navigationDomain, navigationGroups, navigationIcon, navigationLogo, navigationMatches, navigationType } from '@/lib/navigationDirectory'
+const route = useRoute(), router = useRouter()
+const { data, loading, error, load } = useCommunityResource(discoverApi.nav)
+const categories = navigationCategories
+const category = computed(() => categories.find(item => item.key === route.query.nav_category) || categories[0]!)
+const selected = computed(() => category.value.key)
+const filter = computed(() => category.value.filters.some(item => item.key === route.query.nav_filter) ? String(route.query.nav_filter) : '')
+const groups = computed(() => data.value ? navigationGroups(data.value, url => !!webLink(url)) : [])
+const allEntries = computed(() => groups.value.flatMap(group => group.items))
+const entries = computed(() => allEntries.value.filter(item => navigationMatches(item, selected.value, filter.value)))
+function selectCategory(key: string) { void router.replace({query:{...route.query, nav_category:key === 'models' ? undefined : key, nav_filter:undefined}}) }
+function selectFilter(key: string) { void router.replace({query:{...route.query, nav_filter:key || undefined}}) }
 onMounted(load)
 </script>
-<template><div class="directory"><RequestState :loading="loading" :error="error" :empty="!!data&&!groups.length" message="还没有已发布导航。" @retry="load"/><template v-if="data"><aside v-if="groups.length" class="directory-index"><span class="index-label">官方入口</span><h2>AI 导航</h2><p>{{ groups.reduce((count,group)=>count+group.items.length,0) }} 个入口 · {{ groups.length }} 个分组</p><nav aria-label="导航分组"><a v-for="(group,index) in groups" :key="group.name" :href="`#directory-group-${index}`"><DiscoverGlyph name="globe" :size="16"/><span>{{ group.name||'常用入口' }}</span><small>{{ group.items.length }}</small></a></nav></aside><div class="nav-groups"><section v-for="(group,index) in groups" :key="group.name" :id="`directory-group-${index}`" class="nav-card"><header><div><h2>{{ group.name||'常用入口' }}</h2><p>{{ group.items.length }} 个官方入口</p></div><DiscoverGlyph name="globe" :size="20"/></header><div class="nav-grid"><a v-for="item in group.items" :key="item.key" :href="webLink(item.url)" target="_blank" rel="noopener noreferrer"><span class="brand-tile"><RankingVendor :name="item.vendor||item.name"/></span><div><span class="name">{{ item.name }}</span><small class="desktop-domain">{{ domain(item.url) }}</small><small v-if="item.sample" class="sample">示例</small></div><DiscoverGlyph name="external" :size="13" class="external"/></a></div></section></div><p v-if="groups.length" class="nav-note"><DiscoverGlyph name="info" :size="14"/>官方入口会在新标签页打开。</p></template></div></template>
+<template>
+  <div class="directory">
+    <CommunityTabs :items="categories" :active="selected" label="AI 导航分类" @change="selectCategory" />
+    <div class="directory-filters" role="group" :aria-label="`${category.label}筛选`">
+      <button type="button" :aria-pressed="!filter" :class="{on:!filter}" @click="selectFilter('')">全部</button>
+      <button v-for="item in category.filters" :key="item.key" type="button" :aria-pressed="filter===item.key" :class="{on:filter===item.key}" @click="selectFilter(item.key)">{{ item.label }}</button>
+    </div>
+    <RequestState :loading="loading" :error="error" :empty="!!data && !entries.length" message="这个分类还没有已发布入口。" @retry="load" />
+    <div v-if="data" class="nav-grid">
+      <a v-for="item in entries" :key="item.key" :href="webLink(item.url)" target="_blank" rel="noopener noreferrer" class="nav-entry" :title="`${item.name} · ${navigationDomain(item.url)}`">
+        <span class="brand-tile" aria-hidden="true"><img v-if="navigationIcon(item)" :src="navigationIcon(item)" alt="" loading="lazy"><RankingVendor v-else :name="navigationLogo(item)" /></span><DiscoverGlyph name="external" :size="13" class="external" />
+        <span class="entry-name">{{ item.name }}<small v-if="item.sample" class="sample">示例</small></span>
+        <span class="entry-vendor">{{ item.vendor || navigationDomain(item.url) }}</span>
+        <span v-if="item.summary" class="entry-summary">{{ item.summary }}</span>
+        <span class="entry-foot"><span class="entry-domain">{{ navigationDomain(item.url) }}</span><span v-if="navigationType(item)" class="entry-type">{{ navigationType(item) }}</span></span>
+      </a>
+    </div>
+    <p v-if="data && entries.length" class="nav-note"><DiscoverGlyph name="external" :size="13" />点击卡片，在新标签页打开官方入口</p>
+  </div>
+</template>
 <style scoped>
-.directory{padding-top:8px;min-width:0}.nav-groups{display:grid;gap:8px;align-items:start}.nav-card{min-width:0;background:var(--surface);border-radius:16px;padding:16px}header{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--ink-3);padding-bottom:12px}h2{margin:0;font-size:16px;line-height:1.5;color:var(--ink);font-weight:600}header p{margin:4px 0 0;font-size:12px;line-height:1.5}.nav-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 12px}a{display:flex;align-items:center;min-height:64px;gap:8px;padding:8px 0;color:var(--ink);border-radius:10px}a:hover{background:var(--surface-2)}a>div{min-width:0;flex:1}.brand-tile{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:10px;background:var(--surface-2)}.brand-tile :deep(.ranking-vendor){width:22px;height:22px;flex-basis:22px}.brand-tile :deep(.letter-icon){font-size:14px;background:none}.name{font-size:14px;font-weight:500;line-height:1.5;overflow-wrap:anywhere}.external{flex:none;color:var(--ink-3);opacity:.6}.sample{display:block;font-size:12px;color:var(--brand);line-height:1.5}.nav-note{display:flex;align-items:center;gap:6px;color:var(--ink-3);font-size:12px;margin:12px 4px}.nav-note svg{flex:none}@media(min-width:768px){.nav-groups{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.nav-card{padding:20px}.nav-grid{gap:8px 12px}}@media(max-width:370px){.nav-grid{column-gap:8px}.brand-tile{width:32px;height:32px}.external{display:none}}
-
-.directory-index,.desktop-domain{display:none}
-@media(min-width:1024px){
-@container page (min-width:960px){
-  .directory{display:grid;grid-template-columns:200px minmax(0,1fr);gap:24px;padding-top:24px;align-items:start}
-  .directory>:deep(.request-state){grid-column:1/-1}
-  .directory-index{display:block;position:sticky;top:calc(var(--header-h,56px) + 24px)}
-  .index-label{font-size:12px;color:var(--ink-3)}
-  .directory-index>h2{font-size:28px;margin-top:8px;letter-spacing:-.02em}
-  .directory-index>p{font-size:12px;line-height:1.7;margin:12px 0 20px;color:var(--ink-3)}
-  .directory-index nav{display:grid;gap:6px}
-  .directory-index nav a{min-height:48px;padding:10px 12px;gap:10px;background:var(--surface);font-size:14px}
-  .directory-index nav a span{flex:1}
-  .directory-index nav a small{font-size:12px;color:var(--ink-3)}
-  .nav-groups{grid-template-columns:minmax(0,1fr);gap:20px}
-  .nav-card{padding:24px 28px;scroll-margin-top:calc(var(--header-h,56px) + 24px)}
-  .nav-card header{padding-bottom:20px}
-  .nav-card h2{font-size:20px}
-  .nav-card header p{font-size:13px}
-  .nav-grid{grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
-  .nav-grid>a{min-height:88px;gap:12px;padding:14px;background:var(--surface-2)}
-  .nav-grid>a:hover{background:color-mix(in srgb,var(--surface-2) 80%,var(--surface))}
-  .brand-tile{width:40px;height:40px;background:var(--surface)}
-  .brand-tile :deep(.ranking-vendor){width:25px;height:25px;flex-basis:25px}
-  .name{font-size:16px}
-  .desktop-domain{display:block;font-size:12px;font-weight:400;line-height:1.5;color:var(--ink-3);overflow-wrap:anywhere;margin-top:5px}
-  .nav-note{grid-column:2;margin:0 4px;font-size:12px}
-}
-}
+.directory{min-width:0;padding:0 12px 8px;container-type:inline-size}
+.directory :deep(.community-tabs){background:none;padding-inline:0;justify-content:flex-start;gap:28px;margin-bottom:20px}
+.directory-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}
+.directory-filters button{min-height:34px;padding:5px 13px;background:var(--surface);color:var(--ink-2);border:1px solid var(--line);border-radius:24px;cursor:pointer;font-size:12px;line-height:1.5}
+.directory-filters button.on{color:var(--brand);border-color:color-mix(in srgb,var(--brand) 24%,var(--line));background:color-mix(in srgb,var(--brand) 6%,var(--surface))}
+.nav-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.nav-entry{position:relative;min-width:0;display:grid;grid-template-columns:36px minmax(0,1fr);align-content:start;column-gap:8px;padding:14px;box-sizing:border-box;background:var(--surface);border:1px solid var(--line);border-radius:12px;color:var(--ink);transition:border-color .15s,background .15s}
+.nav-entry:hover{background:color-mix(in srgb,var(--surface-2) 35%,var(--surface));border-color:var(--line-strong)}
+.nav-entry:focus-visible,.directory-filters button:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+.brand-tile{grid-column:1;grid-row:1/span 2;align-self:center;display:grid;place-items:center;width:36px;height:36px;border-radius:9px;background:var(--surface-2)}
+.brand-tile>img{width:26px;height:26px;object-fit:contain}.brand-tile :deep(.ranking-vendor){width:24px;height:24px;flex-basis:24px}.brand-tile :deep(.letter-icon){font-size:16px;background:none}
+.external{position:absolute;top:12px;right:10px;color:var(--ink-3);opacity:.5}.nav-entry:hover .external{color:var(--brand);opacity:1}
+.entry-name{grid-column:2;padding-right:10px;font-size:14px;line-height:1.5;font-weight:400;min-width:0;overflow-wrap:anywhere}
+.entry-vendor{grid-column:2;font-size:12px;line-height:1.5;color:var(--ink-3);margin-top:2px;overflow-wrap:anywhere}
+.entry-summary{grid-column:1/-1;margin-top:12px;font-size:12px;line-height:1.7;min-height:3.4em;color:var(--ink-2);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.entry-foot{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;min-width:0}
+.entry-domain{display:none;min-width:0;font-size:12px;line-height:1.5;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.entry-type{flex:none;font-size:11px;line-height:1.5;color:var(--ink-3);background:var(--surface-2);border-radius:5px;padding:2px 6px}
+.sample{font-size:11px;font-weight:400;color:var(--brand);margin-left:4px}
+.nav-note{display:flex;align-items:center;gap:6px;color:var(--ink-3);font-size:12px;line-height:1.6;margin:24px 0 0}.nav-note svg{flex:none}
+@container (min-width:600px){.nav-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.entry-domain{display:block}}
+@container (min-width:920px){.nav-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.nav-entry{padding:18px}}
+@media(min-width:1024px){.directory{padding:0 0 8px}}
+@media(max-width:370px){.nav-entry{padding:12px}.directory :deep(.community-tabs){gap:22px}}
+@media(prefers-reduced-motion:reduce){.nav-entry{transition:none}}
 </style>
