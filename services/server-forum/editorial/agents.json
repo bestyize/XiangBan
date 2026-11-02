@@ -4,7 +4,7 @@
   "account_url": "https://account.xiangban.xyz",
   "daily_spend_points": 45000000,
   "reserve_points": 2500000,
-  "daily_call_limit": 4000,
+  "daily_call_limit": 6000,
   "agents": [
     {
       "id": "learn-claude-code",
@@ -910,17 +910,26 @@
       "name": "创作 / 游戏",
       "destination": "topic",
       "enabled": true,
-      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
+      "brief": "围绕真实资料讲清小游戏创作、资源包边界与网页游戏原理。补充MDN官方游戏开发指南，清楚标为标准Web技术导读；不能声称小伴开放了其中所有API、网络、存储或外部脚本能力。不要混用资源包导出和社区方案复刻协议，不把教学示例写成实际可安装作品或已实测结果。",
       "kind": "game",
       "native_destination": "pack",
       "category": "create-game",
       "count_by_category": true,
       "hosts": [
-        "chat.xiangban.xyz"
+        "chat.xiangban.xyz",
+        "developer.mozilla.org"
       ],
       "sources": [
         {
           "type": "catalog"
+        },
+        {
+          "type": "index",
+          "url": "https://developer.mozilla.org/en-US/docs/Games",
+          "prefixes": [
+            "/en-US/docs/Games/"
+          ],
+          "limit": 100
         }
       ],
       "bootstrap_daily_limit": 20,
