@@ -10,7 +10,7 @@
 | [client/xiaoban-multiplatform](client/xiaoban-multiplatform/README.md) | 可运行原型 | Android/iOS 使用 KMP + Compose；包含社区、小伴 AI 与手机桌面互联，桌面壳使用 Rust + Tauri |
 | [services/server-xiaoban](services/server-xiaoban/README.md) | 已实现 | 正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务 |
 | [services/server-xiaoban-market](services/server-xiaoban-market/README.md) | 已实现 | 小伴市场：专家、技能、连接器的自建目录服务，公开网页、下载 / 更新检测 API，以及 SkillHub、魔搭社区的采集工作台；Rust Axum + PostgreSQL + Vue 3 + Vite |
-| [services/server-forum](services/server-forum/README.md) | 一期已实现，已部署 | 超级小伴论坛（chat.xiangban.xyz）：技术交流、资源分享、福利羊毛与闲聊的社区，Rust Axum + PostgreSQL + Vue 3，登录走统一账号中心，带管理后台和 SEO 页面 |
+| [services/server-forum](services/server-forum/README.md) | 一期已实现，已部署 | 超级小伴社区（chat.xiangban.xyz）：发现、讨论与资源，包含学习、创作、休闲和站方资讯；Rust Axum + PostgreSQL + Vue 3，登录走统一账号中心，带管理后台和 SEO 页面 |
 | [services/server-ai](services/server-ai/README.md) | 一期已实现，部署状态待核实 | AI 网关与额度系统：账号中心验签，经 New API 调用上游模型；按「账号 × 产品」隔离的试用、月卡与加油包额度，档位对用户隐藏真实模型；Rust Axum + PostgreSQL + Vue 3 管理后台。设计见 [docs/architecture/ai-gateway.md](docs/architecture/ai-gateway.md) |
 | [services/server-account](services/server-account/README.md) | 已实现 | 统一账号中心与管理后台，邮箱/手机号验证码验证身份、用户名与密码登录，Rust Axum + PostgreSQL + Vue 3，签发 EdDSA JWT；壁纸网站等客户端已接入 |
 | [libs/agent-kernel](libs/agent-kernel/README.md) | 0.3.0，已接入小伴桌面 | 跨产品复用的 Rust Agent 内核：宿主注入模型、工具与存储，支持三种模型协议、权限、文件、网页、Shell、skills、子 Agent、MCP 与 stdio；可选运行日志与受管进程，不含产品逻辑 |

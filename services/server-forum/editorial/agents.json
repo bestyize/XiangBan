@@ -1,0 +1,689 @@
+{
+  "forum_url": "https://chat.xiangban.xyz",
+  "ai_url": "https://ai.xiangban.xyz",
+  "account_url": "https://account.xiangban.xyz",
+  "daily_spend_points": 2500000,
+  "reserve_points": 1000000,
+  "daily_call_limit": 240,
+  "agents": [
+    {
+      "id": "learn-claude-code",
+      "name": "学习和教程 / Claude Code",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "从官方使用说明提炼具体使用场景、操作和限制，保留未实测说明。",
+      "category": "tech-productivity",
+      "tags": [
+        "Claude-Code"
+      ],
+      "hosts": [
+        "code.claude.com"
+      ],
+      "sources": [
+        {
+          "type": "page",
+          "title": "Claude Code memory",
+          "url": "https://code.claude.com/docs/en/memory"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code permissions",
+          "url": "https://code.claude.com/docs/en/permissions"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code common workflows",
+          "url": "https://code.claude.com/docs/en/common-workflows"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — overview",
+          "url": "https://code.claude.com/docs/en/overview"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — quickstart",
+          "url": "https://code.claude.com/docs/en/quickstart"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — best-practices",
+          "url": "https://code.claude.com/docs/en/best-practices"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — settings",
+          "url": "https://code.claude.com/docs/en/settings"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — hooks",
+          "url": "https://code.claude.com/docs/en/hooks"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — hooks-guide",
+          "url": "https://code.claude.com/docs/en/hooks-guide"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — skills",
+          "url": "https://code.claude.com/docs/en/skills"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — sub-agents",
+          "url": "https://code.claude.com/docs/en/sub-agents"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — mcp",
+          "url": "https://code.claude.com/docs/en/mcp"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — plugins",
+          "url": "https://code.claude.com/docs/en/plugins"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — plugin-marketplaces",
+          "url": "https://code.claude.com/docs/en/plugin-marketplaces"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — output-styles",
+          "url": "https://code.claude.com/docs/en/output-styles"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — checkpointing",
+          "url": "https://code.claude.com/docs/en/checkpointing"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — headless",
+          "url": "https://code.claude.com/docs/en/headless"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — interactive-mode",
+          "url": "https://code.claude.com/docs/en/interactive-mode"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — keybindings",
+          "url": "https://code.claude.com/docs/en/keybindings"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — model-config",
+          "url": "https://code.claude.com/docs/en/model-config"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — costs",
+          "url": "https://code.claude.com/docs/en/costs"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — security",
+          "url": "https://code.claude.com/docs/en/security"
+        },
+        {
+          "type": "page",
+          "title": "Claude Code — sandboxing",
+          "url": "https://code.claude.com/docs/en/sandboxing"
+        }
+      ],
+      "daily_limit": 2,
+      "bootstrap_daily_limit": 20
+    },
+    {
+      "id": "learn-codex",
+      "name": "学习和教程 / Codex",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "依据官方文档写清功能边界，不比较没有依据的能力。",
+      "category": "tech-productivity",
+      "tags": [
+        "Codex"
+      ],
+      "hosts": [
+        "learn.chatgpt.com",
+        "developers.openai.com"
+      ],
+      "sources": [
+        {
+          "type": "page",
+          "title": "Build skills — OpenAI official documentation",
+          "url": "https://learn.chatgpt.com/docs/build-skills.md"
+        },
+        {
+          "type": "page",
+          "title": "Scheduled tasks — OpenAI official documentation",
+          "url": "https://learn.chatgpt.com/docs/automations.md"
+        }
+      ],
+      "daily_limit": 2,
+      "bootstrap_daily_limit": 20
+    },
+    {
+      "id": "learn-prompts",
+      "name": "学习和教程 / 提示词",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "给出可复用的提示编写方法，示例标为示例，不编造测试结果。",
+      "category": "tech-creative",
+      "tags": [
+        "提示词"
+      ],
+      "hosts": [
+        "docs.anthropic.com",
+        "platform.claude.com",
+        "github.com",
+        "raw.githubusercontent.com"
+      ],
+      "sources": [
+        {
+          "type": "page",
+          "title": "Anthropic's Interactive Prompt Engineering Tutorial",
+          "url": "https://github.com/anthropics/prompt-eng-interactive-tutorial"
+        },
+        {
+          "type": "page",
+          "title": "Claude Cookbooks: prompting and evaluation recipes",
+          "url": "https://github.com/anthropics/claude-cookbooks"
+        }
+      ],
+      "daily_limit": 2,
+      "bootstrap_daily_limit": 20
+    },
+    {
+      "id": "learn-workflows",
+      "name": "学习和教程 / 工作流",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "分析编码与协作流程的具体改变、使用条件和验证办法。",
+      "category": "tech-productivity",
+      "tags": [
+        "工作流"
+      ],
+      "hosts": [
+        "github.blog",
+        "docs.github.com"
+      ],
+      "sources": [
+        {
+          "type": "feed",
+          "url": "https://github.blog/changelog/feed/",
+          "keywords": [
+            "Copilot",
+            "agent",
+            "workflow"
+          ]
+        },
+        {
+          "type": "page",
+          "title": "GitHub Copilot coding agent",
+          "url": "https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent"
+        }
+      ],
+      "daily_limit": 2,
+      "bootstrap_daily_limit": 20
+    },
+    {
+      "id": "learn-local",
+      "name": "学习和教程 / 本地部署",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "以官方运行说明为准，区分硬件、模型、上下文与系统限制，不编造亲测。",
+      "category": "tech-llm",
+      "tags": [
+        "本地部署"
+      ],
+      "hosts": [
+        "docs.ollama.com"
+      ],
+      "sources": [
+        {
+          "type": "page",
+          "title": "Ollama FAQ",
+          "url": "https://docs.ollama.com/faq"
+        },
+        {
+          "type": "page",
+          "title": "Ollama GPU support",
+          "url": "https://docs.ollama.com/gpu"
+        },
+        {
+          "type": "page",
+          "title": "Ollama context length",
+          "url": "https://docs.ollama.com/context-length"
+        },
+        {
+          "type": "page",
+          "title": "Ollama model import",
+          "url": "https://docs.ollama.com/import"
+        }
+      ],
+      "daily_limit": 2,
+      "bootstrap_daily_limit": 20
+    },
+    {
+      "id": "learn-hardware",
+      "name": "学习和教程 / AI 硬件",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "解释硬件技术与适用条件，厂商数据必须注明来源，不作购买建议。",
+      "category": "tech-hardware",
+      "tags": [
+        "AI-硬件"
+      ],
+      "hosts": [
+        "developer.nvidia.com"
+      ],
+      "sources": [
+        {
+          "type": "page",
+          "title": "NVIDIA Jetson software",
+          "url": "https://developer.nvidia.com/embedded/jetpack"
+        },
+        {
+          "type": "page",
+          "title": "NVIDIA CUDA platform",
+          "url": "https://developer.nvidia.com/cuda-zone"
+        }
+      ],
+      "daily_limit": 2,
+      "bootstrap_daily_limit": 20
+    },
+    {
+      "id": "casual-work",
+      "name": "休闲 / 职场",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-work",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "casual-offwork",
+      "name": "休闲 / 下班了",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-offwork",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "casual-loss",
+      "name": "休闲 / 亏了吗",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-loss",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "casual-dream",
+      "name": "休闲 / 梦想和人生",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-dream",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "casual-gear",
+      "name": "休闲 / 数码装备",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-gear",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "casual-indie",
+      "name": "休闲 / 副业与独立开发",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-indie",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "casual-fun",
+      "name": "休闲 / 吃喝玩乐",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-fun",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "casual-media",
+      "name": "休闲 / 片单乐评",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-media",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "casual-think",
+      "name": "休闲 / 哲思",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-think",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "casual-help",
+      "name": "休闲 / 互助",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-help",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "casual-chat",
+      "name": "休闲 / 闲聊灌水",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "casual-chat",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+    },
+    {
+      "id": "create-effect",
+      "name": "创作 / 特效",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "effect",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-wallpaper",
+      "name": "创作 / 壁纸",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "wallpaper",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-widget",
+      "name": "创作 / 组件",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "widget",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-game",
+      "name": "创作 / 游戏",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "game",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-reminder",
+      "name": "创作 / 提醒",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "reminder",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-routine",
+      "name": "创作 / 例行",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "routine",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-task",
+      "name": "创作 / 任务",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "task",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-goal",
+      "name": "创作 / 目标",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "goal",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-skill",
+      "name": "创作 / 技能",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "skill",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-expert",
+      "name": "创作 / 专家",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "expert",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-workflow",
+      "name": "创作 / 工作流",
+      "destination": "pack",
+      "enabled": false,
+      "brief": "",
+      "kind": "workflow",
+      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+    },
+    {
+      "id": "create-schemes",
+      "name": "创作 / 方案",
+      "destination": "scheme",
+      "enabled": false,
+      "brief": "",
+      "note": "需组合真实已发布作品，不生成失效引用。"
+    },
+    {
+      "id": "discover-frontier",
+      "name": "发现 / 小伴前沿",
+      "destination": "frontier",
+      "enabled": true,
+      "brief": "围绕有官方原始资料的 AI 技术和产品进展，说明事实、用途和限制；已发生的事件按原始时间叙述，不制造热度和个人体验。",
+      "hosts": [
+        "developer.nvidia.com"
+      ],
+      "sources": [
+        {
+          "type": "feed",
+          "url": "https://developer.nvidia.com/blog/feed/",
+          "keywords": [
+            "AI",
+            "model",
+            "agent",
+            "inference"
+          ],
+          "max_age_days": 30,
+          "require_date": true
+        }
+      ],
+      "daily_limit": 2,
+      "bootstrap_daily_limit": 20
+    },
+    {
+      "id": "discover-daily",
+      "name": "发现 / AI 日报",
+      "destination": "news",
+      "enabled": false,
+      "brief": "",
+      "note": "待接入日报文章发布；不计排行榜。"
+    },
+    {
+      "id": "resource-tools",
+      "name": "资源 / AI 工具",
+      "destination": "tool",
+      "enabled": false,
+      "brief": "",
+      "note": "工具目录使用独立结构，需核实官网、版本、许可、平台及封面。"
+    },
+    {
+      "id": "resource-docs",
+      "name": "资源 / 资料",
+      "destination": "doc",
+      "enabled": false,
+      "brief": "",
+      "note": "官方资料索引，需核实原文链接，不冒充站内文章。"
+    },
+    {
+      "id": "resource-movies",
+      "name": "资源 / 影视",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "share-movies",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置真实来源。求助须有真实请求，不用站方指南制造悬赏。"
+    },
+    {
+      "id": "resource-music",
+      "name": "资源 / 音乐",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "share-music",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置真实来源。求助须有真实请求，不用站方指南制造悬赏。"
+    },
+    {
+      "id": "resource-help",
+      "name": "资源 / 求助悬赏",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "share-help",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置真实来源。求助须有真实请求，不用站方指南制造悬赏。"
+    },
+    {
+      "id": "resource-open",
+      "name": "资源 / 开源精选",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "share-software",
+      "tags": [
+        "开源"
+      ],
+      "hosts": [],
+      "sources": [],
+      "note": "待配置真实来源。求助须有真实请求，不用站方指南制造悬赏。"
+    },
+    {
+      "id": "site-notice",
+      "name": "站务 / 公告",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "site-notice",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "只依据实际站方规则、版本和已发生事件；不虚构决定、反馈及处置。"
+    },
+    {
+      "id": "site-rules",
+      "name": "站务 / 规则",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "site-rules",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "只依据实际站方规则、版本和已发生事件；不虚构决定、反馈及处置。"
+    },
+    {
+      "id": "site-feedback",
+      "name": "站务 / 建议反馈",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "site-feedback",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "只依据实际站方规则、版本和已发生事件；不虚构决定、反馈及处置。"
+    },
+    {
+      "id": "site-reports",
+      "name": "站务 / 举报处理公示",
+      "destination": "topic",
+      "enabled": false,
+      "brief": "",
+      "category": "site-reports",
+      "tags": [],
+      "hosts": [],
+      "sources": [],
+      "note": "只依据实际站方规则、版本和已发生事件；不虚构决定、反馈及处置。"
+    }
+  ]
+}

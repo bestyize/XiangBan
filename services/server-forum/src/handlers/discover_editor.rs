@@ -1,4 +1,4 @@
-//! 发现页编辑副本、人工终审、定时发布与仅能写草稿的采集令牌。
+//! 发现页编辑副本、人工终审、定时发布与默认仅写草稿的采集令牌。
 use super::admin::{audit, AuthAdmin};
 use crate::{
     discover,
@@ -18,6 +18,7 @@ use serde_json::{json, Value};
 use sqlx::{PgConnection, PgPool};
 use std::collections::HashSet;
 use uuid::Uuid;
+use base64::Engine;
 
 pub fn admin_routes() -> Router<AppState> {
     Router::new().nest(
@@ -32,13 +33,38 @@ pub fn admin_routes() -> Router<AppState> {
     )
 }
 
-/// 可供本地采集工具调用；审查、发布、删除、凭据管理始终要求管理员。
+/// 采集工具默认只写草稿；前沿自动发布需要管理员单独授予 publish_kinds。
 pub fn editor_routes() -> Router<AppState> {
     Router::new()
+        .route("/frontier/{key}/assets", post(upload_frontier_asset).layer(axum::extract::DefaultBodyLimit::max(7 * 1024 * 1024)))
         .route("/drafts", get(list))
         .route("/drafts/import", post(import))
         .route("/drafts/{kind}/{key}", get(detail).put(save))
+        .route("/drafts/{kind}/{key}/publish", post(publish_scoped))
         .route("/preview/{kind}", put(preview))
+}
+
+#[derive(Deserialize)]
+struct FrontierAssetInput { data_base64: String }
+
+async fn upload_frontier_asset(State(s): State<AppState>, e: Editor, Path(key): Path<String>, Json(input): Json<FrontierAssetInput>) -> AppResult<Json<Value>> {
+    e.check("frontier")?;
+    if !discover::valid_key(&key) { return Err(AppError::BadRequest("无效文章标识".into())); }
+    let bytes = base64::engine::general_purpose::STANDARD.decode(&input.data_base64)
+        .map_err(|_| AppError::BadRequest("图片编码错误".into()))?;
+    if bytes.is_empty() || bytes.len() > s.config.upload_limit_image as usize { return Err(AppError::BadRequest("图片大小超出限制".into())); }
+    let mime = super::images::sniff(&bytes).ok_or_else(|| AppError::BadRequest("图片格式不支持".into()))?;
+    let id = Uuid::new_v4();
+    let mut tx = s.pool.begin().await?;
+    lock(&mut tx, "frontier", &key).await?;
+    let (count,): (i64,) = sqlx::query_as("SELECT count(*) FROM frontier_assets WHERE article_key=$1")
+        .bind(&key).fetch_one(&mut *tx).await?;
+    if count >= 20 { return Err(AppError::BadRequest("每篇文章最多上传 20 张图片".into())); }
+    sqlx::query("INSERT INTO frontier_assets(id,article_key,mime,data) VALUES($1,$2,$3,$4)")
+        .bind(id).bind(&key).bind(mime).bind(bytes).execute(&mut *tx).await?;
+    log(&mut tx, &e.operator, "frontier.asset.upload", "frontier", &key, &format!("asset={id}")).await?;
+    tx.commit().await?;
+    Ok(Json(json!({"id":id,"path":format!("/api/discover/frontier-assets/{id}")})))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -50,6 +76,7 @@ struct Claims {
 
 pub struct Editor {
     kinds: Vec<String>,
+    publish_kinds: Vec<String>,
     operator: String,
     admin: bool,
 }
@@ -83,13 +110,13 @@ impl FromRequestParts<AppState> for Editor {
             &DecodingKey::from_secret(&s.config.admin_jwt_secret),
             &validation,
         ) {
-            let kinds: Option<(Vec<String>,)> = sqlx::query_as("SELECT kinds FROM discover_tokens WHERE id=$1 AND revoked_at IS NULL AND expires_at>now()")
+            let kinds: Option<(Vec<String>, Vec<String>)> = sqlx::query_as("SELECT kinds,publish_kinds FROM discover_tokens WHERE id=$1 AND revoked_at IS NULL AND expires_at>now()")
                 .bind(token.claims.sub).fetch_optional(&s.pool).await?;
-            let kinds = kinds
-                .ok_or_else(|| AppError::Unauthorized("采集令牌已过期或被撤销".into()))?
-                .0;
+            let (kinds, publish_kinds) = kinds
+                .ok_or_else(|| AppError::Unauthorized("采集令牌已过期或被撤销".into()))?;
             return Ok(Self {
                 kinds,
+                publish_kinds,
                 operator: format!("discover-editor:{}", token.claims.sub),
                 admin: false,
             });
@@ -97,6 +124,7 @@ impl FromRequestParts<AppState> for Editor {
         let AuthAdmin(admin) = AuthAdmin::from_request_parts(parts, s).await?;
         Ok(Self {
             kinds: discover::KINDS.iter().map(|k| k.to_string()).collect(),
+            publish_kinds: vec!["frontier".into()],
             operator: admin.username,
             admin: true,
         })
@@ -521,6 +549,50 @@ async fn review(
         json!({"status":if after.is_some(){"scheduled"}else{"published"}}),
     ))
 }
+
+/// Opt-in automation endpoint. Draft-only tokens cannot reach the publish transition.
+/// Scope, revision, live baseline, article length and same-article cover are checked in one transaction.
+async fn publish_scoped(
+    State(s): State<AppState>, e: Editor,
+    Path((kind, key)): Path<(String, String)>, Json(input): Json<RevisionInput>,
+) -> AppResult<Json<Value>> {
+    e.check(&kind)?;
+    if kind != "frontier" || !e.publish_kinds.contains(&kind) {
+        return Err(AppError::Forbidden("令牌没有此栏目的自动发布权限".into()));
+    }
+    let mut tx = s.pool.begin().await?;
+    lock(&mut tx, &kind, &key).await?;
+    let mut d = read(&mut tx, &kind, &key).await?;
+    check_revision(&d, input.expected_revision)?;
+    if d.status == "published" {
+        return Ok(Json(json!({"status":"published","already_published":true})));
+    }
+    if d.status != "draft" || d.published_at.is_some() || d.source_url.is_empty()
+        || d.source_name.is_empty() || d.data["sample"].as_bool().unwrap_or(false)
+        || d.data["body"].as_str().map_or(0, |body| body.chars().count()) < 1200 {
+        return Err(AppError::BadRequest("自动发布需要完整真实来源、至少1200字的待审正文，并使用实际发布时间".into()));
+    }
+    let cover = d.data["cover_url"].as_str().unwrap_or_default();
+    let relative = "/api/discover/frontier-assets/";
+    let absolute = format!("{}{}", s.config.public_url.trim_end_matches('/'), relative);
+    let asset = cover.strip_prefix(&absolute).or_else(|| cover.strip_prefix(relative))
+        .and_then(|id| Uuid::parse_str(id).ok())
+        .ok_or_else(|| AppError::BadRequest("自动发布封面必须为本篇已上传的站内图片".into()))?;
+    let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM frontier_assets WHERE id=$1 AND article_key=$2)")
+        .bind(asset).bind(&key).fetch_one(&mut *tx).await?;
+    if !exists {
+        return Err(AppError::BadRequest("封面不属于这篇文章".into()));
+    }
+    check_base(&mut tx, &d).await?;
+    let operator = format!("automation:{}", e.operator);
+    sqlx::query("UPDATE discover_drafts SET reviewed_by=$3,reviewed_at=now(),status='published',publish_after=NULL,updated_at=clock_timestamp() WHERE kind=$1 AND key=$2")
+        .bind(&kind).bind(&key).bind(&operator).execute(&mut *tx).await?;
+    d = read(&mut tx, &kind, &key).await?;
+    publish(&mut tx, &d, &operator).await?;
+    log(&mut tx, &operator, "discover.auto_publish", &kind, &key, &format!("checked_revision={}", input.expected_revision)).await?;
+    tx.commit().await?;
+    Ok(Json(json!({"status":"published","already_published":false})))
+}
 async fn cancel(
     State(s): State<AppState>,
     AuthAdmin(a): AuthAdmin,
@@ -622,6 +694,8 @@ struct TokenInput {
     name: String,
     kinds: Vec<String>,
     days: i64,
+    #[serde(default)]
+    publish_kinds: Vec<String>,
 }
 async fn create_token(
     State(s): State<AppState>,
@@ -641,6 +715,11 @@ async fn create_token(
     }
     i.kinds.sort();
     i.kinds.dedup();
+    i.publish_kinds.sort();
+    i.publish_kinds.dedup();
+    if i.publish_kinds.iter().any(|kind| kind != "frontier" || !i.kinds.contains(kind)) {
+        return Err(AppError::BadRequest("自动发布仅支持已授予草稿权限的 frontier 类型".into()));
+    }
     let id = Uuid::new_v4();
     let expires_at = Utc::now() + Duration::days(i.days);
     let token = encode(
@@ -654,11 +733,12 @@ async fn create_token(
     )
     .map_err(|e| AppError::Internal(e.to_string()))?;
     let mut tx = s.pool.begin().await?;
-    sqlx::query("INSERT INTO discover_tokens(id,name,kinds,expires_at) VALUES($1,$2,$3,$4)")
+    sqlx::query("INSERT INTO discover_tokens(id,name,kinds,expires_at,publish_kinds) VALUES($1,$2,$3,$4,$5)")
         .bind(id)
         .bind(&i.name)
         .bind(&i.kinds)
         .bind(expires_at)
+        .bind(&i.publish_kinds)
         .execute(&mut *tx)
         .await?;
     audit(
@@ -667,16 +747,16 @@ async fn create_token(
         "discover.token.create",
         "discover_token",
         id,
-        i.kinds.join(","),
+        format!("drafts={}; auto_publish={}", i.kinds.join(","), i.publish_kinds.join(",")),
     )
     .await?;
     tx.commit().await?;
     Ok(Json(json!({"id":id,"token":token,"expires_at":expires_at})))
 }
 async fn tokens(State(s): State<AppState>, _: AuthAdmin) -> AppResult<Json<Value>> {
-    let rows: Vec<(Uuid,String,Vec<String>,DateTime<Utc>,Option<DateTime<Utc>>)> = sqlx::query_as("SELECT id,name,kinds,expires_at,revoked_at FROM discover_tokens ORDER BY created_at DESC LIMIT 100").fetch_all(&s.pool).await?;
+    let rows: Vec<(Uuid,String,Vec<String>,DateTime<Utc>,Option<DateTime<Utc>>,Vec<String>)> = sqlx::query_as("SELECT id,name,kinds,expires_at,revoked_at,publish_kinds FROM discover_tokens ORDER BY created_at DESC LIMIT 100").fetch_all(&s.pool).await?;
     Ok(Json(
-        json!({"items":rows.into_iter().map(|(id,name,kinds,expires_at,revoked_at)|json!({"id":id,"name":name,"kinds":kinds,"expires_at":expires_at,"revoked_at":revoked_at})).collect::<Vec<_>>()}),
+        json!({"items":rows.into_iter().map(|(id,name,kinds,expires_at,revoked_at,publish_kinds)|json!({"id":id,"name":name,"kinds":kinds,"publish_kinds":publish_kinds,"expires_at":expires_at,"revoked_at":revoked_at})).collect::<Vec<_>>()}),
     ))
 }
 async fn revoke_token(
@@ -750,6 +830,7 @@ async fn store_collected_batch(
     let operator = format!("collector:{source}");
     let e = Editor {
         kinds: discover::KINDS.iter().map(|s| s.to_string()).collect(),
+        publish_kinds: vec![],
         operator: operator.clone(),
         admin: false,
     };

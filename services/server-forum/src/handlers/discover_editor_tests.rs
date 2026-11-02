@@ -665,3 +665,56 @@ async fn discover_workflow_future_content_dates_stay_private_in_lists_counts_and
     assert_eq!(hot["items"], json!([]));
     h.finish().await
 }
+
+#[tokio::test]
+async fn frontier_asset_stays_private_until_reviewed_publication() -> Result<(), Box<dyn std::error::Error>> {
+    let Some(h) = harness().await? else { return Ok(()); };
+    let (status, asset) = call(&h.app, "POST", "/api/discover-editor/frontier/sample/assets", Some(&h.admin_t),
+        json!({"data_base64":"iVBORw0KGgphYmM="})).await;
+    assert_eq!(status, StatusCode::OK, "{asset}");
+    let path = asset["path"].as_str().unwrap();
+    assert_eq!(call(&h.app, "GET", path, None, Value::Null).await.0, StatusCode::NOT_FOUND);
+    let (status, draft) = call(&h.app, "PUT", "/api/admin/discover-workflow/drafts/frontier/sample", Some(&h.admin_t),
+        json!({"expected_revision":0,"data":{"title":"测试","source":"官方","url":"https://example.com/a","cover_url":format!("https://example.com{path}"),"body":"正文"}})).await;
+    assert_eq!(status, StatusCode::OK, "{draft}");
+    assert_eq!(call(&h.app, "GET", path, None, Value::Null).await.0, StatusCode::NOT_FOUND);
+    let (status, result) = call(&h.app, "POST", "/api/admin/discover-workflow/drafts/frontier/sample/review", Some(&h.admin_t),
+        json!({"expected_revision":draft["revision"]})).await;
+    assert_eq!(status, StatusCode::OK, "{result}");
+    assert_eq!(call(&h.app, "GET", path, None, Value::Null).await.0, StatusCode::OK);
+    // Existing collectors stay draft-only. Automation requires an explicit type grant.
+    let (status, readonly) = call(&h.app, "POST", "/api/admin/discover-workflow/tokens", Some(&h.admin_t),
+        json!({"name":"draft only","kinds":["frontier"],"days":1})).await;
+    assert_eq!(status, StatusCode::OK, "{readonly}");
+    let (status, publisher) = call(&h.app, "POST", "/api/admin/discover-workflow/tokens", Some(&h.admin_t),
+        json!({"name":"automatic frontier","kinds":["frontier"],"publish_kinds":["frontier"],"days":1})).await;
+    assert_eq!(status, StatusCode::OK, "{publisher}");
+    let automatic = publisher["token"].as_str().unwrap();
+    let (status, own_asset) = call(&h.app, "POST", "/api/discover-editor/frontier/automatic/assets", Some(automatic),
+        json!({"data_base64":"iVBORw0KGgphYmM="})).await;
+    assert_eq!(status, StatusCode::OK);
+    let own_path = own_asset["path"].as_str().unwrap();
+    let mut input = json!({"expected_revision":0,"source_name":"官方资料","source_url":"https://example.com/a",
+        "data":{"title":"自动采编测试","source":"官方","url":"https://example.com/a","cover_url":format!("{}{path}", h.state.config.public_url),"body":"正文资料".repeat(400)}});
+    let (status, saved) = call(&h.app, "PUT", "/api/discover-editor/drafts/frontier/automatic", Some(automatic), input.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{saved}");
+    let revision = saved["revision"].as_i64().unwrap();
+    let publish_path = "/api/discover-editor/drafts/frontier/automatic/publish";
+    assert_eq!(call(&h.app, "POST", publish_path, readonly["token"].as_str(), json!({"expected_revision":revision})).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(call(&h.app, "POST", publish_path, Some(automatic), json!({"expected_revision":revision})).await.0, StatusCode::BAD_REQUEST, "cannot use another article's cover");
+    input["data"]["cover_url"] = json!(format!("{}{own_path}", h.state.config.public_url));
+    input["expected_revision"] = json!(revision);
+    let (status, saved) = call(&h.app, "PUT", "/api/discover-editor/drafts/frontier/automatic", Some(automatic), input).await;
+    assert_eq!(status, StatusCode::OK, "{saved}");
+    assert_eq!(call(&h.app, "POST", publish_path, Some(automatic), json!({"expected_revision":revision})).await.0, StatusCode::CONFLICT);
+    let checked = json!({"expected_revision":saved["revision"]});
+    assert_eq!(call(&h.app, "GET", own_path, None, Value::Null).await.0, StatusCode::NOT_FOUND);
+    let (status, published) = call(&h.app, "POST", publish_path, Some(automatic), checked.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{published}");
+    assert_eq!(call(&h.app, "POST", publish_path, Some(automatic), checked.clone()).await.0, StatusCode::OK);
+    assert_eq!(call(&h.app, "GET", own_path, None, Value::Null).await.0, StatusCode::OK);
+    assert_eq!(call(&h.app, "POST", "/api/discover-editor/drafts/news/automatic/publish", Some(automatic), checked.clone()).await.0, StatusCode::FORBIDDEN);
+    assert_eq!(call(&h.app, "DELETE", &format!("/api/admin/discover-workflow/tokens/{}", publisher["id"].as_str().unwrap()), Some(&h.admin_t), Value::Null).await.0, StatusCode::OK);
+    assert_eq!(call(&h.app, "POST", publish_path, Some(automatic), checked).await.0, StatusCode::UNAUTHORIZED);
+    h.finish().await
+}

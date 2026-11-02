@@ -16,6 +16,7 @@ import PagerNav from '@/components/PagerNav.vue'
 import { useCommunityResource } from '@/components/community/resource'
 import { webLink } from '@/components/community/contract'
 import { useHead } from '@/lib/head'
+import { RESOURCE_TABS, resourceTopicCategory } from '@/lib/communityStructure'
 import '@/components/community/community.css'
 const route = useRoute(), router = useRouter()
 const brokenIcons = ref<string[]>([])
@@ -26,7 +27,7 @@ function knownBrand(value:string) {
 }
 function toolBrand(tool:ToolSummary) { return knownBrand(tool.name) ? tool.name : tool.developer && knownBrand(tool.developer) ? tool.developer : tool.name }
 
-const tabs = [{ key:'tools',label:'AI 工具' }, { key:'docs',label:'资料' }, { key:'media',label:'影音娱乐' }, { key:'help',label:'求助悬赏' }, { key:'open',label:'开源精选' }]
+const tabs = RESOURCE_TABS
 const tab = computed(() => tabs.some(t => t.key === route.query.tab) ? String(route.query.tab) : 'tools')
 const sectionTitle = computed(() => tabs.find(item => item.key === tab.value)?.label || '资源')
 const sectionIntro = computed(() => ({ tools:'发现适合自己的 AI 工具', docs:'查阅官方文档和学习资料', media:'分享片单、影评和乐评', help:'提出问题，也帮助他人', open:'发现开源软件与免费素材' }[tab.value] || ''))
@@ -37,7 +38,7 @@ const { data, loading, error, load } = useCommunityResource<ResourceData>(async 
   if (tab.value === 'tools') return { kind:'tools', ...(await discoverApi.tools()) }
   if (tab.value === 'docs') return { kind:'docs', ...(await discoverApi.docs()) }
   const help_status = tab.value === 'help' && ['open','solved','bounty'].includes(filter.value) ? filter.value as 'open'|'solved'|'bounty' : undefined
-  const category = tab.value === 'media' ? filter.value === 'music' ? 'share-music' : filter.value === 'movies' ? 'share-movies' : 'share-movies,share-music' : tab.value === 'help' ? 'share-help' : 'share-software'
+  const category = resourceTopicCategory(tab.value, filter.value)
   return { kind:'topics', result: await api.topics({ category, tag:tab.value === 'open' ? '开源' : undefined, help_status, page:page.value, sort:'new' }) }
 })
 const filters = computed(() => tab.value === 'help' ? [{key:'',label:'全部'},{key:'open',label:'进行中'},{key:'solved',label:'已采纳'},{key:'bounty',label:'有悬赏'}] : [{key:'',label:'全部'},{key:'movies',label:'影视'},{key:'music',label:'音乐'}])

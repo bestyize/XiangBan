@@ -193,6 +193,25 @@ async fn scoped_workflow_is_private_idempotent_and_revocable(
         .bind(token_id)
         .execute(&pool)
         .await?;
+    let stale_publish = Request::builder()
+        .method("POST")
+        .uri(&publish_path)
+        .header("authorization", format!("Bearer {token}"))
+        .header("if-match", "\"2000-01-01T00:00:00Z\"")
+        .body(Body::empty())?;
+    let response = app.clone().oneshot(stale_publish).await?;
+    assert_eq!(response.status(), StatusCode::CONFLICT);
+    let (unpublished,): (bool,) = sqlx::query_as("SELECT topic_id IS NULL FROM editor_drafts WHERE id=$1")
+        .bind(Uuid::parse_str(id)?).fetch_one(&pool).await?;
+    assert!(unpublished, "stale review must not publish a newer draft");
+    let mut no_cover = input.clone();
+    no_cover["external_id"] = json!("test-without-cover");
+    no_cover["body"] = json!("没有图片的文章不应进入公开列表。");
+    no_cover["images"] = json!([]);
+    let (status, draft_without_cover) = call(app.clone(), "POST", "/api/editor/drafts", Some(&token), no_cover).await;
+    assert_eq!(status, StatusCode::OK, "{draft_without_cover}");
+    let (status, _) = call(app.clone(), "POST", &format!("/api/editor/drafts/{}/publish", draft_without_cover["id"].as_str().unwrap()), Some(&token), Value::Null).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
     let (status, published) = call(
         app.clone(),
         "POST",
@@ -202,6 +221,14 @@ async fn scoped_workflow_is_private_idempotent_and_revocable(
     )
     .await;
     assert_eq!(status, StatusCode::OK, "{published}");
+    let (images,): (Vec<String>,) = sqlx::query_as("SELECT images FROM topics WHERE id=$1")
+        .bind(published["id"].as_i64().unwrap()).fetch_one(&pool).await?;
+    assert_eq!(images, vec![format!("/api/images/{image}")]);
+    sqlx::query("UPDATE topics SET images='{}' WHERE id=$1").bind(published["id"].as_i64().unwrap()).execute(&pool).await?;
+    crate::discover::backfill_editor_topic_images(&pool).await?;
+    let (restored,): (Vec<String>,) = sqlx::query_as("SELECT images FROM topics WHERE id=$1")
+        .bind(published["id"].as_i64().unwrap()).fetch_one(&pool).await?;
+    assert_eq!(restored, images);
     let (_, again) = call(
         app.clone(),
         "POST",

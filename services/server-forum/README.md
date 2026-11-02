@@ -1,6 +1,8 @@
 # server-forum：超级小伴论坛
 
-状态：一期（网页版）已实现，2026-10-11 部署在香港机 chat.xiangban.xyz。面向开发者和 AI 用户的社区：技术交流、资源分享、随便唠唠和站务板块。站点名「超级小伴」，计划域名 `chat.xiangban.xyz`。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
+状态：一期（网页版）已实现并部署。超级小伴社区 `chat.xiangban.xyz` 当前网页以发现、讨论和资源组织内容；讨论包含创作、学习和教程、休闲，资源包含 AI 工具、资料、影音娱乐、求助悬赏、开源精选。下文的「技术交流、资源分享、随便唠唠、站务」描述的是保留的后端帖子分类，不应直接当作当前网页栏目。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
+
+网页栏目与内容来源的映射集中在 [`web/src/lib/communityStructure.ts`](web/src/lib/communityStructure.ts)：学习和教程聚合旧技术及学习资料分类并按标签筛选；休闲按后端 `casual-*` 分类筛选；创作读取作品包和方案；资源的工具、资料读取发现页目录，影音、求助、开源精选读取既有帖子分类。小伴前沿和日报是发现页文章，不是论坛帖子。上述底层标识继续保留以兼容历史帖子和客户端，不能仅按页面名称删除或迁移。
 
 技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），前端 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。登录走[统一账号中心](../server-account/README.md)，本站不存密码，用 JWKS 公钥离线验签。默认端口 55010。
 
@@ -62,6 +64,8 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 | `FORUM_DAILY_PACK_PUBLISHES` | 5 | 普通用户每天最多发布（含已申请凭证未使用）的内容包数 |
 
 ## 页面与接口
+
+「小伴前沿」提供 `/frontier` 列表和详情、首页已发布文章入口、发现页 `frontier` 草稿类型与隔离的评论表，沿用发现页人工审核发布。`POST /api/discover-editor/frontier/{key}/assets` 使用允许 `frontier` 的采集令牌接收 JSON `data_base64`，限制每图 5 MiB、每篇 20 张；存入数据库并审计，只有已发布文章引用的图片通过公开接口读取。Nginx 对该前缀需设置 `client_max_body_size 7m`。采集和图文生成可由 `tools/claude-skills/xiaoban-frontier` 使用 server-ai 完成，运行需运营账号和受限采集令牌；日报关联和 SEO 暂未实现。
 
 前台路由：`/` 社区发现（推荐、开源热榜、排行榜、追踪、导航）、`/discuss` 讨论、`/resources` 资源、`/daily[/{key}]` 日报、`/tools/{key}` 工具详情；`/create` 官方内置创造体验、`/ai` 小伴 AI、`/me` 我的。手机底栏与 PC 侧栏统一四个模块，发布入口提供发帖与上传已有作品。保留 `/packs/{id}`、`/schemes`、`/weekly/{week}`、`/projects/{slug}`、帖子、分类、搜索、收藏、积分、设置及 `/admin`。旧首页社区作品类型链接转到 `/discuss?tab=create&filter=…`，周刊/项目旧 Tab 继续有效。
 
@@ -221,6 +225,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - **导入**：每篇 `.md` 带 YAML 元信息 `id/title/category/tags`，图片放在该文件旁的 `images/` 并用相对路径引用。`category` 使用真实 slug。一个 ZIP 可含 1–50 篇；单个 `.md` 用于纯文字稿。ZIP 不超过 100 MB，解压后不超过 80 MB、最多 500 个内容文件。每篇最多 20 张图片、共 20 MB；后台上传适配默认每张 5 MB 的限制。浏览器解包，逐篇调用同一导入接口；可选择作者、覆盖板块、更新已有待发布稿。部分失败不回滚成功项。
 - **待发布稿**：导入不产生前台帖子。稿件与图片随数据库/上传目录一起持久化；图片清理任务会保留稿件引用的图片，待发布图片公开接口返回 404。编辑预览通过鉴权接口返回内嵌配图，使用论坛同一 Markdown 渲染器。保存后才更新预览。
 - **发布与去重**：同作者下稿件 `id` 唯一；默认拒绝重复导入，显式覆盖只允许更新待发布稿。逐篇发布在事务中写正文、标签、分类扩展、图片公开状态和记录，再返回正式链接；重试相同稿件只返回已有帖子。已发布稿不能通过再次导入覆盖，走论坛原有编辑入口。发布的是公开帖，暂不提供付费附件、阅读等级、定时发布等字段，额外信息走现有编辑入口。
+- **帖子封面**：发布时从正文提取前 3 张站内图片供列表展示；采编稿需在正文提供可识别的站内图片。升级时只对站方已发布且列表配图为空的旧稿执行一次补全，不覆盖已有配图。
 - **权限与审计**：站方专用通道不受普通用户每日发帖/图片次数限制，但保留作者禁言封禁、最低等级和板块权限检查，所有导入/发布写后台审计。不会因导入或发布额外发注册、签到积分，不制造点赞或浏览量。
 - **创作令牌**：后台生成，仅显示一次，固定绑定一个作者；默认只允许导入，可选直接发布，有效期 1–365 天，可撤销。令牌不能访问管理接口，不存明文；签名使用 `FORUM_ADMIN_JWT_SECRET`，生产必须稳定配置，改密钥会让全部创作令牌失效。
 
@@ -241,6 +246,14 @@ API：
 结构化导入包含 `author_uid/external_id/title/category/body/tags/images`，其中 `images` 是 `{path,data_base64}` 列表（仅用于传输，正式 Markdown 仍是站内 URL）。更新需传 `overwrite:true`，后台编辑还带 `expected_updated_at` 防止覆盖并发修改。单请求上限 30 MiB。生产 Nginx 应给 `/api/editor/drafts` 放宽 `client_max_body_size 31m`，否则图文包可能被代理拒绝；其他上传接口限制不变。
 
 验证：`npm --prefix services/server-forum/web run test:post-bundle`、`python -m unittest discover -s tools/claude-skills/forum-post-studio/scripts -p 'test_*.py'`。数据库回归：设置隔离的 `TEST_DATABASE_URL` 后执行 `cargo test --locked --manifest-path services/server-forum/Cargo.toml handlers::editor`，涵盖作者隔离、令牌撤销、待发布图片私有性、图片保留及重复发布；账号创建回归在账号服务 `admin_and_scoped_service_create_real_users_without_fake_verified_identities` 测试中。
+
+### 自动采编执行器
+
+独立运行的采编 sidecar 见 [`editorial/README.md`](editorial/README.md)。队列、官方来源、事实审校、配图、幂等发布、封面回读和费用停止阈值均由服务进程处理，不依赖 Codex 定时聊天。当前只启用已配置官方来源的部分教程栏目，其余栏目及作品/目录适配器仍待接入，不能视为全部栏目已覆盖。运行 `worker.py audit` 按公开入口核对数量，既有条目数不等于质量验收数。
+
+自动发布请求可携带 `If-Match: "<draft.updated_at>"`，在事务锁内检查已审校版本，发现并发修改返回 409；旧调用省略该头仍兼容，已经发布的稿件重试仍返回原链接。
+
+发现页采集令牌新增可选的 `publish_kinds`（缺省为空，旧令牌仍只写草稿）。当前仅支持单独授权 `frontier`，后台令牌页展示权限并允许撤销。`POST /api/discover-editor/drafts/frontier/{key}/publish {expected_revision}` 在事务内检查精确版本、线上基线、1200 字正文、来源字段和封面属于本篇，使用真实当前发布时间；操作记录标明 `automation:`，不冒充人工终审。其他发现类型仍沿用管理员审核。
 
 ### 精选与官方挑战
 

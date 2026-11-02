@@ -320,7 +320,7 @@ export const adminApi = {
   discardDiscover: (kind: string, key: string, expected_revision: number) =>
     request<{ ok: boolean }>('POST', `/discover-workflow/drafts/${encodeURIComponent(kind)}/${encodeURIComponent(key)}/discard`, { expected_revision }),
   discoverTokens: () => request<{ items: DiscoverToken[] }>('GET', '/discover-workflow/tokens'),
-  createDiscoverToken: (body: { name: string; kinds: string[]; days: number }) =>
+  createDiscoverToken: (body: { name: string; kinds: string[]; days: number; publish_kinds?: string[] }) =>
     request<{ id: string; token: string; expires_at: string }>('POST', '/discover-workflow/tokens', body),
   revokeDiscoverToken: (id: string) => request<{ ok: boolean }>('DELETE', `/discover-workflow/tokens/${encodeURIComponent(id)}`),
 }
@@ -367,6 +367,7 @@ export interface DiscoverDraft extends Omit<DiscoverRow, 'status' | 'published_a
 }
 
 export interface DiscoverToken {
+  publish_kinds?: string[]
   id: string
   name: string
   kinds: string[]

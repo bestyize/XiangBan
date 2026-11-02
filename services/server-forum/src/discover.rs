@@ -9,7 +9,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::PgPool;
 
-pub const KINDS: &[&str] = &["banner", "news", "nav", "doc", "vendor", "model", "model_board", "model_usage", "repo_issue", "quota", "launch", "promo", "tool", "hotword"];
+pub const KINDS: &[&str] = &["banner", "news", "frontier", "nav", "doc", "vendor", "model", "model_board", "model_usage", "repo_issue", "quota", "launch", "promo", "tool", "hotword"];
 
 /// 模型榜分档：(档位, 名称, 下限)。阈值由后端给出，客户端只负责显示。
 pub const TIERS: &[(&str, &str, f64)] =
@@ -531,7 +531,7 @@ pub fn validate(kind: &str, data: Value) -> AppResult<Value> {
         "model_board" => crate::collectors::model_sources::validate_model_board(data),
         "model_usage" => crate::collectors::model_sources::validate_model_usage(data),
         "banner" => go::<Banner>(data),
-        "news" => go::<News>(data),
+        "news" | "frontier" => go::<News>(data),
         "nav" => go::<Nav>(data),
         "doc" => go::<Doc>(data),
         "vendor" => go::<Vendor>(data),
@@ -566,6 +566,22 @@ pub async fn backfill_topic_images(pool: &PgPool) -> AppResult<()> {
         sqlx::query("UPDATE topics SET images = $2 WHERE id = $1").bind(id).bind(crate::markdown::site_images(&body, 3)).execute(&mut *tx).await?;
     }
     sqlx::query("INSERT INTO data_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING").bind(NAME).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// 修复站方批量发布遗漏的列表配图，不覆盖用户后来设置的图片。
+pub async fn backfill_editor_topic_images(pool: &PgPool) -> AppResult<()> {
+    const NAME: &str = "editor-topic-images-v1";
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))").bind(NAME).execute(&mut *tx).await?;
+    let done: Option<(String,)> = sqlx::query_as("SELECT name FROM data_migrations WHERE name=$1").bind(NAME).fetch_optional(&mut *tx).await?;
+    if done.is_some() { return Ok(()); }
+    let rows: Vec<(i64,String)> = sqlx::query_as("SELECT t.id,t.body_md FROM topics t WHERE cardinality(t.images)=0 AND t.body_md LIKE '%/api/images/%' AND EXISTS (SELECT 1 FROM editor_drafts d WHERE d.topic_id=t.id)").fetch_all(&mut *tx).await?;
+    for (id, body) in rows {
+        sqlx::query("UPDATE topics SET images=$2 WHERE id=$1 AND cardinality(images)=0").bind(id).bind(crate::markdown::site_images(&body,3)).execute(&mut *tx).await?;
+    }
+    sqlx::query("INSERT INTO data_migrations(name) VALUES($1) ON CONFLICT DO NOTHING").bind(NAME).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -792,6 +808,15 @@ mod tests {
         assert!(article["body"].as_str().unwrap().contains("配图"));
         data["body"] = json!("字".repeat(50_001));
         assert!(validate("news", data).is_err());
+    }
+
+    #[test]
+    fn frontier_accepts_editorial_content_as_a_separate_kind() {
+        let data = json!({"title":"前沿文章","source":"官方","url":"https://example.com/a",
+            "summary":"摘要","body":"## 正文\n\n内容"});
+        assert!(is_kind("frontier"));
+        let article = validate("frontier", data).unwrap();
+        assert_eq!(article["body"], "## 正文\n\n内容");
     }
 
     #[test]

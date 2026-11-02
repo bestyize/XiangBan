@@ -136,6 +136,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     db::seed(&pool).await?;
     discover::seed(&pool).await?;
     discover::backfill_topic_images(&pool).await?;
+    discover::backfill_editor_topic_images(&pool).await?;
     admin::seed_admin(&pool, &config).await?;
 
     let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;

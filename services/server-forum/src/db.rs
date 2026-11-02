@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     last_seen_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS display_alias TEXT;
 
 CREATE TABLE IF NOT EXISTS categories (
     id             SERIAL PRIMARY KEY,
@@ -1020,6 +1021,14 @@ CREATE TABLE IF NOT EXISTS discover_items (
 );
 CREATE INDEX IF NOT EXISTS discover_items_order_idx ON discover_items (kind, status, sort_order, published_at DESC);
 
+CREATE TABLE IF NOT EXISTS frontier_assets (
+    id UUID PRIMARY KEY,
+    article_key TEXT NOT NULL,
+    mime TEXT NOT NULL,
+    data BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS discover_news_comments (
     id BIGSERIAL PRIMARY KEY,
     news_key TEXT NOT NULL,
@@ -1033,6 +1042,23 @@ CREATE INDEX IF NOT EXISTS discover_news_comments_page_idx ON discover_news_comm
 CREATE INDEX IF NOT EXISTS discover_news_comments_author_idx ON discover_news_comments (author_uid, created_at DESC);
 CREATE TABLE IF NOT EXISTS discover_news_comment_likes (
     comment_id BIGINT NOT NULL REFERENCES discover_news_comments(id) ON DELETE CASCADE,
+    uid UUID NOT NULL REFERENCES users(uid),
+    PRIMARY KEY (comment_id, uid)
+);
+
+CREATE TABLE IF NOT EXISTS discover_frontier_comments (
+    id BIGSERIAL PRIMARY KEY,
+    news_key TEXT NOT NULL,
+    author_uid UUID NOT NULL REFERENCES users(uid),
+    reply_to BIGINT REFERENCES discover_frontier_comments(id),
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'normal' CHECK (status IN ('normal', 'hidden', 'deleted')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS discover_frontier_comments_page_idx ON discover_frontier_comments (news_key, id);
+CREATE INDEX IF NOT EXISTS discover_frontier_comments_author_idx ON discover_frontier_comments (author_uid, created_at DESC);
+CREATE TABLE IF NOT EXISTS discover_frontier_comment_likes (
+    comment_id BIGINT NOT NULL REFERENCES discover_frontier_comments(id) ON DELETE CASCADE,
     uid UUID NOT NULL REFERENCES users(uid),
     PRIMARY KEY (comment_id, uid)
 );
@@ -1121,6 +1147,8 @@ CREATE TABLE IF NOT EXISTS discover_tokens (
     revoked_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Automatic publishing is a separate, explicit grant; existing collectors remain draft-only.
+ALTER TABLE discover_tokens ADD COLUMN IF NOT EXISTS publish_kinds TEXT[] NOT NULL DEFAULT '{}';
 
 -- 列表卡片用的配图：发帖时从正文里取前 3 张站内图片。
 ALTER TABLE topics ADD COLUMN IF NOT EXISTS images TEXT[] NOT NULL DEFAULT '{}';

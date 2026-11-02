@@ -8,6 +8,7 @@ import DiscoverFieldsEditor from './DiscoverFieldsEditor.vue'
 
 const KINDS = [
   { key: 'banner', label: '首页头图', sample: '{"tag":"本周原创","title":"标题","byline":"小伴编辑部 · 8 分钟读完","link":"topic:12"}' },
+  { key: 'frontier', label: '小伴前沿', sample: '{"title":"标题","source":"来源","url":"https://example.com/a","cover_url":"","summary":"文章摘要","body":"文章正文"}' },
   { key: 'news', label: 'AI 日报', sample: '{"title":"标题","source":"来源","url":"https://example.com/a","cover_url":"","summary":"文章摘要","body":"## 小标题\\n\\n站内文章正文，支持 Markdown 和图片。"}' },
   { key: 'repo_issue', label: '开源热榜（按期）', sample: '{"issue_no":1,"week_start":"10.23","week_end":"10.29","total_gain":86420,"wow_pct":12,"daily_gain":[1,2,3,4,5,6,7],"ranks":[{"full_name":"owner/repo","description":"简介","language":"Python","language_color":"#3572A5","star_total":12400,"star_gain":3214,"spark":[1,2,3,4,5,6,7]}]}' },
   { key: 'vendor', label: '模型厂商', sample: '{"name":"厂商名","brand_color":"#E3203C","tint":"#FFE4E8"}' },
@@ -44,7 +45,7 @@ const importJson = ref('[\n  {"kind":"news","key":"source-url-hash","expected_re
 const tokensOpen = ref(false)
 const tokens = ref<DiscoverToken[]>([])
 const issuedToken = ref('')
-const tokenForm = reactive({ name: '', days: 30, kinds: ['news'] as string[] })
+const tokenForm = reactive({ name: '', days: 30, kinds: ['news'] as string[], publish_kinds: [] as string[] })
 const visibleRows = computed(() => view.value === 'live' ? rows.value : drafts.value)
 const structuredKind = computed(() => ["banner","news","nav","doc","launch","promo","hotword","vendor","quota"].includes(kind.value))
 const snapshotKind = computed(() => kind.value === 'model_board' || kind.value === 'model_usage')
@@ -176,11 +177,11 @@ async function loadTokens() {
 }
 async function createToken() {
   busy.value = true
-  await perform(async () => { issuedToken.value = (await adminApi.createDiscoverToken(tokenForm)).token; await loadTokens() }, '令牌已创建，仅此一次显示')
+  await perform(async () => { issuedToken.value = (await adminApi.createDiscoverToken({ ...tokenForm, publish_kinds: tokenForm.kinds.includes('frontier') ? tokenForm.publish_kinds : [] })).token; await loadTokens() }, '令牌已创建，仅此一次显示')
   busy.value = false
 }
 async function revokeToken(t: DiscoverToken) {
-  if (!window.confirm(`撤销 ${t.name} 的采集权限？`)) return
+  if (!window.confirm(`撤销 ${t.name} 的全部采集和发布权限？`)) return
   busy.value = true
   if (await perform(() => adminApi.revokeDiscoverToken(t.id), '已撤销')) { issuedToken.value = ''; await loadTokens() }
   busy.value = false
@@ -221,17 +222,18 @@ onMounted(load)
   </form>
 
   <div v-if="tokensOpen" class="panel adm-card discover-token-panel">
-    <h3>采集令牌</h3><p class="muted">仅能读写勾选类型的草稿。令牌只显示一次，请保存到本地安全位置。</p>
+    <h3>采集令牌</h3><p class="muted">默认只读写勾选类型的草稿。前沿自动发布须单独授权；令牌只显示一次，请保存到本地安全位置。</p>
     <form class="adm-form" @submit.prevent="createToken">
       <div class="adm-form-grid">
         <label class="field"><span>名称</span><input v-model="tokenForm.name" class="input" required maxlength="60" :disabled="busy" /></label>
         <label class="field"><span>有效天数</span><input v-model.number="tokenForm.days" class="input" type="number" min="1" max="365" required :disabled="busy" /></label>
         <div class="field wide"><span>允许的内容类型</span><label v-for="k in KINDS" :key="k.key" class="scope"><input v-model="tokenForm.kinds" type="checkbox" :value="k.key" :disabled="busy" /> {{ k.label }}</label></div>
       </div>
+      <label v-if="tokenForm.kinds.includes('frontier')" class="scope"><input v-model="tokenForm.publish_kinds" type="checkbox" value="frontier" :disabled="busy" /> 允许小伴前沿自动发布已保存版本</label>
       <button class="btn" type="submit" :disabled="busy || !tokenForm.kinds.length">创建令牌</button>
     </form>
     <div v-if="issuedToken" class="field"><textarea class="input adm-mono" :value="issuedToken" readonly rows="3" aria-label="新建的采集令牌" /><button class="btn" @click="copyToken">复制令牌</button></div>
-    <table v-if="tokens.length" class="adm-table"><thead><tr><th>名称</th><th>类型</th><th>到期</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="t in tokens" :key="t.id"><td data-label="名称">{{ t.name }}</td><td data-label="类型">{{ t.kinds.join(', ') }}</td><td data-label="到期">{{ fmtTime(t.expires_at) }}</td><td data-label="状态">{{ t.revoked_at ? '已撤销' : new Date(t.expires_at).getTime() <= Date.now() ? '已过期' : '有效' }}</td><td data-label="操作"><button v-if="!t.revoked_at" class="btn btn-sm" :disabled="busy" @click="revokeToken(t)">撤销</button></td></tr></tbody></table>
+    <table v-if="tokens.length" class="adm-table"><thead><tr><th>名称</th><th>类型</th><th>发布权限</th><th>到期</th><th>状态</th><th>操作</th></tr></thead><tbody><tr v-for="t in tokens" :key="t.id"><td data-label="名称">{{ t.name }}</td><td data-label="类型">{{ t.kinds.join(', ') }}</td><td data-label="发布权限">{{ t.publish_kinds?.length ? `自动：${t.publish_kinds.join(', ')}` : '仅草稿' }}</td><td data-label="到期">{{ fmtTime(t.expires_at) }}</td><td data-label="状态">{{ t.revoked_at ? '已撤销' : new Date(t.expires_at).getTime() <= Date.now() ? '已过期' : '有效' }}</td><td data-label="操作"><button v-if="!t.revoked_at" class="btn btn-sm" :disabled="busy" @click="revokeToken(t)">撤销</button></td></tr></tbody></table>
   </div>
 
   <form v-if="editing !== null" class="panel adm-card adm-form" @submit.prevent="save">

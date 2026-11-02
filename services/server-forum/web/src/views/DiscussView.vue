@@ -8,6 +8,7 @@ import { useSession } from '@/stores/session'
 import { useMeta } from '@/stores/meta'
 import { useHead } from '@/lib/head'
 import { PACK_KINDS } from '@/lib/content'
+import { DISCUSSION_TABS, LEARN_FILTERS, LEARN_CATEGORIES } from '@/lib/communityStructure'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
 import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
 import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
@@ -18,7 +19,7 @@ import PagerNav from '@/components/PagerNav.vue'
 import { useCommunityResource } from '@/components/community/resource'
 import '@/components/community/community.css'
 const route = useRoute(), router = useRouter(), session = useSession(), meta = useMeta()
-const tabs = [{key:'create',label:'创作'},{key:'learn',label:'学习和教程'},{key:'casual',label:'休闲'}]
+const tabs = DISCUSSION_TABS
 const sorts = [{key:'latest',label:'最新回复'},{key:'new',label:'新帖'},{key:'hot',label:'热门'},{key:'featured',label:'精选'},{key:'following',label:'关注'}]
 const tab = computed(() => {
   const raw = String(route.query.tab || 'create')
@@ -32,14 +33,14 @@ const sectionTitle = computed(() => tab.value === 'all' ? '全部讨论' : tabs.
 const sectionIntro = computed(() => ({ create:'发现社区分享的作品和桌面方案', learn:'交流教程、实践和经验', casual:'聊聊生活里的见闻', all:'浏览社区的最新讨论' }[tab.value] || ''))
 const page = computed(() => Math.max(1,Math.floor(Number(route.query.page) || 1)))
 const filter = computed(() => typeof route.query.filter === 'string' ? route.query.filter : '')
-const learnTags = [{key:'',label:'全部'},{key:'claude-code',label:'Claude Code'},{key:'codex',label:'Codex'},{key:'提示词',label:'提示词'},{key:'工作流',label:'工作流'},{key:'本地部署',label:'本地部署'},{key:'ai-硬件',label:'AI 硬件'}]
+const learnTags = LEARN_FILTERS
 const filters = computed(() => tab.value === 'create' ? [{key:'',label:'全部'},...PACK_KINDS,{key:'schemes',label:'方案'}] : tab.value === 'learn' ? learnTags : [{key:'',label:'全部'},...meta.categories.filter(c => c.slug.startsWith('casual-')).map(c => ({key:c.slug,label:c.name}))])
 type Feed = { kind:'packs'; result:Page<PackItem> } | { kind:'schemes'; result:Page<CommunityScheme> } | { kind:'topics'; result:Page<TopicItem> }
 const { data, loading, error, load } = useCommunityResource<Feed>(async () => {
   if (tab.value === 'create' && filter.value === 'schemes') return { kind:'schemes',result:await contentApi.schemes(page.value) }
   if (tab.value === 'create') return { kind:'packs',result:await contentApi.packs({ kind:filter.value || undefined, sort:'new',page:page.value }) }
   if (sort.value === 'following' && tab.value === 'all') return {kind:'topics',result:session.loggedIn ? await api.followingTopics(page.value) : {items:[],page:1,page_size:30,total:0}}
-  return {kind:'topics',result:await api.topics({category:tab.value === 'learn' ? 'tech,share-learn' : tab.value === 'casual' ? filter.value || 'casual' : undefined, tag:tab.value === 'learn' ? filter.value || undefined : undefined, home:tab.value === 'all', sort:sort.value === 'featured' || sort.value === 'following' ? 'new' : sort.value, featured:sort.value === 'featured',page:page.value})}
+  return {kind:'topics',result:await api.topics({category:tab.value === 'learn' ? LEARN_CATEGORIES : tab.value === 'casual' ? filter.value || 'casual' : undefined, tag:tab.value === 'learn' ? filter.value || undefined : undefined, home:tab.value === 'all', sort:sort.value === 'featured' || sort.value === 'following' ? 'new' : sort.value, featured:sort.value === 'featured',page:page.value})}
 })
 watch([tab,sort,page,filter,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
 // The shell loads category metadata; an empty category list still permits the broad casual feed.

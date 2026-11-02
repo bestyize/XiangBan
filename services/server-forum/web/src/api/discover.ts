@@ -30,6 +30,12 @@ export type { Board as ModelBoard, Usage as UsageBoard } from '@/lib/modelRankin
 const get = <T>(url: string, auth = false) => request<T>('GET', url, undefined, auth)
 export const discoverApi = {
   home: () => get<HomeBundle>(path.home),
+  frontier: (page = 1) => get<Page<NewsItem>>(`/discover/frontier?page=${page}`),
+  frontierArticle: (key: string) => get<NewsItem>(`/discover/frontier/${encodeURIComponent(key)}`),
+  frontierComments: (key: string, page = 1) => get<Page<NewsComment>>(`/discover/frontier/${encodeURIComponent(key)}/comments?page=${page}`, true),
+  frontierComment: (key: string, body: string, reply_to?: number) => request<{ id: number }>('POST', `/discover/frontier/${encodeURIComponent(key)}/comments`, { body, reply_to }),
+  likeFrontierComment: (key: string, id: number, on: boolean) => request(on ? 'PUT' : 'DELETE', `/discover/frontier/${encodeURIComponent(key)}/comments/${id}/like`),
+  deleteFrontierComment: (key: string, id: number) => request('DELETE', `/discover/frontier/${encodeURIComponent(key)}/comments/${id}`),
   daily: (page = 1) => get<Page<NewsItem>>(`${path.daily}?page=${page}`),
   article: (key: string) => get<NewsItem>(path.article(key)),
   repo: (owner: string, repo: string) => get<RepoDetail>(path.repo(owner, repo)),

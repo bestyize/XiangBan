@@ -8,7 +8,7 @@ use crate::{
 };
 use axum::{
     extract::{DefaultBodyLimit, FromRequestParts, Path, Query, State},
-    http::{header, request::Parts},
+    http::{header, request::Parts, HeaderMap},
     routing::{get, post},
     Json, Router,
 };
@@ -639,6 +639,7 @@ async fn publish(
     State(s): State<AppState>,
     e: Editor,
     Path(id): Path<Uuid>,
+    headers: HeaderMap,
 ) -> AppResult<Json<Value>> {
     if !e.can_publish {
         return Err(AppError::Forbidden("这个令牌只允许导入待发布稿".into()));
@@ -657,6 +658,16 @@ async fn publish(
             json!({"id":topic,"url":format!("{}/t/{topic}",s.config.public_url),"already_published":true}),
         ));
     }
+    // Bind automated publication to the exact saved version, without changing old clients.
+    if let Some(expected) = headers.get(header::IF_MATCH) {
+        let expected = expected.to_str().ok()
+            .and_then(|v| DateTime::parse_from_rfc3339(v.trim_matches('"')).ok())
+            .map(|v| v.with_timezone(&Utc))
+            .ok_or_else(|| AppError::BadRequest("If-Match 必须为草稿 updated_at".into()))?;
+        if expected != d.updated_at {
+            return Err(AppError::Conflict("草稿在审校后已被修改，请重新审核".into()));
+        }
+    }
     let (slug,): (String,) = sqlx::query_as("SELECT slug FROM categories WHERE id=$1")
         .bind(d.category_id)
         .fetch_one(&mut *tx)
@@ -672,13 +683,21 @@ async fn publish(
             .bind(id)
             .fetch_all(&mut *tx)
             .await?;
-    for (image,) in assets {
+    let covers: Vec<String> = markdown::site_images(&body, usize::MAX)
+        .into_iter()
+        .filter(|url| assets.iter().any(|(image,)| *url == format!("/api/images/{image}")))
+        .take(3)
+        .collect();
+    if covers.is_empty() {
+        return Err(AppError::BadRequest("采编文章必须包含已上传的封面图片".into()));
+    }
+    for (image,) in &assets {
         tokio::fs::metadata(s.config.upload_dir.join(format!("img-{image}")))
             .await
             .map_err(|_| AppError::Conflict("配图文件缺失，请重新导入稿件".into()))?;
     }
-    let (topic,):(i64,)=sqlx::query_as("INSERT INTO topics(category_id,author_uid,title,body_md,body_html,excerpt) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id")
-        .bind(d.category_id).bind(d.author_uid).bind(title).bind(&body).bind(markdown::render(&body,true)).bind(markdown::excerpt(&body,140)).fetch_one(&mut *tx).await?;
+    let (topic,):(i64,)=sqlx::query_as("INSERT INTO topics(category_id,author_uid,title,body_md,body_html,excerpt,images) VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id")
+        .bind(d.category_id).bind(d.author_uid).bind(title).bind(&body).bind(markdown::render(&body,true)).bind(markdown::article_excerpt(&body,140)).bind(covers).fetch_one(&mut *tx).await?;
     for tag in tags {
         let (tag_id,):(i32,)=sqlx::query_as("INSERT INTO tags(name) VALUES ($1) ON CONFLICT(name) DO UPDATE SET name=EXCLUDED.name RETURNING id").bind(tag).fetch_one(&mut *tx).await?;
         sqlx::query("INSERT INTO topic_tags(topic_id,tag_id) VALUES ($1,$2)")

@@ -27,6 +27,12 @@ pub fn routes() -> Router<AppState> {
         .route("/discover/home", get(home))
         .route("/discover/home/v2", get(home_v2))
         .route("/discover/daily", get(daily))
+        .route("/discover/frontier", get(frontier))
+        .route("/discover/frontier-assets/{id}", get(frontier_asset))
+        .route("/discover/frontier/{key}", get(super::discover_frontier::detail))
+        .route("/discover/frontier/{key}/comments", get(super::discover_frontier::list).post(super::discover_frontier::create))
+        .route("/discover/frontier/{key}/comments/{id}", axum::routing::delete(super::discover_frontier::delete))
+        .route("/discover/frontier/{key}/comments/{id}/like", put(super::discover_frontier::like).delete(super::discover_frontier::unlike))
         .route("/discover/daily/{key}", get(super::discover_news::detail))
         .route("/discover/daily/{key}/comments", get(super::discover_news::list).post(super::discover_news::create))
         .route("/discover/daily/{key}/comments/{id}", axum::routing::delete(super::discover_news::delete))
@@ -51,6 +57,16 @@ pub fn routes() -> Router<AppState> {
         .route("/topics/{id}/poll/vote", put(vote))
 }
 
+async fn frontier_asset(State(state): State<AppState>, Path(id): Path<uuid::Uuid>) -> AppResult<axum::response::Response> {
+    use axum::{body::Body, http::{header, Response}};
+    let row: Option<(String, Vec<u8>)> = sqlx::query_as("SELECT a.mime,a.data FROM frontier_assets a JOIN discover_items i ON i.kind='frontier' AND i.key=a.article_key WHERE a.id=$1 AND i.status='published' AND i.published_at<=now() AND position(a.id::text in i.data::text)>0")
+        .bind(id).fetch_optional(&state.pool).await?;
+    let (mime, data) = row.ok_or_else(|| AppError::not_found("图片"))?;
+    Response::builder().header(header::CONTENT_TYPE, mime).header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
+        .header(header::CACHE_CONTROL, "no-store")
+        .body(Body::from(data)).map_err(|e| AppError::Internal(e.to_string()))
+}
+
 pub fn admin_routes() -> Router<AppState> {
     Router::new()
         .route("/discover/{kind}", get(admin_list))
@@ -72,7 +88,7 @@ async fn fetch(pool: &PgPool, kind: &str, order: &str, limit: i64, offset: i64) 
     .await?;
     Ok(rows.into_iter().map(|row| {
         let mut item = item_json(row);
-        if kind == "news" { if let Some(obj) = item.as_object_mut() { obj.remove("body"); } }
+        if kind == "news" || kind == "frontier" { if let Some(obj) = item.as_object_mut() { obj.remove("body"); } }
         item
     }).collect())
 }
@@ -176,6 +192,14 @@ async fn daily(State(state): State<AppState>, Query(q): Query<PageQuery>) -> App
     let size = q.page_size.unwrap_or(20).clamp(1, 50);
     let items = fetch(&state.pool, "news", NEWEST, size, (page - 1) * size).await?;
     let total = count(&state.pool, "news").await?;
+    Ok(Json(Page { items, page, page_size: size, total }))
+}
+
+async fn frontier(State(state): State<AppState>, Query(q): Query<PageQuery>) -> AppResult<Json<Page<Value>>> {
+    let page = q.page.unwrap_or(1).clamp(1, 10_000);
+    let size = q.page_size.unwrap_or(20).clamp(1, 50);
+    let items = fetch(&state.pool, "frontier", NEWEST, size, (page - 1) * size).await?;
+    let total = count(&state.pool, "frontier").await?;
     Ok(Json(Page { items, page, page_size: size, total }))
 }
 

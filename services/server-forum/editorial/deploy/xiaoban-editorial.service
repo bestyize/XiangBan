@@ -1,0 +1,23 @@
+[Unit]
+Description=Xiaoban community editorial agents
+After=network-online.target server-forum.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=xiaoban-editorial
+Group=xiaoban-editorial
+WorkingDirectory=/opt/xiaoban-editorial
+ExecStart=/usr/bin/python3 /opt/xiaoban-editorial/worker.py run --limit 6
+StateDirectory=xiaoban-editorial
+StateDirectoryMode=0700
+UMask=0077
+TimeoutStartSec=35min
+Nice=10
+MemoryMax=256M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+

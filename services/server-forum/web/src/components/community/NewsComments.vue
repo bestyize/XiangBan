@@ -7,12 +7,12 @@ import UserAvatar from '@/components/UserAvatar.vue'
 import RequestState from './RequestState.vue'
 import { useCommunityResource } from './resource'
 import { displayDate } from './contract'
-const props = defineProps<{ articleKey:string }>()
+const props = defineProps<{ articleKey:string; frontier?:boolean }>()
 const session = useSession()
 const page = ref(1), body = ref(''), reply = ref<NewsComment|null>(null)
 const busy = ref(false), actionError = ref('')
 let context = 0
-const { data, loading, error, load } = useCommunityResource(() => discoverApi.comments(props.articleKey, page.value))
+const { data, loading, error, load } = useCommunityResource(() => (props.frontier ? discoverApi.frontierComments : discoverApi.comments)(props.articleKey, page.value))
 watch([() => props.articleKey, () => session.user?.uid, () => session.loggedIn], () => {
   ++context; page.value = 1; body.value = ''; reply.value = null; busy.value = false; actionError.value = ''; void load()
 }, { immediate:true })
@@ -34,16 +34,16 @@ async function act(work:() => Promise<unknown>, done?:() => void) {
 function submit() {
   if (!valid.value) return
   const key = props.articleKey, text = body.value.trim(), parent = reply.value?.id
-  void act(() => discoverApi.comment(key, text, parent), () => { body.value = ''; reply.value = null })
+  void act(() => (props.frontier ? discoverApi.frontierComment : discoverApi.comment)(key, text, parent), () => { body.value = ''; reply.value = null })
 }
 function toggleLike(item:NewsComment) {
   const key = props.articleKey
-  void act(() => discoverApi.likeComment(key, item.id, !item.liked))
+  void act(() => (props.frontier ? discoverApi.likeFrontierComment : discoverApi.likeComment)(key, item.id, !item.liked))
 }
 function remove(item:NewsComment) {
   if (!window.confirm('删除这条评论？')) return
   const key = props.articleKey
-  void act(() => discoverApi.deleteComment(key, item.id))
+  void act(() => (props.frontier ? discoverApi.deleteFrontierComment : discoverApi.deleteComment)(key, item.id))
 }
 function respond(item:NewsComment) { if (session.requireLogin()) reply.value = item }
 </script>
