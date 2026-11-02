@@ -38,6 +38,14 @@ class EditorialTests(unittest.TestCase):
         with patch('worker.socket.getaddrinfo', return_value=[(2, 1, 6, '', ('1.1.1.1', 443))]):
             self.assertEqual(w.source_url('https://docs.example/feed/', ['docs.example']), 'https://docs.example/feed/')
 
+    def test_missing_source_is_excluded_but_transient_failure_remains_retryable(self):
+        for status in (404, 410, 429, 503):
+            error = w.urllib.error.HTTPError('https://docs.example/a', status, 'unavailable', {}, None)
+            with self.subTest(status=status), patch('worker.source_url', side_effect=lambda u, h: u), patch.object(w.HTTP, 'open', side_effect=error):
+                expected = w.Reject if status in (404, 410) else w.Stop
+                with self.assertRaises(expected):
+                    w.fetch_source('https://docs.example/a', ['docs.example'])
+
     def test_feed_retains_source_date_and_skips_stale_and_future_items(self):
         def item(name, days):
             date = (w.dt.datetime.now(w.UTC) - w.dt.timedelta(days=days)).strftime('%a, %d %b %Y %H:%M:%S %z')
