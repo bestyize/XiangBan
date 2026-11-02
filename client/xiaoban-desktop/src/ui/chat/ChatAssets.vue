@@ -6,13 +6,15 @@ import type { Payload, Summary } from '../design/model.ts';
 import type { ReplyBlock } from './replies.ts';
 import { assetMeta, conversationAssets, type ConversationAsset, type LocalAsset } from './assets.ts';
 import AssetThumbnail from './AssetThumbnail.vue';
+import {previewKind} from '../preview/model.ts';
 
 const props = defineProps<{
   session: string | null; designs: Summary[]; blocks: ReplyBlock[]; open: boolean; pinned: boolean;
   anchor: HTMLElement | null; ensureSession: () => Promise<string | null>;
   notify: (message: unknown, type?: 'error' | 'info' | 'success') => void;
+  previewable?:boolean;
 }>();
-const emit = defineEmits<{ close: []; pin: []; count: [count: number]; design: [id: string]; locate: [block: string]; browseDesigns: [] }>();
+const emit = defineEmits<{ close: []; pin: []; count: [count: number]; design: [id: string]; preview:[asset:ConversationAsset]; updated:[assets:ConversationAsset[]]; locate: [block: string]; browseDesigns: [] }>();
 const host = ref<HTMLElement>();
 const files = ref<LocalAsset[]>([]), query = ref(''), tab = ref<'all'|'design'|'image'|'file'>('all');
 const loading = ref(false), importing = ref(false), error = ref(''), importMenu = ref(false), menu = ref(''), busy = ref('');
@@ -30,6 +32,7 @@ function toggleMenu(asset:ConversationAsset,event:MouseEvent){
 }
 let listEpoch = 0, folderEpoch = 0, disposed = false, off: (()=>void) | undefined;
 watch(() => assets.value.length, count => emit('count', count), { immediate: true });
+watch(assets,rows=>emit('updated',rows),{immediate:true});
 
 async function refresh() {
   const version = ++listEpoch, session = props.session;
@@ -68,6 +71,7 @@ async function action(asset: ConversationAsset, how: 'open'|'reveal'|'save'|'cop
   if(how==='copy') {try{await navigator.clipboard.writeText(asset.local!.path);props.notify('已复制路径','success');}catch(e){props.notify(e,'error');}return;}
   if(asset.local?.kind==='folder'&&how==='open') {await openFolder(asset);return;}
   if(asset.design) {emit('design',asset.id);if(!props.pinned)emit('close');return;}
+  if(how==='open'&&props.previewable&&asset.local?.exists&&previewKind(asset.name)){emit('preview',asset);if(!props.pinned)emit('close');return;}
   if(busy.value===asset.key)return;
   const session=props.session;busy.value=asset.key;
   try {

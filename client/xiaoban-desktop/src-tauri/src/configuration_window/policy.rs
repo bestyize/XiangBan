@@ -4,6 +4,7 @@ pub fn kind(label: &str) -> Option<&'static str> {
         return (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("store");
     }
     if let Some(suffix) = label.strip_prefix("configuration-cloud-") { return (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("cloud"); }
+    if let Some(suffix) = label.strip_prefix("configuration-preview-") { return (suffix.len() == 24 && suffix.bytes().all(|c| c.is_ascii_hexdigit())).then_some("preview"); }
     if label == "configuration-community" { return Some("community"); }
     if label == "configuration-settings" { return Some("settings"); }
     let suffix = label.strip_prefix("configuration-model-")?;

@@ -441,6 +441,9 @@ async function listenForAssistant() {
   const off = await Promise.all([
     listen<{ session: string | null }>('assistant-open-chat', ({ session }) => { if (session) void openSession(session); else void newTask(); }),
     listen<{ tab: 'ai' | 'assistant' }>('assistant-open-settings', ({ tab }) => { store.openSettings(tab); }),
+    listen<import('./preview/model.ts').PreviewTarget>('chat-preview-open', async target => {
+      try{await openSession(target.sessionId);store.previewOpening=target;}catch(e){store.notify(e,'error');}
+    }),
     listen<{id:string;session:string}>('design-open', async ({id,session}) => {
       if(store.chat.sessions.some(s=>s.id===session))await openSession(session);
       else {await store.chat.select(null);navigate('chat');}

@@ -24,6 +24,7 @@ export type StudioTab = "wallpapers" | "effects" | "widgets" | "pets" | "skins";
 export type SettingsTab = "general" | "appearance" | "ai" | "agent" | "assistant" | "voice" | "network" | "safety" | "about";
 export interface ControlStore {
   designOpening?:string;
+  previewOpening?:import('./preview/model.ts').PreviewTarget|null;
   settings: Settings;
   info: AppInfo;
   library: WallpaperLibrary;

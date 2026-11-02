@@ -160,7 +160,7 @@ fn within(root: &Path, relative: &str) -> Result<PathBuf, String> {
     if !child.is_file() && !child.is_dir() { return Err("不是普通文件或文件夹".into()); }
     Ok(child)
 }
-fn resolve(app: &tauri::AppHandle, session: &str, id: &str, relative: &str) -> Result<PathBuf, String> {
+pub(crate) fn resolve(app: &tauri::AppHandle, session: &str, id: &str, relative: &str) -> Result<PathBuf, String> {
     let asset = list(app, session)?.into_iter().find(|a| a.id == id).ok_or("这份资产已不在当前对话中")?;
     if !asset.exists { return Err("原文件已移动或删除，请定位交付消息".into()); }
     within(Path::new(&asset.path), relative)
@@ -235,6 +235,9 @@ pub async fn chat_asset_children(window: tauri::WebviewWindow, session_id: Strin
 #[tauri::command]
 pub async fn chat_asset_open(window: tauri::WebviewWindow, session_id: String, id: String, relative: String, action: String) -> Result<bool, String> {
     control(&window)?; let app = window.app_handle().clone();
+    open_for_preview(app,window,session_id,id,relative,action).await
+}
+pub(crate) async fn open_for_preview(app:tauri::AppHandle,window:tauri::WebviewWindow,session_id:String,id:String,relative:String,action:String)->Result<bool,String>{
     tauri::async_runtime::spawn_blocking(move || {
         let path = resolve(&app, &session_id, &id, &relative)?;
         match action.as_str() {

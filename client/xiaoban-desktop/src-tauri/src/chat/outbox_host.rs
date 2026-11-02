@@ -115,6 +115,7 @@ pub(super) fn kick(app: &tauri::AppHandle, session: &str) {
             None,
             Some(entry),
             None,
+            None,
         )?;
         Ok(())
     })();
@@ -215,10 +216,12 @@ pub fn chat_enqueue(
     request_id: String,
     stop_now: Option<bool>,
     design_id: Option<String>,
+    preview_target: Option<crate::chat_preview::Target>,
 ) -> Result<Value, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
     if let Some(id)=&design_id{crate::design::store(&app)?.load(id)?;}
+    let preview_target=preview_target.map(|target|target.context(&app,&session_id)).transpose()?;
     let state = app.state::<ChatState>();
     let _delivery = lock(&state.delivery);
     let context = binding(&app, &session_id)?;
@@ -266,7 +269,7 @@ pub fn chat_enqueue(
     let files = AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments"));
     let saved = files.import(&session_id, &inputs)?;
     let mut message = Message::user(user_parts(&text, &model_images));
-    message.structured_content = Some(json!({"attachments":saved,"designId":design_id}));
+    message.structured_content = Some(json!({"attachments":saved,"designId":design_id,"previewTarget":preview_target}));
     let mentions = mentions
         .unwrap_or_default()
         .into_iter()
