@@ -1,5 +1,5 @@
 //! Bounded, read-only health checks and factual operations aggregates. No content state is changed.
-mod network;
+pub(crate) mod network;
 pub mod schema;
 use crate::{
     collectors,

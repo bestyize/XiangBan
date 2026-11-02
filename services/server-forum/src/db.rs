@@ -245,6 +245,7 @@ pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     sqlx::raw_sql(CONTENT_SCHEMA).execute(pool).await?;
     sqlx::raw_sql(COMPLIANCE_SCHEMA).execute(pool).await?;
     sqlx::raw_sql(DISCOVER_SCHEMA).execute(pool).await?;
+    sqlx::raw_sql(crate::handlers::open_source_workflow::SCHEMA).execute(pool).await?;
     crate::collectors::schema::init(pool).await?;
     crate::link_health::schema::init(pool).await?;
     crate::community_editor::schema::init(pool).await?;

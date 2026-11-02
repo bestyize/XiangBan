@@ -2,7 +2,7 @@ export type Section = 'home' | 'resources' | 'discuss'
 export type Area = 'community' | 'ai' | 'create' | 'me'
 type Route = { name?: unknown; params: Record<string, unknown> }
 export function sectionOf(route: Route): Section {
-  if (['home', 'daily', 'daily-detail', 'model-rankings', 'weekly-issue', 'project'].includes(String(route.name))) return 'home'
+  if (['home', 'daily', 'daily-detail', 'model-rankings', 'weekly-issue', 'project', 'open-source', 'open-source-project', 'open-source-collection'].includes(String(route.name))) return 'home'
   if (['resources', 'tool-detail'].includes(String(route.name))) return 'resources'
   if (route.name === 'category') {
     const slug = String(route.params.slug ?? '')

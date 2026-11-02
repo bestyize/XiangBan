@@ -1,0 +1,651 @@
+{
+  "version": 1,
+  "reviewed_at": "2026-11-02",
+  "notice": "根据项目公开资料整理，未经本站实测；具体功能与许可请以官方说明为准。",
+  "categories": [
+    {
+      "key": "ai",
+      "label": "AI 与智能体",
+      "description": "探索模型、智能体与知识库"
+    },
+    {
+      "key": "skills",
+      "label": "Skill 与 MCP",
+      "description": "给 AI 增加技能与连接能力"
+    },
+    {
+      "key": "office",
+      "label": "办公效率",
+      "description": "让日常工作顺手一点"
+    },
+    {
+      "key": "design",
+      "label": "设计创作",
+      "description": "把想法变成看得见的作品"
+    },
+    {
+      "key": "media",
+      "label": "影音媒体",
+      "description": "处理视频、声音和字幕"
+    },
+    {
+      "key": "dev",
+      "label": "开发工具",
+      "description": "改善编写、调试与交付的过程"
+    },
+    {
+      "key": "learn",
+      "label": "教程资源",
+      "description": "沿着清楚的路线学点新东西"
+    },
+    {
+      "key": "hardware",
+      "label": "开源硬件",
+      "description": "从图纸到可以动起来的实物"
+    },
+    {
+      "key": "security",
+      "label": "安全逆向",
+      "description": "理解软件、协议与安全边界"
+    },
+    {
+      "key": "fun",
+      "label": "趣味探索",
+      "description": "发现代码之外的乐趣"
+    },
+    {
+      "key": "web",
+      "label": "建站应用",
+      "description": "搭建属于自己的网站"
+    }
+  ],
+  "projects": [
+    {
+      "full_name": "excalidraw/excalidraw",
+      "name": "Excalidraw",
+      "title": "像在纸上画画一样，把想法讲清楚",
+      "summary": "一块手绘风格的在线白板，用图形、箭头和文字梳理流程与想法。",
+      "category": "design",
+      "related_categories": [
+        "office"
+      ],
+      "tags": [
+        "白板",
+        "流程图",
+        "浏览器"
+      ],
+      "effort": "打开网页即可尝试",
+      "cover_url": "/open-source-media/excalidraw.png",
+      "cover_caption": "项目 README 展示图",
+      "homepage_url": "https://excalidraw.com",
+      "highlights": [
+        "手绘风格让流程图与草图更自然",
+        "从浏览器就能开始，适合快速表达想法",
+        "项目开放编辑器源码，也提供集成方式"
+      ],
+      "audience": "适合需要解释流程、讨论方案和绘制草图的人。它更强调自由表达，精确的工程制图需另选工具。",
+      "getting_started": "先在官方在线白板画一张简单流程图；需要嵌入自己的产品时，再阅读组件文档。",
+      "notes": [
+        "在线服务、商业服务与开源编辑器的能力和条款分别确认。"
+      ],
+      "source_url": "https://github.com/excalidraw/excalidraw#readme",
+      "featured": true,
+      "order": 1,
+      "cover_style": "illustration",
+      "cover_layout": "flow",
+      "cover_accent": "#7763B4",
+      "cover_lines": [
+        "想法",
+        "草图",
+        "讨论"
+      ],
+      "icon_url": "/open-source-media/excalidraw-icon.png",
+      "icon_source_url": "https://excalidraw.com/apple-touch-icon.png",
+      "cover_template": "flow",
+      "cover_variant": "balanced",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "AppFlowy-IO/AppFlowy",
+      "name": "AppFlowy",
+      "title": "给笔记、项目和知识找一个共同的家",
+      "summary": "把文档、知识与项目组织在一起的开源工作空间。",
+      "category": "office",
+      "related_categories": [
+        "ai"
+      ],
+      "tags": [
+        "笔记",
+        "知识管理",
+        "协作"
+      ],
+      "effort": "安装应用后使用",
+      "cover_url": "/open-source-media/appflowy.png",
+      "cover_caption": "项目 README 展示图",
+      "homepage_url": "https://appflowy.io",
+      "highlights": [
+        "将笔记与项目放在一个工作空间",
+        "源码公开，可进一步了解数据与部署方式",
+        "项目持续探索 AI 与知识工作结合的方式"
+      ],
+      "audience": "适合希望把个人笔记和项目资料放在一起管理的人，也适合研究协作工作空间的开发者。",
+      "getting_started": "从官网选择对应平台的版本，先用少量非敏感资料了解编辑和组织方式。",
+      "notes": [
+        "本地、云端、协作及 AI 功能的可用范围以官方当前说明为准。",
+        "自部署需要额外服务配置；不等于安装桌面应用。"
+      ],
+      "source_url": "https://github.com/AppFlowy-IO/AppFlowy#readme",
+      "featured": true,
+      "order": 2,
+      "cover_style": "screen",
+      "cover_layout": "notes",
+      "cover_accent": "#5574B2",
+      "cover_lines": [],
+      "icon_url": "/open-source-media/appflowy-icon.png",
+      "icon_source_url": "https://appflowy.com/_next/static/media/appflowy.929cfa16.ico",
+      "cover_template": "screenshot",
+      "cover_variant": "offset",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "ollama/ollama",
+      "name": "Ollama",
+      "title": "从在自己电脑上运行一个模型开始",
+      "summary": "用于运行和调用模型的工具，为本地 AI 应用提供一个起点。",
+      "category": "ai",
+      "related_categories": [
+        "dev"
+      ],
+      "tags": [
+        "本地模型",
+        "模型运行",
+        "API"
+      ],
+      "effort": "需要准备模型与运行环境",
+      "cover_url": "",
+      "cover_caption": "",
+      "homepage_url": "https://ollama.com",
+      "highlights": [
+        "提供模型运行与管理工具",
+        "可以通过接口接入自己的应用",
+        "适合从本地模型探索 AI 工作流"
+      ],
+      "audience": "适合想体验本地模型、研究 AI 应用或了解模型运行方式的人。",
+      "getting_started": "先查看官方平台要求，再选择适合设备内存和显存的模型，使用非敏感文本试运行。",
+      "notes": [
+        "模型需要单独下载，硬件要求与许可证因模型而异。",
+        "项目也有云端能力，使用时确认实际运行位置。"
+      ],
+      "source_url": "https://github.com/ollama/ollama#readme",
+      "featured": true,
+      "order": 3,
+      "cover_style": "illustration",
+      "cover_layout": "terminal",
+      "cover_accent": "#657063",
+      "cover_lines": [
+        "$ ollama run <model>",
+        "本地模型",
+        "API"
+      ],
+      "icon_url": "/open-source-media/ollama-icon.png",
+      "icon_source_url": "https://ollama.com/public/apple-touch-icon.png",
+      "cover_template": "terminal",
+      "cover_variant": "balanced",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "obra/superpowers",
+      "name": "Superpowers",
+      "title": "给编程助手一套做事的方法",
+      "summary": "围绕规划、开发与验证组织的一组可组合技能和工作方法。",
+      "category": "skills",
+      "related_categories": [
+        "dev"
+      ],
+      "tags": [
+        "Skill",
+        "编程助手",
+        "工作流"
+      ],
+      "effort": "需要兼容的编程助手",
+      "cover_url": "",
+      "cover_caption": "",
+      "homepage_url": "https://github.com/obra/superpowers#readme",
+      "highlights": [
+        "把开发过程拆成可以组合的技能",
+        "包含规划与验证等工作方法",
+        "可以阅读技能源文件理解具体指令"
+      ],
+      "audience": "适合已经在使用编程助手，想进一步组织开发流程的人。",
+      "getting_started": "先阅读仓库的安装与兼容性说明，再挑一项技能查看其指令、依赖和触发条件。",
+      "notes": [
+        "不同客户端的安装方式以仓库说明为准。",
+        "收录不代表已经接入小伴，也不代表可以直接安装。"
+      ],
+      "source_url": "https://github.com/obra/superpowers#readme",
+      "featured": true,
+      "order": 4,
+      "cover_style": "illustration",
+      "cover_layout": "flow",
+      "cover_accent": "#8A6C9B",
+      "cover_lines": [
+        "规划",
+        "开发",
+        "验证"
+      ],
+      "icon_url": "",
+      "icon_source_url": "",
+      "cover_template": "flow",
+      "cover_variant": "offset",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "yt-dlp/yt-dlp",
+      "name": "yt-dlp",
+      "title": "把音视频下载变成可组合的工作流",
+      "summary": "提供格式选择、字幕处理等能力的命令行音视频下载工具。",
+      "category": "media",
+      "related_categories": [
+        "dev"
+      ],
+      "tags": [
+        "媒体下载",
+        "字幕",
+        "命令行"
+      ],
+      "effort": "需要命令行基础",
+      "cover_url": "",
+      "cover_caption": "",
+      "homepage_url": "https://github.com/yt-dlp/yt-dlp#readme",
+      "highlights": [
+        "在命令行中选择需要的媒体格式",
+        "可结合字幕与后处理能力",
+        "适合有批量处理需求的工作流"
+      ],
+      "audience": "适合有权保存音视频、并且愿意使用命令行的用户。",
+      "getting_started": "按官方安装说明准备工具，先从查看一个有权访问和保存的链接的可用格式开始。",
+      "notes": [
+        "部分合并和后处理能力依赖 FFmpeg。",
+        "站点支持情况会变化；访问权限与内容使用许可需分别确认。"
+      ],
+      "source_url": "https://github.com/yt-dlp/yt-dlp#readme",
+      "featured": true,
+      "order": 5,
+      "cover_style": "illustration",
+      "cover_layout": "terminal",
+      "cover_accent": "#B25E66",
+      "cover_lines": [
+        "$ yt-dlp --list-formats <url>",
+        "格式 · 字幕 · 后处理"
+      ],
+      "icon_url": "/open-source-media/ytdlp-icon.svg",
+      "icon_source_url": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/.github/banner.svg",
+      "cover_template": "terminal",
+      "cover_variant": "balanced",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "hoppscotch/hoppscotch",
+      "name": "Hoppscotch",
+      "title": "给接口调试留一个轻便的入口",
+      "summary": "用于构造请求、检查响应和组织 API 调试工作的开源工具。",
+      "category": "dev",
+      "related_categories": [],
+      "tags": [
+        "API",
+        "接口调试",
+        "开发"
+      ],
+      "effort": "可先体验官方网页",
+      "cover_url": "/open-source-media/hoppscotch.png",
+      "cover_caption": "项目 README 展示图",
+      "homepage_url": "https://hoppscotch.io",
+      "highlights": [
+        "在可视化界面中构造与发送请求",
+        "帮助检查响应并组织调试内容",
+        "提供开源实现，便于研究和部署"
+      ],
+      "audience": "适合后端开发者、接口联调人员和正在学习 HTTP 的人。",
+      "getting_started": "在官方网页用公开测试接口构造一次请求，再根据需要了解桌面端和部署方式。",
+      "notes": [
+        "浏览器跨域限制可能需要额外配置。",
+        "社区版、企业版与托管服务的能力及条款分别确认。"
+      ],
+      "source_url": "https://github.com/hoppscotch/hoppscotch#readme",
+      "featured": true,
+      "order": 6,
+      "cover_style": "screen",
+      "cover_layout": "terminal",
+      "cover_accent": "#4A8B7B",
+      "cover_lines": [],
+      "icon_url": "/open-source-media/hoppscotch-icon.png",
+      "icon_source_url": "https://hoppscotch.io/icon.png",
+      "cover_template": "screenshot",
+      "cover_variant": "offset",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "freeCodeCamp/freeCodeCamp",
+      "name": "freeCodeCamp",
+      "title": "沿着练习和项目，逐步学会编程",
+      "summary": "以课程、练习与项目组织的编程学习平台及其开源代码库。",
+      "category": "learn",
+      "related_categories": [
+        "dev"
+      ],
+      "tags": [
+        "编程入门",
+        "课程",
+        "练习"
+      ],
+      "effort": "通过浏览器学习",
+      "cover_url": "",
+      "cover_caption": "",
+      "homepage_url": "https://www.freecodecamp.org",
+      "highlights": [
+        "围绕练习和项目组织学习内容",
+        "提供公开课程与平台源码",
+        "学习者与开发者都能找到参与入口"
+      ],
+      "audience": "适合希望沿着课程练习编程的初学者，也适合研究教育平台实现的人。",
+      "getting_started": "从官网选择一条适合当前基础的课程路线，先完成一个小练习。",
+      "notes": [
+        "课程内容、翻译覆盖与认证要求以官方页面为准。"
+      ],
+      "source_url": "https://github.com/freeCodeCamp/freeCodeCamp#readme",
+      "featured": true,
+      "order": 7,
+      "cover_style": "illustration",
+      "cover_layout": "notes",
+      "cover_accent": "#5E769A",
+      "cover_lines": [
+        "HTML & CSS",
+        "JavaScript",
+        "项目练习"
+      ],
+      "icon_url": "/open-source-media/freecodecamp-icon.png",
+      "icon_source_url": "https://www.freecodecamp.org/icons/icon-144x144.png",
+      "cover_template": "notes",
+      "cover_variant": "balanced",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "VoronDesign/Voron-2",
+      "name": "Voron 2.4",
+      "title": "从一份开源图纸，走向一台 3D 打印机",
+      "summary": "开放设计文件与制作资料的 CoreXY 3D 打印机项目。",
+      "category": "hardware",
+      "related_categories": [],
+      "tags": [
+        "3D 打印",
+        "机械设计",
+        "DIY"
+      ],
+      "effort": "需要采购材料与装配经验",
+      "cover_url": "/open-source-media/voron.jpg",
+      "cover_caption": "项目 README 实物图",
+      "homepage_url": "https://vorondesign.com",
+      "highlights": [
+        "开放机械设计与制作资料",
+        "可以结合物料清单研究结构",
+        "适合将机械、电子与控制知识联系起来"
+      ],
+      "audience": "适合已有一定机械装配、电子和 3D 打印经验的爱好者。",
+      "getting_started": "先阅读官方说明、配置器和物料清单，评估预算、工具与装配空间后再动手。",
+      "notes": [
+        "需要真实硬件采购、装配和调试。",
+        "不同部件可能由其他仓库维护，注意版本与兼容关系。"
+      ],
+      "source_url": "https://github.com/VoronDesign/Voron-2#readme",
+      "featured": true,
+      "order": 8,
+      "cover_style": "photo",
+      "cover_layout": "flow",
+      "cover_accent": "#B36159",
+      "cover_lines": [],
+      "icon_url": "/open-source-media/voron-icon.png",
+      "icon_source_url": "https://vorondesign.com/images/voron_design_logo.png",
+      "cover_template": "photo",
+      "cover_variant": "offset",
+      "icon_fit": "mark-left",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "NationalSecurityAgency/ghidra",
+      "name": "Ghidra",
+      "title": "从编译后的程序，理解软件如何工作",
+      "summary": "提供反汇编、反编译与程序分析能力的软件逆向工程框架。",
+      "category": "security",
+      "related_categories": [
+        "dev"
+      ],
+      "tags": [
+        "逆向分析",
+        "反编译",
+        "程序分析"
+      ],
+      "effort": "需要程序分析基础",
+      "cover_url": "",
+      "cover_caption": "",
+      "homepage_url": "https://ghidra-sre.org",
+      "highlights": [
+        "将反汇编、反编译和分析工具组织在一起",
+        "支持多种平台与处理器架构",
+        "可以通过脚本扩展分析过程"
+      ],
+      "audience": "适合学习程序分析、研究编译结果或进行授权安全研究的人。",
+      "getting_started": "按仓库说明配置运行环境，再用自己编写并编译的小程序熟悉分析界面。",
+      "notes": [
+        "所需 JDK 与构建条件以当前版本文档为准。"
+      ],
+      "source_url": "https://github.com/NationalSecurityAgency/ghidra#readme",
+      "featured": true,
+      "order": 9,
+      "cover_style": "illustration",
+      "cover_layout": "flow",
+      "cover_accent": "#9D7159",
+      "cover_lines": [
+        "反汇编",
+        "反编译",
+        "脚本"
+      ],
+      "icon_url": "/open-source-media/ghidra-icon.png",
+      "icon_source_url": "https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/master/Ghidra/Features/Base/src/main/resources/images/GHIDRA_3.png",
+      "cover_template": "flow",
+      "cover_variant": "balanced",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "OpenTTD/OpenTTD",
+      "name": "OpenTTD",
+      "title": "用铁路、公路和航线，搭建自己的运输网络",
+      "summary": "围绕交通运输与经营展开的开源模拟游戏。",
+      "category": "fun",
+      "related_categories": [],
+      "tags": [
+        "模拟经营",
+        "交通",
+        "开源游戏"
+      ],
+      "effort": "下载安装后游玩",
+      "cover_url": "",
+      "cover_caption": "",
+      "homepage_url": "https://www.openttd.org",
+      "highlights": [
+        "围绕多种交通方式建设运输网络",
+        "可以在游戏中探索调度与经营",
+        "源码公开，也能研究模拟游戏的实现"
+      ],
+      "audience": "适合喜欢运输规划、模拟经营和慢慢建设的玩家。",
+      "getting_started": "从官网获取适合平台的版本，按照官方指南准备图形、声音等基础资源。",
+      "notes": [
+        "游戏代码与基础图形、声音资源有各自的许可和获取方式。"
+      ],
+      "source_url": "https://github.com/OpenTTD/OpenTTD#readme",
+      "featured": true,
+      "order": 10,
+      "cover_style": "illustration",
+      "cover_layout": "flow",
+      "cover_accent": "#718260",
+      "cover_lines": [
+        "城市",
+        "铁路",
+        "港口"
+      ],
+      "icon_url": "/open-source-media/openttd-icon.png",
+      "icon_source_url": "https://www.openttd.org/static/favicon.ico",
+      "cover_template": "flow",
+      "cover_variant": "offset",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "withastro/astro",
+      "name": "Astro",
+      "title": "从一篇文章开始，搭一个自己的站点",
+      "summary": "面向内容网站的 Web 框架，适合博客、文档与展示页面。",
+      "category": "web",
+      "related_categories": [
+        "dev"
+      ],
+      "tags": [
+        "博客",
+        "文档网站",
+        "前端"
+      ],
+      "effort": "需要 Node.js 与前端基础",
+      "cover_url": "",
+      "cover_caption": "",
+      "homepage_url": "https://astro.build",
+      "highlights": [
+        "围绕内容网站组织开发体验",
+        "可以按需加入交互组件",
+        "有文档与主题生态帮助开始建站"
+      ],
+      "audience": "适合想搭博客、文档站或内容网站，并愿意接触前端开发的人。",
+      "getting_started": "阅读官方入门文档，创建一个最小项目并在本地预览，再添加自己的第一篇内容。",
+      "notes": [
+        "部署方式与运行成本取决于站点功能和所选服务。"
+      ],
+      "source_url": "https://github.com/withastro/astro#readme",
+      "featured": true,
+      "order": 11,
+      "cover_style": "illustration",
+      "cover_layout": "notes",
+      "cover_accent": "#9C6C91",
+      "cover_lines": [
+        "首页",
+        "文章",
+        "文档"
+      ],
+      "icon_url": "/open-source-media/astro-icon.svg",
+      "icon_source_url": "https://astro.build/favicon.svg",
+      "cover_template": "notes",
+      "cover_variant": "balanced",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    },
+    {
+      "full_name": "modelcontextprotocol/servers",
+      "name": "MCP Servers",
+      "title": "看看 AI 是怎样连接外部工具的",
+      "summary": "MCP 参考服务实现仓库，用于理解协议如何连接工具与数据。",
+      "category": "skills",
+      "related_categories": [
+        "ai",
+        "dev"
+      ],
+      "tags": [
+        "MCP",
+        "参考实现",
+        "连接器"
+      ],
+      "effort": "需要配置兼容客户端",
+      "cover_url": "",
+      "cover_caption": "",
+      "homepage_url": "https://modelcontextprotocol.io",
+      "highlights": [
+        "提供可以阅读的协议参考服务实现",
+        "帮助理解工具与数据的连接方式",
+        "适合结合协议文档研究实际代码"
+      ],
+      "audience": "适合希望理解 MCP 工作方式、开发服务或配置客户端的人。",
+      "getting_started": "从仓库当前维护的参考服务开始，先看清依赖、启动方式和访问权限。",
+      "notes": [
+        "参考实现不等于面向生产的完整服务目录。",
+        "客户端兼容性与服务权限需要分别配置。"
+      ],
+      "source_url": "https://github.com/modelcontextprotocol/servers#readme",
+      "featured": true,
+      "order": 12,
+      "cover_style": "illustration",
+      "cover_layout": "flow",
+      "cover_accent": "#6F7884",
+      "cover_lines": [
+        "工具",
+        "MCP",
+        "智能体"
+      ],
+      "icon_url": "/open-source-media/mcp-icon.png",
+      "icon_source_url": "https://modelcontextprotocol.io/mintlify-assets/_mintlify/favicons/mcp/ebiVJzri-bsiCfVZ/_generated/favicon/apple-touch-icon.png",
+      "cover_template": "flow",
+      "cover_variant": "offset",
+      "icon_fit": "contain",
+      "cover_focus_x": 50,
+      "cover_focus_y": 46
+    }
+  ],
+  "collections": [
+    {
+      "key": "ideas-to-things",
+      "title": "把想法变成看得见的东西",
+      "summary": "从一张草图、一篇文章，到可以摸到的硬件。",
+      "description": "开源项目的价值，也藏在创造的过程里。这组项目分别提供画图、发布内容和制作硬件的起点，可以按自己的兴趣与经验选择。",
+      "projects": [
+        "excalidraw/excalidraw",
+        "withastro/astro",
+        "VoronDesign/Voron-2"
+      ],
+      "notes": [
+        "用白板讲清一个想法，先把讨论变得具体。",
+        "把整理好的内容放上自己的站点，开始持续表达。",
+        "如果想进一步动手，可以先从图纸和物料清单了解硬件。"
+      ]
+    },
+    {
+      "key": "understand-ai-tools",
+      "title": "从运行模型，到给 AI 增加能力",
+      "summary": "一起看懂模型、技能与连接器各自做什么。",
+      "description": "本地模型、Skill 和 MCP 解决的是不同问题。这组项目帮助建立初步认识：模型怎样运行，工作方法怎样组织，工具又怎样连接。",
+      "projects": [
+        "ollama/ollama",
+        "obra/superpowers",
+        "modelcontextprotocol/servers"
+      ],
+      "notes": [
+        "了解模型运行工具，先确认自己的设备条件。",
+        "阅读技能指令，看看工作流程如何被组织。",
+        "结合参考代码理解 MCP 的连接方式。"
+      ]
+    }
+  ]
+}

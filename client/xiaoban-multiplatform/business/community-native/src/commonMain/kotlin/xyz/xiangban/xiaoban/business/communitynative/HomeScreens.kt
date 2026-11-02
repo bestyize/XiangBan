@@ -78,9 +78,9 @@ import xyz.xiangban.xiaoban.common.community.kindLabel
 import xyz.xiangban.xiaoban.common.community.parseIsoMillis
 import xyz.xiangban.xiaoban.common.community.rankModels
 
-/** 社区首页的五个二级栏目。 */
+/** 社区首页栏目。 */
 internal enum class HomeSub(val key: String, val label: String) {
-    Recommend("recommend", "推荐"), Hot("hot", "开源热榜"), Rank("rank", "排行榜"), Track("track", "追踪"), Nav("nav", "导航");
+    Recommend("recommend", "推荐"), OpenSource("open-source", "精选"), Hot("hot", "开源热榜"), Rank("rank", "排行榜"), Track("track", "追踪"), Nav("nav", "导航");
 
     companion object {
         fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: Recommend
@@ -345,16 +345,14 @@ private fun PeriodCard(issue: RepoIssue, onPast: () -> Unit) {
     }
 }
 
-/** 热榜卡：右上角贴边的名次角标，左边图标块、仓库名、简介、语言和星数，右边小柱、新增、收藏圆钮。 */
+/** 热榜卡：名次、仓库、简介、语言和实际星数；收藏操作留在详情页。 */
 @Composable
 private fun RepoCard(env: CommunityEnv, r: RepoRank, open: (Route) -> Unit) {
-    val (fav, setFav) = rememberPrefFlag(env, "fav_repo:${r.fullName}")
     WhiteCard(Modifier.clickable { openRepo(env, r, open) }, padding = 14.dp) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(r.rank.toString().padStart(2, '0'), style = XType.Secondary, fontWeight = FontWeight.Medium, color = if (r.rank <= 3) Brand else LocalExtraColors.current.ink3)
             RepoTile(r, 32.dp, 8.dp)
             Text(r.fullName, Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            IconTap(XIcons.Bookmark, if (fav) "取消收藏 ${r.fullName}" else "收藏 ${r.fullName}", { setFav(!fav) }, size = 19.dp, tint = if (fav) Brand else LocalExtraColors.current.ink3)
         }
         if (r.shownDescription.isNotBlank()) Text(r.shownDescription, Modifier.padding(top = 8.dp), fontSize = 13.sp, lineHeight = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

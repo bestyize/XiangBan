@@ -7,7 +7,7 @@ const legacyCategories = new Set(channels.channels.filter(c => 'legacy_only' in 
 export function isLegacyCategory(slug:string) { return legacyCategories.has(canonicalCategory(slug)) }
 export const DISCUSSION_TABS = [{key:'create',label:'创作'},{key:'learn',label:'学习和教程'},{key:'casual',label:'休闲'}]
 export const LEARN_FILTERS = [{key:'',label:'全部'},{key:'claude-code',label:'Claude Code'},{key:'codex',label:'Codex'},{key:'提示词',label:'提示词'},{key:'工作流',label:'工作流'},{key:'本地部署',label:'本地部署'},{key:'ai-硬件',label:'AI 硬件'}]
-export const RESOURCE_TABS = [{key:'tools',label:'AI 工具'},{key:'docs',label:'资料'},{key:'media',label:'影音娱乐'},{key:'help',label:'求助悬赏'},{key:'open',label:'开源精选'}]
+export const RESOURCE_TABS = [{key:'tools',label:'AI 工具'},{key:'docs',label:'资料'},{key:'media',label:'影音娱乐'},{key:'help',label:'求助悬赏'},{key:'open',label:'精选'}]
 export const LEARN_CATEGORIES = 'learn'
 export function learnCategory(filter:string) {
   return ({'claude-code':'learn-claude-code',codex:'learn-codex','提示词':'learn-prompts','工作流':'learn-workflows','本地部署':'learn-local','ai-硬件':'learn-hardware'} as Record<string,string>)[filter] || 'learn'

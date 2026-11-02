@@ -30,6 +30,7 @@ fn parse(owner: &str, repo: &str) -> AppResult<String> {
 }
 
 async fn ensure_repo(pool: &PgPool, key: &str) -> AppResult<()> {
+    if super::open_source_workflow::contains(pool,key).await? { return Ok(()); }
     let (found,): (bool,) = sqlx::query_as(&format!("SELECT EXISTS(SELECT 1 FROM discover_items WHERE {PUBLISHED} AND {HAS_REPO})")).bind(key).fetch_one(pool).await?;
     if found { Ok(()) } else { Err(AppError::not_found("项目")) }
 }

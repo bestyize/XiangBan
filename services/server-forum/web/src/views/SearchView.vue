@@ -10,13 +10,19 @@ import { contentApi, type PackItem } from '@/api/content'
 import type { TopicItem } from '@/api/types'
 import { useToast } from '@/stores/toast'
 import { useHead } from '@/lib/head'
+import { filterProjects } from '@/lib/openSource'
+import { openSourceCatalog, loadOpenSourceCatalog } from '@/stores/openSource'
+import OpenSourceProjectCard from '@/components/community/OpenSourceProjectCard.vue'
+import '@/components/community/open-source.css'
 
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 
 const q = computed(() => (typeof route.query.q === 'string' ? route.query.q.trim() : ''))
+void loadOpenSourceCatalog()
 const input = ref(q.value)
+const projects = computed(() => q.value ? filterProjects(openSourceCatalog.projects, 'all', q.value) : [])
 useHead(() => ({ title: q.value ? `搜索 ${q.value}` : '搜索' }))
 
 const items = ref<TopicItem[]>([])
@@ -74,11 +80,15 @@ function submit() {
   <ForumShell :rail="false">
     <form class="search" role="search" @submit.prevent="submit">
       <label for="search-page" class="sr-only">搜索</label>
-      <input id="search-page" v-model="input" class="input" type="search" maxlength="50" placeholder="搜帖子或内容" />
+      <input id="search-page" v-model="input" class="input" type="search" maxlength="50" placeholder="搜项目、帖子或内容" />
       <button class="btn btn-primary" type="submit">搜索</button>
     </form>
 
     <template v-if="q">
+      <section v-if="projects.length" class="packs" aria-label="开源项目搜索结果">
+        <p class="summary muted">开源项目 {{ projects.length }} 个</p>
+        <div class="os-project-grid"><OpenSourceProjectCard v-for="project in projects" :key="project.full_name" :project="project" /></div>
+      </section>
       <section v-if="packs.length" class="packs">
         <p class="summary muted">内容 {{ packTotal }} 个</p>
         <div class="pack-grid">
@@ -89,7 +99,7 @@ function submit() {
       <TopicList :items="items" :loading="loading" empty="没有找到，换个关键词试试。" />
       <PagerNav :page="page" :page-size="30" :total="total" @go="load" />
     </template>
-    <p v-else class="muted hint">输入任何关键词，搜帖子和内容包。</p>
+    <p v-else class="muted hint">输入任何关键词，搜开源项目、帖子和内容包。</p>
   </ForumShell>
 </template>
 

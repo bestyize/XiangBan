@@ -9,6 +9,7 @@ import RequestState from '@/components/community/RequestState.vue'
 import { useCommunityResource } from '@/components/community/resource'
 import { displayDate, repoGrowth } from '@/components/community/contract'
 import { useHead } from '@/lib/head'
+import { useRepoBookmarks } from '@/lib/repoBookmarks'
 import '@/components/community/community.css'
 const route = useRoute()
 const owner = computed(() => String(route.params.owner || ''))
@@ -23,16 +24,10 @@ const blocks = computed(() => (showZh.value ? d.value?.readme.zh_blocks : d.valu
 const long = computed(() => blocks.value.length > 14)
 const color = computed(() => (/^#[\da-f]{6}$/i.test(d.value?.language_color || '') ? d.value!.language_color : 'var(--ink-3)'))
 const github = computed(() => `https://github.com/${encodeURIComponent(owner.value)}/${encodeURIComponent(repo.value)}`)
-const saveKey = 'xiaoban.web.repo-bookmarks'
-const saved = ref(false), saveError = ref('')
-function readSaved():string[] { try { const v = JSON.parse(localStorage.getItem(saveKey) || '[]'); return Array.isArray(v) ? v.filter((s:unknown): s is string => typeof s === 'string').slice(0, 500) : [] } catch { return [] } }
-watch(d, value => { saved.value = !!value && readSaved().includes(value.full_name) })
-function toggleSave() {
-  if (!d.value) return
-  const name = d.value.full_name, next = !saved.value
-  try { const old = readSaved().filter(v => v !== name); localStorage.setItem(saveKey, JSON.stringify(next ? [name, ...old].slice(0, 500) : old)); saved.value = next; saveError.value = '' }
-  catch { saveError.value = '浏览器无法保存收藏' }
-}
+const bookmarks = useRepoBookmarks()
+const saved = computed(() => !!d.value && bookmarks.has(d.value.full_name))
+const saveError = bookmarks.error
+function toggleSave() { if (d.value) bookmarks.toggle(d.value.full_name) }
 function jumpToComments() { document.getElementById('comments')?.scrollIntoView({ behavior:'smooth', block:'start' }) }
 useHead(() => ({ title:d.value ? `${d.value.full_name} · 开源热榜` : '项目详情' }))
 </script>

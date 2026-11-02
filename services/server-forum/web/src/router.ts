@@ -16,6 +16,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/daily/:key', name: 'daily-detail', component: () => import('@/views/DailyView.vue') },
   { path: '/tools/:key', name: 'tool-detail', component: () => import('@/views/ToolView.vue') },
   { path: '/repo/:owner/:repo', name: 'repo-detail', component: () => import('@/views/RepoView.vue') },
+  { path: '/open-source', name: 'open-source', redirect: to => ({path:'/', query:{...to.query, tab:'open-source'}}) },
+  { path: '/open-source/collections/:key', name: 'open-source-collection', component: () => import('@/views/OpenSourceCollectionView.vue') },
+  { path: '/open-source/:owner/:repo', name: 'open-source-project', component: () => import('@/views/OpenSourceDetailView.vue') },
   { path: '/discuss', name: 'discuss', component: DiscussView },
   { path: '/models', name: 'model-rankings', component: () => import('@/views/ModelRankingsView.vue') },
   { path: '/resources', name: 'resources', component: () => import('@/views/ResourcesView.vue') },
@@ -57,7 +60,7 @@ export const router = createRouter({
     if (saved) return saved
     if (to.hash) return { el: to.hash, top: 80 }
     if (to.path === from.path) {
-      if (['/', '/discuss', '/resources', '/models', '/daily'].includes(to.path) && to.fullPath !== from.fullPath) return { top:0 }
+      if (['/', '/discuss', '/resources', '/models', '/daily', '/open-source'].includes(to.path) && to.fullPath !== from.fullPath) return { top:0 }
       return undefined
     }
     return { top: 0 }
@@ -69,6 +72,7 @@ router.afterEach(to => trackRoute(to.name, to.query))
 // 需要登录的页面：没登录就弹登录框，停在原页面（直接打开时回我的页）。
 router.beforeEach((to, from) => {
   if (to.path === '/') {
+    if (to.query.tab === 'repos') return {path:'/', query:{...to.query, tab:'open-source', category:'hot'}}
     const kind = String(to.query.kind || to.query.tab || '')
     if (kind === 'schemes') return { path: '/schemes', query: {...to.query, tab: undefined, kind: undefined} }
     if (['game','widget','wallpaper','effect','pet','skill','expert','workflow','reminder','routine','task','goal'].includes(kind)) {

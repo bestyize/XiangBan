@@ -59,7 +59,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
         Column(Modifier.fillMaxSize()) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
-                CommunitySection.Home -> TabStrip(HomeSub.entries.map { it.key to it.label }, homeSub, centered = true) { homeSub = it }
+                CommunitySection.Home -> TabStrip(HomeSub.entries.filter { it != HomeSub.Hot }.map { it.key to it.label }, if (homeSub == HomeSub.Hot.key) HomeSub.OpenSource.key else homeSub, centered = true) { homeSub = it }
                 CommunitySection.Discuss -> TabStrip(DiscussSub.entries.map { it.key to it.label }, discussSub, centered = true) { discussSub = it }
                 CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, resourceSub, centered = true) { resourceSub = it }
             }
@@ -67,7 +67,8 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
                 when (current) {
                     CommunitySection.Home -> when (HomeSub.byKey(homeSub)) {
                         HomeSub.Recommend -> RecommendTab(env, open, ::switchTo)
-                        HomeSub.Hot -> HotTab(env, open)
+                        HomeSub.OpenSource -> OpenSourceTab(env, open)
+                        HomeSub.Hot -> OpenSourceTab(env, open, initialCategory = "hot")
                         HomeSub.Rank -> RankTab(env, open)
                         HomeSub.Track -> TrackTab(env)
                         HomeSub.Nav -> NavTab(env)

@@ -13,5 +13,6 @@ test('details and legacy scheme pages retain their parent navigation', () => {
   for (const name of ['pack', 'schemes', 'scheme', 'scheme-publish']) strictEqual(areaOf({ name, params: {} }), 'create')
   strictEqual(sectionOf({name:'tool-detail',params:{key:'example'}}), 'resources')
   strictEqual(sectionOf({name:'daily-detail',params:{key:'example'}}), 'home')
+  for (const name of ['open-source','open-source-project','open-source-collection']) strictEqual(sectionOf({name,params:{}}), 'home')
   strictEqual(areaOf({name:'content-bookmarks',params:{}}), 'me')
 })

@@ -71,6 +71,8 @@ Android 冷启动后延迟约 2 秒，在后台静默下载本地语音组件及
 
 ## 开发与验证
 
+精选（2026-11-03，本地实现）：首页与资源中提供同一目录的分类与标签；原开源热榜合并为第二个子 TAB「热榜」，保留旧导航状态与往期榜单；关键词搜索复用顶栏入口，收藏操作仅在项目详情显示。支持 Logo 搭配截图、实物照片或明确标注示意的 16:9 项目封面、专题卡、项目中文导读、官方资料链接和原有仓库评论。历史开源帖子保留「社区分享」入口。目录由 `GET /api/open-source` 返回，与网页读取同一已发布目录（首次发布前使用 `services/server-forum/editorial/open-source.json`），封面配置由精选专属规则解析；此规则不适用于其他社区板块。后台保存与发布流程见论坛 README，依赖论坛服务部署该接口；加载失败显示重试，不以示例数据替代。收藏保存在设备偏好，与开源热榜沿用同一仓库键，未实现账号同步。验证：`:business:community-native:compileAndroidMain`、`:common:community-core:jvmTest --tests '*OpenSourceTest*'`；未做 Android/iOS 实机验收。
+
 Android 与 iOS 在本目录运行。`local.properties` 的 `sdk.dir` 为空时设置 `ANDROID_HOME`（macOS 通常是 `~/Library/Android/sdk`）。
 
 ```sh

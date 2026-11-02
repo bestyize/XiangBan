@@ -14,6 +14,7 @@ import RequestState from '@/components/community/RequestState.vue'
 import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
 import MasonryGrid from '@/components/community/MasonryGrid.vue'
 import EditorialArticles from '@/components/community/EditorialArticles.vue'
+import OpenSourceFeed from '@/components/community/OpenSourceFeed.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { useCommunityResource } from '@/components/community/resource'
 import { webLink } from '@/components/community/contract'
@@ -34,8 +35,9 @@ const tab = computed(() => tabs.some(t => t.key === route.query.tab) ? String(ro
 const sectionTitle = computed(() => tabs.find(item => item.key === tab.value)?.label || '资源')
 const page = computed(() => Math.max(1, Math.floor(Number(route.query.page) || 1)))
 const filter = computed(() => tab.value === 'media' ? String(route.query.filter || '') : '')
-type ResourceData = { kind:'tools'; items:ToolSummary[] } | { kind:'docs'; groups:Group<DocItem>[] } | { kind:'topics'; result:Page<TopicItem> }
+type ResourceData = { kind:'tools'; items:ToolSummary[] } | { kind:'docs'; groups:Group<DocItem>[] } | { kind:'topics'; result:Page<TopicItem> } | { kind:'open' }
 const { data, loading, error, load } = useCommunityResource<ResourceData>(async () => {
+  if (tab.value === 'open') return { kind:'open' }
   if (tab.value === 'tools') return { kind:'tools', ...(await discoverApi.tools()) }
   if (tab.value === 'docs') return { kind:'docs', ...(await discoverApi.docs()) }
   const category = resourceTopicCategory(tab.value, filter.value)
@@ -53,6 +55,7 @@ useHead(() => ({ title:'资源' }))
     <h1 class="sr-only">社区资源</h1>
     <CommunityTabs :items="tabs" :active="tab" label="资源栏目" @change="setTab" />
     <CommunityTabs v-if="tab === 'media'" :items="mediaFilters" :active="filter" label="资源筛选" @change="setFilter" />
+    <OpenSourceFeed v-if="tab === 'open'" />
     <HelpStats v-if="tab === 'help'" />
     <EditorialArticles v-if="tab === 'tools' || tab === 'docs'" :category="resourceTopicCategory(tab,filter)" :title="tab === 'tools' ? '工具导读' : '资料导读'" />
     <p v-if="tab === 'docs'" class="resource-note">官方文档的索引和导读，原文一律跳转官网。</p>

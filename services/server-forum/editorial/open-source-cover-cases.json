@@ -1,0 +1,110 @@
+[
+  {
+    "input": {
+      "full_name": "Example/Tool",
+      "category": "dev",
+      "tags": [],
+      "cover_template": "auto",
+      "cover_url": ""
+    },
+    "expected": {
+      "cover_template": "auto",
+      "cover_style": "illustration",
+      "cover_layout": "flow"
+    }
+  },
+  {
+    "input": {
+      "full_name": "Example/Tool",
+      "category": "hardware",
+      "tags": [],
+      "cover_template": "auto",
+      "cover_url": "https://example.com/part.jpg"
+    },
+    "expected": {
+      "cover_style": "photo",
+      "cover_layout": "flow"
+    }
+  },
+  {
+    "input": {
+      "full_name": "Example/Tool",
+      "category": "office",
+      "tags": [],
+      "cover_template": "auto",
+      "cover_url": "https://example.com/screen.png"
+    },
+    "expected": {
+      "cover_style": "screen",
+      "cover_layout": "flow"
+    }
+  },
+  {
+    "input": {
+      "full_name": "Example/Tool",
+      "category": "learn",
+      "tags": [],
+      "cover_template": "auto",
+      "cover_url": ""
+    },
+    "expected": {
+      "cover_style": "illustration",
+      "cover_layout": "notes"
+    }
+  },
+  {
+    "input": {
+      "full_name": "Example/Tool",
+      "category": "dev",
+      "tags": [
+        "命令行"
+      ],
+      "cover_template": "auto",
+      "cover_url": ""
+    },
+    "expected": {
+      "cover_style": "illustration",
+      "cover_layout": "terminal",
+      "cover_lines": [
+        "命令行"
+      ]
+    }
+  },
+  {
+    "input": {
+      "full_name": "Example/Tool",
+      "category": "office",
+      "tags": [],
+      "cover_template": "screenshot",
+      "cover_url": ""
+    },
+    "expected": {
+      "cover_template": "screenshot",
+      "cover_style": "illustration",
+      "cover_layout": "flow"
+    }
+  },
+  {
+    "input": {
+      "full_name": "Example/Tool",
+      "category": "dev",
+      "tags": [],
+      "cover_template": "notes",
+      "cover_variant": "wide",
+      "cover_accent": "#123456",
+      "cover_focus_x": 13,
+      "cover_focus_y": 76,
+      "icon_fit": "mark-left",
+      "cover_url": ""
+    },
+    "expected": {
+      "cover_style": "illustration",
+      "cover_layout": "notes",
+      "cover_variant": "wide",
+      "cover_accent": "#123456",
+      "cover_focus_x": 13.0,
+      "cover_focus_y": 76.0,
+      "icon_fit": "mark-left"
+    }
+  }
+]

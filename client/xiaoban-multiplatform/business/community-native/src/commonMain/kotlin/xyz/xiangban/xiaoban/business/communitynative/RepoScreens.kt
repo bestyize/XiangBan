@@ -31,6 +31,7 @@ import xyz.xiangban.xiaoban.common.community.NewsComment
 import xyz.xiangban.xiaoban.common.community.ReadmeBlock
 import xyz.xiangban.xiaoban.common.community.RepoDetail
 import xyz.xiangban.xiaoban.common.community.RepoRank
+import xyz.xiangban.xiaoban.common.community.OpenSourceCatalog
 import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.formatGain
 import xyz.xiangban.xiaoban.common.community.formatStars
@@ -101,12 +102,13 @@ private fun LangToggle(zh: Boolean, zhEnabled: Boolean, onPick: (Boolean) -> Uni
 }
 
 @Composable
-fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () -> Unit, open: (Route) -> Unit) {
+fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () -> Unit, open: (Route) -> Unit, curated: Boolean = false) {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
     val name = "$owner/$repo"
     val (fav, setFav) = rememberPrefFlag(env, "fav_repo:$name")
-    var detail by remember(name) { mutableStateOf<RepoDetail?>(null) }
+    var detail by remember(name, curated) { mutableStateOf<RepoDetail?>(null) }
+    var curatedCatalog by remember(name, curated) { mutableStateOf<OpenSourceCatalog?>(null) }
     var error by remember(name) { mutableStateOf<String?>(null) }
     var loadingDetail by remember(name) { mutableStateOf(false) }
     var zh by rememberSaveable(name) { mutableStateOf(true) }
@@ -127,7 +129,14 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
         if (loadingDetail) return
         loadingDetail = true; error = null
         scope.launch {
-            try { detail = env.forum.repoDetail(owner, repo) }
+            try {
+                if (curated) {
+                    val catalog = env.forum.openSourceCatalog()
+                    val project = catalog.project(name) ?: error("这个项目尚未收录")
+                    curatedCatalog = catalog
+                    detail = RepoDetail(fullName = project.fullName)
+                } else detail = env.forum.repoDetail(owner, repo)
+            }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { error = messageOf(e) }
             finally { loadingDetail = false }
@@ -146,10 +155,10 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
             finally { loadingComments = false }
         }
     }
-    LaunchedEffect(name) { loadDetail(); loadComments(true) }
+    LaunchedEffect(name, curated) { loadDetail(); loadComments(true) }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        ScreenBar("仓库详情", onBack = back)
+        ScreenBar(if (curated) "项目导读" else "仓库详情", onBack = back)
         val d = detail
         if (d == null) {
             Box(Modifier.weight(1f)) {
@@ -170,8 +179,15 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                 else -> null
             }
             // 评论标题前面的项数：卡片、介绍标题，再加 README 部分（提示、各块、展开按钮，或"没有 README"）。
-            val commentsIndex = 2 + if (hasReadme) (if (note != null) 1 else 0) + shown.size + (if (long) 1 else 0) else 1
+            val commentsIndex = if (curated) 1 else 2 + if (hasReadme) (if (note != null) 1 else 0) + shown.size + (if (long) 1 else 0) else 1
             LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(bottom = 24.dp)) {
+                if (curated) {
+                    item(key = "curated-article") {
+                        val catalog = curatedCatalog
+                        val project = catalog?.project(name)
+                        if (catalog != null && project != null) OpenSourceArticle(env, catalog, project)
+                    }
+                } else {
                 item(key = "hero") {
                     Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp)) {
                         val asRank = RepoRank(rank = d.rank, fullName = d.fullName, language = d.language, languageColor = d.languageColor)
@@ -254,6 +270,7 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                         Text(if (d.readme.status == "none") "这个仓库没有 README" else "暂时无法获取 README", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                         Text(if (d.readme.status == "none") "作者还没有写项目介绍，可以去 GitHub 查看代码和文档。" else "稍后再来看看，或直接去 GitHub 查看。", Modifier.padding(top = 4.dp), fontSize = 13.sp, lineHeight = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     }
+                }
                 }
                 item(key = "comments-head") {
                     Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {

@@ -24,6 +24,8 @@ use sqlx::PgPool;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .route("/open-source", get(super::open_source::list))
+        .route("/open-source/assets/{id}", get(super::open_source_assets::public))
         .route("/discover/home", get(home))
         .route("/discover/home/v2", get(home_v2))
         .route("/discover/daily", get(daily))

@@ -19,6 +19,8 @@ mod model_rankings;
 
 #[path = "discover_repo_tests.rs"]
 mod repo_detail;
+#[path = "open_source_tests.rs"]
+mod open_source_system;
 
 async fn call(app: &axum::Router, method: &str, path: &str, token: Option<&str>, body: Value) -> (StatusCode, Value) {
     let mut req = Request::builder().method(method).uri(path).header("content-type", "application/json");

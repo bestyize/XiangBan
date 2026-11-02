@@ -60,7 +60,7 @@ import xyz.xiangban.xiaoban.common.community.remainText
 
 /** 资源的五个二级栏目。 */
 internal enum class ResourceSub(val key: String, val label: String) {
-    Tools("tools", "AI 工具"), Docs("docs", "资料"), Media("media", "影音娱乐"), Help("help", "求助悬赏"), Open("open", "开源精选");
+    Tools("tools", "AI 工具"), Docs("docs", "资料"), Media("media", "影音娱乐"), Help("help", "求助悬赏"), Open("open", "精选");
 
     companion object {
         fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: Tools
@@ -74,7 +74,7 @@ internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> U
         ResourceSub.Docs -> DocsTab(env)
         ResourceSub.Media -> MediaTab(env, open, onMessage)
         ResourceSub.Help -> HelpTab(env, open)
-        ResourceSub.Open -> OpenTab(env, open, onMessage)
+        ResourceSub.Open -> OpenSourceTab(env, open)
     }
 }
 
@@ -187,7 +187,7 @@ private fun DocsTab(env: CommunityEnv) {
     }
 }
 
-// ───────────── 影音娱乐、开源精选 ─────────────
+// ───────────── 影音娱乐、精选 ─────────────
 
 @Composable
 private fun MediaTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (String) -> Unit) {
@@ -209,10 +209,10 @@ private fun MediaTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (Strin
 }
 
 @Composable
-private fun OpenTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (String) -> Unit) {
+internal fun OpenSourceCommunityShares(env: CommunityEnv, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
-    val controller = remember(env) { DiscussController(env.forum, scope, category = "share-software", tag = "开源", home = false) }
-    TopicFeed(controller, "还没有开源精选", open, header = { TabNote("只收开源、免费软件和可免费使用的设计素材。") }) { topic ->
+    val controller = remember(env) { DiscussController(env.forum, scope, category = "resource-open", home = false) }
+    TopicFeed(controller, "还没有社区分享", open) { topic ->
         // 有真实配图时显示缩略图，保留标题、来源标签、浏览数和作者。
         Row(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             topic.images.firstOrNull()?.let { Cover(env.forum.imageUrl(it), topic.id, Modifier.size(88.dp)) }

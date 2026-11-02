@@ -6,10 +6,10 @@ import CommunityTabs from '@/components/community/CommunityTabs.vue'
 import NewsRow from '@/components/community/NewsRow.vue'
 import FrontierBanner from '@/components/community/FrontierBanner.vue'
 import RequestState from '@/components/community/RequestState.vue'
-import RepoBoard from '@/components/community/RepoBoard.vue'
 import ModelPreview from '@/components/community/ModelPreview.vue'
 import TrackerPanel from '@/components/community/TrackerPanel.vue'
 import NavDirectory from '@/components/community/NavDirectory.vue'
+import OpenSourceFeed from '@/components/community/OpenSourceFeed.vue'
 import { useCommunityResource } from '@/components/community/resource'
 import { repoMetric, webLink } from '@/components/community/contract'
 import DiscoverGlyph from '@/components/community/DiscoverGlyph.vue'
@@ -20,7 +20,7 @@ import ProjectFeed from '@/components/ProjectFeed.vue'
 import { useHead } from '@/lib/head'
 import '@/components/community/community.css'
 const route = useRoute(), router = useRouter()
-const tabs = [{ key: 'recommend', label: '推荐' }, { key: 'rankings', label: '排行榜' }, { key: 'repos', label: '开源热榜' }, { key: 'tracker', label: '追踪' }, { key: 'nav', label: '导航' }]
+const tabs = [{ key: 'recommend', label: '推荐' }, { key: 'open-source', label: '精选' }, { key: 'rankings', label: '排行榜' }, { key: 'tracker', label: '追踪' }, { key: 'nav', label: '导航' }]
 const tab = computed(() => {
   const raw = String(route.query.tab || 'recommend')
   return tabs.some(t => t.key === raw) || raw === 'weekly' || raw === 'projects' ? raw : 'recommend'
@@ -29,7 +29,7 @@ const { data, loading, error, load } = useCommunityResource(discoverApi.home)
 const frontier = useCommunityResource(() => discoverApi.frontier(1))
 void frontier.load()
 watch(tab, current => { if (current === 'recommend') void load() }, { immediate: true })
-function setTab(key: string) { void router.replace({ query: { ...(key === 'recommend' ? {} : { tab: key }) } }) }
+function setTab(key: string) { void router.replace({ query: key === 'repos' ? { tab:'open-source', category:'hot' } : { ...(key === 'recommend' ? {} : { tab: key }) } }) }
 const banners = computed(() => (data.value?.banners || []).map(banner => {
   const link = banner.link || ''
   const match = /^(topic|pack|tool|weekly):(.+)$/.exec(link)
@@ -55,7 +55,7 @@ useHead(() => ({ title: '社区' }))
       <p v-if="data.sample" class="sample-note"><DiscoverGlyph name="info" :size="14"/>带「示例」字样的条目为示例数据。</p>
     </div>
   </template>
-  <RepoBoard v-else-if="tab === 'repos'" />
+  <OpenSourceFeed v-else-if="tab === 'open-source'" />
   <ModelPreview v-else-if="tab === 'rankings'" />
   <TrackerPanel v-else-if="tab === 'tracker'" />
   <NavDirectory v-else />

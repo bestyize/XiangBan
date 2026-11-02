@@ -27,6 +27,9 @@ sealed interface Route {
     data class News(val key: String) : Route
     /** 开源热榜项目的站内详情：仓库卡片、中文 README、评论。 */
     data class Repo(val owner: String, val repo: String) : Route
+    data class OpenSource(val owner: String, val repo: String) : Route
+    data class OpenSourceCollection(val key: String) : Route
+    data object OpenSourceShares : Route
     /** 模型天梯。 */
     data object Leaderboard : Route
     /** OpenRouter 调用量 Top 50 与历史完整日榜。 */
@@ -71,6 +74,9 @@ sealed interface Route {
         Daily -> "daily"
         is News -> "news:${key.encodeURLParameter()}"
         is Repo -> "repo:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
+        is OpenSource -> "opensource:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
+        is OpenSourceCollection -> "opensource-collection:${key.encodeURLParameter()}"
+        OpenSourceShares -> "opensource-shares"
         Leaderboard -> "leaderboard"
         UsageLeaderboard -> "usage-leaderboard"
         Scatter -> "scatter"
@@ -111,10 +117,14 @@ sealed interface Route {
                 "tool" -> value.takeIf { it.isNotEmpty() }?.let(::Tool)
                 "daily" -> Daily
                 "news" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::News) }.getOrNull()
-                "repo" -> runCatching {
+                "opensource-collection" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::OpenSourceCollection) }.getOrNull()
+                "opensource-shares" -> OpenSourceShares
+                "repo", "opensource" -> runCatching {
                     val owner = value.substringBefore('/').decodeURLPart()
                     val repo = value.substringAfter('/', "").decodeURLPart()
-                    if (owner.isNotBlank() && repo.isNotBlank() && '/' !in owner && '/' !in repo) Repo(owner, repo) else null
+                    if (owner.isNotBlank() && repo.isNotBlank() && '/' !in owner && '/' !in repo) {
+                        if (key == "opensource") OpenSource(owner, repo) else Repo(owner, repo)
+                    } else null
                 }.getOrNull()
                 "leaderboard" -> Leaderboard
                 "usage-leaderboard" -> UsageLeaderboard

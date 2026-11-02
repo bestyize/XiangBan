@@ -1,0 +1,22 @@
+{
+  "scope": "open-source",
+  "version": 1,
+  "width": 1280,
+  "height": 720,
+  "templates": [
+    {"id":"screenshot","label":"界面截图","style":"screen","layout":"flow","requires_media":true},
+    {"id":"photo","label":"实物照片","style":"photo","layout":"flow","requires_media":true},
+    {"id":"flow","label":"流程示意","style":"illustration","layout":"flow","requires_media":false},
+    {"id":"terminal","label":"命令示例","style":"illustration","layout":"terminal","requires_media":false},
+    {"id":"notes","label":"内容示意","style":"illustration","layout":"notes","requires_media":false}
+  ],
+  "variants": [{"id":"balanced","label":"均衡"},{"id":"offset","label":"错位"},{"id":"wide","label":"舒展"}],
+  "palettes": ["#7763B4","#5574B2","#657063","#8A6C9B","#B25E66","#4A8B7B","#5E769A","#B36159","#9D7159","#718260","#9C6C91","#6F7884"],
+  "rules": [
+    {"categories":["hardware","fun"],"requires_media":true,"template":"photo"},
+    {"requires_media":true,"template":"screenshot"},
+    {"categories":["learn","web"],"template":"notes"},
+    {"tags":["命令行","本地模型","模型运行"],"template":"terminal"},
+    {"template":"flow"}
+  ]
+}

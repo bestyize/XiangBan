@@ -26,6 +26,7 @@ import CommunityEditorialPanel from './CommunityEditorialPanel.vue'
 import CommunityOperationsPanel from './CommunityOperationsPanel.vue'
 import AuditPanel from './AuditPanel.vue'
 import AccountPanel from './AccountPanel.vue'
+import OpenSourcePanel from './OpenSourcePanel.vue'
 import { openReports, toasts } from './shared'
 import './admin.css'
 import { useTheme, THEME_LABEL } from '@/lib/theme'
@@ -47,6 +48,7 @@ const SECTIONS = [
   { key: 'projects', label: '项目', comp: ProjectsPanel },
   { key: 'weekly', label: '周刊', comp: WeeklyPanel },
   { key: 'discover', label: '发现页', comp: DiscoverPanel },
+  { key: 'open-source', label: '精选项目', comp: OpenSourcePanel },
   { key: 'collection', label: '内容采集', comp: CollectionPanel },
   { key: 'community-operations', label: '栏目运营', comp: CommunityOperationsPanel },
   { key: 'tool-mirrors', label: '工具镜像', comp: ToolMirrorsPanel },
@@ -57,7 +59,7 @@ const SECTIONS = [
 
 const GROUPS = [
   { label: '工作台', keys: ['', 'metrics'] },
-  { label: '内容运营', keys: ['discover', 'collection', 'community-operations', 'tool-mirrors', 'community-editorial', 'packs', 'projects', 'weekly', 'editor', 'editor-accounts'] },
+  { label: '内容运营', keys: ['discover', 'open-source', 'collection', 'community-operations', 'tool-mirrors', 'community-editorial', 'packs', 'projects', 'weekly', 'editor', 'editor-accounts'] },
   { label: '社区治理', keys: ['reports', 'content-reports', 'moderation', 'topics', 'users', 'categories', 'words'] },
   { label: '系统', keys: ['audit', 'account'] },
 ].map(group => ({...group, sections: group.keys.map(key => SECTIONS.find(section => section.key === key)!)}))
@@ -66,6 +68,7 @@ const DESCRIPTIONS: Record<string,string> = {
   'tool-mirrors': '核验官方安装包，管理资源镜像和下载回退',
   collection: '管理官方数据源，检查采集记录与待审内容', discover: '编排社区栏目，保存草稿并审核发布',
   'community-editorial': '选择首页作品，发起挑战并管理投稿', packs: '审核作品、版本和资源来源',
+  'open-source': '仅管理精选板块的项目、素材、封面模板和发布版本',
   projects: '维护项目介绍与讨论入口', weekly: '组织本期内容，发布社区周刊',
 }
 const route = useRoute()

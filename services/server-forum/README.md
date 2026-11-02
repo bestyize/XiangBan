@@ -107,6 +107,22 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 排行榜概览 `/?tab=rankings` 按手机版顺序展示 AA 智能指数 Top 10、智能 vs 价格散点图、输出速度 Top 5、调用量 Top 5。`/models` 与调用量榜使用可展开的条形排行，支持快照实际提供的能力指标及 UTC 历史日榜。散点图沿用输入/输出 3:1 加权报价、对数价格轴、前沿与中位数优势区，支持厂商筛选、模型定位及全屏搜索。厂商图标来自手机本地资源（附原许可），不请求外部图片。相关验证：`node --experimental-strip-types --test tests/modelRankings.test.ts tests/discover.test.ts tests/navigation.test.ts`（在 web 目录运行）。
 
+### 精选（2026-11-03，本地实现）
+
+首页「精选」与资源入口复用同一目录；原「开源热榜」合并为第二个子 TAB「热榜」，旧 `/?tab=repos` 携带往期期数跳转新入口；`/open-source` 跳转首页精选。推荐、热榜与 11 个用途分类支持跨分类收录、标签筛选，项目卡片与专题卡链接独立导读页；搜索统一进入顶栏，收藏操作仅在项目详情显示。列表封面包含项目 Logo 与名称，下方仅展示推荐标题和标签，不重复名称、收藏状态或使用门槛。历史图文保留在「社区分享」。
+
+**板块边界：以下模板、自动匹配、素材库与发布规则仅用于精选的 GitHub 项目和专题。** 不接入资讯、前沿、讨论、作品、休闲等板块的卡片渲染器；其他板块继续使用各自的内容与封面规范。可以复用图片格式检查等底层能力，不能直接继承精选的版式或匹配策略。
+
+精选封面规则位于 `editorial/open-source-cover-rules.json`：统一 1280×720，提供界面截图、实物照片、流程示意、命令示例、内容示意五个模板，以及均衡、错位、舒展三种构图。自动匹配按素材身份、分类、标签选择，仓库身份稳定决定缺省配色和构图；支持手动选择、品牌色、照片焦点、横向 Logo 裁切和三行示意内容。没有图片时退回明确标注的示意，详情保留上游原图。不依赖模型生图；浏览器与服务端共享清单及协议案例，手机读取服务端解析后的配置。网页管理台可导出 PNG；外部素材受 CORS 限制时，先采集为站内素材或本地上传。
+
+管理入口 `/admin/open-source`，操作顺序为获取 GitHub 资料或手工新增 → 编辑导读与素材 → 保存草稿 → 校验预览 → 发布此版本。GitHub 导入只读取公开仓库元数据和 README 图片候选，过滤徽章，不把作者头像当作项目 Logo，不会自动保存或发布；编辑需核对图片身份与许可。上传支持将 SVG/ICO 在浏览器转成 PNG，服务端仅接收 ≤5 MiB 的 PNG/JPEG/WebP；远程采集逐次检查重定向与公共网络地址。素材按项目归属保存，未被已发布目录引用前仅管理员可预览。
+
+`open_source_catalog` 保存独立草稿、线上快照及版本，`open_source_assets` 保存素材及来源。保存和发布使用事务锁及 `expected_revision` 防止覆盖并发编辑，审计记录保留管理员与版本；只有已保存并通过校验的版本能从管理界面发布。`editorial/open-source.json` 是首版 12 项目、2 专题的随版本目录，首次发布前作为服务端初始内容，发布后以数据库快照为准，允许有意发布空目录。网页 GET `/api/open-source` 后读取线上快照（旧服务无接口时保留随版本目录），手机读取同一接口。精选发布不写入 `discover_items`，不改变其他板块的数据或运营流程。
+
+管理 API 均要求管理员令牌：`GET/PUT /api/admin/open-source` 读取/保存草稿，`POST .../preview` 校验，`POST .../publish` 发布指定已保存版本，`POST .../import-github` 获取资料，`POST .../assets` 上传，`POST .../assets/fetch` 采集，`GET .../assets/{id}` 私有预览。公开素材入口 `/api/open-source/assets/{id}` 仅提供线上目录引用的文件。种子图片来源见 `web/public/open-source-media/README.md`。公开资料导读明确未经本站实测，不伪造 Star 或使用体验；项目评论继续使用原有账号和内容审核规则；收藏沿用设备本地存储，与热榜共用仓库身份。
+
+验证：网页 `npm run build`；在 `web/` 执行 `node --experimental-strip-types --test tests/openSource.test.ts tests/navigation.test.ts tests/cardPresentation.test.ts`。服务端用隔离库运行 `TEST_DATABASE_URL=postgres://… cargo test --manifest-path services/server-forum/Cargo.toml open_source`，覆盖权限、草稿隔离、并发版本、空目录、素材可见性/归属、其他板块隔离和封面协议。手机编译与协议测试见手机项目 README。本轮仅本地实现与验证，未部署生产环境。
+
 ### PC 网页布局（2026-11-02）
 
 公开社区页面在 1024px 起使用独立的 PC 样式：200px 导航栏、与正文对齐的顶部导航和搜索入口，内容区最大 1320px。社区首页的前沿图文、日报、精选作品分清主次，讨论和资源统一卡片与间距，正文保持阅读宽度。排行榜、开源榜、追踪和导航按实际内容宽度切换布局；原先内容容器最大 1000px，却使用 1100px 容器断点，导致宽屏布局无法生效，本轮将其改为 PC 范围内的 960px 内容断点。手机与后台不使用这套桌面样式。 网页窄屏底栏另与手机版对齐：通栏固定、56px 主体加安全区、四个等宽图标文字入口，选中项深色加粗，中间为 44×32px 的品牌色发布按钮；聊天输入区随新底栏高度避让。

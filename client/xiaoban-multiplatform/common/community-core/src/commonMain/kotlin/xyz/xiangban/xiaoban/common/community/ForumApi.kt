@@ -71,6 +71,7 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     }
     private fun repoPath(owner: String, repo: String) = "/api/discover/repo/${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
     suspend fun repoDetail(owner: String, repo: String): RepoDetail = get(repoPath(owner, repo))
+    suspend fun openSourceCatalog(): OpenSourceCatalog = get("/api/open-source")
     suspend fun repoComments(owner: String, repo: String, page: Int = 1): Page<NewsComment> = get("${repoPath(owner, repo)}/comments${query("page" to page)}")
     suspend fun commentRepo(owner: String, repo: String, body: String, replyTo: Long? = null) {
         write(HttpMethod.Post, "${repoPath(owner, repo)}/comments", buildJsonObject {

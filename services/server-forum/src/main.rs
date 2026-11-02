@@ -106,7 +106,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(handlers::model_rankings::routes())
         .merge(handlers::community_editor::public_routes())
         .merge(handbook::api_routes())
-        .nest("/admin", admin::routes().merge(link_health::admin_routes()).nest("/content-social",handlers::content_social::admin_routes()).merge(tool_mirrors::admin_routes()).merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(handlers::discover_editor::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()).merge(handlers::translation_admin::routes()).nest("/collection", handlers::collection::routes()).nest("/community-editorial", handlers::community_editor::admin_routes()))
+        .nest("/admin", admin::routes().merge(link_health::admin_routes()).nest("/content-social",handlers::content_social::admin_routes()).merge(tool_mirrors::admin_routes()).merge(packs::admin_routes()).merge(discover_api::admin_routes()).merge(handlers::discover_editor::admin_routes()).merge(review::admin_routes()).merge(metrics::admin_routes()).merge(handlers::translation_admin::routes()).nest("/collection", handlers::collection::routes()).nest("/community-editorial", handlers::community_editor::admin_routes()).nest("/open-source", handlers::open_source_workflow::admin_routes()))
         .nest("/editor", handlers::editor::routes())
         .nest("/discover-editor", handlers::discover_editor::editor_routes());
 

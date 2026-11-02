@@ -49,6 +49,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import xyz.xiangban.xiaoban.common.community.OpenSourceCatalog
 import xyz.xiangban.xiaoban.common.community.HotWords
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.Pack
@@ -83,7 +84,7 @@ internal fun highlight(text: String, query: String, color: Color): AnnotatedStri
     }
 }
 
-private enum class ResultTab(val label: String) { All("全部"), Packs("作品"), Topics("帖子") }
+private enum class ResultTab(val label: String) { All("全部"), Packs("作品"), Projects("开源项目"), Topics("帖子") }
 
 /**
  * 搜索：灰色页底加白色卡片，输入框是浅灰圆角、没有描边。没输入时是「搜索历史」和「热门搜索」两张卡（前三名名次是红色方块，词右边可带「热」「新」）；
@@ -104,6 +105,10 @@ fun SearchScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     var tabName by rememberSaveable { mutableStateOf(ResultTab.All.name) }
     val hot = rememberLoader(env, "hot-search") { env.forum.hotSearch() }
     val hotState by hot.state.collectAsState()
+    val curated = rememberLoader(env, "search-open-source") { env.forum.openSourceCatalog() }
+    val curatedState by curated.state.collectAsState()
+    val openCatalog = (curatedState as? Load.Ready<OpenSourceCatalog>)?.value
+    val openProjects = if (searched) openCatalog?.filter("all", shown).orEmpty() else emptyList()
 
     fun search(text: String) {
         val q = text.trim()
@@ -152,7 +157,7 @@ fun SearchScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
         }
         when {
             busy -> Spinner()
-            error != null -> CenterMessage(error.orEmpty(), "重试", onAction = { search(query) })
+            error != null && openProjects.isEmpty() -> CenterMessage(error.orEmpty(), "重试", onAction = { search(query) })
             !searched -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val words = (hotState as? Load.Ready<HotWords>)?.value?.items.orEmpty()
                 if (history.isNotEmpty()) WhiteCard(padding = 14.dp) {
@@ -191,28 +196,32 @@ fun SearchScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
                 }
                 if (history.isEmpty() && words.isEmpty()) EmptyState(XIcons.Search, "搜点什么", "输入关键词，搜索社区里的作品、项目和帖子。", Modifier.padding(top = 64.dp))
             }
-            packs.isEmpty() && topics.isEmpty() -> Box(Modifier.fillMaxSize().padding(top = 64.dp), contentAlignment = Alignment.TopCenter) {
-                EmptyState(XIcons.Search, "没有找到相关内容", "没有和“$shown”相关的作品或帖子，换个关键词试试。")
+            packs.isEmpty() && topics.isEmpty() && openProjects.isEmpty() -> Box(Modifier.fillMaxSize().padding(top = 64.dp), contentAlignment = Alignment.TopCenter) {
+                EmptyState(XIcons.Search, "没有找到相关内容", "没有和“$shown”相关的作品、开源项目或帖子，换个关键词试试。")
             }
             else -> {
                 val tab = ResultTab.valueOf(tabName)
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("“$shown”", style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Brand)
-                        Text(" 共 ${packs.size + topics.size} 个结果", style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                        Text(" 共 ${packs.size + topics.size + openProjects.size} 个结果", style = XType.Secondary, color = LocalExtraColors.current.ink3)
                     }
                     PageChipRow(
-                        ResultTab.entries.map { it.name to (if (it == ResultTab.All) it.label else "${it.label} ${if (it == ResultTab.Packs) packs.size else topics.size}") },
+                        ResultTab.entries.map { it.name to (if (it == ResultTab.All) it.label else "${it.label} ${when (it) { ResultTab.Packs -> packs.size; ResultTab.Projects -> openProjects.size; ResultTab.Topics -> topics.size; ResultTab.All -> packs.size + topics.size + openProjects.size }}") },
                         tabName, { tabName = it },
                     )
-                    if (tab != ResultTab.Topics && packs.isNotEmpty()) WhiteCard(padding = 0.dp) {
+                    if ((tab == ResultTab.All || tab == ResultTab.Projects) && openProjects.isNotEmpty() && openCatalog != null) {
+                        ResultHeader("开源项目", openProjects.size, XIcons.Code)
+                        openProjects.forEach { project -> OpenSourceCard(env, project, open) }
+                    }
+                    if ((tab == ResultTab.All || tab == ResultTab.Packs) && packs.isNotEmpty()) WhiteCard(padding = 0.dp) {
                         ResultHeader("作品", packs.size, XIcons.Sparkle)
                         packs.forEachIndexed { i, pack ->
                             if (i > 0) Hairline(Modifier.padding(start = 14.dp))
                             PackResult(pack, shown) { open(Route.Pack(pack.id)) }
                         }
                     }
-                    if (tab != ResultTab.Packs && topics.isNotEmpty()) WhiteCard(padding = 0.dp) {
+                    if ((tab == ResultTab.All || tab == ResultTab.Topics) && topics.isNotEmpty()) WhiteCard(padding = 0.dp) {
                         ResultHeader("帖子", topics.size, XIcons.Message)
                         topics.forEachIndexed { i, topic ->
                             if (i > 0) Hairline(Modifier.padding(start = 14.dp))

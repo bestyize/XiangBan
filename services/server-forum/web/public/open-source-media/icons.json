@@ -1,0 +1,57 @@
+[
+  {
+    "project": "appflowy",
+    "url": "https://appflowy.com/_next/static/media/appflowy.929cfa16.ico",
+    "file": "appflowy-icon.png"
+  },
+  {
+    "project": "astro",
+    "url": "https://astro.build/favicon.svg",
+    "file": "astro-icon.svg"
+  },
+  {
+    "project": "excalidraw",
+    "url": "https://excalidraw.com/apple-touch-icon.png",
+    "file": "excalidraw-icon.png"
+  },
+  {
+    "project": "freecodecamp",
+    "url": "https://www.freecodecamp.org/icons/icon-144x144.png",
+    "file": "freecodecamp-icon.png"
+  },
+  {
+    "project": "ghidra",
+    "url": "https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/master/Ghidra/Features/Base/src/main/resources/images/GHIDRA_3.png",
+    "file": "ghidra-icon.png"
+  },
+  {
+    "project": "hoppscotch",
+    "url": "https://hoppscotch.io/icon.png",
+    "file": "hoppscotch-icon.png"
+  },
+  {
+    "project": "mcp",
+    "url": "https://modelcontextprotocol.io/mintlify-assets/_mintlify/favicons/mcp/ebiVJzri-bsiCfVZ/_generated/favicon/apple-touch-icon.png",
+    "file": "mcp-icon.png"
+  },
+  {
+    "project": "ollama",
+    "url": "https://ollama.com/public/apple-touch-icon.png",
+    "file": "ollama-icon.png"
+  },
+  {
+    "project": "openttd",
+    "url": "https://www.openttd.org/static/favicon.ico",
+    "file": "openttd-icon.png"
+  },
+  {
+    "project": "voron",
+    "url": "https://vorondesign.com/images/voron_design_logo.png",
+    "file": "voron-icon.png"
+  },
+  {
+    "project": "ytdlp",
+    "url": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/.github/banner.svg",
+    "file": "ytdlp-icon.svg"
+  }
+]
