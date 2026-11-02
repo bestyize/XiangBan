@@ -804,17 +804,41 @@
       "name": "创作 / 特效",
       "destination": "topic",
       "enabled": true,
-      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
+      "brief": "围绕真实特效配置、视觉层次与动画设计整理资料，补充MDN Canvas与Web Animations原理导读。明确标准Web API与小伴纯数据特效包的边界，不能声称小伴特效包支持任意JavaScript、DOM或外部API，也不承诺实测性能或视觉效果。示例与设计建议要标明。",
       "kind": "effect",
       "native_destination": "pack",
       "category": "create-effect",
       "count_by_category": true,
       "hosts": [
-        "chat.xiangban.xyz"
+        "chat.xiangban.xyz",
+        "developer.mozilla.org"
       ],
       "sources": [
         {
           "type": "catalog"
+        },
+        {
+          "type": "index",
+          "url": "https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial",
+          "prefixes": [
+            "/en-US/docs/Web/API/Canvas_API/Tutorial/"
+          ],
+          "limit": 100
+        },
+        {
+          "type": "index",
+          "url": "https://developer.mozilla.org/en-US/docs/Web/API/Web_Animations_API",
+          "prefixes": [
+            "/en-US/docs/Web/API/"
+          ],
+          "keywords": [
+            "animat",
+            "timeline",
+            "easing",
+            "timing",
+            "transition"
+          ],
+          "limit": 100
         }
       ],
       "bootstrap_daily_limit": 20,
@@ -1323,16 +1347,49 @@
       "name": "创作 / 方案",
       "destination": "topic",
       "enabled": true,
-      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
+      "brief": "围绕真实桌面方案、工作区设计与使用条件整理资料，补充Microsoft官方PowerToys窗口布局、工作区与桌面工具说明。清楚标为Windows/PowerToys的平台能力，不能说成小伴的原生功能、可直接导入方案或已经亲测的组合；不混用资源包与社区方案复刻协议。来源没支持的系统操作不添加，不虚构实际用户案例。",
       "native_destination": "scheme",
       "category": "create-schemes",
       "count_by_category": true,
       "hosts": [
-        "chat.xiangban.xyz"
+        "chat.xiangban.xyz",
+        "learn.microsoft.com"
       ],
       "sources": [
         {
           "type": "catalog"
+        },
+        {
+          "type": "index",
+          "url": "https://learn.microsoft.com/en-us/windows/powertoys/",
+          "prefixes": [
+            "/en-us/windows/powertoys/"
+          ],
+          "keywords": [
+            "workspace",
+            "fancy",
+            "display",
+            "mouse",
+            "keyboard",
+            "shortcut",
+            "awake",
+            "light",
+            "screen",
+            "peek",
+            "palette",
+            "color",
+            "paste",
+            "zoom",
+            "always-on-top",
+            "crop",
+            "image-resizer",
+            "powertoys-run",
+            "text-extractor",
+            "window-hopper",
+            "quick-accent",
+            "file-explorer"
+          ],
+          "limit": 100
         }
       ],
       "bootstrap_daily_limit": 20,
