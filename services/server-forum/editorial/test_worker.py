@@ -4,9 +4,10 @@ import io
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import worker as w
+import repair
 
 
 class EditorialTests(unittest.TestCase):
@@ -100,6 +101,28 @@ class EditorialTests(unittest.TestCase):
         with patch.object(w.HTTP,'open',side_effect=error) as request,patch('worker.time.sleep'):
             with self.assertRaises(w.HTTPFailure):w.api('https://ai.example','/v1/images/generations',data={'prompt':'example'})
             self.assertEqual(request.call_count,1)
+
+    def test_operator_revision_requires_another_review_and_cannot_repeat(self):
+        w.enqueue(self.db,'learn-a','https://docs.example/a','Document')
+        job=self.db.execute('SELECT * FROM jobs').fetchone();key=job['id'];folder=self.root/'articles'/key
+        self.db.execute("UPDATE jobs SET status='rejected',error=?,attempts=3",('修改后事实审校仍未通过，待编辑处理',));self.db.commit()
+        for name,data in [('article.json',{'body':'old'}),('review.json',{'approved':False,'issues':['wrong scope']}),('evidence.json',{'title':'Document','text':'facts'}),('revision.json',{'at':'earlier'})]:w.atomic(folder/name,data)
+        fake=MagicMock();fake.chat.return_value={'title':'新版本标题','summary':'摘要','body':'具体说明。'*300,'image_prompt':'illustration'}
+        with patch('repair.w.Worker',return_value=fake):
+            self.assertTrue(repair.repair_one(self.root,{'forum_url':'https://forum.example'},key,{'name':'column'}))
+            self.assertFalse(repair.repair_one(self.root,{'forum_url':'https://forum.example'},key,{'name':'column'}))
+        state=self.db.execute('SELECT status,topic_id,attempts FROM jobs WHERE id=?',(key,)).fetchone()
+        self.assertEqual(tuple(state),('queued',None,2))
+        self.assertFalse((folder/'review.json').exists())
+        self.assertTrue((folder/'revision.json').exists())
+        fake.chat.assert_called_once()
+
+    def test_operator_revision_cannot_replace_an_imported_draft(self):
+        w.enqueue(self.db,'learn-a','https://docs.example/a','Document');key=self.db.execute('SELECT id FROM jobs').fetchone()[0]
+        self.db.execute("UPDATE jobs SET status='rejected',error=?,draft_id='existing-draft'",('修改后事实审校仍未通过，待编辑处理',));self.db.commit()
+        with patch('repair.w.Worker') as worker:
+            with self.assertRaises(w.Stop):repair.repair_one(self.root,{'forum_url':'https://forum.example'},key,{'name':'column'})
+            worker.assert_not_called()
 
     def test_budget_blocks_paid_call_before_reservation(self):
         worker = object.__new__(w.Worker)
