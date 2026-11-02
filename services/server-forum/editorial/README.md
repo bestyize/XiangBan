@@ -35,3 +35,5 @@ python3 services/server-forum/editorial/worker.py --root /private/state status
 Nginx 的 `/api/discover-editor/articles/` 与旧 `/api/discover-editor/frontier/` 上传入口均需 `client_max_body_size 7m`，普通编辑稿导入需31m；不要把全站请求上限一并放大。
 
 初始补稿收到 SIGTERM/SIGINT 时先停止领取，等待在途稿件结束（服务停止超时300秒），避免打断已付费的生成请求。时间字段只允许等价的 RFC3339 表示差异，标题、正文和其他待发布字段仍精确比较。
+
+经运营者检查确需修订的退稿，可显式运行 `python3 repair.py --agent create-wallpaper --limit 4`。每篇只增加一次修订机会，仅处理从未导入的事实审校退稿，保留旧稿、旧证据和核查意见。该命令不会批准或发布：新版本清除旧审校记录，仍须进入正常执行器的独立审校；再次不通过便保留退稿，不循环尝试凑数。每天调用数和运营余额阈值同样有效。`--limit` 约束实际尝试次数，失败也占一次。
