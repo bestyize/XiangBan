@@ -28,7 +28,7 @@ pub enum Api {
 }
 
 impl Api {
-    fn path(self) -> &'static str {
+    pub(crate) fn path(self) -> &'static str {
         match self {
             Api::ChatCompletions => "/v1/chat/completions",
             Api::Responses => "/v1/responses",

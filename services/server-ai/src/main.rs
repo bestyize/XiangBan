@@ -1,3 +1,4 @@
+mod information_jobs;
 mod admin_auth;
 mod binding;
 mod codes;
@@ -47,6 +48,8 @@ use tracing::info;
 pub fn build_router(state: AppState) -> Router {
     let api = Router::new()
         .route("/health", get(meta::health))
+        .route("/internal/information-jobs/{action}", post(information_jobs::action).layer(DefaultBodyLimit::max(256 * 1024)))
+        .route("/internal/information-execution/{action}", post(information_jobs::execute).layer(DefaultBodyLimit::max(64 * 1024)))
         .route("/ai/tiers", get(user::tiers))
         .route("/ai/balance", get(user::balance))
         .route("/ai/ledger", get(user::ledger))

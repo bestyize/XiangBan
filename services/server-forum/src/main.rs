@@ -1,3 +1,4 @@
+mod subscriptions;
 mod analytics;
 mod auth;
 mod config;
@@ -96,6 +97,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/attachments/{id}/purchase", post(attachments::purchase))
         .merge(packs::routes())
         .merge(scheme_backups::routes())
+        .merge(subscriptions::routes())
         .merge(handlers::content_social::routes())
         .merge(tool_mirrors::public_routes())
         .merge(discover_api::routes())
@@ -155,6 +157,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         http: reqwest::Client::builder().timeout(Duration::from_secs(5)).build()?,
     };
     jobs::spawn(state.clone());
+    subscriptions::spawn(state.clone());
     link_health::spawn(state.clone());
 
     let listener = tokio::net::TcpListener::bind(addr).await?;

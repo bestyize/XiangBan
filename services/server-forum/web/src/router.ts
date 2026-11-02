@@ -5,6 +5,7 @@ import { useSession } from '@/stores/session'
 import { trackRoute } from '@/lib/analytics'
 
 const routes: RouteRecordRaw[] = [
+  { path: '/me/subscriptions', name: 'subscriptions', component: () => import('@/views/SubscriptionsView.vue'), meta: { auth: true } },
   { path: '/', name: 'home', component: HomeView },
   { path: '/ai', name: 'ai', component: () => import('@/views/AiChatView.vue'), meta: { focus: true } },
   { path: '/create', name: 'create', component: () => import('@/views/CreateView.vue') },

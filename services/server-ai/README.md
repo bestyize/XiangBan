@@ -167,3 +167,8 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 ### 客户端额度获取链接
 
 在管理后台“产品 → 编辑产品 → 额度获取链接”配置 `credit_purchase_url`（http/https），客户端刷新余额后，“兑换”右侧的“获取额度”通过系统浏览器打开该地址。可填写后续在线支付页面；本服务不处理该页面的支付流程。留空关闭入口，旧客户端提交产品时不含此字段不会清除现有链接。启动时自动添加兼容字段；需部署更新后的 server-ai 与后台静态资源后配置才会下发，旧服务端下客户端按钮保持禁用。
+
+
+## 资讯后台任务（开发中，未部署）
+
+平台执行入口 `/api/internal/information-execution/{search|summary}` 与统一额度入口 `/api/internal/information-jobs/{reserve|settle|release}` 使用独立平台服务凭据，默认未配置不可用。重用 Search 提供商与 Chat Completions / Messages 协议路径，支持平台配置的 DeepSeek、OpenAI 与 Claude，不接收用户本地 API Key。任务引用、原始资源计量及策略快照与现有月卡/加油包额度桶关联，预约、释放和结算进入共同流水，新增 `job_reference` 返回期刊编号；没有独立邮件钱包。配置、限额、未确定商业规则与验收范围见 [资讯订阅说明](../server-forum/docs/information-subscriptions.md)。

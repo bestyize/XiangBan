@@ -8,7 +8,7 @@ import UserAvatar from '@/components/UserAvatar.vue'
 useHead(() => ({title:'我的'}))
 const session = useSession(), inbox = useNotifications(), { preference, accentName, openAppearance } = useTheme()
 const groups = [
-  [{to:'/me/works',icon:'create',title:'我的作品',description:'查看已发布的作品与方案'}, {to:'/me/content-bookmarks',icon:'bookmark',title:'作品收藏',description:'留住喜欢的作品和桌面方案'}, {to:'/settings#bm-title',icon:'folder',title:'帖子收藏',description:'值得再读的讨论与经验'}],
+  [{to:'/me/subscriptions',icon:'bell',title:'资讯订阅',description:'我的订阅与历史期刊'}, {to:'/me/works',icon:'create',title:'我的作品',description:'查看已发布的作品与方案'}, {to:'/me/content-bookmarks',icon:'bookmark',title:'作品收藏',description:'留住喜欢的作品和桌面方案'}, {to:'/settings#bm-title',icon:'folder',title:'帖子收藏',description:'值得再读的讨论与经验'}],
   [{to:'/notifications',icon:'bell',title:'消息通知',description:'回复、提及与社区消息'}, {to:'/ai?panel=account',icon:'ai',title:'小伴 AI 与额度',description:'查看可用额度和使用模式'}, {to:'/points',icon:'plus',title:'社区积分',description:'签到、邀请与积分账本'}, {to:'/settings',icon:'settings',title:'账户与设置',description:'个人资料、隐私和屏蔽管理'}],
 ]
 </script>

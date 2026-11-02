@@ -137,6 +137,7 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
 <template>
   <section class="library-page xb-page" data-testid="library-page" aria-label="资料库">
     <header class="xb-page-head library-head" data-tauri-drag-region>
+  <NButton v-if="store.desktop" size="small" title="查看账号订阅与历史期刊" aria-description="查看账号订阅与历史期刊" @click="invoke('community_web_open', { subscriptions: true }).catch(store.notify)">资讯订阅与期刊</NButton>
       <div class="xb-tabs-lg" role="tablist" aria-label="资料库分类" @keydown="tabKey">
         <button v-for="t in TABS" :id="`library-tab-${t.id}`" :key="t.id" type="button" role="tab" :aria-selected="tab === t.id" :tabindex="tab === t.id ? 0 : -1" :data-testid="`library-tab-${t.id}`" @click="pick(t.id)">{{ t.label }}<span class="count">{{ counts[t.id] }}</span></button>
       </div>
