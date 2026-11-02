@@ -1,0 +1,28 @@
+{
+  "verified_at": "2026-11-02T14:48:02.434955+00:00",
+  "converted": 1235,
+  "verified": 1235,
+  "original_bytes": 1673430359,
+  "webp_bytes": 123951414,
+  "local_editorial_covers": 820,
+  "remaining_online_static_png_jpeg": 0,
+  "article_state_unchanged": true,
+  "original_urls_preserved": true,
+  "switch_seconds": 17.83,
+  "private_backup_directory": "/var/lib/xiaoban-editorial/webp-migration-20261102",
+  "checks": [
+    "Original files and database metadata retained in private backups",
+    "Static PNG/JPEG decoded, converted to WebP, and decoded again with identical dimensions",
+    "Every converted image returned image/webp and exact expected bytes through the live HTTP handler",
+    "All 820 editorial cover records bind original and WebP SHA256 hashes",
+    "All fields of topics, posts, editor drafts, discover items and discover drafts unchanged",
+    "Public HTTPS frontier and topic cover responses returned image/webp and HTTP 200",
+    "33 unit tests passed locally and on the server, including database-failure rollback"
+  ],
+  "preserved": [
+    "Existing native WebP images",
+    "One animated GIF with three frames",
+    "Unpublished pending images and unreferenced discover assets",
+    "Article text, URLs, moderation state, permissions and review artifacts"
+  ]
+}
