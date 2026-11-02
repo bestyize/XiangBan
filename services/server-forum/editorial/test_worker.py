@@ -8,6 +8,13 @@ from unittest.mock import patch, MagicMock
 
 import worker as w
 import repair
+import acceptance
+
+
+def image_bytes(mode='RGB', color=(100, 150, 200), size=(512, 256), format='PNG'):
+    output = io.BytesIO()
+    w.Image.new(mode, size, color).save(output, format=format)
+    return output.getvalue()
 
 
 class EditorialTests(unittest.TestCase):
@@ -17,6 +24,63 @@ class EditorialTests(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.db = w.connect(self.root)
         self.addCleanup(self.db.close)
+
+    def test_webp_conversion_preserves_dimensions_alpha_and_native_bytes(self):
+        png = image_bytes('RGBA', (100, 150, 200, 128))
+        encoded = w.webp_cover(png)
+        self.assertEqual(encoded[8:12], b'WEBP')
+        decoded = w.decoded_cover(encoded)
+        self.assertEqual(decoded.size, (512, 256))
+        self.assertEqual(decoded.getpixel((0, 0))[3], 128)
+        self.assertEqual(w.webp_cover(encoded), encoded)
+        acceptance.check_cover_integrity(encoded)
+        acceptance.check_cover_integrity(png)
+        jpeg = image_bytes(format='JPEG')
+        self.assertEqual(w.webp_cover(jpeg)[8:12], b'WEBP')
+
+    def test_webp_gate_rejects_corrupt_animated_and_oversized_images(self):
+        encoded = w.webp_cover(image_bytes())
+        animated = io.BytesIO()
+        w.Image.new('RGB', (256, 256), 'red').save(animated, format='WEBP', save_all=True,
+            append_images=[w.Image.new('RGB', (256, 256), 'blue')], duration=100, loop=0)
+        bad = [b'not an image', encoded[:-8], encoded + b'junk', animated.getvalue(),
+               image_bytes(size=(4097, 256)), image_bytes(size=(255, 256)), b'x' * (7 * 1024 * 1024 + 1)]
+        for raw in bad:
+            with self.subTest(length=len(raw)), self.assertRaises(w.Reject):
+                w.webp_cover(raw)
+
+    def test_legacy_acceptance_selects_the_original_import_asset(self):
+        for extension in ('png', 'webp'):
+            w.atomic(self.root / 'import.json', {'images': [{'path': 'images/cover.' + extension}]})
+            self.assertEqual(w.cover_file(self.root).name, 'cover.' + extension)
+
+    def test_new_topic_import_converts_png_once_and_references_webp(self):
+        w.enqueue(self.db, 'learn-a', 'https://docs.example/a', 'source')
+        job = self.db.execute('SELECT * FROM jobs').fetchone()
+        worker = object.__new__(w.Worker)
+        worker.root, worker.db, worker.forum = self.root, self.db, 'https://forum.example'
+        worker.editor_token, worker.context = 'private', {'author_uid': 'author'}
+        article = {'title': '真实来源说明', 'summary': '摘要', 'body': '具体说明。' * 300, 'image_prompt': 'illustration'}
+        dest = self.root / 'articles' / job['id']
+        w.atomic(dest / 'article.json', article)
+        w.atomic(dest / 'evidence.json', {'title': '官方资料', 'url': job['url'], 'retrieved_at': w.stamp()})
+        w.atomic(dest / 'review.json', {'approved': True, 'issues': [], 'article_sha256': w.hashlib.sha256(json.dumps(article, sort_keys=True, ensure_ascii=False).encode()).hexdigest()})
+        response = {'data': [{'b64_json': w.base64.b64encode(image_bytes()).decode()}]}
+        with patch.object(worker, 'existing_draft', return_value=None), patch.object(worker, 'model', return_value=response) as model, patch.object(worker, 'publish'), patch('worker.api', return_value={'id': 'draft'}) as api:
+            worker.process(job, {'id': 'learn-a', 'destination': 'topic', 'category': 'learn-a'})
+            model.assert_called_once_with(job['id'], 'images/generations', {'prompt': 'illustration', 'n': 1, 'output_format': 'webp'})
+            payload = api.call_args.args[3]
+            self.assertIn('](<images/cover.webp>)', payload['body'])
+            self.assertEqual(payload['images'][0]['path'], 'images/cover.webp')
+            self.assertEqual(w.base64.b64decode(payload['images'][0]['data_base64']), (dest / 'cover.webp').read_bytes())
+            # A lost import response reuses the encoded image without another call.
+            worker.process(job, {'id': 'learn-a', 'destination': 'topic', 'category': 'learn-a'})
+            self.assertEqual(model.call_count, 1)
+        for kind in ('frontier', 'news'):
+            with self.subTest(kind=kind), patch.object(worker, 'frontier_draft', return_value=None), patch.object(worker, 'model') as model, patch.object(worker, 'import_frontier') as importer:
+                worker.process(dict(job, source_published_at=w.stamp()), {'id': 'learn-a', 'destination': kind})
+                importer.assert_called_once_with(job['id'], dest, article, json.loads((dest / 'evidence.json').read_text()), (dest / 'cover.webp').read_bytes(), kind)
+                model.assert_not_called()
 
     def test_source_scope_and_private_network_rejection(self):
         with self.assertRaises(w.Reject):
