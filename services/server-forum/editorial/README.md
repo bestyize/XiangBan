@@ -1,6 +1,8 @@
 # 社区采编执行器
 
-独立 Python 3.10+ sidecar，只有标准库依赖。运行时业务属于 server-forum，不依赖 Codex、Claude 或本机开机。通过论坛已有的受限作者令牌和 server-ai 产品调用，不能访问论坛管理接口。不改变 GitHub Actions 的手动触发方式。
+独立 Python 3.10+ sidecar，图片编解码依赖 Pillow（需支持 WebP）。Ubuntu 安装 `sudo apt-get install --no-install-recommends python3-pil`；本地虚拟环境安装 `python -m pip install Pillow`。运行时业务属于 server-forum，不依赖 Codex、Claude 或本机开机。通过论坛已有的受限作者令牌和 server-ai 产品调用，不能访问论坛管理接口。不改变 GitHub Actions 的手动触发方式。
+
+新封面请求 `output_format=webp`。当前网关可能仍返回 PNG 或 JPEG，执行器在上传前使用 Pillow 转成 WebP（quality=82、method=4），保留原尺寸和透明通道；原生 WebP 在上传限制内直接保留字节，避免重复有损编码。转换不触发额外生图调用。生成响应可在7 MiB内，转换后的实际上传文件仍不超过5 MiB；拒绝异常尺寸、损坏或动画图片，并完整解码校验。普通帖子使用 `images/cover.webp`，日报和前沿资产接口按实际字节识别 MIME。已经导入的稿件及已经发表的历史 PNG 保持原样，恢复与验收兼容两种格式；不会为了换格式重新发表文章。
 
 `agents.json` 启用 41 个文章目标。日报、前沿使用发现页文章通道，其余栏目使用对应分类的图文通道。创作、方案、工具、资料页面同时保留真实作品包或目录；导读文章不计为可安装作品、目录条目、实际悬赏或处罚公示。排行榜不计数。求助与举报栏目可发布明确标识的站方指南，不能虚构请求、经历或处理事件。
 

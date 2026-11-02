@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Persistent, bounded editorial sidecar. Uses only the Python standard library."""
+"""Persistent, bounded editorial sidecar. Pillow encodes and validates covers."""
 import argparse
 import concurrent.futures
 import base64
 import datetime as dt
 import fcntl
 import hashlib
+import io
 from html.parser import HTMLParser
 from email.utils import parsedate_to_datetime
 import ipaddress
@@ -17,7 +18,6 @@ import re
 import signal
 import socket
 import sqlite3
-import struct
 import tempfile
 import threading
 import time
@@ -25,6 +25,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+
+from PIL import Image, UnidentifiedImageError
 
 HERE = Path(__file__).resolve().parent
 UTC = dt.timezone.utc
@@ -608,21 +610,25 @@ class Worker:
             atomic(dest / 'article.json', revised)
             (dest / 'review.json').unlink()
             return self.process(job, agent)
-        if not (dest / 'cover.png').exists():
+        if not (dest / 'cover.webp').exists() and not (dest / 'cover.png').exists():
             self.state(key, 'illustrating')
-            result = self.model(key, 'images/generations', {'prompt': article['image_prompt'], 'n': 1})
+            result = self.model(key, 'images/generations', {'prompt': article['image_prompt'], 'n': 1, 'output_format': 'webp'})
             raw = base64.b64decode(result['data'][0].get('b64_json', ''), validate=True)
-            validate_image(raw)
-            atomic(dest / 'cover.png', raw)
-        raw = (dest / 'cover.png').read_bytes()
+            # Conversion never makes a second, potentially billable model request.
+            atomic(dest / 'cover.webp', webp_cover(raw))
+        if not (dest / 'cover.webp').exists() and not (frontier and (dest / 'frontier-asset.json').exists()):
+            # Only reached before import. Existing remote drafts recover above and
+            # keep their exact approved assets, including legacy PNGs.
+            atomic(dest / 'cover.webp', webp_cover((dest / 'cover.png').read_bytes()))
+        raw = (dest / ('cover.webp' if (dest / 'cover.webp').exists() else 'cover.png')).read_bytes()
         validate_image(raw)
         if frontier:
             self.import_frontier(key, dest, article, evidence, raw,article_kind)
             return
-        body = article['body'].strip() + '\n\n![文章主题概念插画](<images/cover.png>)\n\n'
+        body = article['body'].strip() + '\n\n![文章主题概念插画](<images/cover.webp>)\n\n'
         body += '---\n\n资料来源：[' + evidence['title'].replace('[', '').replace(']', '') + '](' + evidence['url'] + ')。核对日期：' + evidence['retrieved_at'][:10] + '。\n\n本文基于公开资料，由小伴采编助手整理并自动校核；未作实测。封面为 AI 生成的概念插画。'
         self.state(key, 'importing')
-        payload = {'author_uid': self.context['author_uid'], 'external_id': key, 'title': article['title'], 'category': agent['category'], 'body': body, 'tags': agent.get('tags', []), 'images': [{'path': 'images/cover.png', 'data_base64': base64.b64encode(raw).decode()}]}
+        payload = {'author_uid': self.context['author_uid'], 'external_id': key, 'title': article['title'], 'category': agent['category'], 'body': body, 'tags': agent.get('tags', []), 'images': [{'path': 'images/cover.webp', 'data_base64': base64.b64encode(raw).decode()}]}
         atomic(dest / 'import.json', payload)
         saved = api(self.forum, '/api/editor/drafts', self.editor_token, payload)
         self.state(key, 'publishing', draft_id=saved['id'])
@@ -639,6 +645,7 @@ class Worker:
         expected = json.loads((dest / 'import.json').read_text())
         # The forum's Markdown serializer wraps image destinations in angle brackets.
         expected['body'] = expected['body'].replace('](images/cover.png)', '](<images/cover.png>)')
+        expected['body'] = expected['body'].replace('](images/cover.webp)', '](<images/cover.webp>)')
         for remote, local in [(detail['draft']['title'], expected['title']), (detail['body'], expected['body']), (canonical_category(detail['category']), canonical_category(expected['category'])), (detail['draft']['author_uid'], expected['author_uid'])]:
             if remote != local:
                 raise Reject('线上待发布稿已被编辑修改，停止自动发布')
@@ -734,14 +741,52 @@ def validate_article(article):
         raise Reject('稿件含未替换占位符')
 
 
+def decoded_cover(raw, max_bytes=5 * 1024 * 1024, formats=('PNG', 'WEBP')):
+    if not 32 <= len(raw) <= max_bytes:
+        raise Reject('封面文件大小超出限制')
+    try:
+        with Image.open(io.BytesIO(raw)) as image:
+            if image.format not in formats or getattr(image, 'is_animated', False):
+                raise Reject('封面须为静态 PNG、JPEG 或 WebP 图片')
+            width, height = image.size
+            if not 256 <= width <= 4096 or not 256 <= height <= 4096:
+                raise Reject('封面尺寸不适合文章卡片')
+            if image.format == 'WEBP' and (raw[:4] != b'RIFF' or int.from_bytes(raw[4:8], 'little') + 8 != len(raw)):
+                raise Reject('封面 WebP 不完整')
+            image.verify()
+        with Image.open(io.BytesIO(raw)) as image:
+            image.load()
+            return image.copy()
+    except (UnidentifiedImageError, OSError, ValueError, SyntaxError, EOFError, Image.DecompressionBombError) as exc:
+        raise Reject('封面图片无法完整解码') from exc
+
+
 def validate_image(raw):
-    if not raw.startswith(b'\x89PNG\r\n\x1a\n') or not 100 <= len(raw) <= 5 * 1024 * 1024:
-        raise Reject('封面须为不超过 5 MiB 的 PNG')
-    if raw[12:16] != b'IHDR' or raw[-8:-4] != b'IEND':
-        raise Reject('封面 PNG 不完整')
-    width, height = struct.unpack('>II', raw[16:24])
-    if not 256 <= width <= 4096 or not 256 <= height <= 4096:
-        raise Reject('封面尺寸不适合文章卡片')
+    decoded_cover(raw)
+
+
+def webp_cover(raw):
+    # Allow a larger model reply to shrink below the forum's 5 MiB upload limit.
+    image = decoded_cover(raw, max_bytes=7 * 1024 * 1024, formats=('PNG', 'JPEG', 'WEBP'))
+    if raw[:4] == b'RIFF' and len(raw) <= 5 * 1024 * 1024:
+        return raw  # Native WebP must not incur another lossy encode.
+    mode = 'RGBA' if 'A' in image.getbands() or 'transparency' in image.info else 'RGB'
+    output = io.BytesIO()
+    image.convert(mode).save(output, format='WEBP', quality=82, method=4)
+    encoded = output.getvalue()
+    validate_image(encoded)
+    return encoded
+
+
+def cover_file(folder):
+    """Select the asset actually imported, preserving historical PNG acceptance."""
+    imported = folder / 'import.json'
+    if imported.exists():
+        images = json.loads(imported.read_text())['images']
+        if len(images) != 1 or images[0]['path'] not in ('images/cover.png', 'images/cover.webp'):
+            raise Reject('采编封面路径不符合预期')
+        return folder / Path(images[0]['path']).name
+    return folder / ('cover.webp' if (folder / 'cover.webp').exists() else 'cover.png')
 
 
 def snapshot(db, config):

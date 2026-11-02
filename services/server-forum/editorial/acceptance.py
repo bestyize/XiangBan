@@ -58,6 +58,12 @@ def check_png_integrity(raw):
     assert image_data, 'PNG has no image data'
 
 
+def check_cover_integrity(raw):
+    w.validate_image(raw)  # Full decode for WebP as well as historical PNGs.
+    if raw.startswith(b'\x89PNG\r\n\x1a\n'):
+        check_png_integrity(raw)
+
+
 def published_jobs(root):
     db = sqlite3.connect('file:' + str(root / 'editorial.sqlite3') + '?mode=ro', uri=True)
     db.row_factory = sqlite3.Row
@@ -101,8 +107,8 @@ def check(root, config, follow=False):
             assert review.get('approved') is True and review.get('issues') == [], 'review not approved'
             assert review.get('article_sha256') == digest, 'review version mismatch'
             assert evidence['url'] == job['url'] and len(evidence['text']) >= 500, 'missing source evidence'
-            raw = (folder / 'cover.png').read_bytes()
-            check_png_integrity(raw)
+            raw = w.cover_file(folder).read_bytes()
+            check_cover_integrity(raw)
             covers[hashlib.sha256(raw).hexdigest()].append(key)
             titles[article['title'].strip()].append(key)
             prose = re.sub(r'```[^\n]*\n.*?```', '', article['body'], flags=re.S)
@@ -117,8 +123,9 @@ def check(root, config, follow=False):
                 assert public['min_read_level'] == 0 and public.get('status') == 'normal', 'not public'
                 assert public['images'] and public['body_html'], 'missing public image/body'
                 cover = public['images'][0]
-                expected = imported['body'].replace('](images/cover.png)', '](<images/cover.png>)')
-                expected = expected.replace('](<images/cover.png>)', '](<' + cover + '>)')
+                image_path = imported['images'][0]['path']
+                expected = imported['body'].replace('](' + image_path + ')', '](<' + image_path + '>)')
+                expected = expected.replace('](<' + image_path + '>)', '](<' + cover + '>)')
                 assert public['body_md'].strip() == expected.strip(), 'published body differs from approved import'
                 assert article['body'].strip() in expected, 'approved article differs from import'
                 assert evidence['url'] in public['body_md'], 'missing public source'
@@ -168,7 +175,7 @@ def check(root, config, follow=False):
               'all_targets_accepted': len(agents) == 41 and all(counts[k] >= 20 for k in agents) and not issues,
               'targets': rows, 'issues': issues,
               'checks': ['version-bound independent review', 'source evidence', 'public title/category/body',
-                         'public cover type and size', 'complete local PNG chunks and checksums', 'unique titles and cover bytes',
+                         'public cover type and size', 'complete local image decoding; legacy PNG chunks and checksums', 'unique titles and cover bytes',
                          'no synthetic help requests', 'source publication dates for news and frontier']}
     w.atomic(root / 'acceptance.json', result)
     return result
