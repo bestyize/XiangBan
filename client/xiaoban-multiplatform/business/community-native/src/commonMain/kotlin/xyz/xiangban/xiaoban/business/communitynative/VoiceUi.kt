@@ -74,14 +74,14 @@ suspend fun recognizeWith(engines: List<RecognizerEngine>, pcm: ByteArray): Pair
 fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Boolean) -> Unit) {
     val models = env.speechModels ?: return
     var done by remember { mutableStateOf(0L) }
-    var total by remember { mutableStateOf(xyz.xiangban.xiaoban.common.community.VoiceModels.TotalBytes) }
+    var total by remember { mutableStateOf(models.totalBytes) }
     var running by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var job by remember { mutableStateOf<Job?>(null) }
     BottomSheet({ job?.cancel(); onFinished(false) }, panelModifier) {
         Text("在手机上识别语音", style = XType.Title, fontWeight = FontWeight.SemiBold)
         Text(
-            "下载语音模型（SenseVoice 识别、Silero 人声检测和 Smart Turn 判停，共约 ${(total / 1_000_000)} MB，和电脑上用的是同一套）；已下载的文件会复用。之后识别和判断你说完没有都在手机上完成。建议在 Wi-Fi 下载。",
+            "下载本地语音组件和模型（SenseVoice 识别、Silero 人声检测和 Smart Turn 判停，共约 ${(total / 1_000_000)} MB）；已下载的文件会复用。之后识别和判断你说完没有都在手机上完成。建议在 Wi-Fi 下载。",
             Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (running || done > 0) {

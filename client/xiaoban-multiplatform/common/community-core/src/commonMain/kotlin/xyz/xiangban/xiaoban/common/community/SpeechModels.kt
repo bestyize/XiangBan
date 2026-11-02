@@ -10,12 +10,14 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.isSuccess
 import io.ktor.utils.io.readAvailable
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 // 手机上本地语音识别要用的模型文件：和电脑端同一个 SenseVoice Small（INT8），同一个下载源，同样按大小和 SHA-256 校验。
 // 文件清单要和电脑端 `src-tauri/src/asr/engine.rs` 保持一致。
 
 /** 一个固定了大小和哈希的模型文件。 */
-class ModelSpec(val name: String, val bytes: Long, val sha256: String)
+class ModelSpec(val name: String, val bytes: Long, val sha256: String, val sources: List<String> = emptyList())
 
 /** 模型文件放在手机的什么地方（各平台自己实现）。写入先写到临时文件，校验通过才换成正式文件；下载中断后临时文件留着，下次接着下。 */
 interface ModelFiles {
@@ -78,6 +80,8 @@ object SenseVoiceModel {
 interface LocalSpeech {
     val files: ModelFiles
     val recognizer: RecognizerEngine
+    /** 与当前 App 配套的可下载原生运行库；无需原生组件的平台保持为空。 */
+    val runtimeFiles: List<ModelSpec> get() = emptyList()
     /** 未准备好时返回 null，通话改用原有的判停方式。 */
     suspend fun turnComplete(pcm: ByteArray): Boolean? = null
 }
@@ -99,11 +103,13 @@ class SpeechModels(
     private val source: String = SenseVoiceModel.Source,
     private val specs: List<ModelSpec> = VoiceModels.Files,
 ) {
+    private val downloadLock = Mutex()
+    val totalBytes: Long get() = specs.sumOf { it.bytes }
     val ready: Boolean get() = specs.all { files.size(it.name) == it.bytes }
 
     /** 下载缺的文件。[onProgress] 给（已下载字节, 总字节），按所有文件合计。失败时留下已完成的文件，下次接着下缺的。 */
-    suspend fun download(onProgress: (Long, Long) -> Unit) {
-        val total = specs.sumOf { it.bytes }
+    suspend fun download(onProgress: (Long, Long) -> Unit) = downloadLock.withLock {
+        val total = totalBytes
         var done = specs.filter { files.size(it.name) == it.bytes }.sumOf { it.bytes }
         onProgress(done, total)
         for (spec in specs) {
@@ -121,6 +127,20 @@ class SpeechModels(
      * 服务器不支持 Range（回 200）就从头来。断网或取消时临时文件留着，内容不对（太大、校验不过）才删掉。
      */
     private suspend fun fetch(spec: ModelSpec, progress: (Long) -> Unit) {
+        val sources = spec.sources.ifEmpty { listOf(source + spec.name) }
+        var failure: ModelDownloadException? = null
+        for (url in sources) {
+            try {
+                fetchFrom(spec, url, progress)
+                return
+            } catch (e: ModelDownloadException) {
+                failure = e
+            }
+        }
+        throw failure ?: ModelDownloadException("没有可用的下载地址")
+    }
+
+    private suspend fun fetchFrom(spec: ModelSpec, url: String, progress: (Long) -> Unit) {
         var offset = files.partialSize(spec.name)
         if (offset > spec.bytes) { files.discardPartial(spec.name); offset = 0 }
         val hash = Sha256()
@@ -130,7 +150,7 @@ class SpeechModels(
         var discard = false
         try {
             if (offset < spec.bytes) {
-                client.prepareGet(source + spec.name) {
+                client.prepareGet(url) {
                     header(HttpHeaders.UserAgent, "XiaoBan/1.0")
                     // 模型有两百多兆，共用客户端的“整个请求 30 秒”会把下载在半路掐断：这里不限总时长，只要 60 秒内还有数据到就行。
                     timeout {

@@ -103,7 +103,7 @@ class Vad(
 
     companion object {
         init {
-            System.loadLibrary("sherpa-onnx-jni")
+            xyz.xiangban.xiaoban.SpeechNativeLoader.load("sherpa-onnx-jni")
         }
     }
 }

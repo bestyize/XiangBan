@@ -51,6 +51,7 @@ class AndroidModelFiles(context: Context) : ModelFiles {
 
     override fun beginWrite(name: String, append: Boolean): ModelWriter {
         val part = File(dir, "$name.part")
+        part.parentFile!!.mkdirs()
         val out = FileOutputStream(part, append)
         return object : ModelWriter {
             override fun write(bytes: ByteArray, length: Int) = out.write(bytes, 0, length)
@@ -71,7 +72,7 @@ class AndroidModelFiles(context: Context) : ModelFiles {
 
 /**
  * 手机上本地的 SenseVoice 识别（sherpa-onnx），和电脑端同一个模型、同样的设置（自动判断语种、加标点、2 线程、CPU）。
- * 模型没下载、安装包里没带原生库、加载失败都算“用不了”，通话会换下一个引擎。
+ * 模型或运行库没下载、加载失败都算“用不了”，通话会换下一个引擎。
  */
 class SherpaRecognizer(private val files: ModelFiles) : RecognizerEngine {
     override val name = "手机上的语音识别"
@@ -85,6 +86,8 @@ class SherpaRecognizer(private val files: ModelFiles) : RecognizerEngine {
         for (spec in SenseVoiceModel.Files) {
             if (files.size(spec.name) != spec.bytes) throw EngineUnavailable("语音识别模型还没有下载")
         }
+        // 下载前不要触发 JNI 类初始化，否则同进程下载完成后也无法重试。
+        SpeechNativeLoader.load("sherpa-onnx-jni")
         val config = OfflineRecognizerConfig(
             featConfig = FeatureConfig(sampleRate = 16000, featureDim = 80),
             modelConfig = OfflineModelConfig(
@@ -97,7 +100,7 @@ class SherpaRecognizer(private val files: ModelFiles) : RecognizerEngine {
         try {
             OfflineRecognizer(config = config).also { recognizer = it }
         } catch (e: UnsatisfiedLinkError) {
-            throw EngineUnavailable("这个安装包没有带本地语音识别库")
+            throw EngineUnavailable("本地语音组件加载失败，请重新下载")
         } catch (e: Throwable) {
             throw EngineUnavailable("语音识别模型加载失败，请重新下载")
         }
@@ -173,6 +176,7 @@ class SileroGate(modelPath: String) : SpeechGate {
 
 class AndroidLocalSpeech(context: Context) : LocalSpeech {
     override val files: ModelFiles = AndroidModelFiles(context)
+    override val runtimeFiles = SpeechNativeLoader.configure(context, files)
     override val recognizer: RecognizerEngine = SherpaRecognizer(files)
     private val turnLock = kotlinx.coroutines.sync.Mutex()
     private var turnSession: OrtSession? = null
@@ -181,6 +185,7 @@ class AndroidLocalSpeech(context: Context) : LocalSpeech {
         if (files.size(VoiceModels.SmartTurnName) != VoiceModels.SmartTurn.bytes) return@withContext null
         turnLock.lock()
         try {
+            SpeechNativeLoader.load("onnxruntime4j_jni")
             val environment = OrtEnvironment.getEnvironment()
             val session = turnSession ?: OrtSession.SessionOptions().use { options ->
                 options.setIntraOpNumThreads(2)
@@ -208,6 +213,7 @@ class AndroidLocalSpeech(context: Context) : LocalSpeech {
         val spec = VoiceModels.Silero
         if (files.size(spec.name) != spec.bytes) return null
         return try {
+            SpeechNativeLoader.load("sherpa-onnx-jni")
             SileroGate(files.path(spec.name))
         } catch (e: Throwable) {
             null

@@ -62,7 +62,7 @@ fun VoiceSettingsScreen(env: CommunityEnv, back: () -> Unit) {
                     Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Column(Modifier.weight(1f)) {
                             Text("本地语音识别", style = XType.Body)
-                            Text(if (ready) "SenseVoice · 在手机上识别你说的话，不上传录音" else "SenseVoice · 约 242MB，下好后手机上就能识别", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(if (ready) "SenseVoice · 在手机上识别你说的话，不上传录音" else "本地语音组件和模型 · 约 ${models.totalBytes / 1_000_000} MB，下好后手机上就能识别", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         if (ready) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

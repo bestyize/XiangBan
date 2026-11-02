@@ -153,4 +153,39 @@ class SpeechModelsTest {
         assertEquals(0, requests)
         assertTrue(models.ready)
     }
+
+    @Test
+    fun `runtime libraries use pinned mirrors and resume across sources`() = runTest {
+        val files = MemoryFiles()
+        val requested = mutableListOf<String>()
+        val runtime = ModelSpec("voice-runtime/version/libtest.so", body.length.toLong(), sha(body), listOf("https://primary/libtest", "https://fallback/libtest"))
+        val client = HttpClient(MockEngine { request ->
+            requested += request.url.host
+            if (request.url.host == "primary") respond(body.take(10), HttpStatusCode.OK)
+            else {
+                assertEquals("bytes=10-", request.headers[io.ktor.http.HttpHeaders.Range])
+                respond(body.drop(10), HttpStatusCode.PartialContent)
+            }
+        })
+        val models = SpeechModels(client, files, specs = listOf(runtime))
+        models.download { _, _ -> }
+        assertEquals(listOf("primary", "fallback"), requested)
+        assertTrue(models.ready)
+        assertEquals(body, files.stored.getValue(runtime.name).decodeToString())
+        assertEquals(body.length.toLong(), models.totalBytes)
+    }
+
+    @Test
+    fun `cancelling a runtime download does not try another mirror`() = runTest {
+        val requests = mutableListOf<String>()
+        val runtime = ModelSpec("library.so", 1, sha("a"), listOf("https://primary/library", "https://fallback/library"))
+        val client = HttpClient(MockEngine { request ->
+            requests += request.url.host
+            throw kotlinx.coroutines.CancellationException("cancelled")
+        })
+        assertFailsWith<kotlinx.coroutines.CancellationException> {
+            SpeechModels(client, MemoryFiles(), specs = listOf(runtime)).download { _, _ -> }
+        }
+        assertEquals(listOf("primary"), requests)
+    }
 }

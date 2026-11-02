@@ -53,9 +53,13 @@ Android 在内置 `agent_mobile` 原生库时支持私有文本工作区、文�
 
 手机通话沿用桌面的级联方式：本地 Silero 检测人声、Smart Turn v3 判断是否说完、SenseVoice 转文字，再请求聊天模型并按句朗读。说话期间显示本地识别的中间字幕；可在小伴回答时开口打断，本地识别可用时会过滤语气词和朗读回声，下一轮带上已播放内容的说明。通话不会因安静自动挂断，用户可随时静音或结束；后台任务仍按原有权限运行。
 
-首次使用可下载 SenseVoice、Silero 和 Smart Turn（共约 250 MB），已下载的文件会复用；缺少 Smart Turn 或加载失败时回退到原有识别和停顿判定。模型在手机运行，聊天请求仍发到所选服务；无法使用本地识别时按原有顺序尝试电脑或云端识别。Edge 朗读可用时会预备少量简短接话，失败不阻塞对话。
+首次使用下载本地语音组件及 SenseVoice、Silero 和 Smart Turn 模型（模型约 250 MB，原生组件约 60 MB）；已下载的文件会复用，旧用户保留模型，只补齐当前版本组件。缺少 Smart Turn 或加载失败时回退到原有识别和停顿判定。模型在手机运行，聊天请求仍发到所选服务；无法使用本地识别时按原有顺序尝试电脑或云端识别。Edge 朗读可用时会预备少量简短接话，失败不阻塞对话。
 
-安卓构建使用 `onnxruntime-android` 运行 Smart Turn；sherpa-onnx 使用独立命名的运行库，避免两个版本的原生符号冲突。手动打包工作流在准备 sherpa 库时使用 `patchelf` 设置依赖和 SONAME。针对性验证：`./gradlew :common:community-core:jvmTest --tests '*VoiceAlignmentTest*' --tests '*VoiceActivityTest*' --tests '*VoiceCallTest*' --tests '*SpeechModelsTest*' :common:link-core:jvmTest --tests '*RemoteChatTest*' :androidApp:assembleDebug`；外放回声、打断和手机性能仍需实际设备验收。
+安卓构建保留 `onnxruntime-android` 的 Java 接口，四个语音 `.so` 从 APK 排除。`prepareVoiceRuntime` 使用 Python 3.11+、`patchelf` 准备固定版本的预编译库，不编译 Sherpa/ORT；Sherpa 使用独立 SONAME 避免版本冲突。构建输出为 `androidApp/build/voice-runtime/assets/voice-runtime.json`（随 APK 打包）和 `downloads/*.so`（独立分发）。组件按内容哈希命名，客户端下载到私有目录、在加载前核对大小和 SHA-256，再按依赖顺序加载；下载失败可切换备用源、取消或续传。
+
+分发方式沿用桌面端：把 `downloads/*.so` 原名上传到魔搭 `bestyize/xiaoban-asr` 的 `android-voice/` 目录；手动 APK 打包工作流也会先将同一组组件上传到同一个 GitHub Release，作为备用源，再上传 APK。旧哈希文件必须保留供旧客户端使用。`XIAOBAN_VOICE_RELEASE_TAG` 指定备用 Release 标签，默认沿用 `xiaoban-wallpaper-v3.0.0`。组件准备有本地增量检查和 Actions 缓存；Agent Rust 库仍在 APK 内，仍用 Cargo 缓存增量编译。ORT Android 的加载调用由构建时的局部字节码转换接入私有目录加载器，其余推理接口保持上游版本。
+
+针对性验证：`./gradlew :common:community-core:jvmTest --tests '*SpeechModelsTest*' --tests '*DownloadedSpeechRuntimeTest*' :androidApp:assembleDebug`，涵盖镜像续传、取消、缺库后补下载、依赖加载顺序、校验失败与加载重试。真机上的语音识别、判停、外放回声及打断仍需设备验收。
 
 ## 开发与验证
 
