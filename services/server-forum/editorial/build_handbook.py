@@ -91,6 +91,10 @@ def main():
     }
     for key, (title, text) in interface.items():
         docs['interface-'+key] = dict(title=title+'（2026-11-02运营核对）', url='https://chat.xiangban.xyz/', text=text)
+    docs['keyboard-focus'] = dict(
+        title='W3C WAI 可见键盘焦点说明（基础检查更新草案）',
+        url='https://www.w3.org/WAI/test-evaluate/easy-checks/keyboard-focus/',
+        text='W3C WAI基础检查更新草案的键盘焦点页面说明：可见键盘焦点用来指示通过Tab键移动到了哪个交互元素，例如链接、按钮和表单字段。使用键盘或语音导航的人需要知道自己移动到了哪里；盲人也使用键盘导航，但依赖非视觉线索。页面建议检查交互元素是否有明显的视觉样式，以及检查工具是否高亮了没有文字的空白链接。该页面属于基础检查更新草案，不是对小伴社区的检查报告，也没有给出本站合规结论。记录问题时，建议把看不见焦点、操作没有响应和对根因的推测分开表述。这是便于交流的记录建议，不是该草案规定的唯一检查流程。')
     topics['site-notice'] += '|'+'|'.join(value[0] for value in interface.values())
     entries=[]
     for channel, raw in topics.items():
@@ -98,6 +102,7 @@ def main():
             entries.append(dict(id=f'{channel}-{i:02d}',channel=channel,title=title,focus=title,documents=sources[channel],boundary='这是基于现有产品说明或社区规则的站方导读。不是新功能发布、真实用户经历、实际求助、处罚决定或已存在的可安装作品。示例必须明确标为示例；不要添加资料没有支持的能力、日期、价格、规则或服务承诺。'))
     for entry, key in zip([e for e in entries if e['channel']=='site-notice'][30:], interface):
         entry['documents']=['interface-'+key, 'community']
+    next(e for e in entries if e['id']=='site-feedback-26')['documents']=['keyboard-focus','community','privacy']
     output={'version':1,'documents':docs,'entries':entries}
     for doc in docs.values(): doc['sha256']=hashlib.sha256(doc['text'].encode()).hexdigest()
     (HERE/'handbook.json').write_text(json.dumps(output,ensure_ascii=False,indent=2)+'\n')
