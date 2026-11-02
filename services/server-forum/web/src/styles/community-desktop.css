@@ -65,8 +65,9 @@
 
   /* Shared spacing for discussion, tools, documents and article reading. */
   .site-layout.community-layout .desktop-feed-heading { padding: 16px 0 10px; }
+  .site-layout.community-layout .desktop-feed-heading.meta-only { padding: 0 0 8px; min-height: 0; justify-content: flex-end; }
   .site-layout.community-layout .resource-feed, .site-layout.community-layout .pack-grid, .site-layout.community-layout .topic-feed { padding-inline: 0; gap: 16px; }
-  .site-layout.community-layout .filter-row, .site-layout.community-layout .discussion-tools { padding-inline: 0; }
+  .site-layout.community-layout .filter-row { padding-inline: 0; }
   .site-layout.community-layout .tool-card, .site-layout.community-layout .doc-group, .site-layout.community-layout .scheme-card, .site-layout.community-layout .topic-card { border: 1px solid var(--line); border-radius: 12px; transition: border-color .15s, background .15s; }
   .site-layout.community-layout .tool-card:hover, .site-layout.community-layout .scheme-card:hover, .site-layout.community-layout .topic-card:hover { border-color: var(--line-strong); }
   .site-layout.community-layout .resource-note { margin-left: 0; margin-right: 0; }
