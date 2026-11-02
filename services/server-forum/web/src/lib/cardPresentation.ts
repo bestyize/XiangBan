@@ -5,11 +5,11 @@ export function cardTitleLines(category = ''): 2 | 3 {
   return category === 'resource-movies' || category === 'share-movies' ? 3 : 2
 }
 
-/** An illustration does not establish that a post is a visual work. */
+/** Article channels and installable works have separate presentation policies. */
 export function articleLayout(category: string): ArticleLayout {
   if (category === 'site' || category.startsWith('site-')) return 'plain'
-  if (['resource-movies', 'resource-music', 'casual-media'].includes(category)) return 'masonry'
-  return ['resource-tools', 'resource-docs', 'resource-open', 'casual-gear'].includes(category) ? 'visual' : 'reading'
+  if (category === 'casual' || category.startsWith('casual-') || ['resource-movies', 'resource-music'].includes(category)) return 'masonry'
+  return ['resource-tools', 'resource-docs', 'resource-open'].includes(category) ? 'visual' : 'reading'
 }
 export function packLayout(kind: string, wallpaperFeed = false): PackLayout {
   if (wallpaperFeed && kind === 'wallpaper') return 'masonry'

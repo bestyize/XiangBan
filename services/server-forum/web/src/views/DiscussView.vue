@@ -36,7 +36,7 @@ const sectionTitle = computed(() => tab.value === 'all' ? '全部讨论' : tabs.
 const page = computed(() => Math.max(1,Math.floor(Number(route.query.page) || 1)))
 const filter = computed(() => typeof route.query.filter === 'string' ? route.query.filter : '')
 const learnTags = LEARN_FILTERS
-const topicLayout = computed(() => tab.value === 'casual' && filter.value ? articleLayout(filter.value) : 'reading')
+const topicLayout = computed(() => tab.value === 'casual' ? articleLayout(filter.value || 'casual') : 'reading')
 const directoryFeed = computed(() => !!filter.value && packLayout(filter.value) === 'directory')
 const filters = computed(() => tab.value === 'create' ? [{key:'',label:'全部'},...PACK_KINDS,{key:'schemes',label:'方案'}] : tab.value === 'learn' ? learnTags : [{key:'',label:'全部'},...meta.categories.filter(c => c.slug.startsWith('casual-')).map(c => ({key:c.slug,label:c.name}))])
 type Feed = { kind:'packs'; result:Page<PackItem> } | { kind:'schemes'; result:Page<CommunityScheme> } | { kind:'topics'; result:Page<TopicItem> }
@@ -76,7 +76,7 @@ useHead(() => ({title:'讨论'}))
         <MasonryGrid v-if="data.kind === 'packs' && filter === 'wallpaper'" class="wallpaper-feed"><CommunityPackCard v-for="pack in data.result.items" :key="pack.id" :pack="pack" :layout="packLayout(pack.kind,true)" /></MasonryGrid>
         <div v-else-if="data.kind === 'packs'" class="pack-grid" :class="{single:directoryFeed}"><CommunityPackCard v-for="pack in data.result.items" :key="pack.id" :pack="pack" /></div>
         <div v-else-if="data.kind === 'schemes'" class="topic-feed"><RouterLink v-for="scheme in data.result.items" :key="scheme.id" :to="`/schemes/${scheme.id}`" class="scheme-card"><span class="scheme-kind">桌面方案 · {{ scheme.items.length }} 项</span><strong>{{ scheme.title }}</strong><p v-if="scheme.summary">{{ scheme.summary }}</p><span class="scheme-author"><UserAvatar :name="scheme.author.nickname || '社区用户'" :size="20" />{{ scheme.author.nickname || '社区用户' }}</span></RouterLink></div>
-        <MasonryGrid v-else-if="topicLayout === 'masonry'" :columns="2" class="media-topic-feed"><ResourceTopicRow v-for="topic in data.result.items" :key="topic.id" :topic="topic" layout="masonry" /></MasonryGrid>
+        <MasonryGrid v-else-if="topicLayout === 'masonry'" class="media-topic-feed"><ResourceTopicRow v-for="topic in data.result.items" :key="topic.id" :topic="topic" layout="masonry" :show-category="!filter" /></MasonryGrid>
         <div v-else class="topic-feed" :class="`feed-${topicLayout}`"><ResourceTopicRow v-for="topic in data.result.items" :key="topic.id" :topic="topic" :layout="topicLayout" :show-category="tab === 'all' || !filter" /></div>
         <RequestState :empty="!data.result.items.length" /><PagerNav :page="data.result.page" :page-size="data.result.page_size" :total="data.result.total" @go="go" />
       </template>

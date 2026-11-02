@@ -25,7 +25,7 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
     <div class="topic-main">
       <div class="topic-content">
         <h3><span v-if="topic.pinned" class="flag">{{ pinScopeLabel(topic.pin_scope) }}</span><span v-if="topic.featured" class="flag">精选</span><span v-if="topic.min_read_level > 0" class="flag">{{ readLevelBadge(topic.min_read_level) }}</span><RouterLink :to="`/t/${topic.id}`">{{ topic.title || topic.excerpt || '社区分享' }}</RouterLink></h3>
-        <p v-if="topic.excerpt && !visual && topic.excerpt !== topic.title" class="excerpt">{{ topic.excerpt }}</p>
+        <p v-if="topic.excerpt && (!visual || !image) && topic.excerpt !== topic.title" class="excerpt">{{ topic.excerpt }}</p>
         <div v-if="showCategory || mode === 'media' || mode === 'open'" class="secondary"><RouterLink v-if="showCategory" :to="`/c/${topic.category.slug}`" class="tag">{{ topic.category.name }}</RouterLink><span v-else class="tag">{{ topic.tags?.[0] || topic.category.name }}</span></div>
       </div>
       <RouterLink v-if="image && presentation !== 'plain'" :to="`/t/${topic.id}`" class="cover" tabindex="-1" aria-hidden="true"><img :src="image" alt="" loading="lazy" decoding="async" @load="loaded" @error="broken.push(image!)"><span class="cover-stats"><span><DiscoverGlyph name="eye" :size="14" />{{ compactCount(topic.view_count) }}</span><span><DiscoverGlyph name="comment" :size="14" />{{ compactCount(topic.reply_count) }}</span></span></RouterLink>

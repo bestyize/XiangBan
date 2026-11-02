@@ -8,8 +8,8 @@ test('film titles get three lines; music, mixed discussion and other card titles
 })
 
 test('film and music use masonry, while guides, questions and notices remain readable', () => {
-  for (const category of ['resource-movies','resource-music','casual-media']) assert.equal(articleLayout(category),'masonry')
-  for (const category of ['learn-codex','learn-prompts','create-wallpaper','casual-work','resource-help']) assert.equal(articleLayout(category),'reading')
+  for (const category of ['resource-movies','resource-music','casual','casual-work','casual-offwork','casual-loss','casual-dream','casual-gear','casual-indie','casual-fun','casual-media','casual-think','casual-help','casual-chat']) assert.equal(articleLayout(category),'masonry')
+  for (const category of ['learn-codex','learn-prompts','create-wallpaper','resource-help']) assert.equal(articleLayout(category),'reading')
   for (const category of ['site-notice','site-rules','site-feedback','site-reports']) assert.equal(articleLayout(category),'plain')
   for (const category of ['resource-tools','resource-docs','resource-open']) assert.equal(articleLayout(category),'visual')
 })
