@@ -61,7 +61,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
             when (current) {
                 CommunitySection.Home -> TabStrip(HomeSub.entries.filter { it != HomeSub.Hot }.map { it.key to it.label }, if (homeSub == HomeSub.Hot.key) HomeSub.OpenSource.key else homeSub, centered = true) { homeSub = it }
                 CommunitySection.Discuss -> TabStrip(DiscussSub.entries.map { it.key to it.label }, discussSub, centered = true) { discussSub = it }
-                CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, resourceSub, centered = true) { resourceSub = it }
+                CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, ResourceSub.byKey(resourceSub).key, centered = true) { resourceSub = it }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 when (current) {

@@ -58,9 +58,9 @@ import xyz.xiangban.xiaoban.common.community.nowMillis
 import xyz.xiangban.xiaoban.common.community.parseIsoMillis
 import xyz.xiangban.xiaoban.common.community.remainText
 
-/** 资源的五个二级栏目。 */
+/** 资源的四个二级栏目；精选独立放在首页。 */
 internal enum class ResourceSub(val key: String, val label: String) {
-    Tools("tools", "AI 工具"), Docs("docs", "资料"), Media("media", "影音娱乐"), Help("help", "求助悬赏"), Open("open", "精选");
+    Tools("tools", "AI 工具"), Docs("docs", "资料"), Media("media", "影音娱乐"), Help("help", "求助悬赏");
 
     companion object {
         fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: Tools
@@ -74,7 +74,6 @@ internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> U
         ResourceSub.Docs -> DocsTab(env)
         ResourceSub.Media -> MediaTab(env, open, onMessage)
         ResourceSub.Help -> HelpTab(env, open)
-        ResourceSub.Open -> OpenSourceTab(env, open)
     }
 }
 
