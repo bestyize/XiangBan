@@ -1,4 +1,14 @@
 /* Shared card typography at every breakpoint; article/section headings keep their hierarchy. */
+/* Named containers measure the feed itself, excluding navigation and sidebars. */
+.discuss-page,.resource-page,.frontier-page,.editorial-feed,.topic-list-region,.search-packs {
+  container:card-feed / inline-size;
+}
+@container card-feed (min-width:840px) {
+  .adaptive-card-grid { --card-columns:3; }
+}
+@container card-feed (min-width:1120px) {
+  .adaptive-card-grid { --card-columns:4; }
+}
 .site-layout.community-layout .community-page :is(.topic-card,.pack-card,.news-row,.repo-card,.track-card,.scheme-card) h3,
 .site-layout.community-layout .community-page .scheme-card>strong,
 .site-layout.community-layout .community-page .tool-card .tool-body>strong,

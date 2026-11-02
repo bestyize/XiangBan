@@ -22,11 +22,11 @@ function go(value:number) { void router.replace({query:{...route.query,articles_
     <p v-if="intro" class="intro">{{ intro }}</p>
     <RequestState :loading="feed.loading.value" :error="feed.error.value" @retry="feed.load" />
     <MasonryGrid v-if="feed.data.value?.items.length && layout==='masonry'" :columns="2"><ResourceTopicRow v-for="article in feed.data.value.items" :key="article.id" :topic="article" layout="masonry" /></MasonryGrid>
-    <div v-else-if="feed.data.value?.items.length" class="articles" :class="`feed-${layout}`"><ResourceTopicRow v-for="article in feed.data.value.items" :key="article.id" :topic="article" :layout="layout" /></div>
+    <div v-else-if="feed.data.value?.items.length" class="articles" :class="[`feed-${layout}`,{'adaptive-card-grid':layout==='visual'}]"><ResourceTopicRow v-for="article in feed.data.value.items" :key="article.id" :topic="article" :layout="layout" /></div>
     <p v-else-if="!feed.loading.value && !feed.error.value" class="intro">暂无图文分享。</p>
     <PagerNav v-if="feed.data.value" :page="feed.data.value.page" :page-size="feed.data.value.page_size" :total="feed.data.value.total" @go="go" />
   </section>
 </template>
 <style scoped>
-.editorial-feed{padding:12px}.editorial-feed header{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}.editorial-feed h2{font-size:16px;margin:0}.editorial-feed header span,.intro{font-size:12px;color:var(--ink-3)}.intro{margin:6px 0 12px;line-height:1.6}.articles{display:grid;gap:12px}.feed-visual{grid-template-columns:repeat(2,minmax(0,1fr))}@media(min-width:1100px){.editorial-feed{padding-inline:0}}
+.editorial-feed{padding:12px}.editorial-feed header{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}.editorial-feed h2{font-size:16px;margin:0}.editorial-feed header span,.intro{font-size:12px;color:var(--ink-3)}.intro{margin:6px 0 12px;line-height:1.6}.articles{display:grid;gap:12px}.feed-visual{grid-template-columns:repeat(var(--card-columns,2),minmax(0,1fr))}@media(min-width:1100px){.editorial-feed{padding-inline:0}}
 </style>

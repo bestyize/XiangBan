@@ -79,9 +79,9 @@ function submit() {
     </form>
 
     <template v-if="q">
-      <section v-if="packs.length" class="packs">
+      <section v-if="packs.length" class="packs search-packs">
         <p class="summary muted">内容 {{ packTotal }} 个</p>
-        <div class="pack-grid">
+        <div class="pack-grid adaptive-card-grid">
           <PackCard v-for="p in packs" :key="p.id" :pack="p" />
         </div>
       </section>
@@ -116,7 +116,7 @@ function submit() {
 }
 @media (min-width: 768px) {
   .pack-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--card-columns, 2), minmax(0, 1fr));
   }
 }
 .summary {
