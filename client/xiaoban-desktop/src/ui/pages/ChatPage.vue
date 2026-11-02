@@ -15,6 +15,9 @@ import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatActivity from '../chat/ChatActivity.vue';
 import ChatGeneratedImages from '../chat/ChatGeneratedImages.vue';
 import ChatAssets from '../chat/ChatAssets.vue';
+import PreviewPanel from '../preview/PreviewPanel.vue';
+import {assetForLink,previewKind,previewTab,type PreviewTab,type PreviewTarget} from '../preview/model.ts';
+import type {ConversationAsset} from '../chat/assets.ts';
 import ChatTaskCard from '../chat/ChatTaskCard.vue';
 import ChatReasoning from '../chat/ChatReasoning.vue';
 import ChatReasoningGroup from '../chat/ChatReasoningGroup.vue';
@@ -39,16 +42,48 @@ const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
 const designs = ref<DesignSummary[]>([]), designId = ref(''), designContextId=ref(''), designClosed = ref(false), designWidth = ref(64);
 const designPicker=ref(false);
+const previewTabs=ref<PreviewTab[]>([]),activePreview=ref<PreviewTab|null>(null),workspacePinned=ref(false),openedDesigns=ref<string[]>([]);
+const availableAssets=ref<ConversationAsset[]>([]);
+const workspaceVisible=computed(()=>!!activePreview.value||!!designId.value);
+const workspaceDesigns=computed(()=>openedDesigns.value.map(id=>({id,title:designs.value.find(d=>d.id===id)?.title??'设计稿'})));
+let previewVersions=new Map<string,string>(),workspaceSuppressed=false;
+function openPreview(asset:ConversationAsset,manual=true){
+ const session=chat.currentId;if(!session)return;
+ const tab=previewTab(asset,session);if(!tab)return;
+ designOpenEpoch++;activePreview.value=tab;designContextId.value='';workspacePinned.value=manual;workspaceSuppressed=false;
+ previewTabs.value=[...previewTabs.value.filter(t=>t.key!==tab.key),tab].slice(-12);panelOpen.value=false;
+ if(assetsPinned.value)assetsOpen.value=false;
+}
+function updateAssets(rows:ConversationAsset[]){
+ availableAssets.value=rows;const session=chat.currentId;if(!session)return;
+ let candidate:ConversationAsset|undefined;
+ for(const asset of rows){
+  const tab=previewTab(asset,session);if(!tab)continue;
+  const old=previewVersions.get(tab.key);previewVersions.set(tab.key,tab.version);
+  if(old!==tab.version&&!asset.local!.imported&&previewKind(asset.name)==='html'&&(!candidate||candidate.updatedMs<asset.updatedMs))candidate=asset;
+  const at=previewTabs.value.findIndex(t=>t.key===tab.key);if(at>=0)previewTabs.value[at]=tab;
+ }
+ if(candidate&&!workspacePinned.value&&!workspaceSuppressed&&(!designId.value||activePreview.value||candidate.updatedMs>=(designs.value.find(d=>d.id===designId.value)?.updatedMs??0)))openPreview(candidate,false);
+}
+function pickPreview(tab:PreviewTab){designOpenEpoch++;activePreview.value=tab;designContextId.value='';workspacePinned.value=true;workspaceSuppressed=false;}
+function closeWorkspace(){activePreview.value=null;closeDesign();workspacePinned.value=false;workspaceSuppressed=true;}
+function closePreview(){
+ const key=activePreview.value?.key;previewTabs.value=previewTabs.value.filter(t=>t.key!==key);activePreview.value=previewTabs.value.at(-1)??null;
+ if(!activePreview.value){designContextId.value=designId.value;if(!designId.value){workspaceSuppressed=true;workspacePinned.value=false;}}
+}
+async function detachPreview(){
+ const current=activePreview.value;if(!current)return;
+ try{await invoke('configuration_window_open',{target:'preview',provider:JSON.stringify(current.target)});if(activePreview.value?.key===current.key)closePreview();}catch(e){props.store.notify(e,'error');}
+}
+watch(designId,id=>{if(id&&!openedDesigns.value.includes(id))openedDesigns.value.push(id);});
 const assetsOpen=ref(false),assetAnchor=ref<HTMLElement|null>(null);
 const ASSET_PIN_KEY='xiaoban.chat.assets-pinned';
 const assetsPinned=ref((()=>{try{return localStorage.getItem(ASSET_PIN_KEY)==='1';}catch{return false;}})());
 const locatedAssetBlock=ref('');let assetLocateTimer:ReturnType<typeof setTimeout>|undefined;
-function toggleAssets(){assetsOpen.value=!assetsOpen.value;designPicker.value=false;if(assetsOpen.value&&assetsPinned.value){closeDesign();panelOpen.value=false;}}
-function pinAssets(){assetsPinned.value=!assetsPinned.value;if(assetsPinned.value){closeDesign();panelOpen.value=false;}try{localStorage.setItem(ASSET_PIN_KEY,assetsPinned.value?'1':'0');}catch{/* memory only */}}
+function toggleAssets(){assetsOpen.value=!assetsOpen.value;designPicker.value=false;if(assetsOpen.value&&assetsPinned.value){closeWorkspace();panelOpen.value=false;}}
+function pinAssets(){assetsPinned.value=!assetsPinned.value;if(assetsPinned.value){closeWorkspace();panelOpen.value=false;}try{localStorage.setItem(ASSET_PIN_KEY,assetsPinned.value?'1':'0');}catch{/* memory only */}}
 async function openAssetDesign(id:string){
-  const session=chat.currentId;
-  try{await invoke('design_window_open',{id});if(session===chat.currentId){designContextId.value=id;closeDesign();}}
-  catch(e){props.store.notify(e,'error');}
+  await openDesign(id);
 }
 async function locateAsset(block:string){stick.value=false;locatedAssetBlock.value=block;await nextTick();scroller.value?.querySelector<HTMLElement>('[data-asset-located="true"]')?.scrollIntoView?.({block:'center',behavior:'smooth'});clearTimeout(assetLocateTimer);assetLocateTimer=setTimeout(()=>locatedAssetBlock.value='',3500);}
 watch(()=>chat.currentId,(_id,before)=>{if(before)assetsOpen.value=false;locatedAssetBlock.value='';});
@@ -61,7 +96,7 @@ async function openDesign(id:string){
     if(session)await invoke('design_link',{id,session});if(epoch!==designOpenEpoch||chat.currentId!==session)return;designContextId.value=id;
     const detached=await invoke<boolean>('design_window_status',{id});if(epoch!==designOpenEpoch||chat.currentId!==session)return;
     if(detached){await invoke('design_window_open',{id});designPicker.value=false;return;}
-    designId.value=id;designClosed.value=false;designPicker.value=false;panelOpen.value=false;
+    activePreview.value=null;workspacePinned.value=true;workspaceSuppressed=false;designId.value=id;designClosed.value=false;designPicker.value=false;panelOpen.value=false;
   }catch(e){props.store.notify(e,'error');}
 }
 async function detachDesign(){if(detachBusy)return;detachBusy=true;const id=designId.value;try{await invoke('design_window_open',{id});if(designId.value===id)closeDesign();}catch(e){props.store.notify(e,'error');}finally{detachBusy=false;}}
@@ -86,23 +121,39 @@ async function loadDesigns() {
     const merged = new Map(designs.value.map(row => [row.id, row]));
     for (const row of Array.isArray(rows) ? rows : []) if (!merged.has(row.id) || merged.get(row.id)!.revision <= row.revision) merged.set(row.id, row);
     designs.value = [...merged.values()].sort((a, b) => b.updatedMs - a.updatedMs);
-    if(!designContextId.value)designContextId.value=designs.value.find(p=>p.active)?.id??designs.value[0]?.id??'';
+    if(!designContextId.value&&!activePreview.value)designContextId.value=designs.value.find(p=>p.active)?.id??designs.value[0]?.id??'';
     if (!designClosed.value && !designId.value) {const target=designs.value.find(p=>p.id===designContextId.value);if(target&&!target.detached)designId.value=target.id;}
   } catch (e) { props.store.notify(e, 'error'); }
 }
-watch(() => chat.currentId, () => { designOpenEpoch++;designId.value = '';designContextId.value=''; designClosed.value = false; designs.value = []; void loadDesigns(); }, { immediate: true });
-watch(()=>props.store.designOpening,id=>{if(id){designId.value=id;designContextId.value=id;designClosed.value=false;props.store.designOpening='';}},{immediate:true});
+watch(() => chat.currentId, () => { designOpenEpoch++;designId.value = '';designContextId.value=''; designClosed.value = false; designs.value = [];previewTabs.value=[];activePreview.value=null;openedDesigns.value=[];workspacePinned.value=false;previewVersions=new Map();workspaceSuppressed=false;availableAssets.value=[]; void loadDesigns(); }, { immediate: true });
+watch(()=>props.store.designOpening,id=>{if(id){activePreview.value=null;workspacePinned.value=true;designId.value=id;designContextId.value=id;designClosed.value=false;props.store.designOpening='';}},{immediate:true});
 
+watch(()=>props.store.previewOpening,target=>{
+  if(!target)return;props.store.previewOpening=null;void returnPreview(target);
+},{immediate:true});
+async function returnPreview(target:PreviewTarget){
+    try{
+      if(target.sessionId!==chat.currentId)await chat.select(target.sessionId);
+      if(designDisposed||chat.currentId!==target.sessionId)return;
+      const files=await invoke<import('../chat/assets.ts').LocalAsset[]>('chat_assets_list',{sessionId:target.sessionId});
+      if(designDisposed||chat.currentId!==target.sessionId)return;
+      const local=files.find(a=>a.id===target.id);if(!local)throw Error('作品已不在此对话中');
+      const name=target.relative.split('/').at(-1)||local.name;
+      openPreview({key:`local:${target.id}`,id:target.id,name,type:'file',updatedMs:local.updatedMs,relative:target.relative,local:{...local,kind:target.relative?'file':local.kind,path:target.relative?local.path.replace(/[\\/]$/,'')+'/'+target.relative:local.path}});
+    }catch(e){props.store.notify(e,'error');}
+
+}
 onMounted(async () => {
   if (!props.store.desktop) return;
   const off = await listen<DesignSummary>('design-changed', row => {
     if (row.sessionId !== chat.currentId && !row.sessionIds?.includes(chat.currentId ?? '')) return;
     designs.value = [row, ...designs.value.filter(p => p.id !== row.id)];
-    if (!designClosed.value&&!row.detached) { designId.value = row.id;designContextId.value=row.id; panelOpen.value = false; }
+    if (!designClosed.value&&!row.detached&&(!workspacePinned.value||designId.value===row.id&&!activePreview.value)) {activePreview.value=null;designId.value = row.id;designContextId.value=row.id; panelOpen.value = false; }
   });
   if (designDisposed) off(); else designOff = off;
   const removed=await listen<{id:string}>('design-deleted',row=>{designs.value=designs.value.filter(p=>p.id!==row.id);if(designId.value===row.id)closeDesign();if(designContextId.value===row.id)designContextId.value='';});
   if(designDisposed)removed();else designDeleteOff=removed;
+
 });
 onBeforeUnmount(() => { designDisposed = true; designOff?.();designDeleteOff?.(); });
 function closeDesign() { designOpenEpoch++;designId.value = ''; designClosed.value = true; }
@@ -139,6 +190,7 @@ const exampleTags = ['工作区', '壁纸', '关怀', '日常'];
 const view = computed(() => chat.current());
 const blocks = computed(() => replyBlocks(view.value?.items ?? []));
 const running = computed(() => !!view.value?.running);
+watch(running,value=>{if(value)workspaceSuppressed=false;});
 const session = computed(() => (chat.currentId ? chat.sessions.find(s => s.id === chat.currentId) ?? null : null));
 const title = computed(() => session.value?.title || '新对话');
 const folderName = (path: string) => path.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || path;
@@ -417,6 +469,7 @@ const decide = (request: ApprovalRequest, decision: ApprovalDecision) => chat.an
 function answer(request: QuestionRequest, value: string | null) { return chat.answerQuestion(request, value); }
 
 async function openLink(href: string) {
+  const asset=assetForLink(availableAssets.value,href);if(asset&&previewTab(asset,chat.currentId??'')){openPreview(asset);return;}
   const url = href.split('#')[0];
   try {
     if (!props.store.desktop) { window.open(url, '_blank', 'noopener,noreferrer'); return; }
@@ -606,7 +659,7 @@ async function openLink(href: string) {
       <button v-if="!stick && view?.items.length" type="button" class="to-bottom" data-testid="chat-bottom" aria-label="回到最新" @click="stick = true; toBottom()"><ArrowDown :size="16" /></button>
 
       <div class="composer-wrap">
-        <ChatComposer ref="composer" :design-id="designContextId||undefined" :store="store" page="chat" pet="sm" :attention="waiting" placeholder="发送消息给小伴" @sending="stick = true" @sent="toBottom" @settings="openAiSettings" @preview="preview = $event" />
+        <ChatComposer ref="composer" :design-id="designContextId||undefined" :preview-target="activePreview?.target" :store="store" page="chat" pet="sm" :attention="waiting" placeholder="发送消息给小伴" @sending="stick = true" @sent="toBottom" @settings="openAiSettings" @preview="preview = $event" />
         <p class="disclaimer">内容由 AI 生成，请核对重要信息</p>
       </div>
     </div>
@@ -644,9 +697,16 @@ async function openLink(href: string) {
       <img :src="preview" alt="图片预览" />
       <button type="button" class="lightbox-close" data-testid="chat-image-preview-close" aria-label="关闭预览" @click="preview = null"><X :size="18" /></button>
     </div>
-    <ChatAssets v-if="store.desktop" :session="chat.currentId" :designs="designs" :blocks="blocks" :open="assetsOpen" :pinned="assetsPinned" :anchor="assetAnchor" :ensure-session="chat.ensureSession" :notify="store.notify" @close="assetsOpen=false" @pin="pinAssets" @design="openAssetDesign" @locate="locateAsset" @browse-designs="assetsOpen=false;designPicker=true" />
-    <div v-if="designId" class="design-splitter" role="separator" tabindex="0" aria-label="调整聊天和画布宽度" aria-orientation="vertical" :aria-valuenow="Math.round(designWidth)" :aria-valuemin="35" :aria-valuemax="85" @pointerdown="startDesignSplit" @pointermove="moveDesignSplit" @pointerup="finishDesignSplit" @pointercancel="finishDesignSplit" @keydown="designSplitKey" />
-    <aside v-if="designId" :style="{ width: designWidth + '%' }" class="design-dock" aria-label="设计工作台"><DesignWorkbench :project-id="designId" :notify="store.notify" @close="closeDesign" @detach="detachDesign" @copied="openDesign" @request="designRequest" /></aside>
+    <ChatAssets v-if="store.desktop" :session="chat.currentId" :designs="designs" :blocks="blocks" :open="assetsOpen" :pinned="assetsPinned" :anchor="assetAnchor" :ensure-session="chat.ensureSession" :notify="store.notify" previewable @updated="updateAssets" @preview="openPreview" @close="assetsOpen=false" @pin="pinAssets" @design="openAssetDesign" @locate="locateAsset" @browse-designs="assetsOpen=false;designPicker=true" />
+    <div v-if="workspaceVisible" class="design-splitter" role="separator" tabindex="0" aria-label="调整聊天和作品宽度" aria-orientation="vertical" :aria-valuenow="Math.round(designWidth)" :aria-valuemin="35" :aria-valuemax="85" @pointerdown="startDesignSplit" @pointermove="moveDesignSplit" @pointerup="finishDesignSplit" @pointercancel="finishDesignSplit" @keydown="designSplitKey" />
+    <aside v-if="workspaceVisible" :style="{width:designWidth+'%'}" class="design-dock" aria-label="作品工作区">
+      <nav class="workspace-tabs" aria-label="当前对话的作品"><div class="workspace-tab-list" role="tablist">
+        <button v-for="item in workspaceDesigns" :key="item.id" type="button" role="tab" :aria-selected="!activePreview&&designId===item.id" :title="item.title" @click="openDesign(item.id)">{{item.title}}</button>
+        <button v-for="item in previewTabs" :key="item.key" type="button" role="tab" :aria-selected="activePreview?.key===item.key" :title="item.path" @click="pickPreview(item)">{{item.name}}</button>
+      </div><button type="button" class="xb-icon-btn" :class="{'is-active':workspacePinned}" :aria-pressed="workspacePinned" :title="workspacePinned?'取消固定，跟随新作品':'固定当前作品'" :aria-label="workspacePinned?'取消固定当前作品':'固定当前作品'" @click="workspacePinned=!workspacePinned"><PanelRight :size="14"/></button><button class="xb-icon-btn" type="button" title="收起作品工作区" aria-label="收起作品工作区" @click="closeWorkspace"><X :size="14"/></button></nav>
+      <PreviewPanel v-if="activePreview" :key="activePreview.key" :target="activePreview.target" :notify="store.notify" @close="closePreview" @detach="detachPreview"/>
+      <DesignWorkbench v-else-if="designId" :project-id="designId" :notify="store.notify" @close="closeWorkspace" @detach="detachDesign" @copied="openDesign" @request="designRequest" />
+    </aside>
     <SelectionCopyMenu :scope="scroller" />
   </section>
 </template>
@@ -658,7 +718,7 @@ async function openLink(href: string) {
 
 .reply.asset-located{outline:2px solid var(--ui-btn);outline-offset:6px;border-radius:8px}
 .design-splitter{width:4px;flex:none;cursor:col-resize;touch-action:none;background:transparent}.design-splitter:hover,.design-splitter:focus-visible{background:var(--ui-soft);outline:0}
-.design-dock{width:64%;min-width:420px;max-width:calc(100% - 250px);border-left:1px solid var(--ui-line);flex:none;min-height:0;display:flex}@media(max-width:900px){.design-splitter{display:none}.design-dock{position:absolute;inset:0;width:100%!important;min-width:0;max-width:none;z-index:8;background:var(--ui-surface)}}
+.workspace-tabs{display:flex;align-items:center;flex:none;min-height:38px;padding:0 8px;border-bottom:1px solid var(--ui-line);gap:4px}.workspace-tab-list{display:flex;flex:1;min-width:0;overflow:auto;gap:4px}.workspace-tab-list button{flex:none;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;border-radius:5px;padding:7px 10px;background:transparent;color:var(--ui-text-secondary);font:12px var(--ui-font-family);cursor:pointer}.workspace-tab-list button[aria-selected="true"]{background:var(--ui-soft);color:var(--ui-text-primary)}.design-dock{flex-direction:column;width:64%;min-width:420px;max-width:calc(100% - 250px);border-left:1px solid var(--ui-line);flex:none;min-height:0;display:flex}@media(max-width:900px){.design-splitter{display:none}.design-dock{position:absolute;inset:0;width:100%!important;min-width:0;max-width:none;z-index:8;background:var(--ui-surface)}}
 .plan-steps{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}
 .plan-row{display:flex;align-items:center;gap:6px}.plan-row.dragging{opacity:.4}.plan-grip{flex:none;color:var(--ui-text-disabled);cursor:grab}
 .plan-remove{display:grid;place-items:center;flex:none;width:22px;height:22px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--ui-text-tertiary);cursor:pointer}.plan-remove:hover{background:var(--ui-surface-hover);color:var(--ui-text-primary)}

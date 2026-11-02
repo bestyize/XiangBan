@@ -1,0 +1,6 @@
+{
+  "identifier": "chat-preview",
+  "description": "Local artwork preview windows receive theme and native window events. File operations are restricted to the current conversation asset by the native preview commands.",
+  "windows": ["configuration-preview-*"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

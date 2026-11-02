@@ -669,6 +669,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         })
         .deferred_trusted_tool_arc(Arc::new(open_claude_design::DesignTool::new(design_store.clone(), move |project| design_desktop.design_saved(project)).on_remove(move|id|design_remove_desktop.design_removed(id))))
         .middleware(open_claude_design::DesignContext(design_store))
+        .middleware(crate::chat_preview::PreviewContext)
         .tool(TimeNow::new().utc_offset_minutes(utc_offset_minutes))
         .middleware(todo.clone())
         .tool_arc(todo)
@@ -1307,9 +1308,10 @@ fn bind_expert(plugins: &Path, pick: &ExpertPick) -> Result<sessions::ExpertBind
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>, design_id:Option<String>) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>, design_id:Option<String>, preview_target:Option<crate::chat_preview::Target>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
     if let Some(id)=&design_id{crate::design::store(&app)?.load(id)?;}
+    let preview_target=preview_target.map(|target|target.context(&app,&session_id)).transpose()?;
     // The existing Continue button must resume the saved goal and its cumulative
     // budget, rather than silently starting a fresh ordinary-chat budget.
     if matches!(text.trim(), "请接着上面的内容继续写完。" | "继续" | "继续目标" | "继续任务" | "继续执行" | "接着做") && retry != Some(true)
@@ -1330,17 +1332,17 @@ pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id
         let state = app.state::<ChatState>();
         if mentions.is_empty() { lock(&state.mentions).remove(&session_id); } else { lock(&state.mentions).insert(session_id.clone(), mentions); }
     }
-    send_prepared(app.clone(), session_id, text, images, retry, attachments, None, design_id)
+    send_prepared(app.clone(), session_id, text, images, retry, attachments, None, design_id, preview_target)
 }
 
 /// Starts an answer. The command above checks who is asking; the host's own callers (long-term goals) come here.
 pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
     let state = app.state::<ChatState>();
     let _delivery = lock(&state.delivery);
-    send_prepared(app.clone(), session_id, text, images, retry, attachments, None, None)
+    send_prepared(app.clone(), session_id, text, images, retry, attachments, None, None, None)
 }
 
-fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, queued: Option<outbox::Entry>,design_id:Option<String>) -> Result<SessionSummary, String> {
+fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, queued: Option<outbox::Entry>,design_id:Option<String>, preview_target:Option<Value>) -> Result<SessionSummary, String> {
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
@@ -1451,7 +1453,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
         Err(error) => { lock(&state.runs).remove(&session_id); lock(&state.leases).remove(&session_id); return Err(error); }
     };
     let saved_for_thread = saved.clone();
-    let input_metadata = queued.as_ref().and_then(|entry|entry.message.structured_content.clone()).or_else(||Some(json!({"attachments":saved,"designId":design_id})));
+    let input_metadata = queued.as_ref().and_then(|entry|entry.message.structured_content.clone()).or_else(||Some(json!({"attachments":saved,"designId":design_id,"previewTarget":preview_target})));
     if let Err(error) = outbox_host::open(&app, &session_id) {
         lock(&state.runs).remove(&session_id); lock(&state.leases).remove(&session_id);
         if queued.is_none() { attachment_store.rollback(&saved); }

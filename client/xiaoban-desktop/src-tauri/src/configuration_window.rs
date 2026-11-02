@@ -48,6 +48,7 @@ fn keep_visible(window: &tauri::WebviewWindow, fallback: Option<tauri::Monitor>)
     crate::design_window::keep_visible(window, fallback)
 }
 pub fn permitted(label: &str, command: &str) -> Option<bool> {
+    if kind(label)==Some("preview") && command.starts_with("configuration_window_") {return Some(["configuration_window_close","configuration_window_action","configuration_window_resize"].contains(&command));}
     if command.starts_with("configuration_window_") {
         return Some(match command {
             "configuration_window_open" => label == "control" || kind(label) == Some("settings"),
@@ -56,12 +57,14 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
             _ => false,
         });
     }
+    if kind(label)==Some("preview"){return Some(["get_appearance","chat_preview_read","chat_preview_revision","chat_preview_release","chat_preview_action","chat_preview_return"].contains(&command));}
     kind(label).map(|_| false)
 }
 #[tauri::command]
 pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::WebviewWindow, target: String, tab: Option<String>, provider: Option<String>) -> Result<(), String> {
     if window.label() != "control" && kind(window.label()) != Some("settings") { return Err("只能从控制台或设置打开配置窗口".into()); }
-    if !matches!(target.as_str(), "settings" | "model" | "community" | "store" | "cloud") { return Err("配置窗口类型无效".into()); }
+    if target=="preview" && window.label()!="control" {return Err("请从聊天页打开作品预览".into());}
+    if !matches!(target.as_str(), "settings" | "model" | "community" | "store" | "cloud" | "preview") { return Err("配置窗口类型无效".into()); }
     if tab.as_deref().is_some_and(|t| !["general", "appearance", "ai", "agent", "assistant", "voice", "network", "safety", "about"].contains(&t)) { return Err("设置分类无效".into()); }
     let provider = provider.unwrap_or_else(|| "__new__".into());
     let store_identity = if target == "store" { Some(policy::store_identity(&provider)?) } else { None };
@@ -69,7 +72,8 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
     if target == "model" && (provider.is_empty() || provider.len() > 200 || provider.chars().any(char::is_control)) { return Err("服务商编号无效".into()); }
     if target == "cloud" && (provider.is_empty() || provider.len() > 200 || provider.chars().any(char::is_control)) { return Err("云文档编号无效".into()); }
     let _lock = OPEN_LOCK.lock().map_err(|_| "配置窗口锁不可用")?;
-    let label = if target == "cloud" { policy::cloud_label(&provider) } else if let Some(identity) = store_identity { format!("configuration-store-{:x}", Sha256::digest(identity.as_bytes()))[..44].to_string() } else if target == "community" { "configuration-community".into() } else if target == "settings" { "configuration-settings".into() } else { format!("configuration-model-{:x}", Sha256::digest(provider.as_bytes()))[..44].to_string() };
+    let preview_label = if target == "preview" { let label=crate::chat_preview::identity(&provider)?; let target:crate::chat_preview::Target=serde_json::from_str(&provider).map_err(|_|"预览参数无效")?; crate::chat::assets::resolve(&app,&target.session_id,&target.id,&target.relative)?; Some(label) }else{None};
+    let label = if let Some(label)=preview_label {label} else if target == "cloud" { policy::cloud_label(&provider) } else if let Some(identity) = store_identity { format!("configuration-store-{:x}", Sha256::digest(identity.as_bytes()))[..44].to_string() } else if target == "community" { "configuration-community".into() } else if target == "settings" { "configuration-settings".into() } else { format!("configuration-model-{:x}", Sha256::digest(provider.as_bytes()))[..44].to_string() };
     let monitor = window.current_monitor().map_err(|e| e.to_string())?.or(app.primary_monitor().map_err(|e| e.to_string())?);
     if let Some(existing) = app.get_webview_window(&label) {
         existing.unminimize().map_err(|e| e.to_string())?;
@@ -88,7 +92,7 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
     let (width, height, min_width) = if connector_surface { (600f64, 420f64, 420f64) } else if target == "store" { (680f64, 720f64, 420f64) } else if target == "community" { (960f64, 760f64, 540f64) } else if target == "settings" { (940f64, 700f64, 560f64) } else if gateway { (360., 620., 360.) } else { (900., 720., 640.) };
     let (max_w, max_h) = monitor.as_ref().map(|m| { let a=m.work_area(); let s=m.scale_factor(); ((a.size.width as f64/s-32.).max(1.), (a.size.height as f64/s-64.).max(1.)) }).unwrap_or((width, height));
     let mut builder = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(format!("index.html?{query}").into()))
-        .title(if target == "cloud" { "云文档 · 小伴桌面" } else if target == "store" { "插件配置 · 小伴桌面" } else if target == "settings" { "设置 · 小伴桌面" } else if target == "community" { "我的桌面方案 · 小伴桌面" } else { "模型配置 · 小伴桌面" })
+        .title(if target == "preview" { "作品预览 · 小伴桌面" } else if target == "cloud" { "云文档 · 小伴桌面" } else if target == "store" { "插件配置 · 小伴桌面" } else if target == "settings" { "设置 · 小伴桌面" } else if target == "community" { "我的桌面方案 · 小伴桌面" } else { "模型配置 · 小伴桌面" })
         .inner_size(width.min(max_w), height.min(max_h)).min_inner_size(min_width.min(max_w), 360f64.min(max_h))
         .resizable(true).decorations(target == "community").transparent(target != "community").shadow(true).theme(theme).visible(false);
     // Restore only onto a currently connected display, then fit the full native frame inside its work area.

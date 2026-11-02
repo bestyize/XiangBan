@@ -457,6 +457,7 @@ pub struct DesignContext(pub Store);
 impl Middleware for DesignContext {
     fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
         let Some(at) = turn.messages.iter().rposition(|m| m.role == Role::User && !m.synthetic) else { return Ok(()) };
+        if turn.messages[at].structured_content.as_ref().is_some_and(|v| v["previewTarget"].is_object()) { return Ok(()) }
         let selected=turn.messages[at].structured_content.as_ref().and_then(|v|v["designId"].as_str()).filter(|id|self.0.load(id).is_ok()).map(str::to_string);
         let current_text = turn.messages[at].text();
         let continuing = generic_continuation(&current_text);
@@ -508,6 +509,10 @@ mod tests {
     fn fixture() -> (Store, PathBuf) { let root = std::env::temp_dir().join(format!("ocd-{}",nonce().unwrap())); (Store::new(&root),root) }
     fn canvas() -> Value { json!({"v":3,"boards":{"Main.dc.html":{"x":0,"y":0,"w":390,"h":844}},"order":["Main.dc.html"],"notes":{},"unknown":{"keep":true}}) }
     fn files() -> BTreeMap<String,String> { [("Main.dc.html".into(),"<x-dc><h1>Hello</h1></x-dc>".into())].into() }
+    #[test]fn selected_local_preview_does_not_activate_the_design_workbench(){
+        let(store,root)=fixture();let mut message=Message::user_text("按钮改成蓝色");message.structured_content=Some(json!({"previewTarget":{"path":"/work/demo.html"}}));let mut turn=Turn{session:"s".into(),index:0,messages:vec![message],tools:vec![]};DesignContext(store).before_model(&mut turn).unwrap();assert_eq!(turn.messages.len(),1);assert!(!root.exists());
+    }
+
     #[test] fn format_comes_with_the_quality_guide() {
         let (store,_root)=fixture();let tool=DesignTool::new(store,|_|Ok(()));
         let out=tool.call(json!({"action":"format"}),&ToolCtx::detached("s")).unwrap();

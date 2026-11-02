@@ -4,10 +4,11 @@ import ConfigurationWindow from './ConfigurationWindow.vue';
 import CommunitySchemesWindow from '../community/CommunitySchemesWindow.vue';
 import CloudDocumentWindow from '../library/CloudDocumentWindow.vue';
 import StoreWindow from '../ai-store/StoreWindow.vue';
+import PreviewWindow from '../preview/PreviewWindow.vue';
 export function mountConfiguration() {
   document.body.className = 'desktop-control';
   const kind = new URLSearchParams(location.search).get('kind');
-  const app = createApp(kind === 'community' ? CommunitySchemesWindow : kind === 'store' ? StoreWindow : kind === 'cloud' ? CloudDocumentWindow : ConfigurationWindow);
+  const app = createApp(kind === 'preview' ? PreviewWindow : kind === 'community' ? CommunitySchemesWindow : kind === 'store' ? StoreWindow : kind === 'cloud' ? CloudDocumentWindow : ConfigurationWindow);
   app.mount(document.querySelector('#app')!);
   window.addEventListener('beforeunload', () => app.unmount(), { once: true });
 }

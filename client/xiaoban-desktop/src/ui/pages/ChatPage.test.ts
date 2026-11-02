@@ -1381,7 +1381,8 @@ describe('design deliveries in the original conversation', () => {
     await wrapper!.get('[aria-label="关闭设计画布"]').trigger('click'); await flushPromises();
     expect(wrapper!.find('[data-testid="design-workbench"]').exists()).toBe(false);
     await wrapper!.get('[aria-label="打开界面设计"]').trigger('click'); await flushPromises();
-    expect(h.invoke).toHaveBeenCalledWith('design_window_open', { id: project.id });
+    expect(h.invoke).toHaveBeenCalledWith('design_window_status', { id: project.id });
+    expect(wrapper!.find('[data-testid="design-workbench"]').exists()).toBe(true);
     expect(h.invoke).toHaveBeenCalledWith('design_read', { id: project.id });
     expect(h.invoke.mock.calls.some(([command]) => command === 'design_save')).toBe(false);
     await h.chat.select(null); await flushPromises();
@@ -1407,4 +1408,34 @@ describe('returning a design from its independent window',()=>{
   const h=await open({design_read:()=>({project,origin:'preview:'})});wrapper!.unmount();h.store.designOpening=id;
   wrapper=mount(ChatPage,{props:{store:h.store},attachTo:document.body});await flushPromises();expect(wrapper.findAll('.artboard')).toHaveLength(1);expect(h.store.designOpening).toBe('');
  });
+});
+
+
+describe('local interactive deliveries in the workspace',()=>{
+ const file=(id:string,name:string,imported=false)=>({id,name,path:`/work/${name}`,kind:'file',exists:true,imported,bytes:12,updatedMs:10,toolCallId:'write'});
+ const preview={name:'demo.html',kind:'html',source:'<button>click</button>',url:'about:blank#/token/_document',token:'token',revision:'r1'};
+ it('opens generated HTML automatically and binds the selected file to the next queued message',async()=>{
+  const h=await open({chat_overview:()=>overview({sessions:[summary('s1','网页')]}),chat_load_session:()=>[],chat_assets_list:()=>[file('a','demo.html')],chat_preview_read:()=>preview,chat_preview_release:()=>undefined,configuration_window_open:()=>undefined,chat_enqueue:()=>({items:[],paused:false})});
+  await openSession('s1');expect(wrapper!.find('[data-testid="preview-panel"]').exists()).toBe(true);expect(wrapper!.get('iframe').attributes('sandbox')).toBe('allow-scripts');
+  await type('把按钮改成蓝色');await click('chat-send');
+  expect(h.invoke).toHaveBeenCalledWith('chat_enqueue',expect.objectContaining({text:'把按钮改成蓝色',previewTarget:{sessionId:'s1',id:'a',relative:''}}));
+  await wrapper!.get('[aria-label="独立窗口"]').trigger('click');await flushPromises();
+  expect(h.invoke).toHaveBeenCalledWith('configuration_window_open',{target:'preview',provider:JSON.stringify({sessionId:'s1',id:'a',relative:''})});
+ });
+ it('keeps a pinned selection while new outputs arrive and resumes following after unpinning',async()=>{
+  let files=[file('a','demo.html')];const h=await open({chat_overview:()=>overview({sessions:[summary('s1','网页')]}),chat_load_session:()=>[],chat_assets_list:()=>files.map(f=>({...f})),chat_preview_read:()=>preview,chat_preview_release:()=>undefined});await openSession('s1');
+  await wrapper!.get('[aria-label="固定当前作品"]').trigger('click');files.push(file('b','other.html'));h.emit('chat-assets-changed',{session:'s1'});await flushPromises();expect(wrapper!.findAll('[role="tab"]').map(t=>t.text())).not.toContain('other.html');
+  await wrapper!.get('[aria-label="取消固定当前作品"]').trigger('click');files=[...files,file('c','new.html')];h.emit('chat-assets-changed',{session:'s1'});await flushPromises();expect(wrapper!.get('[role="tab"][aria-selected="true"]').text()).toBe('new.html');
+  await h.chat.select(null);await flushPromises();expect(wrapper!.find('[data-testid="preview-panel"]').exists()).toBe(false);
+ });
+ it('does not run imported HTML automatically and opens it explicitly from assets',async()=>{
+  const h=await open({chat_overview:()=>overview({sessions:[summary('s1','导入')]}),chat_load_session:()=>[],chat_assets_list:()=>[file('a','demo.html',true)],chat_preview_read:()=>preview,chat_preview_release:()=>undefined});await openSession('s1');expect(wrapper!.find('iframe').exists()).toBe(false);await click('chat-assets-toggle');await wrapper!.get('[aria-label="打开demo.html"]').trigger('click');await flushPromises();expect(wrapper!.find('[data-testid="preview-panel"]').exists()).toBe(true);expect(h.invoke.mock.calls.some(([c])=>c==='chat_asset_open')).toBe(false);
+ });
+});
+
+it('restores a detached folder descendant after the chat page mounts',async()=>{
+ const target={sessionId:'s1',id:'folder',relative:'nested/demo.html'};
+ const h=await open({chat_overview:()=>overview({sessions:[summary('s1','作品')]}),chat_load_session:()=>[],chat_assets_list:()=>[{id:'folder',name:'delivery',path:'/work/delivery',kind:'folder',exists:true,imported:true,bytes:0,updatedMs:1}],chat_preview_read:()=>({name:'demo.html',kind:'html',source:'<button>ok</button>',url:'about:blank',token:'t',revision:'r'}),chat_preview_release:()=>undefined});
+ wrapper!.unmount();h.store.previewOpening=target;wrapper=mount(ChatPage,{props:{store:h.store},attachTo:document.body});await flushPromises();
+ expect(h.chat.currentId).toBe('s1');expect(h.store.previewOpening).toBeNull();expect(h.invoke).toHaveBeenCalledWith('chat_preview_read',{target});expect(wrapper.find('[data-testid="preview-panel"]').exists()).toBe(true);
 });

@@ -17,11 +17,19 @@
 
 ## 对话资产
 
-聊天右上角的「对话资产」图标统一展示当前对话的设计稿、生成图片、交付文件和文件夹，可搜索、分类、固定为侧栏以及定位交付消息。设计稿打开原生独立画布，图片与文件使用系统默认应用打开；图片、文件可另存为，文件夹可逐级浏览。自动从成功的 `write_file` / `edit_file` 和回答里的本机 Markdown 交付链接整理工作区内的成果，切换过工作区的旧成果也保留；读取过的文件和上传提问附件不会自动混入。Shell 产物需在回答中提供本机交付链接，工作区外文件可手动导入。已移动或删除的原文件显示失效，不自动重新生成。
+聊天右上角的「对话资产」图标统一展示当前对话的设计稿、生成图片、交付文件和文件夹，可搜索、分类、固定为侧栏以及定位交付消息。设计稿和支持预览的本地文件默认打开聊天右侧作品区；生成图片及其他格式使用系统默认应用打开；图片、文件可另存为，文件夹可逐级浏览。自动从成功的 `write_file` / `edit_file` 和回答里的本机 Markdown 交付链接整理工作区内的成果，切换过工作区的旧成果也保留；读取过的文件和上传提问附件不会自动混入。Shell 产物需在回答中提供本机交付链接，工作区外文件可手动导入。已移动或删除的原文件显示失效，不自动重新生成。
 
 资产面板「＋」可导入本机文件、文件夹和设计源文件，也可关联已有设计稿或新建。普通文件 / 文件夹只保存原位置的本机关联，不复制、不移动原件、不自动加入模型上下文；设计 HTML / ZIP 走现有设计稿导入。每段对话最多手动关联 500 份资产，文件夹内文件不重复计入顶层数量，单目录最多展示 500 项。新对话导入会先保存空对话，保留输入草稿、模型与专家设置。取消选择不添加资产；删除对话只清理关联记录，保留用户原文件。
 
 验证：`npx vitest run src/ui/chat/ChatAssets.test.ts src/ui/chat/chat-store.test.ts src/ui/pages/ChatPage.test.ts src/ui/chat/ChatGeneratedImages.test.ts`、`npx vue-tsc --noEmit`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::assets::tests`。浏览器用实际组件与模拟桥接核对展示和导入刷新；系统选择器、文件关联和 Windows 原生效果需桌面实机验收，尚未重新打包。设计稿沿用 [原在线预览](http://127.0.0.1:1420/docs/design-specs/prototypes/conversation-assets.html)。
+
+## 聊天右侧作品区
+
+成功生成的 HTML 自动展示在右侧，可直接操作按钮、表单和图表；通过对话继续修改同一文件，预览每 2 秒检测文件及已加载的本地资源变化。支持多个作品页签、固定当前作品、拖动分屏宽度、源码查看、刷新、原生另存为、外部打开和独立原生窗口；独立窗口可回到所属聊天。手动导入文件仅在打开后运行。发送消息时绑定当时选中的本地作品，作为模型定位数据，不改写用户正文；排队消息也保留这份选择。
+
+支持 UTF-8 HTML/HTM、常见图片、Markdown/JSON/CSV/代码等文本源码。HTML 及文本最多 4MiB，图片或单个静态资源最多 16MiB；PDF/Office 等格式沿用外部应用打开。HTML 使用无同源权限的隔离 iframe 和独立 CSP，仅允许内联脚本及同目录静态资源，不连接外部网络、不访问桌面 IPC；目录穿越、隐藏资源和越界符号链接会被拒绝。普通 HTML 工作区与多画板设计共用右侧入口，设计画布仍保留原有编辑、导出能力。
+
+验证：`npx vitest run src/ui/preview src/ui/chat/ChatAssets.test.ts src/ui/chat/chat-store.test.ts src/ui/components/ChatComposerQueue.test.ts src/ui/pages/ChatPage.test.ts src/ui/configuration/windows.test.ts`、`npx vue-tsc --noEmit`；原生 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat_preview`。系统保存对话框和 Windows 原生窗口仍需实机验收。
 
 ## 聊天图片生成
 

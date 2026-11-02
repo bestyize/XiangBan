@@ -79,3 +79,9 @@ it('deduplicates reused native images and associates the most recent source mess
   const result=conversationAssets([],[],[...blocks,{...blocks[0],id:'reply-2'}]);
   expect(result).toHaveLength(1);expect(result[0].blockId).toBe('reply-2');
 });
+
+it('routes supported local files to the opted-in workspace and keeps Office files external',async()=>{
+ vi.mocked(invoke).mockImplementation(async c=>c==='chat_assets_list'?[file({name:'demo.html',path:'/work/demo.html'}),file({id:'ppt',name:'deck.pptx',path:'/work/deck.pptx'})]:true);
+ open({previewable:true,blocks:[]});await flushPromises();await wrapper.get('[aria-label="打开demo.html"]').trigger('click');await flushPromises();expect(wrapper.emitted('preview')?.[0]?.[0]).toMatchObject({id:'file-1',name:'demo.html'});expect(vi.mocked(invoke).mock.calls.some(([c])=>c==='chat_asset_open')).toBe(false);
+ await wrapper.get('[aria-label="打开deck.pptx"]').trigger('click');await flushPromises();expect(invoke).toHaveBeenCalledWith('chat_asset_open',{sessionId:'s1',id:'ppt',relative:'',action:'open'});
+});

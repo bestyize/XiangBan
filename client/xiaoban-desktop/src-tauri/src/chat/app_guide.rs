@@ -30,7 +30,7 @@ pub(super) const FEATURES: &[Feature] = &[
         by_hand: "用户在手机开启调试并授权，预先安装本机 Android Platform Tools；无线配对需手机显示的配对码。登录、系统权限及中文输入所需 ADB Keyboard 由用户配置。",
         tools: &["phone_devices", "phone_connect", "phone_observe", "phone_action", "phone_push_image", "phone_pack_find", "phone_pack_read", "phone_pack_install", "phone_patch_list", "phone_patch_save", "phone_routes", "phone_match3", "phone_workflow_inspect", "phone_workflow_run"] },
     Feature { id: "chat", name: "对话与任务", path: "侧栏「新建任务」", page: Some(("new-task", None)),
-        does: "向小伴提问、写文档做表格、整理文件、截图识别、深度研究、学习辅导；可选工作区、带附件、设置权限模式。",
+        does: "向小伴提问、写文档做表格、整理文件、截图识别、深度研究、学习辅导；可选工作区、带附件、设置权限模式。聊天右侧作品区可交互运行工作区 HTML、小工具和图表，支持源码、自动刷新、固定、多作品切换和独立窗口；图片及文本文件也可预览。HTML 使用内联或同目录静态资源，不加载外部网络。",
         by_hand: "切换模型、工作区、权限模式在对话输入框旁操作。", tools: NONE },
     Feature { id: "ai-store-experts", name: "AI 插件·专家", path: "侧栏「AI 插件」→ 顶部「专家」标签", page: Some(("ai-store", None)),
         does: "浏览专家角色，可按领域筛选、搜索，用「已安装」筛选只看自己装过的。专家只改变做事的专业方法与交付标准，不会增加工具、权限或记忆。",
