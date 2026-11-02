@@ -15,6 +15,7 @@ import {
 } from './model.ts';
 import {colorHex,contrast} from './colors.ts';
 import {exportOrder,validatePng,pdfImage,makePdf} from './raster-export.ts';
+import {validateScene,type ExportPage,type ExportScene} from './export-scene.ts';
 import {clampScale,zoomAt,wheelPixels,type CanvasView} from './viewport.ts';
 import {createDesignStore} from './design-store.ts';
 const props=defineProps<{projectId:string;detached?:boolean;notify:(message:unknown,type?:'success'|'error'|'info')=>void}>();
@@ -50,12 +51,44 @@ const tokens=computed(()=>project.value?tokensOf(project.value.canvas):{});
 const dsCards=computed<DsCard[]>(()=>project.value?dsCardsOf(project.value):[]);
 const minX=computed(()=>Math.min(0,...boards.value.map(b=>b.x),...notes.value.map(n=>n.x))),minY=computed(()=>Math.min(0,...boards.value.map(b=>b.y),...notes.value.map(n=>n.y)));
 const extent=computed(()=>({w:Math.max(600,...boards.value.map(b=>b.x+b.w),...notes.value.map(n=>n.x+n.w))-minX.value+96,h:Math.max(500,...boards.value.map(b=>b.y+b.h),...notes.value.map(n=>n.y+n.maxH))-minY.value+140}));
-type CaptureView={capture:(options:{width:number;height:number;scale:1|2})=>Promise<string>;cancelCapture:()=>void};
+type CaptureView={capture:(options:{width:number;height:number;scale:1|2})=>Promise<string>;captureScene:(options:{width:number;height:number})=>Promise<ExportScene>;cancelCapture:()=>void};
 const previews=new Map<string,CaptureView>(),captureWorker=ref<CaptureView|null>(null),captureBoard=ref<{board:Board;src:string}|null>(null);
 const rendering=ref(false),renderProgress=ref('');let cancelled=false;
 const canEdit=computed(()=>!!project.value&&!ds.busy&&!ds.conflict&&!rendering.value);
 function bindPreview(file:string,value:unknown){if(value)previews.set(file,value as CaptureView);else previews.delete(file);}
 function cancelRendering(){cancelled=true;for(const view of previews.values())view.cancelCapture();captureWorker.value?.cancelCapture();}
+async function exportEditable(format:'pptx'|'fig',board?:Board){
+ if(!project.value||rendering.value||ds.exporting)return;
+ if(ds.dirty||ds.busy||ds.conflict){props.notify('请先保存当前修改再导出','info');return;}
+ const snapshot=clone(project.value),items=board?[clone(board)]:exportOrder(boardsOf(snapshot.canvas));
+ if(!items.length)return;
+ rendering.value=true;cancelled=false;
+ const check=()=>{if(cancelled)throw Error('导出已取消');if(project.value?.id!==snapshot.id||project.value.revision!==snapshot.revision)throw Error('设计稿已更新，请重新导出');};
+ try{
+  const pages:ExportPage[]=[];let total=0,thumbnail:string|undefined;
+  for(const [index,item] of items.entries()){
+   check();renderProgress.value=`正在提取 ${index+1}/${items.length}：${item.title}`;
+   if(!snapshot.files[item.file])throw Error(`画板尚未生成：${item.title}`);
+   let view=previews.get(item.file);
+   if(!view){captureBoard.value={board:item,src:previewUrl(ds.origin,snapshot,item.file,token.value)};await nextTick();view=captureWorker.value??undefined;}
+   if(!view)throw Error('画板预览尚未就绪');
+   const scene=validateScene(await view.captureScene({width:item.w,height:item.h}),item.w,item.h);check();
+   if(renderErrors.value[item.file])throw Error(`画板渲染失败：${item.title}（${renderErrors.value[item.file]}）`);
+   if(format==='fig'&&index===0){thumbnail=await view.capture({width:item.w,height:item.h,scale:1});validatePng(thumbnail,item,1);check();}
+   total+=JSON.stringify(scene).length;if(total>48*1024*1024)throw Error('导出元素数据超过 48MiB，请减少画板数量');
+   pages.push({title:item.title,file:item.file,x:item.x,y:item.y,scene});captureBoard.value=null;await nextTick();
+  }
+  check();renderProgress.value=format==='pptx'?'正在生成可编辑 PowerPoint':'正在生成 Figma 文件';
+  const data=format==='pptx'?await (await import('./pptx-export.ts')).makePptx(snapshot.title,pages):await (await import('./figma-export.ts')).makeFigma(snapshot.title,pages,thumbnail);
+  check();renderProgress.value='请选择保存位置';
+  const path=await invoke<string|null>('design_export',{id:snapshot.id,format,project:null,rendered:{revision:snapshot.revision,file:board?.file??null,data}});
+  if(path){
+   const count=pages.reduce((n,p)=>n+p.scene.warnings.length,0);
+   props.notify(count?`设计稿已导出，有 ${count} 项兼容提示（见${format==='pptx'?'幻灯片备注':'画板说明'}）`:'设计稿已导出','success');
+  }
+ }catch(error){if(!cancelled)report(error);}
+ finally{rendering.value=false;renderProgress.value='';captureBoard.value=null;}
+}
 async function exportRaster(format:'png'|'pdf',board?:Board,scale:1|2=1){
  if(!project.value||rendering.value||ds.exporting)return;
  if(ds.dirty||ds.busy||ds.conflict){props.notify('请先保存当前修改再导出图片或 PDF','info');return;}
@@ -361,6 +394,8 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
       <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="ds.export('zip')">ZIP 源文件</button>
       <button v-if="project?.canvas.xiaoban?.import?.originalFile" class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" title="保存导入时的原文件，不含后续编辑" @click="ds.export('original')">导入原件</button>
       <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting||!allBoards.length" @click="exportRaster('pdf')">全部画板 PDF</button>
+      <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting||!allBoards.length" title="文字与图形可编辑；复杂效果的兼容提示保存在幻灯片备注" aria-description="文字与图形可编辑；复杂效果的兼容提示保存在幻灯片备注" @click="exportEditable('pptx')">PowerPoint (.pptx)</button>
+      <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting||!allBoards.length" title="直接生成本地 .fig 文件，在 Figma 文件浏览器导入，无需插件" aria-description="直接生成本地 .fig 文件，在 Figma 文件浏览器导入，无需插件" @click="exportEditable('fig')">Figma (.fig)</button>
       <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="ds.export('html')">独立 HTML</button>
       <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="ds.export('md')">Markdown 规范 (.md)</button>
       <button class="xb-menu-item" role="menuitem" @click="copyMarkdown"><ClipboardCopy :size="12"/> 复制 Markdown</button>
@@ -441,6 +476,8 @@ function key(e:KeyboardEvent){if(e.isComposing||e.keyCode===229)return;if((e.met
                 <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="exportRaster('png',b,1)">PNG 1×</button>
                 <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="exportRaster('png',b,2)">PNG 2×</button>
                 <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="exportRaster('pdf',b)">PDF</button>
+                <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="exportEditable('pptx',b)">PowerPoint (.pptx)</button>
+                <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="exportEditable('fig',b)">Figma (.fig)</button>
                 <button class="xb-menu-item" role="menuitem" :disabled="rendering||ds.exporting" @click="exportRaster('pdf')">全部画板 PDF</button>
               </div>
             </details>

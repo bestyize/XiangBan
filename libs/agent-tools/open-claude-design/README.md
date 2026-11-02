@@ -33,11 +33,19 @@
 
 支持 x-dc、helmet、表达式、sc-if/sc-for、DCLogic 状态和事件、参数默认值、画板间相对链接。支持原始 `_blob` 图片及常见媒体/字体的 ZIP 导入与字节保真导出；接口使用 data URL，磁盘按原始二进制独立存储，原生预览按需加载素材并解析项目内相对/根路径。CSS（含相对素材与 @import）和普通本地 JS 在预览中内联；原始文件保持不变。
 
-已支持按名称的 dc-import、本地 x-import React/JSX/TSX、组件状态/生命周期与画布便签。React 适配器的构建和开源许可证见 [runtime](runtime/README.md)。远程 CDN、任意 npm/Node 环境、原生 module script 和未验证的专有扩展尚未完整兼容；PDF 矢量/Flow 分页、PPTX、云端协作等差距见验收报告，不保证任意 Claude Design 项目无损运行。保存源包不会转换原程序，独立 HTML 使用本模块运行时。sandbox/CSP 提供权限隔离，不提供独立进程或无限循环中断能力。
+已支持按名称的 dc-import、本地 x-import React/JSX/TSX、组件状态/生命周期与画布便签。React 适配器的构建和开源许可证见 [runtime](runtime/README.md)。远程 CDN、任意 npm/Node 环境、原生 module script 和未验证的专有扩展尚未完整兼容；PDF 矢量/Flow 分页、云端协作等差距见验收报告，不保证任意 Claude Design 项目无损运行。保存源包不会转换原程序，独立 HTML 使用本模块运行时。sandbox/CSP 提供权限隔离，不提供独立进程或无限循环中断能力。
 
 资料库普通导入、文件夹导入和拖入也会按内容自动识别官方 HTML 与源码 ZIP；旧文档可通过「转为设计稿」转换。官方单 HTML 可导入并展开为多个 `.dc.html`；保留导入原件，按导出顺序安排画板，界面列出缺失引用。HTML 中没有的原画布坐标、分组、批注及源文件名映射不能恢复。官方图片 ZIP 和 PDF 不包含可编辑设计源码；图片 ZIP 会给出明确提示。完整源包仍用 canvas.json + 页面 + 素材 ZIP 导入，与官方图片 ZIP 不同。
 
 已取消单文件 2 MiB、项目/导入包 16 MiB 限制。保留 100 个画板、300 个源文件（包含素材；生成运行时不计入，含运行时最多 405 个文件）、最多 64 个附加会话，以及路径/嵌套校验。解包和对外 Project 仍使用内存，不承诺任意体积可用；PNG/PDF 渲染导出的像素及文件限制独立保留。
+
+## 可编辑交付
+
+桌面宿主支持单画板/全部画板 `.pptx` 与本地 `.fig` 导出。`runtime/export-scene.js` 在原有 opaque sandbox 中读取计算样式、文本换行与 SVG 路径，经过来源/token/请求及数量、尺寸、内容校验后，交给桌面侧的 `pptx-export.ts` / `figma-export.ts`。不由模型猜测布局，不在宿主执行设计程序，也不放宽控制台 CSP。
+
+PPTX 使用 PptxGenJS 构建 Office 原生文本与图形，再补齐原生渐变、阴影、图片圆角等 DrawingML。Figma 使用 openfig-core 的 Kiwi 模板/容器和静态编译器，写出 Zstandard 消息与图片资源，直接导入 Figma 文件浏览器，无需插件。详见桌面 README 的「可编辑 PPTX 与 Figma 导出」与 `src/ui/design/vendor/README.md`。复杂效果允许局部栅格降级并记录提示，不承诺任意 CSS 的无损可编辑转换；字体不嵌入，原型交互、组件/变量语义不转换。
+
+`rendered_export.rs` 原生侧校验 MIME、48MiB 文件上限、ZIP 路径/解压大小及 PPTX/Figma 必要条目。原生保存对话框返回后再次核对项目 revision。当前已验证 PPTX 的 LibreOffice 打开与渲染、`.fig` 本地解析往返；Figma 自身导入与 Windows/macOS 打包验收仍待实机验证。
 
 ## 验证
 

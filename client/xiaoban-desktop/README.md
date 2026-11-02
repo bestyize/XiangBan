@@ -57,8 +57,18 @@
 
 真实用户消息提到设计、画板、原型或准确 design- 编号时可发现设计工具；聊天顶部「设计稿」入口支持全局搜索、打开与新建。支持草稿立即落盘、逐页生成、完成校验与受阻恢复；一份作品支持多个 DC HTML 画板。聊天右侧画布支持拖动分屏、弹出独立窗口（复用、最大化、系统全屏、窗口位置记忆、回到分屏），支持以指针为中心的 Ctrl/⌘ 滚轮缩放、触控板捏合、Space/中键平移、选择/Play、属性与源码编辑、批注交给小伴修改、撤销重做和历史恢复。作品保存在「资料库 → 我的文档」，聊天与资料库读取同一份源数据；可导入完整源包 ZIP / 官方单 HTML（自动展开多画板，保留原件并列出缺失引用；图片 ZIP / PDF 不属于可编辑源码），导出导入原件、ZIP 源包、独立 HTML、PNG 1×/2× 和单画板/全部画板栅格 PDF（按画布位置排序，支持取消）。
 
-普通「导入文档」、文件夹导入和拖入文件也会按内容识别 Claude HTML 与带 canvas.json 的源码 ZIP；普通网页、图片 ZIP 仍按文档保存。旧 HTML/ZIP 文档可用「转为设计稿」从本机副本转换，保留原件、分组和标签，成功后打开独立画布。设计导入已取消 2 MiB 单文件和 16 MiB 项目限制；源文件与素材按内容摘要独立存储，原生预览按需加载素材，历史共用未变化的对象。保存有版本检查和恢复草稿，保留 30 个历史版本，支持重命名、创建独立副本与历史恢复。聊天及排队消息固定发送时选中的设计稿，避免切换作品后改错项目。兼容 v3 boards/order 与旧版 artboards；已补齐官方 name 组件引用、本地 React/JSX/TSX、二进制素材源包、画布便签与部分焦点/键盘交互；39 个原始画板纳入回归。尚不等于全面复刻，远程模块、动态元素逐实例编辑、PDF 矢量/Flow 分页、PPTX 与云端协作等差距见 [复刻验收矩阵](../../docs/agent/open-claude-design-compatibility.md)。详见 [模块说明](../../libs/agent-tools/open-claude-design/README.md) 与 [实施和验证记录](../../docs/agent/open-claude-design.md)。
+普通「导入文档」、文件夹导入和拖入文件也会按内容识别 Claude HTML 与带 canvas.json 的源码 ZIP；普通网页、图片 ZIP 仍按文档保存。旧 HTML/ZIP 文档可用「转为设计稿」从本机副本转换，保留原件、分组和标签，成功后打开独立画布。设计导入已取消 2 MiB 单文件和 16 MiB 项目限制；源文件与素材按内容摘要独立存储，原生预览按需加载素材，历史共用未变化的对象。保存有版本检查和恢复草稿，保留 30 个历史版本，支持重命名、创建独立副本与历史恢复。聊天及排队消息固定发送时选中的设计稿，避免切换作品后改错项目。兼容 v3 boards/order 与旧版 artboards；已补齐官方 name 组件引用、本地 React/JSX/TSX、二进制素材源包、画布便签与部分焦点/键盘交互；39 个原始画板纳入回归。尚不等于全面复刻，远程模块、动态元素逐实例编辑、PDF 矢量/Flow 分页、云端协作等差距见 [复刻验收矩阵](../../docs/agent/open-claude-design-compatibility.md)。详见 [模块说明](../../libs/agent-tools/open-claude-design/README.md) 与 [实施和验证记录](../../docs/agent/open-claude-design.md)。
 
+
+### 可编辑 PPTX 与 Figma 导出
+
+画板顶部「导出」与单画板菜单新增 **PowerPoint (.pptx)**、**Figma (.fig)**。全部画板按画布 y/x 排序。PPTX 保留浏览器实际布局，文字按实际换行拆成可编辑文本行；支持混合样式、中文字体回退、RTL、字间距、原生形状与 SVG 曲线路径、线性/默认径向渐变、独立圆角、阴影、透明度、图片适配裁剪和二维旋转/缩放。多画板共用一个演示文稿页面尺寸，取最大宽高并居中，超大画板统一等比缩放；图表和表格保持为可编辑文字/图形，不转换为有数据源的 Office 图表/表格，不保留网页交互。字体不嵌入，接收端需有对应字体。
+
+Figma 直接生成本地 **`.fig`**（并非 `.figma`，不是改后缀的 JSON），包含 Kiwi 画布、图层、图片素材和首画板预览。在 Figma 文件浏览器导入，无需安装插件；保留画板坐标、文字、形状、矢量、渐变、阴影及图片，不重建组件/变量/自动布局语义。编码器静态生成，不在控制台执行 eval，不扩大预览 IPC 或网络权限。
+
+复杂滤镜、蒙版、三维/斜切变换、动态 Canvas/视频及部分 SVG 引用按局部图片保留；阴影扩展半径等无法完全对应的效果会产生兼容提示。PPTX 提示在幻灯片备注，Figma 提示在画板说明及文件元数据，导出成功也显示提示数量。支持取消、版本变化中止、原生保存选择器及保存前再次核对版本；文件最多 48MiB、最多 100 画板，单画板最多 20000 个输出元素。图片沿用 8192 边长/1600 万像素限制。
+
+验证：`npx vitest run src/ui/design`、`npx vue-tsc --noEmit`、`npx vite build`，以及共享模块 `cargo test --locked --manifest-path libs/agent-tools/open-claude-design/Cargo.toml rendered_export::tests`（仓库根）。`npm run test:design-export:browser` 用真实浏览器核对复杂布局、中文、伪元素和旋转，需启动 Vite（默认 1428 端口）并提供 Playwright；可通过 `PLAYWRIGHT_MODULE`、`DESIGN_EXPORT_BROWSER`、`DESIGN_EXPORT_URL`、`DESIGN_EXPORT_OUTPUT` 指定安装、浏览器、服务和输出目录。PPTX 已用 LibreOffice 打开并渲染对照；`.fig` 已核对二进制结构、图层和资源往返，但尚未在 Figma 中实机导入验收。Windows/macOS 打包后的原生保存流程尚未端到端验证。
 
 ## 外部客户端设计协作（本机 MCP）
 

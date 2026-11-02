@@ -1,4 +1,5 @@
 import {toCanvas} from 'html-to-image';
+import {extractScene} from './export-scene.js';
 
 // Rendering stays in the same opaque sandbox as the design program.
 let capturing=false;
@@ -12,12 +13,25 @@ addEventListener('message',async event=>{
  if(capturing){reply(requestId,{error:'画板正在导出'});return;}
  if(![width,height].every(n=>Number.isInteger(n)&&n>0&&n<=8192)||![1,2].includes(scale)||width*height*scale*scale>16777216){reply(requestId,{error:'导出尺寸超过 8192 边长或 1600 万像素限制'});return;}
  capturing=true;
- let timer;
+ let timer;const animations=[];
  try{
   const ready=Promise.all([document.fonts?.ready,...[...document.images].map(img=>img.decode())]);
   await Promise.race([ready,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('画板图片或字体加载超时')),15000);})]);
   clearTimeout(timer);
+  for(const animation of document.getAnimations?.()??[]){if(animation.playState==='running'){animations.push(animation);try{animation.pause();}catch{}}}
   await new Promise(resolve=>setTimeout(resolve,0));
+  if(data.scene){
+   const raster=async(node,w,h,backgroundOnly=false)=>{
+    if(w*h>16777216||w>8192||h>8192)throw Error('局部图片导出尺寸超过限制');
+    const bitmap=await toCanvas(node,{width:w,height:h,pixelRatio:1,skipAutoScale:true,
+     style:backgroundOnly?{color:'transparent'}:undefined,
+     filter:item=>item===node||!backgroundOnly&&(!(item instanceof Element)||!item.closest('[data-ocd-editor],[data-ocd-pin-layer]'))});
+    const png=bitmap.toDataURL('image/png');bitmap.width=bitmap.height=0;return png;
+   };
+   const scene=await extractScene(width,height,raster);
+   if(JSON.stringify(scene).length>48*1024*1024)throw Error('画板元素数据超过 48MiB');
+   reply(requestId,{scene});return;
+  }
   const canvas=await toCanvas(document.body,{
    width,height,canvasWidth:width,canvasHeight:height,pixelRatio:scale,skipAutoScale:true,
    filter:node=>!(node instanceof Element)||!node.closest('[data-ocd-editor],[data-ocd-pin-layer]'),
@@ -26,5 +40,5 @@ addEventListener('message',async event=>{
   if(!png.startsWith('data:image/png;base64,')||png.length>64*1024*1024)throw Error('画板图片过大，无法导出');
   reply(requestId,{png,width:width*scale,height:height*scale});
  }catch(error){reply(requestId,{error:String(error?.message??error).slice(0,300)});}
- finally{clearTimeout(timer);capturing=false;}
+ finally{clearTimeout(timer);for(const animation of animations)try{animation.play();}catch{}capturing=false;}
 });
