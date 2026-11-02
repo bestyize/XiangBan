@@ -780,6 +780,13 @@ def webp_cover(raw):
 
 def cover_file(folder):
     """Select the asset actually imported, preserving historical PNG acceptance."""
+    converted = folder / 'cover-webp.json'
+    if converted.exists():
+        record = json.loads(converted.read_text())
+        original, output = folder / 'cover.png', folder / 'cover.webp'
+        if hashlib.sha256(original.read_bytes()).hexdigest() != record['original_sha256'] or hashlib.sha256(output.read_bytes()).hexdigest() != record['webp_sha256']:
+            raise Reject('历史封面转换记录与文件摘要不一致')
+        return output
     imported = folder / 'import.json'
     if imported.exists():
         images = json.loads(imported.read_text())['images']

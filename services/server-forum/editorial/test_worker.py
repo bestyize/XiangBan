@@ -1,14 +1,17 @@
 import json
 import contextlib
 import io
+import os
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch, MagicMock
 
 import worker as w
 import repair
 import acceptance
+import migrate_images_webp as migration
 
 
 def image_bytes(mode='RGB', color=(100, 150, 200), size=(512, 256), format='PNG'):
@@ -53,6 +56,46 @@ class EditorialTests(unittest.TestCase):
         for extension in ('png', 'webp'):
             w.atomic(self.root / 'import.json', {'images': [{'path': 'images/cover.' + extension}]})
             self.assertEqual(w.cover_file(self.root).name, 'cover.' + extension)
+
+    def test_migrated_cover_keeps_original_and_binds_both_hashes(self):
+        raw = image_bytes()
+        converted = w.webp_cover(raw)
+        w.atomic(self.root / 'cover.png', raw)
+        w.atomic(self.root / 'cover.webp', converted)
+        w.atomic(self.root / 'cover-webp.json', {'original_sha256': w.hashlib.sha256(raw).hexdigest(), 'webp_sha256': w.hashlib.sha256(converted).hexdigest()})
+        self.assertEqual(w.cover_file(self.root).name, 'cover.webp')
+        w.atomic(self.root / 'cover.png', image_bytes(color=(10, 20, 30)))
+        with self.assertRaises(w.Reject):
+            w.cover_file(self.root)
+
+    def test_hosted_small_images_convert_without_enlarging_dimensions(self):
+        raw = image_bytes('RGBA', (50, 100, 150, 128), size=(48, 32))
+        converted = migration.encode(raw)
+        with w.Image.open(io.BytesIO(converted)) as image:
+            image.load()
+            self.assertEqual(image.format, 'WEBP')
+            self.assertEqual(image.size, (48, 32))
+            self.assertEqual(image.getpixel((0, 0))[3], 128)
+
+    def test_hosted_image_swap_rolls_back_when_database_commit_fails(self):
+        args = SimpleNamespace(root=self.root, backup=self.root / 'backup', uploads=self.root / 'uploads')
+        raw, encoded = image_bytes(), w.webp_cover(image_bytes())
+        row = {'store': 'images', 'id': '00000000-0000-4000-8000-000000000001',
+               'original_sha256': migration.sha(raw), 'webp_sha256': migration.sha(encoded),
+               'mode': 0o640, 'uid': os.getuid(), 'gid': os.getgid(), 'local_covers': []}
+        target = args.uploads / ('img-' + row['id'])
+        w.atomic(target, raw)
+        w.atomic(args.root / 'worker.lock', b'')
+        w.atomic(migration.named(args.backup, row, '.original'), raw)
+        w.atomic(migration.named(args.backup, row, '.webp'), encoded)
+        w.atomic(args.backup / 'prepared.json', {'images': [row]})
+        with patch.object(migration, 'service') as service, patch.object(migration.subprocess, 'run', return_value=SimpleNamespace(returncode=0)), patch.object(migration, 'content_fingerprint', return_value={}), patch.object(migration, 'database_change', side_effect=RuntimeError('simulated conflict')):
+            with self.assertRaisesRegex(RuntimeError, 'simulated conflict'):
+                migration.apply(args)
+            self.assertIn((('start', 'server-forum'),), service.call_args_list)
+            self.assertIn((('start', 'xiaoban-editorial.timer'),), service.call_args_list)
+        self.assertEqual(target.read_bytes(), raw)
+        self.assertEqual(target.stat().st_mode & 0o777, 0o640)
 
     def test_new_topic_import_converts_png_once_and_references_webp(self):
         w.enqueue(self.db, 'learn-a', 'https://docs.example/a', 'source')
