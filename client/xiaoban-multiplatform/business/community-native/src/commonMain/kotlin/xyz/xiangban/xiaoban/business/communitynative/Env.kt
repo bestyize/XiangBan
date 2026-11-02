@@ -181,7 +181,7 @@ class CommunityEnv(
         baseUrl = config.linkBase,
     )
     /** 本地语音识别模型的下载与状态。 */
-    val speechModels: SpeechModels? = speech?.let { SpeechModels(client, it.files) }
+    val speechModels: SpeechModels? = speech?.downloads(client)
 
     val remoteChat = RemoteChatController(phoneLink, scope, remoteCache, session.state.value.accountId)
 

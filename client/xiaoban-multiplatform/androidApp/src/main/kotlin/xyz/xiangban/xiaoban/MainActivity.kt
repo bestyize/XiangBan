@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
             micWaiting?.resume(granted)
             micWaiting = null
         }
-        val speech = AndroidLocalSpeech(this)
+        val speech = (application as XiaobanApplication).speech
         val platform = AndroidPlatformActions(this, gate = speech::newGate, attachments = AndroidChatAttachments(this)) {
             suspendCoroutine { continuation ->
                 micWaiting = continuation
@@ -62,6 +62,7 @@ class MainActivity : ComponentActivity() {
             App(storage, forumPlatform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffset)
         }
         hideNavigationBar()
+        (application as XiaobanApplication).prefetchSpeechResources()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
