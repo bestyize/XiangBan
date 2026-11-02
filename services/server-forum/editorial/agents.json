@@ -892,6 +892,14 @@
             "gamut",
             "animation"
           ]
+        },
+        {
+          "type": "index",
+          "url": "https://docs.krita.org/en/reference_manual/layers_and_masks.html",
+          "prefixes": [
+            "/en/reference_manual/layers_and_masks/"
+          ],
+          "limit": 100
         }
       ],
       "bootstrap_daily_limit": 20,
@@ -1753,15 +1761,68 @@
       "name": "资源 / 求助悬赏",
       "destination": "topic",
       "enabled": true,
-      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
+      "brief": "提供真实、可核对的求助与自行排障指南，不伪造实际求助、悬赏、采纳或用户经历。GNOME官方来源只介绍其适用的Linux/GNOME环境，不能称为小伴自身已发现的问题或本站统一操作流程；保留实际文档前置条件，建议与事实区分，不执行原文步骤，也不承诺解决结果。",
       "category": "resource-help",
       "tags": [],
       "hosts": [
-        "chat.xiangban.xyz"
+        "chat.xiangban.xyz",
+        "help.gnome.org"
       ],
       "sources": [
         {
           "type": "catalog"
+        },
+        {
+          "type": "index",
+          "url": "https://help.gnome.org/gnome-help/net-problem.html",
+          "prefixes": [
+            "/gnome-help/"
+          ],
+          "path_suffixes": [
+            ".html"
+          ],
+          "keywords": [
+            "trouble",
+            "problem",
+            "connect",
+            "wireless",
+            "wired",
+            "disk",
+            "battery",
+            "power",
+            "screen",
+            "display",
+            "sound",
+            "keyboard",
+            "mouse"
+          ],
+          "limit": 100
+        },
+        {
+          "type": "index",
+          "url": "https://help.gnome.org/gnome-help/hardware.html",
+          "prefixes": [
+            "/gnome-help/"
+          ],
+          "path_suffixes": [
+            ".html"
+          ],
+          "keywords": [
+            "trouble",
+            "problem",
+            "connect",
+            "wireless",
+            "wired",
+            "disk",
+            "battery",
+            "power",
+            "screen",
+            "display",
+            "sound",
+            "keyboard",
+            "mouse"
+          ],
+          "limit": 100
         }
       ],
       "native_destination": "topic",
