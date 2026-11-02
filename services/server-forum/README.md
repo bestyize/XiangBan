@@ -45,6 +45,8 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 卡片标题统一14px、400字重；影视标题最多3行，其他卡片最多2行，作者、标签、时间等辅助文字12px。文章详情标题与分组标题保留各自层级。规则集中于 `web/src/lib/cardPresentation.ts` 和 `web/src/styles/community-cards.css`。瀑布流使用保留DOM顺序的网格，图片加载和容器变化由ResizeObserver重排，未支持时退回普通双列。图片继续使用已有WebP资源，懒加载并预留封面比例，不修改文章或权限。
 
+首页“小伴前沿”使用16:9焦点轮播，宽屏旁列展示两条推荐，手机完整显示单张焦点图，不使用横向滚动条。圆点、左右按钮、键盘方向键和水平滑动可切换；每6秒自动轮播，手动切换后暂停，悬停、聚焦、后台或减少动态效果偏好下暂停自动切换。提供明确的播放/暂停按钮，所有跳转仍指向原前沿文章。
+
 验证：`node --experimental-strip-types --test web/tests/cardPresentation.test.ts`（从本目录执行），完整前端构建仍使用上文命令。
 
 ## 配置

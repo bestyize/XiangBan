@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { discoverApi } from '@/api/discover'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
 import NewsRow from '@/components/community/NewsRow.vue'
+import FrontierBanner from '@/components/community/FrontierBanner.vue'
 import RequestState from '@/components/community/RequestState.vue'
 import RepoBoard from '@/components/community/RepoBoard.vue'
 import ModelPreview from '@/components/community/ModelPreview.vue'
@@ -47,7 +48,7 @@ useHead(() => ({ title: '社区' }))
     <RequestState :loading="loading" :error="error" @retry="load" />
     <div v-if="data" class="recommend-feed">
       <div v-if="banners.length" class="banner-strip" aria-label="社区推荐"><a v-for="banner in banners" :key="banner.key" :href="banner.href" class="banner-card"><div class="banner-top"><span v-if="banner.tag" class="banner-tag">{{ banner.tag }}</span><DiscoverGlyph name="sparkle" :size="20"/></div><h2>{{ banner.title }}</h2><div class="banner-bottom"><p v-if="banner.byline">{{ banner.byline }}</p><span v-if="banner.sample" class="sample">示例</span><DiscoverGlyph name="arrow" :size="18"/></div></a></div>
-      <section v-if="frontier.data.value?.items.length" class="home-card frontier-section"><div class="section-heading"><div><DiscoverGlyph name="news" :size="18"/><h2>小伴前沿</h2></div><RouterLink to="/frontier">查看全部<DiscoverGlyph name="arrow" :size="14"/></RouterLink></div><div class="news-grid"><NewsRow v-for="item in frontier.data.value.items.slice(0,3)" :key="item.key" :item="item" frontier /></div></section>
+      <section v-if="frontier.data.value?.items.length" class="home-card frontier-section"><div class="section-heading"><div><DiscoverGlyph name="news" :size="18"/><h2>小伴前沿</h2></div><RouterLink to="/frontier">查看全部<DiscoverGlyph name="arrow" :size="14"/></RouterLink></div><FrontierBanner :items="frontier.data.value.items.slice(0,5)" /></section>
       <section class="daily-section"><div class="section-heading"><div><DiscoverGlyph name="news" :size="18"/><h2>AI 日报</h2><span v-if="data.news.date&&data.news.total>0" class="update-date">{{ data.news.date.slice(5).replace('-',' / ') }} 更新</span></div><RouterLink to="/daily">往期<DiscoverGlyph name="arrow" :size="14"/></RouterLink></div><div class="news-grid"><NewsRow v-for="item in data.news.items" :key="item.key" :item="item"/></div><RequestState :empty="!data.news.items.length" message="暂无已发布日报。"/></section>
       <section v-if="data.featured.length" class="home-card featured-card"><div class="section-heading"><div><DiscoverGlyph name="sparkle" :size="18"/><h2>精选创作</h2></div><RouterLink to="/discuss?tab=create">更多<DiscoverGlyph name="arrow" :size="14"/></RouterLink></div><div class="featured-strip"><CommunityPackCard v-for="pack in data.featured" :key="pack.id" :pack="pack"/></div></section>
       <section v-if="data.repos&&data.repos.ranks.length" class="home-card repo-preview"><div class="section-heading"><div><DiscoverGlyph name="star" :size="18"/><h2>{{ data.repos.metric==='star total baseline'?'开源项目快照':'开源热榜' }}</h2></div><button type="button" @click="setTab('repos')">完整榜单<DiscoverGlyph name="arrow" :size="14"/></button></div><p class="repo-note">{{ repoMetric(data.repos) }} · {{ data.repos.source }}<span v-if="data.repos.sample"> · 示例数据</span></p><DiscoverRepoRow v-for="repo in data.repos.ranks.slice(0,3)" :key="repo.full_name" :repo="repo" :baseline="data.repos.metric==='star total baseline'" compact/></section>
@@ -93,10 +94,4 @@ useHead(() => ({ title: '社区' }))
 }
 
 
-@media(max-width:767px){
- .frontier-section .news-grid{grid-auto-flow:column;grid-auto-columns:84%;grid-template-columns:none;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:6px}
- .frontier-section .news-grid>:last-child:nth-child(odd){grid-column:auto}
- .frontier-section :deep(.news-row){scroll-snap-align:start}
- .frontier-section :deep(.layout-visual h3){font-size:15px}
-}
 </style>
