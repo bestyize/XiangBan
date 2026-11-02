@@ -80,10 +80,24 @@ def main():
     sources = {'create-effect':['effects','templates'], 'create-wallpaper':['formats','desktop'], 'create-widget':['widgets','formats'], 'create-game':['formats','desktop'], 'create-reminder':['desktop','templates'], 'create-routine':['templates','desktop'], 'create-task':['templates','desktop'], 'create-goal':['templates','desktop'], 'create-skill':['agents','templates'], 'create-expert':['agents','templates'], 'create-workflow':['agents','templates'], 'create-schemes':['desktop','community'], 'resource-help':['community','rules'], 'site-rules':['rules','terms'], 'site-feedback':['community','privacy'], 'site-reports':['rules','privacy'], 'site-notice':['community','desktop']}
     topics['casual-dream']='把学习一门语言写成可检查的小目标|为读完一本书设置清楚的边界|整理旧照片时怎样限定范围|准备一份求职资料的目标示例|为一门公开课程定义完成标准|把想做的小作品拆成阶段成果|给个人笔记整理规定交付物|给旅行资料研究限定来源|写一份不会自动替你决定的计划|为练习写作准备一个短周期目标|把想法记下来不等于已经完成|给家庭资料归类设一个小范围|怎样为兴趣项目规定停止条件|从一个可观察的变化开始|为什么目标需要说明现实约束|把愿望与验证依据分开|给公开分享作品列一个检查表|让下一步行动足够具体|为一次技能练习保留反馈记录|在计划中承认尚未确定的部分|不要把模板当成成功保证|给工作之外的兴趣保留选择空间|为一次资料阅读安排回顾方法|先交付一件小事再扩大范围|把记录进展与评价自己分开|怎样在目标里留下人工决定的边界|为一次自学项目说明所需条件|暂停一个不再适合的目标不是执行失败|给长期想法准备可调整的阶段计划|把公开模板改成自己的实际任务'
     sources['casual-dream']=['templates','desktop']
+    # Consumer-facing sources checked against the deployed web views and forum documentation.
+    interface = {
+        'appearance': ('社区网页配色和日夜模式', '网页提供小伴红、薄荷绿、海湾蓝、暮紫、琥珀、石墨六套配色。手机可从「我的 → 外观」进入，电脑有外观入口，账户设置也可选择。主题色与日夜模式是两项独立选择，保存在当前浏览器并在该浏览器的标签页之间同步；这不是账号跨设备同步承诺。夜间模式保留中深灰背景，强调文字按背景调整对比度。选择配色不会更改文章、作品文件或桌面客户端配置。导读可以建议读者在实际阅读页面比较标题、链接和按钮是否清楚，建议只属于选择方法，不宣称某种颜色有医疗或效率效果。'),
+        'search': ('社区网页搜索的实际呈现', '搜索页地址为 /search，输入框提示「搜帖子或内容」，提交非空关键词后显示相关帖子和内容包。输入为空时提示输入关键词；没有找到帖子时提示换个关键词。帖子结果可以翻页；内容包在第一页显示，最多呈现八张卡片，另列内容总数。不同类型结果各自展示，不能把内容包数量和帖子数量加成一个作品总数。可读内容受账号阅读权限、内容状态和屏蔽关系约束，搜索不到不能据此断言内容从未存在。页面没有承诺复杂查询语法、搜索准确率、任意附件全文检索或所有站外资料。导读可以给出清楚标注的关键词修改示例。'),
+        'poster': ('社区分享海报的用途与边界', '内容包详情、周刊和帖子页提供「生成海报」。浏览器生成竖版图片，包含封面或渐变背景、内容类型、标题、摘要、品牌及指向原页面的二维码。可以保存图片或复制链接，手机也可尝试长按图片保存，实际动作受浏览器支持影响。二维码指向原页面，不把文章全文或作品文件装进图片。分享图片不会授予阅读权限，也不代表收件人已经下载或安装内容。受限内容的接收者仍需具备权限；内容后续更改、隐藏或下架时，旧海报文字并不自动更新。发给别人之前，应检查标题、摘要和预览图是否适合公开。海报是内容入口而非授权凭证或产品实测证明。'),
+        'notifications': ('社区互动通知的实际范围', '登录后顶栏铃铛显示未读数量，约每分钟刷新。/notifications 是通知列表页，打开列表会标记已读。站内互动通知包括别人回复你的帖子、回复你的楼层、正文中 @用户名 提到你、你的回答被采纳、你的内容包审核通过或被拒。每篇正文最多提到五人，编辑不会重复发送提及通知；自己对自己的操作不通知。屏蔽关系会阻止对方事件的通知。通知标题和摘要是产生时的快照，已读超过九十天的记录会定期清理，因此通知列表不是永久档案。普通互动提醒是站内通知，不能据此期待邮件或系统推送；独立的信息邮件订阅是另一项设置。阅读通知后应打开相应内容查看当前状态，不从旧摘要推断当前处理结论。'),
+        'blocks': ('屏蔽用户与取消屏蔽', '可以在对方个人主页屏蔽用户；「收藏与设置」页的「屏蔽的用户」列出已屏蔽账号，并提供取消屏蔽按钮。屏蔽时双方的关注关系会被取消。被屏蔽者的帖子不会出现在屏蔽者的列表、搜索和关注流中，回复会折叠且不展示正文，对方事件也不再产生相应通知。其他读者看到的内容不因此改变，对方不会收到你屏蔽他的通知。屏蔽是个人阅读选择，不等于站方处罚、删除对方帖子、全站禁言或已经完成举报处理。取消屏蔽也不能自动补回已经取消的关注关系。遇到规则问题可另行使用举报渠道，描述可核对的事实，避免公开私人信息。'),
+        'analytics': ('网页匿名统计的选择', '「收藏与设置」中的「匿名统计」说明：只记录匿名设备做过哪类操作的次数，不关联账号，不记录内容、搜索词和文件名。按钮在「已开启，点击关闭」与「已关闭，点击开启」之间切换。关闭会删除当前浏览器保存的匿名设备标识；浏览器开启「不跟踪」时也不进行这类上报。匿名设备标识由客户端随机生成，统计用于了解内容是否有人看、有人用。这个开关不是注销账号、删除帖子、清除历史统计或删除全部服务日志的按钮；也不应声称所有相伴产品或其他设备都随之关闭。更完整的数据处理说明以社区隐私政策为准。导读应把当前浏览器选择、账号内容和隐私权请求区分清楚，不编造隐私承诺。'),
+    }
+    for key, (title, text) in interface.items():
+        docs['interface-'+key] = dict(title=title+'（2026-11-02运营核对）', url='https://chat.xiangban.xyz/', text=text)
+    topics['site-notice'] += '|'+'|'.join(value[0] for value in interface.values())
     entries=[]
     for channel, raw in topics.items():
         for i,title in enumerate(raw.split('|'),1):
             entries.append(dict(id=f'{channel}-{i:02d}',channel=channel,title=title,focus=title,documents=sources[channel],boundary='这是基于现有产品说明或社区规则的站方导读。不是新功能发布、真实用户经历、实际求助、处罚决定或已存在的可安装作品。示例必须明确标为示例；不要添加资料没有支持的能力、日期、价格、规则或服务承诺。'))
+    for entry, key in zip([e for e in entries if e['channel']=='site-notice'][30:], interface):
+        entry['documents']=['interface-'+key, 'community']
     output={'version':1,'documents':docs,'entries':entries}
     for doc in docs.values(): doc['sha256']=hashlib.sha256(doc['text'].encode()).hexdigest()
     (HERE/'handbook.json').write_text(json.dumps(output,ensure_ascii=False,indent=2)+'\n')
