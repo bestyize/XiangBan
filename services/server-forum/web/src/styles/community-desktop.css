@@ -24,6 +24,10 @@
   .site-layout.community-layout .site-header { background: var(--surface); border-bottom: 1px solid var(--line); backdrop-filter: none; }
   .site-layout.community-layout .header-inner { height: 68px; padding: 0 32px; }
   .site-layout.community-layout .community-navigation { flex: none; justify-content: flex-start; gap: 32px; height: 68px; }
+  /* Equal side tracks keep the navigation centered when account actions change width. */
+  .site-layout.community-layout .community-header .header-inner { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 16px; }
+  .site-layout.community-layout .community-header .community-navigation { grid-column: 2; grid-row: 1; justify-content: center; }
+  .site-layout.community-layout .community-header .header-actions { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; min-width: 0; }
   .site-layout.community-layout .community-navigation a { font-size: 15px; }
   .site-layout.community-layout .community-navigation a.on:after { bottom: 0; width: 22px; }
   .site-layout.community-layout .header-actions { gap: 10px; }
@@ -101,4 +105,10 @@
 }
 @media (min-width: 1600px) {
   .site-layout.community-layout .app-main, .site-layout.community-layout .app-footer, .site-layout.community-layout .header-inner { padding-left: 40px; padding-right: 40px; }
+}
+
+/* Compact the search affordance before it can crowd the centered navigation. */
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .site-layout.community-layout .community-header .header-icon[aria-label="搜索社区"] { width: 36px; padding: 0; justify-content: center; }
+  .site-layout.community-layout .community-header .desktop-search-label { display: none; }
 }
