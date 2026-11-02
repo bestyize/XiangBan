@@ -12,6 +12,8 @@
 
 ## 第一版实际格式
 
+Agent 已接入 `skin_list`、`skin_read_format`、`skin_create`、`skin_apply`、`skin_export`。运行时格式与完整 JSON 示例由 `skin_read_format` 随程序提供，以下长期设计不是创作依据。简单背景场景可传 `id/name/background_image`，素材来源为 `generated:<生图编号>` 或工作区相对栅格图片路径；工具自动缩放、转为真实 WebP，并生成配置和预览。多图层作品在工作区子目录准备完整包内容后传 `source_dir`，不能与图片创建参数混用。原生用同一导入解析器检查并安装，工作区保存 `skin-<id>.zip` 供交付；不同内容不覆盖，重复执行相同内容复用结果。创建不会改变当前皮肤，明确要求应用时才切换；不必让用户提供样例包。
+
 装扮页目前支持本地安装与删除、应用与恢复默认、导出已导入的包；内置「春江花月夜」「江南烟雨」「海边列车」，其中「春江花月夜」可点击花灯。侧栏与各页面共用场景，新建任务页右侧不叠加白色蒙层，其他页面保留淡色内容底层；场景互动仅在新建任务页启用。皮肤配色、独立窗口场景、动画偏好设置和创作编辑器暂未实现。静态概念稿与真实应用的可见性和帧率仍需桌面实机验收。
 
 ZIP 根目录必须包含 `manifest.json`、`scene.json`、`theme.json` 和 `preview.webp`，加 `assets/` 内实际使用的图片；上面的 manifest 示例可用，`theme.json` 目前必须是 JSON 对象，可写 `{}`，其配色暂不生效。仅接受 PNG、JPEG、WebP 静态图，动图导入后只使用首帧。`scene.json` 的 `layers` 必须包含 1–20 项，每项有小写字母 / 数字 / 连字符组成的 `id`，`assets/` 内的 `image`，0–10 的整数 `depth`，以及 `center`、`top-left`、`top-right`、`bottom-left`、`bottom-right` 之一的 `anchor`。设置 `interactive: true` 并声明 click 互动后，图层作为固定尺寸的交互物件显示；普通图层覆盖整个场景，按锚点裁切。非交互图层可声明 idle 动作。

@@ -237,7 +237,7 @@ impl ToolResult {
         Self { is_error: true, ..Self::ok(output) }
     }
 
-    pub(crate) fn unknown(reason:&str)->Self{Self::error(format!("Execution outcome unknown: {reason}. Inspect external state before retrying; do not replay automatically.")).with_structured_content(serde_json::json!({"harness_status":"outcome_unknown"}))}
+    pub fn unknown(reason:&str)->Self{Self::error(format!("Execution outcome unknown: {reason}. Inspect external state before retrying; do not replay automatically.")).with_structured_content(serde_json::json!({"harness_status":"outcome_unknown"}))}
     pub(crate) fn outcome_unknown(&self) -> bool { self.structured_content.as_ref().is_some_and(|v| v["harness_status"] == "outcome_unknown") }
     pub(crate) fn halts_dispatch(&self)->bool{self.structured_content.as_ref().and_then(|v|v.get("harness_status")).and_then(Value::as_str).is_some_and(|v|matches!(v,"outcome_unknown"|"resource_busy"))}
     pub fn with_part(mut self, part: Part) -> Self {

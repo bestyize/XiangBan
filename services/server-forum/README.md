@@ -39,6 +39,14 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 本地只读联调可设 `FORUM_API=https://chat.xiangban.xyz`；试玩同时需独立本地宿主及 `VITE_GAME_RESOURCE_ORIGIN=https://chat.xiangban.xyz`，后者仅在 DEV 生效，用于匹配 `/files/` 代理。生产构建不启用开发代理。
 - 前端验收：`npm --prefix services/server-forum/web run build`；行为测试：在 `web/` 执行 `node --experimental-strip-types --test tests/*.test.ts`。
 
+## 社区卡片呈现（2026-11-02）
+
+阅读、教程、求助保持单列左文右图；站务为无装饰封面的文字列表。工具与资料导读使用双列16:9上图下文，工具目录和能力作品使用左图标右说明。壁纸作品为手机双列、宽屏三列瀑布流；影视、音乐及片单乐评使用各屏幕双列上图下文瀑布流，预览宽高比限制在2:3到16:9，壁纸预览限制在4:5到16:9，详情保留完整原图。没有方案实景截图时仍展示真实文字与作品引用，不生成伪截图。
+
+卡片标题统一14px、400字重；影视标题最多3行，其他卡片最多2行，作者、标签、时间等辅助文字12px。文章详情标题与分组标题保留各自层级。规则集中于 `web/src/lib/cardPresentation.ts` 和 `web/src/styles/community-cards.css`。瀑布流使用保留DOM顺序的网格，图片加载和容器变化由ResizeObserver重排，未支持时退回普通双列。图片继续使用已有WebP资源，懒加载并预留封面比例，不修改文章或权限。
+
+验证：`node --experimental-strip-types --test web/tests/cardPresentation.test.ts`（从本目录执行），完整前端构建仍使用上文命令。
+
 ## 配置
 
 见 [.env.example](.env.example)。关键项：
@@ -96,6 +104,12 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 网页版外观支持客户端同款小伴红、薄荷绿、海湾蓝、暮紫、琥珀、石墨六套配色，在「我的 → 外观」、PC 外观入口及账户设置中选择。主题色与日夜模式独立保存于当前浏览器，跨标签同步；夜间保留提亮后的中深灰底色，强调文字根据网页背景调整对比度。
 
 排行榜概览 `/?tab=rankings` 按手机版顺序展示 AA 智能指数 Top 10、智能 vs 价格散点图、输出速度 Top 5、调用量 Top 5。`/models` 与调用量榜使用可展开的条形排行，支持快照实际提供的能力指标及 UTC 历史日榜。散点图沿用输入/输出 3:1 加权报价、对数价格轴、前沿与中位数优势区，支持厂商筛选、模型定位及全屏搜索。厂商图标来自手机本地资源（附原许可），不请求外部图片。相关验证：`node --experimental-strip-types --test tests/modelRankings.test.ts tests/discover.test.ts tests/navigation.test.ts`（在 web 目录运行）。
+
+### PC 网页布局（2026-11-02）
+
+公开社区页面在 1024px 起使用独立的 PC 样式：200px 导航栏、与正文对齐的顶部导航和搜索入口，内容区最大 1320px。社区首页的前沿图文、日报、精选作品分清主次，讨论和资源统一卡片与间距，正文保持阅读宽度。排行榜、开源榜、追踪和导航按实际内容宽度切换布局；原先内容容器最大 1000px，却使用 1100px 容器断点，导致宽屏布局无法生效，本轮将其改为 PC 范围内的 960px 内容断点。手机与后台不使用这套桌面样式。 网页窄屏底栏另与手机版对齐：通栏固定、56px 主体加安全区、四个等宽图标文字入口，选中项深色加粗，中间为 44×32px 的品牌色发布按钮；聊天输入区随新底栏高度避让。
+
+验证：网页生产构建（含 Vue/TypeScript 检查）与 navigation/discover/appearance 9 项测试通过；云浏览器使用生产公开数据的只读快照检查首页、讨论、资源、排行榜和日夜主题。预览未连接登录、发布和其他写操作；本轮没有部署生产网站。
 
 ## 社区内容层（内容包、方案、项目、周刊）
 
@@ -282,3 +296,7 @@ API：
 ### 游戏收藏筛选（2026-11-01）
 
 `GET /api/me/content-bookmarks?kind=game&page=1` 筛选当前账号收藏的公开游戏作品，筛选先于分页和 total 统计；响应条目的 `kind` 继续为 `pack`，收藏/取消仍使用 `/content-social/pack/{id}/bookmark`。兼容原有 pack/scheme 查询，不增加收藏表或改变权限。针对性验证：`TEST_DATABASE_URL=... cargo test --locked --manifest-path services/server-forum/Cargo.toml game_bookmarks_filter`，覆盖登录限制、真实总数、分页、下架排除和原作品查询兼容。
+
+## 资讯订阅（开发中，默认关闭）
+
+账号私有订阅、周期任务及期刊档案，桌面/手机/网页统一管理入口。配置、计费边界、投递不确定状态和验证范围见 [资讯订阅](docs/information-subscriptions.md)。未部署，不读取收件箱，不接收用户本地 API Key。

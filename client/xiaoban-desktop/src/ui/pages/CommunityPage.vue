@@ -68,7 +68,7 @@ onActivated(refresh);
 
 <template>
   <section class="community-page">
-    <div class="community-page-head"><h1>社区</h1><div class="community-head-actions"><NButton v-if="store.desktop" size="small" @click="invoke('community_web_open').catch(store.notify)">打开社区</NButton><NButton v-if="store.desktop" size="small" @click="invoke('configuration_window_open', { target: 'community', tab: null, provider: null }).catch(store.notify)">我的桌面方案</NButton></div></div>
+    <div class="community-page-head"><h1>社区</h1><div class="community-head-actions"><NButton v-if="store.desktop" size="small" @click="invoke('community_web_open', { subscriptions: true }).catch(store.notify)">资讯订阅</NButton><NButton v-if="store.desktop" size="small" @click="invoke('community_web_open').catch(store.notify)">打开社区</NButton><NButton v-if="store.desktop" size="small" @click="invoke('configuration_window_open', { target: 'community', tab: null, provider: null }).catch(store.notify)">我的桌面方案</NButton></div></div>
     <p v-if="store.desktop" class="community-web-note">社区窗口可浏览讨论和资源；社区网页需单独登录。</p>
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">社区内容需要在桌面应用中浏览。</NAlert>
 

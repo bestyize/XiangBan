@@ -257,6 +257,11 @@ impl Permission {
         self.always.lock().unwrap_or_else(|e| e.into_inner()).insert(Self::grant_key(session, tool, kind));
     }
 
+    /// Replace a host-persisted session grant list without clearing taint, review or permission mode.
+    pub fn revoke_session_grants(&self, session: &str) {
+        self.always.lock().unwrap_or_else(|e| e.into_inner()).retain(|(s, _)| s != session);
+    }
+
     /// Takes back one grant made by an "always" answer or by `grant`.
     pub fn revoke(&self, session: &str, tool: &str, kind: Option<&str>) {
         self.always.lock().unwrap_or_else(|e| e.into_inner()).remove(&Self::grant_key(session, tool, kind));

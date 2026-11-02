@@ -376,6 +376,8 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     val attachmentScope = rememberCoroutineScope()
     var input by rememberSaveable { mutableStateOf("") }
     var modelSheet by rememberSaveable { mutableStateOf(false) }
+    var permissionSheet by remember(cloud.conversationId) { mutableStateOf(false) }
+    var executionSheet by remember(cloud.conversationId) { mutableStateOf(false) }
     var drawer by rememberSaveable { mutableStateOf(false) }
     var attach by rememberSaveable { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
@@ -390,7 +392,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     val callHost = rememberVoiceCallHost(env)
     val callScope = rememberCoroutineScope()
 
-    LaunchedEffect(session.loggedIn) { if (session.loggedIn) chat.loadMeta() }
+    LaunchedEffect(session.loggedIn, session.accountId) { if (session.loggedIn) chat.loadMeta() }
     cloud.messages.lastOrNull().let { last -> AutoRead(env.reader, last?.id, last?.role, last?.text.orEmpty(), last?.streaming == true, paused = callHost.call != null) }
 
     Box(Modifier.fillMaxSize()) {
@@ -399,6 +401,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                 cloud.title(), onBack = back,
                 trailing = {
                     Row {
+                        IconTap(XIcons.Sliders, "任务设置", { executionSheet = true }, size = 22.dp)
                         IconTap(XIcons.NewChat, "新对话", { chat.clearConversation(); input = "" }, size = 22.dp)
                         IconTap(XIcons.Menu, "对话列表", { drawer = true }, size = 22.dp)
                     }
@@ -413,7 +416,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     if (cloud.messages.isEmpty()) {
                         ChatWelcome()
                     } else {
-                        CloudMessages(cloud.messages, cloud.sending, env.platform, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) })
+                        CloudMessages(cloud.messages, cloud.sending, env.platform, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null)
                     }
                 }
                 cloud.question?.let { question ->
@@ -429,6 +432,13 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     }
                 }
                 Column(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 4.dp)) {
+                    cloud.saveError?.let { message ->
+                        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(message, Modifier.weight(1f), style = XType.Caption, color = MaterialTheme.colorScheme.error)
+                            LinkText("重试保存", chat::retrySave)
+                        }
+                    }
+                    if (!cloud.nativeAgentAvailable) Text("当前仅支持云端对话，本机任务暂不可用", Modifier.padding(bottom = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     PressTip(env, voiceMode, Modifier.padding(bottom = 8.dp))
                     if (attachments.isNotEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         attachments.forEachIndexed { index, item -> ChipPill("${item.name} ×", onClick = { attachments = attachments.filterIndexed { i, _ -> i != index } }) }
@@ -437,6 +447,8 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                         input, { input = it }, "问点什么，或描述想要的装扮、游戏…",
                         onModel = { modelSheet = true },
                         onAttach = { attach = true },
+                        onPermission = if (cloud.nativeAgentAvailable) ({ permissionSheet = true }) else null,
+                        fullTrust = cloud.permissionMode == "auto",
                         voice = voiceInput, voiceMode = voiceMode, onVoiceMode = { voiceMode = it },
                         onVoicePress = { if (cloud.sending) chat.stop() },
                         onLive = {
@@ -460,6 +472,16 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                         hasAttachments = attachments.isNotEmpty(),
                         sending = cloud.sending, onStop = chat::stop,
                     )
+                }
+            }
+        }
+        OverlayTransition(permissionSheet) { panel ->
+            BottomSheet({ permissionSheet = false }, panel) { CloudPermissionSettings(chat, cloud) { permissionSheet = false } }
+        }
+        OverlayTransition(executionSheet) { panel ->
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                BottomSheet({ executionSheet = false }, panel.heightIn(max = maxHeight * 0.85f)) {
+                    CloudExecutionSettings(chat, cloud) { executionSheet = false }
                 }
             }
         }
@@ -548,7 +570,7 @@ private fun ChatWelcome() {
 }
 
 @Composable
-private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit) {
+private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit, onReviewed: () -> Unit = {}, waiting: String? = null) {
     val listState = rememberLazyListState()
     val last = messages.lastOrNull()
     val progressMark = (last?.text?.length ?: 0) + (last?.tools?.size ?: 0) * 7 + (last?.records?.size ?: 0) * 13
@@ -560,11 +582,14 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
             } else {
                 AssistantRow {
                     AssistantTurnCards(
-                        text = turn.text, streaming = turn.streaming, error = turn.error, reasoning = "", tools = turn.tools, records = turn.records,
-                        waiting = null, platform = platform, idleText = "思考中…", onStop = onStop, onSend = onSend,
+                        text = turn.text, streaming = turn.streaming, error = if (turn.cancelled) "已取消" else turn.error, reasoning = turn.reasoning, tools = turn.tools, records = turn.records,
+                        waiting = if (turn.streaming) waiting else null, platform = platform, idleText = turn.activity.ifBlank { "思考中…" }, onStop = onStop, onSend = onSend,
                         onRetry = if (turn.error != null && !sending) onRetry else null,
                         onRegenerate = if (turn.id == last?.id && !turn.streaming && !sending) onRegenerate else null,
+                        extras = TurnExtras(promptTokens = turn.promptTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), completionTokens = turn.completionTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), truncated = turn.truncated,
+                            onContinue = if (turn.id == last?.id && !sending) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null),
                     )
+                    if (turn.id == last?.id && !sending && turn.error.orEmpty().contains("结果尚未确认")) LinkText("已核对，继续", onReviewed)
                     if (turn.error.orEmpty().let { it.contains("额度") || it.contains("兑换") }) LinkText("去兑换额度 ›", onQuota)
                 }
             }
@@ -579,7 +604,7 @@ private fun ChatApproval.toRequest(): RemoteApprovalRequest = RemoteApprovalRequ
     risk = if (danger != null) "high" else "low",
     options = buildList {
         add(RemoteApprovalOption("once", "允许一次"))
-        if (danger == null) add(RemoteApprovalOption("always", "本对话都允许"))
+        if (canRemember) add(RemoteApprovalOption("always", "本对话都允许"))
         add(RemoteApprovalOption("deny", "拒绝"))
     },
     tool = tool, danger = danger,
@@ -605,7 +630,7 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
 
     LaunchedEffect(cloud.redeemMessage) { if (cloud.redeemMessage != null) code = "" }
 
-    LaunchedEffect(session.loggedIn) { if (session.loggedIn) chat.loadMeta() }
+    LaunchedEffect(session.loggedIn, session.accountId) { if (session.loggedIn) chat.loadMeta() }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {

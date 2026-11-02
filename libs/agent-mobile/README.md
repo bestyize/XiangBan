@@ -11,7 +11,7 @@
 
 `todo` 的计划、证据与交接说明单独保存在 `sessions_dir/progress/`，新运行和重启后恢复，不依赖聊天上下文是否已被裁剪；不同会话互相隔离。旧会话无需迁移。宿主应只为同一个 `sessions_dir` 创建一个 Engine，并在删除会话时同时清理它的聊天记录和进度记录。恢复进度只供参考，不代表用户新增授权、独立验收或自动重放动作。
 
-每次运行最多 25 次模型调用。`RepeatGuard` 在同参数同结果连续出现第 3 次时提示，第 6 次起阻止执行；`ContinueGuard` 继续被截断、空答、只宣布操作或仍有未完成任务的回答，连续 3 次无进展或累计 8 次续跑提示后暂停，返回失败的 `run_end` 和暂停原因，宿主应显示原因并让用户继续。临时网络错误、429 和 5xx 最多重试 2 次（首次请求之外）；取消仍会立即中断等待。没有接入后台目标恢复、独立任务验收或跨进程会话锁。
+普通运行默认不限模型轮数；宿主可按会话配置轮数，并在 run 中传工具次数、活跃时间和累计模型用量预算。`RepeatGuard` 在同参数同结果连续出现第 3 次时提示，第 6 次起阻止执行；`ContinueGuard` 继续被截断、空答、只宣布操作或仍有未完成任务的回答，连续 3 次无进展后暂停（不再设置累计 8 次提示上限），返回失败的 `run_end` 和暂停原因，宿主应显示原因并让用户继续。临时网络错误、429 和 5xx 最多重试 3 次（首次请求之外）；取消仍会立即中断等待。没有接入后台目标恢复、独立任务验收或跨进程会话锁。
 
 ## 协议
 
@@ -29,7 +29,7 @@
 | 手机 → 内核 | `answer`（`id`、`answer` 字符串或 `null`） | 用户回答或关闭问题；取消会自动释放等待 |
 | 手机 → 内核 | `run` / `cancel` / `set_model` | 开始一轮 / 取消 / 换模型 |
 
-除读取类（`risk: read`）工具外，所有工具每次都先问用户。
+默认 Ask 模式下读取类（`risk: read`）直接执行，其他工具先问用户；按会话可切换 Auto。删除文件和覆盖已有游戏始终确认且不记忆授权。宿主保存授权清单，并用 configure_session 同步或撤销；结果不明的调用会持久标记需复核，Auto 也不能越过。
 
 `run` 可以保持原来的 `input` 字符串，也可以传非空 `parts` 数组，两者只能选一个，无需变更 JNI：
 
@@ -61,3 +61,14 @@ Rust 测试用假的手机应答模型和工具，覆盖完整审批执行、拒
 ## 打包
 
 GitHub 工作流 `BuildXiaoBanWallpaper` 的 Android 任务用 `cargo-ndk` 编出 arm64-v8a 的库（手机只支持 64 位 ARM），放进 `androidApp/src/main/jniLibs/`（已在 `.gitignore`）。本地没有这些库时，App 照常运行，只是没有智能体，退回纯云端聊天。
+
+## 手机可靠性配置（2026-11-02）
+
+- `configure_session`：`session` 与 `settings`，包括 model、context_tokens（默认 256000）、可选 model_window / max_output_tokens、supports_tools、max_turns、permission（ask / auto）和 grants 工具名清单。清单是完整快照，撤销不会清除不可信内容或结果复核状态。
+- `run` 可传 `retry:true`（不能同时带 input/parts），只重试尚未产生助手/工具记录的用户消息；已有副作用时应发起“检查状态后继续”，不能重放原请求。可选 max_tool_calls、max_millis、max_tokens；手机宿主传 isolate:true 启用资源域隔离，旧 stdio 调用方默认行为不变。
+- `tool_request` 带 session / run_id；取消或超时后发 `tool_cancel`。宿主须停止对应协程并回 `tool_result`，带 cancelled / outcome_unknown。无法确认停止或真实结果时暂停并保留复核状态，不能把离开等待当作平台动作已经停止。`reviewed_session` 只在用户明确核对结果后使用。
+- 按会话使用 TokenBudget 与模型窗口计算上下文，先做有界历史摘录，再裁剪；raw JSONL 保留，通过 history_read 分页回看。过长工具结果按会话落盘，可用 tool_output_read 分页读取，不能读取另一段对话。请求体按实际 JSON 字节限制，预留宿主参数空间。
+- `approval_resolved` 用于关闭已完成或因切换权限放行的审批卡片；普通审批可在切到 Auto 后继续，需复核或危险操作仍等待明确确认。
+- 转发可见推理、工具输入进度、等待、重试、续跑、截断及用量；宿主不要丢弃暂停与结果不明原因。
+
+这些机制不代表加入了后台目标恢复、通用 Shell 或手机系统控制。

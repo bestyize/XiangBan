@@ -69,19 +69,20 @@ suspend fun recognizeWith(engines: List<RecognizerEngine>, pcm: ByteArray): Pair
 
 // ───────────── 本地语音模型下载 ─────────────
 
-/** 第一次要在手机上直接识别语音时：说明模型多大、从哪来，让用户决定下不下载。 */
+/** 声音设置中的手动下载详情；冷启动预下载不主动打开此弹层。 */
 @Composable
 fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Boolean) -> Unit) {
     val models = env.speechModels ?: return
-    var done by remember { mutableStateOf(0L) }
-    var total by remember { mutableStateOf(xyz.xiangban.xiaoban.common.community.VoiceModels.TotalBytes) }
-    var running by remember { mutableStateOf(false) }
+    val status by models.state.collectAsState()
+    val done = status.downloaded
+    val total = status.total
+    val running = status.running
     var error by remember { mutableStateOf<String?>(null) }
     var job by remember { mutableStateOf<Job?>(null) }
     BottomSheet({ job?.cancel(); onFinished(false) }, panelModifier) {
         Text("在手机上识别语音", style = XType.Title, fontWeight = FontWeight.SemiBold)
         Text(
-            "下载语音模型（SenseVoice 识别、Silero 人声检测和 Smart Turn 判停，共约 ${(total / 1_000_000)} MB，和电脑上用的是同一套）；已下载的文件会复用。之后识别和判断你说完没有都在手机上完成。建议在 Wi-Fi 下载。",
+            "下载本地语音组件和模型（SenseVoice 识别、Silero 人声检测和 Smart Turn 判停，共约 ${(total / 1_000_000)} MB）；已下载的文件会复用。之后识别和判断你说完没有都在手机上完成。建议在 Wi-Fi 下载。",
             Modifier.padding(top = 8.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         if (running || done > 0) {
@@ -93,27 +94,22 @@ fun SpeechModelSheet(env: CommunityEnv, panelModifier: Modifier, onFinished: (Bo
         }
         error?.let { Text(it, Modifier.padding(top = 8.dp), style = XType.Body, color = Danger) }
         Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            GhostPillButton(if (running) "取消" else "先不用", { job?.cancel(); onFinished(false) }, Modifier.weight(1f))
-            PillButton(if (running) "下载中…" else if (error != null) "重试" else "下载", {
+            GhostPillButton("关闭", { job?.cancel(); onFinished(false) }, Modifier.weight(1f))
+            PillButton(if (running) "下载中…" else if (models.ready) "已就绪" else if (error != null || status.error != null) "重试" else "下载", {
                 error = null
-                running = true
                 job = env.scope.launch {
                     try {
-                        models.download { d, t -> done = d; total = t }
-                        running = false
+                        models.download { _, _ -> }
                         onFinished(true)
                     } catch (e: CancellationException) {
-                        running = false
                         throw e
                     } catch (e: ModelDownloadException) {
-                        running = false
                         error = e.message
                     } catch (e: Exception) {
-                        running = false
                         error = "下载失败，请检查网络后重试"
                     }
                 }
-            }, Modifier.weight(1f), enabled = !running)
+            }, Modifier.weight(1f), enabled = !running && !models.ready)
         }
     }
 }
@@ -239,26 +235,16 @@ fun rememberVoiceInput(env: CommunityEnv, engines: () -> List<RecognizerEngine>,
     return controller
 }
 
-/** 一通语音通话的发起与本地模型下载的询问。 */
+/** 通话直接使用当前可用引擎；资源预下载独立进行，不以弹窗阻断通话。 */
 class VoiceCallHost(private val env: CommunityEnv) {
     var call by mutableStateOf<VoiceCall?>(null)
     /** 通话收起成了顶部胶囊。 */
     var minimized by mutableStateOf(false)
-    var offering by mutableStateOf(false)
-        private set
-    private var declined = false
-    private var pending: (() -> VoiceCall)? = null
-
-    /** 发起通话。手机支持本地识别但模型还没下载时，先问用户要不要下载（只问一次）。 */
+    /** 本地资源未齐时沿用电脑/云端降级路径，后台继续准备资源。 */
     fun request(factory: () -> VoiceCall) {
-        if (call != null || offering) return
-        if (env.speech != null && env.speechModels?.ready == false && !declined) {
-            pending = factory
-            offering = true
-        } else {
-            minimized = false
-            call = factory().also(::applySettings)
-        }
+        if (call != null) return
+        minimized = false
+        call = factory().also(::applySettings)
     }
 
     /** 声音设置里记着的“直接开口打断”和“不朗读”，打电话时带上。 */
@@ -267,24 +253,17 @@ class VoiceCallHost(private val env: CommunityEnv) {
         if (SpeechState.settings.callSilent) call.setSilent(true)
     }
 
-    fun offerFinished(downloaded: Boolean) {
-        offering = false
-        if (!downloaded) declined = true
-        pending?.let { make -> minimized = false; call = make().also(::applySettings) }
-        pending = null
-    }
 }
 
 @Composable
 fun rememberVoiceCallHost(env: CommunityEnv): VoiceCallHost = remember(env) { VoiceCallHost(env) }
 
 /**
- * 通话相关的几层界面：询问下载模型的底部弹层、通话全屏界面，收起后是页面顶部的胶囊。
+ * 通话全屏界面与收起后的顶部胶囊。
  * 通话的开始、结束都在这里管，所以收起、展开不会打断通话。
  */
 @Composable
 fun VoiceCallLayer(env: CommunityEnv, host: VoiceCallHost, title: String, onNotice: (String) -> Unit) {
-    OverlayTransition(host.offering) { panel -> SpeechModelSheet(env, panel) { host.offerFinished(it) } }
     val current = host.call ?: return
     val state by current.state.collectAsState()
     var seconds by remember(current) { mutableStateOf(0) }

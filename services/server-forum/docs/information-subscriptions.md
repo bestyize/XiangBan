@@ -1,0 +1,65 @@
+# 资讯订阅（开发中，未部署）
+
+同一账号保存任意主题的资讯订阅与私有历史期刊，入口 `/me/subscriptions`。桌面社区/资料库复用独立社区窗口；手机「我的」使用现有浏览器入口（网页独立登录同一账号，不注入客户端令牌）。并非原生移动编辑器。自然语言关注描述可识别简单中文每日/每周时间，始终以可编辑表单确认后保存；不支持的时间语义要求手动选择，不静默猜测。
+
+服务先托管在 server-forum，复用账号中心 JWT 和数据库迁移；队列/执行/投递/额度边界分离，后续可迁独立 worker。agent-proactivity 是本机注意力策略，桌面提醒依赖客户端运行，不适合托管云端周期任务；不改变其权限或本地提醒。云端期刊为独立账号资产，桌面资料库提供入口，不上传本地资料和记忆。
+
+## 安全与调度
+
+- 用户 API 只接受 AuthUser，所有读写按 owner 隔离，修订号防覆盖。邮箱修改撤销验证；确认码仅存摘要，30分钟有效，最多5次尝试。每账号20条有效订阅、每日30次创建/5封确认邮件，每订阅5分钟间隔。默认关闭发信与 worker。
+- 每日/每周按 IANA 时区计算；DST 不存在的时间跳过、重复时间只取首次。宕机不补发大量往期，每条最多排一期到期任务。一次性任务接受含偏移的 RFC3339 时间。
+- PostgreSQL SKIP LOCKED、唯一 occurrence、带随机租约的生成任务；生成最多3次，重试间隔5分钟。编辑/暂停/删除取消未发送版本。邮件提交与暂停共用订阅锁，暂停成功返回后旧任务不会开始新发送。
+- SMTP 没有幂等接口。先持久化 sending，再提交 SMTP；超时或崩溃进入 uncertain，不自动重发，不宣称 exactly-once。需人工与供应商核对后处理账务；尚无管理员核对界面。SMTP 接受不代表收件箱投递成功，未实现退信 webhook。
+- HTML 转义所有内容，引用网址来自检索结果，不接受模型生成链接；历史以纯文本展示，避免执行邮件 HTML。没有可靠来源时不发送。正文按来源摘要，不保证模型事实判断完全正确。
+- 客户端不提交密钥。所有搜索、模型和 SMTP 凭据为平台凭据，不存入订阅、URL 或历史。
+
+## 配置（不含真实凭据，需独立部署配置）
+
+| 变量 | 用途 |
+|---|---|
+| INFORMATION_WORKER_ENABLED | 仅 `true` 开启独立后台循环，默认关闭 |
+| INFORMATION_MAIL_ENABLED | 仅 `true` 开启邮件，默认关闭 |
+| INFORMATION_SMTP_HOST / PORT / USER / PASSWORD | 平台 SMTP，587 STARTTLS / 465 TLS |
+| INFORMATION_MAIL_FROM | 已验证的发件人邮箱，遵守供应商发信域认证 |
+| INFORMATION_EXECUTION_URL | server-ai `/api/internal/information-execution` 完整 URL；分别调用 search 与 summary |
+| AI_INFORMATION_MODEL_BASE_URL / MODEL_KEY / MODEL_PROTOCOL | server-ai 的平台模型地址、凭据、协议（`chat_completions` 或 `messages`）；模型由计费策略指定，无默认模型 |
+| AI_INFORMATION_SEARCH_GATEWAY_KEY | 可选的平台 New API 搜索凭据；否则沿用 `AI_SEARCH_PROVIDERS` 的直连平台配置 |
+| INFORMATION_ACCOUNTING_URL | server-ai `/api/internal/information-jobs` 完整 URL |
+| INFORMATION_SERVICE_TOKEN | 与 AI_INFORMATION_SERVICE_TOKEN 相同的专用服务凭据 |
+| AI_INFORMATION_SERVICE_TOKEN | server-ai 专用服务凭据，至少32字符；不使用账号令牌 |
+| AI_INFORMATION_POLICY | server-ai JSON 策略，未设置时拒绝预约；不提供生产价格 |
+
+Policy 字段：`product_id`（现有统一产品）、`reserve_units`（单任务上限）、`model`、`input_per_million`、`output_per_million`、`search_units`、`email_units`。以上均是现有额度单位，不是人民币价格。模型/搜索/邮件分别计量；原始 usage 保留供核对。DeepSeek/OpenAI 使用现有 Chat Completions 路径，Claude 使用 Messages 路径与原生响应归一化；搜索直接复用 server-ai 的 Search 提供商链，不创建另一个检索系统。模型与检索配置分离，平台密钥仅在 server-ai。月卡与资源包沿用现有 quota_buckets，不建立新钱包、不实现新支付。预约按现有最早到期顺序冻结桶额度、写共同流水，成功后按快照策略结算、释放差额，终止失败释放；同一期重复调用幂等。过期或被撤销的原桶不会因退款复活。超出预约上限或缺少计量保持待核对，不偷偷追加扣款。现有 New API 对账有延迟，仍需上线前验证跨交互调用的限额边界。
+
+**未确定的商业规则**：价格、额度换算、月费包含量、缓存 token 规则、扣费时点和退信/不确定投递处理。代码的“SMTP 接受后结算”是待审阅实现策略，不代表已确认商业条款。不得在这些规则确认前开启生产计费。未配置服务时保存订阅并展示不可投递状态，不伪装已经运行。
+
+DeepSeek 检索端点核对（2026-11-01）：https://api-docs.deepseek.com/guides/search/ ，Search 为 `/v1/tools/search`，Fetch 为 `/v1/tools/fetch`，并非从聊天端点假设出的工具。自然语言关注内容不局限 AI。
+
+## 验证
+
+- `cargo test --locked --manifest-path services/server-forum/Cargo.toml subscriptions`
+- `TEST_DATABASE_URL=隔离测试库 ...`：验证真实 PostgreSQL 迁移、账号隔离、确认、并发 tick/claim、更新取消、删除保留历史。
+- `cargo test --locked --manifest-path services/server-ai/Cargo.toml information_jobs`
+- `npm --prefix services/server-forum/web run build`
+
+不发真实测试邮件、不运行生产迁移、不部署。发布前还需原生设备入口与登录、真实供应商沙箱投递、退信/投诉与退订运营、邮件域名信誉、队列/数据库备份监控验收。
+
+
+## 本地验收记录
+
+2026-11-01，基线 `9598e7e4`，独立功能分支 `feat/information-email-subscriptions`，草稿 PR https://github.com/bestyize/XiangBan/pull/142 。使用隔离的本机 PostgreSQL 17 schema，不访问线上库。
+
+已覆盖：时区日界/DST、一次性/每周、真实归属鉴权与历史隔离、确认码失败/重放、并发 tick 与领取、过期租约不能投递、生成失败后重试、重复发送调用、SMTP 结果不明隔离、暂停/修改/删除、转义和来源引用；额度测试覆盖共享月卡与资源包的分配、并发预约、幂等结算/释放、取消先于预约的竞争、余额不足、账号隔离与流水守恒。供应商协议使用纯数据/mock 验证，没有真实模型/搜索/SMTP 调用。
+
+真实 Windows/macOS/Android/iOS 包及设备尚未验收。手机为浏览器入口，不声称原生订阅编辑或已实现自动 SSO；网页登录账号必须与客户端一致。后续上线前需完善不确定投递的运维核对入口，确定价格与收费时点，并验证现有网关同步延迟下的跨服务余额边界。
+
+
+## 预算与配置变更边界
+
+用户在确认表单中自行填写「单次额度上限」和「每月额度上限」，单位与共同小伴额度一致，不预填人民币价格或额度数。每月按 **UTC 自然月** 计算，界面明确显示。未配置预算的旧订阅暂停，不能因为升级而开始扣款；修改订阅需要再次确认预算。
+
+单期预约取平台预约上限与用户单次上限的较小值。月度校验包含本月已结算用量及未结算预约，对同一订阅串行锁定后与共享额度桶在同一事务内校验；不建立新钱包。失败释放后可重新使用额度。重复 tick、重试和重复结算不重复占用预算；跨月重试仍归原预约月份。降低预算限制后续新任务，不回溯撤销已开始任务；实际计量高于预约仍进入待核对，不追加扣款。
+
+每期预约冻结原产品绑定、模型、费率、模型端点、协议及凭据环境变量名（不保存密钥）。`AI_INFORMATION_POLICY` 可选 `execution: {base_url, protocol, credential_env}`，用于并存不同版本的执行配置；未填写时预约时从 `AI_INFORMATION_MODEL_*` 捕获地址和协议，凭据引用为 `AI_INFORMATION_MODEL_KEY`。更换供应商时保留旧凭据环境变量，供在途任务完成；删除旧凭据会令旧任务失败并释放，不切换到新模型。计量和释放使用原预约，不依赖当前产品仍启用或当前价格策略仍存在。产品停用阻止后续执行，但不妨碍已发生用量的结算或退款。
+
+归档游标为 `(created_at,id)`，同批时间戳相同的65条期刊回归覆盖完整的30/30/5分页。前端写入显式投影字段，回归覆盖完整列表响应后的编辑、暂停/恢复及编辑后新建，避免服务器元数据进入严格写入 DTO。

@@ -1,5 +1,7 @@
 package xyz.xiangban.xiaoban.common.community
 
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -38,6 +40,7 @@ class SetReminderTool(private val scheduler: ReminderScheduler, private val now:
         if (title.isEmpty()) return AgentToolResult(false, "提醒的内容不能为空")
         if (minutes == null || minutes < 1 || minutes > MAX_REMINDER_MINUTES) return AgentToolResult(false, "minutes 要在 1 到 $MAX_REMINDER_MINUTES 之间")
         val at = now() + minutes * 60_000
+        currentCoroutineContext().ensureActive()
         return if (scheduler.schedule(title.take(80), at)) AgentToolResult(true, "已设置：$minutes 分钟后提醒“${title.take(80)}”")
         else AgentToolResult(false, "没能设置提醒，可能是没有开通知权限")
     }

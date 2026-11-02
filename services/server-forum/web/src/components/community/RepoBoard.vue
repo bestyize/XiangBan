@@ -18,7 +18,8 @@ function select(value:string){void router.replace({query:{...route.query,issue:v
 <style scoped>
 .repo-board{display:grid;gap:8px;padding-top:8px;min-width:0}.period-card{padding:16px;background:var(--surface);border-radius:16px}header{display:flex;align-items:center;justify-content:space-between;gap:8px}.period-title{display:flex;align-items:center;gap:10px;min-width:0}.section-icon{display:grid;place-items:center;flex:none;width:36px;height:36px;background:var(--surface-2);border-radius:10px;color:var(--ink-2)}h2{font-size:16px;margin:0;line-height:1.5}.period-date{font-size:12px;margin:4px 0 0;color:var(--ink-3);line-height:1.5}.issue-picker{display:flex;align-items:center;gap:4px;flex:none;position:relative;font-size:12px;color:var(--ink-3);min-height:44px;cursor:pointer}.issue-picker select{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}.issue-picker:focus-within{outline:2px solid var(--brand);outline-offset:3px;border-radius:6px}.period-summary{margin:14px 0 4px;font-size:12px;line-height:1.7;color:var(--ink-2)}.period-summary strong{font-size:16px;font-weight:600;color:var(--ink)}.sample{color:var(--brand)}.method{font-size:12px;color:var(--ink-3)}summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;list-style:none;cursor:pointer}summary::-webkit-details-marker{display:none}details[open] summary svg{transform:rotate(180deg)}.method p{margin:4px 0 8px;line-height:1.7}.repo-list{display:grid;gap:8px;min-width:0}.bookmark-note{display:flex;align-items:center;gap:6px;padding:4px;margin:0;font-size:12px;color:var(--ink-3)}@media(min-width:768px){.repo-board{gap:12px}.period-card{padding:20px}.repo-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}}
 
-@container page (min-width:1100px){
+@media(min-width:1024px){
+@container page (min-width:960px){
   .repo-board{grid-template-columns:280px minmax(0,1fr);gap:20px 24px;padding-top:24px;align-items:start}
   .repo-board>:deep(.request-state){grid-column:1/-1}
   .period-card{grid-column:1;grid-row:1;position:sticky;top:calc(var(--header-h,56px) + 24px);padding:24px;align-self:start}
@@ -42,5 +43,6 @@ function select(value:string){void router.replace({query:{...route.query,issue:v
   .repo-list :deep(.repo-meta .growth){margin-left:0}
   .repo-list :deep(.note){grid-column:1/-1;padding-left:32px;margin-top:0}
   .bookmark-note{grid-column:1;grid-row:2;line-height:1.7;align-self:start;padding:0 8px}
+}
 }
 </style>

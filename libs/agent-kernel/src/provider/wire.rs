@@ -215,3 +215,8 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
     }
     body
 }
+
+/// Serialize a Chat Completions request with the same byte budget as native HTTP providers.
+pub fn encode_request_body(profile: &ProviderProfile, request: &ChatRequest) -> Result<Vec<u8>, crate::HarnessError> {
+    super::budget::encode(profile, request, build_request_body)
+}

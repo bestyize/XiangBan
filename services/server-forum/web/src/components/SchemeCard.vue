@@ -14,7 +14,7 @@ defineProps<{ scheme: CommunityScheme }>()
 </template>
 <style scoped>
 .scheme-card { padding: 16px; border-bottom: 1px solid var(--line); }
-h3 { margin: 0; font-size: var(--fs-md); font-weight: 600; }
+h3 { margin: 0; font-size: 14px; font-weight: 400; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .summary { margin: 8px 0; color: var(--ink-2); font-size: var(--fs-sm); }
 .meta { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 8px 0 12px; color: var(--ink-3); font-size: var(--fs-xs); }
 </style>

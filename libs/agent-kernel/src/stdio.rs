@@ -45,6 +45,10 @@ enum Incoming {
         id: String, session: String, input: Option<String>, parts: Option<Vec<Part>>,
         #[serde(default)] observed: bool,
         max_tool_calls: Option<usize>,
+        max_millis: Option<u64>,
+        max_tokens: Option<u64>,
+        #[serde(default)] retry: bool,
+        #[serde(default)] isolate: bool,
     },
     Cancel { id: String },
     Approval { id: String, decision: String },
@@ -237,6 +241,7 @@ impl StdioBridge {
         let mut message = json!({
             "type": "approval_request", "id": id, "session": request.session, "tool": request.tool,
             "risk": risk_name(request.risk), "arguments": request.arguments, "tainted": request.tainted,
+            "can_remember": request.can_remember(),
         });
         if let Some(danger) = request.danger {
             message["danger"] = json!(danger);
@@ -246,8 +251,9 @@ impl StdioBridge {
             lock(&self.pending).approvals.remove(&id);
             return Approval::Deny;
         }
-        let decision = request.wait_for(&rx).unwrap_or(Approval::Deny);
+        let decision = request.wait_for_approval(&rx).unwrap_or(Approval::Deny);
         lock(&self.pending).approvals.remove(&id);
+        self.send(&json!({"type":"approval_resolved","id":id,"session":request.session}));
         decision
     }
 
@@ -275,17 +281,18 @@ impl StdioBridge {
         }
         match serde_json::from_slice::<Incoming>(line) {
             Err(e) => self.error(&format!("invalid message: {e}")),
-            Ok(Incoming::Run { id, session, input, parts, observed, max_tool_calls }) => {
+            Ok(Incoming::Run { id, session, input, parts, observed, max_tool_calls, max_millis, max_tokens, retry, isolate }) => {
                 let input = match (input, parts) {
-                    (Some(text), None) => vec![Part::Text { text }],
-                    (None, Some(parts)) if !parts.is_empty() => parts,
+                    (None, None) if retry => None,
+                    (Some(text), None) if !retry => Some(vec![Part::Text { text }]),
+                    (None, Some(parts)) if !retry && !parts.is_empty() => Some(parts),
                     _ => return self.error("a run needs exactly one of `input` (a string) or `parts` (a non-empty array)"),
                 };
                 if id.is_empty() || id.chars().count() > MAX_ID_CHARS || session.is_empty() || session.chars().count() > MAX_SESSION_CHARS {
                     return self.error("`id` must be 1 to 128 characters and `session` 1 to 256 characters");
                 }
                 handles.retain(|h| !h.is_finished());
-                if let Some(handle) = self.start_run(agent, id, session, input, observed, max_tool_calls) {
+                if let Some(handle) = self.start_run(agent, id, session, input, observed, max_tool_calls, max_millis, max_tokens, isolate) {
                     handles.push(handle);
                 }
             }
@@ -325,7 +332,7 @@ impl StdioBridge {
         }
     }
 
-    fn start_run(self: &Arc<Self>, agent: &Arc<Agent>, id: String, session: String, input: Vec<Part>, observed: bool, max_tool_calls: Option<usize>) -> Option<JoinHandle<()>> {
+    fn start_run(self: &Arc<Self>, agent: &Arc<Agent>, id: String, session: String, input: Option<Vec<Part>>, observed: bool, max_tool_calls: Option<usize>, max_millis: Option<u64>, max_tokens: Option<u64>, isolate: bool) -> Option<JoinHandle<()>> {
         let cancel = Arc::new(AtomicBool::new(false));
         {
             let mut runs = lock(&self.runs);
@@ -334,17 +341,23 @@ impl StdioBridge {
                 self.error(&format!("run id `{id}` is already in use"));
                 return None;
             }
+            // Reserve the session in protocol order, before spawning its worker. Otherwise a later
+            // request can win the Agent session lock before the earlier thread is scheduled.
+            if runs.values().any(|run| run.session == session) {
+                drop(runs);
+                let mut end = json!({"type":"run_end","run":id,"ok":false,"error":format!("session `{session}` already has a run in progress")});
+                if observed { end["run_id"] = Value::Null; }
+                self.send(&end);
+                return None;
+            }
             runs.insert(id.clone(), RunInfo { session: session.clone(), cancel: cancel.clone() });
         }
         let (bridge, agent) = (self.clone(), agent.clone());
         let thread_id = id.clone();
         let spawned = thread::Builder::new().name(format!("run-{id}")).spawn(move || {
             let mut kernel_run_id = None;
-            let result = agent.run_parts_observed(
-                &session,
-                input,
-                crate::RunOptions { max_tool_calls, ..Default::default() },
-                &mut |record| {
+            let options = crate::RunOptions { max_tool_calls, control: (isolate || max_millis.is_some() || max_tokens.is_some()).then(|| crate::RunControl::limits(max_millis.map(std::time::Duration::from_millis), max_tokens)), ..Default::default() };
+            let mut observe = |record: crate::RunEvent| {
                     kernel_run_id = Some(record.run_id.clone());
                     let sent = if observed { bridge.send(&json!({"type":"run_event", "run":thread_id, "record":record})) }
                         else if let crate::RunEventBody::Event { event } = record.body {
@@ -352,9 +365,11 @@ impl StdioBridge {
                         } else { true };
                     if !sent { cancel.store(true, Ordering::SeqCst); }
                     Ok(())
-                },
-                &cancel,
-            );
+                };
+            let result = match input {
+                Some(parts) => agent.run_parts_observed(&session, parts, options, &mut observe, &cancel),
+                None => agent.retry_last_observed(&session, options, &mut observe, &cancel),
+            };
             lock(&bridge.runs).remove(&thread_id);
             let mut end = match result {
                 Ok(s) => json!({

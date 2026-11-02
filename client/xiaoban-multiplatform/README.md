@@ -53,9 +53,21 @@ Android 在内置 `agent_mobile` 原生库时支持私有文本工作区、文�
 
 手机通话沿用桌面的级联方式：本地 Silero 检测人声、Smart Turn v3 判断是否说完、SenseVoice 转文字，再请求聊天模型并按句朗读。说话期间显示本地识别的中间字幕；可在小伴回答时开口打断，本地识别可用时会过滤语气词和朗读回声，下一轮带上已播放内容的说明。通话不会因安静自动挂断，用户可随时静音或结束；后台任务仍按原有权限运行。
 
-首次使用可下载 SenseVoice、Silero 和 Smart Turn（共约 250 MB），已下载的文件会复用；缺少 Smart Turn 或加载失败时回退到原有识别和停顿判定。模型在手机运行，聊天请求仍发到所选服务；无法使用本地识别时按原有顺序尝试电脑或云端识别。Edge 朗读可用时会预备少量简短接话，失败不阻塞对话。
+Android 冷启动后延迟约 2 秒，在后台静默下载本地语音组件及 SenseVoice、Silero 和 Smart Turn 模型（模型约 250 MB，原生组件约 60 MB）；不弹下载询问、不阻塞首页。Application 进程级下载器与声音设置页共用任务和进度，Activity 重建或手动重试不会重复写入；已有文件复用，旧用户只补齐当前版本组件。断网保留临时文件，按 15 秒、60 秒和 5 分钟有限退避；进程结束后下次冷启动续传。设置页可查看进度或重试。
 
-安卓构建使用 `onnxruntime-android` 运行 Smart Turn；sherpa-onnx 使用独立命名的运行库，避免两个版本的原生符号冲突。手动打包工作流在准备 sherpa 库时使用 `patchelf` 设置依赖和 SONAME。针对性验证：`./gradlew :common:community-core:jvmTest --tests '*VoiceAlignmentTest*' --tests '*VoiceActivityTest*' --tests '*VoiceCallTest*' --tests '*SpeechModelsTest*' :common:link-core:jvmTest --tests '*RemoteChatTest*' :androidApp:assembleDebug`；外放回声、打断和手机性能仍需实际设备验收。
+客户端资源只从魔搭下载。SenseVoice 优先使用上游 Sherpa 适配发布仓库 `pengzhendong/sherpa-onnx-sense-voice-zh-en-ja-ko-yue` 的固定提交（已核对大小及 SHA-256），再用小伴镜像；不把转换版称为阿里原始官方模型。Silero、Smart Turn 与当前兼容运行库使用 `bestyize/xiaoban-asr` 镜像。当前未找到可验证且匹配固定版本的微软/Sherpa 官方魔搭原生库分发；以后若新增官方源，核对版本、ABI 和完整哈希后再优先登记，不在用户手机上动态探测任意来源。
+
+资源未齐时保留电脑/云端语音及原有停顿判定，不弹下载询问阻断通话。模型在手机运行，聊天请求仍发到所选服务。Edge 朗读可用时会预备少量简短接话，失败不阻塞对话。
+
+安卓构建保留 `onnxruntime-android` 的 Java 接口，四个语音 `.so` 从 APK 排除。`prepareVoiceRuntime` 使用 Python 3.11+、`patchelf` 准备固定版本的预编译库，不编译 Sherpa/ORT；Sherpa 使用独立 SONAME 避免版本冲突。构建输出为 `androidApp/build/voice-runtime/assets/voice-runtime.json`（随 APK 打包）和 `downloads/*.so`（独立分发）。公开文件名只保留原始库名，不添加 voice、版本或哈希前缀；大小和 SHA-256 保留在清单中。客户端下载到私有缓存，在加载前校验，再按依赖顺序加载；下载失败可取消或续传。
+
+分发方式沿用桌面端：把 `downloads/*.so` 原名上传到魔搭 `bestyize/xiaoban-asr` 的仓库根目录，文件为 `libonnxruntime.so`、`libonnxruntime4j_jni.so`、`libort_sherpa.so`、`libsherpa-onnx-jni.so`。手动 APK 打包工作流通过官方 `modelscope-hub==0.6.1` SDK 同步缺少或不一致的组件；配置仓库 Secret `MODELSCOPE_API_TOKEN`（该魔搭仓库的写权限）。也可事先手动上传；已有文件匹配时跳过上传，无需写入授权。
+
+`publish-voice-runtime.py` 在构建 APK 前核对本地完整哈希及魔搭公开元数据，并记录已验证文件的 Git 提交到 `published-revisions.json`。随后生成的 APK 下载地址固定到对应提交，同名更新不影响旧客户端；保留魔搭仓库的 Git 历史即可，无需在文件名中暴露版本。缺文件、缺写入授权或无法核验提交时停止 APK 发布；客户端清单不含 GitHub 下载源。
+
+组件准备有本地增量检查和 Actions 缓存；Agent Rust 库仍在 APK 内，仍用 Cargo 缓存增量编译。ORT Android 的加载调用由构建时的局部字节码转换接入私有目录加载器，其余推理接口保持上游版本。
+
+针对性验证：`./gradlew :common:community-core:jvmTest --tests '*SpeechModelsTest*' --tests '*DownloadedSpeechRuntimeTest*' :androidApp:assembleDebug`，涵盖冷启动延迟、静默失败退避、后台与设置共用下载、镜像续传、取消、缺库后补下载、依赖加载顺序、校验失败与加载重试。真机上的语音识别、判停、外放回声及打断仍需设备验收。
 
 ## 开发与验证
 
@@ -131,6 +143,16 @@ Android 的社区游戏作品详情、帖子中的本站游戏链接卡片和回
 
 ## 聊天模型思考等级
 
-对话输入栏模型按钮采用与桌面相同的 Lucide Brain 图标。模型选择列表右侧可打开思考等级菜单，仅展示网关声明的等级；选择等级同时选中该模型，默认不传 reasoning_effort。普通流式聊天与手机 Agent 均携带所选等级。当前按模型在应用运行期间记住选择，切换账号清空；尚未按对话持久化。
+对话输入栏模型按钮采用与桌面相同的 Lucide Brain 图标。模型选择列表右侧可打开思考等级菜单，仅展示网关声明的等级；选择等级同时选中该模型，默认不传 reasoning_effort。普通流式聊天与手机 Agent 均携带所选等级。模型和思考等级随对话持久化，切换对话恢复各自选择，旧记录采用默认值。
 
 验证：community-core JVM 测试及 community-native Android 编译通过，新增 ReasoningTest 覆盖请求参数与默认值清除；本轮尚未安装到手机验收。
+
+## 手机 Agent 可靠性对齐（2026-11-02）
+
+手机本地 Agent 默认不再受 25 轮和累计 8 次续跑提示限制，保留重复调用与连续无进展暂停。聊天页锁图标可按对话切换默认/完全信任、查看和撤销授权；删除文件与覆盖已有游戏仍每次确认。右上角任务设置提供上下文及可选执行预算，模型、思考等级、权限与预算随对话保存，旧记录采用安全默认值。切换账号先停止并保存原账号任务，再切换存储目录。
+
+本地工具取消会传到 Kotlin 协程；结果不明时保留复核状态，由用户核对后继续。重试使用内核原记录，已有输出或操作时转为检查状态后继续。手机与纯云聊天都按真实 JSON 大小控制请求，保留当前提问；上下文提供有界历史摘录和原文回读。取消 120/180 秒总流式截止，保留连接及无数据超时。聊天保存失败会保留待写内容并显示“重试保存”，不再删除原文件后静默换名。
+
+Android 缺原生库或 iOS 当前入口会明确显示纯云聊天；原生与宿主需配套更新。持久 todo 继续可用，系统终止后的后台目标恢复、手机通用 Shell 等仍按原阶段边界。
+
+针对性验证：`cargo test --locked --manifest-path libs/agent-mobile/Cargo.toml`（仓库根）；community-core 的 MobileReliabilityTest、MobileCancellationTest、ChatHistoryTest、AgentChatTest、AgentRuntimeTest 和 ReasoningTest；JNI 测试需设置 AGENT_MOBILE_LIB 指向本次编译的原生库，避免跳过。

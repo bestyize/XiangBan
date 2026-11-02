@@ -77,7 +77,7 @@ fn chat_finish(reason: Option<&str>) -> FinishReason {
 
 impl StreamAccumulator {
     /// The last tool call and how much of its arguments has arrived.
-    pub(crate) fn pending_tool_call(&self) -> Option<super::ToolProgress> {
+    pub fn pending_tool_call(&self) -> Option<super::ToolProgress> {
         self.calls.last().map(|call| super::ToolProgress { id: call.id.clone(), name: call.name.clone(), path: super::path_hint(&call.arguments), bytes: call.arguments.len() })
     }
 

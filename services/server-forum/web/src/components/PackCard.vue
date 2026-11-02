@@ -49,8 +49,8 @@ defineProps<{ pack: PackItem; wide?: boolean }>()
 }
 h3 {
   margin: 0;
-  font-size: var(--fs-md);
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 400;
   line-height: 1.4;
   overflow: hidden;
   display: -webkit-box;

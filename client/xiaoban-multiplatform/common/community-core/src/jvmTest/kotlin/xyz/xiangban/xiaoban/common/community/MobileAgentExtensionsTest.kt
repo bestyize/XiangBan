@@ -147,11 +147,18 @@ class MobileAgentExtensionsTest {
             withTimeout(3_000) { entered.await() }
             runtime.stop()
             runtime.ensureStarted("")
-            runtime.run("s1", "new", "r2")
-            outputs.computeIfAbsent(2) { LinkedBlockingQueue() }.put("""{"type":"tool_request","id":"t1","name":"slow","arguments":{}}""")
-            withTimeout(3_000) { while (inputs.none { it.first == 2L && it.second["type"]?.jsonPrimitive?.content == "tool_result" }) delay(10) }
+            assertFailsWith<IllegalStateException> { runtime.run("s1", "new", "r2") }
             release.complete(Unit)
             withTimeout(3_000) { oldFinished.await() }
+            withTimeout(3_000) {
+                var started = false
+                while (!started) {
+                    try { runtime.run("s1", "new", "r2"); started = true }
+                    catch (_: IllegalStateException) { delay(10) }
+                }
+            }
+            outputs.computeIfAbsent(2) { LinkedBlockingQueue() }.put("""{"type":"tool_request","id":"t1","name":"slow","arguments":{}}""")
+            withTimeout(3_000) { while (inputs.none { it.first == 2L && it.second["type"]?.jsonPrimitive?.content == "tool_result" }) delay(10) }
             delay(100)
             val results = inputs.filter { it.second["type"]?.jsonPrimitive?.content == "tool_result" }
             assertEquals(listOf("new"), results.map { it.second["output"]?.jsonPrimitive?.content })

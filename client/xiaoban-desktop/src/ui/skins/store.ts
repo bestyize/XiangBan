@@ -24,8 +24,14 @@ function accept(result: SkinList) {
   activeSkinId.value = result.activeId;
   activeSkin.value = skins.value.find(s => s.id === result.activeId) ?? null;
 }
-export async function refreshSkins() { accept(await invoke<SkinList>('skin_list')); }
-export async function applySkin(id: string | null) { accept(await invoke<SkinList>('skin_apply', { id })); }
+let revision = 0;
+async function update(command: string, args?: Record<string, unknown>) {
+  const request = ++revision;
+  const result = await invoke<SkinList>(command, args);
+  if (request === revision) accept(result);
+}
+export async function refreshSkins() { await update('skin_list'); }
+export async function applySkin(id: string | null) { await update('skin_apply', { id }); }
 export async function importSkin() { const imported = await invoke<Skin | null>('skin_import'); if (imported) await refreshSkins(); return imported; }
-export async function deleteSkin(id: string) { accept(await invoke<SkinList>('skin_delete', { id })); }
+export async function deleteSkin(id: string) { await update('skin_delete', { id }); }
 export async function exportSkin(id: string) { return await invoke<boolean>('skin_export', { id }); }

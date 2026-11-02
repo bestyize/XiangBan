@@ -31,7 +31,7 @@ watch(() => route.fullPath, () => { searchOpen.value = false })
       <nav v-if="communityRoot" class="community-navigation" aria-label="社区栏目"><RouterLink v-for="item in [{key:'home' as const,label:'首页'},{key:'discuss' as const,label:'讨论'},{key:'resources' as const,label:'资源'}]" :key="item.key" :to="destinations[item.key]" :class="{on:section===item.key}" :aria-current="section===item.key?'page':undefined">{{ item.label }}</RouterLink></nav>
       <span v-else class="header-context">{{ title }}</span>
       <div class="header-actions">
-        <button class="header-icon" :aria-expanded="searchOpen" aria-label="搜索社区" @click="search"><AppIcon name="search" /></button>
+        <button class="header-icon" :aria-expanded="searchOpen" aria-label="搜索社区" @click="search"><AppIcon name="search" /><span class="desktop-search-label" aria-hidden="true">搜索社区内容</span></button>
         <button class="header-icon theme-switch" :title="`外观：${THEME_LABEL[preference]}`" :aria-label="`外观与配色，当前${THEME_LABEL[preference]}`" @click="openAppearance"><AppIcon :name="resolved === 'dark' ? 'moon' : 'sun'" :size="20" /></button>
         <RouterLink v-if="session.loggedIn" class="header-icon notification" to="/notifications" :aria-label="inbox.unread ? `通知，${inbox.unread}条未读` : '通知'"><AppIcon name="bell" /><i v-if="inbox.unread" /></RouterLink>
         <button v-else class="header-login" @click="session.loginOpen = true">登录</button>
@@ -53,7 +53,7 @@ watch(() => route.fullPath, () => { searchOpen.value = false })
 .header-actions{margin-left:auto;display:flex;align-items:center;gap:4px}
 .header-icon{border:0;background:none;width:44px;height:44px;display:grid;place-items:center;border-radius:50%;color:var(--ink-2)}.header-icon:hover{background:var(--surface)}
 .header-login{background:var(--surface);border:0;border-radius:22px;padding:0 18px;height:40px;font-size:14px;font-weight:600}
-.notification{position:relative}.notification i{position:absolute;right:10px;top:9px;width:6px;height:6px;border-radius:50%;background:var(--brand)}
+.desktop-search-label{display:none}.notification{position:relative}.notification i{position:absolute;right:10px;top:9px;width:6px;height:6px;border-radius:50%;background:var(--brand)}
 .header-search{display:flex;gap:8px;padding:0 16px 12px;max-width:760px;margin:auto}.header-search input{min-width:0;flex:1;border:0;border-radius:12px;background:var(--surface);height:44px;padding:0 14px;font-size:16px}
 @media(min-width:1024px){.header-brand{display:none}.header-brand+.header-context{display:block}}
 @media(max-width:767px){.header-inner{height:56px;padding:0 12px}.header-brand{font-size:16px}.header-actions{gap:0}.header-icon{width:40px}.header-login{padding:0 14px}.theme-switch{display:none}}

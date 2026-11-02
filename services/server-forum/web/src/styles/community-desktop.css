@@ -1,0 +1,116 @@
+/* Public community desktop layout. Keep mobile and admin styles independent. */
+@media (min-width: 1024px) {
+  .site-layout.community-layout {
+    --page-w: 1320px;
+    --header-h: 68px;
+    padding-left: 200px;
+    background: color-mix(in srgb, var(--surface) 72%, var(--paper));
+  }
+  .site-layout.community-layout .app-main { padding: 20px 32px 40px; }
+  .site-layout.community-layout:not(.community-root) .app-main { --page-w: 1080px; }
+  .site-layout.community-layout .app-footer { padding: 20px 32px 24px; font-size: 12px; }
+  .site-layout.community-layout .community-page { max-width: none; }
+
+  /* Navigation: a quiet rail, a distinct publish action and an aligned header. */
+  .site-layout.community-layout .primary-nav { width: 200px; padding: 28px 16px 20px; border-right: 1px solid var(--line); }
+  .site-layout.community-layout .nav-brand { font-size: 18px; padding: 0 8px 36px; gap: 9px; letter-spacing: -.02em; }
+  .site-layout.community-layout .nav-brand svg { width: 28px; height: 28px; }
+  .site-layout.community-layout .nav-items { gap: 6px; }
+  .site-layout.community-layout .nav-item, .site-layout.community-layout .nav-publish { min-height: 44px; padding: 0 14px; border-radius: 10px; font-size: 14px; gap: 12px; }
+  .site-layout.community-layout .nav-publish { margin-top: 24px; justify-content: center; border: 0; background: var(--brand-fill); color: var(--brand-ink); font-weight: 600; }
+  .site-layout.community-layout .nav-publish:hover { background: var(--brand-hover); }
+  .site-layout.community-layout .nav-bottom { padding: 24px 8px 0; font-size: 12px; gap: 4px; }
+  .site-layout.community-layout .nav-bottom>div { gap: 10px; padding-top: 12px; margin-top: 10px; border-top: 1px solid var(--line); }
+  .site-layout.community-layout .site-header { background: var(--surface); border-bottom: 1px solid var(--line); backdrop-filter: none; }
+  .site-layout.community-layout .header-inner { height: 68px; padding: 0 32px; }
+  .site-layout.community-layout .community-navigation { flex: none; justify-content: flex-start; gap: 32px; height: 68px; }
+  /* Equal side tracks keep the navigation centered when account actions change width. */
+  .site-layout.community-layout .community-header .header-inner { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 16px; }
+  .site-layout.community-layout .community-header .community-navigation { grid-column: 2; grid-row: 1; justify-content: center; }
+  .site-layout.community-layout .community-header .header-actions { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; min-width: 0; }
+  .site-layout.community-layout .community-navigation a { font-size: 15px; }
+  .site-layout.community-layout .community-navigation a.on:after { bottom: 0; width: 22px; }
+  .site-layout.community-layout .header-actions { gap: 10px; }
+  .site-layout.community-layout .header-icon { width: 36px; height: 36px; }
+  .site-layout.community-layout .header-icon[aria-label="搜索社区"] { width: 204px; display: flex; justify-content: flex-start; gap: 10px; padding: 0 12px; border-radius: 8px; background: var(--surface-2); color: var(--ink-3); }
+  .site-layout.community-layout .header-icon[aria-label="搜索社区"] svg { width: 18px; height: 18px; flex: none; }
+  .site-layout.community-layout .desktop-search-label { display: block; font-size: 12px; }
+  .site-layout.community-layout .header-login { height: 34px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 16px; font-size: 13px; }
+  .site-layout.community-layout .header-search { max-width: var(--page-w); padding: 4px 32px 16px; }
+  .site-layout.community-layout .header-search input { height: 40px; border: 1px solid var(--line); border-radius: 8px; font-size: 14px; background: var(--surface-2); }
+
+  /* Secondary tabs are visually distinct from the three primary community sections. */
+  .site-layout.community-layout .community-tabs { justify-content: flex-start; gap: 6px; background: none; padding: 0; margin-bottom: 20px; border-bottom: 0; }
+  .site-layout.community-layout .community-tabs button { min-height: 36px; padding: 6px 14px; border-radius: 8px; font-size: 14px; transition: background .15s, color .15s; }
+  .site-layout.community-layout .community-tabs button:hover { background: var(--surface); }
+  .site-layout.community-layout .community-tabs button.on { background: var(--brand-soft); color: var(--brand); }
+  .site-layout.community-layout .community-tabs button.on:after { display: none; }
+  .site-layout.community-layout .community-tabs+.community-tabs { margin-top: -8px; }
+  /* Center only the section tabs; filter/sort rows keep their content alignment. */
+  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); column-gap: 16px; overflow: visible; }
+  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type>.community-tab-items { grid-column: 2; grid-row: 1; }
+  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type>.community-tab-actions { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; }
+
+
+  /* Discovery: three editorial stories, then a news column and compact supporting content. */
+  .site-layout.community-layout .home-page .recommend-feed { gap: 20px; padding-top: 0; }
+  .site-layout.community-layout .home-card, .site-layout.community-layout .daily-section { min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 8px 20px 16px; }
+  .site-layout.community-layout .section-heading { min-height: 48px; margin-bottom: 4px; }
+  .site-layout.community-layout .section-heading h2 { font-size: 16px; letter-spacing: -.02em; }
+  .site-layout.community-layout .section-heading>a:hover, .site-layout.community-layout .section-heading>button:hover { color: var(--brand); }
+  .site-layout.community-layout .daily-section>.section-heading { padding: 0; }
+  .site-layout.community-layout .home-page .news-grid>:last-child:nth-child(odd) { grid-column: auto; }
+  .site-layout.community-layout .daily-section .news-grid { grid-template-columns: minmax(0,1fr); gap: 0; }
+  .site-layout.community-layout .daily-section .news-row { padding: 18px 0; min-height: 110px; gap: 18px; border-radius: 0; border-bottom: 1px solid var(--line); background: none; }
+  .site-layout.community-layout .daily-section .news-row:last-child { border-bottom: 0; padding-bottom: 4px; }
+  .site-layout.community-layout .daily-section .news-row h3 { font-size: 16px; line-height: 1.6; margin-bottom: 10px; }
+  .site-layout.community-layout .daily-section .news-row img { width: 124px; height: 84px; border-radius: 8px; }
+  .site-layout.community-layout .news-row:hover h3 { color: var(--brand); }
+  .site-layout.community-layout .banner-card { border: 1px solid var(--line); border-radius: 12px; }
+
+  /* Shared spacing for discussion, tools, documents and article reading. */
+  .site-layout.community-layout .desktop-feed-heading { padding: 16px 0 10px; }
+  .site-layout.community-layout .desktop-feed-heading.meta-only { padding: 0 0 8px; min-height: 0; justify-content: flex-end; }
+  .site-layout.community-layout .resource-feed, .site-layout.community-layout .pack-grid, .site-layout.community-layout .topic-feed { padding-inline: 0; gap: 16px; }
+  .site-layout.community-layout .filter-row { padding-inline: 0; }
+  .site-layout.community-layout .tool-card, .site-layout.community-layout .doc-group, .site-layout.community-layout .scheme-card, .site-layout.community-layout .topic-card { border: 1px solid var(--line); border-radius: 12px; transition: border-color .15s, background .15s; }
+  .site-layout.community-layout .tool-card:hover, .site-layout.community-layout .scheme-card:hover, .site-layout.community-layout .topic-card:hover { border-color: var(--line-strong); }
+  .site-layout.community-layout .resource-note { margin-left: 0; margin-right: 0; }
+  .site-layout.community-layout .community-detail { max-width: 880px; margin-inline: auto; border: 1px solid var(--line); border-radius: 14px; padding: 28px 32px; }
+  .site-layout.community-layout .community-detail .prose { max-width: 72ch; margin-inline: auto; font-size: 16px; line-height: 1.9; }
+}
+
+@media (min-width: 1024px) {
+  @container page (min-width: 960px) {
+    .site-layout.community-layout .home-page .recommend-feed { grid-template-columns: minmax(0,1fr) 320px; gap: 20px; align-items: start; }
+    .site-layout.community-layout .home-page .banner-strip, .site-layout.community-layout .frontier-section { grid-column: 1/-1; }
+    .site-layout.community-layout .frontier-section .news-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 20px; }
+    .site-layout.community-layout .frontier-section .news-row { flex-direction: column-reverse; align-items: stretch; justify-content: flex-end; gap: 12px; padding: 0; min-height: 0; border-radius: 8px; background: none; }
+    .site-layout.community-layout .frontier-section .news-copy { flex: 1; }
+    .site-layout.community-layout .frontier-section .news-row h3 { font-size: 16px; line-height: 1.6; margin-bottom: 10px; }
+    .site-layout.community-layout .frontier-section .news-row img { width: 100%; height: auto; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; }
+    .site-layout.community-layout .daily-section { grid-column: 1; grid-row: span 3; }
+    .site-layout.community-layout .featured-card, .site-layout.community-layout .repo-preview { grid-column: 2; padding: 8px 16px 16px; }
+    .site-layout.community-layout .featured-strip { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 12px; overflow: visible; padding-top: 0; }
+    .site-layout.community-layout .featured-strip .pack-card { min-width: 0; max-width: none; background: none; }
+    .site-layout.community-layout .featured-strip .pack-card:nth-child(n+5) { display: none; }
+    .site-layout.community-layout .featured-strip .pack-card .cover { aspect-ratio: 16/9; border-radius: 8px; }
+    .site-layout.community-layout .featured-strip .pack-card img { height: 100%; object-fit: contain; border-radius: 8px; background: var(--surface-2); }
+    .site-layout.community-layout .featured-strip .copy { padding: 8px 0 0; }
+    .site-layout.community-layout .featured-strip h3 { font-size: 13px; line-height: 1.5; }
+    .site-layout.community-layout .repo-note { font-size: 11px; }
+    .site-layout.community-layout .repo-preview .repo-link { gap: 8px; }
+    .site-layout.community-layout .repo-preview .external { display: none; }
+    .site-layout.community-layout .repo-preview .repo-meta { padding-left: 30px; }
+    .site-layout.community-layout .sample-note { grid-column: 1/-1; font-size: 12px; }
+  }
+}
+@media (min-width: 1600px) {
+  .site-layout.community-layout .app-main, .site-layout.community-layout .app-footer, .site-layout.community-layout .header-inner { padding-left: 40px; padding-right: 40px; }
+}
+
+/* Compact the search affordance before it can crowd the centered navigation. */
+@media (min-width: 1024px) and (max-width: 1199px) {
+  .site-layout.community-layout .community-header .header-icon[aria-label="搜索社区"] { width: 36px; padding: 0; justify-content: center; }
+  .site-layout.community-layout .community-header .desktop-search-label { display: none; }
+}

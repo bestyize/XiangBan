@@ -2,6 +2,10 @@
 
 ## 应用皮肤（第一版）
 
+对话中可让小伴查看皮肤、切换为「江南烟雨」等内置 / 已安装皮肤，或恢复默认。创作皮肤先通过内置 `skin_read_format` 读取真实规范，再用 `skin_create` 从生图编号、工作区栅格图片或完整图层草稿生成并校验 ZIP，安装到「装扮 → 皮肤」，同时在当前工作区交付 ZIP；无需用户提供模板。创建只安装、不应用；用户要求换肤时才使用 `skin_apply`，已有自制皮肤可用 `skin_export` 导出。聊天工具与页面操作共享解析、存储和通知，主界面收到变更后刷新，旧列表响应不会覆盖新选择。`theme.json` 配色仍未启用，场景皮肤与明暗模式、主题色分别管理。
+
+针对性验证：`npx vitest run src/ui/skins/store.test.ts src/ui/pages/SkinsPage.test.ts src/ui/control-store.test.ts src/ui/ControlShell.test.ts`，以及 `cargo test --locked --manifest-path src-tauri/Cargo.toml skin`。原生窗口即时刷新仍需在 Windows / macOS 安装包验收。
+
 「装扮 → 皮肤」可选择内置春江花月夜、江南烟雨、海边列车，或导入 ZIP、预览、应用、导出及删除；恢复默认保留原有主题。皮肤持续显示在侧栏与各页面背景；新建任务页右侧不叠加半透明白色蒙层，其他页面保留淡色内容底层，具体卡片和输入区保留自己的内容面；场景互动只在新建任务页启用。皮肤包只接受声明式配置与本地图片，不运行 HTML、CSS 或 JavaScript；首版图层使用固定锚点，支持轻摆、发光及点击 / 悬停触发，暂不支持帧动画、粒子、皮肤配色和独立窗口场景。原生端限定包大小、格式和图像解码，导入不会自动应用。体验与格式仍在完善，见 [皮肤设计提案](docs/design-specs/application-skins.md)。
 
 

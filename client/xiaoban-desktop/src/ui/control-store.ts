@@ -82,7 +82,7 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
         widget: '帮我创作一个桌面小组件：',
         game: '帮我创作一款小游戏：',
         pet: '帮我创作一个桌面宠物主题。先读取 pet_read_format：',
-        skin: '帮我创作一套小伴界面皮肤，制作可导入的皮肤 ZIP 包。我的想法是：',
+        skin: '帮我创作一套小伴界面皮肤。先读取 skin_read_format，再用 skin_create 制作并校验可导入的 ZIP，保存到皮肤页，保留当前皮肤。我的想法是：',
       };
       // With nothing open the draft goes to 新建任务; with a conversation open it starts a new one on the chat page as before.
       const hadConversation = !!store.chat.currentId;

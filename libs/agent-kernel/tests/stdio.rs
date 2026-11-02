@@ -188,7 +188,9 @@ fn observed_mode_exposes_run_identity_states_and_a_tool_budget_without_changing_
     assert!(!lines.iter().any(|line|line["type"]=="event"));
     let records:Vec<_>=lines.iter().filter(|line|line["type"]=="run_event").map(|line|&line["record"]).collect();
     assert_eq!(records.first().unwrap()["state"],"running");
-    assert_eq!(records.last().unwrap()["state"],"paused");
+    // Terminal state precedes the final Error event; inspect state records explicitly.
+    assert_eq!(records.iter().rev().find(|r| r.get("state").is_some()).unwrap()["state"],"paused");
+    assert_eq!(records.last().unwrap()["event"]["type"],"error");
     for (i,record) in records.iter().enumerate() {
         assert_eq!(record["sequence"],i as u64+1);
         assert_eq!(record["run_id"],end["run_id"]);

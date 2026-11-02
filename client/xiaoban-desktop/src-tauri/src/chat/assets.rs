@@ -82,12 +82,16 @@ fn switched(message: &Message) -> Option<(PathBuf, PathBuf)> {
 }
 fn outputs(messages: &[Message], workspace: &Path) -> Vec<(PathBuf, Option<String>)> {
     let mut calls = HashMap::new();
+    let mut skin_calls = HashMap::new();
     let mut paths = vec![];
     let mut active = messages.iter().find_map(switched).map(|(_,before)| before).unwrap_or_else(||workspace.to_path_buf());
     for message in messages {
         if let Some((after,_)) = switched(message) { active = after; continue; }
         if message.role == Role::Assistant {
             for call in &message.tool_calls {
+                if matches!(call.name.as_str(), "skin_create"|"skin_export") {
+                    skin_calls.insert(call.id.clone(), active.clone());
+                }
                 if matches!(call.name.as_str(), "write_file"|"edit_file") {
                     if let Ok(args) = serde_json::from_str::<Value>(&call.arguments) {
                         if let Some(path) = args["path"].as_str().and_then(|p| output_path(&active, p)) { calls.insert(call.id.clone(), path); }
@@ -102,6 +106,13 @@ fn outputs(messages: &[Message], workspace: &Path) -> Vec<(PathBuf, Option<Strin
             }
         }
         if message.role == Role::Tool && !message.is_error {
+            if let Some((id, root)) = message.tool_call_id.as_ref().and_then(|id| skin_calls.remove(id).map(|root| (id.clone(), root))) {
+                if let Ok(result) = serde_json::from_str::<Value>(&message.text()) {
+                    if let Some(path) = result["packagePath"].as_str().and_then(|p| output_path(&root, p)) {
+                        paths.push((path, Some(id)));
+                    }
+                }
+            }
             if let Some((id, path)) = message.tool_call_id.as_ref().and_then(|id| calls.remove(id).map(|path| (id.clone(), path))) { paths.push((path, Some(id))); }
         }
     }
@@ -278,6 +289,19 @@ mod tests {
         let t=Temp::new();let call=|id:&str,name:&str|agent_kernel::ToolCall{id:id.into(),name:name.into(),arguments:r#"{"path":"report.md"}"#.into()};
         let messages=vec![Message::user_text("[私人文件](secret.txt)"),Message::assistant("",vec![call("w","write_file"),call("r","read_file"),call("e","edit_file")]),Message::tool("w","ok"),Message::tool("r","read"),{let mut m=Message::tool("e","failed");m.is_error=true;m},Message::assistant("[文件夹](delivery) [外链](https://example.com) [越界](../secret)",vec![])];
         let out=outputs(&messages,&t.0);assert_eq!(out.len(),2);assert_eq!(out[0].1.as_deref(),Some("w"));assert!(out[1].0.ends_with("delivery"));
+    }
+    #[test]
+    fn skin_zip_deliveries_are_discovered_without_a_final_markdown_link() {
+        let t=Temp::new();
+        let call=|id:&str,name:&str|agent_kernel::ToolCall{id:id.into(),name:name.into(),arguments:"{}".into()};
+        let result=json!({"packagePath":t.0.join("skin-earth.zip").display().to_string()}).to_string();
+        let mut failed=Message::tool("failed", &result);failed.is_error=true;
+        let messages=vec![Message::assistant("",vec![call("create","skin_create"),call("export","skin_export"),call("read","skin_list"),call("failed","skin_create"),call("outside","skin_export")]),Message::tool("create",&result),Message::tool("export",&result),Message::tool("read",&result),failed,Message::tool("outside",r#"{"packagePath":"../secret.zip"}"#)];
+        let out=outputs(&messages,&t.0);
+        assert_eq!(out.len(),2);
+        assert!(out.iter().all(|(path,_)|path.ends_with("skin-earth.zip")));
+        assert_eq!(out[0].1.as_deref(),Some("create"));
+        assert_eq!(out[1].1.as_deref(),Some("export"));
     }
     #[test]
     fn folders_own_their_descendants_without_double_counting() {
