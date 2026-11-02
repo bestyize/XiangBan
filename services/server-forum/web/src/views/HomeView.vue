@@ -82,7 +82,7 @@ useHead(() => ({ title: '社区' }))
   .featured-strip{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;overflow:visible}
   .featured-strip :deep(.pack-card){min-width:0;max-width:none}
   .featured-strip :deep(.pack-card:nth-child(n+5)){display:none}
-  .featured-strip :deep(.pack-card img){height:100px;aspect-ratio:auto}
+  .featured-strip :deep(.pack-card img){height:100%;aspect-ratio:auto}
   .featured-strip :deep(.copy){padding:10px 12px}
   .featured-strip :deep(h3){font-size:14px;line-height:1.5}
   .repo-preview :deep(.repo-link){gap:8px}
@@ -90,5 +90,13 @@ useHead(() => ({ title: '社区' }))
   .repo-preview :deep(.repo-meta){padding-left:30px}
   .sample-note{grid-column:2;font-size:12px;line-height:1.6}
 }
+}
+
+
+@media(max-width:767px){
+ .frontier-section .news-grid{grid-auto-flow:column;grid-auto-columns:84%;grid-template-columns:none;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:6px}
+ .frontier-section .news-grid>:last-child:nth-child(odd){grid-column:auto}
+ .frontier-section :deep(.news-row){scroll-snap-align:start}
+ .frontier-section :deep(.layout-visual h3){font-size:15px}
 }
 </style>

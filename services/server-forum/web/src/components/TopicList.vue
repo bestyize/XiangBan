@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import type { TopicItem } from '@/api/types'
-import TopicRow from './TopicRow.vue'
+import ResourceTopicRow from './community/ResourceTopicRow.vue'
+import type { ArticleLayout } from '@/lib/cardPresentation'
+import MasonryGrid from './community/MasonryGrid.vue'
 
-withDefaults(defineProps<{ items: TopicItem[]; loading?: boolean; showCategory?: boolean; empty?: string }>(), {
+withDefaults(defineProps<{ items: TopicItem[]; loading?: boolean; showCategory?: boolean; empty?: string; presentation?: ArticleLayout }>(), {
   showCategory: true,
+  presentation:'reading',
 })
 </script>
 
 <template>
-  <div class="list" :aria-busy="loading">
-    <template v-if="items.length">
-      <TopicRow v-for="t in items" :key="t.id" :topic="t" :show-category="showCategory" />
+  <div class="list" :class="`feed-${presentation}`" :aria-busy="loading">
+    <MasonryGrid v-if="items.length && presentation==='masonry'" :columns="2"><ResourceTopicRow v-for="t in items" :key="t.id" :topic="t" :show-category="showCategory" layout="masonry" /></MasonryGrid>
+    <template v-else-if="items.length">
+      <ResourceTopicRow v-for="t in items" :key="t.id" :topic="t" :show-category="showCategory" :layout="presentation" />
     </template>
     <div v-else-if="loading" class="skeleton" aria-label="加载中">
       <div v-for="i in 5" :key="i" class="bar" />
@@ -23,12 +27,9 @@ withDefaults(defineProps<{ items: TopicItem[]; loading?: boolean; showCategory?:
 
 <style scoped>
 /* 平铺列表：没有外框和圆角，只有行与行之间的细线。 */
-.list {
-  border-top: 1px solid var(--line);
-}
-.list > :deep(*) {
-  border-bottom: 1px solid var(--line);
-}
+.list { display:grid; gap:12px; }
+.feed-visual { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.empty,.skeleton { grid-column:1/-1; }
 .list > :deep(.empty),
 .list > :deep(.skeleton) {
   border-bottom: 0;

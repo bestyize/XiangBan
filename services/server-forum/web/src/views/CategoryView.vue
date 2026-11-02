@@ -12,6 +12,8 @@ import { requiredPostLevel } from '@/lib/format'
 import { useTopicList } from '@/lib/useList'
 import { useHead } from '@/lib/head'
 import { tagLabel } from '@/lib/format'
+import { articleLayout } from '@/lib/cardPresentation'
+import { canonicalCategory } from '@/lib/communityStructure'
 
 const route = useRoute()
 const router = useRouter()
@@ -101,7 +103,7 @@ function compose() {
 
     <p v-if="meta.categories.length && !category" class="panel missing">这个分类不存在，可能已经被合并或改名。</p>
     <template v-else>
-      <TopicList :items="list.items.value" :loading="list.loading.value" :show-category="!parent">
+      <TopicList :items="list.items.value" :loading="list.loading.value" :show-category="!parent" :presentation="articleLayout(canonicalCategory(slug))">
         <template #empty>
           <p>这个分类还没有帖子。</p>
           <button v-if="composeTarget" type="button" class="btn btn-sm" @click="compose">发第一帖</button>

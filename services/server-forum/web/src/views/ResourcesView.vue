@@ -12,6 +12,7 @@ import vendorManifest from '../../public/vendor-logos/manifest.json'
 import legacyVendors from '../../public/vendor-logos/legacy.json'
 import RequestState from '@/components/community/RequestState.vue'
 import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
+import MasonryGrid from '@/components/community/MasonryGrid.vue'
 import EditorialArticles from '@/components/community/EditorialArticles.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { useCommunityResource } from '@/components/community/resource'
@@ -58,7 +59,7 @@ useHead(() => ({ title:'资源' }))
     <RequestState :loading="loading" :error="error" @retry="load" />
     <template v-if="data?.kind === 'tools'"><div class="desktop-feed-heading meta-only"><h2 class="sr-only">AI 工具</h2><span>{{ data.items.length }} 款工具</span></div><div class="resource-feed tool-grid"><RouterLink v-for="tool in data.items" :key="tool.key" :to="`/tools/${encodeURIComponent(tool.key)}`" class="tool-card"><span class="tool-icon"><img v-if="webLink(tool.icon_url) && !brokenIcons.includes(tool.key)" :src="webLink(tool.icon_url)" alt="" loading="lazy" @error="brokenIcons.push(tool.key)"><ResourceToolIcon v-else :name="tool.name" :fallback="toolBrand(tool)" /></span><span class="tool-body"><strong>{{ tool.name }} <span v-if="tool.sample" class="sample">示例</span></strong><span class="tool-meta"><span class="license">{{ licenseLabel(tool.license) }}</span><span v-if="tool.latest_version">{{ tool.latest_version }}</span><span v-if="tool.latest_date">{{ tool.latest_date }} 更新</span><span v-if="tool.type_label">{{ tool.type_label }}</span></span></span><span class="arrow" aria-hidden="true">›</span></RouterLink></div><RequestState :empty="!data.items.length" /></template>
     <template v-else-if="data?.kind === 'docs'"><div class="desktop-feed-heading meta-only"><h2 class="sr-only">资料索引</h2><span>{{ data.groups.length }} 个文档分组</span></div><div class="resource-feed doc-grid"><section v-for="group in data.groups" :key="group.name" class="doc-group"><header><span class="doc-icon"><RankingVendor :name="group.name" /></span><h2>{{ group.name || '资料' }}</h2><span>{{ group.items.length }} 篇</span></header><template v-for="doc in group.items" :key="doc.key"><a v-if="webLink(doc.url)" :href="webLink(doc.url)" class="doc-row" target="_blank" rel="noopener noreferrer"><span>{{ doc.title }} <span v-if="doc.sample" class="sample">示例</span></span><span aria-hidden="true">↗</span></a></template></section></div><RequestState :empty="!data.groups.length" /></template>
-    <template v-else-if="data?.kind === 'topics'"><div class="desktop-feed-heading meta-only"><h2 class="sr-only">{{ sectionTitle }}</h2><span>共 {{ data.result.total.toLocaleString('zh-CN') }} 条</span></div><div class="resource-feed topic-grid" :class="`feed-${tab}`"><ResourceTopicRow v-for="topic in data.result.items" :key="topic.id" :topic="topic" :mode="tab === 'media' ? 'media' : tab === 'help' ? 'help' : 'open'" /></div><RequestState :empty="!data.result.items.length" /><PagerNav :page="data.result.page" :page-size="data.result.page_size" :total="data.result.total" @go="go" /></template>
+    <template v-else-if="data?.kind === 'topics'"><div class="desktop-feed-heading meta-only"><h2 class="sr-only">{{ sectionTitle }}</h2><span>共 {{ data.result.total.toLocaleString('zh-CN') }} 条</span></div><MasonryGrid v-if="tab === 'media'" class="resource-feed media-feed" :columns="2"><ResourceTopicRow v-for="topic in data.result.items" :key="topic.id" :topic="topic" mode="media" layout="masonry" /></MasonryGrid><div v-else class="resource-feed topic-grid" :class="`feed-${tab}`"><ResourceTopicRow v-for="topic in data.result.items" :key="topic.id" :topic="topic" :layout="tab === 'help' ? 'reading' : 'visual'" :mode="tab === 'media' ? 'media' : tab === 'help' ? 'help' : 'open'" /></div><RequestState :empty="!data.result.items.length" /><PagerNav :page="data.result.page" :page-size="data.result.page_size" :total="data.result.total" @go="go" /></template>
   </main>
 </template>
 <style scoped>
@@ -68,4 +69,8 @@ useHead(() => ({ title:'资源' }))
  .desktop-feed-heading{display:flex;align-items:baseline;justify-content:space-between;padding:20px 12px 2px}.desktop-feed-heading h2{font-size:17px;margin:0}.desktop-feed-heading span{font-size:12px;color:var(--ink-3)}
  .resource-feed{gap:12px}.tool-grid,.doc-grid,.topic-grid{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.tool-card{min-height:96px;padding:16px 18px}.doc-group{padding:18px}.doc-group header{margin-bottom:8px}.topic-grid :deep(.topic-card){height:100%;padding:18px}.resource-note{margin-top:14px}
 }
+
+
+.topic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.topic-grid.feed-help{grid-template-columns:minmax(0,1fr)}.topic-grid :deep(.topic-card.visual-card),.media-feed :deep(.topic-card.visual-card){padding:0}.doc-row{line-height:1.65}
+@media(min-width:640px){.tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>

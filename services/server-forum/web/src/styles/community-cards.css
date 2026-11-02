@@ -1,0 +1,31 @@
+/* Shared card typography at every breakpoint; article/section headings keep their hierarchy. */
+.site-layout.community-layout .community-page :is(.topic-card,.pack-card,.news-row,.repo-card,.track-card,.scheme-card) h3,
+.site-layout.community-layout .community-page .scheme-card>strong,
+.site-layout.community-layout .community-page .tool-card .tool-body>strong,
+.site-layout.community-layout .community-page .nav-grid .name {
+  font-size:14px;
+  font-weight:400;
+  line-height:1.6;
+  display:-webkit-box;
+  -webkit-box-orient:vertical;
+  -webkit-line-clamp:var(--title-lines,2);
+  overflow:hidden;
+  overflow-wrap:anywhere;
+  white-space:normal;
+}
+.site-layout.community-layout .community-page :is(.topic-card,.pack-card,.news-row,.repo-card,.scheme-card) :is(.meta,.counts,.tag,.flag,.author,.author-name,.kind,.cover-kind,.news-meta,.repo-meta,time,small),
+.site-layout.community-layout .community-page .tool-card :is(.tool-meta,.license,.sample),
+.site-layout.community-layout .community-page .track-card :is(.tags,.launch-top,.deadline,.days,.sample),
+.site-layout.community-layout .community-page .nav-grid small {
+  font-size:12px;
+  font-weight:400;
+}
+/* These selectors override the older desktop feature-story sizes as well. */
+.site-layout.community-layout .frontier-section .news-row h3,
+.site-layout.community-layout .daily-section .news-row h3,
+.site-layout.community-layout .home-page .news-grid .news-row h3,
+.site-layout.community-layout .featured-strip .pack-card h3 {
+  font-size:14px;
+  font-weight:400;
+  -webkit-line-clamp:2;
+}
