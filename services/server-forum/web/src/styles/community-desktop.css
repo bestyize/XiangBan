@@ -46,6 +46,11 @@
   .site-layout.community-layout .community-tabs button.on { background: var(--brand-soft); color: var(--brand); }
   .site-layout.community-layout .community-tabs button.on:after { display: none; }
   .site-layout.community-layout .community-tabs+.community-tabs { margin-top: -8px; }
+  /* Center only the section tabs; filter/sort rows keep their content alignment. */
+  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); column-gap: 16px; overflow: visible; }
+  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type>.community-tab-items { grid-column: 2; grid-row: 1; }
+  .site-layout.community-layout.community-root .community-page>.community-tabs:first-of-type>.community-tab-actions { grid-column: 3; grid-row: 1; justify-self: end; margin-left: 0; }
+
 
   /* Discovery: three editorial stories, then a news column and compact supporting content. */
   .site-layout.community-layout .home-page .recommend-feed { gap: 20px; padding-top: 0; }
