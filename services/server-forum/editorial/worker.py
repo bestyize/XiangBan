@@ -360,11 +360,16 @@ def collect_index(db,config,agent,source):
                 if url not in visited and url not in pages:pages.append(url)
                 continue
             if source.get('prefixes') and not any(p.path.startswith(prefix) for prefix in source['prefixes']):continue
+            if source.get('path_suffixes') and not any(p.path.endswith(suffix) for suffix in source['path_suffixes']):continue
             if source.get('keywords') and not any(k.lower() in (title+' '+p.path).lower() for k in source['keywords']):continue
             if p.path.lower().endswith(('.png','.jpg','.pdf','.zip','.svg','.mp4')):continue
             if source.get('github_raw') and p.hostname=='github.com' and '/blob/' in p.path:
                 parts=p.path.strip('/').split('/')
                 if len(parts)>=5 and parts[2]=='blob':url='https://raw.githubusercontent.com/'+'/'.join(parts[:2]+parts[3:])
+            if source.get('drop_query'):
+                parsed=urllib.parse.urlsplit(url)
+                query=urllib.parse.urlencode([(k,v) for k,v in urllib.parse.parse_qsl(parsed.query,keep_blank_values=True) if k not in source['drop_query']])
+                url=urllib.parse.urlunsplit(parsed._replace(query=query))
             url=canonical(url,preserve_slash=True)
             if canonical(url)==canonical(source['url']) or url in seen:continue
             seen.add(url);enqueue(db,agent['id'],url,title or p.path.rsplit('/',1)[-1])
