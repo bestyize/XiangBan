@@ -1,0 +1,22 @@
+[Unit]
+Description=Xiaoban initial editorial fill with bounded parallelism
+After=network-online.target server-forum.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xiaoban-editorial
+Group=xiaoban-editorial
+WorkingDirectory=/opt/xiaoban-editorial
+ExecStart=/usr/bin/python3 /opt/xiaoban-editorial/worker.py fill --parallel 8 --target 20
+StateDirectory=xiaoban-editorial
+StateDirectoryMode=0700
+UMask=0077
+TimeoutStopSec=300
+Nice=10
+MemoryMax=512M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

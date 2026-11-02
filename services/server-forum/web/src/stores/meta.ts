@@ -2,6 +2,7 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/forum'
 import type { Category } from '@/api/types'
+import { CATEGORY_ALIASES } from '@/lib/communityStructure'
 
 export interface CategoryNode extends Category {
   children: Category[]
@@ -19,7 +20,11 @@ export const useMeta = defineStore('meta', () => {
     return roots.map(r => ({ ...r, children: categories.value.filter(c => c.parent_id === r.id) }))
   })
 
-  const bySlug = computed(() => new Map(categories.value.map(c => [c.slug, c])))
+  const bySlug = computed(() => {
+    const map = new Map(categories.value.map(c => [c.slug, c]))
+    for (const [old, name] of Object.entries(CATEGORY_ALIASES)) { const category=map.get(name); if(category) map.set(old,category) }
+    return map
+  })
   const byId = computed(() => new Map(categories.value.map(c => [c.id, c])))
 
   function load(force = false) {

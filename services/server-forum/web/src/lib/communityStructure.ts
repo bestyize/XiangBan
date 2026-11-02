@@ -1,10 +1,17 @@
-/** 当前网页栏目与既有内容来源的映射；后端分类标识仍用于兼容旧帖子和客户端。 */
+import channels from '../../../editorial/channels.json'
+/** 当前栏目是唯一分类树；旧 slug 仅作为输入别名。 */
+export function canonicalCategory(slug:string) { return (channels.aliases as Record<string,string>)[slug] || slug }
+export const CATEGORY_ALIASES = channels.aliases as Record<string,string>
 export const DISCUSSION_TABS = [{key:'create',label:'创作'},{key:'learn',label:'学习和教程'},{key:'casual',label:'休闲'}]
 export const LEARN_FILTERS = [{key:'',label:'全部'},{key:'claude-code',label:'Claude Code'},{key:'codex',label:'Codex'},{key:'提示词',label:'提示词'},{key:'工作流',label:'工作流'},{key:'本地部署',label:'本地部署'},{key:'ai-硬件',label:'AI 硬件'}]
 export const RESOURCE_TABS = [{key:'tools',label:'AI 工具'},{key:'docs',label:'资料'},{key:'media',label:'影音娱乐'},{key:'help',label:'求助悬赏'},{key:'open',label:'开源精选'}]
-export const LEARN_CATEGORIES = 'tech,share-learn'
+export const LEARN_CATEGORIES = 'learn'
+export function learnCategory(filter:string) {
+  return ({'claude-code':'learn-claude-code',codex:'learn-codex','提示词':'learn-prompts','工作流':'learn-workflows','本地部署':'learn-local','ai-硬件':'learn-hardware'} as Record<string,string>)[filter] || 'learn'
+}
+export function creationCategory(filter:string) { return filter ? `create-${filter}` : 'create' }
 
 export function resourceTopicCategory(tab:string, filter:string):string {
-  if (tab === 'media') return filter === 'music' ? 'share-music' : filter === 'movies' ? 'share-movies' : 'share-movies,share-music'
-  return tab === 'help' ? 'share-help' : 'share-software'
+  if (tab === 'media') return filter === 'music' ? 'resource-music' : filter === 'movies' ? 'resource-movies' : 'resource-movies,resource-music'
+  return tab === 'help' ? 'resource-help' : tab === 'tools' ? 'resource-tools' : tab === 'docs' ? 'resource-docs' : 'resource-open'
 }

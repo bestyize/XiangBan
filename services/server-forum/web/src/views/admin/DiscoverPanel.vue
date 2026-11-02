@@ -177,7 +177,7 @@ async function loadTokens() {
 }
 async function createToken() {
   busy.value = true
-  await perform(async () => { issuedToken.value = (await adminApi.createDiscoverToken({ ...tokenForm, publish_kinds: tokenForm.kinds.includes('frontier') ? tokenForm.publish_kinds : [] })).token; await loadTokens() }, '令牌已创建，仅此一次显示')
+  await perform(async () => { issuedToken.value = (await adminApi.createDiscoverToken({ ...tokenForm, publish_kinds: tokenForm.publish_kinds.filter(kind => tokenForm.kinds.includes(kind)) })).token; await loadTokens() }, '令牌已创建，仅此一次显示')
   busy.value = false
 }
 async function revokeToken(t: DiscoverToken) {
@@ -230,6 +230,7 @@ onMounted(load)
         <div class="field wide"><span>允许的内容类型</span><label v-for="k in KINDS" :key="k.key" class="scope"><input v-model="tokenForm.kinds" type="checkbox" :value="k.key" :disabled="busy" /> {{ k.label }}</label></div>
       </div>
       <label v-if="tokenForm.kinds.includes('frontier')" class="scope"><input v-model="tokenForm.publish_kinds" type="checkbox" value="frontier" :disabled="busy" /> 允许小伴前沿自动发布已保存版本</label>
+      <label v-if="tokenForm.kinds.includes('news')" class="scope"><input v-model="tokenForm.publish_kinds" type="checkbox" value="news" :disabled="busy" /> 允许 AI 日报自动发布已保存版本</label>
       <button class="btn" type="submit" :disabled="busy || !tokenForm.kinds.length">创建令牌</button>
     </form>
     <div v-if="issuedToken" class="field"><textarea class="input adm-mono" :value="issuedToken" readonly rows="3" aria-label="新建的采集令牌" /><button class="btn" @click="copyToken">复制令牌</button></div>

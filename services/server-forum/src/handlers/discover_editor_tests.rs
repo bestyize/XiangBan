@@ -716,5 +716,24 @@ async fn frontier_asset_stays_private_until_reviewed_publication() -> Result<(),
     assert_eq!(call(&h.app, "POST", "/api/discover-editor/drafts/news/automatic/publish", Some(automatic), checked.clone()).await.0, StatusCode::FORBIDDEN);
     assert_eq!(call(&h.app, "DELETE", &format!("/api/admin/discover-workflow/tokens/{}", publisher["id"].as_str().unwrap()), Some(&h.admin_t), Value::Null).await.0, StatusCode::OK);
     assert_eq!(call(&h.app, "POST", publish_path, Some(automatic), checked).await.0, StatusCode::UNAUTHORIZED);
+    let (status, news_token) = call(&h.app,"POST","/api/admin/discover-workflow/tokens",Some(&h.admin_t),
+        json!({"name":"daily publisher","kinds":["news"],"publish_kinds":["news"],"days":1})).await;
+    assert_eq!(status,StatusCode::OK,"{news_token}");
+    let news_auth=news_token["token"].as_str().unwrap();
+    let (status, news_asset)=call(&h.app,"POST","/api/discover-editor/articles/news/automatic/assets",Some(news_auth),json!({"data_base64":"iVBORw0KGgphYmM="})).await;
+    assert_eq!(status,StatusCode::OK,"{news_asset}");
+    let news_path=news_asset["path"].as_str().unwrap();
+    let mut news_input=json!({"expected_revision":0,"source_name":"官方资料","source_url":"https://example.com/daily",
+        "data":{"title":"完整日报测试","source":"官方","url":"https://example.com/daily","body":"日报资料".repeat(400),"cover_url":format!("{}{own_path}",h.state.config.public_url)}});
+    let (status, saved)=call(&h.app,"PUT","/api/discover-editor/drafts/news/automatic",Some(news_auth),news_input.clone()).await;
+    assert_eq!(status,StatusCode::OK,"{saved}");
+    let news_publish="/api/discover-editor/drafts/news/automatic/publish";
+    assert_eq!(call(&h.app,"POST",news_publish,Some(news_auth),json!({"expected_revision":saved["revision"]})).await.0,StatusCode::BAD_REQUEST,"same key in another kind cannot expose its cover");
+    news_input["expected_revision"]=saved["revision"].clone();news_input["data"]["cover_url"]=json!(format!("{}{news_path}",h.state.config.public_url));
+    let (status,saved)=call(&h.app,"PUT","/api/discover-editor/drafts/news/automatic",Some(news_auth),news_input).await;
+    assert_eq!(status,StatusCode::OK);
+    assert_eq!(call(&h.app,"GET",news_path,None,Value::Null).await.0,StatusCode::NOT_FOUND);
+    assert_eq!(call(&h.app,"POST",news_publish,Some(news_auth),json!({"expected_revision":saved["revision"]})).await.0,StatusCode::OK);
+    assert_eq!(call(&h.app,"GET",news_path,None,Value::Null).await.0,StatusCode::OK);
     h.finish().await
 }

@@ -12,6 +12,7 @@ import vendorManifest from '../../public/vendor-logos/manifest.json'
 import legacyVendors from '../../public/vendor-logos/legacy.json'
 import RequestState from '@/components/community/RequestState.vue'
 import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
+import EditorialArticles from '@/components/community/EditorialArticles.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { useCommunityResource } from '@/components/community/resource'
 import { webLink } from '@/components/community/contract'
@@ -39,7 +40,7 @@ const { data, loading, error, load } = useCommunityResource<ResourceData>(async 
   if (tab.value === 'docs') return { kind:'docs', ...(await discoverApi.docs()) }
   const help_status = tab.value === 'help' && ['open','solved','bounty'].includes(filter.value) ? filter.value as 'open'|'solved'|'bounty' : undefined
   const category = resourceTopicCategory(tab.value, filter.value)
-  return { kind:'topics', result: await api.topics({ category, tag:tab.value === 'open' ? '开源' : undefined, help_status, page:page.value, sort:'new' }) }
+  return { kind:'topics', result: await api.topics({ category, help_status, page:page.value, sort:'new' }) }
 })
 const filters = computed(() => tab.value === 'help' ? [{key:'',label:'全部'},{key:'open',label:'进行中'},{key:'solved',label:'已采纳'},{key:'bounty',label:'有悬赏'}] : [{key:'',label:'全部'},{key:'movies',label:'影视'},{key:'music',label:'音乐'}])
 watch([tab,page,filter], load, { immediate:true })
@@ -54,6 +55,7 @@ useHead(() => ({ title:'资源' }))
     <CommunityTabs :items="tabs" :active="tab" label="资源栏目" @change="setTab" />
     <CommunityTabs v-if="tab === 'media' || tab === 'help'" :items="filters" :active="filter" label="资源筛选" @change="setFilter" />
     <HelpStats v-if="tab === 'help'" />
+    <EditorialArticles v-if="tab === 'tools' || tab === 'docs'" :category="resourceTopicCategory(tab,filter)" :title="tab === 'tools' ? '工具导读' : '资料导读'" />
     <p v-if="tab === 'docs'" class="resource-note">官方文档的索引和导读，原文一律跳转官网。</p>
     <p v-else-if="tab === 'media'" class="resource-note">只收片单、影评、乐评和公版或授权内容。</p>
     <p v-else-if="tab === 'open'" class="resource-note">只收开源、免费软件和可免费使用的设计素材。</p>

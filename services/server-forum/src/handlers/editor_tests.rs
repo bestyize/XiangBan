@@ -137,6 +137,13 @@ async fn scoped_workflow_is_private_idempotent_and_revocable(
     .await;
     assert_eq!(status, StatusCode::OK, "{result}");
     let id = result["id"].as_str().unwrap();
+    for (key,expected) in [("test-001",1),("absent-001",0)] {
+        let (status,found)=call(app.clone(),"GET",&format!("/api/editor/drafts?external_id={key}"),Some(&token),Value::Null).await;
+        assert_eq!(status,StatusCode::OK);
+        assert_eq!(found["total"],expected);
+        assert_eq!(found["items"].as_array().unwrap().len(),expected as usize);
+        if expected==1 { assert_eq!(found["items"][0]["id"],id); }
+    }
     let (status, _) = call(
         app.clone(),
         "POST",

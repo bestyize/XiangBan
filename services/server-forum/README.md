@@ -1,8 +1,8 @@
 # server-forum：超级小伴论坛
 
-状态：一期（网页版）已实现并部署。超级小伴社区 `chat.xiangban.xyz` 当前网页以发现、讨论和资源组织内容；讨论包含创作、学习和教程、休闲，资源包含 AI 工具、资料、影音娱乐、求助悬赏、开源精选。下文的「技术交流、资源分享、随便唠唠、站务」描述的是保留的后端帖子分类，不应直接当作当前网页栏目。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
+状态：一期（网页版）已实现并部署。超级小伴社区 `chat.xiangban.xyz` 以发现、讨论和资源组织内容；讨论包含创作、学习和教程、休闲，资源包含 AI 工具、资料、影音娱乐、求助悬赏、开源精选，另有站务。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
 
-网页栏目与内容来源的映射集中在 [`web/src/lib/communityStructure.ts`](web/src/lib/communityStructure.ts)：学习和教程聚合旧技术及学习资料分类并按标签筛选；休闲按后端 `casual-*` 分类筛选；创作读取作品包和方案；资源的工具、资料读取发现页目录，影音、求助、开源精选读取既有帖子分类。小伴前沿和日报是发现页文章，不是论坛帖子。上述底层标识继续保留以兼容历史帖子和客户端，不能仅按页面名称删除或迁移。
+栏目清单位于 [`editorial/channels.json`](editorial/channels.json)，前台映射在 [`web/src/lib/communityStructure.ts`](web/src/lib/communityStructure.ts)。启动迁移会将旧技术、资源和小伴产品分类改为当前栏目，保留分类 ID、历史帖子与权限；旧 slug 查询兼容，旧分类页面跳转至新地址。下文关于旧迁移的记录用于解释历史实现，不代表当前分类仍使用旧名称。创作和方案页面同时呈现真实作品与图文导读，资源工具和资料同时呈现真实目录与导读，彼此独立计数。小伴前沿和日报使用发现页文章通道。常驻采编的来源、预算、发布验证与部署见 [`editorial/README.md`](editorial/README.md)。
 
 技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），前端 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。登录走[统一账号中心](../server-account/README.md)，本站不存密码，用 JWKS 公钥离线验签。默认端口 55010。
 

@@ -8,7 +8,8 @@ import { useSession } from '@/stores/session'
 import { useMeta } from '@/stores/meta'
 import { useHead } from '@/lib/head'
 import { PACK_KINDS } from '@/lib/content'
-import { DISCUSSION_TABS, LEARN_FILTERS, LEARN_CATEGORIES } from '@/lib/communityStructure'
+import { DISCUSSION_TABS, LEARN_FILTERS, learnCategory, creationCategory } from '@/lib/communityStructure'
+import EditorialArticles from '@/components/community/EditorialArticles.vue'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
 import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
 import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
@@ -40,7 +41,7 @@ const { data, loading, error, load } = useCommunityResource<Feed>(async () => {
   if (tab.value === 'create' && filter.value === 'schemes') return { kind:'schemes',result:await contentApi.schemes(page.value) }
   if (tab.value === 'create') return { kind:'packs',result:await contentApi.packs({ kind:filter.value || undefined, sort:'new',page:page.value }) }
   if (sort.value === 'following' && tab.value === 'all') return {kind:'topics',result:session.loggedIn ? await api.followingTopics(page.value) : {items:[],page:1,page_size:30,total:0}}
-  return {kind:'topics',result:await api.topics({category:tab.value === 'learn' ? LEARN_CATEGORIES : tab.value === 'casual' ? filter.value || 'casual' : undefined, tag:tab.value === 'learn' ? filter.value || undefined : undefined, home:tab.value === 'all', sort:sort.value === 'featured' || sort.value === 'following' ? 'new' : sort.value, featured:sort.value === 'featured',page:page.value})}
+  return {kind:'topics',result:await api.topics({category:tab.value === 'learn' ? learnCategory(filter.value) : tab.value === 'casual' ? filter.value || 'casual' : undefined, home:tab.value === 'all', sort:sort.value === 'featured' || sort.value === 'following' ? 'new' : sort.value, featured:sort.value === 'featured',page:page.value})}
 })
 watch([tab,sort,page,filter,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
 // The shell loads category metadata; an empty category list still permits the broad casual feed.
@@ -64,9 +65,10 @@ useHead(() => ({title:'讨论'}))
     <p v-if="categoryError" class="category-error" role="alert">{{ categoryError }} <button class="community-button" @click="loadCategories">重试</button></p>
     <div v-if="tab === 'all' && sort === 'following' && !session.loggedIn" class="login-prompt"><p>登录后查看关注动态。</p><button class="community-button" @click="session.requireLogin()">登录</button></div>
     <template v-else>
+      <EditorialArticles v-if="tab === 'create'" :category="creationCategory(filter)" intro="内容介绍、使用方法与创作经验。可导入的作品和方案在下方单独展示。" />
       <RequestState :loading="loading" :error="error" @retry="load" />
       <template v-if="data">
-        <div class="desktop-feed-heading"><h2>{{ sectionTitle }}</h2><span>共 {{ data.result.total.toLocaleString('zh-CN') }} 条</span></div>
+        <div class="desktop-feed-heading"><h2>{{ tab === 'create' ? '作品与方案' : sectionTitle }}</h2><span>共 {{ data.result.total.toLocaleString('zh-CN') }} 条</span></div>
         <div v-if="data.kind === 'packs'" class="pack-grid" :class="{single:['routine','reminder','task','goal','skill','expert'].includes(filter)}"><CommunityPackCard v-for="pack in data.result.items" :key="pack.id" :pack="pack" /></div>
         <div v-else-if="data.kind === 'schemes'" class="topic-feed"><RouterLink v-for="scheme in data.result.items" :key="scheme.id" :to="`/schemes/${scheme.id}`" class="scheme-card"><span class="scheme-kind">桌面方案 · {{ scheme.items.length }} 项</span><strong>{{ scheme.title }}</strong><p v-if="scheme.summary">{{ scheme.summary }}</p><span class="scheme-author"><UserAvatar :name="scheme.author.nickname || '社区用户'" :size="20" />{{ scheme.author.nickname || '社区用户' }}</span></RouterLink></div>
         <div v-else class="topic-feed" :class="{waterfall:tab === 'casual'}"><ResourceTopicRow v-for="topic in data.result.items" :key="topic.id" :topic="topic" /></div>

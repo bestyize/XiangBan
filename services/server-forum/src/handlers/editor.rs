@@ -325,6 +325,7 @@ const COLS: &str = "id,author_uid,external_id,category_id,title,body_md,tags,top
 #[derive(Deserialize)]
 struct Filter {
     author_uid: Option<Uuid>,
+    external_id: Option<String>,
     page: Option<i64>,
     published: Option<bool>,
 }
@@ -344,10 +345,10 @@ async fn list(
     }
     let uid = e.author.or(f.author_uid);
     let page = f.page.unwrap_or(1).clamp(1, 100000);
-    let rows:Vec<Draft>=sqlx::query_as(&format!("SELECT {COLS} FROM editor_drafts WHERE ($1::uuid IS NULL OR author_uid=$1) AND ($2::bool IS NULL OR (topic_id IS NOT NULL)=$2) ORDER BY updated_at DESC,id LIMIT 30 OFFSET $3"))
-        .bind(uid).bind(f.published).bind((page-1)*30).fetch_all(&s.pool).await?;
-    let (total,):(i64,)=sqlx::query_as("SELECT count(*) FROM editor_drafts WHERE ($1::uuid IS NULL OR author_uid=$1) AND ($2::bool IS NULL OR (topic_id IS NOT NULL)=$2)")
-        .bind(uid).bind(f.published).fetch_one(&s.pool).await?;
+    let rows:Vec<Draft>=sqlx::query_as(&format!("SELECT {COLS} FROM editor_drafts WHERE ($1::uuid IS NULL OR author_uid=$1) AND ($2::bool IS NULL OR (topic_id IS NOT NULL)=$2) AND ($4::text IS NULL OR external_id=$4) ORDER BY updated_at DESC,id LIMIT 30 OFFSET $3"))
+        .bind(uid).bind(f.published).bind((page-1)*30).bind(&f.external_id).fetch_all(&s.pool).await?;
+    let (total,):(i64,)=sqlx::query_as("SELECT count(*) FROM editor_drafts WHERE ($1::uuid IS NULL OR author_uid=$1) AND ($2::bool IS NULL OR (topic_id IS NOT NULL)=$2) AND ($3::text IS NULL OR external_id=$3)")
+        .bind(uid).bind(f.published).bind(&f.external_id).fetch_one(&s.pool).await?;
     // 列表只返回摘要，避免把所有正文带给模型。
     let items:Vec<Value>=rows.into_iter().map(|d|json!({"id":d.id,"author_uid":d.author_uid,"external_id":d.external_id,"category_id":d.category_id,"title":d.title,"tags":d.tags,"topic_id":d.topic_id,"updated_at":d.updated_at})).collect();
     Ok(Json(
@@ -436,8 +437,8 @@ async fn check_category(
         return Err(AppError::Forbidden("作者已被封禁或等级不足".into()));
     }
     users::ensure_can_write(&user)?;
-    let cat:Option<(i32,String,i16,bool,bool)>=sqlx::query_as("SELECT id,kind,min_post_level,admin_only,EXISTS(SELECT 1 FROM categories k WHERE k.parent_id=c.id) FROM categories c WHERE slug=$1 FOR SHARE OF c")
-        .bind(slug).fetch_optional(&mut *conn).await?;
+    let cat:Option<(i32,String,i16,bool,bool)>=sqlx::query_as("SELECT id,kind,min_post_level,admin_only,EXISTS(SELECT 1 FROM categories k WHERE k.parent_id=c.id) FROM categories c WHERE slug=ANY($1) ORDER BY (slug=$2) DESC LIMIT 1 FOR SHARE OF c")
+        .bind(crate::taxonomy::equivalents(slug)).bind(slug).fetch_optional(&mut *conn).await?;
     let (id, kind, min, admin, children) =
         cat.ok_or_else(|| AppError::BadRequest("板块不存在".into()))?;
     if children || user.trust_level < topics::required_post_level(min, admin) {
@@ -706,7 +707,7 @@ async fn publish(
             .execute(&mut *tx)
             .await?;
     }
-    super::help::create_for_topic(&mut tx, topic, d.author_uid, d.category_id, None).await?;
+    // Station-authored help articles are guides, not invented user requests or bounties.
     sqlx::query("UPDATE images SET editor_pending=false WHERE id IN (SELECT image_id FROM editor_draft_assets WHERE draft_id=$1)").bind(id).execute(&mut *tx).await?;
     sqlx::query("UPDATE editor_drafts SET topic_id=$2,updated_at=clock_timestamp() WHERE id=$1")
         .bind(id)

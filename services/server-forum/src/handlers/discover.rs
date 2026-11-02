@@ -29,6 +29,7 @@ pub fn routes() -> Router<AppState> {
         .route("/discover/daily", get(daily))
         .route("/discover/frontier", get(frontier))
         .route("/discover/frontier-assets/{id}", get(frontier_asset))
+        .route("/discover/article-assets/{id}", get(frontier_asset))
         .route("/discover/frontier/{key}", get(super::discover_frontier::detail))
         .route("/discover/frontier/{key}/comments", get(super::discover_frontier::list).post(super::discover_frontier::create))
         .route("/discover/frontier/{key}/comments/{id}", axum::routing::delete(super::discover_frontier::delete))
@@ -59,7 +60,7 @@ pub fn routes() -> Router<AppState> {
 
 async fn frontier_asset(State(state): State<AppState>, Path(id): Path<uuid::Uuid>) -> AppResult<axum::response::Response> {
     use axum::{body::Body, http::{header, Response}};
-    let row: Option<(String, Vec<u8>)> = sqlx::query_as("SELECT a.mime,a.data FROM frontier_assets a JOIN discover_items i ON i.kind='frontier' AND i.key=a.article_key WHERE a.id=$1 AND i.status='published' AND i.published_at<=now() AND position(a.id::text in i.data::text)>0")
+    let row: Option<(String, Vec<u8>)> = sqlx::query_as("SELECT a.mime,a.data FROM frontier_assets a JOIN discover_items i ON i.kind=a.kind AND i.key=a.article_key WHERE a.id=$1 AND i.status='published' AND i.published_at<=now() AND position(a.id::text in i.data::text)>0")
         .bind(id).fetch_optional(&state.pool).await?;
     let (mime, data) = row.ok_or_else(|| AppError::not_found("图片"))?;
     Response::builder().header(header::CONTENT_TYPE, mime).header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")

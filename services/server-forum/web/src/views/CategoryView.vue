@@ -25,7 +25,7 @@ const parent = computed(() => {
   return c?.parent_id ? meta.byId.get(c.parent_id) : undefined
 })
 const sort = computed(() => (route.query.sort === 'new' || route.query.sort === 'hot' ? route.query.sort : 'latest'))
-const helpStatus = computed(() => slug.value === 'share-help' && ['open', 'solved', 'bounty'].includes(String(route.query.help)) ? route.query.help as 'open' | 'solved' | 'bounty' : undefined)
+const helpStatus = computed(() => ['share-help','resource-help'].includes(slug.value) && ['open', 'solved', 'bounty'].includes(String(route.query.help)) ? route.query.help as 'open' | 'solved' | 'bounty' : undefined)
 
 useHead(() => ({ title: category.value?.name ?? '分类' }))
 
@@ -87,7 +87,7 @@ function compose() {
       <RouterLink v-for="t in presetTags" :key="t" :to="withQuery({ tag: t })" class="chip" :class="{ on: tag === t }">{{ tagLabel(t) }}</RouterLink>
     </nav>
 
-    <nav v-if="slug === 'share-help'" class="tag-filter" aria-label="求助筛选">
+    <nav v-if="['share-help','resource-help'].includes(slug)" class="tag-filter" aria-label="求助筛选">
       <RouterLink :to="withQuery({ help: '' })" class="chip" :class="{ on: !helpStatus }">全部求助</RouterLink>
       <RouterLink :to="withQuery({ help: 'open' })" class="chip" :class="{ on: helpStatus === 'open' }">未解决</RouterLink>
       <RouterLink :to="withQuery({ help: 'bounty' })" class="chip" :class="{ on: helpStatus === 'bounty' }">有悬赏</RouterLink>

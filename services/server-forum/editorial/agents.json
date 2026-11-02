@@ -2,9 +2,9 @@
   "forum_url": "https://chat.xiangban.xyz",
   "ai_url": "https://ai.xiangban.xyz",
   "account_url": "https://account.xiangban.xyz",
-  "daily_spend_points": 2500000,
-  "reserve_points": 1000000,
-  "daily_call_limit": 240,
+  "daily_spend_points": 45000000,
+  "reserve_points": 2500000,
+  "daily_call_limit": 4000,
   "agents": [
     {
       "id": "learn-claude-code",
@@ -12,7 +12,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "从官方使用说明提炼具体使用场景、操作和限制，保留未实测说明。",
-      "category": "tech-productivity",
+      "category": "learn-claude-code",
       "tags": [
         "Claude-Code"
       ],
@@ -134,24 +134,37 @@
           "type": "page",
           "title": "Claude Code — sandboxing",
           "url": "https://code.claude.com/docs/en/sandboxing"
+        },
+        {
+          "type": "index",
+          "url": "https://code.claude.com/docs/en/overview",
+          "limit": 100,
+          "prefixes": [
+            "/docs/en/"
+          ]
         }
       ],
       "daily_limit": 2,
-      "bootstrap_daily_limit": 20
+      "bootstrap_daily_limit": 20,
+      "native_destination": "topic",
+      "count_by_category": true
     },
     {
       "id": "learn-codex",
       "name": "学习和教程 / Codex",
       "destination": "topic",
       "enabled": true,
-      "brief": "依据官方文档写清功能边界，不比较没有依据的能力。",
-      "category": "tech-productivity",
+      "brief": "依据官方文档写清功能边界，不比较没有依据的能力。 官方仓库技能的导读要注明依赖和安装条件，不声称用户已安装，也不声称所有环境都支持。",
+      "category": "learn-codex",
       "tags": [
         "Codex"
       ],
       "hosts": [
         "learn.chatgpt.com",
-        "developers.openai.com"
+        "developers.openai.com",
+        "github.com",
+        "raw.githubusercontent.com",
+        "api.github.com"
       ],
       "sources": [
         {
@@ -163,10 +176,38 @@
           "type": "page",
           "title": "Scheduled tasks — OpenAI official documentation",
           "url": "https://learn.chatgpt.com/docs/automations.md"
+        },
+        {
+          "type": "index",
+          "url": "https://github.com/openai/codex/tree/main/docs",
+          "prefixes": [
+            "/openai/codex/blob/main/docs/"
+          ],
+          "github_raw": true,
+          "limit": 100
+        },
+        {
+          "type": "page",
+          "title": "OpenAI Codex official repository",
+          "url": "https://github.com/openai/codex"
+        },
+        {
+          "type": "github_tree",
+          "repo": "openai/skills",
+          "prefixes": [
+            "skills/.curated/"
+          ],
+          "suffixes": [
+            "/SKILL.md"
+          ],
+          "min_bytes": 800,
+          "limit": 100
         }
       ],
       "daily_limit": 2,
-      "bootstrap_daily_limit": 20
+      "bootstrap_daily_limit": 20,
+      "native_destination": "topic",
+      "count_by_category": true
     },
     {
       "id": "learn-prompts",
@@ -174,7 +215,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "给出可复用的提示编写方法，示例标为示例，不编造测试结果。",
-      "category": "tech-creative",
+      "category": "learn-prompts",
       "tags": [
         "提示词"
       ],
@@ -182,22 +223,48 @@
         "docs.anthropic.com",
         "platform.claude.com",
         "github.com",
+        "raw.githubusercontent.com",
+        "docs.anthropic.com",
+        "platform.claude.com",
+        "docs.claude.com",
+        "www.anthropic.com",
+        "api.github.com",
         "raw.githubusercontent.com"
       ],
       "sources": [
         {
-          "type": "page",
-          "title": "Anthropic's Interactive Prompt Engineering Tutorial",
-          "url": "https://github.com/anthropics/prompt-eng-interactive-tutorial"
+          "type": "github_tree",
+          "repo": "anthropics/courses",
+          "prefixes": [
+            "prompt_engineering_interactive_tutorial/",
+            "prompt_evaluations/",
+            "anthropic_api_fundamentals/"
+          ],
+          "suffixes": [
+            ".ipynb"
+          ],
+          "limit": 100
         },
         {
-          "type": "page",
-          "title": "Claude Cookbooks: prompting and evaluation recipes",
-          "url": "https://github.com/anthropics/claude-cookbooks"
+          "type": "github_tree",
+          "repo": "anthropics/claude-cookbooks",
+          "prefixes": [
+            "misc/",
+            "tool_use/",
+            "skills/"
+          ],
+          "suffixes": [
+            ".ipynb",
+            ".md"
+          ],
+          "min_bytes": 1800,
+          "limit": 60
         }
       ],
       "daily_limit": 2,
-      "bootstrap_daily_limit": 20
+      "bootstrap_daily_limit": 20,
+      "native_destination": "topic",
+      "count_by_category": true
     },
     {
       "id": "learn-workflows",
@@ -205,7 +272,7 @@
       "destination": "topic",
       "enabled": true,
       "brief": "分析编码与协作流程的具体改变、使用条件和验证办法。",
-      "category": "tech-productivity",
+      "category": "learn-workflows",
       "tags": [
         "工作流"
       ],
@@ -227,10 +294,20 @@
           "type": "page",
           "title": "GitHub Copilot coding agent",
           "url": "https://docs.github.com/en/copilot/concepts/agents/coding-agent/about-coding-agent"
+        },
+        {
+          "type": "index",
+          "url": "https://docs.github.com/en/copilot",
+          "limit": 100,
+          "prefixes": [
+            "/en/copilot/"
+          ]
         }
       ],
       "daily_limit": 2,
-      "bootstrap_daily_limit": 20
+      "bootstrap_daily_limit": 20,
+      "native_destination": "topic",
+      "count_by_category": true
     },
     {
       "id": "learn-local",
@@ -238,12 +315,13 @@
       "destination": "topic",
       "enabled": true,
       "brief": "以官方运行说明为准，区分硬件、模型、上下文与系统限制，不编造亲测。",
-      "category": "tech-llm",
+      "category": "learn-local",
       "tags": [
         "本地部署"
       ],
       "hosts": [
-        "docs.ollama.com"
+        "docs.ollama.com",
+        "docs.vllm.ai"
       ],
       "sources": [
         {
@@ -265,10 +343,31 @@
           "type": "page",
           "title": "Ollama model import",
           "url": "https://docs.ollama.com/import"
+        },
+        {
+          "type": "index",
+          "url": "https://docs.ollama.com/",
+          "limit": 100,
+          "prefixes": [
+            "/"
+          ]
+        },
+        {
+          "type": "index",
+          "url": "https://docs.vllm.ai/en/latest/",
+          "prefixes": [
+            "/en/latest/serving/",
+            "/en/latest/deployment/",
+            "/en/latest/configuration/",
+            "/en/latest/usage/"
+          ],
+          "limit": 60
         }
       ],
       "daily_limit": 2,
-      "bootstrap_daily_limit": 20
+      "bootstrap_daily_limit": 20,
+      "native_destination": "topic",
+      "count_by_category": true
     },
     {
       "id": "learn-hardware",
@@ -276,12 +375,13 @@
       "destination": "topic",
       "enabled": true,
       "brief": "解释硬件技术与适用条件，厂商数据必须注明来源，不作购买建议。",
-      "category": "tech-hardware",
+      "category": "learn-hardware",
       "tags": [
         "AI-硬件"
       ],
       "hosts": [
-        "developer.nvidia.com"
+        "developer.nvidia.com",
+        "docs.nvidia.com"
       ],
       "sources": [
         {
@@ -293,249 +393,652 @@
           "type": "page",
           "title": "NVIDIA CUDA platform",
           "url": "https://developer.nvidia.com/cuda-zone"
+        },
+        {
+          "type": "feed",
+          "url": "https://developer.nvidia.com/blog/feed/",
+          "keywords": [
+            "Jetson",
+            "GPU",
+            "DGX",
+            "TensorRT",
+            "CUDA",
+            "Spark",
+            "hardware"
+          ],
+          "max_age_days": 90,
+          "require_date": true
+        },
+        {
+          "type": "index",
+          "url": "https://developer.nvidia.com/blog/",
+          "prefixes": [
+            "/blog/"
+          ],
+          "keywords": [
+            "CUDA",
+            "GPU",
+            "Jetson",
+            "DGX",
+            "TensorRT",
+            "Spark"
+          ],
+          "max_pages": 5,
+          "limit": 100
+        },
+        {
+          "type": "index",
+          "url": "https://docs.nvidia.com/jetson/archives/r39.2.1/DeveloperGuide/index.html",
+          "prefixes": [
+            "/jetson/archives/r39.2.1/DeveloperGuide/"
+          ],
+          "keywords": [
+            "performance",
+            "power",
+            "monitor",
+            "GPU",
+            "CUDA",
+            "Jetson",
+            "camera",
+            "hardware",
+            "setup"
+          ],
+          "limit": 80
         }
       ],
       "daily_limit": 2,
-      "bootstrap_daily_limit": 20
+      "bootstrap_daily_limit": 20,
+      "native_destination": "topic",
+      "count_by_category": true
     },
     {
       "id": "casual-work",
       "name": "休闲 / 职场",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "依据 GitLab 公开手册介绍远程协作中的具体做法和局限，明确这是该公司手册，不是个人经历，也不是普遍劳动法规。",
       "category": "casual-work",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "handbook.gitlab.com"
+      ],
+      "sources": [
+        {
+          "type": "index",
+          "url": "https://handbook.gitlab.com/handbook/company/culture/all-remote/",
+          "limit": 100,
+          "prefixes": [
+            "/handbook/company/culture/all-remote/"
+          ]
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2,
+      "source_max_bytes": 8388608
     },
     {
       "id": "casual-offwork",
       "name": "休闲 / 下班了",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "下班后的科学阅读：只讲来源中的太空事实与有趣问题，不编造读者经历、科学家引语或观察结果。",
       "category": "casual-offwork",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "science.nasa.gov",
+        "www.nasa.gov"
+      ],
+      "sources": [
+        {
+          "type": "index",
+          "url": "https://science.nasa.gov/universe/",
+          "limit": 100,
+          "prefixes": [
+            "/universe/"
+          ]
+        },
+        {
+          "type": "feed",
+          "url": "https://www.nasa.gov/feed/",
+          "keywords": [
+            "planet",
+            "galaxy",
+            "moon",
+            "star",
+            "telescope",
+            "asteroid"
+          ],
+          "max_age_days": 365,
+          "require_date": true
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "casual-loss",
       "name": "休闲 / 亏了吗",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "仅整理 FINRA 原始资料中的风险识别与金融常识，说明美国机构及原文适用范围；不荐股、不推荐买卖时点或资产配置，不作个人投资建议，不虚构盈亏经历。",
       "category": "casual-loss",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "www.finra.org"
+      ],
+      "sources": [
+        {
+          "type": "index",
+          "url": "https://www.finra.org/investors/insights",
+          "limit": 100,
+          "prefixes": [
+            "/investors/insights/"
+          ],
+          "max_pages": 5
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "casual-dream",
       "name": "休闲 / 梦想和人生",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "围绕人生选择和个人学习目标，给出明确标为示例的计划写法。只依据现有目标模板字段和限制，不承诺成功、不作心理诊断、不虚构个人经历。",
       "category": "casual-dream",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "casual-gear",
       "name": "休闲 / 数码装备",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "依据 Raspberry Pi 官方教程介绍具体数码项目与所需条件。未亲测就说基于文档，不编造性能、兼容性或购买体验。",
       "category": "casual-gear",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "api.github.com",
+        "raw.githubusercontent.com",
+        "github.com"
+      ],
+      "sources": [
+        {
+          "type": "github_tree",
+          "repo": "raspberrypi/documentation",
+          "prefixes": [
+            "documentation/asciidoc/"
+          ],
+          "suffixes": [
+            ".adoc"
+          ],
+          "min_bytes": 1800,
+          "limit": 120
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "casual-indie",
       "name": "休闲 / 副业与独立开发",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "为独立开发者解释公开仓库维护、发布与协作的一项具体机制，注明官方功能条件，不编造收入、用户增长或真实创业经历。",
       "category": "casual-indie",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "docs.github.com"
+      ],
+      "sources": [
+        {
+          "type": "index",
+          "url": "https://docs.github.com/en/repositories",
+          "limit": 100,
+          "prefixes": [
+            "/en/repositories/"
+          ]
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "casual-fun",
       "name": "休闲 / 吃喝玩乐",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "基于美国国会图书馆图像与文化档案部门的原始文章做轻松阅读，解释作品与资料背景，不冒充参观经历，不复制受限图片或宣称全球公版。",
       "category": "casual-fun",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "blogs.loc.gov"
+      ],
+      "sources": [
+        {
+          "type": "feed",
+          "url": "https://blogs.loc.gov/picturethis/feed/",
+          "keywords": [
+            ""
+          ],
+          "max_age_days": 730,
+          "require_date": true
+        },
+        {
+          "type": "index",
+          "url": "https://blogs.loc.gov/picturethis/",
+          "prefixes": [
+            "/picturethis/"
+          ],
+          "max_pages": 4,
+          "limit": 100
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "casual-media",
       "name": "休闲 / 片单乐评",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "基于 KEXP 原始音乐文章整理作品背景和可讨论的问题；不冒充实际聆听测评，不提供盗版链接，不复制歌词。",
       "category": "casual-media",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "www.kexp.org"
+      ],
+      "sources": [
+        {
+          "type": "index",
+          "url": "https://www.kexp.org/read/",
+          "limit": 100,
+          "prefixes": [
+            "/read/"
+          ]
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "casual-think",
       "name": "休闲 / 哲思",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "基于斯坦福哲学百科的原始学术文章解释一个思想问题。区分原文观点与本文推论，不伪造名言，不涉及现实政治动员。",
       "category": "casual-think",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "plato.stanford.edu"
+      ],
+      "sources": [
+        {
+          "type": "index",
+          "url": "https://plato.stanford.edu/contents.html",
+          "limit": 100,
+          "prefixes": [
+            "/entries/"
+          ],
+          "keywords": [
+            "knowledge",
+            "logic",
+            "ethic",
+            "happiness",
+            "meaning",
+            "friendship",
+            "truth",
+            "reason",
+            "mind",
+            "belief",
+            "memory",
+            "identity",
+            "virtue",
+            "aesthetics"
+          ]
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "casual-help",
       "name": "休闲 / 互助",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "基于 Fedora 官方快速文档整理公开互助排查导读，明确适用系统。先列可观察现象和低影响步骤，不编造真实求助、成功修复案例或用户对话，不推广不可逆命令。",
       "category": "casual-help",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "docs.fedoraproject.org"
+      ],
+      "sources": [
+        {
+          "type": "index",
+          "url": "https://docs.fedoraproject.org/en-US/quick-docs/",
+          "limit": 100,
+          "prefixes": [
+            "/en-US/quick-docs/"
+          ]
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "casual-chat",
       "name": "休闲 / 闲聊灌水",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "用自然短段落聊一个 ESA 官方资料里的太空小问题，事实有出处，讨论问题具体可回答，不虚构用户经历或引语。",
       "category": "casual-chat",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置该栏目真实来源；不虚构个人经历。涉及投资及健康内容需专门审校。"
+      "hosts": [
+        "www.esa.int"
+      ],
+      "sources": [
+        {
+          "type": "index",
+          "url": "https://www.esa.int/Science_Exploration/Space_Science",
+          "limit": 100,
+          "prefixes": [
+            "/Science_Exploration/Space_Science/"
+          ]
+        },
+        {
+          "type": "index",
+          "url": "https://www.esa.int/Science_Exploration/Human_and_Robotic_Exploration",
+          "prefixes": [
+            "/Science_Exploration/Human_and_Robotic_Exploration/"
+          ],
+          "limit": 100
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-effect",
       "name": "创作 / 特效",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "effect",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-effect",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-wallpaper",
       "name": "创作 / 壁纸",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "wallpaper",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-wallpaper",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-widget",
       "name": "创作 / 组件",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "widget",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-widget",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-game",
       "name": "创作 / 游戏",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "game",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-game",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-reminder",
       "name": "创作 / 提醒",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "reminder",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-reminder",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-routine",
       "name": "创作 / 例行",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "routine",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-routine",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-task",
       "name": "创作 / 任务",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "task",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-task",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-goal",
       "name": "创作 / 目标",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "goal",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-goal",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-skill",
       "name": "创作 / 技能",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "skill",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-skill",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-expert",
       "name": "创作 / 专家",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "expert",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-expert",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-workflow",
       "name": "创作 / 工作流",
-      "destination": "pack",
-      "enabled": false,
-      "brief": "",
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "kind": "workflow",
-      "note": "需真实可导入作品、对应版本和封面；普通介绍帖不计入作品数量。"
+      "native_destination": "pack",
+      "category": "create-workflow",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "create-schemes",
       "name": "创作 / 方案",
-      "destination": "scheme",
-      "enabled": false,
-      "brief": "",
-      "note": "需组合真实已发布作品，不生成失效引用。"
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
+      "native_destination": "scheme",
+      "category": "create-schemes",
+      "count_by_category": true,
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "discover-frontier",
@@ -544,7 +1047,9 @@
       "enabled": true,
       "brief": "围绕有官方原始资料的 AI 技术和产品进展，说明事实、用途和限制；已发生的事件按原始时间叙述，不制造热度和个人体验。",
       "hosts": [
-        "developer.nvidia.com"
+        "developer.nvidia.com",
+        "research.google",
+        "blog.google"
       ],
       "sources": [
         {
@@ -556,7 +1061,25 @@
             "agent",
             "inference"
           ],
-          "max_age_days": 30,
+          "max_age_days": 90,
+          "require_date": true
+        },
+        {
+          "type": "feed",
+          "url": "https://research.google/blog/rss/",
+          "keywords": [
+            ""
+          ],
+          "max_age_days": 90,
+          "require_date": true
+        },
+        {
+          "type": "feed",
+          "url": "https://blog.google/technology/ai/rss/",
+          "keywords": [
+            ""
+          ],
+          "max_age_days": 90,
           "require_date": true
         }
       ],
@@ -567,123 +1090,541 @@
       "id": "discover-daily",
       "name": "发现 / AI 日报",
       "destination": "news",
-      "enabled": false,
-      "brief": "",
-      "note": "待接入日报文章发布；不计排行榜。"
+      "enabled": true,
+      "brief": "基于可核验原始技术博客写一篇完整 AI 日报文章，记录事件日期，不把旧事写成刚发生；区分厂商声明、事实与推论。",
+      "hosts": [
+        "deepmind.google",
+        "huggingface.co"
+      ],
+      "sources": [
+        {
+          "type": "feed",
+          "url": "https://deepmind.google/blog/rss.xml",
+          "keywords": [
+            ""
+          ],
+          "max_age_days": 90,
+          "require_date": true
+        },
+        {
+          "type": "feed",
+          "url": "https://huggingface.co/blog/feed.xml",
+          "keywords": [
+            ""
+          ],
+          "max_age_days": 90,
+          "require_date": true
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "resource-tools",
       "name": "资源 / AI 工具",
-      "destination": "tool",
-      "enabled": false,
-      "brief": "",
-      "note": "工具目录使用独立结构，需核实官网、版本、许可、平台及封面。"
+      "destination": "topic",
+      "enabled": true,
+      "brief": "依据项目自己的 README 写工具导读：适用场景、运行条件、许可与限制。不把宣传当亲测，不虚构对比或免费额度，不承诺小伴可直接安装这些工具。",
+      "native_destination": "tool",
+      "category": "resource-tools",
+      "count_by_category": true,
+      "hosts": [
+        "github.com"
+      ],
+      "sources": [
+        {
+          "type": "page",
+          "url": "https://github.com/ollama/ollama",
+          "title": "ollama/ollama 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/ggml-org/llama.cpp",
+          "title": "ggml-org/llama.cpp 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/open-webui/open-webui",
+          "title": "open-webui/open-webui 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/langgenius/dify",
+          "title": "langgenius/dify 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/comfyanonymous/ComfyUI",
+          "title": "comfyanonymous/ComfyUI 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/invoke-ai/InvokeAI",
+          "title": "invoke-ai/InvokeAI 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/AUTOMATIC1111/stable-diffusion-webui",
+          "title": "AUTOMATIC1111/stable-diffusion-webui 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/huggingface/transformers",
+          "title": "huggingface/transformers 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/huggingface/diffusers",
+          "title": "huggingface/diffusers 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/vllm-project/vllm",
+          "title": "vllm-project/vllm 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/lm-sys/FastChat",
+          "title": "lm-sys/FastChat 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/mudler/LocalAI",
+          "title": "mudler/LocalAI 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/Mintplex-Labs/anything-llm",
+          "title": "Mintplex-Labs/anything-llm 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/menloresearch/jan",
+          "title": "menloresearch/jan 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/TabbyML/tabby",
+          "title": "TabbyML/tabby 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/continuedev/continue",
+          "title": "continuedev/continue 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/Aider-AI/aider",
+          "title": "Aider-AI/aider 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/BerriAI/litellm",
+          "title": "BerriAI/litellm 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/infiniflow/ragflow",
+          "title": "infiniflow/ragflow 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/FlowiseAI/Flowise",
+          "title": "FlowiseAI/Flowise 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/n8n-io/n8n",
+          "title": "n8n-io/n8n 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/langflow-ai/langflow",
+          "title": "langflow-ai/langflow 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/assafelovic/gpt-researcher",
+          "title": "assafelovic/gpt-researcher 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/QuivrHQ/quivr",
+          "title": "QuivrHQ/quivr 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/lobehub/lobe-chat",
+          "title": "lobehub/lobe-chat 官方仓库"
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "resource-docs",
       "name": "资源 / 资料",
-      "destination": "doc",
-      "enabled": false,
-      "brief": "",
-      "note": "官方资料索引，需核实原文链接，不冒充站内文章。"
+      "destination": "topic",
+      "enabled": true,
+      "brief": "围绕 MDN 原始学习资料写可用的导读，指出适合什么读者、先后关系与一个关键概念；不是翻译全文，也不虚构代码已运行。",
+      "native_destination": "doc",
+      "category": "resource-docs",
+      "count_by_category": true,
+      "hosts": [
+        "developer.mozilla.org"
+      ],
+      "sources": [
+        {
+          "type": "index",
+          "url": "https://developer.mozilla.org/en-US/docs/Learn_web_development/Core/Structuring_content",
+          "limit": 100,
+          "prefixes": [
+            "/en-US/docs/Learn_web_development/"
+          ]
+        }
+      ],
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "resource-movies",
       "name": "资源 / 影视",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
-      "category": "share-movies",
+      "enabled": true,
+      "brief": "依据 BFI 的原始电影文章整理电影史、创作与作品背景，不冒充观影经历，不提供未经授权的播放下载，不编造评分和评价。",
+      "category": "resource-movies",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置真实来源。求助须有真实请求，不用站方指南制造悬赏。"
+      "hosts": [
+        "www.bfi.org.uk"
+      ],
+      "sources": [
+        {
+          "type": "index",
+          "url": "https://www.bfi.org.uk/articles/type/features",
+          "limit": 100,
+          "prefixes": [
+            "/features/",
+            "/sight-and-sound/",
+            "/lists/"
+          ],
+          "max_pages": 5
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "resource-music",
       "name": "资源 / 音乐",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
-      "category": "share-music",
+      "enabled": true,
+      "brief": "依据美国国会图书馆音乐部门的原始资料介绍音乐、档案与创作背景；不复制歌词，不把档案收录等同全球公版，也不虚构听感。",
+      "category": "resource-music",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置真实来源。求助须有真实请求，不用站方指南制造悬赏。"
+      "hosts": [
+        "blogs.loc.gov"
+      ],
+      "sources": [
+        {
+          "type": "feed",
+          "url": "https://blogs.loc.gov/music/feed/",
+          "keywords": [
+            ""
+          ],
+          "max_age_days": 730,
+          "require_date": true
+        },
+        {
+          "type": "index",
+          "url": "https://blogs.loc.gov/music/",
+          "limit": 100,
+          "prefixes": [
+            "/music/"
+          ]
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "resource-help",
       "name": "资源 / 求助悬赏",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
-      "category": "share-help",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
+      "category": "resource-help",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置真实来源。求助须有真实请求，不用站方指南制造悬赏。"
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "resource-open",
       "name": "资源 / 开源精选",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
-      "category": "share-software",
+      "enabled": true,
+      "brief": "依据真实开源项目原始 README 写资源介绍，说明用途、安装条件和许可；不冒充实测，不把开源等同无条件可商用。",
+      "category": "resource-open",
       "tags": [
         "开源"
       ],
-      "hosts": [],
-      "sources": [],
-      "note": "待配置真实来源。求助须有真实请求，不用站方指南制造悬赏。"
+      "hosts": [
+        "github.com"
+      ],
+      "sources": [
+        {
+          "type": "page",
+          "url": "https://github.com/BurntSushi/ripgrep",
+          "title": "BurntSushi/ripgrep 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/sharkdp/fd",
+          "title": "sharkdp/fd 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/sharkdp/bat",
+          "title": "sharkdp/bat 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/dandavison/delta",
+          "title": "dandavison/delta 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/jqlang/jq",
+          "title": "jqlang/jq 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/mikefarah/yq",
+          "title": "mikefarah/yq 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/FFmpeg/FFmpeg",
+          "title": "FFmpeg/FFmpeg 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/mpv-player/mpv",
+          "title": "mpv-player/mpv 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/obsproject/obs-studio",
+          "title": "obsproject/obs-studio 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/KDE/krita",
+          "title": "KDE/krita 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/inkscape/inkscape",
+          "title": "inkscape/inkscape 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/VideoLAN/vlc",
+          "title": "VideoLAN/vlc 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/syncthing/syncthing",
+          "title": "syncthing/syncthing 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/localsend/localsend",
+          "title": "localsend/localsend 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/rustdesk/rustdesk",
+          "title": "rustdesk/rustdesk 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/git/git",
+          "title": "git/git 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/neovim/neovim",
+          "title": "neovim/neovim 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/helix-editor/helix",
+          "title": "helix-editor/helix 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/zed-industries/zed",
+          "title": "zed-industries/zed 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/wez/wezterm",
+          "title": "wez/wezterm 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/alacritty/alacritty",
+          "title": "alacritty/alacritty 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/starship/starship",
+          "title": "starship/starship 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/nushell/nushell",
+          "title": "nushell/nushell 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/zellij-org/zellij",
+          "title": "zellij-org/zellij 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/tmux/tmux",
+          "title": "tmux/tmux 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/junegunn/fzf",
+          "title": "junegunn/fzf 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/eza-community/eza",
+          "title": "eza-community/eza 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/casey/just",
+          "title": "casey/just 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/TaskfileDev/task",
+          "title": "TaskfileDev/task 官方仓库"
+        },
+        {
+          "type": "page",
+          "url": "https://github.com/restic/restic",
+          "title": "restic/restic 官方仓库"
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "site-notice",
       "name": "站务 / 公告",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "category": "site-notice",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "只依据实际站方规则、版本和已发生事件；不虚构决定、反馈及处置。"
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "site-rules",
       "name": "站务 / 规则",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "category": "site-rules",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "只依据实际站方规则、版本和已发生事件；不虚构决定、反馈及处置。"
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "site-feedback",
       "name": "站务 / 建议反馈",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "category": "site-feedback",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "只依据实际站方规则、版本和已发生事件；不虚构决定、反馈及处置。"
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     },
     {
       "id": "site-reports",
       "name": "站务 / 举报处理公示",
       "destination": "topic",
-      "enabled": false,
-      "brief": "",
+      "enabled": true,
+      "brief": "围绕该栏目整理真实来源，有可操作的说明与明确限制；没有亲自体验就不能写成体验，也不能虚构人物经历、求助或站务事件。",
       "category": "site-reports",
       "tags": [],
-      "hosts": [],
-      "sources": [],
-      "note": "只依据实际站方规则、版本和已发生事件；不虚构决定、反馈及处置。"
+      "hosts": [
+        "chat.xiangban.xyz"
+      ],
+      "sources": [
+        {
+          "type": "catalog"
+        }
+      ],
+      "native_destination": "topic",
+      "count_by_category": true,
+      "bootstrap_daily_limit": 20,
+      "daily_limit": 2
     }
-  ]
+  ],
+  "campaign_spend_points": 45000000
 }

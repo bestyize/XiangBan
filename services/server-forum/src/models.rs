@@ -258,7 +258,7 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
     }
     if let Some(slug) = f.category.as_deref().filter(|s| !s.is_empty()) {
         // 可以用逗号同时指定几个分类（如电影和音乐），一级分类仍然包含它的子分类。
-        let slugs: Vec<String> = slug.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect();
+        let slugs = crate::taxonomy::equivalents(slug);
         qb.push(" AND (c.slug = ANY(")
             .push_bind(slugs.clone())
             .push(") OR c.parent_id IN (SELECT id FROM categories WHERE slug = ANY(")
@@ -313,18 +313,19 @@ pub async fn list_topics(pool: &PgPool, f: &ListFilter) -> Result<Page<TopicItem
     push_filters(&mut qb, f);
     // 置顶按范围逐级生效：首页只提升全站置顶；板块页提升全站、所属一级板块、当前二级板块置顶。
     if let Some(slug) = f.category.as_deref().filter(|s| !s.is_empty()) {
+        let scope = crate::taxonomy::equivalents(slug);
         qb.push(" ORDER BY CASE WHEN t.pin_scope = 'site' THEN 0
             WHEN t.pin_scope = 'parent' AND (
-                c.id = (SELECT id FROM categories WHERE slug = ")
-            .push_bind(slug.to_string())
-            .push(") OR c.parent_id = (SELECT id FROM categories WHERE slug = ")
-            .push_bind(slug.to_string())
-            .push(") OR c.parent_id = (SELECT parent_id FROM categories WHERE slug = ")
-            .push_bind(slug.to_string())
-            .push(")) THEN 1
-            WHEN t.pin_scope = 'category' AND c.id = (SELECT id FROM categories WHERE slug = ")
-            .push_bind(slug.to_string())
-            .push(") THEN 2 ELSE 3 END, ");
+                c.id IN (SELECT id FROM categories WHERE slug = ANY(")
+            .push_bind(scope.clone())
+            .push(")) OR c.parent_id IN (SELECT id FROM categories WHERE slug = ANY(")
+            .push_bind(scope.clone())
+            .push(")) OR c.parent_id IN (SELECT parent_id FROM categories WHERE slug = ANY(")
+            .push_bind(scope.clone())
+            .push("))) THEN 1
+            WHEN t.pin_scope = 'category' AND c.id IN (SELECT id FROM categories WHERE slug = ANY(")
+            .push_bind(scope)
+            .push(")) THEN 2 ELSE 3 END, ");
     } else if f.home {
         qb.push(" ORDER BY CASE WHEN t.pin_scope = 'site' THEN 0 ELSE 1 END, ");
     } else {

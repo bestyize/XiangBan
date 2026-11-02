@@ -37,6 +37,7 @@ pub fn admin_routes() -> Router<AppState> {
 pub fn editor_routes() -> Router<AppState> {
     Router::new()
         .route("/frontier/{key}/assets", post(upload_frontier_asset).layer(axum::extract::DefaultBodyLimit::max(7 * 1024 * 1024)))
+        .route("/articles/{kind}/{key}/assets", post(upload_article_asset).layer(axum::extract::DefaultBodyLimit::max(7 * 1024 * 1024)))
         .route("/drafts", get(list))
         .route("/drafts/import", post(import))
         .route("/drafts/{kind}/{key}", get(detail).put(save))
@@ -48,7 +49,14 @@ pub fn editor_routes() -> Router<AppState> {
 struct FrontierAssetInput { data_base64: String }
 
 async fn upload_frontier_asset(State(s): State<AppState>, e: Editor, Path(key): Path<String>, Json(input): Json<FrontierAssetInput>) -> AppResult<Json<Value>> {
-    e.check("frontier")?;
+    store_article_asset(s,e,"frontier".into(),key,input).await
+}
+async fn upload_article_asset(State(s): State<AppState>, e: Editor, Path((kind,key)): Path<(String,String)>, Json(input): Json<FrontierAssetInput>) -> AppResult<Json<Value>> {
+    store_article_asset(s,e,kind,key,input).await
+}
+async fn store_article_asset(s:AppState,e:Editor,kind:String,key:String,input:FrontierAssetInput)->AppResult<Json<Value>> {
+    e.check(&kind)?;
+    if !["frontier","news"].contains(&kind.as_str()) {return Err(AppError::BadRequest("仅文章类型支持配图".into()));}
     if !discover::valid_key(&key) { return Err(AppError::BadRequest("无效文章标识".into())); }
     let bytes = base64::engine::general_purpose::STANDARD.decode(&input.data_base64)
         .map_err(|_| AppError::BadRequest("图片编码错误".into()))?;
@@ -56,15 +64,15 @@ async fn upload_frontier_asset(State(s): State<AppState>, e: Editor, Path(key): 
     let mime = super::images::sniff(&bytes).ok_or_else(|| AppError::BadRequest("图片格式不支持".into()))?;
     let id = Uuid::new_v4();
     let mut tx = s.pool.begin().await?;
-    lock(&mut tx, "frontier", &key).await?;
-    let (count,): (i64,) = sqlx::query_as("SELECT count(*) FROM frontier_assets WHERE article_key=$1")
-        .bind(&key).fetch_one(&mut *tx).await?;
+    lock(&mut tx, &kind, &key).await?;
+    let (count,): (i64,) = sqlx::query_as("SELECT count(*) FROM frontier_assets WHERE article_key=$1 AND kind=$2")
+        .bind(&key).bind(&kind).fetch_one(&mut *tx).await?;
     if count >= 20 { return Err(AppError::BadRequest("每篇文章最多上传 20 张图片".into())); }
-    sqlx::query("INSERT INTO frontier_assets(id,article_key,mime,data) VALUES($1,$2,$3,$4)")
-        .bind(id).bind(&key).bind(mime).bind(bytes).execute(&mut *tx).await?;
-    log(&mut tx, &e.operator, "frontier.asset.upload", "frontier", &key, &format!("asset={id}")).await?;
+    sqlx::query("INSERT INTO frontier_assets(id,article_key,mime,data,kind) VALUES($1,$2,$3,$4,$5)")
+        .bind(id).bind(&key).bind(mime).bind(bytes).bind(&kind).execute(&mut *tx).await?;
+    log(&mut tx, &e.operator, "article.asset.upload", &kind, &key, &format!("asset={id}")).await?;
     tx.commit().await?;
-    Ok(Json(json!({"id":id,"path":format!("/api/discover/frontier-assets/{id}")})))
+    Ok(Json(json!({"id":id,"path":if kind=="frontier" {format!("/api/discover/frontier-assets/{id}")}else{format!("/api/discover/article-assets/{id}")}})))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -124,7 +132,7 @@ impl FromRequestParts<AppState> for Editor {
         let AuthAdmin(admin) = AuthAdmin::from_request_parts(parts, s).await?;
         Ok(Self {
             kinds: discover::KINDS.iter().map(|k| k.to_string()).collect(),
-            publish_kinds: vec!["frontier".into()],
+            publish_kinds: vec!["frontier".into(),"news".into()],
             operator: admin.username,
             admin: true,
         })
@@ -557,7 +565,7 @@ async fn publish_scoped(
     Path((kind, key)): Path<(String, String)>, Json(input): Json<RevisionInput>,
 ) -> AppResult<Json<Value>> {
     e.check(&kind)?;
-    if kind != "frontier" || !e.publish_kinds.contains(&kind) {
+    if !["frontier","news"].contains(&kind.as_str()) || !e.publish_kinds.contains(&kind) {
         return Err(AppError::Forbidden("令牌没有此栏目的自动发布权限".into()));
     }
     let mut tx = s.pool.begin().await?;
@@ -573,13 +581,13 @@ async fn publish_scoped(
         return Err(AppError::BadRequest("自动发布需要完整真实来源、至少1200字的待审正文，并使用实际发布时间".into()));
     }
     let cover = d.data["cover_url"].as_str().unwrap_or_default();
-    let relative = "/api/discover/frontier-assets/";
-    let absolute = format!("{}{}", s.config.public_url.trim_end_matches('/'), relative);
-    let asset = cover.strip_prefix(&absolute).or_else(|| cover.strip_prefix(relative))
-        .and_then(|id| Uuid::parse_str(id).ok())
+    let asset = ["/api/discover/frontier-assets/","/api/discover/article-assets/"].iter().find_map(|relative| {
+        let absolute=format!("{}{}",s.config.public_url.trim_end_matches('/'),relative);
+        cover.strip_prefix(&absolute).or_else(||cover.strip_prefix(relative)).and_then(|id|Uuid::parse_str(id).ok())
+    })
         .ok_or_else(|| AppError::BadRequest("自动发布封面必须为本篇已上传的站内图片".into()))?;
-    let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM frontier_assets WHERE id=$1 AND article_key=$2)")
-        .bind(asset).bind(&key).fetch_one(&mut *tx).await?;
+    let (exists,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM frontier_assets WHERE id=$1 AND article_key=$2 AND kind=$3)")
+        .bind(asset).bind(&key).bind(&kind).fetch_one(&mut *tx).await?;
     if !exists {
         return Err(AppError::BadRequest("封面不属于这篇文章".into()));
     }
@@ -717,8 +725,8 @@ async fn create_token(
     i.kinds.dedup();
     i.publish_kinds.sort();
     i.publish_kinds.dedup();
-    if i.publish_kinds.iter().any(|kind| kind != "frontier" || !i.kinds.contains(kind)) {
-        return Err(AppError::BadRequest("自动发布仅支持已授予草稿权限的 frontier 类型".into()));
+    if i.publish_kinds.iter().any(|kind| !["frontier","news"].contains(&kind.as_str()) || !i.kinds.contains(kind)) {
+        return Err(AppError::BadRequest("自动发布仅支持已授予草稿权限的 frontier、news 类型".into()));
     }
     let id = Uuid::new_v4();
     let expires_at = Utc::now() + Duration::days(i.days);

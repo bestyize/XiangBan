@@ -1029,6 +1029,8 @@ CREATE TABLE IF NOT EXISTS frontier_assets (
     data BYTEA NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE frontier_assets ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'frontier';
+CREATE INDEX IF NOT EXISTS article_assets_owner_idx ON frontier_assets(kind,article_key);
 
 CREATE TABLE IF NOT EXISTS discover_news_comments (
     id BIGSERIAL PRIMARY KEY,

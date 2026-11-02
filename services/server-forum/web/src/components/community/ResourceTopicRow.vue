@@ -12,6 +12,7 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
 </script>
 <template>
   <article class="topic-card" :class="mode">
+    <span v-if="mode === 'help' && !topic.help" class="flag">站方指南</span>
     <div v-if="topic.help && mode === 'help'" class="help-line"><span class="bounty">{{ topic.help.bounty ? `悬赏 ${topic.help.bounty} 分` : '无悬赏' }}</span><span class="status" :class="topic.help.status">{{ status }}</span><span v-if="status === '进行中'" class="expires">截止 {{ displayDate(topic.help.expires_at) }}</span></div>
     <div class="topic-main">
       <RouterLink v-if="images[0] && ['media','open','help'].includes(mode)" :to="`/t/${topic.id}`" class="cover" :class="mode" tabindex="-1" aria-hidden="true"><img :src="images[0]" alt="" loading="lazy" @error="broken.push(images[0]!)"></RouterLink>
@@ -20,7 +21,7 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
       </div>
       <RouterLink v-if="mode === 'topic' && images[0]" :to="`/t/${topic.id}`" class="cover small" tabindex="-1" aria-hidden="true"><img :src="images[0]" alt="" loading="lazy" @error="broken.push(images[0]!)"></RouterLink>
     </div>
-    <div class="meta"><RouterLink :to="`/u/${topic.author.uid}`" class="author"><UserAvatar :name="topic.author.nickname" :src="topic.author.avatar_url" :size="20" />{{ topic.author.nickname }}</RouterLink><span v-if="topic.locked">已锁定</span><span v-if="topic.like_count">{{ compactCount(topic.like_count) }} 赞</span><span v-if="mode === 'topic' && topic.view_count">{{ compactCount(topic.view_count) }} 浏览</span><span v-if="topic.reply_count || mode === 'help'">{{ compactCount(topic.reply_count) }} {{ mode === 'help' ? '回答' : '回复' }}</span><time :datetime="topic.created_at">{{ timeAgo(topic.created_at) }}</time></div>
+    <div class="meta"><RouterLink :to="`/u/${topic.author.uid}`" class="author"><UserAvatar :name="topic.author.nickname" :src="topic.author.avatar_url" :size="20" />{{ topic.author.nickname }}</RouterLink><span v-if="topic.locked">已锁定</span><span v-if="topic.like_count">{{ compactCount(topic.like_count) }} 赞</span><span v-if="mode === 'topic' && topic.view_count">{{ compactCount(topic.view_count) }} 浏览</span><span v-if="topic.reply_count || mode === 'help'">{{ compactCount(topic.reply_count) }} {{ mode === 'help' && topic.help ? '回答' : '回复' }}</span><time :datetime="topic.created_at">{{ timeAgo(topic.created_at) }}</time></div>
   </article>
 </template>
 <style scoped>
