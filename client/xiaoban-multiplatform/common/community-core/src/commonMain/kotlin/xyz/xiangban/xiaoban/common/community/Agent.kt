@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -55,6 +57,9 @@ interface AgentTool {
     /** 参数的 JSON Schema。 */
     val parameters: JsonObject
     val risk: String get() = "write"
+    val timeoutSeconds: Long get() = 60
+    val alwaysAsk: Boolean get() = false
+    val untrustedOutput: Boolean get() = false
     suspend fun run(arguments: JsonObject): AgentToolResult
 }
 
@@ -63,9 +68,10 @@ sealed interface AgentEvent {
     data class ToolStart(val run: String, val id: String, val name: String, val arguments: String) : AgentEvent
     data class ToolEnd(val run: String, val id: String, val output: String, val isError: Boolean) : AgentEvent
     /** 内核请用户确认一个会改动东西的工具调用；用 [AgentRuntime.answerApproval] 回答。 */
-    data class Approval(val id: String, val tool: String, val risk: String, val arguments: JsonObject, val danger: String?, val session: String = "", val run: String = "") : AgentEvent
+    data class Approval(val id: String, val tool: String, val risk: String, val arguments: JsonObject, val danger: String?, val session: String = "", val run: String = "", val canRemember: Boolean = true) : AgentEvent
     data class Question(val id: String, val session: String, val question: String, val options: List<String>, val run: String = "") : AgentEvent
-    data class RunEnd(val run: String, val ok: Boolean, val text: String?, val error: String?) : AgentEvent
+    data class RunEnd(val run: String, val ok: Boolean, val text: String?, val error: String?, val finish: String? = null, val promptTokens: Long = 0, val completionTokens: Long = 0) : AgentEvent
+    data class Progress(val run: String, val kind: String, val detail: JsonObject) : AgentEvent
     /** 引擎自己出了问题（异常退出等）。 */
     data class Failure(val message: String, val runs: Set<String>? = null) : AgentEvent
 }
@@ -97,10 +103,11 @@ class AgentRuntime(
     private var workers: Job? = null
     private var currentModel = ""
     @Volatile private var currentReasoning: String? = null
-    private val requests = HashMap<Pair<Long, String>, Job>()
-    private val requestsLock = Mutex()
+    private val requests = MutableStateFlow<Map<Pair<Long, String>, Job>>(emptyMap())
+    private val mutationRequests = MutableStateFlow<Set<Pair<Long, String>>>(emptySet())
+    private val requestRuns = MutableStateFlow<Map<Pair<Long, String>, String>>(emptyMap())
     private var nextRun = 0L
-    private data class ActiveRun(val id: String, val generation: Long, val cancelled: Boolean = false)
+    private data class ActiveRun(val id: String, val generation: Long, val cancelled: Boolean = false, val options: ChatOptions = ChatOptions())
     private val activeRuns = MutableStateFlow<Map<String, ActiveRun>>(emptyMap())
 
     private fun line(block: kotlinx.serialization.json.JsonObjectBuilder.() -> Unit): String = buildJsonObject(block).toString()
@@ -127,6 +134,9 @@ class AgentRuntime(
                         put("description", t.description)
                         put("parameters", t.parameters)
                         put("risk", t.risk)
+                        put("timeout_secs", t.timeoutSeconds)
+                        put("always_ask", t.alwaysAsk)
+                        put("untrusted_output", t.untrustedOutput)
                     })
                 })
             }.toString()
@@ -147,17 +157,24 @@ class AgentRuntime(
     /** 在会话 [session] 里开始一轮；返回这一轮的编号，用来取消。 */
     fun nextRunId(): String = "r${++nextRun}"
 
-    fun run(session: String, text: String, id: String = nextRunId(), attachments: List<ChatAttachment> = emptyList()): String {
+    fun run(session: String, text: String, id: String = nextRunId(), attachments: List<ChatAttachment> = emptyList(), options: ChatOptions? = null, tier: AiTier? = null, retry: Boolean = false): String {
         validateChatAttachments(attachments)
-        val run = ActiveRun(id, generation)
+        check(!hasStoppingMutation()) { "上一项本机操作仍在停止，请稍后核对结果再继续" }
+        val snapshot = options ?: ChatOptions(tier = currentModel, reasoningByTier = currentReasoning?.let { mapOf(currentModel to it) }.orEmpty())
+        val run = ActiveRun(id, generation, options = snapshot)
         activeRuns.update {
             check(session !in it) { "上一轮仍在停止，请稍后重试" }
             it + (session to run)
         }
         try {
+            configureSession(session, snapshot, tier)
             send(line {
-                put("type", "run"); put("id", id); put("session", session)
-                if (attachments.isEmpty()) put("input", text) else put("parts", attachmentParts(text, attachments))
+                put("type", "run"); put("id", id); put("session", session); put("isolate", true)
+                if (retry) put("retry", true)
+                else if (attachments.isEmpty()) put("input", text) else put("parts", attachmentParts(text, attachments))
+                snapshot.budget.maxToolCalls?.let { put("max_tool_calls", it) }
+                snapshot.budget.maxMinutes?.let { put("max_millis", it * 60_000) }
+                snapshot.budget.maxTokens?.let { put("max_tokens", it) }
             })
         } catch (e: Exception) {
             activeRuns.update { if (it[session] == run) it - session else it }
@@ -169,6 +186,41 @@ class AgentRuntime(
     fun cancel(run: String) {
         activeRuns.update { running -> running.mapValues { (_, value) -> if (value.id == run) value.copy(cancelled = true) else value } }
         runCatching { send(line { put("type", "cancel"); put("id", run) }) }
+        requestRuns.value.filterValues { it == run }.keys.forEach { requests.value[it]?.cancel() }
+    }
+
+    fun configureSession(session: String, options: ChatOptions, tier: AiTier? = null) {
+        options.validate()
+        if (handle == 0L) return
+        send(line {
+            put("type", "configure_session"); put("session", session)
+            put("settings", buildJsonObject {
+                put("model", options.tier); put("context_tokens", options.contextTokens)
+                tier?.contextWindowTokens?.takeIf { it > 0 }?.let { put("model_window", it) }
+                tier?.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
+                put("supports_tools", tier?.supportsTools ?: true)
+                options.budget.maxTurns?.let { put("max_turns", it) }
+                put("permission", options.permissionMode)
+                put("grants", JsonArray(options.grants.map(::JsonPrimitive)))
+            })
+        })
+        if (session in reviewed.value) {
+            send(line { put("type", "reviewed_session"); put("session", session) })
+            reviewed.update { it - session }
+        }
+    }
+
+    private val reviewed = MutableStateFlow<Set<String>>(emptySet())
+
+    private fun hasStoppingMutation(): Boolean = mutationRequests.value.any { key ->
+        val run = requestRuns.value[key]
+        run != null && activeRuns.value.values.none { it.id == run && !it.cancelled }
+    }
+
+    fun acknowledgeOutcome(session: String) {
+        check(!hasStoppingMutation()) { "本机操作仍在停止，请稍后核对实际结果" }
+        reviewed.update { it + session }
+        if (handle != 0L) { send(line { put("type", "reviewed_session"); put("session", session) }); reviewed.update { it - session } }
     }
 
     /** `decision`：once（允许这一次）、always（这次对话里一直允许）、deny（拒绝）。 */
@@ -199,10 +251,8 @@ class AgentRuntime(
         pump = null
         workers?.cancel()
         workers = null
-        requestsLock.withLock {
-            requests.values.forEach { it.cancel() }
-            requests.clear()
-        }
+        requests.value.values.forEach { it.cancel() }
+        requests.value = emptyMap()
         if (h != 0L) withBlocking { runCatching { bridge.stop(h) } }
     }
 
@@ -226,7 +276,7 @@ class AgentRuntime(
                     pump = null
                     workers?.cancel()
                     workers = null
-                    requestsLock.withLock { requests.values.forEach { it.cancel() }; requests.clear() }
+                    requests.value.values.forEach { it.cancel() }; requests.value = emptyMap()
                     withBlocking { runCatching { bridge.stop(h) } }
                     affected
                 } else null
@@ -242,7 +292,7 @@ class AgentRuntime(
                         activeRuns.value = emptyMap()
                         workers?.cancel()
                         workers = null
-                        requestsLock.withLock { requests.values.forEach { it.cancel() }; requests.clear() }
+                        requests.value.values.forEach { it.cancel() }; requests.value = emptyMap()
                         withBlocking { runCatching { bridge.stop(h) } }
                     }
                 }
@@ -258,16 +308,24 @@ class AgentRuntime(
 
     private fun pendingRun(session: String, epoch: Long): ActiveRun? {
         val running = activeRuns.value
-        val run = if (session.isEmpty()) running.values.singleOrNull() else running[session]
+        val run = if (session.isEmpty()) running.values.filter { it.generation == epoch && !it.cancelled }.singleOrNull() else running[session]
         return run?.takeIf { it.generation == epoch && !it.cancelled }
     }
 
-    private suspend fun request(id: String, epoch: Long, requestScope: CoroutineScope, action: suspend () -> Unit) {
+    private fun request(id: String, epoch: Long, requestScope: CoroutineScope, run: String? = null, mutation: Boolean = false, onSkipped: (() -> Unit)? = null, action: suspend () -> Unit) {
         val key = epoch to id
-        val job = requestScope.launch(Dispatchers.Default, start = CoroutineStart.LAZY) {
-            try { action() } finally { requestsLock.withLock { requests.remove(key) } }
+        val began = MutableStateFlow(false)
+        val job = requestScope.launch(Dispatchers.Default, start = CoroutineStart.LAZY) { began.value = true; action() }
+        if (run != null) requestRuns.update { it + (key to run) }
+        if (mutation) mutationRequests.update { it + key }
+        requests.update { it + (key to job) }
+        // Also runs for a LAZY coroutine cancelled before its body begins.
+        job.invokeOnCompletion {
+            requests.update { if (it[key] == job) it - key else it }
+            mutationRequests.update { it - key }
+            requestRuns.update { it - key }
+            if (!began.value) runCatching { onSkipped?.invoke() }
         }
-        requestsLock.withLock { requests[key] = job }
         job.start()
     }
 
@@ -276,10 +334,12 @@ class AgentRuntime(
         when (obj["type"].str()) {
             "model_request" -> {
                 val id = obj["id"].str() ?: return
-                val body = withReasoningEffort(obj["body"].str() ?: return, currentReasoning)
+                val running = pendingRun(obj["session"].str().orEmpty(), epoch)
+                val body = withReasoningEffort(obj["body"].str() ?: return, if (running != null) running.options.let { it.reasoningByTier[it.tier] } else currentReasoning)
                 val affected = activeRuns.value.values.map { it.id }.toSet()
-                request(id, epoch, requestScope) {
+                request(id, epoch, requestScope, running?.id) {
                     val result = try {
+                        if (running == null || pendingRun(obj["session"].str().orEmpty(), epoch)?.id != running.id) throw CancellationException("run cancelled")
                         model(body) { l -> sendFor(h, epoch, line { put("type", "model_line"); put("id", id); put("line", l) }) }
                     } catch (e: CancellationException) {
                         throw e
@@ -297,24 +357,36 @@ class AgentRuntime(
                     }
                 }
             }
-            "model_cancel" -> obj["id"].str()?.let { id -> requestsLock.withLock { requests.remove(epoch to id) }?.cancel() }
+            "model_cancel", "tool_cancel" -> obj["id"].str()?.let { id -> requests.value[epoch to id]?.cancel() }
             "tool_request" -> {
                 val id = obj["id"].str() ?: return
                 val name = obj["name"].str().orEmpty()
                 val args = obj["arguments"] as? JsonObject ?: JsonObject(emptyMap())
-                val affected = activeRuns.value.values.map { it.id }.toSet()
-                request(id, epoch, requestScope) {
+                val session = obj["session"].str().orEmpty()
+                val running = pendingRun(session, epoch)
+                val tool = tools.firstOrNull { it.name == name }
+                request(id, epoch, requestScope, running?.id, mutation = tool?.risk != "read", onSkipped = {
+                    sendFor(h, epoch, line { put("type", "tool_result"); put("id", id); put("ok", false); put("cancelled", true); put("outcome_unknown", false); put("output", "已取消，工具未开始执行") })
+                }) {
+                    var entered = false
                     val result = try {
-                        tools.firstOrNull { it.name == name }?.run(args) ?: AgentToolResult(false, "没有这个工具：$name")
+                        currentCoroutineContext().ensureActive()
+                        if (running == null || pendingRun(session, epoch)?.id != running.id) throw CancellationException("run cancelled")
+                        entered = true
+                        tool?.run(args) ?: AgentToolResult(false, "没有这个工具：$name")
                     } catch (e: CancellationException) {
-                        throw e
-                    } catch (e: Exception) {
-                        AgentToolResult(false, e.message ?: "工具执行失败")
-                    }
-                    try {
+                        withContext(NonCancellable) {
+                            sendFor(h, epoch, line {
+                                put("type", "tool_result"); put("id", id); put("ok", false); put("cancelled", true)
+                                put("outcome_unknown", entered && tool?.risk != "read")
+                                put("output", if (entered && tool?.risk != "read") "操作被中断，结果需要核对" else "已取消，未确认执行副作用")
+                            })
+                        }
+                        return@request
+                    } catch (e: Exception) { AgentToolResult(false, e.message ?: "工具执行失败") }
+                    // If the operation completed, report its actual outcome even if cancellation raced the reply.
+                    withContext(NonCancellable) {
                         sendFor(h, epoch, line { put("type", "tool_result"); put("id", id); put("ok", result.ok); put("output", result.output) })
-                    } catch (e: Exception) {
-                        if (handle == h && generation == epoch) _events.emit(AgentEvent.Failure(e.message ?: "向智能体发送工具结果失败", affected))
                     }
                 }
             }
@@ -325,9 +397,14 @@ class AgentRuntime(
                 AgentEvent.Approval(
                     id = "$epoch:${obj["id"].str().orEmpty()}", tool = obj["tool"].str().orEmpty(), risk = obj["risk"].str() ?: "write",
                     arguments = obj["arguments"] as? JsonObject ?: JsonObject(emptyMap()), danger = obj["danger"].str(),
-                    session = session, run = run.id,
+                    session = session, run = run.id, canRemember = (obj["can_remember"] as? JsonPrimitive)?.booleanOrNull ?: (obj["danger"].str() == null),
                 ),
                 )
+            }
+            "approval_resolved" -> {
+                val session = obj["session"].str().orEmpty()
+                val run = activeRuns.value[session] ?: return
+                _events.emit(AgentEvent.Progress(run.id, "approval_resolved", buildJsonObject { put("id", "$epoch:${obj["id"].str().orEmpty()}") }))
             }
             "question" -> {
                 val session = obj["session"].str().orEmpty()
@@ -341,7 +418,7 @@ class AgentRuntime(
                 val run = obj["run"].str().orEmpty()
                 activeRuns.update { running -> running.filterValues { it.id != run || it.generation != epoch } }
                 _events.emit(
-                AgentEvent.RunEnd(obj["run"].str().orEmpty(), obj["ok"].let { (it as? JsonPrimitive)?.booleanOrNull } == true, obj["text"].str(), obj["error"].str()),
+                AgentEvent.RunEnd(obj["run"].str().orEmpty(), obj["ok"].let { (it as? JsonPrimitive)?.booleanOrNull } == true, obj["text"].str(), obj["error"].str(), obj["finish"].str(), obj["prompt_tokens"].str()?.toLongOrNull() ?: 0, obj["completion_tokens"].str()?.toLongOrNull() ?: 0),
                 )
             }
             "event" -> {
@@ -350,6 +427,7 @@ class AgentRuntime(
                 when (ev["type"].str()) {
                     "text_delta" -> ev["text"].str()?.let { _events.emit(AgentEvent.Text(run, it)) }
                     "tool_start" -> _events.emit(AgentEvent.ToolStart(run, ev["id"].str().orEmpty(), ev["name"].str().orEmpty(), ev["arguments"].str().orEmpty()))
+                    "reasoning_delta", "tool_input", "tool_waiting", "usage", "retrying", "truncated", "continuing" -> _events.emit(AgentEvent.Progress(run, ev["type"].str().orEmpty(), ev))
                     "tool_end" -> _events.emit(
                         AgentEvent.ToolEnd(run, ev["id"].str().orEmpty(), ev["output"].str().orEmpty(), (ev["is_error"] as? JsonPrimitive)?.booleanOrNull == true),
                     )

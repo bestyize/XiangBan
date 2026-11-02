@@ -1,5 +1,9 @@
 package xyz.xiangban.xiaoban.common.community
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -32,7 +36,7 @@ class InMemoryChatHistoryFiles : ChatHistoryFiles {
 data class ChatSummary(val id: String, val title: String, val updatedAtMs: Long, val workspace: String? = null)
 
 @Serializable
-private data class StoredChat(val id: String, val messages: List<ChatTurn>)
+data class StoredChat(val id: String, val messages: List<ChatTurn>, val options: ChatOptions = ChatOptions())
 
 /** 新对话的编号：时间加随机数，重开应用也不会和以前的对话撞上（智能体内核按这个编号存对话）。 */
 fun newChatId(nowMs: Long, random: Random = Random.Default): String =
@@ -52,22 +56,43 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
     private var folder = ""
     private var index: List<ChatSummary> = emptyList()
     private var groups: List<String> = emptyList()
-    /** 已经交给后台、还没写完的内容；这时读要以它为准。 */
-    private val pending = mutableMapOf<String, String?>()
-    private val writes = Channel<Pair<String, String?>>(Channel.UNLIMITED)
+    private data class Write(val revision: Long, val name: String, val text: String?)
+    private val pending = MutableStateFlow<Map<String, Write>>(emptyMap())
+    private val writes = Channel<Write>(Channel.UNLIMITED)
+    private var revision = 0L
+    private val options = mutableMapOf<String, ChatOptions>()
+    private val _saveError = MutableStateFlow<String?>(null)
+    val saveError = _saveError.asStateFlow()
+    private val failed = MutableStateFlow<Set<String>>(emptySet())
 
     init {
-        // 只有读写文件在后台线程；[pending] 只在 [scope] 的线程上碰。
         scope.launch {
-            for ((name, text) in writes) {
-                withContext(Dispatchers.Default) { runCatching { if (text == null) files.delete(name) else files.write(name, text) } }
-                if (pending[name] == text) pending.remove(name)
+            for (write in writes) {
+                if (pending.value[write.name] != write) continue
+                val result = try {
+                    withContext(Dispatchers.Default) {
+                        if (write.text == null) files.delete(write.name) else files.write(write.name, write.text)
+                    }
+                    Result.success(Unit)
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { Result.failure(e) }
+                if (result.isSuccess) {
+                    pending.update { if (it[write.name] == write) it - write.name else it }
+                    failed.update { it - write.name }
+                    if (failed.value.isEmpty()) _saveError.value = null
+                } else {
+                    failed.update { it + write.name }
+                    _saveError.value = "对话尚未保存，请重试保存；退出应用可能丢失未保存内容。"
+                }
             }
         }
     }
 
+    fun retryPending() { pending.value.values.sortedBy { it.revision }.forEach { writes.trySend(it) } }
+
     /** 换到某个账号的对话；返回它的对话列表（最近的在前）。 */
     fun useAccount(account: String?): List<ChatSummary> {
+        options.clear()
         folder = "chats/" + (account ?: "default").map { if (it.isLetterOrDigit() || it == '-' || it == '_') it else '_' }.joinToString("")
         index = read(indexName())?.let { runCatching { CommunityJson.decodeFromString<List<ChatSummary>>(it) }.getOrNull() }.orEmpty()
             .sortedByDescending { it.updatedAtMs }
@@ -113,22 +138,25 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
 
     fun list(): List<ChatSummary> = index
 
-    /** 读出一个对话；文件没了或坏了就从列表里去掉，返回 null。 */
-    fun load(id: String): List<ChatTurn>? {
-        val chat = read(chatName(id))?.let { runCatching { CommunityJson.decodeFromString<StoredChat>(it) }.getOrNull() }
-        if (chat == null && index.any { it.id == id }) {
-            index = index.filterNot { it.id == id }
-            enqueue(indexName(), CommunityJson.encodeToString(index))
-        }
-        return chat?.messages
+    /** Missing/corrupt/unreadable records must not silently remove the conversation index. */
+    fun loadSnapshot(id: String): StoredChat? = try {
+        read(chatName(id))?.let { CommunityJson.decodeFromString<StoredChat>(it) }?.also { options[id] = it.options }
+    } catch (e: Exception) {
+        _saveError.value = "无法读取这段对话，原记录已保留，请稍后重试。"
+        null
     }
 
+    fun load(id: String): List<ChatTurn>? = loadSnapshot(id)?.messages
+
     /** 存下一个对话（没有内容就不存），把它挪到列表最前面；返回新的列表。 */
-    fun save(id: String, messages: List<ChatTurn>, nowMs: Long): List<ChatSummary> {
-        val kept = messages.filter { it.text.isNotBlank() || it.error != null || it.tools.isNotEmpty() || it.role == "user" }
+    fun save(id: String, messages: List<ChatTurn>, nowMs: Long, settings: ChatOptions? = null): List<ChatSummary> {
+        val kept = messages.filter { it.text.isNotBlank() || it.reasoning.isNotBlank() || it.cancelled || it.error != null || it.tools.isNotEmpty() || it.role == "user" }
             .map { if (it.streaming) it.copy(streaming = false) else it }
+        val selected = settings ?: options[id] ?: ChatOptions()
+        selected.validate()
+        options[id] = selected
+        enqueue(chatName(id), CommunityJson.encodeToString(StoredChat(id, kept, selected)))
         if (kept.none { it.role == "user" }) return index
-        enqueue(chatName(id), CommunityJson.encodeToString(StoredChat(id, kept)))
         index = listOf(ChatSummary(id, chatTitle(kept), nowMs, index.firstOrNull { it.id == id }?.workspace)) + index.filterNot { it.id == id }
         enqueue(indexName(), CommunityJson.encodeToString(index))
         return index
@@ -147,12 +175,14 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
     private fun chatName(id: String) = "$folder/$id.json"
 
     private fun read(name: String): String? {
-        if (name in pending) return pending[name]
-        return runCatching { files.read(name) }.getOrNull()
+        pending.value[name]?.let { return it.text }
+        return try { files.read(name) } catch (e: CancellationException) { throw e }
+        catch (e: Exception) { _saveError.value = "无法读取对话存储，原记录已保留，请稍后重试。"; null }
     }
 
     private fun enqueue(name: String, text: String?) {
-        pending[name] = text
-        writes.trySend(name to text)
+        val write = Write(++revision, name, text)
+        pending.update { it + (name to write) }
+        writes.trySend(write)
     }
 }

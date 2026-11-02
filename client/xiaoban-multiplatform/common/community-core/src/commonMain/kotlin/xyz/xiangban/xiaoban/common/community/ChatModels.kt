@@ -40,6 +40,7 @@ data class ChatRecord(
 private val ToolLabels = mapOf(
     "shell" to "运行命令", "bash" to "运行命令", "read_file" to "读取文件", "write_file" to "写入文件", "edit_file" to "修改文件",
     "list_dir" to "查看文件夹", "grep" to "搜索文件", "web_fetch" to "打开网页", "web_search" to "搜索网页", "todo" to "任务清单",
+    "history_read" to "查阅对话历史", "tool_output_read" to "读取执行结果",
     "ask_user" to "向你提问", "time_now" to "查看时间", "memory_read" to "读取笔记", "memory_write" to "保存笔记", "load_skill" to "读取技能",
     "set_reminder" to "设置提醒", "care_set" to "设置提醒", "care_list" to "查看提醒", "care_delete" to "删除提醒",
     "wallpaper_list" to "查看壁纸", "wallpaper_apply" to "更换壁纸", "wallpaper_create" to "创作壁纸",

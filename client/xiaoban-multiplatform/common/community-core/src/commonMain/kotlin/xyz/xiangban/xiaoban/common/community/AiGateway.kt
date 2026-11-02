@@ -57,6 +57,9 @@ data class AiTier(
     @SerialName("requires_paid") val requiresPaid: Boolean = false,
     val available: Boolean = true,
     @SerialName("reasoning_efforts") val reasoningEfforts: List<String> = emptyList(),
+    @SerialName("context_window_tokens") val contextWindowTokens: Int? = null,
+    @SerialName("supports_tools") val supportsTools: Boolean? = null,
+    @SerialName("max_output_tokens") val maxOutputTokens: Int? = null,
 )
 
 @Serializable
@@ -244,6 +247,7 @@ class AiGatewayApi(
     }
 
     internal suspend fun postChatRaw(body: String, onLine: suspend (String) -> Unit): ModelResult {
+        if (body.encodeToByteArray().size > CHAT_BODY_BYTES) return ModelResult(413, body = "{\"error\":{\"message\":\"request_too_large: 当前请求超过 8 MiB，请减少附件或缩短文本\"}}")
         val token = try {
             requireToken()
         } catch (e: ApiException) {
@@ -256,8 +260,9 @@ class AiGatewayApi(
                 contentType(ContentType.Application.Json)
                 setBody(body)
                 timeout {
-                    requestTimeoutMillis = 180_000
-                    socketTimeoutMillis = 60_000
+                    connectTimeoutMillis = 15_000
+                    requestTimeoutMillis = Long.MAX_VALUE
+                    socketTimeoutMillis = 90_000
                 }
             }.execute { response ->
                 val status = response.status.value
@@ -266,6 +271,7 @@ class AiGatewayApi(
                 while (!channel.isClosedForRead) {
                     val line = channel.readUTF8Line() ?: break
                     onLine(line)
+                    if (line.removePrefix("data:").trim() == "[DONE]") break
                 }
                 ModelResult(status)
             }
@@ -283,26 +289,11 @@ class AiGatewayApi(
         messages: List<ChatMessage>,
         tier: String? = null,
         reasoningEffort: String? = null,
+        contextTokens: Int = 256_000,
         onDelta: (String) -> Unit = {},
     ): String {
         val token = requireToken()
-        val payload = buildJsonObject {
-            if (!tier.isNullOrBlank()) put("model", tier.trim())
-            reasoningEffort?.let { put("reasoning_effort", it) }
-            put("stream", true)
-            put(
-                "messages",
-                buildJsonArray {
-                    for (m in messages) {
-                        add(buildJsonObject {
-                            put("role", m.role)
-                            if (m.attachments.isEmpty()) put("content", m.content)
-                            else put("content", attachmentParts(m.content, m.attachments, chatCompletions = true))
-                        })
-                    }
-                },
-            )
-        }.toString()
+        val payload = boundedChatBody(messages, tier, reasoningEffort, contextTokens)
 
         val statement = try {
             client.preparePost("$base/v1/chat/completions") {
@@ -311,8 +302,9 @@ class AiGatewayApi(
                 contentType(ContentType.Application.Json)
                 setBody(payload)
                 timeout {
-                    requestTimeoutMillis = 120_000
-                    socketTimeoutMillis = 60_000
+                    connectTimeoutMillis = 15_000
+                    requestTimeoutMillis = Long.MAX_VALUE
+                    socketTimeoutMillis = 90_000
                 }
             }
         } catch (e: CancellationException) {
@@ -422,6 +414,13 @@ data class ChatTurn(
     /** 处理过的授权、回答过的问题留下的痕迹。 */
     val records: List<ChatRecord> = emptyList(),
     val attachments: List<ChatAttachment> = emptyList(),
+    val reasoning: String = "",
+    val activity: String = "",
+    val promptTokens: Long = 0,
+    val completionTokens: Long = 0,
+    val truncated: Boolean = false,
+    val nativeNotStarted: Boolean = false,
+    val cancelled: Boolean = false,
 )
 
 /** 智能体要改动东西之前问用户：同意这一次，还是拒绝。 */
@@ -430,6 +429,7 @@ data class ChatApproval(
     val tool: String,
     val detail: String = "",
     val danger: String? = null,
+    val canRemember: Boolean = true,
 )
 
 data class ChatQuestion(val id: String, val question: String, val options: List<String>)
@@ -439,6 +439,12 @@ data class CloudChatState(
     val selectedTier: String = "",
     val reasoningByTier: Map<String, String> = emptyMap(),
     val balance: AiBalance? = null,
+    val contextTokens: Int = 256_000,
+    val permissionMode: String = "ask",
+    val grants: List<String> = emptyList(),
+    val budget: AgentExecutionBudget = AgentExecutionBudget(),
+    val saveError: String? = null,
+    val nativeAgentAvailable: Boolean = false,
     val loadingMeta: Boolean = false,
     val metaError: String? = null,
     val messages: List<ChatTurn> = emptyList(),
@@ -461,8 +467,20 @@ data class CloudChatState(
 private fun systemNowMs(): Long = Clock.System.now().toEpochMilliseconds()
 
 /** 内核报的错带着“HTTP 402: ”这样的前缀，给人看时去掉。 */
-internal fun friendlyAgentError(raw: String?): String =
-    raw.orEmpty().replace(Regex("^HTTP \\d+: "), "").ifBlank { "智能体执行出错" }
+internal fun friendlyAgentError(raw: String?): String {
+    val text = raw.orEmpty()
+    return when {
+        "tool_outcome_needs_review" in text || "Execution outcome unknown" in text -> "操作已中断，结果尚未确认。请先核对文件、提醒或作品的实际状态，再继续任务。"
+        "resources_busy" in text -> "共享资源正在被其他任务使用，当前任务已暂停；等前一个操作结束后再继续。"
+        "invalid_model_terminal_or_call_identity" in text -> "模型返回了无效的工具调用，本轮已暂停，未执行这些无效调用。"
+        "output_length_limit" in text -> "模型连续输出不完整，已暂停；可缩小单次任务或调整模型后继续。"
+        "no_progress" in text -> "任务连续没有取得进展，已暂停。可以补充信息后继续。"
+        "BudgetExceeded" in text || "budget exceeded" in text -> "已达到本次任务预算，可调整预算后继续。"
+        "turn limit" in text -> "已达到你设置的任务轮数预算，可调整后继续。"
+        "cannot retry" in text || "retry requires" in text || "unanswered user message" in text || "cannot be replayed" in text -> "上一轮已有执行记录，请继续任务，不要重新执行原请求。"
+        else -> text.replace(Regex("^HTTP \\d+: "), "").ifBlank { "智能体执行出错" }
+    }
+}
 
 /** 给工具卡片和确认框看的一行说明。 */
 internal fun summarizeToolArguments(tool: String, arguments: String): String {
@@ -498,27 +516,33 @@ class CloudChatController(
     private var nextId = 1L
     private var metaJob: Job? = null
     private var chatJob: Job? = null
+    private var sendEpoch = 0L
     private var agentSession = newSessionId()
         set(value) { field = value; _state.value = _state.value.copy(conversationId = value) }
     private var agentRun: String? = null
     private var agentReplyId: Long = 0
+    private val stoppingRuns = mutableMapOf<String, Pair<String, Long>>()
 
     init {
-        _state.value = _state.value.copy(conversationId = agentSession)
+        _state.value = _state.value.copy(conversationId = agentSession, nativeAgentAvailable = agent != null)
+        history?.let { store -> scope.launch { store.saveError.collect { error -> _state.value = _state.value.copy(saveError = error) } } }
         agent?.let { runtime -> scope.launch { runtime.events.collect(::onAgentEvent) } }
     }
 
     /** 换到某个账号（登录后、换号后调用）：读出这个账号存下的对话列表，当前对话从头开始。 */
     fun useAccount(account: String?) {
-        val list = history?.useAccount(account) ?: emptyList()
+        metaJob?.cancel()
+        // Stop and save under the OLD account before changing the storage namespace.
         clearConversation()
-        _state.value = _state.value.copy(reasoningByTier = emptyMap(), conversations = list, workspaces = history?.workspaces().orEmpty())
+        stoppingRuns.clear()
+        val list = history?.useAccount(account) ?: emptyList()
+        _state.value = _state.value.copy(tiers = emptyList(), balance = null, selectedTier = "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
     }
 
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
     fun openConversation(id: String) {
         if (id == agentSession && _state.value.messages.isNotEmpty()) return
-        val saved = history?.load(id)
+        val saved = history?.loadSnapshot(id)
         if (saved == null) {
             _state.value = _state.value.copy(conversations = history?.list().orEmpty())
             return
@@ -526,8 +550,9 @@ class CloudChatController(
         stop()
         agentSession = id
         agentRun = null
-        nextId = (saved.maxOfOrNull { it.id } ?: 0L) + 1
-        _state.value = _state.value.copy(messages = saved, approval = null, question = null)
+        nextId = (saved.messages.maxOfOrNull { it.id } ?: 0L) + 1
+        applyOptions(saved.options)
+        _state.value = _state.value.copy(messages = saved.messages, approval = null, question = null)
     }
 
     /** 删掉一个存下来的对话；删的是正在看的就换成新对话。 */
@@ -548,8 +573,44 @@ class CloudChatController(
 
     /** 把当前对话存一下（发出提问、回答结束、停止时）。 */
     private fun persist() {
-        val list = history?.save(agentSession, _state.value.messages, clock()) ?: return
+        val list = history?.save(agentSession, _state.value.messages, clock(), options()) ?: return
         _state.value = _state.value.copy(conversations = list, workspaces = history?.workspaces().orEmpty())
+    }
+
+    private fun options(): ChatOptions = _state.value.let {
+        ChatOptions(it.selectedTier, it.reasoningByTier, it.contextTokens, it.permissionMode, it.grants, it.budget)
+    }
+
+    private fun applyOptions(value: ChatOptions) {
+        _state.value = _state.value.copy(selectedTier = value.tier, reasoningByTier = value.reasoningByTier,
+            contextTokens = value.contextTokens, permissionMode = value.permissionMode, grants = value.grants, budget = value.budget)
+    }
+
+    fun setPermission(mode: String) {
+        require(mode in setOf("ask", "auto"))
+        val next = options().copy(permissionMode = mode)
+        agent?.configureSession(agentSession, next, _state.value.activeTier)
+        applyOptions(next); persist()
+    }
+
+    fun revokeGrant(tool: String) {
+        val next = options().copy(grants = _state.value.grants - tool)
+        agent?.configureSession(agentSession, next, _state.value.activeTier)
+        applyOptions(next); persist()
+    }
+
+    fun setExecution(contextTokens: Int, budget: AgentExecutionBudget) {
+        check(!_state.value.sending) { "请先停止当前任务再修改预算" }
+        val next = options().copy(contextTokens = contextTokens, budget = budget)
+        next.validate(); applyOptions(next); persist()
+    }
+
+    fun retrySave() { history?.retryPending() }
+
+    fun acknowledgeOutcome() {
+        check(!_state.value.sending)
+        agent?.acknowledgeOutcome(agentSession)
+        send("我已核对上一轮操作的实际结果。请先读取当前状态，再继续未完成部分，避免重复操作。")
     }
 
     /** 加载档位与余额，并按桌面端同一规则选定可用默认档位。 */
@@ -591,12 +652,15 @@ class CloudChatController(
         val choices = _state.value.reasoningByTier - tier
         _state.value = _state.value.copy(selectedTier = tier,
             reasoningByTier = if (effort == null) choices else choices + (tier to effort))
+        persist()
     }
 
     fun selectTier(tier: String) {
+        if (_state.value.sending) return
         val found = _state.value.tiers.firstOrNull { it.tier == tier }
         if (found != null && !found.available) return
         _state.value = _state.value.copy(selectedTier = tier)
+        persist()
     }
 
     fun send(rawPrompt: String) = sendPrompt(rawPrompt, "")
@@ -605,7 +669,7 @@ class CloudChatController(
 
     fun sendVoice(rawPrompt: String, note: String) = sendPrompt(rawPrompt, note)
 
-    private fun sendPrompt(rawPrompt: String, note: String, attachments: List<ChatAttachment> = emptyList()) {
+    private fun sendPrompt(rawPrompt: String, note: String, attachments: List<ChatAttachment> = emptyList(), nativeRetry: Boolean = false, reuseUser: Boolean = false) {
         val prompt = rawPrompt.trim().ifEmpty { if (attachments.isNotEmpty()) "请查看附件。" else "" }
         if (prompt.isEmpty() || _state.value.sending) return
         validateChatAttachments(attachments)
@@ -621,16 +685,20 @@ class CloudChatController(
             }
             add(ChatMessage("user", note + prompt, attachments))
         }
+        val epoch = ++sendEpoch
+        val ownerSession = agentSession
         val tier = _state.value.selectedTier.ifEmpty { null }
         val reasoning = _state.value.reasoningByTier[tier]?.takeIf { it in _state.value.activeTier?.reasoningEfforts.orEmpty() }
         _state.value = _state.value.copy(
-            messages = _state.value.messages + userTurn + assistantTurn,
+            messages = _state.value.messages + (if (nativeRetry || reuseUser) emptyList() else listOf(userTurn)) + assistantTurn,
             sending = true,
             approval = null,
             question = null,
         )
         persist()
         if (agent != null) {
+            val snapshot = options()
+            val tierSnapshot = _state.value.activeTier
             agentReplyId = replyId
             val session = agentSession
             chatJob = scope.launch {
@@ -640,11 +708,12 @@ class CloudChatController(
                     // 先记下这一轮的编号再发出去，免得回来的事件比赋值还早。
                     val runId = agent.nextRunId()
                     agentRun = runId
-                    agent.run(session, note + prompt, runId, attachments)
+                    agent.run(session, note + prompt, runId, attachments, snapshot, tierSnapshot, retry = nativeRetry)
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    updateTurn(replyId) { it.copy(streaming = false, error = "智能体启动失败：${e.message ?: "未知原因"}") }
+                    if (epoch != sendEpoch || ownerSession != agentSession) return@launch
+                    updateTurn(replyId) { it.copy(streaming = false, error = "智能体启动失败：${e.message ?: "未知原因"}", nativeNotStarted = true) }
                     agentRun = null
                     _state.value = _state.value.copy(sending = false, approval = null, question = null)
                     persist()
@@ -654,18 +723,21 @@ class CloudChatController(
         }
         chatJob = scope.launch {
             try {
-                api.streamChat(history, tier, reasoning) { delta ->
-                    updateTurn(replyId) { it.copy(text = it.text + delta) }
+                api.streamChat(history, tier, reasoning, _state.value.activeTier?.contextWindowTokens?.let { minOf(it, _state.value.contextTokens) } ?: _state.value.contextTokens) { delta ->
+                    if (epoch == sendEpoch && ownerSession == agentSession) updateTurn(replyId) { it.copy(text = it.text + delta) }
                 }
+                if (epoch != sendEpoch || ownerSession != agentSession) return@launch
                 updateTurn(replyId) { it.copy(streaming = false) }
                 _state.value = _state.value.copy(sending = false)
                 persist()
                 refreshBalanceQuietly()
             } catch (e: CancellationException) {
+                if (epoch != sendEpoch || ownerSession != agentSession) throw e
                 updateTurn(replyId) { it.copy(streaming = false) }
                 _state.value = _state.value.copy(sending = false)
                 throw e
             } catch (e: Exception) {
+                if (epoch != sendEpoch || ownerSession != agentSession) return@launch
                 updateTurn(replyId) { it.copy(streaming = false, error = messageOf(e)) }
                 _state.value = _state.value.copy(sending = false)
                 persist()
@@ -683,29 +755,42 @@ class CloudChatController(
         regenerate()
     }
 
-    /** 丢掉最后一条回复，把最后一条用户提问再问一遍。 */
+    /** Never rewind only the UI while the native append-only history still contains tool effects. */
     fun regenerate() {
         val current = _state.value
         if (current.sending) return
         val index = current.messages.indexOfLast { it.role == "user" }
         if (index < 0) return
         val turn = current.messages[index]
+        val last = current.messages.lastOrNull() ?: return
+        if (agent != null) {
+            val safe = last.role == "assistant" && last.error != null && last.text.isBlank() && last.reasoning.isBlank() && last.tools.isEmpty() && last.records.isEmpty() && !last.error.orEmpty().contains("请继续任务")
+            if (safe) {
+                _state.value = current.copy(messages = current.messages.dropLast(1))
+                sendPrompt(turn.text, "", turn.attachments, nativeRetry = !last.nativeNotStarted, reuseUser = true)
+            } else {
+                send(if (last.error != null) "请接着上一次任务继续，先核对已执行操作的真实结果，再处理未完成部分，不要重复已完成的操作。"
+                    else "请结合上文重新回答上一条问题；此前已执行的操作不要重复执行。")
+            }
+            return
+        }
         _state.value = current.copy(messages = current.messages.take(index))
         sendWithAttachments(turn.text, turn.attachments)
     }
 
     /** 停止正在生成的流式回复，保留已输出的部分文字。 */
     fun stop() {
+        ++sendEpoch
         val wasSending = _state.value.sending
         chatJob?.cancel()
         chatJob = null
         val run = agentRun
         agentRun = null
-        run?.let { agent?.cancel(it) }
+        run?.let { stoppingRuns[it] = agentSession to agentReplyId; agent?.cancel(it) }
         val updated = _state.value.messages.mapNotNull { turn ->
             if (!turn.streaming) turn
-            else if (turn.text.isEmpty() && turn.error == null) null
-            else turn.copy(streaming = false, tools = settleTools(turn.tools, false))
+            else if (turn.text.isEmpty() && turn.error == null && turn.tools.isEmpty() && turn.reasoning.isEmpty() && run == null) null
+            else turn.copy(streaming = false, cancelled = true, activity = "已停止", tools = settleTools(turn.tools, true))
         }
         _state.value = _state.value.copy(messages = updated, sending = false, approval = null, question = null)
         if (wasSending) persist()
@@ -715,6 +800,7 @@ class CloudChatController(
         stop()
         agentSession = newSessionId()
         agentRun = null
+        applyOptions(ChatOptions(tier = pickAiTier(_state.value.tiers, "")))
         _state.value = _state.value.copy(messages = emptyList(), approval = null, question = null)
     }
 
@@ -723,6 +809,9 @@ class CloudChatController(
         val pending = _state.value.approval ?: return
         _state.value = _state.value.copy(approval = null, question = null)
         agent?.answerApproval(pending.id, decision)
+        if (decision == "always" && pending.canRemember && pending.tool !in _state.value.grants) {
+            _state.value = _state.value.copy(grants = _state.value.grants + pending.tool)
+        }
         val record = ChatRecord("approval", toolLabel(pending.tool), if (decision == "deny") null else "已允许")
         updateTurn(agentReplyId) { it.copy(records = it.records + record) }
         persist()
@@ -744,6 +833,25 @@ class CloudChatController(
         tools.map { if (it.status == ToolStatus.Running) it.copy(status = if (failed) ToolStatus.Error else ToolStatus.Done, endedAtMs = nowMs()) else it }
 
     private fun onAgentEvent(event: AgentEvent) {
+        if (event is AgentEvent.ToolEnd && event.run != agentRun) {
+            stoppingRuns[event.run]?.let { stopped ->
+                fun update(turn: ChatTurn) = turn.copy(tools = turn.tools.map { if (it.id == event.id) it.copy(output = event.output, status = if (event.isError) ToolStatus.Error else ToolStatus.Done, endedAtMs = nowMs()) else it })
+                if (stopped.first == agentSession) { updateTurn(stopped.second, ::update); persist() }
+                else history?.loadSnapshot(stopped.first)?.let { saved ->
+                    history.save(stopped.first, saved.messages.map { if (it.id == stopped.second) update(it) else it }, clock(), saved.options)
+                }
+            }
+        }
+        if (event is AgentEvent.RunEnd && event.run != agentRun) {
+            val stopped = stoppingRuns.remove(event.run)
+            if (stopped != null && event.error.orEmpty().contains("tool_outcome_needs_review")) {
+                val message = friendlyAgentError(event.error)
+                if (stopped.first == agentSession) { updateTurn(stopped.second) { it.copy(error = message, cancelled = false, activity = "结果需要核对") }; persist() }
+                else history?.loadSnapshot(stopped.first)?.let { saved ->
+                    history.save(stopped.first, saved.messages.map { if (it.id == stopped.second) it.copy(error = message, cancelled = false, activity = "结果需要核对") else it }, clock(), saved.options)
+                }
+            }
+        }
         when (event) {
             is AgentEvent.Text -> if (event.run == agentRun) updateTurn(agentReplyId) { it.copy(text = it.text + event.text) }
             is AgentEvent.ToolStart -> if (event.run == agentRun) {
@@ -758,7 +866,7 @@ class CloudChatController(
                 }
             }
             is AgentEvent.Approval -> if (event.run == agentRun && _state.value.sending) _state.value = _state.value.copy(
-                approval = ChatApproval(event.id, event.tool, summarizeToolArguments(event.tool, event.arguments.toString()), event.danger),
+                approval = ChatApproval(event.id, event.tool, summarizeToolArguments(event.tool, event.arguments.toString()), event.danger, event.canRemember),
             )
             is AgentEvent.Question -> if (event.run == agentRun && event.session == agentSession && _state.value.sending) {
                 _state.value = _state.value.copy(question = ChatQuestion(event.id, event.question, event.options))
@@ -767,13 +875,30 @@ class CloudChatController(
                 val failure = if (event.ok) null else friendlyAgentError(event.error)
                 updateTurn(agentReplyId) { turn ->
                     // 只调工具、没有说话的一轮，回复里留空；失败时把原因挂在这条回复上。
-                    turn.copy(streaming = false, error = failure, text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text, tools = settleTools(turn.tools, !event.ok))
+                    turn.copy(streaming = false, activity = "", error = failure, text = if (turn.text.isEmpty() && event.ok) event.text.orEmpty() else turn.text, tools = settleTools(turn.tools, !event.ok), truncated = turn.truncated || event.finish == "length", promptTokens = maxOf(turn.promptTokens, event.promptTokens), completionTokens = maxOf(turn.completionTokens, event.completionTokens))
                 }
                 _state.value = _state.value.copy(sending = false, approval = null, question = null)
                 agentRun = null
                 persist()
                 if (!event.ok && (failure.orEmpty().contains("额度") || failure.orEmpty().contains("兑换"))) refreshBalanceQuietly()
                 else if (event.ok) refreshBalanceQuietly()
+            }
+            is AgentEvent.Progress -> if (event.run == agentRun) {
+                if (event.kind == "approval_resolved" && _state.value.approval?.id == event.detail["id"].asStr()) _state.value = _state.value.copy(approval = null)
+                updateTurn(agentReplyId) { turn ->
+                fun str(name: String) = event.detail[name].asStr().orEmpty()
+                fun num(name: String) = str(name).toLongOrNull() ?: 0
+                when (event.kind) {
+                    "reasoning_delta" -> turn.copy(reasoning = turn.reasoning + str("text"))
+                    "usage" -> turn.copy(promptTokens = turn.promptTokens + num("prompt_tokens"), completionTokens = turn.completionTokens + num("completion_tokens"))
+                    "retrying" -> turn.copy(reasoning = "", activity = "正在重试（${str("attempt")}）")
+                    "continuing" -> turn.copy(activity = "正在继续未完成任务")
+                    "truncated" -> turn.copy(truncated = true)
+                    "tool_waiting" -> turn.copy(activity = if (str("waiting") == "true") "正在等待资源" else "")
+                    "tool_input" -> turn.copy(activity = "正在准备 ${str("name")}（${str("bytes")} 字节）")
+                    else -> turn
+                }
+                }
             }
             is AgentEvent.Failure -> if (agentRun != null && _state.value.sending && (event.runs == null || agentRun in event.runs)) {
                 updateTurn(agentReplyId) { it.copy(streaming = false, error = event.message, tools = settleTools(it.tools, true)) }
@@ -814,7 +939,7 @@ class CloudChatController(
         chatJob?.cancel()
         agentRun?.let { agent?.cancel(it) }
         agentRun = null
-        _state.value = CloudChatState()
+        _state.value = CloudChatState(nativeAgentAvailable = agent != null)
         agentSession = newSessionId()
     }
 

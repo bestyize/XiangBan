@@ -21,7 +21,7 @@
 
 use agent_kernel::builtin::{AskUser, TimeNow, Todo};
 use agent_kernel::provider::stream::{SseParser, StreamAccumulator};
-use agent_kernel::provider::wire::{build_request_body, ProviderProfile};
+use agent_kernel::provider::wire::{encode_request_body, ProviderProfile};
 use agent_kernel::stdio::StdioBridge;
 use agent_kernel::*;
 use serde::Deserialize;
@@ -35,6 +35,7 @@ use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 pub mod jni_api;
+mod policy;
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(|e| e.into_inner())
@@ -63,7 +64,7 @@ pub struct Config {
 }
 
 fn default_context_tokens() -> usize {
-    60_000
+    256_000
 }
 
 #[derive(Deserialize, Clone)]
@@ -77,6 +78,8 @@ pub struct HostToolDef {
     pub risk: String,
     #[serde(default = "default_tool_timeout")]
     pub timeout_secs: u64,
+    #[serde(default)] pub always_ask: bool,
+    #[serde(default)] pub untrusted_output: bool,
 }
 
 fn default_risk() -> String {
@@ -107,6 +110,8 @@ enum ModelMsg {
 struct ToolMsg {
     ok: bool,
     output: String,
+    cancelled: bool,
+    outcome_unknown: bool,
 }
 
 /// What the engine says to the host, and who is waiting for the host's answers.
@@ -183,6 +188,7 @@ impl Read for LineReader {
 struct HostModel {
     rpc: Arc<Rpc>,
     model: Arc<Mutex<String>>,
+    settings: policy::Settings,
 }
 
 fn http_error(status: u16, body: &str) -> HarnessError {
@@ -196,8 +202,20 @@ fn http_error(status: u16, body: &str) -> HarnessError {
 
 impl ModelProvider for HostModel {
     fn chat(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
-        let profile = ProviderProfile::new("host", "", lock(&self.model).clone());
-        let mut body = build_request_body(&profile, request);
+        self.chat_with_reasoning(request, on_text, &mut |_, _| {}, cancel)
+    }
+
+    fn chat_with_reasoning(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(ReasoningKind, &str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
+        self.chat_with_progress(request, on_text, on_reasoning, &mut |_| {}, cancel)
+    }
+
+    fn chat_with_progress(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(ReasoningKind, &str), on_tool: &mut dyn FnMut(&ToolProgress), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
+        let session = policy::MODEL_SESSION.with(|s| s.borrow().clone());
+        let settings = lock(&self.settings).get(&session).cloned();
+        let mut profile = ProviderProfile::new("host", "", settings.as_ref().map(|s| s.model.clone()).unwrap_or_else(|| lock(&self.model).clone()));
+        profile.max_request_bytes = Some(8 * 1024 * 1024 - 4096);
+        if let Some(settings) = &settings { profile.supports_tools = settings.supports_tools; profile.max_output_tokens = settings.max_output_tokens; }
+        let mut body: Value = serde_json::from_slice(&encode_request_body(&profile, request)?).map_err(|e|HarnessError::Config(e.to_string()))?;
         if profile.model.trim().is_empty() {
             // No model chosen: leave the field out so the server uses its default.
             if let Some(fields) = body.as_object_mut() {
@@ -211,7 +229,7 @@ impl ModelProvider for HostModel {
         let finish = |rpc: &Rpc| {
             lock(&rpc.models).remove(&id);
         };
-        self.rpc.emit(&json!({ "type": "model_request", "id": id, "body": body }));
+        self.rpc.emit(&json!({ "type": "model_request", "id": id, "session": session, "body": body }));
 
         let (mut sse, mut acc) = (SseParser::default(), StreamAccumulator::default());
         let outcome = loop {
@@ -230,16 +248,17 @@ impl ModelProvider for HostModel {
                             Ok(v) => v,
                             Err(e) => break Err(HarnessError::provider(format!("bad stream chunk: {e}"), false)),
                         };
-                        if let Err(e) = acc.push(&chunk, on_text) {
+                        if let Err(e) = acc.push_with_reasoning(&chunk, on_text, on_reasoning) {
                             break Err(e);
                         }
+                        if let Some(progress) = acc.pending_tool_call() { on_tool(&progress); }
                     }
                 }
                 Ok(ModelMsg::End { status, error, body }) => {
                     if let Some(payload) = sse.flush() {
                         if payload.trim() != "[DONE]" {
                             if let Ok(chunk) = serde_json::from_str::<Value>(&payload) {
-                                let _ = acc.push(&chunk, on_text);
+                                let _ = acc.push_with_reasoning(&chunk, on_text, on_reasoning);
                             }
                         }
                     }
@@ -266,6 +285,8 @@ impl ModelProvider for HostModel {
 struct HostTool {
     spec: ToolSpec,
     rpc: Arc<Rpc>,
+    permission: Arc<Permission>,
+    trust: std::path::PathBuf,
 }
 
 impl Tool for HostTool {
@@ -273,27 +294,37 @@ impl Tool for HostTool {
         &self.spec
     }
 
-    fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
+    fn cancel_grace(&self) -> Duration { Duration::from_secs(3) }
+
+    fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
         let id = self.rpc.id("t");
         let (tx, rx) = mpsc::channel();
         lock(&self.rpc.tools).insert(id.clone(), tx);
-        self.rpc.emit(&json!({ "type": "tool_request", "id": id, "name": self.spec.name, "arguments": args }));
+        self.rpc.emit(&json!({ "type": "tool_request", "id": id, "session": ctx.session(), "run_id": ctx.run_id(), "name": self.spec.name, "arguments": args }));
         let started = Instant::now();
-        let outcome = loop {
-            if ctx.is_cancelled() || self.rpc.stopping.load(Ordering::SeqCst) {
-                break Err("cancelled".to_string());
+        let mut cancelling = None;
+        let result = loop {
+            if cancelling.is_none() && (ctx.is_cancelled() || self.rpc.stopping.load(Ordering::SeqCst) || started.elapsed() > self.spec.timeout) {
+                self.rpc.emit(&json!({"type":"tool_cancel","id":id,"session":ctx.session()}));
+                cancelling = Some(Instant::now());
             }
-            if started.elapsed() > self.spec.timeout {
-                break Err("the tool did not answer in time".to_string());
+            if cancelling.is_some_and(|at: Instant| at.elapsed() > Duration::from_secs(2)) {
+                break ToolResult::unknown("phone tool did not acknowledge cancellation");
             }
             match rx.recv_timeout(POLL_STEP) {
-                Ok(msg) => break if msg.ok { Ok(msg.output) } else { Err(msg.output) },
+                Ok(msg) if msg.outcome_unknown => break ToolResult::unknown(&msg.output),
+                Ok(msg) if msg.cancelled => break ToolResult::error("cancelled before a confirmed side effect"),
+                Ok(msg) => break if msg.ok { ToolResult::ok(msg.output) } else { ToolResult::error(msg.output) },
                 Err(RecvTimeoutError::Timeout) => continue,
-                Err(RecvTimeoutError::Disconnected) => break Err("the host stopped answering".to_string()),
+                Err(RecvTimeoutError::Disconnected) => break ToolResult::unknown("the phone stopped answering"),
             }
         };
         lock(&self.rpc.tools).remove(&id);
-        outcome
+        if result.structured_content.as_ref().is_some_and(|v|v["harness_status"] == "outcome_unknown") {
+            let _ = self.permission.restore_trust(&self.trust, ctx.session(), false);
+            let _ = self.permission.require_review(ctx.session());
+        }
+        result
     }
 }
 
@@ -312,6 +343,9 @@ pub struct Engine {
     model: Arc<Mutex<String>>,
     worker: Mutex<Option<JoinHandle<()>>>,
     closed_sent: AtomicBool,
+    permission: Arc<Permission>,
+    settings: policy::Settings,
+    trust: std::path::PathBuf,
 }
 
 impl Engine {
@@ -326,29 +360,42 @@ impl Engine {
             tools: Mutex::new(HashMap::new()),
         });
         let model = Arc::new(Mutex::new(config.model.clone()));
-        let provider: Arc<dyn ModelProvider> = Arc::new(HostModel { rpc: rpc.clone(), model: model.clone() });
+        let settings: policy::Settings = Arc::new(Mutex::new(HashMap::new()));
+        let provider: Arc<dyn ModelProvider> = Arc::new(HostModel { rpc: rpc.clone(), model: model.clone(), settings: settings.clone() });
         let bridge = StdioBridge::new(LineWriter { tx: out_tx.clone(), buf: Vec::new() });
         // Progress is independent of chat trimming and uses the same per-session isolation.
         let todo = Arc::new(Todo::new().persistent(std::path::Path::new(&config.sessions_dir).join("progress")));
 
-        let mut builder = Agent::builder(provider, Arc::new(JsonlStore::new(config.sessions_dir.clone())))
+        let always_confirm: std::collections::HashSet<_> = config.tools.iter().filter(|tool|tool.always_ask).map(|tool|tool.name.clone()).collect();
+        let permission = Arc::new(Permission::new(PermissionMode::Ask, bridge.approver()).danger_check(move |tool,args| {
+            if always_confirm.contains(tool) { Some("此工具每次执行都需要确认".into()) } else { policy::danger(tool,args) }
+        }).check_reads().honor_grants_after_taint());
+        let trust = std::path::Path::new(&config.sessions_dir).join("trust");
+        let store = Arc::new(JsonlStore::new(config.sessions_dir.clone()));
+        let spill = std::path::Path::new(&config.sessions_dir).join("tool-output");
+        let mut builder = Agent::builder(provider, store.clone())
             .system_prompt(config.system_prompt.clone())
             .tool(TimeNow::new().utc_offset_minutes(config.utc_offset_minutes))
             .middleware(todo.clone())
             .tool_arc(todo)
             .tool(AskUser::new(bridge.ask_handler()))
-            .middleware(Permission::new(PermissionMode::Ask, bridge.approver()))
+            .middleware(permission.clone())
             .middleware(RepeatGuard::new())
-            .middleware(ContextTrim::new(config.context_tokens).reserve_output(4096))
-            .middleware(ContinueGuard::new().max_per_run(8))
-            // Recover transient network/429/5xx failures, while retaining the 25-turn run limit.
-            .retry(RetryPolicy { max_retries: 2, ..Default::default() });
+            .middleware(policy::MobileContext { settings: settings.clone(), fallback_context: config.context_tokens })
+            .middleware(policy::MobileSpill(spill.clone()))
+            .tool(policy::OutputRead::new(spill))
+            .tool(policy::HistoryRead::new(store))
+            .middleware(ContinueGuard::new())
+            .retry(RetryPolicy { max_retries: 3, ..Default::default() })
+            .unlimited_turns();
         for def in &config.tools {
             let risk = parse_risk(&def.risk).map_err(|e| format!("tool `{}`: {e}", def.name))?;
-            let spec = ToolSpec::new(def.name.clone(), def.description.clone(), def.parameters.clone())
+            let mut spec = ToolSpec::new(def.name.clone(), def.description.clone(), def.parameters.clone())
                 .risk(risk)
                 .timeout(Duration::from_secs(def.timeout_secs.max(1)));
-            builder = builder.tool(HostTool { spec, rpc: rpc.clone() });
+            spec.always_ask = def.always_ask;
+            spec.untrusted_output = def.untrusted_output;
+            builder = builder.tool(HostTool { spec, rpc: rpc.clone(), permission: permission.clone(), trust: trust.clone() });
         }
         let agent = Arc::new(builder.build().map_err(|e| format!("cannot build the agent: {e}"))?);
 
@@ -370,6 +417,7 @@ impl Engine {
             model,
             worker: Mutex::new(Some(worker)),
             closed_sent: AtomicBool::new(false),
+            permission, settings, trust,
         }))
     }
 
@@ -397,9 +445,19 @@ impl Engine {
             }
             "tool_result" => {
                 if let Some(tx) = lock(&self.rpc.tools).get(&id) {
-                    let _ = tx.send(ToolMsg { ok: value["ok"].as_bool().unwrap_or(false), output: value["output"].as_str().unwrap_or("").to_string() });
+                    let _ = tx.send(ToolMsg { ok: value["ok"].as_bool().unwrap_or(false), output: value["output"].as_str().unwrap_or("").to_string(), cancelled: value["cancelled"].as_bool().unwrap_or(false), outcome_unknown: value["outcome_unknown"].as_bool().unwrap_or(false) });
                 }
                 Ok(())
+            }
+            "reviewed_session" => {
+                let session = value["session"].as_str().ok_or("missing session")?;
+                if !policy::valid_session(session) { return Err("invalid session identity".into()); }
+                self.permission.clear_review(session)
+            }
+            "configure_session" => {
+                let session = value["session"].as_str().ok_or("missing session")?;
+                let next = serde_json::from_value(value["settings"].clone()).map_err(|e|format!("invalid session settings: {e}"))?;
+                policy::configure(&self.settings, &self.permission, &self.trust, session, next)
             }
             "set_model" => {
                 *lock(&self.model) = value["model"].as_str().unwrap_or("").trim().to_string();

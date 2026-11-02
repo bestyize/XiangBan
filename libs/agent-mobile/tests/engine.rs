@@ -348,11 +348,11 @@ fn cancelling_while_waiting_for_an_answer_releases_the_question_and_session() {
 }
 
 #[test]
-fn transient_model_failures_stop_after_two_retries() {
+fn transient_model_failures_stop_after_three_retries() {
     let dir = temp_dir("retry");
     let engine = Engine::start(&config(&dir)).unwrap();
     engine.send(&json!({ "type": "run", "id": "r1", "session": "s1", "input": "你好" }).to_string()).unwrap();
-    for _ in 0..3 {
+    for _ in 0..4 {
         let request = next_of(&engine, "model_request");
         engine.send(&json!({ "type": "model_end", "id": request["id"], "status": 503, "body": "temporarily unavailable" }).to_string()).unwrap();
     }
@@ -392,5 +392,141 @@ fn time_now_uses_the_phones_optional_utc_offset() {
     assert!(body["messages"].to_string().contains("UTC+08:00"), "{body}");
     answer_text(&engine, &request, "这是本地时间。");
     assert_eq!(next_of(&engine, "run_end")["ok"], true);
+    engine.stop();
+}
+
+fn configure(engine: &Engine, session: &str, settings: Value) {
+    engine.send(&json!({"type":"configure_session","session":session,"settings":settings}).to_string()).unwrap();
+}
+
+#[test]
+fn productive_runs_pass_twenty_five_turns_and_explicit_budgets_still_stop() {
+    let dir = temp_dir("long-mobile");
+    let mut cfg: Value = serde_json::from_str(&config(&dir)).unwrap();
+    cfg["tools"][0]["risk"] = json!("read");
+    let engine = Engine::start(&cfg.to_string()).unwrap();
+    configure(&engine,"s1",json!({"model":"chosen","max_turns":null}));
+    engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"完成三十个不同的步骤"}).to_string()).unwrap();
+    for i in 0..30 {
+        let model = next_of(&engine,"model_request");
+        assert_eq!(model["session"],"s1");
+        let body: Value = serde_json::from_str(model["body"].as_str().unwrap()).unwrap();
+        assert_eq!(body["model"],"chosen");
+        ask_tool(&engine,&model,"set_reminder",json!({"title":format!("step {i}"),"minutes":i+1}),&format!("c{i}"));
+        let tool = next_of(&engine,"tool_request");
+        engine.send(&json!({"type":"tool_result","id":tool["id"],"ok":true,"output":format!("step {i} done")}).to_string()).unwrap();
+    }
+    let model = next_of(&engine,"model_request");
+    answer_text(&engine,&model,"三十步已完成。");
+    assert_eq!(next_of(&engine,"run_end")["ok"],true);
+    configure(&engine,"s1",json!({"model":"chosen","max_turns":1}));
+    engine.send(&json!({"type":"run","id":"r2","session":"s1","input":"再执行两个步骤"}).to_string()).unwrap();
+    let model = next_of(&engine,"model_request");
+    ask_tool(&engine,&model,"set_reminder",json!({"title":"budget","minutes":100}),"limited");
+    let tool = next_of(&engine,"tool_request");
+    engine.send(&json!({"type":"tool_result","id":tool["id"],"ok":true,"output":"done"}).to_string()).unwrap();
+    let end = next_of(&engine,"run_end");
+    assert!(end["error"].as_str().unwrap().contains("turn limit (1)"),"{end}");
+    engine.stop();
+}
+
+#[test]
+fn cancellation_reaches_the_host_and_requires_acknowledgement() {
+    let dir = temp_dir("host-cancel-ack");
+    let engine = Engine::start(&config(&dir)).unwrap();
+    configure(&engine,"s1",json!({"permission":"auto"}));
+    engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"设置提醒"}).to_string()).unwrap();
+    let model=next_of(&engine,"model_request");
+    ask_tool(&engine,&model,"set_reminder",json!({"title":"cancel","minutes":1}),"c1");
+    let tool=next_of(&engine,"tool_request");
+    engine.send(&json!({"type":"cancel","id":"r1"}).to_string()).unwrap();
+    let cancelled=next_of(&engine,"tool_cancel");
+    assert_eq!(cancelled["id"],tool["id"]);
+    engine.send(&json!({"type":"tool_result","id":tool["id"],"ok":false,"cancelled":true,"outcome_unknown":true,"output":"write may have committed"}).to_string()).unwrap();
+    let end=next_of(&engine,"run_end");
+    assert!(end["error"].as_str().unwrap().contains("tool_outcome_needs_review"),"{end}");
+    // Review persists even if the host configures full trust again.
+    configure(&engine,"s1",json!({"permission":"auto"}));
+    engine.send(&json!({"type":"run","id":"r2","session":"s1","input":"核对之后再做"}).to_string()).unwrap();
+    let model=next_of(&engine,"model_request");
+    ask_tool(&engine,&model,"set_reminder",json!({"title":"review","minutes":2}),"c2");
+    let approval=next_of(&engine,"approval_request");
+    assert_eq!(approval["can_remember"],false);
+    engine.send(&json!({"type":"approval","id":approval["id"],"decision":"deny"}).to_string()).unwrap();
+    let model=next_of(&engine,"model_request"); answer_text(&engine,&model,"未执行。");
+    next_of(&engine,"run_end");
+    engine.stop();
+}
+
+#[test]
+fn full_trust_still_confirms_deletion_and_grants_are_session_scoped() {
+    let dir=temp_dir("mobile-risk");
+    let mut cfg: Value=serde_json::from_str(&config(&dir)).unwrap();
+    cfg["tools"]=json!([{"name":"delete_file","description":"delete","risk":"write","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}}]);
+    let engine=Engine::start(&cfg.to_string()).unwrap();
+    configure(&engine,"s1",json!({"permission":"auto","grants":["delete_file"]}));
+    engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"删除草稿"}).to_string()).unwrap();
+    let model=next_of(&engine,"model_request");
+    ask_tool(&engine,&model,"delete_file",json!({"path":"drafts/game"}),"c1");
+    let approval=next_of(&engine,"approval_request");
+    assert!(approval["danger"].as_str().unwrap().contains("删除"));
+    assert_eq!(approval["can_remember"],false);
+    engine.send(&json!({"type":"approval","id":approval["id"],"decision":"deny"}).to_string()).unwrap();
+    let model=next_of(&engine,"model_request");answer_text(&engine,&model,"没有删除。");next_of(&engine,"run_end");
+    engine.stop();
+}
+
+#[test]
+fn safe_retry_reuses_the_unanswered_user_message() {
+    let dir=temp_dir("mobile-safe-retry");
+    let engine=Engine::start(&config(&dir)).unwrap();
+    engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"只问一次"}).to_string()).unwrap();
+    let model=next_of(&engine,"model_request");
+    engine.send(&json!({"type":"model_end","id":model["id"],"status":400,"body":"bad request"}).to_string()).unwrap();
+    assert_eq!(next_of(&engine,"run_end")["ok"],false);
+    engine.send(&json!({"type":"run","id":"r2","session":"s1","retry":true}).to_string()).unwrap();
+    let model=next_of(&engine,"model_request");
+    let body: Value=serde_json::from_str(model["body"].as_str().unwrap()).unwrap();
+    assert_eq!(body["messages"].as_array().unwrap().iter().filter(|m|m["role"]=="user").count(),1);
+    answer_text(&engine,&model,"成功。");next_of(&engine,"run_end");
+    engine.send(&json!({"type":"run","id":"r3","session":"s1","retry":true}).to_string()).unwrap();
+    assert_eq!(next_of(&engine,"run_end")["ok"],false,"a completed reply cannot be silently replayed");
+    engine.stop();
+}
+
+#[test]
+fn switching_to_full_trust_resolves_an_ordinary_pending_approval() {
+    let dir=temp_dir("mobile-live-permission");
+    let engine=Engine::start(&config(&dir)).unwrap();
+    configure(&engine,"s1",json!({"permission":"ask"}));
+    engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"设置提醒"}).to_string()).unwrap();
+    let model=next_of(&engine,"model_request");
+    ask_tool(&engine,&model,"set_reminder",json!({"title":"live","minutes":1}),"c1");
+    let approval=next_of(&engine,"approval_request");
+    configure(&engine,"s1",json!({"permission":"auto"}));
+    assert_eq!(next_of(&engine,"approval_resolved")["id"],approval["id"]);
+    let tool=next_of(&engine,"tool_request");
+    engine.send(&json!({"type":"tool_result","id":tool["id"],"ok":true,"output":"set"}).to_string()).unwrap();
+    let model=next_of(&engine,"model_request");answer_text(&engine,&model,"已设置。");
+    assert_eq!(next_of(&engine,"run_end")["ok"],true);
+    engine.stop();
+}
+
+#[test]
+fn productive_continuations_are_not_stopped_after_eight_nudges() {
+    let dir=temp_dir("mobile-continuations");
+    let mut cfg: Value=serde_json::from_str(&config(&dir)).unwrap();
+    cfg["tools"][0]["risk"]=json!("read");
+    let engine=Engine::start(&cfg.to_string()).unwrap();
+    engine.send(&json!({"type":"run","id":"r1","session":"s1","input":"继续完成十个步骤"}).to_string()).unwrap();
+    for i in 0..10 {
+        let model=next_of(&engine,"model_request");
+        ask_tool(&engine,&model,"set_reminder",json!({"title":format!("step {i}"),"minutes":i+1}),&format!("c{i}"));
+        let tool=next_of(&engine,"tool_request");
+        engine.send(&json!({"type":"tool_result","id":tool["id"],"ok":true,"output":format!("done {i}")}).to_string()).unwrap();
+        let model=next_of(&engine,"model_request");answer_text(&engine,&model,"接下来我继续执行下一步。");
+    }
+    let model=next_of(&engine,"model_request");answer_text(&engine,&model,"十个步骤已完成。");
+    assert_eq!(next_of(&engine,"run_end")["ok"],true);
     engine.stop();
 }

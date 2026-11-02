@@ -1,6 +1,9 @@
 package xyz.xiangban.xiaoban
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import androidx.compose.runtime.remember
 import xyz.xiangban.xiaoban.business.communitynative.AppPrefs
 import xyz.xiangban.xiaoban.business.communitynative.CommunityEnv
@@ -36,8 +39,10 @@ fun App(
     workspace: MobileWorkspace? = null,
     utcOffsetMinutes: Int = 0,
 ) {
-    val env = remember(storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffsetMinutes) {
-        CommunityEnv(storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech, prefs = prefs, chatFiles = chatFiles, workspace = workspace, utcOffsetMinutes = utcOffsetMinutes)
+    val compositionScope = rememberCoroutineScope()
+    val environmentScope = remember(compositionScope) { CoroutineScope(compositionScope.coroutineContext + Dispatchers.Default) }
+    val env = remember(environmentScope, storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffsetMinutes) {
+        CommunityEnv(scope = environmentScope, storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech, prefs = prefs, chatFiles = chatFiles, workspace = workspace, utcOffsetMinutes = utcOffsetMinutes)
     }
     CommunityNativeApp(env)
 }

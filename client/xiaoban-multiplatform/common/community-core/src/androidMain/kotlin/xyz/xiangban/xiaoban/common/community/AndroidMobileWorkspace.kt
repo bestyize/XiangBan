@@ -3,6 +3,8 @@ package xyz.xiangban.xiaoban.common.community
 import java.io.ByteArrayOutputStream
 import java.io.File
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import android.system.ErrnoException
 import android.system.Os
@@ -75,6 +77,7 @@ class AndroidMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
         try {
             temporary.writeBytes(content.encodeToByteArray())
             checked(path)
+            currentCoroutineContext().ensureActive()
             require(temporary.renameTo(file)) { "无法保存文件" }
         } finally { temporary.delete() }
         Unit
@@ -86,14 +89,15 @@ class AndroidMobileWorkspace(root: File) : ValidatedMobileWorkspace() {
         if (file.isDirectory && recursive) {
             // Inspect the whole tree before deleting anything; never delete through a symlink.
             entries(path, true)
-            fun removeTree(target: File) {
+            suspend fun removeTree(target: File) {
+                currentCoroutineContext().ensureActive()
                 val relative = target.relativeTo(root).invariantSeparatorsPath
                 val safe = checked(relative)
                 if (safe.isDirectory) (safe.listFiles() ?: error("无法读取目录")).forEach { removeTree(it) }
                 require(safe.delete()) { "无法删除：$relative" }
             }
             removeTree(file)
-        } else require(file.delete()) { "目录非空；删除整个目录需要 recursive=true" }
+        } else { currentCoroutineContext().ensureActive(); require(file.delete()) { "目录非空；删除整个目录需要 recursive=true" } }
         Unit
     }
 }

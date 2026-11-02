@@ -57,7 +57,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
         val chat = remember(env) { CloudChatController(env.ai, appScope, agent = env.agent, history = ChatHistory(env.chatFiles, appScope)) }
         // 登录、换号后读出这个账号存下的对话。
         val signedIn by env.session.state.collectAsState()
-        LaunchedEffect(signedIn.loggedIn, signedIn.accountId) { if (signedIn.loggedIn) chat.useAccount(signedIn.accountId) }
+        LaunchedEffect(signedIn.loggedIn, signedIn.accountId) { chat.useAccount(if (signedIn.loggedIn) signedIn.accountId else null) }
         var tab by rememberSaveable { mutableStateOf(Tab.Ai.name) }
         var stackText by rememberSaveable { mutableStateOf("") }
         var publishOpen by rememberSaveable { mutableStateOf(false) }
