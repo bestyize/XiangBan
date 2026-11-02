@@ -28,9 +28,12 @@ function updated(value:string) { const date=new Date(value); return Number.isNaN
 </div></template>
 <style scoped>
 .boards{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;padding:4px 0 12px}.board{min-width:0;background:var(--surface);padding:14px;border-radius:16px}header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}h2{font-size:16px;font-weight:650;margin:0}header a{font-size:12px;color:var(--ink-3);min-height:44px;display:flex;align-items:center;gap:6px;white-space:nowrap}header a span{font-size:20px}.source{font-size:11px;color:var(--ink-3);line-height:1.6;margin:4px 0 8px}.source.foot{margin:8px 0 0}.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:11px;color:var(--ink-3)}.legend span{display:flex;align-items:center;gap:4px}.legend i{width:6px;height:6px;border-radius:50%}.attribution{padding:0 2px}.attribution a{color:var(--brand)}
-@container page (min-width:1100px){.boards{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}.ability{grid-column:1;grid-row:1}.scatter{grid-column:2;grid-row:1}.speed{grid-column:1}.usage{grid-column:2}.attribution{grid-column:1/-1}}
+@media(min-width:1024px){
+@container page (min-width:960px){.boards{grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}.ability{grid-column:1;grid-row:1}.scatter{grid-column:2;grid-row:1}.speed{grid-column:1}.usage{grid-column:2}.attribution{grid-column:1/-1}}
+}
 
-@container page (min-width:1100px){
+@media(min-width:1024px){
+@container page (min-width:960px){
   .boards{padding-top:24px;gap:20px 24px}
   .boards.ready{grid-template-columns:minmax(0,1.55fr) minmax(330px,1fr);align-items:start}
   .boards.ready .scatter{grid-column:1;grid-row:1/span 3;align-self:start;position:sticky;top:calc(var(--header-h,56px) + 20px);padding:24px}
@@ -50,5 +53,6 @@ function updated(value:string) { const date=new Date(value); return Number.isNaN
   .scatter :deep(.scatter-plot:not(.full) .chart-area){height:clamp(220px,calc(100dvh - 540px),420px)}
   .scatter :deep(.scatter-plot:not(.full) .selected-detail){padding:12px 14px;font-size:14px}
   .scatter :deep(.scatter-plot:not(.full) .selected-detail p){font-size:12px}
+}
 }
 </style>

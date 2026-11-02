@@ -97,6 +97,12 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 排行榜概览 `/?tab=rankings` 按手机版顺序展示 AA 智能指数 Top 10、智能 vs 价格散点图、输出速度 Top 5、调用量 Top 5。`/models` 与调用量榜使用可展开的条形排行，支持快照实际提供的能力指标及 UTC 历史日榜。散点图沿用输入/输出 3:1 加权报价、对数价格轴、前沿与中位数优势区，支持厂商筛选、模型定位及全屏搜索。厂商图标来自手机本地资源（附原许可），不请求外部图片。相关验证：`node --experimental-strip-types --test tests/modelRankings.test.ts tests/discover.test.ts tests/navigation.test.ts`（在 web 目录运行）。
 
+### PC 网页布局（2026-11-02）
+
+公开社区页面在 1024px 起使用独立的 PC 样式：200px 导航栏、与正文对齐的顶部导航和搜索入口，内容区最大 1320px。社区首页的前沿图文、日报、精选作品分清主次，讨论和资源统一卡片与间距，正文保持阅读宽度。排行榜、开源榜、追踪和导航按实际内容宽度切换布局；原先内容容器最大 1000px，却使用 1100px 容器断点，导致宽屏布局无法生效，本轮将其改为 PC 范围内的 960px 内容断点。手机与后台不使用这套桌面样式。
+
+验证：网页生产构建（含 Vue/TypeScript 检查）与 navigation/discover/appearance 9 项测试通过；云浏览器使用生产公开数据的只读快照检查首页、讨论、资源、排行榜和日夜主题。预览未连接登录、发布和其他写操作；本轮没有部署生产网站。
+
 ## 社区内容层（内容包、方案、项目、周刊）
 
 接口都在 `/api` 下，实现见 `src/handlers/content.rs`，纯逻辑（体积上限、清单检查、签名）见 `src/content.rs`。

@@ -30,7 +30,7 @@ watch(() => session.loggedIn, v => {
 </script>
 <template>
   <RouterView v-if="bare" />
-  <div v-else class="site-layout" :class="{'focus-layout':route.meta.focus,'creation-layout':route.name === 'create','community-layout':areaOf(route) === 'community'}">
+  <div v-else class="site-layout" :class="{'focus-layout':route.meta.focus,'creation-layout':route.name === 'create','community-layout':areaOf(route) === 'community','community-root':['home','discuss','resources'].includes(String(route.name))}">
     <a class="skip-link" href="#main-content">跳到正文</a>
     <AppHeader />
     <main id="main-content" class="app-main" :class="{'focus-main':route.meta.focus}">
