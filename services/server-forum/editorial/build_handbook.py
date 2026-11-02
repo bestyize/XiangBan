@@ -106,8 +106,14 @@ def main():
              '当前标题为《反馈键盘导航问题：把焦点看不见的位置说清楚》，原链接https://chat.xiangban.xyz/t/1044和原封面保留，正文和标题已更新。新稿将W3C WAI的可见键盘焦点页面作为原始依据，明确其属于基础检查更新草案，附来源页https://www.w3.org/WAI/test-evaluate/easy-checks/keyboard-focus/。公开资料页也已补充这份来源，读者可从文末资料来源进入核对。\n\n'
              '修订稿已经重新独立审校并批准，公开正文与复审版本一致，原封面仍可读取。原稿与更正记录在站方内部保留，不以无痕替换来宣称原文从来没有问题。当前文章末尾明确写明：“补充W3C WAI原始资料，聚焦可见键盘焦点的记录方法，删除缺乏依据的评估与处理规则表述。”\n\n'
              '这是主动采编核对，不是接获用户投诉的公告，不涉及用户处罚。更正没有宣称已经发现或修复本站的键盘缺陷，也没有对本站作出WCAG合规结论。文中键盘操作场景仍明确标为教学示例，不能当成真实用户工单。新稿保留观察、猜测和未确认事项之间的区别；这份记录仅说明本次已完成的内容更正，不承诺后续处理时限、收费优先级或评估服务。')
+    docs['category-migration'] = dict(
+        title='2026-11-02社区旧分类迁移与入口核对记录', url='https://chat.xiangban.xyz/c/learn',
+        text='2026年11月2日，社区已完成旧分类向当前栏目结构的整理。当前五个一级分类为创作、学习和教程、休闲、资源、站务。旧“技术”入口对应“学习和教程”，旧“分享”入口对应“资源”，旧“小伴”入口对应“创作”。分类改名按原有分类记录迁移，保留历史编号、帖子及阅读权限；历史Claude Code与Codex标签帖子归入各自的教程子类，不因此解除原有阅读限制。\n\n'
+             '公开入口已经实际核对：/c/tech永久转向/c/learn，/c/share永久转向/c/resources，/c/xiaoban永久转向/c/create，/c/tech-llm永久转向/c/learn-local。这些旧入口的响应是308永久重定向，旧书签仍可带读者到达对应的当前分类。旧名称的分类查询也有兼容处理。当前公开分类列表共有45条记录，已经没有tech、share、xiaoban系列旧slug作为重复分类；这个记录数量包含一级分类及历史兼容记录，不等于45个当前采编话题。\n\n'
+             '旧/c/xiaoban-app入口转向/c/create-guides，保留“产品使用”历史分类的访问兼容。当前侧栏、分类标签和新发帖分类树已经不再把这一历史兼容项列成独立当前栏目；浏览器已确认移除后正常显示创作及特效文章列表。保留历史链接和从当前导航移除，是两个同时实施的动作，不表示原链接失效或历史文章已被删除。\n\n'
+             '读者可以继续从已有书签打开旧入口，也可以从当前分类名浏览。新发帖应在当前栏目中选择适合的分类。分类名称或位置变化不能当作文章删除、账号处分、内容变为公开或客户端新增能力的证据。本文档只记录此次已完成的分类整理和核对，不构造用户举报、处理案件或新产品功能。')
     topics['site-notice'] += '|'+'|'.join(value[0] for value in interface.values())
-    topics['site-reports'] += '|五篇站方导读的公开更正记录|键盘焦点反馈指南的补源与更正记录'
+    topics['site-reports'] += '|五篇站方导读的公开更正记录|键盘焦点反馈指南的补源与更正记录|旧分类迁移与入口兼容的实际核对记录'
     entries=[]
     for channel, raw in topics.items():
         for i,title in enumerate(raw.split('|'),1):
@@ -115,10 +121,10 @@ def main():
     for entry, key in zip([e for e in entries if e['channel']=='site-notice'][30:], interface):
         entry['documents']=['interface-'+key, 'community']
     next(e for e in entries if e['id']=='site-feedback-26')['documents']=['keyboard-focus','community','privacy']
-    for ident, doc in [('site-reports-31','guide-corrections'),('site-reports-32','keyboard-correction')]:
+    for ident, doc in [('site-reports-31','guide-corrections'),('site-reports-32','keyboard-correction'),('site-reports-33','category-migration')]:
         entry=next(e for e in entries if e['id']==ident)
         entry['documents']=[doc]
-        entry['boundary']='这是站方自身已完成的真实采编更正记录。只陈述已核实的文章和处理动作，不虚构用户举报、处罚、受影响人数、服务时限或新功能；不要把教学场景当成真实工单。'
+        entry['boundary']='这是站方自身已完成的真实采编更正或分类整理记录。只陈述已核实的文章、分类和处理动作，不虚构用户举报、处罚、受影响人数、服务时限或新功能；不要把教学场景当成真实工单。'
     output={'version':1,'documents':docs,'entries':entries}
     for doc in docs.values(): doc['sha256']=hashlib.sha256(doc['text'].encode()).hexdigest()
     (HERE/'handbook.json').write_text(json.dumps(output,ensure_ascii=False,indent=2)+'\n')
