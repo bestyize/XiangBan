@@ -430,7 +430,10 @@ async function introduceAssistant() {
 function openPageFromAssistant(page: string, tab?: string) {
   if (page === 'settings') { store.openSettings(tab as SettingsTab | undefined); return; }
   store.closeSettings();
-  if (page === 'studio' && tab) navigate(tab === 'pets' ? 'companion' : tab as ControlPage);
+  if (page === 'studio' && tab && ['wallpapers', 'effects', 'widgets', 'pets', 'skins'].includes(tab)) {
+    store.studioTab = tab as typeof store.studioTab;
+    navigate('studio');
+  }
   else navigate(page as ControlPage);
 }
 const assistantListeners: (() => void)[] = [];
@@ -452,6 +455,7 @@ async function listenForAssistant() {
       }catch(e){store.notify(e,'error');}
     }),
     listen<unknown>('games-open', () => { navigate('games'); }),
+    listen<unknown>('application-skins-changed', () => { void refreshSkins().catch(error => store.notify(error, 'error')); }),
     listen<{ page: string; tab?: string | null }>('control-navigate', ({ page, tab }) => openPageFromAssistant(page, tab ?? undefined)),
   ]);
   assistantListeners.push(...off);

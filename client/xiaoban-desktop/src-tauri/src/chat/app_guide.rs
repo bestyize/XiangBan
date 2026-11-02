@@ -16,7 +16,7 @@ pub(super) struct Feature {
 }
 
 pub(super) const PAGES: &[&str] = &["new-task", "ai-store", "library", "studio", "games", "care", "settings"];
-pub(super) const STUDIO_TABS: &[&str] = &["wallpapers", "effects", "widgets", "pets"];
+pub(super) const STUDIO_TABS: &[&str] = &["wallpapers", "effects", "widgets", "pets", "skins"];
 pub(super) const SETTINGS_TABS: &[&str] = &["general", "appearance", "ai", "assistant", "voice", "network", "safety", "about"];
 
 const NONE: &[&str] = &[];
@@ -57,10 +57,13 @@ pub(super) const FEATURES: &[Feature] = &[
     Feature { id: "library-memory", name: "资料库·记忆", path: "侧栏「资料库」→「记忆」标签", page: Some(("library", None)),
         does: "小伴留下的记忆：等你确认的候选经验、小伴的笔记（每次对话都带上）、做事经验、长期目标。对话里小伴能读写笔记、检索经验。右侧「让小伴记住我」开关可整体关闭记忆（已有记忆保留），也能清空全部记忆。记忆只存在本机。",
         by_hand: "确认/修改/忘掉某条、开关记忆、清空全部记忆要用户在页面里操作。打开页面后点「记忆」。", tools: &["memory_read", "memory_write", "experience_recall"] },
+    Feature { id: "application-skin", name: "界面皮肤", path: "侧栏「装扮」→「皮肤」", page: Some(("studio", Some("skins"))),
+        does: "查看内置和已安装皮肤、切换及恢复默认；创作前 skin_read_format 获取完整规范，无需用户提供模板。skin_create 从真实栅格图片或工作区完整草稿生成并校验 ZIP，安装到皮肤页，返回工作区 ZIP；不自动应用。skin_export 导出已安装的自制皮肤。当前只支持背景场景、图层和轻摆/发光互动，theme.json 配色暂不生效。与桌面壁纸、桌宠外壳和明暗/主题色分别管理。",
+        by_hand: "也可在皮肤页手动导入 ZIP、应用、导出、删除；创建后用户要求换肤才调用 skin_apply。", tools: &["skin_list", "skin_read_format", "skin_create", "skin_apply", "skin_export"] },
     Feature { id: "wallpaper", name: "壁纸", path: "侧栏「装扮」→「壁纸」", page: Some(("studio", Some("wallpapers"))),
         does: "查看、更换、创作、删除壁纸。", by_hand: "", tools: &["wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete"] },
     Feature { id: "effect", name: "桌面特效", path: "侧栏「装扮」→「特效」", page: Some(("studio", Some("effects"))),
-        does: "选用或创作粒子类桌面特效。", by_hand: "", tools: &["effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format"] },
+        does: "选用或创作粒子类桌面特效。", by_hand: "", tools: &["effect_list", "effect_set", "effect_monitor_set", "effect_create", "effect_delete", "effect_read_format"] },
     Feature { id: "widget", name: "桌面组件", path: "侧栏「装扮」→「组件」", page: Some(("studio", Some("widgets"))),
         does: "放置、移动、缩放、隐藏、移除时钟/天气/待办/日程/股票/木鱼/月历/纪念日组件；待办条目（增加、标记完成）、纪念日（标题、日期、倒数或已过去、每年重复）、今日日程、股票自选的内容也能直接设置（widget_add / widget_update 的 content）；还能创作自定义组件；可设层级：置顶（始终浮在其他窗口上方）或贴桌面，层级会保存，重启后仍保持，不是临时的。",
         by_hand: "", tools: &["widget_list", "widget_add", "widget_update", "widget_remove", "widget_read_format", "widget_create", "widget_delete_custom"] },
@@ -148,6 +151,7 @@ fn line(f: &Feature, detail: bool) -> String {
 /// What users say for each feature, space separated; matched in the request so the right facts reach the model without
 /// it having to think of looking them up. A new way of asking that was missed becomes a word here and a row in the test.
 const ALIASES: &[(&str, &str)] = &[
+    ("application-skin", "皮肤 换肤 界面皮肤 应用皮肤 春江花月夜 江南烟雨 海边列车 恢复默认外观 skin_create skin_apply skin_read_format"),
     ("image-generation", "生成图片 图片生成 文生图 生图 画一张 画张 画个 画一幅 绘画 插画 image_generate"),
     ("android-phone", "手机操作 操作手机 安卓 android adb 无线调试 小红书 开心消消乐 操作包"),
     ("chat", ""),
@@ -257,6 +261,7 @@ mod tests {
 
     #[test]
     fn open_page_validation_rejects_unknown_pages_and_tabs() {
+        assert!(validate_page("studio", Some("skins")).is_ok());
         assert!(validate_page("studio", Some("widgets")).is_ok());
         assert!(validate_page("settings", None).is_ok());
         assert!(validate_page("chat", None).is_err());
@@ -278,6 +283,9 @@ mod tests {
     #[test]
     fn requests_reach_the_features_they_are_about() {
         let cases: &[(&str, &[&str])] = &[
+            ("帮我创作地球脉动界面皮肤 ZIP", &["application-skin"]),
+            ("换肤，换成江南烟雨", &["application-skin"]),
+            ("恢复默认外观", &["application-skin"]),
             ("把时钟组件置顶", &["widget"]),
             ("帮我加个待办：买花", &["widget"]),
             ("9点提醒我买花", &["care"]),
@@ -316,6 +324,16 @@ mod tests {
         let hint = hint_for("9点提醒我买花").unwrap();
         assert!(hint.contains("care_set") && hint.contains("open_page(page=care)") && hint.contains("tool_load"), "{hint}");
         assert!(hint_for("你好").is_none());
+    }
+
+    #[test]
+    fn skin_requests_include_the_native_workflow_and_open_the_skin_page() {
+        let guide = describe(Some("皮肤"));
+        for tool in ["skin_list", "skin_read_format", "skin_create", "skin_apply", "skin_export"] { assert!(guide.contains(tool)); }
+        assert!(guide.contains("theme.json 配色暂不生效"));
+        let hint = hint_for("帮我创作一套地球脉动界面皮肤 ZIP").unwrap();
+        assert!(hint.contains("skin_read_format") && hint.contains("open_page(page=studio, tab=skins)"));
+        assert!(validate_page("studio", Some("skins")).is_ok());
     }
 
     #[test]

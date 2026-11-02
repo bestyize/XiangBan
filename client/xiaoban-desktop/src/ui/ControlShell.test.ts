@@ -267,6 +267,9 @@ describe('ControlShell sidebar', () => {
       open({ page: 'studio', tab: 'pets' });
       expect(store.page).toBe('studio');
       expect(store.studioTab).toBe('pets');
+      open({ page: 'studio', tab: 'skins' });
+      expect(store.page).toBe('studio');
+      expect(store.studioTab).toBe('skins');
       open({ page: 'care', tab: null });
       expect(store.page).toBe('care');
       open({ page: 'settings', tab: 'network' });
@@ -277,6 +280,22 @@ describe('ControlShell sidebar', () => {
       expect(store.settingsOpen).toBe(false);
       expect(store.page).toBe('games');
     } finally { wrapper.unmount(); }
+  });
+
+  it('refreshes the visible scene when the Agent changes the application skin', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    let id = builtinSkin.id;
+    vi.mocked(invoke).mockImplementation((command, args) => command === 'skin_list'
+      ? Promise.resolve({ skins: [], activeId: id }) : original(command, args));
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    try {
+      await flushPromises();
+      expect(activeSkin.value?.id).toBe(builtinSkin.id);
+      const changed = vi.mocked(listen).mock.calls.find(([name]) => name === 'application-skins-changed')![1];
+      id = 'builtin:jiangnan'; changed(null); await flushPromises();
+      expect(activeSkin.value?.id).toBe('builtin:jiangnan');
+      expect(wrapper.getComponent(SkinScene).props('scene')).toEqual(activeSkin.value?.scene);
+    } finally { wrapper.unmount(); activeSkin.value = null; vi.mocked(invoke).mockImplementation(original); }
   });
 
   it('switches the theme colour from the account menu', async () => {

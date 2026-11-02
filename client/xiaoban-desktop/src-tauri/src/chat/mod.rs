@@ -27,6 +27,7 @@ mod community;
 mod compact;
 mod danger;
 mod desktop_tools;
+mod skin_tools;
 pub mod image_generation;
 pub mod assets;
 mod tool_discovery;

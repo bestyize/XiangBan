@@ -20,6 +20,10 @@ pub struct CompanionChange {
 }
 
 pub trait Desktop: Send + Sync {
+    fn skin_list(&self) -> Result<Value, String> { Err("当前宿主不支持应用皮肤".into()) }
+    fn skin_apply(&self, _id: Option<&str>) -> Result<Value, String> { Err("当前宿主不支持换肤".into()) }
+    fn skin_create(&self, _workspace: &std::path::Path, _args: &Value, _ctx: &ToolCtx) -> Result<Value, String> { Err("当前宿主不支持皮肤创作".into()) }
+    fn skin_export(&self, _workspace: &std::path::Path, _id: &str) -> Result<Value, String> { Err("当前宿主不支持皮肤导出".into()) }
     fn generate_images(&self, _args: Value, _ctx: &ToolCtx) -> Result<Value, String> { Err("当前宿主不支持图片生成".into()) }
     fn design_removed(&self,_id:&str)->Result<(),String>{Ok(())}
     fn design_saved(&self, _project: &open_claude_design::Project) -> Result<(), String> { Ok(()) }
@@ -96,6 +100,13 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn skin_list(&self) -> Result<Value, String> { crate::application_skins::agent_list(&self.app) }
+    fn skin_apply(&self, id: Option<&str>) -> Result<Value, String> {
+        let state = crate::application_skins::apply(&self.app, id)?;
+        Ok(json!({"activeId":state["activeId"],"applied":true}))
+    }
+    fn skin_create(&self, workspace: &std::path::Path, args: &Value, ctx: &ToolCtx) -> Result<Value, String> { crate::application_skins::create(&self.app, workspace, args, ctx) }
+    fn skin_export(&self, workspace: &std::path::Path, id: &str) -> Result<Value, String> { crate::application_skins::export_to_workspace(&self.app, workspace, id) }
     fn generate_images(&self, args: Value, ctx: &ToolCtx) -> Result<Value, String> { super::image_generation::generate(&self.app, args, ctx) }
     fn connector_target(&self, name: &str) -> Result<Option<Arc<dyn Tool>>, String> {
         super::connector_manager(&self.app)?.tools().into_iter().find(|tool| tool.spec().name == name)
@@ -1124,7 +1135,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
     let mut items = vec![
         tool(&desktop, ToolSpec::new("app_guide", "查小伴桌面的功能清单：每项功能能做什么、在控制台哪个页面、对应哪些工具、哪些要用户自己在页面里操作。用户问“能不能…”“在哪里…”“怎么设置…”，或你想说“不支持”之前先调用。topic 可填功能名、页面名、工具名或关键词（如 置顶、代理、提醒）；不填则返回完整目录。", object(json!({"topic":{"type":"string"}}), &[])).risk(Risk::Read).parallel(), |_, a| Ok(super::app_guide::describe(optional_text(a, "topic")?))),
-        tool(&desktop, ToolSpec::new("open_page", "把小伴控制台带到前台并打开指定页面，用来带用户去对话里做不了、或用户想自己操作的地方（如代理、API 密钥、权限、插件商店）。page: new-task 新建任务、ai-store AI 插件、library 资料库、studio 装扮、games 游玩、care 提醒、settings 设置。studio 的 tab: wallpapers 壁纸、effects 特效、widgets 组件、pets 伙伴；settings 的 tab: general、appearance、ai、assistant、voice、network、safety、about。具体页面对应什么功能见 app_guide。", object(json!({
+        tool(&desktop, ToolSpec::new("open_page", "把小伴控制台带到前台并打开指定页面，用来带用户去对话里做不了、或用户想自己操作的地方（如代理、API 密钥、权限、插件商店）。page: new-task 新建任务、ai-store AI 插件、library 资料库、studio 装扮、games 游玩、care 提醒、settings 设置。studio 的 tab: wallpapers 壁纸、effects 特效、widgets 组件、pets 伙伴、skins 皮肤；settings 的 tab: general、appearance、ai、assistant、voice、network、safety、about。具体页面对应什么功能见 app_guide。", object(json!({
             "page":{"type":"string","enum":super::app_guide::PAGES},
             "tab":{"type":"string","description":"studio 或 settings 的子页，其他页面不要填"}
         }), &["page"])).risk(Risk::Write).self_managed().serial(), |d, a| {
@@ -1506,6 +1517,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
     if let Some(mgr) = desktop.delegation_manager() {
         items.extend(super::delegation_tools::tools(mgr, workspace));
     }
+    items.extend(super::skin_tools::tools(desktop, workspace));
     items
 }
 
@@ -1539,6 +1551,10 @@ mod tests {
     }
 
     impl Desktop for Fake {
+        fn skin_list(&self) -> Result<Value, String> { Ok(json!({"skins":[{"id":"builtin:jiangnan","name":"江南烟雨"}],"activeId":null})) }
+        fn skin_apply(&self, id: Option<&str>) -> Result<Value, String> { self.log(format!("skin-apply {}", id.unwrap_or("default")))?; Ok(json!({"activeId":id})) }
+        fn skin_create(&self, workspace: &std::path::Path, _: &Value, _: &ToolCtx) -> Result<Value, String> { self.log(format!("skin-create {}", workspace.display()))?; Ok(json!({"installed":true,"applied":false,"packagePath":"skin-earth-pulse.zip"})) }
+        fn skin_export(&self, _: &std::path::Path, id: &str) -> Result<Value, String> { self.log(format!("skin-export {id}"))?; Ok(json!({"packagePath":"skin-earth-pulse.zip"})) }
         fn pet_catalog(&self)->Result<Value,String>{let themes=crate::pet_packs::builtin().into_iter().map(|t|{let mut v=json!(t);v["source"]=json!("builtin");v}).collect::<Vec<_>>();Ok(json!({"themes":themes,"layout":{"instances":[]},"errors":[]}))}
         fn pet_save_theme(&self,theme:crate::pet_packs::Theme,_overwrite:bool)->Result<Value,String>{crate::pet_packs::validate(&theme)?;self.log(format!("pet-save {}",theme.id))?;self.pet_catalog()}
         fn pet_update(&self,id:&str,patch:crate::pets::Patch)->Result<Value,String>{self.log(format!("pet-update {id} {}",patch.pet_id.unwrap_or_default()))?;self.pet_catalog()}
@@ -1698,7 +1714,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 44);
+        assert_eq!(names.len(), 50);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1708,10 +1724,30 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["app_guide", "care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "game_read_format", "pet_catalog", "pet_read_format", "wallpaper_list", "widget_list", "widget_read_format"]);
+        assert_eq!(read, vec!["app_guide", "care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "game_read_format", "pet_catalog", "pet_read_format", "skin_list", "skin_read_format", "wallpaper_list", "widget_list", "widget_read_format"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
+    }
+
+    #[test]
+    fn skin_tools_read_the_built_in_format_switch_restore_and_deliver_without_applying() {
+        let fake = Arc::new(Fake::default());
+        let format: Value = serde_json::from_str(&call(&fake, "skin_read_format", json!({})).unwrap()).unwrap();
+        assert_eq!(format["kind"], "application-skin");
+        assert!(format["scope"].as_str().unwrap().contains("配色暂不生效"));
+        let state: Value = serde_json::from_str(&call(&fake, "skin_list", json!({})).unwrap()).unwrap();
+        assert_eq!(state["skins"][0]["name"], "江南烟雨");
+        call(&fake, "skin_apply", json!({"id":"builtin:jiangnan"})).unwrap();
+        call(&fake, "skin_apply", json!({"id":"default"})).unwrap();
+        call(&fake, "skin_apply", json!({"id":null})).unwrap();
+        let before = fake.calls().len();
+        assert!(call(&fake, "skin_apply", json!({})).is_err());
+        assert_eq!(fake.calls().len(), before);
+        let result: Value = serde_json::from_str(&call(&fake, "skin_create", json!({"id":"earth-pulse","name":"地球脉动","background_image":"earth.png"})).unwrap()).unwrap();
+        assert_eq!(result["applied"], false);
+        call(&fake, "skin_export", json!({"id":"earth-pulse"})).unwrap();
+        assert_eq!(fake.calls(), vec!["skin-apply builtin:jiangnan", "skin-apply default", "skin-apply default", "skin-create .", "skin-export earth-pulse"]);
     }
 
     #[test]

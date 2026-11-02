@@ -39,6 +39,10 @@ describe('control state with native settings', () => {
     expect(store.creationDraft).toBe('帮我创作一个桌面小组件：');
     await store.startCreation('game');
     expect(store.creationDraft).toBe('帮我创作一款小游戏：');
+    await store.startCreation('skin');
+    expect(store.creationDraft).toContain('skin_read_format');
+    expect(store.creationDraft).toContain('skin_create');
+    expect(store.creationDraft).toContain('保留当前皮肤');
   });
   it('does not replace loaded settings when the optional wallpaper directory fails', async () => {
     const native = { ...clone(defaults), size: 340, expression: 'proud' };
