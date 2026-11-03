@@ -65,7 +65,7 @@ defineExpose({ total: computed(() => data.value?.total ?? null), focusComposer }
     <RequestState :loading="loading" :error="error" @retry="load" />
     <template v-if="data">
       <article v-for="item in data.items" :key="item.id" class="comment">
-        <header><RouterLink :to="`/u/${item.author.uid}`" class="avatar-link" :aria-label="`查看 ${item.author.nickname} 的主页`"><UserAvatar :name="item.author.nickname" :src="item.author.avatar_url" :size="36" /></RouterLink><div class="comment-author"><RouterLink :to="`/u/${item.author.uid}`">{{ item.author.nickname }}</RouterLink><time>{{ displayDate(item.created_at) }}</time></div></header>
+        <header><RouterLink :to="`/u/${item.author.uid}`" class="avatar-link" :aria-label="`查看 ${item.author.nickname} 的主页`"><UserAvatar :name="item.author.nickname" :src="item.author.avatar_url" :size="editorial ? 36 : 32" /></RouterLink><div class="comment-author"><RouterLink :to="`/u/${item.author.uid}`">{{ item.author.nickname }}</RouterLink><time>{{ displayDate(item.created_at) }}</time></div></header>
         <p v-if="item.reply_to" class="reply-to">回复 {{ replyName(item.reply_to) }}</p>
         <p class="body">{{ item.body }}</p>
         <div class="actions"><button class="comment-like" :disabled="busy" :aria-pressed="item.liked" :aria-label="`${item.liked ? '取消赞' : '赞'}这条评论，${item.like_count} 个赞`" @click="toggleLike(item)"><svg v-if="editorial" viewBox="0 0 24 24" width="18" height="18" :fill="item.liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z"/></svg><template v-else>{{ item.liked ? '已赞' : '赞' }}</template>{{ item.like_count || (editorial ? '赞' : 0) }}</button><button :disabled="busy" @click="respond(item)">回复</button><button v-if="item.mine" :disabled="busy" @click="remove(item)">删除</button></div>
@@ -83,7 +83,7 @@ defineExpose({ total: computed(() => data.value?.total ?? null), focusComposer }
         <template v-if="session.loggedIn">
           <div class="compose-title"><label for="repo-comment">{{ reply ? `回复 ${reply.author.nickname}` : '写评论' }}</label><button v-if="editorial" type="button" @click="closeComposer">收起</button><button v-else-if="reply" type="button" @click="reply = null">取消回复</button></div>
           <textarea id="repo-comment" ref="editor" v-model="body" :disabled="busy" rows="3" placeholder="分享你的看法，2–2000 字" maxlength="4000" />
-          <div class="submit"><span>{{ length }} / 2000</span><button type="submit" :disabled="!valid || busy">{{ busy ? '提交中…' : '发送' }}</button></div>
+          <div class="submit"><span>{{ length }} / 2000</span><button type="submit" :disabled="!valid || busy">{{ busy ? '提交中…' : editorial ? '发送' : '发布评论' }}</button></div>
         </template><button v-else type="button" class="login" @click="session.requireLogin()">登录后评论</button>
       </form>
       <p v-if="actionError" class="action-error" role="alert">{{ actionError }}</p>

@@ -1,4 +1,5 @@
 import { Marked } from 'marked'
+import markedFootnote from 'marked-footnote'
 import DOMPurify from 'dompurify'
 
 export interface ProjectReadme {
@@ -38,7 +39,9 @@ export async function fetchProjectReadme(owner: string, repo: string): Promise<P
 
 /** Upstream Markdown is untrusted, including its raw HTML. Never expose it before sanitizing. */
 export function renderProjectReadme(markdown: string): string {
-  const parser = new Marked({ gfm: true })
+  const parser = new Marked({ gfm: true, renderer: {
+    checkbox: ({ checked }) => checked ? '<span aria-label="已完成">☑</span> ' : '<span aria-label="未完成">☐</span> ',
+  } }).use(markedFootnote())
   const html = parser.parse(markdown, { async: false })
   const safe = DOMPurify.sanitize(html, {
     USE_PROFILES: { html: true },
@@ -59,7 +62,7 @@ export function renderProjectReadme(markdown: string): string {
   doc.querySelectorAll('a').forEach(node => {
     const href = node.getAttribute('href') ?? ''
     if (href.startsWith('#')) { node.removeAttribute('target'); return }
-    if (!/^https?:\/\//i.test(href) && !/^mailto:/i.test(href)) { node.removeAttribute('href'); return }
+    if (!/^https?:\/\//i.test(href) && !/^(mailto|xmpp|ircs?):/i.test(href)) { node.removeAttribute('href'); return }
     node.setAttribute('target', '_blank')
     node.setAttribute('rel', 'noopener noreferrer nofollow')
   })
