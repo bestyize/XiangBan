@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DISCUSSION_TABS, discussionCategory } from '@/lib/communityStructure'
+import { DISCUSSION_TABS, discussionCategory, resourceTopicCategory } from '@/lib/communityStructure'
 import { areaOf } from '@/lib/sections'
 import { useTheme, THEME_LABEL } from '@/lib/theme'
 import BrandMark from './BrandMark.vue'
@@ -13,9 +13,10 @@ const links = [{to:'/ai',key:'ai',label:'小伴 AI'}, {to:'/create',key:'create'
 function publish(path: string) {
   publishing.value = false
   const tab = String(route.query.tab ?? '')
-  const category = route.name === 'discuss' && DISCUSSION_TABS.some(item => item.key === tab && tab !== 'all')
-    ? (tab === 'casual-media' && !['movies','music'].includes(String(route.query.filter)) ? tab :
-      discussionCategory(tab, ['learn','casual-media'].includes(tab) ? String(route.query.filter ?? '') : '')) : undefined
+  const category = route.name === 'resources' && tab === 'media'
+    ? resourceTopicCategory(tab)
+    : route.name === 'discuss' && DISCUSSION_TABS.some(item => item.key === tab && tab !== 'all')
+    ? discussionCategory(tab, tab === 'learn' ? String(route.query.filter ?? '') : '') : undefined
   if (path === '/new' && category) void router.push({path,query:{category}})
   else void router.push(path)
 }

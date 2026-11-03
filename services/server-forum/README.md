@@ -119,6 +119,12 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 验证：网页 `npm run build`、`node --experimental-strip-types --test tests/navigationDirectory.test.ts`；隔离库 `TEST_DATABASE_URL=postgres://… cargo test --manifest-path services/server-forum/Cargo.toml navigation_catalog` 检查字段校验、分类迁移、编辑/下架/删除保留。本轮未部署线上。
 
+### 资源 · 开源软件
+
+软件目录由 `editorial/open-source-software.json` 指定 GitHub 仓库及发行仓库。论坛进程分散执行首次采集，目录超过 400 条时匿名首轮分散到约 72 小时，每四分钟最多开始一次。后续按上次成功采集结果分档：至少 1,000 Star 且最近 30 天有推送，每 2 天刷新。至少 1,000 Star 但近期无推送，每 7 天刷新。其余每 14 天刷新。采集队列保存在 PostgreSQL，多实例共用锁和请求间隔，GitHub 限流时按返回的重试时间延后队列，失败时保留上次成功快照。可选的 `FORUM_SOFTWARE_GITHUB_TOKEN` 仅在服务端使用。此调度不依赖 GitHub Actions。
+
+公开列表和详情读取同一份 Star、推送时间、最新正式版和最近 100 个 Release 的快照。近期热门使用距当前快照最接近 7 天的 Star 快照计算，接受相隔 6 至 8 个 UTC 日期的快照，缺少任一端时不计算。首次同步前，列表使用收录时的资料，详情提供 GitHub 官方发布页。安装包链接始终指向 GitHub，全部历史可在官方发布页查看。
+
 ### 精选（2026-11-03，本地实现）
 
 精选仅在首页提供入口，资源页不再重复设置精选子 TAB（旧 `/resources?tab=open` 跳转首页精选）；原「开源热榜」合并为第二个子 TAB「热榜」，旧 `/?tab=repos` 携带往期期数跳转新入口；`/open-source` 跳转首页精选。推荐、热榜与 11 个用途分类支持跨分类收录、标签筛选，项目卡片与专题卡链接独立导读页；搜索统一进入顶栏，收藏操作仅在项目详情显示。列表封面包含项目 Logo 与名称，下方仅展示推荐标题和标签，不重复名称、收藏状态或使用门槛。历史图文保留在「社区分享」。

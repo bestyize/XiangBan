@@ -5,3 +5,17 @@
 .readme-provenance{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:16px 0;color:var(--ink-3);font-size:12px;line-height:1.8}.readme-provenance p{margin:6px 0}.readme-provenance a{color:var(--ink-2)}.readme-provenance details{margin-top:10px}.readme-provenance summary{cursor:pointer}.readme-provenance pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;max-height:300px;overflow:auto}.readme-unavailable{padding:24px 0;font-size:14px;line-height:1.8;color:var(--ink-2)}.readme-unavailable img{width:100%;max-height:420px;object-fit:contain;margin-top:24px}.readme-bar-action{border:0;background:none;display:inline-flex;align-items:center;justify-content:center;gap:6px;color:var(--ink);min-height:44px;cursor:pointer;font-size:13px;white-space:nowrap;padding:0}.readme-bar-action.saved{color:#d49332}.readme-bar-action.saved svg{fill:currentColor}.readme-save-error{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);z-index:39;background:var(--surface);border:1px solid var(--line);padding:10px 16px;font-size:13px;border-radius:10px}
 @media(max-width:1099px){.site-layout:has(.readme-page)>.primary-nav{display:none}}
 @media(max-width:600px){.readme-page{padding:8px 12px 88px}.readme-title{padding:20px 0}.readme-title h1{font-size:22px;line-height:1.55}.readme-project-card{padding:18px;border-radius:14px}.readme-project-meta{gap:8px 12px;font-size:11px}.project-markdown{font-size:14px;line-height:1.9}.project-markdown h1{font-size:23px}.project-markdown h2{font-size:19px}.readme-section{margin-top:22px}}
+
+.project-intro {
+  padding: 18px 0 20px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.7;
+}
+.project-intro > p { margin: 0; color: var(--ink); font-size: 15px; }
+.project-intro dl { display: grid; gap: 10px; margin: 14px 0; }
+.project-intro dl > div { display: grid; grid-template-columns: 4em minmax(0, 1fr); gap: 12px; }
+.project-intro dt { font-weight: 650; color: var(--ink); }
+.project-intro dd { margin: 0; }
+.project-intro > a { display: inline-flex; align-items: center; gap: 6px; color: var(--brand); }
+.readme-toolbar h3 { margin: 0; color: var(--ink); font-size: 14px; }

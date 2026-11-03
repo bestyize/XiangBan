@@ -67,3 +67,49 @@
 | vllm-icon.png | https://raw.githubusercontent.com/vllm-project/vllm/main/docs/assets/logos/vllm-logo-text-light.png | https://github.com/vllm-project/vllm |
 | esphome-icon.svg | https://media.esphome.io/logo/logo-text-on-light.svg | https://github.com/esphome/esphome |
 | lerobot-icon.png | https://raw.githubusercontent.com/huggingface/lerobot/main/media/readme/lerobot-logo-thumbnail.png | https://github.com/huggingface/lerobot |
+
+宽屏封面预览使用 Excalidraw 官方 README 的协作画板展示图（excalidraw-showcase.png）。
+来源：https://excalidraw.nyc3.cdn.digitaloceanspaces.com/github%2Fproduct_showcase.png
+
+## 本地封面预览新增素材
+
+| 文件 | 类型 | 来源 |
+| --- | --- | --- |
+| build-your-own-x-github-home.jpg | 公开仓库首页截图 | https://github.com/codecrafters-io/build-your-own-x |
+| freecodecamp-github-home.jpg | 公开仓库首页截图 | https://github.com/freeCodeCamp/freeCodeCamp |
+| free-programming-books-github-home.jpg | 公开仓库首页截图 | https://github.com/EbookFoundation/free-programming-books |
+| system-design-primer-github-home.jpg | 公开仓库首页截图 | https://github.com/donnemartin/system-design-primer |
+| superpowers-github-home.jpg | 公开仓库首页截图 | https://github.com/obra/superpowers |
+| project-based-learning-github-home.jpg | 公开仓库首页截图 | https://github.com/practical-tutorials/project-based-learning |
+| thealgorithms-python-github-home.jpg | 公开仓库首页截图 | https://github.com/TheAlgorithms/Python |
+| ossu-github-home.jpg | 公开仓库首页截图 | https://github.com/ossu/computer-science |
+| vscode-showcase.png | 官方界面展示 | https://github.com/user-attachments/assets/56af271c-949d-454c-a3ea-16188c063414 |
+| penpot-showcase.jpg | 官方界面展示 | https://github.com/user-attachments/assets/cce75ad6-f783-473f-8803-da9eb8255fef |
+| graphite-showcase.png | 官方界面展示 | https://github.com/user-attachments/assets/decb7011-18c2-4c68-82af-d1fa5064244a |
+| obs-showcase.png | 官方界面展示 | https://obsproject.com/assets/images/features-new/hero_32_1_1.png |
+
+## 其他分类本地预览素材
+
+| 文件 | 类型 | 来源 | 项目 |
+| --- | --- | --- | --- |
+| ollama-app.png | 官方界面或实机展示 | https://files.ollama.com/ollama-app-screenshot.png | https://github.com/ollama/ollama |
+| langflow-playground.png | 官方界面或实机展示 | https://docs.langflow.org/assets/images/quickstart-simple-agent-playground-e3adf053e3da75750e5f2bc8f60b639d.png | https://github.com/langflow-ai/langflow |
+| rustdesk-remote.png | 官方界面或实机展示 | https://github.com/rustdesk/rustdesk/assets/28412477/9baa91e9-3362-4d06-aa1a-7518edcbd7ea | https://github.com/rustdesk/rustdesk |
+| stirling-dashboard.png | 官方界面或实机展示 | https://raw.githubusercontent.com/Stirling-Tools/Stirling-PDF/c687f2f5eb915b72900ae6c5890d352751ec844f/docs/images/home-light.png | https://github.com/Stirling-Tools/Stirling-PDF |
+| affine-writing.jpg | 官方界面或实机展示 | https://affine.pro/overview/Write.jpg | https://github.com/toeverything/AFFiNE |
+| audacity-workspace.webp | 官方界面或实机展示 | https://www.audacityteam.org/_astro/hero-surface-studio-darkened.Bg6vZ4zE_Z1E7Af.webp | https://github.com/audacity/audacity |
+| jellyfin-library.png | 官方界面或实机展示 | https://jellyfin.org/assets/images/10.8-library-9c07ba46877a03e749c0c8b5ed157e53.png | https://github.com/jellyfin/jellyfin |
+| lerobot-so101.webp | 官方实物图 | https://huggingface.co/datasets/huggingface/documentation-images/resolve/main/lerobot/SO101_Follower.webp | https://github.com/huggingface/lerobot |
+| wled-controller.jpg | 官方实物图 | https://raw.githubusercontent.com/wled/WLED/fce41f2655c3087d3eaf95c028d2856967cbc86e/images/macbook-pro-space-gray-on-the-wooden-table.jpg | https://github.com/wled/WLED |
+| tasmota-webui.png | 官方界面或实机展示 | https://tasmota.github.io/docs/_media/themes/dark.png | https://github.com/arendst/Tasmota |
+| imhex-editor.png | 官方界面或实机展示 | https://github.com/user-attachments/assets/902a7c4c-410d-490f-999e-14c856fec027 | https://github.com/WerWolv/ImHex |
+| jadx-gui.png | 官方界面或实机展示 | https://user-images.githubusercontent.com/118523/142730720-839f017e-38db-423e-b53f-39f5f0a0316f.png | https://github.com/skylot/jadx |
+| mindustry-gameplay.png | 官方界面或实机展示 | https://img.itch.zone/aW1hZ2UvMTQwMTY5LzQ3MDY4OTgucG5n/794x1000/N4kEaD.png | https://github.com/Anuken/Mindustry |
+| moonlight-streaming.webp | 官方界面或实机展示 | https://moonlight-stream.org/images/steam_framed.webp | https://github.com/moonlight-stream/moonlight-qt |
+| markitdown-github-home.jpg | 公开仓库首页截图 | https://github.com/microsoft/markitdown | https://github.com/microsoft/markitdown |
+| anthropic-skills-github-home.jpg | 公开仓库首页截图 | https://github.com/anthropics/skills | https://github.com/anthropics/skills |
+| awesome-mcp-servers-github-home.jpg | 公开仓库首页截图 | https://github.com/punkpeye/awesome-mcp-servers | https://github.com/punkpeye/awesome-mcp-servers |
+| yt-dlp-github-home.jpg | 公开仓库首页截图 | https://github.com/yt-dlp/yt-dlp | https://github.com/yt-dlp/yt-dlp |
+| ffmpeg-github-home.jpg | 公开仓库首页截图 | https://github.com/FFmpeg/FFmpeg | https://github.com/FFmpeg/FFmpeg |
+| nextjs-github-home.jpg | 公开仓库首页截图 | https://github.com/vercel/next.js | https://github.com/vercel/next.js |
+| web-dev-for-beginners-github-home.jpg | 公开仓库首页截图 | https://github.com/microsoft/Web-Dev-For-Beginners | https://github.com/microsoft/Web-Dev-For-Beginners |

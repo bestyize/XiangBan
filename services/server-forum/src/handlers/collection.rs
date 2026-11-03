@@ -21,6 +21,7 @@ use uuid::Uuid;
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .merge(crate::software_sync::admin_routes())
         .route("/sources", get(sources))
         .route("/sources/{id}", axum::routing::patch(configure))
         .route("/sources/{id}/credential", axum::routing::put(credential))

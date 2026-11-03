@@ -13,6 +13,7 @@ mod error;
 mod handlers;
 mod handbook;
 mod jobs;
+mod software_sync;
 mod markdown;
 mod models;
 mod moderation;

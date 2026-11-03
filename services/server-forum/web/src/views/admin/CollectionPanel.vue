@@ -4,6 +4,7 @@ import { AdminApiError } from '@/api/admin'
 import { collectionApi, type CollectionBatch, type CollectionRun, type CollectionSource, type CollectionSourceConfig } from '@/api/collection'
 import { errorText, fmtTime, notify } from './shared'
 import TranslationPanel from './TranslationPanel.vue'
+import SoftwareTokens from './SoftwareTokens.vue'
 
 const autoPublishes = (source: string) => ['artificial_analysis', 'openrouter', 'github_repos'].includes(source)
 const sources = ref<CollectionSource[]>([])
@@ -291,6 +292,7 @@ onUnmounted(() => {
 
 <template>
   <div class="collection-panel">
+    <SoftwareTokens />
     <div class="collection-intro">
       <div><p class="adm-eyebrow">数据来源与审核</p><h2>让社区内容持续更新</h2><p class="muted">客观榜单校验后自动发布；资讯与工具版本核对后整批发布。每一步都有记录。</p></div>
       <div class="adm-actions"><button class="btn" :disabled="sourceLoading || runLoading || approving" @click="refresh">刷新状态</button>

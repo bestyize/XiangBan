@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import type { OpenSourceProjectSummary } from '@/lib/openSource'
 import { resolveOpenSourceCover } from '@/lib/openSourceCovers'
-const props = defineProps<{ project: OpenSourceProjectSummary }>()
+const props = defineProps<{ project: OpenSourceProjectSummary; preview?: boolean }>()
 const project = computed(() => resolveOpenSourceCover(props.project))
 const brokenImage = ref(false), brokenIcon = ref(false)
 watch(() => [props.project.full_name, props.project.cover_url, props.project.icon_url], () => { brokenImage.value = false; brokenIcon.value = false })
@@ -15,7 +15,10 @@ const lines = computed(() => (project.value.cover_lines?.length ? project.value.
   <div class="os-cover" :class="[`os-cover-${style}`, `os-cover-layout-${layout}`, `os-cover-variant-${project.cover_variant}`, { 'os-cover-offset': project.cover_variant === 'offset' }]" :style="{ '--cover-accent': accent, '--cover-focus': `${project.cover_focus_x}% ${project.cover_focus_y}%` }" aria-hidden="true">
     <img v-if="style === 'screen' || style === 'photo'" class="os-cover-image" :src="project.cover_url" alt="" loading="lazy" @error="brokenImage = true">
     <div class="os-cover-brand"><img v-if="project.icon_url && !brokenIcon" :class="{'os-icon-mark':project.icon_fit === 'mark-left'}" :src="project.icon_url" alt="" loading="lazy" @error="brokenIcon = true"><span>{{ project.name }}</span></div>
-    <template v-if="style === 'illustration'">
+    <div v-if="preview && style === 'illustration' && layout !== 'terminal' && layout !== 'notes'" class="os-cover-purpose">
+      {{ project.summary || project.title }}
+    </div>
+    <template v-else-if="style === 'illustration'">
       <span class="os-cover-caption">{{ layout === 'terminal' ? '命令示例' : layout === 'notes' ? '内容示意' : '流程示意' }}</span>
       <div v-if="layout === 'terminal'" class="os-cover-terminal"><span class="os-cover-terminal-label">{{ project.name.toLowerCase() }}</span><code>{{ lines[0] }}</code><div class="os-cover-terminal-meta">{{ lines.slice(1).join(' · ') }}</div><span class="os-cover-cursor" /></div>
       <div v-else-if="layout === 'notes'" class="os-cover-notes"><div v-for="(line, index) in lines" :key="line"><span class="os-cover-note-index">0{{ index + 1 }}</span><span>{{ line }}</span><i /></div></div>
@@ -24,6 +27,21 @@ const lines = computed(() => (project.value.cover_lines?.length ? project.value.
   </div>
 </template>
 <style scoped>
+.os-cover-purpose {
+  position: absolute;
+  inset: 34% 8% auto 8%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  border-left: 3px solid var(--cover-accent);
+  padding-left: 10px;
+  font-size: clamp(14px, 5.6cqw, 22px);
+  font-weight: 600;
+  line-height: 1.42;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
 .os-cover{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;isolation:isolate;background:color-mix(in srgb,var(--cover-accent) 7%,var(--surface));border-bottom:1px solid var(--line);container-type:inline-size}
 .os-cover-brand{position:absolute;left:5%;top:7%;z-index:2;display:flex;align-items:center;gap:8px;max-width:72%;color:var(--ink);font-size:clamp(12px,3.2cqw,16px);line-height:1.2;font-weight:500}
 .os-cover-brand>img{width:clamp(24px,7cqw,36px);height:clamp(24px,7cqw,36px);object-fit:contain;background:#fff;border:1px solid #ededed;border-radius:8px;padding:4px;box-sizing:border-box}

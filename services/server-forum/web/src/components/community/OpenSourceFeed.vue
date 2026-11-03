@@ -2,6 +2,7 @@
 import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { openSourceBrowse, type ProjectPage } from '@/api/openSourceBrowse'
+import { previewOpenSourceCover } from '@/lib/openSourceCoverPreview'
 import RequestState from './RequestState.vue'
 import DiscoverGlyph from './DiscoverGlyph.vue'
 import RepoBoard from './RepoBoard.vue'
@@ -30,7 +31,11 @@ const categories = ref<Pick<ProjectPage['categories'][number], 'key' | 'label'>[
 ])
 const tabs = computed(() => [{ key: 'recommend', label: '推荐' }, { key: 'hot', label: '热榜' }, ...categories.value])
 const catalog = computed(() => pages.get(filterKey.value))
-const projects = computed(() => catalog.value?.projects ?? [])
+const coverPreview = computed(() => import.meta.env.DEV && route.query.coverPreview === '1')
+const projects = computed(() => {
+  const items = catalog.value?.projects ?? []
+  return coverPreview.value ? items.map(previewOpenSourceCover) : items
+})
 const tags = computed(() => catalog.value?.tags ?? [])
 const loading = computed(() => pending.has(filterKey.value))
 const error = computed(() => errors.get(filterKey.value) ?? '')
@@ -84,7 +89,7 @@ function selectCategory(value: string) { update({ category: value === 'recommend
 function reset() { update({ tag: undefined, q: undefined, saved: undefined }) }
 </script>
 <template>
-  <section class="os-feed" aria-label="精选">
+  <section class="os-feed" :class="{ 'os-feed--cover-preview': coverPreview }" aria-label="精选">
     <h2 class="sr-only">精选</h2>
     <nav ref="categoriesElement" class="os-category-tabs" aria-label="开源项目分类"><button v-for="item in tabs" :key="item.key" type="button" :aria-current="category === item.key ? 'page' : undefined" @click="selectCategory(item.key)">{{ item.label }}</button></nav>
 
@@ -93,7 +98,7 @@ function reset() { update({ tag: undefined, q: undefined, saved: undefined }) }
     <div v-if="category !== 'recommend' && tags.length" class="os-tag-filters" aria-label="细分标签"><button type="button" :aria-pressed="!tag" @click="update({tag: undefined})">全部</button><button v-for="item in tags" :key="item" type="button" :aria-pressed="tag === item" @click="update({tag: tag === item ? undefined : item})">{{ item }}</button></div>
     <div v-if="catalog" class="os-feed-heading"><h3 class="sr-only">{{ tabs.find(item => item.key === category)?.label ?? "精选" }}</h3><span>{{ catalog.total }} 个项目</span></div>
     <div v-if="projects.length" class="os-project-grid">
-      <template v-for="(project, index) in projects" :key="project.full_name"><OpenSourceProjectCard :project="project" /><OpenSourceCollectionCard v-if="showCollections && index === 3 && catalog?.collections[0]" :collection="catalog?.collections[0]" /><OpenSourceCollectionCard v-if="showCollections && index === 7 && catalog?.collections[1]" :collection="catalog?.collections[1]" /></template>
+      <template v-for="(project, index) in projects" :key="project.full_name"><OpenSourceProjectCard :project="project" :cover-preview="coverPreview" /><OpenSourceCollectionCard v-if="showCollections && index === 3 && catalog?.collections[0]" :collection="catalog?.collections[0]" /><OpenSourceCollectionCard v-if="showCollections && index === 7 && catalog?.collections[1]" :collection="catalog?.collections[1]" /></template>
     </div>
     <div v-else-if="catalog && !loading" class="os-empty" role="status"><DiscoverGlyph name="code" :size="24" /><h3>这个分类的项目正在整理中</h3><p>可以先看看其他分类。</p><button v-if="tag" type="button" class="os-button" @click="reset">清除标签筛选</button></div>
     <RequestState v-if="loading || error" :loading="loading" :error="error" @retry="load" />

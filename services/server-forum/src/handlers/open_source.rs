@@ -183,6 +183,7 @@ pub async fn project(
                 .as_str()
                 .is_some_and(|value| value.eq_ignore_ascii_case(&name))
         })
+        .or_else(|| crate::software_sync::directory_project(&name))
         .ok_or_else(|| crate::error::AppError::not_found("精选项目"))?;
     let mut result = metadata(&data);
     result["projects"] = json!([project]);
