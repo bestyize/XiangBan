@@ -98,14 +98,14 @@ private fun generatedImageMime(bytes: ByteArray): String? = when {
     else -> null
 }
 
-private suspend fun io.ktor.client.statement.HttpResponse.readImageBytes(limit: Int): ByteArray {
+private suspend fun io.ktor.client.statement.HttpResponse.readBoundedBytes(limit: Int): ByteArray {
     val channel = bodyAsChannel()
     val buffer = Buffer()
     val chunk = ByteArray(64 * 1024)
     while (true) {
         val count = channel.readAvailable(chunk, 0, chunk.size)
         if (count < 0) return buffer.readByteArray()
-        check(buffer.size + count <= limit) { "图片响应过大" }
+        check(buffer.size + count <= limit) { "响应过大" }
         buffer.write(chunk, 0, count)
     }
 }
@@ -251,7 +251,7 @@ class AiGatewayApi(
                 timeout { requestTimeoutMillis = 240_000 }
             }.execute { response ->
                 if (!response.status.isSuccess()) {
-                    val error = parseApiError(response.status.value, response.readImageBytes(64 * 1024).decodeToString())
+                    val error = parseApiError(response.status.value, response.readBoundedBytes(64 * 1024).decodeToString())
                     throw when (error.code) {
                         "image_unavailable" -> ApiException(error.status, "小伴 AI 暂未开放生图", error.code)
                         "paid_required" -> ApiException(error.status, "图片生成需要先兑换付费额度", error.code)
@@ -259,7 +259,7 @@ class AiGatewayApi(
                         else -> if (error.status >= 500) ApiException(error.status, UNKNOWN_IMAGE_RESULT) else error
                     }
                 }
-                val body = response.readImageBytes(48 * 1024 * 1024)
+                val body = response.readBoundedBytes(48 * 1024 * 1024)
                 withContext(Dispatchers.Default) { CommunityJson.decodeFromString<ImageGenerationResponse>(body.decodeToString()).data }
             }
             val images = mutableListOf<String>()
@@ -295,12 +295,46 @@ class AiGatewayApi(
         // Download without the AI gateway bearer token.
         return client.prepareGet(raw).execute { response ->
             check(response.status.isSuccess())
-            response.readImageBytes(MAX_GENERATED_IMAGE_BYTES)
+            response.readBoundedBytes(MAX_GENERATED_IMAGE_BYTES)
         }
     }
 
     suspend fun balance(): AiBalance =
         http.send(HttpMethod.Get, "/api/ai/balance", AiBalance.serializer(), token = requireToken())
+
+    internal suspend fun webSearch(query: String, count: Int): WebSearchReply =
+        webRequest("/v1/search", buildJsonObject {
+            put("query", query)
+            put("count", count)
+            put("need_content", false)
+        }, WebSearchReply.serializer())
+
+    internal suspend fun webFetch(url: String): WebFetchReply =
+        webRequest("/v1/fetch", buildJsonObject { put("url", url) }, WebFetchReply.serializer())
+
+    private suspend fun <T> webRequest(
+        path: String, payload: JsonObject, serializer: kotlinx.serialization.DeserializationStrategy<T>,
+    ): T {
+        val token = requireToken()
+        try {
+            return client.preparePost("$base$path") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(payload.toString())
+                timeout { requestTimeoutMillis = 60_000 }
+            }.execute { response ->
+                val body = response.readBoundedBytes(1024 * 1024).decodeToString()
+                if (!response.status.isSuccess()) throw parseApiError(response.status.value, body)
+                CommunityJson.decodeFromString(serializer, body)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: ApiException) {
+            throw e
+        } catch (_: Exception) {
+            throw ApiException(0, "联网请求失败或返回了无效结果")
+        }
+    }
 
     suspend fun redeem(code: String): AiRedeemed {
         val clean = code.trim()

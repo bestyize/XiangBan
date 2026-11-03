@@ -24,6 +24,7 @@ import xyz.xiangban.xiaoban.common.community.MobileGameStore
 import xyz.xiangban.xiaoban.common.community.mobileWorkspaceTools
 import xyz.xiangban.xiaoban.common.community.mobileGameTools
 import xyz.xiangban.xiaoban.common.community.SetReminderTool
+import xyz.xiangban.xiaoban.common.community.gatewayWebTools
 import xyz.xiangban.xiaoban.common.community.postChatLines
 import xyz.xiangban.xiaoban.common.community.AiGatewayApi
 import xyz.xiangban.xiaoban.common.community.ChatHistoryFiles
@@ -171,7 +172,7 @@ class CommunityEnv(
     val agent: AgentRuntime? = if (agentBridge != null && agentDir != null) {
         val tools = listOfNotNull(reminders?.let { SetReminderTool(it) { Clock.System.now().toEpochMilliseconds() } }) +
             workspace?.let(::mobileWorkspaceTools).orEmpty() + games?.let(::mobileGameTools).orEmpty() +
-            mobileGameActionTools(games, workspace, platform)
+            mobileGameActionTools(games, workspace, platform) + gatewayWebTools(ai)
         AgentRuntime(agentBridge, { body, onLine -> ai.postChatLines(body, onLine) }, tools, agentDir, AGENT_SYSTEM_PROMPT, scope, utcOffsetMinutes = utcOffsetMinutes)
     } else null
 

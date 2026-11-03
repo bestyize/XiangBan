@@ -29,6 +29,7 @@ mod danger;
 mod desktop_tools;
 mod skin_tools;
 pub mod image_generation;
+mod web_search;
 pub mod assets;
 mod tool_discovery;
 mod game_draft;
@@ -748,6 +749,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         builder = builder.deferred_tool_arc(tool);
     }
     for tool in connector_tools { builder = builder.deferred_tool_arc(tool); }
+    if let Some(search) = desktop.web_search_tool() { builder = builder.tool_arc(search); }
     for tool in team_tools { builder = builder.tool_arc(tool); }
     for tool in processes.iter().flat_map(|manager| manager.tools()) { builder = builder.tool_arc(tool); }
     builder.build().map_err(|e| e.to_string())
