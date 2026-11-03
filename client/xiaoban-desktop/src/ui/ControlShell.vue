@@ -499,7 +499,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); window.removeEventListener('pets-manage', managePets);
   window.removeEventListener('keydown', onKeydown); document.removeEventListener('pointerdown', onPointerDown, true);
 });
-const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'];
+const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games', 'community'];
 </script>
 <template>
   <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-mac': mac && store.desktop, 'is-win': win, 'has-application-skin': !!activeSkin, 'skin-new-task': store.page === 'new-task' && !!activeSkin }">

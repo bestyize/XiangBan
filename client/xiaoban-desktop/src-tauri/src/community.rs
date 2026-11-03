@@ -45,8 +45,9 @@ fn same_origin(url: &url::Url, origin: &url::Url) -> bool {
 
 /// The remote site has no native permissions and does not receive the desktop account token.
 #[tauri::command]
-pub async fn community_web_open(app: tauri::AppHandle, caller: tauri::WebviewWindow, subscriptions: Option<bool>) -> Result<(), String> {
-    control(&caller)?;
+pub async fn community_web_open(app: tauri::AppHandle, caller: tauri::Webview, subscriptions: Option<bool>) -> Result<(), String> {
+    if caller.label() != "control" { return Err("只有设置面板可以使用社区内容".into()); }
+    let caller = caller.window();
     let _guard = COMMUNITY_OPEN_LOCK.lock().map_err(|_| "社区窗口暂不可用")?;
     if let Some(existing) = app.get_window(COMMUNITY_WINDOW) {
         existing.unminimize().map_err(|e| e.to_string())?;
@@ -147,15 +148,19 @@ fn community_webview(app: &tauri::AppHandle, label: &'static str, origin: url::U
 }
 
 #[tauri::command]
-pub async fn community_tab_bounds(app: tauri::AppHandle, caller: tauri::WebviewWindow, bounds: Option<[f64; 4]>, sync_account: Option<bool>) -> Result<(), String> {
-    control(&caller)?;
+pub async fn community_tab_bounds(app: tauri::AppHandle, caller: tauri::Webview, bounds: Option<[f64; 4]>, sync_account: Option<bool>) -> Result<(), String> {
+    if caller.label() != "control" { return Err("只有设置面板可以使用社区内容".into()); }
     let existing = app.get_webview(COMMUNITY_TAB);
     let Some([x, y, width, height]) = bounds else {
-        return existing.map_or(Ok(()), |view| view.hide().map_err(|e| e.to_string()));
+        // A child view makes control a multi-webview window. Close it so other tabs
+        // can use their existing WebviewWindow commands.
+        return existing.map_or(Ok(()), |view| view.close().map_err(|e| e.to_string()));
     };
     if ![x, y, width, height].into_iter().all(f64::is_finite) || x < 0. || y < 0. || width <= 0. || height <= 0. {
         return Err("社区显示区域无效".into());
     }
+    let origin = web_origin()?;
+    let trusted_origin = origin.origin().ascii_serialization();
     let position = tauri::LogicalPosition::new(x, y);
     let size = tauri::LogicalSize::new(width, height);
     if let Some(view) = existing {
@@ -165,8 +170,6 @@ pub async fn community_tab_bounds(app: tauri::AppHandle, caller: tauri::WebviewW
         }
         view.close().map_err(|e| e.to_string())?;
     }
-    let origin = web_origin()?;
-    let trusted_origin = origin.origin().ascii_serialization();
     let ticket = if trusted_origin == DEFAULT_ORIGIN {
         crate::account::community_login_ticket(&app).await
     } else {
@@ -175,9 +178,18 @@ pub async fn community_tab_bounds(app: tauri::AppHandle, caller: tauri::WebviewW
     let origin_json = serde_json::to_string(&trusted_origin).map_err(|e| e.to_string())?;
     let ticket_json = serde_json::to_string(&ticket).map_err(|e| e.to_string())?;
     let script = format!(
-        "if (window.location.origin === {origin_json}) {{ window.__xiaobanDesktopCommunity = {{ ticket: {ticket_json} }}; }}"
+        r#"if (window.location.origin === {origin_json} && window === window.top) {{
+            window.__xiaobanDesktopCommunity = {{ ticket: {ticket_json} }};
+            const hideSiteNavigation = () => {{
+                const style = document.createElement('style');
+                style.textContent = '.site-layout > .primary-nav {{ display: none !important; }} .site-layout {{ --mobile-nav-offset: 0px; }}';
+                (document.head || document.documentElement).append(style);
+            }};
+            if (document.documentElement) hideSiteNavigation();
+            else document.addEventListener('DOMContentLoaded', hideSiteNavigation, {{ once: true }});
+        }}"#
     );
-    let window = app.get_window(caller.label()).ok_or("找不到控制台窗口")?;
+    let window = caller.window();
     let builder = community_webview(&app, COMMUNITY_TAB, origin).initialization_script(script);
     window.add_child(builder, position, size).map_err(|e| e.to_string())?;
     Ok(())

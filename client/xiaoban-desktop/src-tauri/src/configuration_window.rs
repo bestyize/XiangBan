@@ -61,7 +61,7 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
     kind(label).map(|_| false)
 }
 #[tauri::command]
-pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::WebviewWindow, target: String, tab: Option<String>, provider: Option<String>) -> Result<(), String> {
+pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Webview, target: String, tab: Option<String>, provider: Option<String>) -> Result<(), String> {
     if window.label() != "control" && kind(window.label()) != Some("settings") { return Err("只能从控制台或设置打开配置窗口".into()); }
     if target=="preview" && window.label()!="control" {return Err("请从聊天页打开作品预览".into());}
     if !matches!(target.as_str(), "settings" | "model" | "community" | "store" | "cloud" | "preview") { return Err("配置窗口类型无效".into()); }
@@ -74,7 +74,7 @@ pub async fn configuration_window_open(app: tauri::AppHandle, window: tauri::Web
     let _lock = OPEN_LOCK.lock().map_err(|_| "配置窗口锁不可用")?;
     let preview_label = if target == "preview" { let label=crate::chat_preview::identity(&provider)?; let target:crate::chat_preview::Target=serde_json::from_str(&provider).map_err(|_|"预览参数无效")?; crate::chat::assets::resolve(&app,&target.session_id,&target.id,&target.relative)?; Some(label) }else{None};
     let label = if let Some(label)=preview_label {label} else if target == "cloud" { policy::cloud_label(&provider) } else if let Some(identity) = store_identity { format!("configuration-store-{:x}", Sha256::digest(identity.as_bytes()))[..44].to_string() } else if target == "community" { "configuration-community".into() } else if target == "settings" { "configuration-settings".into() } else { format!("configuration-model-{:x}", Sha256::digest(provider.as_bytes()))[..44].to_string() };
-    let monitor = window.current_monitor().map_err(|e| e.to_string())?.or(app.primary_monitor().map_err(|e| e.to_string())?);
+    let monitor = window.window().current_monitor().map_err(|e| e.to_string())?.or(app.primary_monitor().map_err(|e| e.to_string())?);
     if let Some(existing) = app.get_webview_window(&label) {
         existing.unminimize().map_err(|e| e.to_string())?;
         keep_visible(&existing, monitor)?;
@@ -229,7 +229,7 @@ pub async fn configuration_window_invoke(app: tauri::AppHandle, window: tauri::W
     result
 }
 #[tauri::command]
-pub fn configuration_window_take(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<Request,String> {
+pub fn configuration_window_take(app: tauri::AppHandle, window: tauri::Webview, id: String) -> Result<Request,String> {
     if window.label()!="control" { return Err("只能由主窗口处理配置请求".into()); }
     let state=app.state::<ConfigurationState>();
         let mut pending=state.pending.lock().map_err(|_|"配置请求锁不可用")?;
@@ -237,7 +237,7 @@ pub fn configuration_window_take(app: tauri::AppHandle, window: tauri::WebviewWi
     if p.taken { return Err("配置请求已处理".into()); } p.taken=true; Ok(p.request.clone())
 }
 #[tauri::command]
-pub fn configuration_window_reply(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, ok: bool, value: Value) -> Result<(),String> {
+pub fn configuration_window_reply(app: tauri::AppHandle, window: tauri::Webview, id: String, ok: bool, value: Value) -> Result<(),String> {
     if window.label()!="control" { return Err("只能由主窗口返回配置结果".into()); }
     let p=app.state::<ConfigurationState>().pending.lock().map_err(|_|"配置请求锁不可用")?.remove(&id).ok_or("配置请求已过期")?;
     if !p.taken { return Err("配置请求尚未处理".into()); }
