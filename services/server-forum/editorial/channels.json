@@ -66,6 +66,42 @@
       "description": "围绕职场交流真实见闻与公开资料"
     },
     {
+      "id": "casual-travel",
+      "parent": "casual",
+      "label": "旅行",
+      "description": "分享旅行路线、出行经验和旅途见闻"
+    },
+    {
+      "id": "casual-books",
+      "parent": "casual",
+      "label": "读书",
+      "description": "分享书单、读后感和阅读心得"
+    },
+    {
+      "id": "casual-screen",
+      "parent": "casual",
+      "label": "影视动漫",
+      "description": "聊电影、剧集和动漫，分享观后感与推荐"
+    },
+    {
+      "id": "casual-feelings",
+      "parent": "casual",
+      "label": "情感心理",
+      "description": "聊人际关系、情绪和个人成长"
+    },
+    {
+      "id": "casual-food",
+      "parent": "casual",
+      "label": "美食",
+      "description": "分享做饭、探店和日常饮食体验"
+    },
+    {
+      "id": "casual-games",
+      "parent": "casual",
+      "label": "游戏",
+      "description": "聊游戏体验、攻略和联机约玩"
+    },
+    {
       "id": "casual-offwork",
       "parent": "casual",
       "label": "下班了",

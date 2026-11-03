@@ -7,7 +7,6 @@ import type { TopicItem } from '@/api/types'
 import type { CommunityScheme } from '@/api/schemes'
 import { useSession } from '@/stores/session'
 import { useHead } from '@/lib/head'
-import { PACK_KINDS } from '@/lib/content'
 import { DISCUSSION_TABS, DISCUSSION_BOARD_TOPICS, LEARN_FILTERS, canonicalCategory, discussionCategory } from '@/lib/communityStructure'
 import MasonryGrid from '@/components/community/MasonryGrid.vue'
 import FilterChips from '@/components/community/FilterChips.vue'
@@ -18,24 +17,28 @@ import { useCommunityResource } from '@/components/community/resource'
 import '@/components/community/community.css'
 
 const route = useRoute(), router = useRouter(), session = useSession()
-const workFilters = [{key:'',label:'全部'}, ...PACK_KINDS, {key:'schemes',label:'方案'}]
+const ideas = computed(() => route.name === 'ideas')
 const query = (key:string) => typeof route.query[key] === 'string' ? route.query[key] : ''
 const tab = computed(() => {
+  if (ideas.value) return 'create'
   const raw = query('tab')
   const key = raw === 'casual' ? canonicalCategory(query('filter')) : raw
   return DISCUSSION_TABS.some(item => item.key === key) ? key : 'all'
 })
 const board = computed(() => {
-  const key = canonicalCategory(query('board') || (query('tab') === 'casual' ? query('filter') : ''))
-  return DISCUSSION_BOARD_TOPICS.some(item => item.key === key) ? key : ''
+  if (ideas.value) return ''
+  const rawTab = query('tab')
+  const legacyTab = rawTab === 'casual' ? query('filter') : rawTab
+  const key = canonicalCategory(query('board') || legacyTab)
+  return DISCUSSION_BOARD_TOPICS.some(item => item.key === key) ||
+    (key.startsWith('casual-') && key !== tab.value && DISCUSSION_TABS.some(item => item.key === key)) ? key : ''
 })
 const tag = computed(() => query('tag'))
-const subFilters = computed(() => tab.value === 'create' ? workFilters :
-  tab.value === 'learn' ? LEARN_FILTERS : [])
+const subFilters = computed(() => tab.value === 'learn' ? LEARN_FILTERS : [])
 const filter = computed(() => subFilters.value.some(item => item.key === query('filter')) ? query('filter') : '')
 const following = computed(() => query('mode') === 'following' || query('sort') === 'following' || query('tab') === 'following')
 const page = computed(() => Math.min(1000, Math.max(1, Math.floor(Number(query('page')) || 1))))
-const category = computed(() => board.value || discussionCategory(tab.value, filter.value === 'schemes' ? '' : filter.value))
+const category = computed(() => board.value || discussionCategory(tab.value, filter.value))
 const scope = computed(() => ({category:category.value, tag:tag.value || undefined, home:board.value !== 'casual-chat'}))
 const topicLabel = computed(() => tag.value || DISCUSSION_BOARD_TOPICS.find(item => item.key === board.value)?.label || '')
 
@@ -45,12 +48,11 @@ function date(entry:Entry) {
 }
 const { data, loading, error, load } = useCommunityResource(async () => {
   const current = page.value
-  const wantsWorks = !board.value && ['all','create'].includes(tab.value)
   if (following.value && !session.loggedIn) return { entries:[] as Entry[], hasMore:false }
   const [topics, packs, schemes] = await Promise.all([
-    filter.value === 'schemes' ? null : following.value ? api.followingTopics(current, scope.value) : api.topics({...scope.value, sort:'new', page:current}),
-    wantsWorks && filter.value !== 'schemes' ? contentApi.packs({kind:filter.value || undefined, tag:tag.value || undefined, sort:'new', page:current, following:following.value}) : null,
-    wantsWorks && !tag.value && (!filter.value || filter.value === 'schemes') ? contentApi.schemes(current, following.value) : null,
+    following.value ? api.followingTopics(current, scope.value) : api.topics({...scope.value, sort:'new', page:current}),
+    ideas.value ? contentApi.packs({ tag:tag.value || undefined, sort:'new', page:current, following:following.value}) : null,
+    ideas.value && !tag.value ? contentApi.schemes(current, following.value) : null,
   ])
   const packTopics = new Set(packs?.items.map(item => item.topic_id))
   const entries:Entry[] = [
@@ -63,21 +65,21 @@ const { data, loading, error, load } = useCommunityResource(async () => {
 watch([tab,board,tag,filter,following,page,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
 
 function navigate(values:Record<string,string|undefined>) {
-  void router.replace({query:{tab:tab.value, board:board.value || undefined, tag:tag.value || undefined,
+  void router.replace({query:{tab:ideas.value ? undefined : tab.value, board:board.value || undefined, tag:tag.value || undefined,
     filter:filter.value || undefined, mode:following.value ? 'following' : undefined, ...values}})
 }
 function go(value:number) { navigate({page:String(value)}) }
 
-useHead(() => ({title:'讨论'}))
+useHead(() => ({title:ideas.value ? '创意' : '讨论'}))
 </script>
 
 <template>
   <main class="community-page discuss-page">
-    <h1 class="sr-only">社区讨论</h1>
-    <FilterChips :items="DISCUSSION_TABS" :active="tab" label="讨论分类"
+    <h1 class="sr-only">{{ ideas ? '社区创意' : '社区讨论' }}</h1>
+    <FilterChips v-if="!ideas" :items="DISCUSSION_TABS" :active="tab" label="讨论分类"
       @change="key => navigate({tab:key,filter:undefined,board:undefined,tag:undefined})" />
     <FilterChips v-if="subFilters.length" :items="subFilters"
-      :active="filter" :label="tab === 'create' ? '作品类型' : '教程主题'" @change="key => navigate({filter:key || undefined})" />
+      :active="filter" label="教程主题" @change="key => navigate({filter:key || undefined})" />
     <button v-if="topicLabel" class="active-topic" type="button" @click="navigate({tag:undefined,board:undefined})"># {{ topicLabel }} ×</button>
     <p v-if="board === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>
     <div v-if="following && !session.loggedIn" class="login-prompt">
@@ -87,10 +89,10 @@ useHead(() => ({title:'讨论'}))
       <RequestState :loading="loading" :error="error" @retry="load" />
       <MasonryGrid v-if="data?.entries.length" class="discussion-grid" :columns="2">
         <template v-for="entry in data.entries" :key="entry.kind + ':' + entry.value.id">
-          <ResourceTopicRow v-if="entry.kind === 'topic'" :topic="entry.value" layout="masonry" show-category note-cover @select-tag="navigate({tab:'all',filter:undefined,board:undefined,tag:$event})" />
+          <ResourceTopicRow v-if="entry.kind === 'topic'" :topic="entry.value" layout="masonry" show-category note-cover @select-tag="navigate({tab:ideas ? undefined : 'all',filter:undefined,board:undefined,tag:$event})" />
           <CommunityPackCard v-else-if="entry.kind === 'pack'" :pack="entry.value" layout="masonry" discussion />
           <RouterLink v-else :to="'/schemes/' + entry.value.id" class="scheme-card">
-            <span>创作 · 桌面方案</span><strong>{{ entry.value.title }}</strong><p>{{ entry.value.summary }}</p>
+            <span>创意 · 桌面方案</span><strong>{{ entry.value.title }}</strong><p>{{ entry.value.summary }}</p>
             <small>{{ entry.value.author.nickname || '社区作品' }} · {{ entry.value.items.length }} 项 · 查看导入</small>
           </RouterLink>
         </template>

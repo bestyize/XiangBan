@@ -6,15 +6,20 @@ export const CATEGORY_ALIASES = channels.aliases as Record<string,string>
 const legacyCategories = new Set(channels.channels.filter(c => 'legacy_only' in c && c.legacy_only).map(c => c.id))
 export function isLegacyCategory(slug:string) { return legacyCategories.has(canonicalCategory(slug)) }
 export const DISCUSSION_TABS = [
-  {key:'all',label:'全部'}, {key:'create',label:'创作'}, {key:'learn',label:'教程'},
-  {key:'casual-offwork',label:'下班了'}, {key:'casual-gear',label:'数码'},
-  {key:'casual-fun',label:'吃喝玩乐'},
+  {key:'all',label:'全部'}, {key:'learn',label:'教程'},
+  {key:'casual-travel',label:'旅行'},
+  {key:'casual-books',label:'读书'},
+  {key:'casual-screen',label:'影视动漫'},
+  {key:'casual-feelings',label:'情感心理'},
+  {key:'casual-food',label:'美食'},
+  {key:'casual-work',label:'职场'},
+  {key:'casual-games',label:'游戏'},
 ]
 export const DISCUSSION_BOARD_TOPICS = channels.channels.filter(c =>
   c.parent === 'casual' && c.id !== 'casual-media' && !DISCUSSION_TABS.some(t => t.key === c.id) && !isLegacyCategory(c.id),
 ).map(c => ({key:c.id,label:c.label}))
 export function discussionCategory(tab:string, filter = '') {
-  if (tab === 'all') return 'create,learn,casual,resource-music'
+  if (tab === 'all') return 'learn,casual,resource-music'
   if (tab === 'learn') return learnCategory(filter)
   if (tab === 'create') return creationCategory(filter)
   return tab

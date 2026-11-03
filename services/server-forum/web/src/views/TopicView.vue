@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { canonicalCategory } from '@/lib/communityStructure'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
@@ -256,6 +257,17 @@ async function closeHelp() {
   } catch (e) { toast.error(e) }
   finally { helpBusy.value = false }
 }
+
+function breadcrumbDestination(slug: string) {
+  switch (canonicalCategory(slug)) {
+    case 'resources': return '/resources'
+    case 'resource-movies': return '/resources?tab=media'
+    case 'resource-help': return '/resources?tab=help'
+    case 'resource-open': return '/resources?tab=software'
+    default: return `/c/${slug}`
+  }
+}
+
 </script>
 
 <template>
@@ -284,8 +296,8 @@ async function closeHelp() {
 
     <article v-else class="topic">
       <nav class="crumbs" aria-label="位置">
-        <RouterLink v-if="parentCategory" :to="`/c/${parentCategory.slug}`">{{ parentCategory.name }}</RouterLink>
-        <RouterLink :to="`/c/${topic.category.slug}`">{{ topic.category.name }}</RouterLink>
+        <RouterLink v-if="parentCategory" :to="breadcrumbDestination(parentCategory.slug)">{{ parentCategory.name }}</RouterLink>
+        <RouterLink :to="breadcrumbDestination(topic.category.slug)">{{ topic.category.name }}</RouterLink>
       </nav>
       <h1 v-if="topic.title || topic.pinned" class="title"><span v-if="topic.pinned" class="pin-badge">{{ pinScopeLabel(topic.pin_scope) }}</span>{{ topic.title }}</h1>
       <div class="byline">

@@ -20,6 +20,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/open-source/collections/:key', name: 'open-source-collection', component: () => import('@/views/OpenSourceCollectionView.vue') },
   { path: '/open-source/:owner/:repo', name: 'open-source-project', component: () => import('@/views/OpenSourceDetailView.vue') },
   { path: '/discuss', name: 'discuss', component: DiscussView },
+  { path: '/ideas', name: 'ideas', component: DiscussView },
   { path: '/models', name: 'model-rankings', component: () => import('@/views/ModelRankingsView.vue') },
   { path: '/resources', name: 'resources', component: () => import('@/views/ResourcesView.vue') },
   { path: '/challenges', name: 'challenges', component: () => import('@/views/ChallengesView.vue') },
@@ -60,7 +61,7 @@ export const router = createRouter({
     if (saved) return saved
     if (to.hash) return { el: to.hash, top: 80 }
     if (to.path === from.path) {
-      if (['/', '/discuss', '/resources', '/models', '/daily', '/open-source'].includes(to.path) && to.fullPath !== from.fullPath) return { top:0 }
+      if (['/', '/discuss', '/ideas', '/resources', '/models', '/daily', '/open-source'].includes(to.path) && to.fullPath !== from.fullPath) return { top:0 }
       return undefined
     }
     return { top: 0 }
@@ -72,6 +73,10 @@ router.afterEach(to => trackRoute(to.name, to.query))
 // 需要登录的页面：没登录就弹登录框，停在原页面（直接打开时回我的页）。
 router.beforeEach((to, from) => {
   if (to.path === '/resources' && to.query.tab === 'docs') return { path:'/resources', query:{ tab:'media' }, replace:true }
+  if (to.path === '/discuss' && to.query.tab === 'create') {
+    const { tab, filter, page, ...query } = to.query
+    return { path:'/ideas', query, hash:to.hash, replace:true }
+  }
   if (to.path === '/discuss' && to.query.tab === 'casual-media') {
     if (to.query.filter === 'movies') {
       return { path:'/resources', query:{ tab:'media', page:to.query.page }, hash:to.hash, replace:true }
@@ -84,7 +89,7 @@ router.beforeEach((to, from) => {
     const kind = String(to.query.kind || to.query.tab || '')
     if (kind === 'schemes') return { path: '/schemes', query: {...to.query, tab: undefined, kind: undefined} }
     if (['game','widget','wallpaper','effect','pet','skill','expert','workflow','reminder','routine','task','goal'].includes(kind)) {
-      return {path:'/discuss', query:{...to.query, filter:kind, kind:undefined, tab:'create'}}
+      return {path:'/ideas', query:{...to.query, filter:undefined, kind:undefined, tab:undefined, page:undefined}}
     }
   }
   if (!to.meta.auth) return

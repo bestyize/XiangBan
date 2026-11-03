@@ -15,6 +15,7 @@ function publish(path: string) {
   const tab = String(route.query.tab ?? '')
   const category = route.name === 'resources' && tab === 'media'
     ? resourceTopicCategory(tab)
+    : route.name === 'ideas' ? 'create'
     : route.name === 'discuss' && DISCUSSION_TABS.some(item => item.key === tab && tab !== 'all')
     ? discussionCategory(tab, tab === 'learn' ? String(route.query.filter ?? '') : '') : undefined
   if (path === '/new' && category) void router.push({path,query:{category}})

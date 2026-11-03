@@ -336,6 +336,12 @@ const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool
     ("xiaoban-app", "小伴App", "小伴 App 的功能介绍、更新和使用教程（官方发布，欢迎回复反馈）", "normal", Some("xiaoban"), 3, true, false, false),
     ("casual", "随便唠唠", "什么都可以聊，别引战", "normal", None, 1, true, false, false),
     ("casual-work", "职场", "加班、跳槽、远程办公", "normal", Some("casual"), 1, true, false, false),
+    ("casual-travel", "旅行", "分享旅行路线、出行经验和旅途见闻", "normal", Some("casual"), 1, true, false, false),
+    ("casual-books", "读书", "分享书单、读后感和阅读心得", "normal", Some("casual"), 1, true, false, false),
+    ("casual-screen", "影视动漫", "聊电影、剧集和动漫，分享观后感与推荐", "normal", Some("casual"), 1, true, false, false),
+    ("casual-feelings", "情感心理", "聊人际关系、情绪和个人成长", "normal", Some("casual"), 1, true, false, false),
+    ("casual-food", "美食", "分享做饭、探店和日常饮食体验", "normal", Some("casual"), 1, true, false, false),
+    ("casual-games", "游戏", "聊游戏体验、攻略和联机约玩", "normal", Some("casual"), 1, true, false, false),
     ("casual-offwork", "下班了", "今日下班、打卡、吐槽", "normal", Some("casual"), 1, true, false, false),
     ("casual-loss", "亏了吗", "今天亏了吗？聊聊股票、基金、副业的盈亏和心态；只聊经验和心情，不荐股、不拉群、不带单", "normal", Some("casual"), 1, true, false, false),
     ("casual-dream", "梦想和人生", "聊聊理想、目标、转行和人生的选择，分享你的故事和想法", "normal", Some("casual"), 1, true, false, false),
@@ -521,6 +527,7 @@ const BOARD_MIGRATIONS: &[BoardMigration] = &[
     BoardMigration { name: "casual-dream-v1", parent: "casual", create_parent: false, boards: &["casual-dream"], moves: &[] },
     // 随便唠唠：手机端休闲栏的筛选需要 片单乐评 / 哲思 / 互助，放在“吃喝玩乐”后面
     BoardMigration { name: "casual-boards-v2", parent: "casual", create_parent: false, boards: &["casual-media", "casual-think", "casual-help"], moves: &[] },
+    BoardMigration { name: "casual-life-v1", parent: "casual", create_parent: false, boards: &["casual-travel", "casual-books", "casual-screen", "casual-feelings", "casual-food", "casual-games"], moves: &[] },
     // 小伴产品：新增一级分类和 小伴壁纸 / 小伴游戏 / 小伴App，放在福利羊毛之后、随便唠唠之前
     BoardMigration {
         name: "xiaoban-boards-v1",

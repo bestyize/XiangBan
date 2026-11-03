@@ -11,10 +11,10 @@ const route = useRoute(), router = useRouter(), session = useSession(), inbox = 
 const { preference, resolved, openAppearance } = useTheme()
 const titles = { community: '社区', ai: '小伴 AI', create: '创造', me: '我的' }
 const title = computed(() => titles[areaOf(route)])
-const roots = ['home','discuss','resources','ai','create','me']
-const communityRoot = computed(() => ['home','discuss','resources'].includes(String(route.name)))
+const roots = ['home','discuss','ideas','resources','ai','create','me']
+const communityRoot = computed(() => ['home','discuss','ideas','resources'].includes(String(route.name)))
 const section = computed(() => sectionOf(route))
-const destinations = ref({ home:'/', discuss:'/discuss', resources:'/resources' })
+const destinations = ref({ home:'/', discuss:'/discuss', ideas:'/ideas', resources:'/resources' })
 watch(() => route.fullPath, path => { if (communityRoot.value) destinations.value[section.value] = path }, {immediate:true})
 const detail = computed(() => !roots.includes(String(route.name)))
 const searchOpen = ref(false), query = ref(''), searchInput = ref<HTMLInputElement>()
@@ -28,7 +28,7 @@ watch(() => route.fullPath, () => { searchOpen.value = false })
     <div class="header-inner">
       <button v-if="detail" class="header-icon" aria-label="返回上一页" @click="back"><AppIcon name="back" /></button>
       <RouterLink v-else class="header-brand" to="/" aria-label="超级小伴首页"><BrandMark /><span>超级小伴</span></RouterLink>
-      <nav v-if="communityRoot" class="community-navigation" aria-label="社区栏目"><RouterLink v-for="item in [{key:'home' as const,label:'首页'},{key:'discuss' as const,label:'讨论'},{key:'resources' as const,label:'资源'}]" :key="item.key" :to="destinations[item.key]" :class="{on:section===item.key}" :aria-current="section===item.key?'page':undefined">{{ item.label }}</RouterLink></nav>
+      <nav v-if="communityRoot" class="community-navigation" aria-label="社区栏目"><RouterLink v-for="item in [{key:'home' as const,label:'首页'},{key:'ideas' as const,label:'创意'},{key:'discuss' as const,label:'讨论'},{key:'resources' as const,label:'资源'}]" :key="item.key" :to="destinations[item.key]" :class="{on:section===item.key}" :aria-current="section===item.key?'page':undefined">{{ item.label }}</RouterLink></nav>
       <span v-else class="header-context">{{ title }}</span>
       <div class="header-actions">
         <button class="header-icon" :aria-expanded="searchOpen" aria-label="搜索社区" @click="search"><AppIcon name="search" /><span class="desktop-search-label" aria-hidden="true">搜索社区内容</span></button>
@@ -68,7 +68,7 @@ watch(() => route.fullPath, () => { searchOpen.value = false })
   .community-header .header-brand :deep(svg){width:26px;height:26px}
   .community-header .header-actions{width:44px;justify-content:flex-end;flex:none;margin-left:0}
   .community-header .header-login,.community-header .notification{display:none}
-  .community-navigation{gap:28px;height:48px}
+  .community-navigation{gap:clamp(12px,5vw,28px);height:48px}
   .detail-header .header-inner{height:48px}
   .detail-header .header-login{display:none}
 }
