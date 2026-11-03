@@ -1,6 +1,8 @@
 import seed from '../../../editorial/open-source.json' with { type: 'json' }
 
 export interface OpenSourceProject {
+  stars?: number
+  last_pushed_at?: string
   full_name: string
   name: string
   title: string
@@ -31,6 +33,10 @@ export interface OpenSourceProject {
   featured: boolean
   order: number
 }
+export type OpenSourceProjectSummary = Omit<OpenSourceProject,
+  'effort' | 'cover_caption' | 'icon_source_url' | 'homepage_url' | 'highlights' |
+  'audience' | 'getting_started' | 'notes' | 'source_url' | 'featured' | 'order'>
+
 export interface OpenSourceCollection {
   key: string
   title: string
@@ -48,11 +54,9 @@ export interface OpenSourceCatalog {
   collections: OpenSourceCollection[]
 }
 
-// 随版本目录用于初始展示与旧服务兼容；stores/openSource 从已发布 API 更新，原生端读取同一接口。
+// 随版本目录用于校验采编数据。公开页面通过分页接口读取已发布目录。
 export const openSourceCatalog: OpenSourceCatalog = seed
 export const openSourceCategories = [{ key: 'recommend', label: '推荐', description: '发现值得尝试的开源项目' }, { key: 'hot', label: '热榜', description: '查看开源项目热榜与往期' }, ...seed.categories]
-export const projectPath = (name: string) => `/open-source/${name.split('/').map(encodeURIComponent).join('/')}`
-export const collectionPath = (key: string) => `/open-source/collections/${encodeURIComponent(key)}`
 export const categoryLabel = (key: string) => seed.categories.find(item => item.key === key)?.label || key
 export function findProject(name: string, catalog: OpenSourceCatalog = openSourceCatalog) {
   return catalog.projects.find(item => item.full_name.toLowerCase() === name.toLowerCase())

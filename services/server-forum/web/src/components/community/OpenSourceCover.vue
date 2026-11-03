@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { OpenSourceProject } from '@/lib/openSource'
+import type { OpenSourceProjectSummary } from '@/lib/openSource'
 import { resolveOpenSourceCover } from '@/lib/openSourceCovers'
-const props = defineProps<{ project: OpenSourceProject }>()
+const props = defineProps<{ project: OpenSourceProjectSummary }>()
 const project = computed(() => resolveOpenSourceCover(props.project))
 const brokenImage = ref(false), brokenIcon = ref(false)
 watch(() => [props.project.full_name, props.project.cover_url, props.project.icon_url], () => { brokenImage.value = false; brokenIcon.value = false })

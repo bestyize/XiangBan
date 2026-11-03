@@ -53,5 +53,115 @@
     "project": "ytdlp",
     "url": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/.github/banner.svg",
     "file": "ytdlp-icon.svg"
+  },
+  {
+    "project": "laurent22/joplin",
+    "url": "https://raw.githubusercontent.com/laurent22/joplin/dev/Assets/LinuxIcons/256x256.png",
+    "file": "joplin-icon.png"
+  },
+  {
+    "project": "Stirling-Tools/Stirling-PDF",
+    "url": "https://raw.githubusercontent.com/Stirling-Tools/Stirling-PDF/main/docs/stirling.png",
+    "file": "stirling-icon.png"
+  },
+  {
+    "project": "KDE/krita",
+    "url": "https://krita.org/images/krita-logo-light.svg",
+    "file": "krita-icon.svg"
+  },
+  {
+    "project": "mifi/lossless-cut",
+    "url": "https://raw.githubusercontent.com/mifi/lossless-cut/master/src/renderer/src/icon.svg",
+    "file": "losslesscut-icon.svg"
+  },
+  {
+    "project": "imputnet/cobalt",
+    "url": "https://raw.githubusercontent.com/imputnet/cobalt/main/web/static/favicon.png",
+    "file": "cobalt-icon.png"
+  },
+  {
+    "project": "neovim/neovim",
+    "url": "https://raw.githubusercontent.com/neovim/neovim.github.io/master/static/logos/neovim-logo-300x87.png",
+    "file": "neovim-icon.png"
+  },
+  {
+    "project": "rustdesk/rustdesk",
+    "url": "https://raw.githubusercontent.com/rustdesk/rustdesk/master/res/logo-header.svg",
+    "file": "rustdesk-icon.svg"
+  },
+  {
+    "project": "WerWolv/ImHex",
+    "url": "https://raw.githubusercontent.com/WerWolv/ImHex/master/resources/dist/common/logo/ImHexLogoSVGBG.svg",
+    "file": "imhex-icon.svg"
+  },
+  {
+    "project": "Anuken/Mindustry",
+    "url": "https://raw.githubusercontent.com/Anuken/Mindustry/master/core/assets-raw/sprites/ui/logo.png",
+    "file": "mindustry-icon.png"
+  },
+  {
+    "project": "luanti-org/luanti",
+    "url": "https://raw.githubusercontent.com/luanti-org/luanti/master/textures/base/pack/logo.png",
+    "file": "luanti-icon.png"
+  },
+  {
+    "project": "immich-app/immich",
+    "url": "https://raw.githubusercontent.com/immich-app/immich/main/design/immich-logo-stacked-light.svg",
+    "file": "immich-icon.svg"
+  },
+  {
+    "project": "coollabsio/coolify",
+    "url": "https://raw.githubusercontent.com/coollabsio/coolify/main/public/coolify-logo.svg",
+    "file": "coolify-icon.svg"
+  },
+  {
+    "project": "paperless-ngx/paperless-ngx",
+    "url": "https://raw.githubusercontent.com/paperless-ngx/paperless-ngx/main/docs/assets/logo_full_black.png",
+    "file": "paperless-icon.png"
+  },
+  {
+    "project": "usememos/memos",
+    "url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/brand/lockup.svg",
+    "file": "memos-icon.svg"
+  },
+  {
+    "project": "FreeCAD/FreeCAD",
+    "url": "https://raw.githubusercontent.com/FreeCAD/FreeCAD/main/src/Gui/Icons/freecad.svg",
+    "file": "freecad-icon.svg"
+  },
+  {
+    "project": "godotengine/godot",
+    "url": "https://raw.githubusercontent.com/godotengine/godot/master/misc/logo/logo_outlined.svg",
+    "file": "godot-icon.svg"
+  },
+  {
+    "project": "navidrome/navidrome",
+    "url": "https://raw.githubusercontent.com/navidrome/navidrome/master/resources/logo-192x192.png",
+    "file": "navidrome-icon.png"
+  },
+  {
+    "project": "langflow-ai/langflow",
+    "url": "https://raw.githubusercontent.com/langflow-ai/langflow/main/docs/static/img/langflow-logo-color-black-solid.svg",
+    "file": "langflow-icon.svg"
+  },
+  {
+    "project": "infiniflow/ragflow",
+    "url": "https://raw.githubusercontent.com/infiniflow/ragflow/main/web/src/assets/logo-with-text.svg",
+    "file": "ragflow-icon.svg"
+  },
+  {
+    "project": "vllm-project/vllm",
+    "url": "https://raw.githubusercontent.com/vllm-project/vllm/main/docs/assets/logos/vllm-logo-text-light.png",
+    "file": "vllm-icon.png"
+  },
+  {
+    "project": "esphome/esphome",
+    "url": "https://media.esphome.io/logo/logo-text-on-light.svg",
+    "file": "esphome-icon.svg"
+  },
+  {
+    "project": "huggingface/lerobot",
+    "url": "https://raw.githubusercontent.com/huggingface/lerobot/main/media/readme/lerobot-logo-thumbnail.png",
+    "file": "lerobot-icon.png"
   }
 ]

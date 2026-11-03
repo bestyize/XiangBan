@@ -42,3 +42,24 @@
 遵循本次用户授权：本批可整理全板块稿件并提交本地成果，完成后交付待审；未获得发布指令时不更新线上内容。用户已授权保存后台草稿时按原 key 与 `expected_revision` 幂等保存，发生并发变更就重新核对该条。发布需使用现有发布入口并按原 revision 校验，保留回退快照；不得因改稿绕过审核或覆盖其他编辑工作。
 
 本规范不增加任何自动 GitHub Actions。代码合入与内容发布分开记录；推送后不轮询 CI。云端部署如另获授权，先在本地构建产物。
+
+## 正式网页发布路径（2026-11-03 接入）
+
+正式详情页通过现有已发布目录分页 API 确认项目，再按需读取静态双语文稿：`/open-source-readmes/index.json` → `projects/<SHA256>.json`。未收录、不完整或许可依据待核的正文不进入索引，页面提供上游原文入口。目录 key、分类、专题和评论继续使用原协议及数据库；不把全文塞进列表接口，不直接改库。
+
+在用户授权上线后，负责发布的编辑审阅分片审校记录、独立抽查和校验结果，再生成本次发布产物：
+
+```sh
+python3 services/server-forum/editorial/publish_readme_snapshot.py \
+  services/server-forum/editorial/readme-batches/2026-11-03 \
+  services/server-forum/web/public/open-source-readmes
+npm --prefix services/server-forum/web run build
+```
+
+脚本对快照中的文件逐个校验 SHA256，按原始字节验证 README Git blob SHA，检查审校状态、双语正文、版本来源及许可证；只使用已校验的同一份字节生成内容。`ready_for_review` 是生产候选资格，脚本本身不代替审稿、不连接服务器。发布者另行确认本次发布清单与用户授权。快照发生变化的项目跳过，重建快照后再处理。
+
+Markdown 在浏览器经 Marked 解析和 DOMPurify 过滤后展示，禁用脚本、事件属性、iframe、表单、内联样式与不安全 URL；外链带隔离属性，代码只展示与复制。官方图片保留原链接，项目卡片优先使用已归档的真实项目图标。来源、固定提交、采集日期和许可全文保留在阅读页底部。
+
+先上传不可变项目 JSON，最后原子替换索引。网页代码更新需本地构建后上传，并保留上一版静态目录和旧哈希资源；服务启动时缓存 index.html，因此切换网页版本后重启 `server-forum`，无需替换服务二进制。后续仅追加 README 内容不需重启。回滚恢复旧网页目录和旧索引；不删除用户评论、收藏或修改线上目录 revision。
+
+正式评论使用现有登录、评论、回复和点赞 API；收藏延续当前浏览器收藏。底栏显示真实评论数量，GitHub 入口和收藏按钮，不沿用原型的示例点赞、收藏计数。

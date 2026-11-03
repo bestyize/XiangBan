@@ -1,41 +1,90 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { categoryLabel, findProject } from '@/lib/openSource'
-import { openSourceCatalog as catalog, loadOpenSourceCatalog } from '@/stores/openSource'
+import { openSourceBrowse } from '@/api/openSourceBrowse'
+import { useCommunityResource } from '@/components/community/resource'
+import { fetchProjectReadme, renderProjectReadme } from '@/lib/projectReadme'
 import { useRepoBookmarks } from '@/lib/repoBookmarks'
 import { useHead } from '@/lib/head'
+import RequestState from '@/components/community/RequestState.vue'
 import CommunityBack from '@/components/community/CommunityBack.vue'
 import DiscoverGlyph from '@/components/community/DiscoverGlyph.vue'
 import RepoComments from '@/components/community/RepoComments.vue'
 import OpenSourceProjectCard from '@/components/community/OpenSourceProjectCard.vue'
 import '@/components/community/community.css'
 import '@/components/community/open-source.css'
+import '@/components/community/project-readme.css'
 const route = useRoute()
-void loadOpenSourceCatalog()
-const project = computed(() => findProject(`${String(route.params.owner)}/${String(route.params.repo)}`, catalog))
+const { data: catalog, loading, error, load } = useCommunityResource(() => openSourceBrowse.project(String(route.params.owner), String(route.params.repo)))
+const { data: readme, loading: readmeLoading, error: readmeError, load: loadReadme } = useCommunityResource(() => fetchProjectReadme(String(route.params.owner), String(route.params.repo)))
+const language = ref<'zh' | 'en'>('zh'), brokenIcon = ref(false), article = ref<HTMLElement | null>(null), copyMessage = ref('')
+const project = computed(() => catalog.value?.projects[0])
+const card = computed(() => readme.value?.card)
+const summary = computed(() => card.value?.summary_zh || project.value?.summary || '')
+const github = computed(() => card.value?.github_url || `https://github.com/${project.value?.full_name}`)
+const icon = computed(() => project.value?.icon_url || card.value?.icon_source_url)
+const stars = computed(() => card.value?.stars ?? project.value?.stars)
+const updated = computed(() => card.value?.code_updated_at || project.value?.last_pushed_at)
+const rendered = computed(() => readme.value ? renderProjectReadme(readme.value[language.value]) : '')
 const bookmarks = useRepoBookmarks()
-const broken = ref(false)
-watch(project, () => { broken.value = false })
-const related = computed(() => project.value ? catalog.projects.filter(item => item.full_name !== project.value!.full_name && (item.category === project.value!.category || item.related_categories.includes(project.value!.category) || project.value!.related_categories.includes(item.category))).slice(0, 2) : [])
-useHead(() => ({ title: project.value ? `${project.value.name} · 精选` : '项目未收录' }))
+const category = computed(() => catalog.value?.categories.find(item => item.key === project.value?.category)?.label ?? '开源项目')
+const date = (value?: string) => value ? value.slice(0, 10) : ''
+const count = (value: number) => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
+watch(() => [route.params.owner, route.params.repo], () => {
+  language.value = 'zh'; brokenIcon.value = false; copyMessage.value = ''
+  void load(); void loadReadme()
+}, { immediate: true })
+useHead(() => ({ title: project.value ? `${project.value.name} · 开源精选` : '开源精选', description: summary.value }))
+watch([rendered, project], async () => {
+  await nextTick()
+  article.value?.querySelectorAll('pre').forEach(pre => {
+    if (pre.querySelector('.readme-copy')) return
+    const button = document.createElement('button')
+    button.type = 'button'; button.textContent = '复制'; button.className = 'readme-copy'
+    button.setAttribute('aria-label', '复制代码'); pre.appendChild(button)
+  })
+})
+async function articleClick(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  const button = target.closest<HTMLButtonElement>('.readme-copy')
+  if (button) {
+    try { await navigator.clipboard.writeText(button.parentElement?.querySelector('code')?.textContent ?? ''); button.textContent = '已复制' }
+    catch { copyMessage.value = '无法自动复制，请选中代码复制。' }
+  }
+  const link = target.closest<HTMLAnchorElement>('a[href^="#"]')
+  if (link) {
+    event.preventDefault()
+    let id = link.getAttribute('href')!.slice(1)
+    try { id = decodeURIComponent(id) } catch { /* Keep the upstream anchor. */ }
+    const element = Array.from(article.value?.querySelectorAll('[id],a[name]') ?? []).find(node => node.id === id || node.getAttribute('name') === id)
+    element?.scrollIntoView({ block: 'start' })
+  }
+}
 </script>
 <template>
-  <main class="community-page os-detail-page">
-    <nav class="os-detail-nav"><CommunityBack fallback="/open-source" label="精选" /><span>项目导读</span></nav>
+  <main class="community-page readme-page">
+    <nav class="readme-nav"><CommunityBack fallback="/open-source" label="精选" /><span>开源精选</span><a v-if="project" :href="github" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看项目"><DiscoverGlyph name="github" :size="20" /></a></nav>
     <template v-if="project">
-      <div class="os-detail-layout"><article class="os-detail-body">
-        <header class="os-detail-hero"><div class="os-kicker">{{ categoryLabel(project.category) }}<span>·</span>{{ project.name }}</div><h1>{{ project.title }}</h1><a class="os-repo-name" :href="`https://github.com/${project.full_name}`" target="_blank" rel="noopener noreferrer"><DiscoverGlyph name="github" :size="16" />{{ project.full_name }}<DiscoverGlyph name="external" :size="14" /></a><p class="os-detail-description">{{ project.summary }}</p><div class="os-tags"><span v-for="tag in project.tags" :key="tag">{{ tag }}</span></div><p class="os-hero-effort"><DiscoverGlyph name="compass" :size="14" />{{ project.effort }}</p><div class="os-mobile-actions"><a class="os-button" :href="`https://github.com/${project.full_name}`" target="_blank" rel="noopener noreferrer" aria-label="前往 GitHub 查看项目">GitHub<DiscoverGlyph name="external" :size="16" /></a><button class="os-button secondary" type="button" :aria-pressed="bookmarks.has(project.full_name)" @click="bookmarks.toggle(project.full_name)"><DiscoverGlyph name="bookmark" :size="18" />{{ bookmarks.has(project.full_name) ? '已收藏' : '收藏项目' }}</button></div><p v-if="bookmarks.error.value" class="os-status" role="alert">{{ bookmarks.error.value }}</p></header>
-        <figure v-if="project.cover_url && !broken" class="os-detail-cover"><img :src="project.cover_url" :alt="`${project.name} · ${project.cover_caption}`" @error="broken = true"><figcaption>{{ project.cover_caption }} · 来自<a :href="project.source_url" target="_blank" rel="noopener noreferrer">项目官方仓库 ↗</a></figcaption></figure>
-        <section class="os-detail-section"><h2>为什么值得看看</h2><ol class="os-detail-highlights"><li v-for="item in project.highlights" :key="item">{{ item }}</li></ol></section>
-        <section class="os-detail-section"><h2>适合谁</h2><p>{{ project.audience }}</p></section>
-        <section class="os-detail-section"><h2>从这里开始</h2><p>{{ project.getting_started }}</p></section>
-        <section class="os-detail-section"><h2>开始前了解一下</h2><ul><li v-for="note in project.notes" :key="note">{{ note }}</li></ul></section>
-        <section class="os-detail-section"><h2>继续了解</h2><div class="os-reference-links"><a :href="project.homepage_url" target="_blank" rel="noopener noreferrer">项目官网与文档<DiscoverGlyph name="external" :size="16" /></a><a :href="project.source_url" target="_blank" rel="noopener noreferrer">README 与源代码<DiscoverGlyph name="external" :size="16" /></a><a :href="`https://github.com/${project.full_name}#license`" target="_blank" rel="noopener noreferrer">查看项目许可<DiscoverGlyph name="external" :size="16" /></a></div><p class="os-source-note">{{ catalog.notice }}<br>资料整理：{{ catalog.reviewed_at }}</p></section>
-      </article><aside class="os-detail-sidebar"><section class="os-info-card"><h2>项目速览</h2><dl><div><dt>项目</dt><dd>{{ project.name }}</dd></div><div><dt>使用门槛</dt><dd>{{ project.effort }}</dd></div><div><dt>所属分类</dt><dd>{{ [project.category, ...project.related_categories].map(categoryLabel).join(' / ') }}</dd></div><div><dt>资料来源</dt><dd>项目官方 README</dd></div></dl><div class="os-detail-actions"><a class="os-button" :href="`https://github.com/${project.full_name}`" target="_blank" rel="noopener noreferrer"><DiscoverGlyph name="github" :size="18" />前往 GitHub<DiscoverGlyph name="external" :size="16" /></a><button class="os-button secondary" type="button" :aria-pressed="bookmarks.has(project.full_name)" @click="bookmarks.toggle(project.full_name)"><DiscoverGlyph name="bookmark" :size="18" />{{ bookmarks.has(project.full_name) ? '已收藏' : '收藏项目' }}</button><a class="os-button secondary" href="#comments"><DiscoverGlyph name="comment" :size="18" />交流与提问</a></div><p class="os-source-note">收藏保存在当前浏览器。</p><p v-if="bookmarks.error.value" class="os-status" role="alert">{{ bookmarks.error.value }}</p></section></aside></div>
-      <section class="os-detail-comments"><RepoComments :key="project.full_name" :owner="project.full_name.split('/')[0]!" :repo="project.full_name.split('/')[1]!" /></section>
-      <section v-if="related.length" class="os-related"><h2>还可以看看</h2><div class="os-project-grid"><OpenSourceProjectCard v-for="item in related" :key="item.full_name" :project="item" /></div></section>
+      <header class="readme-title"><p>{{ category }}<span> · </span>OPEN SOURCE</p><h1>{{ project.name }}<span> — {{ summary.replace(/[。.]$/, '') }}</span></h1></header>
+      <section class="readme-project-card" aria-label="项目信息">
+        <div class="readme-project-top"><div class="readme-project-icon"><img v-if="icon && !brokenIcon" :src="icon" :alt="`${project.name} 图标`" referrerpolicy="no-referrer" @error="brokenIcon = true"><span v-else>{{ project.name.slice(0, 1) }}</span></div><div><h2>{{ card?.name || project.name }}</h2><a :href="github" target="_blank" rel="noopener noreferrer">{{ project.full_name }}<DiscoverGlyph name="external" :size="12" /></a></div></div>
+        <p class="readme-project-summary">{{ summary }}</p>
+        <div class="readme-project-meta"><span v-if="stars != null" :title="`${stars.toLocaleString()} Stars · 采集于 ${date(card?.stars_fetched_at) || '目录采集日'}`"><DiscoverGlyph name="star" :size="15" />{{ count(stars) }} Stars</span><span v-if="updated"><DiscoverGlyph name="clock" :size="14" />更新于 {{ date(updated) }}</span><span v-if="card?.license">{{ card.license }}</span><span v-if="card?.platforms.length">{{ card.platforms.join(' / ') }}</span></div>
+        <div class="readme-project-links"><a v-if="card?.primary_url && card.primary_url !== github" class="readme-primary" :href="card.primary_url" target="_blank" rel="noopener noreferrer">{{ card.primary_label || '项目官网' }}<DiscoverGlyph name="external" :size="15" /></a><a :href="github" target="_blank" rel="noopener noreferrer"><DiscoverGlyph name="github" :size="17" />GitHub<DiscoverGlyph name="external" :size="14" /></a></div>
+        <p v-if="card?.github_archived || card?.upstream_maintenance_notice" class="readme-maintenance">{{ card?.upstream_maintenance_notice || '上游仓库已归档，使用前请留意维护状态。' }}</p>
+        <p v-if="card?.icon_attribution" class="readme-icon-credit">{{ card.icon_attribution }}</p>
+      </section>
+      <section class="readme-section" aria-label="项目 README">
+        <div class="readme-toolbar"><span><DiscoverGlyph name="doc" :size="16" />README</span><div v-if="readme" class="readme-languages" aria-label="正文语言"><button :aria-pressed="language === 'zh'" @click="language = 'zh'">中文</button><span aria-hidden="true">|</span><button :aria-pressed="language === 'en'" @click="language = 'en'">English</button></div></div>
+        <RequestState v-if="readmeLoading || readmeError" :loading="readmeLoading" :error="readmeError" @retry="loadReadme" />
+        <template v-else-if="readme"><article ref="article" class="project-markdown" :lang="language === 'zh' ? 'zh-CN' : 'en'" @click="articleClick" v-html="rendered" /><p v-if="copyMessage" role="status">{{ copyMessage }}</p><footer class="readme-provenance"><p>{{ typeof readme.translation === 'string' ? readme.translation : '依据项目官方 README 整理' }}</p><p><a :href="readme.source_url" target="_blank" rel="noopener noreferrer">查看上游原文 ↗</a><span> · </span><a :href="`${github}/commit/${readme.commit}`" target="_blank" rel="noopener noreferrer">版本 {{ readme.commit.slice(0, 7) }}</a><span> · 资料采集 {{ date(readme.fetched_at) }}</span></p><details><summary>许可与版权声明</summary><section v-for="license in readme.licenses" :key="license.name"><h3>{{ license.name }}</h3><pre>{{ license.text }}</pre></section></details></footer></template>
+        <div v-else class="readme-unavailable"><p>中文 README 正在整理中，可以先阅读项目官方原文。</p><a :href="project.source_url" target="_blank" rel="noopener noreferrer">查看官方 README ↗</a><img v-if="project.cover_url" :src="project.cover_url" :alt="`${project.name} 官方项目展示`" loading="lazy"></div>
+      </section>
+      <RepoComments :key="project.full_name" :owner="project.full_name.split('/')[0]!" :repo="project.full_name.split('/')[1]!" editorial><template #actions><a class="readme-bar-action" :href="github" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看项目"><DiscoverGlyph name="github" :size="24" /></a><button class="readme-bar-action" :class="{ saved: bookmarks.has(project.full_name) }" :aria-pressed="bookmarks.has(project.full_name)" title="收藏保存在当前浏览器" @click="bookmarks.toggle(project.full_name)"><DiscoverGlyph name="star" :size="26"/><span>{{ bookmarks.has(project.full_name) ? '已收藏' : '收藏' }}</span></button></template></RepoComments>
+      <p v-if="bookmarks.error.value" class="readme-save-error" role="alert">{{ bookmarks.error.value }}</p>
+      <section v-if="catalog?.related?.length" class="os-related"><h2>还可以看看</h2><div class="os-project-grid"><OpenSourceProjectCard v-for="item in catalog.related.slice(0, 4)" :key="item.full_name" :project="item" /></div></section>
     </template>
-    <section v-else class="os-empty"><DiscoverGlyph name="search" :size="24" /><h1>这个项目尚未收录</h1><p>回到精选页，发现其他值得关注的项目。</p><RouterLink to="/open-source" class="os-button">浏览精选</RouterLink></section>
+    <RequestState v-else-if="loading || error" :loading="loading" :error="error" @retry="load" />
+    <section v-else class="os-empty"><h1>这个项目尚未收录</h1><RouterLink to="/open-source">返回精选</RouterLink></section>
   </main>
 </template>

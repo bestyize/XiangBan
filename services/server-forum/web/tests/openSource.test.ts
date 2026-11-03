@@ -1,6 +1,27 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import selection from '../../editorial/open-source-selection-20261103.json' with { type: 'json' }
 import { collectionProjects, filterProjects, findProject, openSourceCatalog as catalog } from '../src/lib/openSource.ts'
+
+test('the reviewed selection uses verified stars, recent default-branch commits and covers every category', () => {
+  const reviewed = Date.parse(`${selection.reviewed_at}T23:59:59Z`)
+  const cutoff = Date.parse(selection.policy.cutoff)
+  const verified = new Map(selection.selected.map(item => [item.full_name.toLowerCase(), item]))
+  let previousStars = Infinity
+  for (const project of filterProjects(catalog.projects, 'all')) {
+    const source = verified.get(project.full_name.toLowerCase())!
+    assert.ok(source, project.full_name)
+    assert.ok(!source.archived && !source.disabled, project.full_name)
+    assert.ok(Date.parse(source.last_commit_at) >= cutoff && Date.parse(source.last_commit_at) <= reviewed, project.full_name)
+    assert.ok(source.stargazers_count <= previousStars, 'Star count is the primary ordering key')
+    previousStars = source.stargazers_count
+  }
+  assert.equal(verified.size, catalog.projects.length)
+  for (const category of catalog.categories) {
+    assert.ok(catalog.projects.filter(project => project.category === category.key).length >= 15, `${category.key}: at least 15 primary projects`)
+    assert.ok(filterProjects(catalog.projects, category.key).length >= 15, category.key)
+  }
+})
 
 test('a project can be discovered in related categories without becoming a duplicate', () => {
   const office = filterProjects(catalog.projects, 'office')
@@ -13,7 +34,7 @@ test('a project can be discovered in related categories without becoming a dupli
 
 test('Chinese search, repository search and tags combine with the selected category', () => {
   assert.equal(filterProjects(catalog.projects, 'media', '字幕')[0]?.name, 'yt-dlp')
-  assert.equal(filterProjects(catalog.projects, 'skills', 'MCP', 'MCP')[0]?.name, 'MCP Servers')
+  assert.ok(filterProjects(catalog.projects, 'skills', 'MCP', 'MCP').some(item => item.name === 'MCP Servers'))
   assert.equal(filterProjects(catalog.projects, 'design', 'appflowy').length, 0)
   assert.equal(filterProjects(catalog.projects, 'office', ' APPFLOWY-IO/APPFLOWY ')[0]?.name, 'AppFlowy')
   assert.equal(filterProjects(catalog.projects, 'recommend', 'does-not-exist').length, 0)
@@ -23,7 +44,7 @@ test('recommendations require editorial selection and collection references shar
   const excluded = { ...catalog.projects[0]!, featured: false }
   assert.deepEqual(filterProjects([excluded], 'recommend'), [])
   assert.deepEqual(filterProjects([excluded], 'all', excluded.name), [excluded], 'global search also finds projects outside recommendations')
-  assert.equal(findProject('EXCALIDRAW/EXCALIDRAW'), catalog.projects[0])
+  assert.equal(findProject('EXCALIDRAW/EXCALIDRAW'), catalog.projects.find(item => item.full_name === 'excalidraw/excalidraw'))
   const collection = catalog.collections[0]!
   assert.equal(collectionProjects(collection)[0], findProject(collection.projects[0]!))
   assert.deepEqual(collectionProjects({ ...collection, projects: ['missing/repo'] }), [])

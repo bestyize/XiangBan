@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { OpenSourceProject } from '@/lib/openSource'
-import { projectPath } from '@/lib/openSource'
+import type { OpenSourceProjectSummary } from '@/lib/openSource'
+import { projectPath } from '@/lib/openSourcePaths'
 import OpenSourceCover from './OpenSourceCover.vue'
-defineProps<{ project: OpenSourceProject }>()
+defineProps<{ project: OpenSourceProjectSummary }>()
 </script>
 <template>
   <article class="os-project-card">

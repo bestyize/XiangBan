@@ -10,8 +10,9 @@ import { contentApi, type PackItem } from '@/api/content'
 import type { TopicItem } from '@/api/types'
 import { useToast } from '@/stores/toast'
 import { useHead } from '@/lib/head'
-import { filterProjects } from '@/lib/openSource'
-import { openSourceCatalog, loadOpenSourceCatalog } from '@/stores/openSource'
+import { openSourceBrowse } from '@/api/openSourceBrowse'
+import { useCommunityResource } from '@/components/community/resource'
+import RequestState from '@/components/community/RequestState.vue'
 import OpenSourceProjectCard from '@/components/community/OpenSourceProjectCard.vue'
 import '@/components/community/open-source.css'
 
@@ -20,9 +21,16 @@ const router = useRouter()
 const toast = useToast()
 
 const q = computed(() => (typeof route.query.q === 'string' ? route.query.q.trim() : ''))
-void loadOpenSourceCatalog()
 const input = ref(q.value)
-const projects = computed(() => q.value ? filterProjects(openSourceCatalog.projects, 'all', q.value) : [])
+const projectPage = ref(1)
+const { data: projectResults, loading: projectsLoading, error: projectsError, load: loadProjects } =
+  useCommunityResource(() => q.value ? openSourceBrowse.page('all', '', projectPage.value, q.value) : Promise.resolve(null))
+const projects = computed(() => q.value ? projectResults.value?.projects ?? [] : [])
+watch(q, () => { projectPage.value = 1; void loadProjects() }, { immediate: true })
+function goProjects(page: number) {
+  projectPage.value = page
+  void loadProjects()
+}
 useHead(() => ({ title: q.value ? `搜索 ${q.value}` : '搜索' }))
 
 const items = ref<TopicItem[]>([])
@@ -85,9 +93,11 @@ function submit() {
     </form>
 
     <template v-if="q">
-      <section v-if="projects.length" class="packs" aria-label="开源项目搜索结果">
-        <p class="summary muted">开源项目 {{ projects.length }} 个</p>
+      <RequestState v-if="q && (projectsLoading || projectsError)" :loading="projectsLoading" :error="projectsError" @retry="loadProjects" />
+      <section v-if="projectResults && projects.length" class="packs" aria-label="开源项目搜索结果">
+        <p class="summary muted">开源项目 {{ projectResults.total }} 个</p>
         <div class="os-project-grid"><OpenSourceProjectCard v-for="project in projects" :key="project.full_name" :project="project" /></div>
+        <PagerNav :page="projectPage" :page-size="20" :total="projectResults.total" @go="goProjects" />
       </section>
       <section v-if="packs.length" class="packs search-packs">
         <p class="summary muted">内容 {{ packTotal }} 个</p>

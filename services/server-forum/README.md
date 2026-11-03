@@ -332,3 +332,5 @@ API：
 ## 资讯订阅（开发中，默认关闭）
 
 账号私有订阅、周期任务及期刊档案，桌面/手机/网页统一管理入口。配置、计费边界、投递不确定状态和验证范围见 [资讯订阅](docs/information-subscriptions.md)。未部署，不读取收件箱，不接收用户本地 API Key。
+
+开源精选正式详情页现支持默认中文 README / English 切换、真实项目卡片、来源及许可证、现有评论与浏览器收藏。逐项目发布产物位于 `web/public/open-source-readmes/`；缺少已审稿时仅提供官方原文入口。生成、校验及增量发布流程见 [README 采编规范](editorial/OPEN_SOURCE_README_WORKFLOW.md#正式网页发布路径2026-11-03-接入)。

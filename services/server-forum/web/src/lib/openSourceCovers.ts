@@ -1,5 +1,5 @@
 import rules from '../../../editorial/open-source-cover-rules.json' with { type: 'json' }
-import type { OpenSourceProject } from './openSource.ts'
+import type { OpenSourceProjectSummary } from './openSource.ts'
 
 /** This manifest and resolver belong only to the curated GitHub channel. */
 export const openSourceCoverRules = rules
@@ -8,7 +8,7 @@ export function coverHash(name: string): number {
   for (const byte of new TextEncoder().encode(name.toLowerCase())) value = (Math.imul(value, 31) + byte) >>> 0
   return value
 }
-export function resolveOpenSourceCover(project: OpenSourceProject): OpenSourceProject {
+export function resolveOpenSourceCover<T extends OpenSourceProjectSummary>(project: T): T {
   let template = project.cover_template
   if (!template) template = project.cover_style === 'screen' ? 'screenshot' : project.cover_style === 'photo' ? 'photo' : project.cover_layout || 'auto'
   const requested = template

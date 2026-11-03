@@ -5,7 +5,6 @@ import { openSourceAdmin, privateAssetPreview, rasterAsset, type AssetCandidate,
 import { openSourceCoverRules, resolveOpenSourceCover } from '@/lib/openSourceCovers'
 import type { OpenSourceCatalog, OpenSourceProject, OpenSourceCollection } from '@/lib/openSource'
 import { exportOpenSourceCover, downloadCover } from '@/lib/openSourceCoverExport'
-import { loadOpenSourceCatalog } from '@/stores/openSource'
 import OpenSourceCover from '@/components/community/OpenSourceCover.vue'
 import '@/components/community/open-source.css'
 
@@ -99,7 +98,7 @@ async function upload(event: Event, field: 'icon_url' | 'cover_url') {
 }
 async function save() { if (draft.value) await act(async () => { adopt(await openSourceAdmin.save(revision.value, draft.value!)); message.value = '草稿已保存。确认预览后再发布。' }) }
 async function validate() { if (draft.value) await act(async () => { await openSourceAdmin.preview(draft.value!); previewedRevision.value = dirty.value ? -1 : revision.value; message.value = dirty.value ? '校验通过，请先保存草稿。' : `版本 ${revision.value} 校验通过，可以发布。` }) }
-async function publish() { if (canPublish.value) await act(async () => { adopt(await openSourceAdmin.publish(revision.value)); message.value = '精选目录已发布，网页和手机读取同一版本。'; await loadOpenSourceCatalog(true) }) }
+async function publish() { if (canPublish.value) await act(async () => { adopt(await openSourceAdmin.publish(revision.value)); message.value = '精选目录已发布，网页和手机读取同一版本。' }) }
 async function exportCover() { if (preview.value) await act(async () => { downloadCover(await exportOpenSourceCover(preview.value!), preview.value!.name); message.value = '已导出 1280 × 720 PNG 封面。' }) }
 function remove() {
   if (!draft.value || !project.value || !window.confirm('将这个项目移出草稿？已发布内容在下次发布前不受影响。')) return
