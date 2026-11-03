@@ -48,6 +48,8 @@ interface PlatformActions : VoicePlatform {
     val communitySystemShareSupported: Boolean get() = true
     val communityPosterSupported: Boolean get() = false
     suspend fun createCommunityPoster(info: xyz.xiangban.xiaoban.common.community.CommunityShare): androidx.compose.ui.graphics.ImageBitmap? = null
+    val supportsChatImageSave: Boolean get() = false
+    suspend fun saveChatImage(bytes: ByteArray, mime: String): CommunityPosterResult = CommunityPosterResult.Unsupported
     suspend fun saveCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
     suspend fun shareCommunityPoster(image: androidx.compose.ui.graphics.ImageBitmap): CommunityPosterResult = CommunityPosterResult.Unsupported
     val supportsChatAttachments: Boolean get() = false

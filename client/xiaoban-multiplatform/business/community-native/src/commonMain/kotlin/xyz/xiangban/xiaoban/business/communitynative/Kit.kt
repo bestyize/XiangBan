@@ -570,7 +570,7 @@ private fun ToolbarIcon(icon: ImageVector, description: String, onClick: () -> U
 
 /** “添加内容”底部面板：相机、相册、文件、资料库（设计稿 6 号画板）。 */
 @Composable
-fun AttachSheet(onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: Modifier = Modifier) {
+fun AttachSheet(onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: Modifier = Modifier, showImageGeneration: Boolean = false) {
     BottomSheet(onDismiss, panelModifier) {
         Text("添加内容", style = XType.Title, fontWeight = FontWeight.SemiBold)
         Row(Modifier.padding(top = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -580,6 +580,9 @@ fun AttachSheet(onDismiss: () -> Unit, onPick: (String) -> Unit, panelModifier: 
                     Text(label, style = XType.Body)
                 }
             }
+        }
+        if (showImageGeneration) {
+            GhostPillButton("生成图片", { onPick("生成图片") }, Modifier.padding(top = 16.dp).fillMaxWidth())
         }
         GhostPillButton("取消", onDismiss, Modifier.padding(top = 20.dp).fillMaxWidth())
     }

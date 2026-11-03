@@ -150,8 +150,14 @@ class ChatHistory(private val files: ChatHistoryFiles, scope: CoroutineScope) {
 
     /** 存下一个对话（没有内容就不存），把它挪到列表最前面；返回新的列表。 */
     fun save(id: String, messages: List<ChatTurn>, nowMs: Long, settings: ChatOptions? = null): List<ChatSummary> {
-        val kept = messages.filter { it.text.isNotBlank() || it.reasoning.isNotBlank() || it.cancelled || it.error != null || it.tools.isNotEmpty() || it.role == "user" }
-            .map { if (it.streaming) it.copy(streaming = false) else it }
+        val kept = messages.filter { it.text.isNotBlank() || it.reasoning.isNotBlank() || it.cancelled || it.error != null || it.tools.isNotEmpty() || it.imageGeneration || it.role == "user" }
+            .map {
+                when {
+                    it.streaming && it.imageGeneration -> it.copy(streaming = false, error = UNKNOWN_IMAGE_RESULT)
+                    it.streaming -> it.copy(streaming = false)
+                    else -> it
+                }
+            }
         val selected = settings ?: options[id] ?: ChatOptions()
         selected.validate()
         options[id] = selected

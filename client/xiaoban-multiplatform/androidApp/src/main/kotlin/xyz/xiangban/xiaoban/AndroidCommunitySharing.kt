@@ -57,9 +57,9 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
     override suspend fun renderForumCover(spec: xyz.xiangban.xiaoban.business.communitynative.ForumCoverSpec, thumbnail: Boolean) = renderLocalForumCover(spec, thumbnail)
     override suspend fun previewForumCover(file: xyz.xiangban.xiaoban.common.community.ForumUploadFile) = previewLocalForumCover(file)
     private var waiting: CancellableContinuation<Uri?>? = null
-    private val saveDocument = activity.registerForActivityResult(ActivityResultContracts.CreateDocument("image/png")) { uri ->
+    private val saveDocument = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         val current = waiting; waiting = null
-        if (current?.isActive == true) current.resume(uri)
+        if (current?.isActive == true) current.resume(result.data?.data)
     }
 
     /** Fully local, fixed-size PNG source: public text and a QR code for the canonical browser URL. */
@@ -89,19 +89,36 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
         bitmap.asImageBitmap()
     }
 
-    override suspend fun saveCommunityPoster(image: ImageBitmap): CommunityPosterResult {
+    override val supportsChatImageSave = true
+
+    override suspend fun saveChatImage(bytes: ByteArray, mime: String): CommunityPosterResult {
+        val extension = when (mime) {
+            "image/png" -> "png"
+            "image/jpeg" -> "jpg"
+            "image/webp" -> "webp"
+            else -> return CommunityPosterResult.Failed
+        }
+        return saveImage("xiaoban-image-${System.currentTimeMillis()}.$extension", mime) { it.write(bytes) }
+    }
+
+    override suspend fun saveCommunityPoster(image: ImageBitmap): CommunityPosterResult =
+        saveImage("xiaoban-community-${System.currentTimeMillis()}.png", "image/png") {
+            check(image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it))
+        }
+
+    private suspend fun saveImage(filename: String, mime: String, write: (java.io.OutputStream) -> Unit): CommunityPosterResult {
         var inserted: Uri? = null
         return try {
             if (Build.VERSION.SDK_INT >= 29) withContext(Dispatchers.IO) {
                 val values = ContentValues().apply {
-                    put(MediaStore.Images.Media.DISPLAY_NAME, "xiaoban-community-${System.currentTimeMillis()}.png")
-                    put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                    put(MediaStore.Images.Media.DISPLAY_NAME, filename)
+                    put(MediaStore.Images.Media.MIME_TYPE, mime)
                     put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Xiaoban")
                     put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
                 val uri = activity.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return@withContext CommunityPosterResult.Failed
                 inserted = uri
-                activity.contentResolver.openOutputStream(uri)?.use { check(image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)) } ?: error("No output")
+                activity.contentResolver.openOutputStream(uri)?.use(write) ?: error("No output")
                 check(activity.contentResolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null) > 0)
                 inserted = null
                 CommunityPosterResult.Saved
@@ -112,12 +129,18 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
                         if (waiting != null) { continuation.resume(null); return@suspendCancellableCoroutine }
                         waiting = continuation
                         continuation.invokeOnCancellation { activity.runOnUiThread { if (waiting === continuation) waiting = null } }
-                        try { saveDocument.launch("xiaoban-community-${System.currentTimeMillis()}.png") }
+                        try {
+                            saveDocument.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                                type = mime
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                putExtra(Intent.EXTRA_TITLE, filename)
+                            })
+                        }
                         catch (_: Exception) { waiting = null; continuation.resume(null) }
                     }
                 } ?: return CommunityPosterResult.Cancelled
                 withContext(Dispatchers.IO) {
-                    activity.contentResolver.openOutputStream(uri)?.use { check(image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)) } ?: error("No output")
+                    activity.contentResolver.openOutputStream(uri)?.use(write) ?: error("No output")
                 }
                 CommunityPosterResult.Saved
             }

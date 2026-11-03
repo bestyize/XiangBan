@@ -17,7 +17,13 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
+import io.ktor.utils.io.readAvailable
 import io.ktor.utils.io.readUTF8Line
+import io.ktor.client.request.prepareGet
+import io.ktor.http.Url
+import kotlin.io.encoding.Base64
+import kotlinx.io.Buffer
+import kotlinx.io.readByteArray
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToLong
@@ -25,6 +31,8 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -65,7 +73,42 @@ data class AiTier(
 @Serializable
 data class AiTiersResponse(
     val tiers: List<AiTier> = emptyList(),
+    val media: Map<String, AiMediaCapability> = emptyMap(),
 )
+
+@Serializable
+data class AiMediaCapability(val available: Boolean = false, val sizes: List<String> = emptyList())
+
+@Serializable
+private data class ImageGenerationResponse(val data: List<ImageGenerationItem> = emptyList())
+
+@Serializable
+private data class ImageGenerationItem(
+    @SerialName("b64_json") val base64: String? = null,
+    val url: String? = null,
+)
+
+private const val MAX_GENERATED_IMAGE_BYTES = 16 * 1024 * 1024
+internal const val UNKNOWN_IMAGE_RESULT = "生图结果尚未确认，可能已扣除额度，请勿直接重复生成。"
+
+private fun generatedImageMime(bytes: ByteArray): String? = when {
+    bytes.size >= 8 && bytes.copyOf(8).contentEquals(byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10)) -> "image/png"
+    bytes.size >= 3 && bytes[0] == (-1).toByte() && bytes[1] == (-40).toByte() && bytes[2] == (-1).toByte() -> "image/jpeg"
+    bytes.size >= 12 && bytes.decodeToString(0, 4) == "RIFF" && bytes.decodeToString(8, 12) == "WEBP" -> "image/webp"
+    else -> null
+}
+
+private suspend fun io.ktor.client.statement.HttpResponse.readImageBytes(limit: Int): ByteArray {
+    val channel = bodyAsChannel()
+    val buffer = Buffer()
+    val chunk = ByteArray(64 * 1024)
+    while (true) {
+        val count = channel.readAvailable(chunk, 0, chunk.size)
+        if (count < 0) return buffer.readByteArray()
+        check(buffer.size + count <= limit) { "图片响应过大" }
+        buffer.write(chunk, 0, count)
+    }
+}
 
 @Serializable
 data class AiBucket(
@@ -185,8 +228,76 @@ class AiGatewayApi(
     private suspend fun requireToken(): String =
         tokenProvider() ?: throw ApiException(401, "请先登录小伴账号", "unauthorized")
 
-    suspend fun tiers(): List<AiTier> =
-        http.send(HttpMethod.Get, "/api/ai/tiers", AiTiersResponse.serializer(), token = requireToken()).tiers
+    suspend fun tiers(): List<AiTier> = capabilities().tiers
+
+    suspend fun capabilities(): AiTiersResponse =
+        http.send(HttpMethod.Get, "/api/ai/tiers", AiTiersResponse.serializer(), token = requireToken())
+
+    /** 生图与聊天档位独立。请求可能计费，连接中断后不自动重发。 */
+    suspend fun generateImages(prompt: String, count: Int, size: String?): List<String> {
+        require(prompt.isNotBlank() && prompt.length <= 4000) { "请输入 1–4000 字的图片描述" }
+        require(count in 1..4)
+        val token = requireToken()
+        val payload = buildJsonObject {
+            put("prompt", prompt)
+            put("n", count)
+            size?.let { put("size", it) }
+        }
+        try {
+            val items = client.preparePost("$base/v1/images/generations") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(payload.toString())
+                timeout { requestTimeoutMillis = 240_000 }
+            }.execute { response ->
+                if (!response.status.isSuccess()) {
+                    val error = parseApiError(response.status.value, response.readImageBytes(64 * 1024).decodeToString())
+                    throw when (error.code) {
+                        "image_unavailable" -> ApiException(error.status, "小伴 AI 暂未开放生图", error.code)
+                        "paid_required" -> ApiException(error.status, "图片生成需要先兑换付费额度", error.code)
+                        "insufficient_quota" -> ApiException(error.status, "小伴 AI 额度不足，请兑换后再生成", error.code)
+                        else -> if (error.status >= 500) ApiException(error.status, UNKNOWN_IMAGE_RESULT) else error
+                    }
+                }
+                val body = response.readImageBytes(48 * 1024 * 1024)
+                withContext(Dispatchers.Default) { CommunityJson.decodeFromString<ImageGenerationResponse>(body.decodeToString()).data }
+            }
+            val images = mutableListOf<String>()
+            for (item in items.take(count)) {
+                try {
+                    val bytes = item.base64?.let { encoded ->
+                        check(encoded.length <= ((MAX_GENERATED_IMAGE_BYTES + 2) / 3) * 4)
+                        withContext(Dispatchers.Default) { Base64.decode(encoded) }
+                    } ?: downloadGeneratedImage(checkNotNull(item.url))
+                    check(bytes.size <= MAX_GENERATED_IMAGE_BYTES)
+                    val mime = checkNotNull(generatedImageMime(bytes))
+                    images += "data:$mime;base64," + (item.base64 ?: Base64.encode(bytes))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Preserve usable images if a later result cannot be loaded.
+                }
+            }
+            check(images.isNotEmpty())
+            return images
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: ApiException) {
+            throw e
+        } catch (_: Exception) {
+            throw ApiException(0, UNKNOWN_IMAGE_RESULT)
+        }
+    }
+
+    private suspend fun downloadGeneratedImage(raw: String): ByteArray {
+        val url = Url(raw)
+        check(url.protocol.name == "https" && url.host.isNotBlank() && url.user == null && url.password == null)
+        // Download without the AI gateway bearer token.
+        return client.prepareGet(raw).execute { response ->
+            check(response.status.isSuccess())
+            response.readImageBytes(MAX_GENERATED_IMAGE_BYTES)
+        }
+    }
 
     suspend fun balance(): AiBalance =
         http.send(HttpMethod.Get, "/api/ai/balance", AiBalance.serializer(), token = requireToken())
@@ -421,6 +532,8 @@ data class ChatTurn(
     val truncated: Boolean = false,
     val nativeNotStarted: Boolean = false,
     val cancelled: Boolean = false,
+    val imageGeneration: Boolean = false,
+    val generatedImages: List<String> = emptyList(),
 )
 
 /** 智能体要改动东西之前问用户：同意这一次，还是拒绝。 */
@@ -459,7 +572,9 @@ data class CloudChatState(
     /** 存下来的对话，最近的在前。 */
     val conversations: List<ChatSummary> = emptyList(),
     val workspaces: List<String> = emptyList(),
+    val media: Map<String, AiMediaCapability> = emptyMap(),
 ) {
+    val imageCapability: AiMediaCapability? get() = media["image"]
     val activeTier: AiTier? get() = tiers.firstOrNull { it.tier == selectedTier }
 }
 
@@ -536,7 +651,7 @@ class CloudChatController(
         clearConversation()
         stoppingRuns.clear()
         val list = history?.useAccount(account) ?: emptyList()
-        _state.value = _state.value.copy(tiers = emptyList(), balance = null, selectedTier = "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
+        _state.value = _state.value.copy(tiers = emptyList(), media = emptyMap(), balance = null, selectedTier = "", reasoningByTier = emptyMap(), loadingMeta = false, metaError = null, conversations = list, workspaces = history?.workspaces().orEmpty())
     }
 
     /** 打开存下来的某个对话，接着聊；智能体内核按同一个编号接上它记着的上下文。 */
@@ -621,16 +736,17 @@ class CloudChatController(
             try {
                 coroutineScope {
                     val balanceDeferred = async { runCatching { api.balance() } }
-                    val tiersDeferred = async { runCatching { api.tiers() } }
+                    val tiersDeferred = async { runCatching { api.capabilities() } }
                     val balanceRes = balanceDeferred.await()
                     val tiersRes = tiersDeferred.await()
                     val current = _state.value
-                    val nextTiers = tiersRes.getOrNull() ?: current.tiers
+                    val nextTiers = tiersRes.getOrNull()?.tiers ?: current.tiers
                     val nextBalance = balanceRes.getOrNull() ?: current.balance
                     val err = balanceRes.exceptionOrNull() ?: tiersRes.exceptionOrNull()
                     if (err is CancellationException) throw err
                     _state.value = current.copy(
                         tiers = nextTiers,
+                        media = tiersRes.getOrNull()?.media ?: current.media,
                         selectedTier = pickAiTier(nextTiers, current.selectedTier),
                         balance = nextBalance,
                         loadingMeta = false,
@@ -666,6 +782,40 @@ class CloudChatController(
     fun send(rawPrompt: String) = sendPrompt(rawPrompt, "")
 
     fun sendWithAttachments(rawPrompt: String, attachments: List<ChatAttachment>) = sendPrompt(rawPrompt, "", attachments)
+
+    fun generateImages(rawPrompt: String, count: Int, size: String?): Boolean {
+        val current = _state.value
+        if (current.sending) return false
+        val prompt = rawPrompt.trim()
+        require(prompt.isNotBlank() && prompt.length <= 4000) { "请输入 1–4000 字的图片描述" }
+        val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, imageGeneration = true)
+        val replyId = nextId++
+        val reply = ChatTurn(replyId, "assistant", "", streaming = true, imageGeneration = true, activity = "正在生成图片…")
+        val epoch = ++sendEpoch
+        val ownerSession = agentSession
+        _state.value = current.copy(messages = current.messages + userTurn + reply, sending = true)
+        persist()
+        chatJob = scope.launch {
+            try {
+                val images = api.generateImages(prompt, count, size)
+                if (epoch != sendEpoch || ownerSession != agentSession) return@launch
+                updateTurn(replyId) {
+                    val text = if (images.size == count) "已生成 ${images.size} 张图片"
+                    else "已收到 ${images.size} / $count 张图片，请核对结果后再生成。"
+                    it.copy(text = text, streaming = false, generatedImages = images)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (epoch != sendEpoch || ownerSession != agentSession) return@launch
+                updateTurn(replyId) { it.copy(streaming = false, error = messageOf(e)) }
+            }
+            _state.value = _state.value.copy(sending = false)
+            persist()
+            refreshBalanceQuietly()
+        }
+        return true
+    }
 
     fun sendVoice(rawPrompt: String, note: String) = sendPrompt(rawPrompt, note)
 
@@ -751,7 +901,7 @@ class CloudChatController(
     /** 上一条回复失败时，原样重试最后一条用户提问。 */
     fun retryLast() {
         val last = _state.value.messages.lastOrNull() ?: return
-        if (last.role != "assistant" || last.error == null) return
+        if (last.role != "assistant" || last.error == null || last.imageGeneration) return
         regenerate()
     }
 
@@ -763,6 +913,7 @@ class CloudChatController(
         if (index < 0) return
         val turn = current.messages[index]
         val last = current.messages.lastOrNull() ?: return
+        if (turn.imageGeneration || last.imageGeneration) return
         if (agent != null) {
             val safe = last.role == "assistant" && last.error != null && last.text.isBlank() && last.reasoning.isBlank() && last.tools.isEmpty() && last.records.isEmpty() && !last.error.orEmpty().contains("请继续任务")
             if (safe) {
@@ -789,6 +940,7 @@ class CloudChatController(
         run?.let { stoppingRuns[it] = agentSession to agentReplyId; agent?.cancel(it) }
         val updated = _state.value.messages.mapNotNull { turn ->
             if (!turn.streaming) turn
+            else if (turn.imageGeneration) turn.copy(streaming = false, error = "已停止等待。$UNKNOWN_IMAGE_RESULT")
             else if (turn.text.isEmpty() && turn.error == null && turn.tools.isEmpty() && turn.reasoning.isEmpty() && run == null) null
             else turn.copy(streaming = false, cancelled = true, activity = "已停止", tools = settleTools(turn.tools, true))
         }

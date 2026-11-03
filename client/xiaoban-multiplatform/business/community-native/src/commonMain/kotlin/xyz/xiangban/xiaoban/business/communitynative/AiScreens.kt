@@ -380,6 +380,8 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
     var executionSheet by remember(cloud.conversationId) { mutableStateOf(false) }
     var drawer by rememberSaveable { mutableStateOf(false) }
     var attach by rememberSaveable { mutableStateOf(false) }
+    var imageSheet by remember(cloud.conversationId) { mutableStateOf(false) }
+    var preview by remember(cloud.conversationId, session.accountId) { mutableStateOf<ChatImagePreview?>(null) }
     var toast by remember { mutableStateOf<String?>(null) }
     // 语音：麦克风把一句话变成文字放进输入框；波形键是语音通话。识别先用手机本地的 SenseVoice，不行再用云端；合成直连 Edge 朗读。
     val voiceInput = rememberVoiceInput(
@@ -416,7 +418,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                     if (cloud.messages.isEmpty()) {
                         ChatWelcome()
                     } else {
-                        CloudMessages(cloud.messages, cloud.sending, env.platform, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null)
+                        CloudMessages(cloud.messages, cloud.sending, env.platform, onPreview = { preview = it }, onRetry = chat::retryLast, onRegenerate = chat::regenerate, onStop = chat::stop, onSend = chat::send, onQuota = { open(Route.Models) }, onReviewed = { try { chat.acknowledgeOutcome() } catch (e: Exception) { toast = e.message } }, waiting = if (cloud.question != null) "question" else if (cloud.approval != null) "approval" else null)
                     }
                 }
                 cloud.question?.let { question ->
@@ -488,7 +490,11 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
         OverlayTransition(attach) { panel ->
             AttachSheet({ attach = false }, { label ->
                 attach = false
-                if (label == "相册" || label == "文件") {
+                if (label == "生成图片") {
+                    if (cloud.sending) toast = "请先结束当前任务"
+                    else if (cloud.imageCapability?.available == false) toast = "生图暂不可用，请检查登录和额度"
+                    else imageSheet = true
+                } else if (label == "相册" || label == "文件") {
                     if (env.platform?.supportsChatAttachments != true) toast = "当前平台尚未接入附件选择"
                     else if (attachments.size >= 3) toast = "每条消息最多添加 3 个附件"
                     else {
@@ -506,8 +512,22 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                         }
                     }
                 } else toast = "$label 尚未接入，请从相册或文件选择"
-            }, panel)
+            }, panel, showImageGeneration = true)
         }
+        if (imageSheet) {
+            ImageGenerationSheet(
+                initialPrompt = input,
+                sizes = cloud.imageCapability?.sizes.orEmpty(),
+                onDismiss = { imageSheet = false },
+                onGenerate = { prompt, count, size ->
+                    if (chat.generateImages(prompt, count, size)) {
+                        input = ""
+                        imageSheet = false
+                    } else toast = "请先结束当前任务"
+                },
+            )
+        }
+        preview?.let { ChatImageViewer(it, env.platform) { preview = null } }
         AiDrawerOverlay(chat, drawer, { drawer = false }) { route -> if (route != Route.AiChat) open(route) }
         Toast(toast) { toast = null }
         PressOverlay(voiceInput)
@@ -570,7 +590,7 @@ private fun ChatWelcome() {
 }
 
 @Composable
-private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit, onReviewed: () -> Unit = {}, waiting: String? = null) {
+private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: PlatformActions?, onPreview: (ChatImagePreview) -> Unit, onRetry: () -> Unit, onRegenerate: () -> Unit, onStop: () -> Unit, onSend: (String) -> Unit, onQuota: () -> Unit, onReviewed: () -> Unit = {}, waiting: String? = null) {
     val listState = rememberLazyListState()
     val last = messages.lastOrNull()
     val progressMark = (last?.text?.length ?: 0) + (last?.tools?.size ?: 0) * 7 + (last?.records?.size ?: 0) * 13
@@ -578,18 +598,27 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
     LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         items(messages, key = { it.id }) { turn ->
             if (turn.role == "user") {
-                UserBubble(turn.text + turn.attachments.joinToString("") { "\n📎 ${it.name}" })
+                UserBubble((if (turn.imageGeneration) "生成图片 · " else "") + turn.text +
+                    turn.attachments.filter { it.imageDataUrl == null }.joinToString("") { "\n📎 ${it.name}" })
+                turn.attachments.forEach { attachment ->
+                    attachment.imageDataUrl?.let { data ->
+                        ChatImageThumbnail(ChatImagePreview(data, attachment.name), onPreview)
+                    }
+                }
             } else {
                 AssistantRow {
                     AssistantTurnCards(
                         text = turn.text, streaming = turn.streaming, error = if (turn.cancelled) "已取消" else turn.error, reasoning = turn.reasoning, tools = turn.tools, records = turn.records,
                         waiting = if (turn.streaming) waiting else null, platform = platform, idleText = turn.activity.ifBlank { "思考中…" }, onStop = onStop, onSend = onSend,
-                        onRetry = if (turn.error != null && !sending) onRetry else null,
-                        onRegenerate = if (turn.id == last?.id && !turn.streaming && !sending) onRegenerate else null,
+                        onRetry = if (turn.id == last?.id && turn.error != null && !sending && !turn.imageGeneration) onRetry else null,
+                        onRegenerate = if (turn.id == last?.id && !turn.streaming && !sending && !turn.imageGeneration) onRegenerate else null,
                         extras = TurnExtras(promptTokens = turn.promptTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), completionTokens = turn.completionTokens.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), truncated = turn.truncated,
                             onContinue = if (turn.id == last?.id && !sending) ({ onSend("请继续上一次任务，先核对已有结果，不要重复执行已完成的操作。") }) else null),
                     )
-                    if (turn.id == last?.id && !sending && turn.error.orEmpty().contains("结果尚未确认")) LinkText("已核对，继续", onReviewed)
+                    turn.generatedImages.forEachIndexed { index, data ->
+                        ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}"), onPreview)
+                    }
+                    if (!turn.imageGeneration && turn.id == last?.id && !sending && turn.error.orEmpty().contains("结果尚未确认")) LinkText("已核对，继续", onReviewed)
                     if (turn.error.orEmpty().let { it.contains("额度") || it.contains("兑换") }) LinkText("去兑换额度 ›", onQuota)
                 }
             }
