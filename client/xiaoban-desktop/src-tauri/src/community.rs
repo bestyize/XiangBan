@@ -125,6 +125,10 @@ fn community_webview(app: &tauri::AppHandle, label: &'static str, origin: url::U
     WebviewBuilder::new(label, WebviewUrl::External(origin))
         .on_navigation(move |url| {
             if same_origin(url, &nav_origin) { return true; }
+            if label == COMMUNITY_TAB && url.as_str() == "xiaoban://community/open-chat" {
+                let _ = nav_app.emit_to("control", "community-open-chat", ());
+                return false;
+            }
             if url.scheme() == "xiaoban" && url.host_str() == Some("community") {
                 let app = nav_app.clone(); let link = url.to_string();
                 std::thread::spawn(move || receive_link(&app, &link));
@@ -187,12 +191,57 @@ pub async fn community_tab_bounds(app: tauri::AppHandle, caller: tauri::Webview,
             }};
             if (document.documentElement) hideSiteNavigation();
             else document.addEventListener('DOMContentLoaded', hideSiteNavigation, {{ once: true }});
+
+            const mountChatBall = () => {{
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.title = '打开对话';
+                button.setAttribute('aria-label', '打开对话');
+                button.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:100;width:44px;height:44px;display:grid;place-items:center;padding:0;border:1px solid var(--line);border-radius:50%;background:var(--surface);color:var(--ink);box-shadow:0 3px 12px #0002;cursor:pointer';
+                button.innerHTML = '<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8z"/></svg>';
+                button.addEventListener('click', () => {{ location.href = 'xiaoban://community/open-chat'; }});
+                document.body.append(button);
+            }};
+            if (document.body) mountChatBall();
+            else document.addEventListener('DOMContentLoaded', mountChatBall, {{ once: true }});
         }}"#
     );
     let window = caller.window();
     let builder = community_webview(&app, COMMUNITY_TAB, origin).initialization_script(script);
     window.add_child(builder, position, size).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn community_chat_context(app: tauri::AppHandle, caller: tauri::Webview) -> Result<Option<Value>, String> {
+    if caller.label() != "control" { return Err("只有控制台可以读取社区页面".into()); }
+    let Some(view) = app.get_webview(COMMUNITY_TAB) else { return Ok(None); };
+    let origin = web_origin()?;
+    if !same_origin(&view.url().map_err(|e| e.to_string())?, &origin) { return Ok(None); }
+    let trusted = json!(origin.origin().ascii_serialization());
+    let script = format!(r#"(() => {{
+        if (location.origin !== {trusted}) return null;
+        const main = document.querySelector('main');
+        const heading = main?.querySelector('h1')?.textContent?.trim() || document.title;
+        const article = main?.querySelector('article');
+        const description = document.querySelector('meta[name=description]')?.content || '';
+        return {{
+            title: heading.slice(0, 200),
+            url: location.origin + location.pathname,
+            excerpt: (article?.innerText || description).trim().slice(0, 1800)
+        }};
+    }})()"#);
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    let tx = Mutex::new(Some(tx));
+    view.eval_with_callback(script, move |result| {
+        if let Ok(mut tx) = tx.lock() {
+            if let Some(tx) = tx.take() { let _ = tx.send(result); }
+        }
+    }).map_err(|e| e.to_string())?;
+    let Ok(Ok(result)) = tokio::time::timeout(std::time::Duration::from_millis(700), rx).await else {
+        return Ok(None);
+    };
+    serde_json::from_str(&result).map_err(|e| e.to_string())
 }
 
 pub fn invocation_permission(label: &str, command: &str) -> Option<bool> {

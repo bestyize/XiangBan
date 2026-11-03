@@ -616,7 +616,7 @@ pub(crate) fn present_control(app: &tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     app.show().map_err(|error| error.to_string())?;
     let window = app
-        .get_webview_window("control")
+        .get_window("control")
         .ok_or("没有找到小伴设置面板")?;
     apply_window_appearance(app, &settings(app).appearance);
     window.unminimize().map_err(|error| error.to_string())?;
@@ -891,7 +891,7 @@ fn main() {
             chat::store_market::ai_market_inspect, chat::store_market::ai_market_install, chat::store_market::ai_market_group_inspect, chat::store_market::ai_market_group_install,
             chat::store_market::ai_market_updates, chat::store_market::ai_market_update,
             community_schemes::community_schemes_status, community_schemes::community_schemes_save, community_schemes::community_schemes_remove, community_schemes::community_schemes_restore, community_schemes::community_schemes_cloud_enabled, community_schemes::community_schemes_cloud,
-            community::community_web_open, community::community_tab_bounds, community::community_chrome_action, community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
+            community::community_web_open, community::community_tab_bounds, community::community_chat_context, community::community_chrome_action, community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
             community::community_analytics_get, community::community_analytics_set, community::community_track,
             phone_link::phone_link_status, phone_link::phone_link_set_enabled, phone_link::phone_link_remove_peer,
             speech_agent::speech_agent_env, speech_agent::speech_agent_install_guides, speech_agent::speech_agent_hooks_status, speech_agent::speech_agent_hooks_install, speech_agent::speech_agent_hooks_uninstall, speech_agent::speech_agent_inject,

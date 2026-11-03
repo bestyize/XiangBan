@@ -206,7 +206,7 @@ impl agent_kernel::RunInput for Input {
 #[tauri::command]
 pub fn chat_enqueue(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     session_id: String,
     text: String,
     mode: Delivery,
@@ -353,7 +353,7 @@ pub(super) fn enqueue_remote(
 #[tauri::command]
 pub fn chat_queue_update(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     session_id: String,
     action: String,
     id: Option<String>,
@@ -439,7 +439,7 @@ pub fn chat_queue_update(
 #[tauri::command]
 pub fn chat_queue_preview(
     app: tauri::AppHandle,
-    window: tauri::WebviewWindow,
+    window: tauri::Webview,
     session_id: String,
     id: String,
 ) -> Result<Option<String>, String> {

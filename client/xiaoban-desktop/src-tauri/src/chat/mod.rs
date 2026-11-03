@@ -593,7 +593,7 @@ fn skills_for(dirs: &Dirs, bundled: PathBuf) -> Skills {
 
 /// 输入框 `/` 菜单：用户可以用 `/名称` 启动的技能，带来源、版本和中文名。
 #[tauri::command]
-pub fn chat_invocable_skills(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Vec<Value>, String> {
+pub fn chat_invocable_skills(app: tauri::AppHandle, window: tauri::Webview) -> Result<Vec<Value>, String> {
     chat_window(&window)?;
     let dirs = Dirs::of(&app)?;
     sync_computer_use_skill(&dirs.skills(), crate::ai_config::current(&app)?.open_computer_use);
@@ -1037,7 +1037,7 @@ fn validate_model(app: &tauri::AppHandle, mut model: ai_config::SessionModel) ->
 }
 
 #[tauri::command]
-pub fn chat_set_model(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: Option<String>, selection: ai_config::SessionModel) -> Result<ai_config::SessionModel, String> {
+pub fn chat_set_model(app: tauri::AppHandle, window: tauri::Webview, session_id: Option<String>, selection: ai_config::SessionModel) -> Result<ai_config::SessionModel, String> {
     chat_window(&window)?;
     let selection = validate_model(&app, selection)?;
     if let Some(id) = session_id {
@@ -1053,7 +1053,7 @@ pub fn chat_set_model(app: tauri::AppHandle, window: tauri::WebviewWindow, sessi
 }
 
 #[tauri::command]
-pub fn chat_set_session_options(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, context_tokens: Option<usize>, connectors: Option<Vec<String>>) -> Result<SessionSummary, String> {
+pub fn chat_set_session_options(app: tauri::AppHandle, window: tauri::Webview, session_id: String, context_tokens: Option<usize>, connectors: Option<Vec<String>>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
     if context_tokens.is_some_and(|n| !(ai_config::MIN_CONTEXT_TOKENS..=ai_config::MAX_CONTEXT_TOKENS).contains(&n)) { return Err("上下文大小超出范围".into()); }
@@ -1091,7 +1091,7 @@ fn finish_run(app: &tauri::AppHandle, session: &str, success: Option<bool>) {
 }
 
 #[tauri::command]
-pub fn chat_overview(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Value, String> {
+pub fn chat_overview(app: tauri::AppHandle, window: tauri::Webview) -> Result<Value, String> {
     chat_window(&window)?;
     let config = ai_config::current(&app)?;
     pin_session_defaults(&app, &config)?;
@@ -1115,7 +1115,7 @@ pub fn chat_overview(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Res
 }
 
 #[tauri::command]
-pub fn chat_load_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Vec<Message>, String> {
+pub fn chat_load_session(app: tauri::AppHandle, window: tauri::Webview, session_id: String) -> Result<Vec<Message>, String> {
     chat_window(&window)?;
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
@@ -1147,12 +1147,12 @@ pub fn chat_load_session(app: tauri::AppHandle, window: tauri::WebviewWindow, se
 /// A cursor and a projection from the same run trace. Persisted messages after
 /// the run's user input are replaced by that trace, never combined twice.
 #[tauri::command]
-pub async fn chat_session_snapshot(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Value, String> {
+pub async fn chat_session_snapshot(app: tauri::AppHandle, window: tauri::Webview, session_id: String) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || chat_session_snapshot_blocking(app, window, session_id))
         .await.map_err(|e| format!("读取对话快照失败：{e}"))?
 }
 
-fn chat_session_snapshot_blocking(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Value, String> {
+fn chat_session_snapshot_blocking(app: tauri::AppHandle, window: tauri::Webview, session_id: String) -> Result<Value, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
     let _ = chat_load_session(app.clone(), window, session_id.clone())?;
@@ -1202,7 +1202,7 @@ fn interrupted_run(journal_dir: &Path, session: &str) -> Option<(String, Vec<Str
 /// An empty conversation. The chat page makes one when the first message is sent, so the page
 /// already knows the id when the answer's events start to arrive.
 #[tauri::command]
-pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, permission_mode: Option<String>, workspace: Option<String>, expert: Option<ExpertPick>, model: Option<ai_config::SessionModel>, context_tokens: Option<usize>, connectors: Option<Vec<String>>) -> Result<SessionSummary, String> {
+pub fn chat_new_session(app: tauri::AppHandle, window: tauri::Webview, permission_mode: Option<String>, workspace: Option<String>, expert: Option<ExpertPick>, model: Option<ai_config::SessionModel>, context_tokens: Option<usize>, connectors: Option<Vec<String>>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
     let config = ai_config::current(&app)?;
     pin_session_defaults(&app, &config)?;
@@ -1248,7 +1248,7 @@ pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, per
 /// 从某一句话分叉出新对话：复制这句话之前的历史，原对话不动。`before_turn` 是第几条用户消息（从 0 数起），
 /// 等于用户消息总数时复制全部。运行记录、目标、检查点和“本次对话允许”的授权不复制；附件复制一份给新对话。
 #[tauri::command]
-pub fn chat_fork_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, before_turn: usize) -> Result<SessionSummary, String> {
+pub fn chat_fork_session(app: tauri::AppHandle, window: tauri::Webview, session_id: String, before_turn: usize) -> Result<SessionSummary, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
     let state = app.state::<ChatState>();
@@ -1310,7 +1310,7 @@ fn bind_expert(plugins: &Path, pick: &ExpertPick) -> Result<sessions::ExpertBind
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>, design_id:Option<String>, preview_target:Option<crate::chat_preview::Target>) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, window: tauri::Webview, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>, design_id:Option<String>, preview_target:Option<crate::chat_preview::Target>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
     if let Some(id)=&design_id{crate::design::store(&app)?.load(id)?;}
     let preview_target=preview_target.map(|target|target.context(&app,&session_id)).transpose()?;
@@ -1613,7 +1613,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
 /// Kernel completion is not proof that the user's task was successful.
 #[tauri::command]
 pub fn chat_run_history(
-    app: tauri::AppHandle, window: tauri::WebviewWindow,
+    app: tauri::AppHandle, window: tauri::Webview,
     session_id: String, run_id: String, after: Option<u64>,
 ) -> Result<Value, String> {
     if window.label() != "control" {
@@ -1635,7 +1635,7 @@ pub fn chat_run_history(
 /// Verify one specifically requested file artifact. This does NOT approve an entire
 /// multi-step task or let the model self-mark its result as successful.
 #[tauri::command]
-pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::WebviewWindow,
+pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::Webview,
     session_id: String, run_id: String, relative_path: String, expected_sha256: String
 ) -> Result<Value, String> {
     if window.label() != "control" { return Err("仅控制台可以验收任务".into()); }
@@ -1661,7 +1661,7 @@ pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::WebviewWin
 /// Explicit opt-in: run an isolated one-shot reflection model call. No auto approval.
 #[tauri::command]
 pub async fn chat_reflect_run(
-    app: tauri::AppHandle, window: tauri::WebviewWindow,
+    app: tauri::AppHandle, window: tauri::Webview,
     session_id: String, run_id: String
 ) -> Result<Value, String> {
     if window.label() != "control" { return Err("只有控制台可以启动学习".into()); }
@@ -1677,7 +1677,7 @@ pub async fn chat_reflect_run(
 
 /// Only user control-plane review can promote a candidate into reusable memory.
 #[tauri::command]
-pub fn chat_review_experience(app: tauri::AppHandle, window: tauri::WebviewWindow,
+pub fn chat_review_experience(app: tauri::AppHandle, window: tauri::Webview,
     experience_id: i64, approve: bool,
 ) -> Result<Value,String> {
     if window.label() != "control" {return Err("只有控制台可以审核经验".into());}
@@ -1691,7 +1691,7 @@ pub fn chat_review_experience(app: tauri::AppHandle, window: tauri::WebviewWindo
 /// Explicit proposal generation; reviewing and evaluating the proposal are separate steps.
 #[tauri::command]
 pub async fn chat_generate_skill_proposal(
-    app: tauri::AppHandle, window: tauri::WebviewWindow,
+    app: tauri::AppHandle, window: tauri::Webview,
     experience_id: i64, skill_name: String
 ) -> Result<Value,String> {
     if window.label() != "control" {return Err("只有控制台可以生成技能改进".into());}
@@ -1731,7 +1731,7 @@ pub fn chat_rollback_skill_proposal(app:tauri::AppHandle,window:tauri::WebviewWi
 }
 
 #[tauri::command]
-pub fn chat_cancel(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) {
+pub fn chat_cancel(app: tauri::AppHandle, window: tauri::Webview, session_id: String) {
     if chat_window(&window).is_err() || checked_session_id(&session_id).is_err() { return; }
     let state = app.state::<ChatState>(); let _delivery = lock(&state.delivery);
     if let Err(error)=outbox_host::pause(&app, &session_id, "任务已停止，队列已暂停") { eprintln!("无法保存队列暂停状态：{error}"); }
@@ -1748,7 +1748,7 @@ pub(crate) fn cancel_run(app: &tauri::AppHandle, session_id: &str) {
 }
 
 #[tauri::command]
-pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Vec<SessionSummary>, String> {
+pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::Webview, session_id: String) -> Result<Vec<SessionSummary>, String> {
     chat_window(&window)?;
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
@@ -1852,7 +1852,7 @@ fn context_of(app: &tauri::AppHandle, config: &AiConfig, session: Option<&str>, 
 /// How big the next request in a conversation would be, against the limit chosen in settings.
 /// `None` is a conversation that has not been started yet.
 #[tauri::command]
-pub fn chat_context(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: Option<String>, model: Option<ai_config::SessionModel>, context_tokens: Option<usize>) -> Result<ContextInfo, String> {
+pub fn chat_context(app: tauri::AppHandle, window: tauri::Webview, session_id: Option<String>, model: Option<ai_config::SessionModel>, context_tokens: Option<usize>) -> Result<ContextInfo, String> {
     chat_window(&window)?;
     let mut config = match session_id.as_deref() { Some(id) => session_config(&app, id)?, None => ai_config::current(&app)? };
     if session_id.is_none() {
@@ -1918,7 +1918,7 @@ fn auto_compact(app: &tauri::AppHandle, id: &str, config: &AiConfig, key_source:
 /// Replaces the older part of a conversation, for the model only, with a summary the model writes.
 /// The saved conversation and what the user sees are untouched. While it runs the conversation counts as busy.
 #[tauri::command]
-pub async fn chat_compact(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<ContextInfo, String> {
+pub async fn chat_compact(app: tauri::AppHandle, window: tauri::Webview, session_id: String) -> Result<ContextInfo, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
     let cancel = Arc::new(AtomicBool::new(false));
@@ -1955,7 +1955,7 @@ pub async fn chat_compact(app: tauri::AppHandle, window: tauri::WebviewWindow, s
 
 /// The conversation commands are for the control window and the floating assistant only. Every window can reach
 /// the app's commands, and the others show wallpapers, widgets and games, some of them made by the assistant itself.
-fn chat_window(window: &tauri::WebviewWindow) -> Result<(), String> {
+fn chat_window(window: &tauri::Webview) -> Result<(), String> {
     match window.label() {
         "control" | crate::float_assistant::LABEL => Ok(()),
         _ => Err("这个窗口不能使用对话功能".into()),
@@ -1972,7 +1972,7 @@ fn checked_group_id(id: &str) -> Result<(), String> {
 
 /// Renaming works while the conversation is answering: the title is only a label.
 #[tauri::command]
-pub fn chat_rename_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, title: String) -> Result<Library, String> {
+pub fn chat_rename_session(app: tauri::AppHandle, window: tauri::Webview, session_id: String, title: String) -> Result<Library, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
     mutate(&app, |index| index.rename(&session_id, &title).map(|()| index.library()))?
@@ -1980,7 +1980,7 @@ pub fn chat_rename_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
 
 /// An empty or missing `group_id` takes the conversation out of its group.
 #[tauri::command]
-pub fn chat_move_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, group_id: Option<String>) -> Result<Library, String> {
+pub fn chat_move_session(app: tauri::AppHandle, window: tauri::Webview, session_id: String, group_id: Option<String>) -> Result<Library, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
     if let Some(group) = group_id.as_deref().filter(|g| !g.is_empty()) {
@@ -1991,7 +1991,7 @@ pub fn chat_move_session(app: tauri::AppHandle, window: tauri::WebviewWindow, se
 
 /// With `session_id`, the conversation moves into the new group in the same step, so a failed name leaves it where it was.
 #[tauri::command]
-pub fn chat_create_group(app: tauri::AppHandle, window: tauri::WebviewWindow, name: String, session_id: Option<String>) -> Result<Library, String> {
+pub fn chat_create_group(app: tauri::AppHandle, window: tauri::Webview, name: String, session_id: Option<String>) -> Result<Library, String> {
     chat_window(&window)?;
     if let Some(id) = session_id.as_deref() {
         checked_session_id(id)?;
@@ -2010,7 +2010,7 @@ pub fn chat_create_group(app: tauri::AppHandle, window: tauri::WebviewWindow, na
 }
 
 #[tauri::command]
-pub fn chat_rename_group(app: tauri::AppHandle, window: tauri::WebviewWindow, group_id: String, name: String) -> Result<Library, String> {
+pub fn chat_rename_group(app: tauri::AppHandle, window: tauri::Webview, group_id: String, name: String) -> Result<Library, String> {
     chat_window(&window)?;
     checked_group_id(&group_id)?;
     mutate(&app, |index| index.rename_group(&group_id, &name).map(|()| index.library()))?
@@ -2018,7 +2018,7 @@ pub fn chat_rename_group(app: tauri::AppHandle, window: tauri::WebviewWindow, gr
 
 /// The conversations inside are kept and go back to the top level.
 #[tauri::command]
-pub fn chat_delete_group(app: tauri::AppHandle, window: tauri::WebviewWindow, group_id: String) -> Result<Library, String> {
+pub fn chat_delete_group(app: tauri::AppHandle, window: tauri::Webview, group_id: String) -> Result<Library, String> {
     chat_window(&window)?;
     checked_group_id(&group_id)?;
     mutate(&app, |index| index.delete_group(&group_id).map(|()| index.library()))?
@@ -2026,7 +2026,7 @@ pub fn chat_delete_group(app: tauri::AppHandle, window: tauri::WebviewWindow, gr
 
 /// The "安全与权限" settings page: sandbox state, the hooks file and the saved "always allow" answers.
 #[tauri::command]
-pub fn chat_agent_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Value, String> {
+pub fn chat_agent_settings(app: tauri::AppHandle, window: tauri::Webview) -> Result<Value, String> {
     if window.label() != "control" { return Err("只能在设置里查看".into()); }
     let dirs = Dirs::of(&app)?;
     let settings = agent_settings::load(&dirs.chat);
@@ -2050,7 +2050,7 @@ pub fn chat_agent_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) 
 }
 
 #[tauri::command]
-pub fn chat_set_execution_limits(app: tauri::AppHandle, window: tauri::WebviewWindow, limits: task_runtime::ExecutionLimits) -> Result<(), String> {
+pub fn chat_set_execution_limits(app: tauri::AppHandle, window: tauri::Webview, limits: task_runtime::ExecutionLimits) -> Result<(), String> {
     if window.label() != "control" { return Err("只能在设置里修改".into()); }
     limits.validate()?;
     let chat = Dirs::of(&app)?.chat;
@@ -2060,7 +2060,7 @@ pub fn chat_set_execution_limits(app: tauri::AppHandle, window: tauri::WebviewWi
 }
 
 #[tauri::command]
-pub fn chat_set_command_sandbox(app: tauri::AppHandle, window: tauri::WebviewWindow, enabled: bool) -> Result<(), String> {
+pub fn chat_set_command_sandbox(app: tauri::AppHandle, window: tauri::Webview, enabled: bool) -> Result<(), String> {
     if window.label() != "control" { return Err("只能在设置里修改".into()); }
     if enabled && !agent_kernel::sandbox::available() { return Err("当前系统不支持此命令沙箱".into()); }
     let chat = Dirs::of(&app)?.chat;
@@ -2072,7 +2072,7 @@ pub fn chat_set_command_sandbox(app: tauri::AppHandle, window: tauri::WebviewWin
 }
 
 #[tauri::command]
-pub fn chat_set_sandbox_network(app: tauri::AppHandle, window: tauri::WebviewWindow, allowed: bool) -> Result<(), String> {
+pub fn chat_set_sandbox_network(app: tauri::AppHandle, window: tauri::Webview, allowed: bool) -> Result<(), String> {
     if window.label() != "control" { return Err("只能在设置里修改".into()); }
     let chat = Dirs::of(&app)?.chat;
     let mut settings = agent_settings::load(&chat);
@@ -2085,7 +2085,7 @@ pub fn chat_set_sandbox_network(app: tauri::AppHandle, window: tauri::WebviewWin
 /// Windows, experimental: turns the low-integrity sandbox for full-trust commands on or off. Turning it on labels
 /// the sandbox's own folder and the current working folder low integrity (a lasting change to their security label).
 #[tauri::command]
-pub async fn chat_set_windows_sandbox(app: tauri::AppHandle, window: tauri::WebviewWindow, enabled: bool) -> Result<(), String> {
+pub async fn chat_set_windows_sandbox(app: tauri::AppHandle, window: tauri::Webview, enabled: bool) -> Result<(), String> {
     if window.label() != "control" { return Err("只能在设置里修改".into()); }
     if enabled && !cfg!(windows) { return Err("这个选项只用于 Windows".into()); }
     tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
@@ -2108,7 +2108,7 @@ pub async fn chat_set_windows_sandbox(app: tauri::AppHandle, window: tauri::Webv
 
 /// Saves the hooks file after checking it; an empty text removes every hook. Returns how many there are.
 #[tauri::command]
-pub fn chat_save_hooks(app: tauri::AppHandle, window: tauri::WebviewWindow, text: String) -> Result<usize, String> {
+pub fn chat_save_hooks(app: tauri::AppHandle, window: tauri::Webview, text: String) -> Result<usize, String> {
     if window.label() != "control" { return Err("只能在设置里修改".into()); }
     let count = hooks::validate(&text)?;
     let chat = Dirs::of(&app)?.chat;
@@ -2128,7 +2128,7 @@ pub fn chat_save_hooks(app: tauri::AppHandle, window: tauri::WebviewWindow, text
 
 /// Takes back one saved "always allow" answer, on disk and in a conversation that is open now.
 #[tauri::command]
-pub fn chat_revoke_grant(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, tool: String, kind: Option<String>) -> Result<(), String> {
+pub fn chat_revoke_grant(app: tauri::AppHandle, window: tauri::Webview, session_id: String, tool: String, kind: Option<String>) -> Result<(), String> {
     if window.label() != "control" { return Err("只能在设置里修改".into()); }
     checked_session_id(&session_id)?;
     let chat = Dirs::of(&app)?.chat;
@@ -2142,7 +2142,7 @@ pub fn chat_revoke_grant(app: tauri::AppHandle, window: tauri::WebviewWindow, se
 
 /// The answers of a conversation whose file changes can be undone, newest first.
 #[tauri::command]
-pub fn chat_checkpoints(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Value, String> {
+pub fn chat_checkpoints(app: tauri::AppHandle, window: tauri::Webview, session_id: String) -> Result<Value, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
     Ok(json!(checkpoints::list(&Dirs::of(&app)?.checkpoints(), &session_id)))
@@ -2150,7 +2150,7 @@ pub fn chat_checkpoints(app: tauri::AppHandle, window: tauri::WebviewWindow, ses
 
 /// Puts back the files one answer changed with the file tools. Not while the conversation is answering.
 #[tauri::command]
-pub fn chat_undo_run(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, run_id: String) -> Result<Value, String> {
+pub fn chat_undo_run(app: tauri::AppHandle, window: tauri::Webview, session_id: String, run_id: String) -> Result<Value, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
     if lock(&app.state::<ChatState>().runs).contains_key(&session_id) {
@@ -2162,7 +2162,7 @@ pub fn chat_undo_run(app: tauri::AppHandle, window: tauri::WebviewWindow, sessio
 }
 
 #[tauri::command]
-pub fn chat_answer_approval(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, decision: String) -> Result<(), String> {
+pub fn chat_answer_approval(app: tauri::AppHandle, window: tauri::Webview, id: String, decision: String) -> Result<(), String> {
     chat_window(&window)?;
     let decision = match decision.as_str() {
         "once" => Approval::Once,
@@ -2176,7 +2176,7 @@ pub fn chat_answer_approval(app: tauri::AppHandle, window: tauri::WebviewWindow,
 }
 
 #[tauri::command]
-pub fn chat_answer_question(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, answer: Option<String>) -> Result<(), String> {
+pub fn chat_answer_question(app: tauri::AppHandle, window: tauri::Webview, id: String, answer: Option<String>) -> Result<(), String> {
     chat_window(&window)?;
     let answer = answer.map(|a| a.trim().to_string()).filter(|a| !a.is_empty());
     let state=app.state::<ChatState>();
@@ -2531,7 +2531,7 @@ pub(crate) fn remote_answer_approval(app: &tauri::AppHandle, approval_id: &str, 
 }
 
 #[tauri::command]
-pub fn chat_set_permission_mode(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: Option<String>, mode: String) -> Result<String, String> {
+pub fn chat_set_permission_mode(app: tauri::AppHandle, window: tauri::Webview, session_id: Option<String>, mode: String) -> Result<String, String> {
     chat_window(&window)?;
     if !["ask", "auto"].contains(&mode.as_str()) {
         return Err("不支持的权限模式".into());

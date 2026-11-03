@@ -37,7 +37,7 @@ const props = withDefaults(defineProps<{
   designId?:string;
   previewTarget?:PreviewTarget;
   /** The page this box lives on; voice input and incoming drafts only act while it is the page shown. */
-  page: Extract<ControlPage, 'chat' | 'new-task'>;
+  page: Extract<ControlPage, 'chat' | 'new-task' | 'community'>;
   /** Show the working-folder menu in the tool row (the new-task page). */
   workspace?: boolean;
   placeholder?: string;

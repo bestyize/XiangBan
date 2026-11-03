@@ -13,6 +13,7 @@ import { unresolvedCalls } from './task-progress.ts';
 export interface ChatDeps {
   onReply?(session: string, text: string, key?: string): void;
   onActivity?(): void;
+  messageContext?(): Promise<string>;
   desktop: boolean;
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
   listen<T>(event: string, callback: (payload: T) => void): Promise<() => void>;
@@ -375,7 +376,8 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         const requestId = queueAttempts.get(session)!.id;
         const images = attachments.filter((a): a is string => typeof a === 'string');
         const files = attachments.filter(a => typeof a !== 'string').map(({ name, dataUrl }) => ({ name, dataUrl }));
-        const queue = await deps.invoke<MessageQueue>('chat_enqueue', { sessionId: session, text, mode: mode === 'replace' ? 'queue' : mode, stopNow: mode === 'replace', requestId, images, attachments: files, mentions, ...(designId?{designId}:{}), ...(previewTarget?{previewTarget}:{}) });
+        const context = await deps.messageContext?.();
+        const queue = await deps.invoke<MessageQueue>('chat_enqueue', { sessionId: session, text: (context ?? '') + text, mode: mode === 'replace' ? 'queue' : mode, stopNow: mode === 'replace', requestId, images, attachments: files, mentions, ...(designId?{designId}:{}), ...(previewTarget?{previewTarget}:{}) });
         applyQueue(session, queue);
         queueAttempts.delete(session);
         sent.add(session);
@@ -538,6 +540,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       deps.onActivity?.();
       if (!deps.desktop) { deps.notify('请在桌面应用中使用聊天', 'error'); return false; }
       let id = store.currentId;
+      const messageContext = deps.messageContext?.();
       const revision = selectionRevision;
       const ownerDraft = store.draft;
       const pendingWorkspace = store.pendingWorkspace;
@@ -585,7 +588,8 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       view.status = '';
       try {
         // Images are left out entirely when there are none, so a plain message keeps its old shape.
-        const args = { sessionId: id, text: note ? note + text : text, ...(designId?{designId}:{}), ...(previewTarget?{previewTarget}:{}), ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}), ...(mentions.length ? { mentions: mentions.map(({kind,id}) => ({kind,id})) } : {}) };
+        const context = await messageContext;
+        const args = { sessionId: id, text: (context ?? '') + note + text, ...(designId?{designId}:{}), ...(previewTarget?{previewTarget}:{}), ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}), ...(mentions.length ? { mentions: mentions.map(({kind,id}) => ({kind,id})) } : {}) };
         sent.add(id);
         upsert(await deps.invoke<SessionSummary>('chat_send', args));
         return true;

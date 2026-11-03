@@ -225,7 +225,7 @@ async fn generate_request(client: &reqwest::Client, base: &str, token: &str, dir
 }
 
 #[tauri::command]
-pub async fn chat_generated_image_read(window: tauri::WebviewWindow, id: String) -> Result<String, String> {
+pub async fn chat_generated_image_read(window: tauri::Webview, id: String) -> Result<String, String> {
     super::chat_window(&window)?;
     let directory = root(window.app_handle())?;
     tauri::async_runtime::spawn_blocking(move || {
@@ -240,7 +240,7 @@ pub async fn chat_generated_image_read(window: tauri::WebviewWindow, id: String)
 }
 
 #[tauri::command]
-pub async fn chat_generated_image_save(window: tauri::WebviewWindow, id: String) -> Result<bool, String> {
+pub async fn chat_generated_image_save(window: tauri::Webview, id: String) -> Result<bool, String> {
     super::chat_window(&window)?;
     let app = window.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -255,7 +255,7 @@ pub async fn chat_generated_image_save(window: tauri::WebviewWindow, id: String)
 }
 
 #[tauri::command]
-pub fn chat_generated_image_open(window: tauri::WebviewWindow, id: String) -> Result<(), String> {
+pub fn chat_generated_image_open(window: tauri::Webview, id: String) -> Result<(), String> {
     super::chat_window(&window)?;
     crate::storage::show_in_file_manager(&checked_path(&root(window.app_handle())?, &id)?)
 }

@@ -77,7 +77,7 @@ fn search(store: &dyn SessionStore, sessions: Vec<SessionSummary>, request: Requ
 }
 
 #[tauri::command]
-pub async fn chat_search_sessions(app: tauri::AppHandle, window: tauri::WebviewWindow, request: Request) -> Result<Response, String> {
+pub async fn chat_search_sessions(app: tauri::AppHandle, window: tauri::Webview, request: Request) -> Result<Response, String> {
     super::chat_window(&window)?;
     let sessions = super::list(&app)?;
     let root = Dirs::of(&app)?.sessions();

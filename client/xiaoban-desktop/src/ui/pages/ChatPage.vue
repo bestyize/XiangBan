@@ -38,7 +38,8 @@ import { replyBlocks, type ReplyBlock, type ToolCall } from '../chat/replies.ts'
 import { taskProgress, type TaskProgress } from '../chat/task-progress.ts';
 import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest } from '../chat/types.ts';
 
-const props = defineProps<{ store: ControlStore }>();
+const props = defineProps<{ store: ControlStore; embedded?: boolean }>();
+const emit = defineEmits<{ close: [] }>();
 const chat = props.store.chat;
 const designs = ref<DesignSummary[]>([]), designId = ref(''), designContextId=ref(''), designClosed = ref(false), designWidth = ref(64);
 const designPicker=ref(false);
@@ -114,7 +115,7 @@ let designDeleteOff:(()=>void)|undefined;
 let designOff: (() => void) | undefined, designDisposed = false;
 async function loadDesigns() {
   const id = chat.currentId;
-  if (!id || !props.store.desktop) { designs.value = []; return; }
+  if (props.embedded || !id || !props.store.desktop) { designs.value = []; return; }
   try {
     const rows = await invoke<DesignSummary[]>('design_list', { session: id });
     if (chat.currentId !== id || designDisposed) return;
@@ -505,17 +506,17 @@ async function openLink(href: string) {
     <div class="plan-chips"><button v-for="chip in planChips" :key="chip" type="button" :disabled="planRevisionBusy" @click="planChip(chip)">{{ chip }}</button></div>
     <template #footer><div class="plan-editor-actions"><NButton size="small" quaternary :disabled="planRevisionBusy" @click="planEditorOpen = false">取消</NButton><NButton type="primary" size="small" :disabled="!planReady" :loading="planRevisionBusy" data-testid="task-plan-submit" @click="savePlanRevision">调整并继续</NButton></div></template>
   </NModal>
-  <section class="chat-page" data-testid="chat-page">
+  <section class="chat-page" :class="{ 'chat-page-embedded': embedded }" data-testid="chat-page">
     <div class="chat-main">
-      <header class="chat-head" data-tauri-drag-region>
+      <header class="chat-head" :data-tauri-drag-region="embedded ? undefined : ''">
         <nav class="head-crumbs" aria-label="位置">
           <button type="button" class="crumb-space" data-testid="chat-workspace" :disabled="!store.desktop" :title="'工作区：' + (chat.currentWorkspace || '默认工作目录') + (store.desktop ? '。点击在文件管理器中打开' : '')" @click="chat.revealWorkspace()">{{ spaceName }}</button>
           <ChevronRight :size="12" :stroke-width="2.2" class="crumb-sep" aria-hidden="true" />
-          <h1 data-testid="chat-title">{{ title }}</h1>
+          <h1 data-testid="chat-title">{{ embedded && !session ? '小伴对话' : title }}</h1>
           <ChatExpertChip v-if="chat.currentExpert && session?.expert" class="head-expert" :expert="chat.currentExpert" :desktop="store.desktop" />
         </nav>
         <div class="head-actions">
-          <div v-if="store.desktop" class="design-anchor">
+          <div v-if="store.desktop && !embedded" class="design-anchor">
             <button ref="assetAnchor" type="button" class="xb-icon-btn" :class="{'is-active':assetsOpen}" data-testid="chat-assets-toggle" title="对话资产" aria-description="当前对话的设计稿、图片和文件" aria-label="打开对话资产" :aria-expanded="assetsOpen" @click="toggleAssets"><Files :size="16"/></button>
             <DesignPicker v-if="designPicker" :session="chat.currentId" :notify="store.notify" @close="designPicker=false" @open="openDesign" />
           </div>
@@ -541,6 +542,7 @@ async function openLink(href: string) {
               <button type="button" class="xb-menu-item is-danger" role="menuitem" data-testid="chat-menu-delete" :disabled="!session || running" @click="askDelete"><Trash2 :size="15" />删除对话</button>
             </div>
           </div>
+          <button v-if="embedded" type="button" class="xb-icon-btn" aria-label="收起对话" title="收起对话" @click="emit('close')"><X :size="16" /></button>
         </div>
       </header>
       <div v-if="confirmingDelete" class="delete-bar" data-testid="chat-delete-confirm" role="alertdialog" aria-label="删除对话">
@@ -659,7 +661,7 @@ async function openLink(href: string) {
       <button v-if="!stick && view?.items.length" type="button" class="to-bottom" data-testid="chat-bottom" aria-label="回到最新" @click="stick = true; toBottom()"><ArrowDown :size="16" /></button>
 
       <div class="composer-wrap">
-        <ChatComposer ref="composer" :design-id="designContextId||undefined" :preview-target="activePreview?.target" :store="store" page="chat" pet="sm" :attention="waiting" placeholder="发送消息给小伴" @sending="stick = true" @sent="toBottom" @settings="openAiSettings" @preview="preview = $event" />
+        <ChatComposer ref="composer" :design-id="designContextId||undefined" :preview-target="activePreview?.target" :store="store" :page="embedded ? 'community' : 'chat'" :pet="embedded ? false : 'sm'" :attention="waiting" placeholder="发送消息给小伴" @sending="stick = true" @sent="toBottom" @settings="openAiSettings" @preview="preview = $event" />
         <p class="disclaimer">内容由 AI 生成，请核对重要信息</p>
       </div>
     </div>
@@ -697,7 +699,7 @@ async function openLink(href: string) {
       <img :src="preview" alt="图片预览" />
       <button type="button" class="lightbox-close" data-testid="chat-image-preview-close" aria-label="关闭预览" @click="preview = null"><X :size="18" /></button>
     </div>
-    <ChatAssets v-if="store.desktop" :session="chat.currentId" :designs="designs" :blocks="blocks" :open="assetsOpen" :pinned="assetsPinned" :anchor="assetAnchor" :ensure-session="chat.ensureSession" :notify="store.notify" previewable @updated="updateAssets" @preview="openPreview" @close="assetsOpen=false" @pin="pinAssets" @design="openAssetDesign" @locate="locateAsset" @browse-designs="assetsOpen=false;designPicker=true" />
+    <ChatAssets v-if="store.desktop && !embedded" :session="chat.currentId" :designs="designs" :blocks="blocks" :open="assetsOpen" :pinned="assetsPinned" :anchor="assetAnchor" :ensure-session="chat.ensureSession" :notify="store.notify" previewable @updated="updateAssets" @preview="openPreview" @close="assetsOpen=false" @pin="pinAssets" @design="openAssetDesign" @locate="locateAsset" @browse-designs="assetsOpen=false;designPicker=true" />
     <div v-if="workspaceVisible" class="design-splitter" role="separator" tabindex="0" aria-label="调整聊天和作品宽度" aria-orientation="vertical" :aria-valuenow="Math.round(designWidth)" :aria-valuemin="35" :aria-valuemax="85" @pointerdown="startDesignSplit" @pointermove="moveDesignSplit" @pointerup="finishDesignSplit" @pointercancel="finishDesignSplit" @keydown="designSplitKey" />
     <aside v-if="workspaceVisible" :style="{width:designWidth+'%'}" class="design-dock" aria-label="作品工作区">
       <nav class="workspace-tabs" aria-label="当前对话的作品"><div class="workspace-tab-list" role="tablist">
@@ -898,6 +900,13 @@ async function openLink(href: string) {
 .chat-page :deep(.markdown table){border-collapse:collapse;font-size:13.5px}
 .chat-page :deep(.markdown th),.chat-page :deep(.markdown td){border:1px solid var(--ui-line);padding:6px 12px;text-align:left}
 .chat-page :deep(.markdown th){background:var(--ui-surface-sunken);font-weight:600}
+.chat-page-embedded .chat-column{padding:12px 16px 20px}
+.chat-page-embedded .composer-wrap{padding:0 8px 8px}
+.chat-page-embedded .chat-head{padding-inline:12px;gap:6px;border-bottom:1px solid var(--ui-line)}
+.chat-page-embedded .head-actions{gap:2px}
+.chat-page-embedded .info-card{padding:20px 16px}
+.chat-page-embedded .crumb-space,.chat-page-embedded .crumb-sep,.chat-page-embedded .head-expert{display:none}
+.chat-page-embedded .exec-panel{position:absolute;right:0;top:0;bottom:0;max-width:100%;z-index:5}
 @media(max-width:1100px){.exec-panel{position:absolute;right:0;top:0;bottom:0;z-index:5;box-shadow:var(--ui-shadow-menu)}}
 @media(max-width:760px){
   .chat-column{padding:12px 16px 20px}
