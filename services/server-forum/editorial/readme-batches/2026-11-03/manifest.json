@@ -1,11 +1,11 @@
 {
   "source": "inventory.json",
   "revision": 2,
-  "updated_at": "2026-11-03T03:30:02.443692+00:00",
+  "updated_at": "2026-11-03T03:35:40.149400+00:00",
   "total": 168,
-  "ready_for_review": 160,
+  "ready_for_review": 162,
   "blocked": 5,
-  "pending": 3,
+  "pending": 1,
   "collections": [
     {
       "description": "开源项目的价值，也藏在创造的过程里。这组项目分别提供画图、发布内容和制作硬件的起点，可以按自己的兴趣与经验选择。",
@@ -848,13 +848,11 @@
       "key": "calcom/cal.diy",
       "repository": "calcom/cal.diy",
       "directory": "calcom--cal.diy",
-      "status": "pending",
+      "status": "ready_for_review",
       "issues": [
-        "需核实 README 是否存在独立许可及图像权利",
-        "待寻找并核对官方中文或完成全文翻译",
-        "待核对相对链接、图片、代码与数字；英文原文语言尚待确认",
-        "英文固定版本与 MIT 许可已整理；源文 Basecamp 链接缺协议，需核实并在译文修复。",
-        "中文草稿仅开头已译，后续仍为英文，不可发布；已保留个人非生产用途和自托管能力要求警告。"
+        "全文翻译并对照 57 个标题，50 个代码块与英文原样一致；完整保留个人非生产、自托管要求、默认账户、密钥和遥测说明。",
+        "TLS 证书验证关闭选项保留上游警告并增加解释；Basecamp 两步骤对同一密钥变量赋不同值，已如实标注待上游澄清。",
+        "英文原 Basecamp 链接缺协议，中文改为验证可访问的 HTTPS；11 个关键入口及固定版本链接、官方 Logo 和示意图已检查。"
       ]
     },
     {
@@ -1135,13 +1133,13 @@
       "key": "github/github-mcp-server",
       "repository": "github/github-mcp-server",
       "directory": "github--github-mcp-server",
-      "status": "pending",
+      "status": "ready_for_review",
       "issues": [
-        "固定提交递归树未发现官方中文 README；仅有应用程序 pkg/translations。",
-        "原始 README 为 120055 字节、1827 行，含大量工具和资源目录；必须逐项翻译完整正文，不能用摘要或前言替代。",
-        "英语副本相对链接已解析到固定提交，尚待验证全部链接、图像可读性及独立素材许可。",
-        "需确认 README 的许可适用范围。",
-        "已生成未审校机器译文草稿，必须逐项检查全部工具和参数、重新校正 Markdown 与中文锚点；草稿不算完成。"
+        "固定版本全文由 GPT-6.1 Terra 直接逐行译写；含 97 个工具及其全部参数、配置、安全与许可证章节。",
+        "源 Git blob SHA 与固定提交核对；37 个代码块非注释部分一致，全部行内代码项计数一致；代码注释中的自然语言已翻译。",
+        "相对 Markdown 链接与 HTML 图片路径改写为固定提交；中文标题的原有英文锚点链接指向同提交英文原文。未逐一联网验证所有外链。",
+        "OAuth 登录、令牌权限、只读模式和锁定模式非授权边界等限制保留。",
+        "先前 Google Translate 不完整工作草稿单独留存，未用于此译稿；无第三方机翻计入译文。"
       ]
     },
     {

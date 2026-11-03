@@ -67,7 +67,7 @@
   "stars_fetched_at": "2026-11-03T01:50:47.438242+00:00",
   "license_spdx": "MIT",
   "homepage_url": "https://cal.diy",
-  "icon_source_url": "",
+  "icon_source_url": "https://user-images.githubusercontent.com/8019099/210054112-5955e812-a76e-4160-9ddd-58f2c72f1cce.png",
   "license_path": "LICENSE",
   "license_blob_sha": "98b51fbaac9145f1919fd2a79532acdb04a8f24b",
   "license_url": "https://github.com/calcom/cal.diy/blob/81ce067c1d0e16b21c39c2de98b9a43a92562cd1/LICENSE",
@@ -80,5 +80,10 @@
     "url": "https://cal.diy",
     "kind": "official_website"
   },
-  "draft_status": "开头已手工翻译，后续英文未完成，尚不可发布"
+  "translation": {
+    "method": "Terra 全文翻译并逐节审校",
+    "source_path": "README.md",
+    "source_commit_sha": "81ce067c1d0e16b21c39c2de98b9a43a92562cd1",
+    "notes": "完整保留非生产警告、密钥及默认账号、遥测、SSL 例外和所有集成步骤；三个原目录锚点已恢复。"
+  }
 }

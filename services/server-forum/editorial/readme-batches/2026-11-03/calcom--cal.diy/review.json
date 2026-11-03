@@ -1,18 +1,26 @@
 {
-  "status": "pending",
+  "status": "ready_for_review",
   "checks": {
     "source_version_captured": true,
-    "full_chinese": false,
+    "full_chinese": true,
     "english_original": true,
     "license_reviewed": true,
-    "links_and_images_reviewed": false,
-    "code_and_numbers_reviewed": false
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
   },
   "issues": [
-    "需核实 README 是否存在独立许可及图像权利",
-    "待寻找并核对官方中文或完成全文翻译",
-    "待核对相对链接、图片、代码与数字；英文原文语言尚待确认",
-    "英文固定版本与 MIT 许可已整理；源文 Basecamp 链接缺协议，需核实并在译文修复。",
-    "中文草稿仅开头已译，后续仍为英文，不可发布；已保留个人非生产用途和自托管能力要求警告。"
+    "全文翻译并对照 57 个标题，50 个代码块与英文原样一致；完整保留个人非生产、自托管要求、默认账户、密钥和遥测说明。",
+    "TLS 证书验证关闭选项保留上游警告并增加解释；Basecamp 两步骤对同一密钥变量赋不同值，已如实标注待上游澄清。",
+    "英文原 Basecamp 链接缺协议，中文改为验证可访问的 HTTPS；11 个关键入口及固定版本链接、官方 Logo 和示意图已检查。"
+  ],
+  "link_check": {
+    "key_urls_checked": 11,
+    "official_logo_checked": true,
+    "illustration_checked": true
+  },
+  "security_notices": [
+    "仅建议个人非生产使用",
+    "NODE_TLS_REJECT_UNAUTHORIZED=0 会关闭证书验证",
+    "Basecamp 上游步骤中同一变量被赋予两个不同值"
   ]
 }

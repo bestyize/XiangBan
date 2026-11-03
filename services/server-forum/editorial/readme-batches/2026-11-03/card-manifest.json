@@ -1,7 +1,7 @@
 {
   "inventory_source": "inventory.json",
   "revision": 2,
-  "updated_at": "2026-11-03T03:30:02.500494+00:00",
+  "updated_at": "2026-11-03T03:35:40.209055+00:00",
   "total": 168,
   "description": "项目卡片待审清单；null/空数组表示尚未核定。摘要来自已有项目用途摘要或新核对摘要；不使用旧标题。",
   "cards": [
@@ -2912,7 +2912,7 @@
       "repo": "calcom/cal.diy",
       "name": "Cal.diy",
       "summary_zh": "提供日程预约与排期能力的开源项目，当前仓库已迁移为 Cal.diy。",
-      "icon_source_url": null,
+      "icon_source_url": "https://user-images.githubusercontent.com/8019099/210054112-5955e812-a76e-4160-9ddd-58f2c72f1cce.png",
       "icon_license": null,
       "icon_attribution": null,
       "primary_url": "https://cal.diy",
@@ -2925,9 +2925,9 @@
       "license": "MIT",
       "documentation_license": null,
       "platforms": [],
-      "readme_zh_path": null,
+      "readme_zh_path": "calcom--cal.diy/README.zh-CN.md",
       "readme_en_path": "calcom--cal.diy/README.en.md",
-      "status": "pending",
+      "status": "ready_for_review",
       "github_archived": false,
       "github_fork": false,
       "upstream_maintenance_notice": null,
@@ -2942,9 +2942,7 @@
       ],
       "collections": [],
       "field_notes": [
-        "项目图标尚未核定，留空",
-        "运行平台尚未核定，留空",
-        "正文文件仍处于未完成状态，不能当成完成稿"
+        "运行平台尚未核定，留空"
       ]
     },
     {
@@ -3835,12 +3833,12 @@
       "original_key": "github/github-mcp-server",
       "repo": "github/github-mcp-server",
       "name": "GitHub MCP Server",
-      "summary_zh": "GitHub 官方 MCP 服务端，连接仓库、问题与协作相关接口。",
+      "summary_zh": "让 AI 助手通过 GitHub 官方 MCP 服务读取仓库、处理议题与拉取请求等。",
       "icon_source_url": null,
       "icon_license": null,
       "icon_attribution": null,
-      "primary_url": null,
-      "primary_label": null,
+      "primary_url": "https://github.com/github/github-mcp-server",
+      "primary_label": "GitHub 官方仓库",
       "github_url": "https://github.com/github/github-mcp-server",
       "stars": 34172,
       "stars_fetched_at": "2026-11-03T01:51:05.429560+00:00",
@@ -3849,9 +3847,9 @@
       "license": "MIT",
       "documentation_license": null,
       "platforms": [],
-      "readme_zh_path": null,
+      "readme_zh_path": "github--github-mcp-server/README.zh-CN.md",
       "readme_en_path": "github--github-mcp-server/README.en.md",
-      "status": "pending",
+      "status": "ready_for_review",
       "github_archived": false,
       "github_fork": false,
       "upstream_maintenance_notice": null,
@@ -3867,10 +3865,8 @@
       ],
       "collections": [],
       "field_notes": [
-        "主入口及类型尚未核定，留空；GitHub 链接单独保留",
         "项目图标尚未核定，留空",
-        "运行平台尚未核定，留空",
-        "正文文件仍处于未完成状态，不能当成完成稿"
+        "运行平台尚未核定，留空"
       ]
     },
     {

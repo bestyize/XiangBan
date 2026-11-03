@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "released_at": "2026-11-03T03:30:30.073114+00:00",
+  "released_at": "2026-11-03T03:36:58.874238+00:00",
   "inventory_revision": 2,
   "projects": {
     "codecrafters-io/build-your-own-x": "projects/4bc429ff2e57b5c944776dfd19117dc32f3b6eacf3a4f64ee635629537449da1.json",
@@ -75,6 +75,7 @@
     "skylot/jadx": "projects/2ce8d542a7a5520981db2bdebcaf3869a34aaa83dc02124b4ebd3c2be26e1dd7.json",
     "mastodon/mastodon": "projects/667b6f0607b3df56a69d6dd4a94aa21c982393b8b1c0c75578e4ab8325e43265.json",
     "x64dbg/x64dbg": "projects/54cc9f8b2fc3ae45e5d7eb7a401d5013965f99eee012b0d5179bc67bfc1f6889.json",
+    "calcom/cal.diy": "projects/d2cf0c43713fcd9e309fb01eacee3bc20e468421e43ffd62dd46030500379d12.json",
     "paperless-ngx/paperless-ngx": "projects/3e631738934816a5487d80833d93b023e35eb7df0a1e758bcb84abf21472dab3.json",
     "siyuan-note/siyuan": "projects/cd79f0162a9f2d5750b8ae7a4715d2f7e24795d44e9290bef7b4886993aa6284.json",
     "mitmproxy/mitmproxy": "projects/ec4984af6c54193182856b9ae707dbc66c969b0af0fb3a8aa4ad05ca58aec21c.json",
@@ -98,6 +99,7 @@
     "gchq/cyberchef": "projects/062af2b35769aa70e1a30954a188399453d0c383c8454a0b4f42fba28ec1b165.json",
     "agentscope-ai/agentscope": "projects/24344ea088f0f9e80294b7b6fe382cc9a027b29ffbd2061b05d475e7cca6d375.json",
     "freecad/freecad": "projects/10e6754f181e9b99bb3b3ecfbba9e3881eb08fb44b2d7a8c4cf04d78f654d3c8.json",
+    "github/github-mcp-server": "projects/e8f623b17282174f4651fc88dd8da54aceae8b3fcbe34347342eb8e7c43cc08f.json",
     "vercel-labs/agent-skills": "projects/09e49c42a60ba4d019e6f0dd3ed77676ff0130322d98ef48cc894f49006bf216.json",
     "plausible/analytics": "projects/b41f5684f458b63be9bb2655e978641f9a53fb815b9d26e16f9d9edd49c2b7a5.json",
     "anuken/mindustry": "projects/4aeee1cb391950034c96788d18b77c1263aef6023d3a4ae00fa580e2dd08e218.json",

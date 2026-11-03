@@ -1,7 +1,7 @@
 {
   "inventory_revision": 2,
-  "created_at": "2026-11-03T03:30:02.678607+00:00",
-  "count": 160,
+  "created_at": "2026-11-03T03:35:40.399220+00:00",
+  "count": 162,
   "excluded": [],
   "usage": "每次使用前重新校验每个文件 SHA-256；哈希不一致即舍弃该项目并重建快照。ready_for_review 仅表示待审。",
   "projects": [
@@ -3531,6 +3531,54 @@
     },
     {
       "card": {
+        "original_key": "calcom/cal.diy",
+        "repo": "calcom/cal.diy",
+        "name": "Cal.diy",
+        "summary_zh": "提供日程预约与排期能力的开源项目，当前仓库已迁移为 Cal.diy。",
+        "icon_source_url": "https://user-images.githubusercontent.com/8019099/210054112-5955e812-a76e-4160-9ddd-58f2c72f1cce.png",
+        "icon_license": null,
+        "icon_attribution": null,
+        "primary_url": "https://cal.diy",
+        "primary_label": "official_website",
+        "github_url": "https://github.com/calcom/cal.diy",
+        "stars": 49654,
+        "stars_fetched_at": "2026-11-03T01:50:47.438242+00:00",
+        "code_updated_at": "2026-11-02T07:09:20Z",
+        "code_updated_basis": "GitHub repository pushed_at",
+        "license": "MIT",
+        "documentation_license": null,
+        "platforms": [],
+        "readme_zh_path": "calcom--cal.diy/README.zh-CN.md",
+        "readme_en_path": "calcom--cal.diy/README.en.md",
+        "status": "ready_for_review",
+        "github_archived": false,
+        "github_fork": false,
+        "upstream_maintenance_notice": null,
+        "category": "office",
+        "related_categories": [
+          "web"
+        ],
+        "tags": [
+          "日程预约",
+          "排期",
+          "自部署"
+        ],
+        "collections": [],
+        "field_notes": [
+          "运行平台尚未核定，留空"
+        ]
+      },
+      "files_sha256": {
+        "calcom--cal.diy/README.source.md": "a9a6121c41b37242a4aac18704037dcff14f23d41dbf74b8a18c9e3d393b01e7",
+        "calcom--cal.diy/README.zh-CN.md": "1fc150d83c7b434d01188c0ebd96acd76be4eed28d8e27eaff0ac1c140cf2b49",
+        "calcom--cal.diy/README.en.md": "23af74cd5bac339fb475bb6211478ef0e92d7ed66df2401987aeb988da0de1cf",
+        "calcom--cal.diy/metadata.json": "9193caada8926736dac9360d45f7b6a6d579e28622ecc94eba0c7cb85c71c8b7",
+        "calcom--cal.diy/review.json": "1e96981d6884e4f118ef5f89d790249302e066dddbb2a9d0bec825d7841c3741",
+        "calcom--cal.diy/LICENSE.upstream": "95f3d2c4bf316ccec41144d528fb9902de0bf91c635cc404bd94c7f7ebac321c"
+      }
+    },
+    {
+      "card": {
         "original_key": "paperless-ngx/paperless-ngx",
         "repo": "paperless-ngx/paperless-ngx",
         "name": "Paperless-ngx",
@@ -4645,6 +4693,56 @@
         "FreeCAD--FreeCAD/metadata.json": "75f87f90302eea43d365534b11143d94480c308ae4f2376ef02463106e929055",
         "FreeCAD--FreeCAD/review.json": "8530775be9821a904810cbeeafe790d65dc989a20925c021b56fb61c06274acd",
         "FreeCAD--FreeCAD/LICENSE.upstream": "7ffe1954587c77dfba1cf8eb9b2ea743671fa6e63f9e7a2f258119d42e14eefe"
+      }
+    },
+    {
+      "card": {
+        "original_key": "github/github-mcp-server",
+        "repo": "github/github-mcp-server",
+        "name": "GitHub MCP Server",
+        "summary_zh": "让 AI 助手通过 GitHub 官方 MCP 服务读取仓库、处理议题与拉取请求等。",
+        "icon_source_url": null,
+        "icon_license": null,
+        "icon_attribution": null,
+        "primary_url": "https://github.com/github/github-mcp-server",
+        "primary_label": "GitHub 官方仓库",
+        "github_url": "https://github.com/github/github-mcp-server",
+        "stars": 34172,
+        "stars_fetched_at": "2026-11-03T01:51:05.429560+00:00",
+        "code_updated_at": "2026-11-02T22:19:47Z",
+        "code_updated_basis": "GitHub repository pushed_at",
+        "license": "MIT",
+        "documentation_license": null,
+        "platforms": [],
+        "readme_zh_path": "github--github-mcp-server/README.zh-CN.md",
+        "readme_en_path": "github--github-mcp-server/README.en.md",
+        "status": "ready_for_review",
+        "github_archived": false,
+        "github_fork": false,
+        "upstream_maintenance_notice": null,
+        "category": "skills",
+        "related_categories": [
+          "dev",
+          "ai"
+        ],
+        "tags": [
+          "GitHub",
+          "MCP",
+          "代码协作"
+        ],
+        "collections": [],
+        "field_notes": [
+          "项目图标尚未核定，留空",
+          "运行平台尚未核定，留空"
+        ]
+      },
+      "files_sha256": {
+        "github--github-mcp-server/README.source.md": "371e8c991df6e5e61ca6a864d692141dbf1a728ae0790d376b54c96b91e4ff13",
+        "github--github-mcp-server/README.zh-CN.md": "2e4bc8a2d0badd1cdd0d1a1e73e1b7b9608b8bb4c663f456b6bbd81c2471b40f",
+        "github--github-mcp-server/README.en.md": "b06be77fe89cd8520122f6d3e84b952bd766825f23ff36da07af7e375659b163",
+        "github--github-mcp-server/metadata.json": "567059fce73fab846f5ab9d44982dc42de0e7cbb637981ba05e41f0b81a2b16b",
+        "github--github-mcp-server/review.json": "ab038b3f43b3c34e1754226ffeec25bbdd855ce0bd1cbdcd4cfe5c7ed49c9972",
+        "github--github-mcp-server/LICENSE.upstream": "9e48ecfa18e2b15169746a3c97beda4d1d6c6796097038498ca434ca7e0ccd44"
       }
     },
     {

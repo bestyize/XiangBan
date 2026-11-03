@@ -72,7 +72,7 @@
   "license_path": "LICENSE",
   "license_blob_sha": "9a9cc50d37ea399f7ccc2f14b6c6d4cc4de02efc",
   "license_url": "https://github.com/github/github-mcp-server/blob/3366807bbb8473841894de040d4abc89193e5d51/LICENSE",
-  "source_language": "English",
+  "source_language": "en",
   "official_chinese_search": {
     "commit_sha": "3366807bbb8473841894de040d4abc89193e5d51",
     "method": "递归 Git 树查找 README 中 zh/cn/chinese 和 zh/zh-cn/chinese/translations/i18n 路径",
@@ -96,5 +96,10 @@
   "archived": false,
   "fork": false,
   "disabled": false,
-  "official_repository_url": "https://github.com/github/github-mcp-server"
+  "official_repository_url": "https://github.com/github/github-mcp-server",
+  "source_format": "markdown",
+  "translation_method": "GPT-6.1 Terra 基于固定英文原文直接逐行译写并审校；另存的不完整 Google 机翻草稿未用于本译稿。",
+  "description_zh": "让 AI 助手通过 GitHub 官方 MCP 服务读取仓库、处理议题与拉取请求等。",
+  "official_entry": "https://github.com/github/github-mcp-server",
+  "entry_label": "GitHub 官方仓库"
 }
