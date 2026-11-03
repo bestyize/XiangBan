@@ -134,9 +134,10 @@ class AndroidPlatformActions(
     }
 
     override fun openInBrowser(url: String) {
-        val browser = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-            .setSelector(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_BROWSER))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val browser = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            selector = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_BROWSER)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
         runCatching { context.startActivity(browser) }
     }
 
