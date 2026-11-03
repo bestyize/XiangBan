@@ -65,6 +65,7 @@ export interface TopicItem {
   min_read_level: number
   reply_count: number
   like_count: number
+  liked?: boolean
   view_count: number
   created_at: string
   last_reply_at: string

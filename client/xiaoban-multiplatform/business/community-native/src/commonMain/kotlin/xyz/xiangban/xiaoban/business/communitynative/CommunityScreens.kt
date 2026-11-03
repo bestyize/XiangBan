@@ -41,7 +41,7 @@ internal enum class CommunitySection(val label: String) { Home("首页"), Discus
 fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
     var section by rememberSaveable { mutableStateOf(CommunitySection.Home.name) }
     var homeSub by rememberSaveable { mutableStateOf(HomeSub.Recommend.key) }
-    var discussSub by rememberSaveable { mutableStateOf(DiscussSub.Create.key) }
+    var discussSub by rememberSaveable { mutableStateOf(DiscussSub.All.key) }
     var resourceSub by rememberSaveable { mutableStateOf(ResourceSub.Tools.key) }
     var toast by remember { mutableStateOf<String?>(null) }
     val current = CommunitySection.valueOf(section)
@@ -60,7 +60,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
                 CommunitySection.Home -> TabStrip(HomeSub.entries.filter { it != HomeSub.Hot }.map { it.key to it.label }, if (homeSub == HomeSub.Hot.key) HomeSub.OpenSource.key else homeSub, centered = true) { homeSub = it }
-                CommunitySection.Discuss -> TabStrip(DiscussSub.entries.map { it.key to it.label }, discussSub, centered = true) { discussSub = it }
+                CommunitySection.Discuss -> Unit
                 CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, ResourceSub.byKey(resourceSub).key, centered = true) { resourceSub = it }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -73,7 +73,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
                         HomeSub.Track -> TrackTab(env)
                         HomeSub.Nav -> NavTab(env)
                     }
-                    CommunitySection.Discuss -> DiscussTab(env, DiscussSub.byKey(discussSub), open) { toast = it }
+                    CommunitySection.Discuss -> DiscussTab(env, DiscussSub.byKey(discussSub), { discussSub = it.key }, open)
                     CommunitySection.Resources -> ResourceTab(env, ResourceSub.byKey(resourceSub), open) { toast = it }
                 }
             }

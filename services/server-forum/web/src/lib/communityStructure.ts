@@ -5,7 +5,20 @@ export const CATEGORY_ALIASES = channels.aliases as Record<string,string>
 /** Preserve historical category lookup without offering an obsolete publishing channel. */
 const legacyCategories = new Set(channels.channels.filter(c => 'legacy_only' in c && c.legacy_only).map(c => c.id))
 export function isLegacyCategory(slug:string) { return legacyCategories.has(canonicalCategory(slug)) }
-export const DISCUSSION_TABS = [{key:'create',label:'创作'},{key:'learn',label:'学习和教程'},{key:'casual',label:'休闲'}]
+export const DISCUSSION_TABS = [
+  {key:'all',label:'全部'}, {key:'create',label:'创作'}, {key:'learn',label:'教程'},
+  {key:'casual-offwork',label:'下班了'}, {key:'casual-gear',label:'数码'},
+  {key:'casual-fun',label:'吃喝玩乐'}, {key:'casual-media',label:'片单乐评'},
+]
+export const DISCUSSION_BOARD_TOPICS = channels.channels.filter(c =>
+  c.parent === 'casual' && !DISCUSSION_TABS.some(t => t.key === c.id) && !isLegacyCategory(c.id),
+).map(c => ({key:c.id,label:c.label}))
+export function discussionCategory(tab:string, filter = '') {
+  if (tab === 'all') return 'create,learn,casual'
+  if (tab === 'learn') return learnCategory(filter)
+  if (tab === 'create') return creationCategory(filter)
+  return tab
+}
 export const LEARN_FILTERS = [{key:'',label:'全部'},{key:'claude-code',label:'Claude Code'},{key:'codex',label:'Codex'},{key:'提示词',label:'提示词'},{key:'工作流',label:'工作流'},{key:'本地部署',label:'本地部署'},{key:'ai-硬件',label:'AI 硬件'}]
 export const RESOURCE_TABS = [{key:'tools',label:'AI 工具'},{key:'docs',label:'资料'},{key:'media',label:'影音娱乐'},{key:'help',label:'求助悬赏'}]
 export const LEARN_CATEGORIES = 'learn'

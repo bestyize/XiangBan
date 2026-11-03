@@ -98,7 +98,10 @@ fun manifestValue(manifest: JsonObject, vararg keys: String): String? = keys.fir
 class ContentPublishingApi(private val client: HttpClient, private val config: CommunityConfig, private val token: suspend () -> String?) {
     private val http = JsonHttp(client, config.forumBase)
     private suspend fun access() = token() ?: throw ApiException(401, "请登录后发布作品")
-    suspend fun schemes(page: Int = 1): Page<Scheme> = http.send(HttpMethod.Get, "/api/schemes?page=$page", serializer(), token = token())
+    suspend fun schemes(page: Int = 1, following: Boolean = false): Page<Scheme> {
+        val filter = if (following) "&following=true" else ""
+        return http.send(HttpMethod.Get, "/api/schemes?page=$page$filter", serializer(), token = token())
+    }
     suspend fun scheme(id: Long): Scheme = http.send(HttpMethod.Get, "/api/schemes/$id", serializer(), token = token())
     suspend fun myPacks(): MyContentPacks = http.send(HttpMethod.Get, "/api/me/packs", serializer(), token = access())
     suspend fun removeOwn(id: Long) { http.send(HttpMethod.Post, "/api/packs/$id/remove", serializer<JsonObject>(), body = "{}", token = access()) }

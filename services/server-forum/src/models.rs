@@ -105,6 +105,7 @@ pub struct TopicItem {
     pub locked: bool,
     pub reply_count: i32,
     pub like_count: i32,
+    pub liked: bool,
     pub view_count: i32,
     /// 阅读权限：0 所有人，1 成员以上，2 老用户以上，3 守护者以上。
     pub min_read_level: i16,
@@ -176,6 +177,7 @@ impl TopicRow {
             locked: self.locked,
             reply_count: self.reply_count,
             like_count: self.like_count,
+            liked: false,
             view_count: self.view_count,
             min_read_level: self.min_read_level,
             created_at: self.created_at,
@@ -374,12 +376,18 @@ async fn attach_tags(pool: &PgPool, rows: Vec<TopicRow>, viewer: Option<Uuid>) -
     for (id, name) in pairs {
         by_topic.entry(id).or_default().push(name);
     }
+    let liked: std::collections::HashSet<i64> = match viewer.filter(|_| !ids.is_empty()) {
+        Some(uid) => sqlx::query_scalar("SELECT target_id FROM likes WHERE target_type='topic' AND uid=$1 AND target_id=ANY($2)")
+            .bind(uid).bind(&ids).fetch_all(pool).await?.into_iter().collect(),
+        None => Default::default(),
+    };
     let mut polls = load_polls(pool, &ids, viewer).await?;
     Ok(rows.into_iter().map(|r| {
         let tags = by_topic.remove(&r.id).unwrap_or_default();
         let poll = polls.remove(&r.id);
         let mut item = r.into_item(tags);
         item.poll = poll;
+        item.liked = liked.contains(&item.id);
         item
     }).collect())
 }

@@ -149,7 +149,7 @@ export const api = {
     request<Page<PublicUser>>('GET', `/users/${uid}/following${qs({ page })}`),
   followers: (uid: string, page = 1) =>
     request<Page<PublicUser>>('GET', `/users/${uid}/followers${qs({ page })}`),
-  followingTopics: (page = 1) => request<Page<TopicItem>>('GET', `/me/following/topics${qs({ page })}`),
+  followingTopics: (page = 1, filters: Pick<ListParams, 'category'|'tag'|'home'> = {}) => request<Page<TopicItem>>('GET', `/me/following/topics${qs({ page, ...filters })}`),
   userTopics: (uid: string, page = 1) => request<Page<TopicItem>>('GET', `/users/${uid}/topics${qs({ page })}`),
   userPosts: (uid: string, page = 1) =>
     request<{ items: UserReply[] }>('GET', `/users/${uid}/posts${qs({ page })}`),

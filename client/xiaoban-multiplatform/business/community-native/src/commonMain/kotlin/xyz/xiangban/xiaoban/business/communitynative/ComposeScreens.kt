@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.*
@@ -59,6 +60,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     var categoryId by rememberSaveable { mutableStateOf(-1) }
     var title by rememberSaveable { mutableStateOf(initialTitle) }
     var body by rememberSaveable { mutableStateOf(initialBody) }
+    var topicTags by rememberSaveable { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var uploading by remember { mutableStateOf(false) }
     var leaving by remember { mutableStateOf(false) }
@@ -84,7 +86,7 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     fun requestBack() {
         if (busy || uploading || leaving) return
         focus.clearFocus()
-        if (title.isNotBlank() || body.isNotBlank() || attachments.isNotEmpty() || cover != null) confirmingLeave = true else cancelDraft()
+        if (title.isNotBlank() || body.isNotBlank() || topicTags.isNotBlank() || attachments.isNotEmpty() || cover != null) confirmingLeave = true else cancelDraft()
     }
     BackHandler { requestBack() }
     var error by remember { mutableStateOf<String?>(null) }
@@ -142,7 +144,9 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                 check(currentAccount == account) { "账号已切换，请重新编辑" }
                 val postBody = uploadedCover?.let { forumImageMarkdown(it, "封面").trim() + "\n\n" + body.trim() } ?: body.trim()
                 require(postBody.count { !it.isLowSurrogate() } <= 20_000) { "加上封面后正文超过字数上限，请精简正文" }
-                val id = env.forum.createTopic(categoryId, title.trim(), postBody, bounty = if (isHelp) bounty else null, bountyDays = bountyDays,
+                val tags = topicTags.split(',', '，').map { it.trim().removePrefix("#").trim() }
+                    .filter { it.isNotEmpty() }.map { it.take(20) }.distinctBy { it.lowercase() }.take(5)
+                val id = env.forum.createTopic(categoryId, title.trim(), postBody, tags = tags, bounty = if (isHelp) bounty else null, bountyDays = bountyDays,
                     pollOptions = if (pollEnabled) pollOptions else emptyList(), pollDays = pollDays.takeIf { pollEnabled && it != 0 }, attachments = attachments)
                 back(); open(Route.Topic(id))
             } catch (e: kotlinx.coroutines.CancellationException) { throw e }
@@ -169,6 +173,12 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                         Text(chosen?.name ?: "选择发布版块", style = XType.Secondary, fontWeight = FontWeight.Medium)
                         XIcon(XIcons.ChevronDown, size = 14.dp, tint = LocalExtraColors.current.ink3)
                     }
+                    OutlinedTextField(
+                        value = topicTags, onValueChange = { if (it.length <= 110) topicTags = it },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        enabled = !busy, singleLine = true, label = { Text("话题标签（可选）") },
+                        placeholder = { Text("用逗号分隔，最多 5 个") },
+                    )
                     if (env.platform?.forumCoverSupported == true) ForumCoverEntry(cover, !busy && !uploading,
                         onChoose = { focus.clearFocus(); choosingCover = true }, onRemove = { cover = null; coverSpec = null })
                     BasicTextField(title, { title = it }, Modifier.fillMaxWidth().padding(vertical = 8.dp), enabled = !busy,

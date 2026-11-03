@@ -113,6 +113,9 @@ data class CategoryRef(val id: Int, val slug: String, val name: String, @SerialN
 data class PublicUser(val uid: String, val nickname: String, @SerialName("avatar_url") val avatarUrl: String? = null, @SerialName("trust_level") val trustLevel: Int = 0)
 
 @Serializable
+data class DiscussionTag(val name: String)
+
+@Serializable
 data class Topic(
     val id: Long,
     val title: String,
@@ -138,6 +141,7 @@ data class Topic(
     /** 详情里才有，登录后才有内容：你是否点过赞、收藏过，能不能回复。 */
     val viewer: TopicViewer? = null,
     val attachments: List<ForumAttachment> = emptyList(),
+    val liked: Boolean = false,
 )
 
 @Serializable

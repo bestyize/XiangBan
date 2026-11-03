@@ -73,6 +73,8 @@ pub struct ListQuery {
     q: Option<String>,
     tag: Option<String>,
     author: Option<Uuid>,
+    #[serde(default)]
+    following: bool,
     /// `new`（默认）或 `hot`。
     sort: Option<String>,
     page: Option<i64>,
@@ -148,7 +150,10 @@ fn cover_url(state: &AppState, key: Option<&str>) -> Option<String> {
     Some(format!("{base}/{}", key?))
 }
 
-async fn list_packs(State(state): State<AppState>, Query(q): Query<ListQuery>) -> AppResult<Json<Page<Value>>> {
+async fn list_packs(State(state): State<AppState>, MaybeUser(user): MaybeUser, Query(q): Query<ListQuery>) -> AppResult<Json<Page<Value>>> {
+    let follower = if q.following {
+        Some(user.as_ref().ok_or_else(|| AppError::Unauthorized("请先登录".into()))?.uid)
+    } else { None };
     let (page, size) = paging(q.page, q.page_size);
     if let Some(kind) = &q.kind {
         if !content::is_known_kind(kind) {
@@ -163,22 +168,26 @@ async fn list_packs(State(state): State<AppState>, Query(q): Query<ListQuery>) -
         AND ($1::text IS NULL OR p.kind = $1)
         AND ($2::text IS NULL OR p.title ILIKE $2 OR p.summary ILIKE $2)
         AND ($3::text IS NULL OR $3 = ANY(p.tags))
-        AND ($4::uuid IS NULL OR p.author_uid = $4)";
+        AND ($4::uuid IS NULL OR p.author_uid = $4)
+        AND ($5::uuid IS NULL OR (EXISTS(SELECT 1 FROM user_follows f WHERE f.follower_uid=$5 AND f.followed_uid=p.author_uid)
+            AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker=$5 AND b.blocked=p.author_uid)))";
     let (total,): (i64,) = sqlx::query_as(&format!("SELECT count(*) FROM packs p WHERE {filter}"))
         .bind(&q.kind)
         .bind(&pattern)
         .bind(&q.tag)
         .bind(q.author)
+        .bind(follower)
         .fetch_one(&state.pool)
         .await?;
     let rows: Vec<PackRow> = sqlx::query_as(&format!(
         "SELECT {PACK_COLUMNS} FROM packs p LEFT JOIN users u ON u.uid = p.author_uid
-         WHERE {filter} ORDER BY {order} LIMIT $5 OFFSET $6"
+         WHERE {filter} ORDER BY {order} LIMIT $6 OFFSET $7"
     ))
     .bind(&q.kind)
     .bind(&pattern)
     .bind(&q.tag)
     .bind(q.author)
+        .bind(follower)
     .bind(size)
     .bind((page - 1) * size)
     .fetch_all(&state.pool)
@@ -721,16 +730,24 @@ pub(crate) async fn scheme_items(state: &AppState, items: &Value) -> AppResult<V
     Ok(resolved)
 }
 
-async fn list_schemes(State(state): State<AppState>, Query(q): Query<ListQuery>) -> AppResult<Json<Page<Value>>> {
+async fn list_schemes(State(state): State<AppState>, MaybeUser(user): MaybeUser, Query(q): Query<ListQuery>) -> AppResult<Json<Page<Value>>> {
+    let follower = if q.following {
+        Some(user.as_ref().ok_or_else(|| AppError::Unauthorized("请先登录".into()))?.uid)
+    } else { None };
     let (page, size) = paging(q.page, q.page_size);
-    let (total,): (i64,) = sqlx::query_as("SELECT count(*) FROM schemes s JOIN users u ON u.uid=s.author_uid WHERE s.status='published' AND u.status<>'banned'")
+    let filter = "s.status='published' AND u.status<>'banned'
+        AND ($1::uuid IS NULL OR (EXISTS(SELECT 1 FROM user_follows f WHERE f.follower_uid=$1 AND f.followed_uid=s.author_uid)
+            AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker=$1 AND b.blocked=s.author_uid)))";
+    let (total,): (i64,) = sqlx::query_as(&format!("SELECT count(*) FROM schemes s JOIN users u ON u.uid=s.author_uid WHERE {filter}"))
+        .bind(follower)
         .fetch_one(&state.pool)
         .await?;
-    let rows: Vec<(i64, Uuid, String, String, Value, i64, DateTime<Utc>)> = sqlx::query_as(
+    let rows: Vec<(i64, Uuid, String, String, Value, i64, DateTime<Utc>)> = sqlx::query_as(&format!(
         "SELECT s.id, s.author_uid, u.nickname, s.title, s.items, s.apply_count, s.created_at
          FROM schemes s JOIN users u ON u.uid = s.author_uid
-         WHERE s.status = 'published' AND u.status<>'banned' ORDER BY s.created_at DESC, s.id DESC LIMIT $1 OFFSET $2",
-    )
+         WHERE {filter} ORDER BY s.created_at DESC, s.id DESC LIMIT $2 OFFSET $3",
+    ))
+    .bind(follower)
     .bind(size)
     .bind((page - 1) * size)
     .fetch_all(&state.pool)

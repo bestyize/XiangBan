@@ -47,6 +47,7 @@ export interface PackListParams {
   q?: string
   tag?: string
   author?: string
+  following?: boolean
   sort?: 'new' | 'hot'
   page?: number
   page_size?: number
@@ -140,10 +141,10 @@ export const contentApi = {
     request<{ id: number; version: number }>('POST', `/packs/${id}/versions`, { file_key, changelog }),
   removeOwn: (id: number) => request<{ id: number }>('POST', `/packs/${id}/remove`),
   myPacks: () => request<{ items: MyPack[] }>('GET', '/me/packs'),
-  packs: (p: PackListParams) => request<Page<PackItem>>('GET', `/packs${qs({ ...p })}`, undefined, false),
+  packs: (p: PackListParams) => request<Page<PackItem>>('GET', `/packs${qs({ ...p, following:p.following ? "true" : undefined })}`, undefined, p.following === true),
   pack: (id: number) => request<PackDetail>('GET', `/packs/${id}`),
   download: (id: number, version?: number) => request<DownloadInfo>('GET', `/packs/${id}/download${qs({ version })}`, undefined, false),
-  schemes: (page = 1) => request<Page<SchemeItem>>('GET', `/schemes${qs({ page })}`, undefined, false),
+  schemes: (page = 1, following = false) => request<Page<SchemeItem>>('GET', `/schemes${qs({ page, following:following ? "true" : undefined })}`, undefined, following),
   projects: () => request<{ items: ProjectItem[] }>('GET', '/projects', undefined, false),
   project: (slug: string) => request<ProjectDetail>('GET', `/projects/${encodeURIComponent(slug)}`, undefined, false),
   weeklyList: (page = 1) => request<Page<WeeklyIssueItem>>('GET', `/weekly${qs({ page })}`, undefined, false),

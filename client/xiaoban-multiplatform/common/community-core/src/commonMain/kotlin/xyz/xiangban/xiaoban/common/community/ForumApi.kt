@@ -29,8 +29,8 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     private suspend inline fun <reified T> get(path: String): T = http.send(HttpMethod.Get, path, serializer<T>(), token = token())
 
     // ── 内容 ──
-    suspend fun packs(kind: String? = null, sort: String? = null, q: String? = null, page: Int = 1): Page<Pack> =
-        get("/api/packs${query("kind" to kind, "sort" to sort, "q" to q, "page" to page)}")
+    suspend fun packs(kind: String? = null, sort: String? = null, q: String? = null, page: Int = 1, tag: String? = null, following: Boolean = false): Page<Pack> =
+        get("/api/packs${query("kind" to kind, "sort" to sort, "q" to q, "page" to page, "tag" to tag, "following" to following.takeIf { it })}")
 
     suspend fun pack(id: Long): Pack = get("/api/packs/$id")
     suspend fun gameDownload(id: Long, version: Int): CommunityGameDownload = get("/api/packs/$id/download?version=$version")
@@ -129,7 +129,9 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     suspend fun searchTopics(q: String, page: Int = 1): Page<Topic> = get("/api/search${query("q" to q, "page" to page)}")
 
     suspend fun categories(): List<Category> = get("/api/categories")
-    suspend fun followingTopics(page: Int = 1): Page<Topic> = get("/api/me/following/topics${query("page" to page)}")
+    suspend fun followingTopics(page: Int = 1, category: String? = null, tag: String? = null, home: Boolean = false): Page<Topic> =
+        get("/api/me/following/topics${query("page" to page, "category" to category, "tag" to tag, "home" to home.takeIf { it })}")
+    suspend fun topicTags(): List<DiscussionTag> = get("/api/tags")
 
     // ── 发帖与互动（需要登录） ──
     private suspend fun write(method: HttpMethod, path: String, body: JsonObject? = null): JsonObject =
@@ -192,7 +194,8 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
         if (id <= 0) throw ApiException(400, "请选择有效评论")
         return http.send(if (liked) HttpMethod.Put else HttpMethod.Delete, "/api/posts/$id/like", serializer(), body = "{}", token = token() ?: throw ApiException(401, "请先登录"))
     }
-    suspend fun setTopicLiked(id: Long, liked: Boolean) { write(if (liked) HttpMethod.Put else HttpMethod.Delete, "/api/topics/$id/like") }
+    suspend fun setTopicLiked(id: Long, liked: Boolean): LikeState =
+        CommunityJson.decodeFromJsonElement(LikeState.serializer(), write(if (liked) HttpMethod.Put else HttpMethod.Delete, "/api/topics/$id/like"))
     suspend fun setTopicBookmarked(id: Long, on: Boolean) { write(if (on) HttpMethod.Put else HttpMethod.Delete, "/api/topics/$id/bookmark") }
 
     // ── 登录态 ──
