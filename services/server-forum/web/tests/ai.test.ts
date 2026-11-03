@@ -85,3 +85,66 @@ test('completion does not wait for a non-closing cancellation promise', { timeou
   assert.equal(cancelled,true)
   assert.equal(stream.locked,false)
 })
+
+function eventStream(...events: unknown[]): ReadableStream<Uint8Array> {
+  const encoder = new TextEncoder()
+  return new ReadableStream({
+    start(controller) {
+      for (const event of events) controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+      controller.close()
+    },
+  })
+}
+
+test('Responses displays answer deltas once and ignores reasoning and final snapshots', async () => {
+  const received: string[] = []
+  await consumeAiStream(eventStream(
+    { type: 'response.reasoning_summary_text.delta', delta: '内部摘要' },
+    { type: 'response.output_text.delta', delta: '你好' },
+    { type: 'response.output_text.delta', delta: '！' },
+    { type: 'response.output_text.done', text: '你好！' },
+    { type: 'response.completed', response: { status: 'completed' } },
+  ), text => received.push(text), undefined, 'responses')
+  assert.deepEqual(received, ['你好', '！'])
+})
+
+test('Responses requires successful completion', async () => {
+  for (const type of ['response.failed', 'response.incomplete', 'error']) {
+    await assert.rejects(consumeAiStream(eventStream({ type }), () => {}, undefined, 'responses'), /回复中断/)
+  }
+  await assert.rejects(consumeAiStream(eventStream({ type: 'response.created' }), () => {}, undefined, 'responses'), /意外中断/)
+})
+
+test('Chat Completions only displays the primary answer', async () => {
+  const received: string[] = []
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(
+        'data: {"choices":[{"index":1,"delta":{"content":"其他答案"}},{"index":0,"delta":{"content":"正文","reasoning_content":"思考"}}]}\n\ndata: [DONE]\n\n',
+      ))
+      controller.close()
+    },
+  })
+  await consumeAiStream(stream, text => received.push(text))
+  assert.deepEqual(received, ['正文'])
+})
+
+test('invalid UTF-8 fails instead of displaying replacement characters', async () => {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(Uint8Array.of(0xff))
+      controller.close()
+    },
+  })
+  await assert.rejects(consumeAiStream(stream, () => assert.fail('invalid bytes reached the UI')), /编码异常/)
+})
+
+test('Chat Completions stops before appending text from a second completion', async () => {
+  const received: string[] = []
+  const chunk = (id: string, content: string) => ({ id, choices: [{ index: 0, delta: { content } }] })
+  await assert.rejects(consumeAiStream(eventStream(
+    chunk('chatcmpl-greeting', 'Hi! How can'),
+    chunk('chatcmpl-unrelated', '## 错误原因'),
+  ), text => received.push(text)), /回复流异常/)
+  assert.deepEqual(received, ['Hi! How can'])
+})

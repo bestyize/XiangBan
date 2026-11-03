@@ -92,7 +92,8 @@ watch(uid, value => {
 onBeforeUnmount(() => { generation++; accountSequence++; controller?.abort(); accountController?.abort() })
 async function scrollDown() { await nextTick(); scrollArea.value?.scrollTo({ top: scrollArea.value.scrollHeight }) }
 async function run(retry = false) {
-  if (!uid.value || busy.value || !tier.value || !current.value) return
+  const mode = tiers.value.find(item => item.tier === tier.value && item.available)
+  if (!uid.value || busy.value || !mode || !current.value) return
   const chat = current.value
   if (!retry && chat.messages.length >= AI_HISTORY_LIMITS.messages - 1) { error.value = '当前对话已达到历史长度上限，请新建对话。'; return }
   if (retry) {
@@ -116,16 +117,17 @@ async function run(retry = false) {
     const token = await session.accessToken()
     if (!token) throw new Error('无法取得登录凭证，请重新登录。')
     if (!valid() || abort.signal.aborted) return
-    await aiApi.chat(token, tier.value, input, abort.signal, text => {
+    await aiApi.chat(token, mode, input, abort.signal, text => {
       if (!valid() || abort.signal.aborted) return
       if (reply.content.length + text.length > AI_HISTORY_LIMITS.content) throw new Error('回复过长，已停止接收。可以新建对话继续。')
       reply.content += text; void scrollDown()
     })
+    if (valid() && !reply.content.trim()) throw new Error('AI 没有返回文字，请重试。')
   } catch (e) {
     if (valid()) error.value = abort.signal.aborted ? '已停止生成。' : e instanceof Error ? e.message : '回复失败，请重试。'
   } finally {
     if (valid()) {
-      if (!reply.content && chat.messages.at(-1) === reply) chat.messages.pop()
+      if (!reply.content.trim() && chat.messages.at(-1) === reply) chat.messages.pop()
       busy.value = false; controller = null; save(); void loadAccount(ownGeneration)
     }
   }

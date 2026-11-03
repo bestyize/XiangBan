@@ -1,7 +1,7 @@
-import { consumeAiStream } from '../lib/aiStream'
+import { consumeAiStream, type AiChatProtocol } from '../lib/aiStream'
 import type { AiMessage } from '../lib/aiHistory'
 
-export interface AiTier { tier: string; display_name: string; description: string; is_default: boolean; available: boolean; requires_paid: boolean }
+export interface AiTier { tier: string; display_name: string; description: string; is_default: boolean; available: boolean; requires_paid: boolean; chat_protocol?: AiChatProtocol }
 export interface AiBalance { product: {product_id:string; name:string}; total: number; paid:number; quota_per_unit: number; buckets: {id:number; kind:string; total:number; remaining:number; expires_at:string|null; created_at:string}[]; trial: { available: boolean; quota:number; days:number }; credit_purchase_url: string }
 
 export function aiBaseUrl(configured: string): string {
@@ -36,9 +36,16 @@ export const aiApi = {
     return value
   },
   async redeem(token: string, code: string): Promise<void> { await request('/api/ai/redeem', token, { method: 'POST', body: JSON.stringify({ code }) }) },
-  async chat(token: string, model: string, messages: AiMessage[], signal: AbortSignal, onText: (text: string) => void): Promise<void> {
-    const response = await request('/v1/chat/completions', token, { method: 'POST', body: JSON.stringify({ model, messages, stream: true }), signal })
+  async chat(token: string, tier: AiTier, messages: AiMessage[], signal: AbortSignal, onText: (text: string) => void): Promise<void> {
+    const protocol = tier.chat_protocol ?? 'chat_completions'
+    const responses = protocol === 'responses'
+    const payload = responses
+      ? { model: tier.tier, input: messages, stream: true, store: false }
+      : { model: tier.tier, messages, stream: true }
+    const response = await request(responses ? '/v1/responses' : '/v1/chat/completions', token, {
+      method: 'POST', body: JSON.stringify(payload), signal,
+    })
     if (!response.body) throw new Error('浏览器无法读取流式回复。')
-    await consumeAiStream(response.body, onText, signal)
+    await consumeAiStream(response.body, onText, signal, protocol)
   },
 }

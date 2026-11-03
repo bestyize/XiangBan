@@ -306,7 +306,7 @@ async fn respond(upstream: reqwest::Response, tier: &str) -> Result<Response, Ap
         return Response::builder()
             .status(StatusCode::OK)
             .header(header::CONTENT_TYPE, "text/event-stream")
-            .header(header::CACHE_CONTROL, "no-cache")
+            .header(header::CACHE_CONTROL, "no-store")
             .header("x-accel-buffering", "no")
             .body(Body::from_stream(stream))
             .map_err(|e| AppError::Internal(e.to_string()));
@@ -316,7 +316,7 @@ async fn respond(upstream: reqwest::Response, tier: &str) -> Result<Response, Ap
     let mut value: Value =
         serde_json::from_slice(&bytes).map_err(|_| AppError::BadGateway("AI 服务返回了无法识别的内容".into()))?;
     relabel_model(&mut value, tier);
-    Ok(Json(value).into_response())
+    Ok(([(header::CACHE_CONTROL, "no-store")], Json(value)).into_response())
 }
 
 /// 上游的报错原文可能带真实模型名或渠道信息，只按状态归类成通用文案。

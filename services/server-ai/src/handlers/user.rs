@@ -14,6 +14,15 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::FromRow;
 
+// The deployed GPT chat models use New API's Responses-only Codex channel.
+fn web_chat_protocol(model: &str) -> &'static str {
+    let name = model.trim().rsplit('/').next().unwrap_or_default();
+    match name {
+        "gpt-6.1-sol" | "gpt-6-sol" | "gpt-6-astra" | "gpt-6-luna" | "gpt-6-luna[1m]" => "responses",
+        _ => "chat_completions",
+    }
+}
+
 /// 当前产品的可用档位，以及开放了哪些媒体能力（语音的可选音色、图片的可选尺寸、实时语音的时长上限）。
 /// 只返回档位名和展示信息，永远不返回真实模型名。
 pub async fn tiers(State(state): State<AppState>, auth: AuthUser) -> Result<Json<Value>, AppError> {
@@ -31,6 +40,7 @@ pub async fn tiers(State(state): State<AppState>, auth: AuthUser) -> Result<Json
                 "description": t.description,
                 "is_default": t.is_default,
                 "requires_paid": t.requires_paid,
+                "chat_protocol": web_chat_protocol(&t.model),
                 "available": !t.requires_paid || paid,
                 "reasoning_efforts": crate::reasoning::levels(&t.model, t.reasoning_efforts.as_deref()),
             })

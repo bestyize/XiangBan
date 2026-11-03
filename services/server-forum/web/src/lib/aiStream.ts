@@ -1,12 +1,15 @@
 /** Incremental SSE decoder: TextDecoder preserves split UTF-8 sequences and events span chunks. */
 export class AiStreamDecoder {
-  private decoder = new TextDecoder()
+  private decoder = new TextDecoder('utf-8', { fatal: true })
   private buffer = ''
   private data: string[] = []
   private onData: (data: string) => void
   constructor(onData: (data: string) => void) { this.onData = onData }
   push(chunk: Uint8Array, final = false) {
-    this.buffer += this.decoder.decode(chunk, { stream: !final })
+    let decoded: string
+    try { decoded = this.decoder.decode(chunk, { stream: !final }) }
+    catch { throw new Error('AI 回复编码异常，请重试。') }
+    this.buffer += decoded
     if (this.buffer.length + this.data.join('').length > 1_048_576) throw new Error('AI 回复数据过大，请重试。')
     // A CR may be the first half of CRLF; keep it until the next chunk.
     let match: RegExpExecArray | null
@@ -32,20 +35,43 @@ export class AiStreamDecoder {
   }
 }
 
+export type AiChatProtocol = 'chat_completions' | 'responses'
+
 /** Finish on the protocol terminator rather than waiting for the HTTP connection to close. */
-export async function consumeAiStream(body: ReadableStream<Uint8Array>, onText: (text: string) => void, signal?: AbortSignal): Promise<void> {
+export async function consumeAiStream(body: ReadableStream<Uint8Array>, onText: (text: string) => void, signal?: AbortSignal, protocol: AiChatProtocol = 'chat_completions'): Promise<void> {
   let complete = false
+  let completionId: string | undefined
   const parser = new AiStreamDecoder(data => {
     if (complete) return
-    if (data.trim() === '[DONE]') { complete = true; return }
+    if (data.trim() === '[DONE]') {
+      complete = protocol === 'chat_completions'
+      return
+    }
     let event: unknown
     try { event = JSON.parse(data) } catch { throw new Error('AI 回复格式异常，请重试。') }
     if (!event || typeof event !== 'object') throw new Error('AI 回复格式异常，请重试。')
     if ('error' in event && event.error) throw new Error('AI 回复中断，请重试。')
+    if (protocol === 'responses') {
+      const type = 'type' in event ? event.type : undefined
+      if (type === 'response.completed') complete = true
+      if (type === 'error' || type === 'response.failed' || type === 'response.incomplete') {
+        throw new Error('AI 回复中断，请重试。')
+      }
+      if ((type === 'response.output_text.delta' || type === 'response.refusal.delta')
+        && 'delta' in event && typeof event.delta === 'string') onText(event.delta)
+      return
+    }
     const choices = 'choices' in event ? event.choices : undefined
     if (Array.isArray(choices)) {
-      const text = choices[0]?.delta?.content
-      if (typeof text === 'string') onText(text)
+      const text = choices.find(choice => (choice?.index ?? 0) === 0)?.delta?.content
+      if (typeof text !== 'string' || !text) return
+      // A single Chat Completions stream may only emit text from one completion.
+      const id = 'id' in event && typeof event.id === 'string' ? event.id : ''
+      if (id) {
+        if (completionId && id !== completionId) throw new Error('AI 回复流异常，已停止接收，请重试。')
+        completionId = id
+      }
+      onText(text)
     }
   })
   const reader = body.getReader()
