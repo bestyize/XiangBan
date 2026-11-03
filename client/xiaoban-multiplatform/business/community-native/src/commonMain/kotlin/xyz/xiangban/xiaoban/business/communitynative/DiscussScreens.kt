@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -24,8 +24,6 @@ import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items as staggeredItems
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -269,11 +267,6 @@ private fun learnChannel(filter: String): String = when (filter) {
 private val LearnTags = listOf("" to "全部", "claude-code" to "Claude Code", "codex" to "Codex", "提示词" to "提示词", "工作流" to "工作流", "本地部署" to "本地部署", "ai-硬件" to "AI 硬件")
 
 
-private val discussionBoards = listOf(
-    "casual-work" to "职场", "casual-indie" to "副业与独立开发", "casual-loss" to "亏了吗",
-    "casual-dream" to "梦想和人生", "casual-think" to "哲思", "casual-help" to "互助", "casual-chat" to "闲聊灌水",
-)
-
 private sealed interface DiscussionEntry {
     val key: String
     val date: String
@@ -295,34 +288,31 @@ private sealed interface DiscussionEntry {
 private data class DiscussionPage(val entries: List<DiscussionEntry>, val hasMore: Boolean)
 
 private suspend fun loadDiscussion(
-    env: CommunityEnv, sub: DiscussSub, filter: String, board: String, tag: String, following: Boolean, page: Int,
+    env: CommunityEnv, sub: DiscussSub, filter: String, tag: String, page: Int,
 ): DiscussionPage = coroutineScope {
-    val category = board.ifBlank {
-        when (sub) {
-            DiscussSub.All -> "create,learn,casual,resource-movies,resource-music"
-            DiscussSub.Create -> if (filter.isBlank() || filter == "schemes") "create" else "create-$filter"
-            DiscussSub.Learn -> learnChannel(filter)
-            DiscussSub.Media -> when (filter) {
-                "movies" -> "resource-movies"
-                "music" -> "resource-music"
-                else -> "casual-media,resource-movies,resource-music"
-            }
-            else -> sub.key
+    val category = when (sub) {
+        DiscussSub.All -> "create,learn,casual,resource-movies,resource-music"
+        DiscussSub.Create -> if (filter.isBlank() || filter == "schemes") "create" else "create-$filter"
+        DiscussSub.Learn -> learnChannel(filter)
+        DiscussSub.Media -> when (filter) {
+            "movies" -> "resource-movies"
+            "music" -> "resource-music"
+            else -> "casual-media,resource-movies,resource-music"
         }
+        else -> sub.key
     }
-    val home = board != "casual-chat" && sub != DiscussSub.Media
-    val wantsWorks = board.isEmpty() && (sub == DiscussSub.All || sub == DiscussSub.Create)
+    val home = sub != DiscussSub.Media
+    val wantsWorks = sub == DiscussSub.All || sub == DiscussSub.Create
     val topics = async {
         if (filter == "schemes") null
-        else if (following) env.forum.followingTopics(page, category, tag.ifBlank { null }, home)
         else env.forum.topics(sort = "new", category = category, tag = tag.ifBlank { null }, page = page, home = home)
     }
     val packs = async {
-        if (wantsWorks && filter != "schemes") env.forum.packs(kind = filter.ifBlank { null }, page = page, tag = tag.ifBlank { null }, following = following)
+        if (wantsWorks && filter != "schemes") env.forum.packs(kind = filter.ifBlank { null }, page = page, tag = tag.ifBlank { null })
         else null
     }
     val schemes = async {
-        if (wantsWorks && tag.isBlank() && (filter.isBlank() || filter == "schemes")) env.content.schemes(page, following)
+        if (wantsWorks && tag.isBlank() && (filter.isBlank() || filter == "schemes")) env.content.schemes(page)
         else null
     }
     val topicPage = topics.await()
@@ -339,35 +329,21 @@ private suspend fun loadDiscussion(
 @Composable
 internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussSub) -> Unit, open: (Route) -> Unit) {
     val session by env.session.state.collectAsState()
-    var following by rememberSaveable { mutableStateOf(false) }
     var filter by rememberSaveable(sub.key) { mutableStateOf("") }
-    var board by rememberSaveable { mutableStateOf("") }
     var tag by rememberSaveable { mutableStateOf("") }
     var page by rememberSaveable { mutableIntStateOf(1) }
-    var picking by rememberSaveable { mutableStateOf(false) }
 
-    fun selectTopic(value: String, isBoard: Boolean) {
+    fun selectTag(value: String) {
         selectSub(DiscussSub.All)
-        board = if (isBoard) value else ""
-        tag = if (isBoard) "" else value
+        tag = value
         filter = ""
         page = 1
-        picking = false
     }
 
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) {
-                TabStrip(listOf("recommend" to "推荐", "following" to "关注"), if (following) "following" else "recommend", centered = true) {
-                    following = it == "following"
-                    page = 1
-                }
-            }
-            TextButton(onClick = { picking = true }) { Text("找话题") }
-        }
         PageChipRow(DiscussSub.entries.map { it.key to it.label }, sub.key, {
             selectSub(DiscussSub.byKey(it))
-            filter = ""; board = ""; tag = ""; page = 1
+            filter = ""; tag = ""; page = 1
         })
         val subFilters = when (sub) {
             DiscussSub.Create -> CreateChips
@@ -376,81 +352,60 @@ internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussS
             else -> emptyList()
         }
         if (subFilters.isNotEmpty()) PageChipRow(subFilters, filter, { filter = it; page = 1 })
-        if (board.isNotEmpty() || tag.isNotEmpty()) {
-            val label = discussionBoards.toMap()[board] ?: tag
-            TextButton(onClick = { board = ""; tag = ""; page = 1 }) { Text("# $label ×") }
+        if (tag.isNotEmpty()) {
+            TextButton(onClick = { tag = ""; page = 1 }) { Text("# $tag ×") }
         }
-        if (board == "casual-chat") Text("闲聊灌水不进首页，也不加积分", Modifier.padding(horizontal = 12.dp), style = XType.Caption)
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            if (following && !session.loggedIn) {
-                CenterMessage("登录后查看关注动态", "登录", { open(Route.Login) })
-            } else {
-                val loader = rememberLoader(env, listOf(sub, filter, board, tag, following, page, session.accountId)) {
-                    loadDiscussion(env, sub, filter, board, tag, following, page)
-                }
-                val state by loader.state.collectAsState()
-                PullToRefreshBox(
-                    isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize(),
-                ) {
-                    LoadBox(state, loader::reload) { result ->
-                        LazyVerticalStaggeredGrid(
-                            StaggeredGridCells.Fixed(2), Modifier.fillMaxSize(), contentPadding = FeedPadding,
-                            horizontalArrangement = Arrangement.spacedBy(Gap), verticalItemSpacing = Gap,
-                        ) {
-                            staggeredItems(result.entries, key = { it.key }) { entry ->
-                                when (entry) {
-                                    is DiscussionEntry.Post -> VisualTopicCard(env, entry.topic, discussion = true,
-                                        onTag = { selectTopic(it, false) }, onLogin = { open(Route.Login) }) { open(Route.Topic(entry.topic.id)) }
-                                    is DiscussionEntry.Work -> {
-                                        val pack = entry.pack
-                                        Column {
-                                            if (pack.kind in VisualKinds) LookCard(pack, masonry = true) { open(Route.Pack(pack.id)) }
-                                            else SkillCard(pack) { open(Route.Ability(pack.id)) }
-                                            Text("创作 · ${if (pack.kind == "game") "查看试玩" else "查看导入"}",
-                                                Modifier.clickable { open(if (pack.kind in VisualKinds) Route.Pack(pack.id) else Route.Ability(pack.id)) }
-                                                    .padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Caption, color = Brand)
-                                        }
-                                    }
-                                    is DiscussionEntry.DesktopScheme -> WhiteCard(Modifier.clickable { open(Route.Scheme(entry.scheme.id)) }) {
-                                        Text("创作 · 桌面方案", style = XType.Caption, color = Brand)
-                                        Text(entry.scheme.title, style = XType.Section)
-                                        Text("查看导入", style = XType.Caption)
+        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+            val columns = when {
+                maxWidth >= 960.dp -> 4
+                maxWidth >= 720.dp -> 3
+                else -> 2
+            }
+            val loader = rememberLoader(env, listOf(sub, filter, tag, page, session.accountId)) {
+                loadDiscussion(env, sub, filter, tag, page)
+            }
+            val state by loader.state.collectAsState()
+            PullToRefreshBox(
+                isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize(),
+            ) {
+                LoadBox(state, loader::reload) { result ->
+                    LazyVerticalStaggeredGrid(
+                        StaggeredGridCells.Fixed(columns), Modifier.fillMaxSize(), contentPadding = FeedPadding,
+                        horizontalArrangement = Arrangement.spacedBy(Gap), verticalItemSpacing = Gap,
+                    ) {
+                        staggeredItems(result.entries, key = { it.key }) { entry ->
+                            when (entry) {
+                                is DiscussionEntry.Post -> VisualTopicCard(env, entry.topic, discussion = true,
+                                    onTag = ::selectTag, onLogin = { open(Route.Login) }) { open(Route.Topic(entry.topic.id)) }
+                                is DiscussionEntry.Work -> {
+                                    val pack = entry.pack
+                                    Column {
+                                        if (pack.kind in VisualKinds) LookCard(pack, masonry = true) { open(Route.Pack(pack.id)) }
+                                        else SkillCard(pack) { open(Route.Ability(pack.id)) }
+                                        Text("创作 · ${if (pack.kind == "game") "查看试玩" else "查看导入"}",
+                                            Modifier.clickable { open(if (pack.kind in VisualKinds) Route.Pack(pack.id) else Route.Ability(pack.id)) }
+                                                .padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Caption, color = Brand)
                                     }
                                 }
-                            }
-                            if (result.entries.isEmpty()) item(span = StaggeredGridItemSpan.FullLine) {
-                                CenterMessage("暂时没有符合条件的笔记", modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp))
-                            }
-                            if (page > 1 || result.hasMore) item(span = StaggeredGridItemSpan.FullLine) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                                    TextButton(enabled = page > 1, onClick = { page-- }) { Text("上一页") }
-                                    TextButton(enabled = result.hasMore && page < 1000, onClick = { page++ }) { Text("下一页") }
+                                is DiscussionEntry.DesktopScheme -> WhiteCard(Modifier.clickable { open(Route.Scheme(entry.scheme.id)) }) {
+                                    Text("创作 · 桌面方案", style = XType.Caption, color = Brand)
+                                    Text(entry.scheme.title, style = XType.Section)
+                                    Text("查看导入", style = XType.Caption)
                                 }
+                            }
+                        }
+                        if (result.entries.isEmpty()) item(span = StaggeredGridItemSpan.FullLine) {
+                            CenterMessage("暂时没有符合条件的笔记", modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp))
+                        }
+                        if (page > 1 || result.hasMore) item(span = StaggeredGridItemSpan.FullLine) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                TextButton(enabled = page > 1, onClick = { page-- }) { Text("上一页") }
+                                TextButton(enabled = result.hasMore && page < 1000, onClick = { page++ }) { Text("下一页") }
                             }
                         }
                     }
                 }
             }
         }
-    }
-    if (picking) {
-        val loader = rememberLoader(env, "discussion-tags") { env.forum.topicTags() }
-        val state by loader.state.collectAsState()
-        var search by remember { mutableStateOf("") }
-        val tags = (state as? Load.Ready)?.value.orEmpty()
-        AlertDialog(onDismissRequest = { picking = false }, title = { Text("找话题") }, text = {
-            Column {
-                OutlinedTextField(search, { search = it }, label = { Text("搜索话题") }, singleLine = true)
-                LazyColumn(Modifier.heightIn(max = 270.dp)) {
-                    discussionBoards.filter { it.second.contains(search.trim(), ignoreCase = true) }.forEach { (key, label) ->
-                        item(key = "board:$key") { TextButton(onClick = { selectTopic(key, true) }) { Text("# $label") } }
-                    }
-                    tags.filter { it.name.contains(search.trim(), ignoreCase = true) }.forEach { result ->
-                        item(key = "tag:${result.name}") { TextButton(onClick = { selectTopic(result.name, false) }) { Text("# ${result.name}") } }
-                    }
-                    if (state is Load.Failed) item { TextButton(onClick = loader::reload) { Text("话题加载失败，重试") } }
-                }
-            }
-        }, confirmButton = { TextButton(onClick = { picking = false }) { Text("关闭") } })
     }
 }

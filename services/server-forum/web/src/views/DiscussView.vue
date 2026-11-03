@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api/forum'
 import { contentApi, type PackItem } from '@/api/content'
@@ -9,9 +9,7 @@ import { useSession } from '@/stores/session'
 import { useHead } from '@/lib/head'
 import { PACK_KINDS } from '@/lib/content'
 import { DISCUSSION_TABS, DISCUSSION_BOARD_TOPICS, DISCUSSION_MEDIA_FILTERS, LEARN_FILTERS, canonicalCategory, discussionCategory } from '@/lib/communityStructure'
-import ModalDialog from '@/components/ModalDialog.vue'
 import MasonryGrid from '@/components/community/MasonryGrid.vue'
-import CommunityTabs from '@/components/community/CommunityTabs.vue'
 import FilterChips from '@/components/community/FilterChips.vue'
 import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
 import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
@@ -20,7 +18,6 @@ import { useCommunityResource } from '@/components/community/resource'
 import '@/components/community/community.css'
 
 const route = useRoute(), router = useRouter(), session = useSession()
-const modes = [{key:'recommend',label:'推荐'}, {key:'following',label:'关注'}]
 const workFilters = [{key:'',label:'全部'}, ...PACK_KINDS, {key:'schemes',label:'方案'}]
 const query = (key:string) => typeof route.query[key] === 'string' ? route.query[key] : ''
 const tab = computed(() => {
@@ -69,29 +66,14 @@ function navigate(values:Record<string,string|undefined>) {
   void router.replace({query:{tab:tab.value, board:board.value || undefined, tag:tag.value || undefined,
     filter:filter.value || undefined, mode:following.value ? 'following' : undefined, ...values}})
 }
-function setMode(key:string) { navigate({mode:key === 'following' ? key : undefined}) }
 function go(value:number) { navigate({page:String(value)}) }
 
-const topicPicker = ref(false), search = ref('')
-const tagFeed = useCommunityResource(api.tags)
-const topicChoices = computed(() => [
-  ...DISCUSSION_BOARD_TOPICS.map(item => ({...item,board:true})),
-  ...(tagFeed.data.value ?? []).map(item => ({key:item.name,label:item.name,board:false})),
-].filter(item => item.label.toLowerCase().includes(search.value.trim().toLowerCase())))
-function openTopics() { search.value = ''; topicPicker.value = true; if (!tagFeed.data.value) void tagFeed.load() }
-function chooseTopic(key:string, isBoard:boolean) {
-  topicPicker.value = false
-  navigate({tab:'all',filter:undefined,board:isBoard ? key : undefined,tag:isBoard ? undefined : key})
-}
 useHead(() => ({title:'讨论'}))
 </script>
 
 <template>
   <main class="community-page discuss-page">
     <h1 class="sr-only">社区讨论</h1>
-    <CommunityTabs :items="modes" :active="following ? 'following' : 'recommend'" label="讨论信息流" @change="setMode">
-      <template #actions><button type="button" class="topic-picker" @click="openTopics">找话题</button></template>
-    </CommunityTabs>
     <FilterChips :items="DISCUSSION_TABS" :active="tab" label="讨论分类"
       @change="key => navigate({tab:key,filter:undefined,board:undefined,tag:undefined})" />
     <FilterChips v-if="subFilters.length" :items="subFilters"
@@ -105,7 +87,7 @@ useHead(() => ({title:'讨论'}))
       <RequestState :loading="loading" :error="error" @retry="load" />
       <MasonryGrid v-if="data?.entries.length" class="discussion-grid" :columns="2">
         <template v-for="entry in data.entries" :key="entry.kind + ':' + entry.value.id">
-          <ResourceTopicRow v-if="entry.kind === 'topic'" :topic="entry.value" layout="masonry" show-category note-cover @select-tag="chooseTopic($event,false)" />
+          <ResourceTopicRow v-if="entry.kind === 'topic'" :topic="entry.value" layout="masonry" show-category note-cover @select-tag="navigate({tab:'all',filter:undefined,board:undefined,tag:$event})" />
           <CommunityPackCard v-else-if="entry.kind === 'pack'" :pack="entry.value" layout="masonry" discussion />
           <RouterLink v-else :to="'/schemes/' + entry.value.id" class="scheme-card">
             <span>创作 · 桌面方案</span><strong>{{ entry.value.title }}</strong><p>{{ entry.value.summary }}</p>
@@ -120,20 +102,20 @@ useHead(() => ({title:'讨论'}))
         <button class="community-button" :disabled="!data.hasMore || page >= 1000" @click="go(page + 1)">下一页</button>
       </div>
     </template>
-    <ModalDialog :open="topicPicker" title="找话题" @close="topicPicker = false">
-      <input v-model="search" class="topic-search" type="search" aria-label="搜索话题" placeholder="搜索话题标签">
-      <FilterChips :items="topicChoices" :active="board || tag" label="话题" @change="key => chooseTopic(key, topicChoices.find(item => item.key === key)?.board ?? false)" />
-      <RequestState :loading="tagFeed.loading.value" :error="tagFeed.error.value" :empty="!topicChoices.length" @retry="tagFeed.load" />
-    </ModalDialog>
   </main>
 </template>
 
 <style scoped>
-.discussion-grid{margin:4px 12px}.topic-picker{border:0;background:none;color:var(--ink-2);white-space:nowrap;font-size:12px;padding:8px 2px}
+.discussion-grid{margin:4px 12px}
+@container page (min-width: 720px) {
+  .discuss-page .discussion-grid.two-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@container page (min-width: 960px) {
+  .discuss-page .discussion-grid.two-columns { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 .active-topic{margin:0 12px 8px;padding:6px 10px;border:0;border-radius:14px;background:var(--brand-soft);color:var(--brand);font-size:12px}
 .scheme-card{display:flex;flex-direction:column;gap:8px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:14px;color:var(--ink);overflow-wrap:anywhere}
 .scheme-card span,.scheme-card p,.scheme-card small,.feed-note{font-size:12px;color:var(--ink-3);margin:0}
 .feed-note{padding:0 12px 8px}.login-prompt{text-align:center;padding:24px}.discussion-pager{display:flex;align-items:center;justify-content:center;gap:12px;padding:16px;font-size:12px}
-.topic-search{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px}
 @media(min-width:1100px){.discuss-page{max-width:1120px}.discussion-grid{margin-inline:0}}
 </style>
