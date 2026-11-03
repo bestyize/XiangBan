@@ -1,5 +1,7 @@
 # 社区采编执行器
 
+开源精选采用独立的 [README 采编规范](OPEN_SOURCE_README_WORKFLOW.md)，默认中文并支持英文原文；其批量稿件、来源和发布边界不沿用下述普通图文文章流程。
+
 独立 Python 3.10+ sidecar，图片编解码依赖 Pillow（需支持 WebP）。Ubuntu 安装 `sudo apt-get install --no-install-recommends python3-pil`；本地虚拟环境安装 `python -m pip install Pillow`。运行时业务属于 server-forum，不依赖 Codex、Claude 或本机开机。通过论坛已有的受限作者令牌和 server-ai 产品调用，不能访问论坛管理接口。不改变 GitHub Actions 的手动触发方式。
 
 新封面请求 `output_format=webp`。当前网关可能仍返回 PNG 或 JPEG，执行器在上传前使用 Pillow 转成 WebP（quality=82、method=4），保留原尺寸和透明通道；原生 WebP 在上传限制内直接保留字节，避免重复有损编码。转换不触发额外生图调用。生成响应可在7 MiB内，转换后的实际上传文件仍不超过5 MiB；拒绝异常尺寸、损坏或动画图片，并完整解码校验。普通帖子使用 `images/cover.webp`，日报和前沿资产接口按实际字节识别 MIME。常规采编不修改已经导入的历史配图；恢复与验收兼容 PNG 和 WebP，不会为了换格式重新发表文章。
