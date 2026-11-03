@@ -299,13 +299,18 @@ private suspend fun loadDiscussion(
 ): DiscussionPage = coroutineScope {
     val category = board.ifBlank {
         when (sub) {
-            DiscussSub.All -> "create,learn,casual"
+            DiscussSub.All -> "create,learn,casual,resource-movies,resource-music"
             DiscussSub.Create -> if (filter.isBlank() || filter == "schemes") "create" else "create-$filter"
             DiscussSub.Learn -> learnChannel(filter)
+            DiscussSub.Media -> when (filter) {
+                "movies" -> "resource-movies"
+                "music" -> "resource-music"
+                else -> "casual-media,resource-movies,resource-music"
+            }
             else -> sub.key
         }
     }
-    val home = board != "casual-chat"
+    val home = board != "casual-chat" && sub != DiscussSub.Media
     val wantsWorks = board.isEmpty() && (sub == DiscussSub.All || sub == DiscussSub.Create)
     val topics = async {
         if (filter == "schemes") null
@@ -364,9 +369,13 @@ internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussS
             selectSub(DiscussSub.byKey(it))
             filter = ""; board = ""; tag = ""; page = 1
         })
-        if (sub == DiscussSub.Create || sub == DiscussSub.Learn) {
-            PageChipRow(if (sub == DiscussSub.Create) CreateChips else LearnTags, filter, { filter = it; page = 1 })
+        val subFilters = when (sub) {
+            DiscussSub.Create -> CreateChips
+            DiscussSub.Learn -> LearnTags
+            DiscussSub.Media -> listOf("" to "全部", "movies" to "影视", "music" to "音乐")
+            else -> emptyList()
         }
+        if (subFilters.isNotEmpty()) PageChipRow(subFilters, filter, { filter = it; page = 1 })
         if (board.isNotEmpty() || tag.isNotEmpty()) {
             val label = discussionBoards.toMap()[board] ?: tag
             TextButton(onClick = { board = ""; tag = ""; page = 1 }) { Text("# $label ×") }

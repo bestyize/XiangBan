@@ -13,21 +13,26 @@ export const DISCUSSION_TABS = [
 export const DISCUSSION_BOARD_TOPICS = channels.channels.filter(c =>
   c.parent === 'casual' && !DISCUSSION_TABS.some(t => t.key === c.id) && !isLegacyCategory(c.id),
 ).map(c => ({key:c.id,label:c.label}))
+export const DISCUSSION_MEDIA_FILTERS = [{key:'',label:'全部'},{key:'movies',label:'影视'},{key:'music',label:'音乐'}]
 export function discussionCategory(tab:string, filter = '') {
-  if (tab === 'all') return 'create,learn,casual'
+  if (tab === 'all') return 'create,learn,casual,resource-movies,resource-music'
+  if (tab === 'casual-media') {
+    if (filter === 'movies') return 'resource-movies'
+    if (filter === 'music') return 'resource-music'
+    return 'casual-media,resource-movies,resource-music'
+  }
   if (tab === 'learn') return learnCategory(filter)
   if (tab === 'create') return creationCategory(filter)
   return tab
 }
 export const LEARN_FILTERS = [{key:'',label:'全部'},{key:'claude-code',label:'Claude Code'},{key:'codex',label:'Codex'},{key:'提示词',label:'提示词'},{key:'工作流',label:'工作流'},{key:'本地部署',label:'本地部署'},{key:'ai-硬件',label:'AI 硬件'}]
-export const RESOURCE_TABS = [{key:'tools',label:'AI 工具'},{key:'docs',label:'资料'},{key:'media',label:'影音娱乐'},{key:'help',label:'求助悬赏'}]
+export const RESOURCE_TABS = [{key:'tools',label:'工具下载'},{key:'docs',label:'资料'},{key:'help',label:'求助悬赏'}]
 export const LEARN_CATEGORIES = 'learn'
 export function learnCategory(filter:string) {
   return ({'claude-code':'learn-claude-code',codex:'learn-codex','提示词':'learn-prompts','工作流':'learn-workflows','本地部署':'learn-local','ai-硬件':'learn-hardware'} as Record<string,string>)[filter] || 'learn'
 }
 export function creationCategory(filter:string) { return filter ? `create-${filter}` : 'create' }
 
-export function resourceTopicCategory(tab:string, filter:string):string {
-  if (tab === 'media') return filter === 'music' ? 'resource-music' : filter === 'movies' ? 'resource-movies' : 'resource-movies,resource-music'
+export function resourceTopicCategory(tab:string):string {
   return tab === 'help' ? 'resource-help' : tab === 'tools' ? 'resource-tools' : tab === 'docs' ? 'resource-docs' : 'resource-open'
 }

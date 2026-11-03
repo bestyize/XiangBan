@@ -58,9 +58,9 @@ import xyz.xiangban.xiaoban.common.community.nowMillis
 import xyz.xiangban.xiaoban.common.community.parseIsoMillis
 import xyz.xiangban.xiaoban.common.community.remainText
 
-/** 资源的四个二级栏目；精选独立放在首页。 */
+/** 资源的三个二级栏目；精选独立放在首页。 */
 internal enum class ResourceSub(val key: String, val label: String) {
-    Tools("tools", "AI 工具"), Docs("docs", "资料"), Media("media", "影音娱乐"), Help("help", "求助悬赏");
+    Tools("tools", "工具下载"), Docs("docs", "资料"), Help("help", "求助悬赏");
 
     companion object {
         fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: Tools
@@ -68,11 +68,10 @@ internal enum class ResourceSub(val key: String, val label: String) {
 }
 
 @Composable
-internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> Unit, onMessage: (String) -> Unit) {
+internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> Unit) {
     when (sub) {
         ResourceSub.Tools -> ToolsTab(env, open)
         ResourceSub.Docs -> DocsTab(env, open)
-        ResourceSub.Media -> MediaTab(env, open, onMessage)
         ResourceSub.Help -> HelpTab(env, open)
     }
 }
@@ -190,18 +189,7 @@ private fun DocsTab(env: CommunityEnv, open: (Route) -> Unit) {
     }
 }
 
-// ───────────── 影音娱乐与历史社区分享 ─────────────
-
-@Composable
-private fun MediaTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (String) -> Unit) {
-    val scope = rememberCoroutineScope()
-    var filter by rememberSaveable { mutableStateOf("") }
-    val channel = when (filter) { "movies" -> "resource-movies"; "music" -> "resource-music"; else -> "resource-movies,resource-music" }
-    val controller = remember(env, channel) { DiscussController(env.forum, scope, category = channel, home = false) }
-    CasualWaterfall(env, controller, open, header = {
-        PageChipRow(listOf("" to "全部", "movies" to "影视", "music" to "音乐"), filter, { filter = it }, Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
-    })
-}
+// ───────────── 历史社区分享 ─────────────
 
 @Composable
 internal fun OpenSourceCommunityShares(env: CommunityEnv, open: (Route) -> Unit) {

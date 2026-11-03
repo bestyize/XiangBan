@@ -18,8 +18,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -43,7 +43,6 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
     var homeSub by rememberSaveable { mutableStateOf(HomeSub.Recommend.key) }
     var discussSub by rememberSaveable { mutableStateOf(DiscussSub.All.key) }
     var resourceSub by rememberSaveable { mutableStateOf(ResourceSub.Tools.key) }
-    var toast by remember { mutableStateOf<String?>(null) }
     val current = CommunitySection.valueOf(section)
 
     fun switchTo(target: CommunitySection, sub: String) {
@@ -52,6 +51,13 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
             CommunitySection.Home -> homeSub = sub
             CommunitySection.Discuss -> discussSub = sub
             CommunitySection.Resources -> resourceSub = sub
+        }
+    }
+
+    LaunchedEffect(section, resourceSub) {
+        if (current == CommunitySection.Resources && resourceSub == "media") {
+            switchTo(CommunitySection.Discuss, DiscussSub.Media.key)
+            resourceSub = ResourceSub.Tools.key
         }
     }
 
@@ -74,11 +80,10 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
                         HomeSub.Nav -> NavTab(env)
                     }
                     CommunitySection.Discuss -> DiscussTab(env, DiscussSub.byKey(discussSub), { discussSub = it.key }, open)
-                    CommunitySection.Resources -> ResourceTab(env, ResourceSub.byKey(resourceSub), open) { toast = it }
+                    CommunitySection.Resources -> ResourceTab(env, ResourceSub.byKey(resourceSub), open)
                 }
             }
         }
-        Toast(toast) { toast = null }
     }
 }
 

@@ -14,7 +14,8 @@ function publish(path: string) {
   publishing.value = false
   const tab = String(route.query.tab ?? '')
   const category = route.name === 'discuss' && DISCUSSION_TABS.some(item => item.key === tab && tab !== 'all')
-    ? discussionCategory(tab, tab === 'learn' ? String(route.query.filter ?? '') : '') : undefined
+    ? (tab === 'casual-media' && !['movies','music'].includes(String(route.query.filter)) ? tab :
+      discussionCategory(tab, ['learn','casual-media'].includes(tab) ? String(route.query.filter ?? '') : '')) : undefined
   if (path === '/new' && category) void router.push({path,query:{category}})
   else void router.push(path)
 }

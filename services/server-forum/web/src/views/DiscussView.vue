@@ -8,7 +8,7 @@ import type { CommunityScheme } from '@/api/schemes'
 import { useSession } from '@/stores/session'
 import { useHead } from '@/lib/head'
 import { PACK_KINDS } from '@/lib/content'
-import { DISCUSSION_TABS, DISCUSSION_BOARD_TOPICS, LEARN_FILTERS, canonicalCategory, discussionCategory } from '@/lib/communityStructure'
+import { DISCUSSION_TABS, DISCUSSION_BOARD_TOPICS, DISCUSSION_MEDIA_FILTERS, LEARN_FILTERS, canonicalCategory, discussionCategory } from '@/lib/communityStructure'
 import ModalDialog from '@/components/ModalDialog.vue'
 import MasonryGrid from '@/components/community/MasonryGrid.vue'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
@@ -33,14 +33,13 @@ const board = computed(() => {
   return DISCUSSION_BOARD_TOPICS.some(item => item.key === key) ? key : ''
 })
 const tag = computed(() => query('tag'))
-const filter = computed(() => {
-  const options = tab.value === 'create' ? workFilters : tab.value === 'learn' ? LEARN_FILTERS : []
-  return options.some(item => item.key === query('filter')) ? query('filter') : ''
-})
+const subFilters = computed(() => tab.value === 'create' ? workFilters :
+  tab.value === 'learn' ? LEARN_FILTERS : tab.value === 'casual-media' ? DISCUSSION_MEDIA_FILTERS : [])
+const filter = computed(() => subFilters.value.some(item => item.key === query('filter')) ? query('filter') : '')
 const following = computed(() => query('mode') === 'following' || query('sort') === 'following' || query('tab') === 'following')
 const page = computed(() => Math.min(1000, Math.max(1, Math.floor(Number(query('page')) || 1))))
 const category = computed(() => board.value || discussionCategory(tab.value, filter.value === 'schemes' ? '' : filter.value))
-const scope = computed(() => ({category:category.value, tag:tag.value || undefined, home:board.value !== 'casual-chat'}))
+const scope = computed(() => ({category:category.value, tag:tag.value || undefined, home:board.value !== 'casual-chat' && tab.value !== 'casual-media'}))
 const topicLabel = computed(() => tag.value || DISCUSSION_BOARD_TOPICS.find(item => item.key === board.value)?.label || '')
 
 type Entry = {kind:'topic'; value:TopicItem} | {kind:'pack'; value:PackItem} | {kind:'scheme'; value:CommunityScheme}
@@ -95,8 +94,8 @@ useHead(() => ({title:'讨论'}))
     </CommunityTabs>
     <FilterChips :items="DISCUSSION_TABS" :active="tab" label="讨论分类"
       @change="key => navigate({tab:key,filter:undefined,board:undefined,tag:undefined})" />
-    <FilterChips v-if="tab === 'create' || tab === 'learn'" :items="tab === 'create' ? workFilters : LEARN_FILTERS"
-      :active="filter" :label="tab === 'create' ? '作品类型' : '教程主题'" @change="key => navigate({filter:key || undefined})" />
+    <FilterChips v-if="subFilters.length" :items="subFilters"
+      :active="filter" :label="tab === 'create' ? '作品类型' : tab === 'learn' ? '教程主题' : '片单乐评筛选'" @change="key => navigate({filter:key || undefined})" />
     <button v-if="topicLabel" class="active-topic" type="button" @click="navigate({tag:undefined,board:undefined})"># {{ topicLabel }} ×</button>
     <p v-if="board === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>
     <div v-if="following && !session.loggedIn" class="login-prompt">
