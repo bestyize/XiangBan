@@ -46,8 +46,9 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
         tag: String? = null,
         helpStatus: String? = null,
         home: Boolean = true,
+        featured: Boolean = false,
     ): Page<Topic> =
-        get("/api/topics${query("sort" to sort, "category" to category, "tag" to tag, "help_status" to helpStatus, "home" to (if (home) true else null), "page" to page)}")
+        get("/api/topics${query("sort" to sort, "category" to category, "tag" to tag, "help_status" to helpStatus, "home" to (if (home) true else null), "featured" to (if (featured) true else null), "page" to page)}")
 
     suspend fun votePoll(topicId: Long, option: Int): Poll =
         write(HttpMethod.Put, "/api/topics/$topicId/poll/vote", buildJsonObject { put("option", option) })
@@ -56,18 +57,20 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     // ── 发现页 ──
     suspend fun home(): HomeBundle = get("/api/discover/home/v2")
     suspend fun dailyNews(page: Int = 1): Page<NewsItem> = get("/api/discover/daily${query("page" to page)}")
-    suspend fun news(key: String): NewsItem = get("/api/discover/daily/${key.encodeURLParameter()}")
-    suspend fun newsComments(key: String, page: Int = 1): Page<NewsComment> = get("/api/discover/daily/${key.encodeURLParameter()}/comments${query("page" to page)}")
-    suspend fun commentNews(key: String, body: String, replyTo: Long? = null) {
-        write(HttpMethod.Post, "/api/discover/daily/${key.encodeURLParameter()}/comments", buildJsonObject {
+    suspend fun frontier(page: Int = 1): Page<NewsItem> = get("/api/discover/frontier${query("page" to page)}")
+    private fun articlePath(key: String, frontier: Boolean) = "/api/discover/${if (frontier) "frontier" else "daily"}/${key.encodeURLParameter()}"
+    suspend fun news(key: String, frontier: Boolean = false): NewsItem = get(articlePath(key, frontier))
+    suspend fun newsComments(key: String, page: Int = 1, frontier: Boolean = false): Page<NewsComment> = get("${articlePath(key, frontier)}/comments${query("page" to page)}")
+    suspend fun commentNews(key: String, body: String, replyTo: Long? = null, frontier: Boolean = false) {
+        write(HttpMethod.Post, "${articlePath(key, frontier)}/comments", buildJsonObject {
             put("body", body); if (replyTo != null) put("reply_to", replyTo)
         })
     }
-    suspend fun likeNewsComment(key: String, id: Long, liked: Boolean) {
-        write(if (liked) HttpMethod.Put else HttpMethod.Delete, "/api/discover/daily/${key.encodeURLParameter()}/comments/$id/like")
+    suspend fun likeNewsComment(key: String, id: Long, liked: Boolean, frontier: Boolean = false) {
+        write(if (liked) HttpMethod.Put else HttpMethod.Delete, "${articlePath(key, frontier)}/comments/$id/like")
     }
-    suspend fun deleteNewsComment(key: String, id: Long) {
-        write(HttpMethod.Delete, "/api/discover/daily/${key.encodeURLParameter()}/comments/$id")
+    suspend fun deleteNewsComment(key: String, id: Long, frontier: Boolean = false) {
+        write(HttpMethod.Delete, "${articlePath(key, frontier)}/comments/$id")
     }
     private fun repoPath(owner: String, repo: String) = "/api/discover/repo/${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
     suspend fun repoDetail(owner: String, repo: String): RepoDetail = get(repoPath(owner, repo))
@@ -103,6 +106,7 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     suspend fun searchTopics(q: String, page: Int = 1): Page<Topic> = get("/api/search${query("q" to q, "page" to page)}")
 
     suspend fun categories(): List<Category> = get("/api/categories")
+    suspend fun followingTopics(page: Int = 1): Page<Topic> = get("/api/me/following/topics${query("page" to page)}")
 
     // ── 发帖与互动（需要登录） ──
     private suspend fun write(method: HttpMethod, path: String, body: JsonObject? = null): JsonObject =

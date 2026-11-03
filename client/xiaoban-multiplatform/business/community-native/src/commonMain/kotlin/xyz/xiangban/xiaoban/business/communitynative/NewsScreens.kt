@@ -50,27 +50,27 @@ private fun EditorialBody(env: CommunityEnv, html: String) {
 }
 
 @Composable
-fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Route) -> Unit) {
+fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Route) -> Unit, frontier: Boolean = false) {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
-    var article by remember(key) { mutableStateOf<NewsItem?>(null) }
-    var error by remember(key) { mutableStateOf<String?>(null) }
-    var comments by remember(key) { mutableStateOf<List<NewsComment>>(emptyList()) }
-    var commentsError by remember(key) { mutableStateOf<String?>(null) }
-    var commentsPage by remember(key) { mutableIntStateOf(0) }
-    var commentsMore by remember(key) { mutableStateOf(false) }
-    var loadingComments by remember(key) { mutableStateOf(false) }
-    var loadingArticle by remember(key) { mutableStateOf(false) }
-    var draft by remember(key) { mutableStateOf("") }
-    var replyTo by remember(key) { mutableStateOf<NewsComment?>(null) }
-    var sending by remember(key) { mutableStateOf(false) }
-    var deleteTarget by remember(key) { mutableStateOf<NewsComment?>(null) }
+    var article by remember(key, frontier) { mutableStateOf<NewsItem?>(null) }
+    var error by remember(key, frontier) { mutableStateOf<String?>(null) }
+    var comments by remember(key, frontier) { mutableStateOf<List<NewsComment>>(emptyList()) }
+    var commentsError by remember(key, frontier) { mutableStateOf<String?>(null) }
+    var commentsPage by remember(key, frontier) { mutableIntStateOf(0) }
+    var commentsMore by remember(key, frontier) { mutableStateOf(false) }
+    var loadingComments by remember(key, frontier) { mutableStateOf(false) }
+    var loadingArticle by remember(key, frontier) { mutableStateOf(false) }
+    var draft by remember(key, frontier) { mutableStateOf("") }
+    var replyTo by remember(key, frontier) { mutableStateOf<NewsComment?>(null) }
+    var sending by remember(key, frontier) { mutableStateOf(false) }
+    var deleteTarget by remember(key, frontier) { mutableStateOf<NewsComment?>(null) }
 
     fun loadArticle() {
         if (loadingArticle) return
         loadingArticle = true; error = null
         scope.launch {
-            try { article = env.forum.news(key) }
+            try { article = env.forum.news(key, frontier) }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { error = messageOf(e) }
             finally { loadingArticle = false }
@@ -81,7 +81,7 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
         loadingComments = true; commentsError = null
         scope.launch {
             try {
-                val result = env.forum.newsComments(key, if (reset) 1 else commentsPage + 1)
+                val result = env.forum.newsComments(key, if (reset) 1 else commentsPage + 1, frontier)
                 comments = if (reset) result.items else comments + result.items
                 commentsPage = result.page; commentsMore = result.hasMore
             } catch (e: CancellationException) { throw e }
@@ -89,10 +89,10 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
             finally { loadingComments = false }
         }
     }
-    LaunchedEffect(key) { loadArticle(); loadComments(true) }
+    LaunchedEffect(key, frontier) { loadArticle(); loadComments(true) }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        ScreenBar("AI 日报", onBack = back)
+        ScreenBar(if (frontier) "小伴前沿" else "AI 日报", onBack = back)
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(bottom = 24.dp)) {
             if (article == null) item {
                 if (error != null) CenterMessage("文章加载失败：$error", "重试", ::loadArticle, Modifier.fillMaxWidth().padding(32.dp))
@@ -135,7 +135,7 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
                             }
                             Text("${if (comment.liked) "♥" else "♡"} ${comment.likeCount}", Modifier.clickable {
                                 if (!session.loggedIn) open(Route.Login) else scope.launch {
-                                    try { env.forum.likeNewsComment(key, comment.id, !comment.liked); loadComments(true) }
+                                    try { env.forum.likeNewsComment(key, comment.id, !comment.liked, frontier); loadComments(true) }
                                     catch (e: CancellationException) { throw e } catch (e: Exception) { commentsError = messageOf(e) }
                                 }
                             }.padding(5.dp), color = if (comment.liked) Brand else LocalExtraColors.current.ink3, style = XType.Secondary)
@@ -167,7 +167,7 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
                         if (!session.loggedIn) open(Route.Login) else {
                             sending = true
                             scope.launch {
-                                try { env.forum.commentNews(key, draft, replyTo?.id); draft = ""; replyTo = null; loadComments(true) }
+                                try { env.forum.commentNews(key, draft, replyTo?.id, frontier); draft = ""; replyTo = null; loadComments(true) }
                                 catch (e: CancellationException) { throw e } catch (e: Exception) { commentsError = messageOf(e) }
                                 finally { sending = false }
                             }
@@ -180,7 +180,7 @@ fun NewsDetailScreen(env: CommunityEnv, key: String, back: () -> Unit, open: (Ro
     deleteTarget?.let { target ->
         AlertDialog(onDismissRequest = { deleteTarget = null }, title = { Text("删除留言？") }, text = { Text("删除后这条留言将不再显示。") }, confirmButton = {
             TextButton(onClick = { deleteTarget = null; scope.launch {
-                try { env.forum.deleteNewsComment(key, target.id); loadComments(true) }
+                try { env.forum.deleteNewsComment(key, target.id, frontier); loadComments(true) }
                 catch (e: CancellationException) { throw e } catch (e: Exception) { commentsError = messageOf(e) }
             } }) { Text("删除") }
         }, dismissButton = { TextButton(onClick = { deleteTarget = null }) { Text("取消") } })

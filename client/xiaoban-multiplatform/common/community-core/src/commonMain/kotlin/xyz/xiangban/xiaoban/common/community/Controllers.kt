@@ -144,7 +144,7 @@ class DiscussController(
         _state.value = _state.value.copy(loading = true, error = null)
         scope.launch {
             try {
-                val p = api.topics(sort = sort, category = category, page = requested, tag = tag, helpStatus = helpStatus, home = home)
+                val p = if (sort == "following") api.followingTopics(requested) else api.topics(sort = if (sort == "featured") "new" else sort, category = category, page = requested, tag = tag, helpStatus = helpStatus, home = home, featured = sort == "featured")
                 if (mine == generation) _state.value = _state.value.copy(topics = (if (replace) emptyList() else _state.value.topics) + p.items, hasMore = p.hasMore, loading = false)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

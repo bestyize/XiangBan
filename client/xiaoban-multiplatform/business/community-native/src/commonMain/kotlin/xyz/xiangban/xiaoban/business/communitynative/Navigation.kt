@@ -25,6 +25,9 @@ sealed interface Route {
     /** 往期 AI 日报。 */
     data object Daily : Route
     data class News(val key: String) : Route
+    data object Frontier : Route
+    data class FrontierArticle(val key: String) : Route
+    data class Articles(val category: String, val title: String) : Route
     /** 开源热榜项目的站内详情：仓库卡片、中文 README、评论。 */
     data class Repo(val owner: String, val repo: String) : Route
     data class OpenSource(val owner: String, val repo: String) : Route
@@ -73,6 +76,9 @@ sealed interface Route {
         is Tool -> "tool:$key"
         Daily -> "daily"
         is News -> "news:${key.encodeURLParameter()}"
+        Frontier -> "frontier"
+        is FrontierArticle -> "frontier:${key.encodeURLParameter()}"
+        is Articles -> "articles:${category.encodeURLParameter()}:${title.encodeURLParameter()}"
         is Repo -> "repo:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
         is OpenSource -> "opensource:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
         is OpenSourceCollection -> "opensource-collection:${key.encodeURLParameter()}"
@@ -117,6 +123,8 @@ sealed interface Route {
                 "tool" -> value.takeIf { it.isNotEmpty() }?.let(::Tool)
                 "daily" -> Daily
                 "news" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::News) }.getOrNull()
+                "frontier" -> if (value.isEmpty()) Frontier else runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::FrontierArticle) }.getOrNull()
+                "articles" -> runCatching { Articles(value.substringBefore(':').decodeURLPart(), value.substringAfter(':').decodeURLPart()) }.getOrNull()
                 "opensource-collection" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::OpenSourceCollection) }.getOrNull()
                 "opensource-shares" -> OpenSourceShares
                 "repo", "opensource" -> runCatching {

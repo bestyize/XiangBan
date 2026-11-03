@@ -6,6 +6,7 @@
 - InclusionAI 使用其 Ling 模型标志（https://github.com/inclusionAI/Ling）；Alibaba 使用企业标志，Qwen 保留原模型标志。
 - Poolside 保留原始 SVG，`poolside-mark.svg` 取其前景路径用于单色小图标，省略透明度渐变遮罩。
 - Celeris 和 Thinking Machines 使用官网 favicon；Reflection 使用 https://huggingface.co/reflection 组织头像。原始图片保留，单色 SVG 保留小图标尺度的覆盖度。Reflection 的两圆标志以品牌绿色显示。
+- 导航补齐 OpenClaw、OpenCode、Cursor、TRAE、Qoder、WorkBuddy、ModelScope、Vercel、OpenRouter、SiliconFlow、Together、Fireworks、Groq、百度与星火标志，同样来自固定版本 Lobe Icons。OpenClaw 的原始 SVG 保留；`openclaw-mark.svg` 只移除与 24×24 视口完全相同的矩形裁剪，前景路径不变。
 - 既有 Claude、Google、DeepSeek、Qwen、Kimi、MiniMax、Doubao、智谱路径继续复用。未知厂商保留首字母兜底。
 
 更新本地源文件和 manifest.json 后，在仓库根目录运行：

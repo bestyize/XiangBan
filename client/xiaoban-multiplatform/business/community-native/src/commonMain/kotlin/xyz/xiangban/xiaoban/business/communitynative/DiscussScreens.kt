@@ -62,7 +62,7 @@ import xyz.xiangban.xiaoban.common.community.messageOf
 
 /** 讨论的三个二级栏目。 */
 internal enum class DiscussSub(val key: String, val label: String) {
-    Create("create", "创作"), Learn("learn", "学习和教程"), Casual("casual", "休闲");
+    Create("create", "创作"), Learn("learn", "学习和教程"), Casual("casual", "休闲"), All("all", "全部讨论 ›");
 
     companion object {
         fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: Create
@@ -88,10 +88,11 @@ internal fun TopicFeed(
     modifier: Modifier = Modifier,
     pinnedBar: Boolean = false,
     header: (@Composable () -> Unit)? = null,
+    initialSort: String = "latest",
     card: @Composable (Topic) -> Unit,
 ) {
     val state by controller.state.collectAsState()
-    LaunchedEffect(controller) { controller.select("latest") }
+    LaunchedEffect(controller, initialSort) { controller.select(initialSort) }
     val pinned = if (pinnedBar) state.topics.firstOrNull { it.pinned } else null
     val rows = if (pinned != null) state.topics.filter { it.id != pinned.id } else state.topics
     PullToRefreshBox(isRefreshing = state.loading && state.topics.isNotEmpty(), onRefresh = controller::refresh, modifier = modifier.fillMaxSize()) {
@@ -127,22 +128,26 @@ private fun PinnedBar(topic: Topic, onClick: () -> Unit) {
 /** 帖子列表只展示标题、真实配图与轻量元信息，正文和投票在详情阅读。 */
 @Composable
 internal fun TopicCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit, onMessage: (String) -> Unit, tagLabel: String? = null) {
-    val images = topic.images.map { env.forum.imageUrl(it) }
-    Column(Modifier.fillMaxWidth().outlinedCard(12.dp)
-        .clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(topic.cardTitle, Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.Medium, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            if (images.size == 1) Cover(images[0], topic.id, Modifier.size(64.dp))
+    val image = topic.images.firstOrNull()?.let(env.forum::imageUrl)
+    Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable { open(Route.Topic(topic.id)) }.padding(14.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                if (topic.pinned || topic.featured) Text(if (topic.pinned) "置顶" else "精选", style = XType.Caption, color = Brand)
+                Text(topic.cardTitle, style = XType.Secondary, fontWeight = FontWeight.Normal, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (topic.excerpt.isNotBlank() && topic.excerpt != topic.cardTitle) Text(topic.excerpt, style = XType.Secondary, color = LocalExtraColors.current.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                tagLabel?.let { GrayTag(it, compact = true) }
+            }
+            if (image != null) Box(Modifier.widthIn(max = 112.dp)) { CommunityCover(image) { TopicCoverStats(topic) } }
         }
-        if (images.size >= 2) Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            images.take(3).forEachIndexed { i, url -> Cover(url, topic.id + i, Modifier.weight(1f).height(100.dp)) }
-            repeat(3 - images.take(3).size) { Spacer(Modifier.weight(1f)) }
-        }
-        Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Avatar(topic.author.nickname, 18.dp, showInitial = true)
             Text(topic.author.nickname, Modifier.weight(1f), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (topic.poll != null) Text("投票", style = XType.Caption, color = LocalExtraColors.current.brandInk)
-            if (topic.replyCount > 0) Text("${compactCount(topic.replyCount)} 回复", style = XType.Caption, color = LocalExtraColors.current.ink3)
             Text(agoText(topic.createdAt), style = XType.Caption, color = LocalExtraColors.current.ink3)
+        }
+        if (image == null || topic.likeCount > 0 || topic.poll != null) Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (image == null) { Stat(XIcons.Eye, compactCount(topic.viewCount)); Stat(XIcons.Message, compactCount(topic.replyCount)) }
+            if (topic.likeCount > 0) Stat(XIcons.Heart, compactCount(topic.likeCount))
+            if (topic.poll != null) Text("投票", style = XType.Caption, color = Brand)
         }
     }
 }
@@ -210,8 +215,8 @@ private fun skillIcon(kind: String) = when (kind) {
     "routine" -> XIcons.Clock; "reminder" -> XIcons.Bell; "task" -> XIcons.CheckBold; "goal" -> XIcons.Target; "skill" -> XIcons.Cube; "expert" -> XIcons.User; else -> XIcons.Tool
 }
 
-/** 作品卡的封面高度在这几个值里轮换，做出瀑布流错落的样子（取自设计稿）。 */
-private val CoverHeights = listOf(190, 140, 200, 150, 176)
+/** 作品封面沿用网页的真实比例与 16:9 分类规则。 */
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -229,15 +234,21 @@ private fun CreateTab(env: CommunityEnv, open: (Route) -> Unit) {
             when {
                 state.loading && state.packs.isEmpty() -> Spinner()
                 state.error != null && state.packs.isEmpty() -> CenterMessage(state.error.orEmpty(), "重试", controller::refresh)
-                state.isEmpty -> CenterMessage("这里还没有作品")
                 else -> LazyVerticalStaggeredGrid(
                     if (single) StaggeredGridCells.Fixed(1) else StaggeredGridCells.Adaptive(160.dp), Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 24.dp + NavInset),
                     horizontalArrangement = Arrangement.spacedBy(Gap), verticalItemSpacing = Gap,
                 ) {
-                    staggeredItems(state.packs, key = { it.id }) { pack ->
-                        if (pack.kind in VisualKinds) LookCard(pack, single) { open(Route.Pack(pack.id)) } else SkillCard(pack) { open(Route.Ability(pack.id)) }
+                    item(span = StaggeredGridItemSpan.FullLine) {
+                        Column {
+                            EditorialSection(env, if (kind.isBlank()) "create" else "create-$kind", "图文分享", open, "内容介绍、使用方法与创作经验。可导入的作品和方案在下方单独展示。")
+                            Text("作品与方案", Modifier.padding(top = 18.dp, bottom = 6.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
+                        }
                     }
+                    staggeredItems(state.packs, key = { it.id }, span = { if (it.kind in VisualKinds) StaggeredGridItemSpan.SingleLane else StaggeredGridItemSpan.FullLine }) { pack ->
+                        if (pack.kind in VisualKinds) LookCard(pack, masonry = kind == "wallpaper") { open(Route.Pack(pack.id)) } else SkillCard(pack) { open(Route.Ability(pack.id)) }
+                    }
+                    if (state.isEmpty) item(span = StaggeredGridItemSpan.FullLine) { CenterMessage("这里还没有作品") }
                     item(span = StaggeredGridItemSpan.FullLine) { LoadMoreFooter(state.hasMore, state.error, state.packs.size, controller::loadMore, controller::refresh) }
                 }
             }
@@ -255,21 +266,18 @@ private fun AuthorLine(pack: Pack) {
     }
 }
 
-/** 作品卡：错落高度的封面，左上黑底类型标签；下面是标题和作者。 */
+/** 视觉作品卡：16:9 封面，壁纸筛选按实际图片比例展示。 */
 @Composable
-internal fun LookCard(pack: Pack, single: Boolean = false, onClick: () -> Unit) {
-    val h = CoverHeights[(pack.id % CoverHeights.size).toInt()] * (if (single) 1.3f else 1f)
+internal fun LookCard(pack: Pack, masonry: Boolean = false, onClick: () -> Unit) {
     Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick)) {
         Box {
-            val screenshot = pack.kind == "game" || pack.kind == "widget"
-            Cover(pack.coverUrl, pack.id, if (screenshot) Modifier.fillMaxWidth().aspectRatio(1.5f) else Modifier.fillMaxWidth().height(h.dp),
-                contentScale = if (screenshot) androidx.compose.ui.layout.ContentScale.Fit else androidx.compose.ui.layout.ContentScale.Crop)
-            Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 2.dp), style = XType.Caption, color = Color.White)
-
+            if (!pack.coverUrl.isNullOrBlank()) CommunityCover(pack.coverUrl.orEmpty(), natural = masonry, minimum = .8f, contain = pack.kind in setOf("game", "widget"))
+            else Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) { Text(kindLabel(pack.kind), style = XType.Body, color = LocalExtraColors.current.ink3) }
+            Text(kindLabel(pack.kind), Modifier.padding(8.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = .55f)).padding(horizontal = 6.dp, vertical = 2.dp), style = XType.Caption, color = Color.White)
         }
-        Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 10.dp)) {
-            Text(pack.title, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (pack.author != null || pack.likeCount > 0 || pack.replyCount > 0) Box(Modifier.padding(top = 8.dp)) { AuthorLine(pack) }
+        Column(Modifier.padding(10.dp)) {
+            Text(pack.title, style = XType.Secondary, fontWeight = FontWeight.Normal, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (pack.author != null || pack.likeCount > 0 || pack.replyCount > 0) Box(Modifier.padding(top = 10.dp)) { AuthorLine(pack) }
         }
     }
 }
@@ -277,19 +285,22 @@ internal fun LookCard(pack: Pack, single: Boolean = false, onClick: () -> Unit) 
 /** 能力卡：没有封面，显示类型、标题及可用的作者信息。 */
 @Composable
 internal fun SkillCard(pack: Pack, onClick: () -> Unit) {
-    val soft = if (ThemeState.dark) Color(0xFF9FB6DC).copy(alpha = 0.18f) else Color(0xFFE8EEF8)
-    val ink = if (ThemeState.dark) Color(0xFF9FB6DC) else Color(0xFF3E5C8A)
-    Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick).padding(start = 10.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.size(24.dp).clip(RoundedCornerShape(8.dp)).background(soft), contentAlignment = Alignment.Center) { XIcon(skillIcon(pack.kind), tint = ink, size = 16.dp) }
-            Text(skillTag(pack.kind), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Row(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick).padding(14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(48.dp).clip(RoundedCornerShape(10.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) { XIcon(skillIcon(pack.kind), tint = LocalExtraColors.current.ink3, size = 24.dp) }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(skillTag(pack.kind), style = XType.Caption, color = LocalExtraColors.current.ink3)
+            Text(pack.title, style = XType.Secondary, fontWeight = FontWeight.Normal, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (pack.summary.isNotBlank()) Text(pack.summary, style = XType.Secondary, color = LocalExtraColors.current.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (pack.author != null || pack.likeCount > 0 || pack.replyCount > 0) AuthorLine(pack)
         }
-        Text(pack.title, Modifier.padding(top = 8.dp), style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        if (pack.author != null || pack.likeCount > 0 || pack.replyCount > 0) Box(Modifier.padding(top = 10.dp)) { AuthorLine(pack) }
     }
 }
 
 // ───────────── 学习和教程 ─────────────
+
+private fun learnChannel(filter: String): String = when (filter) {
+    "claude-code" -> "learn-claude-code"; "codex" -> "learn-codex"; "提示词" -> "learn-prompts"; "工作流" -> "learn-workflows"; "本地部署" -> "learn-local"; "ai-硬件" -> "learn-hardware"; else -> "learn"
+}
 
 /** 学习和教程的话题标签（论坛里标签是小写、空格换成连字符）。 */
 private val LearnTags = listOf("" to "全部", "claude-code" to "Claude Code", "codex" to "Codex", "提示词" to "提示词", "工作流" to "工作流", "本地部署" to "本地部署", "ai-硬件" to "AI 硬件")
@@ -298,7 +309,7 @@ private val LearnTags = listOf("" to "全部", "claude-code" to "Claude Code", "
 private fun LearnTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     var tag by rememberSaveable { mutableStateOf("") }
-    val controller = remember(env, tag) { DiscussController(env.forum, scope, category = "tech,share-learn", tag = tag.ifEmpty { null }, home = false) }
+    val controller = remember(env, tag) { DiscussController(env.forum, scope, category = learnChannel(tag), home = false) }
     val labels = remember { LearnTags.toMap() }
     TopicFeed(controller, "这个标签下还没有教程", open, pinnedBar = true, header = {
         PageChipRow(LearnTags, tag, { tag = it }, Modifier.padding(top = 6.dp))
@@ -340,5 +351,19 @@ internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, open: (Route) -> Uni
         DiscussSub.Create -> CreateTab(env, open)
         DiscussSub.Learn -> LearnTab(env, open, onMessage)
         DiscussSub.Casual -> CasualTab(env, open, onMessage)
+        DiscussSub.All -> AllDiscussions(env, open, onMessage)
     }
+}
+
+@Composable
+private fun AllDiscussions(env: CommunityEnv, open: (Route) -> Unit, onMessage: (String) -> Unit) {
+    val scope = rememberCoroutineScope()
+    val controller = remember(env) { DiscussController(env.forum, scope) }
+    val state by controller.state.collectAsState()
+    val session by env.session.state.collectAsState()
+    TopicFeed(controller, "暂无讨论", open, header = {
+        PageChipRow(listOf("latest" to "最新回复", "new" to "新帖", "hot" to "热门", "featured" to "精选", "following" to "关注"), state.sort, {
+            if (it == "following" && !session.loggedIn) open(Route.Login) else controller.select(it)
+        })
+    }) { TopicCard(env, it, open, onMessage, tagLabel = it.category.name) }
 }

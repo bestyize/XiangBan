@@ -71,7 +71,7 @@ internal enum class ResourceSub(val key: String, val label: String) {
 internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> Unit, onMessage: (String) -> Unit) {
     when (sub) {
         ResourceSub.Tools -> ToolsTab(env, open)
-        ResourceSub.Docs -> DocsTab(env)
+        ResourceSub.Docs -> DocsTab(env, open)
         ResourceSub.Media -> MediaTab(env, open, onMessage)
         ResourceSub.Help -> HelpTab(env, open)
     }
@@ -116,8 +116,9 @@ private fun ToolsTab(env: CommunityEnv, open: (Route) -> Unit) {
     PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
         LoadBox(state, loader::reload) { list ->
             LazyColumn(Modifier.fillMaxSize(), contentPadding = FeedPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
+                item { EditorialSection(env, "resource-tools", "工具导读", open) }
                 if (list.items.isEmpty()) item { CenterMessage("还没有收录的 AI 工具", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)) }
-                items(list.items, key = { it.key }) { tool -> ToolRow(tool) { open(Route.Tool(tool.key)) } }
+                items(list.items, key = { it.key }) { tool -> ToolRow(env, tool) { open(Route.Tool(tool.key)) } }
                 if (list.items.any { it.sample }) item { FootNote("版本号和更新日期为示例数据。") }
             }
         }
@@ -125,12 +126,14 @@ private fun ToolsTab(env: CommunityEnv, open: (Route) -> Unit) {
 }
 
 @Composable
-private fun ToolRow(tool: ToolSummary, onClick: () -> Unit) {
+private fun ToolRow(env: CommunityEnv, tool: ToolSummary, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ToolIcon(tool.name, tool.developer)
+        var iconFailed by remember(tool.iconUrl) { mutableStateOf(false) }
+        if (tool.iconUrl.isNotBlank() && !iconFailed) coil3.compose.AsyncImage(env.forum.imageUrl(tool.iconUrl), null, imageLoader = rememberImageLoader(), modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)), contentScale = androidx.compose.ui.layout.ContentScale.Fit, onError = { iconFailed = true })
+        else ToolIcon(tool.name, tool.developer)
         Column(Modifier.weight(1f)) {
             Text(tool.name, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -152,12 +155,13 @@ private val DocTints = listOf(Color(0xFFF1ECE4), Color(0xFFE6F4EA), Color(0xFFE8
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DocsTab(env: CommunityEnv) {
+private fun DocsTab(env: CommunityEnv, open: (Route) -> Unit) {
     val loader = rememberLoader(env, "docs") { env.forum.docs() }
     val state by loader.state.collectAsState()
     PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
         LoadBox(state, loader::reload) { groups ->
             LazyColumn(Modifier.fillMaxSize(), contentPadding = FeedPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
+                item { EditorialSection(env, "resource-docs", "资料导读", open) }
                 item { TabNote("官方文档的索引和导读，原文一律跳转官网。") }
                 if (groups.groups.isEmpty()) item { CenterMessage("还没有收录的资料", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)) }
                 groups.groups.forEach { group ->
@@ -173,7 +177,7 @@ private fun DocsTab(env: CommunityEnv) {
                                 Row(Modifier.fillMaxWidth().clickable { env.platform?.openUrl(doc.url) }.padding(vertical = 14.dp),
                                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                     Column(Modifier.weight(1f)) {
-                                        Text(doc.title, style = XType.Body, fontWeight = FontWeight.Medium)
+                                        Text(doc.title, style = XType.Secondary, fontWeight = FontWeight.Normal)
                                     }
                                     XIcon(XIcons.ExternalLink, size = 15.dp, tint = LocalExtraColors.current.ink3)
                                 }
@@ -186,45 +190,24 @@ private fun DocsTab(env: CommunityEnv) {
     }
 }
 
-// ───────────── 影音娱乐、精选 ─────────────
+// ───────────── 影音娱乐与历史社区分享 ─────────────
 
 @Composable
 private fun MediaTab(env: CommunityEnv, open: (Route) -> Unit, onMessage: (String) -> Unit) {
     val scope = rememberCoroutineScope()
-    val controller = remember(env) { DiscussController(env.forum, scope, category = "share-movies,share-music", home = false) }
-    TopicFeed(controller, "还没有影音分享", open, header = { TabNote("只收片单、影评、乐评和公版或授权内容，不提供盗版下载。") }) { topic ->
-        // 72×96 的竖封面在左，右边是类型标签、标题、摘要，底下是作者。
-        Row(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            topic.images.firstOrNull()?.let { Cover(env.forum.imageUrl(it), topic.id, Modifier.size(width = 72.dp, height = 96.dp)) }
-            Column(Modifier.weight(1f)) {
-                Text(topic.title, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GrayTag(topic.tags.firstOrNull() ?: topic.category.name, compact = true)
-                    Text(topic.author.nickname, style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-        }
-    }
+    var filter by rememberSaveable { mutableStateOf("") }
+    val channel = when (filter) { "movies" -> "resource-movies"; "music" -> "resource-music"; else -> "resource-movies,resource-music" }
+    val controller = remember(env, channel) { DiscussController(env.forum, scope, category = channel, home = false) }
+    CasualWaterfall(env, controller, open, header = {
+        PageChipRow(listOf("" to "全部", "movies" to "影视", "music" to "音乐"), filter, { filter = it }, Modifier.padding(horizontal = 12.dp, vertical = 10.dp))
+    })
 }
 
 @Composable
 internal fun OpenSourceCommunityShares(env: CommunityEnv, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
     val controller = remember(env) { DiscussController(env.forum, scope, category = "resource-open", home = false) }
-    TopicFeed(controller, "还没有社区分享", open) { topic ->
-        // 有真实配图时显示缩略图，保留标题、来源标签、浏览数和作者。
-        Row(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable { open(Route.Topic(topic.id)) }.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            topic.images.firstOrNull()?.let { Cover(env.forum.imageUrl(it), topic.id, Modifier.size(88.dp)) }
-            Column(Modifier.weight(1f)) {
-                Text(topic.title, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    GrayTag(topic.tags.firstOrNull { it in setOf("开源", "免费", "免费可商用") } ?: "开源")
-                    Stat(XIcons.Eye, compactCount(topic.viewCount))
-                    Text(topic.author.nickname, Modifier.weight(1f), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-        }
-    }
+    CasualWaterfall(env, controller, open)
 }
 
 // ───────────── 求助悬赏 ─────────────
@@ -252,7 +235,7 @@ internal fun helpRemain(help: HelpInfo): String = when {
 @Composable
 private fun HelpTab(env: CommunityEnv, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
-    val controller = remember(env) { DiscussController(env.forum, scope, category = "share-help", home = false) }
+    val controller = remember(env) { DiscussController(env.forum, scope, category = "resource-help", home = false) }
     val stats = rememberLoader(env, "help-stats") { env.forum.helpStats() }
     val statsState by stats.state.collectAsState()
     TopicFeed(controller, "还没有人发求助", open, header = {
@@ -308,7 +291,7 @@ private fun HelpCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit) {
                 Text("参考图", Modifier.align(Alignment.BottomStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.4f)).padding(horizontal = 4.dp), style = XType.Caption, color = Color.White)
             }
             Column(Modifier.weight(1f)) {
-                Text(topic.title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                Text(topic.title, style = XType.Secondary, fontWeight = FontWeight.Normal, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -292,6 +292,107 @@ internal object VendorBrandLogos {
             .addPath(pathData = addPathNodes("M6 6h20v1H6zM6 7h20v1H6zM6 8h20v1H6zM6 9h20v1H6zM6 10h20v1H6zM6 11h20v1H6zM6 12h20v1H6zM6 13h20v1H6zM6 14h20v1H6zM6 15h20v1H6zM6 16h20v1H6zM6 17h20v1H6zM6 18h20v1H6zM6 19h20v1H6zM6 20h20v1H6zM6 21h20v1H6zM6 22h20v1H6zM6 23h20v1H6zM6 24h20v1H6zM6 25h20v1H6z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.NonZero)
             .build())
     }
+    private val baidu by lazy {
+        val color = Color(0xFF2932E1)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "baidu", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M8.859 11.735c1.017-1.71 4.059-3.083 6.202.286 1.579 2.284 4.284 4.397 4.284 4.397s2.027 1.601.73 4.684c-1.24 2.956-5.64 1.607-6.005 1.49l-.024-.009s-1.746-.568-3.776-.112c-2.026.458-3.773.286-3.773.286l-.045-.001c-.328-.01-2.38-.187-3.001-2.968-.675-3.028 2.365-4.687 2.592-4.968.226-.288 1.802-1.37 2.816-3.085zm.986 1.738v2.032h-1.64s-1.64.138-2.213 2.014c-.2 1.252.177 1.99.242 2.148.067.157.596 1.073 1.927 1.342h3.078v-7.514l-1.394-.022zm3.588 2.191l-1.44.024v3.956s.064.985 1.44 1.344h3.541v-5.3h-1.528v3.979h-1.46s-.466-.068-.553-.447v-3.556zM9.82 16.715v3.06H8.58s-.863-.045-1.126-1.049c-.136-.445.02-.959.088-1.16.063-.203.353-.671.951-.85H9.82zm9.525-9.036c2.086 0 2.646 2.06 2.646 2.742 0 .688.284 3.597-2.309 3.655-2.595.057-2.704-1.77-2.704-3.08 0-1.374.277-3.317 2.367-3.317zM4.24 6.08c1.523-.135 2.645 1.55 2.762 2.513.07.625.393 3.486-1.975 4-2.364.515-3.244-2.249-2.984-3.544 0 0 .28-2.797 2.197-2.969zm8.847-1.483c.14-1.31 1.69-3.316 2.931-3.028 1.236.285 2.367 1.944 2.137 3.37-.224 1.428-1.345 3.313-3.095 3.082-1.748-.226-2.143-1.823-1.973-3.424zM9.425 1c1.307 0 2.364 1.519 2.364 3.398 0 1.879-1.057 3.4-2.364 3.4s-2.367-1.521-2.367-3.4C7.058 2.518 8.118 1 9.425 1z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val spark by lazy {
+        val color = Color(0xFF4176FF)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "spark", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M11.615 0l6.237 6.107c2.382 2.338 2.823 3.743 3.161 6.15-1.197-1.732-1.776-2.02-4.504-2.772C12.48 8.374 11.095 5.933 11.615 0z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M9.32 2.122C4.771 6.367 2 9.182 2 13.08c0 5.76 4.288 9.788 9.745 9.918 5.457.13 9.441-5.284 9.095-8.403-.347-3.118-4.418-3.81-4.418-3.81 1.69 3.16-.13 8.098-4.894 8.098-5.154 0-6.8-6.02-4.2-9.008.82 1.617 1.879 2.563 2.674 3.273.717.64 1.219 1.09 1.136 1.664-.173 1.213-1.385.866-1.385.866.346.607 3.6 1.473 4.59-1.342.613-1.741-.423-2.789-1.714-4.096-1.632-1.651-3.672-3.717-3.31-8.118z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val openclaw by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "openclaw", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M9.046 7.104a.527.527 0 110 1.055.527.527 0 010-1.055z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M15.376 7.104a.528.528 0 110 1.056.528.528 0 010-1.056z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M16.877 1.912c.58-.27 1.14-.323 1.616-.037a.317.317 0 01-.326.542c-.227-.136-.547-.153-1.022.068-.352.165-.765.45-1.234.866 2.683 1.17 4.4 3.5 5.148 5.921a6.421 6.421 0 00-.704.184c-.578.016-1.174.204-1.502.735-.338.55-.268 1.276.072 2.069l.005.012.007.014c.523 1.045 1.318 1.91 2.2 2.284-.912 3.274-3.44 6.144-5.972 6.988v2.109h-2.11v-2.11c-1.043.417-2.086.01-2.11 0v2.11h-2.11v-2.11c-2.531-.843-5.061-3.713-5.973-6.987.882-.373 1.678-1.238 2.2-2.284l.007-.014.006-.012c.34-.793.41-1.518.071-2.069-.327-.531-.923-.719-1.503-.735a6.409 6.409 0 00-.704-.183c.749-2.421 2.466-4.751 5.149-5.922-.47-.416-.88-.701-1.234-.866-.474-.221-.794-.204-1.021-.068a.318.318 0 01-.435-.109.317.317 0 01.109-.433c.476-.286 1.036-.233 1.615.037.49.229 1.031.628 1.621 1.182A9.924 9.924 0 0112 2.568c1.199 0 2.284.19 3.256.526.59-.554 1.13-.953 1.62-1.182zM8.835 6.577a1.266 1.266 0 100 2.532 1.266 1.266 0 000-2.532zm6.33 0a1.267 1.267 0 100 2.533 1.267 1.267 0 000-2.533z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M.395 13.118c-.966-1.932-.163-3.863 2.41-3.365v-.001l.05.01c.084.018.17.038.26.06.033.009.067.017.1.027.084.022.168.048.255.076l.09.027c.528 0 .95.158 1.16.501.212.343.212.87-.105 1.61-.085.17-.178.333-.276.489l-.01.017a4.967 4.967 0 01-.62.791l-.019.02c-1.092 1.117-2.496 1.336-3.295-.262z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M21.193 9.753c2.574-.5 3.378 1.433 2.411 3.365-.58 1.159-1.476 1.361-2.342.96l-.011-.005a2.419 2.419 0 01-.114-.056l-.019-.01a2.751 2.751 0 01-.115-.067l-.023-.014c-.035-.022-.071-.044-.106-.068l-.05-.035c-.55-.388-1.062-1.007-1.44-1.76-.276-.647-.311-1.132-.174-1.472.176-.439.636-.639 1.23-.639.032-.011.066-.02.099-.03.08-.026.16-.05.238-.072l.117-.03a5.502 5.502 0 01.3-.067z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val opencode by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "opencode", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M16 6H8v12h8V6zm4 16H4V2h16v20z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val cursor by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "cursor", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M22.106 5.68L12.5.135a.998.998 0 00-.998 0L1.893 5.68a.84.84 0 00-.419.726v11.186c0 .3.16.577.42.727l9.607 5.547a.999.999 0 00.998 0l9.608-5.547a.84.84 0 00.42-.727V6.407a.84.84 0 00-.42-.726zm-.603 1.176L12.228 22.92c-.063.108-.228.064-.228-.061V12.34a.59.59 0 00-.295-.51l-9.11-5.26c-.107-.062-.063-.228.062-.228h18.55c.264 0 .428.286.296.514z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val trae by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "trae", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M24 20.541H3.428v-3.426H0V3.4h24V20.54zM3.428 17.115h17.144V6.827H3.428v10.288zm8.573-5.196l-2.425 2.424-2.424-2.424 2.424-2.424 2.425 2.424zm6.857-.001l-2.424 2.423-2.425-2.423 2.425-2.425 2.424 2.425z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val qoder by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "qoder", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M23.376 14.458v-4.056c0-2.304-1.003-4.154-2.748-5.075L11.612.574l-.046.086-.045.086c1.68.886 2.644 2.673 2.644 4.902v4.056a7.928 7.928 0 01-.014.454l-.005.061c-.005.081-.01.164-.018.245a4.897 4.897 0 01-.011.1l-.01.076c-.008.068-.015.135-.025.203l-.018.113-.01.058a9.99 9.99 0 01-.098.513l-.007.03a7.209 7.209 0 01-.074.294l-.024.086c-.027.099-.056.197-.087.296l-.027.085a9.592 9.592 0 01-.111.323l-.033.085-.018.046c-.032.082-.064.166-.098.248-.019.048-.04.096-.061.145l-.007.017a6 6 0 01-.084.187c-.024.056-.05.11-.077.165-.03.061-.058.122-.089.182a9.423 9.423 0 01-.176.332c-.03.056-.062.111-.094.167-.031.053-.062.108-.095.16-.033.055-.066.11-.101.164-.033.053-.065.104-.1.155-.034.055-.07.107-.111.169l-.099.144a15.193 15.193 0 01-.34.457c-.04.05-.08.102-.121.151l-.107.128-.007.008a6.987 6.987 0 01-.262.298l-.149.16-.116.12a9.562 9.562 0 01-.204.198l-.03.03-.072.069a9.05 9.05 0 01-.263.235l-.025.022-.029.026-.042.035a11.7 11.7 0 01-.22.18l-.07.055-.018.013a8.904 8.904 0 01-.194.146c-.029.02-.057.042-.086.063a7.7 7.7 0 01-.22.152l-.057.04a8.865 8.865 0 01-.293.185l-.062.037a10.424 10.424 0 01-.307.173l-.037.02-.196.103-.108.052-.012.006a6.196 6.196 0 01-.315.143c-.065.028-.13.054-.196.08l-.035.014-.086.034c-.07.026-.143.05-.215.075l-.039.014-.064.023a8.056 8.056 0 01-.323.097l-.63.173a7.285 7.285 0 01-.33.08l-.07.015c-.053.012-.104.023-.157.032l-.065.011-.085.015a2.332 2.332 0 01-.194.027l-.085.01a4.715 4.715 0 01-.16.018l-.034.003a4.861 4.861 0 01-.246.016h-.033a2.714 2.714 0 01-.155.005h-.106a3.384 3.384 0 01-.225-.007H4.86l-.15-.012-.066-.006a5.586 5.586 0 01-.187-.02l-.04-.005a5.14 5.14 0 01-.219-.035l-.054-.01a6.943 6.943 0 01-.347-.082l-.03-.008-.038-.01a5.034 5.034 0 01-.269-.086l-.063-.023a4.216 4.216 0 01-.188-.073l-.071-.031-.016-.007a4.959 4.959 0 01-.16-.074l-.026-.013a.164.164 0 00-.014-.007l-.671-.351.486.486h.016l8.995 4.742.093.048.03.014.02.01c.056.026.111.052.169.076l.016.008.073.032.195.076.022.008a.718.718 0 01.03.012l.014.004a4.693 4.693 0 00.323.1l.027.007c.073.02.147.038.22.055l.018.004.027.006.066.013.088.016c.075.014.15.026.226.038l.042.004c.064.009.128.016.193.022l.126.012.06.003.05.002.098.005c.046.002.094.002.14.003h.12c.05 0 .1-.002.161-.005h.033l.07-.004a6.17 6.17 0 00.184-.014l.033-.003a.753.753 0 00.058-.005l.108-.012.081-.01.08-.01.129-.021.082-.014.071-.012c.054-.01.107-.021.16-.033l.066-.013.059-.013c.096-.022.192-.046.287-.073l.63-.172a7.354 7.354 0 00.397-.122l.04-.015c.075-.025.149-.051.222-.078.032-.011.062-.024.093-.037l.03-.012c.067-.027.135-.054.2-.082l.128-.056.195-.09.021-.01.102-.05c.068-.034.135-.069.202-.105l.037-.02.073-.038c.08-.044.16-.092.24-.139l.026-.015a8.086 8.086 0 00.322-.2l.065-.045 1.98.902a1.748 1.748 0 002.472-1.59v-7.33l.004.004z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M11.617.576a3.904 3.904 0 00-.093-.047c-.016-.009-.033-.016-.05-.024a5.854 5.854 0 00-.166-.077l-.09-.04a4.094 4.094 0 00-.194-.074c-.017-.006-.035-.015-.053-.02l-.013-.005a5.18 5.18 0 00-.277-.088l-.07-.019a4.034 4.034 0 00-.219-.053c-.015-.003-.03-.008-.044-.012L10.253.1l-.057-.011a5.177 5.177 0 00-.225-.036L9.928.047a5.972 5.972 0 00-.191-.022L9.669.02a1.33 1.33 0 00-.058-.005L9.515.009a4.058 4.058 0 00-.111-.005C9.354 0 9.304 0 9.254 0h-.109c-.052 0-.106.004-.16.004L8.884.01A5.32 5.32 0 008.7.022l-.083.006h-.008c-.05.005-.1.013-.15.019l-.12.014c-.056.008-.112.018-.169.028-.037.006-.074.011-.11.018a7.054 7.054 0 00-.572.133l-.63.172c-.111.031-.22.064-.33.1-.037.011-.072.025-.108.037a12.91 12.91 0 00-.345.126c-.067.027-.133.054-.2.083l-.128.055a11.916 11.916 0 00-.318.15 7.376 7.376 0 00-.311.163c-.082.045-.16.092-.24.14a9.424 9.424 0 00-.35.218l-.016.01-.06.04a9.242 9.242 0 00-.51.37 12.54 12.54 0 00-.315.254l-.043.034-.01.007-.045.041c-.09.078-.18.158-.268.24l-.106.101c-.07.067-.139.135-.207.204l-.056.054-.063.067-.153.164-.12.133-.148.17c-.024.03-.049.057-.073.086l-.043.053a5.96 5.96 0 00-.123.155l-.118.151c-.04.053-.08.106-.118.16l-.075.101-.038.056-.107.155-.11.164a9.91 9.91 0 00-.168.265c-.012.02-.023.043-.037.063a12.43 12.43 0 00-.192.335l-.09.168c-.019.034-.04.07-.057.105-.011.022-.02.043-.032.065l-.092.188-.08.167a19.15 19.15 0 00-.083.192c-.017.038-.035.076-.05.115-.008.016-.014.034-.021.051-.035.083-.067.167-.1.253l-.051.134c-.04.11-.077.22-.113.33l-.02.057c0 .002 0 .005-.002.007l-.008.026c-.032.1-.06.2-.09.301l-.023.089c-.027.1-.052.2-.075.301l-.007.03a7.63 7.63 0 00-.057.267l-.008.048c-.015.074-.026.148-.038.223L.082 8.4c-.011.078-.02.156-.029.234-.006.051-.013.103-.017.154a6.57 6.57 0 00-.02.26c-.003.044-.007.086-.009.13-.004.128-.007.257-.007.386v4.056c0 1.478.42 2.741 1.138 3.692A4.75 4.75 0 002.73 18.67l9.015 4.753c-1.656-.874-2.728-2.685-2.73-5.051v-4.056c0-.13.004-.26.01-.39.002-.043.006-.085.01-.128.005-.088.01-.174.019-.261l.017-.155c.01-.077.018-.155.029-.234l.026-.164c.013-.074.025-.15.039-.223.02-.105.04-.21.064-.313l.008-.031c.023-.1.048-.201.075-.301l.023-.088c.028-.1.058-.202.09-.302l.008-.025.021-.063c.036-.11.073-.22.113-.33l.052-.134c.031-.085.065-.169.1-.253.022-.056.047-.111.07-.166a13.856 13.856 0 01.164-.358c.03-.063.06-.126.092-.188l.088-.172a9.22 9.22 0 01.187-.338l.096-.164c.034-.057.069-.112.104-.168l.1-.159a10.49 10.49 0 01.567-.786l.123-.155.116-.139c.05-.057.098-.115.148-.171a14.092 14.092 0 01.272-.297 9.706 9.706 0 01.432-.425c.088-.083.177-.163.268-.241l.054-.048a10.08 10.08 0 01.553-.435l.092-.068c.075-.053.15-.105.226-.156.019-.013.038-.028.06-.04a9.18 9.18 0 01.362-.227c.08-.047.16-.094.241-.139l.11-.058a7.643 7.643 0 01.521-.256l.126-.056a7.509 7.509 0 01.546-.208l.107-.037c.11-.036.22-.069.33-.1l.63-.172c.095-.026.191-.05.287-.072l.097-.02c.062-.014.125-.029.187-.04l.114-.018c.055-.01.11-.02.166-.028.04-.006.08-.01.12-.014.053-.007.105-.014.157-.019l.083-.006c.061-.005.123-.01.184-.013.034-.003.067-.003.101-.004l.16-.006h.11a3.187 3.187 0 01.261.008l.153.01.067.007c.064.006.128.013.192.022l.043.005a5.232 5.232 0 01.281.047l.141.03c.073.016.146.035.218.053l.07.019c.094.026.187.055.278.087l.067.025a4.326 4.326 0 01.449.19l.143.072L11.617.576z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val workbuddy by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "workbuddy", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M18.777 1.647c.28-.02.536.114.972.51 1.018.926 2.437 2.828 3.318 4.452l.34.631.482.24.11.06v3.638a5.206 5.206 0 00-5.32-1.23c-.491.166-1.021.471-2.08 1.082l-6.09 3.516c-1.057.61-1.586.916-1.975 1.259a5.208 5.208 0 00-1.493 5.572c.165.49.471 1.02 1.082 2.08l.315.543h-3.26c-.685 0-1.34-.135-1.939-.377-.169-.956-.009-1.789.469-2.335.158-.18.164-.189.13-.493a11.846 11.846 0 01-.057-1.711l.02-.444-.667-1.18C2.1 15.622 1.445 14.078 1.192 12.9c-.133-.647-.125-.934.04-1.146.1-.128.427-.261.822-.334.994-.175 3.162-.017 5.575.41l.25.043.551-.487c.915-.81 1.522-1.264 2.641-1.962 1.167-.73 2.484-1.331 3.967-1.807l.476-.152.261-.688c.937-2.471 1.896-4.293 2.58-4.9.235-.21.25-.22.422-.23z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M12.139 18.2a1.203 1.203 0 011.642.44l1.296 2.243a1.204 1.204 0 01-2.083 1.203l-1.296-2.243a1.203 1.203 0 01.44-1.644zM18.629 14.452a1.203 1.203 0 011.642.44l1.295 2.244a1.203 1.203 0 11-2.083 1.203l-1.295-2.243a1.203 1.203 0 01.44-1.644z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val modelscope by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "modelscope", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M2.667 5.3H8v2.667H5.333v2.666H2.667V8.467H.5v2.166h2.167V13.3H0V7.967h2.667V5.3zM2.667 13.3h2.666v2.667H8v2.666H2.667V13.3zM8 10.633h2.667V13.3H8v-2.667zM13.333 13.3v2.667h-2.666V13.3h2.666zM13.333 13.3v-2.667H16V13.3h-2.667z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M21.333 13.3v-2.667h-2.666V7.967H16V5.3h5.333v2.667H24V13.3h-2.667zm0-2.667H23.5V8.467h-2.167v2.166z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M21.333 13.3v5.333H16v-2.666h2.667V13.3h2.666z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val vercel by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "vercel", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M12 0l12 20.785H0L12 0z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val openrouter by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "openrouter", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M18.654 3.87a5.087 5.087 0 110 10.174L23.7 19.09c.64.641.187 1.737-.72 1.737H8.48a8.479 8.479 0 010-16.958h10.175zM8.479 7.26a5.087 5.087 0 100 10.176 5.087 5.087 0 000-10.175z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val siliconcloud by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "siliconcloud", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M22.956 6.521H12.522c-.577 0-1.044.468-1.044 1.044v3.13c0 .577-.466 1.044-1.043 1.044H1.044c-.577 0-1.044.467-1.044 1.044v4.174C0 17.533.467 18 1.044 18h10.434c.577 0 1.044-.467 1.044-1.043v-3.13c0-.578.466-1.044 1.043-1.044h9.391c.577 0 1.044-.467 1.044-1.044V7.565c0-.576-.467-1.044-1.044-1.044z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val together by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "together", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M23.197 4.503A6 6 0 0015 2.307a5.973 5.973 0 00-2.995 4.933l5.996.008v.515h-5.996c.039.937.298 1.87.8 2.74a6 6 0 1010.39-6z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M.805 4.5A6 6 0 003 12.697a5.972 5.972 0 005.77.127L5.779 7.627l.446-.257 2.997 5.192A6 6 0 10.804 4.5z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .addPath(pathData = addPathNodes("M12 23.894a6 6 0 005.999-6c0-2.13-1.1-3.996-2.775-5.06l-3.005 5.189-.444-.258 2.997-5.192A6 6 0 1012 23.894z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val fireworks by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "fireworks", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M14.8 5l-2.801 6.795L9.195 5H7.397l3.072 7.428a1.64 1.64 0 003.038.002L16.598 5H14.8zm1.196 10.352l5.124-5.244-.699-1.669-5.596 5.739a1.664 1.664 0 00-.343 1.807 1.642 1.642 0 001.516 1.012L16 17l8-.02-.699-1.669-7.303.041h-.002zM2.88 10.104l.699-1.669 5.596 5.739c.468.479.603 1.189.343 1.807a1.643 1.643 0 01-1.516 1.012l-8-.018-.002.002.699-1.669 7.303.042-5.122-5.246z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
+    private val groq by lazy {
+        val color = Color(0xFF61748C)
+        BrandLogo(color, color.copy(alpha = 0.1f), ImageVector.Builder(name = "groq", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24.0f, viewportHeight = 24.0f)
+            .addPath(pathData = addPathNodes("M12.036 2c-3.853-.035-7 3-7.036 6.781-.035 3.782 3.055 6.872 6.908 6.907h2.42v-2.566h-2.292c-2.407.028-4.38-1.866-4.408-4.23-.029-2.362 1.901-4.298 4.308-4.326h.1c2.407 0 4.358 1.915 4.365 4.278v6.305c0 2.342-1.944 4.25-4.323 4.279a4.375 4.375 0 01-3.033-1.252l-1.851 1.818A7 7 0 0012.029 22h.092c3.803-.056 6.858-3.083 6.879-6.816v-6.5C18.907 4.963 15.817 2 12.036 2z"), fill = SolidColor(Color.Black), fillAlpha = 1.0f, pathFillType = PathFillType.EvenOdd)
+            .build())
+    }
 
     fun find(name: String): BrandLogo? = when (name.substringBefore('/').lowercase().filter { it.isLetterOrDigit() }) {
         "chatgpt", "openai" -> openai
@@ -332,6 +433,21 @@ internal object VendorBrandLogos {
         "celeris" -> celeris
         "reflection", "reflectionai" -> reflection
         "thinkingmachines", "thinkingmachineslab" -> thinkingmachines
+        "baidu", "百度" -> baidu
+        "spark", "科大讯飞", "讯飞星火" -> spark
+        "openclaw" -> openclaw
+        "opencode" -> opencode
+        "cursor" -> cursor
+        "trae" -> trae
+        "qoder" -> qoder
+        "workbuddy" -> workbuddy
+        "modelscope" -> modelscope
+        "vercel" -> vercel
+        "openrouter" -> openrouter
+        "siliconcloud" -> siliconcloud
+        "together" -> together
+        "fireworks" -> fireworks
+        "groq" -> groq
         else -> null
     }
 }

@@ -58,8 +58,16 @@ class MainActivity : ComponentActivity() {
         val chatFiles = AndroidChatHistoryFiles(this)
         val workspace = AndroidMobileWorkspace(filesDir.resolve("workspace"))
         val utcOffset = java.util.TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60_000
+        // Debug only: adb reverse can preview an undeployed forum API on this computer.
+        // This is process-local, accepts loopback only, and never changes release configuration.
+        val previewBase = if (BuildConfig.DEBUG) intent.getStringExtra("forum_preview_base")?.takeIf {
+            it.matches(Regex("http://127\\.0\\.0\\.1:[0-9]{2,5}")) && it.substringAfterLast(':').toInt() in 1024..65535
+        } else null
+        val communityConfig = xyz.xiangban.xiaoban.common.community.CommunityConfig().let { config ->
+            if (previewBase == null) config else config.copy(forumBase = previewBase)
+        }
         setContent {
-            App(storage, forumPlatform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffset)
+            App(storage, forumPlatform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffset, communityConfig)
         }
         hideNavigationBar()
         (application as XiaobanApplication).prefetchSpeechResources()

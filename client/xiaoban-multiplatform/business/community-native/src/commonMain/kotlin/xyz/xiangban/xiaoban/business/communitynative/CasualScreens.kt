@@ -34,7 +34,7 @@ import xyz.xiangban.xiaoban.common.community.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun CasualWaterfall(env: CommunityEnv, controller: DiscussController, open: (Route) -> Unit, header: @Composable () -> Unit) {
+internal fun CasualWaterfall(env: CommunityEnv, controller: DiscussController, open: (Route) -> Unit, header: @Composable () -> Unit = {}) {
     val state by controller.state.collectAsState()
     val gridState = remember(controller) { LazyStaggeredGridState() }
     LaunchedEffect(controller) { controller.select("latest") }
@@ -49,44 +49,10 @@ internal fun CasualWaterfall(env: CommunityEnv, controller: DiscussController, o
                     state.error != null && state.topics.isEmpty() -> item(span = StaggeredGridItemSpan.FullLine) { CenterMessage(state.error.orEmpty(), "重试", controller::refresh, Modifier.fillMaxWidth().padding(vertical = 48.dp)) }
                     state.topics.isEmpty() -> item(span = StaggeredGridItemSpan.FullLine) { CenterMessage("这里还没有帖子", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)) }
                     else -> {
-                        items(state.topics.distinctBy { it.id }, key = { it.id }) { topic -> CasualCard(env, topic) { open(Route.Topic(topic.id)) } }
+                        items(state.topics.distinctBy { it.id }, key = { it.id }) { topic -> VisualTopicCard(env, topic) { open(Route.Topic(topic.id)) } }
                         item(span = StaggeredGridItemSpan.FullLine) { LoadMoreFooter(state.hasMore, state.error, state.topics.size, controller::loadMore, controller::loadMore) }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CasualCard(env: CommunityEnv, topic: Topic, onClick: () -> Unit) {
-    val url = topic.images.firstOrNull()?.let(env.forum::imageUrl)
-    var ratio by rememberSaveable(url) { mutableStateOf(.75f) }
-    var failed by remember(url) { mutableStateOf(false) }
-    val title = topic.cardTitle
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surface).clickable(onClick = onClick)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(if (url == null) (if (title.length > 24) .75f else 1f) else ratio)
-            .background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
-            if (url == null || failed) {
-                Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.width(24.dp).height(3.dp).background(Brand))
-                    Text(title, style = XType.Title, fontWeight = FontWeight.Bold, maxLines = 6, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            if (url != null && !failed) AsyncImage(url, "${title}的封面", imageLoader = rememberImageLoader(), contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize(), onSuccess = {
-                    val image = it.result.image
-                    if (image.width > 0 && image.height > 0) ratio = (image.width.toFloat() / image.height).coerceIn(.65f, 1.5f)
-                }, onError = { failed = true })
-            if (topic.pinned) Text("置顶", Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(4.dp)).background(Brand).padding(horizontal = 6.dp, vertical = 3.dp), color = Color.White, style = XType.Caption)
-        }
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            Text(title, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                Avatar(topic.author.nickname, 18.dp, showInitial = true)
-                Text(topic.author.nickname, Modifier.weight(1f), style = XType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis, color = LocalExtraColors.current.ink3)
-                XIcon(XIcons.Heart, size = 13.dp, tint = LocalExtraColors.current.ink3)
-                Text(compactCount(topic.likeCount), style = XType.Caption, color = LocalExtraColors.current.ink3)
             }
         }
     }

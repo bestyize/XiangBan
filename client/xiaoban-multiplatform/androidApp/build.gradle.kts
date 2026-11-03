@@ -37,6 +37,7 @@ dependencies {
 }
 
 android {
+    buildFeatures { buildConfig = true }
     namespace = "xyz.xiangban.xiaoban"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 

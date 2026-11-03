@@ -17,7 +17,7 @@
 | `:business:community` | 社区网页壳（MA，已不被 `:shell` 装配，保留作回退）`CommunityApp`：加载 https://chat.xiangban.xyz（周刊、资源、讨论、项目的只读浏览，分享先用网页上的“复制链接”），站内域名只有 chat.xiangban.xyz，配色取自论坛前端的品牌色与黑白灰。对应实施计划的 MA（网页壳）。 |
 | `:common:community-core` | 社区、账号与 AI 网关的网络层和状态逻辑（不依赖 Compose）：`ForumApi`、`AccountApi`（与网页同一组接口）、`AiGatewayApi`（对接 `server-ai` 的档位、余额、兑换码与 `/v1/chat/completions` 流式对话）、`SessionManager`（令牌存储、临近过期自动刷新且并发共用一次、仅服务端明确拒绝才登出）、`FeedController`/`DiscussController`/`CloudChatController`/`Loader`、`DesignTokens`（与论坛前端同一套配色圆角）。能在 JVM 上直接跑单元测试：`./gradlew :common:community-core:jvmTest`。账号中心要先登记客户端 `xiaoban-android`。 |
 | `:common:link-core` | 与桌面互联的协议、客户端与应用控制器（`PhoneLink`、`RemoteChatController`、`SharedPrefsLinkStorage`）：同账号自动发现电脑、经中转收发、会话快照与流式增量、待办审批卡片、断线重连；有对真实 server-link 与 Rust 桌面端的跨语言互通测试。`./gradlew :common:link-core:jvmTest`。详见模块 README。 |
-| `:business:community-native` | 社区、云端与遥控小伴原生界面（Compose），按设计稿[社区与小伴AI 手机原型](docs/design-specs/mobile-prototype/README.md)搭建：悬浮胶囊导航（小伴AI、游戏、发布、社区、我的）与发布弹层；小伴AI 首页和对话页（模型选择、额度与兑换）；社区按[新稿](docs/design/社区与小伴AI%20手机原型.html)改版：首页（推荐、开源热榜、排行榜、追踪、导航）、讨论（创作、学习和教程、休闲，帖子带配图和投票）、资源（AI 工具、资料、影音娱乐、求助悬赏），以及模型天梯、横屏的“智能 vs 价格”散点图、工具详情、求助帖（悬赏、采纳）和内容包、帖子详情；发现页内容来自 server-forum 的 `/api/discover/*`，目前由后台录入，带“示例”标记的是示例数据；我的、设置、登录与完成注册；我的电脑、遥控会话列表、遥控对话页（工具进度、审批卡片、高危二次确认、离线与异常提示）。基础部件（图标、顶栏、按钮、输入框、弹层）在 `Kit.kt`，图标路径由脚本从设计稿生成在 `Icons.kt`。平台能力通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。尚未接入的页面（私人资料库等）见 docs 里的进度说明。 |
+| `:business:community-native` | 社区、云端与遥控小伴原生界面（Compose），按设计稿[社区与小伴AI 手机原型](docs/design-specs/mobile-prototype/README.md)搭建：悬浮胶囊导航（小伴AI、游戏、发布、社区、我的）与发布弹层；小伴AI 首页和对话页（模型选择、额度与兑换）；社区按[新稿](docs/design/社区与小伴AI%20手机原型.html)改版：首页（推荐、精选、排行榜、追踪、导航）、讨论（创作、学习和教程、休闲，帖子带配图和投票）、资源（AI 工具、资料、影音娱乐、求助悬赏），以及模型天梯、横屏的“智能 vs 价格”散点图、工具详情、求助帖（悬赏、采纳）和内容包、帖子详情；发现页内容来自 server-forum 的 `/api/discover/*`，目前由后台录入，带“示例”标记的是示例数据；我的、设置、登录与完成注册；我的电脑、遥控会话列表、遥控对话页（工具进度、审批卡片、高危二次确认、离线与异常提示）。基础部件（图标、顶栏、按钮、输入框、弹层）在 `Kit.kt`，图标路径由脚本从设计稿生成在 `Icons.kt`。平台能力通过 `PlatformActions` 注入，令牌存储通过 `TokenStorage` 注入。尚未接入的页面（私人资料库等）见 docs 里的进度说明。 |
 | `:business:xiaban` | xiaban.xyz 入口 `XiabanApp`：地址、站内域名、与网页一致的浅色/深色配色。 |
 | `:shell` | 装配层，`App(storage, platform, linkStorage)` 渲染 `CommunityNativeApp`；Android 入口传入 `SharedPrefsTokenStorage`、`AndroidPlatformActions` 与 `SharedPrefsLinkStorage`，iOS 暂用内存存储。模板自带的 `Greeting`/`Platform` 示例与测试仍在，未使用。 |
 | `:androidApp` `iosApp/` | Android、iOS 入口。 |
@@ -68,6 +68,19 @@ Android 冷启动后延迟约 2 秒，在后台静默下载本地语音组件及
 组件准备有本地增量检查和 Actions 缓存；Agent Rust 库仍在 APK 内，仍用 Cargo 缓存增量编译。ORT Android 的加载调用由构建时的局部字节码转换接入私有目录加载器，其余推理接口保持上游版本。
 
 针对性验证：`./gradlew :common:community-core:jvmTest --tests '*SpeechModelsTest*' --tests '*DownloadedSpeechRuntimeTest*' :androidApp:assembleDebug`，涵盖冷启动延迟、静默失败退避、后台与设置共用下载、镜像续传、取消、缺库后补下载、依赖加载顺序、校验失败与加载重试。真机上的语音识别、判停、外放回声及打断仍需设备验收。
+
+## 社区网页对齐（2026-11-03）
+
+原生社区同步当前网页的内容结构与卡片规则，使用 Compose 原生布局，保留站内详情、评论、分页和返回栈：
+
+- 推荐：小伴前沿从 `/api/discover/frontier` 读取，16:9 横幅将单行标题、来源与时间覆盖在封面上，左下分页点与手势翻页，不提供暂停或箭头按钮；详情与留言使用独立前沿接口。日报使用文字与右侧小图的阅读卡；移除推荐页的精选创作模块。
+- 精选：仍使用首页的精选入口及第二子 TAB 热榜，资源不重复提供精选；模板封面里的项目名与图标不在卡片底部重复。卡片不外露收藏或安装说明，收藏沿用详情入口。目录由后端提供，接口未部署时显示加载失败与重试。
+- 导航：大模型 / Harness / Skill / API，筛选规则与网页一致；图标、厂商、简介、类型采用双列信息卡，不再重复分类标题、描述和数量。新版 `catalog_version >= 2` 尊重已发布条目、顺序与删除；旧接口按审核快照补齐 66 个入口并保留编辑，v1 删除项不会复活。快照归手机端维护，手动运行 `python3 client/xiaoban-multiplatform/tools/sync-navigation-catalog.py` 从论坛审核目录刷新，Gradle 不跨项目依赖论坛源码。
+- 讨论与资源：阅读帖为紧凑配图卡，休闲与影音按真实图片比例展示瀑布流，封面显示真实浏览和回复数；无图时保留文字，不制造海报。作品默认 16:9，壁纸筛选按真实比例限制在 4:5 至 16:9；能力类作品用横向目录卡。补齐图文分享、工具导读和资料导读入口及站内分页；学习筛选按正式栏目查询。全部讨论提供最新回复、新帖、热门、精选与关注。
+
+Android 调试包可通过 `adb reverse tcp:5290 tcp:5290` 连接本地论坛预览，再运行 `adb shell am force-stop xyz.xiangban.xiaoban` 和 `adb shell am start -n xyz.xiangban.xiaoban/.MainActivity --es forum_preview_base http://127.0.0.1:5290`。入口只在 Debug 接受 `127.0.0.1` 的 1024–65535 端口，不持久保存；普通冷启动恢复正式服务。明文访问许可仅在 Debug 的 loopback 域生效，Release 保持正式地址与 HTTPS。
+
+针对性验证：`:androidApp:assembleDebug`、community-core JVM 的 NavigationDirectoryTest、FrontierTest、CommunityFeedAlignmentTest、DiscoverApiTest 与 OpenSourceTest。小米 14（23127PN0CC）已覆盖安装调试包并验证前沿横幅、日报阅读卡、Harness 编程筛选和创作图文分享。通过本地论坛预览验证精选封面、项目详情、返回及热榜切换；热榜使用本地测试数据，未进行生产写入。iOS 未实机验收。当前线上精选目录 `/api/open-source` 尚未部署，需配套发布论坛服务后才能在正式地址使用。
 
 ## 开发与验证
 

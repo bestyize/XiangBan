@@ -38,11 +38,12 @@ fun App(
     chatFiles: ChatHistoryFiles = InMemoryChatHistoryFiles(),
     workspace: MobileWorkspace? = null,
     utcOffsetMinutes: Int = 0,
+    communityConfig: xyz.xiangban.xiaoban.common.community.CommunityConfig = xyz.xiangban.xiaoban.common.community.CommunityConfig(),
 ) {
     val compositionScope = rememberCoroutineScope()
     val environmentScope = remember(compositionScope) { CoroutineScope(compositionScope.coroutineContext + Dispatchers.Default) }
-    val env = remember(environmentScope, storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffsetMinutes) {
-        CommunityEnv(scope = environmentScope, storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech, prefs = prefs, chatFiles = chatFiles, workspace = workspace, utcOffsetMinutes = utcOffsetMinutes)
+    val env = remember(environmentScope, storage, platform, linkStorage, remoteCache, agentBridge, agentDir, reminders, speech, prefs, chatFiles, workspace, utcOffsetMinutes, communityConfig) {
+        CommunityEnv(config = communityConfig, scope = environmentScope, storage = storage, platform = platform, linkStorage = linkStorage, remoteCache = remoteCache, agentBridge = agentBridge, agentDir = agentDir, reminders = reminders, speech = speech, prefs = prefs, chatFiles = chatFiles, workspace = workspace, utcOffsetMinutes = utcOffsetMinutes)
     }
     CommunityNativeApp(env)
 }

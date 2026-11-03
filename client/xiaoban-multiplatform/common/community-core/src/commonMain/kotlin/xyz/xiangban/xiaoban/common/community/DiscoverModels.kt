@@ -247,13 +247,19 @@ data class NavLink(
     val url: String,
     @SerialName("brand_color") val brandColor: String = "#888888",
     val tint: String = "#EEEEEE",
+    val category: String = "",
+    val subtype: String = "",
+    val region: String = "",
+    val summary: String = "",
+    val logo: String = "",
+    val sample: Boolean = false,
 )
 
 @Serializable
 data class NavGroup(val name: String, val items: List<NavLink> = emptyList())
 
 @Serializable
-data class NavGroups(val groups: List<NavGroup> = emptyList())
+data class NavGroups(val groups: List<NavGroup> = emptyList(), @SerialName("catalog_version") val catalogVersion: Int? = null)
 
 @Serializable
 data class DocLink(val key: String, val product: String = "", val title: String, val subtitle: String = "", val label: String = "guide", val url: String) {

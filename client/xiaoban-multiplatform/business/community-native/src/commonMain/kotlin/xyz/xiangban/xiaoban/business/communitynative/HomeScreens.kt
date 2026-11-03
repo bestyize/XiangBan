@@ -136,10 +136,13 @@ internal fun LangLine(r: RepoRank) {
 internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (CommunitySection, String) -> Unit) {
     val loader = rememberLoader(env, "home") { env.forum.home() }
     val state by loader.state.collectAsState()
-    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
+    val frontierLoader = rememberLoader(env, "frontier") { env.forum.frontier() }
+    val frontierState by frontierLoader.state.collectAsState()
+    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = { loader.reload(); frontierLoader.reload() }, modifier = Modifier.fillMaxSize()) {
         LoadBox(state, loader::reload) { home ->
             LazyColumn(Modifier.fillMaxSize(), contentPadding = ListPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
                 if (home.banners.isNotEmpty()) item { BannerCarousel(home.banners) { openLink(it.link, env, open) } }
+                item(key = "frontier") { FrontierSection(env, frontierState, frontierLoader::reload, open) }
                 item {
                     Column(Modifier.padding(start = 2.dp, end = 2.dp, top = 10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -158,23 +161,6 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
                 }
                 if (home.news.items.isEmpty()) item { WhiteCard { Text("今天还没有日报", style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
                 items(home.news.items, key = { "n-${it.key}" }) { NewsRow(it) { open(Route.News(it.key)) } }
-                if (home.featured.isNotEmpty()) item {
-                    WhiteCard(padding = 0.dp) {
-                        Row(Modifier.padding(start = 14.dp, end = 14.dp, top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                XIcon(XIcons.Sparkle, size = 18.dp)
-                                Text("精选创作", style = XType.Section, fontWeight = FontWeight.SemiBold)
-                            }
-                            Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { switchTo(CommunitySection.Discuss, DiscussSub.Create.key) }.padding(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text("更多", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                                XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 16.dp)
-                            }
-                        }
-                        LazyRow(contentPadding = PaddingValues(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(home.featured, key = { it.id }) { pack -> PickCard(pack) { open(Route.Pack(pack.id)) } }
-                        }
-                    }
-                }
                 home.repos?.takeIf { it.ranks.isNotEmpty() }?.let { issue ->
                     item {
                         WhiteCard(padding = 0.dp) {
@@ -203,79 +189,49 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
     }
 }
 
-/** 头图：深蓝渐变，两团柔光和右上角的装饰柱，左下是标签、标题、署名，右下是分页点。 */
+/** 社区运营推荐：与网页相同的浅色卡片，标题与署名直接在卡片内。 */
 @Composable
 private fun BannerCarousel(banners: List<HomeBanner>, onClick: (HomeBanner) -> Unit) {
     val pager = rememberPagerState { banners.size }
-    Box(Modifier.fillMaxWidth().height(176.dp).clip(RoundedCornerShape(8.dp))) {
-        HorizontalPager(pager, Modifier.fillMaxSize()) { page ->
-            val b = banners[page]
-            Box(Modifier.fillMaxSize().background(Brush.linearGradient(listOf(Color(0xFF1B2A41), Color(0xFF3E5C8A)))).clickable { onClick(b) }) {
-                Canvas(Modifier.fillMaxSize()) {
-                    drawCircle(Brush.radialGradient(listOf(Color(0xFFF4A6A0).copy(alpha = 0.7f), Color.Transparent), center = Offset(size.width + 60.dp.toPx(), 50.dp.toPx()), radius = 100.dp.toPx()), radius = 100.dp.toPx(), center = Offset(size.width + 60.dp.toPx(), 50.dp.toPx()))
-                    drawCircle(Brush.radialGradient(listOf(Color(0xFF9FBFCF).copy(alpha = 0.55f), Color.Transparent), center = Offset(60.dp.toPx(), size.height + 30.dp.toPx()), radius = 90.dp.toPx()), radius = 90.dp.toPx(), center = Offset(60.dp.toPx(), size.height + 30.dp.toPx()))
+    HorizontalPager(pager, Modifier.fillMaxWidth().height(136.dp), pageSpacing = 8.dp) { page ->
+        val banner = banners[page]
+        Column(Modifier.fillMaxSize().outlinedCard(16.dp).clickable { onClick(banner) }.padding(16.dp), verticalArrangement = Arrangement.SpaceBetween) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(banner.tag, Modifier.weight(1f), style = XType.Caption, color = Brand)
+                XIcon(XIcons.Sparkle, tint = Brand, size = 18.dp)
+            }
+            Text(banner.title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (banners.size > 1) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    repeat(banners.size) { index -> Box(Modifier.size(if (index == pager.currentPage) 12.dp else 4.dp, 4.dp).clip(RoundedCornerShape(2.dp)).background(if (index == pager.currentPage) Brand else LocalExtraColors.current.line)) }
                 }
-                Row(Modifier.align(Alignment.TopEnd).padding(end = 28.dp, top = 26.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
-                    listOf(18, 30, 24, 44, 36).forEach { h -> Box(Modifier.width(8.dp).height(h.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.55f))) }
-                }
-                Column(Modifier.align(Alignment.BottomStart).padding(start = 16.dp, end = 16.dp, bottom = 14.dp)) {
-                    if (b.tag.isNotEmpty()) Row(Modifier.clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.2f)).padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        XIcon(XIcons.Sparkle, tint = Color.White, size = 12.dp)
-                        Text(b.tag, style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Color.White)
-                    }
-                    Text(b.title, Modifier.padding(top = 8.dp), style = XType.Title, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Row(Modifier.padding(top = 4.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(b.byline, Modifier.weight(1f), style = XType.Caption, color = Color.White.copy(alpha = 0.85f), maxLines = 1)
-                        if (banners.size > 1) Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            repeat(banners.size) { i ->
-                                val on = i == pager.currentPage
-                                Box(Modifier.size(width = if (on) 14.dp else 4.dp, height = 4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = if (on) 1f else 0.5f)))
-                            }
-                        }
-                    }
-                }
+                Text(banner.byline, Modifier.weight(1f), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, textAlign = TextAlign.End, overflow = TextOverflow.Ellipsis)
             }
         }
     }
 }
 
-/** 日报图文封面卡。没有封面时使用主题色生成占位。 */
+/** 日报为阅读卡，前沿往期为封面卡；没有图片时只展示真实文字。 */
 @Composable
-internal fun NewsRow(item: NewsItem, onClick: () -> Unit) {
-    val accent = hexColor(item.accent, Color(0xFF9FBFCF))
-    Column(Modifier.fillMaxWidth().padding(vertical = 4.dp).outlinedCard(16.dp).clickable(onClick = onClick)) {
-        if (item.coverUrl.isNotEmpty()) Cover(item.coverUrl, item.key.hashCode().toLong() and 0x7fffffff, Modifier.fillMaxWidth().aspectRatio(16f / 9f))
-        else Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Brush.linearGradient(listOf(lerp(accent, Color.Black, 0.48f), accent))), contentAlignment = Alignment.BottomStart) {
-            Text("AI  ·  DAILY", Modifier.padding(18.dp), color = Color.White.copy(alpha = .9f), fontWeight = FontWeight.Bold, letterSpacing = 2.sp, style = XType.Secondary)
-        }
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(item.title, style = XType.Section, fontWeight = FontWeight.Bold, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            if (item.summary.isNotBlank()) Text(item.summary, style = XType.Secondary, color = LocalExtraColors.current.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            val time = agoText(item.sourcePublishedAt ?: item.publishedAt)
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                val logo = BrandLogos.find(item.source)
-                if (logo != null) XIcon(logo.icon, tint = logo.color, size = 14.dp)
-                Text(listOf(item.source, if (item.timeBasis == "collected") "采集于 $time" else time).filter { it.isNotEmpty() }.joinToString(" · "),
-                    style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
+internal fun NewsRow(item: NewsItem, visual: Boolean = false, onClick: () -> Unit) {
+    val content: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(item.title, style = if (visual) XType.Section else XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 3, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                BrandLogos.find(item.source)?.let { XIcon(it.icon, tint = it.color, size = 14.dp) }
+                val time = agoText(item.sourcePublishedAt ?: item.publishedAt)
+                Text(listOf(item.source, if (item.timeBasis == "collected") "采集于 $time" else time, if (item.sample) "示例" else "").filter { it.isNotBlank() }.joinToString(" · "),
+                    style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
-}
-
-/** 精选创作里的一张：宽 132、封面高 104，左上角黑底类型标签，下面是标题和「头像 作者 ♡ 数」。 */
-@Composable
-private fun PickCard(pack: Pack, onClick: () -> Unit) {
-    Column(Modifier.width(132.dp).clickable(onClick = onClick)) {
-        Box {
-            Cover(pack.coverUrl, pack.id, Modifier.fillMaxWidth().height(104.dp))
-            Text(kindLabel(pack.kind), Modifier.padding(6.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 6.dp, vertical = 1.dp), style = XType.Caption, color = Color.White)
-        }
-        Text(pack.title, Modifier.padding(top = 6.dp), style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            Avatar(pack.author?.nickname ?: "?", 14.dp)
-            Text(pack.author?.nickname ?: "社区作品", Modifier.weight(1f), style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (pack.applyCount > 0) Text("${compactCount(pack.applyCount.toInt())} 次应用", style = XType.Caption, color = LocalExtraColors.current.ink3)
-        }
+    if (visual) Column(Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick)) {
+        if (item.coverUrl.isNotBlank()) Cover(item.coverUrl, item.key.hashCode().toLong(), Modifier.fillMaxWidth().aspectRatio(16f / 9f))
+        Box(Modifier.padding(16.dp)) { content() }
+    } else Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable(onClick = onClick).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.weight(1f)) { content() }
+        if (item.coverUrl.isNotBlank()) Cover(item.coverUrl, item.key.hashCode().toLong(), Modifier.width(88.dp).aspectRatio(16f / 9f))
     }
 }
 
@@ -512,51 +468,10 @@ private fun QuotaCard(env: CommunityEnv, q: QuotaInfo) {
     }
 }
 
-// ───────────── 导航 ─────────────
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun NavTab(env: CommunityEnv) {
-    val loader = rememberLoader(env, "nav") { env.forum.navLinks() }
-    val state by loader.state.collectAsState()
-    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
-        LoadBox(state, loader::reload) { groups ->
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = ListPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
-                if (groups.groups.isEmpty()) item { CenterMessage("还没有导航", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)) }
-                groups.groups.forEach { group ->
-                    item(key = "g-${group.name}") {
-                        WhiteCard(padding = 14.dp) {
-                            SectionHeader(group.name, note = "${group.items.size} 个官方入口")
-                            group.items.chunked(2).forEach { row ->
-                                Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    row.forEach { link ->
-                                        Row(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).clickable { env.platform?.openUrl(link.url) }.padding(vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            BrandTile(BrandLogos.find(link.name) ?: BrandLogos.find(link.vendor), link.name, size = 34.dp, corner = 9.dp)
-                                            Column(Modifier.weight(1f)) {
-                                                Text(link.name, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                                            }
-                                        }
-                                    }
-                                    if (row.size == 1) Spacer(Modifier.weight(1f))
-                                }
-                            }
-                        }
-                    }
-                }
-                item { Row(Modifier.padding(horizontal = 6.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    XIcon(XIcons.Info, tint = LocalExtraColors.current.ink3, size = 14.dp)
-                    Text("只放各家官方入口，点开会离开小伴", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                } }
-            }
-        }
-    }
-}
-
 // ───────────── 往期日报 ─────────────
 
 @Composable
-fun DailyScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
+fun DailyScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, frontier: Boolean = false) {
     val scope = rememberCoroutineScope()
     var items by remember { mutableStateOf<List<NewsItem>>(emptyList()) }
     var page by remember { mutableStateOf(0) }
@@ -570,7 +485,7 @@ fun DailyScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
         busy = true; error = null
         scope.launch {
             try {
-                val next = env.forum.dailyNews(page + 1)
+                val next = if (frontier) env.forum.frontier(page + 1) else env.forum.dailyNews(page + 1)
                 items = items + next.items; page += 1; more = next.hasMore
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -584,14 +499,14 @@ fun DailyScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
     LaunchedEffect(retry) { load() }
 
     Column(Modifier.fillMaxSize()) {
-        ScreenBar("AI 日报", onBack = back)
+        ScreenBar(if (frontier) "小伴前沿" else "AI 日报", onBack = back)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(Gap)) {
-            items(items, key = { it.key }) { n -> NewsRow(n) { open(Route.News(n.key)) } }
+            items(items, key = { it.key }) { n -> NewsRow(n, visual = frontier) { open(if (frontier) Route.FrontierArticle(n.key) else Route.News(n.key)) } }
             item {
                 when {
                     error != null -> Text("加载失败，点这里重试", Modifier.fillMaxWidth().clickable { error = null; retry += 1 }.padding(16.dp), color = Danger, style = XType.Body)
                     more -> { LaunchedEffect(items.size) { load() }; Spinner(Modifier.fillMaxWidth().height(48.dp)) }
-                    items.isEmpty() -> CenterMessage("还没有日报", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp))
+                    items.isEmpty() -> CenterMessage(if (frontier) "还没有已发布前沿" else "还没有日报", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp))
                 }
             }
         }

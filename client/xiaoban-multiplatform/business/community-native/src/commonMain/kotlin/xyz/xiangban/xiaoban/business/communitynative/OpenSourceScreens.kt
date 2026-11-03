@@ -94,7 +94,7 @@ internal fun OpenSourceCard(env: CommunityEnv, project: OpenSourceProject, open:
     Column(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable { open(project.route()) }) {
         OpenSourceProjectCover(env, project)
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(project.title, style = XType.Section, fontWeight = FontWeight.Normal)
+            Text(project.title, style = XType.Secondary, fontWeight = FontWeight.Normal)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { project.tags.take(2).forEach { GrayTag(it, compact = true) } }
         }
     }
