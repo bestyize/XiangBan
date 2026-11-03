@@ -41,7 +41,7 @@ report = f'''# 开源精选 README 批次报告
 - 待处理（pending）：{counts['pending']}
 - 专题：{len(inventory['collections'])}，保留原引用，详见 inventory.json。
 
-逐项状态与问题见 manifest.json，项目卡片见 card-manifest.json。pending 包括尚未完成全文翻译、素材/许可核对或审校的项目，不能视为完成；ready_for_review 表示待审，不表示发布。现有目录与详情界面仍按旧导读字段工作，尚未提供经过约定和验证的中英文 README 全文字段及切换；批次文件未写入线上数据库或发布。
+逐项状态与问题见 manifest.json，项目卡片见 card-manifest.json。pending 包括尚未完成全文翻译、素材/许可核对或审校的项目，不能视为完成；ready_for_review 表示待审，不代表该批次文件已经发布。线上发布状态由独立发布流程记录，本报告不推断线上状态。
 
 运行 `python3 tools/build_manifest.py` 和 `python3 tools/build_card_manifest.py` 可按现有 review.json 刷新快照；仅在采编工作停止写入时刷新，避免统计竞争。
 '''

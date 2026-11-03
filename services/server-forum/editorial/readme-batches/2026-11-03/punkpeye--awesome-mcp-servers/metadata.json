@@ -55,7 +55,7 @@
     "watchers": 48
   },
   "fetched_at": "2026-11-03T01:50:45.150584+00:00",
-  "status": "pending",
+  "status": "ready_for_review",
   "canonical_full_name": "punkpeye/awesome-mcp-servers",
   "repository_url": "https://github.com/punkpeye/awesome-mcp-servers",
   "default_branch": "main",
@@ -97,6 +97,13 @@
     "path": "README-zh.md",
     "blob_sha": "edca839783db57899399dd1dffb27af557ee4d09",
     "source_url": "https://github.com/punkpeye/awesome-mcp-servers/blob/29f2d490cc02468e7c9d87b0cf68d40d3041e7ef/README-zh.md",
-    "status": "待核实是否为同项目完整中文及许可证"
-  }
+    "status": "已保存固定版本原字节；该中文候选落后英文目录，未整篇替代本稿"
+  },
+  "description_zh": "按领域整理可自行安装运行的 MCP 服务端，帮助用户查找连接工具与资源。",
+  "official_entry": "https://glama.ai/mcp/servers",
+  "entry_label": "项目官方目录",
+  "stars_fetched_at": "2026-11-03T01:50:45.150584+00:00",
+  "translation_method": "GPT-6.1 Terra 按固定英文源逐条译写及审校；4632 条源描述按行 ID 和翻译哈希记录，条目外目录、介绍、分类及说明逐行翻译。",
+  "source_language": "en",
+  "source_format": "markdown"
 }

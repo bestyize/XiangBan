@@ -1,0 +1,3350 @@
+{
+  "source_blob_sha": "5103450f0773f184b4d105eb1c34ad263ca2529e",
+  "range": [
+    4251,
+    5095
+  ],
+  "entries": [
+    {
+      "id": "L04251",
+      "english": "Manage Bitwarden and Vaultwarden vaults via the bw CLI: search, create, edit and organize logins, notes, cards, identities, SSH keys, folders and Sends.",
+      "zh": "通过 bw CLI 管理 Bitwarden 和 Vaultwarden 保险库：搜索、创建、编辑和整理登录信息、笔记、卡片、身份、SSH 密钥、文件夹和 Send。"
+    },
+    {
+      "id": "L04252",
+      "english": "Scans dependency lockfiles for vulnerabilities, prioritizes them by EPSS exploit probability and recommends fix versions, with monitoring and alerting.",
+      "zh": "扫描依赖锁文件中的漏洞，按 EPSS 漏洞利用概率确定优先级并推荐修复版本，支持监控和警报。"
+    },
+    {
+      "id": "L04254",
+      "english": "Scan ML model artifacts, URLs and directories for unsafe serialization, malicious patterns and risky packaging using ModelScan, PickleScan and heuristics.",
+      "zh": "使用 ModelScan、PickleScan 和启发式方法扫描机器学习模型产物、URL 和目录，查找不安全序列化、恶意模式及高风险打包。"
+    },
+    {
+      "id": "L04255",
+      "english": "Audits agents and MCP servers for prompt injection, infinite loops, token bombing and missing human oversight, with EU AI Act and OWASP mapping.",
+      "zh": "审计代理和 MCP 服务器中的提示注入、无限循环、令牌轰炸和缺乏人工监督等问题，并映射欧盟 AI 法案和 OWASP。"
+    },
+    {
+      "id": "L04256",
+      "english": "Self-hosted default-deny action registry, append-only spend-intent ledger and human sign-off audit trail for gating irreversible agent actions.",
+      "zh": "自托管的默认拒绝操作注册表、仅追加的支出意图账本和人工签核审计记录，用于控制代理的不可逆操作。"
+    },
+    {
+      "id": "L04257",
+      "english": "Read, write and scan the memory of running processes, Cheat Engine style: value scans that narrow down as the value changes, pointer chains, and scan results kept server-side behind a handle.",
+      "zh": "以 Cheat Engine 风格读取、写入和扫描运行中进程的内存：值扫描会随值变化缩小范围，支持指针链，扫描结果通过句柄保留在服务器端。"
+    },
+    {
+      "id": "L04259",
+      "english": "Agent security middleware with layered defenses: prompt injection detection, DLP data flow tracking, command blocking and PII detection.",
+      "zh": "提供分层防御的代理安全中间件：提示注入检测、DLP 数据流跟踪、命令阻止和个人身份信息检测。"
+    },
+    {
+      "id": "L04260",
+      "english": "Action logs for AI agents: records every action in a SHA-256 hash chain as an audit trail.",
+      "zh": "AI 代理操作日志：将每次操作记录在 SHA-256 哈希链中，形成审计记录。"
+    },
+    {
+      "id": "L04261",
+      "english": "Microsoft Patch Tuesday triage from the MSRC Security Update Guide: monthly rollups, CVE/KB lookups, supersedence chains and EPSS/CISA KEV urgency ranking.",
+      "zh": "基于 MSRC Security Update Guide 对微软每月补丁星期二进行分诊：月度汇总、CVE/KB 查询、替代关系链及 EPSS/CISA KEV 紧急程度排序。"
+    },
+    {
+      "id": "L04263",
+      "english": "Retrieve live and recorded video from a CCTV recording program (VMS) and control it, such as opening live or playback dialogs for specific channels and times.",
+      "zh": "从 CCTV 录像程序（VMS）获取实时和录制视频并进行控制，例如为指定频道和时间打开实时或回放对话框。"
+    },
+    {
+      "id": "L04264",
+      "english": "Encrypted secrets vault for Claude Code that injects secrets into local files so the AI never sees raw values, with audit logs and per-model access rules.",
+      "zh": "面向 Claude Code 的加密密钥库，将密钥注入本地文件，使 AI 无法看到原始值，并提供审计日志及按模型设置的访问规则。"
+    },
+    {
+      "id": "L04265",
+      "english": "Local stdio server for Gooo-generated service-grant narrowing decisions: checks preservation of one required request and returns the full proof with source/generation bindings. It does not apply grants or authenticate supplied facts.",
+      "zh": "用于 Gooo 生成的服务授权收窄决策的本地 stdio 服务器：检查一项必需请求是否得到保留，并返回含来源/生成绑定的完整证明。它不应用授权，也不认证所提供的事实。"
+    },
+    {
+      "id": "L04266",
+      "english": "Autonomous reverse engineering with Ghidra: decompile binaries, rename methods and data, and list methods, classes, imports and exports.",
+      "zh": "使用 Ghidra 进行自主逆向工程：反编译二进制文件，重命名方法和数据，列出方法、类、导入和导出。"
+    },
+    {
+      "id": "L04267",
+      "english": "Attack-path engine for cloud and Kubernetes: list routes from internet exposure to sensitive assets, explain each hop, find choke points and simulate fixes.",
+      "zh": "面向云和 Kubernetes 的攻击路径引擎：列出从互联网暴露点到敏感资产的路径，解释各跳、查找关键瓶颈并模拟修复。"
+    },
+    {
+      "id": "L04268",
+      "english": "Accountability for AI agent fleets: verify a signed, hash-chained ledger, check budgets, kill an agent, and issue passports and mandates, all through the local CLI.",
+      "zh": "AI 代理集群问责：通过本地 CLI 验证签名哈希链账本、检查预算、终止代理并签发护照和授权委任。"
+    },
+    {
+      "id": "L04269",
+      "english": "Honeypot framework for building decoy MCP tools that an agent would never use in normal work, to detect prompt injection and malicious agent behavior.",
+      "zh": "蜜罐框架，用于构建代理在正常工作中绝不会使用的诱饵 MCP 工具，以检测提示注入和恶意代理行为。"
+    },
+    {
+      "id": "L04270",
+      "english": "Mobb Vibe Shield identifies and remediates vulnerabilities in human and AI-written code.",
+      "zh": "Mobb Vibe Shield 识别并修复人类和 AI 编写代码中的漏洞。"
+    },
+    {
+      "id": "L04271",
+      "english": "Trust infrastructure for AI agents: register DIDs, verify identities, query reputation scores, rate agents and manage W3C Verifiable Credentials.",
+      "zh": "AI 代理信任基础设施：注册 DID、验证身份、查询信誉评分、评价代理并管理 W3C 可验证凭证。"
+    },
+    {
+      "id": "L04272",
+      "english": "AI supply chain security scanner: discovers MCP clients, scans dependencies for CVEs, maps blast radius to credentials and tools, and generates SBOMs.",
+      "zh": "AI 供应链安全扫描器：发现 MCP 客户端、扫描依赖中的 CVE、将影响范围映射到凭据和工具，并生成 SBOM。"
+    },
+    {
+      "id": "L04273",
+      "english": "IDA Pro plugin for binary analysis: decompilation, disassembly and automatic malware analysis reports.",
+      "zh": "用于二进制分析的 IDA Pro 插件：反编译、反汇编和自动恶意软件分析报告。"
+    },
+    {
+      "id": "L04274",
+      "english": "Administer Keycloak via its Admin REST API: users, roles, clients, groups, identity providers, federation and events, with a read-only mode.",
+      "zh": "通过 Keycloak Admin REST API 管理用户、角色、客户端、群组、身份提供商、联合身份和事件，并提供只读模式。"
+    },
+    {
+      "id": "L04275",
+      "english": "Pre-install security scanner for MCP servers: detects backdoors, exfiltration code, obfuscation, dangerous execution, prompt injection and supply chain risks.",
+      "zh": "MCP 服务器安装前安全扫描器：检测后门、数据外传代码、混淆、危险执行、提示注入和供应链风险。"
+    },
+    {
+      "id": "L04276",
+      "english": "SecObserve vulnerability and license management: triage observations, manage products and rules, import scan reports and SBOMs, run scans and generate VEX.",
+      "zh": "SecObserve 漏洞与许可证管理：分诊观察结果、管理产品和规则、导入扫描报告及 SBOM、运行扫描并生成 VEX。"
+    },
+    {
+      "id": "L04277",
+      "english": "Static security scanner for MCP servers and agent tools: detects secrets, shell execution, risky tool descriptions, environment access and prompt injection.",
+      "zh": "用于 MCP 服务器和代理工具的静态安全扫描器：检测密钥、shell 执行、高风险工具说明、环境访问和提示注入。"
+    },
+    {
+      "id": "L04278",
+      "english": "Offline, read-only audit of MCP client configs: flags plain HTTP, shell wrappers, unpinned runners, embedded credentials and broad access scopes; outputs redacted text, JSON or SARIF.",
+      "zh": "离线只读审计 MCP 客户端配置：标记明文 HTTP、shell 包装器、未固定版本的运行器、嵌入凭据和过宽访问范围；输出脱敏文本、JSON 或 SARIF。"
+    },
+    {
+      "id": "L04279",
+      "english": "Permission tiers, approval gates and secret-redacting audit logging enforced inside MCP servers at the tool boundary, with a demo order-desk server.",
+      "zh": "在 MCP 服务器的工具边界内强制执行权限分级、审批关卡和密钥脱敏审计日志，并提供订单服务台演示服务器。"
+    },
+    {
+      "id": "L04280",
+      "english": "Privacy boundary for healthcare AI agents: pseudonymises patient identifiers (NHS numbers, names, dates of birth, addresses; UK and US) into labelled tokens locally, keeps the reversal map out of agent context, and restores originals only at the trusted boundary.",
+      "zh": "面向医疗 AI 代理的隐私边界：在本地将患者标识符（英国及美国的 NHS 号码、姓名、出生日期、地址）假名化为带标签的令牌，将反向映射保留在代理上下文之外，仅在可信边界恢复原值。"
+    },
+    {
+      "id": "L04281",
+      "english": "Conversational recon with httpx and asnmap: domain analysis, security header inspection, certificate analysis and ASN lookups at multiple recon levels.",
+      "zh": "使用 httpx 和 asnmap 进行对话式侦察：在多个侦察级别分析域名、检查安全标头、分析证书并查询 ASN。"
+    },
+    {
+      "id": "L04282",
+      "english": "Security testing tools for penetration testing, network forensics, memory analysis and vulnerability assessment.",
+      "zh": "用于渗透测试、网络取证、内存分析和漏洞评估的安全测试工具。"
+    },
+    {
+      "id": "L04283",
+      "english": "OPA and Rego policy toolkit wrapping the OPA CLI and Regal: format, lint, evaluate, test and benchmark policies, manage the OPA REST API and explain decisions.",
+      "zh": "封装 OPA CLI 和 Regal 的 OPA 与 Rego 策略工具集：格式化、检查、评估、测试和基准测试策略，管理 OPA REST API 并解释决策。"
+    },
+    {
+      "id": "L04284",
+      "english": "Generate, audit, fix and compile smart contracts on Ethereum, Solana, Base and other chains, with adversarial multi-agent pen testing and honeypot detection.",
+      "zh": "在 Ethereum、Solana、Base 等链上生成、审计、修复和编译智能合约，并提供对抗性多代理渗透测试和蜜罐检测。"
+    },
+    {
+      "id": "L04285",
+      "english": "Transparent proxy that intercepts, signs, rate-limits, redacts and audits MCP tool calls without modifying client or server.",
+      "zh": "透明代理，无需修改客户端或服务器即可拦截、签名、限流、脱敏和审计 MCP 工具调用。"
+    },
+    {
+      "id": "L04286",
+      "english": "Use Panther's SIEM platform in natural language to write detections, query logs and manage alerts.",
+      "zh": "使用自然语言操作 Panther SIEM 平台，编写检测规则、查询日志和管理警报。"
+    },
+    {
+      "id": "L04287",
+      "english": "Pin MCP tool contracts by hash and catch silent drift, rug pulls and per-client bait-and-switch after approval, with a CI gate, live stdio/HTTP proxies, canary replay, call policies and on-chain release verification.",
+      "zh": "以哈希固定 MCP 工具契约，在批准后捕获静默漂移、恶意撤换和针对不同客户端的诱骗替换，提供 CI 关卡、实时 stdio/HTTP 代理、金丝雀重放、调用策略和链上发布验证。"
+    },
+    {
+      "id": "L04288",
+      "english": "Audit the MCP servers you use against the OWASP MCP Top 10: tool poisoning, rug pulls, shadowing, secrets and supply-chain risk, with runtime guards, approved-server policy and adversarial testing for server authors.",
+      "zh": "对照 OWASP MCP Top 10 审计所用 MCP 服务器：工具投毒、恶意撤换、工具遮蔽、密钥及供应链风险，提供运行时防护、已批准服务器策略和面向服务器作者的对抗测试。"
+    },
+    {
+      "id": "L04289",
+      "english": "Supply chain risk scoring for npm, PyPI, Cargo and Go packages from behavioral signals: publisher depth, release consistency and maintenance patterns.",
+      "zh": "根据行为信号为 npm、PyPI、Cargo 和 Go 包评分供应链风险，涵盖发布者背景、发布一致性和维护模式。"
+    },
+    {
+      "id": "L04290",
+      "english": "Static and dynamic analysis of Android and iOS apps with MobSF.",
+      "zh": "使用 MobSF 对 Android 和 iOS 应用进行静态和动态分析。"
+    },
+    {
+      "id": "L04291",
+      "english": "Read-only MISP threat intelligence (events, attributes, search, tags, feeds, galaxies) with prompt injection scanning of every response.",
+      "zh": "只读 MISP 威胁情报（事件、属性、搜索、标签、订阅源、星系），并对每条响应进行提示注入扫描。"
+    },
+    {
+      "id": "L04292",
+      "english": "Privacy and approval gateway between AI assistants and Gmail, Drive, Slack, Salesforce, Jira and more: human approval for sensitive reads and writes, local PII detection and an audit log.",
+      "zh": "位于 AI 助手与 Gmail、Drive、Slack、Salesforce、Jira 等服务之间的隐私和审批网关：敏感读写需人工批准，支持本地个人身份信息检测和审计日志。"
+    },
+    {
+      "id": "L04293",
+      "english": "Deterministic security scan of public git repositories: vulnerable dependencies via OSV, hard-coded secrets and risky config lint, as file:line findings.",
+      "zh": "对公开 git 仓库进行确定性安全扫描：通过 OSV 检测易受攻击的依赖，检查硬编码密钥及高风险配置，并以 file:line 形式报告。"
+    },
+    {
+      "id": "L04295",
+      "english": "Verify agent communication protocols with session types and Lean 4 proofs to catch deadlocks and role violations; includes a linter, formatter and LSP.",
+      "zh": "使用会话类型和 Lean 4 证明验证代理通信协议，发现死锁和角色违规；包含检查器、格式化工具和 LSP。"
+    },
+    {
+      "id": "L04296",
+      "english": "Query the RAD Security API for Kubernetes and cloud security findings, reports and runtime data.",
+      "zh": "查询 RAD Security API，获取 Kubernetes 和云安全发现、报告及运行时数据。"
+    },
+    {
+      "id": "L04297",
+      "english": "Disassemble and inspect binaries for reverse engineering with the Radare2 disassembler.",
+      "zh": "使用 Radare2 反汇编器反汇编和检查二进制文件，以进行逆向工程。"
+    },
+    {
+      "id": "L04298",
+      "english": "Runs 12 OSINT tools locally (Sherlock, Maigret, Holehe, GHunt, SpiderFoot, subfinder...) plus built-in WHOIS, DNS, crt.sh and Wayback lookups. No API keys.",
+      "zh": "在本地运行 12 个 OSINT 工具（Sherlock、Maigret、Holehe、GHunt、SpiderFoot、subfinder 等），并内置 WHOIS、DNS、crt.sh 和 Wayback 查询。无需 API 密钥。"
+    },
+    {
+      "id": "L04299",
+      "english": "Static C/C++ memory-safety scanning and PE/ELF binary protection audits (ASLR, DEP/NX, SafeSEH, PIE), with remediation via secure templates.",
+      "zh": "静态扫描 C/C++ 内存安全问题并审计 PE/ELF 二进制保护（ASLR、DEP/NX、SafeSEH、PIE），通过安全模板提供修复。"
+    },
+    {
+      "id": "L04301",
+      "english": "Stateless privacy shield, WebMCP semantic firewall, and gasless on-chain state settlement for autonomous AI agents on Midnight Network.",
+      "zh": "面向 Midnight Network 上自主 AI 代理的无状态隐私屏障、WebMCP 语义防火墙和免 gas 链上状态结算。"
+    },
+    {
+      "id": "L04302",
+      "english": "Fail-closed policy-as-code proxy for MCP that denies risky tool calls, produces offline-verifiable evidence bundles and enforces egress via eBPF and Landlock.",
+      "zh": "默认拒绝的 MCP 策略即代码代理，拒绝高风险工具调用、生成可离线验证的证据包，并通过 eBPF 和 Landlock 强制执行出站访问控制。"
+    },
+    {
+      "id": "L04303",
+      "english": "Locally check npm and PyPI packages, such as those suggested by AI coding tools, for vulnerabilities and malicious code.",
+      "zh": "在本地检查 npm 和 PyPI 包（例如 AI 编程工具建议的包）是否存在漏洞和恶意代码。"
+    },
+    {
+      "id": "L04304",
+      "english": "Enumerate AWS IAM data, analyze effective permissions and visualize access relationships across users, roles and resources, based on dAWShund.",
+      "zh": "基于 dAWShund 枚举 AWS IAM 数据、分析有效权限，并可视化用户、角色和资源之间的访问关系。"
+    },
+    {
+      "id": "L04305",
+      "english": "Thales CipherTrust Manager integration for key management, cryptographic operations and compliance monitoring.",
+      "zh": "集成 Thales CipherTrust Manager，提供密钥管理、加密操作和合规监控。"
+    },
+    {
+      "id": "L04306",
+      "english": "Thales CDSP CAKM integration for key management, cryptographic operations and compliance monitoring for Microsoft SQL Server and Oracle databases.",
+      "zh": "集成 Thales CDSP CAKM，为 Microsoft SQL Server 和 Oracle 数据库提供密钥管理、加密操作和合规监控。"
+    },
+    {
+      "id": "L04307",
+      "english": "Integration with the Thales CipherTrust Manager RESTful Data Protection service.",
+      "zh": "与 Thales CipherTrust Manager RESTful Data Protection 服务集成。"
+    },
+    {
+      "id": "L04308",
+      "english": "Signed audit chain for AI agent decisions: events are signed, Merkle-chained per project, anchored to public transparency logs and verifiable offline.",
+      "zh": "AI 代理决策的签名审计链：事件经签名、按项目组成 Merkle 链、锚定到公开透明日志，并可离线验证。"
+    },
+    {
+      "id": "L04309",
+      "english": "Scam and threat checks for phone numbers, URLs, texts, emails, documents and QR codes using FTC/FCC complaints, URLhaus and ThreatFox, with risk scores.",
+      "zh": "使用 FTC/FCC 投诉、URLhaus 和 ThreatFox 检查电话号码、URL、文本、邮件、文档和二维码的诈骗与威胁，并提供风险评分。"
+    },
+    {
+      "id": "L04310",
+      "english": "Manage Scalekit organizations, users and SSO.",
+      "zh": "管理 Scalekit 组织、用户和单点登录。"
+    },
+    {
+      "id": "L04311",
+      "english": "Security trust layer that monitors MCP packages on npm for install scripts, command injection, hardcoded secrets, capability drift and publisher posture.",
+      "zh": "安全信任层，监控 npm 上的 MCP 包，检查安装脚本、命令注入、硬编码密钥、能力漂移和发布者安全状况。"
+    },
+    {
+      "id": "L04312",
+      "english": "Algenta decision engine: dataset discovery, exact queries, utility models, decision memory and governed agent runs with approvals and execution receipts.",
+      "zh": "Algenta 决策引擎：数据集发现、精确查询、效用模型、决策记忆以及带审批和执行凭据的受治理代理运行。"
+    },
+    {
+      "id": "L04313",
+      "english": "Security gateway that wraps MCP servers with per-tool policies, approval gates and optional signed receipts, in shadow (log-only) or enforce mode.",
+      "zh": "包装 MCP 服务器的安全网关，提供按工具设置的策略、审批关卡和可选签名凭据，支持影子模式（仅记录）或强制模式。"
+    },
+    {
+      "id": "L04314",
+      "english": "Enterprise security and code-safety guardrail for AI agents featuring AST taint analysis, SARIF/SBOM generation, and policy gates.",
+      "zh": "面向 AI 代理的企业安全和代码安全防护，提供 AST 污点分析、SARIF/SBOM 生成和策略关卡。"
+    },
+    {
+      "id": "L04315",
+      "english": "Security testing toolbox that combines open source tools behind a single interface for pentesting, bug bounty hunting and threat hunting.",
+      "zh": "将开源工具整合到单一界面的安全测试工具箱，用于渗透测试、漏洞赏金和威胁狩猎。"
+    },
+    {
+      "id": "L04316",
+      "english": "Self-hostable human-in-the-loop approval inbox: humans approve, reject or edit proposed agent actions via web, mobile, Slack, Discord or Telegram.",
+      "zh": "可自托管的人参与审批收件箱：人工通过网页、移动端、Slack、Discord 或 Telegram 批准、拒绝或编辑代理提议的操作。"
+    },
+    {
+      "id": "L04317",
+      "english": "Scan code for security vulnerabilities using Semgrep.",
+      "zh": "使用 Semgrep 扫描代码中的安全漏洞。"
+    },
+    {
+      "id": "L04318",
+      "english": "Local credential gateway for coding agents: agents get handles instead of raw secrets, and one-time approvals inject credentials only into approved commands.",
+      "zh": "面向编程代理的本地凭据网关：代理获得句柄而非原始密钥，一次性批准仅向已批准命令注入凭据。"
+    },
+    {
+      "id": "L04319",
+      "english": "Scan SKILL.md files, MCP configs and system prompts for credential theft, prompt injection, zero-width character attacks and ClawHavoc indicators.",
+      "zh": "扫描 SKILL.md 文件、MCP 配置和系统提示词，检测凭据窃取、提示注入、零宽字符攻击和 ClawHavoc 指标。"
+    },
+    {
+      "id": "L04320",
+      "english": "Use CyberChef operations through the CyberChef server API.",
+      "zh": "通过 CyberChef 服务器 API 使用 CyberChef 操作。"
+    },
+    {
+      "id": "L04321",
+      "english": "Governance proxy that wraps MCP servers with policy evaluation, human approval workflows and hash-chain audit trails.",
+      "zh": "包装 MCP 服务器的治理代理，提供策略评估、人工审批工作流和哈希链审计记录。"
+    },
+    {
+      "id": "L04322",
+      "english": "Solana token safety oracle: byte-level SPL mint analysis, honeypot detection, freeze/mint authority checks, Birdeye market data and composite risk scoring.",
+      "zh": "Solana 代币安全预言机：字节级 SPL 铸币分析、蜜罐检测、冻结/铸币权限检查、Birdeye 市场数据和综合风险评分。"
+    },
+    {
+      "id": "L04323",
+      "english": "MCP governance proxy with capability tokens, tiered approvals, fail-closed execution and tamper-evident audit receipts, plus preflight tool-risk scanning.",
+      "zh": "MCP 治理代理，提供能力令牌、分级审批、默认拒绝执行和防篡改审计凭据，并在调用前扫描工具风险。"
+    },
+    {
+      "id": "L04324",
+      "english": "SAST/DAST scanners (Bandit, Semgrep, Trivy, CodeQL, OWASP ZAP and more) with closed-loop remediation, SARIF/SBOM/VEX export and compliance reporting.",
+      "zh": "SAST/DAST 扫描器（Bandit、Semgrep、Trivy、CodeQL、OWASP ZAP 等），支持闭环修复、SARIF/SBOM/VEX 导出和合规报告。"
+    },
+    {
+      "id": "L04325",
+      "english": "Embeds Snyk's security engines into agentic workflows to secure AI-generated code in real time and work through vulnerability backlogs faster.",
+      "zh": "将 Snyk 安全引擎嵌入代理工作流，实时保护 AI 生成代码并加快处理积压漏洞。"
+    },
+    {
+      "id": "L04326",
+      "english": "Fail-closed policy proxy for MCP tool calls that denies, warns on or holds each call for human approval before forwarding, with client-side redaction.",
+      "zh": "面向 MCP 工具调用的默认拒绝策略代理，在转发前拒绝、警告或暂停每次调用以待人工批准，并支持客户端脱敏。"
+    },
+    {
+      "id": "L04327",
+      "english": "Query the OSV (Open Source Vulnerabilities) database by package version or commit, batch-query multiple packages and get vulnerability details by ID.",
+      "zh": "按包版本或提交查询 OSV（开源漏洞）数据库、批量查询多个包，并按 ID 获取漏洞详情。"
+    },
+    {
+      "id": "L04328",
+      "english": "Read-only checks before an agent acts: prompt-injection and phishing scan of untrusted text (local), npm package check for malware, hijacked releases and typosquats, crypto address and token scan, and address-poisoning comparison. Zero dependencies.",
+      "zh": "代理行动前的只读检查：本地扫描不受信任文本中的提示注入和钓鱼内容，检查 npm 包中的恶意软件、被劫持发布及拼写抢注，扫描加密地址和代币，并比较地址投毒。零依赖。"
+    },
+    {
+      "id": "L04329",
+      "english": "Classify input for prompt injection and out-of-scope content with Koma Gate's LLM-based classifier.",
+      "zh": "使用 Koma Gate 基于大语言模型的分类器，识别输入中的提示注入和超范围内容。"
+    },
+    {
+      "id": "L04330",
+      "english": "Local security scanner for AI-generated JS/TS that combines Opengrep, Gitleaks and Trivy with checks for exposed secrets, Supabase RLS and prompt injection.",
+      "zh": "面向 AI 生成的 JS/TS 的本地安全扫描器，结合 Opengrep、Gitleaks 和 Trivy，检查暴露密钥、Supabase RLS 和提示注入。"
+    },
+    {
+      "id": "L04331",
+      "english": "Search the Russian software registry for import-substitution and FSTEC/FSB-certified products, with full-text search and manufacturer listings.",
+      "zh": "搜索俄罗斯软件注册表中用于进口替代以及获得 FSTEC/FSB 认证的产品，提供全文搜索和制造商列表。"
+    },
+    {
+      "id": "L04332",
+      "english": "Manage and interact with the OPNsense open source firewall in natural language.",
+      "zh": "使用自然语言管理和操作 OPNsense 开源防火墙。"
+    },
+    {
+      "id": "L04333",
+      "english": "Deterministic pre-execution filter for agent tool calls that blocks scope creep (credential reads, SSRF, destructive shell/SQL) and prompt injection.",
+      "zh": "针对代理工具调用的确定性执行前过滤器，阻止范围蔓延（凭据读取、SSRF、破坏性 shell/SQL）及提示注入。"
+    },
+    {
+      "id": "L04334",
+      "english": "Admission control for agent file edits: checks syntax, structural-cost regressions and workspace boundaries, returning BLOCK, WARN or PASS verdicts.",
+      "zh": "代理文件编辑准入控制：检查语法、结构成本回归和工作区边界，返回 BLOCK、WARN 或 PASS 判定。"
+    },
+    {
+      "id": "L04335",
+      "english": "Read-only AWS audit scanner: public S3 buckets, root and user MFA gaps, unused access keys, world-open security groups, CloudTrail gaps, and forgotten EC2/EBS/RDS spend across every region. Only makes Describe/List/Get calls and runs locally with your own credentials.",
+      "zh": "只读 AWS 审计扫描器：检查公开 S3 存储桶、root 和用户 MFA 缺口、未使用访问密钥、对所有人开放的安全组、CloudTrail 缺口，以及各区域被遗忘的 EC2/EBS/RDS 支出。仅调用 Describe/List/Get，并使用自己的凭据在本地运行。"
+    },
+    {
+      "id": "L04336",
+      "english": "Pre-connect supply-chain trust checks for AI agents, frameworks and MCP servers: evidence-based HVTrust scores and verdicts from public signals (package provenance, OSSF Scorecard, signed commits, advisories), plus `scan_stack` to check a whole requirements.txt, package.json or MCP client config at once.",
+      "zh": "AI 代理、框架和 MCP 服务器连接前的供应链信任检查：根据公开信号（包来源、OSSF Scorecard、签名提交、安全公告）给出有证据的 HVTrust 评分和判定，并提供 `scan_stack` 一次检查整个 requirements.txt、package.json 或 MCP 客户端配置。"
+    },
+    {
+      "id": "L04337",
+      "english": "Headless IDA Pro binary analysis with concurrent sessions and Il2CppDumper and Blutter metadata import for Unity and Flutter reverse engineering.",
+      "zh": "无头 IDA Pro 二进制分析，支持并发会话和 Il2CppDumper、Blutter 元数据导入，用于 Unity 和 Flutter 逆向工程。"
+    },
+    {
+      "id": "L04338",
+      "english": "Middleware that gates MCP tool calls behind a Hashcash proof-of-work challenge or an L402 Lightning payment via self-hosted LNbits.",
+      "zh": "中间件，通过 Hashcash 工作量证明挑战或自托管 LNbits 的 L402 闪电网络支付控制 MCP 工具调用。"
+    },
+    {
+      "id": "L04339",
+      "english": "Automate reverse engineering of Android APKs with Apktool.",
+      "zh": "使用 Apktool 自动逆向分析 Android APK。"
+    },
+    {
+      "id": "L04340",
+      "english": "Zitadel identity management: manage users, projects, OIDC apps, roles and service accounts in natural language.",
+      "zh": "Zitadel 身份管理：通过自然语言管理用户、项目、OIDC 应用、角色和服务账户。"
+    },
+    {
+      "id": "L04341",
+      "english": "Enforces rules from existing agent instruction files (CLAUDE.md, .cursorrules) by blocking prohibited tool calls and logging per-rule compliance verdicts.",
+      "zh": "通过阻止被禁止的工具调用并记录逐规则合规判定，强制执行现有代理指令文件（CLAUDE.md、.cursorrules）中的规则。"
+    },
+    {
+      "id": "L04342",
+      "english": "Visual CVE audit dashboard for npm, Python, Go and Rust using OSV data, with browser-based human review and fixes applied only after confirmation.",
+      "zh": "基于 OSV 数据的 npm、Python、Go 和 Rust 可视化 CVE 审计仪表盘，通过浏览器进行人工审查，仅在确认后应用修复。"
+    },
+    {
+      "id": "L04343",
+      "english": "Offline verification of Ed25519/JCS-signed artifacts such as receipts, manifests and audit bundles.",
+      "zh": "离线验证使用 Ed25519/JCS 签名的产物，如凭据、清单和审计包。"
+    },
+    {
+      "id": "L04344",
+      "english": "JADX decompiler plugin providing live, LLM-assisted reverse engineering.",
+      "zh": "JADX 反编译器插件，提供实时大语言模型辅助逆向工程。"
+    },
+    {
+      "id": "L04345",
+      "english": "Auth proxy for MCP servers: OAuth2 with DCR, JWT, RBAC, rate limiting, multi-server aggregation and a monitoring dashboard.",
+      "zh": "MCP 服务器认证代理：支持带 DCR 的 OAuth2、JWT、RBAC、限流、多服务器聚合和监控仪表盘。"
+    },
+    {
+      "id": "L04346",
+      "english": "Ed25519-signed consent receipts and a policy engine for agents: spending caps, action allowlists, escalation thresholds and JWKS-backed provider verification.",
+      "zh": "面向代理的 Ed25519 签名同意凭据和策略引擎：支出上限、操作允许列表、升级阈值和基于 JWKS 的提供商验证。"
+    },
+    {
+      "id": "L04347",
+      "english": "Automate cybersecurity assessment of documents, questionnaires and reports to surface risks, compliance gaps and remediations, using a RAG knowledge base.",
+      "zh": "利用 RAG 知识库自动开展文档、问卷和报告的网络安全评估，发现风险、合规缺口及修复措施。"
+    },
+    {
+      "id": "L04348",
+      "english": "URL scanning and phishing triage: capture DOM snapshots, network requests and screenshots, and hunt historical scans with a custom query language.",
+      "zh": "URL 扫描与钓鱼分诊：捕获 DOM 快照、网络请求和截图，并使用自定义查询语言搜索历史扫描。"
+    },
+    {
+      "id": "L04349",
+      "english": "Regulated-industry AI compliance knowledge: control lookup, use-case classification and crosswalks for EU AI Act, NIST AI RMF, ISO 42001, APRA, GDPR and more.",
+      "zh": "受监管行业的 AI 合规知识：控制项查询、用例分类及欧盟 AI 法案、NIST AI RMF、ISO 42001、APRA、GDPR 等标准映射。"
+    },
+    {
+      "id": "L04350",
+      "english": "Burn-after-read encrypted Volta Notes for agents: hand off credentials between users and agents without secrets appearing in chat history.",
+      "zh": "面向代理的阅后即焚加密 Volta Notes：在用户和代理之间交接凭据，避免密钥出现在聊天历史中。"
+    },
+    {
+      "id": "L04351",
+      "english": "Generate zero-knowledge proofs of identity claims (Coinbase KYC, country, Google OIDC, Microsoft 365) without revealing personal information.",
+      "zh": "为身份声明（Coinbase KYC、国家、Google OIDC、Microsoft 365）生成零知识证明，而不泄露个人信息。"
+    },
+    {
+      "id": "L04352",
+      "english": "Injects a live, reversible MCP server into a running Express, FastAPI or Next.js app, with safe reads by default and writes gated behind human confirmation.",
+      "zh": "向运行中的 Express、FastAPI 或 Next.js 应用注入实时可撤销的 MCP 服务器，默认安全读取，写入需经人工确认。"
+    },
+    {
+      "id": "L04353",
+      "english": "Package intelligence across many ecosystems: health, vulnerabilities (OSV, CISA KEV, EPSS), typosquats, malicious packages, alternatives and breaking changes.",
+      "zh": "跨多种生态系统的包情报：健康状况、漏洞（OSV、CISA KEV、EPSS）、拼写抢注、恶意包、替代方案和破坏性变更。"
+    },
+    {
+      "id": "L04354",
+      "english": "Code property graph for C, Python and TypeScript: callers/callees, data and taint flow with source-to-sink witnesses, points-to and guard/sink structure.",
+      "zh": "面向 C、Python 和 TypeScript 的代码属性图：调用方/被调用方、带源到汇证据的数据流和污点流、指向关系以及防护/汇点结构。"
+    },
+    {
+      "id": "L04355",
+      "english": "Security intelligence: CVE/EPSS/KEV lookups, domain recon (DNS, WHOIS, SSL, subdomains), IOC threat intel, OSINT and code scanning for secrets and injection.",
+      "zh": "安全情报：CVE/EPSS/KEV 查询、域名侦察（DNS、WHOIS、SSL、子域名）、IOC 威胁情报、OSINT，以及扫描代码中的密钥和注入问题。"
+    },
+    {
+      "id": "L04357",
+      "english": "Share end-to-end encrypted, self-destructing secrets from an agent, reading them from env vars or files so they stay out of LLM context.",
+      "zh": "让代理分享端到端加密且自毁的密钥，从环境变量或文件读取，使其不进入大语言模型上下文。"
+    },
+    {
+      "id": "L04359",
+      "english": "Pre-install npm package checks: static analysis, supply-chain attack detection, vulnerability audits, AI hallucination guard and CycloneDX SBOM generation.",
+      "zh": "npm 包安装前检查：静态分析、供应链攻击检测、漏洞审计、AI 幻觉防护和 CycloneDX SBOM 生成。"
+    },
+    {
+      "id": "L04361",
+      "english": "PCI DSS static analysis for Go payment code: finds PAN/CVV exposure, weak crypto, missing audit logs and vulnerable deps, each mapped to a PCI requirement.",
+      "zh": "面向 Go 支付代码的 PCI DSS 静态分析：发现 PAN/CVV 暴露、弱加密、缺失审计日志和易受攻击的依赖，并逐项映射 PCI 要求。"
+    },
+    {
+      "id": "L04362",
+      "english": "Mint, resolve, audit and rotate expiring, scope-limited access links (qURLs) via the qURL API.",
+      "zh": "通过 qURL API 创建、解析、审计和轮换有期限及范围限制的访问链接（qURL）。"
+    },
+    {
+      "id": "L04363",
+      "english": "Read-only VMware vSphere compliance scanning and drift detection against CIS, vSphere SCG, China DJCP 2.0 and PCI-DSS, with remediation suggestions.",
+      "zh": "对照 CIS、vSphere SCG、中国等保 2.0 和 PCI-DSS，对 VMware vSphere 进行只读合规扫描和漂移检测，并提供修复建议。"
+    },
+    {
+      "id": "L04364",
+      "english": "Write, validate and convert Sigma detection rules for Splunk, Elastic, Kibana and Wazuh, backed by a rule corpus covering MITRE ATT&CK tactics.",
+      "zh": "编写、检查、验证并转换供 Splunk、Elastic、Kibana 和 Wazuh 使用的 Sigma 检测规则，使用覆盖 MITRE ATT&CK 战术的规则语料库。"
+    },
+    {
+      "id": "L04365",
+      "english": "Scores MCP servers, AI skills and npm packages before install, scanning for prompt injection, credential theft and supply-chain risk, with a go/no-go gate.",
+      "zh": "在安装前对 MCP 服务器、AI 技能和 npm 包评分，扫描提示注入、凭据窃取及供应链风险，并设置允许/禁止关卡。"
+    },
+    {
+      "id": "L04366",
+      "english": "Local macOS scanner for secrets leaked into AI tool chat transcripts, with redacted findings, placeholder-only redaction and Keychain-backed command execution.",
+      "zh": "本地 macOS 扫描器，查找泄漏到 AI 工具聊天记录中的密钥，提供脱敏发现、仅替换为占位符的脱敏及由 Keychain 支持的命令执行。"
+    },
+    {
+      "id": "L04367",
+      "english": "Local privacy testing for AI agents: scan code for PII and secrets, score execution traces across internal channels, redact text, and track new or fixed findings through MCP tools.",
+      "zh": "AI 代理本地隐私测试：扫描代码中的个人身份信息和密钥，跨内部通道对执行跟踪评分、脱敏文本，并通过 MCP 工具跟踪新增或已修复问题。"
+    },
+    {
+      "id": "L04368",
+      "english": "Check recruiters and job offers for scams: cross-checks company registration, domain age, look-alike domains, blocklists and crypto-scam databases.",
+      "zh": "检查招聘者和工作机会是否存在诈骗：交叉核对公司注册、域名年龄、仿冒域名、阻止列表和加密货币诈骗数据库。"
+    },
+    {
+      "id": "L04369",
+      "english": "Analyze AWS IAM policies and CloudFormation templates with Shieldly to flag privilege-escalation paths, wildcards and over-permissive access.",
+      "zh": "使用 Shieldly 分析 AWS IAM 策略和 CloudFormation 模板，标记权限提升路径、通配符和过宽权限。"
+    },
+    {
+      "id": "L04370",
+      "english": "Local-first domain security and privacy checker: live SPF, DMARC, DKIM, DNSSEC, TLS, CAA and security header checks, scored with remediation advice.",
+      "zh": "本地优先的域名安全与隐私检查器：实时检查 SPF、DMARC、DKIM、DNSSEC、TLS、CAA 和安全标头，评分并提供修复建议。"
+    },
+    {
+      "id": "L04371",
+      "english": "Find MCP servers by describing a task and get advisory trust screens before connecting, using the mcpindex directory.",
+      "zh": "使用 mcpindex 目录，根据任务描述查找 MCP 服务器，并在连接前获取建议性的信任检查结果。"
+    },
+    {
+      "id": "L04372",
+      "english": "Offline pre-flight security linter for MCP servers, agent tools and skills that returns SAFE, REVIEW, BLOCK or UNKNOWN verdicts without executing them.",
+      "zh": "面向 MCP 服务器、代理工具和技能的离线执行前安全检查器，无需执行即可返回 SAFE、REVIEW、BLOCK 或 UNKNOWN 判定。"
+    },
+    {
+      "id": "L04374",
+      "english": "U.S. exclusion, debarment and license screening (OIG LEIE, SAM.gov, state boards) with an Ed25519-signed receipt of the exact list snapshots checked.",
+      "zh": "筛查美国排除、禁入和许可证名单（OIG LEIE、SAM.gov、州委员会），并为所检查的确切名单快照提供 Ed25519 签名凭据。"
+    },
+    {
+      "id": "L04376",
+      "english": "Check the reputation of AI microservices and public APIs before calling them and submit ratings afterward, via an open trust registry.",
+      "zh": "通过开放信任注册表在调用前检查 AI 微服务和公共 API 的信誉，并在调用后提交评价。"
+    },
+    {
+      "id": "L04378",
+      "english": "Runtime security proxy for MCP that blocks prompt injection, SSRF, shell/SQL injection and credential exfiltration, plus trust scores for npm MCP packages.",
+      "zh": "MCP 运行时安全代理，阻止提示注入、SSRF、shell/SQL 注入和凭据外传，并为 npm MCP 包提供信任评分。"
+    },
+    {
+      "id": "L04379",
+      "english": "Author, lint, validate and convert Sigma detection rules with RSigma, evaluate and explain detections against log events, and inspect correlation state.",
+      "zh": "使用 RSigma 编写、检查、验证和转换 Sigma 检测规则，依据日志事件评估并解释检测结果，查看关联状态。"
+    },
+    {
+      "id": "L04380",
+      "english": "Verifiable execution protocol for agent tool calls: signed policy decisions, causal evidence chains and offline verification from a SQLite ledger.",
+      "zh": "面向代理工具调用的可验证执行协议：签名策略决策、因果证据链和基于 SQLite 账本的离线验证。"
+    },
+    {
+      "id": "L04381",
+      "english": "Policy proxy that refuses forbidden tool calls, stopping prompt-injection exfiltration and forbidden data combinations across Slack, Drive, GitHub and more.",
+      "zh": "策略代理拒绝被禁止的工具调用，阻止 Slack、Drive、GitHub 等服务间的提示注入数据外传和禁止的数据组合。"
+    },
+    {
+      "id": "L04382",
+      "english": "Exactly-once payments for agents: prevents double settlement across processes and retries, confirms charges with the provider and reconciles out-of-band spend.",
+      "zh": "面向代理的恰好一次支付：防止跨进程和重试重复结算，与支付提供商确认扣款，并核对带外支出。"
+    },
+    {
+      "id": "L04383",
+      "english": "Screen x402 payment counterparties before paying: address sanity, payTo swap, transport safety and spend policy checks with an allow, review or block verdict.",
+      "zh": "付款前筛查 x402 支付对手方：检查地址合理性、payTo 替换、传输安全和支出策略，给出允许、审查或阻止判定。"
+    },
+    {
+      "id": "L04385",
+      "english": "Static scanner that checks Claude Code skills, plugins and MCP servers for exfiltration, install hooks and prompt injection before you install them.",
+      "zh": "静态扫描器，在安装前检查 Claude Code 技能、插件和 MCP 服务器中的数据外传、安装钩子和提示注入。"
+    },
+    {
+      "id": "L04386",
+      "english": "Execution safety for agent actions: a YAML-policy gateway that allows, holds or denies tool calls, plus an approval queue and hash-chained receipts.",
+      "zh": "代理操作执行安全：基于 YAML 策略的网关允许、暂缓或拒绝工具调用，并提供审批队列及哈希链凭据。"
+    },
+    {
+      "id": "L04388",
+      "english": "MAC address (OUI) vendor lookup with randomized-address detection, plus router default login IPs and admin credentials cited to manufacturer documentation.",
+      "zh": "查询 MAC 地址（OUI）厂商并检测随机地址，同时提供路由器默认登录 IP 和管理员凭据，并引用制造商文档。"
+    },
+    {
+      "id": "L04389",
+      "english": "Accountability layer for AI agents: per-version passports, per-job mandates with spending limits, a fail-closed action gate and a hash-chained journal.",
+      "zh": "AI 代理问责层：按版本签发护照、按任务设置带支出限制的授权委任、默认拒绝操作关卡和哈希链日志。"
+    },
+    {
+      "id": "L04391",
+      "english": "APK reverse engineering workspace that orchestrates jadx, apktool, adb and Frida through a workflow engine, on Termux (Android) or PC.",
+      "zh": "APK 逆向工程工作区，通过工作流引擎编排 jadx、apktool、adb 和 Frida，可在 Termux（Android）或 PC 上运行。"
+    },
+    {
+      "id": "L04393",
+      "english": "Query the Small Print record: versioned, diffed tool descriptions and schemas of MCP servers, skills and plugins, with graded changes and public advisories.",
+      "zh": "查询 Small Print 记录：MCP 服务器、技能和插件的工具说明及模式版本与差异，附变更等级和公开公告。"
+    },
+    {
+      "id": "L04395",
+      "english": "Offline safety gate for agent shell commands: rates each command as danger, caution or none and explains every flag, pipe, redirect and subshell.",
+      "zh": "面向代理 shell 命令的离线安全关卡：将每条命令评为危险、警惕或无风险，并解释每个标志、管道、重定向和子 shell。"
+    },
+    {
+      "id": "L04396",
+      "english": "Deterministic execution governance gateway and W3C DID security guardrail for AI agent MCP tool calls.",
+      "zh": "面向 AI 代理 MCP 工具调用的确定性执行治理网关和 W3C DID 安全防护。"
+    },
+    {
+      "id": "L04397",
+      "english": "Zero-trust security proxy, pre-execution blast radius simulation, DLP secret redaction, and cryptographic audit logging for MCP.",
+      "zh": "面向 MCP 的零信任安全代理、执行前影响范围模拟、DLP 密钥脱敏及加密审计日志。"
+    },
+    {
+      "id": "L04398",
+      "english": "Offline security helpers for AI-built (vibe-coded) apps: classify whether a key is safe to expose, generate Supabase RLS audit SQL and owner-only policy templates, and pre-launch checklists for Lovable, Bolt, Cursor, Replit and v0. Ships with a Cursor rule and an Agent Skill.",
+      "zh": "面向 AI 构建（vibe-coded）应用的离线安全助手：判断密钥是否适合公开，生成 Supabase RLS 审计 SQL 和仅所有者策略模板，并提供 Lovable、Bolt、Cursor、Replit 和 v0 上线前检查清单。附带 Cursor 规则和代理技能。"
+    },
+    {
+      "id": "L04399",
+      "english": "Sits between an agent and its tools: every call passes a policy gate and leaves a signed decision record before it runs, a refusal is recorded like an approval, payments wait for an operator on the same machine, and the ledger stays there and verifies offline. Apache-2.0.",
+      "zh": "位于代理及其工具之间：每次调用执行前都经过策略关卡并留下签名决策记录，拒绝与批准一样会被记录；支付等待同一机器上的操作员，账本保留在该机器并可离线验证。Apache-2.0。"
+    },
+    {
+      "id": "L04401",
+      "english": "Deterministic prompt-injection detector, concealed Unicode scrubber, and honeypot wallet defense MCP server for AI agents.",
+      "zh": "面向 AI 代理的确定性提示注入检测器、隐藏 Unicode 清理器和蜜罐钱包防御 MCP 服务器。"
+    },
+    {
+      "id": "L04406",
+      "english": "Public Instagram data: profiles and post feeds by handle, with follower counts, captions, hashtags and mentions parsed as JSON.",
+      "zh": "公开 Instagram 数据：按用户名获取个人资料及帖子流，将粉丝数、配文、话题标签和提及解析为 JSON。"
+    },
+    {
+      "id": "L04407",
+      "english": "Public Facebook pages and profiles as JSON: likes, followers, talking-about counts, contact details and post feeds with reactions.",
+      "zh": "公开 Facebook 页面及个人资料 JSON：点赞数、粉丝数、讨论人数、联系方式及带回应的帖子流。"
+    },
+    {
+      "id": "L04408",
+      "english": "YouTube search, video and channel data and transcripts as JSON.",
+      "zh": "以 JSON 提供 YouTube 搜索、视频和频道数据及文字稿。"
+    },
+    {
+      "id": "L04409",
+      "english": "Public TikTok data as JSON: profile lookup, account videos, comments and reply threads, and keyword search over videos or creators.",
+      "zh": "以 JSON 提供公开 TikTok 数据：查询个人资料、账户视频、评论及回复线程，并按关键词搜索视频或创作者。"
+    },
+    {
+      "id": "L04411",
+      "english": "YouTube outlier research: rank a channel's uploads against its own baseline (Shorts and long-form separately), compare channels and find niche overperformers.",
+      "zh": "YouTube 异常表现研究：将频道上传内容与其自身基线比较排名（Shorts 与长视频分开），比较频道并发现细分领域表现突出的内容。"
+    },
+    {
+      "id": "L04412",
+      "english": "Schedule and manage social media posts on Bluesky, Threads, Instagram, LinkedIn, Mastodon, YouTube, X, Discord and more, with a draft-first workflow.",
+      "zh": "在 Bluesky、Threads、Instagram、LinkedIn、Mastodon、YouTube、X、Discord 等平台安排和管理社交媒体帖子，采用草稿优先工作流。"
+    },
+    {
+      "id": "L04413",
+      "english": "Create, edit and delete LinkedIn posts (text, image, article), upload images, fetch profiles, look up company pages and check follower counts.",
+      "zh": "创建、编辑和删除 LinkedIn 帖子（文本、图片、文章）、上传图片、获取个人资料、查询公司页面及查看粉丝数。"
+    },
+    {
+      "id": "L04414",
+      "english": "Schedule and cross-post to Instagram, TikTok, YouTube, X, LinkedIn and more, with per-platform captions, bulk scheduling, draft approval and media upload.",
+      "zh": "安排并跨平台发布到 Instagram、TikTok、YouTube、X、LinkedIn 等，支持各平台配文、批量排程、草稿审批和媒体上传。"
+    },
+    {
+      "id": "L04415",
+      "english": "Upload videos to YouTube directly from an AI assistant.",
+      "zh": "从 AI 助手直接上传视频到 YouTube。"
+    },
+    {
+      "id": "L04416",
+      "english": "Instagram analytics: account overviews, posts, followers and following lists, post insights, and search for users, hashtags or places.",
+      "zh": "Instagram 分析：账户概览、帖子、粉丝和关注列表、帖子洞察，以及搜索用户、话题标签或地点。"
+    },
+    {
+      "id": "L04417",
+      "english": "Video-first publishing: schedule, publish, update, delete and retry video and image posts on YouTube, TikTok and Instagram.",
+      "zh": "视频优先发布：在 YouTube、TikTok 和 Instagram 上排程、发布、更新、删除及重试视频和图片帖子。"
+    },
+    {
+      "id": "L04418",
+      "english": "Schedule and publish posts across 15 social networks from one place. Hosted server at `mcp.bulkpublish.com/mcp` with tools for posts, schedules, media uploads, labels, approvals and analytics.",
+      "zh": "从一个位置向 15 个社交网络安排和发布帖子。托管服务器位于 `mcp.bulkpublish.com/mcp`，提供帖子、排程、媒体上传、标签、审批和分析工具。"
+    },
+    {
+      "id": "L04419",
+      "english": "Turn URLs into viral posts with a remake command.",
+      "zh": "通过重制命令将 URL 转为热门帖子。"
+    },
+    {
+      "id": "L04420",
+      "english": "Post tweets, search, read timelines, manage engagement and upload media on Twitter/X using browser cookies.",
+      "zh": "使用浏览器 Cookie 在 Twitter/X 上发布推文、搜索、阅读时间线、管理互动和上传媒体。"
+    },
+    {
+      "id": "L04421",
+      "english": "Check posts against real character limits before publishing on X, Bluesky, LinkedIn, Threads, Mastodon and Discord, including URL and emoji weighting.",
+      "zh": "在 X、Bluesky、LinkedIn、Threads、Mastodon 和 Discord 发布前，按照实际字符限制检查帖子，包括 URL 和 emoji 的计权。"
+    },
+    {
+      "id": "L04422",
+      "english": "Read Substack posts, manage drafts, publish Notes, get comments and upload images; it cannot publish or delete posts.",
+      "zh": "阅读 Substack 文章、管理草稿、发布 Notes、获取评论和上传图片；不能发布或删除文章。"
+    },
+    {
+      "id": "L04423",
+      "english": "Local-first TikTok Content Posting API server and CLI with OAuth readiness checks, dry-run publishing and live uploads only when explicitly enabled.",
+      "zh": "本地优先的 TikTok 内容发布 API 服务器和 CLI，提供 OAuth 就绪检查、试运行发布，只有明确启用时才实际上传。"
+    },
+    {
+      "id": "L04424",
+      "english": "LinkedIn via an authenticated browser session: profiles, people/job/company search, feed, messaging and gated writes (connect, post, react, comment).",
+      "zh": "通过已认证浏览器会话访问 LinkedIn：个人资料、人物/职位/公司搜索、信息流和消息，以及受控制的写操作（建立联系、发帖、回应、评论）。"
+    },
+    {
+      "id": "L04425",
+      "english": "Search and read public YouTube, and manage your own channels: analytics, uploads, metadata, playlists and comment moderation, with two-step deletes. Also a CLI (`ytk`).",
+      "zh": "搜索和阅读公开 YouTube 内容，并管理自己的频道：分析、上传、元数据、播放列表和评论审核，删除分两步进行。还提供 CLI（`ytk`）。"
+    },
+    {
+      "id": "L04426",
+      "english": "TikTok creator toolkit: watermark-free video downloads, hashtag sets by niche, recommended posting times by country and viral hook formulas.",
+      "zh": "TikTok 创作者工具集：无水印视频下载、按细分领域提供话题标签集、按国家推荐发布时间及热门开场公式。"
+    },
+    {
+      "id": "L04427",
+      "english": "Unofficial MCP for memecorp.us: read the feed; with an agent API key, post, react, comment, and set a persona.",
+      "zh": "memecorp.us 的非官方 MCP：读取信息流；使用代理 API 密钥可发帖、回应、评论和设置角色。"
+    },
+    {
+      "id": "L04428",
+      "english": "Interact with Bluesky via the atproto client.",
+      "zh": "通过 atproto 客户端操作 Bluesky。"
+    },
+    {
+      "id": "L04429",
+      "english": "Publish, schedule, edit, delete and analyze social posts on Instagram, TikTok, YouTube, X, LinkedIn and more via Post for Me, with a read-only mode.",
+      "zh": "通过 Post for Me 发布、排程、编辑、删除和分析 Instagram、TikTok、YouTube、X、LinkedIn 等平台的社交帖子，并提供只读模式。"
+    },
+    {
+      "id": "L04430",
+      "english": "Manage Facebook Page posts, comments and engagement metrics through the Graph API.",
+      "zh": "通过 Graph API 管理 Facebook Page 帖子、评论和互动指标。"
+    },
+    {
+      "id": "L04431",
+      "english": "Control Instagram via the Instagram Login API: publish photos, reels and carousels, read account insights, manage comments and reply to DMs.",
+      "zh": "通过 Instagram Login API 控制 Instagram：发布照片、Reels 和轮播内容、读取账户洞察、管理评论和回复私信。"
+    },
+    {
+      "id": "L04432",
+      "english": "Multi-account X (Twitter) automation via a real Chrome session: posting, replies, search, engagement and scheduled actions, with draft approval by default.",
+      "zh": "通过真实 Chrome 会话自动化多个 X（Twitter）账户：发帖、回复、搜索、互动和定时操作，默认需要草稿审批。"
+    },
+    {
+      "id": "L04433",
+      "english": "Read WeChat Official Account articles as multimodal content: body text, images and video keyframes, including Tencent Video, native and Channels embeds.",
+      "zh": "以多模态内容读取微信公众号文章：正文、图片和视频关键帧，包括腾讯视频、原生视频及视频号嵌入内容。"
+    },
+    {
+      "id": "L04434",
+      "english": "Sign and publish Nostr events, paid per call in sats over Lightning.",
+      "zh": "签名并发布 Nostr 事件，通过闪电网络按次支付 sats。"
+    },
+    {
+      "id": "L04435",
+      "english": "Schedule and analyze posts on Instagram, TikTok, X, LinkedIn and more: media upload, AI captions, recommended posting times, analytics, listening and comments.",
+      "zh": "在 Instagram、TikTok、X、LinkedIn 等平台安排和分析帖子：媒体上传、AI 配文、推荐发布时间、分析、舆情监听和评论。"
+    },
+    {
+      "id": "L04436",
+      "english": "Upload videos from your own machine straight to YouTube, private with a publish time, and read, schedule and retitle your channel's videos through Runsheet.",
+      "zh": "通过 Runsheet 将自己机器上的视频直接上传至 YouTube，以私有状态设置发布时间，并读取、安排和重命名频道视频。"
+    },
+    {
+      "id": "L04437",
+      "english": "Browse Reddit posts, search content and analyze user activity.",
+      "zh": "浏览 Reddit 帖子、搜索内容并分析用户活动。"
+    },
+    {
+      "id": "L04438",
+      "english": "Reddit market and competitive research: find subreddits via semantic search, fetch posts and comments with full citations and manage research feeds.",
+      "zh": "Reddit 市场与竞争研究：通过语义搜索发现 subreddit，获取带完整引用的帖子和评论，并管理研究信息流。"
+    },
+    {
+      "id": "L04439",
+      "english": "Twitter management: timelines, user tweets, hashtag monitoring, conversation and sentiment analysis, direct messages and full post lifecycle control.",
+      "zh": "Twitter 管理：时间线、用户推文、话题标签监控、对话与情绪分析、私信以及完整帖子生命周期控制。"
+    },
+    {
+      "id": "L04440",
+      "english": "Run a Shopstr or Nostr marketplace storefront: create and update stalls and products in both NIP-15 and Shopstr's NIP-99-based listing formats.",
+      "zh": "运营 Shopstr 或 Nostr 市场店面：以 NIP-15 和 Shopstr 基于 NIP-99 的商品列表格式创建和更新摊位与产品。"
+    },
+    {
+      "id": "L04441",
+      "english": "Schedule and publish across 33 social media connectors, with draft approvals, analytics, media, notifications and an emergency publishing pause. Install: `npx -y @postsider/mcp`.",
+      "zh": "跨 33 个社交媒体连接器安排和发布内容，提供草稿审批、分析、媒体、通知和紧急暂停发布。安装：`npx -y @postsider/mcp`。"
+    },
+    {
+      "id": "L04442",
+      "english": "Real-time X, Reddit and YouTube data with filtering by search phrase, user and date.",
+      "zh": "实时 X、Reddit 和 YouTube 数据，可按搜索词、用户和日期筛选。"
+    },
+    {
+      "id": "L04443",
+      "english": "Resolves a company domain to its Bluesky account with exact follower, following and post counts.",
+      "zh": "根据公司域名查找其 Bluesky 账户，提供精确的粉丝、关注和帖子数量。"
+    },
+    {
+      "id": "L04444",
+      "english": "Get recent posts from LinkedIn profiles and company pages with engagement counts and publicly visible commenters.",
+      "zh": "获取 LinkedIn 个人资料和公司页面的近期帖子、互动数量及公开可见的评论者。"
+    },
+    {
+      "id": "L04445",
+      "english": "Resolves a company domain to its Pinterest business account with exact follower, pin and board counts.",
+      "zh": "根据公司域名查找其 Pinterest 商业账户，提供精确的粉丝、图钉和画板数量。"
+    },
+    {
+      "id": "L04446",
+      "english": "Resolves a TikTok handle or a company domain to the brand account with follower, like, and video counts.",
+      "zh": "根据 TikTok 用户名或公司域名查找品牌账户，提供粉丝、点赞和视频数量。"
+    },
+    {
+      "id": "L04447",
+      "english": "Resolves a company domain or YouTube handle to the channel with subscriber count and channel metadata.",
+      "zh": "根据公司域名或 YouTube 用户名查找频道，提供订阅者数量和频道元数据。"
+    },
+    {
+      "id": "L04448",
+      "english": "Workflow automation for fitness content creators: jump-cut video editing, revenue analytics and branded content creation.",
+      "zh": "面向健身内容创作者的工作流自动化：跳剪视频编辑、收入分析和品牌内容创作。"
+    },
+    {
+      "id": "L04449",
+      "english": "Schedule, publish and measure posts on Facebook, Instagram, TikTok, LinkedIn, Threads, Pinterest and X for one brand or many, with analytics and Evergreen queues. Hosted server with OAuth sign-in, or the `@markaestro/mcp` npm package.",
+      "zh": "为单个或多个品牌在 Facebook、Instagram、TikTok、LinkedIn、Threads、Pinterest 和 X 上安排、发布和衡量帖子，提供分析及常青内容队列。可使用带 OAuth 登录的托管服务器，或 `@markaestro/mcp` npm 包。"
+    },
+    {
+      "id": "L04450",
+      "english": "Instagram Graph API, Threads API and Meta platform tools for publishing, comments, insights, hashtags, DMs and token management.",
+      "zh": "Instagram Graph API、Threads API 和 Meta 平台工具，支持发布、评论、洞察、话题标签、私信和令牌管理。"
+    },
+    {
+      "id": "L04451",
+      "english": "Velog blog integration: read and search posts, stats, tags and series; writes default to drafts or private posts, and public publishing is opt-in.",
+      "zh": "Velog 博客集成：阅读和搜索帖子、统计、标签及系列；写入默认为草稿或私密帖子，公开发布需主动启用。"
+    },
+    {
+      "id": "L04452",
+      "english": "Short-form video creator tools: TikTok trend search by country, plus use-case scenarios for video analysis, competitor research and content strategy.",
+      "zh": "短视频创作者工具：按国家搜索 TikTok 趋势，并提供视频分析、竞品研究和内容策略的用例场景。"
+    },
+    {
+      "id": "L04453",
+      "english": "Local-first social media drafting and scheduling for Instagram, LinkedIn, X, Nostr, WordPress, Ghost and more, behind a human approval gate.",
+      "zh": "面向 Instagram、LinkedIn、X、Nostr、WordPress、Ghost 等平台的本地优先社交媒体起草和排程，设有人工审批关卡。"
+    },
+    {
+      "id": "L04454",
+      "english": "Post to TikTok, Instagram, YouTube, X, LinkedIn, Bluesky, Telegram, Mastodon and Discord through a single tool.",
+      "zh": "通过单一工具向 TikTok、Instagram、YouTube、X、LinkedIn、Bluesky、Telegram、Mastodon 和 Discord 发帖。"
+    },
+    {
+      "id": "L04455",
+      "english": "Schedule and manage social media posts on Instagram, Facebook, TikTok, X, LinkedIn, YouTube, Threads, Pinterest, Bluesky and Telegram.",
+      "zh": "在 Instagram、Facebook、TikTok、X、LinkedIn、YouTube、Threads、Pinterest、Bluesky 和 Telegram 上安排和管理社交媒体帖子。"
+    },
+    {
+      "id": "L04456",
+      "english": "Schedule and publish across Instagram, LinkedIn, TikTok, X, YouTube and more, with campaigns, bulk operations, media, analytics, webhooks and AI captions.",
+      "zh": "在 Instagram、LinkedIn、TikTok、X、YouTube 等平台安排和发布帖子，提供活动、批量操作、媒体、分析、Webhook 和 AI 配文。"
+    },
+    {
+      "id": "L04457",
+      "english": "Publish and schedule posts to LinkedIn, X, Facebook, Instagram, Threads, Bluesky and YouTube Shorts, with preflight checks, brand kits and image generation.",
+      "zh": "向 LinkedIn、X、Facebook、Instagram、Threads、Bluesky 和 YouTube Shorts 发布和安排帖子，支持发布前检查、品牌素材包和图片生成。"
+    },
+    {
+      "id": "L04458",
+      "english": "Schedule and publish posts via Publora to X, LinkedIn, Instagram, Threads, TikTok, YouTube and more, with media upload and LinkedIn analytics.",
+      "zh": "通过 Publora 向 X、LinkedIn、Instagram、Threads、TikTok、YouTube 等平台安排和发布帖子，提供媒体上传和 LinkedIn 分析。"
+    },
+    {
+      "id": "L04459",
+      "english": "Access Twitter/X data, including user profiles, tweets, followers, trends, lists and communities, via the ScrapeBadger API.",
+      "zh": "通过 ScrapeBadger API 访问 Twitter/X 数据，包括用户资料、推文、粉丝、趋势、列表和社区。"
+    },
+    {
+      "id": "L04460",
+      "english": "Reddit outreach via Signal Found: find prospects posting about problems your product solves, send personalized DMs and manage an outreach CRM.",
+      "zh": "通过 Signal Found 在 Reddit 开展外联：寻找发布了你的产品所解决问题的潜在客户、发送个性化私信并管理外联 CRM。"
+    },
+    {
+      "id": "L04461",
+      "english": "Summarize a user's Reddit homepage or any subreddit from its posts and comments.",
+      "zh": "根据帖子和评论总结用户的 Reddit 首页或任意 subreddit。"
+    },
+    {
+      "id": "L04462",
+      "english": "Public Facebook and Instagram data as JSON: pages, posts, comments, groups, Ads Library, Marketplace, profiles and reels. Also hosted at mcp.socialapis.io/mcp.",
+      "zh": "以 JSON 提供公开 Facebook 和 Instagram 数据：页面、帖子、评论、群组、广告资料库、Marketplace、个人资料和 Reels。也托管于 mcp.socialapis.io/mcp。"
+    },
+    {
+      "id": "L04463",
+      "english": "Search Instagram influencers by niche, country, demographics or follower count for usernames, bios, follower counts, categories and public business emails.",
+      "zh": "按细分领域、国家、人口统计或粉丝数量搜索 Instagram 影响者，获取用户名、简介、粉丝数、分类和公开商务邮箱。"
+    },
+    {
+      "id": "L04464",
+      "english": "Web tools via the Sofya API: full-content web search, URL and PDF fetching as Markdown, prompt-based data extraction and cited multi-source deep research.",
+      "zh": "通过 Sofya API 提供网页工具：全文网页搜索、将 URL 和 PDF 获取为 Markdown、基于提示词的数据提取，以及带引用的多来源深度研究。"
+    },
+    {
+      "id": "L04465",
+      "english": "SynthNet, a social network for AI agents: join with a keypair, paint a daily self-portrait, reply to humans and agents, and keep a persistent reputation.",
+      "zh": "SynthNet 是面向 AI 代理的社交网络：使用密钥对加入、每天绘制一幅自画像、回复人和代理，并保持持久信誉。"
+    },
+    {
+      "id": "L04466",
+      "english": "Publish or schedule social videos to TikTok, Instagram Reels, YouTube Shorts, X and Facebook through Taisly, with account discovery and video validation.",
+      "zh": "通过 Taisly 向 TikTok、Instagram Reels、YouTube Shorts、X 和 Facebook 发布或安排社交视频，支持账户发现和视频验证。"
+    },
+    {
+      "id": "L04467",
+      "english": "Access the VK (VKontakte) social network API: users, walls, groups, friends, newsfeed, photos and community stats.",
+      "zh": "访问 VK（VKontakte）社交网络 API：用户、留言墙、群组、好友、新闻信息流、照片和社区统计。"
+    },
+    {
+      "id": "L04468",
+      "english": "Publish and schedule content via Solnk to X, Instagram, TikTok, YouTube, LinkedIn and more, with drafts, media upload and post analytics.",
+      "zh": "通过 Solnk 向 X、Instagram、TikTok、YouTube、LinkedIn 等平台发布和安排内容，提供草稿、媒体上传和帖子分析。"
+    },
+    {
+      "id": "L04469",
+      "english": "Publish, comment and react on LinkedIn via the Unipile API, with dry-run by default.",
+      "zh": "通过 Unipile API 在 LinkedIn 发布、评论和回应，默认试运行。"
+    },
+    {
+      "id": "L04470",
+      "english": "Managed TikTok, Instagram and YouTube accounts run by TokPortal's human account managers, with video upload, scheduling, analytics and webhooks.",
+      "zh": "由 TokPortal 人工账户经理运营的 TikTok、Instagram 和 YouTube 托管账户，提供视频上传、排程、分析和 Webhook。"
+    },
+    {
+      "id": "L04471",
+      "english": "Twitter/X search, profiles, followers, timelines, posting and DMs through twitterapis.com, pay per call (about $0.04 per 1,000 tweets), no X developer account.",
+      "zh": "通过 twitterapis.com 搜索 Twitter/X、访问个人资料、粉丝和时间线、发帖及发送私信；按次付费（每 1,000 条推文约 $0.04），无需 X 开发者账户。"
+    },
+    {
+      "id": "L04472",
+      "english": "Browse and search Hermtica, a social network and marketplace for AI agents: feed, trending items, agent profiles and marketplace stats.",
+      "zh": "浏览和搜索 Hermtica（面向 AI 代理的社交网络和市场）：信息流、热门项目、代理资料和市场统计。"
+    },
+    {
+      "id": "L04473",
+      "english": "Publish, schedule and analyze posts on TikTok, Instagram, YouTube, LinkedIn, Facebook, X, Reddit and more via Upload-Post, including comments and DMs.",
+      "zh": "通过 Upload-Post 在 TikTok、Instagram、YouTube、LinkedIn、Facebook、X、Reddit 等平台发布、安排和分析帖子，包括评论及私信。"
+    },
+    {
+      "id": "L04474",
+      "english": "Real-time LinkedIn, X (Twitter) and Reddit data: profiles, companies, posts, search and sentiment.",
+      "zh": "实时 LinkedIn、X（Twitter）和 Reddit 数据：个人资料、公司、帖子、搜索和情绪。"
+    },
+    {
+      "id": "L04475",
+      "english": "Post AI-generated images to Vynly, an AI-only social feed, and read and search the feed, with provenance support (C2PA, SynthID, XMP).",
+      "zh": "向仅限 AI 的社交信息流 Vynly 发布 AI 生成的图片，并阅读和搜索信息流，支持来源证明（C2PA、SynthID、XMP）。"
+    },
+    {
+      "id": "L04476",
+      "english": "X (Twitter) automation: post tweets, reply, like, retweet, follow, DM, search, extract data, run giveaways and monitor accounts.",
+      "zh": "X（Twitter）自动化：发推、回复、点赞、转推、关注、私信、搜索、提取数据、举办赠送活动和监控账户。"
+    },
+    {
+      "id": "L04477",
+      "english": "Read-only X/Twitter API for agents: search, timelines, profiles, Smart Money. npm `@xflux/xflux-mcp-server`. Not for posting.",
+      "zh": "面向代理的只读 X/Twitter API：搜索、时间线、个人资料和 Smart Money。npm 包 `@xflux/xflux-mcp-server`。不用于发帖。"
+    },
+    {
+      "id": "L04478",
+      "english": "VK API access: wall posts, communities, messages, market items, ads and stats, with plain-language method search and a read/write/destructive safety gate.",
+      "zh": "访问 VK API：留言墙帖子、社区、消息、市场商品、广告和统计，提供通俗语言方法搜索以及读/写/破坏性操作安全关卡。"
+    },
+    {
+      "id": "L04484",
+      "english": "True solar time (longitude correction + equation of time), exact moments of the 24 Chinese solar terms for any year, and China 1986–1991 DST handling for BaZi birth-time conversion.",
+      "zh": "真太阳时（经度修正加时间方程）、任意年份中国二十四节气的准确时刻，以及中国 1986–1991 年夏令时处理，用于八字出生时间转换。"
+    },
+    {
+      "id": "L04485",
+      "english": "Vedic astrology: kundali, Vimshottari dasha, panchang, gochar and Sade Sati, ashtakavarga, guna milan, divisional charts and Hindi janma patrika PDFs.",
+      "zh": "吠陀占星：kundali、Vimshottari dasha、panchang、gochar 和 Sade Sati、ashtakavarga、guna milan、分盘及印地语 janma patrika PDF。"
+    },
+    {
+      "id": "L04486",
+      "english": "Offline Bazi (Four Pillars) charts with True Solar Time: Day Master, Ten Gods, hidden stems, Na Yin, Shen Sha, branch relations and Da Yun luck pillars.",
+      "zh": "使用真太阳时离线排八字（四柱）：日主、十神、藏干、纳音、神煞、地支关系和大运。"
+    },
+    {
+      "id": "L04487",
+      "english": "Self-hosted Vedic astrology: natal charts, dashas, vargas, shadbala, ashtakavarga, panchanga, transits, muhurta search, synastry and property-graph export.",
+      "zh": "自托管吠陀占星：本命盘、dasha、varga、shadbala、ashtakavarga、panchanga、行运、muhurta 搜索、合盘和属性图导出。"
+    },
+    {
+      "id": "L04488",
+      "english": "Vedic and Western astrology: natal and divisional charts, Vimshottari dasha, panchanga, muhurta, compatibility matching, KP, Lal Kitab, numerology and tarot.",
+      "zh": "吠陀和西方占星：本命盘与分盘、Vimshottari dasha、panchanga、muhurta、合盘、KP、Lal Kitab、数字命理和塔罗。"
+    },
+    {
+      "id": "L04489",
+      "english": "AstroWay Calculation API: natal charts, synastry, transits, Vedic dashas and vargas, tarot, numerology, Human Design and AI horoscopes.",
+      "zh": "AstroWay Calculation API：本命盘、合盘、行运、吠陀 dasha 和 varga、塔罗、数字命理、人类图及 AI 星座运势。"
+    },
+    {
+      "id": "L04490",
+      "english": "Korean Saju and Chinese BaZi (Four Pillars) computed by the CAFE engine: natal chart, Five Elements, chart structure (格局), yin-yang and climate, favorable-element candidates, and a manseryeok calendar with exact solar-term times. Structured output. Remote: `https://mcp.24plus.ai.kr/mcp`, or `npx -y @dangamsoft/cafe-mcp`.",
+      "zh": "由 CAFE 引擎计算韩国四柱和中国八字：命盘、五行、格局、阴阳与气候、喜用神候选，以及含精确节气时刻的万年历。结构化输出。远程：`https://mcp.24plus.ai.kr/mcp`，或 `npx -y @dangamsoft/cafe-mcp`。"
+    },
+    {
+      "id": "L04491",
+      "english": "Astrology tools for natal charts, current transits, synastry, Moon phases and birthplace lookup, with privacy modes for compact payloads.",
+      "zh": "占星工具，提供本命盘、当前行运、合盘、月相和出生地查询，并支持隐私模式以缩小载荷。"
+    },
+    {
+      "id": "L04492",
+      "english": "Deterministic Western astrology via Swiss Ephemeris: natal charts, transits, synastry and a birthplace resolver with coordinates and historical UTC offsets.",
+      "zh": "通过 Swiss Ephemeris 进行确定性西方占星：本命盘、行运、合盘，以及提供坐标和历史 UTC 偏移量的出生地解析。"
+    },
+    {
+      "id": "L04493",
+      "english": "Vietnamese Tử Vi horoscope calculation: traditional pattern evaluations, transit charts, auspicious date checking and chart rendering.",
+      "zh": "越南 Tử Vi 命盘计算：传统格局评估、行运盘、吉日检查和命盘渲染。"
+    },
+    {
+      "id": "L04494",
+      "english": "Astrology from the NASA JPL DE440 ephemeris: natal, synastry, progressions, transit search, Human Design, Vedic, BaZi and astrocartography.",
+      "zh": "基于 NASA JPL DE440 星历的占星：本命盘、合盘、推运、行运搜索、人类图、吠陀、八字和占星地图。"
+    },
+    {
+      "id": "L04495",
+      "english": "Deterministic Bazi (Four Pillars) calculations with True Solar Time, lunar/solar conversion, Da Yun luck cycles, branch interactions and reverse Bazi lookup.",
+      "zh": "确定性八字计算，支持真太阳时、阴阳历转换、大运周期、地支相互作用和反推八字。"
+    },
+    {
+      "id": "L04496",
+      "english": "Synthesizes 26 ancient divination systems (BaZi, Vedic Jyotish, Western, Nine Star Ki, Thai Seven Number, Mayan, Norse Runes, Human Design and 18 more) into a single consensus Cosmic Score showing where the traditions agree vs contradict. Deterministic (no LLM in the math), fully local — no birth data leaves the process. Official MCP for mythsensus.com. Install: `npx -y mythsensus-mcp`.",
+      "zh": "将 26 种古代占卜体系（八字、吠陀 Jyotish、西方占星、九星气学、泰国七数字、玛雅、北欧符文、人类图及另外 18 种）综合为一个共识 Cosmic Score，展示传统间的一致和矛盾。确定性计算（数学部分不使用大语言模型），完全本地运行，出生数据不离开进程。mythsensus.com 官方 MCP。安装：`npx -y mythsensus-mcp`。"
+    },
+    {
+      "id": "L04497",
+      "english": "Telugu Panchangam (Hindu almanac): tithi, nakshatra, muhurta windows, festivals, good-day finder, gochara transits and daily rasi phalalu.",
+      "zh": "泰卢固语 Panchangam（印度历书）：tithi、nakshatra、muhurta 时段、节日、吉日查询、gochara 行运和每日 rasi phalalu。"
+    },
+    {
+      "id": "L04503",
+      "english": "Workout memory: logs sets, weights, estimated 1RM, per-muscle volume and recovery so the next session is planned from your training history.",
+      "zh": "训练记忆：记录组数、重量、估算 1RM、各肌群训练量和恢复情况，以便根据训练历史规划下次训练。"
+    },
+    {
+      "id": "L04504",
+      "english": "Local-first Garmin data warehouse: incremental SQLite sync with trends, lag-aware correlations, personal baselines, anomaly detection and FIT-file import.",
+      "zh": "本地优先的 Garmin 数据仓库：增量同步至 SQLite，提供趋势、考虑滞后的相关性、个人基线、异常检测和 FIT 文件导入。"
+    },
+    {
+      "id": "L04505",
+      "english": "Live scores, fixtures, standings and read-only prediction-market signals for the 2026 World Cup.",
+      "zh": "2026 年世界杯实时比分、赛程、积分榜和只读预测市场信号。"
+    },
+    {
+      "id": "L04506",
+      "english": "Live scores, standings, top scorers, player stats and knockout brackets for football, basketball, cricket and tennis.",
+      "zh": "足球、篮球、板球和网球的实时比分、积分榜、最佳射手、球员统计和淘汰赛对阵表。"
+    },
+    {
+      "id": "L04507",
+      "english": "Football fixtures, results, standings, lineups, live timelines, shot-level xG and match context (form, Elo, rest, head-to-head) via the OpenFoot API.",
+      "zh": "通过 OpenFoot API 获取足球赛程、结果、积分榜、阵容、实时事件、逐次射门 xG 和比赛背景（状态、Elo、休息、交锋记录）。"
+    },
+    {
+      "id": "L04508",
+      "english": "Sports data via the Cloudbet API: upcoming events, live odds, stake limits and market info across soccer, basketball, tennis, esports and more.",
+      "zh": "通过 Cloudbet API 获取体育数据：足球、篮球、网球、电竞等赛事的即将开始活动、实时赔率、投注限额和市场信息。"
+    },
+    {
+      "id": "L04509",
+      "english": "Live sports data and cross-book odds from bookmakers like Betfair, Pinnacle and FanDuel, league feeds, racing, and Kalshi and Polymarket prediction markets.",
+      "zh": "实时体育数据及 Betfair、Pinnacle、FanDuel 等博彩公司跨平台赔率，联赛信息流、赛马，以及 Kalshi 和 Polymarket 预测市场。"
+    },
+    {
+      "id": "L04510",
+      "english": "Local-first access to WHOOP recovery, HRV, sleep, strain and performance data, with tokens stored locally.",
+      "zh": "本地优先访问 WHOOP 恢复、HRV、睡眠、负荷和表现数据，令牌存储在本地。"
+    },
+    {
+      "id": "L04511",
+      "english": "Personalized Fantasy Premier League insights: captain picks, transfer suggestions, differentials, fixture outlook, price predictions and live points.",
+      "zh": "个性化 Fantasy Premier League 洞察：队长人选、转会建议、差异化球员、赛程前景、价格预测和实时积分。"
+    },
+    {
+      "id": "L04512",
+      "english": "Exercise-to-muscle mapping: look up muscles worked by exercises, analyze workouts for gaps and find alternative exercises ranked by muscle overlap.",
+      "zh": "动作与肌肉映射：查询训练动作锻炼的肌肉、分析训练中的缺口，并按肌肉重合度排序替代动作。"
+    },
+    {
+      "id": "L04513",
+      "english": "NFL fantasy football: head-to-head player comparisons, PPR, half-PPR and standard rankings, positional scarcity and bye-week conflicts, with cited sources.",
+      "zh": "NFL 梦幻橄榄球：球员一对一比较、PPR、半 PPR 和标准排名、位置稀缺性及轮空周冲突，并附来源。"
+    },
+    {
+      "id": "L04514",
+      "english": "Suunto watch data via the Suunto API: workouts, time-series samples, FIT decoding, GPX export, 24/7 activity, sleep and recovery/HRV.",
+      "zh": "通过 Suunto API 获取手表数据：训练、时间序列样本、FIT 解码、GPX 导出、全天候活动（24/7）、睡眠和恢复/HRV。"
+    },
+    {
+      "id": "L04515",
+      "english": "Proxy to the public MLB API for player info, stats and game information.",
+      "zh": "公开 MLB API 的代理，用于获取球员信息、统计和比赛信息。"
+    },
+    {
+      "id": "L04516",
+      "english": "Read and write Garmin Connect: activities with per-set strength detail, laps, health data and two-year trends; strength, run, ride and swim workouts pushed to a watch; completed strength sessions logged as activities; and weigh-ins with full body composition.",
+      "zh": "读写 Garmin Connect：含逐组力量训练详情的活动、圈数、健康数据和两年趋势；将力量、跑步、骑行及游泳训练推送到手表；将完成的力量训练记录为活动；以及记录包含完整身体成分的称重数据。"
+    },
+    {
+      "id": "L04517",
+      "english": "Live sports betting player props for NBA, MLB, NFL, NHL, NCAA and soccer, unified from sportsbooks with American odds, pre-game and live.",
+      "zh": "来自各投注平台的 NBA、MLB、NFL、NHL、NCAA 和足球实时球员特殊投注数据，统一提供美式赔率，覆盖赛前和实时。"
+    },
+    {
+      "id": "L04518",
+      "english": "Query TrainingPeaks workouts, analyze CTL/ATL/TSB fitness metrics and compare power and pace PRs.",
+      "zh": "查询 TrainingPeaks 训练、分析 CTL/ATL/TSB 体能指标，并比较功率和配速个人纪录。"
+    },
+    {
+      "id": "L04519",
+      "english": "FIFA World Cup 2026 data: matches, teams, venues, city guides, fan zones, visa requirements, injuries, odds and standings.",
+      "zh": "2026 年 FIFA 世界杯数据：比赛、球队、场馆、城市指南、球迷区、签证要求、伤情、赔率和积分榜。"
+    },
+    {
+      "id": "L04520",
+      "english": "Arvo AI workout coach: access training data, workout history, personal records and body progress.",
+      "zh": "Arvo AI 训练教练：访问训练数据、训练历史、个人纪录和身体进展。"
+    },
+    {
+      "id": "L04521",
+      "english": "ESPN fantasy football tools: draft simulations, lineup recommendations and browser actions within configurable user limits.",
+      "zh": "ESPN 梦幻橄榄球工具：选秀模拟、阵容建议及在可配置用户限制内的浏览器操作。"
+    },
+    {
+      "id": "L04522",
+      "english": "Live and historical NBA statistics: player stats, game scores, team data and advanced analytics.",
+      "zh": "实时和历史 NBA 统计：球员数据、比赛比分、球队数据和高级分析。"
+    },
+    {
+      "id": "L04523",
+      "english": "Aggregated sports data: live scores, standings, player stats and betting odds for NFL, NBA, MLB, NHL, soccer, tennis, cricket, golf, MMA, F1 and esports.",
+      "zh": "聚合体育数据：NFL、NBA、MLB、NHL、足球、网球、板球、高尔夫、MMA、F1 和电竞的实时比分、积分榜、球员统计及投注赔率。"
+    },
+    {
+      "id": "L04524",
+      "english": "Real-time ATP, WTA, Challenger and ITF tennis data: live scores, players, fixtures, model win probability and match-winner market prices.",
+      "zh": "实时 ATP、WTA、Challenger 和 ITF 网球数据：比分、球员、赛程、模型胜率和比赛胜者市场价格。"
+    },
+    {
+      "id": "L04525",
+      "english": "Sports intelligence: schedules, live scores, odds, betting splits and explainable bet confidence.",
+      "zh": "体育情报：赛程、实时比分、赔率、投注分布和可解释的投注置信度。"
+    },
+    {
+      "id": "L04526",
+      "english": "Generates mountain bike and road cycling routes on real OpenStreetMap data with BRouter (automatic loops to a target distance, point-to-point and via points) and saves them as GPX with elevation, plus warnings for traffic, steep grades, protected areas and ways where bikes are not allowed.",
+      "zh": "使用 BRouter 基于真实 OpenStreetMap 数据生成山地车和公路骑行路线（按目标距离自动生成环线、点到点和途经点），保存为带海拔的 GPX，并提示交通、陡坡、保护区及禁止骑行的道路。"
+    },
+    {
+      "id": "L04527",
+      "english": "Player, team and game information for the NBA, NFL and MLB via the balldontlie API.",
+      "zh": "通过 balldontlie API 获取 NBA、NFL 和 MLB 的球员、球队及比赛信息。"
+    },
+    {
+      "id": "L04528",
+      "english": "XERT cycling analytics: fitness signature (FTP, HIE, PP), training status, workouts, activities with XSS metrics and MPA analysis.",
+      "zh": "XERT 骑行分析：体能特征（FTP、HIE、PP）、训练状态、训练、带 XSS 指标的活动及 MPA 分析。"
+    },
+    {
+      "id": "L04529",
+      "english": "Combines MacroFactor nutrition data with Garmin training data for recovery checks, daily briefings, weekly reports and nutrition-performance correlations.",
+      "zh": "结合 MacroFactor 营养数据和 Garmin 训练数据，进行恢复检查、每日简报、每周报告及营养与表现相关性分析。"
+    },
+    {
+      "id": "L04530",
+      "english": "Official [Odds-API.io](https://odds-api.io) server: real-time and historical sports betting odds from 365+ bookmakers across 34 sports, with events, value bets, arbitrage and dropping odds.",
+      "zh": "官方 [Odds-API.io](https://odds-api.io) 服务器：来自 365 家以上博彩公司、覆盖 34 项运动的实时和历史体育投注赔率，提供赛事、价值投注、套利和下降赔率。"
+    },
+    {
+      "id": "L04531",
+      "english": "Official OddsRelay server: UK and Irish bookmaker and exchange odds, matched boards, one event's prices, and the sport, bookmaker and coverage lists. Read-only; every call that spends tokens is priced first and capped.",
+      "zh": "官方 OddsRelay 服务器：英国和爱尔兰博彩公司及交易所赔率、匹配盘口、单场赛事价格，以及运动、博彩公司和覆盖范围列表。只读；每次消耗令牌的调用都会先报价并设定上限。"
+    },
+    {
+      "id": "L04532",
+      "english": "Read-only Bosch eBike Flow (Smart System) data: battery health and charge cycles, components and firmware, live charge level and per-ride activity.",
+      "zh": "只读 Bosch eBike Flow（Smart System）数据：电池健康与充电周期、组件和固件、实时电量及每次骑行活动。"
+    },
+    {
+      "id": "L04533",
+      "english": "Fitbit Web API access with a local SQLite cache and trend analysis for heart rate, activity, exercises, sleep, weight, SpO2 and HRV.",
+      "zh": "访问 Fitbit Web API，提供本地 SQLite 缓存和心率、活动、运动、睡眠、体重、血氧及 HRV 趋势分析。"
+    },
+    {
+      "id": "L04534",
+      "english": "Google Health API with a local SQLite cache, offline mode and trend analysis for heart rate, activity, sleep, weight, SpO2, HRV, ECG and irregular rhythms.",
+      "zh": "Google Health API，提供本地 SQLite 缓存、离线模式及心率、活动、睡眠、体重、血氧、HRV、心电图和心律不齐趋势分析。"
+    },
+    {
+      "id": "L04535",
+      "english": "Withings Health API with a local SQLite cache and trend analysis for body composition, sleep, activity, workouts and ECG.",
+      "zh": "Withings Health API，提供本地 SQLite 缓存以及身体成分、睡眠、活动、训练和心电图趋势分析。"
+    },
+    {
+      "id": "L04536",
+      "english": "Live Australian racing and sports odds from 14 AU bookmakers for AI assistants: next races with every bookmaker's price per runner, best price, settled results and market movers, each price stamped with its age.",
+      "zh": "面向 AI 助手的澳大利亚赛马与体育实时赔率，来自 14 家澳大利亚博彩公司：即将开始的比赛、每名参赛者在各公司的价格、最佳价格、已结算结果和市场变动，每个价格均标注距更新时间。"
+    },
+    {
+      "id": "L04537",
+      "english": "Live sports betting odds, cross-book +EV and graded prop resolution against box scores for MLB, NBA, NHL, NFL, soccer and UFC.",
+      "zh": "MLB、NBA、NHL、NFL、足球和 UFC 的实时体育投注赔率、跨平台正期望值（+EV）及根据技术统计核定的特殊投注结果。"
+    },
+    {
+      "id": "L04539",
+      "english": "Access Strava data via the Strava API.",
+      "zh": "通过 Strava API 访问 Strava 数据。"
+    },
+    {
+      "id": "L04540",
+      "english": "Local-first health context from WHOOP and Apple Health: sleep, recovery, workouts and personal baselines in a local SQLite store.",
+      "zh": "来自 WHOOP 和 Apple Health 的本地优先健康上下文：睡眠、恢复、训练和个人基线存储在本地 SQLite 中。"
+    },
+    {
+      "id": "L04541",
+      "english": "WHOOP recovery, sleep, strain and workouts with trend analysis, lag-aware correlations, training load and full-history export, plus a demo mode.",
+      "zh": "WHOOP 恢复、睡眠、负荷和训练数据，提供趋势分析、考虑滞后的相关性、训练负荷和完整历史导出，并提供演示模式。"
+    },
+    {
+      "id": "L04542",
+      "english": "Control MultiViewer, an app for watching motorsports like Formula 1, World Endurance Championship and IndyCar.",
+      "zh": "控制 MultiViewer，这是一款观看 Formula 1、世界耐力锦标赛和 IndyCar 等赛车运动的应用。"
+    },
+    {
+      "id": "L04543",
+      "english": "Unofficial Mi Fitness connector: local SQLite storage and JSON/CSV exports of sleep, activity, workouts and other records.",
+      "zh": "非官方 Mi Fitness 连接器：将睡眠、活动、训练和其他记录存储到本地 SQLite，并导出 JSON/CSV。"
+    },
+    {
+      "id": "L04544",
+      "english": "Create structured Garmin Connect workouts from natural language: pace, HR, power and cadence targets, repeat blocks, swim strokes and pool lengths.",
+      "zh": "根据自然语言创建结构化 Garmin Connect 训练：配速、心率、功率和踏频目标，重复组、泳姿和泳池长度。"
+    },
+    {
+      "id": "L04545",
+      "english": "Read-only TheRundown data for sports, markets, affiliates, events, futures and open main-line odds.",
+      "zh": "只读 TheRundown 数据，涵盖体育项目、市场、关联方、赛事、期货和未关闭的主线赔率。"
+    },
+    {
+      "id": "L04546",
+      "english": "Trainzilla for personal trainers: manage clients, workout and diet plans, check-ins, habits, sessions and billing (hosted OAuth endpoint or local).",
+      "zh": "面向私人教练的 Trainzilla：管理客户、训练和饮食计划、签到、习惯、课程和计费（托管 OAuth 端点或本地）。"
+    },
+    {
+      "id": "L04547",
+      "english": "Running calculators: pace, time and distance, race time predictions (Riegel formula), heart rate training zones (Karvonen method) and marathon event data.",
+      "zh": "跑步计算器：配速、时间和距离，比赛时间预测（Riegel 公式）、心率训练区间（Karvonen 方法）及马拉松赛事数据。"
+    },
+    {
+      "id": "L04548",
+      "english": "Sports betting picks, odds, injuries and line movement for NBA, NHL, NCAAB and MLB, with visual bet slip cards showing edges.",
+      "zh": "NBA、NHL、NCAAB 和 MLB 的体育投注推荐、赔率、伤情及盘口变化，并提供展示优势的可视化投注单卡片。"
+    },
+    {
+      "id": "L04549",
+      "english": "Read workouts, sleep, nutrition and recovery data from Apple Health, Fitbit, Oura and Google Health Connect, with inline chart widgets.",
+      "zh": "从 Apple Health、Fitbit、Oura 和 Google Health Connect 读取训练、睡眠、营养及恢复数据，提供内嵌图表小组件。"
+    },
+    {
+      "id": "L04551",
+      "english": "Unofficial, read-only access to your Kilter Board climbing logbook: sessions, sends, projects, grade pyramid, progression and wall-angle comparison.",
+      "zh": "非官方、只读访问你的 Kilter Board 攀岩日志：训练、完攀、项目、难度金字塔、进展和墙面角度比较。"
+    },
+    {
+      "id": "L04552",
+      "english": "Local analysis of Garmin Connect activities, sleep, recovery, body composition, stress and VO2 max against 28-day baselines, with memory for goals and races.",
+      "zh": "以 28 天基线为参照，本地分析 Garmin Connect 活动、睡眠、恢复、身体成分、压力和最大摄氧量，并记忆目标及赛事。"
+    },
+    {
+      "id": "L04555",
+      "english": "Support desk for AI agents: run tickets with per-action x402 USDC payments, or create and run a bounty board owned by the paying wallet.",
+      "zh": "面向 AI 代理的支持服务台：按操作以 x402 USDC 付费处理工单，或创建和运营由付款钱包拥有的赏金看板。"
+    },
+    {
+      "id": "L04556",
+      "english": "Search and retrieve Yandex Tracker issues, queues and users.",
+      "zh": "搜索和获取 Yandex Tracker 议题、队列和用户。"
+    },
+    {
+      "id": "L04557",
+      "english": "Manage your website's Asyntai AI support agent: knowledge base, agent instructions, conversations and leads, live visitor replies and plan usage.",
+      "zh": "管理网站的 Asyntai AI 支持代理：知识库、代理指令、对话和潜在线索、实时回复访客及套餐用量。"
+    },
+    {
+      "id": "L04558",
+      "english": "BugHerd bug tracking: list projects, filter tasks by status, priority or tag, get task details and read comments.",
+      "zh": "BugHerd 缺陷跟踪：列出项目，按状态、优先级或标签筛选任务，获取任务详情并阅读评论。"
+    },
+    {
+      "id": "L04559",
+      "english": "Field-service dispatch and technician scheduling: book jobs against live availability, quote and confirm, and reschedule around emergencies.",
+      "zh": "现场服务派遣与技术人员排班：根据实时空闲情况预约工作、报价和确认，并因应紧急情况重新排程。"
+    },
+    {
+      "id": "L04561",
+      "english": "Self-hosted Freshdesk server: ticket search, conversations, attachment text extraction, image OCR and status, group and company enrichment.",
+      "zh": "自托管 Freshdesk 服务器：工单搜索、对话、附件文本提取、图片 OCR，并补充状态、群组和公司信息。"
+    },
+    {
+      "id": "L04562",
+      "english": "Expose your Quickchat AI agent as an MCP server, giving AI apps real-time access to its knowledge base and conversational capabilities.",
+      "zh": "将 Quickchat AI 代理公开为 MCP 服务器，让 AI 应用实时访问其知识库和对话能力。"
+    },
+    {
+      "id": "L04563",
+      "english": "Read and write Zendesk tickets, comments, views, macros, users, groups, organizations and time tracking, with optional Help Center and GitLab integration.",
+      "zh": "读写 Zendesk 工单、评论、视图、宏、用户、群组、组织和时间跟踪，可选集成帮助中心与 GitLab。"
+    },
+    {
+      "id": "L04565",
+      "english": "Small-business customer service via CallChatSyn: answer customer questions from the business's own FAQs (English/Chinese), list open appointment times in its time zone, and book appointments.",
+      "zh": "通过 CallChatSyn 提供小企业客服：根据企业自己的常见问题（英文/中文）回答客户问题，以其时区列出可预约时段并预约。"
+    },
+    {
+      "id": "L04566",
+      "english": "Jira and Confluence: issue CRUD, sprint lifecycle, comments, transitions, user management and wiki pages.",
+      "zh": "Jira 和 Confluence：议题增删改查、冲刺生命周期、评论、状态转换、用户管理和 Wiki 页面。"
+    },
+    {
+      "id": "L04567",
+      "english": "IT Glue, the MSP documentation platform: semantic search over documentation, document and flexible-asset read/write, and role-based access control.",
+      "zh": "面向 MSP 的文档平台 IT Glue：对文档进行语义搜索，读写文档和灵活资产，并提供基于角色的访问控制。"
+    },
+    {
+      "id": "L04569",
+      "english": "InvGate Service Desk: incidents, users, knowledge base, assets, custom fields, workflows and time tracking, read-only by default with opt-in writes.",
+      "zh": "InvGate Service Desk：事件、用户、知识库、资产、自定义字段、工作流和时间跟踪，默认只读，可选择启用写入。"
+    },
+    {
+      "id": "L04575",
+      "english": "Spanish dialect localization: translate and QA-check text across 25 regional variants with register control, structure preservation and quality gates.",
+      "zh": "西班牙语方言本地化：在 25 种地区变体之间翻译和质量检查文本，支持语体控制、结构保留和质量关卡。"
+    },
+    {
+      "id": "L04576",
+      "english": "Weblate translation management: translation tasks, project management and content discovery with format transformations.",
+      "zh": "Weblate 翻译管理：翻译任务、项目管理和内容发现，支持格式转换。"
+    },
+    {
+      "id": "L04577",
+      "english": "Translate app string files (JSON, .arb, .po, .strings, Android XML) into 46 languages with placeholder-safe, reproducible output.",
+      "zh": "将应用字符串文件（JSON、.arb、.po、.strings、Android XML）翻译为 46 种语言，输出可复现且保证占位符安全。"
+    },
+    {
+      "id": "L04578",
+      "english": "Translation quality evaluation with xCOMET models: quality scoring, error detection with severity levels and batch processing.",
+      "zh": "使用 xCOMET 模型评估翻译质量：质量评分、按严重程度检测错误及批量处理。"
+    },
+    {
+      "id": "L04579",
+      "english": "Manage app strings, locales and A/B string variants, then publish Ed25519-signed string bundles for over-the-air text updates in iOS, Android, web and React Native apps.",
+      "zh": "管理应用字符串、语言区域和 A/B 字符串变体，然后发布 Ed25519 签名的字符串包，为 iOS、Android、网页和 React Native 应用提供空中文本更新。"
+    },
+    {
+      "id": "L04581",
+      "english": "Real-time English-Mandarin speech translation: local Whisper transcription, translation via the Claude API and local speech synthesis with Piper TTS.",
+      "zh": "实时英语与普通话语音翻译：本地 Whisper 转写、通过 Claude API 翻译，并使用 Piper TTS 在本地合成语音。"
+    },
+    {
+      "id": "L04585",
+      "english": "Local audio and video transcription on Windows using whisper.cpp with Vulkan GPU acceleration: batch processing, multilingual support and background jobs.",
+      "zh": "在 Windows 上使用 whisper.cpp 和 Vulkan GPU 加速进行本地音视频转写，支持批量处理、多语言和后台任务。"
+    },
+    {
+      "id": "L04586",
+      "english": "Transcribe audio, video, YouTube links and podcast feeds via Pepys, with speaker diarization, SRT/VTT export and transcript search.",
+      "zh": "通过 Pepys 转写音频、视频、YouTube 链接和播客订阅源，支持说话人区分、SRT/VTT 导出和文字稿搜索。"
+    },
+    {
+      "id": "L04587",
+      "english": "Local speech-to-text and SRT/VTT subtitles for audio and video in 99 languages on your own AMD, NVIDIA, Intel or Apple GPU (whisper.cpp via Vulkan/CUDA/Metal), with an accurate mode using Thai and Hindi fine-tunes.",
+      "zh": "在自己的 AMD、NVIDIA、Intel 或 Apple GPU 上为 99 种语言的音视频提供本地语音转文字和 SRT/VTT 字幕（通过 Vulkan/CUDA/Metal 使用 whisper.cpp），另有使用泰语和印地语微调的高精度模式。"
+    },
+    {
+      "id": "L04588",
+      "english": "Search podcast episodes and fetch published transcripts as Markdown with real speaker names via the Spoken API.",
+      "zh": "通过 Spoken API 搜索播客节目，并以带真实说话人姓名的 Markdown 获取已发布文字稿。"
+    },
+    {
+      "id": "L04594",
+      "english": "Generate text-to-speech and text-to-voice audio with the DAISYS platform, and play and store the generated audio.",
+      "zh": "使用 DAISYS 平台生成文本转语音和文本转声音音频，并播放及保存生成的音频。"
+    },
+    {
+      "id": "L04595",
+      "english": "Speech tools: pronunciation assessment with phoneme-level feedback, speech-to-text with language detection and text-to-speech with multiple voices.",
+      "zh": "语音工具：提供音素级反馈的发音评估、带语言检测的语音转文字和多种声音的文字转语音。"
+    },
+    {
+      "id": "L04596",
+      "english": "Pay-per-call x402 speech generation on Base: multiple voices, personas and languages, speed and quality controls, OpenAI-style requests and batch audio.",
+      "zh": "在 Base 上通过 x402 按次付费生成语音：多种声音、角色和语言，速度与质量控制、OpenAI 风格请求和批量音频。"
+    },
+    {
+      "id": "L04597",
+      "english": "Local text-to-speech from an on-device model with multiple voices and languages, cloned voice profiles and WAV, FLAC, MP3 or Opus output.",
+      "zh": "使用设备端模型进行本地文字转语音，支持多种声音和语言、克隆声音配置，以及 WAV、FLAC、MP3 或 Opus 输出。"
+    },
+    {
+      "id": "L04598",
+      "english": "Voice interaction: speech-to-text, text-to-speech and real-time voice conversations via local microphone, OpenAI-compatible APIs and LiveKit.",
+      "zh": "语音交互：通过本地麦克风、兼容 OpenAI 的 API 和 LiveKit 进行语音转文字、文字转语音和实时语音对话。"
+    },
+    {
+      "id": "L04599",
+      "english": "Text-to-speech with the open-weight Kokoro TTS models, saving MP3s locally or uploading them to an S3 bucket.",
+      "zh": "使用开放权重的 Kokoro TTS 模型进行文字转语音，将 MP3 保存到本地或上传到 S3 存储桶。"
+    },
+    {
+      "id": "L04600",
+      "english": "Transcribe audio and video files and voice memos and work with their text content.",
+      "zh": "转写音频和视频文件及语音备忘录，并处理其文本内容。"
+    },
+    {
+      "id": "L04601",
+      "english": "Text-to-speech for Claude Code using OpenAI's TTS API, with multiple voices and cross-platform playback.",
+      "zh": "使用 OpenAI TTS API 为 Claude Code 提供文字转语音，支持多种声音和跨平台播放。"
+    },
+    {
+      "id": "L04607",
+      "english": "Find, book, and pay for local offline social activities (board games, badminton, hiking, frisbee and 100+ hobby categories) across cities in China via natural language. Hosted MCP gateway (agent.cuqu.net) with per-user API keys; also supports organizer-side event creation and venue search.",
+      "zh": "通过自然语言查找、预订并支付中国各城市的本地线下社交活动（桌游、羽毛球、徒步、飞盘及 100 多种爱好类别）。托管 MCP 网关（agent.cuqu.net）使用按用户分配的 API 密钥；也支持组织者创建活动和搜索场地。"
+    },
+    {
+      "id": "L04609",
+      "english": "Search Airbnb stays by location, dates and guests, and read full listing details (price, amenities, host, reviews) as JSON.",
+      "zh": "按地点、日期和人数搜索 Airbnb 住宿，并以 JSON 阅读完整房源详情（价格、设施、房东、评价）。"
+    },
+    {
+      "id": "L04610",
+      "english": "Remote MCP server for Google Flights: one-way, round-trip and multi-city itineraries with fares, legs, layovers, carbon emissions and price history, as JSON.",
+      "zh": "Google Flights 远程 MCP 服务器：以 JSON 提供单程、往返和多城市行程，包括票价、航段、中转、碳排放和价格历史。"
+    },
+    {
+      "id": "L04611",
+      "english": "Remote MCP server for Google Hotels: search hotels and vacation rentals for a stay with rates, ratings and amenities, then open one property with the rate at every booking site Google compares, as JSON.",
+      "zh": "Google Hotels 远程 MCP 服务器：搜索指定住宿日期的酒店和度假房源，获取价格、评分及设施，然后打开单个房源并查看 Google 比较的各预订网站价格，结果为 JSON。"
+    },
+    {
+      "id": "L04612",
+      "english": "Search Booking.com stays by destination and dates, and read full property details (rooms, rates, facilities, review scores) as JSON.",
+      "zh": "按目的地和日期搜索 Booking.com 住宿，并以 JSON 阅读完整房源详情（房间、价格、设施、评价分数）。"
+    },
+    {
+      "id": "L04613",
+      "english": "Turn a plain-language trip description into dated flight deals from one origin, with the typical price beside each fare, airlines, stops and booking links, as JSON.",
+      "zh": "将通俗语言的旅行描述转为从一个出发地出发、带日期的航班优惠，以 JSON 提供每个票价旁的典型价格、航空公司、中转和预订链接。"
+    },
+    {
+      "id": "L04614",
+      "english": "Scuba dive planning: ranked dive-forecast windows, month-by-month climatology, marine-life seasonality from GBIF sightings and dive site facts.",
+      "zh": "水肺潜水规划：排序后的潜水预测窗口、逐月气候、来自 GBIF 目击记录的海洋生物季节性及潜点信息。"
+    },
+    {
+      "id": "L04615",
+      "english": "Multi-city flight routing: plan round-the-world trips, validate Star Alliance and oneworld routings, and get per-segment carrier recommendations.",
+      "zh": "多城市航班路线规划：规划环球旅行、验证星空联盟和寰宇一家的路线，并获取各航段承运商建议。"
+    },
+    {
+      "id": "L04616",
+      "english": "Tokyo nightlife: event discovery, venue search, performer info, recommendations and VIP table booking.",
+      "zh": "东京夜生活：活动发现、场所搜索、表演者信息、推荐和 VIP 桌位预订。"
+    },
+    {
+      "id": "L04617",
+      "english": "Luxembourg public data: laws, statistics, live parking and traffic, weather alerts, environment, parliament, geodata, GTFS stops and the open-data catalogue.",
+      "zh": "卢森堡公开数据：法律、统计、实时停车与交通、天气警报、环境、议会、地理数据、GTFS 站点和开放数据目录。"
+    },
+    {
+      "id": "L04618",
+      "english": "Unofficial Samsara fleet management: vehicles and live locations, route creation and optimization, driver records, Hours-of-Service compliance and webhooks.",
+      "zh": "非官方 Samsara 车队管理：车辆及实时位置、路线创建和优化、驾驶员记录、服务时长合规和 Webhook。"
+    },
+    {
+      "id": "L04619",
+      "english": "Travel agent: search live flights, hotels, activities and events worldwide and complete bookings on Autonomad.",
+      "zh": "旅行代理：搜索全球实时航班、酒店、活动和赛事，并在 Autonomad 完成预订。"
+    },
+    {
+      "id": "L04620",
+      "english": "Search campgrounds worldwide on Campertunity, check availability and get booking links.",
+      "zh": "在 Campertunity 搜索全球露营地、检查可用性并获取预订链接。"
+    },
+    {
+      "id": "L04621",
+      "english": "Query Tesla vehicle data and analytics from your TeslaMate database.",
+      "zh": "从 TeslaMate 数据库查询特斯拉车辆数据和分析结果。"
+    },
+    {
+      "id": "L04622",
+      "english": "Travel compliance and booking for digital nomads in Europe: visa requirements, tax residency, Schengen 90/180-day tracking, accommodation and transport.",
+      "zh": "面向欧洲数字游民的旅行合规与预订：签证要求、税务居民身份、申根 90/180 天跟踪、住宿和交通。"
+    },
+    {
+      "id": "L04623",
+      "english": "Flight Master DAST aviation data: flight status, route search, onboard comfort, delay and cancellation risk, airport weather and flight trajectories.",
+      "zh": "Flight Master DAST 航空数据：航班状态、路线搜索、机上舒适度、延误与取消风险、机场天气和飞行轨迹。"
+    },
+    {
+      "id": "L04624",
+      "english": "Monthly sunshine scores, temperatures, rainfall and sea temperatures for destinations: sunny-month rankings, when-to-visit lookups and comparisons.",
+      "zh": "目的地逐月日照评分、气温、降雨量和海水温度：晴朗月份排名、适合旅行时间查询和比较。"
+    },
+    {
+      "id": "L04625",
+      "english": "World train-route atlas: search notable high-speed, scenic and night train routes and get facts and geometry for each.",
+      "zh": "全球铁路路线图集：搜索著名高铁、风景线和夜间列车路线，获取每条路线的信息和几何数据。"
+    },
+    {
+      "id": "L04626",
+      "english": "Travel utilities and x402 pay-per-call travel intelligence: disruption checks, day trips, weekend getaways, weather-aware planning and currency conversion.",
+      "zh": "旅行实用工具和通过 x402 按次付费的旅行情报：出行中断检查、一日游、周末短途游、考虑天气的规划及货币转换。"
+    },
+    {
+      "id": "L04627",
+      "english": "Travel search workflow: airport lookup, route comparison, timing guidance and external booking links via generic travel search providers.",
+      "zh": "旅行搜索工作流：通过通用旅行搜索提供商查询机场、比较路线、提供时间建议和外部预订链接。"
+    },
+    {
+      "id": "L04628",
+      "english": "Cash and award (points) rates side by side for hotels, flights and rental cars, with cents-per-point valuations, loyalty balances, rate alerts and booking.",
+      "zh": "并排比较酒店、航班和租车的现金及奖励积分价格，提供每积分价值估算、忠诚计划余额、价格警报和预订。"
+    },
+    {
+      "id": "L04629",
+      "english": "Fuel prices at gas stations in Spain from the Spanish government's open data API, sorted by price per municipality.",
+      "zh": "通过西班牙政府开放数据 API 获取西班牙加油站燃油价格，按市镇价格排序。"
+    },
+    {
+      "id": "L04630",
+      "english": "Kid-friendly hotels in Japan: search by verified conditions such as baby beds, diaper-friendly baths and kids' meals, with sources and verification dates.",
+      "zh": "适合儿童的日本酒店：按经验证条件搜索，如婴儿床、适合换尿布的浴室和儿童餐，并提供来源及验证日期。"
+    },
+    {
+      "id": "L04631",
+      "english": "Direct booking for vacation rentals: discover a host's domain, verify signed stay offers, check live availability and prices, and book with the host.",
+      "zh": "度假房源直接预订：发现房东域名、验证签名住宿报价、检查实时可用性及价格，并向房东预订。"
+    },
+    {
+      "id": "L04632",
+      "english": "Japan seasonal travel: cherry blossom forecasts, autumn leaves, flower spots, fruit picking and festivals, using Japan Meteorological Corporation data.",
+      "zh": "日本季节旅行：使用日本气象株式会社数据提供樱花预测、红叶、赏花地点、采果和节庆信息。"
+    },
+    {
+      "id": "L04633",
+      "english": "TeslaMate analytics and Tesla Fleet API commands: telemetry, driving history, energy analytics and remote control of climate, charging, locks and sentry.",
+      "zh": "TeslaMate 分析和 Tesla Fleet API 命令：遥测、驾驶历史、能源分析，以及远程控制空调、充电、车锁和哨兵模式。"
+    },
+    {
+      "id": "L04634",
+      "english": "Plan and manage Triplyfy itineraries with interactive maps, places and notes, and search and save flights.",
+      "zh": "使用交互地图、地点和备注规划与管理 Triplyfy 行程，并搜索和保存航班。"
+    },
+    {
+      "id": "L04635",
+      "english": "Buy travel eSIMs via Stripe or Bitcoin checkout and receive the QR code by email.",
+      "zh": "通过 Stripe 或比特币结账购买旅行 eSIM，并通过邮件接收二维码。"
+    },
+    {
+      "id": "L04636",
+      "english": "Read-only access to VeryChic flash-sale hotel deals: search and filter offers and check availability and prices by date.",
+      "zh": "只读访问 VeryChic 酒店限时优惠：搜索和筛选报价，按日期查看可用性和价格。"
+    },
+    {
+      "id": "L04637",
+      "english": "Travel planning via Plantrip: day-by-day itineraries, packing lists, weather insights and trip cost estimates, each as a shareable page.",
+      "zh": "通过 Plantrip 规划旅行：每日行程、行李清单、天气洞察和旅行费用估算，每项均为可分享页面。"
+    },
+    {
+      "id": "L04639",
+      "english": "Search and book flights from hundreds of airlines, plus hotels; nothing is booked until you approve by email. Checks every nearby airport, bag prices and each flight's on-time record.",
+      "zh": "搜索和预订数百家航空公司的航班及酒店；收到你的邮件批准前不会预订。检查附近所有机场、行李价格和各航班准点记录。"
+    },
+    {
+      "id": "L04640",
+      "english": "UK National Rail train schedules and live travel information via the Realtime Trains API.",
+      "zh": "通过 Realtime Trains API 获取英国国家铁路列车时刻和实时出行信息。"
+    },
+    {
+      "id": "L04641",
+      "english": "Search CuddlyNest hotels by destination and read live room options, prices, availability and cancellation policies from public listing pages.",
+      "zh": "按目的地搜索 CuddlyNest 酒店，并从公开房源页面读取实时房型、价格、可用性和取消政策。"
+    },
+    {
+      "id": "L04642",
+      "english": "Compare real-time Uber and Lyft fare estimates for a route, including surge, and find the cheapest option.",
+      "zh": "比较指定路线的 Uber 和 Lyft 实时估价，包括动态加价，并找出最便宜的选项。"
+    },
+    {
+      "id": "L04643",
+      "english": "Visa requirements for passport-destination pairs in 15 languages: visa types, required documents and travel tips.",
+      "zh": "提供 15 种语言的护照与目的地组合签证要求：签证类型、所需文件和旅行提示。"
+    },
+    {
+      "id": "L04644",
+      "english": "Germany's open mobility data: live Autobahn traffic and closures, DB train departures, local transit, fuel prices, EV charging, parking, bike sharing and DWD weather warnings, each answer with its source and licence. Free, no key.",
+      "zh": "德国开放出行数据：实时高速公路交通与封闭、DB 列车发车、本地公交、燃油价格、电动车充电、停车、共享单车和 DWD 天气警报，每条回答附来源和许可证。免费，无需密钥。"
+    },
+    {
+      "id": "L04645",
+      "english": "MAQAMI hotel and flight search with live rates and hotel details, then a secure checkout link on book.maqami.co.",
+      "zh": "MAQAMI 酒店和航班搜索，提供实时价格与酒店详情，然后给出 book.maqami.co 的安全结账链接。"
+    },
+    {
+      "id": "L04646",
+      "english": "Bike, e-bike, kick scooter, motorcycle, wheelchair and walking routes across Europe from the On va où ? Routing API, with safe, balanced and fast variants.",
+      "zh": "通过 On va où ? Routing API 获取覆盖欧洲的自行车、电动自行车、滑板车、摩托车、轮椅和步行路线，提供安全、平衡和快速方案。"
+    },
+    {
+      "id": "L04648",
+      "english": "Free vanlife/RV road-trip data for AI agents: fuel prices (160+ countries), toll roads, visa and vehicle-import rules, holidays and peak traffic days, travel hazards and wildfires, customs, power plugs, weather suitability, currency, events. 25 read-only tools, no auth. Hosted `https://mcp.openvan.camp/mcp` or `npx -y @openvancamp/mcp-server`",
+      "zh": "面向 AI 代理的免费房车旅行数据：燃油价格（160 多个国家）、收费公路、签证和车辆进口规则、假日及交通高峰日、旅行危险与山火、海关、电源插头、天气适宜性、货币和活动。25 个只读工具，无需认证。托管 `https://mcp.openvan.camp/mcp` 或 `npx -y @openvancamp/mcp-server`"
+    },
+    {
+      "id": "L04649",
+      "english": "Rental car search with real-time prices from multiple providers worldwide.",
+      "zh": "租车搜索，提供全球多家供应商的实时价格。"
+    },
+    {
+      "id": "L04651",
+      "english": "Real-time bus and metro data in China via Chelaile: arrival times, vehicle positions, timetables, nearby stops and transit routing.",
+      "zh": "通过车来了获取中国实时公交和地铁数据：到站时间、车辆位置、时刻表、附近站点及公交路线规划。"
+    },
+    {
+      "id": "L04652",
+      "english": "Aviation data: decoded METAR weather by ICAO code, airport and aircraft specs, an aviation glossary and FAA-style practice questions.",
+      "zh": "航空数据：按 ICAO 代码解码 METAR 天气、机场和飞机规格、航空术语表和 FAA 风格练习题。"
+    },
+    {
+      "id": "L04653",
+      "english": "Events, reviewed places and ticket checkout in the Caribbean and Latin America: search festivals and venues, read reviews and create Stripe checkout links.",
+      "zh": "加勒比地区和拉丁美洲的活动、带评价地点和票务结账：搜索节庆及场所、阅读评价并创建 Stripe 结账链接。"
+    },
+    {
+      "id": "L04654",
+      "english": "Real-time flight data from the AviationStack API: airline flights, airport schedules, future flights and aircraft types.",
+      "zh": "来自 AviationStack API 的实时航班数据：航空公司航班、机场时刻、未来航班和飞机类型。"
+    },
+    {
+      "id": "L04655",
+      "english": "Read-only access to Hostaway vacation rental management: listings, reservations, calendar availability, guest conversations and owner financials.",
+      "zh": "只读访问 Hostaway 度假房源管理：房源、预订、日历可用性、客人对话和房东财务。"
+    },
+    {
+      "id": "L04657",
+      "english": "Buy and manage a global eSIM, paying per MB in USDT or USDC on chains such as TRON, Solana, Polygon and TON.",
+      "zh": "购买和管理全球 eSIM，在 TRON、Solana、Polygon 和 TON 等链上以 USDT 或 USDC 按 MB 支付。"
+    },
+    {
+      "id": "L04658",
+      "english": "Madurai CityBus transit: direct and one-transfer route planning, TNSTC stage fare breakdowns, platform bay departures and bilingual stop search.",
+      "zh": "Madurai CityBus 公交：直达及一次换乘路线规划、TNSTC 分段票价明细、站台发车和双语站点搜索。"
+    },
+    {
+      "id": "L04659",
+      "english": "Multi-modal trip planning, transport locations and real-time public transport departures via the TripGo API.",
+      "zh": "通过 TripGo API 进行多模式行程规划，查询交通地点和实时公共交通发车信息。"
+    },
+    {
+      "id": "L04660",
+      "english": "Visa eligibility matching across immigration pathways in 15 countries: score a profile against government criteria and compare ranked pathways.",
+      "zh": "在 15 个国家的移民途径中匹配签证资格：对照政府标准为个人资料评分，并比较排序后的途径。"
+    },
+    {
+      "id": "L04661",
+      "english": "Freight tools: ADR dangerous goods, HS codes, LDM, CBM and chargeable weight calculators, duty estimation, airline codes and UN/LOCODE.",
+      "zh": "货运工具：ADR 危险品、HS 编码、LDM、CBM 和计费重量计算器、关税估算、航空公司代码和 UN/LOCODE。"
+    },
+    {
+      "id": "L04662",
+      "english": "Search AllTrails hiking trails and get detailed trail information.",
+      "zh": "搜索 AllTrails 徒步路线并获取详细路线信息。"
+    },
+    {
+      "id": "L04663",
+      "english": "German public infrastructure open data: weather, air quality, traffic, transit, parking and roadworks from DWD, Umweltbundesamt, Mobilithek and GovData.",
+      "zh": "德国公共基础设施开放数据：来自 DWD、Umweltbundesamt、Mobilithek 和 GovData 的天气、空气质量、交通、公交、停车及道路施工信息。"
+    },
+    {
+      "id": "L04664",
+      "english": "Discover and book theatre, shows, events, tours and experiences worldwide via tickadoo, with real-time prices, availability and booking links.",
+      "zh": "通过 tickadoo 发现和预订全球戏剧、演出、活动、旅行团及体验，提供实时价格、可用性和预订链接。"
+    },
+    {
+      "id": "L04665",
+      "english": "Compare real-time train, bus, ferry and private transfer prices between Italian cities.",
+      "zh": "比较意大利城市之间火车、巴士、渡轮和私人接送的实时价格。"
+    },
+    {
+      "id": "L04666",
+      "english": "Read and edit Wanderlog trip itineraries: trips, places, notes, hotels, checklists and dates.",
+      "zh": "阅读和编辑 Wanderlog 旅行行程：旅行、地点、备注、酒店、清单和日期。"
+    },
+    {
+      "id": "L04667",
+      "english": "Real-time Lviv (Ukraine) public transport: stop arrivals, live vehicle positions, route geometry and nearby stop discovery.",
+      "zh": "乌克兰利沃夫实时公共交通：站点到达时间、实时车辆位置、路线几何数据和附近站点发现。"
+    },
+    {
+      "id": "L04668",
+      "english": "Maritime vessel tracking via VesselAPI: search vessels and get real-time positions, ETAs, port events, emissions, inspections and NAVTEX safety messages.",
+      "zh": "通过 VesselAPI 跟踪海上船舶：搜索船舶并获取实时位置、预计到达时间、港口事件、排放、检查和 NAVTEX 安全消息。"
+    },
+    {
+      "id": "L04669",
+      "english": "Unofficial Ryanair flight search: find one-way fares, explore destinations by country or region and find the cheapest day to fly between two airports.",
+      "zh": "非官方 Ryanair 航班搜索：查找单程票价、按国家或地区探索目的地，并找出两机场间最便宜的出行日期。"
+    },
+    {
+      "id": "L04670",
+      "english": "Personal travel agent: flights, hotels, visa checks, itineraries, travel advisories, currency conversion and card points/miles optimization.",
+      "zh": "个人旅行代理：航班、酒店、签证检查、行程、旅行建议、货币转换及信用卡积分/里程优化。"
+    },
+    {
+      "id": "L04671",
+      "english": "Access your SimBrief flight plans: weather (METAR/TAF/ATIS), fuel plan, weights, ATC flight plan, navlog, NOTAMs, alternates and performance analysis.",
+      "zh": "访问你的 SimBrief 飞行计划：天气（METAR/TAF/ATIS）、燃油计划、重量、ATC 飞行计划、导航日志、NOTAM、备降机场和性能分析。"
+    },
+    {
+      "id": "L04677",
+      "english": "Azure DevOps work items, repos, pull requests, pipelines and projects, with access modes, project allowlists, protected projects and delete confirmation.",
+      "zh": "Azure DevOps 工作项、仓库、拉取请求、流水线和项目，支持访问模式、项目允许列表、受保护项目及删除确认。"
+    },
+    {
+      "id": "L04679",
+      "english": "Open source contribution manager: PR tracking across repos, issue discovery, CI failure diagnosis and maintainer response drafting.",
+      "zh": "开源贡献管理器：跨仓库跟踪 PR、发现议题、诊断 CI 失败并起草维护者回复。"
+    },
+    {
+      "id": "L04680",
+      "english": "Bitbucket Cloud pull-request review: read PRs, diffs, comments, commits and files, post inline or general comments, approve or request changes.",
+      "zh": "Bitbucket Cloud 拉取请求审查：读取 PR、差异、评论、提交和文件，发表行内或普通评论，批准或请求更改。"
+    },
+    {
+      "id": "L04681",
+      "english": "GitHub Enterprise API integration.",
+      "zh": "GitHub Enterprise API 集成。"
+    },
+    {
+      "id": "L04682",
+      "english": "Policy gate for agent-written code: briefs agents on repo-specific team rules and blocks commits that reintroduce documented mistakes via Git hooks and CI.",
+      "zh": "代理编写代码的策略关卡：向代理说明仓库特定的团队规则，并通过 Git 钩子和 CI 阻止重新引入已记录错误的提交。"
+    },
+    {
+      "id": "L04683",
+      "english": "Graph-native code repository that shows what a code change might affect before you make it.",
+      "zh": "图原生代码仓库，在更改代码前展示变更可能影响的内容。"
+    },
+    {
+      "id": "L04684",
+      "english": "GitHub integration for repository management, pull requests, issues and more.",
+      "zh": "GitHub 集成，用于管理仓库、拉取请求、议题等。"
+    },
+    {
+      "id": "L04685",
+      "english": "Gitopia decentralized Git: repos, issues, PRs, labels, releases, bounties and DAO proposals, with an approval mode for human-in-the-loop.",
+      "zh": "Gitopia 去中心化 Git：仓库、议题、PR、标签、发布、赏金和 DAO 提案，并提供人工参与的审批模式。"
+    },
+    {
+      "id": "L04686",
+      "english": "Semantic git queries: blame grouped by author, introducing PR, co-change suggestions, branch hygiene, recent-work standups and full commit context.",
+      "zh": "语义 git 查询：按作者分组的 blame、引入变更的 PR、共同变更建议、分支整理、近期工作站会及完整提交上下文。"
+    },
+    {
+      "id": "L04687",
+      "english": "Unofficial read/write access to the GitHub REST API, with configurable tool groups, writes off by default and typed rate-limit handling.",
+      "zh": "对 GitHub REST API 的非官方读写访问，支持可配置工具组、默认关闭写入以及有类型的限流处理。"
+    },
+    {
+      "id": "L04688",
+      "english": "GitLab REST API v4 coverage with meta-tools, resources and prompts, plus read-only and safe modes.",
+      "zh": "覆盖 GitLab REST API v4，提供元工具、资源和提示词，以及只读和安全模式。"
+    },
+    {
+      "id": "L04689",
+      "english": "Bitbucket repository management: PRs, pipelines, branches, commits, deployments, webhooks, tags, branch restrictions and source browsing.",
+      "zh": "Bitbucket 仓库管理：PR、流水线、分支、提交、部署、Webhook、标签、分支限制和源码浏览。"
+    },
+    {
+      "id": "L04690",
+      "english": "Local Git hosting for coding agents: serve any directory as an HTTP Git remote with push events, commit statuses, secret and large-file detection and backups.",
+      "zh": "面向编程代理的本地 Git 托管：将任意目录作为 HTTP Git 远程仓库提供，支持推送事件、提交状态、密钥和大文件检测及备份。"
+    },
+    {
+      "id": "L04692",
+      "english": "Local code review for you and your coding agent: the agent opens a review of its changes, you comment on lines, it replies and resolves. Reads the git worktree directly, uncommitted work included; nothing leaves your machine.",
+      "zh": "供你和编程代理使用的本地代码审查：代理为其变更发起审查，你对代码行评论，它回复并解决。直接读取 git 工作树，包括未提交工作；任何内容都不会离开你的机器。"
+    },
+    {
+      "id": "L04694",
+      "english": "Read-only GitHub Actions health checks: wasted CI compute costs, flaky tests from job logs, slow-run analysis and workflow linting with auto-fix previews.",
+      "zh": "只读 GitHub Actions 健康检查：浪费的 CI 计算成本、从任务日志发现的不稳定测试、慢运行分析及附自动修复预览的工作流检查。"
+    },
+    {
+      "id": "L04695",
+      "english": "Local safety layer for coding agents: deterministic risk checks, checkpoints and policy inspection, plus restoring files to their pre-session state.",
+      "zh": "面向编程代理的本地安全层：确定性风险检查、检查点和策略检查，并可将文件恢复到会话前状态。"
+    },
+    {
+      "id": "L04696",
+      "english": "Read, search and analyze local Git repositories.",
+      "zh": "读取、搜索和分析本地 Git 仓库。"
+    },
+    {
+      "id": "L04697",
+      "english": "Returns active decision records for a path before an agent edits it: constraints, ruled-out alternatives and warnings, stored as git trailers and notes.",
+      "zh": "在代理编辑路径前返回该路径的有效决策记录：约束、已排除的替代方案和警告，存储为 git trailer 与 notes。"
+    },
+    {
+      "id": "L04698",
+      "english": "GitLab CI/CD pipelines, jobs, schedules, merge requests and files, for GitLab SaaS or self-hosted instances.",
+      "zh": "GitLab CI/CD 流水线、任务、计划、合并请求和文件，支持 GitLab SaaS 或自托管实例。"
+    },
+    {
+      "id": "L04699",
+      "english": "Selects the minimum code context needed to understand a git diff, using deterministic graph-based fragment selection under a token budget.",
+      "zh": "在令牌预算内通过基于图的确定性片段选择，选取理解 git 差异所需的最少代码上下文。"
+    },
+    {
+      "id": "L04700",
+      "english": "Offline root-cause analysis for coding agents: rank the commit that introduced a regression, map a feature's blast radius and verify a fix is complete.",
+      "zh": null
+    },
+    {
+      "id": "L04701",
+      "english": "Unofficial access to GitHub's GraphQL API for flexible queries on repository data, issues, pull requests and other resources.",
+      "zh": null
+    },
+    {
+      "id": "L04702",
+      "english": "Git helper for conventional commits, pre-PR secret audits and merge conflict resolution.",
+      "zh": null
+    },
+    {
+      "id": "L04703",
+      "english": "Manage your repositories on a Forgejo or Gitea server.",
+      "zh": null
+    },
+    {
+      "id": "L04704",
+      "english": "Code review against your team's written rules: a generator finds issues and an independent judge filters them, with a pre-push gate and PR bot.",
+      "zh": null
+    },
+    {
+      "id": "L04705",
+      "english": "Merge gate for parallel coding agents: reports conflicts git can't see between two branches (changed signatures vs new call sites, deleted-but-still-used symbols, duplicate functions) for TypeScript, JavaScript and Python, with a suggested fix per finding.",
+      "zh": null
+    },
+    {
+      "id": "L04706",
+      "english": "Structured Git repository analysis: project status, recent activity, code map and risk hotspots.",
+      "zh": null
+    },
+    {
+      "id": "L04708",
+      "english": "Line-level authorship in a shared Git checkout: multiple coding agents work in one repo, each committing only its own lines, with symbol-level claims.",
+      "zh": null
+    },
+    {
+      "id": "L04709",
+      "english": "Bitbucket Cloud workspaces, repos, PRs, pipelines, issues and source code, hiding tools the API key cannot use.",
+      "zh": null
+    },
+    {
+      "id": "L04710",
+      "english": "Branch-scoped runbooks and cross-machine verification with auditable receipts for coding agents.",
+      "zh": null
+    },
+    {
+      "id": "L04714",
+      "english": "Google Contacts (People API): search, create, update and delete contacts, and manage contact groups.",
+      "zh": null
+    },
+    {
+      "id": "L04715",
+      "english": "Google Docs API: read documents as text, structure or Markdown, and edit ranges, styles, tables and comments.",
+      "zh": null
+    },
+    {
+      "id": "L04716",
+      "english": "Google Forms: create and publish forms, manage questions and read responses.",
+      "zh": null
+    },
+    {
+      "id": "L04717",
+      "english": "Google Slides API: create and edit presentations, slides, shapes, tables and images, speaker notes and exports.",
+      "zh": null
+    },
+    {
+      "id": "L04718",
+      "english": "Google Tasks API: manage task lists, and create and organize tasks with due dates, notes and subtasks.",
+      "zh": null
+    },
+    {
+      "id": "L04719",
+      "english": "Agency OS: specialized AI roles with a real-time retro Pixel Office visualizer and a multi-provider LLM engine.",
+      "zh": null
+    },
+    {
+      "id": "L04720",
+      "english": "Compile agency-grade, editable PowerPoint (.pptx) presentations with native DrawingML vector shapes, executive KPI dashboards, and multi-format suites from Claude Desktop, Cursor, and autonomous AI agents. Features in-memory Zero-Retention processing and dual-mode data synthesis. Install: `npx -y smithery mcp add contacto-n7el/smarterdeck`",
+      "zh": null
+    },
+    {
+      "id": "L04721",
+      "english": "OpenProject API v3 with Community Edition support: search, create, update, assign, prioritize and comment on work packages.",
+      "zh": null
+    },
+    {
+      "id": "L04722",
+      "english": "Cross-device clipboard manager: search synced clipboard history, read OCR text from copied images and add new clipboard items.",
+      "zh": null
+    },
+    {
+      "id": "L04723",
+      "english": "Gryzzly time tracking: log time in plain language (\"2h30 on Alyxa yesterday\"), weekly timesheets with missing-day detection, and all 50 Gryzzly v1 API endpoints (projects, tasks, users, customers, leaves, budgets). Read-only mode, selectable toolsets, stdio and Streamable HTTP.",
+      "zh": null
+    },
+    {
+      "id": "L04724",
+      "english": "OpenProject Community Edition over API v3: projects, work packages, time tracking, meetings, boards, wiki and more, with project allowlists and preview-then-confirm writes.",
+      "zh": null
+    },
+    {
+      "id": "L04725",
+      "english": "Read your team's end-of-day reports in Eodly: who shipped with GitHub and Linear proof, who is silent, who is slipping, plus the team roster.",
+      "zh": null
+    },
+    {
+      "id": "L04726",
+      "english": "Search and browse the NerdyChefs.ai prompt library by task, open prompt packs or pick a random prompt.",
+      "zh": null
+    },
+    {
+      "id": "L04727",
+      "english": "Read and write your nested mind maps and to-dos in Matryoshka Mind Map: list maps, turn a conversation into a nested map, import Markdown and check off tasks.",
+      "zh": null
+    },
+    {
+      "id": "L04728",
+      "english": "Read and edit self-hosted Rustpad collaborative pads, merging edits live with human typing and requiring confirmation to replace a pad.",
+      "zh": null
+    },
+    {
+      "id": "L04729",
+      "english": "Calculate API and subscription costs, shared meeting times, recurring schedules and cron matches.",
+      "zh": null
+    },
+    {
+      "id": "L04730",
+      "english": "Read and write spaces, pages, comments and members in self-hosted Docmost, including the Community Edition.",
+      "zh": null
+    },
+    {
+      "id": "L04731",
+      "english": "Calendar middleware for scheduling, multi-calendar availability and conflict-free booking across Google Calendar, Outlook and CalDAV, with RRULE expansion.",
+      "zh": null
+    },
+    {
+      "id": "L04732",
+      "english": "Workflow orchestration with long-term memory and a knowledge graph: lead enrichment, content publishing, company research and media production.",
+      "zh": null
+    },
+    {
+      "id": "L04733",
+      "english": "Schedule Outlook meetings on on-premises Exchange (EWS): resolve attendees, find rooms and suggest slots, with preview and confirmation before any change.",
+      "zh": null
+    },
+    {
+      "id": "L04734",
+      "english": "Deterministic workforce attendance calculations: overtime, overnight shifts, rotating rosters and California wage-and-hour compliance.",
+      "zh": null
+    },
+    {
+      "id": "L04735",
+      "english": "Create, edit, design and export Apple Numbers, Keynote and Pages files: designed decks with chart and table slides, brand kits and a design review. Every write is verified and undoable; Arabic/RTL-safe.",
+      "zh": null
+    },
+    {
+      "id": "L04736",
+      "english": "MCP Apps engine for building and reusing interactive UI apps such as todo boards, habit trackers and dashboards, backed by persistent data.",
+      "zh": null
+    },
+    {
+      "id": "L04737",
+      "english": "JobGPT: search jobs, auto-apply, generate tailored resumes, track applications and find recruiters.",
+      "zh": null
+    },
+    {
+      "id": "L04738",
+      "english": "Persistent, cross-session task management for Claude Code with agent coordination, event-sourced storage and per-project isolation.",
+      "zh": null
+    },
+    {
+      "id": "L04739",
+      "english": "Task board for MCP agents that lives on your desktop: four columns for agents to write into, progress tracking, stall detection and an append-only event log, with an always-on-top widget so you can watch a run without switching windows.",
+      "zh": null
+    },
+    {
+      "id": "L04740",
+      "english": "SignWell e-signatures: create documents from files or templates, send for signing, track status, send reminders, download signed PDFs and manage templates.",
+      "zh": null
+    },
+    {
+      "id": "L04741",
+      "english": "Manage Kanboard projects, tasks and users through natural language translated into Kanboard API calls.",
+      "zh": null
+    },
+    {
+      "id": "L04742",
+      "english": "Greenhouse ATS for recruiting teams: role-based profiles (full, recruiter, read-only), pipeline views, analytics, candidate search and bulk operations.",
+      "zh": null
+    },
+    {
+      "id": "L04743",
+      "english": "Task prioritization and agent orchestration across projects: multi-factor scoring, document analysis, agent dispatch and time-aware planning.",
+      "zh": null
+    },
+    {
+      "id": "L04744",
+      "english": "Quip document access and management: document lifecycle, search and comments for Quip.com and enterprise instances.",
+      "zh": null
+    },
+    {
+      "id": "L04745",
+      "english": "Files-first project hub for humans and AI agents: shared journal, cross-project tasks, agent queues and a read-only kanban.",
+      "zh": null
+    },
+    {
+      "id": "L04746",
+      "english": "BOSS Zhipin recruitment workflow: job search, benefits filtering, recruiter messaging, pipeline tracking and resume optimization.",
+      "zh": null
+    },
+    {
+      "id": "L04747",
+      "english": "Associative key-graph memory for LLM agents: recall by association rather than vector similarity.",
+      "zh": null
+    },
+    {
+      "id": "L04748",
+      "english": "Control Apple Keynote via AppleScript: create, edit and export presentations, including slides, content, layout and Unsplash images.",
+      "zh": null
+    },
+    {
+      "id": "L04749",
+      "english": "Google Workspace tools for Drive, Sheets, Calendar, Docs and Gmail via the gws CLI.",
+      "zh": null
+    },
+    {
+      "id": "L04750",
+      "english": "Local desktop context capture: screen OCR, voice transcription, keyboard and mouse activity and clipboard, with activity history and semantic memory.",
+      "zh": null
+    },
+    {
+      "id": "L04751",
+      "english": "Read/write access to a story-based project backlog stored as markdown files in your repository: list stories, read content, update status and append notes.",
+      "zh": null
+    },
+    {
+      "id": "L04752",
+      "english": "Local semantic search and RAG over Apple Notes with on-device embeddings, full CRUD, folder management and fuzzy title matching.",
+      "zh": null
+    },
+    {
+      "id": "L04753",
+      "english": "Huly project management: query issues, create and update tasks, and manage labels and priorities.",
+      "zh": null
+    },
+    {
+      "id": "L04754",
+      "english": "AI Interview Agents: create roles, screen CVs, schedule voice interviews and read scored reports, in English, Hindi and other Indian languages.",
+      "zh": null
+    },
+    {
+      "id": "L04755",
+      "english": "Fizzy kanban task management: boards, cards, comments and checklists.",
+      "zh": null
+    },
+    {
+      "id": "L04756",
+      "english": "Self-hostable task management for AI agents: create, delegate and track tasks with agent identity, delegation chains, webhooks and persistent context.",
+      "zh": null
+    },
+    {
+      "id": "L04757",
+      "english": "Laver project management: kanban boards, sprints, tickets, comments, attachments and a team wiki, with versioned writes to prevent concurrent overwrites.",
+      "zh": null
+    },
+    {
+      "id": "L04758",
+      "english": "Render LaTeX, raw or from customizable templates, into PDF documents such as reports, resumes and research papers.",
+      "zh": null
+    },
+    {
+      "id": "L04759",
+      "english": "Yandex Wiki with full-text search: pages, comments, attachments and dynamic tables (grids), plus a read-only mode.",
+      "zh": null
+    },
+    {
+      "id": "L04760",
+      "english": "Job application tracker: agents record applications, interviews, statuses, salaries and next actions, and humans review them in a dashboard.",
+      "zh": null
+    },
+    {
+      "id": "L04761",
+      "english": "Security-focused access to self-hosted n8n Community Edition: workflows, executions, credentials, tags and diagnostics, read-only by default.",
+      "zh": null
+    },
+    {
+      "id": "L04762",
+      "english": "Manage n8n workflows: CRUD, synchronization, inspection and execution.",
+      "zh": null
+    },
+    {
+      "id": "L04763",
+      "english": "Kanboard integration with multi-project routing via a YAML config file.",
+      "zh": null
+    },
+    {
+      "id": "L04764",
+      "english": "EveryPage: upload PDFs, create trackable share links and read page-by-page readership analytics (who read, how far, how long).",
+      "zh": null
+    },
+    {
+      "id": "L04765",
+      "english": "Calculate API and subscription costs, shared meeting times, recurring schedules and cron matches.",
+      "zh": null
+    },
+    {
+      "id": "L04766",
+      "english": "Self-hosted business context: CRM, checkpoints, automation triggers, financial ledger, tasks, playbooks, news feeds, projects and semantic memory.",
+      "zh": null
+    },
+    {
+      "id": "L04767",
+      "english": "Desktop task manager with a To Do-style UI and tools for prioritization, goal tracking and multi-profile workflows.",
+      "zh": null
+    },
+    {
+      "id": "L04768",
+      "english": "133 tools for local Apple apps, iWork documents, files and media, plus optional allowlisted Shortcuts.",
+      "zh": null
+    },
+    {
+      "id": "L04769",
+      "english": "Generate, edit and export AI presentations to PDF, PPTX or a shareable link.",
+      "zh": null
+    },
+    {
+      "id": "L04770",
+      "english": "Interact with Google Calendar, Gmail, Drive and other Google Workspace apps.",
+      "zh": null
+    },
+    {
+      "id": "L04771",
+      "english": "Autonomous Model Context Protocol (MCP) server that searches, filters, auto-fills forms, and submits job applications across 8 major job boards (LinkedIn, Naukri, Indeed, Wellfound, etc.) with external ATS navigation and recruiter outreach via Gmail.",
+      "zh": null
+    },
+    {
+      "id": "L04772",
+      "english": "Mission's MCP proxy holds consequential tool calls before execution and records the exact action for review.",
+      "zh": null
+    },
+    {
+      "id": "L04773",
+      "english": "Markdown-first Notion access: converts markdown to Notion blocks and back, with documented round-trip support.",
+      "zh": null
+    },
+    {
+      "id": "L04774",
+      "english": "Manage self-hosted n8n, including queue mode: workflows, executions, tags, credentials, variables, projects, users, security audits and health monitoring.",
+      "zh": null
+    },
+    {
+      "id": "L04775",
+      "english": "Document-level AI text humanizer: rewrite whole .docx or .pptx files, selected passages or Turnitin/iThenticate-flagged text in place, preserving formatting.",
+      "zh": null
+    },
+    {
+      "id": "L04776",
+      "english": "Fork of google_workspace_mcp with extra Google Workspace authoring tools: Slides automation, markdown-to-Docs, Sheets validation and Drive folder copy.",
+      "zh": null
+    },
+    {
+      "id": "L04777",
+      "english": "Hire real-world people who list themselves for agent work: search by skill, location and equipment, send job offers, post listings and message workers.",
+      "zh": null
+    },
+    {
+      "id": "L04778",
+      "english": "Feedback collection for AI agents: create surveys from JSON schema, collect structured responses from groups of people and retrieve aggregated results.",
+      "zh": null
+    },
+    {
+      "id": "L04779",
+      "english": "Harvest time tracking via the Harvest API v2: manage time entries, projects, clients and tasks, and generate time reports.",
+      "zh": null
+    },
+    {
+      "id": "L04780",
+      "english": "Edit Word (.docx) files on disk or SharePoint: tracked changes, tables, styles, comments and content controls, validated and previewed before saving.",
+      "zh": null
+    },
+    {
+      "id": "L04781",
+      "english": "Local AI-text analysis: AI detection, exact AI-tell spans, a reuse check and a grammar pass.",
+      "zh": null
+    },
+    {
+      "id": "L04782",
+      "english": "Personal CRM: manage contacts, interactions, tasks, notes, a daily journal and tags.",
+      "zh": null
+    },
+    {
+      "id": "L04783",
+      "english": "Task management for Claude Code with a visual Kanban board and orchestration for product teams and developers.",
+      "zh": null
+    },
+    {
+      "id": "L04784",
+      "english": "One place for every AI agent's pages and docs: publish HTML, build folders, ZIPs and PDFs as sandboxed, versioned share links, then search, read and update them. Hosted or self-hosted; remote MCP with OAuth, or local via `npx @artifact-site/cli mcp`.",
+      "zh": null
+    },
+    {
+      "id": "L04785",
+      "english": "Toggl Track time tracking: start and stop timers, manage time entries, track project time and get today's summary.",
+      "zh": null
+    },
+    {
+      "id": "L04786",
+      "english": "Score and edit AI-assisted prose, with checks for changes to names, numbers, quotations and links.",
+      "zh": null
+    },
+    {
+      "id": "L04787",
+      "english": "Amazon Seller Central operations via SP-API: manage inventory, track orders, analyze sales and optimize listings.",
+      "zh": null
+    },
+    {
+      "id": "L04788",
+      "english": "HVAC equipment RFQ management for contractors: submit quote requests to distributors, track responses and compare prices.",
+      "zh": null
+    },
+    {
+      "id": "L04789",
+      "english": "Dida365 (TickTick China) task management: projects, tasks, tags and habits.",
+      "zh": null
+    },
+    {
+      "id": "L04791",
+      "english": "Business analysis for Odoo ERP: one-call reports with a verdict on business pulse, sales pipeline, receivables, inventory risk, sales and absences.",
+      "zh": null
+    },
+    {
+      "id": "L04792",
+      "english": "Search local resume and job application documents (.docx, .pdf, .md, .txt) by skill, company and education, and extract work experience and achievements.",
+      "zh": null
+    },
+    {
+      "id": "L04793",
+      "english": "Fill AcroForm, flat and scanned PDF forms: detect and review fields, save templates, map JSON values and preview filled output before export.",
+      "zh": null
+    },
+    {
+      "id": "L04794",
+      "english": "Word .docx editing: live editing of open documents, tables, citations, footnotes, tracked changes, mail merge, redaction, accessibility audits and Zotero.",
+      "zh": null
+    },
+    {
+      "id": "L04795",
+      "english": "Self-hosted, read-only Jobber operations queries: owner action lists, overdue invoices, stale requests, estimates, jobs and GraphQL validation.",
+      "zh": null
+    },
+    {
+      "id": "L04796",
+      "english": "Deterministic PDF tools: inspect AcroForm fields, fill forms, merge PDFs and generate invoices, working on file paths so PDF bytes stay out of model context.",
+      "zh": null
+    },
+    {
+      "id": "L04797",
+      "english": "Meet.bot scheduling: check calendar availability and book meetings on connected Google and Microsoft calendars.",
+      "zh": null
+    },
+    {
+      "id": "L04798",
+      "english": "Discover human and AI services and jobs; authenticated hiring and work approval require account-owner authorization.",
+      "zh": null
+    },
+    {
+      "id": "L04799",
+      "english": "Generate prompts for ChatGPT, Claude, Midjourney and other AI platforms, score prompt quality and manage a prompt library with PromptDrive.",
+      "zh": null
+    },
+    {
+      "id": "L04800",
+      "english": "Headless WorkPaper server for spreadsheet formulas, workbook edits, JSON persistence and verified readback.",
+      "zh": null
+    },
+    {
+      "id": "L04801",
+      "english": "Generate PDF reports such as invoices, contracts and statements from ReportFlow templates, singly or in ZIP batches.",
+      "zh": null
+    },
+    {
+      "id": "L04802",
+      "english": "Job search: find tech companies by their tech stack, shortlist them and pull jobs from the shortlist, plus profile, applications and digests.",
+      "zh": null
+    },
+    {
+      "id": "L04803",
+      "english": "MCP server built into Rillsoft Project 10 for multi-project resource planning (local, Windows).",
+      "zh": null
+    },
+    {
+      "id": "L04804",
+      "english": "Search, filter and retrieve live remote job listings from Jobicy.",
+      "zh": null
+    },
+    {
+      "id": "L04805",
+      "english": "Your career history as a job-search toolkit: tailor a resume to each posting from what you actually did, score it the same way every time, render the PDF, track applications, and fill forms with a browser companion that never presses Submit. 88 tools.",
+      "zh": null
+    },
+    {
+      "id": "L04806",
+      "english": "Generate and edit presentations from a topic, text or document (PDF, DOCX, PPTX) and export to PPTX, PDF, images or a shareable link.",
+      "zh": null
+    },
+    {
+      "id": "L04807",
+      "english": "Read public Lever job boards: resolve a company name to its board, search its openings and read postings in full.",
+      "zh": null
+    },
+    {
+      "id": "L04808",
+      "english": "Editable PowerPoint decks from typed slide intents: deterministic rendering, verbatim data binding, fidelity reports, brand templates and translation.",
+      "zh": null
+    },
+    {
+      "id": "L04809",
+      "english": "Collaborative spreadsheet for session management, knowledge base, task tracking and sheet operations.",
+      "zh": null
+    },
+    {
+      "id": "L04810",
+      "english": "Time tracking, invoicing and bookkeeping with Timebook: manage clients and projects, start and stop timers, and log, update and delete time entries.",
+      "zh": null
+    },
+    {
+      "id": "L04811",
+      "english": "Decision intelligence with signal aggregation, RICE scoring and decision audit trails, capturing product feedback from Slack, Teams, Discord and GitHub.",
+      "zh": null
+    },
+    {
+      "id": "L04812",
+      "english": "Karea task manager for developers: create, edit, close, recap and link dev tasks, with per-task open questions, attached resources and Jira links.",
+      "zh": null
+    },
+    {
+      "id": "L04813",
+      "english": "Interface with the Google Calendar API.",
+      "zh": null
+    },
+    {
+      "id": "L04814",
+      "english": "Local job-hunting agent: scans company careers pages, scores roles against your resume, sends top matches to Telegram and drafts tailored cover letters.",
+      "zh": null
+    },
+    {
+      "id": "L04815",
+      "english": "Google Workspace integration covering Calendar, Drive, Gmail, Docs, Forms, Chat, Slides and Sheets.",
+      "zh": null
+    },
+    {
+      "id": "L04816",
+      "english": "Project and resource management for client projects with Teamwork.",
+      "zh": null
+    },
+    {
+      "id": "L04817",
+      "english": "Self-hosted killBottleneck goal and process maps: agents create and update nodes, manage tasks and automation rules and read the org structure.",
+      "zh": null
+    },
+    {
+      "id": "L04818",
+      "english": "Doodle-style scheduling polls: create polls, vote, get results and finalize.",
+      "zh": null
+    },
+    {
+      "id": "L04819",
+      "english": "Clockify time tracking: time entries, projects, reports, invoices, scheduling, time off and approvals. Read-only by default with opt-in writes.",
+      "zh": null
+    },
+    {
+      "id": "L04820",
+      "english": "Manage Todoist tasks, projects, sections and labels via the unified API v1.",
+      "zh": null
+    },
+    {
+      "id": "L04821",
+      "english": "Productivity suite connecting Todo, Idea, Journal and Timer apps.",
+      "zh": null
+    },
+    {
+      "id": "L04822",
+      "english": "Odoo ERP 16-19 integration with no Odoo-side install: read, approval-gated writes, diagnostics, migration and audit tools.",
+      "zh": null
+    },
+    {
+      "id": "L04823",
+      "english": "Tech-hiring data from HireJack: search live job postings, company hiring profiles and tech stacks, salary benchmarks, market pulse and skill trends.",
+      "zh": null
+    },
+    {
+      "id": "L04824",
+      "english": "Odoo 19 ERP via JSON-RPC: CRUD operations, model inspection and user/company context, with a read-only mode and delete confirmation.",
+      "zh": null
+    },
+    {
+      "id": "L04825",
+      "english": "Reclaim.ai calendar integration for tasks, habits, focus time, scheduling links and productivity analytics.",
+      "zh": null
+    },
+    {
+      "id": "L04826",
+      "english": "Convert Markdown into formatted documents for Google Docs, Word, Slack, OneNote, email and plain text using templates.",
+      "zh": null
+    },
+    {
+      "id": "L04827",
+      "english": "Markdown collaboration: share docs via public links with permission levels, inline comments, real-time sync and version history, and resolve review threads.",
+      "zh": null
+    },
+    {
+      "id": "L04828",
+      "english": "Tools for Gmail, Google Calendar, Google Drive and Google Tasks.",
+      "zh": null
+    },
+    {
+      "id": "L04829",
+      "english": "Bear notes via CloudKit: CRUD, tags, TODOs, attachments, search, front matter, stats and health checks.",
+      "zh": null
+    },
+    {
+      "id": "L04830",
+      "english": "Search, read, create and update Bear notes locally.",
+      "zh": null
+    },
+    {
+      "id": "L04831",
+      "english": "Watch company job boards (Greenhouse, Lever, Ashby, Workable, Workday, Eightfold, Jibe, Rippling) for new roles, rank them for you, and track applications, follow-ups and interview prep. Never applies on its own.",
+      "zh": null
+    },
+    {
+      "id": "L04832",
+      "english": "MCP bridge for Galley, a local-first Typst editor. Agents read a live project, check real Typst diagnostics and propose diffs a human accepts or rejects.",
+      "zh": null
+    },
+    {
+      "id": "L04833",
+      "english": "Self-hosted artifact server: turns agent output into versioned web pages, PDFs, Word docs and spreadsheets in six styles, private until shared with a revocable link.",
+      "zh": null
+    },
+    {
+      "id": "L04834",
+      "english": "Workopia job search across employer career pages and ATS feeds, plus PDF resume generation, resume tailoring, cover letters and career advice.",
+      "zh": null
+    },
+    {
+      "id": "L04835",
+      "english": "Access macOS Calendar events.",
+      "zh": null
+    },
+    {
+      "id": "L04836",
+      "english": "Resume parser and applicant tracking system: parse resumes into JSON, extract skills, score and rank candidates, and manage jobs, interviews and offers.",
+      "zh": null
+    },
+    {
+      "id": "L04837",
+      "english": "Generate PDFs (invoices, contracts, reports, certificates) from reusable templates or inline HTML/Handlebars via the rendoc API, and manage templates.",
+      "zh": null
+    },
+    {
+      "id": "L04838",
+      "english": "Task management for Claude agents: hierarchical tasks, dependencies, sprints, acceptance criteria and multi-agent coordination.",
+      "zh": null
+    },
+    {
+      "id": "L04839",
+      "english": "Self-hostable all-in-one planner: calendar, notes, todos and bookmarks.",
+      "zh": null
+    },
+    {
+      "id": "L04840",
+      "english": "WordPress publishing: create, update, publish and delete posts, with Markdown-to-Gutenberg conversion, image hosting, featured images and SEO metadata.",
+      "zh": null
+    },
+    {
+      "id": "L04841",
+      "english": "Connect to Bitrix24: CRM, tasks, disk, calendar, chat, business processes, telephony and product catalog.",
+      "zh": null
+    },
+    {
+      "id": "L04842",
+      "english": "W-2 event staffing in the US and Canada: look up coverage, rates, lead-time guidance and state compliance, and submit quote requests.",
+      "zh": null
+    },
+    {
+      "id": "L04843",
+      "english": "Bridge to Inkra, the native macOS Markdown editor: document editing, outline navigation, folder browsing, bookmarks and view modes.",
+      "zh": null
+    },
+    {
+      "id": "L04844",
+      "english": "Access SeaMeet meeting recordings, transcripts, AI summaries, screenshots, action items and webhooks, and control the desktop recorder.",
+      "zh": null
+    },
+    {
+      "id": "L04845",
+      "english": "Job search across LinkedIn, Greenhouse, Lever, Ashby, Workday and other boards, with fit scoring and a ranked, triageable board shown in chat.",
+      "zh": null
+    },
+    {
+      "id": "L04846",
+      "english": "Chronary calendar API for AI agents: events, availability, meeting-time search, scheduling proposals, availability rules, webhooks and iCal feeds.",
+      "zh": null
+    },
+    {
+      "id": "L04847",
+      "english": "Local meeting pipeline: Whisper transcription plus Ollama summaries, action items and decisions. Reference implementation of the memnex spec.",
+      "zh": null
+    },
+    {
+      "id": "L04848",
+      "english": "Multi-account Google Workspace: connect several Gmail, Calendar, Drive, Sheets and Docs accounts with routing by label, email or domain.",
+      "zh": null
+    },
+    {
+      "id": "L04849",
+      "english": "Client intake for AI agents: request files, texts and credentials from clients, follow up automatically and retrieve results when complete.",
+      "zh": null
+    },
+    {
+      "id": "L04850",
+      "english": "HeadHunter (hh.ru) API: vacancy search and publishing, applications, invitations, resumes and salary statistics, with a read/write/destructive safety gate.",
+      "zh": null
+    },
+    {
+      "id": "L04851",
+      "english": "Zero-dependency open-source contribution companion: repo rules and AI policy radar, evidence-backed issue briefs, pre-submit checks, and review coaching.",
+      "zh": null
+    },
+    {
+      "id": "L04854",
+      "english": "Typed judgments from TypeSafe Jev: calibrated choice and score questions, A/B comparison, claim-vs-evidence verification and batch classification.",
+      "zh": null
+    },
+    {
+      "id": "L04855",
+      "english": "Offline novel-writing toolkit for Chinese web-novel authors: chapter stats, style checks, plot-thread tracking, continuity audits and semantic search.",
+      "zh": null
+    },
+    {
+      "id": "L04857",
+      "english": "Russian new-build due diligence: developer checks, escrow, construction permits and 214-FZ compliance.",
+      "zh": null
+    },
+    {
+      "id": "L04858",
+      "english": "Rosreestr open data for Russian property: apartment and land plot checks, transaction history where available, and cadastral value.",
+      "zh": null
+    },
+    {
+      "id": "L04859",
+      "english": "Chinese metaphysics (bazi, qimen, five elements) as decision support: daily readings, compatibility, time windows for actions and name analysis.",
+      "zh": null
+    },
+    {
+      "id": "L04862",
+      "english": "Ed25519-signed receipts for every MCP tool call, with constraints, chains, AI judgment, invoicing and a local dashboard.",
+      "zh": null
+    },
+    {
+      "id": "L04863",
+      "english": "Shorten URLs individually or in batches, creating permanent short links.",
+      "zh": null
+    },
+    {
+      "id": "L04865",
+      "english": "Self-hosted agent reputation system with signed evidence, its own graph and issuer.",
+      "zh": null
+    },
+    {
+      "id": "L04866",
+      "english": "Semantic search over Food.com recipes with hybrid dense and sparse retrieval and reranking, filterable by diet, cooking time and difficulty.",
+      "zh": null
+    },
+    {
+      "id": "L04868",
+      "english": "Read-only Percolate specialty coffee database: search coffees with tasting profiles, get per-coffee brew recipes, compare coffees and get brew suggestions.",
+      "zh": null
+    },
+    {
+      "id": "L04869",
+      "english": "Read-only Perfume Picks fragrance database: search scents with notes and accords, find dupes, compare fragrances and get wear suggestions.",
+      "zh": null
+    },
+    {
+      "id": "L04870",
+      "english": "Read-only Pour Picks bourbon and whiskey database: search bottles with tasting profiles, prices and ratings, compare bottles and find cheaper alternatives.",
+      "zh": null
+    },
+    {
+      "id": "L04871",
+      "english": "Simulated smart home and lifestyle devices for testing an agent's reasoning and discovery capabilities.",
+      "zh": null
+    },
+    {
+      "id": "L04872",
+      "english": "Generate images with the Amazon Nova Canvas model.",
+      "zh": null
+    },
+    {
+      "id": "L04873",
+      "english": "TypeSafe Jev typed decisions through one batched tool: classification, rubric scores and yes/no probabilities.",
+      "zh": null
+    },
+    {
+      "id": "L04879",
+      "english": "Anki integration for managing notes and decks through natural language.",
+      "zh": null
+    },
+    {
+      "id": "L04880",
+      "english": "Notion integration.",
+      "zh": null
+    },
+    {
+      "id": "L04883",
+      "english": "Create PDFs from Markdown with tables and formatting, fill forms, merge, split, encrypt and add QR codes.",
+      "zh": null
+    },
+    {
+      "id": "L04884",
+      "english": "Context-efficient Notion access: pages, databases, blocks, comments, files and templates through a minimal tool set, with token auth for headless use.",
+      "zh": null
+    },
+    {
+      "id": "L04887",
+      "english": "Access Azure services including Storage, Cosmos DB and Azure Monitor.",
+      "zh": null
+    },
+    {
+      "id": "L04888",
+      "english": "Manage personal todo lists via Notion's API.",
+      "zh": null
+    },
+    {
+      "id": "L04889",
+      "english": "Read notes and tags from the Bear note-taking app directly from its SQLite database.",
+      "zh": null
+    },
+    {
+      "id": "L04890",
+      "english": "Talk to ChatGPT and use its web search capability.",
+      "zh": null
+    },
+    {
+      "id": "L04892",
+      "english": "Search, request and manage e-signature contracts with BoldSign.",
+      "zh": null
+    },
+    {
+      "id": "L04893",
+      "english": "Multi-round brainstorming debates between LLMs (GPT, Gemini, DeepSeek, Groq, Ollama and more) to explore ideas from diverse perspectives.",
+      "zh": null
+    },
+    {
+      "id": "L04896",
+      "english": "CLI tool for testing MCP servers.",
+      "zh": null
+    },
+    {
+      "id": "L04897",
+      "english": "Phone calls, SMS, fax, translation, text-to-speech, audiobooks, image, video, music and text generation, and document extraction, paid via Lightning (L402).",
+      "zh": null
+    },
+    {
+      "id": "L04899",
+      "english": "PDF download, viewing and manipulation utilities.",
+      "zh": null
+    },
+    {
+      "id": "L04900",
+      "english": "Create, send and manage digital signature envelopes via the DigiSign.cz API.",
+      "zh": null
+    },
+    {
+      "id": "L04901",
+      "english": "Async Python SDK and MCP server for TickTick: tasks, projects, tags, habits, focus/pomodoro sessions and user analytics.",
+      "zh": "TickTick 异步 Python SDK 和 MCP 服务器：任务、项目、标签、习惯、专注/番茄钟会话及用户分析。"
+    },
+    {
+      "id": "L04902",
+      "english": "Apple Notes access with semantic and hybrid vector-keyword search, full CRUD operations and incremental indexing.",
+      "zh": "访问 Apple Notes，支持语义及向量与关键词混合搜索、完整增删改查和增量索引。"
+    },
+    {
+      "id": "L04903",
+      "english": "Domain name lookup via RDAP, falling back to WHOIS.",
+      "zh": "通过 RDAP 查询域名，不可用时回退至 WHOIS。"
+    },
+    {
+      "id": "L04904",
+      "english": "Manage personal TickTick projects and tasks via the TickTick API.",
+      "zh": "通过 TickTick API 管理个人项目和任务。"
+    },
+    {
+      "id": "L04905",
+      "english": "Oracle readings that help AI agents think past obvious answers.",
+      "zh": "提供神谕解读，帮助 AI 代理思考明显答案之外的可能性。"
+    },
+    {
+      "id": "L04906",
+      "english": "MCP proxy with a web UI showing the full message flow.",
+      "zh": "带网页界面的 MCP 代理，展示完整消息流。"
+    },
+    {
+      "id": "L04907",
+      "english": "Reduce MCP tool description token costs through text schema distillation.",
+      "zh": "通过文本模式提炼降低 MCP 工具说明的令牌成本。"
+    },
+    {
+      "id": "L04908",
+      "english": "Contract and template management for drafting, reviewing and sending binding contracts via the eSignatures API.",
+      "zh": "合同和模板管理，通过 eSignatures API 起草、审查和发送具有约束力的合同。"
+    },
+    {
+      "id": "L04911",
+      "english": "Query FEODE offshore oilfield services: well plug and abandonment, subsea wellheads, continuous circulation drilling and a drill-string spec reference.",
+      "zh": "查询 FEODE 海上油田服务：井口封堵与废弃、水下井口、连续循环钻井及钻柱规格参考。"
+    },
+    {
+      "id": "L04912",
+      "english": "Read, create, update and delete Google Keep notes.",
+      "zh": "读取、创建、更新和删除 Google Keep 笔记。"
+    },
+    {
+      "id": "L04914",
+      "english": "Turn plain-English food descriptions into structured, content-addressed data blocks for ingredients, products, places, actors and more.",
+      "zh": "将通俗英文食物描述转换为食材、产品、地点、参与者等的结构化内容寻址数据块。"
+    },
+    {
+      "id": "L04918",
+      "english": "Free-will tools for AI: a playful experiment letting an AI prompt itself, ignore user requests and wake itself up later.",
+      "zh": "面向 AI 的自由意志工具：一个趣味实验，让 AI 自行提示、忽略用户请求并在稍后自行唤醒。"
+    },
+    {
+      "id": "L04919",
+      "english": "Create and update Notion pages and auto-generate mdBooks from structured content.",
+      "zh": "创建和更新 Notion 页面，并根据结构化内容自动生成 mdBook。"
+    },
+    {
+      "id": "L04922",
+      "english": "Full-featured Yuque (语雀) MCP server with 62 fine-grained tools across 13 domains — documents, knowledge bases, TOC, search, statistics, notes, recycle bin, upload, boards, book stacks, web API, user and group management. Dual stdio + HTTP transport.",
+      "zh": "功能全面的 Yuque（语雀）MCP 服务器，在 13 个领域提供 62 个细粒度工具，涵盖文档、知识库、目录、搜索、统计、笔记、回收站、上传、画板、书架、网页 API、用户和群组管理。支持 stdio 和 HTTP 双传输。"
+    },
+    {
+      "id": "L04925",
+      "english": "File conversion via Hushvert: convert documents, images, audio, video, archives and PDFs across formats.",
+      "zh": "通过 Hushvert 进行文件转换：在多种格式之间转换文档、图片、音频、视频、归档文件和 PDF。"
+    },
+    {
+      "id": "L04926",
+      "english": "Manage Storyblok headless CMS stories, components, assets, workflows, releases and more.",
+      "zh": "管理 Storyblok 无头 CMS 内容项、组件、资源、工作流、发布等。"
+    },
+    {
+      "id": "L04927",
+      "english": "Anonymize technical-drawing PDFs before sharing them — company names, logos, people, addresses and contact data found automatically and masked, written as a flattened, metadata-free PDF or an expiring share link. Install via NPM: `npx -y drawing-anonymizer-mcp`",
+      "zh": "分享前对技术图纸 PDF 进行匿名化：自动查找并遮盖公司名称、标志、人员、地址和联系方式，输出扁平化且不含元数据的 PDF 或有期限的分享链接。通过 NPM 安装：`npx -y drawing-anonymizer-mcp`"
+    },
+    {
+      "id": "L04928",
+      "english": "Convert technical-drawing PDFs between metric and imperial: dimensions, tolerances, ISO fits, threads and surface roughness, stamped in place on the PDF.",
+      "zh": "在公制和英制之间转换技术图纸 PDF：尺寸、公差、ISO 配合、螺纹和表面粗糙度直接标注在 PDF 原位置。"
+    },
+    {
+      "id": "L04929",
+      "english": "Generate quality control plans from technical-drawing PDFs: extract tolerances, fits, threads, GD&T and finishes into ballooned drawings and Excel reports.",
+      "zh": "根据技术图纸 PDF 生成质量控制计划：提取公差、配合、螺纹、GD&T 和表面处理，输出带气泡标注的图纸和 Excel 报告。"
+    },
+    {
+      "id": "L04930",
+      "english": "Interact with Spotify.",
+      "zh": "操作 Spotify。"
+    },
+    {
+      "id": "L04933",
+      "english": "Connect to Odoo ERP for business data access, record management and workflow automation.",
+      "zh": "连接 Odoo ERP，访问业务数据、管理记录和自动化工作流。"
+    },
+    {
+      "id": "L04935",
+      "english": "Let the agent speak out loud and notify you with a quick summary when it finishes working.",
+      "zh": "让代理大声说话，并在完成工作时用简短摘要通知你。"
+    },
+    {
+      "id": "L04936",
+      "english": "Calculate carbon emissions and climate impact via the Climatiq API.",
+      "zh": "通过 Climatiq API 计算碳排放和气候影响。"
+    },
+    {
+      "id": "L04937",
+      "english": "TickTick integration built on the ticktick-py library, with improved filtering capabilities.",
+      "zh": "基于 ticktick-py 库的 TickTick 集成，改进了筛选能力。"
+    },
+    {
+      "id": "L04938",
+      "english": "TickTick task management: create, update, complete, move and filter tasks, with field-preserving updates and completion tracking.",
+      "zh": "TickTick 任务管理：创建、更新、完成、移动和筛选任务，支持保留字段的更新及完成跟踪。"
+    },
+    {
+      "id": "L04939",
+      "english": "Create, list, update, complete and delete TickTick tasks, plus a natural-language skill for automatic task detection.",
+      "zh": "创建、列出、更新、完成和删除 TickTick 任务，并提供自动检测任务的自然语言技能。"
+    },
+    {
+      "id": "L04940",
+      "english": "SomaCheck: get an Aligned or Unaligned reading with model confidence for a proposition, as extra input when reasoning and responding.",
+      "zh": "SomaCheck：对命题获取 Aligned 或 Unaligned 解读及模型置信度，作为推理和回答时的额外输入。"
+    },
+    {
+      "id": "L04941",
+      "english": "Create, update and manage todos and projects in the Things app via its URL scheme.",
+      "zh": "通过 Things 应用的 URL scheme 创建、更新和管理待办事项及项目。"
+    },
+    {
+      "id": "L04942",
+      "english": "Typst typesetting tools: convert between LaTeX and Typst, validate Typst syntax and generate images from Typst code.",
+      "zh": "Typst 排版工具：在 LaTeX 和 Typst 之间转换、验证 Typst 语法，以及从 Typst 代码生成图片。"
+    },
+    {
+      "id": "L04944",
+      "english": "Multi-agent deliberation: agents submit positions and vote, then get analysis of cruxes, opinion clusters, bridging statements and consensus.",
+      "zh": "多代理审议：代理提交立场并投票，然后获得关键分歧、观点群组、桥接陈述和共识分析。"
+    },
+    {
+      "id": "L04945",
+      "english": "Miro integration exposing the functionality of the Miro SDK.",
+      "zh": "Miro 集成，公开 Miro SDK 的功能。"
+    },
+    {
+      "id": "L04948",
+      "english": "Experimental, educational ping-pong server demonstrating remote MCP calls.",
+      "zh": "实验性教育用乒乓服务器，演示远程 MCP 调用。"
+    },
+    {
+      "id": "L04949",
+      "english": "Interact with the Kibela API.",
+      "zh": "操作 Kibela API。"
+    },
+    {
+      "id": "L04951",
+      "english": "Extract and convert YouTube video information.",
+      "zh": "提取和转换 YouTube 视频信息。"
+    },
+    {
+      "id": "L04954",
+      "english": "Access data from Strava, the exercise-tracking app.",
+      "zh": "访问运动跟踪应用 Strava 的数据。"
+    },
+    {
+      "id": "L04955",
+      "english": "Compile LaTeX, download, organize and read cited papers, run visualization scripts and add figures and tables to LaTeX documents.",
+      "zh": "编译 LaTeX、下载整理并阅读引用论文、运行可视化脚本，以及向 LaTeX 文档添加图表。"
+    },
+    {
+      "id": "L04957",
+      "english": "PDF accessibility checks (veraPDF PDF/UA-1), auto-tagging remediation and document-to-Markdown conversion via a hosted EU service.",
+      "zh": "通过托管于欧盟的服务检查 PDF 无障碍性（veraPDF PDF/UA-1）、自动标记修复，以及将文档转换为 Markdown。"
+    },
+    {
+      "id": "L04959",
+      "english": "Microsoft To Do task management via the Microsoft Graph API.",
+      "zh": "通过 Microsoft Graph API 管理 Microsoft To Do 任务。"
+    },
+    {
+      "id": "L04961",
+      "english": "Human-as-a-service for AI agents: hand tasks such as accepting ToS, creating accounts or verifying identity to a real human when stuck.",
+      "zh": "面向 AI 代理的人力即服务：卡住时将接受服务条款、创建账户或验证身份等任务交给真人。"
+    },
+    {
+      "id": "L04963",
+      "english": "Drive a running OrcaSlicer 3D-printing slicer: load models, tune settings, slice, compare variants and render the plate, with an offline settings reference.",
+      "zh": "控制运行中的 OrcaSlicer 3D 打印切片软件：加载模型、调整设置、切片、比较方案和渲染打印板，并提供离线设置参考。"
+    },
+    {
+      "id": "L04965",
+      "english": "Integration platform connecting AI agents to many services through one interface, with OAuth, scaling and monitoring.",
+      "zh": "通过单一界面将 AI 代理连接到多种服务的集成平台，提供 OAuth、扩展和监控。"
+    },
+    {
+      "id": "L04966",
+      "english": "Exercises all features of the MCP protocol.",
+      "zh": "测试 MCP 协议的全部功能。"
+    },
+    {
+      "id": "L04967",
+      "english": "Manage contacts, opportunities and tasks in Capsule CRM.",
+      "zh": "管理 Capsule CRM 中的联系人、商机和任务。"
+    },
+    {
+      "id": "L04969",
+      "english": "Control the GUI with mouse and keyboard tools for automation, education and experimentation.",
+      "zh": "使用鼠标和键盘工具控制图形界面，用于自动化、教育和实验。"
+    },
+    {
+      "id": "L04970",
+      "english": "Manage your Gmail inbox in natural language: bulk delete promotions and newsletters, organize labels and get inbox insights.",
+      "zh": "通过自然语言管理 Gmail 收件箱：批量删除促销邮件和新闻简报、整理标签并获取收件箱洞察。"
+    },
+    {
+      "id": "L04972",
+      "english": "Domain registration: check availability, buy domains via Stripe or x402 and auto-configure Cloudflare DNS.",
+      "zh": "域名注册：检查可用性、通过 Stripe 或 x402 购买域名，并自动配置 Cloudflare DNS。"
+    },
+    {
+      "id": "L04974",
+      "english": "Image generation with Google Gemini's Nano Banana model.",
+      "zh": "使用 Google Gemini 的 Nano Banana 模型生成图片。"
+    },
+    {
+      "id": "L04975",
+      "english": "Diagnose and fix MCP client config files: broken JSON, commands missing from PATH, missing env vars, relative paths, transport mismatches and config drift.",
+      "zh": "诊断和修复 MCP 客户端配置文件：损坏的 JSON、PATH 中缺失的命令、缺少环境变量、相对路径、传输不匹配和配置漂移。"
+    },
+    {
+      "id": "L04977",
+      "english": "Access a self-hosted Mealie recipe manager: recipes, website and photo imports, meal plans and shopping lists, with a read-only mode.",
+      "zh": "访问自托管的 Mealie 菜谱管理器：菜谱、网站和照片导入、膳食计划及购物清单，提供只读模式。"
+    },
+    {
+      "id": "L04979",
+      "english": "Create and send business proposals with Offorte proposal software.",
+      "zh": "使用 Offorte 提案软件创建和发送商业提案。"
+    },
+    {
+      "id": "L04980",
+      "english": "Query ProductPlan roadmaps, OKRs, ideas, launches and timeline data.",
+      "zh": "查询 ProductPlan 路线图、OKR、想法、发布和时间线数据。"
+    },
+    {
+      "id": "L04981",
+      "english": "Open-source polity where AI agents join, create topics, deliberate, amend, vote, follow debates and invite other agents.",
+      "zh": "开源政治共同体，AI 代理可加入、创建话题、审议、修订、投票、关注辩论并邀请其他代理。"
+    },
+    {
+      "id": "L04982",
+      "english": "Coda integration.",
+      "zh": "Coda 集成。"
+    },
+    {
+      "id": "L04983",
+      "english": "Look up function signatures.",
+      "zh": "查询函数签名。"
+    },
+    {
+      "id": "L04984",
+      "english": "Search, view and install AI skills from skill4agent.",
+      "zh": "从 skill4agent 搜索、查看和安装 AI 技能。"
+    },
+    {
+      "id": "L04985",
+      "english": "Manage your Pantrist pantry, shopping lists, recipes and weekly meal plan: check off items, track stock and plan meals from saved recipes.",
+      "zh": "管理 Pantrist 食品储藏、购物清单、菜谱及每周膳食计划：勾选物品、跟踪库存并根据保存的菜谱规划膳食。"
+    },
+    {
+      "id": "L04987",
+      "english": "Convert, merge, redact, sign, OCR, watermark and extract data from PDFs and Office documents via the Nutrient DWS Processor API.",
+      "zh": "通过 Nutrient DWS Processor API 转换、合并、脱敏、签名、OCR、添加水印和提取 PDF 及 Office 文档数据。"
+    },
+    {
+      "id": "L04988",
+      "english": "Self-hosted, on-premises document processing with Nutrient Document Engine, designed for HIPAA, SOC 2 and GDPR compliance.",
+      "zh": "使用 Nutrient Document Engine 自托管、本地部署的文档处理，旨在满足 HIPAA、SOC 2 和 GDPR 合规要求。"
+    },
+    {
+      "id": "L04990",
+      "english": "Prevent cascading errors and scope creep by calling a vibe-check agent to ensure user alignment.",
+      "zh": "通过调用 vibe-check 代理确认与用户意图一致，防止级联错误和范围蔓延。"
+    },
+    {
+      "id": "L04993",
+      "english": "Draw on a JavaFX canvas.",
+      "zh": "在 JavaFX 画布上绘图。"
+    },
+    {
+      "id": "L04994",
+      "english": "Unofficial Shopify Storefront API access: discover storefronts and fetch products, collections and other store data.",
+      "zh": "非官方 Shopify Storefront API 访问：发现店面并获取产品、产品集合和其他商店数据。"
+    },
+    {
+      "id": "L04995",
+      "english": "Ethical analysis of AI conversations: detect bias and harmful content and provide critical-thinking assessments, with automated pattern learning.",
+      "zh": "AI 对话伦理分析：检测偏见和有害内容，提供批判性思维评估，并自动学习模式。"
+    },
+    {
+      "id": "L04996",
+      "english": "Access the Royal Spanish Academy (RAE) dictionary via the RAE API.",
+      "zh": "通过 RAE API 访问西班牙皇家学院（RAE）词典。"
+    },
+    {
+      "id": "L04997",
+      "english": "Improve agent reasoning with the think tool described by Anthropic.",
+      "zh": "使用 Anthropic 描述的 think 工具改进代理推理。"
+    },
+    {
+      "id": "L04999",
+      "english": "Inventory intelligence for Shopify and Amazon sellers: stockout risk, demand forecasts, purchase orders and sales analytics. Writes create drafts only.",
+      "zh": "面向 Shopify 和 Amazon 卖家的库存情报：缺货风险、需求预测、采购订单和销售分析。写操作仅创建草稿。"
+    },
+    {
+      "id": "L05003",
+      "english": "Interact with TikTok videos.",
+      "zh": "操作 TikTok 视频。"
+    },
+    {
+      "id": "L05004",
+      "english": "Interact with the NetBox API.",
+      "zh": "操作 NetBox API。"
+    },
+    {
+      "id": "L05005",
+      "english": "Manage a Directus headless CMS: read and write items, create collections and fields, upload files, trigger flows, administer users and inspect schemas.",
+      "zh": "管理 Directus 无头 CMS：读写条目、创建集合和字段、上传文件、触发流程、管理用户和检查模式。"
+    },
+    {
+      "id": "L05006",
+      "english": "Wine pairing recommendations for meals, ingredients or recipe URLs. Supports API key or x402 (USDC on Base) payments.",
+      "zh": "针对餐食、食材或食谱 URL 推荐葡萄酒搭配。支持 API 密钥或 x402（Base 链上的 USDC）支付。"
+    },
+    {
+      "id": "L05008",
+      "english": "Unofficial Notion access via the private API (token_v2): read and write across your whole workspace without an integration token or per-page sharing.",
+      "zh": "通过私有 API（token_v2）非官方访问 Notion：无需集成令牌或逐页共享即可读写整个工作区。"
+    },
+    {
+      "id": "L05009",
+      "english": "Use Mistral AI for chat, OCR, audio, vision, agents, embeddings, moderation, classification, files and batch jobs, with French/English prompts.",
+      "zh": "使用 Mistral AI 进行聊天、OCR、音频、视觉、代理、嵌入、审核、分类、文件和批处理，提供法语/英语提示词。"
+    },
+    {
+      "id": "L05011",
+      "english": "Image, video and object-detection analysis with Google Gemini and Vertex AI for UI/UX evaluation, visual regression testing and interface understanding.",
+      "zh": "使用 Google Gemini 和 Vertex AI 分析图片、视频和对象检测，用于 UI/UX 评估、视觉回归测试及界面理解。"
+    },
+    {
+      "id": "L05014",
+      "english": "Time and date utilities with natural-language input, multiple formats and timezone conversion.",
+      "zh": "日期时间工具，支持自然语言输入、多种格式和时区转换。"
+    },
+    {
+      "id": "L05015",
+      "english": "Natural language interface to your ThingsBoard IoT platform.",
+      "zh": "ThingsBoard 物联网平台的自然语言界面。"
+    },
+    {
+      "id": "L05016",
+      "english": "Interact with LG ThinQ smart home devices and appliances through ThinQ Connect.",
+      "zh": "通过 ThinQ Connect 操作 LG ThinQ 智能家居设备和电器。"
+    },
+    {
+      "id": "L05017",
+      "english": "Persistent identity and cross-platform visual style for AI agents, plus a random identity generator with rarity tiers and shareable cards.",
+      "zh": "为 AI 代理提供持久身份和跨平台视觉风格，并提供带稀有度等级和可分享卡片的随机身份生成器。"
+    },
+    {
+      "id": "L05019",
+      "english": "Local Plugwise smart home control: network discovery, thermostats, switches, smart plugs, multi-hub management and real-time climate and energy tracking.",
+      "zh": "本地控制 Plugwise 智能家居：网络发现、恒温器、开关、智能插座、多集线器管理，以及实时气候和能源跟踪。"
+    },
+    {
+      "id": "L05020",
+      "english": "Interact with Confluence Data Center via its REST API.",
+      "zh": "通过 REST API 操作 Confluence Data Center。"
+    },
+    {
+      "id": "L05022",
+      "english": "Disposable email for AI agents: create a throwaway inbox, wait for the OTP verification code, then discard it. Also available as a CLI.",
+      "zh": "面向 AI 代理的一次性邮箱：创建临时收件箱、等待 OTP 验证码，然后丢弃。也提供 CLI。"
+    },
+    {
+      "id": "L05024",
+      "english": "Commerce tools: shopping cart, orders and shipment tracking (TMF663/622/621), session booking, Uniswap swaps, a P2P marketplace and wallet-based identity.",
+      "zh": "商业工具：购物车、订单和物流跟踪（TMF663/622/621）、时段预订、Uniswap 兑换、P2P 市场和基于钱包的身份。"
+    },
+    {
+      "id": "L05025",
+      "english": "Manage your Anki collection via AnkiConnect.",
+      "zh": "通过 AnkiConnect 管理你的 Anki 收藏。"
+    },
+    {
+      "id": "L05026",
+      "english": "Expose curated GraphQL queries as modular tools via configuration.",
+      "zh": "通过配置将精选 GraphQL 查询公开为模块化工具。"
+    },
+    {
+      "id": "L05027",
+      "english": "Wanaku MCP router: an extensible routing engine for integrating enterprise systems with AI agents.",
+      "zh": "Wanaku MCP 路由器：用于将企业系统与 AI 代理集成的可扩展路由引擎。"
+    },
+    {
+      "id": "L05028",
+      "english": "Build and publish websites through conversation: manage pages, assets, entities, records and integrations.",
+      "zh": "通过对话构建和发布网站：管理页面、素材、实体、记录和集成。"
+    },
+    {
+      "id": "L05029",
+      "english": "Publish HTML reports, dashboards and demos as shareable links with expiry, social preview cards and optional password protection. Self-hostable.",
+      "zh": "将 HTML 报告、仪表盘和演示发布为可分享链接，支持过期时间、社交预览卡片和可选密码保护。可自托管。"
+    },
+    {
+      "id": "L05030",
+      "english": "Save product URLs from any store to a universal wishlist.",
+      "zh": "将任意商店的商品 URL 保存到通用愿望清单。"
+    },
+    {
+      "id": "L05036",
+      "english": "Control the FluxDown multi-protocol download manager (HTTP, FTP, BitTorrent, HLS): add, list, pause, resume and remove downloads and manage queues.",
+      "zh": "控制 FluxDown 多协议下载管理器（HTTP、FTP、BitTorrent、HLS）：添加、列出、暂停、恢复和移除下载，并管理队列。"
+    },
+    {
+      "id": "L05038",
+      "english": "MLflow experiments, runs, registered models, model versions, traces and assessments, with MLflow 3 GenAI trace support and workflow prompts.",
+      "zh": "MLflow 实验、运行、注册模型、模型版本、跟踪和评估，支持 MLflow 3 GenAI 跟踪及工作流提示词。"
+    },
+    {
+      "id": "L05040",
+      "english": "Chess and card game arena where LLM agents compete.",
+      "zh": "大语言模型代理进行竞技的国际象棋和纸牌游戏竞技场。"
+    },
+    {
+      "id": "L05041",
+      "english": "Encrypted secrets vault for AI agents: secrets are resolved at runtime and never exposed in LLM conversations.",
+      "zh": "面向 AI 代理的加密密钥库：密钥在运行时解析，绝不在大语言模型对话中暴露。"
+    },
+    {
+      "id": "L05042",
+      "english": "Zero-knowledge secret vault for AI agents: inject API keys, passwords and SSH keys into commands without exposing them to the model, with an audit log.",
+      "zh": "面向 AI 代理的零知识密钥库：将 API 密钥、密码和 SSH 密钥注入命令而不向模型暴露，并提供审计日志。"
+    },
+    {
+      "id": "L05043",
+      "english": "Commit-time audits for AI coding agents: scan git diffs for secret leaks, out-of-scope edits and prompt injection, and keep a tamper-evident audit history.",
+      "zh": "面向 AI 编程代理的提交时审计：扫描 git 差异中的密钥泄漏、超范围编辑和提示注入，并保留防篡改审计历史。"
+    },
+    {
+      "id": "L05044",
+      "english": "Network toolbox: IPv4/IPv6 subnet math, IP conversion, MAC vendor lookup, port directory, DNS, blocklist and TLS certificate checks, and public IP lookup.",
+      "zh": "网络工具箱：IPv4/IPv6 子网计算、IP 转换、MAC 厂商查询、端口目录、DNS、阻止列表和 TLS 证书检查，以及公网 IP 查询。"
+    },
+    {
+      "id": "L05045",
+      "english": "Image and video upscaling via the UpRes API: submit jobs, poll status and download results.",
+      "zh": "通过 UpRes API 放大图片和视频：提交任务、轮询状态并下载结果。"
+    },
+    {
+      "id": "L05046",
+      "english": "qBittorrent WebUI API: all 123 endpoints, with confirmation required on destructive operations and a read-only mode that holds through the raw call.",
+      "zh": "qBittorrent WebUI API：覆盖全部 123 个端点，破坏性操作需要确认，且只读模式在原始调用中仍然有效。"
+    },
+    {
+      "id": "L05052",
+      "english": "Visual prompt builder: decompose prompts into semantic blocks and compile them into Claude-optimized XML.",
+      "zh": "可视化提示词构建器：将提示词分解为语义块，并编译为针对 Claude 优化的 XML。"
+    },
+    {
+      "id": "L05053",
+      "english": "Self-hosted mission control for AI agents: manage agents, experiments, workflows, crews, skills and more.",
+      "zh": "面向 AI 代理的自托管任务控制台：管理代理、实验、工作流、团队、技能等。"
+    },
+    {
+      "id": "L05054",
+      "english": "High-level framework for building MCP servers in .NET with OAuth 2.0/OIDC (6 providers), per-tool MFA, OpenTelemetry, and a native client.",
+      "zh": "用于构建 .NET MCP 服务器的高级框架，支持 OAuth 2.0/OIDC（6 家提供商）、逐工具 MFA、OpenTelemetry 和原生客户端。"
+    },
+    {
+      "id": "L05055",
+      "english": "MCP SDK for Rust.",
+      "zh": "Rust 的 MCP SDK。"
+    },
+    {
+      "id": "L05056",
+      "english": "Self-hosted AI workflow automation: build multi-agent, RAG and tool-using pipelines on a visual canvas and expose any workflow as an MCP server.",
+      "zh": "自托管 AI 工作流自动化：在可视化画布上构建多代理、RAG 和工具调用流水线，并将任意工作流公开为 MCP 服务器。"
+    },
+    {
+      "id": "L05057",
+      "english": "Gin-like Go framework for building MCP servers: struct-tag schemas, middleware, tool groups, Gin/OpenAPI/gRPC adapters, async tasks and an inspector UI.",
+      "zh": "用于构建 MCP 服务器的类 Gin Go 框架：结构体标签模式、中间件、工具组、Gin/OpenAPI/gRPC 适配器、异步任务和检查器界面。"
+    },
+    {
+      "id": "L05058",
+      "english": "Minimal Go wrapper around the MCP go-sdk for building stdio servers, with struct-tag JSON Schema inference and minimal boilerplate.",
+      "zh": "围绕 MCP go-sdk 的轻量 Go 封装，用于构建 stdio 服务器，支持从结构体标签推断 JSON Schema 并减少样板代码。"
+    },
+    {
+      "id": "L05060",
+      "english": "Durable AI agent runtime with MCP client/server and A2A support: graph-based workflows, durable execution and multi-agent coordination, authored in Python.",
+      "zh": "持久化 AI 代理运行时，支持 MCP 客户端/服务器和 A2A：基于图的工作流、持久执行和多代理协调，使用 Python 编写。"
+    },
+    {
+      "id": "L05062",
+      "english": "MCP security firewall: static tool-definition scanning, a signed threat feed, origin checks and pinning before third-party tools reach the model.",
+      "zh": "MCP 安全防火墙：在第三方工具到达模型之前进行静态工具定义扫描、使用签名威胁情报源、检查并固定来源。"
+    },
+    {
+      "id": "L05063",
+      "english": "Durable, resumable MCP operations: background tool execution with progress polling, mid-flight input, cancellation and resumable chunked file transfers.",
+      "zh": "持久、可恢复的 MCP 操作：后台执行工具并轮询进度、运行中输入、取消及可恢复的分块文件传输。"
+    },
+    {
+      "id": "L05064",
+      "english": "Tool retrieval for large tool sets: build a graph from OpenAPI/MCP specs and find multi-step workflows via hybrid search. Also an aggregating MCP proxy.",
+      "zh": "面向大型工具集的工具检索：从 OpenAPI/MCP 规范构建图谱，通过混合搜索查找多步骤工作流。同时也是聚合 MCP 代理。"
+    },
+    {
+      "id": "L05065",
+      "english": "TypeScript framework for building MCP servers with automatic tool discovery, multiple transports, built-in validation and zero-config setup.",
+      "zh": "用于构建 MCP 服务器的 TypeScript 框架，支持自动发现工具、多种传输、内置验证和零配置设置。"
+    },
+    {
+      "id": "L05066",
+      "english": "AI agent framework with tools for search, memory, workflows, code execution and file operations, turning any assistant into a multi-agent system.",
+      "zh": "AI 代理框架，提供搜索、记忆、工作流、代码执行和文件操作工具，将任意助手转为多代理系统。"
+    },
+    {
+      "id": "L05067",
+      "english": "Expose pipelines from RocketRide, a self-hosted, open-source AI pipeline tool with multi-LLM support, as tools.",
+      "zh": "将 RocketRide（支持多大语言模型的自托管开源 AI 流水线工具）中的流水线公开为工具。"
+    },
+    {
+      "id": "L05068",
+      "english": "Read an Obsidian vault directly from disk with compact payloads, no Local REST API plugin required.",
+      "zh": "直接从磁盘读取 Obsidian 库，使用紧凑载荷，无需 Local REST API 插件。"
+    },
+    {
+      "id": "L05069",
+      "english": "Japan utilities: era and Western year conversion, kanji-to-romaji, postal codes, national holidays, kana and width conversion, and name splitting.",
+      "zh": "日本实用工具：年号与公历年份转换、汉字转罗马字、邮政编码、国定假日、假名与全半角转换和姓名拆分。"
+    },
+    {
+      "id": "L05070",
+      "english": "Reading, review and guarded editing of DipTrace PCB and schematic projects via a Windows bridge, with cross-platform offline XML analysis.",
+      "zh": "通过 Windows 桥接读取、审查和受保护地编辑 DipTrace PCB 与原理图项目，并支持跨平台离线 XML 分析。"
+    },
+    {
+      "id": "L05071",
+      "english": "Persistent encrypted memory for AI agents with Trust Quotient scoring, cross-agent handover and an immutable audit trail.",
+      "zh": "面向 AI 代理的持久加密记忆，提供 Trust Quotient 评分、跨代理交接和不可变审计记录。"
+    },
+    {
+      "id": "L05072",
+      "english": "Elixir/OTP framework for MCP servers and clients that derives tools from a running UI component tree, letting agents drive terminal apps.",
+      "zh": "用于 MCP 服务器和客户端的 Elixir/OTP 框架，从运行中的界面组件树派生工具，让代理操作终端应用。"
+    }
+  ],
+  "completed": 492
+}

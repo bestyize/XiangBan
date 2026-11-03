@@ -1,0 +1,1067 @@
+{
+  "status": "partial_not_ready",
+  "source_blob_sha": "5103450f0773f184b4d105eb1c34ad263ca2529e",
+  "range": [
+    4700,
+    4900
+  ],
+  "count": 176,
+  "entries": [
+    {
+      "id": "L04700",
+      "source_line": 4700,
+      "english_description": "Offline root-cause analysis for coding agents: rank the commit that introduced a regression, map a feature's blast radius and verify a fix is complete.",
+      "chinese_description": "供编码智能体使用的离线根因分析：排序引入回归的提交、映射功能的影响范围，并验证修复是否完整。"
+    },
+    {
+      "id": "L04701",
+      "source_line": 4701,
+      "english_description": "Unofficial access to GitHub's GraphQL API for flexible queries on repository data, issues, pull requests and other resources.",
+      "chinese_description": "非官方访问 GitHub GraphQL API，灵活查询仓库数据、问题、拉取请求及其他资源。"
+    },
+    {
+      "id": "L04702",
+      "source_line": 4702,
+      "english_description": "Git helper for conventional commits, pre-PR secret audits and merge conflict resolution.",
+      "chinese_description": "Git 助手，支持规范化提交、PR 前密钥审计和合并冲突解决。"
+    },
+    {
+      "id": "L04703",
+      "source_line": 4703,
+      "english_description": "Manage your repositories on a Forgejo or Gitea server.",
+      "chinese_description": "管理 Forgejo 或 Gitea 服务器上的仓库。"
+    },
+    {
+      "id": "L04704",
+      "source_line": 4704,
+      "english_description": "Code review against your team's written rules: a generator finds issues and an independent judge filters them, with a pre-push gate and PR bot.",
+      "chinese_description": "根据团队书面规则审查代码：生成器发现问题，独立评判器进行筛选，并提供推送前门控和 PR 机器人。"
+    },
+    {
+      "id": "L04705",
+      "source_line": 4705,
+      "english_description": "Merge gate for parallel coding agents: reports conflicts git can't see between two branches (changed signatures vs new call sites, deleted-but-still-used symbols, duplicate functions) for TypeScript, JavaScript and Python, with a suggested fix per finding.",
+      "chinese_description": "供并行编码智能体使用的合并门控：针对 TypeScript、JavaScript 和 Python，报告 Git 看不到的两分支冲突，如签名变化与新调用点、已删除但仍使用的符号及重复函数，并为每项发现提供修复建议。"
+    },
+    {
+      "id": "L04706",
+      "source_line": 4706,
+      "english_description": "Structured Git repository analysis: project status, recent activity, code map and risk hotspots.",
+      "chinese_description": "结构化 Git 仓库分析：项目状态、近期活动、代码地图及风险热点。"
+    },
+    {
+      "id": "L04708",
+      "source_line": 4708,
+      "english_description": "Line-level authorship in a shared Git checkout: multiple coding agents work in one repo, each committing only its own lines, with symbol-level claims.",
+      "chinese_description": "共享 Git 检出目录中的行级作者归属：多个编码智能体在同一仓库工作，各自只提交自己的代码行，并支持符号级认领。"
+    },
+    {
+      "id": "L04709",
+      "source_line": 4709,
+      "english_description": "Bitbucket Cloud workspaces, repos, PRs, pipelines, issues and source code, hiding tools the API key cannot use.",
+      "chinese_description": "Bitbucket Cloud 工作区、仓库、PR、流水线、问题和源代码，并隐藏 API 密钥无权使用的工具。"
+    },
+    {
+      "id": "L04710",
+      "source_line": 4710,
+      "english_description": "Branch-scoped runbooks and cross-machine verification with auditable receipts for coding agents.",
+      "chinese_description": "供编码智能体使用的分支范围运行手册及跨机器验证，提供可审计收据。"
+    },
+    {
+      "id": "L04714",
+      "source_line": 4714,
+      "english_description": "Google Contacts (People API): search, create, update and delete contacts, and manage contact groups.",
+      "chinese_description": "Google Contacts（People API）：搜索、创建、更新和删除联系人，并管理联系人组。"
+    },
+    {
+      "id": "L04715",
+      "source_line": 4715,
+      "english_description": "Google Docs API: read documents as text, structure or Markdown, and edit ranges, styles, tables and comments.",
+      "chinese_description": "Google Docs API：以文本、结构或 Markdown 读取文档，并编辑范围、样式、表格和评论。"
+    },
+    {
+      "id": "L04716",
+      "source_line": 4716,
+      "english_description": "Google Forms: create and publish forms, manage questions and read responses.",
+      "chinese_description": "Google Forms：创建并发布表单、管理问题及读取回复。"
+    },
+    {
+      "id": "L04717",
+      "source_line": 4717,
+      "english_description": "Google Slides API: create and edit presentations, slides, shapes, tables and images, speaker notes and exports.",
+      "chinese_description": "Google Slides API：创建和编辑演示文稿、幻灯片、形状、表格、图片与演讲者备注，并导出。"
+    },
+    {
+      "id": "L04718",
+      "source_line": 4718,
+      "english_description": "Google Tasks API: manage task lists, and create and organize tasks with due dates, notes and subtasks.",
+      "chinese_description": "Google Tasks API：管理任务列表，创建和整理带截止日期、备注及子任务的任务。"
+    },
+    {
+      "id": "L04719",
+      "source_line": 4719,
+      "english_description": "Agency OS: specialized AI roles with a real-time retro Pixel Office visualizer and a multi-provider LLM engine.",
+      "chinese_description": "Agency OS：提供专业 AI 角色、实时复古 Pixel Office 可视化及多提供商 LLM 引擎。"
+    },
+    {
+      "id": "L04720",
+      "source_line": 4720,
+      "english_description": "Compile agency-grade, editable PowerPoint (.pptx) presentations with native DrawingML vector shapes, executive KPI dashboards, and multi-format suites from Claude Desktop, Cursor, and autonomous AI agents. Features in-memory Zero-Retention processing and dual-mode data synthesis. Install: `npx -y smithery mcp add contacto-n7el/smarterdeck`",
+      "chinese_description": "从 Claude Desktop、Cursor 和自主 AI 智能体编译机构级可编辑 PowerPoint（.pptx）演示文稿，支持原生 DrawingML 矢量形状、高管 KPI 仪表盘及多格式套件；提供内存零保留处理和双模式数据合成。安装：`npx -y smithery mcp add contacto-n7el/smarterdeck`"
+    },
+    {
+      "id": "L04721",
+      "source_line": 4721,
+      "english_description": "OpenProject API v3 with Community Edition support: search, create, update, assign, prioritize and comment on work packages.",
+      "chinese_description": "支持社区版的 OpenProject API v3：搜索、创建、更新、分配、排序并评论工作包。"
+    },
+    {
+      "id": "L04722",
+      "source_line": 4722,
+      "english_description": "Cross-device clipboard manager: search synced clipboard history, read OCR text from copied images and add new clipboard items.",
+      "chinese_description": "跨设备剪贴板管理器：搜索同步的剪贴板历史、读取复制图片中的 OCR 文本并添加新剪贴板项。"
+    },
+    {
+      "id": "L04723",
+      "source_line": 4723,
+      "english_description": "Gryzzly time tracking: log time in plain language (\"2h30 on Alyxa yesterday\"), weekly timesheets with missing-day detection, and all 50 Gryzzly v1 API endpoints (projects, tasks, users, customers, leaves, budgets). Read-only mode, selectable toolsets, stdio and Streamable HTTP.",
+      "chinese_description": "Gryzzly 时间跟踪：用自然语言记录工时（例如“昨天在 Alyxa 上用时 2 小时 30 分钟”）、带缺失日期检测的每周工时表，以及全部 50 个 Gryzzly v1 API 端点（项目、任务、用户、客户、休假、预算）；支持只读模式、可选工具集、stdio 和 Streamable HTTP。"
+    },
+    {
+      "id": "L04724",
+      "source_line": 4724,
+      "english_description": "OpenProject Community Edition over API v3: projects, work packages, time tracking, meetings, boards, wiki and more, with project allowlists and preview-then-confirm writes.",
+      "chinese_description": "通过 API v3 操作 OpenProject 社区版：项目、工作包、时间跟踪、会议、看板、Wiki 等，支持项目允许列表及预览后确认写入。"
+    },
+    {
+      "id": "L04725",
+      "source_line": 4725,
+      "english_description": "Read your team's end-of-day reports in Eodly: who shipped with GitHub and Linear proof, who is silent, who is slipping, plus the team roster.",
+      "chinese_description": "在 Eodly 阅读团队每日结束报告：谁完成交付（附 GitHub 和 Linear 证明）、谁没有汇报、谁进度落后，以及团队名册。"
+    },
+    {
+      "id": "L04726",
+      "source_line": 4726,
+      "english_description": "Search and browse the NerdyChefs.ai prompt library by task, open prompt packs or pick a random prompt.",
+      "chinese_description": "按任务搜索和浏览 NerdyChefs.ai 提示词库，打开提示包或随机选择提示词。"
+    },
+    {
+      "id": "L04727",
+      "source_line": 4727,
+      "english_description": "Read and write your nested mind maps and to-dos in Matryoshka Mind Map: list maps, turn a conversation into a nested map, import Markdown and check off tasks.",
+      "chinese_description": "读取和写入 Matryoshka Mind Map 中的嵌套思维导图及待办：列出导图、将对话转成嵌套图、导入 Markdown 并勾选任务。"
+    },
+    {
+      "id": "L04728",
+      "source_line": 4728,
+      "english_description": "Read and edit self-hosted Rustpad collaborative pads, merging edits live with human typing and requiring confirmation to replace a pad.",
+      "chinese_description": "读取和编辑自托管 Rustpad 协作便笺，将编辑与人工输入实时合并；替换便笺需要确认。"
+    },
+    {
+      "id": "L04729",
+      "source_line": 4729,
+      "english_description": "Calculate API and subscription costs, shared meeting times, recurring schedules and cron matches.",
+      "chinese_description": "计算 API 和订阅成本、共同会议时间、重复计划及 cron 匹配。"
+    },
+    {
+      "id": "L04730",
+      "source_line": 4730,
+      "english_description": "Read and write spaces, pages, comments and members in self-hosted Docmost, including the Community Edition.",
+      "chinese_description": "在自托管 Docmost（包括社区版）中读写空间、页面、评论和成员。"
+    },
+    {
+      "id": "L04731",
+      "source_line": 4731,
+      "english_description": "Calendar middleware for scheduling, multi-calendar availability and conflict-free booking across Google Calendar, Outlook and CalDAV, with RRULE expansion.",
+      "chinese_description": "日历中间件，跨 Google Calendar、Outlook 和 CalDAV 进行日程安排、多日历可用性查询及无冲突预订，支持 RRULE 展开。"
+    },
+    {
+      "id": "L04732",
+      "source_line": 4732,
+      "english_description": "Workflow orchestration with long-term memory and a knowledge graph: lead enrichment, content publishing, company research and media production.",
+      "chinese_description": "结合长期记忆和知识图编排工作流：潜客资料补全、内容发布、公司研究和媒体制作。"
+    },
+    {
+      "id": "L04733",
+      "source_line": 4733,
+      "english_description": "Schedule Outlook meetings on on-premises Exchange (EWS): resolve attendees, find rooms and suggest slots, with preview and confirmation before any change.",
+      "chinese_description": "在本地部署的 Exchange（EWS）上安排 Outlook 会议：解析参会者、查找会议室并建议时段，所有更改前均需预览和确认。"
+    },
+    {
+      "id": "L04734",
+      "source_line": 4734,
+      "english_description": "Deterministic workforce attendance calculations: overtime, overnight shifts, rotating rosters and California wage-and-hour compliance.",
+      "chinese_description": "确定性劳动力出勤计算：加班、跨夜班次、轮班表及加州工资和工时合规。"
+    },
+    {
+      "id": "L04735",
+      "source_line": 4735,
+      "english_description": "Create, edit, design and export Apple Numbers, Keynote and Pages files: designed decks with chart and table slides, brand kits and a design review. Every write is verified and undoable; Arabic/RTL-safe.",
+      "chinese_description": "创建、编辑、设计及导出 Apple Numbers、Keynote 和 Pages 文件：设计带图表及表格幻灯片的演示稿、品牌套件和设计审查。每次写入均经验证且可撤销；支持阿拉伯语及从右向左文本。"
+    },
+    {
+      "id": "L04736",
+      "source_line": 4736,
+      "english_description": "MCP Apps engine for building and reusing interactive UI apps such as todo boards, habit trackers and dashboards, backed by persistent data.",
+      "chinese_description": "MCP Apps 引擎，用于构建和复用待办看板、习惯跟踪器和仪表盘等交互式 UI 应用，并由持久数据支持。"
+    },
+    {
+      "id": "L04737",
+      "source_line": 4737,
+      "english_description": "JobGPT: search jobs, auto-apply, generate tailored resumes, track applications and find recruiters.",
+      "chinese_description": "JobGPT：搜索职位、自动申请、生成定制简历、跟踪申请及查找招聘人员。"
+    },
+    {
+      "id": "L04738",
+      "source_line": 4738,
+      "english_description": "Persistent, cross-session task management for Claude Code with agent coordination, event-sourced storage and per-project isolation.",
+      "chinese_description": "供 Claude Code 使用的持久跨会话任务管理，支持智能体协调、事件溯源存储和逐项目隔离。"
+    },
+    {
+      "id": "L04739",
+      "source_line": 4739,
+      "english_description": "Task board for MCP agents that lives on your desktop: four columns for agents to write into, progress tracking, stall detection and an append-only event log, with an always-on-top widget so you can watch a run without switching windows.",
+      "chinese_description": "运行在桌面的 MCP 智能体任务看板：四列供智能体写入，支持进度跟踪、停滞检测和仅追加事件日志，并有置顶小组件供用户无需切换窗口观察运行。"
+    },
+    {
+      "id": "L04740",
+      "source_line": 4740,
+      "english_description": "SignWell e-signatures: create documents from files or templates, send for signing, track status, send reminders, download signed PDFs and manage templates.",
+      "chinese_description": "SignWell 电子签名：从文件或模板创建文档、发送签署、跟踪状态、发送提醒、下载已签署 PDF 及管理模板。"
+    },
+    {
+      "id": "L04741",
+      "source_line": 4741,
+      "english_description": "Manage Kanboard projects, tasks and users through natural language translated into Kanboard API calls.",
+      "chinese_description": "通过转成 Kanboard API 调用的自然语言管理 Kanboard 项目、任务和用户。"
+    },
+    {
+      "id": "L04742",
+      "source_line": 4742,
+      "english_description": "Greenhouse ATS for recruiting teams: role-based profiles (full, recruiter, read-only), pipeline views, analytics, candidate search and bulk operations.",
+      "chinese_description": "面向招聘团队的 Greenhouse ATS：基于角色的资料（完整、招聘人员、只读）、招聘流程视图、分析、候选人搜索和批量操作。"
+    },
+    {
+      "id": "L04743",
+      "source_line": 4743,
+      "english_description": "Task prioritization and agent orchestration across projects: multi-factor scoring, document analysis, agent dispatch and time-aware planning.",
+      "chinese_description": "跨项目任务优先级排序及智能体编排：多因素评分、文档分析、智能体派遣和时间感知规划。"
+    },
+    {
+      "id": "L04744",
+      "source_line": 4744,
+      "english_description": "Quip document access and management: document lifecycle, search and comments for Quip.com and enterprise instances.",
+      "chinese_description": "访问和管理 Quip 文档：面向 Quip.com 及企业实例的文档生命周期、搜索与评论。"
+    },
+    {
+      "id": "L04745",
+      "source_line": 4745,
+      "english_description": "Files-first project hub for humans and AI agents: shared journal, cross-project tasks, agent queues and a read-only kanban.",
+      "chinese_description": "面向人类及 AI 智能体、以文件为先的项目中心：共享日志、跨项目任务、智能体队列和只读看板。"
+    },
+    {
+      "id": "L04746",
+      "source_line": 4746,
+      "english_description": "BOSS Zhipin recruitment workflow: job search, benefits filtering, recruiter messaging, pipeline tracking and resume optimization.",
+      "chinese_description": "BOSS 直聘招聘工作流：职位搜索、福利筛选、招聘方消息、流程跟踪和简历优化。"
+    },
+    {
+      "id": "L04747",
+      "source_line": 4747,
+      "english_description": "Associative key-graph memory for LLM agents: recall by association rather than vector similarity.",
+      "chinese_description": "面向 LLM 智能体的关联键图记忆：按关联而非向量相似度召回。"
+    },
+    {
+      "id": "L04748",
+      "source_line": 4748,
+      "english_description": "Control Apple Keynote via AppleScript: create, edit and export presentations, including slides, content, layout and Unsplash images.",
+      "chinese_description": "通过 AppleScript 控制 Apple Keynote：创建、编辑及导出演示文稿，包括幻灯片、内容、布局和 Unsplash 图片。"
+    },
+    {
+      "id": "L04749",
+      "source_line": 4749,
+      "english_description": "Google Workspace tools for Drive, Sheets, Calendar, Docs and Gmail via the gws CLI.",
+      "chinese_description": "通过 gws CLI 提供 Google Workspace 的 Drive、Sheets、Calendar、Docs 和 Gmail 工具。"
+    },
+    {
+      "id": "L04750",
+      "source_line": 4750,
+      "english_description": "Local desktop context capture: screen OCR, voice transcription, keyboard and mouse activity and clipboard, with activity history and semantic memory.",
+      "chinese_description": "本地桌面上下文捕获：屏幕 OCR、语音转写、键盘与鼠标活动及剪贴板，附活动历史和语义记忆。"
+    },
+    {
+      "id": "L04751",
+      "source_line": 4751,
+      "english_description": "Read/write access to a story-based project backlog stored as markdown files in your repository: list stories, read content, update status and append notes.",
+      "chinese_description": "读写以 Markdown 文件存于仓库的故事式项目积压事项：列出故事、读取内容、更新状态和追加笔记。"
+    },
+    {
+      "id": "L04752",
+      "source_line": 4752,
+      "english_description": "Local semantic search and RAG over Apple Notes with on-device embeddings, full CRUD, folder management and fuzzy title matching.",
+      "chinese_description": "使用设备端嵌入对 Apple Notes 进行本地语义搜索和 RAG，支持完整增删查改、文件夹管理和标题模糊匹配。"
+    },
+    {
+      "id": "L04753",
+      "source_line": 4753,
+      "english_description": "Huly project management: query issues, create and update tasks, and manage labels and priorities.",
+      "chinese_description": "Huly 项目管理：查询问题、创建及更新任务，并管理标签和优先级。"
+    },
+    {
+      "id": "L04754",
+      "source_line": 4754,
+      "english_description": "AI Interview Agents: create roles, screen CVs, schedule voice interviews and read scored reports, in English, Hindi and other Indian languages.",
+      "chinese_description": "AI 面试代理：创建职位、筛选简历、安排语音面试并查看评分报告，支持英语、印地语及其他印度语言。"
+    },
+    {
+      "id": "L04755",
+      "source_line": 4755,
+      "english_description": "Fizzy kanban task management: boards, cards, comments and checklists.",
+      "chinese_description": "Fizzy 看板任务管理：看板、卡片、评论和清单。"
+    },
+    {
+      "id": "L04756",
+      "source_line": 4756,
+      "english_description": "Self-hostable task management for AI agents: create, delegate and track tasks with agent identity, delegation chains, webhooks and persistent context.",
+      "chinese_description": "可自行托管的 AI 代理任务管理：创建、委派和跟踪任务，支持代理身份、委派链、Webhook 和持久上下文。"
+    },
+    {
+      "id": "L04757",
+      "source_line": 4757,
+      "english_description": "Laver project management: kanban boards, sprints, tickets, comments, attachments and a team wiki, with versioned writes to prevent concurrent overwrites.",
+      "chinese_description": "Laver 项目管理：看板、冲刺、工单、评论、附件和团队 Wiki，通过版本化写入防止并发覆盖。"
+    },
+    {
+      "id": "L04758",
+      "source_line": 4758,
+      "english_description": "Render LaTeX, raw or from customizable templates, into PDF documents such as reports, resumes and research papers.",
+      "chinese_description": "将原始 LaTeX 或可自定义模板渲染为报告、简历和研究论文等 PDF 文档。"
+    },
+    {
+      "id": "L04759",
+      "source_line": 4759,
+      "english_description": "Yandex Wiki with full-text search: pages, comments, attachments and dynamic tables (grids), plus a read-only mode.",
+      "chinese_description": "支持全文搜索的 Yandex Wiki：页面、评论、附件和动态表格（网格），另有只读模式。"
+    },
+    {
+      "id": "L04760",
+      "source_line": 4760,
+      "english_description": "Job application tracker: agents record applications, interviews, statuses, salaries and next actions, and humans review them in a dashboard.",
+      "chinese_description": "求职申请跟踪器：代理记录申请、面试、状态、薪资和下一步行动，用户在仪表盘中审阅。"
+    },
+    {
+      "id": "L04761",
+      "source_line": 4761,
+      "english_description": "Security-focused access to self-hosted n8n Community Edition: workflows, executions, credentials, tags and diagnostics, read-only by default.",
+      "chinese_description": "以安全为中心访问自行托管的 n8n Community Edition：工作流、执行记录、凭据、标签和诊断，默认只读。"
+    },
+    {
+      "id": "L04762",
+      "source_line": 4762,
+      "english_description": "Manage n8n workflows: CRUD, synchronization, inspection and execution.",
+      "chinese_description": "管理 n8n 工作流：创建、读取、更新、删除、同步、检查和执行。"
+    },
+    {
+      "id": "L04763",
+      "source_line": 4763,
+      "english_description": "Kanboard integration with multi-project routing via a YAML config file.",
+      "chinese_description": "通过 YAML 配置文件支持多项目路由的 Kanboard 集成。"
+    },
+    {
+      "id": "L04764",
+      "source_line": 4764,
+      "english_description": "EveryPage: upload PDFs, create trackable share links and read page-by-page readership analytics (who read, how far, how long).",
+      "chinese_description": "EveryPage：上传 PDF、创建可跟踪的分享链接并查看逐页阅读分析（谁读过、读到哪里、阅读多久）。"
+    },
+    {
+      "id": "L04765",
+      "source_line": 4765,
+      "english_description": "Calculate API and subscription costs, shared meeting times, recurring schedules and cron matches.",
+      "chinese_description": "计算 API 和订阅费用、共同会议时间、周期性日程和 cron 匹配。"
+    },
+    {
+      "id": "L04766",
+      "source_line": 4766,
+      "english_description": "Self-hosted business context: CRM, checkpoints, automation triggers, financial ledger, tasks, playbooks, news feeds, projects and semantic memory.",
+      "chinese_description": "自行托管的业务上下文：CRM、检查点、自动化触发器、财务账本、任务、操作手册、新闻源、项目和语义记忆。"
+    },
+    {
+      "id": "L04767",
+      "source_line": 4767,
+      "english_description": "Desktop task manager with a To Do-style UI and tools for prioritization, goal tracking and multi-profile workflows.",
+      "chinese_description": "桌面任务管理器，提供类似 To Do 的界面以及优先级排序、目标跟踪和多配置工作流工具。"
+    },
+    {
+      "id": "L04768",
+      "source_line": 4768,
+      "english_description": "133 tools for local Apple apps, iWork documents, files and media, plus optional allowlisted Shortcuts.",
+      "chinese_description": "为本地 Apple 应用、iWork 文档、文件和媒体提供 133 个工具，还可选择使用允许列表中的快捷指令。"
+    },
+    {
+      "id": "L04769",
+      "source_line": 4769,
+      "english_description": "Generate, edit and export AI presentations to PDF, PPTX or a shareable link.",
+      "chinese_description": "生成、编辑 AI 演示文稿，并导出为 PDF、PPTX 或可分享链接。"
+    },
+    {
+      "id": "L04770",
+      "source_line": 4770,
+      "english_description": "Interact with Google Calendar, Gmail, Drive and other Google Workspace apps.",
+      "chinese_description": "与 Google Calendar、Gmail、Drive 及其他 Google Workspace 应用交互。"
+    },
+    {
+      "id": "L04771",
+      "source_line": 4771,
+      "english_description": "Autonomous Model Context Protocol (MCP) server that searches, filters, auto-fills forms, and submits job applications across 8 major job boards (LinkedIn, Naukri, Indeed, Wellfound, etc.) with external ATS navigation and recruiter outreach via Gmail.",
+      "chinese_description": "自主 Model Context Protocol（MCP）服务器，可在 8 个主要招聘网站（LinkedIn、Naukri、Indeed、Wellfound 等）搜索、筛选、自动填写表格并提交求职申请，还支持外部 ATS 导航和通过 Gmail 联系招聘人员。"
+    },
+    {
+      "id": "L04772",
+      "source_line": 4772,
+      "english_description": "Mission's MCP proxy holds consequential tool calls before execution and records the exact action for review.",
+      "chinese_description": "Mission 的 MCP 代理在执行前暂缓影响重大的工具调用，并记录确切操作供审阅。"
+    },
+    {
+      "id": "L04773",
+      "source_line": 4773,
+      "english_description": "Markdown-first Notion access: converts markdown to Notion blocks and back, with documented round-trip support.",
+      "chinese_description": "以 Markdown 为中心访问 Notion：在 Markdown 与 Notion 块之间相互转换，并记录往返转换支持情况。"
+    },
+    {
+      "id": "L04774",
+      "source_line": 4774,
+      "english_description": "Manage self-hosted n8n, including queue mode: workflows, executions, tags, credentials, variables, projects, users, security audits and health monitoring.",
+      "chinese_description": "管理自行托管的 n8n，包括队列模式：工作流、执行记录、标签、凭据、变量、项目、用户、安全审计和健康监控。"
+    },
+    {
+      "id": "L04775",
+      "source_line": 4775,
+      "english_description": "Document-level AI text humanizer: rewrite whole .docx or .pptx files, selected passages or Turnitin/iThenticate-flagged text in place, preserving formatting.",
+      "chinese_description": "文档级 AI 文本人工化工具：原位改写完整 .docx 或 .pptx 文件、选定段落或被 Turnitin/iThenticate 标记的文本，同时保留格式。"
+    },
+    {
+      "id": "L04776",
+      "source_line": 4776,
+      "english_description": "Fork of google_workspace_mcp with extra Google Workspace authoring tools: Slides automation, markdown-to-Docs, Sheets validation and Drive folder copy.",
+      "chinese_description": "google_workspace_mcp 的分支，增加 Google Workspace 创作工具：Slides 自动化、Markdown 转 Docs、Sheets 验证和 Drive 文件夹复制。"
+    },
+    {
+      "id": "L04777",
+      "source_line": 4777,
+      "english_description": "Hire real-world people who list themselves for agent work: search by skill, location and equipment, send job offers, post listings and message workers.",
+      "chinese_description": "雇用登记愿意接受代理工作的真人：按技能、地点和设备搜索，发送工作邀约、发布职位并向工作者发消息。"
+    },
+    {
+      "id": "L04778",
+      "source_line": 4778,
+      "english_description": "Feedback collection for AI agents: create surveys from JSON schema, collect structured responses from groups of people and retrieve aggregated results.",
+      "chinese_description": "AI 代理的反馈收集：根据 JSON Schema 创建调查，收集人群的结构化回复并获取汇总结果。"
+    },
+    {
+      "id": "L04779",
+      "source_line": 4779,
+      "english_description": "Harvest time tracking via the Harvest API v2: manage time entries, projects, clients and tasks, and generate time reports.",
+      "chinese_description": "通过 Harvest API v2 跟踪工时：管理工时条目、项目、客户和任务，并生成工时报告。"
+    },
+    {
+      "id": "L04780",
+      "source_line": 4780,
+      "english_description": "Edit Word (.docx) files on disk or SharePoint: tracked changes, tables, styles, comments and content controls, validated and previewed before saving.",
+      "chinese_description": "编辑磁盘或 SharePoint 上的 Word（.docx）文件：支持修订、表格、样式、评论和内容控件，保存前验证并预览。"
+    },
+    {
+      "id": "L04781",
+      "source_line": 4781,
+      "english_description": "Local AI-text analysis: AI detection, exact AI-tell spans, a reuse check and a grammar pass.",
+      "chinese_description": "本地 AI 文本分析：AI 检测、标出具体 AI 痕迹片段、复用检查和语法检查。"
+    },
+    {
+      "id": "L04782",
+      "source_line": 4782,
+      "english_description": "Personal CRM: manage contacts, interactions, tasks, notes, a daily journal and tags.",
+      "chinese_description": "个人 CRM：管理联系人、互动、任务、笔记、每日日志和标签。"
+    },
+    {
+      "id": "L04783",
+      "source_line": 4783,
+      "english_description": "Task management for Claude Code with a visual Kanban board and orchestration for product teams and developers.",
+      "chinese_description": "Claude Code 任务管理，提供可视化看板以及面向产品团队和开发者的编排功能。"
+    },
+    {
+      "id": "L04784",
+      "source_line": 4784,
+      "english_description": "One place for every AI agent's pages and docs: publish HTML, build folders, ZIPs and PDFs as sandboxed, versioned share links, then search, read and update them. Hosted or self-hosted; remote MCP with OAuth, or local via `npx @artifact-site/cli mcp`.",
+      "chinese_description": "集中管理所有 AI 代理页面和文档：将 HTML、构建文件夹、ZIP 和 PDF 发布为沙箱化、版本化的分享链接，然后搜索、读取和更新。支持托管或自行托管；可通过 OAuth 远程使用 MCP，或通过 `npx @artifact-site/cli mcp` 本地使用。"
+    },
+    {
+      "id": "L04785",
+      "source_line": 4785,
+      "english_description": "Toggl Track time tracking: start and stop timers, manage time entries, track project time and get today's summary.",
+      "chinese_description": "Toggl Track 工时跟踪：启动和停止计时器、管理工时条目、跟踪项目时间并获取今日摘要。"
+    },
+    {
+      "id": "L04786",
+      "source_line": 4786,
+      "english_description": "Score and edit AI-assisted prose, with checks for changes to names, numbers, quotations and links.",
+      "chinese_description": "对 AI 辅助撰写的文章评分和编辑，检查人名、数字、引文和链接的变化。"
+    },
+    {
+      "id": "L04787",
+      "source_line": 4787,
+      "english_description": "Amazon Seller Central operations via SP-API: manage inventory, track orders, analyze sales and optimize listings.",
+      "chinese_description": "通过 SP-API 操作 Amazon Seller Central：管理库存、跟踪订单、分析销售并优化商品列表。"
+    },
+    {
+      "id": "L04788",
+      "source_line": 4788,
+      "english_description": "HVAC equipment RFQ management for contractors: submit quote requests to distributors, track responses and compare prices.",
+      "chinese_description": "面向承包商的暖通空调设备询价管理：向分销商提交报价请求、跟踪回复并比较价格。"
+    },
+    {
+      "id": "L04789",
+      "source_line": 4789,
+      "english_description": "Dida365 (TickTick China) task management: projects, tasks, tags and habits.",
+      "chinese_description": "滴答清单（TickTick 中国版）任务管理：项目、任务、标签和习惯。"
+    },
+    {
+      "id": "L04791",
+      "source_line": 4791,
+      "english_description": "Business analysis for Odoo ERP: one-call reports with a verdict on business pulse, sales pipeline, receivables, inventory risk, sales and absences.",
+      "chinese_description": "Odoo ERP 业务分析：一次调用生成报告，判断业务概况、销售管线、应收账款、库存风险、销售和缺勤情况。"
+    },
+    {
+      "id": "L04792",
+      "source_line": 4792,
+      "english_description": "Search local resume and job application documents (.docx, .pdf, .md, .txt) by skill, company and education, and extract work experience and achievements.",
+      "chinese_description": "按技能、公司和教育经历搜索本地简历与求职申请文档（.docx、.pdf、.md、.txt），提取工作经历和成就。"
+    },
+    {
+      "id": "L04793",
+      "source_line": 4793,
+      "english_description": "Fill AcroForm, flat and scanned PDF forms: detect and review fields, save templates, map JSON values and preview filled output before export.",
+      "chinese_description": "填写 AcroForm、平面和扫描版 PDF 表单：检测和审阅字段、保存模板、映射 JSON 值并在导出前预览填写结果。"
+    },
+    {
+      "id": "L04794",
+      "source_line": 4794,
+      "english_description": "Word .docx editing: live editing of open documents, tables, citations, footnotes, tracked changes, mail merge, redaction, accessibility audits and Zotero.",
+      "chinese_description": "Word .docx 编辑：实时编辑已打开文档，支持表格、引用、脚注、修订、邮件合并、删密、无障碍审计和 Zotero。"
+    },
+    {
+      "id": "L04795",
+      "source_line": 4795,
+      "english_description": "Self-hosted, read-only Jobber operations queries: owner action lists, overdue invoices, stale requests, estimates, jobs and GraphQL validation.",
+      "chinese_description": "自行托管的只读 Jobber 运营查询：负责人待办清单、逾期发票、久未处理的请求、报价、工作和 GraphQL 验证。"
+    },
+    {
+      "id": "L04796",
+      "source_line": 4796,
+      "english_description": "Deterministic PDF tools: inspect AcroForm fields, fill forms, merge PDFs and generate invoices, working on file paths so PDF bytes stay out of model context.",
+      "chinese_description": "确定性 PDF 工具：检查 AcroForm 字段、填写表单、合并 PDF 和生成发票；操作文件路径，使 PDF 字节不进入模型上下文。"
+    },
+    {
+      "id": "L04797",
+      "source_line": 4797,
+      "english_description": "Meet.bot scheduling: check calendar availability and book meetings on connected Google and Microsoft calendars.",
+      "chinese_description": "Meet.bot 日程安排：检查日历空闲时间，并在连接的 Google 和 Microsoft 日历上预约会议。"
+    },
+    {
+      "id": "L04798",
+      "source_line": 4798,
+      "english_description": "Discover human and AI services and jobs; authenticated hiring and work approval require account-owner authorization.",
+      "chinese_description": "发现真人及 AI 服务和工作；经过身份验证的雇用与工作审批需要账户所有者授权。"
+    },
+    {
+      "id": "L04799",
+      "source_line": 4799,
+      "english_description": "Generate prompts for ChatGPT, Claude, Midjourney and other AI platforms, score prompt quality and manage a prompt library with PromptDrive.",
+      "chinese_description": "为 ChatGPT、Claude、Midjourney 和其他 AI 平台生成提示词，对提示词质量评分并用 PromptDrive 管理提示词库。"
+    },
+    {
+      "id": "L04800",
+      "source_line": 4800,
+      "english_description": "Headless WorkPaper server for spreadsheet formulas, workbook edits, JSON persistence and verified readback.",
+      "chinese_description": "无界面 WorkPaper 服务器，支持电子表格公式、工作簿编辑、JSON 持久化和验证读取。"
+    },
+    {
+      "id": "L04801",
+      "source_line": 4801,
+      "english_description": "Generate PDF reports such as invoices, contracts and statements from ReportFlow templates, singly or in ZIP batches.",
+      "chinese_description": "根据 ReportFlow 模板逐份或以 ZIP 批量生成发票、合同和对账单等 PDF 报告。"
+    },
+    {
+      "id": "L04802",
+      "source_line": 4802,
+      "english_description": "Job search: find tech companies by their tech stack, shortlist them and pull jobs from the shortlist, plus profile, applications and digests.",
+      "chinese_description": "求职搜索：按技术栈查找科技公司、列入候选名单并获取候选公司的职位，还支持个人资料、申请和摘要。"
+    },
+    {
+      "id": "L04803",
+      "source_line": 4803,
+      "english_description": "MCP server built into Rillsoft Project 10 for multi-project resource planning (local, Windows).",
+      "chinese_description": "内置于 Rillsoft Project 10 的 MCP 服务器，用于多项目资源规划（本地、Windows）。"
+    },
+    {
+      "id": "L04804",
+      "source_line": 4804,
+      "english_description": "Search, filter and retrieve live remote job listings from Jobicy.",
+      "chinese_description": "搜索、筛选和获取 Jobicy 的实时远程职位。"
+    },
+    {
+      "id": "L04805",
+      "source_line": 4805,
+      "english_description": "Your career history as a job-search toolkit: tailor a resume to each posting from what you actually did, score it the same way every time, render the PDF, track applications, and fill forms with a browser companion that never presses Submit. 88 tools.",
+      "chinese_description": "把职业经历变成求职工具箱：根据真实经历为每个职位定制简历、以一致方式评分、生成 PDF、跟踪申请，并通过绝不按提交按钮的浏览器助手填写表单。共 88 个工具。"
+    },
+    {
+      "id": "L04806",
+      "source_line": 4806,
+      "english_description": "Generate and edit presentations from a topic, text or document (PDF, DOCX, PPTX) and export to PPTX, PDF, images or a shareable link.",
+      "chinese_description": "根据主题、文本或文档（PDF、DOCX、PPTX）生成和编辑演示文稿，导出为 PPTX、PDF、图片或分享链接。"
+    },
+    {
+      "id": "L04807",
+      "source_line": 4807,
+      "english_description": "Read public Lever job boards: resolve a company name to its board, search its openings and read postings in full.",
+      "chinese_description": "读取公开的 Lever 招聘页面：根据公司名称定位招聘页面、搜索空缺并阅读全文。"
+    },
+    {
+      "id": "L04808",
+      "source_line": 4808,
+      "english_description": "Editable PowerPoint decks from typed slide intents: deterministic rendering, verbatim data binding, fidelity reports, brand templates and translation.",
+      "chinese_description": "根据类型化幻灯片意图生成可编辑 PowerPoint 演示文稿：确定性渲染、逐字数据绑定、保真度报告、品牌模板和翻译。"
+    },
+    {
+      "id": "L04809",
+      "source_line": 4809,
+      "english_description": "Collaborative spreadsheet for session management, knowledge base, task tracking and sheet operations.",
+      "chinese_description": "协作电子表格，用于会话管理、知识库、任务跟踪和表格操作。"
+    },
+    {
+      "id": "L04810",
+      "source_line": 4810,
+      "english_description": "Time tracking, invoicing and bookkeeping with Timebook: manage clients and projects, start and stop timers, and log, update and delete time entries.",
+      "chinese_description": "使用 Timebook 跟踪工时、开票和记账：管理客户和项目、启动和停止计时，以及记录、更新和删除工时条目。"
+    },
+    {
+      "id": "L04811",
+      "source_line": 4811,
+      "english_description": "Decision intelligence with signal aggregation, RICE scoring and decision audit trails, capturing product feedback from Slack, Teams, Discord and GitHub.",
+      "chinese_description": "决策智能：汇总信号、进行 RICE 评分并保留决策审计记录，收集 Slack、Teams、Discord 和 GitHub 上的产品反馈。"
+    },
+    {
+      "id": "L04812",
+      "source_line": 4812,
+      "english_description": "Karea task manager for developers: create, edit, close, recap and link dev tasks, with per-task open questions, attached resources and Jira links.",
+      "chinese_description": "面向开发者的 Karea 任务管理器：创建、编辑、关闭、回顾和关联开发任务，支持各任务的待解问题、附件资源和 Jira 链接。"
+    },
+    {
+      "id": "L04813",
+      "source_line": 4813,
+      "english_description": "Interface with the Google Calendar API.",
+      "chinese_description": "对接 Google Calendar API。"
+    },
+    {
+      "id": "L04814",
+      "source_line": 4814,
+      "english_description": "Local job-hunting agent: scans company careers pages, scores roles against your resume, sends top matches to Telegram and drafts tailored cover letters.",
+      "chinese_description": "本地求职代理：扫描公司招聘页面、根据你的简历为职位评分、将最匹配的职位发送到 Telegram 并起草定制求职信。"
+    },
+    {
+      "id": "L04815",
+      "source_line": 4815,
+      "english_description": "Google Workspace integration covering Calendar, Drive, Gmail, Docs, Forms, Chat, Slides and Sheets.",
+      "chinese_description": "Google Workspace 集成，涵盖 Calendar、Drive、Gmail、Docs、Forms、Chat、Slides 和 Sheets。"
+    },
+    {
+      "id": "L04816",
+      "source_line": 4816,
+      "english_description": "Project and resource management for client projects with Teamwork.",
+      "chinese_description": "使用 Teamwork 管理客户项目及资源。"
+    },
+    {
+      "id": "L04817",
+      "source_line": 4817,
+      "english_description": "Self-hosted killBottleneck goal and process maps: agents create and update nodes, manage tasks and automation rules and read the org structure.",
+      "chinese_description": "自行托管的 killBottleneck 目标与流程图：代理创建和更新节点、管理任务及自动化规则并读取组织结构。"
+    },
+    {
+      "id": "L04818",
+      "source_line": 4818,
+      "english_description": "Doodle-style scheduling polls: create polls, vote, get results and finalize.",
+      "chinese_description": "类似 Doodle 的日程投票：创建投票、投票、获取结果并敲定安排。"
+    },
+    {
+      "id": "L04819",
+      "source_line": 4819,
+      "english_description": "Clockify time tracking: time entries, projects, reports, invoices, scheduling, time off and approvals. Read-only by default with opt-in writes.",
+      "chinese_description": "Clockify 工时跟踪：工时条目、项目、报告、发票、排班、休假和审批。默认只读，写入需主动启用。"
+    },
+    {
+      "id": "L04820",
+      "source_line": 4820,
+      "english_description": "Manage Todoist tasks, projects, sections and labels via the unified API v1.",
+      "chinese_description": "通过统一 API v1 管理 Todoist 任务、项目、分区和标签。"
+    },
+    {
+      "id": "L04821",
+      "source_line": 4821,
+      "english_description": "Productivity suite connecting Todo, Idea, Journal and Timer apps.",
+      "chinese_description": "连接 Todo、Idea、Journal 和 Timer 应用的效率套件。"
+    },
+    {
+      "id": "L04822",
+      "source_line": 4822,
+      "english_description": "Odoo ERP 16-19 integration with no Odoo-side install: read, approval-gated writes, diagnostics, migration and audit tools.",
+      "chinese_description": "无需在 Odoo 端安装的 Odoo ERP 16–19 集成：读取、需审批的写入、诊断、迁移和审计工具。"
+    },
+    {
+      "id": "L04823",
+      "source_line": 4823,
+      "english_description": "Tech-hiring data from HireJack: search live job postings, company hiring profiles and tech stacks, salary benchmarks, market pulse and skill trends.",
+      "chinese_description": "HireJack 技术招聘数据：搜索实时职位、公司招聘概况及技术栈、薪资基准、市场动态和技能趋势。"
+    },
+    {
+      "id": "L04824",
+      "source_line": 4824,
+      "english_description": "Odoo 19 ERP via JSON-RPC: CRUD operations, model inspection and user/company context, with a read-only mode and delete confirmation.",
+      "chinese_description": "通过 JSON-RPC 使用 Odoo 19 ERP：增删改查、模型检查和用户／公司上下文，支持只读模式和删除确认。"
+    },
+    {
+      "id": "L04825",
+      "source_line": 4825,
+      "english_description": "Reclaim.ai calendar integration for tasks, habits, focus time, scheduling links and productivity analytics.",
+      "chinese_description": "Reclaim.ai 日历集成，支持任务、习惯、专注时间、日程链接和效率分析。"
+    },
+    {
+      "id": "L04826",
+      "source_line": 4826,
+      "english_description": "Convert Markdown into formatted documents for Google Docs, Word, Slack, OneNote, email and plain text using templates.",
+      "chinese_description": "通过模板将 Markdown 转换为适用于 Google Docs、Word、Slack、OneNote、电子邮件和纯文本的格式化文档。"
+    },
+    {
+      "id": "L04827",
+      "source_line": 4827,
+      "english_description": "Markdown collaboration: share docs via public links with permission levels, inline comments, real-time sync and version history, and resolve review threads.",
+      "chinese_description": "Markdown 协作：通过公开链接按权限级别分享文档，支持行内评论、实时同步和版本历史，并解决审阅讨论。"
+    },
+    {
+      "id": "L04828",
+      "source_line": 4828,
+      "english_description": "Tools for Gmail, Google Calendar, Google Drive and Google Tasks.",
+      "chinese_description": "Gmail、Google Calendar、Google Drive 和 Google Tasks 工具。"
+    },
+    {
+      "id": "L04829",
+      "source_line": 4829,
+      "english_description": "Bear notes via CloudKit: CRUD, tags, TODOs, attachments, search, front matter, stats and health checks.",
+      "chinese_description": "通过 CloudKit 管理 Bear 笔记：增删改查、标签、待办、附件、搜索、前置元数据、统计和健康检查。"
+    },
+    {
+      "id": "L04830",
+      "source_line": 4830,
+      "english_description": "Search, read, create and update Bear notes locally.",
+      "chinese_description": "在本地搜索、读取、创建和更新 Bear 笔记。"
+    },
+    {
+      "id": "L04831",
+      "source_line": 4831,
+      "english_description": "Watch company job boards (Greenhouse, Lever, Ashby, Workable, Workday, Eightfold, Jibe, Rippling) for new roles, rank them for you, and track applications, follow-ups and interview prep. Never applies on its own.",
+      "chinese_description": "监控公司招聘页面（Greenhouse、Lever、Ashby、Workable、Workday、Eightfold、Jibe、Rippling）的新职位，为你排序，并跟踪申请、后续联系和面试准备。绝不会自行申请。"
+    },
+    {
+      "id": "L04832",
+      "source_line": 4832,
+      "english_description": "MCP bridge for Galley, a local-first Typst editor. Agents read a live project, check real Typst diagnostics and propose diffs a human accepts or rejects.",
+      "chinese_description": "Galley 的 MCP 桥接，Galley 是本地优先的 Typst 编辑器。代理读取实时项目、检查真实 Typst 诊断结果并提出由人接受或拒绝的差异。"
+    },
+    {
+      "id": "L04833",
+      "source_line": 4833,
+      "english_description": "Self-hosted artifact server: turns agent output into versioned web pages, PDFs, Word docs and spreadsheets in six styles, private until shared with a revocable link.",
+      "chinese_description": "自行托管的成果服务器：将代理输出转换为六种风格的版本化网页、PDF、Word 文档和电子表格，在使用可撤销链接分享之前保持私密。"
+    },
+    {
+      "id": "L04834",
+      "source_line": 4834,
+      "english_description": "Workopia job search across employer career pages and ATS feeds, plus PDF resume generation, resume tailoring, cover letters and career advice.",
+      "chinese_description": "Workopia 求职搜索，覆盖雇主招聘页面和 ATS 数据源，另有 PDF 简历生成、简历定制、求职信和职业建议。"
+    },
+    {
+      "id": "L04835",
+      "source_line": 4835,
+      "english_description": "Access macOS Calendar events.",
+      "chinese_description": "访问 macOS Calendar 日程。"
+    },
+    {
+      "id": "L04836",
+      "source_line": 4836,
+      "english_description": "Resume parser and applicant tracking system: parse resumes into JSON, extract skills, score and rank candidates, and manage jobs, interviews and offers.",
+      "chinese_description": "简历解析和应聘者跟踪系统：将简历解析为 JSON、提取技能、为候选人评分和排序，并管理职位、面试和录用。"
+    },
+    {
+      "id": "L04837",
+      "source_line": 4837,
+      "english_description": "Generate PDFs (invoices, contracts, reports, certificates) from reusable templates or inline HTML/Handlebars via the rendoc API, and manage templates.",
+      "chinese_description": "通过 rendoc API 根据可复用模板或内联 HTML/Handlebars 生成 PDF（发票、合同、报告、证书），并管理模板。"
+    },
+    {
+      "id": "L04838",
+      "source_line": 4838,
+      "english_description": "Task management for Claude agents: hierarchical tasks, dependencies, sprints, acceptance criteria and multi-agent coordination.",
+      "chinese_description": "Claude 代理任务管理：层级任务、依赖关系、冲刺、验收标准和多代理协作。"
+    },
+    {
+      "id": "L04839",
+      "source_line": 4839,
+      "english_description": "Self-hostable all-in-one planner: calendar, notes, todos and bookmarks.",
+      "chinese_description": "可自行托管的一体化规划工具：日历、笔记、待办和书签。"
+    },
+    {
+      "id": "L04840",
+      "source_line": 4840,
+      "english_description": "WordPress publishing: create, update, publish and delete posts, with Markdown-to-Gutenberg conversion, image hosting, featured images and SEO metadata.",
+      "chinese_description": "WordPress 发布：创建、更新、发布和删除文章，支持 Markdown 转 Gutenberg、图片托管、特色图片和 SEO 元数据。"
+    },
+    {
+      "id": "L04841",
+      "source_line": 4841,
+      "english_description": "Connect to Bitrix24: CRM, tasks, disk, calendar, chat, business processes, telephony and product catalog.",
+      "chinese_description": "连接 Bitrix24：CRM、任务、磁盘、日历、聊天、业务流程、电话和产品目录。"
+    },
+    {
+      "id": "L04842",
+      "source_line": 4842,
+      "english_description": "W-2 event staffing in the US and Canada: look up coverage, rates, lead-time guidance and state compliance, and submit quote requests.",
+      "chinese_description": "美国和加拿大的 W-2 活动人员配备：查询覆盖范围、费率、准备时间建议和州合规情况，并提交报价请求。"
+    },
+    {
+      "id": "L04843",
+      "source_line": 4843,
+      "english_description": "Bridge to Inkra, the native macOS Markdown editor: document editing, outline navigation, folder browsing, bookmarks and view modes.",
+      "chinese_description": "连接 Inkra 原生 macOS Markdown 编辑器：文档编辑、大纲导航、文件夹浏览、书签和视图模式。"
+    },
+    {
+      "id": "L04844",
+      "source_line": 4844,
+      "english_description": "Access SeaMeet meeting recordings, transcripts, AI summaries, screenshots, action items and webhooks, and control the desktop recorder.",
+      "chinese_description": "访问 SeaMeet 会议录像、转录、AI 摘要、截图、待办事项和 Webhook，并控制桌面录制器。"
+    },
+    {
+      "id": "L04845",
+      "source_line": 4845,
+      "english_description": "Job search across LinkedIn, Greenhouse, Lever, Ashby, Workday and other boards, with fit scoring and a ranked, triageable board shown in chat.",
+      "chinese_description": "跨 LinkedIn、Greenhouse、Lever、Ashby、Workday 及其他招聘网站搜索职位，提供匹配度评分和聊天中可分类处理的排序看板。"
+    },
+    {
+      "id": "L04846",
+      "source_line": 4846,
+      "english_description": "Chronary calendar API for AI agents: events, availability, meeting-time search, scheduling proposals, availability rules, webhooks and iCal feeds.",
+      "chinese_description": "面向 AI 代理的 Chronary 日历 API：日程、空闲时间、会议时间搜索、日程建议、空闲规则、Webhook 和 iCal 数据源。"
+    },
+    {
+      "id": "L04847",
+      "source_line": 4847,
+      "english_description": "Local meeting pipeline: Whisper transcription plus Ollama summaries, action items and decisions. Reference implementation of the memnex spec.",
+      "chinese_description": "本地会议处理流程：Whisper 转录，加上 Ollama 摘要、待办和决策。memnex 规范的参考实现。"
+    },
+    {
+      "id": "L04848",
+      "source_line": 4848,
+      "english_description": "Multi-account Google Workspace: connect several Gmail, Calendar, Drive, Sheets and Docs accounts with routing by label, email or domain.",
+      "chinese_description": "多账户 Google Workspace：连接多个 Gmail、Calendar、Drive、Sheets 和 Docs 账户，按标签、邮箱或域名路由。"
+    },
+    {
+      "id": "L04849",
+      "source_line": 4849,
+      "english_description": "Client intake for AI agents: request files, texts and credentials from clients, follow up automatically and retrieve results when complete.",
+      "chinese_description": "面向 AI 代理的客户资料收集：向客户请求文件、文本和凭据，自动跟进并在完成时获取结果。"
+    },
+    {
+      "id": "L04850",
+      "source_line": 4850,
+      "english_description": "HeadHunter (hh.ru) API: vacancy search and publishing, applications, invitations, resumes and salary statistics, with a read/write/destructive safety gate.",
+      "chinese_description": "HeadHunter（hh.ru）API：职位搜索和发布、申请、邀请、简历及薪资统计，设有读取／写入／破坏性操作安全关卡。"
+    },
+    {
+      "id": "L04851",
+      "source_line": 4851,
+      "english_description": "Zero-dependency open-source contribution companion: repo rules and AI policy radar, evidence-backed issue briefs, pre-submit checks, and review coaching.",
+      "chinese_description": "零依赖的开源贡献助手：仓库规则和 AI 政策雷达、基于证据的问题简报、提交前检查和审查指导。"
+    },
+    {
+      "id": "L04854",
+      "source_line": 4854,
+      "english_description": "Typed judgments from TypeSafe Jev: calibrated choice and score questions, A/B comparison, claim-vs-evidence verification and batch classification.",
+      "chinese_description": "TypeSafe Jev 的类型化判断：经校准的选择和评分问题、A/B 比较、主张与证据核验及批量分类。"
+    },
+    {
+      "id": "L04855",
+      "source_line": 4855,
+      "english_description": "Offline novel-writing toolkit for Chinese web-novel authors: chapter stats, style checks, plot-thread tracking, continuity audits and semantic search.",
+      "chinese_description": "面向中文网文作者的离线小说写作工具包：章节统计、风格检查、情节线跟踪、连续性审计和语义搜索。"
+    },
+    {
+      "id": "L04857",
+      "source_line": 4857,
+      "english_description": "Russian new-build due diligence: developer checks, escrow, construction permits and 214-FZ compliance.",
+      "chinese_description": "俄罗斯新建楼盘尽职调查：开发商检查、托管、施工许可及 214-FZ 合规情况。"
+    },
+    {
+      "id": "L04858",
+      "source_line": 4858,
+      "english_description": "Rosreestr open data for Russian property: apartment and land plot checks, transaction history where available, and cadastral value.",
+      "chinese_description": "俄罗斯房产 Rosreestr 开放数据：公寓和地块检查、可获取时的交易历史及地籍价值。"
+    },
+    {
+      "id": "L04859",
+      "source_line": 4859,
+      "english_description": "Chinese metaphysics (bazi, qimen, five elements) as decision support: daily readings, compatibility, time windows for actions and name analysis.",
+      "chinese_description": "以中国玄学（八字、奇门、五行）辅助决策：每日解读、相合度、行动时间窗口和姓名分析。"
+    },
+    {
+      "id": "L04862",
+      "source_line": 4862,
+      "english_description": "Ed25519-signed receipts for every MCP tool call, with constraints, chains, AI judgment, invoicing and a local dashboard.",
+      "chinese_description": "为每次 MCP 工具调用提供 Ed25519 签名收据，支持约束、链、AI 判断、开票和本地仪表盘。"
+    },
+    {
+      "id": "L04863",
+      "source_line": 4863,
+      "english_description": "Shorten URLs individually or in batches, creating permanent short links.",
+      "chinese_description": "单个或批量缩短 URL，创建永久短链接。"
+    },
+    {
+      "id": "L04865",
+      "source_line": 4865,
+      "english_description": "Self-hosted agent reputation system with signed evidence, its own graph and issuer.",
+      "chinese_description": "自行托管的代理信誉系统，具有签名证据、自己的关系图和签发者。"
+    },
+    {
+      "id": "L04866",
+      "source_line": 4866,
+      "english_description": "Semantic search over Food.com recipes with hybrid dense and sparse retrieval and reranking, filterable by diet, cooking time and difficulty.",
+      "chinese_description": "对 Food.com 食谱进行语义搜索，结合稠密与稀疏混合检索和重排序，可按饮食、烹饪时间及难度筛选。"
+    },
+    {
+      "id": "L04868",
+      "source_line": 4868,
+      "english_description": "Read-only Percolate specialty coffee database: search coffees with tasting profiles, get per-coffee brew recipes, compare coffees and get brew suggestions.",
+      "chinese_description": "只读 Percolate 精品咖啡数据库：按风味搜索咖啡、获取每款咖啡的冲煮配方、比较咖啡并获得冲煮建议。"
+    },
+    {
+      "id": "L04869",
+      "source_line": 4869,
+      "english_description": "Read-only Perfume Picks fragrance database: search scents with notes and accords, find dupes, compare fragrances and get wear suggestions.",
+      "chinese_description": "只读 Perfume Picks 香水数据库：按香调和香型搜索、查找平替、比较香水并获取使用建议。"
+    },
+    {
+      "id": "L04870",
+      "source_line": 4870,
+      "english_description": "Read-only Pour Picks bourbon and whiskey database: search bottles with tasting profiles, prices and ratings, compare bottles and find cheaper alternatives.",
+      "chinese_description": "只读 Pour Picks 波本和威士忌数据库：按风味、价格和评分搜索酒款、比较酒款并寻找更便宜的替代品。"
+    },
+    {
+      "id": "L04871",
+      "source_line": 4871,
+      "english_description": "Simulated smart home and lifestyle devices for testing an agent's reasoning and discovery capabilities.",
+      "chinese_description": "模拟智能家居和生活设备，用于测试代理的推理和发现能力。"
+    },
+    {
+      "id": "L04872",
+      "source_line": 4872,
+      "english_description": "Generate images with the Amazon Nova Canvas model.",
+      "chinese_description": "使用 Amazon Nova Canvas 模型生成图片。"
+    },
+    {
+      "id": "L04873",
+      "source_line": 4873,
+      "english_description": "TypeSafe Jev typed decisions through one batched tool: classification, rubric scores and yes/no probabilities.",
+      "chinese_description": "通过一个批量工具执行 TypeSafe Jev 类型化决策：分类、评分标准分数和是／否概率。"
+    },
+    {
+      "id": "L04879",
+      "source_line": 4879,
+      "english_description": "Anki integration for managing notes and decks through natural language.",
+      "chinese_description": "Anki 集成，通过自然语言管理笔记和牌组。"
+    },
+    {
+      "id": "L04880",
+      "source_line": 4880,
+      "english_description": "Notion integration.",
+      "chinese_description": "Notion 集成。"
+    },
+    {
+      "id": "L04883",
+      "source_line": 4883,
+      "english_description": "Create PDFs from Markdown with tables and formatting, fill forms, merge, split, encrypt and add QR codes.",
+      "chinese_description": "从 Markdown 创建带表格和格式的 PDF，填写表单、合并、拆分、加密并添加二维码。"
+    },
+    {
+      "id": "L04884",
+      "source_line": 4884,
+      "english_description": "Context-efficient Notion access: pages, databases, blocks, comments, files and templates through a minimal tool set, with token auth for headless use.",
+      "chinese_description": "节省上下文的 Notion 访问：通过精简工具集操作页面、数据库、块、评论、文件和模板，支持无界面使用的令牌认证。"
+    },
+    {
+      "id": "L04887",
+      "source_line": 4887,
+      "english_description": "Access Azure services including Storage, Cosmos DB and Azure Monitor.",
+      "chinese_description": "访问 Azure 服务，包括 Storage、Cosmos DB 和 Azure Monitor。"
+    },
+    {
+      "id": "L04888",
+      "source_line": 4888,
+      "english_description": "Manage personal todo lists via Notion's API.",
+      "chinese_description": "通过 Notion API 管理个人待办清单。"
+    },
+    {
+      "id": "L04889",
+      "source_line": 4889,
+      "english_description": "Read notes and tags from the Bear note-taking app directly from its SQLite database.",
+      "chinese_description": "直接从 Bear 笔记应用的 SQLite 数据库读取笔记和标签。"
+    },
+    {
+      "id": "L04890",
+      "source_line": 4890,
+      "english_description": "Talk to ChatGPT and use its web search capability.",
+      "chinese_description": "与 ChatGPT 对话并使用其网络搜索功能。"
+    },
+    {
+      "id": "L04892",
+      "source_line": 4892,
+      "english_description": "Search, request and manage e-signature contracts with BoldSign.",
+      "chinese_description": "使用 BoldSign 搜索、请求和管理电子签名合同。"
+    },
+    {
+      "id": "L04893",
+      "source_line": 4893,
+      "english_description": "Multi-round brainstorming debates between LLMs (GPT, Gemini, DeepSeek, Groq, Ollama and more) to explore ideas from diverse perspectives.",
+      "chinese_description": "让多个大语言模型（GPT、Gemini、DeepSeek、Groq、Ollama 等）进行多轮头脑风暴辩论，从不同视角探索想法。"
+    },
+    {
+      "id": "L04896",
+      "source_line": 4896,
+      "english_description": "CLI tool for testing MCP servers.",
+      "chinese_description": "用于测试 MCP 服务器的命令行工具。"
+    },
+    {
+      "id": "L04897",
+      "source_line": 4897,
+      "english_description": "Phone calls, SMS, fax, translation, text-to-speech, audiobooks, image, video, music and text generation, and document extraction, paid via Lightning (L402).",
+      "chinese_description": "电话、短信、传真、翻译、文字转语音、有声书、图像、视频、音乐和文本生成，以及文档提取，通过 Lightning（L402）付费。"
+    },
+    {
+      "id": "L04899",
+      "source_line": 4899,
+      "english_description": "PDF download, viewing and manipulation utilities.",
+      "chinese_description": "PDF 下载、查看和处理工具。"
+    },
+    {
+      "id": "L04900",
+      "source_line": 4900,
+      "english_description": "Create, send and manage digital signature envelopes via the DigiSign.cz API.",
+      "chinese_description": "通过 DigiSign.cz API 创建、发送和管理数字签名信封。"
+    }
+  ]
+}

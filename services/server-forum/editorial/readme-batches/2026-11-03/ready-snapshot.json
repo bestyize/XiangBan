@@ -1,7 +1,7 @@
 {
   "inventory_revision": 2,
-  "created_at": "2026-11-03T03:35:40.399220+00:00",
-  "count": 162,
+  "created_at": "2026-11-03T03:47:39.197854+00:00",
+  "count": 163,
   "excluded": [],
   "usage": "每次使用前重新校验每个文件 SHA-256；哈希不一致即舍弃该项目并重建快照。ready_for_review 仅表示待审。",
   "projects": [
@@ -198,7 +198,8 @@
         "donnemartin--system-design-primer/README.en.md": "ad68f3b45a00fefe2bb341d05cb4fd98f6487502743d6e9612ec9186858b48ea",
         "donnemartin--system-design-primer/metadata.json": "c8881117b60e05de0f1df1d9f29651a3645654c274cb7a41732318703aa9a584",
         "donnemartin--system-design-primer/review.json": "6cc4c3fa20846449d9d808aa3c61ec8a43cbbdf55085cbdabae72a8770fd4d9a",
-        "donnemartin--system-design-primer/LICENSE.upstream": "9a7492f956e845e14e04f42e3f6cdd971460a231eeb04317af9e6aace1470876"
+        "donnemartin--system-design-primer/LICENSE.upstream": "9a7492f956e845e14e04f42e3f6cdd971460a231eeb04317af9e6aace1470876",
+        "donnemartin--system-design-primer/README.official-zh.source.md": "8a58512b70b6c8680cea860bcfe15c3b92d2814e5f0004781a3b17b7ff078760"
       }
     },
     {
@@ -490,7 +491,8 @@
         "trekhleb--javascript-algorithms/README.en.md": "74480a8fa03b8bb71ec2689de0a09de08816531d3dff5a3ed5b93f48c4d995f1",
         "trekhleb--javascript-algorithms/metadata.json": "e71f138a59aedbfde6fcfdf2dfb576e9dfaf82d343640cad9ecb14299f638023",
         "trekhleb--javascript-algorithms/review.json": "8192ac10640f147d1173a3ce3af8595095e2e2da8b448b13b9902f6031c76dc7",
-        "trekhleb--javascript-algorithms/LICENSE.upstream": "fa87ec64a7ecbf02d8c195e8fef346c09d234857abdf5b084955a1fb7f8c15ad"
+        "trekhleb--javascript-algorithms/LICENSE.upstream": "fa87ec64a7ecbf02d8c195e8fef346c09d234857abdf5b084955a1fb7f8c15ad",
+        "trekhleb--javascript-algorithms/README.official-zh.source.md": "e383d1878339f8423851a19fa19546d7c47911c081734c4b5d2cae8c2d3702e1"
       }
     },
     {
@@ -684,7 +686,8 @@
         "huggingface--transformers/README.en.md": "3baf90cbe258cc0ff36caeb849dd4eba9827778cae296ca6e884ed06a057092d",
         "huggingface--transformers/metadata.json": "aba6f336b43c0966d388f676e7a91c00088216ee9019ad8e6df7928e5557c83b",
         "huggingface--transformers/review.json": "65dbcbc96c4a649594173a6ee112877ab3d363f3a2d4438842b6b298679cda84",
-        "huggingface--transformers/LICENSE.upstream": "77fd4710def9ec3c0f6225800e0235f15a425abd4a8b03559127fcd782612049"
+        "huggingface--transformers/LICENSE.upstream": "77fd4710def9ec3c0f6225800e0235f15a425abd4a8b03559127fcd782612049",
+        "huggingface--transformers/README.official-zh.source.md": "11376108e5e66c3732213f3165d3402a85af9b8af555118bf7ae1e8169e82d36"
       }
     },
     {
@@ -976,7 +979,8 @@
         "rustdesk--rustdesk/README.en.md": "5812ecfda5c0a1f98d12a303136606a1ce941697a448d1605313e5f27380b185",
         "rustdesk--rustdesk/metadata.json": "3571b065c24c40a9a5cd9dc095fb09cb009c33307f21a8579e41d267e9218897",
         "rustdesk--rustdesk/review.json": "6571716c0efa2831fe4aee8ca0418c339b7740738dbfb84fc6790a59029826b7",
-        "rustdesk--rustdesk/LICENSE.upstream": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef"
+        "rustdesk--rustdesk/LICENSE.upstream": "8486a10c4393cee1c25392769ddd3b2d6c242d6ec7928e1414efff7dfb2f07ef",
+        "rustdesk--rustdesk/README.official-zh.source.md": "7c4607f10d89e5ec6c4f27f81d6ff83ef89240b0515a13fc2b7b353216de2f1d"
       }
     },
     {
@@ -1026,7 +1030,8 @@
         "microsoft--generative-ai-for-beginners/README.en.md": "3c96d0c4ddb880420c3f277f86a13d6e07f55928790a2445c56187fb986a1d91",
         "microsoft--generative-ai-for-beginners/metadata.json": "8a27435afa809352c3608c0f22ec3c43cdd76bcc83940774d503947cc3549ae7",
         "microsoft--generative-ai-for-beginners/review.json": "2888432ae8fad036c8b5dbe658c27862fb92ada1d5c9362c3f273635657b8bdc",
-        "microsoft--generative-ai-for-beginners/LICENSE.upstream": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        "microsoft--generative-ai-for-beginners/LICENSE.upstream": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+        "microsoft--generative-ai-for-beginners/README.official-zh.source.md": "72b9e75e95b96cd9f091507c35d564d2ccab6fa6d8a52aba96775effcb1f7d3e"
       }
     },
     {
@@ -1123,7 +1128,8 @@
         "immich-app--immich/README.en.md": "b5af33629c0252bc170f0599da5d48d5185b87e18c04576c56c2cd0b2dad19f8",
         "immich-app--immich/metadata.json": "d4899e190cc7f1e6ff20455f917e1071b1572cb7c9f87903f322d56fabd51656",
         "immich-app--immich/review.json": "1a8399f9630cf6760f5c3272a939fab265fa6d56845d62a64c68ea976940957c",
-        "immich-app--immich/LICENSE.upstream": "a3bad629f67f442b23b5224419e49edafc32e6b9c876b89464f7aafe6091ccde"
+        "immich-app--immich/LICENSE.upstream": "a3bad629f67f442b23b5224419e49edafc32e6b9c876b89464f7aafe6091ccde",
+        "immich-app--immich/README.official-zh.source.md": "ac80759eac13a2727da951daf8e354c63e13a6785aff4b429bc1cb8b4127aa02"
       }
     },
     {
@@ -1171,7 +1177,8 @@
         "supabase--supabase/README.en.md": "0e7d74666c378cd42d61648f8ad8c1df9381fd1bb478d83f78493ad5a0276661",
         "supabase--supabase/metadata.json": "e00fa01c655a70bca8c2bbce818ac7456bf09dd5ca434ec2c1aa697363f6dd7c",
         "supabase--supabase/review.json": "243272d9e54940f5a1f5ed28dc5e3db5ee6091b5341b3f4c5d3053797eae1ffd",
-        "supabase--supabase/LICENSE.upstream": "c29468abcd629e248c2f76848155c386b733872bcabcc4cf65ef1e7c61431042"
+        "supabase--supabase/LICENSE.upstream": "c29468abcd629e248c2f76848155c386b733872bcabcc4cf65ef1e7c61431042",
+        "supabase--supabase/README.official-zh.source.md": "8be540d98ef630156ac357a484c91aed2728dda00085b44ebd59a67c2cf655e0"
       }
     },
     {
@@ -1365,6 +1372,65 @@
     },
     {
       "card": {
+        "original_key": "punkpeye/awesome-mcp-servers",
+        "repo": "punkpeye/awesome-mcp-servers",
+        "name": "Awesome MCP Servers",
+        "summary_zh": "按领域整理可自行安装运行的 MCP 服务端，帮助用户查找连接工具与资源。",
+        "icon_source_url": null,
+        "icon_license": null,
+        "icon_attribution": null,
+        "primary_url": "https://glama.ai/mcp/servers",
+        "primary_label": "项目官方目录",
+        "github_url": "https://github.com/punkpeye/awesome-mcp-servers",
+        "stars": 97212,
+        "stars_fetched_at": "2026-11-03T01:50:45.150584+00:00",
+        "code_updated_at": "2026-11-02T04:38:05Z",
+        "code_updated_basis": "GitHub repository pushed_at",
+        "license": "MIT",
+        "documentation_license": null,
+        "platforms": [],
+        "readme_zh_path": "punkpeye--awesome-mcp-servers/README.zh-CN.md",
+        "readme_en_path": "punkpeye--awesome-mcp-servers/README.en.md",
+        "status": "ready_for_review",
+        "github_archived": false,
+        "github_fork": false,
+        "upstream_maintenance_notice": null,
+        "category": "skills",
+        "related_categories": [
+          "ai"
+        ],
+        "tags": [
+          "MCP",
+          "工具目录",
+          "连接器"
+        ],
+        "collections": [],
+        "field_notes": [
+          "项目图标尚未核定，留空",
+          "运行平台尚未核定，留空"
+        ]
+      },
+      "files_sha256": {
+        "punkpeye--awesome-mcp-servers/README.source.md": "30cfd63388477a60dd7c21b8cdf24b287a15b1e592c7e3bc2b08ebe2222a4670",
+        "punkpeye--awesome-mcp-servers/README.zh-CN.md": "4bfbbaee2fe6d06b510f800144b983c91fbfd1e14414c6a5df9031bca43c99ef",
+        "punkpeye--awesome-mcp-servers/README.en.md": "830302ed3b3a4c38e6441d611cdce6cc0d315a1fcc334aef31e0877430d61ca0",
+        "punkpeye--awesome-mcp-servers/metadata.json": "52d0b818ec584f6f747df3836133769c138e590944c5c313ed98799b02dc7217",
+        "punkpeye--awesome-mcp-servers/review.json": "9b83022d17c293911b51e1a53c2a8346276d12ea7eb139cd564aade7d2d872fa",
+        "punkpeye--awesome-mcp-servers/LICENSE.upstream": "8cb2c0a4c6590502ffb793005c0f1b440ca4db34dcc209bbe9cf34d3b52a7e07",
+        "punkpeye--awesome-mcp-servers/README.official-zh.source.md": "0275fab11f273b9b593781bc815771f10818bafd97001615574bb4bf925316a4",
+        "punkpeye--awesome-mcp-servers/description-index.json": "7019c234e573e970879e1a5059a6e44ea8d2f922ede0d69047afce7f78d85578",
+        "punkpeye--awesome-mcp-servers/translation-provenance.json": "61dbe19beb67adcda584cc419fdeef3ce6221962f4f344c3c1ca9581e84019c0",
+        "punkpeye--awesome-mcp-servers/assembly-inputs/awesome-nonitems.json": "319f5361d67352d5cdd44945abc8c08cd77dbe56885801a757d05b0f2e5d5898",
+        "punkpeye--awesome-mcp-servers/assembly-inputs/awesome-part-a-tail.json": "d872821bf4780501ffc1d8978af8b2feb6c2a61a83fdfdc530694becbf39892f",
+        "punkpeye--awesome-mcp-servers/assembly-inputs/awesome-part-a.json": "b0410089b273dd57a278e257962c03c66c1747545b8c6908eb26ab6d6512b939",
+        "punkpeye--awesome-mcp-servers/assembly-inputs/awesome-part-b.json": "3ec63278cc56e9830f149667166c25b810851841c2c00573211aa4e8fd77d217",
+        "punkpeye--awesome-mcp-servers/assembly-inputs/awesome-part-self.json": "dbeb272edfe3729112a1d6acf6b25e1ec0b61299e255a846a29f9bac2d4a2929",
+        "punkpeye--awesome-mcp-servers/assembly-inputs/awesome-part-tail.json": "6a7c097684b234bab0988ff41908b53e12d5c9e819760b832f3766e6dce51a63",
+        "punkpeye--awesome-mcp-servers/assembly-inputs/translation-fragments.json": "ed369f7653750879a024250089f7816f9f3cbb4fde2c324bed8f679ac4964d3a"
+      }
+    },
+    {
+      "card": {
         "original_key": "NationalSecurityAgency/ghidra",
         "repo": "NationalSecurityAgency/ghidra",
         "name": "Ghidra",
@@ -1458,7 +1524,8 @@
         "microsoft--Web-Dev-For-Beginners/README.en.md": "9d7a2f5c86316da4a2a315b56a845912dbc970b3303e159692e0461a6dcb14e6",
         "microsoft--Web-Dev-For-Beginners/metadata.json": "ceef51315dcb2d2be773c3b1c818898237f08caf92f02e9125531f47e4a468c1",
         "microsoft--Web-Dev-For-Beginners/review.json": "808870027f334b406b1e43bba5d366f8e04aa1d6fe2af2a73e904a205a76bd98",
-        "microsoft--Web-Dev-For-Beginners/LICENSE.upstream": "9906940f61b1f0b533fa7d99baf55178b2808fbe113ea51dfbfad8572ccd5f2b"
+        "microsoft--Web-Dev-For-Beginners/LICENSE.upstream": "9906940f61b1f0b533fa7d99baf55178b2808fbe113ea51dfbfad8572ccd5f2b",
+        "microsoft--Web-Dev-For-Beginners/README.official-zh.source.md": "710f0f4e3a7d4f45a0a7bed1b34f8c094bca6e671da987b040bdd73742aa734c"
       }
     },
     {
@@ -1651,7 +1718,8 @@
         "infiniflow--ragflow/README.en.md": "81d8e141e6ce4a64ca5574fa227731303cc1d23ae40296f6b298e147aa4fa23d",
         "infiniflow--ragflow/metadata.json": "4f97a57e5590ceb8b3932f61f0f7dac665d4a5ccca4fd0d30cf9cab852d7c43b",
         "infiniflow--ragflow/review.json": "2430151919576514ec8780d6a5a22845792dda9f9c027975ee75e87f6822ce80",
-        "infiniflow--ragflow/LICENSE.upstream": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        "infiniflow--ragflow/LICENSE.upstream": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "infiniflow--ragflow/README.official-zh.source.md": "ff93456a705f59fcacdf753450aabadb6eb2469ba91a45dd283f23a973633998"
       }
     },
     {
@@ -1749,7 +1817,8 @@
         "microsoft--ML-For-Beginners/README.en.md": "aa19736a6ce2f23a15a955295bcc85f5a149cf295285564db9cbc3ae0e879b6d",
         "microsoft--ML-For-Beginners/metadata.json": "7427d3ff57d88f626bdb9c0e1862c37a0b504eba1e902b363552bfc5afa2badb",
         "microsoft--ML-For-Beginners/review.json": "3ddace36c5fce5216c1a4d22987f8f1a446d1735dd2e0871f7af1261e70de004",
-        "microsoft--ML-For-Beginners/LICENSE.upstream": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        "microsoft--ML-For-Beginners/LICENSE.upstream": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+        "microsoft--ML-For-Beginners/README.official-zh.source.md": "6ae14bebd9126fe813767881c9334f2d1c9fba0298774e0c5333137b35cd323d"
       }
     },
     {
@@ -2182,7 +2251,8 @@
         "microsoft--ai-agents-for-beginners/README.en.md": "1df6866295526f7a0445e58ac7972b6039924664cbef34452437a359f1bdc6e7",
         "microsoft--ai-agents-for-beginners/metadata.json": "376a0564c70f6afbe3e3dafa9a400a184f35ecea06823ce6fde6d5a0566553f7",
         "microsoft--ai-agents-for-beginners/review.json": "f042e317d325261d2fa236b40c1dfdc7f96467558cc13e57a5ef60b3719d4ad1",
-        "microsoft--ai-agents-for-beginners/LICENSE.upstream": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        "microsoft--ai-agents-for-beginners/LICENSE.upstream": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+        "microsoft--ai-agents-for-beginners/README.official-zh.source.md": "0f89418d7a566d826b2091e0696a7c3b0a3e22af60d232efb3765de3ce049eab"
       }
     },
     {
@@ -2437,7 +2507,8 @@
         "microsoft--AI-For-Beginners/README.en.md": "38ce6002c0b77f8f32aab64af0a7e865705c47b22c32be0fb1155a28629d1ace",
         "microsoft--AI-For-Beginners/metadata.json": "c75abb65f48bca7735a7f39d97487d6c84901cc0322a0ac9984881baab638e99",
         "microsoft--AI-For-Beginners/review.json": "d75be908f924af71c33d8117c82552f97e0383b06c9bdf5bb62cb4b95a44c3a7",
-        "microsoft--AI-For-Beginners/LICENSE.upstream": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        "microsoft--AI-For-Beginners/LICENSE.upstream": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+        "microsoft--AI-For-Beginners/README.official-zh.source.md": "89c965505bf36ebdb6d3bd7927e4a650b5564ef8597bbdfb4d92191b1a02a18a"
       }
     },
     {
@@ -2779,7 +2850,8 @@
         "upstash--context7/README.en.md": "9721deabd6ff259758e21e05a8c6d50ca354817ca58245d8c6f48999010eb759",
         "upstash--context7/metadata.json": "79a873ac4b038ff5f9abe8dfcd09668228b79b0d7459edea9f6606e894bd35b9",
         "upstash--context7/review.json": "1ce1e732ed6cb947dcbc25ab0e86b1f63b689d77726eb4062eee6b2d45893143",
-        "upstash--context7/LICENSE.upstream": "85cfb556dc2b22b55d2565674fcdaac82f3f2f6b7a928d27003132721bb6736c"
+        "upstash--context7/LICENSE.upstream": "85cfb556dc2b22b55d2565674fcdaac82f3f2f6b7a928d27003132721bb6736c",
+        "upstash--context7/README.zh-CN.source.md": "8e329e96364bba9e7fdc0f8f494a16f100a04fff6a2d2cedc12029441c7ef3df"
       }
     },
     {
@@ -2983,7 +3055,8 @@
         "sharkdp--bat/metadata.json": "a0eab4e6796cc9e236fc5dff0cda6414e1a070d557c1e8878ddd4cdff1709e31",
         "sharkdp--bat/review.json": "d128250260a142ea7d7801a0916d1c5cdd5ba01a5082093768724e0f8ff685f5",
         "sharkdp--bat/LICENSE.MIT": "dccda9eb9533f5c65624a1106536c6cfde46008d58e60b3faf154e8b9fd5b46e",
-        "sharkdp--bat/LICENSE.upstream": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+        "sharkdp--bat/LICENSE.upstream": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "sharkdp--bat/README.zh-CN.source.md": "b72de1f9145969600167603811da089cf5e37460e84bc13d3667c7ca094c2340"
       }
     },
     {
@@ -3134,7 +3207,8 @@
         "go-gitea--gitea/README.en.md": "4c919b7d0060c4337f139d5a52019386574ba036bf0b053332f16659b4d98771",
         "go-gitea--gitea/metadata.json": "7d7ec8dacb48d268b6796522239fb4557edbb4a29f8aee01e5a1d19647c89806",
         "go-gitea--gitea/review.json": "47e93b076638e675a274308e1c4ab8d747698835da3717a3370175cc8ab9df05",
-        "go-gitea--gitea/LICENSE.upstream": "ed2f10a9d78b8c6c9ef33f1420d0eb266981891caf2f15d630553f02dc60d3ae"
+        "go-gitea--gitea/LICENSE.upstream": "ed2f10a9d78b8c6c9ef33f1420d0eb266981891caf2f15d630553f02dc60d3ae",
+        "go-gitea--gitea/README.zh-CN.source.md": "808a60aeaeb7b262c9329d04a8f6dccbb6999699f141f27f896a0e87a76b0ea5"
       }
     },
     {
@@ -3183,7 +3257,8 @@
         "appwrite--appwrite/README.en.md": "ceb90a04fef13ee3544ebfbf6321c49ab1259ae6845aae22ad996e5160b0f76a",
         "appwrite--appwrite/metadata.json": "42118729d103dff4483bca9457af9a88687661b1b75f7ab2471d506dbf2a943a",
         "appwrite--appwrite/review.json": "8a89ca9ff0df8bd7bcd56c1998c6c31c709c4842f63e189188ee3f3e31dc8eca",
-        "appwrite--appwrite/LICENSE.upstream": "afcf20b6b9c522527dea8dd87599136509a245e36a7e1eacd969e6a21a3f5510"
+        "appwrite--appwrite/LICENSE.upstream": "afcf20b6b9c522527dea8dd87599136509a245e36a7e1eacd969e6a21a3f5510",
+        "appwrite--appwrite/README.zh-CN.source.md": "e5d8746ccf4f7e55596d28bc81421225087a12b6d1f4fc661c69f8c5d2027da0"
       }
     },
     {
@@ -3668,7 +3743,8 @@
         "siyuan-note--siyuan/README.en.md": "e58de71fb127b4744c42a228f6786eebfdd439447a10df242696cb3aad60b84f",
         "siyuan-note--siyuan/metadata.json": "2fdaf503a7917f8f836ea9e55e4a30e3e83291c3df02496596b366ecb075f997",
         "siyuan-note--siyuan/review.json": "66adc9da07b031b377e1e2dd00037bdbe11874f3c193563aa247111e6432adcc",
-        "siyuan-note--siyuan/LICENSE.upstream": "4df3c306dddaaf4baffdff5ca820cc679ac8cd6dc263c6a74517783e42fa7a3b"
+        "siyuan-note--siyuan/LICENSE.upstream": "4df3c306dddaaf4baffdff5ca820cc679ac8cd6dc263c6a74517783e42fa7a3b",
+        "siyuan-note--siyuan/README.zh-CN.source.md": "e6c53ca477931ec2b8a69ccf62d50d9782b81b89aeafda673e73110ba0471b80"
       }
     },
     {
@@ -4148,7 +4224,8 @@
         "HKUDS--LightRAG/README.en.md": "9d9105206597db49d062443948c292f03d533f70e63b2721c5b53dcc4979910b",
         "HKUDS--LightRAG/metadata.json": "29431d1f75834908aeb7a802f4b6864a76cab6a9562caa0dd777f1af591014dc",
         "HKUDS--LightRAG/review.json": "68b81f260216765935936e06353290b064796f78456ab56206212d9a16e9a50d",
-        "HKUDS--LightRAG/LICENSE.upstream": "0c16924564059e493c86854574660a47ed1dcc2a476ba7b5f949d3f2f73a1984"
+        "HKUDS--LightRAG/LICENSE.upstream": "0c16924564059e493c86854574660a47ed1dcc2a476ba7b5f949d3f2f73a1984",
+        "HKUDS--LightRAG/README.zh-CN.source.md": "9c3533b465553acc237f9a8b4cf852cf8d53b71772d15a156cad07c0298063b5"
       }
     },
     {
@@ -4296,7 +4373,8 @@
         "TriliumNext--Trilium/README.en.md": "0b52166e76b201262649860144206a2f84b92f39eaae0a2de82021b0281756df",
         "TriliumNext--Trilium/metadata.json": "8d6ee0d1602e7346471ddd0e1010bdd81edf1ffb23aaa1e546456e3143adbdd5",
         "TriliumNext--Trilium/review.json": "425ccf67e4934baad3979438ba4441e15fb4628e326b4270aa6910eae11e2c40",
-        "TriliumNext--Trilium/LICENSE.upstream": "76a97c878c9c7a8321bb395c2b44d3fe2f8d81314d219b20138ed0e2dddd5182"
+        "TriliumNext--Trilium/LICENSE.upstream": "76a97c878c9c7a8321bb395c2b44d3fe2f8d81314d219b20138ed0e2dddd5182",
+        "TriliumNext--Trilium/README.zh-CN.source.md": "7c2f501e89a9e98c682adf5adfc76187facbc3d87e1c9f46cf8ad36c32ee8cfd"
       }
     },
     {
@@ -4393,7 +4471,8 @@
         "microsoft--Data-Science-For-Beginners/README.en.md": "425198737f76c5cd3dae63a461a5cde847b1ed0ded8e024f43404d7e64526f49",
         "microsoft--Data-Science-For-Beginners/metadata.json": "3fd1872d271fdc2f04fab7961c9316b24d38c722ca6966d59122406111271efe",
         "microsoft--Data-Science-For-Beginners/review.json": "b0cd82d8b73c69626829ea70dc2fb400f640c965f50e423f0efe428ea1186a55",
-        "microsoft--Data-Science-For-Beginners/LICENSE.upstream": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
+        "microsoft--Data-Science-For-Beginners/LICENSE.upstream": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+        "microsoft--Data-Science-For-Beginners/README.zh-CN.source.md": "6a7b1d22aa88aba6a61909229c301b377e8925f160b1292ed43d31836bf0c95a"
       }
     },
     {
@@ -4642,7 +4721,8 @@
         "agentscope-ai--agentscope/README.en.md": "b427ba5dac36178a8b3d164d6e0bf21729d64e407f33847bdbe80fa8fb733d2f",
         "agentscope-ai--agentscope/metadata.json": "7d1193607ac094dfacc63702df3c371fbacbe43e2e336bcec7ad7cf0f8513642",
         "agentscope-ai--agentscope/review.json": "563a6c35aab88acaa15c174887166daddcb97283f32ca44e3133aab6197be892",
-        "agentscope-ai--agentscope/LICENSE.upstream": "4186bcadf358c60080060309769db6b2a352720d7353d827bb574c600fee9913"
+        "agentscope-ai--agentscope/LICENSE.upstream": "4186bcadf358c60080060309769db6b2a352720d7353d827bb574c600fee9913",
+        "agentscope-ai--agentscope/README.zh-CN.source.md": "4b5bc62239631ec20141027858eed13c9274f9244b2e4fd2e3545fefbd5aa778"
       }
     },
     {

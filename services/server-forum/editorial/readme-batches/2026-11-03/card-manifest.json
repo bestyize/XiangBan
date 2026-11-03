@@ -1,7 +1,7 @@
 {
   "inventory_source": "inventory.json",
   "revision": 2,
-  "updated_at": "2026-11-03T03:35:40.209055+00:00",
+  "updated_at": "2026-11-03T03:45:17.420769+00:00",
   "total": 168,
   "description": "项目卡片待审清单；null/空数组表示尚未核定。摘要来自已有项目用途摘要或新核对摘要；不使用旧标题。",
   "cards": [
@@ -1127,12 +1127,12 @@
       "original_key": "punkpeye/awesome-mcp-servers",
       "repo": "punkpeye/awesome-mcp-servers",
       "name": "Awesome MCP Servers",
-      "summary_zh": "按领域整理 MCP 服务端与相关资源的目录，适合作为发现入口。",
+      "summary_zh": "按领域整理可自行安装运行的 MCP 服务端，帮助用户查找连接工具与资源。",
       "icon_source_url": null,
       "icon_license": null,
       "icon_attribution": null,
-      "primary_url": null,
-      "primary_label": null,
+      "primary_url": "https://glama.ai/mcp/servers",
+      "primary_label": "项目官方目录",
       "github_url": "https://github.com/punkpeye/awesome-mcp-servers",
       "stars": 97212,
       "stars_fetched_at": "2026-11-03T01:50:45.150584+00:00",
@@ -1141,9 +1141,9 @@
       "license": "MIT",
       "documentation_license": null,
       "platforms": [],
-      "readme_zh_path": null,
-      "readme_en_path": null,
-      "status": "pending",
+      "readme_zh_path": "punkpeye--awesome-mcp-servers/README.zh-CN.md",
+      "readme_en_path": "punkpeye--awesome-mcp-servers/README.en.md",
+      "status": "ready_for_review",
       "github_archived": false,
       "github_fork": false,
       "upstream_maintenance_notice": null,
@@ -1158,7 +1158,6 @@
       ],
       "collections": [],
       "field_notes": [
-        "主入口及类型尚未核定，留空；GitHub 链接单独保留",
         "项目图标尚未核定，留空",
         "运行平台尚未核定，留空"
       ]

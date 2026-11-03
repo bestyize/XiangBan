@@ -20,10 +20,17 @@ for card in cards['cards']:
             raise ValueError('review state changed')
         required = [folder / name for name in ('README.source.md', 'README.zh-CN.md', 'README.en.md', 'metadata.json', 'review.json')]
         licenses = sorted(path for path in folder.glob('LICENSE*') if path.is_file())
+        official_chinese_sources = [folder / name for name in ('README.official-zh.source.md', 'README.zh-CN.source.md') if (folder / name).is_file()]
+        provenance_files = ([folder / name for name in ('description-index.json', 'translation-provenance.json')]
+                            if card['original_key'] == 'punkpeye/awesome-mcp-servers' else [])
+        if provenance_files:
+            provenance_files += sorted((folder / 'assembly-inputs').glob('*.json'))
+            if len(provenance_files) != 9:
+                raise ValueError('awesome assembly inputs missing')
         if not licenses:
             raise ValueError('license file missing')
         files = {}
-        for path in required + licenses:
+        for path in required + licenses + official_chinese_sources + provenance_files:
             content = path.read_bytes()
             if not content:
                 raise ValueError(f'empty file: {path.name}')
