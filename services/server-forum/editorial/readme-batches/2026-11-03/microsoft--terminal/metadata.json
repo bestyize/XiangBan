@@ -1,0 +1,90 @@
+{
+  "inventory_key": "microsoft/terminal",
+  "full_name": "microsoft/terminal",
+  "inventory_entry": {
+    "audience": "适合希望改善日常开发与命令行工作流的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:17:31.107990+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "terminal",
+    "cover_lines": [
+      "终端",
+      "Windows",
+      "命令行"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 9716,
+    "full_name": "microsoft/terminal",
+    "getting_started": "安装官方稳定版，先为常用 Shell 配置一个启动入口。",
+    "highlights": [
+      "集中管理终端配置",
+      "支持多标签等交互方式"
+    ],
+    "homepage_url": "https://github.com/microsoft/terminal",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:35:54Z",
+    "last_pushed_at": "2026-11-02T17:35:59Z",
+    "name": "Windows Terminal",
+    "notes": [
+      "终端应用本身不提供所有 Shell 和开发工具，需分别安装。"
+    ],
+    "order": 28,
+    "readme_sha": "2bd2aa24a9210265cbdb34c8fbdfb110b521277f",
+    "related_categories": [],
+    "source_url": "https://github.com/microsoft/terminal/blob/main/README.md",
+    "stars": 105316,
+    "summary": "微软维护的开源终端应用，可承载多个命令行配置与会话。",
+    "tags": [
+      "终端",
+      "Windows",
+      "命令行"
+    ],
+    "title": "给不同命令行环境一个共同的窗口",
+    "watchers": 1369
+  },
+  "fetched_at": "2026-11-03T01:50:44.995018+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "microsoft/terminal",
+  "repository_url": "https://github.com/microsoft/terminal",
+  "default_branch": "main",
+  "stars": 105315,
+  "pushed_at": "2026-11-02T22:14:34Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "188822fa51dba7e11b64801483f4909db5fd020a",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "017b9885a46ad4c7f4367ad2949fb66fb56f977f",
+    "source_url": "https://github.com/microsoft/terminal/blob/188822fa51dba7e11b64801483f4909db5fd020a/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "2bd2aa24a9210265cbdb34c8fbdfb110b521277f",
+    "source_url": "https://github.com/microsoft/terminal/blob/188822fa51dba7e11b64801483f4909db5fd020a/README.md",
+    "raw_url": "https://raw.githubusercontent.com/microsoft/terminal/188822fa51dba7e11b64801483f4909db5fd020a/README.md",
+    "size_bytes": 18794,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "plain_summary": "Windows 上支持标签页、主题和多种命令行环境的终端应用。",
+  "official_entry": "https://learn.microsoft.com/windows/terminal/",
+  "translation_provenance": "Terra 对固定提交英文 README 全文译写。",
+  "image_rights": "项目图为上游原图链接；Microsoft 品牌和标识可能受独立商标政策约束。",
+  "entry_label": "查看文档"
+}

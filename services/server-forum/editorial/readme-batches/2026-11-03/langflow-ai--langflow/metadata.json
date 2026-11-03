@@ -1,0 +1,97 @@
+{
+  "inventory_key": "langflow-ai/langflow",
+  "full_name": "langflow-ai/langflow",
+  "inventory_entry": {
+    "audience": "适合希望构建、运行或理解 AI 应用的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:16:53.564194+00:00",
+    "cover_accent": "#657063",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "可视化",
+      "智能体",
+      "工作流"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 10311,
+    "full_name": "langflow-ai/langflow",
+    "getting_started": "从官方入门搭建一个最小对话流程，再连接测试数据。",
+    "highlights": [
+      "用组件连接模型与工具",
+      "可逐步检查工作流行为"
+    ],
+    "homepage_url": "https://github.com/langflow-ai/langflow",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/langflow-ai/langflow/main/docs/static/img/langflow-logo-color-black-solid.svg",
+    "icon_url": "/open-source-media/langflow-icon.svg",
+    "last_commit_at": "2026-10-30T01:56:07Z",
+    "last_pushed_at": "2026-11-02T17:54:29Z",
+    "name": "Langflow",
+    "notes": [
+      "托管平台、第三方模型和自行部署的费用与条款分别确认。"
+    ],
+    "order": 16,
+    "readme_sha": "1e9c7ce08a9e61c6f4e796366c695be81c47d7eb",
+    "related_categories": [
+      "dev",
+      "skills"
+    ],
+    "source_url": "https://github.com/langflow-ai/langflow/blob/main/README.md",
+    "stars": 156265,
+    "summary": "通过可视化组件组织模型、数据与工具的 AI 应用开发平台。",
+    "tags": [
+      "可视化",
+      "智能体",
+      "工作流"
+    ],
+    "title": "用画布搭建自己的 AI 工作流",
+    "watchers": 526
+  },
+  "fetched_at": "2026-11-03T01:50:40.427501+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "langflow-ai/langflow",
+  "repository_url": "https://github.com/langflow-ai/langflow",
+  "default_branch": "main",
+  "stars": 156268,
+  "pushed_at": "2026-11-03T01:44:30Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "http://www.langflow.org",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/langflow-ai/langflow/b5c54a64e685b7e50fd3bc76e965ad718fc2dea3/docs/static/img/langflow-logo-color-black-solid.svg",
+  "commit_sha": "b5c54a64e685b7e50fd3bc76e965ad718fc2dea3",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "ee3d6be71bdd1b5e4cc5b85da4a4aabc7bfe3347",
+    "source_url": "https://github.com/langflow-ai/langflow/blob/b5c54a64e685b7e50fd3bc76e965ad718fc2dea3/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "1e9c7ce08a9e61c6f4e796366c695be81c47d7eb",
+    "source_url": "https://github.com/langflow-ai/langflow/blob/b5c54a64e685b7e50fd3bc76e965ad718fc2dea3/README.md",
+    "raw_url": "https://raw.githubusercontent.com/langflow-ai/langflow/b5c54a64e685b7e50fd3bc76e965ad718fc2dea3/README.md",
+    "size_bytes": 5609,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "b5c54a64e685b7e50fd3bc76e965ad718fc2dea3",
+  "official_chinese_search": "固定提交的递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://langflow.org",
+    "kind": "项目官网"
+  },
+  "plain_summary": "用可视化方式构建和部署 AI 智能体及工作流。"
+}

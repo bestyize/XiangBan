@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，代码块完全一致；上游性能、安全与首创称谓已明确为未独立验证的项目自述。",
+    "MIT 许可原文已保存；两个部署短链和 G2、npm 网页返回 403，保留原链并加译注，提供官方部署文档和 npm 注册表。",
+    "官方界面横幅保留外链，未复制素材；未核实项目图标，使用名称占位。"
+  ],
+  "link_check": {
+    "urls_checked": 38,
+    "result": "34 个 HEAD 200；两个部署短链、G2 和 npm 页返回 403；译注提供可访问的官方部署文档及 npm 注册表，一键部署可用性未确认。"
+  }
+}

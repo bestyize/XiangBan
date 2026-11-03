@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "对照原文全部段落、标题、安装方式、命令和链接",
+  "code_and_numbers": "代码块逐字保留，版本与路径未改",
+  "links_and_images": "相对贡献指南链接固定到采集提交；图像、徽章和贡献指南采集时返回 HTTP 200",
+  "license": "MIT，仓库许可证和版权声明保存在 LICENSE.upstream",
+  "issues": [
+    "图片与动态徽章由上游或第三方源提供，后续可用性可能变化。"
+  ],
+  "manual_review": "非官方翻译；交付后仍需编辑复核"
+}

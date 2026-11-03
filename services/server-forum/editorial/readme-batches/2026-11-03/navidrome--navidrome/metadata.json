@@ -1,0 +1,98 @@
+{
+  "inventory_index": 113,
+  "original_key": "navidrome/navidrome",
+  "repository": "navidrome/navidrome",
+  "catalog": {
+    "audience": "适合需要播放、处理或组织自有音视频内容的人。",
+    "category": "media",
+    "collected_at": "2026-11-02T18:17:26.722969+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "音乐库",
+      "自部署",
+      "音频"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 1799,
+    "full_name": "navidrome/navidrome",
+    "getting_started": "用少量自有音乐配置测试媒体库，检查标签和播放。",
+    "highlights": [
+      "围绕本地音乐文件建立服务",
+      "可与兼容客户端配合使用"
+    ],
+    "homepage_url": "https://www.navidrome.org",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/navidrome/navidrome/master/resources/logo-192x192.png",
+    "icon_url": "/open-source-media/navidrome-icon.png",
+    "last_commit_at": "2026-11-01T19:35:11Z",
+    "last_pushed_at": "2026-11-02T10:10:39Z",
+    "name": "Navidrome",
+    "notes": [
+      "音乐文件的权利与备份需自行确认。"
+    ],
+    "order": 114,
+    "readme_sha": "a405319b6f1c61abe72d90f622d2753fdf25aea7",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/navidrome/navidrome/blob/master/README.md",
+    "stars": 24488,
+    "summary": "用于管理和播放个人音乐收藏的开源自部署服务。",
+    "tags": [
+      "音乐库",
+      "自部署",
+      "音频"
+    ],
+    "title": "让自己的音乐库有一个轻巧的入口",
+    "watchers": 93
+  },
+  "github_url": "https://github.com/navidrome/navidrome",
+  "official_url": "https://www.navidrome.org",
+  "stars": 24494,
+  "code_pushed_at": "2026-11-03T00:43:23Z",
+  "default_branch": "master",
+  "commit_sha": "563c5c72a16f7128dd2c31e46d7438af5e6c1399",
+  "readme_path": "README.md",
+  "readme_blob_sha": "a405319b6f1c61abe72d90f622d2753fdf25aea7",
+  "readme_source_url": "https://github.com/navidrome/navidrome/blob/563c5c72a16f7128dd2c31e46d7438af5e6c1399/README.md",
+  "readme_api_url": "https://api.github.com/repos/navidrome/navidrome/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/navidrome/navidrome/blob/563c5c72a16f7128dd2c31e46d7438af5e6c1399/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/resources/logo-192x192.png",
+  "fetched_at": "2026-11-03T01:50:31.124818+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "navidrome/navidrome",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/resources/logo-192x192.png",
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/resources/hosting/pikapods.svg",
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/resources/hosting/zenith.svg",
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/resources/hosting/elfhosted.svg",
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/.github/screenshots/ss-mobile-login.png",
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/.github/screenshots/ss-mobile-player.png",
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/.github/screenshots/ss-mobile-album-view.png",
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/.github/screenshots/ss-desktop-player.png"
+  ],
+  "license_basis": "仓库 GPL-3.0 许可证",
+  "official_entry": {
+    "url": "https://www.navidrome.org",
+    "kind": "项目官网"
+  },
+  "license_blob_sha": "94a045322262546cfb9d72561e1d587b5c2ffb1e",
+  "license_file_verified_at_commit": true
+}

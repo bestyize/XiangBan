@@ -1,0 +1,128 @@
+{
+  "inventory_key": "microsoft/ML-For-Beginners",
+  "full_name": "microsoft/ML-For-Beginners",
+  "inventory_entry": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:17:40.021670+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "机器学习",
+      "课程",
+      "Python"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 22828,
+    "full_name": "microsoft/ML-For-Beginners",
+    "getting_started": "从基础课程和官方练习开始，先理解数据与评估过程。",
+    "highlights": [
+      "以具体问题组织学习",
+      "提供配套练习与数据相关说明"
+    ],
+    "homepage_url": "https://github.com/microsoft/ML-For-Beginners",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-09-14T19:45:03Z",
+    "last_pushed_at": "2026-10-31T23:23:54Z",
+    "name": "机器学习入门",
+    "notes": [
+      "示例成绩不等于真实业务效果，数据许可与偏差需单独考虑。"
+    ],
+    "order": 38,
+    "readme_sha": "bf4a5274ff17858a8e4d2c833b55e3b4b8925743",
+    "related_categories": [
+      "ai"
+    ],
+    "source_url": "https://github.com/microsoft/ML-For-Beginners/blob/main/README.md",
+    "stars": 91951,
+    "summary": "围绕经典机器学习主题组织的课程与练习项目。",
+    "tags": [
+      "机器学习",
+      "课程",
+      "Python"
+    ],
+    "title": "通过经典问题理解机器学习的工作方式",
+    "watchers": 1088
+  },
+  "fetched_at": "2026-11-03T01:50:48.514999+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "microsoft/ML-For-Beginners",
+  "repository_url": "https://github.com/microsoft/ML-For-Beginners",
+  "default_branch": "main",
+  "stars": 91954,
+  "pushed_at": "2026-10-31T23:23:54Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "de2d4e12236445198213a0711855e348e7253cd4",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
+    "source_url": "https://github.com/microsoft/ML-For-Beginners/blob/de2d4e12236445198213a0711855e348e7253cd4/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "bf4a5274ff17858a8e4d2c833b55e3b4b8925743",
+    "source_url": "https://github.com/microsoft/ML-For-Beginners/blob/de2d4e12236445198213a0711855e348e7253cd4/README.md",
+    "raw_url": "https://raw.githubusercontent.com/microsoft/ML-For-Beginners/de2d4e12236445198213a0711855e348e7253cd4/README.md",
+    "size_bytes": 31845,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "8-Reinforcement/1-QLearning/translations/README.zh-cn.md",
+      "blob_sha": "e047c89514b21fbcbc4bd131dde3e25d6abb21cd"
+    },
+    {
+      "path": "8-Reinforcement/2-Gym/translations/README.zh-cn.md",
+      "blob_sha": "9ff984d6f95c5aad913b399707fb73b6d31f4042"
+    },
+    {
+      "path": "9-Real-World/2-Debugging-ML-Models/translations/README.zh-cn.md",
+      "blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "9-Real-World/2-Debugging-ML-Models/translations/README.zh-tw.md",
+      "blob_sha": "e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
+    },
+    {
+      "path": "translations/zh-CN/README.md",
+      "blob_sha": "5e2d3fa316e61fd26fd7681e3c638ea6436fafbe"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "translations/zh-CN/README.md",
+    "blob_sha": "5e2d3fa316e61fd26fd7681e3c638ea6436fafbe",
+    "source_url": "https://github.com/microsoft/ML-For-Beginners/blob/de2d4e12236445198213a0711855e348e7253cd4/translations/zh-CN/README.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "source_language": "en",
+  "translation_source": "基于官方中文补译",
+  "translation_basis_commit": "de2d4e12236445198213a0711855e348e7253cd4",
+  "translation_changes": [
+    "补译官方中文缺失的 GitHub Codespaces 快速开始提示",
+    "修正相对链接并固定到采集提交",
+    "保留官方 AI 翻译免责声明"
+  ],
+  "icon_fallback": "项目名称占位",
+  "official_entry": {
+    "url": "https://github.com/microsoft/ML-For-Beginners",
+    "kind": "查看文档"
+  },
+  "plain_summary": "通过课程和项目学习机器学习基础。"
+}

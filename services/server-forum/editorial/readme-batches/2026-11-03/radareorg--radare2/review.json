@@ -1,0 +1,16 @@
+{
+  "status": "pending",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "许可证识别或适用范围尚待核实；未保存 README。",
+    "已检查根目录 LICENSE/COPYING 等候选，仍需人工核验文本和 README 适用范围。",
+    "固定提交 README.md 已按 Git blob SHA 校验并保存；文档适用许可尚需核定，未开始翻译或发布。"
+  ]
+}

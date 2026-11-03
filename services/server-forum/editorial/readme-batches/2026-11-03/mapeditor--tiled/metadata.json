@@ -1,0 +1,115 @@
+{
+  "inventory_index": 142,
+  "original_key": "mapeditor/tiled",
+  "repository": "mapeditor/tiled",
+  "catalog": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:20.979362+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "地图编辑",
+      "瓦片",
+      "游戏关卡"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 1992,
+    "full_name": "mapeditor/tiled",
+    "getting_started": "导入一套有权使用的瓦片素材，建立小地图并验证导出。",
+    "highlights": [
+      "以图层和瓦片组织关卡",
+      "可为对象添加自定义属性"
+    ],
+    "homepage_url": "https://www.mapeditor.org/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-24T08:41:50Z",
+    "last_pushed_at": "2026-11-02T07:53:48Z",
+    "name": "Tiled",
+    "notes": [
+      "地图格式与游戏引擎的导入插件需相互匹配。"
+    ],
+    "order": 143,
+    "readme_sha": "8705f521dcec134320e3848354e86a02e90c3999",
+    "related_categories": [
+      "fun"
+    ],
+    "source_url": "https://github.com/mapeditor/tiled/blob/master/README.md",
+    "stars": 13022,
+    "summary": "用于瓦片地图、图层和对象编辑的开源地图编辑器。",
+    "tags": [
+      "地图编辑",
+      "瓦片",
+      "游戏关卡"
+    ],
+    "title": "给自己的游戏设计一张地图",
+    "watchers": 338
+  },
+  "github_url": "https://github.com/mapeditor/tiled",
+  "official_url": "https://www.mapeditor.org/",
+  "stars": 13024,
+  "code_pushed_at": "2026-11-02T07:53:48Z",
+  "default_branch": "master",
+  "commit_sha": "83e4cfd9faa653e543e64d1af3b1010f8d5794da",
+  "readme_path": "README.md",
+  "readme_blob_sha": "8705f521dcec134320e3848354e86a02e90c3999",
+  "readme_source_url": "https://github.com/mapeditor/tiled/blob/83e4cfd9faa653e543e64d1af3b1010f8d5794da/README.md",
+  "readme_api_url": "https://api.github.com/repos/mapeditor/tiled/contents/README.md?ref=master",
+  "readme_language": "unverified",
+  "license_spdx": "NOASSERTION",
+  "license_source_url": "https://github.com/mapeditor/tiled/blob/master/COPYING",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:40.784412+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "COPYING",
+      "url": "https://github.com/mapeditor/tiled/blob/83e4cfd9faa653e543e64d1af3b1010f8d5794da/COPYING",
+      "sha": "951634a551303a1b3bf7a357580aba3a63177296"
+    },
+    {
+      "name": "LICENSE.APACHE",
+      "url": "https://github.com/mapeditor/tiled/blob/83e4cfd9faa653e543e64d1af3b1010f8d5794da/LICENSE.APACHE",
+      "sha": "20e4bd85661f5fbc86e0a8aac3934ddabe776160"
+    },
+    {
+      "name": "LICENSE.BSD",
+      "url": "https://github.com/mapeditor/tiled/blob/83e4cfd9faa653e543e64d1af3b1010f8d5794da/LICENSE.BSD",
+      "sha": "daed875fbeb33f6724a1f5e75d350a0ac2c2abde"
+    },
+    {
+      "name": "LICENSE.GPL",
+      "url": "https://github.com/mapeditor/tiled/blob/83e4cfd9faa653e543e64d1af3b1010f8d5794da/LICENSE.GPL",
+      "sha": "d159169d1050894d3ea3b98e1c965c4058208fe1"
+    }
+  ],
+  "needs_license_review": true,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "mapeditor/tiled",
+  "license_review_evidence": {
+    "tree_truncated": false,
+    "checked_files": [
+      "COPYING",
+      ".LICENSE-HEADER"
+    ],
+    "finding": "已检查固定提交完整仓库树及根 COPYING：许可按文件和目录分别确定，README 无文件级声明，未找到其转载与翻译许可。",
+    "specific_terms": {
+      "path": "COPYING",
+      "excerpt": "Several independent works are being distributed along with Tiled that fall under different licenses. You can find the license that applies to each file in the comment at the top, but for clarity they are also listed here:",
+      "scope": "表格列出 src/tiled、src/plugins 和其他代码目录许可，未列根 README；README 无文件级许可头。",
+      "url": "https://github.com/mapeditor/tiled/blob/83e4cfd9faa653e543e64d1af3b1010f8d5794da/COPYING"
+    }
+  }
+}

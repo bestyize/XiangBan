@@ -1,0 +1,23 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留完整维护者名单，将最高级和可靠性描述归于项目方",
+    "验证官网、开发入口、固定版本代码目录和许可；动态徽章与其他外链未逐一联网",
+    "保存 GPL 许可证"
+  ],
+  "link_results": {
+    "https://ardupilot.org": 200,
+    "https://ardupilot.org/dev/": 200,
+    "https://github.com/ArduPilot/ardupilot/blob/5c3ed1c360f94f7ab9744c5dcec4519c5d55045d/COPYING.txt": 200,
+    "https://github.com/ArduPilot/ardupilot/tree/5c3ed1c360f94f7ab9744c5dcec4519c5d55045d/ArduCopter": 200,
+    "https://github.com/ArduPilot/ardupilot/tree/5c3ed1c360f94f7ab9744c5dcec4519c5d55045d/ArduPlane": 200,
+    "https://github.com/ArduPilot/ardupilot/tree/5c3ed1c360f94f7ab9744c5dcec4519c5d55045d/Rover": 200,
+    "https://github.com/ArduPilot/ardupilot/tree/5c3ed1c360f94f7ab9744c5dcec4519c5d55045d/ArduSub": 200,
+    "https://github.com/ArduPilot/ardupilot/tree/5c3ed1c360f94f7ab9744c5dcec4519c5d55045d/AntennaTracker": 200
+  },
+  "issues": []
+}

@@ -1,0 +1,190 @@
+{
+  "inventory_key": "trekhleb/javascript-algorithms",
+  "full_name": "trekhleb/javascript-algorithms",
+  "inventory_entry": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:17:42.012803+00:00",
+    "cover_accent": "#5E769A",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "JavaScript",
+      "算法",
+      "数据结构"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 30995,
+    "full_name": "trekhleb/javascript-algorithms",
+    "getting_started": "选一个熟悉的数据结构，阅读实现并用小输入运行测试。",
+    "highlights": [
+      "按算法主题组织实现",
+      "提供解释与继续阅读入口"
+    ],
+    "homepage_url": "https://github.com/trekhleb/javascript-algorithms",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-07-26T02:43:01Z",
+    "last_pushed_at": "2026-07-26T02:43:08Z",
+    "name": "JavaScript Algorithms",
+    "notes": [
+      "教学实现不代表生产环境中最合适或最高效的选择。"
+    ],
+    "order": 10,
+    "readme_sha": "0eef20119a77bd3c9f533908409be8b4d57fd409",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/trekhleb/javascript-algorithms/blob/master/README.md",
+    "stars": 196720,
+    "summary": "包含算法、数据结构实现与解释资料的学习型仓库。",
+    "tags": [
+      "JavaScript",
+      "算法",
+      "数据结构"
+    ],
+    "title": "用 JavaScript 把数据结构与算法串起来",
+    "watchers": 4181
+  },
+  "fetched_at": "2026-11-03T01:50:38.311472+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "trekhleb/javascript-algorithms",
+  "repository_url": "https://github.com/trekhleb/javascript-algorithms",
+  "default_branch": "master",
+  "stars": 196721,
+  "pushed_at": "2026-07-26T02:43:08Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "85293e3e2b88f4d2ce330d956b139cf628aa1e82",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "e7885bd74b46f9e23f1ad796fdc1d89250a99fe4",
+    "source_url": "https://github.com/trekhleb/javascript-algorithms/blob/85293e3e2b88f4d2ce330d956b139cf628aa1e82/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "0eef20119a77bd3c9f533908409be8b4d57fd409",
+    "source_url": "https://github.com/trekhleb/javascript-algorithms/blob/85293e3e2b88f4d2ce330d956b139cf628aa1e82/README.md",
+    "raw_url": "https://raw.githubusercontent.com/trekhleb/javascript-algorithms/85293e3e2b88f4d2ce330d956b139cf628aa1e82/README.md",
+    "size_bytes": 25792,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "README.zh-CN.md",
+      "blob_sha": "f31359eccba29bcdbf812675eea8f09a25b359a5"
+    },
+    {
+      "path": "README.zh-TW.md",
+      "blob_sha": "aa48b40bd8f14e12b5df8a404e13a81e10247624"
+    },
+    {
+      "path": "src/algorithms/graph/dijkstra/README.zh-CN.md",
+      "blob_sha": "382a9dee053c53f2cbaf46e021593c1382e40120"
+    },
+    {
+      "path": "src/algorithms/graph/dijkstra/README.zh-TW.md",
+      "blob_sha": "e960b4179712cfc037df0a5e988853989158abb6"
+    },
+    {
+      "path": "src/algorithms/linked-list/reverse-traversal/README.zh-CN.md",
+      "blob_sha": "cf0217a5b1a3ad4f5659c978c975f72b3aae44ad"
+    },
+    {
+      "path": "src/algorithms/linked-list/traversal/README.zh-CN.md",
+      "blob_sha": "19a01502b50e77e55abb1d692ced7bd5d366b12d"
+    },
+    {
+      "path": "src/algorithms/math/bits/README.zh-CN.md",
+      "blob_sha": "9ec75069c6c3686e1548ef9905521e5130774579"
+    },
+    {
+      "path": "src/algorithms/math/factorial/README.zh-CN.md",
+      "blob_sha": "89bcff1ff21c9234738ccfda3e52a2530dda6bdf"
+    },
+    {
+      "path": "src/algorithms/math/fibonacci/README.zh-CN.md",
+      "blob_sha": "20378000d44e7024326f831d79662f9ad6e920b5"
+    },
+    {
+      "path": "src/algorithms/math/prime-factors/README.zh-CN.md",
+      "blob_sha": "c6ab82e39ba895f8fc028b3799c6cadef2cbd7fa"
+    },
+    {
+      "path": "src/algorithms/sorting/quick-sort/README.zh-CN.md",
+      "blob_sha": "96b2e44de8ab264b843b7c87d0d5206bce5d34b2"
+    },
+    {
+      "path": "src/data-structures/doubly-linked-list/README.zh-CN.md",
+      "blob_sha": "3e669f4c453b111d00def8af316b23a2d7263ca1"
+    },
+    {
+      "path": "src/data-structures/graph/README.zh-CN.md",
+      "blob_sha": "1f885a43b988c13a8564f55e8e1cd9ee3b69e74b"
+    },
+    {
+      "path": "src/data-structures/hash-table/README.zh-CN.md",
+      "blob_sha": "c53214aa88e3c5f581738fde26cd0bb9260b369d"
+    },
+    {
+      "path": "src/data-structures/heap/README.zh-CN.md",
+      "blob_sha": "8ba42dfb05230b61aee6db3fc4afc11c76184e7b"
+    },
+    {
+      "path": "src/data-structures/linked-list/README.zh-CN.md",
+      "blob_sha": "f0b75121e75f3cb454de92ee1df4a11d023f5a07"
+    },
+    {
+      "path": "src/data-structures/priority-queue/README.zh-CN.md",
+      "blob_sha": "caffcd71361e60bf395521cf99772e6199bcd47b"
+    },
+    {
+      "path": "src/data-structures/queue/README.zh-CN.md",
+      "blob_sha": "af608107d37fc0c6983929f06bd1a2c5ca289a84"
+    },
+    {
+      "path": "src/data-structures/stack/README.zh-CN.md",
+      "blob_sha": "f00e3eab00d4c668445bc7e049cef7b1e9f7897f"
+    },
+    {
+      "path": "src/data-structures/tree/README.zh-CN.md",
+      "blob_sha": "2f4df983d46b419a095d9d4deb860e0f496f1784"
+    },
+    {
+      "path": "src/data-structures/trie/README.zh-CN.md",
+      "blob_sha": "e812f57523c48e6fc69bafb50ce357214058c7cc"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "README.zh-CN.md",
+    "blob_sha": "f31359eccba29bcdbf812675eea8f09a25b359a5",
+    "source_url": "https://github.com/trekhleb/javascript-algorithms/blob/85293e3e2b88f4d2ce330d956b139cf628aa1e82/README.zh-CN.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "official_entry": {
+    "url": "https://github.com/trekhleb/javascript-algorithms",
+    "kind": "GitHub"
+  },
+  "translation": {
+    "method": "以同提交官方简体中文为基础，Terra 对照固定英文逐项补译和修正",
+    "source_blob_sha": "0eef20119a77bd3c9f533908409be8b4d57fd409",
+    "official_zh_path": "README.zh-CN.md",
+    "official_zh_blob_sha": "f31359eccba29bcdbf812675eea8f09a25b359a5",
+    "localized_link_base": "仓库根目录；原始快照保留，输出相对链接按原路径固定提交。",
+    "updates": "补齐英文 162 个算法与结构目录项、故障排除、Node >=16、全部复杂度表、作者与图示等；对照更新分类、说明与源链接。"
+  }
+}

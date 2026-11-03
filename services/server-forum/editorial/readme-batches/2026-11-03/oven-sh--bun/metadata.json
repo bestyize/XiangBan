@@ -1,0 +1,92 @@
+{
+  "inventory_key": "oven-sh/bun",
+  "full_name": "oven-sh/bun",
+  "inventory_entry": {
+    "audience": "适合希望改善日常开发与命令行工作流的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:17:35.500786+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "JavaScript",
+      "运行时",
+      "包管理"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 5289,
+    "full_name": "oven-sh/bun",
+    "getting_started": "从官方安装指南开始，在测试项目里验证运行与依赖安装。",
+    "highlights": [
+      "集中多种项目工具能力",
+      "可用于脚本和应用开发流程"
+    ],
+    "homepage_url": "https://bun.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T16:50:15Z",
+    "last_pushed_at": "2026-11-02T18:14:49Z",
+    "name": "Bun",
+    "notes": [
+      "迁移已有项目时逐项检查 Node.js 生态兼容性与锁文件。"
+    ],
+    "order": 33,
+    "readme_sha": "12d794639770b264b823156ff6739c1f370898f2",
+    "related_categories": [],
+    "source_url": "https://github.com/oven-sh/bun/blob/main/README.md",
+    "stars": 96516,
+    "summary": "组合运行时、包管理、测试与构建相关能力的 JavaScript 工具集。",
+    "tags": [
+      "JavaScript",
+      "运行时",
+      "包管理"
+    ],
+    "title": "把 JavaScript 项目的常用工具收在一起",
+    "watchers": 611
+  },
+  "fetched_at": "2026-11-03T01:50:46.496496+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "oven-sh/bun",
+  "repository_url": "https://github.com/oven-sh/bun",
+  "default_branch": "main",
+  "stars": 96521,
+  "pushed_at": "2026-11-03T01:47:12Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://bun.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://github.com/user-attachments/assets/50282090-adfd-4ddb-9e27-c30753c6b161",
+  "commit_sha": "6cdb3835d90f8e05e4ebff86c7135078c9eb7e88",
+  "license": {
+    "path": "LICENSE.md",
+    "blob_sha": "6abe6776e993acaafca259f448a4cf53a2c40ef6",
+    "source_url": "https://github.com/oven-sh/bun/blob/6cdb3835d90f8e05e4ebff86c7135078c9eb7e88/LICENSE.md",
+    "spdx": "NOASSERTION"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "12d794639770b264b823156ff6739c1f370898f2",
+    "source_url": "https://github.com/oven-sh/bun/blob/6cdb3835d90f8e05e4ebff86c7135078c9eb7e88/README.md",
+    "size_bytes": 26209
+  },
+  "license_search": {
+    "scope": "根 LICENSE.md 声明 Bun 自身为 MIT，列出若干第三方组件单独许可证；需确认文档素材范围",
+    "root_license_files": [
+      "LICENSE.md"
+    ]
+  },
+  "plain_summary": "将 JavaScript 和 TypeScript 运行时、包管理、测试及构建工具组合在一起。",
+  "official_entry": "https://bun.com/",
+  "entry_label": "项目官网",
+  "translation_provenance": "Terra 对固定提交英文 README 全文译写，305 个文档和指南链接按稳定行号逐条翻译保留。",
+  "license_note": "根 LICENSE.md 声明 Bun 自身 MIT，并列明静态链接库等第三方组件许可；已保存完整原文。"
+}

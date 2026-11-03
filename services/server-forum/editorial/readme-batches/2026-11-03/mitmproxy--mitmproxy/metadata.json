@@ -1,0 +1,90 @@
+{
+  "inventory_index": 78,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合在自有或获授权环境中学习软件、协议与安全分析的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:17:57.225401+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "网络调试",
+      "HTTP",
+      "代理"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 4920,
+    "full_name": "mitmproxy/mitmproxy",
+    "getting_started": "先在本地测试应用上了解代理配置和请求查看。",
+    "highlights": [
+      "便于检查请求与响应",
+      "可通过脚本组织测试流程"
+    ],
+    "homepage_url": "https://mitmproxy.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-30T08:41:59Z",
+    "last_pushed_at": "2026-11-01T22:07:37Z",
+    "name": "mitmproxy",
+    "notes": [
+      "只观察授权流量，测试证书和敏感数据需按环境妥善处理。"
+    ],
+    "order": 79,
+    "readme_sha": "dfc3fd1a81507f91b55a90eda9077b27c4248d68",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/mitmproxy/mitmproxy/blob/main/README.md",
+    "stars": 46564,
+    "summary": "提供交互式代理与脚本能力的开源网络调试工具。",
+    "tags": [
+      "网络调试",
+      "HTTP",
+      "代理"
+    ],
+    "title": "在测试环境里看清网络请求的来回",
+    "watchers": 627
+  },
+  "repository": "mitmproxy/mitmproxy",
+  "fetched_at": "2026-11-03T01:50:46.683261+00:00",
+  "canonical_repository": "mitmproxy/mitmproxy",
+  "default_branch": "main",
+  "commit_sha": "b08148b35d7679bc9be8d4a3d85b32bcea5ce250",
+  "readme_path": "README.md",
+  "readme_blob_sha": "dfc3fd1a81507f91b55a90eda9077b27c4248d68",
+  "readme_url": "https://github.com/mitmproxy/mitmproxy/blob/b08148b35d7679bc9be8d4a3d85b32bcea5ce250/README.md",
+  "stars": 46577,
+  "pushed_at": "2026-11-01T22:07:37Z",
+  "stars_fetched_at": "2026-11-03T01:50:48.652451+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://mitmproxy.org",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "c08a0186d79d45a4647c31f5dfeabfbc4db82daf",
+  "license_url": "https://github.com/mitmproxy/mitmproxy/blob/b08148b35d7679bc9be8d4a3d85b32bcea5ce250/LICENSE",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "相对贡献指南指向固定提交",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/mitmproxy/mitmproxy",
+  "description_zh": "查看和调试 HTTP 与 WebSocket 网络请求的代理工具。",
+  "entry_label": "项目官网",
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实的项目图标",
+  "official_entry": {
+    "url": "https://mitmproxy.org",
+    "kind": "项目官网",
+    "verification": "上游 README 指向该站，HTTP HEAD 返回 200"
+  }
+}

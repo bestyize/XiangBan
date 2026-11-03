@@ -1,0 +1,33 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "英文与官方自动中文逐节对照；20 课编号、主题、学习目标及作者一致，两个引用式命令块完全一致，保留上游 AI 翻译免责声明。",
+    "MIT 许可原文与版权已保存。原活动图片、翻译指南及 star/watch 目标失效，使用同仓库已核实图片/贡献指南及仓库主页，并在中英文备注中标明；旧活动 Discord 403 原链保留。",
+    "中文源位于 translations/zh-CN，所有相对链接依该目录固定到源提交；图片仅引用官方外链，未复制素材。"
+  ],
+  "automated_candidate_comparison": {
+    "method": "初筛：正则统计标题与代码围栏，不代表章节一致性或翻译准确性审校",
+    "english_source": {
+      "heading_count": 24,
+      "fence_markers": 0,
+      "byte_count": 27446
+    },
+    "official_chinese_candidate": {
+      "heading_count": 24,
+      "fence_markers": 0,
+      "byte_count": 26060
+    }
+  },
+  "link_check": {
+    "urls_checked": 145,
+    "result": "140 个 HEAD 200；活动图片、翻译指南、star/watch 目标共 4 个 404，已替换为同提交真实活动图、贡献指南翻译章节及仓库首页并标注；旧活动 Discord 链接 GET 403，保留并注明，下方另一社区入口 GET 200。"
+  }
+}

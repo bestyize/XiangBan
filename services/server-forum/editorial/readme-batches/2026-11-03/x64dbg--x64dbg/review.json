@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，32/64 位路径保留；历史捐赠表格中 212 项金额和日期序列一致，未省略历史引用。",
+    "LICENSE 为上游修改版 GPLv3，新增符合条件的动态插件闭源/商业许可例外；完整原文已保存，SPDX 保持 NOASSERTION。",
+    "部分非核心历史/第三方链接不可读或限流，保留原链并在译注给出可读 GitHub Releases；截图按固定提交外链引用，未复制。",
+    "虫子图标由 VisualPharm 创作，单独权利待核实，卡片使用名称占位。"
+  ],
+  "link_check": {
+    "urls_checked": 60,
+    "result": "52 个 HEAD 200；GitHub issues 初次 500、重试 200；SourceForge 两链接 403、DeepWiki 429、作者站 521/超时、Coverity 403、历史捐赠链接 403。原链保留，译注指出 GitHub Releases 替代下载入口。"
+  }
+}

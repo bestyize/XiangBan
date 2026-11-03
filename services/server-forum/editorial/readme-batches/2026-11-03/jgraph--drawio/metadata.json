@@ -1,0 +1,90 @@
+{
+  "inventory_index": 150,
+  "original_key": "jgraph/drawio",
+  "repository": "jgraph/drawio",
+  "catalog": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:15.812676+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "流程图",
+      "架构图",
+      "图表"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 1361,
+    "full_name": "jgraph/drawio",
+    "getting_started": "打开官方编辑器画一张小型流程图，并测试本地导出。",
+    "highlights": [
+      "提供通用图形与连线编辑",
+      "适合整理系统和业务流程"
+    ],
+    "homepage_url": "https://www.drawio.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-30T21:28:24Z",
+    "last_pushed_at": "2026-10-30T21:28:34Z",
+    "name": "diagrams.net",
+    "notes": [
+      "云盘集成、第三方素材与开源编辑器分别确认使用条件。"
+    ],
+    "order": 151,
+    "readme_sha": "2d854e6f655ee750625131ca83c5df93b096827c",
+    "related_categories": [
+      "office"
+    ],
+    "source_url": "https://github.com/jgraph/drawio/blob/dev/README.md",
+    "stars": 9136,
+    "summary": "用于绘制流程图、架构图与其他图表的网页编辑器项目。",
+    "tags": [
+      "流程图",
+      "架构图",
+      "图表"
+    ],
+    "title": "用图表把复杂流程说明白",
+    "watchers": 53
+  },
+  "github_url": "https://github.com/jgraph/drawio",
+  "official_url": "https://www.drawio.com",
+  "stars": 9142,
+  "code_pushed_at": "2026-10-30T21:28:34Z",
+  "default_branch": "dev",
+  "commit_sha": "3e707fd20b6930778d6f6bf6e4d0079b4bce366b",
+  "readme_path": "README.md",
+  "readme_blob_sha": "2d854e6f655ee750625131ca83c5df93b096827c",
+  "readme_source_url": "https://github.com/jgraph/drawio/blob/3e707fd20b6930778d6f6bf6e4d0079b4bce366b/README.md",
+  "readme_api_url": "https://api.github.com/repos/jgraph/drawio/contents/README.md?ref=dev",
+  "readme_language": "en",
+  "license_spdx": "Apache-2.0",
+  "license_source_url": "https://github.com/jgraph/drawio/blob/3e707fd20b6930778d6f6bf6e4d0079b4bce366b/LICENSE",
+  "icon_source_url": null,
+  "fetched_at": "2026-11-03T01:50:43.096860+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [],
+  "license_basis": "仓库源代码 Apache-2.0；原文对图标和商标有独立限制，翻译全文保留",
+  "official_entry": {
+    "url": "https://app.diagrams.net",
+    "kind": "在线体验"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "jgraph/drawio",
+  "license_blob_sha": "f49a4e16e68b128803cc2dcea614603632b04eac",
+  "license_file_verified_at_commit": true,
+  "icon_basis": "上游 README 明确限制商标与标志使用，卡片名称占位，保留源链接供审查"
+}

@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对功能、平台、软件包、源码构建、迁移、目录结构和许可例外",
+  "code_and_numbers": "两个构建代码块及缩进项目结构与英文一致；标识、命令、路径和提交号保留",
+  "links_and_images": "参考式与普通相对文档链接固定到采集提交；官方标识、四个徽章及相关文件返回 HTTP 200",
+  "license": "自 b17d96 起的 Neovim 贡献采用 Apache-2.0，从 Vim 复制的 vim-patch 内容例外；完整 Apache 与 Vim 许可声明保存在 LICENSE.upstream",
+  "issues": [
+    "官方标识链接指向独立网站仓库的动态分支；素材许可和后续可用性以来源为准。"
+  ],
+  "manual_review": "非官方中文译文；交付后仍需编辑复核"
+}

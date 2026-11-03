@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对引擎定位、支持平台、MIT 许可、项目历史、下载、编译和社区资源",
+  "code_and_numbers": "无代码块；2014 年 2 月、平台名称、开发者姓名和许可证已核对",
+  "links_and_images": "图标与贡献指南相对路径固定到采集提交；官方截图、两个徽章和固定版本图标、指南返回 HTTP 200",
+  "license": "MIT；仓库许可证和版权声明保存在 LICENSE.upstream。外链截图来自 Godot 独立设计仓库，其仓库许可证为 CC-BY-4.0。",
+  "issues": [
+    "外链截图指向独立设计仓库的动态分支，后续内容和可用性可能变化。"
+  ],
+  "manual_review": "非官方译文；交付后仍需编辑复核"
+}

@@ -1,0 +1,90 @@
+{
+  "inventory_index": 80,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望搭建自己的网站、应用或服务的个人与团队。",
+    "category": "web",
+    "collected_at": "2026-11-02T18:18:07.314036+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "TypeScript",
+      "CMS",
+      "内容后台"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要开发或部署环境",
+    "featured": true,
+    "forks": 4384,
+    "full_name": "payloadcms/payload",
+    "getting_started": "按官方入门建立最小项目，定义一组测试内容并查看管理界面。",
+    "highlights": [
+      "通过代码组织数据与管理能力",
+      "可与现代网页应用结合"
+    ],
+    "homepage_url": "https://payloadcms.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:03:20Z",
+    "last_pushed_at": "2026-11-02T18:13:59Z",
+    "name": "Payload",
+    "notes": [
+      "所用数据库、存储和托管服务需要按实际部署配置。"
+    ],
+    "order": 81,
+    "readme_sha": "c60e7ae722f4480a51a0d05217d01b20c217dbb2",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/payloadcms/payload/blob/main/README.md",
+    "stars": 45623,
+    "summary": "面向内容管理与应用后端的开源 TypeScript 框架。",
+    "tags": [
+      "TypeScript",
+      "CMS",
+      "内容后台"
+    ],
+    "title": "在 TypeScript 项目里直接定义内容后台",
+    "watchers": 163
+  },
+  "repository": "payloadcms/payload",
+  "fetched_at": "2026-11-03T01:50:48.250607+00:00",
+  "canonical_repository": "payloadcms/payload",
+  "default_branch": "main",
+  "commit_sha": "be95e1a17acfa9979bd6c9d34565708a3c833e68",
+  "readme_path": "README.md",
+  "readme_blob_sha": "c60e7ae722f4480a51a0d05217d01b20c217dbb2",
+  "readme_url": "https://github.com/payloadcms/payload/blob/be95e1a17acfa9979bd6c9d34565708a3c833e68/README.md",
+  "stars": 45630,
+  "pushed_at": "2026-11-02T21:47:22Z",
+  "stars_fetched_at": "2026-11-03T01:50:51.159467+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://payloadcms.com",
+  "icon_source_url": "",
+  "license_path": "LICENSE.md",
+  "license_blob_sha": "b01626c32d15467951f80dc77a0427ed3483a815",
+  "license_url": "https://github.com/payloadcms/payload/blob/be95e1a17acfa9979bd6c9d34565708a3c833e68/LICENSE.md",
+  "source_language": "English",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/payloadcms/payload",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "模板、示例、迁移和贡献文档指向固定提交",
+  "description_zh": "为网站和应用提供内容管理、数据和管理界面的开源平台。",
+  "official_entry": {
+    "url": "https://payloadcms.com",
+    "kind": "项目官网",
+    "verification": "上游 README 项目官网，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标",
+  "image_license": "官方界面横幅保留原外链，未复制素材；单独图片权利待后续核实。"
+}

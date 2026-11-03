@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对特性、硬件、模型、安装与引用；保留所有原文数字及原项目宣称",
+  "code_and_numbers": "两个代码块与英文完全一致；命令、模型名称和数值已核对",
+  "links_and_images": "原版两张 logo 指向默认分支，已固定到采集提交并返回 HTTP 200；其余链接按原文保留",
+  "license": "Apache-2.0，仓库许可证保存在 LICENSE.upstream",
+  "issues": [
+    "文中性能、支持范围及产品表述为上游声明，需以后续版本为准。"
+  ],
+  "manual_review": "非官方翻译；交付后仍需编辑复核"
+}

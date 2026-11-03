@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文；保留 Aseprite 的历史时间和许可证条件",
+    "验证官网下载及固定版本的相对文档；动态徽章及其他外链未逐一联网",
+    "保存 GPL-2.0 许可证"
+  ],
+  "link_results": {
+    "https://libresprite.github.io/": 200,
+    "https://github.com/LibreSprite/LibreSprite/releases/latest": 200,
+    "https://github.com/LibreSprite/LibreSprite/blob/98f74431f5f523c747d278e3486625ccc7fc52cc/CONTRIBUTING.md": 200,
+    "https://github.com/LibreSprite/LibreSprite/blob/98f74431f5f523c747d278e3486625ccc7fc52cc/INSTALL.md": 200,
+    "https://github.com/LibreSprite/LibreSprite/blob/98f74431f5f523c747d278e3486625ccc7fc52cc/LICENSE.txt": 200,
+    "https://github.com/LibreSprite/LibreSprite/blob/98f74431f5f523c747d278e3486625ccc7fc52cc/CONTRIBUTORS.md": 200
+  },
+  "issues": []
+}

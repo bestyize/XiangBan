@@ -1,0 +1,153 @@
+{
+  "inventory_key": "donnemartin/system-design-primer",
+  "full_name": "donnemartin/system-design-primer",
+  "inventory_entry": {
+    "audience": "希望系统学习服务架构和设计面试题的开发者。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:01:31.469972+00:00",
+    "cover_accent": "#5E769A",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "系统设计",
+      "架构",
+      "学习路线"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 59129,
+    "full_name": "donnemartin/system-design-primer",
+    "getting_started": "先阅读核心概念，再选择一个案例画出组件与数据流。",
+    "highlights": [
+      "按主题整理架构知识",
+      "提供案例与练习入口"
+    ],
+    "homepage_url": "https://github.com/donnemartin/system-design-primer",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-03-20T01:52:18Z",
+    "last_pushed_at": "2026-09-15T01:10:09Z",
+    "name": "System Design Primer",
+    "notes": [
+      "资料与示例用于学习，不能直接替代具体业务的设计验证。"
+    ],
+    "order": 4,
+    "readme_sha": "9e2cdb88dec86c34c9b49b657f5629a1866c6976",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/donnemartin/system-design-primer/blob/master/README.md",
+    "stars": 376546,
+    "summary": "整理系统设计概念、扩展思路和练习题的学习资料。",
+    "tags": [
+      "系统设计",
+      "架构",
+      "学习路线"
+    ],
+    "title": "沿着案例理解大型系统如何设计",
+    "watchers": 6881
+  },
+  "fetched_at": "2026-11-03T01:50:36.114476+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "donnemartin/system-design-primer",
+  "repository_url": "https://github.com/donnemartin/system-design-primer",
+  "default_branch": "master",
+  "stars": 376575,
+  "pushed_at": "2026-09-15T01:10:09Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "NOASSERTION",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "ae9bbd7b02d90b9866215de185217d33f39ab733",
+  "license": {
+    "path": "LICENSE.txt",
+    "blob_sha": "5a04d642d61db37868f7485fa0fbcc96d8916919",
+    "source_url": "https://github.com/donnemartin/system-design-primer/blob/ae9bbd7b02d90b9866215de185217d33f39ab733/LICENSE.txt",
+    "spdx": "NOASSERTION",
+    "human_read_label": "CC-BY-4.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "9e2cdb88dec86c34c9b49b657f5629a1866c6976",
+    "source_url": "https://github.com/donnemartin/system-design-primer/blob/ae9bbd7b02d90b9866215de185217d33f39ab733/README.md",
+    "size_bytes": 109830
+  },
+  "official_zh_candidates": [
+    {
+      "path": "README-zh-Hans.md",
+      "blob_sha": "474fb4251a8298121172d372fd6c4e89abb5ad5b"
+    },
+    {
+      "path": "README-zh-TW.md",
+      "blob_sha": "b51b0e7be7ce5a18b31e067f5e46816a61645347"
+    },
+    {
+      "path": "solutions/system_design/mint/README-zh-Hans.md",
+      "blob_sha": "58467bc6bf11e25cfe22aff28d10e2f991111ddb"
+    },
+    {
+      "path": "solutions/system_design/pastebin/README-zh-Hans.md",
+      "blob_sha": "d2946e970903b381d30c1a2a264b1f37f297f327"
+    },
+    {
+      "path": "solutions/system_design/query_cache/README-zh-Hans.md",
+      "blob_sha": "c6f4be7519b49892a8175565e5b0906efce9efef"
+    },
+    {
+      "path": "solutions/system_design/sales_rank/README-zh-Hans.md",
+      "blob_sha": "960f9258f23a4e2306f703bfe279f77b8daa9d04"
+    },
+    {
+      "path": "solutions/system_design/scaling_aws/README-zh-Hans.md",
+      "blob_sha": "c071c70eb0852da99a9547ac3a0597fc518b2665"
+    },
+    {
+      "path": "solutions/system_design/social_graph/README-zh-Hans.md",
+      "blob_sha": "07b8e3e7886a53d30f36556d914f08cf3327d00e"
+    },
+    {
+      "path": "solutions/system_design/twitter/README-zh-Hans.md",
+      "blob_sha": "1853444dbc8ec367f7f203663b562acbc5a402a5"
+    },
+    {
+      "path": "solutions/system_design/web_crawler/README-zh-Hans.md",
+      "blob_sha": "2ad0938e5d9a42f5327e4d7be1903c2d1f9faad6"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "README-zh-Hans.md",
+    "blob_sha": "474fb4251a8298121172d372fd6c4e89abb5ad5b",
+    "source_url": "https://github.com/donnemartin/system-design-primer/blob/ae9bbd7b02d90b9866215de185217d33f39ab733/README-zh-Hans.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "official_entry": {
+    "url": "https://github.com/donnemartin/system-design-primer",
+    "kind": "GitHub"
+  },
+  "translation": {
+    "method": "同提交官方简体中文逐节对照英文并由 Terra 补译、修正",
+    "source_blob_sha": "9e2cdb88dec86c34c9b49b657f5629a1866c6976",
+    "official_zh_path": "README-zh-Hans.md",
+    "official_zh_blob_sha": "474fb4251a8298121172d372fd6c4e89abb5ad5b",
+    "localized_link_base": "源中文与英文均位于仓库根目录；所有同仓库相对链接固定提交。",
+    "changes": "补齐可用性数字章节、遗漏的原文外链与表格条目，修正 CAP、微服务进程、TCP 时效、缓存回写复杂度、CDN 场景和安全加密等误译，恢复版权署名。",
+    "image_note": "上游 Camo 链接返回 403，已恢复其可读原图 https://i.imgur.com/k0t1e.png。"
+  },
+  "attribution": {
+    "author": "Donne Martin",
+    "copyright": "Copyright 2017 Donne Martin",
+    "license": "CC BY 4.0",
+    "source": "https://github.com/donnemartin/system-design-primer/blob/ae9bbd7b02d90b9866215de185217d33f39ab733/README.md",
+    "changes": "中文翻译基于官方中文并补译修订，链接固定版本"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "按固定提交全文译写，包括目录、Canary 风险、安装依赖、构建与调试说明。",
+  "code_and_numbers": "原文 9 个围栏代码块逐字一致，原文所有行内代码均保留；PowerShell 7 安装注释补充中文解释。",
+  "links_and_images": "相对文件与目录均解析至固定提交；Microsoft 官方文档和上游品牌图本次 HTTP 200；非关键外链未逐一联网检查。",
+  "license": "仓库 MIT 许可证已保存；Microsoft 标志和名称可能另受商标政策约束，保留上游原图链接。",
+  "issues": [
+    "Canary 稳定性、依赖版本、团队成员等均为上游固定版本表述，未视为实时状态。",
+    "品牌图与商店标识保留原始链接，独立商标使用授权未确认。"
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "inventory_key": "gohugoio/hugo",
+  "full_name": "gohugoio/hugo",
+  "inventory_entry": {
+    "audience": "需要搭建内容网站或个人博客的人。",
+    "category": "web",
+    "collected_at": "2026-11-02T18:02:39.083489+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "静态网站",
+      "博客",
+      "Go"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要开发或部署环境",
+    "featured": true,
+    "forks": 8447,
+    "full_name": "gohugoio/hugo",
+    "getting_started": "按官方快速入门创建站点，选主题并发布几篇测试内容。",
+    "highlights": [
+      "围绕内容和模板构建网站",
+      "生成可独立托管的静态文件"
+    ],
+    "homepage_url": "https://gohugo.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-30T18:58:58Z",
+    "last_pushed_at": "2026-11-02T08:28:02Z",
+    "name": "Hugo",
+    "notes": [
+      "主题、字体和图片可能有各自许可。"
+    ],
+    "order": 42,
+    "readme_sha": "14b27fb89fc465f5a316f89dd1e060a4632c22a6",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/gohugoio/hugo/blob/master/README.md",
+    "stars": 90326,
+    "summary": "基于 Go 的静态网站生成器，适合博客、文档与内容站点。",
+    "tags": [
+      "静态网站",
+      "博客",
+      "Go"
+    ],
+    "title": "把内容快速组织成一个静态网站",
+    "watchers": 1080
+  },
+  "fetched_at": "2026-11-03T01:50:50.123279+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "gohugoio/hugo",
+  "repository_url": "https://github.com/gohugoio/hugo",
+  "default_branch": "master",
+  "stars": 90328,
+  "pushed_at": "2026-11-02T21:37:14Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "Apache-2.0",
+  "homepage": "https://gohugo.io",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/gohugoio/gohugoioTheme/master/static/images/hugo-logo-wide.svg?sanitize=true",
+  "commit_sha": "185a609ec26020ac97b0a3f78c9ca299e20e7477",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+    "source_url": "https://github.com/gohugoio/hugo/blob/185a609ec26020ac97b0a3f78c9ca299e20e7477/LICENSE",
+    "spdx": "Apache-2.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "14b27fb89fc465f5a316f89dd1e060a4632c22a6",
+    "source_url": "https://github.com/gohugoio/hugo/blob/185a609ec26020ac97b0a3f78c9ca299e20e7477/README.md",
+    "raw_url": "https://raw.githubusercontent.com/gohugoio/hugo/185a609ec26020ac97b0a3f78c9ca299e20e7477/README.md",
+    "size_bytes": 7652,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "185a609ec26020ac97b0a3f78c9ca299e20e7477",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://gohugo.io",
+    "kind": "项目官网"
+  },
+  "plain_summary": "把内容和模板生成静态网站的工具。",
+  "image_sources": [
+    {
+      "url": "https://raw.githubusercontent.com/gohugoio/gohugoioTheme/master/static/images/hugo-logo-wide.svg?sanitize=true",
+      "source": "gohugoio/gohugoioTheme",
+      "note": "保留 README 中的官方标识原链接，未下载；独立仓库素材许可应以来源为准。"
+    }
+  ]
+}

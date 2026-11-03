@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照概览、版本特性表、安装、构建、支持、贡献限制及三项内含库许可",
+  "code_and_numbers": "两个代码块与英文完全一致；Go 1.27.0、20,000 个主题和版本区别已核对",
+  "links_and_images": "参考式相对链接与文档链接固定到采集提交；官方标识、两个赞助商图、两个徽章与文档链接返回 HTTP 200",
+  "license": "Apache-2.0，仓库许可证及版权声明保存在 LICENSE.upstream；正文保留 libwebp、KaTeX 和 QuickJS 的各自许可链接",
+  "issues": [
+    "官方标识和赞助商图像来自独立仓库，维持上游外链；素材许可和后续可用性应以各来源为准。"
+  ],
+  "manual_review": "非官方译文；交付后仍需编辑复核"
+}

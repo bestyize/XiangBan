@@ -1,0 +1,18 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照，保留软件包、版本、全部构建命令与 Steam Link 硬件限制",
+    "软件包列表保留完整标识符；主要入口核验，其他外链和动态徽章未逐一联网",
+    "保留 GPL 许可证"
+  ],
+  "link_results": {
+    "https://moonlight-stream.org": 200,
+    "https://github.com/moonlight-stream/moonlight-qt/releases": 200,
+    "https://github.com/moonlight-stream/moonlight-docs/wiki": 200
+  },
+  "issues": []
+}

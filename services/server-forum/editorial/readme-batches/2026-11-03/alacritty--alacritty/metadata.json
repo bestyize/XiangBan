@@ -1,0 +1,93 @@
+{
+  "inventory_key": "alacritty/alacritty",
+  "full_name": "alacritty/alacritty",
+  "inventory_entry": {
+    "audience": "适合希望改善日常开发与命令行工作流的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:17:31.583000+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "终端",
+      "GPU",
+      "跨平台"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 3704,
+    "full_name": "alacritty/alacritty",
+    "getting_started": "安装官方构建并连接已有 Shell，再按文档调整字体与快捷键。",
+    "highlights": [
+      "专注终端显示与交互",
+      "可用配置调整常见行为"
+    ],
+    "homepage_url": "https://alacritty.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T05:42:36Z",
+    "last_pushed_at": "2026-11-02T05:42:37Z",
+    "name": "Alacritty",
+    "notes": [
+      "多路复用和 Shell 能力来自其他工具，按自己的工作流搭配。"
+    ],
+    "order": 55,
+    "readme_sha": "1f7a5390822490a79e881f1fcfdb44f60d0d6580",
+    "related_categories": [],
+    "source_url": "https://github.com/alacritty/alacritty/blob/master/README.md",
+    "stars": 66108,
+    "summary": "使用 GPU 加速渲染的跨平台开源终端模拟器。",
+    "tags": [
+      "终端",
+      "GPU",
+      "跨平台"
+    ],
+    "title": "给终端操作准备一个专注的窗口",
+    "watchers": 450
+  },
+  "fetched_at": "2026-11-03T01:50:53.706037+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "alacritty/alacritty",
+  "repository_url": "https://github.com/alacritty/alacritty",
+  "default_branch": "master",
+  "stars": 66110,
+  "pushed_at": "2026-11-02T05:42:37Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "Apache-2.0",
+  "homepage": "https://alacritty.org",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/alacritty/alacritty/aecf0f600fa840a415b55da5cf34fbeaec39ac32/extra/logo/compat/alacritty-term%2Bscanlines.png",
+  "commit_sha": "aecf0f600fa840a415b55da5cf34fbeaec39ac32",
+  "license": {
+    "path": "LICENSE-APACHE",
+    "blob_sha": "9c3147f335e8d80568f5a3e6df2aea17398d7733",
+    "source_url": "https://github.com/alacritty/alacritty/blob/aecf0f600fa840a415b55da5cf34fbeaec39ac32/LICENSE-APACHE",
+    "spdx": "NOASSERTION",
+    "human_read_label": "Apache-2.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "1f7a5390822490a79e881f1fcfdb44f60d0d6580",
+    "source_url": "https://github.com/alacritty/alacritty/blob/aecf0f600fa840a415b55da5cf34fbeaec39ac32/README.md",
+    "size_bytes": 4365
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "aecf0f600fa840a415b55da5cf34fbeaec39ac32",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://alacritty.org/",
+    "kind": "项目官网"
+  },
+  "plain_summary": "运行命令行程序的跨平台终端模拟器。"
+}

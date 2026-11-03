@@ -1,0 +1,93 @@
+{
+  "inventory_index": 98,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:20.008198+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "参数化建模",
+      "CAD",
+      "3D"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/freecad-screen.jpg",
+    "cover_variant": "wide",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 6328,
+    "full_name": "FreeCAD/FreeCAD",
+    "getting_started": "跟随官方入门创建草图与简单实体，测试保存和导出。",
+    "highlights": [
+      "通过参数约束组织模型",
+      "适合研究零件与工程设计流程"
+    ],
+    "homepage_url": "https://www.freecad.org",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/FreeCAD/FreeCAD/main/src/Gui/Icons/freecad.svg",
+    "icon_url": "/open-source-media/freecad-icon.svg",
+    "last_commit_at": "2026-11-02T17:38:50Z",
+    "last_pushed_at": "2026-11-02T18:04:45Z",
+    "name": "FreeCAD",
+    "notes": [
+      "生产制造前需按实际尺寸、材料和工艺验证模型。"
+    ],
+    "order": 99,
+    "readme_sha": "ac34bb09eec6ac38a05a1e62e5b3cb76d504c9bb",
+    "related_categories": [
+      "hardware"
+    ],
+    "source_url": "https://github.com/FreeCAD/FreeCAD/blob/main/README.md",
+    "stars": 35062,
+    "summary": "面向工程和产品设计的开源参数化三维建模工具。",
+    "tags": [
+      "参数化建模",
+      "CAD",
+      "3D"
+    ],
+    "title": "用参数化方式表达一个三维零件",
+    "watchers": 555
+  },
+  "repository": "FreeCAD/FreeCAD",
+  "fetched_at": "2026-11-03T01:51:01.563035+00:00",
+  "canonical_repository": "FreeCAD/FreeCAD",
+  "default_branch": "main",
+  "commit_sha": "f69b1eb064874749739b87bf3d951985ce51bfe3",
+  "readme_path": "README.md",
+  "readme_blob_sha": "ac34bb09eec6ac38a05a1e62e5b3cb76d504c9bb",
+  "readme_url": "https://github.com/FreeCAD/FreeCAD/blob/f69b1eb064874749739b87bf3d951985ce51bfe3/README.md",
+  "stars": 35073,
+  "pushed_at": "2026-11-03T01:41:03Z",
+  "stars_fetched_at": "2026-11-03T01:51:04.488100+00:00",
+  "license_spdx": "LGPL-2.1",
+  "homepage_url": "https://www.freecad.org",
+  "icon_source_url": "https://raw.githubusercontent.com/FreeCAD/FreeCAD/main/src/Gui/Icons/freecad.svg",
+  "license_path": "LICENSE",
+  "license_blob_sha": "bc0390e98c98f2ad3ab7decdb82b4d57d7f850d4",
+  "license_url": "https://github.com/FreeCAD/FreeCAD/blob/f69b1eb064874749739b87bf3d951985ce51bfe3/LICENSE",
+  "source_language": "English",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/FreeCAD/FreeCAD",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "项目图标、示例图和贡献指南指向固定提交",
+  "description_zh": "设计现实物体并制作三维模型和图纸的参数化建模软件。",
+  "official_entry": {
+    "url": "https://freecad.org",
+    "kind": "项目官网",
+    "verification": "原文首页入口，HTTP HEAD 200"
+  },
+  "platforms": [
+    "Windows",
+    "macOS",
+    "Linux"
+  ],
+  "image_license": "官方图标与示例图以固定提交外链引用，未复制素材；图片单独许可待核实。"
+}

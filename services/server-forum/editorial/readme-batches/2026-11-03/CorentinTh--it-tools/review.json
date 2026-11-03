@@ -1,0 +1,56 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，所有代码块完全一致，保留两种 Docker 镜像及开发、测试命令。",
+    "GPLv3 仓库许可原文已保存；原文一个 VS Code 扩展页面 GET 404，保留原链并在译注提供 Volar 页面，替代效果未作保证。",
+    "项目 Logo 使用固定提交官方外链，未复制素材；单独图片权利待后续核实。"
+  ],
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://raw.githubusercontent.com/CorentinTh/it-tools/d505845f918e946ec300af7b36efc107e2f66e9e/.github/logo-white.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/CorentinTh/it-tools/d505845f918e946ec300af7b36efc107e2f66e9e/.github/logo-dark.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=345793&theme=light",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check_batch": {
+    "method": "HTTP HEAD，排除动态徽章、Discord 邀请与 GitHub 附件",
+    "urls_checked": 22,
+    "failures": [
+      {
+        "url": "https://marketplace.visualstudio.com/items?itemName=Vue.volar",
+        "result": "HTTP Error 404: Not Found"
+      },
+      {
+        "url": "https://marketplace.visualstudio.com/items?itemName=lokalise.i18n-ally",
+        "result": "HTTP Error 404: Not Found"
+      },
+      {
+        "url": "https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin",
+        "result": "HTTP Error 404: Not Found"
+      },
+      {
+        "url": "https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint",
+        "result": "HTTP Error 404: Not Found"
+      }
+    ],
+    "retest": "4 个 VS Code 扩展页 HEAD 均 404；GET 重试其中 3 个为 200，TypeScript Vue Plugin 仍为 404，译注指向原文已有 Volar 页面并提示效果需确认。"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留支持格式、编码器和贡献限制",
+    "验证文档入口和全部固定版本仓库文档；动态徽章及其他外链未逐一联网",
+    "保留 GPLv2 许可证，原文无图形资源"
+  ],
+  "link_results": {
+    "https://handbrake.fr/docs": 200,
+    "https://github.com/HandBrake/HandBrake/blob/b48c2e9821930c9532068a8f416dcf7af8f3ce72/LICENSE": 200,
+    "https://github.com/HandBrake/HandBrake/blob/b48c2e9821930c9532068a8f416dcf7af8f3ce72/CODE_OF_CONDUCT.md": 200,
+    "https://github.com/HandBrake/HandBrake/blob/b48c2e9821930c9532068a8f416dcf7af8f3ce72/TRANSLATION.markdown": 200,
+    "https://github.com/HandBrake/HandBrake/blob/b48c2e9821930c9532068a8f416dcf7af8f3ce72/AUTHORS.markdown": 200,
+    "https://github.com/HandBrake/HandBrake/blob/b48c2e9821930c9532068a8f416dcf7af8f3ce72/NEWS.markdown": 200,
+    "https://github.com/HandBrake/HandBrake/blob/b48c2e9821930c9532068a8f416dcf7af8f3ce72/THANKS.markdown": 200
+  },
+  "issues": []
+}

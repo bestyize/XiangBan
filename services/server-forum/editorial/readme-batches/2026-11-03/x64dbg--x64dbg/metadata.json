@@ -1,0 +1,97 @@
+{
+  "inventory_index": 74,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "学习程序调试和二进制分析的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:01:37.568579+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "Windows",
+      "调试器",
+      "逆向"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/x64dbg-screen.png",
+    "cover_variant": "wide",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 2917,
+    "full_name": "x64dbg/x64dbg",
+    "getting_started": "使用官方发布，在自编译的小程序上练习断点和单步。",
+    "highlights": [
+      "支持二进制调试与执行观察",
+      "提供插件扩展机制"
+    ],
+    "homepage_url": "https://github.com/x64dbg/x64dbg",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-28T22:00:03Z",
+    "last_pushed_at": "2026-10-28T22:00:03Z",
+    "name": "x64dbg",
+    "notes": [
+      "只调试自己拥有或获授权的软件，注意第三方插件来源。"
+    ],
+    "order": 75,
+    "readme_sha": "87b9d6330995766cab9b793eaf9856769df5f35a",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/x64dbg/x64dbg/blob/development/README.md",
+    "stars": 50162,
+    "summary": "面向 Windows 可执行程序的开源二进制调试器。",
+    "tags": [
+      "Windows",
+      "调试器",
+      "逆向"
+    ],
+    "title": "逐步观察 Windows 程序如何执行",
+    "watchers": 2653
+  },
+  "repository": "x64dbg/x64dbg",
+  "fetched_at": "2026-11-03T01:50:44.349186+00:00",
+  "canonical_repository": "x64dbg/x64dbg",
+  "default_branch": "development",
+  "commit_sha": "79d57163d07432d24f0bff00298bfd2acd98f341",
+  "readme_path": "README.md",
+  "readme_blob_sha": "87b9d6330995766cab9b793eaf9856769df5f35a",
+  "readme_url": "https://github.com/x64dbg/x64dbg/blob/79d57163d07432d24f0bff00298bfd2acd98f341/README.md",
+  "stars": 50170,
+  "pushed_at": "2026-10-28T22:00:03Z",
+  "stars_fetched_at": "2026-11-03T01:50:46.518922+00:00",
+  "license_spdx": "NOASSERTION",
+  "homepage_url": "http://x64dbg.com",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "df0d2a5440581d4240fcab2856a37ab8b1f4d142",
+  "license_url": "https://github.com/x64dbg/x64dbg/blob/79d57163d07432d24f0bff00298bfd2acd98f341/LICENSE",
+  "root_license_candidates": [
+    "LICENSE"
+  ],
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/x64dbg/x64dbg",
+  "license_scope_caveat": "上游 LICENSE 标记 THIS DOCUMENT HAS BEEN MODIFIED；与另一仓库的 GPLv3 原文比对发现新增第 2 节 Treatment of plugins，允许通过提供的接口实现、仅在 x64dbg 运行的动态链接插件按自有许可闭源及商业分发；后续章节重新编号。以保存的完整上游许可为准。",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "截图、图标和贡献文档按固定提交解析",
+  "license_name": "修改版 GPLv3（含插件例外）",
+  "description_zh": "在 Windows 上调试二进制程序并分析可执行文件的开源工具。",
+  "official_entry": {
+    "url": "https://x64dbg.com",
+    "kind": "项目官网",
+    "verification": "上游 README 官网，HTTP HEAD 200"
+  },
+  "platforms": [
+    "Windows"
+  ],
+  "icon_display": "项目名占位；README 将虫子图标归功于 VisualPharm，单独权利待核实",
+  "image_license": "官方界面截图按固定提交外链引用，未复制素材；第三方图标和赞助图权利待后续核实。"
+}

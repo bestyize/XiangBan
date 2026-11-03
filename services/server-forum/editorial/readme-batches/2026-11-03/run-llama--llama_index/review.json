@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，9 段代码与引用完全一致；区分开放框架和企业 LlamaParse，保留 300+ 集成及 130+ 格式。",
+    "MIT 仓库许可原文已保存；云入口 HEAD 405、GET 200。原文失效的 LlamaParse 章节锚点已在中英文阅读稿修正，译注说明。",
+    "上游安全/性能主张注明未经独立验证；未核实项目图标，卡片名称占位。"
+  ],
+  "link_check": {
+    "urls_checked": 18,
+    "result": "17 个非社交/非 PyPI 链接 HEAD 200；LlamaParse 云入口 HEAD 405、GET 200。"
+  }
+}

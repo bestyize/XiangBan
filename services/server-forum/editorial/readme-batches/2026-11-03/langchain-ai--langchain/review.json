@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照项目定位、提示、生态组件、功能说明和资源列表；产品能力为上游宣称",
+  "code_and_numbers": "两个代码块与英文完全一致，代码、模型名称、路径与数字保留",
+  "links_and_images": "相对 logo 链接解析到采集提交；两张 logo 和四个动态徽章采集时均返回 HTTP 200",
+  "license": "MIT，许可证及版权声明保存在 LICENSE.upstream",
+  "issues": [
+    "动态徽章后续可用性可能变化。"
+  ],
+  "manual_review": "非官方翻译；交付后仍需编辑复核"
+}

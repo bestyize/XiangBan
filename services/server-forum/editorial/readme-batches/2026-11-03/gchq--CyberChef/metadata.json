@@ -1,0 +1,91 @@
+{
+  "inventory_index": 96,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合在自有或获授权环境中学习软件、协议与安全分析的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:17:58.941317+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "数据分析",
+      "编码转换",
+      "浏览器"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 4192,
+    "full_name": "gchq/CyberChef",
+    "getting_started": "用一段无敏感信息的测试文字组合简单转换流程。",
+    "highlights": [
+      "将多个转换步骤组织成配方",
+      "适合观察中间结果"
+    ],
+    "homepage_url": "https://gchq.github.io/CyberChef",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-29T10:00:04Z",
+    "last_pushed_at": "2026-11-02T14:31:04Z",
+    "name": "CyberChef",
+    "notes": [
+      "转换与加密功能不能替代具体系统的安全设计与验证。"
+    ],
+    "order": 97,
+    "readme_sha": "4a2969a68579c8b82adc426011f3cc77c719f82c",
+    "related_categories": [
+      "dev",
+      "office"
+    ],
+    "source_url": "https://github.com/gchq/CyberChef/blob/master/README.md",
+    "stars": 36297,
+    "summary": "在浏览器中组合编码、压缩、解析等数据处理操作的工具。",
+    "tags": [
+      "数据分析",
+      "编码转换",
+      "浏览器"
+    ],
+    "title": "把数据转换步骤连成可复用的配方",
+    "watchers": 389
+  },
+  "repository": "gchq/CyberChef",
+  "fetched_at": "2026-11-03T01:50:58.816081+00:00",
+  "canonical_repository": "gchq/CyberChef",
+  "default_branch": "master",
+  "commit_sha": "b75398f1134fc59fd74d288f620aa1eecba77dc9",
+  "readme_path": "README.md",
+  "readme_blob_sha": "4a2969a68579c8b82adc426011f3cc77c719f82c",
+  "readme_url": "https://github.com/gchq/CyberChef/blob/b75398f1134fc59fd74d288f620aa1eecba77dc9/README.md",
+  "stars": 36297,
+  "pushed_at": "2026-11-02T14:31:04Z",
+  "stars_fetched_at": "2026-11-03T01:51:02.939055+00:00",
+  "license_spdx": "Apache-2.0",
+  "homepage_url": "https://gchq.github.io/CyberChef",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "7a4a3ea2424c09fbe48d455aed1eaa94d9124835",
+  "license_url": "https://github.com/gchq/CyberChef/blob/b75398f1134fc59fd74d288f620aa1eecba77dc9/LICENSE",
+  "source_language": "en",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/gchq/CyberChef",
+  "translation_work_status": "全文翻译与审校完成",
+  "official_entry": {
+    "url": "https://gchq.github.io/CyberChef",
+    "kind": "official_website"
+  },
+  "translation": {
+    "method": "Terra 全文翻译并逐节核对",
+    "source_path": "README.md",
+    "source_commit_sha": "b75398f1134fc59fd74d288f620aa1eecba77dc9",
+    "notes": "相对链接固定至原始提交；原代码、参数、版本及示例链接均保留。"
+  }
+}

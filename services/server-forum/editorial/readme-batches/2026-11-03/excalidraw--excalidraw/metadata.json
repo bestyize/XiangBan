@@ -1,0 +1,104 @@
+{
+  "inventory_key": "excalidraw/excalidraw",
+  "full_name": "excalidraw/excalidraw",
+  "inventory_entry": {
+    "audience": "适合需要解释流程、讨论方案和绘制草图的人。它更强调自由表达，精确的工程制图需另选工具。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:01:23.398111+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "项目 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "想法",
+      "草图",
+      "讨论"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "flow",
+    "cover_url": "/open-source-media/excalidraw.png",
+    "cover_variant": "balanced",
+    "effort": "打开网页即可尝试",
+    "featured": true,
+    "forks": 15973,
+    "full_name": "excalidraw/excalidraw",
+    "getting_started": "先在官方在线白板画一张简单流程图；需要嵌入自己的产品时，再阅读组件文档。",
+    "highlights": [
+      "手绘风格让流程图与草图更自然",
+      "从浏览器就能开始，适合快速表达想法",
+      "项目开放编辑器源码，也提供集成方式"
+    ],
+    "homepage_url": "https://excalidraw.com",
+    "icon_fit": "contain",
+    "icon_source_url": "https://excalidraw.com/apple-touch-icon.png",
+    "icon_url": "/open-source-media/excalidraw-icon.png",
+    "last_commit_at": "2026-10-31T16:48:47Z",
+    "last_pushed_at": "2026-11-02T16:26:43Z",
+    "name": "Excalidraw",
+    "notes": [
+      "在线服务、商业服务与开源编辑器的能力和条款分别确认。"
+    ],
+    "order": 19,
+    "readme_sha": "48b9d1de9fbb1c74406407e89e2471a01b1f28de",
+    "related_categories": [
+      "office"
+    ],
+    "source_url": "https://github.com/excalidraw/excalidraw#readme",
+    "stars": 135044,
+    "summary": "一块手绘风格的在线白板，用图形、箭头和文字梳理流程与想法。",
+    "tags": [
+      "白板",
+      "流程图",
+      "浏览器"
+    ],
+    "title": "像在纸上画画一样，把想法讲清楚",
+    "watchers": 512
+  },
+  "fetched_at": "2026-11-03T01:50:41.614051+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "excalidraw/excalidraw",
+  "repository_url": "https://github.com/excalidraw/excalidraw",
+  "default_branch": "master",
+  "stars": 135060,
+  "pushed_at": "2026-11-02T16:26:43Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://excalidraw.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/excalidraw/excalidraw/8bcdca4526867433f99fdfcb55a063668db0c9dc/public/favicon.svg",
+  "commit_sha": "8bcdca4526867433f99fdfcb55a063668db0c9dc",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "8a844bc750a313db95d147bea9e4c9537b2cebc0",
+    "source_url": "https://github.com/excalidraw/excalidraw/blob/8bcdca4526867433f99fdfcb55a063668db0c9dc/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "48b9d1de9fbb1c74406407e89e2471a01b1f28de",
+    "source_url": "https://github.com/excalidraw/excalidraw/blob/8bcdca4526867433f99fdfcb55a063668db0c9dc/README.md",
+    "raw_url": "https://raw.githubusercontent.com/excalidraw/excalidraw/8bcdca4526867433f99fdfcb55a063668db0c9dc/README.md",
+    "size_bytes": 7774,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "8bcdca4526867433f99fdfcb55a063668db0c9dc",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://excalidraw.com",
+    "kind": "在线体验"
+  },
+  "plain_summary": "在线绘制手绘风格的图表、草图并与他人协作。",
+  "image_sources": [
+    {
+      "url": "https://excalidraw.nyc3.cdn.digitaloceanspaces.com/github%2Fproduct_showcase.png",
+      "source": "上游 README 的官方产品展示图",
+      "note": "保留原图链接，未下载。"
+    }
+  ]
+}

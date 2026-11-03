@@ -1,0 +1,80 @@
+{
+  "inventory_index": 89,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合为智能体编写、连接或评估技能与工具的开发者。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:17:00.719032+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "浏览器自动化",
+      "MCP",
+      "测试"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 3362,
+    "full_name": "microsoft/playwright-mcp",
+    "getting_started": "先在测试页面配置 MCP 客户端，熟悉页面读取与基本操作。",
+    "highlights": [
+      "以工具接口接入浏览器操作",
+      "便于组织可重复的网页任务"
+    ],
+    "homepage_url": "https://www.npmjs.com/package/@playwright/mcp",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-01T23:12:54Z",
+    "last_pushed_at": "2026-11-01T23:12:55Z",
+    "name": "Playwright MCP",
+    "notes": [
+      "涉及登录、提交和写操作时按实际权限配置与核对。"
+    ],
+    "order": 90,
+    "readme_sha": "562894810cabff357979aac7b180a1d706321084",
+    "related_categories": [
+      "dev",
+      "ai"
+    ],
+    "source_url": "https://github.com/microsoft/playwright-mcp/blob/main/README.md",
+    "stars": 39000,
+    "summary": "基于 Playwright 提供浏览器自动化能力的 MCP 服务端。",
+    "tags": [
+      "浏览器自动化",
+      "MCP",
+      "测试"
+    ],
+    "title": "让智能体通过结构化方式操作网页",
+    "watchers": 149
+  },
+  "repository": "microsoft/playwright-mcp",
+  "fetched_at": "2026-11-03T01:50:54.997481+00:00",
+  "canonical_repository": "microsoft/playwright-mcp",
+  "default_branch": "main",
+  "commit_sha": "ec572ee8354015293bed67145db21eed386e876d",
+  "readme_path": "README.md",
+  "readme_blob_sha": "562894810cabff357979aac7b180a1d706321084",
+  "readme_url": "https://github.com/microsoft/playwright-mcp/blob/ec572ee8354015293bed67145db21eed386e876d/README.md",
+  "stars": 39055,
+  "pushed_at": "2026-11-01T23:12:55Z",
+  "stars_fetched_at": "2026-11-03T01:50:57.554333+00:00",
+  "license_spdx": "Apache-2.0",
+  "homepage_url": "https://www.npmjs.com/package/@playwright/mcp",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "cefe596afef12e19a8e5e923f1a04c7da3188760",
+  "license_url": "https://github.com/microsoft/playwright-mcp/blob/ec572ee8354015293bed67145db21eed386e876d/LICENSE",
+  "source_language": "unverified",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/microsoft/playwright-mcp"
+}

@@ -1,0 +1,18 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照原文，保留图标限制、测试与付费生产版本区别、浏览器版本及商标限制",
+    "验证主要入口与固定版本许可证；其余链接未逐一联网",
+    "保存 Apache-2.0 许可证"
+  ],
+  "link_results": {
+    "https://app.diagrams.net": 200,
+    "https://get.diagrams.net": 200,
+    "https://github.com/jgraph/drawio/blob/3e707fd20b6930778d6f6bf6e4d0079b4bce366b/LICENSE": 200
+  },
+  "issues": []
+}

@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "上游 backers 徽章原指向缺失的 #-backers 锚点，保留上游目标；赞助者入口仍可通过 Open Collective 访问。",
+    "alpha/beta、Android 计划及运行脚本 URL 均为上游固定版本表述，并非当前状态验证。"
+  ],
+  "full_text_coverage": "固定提交全文译写，数据库版 alpha/beta、数据丢失与备份警告、安装与赞助说明均保留。",
+  "code_and_numbers": "Linux 安装脚本三个示例所在代码块逐字保留；版本号与渠道名称保留。",
+  "links_and_images": "相对文档和图片按固定提交解析；官网、Logo 和开发文档本次 HTTP 200；动态徽章和其他外链未逐条联网验证。",
+  "license": "仓库 AGPL-3.0 许可证已保存；Logo、产品与赞助商标志保留上游链接，独立素材权利未单独确认。"
+}

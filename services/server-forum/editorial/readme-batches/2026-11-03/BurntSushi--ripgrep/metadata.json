@@ -1,0 +1,89 @@
+{
+  "inventory_key": "BurntSushi/ripgrep",
+  "full_name": "BurntSushi/ripgrep",
+  "inventory_entry": {
+    "audience": "适合希望改善日常开发与命令行工作流的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:17:33.397750+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "terminal",
+    "cover_lines": [
+      "代码搜索",
+      "命令行",
+      "Rust"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 4217,
+    "full_name": "BurntSushi/ripgrep",
+    "getting_started": "在测试仓库用一个关键词开始，再阅读过滤与正则选项。",
+    "highlights": [
+      "可递归搜索文件内容",
+      "支持正则与多种输出形式"
+    ],
+    "homepage_url": "https://github.com/BurntSushi/ripgrep",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-27T18:31:24Z",
+    "last_pushed_at": "2026-10-27T18:31:31Z",
+    "name": "ripgrep",
+    "notes": [
+      "默认忽略规则和二进制处理方式会影响搜索范围。"
+    ],
+    "order": 53,
+    "readme_sha": "54a7158a564faae22988da41efb1ef279e06fe5e",
+    "related_categories": [],
+    "source_url": "https://github.com/BurntSushi/ripgrep/blob/master/README.md",
+    "stars": 69644,
+    "summary": "结合递归搜索与常见忽略规则的命令行文本搜索工具。",
+    "tags": [
+      "代码搜索",
+      "命令行",
+      "Rust"
+    ],
+    "title": "在代码仓库中快速查找文字",
+    "watchers": 313
+  },
+  "fetched_at": "2026-11-03T01:50:53.536412+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "BurntSushi/ripgrep",
+  "repository_url": "https://github.com/BurntSushi/ripgrep",
+  "default_branch": "master",
+  "stars": 69664,
+  "pushed_at": "2026-10-27T18:31:31Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT OR Unlicense",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "91f5d22ef48bde459d90a8c7dbeab416e97d0f2b",
+  "license": {
+    "path": "UNLICENSE",
+    "blob_sha": "68a49daad8ff7e35068f2b7a97d643aab440eaec",
+    "source_url": "https://github.com/BurntSushi/ripgrep/blob/91f5d22ef48bde459d90a8c7dbeab416e97d0f2b/UNLICENSE",
+    "spdx": "NOASSERTION",
+    "human_read_label": "Unlicense"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "54a7158a564faae22988da41efb1ef279e06fe5e",
+    "source_url": "https://github.com/BurntSushi/ripgrep/blob/91f5d22ef48bde459d90a8c7dbeab416e97d0f2b/README.md",
+    "size_bytes": 21599
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "plain_summary": "在目录中递归搜索文本，并默认遵守忽略规则、跳过隐藏文件和二进制文件。",
+  "official_entry": "https://github.com/BurntSushi/ripgrep",
+  "entry_label": "GitHub",
+  "translation_provenance": "Terra 对固定提交英文 README 全文译写。",
+  "license_choice": "MIT OR Unlicense；两份原文分别为 LICENSE.MIT 和 LICENSE.upstream。"
+}

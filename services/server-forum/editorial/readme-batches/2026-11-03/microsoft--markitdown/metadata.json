@@ -1,0 +1,99 @@
+{
+  "inventory_key": "microsoft/markitdown",
+  "full_name": "microsoft/markitdown",
+  "inventory_entry": {
+    "audience": "适合为智能体编写、连接或评估技能与工具的开发者。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:17:03.224544+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "文档转换",
+      "Markdown",
+      "MCP"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 14521,
+    "full_name": "microsoft/markitdown",
+    "getting_started": "先选一份公开样本文档，按官方说明转换并检查结构是否完整。",
+    "highlights": [
+      "统一多种文件的文字提取入口",
+      "便于连接检索与智能体流程"
+    ],
+    "homepage_url": "https://github.com/microsoft/markitdown",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-22T22:31:47Z",
+    "last_pushed_at": "2026-10-28T15:33:14Z",
+    "name": "MarkItDown",
+    "notes": [
+      "复杂排版、图片和受保护文件可能需要额外处理。"
+    ],
+    "order": 12,
+    "readme_sha": "13e1ea8b1c60275a4b3afab8ce8cd442531cf736",
+    "related_categories": [
+      "office",
+      "ai"
+    ],
+    "source_url": "https://github.com/microsoft/markitdown/blob/main/README.md",
+    "stars": 193553,
+    "summary": "将多种文件格式转换为 Markdown 的 Python 工具，也提供 MCP 相关接入方式。",
+    "tags": [
+      "文档转换",
+      "Markdown",
+      "MCP"
+    ],
+    "title": "先把复杂文档整理成模型易读的文字",
+    "watchers": 591
+  },
+  "fetched_at": "2026-11-03T01:50:38.930941+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "microsoft/markitdown",
+  "repository_url": "https://github.com/microsoft/markitdown",
+  "default_branch": "main",
+  "stars": 193602,
+  "pushed_at": "2026-10-28T15:33:14Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "7482c092d9c0074a89803c9fdb63a969e7fe17fc",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
+    "source_url": "https://github.com/microsoft/markitdown/blob/7482c092d9c0074a89803c9fdb63a969e7fe17fc/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "13e1ea8b1c60275a4b3afab8ce8cd442531cf736",
+    "source_url": "https://github.com/microsoft/markitdown/blob/7482c092d9c0074a89803c9fdb63a969e7fe17fc/README.md",
+    "raw_url": "https://raw.githubusercontent.com/microsoft/markitdown/7482c092d9c0074a89803c9fdb63a969e7fe17fc/README.md",
+    "size_bytes": 21078,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "official_entry": {
+    "url": "https://github.com/microsoft/markitdown",
+    "kind": "GitHub"
+  },
+  "translation": {
+    "method": "Terra 直接全文翻译并逐节对照固定提交英文 README",
+    "source_blob_sha": "13e1ea8b1c60275a4b3afab8ce8cd442531cf736",
+    "official_zh_candidates": [],
+    "link_base": "README 根目录，仓库相对链接解析到固定提交；原有锚点通过显式 id 保留。",
+    "icon_note": "README 无项目图标；保留原有两个可读徽章，未将所有者头像当作项目图标。"
+  }
+}

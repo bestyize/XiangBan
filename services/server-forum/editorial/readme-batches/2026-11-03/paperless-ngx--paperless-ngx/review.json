@@ -1,0 +1,42 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，安装代码完全一致，保留明文存储、不可信主机与演示内容重置等警告。",
+    "GPL-3.0 仓库许可原文已保存；原文演示和文档域名返回 403，保留原链并加译注，提供同一提交的 GitHub 文档首页、安装和开发指南；演示可用性未确认。",
+    "官方 Logo 和截图使用固定提交外链，未复制素材；单独图片权利待后续核实。"
+  ],
+  "link_check_batch": {
+    "method": "HTTP HEAD，排除动态徽章、Discord 邀请与 GitHub 附件",
+    "urls_checked": 26,
+    "failures": [
+      {
+        "url": "https://docs.paperless-ngx.com/development/",
+        "result": "HTTP Error 403: Forbidden"
+      },
+      {
+        "url": "https://demo.paperless-ngx.com",
+        "result": "HTTP Error 403: Forbidden"
+      },
+      {
+        "url": "https://docs.paperless-ngx.com/setup/",
+        "result": "HTTP Error 403: Forbidden"
+      },
+      {
+        "url": "https://docs.paperless-ngx.com",
+        "result": "HTTP Error 403: Forbidden"
+      },
+      {
+        "url": "https://docs.paperless-ngx.com/",
+        "result": "HTTP Error 403: Forbidden"
+      }
+    ]
+  }
+}

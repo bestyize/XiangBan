@@ -1,0 +1,46 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "保留 Ghost(Pro) 托管服务说明、三条安装命令和会员支持等内容。",
+    "MIT 许可证及版权原文已保存；原文 Ghost 商标政策已保留。",
+    "34 个非动态、非 GitHub 附件链接 HEAD 200；官方图片保留上游外链，未复制素材。"
+  ],
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://user-images.githubusercontent.com/353959/169805900-66be5b89-0859-4816-8da9-528ed7534704.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://user-images.githubusercontent.com/65487235/157849437-9b8fcc48-1920-4b26-a1e8-5806db0e6bb9.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://user-images.githubusercontent.com/65487235/157884383-1b75feb1-45d8-4430-b636-3f7e06577347.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://user-images.githubusercontent.com/65487235/157849205-aa24152c-4610-4d7d-b752-3a8c4f9319e6.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://user-images.githubusercontent.com/65487235/157849438-79889b04-b7b6-4ba7-8de6-4c1e4b4e16a5.png",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check_batch": {
+    "method": "HTTP HEAD，排除动态徽章、Discord 邀请与 GitHub 附件",
+    "urls_checked": 34,
+    "failures": []
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "inventory_key": "TheAlgorithms/Python",
+  "full_name": "TheAlgorithms/Python",
+  "inventory_entry": {
+    "audience": "学习算法原理和 Python 实现方式的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:01:32.535983+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "算法",
+      "Python",
+      "练习"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 51266,
+    "full_name": "TheAlgorithms/Python",
+    "getting_started": "从熟悉的数据结构开始，阅读实现并用小输入验证行为。",
+    "highlights": [
+      "实现按算法主题组织",
+      "可配合测试理解边界情况"
+    ],
+    "homepage_url": "https://thealgorithms.github.io/Python/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-20T05:01:26Z",
+    "last_pushed_at": "2026-10-20T05:01:26Z",
+    "name": "The Algorithms · Python",
+    "notes": [
+      "代码以教学为目的，不保证比标准库更高效。"
+    ],
+    "order": 7,
+    "readme_sha": "e9a19fa15499332843dd51e0c9bced3b0b750988",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/TheAlgorithms/Python/blob/master/README.md",
+    "stars": 225778,
+    "summary": "用 Python 展示算法实现的学习型仓库。",
+    "tags": [
+      "算法",
+      "Python",
+      "练习"
+    ],
+    "title": "把算法读懂，再亲手运行一遍",
+    "watchers": 5934
+  },
+  "fetched_at": "2026-11-03T01:50:37.582122+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "TheAlgorithms/Python",
+  "repository_url": "https://github.com/TheAlgorithms/Python",
+  "default_branch": "master",
+  "stars": 225794,
+  "pushed_at": "2026-11-02T19:35:18Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://thealgorithms.github.io/Python/",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/TheAlgorithms/website/1cd824df116b27029f17c2d1b42d81731f28a920/public/logo.svg",
+  "commit_sha": "574d100b7181956e9c8384552fd078165e4cc326",
+  "license": {
+    "path": "LICENSE.md",
+    "blob_sha": "de631c3ef33374d91a78dca3a656806e4e3bb890",
+    "source_url": "https://github.com/TheAlgorithms/Python/blob/574d100b7181956e9c8384552fd078165e4cc326/LICENSE.md",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "e9a19fa15499332843dd51e0c9bced3b0b750988",
+    "source_url": "https://github.com/TheAlgorithms/Python/blob/574d100b7181956e9c8384552fd078165e4cc326/README.md",
+    "raw_url": "https://raw.githubusercontent.com/TheAlgorithms/Python/574d100b7181956e9c8384552fd078165e4cc326/README.md",
+    "size_bytes": 2550,
+    "language_unverified": "English candidate"
+  },
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "574d100b7181956e9c8384552fd078165e4cc326",
+  "official_chinese_search": "完整递归仓库路径中未发现带 zh、chinese 或中文名称的 README；未发现上游中文正文",
+  "official_entry": {
+    "url": "https://the-algorithms.com/",
+    "kind": "项目官网"
+  },
+  "plain_summary": "用 Python 代码学习常见算法的实现。"
+}

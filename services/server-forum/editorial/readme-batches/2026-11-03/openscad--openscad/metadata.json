@@ -1,0 +1,92 @@
+{
+  "inventory_index": 147,
+  "original_key": "openscad/openscad",
+  "repository": "openscad/openscad",
+  "catalog": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:22.476396+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "代码建模",
+      "CAD",
+      "参数化"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 1785,
+    "full_name": "openscad/openscad",
+    "getting_started": "先写几个基础几何体和参数，预览组合后的模型。",
+    "highlights": [
+      "用脚本组织形状与参数",
+      "适合可重复修改的结构模型"
+    ],
+    "homepage_url": "https://www.openscad.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-01T22:27:22Z",
+    "last_pushed_at": "2026-11-01T22:27:28Z",
+    "name": "OpenSCAD",
+    "notes": [
+      "输出文件需在后续制造或切片工具里再次检查。"
+    ],
+    "order": 148,
+    "readme_sha": "a16f83066366e7e800699abf117cb12358a59c6f",
+    "related_categories": [
+      "hardware"
+    ],
+    "source_url": "https://github.com/openscad/openscad/blob/master/README.md",
+    "stars": 10575,
+    "summary": "通过脚本表达几何关系的开源三维 CAD 建模工具。",
+    "tags": [
+      "代码建模",
+      "CAD",
+      "参数化"
+    ],
+    "title": "用代码描述可以修改的三维结构",
+    "watchers": 259
+  },
+  "github_url": "https://github.com/openscad/openscad",
+  "official_url": "https://www.openscad.org",
+  "stars": 10580,
+  "code_pushed_at": "2026-11-01T22:27:28Z",
+  "default_branch": "master",
+  "commit_sha": "8e8df3ddae295e8667cbc9f6c4fbb7c88b0ec45b",
+  "readme_path": "README.md",
+  "readme_blob_sha": "a16f83066366e7e800699abf117cb12358a59c6f",
+  "readme_source_url": "https://github.com/openscad/openscad/blob/8e8df3ddae295e8667cbc9f6c4fbb7c88b0ec45b/README.md",
+  "readme_api_url": "https://api.github.com/repos/openscad/openscad/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-2.0-or-later",
+  "license_source_url": "https://github.com/openscad/openscad/blob/8e8df3ddae295e8667cbc9f6c4fbb7c88b0ec45b/COPYING",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:42.576569+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "COPYING",
+      "url": "https://github.com/openscad/openscad/blob/8e8df3ddae295e8667cbc9f6c4fbb7c88b0ec45b/COPYING",
+      "sha": "627c964a841a48896bf9c779e7b051dd3cbfd2d7"
+    }
+  ],
+  "needs_license_review": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "openscad/openscad",
+  "license_basis": "仓库 COPYING 为 GPLv2 及 CGAL 链接例外",
+  "translation_origin": "非官方中文译文",
+  "official_entry": {
+    "url": "https://www.openscad.org/",
+    "kind": "项目官网"
+  }
+}

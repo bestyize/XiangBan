@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "上游同时写 .NET 10 SDK、支持 .NET 6 的 IDE 和 Codespaces 下载 .NET 7，均按原文保留，版本适用性未独立验证。",
+    "横幅与赞助商标识使用上游链接，其独立版权和商标权需按用途核实。"
+  ],
+  "full_text_coverage": "固定提交 README 全文译写，包含 Codespaces 各项提示、开发说明及赞助署名。",
+  "code_and_numbers": "三个围栏代码块逐字一致；所有反引号内容保留。",
+  "links_and_images": "源 README 图片为外部原始链接，英文稿无相对文件链接；官网和 banner 本次 HTTP 200，动态徽章与非关键外链未逐一联网验证。",
+  "license": "仓库 GPL-2.0 许可已保存；横幅位于另一个 jellyfin-ux 仓库，保留上游图链，未将服务器仓库许可推定为横幅授权。"
+}

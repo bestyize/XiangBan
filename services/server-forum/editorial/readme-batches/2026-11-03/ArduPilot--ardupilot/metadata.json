@@ -1,0 +1,86 @@
+{
+  "inventory_index": 134,
+  "original_key": "ArduPilot/ardupilot",
+  "repository": "ArduPilot/ardupilot",
+  "catalog": {
+    "audience": "适合愿意阅读硬件文档、准备实验环境并验证设备的爱好者与开发者。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:17:49.810202+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "自动控制",
+      "机器人",
+      "载具"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要兼容硬件或仿真环境",
+    "featured": true,
+    "forks": 21719,
+    "full_name": "ArduPilot/ardupilot",
+    "getting_started": "优先从官方软件仿真环境了解流程，再考虑实际硬件。",
+    "highlights": [
+      "覆盖多种载具控制场景",
+      "提供仿真与硬件集成相关资料"
+    ],
+    "homepage_url": "https://github.com/ArduPilot/ardupilot",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T12:23:04Z",
+    "last_pushed_at": "2026-11-02T14:51:10Z",
+    "name": "ArduPilot",
+    "notes": [
+      "真实载具测试需要合适场地、安全措施及相应资质和规则。"
+    ],
+    "order": 135,
+    "readme_sha": "294acae54448852138cbecc1bfca5ee5a688e472",
+    "related_categories": [
+      "ai"
+    ],
+    "source_url": "https://github.com/ArduPilot/ardupilot/blob/master/README.md",
+    "stars": 16306,
+    "summary": "面向飞行器、车辆等载具的开源自动驾驶与控制软件。",
+    "tags": [
+      "自动控制",
+      "机器人",
+      "载具"
+    ],
+    "title": "理解多种载具如何组织自主控制",
+    "watchers": 679
+  },
+  "github_url": "https://github.com/ArduPilot/ardupilot",
+  "official_url": "https://github.com/ArduPilot/ardupilot",
+  "stars": 16307,
+  "code_pushed_at": "2026-11-03T00:50:25Z",
+  "default_branch": "master",
+  "commit_sha": "5c3ed1c360f94f7ab9744c5dcec4519c5d55045d",
+  "readme_path": "README.md",
+  "readme_blob_sha": "294acae54448852138cbecc1bfca5ee5a688e472",
+  "readme_source_url": "https://github.com/ArduPilot/ardupilot/blob/5c3ed1c360f94f7ab9744c5dcec4519c5d55045d/README.md",
+  "readme_api_url": "https://api.github.com/repos/ArduPilot/ardupilot/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/ArduPilot/ardupilot/blob/master/COPYING.txt",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:37.541018+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "ArduPilot/ardupilot",
+  "translation_origin": "非官方中文译文",
+  "license_basis": "README 明确 GPL-3.0-or-later",
+  "official_entry": {
+    "url": "https://ardupilot.org",
+    "kind": "项目官网"
+  }
+}

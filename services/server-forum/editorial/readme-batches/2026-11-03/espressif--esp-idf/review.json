@@ -1,0 +1,27 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照官方中文与英文，修正首段缺少 SoC 和安装脚本择一关系",
+    "官方中文使用中文版本页面、兼容性页面及 Bilibili 初学视频，英文链接各自保留",
+    "主要入口、两张图和相对文档已核验，其他外链未逐个联网；相对路径固定至所采集提交",
+    "保留 Apache-2.0 许可"
+  ],
+  "link_results": {
+    "https://idf.espressif.com/": 200,
+    "https://dl.espressif.com/dl/esp-idf/support-periods.svg?v=1": 200,
+    "https://dl.espressif.com/dl/esp-idf/chip-support.svg?v=1": 200,
+    "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/SUPPORT_POLICY.md": 200,
+    "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/SUPPORT_POLICY_CN.md": 200,
+    "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/.gitmodules": 200,
+    "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/tools/set-submodules-to-github.sh": 200,
+    "https://github.com/espressif/esp-idf/tree/0e6b480f858c69862ffb6001d96e9eef74599a6e/examples": 200,
+    "https://github.com/espressif/esp-idf/tree/0e6b480f858c69862ffb6001d96e9eef74599a6e/docs": 200,
+    "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/COMPATIBILITY.md": 200,
+    "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/COMPATIBILITY_CN.md": 200
+  },
+  "issues": []
+}

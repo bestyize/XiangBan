@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照正文，保留企业版许可范围和路径",
+    "验证官网、文档入口与四张原文图片；其他外链未逐一联网",
+    "保留仓库 AGPL 许可全文"
+  ],
+  "link_results": {
+    "https://docmost.com": 200,
+    "https://docmost.com/docs": 200,
+    "https://docmost.com/screenshots/home.png": 200,
+    "https://docmost.com/screenshots/editor.png": 200,
+    "https://github.com/user-attachments/assets/a6c3d352-e41b-448d-b6cd-3fbca3109f07": 200,
+    "https://github.com/user-attachments/assets/6ccad04a-9589-4965-b6a1-d5cb1f4f9e94": 200
+  },
+  "issues": []
+}

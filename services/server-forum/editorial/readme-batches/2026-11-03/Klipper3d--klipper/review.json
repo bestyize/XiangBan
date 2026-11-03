@@ -1,0 +1,14 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "对照固定提交逐句核对全文；原文无代码块或数字",
+    "英文仅改写相对路径为固定提交链接",
+    "图片和 README 里的外链 HTTP 访问均返回 200",
+    "README 明确引用仓库 GPL-3.0 许可证；保留许可证全文"
+  ],
+  "issues": []
+}

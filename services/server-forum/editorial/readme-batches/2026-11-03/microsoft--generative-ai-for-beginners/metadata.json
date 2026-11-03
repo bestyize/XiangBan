@@ -1,0 +1,113 @@
+{
+  "inventory_key": "microsoft/generative-ai-for-beginners",
+  "full_name": "microsoft/generative-ai-for-beginners",
+  "inventory_entry": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:17:39.906437+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "生成式AI",
+      "入门课程",
+      "实践"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 65734,
+    "full_name": "microsoft/generative-ai-for-beginners",
+    "getting_started": "按课程说明准备测试环境，从第一组基础示例开始。",
+    "highlights": [
+      "以课程和练习组织知识",
+      "涵盖应用开发相关基础"
+    ],
+    "homepage_url": "https://github.com/microsoft/generative-ai-for-beginners",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-30T16:28:40Z",
+    "last_pushed_at": "2026-11-02T12:45:41Z",
+    "name": "生成式 AI 入门",
+    "notes": [
+      "练习可能需要第三方模型账号，先确认服务费用与数据使用方式。"
+    ],
+    "order": 22,
+    "readme_sha": "92cc3d51203d4087685202b2299901914b864001",
+    "related_categories": [
+      "ai",
+      "dev"
+    ],
+    "source_url": "https://github.com/microsoft/generative-ai-for-beginners/blob/main/README.md",
+    "stars": 122848,
+    "summary": "微软维护的生成式 AI 入门课程与配套实践材料。",
+    "tags": [
+      "生成式AI",
+      "入门课程",
+      "实践"
+    ],
+    "title": "从小练习开始理解生成式 AI 应用",
+    "watchers": 1019
+  },
+  "fetched_at": "2026-11-03T01:50:42.181887+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "microsoft/generative-ai-for-beginners",
+  "repository_url": "https://github.com/microsoft/generative-ai-for-beginners",
+  "default_branch": "main",
+  "stars": 122866,
+  "pushed_at": "2026-11-02T18:55:18Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "79a4334e158147d4f36c27d805e0cb163c1e445b",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
+    "source_url": "https://github.com/microsoft/generative-ai-for-beginners/blob/79a4334e158147d4f36c27d805e0cb163c1e445b/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "92cc3d51203d4087685202b2299901914b864001",
+    "source_url": "https://github.com/microsoft/generative-ai-for-beginners/blob/79a4334e158147d4f36c27d805e0cb163c1e445b/README.md",
+    "raw_url": "https://raw.githubusercontent.com/microsoft/generative-ai-for-beginners/79a4334e158147d4f36c27d805e0cb163c1e445b/README.md",
+    "size_bytes": 24618,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "translations/zh-CN/README.md",
+      "blob_sha": "7f7f638516c5e8310dbbd76a7d7cacd52a6618b3"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "translations/zh-CN/README.md",
+    "blob_sha": "7f7f638516c5e8310dbbd76a7d7cacd52a6618b3",
+    "source_url": "https://github.com/microsoft/generative-ai-for-beginners/blob/79a4334e158147d4f36c27d805e0cb163c1e445b/translations/zh-CN/README.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "source_language": "en",
+  "translation_source": "基于官方中文补译",
+  "translation_basis_commit": "79a4334e158147d4f36c27d805e0cb163c1e445b",
+  "translation_changes": [
+    "按英文原文将过时的翻译维护方式改为 Co-op Translator",
+    "相对链接固定到采集提交",
+    "保留官方 AI 翻译免责声明"
+  ],
+  "icon_fallback": "项目名称占位",
+  "official_entry": {
+    "url": "https://github.com/microsoft/generative-ai-for-beginners",
+    "kind": "查看文档"
+  },
+  "plain_summary": "通过课程和代码示例学习构建生成式 AI 应用。"
+}

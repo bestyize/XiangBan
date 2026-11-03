@@ -1,0 +1,8 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "全文逐节直译，含全部平台安装说明、演示视频、赞助者和操作限制。",
+  "code_and_numbers": "30 个 fenced 代码块与英文逐字一致；安装版本、快捷键和破坏性操作说明保留。",
+  "links_and_images": "根目录相对文档目标均存在于固定提交 Git 树；3 张特殊 ../assets 图按上游 assets 分支提交固定。11 张非头像图和抽样 1 个赞助头像返回可读图片；其他赞助头像保留原始链接，未逐一请求。",
+  "license": "MIT 许可证保存于 LICENSE.upstream。",
+  "issues": []
+}

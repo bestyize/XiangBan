@@ -1,0 +1,88 @@
+{
+  "inventory_index": 166,
+  "original_key": "synfig/synfig",
+  "repository": "synfig/synfig",
+  "catalog": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:17.777360+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "2D动画",
+      "矢量",
+      "补间"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 446,
+    "full_name": "synfig/synfig",
+    "getting_started": "先跟随官方教程制作一个物体移动的短动画。",
+    "highlights": [
+      "支持图层式动画工作流",
+      "可减少部分逐帧重复绘制"
+    ],
+    "homepage_url": "https://synfig.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-01T15:02:04Z",
+    "last_pushed_at": "2026-11-01T23:13:43Z",
+    "name": "Synfig Studio",
+    "notes": [
+      "复杂效果与最终输出效果需在自己的场景中验证。"
+    ],
+    "order": 167,
+    "readme_sha": "0a3e84d80e01dc840fc3b5bd1c5096dffa2dc612",
+    "related_categories": [
+      "media"
+    ],
+    "source_url": "https://github.com/synfig/synfig/blob/master/README.md",
+    "stars": 2329,
+    "summary": "结合矢量与位图图层制作二维动画的开源软件。",
+    "tags": [
+      "2D动画",
+      "矢量",
+      "补间"
+    ],
+    "title": "用图层和补间探索二维动画",
+    "watchers": 60
+  },
+  "github_url": "https://github.com/synfig/synfig",
+  "official_url": "https://synfig.org",
+  "stars": 2330,
+  "code_pushed_at": "2026-11-01T23:13:43Z",
+  "default_branch": "master",
+  "commit_sha": "751779eedc3ec18c47e4d2d9f0265b86d3e45afd",
+  "readme_path": "README.md",
+  "readme_blob_sha": "0a3e84d80e01dc840fc3b5bd1c5096dffa2dc612",
+  "readme_source_url": "https://github.com/synfig/synfig/blob/751779eedc3ec18c47e4d2d9f0265b86d3e45afd/README.md",
+  "readme_api_url": "https://api.github.com/repos/synfig/synfig/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/synfig/synfig/blob/751779eedc3ec18c47e4d2d9f0265b86d3e45afd/LICENSE",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:48.794451+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "license_basis": "README 明确 GNU GPL v3.0",
+  "official_entry": {
+    "url": "https://synfig.org/",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "synfig/synfig",
+  "license_blob_sha": "f288702d2fa16d3cdf0035b15a9fcbc552cd88e7",
+  "license_file_verified_at_commit": true
+}

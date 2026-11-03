@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对编辑器能力、在线版额外功能、未来插件计划、npm 集成步骤、第三方集成与赞助信息",
+  "code_and_numbers": "安装代码块与英文完全一致；文件扩展名、npm 包名和离线/端到端加密范围保留",
+  "links_and_images": "本仓库相对素材固定到采集提交；24 个官方图片或徽章中 DeepWiki 返回 HTTP 429，其余返回 HTTP 200；不可读徽章已改为原入口文本链接",
+  "license": "MIT，仓库许可证及版权声明保存在 LICENSE.upstream；Excalidraw+ 是正文中单独提及的服务",
+  "issues": [
+    "DeepWiki 动态徽章请求受限，已改为原入口文本链接；第三方赞助商图像后续可用性可能变化。"
+  ],
+  "manual_review": "非官方译文；交付后仍需编辑复核"
+}

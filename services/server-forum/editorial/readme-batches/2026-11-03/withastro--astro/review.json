@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，两段安装代码完全一致，软件包目录与更新日志共 40 个固定版本链接全部保留。",
+    "MIT 许可证包括关联文档，已保存原文及版权；57 个非动态链接 HEAD 200。",
+    "项目官网 favicon 与横幅保留官方外链，未复制素材；图片单独权利待后续核实。"
+  ],
+  "link_check": {
+    "method": "HTTP HEAD，排除动态徽章",
+    "urls_checked": 57,
+    "http_200": 57
+  }
+}

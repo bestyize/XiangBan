@@ -1,0 +1,88 @@
+{
+  "inventory_index": 128,
+  "original_key": "MarlinFirmware/Marlin",
+  "repository": "MarlinFirmware/Marlin",
+  "catalog": {
+    "audience": "希望研究打印机控制与设备配置的硬件开发者。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:01:34.160786+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "3D打印",
+      "固件",
+      "嵌入式"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要硬件或开发环境",
+    "featured": true,
+    "forks": 19715,
+    "full_name": "MarlinFirmware/Marlin",
+    "getting_started": "先确认设备与控制板，再从稳定发布和官方配置示例学习。",
+    "highlights": [
+      "支持多种打印机与主板",
+      "配置和控制逻辑可查阅"
+    ],
+    "homepage_url": "https://marlinfw.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T06:10:20Z",
+    "last_pushed_at": "2026-11-02T06:10:24Z",
+    "name": "Marlin",
+    "notes": [
+      "默认开发分支并非稳定发行版，实际刷写须匹配设备与安全配置。"
+    ],
+    "order": 129,
+    "readme_sha": "93e16d33f023b0ba5648743753c55a5cfa960934",
+    "related_categories": [],
+    "source_url": "https://github.com/MarlinFirmware/Marlin/blob/bugfix-2.1.x/README.md",
+    "stars": 17644,
+    "summary": "面向多种三维打印机与控制板的开源固件项目。",
+    "tags": [
+      "3D打印",
+      "固件",
+      "嵌入式"
+    ],
+    "title": "探索三维打印机固件的控制逻辑",
+    "watchers": 858
+  },
+  "github_url": "https://github.com/MarlinFirmware/Marlin",
+  "official_url": "https://marlinfw.org",
+  "stars": 17645,
+  "code_pushed_at": "2026-11-03T00:28:44Z",
+  "default_branch": "bugfix-2.1.x",
+  "commit_sha": "6e03341e0436b076f8339f0f702be18a05f81522",
+  "readme_path": "README.md",
+  "readme_blob_sha": "93e16d33f023b0ba5648743753c55a5cfa960934",
+  "readme_source_url": "https://github.com/MarlinFirmware/Marlin/blob/6e03341e0436b076f8339f0f702be18a05f81522/README.md",
+  "readme_api_url": "https://api.github.com/repos/MarlinFirmware/Marlin/contents/README.md?ref=bugfix-2.1.x",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/MarlinFirmware/Marlin/blob/bugfix-2.1.x/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/MarlinFirmware/Marlin/6e03341e0436b076f8339f0f702be18a05f81522/buildroot/share/pixmaps/logo/marlin-outrun-nf-500.png",
+  "fetched_at": "2026-11-03T01:50:35.517133+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "MarlinFirmware/Marlin",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/MarlinFirmware/Marlin/6e03341e0436b076f8339f0f702be18a05f81522/buildroot/share/pixmaps/logo/marlin-outrun-nf-500.png"
+  ],
+  "icon_attribution": "原始 Marlin Logo 由 Ahmet Cem TURAN 设计；截图链接为项目仓库变体",
+  "license_basis": "README 指明 GPL，仓库 GPLv3",
+  "official_entry": {
+    "url": "https://marlinfw.org/",
+    "kind": "查看文档"
+  }
+}

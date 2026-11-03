@@ -1,0 +1,93 @@
+{
+  "inventory_index": 138,
+  "original_key": "ReFirmLabs/binwalk",
+  "repository": "ReFirmLabs/binwalk",
+  "catalog": {
+    "audience": "适合在自有或获授权环境中学习软件、协议与安全分析的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:17:52.888591+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "固件分析",
+      "文件结构",
+      "逆向"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 1865,
+    "full_name": "ReFirmLabs/binwalk",
+    "getting_started": "用自己拥有的固件样本阅读官方基础示例，先观察识别结果。",
+    "highlights": [
+      "帮助识别文件中的数据结构",
+      "可为后续分析提供入口"
+    ],
+    "homepage_url": "https://github.com/ReFirmLabs/binwalk",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-08-11T15:27:26Z",
+    "last_pushed_at": "2026-08-11T15:27:34Z",
+    "name": "Binwalk",
+    "notes": [
+      "处理未知样本时使用隔离环境，提取结果不保证完整或准确。"
+    ],
+    "order": 139,
+    "readme_sha": "fb517d90d1fae4cb2ffad1e0347c0843204b6d1b",
+    "related_categories": [
+      "hardware"
+    ],
+    "source_url": "https://github.com/ReFirmLabs/binwalk/blob/master/README.md",
+    "stars": 14582,
+    "summary": "用于识别与分析固件及二进制文件组成的开源工具。",
+    "tags": [
+      "固件分析",
+      "文件结构",
+      "逆向"
+    ],
+    "title": "从固件文件中寻找内部结构的线索",
+    "watchers": 360
+  },
+  "github_url": "https://github.com/ReFirmLabs/binwalk",
+  "official_url": "https://github.com/ReFirmLabs/binwalk",
+  "stars": 14591,
+  "code_pushed_at": "2026-08-11T15:27:34Z",
+  "default_branch": "master",
+  "commit_sha": "26713972e3f9f52dc37d4a421c4554b0bd9e82ef",
+  "readme_path": "README.md",
+  "readme_blob_sha": "fb517d90d1fae4cb2ffad1e0347c0843204b6d1b",
+  "readme_source_url": "https://github.com/ReFirmLabs/binwalk/blob/26713972e3f9f52dc37d4a421c4554b0bd9e82ef/README.md",
+  "readme_api_url": "https://api.github.com/repos/ReFirmLabs/binwalk/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "MIT",
+  "license_source_url": "https://github.com/ReFirmLabs/binwalk/blob/26713972e3f9f52dc37d4a421c4554b0bd9e82ef/LICENSE",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:39.032500+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/ReFirmLabs/binwalk/26713972e3f9f52dc37d4a421c4554b0bd9e82ef/images/binwalk_animated.svg",
+    "https://raw.githubusercontent.com/ReFirmLabs/binwalk/26713972e3f9f52dc37d4a421c4554b0bd9e82ef/images/output.png"
+  ],
+  "license_basis": "固定版本根目录 MIT 许可证",
+  "official_chinese_search": "固定提交树未找到中文 README",
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "official_entry": {
+    "url": "https://github.com/ReFirmLabs/binwalk/wiki",
+    "kind": "查看文档"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "ReFirmLabs/binwalk",
+  "license_blob_sha": "2e006161d7c6dc63b87331c43c7095c119b9bfe2",
+  "license_file_verified_at_commit": true
+}

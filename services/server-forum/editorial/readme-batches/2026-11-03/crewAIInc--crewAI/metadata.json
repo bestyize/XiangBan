@@ -1,0 +1,79 @@
+{
+  "inventory_index": 63,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望构建、运行或理解 AI 应用的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:16:56.096507+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "多智能体",
+      "任务编排",
+      "Python"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 9001,
+    "full_name": "crewAIInc/crewAI",
+    "getting_started": "先按官方教程配置一个小型协作任务，再增加工具和数据。",
+    "highlights": [
+      "可按角色分配任务",
+      "支持逐步组织智能体执行流程"
+    ],
+    "homepage_url": "https://crewai.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-01T22:32:38Z",
+    "last_pushed_at": "2026-11-02T17:57:11Z",
+    "name": "CrewAI",
+    "notes": [
+      "开源框架与商业管理平台的能力、许可和费用分别核对。"
+    ],
+    "order": 64,
+    "readme_sha": "4a5360ad587a35625684747157881558c6acae1d",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/crewAIInc/crewAI/blob/main/README.md",
+    "stars": 60427,
+    "summary": "围绕角色、任务与流程组织多智能体应用的框架。",
+    "tags": [
+      "多智能体",
+      "任务编排",
+      "Python"
+    ],
+    "title": "让不同角色的智能体协同完成任务",
+    "watchers": 390
+  },
+  "repository": "crewAIInc/crewAI",
+  "fetched_at": "2026-11-03T01:50:37.258214+00:00",
+  "canonical_repository": "crewAIInc/crewAI",
+  "default_branch": "main",
+  "commit_sha": "86dca29b536d700b69a97a3592857d5f9d4a8873",
+  "readme_path": "README.md",
+  "readme_blob_sha": "4a5360ad587a35625684747157881558c6acae1d",
+  "readme_url": "https://github.com/crewAIInc/crewAI/blob/86dca29b536d700b69a97a3592857d5f9d4a8873/README.md",
+  "stars": 60432,
+  "pushed_at": "2026-11-03T00:27:16Z",
+  "stars_fetched_at": "2026-11-03T01:50:39.657883+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://crewai.com",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "a6ee25527ec07201e4373fcbf89f128f304a6f2e",
+  "license_url": "https://github.com/crewAIInc/crewAI/blob/86dca29b536d700b69a97a3592857d5f9d4a8873/LICENSE",
+  "source_language": "unverified",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/crewAIInc/crewAI"
+}

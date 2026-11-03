@@ -1,0 +1,93 @@
+{
+  "inventory_index": 158,
+  "original_key": "wesnoth/wesnoth",
+  "repository": "wesnoth/wesnoth",
+  "catalog": {
+    "audience": "适合希望体验游戏，或研究开放游戏实现与内容生态的人。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:18:00.906844+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "回合制",
+      "战棋",
+      "奇幻"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/wesnoth-screen.jpg",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或体验",
+    "featured": true,
+    "forks": 1278,
+    "full_name": "wesnoth/wesnoth",
+    "getting_started": "安装官方稳定版，先完成基础教学与一段战役。",
+    "highlights": [
+      "围绕单位与地形组织策略",
+      "提供战役和社区扩展能力"
+    ],
+    "homepage_url": "https://www.wesnoth.org/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T11:07:05Z",
+    "last_pushed_at": "2026-11-02T11:07:06Z",
+    "name": "The Battle for Wesnoth",
+    "notes": [
+      "扩展内容和美术、音乐可能有不同许可。"
+    ],
+    "order": 159,
+    "readme_sha": "7afd7e7c486a1f4104f7dbd00d14f2be77568e16",
+    "related_categories": [],
+    "source_url": "https://github.com/wesnoth/wesnoth/blob/master/README.md",
+    "stars": 6968,
+    "summary": "包含战役、多人对战与扩展内容的开源回合制策略游戏。",
+    "tags": [
+      "回合制",
+      "战棋",
+      "奇幻"
+    ],
+    "title": "在回合之间规划一场奇幻战役",
+    "watchers": 160
+  },
+  "github_url": "https://github.com/wesnoth/wesnoth",
+  "official_url": "https://www.wesnoth.org/",
+  "stars": 6968,
+  "code_pushed_at": "2026-11-02T23:39:28Z",
+  "default_branch": "master",
+  "commit_sha": "a50b1574a6916668a7be11ec34c767303ad4c631",
+  "readme_path": "README.md",
+  "readme_blob_sha": "7afd7e7c486a1f4104f7dbd00d14f2be77568e16",
+  "readme_source_url": "https://github.com/wesnoth/wesnoth/blob/a50b1574a6916668a7be11ec34c767303ad4c631/README.md",
+  "readme_api_url": "https://api.github.com/repos/wesnoth/wesnoth/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-2.0",
+  "license_source_url": "https://github.com/wesnoth/wesnoth/blob/a50b1574a6916668a7be11ec34c767303ad4c631/COPYING",
+  "icon_source_url": "https://raw.githubusercontent.com/wesnoth/wesnoth/a50b1574a6916668a7be11ec34c767303ad4c631/images/misc/logo.png",
+  "fetched_at": "2026-11-03T01:50:46.207982+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://www.wesnoth.org/images/sshots/wesnoth-1.16.0-1.jpg",
+    "https://www.wesnoth.org/images/sshots/wesnoth-1.16.0-2.jpg",
+    "https://www.wesnoth.org/images/sshots/wesnoth-1.16.0-5.jpg",
+    "https://www.wesnoth.org/images/sshots/wesnoth-1.16.0-8.jpg"
+  ],
+  "license_basis": "README 指明代码 GPLv2+，历史美术多为 GPLv2+，新贡献 CC BY-SA 4.0",
+  "official_entry": {
+    "url": "https://www.wesnoth.org/",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "wesnoth/wesnoth",
+  "license_blob_sha": "3912109b5cd65a68039d473c11c9f7ac2303e06d",
+  "license_file_verified_at_commit": true,
+  "icon_basis": "固定版本仓库项目 Logo/应用图标，链接保留上游"
+}

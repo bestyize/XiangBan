@@ -1,0 +1,114 @@
+{
+  "inventory_key": "supabase/supabase",
+  "full_name": "supabase/supabase",
+  "inventory_entry": {
+    "audience": "适合希望搭建自己的网站、应用或服务的个人与团队。",
+    "category": "web",
+    "collected_at": "2026-11-02T18:18:08.256606+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "PostgreSQL",
+      "后端平台",
+      "自部署"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/supabase-screen.png",
+    "cover_variant": "offset",
+    "effort": "需要开发或部署环境",
+    "featured": true,
+    "forks": 15767,
+    "full_name": "supabase/supabase",
+    "getting_started": "从官方本地开发入门建立测试项目，理解数据与访问控制。",
+    "highlights": [
+      "以 PostgreSQL 为基础组织服务",
+      "提供应用开发常用的配套能力"
+    ],
+    "homepage_url": "https://supabase.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:57:08Z",
+    "last_pushed_at": "2026-11-02T17:57:11Z",
+    "name": "Supabase",
+    "notes": [
+      "托管服务和自行部署的费用、维护与功能范围分别确认。"
+    ],
+    "order": 25,
+    "readme_sha": "163afeaf8ad8ee5d944e994becc27716431369f1",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/supabase/supabase/blob/master/README.md",
+    "stars": 114443,
+    "summary": "组合数据库、认证、存储等能力的开源开发平台。",
+    "tags": [
+      "PostgreSQL",
+      "后端平台",
+      "自部署"
+    ],
+    "title": "围绕 PostgreSQL 搭建应用后端",
+    "watchers": 759
+  },
+  "fetched_at": "2026-11-03T01:50:43.212735+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "supabase/supabase",
+  "repository_url": "https://github.com/supabase/supabase",
+  "default_branch": "master",
+  "stars": 114455,
+  "pushed_at": "2026-11-03T00:26:20Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "Apache-2.0",
+  "homepage": "https://supabase.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://user-images.githubusercontent.com/8291514/213727234-cda046d6-28c6-491a-b284-b86c5cede25d.png",
+  "commit_sha": "5ce8532dfffcfc8f2acc11918966a9858bbb8cbe",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "49ea124025275674563eeff03af0f653ca49fdc0",
+    "source_url": "https://github.com/supabase/supabase/blob/5ce8532dfffcfc8f2acc11918966a9858bbb8cbe/LICENSE",
+    "spdx": "Apache-2.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "163afeaf8ad8ee5d944e994becc27716431369f1",
+    "source_url": "https://github.com/supabase/supabase/blob/5ce8532dfffcfc8f2acc11918966a9858bbb8cbe/README.md",
+    "raw_url": "https://raw.githubusercontent.com/supabase/supabase/5ce8532dfffcfc8f2acc11918966a9858bbb8cbe/README.md",
+    "size_bytes": 16839,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "i18n/README.zh-cn.md",
+      "blob_sha": "e63bab80664d72152e640240ac0d01a6f8c7460e"
+    },
+    {
+      "path": "i18n/README.zh-tw.md",
+      "blob_sha": "3fd2768e870db7f5991d0e061c307ee7e8a6d79a"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "i18n/README.zh-cn.md",
+    "blob_sha": "e63bab80664d72152e640240ac0d01a6f8c7460e",
+    "source_url": "https://github.com/supabase/supabase/blob/5ce8532dfffcfc8f2acc11918966a9858bbb8cbe/i18n/README.zh-cn.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "translation": {
+    "method": "以固定提交英文为完整底本，参考同提交官方简体中文并由 Terra 对照补译重写",
+    "source_blob_sha": "163afeaf8ad8ee5d944e994becc27716431369f1",
+    "official_zh_path": "i18n/README.zh-cn.md",
+    "official_zh_blob_sha": "e63bab80664d72152e640240ac0d01a6f8c7460e",
+    "official_zh_differences": "官方中文旧版本将 GoTrue 写为 SWT，使用 Kong 和过期客户端列表，缺少徽章和示例代码；已依据英文更新为 JWT、Envoy 和完整当前列表并补齐徽章。旧版额外赞助段落不属于固定英文原文，保留在官方中文来源文件中。",
+    "link_base": "重建版以英文根目录为基准；所有相对地址固定提交；官方中文来源文件未修改。"
+  },
+  "official_entry": {
+    "url": "https://supabase.com",
+    "kind": "项目官网"
+  }
+}

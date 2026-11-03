@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "全文逐节对照，代码命令和版本保留",
+    "相对图片链接固定到同一提交；检查两张图片和 Wiki 入口",
+    "仓库 MIT 许可证已保存"
+  ],
+  "link_results": {
+    "https://raw.githubusercontent.com/ReFirmLabs/binwalk/26713972e3f9f52dc37d4a421c4554b0bd9e82ef/images/binwalk_animated.svg": 200,
+    "https://raw.githubusercontent.com/ReFirmLabs/binwalk/26713972e3f9f52dc37d4a421c4554b0bd9e82ef/images/output.png": 200,
+    "https://github.com/ReFirmLabs/binwalk/wiki": 200
+  },
+  "issues": [
+    "未逐一联网测试所有 Wiki 子页面"
+  ]
+}

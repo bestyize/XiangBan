@@ -1,0 +1,98 @@
+{
+  "inventory_index": 159,
+  "original_key": "go-vikunja/vikunja",
+  "repository": "go-vikunja/vikunja",
+  "catalog": {
+    "audience": "适合希望自主组织笔记、文档和团队工作的人。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:17:13.827900+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "任务管理",
+      "项目计划",
+      "自部署"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 792,
+    "full_name": "go-vikunja/vikunja",
+    "getting_started": "先建立一个测试项目和任务清单，再配置团队或同步。",
+    "highlights": [
+      "集中管理个人与团队任务",
+      "提供多种任务组织方式"
+    ],
+    "homepage_url": "https://vikunja.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T15:17:15Z",
+    "last_pushed_at": "2026-11-02T17:55:04Z",
+    "name": "Vikunja",
+    "notes": [
+      "移动、桌面和服务端的部署方式与版本分别核对。"
+    ],
+    "order": 160,
+    "readme_sha": "f34912266f33cd9d0328ac16bfcbaf6fb104ee99",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/go-vikunja/vikunja/blob/main/README.md",
+    "stars": 5939,
+    "summary": "提供任务与项目管理能力的开源应用，可自行维护服务。",
+    "tags": [
+      "任务管理",
+      "项目计划",
+      "自部署"
+    ],
+    "title": "把任务、清单和计划放回自己手里",
+    "watchers": 16
+  },
+  "github_url": "https://github.com/go-vikunja/vikunja",
+  "official_url": "https://vikunja.io",
+  "stars": 5944,
+  "code_pushed_at": "2026-11-03T00:06:32Z",
+  "default_branch": "main",
+  "commit_sha": "e2f3847d2461c8f86f140b268843ae41d6d64a8a",
+  "readme_path": "README.md",
+  "readme_blob_sha": "f34912266f33cd9d0328ac16bfcbaf6fb104ee99",
+  "readme_source_url": "https://github.com/go-vikunja/vikunja/blob/e2f3847d2461c8f86f140b268843ae41d6d64a8a/README.md",
+  "readme_api_url": "https://api.github.com/repos/go-vikunja/vikunja/contents/README.md?ref=main",
+  "readme_language": "en",
+  "license_spdx": "AGPL-3.0",
+  "license_source_url": "https://github.com/go-vikunja/vikunja/blob/e2f3847d2461c8f86f140b268843ae41d6d64a8a/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/go-vikunja/vikunja/e2f3847d2461c8f86f140b268843ae41d6d64a8a/frontend/originalMedia/images/logo-full.svg",
+  "fetched_at": "2026-11-03T01:50:46.484487+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/go-vikunja/vikunja/e2f3847d2461c8f86f140b268843ae41d6d64a8a/frontend/originalMedia/images/logo-full.svg"
+  ],
+  "license_basis": "仓库主要部分 AGPL-3.0-or-later，desktop 为 GPL-3.0-or-later；原文图片另有 Unsplash 条款",
+  "image_replacements": [
+    {
+      "original": "https://vikunja.io/images/vikunja-logo.svg",
+      "replacement": "https://raw.githubusercontent.com/go-vikunja/vikunja/e2f3847d2461c8f86f140b268843ae41d6d64a8a/frontend/originalMedia/images/logo-full.svg",
+      "reason": "原文图 404，替换为固定版本仓库官方 Logo"
+    }
+  ],
+  "official_entry": {
+    "url": "https://try.vikunja.io",
+    "kind": "在线体验"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "go-vikunja/vikunja",
+  "license_blob_sha": "be3f7b28e564e7dd05eaf59d64adba1a4065ac0e",
+  "license_file_verified_at_commit": true
+}

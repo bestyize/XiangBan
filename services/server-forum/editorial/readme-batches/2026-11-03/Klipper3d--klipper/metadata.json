@@ -1,0 +1,92 @@
+{
+  "inventory_index": 144,
+  "original_key": "Klipper3d/klipper",
+  "repository": "Klipper3d/klipper",
+  "catalog": {
+    "audience": "想理解打印机运动控制和配置方式的人。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:01:34.471899+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "3D打印",
+      "固件",
+      "运动控制"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要硬件或开发环境",
+    "featured": true,
+    "forks": 5964,
+    "full_name": "Klipper3d/klipper",
+    "getting_started": "从官方安装与设备兼容说明开始，使用对应打印机的配置。",
+    "highlights": [
+      "把计算任务与底层控制分工",
+      "配置与扩展能力公开"
+    ],
+    "homepage_url": "https://github.com/Klipper3d/klipper",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-28T19:05:41Z",
+    "last_pushed_at": "2026-10-28T19:08:56Z",
+    "name": "Klipper",
+    "notes": [
+      "安装与校准涉及真实设备，使用稳定版本和对应硬件配置。"
+    ],
+    "order": 145,
+    "readme_sha": "f8e8c9590c5bbf535e803d2eadd04bf6a0bcb873",
+    "related_categories": [],
+    "source_url": "https://github.com/Klipper3d/klipper/blob/master/README.md",
+    "stars": 12023,
+    "summary": "组合通用计算机和微控制器的三维打印固件系统。",
+    "tags": [
+      "3D打印",
+      "固件",
+      "运动控制"
+    ],
+    "title": "让主机与微控制器协同控制打印机",
+    "watchers": 377
+  },
+  "github_url": "https://github.com/Klipper3d/klipper",
+  "official_url": "https://github.com/Klipper3d/klipper",
+  "stars": 12023,
+  "code_pushed_at": "2026-10-28T19:08:56Z",
+  "default_branch": "master",
+  "commit_sha": "0cee841e31d701595b3e509a0b502f6e320f52a8",
+  "readme_path": "README.md",
+  "readme_blob_sha": "f8e8c9590c5bbf535e803d2eadd04bf6a0bcb873",
+  "readme_source_url": "https://github.com/Klipper3d/klipper/blob/0cee841e31d701595b3e509a0b502f6e320f52a8/README.md",
+  "readme_api_url": "https://api.github.com/repos/Klipper3d/klipper/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/Klipper3d/klipper/blob/0cee841e31d701595b3e509a0b502f6e320f52a8/COPYING",
+  "icon_source_url": "https://raw.githubusercontent.com/Klipper3d/klipper/0cee841e31d701595b3e509a0b502f6e320f52a8/docs/img/klipper-logo-small.png",
+  "fetched_at": "2026-11-03T01:50:41.224811+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/Klipper3d/klipper/0cee841e31d701595b3e509a0b502f6e320f52a8/docs/img/klipper-logo-small.png"
+  ],
+  "link_rewrite_note": "相对路径解析至记录的提交；原文保留于 README.source.md",
+  "license_basis": "仓库 COPYING，GPL-3.0；README 引用该许可证，未发现文档排除条款",
+  "official_chinese_search": "已搜索固定提交树中的 README 中文路径，未发现中文 README",
+  "platforms": [],
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "official_entry": {
+    "url": "https://www.klipper3d.org/",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "Klipper3d/klipper",
+  "license_blob_sha": "f288702d2fa16d3cdf0035b15a9fcbc552cd88e7",
+  "license_file_verified_at_commit": true
+}

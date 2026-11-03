@@ -1,0 +1,10 @@
+{
+  "status": "blocked",
+  "full_text_coverage": "blocked",
+  "code_and_numbers": "pending",
+  "links_and_images": "pending",
+  "license": "blocked",
+  "issues": [
+    "固定提交的仓库根目录及根 README 均未发现许可声明；递归树中的许可属于独立 skill 子目录，尚无根 README 的明确复制与翻译授权依据。"
+  ]
+}

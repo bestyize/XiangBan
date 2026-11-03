@@ -1,0 +1,10 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "全部 359 个教程标题和其余介绍、贡献及许可段落已直接译写；保留对应语言标签与类别。",
+  "code_and_numbers": "无代码块；技术名称、语言标签和标题中的数量按原文保留。",
+  "links_and_images": "中文与英文共 369 个外部 Markdown URL 顺序完全一致，所有目录锚点均存在；两张正文图片返回可读图像。外部教程内容未逐站复制或重许可。",
+  "license": "原 README 明确声明 CC0 1.0，原文许可保存于 LICENSE.upstream；第三方教程各自许可独立。",
+  "issues": [
+    "README 中仅有官方横幅，未确认可单独使用的项目图标。"
+  ]
+}

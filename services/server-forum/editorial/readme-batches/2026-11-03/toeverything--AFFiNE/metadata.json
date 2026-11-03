@@ -1,0 +1,105 @@
+{
+  "inventory_key": "toeverything/AFFiNE",
+  "full_name": "toeverything/AFFiNE",
+  "inventory_entry": {
+    "audience": "需要在文字与可视化表达间切换的个人或团队。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:01:21.332392+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "文档",
+      "白板",
+      "工作空间"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 5450,
+    "full_name": "toeverything/AFFiNE",
+    "getting_started": "从官方客户端下载或在线演示开始，再评估自部署。",
+    "highlights": [
+      "文档与画布可结合使用",
+      "社区版本公开源码"
+    ],
+    "homepage_url": "https://affine.pro",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T13:43:59Z",
+    "last_pushed_at": "2026-11-02T13:44:03Z",
+    "name": "AFFiNE",
+    "notes": [
+      "社区版与后端等目录存在不同许可，商业和云功能以官方说明为准。"
+    ],
+    "order": 50,
+    "readme_sha": "537c3615ba5e354c277a30a3b8cd21faf1ab3503",
+    "related_categories": [
+      "design"
+    ],
+    "source_url": "https://github.com/toeverything/AFFiNE/blob/canary/README.md",
+    "stars": 74117,
+    "summary": "结合文档、画布与表格的工作空间，提供本地与自部署相关能力。",
+    "tags": [
+      "文档",
+      "白板",
+      "工作空间"
+    ],
+    "title": "把文档、白板和资料放在一处",
+    "watchers": 292
+  },
+  "fetched_at": "2026-11-03T01:50:52.593016+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "toeverything/AFFiNE",
+  "repository_url": "https://github.com/toeverything/AFFiNE",
+  "default_branch": "canary",
+  "stars": 74137,
+  "pushed_at": "2026-11-02T13:44:03Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "NOASSERTION",
+  "homepage": "https://affine.pro",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/toeverything/AFFiNE/91ac3ca384b791ffd1a87de352a82e766f11ae08/packages/frontend/core/public/favicon-144.png",
+  "commit_sha": "91ac3ca384b791ffd1a87de352a82e766f11ae08",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "ee4c98c5f018d7421d7a4a28d24f0710f1705269",
+    "source_url": "https://github.com/toeverything/AFFiNE/blob/91ac3ca384b791ffd1a87de352a82e766f11ae08/LICENSE",
+    "spdx": "NOASSERTION",
+    "human_read_label": "MIT (excluding specified paths)"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "537c3615ba5e354c277a30a3b8cd21faf1ab3503",
+    "source_url": "https://github.com/toeverything/AFFiNE/blob/91ac3ca384b791ffd1a87de352a82e766f11ae08/README.md",
+    "size_bytes": 16285
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "91ac3ca384b791ffd1a87de352a82e766f11ae08",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://affine.pro",
+    "kind": "项目官网"
+  },
+  "plain_summary": "结合文档、白板和数据库的本地优先工作空间。",
+  "license_summary": "根 LICENSE 对多数目录使用 MIT，但 packages/backend 和 packages/common/native 等例外适用 AFFiNE EE 许可；具体以原文为准",
+  "license_conflict": {
+    "upstream_readme": "固定版本 README 声称 EE 尚未发布",
+    "current_official": "企业版页面说明后端采用 EE 许可，修改、编译或再分发需商业协议",
+    "official_url": "https://affine.pro/enterprise",
+    "captured_root_license": "https://github.com/toeverything/AFFiNE/blob/91ac3ca384b791ffd1a87de352a82e766f11ae08/LICENSE",
+    "captured_backend_license": "https://github.com/toeverything/AFFiNE/blob/91ac3ca384b791ffd1a87de352a82e766f11ae08/packages/backend/server/LICENSE",
+    "backend_license_file": "LICENSE.backend-ee",
+    "checked_at": "2026-11-03T02:49:09.525875+00:00"
+  }
+}

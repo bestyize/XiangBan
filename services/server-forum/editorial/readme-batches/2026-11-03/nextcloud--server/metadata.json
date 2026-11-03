@@ -1,0 +1,91 @@
+{
+  "inventory_index": 95,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望自主组织笔记、文档和团队工作的人。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:17:10.061345+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "文件协作",
+      "自部署",
+      "团队空间"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/nextcloud-screen.png",
+    "cover_variant": "wide",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 5334,
+    "full_name": "nextcloud/server",
+    "getting_started": "先部署测试实例，配置少量账号和文件后验证同步与共享。",
+    "highlights": [
+      "围绕文件组织协作流程",
+      "可通过应用生态扩展用途"
+    ],
+    "homepage_url": "https://nextcloud.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T18:07:07Z",
+    "last_pushed_at": "2026-11-02T18:07:30Z",
+    "name": "Nextcloud",
+    "notes": [
+      "运行维护、扩展应用和备份由部署者负责，商业服务另行确认。"
+    ],
+    "order": 96,
+    "readme_sha": "2f526984a6a663779f6e0e96a6683ffeca17b270",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/nextcloud/server/blob/master/README.md",
+    "stars": 37396,
+    "summary": "可自行部署的文件协作服务，提供文件管理与应用扩展相关能力。",
+    "tags": [
+      "文件协作",
+      "自部署",
+      "团队空间"
+    ],
+    "title": "给团队的文件和资料建立自有空间",
+    "watchers": 543
+  },
+  "repository": "nextcloud/server",
+  "fetched_at": "2026-11-03T01:50:58.702478+00:00",
+  "canonical_repository": "nextcloud/server",
+  "default_branch": "master",
+  "commit_sha": "5cc43956c923fabb689fbe1acc3e9a1ad0d8e088",
+  "readme_path": "README.md",
+  "readme_blob_sha": "2f526984a6a663779f6e0e96a6683ffeca17b270",
+  "readme_url": "https://github.com/nextcloud/server/blob/5cc43956c923fabb689fbe1acc3e9a1ad0d8e088/README.md",
+  "stars": 37398,
+  "pushed_at": "2026-11-03T00:29:17Z",
+  "stars_fetched_at": "2026-11-03T01:51:00.767710+00:00",
+  "license_spdx": "AGPL-3.0",
+  "homepage_url": "https://nextcloud.com",
+  "icon_source_url": "",
+  "license_path": "COPYING",
+  "license_blob_sha": "dba13ed2ddf783ee8118c6a581dbf75305f816a3",
+  "license_url": "https://github.com/nextcloud/server/blob/5cc43956c923fabb689fbe1acc3e9a1ad0d8e088/COPYING",
+  "source_language": "English",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/nextcloud/server",
+  "translation_attribution": "非官方中文全文译文，保留原文件 SPDX 版权与许可声明",
+  "relative_link_resolution": "仓库内相对文档链接指向固定提交",
+  "description_zh": "在自己的服务器上保存、同步和分享文件与日历等数据。",
+  "official_entry": {
+    "url": "https://nextcloud.com",
+    "kind": "项目官网",
+    "verification": "上游 README 链接，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标",
+  "image_license": "原文中的官方截图保留外链，未复制图片；单独素材权利待核实。",
+  "documentation_license": "AGPL-3.0-or-later（README 文件头 SPDX）"
+}

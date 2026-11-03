@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对参考实现安全警告、七个参考服务器、归档列表、客户端配置、传输对比、安全及许可说明",
+  "code_and_numbers": "六个代码块与英文完全一致；Windows cmd /c、stdio 无端口、HTTP 端口和仅 Everything 支持 Streamable HTTP 等限制已核对",
+  "links_and_images": "全部相对文档及服务器路径固定到采集提交，并经完整 Git 树核对；官方 MCP 图标返回 HTTP 200",
+  "license": "文档（规范除外）CC BY 4.0；代码由 MIT 向 Apache-2.0 过渡。原始许可和版权声明保存在 LICENSE.upstream，文档许可全文保存在 LICENSE.CC-BY-4.0；已记录署名和翻译修改",
+  "issues": [
+    "README 将服务器定位为参考实现，明确不是可直接用于生产的解决方案；需保留上游威胁模型警告。"
+  ],
+  "manual_review": "非官方中文译文；交付后仍需编辑复核"
+}

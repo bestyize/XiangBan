@@ -1,0 +1,99 @@
+{
+  "inventory_key": "practical-tutorials/project-based-learning",
+  "full_name": "practical-tutorials/project-based-learning",
+  "inventory_entry": {
+    "audience": "希望用实际作品推动学习的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:01:32.483806+00:00",
+    "cover_accent": "#657063",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "项目实战",
+      "教程目录",
+      "编程"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 36792,
+    "full_name": "practical-tutorials/project-based-learning",
+    "getting_started": "选择一个符合当前基础的项目，逐步完成并记录自己的改动。",
+    "highlights": [
+      "按语言与项目方向查找",
+      "适合以完整作品串联知识"
+    ],
+    "homepage_url": "https://github.com/practical-tutorials/project-based-learning",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T06:38:51Z",
+    "last_pushed_at": "2026-11-02T06:38:53Z",
+    "name": "Project Based Learning",
+    "notes": [
+      "目录更新不代表所有外链教程都更新，先检查依赖与原文日期。"
+    ],
+    "order": 6,
+    "readme_sha": "b5906c7ef98aa98401f51d10469da76eaa288091",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/practical-tutorials/project-based-learning/blob/master/README.md",
+    "stars": 288798,
+    "summary": "按编程语言整理从零构建应用的教程链接。",
+    "tags": [
+      "项目实战",
+      "教程目录",
+      "编程"
+    ],
+    "title": "通过做一个完整项目学会新技能",
+    "watchers": 3464
+  },
+  "fetched_at": "2026-11-03T01:50:36.114683+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "practical-tutorials/project-based-learning",
+  "repository_url": "https://github.com/practical-tutorials/project-based-learning",
+  "default_branch": "master",
+  "stars": 288819,
+  "pushed_at": "2026-11-02T06:38:53Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": null,
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "2146917314b5e98e58513c930c0a745cc6c7100c",
+  "license": {
+    "path": "LICENSE.md",
+    "blob_sha": "3632221e90963ae21a4e5b75db7feda0cb8a8bbe",
+    "source_url": "https://github.com/practical-tutorials/project-based-learning/blob/2146917314b5e98e58513c930c0a745cc6c7100c/LICENSE.md",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "b5906c7ef98aa98401f51d10469da76eaa288091",
+    "source_url": "https://github.com/practical-tutorials/project-based-learning/blob/2146917314b5e98e58513c930c0a745cc6c7100c/README.md",
+    "raw_url": "https://raw.githubusercontent.com/practical-tutorials/project-based-learning/2146917314b5e98e58513c930c0a745cc6c7100c/README.md",
+    "size_bytes": 52344,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "official_entry": {
+    "url": "https://github.com/practical-tutorials/project-based-learning",
+    "kind": "GitHub"
+  },
+  "translation": {
+    "method": "Terra 逐条译写并对照全文；15 个完全同名条目复用本批已译标题",
+    "source_blob_sha": "b5906c7ef98aa98401f51d10469da76eaa288091",
+    "title_index": "title-index.json",
+    "title_fragments": "title-fragments.json",
+    "coverage": "457 个标准链接标题及所有非链接分组标题、介绍、附注均已处理。",
+    "third_party_license": "仓库 MIT 许可适用于 README；链接的第三方教程适用其自身许可。"
+  }
+}

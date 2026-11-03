@@ -1,0 +1,10 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "对照固定英文补齐官方中文缺项；162 个算法／结构目录项按链接及出现次数核对，全部章节与复杂度表保留。",
+  "code_and_numbers": "6 个 fenced 代码块与英文逐字一致；Node >=16 与表格数字按英文保留。",
+  "links_and_images": "固定提交完整 Git 树核验 129 个英文及 128 个中文仓库相对目标，均存在；4 个正文图片均返回可读图片。",
+  "license": "根 MIT 许可证保存于 LICENSE.upstream；原始官方中文快照另存。",
+  "issues": [
+    "README 未提供可确认的项目图标，需素材核实。"
+  ]
+}

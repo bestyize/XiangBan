@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对七个库、四类工具、文档路径、混合许可与补丁提交说明",
+  "code_and_numbers": "无代码块；工具、库、路径和 git 命令保留原样",
+  "links_and_images": "README 无图片；FFmpeg 官方网站图标返回 HTTP 200，原文链接保持原状",
+  "license": "根 LICENSE.md 说明大部分代码 LGPL-2.1+ 且列出 GPL 等例外，完整声明及四份 GPL/LGPL 许可证已保存在 LICENSE* 文件中",
+  "issues": [
+    "README 明确说明 GitHub Pull Request 不属于审查流程且会被忽略；项目各文件和可选组件可能适用不同许可证。"
+  ],
+  "manual_review": "非官方中文译文；交付后仍需编辑复核"
+}

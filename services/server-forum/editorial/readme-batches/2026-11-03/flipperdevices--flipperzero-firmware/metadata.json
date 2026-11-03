@@ -1,0 +1,90 @@
+{
+  "inventory_index": 131,
+  "original_key": "flipperdevices/flipperzero-firmware",
+  "repository": "flipperdevices/flipperzero-firmware",
+  "catalog": {
+    "audience": "适合愿意阅读硬件文档、准备实验环境并验证设备的爱好者与开发者。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:17:52.506038+00:00",
+    "cover_accent": "#657063",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "设备固件",
+      "嵌入式",
+      "开发工具"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要兼容硬件或仿真环境",
+    "featured": true,
+    "forks": 3515,
+    "full_name": "flipperdevices/flipperzero-firmware",
+    "getting_started": "先在官方文档了解设备能力，再从示例和构建说明开始阅读。",
+    "highlights": [
+      "可查看设备功能的实现",
+      "提供固件构建与扩展相关入口"
+    ],
+    "homepage_url": "https://flipper.net",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-30T19:23:12Z",
+    "last_pushed_at": "2026-10-30T19:23:12Z",
+    "name": "Flipper Zero Firmware",
+    "notes": [
+      "仅对自有或获授权设备进行实验，遵守当地射频使用规则。"
+    ],
+    "order": 132,
+    "readme_sha": "accd2ed95bd5caea9c6dfc5a05e8dc7f56c5c6a9",
+    "related_categories": [
+      "security"
+    ],
+    "source_url": "https://github.com/flipperdevices/flipperzero-firmware/blob/dev/ReadMe.md",
+    "stars": 16823,
+    "summary": "Flipper Zero 设备的官方固件源码与开发相关资料。",
+    "tags": [
+      "设备固件",
+      "嵌入式",
+      "开发工具"
+    ],
+    "title": "阅读一台多功能硬件工具的官方固件",
+    "watchers": 355
+  },
+  "github_url": "https://github.com/flipperdevices/flipperzero-firmware",
+  "official_url": "https://flipper.net",
+  "stars": 16825,
+  "code_pushed_at": "2026-10-30T19:23:12Z",
+  "default_branch": "dev",
+  "commit_sha": "9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a",
+  "readme_path": "ReadMe.md",
+  "readme_blob_sha": "accd2ed95bd5caea9c6dfc5a05e8dc7f56c5c6a9",
+  "readme_source_url": "https://github.com/flipperdevices/flipperzero-firmware/blob/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/ReadMe.md",
+  "readme_api_url": "https://api.github.com/repos/flipperdevices/flipperzero-firmware/contents/ReadMe.md?ref=dev",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/flipperdevices/flipperzero-firmware/blob/dev/LICENSE",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:36.695601+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "flipperdevices/flipperzero-firmware",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/flipperdevices/flipperzero-firmware/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/.github/assets/dark_theme_banner.png",
+    "https://raw.githubusercontent.com/flipperdevices/flipperzero-firmware/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/.github/assets/light_theme_banner.png"
+  ],
+  "license_basis": "仓库 GPL-3.0 许可证",
+  "official_entry": {
+    "url": "https://flipper.net",
+    "kind": "项目官网"
+  }
+}

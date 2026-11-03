@@ -1,0 +1,92 @@
+{
+  "inventory_index": 106,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:22.251146+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "矢量图形",
+      "节点编辑",
+      "浏览器"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 1311,
+    "full_name": "GraphiteEditor/Graphite",
+    "getting_started": "先在官方演示创建简单图形，再理解图层与节点关系。",
+    "highlights": [
+      "围绕可编辑图形组织操作",
+      "提供节点式创作相关能力"
+    ],
+    "homepage_url": "https://graphite.art",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:59:22Z",
+    "last_pushed_at": "2026-11-02T17:59:24Z",
+    "name": "Graphite",
+    "notes": [
+      "项目仍在持续演进，具体导出和浏览器支持以当前文档为准。"
+    ],
+    "order": 107,
+    "readme_sha": "ad20249f120e9c033efff22604522a2e9ec4d6f4",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/GraphiteEditor/Graphite/blob/master/README.md",
+    "stars": 27821,
+    "summary": "结合图形编辑与节点工作流的开源设计工具。",
+    "tags": [
+      "矢量图形",
+      "节点编辑",
+      "浏览器"
+    ],
+    "title": "在浏览器里探索可编辑的图形流程",
+    "watchers": 128
+  },
+  "repository": "GraphiteEditor/Graphite",
+  "fetched_at": "2026-11-03T01:51:06.194230+00:00",
+  "canonical_repository": "GraphiteEditor/Graphite",
+  "default_branch": "master",
+  "commit_sha": "8206b4cc8810d357852b3bb4d669d3efd02d41ca",
+  "readme_path": "README.md",
+  "readme_blob_sha": "ad20249f120e9c033efff22604522a2e9ec4d6f4",
+  "readme_url": "https://github.com/GraphiteEditor/Graphite/blob/8206b4cc8810d357852b3bb4d669d3efd02d41ca/README.md",
+  "stars": 27823,
+  "pushed_at": "2026-11-02T22:50:43Z",
+  "stars_fetched_at": "2026-11-03T01:51:08.287070+00:00",
+  "license_spdx": "Apache-2.0",
+  "homepage_url": "https://graphite.art",
+  "icon_source_url": "https://github.com/user-attachments/assets/791508ab-bcd5-4e31-a3b9-1187cfd7a2f6",
+  "license_path": "LICENSE-APACHE",
+  "license_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+  "license_url": "https://github.com/GraphiteEditor/Graphite/blob/8206b4cc8810d357852b3bb4d669d3efd02d41ca/LICENSE-APACHE",
+  "source_language": "English",
+  "license_scope_caveat": "上游同时提供 MIT 与 Apache；MIT 文本明确包括软件及关联文档。README 图片和商标可能单独受限，待审核。",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/GraphiteEditor/Graphite",
+  "license_choice": "MIT",
+  "license_mit_url": "https://github.com/GraphiteEditor/Graphite/blob/8206b4cc8810d357852b3bb4d669d3efd02d41ca/LICENSE-MIT",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "双许可证链接指向固定提交",
+  "description_zh": "在线绘制和编辑矢量、栅格图形的开源创作工具。",
+  "official_entry": {
+    "url": "https://editor.graphite.art",
+    "kind": "在线体验",
+    "verification": "上游 README 的 Alpha 编辑器入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "image_license": "官方 Logo 和示例图保留可读上游外链，未复制素材；单独图片权利待后续核实。"
+}

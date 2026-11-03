@@ -1,0 +1,23 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文；键盘路径固定到采集提交",
+    "已核验官网、文档入口及主要相对路径；动态徽章和其余外链未逐一联网",
+    "保留 GPL-2.0 仓库许可"
+  ],
+  "link_results": {
+    "https://qmk.fm": 200,
+    "https://docs.qmk.fm": 200,
+    "https://github.com/qmk/qmk_firmware/tree/f5db962110615fd263c3ebf9f0402e7c2b08fbe4/keyboards/planck/": 200,
+    "https://github.com/qmk/qmk_firmware/tree/f5db962110615fd263c3ebf9f0402e7c2b08fbe4/keyboards/preonic/": 200,
+    "https://github.com/qmk/qmk_firmware/tree/f5db962110615fd263c3ebf9f0402e7c2b08fbe4/keyboards/ergodox_ez/": 200,
+    "https://github.com/qmk/qmk_firmware/tree/f5db962110615fd263c3ebf9f0402e7c2b08fbe4/keyboards/clueboard/": 200,
+    "https://github.com/qmk/qmk_firmware/tree/f5db962110615fd263c3ebf9f0402e7c2b08fbe4/keyboards/clueboard/17/": 200,
+    "https://github.com/qmk/qmk_firmware/tree/f5db962110615fd263c3ebf9f0402e7c2b08fbe4/keyboards/atreus/": 200
+  },
+  "issues": []
+}

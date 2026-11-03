@@ -1,0 +1,96 @@
+{
+  "inventory_key": "Stirling-Tools/Stirling-PDF",
+  "full_name": "Stirling-Tools/Stirling-PDF",
+  "inventory_entry": {
+    "audience": "经常整理和转换 PDF 文档的人。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:01:21.775080+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "PDF",
+      "文档处理",
+      "自部署"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 10014,
+    "full_name": "Stirling-Tools/Stirling-PDF",
+    "getting_started": "从官方文档选择桌面版或部署方式，用测试文件确认所需功能。",
+    "highlights": [
+      "集中常见 PDF 处理工具",
+      "提供桌面、网页与服务端相关入口"
+    ],
+    "homepage_url": "https://stirling.com",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/Stirling-Tools/Stirling-PDF/main/docs/stirling.png",
+    "icon_url": "/open-source-media/stirling-icon.png",
+    "last_commit_at": "2026-11-02T16:39:47Z",
+    "last_pushed_at": "2026-11-02T16:59:59Z",
+    "name": "Stirling PDF",
+    "notes": [
+      "项目为开放核心模式：基础部分与 proprietary、saas、部分 engine 等目录的许可不同。"
+    ],
+    "order": 35,
+    "readme_sha": "d266d6e9ce5b63599afa099b0fd3003f94442fd2",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/Stirling-Tools/Stirling-PDF/blob/main/README.md",
+    "stars": 95584,
+    "summary": "面向 PDF 合并、拆分、转换等任务的平台，可按需使用桌面或自部署版本。",
+    "tags": [
+      "PDF",
+      "文档处理",
+      "自部署"
+    ],
+    "title": "给日常 PDF 处理准备一个工具台",
+    "watchers": 293
+  },
+  "fetched_at": "2026-11-03T01:50:47.254756+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "Stirling-Tools/Stirling-PDF",
+  "repository_url": "https://github.com/Stirling-Tools/Stirling-PDF",
+  "default_branch": "main",
+  "stars": 95612,
+  "pushed_at": "2026-11-03T00:27:15Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "NOASSERTION",
+  "homepage": "https://stirling.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/Stirling-Tools/Stirling-PDF/c687f2f5eb915b72900ae6c5890d352751ec844f/docs/stirling.png",
+  "commit_sha": "c687f2f5eb915b72900ae6c5890d352751ec844f",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "3510a74aa8ac273d4a894c50f7d8b3bd59047ad4",
+    "source_url": "https://github.com/Stirling-Tools/Stirling-PDF/blob/c687f2f5eb915b72900ae6c5890d352751ec844f/LICENSE",
+    "spdx": "NOASSERTION",
+    "human_read_label": "MIT (excluding specified proprietary paths)"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "d266d6e9ce5b63599afa099b0fd3003f94442fd2",
+    "source_url": "https://github.com/Stirling-Tools/Stirling-PDF/blob/c687f2f5eb915b72900ae6c5890d352751ec844f/README.md",
+    "size_bytes": 3197
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "c687f2f5eb915b72900ae6c5890d352751ec844f",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://stirling.com",
+    "kind": "项目官网"
+  },
+  "plain_summary": "编辑、转换和自动处理 PDF 的工具，支持自托管。",
+  "license_summary": "开放核心：根 LICENSE 的 MIT 条款不适用于列出的专有或独立许可目录"
+}

@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，缩进命令示例完全一致且原文反引号标识符均保留；系统版本、旧版本不受支持、DASH 安全提示和依赖列表保留。",
+    "上游 Copyright 默认 GPLv2+ 并区分 LGPL 构建及文档例外，已保存 Copyright、GPL 与 LGPL 原文；译注明确 -Dgpl=false 本身不授予 LGPL 权利。",
+    "21 个链接 HEAD 200；项目 Logo 使用官方外链，未复制素材，单独图片权利待后续核实。"
+  ],
+  "link_check": {
+    "method": "HTTP HEAD，排除示例命令中的 URL",
+    "urls_checked": 21,
+    "http_200": 21
+  }
+}

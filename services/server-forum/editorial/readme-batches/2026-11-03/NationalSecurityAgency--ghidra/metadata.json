@@ -1,0 +1,97 @@
+{
+  "inventory_key": "NationalSecurityAgency/ghidra",
+  "full_name": "NationalSecurityAgency/ghidra",
+  "inventory_entry": {
+    "audience": "适合学习程序分析、研究编译结果或进行授权安全研究的人。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:01:36.545079+00:00",
+    "cover_accent": "#9D7159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "反汇编",
+      "反编译",
+      "脚本"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "flow",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要程序分析基础",
+    "featured": true,
+    "forks": 10978,
+    "full_name": "NationalSecurityAgency/ghidra",
+    "getting_started": "按仓库说明配置运行环境，再用自己编写并编译的小程序熟悉分析界面。",
+    "highlights": [
+      "将反汇编、反编译和分析工具组织在一起",
+      "支持多种平台与处理器架构",
+      "可以通过脚本扩展分析过程"
+    ],
+    "homepage_url": "https://ghidra-sre.org",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/master/Ghidra/Features/Base/src/main/resources/images/GHIDRA_3.png",
+    "icon_url": "/open-source-media/ghidra-icon.png",
+    "last_commit_at": "2026-10-30T17:50:01Z",
+    "last_pushed_at": "2026-11-02T09:44:00Z",
+    "name": "Ghidra",
+    "notes": [
+      "所需 JDK 与构建条件以当前版本文档为准。"
+    ],
+    "order": 31,
+    "readme_sha": "3f1eea7b35d8551f2433f3074f68ba736d72673f",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/NationalSecurityAgency/ghidra#readme",
+    "stars": 97098,
+    "summary": "提供反汇编、反编译与程序分析能力的软件逆向工程框架。",
+    "tags": [
+      "逆向分析",
+      "反编译",
+      "程序分析"
+    ],
+    "title": "从编译后的程序，理解软件如何工作",
+    "watchers": 1203
+  },
+  "fetched_at": "2026-11-03T01:50:45.207246+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "NationalSecurityAgency/ghidra",
+  "repository_url": "https://github.com/NationalSecurityAgency/ghidra",
+  "default_branch": "master",
+  "stars": 97200,
+  "pushed_at": "2026-11-02T22:44:54Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "Apache-2.0",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/251f3603f89c0620bdc503ff9a19382bf469ffec/Ghidra/Features/Base/src/main/resources/images/GHIDRA_3.png",
+  "commit_sha": "251f3603f89c0620bdc503ff9a19382bf469ffec",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+    "source_url": "https://github.com/NationalSecurityAgency/ghidra/blob/251f3603f89c0620bdc503ff9a19382bf469ffec/LICENSE",
+    "spdx": "Apache-2.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "3f1eea7b35d8551f2433f3074f68ba736d72673f",
+    "source_url": "https://github.com/NationalSecurityAgency/ghidra/blob/251f3603f89c0620bdc503ff9a19382bf469ffec/README.md",
+    "raw_url": "https://raw.githubusercontent.com/NationalSecurityAgency/ghidra/251f3603f89c0620bdc503ff9a19382bf469ffec/README.md",
+    "size_bytes": 7205,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "251f3603f89c0620bdc503ff9a19382bf469ffec",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://ghidra-sre.org/",
+    "kind": "项目官网"
+  },
+  "plain_summary": "分析和研究已编译软件的逆向工程工具。"
+}

@@ -1,0 +1,24 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐项对照全文，保留快捷键、路径、权限及版本方案",
+    "官网、Logo 和固定版本编译文档已验证；动态徽章和其他外链未逐一联网",
+    "保留 LGPL 许可证与上游素材许可清单"
+  ],
+  "link_results": {
+    "https://www.luanti.org/": 200,
+    "https://docs.luanti.org/": 200,
+    "https://raw.githubusercontent.com/luanti-org/luanti/9c424c44ff523ebce076367e52222ac4d71e94c1/textures/base/pack/logo.png": 200,
+    "https://github.com/luanti-org/luanti/blob/9c424c44ff523ebce076367e52222ac4d71e94c1/doc/compiling/README.md": 200,
+    "https://github.com/luanti-org/luanti/blob/9c424c44ff523ebce076367e52222ac4d71e94c1/doc/compiling/linux.md": 200,
+    "https://github.com/luanti-org/luanti/blob/9c424c44ff523ebce076367e52222ac4d71e94c1/doc/compiling/windows.md": 200,
+    "https://github.com/luanti-org/luanti/blob/9c424c44ff523ebce076367e52222ac4d71e94c1/doc/compiling/macos.md": 200,
+    "https://github.com/luanti-org/luanti/blob/9c424c44ff523ebce076367e52222ac4d71e94c1/doc/developing/docker.md": 200,
+    "https://github.com/luanti-org/luanti/blob/9c424c44ff523ebce076367e52222ac4d71e94c1/doc/docker_server.md": 200
+  },
+  "issues": []
+}

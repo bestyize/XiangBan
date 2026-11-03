@@ -1,0 +1,89 @@
+{
+  "inventory_index": 88,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望搭建自己的网站、应用或服务的个人与团队。",
+    "category": "web",
+    "collected_at": "2026-11-02T18:18:09.489707+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "网站统计",
+      "产品分析",
+      "自部署"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要开发或部署环境",
+    "featured": true,
+    "forks": 8471,
+    "full_name": "umami-software/umami",
+    "getting_started": "先在测试站点接入，核对事件与访问统计是否符合预期。",
+    "highlights": [
+      "以看板和指标观察使用情况",
+      "可控制自己的分析服务部署"
+    ],
+    "homepage_url": "https://umami.is",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-23T08:07:12Z",
+    "last_pushed_at": "2026-11-01T20:45:48Z",
+    "name": "Umami",
+    "notes": [
+      "统计口径和隐私合规仍需按采集配置与实际使用地区确认。"
+    ],
+    "order": 89,
+    "readme_sha": "c641cee3a9892f2aa0264f8ee093a74f14547705",
+    "related_categories": [
+      "office"
+    ],
+    "source_url": "https://github.com/umami-software/umami/blob/master/README.md",
+    "stars": 39872,
+    "summary": "提供网页与产品分析能力的开源平台，可自行部署。",
+    "tags": [
+      "网站统计",
+      "产品分析",
+      "自部署"
+    ],
+    "title": "用清楚的指标观察网站的使用情况",
+    "watchers": 135
+  },
+  "repository": "umami-software/umami",
+  "fetched_at": "2026-11-03T01:50:54.078066+00:00",
+  "canonical_repository": "umami-software/umami",
+  "default_branch": "master",
+  "commit_sha": "559e3c607c23d2c72d9bd4f6481bda428255323c",
+  "readme_path": "README.md",
+  "readme_blob_sha": "c641cee3a9892f2aa0264f8ee093a74f14547705",
+  "readme_url": "https://github.com/umami-software/umami/blob/559e3c607c23d2c72d9bd4f6481bda428255323c/README.md",
+  "stars": 39881,
+  "pushed_at": "2026-11-03T01:21:55Z",
+  "stars_fetched_at": "2026-11-03T01:50:56.531072+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://umami.is",
+  "icon_source_url": "https://content.umami.is/website/images/umami-logo.png",
+  "license_path": "LICENSE",
+  "license_blob_sha": "eff41369347b0c5e88a96bd00c9266343b758e7a",
+  "license_url": "https://github.com/umami-software/umami/blob/559e3c607c23d2c72d9bd4f6481bda428255323c/LICENSE",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "许可证链接指向固定提交",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/umami-software/umami",
+  "description_zh": "统计网站流量、访问行为和转化的开源分析工具。",
+  "official_entry": {
+    "url": "https://umami.is",
+    "kind": "项目官网",
+    "verification": "上游 README 文档所属官网，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "image_license": "README 标明的 Umami Logo 使用官方外链，未复制素材；单独图片权利待后续核实。"
+}

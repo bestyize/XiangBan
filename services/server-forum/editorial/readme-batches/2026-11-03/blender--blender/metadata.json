@@ -1,0 +1,98 @@
+{
+  "inventory_index": 117,
+  "original_key": "blender/blender",
+  "repository": "blender/blender",
+  "catalog": {
+    "audience": "想学习三维制作或搭建创作流程的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:01:23.987085+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "3D",
+      "动画",
+      "渲染"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/blender-screen.jpg",
+    "cover_variant": "offset",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 3486,
+    "full_name": "blender/blender",
+    "getting_started": "从官网下载稳定版，跟随官方入门完成一个简单场景。",
+    "highlights": [
+      "覆盖多种三维制作环节",
+      "插件和学习资源丰富"
+    ],
+    "homepage_url": "https://developer.blender.org/docs/handbook/contributing/using_git/#github-mirror",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:26:17Z",
+    "last_pushed_at": "2026-11-02T17:46:50Z",
+    "name": "Blender",
+    "notes": [
+      "GitHub 是官方镜像；贡献流程与主仓库位置以 Blender 官方说明为准。"
+    ],
+    "order": 118,
+    "readme_sha": "0f97685b82467ea3f830f69404ae999c7ef5c21d",
+    "related_categories": [
+      "media"
+    ],
+    "source_url": "https://github.com/blender/blender/blob/main/.github/README.md",
+    "stars": 21538,
+    "summary": "覆盖三维建模、动画、渲染等环节的开源创作套件。",
+    "tags": [
+      "3D",
+      "动画",
+      "渲染"
+    ],
+    "title": "从建模到动画，探索完整的三维创作",
+    "watchers": 369
+  },
+  "github_url": "https://github.com/blender/blender",
+  "official_url": "https://developer.blender.org/docs/handbook/contributing/using_git/#github-mirror",
+  "stars": 21555,
+  "code_pushed_at": "2026-11-03T01:16:50Z",
+  "default_branch": "main",
+  "commit_sha": "50d477803fa8c53cf0f93c131c07b3ee6f2afb73",
+  "readme_path": ".github/README.md",
+  "readme_blob_sha": "0f97685b82467ea3f830f69404ae999c7ef5c21d",
+  "readme_source_url": "https://github.com/blender/blender/blob/50d477803fa8c53cf0f93c131c07b3ee6f2afb73/.github/README.md",
+  "readme_api_url": "https://api.github.com/repos/blender/blender/contents/.github/README.md?ref=main",
+  "readme_language": "en",
+  "license_spdx": "GPL-2.0-or-later",
+  "license_source_url": "https://github.com/blender/blender/blob/50d477803fa8c53cf0f93c131c07b3ee6f2afb73/COPYING",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:31.125737+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "COPYING",
+      "url": "https://github.com/blender/blender/blob/50d477803fa8c53cf0f93c131c07b3ee6f2afb73/COPYING",
+      "sha": "3be7c91320a650eb99fc4ebda1f5fab48c7dbea2"
+    }
+  ],
+  "needs_license_review": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "blender/blender",
+  "license_basis": "官方许可页：项目源代码默认 GPL-2.0-or-later，合并后的 Blender 二进制分发 GPL-3.0-or-later；README 说整体 GPLv3",
+  "license_text_source_url": "https://raw.githubusercontent.com/blender/blender/50d477803fa8c53cf0f93c131c07b3ee6f2afb73/doc/license/GPL-license.txt",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://code.blender.org/wp-content/uploads/2018/12/springrg.jpg"
+  ],
+  "official_entry": {
+    "url": "https://www.blender.org",
+    "kind": "项目官网"
+  },
+  "license_blob_sha": "3be7c91320a650eb99fc4ebda1f5fab48c7dbea2",
+  "license_file_verified_at_commit": true
+}

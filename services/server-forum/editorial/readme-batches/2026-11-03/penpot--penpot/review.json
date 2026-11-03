@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，明确保留云服务、自托管及付费 Enterprise 区别，原文安全与独占性称谓注明尚未独立验证；许可证代码块完全一致。",
+    "MPL-2.0 仓库许可与版权说明已保存；两项原链接 404、一项看板超时，原链保留并在译注提供官方文档/博客入口。",
+    "5 张项目官方界面图 Range GET 206，仅用外链未复制；未核实项目图标，卡片使用名称占位。"
+  ],
+  "link_check": {
+    "urls_checked": 47,
+    "result": "44 个 HEAD 200；MCP 介绍页与开发日志 404、Taiga 看板超时；译注提供官方 MCP 文档和博客。5 张官方图片 Range GET 206。"
+  }
+}

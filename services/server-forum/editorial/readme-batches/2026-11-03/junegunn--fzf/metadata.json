@@ -1,0 +1,90 @@
+{
+  "inventory_key": "junegunn/fzf",
+  "full_name": "junegunn/fzf",
+  "inventory_entry": {
+    "audience": "适合希望改善日常开发与命令行工作流的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:17:34.100190+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "terminal",
+    "cover_lines": [
+      "模糊搜索",
+      "终端",
+      "命令行"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 4189,
+    "full_name": "junegunn/fzf",
+    "getting_started": "先把一个文件列表交给 fzf，熟悉选择与快捷键。",
+    "highlights": [
+      "可处理来自不同命令的列表",
+      "便于组合自己的交互流程"
+    ],
+    "homepage_url": "https://junegunn.github.io/fzf/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T13:14:08Z",
+    "last_pushed_at": "2026-11-02T13:18:35Z",
+    "name": "fzf",
+    "notes": [
+      "筛选结果交给其他命令前仍需核对，尤其是写操作。"
+    ],
+    "order": 43,
+    "readme_sha": "55005aa38acef7b1ca655eb5ac3765a88fdfafba",
+    "related_categories": [],
+    "source_url": "https://github.com/junegunn/fzf/blob/master/README.md",
+    "stars": 83944,
+    "summary": "可在命令行中交互使用的通用模糊查找工具。",
+    "tags": [
+      "模糊搜索",
+      "终端",
+      "命令行"
+    ],
+    "title": "在长列表里更快找到想要的那一项",
+    "watchers": 446
+  },
+  "fetched_at": "2026-11-03T01:50:50.292926+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "junegunn/fzf",
+  "repository_url": "https://github.com/junegunn/fzf",
+  "default_branch": "master",
+  "stars": 83962,
+  "pushed_at": "2026-11-02T13:18:35Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://junegunn.github.io/fzf/",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/junegunn/i/master/fzf-color.png",
+  "commit_sha": "99bfd5aa0f66133d7dcfbf18f8044eb765f04649",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "f63057ce12075081be3c2b3e31bafff9d9359545",
+    "source_url": "https://github.com/junegunn/fzf/blob/99bfd5aa0f66133d7dcfbf18f8044eb765f04649/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "55005aa38acef7b1ca655eb5ac3765a88fdfafba",
+    "source_url": "https://github.com/junegunn/fzf/blob/99bfd5aa0f66133d7dcfbf18f8044eb765f04649/README.md",
+    "raw_url": "https://raw.githubusercontent.com/junegunn/fzf/99bfd5aa0f66133d7dcfbf18f8044eb765f04649/README.md",
+    "size_bytes": 42726,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "plain_summary": "在终端中对文件、命令历史或其他列表进行交互式模糊查找。",
+  "official_entry": "https://junegunn.github.io/fzf/",
+  "entry_label": "项目官网",
+  "translation_provenance": "Terra 对固定提交英文 README 全文译写，代码中的自然语言注释译成中文，命令保留。",
+  "image_rights": "项目标志沿用 README 中作者维护的独立素材仓库原图链接；素材许可及商标权未单独确认。"
+}

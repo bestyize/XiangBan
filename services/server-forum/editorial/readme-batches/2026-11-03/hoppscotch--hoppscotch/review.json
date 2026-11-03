@@ -1,0 +1,12 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐项对照 HTTP 方法、界面、请求与响应、认证、代理、协作、环境、附加组件、演示、贡献和许可",
+  "code_and_numbers": "无代码块；HTTP 方法、10 多种语言、OIDC/PKCE 及 SSO 为企业版功能的脚注均保留",
+  "links_and_images": "全部相对链接固定到采集提交并经完整 Git 树检查；13 个图像及徽章返回 HTTP 200",
+  "license": "MIT，仓库许可证和版权声明保存在 LICENSE.upstream",
+  "issues": [
+    "原文顶部为 GitHub 组织头像，阅读稿改用同提交仓库内项目 logo；原图保留在 README.source.md。",
+    "代理能力、无限数量等为上游产品描述，不作为本站保证。"
+  ],
+  "manual_review": "非官方中文译文；交付后仍需编辑复核"
+}

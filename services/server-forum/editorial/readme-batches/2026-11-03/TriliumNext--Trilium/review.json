@@ -1,0 +1,58 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "官方中文与英文逐节对照，版本兼容、安装要求及四段命令保留；上游中文代码注释保留，赞助商说明已补译。",
+    "AGPL 许可证及版权声明已保存；105 个非动态链接中第三方社区 TriliumRocks 超时，译注提供经核实官方文档。",
+    "官方截图以固定提交外链引用，未复制素材；单独图片权利待后续核实。未核实项目图标，使用名称占位。"
+  ],
+  "automated_candidate_comparison": {
+    "method": "初筛：正则统计标题与代码围栏，不代表章节一致性或翻译准确性审校",
+    "english_source": {
+      "heading_count": 27,
+      "fence_markers": 8,
+      "byte_count": 16254
+    },
+    "official_chinese_candidate": {
+      "heading_count": 27,
+      "fence_markers": 8,
+      "byte_count": 15914
+    }
+  },
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://raw.githubusercontent.com/TriliumNext/Trilium/e26f7486eb66ca77d13bc0e9cd5c6c79b95e0fec/docs/logo-ck.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/TriliumNext/Trilium/e26f7486eb66ca77d13bc0e9cd5c6c79b95e0fec/docs/app.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dosu.dev/hero-new/dosu-icon.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://www.netperfect.fr/sites/default/files/Logo%20NetPerfect%20V4%20250px_0.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://repology.org/badge/vertical-allrepos/trilium.svg",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check": {
+    "urls_checked": 105,
+    "result": "103 个 HEAD 200，TriliumDroid 链接重试 200，第三方社区 TriliumRocks 两次超时；译注提供官方文档。"
+  }
+}

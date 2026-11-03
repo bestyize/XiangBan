@@ -1,0 +1,90 @@
+{
+  "inventory_index": 56,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望自主组织笔记、文档和团队工作的人。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:17:11.492947+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "碎片笔记",
+      "时间线",
+      "自部署"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/memos-screen.png",
+    "cover_variant": "wide",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 4934,
+    "full_name": "usememos/memos",
+    "getting_started": "在测试环境部署后先记录几条笔记，确认访问与备份方式。",
+    "highlights": [
+      "适合快速记录日常想法",
+      "可用标签整理和回顾内容"
+    ],
+    "homepage_url": "https://usememos.com",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/brand/lockup.svg",
+    "icon_url": "/open-source-media/memos-icon.svg",
+    "last_commit_at": "2026-11-01T13:48:49Z",
+    "last_pushed_at": "2026-11-02T13:10:22Z",
+    "name": "Memos",
+    "notes": [
+      "公开分享和访问权限应根据笔记内容配置。"
+    ],
+    "order": 57,
+    "readme_sha": "69210e53c4d2b84435362adae94997ca3c6db0a0",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/usememos/memos/blob/main/README.md",
+    "stars": 64236,
+    "summary": "以个人时间线组织短笔记的开源自部署应用。",
+    "tags": [
+      "碎片笔记",
+      "时间线",
+      "自部署"
+    ],
+    "title": "随手记下想法，再慢慢串联它们",
+    "watchers": 185
+  },
+  "repository": "usememos/memos",
+  "fetched_at": "2026-11-03T01:50:32.911850+00:00",
+  "canonical_repository": "usememos/memos",
+  "default_branch": "main",
+  "commit_sha": "b40d8a7b573774c52b022c8d6537d6baf2129dc0",
+  "readme_path": "README.md",
+  "readme_blob_sha": "69210e53c4d2b84435362adae94997ca3c6db0a0",
+  "readme_url": "https://github.com/usememos/memos/blob/b40d8a7b573774c52b022c8d6537d6baf2129dc0/README.md",
+  "stars": 64240,
+  "pushed_at": "2026-11-02T13:10:22Z",
+  "stars_fetched_at": "2026-11-03T01:50:34.970746+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://usememos.com",
+  "icon_source_url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/brand/lockup.svg",
+  "license_path": "LICENSE",
+  "license_blob_sha": "ad324eef282c58316ff9dfc8ed5086d120a2311c",
+  "license_url": "https://github.com/usememos/memos/blob/b40d8a7b573774c52b022c8d6537d6baf2129dc0/LICENSE",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "文档相对链接指向所选固定提交；图像保持上游官方链接",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/usememos/memos",
+  "description_zh": "通过个人时间线记录和整理短笔记的自托管应用。",
+  "entry_label": "项目官网",
+  "platforms": [],
+  "image_license": "官方仓库外链；单独许可未确认，不下载或复制素材。",
+  "official_entry": {
+    "url": "https://usememos.com",
+    "kind": "项目官网",
+    "verification": "上游 README 指向该站，HTTP HEAD 返回 200"
+  }
+}

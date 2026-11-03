@@ -1,0 +1,94 @@
+{
+  "inventory_key": "ollama/ollama",
+  "full_name": "ollama/ollama",
+  "inventory_entry": {
+    "audience": "适合想体验本地模型、研究 AI 应用或了解模型运行方式的人。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:01:14.651331+00:00",
+    "cover_accent": "#657063",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "terminal",
+    "cover_lines": [
+      "$ ollama run <model>",
+      "本地模型",
+      "API"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "terminal",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要准备模型与运行环境",
+    "featured": true,
+    "forks": 18872,
+    "full_name": "ollama/ollama",
+    "getting_started": "先查看官方平台要求，再选择适合设备内存和显存的模型，使用非敏感文本试运行。",
+    "highlights": [
+      "提供模型运行与管理工具",
+      "可以通过接口接入自己的应用",
+      "适合从本地模型探索 AI 工作流"
+    ],
+    "homepage_url": "https://ollama.com",
+    "icon_fit": "contain",
+    "icon_source_url": "https://ollama.com/public/apple-touch-icon.png",
+    "icon_url": "/open-source-media/ollama-icon.png",
+    "last_commit_at": "2026-10-31T22:46:17Z",
+    "last_pushed_at": "2026-11-02T16:31:35Z",
+    "name": "Ollama",
+    "notes": [
+      "模型需要单独下载，硬件要求与许可证因模型而异。",
+      "项目也有云端能力，使用时确认实际运行位置。"
+    ],
+    "order": 14,
+    "readme_sha": "6ccf0acbeff491cfffdd6fc972109801fd68fe36",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/ollama/ollama#readme",
+    "stars": 185685,
+    "summary": "用于运行和调用模型的工具，为本地 AI 应用提供一个起点。",
+    "tags": [
+      "本地模型",
+      "模型运行",
+      "API"
+    ],
+    "title": "从在自己电脑上运行一个模型开始",
+    "watchers": 1022
+  },
+  "fetched_at": "2026-11-03T01:50:39.535918+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "ollama/ollama",
+  "repository_url": "https://github.com/ollama/ollama",
+  "default_branch": "main",
+  "stars": 185724,
+  "pushed_at": "2026-11-03T01:42:58Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://ollama.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://ollama.com/public/apple-touch-icon.png",
+  "commit_sha": "9a3e8177767245acc62b735eba7d5d8a553606d0",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "8e3dc978a7ca8c53f56bbedc5b558116140fc02e",
+    "source_url": "https://github.com/ollama/ollama/blob/9a3e8177767245acc62b735eba7d5d8a553606d0/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "6ccf0acbeff491cfffdd6fc972109801fd68fe36",
+    "source_url": "https://github.com/ollama/ollama/blob/9a3e8177767245acc62b735eba7d5d8a553606d0/README.md",
+    "raw_url": "https://raw.githubusercontent.com/ollama/ollama/9a3e8177767245acc62b735eba7d5d8a553606d0/README.md",
+    "size_bytes": 19347,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "plain_summary": "在本地或云端运行开放模型，并通过命令行或 API 将其接入应用。",
+  "official_entry": "https://ollama.com/",
+  "translation_provenance": "Terra 对固定版本英文 README 全文译写，逐项翻译 143 条社区集成说明。",
+  "image_rights": "官方标识沿用 README 原图链接，可能有独立商标权。",
+  "entry_label": "项目官网"
+}

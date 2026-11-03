@@ -1,0 +1,17 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照英文固定版本的误用免责声明、构建依赖、Linux/Docker 命令、文件结构和截图；部分免责声明采用官方中文表述",
+  "code_and_numbers": "11 个代码块与英文完全一致；相较官方中文旧版，Fedora 依赖和 Docker 构建流程等已按英文补正",
+  "links_and_images": "阅读稿采用固定英文 README 根目录作为链接基准；官方中文源路径与 SHA 保存在 metadata；全部相对链接经完整 Git 树核对；官方 logo 和 8 个外部图像返回 HTTP 200",
+  "license": "AGPL-3.0，仓库许可证及版权声明保存在 LICENSE.upstream",
+  "issues": [
+    "旧版官方中文含 16 个代码块和额外镜像、代理示例，固定英文版为 11 个；阅读稿按固定英文版整理，原始官方中文完整保留。",
+    "项目对数据安全的表述属于作者观点，未作为独立安全保证。"
+  ],
+  "manual_review": "基于官方中文补译，交付后仍需编辑复核",
+  "localized_links_audit": {
+    "source_path": "docs/README-ZH.md",
+    "source_blob_sha": "dc73d85a5272d4bdf9c2976ee0002bc74a8a9d85",
+    "method": "阅读稿结构与链接取固定英文源 README；仅复用官方中文的免责声明及部分措辞，没有从中文源移植相对链接。"
+  }
+}

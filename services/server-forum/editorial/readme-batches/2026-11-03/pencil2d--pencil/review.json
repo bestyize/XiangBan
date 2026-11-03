@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留每夜构建版稳定性说明、支持平台和镜像",
+    "验证官网、下载页与展示图；其他链接和动态徽章未逐一联网",
+    "中文页中的原 HTTP 展示图升级为 HTTPS，原始 URL 保留于来源文件",
+    "保留仓库许可证"
+  ],
+  "link_results": {
+    "https://www.pencil2d.org/": 200,
+    "https://www.pencil2d.org/download/": 200,
+    "https://img.youtube.com/vi/ma52j9B1kEM/hqdefault.jpg": 200
+  },
+  "issues": []
+}

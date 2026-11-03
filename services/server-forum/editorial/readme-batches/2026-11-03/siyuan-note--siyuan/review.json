@@ -1,0 +1,33 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "官方中文与英文源同一提交；核对章节结构、关键数据保护及付费限制和版本数值。12 段代码恢复英文源完全一致，AuthCode 内联命令与路径亦恢复，中文多出的宝塔、小皮、1Panel 指南明确保留。",
+    "AGPLv3 原许可已保存；酷安、官方社区/赞助及 GNU 站点本次不可读或限流，原链保留并加译注，GitHub Releases 与本地许可证可用。",
+    "官方 Logo 和截图仅引用外链，未复制素材；单独图片权利待后续核实。"
+  ],
+  "automated_candidate_comparison": {
+    "method": "初筛：正则统计标题与代码围栏，不代表章节一致性或翻译准确性审校",
+    "english_source": {
+      "heading_count": 40,
+      "fence_markers": 24,
+      "byte_count": 32339
+    },
+    "official_chinese_candidate": {
+      "heading_count": 52,
+      "fence_markers": 24,
+      "byte_count": 34798
+    }
+  },
+  "link_check": {
+    "urls_checked": 54,
+    "result": "48 个 HEAD 200；华为和微软商店 GET 均 200；酷安 567、官方社区/赞助页 429、GNU 许可站超时，译注保留原链并提供 GitHub Releases。"
+  }
+}

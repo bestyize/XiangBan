@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照安装方式、推理特性、完整后端表、文档和致谢中的第三方许可",
+  "code_and_numbers": "两个代码块与英文完全一致；量化位数、模型名、硬件和后端状态已核对",
+  "links_and_images": "仓库相对路径固定到采集提交，并通过完整 Git 树核对；截图、品牌图片和动态徽章返回 HTTP 200",
+  "license": "项目代码 MIT；品牌素材 CC BY-NC 4.0，另有 ggml-org 对识别 Llama.cpp 的商业及非商业使用许可，完整条款保存在 LICENSE.llama-brand 与 BRAND-USAGE.md，须署名 ggml-org/llama.brand",
+  "issues": [
+    "README 中性能和支持范围是上游项目的表述；外链截图和徽章后续可用性可能变化。"
+  ],
+  "manual_review": "非官方中文译文；交付后仍需编辑复核"
+}

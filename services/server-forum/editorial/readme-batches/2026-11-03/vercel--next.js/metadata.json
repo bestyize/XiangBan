@@ -1,0 +1,96 @@
+{
+  "inventory_key": "vercel/next.js",
+  "full_name": "vercel/next.js",
+  "inventory_entry": {
+    "audience": "需要构建 React 网站或应用的开发者。",
+    "category": "web",
+    "collected_at": "2026-11-02T18:01:43.314904+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "React",
+      "全栈",
+      "网站框架"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要开发或部署环境",
+    "featured": true,
+    "forks": 33614,
+    "full_name": "vercel/next.js",
+    "getting_started": "跟随官方入门建立最小页面，再理解路由与渲染方式。",
+    "highlights": [
+      "集成网站应用开发常用能力",
+      "提供配套文档与学习案例"
+    ],
+    "homepage_url": "https://nextjs.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:23:22Z",
+    "last_pushed_at": "2026-11-02T17:59:54Z",
+    "name": "Next.js",
+    "notes": [
+      "框架与托管服务分别选择，部署成本取决于实际架构。"
+    ],
+    "order": 18,
+    "readme_sha": "5784281f81edbceb46d272ce48186e4eec9914f2",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/vercel/next.js/blob/canary/readme.md",
+    "stars": 143471,
+    "summary": "围绕 React 提供路由、渲染和全栈开发能力的网页应用框架。",
+    "tags": [
+      "React",
+      "全栈",
+      "网站框架"
+    ],
+    "title": "用 React 搭建完整网站和应用",
+    "watchers": 1620
+  },
+  "fetched_at": "2026-11-03T01:50:41.232835+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "vercel/next.js",
+  "repository_url": "https://github.com/vercel/next.js",
+  "default_branch": "canary",
+  "stars": 143235,
+  "pushed_at": "2026-11-03T01:09:41Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://nextjs.org",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://assets.vercel.com/image/upload/v1662130559/nextjs/Icon_light_background.png",
+  "commit_sha": "61e1348fb523473db8cb3a6cfcadf7eefbf27d5f",
+  "license": {
+    "path": "license.md",
+    "blob_sha": "5948ee9bd0de5064423688a2967ab3111c2658ed",
+    "source_url": "https://github.com/vercel/next.js/blob/61e1348fb523473db8cb3a6cfcadf7eefbf27d5f/license.md",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "readme.md",
+    "blob_sha": "5784281f81edbceb46d272ce48186e4eec9914f2",
+    "source_url": "https://github.com/vercel/next.js/blob/61e1348fb523473db8cb3a6cfcadf7eefbf27d5f/readme.md",
+    "raw_url": "https://raw.githubusercontent.com/vercel/next.js/61e1348fb523473db8cb3a6cfcadf7eefbf27d5f/readme.md",
+    "size_bytes": 3105,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "61e1348fb523473db8cb3a6cfcadf7eefbf27d5f",
+  "official_chinese_search": "固定提交的完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://nextjs.org/",
+    "kind": "项目官网"
+  },
+  "plain_summary": "使用 React 构建网站和全栈 Web 应用。"
+}

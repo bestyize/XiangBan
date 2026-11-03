@@ -1,0 +1,90 @@
+{
+  "inventory_index": 122,
+  "original_key": "ppy/osu",
+  "repository": "ppy/osu",
+  "catalog": {
+    "audience": "适合希望体验游戏，或研究开放游戏实现与内容生态的人。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:18:03.532252+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "节奏游戏",
+      "音乐",
+      "社区"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或体验",
+    "featured": true,
+    "forks": 2870,
+    "full_name": "ppy/osu",
+    "getting_started": "从官方客户端开始体验，再阅读贡献与开发文档。",
+    "highlights": [
+      "围绕节奏与输入反馈设计玩法",
+      "客户端源码与框架可学习"
+    ],
+    "homepage_url": "https://osu.ppy.sh",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T09:38:36Z",
+    "last_pushed_at": "2026-11-02T09:38:36Z",
+    "name": "osu!",
+    "notes": [
+      "游戏代码与曲目、谱面、皮肤等内容的许可不同。"
+    ],
+    "order": 123,
+    "readme_sha": "8d6690460d055b8e16cb670a6bd88bc3706f0697",
+    "related_categories": [
+      "media"
+    ],
+    "source_url": "https://github.com/ppy/osu/blob/master/README.md",
+    "stars": 19363,
+    "summary": "开源节奏游戏客户端与相关框架项目，支持社区内容生态。",
+    "tags": [
+      "节奏游戏",
+      "音乐",
+      "社区"
+    ],
+    "title": "在节奏和交互之间练习精准反馈",
+    "watchers": 300
+  },
+  "github_url": "https://github.com/ppy/osu",
+  "official_url": "https://osu.ppy.sh",
+  "stars": 19365,
+  "code_pushed_at": "2026-11-03T01:30:39Z",
+  "default_branch": "master",
+  "commit_sha": "fc9d1d936a3b886d6f8eab9c819174f3580796b9",
+  "readme_path": "README.md",
+  "readme_blob_sha": "8d6690460d055b8e16cb670a6bd88bc3706f0697",
+  "readme_source_url": "https://github.com/ppy/osu/blob/fc9d1d936a3b886d6f8eab9c819174f3580796b9/README.md",
+  "readme_api_url": "https://api.github.com/repos/ppy/osu/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "MIT",
+  "license_source_url": "https://github.com/ppy/osu/blob/master/LICENCE",
+  "icon_source_url": null,
+  "fetched_at": "2026-11-03T01:50:33.795021+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "ppy/osu",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/ppy/osu/fc9d1d936a3b886d6f8eab9c819174f3580796b9/assets/lazer.png"
+  ],
+  "license_basis": "README 指明代码 MIT；品牌和游戏资源单独受限",
+  "official_entry": {
+    "url": "https://osu.ppy.sh",
+    "kind": "项目官网"
+  },
+  "icon_basis": "README 表示品牌在宣传中受商标限制，卡片先用名称占位，原文图片链接保留"
+}

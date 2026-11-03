@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照原文，保留所有贡献者和赞助者图墙",
+    "验证官网、安装文档及固定版本许可证；动态徽章和其他外链未逐一联网",
+    "保留 GPL v3 许可全文",
+    "贡献者图、个人捐助图及 10 个组织头像均返回 HTTP 200"
+  ],
+  "link_results": {
+    "https://synfig.org/": 200,
+    "https://synfig.readthedocs.io/en/latest/installation.html": 200,
+    "https://github.com/synfig/synfig/blob/751779eedc3ec18c47e4d2d9f0265b86d3e45afd/LICENSE": 200
+  },
+  "issues": []
+}

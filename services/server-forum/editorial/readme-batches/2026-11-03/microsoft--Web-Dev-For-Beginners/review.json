@@ -1,0 +1,25 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "对照英文和官方中文的课程要求、安装方式、测验、教学法、许可证及 28 行课程表；保留官方自动翻译免责声明",
+  "code_and_numbers": "三个代码块与英文完全一致；12 周、24 节、48 次测验及课程表数字已核对",
+  "links_and_images": "基于完整 Git 树检查所有相对链接、固定到采集提交；39 个中英文图片和徽章采集时返回 HTTP 200 中文相对链接已按中文原文件目录重新解析。",
+  "license": "MIT，仓库许可证和版权声明保存在 LICENSE.upstream。第三方商标及标识另依其权利人政策。",
+  "issues": [
+    "上游中文由 Co-op Translator 生成，已保留其免责声明；图片与徽章后续可用性可能变化。",
+    "未确认独立项目图标，卡片使用项目名称占位。"
+  ],
+  "manual_review": "官方中文按固定英文版本补正，交付后仍需编辑复核",
+  "localized_links_audit": {
+    "source_path": "translations/zh-CN/README.md",
+    "source_blob_sha": "8a365bb7d52eb726532df9270864d06608a4f239",
+    "base_directory": "translations/zh-CN",
+    "fixed_distinct_targets": 34,
+    "missing_upstream_relative_links": [
+      "./images/createcodespace.png"
+    ],
+    "method": "以中文原文件目录解析并对照固定提交 Git 树，原有无效目标单独列出。",
+    "missing_target_resolution": "中文源 ./images/createcodespace.png 在中文目录不存在；对应英文原文链接指向仓库根目录 images/createcodespace.png，草稿沿用固定提交的这一文件。",
+    "chinese_images_checked": 36,
+    "chinese_image_failures": []
+  }
+}

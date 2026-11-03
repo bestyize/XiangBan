@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留平台安装命令及插件说明",
+    "Logo、截图与 docker 目录已固定到采集提交并验证；动态徽章及其他外链未逐一联网",
+    "保留仓库许可证"
+  ],
+  "link_results": {
+    "https://cutter.re": 200,
+    "https://raw.githubusercontent.com/rizinorg/cutter/1fbee2e0d688eb12110e4301c993aa5a04a6a29e/src/img/cutter.svg?sanitize=true": 200,
+    "https://raw.githubusercontent.com/rizinorg/cutter/1fbee2e0d688eb12110e4301c993aa5a04a6a29e/docs/source/images/screenshot.png": 200,
+    "https://github.com/rizinorg/cutter/tree/1fbee2e0d688eb12110e4301c993aa5a04a6a29e/docker": 200,
+    "https://github.com/rizinorg/cutter/releases": 200
+  },
+  "issues": []
+}

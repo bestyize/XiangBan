@@ -1,0 +1,11 @@
+{
+  "status": "blocked",
+  "issues": [
+    "已检查固定提交完整仓库树及根 LICENSE.md、license_general.txt：代码与素材分别许可，README 文档未见可确认的转载或翻译许可。",
+    "许可原文摘录、固定版本路径及具体适用范围见 metadata.license_review_evidence.specific_terms；待权利人或明确上游材料确认 README 许可"
+  ],
+  "full_translation_checked": false,
+  "code_and_numbers_checked": false,
+  "links_and_images_checked": false,
+  "license_checked": false
+}

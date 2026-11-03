@@ -1,0 +1,98 @@
+{
+  "inventory_index": 164,
+  "original_key": "beyond-all-reason/Beyond-All-Reason",
+  "repository": "beyond-all-reason/Beyond-All-Reason",
+  "catalog": {
+    "audience": "适合希望体验游戏，或研究开放游戏实现与内容生态的人。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:18:03.905572+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "即时战略",
+      "资源管理",
+      "多人"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "按官方指南安装或体验",
+    "featured": true,
+    "forks": 696,
+    "full_name": "beyond-all-reason/Beyond-All-Reason",
+    "getting_started": "从官方启动器进入教学或单人练习，先熟悉资源系统。",
+    "highlights": [
+      "围绕经济与战场组织对战",
+      "社区持续维护游戏内容"
+    ],
+    "homepage_url": "https://www.beyondallreason.info/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:54:47Z",
+    "last_pushed_at": "2026-11-02T18:03:53Z",
+    "name": "Beyond All Reason",
+    "notes": [
+      "游戏代码采用 GPLv2；部分模型、纹理等素材采用含非商业或禁止演绎条件的许可，不能视为同一开放许可。"
+    ],
+    "order": 165,
+    "readme_sha": "c54575e427c00083ba4a0a993fce452874b8427a",
+    "related_categories": [],
+    "source_url": "https://github.com/beyond-all-reason/Beyond-All-Reason/blob/master/README.md",
+    "stars": 4338,
+    "summary": "基于 Recoil 引擎的开源即时战略游戏。",
+    "tags": [
+      "即时战略",
+      "资源管理",
+      "多人"
+    ],
+    "title": "把资源、战线和单位组成大规模战局",
+    "watchers": 30
+  },
+  "github_url": "https://github.com/beyond-all-reason/Beyond-All-Reason",
+  "official_url": "https://www.beyondallreason.info/",
+  "stars": 4338,
+  "code_pushed_at": "2026-11-03T00:44:47Z",
+  "default_branch": "master",
+  "commit_sha": "1d900169cdafe4867b16b076b85d8a67c84176a7",
+  "readme_path": "README.md",
+  "readme_blob_sha": "c54575e427c00083ba4a0a993fce452874b8427a",
+  "readme_source_url": "https://github.com/beyond-all-reason/Beyond-All-Reason/blob/1d900169cdafe4867b16b076b85d8a67c84176a7/README.md",
+  "readme_api_url": "https://api.github.com/repos/beyond-all-reason/Beyond-All-Reason/contents/README.md?ref=master",
+  "readme_language": "unverified",
+  "license_spdx": "NOASSERTION",
+  "license_source_url": "https://github.com/beyond-all-reason/Beyond-All-Reason/blob/master/LICENSE.md",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:48.027467+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "LICENSE.md",
+      "url": "https://github.com/beyond-all-reason/Beyond-All-Reason/blob/1d900169cdafe4867b16b076b85d8a67c84176a7/LICENSE.md",
+      "sha": "7cda23b92d138d0713e7d9a955ffb94a4f7c74fb"
+    }
+  ],
+  "needs_license_review": true,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "beyond-all-reason/Beyond-All-Reason",
+  "license_review_evidence": {
+    "tree_truncated": false,
+    "checked_files": [
+      "LICENSE.md",
+      "license_general.txt"
+    ],
+    "finding": "已检查固定提交完整仓库树及根 LICENSE.md、license_general.txt：代码与素材分别许可，README 文档未见可确认的转载或翻译许可。",
+    "specific_terms": {
+      "path": "LICENSE.md",
+      "excerpt": "BAR game code is released under the GPL v2 licence, though individual files can have their own license",
+      "scope": "根许可按代码、模型纹理动画、其他美术分别规定；其他美术未列明则保留所有权利，该兜底条款仅明确作用于美术，不推断适用于 README。",
+      "url": "https://github.com/beyond-all-reason/Beyond-All-Reason/blob/1d900169cdafe4867b16b076b85d8a67c84176a7/LICENSE.md"
+    }
+  }
+}

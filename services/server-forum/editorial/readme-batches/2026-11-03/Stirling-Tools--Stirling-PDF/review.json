@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照产品能力、快速开始、资源、付费方案、贡献和开放核心许可说明",
+  "code_and_numbers": "Docker 代码块与英文完全相同；50 多种工具及 40 多种界面语言等数字已核对",
+  "links_and_images": "相对文档、项目图标和界面图片固定到采集提交；图片、徽章及文档链接采集时返回 HTTP 200",
+  "license": "根许可证为 MIT 并列出多个专有或独立许可目录，项目自称开放核心；完整声明保存于 LICENSE.upstream",
+  "issues": [
+    "项目能力和处理规模为上游声明，企业版功能及相关许可须以官方说明为准。"
+  ],
+  "manual_review": "非官方译文；交付后仍需编辑复核"
+}

@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留 EA 未支持说明、过时文档提示和 GPL 许可",
+    "官网和固定版本仓库文档已验证；Wiki、动态徽章及其他外链未逐一联网",
+    "保存仓库许可证全文"
+  ],
+  "link_results": {
+    "https://www.openra.net": 200,
+    "https://github.com/OpenRA/OpenRA/blob/9636b63eaee62fcb60ef2e896e7985bdf2f1ee68/INSTALL.md": 200,
+    "https://github.com/OpenRA/OpenRA/blob/9636b63eaee62fcb60ef2e896e7985bdf2f1ee68/CODE_OF_CONDUCT.md": 200,
+    "https://github.com/OpenRA/OpenRA/blob/9636b63eaee62fcb60ef2e896e7985bdf2f1ee68/CONTRIBUTING.md": 200,
+    "https://github.com/OpenRA/OpenRA/blob/9636b63eaee62fcb60ef2e896e7985bdf2f1ee68/COPYING": 200
+  },
+  "issues": []
+}

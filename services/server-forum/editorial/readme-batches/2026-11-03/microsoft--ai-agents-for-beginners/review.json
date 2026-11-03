@@ -1,0 +1,25 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "按段核对全部标题、学习要求、课程表 20 行、贡献协议与商标说明；保留官方自动翻译免责声明",
+  "code_and_numbers": "两个代码块与英文完全一致；21 课、50 多种语言及 204K 令牌已核对",
+  "links_and_images": "英文与中文的课程表各行对应同一课程；以完整 Git 树核对相对目标；修正缺失目录和中文锚点，固定提交的 34 个中英文图片均返回 HTTP 200 中文相对链接已按中文原文件目录重新解析。",
+  "license": "MIT；仓库许可证及版权声明保存在 LICENSE.upstream。微软商标及第三方标识仍受上游政策约束，见原文。",
+  "issues": [
+    "上游中文本身由 Co-op Translator 生成，已保留其免责声明；图片及徽章后续可用性可能变化。",
+    "未找到独立项目图标，卡片使用项目名称占位；官方课程缩略图仅作正文图片。"
+  ],
+  "manual_review": "官方中文按固定英文版本补正，交付后仍需编辑复核",
+  "localized_links_audit": {
+    "source_path": "translations/zh-CN/README.md",
+    "source_blob_sha": "aa4e6b234b843a9c198fea17efde4a2e1aa09798",
+    "base_directory": "translations/zh-CN",
+    "fixed_distinct_targets": 19,
+    "missing_upstream_relative_links": [
+      "../mni/README.md"
+    ],
+    "method": "以中文原文件目录解析并对照固定提交 Git 树，原有无效目标单独列出。",
+    "missing_target_resolution": "原文额外的曼尼普尔语链接指向不存在的 translations/mni/README.md，英文语言表亦无此项，已在译稿移除并保留原始快照。",
+    "chinese_images_checked": 33,
+    "chinese_image_failures": []
+  }
+}

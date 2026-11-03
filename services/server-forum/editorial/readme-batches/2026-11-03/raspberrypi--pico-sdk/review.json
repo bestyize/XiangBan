@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，11 个代码块直接保留原文及英文代码注释，完整保留版本、板卡及 RISC-V 条件",
+    "主要文档与固定版本相对文档已核验；其他外链未逐一联网",
+    "保存 BSD 许可"
+  ],
+  "link_results": {
+    "https://rptl.io/pico-get-started": 200,
+    "https://rptl.io/pico-c-sdk": 200,
+    "https://github.com/raspberrypi/pico-sdk/blob/079c6f39023649b154152db30f1d781e884879bc/external/pico_sdk_import.cmake": 200,
+    "https://github.com/raspberrypi/pico-sdk/tree/079c6f39023649b154152db30f1d781e884879bc/src/boards/include/boards": 200
+  },
+  "issues": []
+}

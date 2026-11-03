@@ -1,0 +1,99 @@
+{
+  "inventory_key": "obsproject/obs-studio",
+  "full_name": "obsproject/obs-studio",
+  "inventory_entry": {
+    "audience": "适合需要播放、处理或组织自有音视频内容的人。",
+    "category": "media",
+    "collected_at": "2026-11-02T18:17:24.501424+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "录屏",
+      "直播",
+      "场景合成"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 11037,
+    "full_name": "obsproject/obs-studio",
+    "getting_started": "先建立一个录屏场景，测试本地录制后再配置直播。",
+    "highlights": [
+      "可组合多个画面与音频来源",
+      "支持录制与直播工作流"
+    ],
+    "homepage_url": "https://obsproject.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-29T20:34:21Z",
+    "last_pushed_at": "2026-10-29T21:06:06Z",
+    "name": "OBS Studio",
+    "notes": [
+      "编码负载和画质依硬件与设置而异，插件另行核对。"
+    ],
+    "order": 46,
+    "readme_sha": "67a4673ff48767c3384791783db2b12ea6ad4130",
+    "related_categories": [
+      "design"
+    ],
+    "source_url": "https://github.com/obsproject/obs-studio/blob/master/README.rst",
+    "stars": 78840,
+    "summary": "用于视频录制和直播的开源软件，围绕场景与来源组织画面。",
+    "tags": [
+      "录屏",
+      "直播",
+      "场景合成"
+    ],
+    "title": "把录屏、摄像头与直播画面组合起来",
+    "watchers": 1560
+  },
+  "fetched_at": "2026-11-03T01:50:50.661518+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "obsproject/obs-studio",
+  "repository_url": "https://github.com/obsproject/obs-studio",
+  "default_branch": "master",
+  "stars": 78845,
+  "pushed_at": "2026-11-02T19:12:01Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "GPL-2.0",
+  "homepage": "https://obsproject.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/obsproject/obs-studio/65c320b46e1af5c7a555161aea6182cdf7a8c524/frontend/cmake/linux/icons/obs-logo-256.png",
+  "commit_sha": "65c320b46e1af5c7a555161aea6182cdf7a8c524",
+  "license": {
+    "path": "COPYING",
+    "blob_sha": "d159169d1050894d3ea3b98e1c965c4058208fe1",
+    "source_url": "https://github.com/obsproject/obs-studio/blob/65c320b46e1af5c7a555161aea6182cdf7a8c524/COPYING",
+    "spdx": "GPL-2.0"
+  },
+  "readme": {
+    "path": "README.rst",
+    "blob_sha": "67a4673ff48767c3384791783db2b12ea6ad4130",
+    "source_url": "https://github.com/obsproject/obs-studio/blob/65c320b46e1af5c7a555161aea6182cdf7a8c524/README.rst",
+    "raw_url": "https://raw.githubusercontent.com/obsproject/obs-studio/65c320b46e1af5c7a555161aea6182cdf7a8c524/README.rst",
+    "size_bytes": 3139,
+    "language_unverified": "English candidate",
+    "format": "reStructuredText",
+    "storage_note": "README.source.md 保存上游原始字节，原路径为 README.rst，扩展名不代表原格式；后续须忠实转换语法并保留原文。"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "65c320b46e1af5c7a555161aea6182cdf7a8c524",
+  "format_conversion": "源文件为 reStructuredText，英文及中文阅读稿转换为 Markdown；英文词句保持原意",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://obsproject.com",
+    "kind": "项目官网"
+  },
+  "plain_summary": "录制屏幕、组合画面并进行视频直播。"
+}

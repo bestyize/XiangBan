@@ -1,0 +1,111 @@
+{
+  "inventory_index": 87,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望构建、运行或理解 AI 应用的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:16:58.438091+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "检索增强",
+      "知识图谱",
+      "研究实现"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 5752,
+    "full_name": "HKUDS/LightRAG",
+    "getting_started": "先阅读官方介绍，用小规模公开文本运行示例并比较查询结果。",
+    "highlights": [
+      "围绕知识关系构建检索流程",
+      "提供可阅读的实现与示例"
+    ],
+    "homepage_url": "https://arxiv.org/abs/2410.05779",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-14T14:55:37Z",
+    "last_pushed_at": "2026-10-29T18:05:03Z",
+    "name": "LightRAG",
+    "notes": [
+      "研究结果不等于对所有数据都有效，需用自己的任务评估。"
+    ],
+    "order": 88,
+    "readme_sha": "63359639ba73a039fbac15784a34efb77f5b0beb",
+    "related_categories": [
+      "dev",
+      "learn"
+    ],
+    "source_url": "https://github.com/HKUDS/LightRAG/blob/main/README.md",
+    "stars": 40487,
+    "summary": "结合文本检索与知识关系组织信息的 RAG 项目。",
+    "tags": [
+      "检索增强",
+      "知识图谱",
+      "研究实现"
+    ],
+    "title": "探索轻量检索增强的另一种路径",
+    "watchers": 285
+  },
+  "repository": "HKUDS/LightRAG",
+  "fetched_at": "2026-11-03T01:50:53.314547+00:00",
+  "canonical_repository": "HKUDS/LightRAG",
+  "default_branch": "main",
+  "commit_sha": "aaebfe1bb8d55deb6a4304d357a3bf4c92fcd40a",
+  "readme_path": "README.md",
+  "readme_blob_sha": "63359639ba73a039fbac15784a34efb77f5b0beb",
+  "readme_url": "https://github.com/HKUDS/LightRAG/blob/aaebfe1bb8d55deb6a4304d357a3bf4c92fcd40a/README.md",
+  "stars": 40488,
+  "pushed_at": "2026-10-29T18:05:03Z",
+  "stars_fetched_at": "2026-11-03T01:50:55.796312+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://arxiv.org/abs/2410.05779",
+  "icon_source_url": "https://raw.githubusercontent.com/HKUDS/LightRAG/aaebfe1bb8d55deb6a4304d357a3bf4c92fcd40a/assets/logo.png",
+  "license_path": "LICENSE",
+  "license_blob_sha": "ff0c29b4790f767e8abdc14f43ca0495330e89e4",
+  "license_url": "https://github.com/HKUDS/LightRAG/blob/aaebfe1bb8d55deb6a4304d357a3bf4c92fcd40a/LICENSE",
+  "source_language": "en",
+  "official_chinese_candidate": {
+    "path": "README-zh.md",
+    "blob_sha": "9b0331306eb41a43223e5ed99532a4392f63ebd4",
+    "url": "https://github.com/HKUDS/LightRAG/blob/aaebfe1bb8d55deb6a4304d357a3bf4c92fcd40a/README-zh.md",
+    "fetched_at": "2026-11-03T01:51:38.899508+00:00",
+    "status": "已对照英文固定版本并修正差异"
+  },
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/HKUDS/LightRAG",
+  "official_entry": {
+    "url": "https://github.com/HKUDS/LightRAG",
+    "kind": "official_repository"
+  },
+  "draft_comparison": {
+    "code_blocks_restored": 13,
+    "percentages_exactly_equal": 128,
+    "pinned_links_checked": 30,
+    "corrected_chinese_discrepancies": [
+      "查询模式数量：4 → 5",
+      "配置文件 .env.example → env.example",
+      "DEFAULT_MAX_FILE_PATHS → MAX_FILE_PATHS"
+    ],
+    "upstream_contradiction": "Embedding 段声称无重新嵌入工具，后文列出 lightrag-rebuild-vdb；保留并标注。",
+    "status": "已核对并修正"
+  },
+  "translation_work_status": "官方中文全文对照英文，补齐目录与术语差异，待审核",
+  "translation": {
+    "method": "复用官方中文并由 Terra 逐节对照、补译和修正",
+    "source_path": "README-zh.md",
+    "source_blob_sha": "9b0331306eb41a43223e5ed99532a4392f63ebd4",
+    "source_commit_sha": "aaebfe1bb8d55deb6a4304d357a3bf4c92fcd40a",
+    "notes": "固定目录链接，补回英文引用和缺失目录行；官方中文版独有内容保留。"
+  }
+}

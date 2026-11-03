@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对亮点、安装、项目/脚本/工具/版本功能、FAQ、致谢及双重许可",
+  "code_and_numbers": "16 个代码块与英文完全一致；10–100 倍是上游基准声明，所有示例版本和命令保留",
+  "links_and_images": "中文内部锚点已对齐标题，相对风格与许可证链接固定到采集提交；图表、徽章及相关文件采集时返回 HTTP 200",
+  "license": "Apache-2.0 或 MIT 由用户任选；两份许可证分别保存于 LICENSE.upstream 和 LICENSE.MIT",
+  "issues": [
+    "性能提升是上游作者的基准声明，受测试场景影响；外部图表和徽章后续可用性可能变化。"
+  ],
+  "manual_review": "非官方中文译文；交付后仍需编辑复核"
+}

@@ -1,0 +1,92 @@
+{
+  "inventory_index": 100,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合为智能体编写、连接或评估技能与工具的开发者。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:17:09.010464+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "Agent Skills",
+      "网页开发",
+      "官方技能"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 2928,
+    "full_name": "vercel-labs/agent-skills",
+    "getting_started": "挑选一个与当前项目相关的技能，先读说明与配套资源。",
+    "highlights": [
+      "以 SKILL.md 组织任务知识",
+      "适合参考官方的技能拆分方式"
+    ],
+    "homepage_url": "https://skills.sh/vercel-labs/agent-skills",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-27T21:40:02Z",
+    "last_pushed_at": "2026-10-28T19:17:28Z",
+    "name": "Vercel Agent Skills",
+    "notes": [
+      "具体技能可能面向特定框架或工作环境，使用前核对适用范围。"
+    ],
+    "order": 101,
+    "readme_sha": "396ef38284797174c737942a9cc84fc09680b705",
+    "related_categories": [
+      "dev",
+      "learn"
+    ],
+    "source_url": "https://github.com/vercel-labs/agent-skills/blob/main/README.md",
+    "stars": 33416,
+    "summary": "Vercel 提供的 Agent Skills 集合，覆盖其生态中的开发与网页相关任务。",
+    "tags": [
+      "Agent Skills",
+      "网页开发",
+      "官方技能"
+    ],
+    "title": "把官方开发经验整理成可复用技能",
+    "watchers": 126
+  },
+  "repository": "vercel-labs/agent-skills",
+  "fetched_at": "2026-11-03T01:51:02.284150+00:00",
+  "canonical_repository": "vercel-labs/agent-skills",
+  "default_branch": "main",
+  "commit_sha": "1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62",
+  "readme_path": "README.md",
+  "readme_blob_sha": "396ef38284797174c737942a9cc84fc09680b705",
+  "readme_url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/README.md",
+  "stars": 33423,
+  "pushed_at": "2026-10-28T19:17:28Z",
+  "stars_fetched_at": "2026-11-03T01:51:04.927966+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://skills.sh/vercel-labs/agent-skills",
+  "icon_source_url": "",
+  "root_license_candidates": [],
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/vercel-labs/agent-skills",
+  "license_path": "README.md（License 章节）",
+  "license_url": "https://github.com/vercel-labs/agent-skills/blob/1a2c79d4e6c4a2283dc2c614b6538cbe1ed5ca62/README.md",
+  "license_scope_caveat": "README License 章节明确声明 MIT；递归树未发现独立 LICENSE 文件，需确认适当版权署名及完整许可文本呈现。",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文，代码块和提示词示例原样保留",
+  "description_zh": "为编码助手提供 React、设计审查和部署等可复用技能。",
+  "official_entry": {
+    "url": "https://skills.sh/vercel-labs/agent-skills",
+    "kind": "查看文档",
+    "verification": "上游 README 技能目录入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标",
+  "license_notice": "上游 README License 章节仅声明 MIT，仓库无独立 LICENSE 或版权人声明；已保存原始声明和 SPDX MIT 标准模板（模板占位符不是项目版权声明）。",
+  "license_template_source": "https://github.com/spdx/license-list-data/blob/main/text/MIT.txt"
+}

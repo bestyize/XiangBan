@@ -1,0 +1,90 @@
+{
+  "inventory_index": 115,
+  "original_key": "FreeTubeApp/FreeTube",
+  "repository": "FreeTubeApp/FreeTube",
+  "catalog": {
+    "audience": "适合需要播放、处理或组织自有音视频内容的人。",
+    "category": "media",
+    "collected_at": "2026-11-02T18:17:27.482691+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "视频客户端",
+      "桌面应用",
+      "订阅"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 1566,
+    "full_name": "FreeTubeApp/FreeTube",
+    "getting_started": "从官方发布下载稳定版，先测试公开内容的浏览与订阅。",
+    "highlights": [
+      "以桌面应用组织视频浏览",
+      "可研究其本地资料管理方式"
+    ],
+    "homepage_url": "https://freetubeapp.io/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T14:51:43Z",
+    "last_pushed_at": "2026-11-02T14:51:51Z",
+    "name": "FreeTube",
+    "notes": [
+      "上游平台变化可能影响使用，内容权利与平台规则需遵守。"
+    ],
+    "order": 116,
+    "readme_sha": "b84ddbff71612a0c07c8af12dac2cb3429b5ca2a",
+    "related_categories": [],
+    "source_url": "https://github.com/FreeTubeApp/FreeTube/blob/development/README.md",
+    "stars": 22295,
+    "summary": "提供独立桌面视频浏览体验的开源项目。",
+    "tags": [
+      "视频客户端",
+      "桌面应用",
+      "订阅"
+    ],
+    "title": "用桌面客户端探索视频浏览方式",
+    "watchers": 214
+  },
+  "github_url": "https://github.com/FreeTubeApp/FreeTube",
+  "official_url": "https://freetubeapp.io/",
+  "stars": 22299,
+  "code_pushed_at": "2026-11-03T00:47:49Z",
+  "default_branch": "development",
+  "commit_sha": "a0dd9bd6c19715f06bd5ae6fe3c1087addf30b31",
+  "readme_path": "README.md",
+  "readme_blob_sha": "b84ddbff71612a0c07c8af12dac2cb3429b5ca2a",
+  "readme_source_url": "https://github.com/FreeTubeApp/FreeTube/blob/a0dd9bd6c19715f06bd5ae6fe3c1087addf30b31/README.md",
+  "readme_api_url": "https://api.github.com/repos/FreeTubeApp/FreeTube/contents/README.md?ref=development",
+  "readme_language": "en",
+  "license_spdx": "AGPL-3.0",
+  "license_source_url": "https://github.com/FreeTubeApp/FreeTube/blob/development/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/FreeTubeApp/FreeTube/a0dd9bd6c19715f06bd5ae6fe3c1087addf30b31/_icons/logoColor.svg",
+  "fetched_at": "2026-11-03T01:50:31.124991+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "FreeTubeApp/FreeTube",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/FreeTubeApp/FreeTube/a0dd9bd6c19715f06bd5ae6fe3c1087addf30b31/_icons/logoColor.svg",
+    "https://raw.githubusercontent.com/FreeTubeApp/FreeTubeApp.io/master/src/images/FreeTube1.png",
+    "https://raw.githubusercontent.com/FreeTubeApp/FreeTubeApp.io/master/src/images/FreeTube2.png",
+    "https://raw.githubusercontent.com/FreeTubeApp/FreeTubeApp.io/master/src/images/FreeTube3.png"
+  ],
+  "license_basis": "README 指明 AGPL-3.0-or-later",
+  "official_entry": {
+    "url": "https://freetubeapp.io/",
+    "kind": "项目官网"
+  }
+}

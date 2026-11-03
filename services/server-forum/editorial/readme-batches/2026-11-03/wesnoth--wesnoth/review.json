@@ -1,0 +1,22 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留 iOS 与 Android 版本维护限制及不同作品许可",
+    "官网、四张截图与固定版本安装贡献文档已核验；其余外链和动态徽章未逐一联网",
+    "保留 GPL 许可证与原文美术许可说明"
+  ],
+  "link_results": {
+    "https://www.wesnoth.org/": 200,
+    "https://github.com/wesnoth/wesnoth/blob/a50b1574a6916668a7be11ec34c767303ad4c631/INSTALL.md": 200,
+    "https://github.com/wesnoth/wesnoth/blob/a50b1574a6916668a7be11ec34c767303ad4c631/CONTRIBUTING.md": 200,
+    "https://www.wesnoth.org/images/sshots/wesnoth-1.16.0-1.jpg": 200,
+    "https://www.wesnoth.org/images/sshots/wesnoth-1.16.0-2.jpg": 200,
+    "https://www.wesnoth.org/images/sshots/wesnoth-1.16.0-5.jpg": 200,
+    "https://www.wesnoth.org/images/sshots/wesnoth-1.16.0-8.jpg": 200
+  },
+  "issues": []
+}

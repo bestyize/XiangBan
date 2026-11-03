@@ -1,0 +1,98 @@
+{
+  "inventory_index": 58,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合为智能体编写、连接或评估技能与工具的开发者。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:17:00.615532+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "开发文档",
+      "MCP",
+      "编程助手"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 3201,
+    "full_name": "upstash/context7",
+    "getting_started": "按官方指南配置 MCP 客户端，查询一个正在使用的库。",
+    "highlights": [
+      "面向库文档与版本上下文",
+      "可以接入支持 MCP 的工具"
+    ],
+    "homepage_url": "https://context7.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T13:14:44Z",
+    "last_pushed_at": "2026-11-02T16:19:03Z",
+    "name": "Context7",
+    "notes": [
+      "在线服务的认证、额度和文档覆盖范围以官方说明为准。"
+    ],
+    "order": 59,
+    "readme_sha": "5d763258318ad99a8324faab59c6c6b2efd72350",
+    "related_categories": [
+      "dev",
+      "ai"
+    ],
+    "source_url": "https://github.com/upstash/context7/blob/master/README.md",
+    "stars": 64087,
+    "summary": "为 AI 编程工具提供库文档与代码示例的服务和 MCP 接入项目。",
+    "tags": [
+      "开发文档",
+      "MCP",
+      "编程助手"
+    ],
+    "title": "让编程助手参考对应版本的文档",
+    "watchers": 161
+  },
+  "repository": "upstash/context7",
+  "fetched_at": "2026-11-03T01:50:32.912585+00:00",
+  "canonical_repository": "upstash/context7",
+  "default_branch": "master",
+  "commit_sha": "ceaf5f91f48949eaa6e4da5e66f3f59d1b44556d",
+  "readme_path": "README.md",
+  "readme_blob_sha": "5d763258318ad99a8324faab59c6c6b2efd72350",
+  "readme_url": "https://github.com/upstash/context7/blob/ceaf5f91f48949eaa6e4da5e66f3f59d1b44556d/README.md",
+  "stars": 64101,
+  "pushed_at": "2026-11-02T16:19:03Z",
+  "stars_fetched_at": "2026-11-03T01:50:36.147813+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://context7.com",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "17900de42d69131467aaa7a53fa88b92d238dc63",
+  "license_url": "https://github.com/upstash/context7/blob/ceaf5f91f48949eaa6e4da5e66f3f59d1b44556d/LICENSE",
+  "source_language": "English",
+  "official_chinese_candidate": {
+    "path": "i18n/README.zh-CN.md",
+    "blob_sha": "06bd3ec6dd026b27061e5300db939d2fd987fd4a",
+    "url": "https://github.com/upstash/context7/blob/ceaf5f91f48949eaa6e4da5e66f3f59d1b44556d/i18n/README.zh-CN.md",
+    "fetched_at": "2026-11-03T01:51:34.648522+00:00",
+    "status": "已对照英文补齐 Node 版本、Bearer 认证、language 参数与软件包章节，修复 use library 指令"
+  },
+  "translation_attribution": "基于官方中文补译：Node.js 版本、认证请求头、language 参数和软件包章节；自然语言示例由上游翻译",
+  "relative_link_resolution": "相对文档与封面解析到固定提交",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/upstash/context7",
+  "description_zh": "为编程助手查找与所用库版本匹配的文档和代码示例。",
+  "official_entry": {
+    "url": "https://context7.com",
+    "kind": "项目官网",
+    "verification": "上游 README 项目网站，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标",
+  "image_license": "官方封面仅以固定提交外链引用，未复制素材；单独图片权利待后续核实。"
+}

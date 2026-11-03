@@ -1,0 +1,90 @@
+{
+  "inventory_index": 160,
+  "original_key": "supertuxkart/stk-code",
+  "repository": "supertuxkart/stk-code",
+  "catalog": {
+    "audience": "适合希望体验游戏，或研究开放游戏实现与内容生态的人。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:17:59.567662+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "竞速",
+      "卡丁车",
+      "多人"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "按官方指南安装或体验",
+    "featured": true,
+    "forks": 1253,
+    "full_name": "supertuxkart/stk-code",
+    "getting_started": "从官方版本体验基础赛道，再了解多人或自定义内容。",
+    "highlights": [
+      "提供轻松的竞速玩法",
+      "代码与扩展制作入口公开"
+    ],
+    "homepage_url": "https://github.com/supertuxkart/stk-code",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-01T19:01:50Z",
+    "last_pushed_at": "2026-11-01T19:02:12Z",
+    "name": "SuperTuxKart",
+    "notes": [
+      "游戏代码与赛道、角色等资源的许可分别查看。"
+    ],
+    "order": 161,
+    "readme_sha": "63ddba4138da49b11fc04992a4a1875488625002",
+    "related_categories": [],
+    "source_url": "https://github.com/supertuxkart/stk-code/blob/master/README.md",
+    "stars": 5461,
+    "summary": "以趣味驾驶和竞速为核心的自由卡丁车游戏。",
+    "tags": [
+      "竞速",
+      "卡丁车",
+      "多人"
+    ],
+    "title": "在开源卡丁车世界里来一场比赛",
+    "watchers": 291
+  },
+  "github_url": "https://github.com/supertuxkart/stk-code",
+  "official_url": "https://github.com/supertuxkart/stk-code",
+  "stars": 5463,
+  "code_pushed_at": "2026-11-02T21:32:26Z",
+  "default_branch": "master",
+  "commit_sha": "7ed766d35d7f4a265df79c74f9d3f90522ae19a3",
+  "readme_path": "README.md",
+  "readme_blob_sha": "63ddba4138da49b11fc04992a4a1875488625002",
+  "readme_source_url": "https://github.com/supertuxkart/stk-code/blob/7ed766d35d7f4a265df79c74f9d3f90522ae19a3/README.md",
+  "readme_api_url": "https://api.github.com/repos/supertuxkart/stk-code/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0-or-later",
+  "license_source_url": "https://github.com/supertuxkart/stk-code/blob/7ed766d35d7f4a265df79c74f9d3f90522ae19a3/COPYING",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:46.812578+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "COPYING",
+      "url": "https://github.com/supertuxkart/stk-code/blob/7ed766d35d7f4a265df79c74f9d3f90522ae19a3/COPYING",
+      "sha": "55091b48d401eca809485e653eab18afcb3d057f"
+    }
+  ],
+  "needs_license_review": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "supertuxkart/stk-code",
+  "license_basis": "COPYING 指明代码 GPL-3.0-or-later，素材许可另有区别",
+  "translation_origin": "非官方中文译文",
+  "official_entry": {
+    "url": "https://supertuxkart.net/",
+    "kind": "项目官网"
+  }
+}

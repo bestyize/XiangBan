@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "逐节对照完整 README、模型列表与引用；全部代码块和行内代码与原文一致。",
+    "Apache-2.0 原始许可证含项目版权声明已保存。图片保留上游固定版本链接，模型和数据集各自许可须另行核实。",
+    "36 个固定版本仓库链接及图片检查成功；飞书中文教程入口重定向循环，译注保留并提供已验证官方文档入口。"
+  ],
+  "link_check": {
+    "pinned_repository_urls_checked": 36,
+    "official_documentation_http": 200,
+    "chinese_tutorial": "redirect loop"
+  }
+}

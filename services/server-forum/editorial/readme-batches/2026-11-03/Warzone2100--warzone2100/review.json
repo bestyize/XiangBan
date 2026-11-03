@@ -1,0 +1,26 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，9 个代码块逐字保留；保留下载构建、端口、依赖版本和子模块警告",
+    "官网、固定版本 Logo 与相对文档已核验；动态徽章与其他外链未逐一联网",
+    "保留 GPL 许可及其他许可清单"
+  ],
+  "link_results": {
+    "https://wz2100.net/": 200,
+    "https://raw.githubusercontent.com/Warzone2100/warzone2100/253e370c2af78228a822df6afa82b6261dc94656/icons/warzone2100.large.png": 200,
+    "https://github.com/Warzone2100/warzone2100/blob/253e370c2af78228a822df6afa82b6261dc94656/doc/Cheats.md": 200,
+    "https://github.com/Warzone2100/warzone2100/blob/253e370c2af78228a822df6afa82b6261dc94656/doc/Scripting.md": 200,
+    "https://github.com/Warzone2100/warzone2100/blob/253e370c2af78228a822df6afa82b6261dc94656/doc/PIE.md": 200,
+    "https://github.com/Warzone2100/warzone2100/blob/253e370c2af78228a822df6afa82b6261dc94656/doc/Animation.md": 200,
+    "https://github.com/Warzone2100/warzone2100/blob/253e370c2af78228a822df6afa82b6261dc94656/platforms/windows/README-build.md": 200,
+    "https://github.com/Warzone2100/warzone2100/blob/253e370c2af78228a822df6afa82b6261dc94656/platforms/macos/README.md": 200,
+    "https://github.com/Warzone2100/warzone2100/blob/253e370c2af78228a822df6afa82b6261dc94656/COPYING": 200,
+    "https://github.com/Warzone2100/warzone2100/blob/253e370c2af78228a822df6afa82b6261dc94656/COPYING.README": 200,
+    "https://github.com/Warzone2100/warzone2100/blob/253e370c2af78228a822df6afa82b6261dc94656/COPYING.NONGPL": 200
+  },
+  "issues": []
+}

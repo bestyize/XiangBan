@@ -1,0 +1,27 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "按 29 个主章节和资源表对照官方中文与固定英文，补齐原文缺失的可用性章节、原文外链和 3 个表格条目，修正多处实质误译。",
+  "code_and_numbers": "9 个 fenced 代码块与英文逐字一致；可用性和延迟表保留原文数值。",
+  "links_and_images": "英文 56 个、中文 59 个原始相对目标均在固定提交树中存在；修正 3 处内部锚点。37 张图可读，其中原 Camo 地址返回 403，替换为其可读原图。",
+  "license": "LICENSE.txt 原文保存为 LICENSE.upstream，CC BY 4.0 作者、版权、来源、许可及译文改动均已注明。",
+  "issues": [
+    "上游 README 未提供可确认的项目图标，需素材核实。"
+  ],
+  "automated_alignment_evidence": {
+    "english_headings": 145,
+    "chinese_headings": 144,
+    "english_fenced_blocks": 9,
+    "chinese_fenced_blocks": 7,
+    "english_fenced_blocks_without_exact_match": 4,
+    "note": "仅用于定位差异；标题数量和代码块一致不代表翻译已核对。"
+  },
+  "verification": {
+    "english_and_chinese_sections": 29,
+    "english_links_missing_from_zh_before_pinning": 0,
+    "code_blocks_identical": 9,
+    "images_readable": 37,
+    "chinese_relative_targets_found_in_git_tree": 59,
+    "english_relative_targets_found_in_git_tree": 56,
+    "broken_anchor_aliases_fixed": 3
+  }
+}

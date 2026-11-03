@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "中文与英文全文逐节对照；示例目录树及代码注释原样保留。",
+    "README 明确文档 CC BY 4.0、代码 Apache 2.0；已保存两份许可，译文顶部标注作者、原文、许可和修改。",
+    "10 个非动态链接均返回 HTTP 200；未发现已核实项目图标，卡片使用项目名占位。"
+  ],
+  "link_check": {
+    "method": "HTTP HEAD，排除动态徽章",
+    "urls_checked": 10,
+    "http_200": 10
+  }
+}

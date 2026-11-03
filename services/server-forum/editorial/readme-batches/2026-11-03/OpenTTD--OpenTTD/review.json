@@ -1,0 +1,23 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留原版数据文件清单、旧平台说明及全部第三方许可例外",
+    "固定版本相对文档和官网已核验；其他外链未逐一联网",
+    "保留 GPLv2 许可证"
+  ],
+  "link_results": {
+    "https://www.openttd.org/": 200,
+    "https://github.com/OpenTTD/OpenTTD/blob/e87721aac6f405af3301fa3c1b825f99a4eec0b9/docs/directory_structure.md": 200,
+    "https://github.com/OpenTTD/OpenTTD/blob/e87721aac6f405af3301fa3c1b825f99a4eec0b9/COMPILING.md": 200,
+    "https://github.com/OpenTTD/OpenTTD/blob/e87721aac6f405af3301fa3c1b825f99a4eec0b9/docs/multiplayer.md": 200,
+    "https://github.com/OpenTTD/OpenTTD/blob/e87721aac6f405af3301fa3c1b825f99a4eec0b9/CONTRIBUTING.md": 200,
+    "https://github.com/OpenTTD/OpenTTD/blob/e87721aac6f405af3301fa3c1b825f99a4eec0b9/docs/debugging_desyncs.md": 200,
+    "https://github.com/OpenTTD/OpenTTD/blob/e87721aac6f405af3301fa3c1b825f99a4eec0b9/COPYING.md": 200,
+    "https://github.com/OpenTTD/OpenTTD/blob/e87721aac6f405af3301fa3c1b825f99a4eec0b9/CREDITS.md": 200
+  },
+  "issues": []
+}

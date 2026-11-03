@@ -1,0 +1,89 @@
+{
+  "inventory_index": 86,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "经常处理文本、编码与技术数据的人。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:01:21.797359+00:00",
+    "cover_accent": "#5E769A",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "工具箱",
+      "格式转换",
+      "自部署"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 5555,
+    "full_name": "CorentinTh/it-tools",
+    "getting_started": "打开官方演示选择一个工具；需要自部署时阅读容器指南。",
+    "highlights": [
+      "常用小工具集中查找",
+      "可以查看实现并自部署"
+    ],
+    "homepage_url": "https://it-tools.tech",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-02-12T00:59:29Z",
+    "last_pushed_at": "2026-10-27T22:29:12Z",
+    "name": "IT Tools",
+    "notes": [
+      "处理敏感内容前先确认实际部署环境和数据处理方式。"
+    ],
+    "order": 87,
+    "readme_sha": "72cbbd8d93469b91a93d39486dbd1a1b33c8884c",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/CorentinTh/it-tools/blob/main/README.md",
+    "stars": 41099,
+    "summary": "包含编码转换、文本处理、网络与开发辅助功能的工具集合。",
+    "tags": [
+      "工具箱",
+      "格式转换",
+      "自部署"
+    ],
+    "title": "把常用的小工具收进一个网页",
+    "watchers": 163
+  },
+  "repository": "CorentinTh/it-tools",
+  "fetched_at": "2026-11-03T01:50:52.904862+00:00",
+  "canonical_repository": "CorentinTh/it-tools",
+  "default_branch": "main",
+  "commit_sha": "d505845f918e946ec300af7b36efc107e2f66e9e",
+  "readme_path": "README.md",
+  "readme_blob_sha": "72cbbd8d93469b91a93d39486dbd1a1b33c8884c",
+  "readme_url": "https://github.com/CorentinTh/it-tools/blob/d505845f918e946ec300af7b36efc107e2f66e9e/README.md",
+  "stars": 41101,
+  "pushed_at": "2026-10-27T22:29:12Z",
+  "stars_fetched_at": "2026-11-03T01:50:54.891328+00:00",
+  "license_spdx": "GPL-3.0",
+  "homepage_url": "https://it-tools.tech",
+  "icon_source_url": "https://raw.githubusercontent.com/CorentinTh/it-tools/d505845f918e946ec300af7b36efc107e2f66e9e/.github/logo-dark.png",
+  "license_path": "LICENSE",
+  "license_blob_sha": "e72bfddabc15be5718a7cc061ac10e47741d8219",
+  "license_url": "https://github.com/CorentinTh/it-tools/blob/d505845f918e946ec300af7b36efc107e2f66e9e/LICENSE",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "Logo raw 和许可证 blob 均固定到源码提交",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/CorentinTh/it-tools",
+  "description_zh": "汇集编码、转换和其他开发者常用工具的在线工具箱。",
+  "official_entry": {
+    "url": "https://it-tools.tech",
+    "kind": "在线体验",
+    "verification": "上游 README 的 Try it 入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "image_license": "README 中的项目 Logo 使用固定提交官方外链，未复制素材；单独图片权利待后续核实。"
+}

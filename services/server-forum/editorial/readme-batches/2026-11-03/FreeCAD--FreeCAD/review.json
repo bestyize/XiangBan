@@ -1,0 +1,22 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，保留稳定版和开发版区别、系统平台、问题复现及原文删除配置文件的说明。",
+    "仓库 LGPL-2.1 许可原文已保存；32 个非动态链接中 31 个 HEAD 200，Reddit 返回 403，中文译注指出原文的官方论坛入口。",
+    "官方图标和示例图以固定提交外链引用，未复制素材；图片单独权利待后续核实。"
+  ],
+  "link_check": {
+    "method": "HTTP HEAD，排除动态徽章",
+    "urls_checked": 32,
+    "http_200": 31,
+    "exception": "Reddit 返回 403，已保留原链并在译注给出原文官方论坛入口。"
+  }
+}

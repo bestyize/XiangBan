@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，三段命令完全一致；硬件表、正在集成的设备、贡献者赞助等原文内容保留，生产采用情况归属上游自述。",
+    "Apache-2.0 原许可已保存；55 个非社交非徽章链接中 Slack 403，保留原链并在译注提供 GitHub Issues。",
+    "官方 Logo 与采用情况图仅引用上游外链，未复制；图片单独权利待后续核实。"
+  ],
+  "link_check": {
+    "urls_checked": 55,
+    "result": "54 个 HEAD 200；Slack 入口 403，译注提供原文已有 GitHub Issues。社交链接和动态徽章未逐项验证。"
+  }
+}

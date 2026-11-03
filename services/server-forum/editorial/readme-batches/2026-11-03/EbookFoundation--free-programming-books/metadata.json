@@ -1,0 +1,103 @@
+{
+  "inventory_key": "EbookFoundation/free-programming-books",
+  "full_name": "EbookFoundation/free-programming-books",
+  "inventory_entry": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:17:38.371766+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "编程书籍",
+      "学习资源",
+      "多语言"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 67070,
+    "full_name": "EbookFoundation/free-programming-books",
+    "getting_started": "先进入熟悉语言的目录，挑选一份适合当前阶段的官方或作者资源。",
+    "highlights": [
+      "按主题和语言组织资源",
+      "适合建立自己的学习资料清单"
+    ],
+    "homepage_url": "https://ebookfoundation.github.io/free-programming-books/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-01T02:48:06Z",
+    "last_pushed_at": "2026-11-01T02:48:06Z",
+    "name": "Free Programming Books",
+    "notes": [
+      "目录采用开放许可，书籍与外链内容各有自己的版权和使用条件。"
+    ],
+    "order": 3,
+    "readme_sha": "4381df60280381cac21503d7ad91ac0babf17936",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/EbookFoundation/free-programming-books/blob/main/README.md",
+    "stars": 400745,
+    "summary": "由社区整理的编程书籍、课程与其他学习资源目录。",
+    "tags": [
+      "编程书籍",
+      "学习资源",
+      "多语言"
+    ],
+    "title": "按语言和主题寻找可免费阅读的编程资料",
+    "watchers": 9771
+  },
+  "fetched_at": "2026-11-03T01:50:36.114028+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "EbookFoundation/free-programming-books",
+  "repository_url": "https://github.com/EbookFoundation/free-programming-books",
+  "default_branch": "main",
+  "stars": 400762,
+  "pushed_at": "2026-11-01T02:48:06Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "CC-BY-4.0",
+  "homepage": "https://ebookfoundation.github.io/free-programming-books/",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://ebookfoundation.github.io/free-programming-books/favicon.ico",
+  "commit_sha": "b4c4cc4040b614d2aca81ad5f2bcd92ed3d422ec",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "10fabd90118f7ce38bb2e4753e105e744442a429",
+    "source_url": "https://github.com/EbookFoundation/free-programming-books/blob/b4c4cc4040b614d2aca81ad5f2bcd92ed3d422ec/LICENSE",
+    "spdx": "CC-BY-4.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "4381df60280381cac21503d7ad91ac0babf17936",
+    "source_url": "https://github.com/EbookFoundation/free-programming-books/blob/b4c4cc4040b614d2aca81ad5f2bcd92ed3d422ec/README.md",
+    "raw_url": "https://raw.githubusercontent.com/EbookFoundation/free-programming-books/b4c4cc4040b614d2aca81ad5f2bcd92ed3d422ec/README.md",
+    "size_bytes": 16002,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "b4c4cc4040b614d2aca81ad5f2bcd92ed3d422ec",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://ebookfoundation.github.io/free-programming-books/",
+    "kind": "查看文档"
+  },
+  "plain_summary": "按语言和类别汇集免费编程书籍、课程与学习资源。",
+  "attribution": {
+    "source": "https://github.com/EbookFoundation/free-programming-books/blob/b4c4cc4040b614d2aca81ad5f2bcd92ed3d422ec/README.md",
+    "copyright": "Free Ebook Foundation and contributors",
+    "modifications": "非官方中文译文，将相对链接固定到采集提交并翻译语言和栏目名称",
+    "license": "CC-BY-4.0",
+    "license_path": "LICENSE.upstream"
+  }
+}

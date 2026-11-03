@@ -1,0 +1,96 @@
+{
+  "inventory_key": "google-gemini/gemini-cli",
+  "full_name": "google-gemini/gemini-cli",
+  "inventory_entry": {
+    "audience": "适合希望构建、运行或理解 AI 应用的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:17:00.975429+00:00",
+    "cover_accent": "#5E769A",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "终端助手",
+      "编程",
+      "工具调用"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 14916,
+    "full_name": "google-gemini/gemini-cli",
+    "getting_started": "跟随官方快速入门完成认证，在测试项目里尝试一个小任务。",
+    "highlights": [
+      "提供终端中的对话与工具使用",
+      "源码与扩展说明公开"
+    ],
+    "homepage_url": "https://geminicli.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-30T21:38:47Z",
+    "last_pushed_at": "2026-11-02T01:22:37Z",
+    "name": "Gemini CLI",
+    "notes": [
+      "开源客户端与模型服务的额度、费用及账号要求分别确认。"
+    ],
+    "order": 27,
+    "readme_sha": "22cd5a1311378355b533140665d25fed89496d00",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/google-gemini/gemini-cli/blob/main/README.md",
+    "stars": 108672,
+    "summary": "将 Gemini 模型能力带入命令行工作环境的开源智能体工具。",
+    "tags": [
+      "终端助手",
+      "编程",
+      "工具调用"
+    ],
+    "title": "在终端里与 AI 一起处理任务",
+    "watchers": 588
+  },
+  "fetched_at": "2026-11-03T01:50:44.422854+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "google-gemini/gemini-cli",
+  "repository_url": "https://github.com/google-gemini/gemini-cli",
+  "default_branch": "main",
+  "stars": 108683,
+  "pushed_at": "2026-11-03T01:18:35Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "Apache-2.0",
+  "homepage": "https://geminicli.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://geminicli.com/icon.png",
+  "commit_sha": "0ac57c029b848d109eef940afe0db4b5a0c3dad0",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "7a4a3ea2424c09fbe48d455aed1eaa94d9124835",
+    "source_url": "https://github.com/google-gemini/gemini-cli/blob/0ac57c029b848d109eef940afe0db4b5a0c3dad0/LICENSE",
+    "spdx": "Apache-2.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "22cd5a1311378355b533140665d25fed89496d00",
+    "source_url": "https://github.com/google-gemini/gemini-cli/blob/0ac57c029b848d109eef940afe0db4b5a0c3dad0/README.md",
+    "raw_url": "https://raw.githubusercontent.com/google-gemini/gemini-cli/0ac57c029b848d109eef940afe0db4b5a0c3dad0/README.md",
+    "size_bytes": 13488,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "0ac57c029b848d109eef940afe0db4b5a0c3dad0",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://geminicli.com/docs/",
+    "kind": "查看文档"
+  },
+  "plain_summary": "面向 Google Cloud 企业 Code Assist 工作流的开源终端智能体。"
+}

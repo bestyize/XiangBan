@@ -1,0 +1,16 @@
+{
+  "status": "pending",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "需核实 README 是否存在独立许可及图像权利",
+    "待寻找并核对官方中文或完成全文翻译",
+    "待核对相对链接、图片、代码与数字；英文原文语言尚待确认"
+  ]
+}

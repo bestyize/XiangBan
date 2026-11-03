@@ -1,0 +1,30 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，9 段代码完全一致；保留默认 admin/umami 凭据、双因素加密密钥和 MCP 默认禁用说明。",
+    "MIT 许可证已保存；9 个非社交非徽章链接 HEAD 200，社交链接未逐项验证。",
+    "上游官方 Logo 使用外链，未复制素材；单独图片权利待后续核实。"
+  ],
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://content.umami.is/website/images/umami-logo.png",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check": {
+    "method": "HTTP HEAD，排除社交链接和动态徽章",
+    "urls_checked": 9,
+    "http_200": 9
+  }
+}

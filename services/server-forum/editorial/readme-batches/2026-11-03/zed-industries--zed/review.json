@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照平台状态、开发与贡献、混合许可、依赖许可排错及营利性赞助说明",
+  "code_and_numbers": "无代码块；许可证标识、配置键、路径与错误消息保持原样",
+  "links_and_images": "相对文档链接固定到采集提交，官方项目图标与两个徽章均返回 HTTP 200",
+  "license": "README 指出代码主要采用 GPL-3.0-or-later，标明的组件采用 Apache-2.0；两份仓库许可证保存在 LICENSE.LICENSE-GPL 和 LICENSE.LICENSE-APACHE",
+  "issues": [
+    "赞助款属于营利公司普通收入且没有赞助权益，已按原文保留。"
+  ],
+  "manual_review": "非官方中文译文；交付后仍需编辑复核"
+}

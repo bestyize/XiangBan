@@ -1,0 +1,106 @@
+{
+  "inventory_key": "neovim/neovim",
+  "full_name": "neovim/neovim",
+  "inventory_entry": {
+    "audience": "愿意配置键盘驱动编辑流程的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:01:29.239506+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "终端编辑器",
+      "Lua",
+      "插件"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 7395,
+    "full_name": "neovim/neovim",
+    "getting_started": "安装稳定版后完成内置教程，再逐步添加所需插件。",
+    "highlights": [
+      "终端操作与可编程配置结合",
+      "支持插件和外部工具协作"
+    ],
+    "homepage_url": "https://neovim.io",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/neovim/neovim.github.io/master/static/logos/neovim-logo-300x87.png",
+    "icon_url": "/open-source-media/neovim-icon.png",
+    "last_commit_at": "2026-11-02T16:06:06Z",
+    "last_pushed_at": "2026-11-02T16:06:06Z",
+    "name": "Neovim",
+    "notes": [
+      "插件各自维护，先从少量配置开始排查兼容问题。"
+    ],
+    "order": 29,
+    "readme_sha": "e92d0961d7307a7e539b68d5b5ba840727000e00",
+    "related_categories": [],
+    "source_url": "https://github.com/neovim/neovim/blob/master/README.md",
+    "stars": 103307,
+    "summary": "持续改进 Vim 架构的编辑器项目，支持插件、嵌入和开发工具集成。",
+    "tags": [
+      "终端编辑器",
+      "Lua",
+      "插件"
+    ],
+    "title": "把终端编辑器打造成自己的工作环境",
+    "watchers": 1022
+  },
+  "fetched_at": "2026-11-03T01:50:45.001092+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "neovim/neovim",
+  "repository_url": "https://github.com/neovim/neovim",
+  "default_branch": "master",
+  "stars": 103322,
+  "pushed_at": "2026-11-02T19:34:23Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "NOASSERTION",
+  "homepage": "https://neovim.io",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/neovim/neovim.github.io/master/static/logos/neovim-logo-300x87.png",
+  "commit_sha": "6332ba64fe56f922c5cd2d93e4cfa23673966b6d",
+  "license": {
+    "path": "LICENSE.txt",
+    "blob_sha": "7d06aaf8bced96162aa9f8849c16279731e1baf0",
+    "source_url": "https://github.com/neovim/neovim/blob/6332ba64fe56f922c5cd2d93e4cfa23673966b6d/LICENSE.txt",
+    "spdx": "NOASSERTION"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "e92d0961d7307a7e539b68d5b5ba840727000e00",
+    "source_url": "https://github.com/neovim/neovim/blob/6332ba64fe56f922c5cd2d93e4cfa23673966b6d/README.md",
+    "size_bytes": 5261
+  },
+  "license_search": {
+    "scope": "Apache-2.0 与 Vim 许可证并存；需逐项确认 README 适用范围",
+    "root_license_files": [
+      "LICENSE.txt"
+    ]
+  },
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "6332ba64fe56f922c5cd2d93e4cfa23673966b6d",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://neovim.io",
+    "kind": "项目官网"
+  },
+  "plain_summary": "可扩展的文本编辑器，适合编辑代码与文本。",
+  "license_summary": "Apache-2.0 与 Vim 许可并存，具体贡献依上游说明区分",
+  "image_sources": [
+    {
+      "url": "https://raw.githubusercontent.com/neovim/neovim.github.io/master/static/logos/neovim-logo-300x87.png",
+      "source": "neovim/neovim.github.io 官方网站仓库",
+      "repository_license": "MIT",
+      "license_url": "https://github.com/neovim/neovim.github.io/blob/master/LICENSE",
+      "note": "保留上游标识外链，未下载。"
+    }
+  ]
+}

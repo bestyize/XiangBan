@@ -1,0 +1,23 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐段翻译并对照全文 56 段文字；SDK 部分重复的安装与加载指令采用一致译法",
+    "55 个代码块逐字保留；各平台版本、工具名、配置及运行限制均保留",
+    "官网、固定版本 Logo、架构图与相对文档已核验；动态徽章及其他外链未逐一联网",
+    "保留 Apache-2.0 许可证"
+  ],
+  "link_results": {
+    "https://mcp-toolbox.dev/": 200,
+    "https://raw.githubusercontent.com/googleapis/mcp-toolbox/ea2d71e7c2636f00158d2e89b46bdaf36182ceb6/logo.png": 200,
+    "https://raw.githubusercontent.com/googleapis/mcp-toolbox/ea2d71e7c2636f00158d2e89b46bdaf36182ceb6/docs/en/documentation/introduction/architecture.png": 200,
+    "https://github.com/googleapis/mcp-toolbox/blob/ea2d71e7c2636f00158d2e89b46bdaf36182ceb6/DEVELOPER.md": 200,
+    "https://github.com/googleapis/mcp-toolbox/blob/ea2d71e7c2636f00158d2e89b46bdaf36182ceb6/skills/README.md": 200,
+    "https://github.com/googleapis/mcp-toolbox/blob/ea2d71e7c2636f00158d2e89b46bdaf36182ceb6/CONTRIBUTING.md": 200,
+    "https://github.com/googleapis/mcp-toolbox/blob/ea2d71e7c2636f00158d2e89b46bdaf36182ceb6/CODE_OF_CONDUCT.md": 200
+  },
+  "issues": []
+}

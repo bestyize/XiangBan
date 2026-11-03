@@ -1,0 +1,96 @@
+{
+  "inventory_index": 101,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望搭建自己的网站、应用或服务的个人与团队。",
+    "category": "web",
+    "collected_at": "2026-11-02T18:18:10.347701+00:00",
+    "cover_accent": "#9D7159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "网站分析",
+      "隐私",
+      "自部署"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要开发或部署环境",
+    "featured": true,
+    "forks": 1928,
+    "full_name": "plausible/analytics",
+    "getting_started": "阅读当前社区版部署指南，在测试网站验证统计配置。",
+    "highlights": [
+      "用统计看板观察访问来源与行为",
+      "提供社区版自行部署入口"
+    ],
+    "homepage_url": "https://plausible.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T16:31:03Z",
+    "last_pushed_at": "2026-11-02T16:35:39Z",
+    "name": "Plausible CE",
+    "notes": [
+      "社区版和商业托管服务的功能、运维要求与条款分别确认。"
+    ],
+    "order": 102,
+    "readme_sha": "6320d91e4b69b40da0c6a5433a258bf23e0f51ce",
+    "related_categories": [
+      "office"
+    ],
+    "source_url": "https://github.com/plausible/analytics/blob/master/README.md",
+    "stars": 29751,
+    "summary": "提供网站流量分析能力的开源社区版本。",
+    "tags": [
+      "网站分析",
+      "隐私",
+      "自部署"
+    ],
+    "title": "为网站准备一套易读的访问统计",
+    "watchers": 152
+  },
+  "repository": "plausible/analytics",
+  "fetched_at": "2026-11-03T01:51:03.319313+00:00",
+  "canonical_repository": "plausible/analytics",
+  "default_branch": "master",
+  "commit_sha": "3644844d81058c5b26923d33177fe1c3de7f9fb3",
+  "readme_path": "README.md",
+  "readme_blob_sha": "6320d91e4b69b40da0c6a5433a258bf23e0f51ce",
+  "readme_url": "https://github.com/plausible/analytics/blob/3644844d81058c5b26923d33177fe1c3de7f9fb3/README.md",
+  "stars": 29752,
+  "pushed_at": "2026-11-02T23:16:00Z",
+  "stars_fetched_at": "2026-11-03T01:51:05.383035+00:00",
+  "license_spdx": "AGPL-3.0",
+  "homepage_url": "https://plausible.io",
+  "icon_source_url": "",
+  "license_path": "LICENSE.md",
+  "license_blob_sha": "0ad25db4bd1d86c452db3f9602ccdbe172438f52",
+  "license_url": "https://github.com/plausible/analytics/blob/3644844d81058c5b26923d33177fe1c3de7f9fb3/LICENSE.md",
+  "source_language": "English",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/plausible/analytics",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "仓库界面截图和文档指向固定提交",
+  "tracker_license": {
+    "spdx": "MIT",
+    "path": "tracker/npm_package/LICENSE.md",
+    "blob_sha": "addb30cee09b39abc1bf1ffd0699ac8247324f0d",
+    "url": "https://github.com/plausible/analytics/blob/3644844d81058c5b26923d33177fe1c3de7f9fb3/tracker/npm_package/LICENSE.md"
+  },
+  "description_zh": "用于查看网站流量与转化数据的网站分析工具。",
+  "official_entry": {
+    "url": "https://plausible.io",
+    "kind": "项目官网",
+    "verification": "上游 README 项目官网，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位；上游说明名称和 Logo 为商标",
+  "image_license": "官方界面截图和 Logo 原链接保留，未复制素材；商标使用遵循原文政策。"
+}

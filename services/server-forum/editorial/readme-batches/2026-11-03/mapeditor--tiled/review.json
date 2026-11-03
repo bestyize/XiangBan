@@ -1,0 +1,11 @@
+{
+  "status": "blocked",
+  "issues": [
+    "已检查固定提交完整仓库树及根 COPYING：许可按文件和目录分别确定，README 无文件级声明，未找到其转载与翻译许可。",
+    "许可原文摘录、固定版本路径及具体适用范围见 metadata.license_review_evidence.specific_terms；待权利人或明确上游材料确认 README 许可"
+  ],
+  "full_translation_checked": false,
+  "code_and_numbers_checked": false,
+  "links_and_images_checked": false,
+  "license_checked": false
+}

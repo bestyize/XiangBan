@@ -1,0 +1,91 @@
+{
+  "inventory_index": 57,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望改善日常开发与命令行工作流的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:17:34.998774+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "版本控制",
+      "分支",
+      "协作"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 28755,
+    "full_name": "git/git",
+    "getting_started": "先在测试目录建立仓库，练习提交、分支与合并。",
+    "highlights": [
+      "以提交组织版本历史",
+      "支持分支合并与分布式协作"
+    ],
+    "homepage_url": "https://github.com/git/git",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-01T17:25:24Z",
+    "last_pushed_at": "2026-11-02T05:36:32Z",
+    "name": "Git",
+    "notes": [
+      "涉及远端共享历史时，先确认团队的协作约定。"
+    ],
+    "order": 58,
+    "readme_sha": "46489b0971d04d02c1ba3eea5cd5c134e60c4f77",
+    "related_categories": [],
+    "source_url": "https://github.com/git/git/blob/master/README.md",
+    "stars": 64121,
+    "summary": "分布式版本控制系统的官方源码仓库。",
+    "tags": [
+      "版本控制",
+      "分支",
+      "协作"
+    ],
+    "title": "理解版本历史是怎样被记录和组合的",
+    "watchers": 2502
+  },
+  "repository": "git/git",
+  "fetched_at": "2026-11-03T01:50:32.912402+00:00",
+  "canonical_repository": "git/git",
+  "default_branch": "master",
+  "commit_sha": "ebdc087dc99d68bb340c282b2ba5f722def28d19",
+  "readme_path": "README.md",
+  "readme_blob_sha": "46489b0971d04d02c1ba3eea5cd5c134e60c4f77",
+  "readme_url": "https://github.com/git/git/blob/ebdc087dc99d68bb340c282b2ba5f722def28d19/README.md",
+  "stars": 64132,
+  "pushed_at": "2026-11-03T01:07:30Z",
+  "stars_fetched_at": "2026-11-03T01:50:35.400911+00:00",
+  "license_spdx": "GPL-2.0-only",
+  "homepage_url": "",
+  "icon_source_url": "",
+  "license_path": "COPYING",
+  "license_blob_sha": "536e55524db72bd2acf175208aef4f3dfc148d42",
+  "license_url": "https://github.com/git/git/blob/ebdc087dc99d68bb340c282b2ba5f722def28d19/COPYING",
+  "root_license_candidates": [
+    "COPYING"
+  ],
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/git/git",
+  "license_scope_caveat": "COPYING 说明整个 Git 项目默认 GPL v2，除非另有明确说明；需保留各文件例外。",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "Markdown 引用式链接解析到固定提交",
+  "description_zh": "记录文件修改并支持多人协作的分布式版本控制工具。",
+  "official_entry": {
+    "url": "https://git-scm.com",
+    "kind": "项目官网",
+    "verification": "上游 README 指向官方网站，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标"
+}

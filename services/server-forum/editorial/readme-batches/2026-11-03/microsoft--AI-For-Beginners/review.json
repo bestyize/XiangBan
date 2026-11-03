@@ -1,0 +1,22 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照英文与官方中文、39 行课程表及学习限制；补译缺失的参与贡献章节，保留官方自动翻译免责声明",
+  "code_and_numbers": "两个代码块与英文完全一致；示例名称及课程表数字已核对",
+  "links_and_images": "基于完整 Git 树核对相对链接并固定到采集提交；34 个中英文图片和徽章返回 HTTP 200 中文相对链接已按中文原文件目录重新解析。",
+  "license": "MIT，仓库许可证及版权声明保存在 LICENSE.upstream。第三方商标及标识另依其权利人政策。",
+  "issues": [
+    "上游中文由 Co-op Translator 生成，已保留其免责声明；图片与徽章后续可用性可能变化。",
+    "未确认独立项目图标，卡片使用项目名称占位。"
+  ],
+  "manual_review": "官方中文按固定英文版本补正，交付后仍需编辑复核",
+  "localized_links_audit": {
+    "source_path": "translations/zh-CN/README.md",
+    "source_blob_sha": "c883d9bd1c2e19b872175cc0274510bfab18ebc2",
+    "base_directory": "translations/zh-CN",
+    "fixed_distinct_targets": 68,
+    "missing_upstream_relative_links": [],
+    "method": "以中文原文件目录解析并对照固定提交 Git 树，原有无效目标单独列出。",
+    "chinese_images_checked": 34,
+    "chinese_image_failures": []
+  }
+}

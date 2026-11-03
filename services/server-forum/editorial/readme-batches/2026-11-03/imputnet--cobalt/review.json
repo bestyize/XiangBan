@@ -1,0 +1,34 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐段对照，保留作者对内容公开范围、责任承担、代理行为和版权用途的表述。",
+    "上游 README 指明除单独说明外仓库其余部分采用 AGPL-3.0，已保存许可证；API 与 Web 子目录许可分别依上游说明。",
+    "19 个链接可读，Bluesky 链接 HEAD 404 但 GET 200；官方图标以原仓库固定提交外链引用，单独素材权利待后续核实。"
+  ],
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://raw.githubusercontent.com/imputnet/cobalt/a636575b09de1fc55d9b8cd98cac88f5f2f16b42/web/static/favicon.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/imputnet/cobalt/main/web/static/favicon.png",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check": {
+    "method": "HTTP HEAD；对 HEAD 失败的 Bluesky 链接补做 GET",
+    "urls_checked": 19,
+    "http_200": 19
+  }
+}

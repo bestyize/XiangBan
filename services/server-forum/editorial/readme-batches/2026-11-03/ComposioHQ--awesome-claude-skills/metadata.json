@@ -1,0 +1,104 @@
+{
+  "inventory_key": "ComposioHQ/awesome-claude-skills",
+  "full_name": "ComposioHQ/awesome-claude-skills",
+  "inventory_entry": {
+    "audience": "希望从现成示例学习技能设计的人。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:01:19.581135+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "技能目录",
+      "Claude",
+      "工作流"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 9504,
+    "full_name": "ComposioHQ/awesome-claude-skills",
+    "getting_started": "先挑一个与日常任务相关的技能，阅读说明和脚本后再使用。",
+    "highlights": [
+      "按任务收集技能与示例",
+      "提供继续了解的上游入口"
+    ],
+    "homepage_url": "https://github.com/ComposioHQ/awesome-claude-skills",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-07-24T07:48:01Z",
+    "last_pushed_at": "2026-09-18T07:16:11Z",
+    "name": "Awesome Claude Skills",
+    "notes": [
+      "README 声明目录为 Apache-2.0，独立技能可能采用不同许可；逐项核对。"
+    ],
+    "order": 48,
+    "readme_sha": "d28b9c3515147fba1242461eb2c11155ffca5bbf",
+    "related_categories": [
+      "ai",
+      "office"
+    ],
+    "source_url": "https://github.com/ComposioHQ/awesome-claude-skills/blob/master/README.md",
+    "stars": 78586,
+    "summary": "汇集 Claude Skills 与插件示例，帮助理解可复用的任务能力。",
+    "tags": [
+      "技能目录",
+      "Claude",
+      "工作流"
+    ],
+    "title": "找到适合自己工作流的技能思路",
+    "watchers": 460
+  },
+  "fetched_at": "2026-11-03T01:50:51.827684+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "ComposioHQ/awesome-claude-skills",
+  "repository_url": "https://github.com/ComposioHQ/awesome-claude-skills",
+  "default_branch": "master",
+  "stars": 78605,
+  "pushed_at": "2026-09-18T07:16:11Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": null,
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "be2a406907dbc61b73e6827ded415c96139d13a2",
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "d28b9c3515147fba1242461eb2c11155ffca5bbf",
+    "source_url": "https://github.com/ComposioHQ/awesome-claude-skills/blob/be2a406907dbc61b73e6827ded415c96139d13a2/README.md",
+    "size_bytes": 40668
+  },
+  "license": {
+    "spdx": "Apache-2.0",
+    "basis": "README 自带许可声明；见固定提交原文",
+    "source_url": "https://github.com/ComposioHQ/awesome-claude-skills/blob/be2a406907dbc61b73e6827ded415c96139d13a2/README.md#license",
+    "license_text_url": "https://www.apache.org/licenses/LICENSE-2.0.txt"
+  },
+  "official_entry": {
+    "url": "https://github.com/ComposioHQ/awesome-claude-skills",
+    "kind": "GitHub"
+  },
+  "translation": {
+    "status": "ready_for_review",
+    "method": "Terra 直接翻译；176 条按固定源行号翻译，并对剩余章节补译",
+    "unresolved": "固定提交 78 个相对技能目录不存在；无法将同一 connect 目录冒充独立资源。",
+    "image_check": "8 张非代码图片已验证 HTTP 200，含原始 banner；3 个带空格的原始徽章 URL 已作等价百分号编码。"
+  },
+  "official_banner_url": "https://github.com/user-attachments/assets/e91255af-e4ba-4d71-b1a8-bd081e8a234a",
+  "upstream_maintenance_notice": {
+    "relative_targets_checked": 102,
+    "missing_targets": 78,
+    "fixed_revision": "be2a406907dbc61b73e6827ded415c96139d13a2",
+    "impact": "部分核心 SaaS 自动化技能目录在固定版本不存在，原目录链接仍保留，不能保证可直接使用。",
+    "general_connect": "https://github.com/ComposioHQ/awesome-claude-skills/tree/be2a406907dbc61b73e6827ded415c96139d13a2/connect",
+    "general_connect_note": "该入口存在，但不是 78 个不同目录的等价替代。",
+    "missing_targets_record": "review.json:missing_upstream_relative_targets"
+  }
+}

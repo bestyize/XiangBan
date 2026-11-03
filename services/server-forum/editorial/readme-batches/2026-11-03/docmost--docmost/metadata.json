@@ -1,0 +1,96 @@
+{
+  "inventory_index": 116,
+  "original_key": "docmost/docmost",
+  "repository": "docmost/docmost",
+  "catalog": {
+    "audience": "适合希望自主组织笔记、文档和团队工作的人。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:17:15.211307+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "团队文档",
+      "知识库",
+      "自部署"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/docmost-screen.png",
+    "cover_variant": "offset",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 1661,
+    "full_name": "docmost/docmost",
+    "getting_started": "部署测试实例后建立一个工作区，确认编辑与阅读权限。",
+    "highlights": [
+      "提供协作文档与知识组织",
+      "可以建立团队内部资料空间"
+    ],
+    "homepage_url": "https://docmost.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T14:17:27Z",
+    "last_pushed_at": "2026-11-02T14:17:28Z",
+    "name": "Docmost",
+    "notes": [
+      "核心采用 AGPL，企业功能另有许可，选型时分别确认。"
+    ],
+    "order": 117,
+    "readme_sha": "f09680e14205fbcd14e9ec75167534c72a5b546a",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/docmost/docmost/blob/main/README.md",
+    "stars": 22203,
+    "summary": "用于多人协作、知识库与团队文档的开源平台。",
+    "tags": [
+      "团队文档",
+      "知识库",
+      "自部署"
+    ],
+    "title": "把团队知识整理成共同维护的文档",
+    "watchers": 67
+  },
+  "github_url": "https://github.com/docmost/docmost",
+  "official_url": "https://docmost.com",
+  "stars": 22207,
+  "code_pushed_at": "2026-11-03T01:27:32Z",
+  "default_branch": "main",
+  "commit_sha": "635757ee96b50f2d5bc6943024664f34b90f2dcd",
+  "readme_path": "README.md",
+  "readme_blob_sha": "f09680e14205fbcd14e9ec75167534c72a5b546a",
+  "readme_source_url": "https://github.com/docmost/docmost/blob/635757ee96b50f2d5bc6943024664f34b90f2dcd/README.md",
+  "readme_api_url": "https://api.github.com/repos/docmost/docmost/contents/README.md?ref=main",
+  "readme_language": "en",
+  "license_spdx": "AGPL-3.0",
+  "license_source_url": "https://github.com/docmost/docmost/blob/635757ee96b50f2d5bc6943024664f34b90f2dcd/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/docmost/docmost/635757ee96b50f2d5bc6943024664f34b90f2dcd/apps/client/public/icons/app-icon-192x192.png",
+  "fetched_at": "2026-11-03T01:50:31.126432+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://docmost.com/screenshots/home.png",
+    "https://docmost.com/screenshots/editor.png",
+    "https://github.com/user-attachments/assets/a6c3d352-e41b-448d-b6cd-3fbca3109f07",
+    "https://github.com/user-attachments/assets/6ccad04a-9589-4965-b6a1-d5cb1f4f9e94"
+  ],
+  "license_basis": "仓库核心 AGPL-3.0；README 明确列明企业版目录例外",
+  "official_chinese_search": "固定提交树未找到中文 README",
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "official_entry": {
+    "url": "https://docmost.com",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "docmost/docmost",
+  "license_blob_sha": "0ad25db4bd1d86c452db3f9602ccdbe172438f52",
+  "license_file_verified_at_commit": true,
+  "icon_basis": "固定版本仓库项目 Logo/应用图标，链接保留上游"
+}

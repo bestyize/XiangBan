@@ -1,0 +1,103 @@
+{
+  "inventory_key": "FFmpeg/FFmpeg",
+  "full_name": "FFmpeg/FFmpeg",
+  "inventory_entry": {
+    "audience": "需要批量处理媒体或集成音视频能力的开发者。",
+    "category": "media",
+    "collected_at": "2026-11-02T18:01:25.664002+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "terminal",
+    "cover_lines": [
+      "音视频",
+      "转码",
+      "命令行"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 14502,
+    "full_name": "FFmpeg/FFmpeg",
+    "getting_started": "先从官方文档学习一个基本转换示例，保留原始文件。",
+    "highlights": [
+      "覆盖多种媒体格式和处理链",
+      "既能命令行使用也可作为库集成"
+    ],
+    "homepage_url": "https://ffmpeg.org/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T12:35:20Z",
+    "last_pushed_at": "2026-11-02T12:36:03Z",
+    "name": "FFmpeg",
+    "notes": [
+      "编解码组件与构建选项涉及不同许可，分发时需单独核对。"
+    ],
+    "order": 54,
+    "readme_sha": "969e9ae2ae0a7bb31dfe22914989c8ec7c1de052",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/FFmpeg/FFmpeg/blob/master/README.md",
+    "stars": 66299,
+    "summary": "用于音视频解码、编码、转换及流处理的库与命令行工具集合。",
+    "tags": [
+      "音视频",
+      "转码",
+      "命令行"
+    ],
+    "title": "用一套工具处理音视频格式",
+    "watchers": 1552
+  },
+  "fetched_at": "2026-11-03T01:50:53.645252+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "FFmpeg/FFmpeg",
+  "repository_url": "https://github.com/FFmpeg/FFmpeg",
+  "default_branch": "master",
+  "stars": 66327,
+  "pushed_at": "2026-11-03T01:49:49Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "NOASSERTION",
+  "homepage": "https://ffmpeg.org/",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://ffmpeg.org/favicon.ico",
+  "commit_sha": "aab6cec3e8415154b3f0570f8d131db07a9901de",
+  "license": {
+    "path": "LICENSE.md",
+    "blob_sha": "0e75dd3030844784ae339fb51300bd1a3b1e6207",
+    "source_url": "https://github.com/FFmpeg/FFmpeg/blob/aab6cec3e8415154b3f0570f8d131db07a9901de/LICENSE.md",
+    "spdx": "NOASSERTION"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "969e9ae2ae0a7bb31dfe22914989c8ec7c1de052",
+    "source_url": "https://github.com/FFmpeg/FFmpeg/blob/aab6cec3e8415154b3f0570f8d131db07a9901de/README.md",
+    "size_bytes": 2026
+  },
+  "license_search": {
+    "scope": "根 LICENSE.md 将多数文件置于 LGPL 2.1+ 并列出 GPL 等例外；需核对 README 与素材具体适用范围",
+    "root_license_files": [
+      "LICENSE.md",
+      "COPYING.LGPLv2.1",
+      "COPYING.LGPLv3",
+      "COPYING.GPLv2",
+      "COPYING.GPLv3"
+    ]
+  },
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "aab6cec3e8415154b3f0570f8d131db07a9901de",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://ffmpeg.org",
+    "kind": "项目官网"
+  },
+  "plain_summary": "处理和转换音视频及其他多媒体内容的工具与软件库。",
+  "license_summary": "大部分代码 LGPL-2.1 或更高版本；部分可选组件 GPL 或其他许可，详见上游 LICENSE"
+}

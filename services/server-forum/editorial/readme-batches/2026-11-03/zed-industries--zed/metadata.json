@@ -1,0 +1,98 @@
+{
+  "inventory_key": "zed-industries/zed",
+  "full_name": "zed-industries/zed",
+  "inventory_entry": {
+    "audience": "适合希望改善日常开发与命令行工作流的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:17:37.423384+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "编辑器",
+      "协作",
+      "Rust"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 11364,
+    "full_name": "zed-industries/zed",
+    "getting_started": "从官方版本打开一个测试项目，再配置语言与扩展。",
+    "highlights": [
+      "提供代码编辑与项目工作流",
+      "支持协作和扩展相关能力"
+    ],
+    "homepage_url": "https://zed.dev",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:27:20Z",
+    "last_pushed_at": "2026-11-02T17:35:54Z",
+    "name": "Zed",
+    "notes": [
+      "编辑器、扩展和在线 AI 服务的许可与费用分别确认。"
+    ],
+    "order": 37,
+    "readme_sha": "9f641fb3841909e9e1f6dbfb947f953c0a0c5ebf",
+    "related_categories": [],
+    "source_url": "https://github.com/zed-industries/zed/blob/main/README.md",
+    "stars": 92564,
+    "summary": "以性能、协作与现代开发流程为方向的开源编辑器。",
+    "tags": [
+      "编辑器",
+      "协作",
+      "Rust"
+    ],
+    "title": "试试围绕快速协作组织的代码编辑器",
+    "watchers": 317
+  },
+  "fetched_at": "2026-11-03T01:50:48.312851+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "zed-industries/zed",
+  "repository_url": "https://github.com/zed-industries/zed",
+  "default_branch": "main",
+  "stars": 92581,
+  "pushed_at": "2026-11-02T22:33:53Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "NOASSERTION",
+  "homepage": "https://zed.dev",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/zed-industries/zed/504a7f2cf25b817cda3998cab93473adef15f93c/crates/zed/resources/app-icon.png",
+  "commit_sha": "504a7f2cf25b817cda3998cab93473adef15f93c",
+  "license": {
+    "path": "LICENSE-APACHE",
+    "blob_sha": "461a0fe5ba20a096c281a2686da08fef79f534a3",
+    "source_url": "https://github.com/zed-industries/zed/blob/504a7f2cf25b817cda3998cab93473adef15f93c/LICENSE-APACHE",
+    "spdx": "NOASSERTION"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "9f641fb3841909e9e1f6dbfb947f953c0a0c5ebf",
+    "source_url": "https://github.com/zed-industries/zed/blob/504a7f2cf25b817cda3998cab93473adef15f93c/README.md",
+    "size_bytes": 2854
+  },
+  "license_search": {
+    "scope": "仓库同时提供 Apache-2.0 与 GPL 许可；需核对 README 及图片具体适用范围",
+    "root_license_files": [
+      "LICENSE-APACHE",
+      "LICENSE-GPL"
+    ]
+  },
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "504a7f2cf25b817cda3998cab93473adef15f93c",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://zed.dev",
+    "kind": "项目官网"
+  },
+  "plain_summary": "支持多人协作的跨平台代码编辑器。",
+  "license_summary": "源代码主要为 GPL-3.0-or-later；标明的组件为 Apache-2.0"
+}

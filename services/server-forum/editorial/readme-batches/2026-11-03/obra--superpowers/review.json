@@ -1,0 +1,9 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "已逐节直接翻译完整 README，目录和全部安装、贡献、遥测说明均保留。",
+  "code_and_numbers": "28 个 fenced 代码块与英文版逐字一致；版本、命令和变量均保留。",
+  "links_and_images": "两条仓库相对链接解析至固定提交，原始地址验证 HTTP 200；README 无图片。中文标题保留原文锚点。",
+  "license": "仓库根 MIT 许可证已保存 LICENSE.upstream，保留其版权和许可文本。",
+  "issues": [],
+  "icon": "官方仓库 assets/app-icon.png，已验证可读取。"
+}

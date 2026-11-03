@@ -1,0 +1,8 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "按英文全文逐节核对，客户端表格、翻译列表和徽章均按固定版本保留；参考官方中文并纠正旧版差异。",
+  "code_and_numbers": "四个 fenced 代码块逐字一致。",
+  "links_and_images": "根目录相对链接固定提交，7 个正文图片均 HTTP 200 且为图片；图标使用上游 README 的官方标志。",
+  "license": "根 Apache-2.0 许可文本保存于 LICENSE.upstream。",
+  "issues": []
+}

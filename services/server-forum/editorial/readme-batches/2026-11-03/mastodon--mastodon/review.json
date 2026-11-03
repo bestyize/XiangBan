@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，版本要求及许可声明原文保持一致；版权信息和 AGPL 许可文本已保存。",
+    "30 个非动态链接均返回 HTTP 200；原文项目图片使用固定提交的官方外链，未复制素材。",
+    "未发现已核实项目图标，卡片以项目名占位；图片单独权利需在后续复制或站内托管前确认。"
+  ],
+  "link_check": {
+    "method": "HTTP HEAD，排除动态徽章",
+    "urls_checked": 30,
+    "http_200": 30
+  }
+}

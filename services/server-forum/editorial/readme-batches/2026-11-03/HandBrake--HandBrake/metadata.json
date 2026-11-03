@@ -1,0 +1,97 @@
+{
+  "inventory_index": 112,
+  "original_key": "HandBrake/HandBrake",
+  "repository": "HandBrake/HandBrake",
+  "catalog": {
+    "audience": "适合需要播放、处理或组织自有音视频内容的人。",
+    "category": "media",
+    "collected_at": "2026-11-02T18:17:24.433181+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "视频转码",
+      "编码",
+      "桌面工具"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 1742,
+    "full_name": "HandBrake/HandBrake",
+    "getting_started": "保留原文件，用副本测试一个官方预设并检查画质。",
+    "highlights": [
+      "以预设和参数组织转码任务",
+      "提供适合图形界面的媒体处理流程"
+    ],
+    "homepage_url": "https://handbrake.fr",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:06:42Z",
+    "last_pushed_at": "2026-11-02T17:06:42Z",
+    "name": "HandBrake",
+    "notes": [
+      "转换耗时、质量和兼容性取决于素材与编码设置。"
+    ],
+    "order": 113,
+    "readme_sha": "880f735211000624ee8f35959d6fcf34b4378f85",
+    "related_categories": [],
+    "source_url": "https://github.com/HandBrake/HandBrake/blob/master/README.markdown",
+    "stars": 24863,
+    "summary": "面向常见视频转换与编码任务的开源应用。",
+    "tags": [
+      "视频转码",
+      "编码",
+      "桌面工具"
+    ],
+    "title": "把视频转换成更合适的格式",
+    "watchers": 297
+  },
+  "github_url": "https://github.com/HandBrake/HandBrake",
+  "official_url": "https://handbrake.fr",
+  "stars": 24864,
+  "code_pushed_at": "2026-11-02T17:06:42Z",
+  "default_branch": "master",
+  "commit_sha": "b48c2e9821930c9532068a8f416dcf7af8f3ce72",
+  "readme_path": "README.markdown",
+  "readme_blob_sha": "880f735211000624ee8f35959d6fcf34b4378f85",
+  "readme_source_url": "https://github.com/HandBrake/HandBrake/blob/b48c2e9821930c9532068a8f416dcf7af8f3ce72/README.markdown",
+  "readme_api_url": "https://api.github.com/repos/HandBrake/HandBrake/contents/README.markdown?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-2.0",
+  "license_source_url": "https://github.com/HandBrake/HandBrake/blob/b48c2e9821930c9532068a8f416dcf7af8f3ce72/COPYING",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:31.124437+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "COPYING",
+      "url": "https://github.com/HandBrake/HandBrake/blob/b48c2e9821930c9532068a8f416dcf7af8f3ce72/COPYING",
+      "sha": "d159169d1050894d3ea3b98e1c965c4058208fe1"
+    },
+    {
+      "name": "LICENSE",
+      "url": "https://github.com/HandBrake/HandBrake/blob/b48c2e9821930c9532068a8f416dcf7af8f3ce72/LICENSE",
+      "sha": "e727b258624c5b0d0ca9b6240a8a9b9124d13c27"
+    }
+  ],
+  "needs_license_review": false,
+  "license_basis": "README 与仓库 LICENSE 指明 GPLv2；图形资源有单独许可",
+  "translation_origin": "非官方中文译文",
+  "official_entry": {
+    "url": "https://handbrake.fr/docs",
+    "kind": "查看文档"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "HandBrake/HandBrake",
+  "license_blob_sha": "d159169d1050894d3ea3b98e1c965c4058208fe1",
+  "license_file_verified_at_commit": true
+}

@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，两段代码块完全一致，保留 FastMCP 与企业 Gateway 的区别；下载量和 70% 的数据明确归属于项目自述。",
+    "仓库 Apache-2.0 许可原文已保存；34 个非动态链接均返回 HTTP 200。",
+    "项目官方图像使用固定提交外链，未复制；单独图片权利在后续复制或托管时再核实。"
+  ],
+  "link_check": {
+    "method": "HTTP HEAD，排除动态徽章和 Discord 邀请",
+    "urls_checked": 34,
+    "http_200": 34
+  }
+}

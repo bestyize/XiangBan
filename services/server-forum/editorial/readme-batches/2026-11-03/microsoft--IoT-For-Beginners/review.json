@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照官方中文、英文，核对全部 24 行课程表、学习目标及 3 个代码块；澄清第 23、24 课描述",
+    "中文及英文相对链接分别按各自文件目录解析，完整提交树核对无缺失",
+    "验证课程路线图、GIF 与视频封面；动态徽章和外部资源目录未逐个联网",
+    "保留官方 Co-op Translator 免责声明与原始中文候选，保存 MIT 许可证"
+  ],
+  "link_results": {
+    "https://raw.githubusercontent.com/microsoft/IoT-For-Beginners/6ae558ee2b0aaade53f08b0f76505d5ea9736c43/translated_images/zh-CN/Roadmap.bb1dec285dda0eda.webp": 200,
+    "https://raw.githubusercontent.com/microsoft/IoT-For-Beginners/6ae558ee2b0aaade53f08b0f76505d5ea9736c43/sketchnotes/Roadmap.jpg": 200,
+    "https://raw.githubusercontent.com/microsoft/IoT-For-Beginners/6ae558ee2b0aaade53f08b0f76505d5ea9736c43/images/IOT.gif": 200,
+    "https://img.youtube.com/vi/bccEMm8gRuc/0.jpg": 200,
+    "https://github.com/microsoft/IoT-For-Beginners": 200
+  },
+  "issues": []
+}

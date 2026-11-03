@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "GPU、macOS 构建和签名要求为固定版本上游说明，使用时应核对最新文档。",
+    "官方 logo 与赞助商标识保留上游图链，独立商标及素材权利未单独确认。"
+  ],
+  "full_text_coverage": "固定提交全文译写，包括全部功能项、赞助者、要求、SDK、依赖和签名政策。",
+  "code_and_numbers": "全部行内代码、SDK 命令、架构及版本保留；无围栏代码。",
+  "links_and_images": "相对文档、目录和图片按固定提交解析；官网、图标、安装及编译指南本次可访问；其他外链未逐条验证。",
+  "license": "主要项目为 GPLv2-only；上游明确 lib/libimhex 和 plugins/ui 采用 LGPLv2.1，两处许可原文与根许可证均保存。"
+}

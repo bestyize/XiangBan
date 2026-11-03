@@ -1,0 +1,90 @@
+{
+  "inventory_index": 146,
+  "original_key": "KDE/krita",
+  "repository": "KDE/krita",
+  "catalog": {
+    "audience": "绘画爱好者和希望了解开源绘画工具的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:01:23.920975+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "数字绘画",
+      "插画",
+      "画笔"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 898,
+    "full_name": "KDE/krita",
+    "getting_started": "从官网下载稳定版本，先熟悉画笔、图层和文件保存。",
+    "highlights": [
+      "围绕数字绘画提供工具",
+      "支持画笔和图层工作流"
+    ],
+    "homepage_url": "https://invent.kde.org/graphics/krita",
+    "icon_fit": "contain",
+    "icon_source_url": "https://krita.org/images/krita-logo-light.svg",
+    "icon_url": "/open-source-media/krita-icon.svg",
+    "last_commit_at": "2026-11-02T14:51:17Z",
+    "last_pushed_at": "2026-11-02T14:54:14Z",
+    "name": "Krita",
+    "notes": [
+      "GitHub 为镜像，主开发仓库位于 KDE Invent。"
+    ],
+    "order": 147,
+    "readme_sha": "3d0ebbcd7757c0a6ee5b974866f540064d7f1a3c",
+    "related_categories": [],
+    "source_url": "https://github.com/KDE/krita/blob/master/README.md",
+    "stars": 10680,
+    "summary": "面向数字绘画、插画与概念设计的自由软件。",
+    "tags": [
+      "数字绘画",
+      "插画",
+      "画笔"
+    ],
+    "title": "为绘画和插画准备一张数字画布",
+    "watchers": 200
+  },
+  "github_url": "https://github.com/KDE/krita",
+  "official_url": "https://invent.kde.org/graphics/krita",
+  "stars": 10682,
+  "code_pushed_at": "2026-11-02T14:54:14Z",
+  "default_branch": "master",
+  "commit_sha": "8dc000e3a6ac9be37aeafc313b6ac94c3ebb449f",
+  "readme_path": "README.md",
+  "readme_blob_sha": "3d0ebbcd7757c0a6ee5b974866f540064d7f1a3c",
+  "readme_source_url": "https://github.com/KDE/krita/blob/8dc000e3a6ac9be37aeafc313b6ac94c3ebb449f/README.md",
+  "readme_api_url": "https://api.github.com/repos/KDE/krita/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/KDE/krita/blob/8dc000e3a6ac9be37aeafc313b6ac94c3ebb449f/COPYING",
+  "icon_source_url": "https://krita.org/images/krita-logo-light.svg",
+  "fetched_at": "2026-11-03T01:50:41.815672+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://krita.org/images/krita-logo-light.svg",
+    "https://krita.org/images/hero-image-50.webp"
+  ],
+  "license_basis": "README 明确 GPLv3，单个文件可采用兼容许可",
+  "official_entry": {
+    "url": "https://krita.org",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "KDE/krita",
+  "license_blob_sha": "94a9ed024d3859793618152ea559a168bbcbb5e2",
+  "license_file_verified_at_commit": true
+}

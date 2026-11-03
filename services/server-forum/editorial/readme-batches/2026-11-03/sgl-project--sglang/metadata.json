@@ -1,0 +1,89 @@
+{
+  "inventory_index": 91,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望构建、运行或理解 AI 应用的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:16:58.342106+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "推理服务",
+      "多模态",
+      "部署"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 10090,
+    "full_name": "sgl-project/sglang",
+    "getting_started": "先核对模型与平台支持，再按官方快速入门搭建测试服务。",
+    "highlights": [
+      "支持模型服务部署",
+      "提供与请求执行相关的开发能力"
+    ],
+    "homepage_url": "https://sglang.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:53:14Z",
+    "last_pushed_at": "2026-11-02T17:53:15Z",
+    "name": "SGLang",
+    "notes": [
+      "实际性能依模型、硬件和请求负载而异。"
+    ],
+    "order": 92,
+    "readme_sha": "0c28df5e901bf8f1e1b0f8c0d5972ed0004b0529",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/sgl-project/sglang/blob/main/README.md",
+    "stars": 38379,
+    "summary": "面向语言模型与多模态模型推理服务的开发框架。",
+    "tags": [
+      "推理服务",
+      "多模态",
+      "部署"
+    ],
+    "title": "了解模型服务如何处理复杂请求",
+    "watchers": 185
+  },
+  "repository": "sgl-project/sglang",
+  "fetched_at": "2026-11-03T01:50:55.649580+00:00",
+  "canonical_repository": "sgl-project/sglang",
+  "default_branch": "main",
+  "commit_sha": "62f9f3f785f889822ab4e78d65de9997d0b58441",
+  "readme_path": "README.md",
+  "readme_blob_sha": "0c28df5e901bf8f1e1b0f8c0d5972ed0004b0529",
+  "readme_url": "https://github.com/sgl-project/sglang/blob/62f9f3f785f889822ab4e78d65de9997d0b58441/README.md",
+  "stars": 38384,
+  "pushed_at": "2026-11-03T01:43:12Z",
+  "stars_fetched_at": "2026-11-03T01:50:58.154486+00:00",
+  "license_spdx": "Apache-2.0",
+  "homepage_url": "https://sglang.io",
+  "icon_source_url": "https://raw.githubusercontent.com/sgl-project/sglang/62f9f3f785f889822ab4e78d65de9997d0b58441/assets/logo.png",
+  "license_path": "LICENSE",
+  "license_blob_sha": "9c422689c8f5c317c7c65153b1209349ec57007e",
+  "license_url": "https://github.com/sgl-project/sglang/blob/62f9f3f785f889822ab4e78d65de9997d0b58441/LICENSE",
+  "source_language": "English",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/sgl-project/sglang",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "仓库许可、文档、Logo 链接指向固定提交",
+  "description_zh": "为大语言模型和多模态模型提供推理与部署服务的框架。",
+  "official_entry": {
+    "url": "https://docs.sglang.io/",
+    "kind": "查看文档",
+    "verification": "上游 README 官方文档入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "image_license": "官方 Logo 使用固定提交外链，采用情况图使用上游官方外链；未复制素材，图片单独权利待后续核实。"
+}

@@ -1,0 +1,18 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留 4 与 3.x 分支差异及文档、代码许可区别",
+    "验证官网和固定提交相对文档；其余外链和动态徽章未逐一联网",
+    "保留根许可证，并记录文档 CC BY 3.0 来源及署名要求"
+  ],
+  "link_results": {
+    "https://www.audacityteam.org": 200,
+    "https://github.com/audacity/audacity/blob/9f09f496ddb402cf56d6f383905ed796820c61d3/BUILDING.md": 200,
+    "https://github.com/audacity/audacity/blob/9f09f496ddb402cf56d6f383905ed796820c61d3/LICENSE.txt": 200
+  },
+  "issues": []
+}

@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照仓库、产品发行版、贡献、反馈、扩展、开发容器与许可说明；保留 Code - OSS 和微软发行版许可证区别",
+  "code_and_numbers": "无代码块；4 核、6 GB、推荐 8 GB 以及扩展和命令名称已核对",
+  "links_and_images": "全部相对路径固定到采集提交；项目图标、界面截图、两个徽章和四个仓库链接返回 HTTP 200",
+  "license": "Code - OSS 仓库使用 MIT，许可证和版权声明保存在 LICENSE.upstream；微软 Visual Studio Code 发行版使用其产品许可，见正文",
+  "issues": [
+    "项目图标与微软商标的使用需遵循上游政策；外部图片和徽章后续可用性可能变化。"
+  ],
+  "manual_review": "非官方译文；交付后仍需编辑复核"
+}

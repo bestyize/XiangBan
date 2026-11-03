@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐段对照，所有反引号中的命令和路径一致，保留安全披露邮件地址及 Git 名称的原文玩笑。",
+    "README 与 COPYING 均说明项目 GPLv2，部分文件有兼容的其他许可；COPYING 原文已保存。",
+    "非动态链接可读，marc.info HEAD 204、GET 200；未发现已核实项目图标，卡片使用名称占位。"
+  ],
+  "link_check": {
+    "method": "检查非动态文档、邮件列表和项目入口",
+    "result": "除 marc.info HEAD 204 外均 HEAD 200；marc.info 补做 GET 200。"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留所有构建命令、路径、AI 开发暂停政策及其期限",
+    "官网、用户手册和两张图片已验证；其他链接和动态徽章未逐一联网",
+    "保留 GPL 许可与单个文件许可例外"
+  ],
+  "link_results": {
+    "https://krita.org": 200,
+    "https://krita.org/images/krita-logo-light.svg": 200,
+    "https://krita.org/images/hero-image-50.webp": 200,
+    "https://docs.krita.org/en/user_manual.html": 200
+  },
+  "issues": []
+}

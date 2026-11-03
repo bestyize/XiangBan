@@ -1,0 +1,44 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐段对照，六段代码完全一致；明确保留不建议生产使用、MCP 和 Studio 安全警告。",
+    "README 前后维护声明及 GitHub archived=false 的矛盾均在译注与 metadata 标明；需持续关注上游更新。",
+    "CC BY 4.0 文档和 MIT 代码许可均保存，译文顶部注明作者、来源、许可及修改。",
+    "四个 NuGet 包页面 GET 200；LinkedIn 403，原链接保留并给社区替代入口。Microsoft 商标和 Logo 不由项目许可授权，卡片使用名称占位。"
+  ],
+  "link_check_batch": {
+    "method": "HTTP HEAD，排除动态徽章、Discord 邀请与 GitHub 附件",
+    "urls_checked": 51,
+    "failures": [
+      {
+        "url": "https://www.linkedin.com/company/105812540",
+        "result": "HTTP Error 403: Forbidden"
+      },
+      {
+        "url": "https://www.nuget.org/packages/Microsoft.AutoGen.Core.Grpc/",
+        "result": "HTTP Error 404: Not Found"
+      },
+      {
+        "url": "https://www.nuget.org/packages/Microsoft.AutoGen.Contracts/",
+        "result": "HTTP Error 404: Not Found"
+      },
+      {
+        "url": "https://www.nuget.org/packages/Microsoft.AutoGen.Core/",
+        "result": "HTTP Error 404: Not Found"
+      },
+      {
+        "url": "https://www.nuget.org/packages/Microsoft.AutoGen.RuntimeGateway.Grpc/",
+        "result": "HTTP Error 404: Not Found"
+      }
+    ],
+    "retest": "四个 NuGet 包页面 HEAD 404，GET 均 200；LinkedIn 403，译注给出 GitHub Discussions。"
+  }
+}

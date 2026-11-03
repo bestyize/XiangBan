@@ -1,0 +1,106 @@
+{
+  "inventory_index": 61,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望构建、运行或理解 AI 应用的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:16:56.060680+00:00",
+    "cover_accent": "#9D7159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "多智能体",
+      "框架",
+      "工具调用"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 9348,
+    "full_name": "microsoft/autogen",
+    "getting_started": "从官方当前推荐的入门示例开始，先配置单个模型连接。",
+    "highlights": [
+      "通过组件组织智能体能力",
+      "提供示例帮助理解协作模式"
+    ],
+    "homepage_url": "https://microsoft.github.io/autogen/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-28T14:45:27Z",
+    "last_pushed_at": "2026-10-28T14:45:27Z",
+    "name": "AutoGen",
+    "notes": [
+      "框架版本与后续维护方向以官方仓库说明为准；代码与文档的许可不同。"
+    ],
+    "order": 62,
+    "readme_sha": "042b9df197a220ec7072a116d694cd497ec332ad",
+    "related_categories": [
+      "dev",
+      "skills"
+    ],
+    "source_url": "https://github.com/microsoft/autogen/blob/main/README.md",
+    "stars": 61680,
+    "summary": "用于开发智能体应用的编程框架，提供对话、工具和多智能体相关组件。",
+    "tags": [
+      "多智能体",
+      "框架",
+      "工具调用"
+    ],
+    "title": "把多个智能体的协作过程拆开观察",
+    "watchers": 523
+  },
+  "repository": "microsoft/autogen",
+  "fetched_at": "2026-11-03T01:50:35.630926+00:00",
+  "canonical_repository": "microsoft/autogen",
+  "default_branch": "main",
+  "commit_sha": "d07c667a3239ea4ab7af62a53b0f4ff205a1f23d",
+  "readme_path": "README.md",
+  "readme_blob_sha": "042b9df197a220ec7072a116d694cd497ec332ad",
+  "readme_url": "https://github.com/microsoft/autogen/blob/d07c667a3239ea4ab7af62a53b0f4ff205a1f23d/README.md",
+  "stars": 61681,
+  "pushed_at": "2026-10-28T14:45:27Z",
+  "stars_fetched_at": "2026-11-03T01:50:38.925484+00:00",
+  "license_spdx": "CC-BY-4.0",
+  "homepage_url": "https://microsoft.github.io/autogen/",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "2f244ac814036ecd9ba9f69782e89ce6b1dca9eb",
+  "license_url": "https://github.com/microsoft/autogen/blob/d07c667a3239ea4ab7af62a53b0f4ff205a1f23d/LICENSE",
+  "source_language": "English",
+  "documentation_license": "CC-BY-4.0（README 明确说明文档及其他内容采用 CC BY 4.0；代码 MIT）",
+  "documentation_license_url": "https://creativecommons.org/licenses/by/4.0/legalcode",
+  "documentation_attribution_required": true,
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/microsoft/autogen",
+  "translation_attribution": "Microsoft 和贡献者；CC BY 4.0 非官方中文译文，顶部标注原文、许可和修改",
+  "relative_link_resolution": "仓库相对文档、图片按固定提交解析",
+  "upstream_maintenance_notice": {
+    "status": "上游 README 声明项目已归档，Microsoft 不再积极维护或提供错误修复、安全修复、新功能和支持，建议新用户使用 Microsoft Agent Framework、现有用户迁移，并不建议生产使用。",
+    "conflict": "同一 README 后文又称处于维护模式、接受错误修复和安全补丁；GitHub API archived=false。须核实差异，不能将 README 声明等同于平台归档标记。",
+    "source_url": "https://github.com/microsoft/autogen/blob/d07c667a3239ea4ab7af62a53b0f4ff205a1f23d/README.md",
+    "commit_sha": "d07c667a3239ea4ab7af62a53b0f4ff205a1f23d"
+  },
+  "code_license": {
+    "spdx": "MIT",
+    "path": "LICENSE-CODE",
+    "blob_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
+    "url": "https://github.com/microsoft/autogen/blob/d07c667a3239ea4ab7af62a53b0f4ff205a1f23d/LICENSE-CODE"
+  },
+  "description_zh": "用于构建多个 AI 智能体协作应用的开发框架。",
+  "official_entry": {
+    "url": "https://microsoft.github.io/autogen/",
+    "kind": "查看文档",
+    "verification": "上游 README 文档入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位；上游声明 Microsoft 名称和标志不由项目许可授权",
+  "image_license": "原 README 的图片保留官方外链，未复制素材；Microsoft 商标和 Logo 权利依据原文另行处理。"
+}

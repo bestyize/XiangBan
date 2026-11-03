@@ -1,0 +1,90 @@
+{
+  "inventory_index": 103,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合愿意阅读硬件文档、准备实验环境并验证设备的爱好者与开发者。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:17:45.470581+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "机器人",
+      "机器学习",
+      "数据集"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要兼容硬件或仿真环境",
+    "featured": true,
+    "forks": 5999,
+    "full_name": "huggingface/lerobot",
+    "getting_started": "先阅读官方兼容硬件与入门说明，用示例理解数据和控制流程。",
+    "highlights": [
+      "连接数据采集与机器人学习流程",
+      "提供模型和工具相关实现"
+    ],
+    "homepage_url": "https://huggingface.co/docs/lerobot",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/huggingface/lerobot/main/media/readme/lerobot-logo-thumbnail.png",
+    "icon_url": "/open-source-media/lerobot-icon.png",
+    "last_commit_at": "2026-11-02T14:36:34Z",
+    "last_pushed_at": "2026-11-02T18:00:46Z",
+    "name": "LeRobot",
+    "notes": [
+      "真实设备需要校准与安全验证，模型和数据集许可另行核对。"
+    ],
+    "order": 104,
+    "readme_sha": "4481c8176f9a119d52a5f5ccf7af9446103ab3f2",
+    "related_categories": [
+      "ai",
+      "learn"
+    ],
+    "source_url": "https://github.com/huggingface/lerobot/blob/main/README.md",
+    "stars": 28647,
+    "summary": "为真实机器人学习提供模型、数据集与开发工具的开源项目。",
+    "tags": [
+      "机器人",
+      "机器学习",
+      "数据集"
+    ],
+    "title": "把机器人学习拆成可实践的工具链",
+    "watchers": 162
+  },
+  "repository": "huggingface/lerobot",
+  "fetched_at": "2026-11-03T01:51:05.468725+00:00",
+  "canonical_repository": "huggingface/lerobot",
+  "default_branch": "main",
+  "commit_sha": "f5c9bc02137c331b009eccd44ece6f11b62187a8",
+  "readme_path": "README.md",
+  "readme_blob_sha": "4481c8176f9a119d52a5f5ccf7af9446103ab3f2",
+  "readme_url": "https://github.com/huggingface/lerobot/blob/f5c9bc02137c331b009eccd44ece6f11b62187a8/README.md",
+  "stars": 28651,
+  "pushed_at": "2026-11-02T23:21:33Z",
+  "stars_fetched_at": "2026-11-03T01:51:08.009336+00:00",
+  "license_spdx": "Apache-2.0",
+  "homepage_url": "https://huggingface.co/docs/lerobot",
+  "icon_source_url": "https://raw.githubusercontent.com/huggingface/lerobot/f5c9bc02137c331b009eccd44ece6f11b62187a8/media/readme/lerobot-logo-thumbnail.png",
+  "license_path": "LICENSE",
+  "license_blob_sha": "93baf0c18936131979fdda6a38536cbcef0efccb",
+  "license_url": "https://github.com/huggingface/lerobot/blob/f5c9bc02137c331b009eccd44ece6f11b62187a8/LICENSE",
+  "source_language": "en",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/huggingface/lerobot",
+  "official_entry": {
+    "url": "https://huggingface.co/docs/lerobot",
+    "kind": "official_documentation"
+  },
+  "translation": {
+    "method": "Terra 全文翻译并逐节核对",
+    "source_path": "README.md",
+    "source_commit_sha": "f5c9bc02137c331b009eccd44ece6f11b62187a8",
+    "notes": "代码块与行内代码逐项一致；相对链接按固定提交解析。"
+  }
+}

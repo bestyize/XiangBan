@@ -1,0 +1,29 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照官方中文与英文，补译缺失的开发、文档及 Qt Linguist 支持说明",
+    "保留官方来源安全警告、许可证例外和构建平台",
+    "官网与中文相关文档路径已固定至提交并核验；动态徽章和其他外链未逐一联网",
+    "保留 BSD 许可全文"
+  ],
+  "link_results": {
+    "https://opentoonz.github.io/": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/doc/README_ja.md": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/doc/README_chs.md": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/doc/development_checklist.md": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/doc/ai_assisted_development_checklist.md": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/doc/how_to_build_win_chs.md": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/doc/how_to_build_macosx.md": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/doc/how_to_build_linux.md": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/doc/how_to_build_bsd.md": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/doc/how_to_stylesheet.md": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/doc/how_to_test_prs_chs.md": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/LICENSE.txt": 200,
+    "https://github.com/opentoonz/opentoonz/blob/572d59ac5fedfeaf7910967b439c6b8d73c9c3e1/toonz/sources/translations/README.md": 200
+  },
+  "issues": []
+}

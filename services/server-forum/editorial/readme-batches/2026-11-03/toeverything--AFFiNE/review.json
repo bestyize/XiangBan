@@ -1,0 +1,12 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对项目功能、团队观点、贡献者许可协议、模板、博客、上游项目、自托管及版本说明",
+  "code_and_numbers": "无代码块；10 个模板、CLA 检查键与各版本名称保留",
+  "links_and_images": "相对链接及参考定义固定到采集提交并经完整 Git 树核查；11 个图片和徽章及项目图标返回 HTTP 200；未使用的 jobs.md 参考定义在上游固定提交不存在",
+  "license": "根许可证规定多个例外目录适用 EE 许可，其他符合条件内容采用 MIT；根许可证及后台 EE 许可证分别保存于 LICENSE.upstream 和 LICENSE.backend-ee",
+  "issues": [
+    "固定 README 称 EE 尚未发布，但官方企业版页面与根 LICENSE 表明后台已使用 EE 许可；中英文阅读稿均加编辑说明并链接来源，不将旧状态视为现状。",
+    "未使用的 docs/jobs.md 参考定义在固定提交中不存在；保留原始目标，未确认替代入口。"
+  ],
+  "manual_review": "非官方中文译文；交付后仍需编辑复核"
+}

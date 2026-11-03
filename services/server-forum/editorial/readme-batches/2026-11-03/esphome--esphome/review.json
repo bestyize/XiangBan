@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐项对照原文全部链接和标志；原文没有功能或安装说明",
+    "官网、两个 Logo 和基金会图片已验证；动态徽章及其他外链未逐一联网",
+    "保留包含 MIT 和 GPLv3 的仓库许可证全文"
+  ],
+  "link_results": {
+    "https://esphome.io": 200,
+    "https://media.esphome.io/logo/logo-text-on-dark.svg": 200,
+    "https://media.esphome.io/logo/logo-text-on-light.svg": 200,
+    "https://www.openhomefoundation.org/badges/esphome.png": 200
+  },
+  "issues": []
+}

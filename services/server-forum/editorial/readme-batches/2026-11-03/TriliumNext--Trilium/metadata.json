@@ -1,0 +1,99 @@
+{
+  "inventory_index": 90,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望自主组织笔记、文档和团队工作的人。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:17:12.108180+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "知识库",
+      "笔记树",
+      "标签"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 2611,
+    "full_name": "TriliumNext/Trilium",
+    "getting_started": "从官方当前发行版本建立测试笔记树，熟悉链接与导入方式。",
+    "highlights": [
+      "支持分层与关联笔记",
+      "适合积累结构化个人资料"
+    ],
+    "homepage_url": "https://triliumnotes.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T07:26:39Z",
+    "last_pushed_at": "2026-11-02T07:26:42Z",
+    "name": "Trilium Notes",
+    "notes": [
+      "升级前备份笔记数据，扩展脚本按自己的需求审查。"
+    ],
+    "order": 91,
+    "readme_sha": "e686e04e62c5659dd7e5c19120ee9e5fc1aed87d",
+    "related_categories": [],
+    "source_url": "https://github.com/TriliumNext/Trilium/blob/main/README.md",
+    "stars": 38669,
+    "summary": "以分层笔记、标签和关联组织个人知识的开源应用。",
+    "tags": [
+      "知识库",
+      "笔记树",
+      "标签"
+    ],
+    "title": "把层层关联的笔记整理成知识树",
+    "watchers": 278
+  },
+  "repository": "TriliumNext/Trilium",
+  "fetched_at": "2026-11-03T01:50:55.181170+00:00",
+  "canonical_repository": "TriliumNext/Trilium",
+  "default_branch": "main",
+  "commit_sha": "e26f7486eb66ca77d13bc0e9cd5c6c79b95e0fec",
+  "readme_path": "README.md",
+  "readme_blob_sha": "e686e04e62c5659dd7e5c19120ee9e5fc1aed87d",
+  "readme_url": "https://github.com/TriliumNext/Trilium/blob/e26f7486eb66ca77d13bc0e9cd5c6c79b95e0fec/README.md",
+  "stars": 38674,
+  "pushed_at": "2026-11-02T20:41:23Z",
+  "stars_fetched_at": "2026-11-03T01:50:57.603955+00:00",
+  "license_spdx": "AGPL-3.0",
+  "homepage_url": "https://triliumnotes.org",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "dbbe3558157f5861bff35dcb37b328b679b0ccfd",
+  "license_url": "https://github.com/TriliumNext/Trilium/blob/e26f7486eb66ca77d13bc0e9cd5c6c79b95e0fec/LICENSE",
+  "source_language": "English",
+  "official_chinese_candidate": {
+    "path": "docs/README-ZH_CN.md",
+    "blob_sha": "b7428a2e9f53ae02270e0af77c075f291081225b",
+    "url": "https://github.com/TriliumNext/Trilium/blob/e26f7486eb66ca77d13bc0e9cd5c6c79b95e0fec/docs/README-ZH_CN.md",
+    "fetched_at": "2026-11-03T01:51:39.648758+00:00",
+    "status": "已与英文源逐节对照；保留上游翻译的代码注释并补译赞助说明"
+  },
+  "translation_attribution": "基于官方中文补译（赞助商说明）",
+  "relative_link_resolution": "相对文档和图片分别基于原文件目录定位至固定提交",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/TriliumNext/Trilium",
+  "description_zh": "以树状结构组织笔记、构建个人知识库的开源应用。",
+  "official_entry": {
+    "url": "https://docs.triliumnotes.org/",
+    "kind": "查看文档",
+    "verification": "上游 README 官方文档入口，HTTP HEAD 200"
+  },
+  "platforms": [
+    "Windows",
+    "macOS",
+    "Linux"
+  ],
+  "icon_display": "项目名占位，未发现已核实项目图标",
+  "image_license": "官方截图按固定提交外链引用，未复制素材；单独图片权利待后续核实。"
+}

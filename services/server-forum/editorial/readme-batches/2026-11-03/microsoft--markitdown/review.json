@@ -1,0 +1,10 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "全文逐节直译审校，包含费用、输入安全及贡献范围等所有警示与说明。",
+  "code_and_numbers": "29 个 fenced 代码块与英文逐字一致；Python 3.10–3.14、收费及重试次数核对。",
+  "links_and_images": "唯一仓库相对文档链接固定提交并返回 200；两个上游徽章返回可读图片；原有锚点保留。",
+  "license": "MIT 许可证保存于 LICENSE.upstream；原文商标政策保留。",
+  "issues": [
+    "README 没有可确认的项目图标，尚需素材核实。"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照 RST 原文，保留安装与教程路径、问题反馈、贡献与测试说明",
+  "code_and_numbers": "无代码块；所有文件路径、30 秒和界面按钮名称已核对",
+  "links_and_images": "README 无图片；官方项目网站图标采集时返回 HTTP 200，原文链接保留",
+  "license": "BSD-3-Clause，仓库许可证与版权声明保存在 LICENSE.upstream",
+  "issues": [
+    "原文 RST 转换为 Markdown；官方图标由 Django 官网提供，后续可用性可能变化。"
+  ],
+  "manual_review": "非官方中文译文，交付后仍需编辑复核"
+}

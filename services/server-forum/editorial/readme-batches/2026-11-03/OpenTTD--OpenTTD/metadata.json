@@ -1,0 +1,93 @@
+{
+  "inventory_index": 152,
+  "original_key": "OpenTTD/OpenTTD",
+  "repository": "OpenTTD/OpenTTD",
+  "catalog": {
+    "audience": "适合喜欢运输规划、模拟经营和慢慢建设的玩家。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:01:40.249604+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "城市",
+      "铁路",
+      "港口"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "flow",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "下载安装后游玩",
+    "featured": true,
+    "forks": 1328,
+    "full_name": "OpenTTD/OpenTTD",
+    "getting_started": "从官网获取适合平台的版本，按照官方指南准备图形、声音等基础资源。",
+    "highlights": [
+      "围绕多种交通方式建设运输网络",
+      "可以在游戏中探索调度与经营",
+      "源码公开，也能研究模拟游戏的实现"
+    ],
+    "homepage_url": "https://www.openttd.org",
+    "icon_fit": "contain",
+    "icon_source_url": "https://www.openttd.org/static/favicon.ico",
+    "icon_url": "/open-source-media/openttd-icon.png",
+    "last_commit_at": "2026-11-02T17:13:12Z",
+    "last_pushed_at": "2026-11-02T17:13:13Z",
+    "name": "OpenTTD",
+    "notes": [
+      "游戏代码与基础图形、声音资源有各自的许可和获取方式。"
+    ],
+    "order": 153,
+    "readme_sha": "a0e50bdef899db73b4fc8a8d6f29da13f1ac0d25",
+    "related_categories": [],
+    "source_url": "https://github.com/OpenTTD/OpenTTD#readme",
+    "stars": 8451,
+    "summary": "围绕交通运输与经营展开的开源模拟游戏。",
+    "tags": [
+      "模拟经营",
+      "交通",
+      "开源游戏"
+    ],
+    "title": "用铁路、公路和航线，搭建自己的运输网络",
+    "watchers": 124
+  },
+  "github_url": "https://github.com/OpenTTD/OpenTTD",
+  "official_url": "https://www.openttd.org",
+  "stars": 8451,
+  "code_pushed_at": "2026-11-02T23:14:00Z",
+  "default_branch": "master",
+  "commit_sha": "e87721aac6f405af3301fa3c1b825f99a4eec0b9",
+  "readme_path": "README.md",
+  "readme_blob_sha": "a0e50bdef899db73b4fc8a8d6f29da13f1ac0d25",
+  "readme_source_url": "https://github.com/OpenTTD/OpenTTD/blob/e87721aac6f405af3301fa3c1b825f99a4eec0b9/README.md",
+  "readme_api_url": "https://api.github.com/repos/OpenTTD/OpenTTD/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-2.0",
+  "license_source_url": "https://github.com/OpenTTD/OpenTTD/blob/e87721aac6f405af3301fa3c1b825f99a4eec0b9/COPYING.md",
+  "icon_source_url": "https://www.openttd.org/static/favicon.ico",
+  "fetched_at": "2026-11-03T01:50:43.894644+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "COPYING.md",
+      "url": "https://github.com/OpenTTD/OpenTTD/blob/e87721aac6f405af3301fa3c1b825f99a4eec0b9/COPYING.md",
+      "sha": "089f86e973d7e5e2b8ac901a7d44a6083fca4b1c"
+    }
+  ],
+  "needs_license_review": false,
+  "license_basis": "README 指明所有文件默认 GPL-2.0，列出第三方例外",
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "OpenTTD/OpenTTD",
+  "translation_origin": "非官方中文译文",
+  "official_entry": {
+    "url": "https://www.openttd.org/",
+    "kind": "项目官网"
+  }
+}

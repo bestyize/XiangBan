@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对 NSA 归属、安全警告、下载安装、构建工具、开发与贡献说明",
+  "code_and_numbers": "所有代码块与英文完全一致；JDK、Gradle、Python 和 Visual Studio 版本及路径保持不变",
+  "links_and_images": "相对文档、图标引用固定到采集提交并返回 HTTP 200；构建徽章及项目官网返回 HTTP 200",
+  "license": "Apache-2.0，仓库许可证及版权声明保存在 LICENSE.upstream",
+  "issues": [
+    "安全漏洞警告保留上游原文归属，具体影响应以官方安全公告为准。"
+  ],
+  "manual_review": "非官方译文；交付后仍需编辑复核"
+}

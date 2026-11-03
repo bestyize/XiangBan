@@ -1,0 +1,27 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照项目介绍、五条更新、功能、部署、来源构建与贡献；官方中文额外镜像源提示和商务、社区章节予以保留",
+  "code_and_numbers": "20 个代码块的命令已与英文对齐；其中 sysctl 示例中文注释作了翻译。补正过时安装步骤、发布日期、版本和资源要求",
+  "links_and_images": "相对链接固定到采集提交并在完整 Git 树核实；26 个中英文图片采集时返回 HTTP 200，图标亦固定版本",
+  "license": "Apache-2.0，仓库许可证及版权声明保存在 LICENSE.upstream；外链图像维持原来源",
+  "issues": [
+    "中文源额外包含官方提供的国内镜像源及商务、社区信息，英文原文没有相应段落。",
+    "图像和第三方服务后续可用性可能变化。"
+  ],
+  "manual_review": "官方中文按固定英文版本补正，交付后仍需编辑复核",
+  "localized_links_audit": {
+    "source_path": "README_zh.md",
+    "source_blob_sha": "300613378ec0ff87cda9e1512abc4beb4ba4d8ae",
+    "base_directory": ".",
+    "fixed_distinct_targets": 0,
+    "missing_upstream_relative_links": [],
+    "method": "以中文原文件目录解析并对照固定提交 Git 树，未发现错误目标。"
+  },
+  "fenced_code_comparison": {
+    "english_blocks": 20,
+    "chinese_blocks": 20,
+    "comparison": "按出现顺序逐块比较：第 2 块仅将 shell 注释 “In this case, we set it to 262144” 译为中文，命令完全相同；其余 19 块逐字相同。",
+    "official_zh_version_correction": "第 11 块上游中文曾额外运行 uv run deps/download_deps.py，已按相同提交英文删去；相邻段落补译只应在镜像构建或 CI 中运行、不可用于本地开发的限制。",
+    "additional_localized_content": "保留上游中文额外的华为云/阿里云镜像源行内提示、商务合作与中文社区两个章节，已在 issues 披露。"
+  }
+}

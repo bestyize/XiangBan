@@ -1,0 +1,91 @@
+{
+  "inventory_index": 124,
+  "original_key": "wled/WLED",
+  "repository": "wled/WLED",
+  "catalog": {
+    "audience": "适合愿意阅读硬件文档、准备实验环境并验证设备的爱好者与开发者。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:17:46.296959+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "灯光控制",
+      "LED",
+      "ESP32"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要兼容硬件或仿真环境",
+    "featured": true,
+    "forks": 4440,
+    "full_name": "wled/WLED",
+    "getting_started": "先核对控制板与灯带电压，用短灯带搭建测试环境。",
+    "highlights": [
+      "提供灯光效果与配置入口",
+      "适合研究联网灯带控制"
+    ],
+    "homepage_url": "https://kno.wled.ge",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-28T22:55:46Z",
+    "last_pushed_at": "2026-11-01T15:01:16Z",
+    "name": "WLED",
+    "notes": [
+      "供电电流、布线和设备兼容需要按真实硬件确认。"
+    ],
+    "order": 125,
+    "readme_sha": "fc42e1888972646d412015a7608fd96229289bbc",
+    "related_categories": [
+      "fun"
+    ],
+    "source_url": "https://github.com/wled/WLED/blob/main/readme.md",
+    "stars": 18956,
+    "summary": "面向兼容微控制器的开源灯光控制固件，支持可寻址 LED 等设备。",
+    "tags": [
+      "灯光控制",
+      "LED",
+      "ESP32"
+    ],
+    "title": "让灯带成为可以编排的光",
+    "watchers": 314
+  },
+  "github_url": "https://github.com/wled/WLED",
+  "official_url": "https://kno.wled.ge",
+  "stars": 18958,
+  "code_pushed_at": "2026-11-03T00:04:26Z",
+  "default_branch": "main",
+  "commit_sha": "fce41f2655c3087d3eaf95c028d2856967cbc86e",
+  "readme_path": "readme.md",
+  "readme_blob_sha": "fc42e1888972646d412015a7608fd96229289bbc",
+  "readme_source_url": "https://github.com/wled/WLED/blob/fce41f2655c3087d3eaf95c028d2856967cbc86e/readme.md",
+  "readme_api_url": "https://api.github.com/repos/wled/WLED/contents/readme.md?ref=main",
+  "readme_language": "en",
+  "license_spdx": "EUPL-1.2",
+  "license_source_url": "https://github.com/wled/WLED/blob/main/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/wled/WLED/fce41f2655c3087d3eaf95c028d2856967cbc86e/images/wled_logo_akemi.png",
+  "fetched_at": "2026-11-03T01:50:34.697067+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "wled/WLED",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/wled/WLED/fce41f2655c3087d3eaf95c028d2856967cbc86e/images/wled_logo_akemi.png",
+    "https://raw.githubusercontent.com/wled/WLED/fce41f2655c3087d3eaf95c028d2856967cbc86e/images/macbook-pro-space-gray-on-the-wooden-table.jpg",
+    "https://raw.githubusercontent.com/wled/WLED/fce41f2655c3087d3eaf95c028d2856967cbc86e/images/walking-with-iphone-x.jpg"
+  ],
+  "license_basis": "README 指明 EUPL v1.2",
+  "official_entry": {
+    "url": "https://kno.wled.ge",
+    "kind": "查看文档"
+  }
+}

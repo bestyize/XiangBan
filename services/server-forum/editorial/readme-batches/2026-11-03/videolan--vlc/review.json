@@ -1,0 +1,18 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留平台版本、许可区别和完整原文代码目录块",
+    "检查官网、GitLab 与支持入口；其余外链未逐一联网",
+    "保留项目许可证，libVLC 许可见固定版本 COPYING.LIB"
+  ],
+  "link_results": {
+    "https://www.videolan.org/vlc/": 200,
+    "https://code.videolan.org/videolan/vlc/": 200,
+    "https://www.videolan.org/support/": 200
+  },
+  "issues": []
+}

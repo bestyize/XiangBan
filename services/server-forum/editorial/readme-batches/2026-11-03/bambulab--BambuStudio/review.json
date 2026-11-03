@@ -1,0 +1,18 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照，保留功能、构建平台、AGPL 项目方说明及可选非自由插件",
+    "验证发布页、固定版本文档目录与正文图片，其余外链未逐一联网",
+    "保留仓库许可证全文"
+  ],
+  "link_results": {
+    "https://github.com/bambulab/BambuStudio/releases/": 200,
+    "https://github.com/bambulab/BambuStudio/tree/79df7ae309be398ed30c9f397c13c9911c2edc57/doc": 200,
+    "https://user-images.githubusercontent.com/106916061/179006347-497d24c0-9bd6-45b7-8c49-d5cc8ecfe5d7.png": 200
+  },
+  "issues": []
+}

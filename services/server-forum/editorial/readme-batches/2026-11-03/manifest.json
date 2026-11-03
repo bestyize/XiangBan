@@ -1,0 +1,1747 @@
+{
+  "source": "inventory.json",
+  "revision": 2,
+  "updated_at": "2026-11-03T03:22:41.690394+00:00",
+  "total": 168,
+  "ready_for_review": 156,
+  "blocked": 5,
+  "pending": 7,
+  "collections": [
+    {
+      "description": "开源项目的价值，也藏在创造的过程里。这组项目分别提供画图、发布内容和制作硬件的起点，可以按自己的兴趣与经验选择。",
+      "key": "ideas-to-things",
+      "notes": [
+        "用白板讲清一个想法，先把讨论变得具体。",
+        "把整理好的内容放上自己的站点，开始持续表达。",
+        "如果想进一步动手，可以先从图纸和物料清单了解硬件。"
+      ],
+      "projects": [
+        "excalidraw/excalidraw",
+        "withastro/astro",
+        "VoronDesign/Voron-2"
+      ],
+      "summary": "从一张草图、一篇文章，到可以摸到的硬件。",
+      "title": "把想法变成看得见的东西"
+    },
+    {
+      "description": "本地模型、Skill 和 MCP 解决的是不同问题。这组项目帮助建立初步认识：模型怎样运行，工作方法怎样组织，工具又怎样连接。",
+      "key": "understand-ai-tools",
+      "notes": [
+        "了解模型运行工具，先确认自己的设备条件。",
+        "阅读技能指令，看看工作流程如何被组织。",
+        "结合参考代码理解 MCP 的连接方式。"
+      ],
+      "projects": [
+        "ollama/ollama",
+        "obra/superpowers",
+        "modelcontextprotocol/servers"
+      ],
+      "summary": "一起看懂模型、技能与连接器各自做什么。",
+      "title": "从运行模型，到给 AI 增加能力"
+    }
+  ],
+  "projects": [
+    {
+      "index": 0,
+      "key": "codecrafters-io/build-your-own-x",
+      "repository": "codecrafters-io/build-your-own-x",
+      "directory": "codecrafters-io--build-your-own-x",
+      "status": "ready_for_review",
+      "issues": [
+        "README 中仅有官方横幅，未确认可单独使用的项目图标。"
+      ]
+    },
+    {
+      "index": 1,
+      "key": "freeCodeCamp/freeCodeCamp",
+      "repository": "freeCodeCamp/freeCodeCamp",
+      "directory": "freeCodeCamp--freeCodeCamp",
+      "status": "ready_for_review",
+      "issues": [
+        "认证与就业数字为上游项目的表述；课程材料及第三方素材的权利范围请以其各自来源为准。"
+      ]
+    },
+    {
+      "index": 2,
+      "key": "EbookFoundation/free-programming-books",
+      "repository": "EbookFoundation/free-programming-books",
+      "directory": "EbookFoundation--free-programming-books",
+      "status": "ready_for_review",
+      "issues": [
+        "目录链接指向的第三方书籍、课程及其他资源各有自己的版权和许可，不随目录许可一并授权。"
+      ]
+    },
+    {
+      "index": 3,
+      "key": "donnemartin/system-design-primer",
+      "repository": "donnemartin/system-design-primer",
+      "directory": "donnemartin--system-design-primer",
+      "status": "ready_for_review",
+      "issues": [
+        "上游 README 未提供可确认的项目图标，需素材核实。"
+      ]
+    },
+    {
+      "index": 4,
+      "key": "obra/superpowers",
+      "repository": "obra/superpowers",
+      "directory": "obra--superpowers",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 5,
+      "key": "practical-tutorials/project-based-learning",
+      "repository": "practical-tutorials/project-based-learning",
+      "directory": "practical-tutorials--project-based-learning",
+      "status": "ready_for_review",
+      "issues": [
+        "README 未提供可确认的项目图标，需素材核实。"
+      ]
+    },
+    {
+      "index": 6,
+      "key": "TheAlgorithms/Python",
+      "repository": "TheAlgorithms/Python",
+      "directory": "TheAlgorithms--Python",
+      "status": "ready_for_review",
+      "issues": [
+        "图片与动态徽章由第三方源提供，后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 7,
+      "key": "ossu/computer-science",
+      "repository": "ossu/computer-science",
+      "directory": "ossu--computer-science",
+      "status": "ready_for_review",
+      "issues": [
+        "课程价格、可用性、学习时间和相当学士学位的上游声明未经独立核定，译注提示核对。",
+        "链接清单庞大，外部课程和资源未逐一联网确认。"
+      ]
+    },
+    {
+      "index": 8,
+      "key": "yt-dlp/yt-dlp",
+      "repository": "yt-dlp/yt-dlp",
+      "directory": "yt-dlp--yt-dlp",
+      "status": "ready_for_review",
+      "issues": [
+        "部分示例帮助输出中的英文专有参数与机器可解析内容保持原样；弃用选项表保留原文并附完整自然语言对应说明。",
+        "项目版本和站点支持会变化，译文对应固定提交，不代表实时状态。",
+        "标志为上游原始链接，商标使用权未单独确认；外链和动态徽章未逐条验证。"
+      ]
+    },
+    {
+      "index": 9,
+      "key": "trekhleb/javascript-algorithms",
+      "repository": "trekhleb/javascript-algorithms",
+      "directory": "trekhleb--javascript-algorithms",
+      "status": "ready_for_review",
+      "issues": [
+        "README 未提供可确认的项目图标，需素材核实。"
+      ]
+    },
+    {
+      "index": 10,
+      "key": "microsoft/vscode",
+      "repository": "microsoft/vscode",
+      "directory": "microsoft--vscode",
+      "status": "ready_for_review",
+      "issues": [
+        "项目图标与微软商标的使用需遵循上游政策；外部图片和徽章后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 11,
+      "key": "microsoft/markitdown",
+      "repository": "microsoft/markitdown",
+      "directory": "microsoft--markitdown",
+      "status": "ready_for_review",
+      "issues": [
+        "README 没有可确认的项目图标，尚需素材核实。"
+      ]
+    },
+    {
+      "index": 12,
+      "key": "anthropics/skills",
+      "repository": "anthropics/skills",
+      "directory": "anthropics--skills",
+      "status": "blocked",
+      "issues": [
+        "固定提交的仓库根目录及根 README 均未发现许可声明；递归树中的许可属于独立 skill 子目录，尚无根 README 的明确复制与翻译授权依据。"
+      ]
+    },
+    {
+      "index": 13,
+      "key": "ollama/ollama",
+      "repository": "ollama/ollama",
+      "directory": "ollama--ollama",
+      "status": "ready_for_review",
+      "issues": [
+        "“完整隐私保护”等为上游声明，尤其云端使用的隐私保障未独立核验，译注提醒查看服务政策。",
+        "社区项目条目按源文保留，不代表已逐一验证其维护状态或功能；官方图标可能受独立商标权限制。"
+      ]
+    },
+    {
+      "index": 14,
+      "key": "huggingface/transformers",
+      "repository": "huggingface/transformers",
+      "directory": "huggingface--transformers",
+      "status": "ready_for_review",
+      "issues": [
+        "Zenodo 徽章图返回 HTTP 403，保留原 DOI 入口及明确译注。"
+      ]
+    },
+    {
+      "index": 15,
+      "key": "langflow-ai/langflow",
+      "repository": "langflow-ai/langflow",
+      "directory": "langflow-ai--langflow",
+      "status": "ready_for_review",
+      "issues": [
+        "DeepWiki 动态徽章请求受限，改为原入口文本链接；图片后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 16,
+      "key": "langchain-ai/langchain",
+      "repository": "langchain-ai/langchain",
+      "directory": "langchain-ai--langchain",
+      "status": "ready_for_review",
+      "issues": [
+        "动态徽章后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 17,
+      "key": "vercel/next.js",
+      "repository": "vercel/next.js",
+      "directory": "vercel--next.js",
+      "status": "ready_for_review",
+      "issues": [
+        "图片与动态徽章由上游或第三方源提供，后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 18,
+      "key": "excalidraw/excalidraw",
+      "repository": "excalidraw/excalidraw",
+      "directory": "excalidraw--excalidraw",
+      "status": "ready_for_review",
+      "issues": [
+        "DeepWiki 动态徽章请求受限，已改为原入口文本链接；第三方赞助商图像后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 19,
+      "key": "ggml-org/llama.cpp",
+      "repository": "ggml-org/llama.cpp",
+      "directory": "ggml-org--llama.cpp",
+      "status": "ready_for_review",
+      "issues": [
+        "README 中性能和支持范围是上游项目的表述；外链截图和徽章后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 20,
+      "key": "rustdesk/rustdesk",
+      "repository": "rustdesk/rustdesk",
+      "directory": "rustdesk--rustdesk",
+      "status": "ready_for_review",
+      "issues": [
+        "旧版官方中文含 16 个代码块和额外镜像、代理示例，固定英文版为 11 个；阅读稿按固定英文版整理，原始官方中文完整保留。",
+        "项目对数据安全的表述属于作者观点，未作为独立安全保证。"
+      ]
+    },
+    {
+      "index": 21,
+      "key": "microsoft/generative-ai-for-beginners",
+      "repository": "microsoft/generative-ai-for-beginners",
+      "directory": "microsoft--generative-ai-for-beginners",
+      "status": "ready_for_review",
+      "issues": [
+        "上游中文由 Co-op Translator 生成，已保留其免责声明；图片与徽章后续可用性可能变化。",
+        "未确认独立项目图标，卡片使用项目名称占位。"
+      ]
+    },
+    {
+      "index": 22,
+      "key": "godotengine/godot",
+      "repository": "godotengine/godot",
+      "directory": "godotengine--godot",
+      "status": "ready_for_review",
+      "issues": [
+        "外链截图指向独立设计仓库的动态分支，后续内容和可用性可能变化。"
+      ]
+    },
+    {
+      "index": 23,
+      "key": "immich-app/immich",
+      "repository": "immich-app/immich",
+      "directory": "immich-app--immich",
+      "status": "ready_for_review",
+      "issues": [
+        "图片与动态徽章由上游或第三方源提供，后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 24,
+      "key": "supabase/supabase",
+      "repository": "supabase/supabase",
+      "directory": "supabase--supabase",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 25,
+      "key": "denoland/deno",
+      "repository": "denoland/deno",
+      "directory": "denoland--deno",
+      "status": "ready_for_review",
+      "issues": [
+        "图片与动态徽章由上游或第三方源提供，后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 26,
+      "key": "google-gemini/gemini-cli",
+      "repository": "google-gemini/gemini-cli",
+      "directory": "google-gemini--gemini-cli",
+      "status": "ready_for_review",
+      "issues": [
+        "账号资格、免费层级、模型支持及发布时间均为固定版本 README 的上游说明，可能变化；使用前应核对官方最新文档。"
+      ]
+    },
+    {
+      "index": 27,
+      "key": "microsoft/terminal",
+      "repository": "microsoft/terminal",
+      "directory": "microsoft--terminal",
+      "status": "ready_for_review",
+      "issues": [
+        "Canary 稳定性、依赖版本、团队成员等均为上游固定版本表述，未视为实时状态。",
+        "品牌图与商店标识保留原始链接，独立商标使用授权未确认。"
+      ]
+    },
+    {
+      "index": 28,
+      "key": "neovim/neovim",
+      "repository": "neovim/neovim",
+      "directory": "neovim--neovim",
+      "status": "ready_for_review",
+      "issues": [
+        "官方标识链接指向独立网站仓库的动态分支；素材许可和后续可用性以来源为准。"
+      ]
+    },
+    {
+      "index": 29,
+      "key": "punkpeye/awesome-mcp-servers",
+      "repository": "punkpeye/awesome-mcp-servers",
+      "directory": "punkpeye--awesome-mcp-servers",
+      "status": "pending",
+      "issues": [
+        "尚未核对文档或图片是否适用仓库许可证。",
+        "尚未完成官方中文查找和章节对照、全文翻译及审校。",
+        "尚未校正固定版本的相对链接并核验图片。",
+        "官方简中 README-zh.md 约 99 KB、仅 42 个 Markdown 标题；英文原文约 1.63 MB、71 个标题，资源目录大量未覆盖；不得当成完整译文，需逐条对照补齐。"
+      ]
+    },
+    {
+      "index": 30,
+      "key": "NationalSecurityAgency/ghidra",
+      "repository": "NationalSecurityAgency/ghidra",
+      "directory": "NationalSecurityAgency--ghidra",
+      "status": "ready_for_review",
+      "issues": [
+        "安全漏洞警告保留上游原文归属，具体影响应以官方安全公告为准。"
+      ]
+    },
+    {
+      "index": 31,
+      "key": "microsoft/Web-Dev-For-Beginners",
+      "repository": "microsoft/Web-Dev-For-Beginners",
+      "directory": "microsoft--Web-Dev-For-Beginners",
+      "status": "ready_for_review",
+      "issues": [
+        "上游中文由 Co-op Translator 生成，已保留其免责声明；图片与徽章后续可用性可能变化。",
+        "未确认独立项目图标，卡片使用项目名称占位。"
+      ]
+    },
+    {
+      "index": 32,
+      "key": "oven-sh/bun",
+      "repository": "oven-sh/bun",
+      "directory": "oven-sh--bun",
+      "status": "ready_for_review",
+      "issues": [
+        "性能、内存和兼容性为上游表述，未独立测量。",
+        "项目标识沿用上游图片链接，商标及独立素材权利未单独确认。"
+      ]
+    },
+    {
+      "index": 33,
+      "key": "vllm-project/vllm",
+      "repository": "vllm-project/vllm",
+      "directory": "vllm-project--vllm",
+      "status": "ready_for_review",
+      "issues": [
+        "文中性能、支持范围及产品表述为上游声明，需以后续版本为准。"
+      ]
+    },
+    {
+      "index": 34,
+      "key": "Stirling-Tools/Stirling-PDF",
+      "repository": "Stirling-Tools/Stirling-PDF",
+      "directory": "Stirling-Tools--Stirling-PDF",
+      "status": "ready_for_review",
+      "issues": [
+        "项目能力和处理规模为上游声明，企业版功能及相关许可须以官方说明为准。"
+      ]
+    },
+    {
+      "index": 35,
+      "key": "infiniflow/ragflow",
+      "repository": "infiniflow/ragflow",
+      "directory": "infiniflow--ragflow",
+      "status": "ready_for_review",
+      "issues": [
+        "中文源额外包含官方提供的国内镜像源及商务、社区信息，英文原文没有相应段落。",
+        "图像和第三方服务后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 36,
+      "key": "zed-industries/zed",
+      "repository": "zed-industries/zed",
+      "directory": "zed-industries--zed",
+      "status": "ready_for_review",
+      "issues": [
+        "赞助款属于营利公司普通收入且没有赞助权益，已按原文保留。"
+      ]
+    },
+    {
+      "index": 37,
+      "key": "microsoft/ML-For-Beginners",
+      "repository": "microsoft/ML-For-Beginners",
+      "directory": "microsoft--ML-For-Beginners",
+      "status": "ready_for_review",
+      "issues": [
+        "上游中文由 Co-op Translator 生成，已保留其免责声明；图片与徽章后续可用性可能变化。",
+        "未确认独立项目图标，卡片使用项目名称占位。"
+      ]
+    },
+    {
+      "index": 38,
+      "key": "modelcontextprotocol/servers",
+      "repository": "modelcontextprotocol/servers",
+      "directory": "modelcontextprotocol--servers",
+      "status": "ready_for_review",
+      "issues": [
+        "README 将服务器定位为参考实现，明确不是可直接用于生产的解决方案；需保留上游威胁模型警告。"
+      ]
+    },
+    {
+      "index": 39,
+      "key": "django/django",
+      "repository": "django/django",
+      "directory": "django--django",
+      "status": "ready_for_review",
+      "issues": [
+        "原文 RST 转换为 Markdown；官方图标由 Django 官网提供，后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 40,
+      "key": "astral-sh/uv",
+      "repository": "astral-sh/uv",
+      "directory": "astral-sh--uv",
+      "status": "ready_for_review",
+      "issues": [
+        "性能提升是上游作者的基准声明，受测试场景影响；外部图表和徽章后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 41,
+      "key": "gohugoio/hugo",
+      "repository": "gohugoio/hugo",
+      "directory": "gohugoio--hugo",
+      "status": "ready_for_review",
+      "issues": [
+        "官方标识和赞助商图像来自独立仓库，维持上游外链；素材许可和后续可用性应以各来源为准。"
+      ]
+    },
+    {
+      "index": 42,
+      "key": "junegunn/fzf",
+      "repository": "junegunn/fzf",
+      "directory": "junegunn--fzf",
+      "status": "ready_for_review",
+      "issues": [
+        "`FZF_EXPANSION_OPS` 等名称按上游固定版本原样保留，未推断是否为笔误。",
+        "性能为上游表述，未单独基准测试；第三方图片和商标的权利未单独确认。"
+      ]
+    },
+    {
+      "index": 43,
+      "key": "jesseduffield/lazygit",
+      "repository": "jesseduffield/lazygit",
+      "directory": "jesseduffield--lazygit",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 44,
+      "key": "hoppscotch/hoppscotch",
+      "repository": "hoppscotch/hoppscotch",
+      "directory": "hoppscotch--hoppscotch",
+      "status": "ready_for_review",
+      "issues": [
+        "原文顶部为 GitHub 组织头像，阅读稿改用同提交仓库内项目 logo；原图保留在 README.source.md。",
+        "代理能力、无限数量等为上游产品描述，不作为本站保证。"
+      ]
+    },
+    {
+      "index": 45,
+      "key": "obsproject/obs-studio",
+      "repository": "obsproject/obs-studio",
+      "directory": "obsproject--obs-studio",
+      "status": "ready_for_review",
+      "issues": [
+        "动态徽章后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 46,
+      "key": "microsoft/ai-agents-for-beginners",
+      "repository": "microsoft/ai-agents-for-beginners",
+      "directory": "microsoft--ai-agents-for-beginners",
+      "status": "ready_for_review",
+      "issues": [
+        "上游中文本身由 Co-op Translator 生成，已保留其免责声明；图片及徽章后续可用性可能变化。",
+        "未找到独立项目图标，卡片使用项目名称占位；官方课程缩略图仅作正文图片。"
+      ]
+    },
+    {
+      "index": 47,
+      "key": "ComposioHQ/awesome-claude-skills",
+      "repository": "ComposioHQ/awesome-claude-skills",
+      "directory": "ComposioHQ--awesome-claude-skills",
+      "status": "ready_for_review",
+      "issues": [
+        "上游固定版本存在 78 个失效的同仓库相对目标，包含部分核心技能目录；不可宣称全部技能可用。"
+      ]
+    },
+    {
+      "index": 48,
+      "key": "AppFlowy-IO/AppFlowy",
+      "repository": "AppFlowy-IO/AppFlowy",
+      "directory": "AppFlowy-IO--AppFlowy",
+      "status": "ready_for_review",
+      "issues": [
+        "Notion 比较、数据安全及 100% 控制为 AppFlowy 团队观点，不构成独立验证。",
+        "inlang 动态徽章已改为原入口文本链接；其他外部图片后续可用性可能变化。"
+      ]
+    },
+    {
+      "index": 49,
+      "key": "toeverything/AFFiNE",
+      "repository": "toeverything/AFFiNE",
+      "directory": "toeverything--AFFiNE",
+      "status": "ready_for_review",
+      "issues": [
+        "固定 README 称 EE 尚未发布，但官方企业版页面与根 LICENSE 表明后台已使用 EE 许可；中英文阅读稿均加编辑说明并链接来源，不将旧状态视为现状。",
+        "未使用的 docs/jobs.md 参考定义在固定提交中不存在；保留原始目标，未确认替代入口。"
+      ]
+    },
+    {
+      "index": 50,
+      "key": "strapi/strapi",
+      "repository": "strapi/strapi",
+      "directory": "strapi--strapi",
+      "status": "ready_for_review",
+      "issues": [
+        "原 README 的两个深浅色 logo 在采集时返回 HTTP 403，阅读稿改用仓库内官方 logo 并保留原始快照；产品能力是上游陈述。"
+      ]
+    },
+    {
+      "index": 51,
+      "key": "microsoft/AI-For-Beginners",
+      "repository": "microsoft/AI-For-Beginners",
+      "directory": "microsoft--AI-For-Beginners",
+      "status": "ready_for_review",
+      "issues": [
+        "上游中文由 Co-op Translator 生成，已保留其免责声明；图片与徽章后续可用性可能变化。",
+        "未确认独立项目图标，卡片使用项目名称占位。"
+      ]
+    },
+    {
+      "index": 52,
+      "key": "BurntSushi/ripgrep",
+      "repository": "BurntSushi/ripgrep",
+      "directory": "BurntSushi--ripgrep",
+      "status": "ready_for_review",
+      "issues": [
+        "性能测试结果为上游在指定硬件和条件下的结果，未由本次重新运行。",
+        "无已核实独立项目图标，卡片保留名称占位；上游截图使用原始外链。"
+      ]
+    },
+    {
+      "index": 53,
+      "key": "FFmpeg/FFmpeg",
+      "repository": "FFmpeg/FFmpeg",
+      "directory": "FFmpeg--FFmpeg",
+      "status": "ready_for_review",
+      "issues": [
+        "README 明确说明 GitHub Pull Request 不属于审查流程且会被忽略；项目各文件和可选组件可能适用不同许可证。"
+      ]
+    },
+    {
+      "index": 54,
+      "key": "alacritty/alacritty",
+      "repository": "alacritty/alacritty",
+      "directory": "alacritty--alacritty",
+      "status": "ready_for_review",
+      "issues": [
+        "性能比较是上游作者的表述，原文也建议用户按自己的场景测试。"
+      ]
+    },
+    {
+      "index": 55,
+      "key": "coollabsio/coolify",
+      "repository": "coollabsio/coolify",
+      "directory": "coollabsio--coolify",
+      "status": "ready_for_review",
+      "issues": [
+        "小额赞助商链接采集时：Movavi 返回 500；ULTRASERVERS、Crypto Jobs List 和 360Creators 返回 403；arvensis.systems 和 decidable.no 出现 TLS 错误。未确认替代官方入口，均保留上游链接。",
+        "赞助商功能和价格描述为上游提供的信息，不代表本站验证或实时价格。"
+      ]
+    },
+    {
+      "index": 56,
+      "key": "usememos/memos",
+      "repository": "usememos/memos",
+      "directory": "usememos--memos",
+      "status": "ready_for_review",
+      "issues": [
+        "原文、中文逐节对照；唯一命令代码块完全一致，核对全部升级版本标签与路径。",
+        "已检查 30 个非动态链接均返回 HTTP 200；徽章为上游动态链接。",
+        "README 和译文依据 MIT 许可使用并附原许可。官方图片以可读的上游链接引用，图片单独许可未知；后续如需下载、复制或替换，须另行核实。"
+      ]
+    },
+    {
+      "index": 57,
+      "key": "git/git",
+      "repository": "git/git",
+      "directory": "git--git",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐段对照，所有反引号中的命令和路径一致，保留安全披露邮件地址及 Git 名称的原文玩笑。",
+        "README 与 COPYING 均说明项目 GPLv2，部分文件有兼容的其他许可；COPYING 原文已保存。",
+        "非动态链接可读，marc.info HEAD 204、GET 200；未发现已核实项目图标，卡片使用名称占位。"
+      ]
+    },
+    {
+      "index": 58,
+      "key": "upstash/context7",
+      "repository": "upstash/context7",
+      "directory": "upstash--context7",
+      "status": "ready_for_review",
+      "issues": [
+        "官方中文对照英文，补齐 Node.js 22.13、Authorization Bearer、language 参数与软件包章节；恢复 use library 指令。上游翻译的自然语言示例保留，命令和标识符一致。",
+        "MIT 许可证原文已保存；原文部分第三方目录受 403 限制，保留原链并在译注提供可读官方替代入口。",
+        "封面采用固定提交上游外链，未复制素材；未核实项目图标，卡片使用名称占位。"
+      ]
+    },
+    {
+      "index": 59,
+      "key": "withastro/astro",
+      "repository": "withastro/astro",
+      "directory": "withastro--astro",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，两段安装代码完全一致，软件包目录与更新日志共 40 个固定版本链接全部保留。",
+        "MIT 许可证包括关联文档，已保存原文及版权；57 个非动态链接 HEAD 200。",
+        "项目官网 favicon 与横幅保留官方外链，未复制素材；图片单独权利待后续核实。"
+      ]
+    },
+    {
+      "index": 60,
+      "key": "penpot/penpot",
+      "repository": "penpot/penpot",
+      "directory": "penpot--penpot",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，明确保留云服务、自托管及付费 Enterprise 区别，原文安全与独占性称谓注明尚未独立验证；许可证代码块完全一致。",
+        "MPL-2.0 仓库许可与版权说明已保存；两项原链接 404、一项看板超时，原链保留并在译注提供官方文档/博客入口。",
+        "5 张项目官方界面图 Range GET 206，仅用外链未复制；未核实项目图标，卡片使用名称占位。"
+      ]
+    },
+    {
+      "index": 61,
+      "key": "microsoft/autogen",
+      "repository": "microsoft/autogen",
+      "directory": "microsoft--autogen",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐段对照，六段代码完全一致；明确保留不建议生产使用、MCP 和 Studio 安全警告。",
+        "README 前后维护声明及 GitHub archived=false 的矛盾均在译注与 metadata 标明；需持续关注上游更新。",
+        "CC BY 4.0 文档和 MIT 代码许可均保存，译文顶部注明作者、来源、许可及修改。",
+        "四个 NuGet 包页面 GET 200；LinkedIn 403，原链接保留并给社区替代入口。Microsoft 商标和 Logo 不由项目许可授权，卡片使用名称占位。"
+      ]
+    },
+    {
+      "index": 62,
+      "key": "sharkdp/bat",
+      "repository": "sharkdp/bat",
+      "directory": "sharkdp--bat",
+      "status": "pending",
+      "issues": [
+        "需核实 README 是否存在独立许可及图像权利",
+        "待寻找并核对官方中文或完成全文翻译",
+        "待核对相对链接、图片、代码与数字；英文原文语言尚待确认",
+        "已保存上游官方中文候选，尚未审校，也尚未修正相对链接，不能作为最终译文。",
+        "中文候选按 doc/ 基准固定链接，六个源链接失效已在草稿中按固定提交实际路径修复；已补译 Decorations、less、man/帮助高亮，其他章节和命令仍待全文核对。",
+        "58 个英文 fenced 代码块均在中文草稿中逐块原样保留；官方中文独有 Funtoo、Void、Termux 三块额外保留。代码块不代表全部自然语言已审校。",
+        "已核对并修正 Rust 1.79、配置路径、自动分页、暗色主题、输出样式、ANSI 清理、Copyright 2018–2025 等，但其他中文正文仍待逐节审校。"
+      ]
+    },
+    {
+      "index": 63,
+      "key": "crewAIInc/crewAI",
+      "repository": "crewAIInc/crewAI",
+      "directory": "crewAIInc--crewAI",
+      "status": "pending",
+      "issues": [
+        "需核实 README 是否存在独立许可及图像权利",
+        "待寻找并核对官方中文或完成全文翻译",
+        "待核对相对链接、图片、代码与数字；英文原文语言尚待确认"
+      ]
+    },
+    {
+      "index": 64,
+      "key": "jellyfin/jellyfin",
+      "repository": "jellyfin/jellyfin",
+      "directory": "jellyfin--jellyfin",
+      "status": "ready_for_review",
+      "issues": [
+        "上游同时写 .NET 10 SDK、支持 .NET 6 的 IDE 和 Codespaces 下载 .NET 7，均按原文保留，版本适用性未独立验证。",
+        "横幅与赞助商标识使用上游链接，其独立版权和商标权需按用途核实。"
+      ]
+    },
+    {
+      "index": 65,
+      "key": "go-gitea/gitea",
+      "repository": "go-gitea/gitea",
+      "directory": "go-gitea--gitea",
+      "status": "ready_for_review",
+      "issues": [
+        "官方中文与英文源逐节比较后，滞后的目的、构建、贡献、翻译及常见问题章节已按英文补译；截图及原文链接保留。",
+        "MIT 许可证覆盖相关文档，原文已保存；67 个非动态链接 HEAD 200。",
+        "原文截图保留官方外链，未复制素材；单独图片权利待后续核实。未确认项目图标，卡片使用名称占位。"
+      ]
+    },
+    {
+      "index": 66,
+      "key": "appwrite/appwrite",
+      "repository": "appwrite/appwrite",
+      "directory": "appwrite--appwrite",
+      "status": "ready_for_review",
+      "issues": [
+        "官方中英文逐节对照，7 个代码块完全一致，保留 Docker API 不匹配、仅监听本机和 SSH 隧道要求。",
+        "BSD 3-Clause 原许可已保存；两个非核心市场入口不可读，原链接保留，译注给出官方 DigitalOcean 指南及一般自托管文档。",
+        "项目图片保持可读上游外链，未复制素材；单独图片权利待后续核实。未发现已核实图标，卡片使用名称占位。"
+      ]
+    },
+    {
+      "index": 67,
+      "key": "laurent22/joplin",
+      "repository": "laurent22/joplin",
+      "directory": "laurent22--joplin",
+      "status": "blocked",
+      "issues": [
+        "上游根 LICENSE 将 AGPL-3.0-or-later 明确限定为仓库中的代码；readme/licenses.md 亦重复该代码范围并列出依赖许可。未找到 README 文档复制和翻译授权依据，待项目方或明确的文档许可确认。"
+      ]
+    },
+    {
+      "index": 68,
+      "key": "WerWolv/ImHex",
+      "repository": "WerWolv/ImHex",
+      "directory": "WerWolv--ImHex",
+      "status": "ready_for_review",
+      "issues": [
+        "GPU、macOS 构建和签名要求为固定版本上游说明，使用时应核对最新文档。",
+        "官方 logo 与赞助商标识保留上游图链，独立商标及素材权利未单独确认。"
+      ]
+    },
+    {
+      "index": 69,
+      "key": "TryGhost/Ghost",
+      "repository": "TryGhost/Ghost",
+      "directory": "TryGhost--Ghost",
+      "status": "ready_for_review",
+      "issues": [
+        "保留 Ghost(Pro) 托管服务说明、三条安装命令和会员支持等内容。",
+        "MIT 许可证及版权原文已保存；原文 Ghost 商标政策已保留。",
+        "34 个非动态、非 GitHub 附件链接 HEAD 200；官方图片保留上游外链，未复制素材。"
+      ]
+    },
+    {
+      "index": 70,
+      "key": "ChromeDevTools/chrome-devtools-mcp",
+      "repository": "ChromeDevTools/chrome-devtools-mcp",
+      "directory": "ChromeDevTools--chrome-devtools-mcp",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，六段代码完全一致；保留浏览器数据暴露、CrUX URL、默认使用统计和更新检查、退出开关及环境变量。",
+        "Apache-2.0 原许可已保存；npm 页面本次 403，原链保留并在译注提供可用 npm 官方文档和注册表。",
+        "未核实项目专用图标，卡片使用项目名占位。"
+      ]
+    },
+    {
+      "index": 71,
+      "key": "run-llama/llama_index",
+      "repository": "run-llama/llama_index",
+      "directory": "run-llama--llama_index",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，9 段代码与引用完全一致；区分开放框架和企业 LlamaParse，保留 300+ 集成及 130+ 格式。",
+        "MIT 仓库许可原文已保存；云入口 HEAD 405、GET 200。原文失效的 LlamaParse 章节锚点已在中英文阅读稿修正，译注说明。",
+        "上游安全/性能主张注明未经独立验证；未核实项目图标，卡片名称占位。"
+      ]
+    },
+    {
+      "index": 72,
+      "key": "skylot/jadx",
+      "repository": "skylot/jadx",
+      "directory": "skylot--jadx",
+      "status": "ready_for_review",
+      "issues": [
+        "反编译无法保证 100% 成功的上游警告已保留。",
+        "禁用 XML/ZIP 安全检查和压缩炸弹限制的环境变量均保留并说明，未建议默认关闭保护。"
+      ]
+    },
+    {
+      "index": 73,
+      "key": "mastodon/mastodon",
+      "repository": "mastodon/mastodon",
+      "directory": "mastodon--mastodon",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，版本要求及许可声明原文保持一致；版权信息和 AGPL 许可文本已保存。",
+        "30 个非动态链接均返回 HTTP 200；原文项目图片使用固定提交的官方外链，未复制素材。",
+        "未发现已核实项目图标，卡片以项目名占位；图片单独权利需在后续复制或站内托管前确认。"
+      ]
+    },
+    {
+      "index": 74,
+      "key": "x64dbg/x64dbg",
+      "repository": "x64dbg/x64dbg",
+      "directory": "x64dbg--x64dbg",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，32/64 位路径保留；历史捐赠表格中 212 项金额和日期序列一致，未省略历史引用。",
+        "LICENSE 为上游修改版 GPLv3，新增符合条件的动态插件闭源/商业许可例外；完整原文已保存，SPDX 保持 NOASSERTION。",
+        "部分非核心历史/第三方链接不可读或限流，保留原链并在译注给出可读 GitHub Releases；截图按固定提交外链引用，未复制。",
+        "虫子图标由 VisualPharm 创作，单独权利待核实，卡片使用名称占位。"
+      ]
+    },
+    {
+      "index": 75,
+      "key": "calcom/cal.diy",
+      "repository": "calcom/cal.diy",
+      "directory": "calcom--cal.diy",
+      "status": "pending",
+      "issues": [
+        "需核实 README 是否存在独立许可及图像权利",
+        "待寻找并核对官方中文或完成全文翻译",
+        "待核对相对链接、图片、代码与数字；英文原文语言尚待确认"
+      ]
+    },
+    {
+      "index": 76,
+      "key": "paperless-ngx/paperless-ngx",
+      "repository": "paperless-ngx/paperless-ngx",
+      "directory": "paperless-ngx--paperless-ngx",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，安装代码完全一致，保留明文存储、不可信主机与演示内容重置等警告。",
+        "GPL-3.0 仓库许可原文已保存；原文演示和文档域名返回 403，保留原链并加译注，提供同一提交的 GitHub 文档首页、安装和开发指南；演示可用性未确认。",
+        "官方 Logo 和截图使用固定提交外链，未复制素材；单独图片权利待后续核实。"
+      ]
+    },
+    {
+      "index": 77,
+      "key": "siyuan-note/siyuan",
+      "repository": "siyuan-note/siyuan",
+      "directory": "siyuan-note--siyuan",
+      "status": "ready_for_review",
+      "issues": [
+        "官方中文与英文源同一提交；核对章节结构、关键数据保护及付费限制和版本数值。12 段代码恢复英文源完全一致，AuthCode 内联命令与路径亦恢复，中文多出的宝塔、小皮、1Panel 指南明确保留。",
+        "AGPLv3 原许可已保存；酷安、官方社区/赞助及 GNU 站点本次不可读或限流，原链保留并加译注，GitHub Releases 与本地许可证可用。",
+        "官方 Logo 和截图仅引用外链，未复制素材；单独图片权利待后续核实。"
+      ]
+    },
+    {
+      "index": 78,
+      "key": "mitmproxy/mitmproxy",
+      "repository": "mitmproxy/mitmproxy",
+      "directory": "mitmproxy--mitmproxy",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐段对照，保留 HTTP/1、HTTP/2、WebSockets 和 SSL/TLS 支持范围。",
+        "MIT 许可证明确包括相关文档，已保存原文；11 个非动态链接均返回 HTTP 200。",
+        "未发现已核实项目图标，卡片使用项目名占位；徽章为上游动态外链。"
+      ]
+    },
+    {
+      "index": 79,
+      "key": "imputnet/cobalt",
+      "repository": "imputnet/cobalt",
+      "directory": "imputnet--cobalt",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐段对照，保留作者对内容公开范围、责任承担、代理行为和版权用途的表述。",
+        "上游 README 指明除单独说明外仓库其余部分采用 AGPL-3.0，已保存许可证；API 与 Web 子目录许可分别依上游说明。",
+        "19 个链接可读，Bluesky 链接 HEAD 404 但 GET 200；官方图标以原仓库固定提交外链引用，单独素材权利待后续核实。"
+      ]
+    },
+    {
+      "index": 80,
+      "key": "payloadcms/payload",
+      "repository": "payloadcms/payload",
+      "directory": "payloadcms--payload",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，代码块完全一致；上游性能、安全与首创称谓已明确为未独立验证的项目自述。",
+        "MIT 许可原文已保存；两个部署短链和 G2、npm 网页返回 403，保留原链并加译注，提供官方部署文档和 npm 注册表。",
+        "官方界面横幅保留外链，未复制素材；未核实项目图标，使用名称占位。"
+      ]
+    },
+    {
+      "index": 81,
+      "key": "mifi/lossless-cut",
+      "repository": "mifi/lossless-cut",
+      "directory": "mifi--lossless-cut",
+      "status": "ready_for_review",
+      "issues": [
+        "商店徽章、截图和第三方图像可能另有权利，仅保留上游链接，发布前按用途核实；动态徽章和非关键外链未逐一联网核验。"
+      ]
+    },
+    {
+      "index": 82,
+      "key": "logseq/logseq",
+      "repository": "logseq/logseq",
+      "directory": "logseq--logseq",
+      "status": "ready_for_review",
+      "issues": [
+        "上游 backers 徽章原指向缺失的 #-backers 锚点，保留上游目标；赞助者入口仍可通过 Open Collective 访问。",
+        "alpha/beta、Android 计划及运行脚本 URL 均为上游固定版本表述，并非当前状态验证。"
+      ]
+    },
+    {
+      "index": 83,
+      "key": "sharkdp/fd",
+      "repository": "sharkdp/fd",
+      "directory": "sharkdp--fd",
+      "status": "ready_for_review",
+      "issues": [
+        "基准性能为上游指定机器的历史结果，未独立复测。",
+        "未找到经核实的独立项目图标，卡片保留名称占位；上游截图素材的单独权利未确认。"
+      ]
+    },
+    {
+      "index": 84,
+      "key": "langchain-ai/langgraph",
+      "repository": "langchain-ai/langgraph",
+      "directory": "langchain-ai--langgraph",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，安装命令一致；项目对客户采用情况的说法明确归属于项目作者。",
+        "MIT 许可包括相关文档，已保存许可证与版权；31 个非动态链接 HEAD 200。",
+        "项目 Logo 用固定提交官方外链，未复制素材；单独图片权利在后续复制或托管时再核实。"
+      ]
+    },
+    {
+      "index": 85,
+      "key": "LizardByte/Sunshine",
+      "repository": "LizardByte/Sunshine",
+      "directory": "LizardByte--Sunshine",
+      "status": "ready_for_review",
+      "issues": [
+        "硬件要求表为上游进行中的资料，原文明确不要据此购买硬件，译文完整保留。",
+        "Virtual HID Broker 需独立安装和许可的限制按原文保留；性能表述未经独立测量。"
+      ]
+    },
+    {
+      "index": 86,
+      "key": "CorentinTh/it-tools",
+      "repository": "CorentinTh/it-tools",
+      "directory": "CorentinTh--it-tools",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，所有代码块完全一致，保留两种 Docker 镜像及开发、测试命令。",
+        "GPLv3 仓库许可原文已保存；原文一个 VS Code 扩展页面 GET 404，保留原链并在译注提供 Volar 页面，替代效果未作保证。",
+        "项目 Logo 使用固定提交官方外链，未复制素材；单独图片权利待后续核实。"
+      ]
+    },
+    {
+      "index": 87,
+      "key": "HKUDS/LightRAG",
+      "repository": "HKUDS/LightRAG",
+      "directory": "HKUDS--LightRAG",
+      "status": "ready_for_review",
+      "issues": [
+        "官方中文与英文逐节对照：23 条新闻日期、128 个论文表百分比一致，13 个代码块恢复为英文原样；补齐遗漏目录行和英文文档引用。",
+        "修正中文候选的查询模式数、env.example、MAX_FILE_PATHS 以及模型建议遗漏；中文独有 LiteWrite 内容已标明并保留。",
+        "英文自身对重新嵌入工具、smart_heading 默认行为的描述存在矛盾，均在译注保留，待上游澄清。",
+        "仓库固定版本的 30 个文档／图片链接以及三张外部示意图验证可读；外部图像保留上游链接，图片各自权利未推定。"
+      ]
+    },
+    {
+      "index": 88,
+      "key": "umami-software/umami",
+      "repository": "umami-software/umami",
+      "directory": "umami-software--umami",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，9 段代码完全一致；保留默认 admin/umami 凭据、双因素加密密钥和 MCP 默认禁用说明。",
+        "MIT 许可证已保存；9 个非社交非徽章链接 HEAD 200，社交链接未逐项验证。",
+        "上游官方 Logo 使用外链，未复制素材；单独图片权利待后续核实。"
+      ]
+    },
+    {
+      "index": 89,
+      "key": "microsoft/playwright-mcp",
+      "repository": "microsoft/playwright-mcp",
+      "directory": "microsoft--playwright-mcp",
+      "status": "pending",
+      "issues": [
+        "需核实 README 是否存在独立许可及图像权利",
+        "待寻找并核对官方中文或完成全文翻译",
+        "待核对相对链接、图片、代码与数字；英文原文语言尚待确认"
+      ]
+    },
+    {
+      "index": 90,
+      "key": "TriliumNext/Trilium",
+      "repository": "TriliumNext/Trilium",
+      "directory": "TriliumNext--Trilium",
+      "status": "ready_for_review",
+      "issues": [
+        "官方中文与英文逐节对照，版本兼容、安装要求及四段命令保留；上游中文代码注释保留，赞助商说明已补译。",
+        "AGPL 许可证及版权声明已保存；105 个非动态链接中第三方社区 TriliumRocks 超时，译注提供经核实官方文档。",
+        "官方截图以固定提交外链引用，未复制素材；单独图片权利待后续核实。未核实项目图标，使用名称占位。"
+      ]
+    },
+    {
+      "index": 91,
+      "key": "sgl-project/sglang",
+      "repository": "sgl-project/sglang",
+      "directory": "sgl-project--sglang",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，三段命令完全一致；硬件表、正在集成的设备、贡献者赞助等原文内容保留，生产采用情况归属上游自述。",
+        "Apache-2.0 原许可已保存；55 个非社交非徽章链接中 Slack 403，保留原链并在译注提供 GitHub Issues。",
+        "官方 Logo 与采用情况图仅引用上游外链，未复制；图片单独权利待后续核实。"
+      ]
+    },
+    {
+      "index": 92,
+      "key": "microsoft/Data-Science-For-Beginners",
+      "repository": "microsoft/Data-Science-For-Beginners",
+      "directory": "microsoft--Data-Science-For-Beginners",
+      "status": "ready_for_review",
+      "issues": [
+        "英文与官方自动中文逐节对照；20 课编号、主题、学习目标及作者一致，两个引用式命令块完全一致，保留上游 AI 翻译免责声明。",
+        "MIT 许可原文与版权已保存。原活动图片、翻译指南及 star/watch 目标失效，使用同仓库已核实图片/贡献指南及仓库主页，并在中英文备注中标明；旧活动 Discord 403 原链保留。",
+        "中文源位于 translations/zh-CN，所有相对链接依该目录固定到源提交；图片仅引用官方外链，未复制素材。"
+      ]
+    },
+    {
+      "index": 93,
+      "key": "vercel-labs/skills",
+      "repository": "vercel-labs/skills",
+      "directory": "vercel-labs--skills",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，保留 Node.js 22.20、实验性命令变更提示、遥测和安全审计关闭设置，命令及代码注释保持原样。",
+        "MIT 许可证明确覆盖相关文档，已保存许可与版权。12 个非动态链接中 npm 网页 403，保留原链并在译注提供可访问的官方注册表地址。",
+        "未发现已核实项目图标，卡片以名称占位。"
+      ]
+    },
+    {
+      "index": 94,
+      "key": "mpv-player/mpv",
+      "repository": "mpv-player/mpv",
+      "directory": "mpv-player--mpv",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，缩进命令示例完全一致且原文反引号标识符均保留；系统版本、旧版本不受支持、DASH 安全提示和依赖列表保留。",
+        "上游 Copyright 默认 GPLv2+ 并区分 LGPL 构建及文档例外，已保存 Copyright、GPL 与 LGPL 原文；译注明确 -Dgpl=false 本身不授予 LGPL 权利。",
+        "21 个链接 HEAD 200；项目 Logo 使用官方外链，未复制素材，单独图片权利待后续核实。"
+      ]
+    },
+    {
+      "index": 95,
+      "key": "nextcloud/server",
+      "repository": "nextcloud/server",
+      "directory": "nextcloud--server",
+      "status": "ready_for_review",
+      "issues": [
+        "README 文件头明确 AGPL-3.0-or-later 及版权，已保留声明与许可证；译文逐节核对，保留命令、日期及不用于生产系统的说明。",
+        "非动态链接可读；失效的动态 Design 徽章在中文中以原目标链接替代并标注译注。",
+        "官方截图保持上游外链，未复制图片；单独素材权利待后续核实。未发现已核实项目图标，卡片使用项目名占位。"
+      ]
+    },
+    {
+      "index": 96,
+      "key": "gchq/CyberChef",
+      "repository": "gchq/CyberChef",
+      "directory": "gchq--CyberChef",
+      "status": "ready_for_review",
+      "issues": [
+        "全文对照逐节保留操作、配置、浏览器及 Node 版本、限制和 Crown Copyright；代码块与行内代码逐项一致。",
+        "Apache-2.0 原始许可证已保存；官方站点及固定版本工作流、.nvmrc、安全政策、贡献指南均可访问。",
+        "未核实独立图标，卡片使用名称占位；原文所述浏览器端处理与 Node 版本支持属于上游项目声明。"
+      ]
+    },
+    {
+      "index": 97,
+      "key": "agentscope-ai/agentscope",
+      "repository": "agentscope-ai/agentscope",
+      "directory": "agentscope-ai--agentscope",
+      "status": "ready_for_review",
+      "issues": [
+        "官方中文与英文逐节对照，代码区别仅为上游翻译的注释，英文 FEAT、INTE、Experimental 标签已恢复。",
+        "Apache-2.0 许可原文已保存；43 个非动态链接中第三方 DeepWiki 限流 429，译注提供官方文档替代入口。",
+        "官方图像仅以可读外链引用，未复制；单独图片权利待后续复制或托管时核实。"
+      ]
+    },
+    {
+      "index": 98,
+      "key": "FreeCAD/FreeCAD",
+      "repository": "FreeCAD/FreeCAD",
+      "directory": "FreeCAD--FreeCAD",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，保留稳定版和开发版区别、系统平台、问题复现及原文删除配置文件的说明。",
+        "仓库 LGPL-2.1 许可原文已保存；32 个非动态链接中 31 个 HEAD 200，Reddit 返回 403，中文译注指出原文的官方论坛入口。",
+        "官方图标和示例图以固定提交外链引用，未复制素材；图片单独权利待后续核实。"
+      ]
+    },
+    {
+      "index": 99,
+      "key": "github/github-mcp-server",
+      "repository": "github/github-mcp-server",
+      "directory": "github--github-mcp-server",
+      "status": "pending",
+      "issues": [
+        "固定提交递归树未发现官方中文 README；仅有应用程序 pkg/translations。",
+        "原始 README 为 120055 字节、1827 行，含大量工具和资源目录；必须逐项翻译完整正文，不能用摘要或前言替代。",
+        "英语副本相对链接已解析到固定提交，尚待验证全部链接、图像可读性及独立素材许可。",
+        "需确认 README 的许可适用范围。",
+        "已生成未审校机器译文草稿，必须逐项检查全部工具和参数、重新校正 Markdown 与中文锚点；草稿不算完成。"
+      ]
+    },
+    {
+      "index": 100,
+      "key": "vercel-labs/agent-skills",
+      "repository": "vercel-labs/agent-skills",
+      "directory": "vercel-labs--agent-skills",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐项对照全部技能、规则数量、部署方式和发现索引；代码及提示词示例原样保留，并在译注标明。",
+        "上游 README 明确声明 MIT，但仓库无独立许可证或版权人声明；已保存精确上游声明及 SPDX 标准 MIT 模板，模板占位符不冒充项目版权。",
+        "3 个非动态入口 HEAD 200；未核实项目图标，卡片使用名称占位。"
+      ]
+    },
+    {
+      "index": 101,
+      "key": "plausible/analytics",
+      "repository": "plausible/analytics",
+      "directory": "plausible--analytics",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，保留云服务与 CE 八项差异、付费/高级功能限制、独立资金及自托管支持边界；合规、性能和竞品商业模式明确为上游说法。",
+        "CE 的 AGPL 许可及跟踪器 MIT 许可分别保存，保留原文商标声明；反馈看板 403，原链保留并在译注提供 GitHub Issues。",
+        "项目截图与 Logo 保留官方外链，未复制；名称和 Logo 为上游商标，卡片使用名称占位。"
+      ]
+    },
+    {
+      "index": 102,
+      "key": "Anuken/Mindustry",
+      "repository": "Anuken/Mindustry",
+      "directory": "Anuken--Mindustry",
+      "status": "ready_for_review",
+      "issues": [
+        "保留 JDK 17 限制、Android SDK 配置、未签名 APK 路径及全部构建命令。",
+        "仓库 GPL-3.0 许可原文已保存。",
+        "19 个非动态、非 GitHub 附件链接 HEAD 200；官方图片保留上游外链，未复制素材。"
+      ]
+    },
+    {
+      "index": 103,
+      "key": "huggingface/lerobot",
+      "repository": "huggingface/lerobot",
+      "directory": "huggingface--lerobot",
+      "status": "ready_for_review",
+      "issues": [
+        "逐节对照完整 README、模型列表与引用；全部代码块和行内代码与原文一致。",
+        "Apache-2.0 原始许可证含项目版权声明已保存。图片保留上游固定版本链接，模型和数据集各自许可须另行核实。",
+        "36 个固定版本仓库链接及图片检查成功；飞书中文教程入口重定向循环，译注保留并提供已验证官方文档入口。"
+      ]
+    },
+    {
+      "index": 104,
+      "key": "4ian/GDevelop",
+      "repository": "4ian/GDevelop",
+      "directory": "4ian--GDevelop",
+      "status": "blocked",
+      "issues": [
+        "上游 LICENSE.md 与 README 仅对 Core、GDJS、newIDE、Extensions 等列明代码目录授权 MIT，并声明 GDevelop 名称和 Logo 专属权利；未找到根 README 文档复制和翻译授权依据，待确认。"
+      ]
+    },
+    {
+      "index": 105,
+      "key": "PrefectHQ/fastmcp",
+      "repository": "PrefectHQ/fastmcp",
+      "directory": "PrefectHQ--fastmcp",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，两段代码块完全一致，保留 FastMCP 与企业 Gateway 的区别；下载量和 70% 的数据明确归属于项目自述。",
+        "仓库 Apache-2.0 许可原文已保存；34 个非动态链接均返回 HTTP 200。",
+        "项目官方图像使用固定提交外链，未复制；单独图片权利在后续复制或托管时再核实。"
+      ]
+    },
+    {
+      "index": 106,
+      "key": "GraphiteEditor/Graphite",
+      "repository": "GraphiteEditor/Graphite",
+      "directory": "GraphiteEditor--Graphite",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，明确 Alpha 状态并将照片编辑、动态图形等保留为路线图计划。",
+        "仓库双许可中选择 MIT，其许可文本包括相关文档；MIT 和 Apache 原文均已保存。",
+        "Reddit 社区链接返回 403，原链保留并在译注提供官方 Discord。Logo 和截图使用官方外链，未复制素材；单独图片权利待后续核实。"
+      ]
+    },
+    {
+      "index": 107,
+      "key": "hashcat/hashcat",
+      "repository": "hashcat/hashcat",
+      "directory": "hashcat--hashcat",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐段核对，保留项目支持的模式数量、平台、版本与命令；速度等作者自述已加译注说明未独立验证。",
+        "README 指向的 docs/license.txt 完整 MIT 条款和版权已保存；27 个非动态链接 HTTP 200。",
+        "未发现已核实项目图标，卡片使用名称占位。"
+      ]
+    },
+    {
+      "index": 108,
+      "key": "iBotPeaches/Apktool",
+      "repository": "iBotPeaches/Apktool",
+      "directory": "iBotPeaches--Apktool",
+      "status": "ready_for_review",
+      "issues": [
+        "全文逐节对照，保留反盗版用途声明、3.x 和 2.x 分支及安全漏洞私下报告方式。",
+        "Apache-2.0 仓库许可证原文已保存；非核心 XDA 帖子和 CI 徽章目标链接分别 403/404，原链保留并在译注给出官方替代入口。",
+        "赞助商图片使用固定版本外链，未复制素材；未核实项目图标，使用名称占位。"
+      ]
+    },
+    {
+      "index": 109,
+      "key": "agentskills/agentskills",
+      "repository": "agentskills/agentskills",
+      "directory": "agentskills--agentskills",
+      "status": "ready_for_review",
+      "issues": [
+        "中文与英文全文逐节对照；示例目录树及代码注释原样保留。",
+        "README 明确文档 CC BY 4.0、代码 Apache 2.0；已保存两份许可，译文顶部标注作者、原文、许可和修改。",
+        "10 个非动态链接均返回 HTTP 200；未发现已核实项目图标，卡片使用项目名占位。"
+      ]
+    },
+    {
+      "index": 110,
+      "key": "radareorg/radare2",
+      "repository": "radareorg/radare2",
+      "directory": "radareorg--radare2",
+      "status": "pending",
+      "issues": [
+        "许可证识别或适用范围尚待核实；未保存 README。",
+        "已检查根目录 LICENSE/COPYING 等候选，仍需人工核验文本和 README 适用范围。",
+        "固定提交 README.md 已按 Git blob SHA 校验并保存；文档适用许可尚需核定，未开始翻译或发布。"
+      ]
+    },
+    {
+      "index": 111,
+      "key": "arendst/Tasmota",
+      "repository": "arendst/Tasmota",
+      "directory": "arendst--Tasmota",
+      "status": "ready_for_review",
+      "issues": [
+        "上游固件下载链接包含 HTTP 明文地址，原样保留；发布时可优先展示 HTTPS 官方安装文档。",
+        "设备兼容性和升级行为为固定版本上游说明，使用前请核对最新文档；高压和刷写警告完整保留。"
+      ]
+    },
+    {
+      "index": 112,
+      "key": "HandBrake/HandBrake",
+      "repository": "HandBrake/HandBrake",
+      "directory": "HandBrake--HandBrake",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 113,
+      "key": "navidrome/navidrome",
+      "repository": "navidrome/navidrome",
+      "directory": "navidrome--navidrome",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 114,
+      "key": "frida/frida",
+      "repository": "frida/frida",
+      "directory": "frida--frida",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 115,
+      "key": "FreeTubeApp/FreeTube",
+      "repository": "FreeTubeApp/FreeTube",
+      "directory": "FreeTubeApp--FreeTube",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 116,
+      "key": "docmost/docmost",
+      "repository": "docmost/docmost",
+      "directory": "docmost--docmost",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 117,
+      "key": "blender/blender",
+      "repository": "blender/blender",
+      "directory": "blender--blender",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 118,
+      "key": "qmk/qmk_firmware",
+      "repository": "qmk/qmk_firmware",
+      "directory": "qmk--qmk_firmware",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 119,
+      "key": "videolan/vlc",
+      "repository": "videolan/vlc",
+      "directory": "videolan--vlc",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 120,
+      "key": "rizinorg/cutter",
+      "repository": "rizinorg/cutter",
+      "directory": "rizinorg--cutter",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 121,
+      "key": "espressif/esp-idf",
+      "repository": "espressif/esp-idf",
+      "directory": "espressif--esp-idf",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 122,
+      "key": "ppy/osu",
+      "repository": "ppy/osu",
+      "directory": "ppy--osu",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 123,
+      "key": "moonlight-stream/moonlight-qt",
+      "repository": "moonlight-stream/moonlight-qt",
+      "directory": "moonlight-stream--moonlight-qt",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 124,
+      "key": "wled/WLED",
+      "repository": "wled/WLED",
+      "directory": "wled--WLED",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 125,
+      "key": "lichess-org/lila",
+      "repository": "lichess-org/lila",
+      "directory": "lichess-org--lila",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 126,
+      "key": "audacity/audacity",
+      "repository": "audacity/audacity",
+      "directory": "audacity--audacity",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 127,
+      "key": "OpenRA/OpenRA",
+      "repository": "OpenRA/OpenRA",
+      "directory": "OpenRA--OpenRA",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 128,
+      "key": "MarlinFirmware/Marlin",
+      "repository": "MarlinFirmware/Marlin",
+      "directory": "MarlinFirmware--Marlin",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 129,
+      "key": "microsoft/IoT-For-Beginners",
+      "repository": "microsoft/IoT-For-Beginners",
+      "directory": "microsoft--IoT-For-Beginners",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 130,
+      "key": "zephyrproject-rtos/zephyr",
+      "repository": "zephyrproject-rtos/zephyr",
+      "directory": "zephyrproject-rtos--zephyr",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 131,
+      "key": "flipperdevices/flipperzero-firmware",
+      "repository": "flipperdevices/flipperzero-firmware",
+      "directory": "flipperdevices--flipperzero-firmware",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 132,
+      "key": "googleapis/mcp-toolbox",
+      "repository": "googleapis/mcp-toolbox",
+      "directory": "googleapis--mcp-toolbox",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 133,
+      "key": "OpenRCT2/OpenRCT2",
+      "repository": "OpenRCT2/OpenRCT2",
+      "directory": "OpenRCT2--OpenRCT2",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 134,
+      "key": "ArduPilot/ardupilot",
+      "repository": "ArduPilot/ardupilot",
+      "directory": "ArduPilot--ardupilot",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 135,
+      "key": "zaproxy/zaproxy",
+      "repository": "zaproxy/zaproxy",
+      "directory": "zaproxy--zaproxy",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 136,
+      "key": "mltframework/shotcut",
+      "repository": "mltframework/shotcut",
+      "directory": "mltframework--shotcut",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 137,
+      "key": "musescore/MuseScore",
+      "repository": "musescore/MuseScore",
+      "directory": "musescore--MuseScore",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 138,
+      "key": "ReFirmLabs/binwalk",
+      "repository": "ReFirmLabs/binwalk",
+      "directory": "ReFirmLabs--binwalk",
+      "status": "ready_for_review",
+      "issues": [
+        "未逐一联网测试所有 Wiki 子页面"
+      ]
+    },
+    {
+      "index": 139,
+      "key": "juice-shop/juice-shop",
+      "repository": "juice-shop/juice-shop",
+      "directory": "juice-shop--juice-shop",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 140,
+      "key": "luanti-org/luanti",
+      "repository": "luanti-org/luanti",
+      "directory": "luanti-org--luanti",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 141,
+      "key": "CleverRaven/Cataclysm-DDA",
+      "repository": "CleverRaven/Cataclysm-DDA",
+      "directory": "CleverRaven--Cataclysm-DDA",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 142,
+      "key": "mapeditor/tiled",
+      "repository": "mapeditor/tiled",
+      "directory": "mapeditor--tiled",
+      "status": "blocked",
+      "issues": [
+        "已检查固定提交完整仓库树及根 COPYING：许可按文件和目录分别确定，README 无文件级声明，未找到其转载与翻译许可。",
+        "许可原文摘录、固定版本路径及具体适用范围见 metadata.license_review_evidence.specific_terms；待权利人或明确上游材料确认 README 许可"
+      ]
+    },
+    {
+      "index": 143,
+      "key": "PX4/PX4-Autopilot",
+      "repository": "PX4/PX4-Autopilot",
+      "directory": "PX4--PX4-Autopilot",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 144,
+      "key": "Klipper3d/klipper",
+      "repository": "Klipper3d/klipper",
+      "directory": "Klipper3d--klipper",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 145,
+      "key": "esphome/esphome",
+      "repository": "esphome/esphome",
+      "directory": "esphome--esphome",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 146,
+      "key": "KDE/krita",
+      "repository": "KDE/krita",
+      "directory": "KDE--krita",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 147,
+      "key": "openscad/openscad",
+      "repository": "openscad/openscad",
+      "directory": "openscad--openscad",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 148,
+      "key": "wireshark/wireshark",
+      "repository": "wireshark/wireshark",
+      "directory": "wireshark--wireshark",
+      "status": "ready_for_review",
+      "issues": [
+        "上游 README 所列 GitLab issue 入口本次返回 HTTP 404；项目 GitLab 首页可访问，替代官方报告入口尚未确认，译文已标明"
+      ]
+    },
+    {
+      "index": 149,
+      "key": "prusa3d/PrusaSlicer",
+      "repository": "prusa3d/PrusaSlicer",
+      "directory": "prusa3d--PrusaSlicer",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 150,
+      "key": "jgraph/drawio",
+      "repository": "jgraph/drawio",
+      "directory": "jgraph--drawio",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 151,
+      "key": "LibreSprite/LibreSprite",
+      "repository": "LibreSprite/LibreSprite",
+      "directory": "LibreSprite--LibreSprite",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 152,
+      "key": "OpenTTD/OpenTTD",
+      "repository": "OpenTTD/OpenTTD",
+      "directory": "OpenTTD--OpenTTD",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 153,
+      "key": "fontforge/fontforge",
+      "repository": "fontforge/fontforge",
+      "directory": "fontforge--fontforge",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 154,
+      "key": "opentoonz/opentoonz",
+      "repository": "opentoonz/opentoonz",
+      "directory": "opentoonz--opentoonz",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 155,
+      "key": "endless-sky/endless-sky",
+      "repository": "endless-sky/endless-sky",
+      "directory": "endless-sky--endless-sky",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 156,
+      "key": "veloren/veloren",
+      "repository": "veloren/veloren",
+      "directory": "veloren--veloren",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 157,
+      "key": "hedgedoc/hedgedoc",
+      "repository": "hedgedoc/hedgedoc",
+      "directory": "hedgedoc--hedgedoc",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 158,
+      "key": "wesnoth/wesnoth",
+      "repository": "wesnoth/wesnoth",
+      "directory": "wesnoth--wesnoth",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 159,
+      "key": "go-vikunja/vikunja",
+      "repository": "go-vikunja/vikunja",
+      "directory": "go-vikunja--vikunja",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 160,
+      "key": "supertuxkart/stk-code",
+      "repository": "supertuxkart/stk-code",
+      "directory": "supertuxkart--stk-code",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 161,
+      "key": "bambulab/BambuStudio",
+      "repository": "bambulab/BambuStudio",
+      "directory": "bambulab--BambuStudio",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 162,
+      "key": "raspberrypi/pico-sdk",
+      "repository": "raspberrypi/pico-sdk",
+      "directory": "raspberrypi--pico-sdk",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 163,
+      "key": "VoronDesign/Voron-2",
+      "repository": "VoronDesign/Voron-2",
+      "directory": "VoronDesign--Voron-2",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 164,
+      "key": "beyond-all-reason/Beyond-All-Reason",
+      "repository": "beyond-all-reason/Beyond-All-Reason",
+      "directory": "beyond-all-reason--Beyond-All-Reason",
+      "status": "blocked",
+      "issues": [
+        "已检查固定提交完整仓库树及根 LICENSE.md、license_general.txt：代码与素材分别许可，README 文档未见可确认的转载或翻译许可。",
+        "许可原文摘录、固定版本路径及具体适用范围见 metadata.license_review_evidence.specific_terms；待权利人或明确上游材料确认 README 许可"
+      ]
+    },
+    {
+      "index": 165,
+      "key": "Warzone2100/warzone2100",
+      "repository": "Warzone2100/warzone2100",
+      "directory": "Warzone2100--warzone2100",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 166,
+      "key": "synfig/synfig",
+      "repository": "synfig/synfig",
+      "directory": "synfig--synfig",
+      "status": "ready_for_review",
+      "issues": []
+    },
+    {
+      "index": 167,
+      "key": "pencil2d/pencil",
+      "repository": "pencil2d/pencil",
+      "directory": "pencil2d--pencil",
+      "status": "ready_for_review",
+      "issues": []
+    }
+  ]
+}

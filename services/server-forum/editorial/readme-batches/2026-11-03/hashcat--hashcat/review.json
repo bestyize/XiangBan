@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐段核对，保留项目支持的模式数量、平台、版本与命令；速度等作者自述已加译注说明未独立验证。",
+    "README 指向的 docs/license.txt 完整 MIT 条款和版权已保存；27 个非动态链接 HTTP 200。",
+    "未发现已核实项目图标，卡片使用名称占位。"
+  ],
+  "link_check": {
+    "method": "HTTP HEAD，排除动态 CI 徽章",
+    "urls_checked": 27,
+    "http_200": 27
+  }
+}

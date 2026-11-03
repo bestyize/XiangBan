@@ -1,0 +1,89 @@
+{
+  "inventory_index": 79,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "需要保存自有或已获授权媒体的人。",
+    "category": "media",
+    "collected_at": "2026-11-02T18:01:27.879998+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "媒体保存",
+      "网页",
+      "自部署"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 4031,
+    "full_name": "imputnet/cobalt",
+    "getting_started": "先查看官方支持列表和实例状态，再提交一个获授权链接。",
+    "highlights": [
+      "提供简洁网页入口",
+      "前端与 API 源码可供研究"
+    ],
+    "homepage_url": "https://cobalt.tools",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/imputnet/cobalt/main/web/static/favicon.png",
+    "icon_url": "/open-source-media/cobalt-icon.png",
+    "last_commit_at": "2026-04-06T11:59:51Z",
+    "last_pushed_at": "2026-04-06T11:59:56Z",
+    "name": "cobalt",
+    "notes": [
+      "仅保存自有或已获授权的内容；上游站点变更可能影响可用性。"
+    ],
+    "order": 80,
+    "readme_sha": "795eb7e30a742fbf5ebcf16991e6e5c90332f614",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/imputnet/cobalt/blob/main/README.md",
+    "stars": 45720,
+    "summary": "提供媒体保存网页与 API 的开源项目，可了解其站点支持与自部署方式。",
+    "tags": [
+      "媒体保存",
+      "网页",
+      "自部署"
+    ],
+    "title": "把授权媒体保存流程变得直接",
+    "watchers": 196
+  },
+  "repository": "imputnet/cobalt",
+  "fetched_at": "2026-11-03T01:50:47.758722+00:00",
+  "canonical_repository": "imputnet/cobalt",
+  "default_branch": "main",
+  "commit_sha": "a636575b09de1fc55d9b8cd98cac88f5f2f16b42",
+  "readme_path": "README.md",
+  "readme_blob_sha": "795eb7e30a742fbf5ebcf16991e6e5c90332f614",
+  "readme_url": "https://github.com/imputnet/cobalt/blob/a636575b09de1fc55d9b8cd98cac88f5f2f16b42/README.md",
+  "stars": 45730,
+  "pushed_at": "2026-04-06T11:59:56Z",
+  "stars_fetched_at": "2026-11-03T01:50:49.962822+00:00",
+  "license_spdx": "AGPL-3.0",
+  "homepage_url": "https://cobalt.tools",
+  "icon_source_url": "https://raw.githubusercontent.com/imputnet/cobalt/main/web/static/favicon.png",
+  "license_path": "LICENSE",
+  "license_blob_sha": "7d1945a36a17b0912d3e0c23f51552be665719cd",
+  "license_url": "https://github.com/imputnet/cobalt/blob/a636575b09de1fc55d9b8cd98cac88f5f2f16b42/LICENSE",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "按原仓库根目录解析，文件和目录指向固定提交，图片使用固定提交 raw",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/imputnet/cobalt",
+  "description_zh": "通过粘贴链接保存公开媒体内容的工具。",
+  "official_entry": {
+    "url": "https://cobalt.tools",
+    "kind": "在线体验",
+    "verification": "上游 README 指向在线应用，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "image_license": "图标以固定提交的上游链接引用，未复制图片；单独素材权利待后续核实。"
+}

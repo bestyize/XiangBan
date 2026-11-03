@@ -1,0 +1,28 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "官方中文与英文逐节对照：23 条新闻日期、128 个论文表百分比一致，13 个代码块恢复为英文原样；补齐遗漏目录行和英文文档引用。",
+    "修正中文候选的查询模式数、env.example、MAX_FILE_PATHS 以及模型建议遗漏；中文独有 LiteWrite 内容已标明并保留。",
+    "英文自身对重新嵌入工具、smart_heading 默认行为的描述存在矛盾，均在译注保留，待上游澄清。",
+    "仓库固定版本的 30 个文档／图片链接以及三张外部示意图验证可读；外部图像保留上游链接，图片各自权利未推定。"
+  ],
+  "link_check": {
+    "pinned_urls_checked": 30,
+    "external_diagrams_checked": 3
+  },
+  "chinese_source": {
+    "path": "README-zh.md",
+    "blob_sha": "9b0331306eb41a43223e5ed99532a4392f63ebd4",
+    "url": "https://github.com/HKUDS/LightRAG/blob/aaebfe1bb8d55deb6a4304d357a3bf4c92fcd40a/README-zh.md",
+    "fetched_at": "2026-11-03T01:51:38.899508+00:00",
+    "status": "已对照英文固定版本并修正差异"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "官方中英文逐节对照，7 个代码块完全一致，保留 Docker API 不匹配、仅监听本机和 SSH 隧道要求。",
+    "BSD 3-Clause 原许可已保存；两个非核心市场入口不可读，原链接保留，译注给出官方 DigitalOcean 指南及一般自托管文档。",
+    "项目图片保持可读上游外链，未复制素材；单独图片权利待后续核实。未发现已核实图标，卡片使用名称占位。"
+  ],
+  "automated_candidate_comparison": {
+    "method": "初筛：正则统计标题与代码围栏，不代表章节一致性或翻译准确性审校",
+    "english_source": {
+      "heading_count": 20,
+      "fence_markers": 14,
+      "byte_count": 17807
+    },
+    "official_chinese_candidate": {
+      "heading_count": 20,
+      "fence_markers": 14,
+      "byte_count": 17027
+    }
+  },
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://github.com/user-attachments/assets/55a81268-4ecc-46cd-bdf5-73f7e8662fee",
+        "head_result": "HTTP Error 403: Forbidden",
+        "range_get_result": "206 image/png（HEAD 返回 403，已改用 Range GET 验证）"
+      },
+      {
+        "url": "https://raw.githubusercontent.com/appwrite/appwrite/f5b8e8b3c473ae5f285cfa4187d3133d672d144d/public/images/integrations/aws-logo.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/appwrite/appwrite/f5b8e8b3c473ae5f285cfa4187d3133d672d144d/public/images/integrations/akamai-logo.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/appwrite/appwrite/f5b8e8b3c473ae5f285cfa4187d3133d672d144d/public/images/integrations/digitalocean-logo.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/appwrite/appwrite/f5b8e8b3c473ae5f285cfa4187d3133d672d144d/public/images/integrations/gitpod-logo.svg",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check": {
+    "urls_checked": 96,
+    "result": "93 个 HEAD 200；Bluesky HEAD 404、GET 200；两个非核心市场链接分别 GET 404/403，译注标明并给出可读官方指南；首图 Range GET 206。"
+  }
+}

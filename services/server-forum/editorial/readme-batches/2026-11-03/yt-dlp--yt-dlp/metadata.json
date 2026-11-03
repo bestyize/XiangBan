@@ -1,0 +1,93 @@
+{
+  "inventory_key": "yt-dlp/yt-dlp",
+  "full_name": "yt-dlp/yt-dlp",
+  "inventory_entry": {
+    "audience": "适合有权保存音视频、并且愿意使用命令行的用户。",
+    "category": "media",
+    "collected_at": "2026-11-02T18:01:27.134645+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "terminal",
+    "cover_lines": [
+      "$ yt-dlp --list-formats <url>",
+      "格式 · 字幕 · 后处理"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "terminal",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要命令行基础",
+    "featured": true,
+    "forks": 17978,
+    "full_name": "yt-dlp/yt-dlp",
+    "getting_started": "按官方安装说明准备工具，先从查看一个有权访问和保存的链接的可用格式开始。",
+    "highlights": [
+      "在命令行中选择需要的媒体格式",
+      "可结合字幕与后处理能力",
+      "适合有批量处理需求的工作流"
+    ],
+    "homepage_url": "https://github.com/yt-dlp/yt-dlp#readme",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/master/.github/banner.svg",
+    "icon_url": "/open-source-media/ytdlp-icon.svg",
+    "last_commit_at": "2026-10-29T20:36:17Z",
+    "last_pushed_at": "2026-10-29T20:36:18Z",
+    "name": "yt-dlp",
+    "notes": [
+      "部分合并和后处理能力依赖 FFmpeg。",
+      "站点支持情况会变化；访问权限与内容使用许可需分别确认。"
+    ],
+    "order": 9,
+    "readme_sha": "750fae655ea0d5221bf49901508deb44681f3db0",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/yt-dlp/yt-dlp#readme",
+    "stars": 204719,
+    "summary": "提供格式选择、字幕处理等能力的命令行音视频下载工具。",
+    "tags": [
+      "媒体下载",
+      "字幕",
+      "命令行"
+    ],
+    "title": "把音视频下载变成可组合的工作流",
+    "watchers": 965
+  },
+  "fetched_at": "2026-11-03T01:50:38.284186+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "yt-dlp/yt-dlp",
+  "repository_url": "https://github.com/yt-dlp/yt-dlp",
+  "default_branch": "master",
+  "stars": 204790,
+  "pushed_at": "2026-10-29T20:36:18Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "Unlicense",
+  "homepage": "https://discord.gg/H5MNcFW63r",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/yt-dlp/yt-dlp/b77c9304e1c4220cca450c583491904daf8455af/.github/banner.svg",
+  "commit_sha": "b77c9304e1c4220cca450c583491904daf8455af",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "68a49daad8ff7e35068f2b7a97d643aab440eaec",
+    "source_url": "https://github.com/yt-dlp/yt-dlp/blob/b77c9304e1c4220cca450c583491904daf8455af/LICENSE",
+    "spdx": "NOASSERTION",
+    "human_read_label": "Unlicense"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "750fae655ea0d5221bf49901508deb44681f3db0",
+    "source_url": "https://github.com/yt-dlp/yt-dlp/blob/b77c9304e1c4220cca450c583491904daf8455af/README.md",
+    "size_bytes": 179127
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "plain_summary": "在命令行下载音视频，并选择格式、字幕和后处理方式。",
+  "official_entry": "https://github.com/yt-dlp/yt-dlp",
+  "readme_translation": "Terra 对固定提交英文 README 全文译写，无官方中文候选；示例代码中的自然语言注释译为中文。",
+  "image_rights": "使用原 README 的固定提交官方 banner 链接，未另行复制；仓库采用 Unlicense，标志可能涉及独立商标权。",
+  "upstream_license_note": "README 说明项目仓库采用 Unlicense；部分发行包另含 GPLv3+、ISC、MIT 代码，详见 README 许可章节和 THIRD_PARTY_LICENSES.txt。",
+  "entry_label": "GitHub"
+}

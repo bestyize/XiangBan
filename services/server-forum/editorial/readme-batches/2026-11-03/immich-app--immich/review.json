@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对官方中文与英文，补正三处；保留备份警告、演示账号、所有功能表条目和说明",
+  "code_and_numbers": "无代码块；演示账号及配置标签已核对",
+  "links_and_images": "相对文档和图片解析到固定提交；全部官方图片与动态徽章采集时返回 HTTP 200",
+  "license": "AGPL-3.0，仓库许可证保存在 LICENSE.upstream；第三方动态图像仍以原地址展示",
+  "issues": [
+    "图片与动态徽章由上游或第三方源提供，后续可用性可能变化。"
+  ],
+  "manual_review": "官方中文按英文补译，交付后仍需编辑复核",
+  "localized_links_audit": {
+    "source_path": "readme_i18n/README_zh_CN.md",
+    "source_blob_sha": "3c29007a8bc82630044ec8f4fbd5b573ee654ed1",
+    "base_directory": "readme_i18n",
+    "fixed_distinct_targets": 0,
+    "missing_upstream_relative_links": [],
+    "method": "以中文原文件目录解析并对照固定提交 Git 树，未发现错误目标。"
+  }
+}

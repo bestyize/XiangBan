@@ -1,0 +1,80 @@
+{
+  "inventory_index": 67,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "需要跨设备管理个人笔记和资料的人。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:01:19.895997+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "笔记",
+      "Markdown",
+      "离线优先"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/joplin-screen.png",
+    "cover_variant": "offset",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 6390,
+    "full_name": "laurent22/joplin",
+    "getting_started": "从官方版本建立一个笔记本，再决定是否配置同步。",
+    "highlights": [
+      "支持笔记组织和全文检索",
+      "提供多平台客户端与同步方式"
+    ],
+    "homepage_url": "https://joplinapp.org",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/laurent22/joplin/dev/Assets/LinuxIcons/256x256.png",
+    "icon_url": "/open-source-media/joplin-icon.png",
+    "last_commit_at": "2026-11-02T15:28:32Z",
+    "last_pushed_at": "2026-11-02T15:31:11Z",
+    "name": "Joplin",
+    "notes": [
+      "客户端、服务器和第三方插件的许可及服务条款分别确认。"
+    ],
+    "order": 68,
+    "readme_sha": "6f9f342fa1f579f868cc40ae6ddb31bb2d94e2d4",
+    "related_categories": [],
+    "source_url": "https://github.com/laurent22/joplin/blob/dev/README.md",
+    "stars": 56993,
+    "summary": "支持笔记本、待办和同步的开源笔记应用，强调离线可用。",
+    "tags": [
+      "笔记",
+      "Markdown",
+      "离线优先"
+    ],
+    "title": "让笔记和待办在离线时也能继续",
+    "watchers": 487
+  },
+  "repository": "laurent22/joplin",
+  "fetched_at": "2026-11-03T01:50:40.181822+00:00",
+  "canonical_repository": "laurent22/joplin",
+  "default_branch": "dev",
+  "commit_sha": "18ffcff40ea18687a70a82fd193d2ef6e88cead9",
+  "readme_path": "README.md",
+  "readme_blob_sha": "6f9f342fa1f579f868cc40ae6ddb31bb2d94e2d4",
+  "readme_url": "https://github.com/laurent22/joplin/blob/18ffcff40ea18687a70a82fd193d2ef6e88cead9/README.md",
+  "stars": 56999,
+  "pushed_at": "2026-11-03T00:41:36Z",
+  "stars_fetched_at": "2026-11-03T01:50:42.350297+00:00",
+  "license_spdx": "NOASSERTION",
+  "homepage_url": "https://joplinapp.org",
+  "icon_source_url": "https://raw.githubusercontent.com/laurent22/joplin/dev/Assets/LinuxIcons/256x256.png",
+  "license_path": "LICENSE",
+  "license_blob_sha": "2bb93544540be10fcd06928d0064daa29caab7dd",
+  "license_url": "https://github.com/laurent22/joplin/blob/18ffcff40ea18687a70a82fd193d2ef6e88cead9/LICENSE",
+  "root_license_candidates": [
+    "LICENSE"
+  ],
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/laurent22/joplin",
+  "license_scope_caveat": "上游根 LICENSE 将 AGPL-3.0-or-later 明确限定为仓库中的代码；readme/licenses.md 亦重复该代码范围并列出依赖许可。未找到 README 文档复制和翻译授权依据，待项目方或明确的文档许可确认。"
+}

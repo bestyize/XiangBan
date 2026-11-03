@@ -1,0 +1,96 @@
+{
+  "inventory_key": "vllm-project/vllm",
+  "full_name": "vllm-project/vllm",
+  "inventory_entry": {
+    "audience": "适合希望构建、运行或理解 AI 应用的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:16:58.207659+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "模型推理",
+      "部署",
+      "GPU"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 24315,
+    "full_name": "vllm-project/vllm",
+    "getting_started": "先核对支持的模型和硬件，再按官方示例启动小型服务。",
+    "highlights": [
+      "支持模型推理与服务接口",
+      "围绕批处理和资源使用提供优化"
+    ],
+    "homepage_url": "https://vllm.ai",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/vllm-project/vllm/main/docs/assets/logos/vllm-logo-text-light.png",
+    "icon_url": "/open-source-media/vllm-icon.png",
+    "last_commit_at": "2026-11-02T18:10:40Z",
+    "last_pushed_at": "2026-11-02T18:10:41Z",
+    "name": "vLLM",
+    "notes": [
+      "硬件需求与可用特性因模型、量化和加速后端而异。"
+    ],
+    "order": 34,
+    "readme_sha": "ff92fface4421933f1056f53d736c0840eac4728",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/vllm-project/vllm/blob/main/README.md",
+    "stars": 96149,
+    "summary": "面向语言模型推理与服务部署的开源引擎。",
+    "tags": [
+      "模型推理",
+      "部署",
+      "GPU"
+    ],
+    "title": "为模型搭建可持续调用的推理服务",
+    "watchers": 605
+  },
+  "fetched_at": "2026-11-03T01:50:46.508535+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "vllm-project/vllm",
+  "repository_url": "https://github.com/vllm-project/vllm",
+  "default_branch": "main",
+  "stars": 96166,
+  "pushed_at": "2026-11-03T01:43:05Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "Apache-2.0",
+  "homepage": "https://vllm.ai",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/vllm-project/vllm/190df0b90007eead441d97d3abf6270f84f2c63e/docs/assets/logos/vllm-logo-text-light.png",
+  "commit_sha": "190df0b90007eead441d97d3abf6270f84f2c63e",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+    "source_url": "https://github.com/vllm-project/vllm/blob/190df0b90007eead441d97d3abf6270f84f2c63e/LICENSE",
+    "spdx": "Apache-2.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "ff92fface4421933f1056f53d736c0840eac4728",
+    "source_url": "https://github.com/vllm-project/vllm/blob/190df0b90007eead441d97d3abf6270f84f2c63e/README.md",
+    "raw_url": "https://raw.githubusercontent.com/vllm-project/vllm/190df0b90007eead441d97d3abf6270f84f2c63e/README.md",
+    "size_bytes": 5772,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "190df0b90007eead441d97d3abf6270f84f2c63e",
+  "official_chinese_search": "固定提交的递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://vllm.ai",
+    "kind": "项目官网"
+  },
+  "plain_summary": "用于运行和提供大语言模型推理服务的工具。"
+}

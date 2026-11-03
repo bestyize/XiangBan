@@ -1,0 +1,26 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留故意不安全的定位、演示实例禁止自行攻击、Node 版本表、命令和配套书许可限制",
+    "官网、固定版本 Logo、截图与文档及配套书封面链接已核验；动态徽章和其他外链未逐一联网",
+    "MIT 许可证已保存；配套书封面仅保留上游链接"
+  ],
+  "link_results": {
+    "https://owasp-juice.shop": 200,
+    "https://raw.githubusercontent.com/juice-shop/juice-shop/717f5efa886b0417eeecb52378b03cf10567b7e2/frontend/src/assets/public/images/JuiceShop_Logo_100px.png": 200,
+    "https://raw.githubusercontent.com/juice-shop/juice-shop/717f5efa886b0417eeecb52378b03cf10567b7e2/frontend/src/assets/public/images/JuiceShop_Logo_400px.png": 200,
+    "https://raw.githubusercontent.com/juice-shop/juice-shop/717f5efa886b0417eeecb52378b03cf10567b7e2/screenshots/slideshow.gif": 200,
+    "https://github.com/juice-shop/juice-shop/blob/717f5efa886b0417eeecb52378b03cf10567b7e2/LICENSE": 200,
+    "https://github.com/juice-shop/juice-shop/blob/717f5efa886b0417eeecb52378b03cf10567b7e2/CONTRIBUTING.md": 200,
+    "https://github.com/juice-shop/juice-shop/blob/717f5efa886b0417eeecb52378b03cf10567b7e2/CODE_OF_CONDUCT.md": 200,
+    "https://github.com/juice-shop/juice-shop/blob/717f5efa886b0417eeecb52378b03cf10567b7e2/REFERENCES.md": 200,
+    "https://github.com/juice-shop/juice-shop/blob/717f5efa886b0417eeecb52378b03cf10567b7e2/HALL_OF_FAME.md": 200,
+    "https://raw.githubusercontent.com/juice-shop/pwning-juice-shop/master/docs/modules/ROOT/assets/images/cover.jpg": 200,
+    "https://raw.githubusercontent.com/juice-shop/pwning-juice-shop/master/docs/modules/ROOT/assets/images/introduction/back.jpg": 200
+  },
+  "issues": []
+}

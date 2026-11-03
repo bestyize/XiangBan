@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对功能、配置、Docker 官方镜像限制、云端服务、仓库列表、安全披露、支持和许可",
+  "code_and_numbers": "两个代码块与英文完全一致；包名、文件名、100% JavaScript/TypeScript 等信息已核对",
+  "links_and_images": "仓库相对许可证链接固定到采集提交；原 README 两个官网 logo 返回 HTTP 403，已替换为同提交仓库内官方 logo，其余 6 个图片和徽章返回 HTTP 200",
+  "license": "根许可证以 MIT 为基础，企业版 ee 等列明目录适用单独条款；完整声明保存在 LICENSE.upstream",
+  "issues": [
+    "原 README 的两个深浅色 logo 在采集时返回 HTTP 403，阅读稿改用仓库内官方 logo 并保留原始快照；产品能力是上游陈述。"
+  ],
+  "manual_review": "非官方中文译文；交付后仍需编辑复核"
+}

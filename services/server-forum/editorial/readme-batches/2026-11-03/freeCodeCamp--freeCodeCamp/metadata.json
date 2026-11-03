@@ -1,0 +1,111 @@
+{
+  "inventory_key": "freeCodeCamp/freeCodeCamp",
+  "full_name": "freeCodeCamp/freeCodeCamp",
+  "inventory_entry": {
+    "audience": "适合希望沿着课程练习编程的初学者，也适合研究教育平台实现的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:01:30.260488+00:00",
+    "cover_accent": "#5E769A",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "HTML & CSS",
+      "JavaScript",
+      "项目练习"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "notes",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "通过浏览器学习",
+    "featured": true,
+    "forks": 48189,
+    "full_name": "freeCodeCamp/freeCodeCamp",
+    "getting_started": "从官网选择一条适合当前基础的课程路线，先完成一个小练习。",
+    "highlights": [
+      "围绕练习和项目组织学习内容",
+      "提供公开课程与平台源码",
+      "学习者与开发者都能找到参与入口"
+    ],
+    "homepage_url": "https://www.freecodecamp.org",
+    "icon_fit": "contain",
+    "icon_source_url": "https://www.freecodecamp.org/icons/icon-144x144.png",
+    "icon_url": "/open-source-media/freecodecamp-icon.png",
+    "last_commit_at": "2026-11-02T16:05:00Z",
+    "last_pushed_at": "2026-11-02T16:05:01Z",
+    "name": "freeCodeCamp",
+    "notes": [
+      "课程内容、翻译覆盖与认证要求以官方页面为准。"
+    ],
+    "order": 2,
+    "readme_sha": "19f0d9e28b93f2b2b254e2a33f73f324c3486406",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/freeCodeCamp/freeCodeCamp#readme",
+    "stars": 458442,
+    "summary": "以课程、练习与项目组织的编程学习平台及其开源代码库。",
+    "tags": [
+      "编程入门",
+      "课程",
+      "练习"
+    ],
+    "title": "沿着练习和项目，逐步学会编程",
+    "watchers": 8585
+  },
+  "fetched_at": "2026-11-03T01:50:36.114336+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "freeCodeCamp/freeCodeCamp",
+  "repository_url": "https://github.com/freeCodeCamp/freeCodeCamp",
+  "default_branch": "main",
+  "stars": 458455,
+  "pushed_at": "2026-11-02T16:05:01Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "BSD-3-Clause",
+  "homepage": "https://contribute.freecodecamp.org",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://www.freecodecamp.org/icons/icon-144x144.png",
+  "commit_sha": "124bba5f531aae30f22d679a49923b81634b7f69",
+  "license": {
+    "path": "LICENSE.md",
+    "blob_sha": "c61d66f5a8c407d57d4cb304760f04931dffe452",
+    "source_url": "https://github.com/freeCodeCamp/freeCodeCamp/blob/124bba5f531aae30f22d679a49923b81634b7f69/LICENSE.md",
+    "spdx": "BSD-3-Clause"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "19f0d9e28b93f2b2b254e2a33f73f324c3486406",
+    "source_url": "https://github.com/freeCodeCamp/freeCodeCamp/blob/124bba5f531aae30f22d679a49923b81634b7f69/README.md",
+    "raw_url": "https://raw.githubusercontent.com/freeCodeCamp/freeCodeCamp/124bba5f531aae30f22d679a49923b81634b7f69/README.md",
+    "size_bytes": 7206,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "license_search": {
+    "root_license": "BSD-3-Clause",
+    "license_url": "https://github.com/freeCodeCamp/freeCodeCamp/blob/124bba5f531aae30f22d679a49923b81634b7f69/LICENSE.md",
+    "root_readme_statement": "https://github.com/freeCodeCamp/freeCodeCamp/blob/124bba5f531aae30f22d679a49923b81634b7f69/README.md#license",
+    "scope_evidence": "仓库根 LICENSE.md 与包元数据标示 BSD-3-Clause；README 将其表述为 computer software，另对 curriculum 子目录声明版权，根 README 位于该子目录之外。",
+    "resolution": "仓库通用许可可作为根 README 的初步依据；课程内容及素材的单独权利仍需审校，保留 pending。"
+  },
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "124bba5f531aae30f22d679a49923b81634b7f69",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://www.freecodecamp.org",
+    "kind": "在线体验"
+  },
+  "plain_summary": "通过免费课程和练习学习编程与计算机科学。",
+  "image_sources": [
+    {
+      "url": "https://cdn.freecodecamp.org/platform/universal/fcc_banner_new.png",
+      "source": "freeCodeCamp 官方 README 的项目横幅",
+      "note": "保留上游外链，未下载。"
+    }
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "inventory_index": 141,
+  "original_key": "CleverRaven/Cataclysm-DDA",
+  "repository": "CleverRaven/Cataclysm-DDA",
+  "catalog": {
+    "audience": "喜欢复杂系统和长期探索的玩家。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:01:41.958762+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "生存",
+      "回合制",
+      "探索"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 4714,
+    "full_name": "CleverRaven/Cataclysm-DDA",
+    "getting_started": "选择官方稳定版本，阅读基础操作指南后建立角色。",
+    "highlights": [
+      "具有丰富生存与制作机制",
+      "长期由社区共同开发"
+    ],
+    "homepage_url": "https://github.com/CleverRaven/Cataclysm-DDA",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T04:39:48Z",
+    "last_pushed_at": "2026-11-02T04:40:09Z",
+    "name": "Cataclysm: DDA",
+    "notes": [
+      "实验构建变化较多，新手优先选择稳定版。"
+    ],
+    "order": 142,
+    "readme_sha": "af1dfdb2851ce30ada2dab18ab3f482d70bac051",
+    "related_categories": [],
+    "source_url": "https://github.com/CleverRaven/Cataclysm-DDA/blob/master/README.md",
+    "stars": 13451,
+    "summary": "以末日生存、探索和制作系统为核心的开源回合制游戏。",
+    "tags": [
+      "生存",
+      "回合制",
+      "探索"
+    ],
+    "title": "在回合之间探索一个复杂生存世界",
+    "watchers": 312
+  },
+  "github_url": "https://github.com/CleverRaven/Cataclysm-DDA",
+  "official_url": "https://github.com/CleverRaven/Cataclysm-DDA",
+  "stars": 13453,
+  "code_pushed_at": "2026-11-02T20:44:14Z",
+  "default_branch": "master",
+  "commit_sha": "57cf429e845fec8ae0405ec0f4dca5921c9c6d79",
+  "readme_path": "README.md",
+  "readme_blob_sha": "af1dfdb2851ce30ada2dab18ab3f482d70bac051",
+  "readme_source_url": "https://github.com/CleverRaven/Cataclysm-DDA/blob/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/README.md",
+  "readme_api_url": "https://api.github.com/repos/CleverRaven/Cataclysm-DDA/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "CC-BY-SA-3.0",
+  "license_source_url": "https://github.com/CleverRaven/Cataclysm-DDA/blob/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/LICENSE.txt",
+  "icon_source_url": "https://raw.githubusercontent.com/CleverRaven/Cataclysm-DDA/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/build-data/osx/AppIcon.iconset/icon_256x256.png",
+  "fetched_at": "2026-11-03T01:50:40.459503+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "LICENSE.txt",
+      "url": "https://github.com/CleverRaven/Cataclysm-DDA/blob/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/LICENSE.txt",
+      "sha": "7382dbb3dac585cefe4d0edbf9caa486dde11fac"
+    }
+  ],
+  "needs_license_review": false,
+  "license_basis": "README 明确 CC BY-SA 3.0；部分第三方代码有其他许可",
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "CleverRaven/Cataclysm-DDA",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/CleverRaven/Cataclysm-DDA/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/data/screenshots/ultica-showcase-sep-2021.png"
+  ],
+  "documentation_license": "CC-BY-SA-3.0",
+  "official_entry": {
+    "url": "https://cataclysmdda.org/releases/",
+    "kind": "下载应用"
+  },
+  "icon_basis": "固定版本仓库项目 Logo/应用图标，链接保留上游"
+}

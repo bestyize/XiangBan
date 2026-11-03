@@ -1,0 +1,94 @@
+{
+  "inventory_key": "microsoft/vscode",
+  "full_name": "microsoft/vscode",
+  "inventory_entry": {
+    "audience": "需要日常编码或研究编辑器架构的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:01:28.236979+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "编辑器",
+      "扩展",
+      "TypeScript"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 44379,
+    "full_name": "microsoft/vscode",
+    "getting_started": "使用官方产品可从下载页开始；研究源码则按仓库贡献文档构建。",
+    "highlights": [
+      "编辑器源码与开发流程公开",
+      "具有丰富扩展能力"
+    ],
+    "homepage_url": "https://code.visualstudio.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T18:00:03Z",
+    "last_pushed_at": "2026-11-02T18:00:06Z",
+    "name": "Code - OSS",
+    "notes": [
+      "仓库 Code - OSS 的 MIT 许可与微软 VS Code 发行版的产品许可不同。"
+    ],
+    "order": 11,
+    "readme_sha": "b7770cecdd10433d6e7f072a3e2adf2f41bbedc2",
+    "related_categories": [],
+    "source_url": "https://github.com/microsoft/vscode/blob/main/README.md",
+    "stars": 194487,
+    "summary": "Visual Studio Code 的开源开发仓库，可了解编辑器实现与扩展体系。",
+    "tags": [
+      "编辑器",
+      "扩展",
+      "TypeScript"
+    ],
+    "title": "研究常用代码编辑器的开源底座",
+    "watchers": 3552
+  },
+  "fetched_at": "2026-11-03T01:50:38.603033+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "microsoft/vscode",
+  "repository_url": "https://github.com/microsoft/vscode",
+  "default_branch": "main",
+  "stars": 194510,
+  "pushed_at": "2026-11-03T01:43:08Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://code.visualstudio.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/microsoft/vscode/18c52617ca765445751c66ffb61137d9101823cc/resources/linux/code.png",
+  "commit_sha": "18c52617ca765445751c66ffb61137d9101823cc",
+  "license": {
+    "path": "LICENSE.txt",
+    "blob_sha": "0ac28ee234d232ac0691f39cebf95bf6b2a763a5",
+    "source_url": "https://github.com/microsoft/vscode/blob/18c52617ca765445751c66ffb61137d9101823cc/LICENSE.txt",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "b7770cecdd10433d6e7f072a3e2adf2f41bbedc2",
+    "source_url": "https://github.com/microsoft/vscode/blob/18c52617ca765445751c66ffb61137d9101823cc/README.md",
+    "raw_url": "https://raw.githubusercontent.com/microsoft/vscode/18c52617ca765445751c66ffb61137d9101823cc/README.md",
+    "size_bytes": 6728,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "18c52617ca765445751c66ffb61137d9101823cc",
+  "official_chinese_search": "固定提交的完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://code.visualstudio.com",
+    "kind": "项目官网"
+  },
+  "plain_summary": "用于编写、调试和扩展代码的跨平台编辑器源代码。"
+}

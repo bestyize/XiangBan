@@ -1,0 +1,59 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "原文、中文逐节对照；唯一命令代码块完全一致，核对全部升级版本标签与路径。",
+    "已检查 30 个非动态链接均返回 HTTP 200；徽章为上游动态链接。",
+    "README 和译文依据 MIT 许可使用并附原许可。官方图片以可读的上游链接引用，图片单独许可未知；后续如需下载、复制或替换，须另行核实。"
+  ],
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/sponsors/coderabbit/orange-typemark.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/brand/lockup.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/brand/lockup-on-dark.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/sponsors/testmuai/black.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/previews/timeline-light.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/sponsors/testmuai/white.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/sponsors/coderabbit/white-typemark.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/usememos/.github/refs/heads/main/assets/previews/timeline-dark.png",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check": {
+    "method": "HTTP HEAD，排除动态徽章",
+    "urls_checked": 30,
+    "http_200": 30,
+    "note": "未检查动态徽章；官方 .github 仓库的图片没有找到根许可证，未下载或复制。"
+  }
+}

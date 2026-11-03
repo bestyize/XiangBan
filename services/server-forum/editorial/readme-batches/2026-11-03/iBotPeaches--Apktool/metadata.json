@@ -1,0 +1,90 @@
+{
+  "inventory_index": 108,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合在自有或获授权环境中学习软件、协议与安全分析的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:17:55.094110+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "Android",
+      "APK",
+      "资源分析"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 4204,
+    "full_name": "iBotPeaches/Apktool",
+    "getting_started": "从自己构建的测试 APK 开始，对照原项目观察资源。",
+    "highlights": [
+      "帮助阅读应用资源结构",
+      "可研究重建与打包相关流程"
+    ],
+    "homepage_url": "https://apktool.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-28T09:26:09Z",
+    "last_pushed_at": "2026-11-02T09:04:06Z",
+    "name": "Apktool",
+    "notes": [
+      "重建不保证保留所有行为，签名和第三方软件权利需分别确认。"
+    ],
+    "order": 109,
+    "readme_sha": "21e0fbecf4ebe808bcc28aca6bd4149217472098",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/iBotPeaches/Apktool/blob/main/README.md",
+    "stars": 26929,
+    "summary": "用于 Android APK 资源解码、重建与分析的开源工具。",
+    "tags": [
+      "Android",
+      "APK",
+      "资源分析"
+    ],
+    "title": "拆开自己的 Android 包，理解资源如何组织",
+    "watchers": 671
+  },
+  "repository": "iBotPeaches/Apktool",
+  "fetched_at": "2026-11-03T01:51:08.895920+00:00",
+  "canonical_repository": "iBotPeaches/Apktool",
+  "default_branch": "main",
+  "commit_sha": "2062db67b2cdd3de12739105eee43417b52f0316",
+  "readme_path": "README.md",
+  "readme_blob_sha": "21e0fbecf4ebe808bcc28aca6bd4149217472098",
+  "readme_url": "https://github.com/iBotPeaches/Apktool/blob/2062db67b2cdd3de12739105eee43417b52f0316/README.md",
+  "stars": 26945,
+  "pushed_at": "2026-11-02T09:04:06Z",
+  "stars_fetched_at": "2026-11-03T01:51:10.909997+00:00",
+  "license_spdx": "Apache-2.0",
+  "homepage_url": "https://apktool.org",
+  "icon_source_url": "",
+  "license_path": "LICENSE.md",
+  "license_blob_sha": "1a20d8221b4046fa8a57dc1723e77d3f6df86d83",
+  "license_url": "https://github.com/iBotPeaches/Apktool/blob/2062db67b2cdd3de12739105eee43417b52f0316/LICENSE.md",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "上游指向移动分支的仓库图片和许可证链接固定到采集提交",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/iBotPeaches/Apktool",
+  "description_zh": "解码、修改并重新构建 Android 应用资源的开发工具。",
+  "official_entry": {
+    "url": "https://apktool.org",
+    "kind": "项目官网",
+    "verification": "上游 README 项目页面，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标",
+  "image_license": "赞助商图片使用官方仓库固定版本外链，未复制素材；单独图片权利待后续核实。"
+}

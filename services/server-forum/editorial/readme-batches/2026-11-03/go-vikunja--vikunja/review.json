@@ -1,0 +1,23 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留 LLM 工具披露、Pro 与托管版本、desktop 独立许可和 Unsplash 条款",
+    "验证官网、试用入口、Logo 和固定版本相对文档；动态徽章和其他外链未逐一联网",
+    "保存 AGPL 许可，desktop 许可保留官方固定版本链接",
+    "原文 Logo 返回 404，已替换为同一提交仓库中的官方 Logo；原始地址保留于 README.source.md"
+  ],
+  "link_results": {
+    "https://vikunja.io": 200,
+    "https://vikunja.io/images/vikunja-logo.svg": 404,
+    "https://try.vikunja.io": 200,
+    "https://github.com/go-vikunja/vikunja/blob/e2f3847d2461c8f86f140b268843ae41d6d64a8a/LICENSE": 200,
+    "https://github.com/go-vikunja/vikunja/blob/e2f3847d2461c8f86f140b268843ae41d6d64a8a/desktop/LICENSE": 200,
+    "https://github.com/go-vikunja/vikunja/tree/e2f3847d2461c8f86f140b268843ae41d6d64a8a/desktop/": 200,
+    "https://raw.githubusercontent.com/go-vikunja/vikunja/e2f3847d2461c8f86f140b268843ae41d6d64a8a/frontend/originalMedia/images/logo-full.svg": 200
+  },
+  "issues": []
+}

@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，六段代码完全一致；保留浏览器数据暴露、CrUX URL、默认使用统计和更新检查、退出开关及环境变量。",
+    "Apache-2.0 原许可已保存；npm 页面本次 403，原链保留并在译注提供可用 npm 官方文档和注册表。",
+    "未核实项目专用图标，卡片使用项目名占位。"
+  ],
+  "link_check": {
+    "result": "核心仓库与固定版本文档链接 HEAD 200；npm 首页和包网页 403，译注提供 npm 文档及注册表链接（均 200）。"
+  }
+}

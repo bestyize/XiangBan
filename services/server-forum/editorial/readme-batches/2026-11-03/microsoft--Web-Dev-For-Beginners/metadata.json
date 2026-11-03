@@ -1,0 +1,138 @@
+{
+  "inventory_key": "microsoft/Web-Dev-For-Beginners",
+  "full_name": "microsoft/Web-Dev-For-Beginners",
+  "inventory_entry": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:17:40.922399+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "网页开发",
+      "HTML",
+      "JavaScript"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 16111,
+    "full_name": "microsoft/Web-Dev-For-Beginners",
+    "getting_started": "先按课程的先修与环境要求建立本地练习目录。",
+    "highlights": [
+      "按课程推进基础主题",
+      "通过练习理解网页构建流程"
+    ],
+    "homepage_url": "https://github.com/microsoft/Web-Dev-For-Beginners",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-09-14T16:44:11Z",
+    "last_pushed_at": "2026-11-01T04:38:21Z",
+    "name": "Web 开发入门",
+    "notes": [
+      "课程所用依赖可能随时间变化，按当前说明配置。"
+    ],
+    "order": 32,
+    "readme_sha": "7290bff1d6056334c48afd3ad73eec9f2e363fba",
+    "related_categories": [
+      "dev",
+      "web"
+    ],
+    "source_url": "https://github.com/microsoft/Web-Dev-For-Beginners/blob/main/README.md",
+    "stars": 97065,
+    "summary": "微软提供的网页开发入门课程，结合基础知识与项目实践。",
+    "tags": [
+      "网页开发",
+      "HTML",
+      "JavaScript"
+    ],
+    "title": "沿着练习建立自己的网页开发基础",
+    "watchers": 2658
+  },
+  "fetched_at": "2026-11-03T01:50:46.172195+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "microsoft/Web-Dev-For-Beginners",
+  "repository_url": "https://github.com/microsoft/Web-Dev-For-Beginners",
+  "default_branch": "main",
+  "stars": 97072,
+  "pushed_at": "2026-11-01T04:38:21Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "78085398be0dea7abaaf5eda914817f46f6ddbbc",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "3d8b93bc7987d14c848448c089e2ae15311380d7",
+    "source_url": "https://github.com/microsoft/Web-Dev-For-Beginners/blob/78085398be0dea7abaaf5eda914817f46f6ddbbc/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "7290bff1d6056334c48afd3ad73eec9f2e363fba",
+    "source_url": "https://github.com/microsoft/Web-Dev-For-Beginners/blob/78085398be0dea7abaaf5eda914817f46f6ddbbc/README.md",
+    "raw_url": "https://raw.githubusercontent.com/microsoft/Web-Dev-For-Beginners/78085398be0dea7abaaf5eda914817f46f6ddbbc/README.md",
+    "size_bytes": 32809,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "3-terrarium/3-intro-to-DOM-and-closures/translations/README.zh-tw.md",
+      "blob_sha": "85bdfb0facb066996853a72f6b04fbe444983a69"
+    },
+    {
+      "path": "4-typing-game/typing-game/translations/README.zh-tw.md",
+      "blob_sha": "6f6bb8a4a973ff3431d7b95d7bb0b954a41e5d31"
+    },
+    {
+      "path": "5-browser-extension/1-about-browsers/translations/README.zh-tw.md",
+      "blob_sha": "bee8ef0677f76da038c59ad39f1665f38359ce0d"
+    },
+    {
+      "path": "5-browser-extension/2-forms-browsers-local-storage/translations/README.zh-tw.md",
+      "blob_sha": "95fdb21e473eecf422adaf1198222f6ff129ee7e"
+    },
+    {
+      "path": "5-browser-extension/3-background-tasks-and-performance/translations/README.zh-tw.md",
+      "blob_sha": "77249367838e4f1d58507b146167eaf68909ef03"
+    },
+    {
+      "path": "7-bank-project/api/translations/README.zh-tw.md",
+      "blob_sha": "6dda5b4dc8b8515091a6570063f94cf14f73f302"
+    },
+    {
+      "path": "translations/zh-CN/README.md",
+      "blob_sha": "8a365bb7d52eb726532df9270864d06608a4f239"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "translations/zh-CN/README.md",
+    "blob_sha": "8a365bb7d52eb726532df9270864d06608a4f239",
+    "source_url": "https://github.com/microsoft/Web-Dev-For-Beginners/blob/78085398be0dea7abaaf5eda914817f46f6ddbbc/translations/zh-CN/README.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "source_language": "en",
+  "translation_source": "基于官方中文补译",
+  "translation_basis_commit": "78085398be0dea7abaaf5eda914817f46f6ddbbc",
+  "translation_changes": [
+    "润色官方中文导语的 24 节课程句子",
+    "修正中文相对路径并将相对链接固定到采集提交",
+    "保留官方 AI 翻译免责声明",
+    "中文原文一个 CodeSpace 图片链接相对路径失效，按英文原文修正到同版本根目录图片"
+  ],
+  "icon_fallback": "项目名称占位",
+  "official_entry": {
+    "url": "https://github.com/microsoft/Web-Dev-For-Beginners",
+    "kind": "查看文档"
+  },
+  "plain_summary": "通过项目、测验和练习学习 HTML、CSS 与 JavaScript 网页开发。"
+}

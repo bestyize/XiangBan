@@ -1,0 +1,114 @@
+{
+  "inventory_key": "huggingface/transformers",
+  "full_name": "huggingface/transformers",
+  "inventory_entry": {
+    "audience": "开发者和希望理解模型调用方式的学习者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:02:39.207273+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "模型工具",
+      "多模态",
+      "Python"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 35086,
+    "full_name": "huggingface/transformers",
+    "getting_started": "从官方快速入门选一个任务，用小模型跑通推理流程。",
+    "highlights": [
+      "统一的任务接口便于比较模型",
+      "预训练模型生态与文档完善"
+    ],
+    "homepage_url": "https://huggingface.co/transformers",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:15:31Z",
+    "last_pushed_at": "2026-11-02T18:02:34Z",
+    "name": "Transformers",
+    "notes": [
+      "模型权重的许可和硬件要求需单独核对。"
+    ],
+    "order": 15,
+    "readme_sha": "3fb175afdddfae6feb4ef5438326aa9b0a9abd99",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/huggingface/transformers/blob/main/README.md",
+    "stars": 168451,
+    "summary": "涵盖文本、图像、语音等任务的模型工具库，连接预训练模型与实际应用。",
+    "tags": [
+      "模型工具",
+      "多模态",
+      "Python"
+    ],
+    "title": "用同一套接口探索不同模型",
+    "watchers": 1241
+  },
+  "fetched_at": "2026-11-03T01:50:39.933705+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "huggingface/transformers",
+  "repository_url": "https://github.com/huggingface/transformers",
+  "default_branch": "main",
+  "stars": 168460,
+  "pushed_at": "2026-11-03T01:49:13Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "Apache-2.0",
+  "homepage": "https://huggingface.co/transformers",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://huggingface.co/datasets/huggingface/documentation-images/raw/main/transformers-logo-light.svg",
+  "commit_sha": "409c349011c1099d66501d6c424ba411b9835a19",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "68b7d66c97d66c58de883ed0c451af2b3183e6f3",
+    "source_url": "https://github.com/huggingface/transformers/blob/409c349011c1099d66501d6c424ba411b9835a19/LICENSE",
+    "spdx": "Apache-2.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "3fb175afdddfae6feb4ef5438326aa9b0a9abd99",
+    "source_url": "https://github.com/huggingface/transformers/blob/409c349011c1099d66501d6c424ba411b9835a19/README.md",
+    "raw_url": "https://raw.githubusercontent.com/huggingface/transformers/409c349011c1099d66501d6c424ba411b9835a19/README.md",
+    "size_bytes": 17010,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "i18n/README_zh-hans.md",
+      "blob_sha": "eefdd7f2cb7194ac65d5f18fc136ed943426a7d0"
+    },
+    {
+      "path": "i18n/README_zh-hant.md",
+      "blob_sha": "bf63a443eafac49e73cb54db0a4d7015175d6231"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "i18n/README_zh-hans.md",
+    "blob_sha": "eefdd7f2cb7194ac65d5f18fc136ed943426a7d0",
+    "source_url": "https://github.com/huggingface/transformers/blob/409c349011c1099d66501d6c424ba411b9835a19/i18n/README_zh-hans.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "translation": {
+    "method": "同提交官方简体中文逐节对照英文并由 Terra 修订补译",
+    "source_blob_sha": "3fb175afdddfae6feb4ef5438326aa9b0a9abd99",
+    "official_zh_path": "i18n/README_zh-hans.md",
+    "official_zh_blob_sha": "eefdd7f2cb7194ac65d5f18fc136ed943426a7d0",
+    "localized_link_base": "官方中文 i18n/ 目录；相对链接按此基准固定提交；英文按根目录。",
+    "corrected_differences": "更新依赖至 Python 3.11+、PyTorch 2.6+；补充 transformers serve 前提、当前音频及多模态模型清单、马拉地语链接、百种架构和全部英文代码示例；保留官方原文源文件。"
+  },
+  "official_entry": {
+    "url": "https://huggingface.co/docs/transformers/index",
+    "kind": "查看文档"
+  }
+}

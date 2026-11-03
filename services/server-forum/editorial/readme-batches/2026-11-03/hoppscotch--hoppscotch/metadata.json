@@ -1,0 +1,99 @@
+{
+  "inventory_key": "hoppscotch/hoppscotch",
+  "full_name": "hoppscotch/hoppscotch",
+  "inventory_entry": {
+    "audience": "适合后端开发者、接口联调人员和正在学习 HTTP 的人。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:01:28.114930+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "项目 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "API",
+      "接口调试",
+      "开发"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/hoppscotch.png",
+    "cover_variant": "offset",
+    "effort": "可先体验官方网页",
+    "featured": true,
+    "forks": 6224,
+    "full_name": "hoppscotch/hoppscotch",
+    "getting_started": "在官方网页用公开测试接口构造一次请求，再根据需要了解桌面端和部署方式。",
+    "highlights": [
+      "在可视化界面中构造与发送请求",
+      "帮助检查响应并组织调试内容",
+      "提供开源实现，便于研究和部署"
+    ],
+    "homepage_url": "https://hoppscotch.io",
+    "icon_fit": "contain",
+    "icon_source_url": "https://hoppscotch.io/icon.png",
+    "icon_url": "/open-source-media/hoppscotch-icon.png",
+    "last_commit_at": "2026-10-30T09:17:16Z",
+    "last_pushed_at": "2026-10-31T09:16:29Z",
+    "name": "Hoppscotch",
+    "notes": [
+      "浏览器跨域限制可能需要额外配置。",
+      "社区版、企业版与托管服务的能力及条款分别确认。"
+    ],
+    "order": 45,
+    "readme_sha": "ffe946ee471221c8ff23601d1067e4a4fb88687b",
+    "related_categories": [],
+    "source_url": "https://github.com/hoppscotch/hoppscotch#readme",
+    "stars": 80724,
+    "summary": "用于构造请求、检查响应和组织 API 调试工作的开源工具。",
+    "tags": [
+      "API",
+      "接口调试",
+      "开发"
+    ],
+    "title": "给接口调试留一个轻便的入口",
+    "watchers": 504
+  },
+  "fetched_at": "2026-11-03T01:50:50.445397+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "hoppscotch/hoppscotch",
+  "repository_url": "https://github.com/hoppscotch/hoppscotch",
+  "default_branch": "main",
+  "stars": 80725,
+  "pushed_at": "2026-10-31T09:16:29Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://hoppscotch.io",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/hoppscotch/hoppscotch/39d25650bdb4e86464b2cd69174c567b86f57892/packages/hoppscotch-common/public/logo.svg",
+  "commit_sha": "39d25650bdb4e86464b2cd69174c567b86f57892",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "4d209962a5a25c3d3176dd8f2e9d40ccb44e39b4",
+    "source_url": "https://github.com/hoppscotch/hoppscotch/blob/39d25650bdb4e86464b2cd69174c567b86f57892/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "ffe946ee471221c8ff23601d1067e4a4fb88687b",
+    "source_url": "https://github.com/hoppscotch/hoppscotch/blob/39d25650bdb4e86464b2cd69174c567b86f57892/README.md",
+    "raw_url": "https://raw.githubusercontent.com/hoppscotch/hoppscotch/39d25650bdb4e86464b2cd69174c567b86f57892/README.md",
+    "size_bytes": 11653,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "39d25650bdb4e86464b2cd69174c567b86f57892",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://hoppscotch.io",
+    "kind": "在线体验"
+  },
+  "plain_summary": "在浏览器或桌面应用中构建、发送和测试 API 请求。",
+  "presentation_changes": [
+    "原 README 使用 GitHub 组织头像；阅读稿换为同提交仓库内的项目 logo，原文快照保留原图片来源。"
+  ]
+}

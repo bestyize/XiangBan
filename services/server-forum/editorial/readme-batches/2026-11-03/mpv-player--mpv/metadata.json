@@ -1,0 +1,97 @@
+{
+  "inventory_index": 94,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "偏好轻量播放与自定义操作的人。",
+    "category": "media",
+    "collected_at": "2026-11-02T18:01:25.934190+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "播放器",
+      "脚本",
+      "跨平台"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 3619,
+    "full_name": "mpv-player/mpv",
+    "getting_started": "从官方安装页选择平台版本，先播放本地文件。",
+    "highlights": [
+      "提供媒体播放与丰富配置",
+      "可通过脚本扩展交互"
+    ],
+    "homepage_url": "https://mpv.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T04:29:24Z",
+    "last_pushed_at": "2026-11-02T04:29:24Z",
+    "name": "mpv",
+    "notes": [
+      "可用解码和硬件加速能力取决于平台与构建。"
+    ],
+    "order": 95,
+    "readme_sha": "0d8caf101928aa0831583fd5742cb16d48d43315",
+    "related_categories": [],
+    "source_url": "https://github.com/mpv-player/mpv/blob/master/README.md",
+    "stars": 37678,
+    "summary": "可扩展的命令行媒体播放器，支持脚本与配置定制。",
+    "tags": [
+      "播放器",
+      "脚本",
+      "跨平台"
+    ],
+    "title": "用轻巧播放器专注播放内容",
+    "watchers": 496
+  },
+  "repository": "mpv-player/mpv",
+  "fetched_at": "2026-11-03T01:50:58.331087+00:00",
+  "canonical_repository": "mpv-player/mpv",
+  "default_branch": "master",
+  "commit_sha": "a687796d9d0efded1787d497167facd462b8f2ee",
+  "readme_path": "README.md",
+  "readme_blob_sha": "0d8caf101928aa0831583fd5742cb16d48d43315",
+  "readme_url": "https://github.com/mpv-player/mpv/blob/a687796d9d0efded1787d497167facd462b8f2ee/README.md",
+  "stars": 37682,
+  "pushed_at": "2026-11-02T04:29:24Z",
+  "stars_fetched_at": "2026-11-03T01:51:01.208514+00:00",
+  "license_spdx": "GPL-2.0-or-later",
+  "homepage_url": "https://mpv.io",
+  "icon_source_url": "https://raw.githubusercontent.com/mpv-player/mpv.io/master/source/images/mpv-logo-128.png",
+  "license_path": "Copyright",
+  "license_blob_sha": "9efa6fbc962836e243e20f7f23db062e2c077d28",
+  "license_url": "https://github.com/mpv-player/mpv/blob/a687796d9d0efded1787d497167facd462b8f2ee/Copyright",
+  "root_license_candidates": [
+    "Copyright",
+    "LICENSE.GPL",
+    "LICENSE.LGPL"
+  ],
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/mpv-player/mpv",
+  "license_scope_caveat": "Copyright 说明 mpv 整体默认 GPLv2+，但文档、配置及部分文件可能有各自许可；需逐项核对。",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "上游指向仓库 master 的文档链接解析到固定提交",
+  "description_zh": "播放多种音视频格式的开源媒体播放器。",
+  "official_entry": {
+    "url": "https://mpv.io",
+    "kind": "项目官网",
+    "verification": "上游 README 项目网站，HTTP HEAD 200"
+  },
+  "platforms": [
+    "Linux",
+    "Windows",
+    "macOS"
+  ],
+  "image_license": "README 官方 Logo 保留上游外链，未复制素材；单独图片权利待后续核实。"
+}

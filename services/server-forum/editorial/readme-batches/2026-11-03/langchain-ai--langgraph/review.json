@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，安装命令一致；项目对客户采用情况的说法明确归属于项目作者。",
+    "MIT 许可包括相关文档，已保存许可证与版权；31 个非动态链接 HEAD 200。",
+    "项目 Logo 用固定提交官方外链，未复制素材；单独图片权利在后续复制或托管时再核实。"
+  ],
+  "link_check": {
+    "method": "HTTP HEAD，排除动态徽章",
+    "urls_checked": 31,
+    "http_200": 31
+  }
+}

@@ -1,0 +1,92 @@
+{
+  "inventory_index": 167,
+  "original_key": "pencil2d/pencil",
+  "repository": "pencil2d/pencil",
+  "catalog": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:20.401881+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "逐帧动画",
+      "手绘",
+      "2D"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 313,
+    "full_name": "pencil2d/pencil",
+    "getting_started": "从官方稳定版开始，用少量帧练习绘画和播放。",
+    "highlights": [
+      "支持手绘逐帧动画",
+      "界面围绕基础动画制作组织"
+    ],
+    "homepage_url": "https://github.com/pencil2d/pencil",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-26T11:01:42Z",
+    "last_pushed_at": "2026-10-26T11:02:23Z",
+    "name": "Pencil2D",
+    "notes": [
+      "发布素材、字体和音轨前仍需核对各自使用许可。"
+    ],
+    "order": 168,
+    "readme_sha": "f25674a7364bfcd30a0a3c92ba46c3c39ba770bd",
+    "related_categories": [
+      "media"
+    ],
+    "source_url": "https://github.com/pencil2d/pencil/blob/master/README.md",
+    "stars": 1816,
+    "summary": "提供位图和矢量绘画工作流的开源二维动画应用。",
+    "tags": [
+      "逐帧动画",
+      "手绘",
+      "2D"
+    ],
+    "title": "从逐帧绘画开始制作二维动画",
+    "watchers": 70
+  },
+  "github_url": "https://github.com/pencil2d/pencil",
+  "official_url": "https://github.com/pencil2d/pencil",
+  "stars": 1816,
+  "code_pushed_at": "2026-10-26T11:02:23Z",
+  "default_branch": "master",
+  "commit_sha": "408563a37068daf7f1b4c6a9291daef039be8cb5",
+  "readme_path": "README.md",
+  "readme_blob_sha": "f25674a7364bfcd30a0a3c92ba46c3c39ba770bd",
+  "readme_source_url": "https://github.com/pencil2d/pencil/blob/408563a37068daf7f1b4c6a9291daef039be8cb5/README.md",
+  "readme_api_url": "https://api.github.com/repos/pencil2d/pencil/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-2.0",
+  "license_source_url": "https://github.com/pencil2d/pencil/blob/408563a37068daf7f1b4c6a9291daef039be8cb5/LICENSE.TXT",
+  "icon_source_url": "https://raw.githubusercontent.com/pencil2d/pencil/408563a37068daf7f1b4c6a9291daef039be8cb5/app/data/icons/icon.png",
+  "fetched_at": "2026-11-03T01:50:49.425255+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://img.youtube.com/vi/ma52j9B1kEM/hqdefault.jpg"
+  ],
+  "license_basis": "仓库 GPL 许可证",
+  "official_entry": {
+    "url": "https://www.pencil2d.org/",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "pencil2d/pencil",
+  "license_blob_sha": "9efa6fbc962836e243e20f7f23db062e2c077d28",
+  "license_file_verified_at_commit": true,
+  "icon_basis": "固定版本仓库项目 Logo/应用图标，链接保留上游"
+}

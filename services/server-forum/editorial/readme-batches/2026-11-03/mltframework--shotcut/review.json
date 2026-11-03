@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "全文对照，构建警告、命令和 Qt 版本原样保留",
+    "检查官网、下载入口、截图和固定版本 COPYING；其余链接与动态徽章未逐一联网",
+    "保留 GPLv3 许可证全文"
+  ],
+  "link_results": {
+    "https://www.shotcut.org/": 200,
+    "https://www.shotcut.org/assets/img/screenshots/Shotcut-18.11.18.png": 200,
+    "https://www.shotcut.org/download/": 200,
+    "https://github.com/mltframework/shotcut/blob/27e0c04dfb89a7d2f6d5ea147de6221ff17ed8c1/COPYING": 200
+  },
+  "issues": []
+}

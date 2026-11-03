@@ -1,0 +1,86 @@
+{
+  "inventory_index": 123,
+  "original_key": "moonlight-stream/moonlight-qt",
+  "repository": "moonlight-stream/moonlight-qt",
+  "catalog": {
+    "audience": "适合需要播放、处理或组织自有音视频内容的人。",
+    "category": "media",
+    "collected_at": "2026-11-02T18:17:26.818026+00:00",
+    "cover_accent": "#657063",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "串流客户端",
+      "远程画面",
+      "跨平台"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 1502,
+    "full_name": "moonlight-stream/moonlight-qt",
+    "getting_started": "先准备兼容主机端，再在自己的局域网内完成配对测试。",
+    "highlights": [
+      "将主机画面传到客户端",
+      "提供桌面平台的交互入口"
+    ],
+    "homepage_url": "https://github.com/moonlight-stream/moonlight-qt",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-30T04:55:57Z",
+    "last_pushed_at": "2026-10-31T10:51:26Z",
+    "name": "Moonlight",
+    "notes": [
+      "项目是客户端，主机端、网络与设备能力需另行准备。"
+    ],
+    "order": 124,
+    "readme_sha": "7dd47b25c8c190fef3529a698abca40ccd89a141",
+    "related_categories": [
+      "fun"
+    ],
+    "source_url": "https://github.com/moonlight-stream/moonlight-qt/blob/master/README.md",
+    "stars": 19362,
+    "summary": "开源远程串流客户端，可与兼容主机端配合使用。",
+    "tags": [
+      "串流客户端",
+      "远程画面",
+      "跨平台"
+    ],
+    "title": "在另一块屏幕上继续使用自己的电脑",
+    "watchers": 106
+  },
+  "github_url": "https://github.com/moonlight-stream/moonlight-qt",
+  "official_url": "https://github.com/moonlight-stream/moonlight-qt",
+  "stars": 19364,
+  "code_pushed_at": "2026-10-31T10:51:26Z",
+  "default_branch": "master",
+  "commit_sha": "1ced9dd9b0a2a41ba720b72ae03e356b25fc4243",
+  "readme_path": "README.md",
+  "readme_blob_sha": "7dd47b25c8c190fef3529a698abca40ccd89a141",
+  "readme_source_url": "https://github.com/moonlight-stream/moonlight-qt/blob/1ced9dd9b0a2a41ba720b72ae03e356b25fc4243/README.md",
+  "readme_api_url": "https://api.github.com/repos/moonlight-stream/moonlight-qt/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/moonlight-stream/moonlight-qt/blob/master/LICENSE",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:33.886875+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "moonlight-stream/moonlight-qt",
+  "translation_origin": "非官方中文译文",
+  "license_basis": "仓库 GPL-3.0 许可证",
+  "official_entry": {
+    "url": "https://moonlight-stream.org",
+    "kind": "项目官网"
+  }
+}

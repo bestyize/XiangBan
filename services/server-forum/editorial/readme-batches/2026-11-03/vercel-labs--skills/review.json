@@ -1,0 +1,29 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，保留 Node.js 22.20、实验性命令变更提示、遥测和安全审计关闭设置，命令及代码注释保持原样。",
+    "MIT 许可证明确覆盖相关文档，已保存许可与版权。12 个非动态链接中 npm 网页 403，保留原链并在译注提供可访问的官方注册表地址。",
+    "未发现已核实项目图标，卡片以名称占位。"
+  ],
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://skills.sh/b/vercel-labs/skills?style=for-the-badge",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check": {
+    "urls_checked": 12,
+    "result": "11 个 HEAD 200；npm 网页 403，官方注册表 https://registry.npmjs.org/skills HEAD 200，已加译注"
+  }
+}

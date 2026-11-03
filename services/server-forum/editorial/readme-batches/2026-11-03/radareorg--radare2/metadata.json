@@ -1,0 +1,95 @@
+{
+  "inventory_index": 110,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "希望建立脚本化二进制分析流程的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:01:38.535112+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "terminal",
+    "cover_lines": [
+      "反汇编",
+      "命令行",
+      "逆向"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 3400,
+    "full_name": "radareorg/radare2",
+    "getting_started": "从官方手册的基础命令开始分析一个自编译样例。",
+    "highlights": [
+      "提供可组合的分析命令",
+      "支持多架构与插件"
+    ],
+    "homepage_url": "https://www.radare.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T16:24:36Z",
+    "last_pushed_at": "2026-11-02T16:39:30Z",
+    "name": "radare2",
+    "notes": [
+      "插件与依赖可能采用不同许可，处理真实样本前隔离环境。"
+    ],
+    "order": 111,
+    "readme_sha": "9a8a827054adc8a3c1e7c822cd6476f65472adb7",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/radareorg/radare2/blob/master/README.md",
+    "stars": 25252,
+    "summary": "包含反汇编、调试与二进制分析能力的逆向工程框架。",
+    "tags": [
+      "反汇编",
+      "命令行",
+      "逆向"
+    ],
+    "title": "用可脚本化工具探索二进制文件",
+    "watchers": 488
+  },
+  "repository": "radareorg/radare2",
+  "fetched_at": "2026-11-03T01:51:09.078097+00:00",
+  "canonical_repository": "radareorg/radare2",
+  "default_branch": "master",
+  "commit_sha": "70c2da061abbbca8fe51ea742c12b7e24483d8be",
+  "readme_path": "README.md",
+  "readme_blob_sha": "9a8a827054adc8a3c1e7c822cd6476f65472adb7",
+  "readme_url": "https://github.com/radareorg/radare2/blob/70c2da061abbbca8fe51ea742c12b7e24483d8be/README.md",
+  "stars": 25263,
+  "pushed_at": "2026-11-03T01:45:44Z",
+  "stars_fetched_at": "2026-11-03T01:51:11.750973+00:00",
+  "license_spdx": "NOASSERTION",
+  "homepage_url": "https://www.radare.org",
+  "icon_source_url": "",
+  "license_path": "COPYING.md",
+  "license_blob_sha": "d5b507e442e1ba45ea2df0bd1a141debafbf11d6",
+  "license_url": "https://github.com/radareorg/radare2/blob/70c2da061abbbca8fe51ea742c12b7e24483d8be/COPYING.md",
+  "root_license_candidates": [
+    "COPYING.md"
+  ],
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/radareorg/radare2",
+  "source_format": "markdown",
+  "source_language": "en",
+  "source_blob_verified": true,
+  "license_scope_note": "COPYING.md 表明大部分 radare2 为 LGPLv3，组件及插件许可各异；README 文档许可范围待进一步核定。",
+  "license_basis": "README.md 第 13–14 行写明项目以 LGPLv3 分发，插件可能采用不同许可证；COPYING.md 称大部分项目为 LGPLv3；本项目保留原始条款文本，插件另行核查。 README 使用“LGPLv3”未明确 only 或 later，因此不把这两种 SPDX 形式当作已确认。",
+  "additional_license": {
+    "path": "doc/licenses/LGPL-3.0-only.txt",
+    "url": "https://raw.githubusercontent.com/radareorg/radare2/70c2da061abbbca8fe51ea742c12b7e24483d8be/doc/licenses/LGPL-3.0-only.txt",
+    "blob_sha": "6a1c77d5940580d0d78ff3a00978d839d1f1b711"
+  },
+  "official_entry": {
+    "url": "https://www.radare.org",
+    "kind": "official_website"
+  }
+}

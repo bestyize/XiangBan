@@ -1,0 +1,89 @@
+{
+  "inventory_index": 60,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "设计数字产品并需要团队协作的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:01:23.472425+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "界面设计",
+      "原型",
+      "协作"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 4360,
+    "full_name": "penpot/penpot",
+    "getting_started": "先使用官方演示或注册入口建立小型设计稿，再评估自部署。",
+    "highlights": [
+      "提供界面设计与原型工作流",
+      "采用开放的网页技术"
+    ],
+    "homepage_url": "https://penpot.app",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T14:02:55Z",
+    "last_pushed_at": "2026-11-02T17:46:09Z",
+    "name": "Penpot",
+    "notes": [
+      "官方云服务与自行部署的运行维护要求分别确认。"
+    ],
+    "order": 61,
+    "readme_sha": "ffd702aa315a90be43c7d6846b0702148f94d551",
+    "related_categories": [
+      "office"
+    ],
+    "source_url": "https://github.com/penpot/penpot/blob/develop/README.md",
+    "stars": 61994,
+    "summary": "面向产品界面设计、原型与团队协作的开源设计平台。",
+    "tags": [
+      "界面设计",
+      "原型",
+      "协作"
+    ],
+    "title": "让设计师和开发者共享同一张画布",
+    "watchers": 281
+  },
+  "repository": "penpot/penpot",
+  "fetched_at": "2026-11-03T01:50:32.913093+00:00",
+  "canonical_repository": "penpot/penpot",
+  "default_branch": "develop",
+  "commit_sha": "93d36d04d8a2c92ad124c7f3ee5709587619ac83",
+  "readme_path": "README.md",
+  "readme_blob_sha": "ffd702aa315a90be43c7d6846b0702148f94d551",
+  "readme_url": "https://github.com/penpot/penpot/blob/93d36d04d8a2c92ad124c7f3ee5709587619ac83/README.md",
+  "stars": 61998,
+  "pushed_at": "2026-11-02T23:36:05Z",
+  "stars_fetched_at": "2026-11-03T01:50:37.852722+00:00",
+  "license_spdx": "MPL-2.0",
+  "homepage_url": "https://penpot.app",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "a612ad9813b006ce81d1ee438dd784da99a54007",
+  "license_url": "https://github.com/penpot/penpot/blob/93d36d04d8a2c92ad124c7f3ee5709587619ac83/LICENSE",
+  "source_language": "English",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/penpot/penpot",
+  "translation_attribution": "非官方中文全文译文；许可证代码块保留英文原文",
+  "description_zh": "供团队协作设计和制作界面原型的开源平台。",
+  "official_entry": {
+    "url": "https://penpot.app",
+    "kind": "项目官网",
+    "verification": "上游 README 官网入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目专用图标",
+  "image_license": "项目官网和 README 真实界面图仅引用官方外链，未复制素材；图片单独权利待后续核实。"
+}

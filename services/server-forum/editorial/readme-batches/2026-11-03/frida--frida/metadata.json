@@ -1,0 +1,94 @@
+{
+  "inventory_index": 114,
+  "original_key": "frida/frida",
+  "repository": "frida/frida",
+  "catalog": {
+    "audience": "需要理解运行时行为的开发者与研究者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:01:40.308111+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "动态插桩",
+      "调试",
+      "安全研究"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 2297,
+    "full_name": "frida/frida",
+    "getting_started": "在自己编写的测试程序上跟随官方示例练习插桩。",
+    "highlights": [
+      "可用脚本观察运行时行为",
+      "提供多平台工具与接口"
+    ],
+    "homepage_url": "https://frida.re",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-01T14:11:56Z",
+    "last_pushed_at": "2026-11-01T14:11:58Z",
+    "name": "Frida",
+    "notes": [
+      "仅对自有或明确授权的程序进行测试。"
+    ],
+    "order": 115,
+    "readme_sha": "534f218300e81cb6d1ceef9ce15f03d3b69a28db",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/frida/frida/blob/main/README.md",
+    "stars": 22614,
+    "summary": "面向开发、调试和安全研究的动态插桩工具集。",
+    "tags": [
+      "动态插桩",
+      "调试",
+      "安全研究"
+    ],
+    "title": "在程序运行时观察与验证行为",
+    "watchers": 331
+  },
+  "github_url": "https://github.com/frida/frida",
+  "official_url": "https://frida.re",
+  "stars": 22623,
+  "code_pushed_at": "2026-11-02T21:10:55Z",
+  "default_branch": "main",
+  "commit_sha": "29016dbd9d8fce836b2b86892b04cc31c2f767aa",
+  "readme_path": "README.md",
+  "readme_blob_sha": "534f218300e81cb6d1ceef9ce15f03d3b69a28db",
+  "readme_source_url": "https://github.com/frida/frida/blob/29016dbd9d8fce836b2b86892b04cc31c2f767aa/README.md",
+  "readme_api_url": "https://api.github.com/repos/frida/frida/contents/README.md?ref=main",
+  "readme_language": "en",
+  "license_spdx": "wxWindows",
+  "license_source_url": "https://github.com/frida/frida/blob/29016dbd9d8fce836b2b86892b04cc31c2f767aa/COPYING",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:31.124902+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "COPYING",
+      "url": "https://github.com/frida/frida/blob/29016dbd9d8fce836b2b86892b04cc31c2f767aa/COPYING",
+      "sha": "b01d49c670e55dbff638eb294ac1a52416fb32e8"
+    }
+  ],
+  "needs_license_review": false,
+  "license_basis": "仓库根 COPYING：wxWindows Library Licence 3.1",
+  "translation_origin": "非官方中文译文",
+  "official_entry": {
+    "url": "https://frida.re/",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "frida/frida",
+  "license_blob_sha": "b01d49c670e55dbff638eb294ac1a52416fb32e8",
+  "license_file_verified_at_commit": true
+}

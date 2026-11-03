@@ -1,0 +1,42 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "官方中文对照英文，补齐 Node.js 22.13、Authorization Bearer、language 参数与软件包章节；恢复 use library 指令。上游翻译的自然语言示例保留，命令和标识符一致。",
+    "MIT 许可证原文已保存；原文部分第三方目录受 403 限制，保留原链并在译注提供可读官方替代入口。",
+    "封面采用固定提交上游外链，未复制素材；未核实项目图标，卡片使用名称占位。"
+  ],
+  "automated_candidate_comparison": {
+    "method": "初筛：正则统计标题与代码围栏，不代表章节一致性或翻译准确性审校",
+    "english_source": {
+      "heading_count": 17,
+      "fence_markers": 14,
+      "byte_count": 13026
+    },
+    "official_chinese_candidate": {
+      "heading_count": 16,
+      "fence_markers": 14,
+      "byte_count": 11748
+    }
+  },
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://raw.githubusercontent.com/upstash/context7/ceaf5f91f48949eaa6e4da5e66f3f59d1b44556d/public/cover.png",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check": {
+    "urls_checked": 44,
+    "result": "36 个 HEAD 200；VS Code Marketplace HEAD 404 但 GET 200；ChatGPT 和 Claude 目录、5 个 npm 页面 GET/HEAD 403，5 个对应 npm 官方注册表地址均 HEAD 200，译注给出官方客户端文档及注册表。"
+  }
+}

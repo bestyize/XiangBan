@@ -1,0 +1,14 @@
+{
+  "status": "blocked",
+  "checks": {
+    "source_version_captured": false,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "上游根 LICENSE 将 AGPL-3.0-or-later 明确限定为仓库中的代码；readme/licenses.md 亦重复该代码范围并列出依赖许可。未找到 README 文档复制和翻译授权依据，待项目方或明确的文档许可确认。"
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "inventory_index": 139,
+  "original_key": "juice-shop/juice-shop",
+  "repository": "juice-shop/juice-shop",
+  "catalog": {
+    "audience": "适合在自有或获授权环境中学习软件、协议与安全分析的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:23:41.477389+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "Web安全",
+      "练习环境",
+      "教学"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 20435,
+    "full_name": "juice-shop/juice-shop",
+    "getting_started": "优先在隔离的本地环境按官方指南启动，再阅读教学说明。",
+    "highlights": [
+      "通过练习应用认识常见问题",
+      "提供配套学习与挑战入口"
+    ],
+    "homepage_url": "https://owasp-juice.shop",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-23T09:27:35Z",
+    "last_pushed_at": "2026-10-30T20:57:52Z",
+    "name": "OWASP Juice Shop",
+    "notes": [
+      "这是故意不安全的教学系统，不应作为正常业务公开部署。"
+    ],
+    "order": 140,
+    "readme_sha": "e95bdda8dddc00545f9b6e5a8523b34c052997e9",
+    "related_categories": [
+      "learn",
+      "web"
+    ],
+    "source_url": "https://github.com/juice-shop/juice-shop/blob/master/README.md",
+    "stars": 14337,
+    "summary": "故意包含安全问题的开源教学应用，用于合法培训与实验。",
+    "tags": [
+      "Web安全",
+      "练习环境",
+      "教学"
+    ],
+    "title": "在专门的练习应用里学习 Web 安全",
+    "watchers": 182
+  },
+  "github_url": "https://github.com/juice-shop/juice-shop",
+  "official_url": "https://owasp-juice.shop",
+  "stars": 14340,
+  "code_pushed_at": "2026-10-30T20:57:52Z",
+  "default_branch": "master",
+  "commit_sha": "717f5efa886b0417eeecb52378b03cf10567b7e2",
+  "readme_path": "README.md",
+  "readme_blob_sha": "e95bdda8dddc00545f9b6e5a8523b34c052997e9",
+  "readme_source_url": "https://github.com/juice-shop/juice-shop/blob/717f5efa886b0417eeecb52378b03cf10567b7e2/README.md",
+  "readme_api_url": "https://api.github.com/repos/juice-shop/juice-shop/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "MIT",
+  "license_source_url": "https://github.com/juice-shop/juice-shop/blob/master/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/juice-shop/juice-shop/717f5efa886b0417eeecb52378b03cf10567b7e2/frontend/src/assets/public/images/JuiceShop_Logo_100px.png",
+  "fetched_at": "2026-11-03T01:50:39.152950+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "juice-shop/juice-shop",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/juice-shop/juice-shop/717f5efa886b0417eeecb52378b03cf10567b7e2/frontend/src/assets/public/images/JuiceShop_Logo_100px.png",
+    "https://raw.githubusercontent.com/juice-shop/juice-shop/717f5efa886b0417eeecb52378b03cf10567b7e2/frontend/src/assets/public/images/JuiceShop_Logo_400px.png",
+    "https://raw.githubusercontent.com/juice-shop/juice-shop/717f5efa886b0417eeecb52378b03cf10567b7e2/screenshots/slideshow.gif",
+    "https://raw.githubusercontent.com/juice-shop/pwning-juice-shop/master/docs/modules/ROOT/assets/images/cover.jpg",
+    "https://raw.githubusercontent.com/juice-shop/pwning-juice-shop/master/docs/modules/ROOT/assets/images/introduction/back.jpg"
+  ],
+  "license_basis": "程序 MIT，配套书另采用 CC BY-NC-ND 4.0，图片仅保留上游链接",
+  "official_entry": {
+    "url": "https://owasp-juice.shop",
+    "kind": "项目官网"
+  }
+}

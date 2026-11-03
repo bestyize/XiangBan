@@ -1,0 +1,74 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "官方中文与英文逐节对照，代码区别仅为上游翻译的注释，英文 FEAT、INTE、Experimental 标签已恢复。",
+    "Apache-2.0 许可原文已保存；43 个非动态链接中第三方 DeepWiki 限流 429，译注提供官方文档替代入口。",
+    "官方图像仅以可读外链引用，未复制；单独图片权利待后续复制或托管时核实。"
+  ],
+  "automated_candidate_comparison": {
+    "method": "初筛：正则统计标题与代码围栏，不代表章节一致性或翻译准确性审校",
+    "english_source": {
+      "heading_count": 13,
+      "fence_markers": 12,
+      "byte_count": 14755
+    },
+    "official_chinese_candidate": {
+      "heading_count": 13,
+      "fence_markers": 12,
+      "byte_count": 14598
+    }
+  },
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://img.alicdn.com/imgextra/i3/O1CN01k5XbA5dLCIB4S3xd_!!6000000003894-2-tps-2193-1564.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/agentscope-ai/agentscope/fc3445e32fd5b1bc085cb266e09850eb614e3468/assets/images/team.gif",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/agentscope-ai/agentscope/fc3445e32fd5b1bc085cb266e09850eb614e3468/assets/images/dingtalk_qr_code.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/agentscope-ai/agentscope/fc3445e32fd5b1bc085cb266e09850eb614e3468/assets/images/task.gif",
+        "head_result": 200
+      },
+      {
+        "url": "https://trendshift.io/api/badge/repositories/20310",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/agentscope-ai/agentscope/fc3445e32fd5b1bc085cb266e09850eb614e3468/assets/images/permission_bypass.gif",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/agentscope-ai/agentscope/fc3445e32fd5b1bc085cb266e09850eb614e3468/assets/images/bg_tool.gif",
+        "head_result": 200
+      },
+      {
+        "url": "https://img.alicdn.com/imgextra/i1/O1CN01nTg6w21NqT5qFKH1u_!!6000000001621-55-tps-550-550.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://gw.alicdn.com/imgextra/i1/O1CN01hhD1mu1Dd3BWVUvxN_!!6000000000238-2-tps-400-400.png",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check": {
+    "urls_checked": 43,
+    "result": "42 个 HEAD 200，第三方 DeepWiki 返回 429；译注提供经核实官方文档入口。"
+  }
+}

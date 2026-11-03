@@ -1,0 +1,12 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对功能、自托管与付费云服务差异、部署限制、赞助商文字及赞助入口；保留所有赞助商名称和目标链接",
+  "code_and_numbers": "安装代码块与英文完全相同；360 多项服务、赞助商价格与其他数字保留为上游陈述",
+  "links_and_images": "45 张动态赞助商图像改为对应名称链接并在中英文注明，上游原始图墙保留于 README.source.md；项目图标和其他图片返回 HTTP 200。对 46 个小额赞助目标抽查时，6 个返回 403、500 或 TLS 错误，原链接保留",
+  "license": "Apache-2.0，仓库许可证和版权声明保存在 LICENSE.upstream",
+  "issues": [
+    "小额赞助商链接采集时：Movavi 返回 500；ULTRASERVERS、Crypto Jobs List 和 360Creators 返回 403；arvensis.systems 和 decidable.no 出现 TLS 错误。未确认替代官方入口，均保留上游链接。",
+    "赞助商功能和价格描述为上游提供的信息，不代表本站验证或实时价格。"
+  ],
+  "manual_review": "非官方译文；交付后仍需编辑复核"
+}

@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "对照原文全部段落、标题和安全警告",
+  "code_and_numbers": "无代码块；标识、URL、数值保留",
+  "links_and_images": "相对贡献指南链接固定到采集提交并返回 HTTP 200；原文六个图片地址均返回 HTTP 200，徽章为动态内容",
+  "license": "MIT，包含软件及相关文档；许可证和版权声明保存在 LICENSE.upstream",
+  "issues": [
+    "图片与动态徽章由上游或第三方源提供，后续可用性可能变化。"
+  ],
+  "manual_review": "非官方翻译；交付后仍需编辑复核"
+}

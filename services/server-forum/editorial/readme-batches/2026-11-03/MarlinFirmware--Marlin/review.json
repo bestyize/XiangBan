@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留语言表、平台表、全部测试命令及不适合生产的警告",
+    "项目关于 GPL 合规方式的表述归于项目方，并保留 Logo 原作者信息",
+    "验证官网、固定版本 Logo、许可与测试目录；动态徽章及其他外链未逐一联网",
+    "保留仓库 GPLv3 许可证"
+  ],
+  "link_results": {
+    "https://marlinfw.org/": 200,
+    "https://raw.githubusercontent.com/MarlinFirmware/Marlin/6e03341e0436b076f8339f0f702be18a05f81522/buildroot/share/pixmaps/logo/marlin-outrun-nf-500.png": 200,
+    "https://github.com/MarlinFirmware/Marlin/blob/6e03341e0436b076f8339f0f702be18a05f81522/LICENSE": 200,
+    "https://github.com/MarlinFirmware/Marlin/tree/6e03341e0436b076f8339f0f702be18a05f81522/test": 200
+  },
+  "issues": []
+}

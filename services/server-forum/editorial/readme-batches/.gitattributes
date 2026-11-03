@@ -1,0 +1,2 @@
+# Preserve upstream bytes and snapshot hashes, including CRLF README/license files.
+* -text

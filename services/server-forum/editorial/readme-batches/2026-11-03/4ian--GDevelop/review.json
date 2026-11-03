@@ -1,0 +1,14 @@
+{
+  "status": "blocked",
+  "checks": {
+    "source_version_captured": false,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "上游 LICENSE.md 与 README 仅对 Core、GDJS、newIDE、Extensions 等列明代码目录授权 MIT，并声明 GDevelop 名称和 Logo 专属权利；未找到根 README 文档复制和翻译授权依据，待确认。"
+  ]
+}

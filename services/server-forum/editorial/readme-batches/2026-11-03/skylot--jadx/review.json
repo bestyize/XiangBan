@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "反编译无法保证 100% 成功的上游警告已保留。",
+    "禁用 XML/ZIP 安全检查和压缩炸弹限制的环境变量均保留并说明，未建议默认关闭保护。"
+  ],
+  "full_text_coverage": "固定提交全文译写；命令和插件帮助原文保留，全部选项、插件键及环境变量逐项附中文说明。",
+  "code_and_numbers": "6 个围栏代码块逐字一致；主命令全部长选项和插件设置键与中文说明交叉核对无缺失，版本、示例和安全限制保留。",
+  "links_and_images": "相对贡献文档和官方标志按固定提交解析；GitHub 和 logo 本次 HTTP 200；其他外链未逐条联网检查。",
+  "license": "Apache-2.0 许可原文已保存；官方标志和截图使用上游链接，单独素材权利未确认。"
+}

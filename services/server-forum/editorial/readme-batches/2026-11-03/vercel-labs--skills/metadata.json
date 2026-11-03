@@ -1,0 +1,90 @@
+{
+  "inventory_index": 93,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合为智能体编写、连接或评估技能与工具的开发者。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:17:08.702829+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "terminal",
+    "cover_lines": [
+      "Agent Skills",
+      "命令行",
+      "技能管理"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 3264,
+    "full_name": "vercel-labs/skills",
+    "getting_started": "先阅读 CLI 文档列出目标技能，检查内容后在测试项目中配置。",
+    "highlights": [
+      "提供技能发现与安装入口",
+      "支持多种技能兼容客户端"
+    ],
+    "homepage_url": "https://skills.sh",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T18:00:45Z",
+    "last_pushed_at": "2026-11-02T18:00:46Z",
+    "name": "Skills CLI",
+    "notes": [
+      "技能中的脚本和外部工具各有权限与依赖，使用前逐项检查。"
+    ],
+    "order": 94,
+    "readme_sha": "cc7f55e9e2fb5e0ee7e57179641225c85a4d7f28",
+    "related_categories": [
+      "dev",
+      "ai"
+    ],
+    "source_url": "https://github.com/vercel-labs/skills/blob/main/README.md",
+    "stars": 37775,
+    "summary": "面向开放 Agent Skills 生态的命令行工具，支持发现和管理技能。",
+    "tags": [
+      "Agent Skills",
+      "命令行",
+      "技能管理"
+    ],
+    "title": "集中查找和管理 Agent Skills",
+    "watchers": 124
+  },
+  "repository": "vercel-labs/skills",
+  "fetched_at": "2026-11-03T01:50:57.177222+00:00",
+  "canonical_repository": "vercel-labs/skills",
+  "default_branch": "main",
+  "commit_sha": "7a5e920bead4b1039a6d6df5d7e1163b7b09423a",
+  "readme_path": "README.md",
+  "readme_blob_sha": "cc7f55e9e2fb5e0ee7e57179641225c85a4d7f28",
+  "readme_url": "https://github.com/vercel-labs/skills/blob/7a5e920bead4b1039a6d6df5d7e1163b7b09423a/README.md",
+  "stars": 37814,
+  "pushed_at": "2026-11-03T00:14:26Z",
+  "stars_fetched_at": "2026-11-03T01:50:59.315135+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://skills.sh",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "eabe3008f6c0275929faa8b07d406e82717648cc",
+  "license_url": "https://github.com/vercel-labs/skills/blob/7a5e920bead4b1039a6d6df5d7e1163b7b09423a/LICENSE",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文；代码块中的原始英文注释保留",
+  "relative_link_resolution": "文档及许可证链接解析至固定提交",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/vercel-labs/skills",
+  "description_zh": "为兼容的编码助手查找、安装和管理技能的命令行工具。",
+  "official_entry": {
+    "url": "https://skills.sh",
+    "kind": "项目官网",
+    "verification": "上游 README 指向技能目录，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标"
+}

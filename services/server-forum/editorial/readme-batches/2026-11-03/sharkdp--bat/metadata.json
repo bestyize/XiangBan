@@ -1,0 +1,113 @@
+{
+  "inventory_index": 62,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望改善日常开发与命令行工作流的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:17:32.904415+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "文件查看",
+      "语法高亮",
+      "终端"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 3107,
+    "full_name": "sharkdp/bat",
+    "getting_started": "在终端查看一个自己的源码文件，再调整主题和分页方式。",
+    "highlights": [
+      "提供带高亮的文件阅读",
+      "可与其他命令行工具组合"
+    ],
+    "homepage_url": "https://github.com/sharkdp/bat",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T13:03:58Z",
+    "last_pushed_at": "2026-11-02T13:03:59Z",
+    "name": "bat",
+    "notes": [
+      "输出到管道时的样式行为需按实际命令选项确认。"
+    ],
+    "order": 63,
+    "readme_sha": "b54a227d240c4c7f23b41f9ed8b698dd6216f78c",
+    "related_categories": [],
+    "source_url": "https://github.com/sharkdp/bat/blob/master/README.md",
+    "stars": 61025,
+    "summary": "为文件内容查看增加语法高亮与 Git 相关信息的命令行工具。",
+    "tags": [
+      "文件查看",
+      "语法高亮",
+      "终端"
+    ],
+    "title": "在终端里更清楚地阅读代码文件",
+    "watchers": 251
+  },
+  "repository": "sharkdp/bat",
+  "fetched_at": "2026-11-03T01:50:36.539234+00:00",
+  "canonical_repository": "sharkdp/bat",
+  "default_branch": "master",
+  "commit_sha": "67e2ec24e0284694c10d1e25166fc97aad15845e",
+  "readme_path": "README.md",
+  "readme_blob_sha": "b54a227d240c4c7f23b41f9ed8b698dd6216f78c",
+  "readme_url": "https://github.com/sharkdp/bat/blob/67e2ec24e0284694c10d1e25166fc97aad15845e/README.md",
+  "stars": 61035,
+  "pushed_at": "2026-11-02T20:07:29Z",
+  "stars_fetched_at": "2026-11-03T01:50:40.043081+00:00",
+  "license_spdx": "MIT OR Apache-2.0",
+  "homepage_url": "",
+  "icon_source_url": "https://raw.githubusercontent.com/sharkdp/bat/67e2ec24e0284694c10d1e25166fc97aad15845e/doc/logo-header.svg",
+  "license_path": "LICENSE-APACHE",
+  "license_blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+  "license_url": "https://github.com/sharkdp/bat/blob/67e2ec24e0284694c10d1e25166fc97aad15845e/LICENSE-APACHE",
+  "source_language": "en",
+  "official_chinese_candidate": {
+    "path": "doc/README-zh.md",
+    "blob_sha": "586a4856d743f22dc5ad0f6626b0994efcfd51e1",
+    "url": "https://github.com/sharkdp/bat/blob/67e2ec24e0284694c10d1e25166fc97aad15845e/doc/README-zh.md",
+    "fetched_at": "2026-11-03T01:51:35.681002+00:00",
+    "status": "已与英文固定版本逐节对照并补译修正"
+  },
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/sharkdp/bat",
+  "additional_license": {
+    "path": "LICENSE-MIT",
+    "url": "https://github.com/sharkdp/bat/blob/67e2ec24e0284694c10d1e25166fc97aad15845e/LICENSE-MIT",
+    "blob_sha": "2374e6c3f82b87e31f06b39e1c2c05beda16242a"
+  },
+  "official_entry": {
+    "url": "https://github.com/sharkdp/bat",
+    "kind": "official_repository"
+  },
+  "english_preparation": "固定提交的英文原文及相对引用已准备，仍待验证链接",
+  "candidate_link_repairs": {
+    "count": 6,
+    "reason": "中文原文位于 doc/，原相对路径返回 404；替换为固定提交中英文 README 指向的仓库根目录目标",
+    "paths": [
+      "assets/syntaxes/02_Extra/Manpage.sublime-syntax",
+      "LICENSE-APACHE",
+      "LICENSE-MIT",
+      "doc/assets.md",
+      "CONTRIBUTING.md",
+      "doc/alternatives.md"
+    ]
+  },
+  "translation": {
+    "method": "复用官方中文，由 Terra 对照固定版本逐节补译和修正",
+    "source_path": "doc/README-zh.md",
+    "source_blob_sha": "586a4856d743f22dc5ad0f6626b0994efcfd51e1",
+    "source_commit_sha": "67e2ec24e0284694c10d1e25166fc97aad15845e",
+    "notes": "中文来源链接按 doc/ 解析；六处上游失效链接纠正；58 个英文代码块原样保留，中文独有发行版安装内容保留。"
+  }
+}

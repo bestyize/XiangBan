@@ -1,0 +1,93 @@
+{
+  "inventory_index": 125,
+  "original_key": "lichess-org/lila",
+  "repository": "lichess-org/lila",
+  "catalog": {
+    "audience": "适合希望体验游戏，或研究开放游戏实现与内容生态的人。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:17:59.309976+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "国际象棋",
+      "社区服务",
+      "对弈"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "按官方指南安装或体验",
+    "featured": true,
+    "forks": 2800,
+    "full_name": "lichess-org/lila",
+    "getting_started": "体验官方站点的基础对弈，再按开发文档了解本地环境。",
+    "highlights": [
+      "包含线上对弈社区相关实现",
+      "可研究服务端与协作机制"
+    ],
+    "homepage_url": "https://lichess.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T08:49:42Z",
+    "last_pushed_at": "2026-11-02T08:49:42Z",
+    "name": "Lichess",
+    "notes": [
+      "运行完整实例涉及较多服务与维护，不等于直接启动一个小游戏。"
+    ],
+    "order": 126,
+    "readme_sha": "5c1a70c394af413ad18e3ad687aa1ae9582781c5",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/lichess-org/lila/blob/master/README.md",
+    "stars": 18937,
+    "summary": "国际象棋社区 Lichess 的开源服务端项目。",
+    "tags": [
+      "国际象棋",
+      "社区服务",
+      "对弈"
+    ],
+    "title": "了解一个开放国际象棋社区如何运转",
+    "watchers": 214
+  },
+  "github_url": "https://github.com/lichess-org/lila",
+  "official_url": "https://lichess.org",
+  "stars": 18938,
+  "code_pushed_at": "2026-11-03T00:20:48Z",
+  "default_branch": "master",
+  "commit_sha": "2e3e641c32b361c113e696cee34f9fddefef6727",
+  "readme_path": "README.md",
+  "readme_blob_sha": "5c1a70c394af413ad18e3ad687aa1ae9582781c5",
+  "readme_source_url": "https://github.com/lichess-org/lila/blob/2e3e641c32b361c113e696cee34f9fddefef6727/README.md",
+  "readme_api_url": "https://api.github.com/repos/lichess-org/lila/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "AGPL-3.0",
+  "license_source_url": "https://github.com/lichess-org/lila/blob/2e3e641c32b361c113e696cee34f9fddefef6727/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/lichess-org/lila/2e3e641c32b361c113e696cee34f9fddefef6727/public/logo/lichess.svg",
+  "fetched_at": "2026-11-03T01:50:34.817716+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "lichess-org/lila",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/lichess-org/lila/2e3e641c32b361c113e696cee34f9fddefef6727/public/images/home-bicolor.png",
+    "https://raw.githubusercontent.com/lichess-org/lila/2e3e641c32b361c113e696cee34f9fddefef6727/public/images/architecture.png"
+  ],
+  "license_basis": "README 明确 AGPL-3.0-or-later",
+  "official_entry": {
+    "url": "https://lichess.org",
+    "kind": "在线体验"
+  },
+  "license_blob_sha": "be3f7b28e564e7dd05eaf59d64adba1a4065ac0e",
+  "license_file_verified_at_commit": true,
+  "icon_basis": "固定版本仓库项目 Logo/应用图标，链接保留上游"
+}

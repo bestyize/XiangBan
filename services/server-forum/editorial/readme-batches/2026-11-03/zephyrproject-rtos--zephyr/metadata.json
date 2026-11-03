@@ -1,0 +1,94 @@
+{
+  "inventory_index": 130,
+  "original_key": "zephyrproject-rtos/zephyr",
+  "repository": "zephyrproject-rtos/zephyr",
+  "catalog": {
+    "audience": "适合愿意阅读硬件文档、准备实验环境并验证设备的爱好者与开发者。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:17:48.550902+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "RTOS",
+      "嵌入式",
+      "物联网"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要兼容硬件或仿真环境",
+    "featured": true,
+    "forks": 10334,
+    "full_name": "zephyrproject-rtos/zephyr",
+    "getting_started": "从官方支持列表选择开发板，先编译并运行基础示例。",
+    "highlights": [
+      "支持多种处理器与开发板",
+      "围绕驱动和系统组件组织开发"
+    ],
+    "homepage_url": "https://docs.zephyrproject.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T16:47:49Z",
+    "last_pushed_at": "2026-11-02T16:49:09Z",
+    "name": "Zephyr",
+    "notes": [
+      "板级配置、工具链与所用版本需要相互匹配。"
+    ],
+    "order": 131,
+    "readme_sha": "a82f73b6fb0a1beaf00387d24211a7dd98a240ed",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/zephyrproject-rtos/zephyr/blob/main/README.rst",
+    "stars": 16984,
+    "summary": "面向资源受限设备的开源实时操作系统与开发生态。",
+    "tags": [
+      "RTOS",
+      "嵌入式",
+      "物联网"
+    ],
+    "title": "为嵌入式设备准备可扩展的系统基础",
+    "watchers": 408
+  },
+  "github_url": "https://github.com/zephyrproject-rtos/zephyr",
+  "official_url": "https://docs.zephyrproject.org",
+  "stars": 16985,
+  "code_pushed_at": "2026-11-02T16:49:09Z",
+  "default_branch": "main",
+  "commit_sha": "d1b8eec76bfd14058854245d09aa1e413e355c4a",
+  "readme_path": "README.rst",
+  "readme_blob_sha": "a82f73b6fb0a1beaf00387d24211a7dd98a240ed",
+  "readme_source_url": "https://github.com/zephyrproject-rtos/zephyr/blob/d1b8eec76bfd14058854245d09aa1e413e355c4a/README.rst",
+  "readme_api_url": "https://api.github.com/repos/zephyrproject-rtos/zephyr/contents/README.rst?ref=main",
+  "readme_language": "en",
+  "license_spdx": "Apache-2.0",
+  "license_source_url": "https://github.com/zephyrproject-rtos/zephyr/blob/d1b8eec76bfd14058854245d09aa1e413e355c4a/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/zephyrproject-rtos/zephyr/d1b8eec76bfd14058854245d09aa1e413e355c4a/doc/_static/images/logo-readme-light.svg",
+  "fetched_at": "2026-11-03T01:50:36.573293+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": true,
+  "translation_origin": "非官方中文译文",
+  "source_format": "reStructuredText",
+  "conversion": "将 RST 排版转换成 Markdown；原始文件逐字节保存在 README.source.md",
+  "image_sources": [
+    "https://raw.githubusercontent.com/zephyrproject-rtos/zephyr/d1b8eec76bfd14058854245d09aa1e413e355c4a/doc/_static/images/logo-readme-dark.svg",
+    "https://raw.githubusercontent.com/zephyrproject-rtos/zephyr/d1b8eec76bfd14058854245d09aa1e413e355c4a/doc/_static/images/logo-readme-light.svg"
+  ],
+  "license_basis": "仓库 Apache-2.0 许可证",
+  "official_entry": {
+    "url": "https://www.zephyrproject.org",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "zephyrproject-rtos/zephyr",
+  "license_blob_sha": "8f71f43fee3f78649d238238cbde51e6d7055c82",
+  "license_file_verified_at_commit": true
+}

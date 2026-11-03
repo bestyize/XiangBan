@@ -1,0 +1,97 @@
+{
+  "inventory_index": 66,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望搭建自己的网站、应用或服务的个人与团队。",
+    "category": "web",
+    "collected_at": "2026-11-02T18:18:08.097888+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "应用后端",
+      "认证",
+      "自部署"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/appwrite-screen.png",
+    "cover_variant": "offset",
+    "effort": "需要开发或部署环境",
+    "featured": true,
+    "forks": 5830,
+    "full_name": "appwrite/appwrite",
+    "getting_started": "在测试环境创建项目，先完成一个最小认证或数据读写流程。",
+    "highlights": [
+      "集中应用开发常用后端能力",
+      "提供客户端与服务端相关接入方式"
+    ],
+    "homepage_url": "https://appwrite.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T16:37:12Z",
+    "last_pushed_at": "2026-11-02T17:06:19Z",
+    "name": "Appwrite",
+    "notes": [
+      "不同部署方式的功能、运维要求和费用分别确认。"
+    ],
+    "order": 67,
+    "readme_sha": "6a40fd02587e4aab5cd7d5e59dbfcbd441b4cb05",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/appwrite/appwrite/blob/main/README.md",
+    "stars": 57853,
+    "summary": "提供认证、数据库、存储和函数等能力的开源后端平台。",
+    "tags": [
+      "应用后端",
+      "认证",
+      "自部署"
+    ],
+    "title": "把认证、数据和存储接进应用开发",
+    "watchers": 429
+  },
+  "repository": "appwrite/appwrite",
+  "fetched_at": "2026-11-03T01:50:39.882219+00:00",
+  "canonical_repository": "appwrite/appwrite",
+  "default_branch": "main",
+  "commit_sha": "f5b8e8b3c473ae5f285cfa4187d3133d672d144d",
+  "readme_path": "README.md",
+  "readme_blob_sha": "6a40fd02587e4aab5cd7d5e59dbfcbd441b4cb05",
+  "readme_url": "https://github.com/appwrite/appwrite/blob/f5b8e8b3c473ae5f285cfa4187d3133d672d144d/README.md",
+  "stars": 57853,
+  "pushed_at": "2026-11-03T01:49:54Z",
+  "stars_fetched_at": "2026-11-03T01:50:41.985112+00:00",
+  "license_spdx": "BSD-3-Clause",
+  "homepage_url": "https://appwrite.io",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "8dcd0631cf592479fc40d7bec6203e84b2a31a9f",
+  "license_url": "https://github.com/appwrite/appwrite/blob/f5b8e8b3c473ae5f285cfa4187d3133d672d144d/LICENSE",
+  "source_language": "English",
+  "official_chinese_candidate": {
+    "path": "README-CN.md",
+    "blob_sha": "6a373731b610ecbf26d6181f2c76fa9bae8f1131",
+    "url": "https://github.com/appwrite/appwrite/blob/f5b8e8b3c473ae5f285cfa4187d3133d672d144d/README-CN.md",
+    "fetched_at": "2026-11-03T01:51:37.347710+00:00",
+    "status": "已与英文源逐节核对，7 个代码块完全一致"
+  },
+  "translation_attribution": "官方中文",
+  "relative_link_resolution": "相对文档、图片分别指向固定提交的 GitHub blob 和 raw",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/appwrite/appwrite",
+  "description_zh": "为应用提供用户登录、数据库、文件存储等后端功能的平台。",
+  "official_entry": {
+    "url": "https://appwrite.io",
+    "kind": "项目官网",
+    "verification": "上游 README 官网入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标",
+  "image_license": "项目官方图片以可读上游外链引用，未复制素材；单独图片权利待后续核实。"
+}

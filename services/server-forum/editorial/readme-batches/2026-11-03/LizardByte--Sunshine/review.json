@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "硬件要求表为上游进行中的资料，原文明确不要据此购买硬件，译文完整保留。",
+    "Virtual HID Broker 需独立安装和许可的限制按原文保留；性能表述未经独立测量。"
+  ],
+  "full_text_coverage": "固定提交全文译写；完整保留手柄、编码、屏幕捕获和硬件兼容表及脚注。",
+  "code_and_numbers": "无代码块；所有表格行、单元格、图例和兼容性标记计数一致，版本号保留。",
+  "links_and_images": "相对官方图标按固定提交解析；稳定文档及图标本次 HTTP 200，动态徽章和非关键链接未逐条验证。",
+  "license": "上游仓库 GPL 3.0 许可证已保存；图标使用上游原图链接，独立品牌权利未确认。"
+}

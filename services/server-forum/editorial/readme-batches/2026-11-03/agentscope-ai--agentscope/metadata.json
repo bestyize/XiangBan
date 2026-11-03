@@ -1,0 +1,97 @@
+{
+  "inventory_index": 97,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望构建、运行或理解 AI 应用的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:16:58.341653+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "智能体框架",
+      "工具",
+      "Python"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 3774,
+    "full_name": "agentscope-ai/agentscope",
+    "getting_started": "从官方快速入门启动最小智能体，再逐个接入工具。",
+    "highlights": [
+      "提供智能体开发组件",
+      "包含可供学习的应用示例"
+    ],
+    "homepage_url": "https://docs.agentscope.io/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T12:49:37Z",
+    "last_pushed_at": "2026-11-02T12:49:38Z",
+    "name": "AgentScope",
+    "notes": [
+      "工具权限、模型调用和外部服务需按实际用途配置。"
+    ],
+    "order": 98,
+    "readme_sha": "1da8a786542b2753c89edd39dbea6ca770ea8192",
+    "related_categories": [
+      "dev",
+      "skills"
+    ],
+    "source_url": "https://github.com/agentscope-ai/agentscope/blob/main/README.md",
+    "stars": 35223,
+    "summary": "面向智能体开发与运行的开源框架，组织消息、工具及相关流程。",
+    "tags": [
+      "智能体框架",
+      "工具",
+      "Python"
+    ],
+    "title": "构建能看清执行过程的智能体",
+    "watchers": 159
+  },
+  "repository": "agentscope-ai/agentscope",
+  "fetched_at": "2026-11-03T01:50:59.981121+00:00",
+  "canonical_repository": "agentscope-ai/agentscope",
+  "default_branch": "main",
+  "commit_sha": "fc3445e32fd5b1bc085cb266e09850eb614e3468",
+  "readme_path": "README.md",
+  "readme_blob_sha": "1da8a786542b2753c89edd39dbea6ca770ea8192",
+  "readme_url": "https://github.com/agentscope-ai/agentscope/blob/fc3445e32fd5b1bc085cb266e09850eb614e3468/README.md",
+  "stars": 35234,
+  "pushed_at": "2026-11-02T12:49:38Z",
+  "stars_fetched_at": "2026-11-03T01:51:02.184403+00:00",
+  "license_spdx": "Apache-2.0",
+  "homepage_url": "https://docs.agentscope.io/",
+  "icon_source_url": "https://img.alicdn.com/imgextra/i1/O1CN01nTg6w21NqT5qFKH1u_!!6000000001621-55-tps-550-550.svg",
+  "license_path": "LICENSE",
+  "license_blob_sha": "2f2f2f25ea6019e5a51213c4e8a4df0c67a6ea2a",
+  "license_url": "https://github.com/agentscope-ai/agentscope/blob/fc3445e32fd5b1bc085cb266e09850eb614e3468/LICENSE",
+  "source_language": "English",
+  "official_chinese_candidate": {
+    "path": "README_zh.md",
+    "blob_sha": "ae1d2495348e9d55629ee7fe4ae544db3fbb2c83",
+    "url": "https://github.com/agentscope-ai/agentscope/blob/fc3445e32fd5b1bc085cb266e09850eb614e3468/README_zh.md",
+    "fetched_at": "2026-11-03T01:51:40.898318+00:00",
+    "status": "已与英文源逐节对照；保留上游翻译的代码注释，并恢复英文新闻标签"
+  },
+  "translation_attribution": "基于官方中文补正：保留英文原文中的 FEAT、INTE、Experimental 标签；代码注释由上游翻译",
+  "relative_link_resolution": "文档指向固定提交的 GitHub blob，图片指向固定提交的 raw；源文件保留原始相对链接",
+  "official_entry": {
+    "url": "https://docs.agentscope.io/",
+    "kind": "查看文档",
+    "verification": "上游 README 文档入口，HTTP HEAD 200"
+  },
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/agentscope-ai/agentscope",
+  "description_zh": "用于构建和运行 AI 智能体应用的开发框架。",
+  "platforms": [],
+  "image_license": "项目 README 指明的官方 Logo 与插图保留外链，未复制素材；单独图片权利待后续核实。"
+}

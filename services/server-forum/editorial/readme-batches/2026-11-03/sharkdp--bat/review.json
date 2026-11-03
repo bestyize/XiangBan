@@ -1,0 +1,30 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "对照固定提交官方中文和英文，补齐装饰、less、帮助高亮、暗色模式等英文新增内容，修正 Rust 最低版本、分页选项、版权年份、配置路径及其他译文差异。",
+    "58 个英文代码块按顺序逐块原样保留，官方中文独有 Funtoo、Void、Termux 三个安装块保留并在译注标明。",
+    "同提交中文候选的 6 个相对链接按 doc/ 解析失效，已修正指向英文原文所在的固定版本目标并注明；原始候选保留。",
+    "README 三张示意图和 Logo 均返回可读图片，固定仓库链接与关键文档入口已验证；外部图片权利依上游来源，不推定项目许可证涵盖。"
+  ],
+  "chinese_source": {
+    "path": "doc/README-zh.md",
+    "blob_sha": "586a4856d743f22dc5ad0f6626b0994efcfd51e1",
+    "url": "https://github.com/sharkdp/bat/blob/67e2ec24e0284694c10d1e25166fc97aad15845e/doc/README-zh.md",
+    "fetched_at": "2026-11-03T01:51:35.681002+00:00",
+    "status": "已与英文固定版本逐节对照并补译修正"
+  },
+  "link_check": {
+    "pinned_english_urls_checked": 12,
+    "key_external_urls_checked": 7,
+    "illustrations_checked": 3,
+    "logo_checked": 1
+  }
+}

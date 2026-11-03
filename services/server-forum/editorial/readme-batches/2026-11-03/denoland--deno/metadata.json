@@ -1,0 +1,94 @@
+{
+  "inventory_key": "denoland/deno",
+  "full_name": "denoland/deno",
+  "inventory_entry": {
+    "audience": "适合希望改善日常开发与命令行工作流的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:17:36.255541+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "TypeScript",
+      "运行时",
+      "权限管理"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 6494,
+    "full_name": "denoland/deno",
+    "getting_started": "在测试目录运行官方入门示例，再了解权限和依赖方式。",
+    "highlights": [
+      "提供脚本与应用运行能力",
+      "可按任务声明访问权限"
+    ],
+    "homepage_url": "https://deno.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-26T11:27:08Z",
+    "last_pushed_at": "2026-10-29T08:03:10Z",
+    "name": "Deno",
+    "notes": [
+      "是否允许文件、网络等访问应按脚本任务配置。"
+    ],
+    "order": 26,
+    "readme_sha": "8173eb951062916cc112a8fb7c0e120b1c945975",
+    "related_categories": [],
+    "source_url": "https://github.com/denoland/deno/blob/main/README.md",
+    "stars": 108793,
+    "summary": "面向 JavaScript、TypeScript 与 Web 标准的开源运行环境。",
+    "tags": [
+      "TypeScript",
+      "运行时",
+      "权限管理"
+    ],
+    "title": "用明确权限运行 JavaScript 和 TypeScript",
+    "watchers": 1409
+  },
+  "fetched_at": "2026-11-03T01:50:44.209882+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "denoland/deno",
+  "repository_url": "https://github.com/denoland/deno",
+  "default_branch": "main",
+  "stars": 108794,
+  "pushed_at": "2026-10-29T08:03:10Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://deno.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://deno.land/logo.svg",
+  "commit_sha": "e7b39ebd55c85aaf6a29290c1f5a99e2e21e09dd",
+  "license": {
+    "path": "LICENSE.md",
+    "blob_sha": "b641c75c0b04ccfddcb1145d2554ab49b6ca9411",
+    "source_url": "https://github.com/denoland/deno/blob/e7b39ebd55c85aaf6a29290c1f5a99e2e21e09dd/LICENSE.md",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "8173eb951062916cc112a8fb7c0e120b1c945975",
+    "source_url": "https://github.com/denoland/deno/blob/e7b39ebd55c85aaf6a29290c1f5a99e2e21e09dd/README.md",
+    "raw_url": "https://raw.githubusercontent.com/denoland/deno/e7b39ebd55c85aaf6a29290c1f5a99e2e21e09dd/README.md",
+    "size_bytes": 3807,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "e7b39ebd55c85aaf6a29290c1f5a99e2e21e09dd",
+  "official_chinese_search": "固定提交的完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://deno.com/",
+    "kind": "项目官网"
+  },
+  "plain_summary": "运行 JavaScript、TypeScript 和 WebAssembly 程序的开发工具。"
+}

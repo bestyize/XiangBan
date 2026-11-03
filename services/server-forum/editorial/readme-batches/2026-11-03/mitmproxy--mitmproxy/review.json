@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐段对照，保留 HTTP/1、HTTP/2、WebSockets 和 SSL/TLS 支持范围。",
+    "MIT 许可证明确包括相关文档，已保存原文；11 个非动态链接均返回 HTTP 200。",
+    "未发现已核实项目图标，卡片使用项目名占位；徽章为上游动态外链。"
+  ],
+  "link_check": {
+    "method": "HTTP HEAD，排除动态徽章",
+    "urls_checked": 11,
+    "http_200": 11
+  }
+}

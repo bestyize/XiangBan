@@ -1,0 +1,88 @@
+{
+  "inventory_index": 133,
+  "original_key": "OpenRCT2/OpenRCT2",
+  "repository": "OpenRCT2/OpenRCT2",
+  "catalog": {
+    "audience": "适合希望体验游戏，或研究开放游戏实现与内容生态的人。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:18:03.034914+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "模拟经营",
+      "游乐园",
+      "经典游戏"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或体验",
+    "featured": true,
+    "forks": 1957,
+    "full_name": "OpenRCT2/OpenRCT2",
+    "getting_started": "先阅读官方启动要求，准备合法取得的原作资源再安装。",
+    "highlights": [
+      "持续改进经典经营体验",
+      "引擎源码可供研究和贡献"
+    ],
+    "homepage_url": "https://openrct2.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T04:03:49Z",
+    "last_pushed_at": "2026-11-02T04:03:50Z",
+    "name": "OpenRCT2",
+    "notes": [
+      "通常需要原游戏数据，代码许可不包含原作素材授权。"
+    ],
+    "order": 134,
+    "readme_sha": "c995a057f1cd7e17ef590abadea663e0b5be4d93",
+    "related_categories": [],
+    "source_url": "https://github.com/OpenRCT2/OpenRCT2/blob/develop/readme.md",
+    "stars": 16532,
+    "summary": "对 RollerCoaster Tycoon 2 进行开源重新实现的项目。",
+    "tags": [
+      "模拟经营",
+      "游乐园",
+      "经典游戏"
+    ],
+    "title": "把游乐园经营带进持续维护的实现",
+    "watchers": 196
+  },
+  "github_url": "https://github.com/OpenRCT2/OpenRCT2",
+  "official_url": "https://openrct2.io",
+  "stars": 16536,
+  "code_pushed_at": "2026-11-02T21:37:44Z",
+  "default_branch": "develop",
+  "commit_sha": "5df376f311e03a90ad162334d145cc1fbc0e671b",
+  "readme_path": "readme.md",
+  "readme_blob_sha": "c995a057f1cd7e17ef590abadea663e0b5be4d93",
+  "readme_source_url": "https://github.com/OpenRCT2/OpenRCT2/blob/5df376f311e03a90ad162334d145cc1fbc0e671b/readme.md",
+  "readme_api_url": "https://api.github.com/repos/OpenRCT2/OpenRCT2/contents/readme.md?ref=develop",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/OpenRCT2/OpenRCT2/blob/develop/licence.txt",
+  "icon_source_url": "https://raw.githubusercontent.com/OpenRCT2/OpenRCT2/5df376f311e03a90ad162334d145cc1fbc0e671b/resources/logo/icon_x128.png",
+  "fetched_at": "2026-11-03T01:50:37.133493+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "OpenRCT2/OpenRCT2",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/OpenRCT2/OpenRCT2/5df376f311e03a90ad162334d145cc1fbc0e671b/resources/logo/icon_x128.png",
+    "https://github.com/user-attachments/assets/fa893cc8-1484-4751-94be-4ead00a6c8f9"
+  ],
+  "license_basis": "README 指明 GPL-3.0-or-later；游戏运行需原版 RCT2 文件",
+  "official_entry": {
+    "url": "https://openrct2.io",
+    "kind": "项目官网"
+  }
+}

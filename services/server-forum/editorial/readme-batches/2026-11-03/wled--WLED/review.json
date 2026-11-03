@@ -1,0 +1,22 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留光敏性癫痫警告、输出数量、功能及许可免责声明",
+    "主要文档、固定版本图片与贡献文件已验证；动态徽章和其他外链未逐一联网",
+    "保留 EUPL v1.2 许可证"
+  ],
+  "link_results": {
+    "https://kno.wled.ge": 200,
+    "https://raw.githubusercontent.com/wled/WLED/fce41f2655c3087d3eaf95c028d2856967cbc86e/images/wled_logo_akemi.png": 200,
+    "https://raw.githubusercontent.com/wled/WLED/fce41f2655c3087d3eaf95c028d2856967cbc86e/images/macbook-pro-space-gray-on-the-wooden-table.jpg": 200,
+    "https://raw.githubusercontent.com/wled/WLED/fce41f2655c3087d3eaf95c028d2856967cbc86e/images/walking-with-iphone-x.jpg": 200,
+    "https://raw.githubusercontent.com/wled/WLED/fce41f2655c3087d3eaf95c028d2856967cbc86e/LICENSE": 200,
+    "https://github.com/wled/WLED/blob/fce41f2655c3087d3eaf95c028d2856967cbc86e/CONTRIBUTING.md": 200,
+    "https://github.com/wled/WLED/blob/fce41f2655c3087d3eaf95c028d2856967cbc86e/AGENTS.md": 200
+  },
+  "issues": []
+}

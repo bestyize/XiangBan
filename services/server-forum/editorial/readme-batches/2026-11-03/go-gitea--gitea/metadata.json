@@ -1,0 +1,103 @@
+{
+  "inventory_index": 65,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "希望自建代码协作平台的个人或团队。",
+    "category": "web",
+    "collected_at": "2026-11-02T18:02:41.242430+00:00",
+    "cover_accent": "#9D7159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "Git",
+      "代码托管",
+      "自部署"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要开发或部署环境",
+    "featured": true,
+    "forks": 7348,
+    "full_name": "go-gitea/gitea",
+    "getting_started": "按官方指南建立测试实例，再配置仓库与备份。",
+    "highlights": [
+      "把仓库与协作功能集中管理",
+      "提供自部署和迁移相关文档"
+    ],
+    "homepage_url": "https://gitea.com",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T14:30:41Z",
+    "last_pushed_at": "2026-11-02T14:49:40Z",
+    "name": "Gitea",
+    "notes": [
+      "域名、邮件、数据库和备份需要单独维护。"
+    ],
+    "order": 66,
+    "readme_sha": "d11344cbf5e99f6d7d2b93f18ebf7da242b42b4e",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/go-gitea/gitea/blob/main/README.md",
+    "stars": 58826,
+    "summary": "提供 Git 仓库托管、问题跟踪和代码协作的轻量服务。",
+    "tags": [
+      "Git",
+      "代码托管",
+      "自部署"
+    ],
+    "title": "搭建由自己维护的代码协作空间",
+    "watchers": 487
+  },
+  "repository": "go-gitea/gitea",
+  "fetched_at": "2026-11-03T01:50:38.685806+00:00",
+  "canonical_repository": "go-gitea/gitea",
+  "default_branch": "main",
+  "commit_sha": "12b20c7c9962e0be75912b290a0c5778799b0ad2",
+  "readme_path": "README.md",
+  "readme_blob_sha": "d11344cbf5e99f6d7d2b93f18ebf7da242b42b4e",
+  "readme_url": "https://github.com/go-gitea/gitea/blob/12b20c7c9962e0be75912b290a0c5778799b0ad2/README.md",
+  "stars": 58826,
+  "pushed_at": "2026-11-03T00:24:56Z",
+  "stars_fetched_at": "2026-11-03T01:50:41.371070+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://gitea.com",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "a8d4b49dd073a4a38a7e58385eeff7cc52568697",
+  "license_url": "https://github.com/go-gitea/gitea/blob/12b20c7c9962e0be75912b290a0c5778799b0ad2/LICENSE",
+  "source_language": "English",
+  "official_chinese_candidate": {
+    "path": "README.zh-cn.md",
+    "blob_sha": "b5d49053e57d7507315e682345a1d0a48c2ec701",
+    "url": "https://github.com/go-gitea/gitea/blob/12b20c7c9962e0be75912b290a0c5778799b0ad2/README.zh-cn.md",
+    "fetched_at": "2026-11-03T01:51:36.438704+00:00",
+    "status": "已与英文源逐节核对，滞后的目的、构建、贡献、翻译及常见问题章节已按英文补译"
+  },
+  "translation_attribution": "基于官方中文补译；替换滞后的目的、构建、贡献、翻译和常见问题章节",
+  "relative_link_resolution": "相对文档指向所选固定提交",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/go-gitea/gitea",
+  "description_zh": "自托管 Git 仓库，并进行代码审查、问题跟踪和团队协作的平台。",
+  "official_entry": {
+    "url": "https://docs.gitea.com/",
+    "kind": "查看文档",
+    "verification": "上游 README 官方文档入口，HTTP HEAD 200"
+  },
+  "platforms": [
+    "Linux",
+    "macOS",
+    "FreeBSD",
+    "OpenBSD",
+    "Windows"
+  ],
+  "icon_display": "项目名占位，未发现已核实项目图标",
+  "image_license": "截图以官方上游链接引用，未复制素材；单独素材权利待后续核实。"
+}

@@ -1,0 +1,102 @@
+{
+  "inventory_key": "obra/superpowers",
+  "full_name": "obra/superpowers",
+  "inventory_entry": {
+    "audience": "适合已经在使用编程助手，想进一步组织开发流程的人。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:01:16.978984+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "规划",
+      "开发",
+      "验证"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "flow",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要兼容的编程助手",
+    "featured": true,
+    "forks": 27681,
+    "full_name": "obra/superpowers",
+    "getting_started": "先阅读仓库的安装与兼容性说明，再挑一项技能查看其指令、依赖和触发条件。",
+    "highlights": [
+      "把开发过程拆成可以组合的技能",
+      "包含规划与验证等工作方法",
+      "可以阅读技能源文件理解具体指令"
+    ],
+    "homepage_url": "https://github.com/obra/superpowers#readme",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-21T21:00:49Z",
+    "last_pushed_at": "2026-10-29T23:35:34Z",
+    "name": "Superpowers",
+    "notes": [
+      "不同客户端的安装方式以仓库说明为准。",
+      "收录不代表已经接入小伴，也不代表可以直接安装。"
+    ],
+    "order": 5,
+    "readme_sha": "c5bb59fdaf17ba154e803c549cd71a73ef36c24b",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/obra/superpowers#readme",
+    "stars": 311091,
+    "summary": "围绕规划、开发与验证组织的一组可组合技能和工作方法。",
+    "tags": [
+      "Skill",
+      "编程助手",
+      "工作流"
+    ],
+    "title": "给编程助手一套做事的方法",
+    "watchers": 1133
+  },
+  "fetched_at": "2026-11-03T01:50:36.114541+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "obra/superpowers",
+  "repository_url": "https://github.com/obra/superpowers",
+  "default_branch": "main",
+  "stars": 311264,
+  "pushed_at": "2026-11-03T01:39:28Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/obra/superpowers/2ce8aa15d05bd57213e6f746f953aafb7ded7a8b/assets/app-icon.png",
+  "commit_sha": "2ce8aa15d05bd57213e6f746f953aafb7ded7a8b",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "abf0390320aa14406af7a520b9b0739fdda9bf08",
+    "source_url": "https://github.com/obra/superpowers/blob/2ce8aa15d05bd57213e6f746f953aafb7ded7a8b/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "c5bb59fdaf17ba154e803c549cd71a73ef36c24b",
+    "source_url": "https://github.com/obra/superpowers/blob/2ce8aa15d05bd57213e6f746f953aafb7ded7a8b/README.md",
+    "raw_url": "https://raw.githubusercontent.com/obra/superpowers/2ce8aa15d05bd57213e6f746f953aafb7ded7a8b/README.md",
+    "size_bytes": 14847,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "translation": {
+    "method": "Terra 直接全文翻译并逐节对照固定提交英文 README",
+    "source_blob_sha": "c5bb59fdaf17ba154e803c549cd71a73ef36c24b",
+    "official_zh_candidates": [],
+    "source_language": "en",
+    "target_language": "zh-CN",
+    "links": "相对 Markdown 链接按 README 根目录解析到固定提交；保留原有可见地址、锚点与代码块。",
+    "icon_note": "项目固定提交 assets/app-icon.png，官方仓库原图。"
+  },
+  "official_entry": {
+    "url": "https://github.com/obra/superpowers",
+    "kind": "GitHub"
+  }
+}

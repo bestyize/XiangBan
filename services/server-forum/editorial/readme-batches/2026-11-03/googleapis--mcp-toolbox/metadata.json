@@ -1,0 +1,91 @@
+{
+  "inventory_index": 132,
+  "original_key": "googleapis/mcp-toolbox",
+  "repository": "googleapis/mcp-toolbox",
+  "catalog": {
+    "audience": "适合为智能体编写、连接或评估技能与工具的开发者。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:17:06.728516+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "数据库",
+      "MCP",
+      "工具接入"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 1787,
+    "full_name": "googleapis/mcp-toolbox",
+    "getting_started": "先为测试数据库配置只读连接，验证一个简单查询工具。",
+    "highlights": [
+      "连接多种数据库工具场景",
+      "可围绕查询组织明确的接口"
+    ],
+    "homepage_url": "https://mcp-toolbox.dev/documentation/introduction/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-29T20:50:57Z",
+    "last_pushed_at": "2026-11-02T09:17:08Z",
+    "name": "MCP Toolbox for Databases",
+    "notes": [
+      "数据库访问凭据与查询权限需按数据范围限制。"
+    ],
+    "order": 133,
+    "readme_sha": "0de8aac968368169f7ea20500d59ba731eb9dc13",
+    "related_categories": [
+      "dev",
+      "ai"
+    ],
+    "source_url": "https://github.com/googleapis/mcp-toolbox/blob/main/README.md",
+    "stars": 16792,
+    "summary": "为数据库提供 MCP 工具接入和配置能力的开源服务。",
+    "tags": [
+      "数据库",
+      "MCP",
+      "工具接入"
+    ],
+    "title": "把数据库访问封装成可管理的工具",
+    "watchers": 89
+  },
+  "github_url": "https://github.com/googleapis/mcp-toolbox",
+  "official_url": "https://mcp-toolbox.dev/documentation/introduction/",
+  "stars": 16793,
+  "code_pushed_at": "2026-11-02T23:43:59Z",
+  "default_branch": "main",
+  "commit_sha": "ea2d71e7c2636f00158d2e89b46bdaf36182ceb6",
+  "readme_path": "README.md",
+  "readme_blob_sha": "0de8aac968368169f7ea20500d59ba731eb9dc13",
+  "readme_source_url": "https://github.com/googleapis/mcp-toolbox/blob/ea2d71e7c2636f00158d2e89b46bdaf36182ceb6/README.md",
+  "readme_api_url": "https://api.github.com/repos/googleapis/mcp-toolbox/contents/README.md?ref=main",
+  "readme_language": "en",
+  "license_spdx": "Apache-2.0",
+  "license_source_url": "https://github.com/googleapis/mcp-toolbox/blob/main/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/googleapis/mcp-toolbox/ea2d71e7c2636f00158d2e89b46bdaf36182ceb6/logo.png",
+  "fetched_at": "2026-11-03T01:50:37.055732+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "googleapis/mcp-toolbox",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/googleapis/mcp-toolbox/ea2d71e7c2636f00158d2e89b46bdaf36182ceb6/logo.png",
+    "https://raw.githubusercontent.com/googleapis/mcp-toolbox/ea2d71e7c2636f00158d2e89b46bdaf36182ceb6/docs/en/documentation/introduction/architecture.png"
+  ],
+  "license_basis": "仓库 Apache-2.0 许可",
+  "official_entry": {
+    "url": "https://mcp-toolbox.dev/",
+    "kind": "查看文档"
+  }
+}

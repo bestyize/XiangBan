@@ -1,0 +1,93 @@
+{
+  "inventory_index": 109,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合为智能体编写、连接或评估技能与工具的开发者。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:17:07.854411+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "Agent Skills",
+      "开放标准",
+      "规范"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 1988,
+    "full_name": "agentskills/agentskills",
+    "getting_started": "从规范和最小目录示例开始，写一个只包含说明的测试技能。",
+    "highlights": [
+      "描述技能目录与元数据结构",
+      "提供跨客户端理解技能的共同基础"
+    ],
+    "homepage_url": "https://agentskills.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-08-09T20:36:04Z",
+    "last_pushed_at": "2026-08-09T20:36:04Z",
+    "name": "Agent Skills 规范",
+    "notes": [
+      "规范兼容不意味着各客户端支持的能力与权限完全一致。"
+    ],
+    "order": 110,
+    "readme_sha": "247e4a18e908d3bf27092f886f25c2515d84ecbc",
+    "related_categories": [
+      "learn",
+      "ai"
+    ],
+    "source_url": "https://github.com/agentskills/agentskills/blob/main/README.md",
+    "stars": 26878,
+    "summary": "记录 Agent Skills 开放格式、规范与文档的官方项目。",
+    "tags": [
+      "Agent Skills",
+      "开放标准",
+      "规范"
+    ],
+    "title": "先理解技能的格式，再设计自己的能力",
+    "watchers": 241
+  },
+  "repository": "agentskills/agentskills",
+  "fetched_at": "2026-11-03T01:51:08.903328+00:00",
+  "canonical_repository": "agentskills/agentskills",
+  "default_branch": "main",
+  "commit_sha": "69ef37e9424c0a7ea9dd2293b559e43ec8176379",
+  "readme_path": "README.md",
+  "readme_blob_sha": "247e4a18e908d3bf27092f886f25c2515d84ecbc",
+  "readme_url": "https://github.com/agentskills/agentskills/blob/69ef37e9424c0a7ea9dd2293b559e43ec8176379/README.md",
+  "stars": 26889,
+  "pushed_at": "2026-08-09T20:36:04Z",
+  "stars_fetched_at": "2026-11-03T01:51:11.112097+00:00",
+  "license_spdx": "Apache-2.0",
+  "homepage_url": "https://agentskills.io",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "a20f4476df158a57a68409015ea607c738856f57",
+  "license_url": "https://github.com/agentskills/agentskills/blob/69ef37e9424c0a7ea9dd2293b559e43ec8176379/LICENSE",
+  "source_language": "English",
+  "documentation_license_text_url": "https://creativecommons.org/licenses/by/4.0/legalcode.txt",
+  "documentation_license": "CC-BY-4.0",
+  "translation_attribution": "非官方中文全文译文；来源 Agent Skills 项目，文档依 CC BY 4.0 许可，翻译及链接适配已标明",
+  "relative_link_resolution": "相对文档指向固定提交",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/agentskills/agentskills",
+  "description_zh": "把任务说明打包成技能，让兼容的 AI 助手按需使用。",
+  "entry_label": "查看文档",
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实的项目图标",
+  "official_entry": {
+    "url": "https://agentskills.io",
+    "kind": "查看文档",
+    "verification": "上游 README 指向该站，HTTP HEAD 返回 200"
+  }
+}

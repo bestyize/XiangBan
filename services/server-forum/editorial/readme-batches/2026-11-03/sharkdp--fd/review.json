@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "基准性能为上游指定机器的历史结果，未独立复测。",
+    "未找到经核实的独立项目图标，卡片保留名称占位；上游截图素材的单独权利未确认。"
+  ],
+  "full_text_coverage": "固定提交 README 全文译写；原始命令帮助输出保留并逐项附中文说明，删除命令及竞态提示均保留。",
+  "code_and_numbers": "68 个围栏代码块逐字一致，所有反引号技术内容保留；原始基准数字保留。",
+  "links_and_images": "相对许可证和示例图链接解析到固定提交；示例图片 HTTP 200；其他非关键链接未逐条联网检查。",
+  "license": "固定版本 Cargo.toml 标注 MIT OR Apache-2.0，两个许可文件已保存；示例图使用上游外链。"
+}

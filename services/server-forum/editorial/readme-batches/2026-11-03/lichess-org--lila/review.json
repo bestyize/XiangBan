@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留代码块、浏览器要求及 2022 年架构日期",
+    "官网、两张固定版本图片和许可证已核验；动态徽章和其他外链未逐一联网",
+    "保留 AGPL 许可文本"
+  ],
+  "link_results": {
+    "https://lichess.org": 200,
+    "https://raw.githubusercontent.com/lichess-org/lila/2e3e641c32b361c113e696cee34f9fddefef6727/public/images/home-bicolor.png": 200,
+    "https://raw.githubusercontent.com/lichess-org/lila/2e3e641c32b361c113e696cee34f9fddefef6727/public/images/architecture.png": 200,
+    "https://github.com/lichess-org/lila/blob/2e3e641c32b361c113e696cee34f9fddefef6727/COPYING.md": 200
+  },
+  "issues": []
+}

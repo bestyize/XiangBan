@@ -1,0 +1,95 @@
+{
+  "inventory_index": 107,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合在自有或获授权环境中学习软件、协议与安全分析的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:17:56.669006+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "口令审计",
+      "恢复验证",
+      "GPU"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 3601,
+    "full_name": "hashcat/hashcat",
+    "getting_started": "只在自己生成的测试哈希和明确授权的实验环境中学习官方示例。",
+    "highlights": [
+      "支持多种计算后端",
+      "可用于理解密码哈希与恢复任务"
+    ],
+    "homepage_url": "https://hashcat.net/hashcat/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:28:31Z",
+    "last_pushed_at": "2026-11-02T17:28:31Z",
+    "name": "hashcat",
+    "notes": [
+      "不得用于未获授权的凭据获取或账户访问。"
+    ],
+    "order": 108,
+    "readme_sha": "4697d6ce30d990fa8d1c4bc915da5bd3e7f40b81",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/hashcat/hashcat/blob/master/README.md",
+    "stars": 27228,
+    "summary": "面向口令恢复和经授权密码审计的开源计算工具。",
+    "tags": [
+      "口令审计",
+      "恢复验证",
+      "GPU"
+    ],
+    "title": "了解口令恢复与强度验证的计算过程",
+    "watchers": 522
+  },
+  "repository": "hashcat/hashcat",
+  "fetched_at": "2026-11-03T01:51:07.693502+00:00",
+  "canonical_repository": "hashcat/hashcat",
+  "default_branch": "master",
+  "commit_sha": "4ff3224b6794000cad4df605fd9fc4b8812db28f",
+  "readme_path": "README.md",
+  "readme_blob_sha": "4697d6ce30d990fa8d1c4bc915da5bd3e7f40b81",
+  "readme_url": "https://github.com/hashcat/hashcat/blob/4ff3224b6794000cad4df605fd9fc4b8812db28f/README.md",
+  "stars": 27235,
+  "pushed_at": "2026-11-02T17:28:31Z",
+  "stars_fetched_at": "2026-11-03T01:51:10.242273+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://hashcat.net/hashcat/",
+  "icon_source_url": "",
+  "root_license_candidates": [],
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/hashcat/hashcat",
+  "license_path": "docs/license.txt",
+  "license_blob_sha": "6420c167f450cbdf46846f3cbfec883834470783",
+  "license_url": "https://github.com/hashcat/hashcat/blob/4ff3224b6794000cad4df605fd9fc4b8812db28f/docs/license.txt",
+  "license_scope_caveat": "README 明确项目 MIT，docs/license.txt 包含 MIT 完整文本及版权；需检查文档和图片的个别例外。",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "相对文档和目录指向固定提交",
+  "description_zh": "使用 CPU 或 GPU 恢复密码的工具。",
+  "official_entry": {
+    "url": "https://hashcat.net/hashcat/",
+    "kind": "项目官网",
+    "verification": "上游 README 下载链接，HTTP HEAD 200"
+  },
+  "platforms": [
+    "Linux",
+    "Windows",
+    "macOS"
+  ],
+  "icon_display": "项目名占位，未发现已核实项目图标"
+}

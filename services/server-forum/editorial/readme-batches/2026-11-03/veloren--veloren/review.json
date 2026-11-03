@@ -1,0 +1,22 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留稳定版可能与服务器不兼容的限制及认证表述归属",
+    "保留横幅的 Hrom 署名和 CC BY-SA 4.0 声明并保存许可文本",
+    "官网、下载页和正文图片已核验；动态徽章和其他外链未逐一联网",
+    "保存 GPLv3 许可证"
+  ],
+  "link_results": {
+    "https://veloren.net": 200,
+    "https://veloren.net/download": 200,
+    "https://s3.eu-central-2.wasabisys.com/veloren-blog/cdn/common/2025-06-29_Hrom_bestest-banner.webp": 200,
+    "https://translate.codeberg.org/widgets/veloren/-/open-graph.png": 200,
+    "https://opencollective.com/veloren/contribute/button@2x.png?color=blue": 200,
+    "https://creativecommons.org/licenses/by-sa/4.0/legalcode.txt": 200
+  },
+  "issues": []
+}

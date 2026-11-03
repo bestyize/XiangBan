@@ -1,0 +1,25 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留安装命令、按键、教程可能失效警告及第三方许可",
+    "保留 CC BY-SA 署名、原文链接和修改说明，保存许可证",
+    "检查下载页、固定版本截图和编译文档；动态徽章与其他外链未逐一联网"
+  ],
+  "link_results": {
+    "https://cataclysmdda.org/releases/": 200,
+    "https://raw.githubusercontent.com/CleverRaven/Cataclysm-DDA/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/data/screenshots/ultica-showcase-sep-2021.png": 200,
+    "https://github.com/CleverRaven/Cataclysm-DDA/tree/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/doc": 200,
+    "https://github.com/CleverRaven/Cataclysm-DDA/blob/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/doc/c++/COMPILING.md": 200,
+    "https://github.com/CleverRaven/Cataclysm-DDA/blob/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/doc/c++/COMPILER_SUPPORT.md": 200,
+    "https://github.com/CleverRaven/Cataclysm-DDA/blob/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/doc/c++/COMPILING-MSYS.md": 200,
+    "https://github.com/CleverRaven/Cataclysm-DDA/blob/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/doc/c++/COMPILING-VS-VCPKG.md": 200,
+    "https://github.com/CleverRaven/Cataclysm-DDA/blob/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/doc/c++/COMPILING-CMAKE.md": 200,
+    "https://github.com/CleverRaven/Cataclysm-DDA/blob/57cf429e845fec8ae0405ec0f4dca5921c9c6d79/CONTRIBUTING.md": 200,
+    "https://creativecommons.org/licenses/by-sa/3.0/legalcode.txt": 200
+  },
+  "issues": []
+}

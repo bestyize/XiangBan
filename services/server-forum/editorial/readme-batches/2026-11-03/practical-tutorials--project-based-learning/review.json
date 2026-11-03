@@ -1,0 +1,10 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "457 个标准格式教程链接标题和其他分组、介绍、附注全部译写；原始警告、版本与语言保留。",
+  "code_and_numbers": "无 fenced 代码块；章节、版本和视频标记保留。",
+  "links_and_images": "中英文 463 个外部 URL 按原顺序一致；贡献指南固定提交并验证 200；目录锚点无缺失，两张正文徽章可读。",
+  "license": "MIT 许可证保存于 LICENSE.upstream，外链教程各自许可独立。",
+  "issues": [
+    "README 未提供可确认的项目图标，需素材核实。"
+  ]
+}

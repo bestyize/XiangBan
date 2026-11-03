@@ -1,0 +1,91 @@
+{
+  "inventory_index": 149,
+  "original_key": "prusa3d/PrusaSlicer",
+  "repository": "prusa3d/PrusaSlicer",
+  "catalog": {
+    "audience": "需要准备打印任务或研究切片算法的人。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:01:35.285905+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "切片",
+      "3D打印",
+      "模型处理"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要硬件或开发环境",
+    "featured": true,
+    "forks": 2393,
+    "full_name": "prusa3d/PrusaSlicer",
+    "getting_started": "安装官方稳定版，选择设备与材料预设后预览切片结果。",
+    "highlights": [
+      "提供模型切片和打印预设",
+      "可预览路径与打印参数"
+    ],
+    "homepage_url": "https://www.prusa3d.com/prusaslicer/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-09-21T11:59:08Z",
+    "last_pushed_at": "2026-11-02T16:34:24Z",
+    "name": "PrusaSlicer",
+    "notes": [
+      "打印参数需与实际机器、材料和喷嘴相匹配。"
+    ],
+    "order": 150,
+    "readme_sha": "5810caaf7da2a126380ecec24f99cdac0c8d1d7a",
+    "related_categories": [
+      "design"
+    ],
+    "source_url": "https://github.com/prusa3d/PrusaSlicer/blob/master/README.md",
+    "stars": 9454,
+    "summary": "将三维模型切片并生成 FDM 或 mSLA 打印指令的应用。",
+    "tags": [
+      "切片",
+      "3D打印",
+      "模型处理"
+    ],
+    "title": "把三维模型转成打印机能执行的路径",
+    "watchers": 254
+  },
+  "github_url": "https://github.com/prusa3d/PrusaSlicer",
+  "official_url": "https://www.prusa3d.com/prusaslicer/",
+  "stars": 9454,
+  "code_pushed_at": "2026-11-02T22:58:23Z",
+  "default_branch": "master",
+  "commit_sha": "ff3d6677cfccfc7fbad72acc63f01c9abec6f5d9",
+  "readme_path": "README.md",
+  "readme_blob_sha": "5810caaf7da2a126380ecec24f99cdac0c8d1d7a",
+  "readme_source_url": "https://github.com/prusa3d/PrusaSlicer/blob/ff3d6677cfccfc7fbad72acc63f01c9abec6f5d9/README.md",
+  "readme_api_url": "https://api.github.com/repos/prusa3d/PrusaSlicer/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "AGPL-3.0",
+  "license_source_url": "https://github.com/prusa3d/PrusaSlicer/blob/ff3d6677cfccfc7fbad72acc63f01c9abec6f5d9/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/prusa3d/PrusaSlicer/ff3d6677cfccfc7fbad72acc63f01c9abec6f5d9/resources/icons/PrusaSlicer_128px.png",
+  "fetched_at": "2026-11-03T01:50:42.792868+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/prusa3d/PrusaSlicer/ff3d6677cfccfc7fbad72acc63f01c9abec6f5d9/resources/icons/PrusaSlicer_128px.png"
+  ],
+  "license_basis": "仓库根许可证，第三方依赖许可另核",
+  "official_entry": {
+    "url": "https://www.prusa3d.com/prusaslicer/",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "prusa3d/PrusaSlicer",
+  "license_blob_sha": "70eec1ee036bb3d375349df21457cb1d149731d5",
+  "license_file_verified_at_commit": true
+}

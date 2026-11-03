@@ -1,0 +1,97 @@
+{
+  "inventory_index": 161,
+  "original_key": "bambulab/BambuStudio",
+  "repository": "bambulab/BambuStudio",
+  "catalog": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:23.325142+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "3D打印",
+      "切片",
+      "模型处理"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 1113,
+    "full_name": "bambulab/BambuStudio",
+    "getting_started": "安装官方版本并选择实际设备配置，用测试模型预览切片。",
+    "highlights": [
+      "提供模型处理与切片预览",
+      "围绕打印配置组织操作"
+    ],
+    "homepage_url": "https://github.com/bambulab/BambuStudio",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-13T12:44:23Z",
+    "last_pushed_at": "2026-10-13T12:44:23Z",
+    "name": "Bambu Studio",
+    "notes": [
+      "软件、云服务和硬件的条款不同，配置需与设备匹配。"
+    ],
+    "order": 162,
+    "readme_sha": "68bc1bd632af66dd00ff1b308169404711c4739f",
+    "related_categories": [
+      "hardware"
+    ],
+    "source_url": "https://github.com/bambulab/BambuStudio/blob/master/README.md",
+    "stars": 5209,
+    "summary": "用于准备三维打印任务的开源切片软件。",
+    "tags": [
+      "3D打印",
+      "切片",
+      "模型处理"
+    ],
+    "title": "把三维模型整理成一次打印任务",
+    "watchers": 78
+  },
+  "github_url": "https://github.com/bambulab/BambuStudio",
+  "official_url": "https://github.com/bambulab/BambuStudio",
+  "stars": 5212,
+  "code_pushed_at": "2026-10-13T12:44:23Z",
+  "default_branch": "master",
+  "commit_sha": "79df7ae309be398ed30c9f397c13c9911c2edc57",
+  "readme_path": "README.md",
+  "readme_blob_sha": "68bc1bd632af66dd00ff1b308169404711c4739f",
+  "readme_source_url": "https://github.com/bambulab/BambuStudio/blob/79df7ae309be398ed30c9f397c13c9911c2edc57/README.md",
+  "readme_api_url": "https://api.github.com/repos/bambulab/BambuStudio/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "AGPL-3.0",
+  "license_source_url": "https://github.com/bambulab/BambuStudio/blob/79df7ae309be398ed30c9f397c13c9911c2edc57/LICENSE",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:46.847104+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [
+    {
+      "path": "src/slic3r/GUI/DeviceWeb/device_page/README_zh.md",
+      "blob_sha": "1c6024b8a1f0c1a902313248ccf338ea7305eff7",
+      "url": "https://github.com/bambulab/BambuStudio/blob/79df7ae309be398ed30c9f397c13c9911c2edc57/src/slic3r/GUI/DeviceWeb/device_page/README_zh.md"
+    }
+  ],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://user-images.githubusercontent.com/106916061/179006347-497d24c0-9bd6-45b7-8c49-d5cc8ecfe5d7.png"
+  ],
+  "license_basis": "README 明示 AGPL-3.0 与可选非自由网络插件",
+  "official_entry": {
+    "url": "https://github.com/bambulab/BambuStudio/releases/",
+    "kind": "下载应用"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "bambulab/BambuStudio",
+  "license_blob_sha": "dba13ed2ddf783ee8118c6a581dbf75305f816a3",
+  "license_file_verified_at_commit": true
+}

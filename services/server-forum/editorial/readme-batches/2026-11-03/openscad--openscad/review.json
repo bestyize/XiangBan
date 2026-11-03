@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留所有代码块、依赖版本、构建时长和磁盘空间警告",
+    "主要入口和固定版本相对文档已核验；动态徽章及其他外链未逐一联网",
+    "保留 GPLv2 许可证及 CGAL 例外"
+  ],
+  "link_results": {
+    "https://www.openscad.org/": 200,
+    "https://github.com/openscad/openscad/tree/8e8df3ddae295e8667cbc9f6c4fbb7c88b0ec45b/scripts/nix": 200,
+    "https://github.com/openscad/openscad/blob/8e8df3ddae295e8667cbc9f6c4fbb7c88b0ec45b/doc/win-build.md": 200,
+    "https://opencollective.com/openscad/donate/button@2x.png?color=white": 200
+  },
+  "issues": []
+}

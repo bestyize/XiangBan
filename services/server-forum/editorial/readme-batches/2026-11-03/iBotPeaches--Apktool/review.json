@@ -1,0 +1,51 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，保留反盗版用途声明、3.x 和 2.x 分支及安全漏洞私下报告方式。",
+    "Apache-2.0 仓库许可证原文已保存；非核心 XDA 帖子和 CI 徽章目标链接分别 403/404，原链保留并在译注给出官方替代入口。",
+    "赞助商图片使用固定版本外链，未复制素材；未核实项目图标，使用名称占位。"
+  ],
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://raw.githubusercontent.com/iBotPeaches/Apktool/2062db67b2cdd3de12739105eee43417b52f0316/.github/assets/sponsors/emerge-tools-vertical-white.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/iBotPeaches/Apktool/2062db67b2cdd3de12739105eee43417b52f0316/.github/assets/sponsors/emerge-tools-vertical-black.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/iBotPeaches/Apktool/2062db67b2cdd3de12739105eee43417b52f0316/.github/assets/sponsors/sourcetoad-horizontal.svg",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check_batch": {
+    "method": "HTTP HEAD，排除动态徽章、Discord 邀请与 GitHub 附件",
+    "urls_checked": 20,
+    "failures": [
+      {
+        "url": "https://forum.xda-developers.com/t/util-dec-2-2020-apktool-tool-for-reverse-engineering-apk-files.1755243/",
+        "result": "HTTP Error 403: Forbidden"
+      },
+      {
+        "url": "https://github.com/iBotPeaches/Apktool/actions/workflows/test.yml",
+        "result": "HTTP Error 404: Not Found"
+      }
+    ]
+  },
+  "link_check": {
+    "urls_checked": 20,
+    "result": "18 个 HEAD 200；XDA 帖子 403，CI 工作流链接 404，译注提供可读官方文档与 Actions 页面。"
+  }
+}

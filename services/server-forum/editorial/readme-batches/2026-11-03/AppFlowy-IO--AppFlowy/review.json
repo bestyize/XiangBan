@@ -1,0 +1,12 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段核对安装平台和限制、开发、翻译、团队观点、许可及致谢；保留项目作者对 Notion 和数据安全的观点归属",
+  "code_and_numbers": "无代码块；Android 10、ARMv7 不支持、翻译命令及 100% 数据控制等上游表述已核对",
+  "links_and_images": "14 个原文图片返回 HTTP 200；原来的 GitHub 页面图片地址返回 HTML，已固定为同提交原始 GIF；inlang 动态徽章返回 HTTP 404，改为原入口文本链接；官方项目图标返回 HTTP 200",
+  "license": "AGPL-3.0，仓库许可证和版权声明保存在 LICENSE.upstream",
+  "issues": [
+    "Notion 比较、数据安全及 100% 控制为 AppFlowy 团队观点，不构成独立验证。",
+    "inlang 动态徽章已改为原入口文本链接；其他外部图片后续可用性可能变化。"
+  ],
+  "manual_review": "非官方中文译文；交付后仍需编辑复核"
+}

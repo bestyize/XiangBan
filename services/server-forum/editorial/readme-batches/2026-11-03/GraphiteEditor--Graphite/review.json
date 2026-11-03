@@ -1,0 +1,34 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，明确 Alpha 状态并将照片编辑、动态图形等保留为路线图计划。",
+    "仓库双许可中选择 MIT，其许可文本包括相关文档；MIT 和 Apache 原文均已保存。",
+    "Reddit 社区链接返回 403，原链保留并在译注提供官方 Discord。Logo 和截图使用官方外链，未复制素材；单独图片权利待后续核实。"
+  ],
+  "link_check_batch": {
+    "method": "HTTP HEAD，排除动态徽章、Discord 邀请与 GitHub 附件",
+    "urls_checked": 13,
+    "failures": [
+      {
+        "url": "https://bsky.app/profile/graphiteeditor.bsky.social",
+        "result": "HTTP Error 404: Not Found"
+      },
+      {
+        "url": "https://www.reddit.com/r/graphite/",
+        "result": "HTTP Error 403: Blocked"
+      }
+    ]
+  },
+  "link_check": {
+    "urls_checked": 13,
+    "result": "11 个 HEAD 200；Bluesky HEAD 404 但 GET 200；Reddit 返回 403，译注提供官方 Discord；4 张 Logo/截图 Range GET 206。"
+  }
+}

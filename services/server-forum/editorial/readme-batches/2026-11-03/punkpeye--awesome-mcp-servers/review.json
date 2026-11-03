@@ -1,0 +1,51 @@
+{
+  "status": "pending",
+  "full_text_coverage": "pending",
+  "code_and_numbers": "pending",
+  "links_and_images": "pending",
+  "license": "pending",
+  "issues": [
+    "尚未核对文档或图片是否适用仓库许可证。",
+    "尚未完成官方中文查找和章节对照、全文翻译及审校。",
+    "尚未校正固定版本的相对链接并核验图片。",
+    "官方简中 README-zh.md 约 99 KB、仅 42 个 Markdown 标题；英文原文约 1.63 MB、71 个标题，资源目录大量未覆盖；不得当成完整译文，需逐条对照补齐。"
+  ],
+  "automated_alignment_evidence": {
+    "english_headings": 71,
+    "chinese_headings": 42,
+    "english_fenced_blocks": 0,
+    "chinese_fenced_blocks": 0,
+    "english_fenced_blocks_without_exact_match": 0,
+    "note": "仅用于定位差异；标题数量和代码块一致不代表翻译已核对。"
+  },
+  "alignment_findings": {
+    "english_unique_github_repo_urls": 4629,
+    "chinese_unique_github_repo_urls": 436,
+    "common_github_repo_urls": 392,
+    "english_only_github_repo_urls": 4237,
+    "method": "粗略提取 GitHub owner/repo URL，忽略大小写；未核对重定向或非 GitHub 条目，供定位差异使用。"
+  },
+  "translation_alignment": {
+    "file": "translation-alignment.json",
+    "source_sha": "5103450f0773f184b4d105eb1c34ad263ca2529e",
+    "shared_candidates": 392,
+    "english_only_repos": 4237,
+    "status": "待人工确认匹配并完成全文翻译；不代表中文已覆盖",
+    "manually_translated_entries": 410,
+    "partial_file": "translation-fragments.json",
+    "caution": "样本中官方中文对 21st.dev 的误译及 8b-is/smart-tree 的额外 10 倍表现主张未沿用；译稿以固定英文原文为准。",
+    "description_index": "description-index.json",
+    "indexed_english_descriptions": 4632,
+    "progress": "partial_not_ready"
+  },
+  "parallel_translation": {
+    "source_blob_sha": "5103450f0773f184b4d105eb1c34ad263ca2529e",
+    "total_indexed": 4632,
+    "original_fragments": 410,
+    "self_range": "L00143–L01800",
+    "self_new_completed": 1000,
+    "part_a_range": "L01801–L03400",
+    "part_b_range": "L03401–L05095",
+    "note": "仅本地分片，尚未合并全文；正文其他段落与完整链接尚待核验，继续 pending。"
+  }
+}

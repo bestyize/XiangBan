@@ -1,0 +1,77 @@
+{
+  "inventory_key": "anthropics/skills",
+  "full_name": "anthropics/skills",
+  "inventory_entry": {
+    "audience": "想编写或评估 Agent Skills 的开发者。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:01:17.092721+00:00",
+    "cover_accent": "#657063",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "Agent Skills",
+      "官方示例",
+      "技能模板"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 22049,
+    "full_name": "anthropics/skills",
+    "getting_started": "从 template 和一个示例技能开始阅读，核对该技能自己的许可。",
+    "highlights": [
+      "可直接阅读 SKILL.md 与配套资源",
+      "覆盖创作、开发等任务示例"
+    ],
+    "homepage_url": "https://github.com/anthropics/skills",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-28T19:20:38Z",
+    "last_pushed_at": "2026-10-28T19:20:39Z",
+    "name": "Anthropic Skills",
+    "notes": [
+      "仓库采用混合许可：许多示例为 Apache-2.0，docx、pdf、pptx、xlsx 等文档技能仅源码可见，不能视为同一开源许可。"
+    ],
+    "order": 13,
+    "readme_sha": "eb54ee8b92f2d40b4b26569be0772be3c1e23156",
+    "related_categories": [
+      "ai",
+      "learn"
+    ],
+    "source_url": "https://github.com/anthropics/skills/blob/main/README.md",
+    "stars": 186690,
+    "summary": "Anthropic 的技能示例与模板集合，可参考任务说明、脚本和资源的组织方式。",
+    "tags": [
+      "Agent Skills",
+      "官方示例",
+      "技能模板"
+    ],
+    "title": "从官方示例理解一项 Skill 如何组织",
+    "watchers": 1134
+  },
+  "fetched_at": "2026-11-03T01:50:39.164510+00:00",
+  "status": "blocked",
+  "canonical_full_name": "anthropics/skills",
+  "repository_url": "https://github.com/anthropics/skills",
+  "default_branch": "main",
+  "stars": 186785,
+  "pushed_at": "2026-10-28T19:20:39Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": null,
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "ca45fc496a3436251f191354091d557da31c15b5",
+  "license_search": {
+    "checked": "固定提交仓库根目录、README 许可声明及完整递归树的 LICENSE/COPYING 文件",
+    "result": "根目录和 README 无许可声明；仅各 skills 子目录存在单独 LICENSE.txt，无法据此认定根 README 的许可",
+    "tree_truncated": false
+  }
+}

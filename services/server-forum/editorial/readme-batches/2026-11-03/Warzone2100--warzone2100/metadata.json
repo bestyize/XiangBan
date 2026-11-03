@@ -1,0 +1,87 @@
+{
+  "inventory_index": 165,
+  "original_key": "Warzone2100/warzone2100",
+  "repository": "Warzone2100/warzone2100",
+  "catalog": {
+    "audience": "适合希望体验游戏，或研究开放游戏实现与内容生态的人。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:18:02.301368+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "即时战略",
+      "科技树",
+      "基地建设"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或体验",
+    "featured": true,
+    "forks": 632,
+    "full_name": "Warzone2100/warzone2100",
+    "getting_started": "安装官方稳定版，从教学或单人战役认识基础系统。",
+    "highlights": [
+      "提供战役与遭遇战玩法",
+      "可按组件设计作战单位"
+    ],
+    "homepage_url": "https://wz2100.net",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T12:43:47Z",
+    "last_pushed_at": "2026-11-02T13:06:28Z",
+    "name": "Warzone 2100",
+    "notes": [
+      "社区地图、模组与其他资源的版本兼容和许可分别确认。"
+    ],
+    "order": 166,
+    "readme_sha": "f2384ae9ff738f2eb38e027f796eddd4bd3c12cb",
+    "related_categories": [],
+    "source_url": "https://github.com/Warzone2100/warzone2100/blob/master/README.md",
+    "stars": 4031,
+    "summary": "结合基地建设、科技研发与单位设计的开源三维即时战略游戏。",
+    "tags": [
+      "即时战略",
+      "科技树",
+      "基地建设"
+    ],
+    "title": "在科技树和车辆设计之间安排下一步",
+    "watchers": 122
+  },
+  "github_url": "https://github.com/Warzone2100/warzone2100",
+  "official_url": "https://wz2100.net",
+  "stars": 4032,
+  "code_pushed_at": "2026-11-02T13:06:28Z",
+  "default_branch": "master",
+  "commit_sha": "253e370c2af78228a822df6afa82b6261dc94656",
+  "readme_path": "README.md",
+  "readme_blob_sha": "f2384ae9ff738f2eb38e027f796eddd4bd3c12cb",
+  "readme_source_url": "https://github.com/Warzone2100/warzone2100/blob/253e370c2af78228a822df6afa82b6261dc94656/README.md",
+  "readme_api_url": "https://api.github.com/repos/Warzone2100/warzone2100/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-2.0",
+  "license_source_url": "https://github.com/Warzone2100/warzone2100/blob/master/COPYING",
+  "icon_source_url": "https://raw.githubusercontent.com/Warzone2100/warzone2100/253e370c2af78228a822df6afa82b6261dc94656/icons/warzone2100.large.png",
+  "fetched_at": "2026-11-03T01:50:48.676680+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "Warzone2100/warzone2100",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/Warzone2100/warzone2100/253e370c2af78228a822df6afa82b6261dc94656/icons/warzone2100.large.png"
+  ],
+  "license_basis": "README 指明 GPL-2.0-or-later，COPYING.NONGPL 记录其他许可",
+  "official_entry": {
+    "url": "https://wz2100.net/",
+    "kind": "项目官网"
+  }
+}

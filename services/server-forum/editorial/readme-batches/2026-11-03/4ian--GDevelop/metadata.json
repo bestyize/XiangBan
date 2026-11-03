@@ -1,0 +1,83 @@
+{
+  "inventory_index": 104,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "想尝试制作游戏的创作者。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:01:40.895267+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "游戏制作",
+      "可视化",
+      "事件系统"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/gdevelop-screen.png",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 1641,
+    "full_name": "4ian/GDevelop",
+    "getting_started": "打开官方编辑器，用一个基础模板练习事件与场景。",
+    "highlights": [
+      "可通过事件系统组织游戏逻辑",
+      "支持多平台导出"
+    ],
+    "homepage_url": "https://gdevelop.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T14:23:56Z",
+    "last_pushed_at": "2026-11-02T16:34:23Z",
+    "name": "GDevelop",
+    "notes": [
+      "开源编辑器与商业云服务、资源包的条款分别确认。"
+    ],
+    "order": 105,
+    "readme_sha": "9a5e4101e3cce856a35bf67b87d63490145a05c5",
+    "related_categories": [
+      "design",
+      "learn"
+    ],
+    "source_url": "https://github.com/4ian/GDevelop/blob/master/README.md",
+    "stars": 28351,
+    "summary": "使用事件系统创作二维、三维与网页游戏的开源游戏开发工具。",
+    "tags": [
+      "游戏制作",
+      "可视化",
+      "事件系统"
+    ],
+    "title": "不用从代码开始，也能做出小游戏",
+    "watchers": 413
+  },
+  "repository": "4ian/GDevelop",
+  "fetched_at": "2026-11-03T01:51:05.888572+00:00",
+  "canonical_repository": "4ian/GDevelop",
+  "default_branch": "master",
+  "commit_sha": "4d867e222bc7c462ca310425c95080b28b403a8d",
+  "readme_path": "README.md",
+  "readme_blob_sha": "9a5e4101e3cce856a35bf67b87d63490145a05c5",
+  "readme_url": "https://github.com/4ian/GDevelop/blob/4d867e222bc7c462ca310425c95080b28b403a8d/README.md",
+  "stars": 28365,
+  "pushed_at": "2026-11-02T23:49:09Z",
+  "stars_fetched_at": "2026-11-03T01:51:08.294241+00:00",
+  "license_spdx": "NOASSERTION",
+  "homepage_url": "https://gdevelop.io",
+  "icon_source_url": "",
+  "license_path": "LICENSE.md",
+  "license_blob_sha": "f57bac1faad6f8e52d2423a34b4fc7876ffff1d3",
+  "license_url": "https://github.com/4ian/GDevelop/blob/4d867e222bc7c462ca310425c95080b28b403a8d/LICENSE.md",
+  "root_license_candidates": [
+    "LICENSE.md"
+  ],
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/4ian/GDevelop",
+  "license_scope_caveat": "上游 LICENSE.md 与 README 仅对 Core、GDJS、newIDE、Extensions 等列明代码目录授权 MIT，并声明 GDevelop 名称和 Logo 专属权利；未找到根 README 文档复制和翻译授权依据，待确认。"
+}

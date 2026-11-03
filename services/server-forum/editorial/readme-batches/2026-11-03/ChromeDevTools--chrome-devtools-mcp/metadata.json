@@ -1,0 +1,90 @@
+{
+  "inventory_index": 70,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合为智能体编写、连接或评估技能与工具的开发者。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:17:01.298682+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "浏览器",
+      "MCP",
+      "网页调试"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 5249,
+    "full_name": "ChromeDevTools/chrome-devtools-mcp",
+    "getting_started": "在测试浏览器和本地测试页面中配置客户端，先进行只读观察。",
+    "highlights": [
+      "连接浏览器开发工具",
+      "支持围绕页面状态开展调试"
+    ],
+    "homepage_url": "https://developer.chrome.com/docs/devtools/agents",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T13:28:05Z",
+    "last_pushed_at": "2026-11-02T13:32:53Z",
+    "name": "Chrome DevTools MCP",
+    "notes": [
+      "浏览器会话可能包含账号和页面数据，按任务限定接入范围。"
+    ],
+    "order": 71,
+    "readme_sha": "970f869de1a33bfb798e36d3a46976e94c025ae1",
+    "related_categories": [
+      "dev",
+      "ai"
+    ],
+    "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/main/README.md",
+    "stars": 54661,
+    "summary": "把 Chrome DevTools 的调试与页面观察能力接入支持 MCP 的智能体。",
+    "tags": [
+      "浏览器",
+      "MCP",
+      "网页调试"
+    ],
+    "title": "给智能体一个观察网页的开发工具",
+    "watchers": 242
+  },
+  "repository": "ChromeDevTools/chrome-devtools-mcp",
+  "fetched_at": "2026-11-03T01:50:42.003417+00:00",
+  "canonical_repository": "ChromeDevTools/chrome-devtools-mcp",
+  "default_branch": "main",
+  "commit_sha": "aade3be8f65d8afc941c97b498b9752ef562f181",
+  "readme_path": "README.md",
+  "readme_blob_sha": "970f869de1a33bfb798e36d3a46976e94c025ae1",
+  "readme_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/aade3be8f65d8afc941c97b498b9752ef562f181/README.md",
+  "stars": 54680,
+  "pushed_at": "2026-11-02T13:32:53Z",
+  "stars_fetched_at": "2026-11-03T01:50:44.284260+00:00",
+  "license_spdx": "Apache-2.0",
+  "homepage_url": "https://developer.chrome.com/docs/devtools/agents",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "7a4a3ea2424c09fbe48d455aed1eaa94d9124835",
+  "license_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp/blob/aade3be8f65d8afc941c97b498b9752ef562f181/LICENSE",
+  "source_language": "English",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+  "translation_attribution": "非官方中文全文译文；代码与自然语言提示词示例原样保留",
+  "relative_link_resolution": "引用式文档链接和技能目录指向固定提交",
+  "description_zh": "让编码助手通过 Chrome DevTools 检查和自动化浏览器的工具。",
+  "official_entry": {
+    "url": "https://developer.chrome.com/docs/devtools/agents",
+    "kind": "查看文档",
+    "verification": "GitHub 仓库官方 homepage，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标"
+}

@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留 Linux Flathub 分发说明与 C++20 要求",
+    "核验官网、固定版本 Logo、构建和贡献文档及依赖目录；其余链接未逐一联网",
+    "保留仓库许可证"
+  ],
+  "link_results": {
+    "https://www.prusa3d.com/prusaslicer/": 200,
+    "https://raw.githubusercontent.com/prusa3d/PrusaSlicer/ff3d6677cfccfc7fbad72acc63f01c9abec6f5d9/resources/icons/PrusaSlicer_128px.png": 200,
+    "https://github.com/prusa3d/PrusaSlicer/blob/ff3d6677cfccfc7fbad72acc63f01c9abec6f5d9/doc/Build.md": 200,
+    "https://github.com/prusa3d/PrusaSlicer/blob/ff3d6677cfccfc7fbad72acc63f01c9abec6f5d9/.github/CONTRIBUTING.md": 200,
+    "https://github.com/prusa3d/PrusaSlicer/tree/ff3d6677cfccfc7fbad72acc63f01c9abec6f5d9/deps/": 200,
+    "https://github.com/prusa3d/PrusaSlicer/tree/ff3d6677cfccfc7fbad72acc63f01c9abec6f5d9/bundled_deps/": 200
+  },
+  "issues": []
+}

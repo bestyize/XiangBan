@@ -1,0 +1,92 @@
+{
+  "inventory_index": 120,
+  "original_key": "rizinorg/cutter",
+  "repository": "rizinorg/cutter",
+  "catalog": {
+    "audience": "适合在自有或获授权环境中学习软件、协议与安全分析的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:17:53.184753+00:00",
+    "cover_accent": "#5E769A",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "二进制分析",
+      "图形界面",
+      "逆向"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 1533,
+    "full_name": "rizinorg/cutter",
+    "getting_started": "使用自编译的测试程序，先观察反汇编和函数关系。",
+    "highlights": [
+      "把逆向分析能力放进图形界面",
+      "可从视图中理解程序结构"
+    ],
+    "homepage_url": "https://cutter.re",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T08:42:27Z",
+    "last_pushed_at": "2026-11-02T08:42:27Z",
+    "name": "Cutter",
+    "notes": [
+      "仅处理获授权的软件，分析结果需要结合其他证据核对。"
+    ],
+    "order": 121,
+    "readme_sha": "cd52b08af84d6dc96bf17c6d65e090b523830934",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/rizinorg/cutter/blob/dev/README.md",
+    "stars": 20132,
+    "summary": "基于 Rizin 的开源逆向分析平台，提供可视化分析与调试相关功能。",
+    "tags": [
+      "二进制分析",
+      "图形界面",
+      "逆向"
+    ],
+    "title": "用图形界面探索二进制分析流程",
+    "watchers": 302
+  },
+  "github_url": "https://github.com/rizinorg/cutter",
+  "official_url": "https://cutter.re",
+  "stars": 20138,
+  "code_pushed_at": "2026-11-02T08:42:27Z",
+  "default_branch": "dev",
+  "commit_sha": "1fbee2e0d688eb12110e4301c993aa5a04a6a29e",
+  "readme_path": "README.md",
+  "readme_blob_sha": "cd52b08af84d6dc96bf17c6d65e090b523830934",
+  "readme_source_url": "https://github.com/rizinorg/cutter/blob/1fbee2e0d688eb12110e4301c993aa5a04a6a29e/README.md",
+  "readme_api_url": "https://api.github.com/repos/rizinorg/cutter/contents/README.md?ref=dev",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/rizinorg/cutter/blob/1fbee2e0d688eb12110e4301c993aa5a04a6a29e/COPYING",
+  "icon_source_url": "https://raw.githubusercontent.com/rizinorg/cutter/1fbee2e0d688eb12110e4301c993aa5a04a6a29e/src/img/cutter.svg?sanitize=true",
+  "fetched_at": "2026-11-03T01:50:33.148479+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/rizinorg/cutter/1fbee2e0d688eb12110e4301c993aa5a04a6a29e/src/img/cutter.svg?sanitize=true",
+    "https://raw.githubusercontent.com/rizinorg/cutter/1fbee2e0d688eb12110e4301c993aa5a04a6a29e/docs/source/images/screenshot.png"
+  ],
+  "license_basis": "仓库 GPL-3.0 许可证",
+  "official_entry": {
+    "url": "https://cutter.re",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "rizinorg/cutter",
+  "license_blob_sha": "10926e87f113fb026c366866d6fa466061562870",
+  "license_file_verified_at_commit": true
+}

@@ -1,0 +1,99 @@
+{
+  "inventory_key": "astral-sh/uv",
+  "full_name": "astral-sh/uv",
+  "inventory_entry": {
+    "audience": "维护 Python 项目或需要隔离运行工具的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:01:30.146985+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "Python",
+      "包管理",
+      "开发环境"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 3744,
+    "full_name": "astral-sh/uv",
+    "getting_started": "阅读官方入门，在一个测试项目里建立环境和依赖锁文件。",
+    "highlights": [
+      "集中项目与依赖管理",
+      "支持工具运行和 Python 版本相关工作流"
+    ],
+    "homepage_url": "https://docs.astral.sh/uv",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T15:09:40Z",
+    "last_pushed_at": "2026-11-02T16:31:10Z",
+    "name": "uv",
+    "notes": [
+      "与现有包索引和项目配置的兼容性以官方文档为准。"
+    ],
+    "order": 41,
+    "readme_sha": "66caaf9ccc62add8c63de8e71184c9b7677377ad",
+    "related_categories": [],
+    "source_url": "https://github.com/astral-sh/uv/blob/main/README.md",
+    "stars": 91468,
+    "summary": "用 Rust 编写的 Python 包与项目管理工具，覆盖环境、依赖和工具运行。",
+    "tags": [
+      "Python",
+      "包管理",
+      "开发环境"
+    ],
+    "title": "让 Python 环境和依赖管理更集中",
+    "watchers": 195
+  },
+  "fetched_at": "2026-11-03T01:50:50.080824+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "astral-sh/uv",
+  "repository_url": "https://github.com/astral-sh/uv",
+  "default_branch": "main",
+  "stars": 91481,
+  "pushed_at": "2026-11-03T01:46:18Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "Apache-2.0",
+  "homepage": "https://docs.astral.sh/uv",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/astral-sh/uv/3db723cf104c685b9f2f31a26834b7d417db652f/docs/assets/logo-letter.svg",
+  "commit_sha": "3db723cf104c685b9f2f31a26834b7d417db652f",
+  "license": {
+    "path": "LICENSE-APACHE",
+    "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+    "source_url": "https://github.com/astral-sh/uv/blob/3db723cf104c685b9f2f31a26834b7d417db652f/LICENSE-APACHE",
+    "spdx": "NOASSERTION",
+    "human_read_label": "Apache-2.0",
+    "additional": {
+      "path": "LICENSE-MIT",
+      "source_url": "https://raw.githubusercontent.com/astral-sh/uv/3db723cf104c685b9f2f31a26834b7d417db652f/LICENSE-MIT",
+      "basis": "README 明确可选择 MIT 或 Apache-2.0"
+    }
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "66caaf9ccc62add8c63de8e71184c9b7677377ad",
+    "source_url": "https://github.com/astral-sh/uv/blob/3db723cf104c685b9f2f31a26834b7d417db652f/README.md",
+    "size_bytes": 9859
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "3db723cf104c685b9f2f31a26834b7d417db652f",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://docs.astral.sh/uv/",
+    "kind": "查看文档"
+  },
+  "plain_summary": "管理 Python 版本、项目依赖与命令行工具。",
+  "license_summary": "Apache-2.0 或 MIT，用户可任选其一"
+}

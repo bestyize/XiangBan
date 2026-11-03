@@ -1,0 +1,115 @@
+{
+  "inventory_index": 121,
+  "original_key": "espressif/esp-idf",
+  "repository": "espressif/esp-idf",
+  "catalog": {
+    "audience": "开发 ESP 系列设备的嵌入式开发者。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:01:35.030651+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "ESP32",
+      "物联网",
+      "嵌入式"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要硬件或开发环境",
+    "featured": true,
+    "forks": 8580,
+    "full_name": "espressif/esp-idf",
+    "getting_started": "按对应芯片的入门文档配置环境，先运行官方基础示例。",
+    "highlights": [
+      "覆盖多种乐鑫芯片",
+      "工具、组件与官方文档配套"
+    ],
+    "homepage_url": "https://github.com/espressif/esp-idf",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T05:33:51Z",
+    "last_pushed_at": "2026-11-02T11:44:41Z",
+    "name": "ESP-IDF",
+    "notes": [
+      "不同芯片与框架分支的支持周期不同，按官方版本政策选择。"
+    ],
+    "order": 122,
+    "readme_sha": "119668516b36594119d7b68c0c0fef2a5700ef0c",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/espressif/esp-idf/blob/master/README.md",
+    "stars": 19405,
+    "summary": "乐鑫芯片的官方物联网开发框架，提供构建工具、组件与示例。",
+    "tags": [
+      "ESP32",
+      "物联网",
+      "嵌入式"
+    ],
+    "title": "从官方框架开始开发 ESP 设备",
+    "watchers": 509
+  },
+  "github_url": "https://github.com/espressif/esp-idf",
+  "official_url": "https://github.com/espressif/esp-idf",
+  "stars": 19409,
+  "code_pushed_at": "2026-11-02T22:12:48Z",
+  "default_branch": "master",
+  "commit_sha": "0e6b480f858c69862ffb6001d96e9eef74599a6e",
+  "readme_path": "README.md",
+  "readme_blob_sha": "119668516b36594119d7b68c0c0fef2a5700ef0c",
+  "readme_source_url": "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/README.md",
+  "readme_api_url": "https://api.github.com/repos/espressif/esp-idf/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "Apache-2.0",
+  "license_source_url": "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/LICENSE",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:33.328807+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [
+    {
+      "path": "README_CN.md",
+      "blob_sha": "ee99ab381f167cfdce02318e6eeb848bf955206f",
+      "url": "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/README_CN.md"
+    },
+    {
+      "path": "docs/README_CN.md",
+      "blob_sha": "c68a5ab37a60ec3a17727cca479ef1df0bcedc73",
+      "url": "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/docs/README_CN.md"
+    },
+    {
+      "path": "components/wear_levelling/README_CN.rst",
+      "blob_sha": "e1129fba6cfad57c423703f8d3468c6a28fcfc85",
+      "url": "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/components/wear_levelling/README_CN.rst"
+    },
+    {
+      "path": "tools/mass_mfg/docs/README_CN.rst",
+      "blob_sha": "8c1de23e5bec11d9754199405a8fa62c2a7798b3",
+      "url": "https://github.com/espressif/esp-idf/blob/0e6b480f858c69862ffb6001d96e9eef74599a6e/tools/mass_mfg/docs/README_CN.rst"
+    }
+  ],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "基于官方中文补译和修订",
+  "official_chinese_path": "README_CN.md",
+  "official_chinese_blob_sha": "ee99ab381f167cfdce02318e6eeb848bf955206f",
+  "image_sources": [
+    "https://dl.espressif.com/dl/esp-idf/support-periods.svg?v=1",
+    "https://dl.espressif.com/dl/esp-idf/chip-support.svg?v=1"
+  ],
+  "license_basis": "仓库 Apache-2.0 许可证",
+  "official_entry": {
+    "url": "https://idf.espressif.com/",
+    "kind": "查看文档"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "espressif/esp-idf",
+  "license_blob_sha": "d645695673349e3947e8e5ae42332d0ac3164cd7",
+  "license_file_verified_at_commit": true
+}

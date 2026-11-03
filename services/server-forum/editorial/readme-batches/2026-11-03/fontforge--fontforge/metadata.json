@@ -1,0 +1,102 @@
+{
+  "inventory_index": 153,
+  "original_key": "fontforge/fontforge",
+  "repository": "fontforge/fontforge",
+  "catalog": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:22.506655+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "字体设计",
+      "字形",
+      "排版"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 817,
+    "full_name": "fontforge/fontforge",
+    "getting_started": "用一个新建测试字体练习字形轮廓，再检查导出结果。",
+    "highlights": [
+      "提供字形轮廓编辑",
+      "支持多种字体格式的制作与转换"
+    ],
+    "homepage_url": "https://github.com/fontforge/fontforge",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T16:43:35Z",
+    "last_pushed_at": "2026-11-02T16:43:35Z",
+    "name": "FontForge",
+    "notes": [
+      "编辑现有字体前需确认原字体允许修改与再分发。"
+    ],
+    "order": 154,
+    "readme_sha": "dfef1575fed88416ede61f599a4900afa9087e86",
+    "related_categories": [],
+    "source_url": "https://github.com/fontforge/fontforge/blob/master/README.md",
+    "stars": 8057,
+    "summary": "用于创建、编辑与转换字体的自由软件。",
+    "tags": [
+      "字体设计",
+      "字形",
+      "排版"
+    ],
+    "title": "给文字设计属于自己的形状",
+    "watchers": 151
+  },
+  "github_url": "https://github.com/fontforge/fontforge",
+  "official_url": "https://github.com/fontforge/fontforge",
+  "stars": 8057,
+  "code_pushed_at": "2026-11-02T16:43:35Z",
+  "default_branch": "master",
+  "commit_sha": "b523b447a14b2d97d992a5d55c7ba61e3abe0774",
+  "readme_path": "README.md",
+  "readme_blob_sha": "dfef1575fed88416ede61f599a4900afa9087e86",
+  "readme_source_url": "https://github.com/fontforge/fontforge/blob/b523b447a14b2d97d992a5d55c7ba61e3abe0774/README.md",
+  "readme_api_url": "https://api.github.com/repos/fontforge/fontforge/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0-or-later",
+  "license_source_url": "https://github.com/fontforge/fontforge/blob/b523b447a14b2d97d992a5d55c7ba61e3abe0774/LICENSE",
+  "icon_source_url": "https://fontforge.github.io/assets/img/logo-transparent.png",
+  "fetched_at": "2026-11-03T01:50:44.368825+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "COPYING.gplv3",
+      "url": "https://github.com/fontforge/fontforge/blob/b523b447a14b2d97d992a5d55c7ba61e3abe0774/COPYING.gplv3",
+      "sha": "94a9ed024d3859793618152ea559a168bbcbb5e2"
+    },
+    {
+      "name": "LICENSE",
+      "url": "https://github.com/fontforge/fontforge/blob/b523b447a14b2d97d992a5d55c7ba61e3abe0774/LICENSE",
+      "sha": "2d8a006ba7ed0e9ec1e05e3076214fe38b296e05"
+    }
+  ],
+  "needs_license_review": false,
+  "license_basis": "仓库 LICENSE 为整体 GPL-3.0-or-later，部分单独许可；已同时保存 GPL 正文",
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://fontforge.github.io/assets/img/logo-transparent.png"
+  ],
+  "official_entry": {
+    "url": "https://fontforge.org",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "fontforge/fontforge",
+  "license_blob_sha": "2d8a006ba7ed0e9ec1e05e3076214fe38b296e05",
+  "license_file_verified_at_commit": true
+}

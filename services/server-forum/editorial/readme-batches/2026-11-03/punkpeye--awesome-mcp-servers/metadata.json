@@ -1,0 +1,102 @@
+{
+  "inventory_key": "punkpeye/awesome-mcp-servers",
+  "full_name": "punkpeye/awesome-mcp-servers",
+  "inventory_entry": {
+    "audience": "希望为智能体寻找数据源和工具的人。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:01:19.136083+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "MCP",
+      "工具目录",
+      "连接器"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 19032,
+    "full_name": "punkpeye/awesome-mcp-servers",
+    "getting_started": "按目录选择一项服务，跳转其官方仓库检查维护和权限要求。",
+    "highlights": [
+      "按用途收集服务端",
+      "链接到独立项目便于进一步比较"
+    ],
+    "homepage_url": "https://glama.ai/mcp/servers",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T04:38:05Z",
+    "last_pushed_at": "2026-11-02T04:38:05Z",
+    "name": "Awesome MCP Servers",
+    "notes": [
+      "目录的活跃度不代表每个收录服务都持续维护；使用前逐项检查。"
+    ],
+    "order": 30,
+    "readme_sha": "5103450f0773f184b4d105eb1c34ad263ca2529e",
+    "related_categories": [
+      "ai"
+    ],
+    "source_url": "https://github.com/punkpeye/awesome-mcp-servers/blob/main/README.md",
+    "stars": 97198,
+    "summary": "按领域整理 MCP 服务端与相关资源的目录，适合作为发现入口。",
+    "tags": [
+      "MCP",
+      "工具目录",
+      "连接器"
+    ],
+    "title": "按需求寻找模型能连接的工具",
+    "watchers": 48
+  },
+  "fetched_at": "2026-11-03T01:50:45.150584+00:00",
+  "status": "pending",
+  "canonical_full_name": "punkpeye/awesome-mcp-servers",
+  "repository_url": "https://github.com/punkpeye/awesome-mcp-servers",
+  "default_branch": "main",
+  "stars": 97212,
+  "pushed_at": "2026-11-02T04:38:05Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://glama.ai/mcp/servers",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "29f2d490cc02468e7c9d87b0cf68d40d3041e7ef",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "7f5a6e30ea24860b1528cfb7a54cf777650fd46a",
+    "source_url": "https://github.com/punkpeye/awesome-mcp-servers/blob/29f2d490cc02468e7c9d87b0cf68d40d3041e7ef/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "5103450f0773f184b4d105eb1c34ad263ca2529e",
+    "source_url": "https://github.com/punkpeye/awesome-mcp-servers/blob/29f2d490cc02468e7c9d87b0cf68d40d3041e7ef/README.md",
+    "raw_url": "https://raw.githubusercontent.com/punkpeye/awesome-mcp-servers/29f2d490cc02468e7c9d87b0cf68d40d3041e7ef/README.md",
+    "size_bytes": 1626662,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "README-zh.md",
+      "blob_sha": "edca839783db57899399dd1dffb27af557ee4d09"
+    },
+    {
+      "path": "README-zh_TW.md",
+      "blob_sha": "48a30f4e7e53fe95c3ca201257c06fb61be5d7f7"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "README-zh.md",
+    "blob_sha": "edca839783db57899399dd1dffb27af557ee4d09",
+    "source_url": "https://github.com/punkpeye/awesome-mcp-servers/blob/29f2d490cc02468e7c9d87b0cf68d40d3041e7ef/README-zh.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  }
+}

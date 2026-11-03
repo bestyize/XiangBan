@@ -1,0 +1,108 @@
+{
+  "inventory_key": "strapi/strapi",
+  "full_name": "strapi/strapi",
+  "inventory_entry": {
+    "audience": "适合希望搭建自己的网站、应用或服务的个人与团队。",
+    "category": "web",
+    "collected_at": "2026-11-02T18:18:06.687016+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "CMS",
+      "内容管理",
+      "API"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要开发或部署环境",
+    "featured": true,
+    "forks": 10050,
+    "full_name": "strapi/strapi",
+    "getting_started": "先创建测试内容类型，再用一个简单页面读取接口。",
+    "highlights": [
+      "可为内容定义数据结构",
+      "通过接口连接不同前端"
+    ],
+    "homepage_url": "https://strapi.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:19:04Z",
+    "last_pushed_at": "2026-11-02T17:45:47Z",
+    "name": "Strapi",
+    "notes": [
+      "社区核心与企业功能可能采用不同许可，托管服务也有独立条款。"
+    ],
+    "order": 51,
+    "readme_sha": "421efc02367efeb7ca69fd5dc7afece91cbe9433",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/strapi/strapi/blob/develop/README.md",
+    "stars": 73424,
+    "summary": "以 API 为中心的开源无头内容管理系统。",
+    "tags": [
+      "CMS",
+      "内容管理",
+      "API"
+    ],
+    "title": "给网站内容建立可维护的后台",
+    "watchers": 647
+  },
+  "fetched_at": "2026-11-03T01:50:52.817556+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "strapi/strapi",
+  "repository_url": "https://github.com/strapi/strapi",
+  "default_branch": "develop",
+  "stars": 73424,
+  "pushed_at": "2026-11-02T22:10:10Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "NOASSERTION",
+  "homepage": "https://strapi.io",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/strapi/strapi/73032435344ce40b4d756745dd5cbbbe24039911/packages/core/admin/admin/src/assets/images/logo-strapi-2022.svg",
+  "commit_sha": "73032435344ce40b4d756745dd5cbbbe24039911",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "f63cf15b91b4878a1d3afe0f7c59d28fc7564ebe",
+    "source_url": "https://github.com/strapi/strapi/blob/73032435344ce40b4d756745dd5cbbbe24039911/LICENSE",
+    "spdx": "NOASSERTION",
+    "human_read_label": "MIT (excluding enterprise paths)"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "421efc02367efeb7ca69fd5dc7afece91cbe9433",
+    "source_url": "https://github.com/strapi/strapi/blob/73032435344ce40b4d756745dd5cbbbe24039911/README.md",
+    "size_bytes": 8886
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "73032435344ce40b4d756745dd5cbbbe24039911",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://strapi.io",
+    "kind": "项目官网"
+  },
+  "plain_summary": "用可视化界面管理内容并为应用提供内容 API。",
+  "license_summary": "MIT 为基础许可；企业版 ee 目录及其他明确列明部分适用单独条款，详见根 LICENSE",
+  "image_sources": [
+    {
+      "url": "https://docs.strapi.io/img/assets/backend-customization/diagram-routes.png",
+      "source": "Strapi 官方文档",
+      "note": "保留上游外链，未下载。"
+    },
+    {
+      "url": "https://raw.githubusercontent.com/strapi/strapi/73032435344ce40b4d756745dd5cbbbe24039911/packages/core/admin/admin/src/assets/images/logo-strapi-2022.svg",
+      "source": "Strapi 仓库固定提交的官方标志",
+      "note": "README 中 strapi.io 的深浅色标志均返回 HTTP 403，替换为仓库中的官方标志；原始 URL 保留在 README.source.md。"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "商店徽章、截图和第三方图像可能另有权利，仅保留上游链接，发布前按用途核实；动态徽章和非关键外链未逐一联网核验。"
+  ],
+  "full_text_coverage": "固定提交 README 含下载选项、格式支持、原作者第一人称说明及署名均已完整翻译。",
+  "code_and_numbers": "无围栏代码；平台、版本号、文件名和格式均保留。",
+  "links_and_images": "相对文档与图片已解析至固定提交；官网、官方图标本次 HTTP 200；其他外链和动态徽章未逐一联网校验。",
+  "license": "仓库 GPL-2.0；README 另外注明应用图标由 Dimi Kazak / Flaticon 提供，CC BY 3.0，署名和链接已保留；截图保留上游原图链接。"
+}

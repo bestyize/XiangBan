@@ -1,0 +1,13 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐句对照固定提交原文，保留全部链接和图",
+    "图像地址升级为 HTTPS，保留相同官方资源；全部正文链接与图片已确认 HTTP 200",
+    "仓库根许可证为 GPL-3.0；保留许可证全文"
+  ],
+  "issues": []
+}

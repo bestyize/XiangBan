@@ -1,0 +1,101 @@
+{
+  "inventory_index": 129,
+  "original_key": "microsoft/IoT-For-Beginners",
+  "repository": "microsoft/IoT-For-Beginners",
+  "catalog": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:18:15.960249+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "物联网",
+      "硬件课程",
+      "传感器"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 2936,
+    "full_name": "microsoft/IoT-For-Beginners",
+    "getting_started": "先核对课程所需器材，也可从可用的模拟环境开始。",
+    "highlights": [
+      "以设备场景组织学习",
+      "连接硬件与应用层知识"
+    ],
+    "homepage_url": "https://github.com/microsoft/IoT-For-Beginners",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-05-26T21:50:02Z",
+    "last_pushed_at": "2026-05-26T21:50:02Z",
+    "name": "物联网入门",
+    "notes": [
+      "器材、云服务和所在地区的无线使用要求需分别确认。"
+    ],
+    "order": 130,
+    "readme_sha": "0484d02f8d568af52be10671afbc681190b1a466",
+    "related_categories": [
+      "hardware"
+    ],
+    "source_url": "https://github.com/microsoft/IoT-For-Beginners/blob/main/README.md",
+    "stars": 17167,
+    "summary": "将硬件、网络与云端相关知识结合起来的入门课程。",
+    "tags": [
+      "物联网",
+      "硬件课程",
+      "传感器"
+    ],
+    "title": "从传感器与设备连接理解物联网",
+    "watchers": 331
+  },
+  "github_url": "https://github.com/microsoft/IoT-For-Beginners",
+  "official_url": "https://github.com/microsoft/IoT-For-Beginners",
+  "stars": 17167,
+  "code_pushed_at": "2026-05-26T21:50:02Z",
+  "default_branch": "main",
+  "commit_sha": "6ae558ee2b0aaade53f08b0f76505d5ea9736c43",
+  "readme_path": "README.md",
+  "readme_blob_sha": "0484d02f8d568af52be10671afbc681190b1a466",
+  "readme_source_url": "https://github.com/microsoft/IoT-For-Beginners/blob/6ae558ee2b0aaade53f08b0f76505d5ea9736c43/README.md",
+  "readme_api_url": "https://api.github.com/repos/microsoft/IoT-For-Beginners/contents/README.md?ref=main",
+  "readme_language": "unverified",
+  "license_spdx": "MIT",
+  "license_source_url": "https://github.com/microsoft/IoT-For-Beginners/blob/main/LICENSE",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:35.798704+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [
+    {
+      "path": "translations/zh-CN/README.md",
+      "blob_sha": "a8b231ab1b65189fb2cd2c5047c7d3d7571d708e",
+      "url": "https://github.com/microsoft/IoT-For-Beginners/blob/6ae558ee2b0aaade53f08b0f76505d5ea9736c43/translations/zh-CN/README.md"
+    }
+  ],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "microsoft/IoT-For-Beginners",
+  "official_chinese_path": "translations/zh-CN/README.md",
+  "official_chinese_blob_sha": "a8b231ab1b65189fb2cd2c5047c7d3d7571d708e",
+  "translation_origin": "基于官方中文补校",
+  "official_entry": {
+    "url": "https://github.com/microsoft/IoT-For-Beginners",
+    "kind": "查看文档"
+  },
+  "official_chinese_url": "https://github.com/microsoft/IoT-For-Beginners/blob/6ae558ee2b0aaade53f08b0f76505d5ea9736c43/translations/zh-CN/README.md",
+  "image_sources": [
+    "https://raw.githubusercontent.com/microsoft/IoT-For-Beginners/6ae558ee2b0aaade53f08b0f76505d5ea9736c43/translated_images/zh-CN/Roadmap.bb1dec285dda0eda.webp",
+    "https://raw.githubusercontent.com/microsoft/IoT-For-Beginners/6ae558ee2b0aaade53f08b0f76505d5ea9736c43/sketchnotes/Roadmap.jpg",
+    "https://raw.githubusercontent.com/microsoft/IoT-For-Beginners/6ae558ee2b0aaade53f08b0f76505d5ea9736c43/images/IOT.gif",
+    "https://img.youtube.com/vi/bccEMm8gRuc/0.jpg"
+  ],
+  "license_basis": "仓库 MIT 许可证"
+}

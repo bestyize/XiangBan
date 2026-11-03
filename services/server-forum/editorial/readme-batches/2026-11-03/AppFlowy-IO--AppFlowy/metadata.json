@@ -1,0 +1,98 @@
+{
+  "inventory_key": "AppFlowy-IO/AppFlowy",
+  "full_name": "AppFlowy-IO/AppFlowy",
+  "inventory_entry": {
+    "audience": "适合希望把个人笔记和项目资料放在一起管理的人，也适合研究协作工作空间的开发者。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:01:19.178271+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "项目 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "笔记",
+      "知识管理",
+      "协作"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/appflowy.png",
+    "cover_variant": "offset",
+    "effort": "安装应用后使用",
+    "featured": true,
+    "forks": 6160,
+    "full_name": "AppFlowy-IO/AppFlowy",
+    "getting_started": "从官网选择对应平台的版本，先用少量非敏感资料了解编辑和组织方式。",
+    "highlights": [
+      "将笔记与项目放在一个工作空间",
+      "源码公开，可进一步了解数据与部署方式",
+      "项目持续探索 AI 与知识工作结合的方式"
+    ],
+    "homepage_url": "https://appflowy.io",
+    "icon_fit": "contain",
+    "icon_source_url": "https://appflowy.com/_next/static/media/appflowy.929cfa16.ico",
+    "icon_url": "/open-source-media/appflowy-icon.png",
+    "last_commit_at": "2026-10-28T06:07:24Z",
+    "last_pushed_at": "2026-10-28T06:07:27Z",
+    "name": "AppFlowy",
+    "notes": [
+      "本地、云端、协作及 AI 功能的可用范围以官方当前说明为准。",
+      "自部署需要额外服务配置；不等于安装桌面应用。"
+    ],
+    "order": 49,
+    "readme_sha": "4072edec24f1e38f47c48ec774eca09ce06af354",
+    "related_categories": [
+      "ai"
+    ],
+    "source_url": "https://github.com/AppFlowy-IO/AppFlowy#readme",
+    "stars": 78110,
+    "summary": "把文档、知识与项目组织在一起的开源工作空间。",
+    "tags": [
+      "笔记",
+      "知识管理",
+      "协作"
+    ],
+    "title": "给笔记、项目和知识找一个共同的家",
+    "watchers": 400
+  },
+  "fetched_at": "2026-11-03T01:50:51.911626+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "AppFlowy-IO/AppFlowy",
+  "repository_url": "https://github.com/AppFlowy-IO/AppFlowy",
+  "default_branch": "main",
+  "stars": 78126,
+  "pushed_at": "2026-11-02T23:40:52Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "AGPL-3.0",
+  "homepage": "https://appflowy.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://appflowy.com/_next/static/media/appflowy.929cfa16.ico",
+  "commit_sha": "8fcee27d9bd93aad4ee0191d5d8d915d6a9a4e93",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "0ad25db4bd1d86c452db3f9602ccdbe172438f52",
+    "source_url": "https://github.com/AppFlowy-IO/AppFlowy/blob/8fcee27d9bd93aad4ee0191d5d8d915d6a9a4e93/LICENSE",
+    "spdx": "AGPL-3.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "4072edec24f1e38f47c48ec774eca09ce06af354",
+    "source_url": "https://github.com/AppFlowy-IO/AppFlowy/blob/8fcee27d9bd93aad4ee0191d5d8d915d6a9a4e93/README.md",
+    "raw_url": "https://raw.githubusercontent.com/AppFlowy-IO/AppFlowy/8fcee27d9bd93aad4ee0191d5d8d915d6a9a4e93/README.md",
+    "size_bytes": 8805,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "8fcee27d9bd93aad4ee0191d5d8d915d6a9a4e93",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://www.appflowy.com",
+    "kind": "项目官网"
+  },
+  "plain_summary": "用于文档、项目和团队协作的工作空间。"
+}

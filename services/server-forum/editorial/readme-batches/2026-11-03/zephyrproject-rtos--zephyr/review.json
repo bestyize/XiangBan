@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照完整 RST，转为 Markdown 并保留所有资源链接",
+    "官网、文档及两个固定版本 Logo 已核验；动态徽章和其他外链未逐一联网",
+    "保留仓库 Apache-2.0 许可证"
+  ],
+  "link_results": {
+    "https://www.zephyrproject.org": 200,
+    "https://docs.zephyrproject.org": 200,
+    "https://raw.githubusercontent.com/zephyrproject-rtos/zephyr/d1b8eec76bfd14058854245d09aa1e413e355c4a/doc/_static/images/logo-readme-dark.svg": 200,
+    "https://raw.githubusercontent.com/zephyrproject-rtos/zephyr/d1b8eec76bfd14058854245d09aa1e413e355c4a/doc/_static/images/logo-readme-light.svg": 200
+  },
+  "issues": []
+}

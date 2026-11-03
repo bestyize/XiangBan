@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留 Git LFS 克隆警告",
+    "官网、配图及许可说明页面已核验；其他外链未逐一联网",
+    "根 COPYING 与 README 对 GPL 版本说明不一致，已保存两种许可文本",
+    "对照官网许可说明：源代码默认 GPLv2 或更高，整体分发为 GPLv3 或更高，与 README 的整体说明相容"
+  ],
+  "link_results": {
+    "https://www.blender.org": 200,
+    "https://code.blender.org/wp-content/uploads/2018/12/springrg.jpg": 200,
+    "https://www.blender.org/about/license": 200,
+    "https://raw.githubusercontent.com/spdx/license-list-data/main/text/GPL-3.0-only.txt": 200
+  },
+  "issues": []
+}

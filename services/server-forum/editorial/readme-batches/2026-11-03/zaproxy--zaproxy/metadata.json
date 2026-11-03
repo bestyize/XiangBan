@@ -1,0 +1,95 @@
+{
+  "inventory_index": 135,
+  "original_key": "zaproxy/zaproxy",
+  "repository": "zaproxy/zaproxy",
+  "catalog": {
+    "audience": "适合在自有或获授权环境中学习软件、协议与安全分析的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:17:58.177791+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "Web安全",
+      "测试代理",
+      "应用审查"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 2690,
+    "full_name": "zaproxy/zaproxy",
+    "getting_started": "从官方测试示例或自己的演示站点开始，先了解代理与范围配置。",
+    "highlights": [
+      "支持围绕网页请求开展测试",
+      "可扩展测试与自动化相关流程"
+    ],
+    "homepage_url": "https://www.zaproxy.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T09:17:14Z",
+    "last_pushed_at": "2026-11-02T16:13:53Z",
+    "name": "ZAP",
+    "notes": [
+      "测试范围必须获得明确授权，避免对外部系统产生未经许可的请求。"
+    ],
+    "order": 136,
+    "readme_sha": "e5efcf16bf926466a0dbb8e29f146884df227f05",
+    "related_categories": [
+      "dev",
+      "web"
+    ],
+    "source_url": "https://github.com/zaproxy/zaproxy/blob/main/README.md",
+    "stars": 16094,
+    "summary": "用于网页应用安全测试的开源代理与工具平台。",
+    "tags": [
+      "Web安全",
+      "测试代理",
+      "应用审查"
+    ],
+    "title": "为自己的网页应用建立安全测试流程",
+    "watchers": 391
+  },
+  "github_url": "https://github.com/zaproxy/zaproxy",
+  "official_url": "https://www.zaproxy.org",
+  "stars": 16096,
+  "code_pushed_at": "2026-11-02T16:13:53Z",
+  "default_branch": "main",
+  "commit_sha": "528bdf4c8c808342cb1f12314a2492c8d3e0b551",
+  "readme_path": "README.md",
+  "readme_blob_sha": "e5efcf16bf926466a0dbb8e29f146884df227f05",
+  "readme_source_url": "https://github.com/zaproxy/zaproxy/blob/528bdf4c8c808342cb1f12314a2492c8d3e0b551/README.md",
+  "readme_api_url": "https://api.github.com/repos/zaproxy/zaproxy/contents/README.md?ref=main",
+  "readme_language": "en",
+  "license_spdx": "Apache-2.0",
+  "license_source_url": "https://github.com/zaproxy/zaproxy/blob/528bdf4c8c808342cb1f12314a2492c8d3e0b551/LICENSE",
+  "icon_source_url": "https://raw.githubusercontent.com/wiki/zaproxy/zaproxy/images/zap-by-checkmarx.png",
+  "fetched_at": "2026-11-03T01:50:38.666176+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/wiki/zaproxy/zaproxy/images/zap-by-checkmarx.png",
+    "https://raw.githubusercontent.com/wiki/zaproxy/zaproxy/images/ZAP-Download.png",
+    "https://raw.githubusercontent.com/wiki/zaproxy/zaproxy/images/zap-website.png"
+  ],
+  "license_basis": "仓库 Apache-2.0 许可",
+  "official_chinese_search": "固定提交树未发现中文 README",
+  "official_entry": {
+    "url": "https://www.zaproxy.org/",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "zaproxy/zaproxy",
+  "license_blob_sha": "8dada3edaf50dbc082c9a125058f25def75e625a",
+  "license_file_verified_at_commit": true
+}

@@ -1,0 +1,46 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "保留 JDK 17 限制、Android SDK 配置、未签名 APK 路径及全部构建命令。",
+    "仓库 GPL-3.0 许可原文已保存。",
+    "19 个非动态、非 GitHub 附件链接 HEAD 200；官方图片保留上游外链，未复制素材。"
+  ],
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://play.google.com/intl/en_us/badges/images/generic/en-play-badge.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/Anuken/Mindustry/b873c01ed559a8803c2dad5c5c79d7ad750d5b95/core/assets-raw/sprites/ui/logo.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://flathub.org/assets/badges/flathub-badge-en.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://raw.githubusercontent.com/Anuken/Mindustry/master/core/assets-raw/sprites/ui/logo.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://fdroid.gitlab.io/artwork/badge/get-it-on.png",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check_batch": {
+    "method": "HTTP HEAD，排除动态徽章、Discord 邀请与 GitHub 附件",
+    "urls_checked": 19,
+    "failures": []
+  }
+}

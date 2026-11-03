@@ -1,0 +1,106 @@
+{
+  "inventory_key": "modelcontextprotocol/servers",
+  "full_name": "modelcontextprotocol/servers",
+  "inventory_entry": {
+    "audience": "适合希望理解 MCP 工作方式、开发服务或配置客户端的人。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:01:17.050527+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "工具",
+      "MCP",
+      "智能体"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "flow",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要配置兼容客户端",
+    "featured": true,
+    "forks": 11907,
+    "full_name": "modelcontextprotocol/servers",
+    "getting_started": "从仓库当前维护的参考服务开始，先看清依赖、启动方式和访问权限。",
+    "highlights": [
+      "提供可以阅读的协议参考服务实现",
+      "帮助理解工具与数据的连接方式",
+      "适合结合协议文档研究实际代码"
+    ],
+    "homepage_url": "https://modelcontextprotocol.io",
+    "icon_fit": "contain",
+    "icon_source_url": "https://modelcontextprotocol.io/mintlify-assets/_mintlify/favicons/mcp/ebiVJzri-bsiCfVZ/_generated/favicon/apple-touch-icon.png",
+    "icon_url": "/open-source-media/mcp-icon.png",
+    "last_commit_at": "2026-10-28T20:43:56Z",
+    "last_pushed_at": "2026-10-29T05:27:40Z",
+    "name": "MCP Servers",
+    "notes": [
+      "参考实现不等于面向生产的完整服务目录。",
+      "客户端兼容性与服务权限需要分别配置。"
+    ],
+    "order": 39,
+    "readme_sha": "224364cb6b1ea7af9e52e39d432d8d7d6dabdcdb",
+    "related_categories": [
+      "ai",
+      "dev"
+    ],
+    "source_url": "https://github.com/modelcontextprotocol/servers#readme",
+    "stars": 91745,
+    "summary": "MCP 参考服务实现仓库，用于理解协议如何连接工具与数据。",
+    "tags": [
+      "MCP",
+      "参考实现",
+      "连接器"
+    ],
+    "title": "看看 AI 是怎样连接外部工具的",
+    "watchers": 630
+  },
+  "fetched_at": "2026-11-03T01:50:48.646955+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "modelcontextprotocol/servers",
+  "repository_url": "https://github.com/modelcontextprotocol/servers",
+  "default_branch": "main",
+  "stars": 91749,
+  "pushed_at": "2026-10-29T05:27:40Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "NOASSERTION",
+  "homepage": "https://modelcontextprotocol.io",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://modelcontextprotocol.io/mintlify-assets/_mintlify/favicons/mcp/ebiVJzri-bsiCfVZ/_generated/favicon/apple-touch-icon.png",
+  "commit_sha": "194cc86e3ae6400958555bd4116849d822d69263",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "4a93985763241755401a10678395303de4e720ba",
+    "source_url": "https://github.com/modelcontextprotocol/servers/blob/194cc86e3ae6400958555bd4116849d822d69263/LICENSE",
+    "spdx": "NOASSERTION",
+    "human_read_label": "CC-BY-4.0 (documentation)"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "224364cb6b1ea7af9e52e39d432d8d7d6dabdcdb",
+    "source_url": "https://github.com/modelcontextprotocol/servers/blob/194cc86e3ae6400958555bd4116849d822d69263/README.md",
+    "size_bytes": 10562
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "194cc86e3ae6400958555bd4116849d822d69263",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://modelcontextprotocol.io",
+    "kind": "查看文档"
+  },
+  "plain_summary": "展示如何为 AI 连接工具和数据源的 MCP 参考服务器。",
+  "license_summary": "文档（规范除外）CC BY 4.0；代码正在由 MIT 向 Apache-2.0 过渡，详见根 LICENSE",
+  "attribution": {
+    "source": "https://github.com/modelcontextprotocol/servers/blob/194cc86e3ae6400958555bd4116849d822d69263/README.md",
+    "copyright": "Model Context Protocol a Series of LF Projects, LLC and contributors",
+    "modifications": "非官方中文译文，保留原文并将相对链接固定到采集提交",
+    "license": "CC-BY-4.0",
+    "license_path": "LICENSE.CC-BY-4.0"
+  }
+}

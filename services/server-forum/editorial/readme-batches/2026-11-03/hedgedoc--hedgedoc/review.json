@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留 1.x 与 2 开发状态、Alpha 及 Logo 许可例外",
+    "文首注明译文、作者、来源与 CC BY-SA 4.0 并保存许可文本",
+    "官网、Logo、作者和贡献文档已验证；动态徽章及其他外链未逐一联网"
+  ],
+  "link_results": {
+    "https://hedgedoc.org": 200,
+    "https://raw.githubusercontent.com/hedgedoc/hedgedoc/f2ff89befccc2686b2bdf266af604b7de5a0c619/docs/content/images/hedgedoc_logo_white.svg": 200,
+    "https://raw.githubusercontent.com/hedgedoc/hedgedoc/f2ff89befccc2686b2bdf266af604b7de5a0c619/docs/content/images/hedgedoc_logo_black.svg": 200,
+    "https://github.com/hedgedoc/hedgedoc/blob/f2ff89befccc2686b2bdf266af604b7de5a0c619/AUTHORS": 200,
+    "https://github.com/hedgedoc/hedgedoc/blob/f2ff89befccc2686b2bdf266af604b7de5a0c619/CONTRIBUTING.md": 200,
+    "https://creativecommons.org/licenses/by-sa/4.0/legalcode.txt": 200
+  },
+  "issues": []
+}

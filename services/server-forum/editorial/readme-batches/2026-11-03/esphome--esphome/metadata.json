@@ -1,0 +1,98 @@
+{
+  "inventory_index": 145,
+  "original_key": "esphome/esphome",
+  "repository": "esphome/esphome",
+  "catalog": {
+    "audience": "适合愿意阅读硬件文档、准备实验环境并验证设备的爱好者与开发者。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:17:47.636471+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "智能家居",
+      "配置式开发",
+      "ESP"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要兼容硬件或仿真环境",
+    "featured": true,
+    "forks": 5781,
+    "full_name": "esphome/esphome",
+    "getting_started": "选择官方支持的开发板，先配置一个简单传感器或示例。",
+    "highlights": [
+      "以配置表达传感器和设备能力",
+      "可结合家庭自动化系统使用"
+    ],
+    "homepage_url": "https://esphome.io/",
+    "icon_fit": "contain",
+    "icon_source_url": "https://media.esphome.io/logo/logo-text-on-light.svg",
+    "icon_url": "/open-source-media/esphome-icon.svg",
+    "last_commit_at": "2026-11-02T18:01:17Z",
+    "last_pushed_at": "2026-11-02T18:01:20Z",
+    "name": "ESPHome",
+    "notes": [
+      "设备、供电、网络和固件版本需要匹配。"
+    ],
+    "order": 146,
+    "readme_sha": "16497ee0be21c8eddbfd6941f78e35bc07a147a2",
+    "related_categories": [],
+    "source_url": "https://github.com/esphome/esphome/blob/dev/README.md",
+    "stars": 12005,
+    "summary": "为兼容微控制器提供配置、构建与设备控制工作流的开源项目。",
+    "tags": [
+      "智能家居",
+      "配置式开发",
+      "ESP"
+    ],
+    "title": "通过配置文件组合自己的联网设备",
+    "watchers": 162
+  },
+  "github_url": "https://github.com/esphome/esphome",
+  "official_url": "https://esphome.io/",
+  "stars": 12006,
+  "code_pushed_at": "2026-11-03T01:38:47Z",
+  "default_branch": "dev",
+  "commit_sha": "ed4db4b20e611f56170b648fadfab75e81a3a85e",
+  "readme_path": "README.md",
+  "readme_blob_sha": "16497ee0be21c8eddbfd6941f78e35bc07a147a2",
+  "readme_source_url": "https://github.com/esphome/esphome/blob/ed4db4b20e611f56170b648fadfab75e81a3a85e/README.md",
+  "readme_api_url": "https://api.github.com/repos/esphome/esphome/contents/README.md?ref=dev",
+  "readme_language": "en",
+  "license_spdx": "MIT AND GPL-3.0",
+  "license_source_url": "https://github.com/esphome/esphome/blob/ed4db4b20e611f56170b648fadfab75e81a3a85e/LICENSE",
+  "icon_source_url": "https://media.esphome.io/logo/logo-text-on-light.svg",
+  "fetched_at": "2026-11-03T01:50:41.676670+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "LICENSE",
+      "url": "https://github.com/esphome/esphome/blob/ed4db4b20e611f56170b648fadfab75e81a3a85e/LICENSE",
+      "sha": "215460a32c17c1b9a83c877c828e3ee7db512295"
+    }
+  ],
+  "needs_license_review": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "esphome/esphome",
+  "license_basis": "仓库 LICENSE 指明 C++/运行时代码 GPLv3，Python 及其余部分 MIT；README 适用 MIT",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://media.esphome.io/logo/logo-text-on-dark.svg",
+    "https://media.esphome.io/logo/logo-text-on-light.svg",
+    "https://www.openhomefoundation.org/badges/esphome.png"
+  ],
+  "documentation_license": "MIT",
+  "official_entry": {
+    "url": "https://esphome.io",
+    "kind": "查看文档"
+  },
+  "license_blob_sha": "215460a32c17c1b9a83c877c828e3ee7db512295",
+  "license_file_verified_at_commit": true
+}

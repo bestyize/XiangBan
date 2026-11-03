@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐项对照全部技能、规则数量、部署方式和发现索引；代码及提示词示例原样保留，并在译注标明。",
+    "上游 README 明确声明 MIT，但仓库无独立许可证或版权人声明；已保存精确上游声明及 SPDX 标准 MIT 模板，模板占位符不冒充项目版权。",
+    "3 个非动态入口 HEAD 200；未核实项目图标，卡片使用名称占位。"
+  ],
+  "link_check": {
+    "urls_checked": 3,
+    "http_200": 3,
+    "note": "技能目录、Agent Skills 规范和 GitHub 仓库均可访问；动态徽章不计。"
+  }
+}

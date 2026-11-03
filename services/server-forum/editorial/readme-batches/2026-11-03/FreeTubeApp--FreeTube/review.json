@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留 Beta 警告、VPN/Tor 建议、IP 请求可见、平台限制、非官方构建说明和捐赠地址",
+    "验证官网、固定版本 Logo、贡献指南与三张截图；动态徽章及其他外链未逐一联网",
+    "隐私功能表述归于项目方，保留 AGPL 许可"
+  ],
+  "link_results": {
+    "https://freetubeapp.io/": 200,
+    "https://raw.githubusercontent.com/FreeTubeApp/FreeTube/a0dd9bd6c19715f06bd5ae6fe3c1087addf30b31/_icons/logoColor.svg": 200,
+    "https://github.com/FreeTubeApp/FreeTube/blob/a0dd9bd6c19715f06bd5ae6fe3c1087addf30b31/CONTRIBUTING.md": 200,
+    "https://raw.githubusercontent.com/FreeTubeApp/FreeTubeApp.io/master/src/images/FreeTube1.png": 200,
+    "https://raw.githubusercontent.com/FreeTubeApp/FreeTubeApp.io/master/src/images/FreeTube2.png": 200,
+    "https://raw.githubusercontent.com/FreeTubeApp/FreeTubeApp.io/master/src/images/FreeTube3.png": 200
+  },
+  "issues": []
+}

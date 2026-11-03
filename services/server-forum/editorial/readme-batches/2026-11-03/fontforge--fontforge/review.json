@@ -1,0 +1,21 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留平台和字体格式",
+    "主要入口、图与固定版本文档已验证；其他外链和动态徽章未逐一联网",
+    "中文图及官网链接由 HTTP 升级为 HTTPS，原链接留在原文",
+    "保存 GPL 许可与项目 LICENSE"
+  ],
+  "link_results": {
+    "https://fontforge.org": 200,
+    "https://fontforge.github.io/assets/img/logo-transparent.png": 200,
+    "https://github.com/fontforge/fontforge/blob/b523b447a14b2d97d992a5d55c7ba61e3abe0774/INSTALL.md": 200,
+    "https://github.com/fontforge/fontforge/blob/b523b447a14b2d97d992a5d55c7ba61e3abe0774/.github/workflows/scripts/setup_linux_deps.sh": 200,
+    "https://github.com/fontforge/fontforge/blob/b523b447a14b2d97d992a5d55c7ba61e3abe0774/CONTRIBUTING.md": 200
+  },
+  "issues": []
+}

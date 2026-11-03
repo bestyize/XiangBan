@@ -1,0 +1,16 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "固定提交全文译写，完整保留目录、示例、shell 集成和警告；所有目录锚点补齐。",
+  "code_and_numbers": "55 个围栏代码块的非注释命令逐字一致；57 种自然语言代码注释已译，全部反引号技术内容和版本号保留。",
+  "links_and_images": "仓库相对文件及目录链接按固定提交解析；官网、项目图、Vim 文档及 Nushell 补全示例本次 HTTP 200；非关键外链未逐一联网验证。",
+  "license": "上游 MIT 原文已保存；品牌图来自作者独立素材仓库，沿用上游原始链接，未推断同一许可。",
+  "issues": [
+    "`FZF_EXPANSION_OPS` 等名称按上游固定版本原样保留，未推断是否为笔误。",
+    "性能为上游表述，未单独基准测试；第三方图片和商标的权利未单独确认。"
+  ],
+  "translation_progress": {
+    "status": "complete_for_review",
+    "source_lines": "1–1160",
+    "note": "完整译文、目录、锚点及命令检查完成；待独立编辑复核。"
+  }
+}

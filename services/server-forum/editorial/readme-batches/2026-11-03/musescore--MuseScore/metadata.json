@@ -1,0 +1,97 @@
+{
+  "inventory_index": 137,
+  "original_key": "musescore/MuseScore",
+  "repository": "musescore/MuseScore",
+  "catalog": {
+    "audience": "适合需要播放、处理或组织自有音视频内容的人。",
+    "category": "media",
+    "collected_at": "2026-11-02T18:17:28.821525+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "制谱",
+      "音乐创作",
+      "乐谱"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 3383,
+    "full_name": "musescore/MuseScore",
+    "getting_started": "从官方安装稳定版，创建一小段乐谱并检查排版与播放。",
+    "highlights": [
+      "以乐谱编辑组织音乐内容",
+      "可通过播放辅助检查作品"
+    ],
+    "homepage_url": "https://musescore.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T15:13:59Z",
+    "last_pushed_at": "2026-11-02T15:13:59Z",
+    "name": "MuseScore Studio",
+    "notes": [
+      "软件、在线乐谱服务和外部音色的条款分别确认。"
+    ],
+    "order": 138,
+    "readme_sha": "a0724e74f4fa3f8c89ee70ef6f93d37de9fe01d2",
+    "related_categories": [
+      "design"
+    ],
+    "source_url": "https://github.com/musescore/MuseScore/blob/main/README.md",
+    "stars": 15348,
+    "summary": "用于乐谱创作、排版与播放的开源桌面软件。",
+    "tags": [
+      "制谱",
+      "音乐创作",
+      "乐谱"
+    ],
+    "title": "把旋律写成可以编辑和播放的乐谱",
+    "watchers": 232
+  },
+  "github_url": "https://github.com/musescore/MuseScore",
+  "official_url": "https://musescore.org",
+  "stars": 15347,
+  "code_pushed_at": "2026-11-02T15:13:59Z",
+  "default_branch": "main",
+  "commit_sha": "f4194eb421cbdc51f6758ba91a96d3495e9c61aa",
+  "readme_path": "README.md",
+  "readme_blob_sha": "a0724e74f4fa3f8c89ee70ef6f93d37de9fe01d2",
+  "readme_source_url": "https://github.com/musescore/MuseScore/blob/f4194eb421cbdc51f6758ba91a96d3495e9c61aa/README.md",
+  "readme_api_url": "https://api.github.com/repos/musescore/MuseScore/contents/README.md?ref=main",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/musescore/MuseScore/blob/f4194eb421cbdc51f6758ba91a96d3495e9c61aa/LICENSE.txt",
+  "icon_source_url": "https://raw.githubusercontent.com/musescore/MuseScore/f4194eb421cbdc51f6758ba91a96d3495e9c61aa/share/icons/musescore_logo_full.png",
+  "fetched_at": "2026-11-03T01:50:38.905482+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "LICENSE.txt",
+      "url": "https://github.com/musescore/MuseScore/blob/f4194eb421cbdc51f6758ba91a96d3495e9c61aa/LICENSE.txt",
+      "sha": "6d802f72be583b9df9102f85815f5c1e6cac2222"
+    }
+  ],
+  "needs_license_review": false,
+  "license_basis": "README 明确 GPL 3.0",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/musescore/MuseScore/f4194eb421cbdc51f6758ba91a96d3495e9c61aa/share/icons/musescore_logo_full.png"
+  ],
+  "official_entry": {
+    "url": "https://musescore.org",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "musescore/MuseScore",
+  "license_blob_sha": "6d802f72be583b9df9102f85815f5c1e6cac2222",
+  "license_file_verified_at_commit": true
+}

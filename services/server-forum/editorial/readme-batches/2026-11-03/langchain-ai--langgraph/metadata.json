@@ -1,0 +1,89 @@
+{
+  "inventory_index": 84,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "需要管理长流程与人工确认节点的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:02:39.302581+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "智能体",
+      "工作流",
+      "状态管理"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 7622,
+    "full_name": "langchain-ai/langgraph",
+    "getting_started": "从官方教程构建一个小型状态图，理解节点、边和状态。",
+    "highlights": [
+      "流程与状态可显式建模",
+      "支持持久化和人工介入"
+    ],
+    "homepage_url": "https://docs.langchain.com/oss/python/langgraph/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T04:33:29Z",
+    "last_pushed_at": "2026-11-02T17:07:21Z",
+    "name": "LangGraph",
+    "notes": [
+      "框架与托管平台分别确认部署条件及费用。"
+    ],
+    "order": 85,
+    "readme_sha": "97c31e9cb4d8fe56be8d768ce3eb5e22400e897e",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/langchain-ai/langgraph/blob/main/README.md",
+    "stars": 44335,
+    "summary": "使用图结构组织有状态智能体流程，支持持久化和人工参与。",
+    "tags": [
+      "智能体",
+      "工作流",
+      "状态管理"
+    ],
+    "title": "让多步骤智能体的执行过程更清楚",
+    "watchers": 188
+  },
+  "repository": "langchain-ai/langgraph",
+  "fetched_at": "2026-11-03T01:50:51.164396+00:00",
+  "canonical_repository": "langchain-ai/langgraph",
+  "default_branch": "main",
+  "commit_sha": "3c916d750575b22c464790e9774494d810ccd322",
+  "readme_path": "README.md",
+  "readme_blob_sha": "97c31e9cb4d8fe56be8d768ce3eb5e22400e897e",
+  "readme_url": "https://github.com/langchain-ai/langgraph/blob/3c916d750575b22c464790e9774494d810ccd322/README.md",
+  "stars": 44348,
+  "pushed_at": "2026-11-03T01:03:28Z",
+  "stars_fetched_at": "2026-11-03T01:50:53.872120+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://docs.langchain.com/oss/python/langgraph/",
+  "icon_source_url": "https://raw.githubusercontent.com/langchain-ai/langgraph/3c916d750575b22c464790e9774494d810ccd322/.github/images/logo-dark.svg",
+  "license_path": "LICENSE",
+  "license_blob_sha": "fc0602feecdd6748623c852ab534e1ca612673c7",
+  "license_url": "https://github.com/langchain-ai/langgraph/blob/3c916d750575b22c464790e9774494d810ccd322/LICENSE",
+  "source_language": "English",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/langchain-ai/langgraph",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "项目 logo 指向固定提交 raw",
+  "description_zh": "构建和管理长时间运行的 AI 智能体工作流的开发框架。",
+  "official_entry": {
+    "url": "https://docs.langchain.com/oss/python/langgraph/overview",
+    "kind": "查看文档",
+    "verification": "上游 README 文档入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "image_license": "项目 README 中标注 LangGraph Logo 的固定提交官方图像，仅以外链引用；单独图片权利待后续核实。"
+}

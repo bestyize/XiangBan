@@ -1,0 +1,22 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留 root 捕获安全警告、敏感数据提示、设备限制、命令与两个原文示例块",
+    "官网、下载、开发文档和错误跟踪入口已核验",
+    "保留 GPLv2 许可及第三方工具例外",
+    "上游问题入口失败，保留原链接并注明 404；未猜测替代入口"
+  ],
+  "link_results": {
+    "https://www.wireshark.org": 200,
+    "https://www.wireshark.org/download": 200,
+    "https://www.wireshark.org/docs/wsdg_html_chunked/": 200,
+    "https://gitlab.com/wireshark/wireshark/-/issues": 404
+  },
+  "issues": [
+    "上游 README 所列 GitLab issue 入口本次返回 HTTP 404；项目 GitLab 首页可访问，替代官方报告入口尚未确认，译文已标明"
+  ]
+}

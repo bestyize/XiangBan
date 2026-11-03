@@ -1,0 +1,88 @@
+{
+  "inventory_index": 151,
+  "original_key": "LibreSprite/LibreSprite",
+  "repository": "LibreSprite/LibreSprite",
+  "catalog": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:17.032687+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "像素画",
+      "精灵动画",
+      "游戏素材"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 612,
+    "full_name": "LibreSprite/LibreSprite",
+    "getting_started": "创建一张小尺寸画布，画几帧简单动作后检查导出。",
+    "highlights": [
+      "围绕像素图形编辑设计",
+      "可制作和导出精灵动画"
+    ],
+    "homepage_url": "https://libresprite.github.io/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-30T21:59:47Z",
+    "last_pushed_at": "2026-10-30T21:59:47Z",
+    "name": "LibreSprite",
+    "notes": [
+      "素材的发布和商用权限由创作者自行确认。"
+    ],
+    "order": 152,
+    "readme_sha": "6bd10c76f627fe6de052807eeddf4ac94699b4ec",
+    "related_categories": [
+      "fun"
+    ],
+    "source_url": "https://github.com/LibreSprite/LibreSprite/blob/master/README.md",
+    "stars": 8712,
+    "summary": "面向像素画与精灵动画的开源桌面编辑器。",
+    "tags": [
+      "像素画",
+      "精灵动画",
+      "游戏素材"
+    ],
+    "title": "给像素角色画出连续的动作",
+    "watchers": 83
+  },
+  "github_url": "https://github.com/LibreSprite/LibreSprite",
+  "official_url": "https://libresprite.github.io/",
+  "stars": 8715,
+  "code_pushed_at": "2026-10-30T21:59:47Z",
+  "default_branch": "master",
+  "commit_sha": "98f74431f5f523c747d278e3486625ccc7fc52cc",
+  "readme_path": "README.md",
+  "readme_blob_sha": "6bd10c76f627fe6de052807eeddf4ac94699b4ec",
+  "readme_source_url": "https://github.com/LibreSprite/LibreSprite/blob/98f74431f5f523c747d278e3486625ccc7fc52cc/README.md",
+  "readme_api_url": "https://api.github.com/repos/LibreSprite/LibreSprite/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-2.0",
+  "license_source_url": "https://github.com/LibreSprite/LibreSprite/blob/98f74431f5f523c747d278e3486625ccc7fc52cc/LICENSE.txt",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:43.534521+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "translation_origin": "非官方中文译文",
+  "license_basis": "README 指明 GNU GPL 2；仓库 LICENSE.txt 已保存",
+  "official_entry": {
+    "url": "https://libresprite.github.io/",
+    "kind": "项目官网"
+  },
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "LibreSprite/LibreSprite",
+  "license_blob_sha": "d159169d1050894d3ea3b98e1c965c4058208fe1",
+  "license_file_verified_at_commit": true
+}

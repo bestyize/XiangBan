@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文逐节对照，保留云服务与 CE 八项差异、付费/高级功能限制、独立资金及自托管支持边界；合规、性能和竞品商业模式明确为上游说法。",
+    "CE 的 AGPL 许可及跟踪器 MIT 许可分别保存，保留原文商标声明；反馈看板 403，原链保留并在译注提供 GitHub Issues。",
+    "项目截图与 Logo 保留官方外链，未复制；名称和 Logo 为上游商标，卡片使用名称占位。"
+  ],
+  "link_check": {
+    "urls_checked": 36,
+    "result": "35 个非社交、非徽章链接 HEAD 200；反馈看板 403，译注给出 GitHub Issues。"
+  }
+}

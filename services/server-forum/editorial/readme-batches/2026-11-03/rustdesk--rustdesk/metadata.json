@@ -1,0 +1,113 @@
+{
+  "inventory_key": "rustdesk/rustdesk",
+  "full_name": "rustdesk/rustdesk",
+  "inventory_entry": {
+    "audience": "需要维护自有设备或评估远程协作方案的人。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:01:30.186044+00:00",
+    "cover_accent": "#8A6C9B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "远程桌面",
+      "跨平台",
+      "自部署"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 20249,
+    "full_name": "rustdesk/rustdesk",
+    "getting_started": "先在自己的两台设备测试，再阅读自建服务指南。",
+    "highlights": [
+      "提供多平台远程桌面客户端",
+      "支持研究和搭建自己的连接服务"
+    ],
+    "homepage_url": "https://rustdesk.com",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/rustdesk/rustdesk/master/res/logo-header.svg",
+    "icon_url": "/open-source-media/rustdesk-icon.svg",
+    "last_commit_at": "2026-11-02T15:48:27Z",
+    "last_pushed_at": "2026-11-02T15:48:28Z",
+    "name": "RustDesk",
+    "notes": [
+      "客户端、服务端与商业功能的许可和部署要求分别核对。"
+    ],
+    "order": 21,
+    "readme_sha": "38433e0afced9361a77254f6b5499c86066dae03",
+    "related_categories": [
+      "office"
+    ],
+    "source_url": "https://github.com/rustdesk/rustdesk/blob/master/README.md",
+    "stars": 127918,
+    "summary": "提供跨平台远程桌面客户端及自建连接服务相关能力的项目。",
+    "tags": [
+      "远程桌面",
+      "跨平台",
+      "自部署"
+    ],
+    "title": "了解可自建服务的远程桌面方案",
+    "watchers": 637
+  },
+  "fetched_at": "2026-11-03T01:50:41.677929+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "rustdesk/rustdesk",
+  "repository_url": "https://github.com/rustdesk/rustdesk",
+  "default_branch": "master",
+  "stars": 127945,
+  "pushed_at": "2026-11-03T00:26:09Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "AGPL-3.0",
+  "homepage": "https://rustdesk.com",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/rustdesk/rustdesk/beeeef14f0a61bd622aacf042b4396bdeaed9b61/res/logo-header.svg",
+  "commit_sha": "beeeef14f0a61bd622aacf042b4396bdeaed9b61",
+  "license": {
+    "path": "LICENCE",
+    "blob_sha": "0ad25db4bd1d86c452db3f9602ccdbe172438f52",
+    "source_url": "https://github.com/rustdesk/rustdesk/blob/beeeef14f0a61bd622aacf042b4396bdeaed9b61/LICENCE",
+    "spdx": "AGPL-3.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "38433e0afced9361a77254f6b5499c86066dae03",
+    "source_url": "https://github.com/rustdesk/rustdesk/blob/beeeef14f0a61bd622aacf042b4396bdeaed9b61/README.md",
+    "raw_url": "https://raw.githubusercontent.com/rustdesk/rustdesk/beeeef14f0a61bd622aacf042b4396bdeaed9b61/README.md",
+    "size_bytes": 9976,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "docs/README-ZH.md",
+      "blob_sha": "dc73d85a5272d4bdf9c2976ee0002bc74a8a9d85"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "docs/README-ZH.md",
+    "blob_sha": "dc73d85a5272d4bdf9c2976ee0002bc74a8a9d85",
+    "source_url": "https://github.com/rustdesk/rustdesk/blob/beeeef14f0a61bd622aacf042b4396bdeaed9b61/docs/README-ZH.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "source_language": "en",
+  "translation_source": "基于官方中文补译",
+  "translation_basis_commit": "beeeef14f0a61bd622aacf042b4396bdeaed9b61",
+  "translation_changes": [
+    "复用官方中文的滥用免责声明和部分章节表述",
+    "按固定提交英文重新核对并补译全部构建命令、Docker 步骤与说明；旧中文包含额外或过时构建步骤",
+    "将安全性表述明确归属于项目作者",
+    "官方中文有 16 个代码块，固定英文有 11 个；旧文的 Docker 镜像、代理示例与已过时构建步骤未并入阅读稿，原始官方中文仍保留供追溯。",
+    "正文链接根据选用的固定英文 README 根目录解析；中文官方原文仅复用部分文字，未沿用其相对链接。"
+  ],
+  "official_entry": {
+    "url": "https://rustdesk.com",
+    "kind": "项目官网"
+  },
+  "plain_summary": "远程连接和控制电脑，并可自行搭建中继服务。"
+}

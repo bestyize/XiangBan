@@ -1,0 +1,102 @@
+{
+  "inventory_key": "jesseduffield/lazygit",
+  "full_name": "jesseduffield/lazygit",
+  "inventory_entry": {
+    "audience": "适合希望改善日常开发与命令行工作流的开发者。",
+    "category": "dev",
+    "collected_at": "2026-11-02T18:17:35.051815+00:00",
+    "cover_accent": "#5E769A",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "Git",
+      "终端界面",
+      "版本管理"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要安装或开发环境",
+    "featured": true,
+    "forks": 3269,
+    "full_name": "jesseduffield/lazygit",
+    "getting_started": "在测试仓库里查看变更与历史，再练习暂存和提交。",
+    "highlights": [
+      "把变更、提交与分支状态集中显示",
+      "减少日常命令查找"
+    ],
+    "homepage_url": "https://github.com/jesseduffield/lazygit",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-31T14:12:18Z",
+    "last_pushed_at": "2026-10-31T14:20:09Z",
+    "name": "Lazygit",
+    "notes": [
+      "重写历史和删除分支等操作仍需理解 Git 的实际行为。"
+    ],
+    "order": 44,
+    "readme_sha": "e40b06b6cab4a038e739ba182d8ac17592ed366f",
+    "related_categories": [],
+    "source_url": "https://github.com/jesseduffield/lazygit/blob/master/README.md",
+    "stars": 83611,
+    "summary": "围绕 Git 日常操作提供交互式终端界面的开源工具。",
+    "tags": [
+      "Git",
+      "终端界面",
+      "版本管理"
+    ],
+    "title": "在终端界面里看清 Git 的当前状态",
+    "watchers": 335
+  },
+  "fetched_at": "2026-11-03T01:50:50.360258+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "jesseduffield/lazygit",
+  "repository_url": "https://github.com/jesseduffield/lazygit",
+  "default_branch": "master",
+  "stars": 83615,
+  "pushed_at": "2026-10-31T14:20:09Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://user-images.githubusercontent.com/8456633/174470852-339b5011-5800-4bb9-a628-ff230aa8cd4e.png",
+  "commit_sha": "c9c0db40bd47894e95c4fdaab0f3eadb40edb55c",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "83121f5a650729af45e44f0d4e94449a61826006",
+    "source_url": "https://github.com/jesseduffield/lazygit/blob/c9c0db40bd47894e95c4fdaab0f3eadb40edb55c/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "e40b06b6cab4a038e739ba182d8ac17592ed366f",
+    "source_url": "https://github.com/jesseduffield/lazygit/blob/c9c0db40bd47894e95c4fdaab0f3eadb40edb55c/README.md",
+    "raw_url": "https://raw.githubusercontent.com/jesseduffield/lazygit/c9c0db40bd47894e95c4fdaab0f3eadb40edb55c/README.md",
+    "size_bytes": 39564,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "vendor/github.com/gookit/color/README.zh-CN.md",
+      "blob_sha": "6abd5cfe8eeb6a8e53d810a0ed65b7bebbc254c7"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_candidates_note": "搜索结果为 vendor 中第三方项目 README，不是本项目官方中文。",
+  "official_entry": {
+    "url": "https://github.com/jesseduffield/lazygit",
+    "kind": "GitHub"
+  },
+  "translation": {
+    "method": "Terra 直接全文翻译并逐节对照固定提交英文 README",
+    "source_blob_sha": "e40b06b6cab4a038e739ba182d8ac17592ed366f",
+    "official_zh_candidates_note": "唯一候选为第三方 vendor README，与本项目无关",
+    "link_base": "根目录 README 相对文档链接固定主提交；原始 ../assets 图片是独立 assets 分支，冻结该分支提交 693129b537097edfa4c9bdbcd705fb57f4363cee；../../releases 按上游项目发布入口解析。",
+    "sponsor_media": "保留全部 100 个外链赞助头像；抽样 1 个可读，其余未逐一请求。"
+  }
+}

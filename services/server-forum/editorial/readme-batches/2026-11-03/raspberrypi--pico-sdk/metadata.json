@@ -1,0 +1,86 @@
+{
+  "inventory_index": 162,
+  "original_key": "raspberrypi/pico-sdk",
+  "repository": "raspberrypi/pico-sdk",
+  "catalog": {
+    "audience": "希望研究微控制器和板级外设的人。",
+    "category": "hardware",
+    "collected_at": "2026-11-02T18:01:36.286596+00:00",
+    "cover_accent": "#657063",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "Raspberry Pi",
+      "C/C++",
+      "微控制器"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要硬件或开发环境",
+    "featured": true,
+    "forks": 1301,
+    "full_name": "raspberrypi/pico-sdk",
+    "getting_started": "准备对应开发板和工具链，从官方最小示例开始。",
+    "highlights": [
+      "提供硬件接口与库",
+      "可与官方示例及开发板资料配合使用"
+    ],
+    "homepage_url": "https://github.com/raspberrypi/pico-sdk",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-09-04T22:35:16Z",
+    "last_pushed_at": "2026-11-02T16:40:10Z",
+    "name": "Raspberry Pi Pico SDK",
+    "notes": [
+      "SDK、开发板型号和外围电路需要匹配。"
+    ],
+    "order": 163,
+    "readme_sha": "bb89fc0bc76b35d2f3072f6f2e4ed60acfe5614c",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/raspberrypi/pico-sdk/blob/master/README.md",
+    "stars": 5013,
+    "summary": "为 Raspberry Pi RP 系列微控制器提供 C/C++ 开发接口和构建支持。",
+    "tags": [
+      "Raspberry Pi",
+      "C/C++",
+      "微控制器"
+    ],
+    "title": "为 RP 系列芯片编写自己的设备程序",
+    "watchers": 115
+  },
+  "github_url": "https://github.com/raspberrypi/pico-sdk",
+  "official_url": "https://github.com/raspberrypi/pico-sdk",
+  "stars": 5013,
+  "code_pushed_at": "2026-11-02T16:40:10Z",
+  "default_branch": "master",
+  "commit_sha": "079c6f39023649b154152db30f1d781e884879bc",
+  "readme_path": "README.md",
+  "readme_blob_sha": "bb89fc0bc76b35d2f3072f6f2e4ed60acfe5614c",
+  "readme_source_url": "https://github.com/raspberrypi/pico-sdk/blob/079c6f39023649b154152db30f1d781e884879bc/README.md",
+  "readme_api_url": "https://api.github.com/repos/raspberrypi/pico-sdk/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "BSD-3-Clause",
+  "license_source_url": "https://github.com/raspberrypi/pico-sdk/blob/master/LICENSE.TXT",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:47.582092+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "raspberrypi/pico-sdk",
+  "translation_origin": "非官方中文译文",
+  "license_basis": "仓库 BSD-3-Clause 许可证",
+  "official_entry": {
+    "url": "https://rptl.io/pico-get-started",
+    "kind": "查看文档"
+  }
+}

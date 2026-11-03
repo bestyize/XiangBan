@@ -1,0 +1,29 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留开发平台版本、烧录前提及所有命令",
+    "官网、用户文档、两张图片及固定版本相对文档已核验；其他外链未逐一联网",
+    "保存仓库许可证"
+  ],
+  "link_results": {
+    "https://flipper.net": 200,
+    "https://docs.flipper.net/zero": 200,
+    "https://raw.githubusercontent.com/flipperdevices/flipperzero-firmware/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/.github/assets/dark_theme_banner.png": 200,
+    "https://raw.githubusercontent.com/flipperdevices/flipperzero-firmware/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/.github/assets/light_theme_banner.png": 200,
+    "https://github.com/flipperdevices/flipperzero-firmware/blob/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/CODE_OF_CONDUCT.md": 200,
+    "https://github.com/flipperdevices/flipperzero-firmware/blob/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/CONTRIBUTING.md": 200,
+    "https://github.com/flipperdevices/flipperzero-firmware/blob/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/CODING_STYLE.md": 200,
+    "https://github.com/flipperdevices/flipperzero-firmware/blob/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/LICENSE": 200,
+    "https://github.com/flipperdevices/flipperzero-firmware/blob/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/documentation/fbt.md": 200,
+    "https://github.com/flipperdevices/flipperzero-firmware/blob/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/documentation/AppsOnSDCard.md": 200,
+    "https://github.com/flipperdevices/flipperzero-firmware/blob/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/documentation/AppManifests.md": 200,
+    "https://github.com/flipperdevices/flipperzero-firmware/blob/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/documentation/KeyCombo.md": 200,
+    "https://github.com/flipperdevices/flipperzero-firmware/blob/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/documentation/UniversalRemotes.md": 200,
+    "https://github.com/flipperdevices/flipperzero-firmware/tree/9981d9d4aa5ec7b14bb46cf15763dd293a7dec6a/documentation/file_formats": 200
+  },
+  "issues": []
+}

@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": false,
+    "english_original": false,
+    "license_reviewed": false,
+    "links_and_images_reviewed": false,
+    "code_and_numbers_reviewed": false
+  },
+  "issues": [
+    "上游固件下载链接包含 HTTP 明文地址，原样保留；发布时可优先展示 HTTPS 官方安装文档。",
+    "设备兼容性和升级行为为固定版本上游说明，使用前请核对最新文档；高压和刷写警告完整保留。"
+  ],
+  "full_text_coverage": "完整译写功能表、设备要求、触电警告、刷写/迁移注意事项和全部贡献者署名。",
+  "code_and_numbers": "无围栏代码；芯片型号、GPIO、固件版本与所有行内代码保留，原始外链均保留。",
+  "links_and_images": "相对 logo、许可和变更日志链接解析到固定提交；官方文档、logo、变更日志本次 HTTP 200；非关键链接未逐条联网检查。",
+  "license": "上游明确 GPL-3.0-only，许可原文已保存；标志由 tmo 设计，上游署名保留，独立素材和商标权未确认。"
+}

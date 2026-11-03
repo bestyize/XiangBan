@@ -1,0 +1,100 @@
+{
+  "inventory_index": 99,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合为智能体编写、连接或评估技能与工具的开发者。",
+    "category": "skills",
+    "collected_at": "2026-11-02T18:17:03.385869+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "GitHub",
+      "MCP",
+      "代码协作"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "阅读说明并配置工具",
+    "featured": true,
+    "forks": 5275,
+    "full_name": "github/github-mcp-server",
+    "getting_started": "按官方文档配置客户端，以只读仓库任务验证连接。",
+    "highlights": [
+      "由 GitHub 官方维护",
+      "通过工具接口连接仓库工作流"
+    ],
+    "homepage_url": "https://github.com/github/github-mcp-server",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-28T14:28:59Z",
+    "last_pushed_at": "2026-11-02T11:29:26Z",
+    "name": "GitHub MCP Server",
+    "notes": [
+      "令牌应使用任务所需的最小权限，写操作需按实际授权执行。"
+    ],
+    "order": 100,
+    "readme_sha": "432541f4342321f88225308ebb70402632798a56",
+    "related_categories": [
+      "dev",
+      "ai"
+    ],
+    "source_url": "https://github.com/github/github-mcp-server/blob/main/README.md",
+    "stars": 34167,
+    "summary": "GitHub 官方 MCP 服务端，连接仓库、问题与协作相关接口。",
+    "tags": [
+      "GitHub",
+      "MCP",
+      "代码协作"
+    ],
+    "title": "把代码仓库协作能力接进智能体",
+    "watchers": 413
+  },
+  "repository": "github/github-mcp-server",
+  "fetched_at": "2026-11-03T01:51:01.817645+00:00",
+  "canonical_repository": "github/github-mcp-server",
+  "default_branch": "main",
+  "commit_sha": "3366807bbb8473841894de040d4abc89193e5d51",
+  "readme_path": "README.md",
+  "readme_blob_sha": "432541f4342321f88225308ebb70402632798a56",
+  "readme_url": "https://github.com/github/github-mcp-server/blob/3366807bbb8473841894de040d4abc89193e5d51/README.md",
+  "stars": 34172,
+  "pushed_at": "2026-11-02T22:19:47Z",
+  "stars_fetched_at": "2026-11-03T01:51:05.429560+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "9a9cc50d37ea399f7ccc2f14b6c6d4cc4de02efc",
+  "license_url": "https://github.com/github/github-mcp-server/blob/3366807bbb8473841894de040d4abc89193e5d51/LICENSE",
+  "source_language": "English",
+  "official_chinese_search": {
+    "commit_sha": "3366807bbb8473841894de040d4abc89193e5d51",
+    "method": "递归 Git 树查找 README 中 zh/cn/chinese 和 zh/zh-cn/chinese/translations/i18n 路径",
+    "tree_truncated": false,
+    "matches": [
+      "pkg/translations",
+      "pkg/translations/translations.go"
+    ],
+    "finding": "仅发现程序翻译代码，未发现官方中文 README"
+  },
+  "source_size_bytes": 120055,
+  "source_heading_count": 46,
+  "relative_link_resolution": "英语副本中的相对 Markdown 文档链接解析至固定提交；尚需逐项验证",
+  "machine_translation_disclosure": {
+    "service": "Google Translate public endpoint (translate.googleapis.com)",
+    "scope": "仅公开上游固定提交 README 中选定英文自然语言行，分批发送；尝试以占位符隐藏代码块、HTML 标签、URL 和反引号标识符，无法保证完全排除技术文本",
+    "result": "候选 921 行中 335 行得到返回，586 行未完成；HTTP 429 后停止请求",
+    "artifact": "README.zh-CN.machine-draft.md",
+    "status": "未审校、不完整，不计入完成；只有 Terra 全文逐项译写核验后方可考虑 ready_for_review"
+  },
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/github/github-mcp-server"
+}

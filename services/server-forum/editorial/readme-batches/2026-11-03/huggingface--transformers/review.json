@@ -1,0 +1,10 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐节对照固定英文修正官方中文的版本、模型和要求；示例清单按英文更新。",
+  "code_and_numbers": "10 个 fenced 代码块逐字一致；版本要求、模型名称和数量核对。",
+  "links_and_images": "官方中文相对链接按 i18n 源目录固定到提交，英文根目录相对链接同样固定；所有其他正文图片 HTTP 200，Zenodo 徽章 403 改为 DOI 链接并附中英译注。",
+  "license": "Apache-2.0 许可证保存于 LICENSE.upstream；原文版权和许可证声明保留。",
+  "issues": [
+    "Zenodo 徽章图返回 HTTP 403，保留原 DOI 入口及明确译注。"
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "inventory_key": "godotengine/godot",
+  "full_name": "godotengine/godot",
+  "inventory_entry": {
+    "audience": "适合希望使用开放工具进行设计、创作或学习的人。",
+    "category": "design",
+    "collected_at": "2026-11-02T18:17:15.843796+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "游戏引擎",
+      "2D",
+      "3D"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/godot-screen.jpg",
+    "cover_variant": "balanced",
+    "effort": "安装应用或使用官方演示",
+    "featured": true,
+    "forks": 27334,
+    "full_name": "godotengine/godot",
+    "getting_started": "从官方稳定版跟随入门教程，完成一个最小二维场景。",
+    "highlights": [
+      "同时覆盖二维与三维场景",
+      "编辑器与引擎源码公开"
+    ],
+    "homepage_url": "https://godotengine.org",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/godotengine/godot/master/misc/logo/logo_outlined.svg",
+    "icon_url": "/open-source-media/godot-icon.svg",
+    "last_commit_at": "2026-11-02T14:57:47Z",
+    "last_pushed_at": "2026-11-02T15:04:43Z",
+    "name": "Godot",
+    "notes": [
+      "插件、游戏素材与引擎的许可分别确认，导出平台也有各自要求。"
+    ],
+    "order": 23,
+    "readme_sha": "aa4bc5f484dbf486a2bd7f1773fdc7ec97f210e1",
+    "related_categories": [
+      "fun",
+      "learn"
+    ],
+    "source_url": "https://github.com/godotengine/godot/blob/master/README.md",
+    "stars": 119455,
+    "summary": "面向二维和三维游戏的开源引擎，提供编辑器与脚本开发能力。",
+    "tags": [
+      "游戏引擎",
+      "2D",
+      "3D"
+    ],
+    "title": "把游戏想法做成能运行的场景",
+    "watchers": 1556
+  },
+  "fetched_at": "2026-11-03T01:50:42.531512+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "godotengine/godot",
+  "repository_url": "https://github.com/godotengine/godot",
+  "default_branch": "master",
+  "stars": 119473,
+  "pushed_at": "2026-11-02T15:04:43Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://godotengine.org",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/godotengine/godot/b251066fb5b5654a6cf9c1bb284fac53d20a10d2/misc/logo/logo_outlined.svg",
+  "commit_sha": "b251066fb5b5654a6cf9c1bb284fac53d20a10d2",
+  "license": {
+    "path": "LICENSE.txt",
+    "blob_sha": "0e3ba08d6b2e8cf435241829c96f10b74e4356fe",
+    "source_url": "https://github.com/godotengine/godot/blob/b251066fb5b5654a6cf9c1bb284fac53d20a10d2/LICENSE.txt",
+    "spdx": "NOASSERTION",
+    "human_read_label": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "aa4bc5f484dbf486a2bd7f1773fdc7ec97f210e1",
+    "source_url": "https://github.com/godotengine/godot/blob/b251066fb5b5654a6cf9c1bb284fac53d20a10d2/README.md",
+    "size_bytes": 3722
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "b251066fb5b5654a6cf9c1bb284fac53d20a10d2",
+  "official_chinese_search": "固定提交完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://godotengine.org",
+    "kind": "项目官网"
+  },
+  "plain_summary": "用于制作和发布 2D、3D 游戏的跨平台游戏引擎。",
+  "image_sources": [
+    {
+      "url": "https://raw.githubusercontent.com/godotengine/godot-design/master/screenshots/editor_tps_demo_1920x1080.jpg",
+      "source": "godotengine/godot-design",
+      "repository_license": "CC-BY-4.0",
+      "license_url": "https://github.com/godotengine/godot-design/blob/master/LICENSE",
+      "note": "保留上游链接；图片位于独立设计仓库，未下载。"
+    }
+  ]
+}

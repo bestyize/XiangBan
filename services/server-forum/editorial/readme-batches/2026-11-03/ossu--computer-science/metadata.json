@@ -1,0 +1,92 @@
+{
+  "inventory_key": "ossu/computer-science",
+  "full_name": "ossu/computer-science",
+  "inventory_entry": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:17:42.277930+00:00",
+    "cover_accent": "#B36159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "计算机科学",
+      "课程路线",
+      "自学"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 26060,
+    "full_name": "ossu/computer-science",
+    "getting_started": "先阅读路线与先修要求，从适合基础的一门课程开始。",
+    "highlights": [
+      "提供较完整的课程组织思路",
+      "可结合先修关系安排学习顺序"
+    ],
+    "homepage_url": "https://cs.ossu.dev",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-07-14T05:38:24Z",
+    "last_pushed_at": "2026-07-14T05:38:25Z",
+    "name": "OSSU Computer Science",
+    "notes": [
+      "目录与外部课程的访问、证书和材料条款分别确认。"
+    ],
+    "order": 8,
+    "readme_sha": "ae69b33e2c93d27a893d9ff8e79fe2e88e591ff9",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/ossu/computer-science/blob/master/README.md",
+    "stars": 210657,
+    "summary": "把计算机科学相关公开课程组织成可参考的自学路径。",
+    "tags": [
+      "计算机科学",
+      "课程路线",
+      "自学"
+    ],
+    "title": "给计算机科学自学安排一条长期路线",
+    "watchers": 5984
+  },
+  "fetched_at": "2026-11-03T01:50:37.919354+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "ossu/computer-science",
+  "repository_url": "https://github.com/ossu/computer-science",
+  "default_branch": "master",
+  "stars": 210664,
+  "pushed_at": "2026-07-14T05:38:25Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://cs.ossu.dev",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/ossu/computer-science/33d44a44e3526ede8e862bf1ad50ae5ae7a2f112/images/ossu-logo.webp",
+  "commit_sha": "33d44a44e3526ede8e862bf1ad50ae5ae7a2f112",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "7c561549df21a30027d111316235e44670292b94",
+    "source_url": "https://github.com/ossu/computer-science/blob/33d44a44e3526ede8e862bf1ad50ae5ae7a2f112/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "ae69b33e2c93d27a893d9ff8e79fe2e88e591ff9",
+    "source_url": "https://github.com/ossu/computer-science/blob/33d44a44e3526ede8e862bf1ad50ae5ae7a2f112/README.md",
+    "raw_url": "https://raw.githubusercontent.com/ossu/computer-science/33d44a44e3526ede8e862bf1ad50ae5ae7a2f112/README.md",
+    "size_bytes": 29250,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "plain_summary": "提供自学计算机科学的课程路径，包含核心课程、进阶选修和最终项目。",
+  "official_entry": "https://cs.ossu.dev/",
+  "entry_label": "项目官网",
+  "translation_provenance": "Terra 按固定提交全文译写，113 条主题、63 门课程按稳定源行逐项处理。",
+  "license_note": "仓库 MIT 许可证已保存；外部课程和素材分别适用各自权利，README 只保留链接。"
+}

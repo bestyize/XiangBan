@@ -1,0 +1,114 @@
+{
+  "inventory_key": "microsoft/ai-agents-for-beginners",
+  "full_name": "microsoft/ai-agents-for-beginners",
+  "inventory_entry": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:18:15.899507+00:00",
+    "cover_accent": "#5E769A",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "智能体",
+      "课程",
+      "工具调用"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 25773,
+    "full_name": "microsoft/ai-agents-for-beginners",
+    "getting_started": "按当前课程说明选择一个基础示例，在测试环境运行。",
+    "highlights": [
+      "以课程和代码示例解释智能体",
+      "适合建立工具与流程的基础认识"
+    ],
+    "homepage_url": "https://aka.ms/ai-agents-beginners",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T08:30:28Z",
+    "last_pushed_at": "2026-11-02T08:30:28Z",
+    "name": "AI 智能体入门",
+    "notes": [
+      "模型服务、工具访问和第三方依赖的条件分别确认。"
+    ],
+    "order": 47,
+    "readme_sha": "58d295fa647db1c9bc30a9d370ed1e5fb6a6787a",
+    "related_categories": [
+      "ai",
+      "skills"
+    ],
+    "source_url": "https://github.com/microsoft/ai-agents-for-beginners/blob/main/README.md",
+    "stars": 78701,
+    "summary": "介绍 AI 智能体开发思路与相关实践的入门课程。",
+    "tags": [
+      "智能体",
+      "课程",
+      "工具调用"
+    ],
+    "title": "从基础概念开始搭建一个智能体",
+    "watchers": 574
+  },
+  "fetched_at": "2026-11-03T01:50:51.723487+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "microsoft/ai-agents-for-beginners",
+  "repository_url": "https://github.com/microsoft/ai-agents-for-beginners",
+  "default_branch": "main",
+  "stars": 78727,
+  "pushed_at": "2026-11-02T18:50:16Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://aka.ms/ai-agents-beginners",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "08aadc99f56eac5295193c769c4efdd0cf7d0b5a",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
+    "source_url": "https://github.com/microsoft/ai-agents-for-beginners/blob/08aadc99f56eac5295193c769c4efdd0cf7d0b5a/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "58d295fa647db1c9bc30a9d370ed1e5fb6a6787a",
+    "source_url": "https://github.com/microsoft/ai-agents-for-beginners/blob/08aadc99f56eac5295193c769c4efdd0cf7d0b5a/README.md",
+    "raw_url": "https://raw.githubusercontent.com/microsoft/ai-agents-for-beginners/08aadc99f56eac5295193c769c4efdd0cf7d0b5a/README.md",
+    "size_bytes": 20322,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "translations/zh-CN/README.md",
+      "blob_sha": "aa4e6b234b843a9c198fea17efde4a2e1aa09798"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "translations/zh-CN/README.md",
+    "blob_sha": "aa4e6b234b843a9c198fea17efde4a2e1aa09798",
+    "source_url": "https://github.com/microsoft/ai-agents-for-beginners/blob/08aadc99f56eac5295193c769c4efdd0cf7d0b5a/translations/zh-CN/README.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "source_language": "en",
+  "translation_source": "基于官方中文补译",
+  "translation_basis_commit": "08aadc99f56eac5295193c769c4efdd0cf7d0b5a",
+  "translation_changes": [
+    "移除官方中文中英文原文没有且固定提交中不存在的曼尼普尔语目录链接",
+    "将中文目录锚点修正为中文标题",
+    "中文课程链接相对中文原文件目录解析并固定到采集提交；保留官方 AI 译文免责声明"
+  ],
+  "icon_source_note": "官方课程缩略图；无独立项目图标时卡片应使用项目名称占位，不能将缩略图作为图标",
+  "official_entry": {
+    "url": "https://github.com/microsoft/ai-agents-for-beginners",
+    "kind": "查看文档"
+  },
+  "plain_summary": "通过课程和代码示例学习构建 AI 智能体。",
+  "illustration_source_url": "https://raw.githubusercontent.com/microsoft/ai-agents-for-beginners/08aadc99f56eac5295193c769c4efdd0cf7d0b5a/images/repo-thumbnailv3.png"
+}

@@ -1,0 +1,18 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留缩进命令、示例、变量和选项；代码注释保持原文",
+    "检查官网、文档与发布入口；Apple 指南未逐一联网",
+    "保留仓库根 wxWindows 许可证"
+  ],
+  "link_results": {
+    "https://frida.re/": 200,
+    "https://frida.re/docs/home/": 200,
+    "https://github.com/frida/frida/releases": 200
+  },
+  "issues": []
+}

@@ -1,0 +1,89 @@
+{
+  "inventory_index": 156,
+  "original_key": "veloren/veloren",
+  "repository": "veloren/veloren",
+  "catalog": {
+    "audience": "适合希望体验游戏，或研究开放游戏实现与内容生态的人。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:18:04.355154+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "体素世界",
+      "角色扮演",
+      "多人"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "按官方指南安装或体验",
+    "featured": true,
+    "forks": 573,
+    "full_name": "veloren/veloren",
+    "getting_started": "通过官方启动器了解当前可用版本，先尝试基础探索。",
+    "highlights": [
+      "以体素世界承载探索玩法",
+      "社区共同维护实现与内容"
+    ],
+    "homepage_url": "https://veloren.net",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-30T00:27:19Z",
+    "last_pushed_at": "2026-10-30T01:14:55Z",
+    "name": "Veloren",
+    "notes": [
+      "GitHub 为主项目镜像，版本与贡献入口以官方说明为准。"
+    ],
+    "order": 157,
+    "readme_sha": "b5385a98bf5857b4d65f8446ac38e843d78cac73",
+    "related_categories": [],
+    "source_url": "https://github.com/veloren/veloren/blob/master/README.md",
+    "stars": 7674,
+    "summary": "开放世界体素角色扮演游戏，包含探索与多人协作相关玩法。",
+    "tags": [
+      "体素世界",
+      "角色扮演",
+      "多人"
+    ],
+    "title": "走进一个由社区共同建造的体素世界",
+    "watchers": 92
+  },
+  "github_url": "https://github.com/veloren/veloren",
+  "official_url": "https://veloren.net",
+  "stars": 7675,
+  "code_pushed_at": "2026-10-30T01:14:55Z",
+  "default_branch": "master",
+  "commit_sha": "cd75076cf157d47c97bdf21c5bd7012cc4959dfc",
+  "readme_path": "README.md",
+  "readme_blob_sha": "b5385a98bf5857b4d65f8446ac38e843d78cac73",
+  "readme_source_url": "https://github.com/veloren/veloren/blob/cd75076cf157d47c97bdf21c5bd7012cc4959dfc/README.md",
+  "readme_api_url": "https://api.github.com/repos/veloren/veloren/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-3.0",
+  "license_source_url": "https://github.com/veloren/veloren/blob/master/LICENSE",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:45.626966+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "veloren/veloren",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://s3.eu-central-2.wasabisys.com/veloren-blog/cdn/common/2025-06-29_Hrom_bestest-banner.webp",
+    "https://translate.codeberg.org/widgets/veloren/-/open-graph.png",
+    "https://opencollective.com/veloren/contribute/button@2x.png?color=blue"
+  ],
+  "license_basis": "游戏 GPLv3；README 横幅文件标注 Hrom、CC BY-SA 4.0",
+  "official_entry": {
+    "url": "https://veloren.net",
+    "kind": "项目官网"
+  }
+}

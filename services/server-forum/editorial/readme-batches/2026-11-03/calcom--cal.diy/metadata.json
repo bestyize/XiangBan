@@ -1,0 +1,79 @@
+{
+  "inventory_index": 75,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望自主组织笔记、文档和团队工作的人。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:17:14.860959+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "日程预约",
+      "排期",
+      "自部署"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 15520,
+    "full_name": "calcom/cal.diy",
+    "getting_started": "从当前官方仓库阅读部署与日历连接指南，先用测试日历验证。",
+    "highlights": [
+      "围绕预约时间组织安排",
+      "公开完整开源版本的实现"
+    ],
+    "homepage_url": "https://cal.diy",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T07:07:42Z",
+    "last_pushed_at": "2026-11-02T07:09:20Z",
+    "name": "Cal.diy",
+    "notes": [
+      "使用当前 Cal.diy 的文档和许可，不能把它与其他 Cal.com 产品的条款混用。"
+    ],
+    "order": 76,
+    "readme_sha": "4bfd00c01597ecb1fbd76bcaff5d018c7b61b7bd",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/calcom/cal.diy/blob/main/README.md",
+    "stars": 49649,
+    "summary": "提供日程预约与排期能力的开源项目，当前仓库已迁移为 Cal.diy。",
+    "tags": [
+      "日程预约",
+      "排期",
+      "自部署"
+    ],
+    "title": "让预约安排形成可分享的流程",
+    "watchers": 205
+  },
+  "repository": "calcom/cal.diy",
+  "fetched_at": "2026-11-03T01:50:45.352640+00:00",
+  "canonical_repository": "calcom/cal.diy",
+  "default_branch": "main",
+  "commit_sha": "81ce067c1d0e16b21c39c2de98b9a43a92562cd1",
+  "readme_path": "README.md",
+  "readme_blob_sha": "4bfd00c01597ecb1fbd76bcaff5d018c7b61b7bd",
+  "readme_url": "https://github.com/calcom/cal.diy/blob/81ce067c1d0e16b21c39c2de98b9a43a92562cd1/README.md",
+  "stars": 49654,
+  "pushed_at": "2026-11-02T07:09:20Z",
+  "stars_fetched_at": "2026-11-03T01:50:47.438242+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://cal.diy",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "98b51fbaac9145f1919fd2a79532acdb04a8f24b",
+  "license_url": "https://github.com/calcom/cal.diy/blob/81ce067c1d0e16b21c39c2de98b9a43a92562cd1/LICENSE",
+  "source_language": "unverified",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/calcom/cal.diy"
+}

@@ -1,0 +1,116 @@
+{
+  "inventory_key": "infiniflow/ragflow",
+  "full_name": "infiniflow/ragflow",
+  "inventory_entry": {
+    "audience": "适合希望构建、运行或理解 AI 应用的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:16:53.759355+00:00",
+    "cover_accent": "#9D7159",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "知识库",
+      "文档解析",
+      "检索增强"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 11207,
+    "full_name": "infiniflow/ragflow",
+    "getting_started": "按官方部署文档建立测试实例，导入少量公开文档检查检索效果。",
+    "highlights": [
+      "提供文档处理与检索工作流",
+      "可以围绕自有资料构建应用"
+    ],
+    "homepage_url": "https://ragflow.io",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/infiniflow/ragflow/main/web/src/assets/logo-with-text.svg",
+    "icon_url": "/open-source-media/ragflow-icon.svg",
+    "last_commit_at": "2026-11-02T15:44:48Z",
+    "last_pushed_at": "2026-11-02T15:44:48Z",
+    "name": "RAGFlow",
+    "notes": [
+      "文档解析和模型运行所需资源依部署方式而异。"
+    ],
+    "order": 36,
+    "readme_sha": "3a54f3754050737d171fe68d6ed91d6b708595dd",
+    "related_categories": [
+      "office",
+      "web"
+    ],
+    "source_url": "https://github.com/infiniflow/ragflow/blob/main/README.md",
+    "stars": 93365,
+    "summary": "围绕文档解析、检索与智能体上下文构建的开源平台。",
+    "tags": [
+      "知识库",
+      "文档解析",
+      "检索增强"
+    ],
+    "title": "把文档变成可以检索的 AI 上下文",
+    "watchers": 359
+  },
+  "fetched_at": "2026-11-03T01:50:48.099926+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "infiniflow/ragflow",
+  "repository_url": "https://github.com/infiniflow/ragflow",
+  "default_branch": "main",
+  "stars": 93374,
+  "pushed_at": "2026-11-03T01:47:52Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "Apache-2.0",
+  "homepage": "https://ragflow.io",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/infiniflow/ragflow/f015f71f1f7c3bcb7b011d63f05f706f34bed22d/web/src/assets/logo-with-text.svg",
+  "commit_sha": "f015f71f1f7c3bcb7b011d63f05f706f34bed22d",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "261eeb9e9f8b2b4b0d119366dda99c6fd7d35c64",
+    "source_url": "https://github.com/infiniflow/ragflow/blob/f015f71f1f7c3bcb7b011d63f05f706f34bed22d/LICENSE",
+    "spdx": "Apache-2.0"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "3a54f3754050737d171fe68d6ed91d6b708595dd",
+    "source_url": "https://github.com/infiniflow/ragflow/blob/f015f71f1f7c3bcb7b011d63f05f706f34bed22d/README.md",
+    "raw_url": "https://raw.githubusercontent.com/infiniflow/ragflow/f015f71f1f7c3bcb7b011d63f05f706f34bed22d/README.md",
+    "size_bytes": 17203,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "README_tzh.md",
+      "blob_sha": "0aed92e383ea162275cdb7e010d3963bea029288"
+    },
+    {
+      "path": "README_zh.md",
+      "blob_sha": "300613378ec0ff87cda9e1512abc4beb4ba4d8ae"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "README_zh.md",
+    "blob_sha": "300613378ec0ff87cda9e1512abc4beb4ba4d8ae",
+    "source_url": "https://github.com/infiniflow/ragflow/blob/f015f71f1f7c3bcb7b011d63f05f706f34bed22d/README_zh.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "source_language": "en",
+  "translation_source": "基于官方中文补译",
+  "translation_basis_commit": "f015f71f1f7c3bcb7b011d63f05f706f34bed22d",
+  "translation_changes": [
+    "补译过时的依赖下载步骤并保留英文原文仅用于镜像或 CI 的警告",
+    "将中文发布记录日期与固定提交英文原文对齐，并补正源码构建前提条件",
+    "保留官方中文额外的镜像源提示、商务合作和中文社区章节"
+  ],
+  "official_entry": {
+    "url": "https://ragflow.io/",
+    "kind": "项目官网"
+  },
+  "plain_summary": "从文档等资料中检索信息，为 AI 问答和工作流提供上下文。"
+}

@@ -1,0 +1,86 @@
+{
+  "inventory_index": 148,
+  "original_key": "wireshark/wireshark",
+  "repository": "wireshark/wireshark",
+  "catalog": {
+    "audience": "适合在自有或获授权环境中学习软件、协议与安全分析的开发者。",
+    "category": "security",
+    "collected_at": "2026-11-02T18:17:56.878121+00:00",
+    "cover_accent": "#5574B2",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "协议分析",
+      "网络调试",
+      "抓包"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要分析与调试基础",
+    "featured": true,
+    "forks": 2250,
+    "full_name": "wireshark/wireshark",
+    "getting_started": "先分析官方公开示例或自己的测试流量，熟悉过滤和协议视图。",
+    "highlights": [
+      "可分层查看协议与数据包",
+      "适合排查自有网络通信问题"
+    ],
+    "homepage_url": "https://www.wireshark.org",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T15:43:07Z",
+    "last_pushed_at": "2026-11-02T16:35:47Z",
+    "name": "Wireshark",
+    "notes": [
+      "网络数据可能含敏感信息，只采集和处理获授权的流量。"
+    ],
+    "order": 149,
+    "readme_sha": "8f1d96edc95b767b4ee3182a12f6aa52aab26d90",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/wireshark/wireshark/blob/master/README.md",
+    "stars": 10136,
+    "summary": "提供协议解析与网络抓包分析能力的开源工具。",
+    "tags": [
+      "协议分析",
+      "网络调试",
+      "抓包"
+    ],
+    "title": "把网络通信变成可以逐层阅读的数据",
+    "watchers": 300
+  },
+  "github_url": "https://github.com/wireshark/wireshark",
+  "official_url": "https://www.wireshark.org",
+  "stars": 10138,
+  "code_pushed_at": "2026-11-03T01:24:01Z",
+  "default_branch": "master",
+  "commit_sha": "77b093185d013a4e80f8e6e29b934e594ea246a6",
+  "readme_path": "README.md",
+  "readme_blob_sha": "8f1d96edc95b767b4ee3182a12f6aa52aab26d90",
+  "readme_source_url": "https://github.com/wireshark/wireshark/blob/77b093185d013a4e80f8e6e29b934e594ea246a6/README.md",
+  "readme_api_url": "https://api.github.com/repos/wireshark/wireshark/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "GPL-2.0",
+  "license_source_url": "https://github.com/wireshark/wireshark/blob/master/COPYING",
+  "icon_source_url": "",
+  "fetched_at": "2026-11-03T01:50:42.603119+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "official_chinese_candidates": [],
+  "chinese_search_tree_truncated": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "wireshark/wireshark",
+  "translation_origin": "非官方中文译文",
+  "license_basis": "README 指明 GPLv2，部分文件及工具有兼容或特定例外",
+  "official_entry": {
+    "url": "https://www.wireshark.org",
+    "kind": "项目官网"
+  }
+}

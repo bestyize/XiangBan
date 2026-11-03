@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "README 文件头明确 AGPL-3.0-or-later 及版权，已保留声明与许可证；译文逐节核对，保留命令、日期及不用于生产系统的说明。",
+    "非动态链接可读；失效的动态 Design 徽章在中文中以原目标链接替代并标注译注。",
+    "官方截图保持上游外链，未复制图片；单独素材权利待后续核实。未发现已核实项目图标，卡片使用项目名占位。"
+  ],
+  "link_check": {
+    "urls_checked": 35,
+    "result": "33 HEAD 200，Bluesky HEAD 404 但 GET 200；Design 动态徽章 500，中文以原目标链接替代并标注译注"
+  }
+}

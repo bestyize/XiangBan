@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留所有代码命令、构建选项和平台要求",
+    "官网、项目 Logo、Wiki 入口及固定版本许可证已验证；其他外链和动态徽章未逐一联网",
+    "保留 GPLv3 许可"
+  ],
+  "link_results": {
+    "https://musescore.org": 200,
+    "https://raw.githubusercontent.com/musescore/MuseScore/f4194eb421cbdc51f6758ba91a96d3495e9c61aa/share/icons/musescore_logo_full.png": 200,
+    "https://github.com/musescore/MuseScore/blob/f4194eb421cbdc51f6758ba91a96d3495e9c61aa/LICENSE.txt": 200,
+    "https://github.com/musescore/MuseScore/wiki": 200
+  },
+  "issues": []
+}

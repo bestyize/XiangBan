@@ -1,0 +1,93 @@
+{
+  "inventory_index": 59,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合想搭博客、文档站或内容网站，并愿意接触前端开发的人。",
+    "category": "web",
+    "collected_at": "2026-11-02T18:01:42.628858+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "首页",
+      "文章",
+      "文档"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "notes",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要 Node.js 与前端基础",
+    "featured": true,
+    "forks": 3908,
+    "full_name": "withastro/astro",
+    "getting_started": "阅读官方入门文档，创建一个最小项目并在本地预览，再添加自己的第一篇内容。",
+    "highlights": [
+      "围绕内容网站组织开发体验",
+      "可以按需加入交互组件",
+      "有文档与主题生态帮助开始建站"
+    ],
+    "homepage_url": "https://astro.build",
+    "icon_fit": "contain",
+    "icon_source_url": "https://astro.build/favicon.svg",
+    "icon_url": "/open-source-media/astro-icon.svg",
+    "last_commit_at": "2026-11-02T17:51:28Z",
+    "last_pushed_at": "2026-11-02T17:56:40Z",
+    "name": "Astro",
+    "notes": [
+      "部署方式与运行成本取决于站点功能和所选服务。"
+    ],
+    "order": 60,
+    "readme_sha": "c7e692c133c3bcd307ed39ec4ed78464602862e0",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/withastro/astro#readme",
+    "stars": 63672,
+    "summary": "面向内容网站的 Web 框架，适合博客、文档与展示页面。",
+    "tags": [
+      "博客",
+      "文档网站",
+      "前端"
+    ],
+    "title": "从一篇文章开始，搭一个自己的站点",
+    "watchers": 217
+  },
+  "repository": "withastro/astro",
+  "fetched_at": "2026-11-03T01:50:32.912819+00:00",
+  "canonical_repository": "withastro/astro",
+  "default_branch": "main",
+  "commit_sha": "402c0fae01d251c97298c255804008ff566802f9",
+  "readme_path": "README.md",
+  "readme_blob_sha": "c7e692c133c3bcd307ed39ec4ed78464602862e0",
+  "readme_url": "https://github.com/withastro/astro/blob/402c0fae01d251c97298c255804008ff566802f9/README.md",
+  "stars": 63679,
+  "pushed_at": "2026-11-02T22:00:53Z",
+  "stars_fetched_at": "2026-11-03T01:50:35.683005+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://astro.build",
+  "icon_source_url": "https://astro.build/favicon.svg",
+  "license_path": "LICENSE",
+  "license_blob_sha": "b3cd0c0f0e01d20109fc8660a4d6b7dc9a22bc49",
+  "license_url": "https://github.com/withastro/astro/blob/402c0fae01d251c97298c255804008ff566802f9/LICENSE",
+  "root_license_candidates": [
+    "LICENSE"
+  ],
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/withastro/astro",
+  "source_language": "English",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "软件包目录、更新日志、许可证、贡献指南及横幅指向固定提交",
+  "description_zh": "帮助开发者构建网站的开源框架。",
+  "official_entry": {
+    "url": "https://astro.build",
+    "kind": "项目官网",
+    "verification": "上游 README 官网入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "image_license": "官网 favicon 和固定提交的横幅使用官方外链，未复制素材；图片单独权利待后续核实。"
+}

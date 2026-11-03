@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留硬件版本要求及坐标轴说明",
+    "官网、FAQ 和固定版本文档已验证；动态徽章及其他外链未逐一联网",
+    "保存 GPL 许可证"
+  ],
+  "link_results": {
+    "https://supertuxkart.net/": 200,
+    "https://supertuxkart.net/FAQ": 200,
+    "https://github.com/supertuxkart/stk-code/blob/7ed766d35d7f4a265df79c74f9d3f90522ae19a3/COPYING": 200,
+    "https://github.com/supertuxkart/stk-code/blob/7ed766d35d7f4a265df79c74f9d3f90522ae19a3/INSTALL.md": 200
+  },
+  "issues": []
+}

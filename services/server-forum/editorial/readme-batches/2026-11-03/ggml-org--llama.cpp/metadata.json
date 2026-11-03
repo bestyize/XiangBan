@@ -1,0 +1,117 @@
+{
+  "inventory_key": "ggml-org/llama.cpp",
+  "full_name": "ggml-org/llama.cpp",
+  "inventory_entry": {
+    "audience": "希望理解本地推理和资源开销的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:01:17.277443+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "本地推理",
+      "C++",
+      "模型量化"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 25064,
+    "full_name": "ggml-org/llama.cpp",
+    "getting_started": "先查看官方支持的模型格式与安装方式，再运行小型模型。",
+    "highlights": [
+      "支持多种处理器与加速方式",
+      "提供命令行和服务端工具"
+    ],
+    "homepage_url": "https://llama.app",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T17:39:51Z",
+    "last_pushed_at": "2026-11-02T17:45:50Z",
+    "name": "llama.cpp",
+    "notes": [
+      "模型文件需另行取得并遵守各自许可。"
+    ],
+    "order": 20,
+    "readme_sha": "a72afcae664ae5217bfac8959582ea4b8e436a89",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/ggml-org/llama.cpp/blob/master/README.md",
+    "stars": 133173,
+    "summary": "面向多种硬件的模型推理项目，提供命令行工具与服务接口。",
+    "tags": [
+      "本地推理",
+      "C++",
+      "模型量化"
+    ],
+    "title": "深入本地模型的推理与部署",
+    "watchers": 876
+  },
+  "fetched_at": "2026-11-03T01:50:41.666356+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "ggml-org/llama.cpp",
+  "repository_url": "https://github.com/ggml-org/llama.cpp",
+  "default_branch": "master",
+  "stars": 133203,
+  "pushed_at": "2026-11-03T01:19:03Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://llama.app",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/ggml-org/llama.brand/0708f2327336589bd4d3eba15a95199c318cd771/logo/llama-cpp/logo-llama-cpp-dark.svg",
+  "commit_sha": "2cbca389f515df455412dafa07e2b1359cc72a6d",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "e7dca554bcb802f98408383a864404e3aa4eacca",
+    "source_url": "https://github.com/ggml-org/llama.cpp/blob/2cbca389f515df455412dafa07e2b1359cc72a6d/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "a72afcae664ae5217bfac8959582ea4b8e436a89",
+    "source_url": "https://github.com/ggml-org/llama.cpp/blob/2cbca389f515df455412dafa07e2b1359cc72a6d/README.md",
+    "raw_url": "https://raw.githubusercontent.com/ggml-org/llama.cpp/2cbca389f515df455412dafa07e2b1359cc72a6d/README.md",
+    "size_bytes": 7676,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "2cbca389f515df455412dafa07e2b1359cc72a6d",
+  "official_chinese_search": "固定提交的完整递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://llama.app",
+    "kind": "项目官网"
+  },
+  "plain_summary": "在本地或云端设备上运行大语言模型的推理工具。",
+  "image_sources": [
+    {
+      "url": "https://raw.githubusercontent.com/ggml-org/llama.brand/0708f2327336589bd4d3eba15a95199c318cd771/cover/llama-cpp/cover-llama-cpp-dark.svg",
+      "repository": "ggml-org/llama.brand",
+      "commit_sha": "0708f2327336589bd4d3eba15a95199c318cd771",
+      "license": "CC-BY-NC-4.0 with additional permission to identify Llama.cpp, including commercially",
+      "license_path": "LICENSE.llama-brand",
+      "permission_path": "BRAND-USAGE.md",
+      "attribution": "ggml-org/llama.brand"
+    },
+    {
+      "url": "https://github.com/user-attachments/assets/88726b48-1713-48aa-a525-95a02e78afc4",
+      "source": "上游 README 的 VLM 会话截图",
+      "note": "保留上游外链，未下载。"
+    },
+    {
+      "url": "https://github.com/user-attachments/assets/b402f972-2e32-4def-8771-8d849f08cf2e",
+      "source": "上游 README 的 Web UI 截图",
+      "note": "保留上游外链，未下载。"
+    }
+  ]
+}

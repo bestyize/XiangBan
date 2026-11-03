@@ -1,0 +1,19 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "全文对照逐节保留操作、配置、浏览器及 Node 版本、限制和 Crown Copyright；代码块与行内代码逐项一致。",
+    "Apache-2.0 原始许可证已保存；官方站点及固定版本工作流、.nvmrc、安全政策、贡献指南均可访问。",
+    "未核实独立图标，卡片使用名称占位；原文所述浏览器端处理与 Node 版本支持属于上游项目声明。"
+  ],
+  "link_check": {
+    "key_urls_http_200": 5
+  }
+}

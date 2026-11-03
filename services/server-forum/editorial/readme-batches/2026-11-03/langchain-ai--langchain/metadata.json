@@ -1,0 +1,96 @@
+{
+  "inventory_key": "langchain-ai/langchain",
+  "full_name": "langchain-ai/langchain",
+  "inventory_entry": {
+    "audience": "需要把模型接入业务流程的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:02:39.220621+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "应用框架",
+      "检索增强",
+      "工具调用"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "offset",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 25030,
+    "full_name": "langchain-ai/langchain",
+    "getting_started": "先按官方入门搭建最小应用，再逐项加入检索或工具。",
+    "highlights": [
+      "提供模型与数据源集成",
+      "支持组合式应用开发"
+    ],
+    "homepage_url": "https://docs.langchain.com/langchain/",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-11-02T16:21:09Z",
+    "last_pushed_at": "2026-11-02T16:21:12Z",
+    "name": "LangChain",
+    "notes": [
+      "第三方模型和外部服务可能单独收费。"
+    ],
+    "order": 17,
+    "readme_sha": "aeea8c38765f4a33c777e8755ac2f439132ffbb0",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/langchain-ai/langchain/blob/master/README.md",
+    "stars": 148883,
+    "summary": "用于组织模型调用、工具和外部数据的 AI 应用开发框架。",
+    "tags": [
+      "应用框架",
+      "检索增强",
+      "工具调用"
+    ],
+    "title": "把模型、检索与工具连接成应用",
+    "watchers": 921
+  },
+  "fetched_at": "2026-11-03T01:50:40.720932+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "langchain-ai/langchain",
+  "repository_url": "https://github.com/langchain-ai/langchain",
+  "default_branch": "master",
+  "stars": 148907,
+  "pushed_at": "2026-11-03T00:22:35Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "https://docs.langchain.com/langchain/",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": "https://raw.githubusercontent.com/langchain-ai/langchain/2775506076baf2cba8126b21b9e63424fcd97ab9/.github/images/logo-dark.svg",
+  "commit_sha": "2775506076baf2cba8126b21b9e63424fcd97ab9",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "3957738673765912ca83a0048f833e095d61e087",
+    "source_url": "https://github.com/langchain-ai/langchain/blob/2775506076baf2cba8126b21b9e63424fcd97ab9/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "aeea8c38765f4a33c777e8755ac2f439132ffbb0",
+    "source_url": "https://github.com/langchain-ai/langchain/blob/2775506076baf2cba8126b21b9e63424fcd97ab9/README.md",
+    "raw_url": "https://raw.githubusercontent.com/langchain-ai/langchain/2775506076baf2cba8126b21b9e63424fcd97ab9/README.md",
+    "size_bytes": 5935,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [],
+  "official_zh_tree_truncated": false,
+  "source_language": "en",
+  "translation_source": "非官方中文译文",
+  "translation_basis_commit": "2775506076baf2cba8126b21b9e63424fcd97ab9",
+  "official_chinese_search": "固定提交的递归仓库树未发现名称带 zh、chinese 或中文的 README",
+  "official_entry": {
+    "url": "https://docs.langchain.com/oss/python/langchain/overview",
+    "kind": "查看文档"
+  },
+  "plain_summary": "用可复用组件构建大语言模型应用和智能体。"
+}

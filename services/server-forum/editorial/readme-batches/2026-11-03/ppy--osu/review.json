@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留 iOS 名额限制、平台版本、代码块、禁止 AI 辅助贡献及商标与资源许可限制",
+    "官网、固定版本 Logo、模板和贡献文档已核验；动态徽章及其他外链未逐一联网",
+    "保留 MIT 许可与原文许可例外"
+  ],
+  "link_results": {
+    "https://osu.ppy.sh": 200,
+    "https://raw.githubusercontent.com/ppy/osu/fc9d1d936a3b886d6f8eab9c819174f3580796b9/assets/lazer.png": 200,
+    "https://github.com/ppy/osu/tree/fc9d1d936a3b886d6f8eab9c819174f3580796b9/Templates": 200,
+    "https://github.com/ppy/osu/blob/fc9d1d936a3b886d6f8eab9c819174f3580796b9/CONTRIBUTING.md": 200,
+    "https://github.com/ppy/osu/blob/fc9d1d936a3b886d6f8eab9c819174f3580796b9/LICENCE": 200
+  },
+  "issues": []
+}

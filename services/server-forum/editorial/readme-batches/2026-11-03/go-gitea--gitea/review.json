@@ -1,0 +1,175 @@
+{
+  "status": "ready_for_review",
+  "checks": {
+    "source_version_captured": true,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
+  },
+  "issues": [
+    "官方中文与英文源逐节比较后，滞后的目的、构建、贡献、翻译及常见问题章节已按英文补译；截图及原文链接保留。",
+    "MIT 许可证覆盖相关文档，原文已保存；67 个非动态链接 HEAD 200。",
+    "原文截图保留官方外链，未复制素材；单独图片权利待后续核实。未确认项目图标，卡片使用名称占位。"
+  ],
+  "automated_candidate_comparison": {
+    "method": "初筛：正则统计标题与代码围栏，不代表章节一致性或翻译准确性审校",
+    "english_source": {
+      "heading_count": 24,
+      "fence_markers": 0,
+      "byte_count": 10432
+    },
+    "official_chinese_candidate": {
+      "heading_count": 25,
+      "fence_markers": 0,
+      "byte_count": 9975
+    }
+  },
+  "image_http_head_sample": {
+    "note": "仅抽检非动态徽章图源；HTTP 成功不证明许可，失败需人工复核",
+    "results": [
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_commits.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_issues.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://opencollective.com/gitea/backers.svg?width=890",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_activity.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_pull_request_commits.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_pull_request_file.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/explore_orgs.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_code_frequency.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/pull_requests.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_contributors.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/org_home.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/user_profile.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_tags.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_labels.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/issues.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_recent_commits.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/login.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_actions.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_releases.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://www.codetriage.com/go-gitea/gitea/badges/users.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://pkg.go.dev/badge/gitea.dev?status.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_issue.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_milestones.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/register.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_pull_request.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://badges.crowdin.net/gitea/localized.svg",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_branches.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/milestones.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/home.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/explore_users.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_pull_requests.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/explore_repos.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_home.png",
+        "head_result": 200
+      },
+      {
+        "url": "https://dl.gitea.com/screenshots/repo_actions_run.png",
+        "head_result": 200
+      }
+    ]
+  },
+  "link_check": {
+    "method": "HTTP HEAD，排除动态赞助者图墙及徽章",
+    "urls_checked": 67,
+    "http_200": 67
+  }
+}

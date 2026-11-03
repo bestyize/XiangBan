@@ -1,0 +1,27 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐节对照全文，保留不稳定分支警告、云托管分成、歌词格式和功能说明",
+    "主要入口、固定版本 Logo、托管图、截图和贡献准则已验证；动态徽章及其他外链未逐一联网",
+    "保留仓库 GPL 许可证"
+  ],
+  "link_results": {
+    "https://www.navidrome.org": 200,
+    "https://www.navidrome.org/docs/installation/": 200,
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/resources/logo-192x192.png": 200,
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/resources/hosting/pikapods.svg": 200,
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/resources/hosting/zenith.svg": 200,
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/resources/hosting/elfhosted.svg": 200,
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/.github/screenshots/ss-mobile-login.png": 200,
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/.github/screenshots/ss-mobile-player.png": 200,
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/.github/screenshots/ss-mobile-album-view.png": 200,
+    "https://raw.githubusercontent.com/navidrome/navidrome/563c5c72a16f7128dd2c31e46d7438af5e6c1399/.github/screenshots/ss-desktop-player.png": 200,
+    "https://github.com/navidrome/navidrome/blob/563c5c72a16f7128dd2c31e46d7438af5e6c1399/CODE_OF_CONDUCT.md": 200,
+    "https://github.com/user-attachments/assets/c19b1d2b-01e1-4682-a007-12356c42147c": 200
+  },
+  "issues": []
+}

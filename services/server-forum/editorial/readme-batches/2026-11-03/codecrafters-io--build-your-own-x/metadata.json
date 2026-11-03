@@ -1,0 +1,96 @@
+{
+  "inventory_key": "codecrafters-io/build-your-own-x",
+  "full_name": "codecrafters-io/build-your-own-x",
+  "inventory_entry": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:17:43.976412+00:00",
+    "cover_accent": "#4A8B7B",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "从零实现",
+      "项目实战",
+      "教程目录"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 52286,
+    "full_name": "codecrafters-io/build-your-own-x",
+    "getting_started": "选择一个符合当前基础的项目，先阅读原教程的依赖和完成目标。",
+    "highlights": [
+      "围绕完整技术项目组织学习",
+      "提供继续阅读的原始教程入口"
+    ],
+    "homepage_url": "https://codecrafters.io",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-07-14T19:25:58Z",
+    "last_pushed_at": "2026-07-14T19:25:58Z",
+    "name": "Build Your Own X",
+    "notes": [
+      "目录的开放声明不替代各外链教程与示例代码的许可，逐项核对。"
+    ],
+    "order": 1,
+    "readme_sha": "9a553c729b29bc69296d7092fc1c314c2c811bad",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/codecrafters-io/build-your-own-x/blob/master/README.md",
+    "stars": 558815,
+    "summary": "按技术方向整理从零实现数据库、解释器、渲染器等项目的教程目录。",
+    "tags": [
+      "从零实现",
+      "项目实战",
+      "教程目录"
+    ],
+    "title": "通过亲手重做，理解常用技术的内部结构",
+    "watchers": 6795
+  },
+  "fetched_at": "2026-11-03T01:50:36.114372+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "codecrafters-io/build-your-own-x",
+  "repository_url": "https://github.com/codecrafters-io/build-your-own-x",
+  "default_branch": "master",
+  "stars": 558917,
+  "pushed_at": "2026-07-14T19:25:58Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": null,
+  "homepage": "https://codecrafters.io",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "aa17439b62f384511a5561ce308e9598b94d8989",
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "9a553c729b29bc69296d7092fc1c314c2c811bad",
+    "source_url": "https://github.com/codecrafters-io/build-your-own-x/blob/aa17439b62f384511a5561ce308e9598b94d8989/README.md",
+    "size_bytes": 46683
+  },
+  "license": {
+    "spdx": "CC0-1.0",
+    "basis": "README 自带许可声明；见固定提交原文",
+    "source_url": "https://github.com/codecrafters-io/build-your-own-x/blob/aa17439b62f384511a5561ce308e9598b94d8989/README.md#origins--license",
+    "license_text_url": "https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt"
+  },
+  "official_entry": {
+    "url": "https://codecrafters.io",
+    "kind": "项目官网"
+  },
+  "official_banner_url": "https://codecrafters.io/images/new-ccgithub-banner.png",
+  "translation": {
+    "method": "Terra 逐条直接翻译、回填并对照 README 完整目录",
+    "source_blob_sha": "9a553c729b29bc69296d7092fc1c314c2c811bad",
+    "title_index": "title-index.json",
+    "title_fragments": "title-fragments.json",
+    "coverage": "355 条标准格式教程标题加 4 条特殊格式逐条译写；原语言标签和全部链接保留。",
+    "third_party_license": "CC0 适用于 README 清单本身；清单中链接的各第三方教程适用其自身许可。"
+  }
+}

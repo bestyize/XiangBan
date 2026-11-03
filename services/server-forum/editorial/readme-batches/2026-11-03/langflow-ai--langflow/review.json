@@ -1,0 +1,11 @@
+{
+  "status": "ready_for_review",
+  "full_text_coverage": "逐段对照全文，保留所有部署、认证说明、安装要求和警告",
+  "code_and_numbers": "四个代码块与英文完全一致；Python 版本号及环境变量已核对",
+  "links_and_images": "仓库相对图片及文档链接指向采集提交，均返回 HTTP 200；其他图像可读，DeepWiki 徽章返回 HTTP 429，已改为原入口文本链接",
+  "license": "MIT，许可证及版权声明保存在 LICENSE.upstream",
+  "issues": [
+    "DeepWiki 动态徽章请求受限，改为原入口文本链接；图片后续可用性可能变化。"
+  ],
+  "manual_review": "非官方翻译；交付后仍需编辑复核"
+}

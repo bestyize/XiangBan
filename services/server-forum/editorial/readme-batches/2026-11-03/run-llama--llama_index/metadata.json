@@ -1,0 +1,90 @@
+{
+  "inventory_index": 71,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望构建、运行或理解 AI 应用的开发者。",
+    "category": "ai",
+    "collected_at": "2026-11-02T18:16:53.770808+00:00",
+    "cover_accent": "#B25E66",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "数据连接",
+      "知识库",
+      "检索增强"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "需要模型或开发环境",
+    "featured": true,
+    "forks": 8500,
+    "full_name": "run-llama/llama_index",
+    "getting_started": "从官方入门读取一小组测试文档，验证索引与查询流程。",
+    "highlights": [
+      "提供数据接入与索引相关工具",
+      "可组合检索和模型调用"
+    ],
+    "homepage_url": "https://developers.llamaindex.ai",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-10-14T15:29:28Z",
+    "last_pushed_at": "2026-10-26T21:25:10Z",
+    "name": "LlamaIndex",
+    "notes": [
+      "模型、存储与托管服务可能涉及独立费用。"
+    ],
+    "order": 72,
+    "readme_sha": "572527a8f5293bcf001366da01e51549280ff2e0",
+    "related_categories": [
+      "dev",
+      "office"
+    ],
+    "source_url": "https://github.com/run-llama/llama_index/blob/main/README.md",
+    "stars": 52778,
+    "summary": "为文档处理、索引与检索增强应用提供开发组件。",
+    "tags": [
+      "数据连接",
+      "知识库",
+      "检索增强"
+    ],
+    "title": "把自己的资料接进模型应用",
+    "watchers": 284
+  },
+  "repository": "run-llama/llama_index",
+  "fetched_at": "2026-11-03T01:50:42.638241+00:00",
+  "canonical_repository": "run-llama/llama_index",
+  "default_branch": "main",
+  "commit_sha": "619d74664e8404612038bc15a1a40c686037277c",
+  "readme_path": "README.md",
+  "readme_blob_sha": "572527a8f5293bcf001366da01e51549280ff2e0",
+  "readme_url": "https://github.com/run-llama/llama_index/blob/619d74664e8404612038bc15a1a40c686037277c/README.md",
+  "stars": 52780,
+  "pushed_at": "2026-10-26T21:25:10Z",
+  "stars_fetched_at": "2026-11-03T01:50:45.996524+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "https://developers.llamaindex.ai",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "e6074042d0391061b7d7d45d21e6693ae108daec",
+  "license_url": "https://github.com/run-llama/llama_index/blob/619d74664e8404612038bc15a1a40c686037277c/LICENSE",
+  "source_language": "English",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/run-llama/llama_index",
+  "translation_attribution": "非官方中文全文译文，代码及代码注释保留原文",
+  "relative_link_resolution": "仓库贡献指南指向固定提交",
+  "description_zh": "帮助开发者构建检索增强和 AI 智能体应用的数据框架。",
+  "official_entry": {
+    "url": "https://developers.llamaindex.ai/python/framework/",
+    "kind": "查看文档",
+    "verification": "上游 README 框架文档入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标"
+}

@@ -1,0 +1,20 @@
+{
+  "status": "ready_for_review",
+  "full_translation_checked": true,
+  "code_and_numbers_checked": true,
+  "links_and_images_checked": true,
+  "license_checked": true,
+  "checks": [
+    "逐段对照保留原文功能描述，并明确扫描器排名是项目方表述",
+    "官网、下载入口与三张正文配图已检查；动态徽章及其余链接未逐个联网",
+    "Apache-2.0 许可全文已保存"
+  ],
+  "link_results": {
+    "https://www.zaproxy.org/": 200,
+    "https://www.zaproxy.org/download/": 200,
+    "https://raw.githubusercontent.com/wiki/zaproxy/zaproxy/images/zap-by-checkmarx.png": 200,
+    "https://raw.githubusercontent.com/wiki/zaproxy/zaproxy/images/ZAP-Download.png": 200,
+    "https://raw.githubusercontent.com/wiki/zaproxy/zaproxy/images/zap-website.png": 200
+  },
+  "issues": []
+}

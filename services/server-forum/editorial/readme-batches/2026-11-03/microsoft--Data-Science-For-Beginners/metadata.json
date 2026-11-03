@@ -1,0 +1,97 @@
+{
+  "inventory_index": 92,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:17:42.271533+00:00",
+    "cover_accent": "#9C6C91",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "数据科学",
+      "数据分析",
+      "可视化"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "balanced",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 7626,
+    "full_name": "microsoft/Data-Science-For-Beginners",
+    "getting_started": "先选一份公开练习数据，跟随课程完成清理和可视化。",
+    "highlights": [
+      "帮助认识完整数据工作流",
+      "提供课程与实践材料"
+    ],
+    "homepage_url": "https://github.com/microsoft/Data-Science-For-Beginners",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-07-17T20:10:36Z",
+    "last_pushed_at": "2026-10-21T03:27:14Z",
+    "name": "数据科学入门",
+    "notes": [
+      "处理真实数据时需要另外确认隐私、来源与使用权限。"
+    ],
+    "order": 93,
+    "readme_sha": "d09f4307c8baff999b92df3d80763bb7e1e2c817",
+    "related_categories": [
+      "dev"
+    ],
+    "source_url": "https://github.com/microsoft/Data-Science-For-Beginners/blob/main/README.md",
+    "stars": 37897,
+    "summary": "围绕数据科学基础、分析与可视化组织的课程材料。",
+    "tags": [
+      "数据科学",
+      "数据分析",
+      "可视化"
+    ],
+    "title": "把数据收集、分析和表达连成一条线",
+    "watchers": 549
+  },
+  "repository": "microsoft/Data-Science-For-Beginners",
+  "fetched_at": "2026-11-03T01:50:56.507699+00:00",
+  "canonical_repository": "microsoft/Data-Science-For-Beginners",
+  "default_branch": "main",
+  "commit_sha": "4d2ac427ad6f022e73a75c4f46a28bbb7978ec3f",
+  "readme_path": "README.md",
+  "readme_blob_sha": "d09f4307c8baff999b92df3d80763bb7e1e2c817",
+  "readme_url": "https://github.com/microsoft/Data-Science-For-Beginners/blob/4d2ac427ad6f022e73a75c4f46a28bbb7978ec3f/README.md",
+  "stars": 37908,
+  "pushed_at": "2026-10-21T03:27:14Z",
+  "stars_fetched_at": "2026-11-03T01:51:00.482685+00:00",
+  "license_spdx": "MIT",
+  "homepage_url": "",
+  "icon_source_url": "",
+  "license_path": "LICENSE",
+  "license_blob_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
+  "license_url": "https://github.com/microsoft/Data-Science-For-Beginners/blob/4d2ac427ad6f022e73a75c4f46a28bbb7978ec3f/LICENSE",
+  "source_language": "English",
+  "official_chinese_candidate": {
+    "path": "translations/zh-CN/README.md",
+    "blob_sha": "e18f68e1c7f8fffe0a896fbb435ecd6580f57958",
+    "url": "https://github.com/microsoft/Data-Science-For-Beginners/blob/4d2ac427ad6f022e73a75c4f46a28bbb7978ec3f/translations/zh-CN/README.md",
+    "fetched_at": "2026-11-03T01:51:40.341726+00:00",
+    "status": "同提交上游自动中文；已逐节核对正文、20 课主题、目标及作者，保留上游 AI 翻译免责声明"
+  },
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/microsoft/Data-Science-For-Beginners",
+  "translation_attribution": "官方中文（上游自动翻译），待人工全文审校",
+  "relative_link_resolution": "中文从 translations/zh-CN 目录、英文从仓库根目录解析相对链接至固定提交",
+  "description_zh": "通过 20 节项目课程学习数据科学基础的免费教材。",
+  "official_entry": {
+    "url": "https://github.com/microsoft/Data-Science-For-Beginners",
+    "kind": "查看文档",
+    "verification": "项目仓库及课程入口，HTTP HEAD 200"
+  },
+  "platforms": [],
+  "icon_display": "项目名占位，未发现已核实项目图标",
+  "image_license": "官方课程插图仅引用固定提交外链，未复制素材；单独图片权利待后续核实。"
+}

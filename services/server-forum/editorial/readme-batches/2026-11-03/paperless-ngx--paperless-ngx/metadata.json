@@ -1,0 +1,89 @@
+{
+  "inventory_index": 76,
+  "original_key": null,
+  "inventory_item": {
+    "audience": "适合希望自主组织笔记、文档和团队工作的人。",
+    "category": "office",
+    "collected_at": "2026-11-02T18:17:10.911830+00:00",
+    "cover_accent": "#6F7884",
+    "cover_caption": "项目官方 README 展示图",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "文档归档",
+      "OCR",
+      "自部署"
+    ],
+    "cover_style": "screen",
+    "cover_template": "screenshot",
+    "cover_url": "/open-source-media/paperless-screen.png",
+    "cover_variant": "balanced",
+    "effort": "按官方指南安装或部署",
+    "featured": true,
+    "forks": 3330,
+    "full_name": "paperless-ngx/paperless-ngx",
+    "getting_started": "按官方部署文档导入几份公开扫描件，先校验识别和归档结果。",
+    "highlights": [
+      "把扫描件与文字索引关联",
+      "支持标签和文档检索"
+    ],
+    "homepage_url": "https://github.com/paperless-ngx/paperless-ngx",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/paperless-ngx/paperless-ngx/main/docs/assets/logo_full_black.png",
+    "icon_url": "/open-source-media/paperless-icon.png",
+    "last_commit_at": "2026-11-02T16:53:17Z",
+    "last_pushed_at": "2026-11-02T17:22:22Z",
+    "name": "Paperless-ngx",
+    "notes": [
+      "OCR 质量依语言和原始扫描质量而异；资料仍需独立备份。"
+    ],
+    "order": 77,
+    "readme_sha": "f1e5141043dcb5e36b496c7ce71192d9e5e24aea",
+    "related_categories": [
+      "web"
+    ],
+    "source_url": "https://github.com/paperless-ngx/paperless-ngx/blob/dev/README.md",
+    "stars": 47582,
+    "summary": "用于接收、识别、索引和归档纸质文档扫描件的管理系统。",
+    "tags": [
+      "文档归档",
+      "OCR",
+      "自部署"
+    ],
+    "title": "把扫描件整理成能搜索的文档库",
+    "watchers": 164
+  },
+  "repository": "paperless-ngx/paperless-ngx",
+  "fetched_at": "2026-11-03T01:50:46.513188+00:00",
+  "canonical_repository": "paperless-ngx/paperless-ngx",
+  "default_branch": "dev",
+  "commit_sha": "cd58cffd89e2dd2cd5098f18da6ec659509c2a15",
+  "readme_path": "README.md",
+  "readme_blob_sha": "f1e5141043dcb5e36b496c7ce71192d9e5e24aea",
+  "readme_url": "https://github.com/paperless-ngx/paperless-ngx/blob/cd58cffd89e2dd2cd5098f18da6ec659509c2a15/README.md",
+  "stars": 47604,
+  "pushed_at": "2026-11-03T00:32:36Z",
+  "stars_fetched_at": "2026-11-03T01:50:48.590486+00:00",
+  "license_spdx": "GPL-3.0",
+  "homepage_url": "http://docs.paperless-ngx.com/",
+  "icon_source_url": "https://raw.githubusercontent.com/paperless-ngx/paperless-ngx/cd58cffd89e2dd2cd5098f18da6ec659509c2a15/docs/assets/logo_full_black.png",
+  "license_path": "LICENSE",
+  "license_blob_sha": "733c072369ca77331f392c40da7404c85c36542c",
+  "license_url": "https://github.com/paperless-ngx/paperless-ngx/blob/cd58cffd89e2dd2cd5098f18da6ec659509c2a15/LICENSE",
+  "source_language": "English",
+  "archived": false,
+  "fork": false,
+  "disabled": false,
+  "official_repository_url": "https://github.com/paperless-ngx/paperless-ngx",
+  "translation_attribution": "非官方中文全文译文",
+  "relative_link_resolution": "README 相对图像及移动分支的仓库文档图像指向固定提交；代码命令保持原样",
+  "description_zh": "将纸质文件整理为可搜索数字档案的自托管文档管理工具。",
+  "official_entry": {
+    "url": "https://github.com/paperless-ngx/paperless-ngx/blob/cd58cffd89e2dd2cd5098f18da6ec659509c2a15/docs/index.md",
+    "kind": "查看文档",
+    "verification": "上游仓库同一提交的官方文档首页；文档网站本次返回 403"
+  },
+  "platforms": [],
+  "image_license": "官方 Logo 和截图使用固定提交外链，未复制素材；单独图片权利待后续核实。"
+}

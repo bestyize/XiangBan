@@ -1,0 +1,112 @@
+{
+  "inventory_key": "microsoft/AI-For-Beginners",
+  "full_name": "microsoft/AI-For-Beginners",
+  "inventory_entry": {
+    "audience": "适合希望按清楚的路线动手学习技术的人。",
+    "category": "learn",
+    "collected_at": "2026-11-02T18:17:40.266415+00:00",
+    "cover_accent": "#718260",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "notes",
+    "cover_lines": [
+      "人工智能",
+      "基础课程",
+      "实践"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "阅读与动手练习",
+    "featured": true,
+    "forks": 13715,
+    "full_name": "microsoft/AI-For-Beginners",
+    "getting_started": "从课程导航选择适合基础的主题，逐步完成练习。",
+    "highlights": [
+      "按主题组织基础知识",
+      "搭配实践材料辅助理解"
+    ],
+    "homepage_url": "https://github.com/microsoft/AI-For-Beginners",
+    "icon_fit": "contain",
+    "icon_source_url": "",
+    "icon_url": "",
+    "last_commit_at": "2026-09-04T15:24:51Z",
+    "last_pushed_at": "2026-10-23T23:55:14Z",
+    "name": "人工智能入门",
+    "notes": [
+      "历史课程涉及的依赖和外部平台需要按当前文档检查。"
+    ],
+    "order": 52,
+    "readme_sha": "241acdd14005bf18a832d1695e9f855313f61d03",
+    "related_categories": [
+      "ai"
+    ],
+    "source_url": "https://github.com/microsoft/AI-For-Beginners/blob/main/README.md",
+    "stars": 70476,
+    "summary": "覆盖人工智能基础主题的课程与教学资源。",
+    "tags": [
+      "人工智能",
+      "基础课程",
+      "实践"
+    ],
+    "title": "从概念、练习与案例认识人工智能",
+    "watchers": 662
+  },
+  "fetched_at": "2026-11-03T01:50:53.010891+00:00",
+  "status": "ready_for_review",
+  "canonical_full_name": "microsoft/AI-For-Beginners",
+  "repository_url": "https://github.com/microsoft/AI-For-Beginners",
+  "default_branch": "main",
+  "stars": 70499,
+  "pushed_at": "2026-10-23T23:55:14Z",
+  "pushed_at_basis": "GitHub repository pushed_at",
+  "license_spdx": "MIT",
+  "homepage": "",
+  "archived": false,
+  "fork": false,
+  "icon_source_url": null,
+  "commit_sha": "392d0df1b2647cbee104942390551f1ed9e072c8",
+  "license": {
+    "path": "LICENSE",
+    "blob_sha": "9e841e7a26e4eb057b24511e7b92d42b257a80e5",
+    "source_url": "https://github.com/microsoft/AI-For-Beginners/blob/392d0df1b2647cbee104942390551f1ed9e072c8/LICENSE",
+    "spdx": "MIT"
+  },
+  "readme": {
+    "path": "README.md",
+    "blob_sha": "241acdd14005bf18a832d1695e9f855313f61d03",
+    "source_url": "https://github.com/microsoft/AI-For-Beginners/blob/392d0df1b2647cbee104942390551f1ed9e072c8/README.md",
+    "raw_url": "https://raw.githubusercontent.com/microsoft/AI-For-Beginners/392d0df1b2647cbee104942390551f1ed9e072c8/README.md",
+    "size_bytes": 29097,
+    "language_unverified": "English candidate"
+  },
+  "official_zh_candidates": [
+    {
+      "path": "translations/zh-CN/README.md",
+      "blob_sha": "c883d9bd1c2e19b872175cc0274510bfab18ebc2"
+    }
+  ],
+  "official_zh_tree_truncated": false,
+  "official_zh_source": {
+    "path": "translations/zh-CN/README.md",
+    "blob_sha": "c883d9bd1c2e19b872175cc0274510bfab18ebc2",
+    "source_url": "https://github.com/microsoft/AI-For-Beginners/blob/392d0df1b2647cbee104942390551f1ed9e072c8/translations/zh-CN/README.md",
+    "status": "待核实是否为同项目完整中文及许可证"
+  },
+  "source_language": "en",
+  "translation_source": "基于官方中文补译",
+  "translation_basis_commit": "392d0df1b2647cbee104942390551f1ed9e072c8",
+  "translation_changes": [
+    "补译官方中文缺失的参与贡献章节",
+    "相对链接固定到采集提交",
+    "保留官方 AI 翻译免责声明"
+  ],
+  "icon_fallback": "项目名称占位",
+  "official_entry": {
+    "url": "https://github.com/microsoft/AI-For-Beginners",
+    "kind": "查看文档"
+  },
+  "plain_summary": "通过课程和实践示例学习人工智能基础。"
+}

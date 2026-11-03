@@ -1,0 +1,102 @@
+{
+  "inventory_index": 140,
+  "original_key": "luanti-org/luanti",
+  "repository": "luanti-org/luanti",
+  "catalog": {
+    "audience": "喜欢沙盒世界或想学习模组制作的人。",
+    "category": "fun",
+    "collected_at": "2026-11-02T18:01:42.495643+00:00",
+    "cover_accent": "#7763B4",
+    "cover_caption": "",
+    "cover_focus_x": 50.0,
+    "cover_focus_y": 46.0,
+    "cover_layout": "flow",
+    "cover_lines": [
+      "体素",
+      "沙盒",
+      "模组"
+    ],
+    "cover_style": "illustration",
+    "cover_template": "auto",
+    "cover_url": "",
+    "cover_variant": "wide",
+    "effort": "按官方指南安装或使用",
+    "featured": true,
+    "forks": 2509,
+    "full_name": "luanti-org/luanti",
+    "getting_started": "安装官方版本后选择一个游戏包，再尝试简单模组。",
+    "highlights": [
+      "游戏和模组体系可扩展",
+      "提供 Lua 开发接口"
+    ],
+    "homepage_url": "https://www.luanti.org/",
+    "icon_fit": "contain",
+    "icon_source_url": "https://raw.githubusercontent.com/luanti-org/luanti/master/textures/base/pack/logo.png",
+    "icon_url": "/open-source-media/luanti-icon.png",
+    "last_commit_at": "2026-10-30T22:55:03Z",
+    "last_pushed_at": "2026-10-30T22:55:03Z",
+    "name": "Luanti",
+    "notes": [
+      "引擎与独立游戏包、纹理的许可不同，需分别查看。"
+    ],
+    "order": 141,
+    "readme_sha": "07244389126bb1a6e4fe743b1e1599c5eebeb591",
+    "related_categories": [
+      "learn"
+    ],
+    "source_url": "https://github.com/luanti-org/luanti/blob/master/README.md",
+    "stars": 13809,
+    "summary": "可扩展的开源体素游戏引擎，通过游戏包与模组构建不同玩法。",
+    "tags": [
+      "体素",
+      "沙盒",
+      "模组"
+    ],
+    "title": "从方块世界走进游戏与模组创作",
+    "watchers": 315
+  },
+  "github_url": "https://github.com/luanti-org/luanti",
+  "official_url": "https://www.luanti.org/",
+  "stars": 13810,
+  "code_pushed_at": "2026-10-30T22:55:03Z",
+  "default_branch": "master",
+  "commit_sha": "9c424c44ff523ebce076367e52222ac4d71e94c1",
+  "readme_path": "README.md",
+  "readme_blob_sha": "07244389126bb1a6e4fe743b1e1599c5eebeb591",
+  "readme_source_url": "https://github.com/luanti-org/luanti/blob/9c424c44ff523ebce076367e52222ac4d71e94c1/README.md",
+  "readme_api_url": "https://api.github.com/repos/luanti-org/luanti/contents/README.md?ref=master",
+  "readme_language": "en",
+  "license_spdx": "LGPL-2.1-or-later",
+  "license_source_url": "https://github.com/luanti-org/luanti/blob/9c424c44ff523ebce076367e52222ac4d71e94c1/COPYING.LESSER",
+  "icon_source_url": "https://raw.githubusercontent.com/luanti-org/luanti/9c424c44ff523ebce076367e52222ac4d71e94c1/textures/base/pack/logo.png",
+  "fetched_at": "2026-11-03T01:50:40.216106+00:00",
+  "errors": {},
+  "readme_blob_verified_at_commit": true,
+  "root_license_candidates": [
+    {
+      "name": "COPYING.LESSER",
+      "url": "https://github.com/luanti-org/luanti/blob/9c424c44ff523ebce076367e52222ac4d71e94c1/COPYING.LESSER",
+      "sha": "99f47575b5b0f10bd1035444d143fb0a865d8d19"
+    },
+    {
+      "name": "LICENSE.txt",
+      "url": "https://github.com/luanti-org/luanti/blob/9c424c44ff523ebce076367e52222ac4d71e94c1/LICENSE.txt",
+      "sha": "5ad892b702af65b3d1fd0573094aba09e49aa4e3"
+    }
+  ],
+  "needs_license_review": false,
+  "archived": false,
+  "fork": false,
+  "canonical_repository": "luanti-org/luanti",
+  "license_basis": "README 标记 LGPL-2.1-or-later，游戏素材另有许可",
+  "translation_origin": "非官方中文译文",
+  "image_sources": [
+    "https://raw.githubusercontent.com/luanti-org/luanti/9c424c44ff523ebce076367e52222ac4d71e94c1/textures/base/pack/logo.png"
+  ],
+  "official_entry": {
+    "url": "https://www.luanti.org/",
+    "kind": "项目官网"
+  },
+  "icon_license": "CC-BY-SA-3.0",
+  "icon_attribution": "erle，依据固定提交 LICENSE.txt"
+}
