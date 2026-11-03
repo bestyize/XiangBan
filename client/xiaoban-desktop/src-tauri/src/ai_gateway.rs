@@ -150,7 +150,14 @@ pub async fn ai_gateway_tiers(app: tauri::AppHandle) -> Result<Vec<Tier>, Accoun
     let mut changed = None;
     let io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let mut config = ai_config::load(&path).map_err(|e| e.to_string())?;
-    if is_active(&config) {
+    if config.gateway_enabled && config.active_provider.is_empty() && !config.is_complete() {
+        if let Some(tier) = tiers.iter().find(|tier| tier.is_default && tier.available) {
+            select(&mut config, &tier.tier, &format!("{}/v1", ai_base_url()));
+            config.gateway_reasoning_efforts = tier.reasoning_efforts.clone();
+            ai_config::save(&path, &config).map_err(|e| e.to_string())?;
+            changed = Some(config.view(&ai_config::default_workspace(&app)?));
+        }
+    } else if is_active(&config) {
         let levels = tiers.iter().find(|t| t.tier == config.gateway_tier).map(|t| t.reasoning_efforts.clone()).unwrap_or_default();
         if config.gateway_reasoning_efforts != levels {
             config.gateway_reasoning_efforts = levels;

@@ -114,7 +114,7 @@ watch(() => chat.currentId, (id, before) => {
   if (shown.value) void readModelLabel();
 }, { flush: 'sync' });
 watch(microphoneAllowed, allowed => { if (!allowed && shown.value && !liveActive.value) asr?.deactivate(); }, { flush: 'sync' });
-watch(() => chat.model, () => { if (shown.value) void readModelLabel(); }, { deep: true });
+watch([() => chat.model, () => chat.configured], () => { if (shown.value) void readModelLabel(); }, { deep: true });
 watch(shown, now => { if (!now && !liveActive.value) asr?.deactivate(); else if (now) void readModelLabel(); }, { flush: 'sync' });
 /** 实时对话 sits beside send; it waits while an answer is being written or a dictation is under way. */
 const offersLive = computed(() => Boolean(live && asr) && props.store.desktop && asr!.microphoneSupported !== false);

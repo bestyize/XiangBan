@@ -111,12 +111,22 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
           store.settings.autostart = false;
           return;
         }
+        async function restoreDefaultModel() {
+          if (!store.account || disposed) return;
+          try {
+            const config = await invoke<AiConfigView>('get_ai_config');
+            if (!disposed && store.account && config.gatewayEnabled && !config.activeProvider) {
+              await invoke('ai_gateway_tiers');
+              if (!disposed) await store.chat.refresh();
+            }
+          } catch { /* The model picker can retry when the gateway is reachable. */ }
+        }
         const subscriptions = await Promise.all([
           listen<typeof store.speech.settings>("tts-settings-changed", value => { if (!disposed) store.speech.settings = value; }),
           listen<AiConfigView>("ai-config-changed", () => { if (!disposed) void store.chat.refresh(); }),
           listen<Settings>("settings-changed", (settings) => { if (!disposed) store.settings = settings; }),
           listen<WebsiteStatus>("website-status", (website) => { if (!disposed) store.website = website; }),
-          listen<AccountSession | null>("account-changed", (account) => { if (!disposed) { store.account = account; void invoke('refresh_ai_providers', { force: true }).catch(() => {}); } }),
+          listen<AccountSession | null>("account-changed", (account) => { if (!disposed) { store.account = account; void restoreDefaultModel(); void invoke('refresh_ai_providers', { force: true }).catch(() => {}); } }),
           listen<boolean>("games-active", (active) => { if (!disposed) store.game.active = active; }),
           listen<string | null>("desk-game-active", (id) => { if (!disposed) store.game.desk = { active: !!id, id: id ?? null }; }),
           listen("care-voice-start", () => { if (!disposed) void store.speech.stop(); }),
@@ -135,7 +145,7 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
         else notify(`应用信息读取失败：${initial[1].reason}`, "error");
         if (initial[2].status === "fulfilled") store.library = initial[2].value;
         else notify(`本地壁纸目录读取失败：${initial[2].reason}`, "error");
-        if (initial[3].status === "fulfilled") store.account = initial[3].value;
+        if (initial[3].status === "fulfilled") { store.account = initial[3].value; void restoreDefaultModel(); }
         const secondary = await Promise.allSettled([
           invoke<ControlStore["startup"]>("get_startup_status"), invoke<ControlStore["game"]>("get_game_status"), invoke<WebsiteStatus>("get_website_status"),
         ]);
