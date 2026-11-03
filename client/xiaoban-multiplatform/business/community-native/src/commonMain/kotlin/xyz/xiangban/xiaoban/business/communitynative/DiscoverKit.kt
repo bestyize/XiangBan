@@ -114,13 +114,13 @@ fun VendorIcon(name: String, vendor: ModelVendor?, modifier: Modifier = Modifier
 }
 
 /** 站内落点（`topic:12`、`pack:3`、`tool:cc-switch`、`weekly:2026-W44`）或外链；其余忽略。 */
-fun openLink(link: String, env: CommunityEnv, open: (Route) -> Unit) {
+fun openLink(link: String, open: (Route) -> Unit) {
     when {
         link.startsWith("topic:") -> link.removePrefix("topic:").toLongOrNull()?.let { open(Route.Topic(it)) }
         link.startsWith("pack:") -> link.removePrefix("pack:").toLongOrNull()?.let { open(Route.Pack(it)) }
         link.startsWith("tool:") -> link.removePrefix("tool:").takeIf { it.isNotEmpty() }?.let { open(Route.Tool(it)) }
         link.startsWith("weekly:") -> link.removePrefix("weekly:").takeIf { it.isNotEmpty() }?.let { open(Route.Weekly(it)) }
-        link.startsWith("http") -> env.platform?.openUrl(link)
+        else -> webPageRoute(link)?.let(open)
     }
 }
 

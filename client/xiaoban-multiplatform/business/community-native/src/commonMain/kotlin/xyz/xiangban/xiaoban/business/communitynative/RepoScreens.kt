@@ -185,7 +185,7 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                     item(key = "curated-article") {
                         val catalog = curatedCatalog
                         val project = catalog?.project(name)
-                        if (catalog != null && project != null) OpenSourceArticle(env, catalog, project)
+                        if (catalog != null && project != null) OpenSourceArticle(env, catalog, project, open)
                     }
                 } else {
                 item(key = "hero") {
@@ -234,7 +234,7 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                             )
                             Text(
                                 "在 GitHub 查看 ↗",
-                                Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(LocalExtraColors.current.fill).clickable { env.platform?.openUrl(d.url.ifBlank { "https://github.com/$name" }) }.padding(vertical = 11.dp),
+                                Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(LocalExtraColors.current.fill).clickable { webPageRoute(d.url.ifBlank { "https://github.com/$name" })?.let(open) }.padding(vertical = 11.dp),
                                 fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                             )
                         }

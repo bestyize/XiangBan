@@ -133,6 +133,13 @@ class AndroidPlatformActions(
         runCatching { context.startActivity(view) }
     }
 
+    override fun openInBrowser(url: String) {
+        val browser = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+            .setSelector(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_BROWSER))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(browser) }
+    }
+
     override val supportsChatAttachments: Boolean get() = attachments != null
 
     override suspend fun pickChatAttachment(image: Boolean) = attachments?.pick(image)

@@ -141,7 +141,7 @@ internal fun RecommendTab(env: CommunityEnv, open: (Route) -> Unit, switchTo: (C
     PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = { loader.reload(); frontierLoader.reload() }, modifier = Modifier.fillMaxSize()) {
         LoadBox(state, loader::reload) { home ->
             LazyColumn(Modifier.fillMaxSize(), contentPadding = ListPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
-                if (home.banners.isNotEmpty()) item { BannerCarousel(home.banners) { openLink(it.link, env, open) } }
+                if (home.banners.isNotEmpty()) item { BannerCarousel(home.banners) { openLink(it.link, open) } }
                 item(key = "frontier") { FrontierSection(env, frontierState, frontierLoader::reload, open) }
                 item {
                     Column(Modifier.padding(start = 2.dp, end = 2.dp, top = 10.dp)) {

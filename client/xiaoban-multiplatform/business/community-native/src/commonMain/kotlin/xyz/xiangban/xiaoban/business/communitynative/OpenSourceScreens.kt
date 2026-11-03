@@ -147,7 +147,7 @@ internal fun OpenSourceCollectionScreen(env: CommunityEnv, key: String, back: ()
 
 /** 由仓库详情页承载，评论继续复用同一仓库身份。 */
 @Composable
-internal fun OpenSourceArticle(env: CommunityEnv, catalog: OpenSourceCatalog, project: OpenSourceProject) {
+internal fun OpenSourceArticle(env: CommunityEnv, catalog: OpenSourceCatalog, project: OpenSourceProject, open: (Route) -> Unit) {
     val (saved, setSaved) = rememberPrefFlag(env, "fav_repo:${project.fullName}")
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.fillMaxWidth().outlinedCard(16.dp)) {
@@ -164,7 +164,7 @@ internal fun OpenSourceArticle(env: CommunityEnv, catalog: OpenSourceCatalog, pr
             Text("项目速览", style = XType.Section, fontWeight = FontWeight.SemiBold)
             Text(project.effort, Modifier.padding(top = 12.dp), style = XType.Body)
             Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GhostPillButton("前往 GitHub ↗", { env.platform?.openUrl(project.githubUrl) }, Modifier.weight(1f), height = 44.dp, fontSize = 14, textColor = LocalExtraColors.current.brandInk)
+                GhostPillButton("前往 GitHub ↗", { webPageRoute(project.githubUrl)?.let(open) }, Modifier.weight(1f), height = 44.dp, fontSize = 14, textColor = LocalExtraColors.current.brandInk)
                 GhostPillButton(if (saved) "已收藏" else "收藏项目", { setSaved(!saved) }, Modifier.weight(1f), height = 44.dp, fontSize = 14)
             }
         }
@@ -173,9 +173,9 @@ internal fun OpenSourceArticle(env: CommunityEnv, catalog: OpenSourceCatalog, pr
         OpenSourceSection("从这里开始") { Text(project.gettingStarted, style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         OpenSourceSection("开始前了解一下") { project.notes.forEach { Text("· $it", style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
         OpenSourceSection("继续了解") {
-            OpenSourceLink("项目官网与文档") { env.platform?.openUrl(project.homepageUrl) }
-            OpenSourceLink("README 与源代码") { env.platform?.openUrl(project.sourceUrl) }
-            OpenSourceLink("查看项目许可") { env.platform?.openUrl("${project.githubUrl}#license") }
+            OpenSourceLink("项目官网与文档") { webPageRoute(project.homepageUrl)?.let(open) }
+            OpenSourceLink("README 与源代码") { webPageRoute(project.sourceUrl)?.let(open) }
+            OpenSourceLink("查看项目许可") { webPageRoute("${project.githubUrl}#license")?.let(open) }
             Text("${catalog.notice}\n资料整理：${catalog.reviewedAt}", style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
     }

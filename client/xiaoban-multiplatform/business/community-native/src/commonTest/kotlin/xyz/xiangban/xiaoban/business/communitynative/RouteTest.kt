@@ -9,7 +9,8 @@ class RouteTest {
     fun everyRouteSurvivesEncoding() {
         val routes = listOf(Route.Pack(42), Route.Topic(7), Route.Weekly("2026-W43"), Route.Project("xiaoban"), Route.Login, Route.Devices,
             Route.Tool("cc-switch"), Route.Frontier, Route.FrontierArticle("中文:1"), Route.Articles("create-game", "图文分享"), Route.Daily, Route.News("news-article-1"), Route.Leaderboard, Route.Scatter, Route.Search, Route.NewPost, Route.NewHelp, Route.Settings, Route.Models, Route.AiChat, Route.RemoteChat("dsk_abc123"),
-            Route.OpenSource("AppFlowy-IO", "AppFlowy"), Route.OpenSourceCollection("ideas-to-things"), Route.OpenSourceShares)
+            Route.OpenSource("AppFlowy-IO", "AppFlowy"), Route.OpenSourceCollection("ideas-to-things"), Route.OpenSourceShares,
+            Route.WebPage("https://github.com/example/project?tab=readme&x=a%20b#license"))
         routes.forEach { assertEquals(it, Route.decode(it.encode())) }
         assertEquals(routes, Route.decodeStack(Route.encodeStack(routes)))
     }
@@ -24,6 +25,14 @@ class RouteTest {
         assertEquals(routes, Route.decodeStack(Route.encodeStack(routes)))
         assertNull(Route.decode("publishgame:../private"))
         assertNull(Route.decode("publishgame:"))
+    }
+
+    @Test
+    fun embeddedBrowserAcceptsOnlyWebLinksWithAHost() {
+        assertEquals(Route.WebPage("http://example.org"), webPageRoute("http://example.org"))
+        for (url in listOf("javascript:alert(1)", "file:///tmp/page", "https:///path", "https://user@example.org")) {
+            assertNull(webPageRoute(url))
+        }
     }
 
     @Test

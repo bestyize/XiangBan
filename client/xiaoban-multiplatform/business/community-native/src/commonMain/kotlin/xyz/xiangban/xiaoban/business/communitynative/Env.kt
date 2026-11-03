@@ -60,6 +60,7 @@ interface PlatformActions : VoicePlatform {
     fun copy(text: String)
     fun share(title: String, url: String)
     fun openUrl(url: String)
+    fun openInBrowser(url: String) = openUrl(url)
     /** 结束应用（最外面一页按返回）；平台不支持就什么也不做。 */
     fun exitApp() {}
     /** 在独立沙箱中试玩游戏；平台未实现时返回 false。 */

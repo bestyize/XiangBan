@@ -1,5 +1,6 @@
 package xyz.xiangban.xiaoban.business.communitynative
 
+import io.ktor.http.Url
 import io.ktor.http.encodeURLParameter
 import io.ktor.http.decodeURLPart
 
@@ -30,6 +31,7 @@ sealed interface Route {
     data class Articles(val category: String, val title: String) : Route
     /** 开源热榜项目的站内详情：仓库卡片、中文 README、评论。 */
     data class Repo(val owner: String, val repo: String) : Route
+    data class WebPage(val url: String) : Route
     data class OpenSource(val owner: String, val repo: String) : Route
     data class OpenSourceCollection(val key: String) : Route
     data object OpenSourceShares : Route
@@ -80,6 +82,7 @@ sealed interface Route {
         is FrontierArticle -> "frontier:${key.encodeURLParameter()}"
         is Articles -> "articles:${category.encodeURLParameter()}:${title.encodeURLParameter()}"
         is Repo -> "repo:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
+        is WebPage -> "web:${url.encodeURLParameter()}"
         is OpenSource -> "opensource:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
         is OpenSourceCollection -> "opensource-collection:${key.encodeURLParameter()}"
         OpenSourceShares -> "opensource-shares"
@@ -125,6 +128,7 @@ sealed interface Route {
                 "news" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::News) }.getOrNull()
                 "frontier" -> if (value.isEmpty()) Frontier else runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::FrontierArticle) }.getOrNull()
                 "articles" -> runCatching { Articles(value.substringBefore(':').decodeURLPart(), value.substringAfter(':').decodeURLPart()) }.getOrNull()
+                "web" -> runCatching { webPageRoute(value.decodeURLPart()) }.getOrNull()
                 "opensource-collection" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::OpenSourceCollection) }.getOrNull()
                 "opensource-shares" -> OpenSourceShares
                 "repo", "opensource" -> runCatching {
@@ -167,3 +171,13 @@ sealed interface Route {
 
 /** 悬浮导航里的四个去处（中间的“发布”是弹层，不是页面）。 */
 enum class Tab(val label: String) { Ai("小伴AI"), Games("创造"), Community("社区"), Mine("我的") }
+
+/** Only explicit HTTP(S) URLs with a host can enter the embedded browser. */
+internal fun webPageRoute(url: String): Route.WebPage? {
+    val candidate = url.trim()
+    if (!candidate.startsWith("https://", ignoreCase = true) && !candidate.startsWith("http://", ignoreCase = true)) return null
+    val authority = candidate.substringAfter("://").takeWhile { it !in "/?#" }
+    if (authority.isBlank() || authority.any { it.isWhitespace() || it == '@' || it == '\\' }) return null
+    val parsed = runCatching { Url(candidate) }.getOrNull() ?: return null
+    return candidate.takeIf { parsed.host.isNotBlank() && parsed.user == null && parsed.password == null }?.let { Route.WebPage(it) }
+}
