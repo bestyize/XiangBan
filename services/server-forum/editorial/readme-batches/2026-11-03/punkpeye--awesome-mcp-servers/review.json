@@ -43,7 +43,7 @@
     "total_indexed": 4632,
     "original_fragments": 410,
     "self_range": "L00143–L01800",
-    "self_new_completed": 1000,
+    "self_new_completed": 1409,
     "part_a_range": "L01801–L03400",
     "part_b_range": "L03401–L05095",
     "note": "仅本地分片，尚未合并全文；正文其他段落与完整链接尚待核验，继续 pending。"

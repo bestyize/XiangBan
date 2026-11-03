@@ -1,11 +1,11 @@
 {
   "source": "inventory.json",
   "revision": 2,
-  "updated_at": "2026-11-03T03:22:41.690394+00:00",
+  "updated_at": "2026-11-03T03:30:02.443692+00:00",
   "total": 168,
-  "ready_for_review": 156,
+  "ready_for_review": 160,
   "blocked": 5,
-  "pending": 7,
+  "pending": 3,
   "collections": [
     {
       "description": "开源项目的价值，也藏在创造的过程里。这组项目分别提供画图、发布内容和制作硬件的起点，可以按自己的兴趣与经验选择。",
@@ -695,15 +695,12 @@
       "key": "sharkdp/bat",
       "repository": "sharkdp/bat",
       "directory": "sharkdp--bat",
-      "status": "pending",
+      "status": "ready_for_review",
       "issues": [
-        "需核实 README 是否存在独立许可及图像权利",
-        "待寻找并核对官方中文或完成全文翻译",
-        "待核对相对链接、图片、代码与数字；英文原文语言尚待确认",
-        "已保存上游官方中文候选，尚未审校，也尚未修正相对链接，不能作为最终译文。",
-        "中文候选按 doc/ 基准固定链接，六个源链接失效已在草稿中按固定提交实际路径修复；已补译 Decorations、less、man/帮助高亮，其他章节和命令仍待全文核对。",
-        "58 个英文 fenced 代码块均在中文草稿中逐块原样保留；官方中文独有 Funtoo、Void、Termux 三块额外保留。代码块不代表全部自然语言已审校。",
-        "已核对并修正 Rust 1.79、配置路径、自动分页、暗色主题、输出样式、ANSI 清理、Copyright 2018–2025 等，但其他中文正文仍待逐节审校。"
+        "对照固定提交官方中文和英文，补齐装饰、less、帮助高亮、暗色模式等英文新增内容，修正 Rust 最低版本、分页选项、版权年份、配置路径及其他译文差异。",
+        "58 个英文代码块按顺序逐块原样保留，官方中文独有 Funtoo、Void、Termux 三个安装块保留并在译注标明。",
+        "同提交中文候选的 6 个相对链接按 doc/ 解析失效，已修正指向英文原文所在的固定版本目标并注明；原始候选保留。",
+        "README 三张示意图和 Logo 均返回可读图片，固定仓库链接与关键文档入口已验证；外部图片权利依上游来源，不推定项目许可证涵盖。"
       ]
     },
     {
@@ -711,11 +708,11 @@
       "key": "crewAIInc/crewAI",
       "repository": "crewAIInc/crewAI",
       "directory": "crewAIInc--crewAI",
-      "status": "pending",
+      "status": "ready_for_review",
       "issues": [
-        "需核实 README 是否存在独立许可及图像权利",
-        "待寻找并核对官方中文或完成全文翻译",
-        "待核对相对链接、图片、代码与数字；英文原文语言尚待确认"
+        "全文翻译并对照 54 个标题和 21 条 FAQ；23 个代码块和行内代码与英文原文一致。",
+        "默认遥测范围、share_crew 扩展数据及 OTEL_SDK_DISABLED 停用方式均按项目原文保留；商业服务和性能声明明确归于上游。",
+        "中文标题恢复 35 个上游目录锚点；12 个固定版本与关键官方入口访问成功，MIT 原始许可证与官方图标保留。"
       ]
     },
     {
@@ -855,7 +852,9 @@
       "issues": [
         "需核实 README 是否存在独立许可及图像权利",
         "待寻找并核对官方中文或完成全文翻译",
-        "待核对相对链接、图片、代码与数字；英文原文语言尚待确认"
+        "待核对相对链接、图片、代码与数字；英文原文语言尚待确认",
+        "英文固定版本与 MIT 许可已整理；源文 Basecamp 链接缺协议，需核实并在译文修复。",
+        "中文草稿仅开头已译，后续仍为英文，不可发布；已保留个人非生产用途和自托管能力要求警告。"
       ]
     },
     {
@@ -1015,11 +1014,12 @@
       "key": "microsoft/playwright-mcp",
       "repository": "microsoft/playwright-mcp",
       "directory": "microsoft--playwright-mcp",
-      "status": "pending",
+      "status": "ready_for_review",
       "issues": [
-        "需核实 README 是否存在独立许可及图像权利",
-        "待寻找并核对官方中文或完成全文翻译",
-        "待核对相对链接、图片、代码与数字；英文原文语言尚待确认"
+        "按固定源逐行完整翻译正文、全部配置选项与工具参数；配置示例中自然语言注释已译，可执行代码和配置值保留。",
+        "逐块比较全部代码围栏的非注释内容一致，原始源文件 Git blob SHA 已核对。",
+        "原文无相对 Markdown 目标；官方入口保留。未逐一联网验证全部外链，缺图使用项目名占位。",
+        "源文明确指出 Playwright MCP 不是安全边界，保留文件访问、网络源与不安全代码执行的限制。"
       ]
     },
     {
@@ -1267,11 +1267,11 @@
       "key": "radareorg/radare2",
       "repository": "radareorg/radare2",
       "directory": "radareorg--radare2",
-      "status": "pending",
+      "status": "ready_for_review",
       "issues": [
-        "许可证识别或适用范围尚待核实；未保存 README。",
-        "已检查根目录 LICENSE/COPYING 等候选，仍需人工核验文本和 README 适用范围。",
-        "固定提交 README.md 已按 Git blob SHA 校验并保存；文档适用许可尚需核定，未开始翻译或发布。"
+        "README 明示 LGPLv3 分发、插件许可各异，COPYING.md 列出大部分项目为 LGPLv3；保存固定版本 LGPLv3 文本。README 未说明 only 或 later，元数据 SPDX 保持 NOASSERTION。",
+        "完整保留所有插件、平台、架构、文件系统、格式及版本；全部代码块和行内代码与原文一致。",
+        "40 个 GitHub、官方入口和图片链接核验成功；原文 #contributing 锚点不存在，中文指向同版本 CONTRIBUTING.md 并在译注说明。"
       ]
     },
     {

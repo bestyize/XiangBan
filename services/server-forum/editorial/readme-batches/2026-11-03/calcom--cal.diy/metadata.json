@@ -71,9 +71,14 @@
   "license_path": "LICENSE",
   "license_blob_sha": "98b51fbaac9145f1919fd2a79532acdb04a8f24b",
   "license_url": "https://github.com/calcom/cal.diy/blob/81ce067c1d0e16b21c39c2de98b9a43a92562cd1/LICENSE",
-  "source_language": "unverified",
+  "source_language": "en",
   "archived": false,
   "fork": false,
   "disabled": false,
-  "official_repository_url": "https://github.com/calcom/cal.diy"
+  "official_repository_url": "https://github.com/calcom/cal.diy",
+  "official_entry": {
+    "url": "https://cal.diy",
+    "kind": "official_website"
+  },
+  "draft_status": "开头已手工翻译，后续英文未完成，尚不可发布"
 }

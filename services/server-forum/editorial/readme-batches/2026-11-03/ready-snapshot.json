@@ -1,7 +1,7 @@
 {
   "inventory_revision": 2,
-  "created_at": "2026-11-03T03:22:41.926386+00:00",
-  "count": 156,
+  "created_at": "2026-11-03T03:30:02.678607+00:00",
+  "count": 160,
   "excluded": [],
   "usage": "每次使用前重新校验每个文件 SHA-256；哈希不一致即舍弃该项目并重建快照。ready_for_review 仅表示待审。",
   "projects": [
@@ -2941,6 +2941,101 @@
     },
     {
       "card": {
+        "original_key": "sharkdp/bat",
+        "repo": "sharkdp/bat",
+        "name": "bat",
+        "summary_zh": "为文件内容查看增加语法高亮与 Git 相关信息的命令行工具。",
+        "icon_source_url": "https://raw.githubusercontent.com/sharkdp/bat/67e2ec24e0284694c10d1e25166fc97aad15845e/doc/logo-header.svg",
+        "icon_license": null,
+        "icon_attribution": null,
+        "primary_url": "https://github.com/sharkdp/bat",
+        "primary_label": "official_repository",
+        "github_url": "https://github.com/sharkdp/bat",
+        "stars": 61035,
+        "stars_fetched_at": "2026-11-03T01:50:40.043081+00:00",
+        "code_updated_at": "2026-11-02T20:07:29Z",
+        "code_updated_basis": "GitHub repository pushed_at",
+        "license": "MIT OR Apache-2.0",
+        "documentation_license": null,
+        "platforms": [],
+        "readme_zh_path": "sharkdp--bat/README.zh-CN.md",
+        "readme_en_path": "sharkdp--bat/README.en.md",
+        "status": "ready_for_review",
+        "github_archived": false,
+        "github_fork": false,
+        "upstream_maintenance_notice": null,
+        "category": "dev",
+        "related_categories": [],
+        "tags": [
+          "文件查看",
+          "语法高亮",
+          "终端"
+        ],
+        "collections": [],
+        "field_notes": [
+          "运行平台尚未核定，留空"
+        ]
+      },
+      "files_sha256": {
+        "sharkdp--bat/README.source.md": "6ce2a931bf4c7da9486c7e6c8a5df8f9bbb82288184f49b6b2d8701eec03cb0a",
+        "sharkdp--bat/README.zh-CN.md": "a7de913d924062cf40a25d4bc379ab21503a8152b928a64699d6ec3862ccb271",
+        "sharkdp--bat/README.en.md": "7edb0f0070f59312f6c24c7b47d58ff95e0a00c33c0607306a5dd457b714b185",
+        "sharkdp--bat/metadata.json": "a0eab4e6796cc9e236fc5dff0cda6414e1a070d557c1e8878ddd4cdff1709e31",
+        "sharkdp--bat/review.json": "d128250260a142ea7d7801a0916d1c5cdd5ba01a5082093768724e0f8ff685f5",
+        "sharkdp--bat/LICENSE.MIT": "dccda9eb9533f5c65624a1106536c6cfde46008d58e60b3faf154e8b9fd5b46e",
+        "sharkdp--bat/LICENSE.upstream": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      }
+    },
+    {
+      "card": {
+        "original_key": "crewAIInc/crewAI",
+        "repo": "crewAIInc/crewAI",
+        "name": "CrewAI",
+        "summary_zh": "围绕角色、任务与流程组织多智能体应用的框架。",
+        "icon_source_url": "https://raw.githubusercontent.com/crewAIInc/crewAI/86dca29b536d700b69a97a3592857d5f9d4a8873/docs/images/crewai_logo.png",
+        "icon_license": null,
+        "icon_attribution": null,
+        "primary_url": "https://crewai.com",
+        "primary_label": "official_website",
+        "github_url": "https://github.com/crewAIInc/crewAI",
+        "stars": 60432,
+        "stars_fetched_at": "2026-11-03T01:50:39.657883+00:00",
+        "code_updated_at": "2026-11-03T00:27:16Z",
+        "code_updated_basis": "GitHub repository pushed_at",
+        "license": "MIT",
+        "documentation_license": null,
+        "platforms": [],
+        "readme_zh_path": "crewAIInc--crewAI/README.zh-CN.md",
+        "readme_en_path": "crewAIInc--crewAI/README.en.md",
+        "status": "ready_for_review",
+        "github_archived": false,
+        "github_fork": false,
+        "upstream_maintenance_notice": null,
+        "category": "ai",
+        "related_categories": [
+          "dev"
+        ],
+        "tags": [
+          "多智能体",
+          "任务编排",
+          "Python"
+        ],
+        "collections": [],
+        "field_notes": [
+          "运行平台尚未核定，留空"
+        ]
+      },
+      "files_sha256": {
+        "crewAIInc--crewAI/README.source.md": "b0f39843f93676b12883d5821a34555e2146e62bd2c42dc12733fc41222de013",
+        "crewAIInc--crewAI/README.zh-CN.md": "cd1e280fe0123ffc5a10f0670b3b16cdabcf881d92e10efc982fae0378e46aee",
+        "crewAIInc--crewAI/README.en.md": "bc23924a962f43ba43cbc2e6e354d75fe3f51b4d2872556d0544cb4415c8aa9e",
+        "crewAIInc--crewAI/metadata.json": "1e69a4ca43b7e043b81982d48d3baf1fb0ffa216a17f1fc5e1d2ff43887e7abc",
+        "crewAIInc--crewAI/review.json": "dd24ddd74c6d59c5cbe998bf4a1cb2709757d0865f66c454e84e55e0c2f490d2",
+        "crewAIInc--crewAI/LICENSE.upstream": "28868731966f4aa37f02879839aabc797137e27ddde4e274ef9cf965f9a71774"
+      }
+    },
+    {
+      "card": {
         "original_key": "jellyfin/jellyfin",
         "repo": "jellyfin/jellyfin",
         "name": "Jellyfin",
@@ -4058,6 +4153,56 @@
     },
     {
       "card": {
+        "original_key": "microsoft/playwright-mcp",
+        "repo": "microsoft/playwright-mcp",
+        "name": "Playwright MCP",
+        "summary_zh": "让 AI 工具通过 Playwright 操作浏览器，读取页面并执行自动化任务。",
+        "icon_source_url": null,
+        "icon_license": null,
+        "icon_attribution": null,
+        "primary_url": "https://www.npmjs.com/package/@playwright/mcp",
+        "primary_label": "npm 官方软件包",
+        "github_url": "https://github.com/microsoft/playwright-mcp",
+        "stars": 39055,
+        "stars_fetched_at": "2026-11-03T01:50:57.554333+00:00",
+        "code_updated_at": "2026-11-01T23:12:55Z",
+        "code_updated_basis": "GitHub repository pushed_at",
+        "license": "Apache-2.0",
+        "documentation_license": null,
+        "platforms": [],
+        "readme_zh_path": "microsoft--playwright-mcp/README.zh-CN.md",
+        "readme_en_path": "microsoft--playwright-mcp/README.en.md",
+        "status": "ready_for_review",
+        "github_archived": false,
+        "github_fork": false,
+        "upstream_maintenance_notice": null,
+        "category": "skills",
+        "related_categories": [
+          "dev",
+          "ai"
+        ],
+        "tags": [
+          "浏览器自动化",
+          "MCP",
+          "测试"
+        ],
+        "collections": [],
+        "field_notes": [
+          "项目图标尚未核定，留空",
+          "运行平台尚未核定，留空"
+        ]
+      },
+      "files_sha256": {
+        "microsoft--playwright-mcp/README.source.md": "b3a0d1f804f4db560344ae3ef98e8e8497d9c41d2fc433a95d4060c40a401d4b",
+        "microsoft--playwright-mcp/README.zh-CN.md": "7d6e3c108c90806bd602763c0c5af2480cfb4fb9bb6c638ccd0c5be4fcb387f9",
+        "microsoft--playwright-mcp/README.en.md": "b3a0d1f804f4db560344ae3ef98e8e8497d9c41d2fc433a95d4060c40a401d4b",
+        "microsoft--playwright-mcp/metadata.json": "1eef68ce45c76fbf4f7e91d79cb953dbdcbbca26833066c65037f6d54437fb26",
+        "microsoft--playwright-mcp/review.json": "ce0d1cf03a8546bfdf102fecfe77e696110d489e2891b2f2056c65d15cce219d",
+        "microsoft--playwright-mcp/LICENSE.upstream": "9a7110fc2d2f964038e5dc49128f908f29f47a574c961cba16085914e879cbda"
+      }
+    },
+    {
+      "card": {
         "original_key": "TriliumNext/Trilium",
         "repo": "TriliumNext/Trilium",
         "name": "Trilium Notes",
@@ -4949,6 +5094,57 @@
         "agentskills--agentskills/review.json": "5b4af13083ed2eb7ccd75b0311ca3fd6264a1e9b3ee730569e81f7231167c9cd",
         "agentskills--agentskills/LICENSE.docs.CC-BY-4.0.txt": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411",
         "agentskills--agentskills/LICENSE.upstream": "993da3f8d330d69108e521636555f7783ef81d46b904394c59ec5ff651331fe5"
+      }
+    },
+    {
+      "card": {
+        "original_key": "radareorg/radare2",
+        "repo": "radareorg/radare2",
+        "name": "radare2",
+        "summary_zh": "包含反汇编、调试与二进制分析能力的逆向工程框架。",
+        "icon_source_url": "https://raw.githubusercontent.com/radareorg/radare2/70c2da061abbbca8fe51ea742c12b7e24483d8be/doc/images/r2emoji.png",
+        "icon_license": null,
+        "icon_attribution": null,
+        "primary_url": "https://www.radare.org",
+        "primary_label": "official_website",
+        "github_url": "https://github.com/radareorg/radare2",
+        "stars": 25263,
+        "stars_fetched_at": "2026-11-03T01:51:11.750973+00:00",
+        "code_updated_at": "2026-11-03T01:45:44Z",
+        "code_updated_basis": "GitHub repository pushed_at",
+        "license": null,
+        "documentation_license": null,
+        "platforms": [],
+        "readme_zh_path": "radareorg--radare2/README.zh-CN.md",
+        "readme_en_path": "radareorg--radare2/README.en.md",
+        "status": "ready_for_review",
+        "github_archived": false,
+        "github_fork": false,
+        "upstream_maintenance_notice": null,
+        "category": "security",
+        "related_categories": [
+          "dev"
+        ],
+        "tags": [
+          "反汇编",
+          "命令行",
+          "逆向"
+        ],
+        "collections": [],
+        "field_notes": [
+          "许可尚未核定，留空",
+          "运行平台尚未核定，留空"
+        ]
+      },
+      "files_sha256": {
+        "radareorg--radare2/README.source.md": "dc86af03a0eb92735a59fa18e397520a90d593683abd504d5f85f4f80db1b7c9",
+        "radareorg--radare2/README.zh-CN.md": "c36c7071787c09271f4af421b97b40064f2759d2a4ae5b6ee666ba5d0b74ad71",
+        "radareorg--radare2/README.en.md": "cea022abd65a91ac9cf49fb9f9a183e5f7d45acec37c3bcdd48fa7aa38ba7da7",
+        "radareorg--radare2/metadata.json": "fb00a025fac582f0fe9545a65438568109b767f8b8463047c74d9fd91f1b950a",
+        "radareorg--radare2/review.json": "99c77c60f7b6fb26c8679991fd7d555c1edc9e2f7a9c05acc7aa2b99dc6f6aae",
+        "radareorg--radare2/LICENSE.LGPL-3.0-only": "0740dfbcda3fd11515fae1a49b9238ddf2316c30d53fa7209823377314dd241f",
+        "radareorg--radare2/LICENSE.candidate.COPYING.md": "c4154ac363318953bc18c8faf4b41dad3457ee51475d63e708db7b41570ffa79",
+        "radareorg--radare2/LICENSE.upstream": "c4154ac363318953bc18c8faf4b41dad3457ee51475d63e708db7b41570ffa79"
       }
     },
     {

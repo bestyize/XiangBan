@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "released_at": "2026-11-03T03:24:19.243636+00:00",
+  "released_at": "2026-11-03T03:30:30.073114+00:00",
   "inventory_revision": 2,
   "projects": {
     "codecrafters-io/build-your-own-x": "projects/4bc429ff2e57b5c944776dfd19117dc32f3b6eacf3a4f64ee635629537449da1.json",
@@ -63,6 +63,8 @@
     "withastro/astro": "projects/6929bf24c9c8b18033bc42b9495ad38916bd644696457a9c1afcb25ec1cd7aef.json",
     "penpot/penpot": "projects/e76ff9f281410e25983223181216063e24156c2088f74f83879e43e20f67b596.json",
     "microsoft/autogen": "projects/9d0cdd0f1ba11894f24d53a9d681895b60f010df0d0d215c6fb82e557e1d9c3b.json",
+    "sharkdp/bat": "projects/4302507f7f2c153bc98011833cf6010b0f726133acd91322a18b25c91f554c55.json",
+    "crewaiinc/crewai": "projects/bf122b6a409c82d3d68181ee17076fea5929bc61c5455cfe5e466d6340a7a776.json",
     "jellyfin/jellyfin": "projects/9587edfde198c7be9ba1088a6a75b519fd6ac90e14407889a27f6133b9c7bcfe.json",
     "go-gitea/gitea": "projects/70e3d189305bdf29eb83c895bb9b4c4295583d5deb1c60900412f7ee5b0c3bb8.json",
     "appwrite/appwrite": "projects/750846ab95b9a5e1a98d3fb241ef0781acd85abd61a95404aced77716f818dd2.json",
@@ -86,6 +88,7 @@
     "corentinth/it-tools": "projects/c1ee2d2ffbdfb584e3bd17d8f470b2f251c035c79af14b369c91e2b14a3cc7ef.json",
     "hkuds/lightrag": "projects/6d6de530a543b8d39e7b1272f310e5e2ee3023140282f84c136d286ccd1b4283.json",
     "umami-software/umami": "projects/2f212ff67a1960081af1f782f95bffb8a203eaf84f443e172dccaf42a1d9d9d3.json",
+    "microsoft/playwright-mcp": "projects/e45caffe3db44a715a06559439c58f15e915bc74cb9ba5624165138f588d932e.json",
     "triliumnext/trilium": "projects/73eff9d30038d1c6383719ff205063a11fdfe791ae0316450326a22c579c236b.json",
     "sgl-project/sglang": "projects/5f218f500451efce38a4329e509c1b01dae3a752bbe23121767c5b009d1fbd7f.json",
     "microsoft/data-science-for-beginners": "projects/6af60d72bd5554e86a40eaceec87def2697e448fda99efc5057b0b84bc28af50.json",
@@ -104,6 +107,7 @@
     "hashcat/hashcat": "projects/96a6c27091f3436a5fa679d22829ebef0283ba395c13644d9916230efea9dc1a.json",
     "ibotpeaches/apktool": "projects/e0e5a53361379da5255409994b1724969114fc66c8a3f0309d438c2c9a7ff4d1.json",
     "agentskills/agentskills": "projects/b6f892874bd1c368d3419dc2fdf83082fa4c20959b03a6cabc2e3cac025bf0db.json",
+    "radareorg/radare2": "projects/cfe8b75d21c80a0971395bc955a43c2606f86ba39cddfbc0bfcc81c3a49ebf2f.json",
     "arendst/tasmota": "projects/01c1b9beecca6a8f65f212571d3ff5233be7ebde3941eba4c8f00865b3eaba07.json",
     "handbrake/handbrake": "projects/5930a00a4f07aaf5a3e692e5092437bef25e277cee97ff251ed93451d9e70625.json",
     "navidrome/navidrome": "projects/bcb19527cfc241c380bdb00420cb8056200c65933d3347c4cbc580383a58144b.json",

@@ -3,14 +3,16 @@
   "checks": {
     "source_version_captured": true,
     "full_chinese": false,
-    "english_original": false,
-    "license_reviewed": false,
+    "english_original": true,
+    "license_reviewed": true,
     "links_and_images_reviewed": false,
     "code_and_numbers_reviewed": false
   },
   "issues": [
     "需核实 README 是否存在独立许可及图像权利",
     "待寻找并核对官方中文或完成全文翻译",
-    "待核对相对链接、图片、代码与数字；英文原文语言尚待确认"
+    "待核对相对链接、图片、代码与数字；英文原文语言尚待确认",
+    "英文固定版本与 MIT 许可已整理；源文 Basecamp 链接缺协议，需核实并在译文修复。",
+    "中文草稿仅开头已译，后续仍为英文，不可发布；已保留个人非生产用途和自托管能力要求警告。"
   ]
 }

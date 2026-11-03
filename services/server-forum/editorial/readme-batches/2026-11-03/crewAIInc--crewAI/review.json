@@ -1,16 +1,20 @@
 {
-  "status": "pending",
+  "status": "ready_for_review",
   "checks": {
     "source_version_captured": true,
-    "full_chinese": false,
-    "english_original": false,
-    "license_reviewed": false,
-    "links_and_images_reviewed": false,
-    "code_and_numbers_reviewed": false
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
   },
   "issues": [
-    "需核实 README 是否存在独立许可及图像权利",
-    "待寻找并核对官方中文或完成全文翻译",
-    "待核对相对链接、图片、代码与数字；英文原文语言尚待确认"
-  ]
+    "全文翻译并对照 54 个标题和 21 条 FAQ；23 个代码块和行内代码与英文原文一致。",
+    "默认遥测范围、share_crew 扩展数据及 OTEL_SDK_DISABLED 停用方式均按项目原文保留；商业服务和性能声明明确归于上游。",
+    "中文标题恢复 35 个上游目录锚点；12 个固定版本与关键官方入口访问成功，MIT 原始许可证与官方图标保留。"
+  ],
+  "link_check": {
+    "key_urls_checked": 12
+  },
+  "telemetry_review": "已核对默认数据项、share_crew 例外和停用变量"
 }

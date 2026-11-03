@@ -67,13 +67,23 @@
   "stars_fetched_at": "2026-11-03T01:50:39.657883+00:00",
   "license_spdx": "MIT",
   "homepage_url": "https://crewai.com",
-  "icon_source_url": "",
+  "icon_source_url": "https://raw.githubusercontent.com/crewAIInc/crewAI/86dca29b536d700b69a97a3592857d5f9d4a8873/docs/images/crewai_logo.png",
   "license_path": "LICENSE",
   "license_blob_sha": "a6ee25527ec07201e4373fcbf89f128f304a6f2e",
   "license_url": "https://github.com/crewAIInc/crewAI/blob/86dca29b536d700b69a97a3592857d5f9d4a8873/LICENSE",
-  "source_language": "unverified",
+  "source_language": "en",
   "archived": false,
   "fork": false,
   "disabled": false,
-  "official_repository_url": "https://github.com/crewAIInc/crewAI"
+  "official_repository_url": "https://github.com/crewAIInc/crewAI",
+  "official_entry": {
+    "url": "https://crewai.com",
+    "kind": "official_website"
+  },
+  "translation": {
+    "method": "Terra 全文翻译并逐节审校",
+    "source_path": "README.md",
+    "source_commit_sha": "86dca29b536d700b69a97a3592857d5f9d4a8873",
+    "notes": "保留全部命令和代码、模型要求、FAQ 与遥测声明；为原目录链接恢复 35 个锚点。"
+  }
 }

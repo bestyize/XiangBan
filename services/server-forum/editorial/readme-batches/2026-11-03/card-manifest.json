@@ -1,7 +1,7 @@
 {
   "inventory_source": "inventory.json",
   "revision": 2,
-  "updated_at": "2026-11-03T03:22:41.750679+00:00",
+  "updated_at": "2026-11-03T03:30:02.500494+00:00",
   "total": 168,
   "description": "项目卡片待审清单；null/空数组表示尚未核定。摘要来自已有项目用途摘要或新核对摘要；不使用旧标题。",
   "cards": [
@@ -2421,9 +2421,9 @@
       "license": "MIT OR Apache-2.0",
       "documentation_license": null,
       "platforms": [],
-      "readme_zh_path": null,
+      "readme_zh_path": "sharkdp--bat/README.zh-CN.md",
       "readme_en_path": "sharkdp--bat/README.en.md",
-      "status": "pending",
+      "status": "ready_for_review",
       "github_archived": false,
       "github_fork": false,
       "upstream_maintenance_notice": null,
@@ -2436,8 +2436,7 @@
       ],
       "collections": [],
       "field_notes": [
-        "运行平台尚未核定，留空",
-        "正文文件仍处于未完成状态，不能当成完成稿"
+        "运行平台尚未核定，留空"
       ]
     },
     {
@@ -2445,11 +2444,11 @@
       "repo": "crewAIInc/crewAI",
       "name": "CrewAI",
       "summary_zh": "围绕角色、任务与流程组织多智能体应用的框架。",
-      "icon_source_url": null,
+      "icon_source_url": "https://raw.githubusercontent.com/crewAIInc/crewAI/86dca29b536d700b69a97a3592857d5f9d4a8873/docs/images/crewai_logo.png",
       "icon_license": null,
       "icon_attribution": null,
-      "primary_url": null,
-      "primary_label": null,
+      "primary_url": "https://crewai.com",
+      "primary_label": "official_website",
       "github_url": "https://github.com/crewAIInc/crewAI",
       "stars": 60432,
       "stars_fetched_at": "2026-11-03T01:50:39.657883+00:00",
@@ -2458,9 +2457,9 @@
       "license": "MIT",
       "documentation_license": null,
       "platforms": [],
-      "readme_zh_path": null,
-      "readme_en_path": null,
-      "status": "pending",
+      "readme_zh_path": "crewAIInc--crewAI/README.zh-CN.md",
+      "readme_en_path": "crewAIInc--crewAI/README.en.md",
+      "status": "ready_for_review",
       "github_archived": false,
       "github_fork": false,
       "upstream_maintenance_notice": null,
@@ -2475,8 +2474,6 @@
       ],
       "collections": [],
       "field_notes": [
-        "主入口及类型尚未核定，留空；GitHub 链接单独保留",
-        "项目图标尚未核定，留空",
         "运行平台尚未核定，留空"
       ]
     },
@@ -2918,8 +2915,8 @@
       "icon_source_url": null,
       "icon_license": null,
       "icon_attribution": null,
-      "primary_url": null,
-      "primary_label": null,
+      "primary_url": "https://cal.diy",
+      "primary_label": "official_website",
       "github_url": "https://github.com/calcom/cal.diy",
       "stars": 49654,
       "stars_fetched_at": "2026-11-03T01:50:47.438242+00:00",
@@ -2929,7 +2926,7 @@
       "documentation_license": null,
       "platforms": [],
       "readme_zh_path": null,
-      "readme_en_path": null,
+      "readme_en_path": "calcom--cal.diy/README.en.md",
       "status": "pending",
       "github_archived": false,
       "github_fork": false,
@@ -2945,9 +2942,9 @@
       ],
       "collections": [],
       "field_notes": [
-        "主入口及类型尚未核定，留空；GitHub 链接单独保留",
         "项目图标尚未核定，留空",
-        "运行平台尚未核定，留空"
+        "运行平台尚未核定，留空",
+        "正文文件仍处于未完成状态，不能当成完成稿"
       ]
     },
     {
@@ -3445,12 +3442,12 @@
       "original_key": "microsoft/playwright-mcp",
       "repo": "microsoft/playwright-mcp",
       "name": "Playwright MCP",
-      "summary_zh": "基于 Playwright 提供浏览器自动化能力的 MCP 服务端。",
+      "summary_zh": "让 AI 工具通过 Playwright 操作浏览器，读取页面并执行自动化任务。",
       "icon_source_url": null,
       "icon_license": null,
       "icon_attribution": null,
-      "primary_url": null,
-      "primary_label": null,
+      "primary_url": "https://www.npmjs.com/package/@playwright/mcp",
+      "primary_label": "npm 官方软件包",
       "github_url": "https://github.com/microsoft/playwright-mcp",
       "stars": 39055,
       "stars_fetched_at": "2026-11-03T01:50:57.554333+00:00",
@@ -3459,9 +3456,9 @@
       "license": "Apache-2.0",
       "documentation_license": null,
       "platforms": [],
-      "readme_zh_path": null,
-      "readme_en_path": null,
-      "status": "pending",
+      "readme_zh_path": "microsoft--playwright-mcp/README.zh-CN.md",
+      "readme_en_path": "microsoft--playwright-mcp/README.en.md",
+      "status": "ready_for_review",
       "github_archived": false,
       "github_fork": false,
       "upstream_maintenance_notice": null,
@@ -3477,7 +3474,6 @@
       ],
       "collections": [],
       "field_notes": [
-        "主入口及类型尚未核定，留空；GitHub 链接单独保留",
         "项目图标尚未核定，留空",
         "运行平台尚未核定，留空"
       ]
@@ -4279,11 +4275,11 @@
       "repo": "radareorg/radare2",
       "name": "radare2",
       "summary_zh": "包含反汇编、调试与二进制分析能力的逆向工程框架。",
-      "icon_source_url": null,
+      "icon_source_url": "https://raw.githubusercontent.com/radareorg/radare2/70c2da061abbbca8fe51ea742c12b7e24483d8be/doc/images/r2emoji.png",
       "icon_license": null,
       "icon_attribution": null,
-      "primary_url": null,
-      "primary_label": null,
+      "primary_url": "https://www.radare.org",
+      "primary_label": "official_website",
       "github_url": "https://github.com/radareorg/radare2",
       "stars": 25263,
       "stars_fetched_at": "2026-11-03T01:51:11.750973+00:00",
@@ -4292,9 +4288,9 @@
       "license": null,
       "documentation_license": null,
       "platforms": [],
-      "readme_zh_path": null,
-      "readme_en_path": null,
-      "status": "pending",
+      "readme_zh_path": "radareorg--radare2/README.zh-CN.md",
+      "readme_en_path": "radareorg--radare2/README.en.md",
+      "status": "ready_for_review",
       "github_archived": false,
       "github_fork": false,
       "upstream_maintenance_notice": null,
@@ -4309,8 +4305,6 @@
       ],
       "collections": [],
       "field_notes": [
-        "主入口及类型尚未核定，留空；GitHub 链接单独保留",
-        "项目图标尚未核定，留空",
         "许可尚未核定，留空",
         "运行平台尚未核定，留空"
       ]

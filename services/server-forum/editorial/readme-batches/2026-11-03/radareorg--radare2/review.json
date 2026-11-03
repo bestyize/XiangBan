@@ -1,16 +1,20 @@
 {
-  "status": "pending",
+  "status": "ready_for_review",
   "checks": {
     "source_version_captured": true,
-    "full_chinese": false,
-    "english_original": false,
-    "license_reviewed": false,
-    "links_and_images_reviewed": false,
-    "code_and_numbers_reviewed": false
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
+    "links_and_images_reviewed": true,
+    "code_and_numbers_reviewed": true
   },
   "issues": [
-    "许可证识别或适用范围尚待核实；未保存 README。",
-    "已检查根目录 LICENSE/COPYING 等候选，仍需人工核验文本和 README 适用范围。",
-    "固定提交 README.md 已按 Git blob SHA 校验并保存；文档适用许可尚需核定，未开始翻译或发布。"
-  ]
+    "README 明示 LGPLv3 分发、插件许可各异，COPYING.md 列出大部分项目为 LGPLv3；保存固定版本 LGPLv3 文本。README 未说明 only 或 later，元数据 SPDX 保持 NOASSERTION。",
+    "完整保留所有插件、平台、架构、文件系统、格式及版本；全部代码块和行内代码与原文一致。",
+    "40 个 GitHub、官方入口和图片链接核验成功；原文 #contributing 锚点不存在，中文指向同版本 CONTRIBUTING.md 并在译注说明。"
+  ],
+  "link_check": {
+    "key_urls_checked": 40
+  },
+  "license_scope_note": "README.md 第 13–14 行写明项目以 LGPLv3 分发，插件可能采用不同许可证；COPYING.md 称大部分项目为 LGPLv3；本项目保留原始条款文本，插件另行核查。 README 使用“LGPLv3”未明确 only 或 later，因此不把这两种 SPDX 形式当作已确认。"
 }

@@ -72,9 +72,16 @@
   "license_path": "LICENSE",
   "license_blob_sha": "cefe596afef12e19a8e5e923f1a04c7da3188760",
   "license_url": "https://github.com/microsoft/playwright-mcp/blob/ec572ee8354015293bed67145db21eed386e876d/LICENSE",
-  "source_language": "unverified",
+  "source_language": "en",
   "archived": false,
   "fork": false,
   "disabled": false,
-  "official_repository_url": "https://github.com/microsoft/playwright-mcp"
+  "official_repository_url": "https://github.com/microsoft/playwright-mcp",
+  "source_format": "markdown",
+  "translation_method": "GPT-6.1 Terra 按固定英文原文逐行译写；代码块中自然语言注释翻译，代码和配置值保留。",
+  "description_zh": "让 AI 工具通过 Playwright 操作浏览器，读取页面并执行自动化任务。",
+  "official_entry": "https://www.npmjs.com/package/@playwright/mcp",
+  "entry_label": "npm 官方软件包",
+  "code_updated_at": "2026-11-01T23:12:54Z",
+  "code_updated_basis": "catalog last_commit_at"
 }

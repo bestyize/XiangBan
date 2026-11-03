@@ -1,16 +1,21 @@
 {
-  "status": "pending",
+  "status": "ready_for_review",
   "checks": {
     "source_version_captured": true,
-    "full_chinese": false,
-    "english_original": false,
-    "license_reviewed": false,
+    "full_chinese": true,
+    "english_original": true,
+    "license_reviewed": true,
     "links_and_images_reviewed": false,
-    "code_and_numbers_reviewed": false
+    "code_and_numbers_reviewed": true
   },
   "issues": [
-    "需核实 README 是否存在独立许可及图像权利",
-    "待寻找并核对官方中文或完成全文翻译",
-    "待核对相对链接、图片、代码与数字；英文原文语言尚待确认"
-  ]
+    "按固定源逐行完整翻译正文、全部配置选项与工具参数；配置示例中自然语言注释已译，可执行代码和配置值保留。",
+    "逐块比较全部代码围栏的非注释内容一致，原始源文件 Git blob SHA 已核对。",
+    "原文无相对 Markdown 目标；官方入口保留。未逐一联网验证全部外链，缺图使用项目名占位。",
+    "源文明确指出 Playwright MCP 不是安全边界，保留文件访问、网络源与不安全代码执行的限制。"
+  ],
+  "link_check": {
+    "all_external_urls_verified": false
+  },
+  "translation_line_count": 683
 }

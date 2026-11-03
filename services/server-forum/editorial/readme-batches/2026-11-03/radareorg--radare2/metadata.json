@@ -67,7 +67,7 @@
   "stars_fetched_at": "2026-11-03T01:51:11.750973+00:00",
   "license_spdx": "NOASSERTION",
   "homepage_url": "https://www.radare.org",
-  "icon_source_url": "",
+  "icon_source_url": "https://raw.githubusercontent.com/radareorg/radare2/70c2da061abbbca8fe51ea742c12b7e24483d8be/doc/images/r2emoji.png",
   "license_path": "COPYING.md",
   "license_blob_sha": "d5b507e442e1ba45ea2df0bd1a141debafbf11d6",
   "license_url": "https://github.com/radareorg/radare2/blob/70c2da061abbbca8fe51ea742c12b7e24483d8be/COPYING.md",
@@ -91,5 +91,11 @@
   "official_entry": {
     "url": "https://www.radare.org",
     "kind": "official_website"
+  },
+  "translation": {
+    "method": "Terra 全文翻译并逐节核对",
+    "source_path": "README.md",
+    "source_commit_sha": "70c2da061abbbca8fe51ea742c12b7e24483d8be",
+    "notes": "保留所有平台、文件格式、插件、命令、版本和许可声明。"
   }
 }
