@@ -4,6 +4,8 @@
 Does not upload, publish the database catalog, or execute upstream content.
 """
 import argparse
+import re
+from urllib.parse import urljoin
 import datetime
 import hashlib
 import json
@@ -43,6 +45,30 @@ def build(batch: Path, output: Path) -> dict:
                 raise ValueError('upstream blob mismatch')
             zh = files[card['readme_zh_path']].decode('utf-8')
             en = files[card['readme_en_path']].decode('utf-8')
+            translation = (metadata.get('translation_origin') or metadata.get('translation_source')
+                           or metadata.get('translation_provenance') or metadata.get('translation_attribution')
+                           or '非官方中文译文；依据项目官方 README 整理')
+            if metadata.get('publish_official_zh'):
+                official = metadata['official_zh_source']
+                raw_zh = files[folder + '/README.official-zh.source.md']
+                zh_blob = hashlib.sha1(b'blob ' + str(len(raw_zh)).encode() + b'\0' + raw_zh).hexdigest()
+                if zh_blob != official['blob_sha']:
+                    raise ValueError('official Chinese upstream blob mismatch')
+                full_translation = zh.encode('utf-8')
+                filename = hashlib.sha256(full_translation).hexdigest() + '.md'
+                (output / 'projects' / filename).write_bytes(full_translation)
+                translation = '中文页使用完整官方简体中文版，约收录 436 条；英文版收录 4632 条。'
+                official_body = re.sub(
+                    r'\]\((README[^ )]*\.md)\)',
+                    lambda match: '](' + urljoin(official['source_url'], match[1]) + ')',
+                    raw_zh.decode('utf-8'),
+                )
+                official_body = official_body.replace('](#什么是MCP？)', '](#什么是mcp)')
+                zh = (
+                    f'> {translation} [官方简体中文原文]({official["source_url"]}) · '
+                    f'[查看社区全量中文译文](https://chat.xiangban.xyz/open-source-readmes/projects/{filename})\n\n'
+                    + official_body
+                )
             if not zh.strip() or not en.strip():
                 raise ValueError('empty README')
             licenses = [{'name': Path(rel).name, 'text': raw.decode('utf-8')} for rel, raw in files.items()
@@ -52,7 +78,7 @@ def build(batch: Path, output: Path) -> dict:
             data = {'schema': 1, 'full_name': key, 'card': card,
                     'source_url': metadata.get('readme_source_url') or metadata.get('readme_url') or metadata.get('readme', {}).get('source_url'),
                     'commit': metadata.get('commit_sha'), 'fetched_at': metadata.get('fetched_at'),
-                    'translation': metadata.get('translation_origin') or metadata.get('translation_source') or metadata.get('translation_provenance') or metadata.get('translation_attribution') or '非官方中文译文；依据项目官方 README 整理',
+                    'translation': translation,
                     'zh': zh, 'en': en, 'licenses': licenses}
             if not data['source_url'] or not data['commit']:
                 raise ValueError('provenance missing')

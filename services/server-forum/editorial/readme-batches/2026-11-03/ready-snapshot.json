@@ -1,6 +1,6 @@
 {
   "inventory_revision": 2,
-  "created_at": "2026-11-03T03:47:39.197854+00:00",
+  "created_at": "2026-11-03T13:44:07.252932+00:00",
   "count": 163,
   "excluded": [],
   "usage": "每次使用前重新校验每个文件 SHA-256；哈希不一致即舍弃该项目并重建快照。ready_for_review 仅表示待审。",
@@ -1414,7 +1414,7 @@
         "punkpeye--awesome-mcp-servers/README.source.md": "30cfd63388477a60dd7c21b8cdf24b287a15b1e592c7e3bc2b08ebe2222a4670",
         "punkpeye--awesome-mcp-servers/README.zh-CN.md": "4bfbbaee2fe6d06b510f800144b983c91fbfd1e14414c6a5df9031bca43c99ef",
         "punkpeye--awesome-mcp-servers/README.en.md": "830302ed3b3a4c38e6441d611cdce6cc0d315a1fcc334aef31e0877430d61ca0",
-        "punkpeye--awesome-mcp-servers/metadata.json": "52d0b818ec584f6f747df3836133769c138e590944c5c313ed98799b02dc7217",
+        "punkpeye--awesome-mcp-servers/metadata.json": "163aa06db300edc5349604f139b166d4b7af2bb75014b4475f25570dc91cf65c",
         "punkpeye--awesome-mcp-servers/review.json": "9b83022d17c293911b51e1a53c2a8346276d12ea7eb139cd564aade7d2d872fa",
         "punkpeye--awesome-mcp-servers/LICENSE.upstream": "8cb2c0a4c6590502ffb793005c0f1b440ca4db34dcc209bbe9cf34d3b52a7e07",
         "punkpeye--awesome-mcp-servers/README.official-zh.source.md": "0275fab11f273b9b593781bc815771f10818bafd97001615574bb4bf925316a4",

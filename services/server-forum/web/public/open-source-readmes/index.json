@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "released_at": "2026-11-03T03:48:47.735665+00:00",
+  "released_at": "2026-11-03T13:44:07.288623+00:00",
   "inventory_revision": 2,
   "projects": {
     "codecrafters-io/build-your-own-x": "projects/4bc429ff2e57b5c944776dfd19117dc32f3b6eacf3a4f64ee635629537449da1.json",
@@ -31,7 +31,7 @@
     "google-gemini/gemini-cli": "projects/e08e7b5f45c2750a13850aa3fd0be123f6a3301e816fe15490690c1d7284da6a.json",
     "microsoft/terminal": "projects/6bdcd5b97a203af8beb70a3930aae8d8c9133527af3fe82c81af9627cad64685.json",
     "neovim/neovim": "projects/cda1d311fd94b4ad33d312744dc7ac812db05ad6f0159df6cbd5a4effffe254c.json",
-    "punkpeye/awesome-mcp-servers": "projects/0d49c5f782e011c65916f39b8483b2383b0ef3397cb4012ca68471867221ff35.json",
+    "punkpeye/awesome-mcp-servers": "projects/790f6b2692b7ff97adaaaac3892f29d526cc18a99dfe709285d0b34dbe494b51.json",
     "nationalsecurityagency/ghidra": "projects/f32422e724e6e6592e23eaa07850e0a96c87347741008629ef8946b5a0a2655e.json",
     "microsoft/web-dev-for-beginners": "projects/a0f3ce1184f3541d409aae8d77b1de7265344834f24bac7a10a1640515fba6d7.json",
     "oven-sh/bun": "projects/ed8d2e38dfb4475a0d0a3a52e69fce550930b294612755bb8adeb723e01d6742.json",
