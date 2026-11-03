@@ -7,6 +7,15 @@ import { clearInvite } from '@/lib/invite'
 import { SessionScope } from '@/lib/sessionScope'
 
 const STORAGE_KEY = 'chat.xiangban.session'
+const desktopWindow = window as Window & { __xiaobanDesktopCommunity?: { ticket: string | null } }
+const desktopBootstrap = desktopWindow.__xiaobanDesktopCommunity
+delete desktopWindow.__xiaobanDesktopCommunity
+const desktopStorageKey = `${STORAGE_KEY}.desktop`
+
+function tokenStorage(): [Storage, string] {
+  return desktopBootstrap ? [sessionStorage, desktopStorageKey] : [localStorage, STORAGE_KEY]
+}
+
 /** 访问令牌到期前这么久就换新，避免请求途中过期。 */
 const REFRESH_MARGIN_MS = 60_000
 
@@ -18,7 +27,8 @@ interface Tokens {
 
 function readTokens(): Tokens | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    const [storage, key] = tokenStorage()
+    const raw = storage.getItem(key)
     const parsed = raw ? (JSON.parse(raw) as Tokens) : null
     return parsed && typeof parsed.accessToken === 'string' && parsed.accessToken && typeof parsed.refreshToken === 'string' && parsed.refreshToken
       ? { ...parsed, expiresAt:Number.isFinite(parsed.expiresAt) ? parsed.expiresAt : 0 } : null
@@ -29,8 +39,9 @@ function readTokens(): Tokens | null {
 
 function writeTokens(tokens: Tokens | null) {
   try {
-    if (tokens) localStorage.setItem(STORAGE_KEY, JSON.stringify(tokens))
-    else localStorage.removeItem(STORAGE_KEY)
+    const [storage, key] = tokenStorage()
+    if (tokens) storage.setItem(key, JSON.stringify(tokens))
+    else storage.removeItem(key)
   } catch {
     // 隐私模式下存储不可用，登录只在本页有效
   }
@@ -108,6 +119,14 @@ export const useSession = defineStore('session', () => {
     const generation = scope.capture(), request = ++restoreSequence
     restoring.value = true
     try {
+      const ticket = desktopBootstrap?.ticket
+      if (desktopBootstrap) desktopBootstrap.ticket = null
+      if (ticket && !tokens.value) {
+        const active = scope.loginAttempt()
+        const pair = await accountApi.redeemDesktopTicket(ticket).catch(() => null)
+        if (!active()) return
+        if (pair) save(fromPair(pair))
+      }
       await loadSession()
     } finally {
       if (scope.current(generation) && request === restoreSequence) restoring.value = false

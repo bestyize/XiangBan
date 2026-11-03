@@ -51,6 +51,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/auth/password/login", post(auth::login_with_password))
         .route("/auth/password/reset", post(auth::reset_password))
         .route("/auth/refresh", post(auth::refresh))
+        .route("/auth/desktop-forum/ticket", post(auth::desktop_forum_ticket))
+        .route("/auth/desktop-forum/redeem", post(auth::redeem_desktop_forum_ticket))
         .route("/auth/logout", post(auth::logout))
         .route("/auth/logout-all", post(auth::logout_all))
         .route("/me", get(me::get_me).patch(me::update_me))

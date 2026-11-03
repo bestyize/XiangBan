@@ -72,6 +72,13 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 CREATE INDEX IF NOT EXISTS refresh_tokens_uid_idx ON refresh_tokens (uid);
 CREATE INDEX IF NOT EXISTS refresh_tokens_family_idx ON refresh_tokens (family_id);
 
+CREATE TABLE IF NOT EXISTS desktop_forum_tickets (
+    token_hash BYTEA PRIMARY KEY,
+    uid UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS desktop_forum_tickets_expiry_idx ON desktop_forum_tickets (expires_at);
+
 CREATE TABLE IF NOT EXISTS admins (
     id            UUID PRIMARY KEY,
     username      TEXT NOT NULL UNIQUE,

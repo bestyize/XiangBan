@@ -70,6 +70,8 @@ async function call<T>(method: string, path: string, body?: unknown, token?: str
 }
 
 export const accountApi = {
+  redeemDesktopTicket: (ticket: string) =>
+    call<TokenPair>('POST', '/api/auth/desktop-forum/redeem', { ticket }),
   sendCode: (identifier: string, purpose: 'login' | 'reset_password' = 'login') =>
     call<{ cooldown_seconds: number; expires_in: number }>('POST', '/api/auth/code/send', { identifier, purpose }),
   async loginWithCode(identifier: string, code: string) {

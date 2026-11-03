@@ -275,6 +275,21 @@ pub async fn fresh_access_token(app: &tauri::AppHandle) -> Result<String, Accoun
     refresh_session(app, &current).await
 }
 
+pub(crate) async fn community_login_ticket(app: &tauri::AppHandle) -> Option<String> {
+    let uid = get_account_session(app.clone())?.user.uid;
+    let access = fresh_access_token(app).await.ok()?;
+    let ticket = tauri::async_runtime::spawn_blocking(move || {
+        let response = client().ok()?
+            .post(format!("{}/api/auth/desktop-forum/ticket", account_base_url()))
+            .timeout(Duration::from_secs(4))
+            .bearer_auth(access)
+            .send().ok()?.error_for_status().ok()?
+            .json::<Value>().ok()?;
+        response["ticket"].as_str().map(str::to_owned)
+    }).await.ok().flatten()?;
+    (get_account_session(app.clone())?.user.uid == uid).then_some(ticket)
+}
+
 async fn refresh_session(app: &tauri::AppHandle, current: &AccountSession) -> Result<String, AccountFailure> {
     let state = app.state::<AccountState>();
     let val = match call_json(

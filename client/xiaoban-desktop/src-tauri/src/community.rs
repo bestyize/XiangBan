@@ -18,6 +18,7 @@ pub(crate) fn origin() -> String {
 const COMMUNITY_WINDOW: &str = "community-window";
 const COMMUNITY_CHROME: &str = "community-chrome";
 const COMMUNITY_CONTENT: &str = "community-web";
+const COMMUNITY_TAB: &str = "community-tab";
 const TITLE_HEIGHT: f64 = 44.;
 const EDGE: f64 = 5.;
 static COMMUNITY_OPEN_LOCK: Mutex<()> = Mutex::new(());
@@ -71,10 +72,6 @@ pub async fn community_web_open(app: tauri::AppHandle, caller: tauri::WebviewWin
     }
     let mut origin = web_origin()?;
     if subscriptions == Some(true) { origin.set_path("/me/subscriptions"); }
-    let nav_origin = origin.clone();
-    let nav_app = app.clone();
-    let new_origin = origin.clone();
-    let new_app = app.clone();
     let monitor = caller.current_monitor().map_err(|e| e.to_string())?.or(app.primary_monitor().map_err(|e| e.to_string())?);
     let (width, height) = monitor.as_ref().map(|m| {
         let area = m.work_area(); let scale = m.scale_factor();
@@ -91,29 +88,7 @@ pub async fn community_web_open(app: tauri::AppHandle, caller: tauri::WebviewWin
     let result = (|| -> Result<(), String> {
         window.add_child(WebviewBuilder::new(COMMUNITY_CHROME, WebviewUrl::App("community-chrome.html".into())).auto_resize(),
             tauri::LogicalPosition::new(0., 0.), tauri::LogicalSize::new(width, height)).map_err(|e| e.to_string())?;
-        let content = WebviewBuilder::new(COMMUNITY_CONTENT, WebviewUrl::External(origin))
-            .on_navigation(move |url| {
-                if same_origin(url, &nav_origin) { return true; }
-                if url.scheme() == "xiaoban" && url.host_str() == Some("community") {
-                    let app = nav_app.clone(); let link = url.to_string();
-                    std::thread::spawn(move || receive_link(&app, &link));
-                } else if matches!(url.scheme(), "http" | "https") {
-                    let link = url.to_string();
-                    std::thread::spawn(move || { let _ = crate::content::open_download_url(link); });
-                }
-                false
-            })
-            .on_new_window(move |url, _| {
-                let app = new_app.clone();
-                if same_origin(&url, &new_origin) {
-                    std::thread::spawn(move || { if let Some(view) = app.get_webview(COMMUNITY_CONTENT) { let _ = view.navigate(url); } });
-                } else if url.scheme() == "xiaoban" && url.host_str() == Some("community") {
-                    std::thread::spawn(move || receive_link(&app, url.as_str()));
-                } else if matches!(url.scheme(), "http" | "https") {
-                    std::thread::spawn(move || { let _ = crate::content::open_download_url(url.to_string()); });
-                }
-                tauri::webview::NewWindowResponse::Deny
-            });
+        let content = community_webview(&app, COMMUNITY_CONTENT, origin);
         let content = window.add_child(content, tauri::LogicalPosition::new(EDGE, TITLE_HEIGHT),
             tauri::LogicalSize::new((width - EDGE * 2.).max(1.), (height - TITLE_HEIGHT - EDGE).max(1.))).map_err(|e| e.to_string())?;
         // Tauri's auto_resize scales offsets proportionally; the titlebar and resize edges
@@ -141,9 +116,76 @@ pub async fn community_web_open(app: tauri::AppHandle, caller: tauri::WebviewWin
     result
 }
 
+fn community_webview(app: &tauri::AppHandle, label: &'static str, origin: url::Url) -> WebviewBuilder<tauri::Wry> {
+    let nav_origin = origin.clone();
+    let new_origin = origin.clone();
+    let nav_app = app.clone();
+    let new_app = app.clone();
+    WebviewBuilder::new(label, WebviewUrl::External(origin))
+        .on_navigation(move |url| {
+            if same_origin(url, &nav_origin) { return true; }
+            if url.scheme() == "xiaoban" && url.host_str() == Some("community") {
+                let app = nav_app.clone(); let link = url.to_string();
+                std::thread::spawn(move || receive_link(&app, &link));
+            } else if matches!(url.scheme(), "http" | "https") {
+                let link = url.to_string();
+                std::thread::spawn(move || { let _ = crate::content::open_download_url(link); });
+            }
+            false
+        })
+        .on_new_window(move |url, _| {
+            let app = new_app.clone();
+            if same_origin(&url, &new_origin) {
+                std::thread::spawn(move || { if let Some(view) = app.get_webview(label) { let _ = view.navigate(url); } });
+            } else if url.scheme() == "xiaoban" && url.host_str() == Some("community") {
+                std::thread::spawn(move || receive_link(&app, url.as_str()));
+            } else if matches!(url.scheme(), "http" | "https") {
+                std::thread::spawn(move || { let _ = crate::content::open_download_url(url.to_string()); });
+            }
+            tauri::webview::NewWindowResponse::Deny
+        })
+}
+
+#[tauri::command]
+pub async fn community_tab_bounds(app: tauri::AppHandle, caller: tauri::WebviewWindow, bounds: Option<[f64; 4]>, sync_account: Option<bool>) -> Result<(), String> {
+    control(&caller)?;
+    let existing = app.get_webview(COMMUNITY_TAB);
+    let Some([x, y, width, height]) = bounds else {
+        return existing.map_or(Ok(()), |view| view.hide().map_err(|e| e.to_string()));
+    };
+    if ![x, y, width, height].into_iter().all(f64::is_finite) || x < 0. || y < 0. || width <= 0. || height <= 0. {
+        return Err("社区显示区域无效".into());
+    }
+    let position = tauri::LogicalPosition::new(x, y);
+    let size = tauri::LogicalSize::new(width, height);
+    if let Some(view) = existing {
+        if sync_account != Some(true) {
+            view.set_bounds(tauri::Rect { position: position.into(), size: size.into() }).map_err(|e| e.to_string())?;
+            return view.show().map_err(|e| e.to_string());
+        }
+        view.close().map_err(|e| e.to_string())?;
+    }
+    let origin = web_origin()?;
+    let trusted_origin = origin.origin().ascii_serialization();
+    let ticket = if trusted_origin == DEFAULT_ORIGIN {
+        crate::account::community_login_ticket(&app).await
+    } else {
+        None
+    };
+    let origin_json = serde_json::to_string(&trusted_origin).map_err(|e| e.to_string())?;
+    let ticket_json = serde_json::to_string(&ticket).map_err(|e| e.to_string())?;
+    let script = format!(
+        "if (window.location.origin === {origin_json}) {{ window.__xiaobanDesktopCommunity = {{ ticket: {ticket_json} }}; }}"
+    );
+    let window = app.get_window(caller.label()).ok_or("找不到控制台窗口")?;
+    let builder = community_webview(&app, COMMUNITY_TAB, origin).initialization_script(script);
+    window.add_child(builder, position, size).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 pub fn invocation_permission(label: &str, command: &str) -> Option<bool> {
     match label {
-        COMMUNITY_CONTENT => Some(false),
+        COMMUNITY_CONTENT | COMMUNITY_TAB => Some(false),
         COMMUNITY_CHROME => Some(command == "community_chrome_action"),
         _ => None,
     }

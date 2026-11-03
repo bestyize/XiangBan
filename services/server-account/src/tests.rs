@@ -157,6 +157,39 @@ macro_rules! harness {
 }
 
 #[tokio::test]
+async fn desktop_forum_ticket_is_single_use_and_issues_a_forum_session() {
+    let h = harness!(&[("ACCOUNT_CLIENTS", "xiaban-web,xiaoban-desktop-wallpaper,forum-web")]);
+    let web = h.login("web@example.com").await;
+    let desktop = h.login_as("desktop@example.com", "xiaoban-desktop-wallpaper", None).await;
+    let issue = "/api/auth/desktop-forum/ticket";
+    let redeem = "/api/auth/desktop-forum/redeem";
+    let (status, _) = h.post(issue, web["access_token"].as_str(), json!({})).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+
+    let (status, body) = h.post(issue, desktop["access_token"].as_str(), json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    let (first, second) = tokio::join!(h.post(redeem, None, body.clone()), h.post(redeem, None, body));
+    let (success, rejected) = if first.0 == StatusCode::OK { (first, second) } else { (second, first) };
+    assert_eq!(success.0, StatusCode::OK);
+    assert_eq!(rejected.0, StatusCode::UNAUTHORIZED);
+    let claims = crate::tokens::verify_access(
+        &h.state.keys,
+        &h.state.config.issuer,
+        success.1["access_token"].as_str().unwrap(),
+    ).unwrap();
+    assert_eq!(claims.aud, "forum-web");
+    assert_eq!(claims.sub, desktop["user"]["uid"].as_str().unwrap());
+
+    let (status, body) = h.post(issue, desktop["access_token"].as_str(), json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    sqlx::query("UPDATE desktop_forum_tickets SET expires_at = now()")
+        .execute(&h.state.pool).await.unwrap();
+    let (status, _) = h.post(redeem, None, body).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    h.cleanup().await;
+}
+
+#[tokio::test]
 async fn code_login_registers_then_reuses_the_same_user() {
     let h = harness!(&[]);
     let first = h.login("Alice@Example.com").await;

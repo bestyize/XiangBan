@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { onActivated, onMounted, ref } from 'vue';
+import { nextTick, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue';
 import { NAlert, NButton, NSkeleton } from 'naive-ui';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
-import { KIND_LABEL, startApply, startScheme, SUPPORTED_KINDS, trackEvent, TRUST_LABEL, type SchemeItem } from '../community/apply.ts';
+import { applyFlow, KIND_LABEL, startApply, startScheme, SUPPORTED_KINDS, trackEvent, TRUST_LABEL, type SchemeItem } from '../community/apply.ts';
 
 defineOptions({ name: 'CommunityPage' });
 const props = defineProps<{ store: ControlStore }>();
@@ -61,18 +61,78 @@ async function toggleStats() {
   const next = !statsOn.value;
   try { await invoke('community_analytics_set', { on: next }); statsOn.value = next; } catch (e) { props.store.notify(e, 'error'); }
 }
-function refresh() { if (props.store.desktop) { trackEvent('desktop_community_open'); void loadWeekly(); void loadPacks(); void loadStats(); } else loading.value = false; }
-onMounted(refresh);
-onActivated(refresh);
+function refresh() { if (props.store.desktop) { void loadWeekly(); void loadPacks(); void loadStats(); } else loading.value = false; }
+const showWebsite = ref(true);
+const webHost = ref<HTMLElement | null>(null);
+const webError = ref('');
+let active = false;
+let accountChanged = false;
+let pending = Promise.resolve();
+let observer: ResizeObserver | undefined;
+
+function syncWebsite() {
+  pending = pending.then(async () => {
+    const rect = active && applyFlow.state.phase === 'idle' ? webHost.value?.getBoundingClientRect() : undefined;
+    const bounds = rect && rect.width > 0 && rect.height > 0
+      ? [rect.left, rect.top, rect.width, rect.height]
+      : null;
+    const syncAccount = bounds !== null && accountChanged;
+    if (syncAccount) accountChanged = false;
+    await invoke('community_tab_bounds', { bounds, syncAccount });
+  }).catch(e => { webError.value = text(e); });
+}
+
+function selectView(website: boolean) {
+  showWebsite.value = website;
+  if (!website) refresh();
+}
+
+watch(webHost, (host, previous) => {
+  if (previous) observer?.unobserve(previous);
+  if (host && typeof ResizeObserver !== 'undefined') {
+    observer ??= new ResizeObserver(syncWebsite);
+    observer.observe(host);
+  }
+  if (props.store.desktop) syncWebsite();
+}, { flush: 'post' });
+watch(() => props.store.account?.user.uid, () => {
+  accountChanged = true;
+  if (active) syncWebsite();
+});
+watch(() => applyFlow.state.phase, () => {
+  if (active && props.store.desktop) syncWebsite();
+});
+onActivated(() => {
+  active = props.store.desktop;
+  if (!active) return;
+  trackEvent('desktop_community_open');
+  window.addEventListener('resize', syncWebsite);
+  if (showWebsite.value) void nextTick(syncWebsite);
+  else refresh();
+});
+function deactivate() {
+  if (!active) return;
+  active = false;
+  window.removeEventListener('resize', syncWebsite);
+  syncWebsite();
+}
+onDeactivated(deactivate);
+onBeforeUnmount(() => {
+  deactivate();
+  observer?.disconnect();
+});
 </script>
 
 <template>
-  <section class="community-page">
-    <div class="community-page-head"><h1>社区</h1><div class="community-head-actions"><NButton v-if="store.desktop" size="small" @click="invoke('community_web_open', { subscriptions: true }).catch(store.notify)">资讯订阅</NButton><NButton v-if="store.desktop" size="small" @click="invoke('community_web_open').catch(store.notify)">打开社区</NButton><NButton v-if="store.desktop" size="small" @click="invoke('configuration_window_open', { target: 'community', tab: null, provider: null }).catch(store.notify)">我的桌面方案</NButton></div></div>
-    <p v-if="store.desktop" class="community-web-note">社区窗口可浏览讨论和资源；社区网页需单独登录。</p>
+  <section class="community-page" :class="{ 'community-page-web': store.desktop && showWebsite }">
+    <div class="community-page-head"><h1>社区</h1><div class="community-head-actions"><NButton v-if="store.desktop" size="small" @click="invoke('community_web_open', { subscriptions: true }).catch(store.notify)">资讯订阅</NButton><NButton v-if="store.desktop" size="small" @click="selectView(!showWebsite)">{{ showWebsite ? '桌面作品' : '社区网站' }}</NButton><NButton v-if="store.desktop" size="small" @click="invoke('configuration_window_open', { target: 'community', tab: null, provider: null }).catch(store.notify)">我的桌面方案</NButton></div></div>
+    <template v-if="store.desktop && showWebsite">
+      <NAlert v-if="webError" type="warning" :show-icon="false">{{ webError }} <NButton size="tiny" @click="invoke('community_web_open').catch(store.notify)">在独立窗口打开</NButton></NAlert>
+      <div v-else ref="webHost" class="community-web-host" aria-label="小伴社区网站" />
+    </template>
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">社区内容需要在桌面应用中浏览。</NAlert>
 
-    <template v-else>
+    <template v-else-if="!showWebsite">
       <div v-if="weekly" class="community-weekly">
         <p class="community-eyebrow">本期周刊 · {{ weekly.week }}</p>
         <h2>{{ weekly.title }}</h2>
@@ -126,7 +186,8 @@ onActivated(refresh);
 <style scoped>
 .community-page { padding: 20px 24px; max-width: 880px; margin: 0 auto; }
 .community-head-actions {display:flex;flex-wrap:wrap;gap:8px}
-.community-web-note {color:var(--ui-text-secondary, var(--xb-text-3, #888));font-size:12px;margin:0 0 16px}
+.community-page-web { box-sizing: border-box; display: flex; flex-direction: column; width: 100%; height: 100%; max-width: none; padding: 12px 16px 0; }
+.community-web-host { flex: 1; min-height: 0; }
 .community-page-head {display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:16px}
 h1 { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
 .community-weekly { margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid var(--xb-line, #eee); }

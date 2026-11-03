@@ -39,6 +39,62 @@ async fn require_client(state: &AppState, client_id: &str) -> Result<(), AppErro
     }
 }
 
+const DESKTOP_CLIENT: &str = "xiaoban-desktop-wallpaper";
+const FORUM_CLIENT: &str = "forum-web";
+
+pub async fn desktop_forum_ticket(
+    State(state): State<AppState>,
+    auth: AuthUser,
+) -> Result<Json<Value>, AppError> {
+    if auth.client_id != DESKTOP_CLIENT {
+        return Err(AppError::Forbidden("仅小伴桌面可申请社区登录凭证".into()));
+    }
+    require_client(&state, DESKTOP_CLIENT).await?;
+    require_client(&state, FORUM_CLIENT).await?;
+    let ticket = crate::crypto::random_token();
+    let inserted = sqlx::query(
+        "WITH expired AS (DELETE FROM desktop_forum_tickets WHERE expires_at <= now())
+         INSERT INTO desktop_forum_tickets (token_hash, uid, expires_at)
+         SELECT $1, uid, now() + interval '60 seconds' FROM users WHERE uid = $2 AND status = 'active'",
+    )
+    .bind(crate::crypto::sha256(ticket.as_bytes()))
+    .bind(auth.uid)
+    .execute(&state.pool)
+    .await?;
+    if inserted.rows_affected() == 0 {
+        return Err(AppError::Forbidden("账号已被停用".into()));
+    }
+    Ok(Json(json!({ "ticket": ticket })))
+}
+
+#[derive(Deserialize)]
+pub struct DesktopForumTicket {
+    ticket: String,
+}
+
+pub async fn redeem_desktop_forum_ticket(
+    State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
+    Json(req): Json<DesktopForumTicket>,
+) -> Result<Json<TokenPair>, AppError> {
+    let invalid = || AppError::Unauthorized("社区登录凭证无效或已过期".into());
+    if req.ticket.len() != 43 {
+        return Err(invalid());
+    }
+    require_client(&state, DESKTOP_CLIENT).await?;
+    require_client(&state, FORUM_CLIENT).await?;
+    let uid: Uuid = sqlx::query_scalar(
+        "DELETE FROM desktop_forum_tickets t USING users u
+         WHERE t.token_hash = $1 AND t.expires_at > now() AND u.uid = t.uid AND u.status = 'active'
+         RETURNING t.uid",
+    )
+    .bind(crate::crypto::sha256(req.ticket.as_bytes()))
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(invalid)?;
+    Ok(Json(sessions::issue(&state, uid, FORUM_CLIENT, None, Some("小伴桌面 · 社区"), &ip).await?))
+}
+
 async fn respond(
     state: &AppState,
     uid: Uuid,
