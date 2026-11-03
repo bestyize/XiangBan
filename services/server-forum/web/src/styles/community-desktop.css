@@ -1,26 +1,13 @@
 /* Public community desktop layout. Keep mobile and admin styles independent. */
 @media (min-width: 1024px) {
   .site-layout.community-layout {
-    --page-w: 1320px;
     --header-h: 68px;
-    padding-left: 200px;
     background: color-mix(in srgb, var(--surface) 72%, var(--paper));
   }
   .site-layout.community-layout .app-main { padding: 20px 32px 40px; }
-  .site-layout.community-layout:not(.community-root) .app-main { --page-w: 1080px; }
   .site-layout.community-layout .app-footer { padding: 20px 32px 24px; font-size: 12px; }
   .site-layout.community-layout .community-page { max-width: none; }
 
-  /* Navigation: a quiet rail, a distinct publish action and an aligned header. */
-  .site-layout.community-layout .primary-nav { width: 200px; padding: 28px 16px 20px; border-right: 1px solid var(--line); }
-  .site-layout.community-layout .nav-brand { font-size: 18px; padding: 0 8px 36px; gap: 9px; letter-spacing: -.02em; }
-  .site-layout.community-layout .nav-brand svg { width: 28px; height: 28px; }
-  .site-layout.community-layout .nav-items { gap: 6px; }
-  .site-layout.community-layout .nav-item, .site-layout.community-layout .nav-publish { min-height: 44px; padding: 0 14px; border-radius: 10px; font-size: 14px; gap: 12px; }
-  .site-layout.community-layout .nav-publish { margin-top: 24px; justify-content: center; border: 0; background: var(--brand-fill); color: var(--brand-ink); font-weight: 600; }
-  .site-layout.community-layout .nav-publish:hover { background: var(--brand-hover); }
-  .site-layout.community-layout .nav-bottom { padding: 24px 8px 0; font-size: 12px; gap: 4px; }
-  .site-layout.community-layout .nav-bottom>div { gap: 10px; padding-top: 12px; margin-top: 10px; border-top: 1px solid var(--line); }
   .site-layout.community-layout .site-header { background: var(--surface); border-bottom: 1px solid var(--line); backdrop-filter: none; }
   .site-layout.community-layout .header-inner { height: 68px; padding: 0 32px; }
   .site-layout.community-layout .community-navigation { flex: none; justify-content: flex-start; gap: 32px; height: 68px; }

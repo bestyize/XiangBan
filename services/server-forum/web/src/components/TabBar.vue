@@ -53,9 +53,7 @@ function publish(path: string) {
 .nav-publish{order:5;margin-top:16px;background:var(--brand-soft);color:var(--brand)}
 .nav-bottom{margin-top:auto;display:grid;gap:8px;padding:24px 8px 0;font-size:13px;color:var(--ink-3)}.nav-bottom>button,.nav-bottom>a{display:flex;align-items:center;gap:10px;min-height:40px;background:none;border:0;padding:0;text-align:left}.nav-bottom>div{display:flex;gap:12px;margin-top:16px;font-size:12px}
 .publish-options{display:grid;gap:8px}.publish-options>button{display:flex;align-items:center;gap:12px;width:100%;text-align:left;padding:16px 12px;border:0;border-radius:12px;background:var(--surface-2)}.publish-options>button>span:nth-child(2){flex:1}.publish-options b{display:block;font-size:15px;font-weight:600}.publish-options small{display:block;font-size:12px;color:var(--ink-3);margin-top:3px}.option-icon{color:var(--brand)}
-/* Match the native app: fixed full-width bar, labeled slots and a central publish button. */
-@media(max-width:1023px){
-  .primary-nav{top:auto;left:0;right:0;bottom:0;width:100%;height:calc(56px + env(safe-area-inset-bottom));padding:0 0 env(safe-area-inset-bottom);border-radius:0;border-top:1px solid var(--line);background:var(--surface);box-shadow:none;backdrop-filter:none}
+  .primary-nav{top:auto;left:0;right:0;bottom:0;width:100%;max-width:var(--page-w);margin-inline:auto;height:calc(56px + env(safe-area-inset-bottom));padding:0 0 env(safe-area-inset-bottom);border-radius:0;border-top:1px solid var(--line);background:var(--surface);box-shadow:none;backdrop-filter:none}
   .nav-brand,.nav-bottom{display:none}
   .nav-items{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;align-items:center;height:56px}
   .nav-item,.nav-publish{order:initial;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;min-width:0;width:100%;height:56px;min-height:56px;padding:0;margin:0;border:0;border-radius:0;background:none;color:var(--ink-3);font-size:11px;line-height:14px;font-weight:400}
@@ -67,8 +65,4 @@ function publish(path: string) {
   .nav-publish>.publish-icon{display:grid;place-items:center;width:44px;height:32px;border-radius:10px;background:var(--brand-fill);color:#fff}
   .publish-icon>svg{width:20px;height:20px}
   .nav-publish:hover>.publish-icon{background:var(--brand-hover)}
-}
-@media(min-width:1100px){
-.primary-nav{width:200px;padding:28px 16px;border-right:1px solid var(--line)}.nav-brand{font-size:18px;padding:0 8px 36px;gap:8px}.nav-brand :deep(svg){width:28px;height:28px}.nav-items{gap:6px}.nav-item,.nav-publish{border-radius:10px;font-size:14px;min-height:46px;gap:12px}.nav-publish{margin-top:24px;border:1px solid var(--line);background:var(--surface)}.nav-bottom{padding-left:8px;padding-right:0;font-size:12px}.nav-bottom>div{gap:10px}
-}
 </style>
