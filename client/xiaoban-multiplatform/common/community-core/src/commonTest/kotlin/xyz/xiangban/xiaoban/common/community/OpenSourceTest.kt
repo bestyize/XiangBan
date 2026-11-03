@@ -3,10 +3,38 @@ package xyz.xiangban.xiaoban.common.community
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class OpenSourceTest {
+    @Test
+    fun projectReadmeLoadsThePublicBilingualSnapshotWithoutAuth() = runTest {
+        val server = FakeServer()
+        val file = "projects/${"a".repeat(64)}.json"
+        server.on("/open-source-readmes/index.json", body = """{"projects":{"example/notes":"$file","bad/path":"../private"}}""")
+        server.on("/open-source-readmes/$file", body = """{
+            "schema":1,"full_name":"example/notes","card":{"name":"Notes","stars":42,"license":null},
+            "source_url":"https://github.com/example/notes","commit":"abc123","fetched_at":"2026-11-03",
+            "zh":"中文正文","en":"English README","licenses":[{"name":"MIT","text":"License text"}]
+        }""")
+        val api = ForumApi(server.client, CommunityConfig()) { error("public README should not request an access token") }
+        try {
+            val readme = api.projectReadme("EXAMPLE/Notes")!!
+            assertEquals("中文正文", readme.zh)
+            assertEquals("English README", readme.en)
+            assertEquals(42L, readme.card.stars)
+            assertEquals("MIT", readme.licenses.single().name)
+            assertNull(api.projectReadme("missing/repo"))
+            assertFailsWith<ApiException> { api.projectReadme("bad/path") }
+            assertEquals(listOf("/open-source-readmes/index.json", "/open-source-readmes/$file",
+                "/open-source-readmes/index.json", "/open-source-readmes/index.json"),
+                server.requests.map { it.url.encodedPath })
+        } finally {
+            server.client.close()
+        }
+    }
+
     @Test
     fun catalogDecodesEditorialFieldsAndAllowsCrossCategoryDiscovery() = runTest {
         val server = FakeServer()

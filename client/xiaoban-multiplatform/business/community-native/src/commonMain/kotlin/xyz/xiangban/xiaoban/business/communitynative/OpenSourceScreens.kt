@@ -4,10 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -17,10 +19,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import coil3.compose.AsyncImage
 import xyz.xiangban.xiaoban.common.community.Load
+import xyz.xiangban.xiaoban.common.community.MdBlock
+import xyz.xiangban.xiaoban.common.community.ProjectReadme
+import xyz.xiangban.xiaoban.common.community.ProjectReadmeCard
 import xyz.xiangban.xiaoban.common.community.OpenSourceCatalog
 import xyz.xiangban.xiaoban.common.community.OpenSourceCollection
 import xyz.xiangban.xiaoban.common.community.OpenSourceProject
 import androidx.compose.ui.unit.dp
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Instant
+import xyz.xiangban.xiaoban.common.community.formatStars
 
 private fun OpenSourceProject.route() = Route.OpenSource(fullName.substringBefore('/'), fullName.substringAfter('/'))
 
@@ -145,46 +153,142 @@ internal fun OpenSourceCollectionScreen(env: CommunityEnv, key: String, back: ()
     }
 }
 
-/** 由仓库详情页承载，评论继续复用同一仓库身份。 */
-@Composable
-internal fun OpenSourceArticle(env: CommunityEnv, catalog: OpenSourceCatalog, project: OpenSourceProject, open: (Route) -> Unit) {
-    val (saved, setSaved) = rememberPrefFlag(env, "fav_repo:${project.fullName}")
-    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(Modifier.fillMaxWidth().outlinedCard(16.dp)) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("${catalog.categoryLabel(project.category)} · ${project.name}", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                Text(project.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                Text(project.fullName, style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                Text(project.summary, style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant)
+/** 精选项目使用与 Web 相同的 README 快照，评论继续复用仓库身份。 */
+internal fun LazyListScope.curatedReadmeItems(
+    env: CommunityEnv,
+    catalog: OpenSourceCatalog,
+    project: OpenSourceProject,
+    state: Load<ProjectReadme?>,
+    blocks: List<MdBlock>,
+    chinese: Boolean,
+    setChinese: (Boolean) -> Unit,
+    retry: () -> Unit,
+    open: (Route) -> Unit,
+) {
+    val readme = (state as? Load.Ready)?.value
+    val github = readme?.card?.githubUrl.orEmpty().ifBlank { project.githubUrl }
+    val follow: (String) -> Unit = { webPageRoute(it)?.let(open) }
+    item(key = "curated-project") { CuratedProjectCard(env, catalog, project, readme?.card, github, follow) }
+    item(key = "curated-readme-toolbar") {
+        Row(
+            Modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("README", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.SemiBold)
+            if (readme != null) {
+                PageChip("中文", chinese) { setChinese(true) }
+                Spacer(Modifier.width(6.dp))
+                PageChip("English", !chinese) { setChinese(false) }
             }
-            OpenSourceImage(env, project)
-            if (project.coverUrl.isNotBlank()) Text("${project.coverCaption} · 项目官方仓库", Modifier.padding(12.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
-        WhiteCard {
-            Text("项目速览", style = XType.Section, fontWeight = FontWeight.SemiBold)
-            Text(project.effort, Modifier.padding(top = 12.dp), style = XType.Body)
-            Row(Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                GhostPillButton("前往 GitHub ↗", { webPageRoute(project.githubUrl)?.let(open) }, Modifier.weight(1f), height = 44.dp, fontSize = 14, textColor = LocalExtraColors.current.brandInk)
-                GhostPillButton(if (saved) "已收藏" else "收藏项目", { setSaved(!saved) }, Modifier.weight(1f), height = 44.dp, fontSize = 14)
+        Hairline(Modifier.padding(horizontal = 12.dp))
+    }
+    when (state) {
+        Load.Loading -> item(key = "curated-readme-loading") { Spinner(Modifier.fillMaxWidth().height(64.dp)) }
+        is Load.Failed -> item(key = "curated-readme-error") {
+            CenterMessage(state.message, "重试", retry, Modifier.fillMaxWidth())
+        }
+        is Load.Ready -> {
+            if (readme == null) item(key = "curated-readme-missing") {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("双语 README 正在整理中，可以先阅读项目官方原文。", style = XType.Body)
+                    OpenSourceLink("查看官方 README") { follow(project.sourceUrl) }
+                    OpenSourceImage(env, project)
+                }
+            } else {
+                items(blocks.size, key = { "curated-readme-block:$it" }) { index ->
+                    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp)) {
+                        MarkdownContentBlock(blocks[index], env.platform, follow)
+                    }
+                }
+                item(key = "curated-readme-source") { ReadmeProvenance(readme, github, follow) }
             }
-        }
-        OpenSourceSection("为什么值得看看") { project.highlights.forEachIndexed { index, text -> Text("0${index + 1}  $text", style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-        OpenSourceSection("适合谁") { Text(project.audience, style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        OpenSourceSection("从这里开始") { Text(project.gettingStarted, style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        OpenSourceSection("开始前了解一下") { project.notes.forEach { Text("· $it", style = XType.Body, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
-        OpenSourceSection("继续了解") {
-            OpenSourceLink("项目官网与文档") { webPageRoute(project.homepageUrl)?.let(open) }
-            OpenSourceLink("README 与源代码") { webPageRoute(project.sourceUrl)?.let(open) }
-            OpenSourceLink("查看项目许可") { webPageRoute("${project.githubUrl}#license")?.let(open) }
-            Text("${catalog.notice}\n资料整理：${catalog.reviewedAt}", style = XType.Caption, color = LocalExtraColors.current.ink3)
         }
     }
 }
 
 @Composable
-private fun OpenSourceSection(title: String, content: @Composable ColumnScope.() -> Unit) {
-    WhiteCard { Text(title, style = XType.Section, fontWeight = FontWeight.SemiBold); Column(Modifier.padding(top = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content) }
+private fun CuratedProjectCard(
+    env: CommunityEnv,
+    catalog: OpenSourceCatalog,
+    project: OpenSourceProject,
+    card: ProjectReadmeCard?,
+    github: String,
+    follow: (String) -> Unit,
+) {
+    val summary = card?.summaryZh.orEmpty().ifBlank { project.summary }
+    val name = card?.name.orEmpty().ifBlank { project.name }
+    val icon = project.iconUrl.ifBlank { card?.iconSourceUrl.orEmpty() }
+    val primaryUrl = card?.primaryUrl.orEmpty().ifBlank { project.homepageUrl }
+    var brokenIcon by remember(icon) { mutableStateOf(false) }
+    val metadata = listOfNotNull(
+        card?.stars?.let { "${formatStars(it)} Stars" },
+        card?.codeUpdatedAt?.takeIf { it.isNotBlank() }?.let { "更新于 ${readmeDate(it)}" },
+        card?.license?.takeIf { it.isNotBlank() },
+        card?.platforms?.takeIf { it.isNotEmpty() }?.joinToString(" / "),
+    )
+    Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text("${catalog.categoryLabel(project.category)} · OPEN SOURCE", style = XType.Caption, color = LocalExtraColors.current.ink3)
+        Text("$name — ${summary.trimEnd('。', '.')}", style = XType.Headline, fontWeight = FontWeight.SemiBold)
+        WhiteCard {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)).background(LocalExtraColors.current.fill),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (icon.isBlank() || brokenIcon) Text(name.take(1), style = XType.Section)
+                    else AsyncImage(
+                        model = env.forum.imageUrl(icon), imageLoader = rememberImageLoader(),
+                        contentDescription = null, modifier = Modifier.fillMaxSize().padding(4.dp),
+                        onError = { brokenIcon = true },
+                    )
+                }
+                Column(Modifier.weight(1f)) {
+                    Text(name, style = XType.Section, fontWeight = FontWeight.SemiBold)
+                    Text(project.fullName, Modifier.clickable { follow(github) }, style = XType.Caption, color = Brand)
+                }
+            }
+            Text(summary, Modifier.padding(top = 12.dp), style = XType.Body)
+            if (metadata.isNotEmpty()) Text(metadata.joinToString(" · "), Modifier.padding(top = 8.dp), style = XType.Caption)
+            if (primaryUrl.isNotBlank() && primaryUrl != github) {
+                OpenSourceLink(card?.primaryLabel.orEmpty().ifBlank { "项目官网" }) { follow(primaryUrl) }
+            }
+            OpenSourceLink("GitHub") { follow(github) }
+            if (card != null && (card.githubArchived || card.upstreamMaintenanceNotice.isNotBlank())) {
+                Text(card.upstreamMaintenanceNotice.ifBlank { "上游仓库已归档，使用前请留意维护状态。" }, style = XType.Caption)
+            }
+            card?.iconAttribution?.takeIf { it.isNotBlank() }?.let { Text(it, style = XType.Caption) }
+        }
+    }
 }
+
+@Composable
+private fun ReadmeProvenance(readme: ProjectReadme, github: String, follow: (String) -> Unit) {
+    var showLicenses by rememberSaveable(readme.fullName) { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Hairline()
+        Text(readme.translation.ifBlank { "依据项目官方 README 整理" }, style = XType.Caption)
+        Text("资料采集 ${readmeDate(readme.fetchedAt)}", style = XType.Caption)
+        OpenSourceLink("查看上游原文") { follow(readme.sourceUrl) }
+        if (readme.commit.isNotBlank()) {
+            OpenSourceLink("版本 ${readme.commit.take(7)}") { follow("${github.trimEnd('/')}/commit/${readme.commit}") }
+        }
+        if (readme.licenses.isNotEmpty()) {
+            TextButton(onClick = { showLicenses = !showLicenses }) {
+                Text(if (showLicenses) "收起许可与版权声明" else "许可与版权声明")
+            }
+            if (showLicenses) readme.licenses.forEach { license ->
+                Text(license.name, style = XType.Section)
+                MarkdownContentBlock(MdBlock.Code("", license.text), null) {}
+            }
+        }
+    }
+}
+
+@OptIn(kotlin.time.ExperimentalTime::class)
+private fun readmeDate(value: String): String =
+    runCatching { (Instant.parse(value) + 8.hours).toString().substringBefore('T') }
+        .getOrElse { value.substringBefore('T') }
 
 @Composable
 private fun OpenSourceLink(text: String, onClick: () -> Unit) {

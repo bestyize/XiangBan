@@ -837,24 +837,27 @@ private fun StatusLine(text: String, alert: Boolean) {
 @Composable
 fun MarkdownBubble(text: String, streaming: Boolean, platform: PlatformActions?, modifier: Modifier = Modifier) {
     val blocks = remember(text, streaming) { parseMarkdown(if (streaming) "$text ▍" else text) }
-    val extra = LocalExtraColors.current
-    val codeBg = extra.fill
     val onLink: (String) -> Unit = { url -> if (url.startsWith("https://") || url.startsWith("http://")) platform?.openUrl(url) }
     Column(
         modifier.clip(AssistantBubbleShape).background(MaterialTheme.colorScheme.surface).padding(horizontal = 12.dp, vertical = 9.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        blocks.forEach { block ->
-            when (block) {
-                is MdBlock.Heading -> Text(inlineText(block.inlines, codeBg, onLink), fontSize = if (block.level <= 1) 17.sp else if (block.level == 2) 16.sp else 15.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
-                is MdBlock.Paragraph -> Text(inlineText(block.inlines, codeBg, onLink), style = XType.Body)
-                is MdBlock.Bullets -> block.items.forEach { item -> ListItem("•", item, codeBg, onLink) }
-                is MdBlock.Numbered -> block.items.forEachIndexed { i, item -> ListItem("${block.start + i}.", item, codeBg, onLink) }
-                is MdBlock.Quote -> Text(inlineText(block.inlines, codeBg, onLink), Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                is MdBlock.Code -> CodeBlock(block.language, block.text, platform)
-                MdBlock.Rule -> Hairline()
-            }
-        }
+        blocks.forEach { block -> MarkdownContentBlock(block, platform, onLink) }
+    }
+}
+
+@Composable
+internal fun MarkdownContentBlock(block: MdBlock, platform: PlatformActions?, onLink: (String) -> Unit) {
+    val extra = LocalExtraColors.current
+    val codeBg = extra.fill
+    when (block) {
+        is MdBlock.Heading -> Text(inlineText(block.inlines, codeBg, onLink), fontSize = if (block.level <= 1) 17.sp else if (block.level == 2) 16.sp else 15.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
+        is MdBlock.Paragraph -> Text(inlineText(block.inlines, codeBg, onLink), style = XType.Body)
+        is MdBlock.Bullets -> block.items.forEach { item -> ListItem("•", item, codeBg, onLink) }
+        is MdBlock.Numbered -> block.items.forEachIndexed { i, item -> ListItem("${block.start + i}.", item, codeBg, onLink) }
+        is MdBlock.Quote -> Text(inlineText(block.inlines, codeBg, onLink), Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(extra.fill).padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        is MdBlock.Code -> CodeBlock(block.language, block.text, platform)
+        MdBlock.Rule -> Hairline()
     }
 }
 

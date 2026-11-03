@@ -59,6 +59,7 @@ data class OpenSourceCatalog(
     val categories: List<OpenSourceCategory> = emptyList(),
     val projects: List<OpenSourceProject> = emptyList(),
     val collections: List<OpenSourceCollection> = emptyList(),
+    val related: List<RelatedOpenSourceProject> = emptyList(),
 ) {
     fun project(name: String) = projects.firstOrNull { it.fullName.equals(name, ignoreCase = true) }
     fun categoryLabel(key: String) = categories.firstOrNull { it.key == key }?.label ?: key
@@ -71,3 +72,47 @@ data class OpenSourceCatalog(
         }.sortedBy { it.order }
     }
 }
+
+@Serializable
+data class RelatedOpenSourceProject(
+    @SerialName("full_name") val fullName: String,
+    val name: String,
+    val summary: String = "",
+)
+
+@Serializable
+internal data class ProjectReadmeIndex(val projects: Map<String, String>)
+
+@Serializable
+data class ProjectReadme(
+    val schema: Int,
+    @SerialName("full_name") val fullName: String,
+    val card: ProjectReadmeCard,
+    @SerialName("source_url") val sourceUrl: String,
+    val commit: String,
+    @SerialName("fetched_at") val fetchedAt: String,
+    val translation: String = "",
+    val zh: String,
+    val en: String,
+    val licenses: List<ProjectReadmeLicense> = emptyList(),
+)
+
+@Serializable
+data class ProjectReadmeCard(
+    val name: String,
+    @SerialName("summary_zh") val summaryZh: String = "",
+    @SerialName("icon_source_url") val iconSourceUrl: String = "",
+    @SerialName("icon_attribution") val iconAttribution: String = "",
+    @SerialName("github_url") val githubUrl: String = "",
+    @SerialName("primary_url") val primaryUrl: String = "",
+    @SerialName("primary_label") val primaryLabel: String = "",
+    val stars: Long? = null,
+    @SerialName("code_updated_at") val codeUpdatedAt: String = "",
+    val license: String = "",
+    val platforms: List<String> = emptyList(),
+    @SerialName("github_archived") val githubArchived: Boolean = false,
+    @SerialName("upstream_maintenance_notice") val upstreamMaintenanceNotice: String = "",
+)
+
+@Serializable
+data class ProjectReadmeLicense(val name: String, val text: String)

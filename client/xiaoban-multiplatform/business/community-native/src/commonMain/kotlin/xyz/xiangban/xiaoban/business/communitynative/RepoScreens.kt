@@ -32,6 +32,8 @@ import xyz.xiangban.xiaoban.common.community.ReadmeBlock
 import xyz.xiangban.xiaoban.common.community.RepoDetail
 import xyz.xiangban.xiaoban.common.community.RepoRank
 import xyz.xiangban.xiaoban.common.community.OpenSourceCatalog
+import xyz.xiangban.xiaoban.common.community.Load
+import xyz.xiangban.xiaoban.common.community.parseMarkdown
 import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.formatGain
 import xyz.xiangban.xiaoban.common.community.formatStars
@@ -125,13 +127,22 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
     var deleteTarget by remember(name) { mutableStateOf<NewsComment?>(null) }
     val listState = rememberLazyListState()
 
+    val readmeLoader = if (curated) rememberLoader(env, "project-readme:$name") { env.forum.projectReadme(name) } else null
+    val curatedReadme = readmeLoader?.state?.collectAsState()?.value
+    val curatedProject = curatedCatalog?.project(name)
+    val readme = (curatedReadme as? Load.Ready)?.value
+    val curatedGithub = readme?.card?.githubUrl.orEmpty().ifBlank { curatedProject?.githubUrl.orEmpty() }
+    val readmeBlocks = remember(readme, zh) {
+        readme?.let { parseMarkdown(if (zh) it.zh else it.en) }.orEmpty()
+    }
+
     fun loadDetail() {
         if (loadingDetail) return
         loadingDetail = true; error = null
         scope.launch {
             try {
                 if (curated) {
-                    val catalog = env.forum.openSourceCatalog()
+                    val catalog = env.forum.openSourceProject(owner, repo)
                     val project = catalog.project(name) ?: error("这个项目尚未收录")
                     curatedCatalog = catalog
                     detail = RepoDetail(fullName = project.fullName)
@@ -158,7 +169,11 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
     LaunchedEffect(name, curated) { loadDetail(); loadComments(true) }
 
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
-        ScreenBar(if (curated) "项目导读" else "仓库详情", onBack = back)
+        ScreenBar(if (curated) "开源精选" else "仓库详情", onBack = back, trailing = {
+            webPageRoute(curatedGithub)?.let { github ->
+                IconTap(XIcons.ExternalLink, "在 GitHub 查看项目", { open(github) })
+            }
+        })
         val d = detail
         if (d == null) {
             Box(Modifier.weight(1f)) {
@@ -179,13 +194,12 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                 else -> null
             }
             // 评论标题前面的项数：卡片、介绍标题，再加 README 部分（提示、各块、展开按钮，或"没有 README"）。
-            val commentsIndex = if (curated) 1 else 2 + if (hasReadme) (if (note != null) 1 else 0) + shown.size + (if (long) 1 else 0) else 1
+            val commentsIndex = 2 + if (hasReadme) (if (note != null) 1 else 0) + shown.size + (if (long) 1 else 0) else 1
             LazyColumn(Modifier.weight(1f), state = listState, contentPadding = PaddingValues(bottom = 24.dp)) {
                 if (curated) {
-                    item(key = "curated-article") {
-                        val catalog = curatedCatalog
-                        val project = catalog?.project(name)
-                        if (catalog != null && project != null) OpenSourceArticle(env, catalog, project, open)
+                    val catalog = curatedCatalog
+                    if (catalog != null && curatedProject != null && curatedReadme != null && readmeLoader != null) {
+                        curatedReadmeItems(env, catalog, curatedProject, curatedReadme, readmeBlocks, zh, { zh = it }, readmeLoader::reload, open)
                     }
                 } else {
                 item(key = "hero") {
@@ -312,11 +326,32 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
                     else if (commentsMore) Text("加载更多评论", Modifier.clickable { loadComments() }.padding(20.dp), color = Brand, fontSize = 14.sp)
                     if (loadingComments) Spinner(Modifier.fillMaxWidth().height(48.dp))
                 }
+                val related = curatedCatalog?.related.orEmpty()
+                if (related.isNotEmpty()) item(key = "curated-related") {
+                    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                        Text("还可以看看", style = XType.Section, fontWeight = FontWeight.SemiBold)
+                        related.forEach { project ->
+                            Column(Modifier.fillMaxWidth().clickable {
+                                open(Route.OpenSource(project.fullName.substringBefore('/'), project.fullName.substringAfter('/')))
+                            }.padding(vertical = 10.dp)) {
+                                Text(project.name, style = XType.Body, fontWeight = FontWeight.SemiBold)
+                                Text(project.summary, style = XType.Caption, color = ink3)
+                            }
+                        }
+                    }
+                }
             }
             Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).imePadding().padding(horizontal = 14.dp, vertical = 8.dp)) {
                 replyTo?.let { Text("回复 ${it.author.nickname} · 取消", Modifier.clickable { replyTo = null }.padding(bottom = 6.dp), color = Brand, fontSize = 12.sp) }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(value = draft, onValueChange = { if (it.length <= 2000) draft = it }, modifier = Modifier.weight(1f), placeholder = { Text(if (replyTo != null) "回复 ${replyTo?.author?.nickname}" else "写下你的看法…", fontSize = 14.sp) }, maxLines = 3, shape = RoundedCornerShape(12.dp))
+                    if (curated) IconTap(
+                        XIcons.Star,
+                        if (fav) "取消收藏" else "收藏",
+                        { setFav(!fav) },
+                        tint = if (fav) Brand else MaterialTheme.colorScheme.onSurfaceVariant,
+                        size = 20.dp,
+                    )
                     TextButton(enabled = !sending && draft.trim().length >= 2, onClick = {
                         if (!session.loggedIn) open(Route.Login) else {
                             sending = true

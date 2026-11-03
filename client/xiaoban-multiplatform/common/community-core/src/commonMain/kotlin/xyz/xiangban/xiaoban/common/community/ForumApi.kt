@@ -13,6 +13,8 @@ import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import kotlinx.serialization.serializer
 
+private val ProjectReadmePath = Regex("projects/[a-f0-9]{64}[.]json")
+
 /** 论坛接口（只读浏览 + 登录态相关的几项）。需要登录的请求带上 [token]，公开内容没登录也能看。 */
 class ForumApi(client: HttpClient, config: CommunityConfig, private val token: suspend () -> String?) {
     private val http = JsonHttp(client, config.forumBase)
@@ -75,6 +77,27 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     private fun repoPath(owner: String, repo: String) = "/api/discover/repo/${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
     suspend fun repoDetail(owner: String, repo: String): RepoDetail = get(repoPath(owner, repo))
     suspend fun openSourceCatalog(): OpenSourceCatalog = get("/api/open-source")
+    suspend fun openSourceProject(owner: String, repo: String): OpenSourceCatalog = http.send(
+        HttpMethod.Get,
+        "/api/open-source/projects/${owner.encodeURLParameter()}/${repo.encodeURLParameter()}",
+        OpenSourceCatalog.serializer(),
+    )
+    suspend fun projectReadme(fullName: String): ProjectReadme? {
+        val root = "/open-source-readmes"
+        val index = try {
+            http.send(HttpMethod.Get, "$root/index.json", ProjectReadmeIndex.serializer())
+        } catch (e: ApiException) {
+            if (e.status == 404) return null
+            throw e
+        }
+        val path = index.projects[fullName.lowercase()] ?: return null
+        if (!ProjectReadmePath.matches(path)) throw ApiException(200, "README 索引无效")
+        val readme = http.send(HttpMethod.Get, "$root/$path", ProjectReadme.serializer())
+        if (readme.schema != 1 || !readme.fullName.equals(fullName, ignoreCase = true)) {
+            throw ApiException(200, "README 内容校验失败")
+        }
+        return readme
+    }
     suspend fun repoComments(owner: String, repo: String, page: Int = 1): Page<NewsComment> = get("${repoPath(owner, repo)}/comments${query("page" to page)}")
     suspend fun commentRepo(owner: String, repo: String, body: String, replyTo: Long? = null) {
         write(HttpMethod.Post, "${repoPath(owner, repo)}/comments", buildJsonObject {
