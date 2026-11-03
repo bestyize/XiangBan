@@ -28,7 +28,11 @@ const updated = computed(() => card.value?.code_updated_at || project.value?.las
 const rendered = computed(() => readme.value ? renderProjectReadme(readme.value[language.value]) : '')
 const bookmarks = useRepoBookmarks()
 const category = computed(() => catalog.value?.categories.find(item => item.key === project.value?.category)?.label ?? '开源项目')
-const date = (value?: string) => value ? value.slice(0, 10) : ''
+const date = (value?: string) => {
+  if (!value) return ''
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? '' : new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(parsed)
+}
 const count = (value: number) => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value)
 watch(() => [route.params.owner, route.params.repo], () => {
   language.value = 'zh'; brokenIcon.value = false; copyMessage.value = ''
