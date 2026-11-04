@@ -148,9 +148,9 @@ pub async fn design_mcp_configure(app:tauri::AppHandle,window:tauri::WebviewWind
 }
 fn quote(s:&str)->String{if cfg!(windows){format!("\"{}\"",s.replace('"',"\\\""))}else{format!("'{}'",s.replace('\'',"'\\''"))}}
 #[tauri::command]
-pub async fn design_mcp_open_settings(app:tauri::AppHandle,window:tauri::WebviewWindow)->Result<(),String>{
+pub async fn design_mcp_open_settings(app:tauri::AppHandle,window:tauri::Webview)->Result<(),String>{
     if window.label()!="control"&&crate::design_window::project_id(window.label()).is_none(){return Err("请从设计画板打开协作设置".into())}
-    let control=app.get_webview_window("control").ok_or("控制台未就绪")?;
+    let control=app.get_webview("control").ok_or("控制台未就绪")?;
     crate::configuration_window::configuration_window_open(app,control,"settings".into(),Some("agent".into()),None).await
 }
 pub fn start(app:&tauri::AppHandle){

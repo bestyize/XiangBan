@@ -5,6 +5,7 @@ use agent_kernel::Role;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::io::{Cursor, Read};
 use std::path::Component;
 use tauri_plugin_dialog::DialogExt;
@@ -80,15 +81,24 @@ fn switched(message: &Message) -> Option<(PathBuf, PathBuf)> {
     let (after, before) = (PathBuf::from(quoted[0]), PathBuf::from(quoted[1]));
     (after.is_absolute() && before.is_absolute()).then_some((after,before))
 }
-fn outputs(messages: &[Message], workspace: &Path) -> Vec<(PathBuf, Option<String>)> {
+fn outputs_with_downloads(messages: &[Message], workspace: &Path, downloads: Option<&Path>) -> Vec<(PathBuf, Option<String>)> {
     let mut calls = HashMap::new();
     let mut skin_calls = HashMap::new();
     let mut paths = vec![];
+    let mut download_calls = HashSet::new();
+    let mut download_outputs: HashMap<PathBuf, String> = HashMap::new();
     let mut active = messages.iter().find_map(switched).map(|(_,before)| before).unwrap_or_else(||workspace.to_path_buf());
     for message in messages {
         if let Some((after,_)) = switched(message) { active = after; continue; }
+        if message.role == Role::User {
+            download_calls.clear();
+            download_outputs.clear();
+        }
         if message.role == Role::Assistant {
             for call in &message.tool_calls {
+                if call.name == "community_download_video" {
+                    download_calls.insert(call.id.clone());
+                }
                 if matches!(call.name.as_str(), "skin_create"|"skin_export") {
                     skin_calls.insert(call.id.clone(), active.clone());
                 }
@@ -102,10 +112,44 @@ fn outputs(messages: &[Message], workspace: &Path) -> Vec<(PathBuf, Option<Strin
             let text = message.text();
             for rest in text.split("](").skip(1) {
                 let end = if rest.starts_with('<') { rest.find('>').map(|n| n + 1) } else { rest.find(')') };
-                if let Some(path) = end.and_then(|end| output_path(&active, &rest[..end])) { paths.push((path, None)); }
+                if let Some(raw) = end.map(|end| &rest[..end]) {
+                    if let Some(path) = output_path(&active, raw) { paths.push((path, None)); }
+                    for (root, id) in &download_outputs {
+                        if let Some(path) = output_path(root, raw).filter(|path| path.is_file()) {
+                            paths.push((path, Some(id.clone())));
+                        }
+                    }
+                }
+            }
+            // Older replies may put the final absolute path in a code block.
+            for line in text.lines() {
+                let raw = line.trim().trim_matches('`');
+                if !Path::new(raw).is_absolute() { continue; }
+                if let Some(path) = output_path(&active, raw).filter(|path| path.is_file()) {
+                    paths.push((path, None));
+                }
+                for (root, id) in &download_outputs {
+                    if let Some(path) = output_path(root, raw).filter(|path| path.is_file()) {
+                        paths.push((path, Some(id.clone())));
+                    }
+                }
             }
         }
         if message.role == Role::Tool && !message.is_error {
+            if let Some(id) = message.tool_call_id.as_ref().filter(|id| download_calls.remove(*id)) {
+                if let Some(path) = downloads.and_then(|root| {
+                    let value: Value = serde_json::from_str(&message.text()).ok()?;
+                    output_path(root, value["path"].as_str()?)
+                }) {
+                    if let Some(parent) = path.parent().filter(|parent| Some(*parent) != downloads) {
+                        download_outputs.insert(parent.to_path_buf(), id.clone());
+                        // New downloads return the merged video; older results can be a split stream.
+                        if path.file_stem().is_some_and(|stem| stem == "video") {
+                            paths.push((path, Some(id.clone())));
+                        }
+                    }
+                }
+            }
             if let Some((id, root)) = message.tool_call_id.as_ref().and_then(|id| skin_calls.remove(id).map(|root| (id.clone(), root))) {
                 if let Ok(result) = serde_json::from_str::<Value>(&message.text()) {
                     if let Some(path) = result["packagePath"].as_str().and_then(|p| output_path(&root, p)) {
@@ -119,9 +163,14 @@ fn outputs(messages: &[Message], workspace: &Path) -> Vec<(PathBuf, Option<Strin
     paths
 }
 
-fn collect(chat: &Path, session: &str, workspace: &Path, messages: &[Message]) -> Result<Vec<Asset>, String> {
+#[cfg(test)]
+fn outputs(messages: &[Message], workspace: &Path) -> Vec<(PathBuf, Option<String>)> {
+    outputs_with_downloads(messages, workspace, None)
+}
+
+fn collect(chat: &Path, session: &str, workspace: &Path, messages: &[Message], downloads: Option<&Path>) -> Result<Vec<Asset>, String> {
     let mut rows = HashMap::new();
-    for (path, call) in outputs(messages, workspace) {
+    for (path, call) in outputs_with_downloads(messages, workspace, downloads) {
         let call = call.or_else(|| rows.get(&path).and_then(|a: &Asset| a.tool_call_id.clone()));
         rows.insert(path.clone(), describe(&path, false, 0, call));
     }
@@ -147,7 +196,8 @@ fn context(app: &tauri::AppHandle, session: &str) -> Result<(PathBuf, PathBuf, V
 }
 fn list(app: &tauri::AppHandle, session: &str) -> Result<Vec<Asset>, String> {
     let (chat, workspace, messages) = context(app, session)?;
-    collect(&chat, session, &workspace, &messages)
+    let downloads = app.path().download_dir().ok().map(|path| path.join("小伴"));
+    collect(&chat, session, &workspace, &messages, downloads.as_deref())
 }
 
 /// Resolve an opaque asset ID, never a caller-supplied absolute path; directory traversal and symlink escapes fail.
@@ -283,7 +333,7 @@ mod tests {
         let t=Temp::new();let file=t.0.join("报告.pdf");fs::write(&file,"pdf").unwrap();
         assert_eq!(associate(&t.0,"s",vec![file.clone()]).unwrap(),1);
         assert_eq!(associate(&t.0,"s",vec![file.clone()]).unwrap(),0);
-        fs::remove_file(&file).unwrap();let a=collect(&t.0,"s",&t.0,&[]).unwrap();
+        fs::remove_file(&file).unwrap();let a=collect(&t.0,"s",&t.0,&[],None).unwrap();
         assert_eq!(a.len(),1);assert!(a[0].imported);assert!(!a[0].exists);
         fs::write(registry(&t.0,"s"),"broken").unwrap();assert!(associate(&t.0,"s",vec![]).is_err());
     }
@@ -293,6 +343,31 @@ mod tests {
         let messages=vec![Message::user_text("[私人文件](secret.txt)"),Message::assistant("",vec![call("w","write_file"),call("r","read_file"),call("e","edit_file")]),Message::tool("w","ok"),Message::tool("r","read"),{let mut m=Message::tool("e","failed");m.is_error=true;m},Message::assistant("[文件夹](delivery) [外链](https://example.com) [越界](../secret)",vec![])];
         let out=outputs(&messages,&t.0);assert_eq!(out.len(),2);assert_eq!(out[0].1.as_deref(),Some("w"));assert!(out[1].0.ends_with("delivery"));
     }
+    #[test]
+    fn recovered_download_delivers_final_file_without_exposing_split_streams() {
+        let t = Temp::new();
+        let workspace = t.0.join("workspace");
+        let downloads = t.0.join("downloads");
+        let destination = downloads.join("视频-1");
+        fs::create_dir_all(&workspace).unwrap();
+        fs::create_dir_all(&destination).unwrap();
+        let audio = destination.join("video.f30280.m4a");
+        let video = destination.join("最终视频.mp4");
+        let unrelated = downloads.join("unrelated.mp4");
+        for file in [&audio, &video, &unrelated] {
+            fs::write(file, "fixture").unwrap();
+        }
+        let messages = [
+            Message::assistant("", vec![agent_kernel::ToolCall {
+                id: "download".into(), name: "community_download_video".into(), arguments: "{}".into(),
+            }]),
+            Message::tool("download", json!({"path": audio}).to_string()),
+            Message::assistant(format!("```\n{}\n```\n{}", video.display(), unrelated.display()), vec![]),
+        ];
+        assert_eq!(outputs_with_downloads(&messages, &workspace, Some(&downloads)),
+            vec![(video, Some("download".into()))]);
+    }
+
     #[test]
     fn skin_zip_deliveries_are_discovered_without_a_final_markdown_link() {
         let t=Temp::new();
@@ -310,7 +385,7 @@ mod tests {
     fn folders_own_their_descendants_without_double_counting() {
         let t=Temp::new();let folder=t.0.join("交付");fs::create_dir(&folder).unwrap();fs::write(folder.join("a.txt"),"x").unwrap();
         associate(&t.0,"s",vec![folder.clone(),folder.join("a.txt")]).unwrap();
-        assert_eq!(collect(&t.0,"s",&t.0,&[]).unwrap().len(),1);
+        assert_eq!(collect(&t.0,"s",&t.0,&[],None).unwrap().len(),1);
         assert!(within(&folder,"../a.txt").is_err());assert!(within(&folder,"/a.txt").is_err());assert!(within(&folder,"a.txt").unwrap().is_file());
     }
     #[test]
@@ -328,6 +403,6 @@ mod tests {
         std::os::unix::fs::symlink(&outside,root.join("escape")).unwrap();
         assert!(within(&root,"escape").is_err());assert!(output_path(&root,"escape").is_none());
         let alias=t.0.join("alias");std::os::unix::fs::symlink(&root,&alias).unwrap();associate(&t.0,"s",vec![alias.clone()]).unwrap();
-        fs::remove_file(&alias).unwrap();std::os::unix::fs::symlink(&t.0,&alias).unwrap();assert!(!collect(&t.0,"s",&root,&[]).unwrap()[0].exists);
+        fs::remove_file(&alias).unwrap();std::os::unix::fs::symlink(&t.0,&alias).unwrap();assert!(!collect(&t.0,"s",&root,&[],None).unwrap()[0].exists);
     }
 }

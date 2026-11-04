@@ -87,6 +87,14 @@ pub fn reflect_run(app:&tauri::AppHandle,session:&str,run:&str)->Result<Value,St
  Ok(json!({"candidate":db.get_experience(id)?,"needsReview":true}))
 }
 
+/// A deterministic candidate from a paired failure and a verified retry in the same run.
+pub(super) fn record_bilibili_recovery(db: &LearningDb, run: &str) -> Result<(), String> {
+    db.add_experience("personal", run, "procedure",
+        "B 站 Bilibili 视频用 yt-dlp 解析成功但下载媒体流返回 HTTP 567 时，可在同一链接上匿名加 Range: bytes=0- 重试一次。用 ffprobe 确认成品包含音频和视频。仍失败就报告原始错误，使用浏览器 Cookie 前先获授权。",
+        "同一运行、同一规范化链接的首轮请求返回 HTTP 567。内置工具加 Range 重试后，ffprobe 确认成品包含视频和音频。")?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests{
  use super::*;

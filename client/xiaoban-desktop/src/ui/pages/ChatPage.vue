@@ -17,7 +17,7 @@ import ChatGeneratedImages from '../chat/ChatGeneratedImages.vue';
 import ChatAssets from '../chat/ChatAssets.vue';
 import PreviewPanel from '../preview/PreviewPanel.vue';
 import {assetForLink,previewKind,previewTab,type PreviewTab,type PreviewTarget} from '../preview/model.ts';
-import type {ConversationAsset} from '../chat/assets.ts';
+import { assetMeta, type ConversationAsset } from '../chat/assets.ts';
 import ChatTaskCard from '../chat/ChatTaskCard.vue';
 import ChatReasoning from '../chat/ChatReasoning.vue';
 import ChatReasoningGroup from '../chat/ChatReasoningGroup.vue';
@@ -230,7 +230,7 @@ const statusLine = computed(() => {
   return silenceNotice(silentSeconds.value, view.value?.retry ? base : '') || base;
 });
 const lastBlockId = computed(() => blocks.value.at(-1)?.id);
-const progressByBlock = computed(() => new Map(blocks.value.map(block => [block.id, taskProgress(block,
+const progressByBlock = computed(() => new Map(blocks.value.map(block => [block.id, taskProgress(recoveredBlock(block),
   running.value && block.id === lastBlockId.value,
   block.id === lastBlockId.value ? view.value?.questions.length ? 'question' : view.value?.approvals.length ? 'approval' : null : null,
   block.id === lastBlockId.value ? statusLine.value : '',
@@ -325,6 +325,40 @@ const answers = (block: ReplyBlock) => block.items.filter((item): item is Assist
 const speaks = (block: ReplyBlock) => block.calls.length > 0 || block.items.some(item => item.kind === 'assistant' || item.kind === 'reasoning');
 const replyText = (block: ReplyBlock) => answers(block).map(item => item.text.trim()).filter(Boolean).join('\n\n');
 const finished = (block: ReplyBlock) => !answers(block).some(item => item.streaming) && !(running.value && block.id === lastBlockId.value);
+function deliveries(block: ReplyBlock) {
+  return availableAssets.value.filter(asset => asset.blockId === block.id && asset.local && !asset.local.imported);
+}
+async function openDelivery(asset: ConversationAsset, action: 'open' | 'reveal') {
+  const sessionId = chat.currentId;
+  if (!sessionId || !asset.local) return;
+  if (!asset.local.exists) { props.store.notify('原文件已移动或删除', 'info'); return; }
+  if (action === 'open' && previewTab(asset, sessionId)) { openPreview(asset); return; }
+  try { await invoke('chat_asset_open', { sessionId, id: asset.id, relative: asset.relative ?? '', action }); }
+  catch (error) { props.store.notify(error, 'error'); }
+}
+
+function recoveredBlock(block: ReplyBlock): ReplyBlock {
+  const errors = block.calls.filter(call => call.status === 'error');
+  if (!errors.length || !finished(block) || !deliveries(block).some(asset =>
+    asset.local?.exists && asset.local.bytes > 0 && block.calls.some(call =>
+      call.id === asset.local?.toolCallId && call.name === 'community_download_video' && call.status === 'done'))) return block;
+
+  // The downloader can recover from a failed executable lookup without losing the delivery.
+  const diagnosticOnly = errors.every(call => {
+    if (call.name !== 'shell') return false;
+    try {
+      const { command } = JSON.parse(call.arguments);
+      return typeof command === 'string'
+        && command.split(';').every(part => /^(?:ls -la "[^"\r\n]+?"|which yt-dlp(?: ffmpeg)?|yt-dlp --version(?: 2>\/dev\/null)?)$/.test(part.trim()))
+        && block.calls.slice(block.calls.indexOf(call) + 1).some(later => later.name === 'shell' && later.status === 'done');
+    } catch { return false; }
+  });
+  if (!diagnosticOnly) return block;
+  return { ...block, items: block.items.map(item =>
+    item.kind === 'notice' && item.taskStatus === 'partial'
+      ? { ...item, taskStatus: 'succeeded', tone: 'info', text: '已完成', canContinue: false }
+      : item) };
+}
 const replyUsage = (block: ReplyBlock) => [...answers(block)].reverse().find(item => item.usage)?.usage;
 const speechKey = (block: ReplyBlock) => answers(block).at(-1)?.id ?? block.id;
 interface FileCard { path: string; name: string; ext: string; changed: boolean }
@@ -469,8 +503,13 @@ watch(() => chat.currentId, () => { processBlockId.value = null; planEditorOpen.
 const decide = (request: ApprovalRequest, decision: ApprovalDecision) => chat.answerApproval(request, decision);
 function answer(request: QuestionRequest, value: string | null) { return chat.answerQuestion(request, value); }
 
+function hasLocalLink(path: string) {
+  return props.store.desktop && !!assetForLink(availableAssets.value, path);
+}
+
 async function openLink(href: string) {
-  const asset=assetForLink(availableAssets.value,href);if(asset&&previewTab(asset,chat.currentId??'')){openPreview(asset);return;}
+  const asset = assetForLink(availableAssets.value, href);
+  if (asset) { await openDelivery(asset, 'open'); return; }
   const url = href.split('#')[0];
   try {
     if (!props.store.desktop) { window.open(url, '_blank', 'noopener,noreferrer'); return; }
@@ -594,11 +633,11 @@ async function openLink(href: string) {
                 <ChatActivity v-else-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === lastBlockId" :waiting="waiting && block.id === lastBlockId" :status="block.id === lastBlockId ? statusLine : ''" />
                 <ChatAnswered v-for="record in askRecords(block.calls)" :key="record.id" :record="record" />
                 <ChatGeneratedImages :calls="block.calls" :awaiting-approval="block.id === lastBlockId && view.approvals.some(request => request.tool === 'image_generate')" />
-                <template v-for="item in groupReasoning(block.items)" :key="item.id">
+                <template v-for="item in groupReasoning(recoveredBlock(block).items)" :key="item.id">
                   <ChatReasoningGroup v-if="item.kind === 'reasoning-group'" :group="item" />
                   <ChatReasoning v-else-if="item.kind === 'reasoning'" :text="item.text" :reasoning-kind="item.reasoningKind" :streaming="item.streaming" />
                   <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
-                    <div class="answer" data-search><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span></div>
+                    <div class="answer" data-search><MarkdownView :source="item.text" :local-link="hasLocalLink" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span></div>
                   </div>
                   <div v-else-if="item.kind === 'notice' && (item.text || item.details)" class="notice" :class="[item.tone, { 'outcome-details': item.taskStatus && !item.text }]" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
                     <span v-if="item.text" class="notice-text">{{ item.text }}</span>
@@ -616,7 +655,19 @@ async function openLink(href: string) {
                     </template>
                   </div>
                 </template>
-                <details v-if="finished(block) && filesOf(block.calls).length" class="file-cards" :class="{ 'task-delivery': !!progressOf(block) }" data-testid="chat-files">
+                <details v-if="finished(block) && deliveries(block).length" open class="file-cards task-delivery" data-testid="chat-deliveries">
+                  <summary class="file-summary"><ChevronRight :size="14" class="file-chevron" /><FileText :size="14" /><span>交付文件</span><span class="file-count">{{ deliveries(block).length }}</span></summary>
+                  <div class="file-list" role="list" aria-label="本轮交付文件">
+                    <div v-for="asset in deliveries(block)" :key="asset.key" class="file-card" :title="asset.local?.path" role="listitem">
+                      <FileText :size="16" aria-hidden="true" />
+                      <span class="file-name">{{ asset.name }}</span>
+                      <small class="file-status">{{ assetMeta(asset) }}</small>
+                      <button type="button" class="xb-link" :disabled="!asset.local?.exists" @click="openDelivery(asset, 'open')">打开</button>
+                      <button type="button" class="xb-icon-btn is-sm" :disabled="!asset.local?.exists" aria-label="打开文件夹" title="打开文件夹" @click="openDelivery(asset, 'reveal')"><FolderOpen :size="14" /></button>
+                    </div>
+                  </div>
+                </details>
+                <details v-if="finished(block) && !deliveries(block).length && filesOf(block.calls).length" class="file-cards" :class="{ 'task-delivery': !!progressOf(block) }" data-testid="chat-files">
                   <summary class="file-summary" data-testid="chat-files-toggle"><ChevronRight :size="14" class="file-chevron" /><FileText :size="14" /><span>{{ progressOf(block)?.state === 'completed' ? '交付文件' : '文件变更' }}</span><span class="file-count">{{ filesOf(block.calls).length }}</span><small>{{ spaceName }}</small></summary>
                   <div class="file-list" role="list" aria-label="本轮变更的文件">
                     <div v-for="file in filesOf(block.calls)" :key="file.path" class="file-card" data-testid="chat-file-card" :title="file.path" role="listitem">

@@ -3,6 +3,8 @@
 //! matching is plain code with a test table, and the hint is added to this request only, never to the stored chat.
 use agent_kernel::{HarnessError, Message, Middleware, Role, Turn};
 
+use crate::community_media::{BILIBILI_HTTP_567, DOWNLOAD_TOOL};
+
 pub struct FeatureHints;
 
 impl Middleware for FeatureHints {
@@ -11,6 +13,28 @@ impl Middleware for FeatureHints {
         let Some(at) = turn.messages.iter().rposition(|m| m.role == Role::User && !m.synthetic) else { return Ok(()) };
         if let Some(hint) = super::app_guide::hint_for(&turn.messages[at].text()) {
             turn.messages.insert(at + 1, Message::reminder(hint));
+        }
+        Ok(())
+    }
+}
+
+/// Keep the reminder next to the failing tool batch without splitting a call/result pair.
+pub struct RecoveryHint;
+
+impl Middleware for RecoveryHint {
+    fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
+        if !turn.tools.iter().any(|tool| tool.name == "web_search") { return Ok(()); }
+        let Some(user) = turn.messages.iter().rposition(|m| m.role == Role::User && !m.synthetic) else { return Ok(()); };
+        let current = &turn.messages[user + 1..];
+        let trailing_results = current.iter().rev().take_while(|m| m.role == Role::Tool);
+        let calls = current.iter().flat_map(|m| &m.tool_calls);
+        if trailing_results.filter(|m| m.is_error).any(|result| {
+            result.structured_content.as_ref().is_some_and(|meta| meta["recoverable_error"] == BILIBILI_HTTP_567)
+                && calls.clone().any(|call| call.name == DOWNLOAD_TOOL && Some(call.id.as_str()) == result.tool_call_id.as_deref())
+        }) {
+            turn.messages.push(Message::reminder(
+                "【桌面故障排查】B 站下载工具在媒体流阶段返回 HTTP 567。若用户允许继续联网排查，请用 yt-dlp、Bilibili、HTTP 567 检索上游问题记录，核对条件后只改一个参数验证一次。用公开关键词，不把用户链接、凭据或完整日志发给搜索服务。按工具结果确认成品，不凭错误码判断登录要求。",
+            ));
         }
         Ok(())
     }

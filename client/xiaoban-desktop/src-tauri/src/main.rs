@@ -23,6 +23,7 @@ mod ai_catalogue;
 mod ai_gateway;
 mod chat;
 mod community;
+mod community_media;
 mod community_schemes;
 mod phone_link;
 mod phone_voice;
@@ -891,7 +892,7 @@ fn main() {
             chat::store_market::ai_market_inspect, chat::store_market::ai_market_install, chat::store_market::ai_market_group_inspect, chat::store_market::ai_market_group_install,
             chat::store_market::ai_market_updates, chat::store_market::ai_market_update,
             community_schemes::community_schemes_status, community_schemes::community_schemes_save, community_schemes::community_schemes_remove, community_schemes::community_schemes_restore, community_schemes::community_schemes_cloud_enabled, community_schemes::community_schemes_cloud,
-            community::community_web_open, community::community_tab_bounds, community::community_chat_context, community::community_chrome_action, community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
+            community::community_web_open, community::community_tab_bounds, community::community_chat_context, community::community_media_page, community_media::community_media_action, community::community_chrome_action, community::community_take_link, community::community_browse, community::community_prepare, community::community_apply,
             community::community_analytics_get, community::community_analytics_set, community::community_track,
             phone_link::phone_link_status, phone_link::phone_link_set_enabled, phone_link::phone_link_remove_peer,
             speech_agent::speech_agent_env, speech_agent::speech_agent_install_guides, speech_agent::speech_agent_hooks_status, speech_agent::speech_agent_hooks_install, speech_agent::speech_agent_hooks_uninstall, speech_agent::speech_agent_inject,

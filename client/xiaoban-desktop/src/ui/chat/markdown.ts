@@ -105,7 +105,9 @@ function tryLink(src: string, open: number): { text: string; url: string; end: n
   return src[k] === ')' ? { text: src.slice(open + 1, j), url, end: k + 1 } : null;
 }
 
-function tryEmphasis(src: string, i: number, depth: number, inLink: boolean): { node: Inline; end: number } | null {
+type LocalLink = (path: string) => boolean;
+
+function tryEmphasis(src: string, i: number, depth: number, inLink: boolean, localLink?: LocalLink): { node: Inline; end: number } | null {
   const delim = src.startsWith('***', i) ? '***' : src.startsWith('**', i) ? '**' : src.startsWith('__', i) ? '__' : src.startsWith('~~', i) ? '~~' : src[i];
   if (isSpace(src[i + delim.length])) return null;
   if (delim[0] === '_' && isWord(src[i - 1])) return null;
@@ -118,7 +120,7 @@ function tryEmphasis(src: string, i: number, depth: number, inLink: boolean): { 
     const doubled = delim.length === 1 && (after === delim || src[k - 1] === delim);
     const closes = k > i + delim.length && !isSpace(src[k - 1]) && src[k - 1] !== '\\' && !doubled && !(delim[0] === '_' && isWord(after));
     if (closes) {
-      const c = parseInline(src.slice(i + delim.length, k), depth + 1, inLink);
+      const c = parseInline(src.slice(i + delim.length, k), depth + 1, inLink, localLink);
       const t = delim === '~~' ? 'del' : delim.length === 1 ? 'em' : 'strong';
       const node: Inline = delim === '***' ? { t: 'strong', c: [{ t: 'em', c }] } : { t, c };
       return { node, end: k + delim.length };
@@ -138,7 +140,7 @@ function trimUrl(url: string): string {
   }
 }
 
-export function parseInline(src: string, depth = 0, inLink = false): Inline[] {
+export function parseInline(src: string, depth = 0, inLink = false, localLink?: LocalLink): Inline[] {
   const out: Inline[] = [];
   let text = '';
   const flush = () => { if (text) { out.push({ t: 'text', v: text }); text = ''; } };
@@ -157,7 +159,7 @@ export function parseInline(src: string, depth = 0, inLink = false): Inline[] {
       const image = ch === '!';
       const link = !inLink || image ? tryLink(src, image ? i + 1 : i) : null;
       if (link) {
-        const href = safeHref(link.url);
+        const href = safeHref(link.url) ?? (!inLink && !image && localLink?.(link.url) ? link.url : null);
         const label = parseInline(link.text, depth + 1, true);
         flush();
         if (!href) out.push(...(label.length ? label : [{ t: 'text' as const, v: link.url }]));
@@ -172,7 +174,7 @@ export function parseInline(src: string, depth = 0, inLink = false): Inline[] {
       if (auto && href) { flush(); out.push({ t: 'link', href, c: [{ t: 'text', v: auto[1] }] }); i += auto[0].length; continue; }
     }
     if ((ch === '*' || ch === '_' || ch === '~') && depth < MAX_DEPTH && (ch !== '~' || src[i + 1] === '~')) {
-      const found = tryEmphasis(src, i, depth, inLink);
+      const found = tryEmphasis(src, i, depth, inLink, localLink);
       if (found) { flush(); out.push(found.node); i = found.end; continue; }
     }
     if (ch === 'h' && !inLink && !isWord(src[i - 1]) && /^https?:\/\//.test(src.slice(i, i + 8))) {
@@ -225,20 +227,20 @@ function startsBlock(lines: string[], i: number, nested: boolean): boolean {
   return FENCE.test(line) || HEADING.test(line) || HR.test(line) || tableAt(lines, i) || (nested && (QUOTE.test(line) || ITEM.test(line)));
 }
 
-function parseTable(lines: string[], start: number): [Block, number] {
+function parseTable(lines: string[], start: number, localLink?: LocalLink): [Block, number] {
   const head = cells(lines[start]);
   const align: Align[] = cells(lines[start + 1]).map(spec => (spec.startsWith(':') && spec.endsWith(':') ? 'center' : spec.endsWith(':') ? 'right' : spec.startsWith(':') ? 'left' : null));
   const rows: Inline[][][] = [];
   let i = start + 2;
   while (i < lines.length && !blank(lines[i]) && lines[i].includes('|') && rows.length < 500) {
     const row = cells(lines[i]);
-    rows.push(head.map((_, n) => parseInline(row[n] ?? '')));
+    rows.push(head.map((_, n) => parseInline(row[n] ?? '', 0, false, localLink)));
     i++;
   }
-  return [{ t: 'table', align, head: head.map(cell => parseInline(cell)), rows }, i];
+  return [{ t: 'table', align, head: head.map(cell => parseInline(cell, 0, false, localLink)), rows }, i];
 }
 
-function parseList(lines: string[], start: number, depth: number): [Block, number] {
+function parseList(lines: string[], start: number, depth: number, localLink?: LocalLink): [Block, number] {
   const first = ITEM.exec(lines[start])!;
   const ordered = /\d/.test(first[2][0]);
   const items: Block[][] = [];
@@ -267,7 +269,7 @@ function parseList(lines: string[], start: number, depth: number): [Block, numbe
       if (!startsBlock(lines, i, true) && !blank(own[own.length - 1])) { own.push(line.trim()); i++; continue; }
       break;
     }
-    items.push(parseBlocks(own, depth + 1));
+    items.push(parseBlocks(own, depth + 1, localLink));
     let j = i;
     while (j < lines.length && blank(lines[j])) j++;
     const next = j < lines.length ? ITEM.exec(lines[j]) : null;
@@ -277,7 +279,7 @@ function parseList(lines: string[], start: number, depth: number): [Block, numbe
   return [{ t: 'list', ordered, start: ordered ? parseInt(first[2], 10) : 1, items }, i];
 }
 
-export function parseBlocks(lines: string[], depth = 0): Block[] {
+export function parseBlocks(lines: string[], depth = 0, localLink?: LocalLink): Block[] {
   const blocks: Block[] = [];
   const nested = depth < MAX_DEPTH;
   let i = 0;
@@ -300,7 +302,7 @@ export function parseBlocks(lines: string[], depth = 0): Block[] {
     }
     const heading = HEADING.exec(line);
     if (heading) {
-      blocks.push({ t: 'h', level: heading[1].length, c: parseInline((heading[2] ?? '').replace(/[ \t]+#+[ \t]*$/, '').replace(/^#+$/, '')) });
+      blocks.push({ t: 'h', level: heading[1].length, c: parseInline((heading[2] ?? '').replace(/[ \t]+#+[ \t]*$/, '').replace(/^#+$/, ''), 0, false, localLink) });
       i++;
       continue;
     }
@@ -308,17 +310,17 @@ export function parseBlocks(lines: string[], depth = 0): Block[] {
     if (nested && QUOTE.test(line)) {
       const inner: string[] = [];
       while (i < lines.length && QUOTE.test(lines[i])) { inner.push(lines[i].replace(/^ {0,3}> ?/, '')); i++; }
-      blocks.push({ t: 'quote', c: parseBlocks(inner, depth + 1) });
+      blocks.push({ t: 'quote', c: parseBlocks(inner, depth + 1, localLink) });
       continue;
     }
     if (nested && ITEM.test(line)) {
-      const [block, next] = parseList(lines, i, depth);
+      const [block, next] = parseList(lines, i, depth, localLink);
       blocks.push(block);
       i = next;
       continue;
     }
     if (tableAt(lines, i)) {
-      const [block, next] = parseTable(lines, i);
+      const [block, next] = parseTable(lines, i, localLink);
       blocks.push(block);
       i = next;
       continue;
@@ -326,11 +328,11 @@ export function parseBlocks(lines: string[], depth = 0): Block[] {
     const paragraph = [line.trim()];
     i++;
     while (i < lines.length && !blank(lines[i]) && !startsBlock(lines, i, nested)) { paragraph.push(lines[i].trim()); i++; }
-    blocks.push({ t: 'p', c: parseInline(paragraph.join('\n')) });
+    blocks.push({ t: 'p', c: parseInline(paragraph.join('\n'), 0, false, localLink) });
   }
   return blocks;
 }
 
-export function parseMarkdown(source: string): Block[] {
-  return parseBlocks(source.replace(/\r\n?/g, '\n').split('\n'));
+export function parseMarkdown(source: string, localLink?: LocalLink): Block[] {
+  return parseBlocks(source.replace(/\r\n?/g, '\n').split('\n'), 0, localLink);
 }

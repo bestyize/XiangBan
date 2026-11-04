@@ -613,7 +613,7 @@ struct Extras {
     team_tools: Vec<Arc<dyn agent_kernel::Tool>>,
     /// What the message `@`-mentioned.
     mentions: Vec<mentions::Mention>,
-    /// Current connector statuses, noted in every request.
+    /// Current statuses for connectors explicitly selected in this request.
     connector_status: Option<Arc<dyn Fn() -> Value + Send + Sync>>,
     /// Only the real desktop host can show path-specific approval cards.
     path_approve: Option<Arc<dyn Fn(&str, &Path, Risk, &Value, &ToolCtx) -> bool + Send + Sync>>,
@@ -704,6 +704,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     builder = builder
         // Facts about the app's own features that match the request, before trimming so their size is counted.
         .middleware(feature_hints::FeatureHints)
+        .middleware(feature_hints::RecoveryHint)
         // `/技能名`：把用户点名的技能说明放到这条请求后面。
         .middleware(skill_invocation::SkillInvocation::new(skills.clone()).mentioning(mentions::skill_names(&mentions)))
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
@@ -1541,7 +1542,7 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
                 // a verified business success automatically.
                 if let Some(run) = observed_run_id {
                     if journal.inspect(&run).is_ok_and(|i|!i.incomplete_tools.is_empty()){if let Err(e)=handle.state::<ChatState>().permission.require_review(&id){eprintln!("无法保存结果复核要求：{e}");}}
-                    if let Ok(mut outcome) = task_outcome::inspect(&journal, &id, &run) {
+                    if let Ok((mut outcome, recovered_video)) = task_outcome::inspect_with_recovery(&journal, &id, &run) {
                         if let Ok(Some(goal)) = agent_kernel::goals::GoalStore::new(dirs.chat.join("goals")).load(&id) {
                             if goal.state == agent_kernel::goals::GoalState::Completed && goal.last_run_id.as_deref() == Some(&run) {
                                 outcome.status = task_outcome::Status::Succeeded;
@@ -1555,6 +1556,11 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
                             let _ = db.record_outcome(&outcome.run_id, &outcome.session_id,
                                 &format!("{:?}", outcome.status).to_lowercase(),
                                 &outcome.validator, &outcome.evidence);
+                            if recovered_video && memory_center::remembering(&dirs) {
+                                if let Err(error) = learning::record_bilibili_recovery(&db, &run) {
+                                    eprintln!("无法保存下载恢复经验候选：{error}");
+                                }
+                            }
                         }
                         crate::proactivity::observe_task_outcome(&sender, &outcome);
                         emit(&sender, "chat-task-outcome", json!({ "session": id, "outcome": outcome }));

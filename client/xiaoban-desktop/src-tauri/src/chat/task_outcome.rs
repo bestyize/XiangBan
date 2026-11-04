@@ -1,6 +1,7 @@
 //! Conservative business outcomes: a completed model loop is never task success.
 //! Artifact verification is explicitly scoped to the claimed file, not a generic task score.
 use agent_kernel::journal::JsonlRunLog;
+use crate::community_media::{bilibili_target, BILIBILI_HTTP_567, DOWNLOAD_TOOL};
 use agent_kernel::{RunEventBody, RunState, Event};
 use serde::{Serialize, Deserialize};
 use sha2::{Digest, Sha256};
@@ -73,10 +74,17 @@ pub fn save(root: &Path, record: &TaskOutcome) -> Result<(), String> {
 }
 
 pub fn inspect(journal: &JsonlRunLog, session: &str, run: &str) -> Result<TaskOutcome, String> {
+    inspect_with_recovery(journal, session, run).map(|(outcome, _)| outcome)
+}
+
+pub(super) fn inspect_with_recovery(journal: &JsonlRunLog, session: &str, run: &str) -> Result<(TaskOutcome, bool), String> {
     let inspection = journal.inspect(run).map_err(|e| e.to_string())?;
     // Read all tool end statuses using a bounded cursor, not model text.
     let mut after = 0;
     let mut failed_tools = 0usize;
+    let mut only_failed_downloads_or_lookups = true;
+    let mut failed_download = false;
+    let mut recovered_video = false;
     let mut last_tool_call_id = None;
     let mut calls = std::collections::HashMap::new();
     let mut unresolved = Vec::new();
@@ -95,16 +103,33 @@ pub fn inspect(journal: &JsonlRunLog, session: &str, run: &str) -> Result<TaskOu
                     }
                     Event::ToolEnd { id, is_error, structured_content, output, .. } => {
                         let key = calls.remove(id).unwrap_or_else(|| (id.clone(), serde_json::Value::Null));
+                        let download = key.0 == DOWNLOAD_TOOL;
+                        failed_download |= download && *is_error;
+                        only_failed_downloads_or_lookups &= (download && *is_error)
+                            || matches!(key.0.as_str(), "web_search" | "web_fetch" | "web_extract" | "experience_recall" | "todo");
                         if *is_error {
                             failed_tools += 1;
                             let validation = structured_content.as_ref().is_some_and(|v| v["harness_status"] == "invalid_arguments")
                                 || output.starts_with("invalid arguments for `");
-                            let failure = (key, validation);
+                            let recoverable = download && structured_content.as_ref()
+                                .is_some_and(|meta| meta["recoverable_error"] == BILIBILI_HTTP_567);
+                            let failure = (key, validation, recoverable);
                             if !unresolved.contains(&failure) { unresolved.push(failure); }
                         } else if !structured_content.as_ref().is_some_and(|v| v["harness_status"] == "unchanged_repeat") {
                             // A later successful retry of the same operation can repair a
                             // failed attempt. A different tool/target is not proof of repair.
-                            unresolved.retain(|(old, validation)| old != &key && !(*validation && old.0 == key.0
+                            if download && key.1["range_retry"] == true && structured_content.as_ref()
+                                .is_some_and(|meta| meta["verified_recovery"] == BILIBILI_HTTP_567)
+                            {
+                                if let Some(target) = key.1["url"].as_str().and_then(bilibili_target) {
+                                    let count = unresolved.len();
+                                    unresolved.retain(|(old, _, recoverable)| {
+                                        !*recoverable || old.1["url"].as_str().and_then(bilibili_target).as_ref() != Some(&target)
+                                    });
+                                    recovered_video |= count != unresolved.len();
+                                }
+                            }
+                            unresolved.retain(|(old, validation, _)| old != &key && !(*validation && old.0 == key.0
                                 && old.1.as_object().is_some_and(|args| args.iter().all(|(name, value)| key.1.get(name) == Some(value)))));
                         }
                     }
@@ -121,16 +146,19 @@ pub fn inspect(journal: &JsonlRunLog, session: &str, run: &str) -> Result<TaskOu
         match inspection.state {
             Some(RunState::Cancelled) => Status::Cancelled,
             Some(RunState::Failed) => Status::Failed,
+            Some(RunState::Completed) if failed_download && only_failed_downloads_or_lookups => Status::Failed,
             Some(RunState::Completed) if !unresolved.is_empty() => Status::Partial,
             // Even with no tool errors, completion is not proof of user task success.
             _ => Status::Unknown,
         }
     };
-    Ok(TaskOutcome { run_id: run.into(), session_id: session.into(), status,
+    let recovered_video = recovered_video && inspection.terminal && inspection.incomplete_tools.is_empty()
+        && matches!(inspection.state, Some(RunState::Completed));
+    Ok((TaskOutcome { run_id: run.into(), session_id: session.into(), status,
         validator: "run_trace_only".into(),
-        evidence: format!("terminal={}; tool_errors={failed_tools}; unresolved_tool_errors={}; incomplete_tools={}",
+        evidence: format!("terminal={}; tool_errors={failed_tools}; unresolved_tool_errors={}; incomplete_tools={}; verified_video_recovery={recovered_video}",
             inspection.terminal, unresolved.len(), inspection.incomplete_tools.len()),
-        verified_at_ms: None, last_tool_call_id })
+        verified_at_ms: None, last_tool_call_id }, recovered_video))
 }
 
 /// Deterministic validator for one explicitly declared file-output objective.
@@ -173,6 +201,69 @@ pub fn verify_file(root: &Path, session: &str, run: &str, workspace: &Path,
 #[cfg(test)]
 mod tests {
  use super::*;
+ #[test]
+ fn verified_bilibili_retry_reconciles_only_the_original_target() {
+    use agent_kernel::{Agent, MemoryStore, Tool, ToolSpec, ToolCtx, ToolResult, Risk, Part, RunOptions};
+    use agent_kernel::provider::scripted::{ScriptedProvider, Step};
+    use serde_json::{json, Value};
+    use std::sync::{Arc, atomic::AtomicBool};
+
+    struct Stub(ToolSpec);
+    impl Tool for Stub {
+        fn spec(&self) -> &ToolSpec { &self.0 }
+        fn execute_result(&self, args: Value, _: &ToolCtx) -> ToolResult {
+            if self.0.name == "web_search" {
+                return ToolResult::ok("上游问题记录提供了一次 Range 重试的线索");
+            }
+            if args["range_retry"] == true {
+                ToolResult::ok("verified media").with_structured_content(json!({"verified_recovery": BILIBILI_HTTP_567}))
+            } else {
+                ToolResult::error("HTTP Error 567").with_structured_content(json!({"recoverable_error": BILIBILI_HTTP_567}))
+            }
+        }
+    }
+
+    for (case, retry_url, recovered) in [
+        ("same", "https://www.bilibili.com/video/BV15N4V6hEmF/", true),
+        ("other-part", "https://www.bilibili.com/video/BV15N4V6hEmF/?p=2", false),
+    ] {
+        let root = std::env::temp_dir().join(format!("xiaoban-video-recovery-{}-{case}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let provider = Arc::new(ScriptedProvider::new(vec![
+            Step::tool_call("original", DOWNLOAD_TOOL, r#"{"url":"https://www.bilibili.com/zh-Hans/video/BV15N4V6hEmF/?trackid=example"}"#),
+            Step::tool_call("search", "web_search", r#"{"query":"yt-dlp Bilibili HTTP 567"}"#),
+            Step::tool_call("retry", DOWNLOAD_TOOL, &json!({"url":retry_url,"range_retry":true}).to_string()),
+            Step::text("交付文件"),
+        ]));
+        let agent = Agent::builder(provider.clone(), Arc::new(MemoryStore::new()))
+            .tool(Stub(ToolSpec::new(DOWNLOAD_TOOL, "download", json!({"type":"object"})).risk(Risk::Read)))
+            .tool(Stub(ToolSpec::new("web_search", "search", json!({"type":"object"})).risk(Risk::Read)))
+            .middleware(super::super::feature_hints::RecoveryHint)
+            .build().unwrap();
+        let journal = JsonlRunLog::new(root.join("runs"));
+        let run = agent.run_parts_observed("s", vec![Part::Text { text:"下载视频".into() }],
+            RunOptions::default(), &mut |record| journal.append(&record), &Arc::new(AtomicBool::new(false))).unwrap();
+        let requests = provider.requests();
+        assert!(!requests[0].messages.iter().any(|message| message.text().contains("桌面故障排查")));
+        let followup = &requests[1].messages;
+        assert_eq!(followup[followup.len()-2].role, agent_kernel::Role::Tool);
+        assert!(followup.last().unwrap().synthetic && followup.last().unwrap().text().contains("上游问题记录"));
+        let (outcome, verified) = inspect_with_recovery(&journal, "s", &run.run_id).unwrap();
+        assert_eq!(verified, recovered);
+        assert_eq!(outcome.status, if recovered { Status::Unknown } else { Status::Partial });
+
+        if verified {
+            let db = super::super::LearningDb::open(&root.join("learning.sqlite")).unwrap();
+            super::super::learning::record_bilibili_recovery(&db, &run.run_id).unwrap();
+            let candidates = db.list_experiences("personal").unwrap();
+            assert_eq!(candidates.len(), 1);
+            assert_eq!(candidates[0].0.state, "candidate");
+            assert!(db.search_experiences("personal", "Bilibili", 5).unwrap().is_empty());
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+ }
+
  #[test]
  fn skipping_an_unchanged_read_does_not_repair_failed_execution() {
     use agent_kernel::{Agent, MemoryStore, Tool, ToolSpec, ToolCtx, ToolResult, Risk, Part, RunOptions};

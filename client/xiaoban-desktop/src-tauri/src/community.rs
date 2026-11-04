@@ -244,6 +244,14 @@ pub async fn community_chat_context(app: tauri::AppHandle, caller: tauri::Webvie
     serde_json::from_str(&result).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn community_media_page(app: tauri::AppHandle, caller: tauri::Webview) -> Result<bool, String> {
+    if caller.label() != "control" { return Err("只有设置面板可以使用社区内容".into()); }
+    let Some(view) = app.get_webview(COMMUNITY_TAB) else { return Ok(false); };
+    let current = view.url().map_err(|e| e.to_string())?;
+    Ok(same_origin(&current, &web_origin()?) && current.path().trim_end_matches('/') == "/open-source/yt-dlp/yt-dlp")
+}
+
 pub fn invocation_permission(label: &str, command: &str) -> Option<bool> {
     match label {
         COMMUNITY_CONTENT | COMMUNITY_TAB => Some(false),

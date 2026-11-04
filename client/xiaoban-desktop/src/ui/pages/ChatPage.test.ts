@@ -1023,6 +1023,31 @@ describe('links in answers', () => {
     return h;
   }
 
+  it('opens delivered media from both the reply path and its Markdown link', async () => {
+    const path = '/Users/read/Downloads/小伴/测试 视频.mp4';
+    const text = ['交付文件', '', '```', path, '```', '',
+      `[打开视频](<${path}>) [无关文件](file:///etc/passwd)`].join('\n');
+    const h = await open({
+      chat_overview: () => overview({ sessions: [summary('s1', '下载视频')] }),
+      chat_load_session: () => [{ role: 'assistant', parts: [{ type: 'text', text }] }] as WireMessage[],
+      chat_assets_list: () => [{ id: 'media', name: '测试 视频.mp4', path, kind: 'file', exists: true,
+        imported: false, bytes: 120, updatedMs: 1 }],
+      chat_asset_open: () => true,
+    });
+    await openSession('s1');
+    const links = wrapper!.findAll('a.md-link');
+    expect(links.map(link => link.text())).toEqual([path, '打开视频']);
+    expect(links.every(link => link.attributes('href') === undefined)).toBe(true);
+    await links[0].trigger('click');
+    await links[1].trigger('keydown', { key: 'Enter' });
+    await flushPromises();
+    expect(h.calls.filter(([cmd]) => cmd === 'chat_asset_open')).toEqual([
+      ['chat_asset_open', { sessionId: 's1', id: 'media', relative: '', action: 'open' }],
+      ['chat_asset_open', { sessionId: 's1', id: 'media', relative: '', action: 'open' }],
+    ]);
+    expect(h.commands()).not.toContain('open_download_url');
+  });
+
   it('opens a link in the system browser, without the part after #', async () => {
     const h = await withLink();
     wrapper!.find('a.md-link').element.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));

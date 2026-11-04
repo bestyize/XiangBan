@@ -867,13 +867,18 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     if (existing < 0 && outcome.lastToolCallId && anchors.length !== 1) return;
     if (existing < 0 && !outcome.lastToolCallId && (!v.items.some(i => i.kind === 'tool')
       || activeRun.has(session) && activeRun.get(session) !== outcome.runId)) return;
-    const partial = outcome.status === 'partial', failed = outcome.status === 'failed';
-    const status = ['succeeded','failed','partial','cancelled','unknown'].includes(outcome.status)
+    let status = ['succeeded','failed','partial','cancelled','unknown'].includes(outcome.status)
       ? outcome.status as 'succeeded'|'failed'|'partial'|'cancelled'|'unknown' : 'unknown';
     const blocks = replyBlocks(v.items);
     const block = outcome.lastToolCallId
       ? blocks.find(block => block.calls.some(call => call.id === outcome.lastToolCallId))
       : [...blocks].reverse().find(block => block.calls.length);
+    // Older saved runs classified all-failed downloads as partial.
+    if (status === 'partial' && outcome.validator === 'run_trace_only' && block?.calls.length
+      && block.calls.every(call => call.name === 'community_download_video' && call.status === 'error')) {
+      status = 'failed';
+    }
+    const partial = status === 'partial', failed = status === 'failed';
     const errors = unresolvedCalls(block?.calls ?? []);
     const lastError = errors.at(-1);
     const failure = block?.items.find(item => item.kind === 'notice' && !item.taskStatus && item.tone !== 'info');
@@ -884,7 +889,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       && /(?:terminal=false|incomplete_tools=[1-9]\d*)/.test(outcome.evidence);
     const notice: ChatItem = { kind: 'notice', id, taskStatus: status, tone: partial || failed || uncertain ? 'warning' : 'info',
       text: partial ? `部分完成${reason ? `：${reason}` : '，仍有操作未完成。'}`
-        : failed ? (failure?.kind === 'notice' ? failure.text : reason || '本次任务未完成。')
+        : failed ? (failure?.kind === 'notice' ? failure.text : reason ? `未完成：${reason}` : '本次任务未完成。')
         : outcome.status === 'cancelled' ? '已停止'
         : uncertain ? '有操作尚未返回结果，请展开执行详情查看。' : '',
       verifiedAtMs: outcome.verifiedAtMs ?? undefined,

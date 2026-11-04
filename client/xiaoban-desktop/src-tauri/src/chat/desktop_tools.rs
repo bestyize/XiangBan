@@ -20,6 +20,7 @@ pub struct CompanionChange {
 }
 
 pub trait Desktop: Send + Sync {
+    fn saved_community_tool(&self) -> Option<Arc<dyn Tool>> { None }
     fn web_search_tool(&self) -> Option<Arc<dyn Tool>> { None }
     fn skin_list(&self) -> Result<Value, String> { Err("当前宿主不支持应用皮肤".into()) }
     fn skin_apply(&self, _id: Option<&str>) -> Result<Value, String> { Err("当前宿主不支持换肤".into()) }
@@ -101,6 +102,7 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn saved_community_tool(&self) -> Option<Arc<dyn Tool>> { crate::community_media::saved_tool(&self.app) }
     fn web_search_tool(&self) -> Option<Arc<dyn Tool>> { Some(super::web_search::tool(self.app.clone())) }
     fn skin_list(&self) -> Result<Value, String> { crate::application_skins::agent_list(&self.app) }
     fn skin_apply(&self, id: Option<&str>) -> Result<Value, String> {
@@ -1519,6 +1521,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
     if let Some(mgr) = desktop.delegation_manager() {
         items.extend(super::delegation_tools::tools(mgr, workspace));
     }
+    items.extend(desktop.saved_community_tool());
     items.extend(super::skin_tools::tools(desktop, workspace));
     items
 }

@@ -63,6 +63,7 @@ export function taskProgress(block: ReplyBlock, active: boolean, waiting: 'quest
   if (waiting) state = waiting === 'question' ? 'waiting' : 'approval';
   else if (active) state = 'running';
   else if (taskStatus === 'cancelled' || notice?.text === '已停止') state = 'paused';
+  else if (taskStatus === 'succeeded') state = 'completed';
   else if (taskStatus === 'partial') state = 'partial';
   else if (taskStatus === 'failed') state = 'failed';
   else if (notice || unresolved.length > 0 || block.calls.some(call => call.status === 'running')) state = 'blocked';

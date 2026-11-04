@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onActivated, onBeforeUnmount, onDeactivated, ref, watch } from 'vue';
 import ChatPage from './ChatPage.vue';
+import CommunityMediaAssistant from '../community/CommunityMediaAssistant.vue';
 import { NAlert, NButton } from 'naive-ui';
 import { invoke, listen } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -11,6 +12,7 @@ const props = defineProps<{ store: ControlStore }>();
 const webHost = ref<HTMLElement | null>(null);
 const webError = ref('');
 const assistantOpen = ref(false);
+const mediaPage = ref(false);
 
 let stopOpenChat: (() => void) | undefined;
 let disposed = false;
@@ -18,7 +20,12 @@ let disposed = false;
 onMounted(async () => {
   if (!props.store.desktop) return;
   const stop = await listen('community-open-chat', () => {
-    if (active) assistantOpen.value = true;
+    if (!active) return;
+    assistantOpen.value = true;
+    mediaPage.value = false;
+    void invoke<boolean>('community_media_page').then(recognized => {
+      if (active && assistantOpen.value) mediaPage.value = recognized;
+    }).catch(() => {});
   });
   if (disposed) stop();
   else stopOpenChat = stop;
@@ -27,6 +34,7 @@ onMounted(async () => {
 function closeAssistant() {
   if (!assistantOpen.value) return;
   assistantOpen.value = false;
+  mediaPage.value = false;
   props.store.live?.end();
   props.store.asr.deactivate();
   void props.store.speech.stop();
@@ -106,6 +114,7 @@ onBeforeUnmount(() => {
     <template v-else>
       <div ref="webHost" class="community-web-host" aria-label="小伴社区网站" />
       <div v-if="assistantOpen" class="community-assistant-dock">
+        <CommunityMediaAssistant v-if="mediaPage" recognized />
         <ChatPage :store="store" embedded @close="closeAssistant" />
       </div>
     </template>
