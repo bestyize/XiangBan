@@ -10,6 +10,7 @@ import xyz.xiangban.xiaoban.business.communitynative.defaultLinkHttpClient
 /** Application 管理进程级任务；用户打开主界面后才启动，提醒广播等系统唤醒不会触发下载。 */
 class XiaobanApplication : Application() {
     val speech by lazy { AndroidLocalSpeech(this) }
+    internal val toolEnvironment by lazy { AndroidToolEnvironment(this) }
     private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var prefetchStarted = false
 

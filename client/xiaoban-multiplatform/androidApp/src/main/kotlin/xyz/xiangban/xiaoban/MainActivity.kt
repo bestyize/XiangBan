@@ -35,8 +35,12 @@ class MainActivity : ComponentActivity() {
             micWaiting?.resume(granted)
             micWaiting = null
         }
-        val speech = (application as XiaobanApplication).speech
-        val platform = AndroidPlatformActions(this, gate = speech::newGate, attachments = AndroidChatAttachments(this)) {
+        val app = application as XiaobanApplication
+        val speech = app.speech
+        val platform = AndroidPlatformActions(
+            this, gate = speech::newGate, attachments = AndroidChatAttachments(this),
+            toolEnvironment = app.toolEnvironment,
+        ) {
             suspendCoroutine { continuation ->
                 micWaiting = continuation
                 micLauncher.launch(Manifest.permission.RECORD_AUDIO)

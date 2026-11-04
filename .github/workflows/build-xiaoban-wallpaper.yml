@@ -364,6 +364,16 @@ jobs:
             echo "SIGNED=false" >> "$GITHUB_ENV"
             echo "::warning::XIAOBAN_ANDROID_KEYSTORE_BASE64 is not set, building an installable debug APK instead of a signed release APK."
           fi
+      - name: Set up ARM64 emulation for the Android tool environment
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+      - name: Prepare the on-demand Android tool environment
+        env:
+          TOOL_RELEASE_REPO: ${{ github.repository }}
+          TOOL_RELEASE_TAG: ${{ needs.release.outputs.tag }}
+        run: |
+          bash androidApp/scripts/prepare-tool-environment.sh androidApp/build/tool-environment "$TOOL_RELEASE_REPO" "$TOOL_RELEASE_TAG"
       - name: Build the APK
         env:
           KEYSTORE_PASSWORD: ${{ secrets.XIAOBAN_ANDROID_KEYSTORE_PASSWORD }}
@@ -400,6 +410,8 @@ jobs:
           gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^XiaoBanWallpaper-.*-Android-arm64-v8a(-unsigned)?\.apk$' | while read -r name; do
             gh release delete-asset "$TAG" "$name" --yes
           done || true
+          # Publish the content-addressed runtime before any APK that references it.
+          gh release upload "$TAG" androidApp/build/tool-environment/downloads/* --clobber
           gh release upload "$TAG" out/* --clobber
 
   # ───────────── 服务端镜像：单独的 Release，供服务器上拉取更新 ─────────────

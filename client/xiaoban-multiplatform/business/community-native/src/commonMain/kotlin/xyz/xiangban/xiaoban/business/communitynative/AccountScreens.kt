@@ -255,6 +255,11 @@ fun SettingsScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
             GroupLabel("外观与声音")
             NavRow("主题", ThemeState.mode.label, first = true) { open(Route.Appearance) }
             NavRow("声音", SpeechState.settings.let { if (it.source == SpeechSource.Edge) "Edge · ${EdgeVoices.byId(it.voice).name}" else it.source.label }) { open(Route.Voice) }
+            env.platform?.toolEnvironment?.let { environment ->
+                val tools by environment.state.collectAsState()
+                GroupLabel("本机工具")
+                NavRow("环境配置", tools.status.label, first = true) { open(Route.ToolEnvironment) }
+            }
             GroupLabel("关于")
             NavRow("用户协议", first = true) { env.platform?.openUrl("$site/terms") }
             NavRow("隐私政策") { env.platform?.openUrl("$site/privacy") }

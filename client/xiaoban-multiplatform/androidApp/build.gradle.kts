@@ -31,6 +31,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation("com.google.zxing:core:3.5.4")
     implementation(libs.onnxruntime.android)
+    implementation("org.apache.commons:commons-compress:1.27.1")
+    implementation("org.tukaani:xz:1.10")
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
@@ -50,7 +52,14 @@ android {
         // 手机只支持 64 位 ARM（arm64-v8a）：原生库只打这一种，其他 CPU 的包不装。
         ndk { abiFilters += "arm64-v8a" }
     }
+    sourceSets.getByName("main") {
+        assets.srcDir(layout.buildDirectory.dir("tool-environment/assets").get().asFile)
+        jniLibs.srcDir(layout.buildDirectory.dir("tool-environment/jni").get().asFile)
+    }
     packaging {
+        // PRoot is launched as an executable from Android's extracted, read-only native library directory.
+        jniLibs.useLegacyPackaging = true
+        jniLibs.keepDebugSymbols += setOf("**/libproot*.so", "**/libtalloc.so", "**/libandroid-shmem.so")
         // Java/JNI 接口保留在 APK；四个语音原生库从带校验的组件清单按需下载。
         jniLibs.excludes += setOf("**/libonnxruntime.so", "**/libonnxruntime4j_jni.so", "**/libort_sherpa.so", "**/libsherpa-onnx-jni.so")
         resources {

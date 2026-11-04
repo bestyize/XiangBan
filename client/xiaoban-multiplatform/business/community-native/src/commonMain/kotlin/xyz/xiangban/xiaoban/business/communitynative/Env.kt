@@ -43,6 +43,7 @@ import xyz.xiangban.xiaoban.common.link.RemoteChatController
 
 /** 各平台才能做的事：复制到剪贴板、系统分享面板、用浏览器打开链接。不提供时对应按钮不可用。 */
 interface PlatformActions : VoicePlatform {
+    val toolEnvironment: ToolEnvironmentController? get() = null
     /** Public community links only; consumed after explicit confirmation or dismissal. */
     val communityLinks: kotlinx.coroutines.flow.StateFlow<String?> get() = EmptyCommunityLinks
     fun consumeCommunityLink() {}

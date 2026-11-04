@@ -54,6 +54,7 @@ sealed interface Route {
     data object Appearance : Route
     /** 设置里的声音：语音识别、朗读（来源、音色、语速）、通话。 */
     data object Voice : Route
+    data object ToolEnvironment : Route
     /** 云端小伴的对话页。 */
     data object AiChat : Route
     data object Devices : Route
@@ -100,6 +101,7 @@ sealed interface Route {
         Models -> "models"
         Appearance -> "appearance"
         Voice -> "voice"
+        ToolEnvironment -> "tool-environment"
         AiChat -> "aichat"
         Devices -> "devices"
         is RemoteChat -> "rchat:$peer" + if (draft.isNotBlank()) ":${draft.encodeURLParameter()}" else ""
@@ -154,6 +156,7 @@ sealed interface Route {
                 "models" -> Models
                 "appearance", "accent" -> Appearance
                 "voice" -> Voice
+                "tool-environment" -> ToolEnvironment
                 "aichat" -> AiChat
                 "devices" -> Devices
                 "rchat" -> value.substringBefore(':').takeIf { it.isNotEmpty() }?.let { peer -> runCatching { RemoteChat(peer, value.substringAfter(':', "").decodeURLPart()) }.getOrNull() }

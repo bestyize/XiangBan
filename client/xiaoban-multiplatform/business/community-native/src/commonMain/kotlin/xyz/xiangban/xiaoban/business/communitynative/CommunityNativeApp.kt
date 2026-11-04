@@ -171,6 +171,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         Route.Models -> ModelsScreen(env, chat, back = pop, open = push)
         Route.Appearance -> AppearanceScreen(back = pop)
         Route.Voice -> VoiceSettingsScreen(env, back = pop)
+        Route.ToolEnvironment -> ToolEnvironmentScreen(env.platform?.toolEnvironment, back = pop)
         Route.AiChat -> AiChatPage(env, chat, back = pop, open = push)
         Route.Devices -> DevicesScreen(env, back = pop, open = push)
         is Route.RemoteChat -> RemoteChatScreen(env, route.peer, back = pop, open = push, initialDraft = route.draft)
