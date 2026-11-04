@@ -82,7 +82,6 @@ fn switched(message: &Message) -> Option<(PathBuf, PathBuf)> {
     (after.is_absolute() && before.is_absolute()).then_some((after,before))
 }
 fn outputs_with_downloads(messages: &[Message], workspace: &Path, downloads: Option<&Path>) -> Vec<(PathBuf, Option<String>)> {
-    let mut calls = HashMap::new();
     let mut skin_calls = HashMap::new();
     let mut paths = vec![];
     let mut download_calls = HashSet::new();
@@ -102,13 +101,9 @@ fn outputs_with_downloads(messages: &[Message], workspace: &Path, downloads: Opt
                 if matches!(call.name.as_str(), "skin_create"|"skin_export") {
                     skin_calls.insert(call.id.clone(), active.clone());
                 }
-                if matches!(call.name.as_str(), "write_file"|"edit_file") {
-                    if let Ok(args) = serde_json::from_str::<Value>(&call.arguments) {
-                        if let Some(path) = args["path"].as_str().and_then(|p| output_path(&active, p)) { calls.insert(call.id.clone(), path); }
-                    }
-                }
             }
-            // Local Markdown delivery links also cover files/folders produced through shell or other tools.
+            if !message.tool_calls.is_empty() { continue; }
+            // Collect explicit delivery links from replies, regardless of how the file was created.
             let text = message.text();
             for rest in text.split("](").skip(1) {
                 let end = if rest.starts_with('<') { rest.find('>').map(|n| n + 1) } else { rest.find(')') };
@@ -121,13 +116,10 @@ fn outputs_with_downloads(messages: &[Message], workspace: &Path, downloads: Opt
                     }
                 }
             }
-            // Older replies may put the final absolute path in a code block.
+            // Older download replies may put the final absolute path in a code block.
             for line in text.lines() {
                 let raw = line.trim().trim_matches('`');
                 if !Path::new(raw).is_absolute() { continue; }
-                if let Some(path) = output_path(&active, raw).filter(|path| path.is_file()) {
-                    paths.push((path, None));
-                }
                 for (root, id) in &download_outputs {
                     if let Some(path) = output_path(root, raw).filter(|path| path.is_file()) {
                         paths.push((path, Some(id.clone())));
@@ -157,7 +149,6 @@ fn outputs_with_downloads(messages: &[Message], workspace: &Path, downloads: Opt
                     }
                 }
             }
-            if let Some((id, path)) = message.tool_call_id.as_ref().and_then(|id| calls.remove(id).map(|path| (id.clone(), path))) { paths.push((path, Some(id))); }
         }
     }
     paths
@@ -338,10 +329,19 @@ mod tests {
         fs::write(registry(&t.0,"s"),"broken").unwrap();assert!(associate(&t.0,"s",vec![]).is_err());
     }
     #[test]
-    fn only_successful_writes_and_assistant_local_links_become_outputs() {
-        let t=Temp::new();let call=|id:&str,name:&str|agent_kernel::ToolCall{id:id.into(),name:name.into(),arguments:r#"{"path":"report.md"}"#.into()};
-        let messages=vec![Message::user_text("[私人文件](secret.txt)"),Message::assistant("",vec![call("w","write_file"),call("r","read_file"),call("e","edit_file")]),Message::tool("w","ok"),Message::tool("r","read"),{let mut m=Message::tool("e","failed");m.is_error=true;m},Message::assistant("[文件夹](delivery) [外链](https://example.com) [越界](../secret)",vec![])];
-        let out=outputs(&messages,&t.0);assert_eq!(out.len(),2);assert_eq!(out[0].1.as_deref(),Some("w"));assert!(out[1].0.ends_with("delivery"));
+    fn only_explicit_reply_links_collect_workspace_files() {
+        let t = Temp::new();
+        let temporary = t.0.join("helper.py");
+        fs::write(&temporary, "fixture").unwrap();
+        let messages = [
+            Message::user_text("[私人文件](secret.txt)"),
+            Message::assistant("[临时脚本](helper.py)", vec![agent_kernel::ToolCall {
+                id: "write".into(), name: "write_file".into(), arguments: r#"{"path":"helper.py"}"#.into(),
+            }]),
+            Message::tool("write", "ok"),
+            Message::assistant(format!("{}\n[交付脚本](run.py) [文件夹](delivery) [外链](https://example.com) [越界](../secret)", temporary.display()), vec![]),
+        ];
+        assert_eq!(outputs(&messages, &t.0), vec![(t.0.join("run.py"), None), (t.0.join("delivery"), None)]);
     }
     #[test]
     fn recovered_download_delivers_final_file_without_exposing_split_streams() {
