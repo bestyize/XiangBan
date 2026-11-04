@@ -171,7 +171,7 @@ fn store_image(root: &Path, bytes: &[u8]) -> Result<GeneratedImage, String> {
     Ok(GeneratedImage { name: format!("小伴生图-{}.{}", &id[..12], extension), id, mime: mime.into(), width: image.width(), height: image.height() })
 }
 
-pub(crate) fn skin_image_path(app: &tauri::AppHandle, id: &str) -> Result<PathBuf, String> { checked_path(&root(app)?, id) }
+pub(crate) fn generated_image_path(app: &tauri::AppHandle, id: &str) -> Result<PathBuf, String> { checked_path(&root(app)?, id) }
 
 fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> { Ok(super::Dirs::of(app)?.chat.join("generated-images")) }
 fn checked_path(root: &Path, id: &str) -> Result<PathBuf, String> {

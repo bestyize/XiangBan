@@ -434,7 +434,13 @@ impl Tool for DesignTool {
 }
 
 pub fn design_intent(text: &str) -> bool {
-    ["设计", "画板", "原型", "design-", "open-claude-design"].iter().any(|word|text.to_lowercase().contains(word))
+    let text = text.to_lowercase();
+    ["画板", "设计工作台", "设计稿", "原型", "design-", NAME].iter().any(|word| text.contains(word))
+        || (text.contains("设计") && !wallpaper_intent(&text))
+}
+
+fn wallpaper_intent(text: &str) -> bool {
+    ["壁纸", "动态桌面", "桌面背景", "wallpaper"].iter().any(|word| text.contains(word))
 }
 /// Recognize only generic continuation requests; task-specific text is left to the model.
 fn generic_continuation(text: &str) -> bool {
@@ -460,6 +466,9 @@ impl Middleware for DesignContext {
         if turn.messages[at].structured_content.as_ref().is_some_and(|v| v["previewTarget"].is_object()) { return Ok(()) }
         let selected=turn.messages[at].structured_content.as_ref().and_then(|v|v["designId"].as_str()).filter(|id|self.0.load(id).is_ok()).map(str::to_string);
         let current_text = turn.messages[at].text();
+        if selected.is_none() && wallpaper_intent(&current_text.to_lowercase()) && !design_intent(&current_text) {
+            return Ok(());
+        }
         let continuing = generic_continuation(&current_text);
         let mut saw_visual_edit = false;
         let prior_task = turn.messages[..at].iter().rev()
@@ -467,7 +476,8 @@ impl Middleware for DesignContext {
             .find(|m| {
                 let text = m.text();
                 if generic_continuation(&text) { return false }
-                if visual_edit(&text) && !design_intent(&text) && m.structured_content.as_ref().and_then(|v| v["designId"].as_str()).is_none() {
+                if visual_edit(&text) && !wallpaper_intent(&text.to_lowercase()) && !design_intent(&text)
+                    && m.structured_content.as_ref().and_then(|v| v["designId"].as_str()).is_none() {
                     saw_visual_edit = true;
                     return false
                 }
@@ -542,6 +552,9 @@ mod tests {
         store.create("x".into(),"s",canvas(),files()).unwrap(); t.messages=vec![Message::user_text("你好")];mid.before_model(&mut t).unwrap();assert_eq!(t.messages.len(),1);
         t.messages=vec![Message::user_text("颜色改浅")];mid.before_model(&mut t).unwrap();assert!(t.messages[1].synthetic);
         t.messages=vec![Message::user_text("写一个网页"),Message::user_text("颜色改浅")];mid.before_model(&mut t).unwrap();assert_eq!(t.messages.len(),2);
+        t.messages=vec![Message::user_text("设计一个动态桌面")];mid.before_model(&mut t).unwrap();assert_eq!(t.messages.len(),1);
+        t.messages.push(Message::user_text("继续"));mid.before_model(&mut t).unwrap();assert_eq!(t.messages.len(),2);
+        t.messages=vec![Message::user_text("用画板设计一张动态壁纸")];mid.before_model(&mut t).unwrap();assert!(t.messages[1].synthetic);
         fs::remove_dir_all(root).unwrap();
     }
     #[test] fn generic_followups_inherit_only_the_latest_real_task_without_hiding_tools() {

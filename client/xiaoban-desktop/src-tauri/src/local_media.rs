@@ -235,6 +235,8 @@ pub fn import_file(root: &Path, source: &Path) -> Result<Wallpaper, String> {
     result
 }
 
+pub(crate) const MAX_HTML_BYTES: u64 = 4 * 1024 * 1024;
+
 pub fn save_local_html(
     root: &Path,
     title: &str,
@@ -244,7 +246,7 @@ pub fn save_local_html(
     if html.trim().is_empty() {
         return Err("HTML 内容不能为空".into());
     }
-    if html.len() as u64 > 4 * 1024 * 1024 {
+    if html.len() as u64 > MAX_HTML_BYTES {
         return Err("动态壁纸 HTML 内容不能超过 4 MB".into());
     }
     let title_clean = title.trim();

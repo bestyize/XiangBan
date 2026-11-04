@@ -61,7 +61,7 @@ pub(super) const FEATURES: &[Feature] = &[
         does: "查看内置和已安装皮肤、切换及恢复默认；创作前 skin_read_format 获取完整规范，无需用户提供模板。skin_create 从真实栅格图片或工作区完整草稿生成并校验 ZIP，安装到皮肤页，返回工作区 ZIP；不自动应用。skin_export 导出已安装的自制皮肤。当前只支持背景场景、图层和轻摆/发光互动，theme.json 配色暂不生效。与桌面壁纸、桌宠外壳和明暗/主题色分别管理。",
         by_hand: "也可在皮肤页手动导入 ZIP、应用、导出、删除；创建后用户要求换肤才调用 skin_apply。", tools: &["skin_list", "skin_read_format", "skin_create", "skin_apply", "skin_export"] },
     Feature { id: "wallpaper", name: "壁纸", path: "侧栏「装扮」→「壁纸」", page: Some(("studio", Some("wallpapers"))),
-        does: "查看、更换、创作、删除壁纸。", by_hand: "", tools: &["wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete"] },
+        does: "查看、更换、创作、导入、删除壁纸。", by_hand: "", tools: &["wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_import", "wallpaper_delete"] },
     Feature { id: "effect", name: "桌面特效", path: "侧栏「装扮」→「特效」", page: Some(("studio", Some("effects"))),
         does: "选用或创作粒子类桌面特效。", by_hand: "", tools: &["effect_list", "effect_set", "effect_monitor_set", "effect_create", "effect_delete", "effect_read_format"] },
     Feature { id: "widget", name: "桌面组件", path: "侧栏「装扮」→「组件」", page: Some(("studio", Some("widgets"))),

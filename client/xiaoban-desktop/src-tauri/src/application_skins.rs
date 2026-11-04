@@ -58,7 +58,7 @@ pub(crate) fn create(
             .as_str()
             .ok_or("缺少背景图片 background_image")?;
         let path = if let Some(id) = source.strip_prefix("generated:") {
-            crate::chat::image_generation::skin_image_path(app, id)?
+            crate::chat::image_generation::generated_image_path(app, id)?
         } else {
             workspace_path(workspace, source)?
         };

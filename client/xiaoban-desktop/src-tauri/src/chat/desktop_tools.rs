@@ -10,6 +10,7 @@ use crate::preferences::{EXPRESSIONS, SKINS};
 use crate::reminders::Rule;
 use agent_kernel::{Risk, Tool, ToolCtx, ToolSpec};
 use serde_json::{json, Value};
+use std::{fs::File, io::Read, path::{Component, Path}};
 use std::sync::Arc;
 use tauri::Manager;
 
@@ -48,6 +49,9 @@ pub trait Desktop: Send + Sync {
     fn wallpapers(&self) -> Result<Value, String>;
     fn apply_wallpaper(&self, id: &str) -> Result<(), String>;
     fn create_wallpaper(&self, title: &str, description: Option<&str>, html: &str, apply_now: bool) -> Result<Value, String>;
+    fn import_wallpaper(&self, _workspace: &Path, _source: &str) -> Result<String, String> {
+        Err("当前宿主不支持壁纸导入".into())
+    }
     fn delete_wallpaper(&self, id: &str) -> Result<String, String>;
     /// `{ packs: [{ id, name }] }` plus `selected` for the one in use.
     fn effects(&self) -> Result<Value, String>;
@@ -201,11 +205,27 @@ impl Desktop for TauriDesktop {
 
     fn create_wallpaper(&self, title: &str, description: Option<&str>, html: &str, apply_now: bool) -> Result<Value, String> {
         let root = crate::content::root(&self.app)?;
-        let item = crate::local_media::save_local_html(&root, title, description, html)?;
+        let item = {
+            let state = self.app.state::<crate::content::ContentState>();
+            let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
+            crate::local_media::save_local_html(&root, title, description, html)?
+        };
         if apply_now {
             self.apply_wallpaper(&item.id)?;
         }
         Ok(json!({ "id": item.id, "title": item.title, "applied": apply_now }))
+    }
+
+    fn import_wallpaper(&self, workspace: &Path, source: &str) -> Result<String, String> {
+        let path = if let Some(id) = source.strip_prefix("generated:") {
+            super::image_generation::generated_image_path(&self.app, id)?
+        } else {
+            workspace_wallpaper_file(workspace, source)?
+        };
+        let state = self.app.state::<crate::content::ContentState>();
+        let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
+        let item = crate::local_media::import_file(&crate::content::root(&self.app)?, &path)?;
+        Ok(item.id)
     }
 
     fn effects(&self) -> Result<Value, String> {
@@ -456,9 +476,47 @@ fn wallpaper_apply(desktop: &dyn Desktop, args: &Value) -> Result<String, String
     Ok(if id == "companion" { "已换回系统桌面".to_string() } else { format!("已应用壁纸 {id}") })
 }
 
-fn wallpaper_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+fn workspace_wallpaper_file(workspace: &Path, source: &str) -> Result<std::path::PathBuf, String> {
+    let source = Path::new(source);
+    if !source.components().all(|part| matches!(part, Component::Normal(_) | Component::CurDir)) {
+        return Err("source_path 必须是工作区内文件的相对路径".into());
+    }
+    let workspace = workspace.canonicalize().map_err(|e| format!("无法读取工作区：{e}"))?;
+    let path = workspace.join(source).canonicalize().map_err(|e| format!("无法定位壁纸文件：{e}"))?;
+    if !path.starts_with(&workspace) || !path.is_file() {
+        return Err("壁纸必须是工作区内的普通文件".into());
+    }
+    Ok(path)
+}
+
+fn read_wallpaper_source(workspace: &Path, source: &str) -> Result<String, String> {
+    if !Path::new(source).extension().and_then(|ext| ext.to_str()).is_some_and(|ext| {
+        ext.eq_ignore_ascii_case("html") || ext.eq_ignore_ascii_case("htm")
+    }) {
+        return Err("壁纸草稿必须是 HTML 文件".into());
+    }
+    let path = workspace_wallpaper_file(workspace, source)?;
+    let mut bytes = Vec::new();
+    File::open(path)
+        .and_then(|file| file.take(crate::local_media::MAX_HTML_BYTES + 1).read_to_end(&mut bytes))
+        .map_err(|e| format!("无法读取壁纸草稿：{e}"))?;
+    if bytes.len() as u64 > crate::local_media::MAX_HTML_BYTES {
+        return Err("动态壁纸 HTML 内容不能超过 4 MB".into());
+    }
+    String::from_utf8(bytes).map_err(|_| "壁纸草稿必须是 UTF-8 HTML".into())
+}
+
+fn wallpaper_create(desktop: &dyn Desktop, args: &Value, workspace: &Path) -> Result<String, String> {
     let title = text_arg(args, "title")?;
-    let html = text_arg(args, "html")?;
+    let source_html;
+    let html = match (optional_text(args, "html")?, optional_text(args, "source_path")?) {
+        (Some(_), None) => text_arg(args, "html")?,
+        (None, Some(source)) => {
+            source_html = read_wallpaper_source(workspace, source)?;
+            &source_html
+        }
+        _ => return Err("请在 html 和 source_path 中只提供一种壁纸来源".into()),
+    };
     let description = optional_text(args, "description")?;
     let apply_now = optional_bool(args, "apply_now")?.unwrap_or(false);
 
@@ -1107,6 +1165,8 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
 
 pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path) -> Vec<Arc<dyn Tool>> {
     let game_workspace = workspace.to_path_buf();
+    let wallpaper_workspace = workspace.to_path_buf();
+    let import_workspace = workspace.to_path_buf();
     let none = || object(json!({}), &[]);
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
     let mut items = vec![
@@ -1148,6 +1208,16 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
         tool(&desktop, ToolSpec::new("wallpaper_list", "列出可用的壁纸（id、标题、类型、是否已下载）和当前正在使用的那张。", none()).risk(Risk::Read).parallel(), wallpaper_list),
         tool(
             &desktop,
+            ToolSpec::new("wallpaper_import", "直接把工作区中的图片或视频、或小伴刚生成的图片保存到壁纸库。只入库，返回可供 wallpaper_apply 使用的 id。自包含 HTML 请用 wallpaper_create。",
+                object(json!({"source_path":{"type":"string","description":"当前工作区内的相对文件路径，或 generated:<image_generate 返回的图片 id>"}}), &["source_path"]))
+                .risk(Risk::Write).serial(),
+            move |desktop, args| {
+                let id = desktop.import_wallpaper(&import_workspace, text_arg(args, "source_path")?)?;
+                Ok(format!("已保存到壁纸库（id: {id}），可在壁纸库预览和选用。"))
+            },
+        ),
+        tool(
+            &desktop,
             ToolSpec::new("wallpaper_apply", "把桌面壁纸换成指定的壁纸，用 wallpaper_list 里的 id。id 为 companion 表示换回没有壁纸的系统桌面。", object(json!({"id": {"type": "string"}}), &["id"]))
                 .risk(Risk::Write).self_managed()
                 .serial()
@@ -1158,20 +1228,21 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "wallpaper_create",
-                "创作自包含的单文件 HTML 动态或交互壁纸（最多 4 MiB），可用 Canvas、WebGL、内联 CSS/JS。壁纸运行于隔离 iframe，不能用本地存储、Cookie、IndexedDB、弹窗或外层导航。作品应离线可用，不依赖外链或网络。用 100vw × 100vh 并处理 resize，主体避开桌面图标密集区，考虑不同屏幕比例，暂停不可见的动画。创作先保存到壁纸库，预览画面和交互后，用户要求换上时再用 wallpaper_apply。apply_now 默认 false。",
+                "创作并保存自包含的单文件 HTML 动态或交互壁纸（最多 4 MiB）。从零创作直接传 html；已有工作区草稿时传 source_path，无需再读出和重发源码。两者只传一个。可用 Canvas、WebGL、内联 CSS/JS。壁纸运行于隔离 iframe，不能用本地存储、Cookie、IndexedDB、弹窗或外层导航。作品应离线可用，不依赖外链或同目录资源。用 100vw × 100vh 并处理 resize，主体避开桌面图标密集区，考虑不同屏幕比例，暂停不可见的动画。默认保存到壁纸库供预览；用户明确要求立即换上时传 apply_now=true。",
                 object(
                     json!({
                         "title": { "type": "string", "description": "动态壁纸标题（最多 48 字，如 水墨涟漪交互壁纸）" },
                         "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含完整的 <!DOCTYPE html>、<style>、Canvas/DOM 结构与动画逻辑）" },
+                        "source_path": { "type": "string", "description": "已有自包含 UTF-8 HTML 草稿在当前工作区内的相对路径" },
                         "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
                         "apply_now": { "type": "boolean", "description": "是否立即应用为桌面壁纸。默认 false，用户明确要求立即换上时使用 true" },
                     }),
-                    &["title", "html"],
+                    &["title"],
                 ),
             )
             .risk(Risk::Write)
             .serial(),
-            wallpaper_create,
+            move |desktop, args| wallpaper_create(desktop, args, &wallpaper_workspace),
         ),
         tool(
             &desktop,
@@ -2282,6 +2353,20 @@ mod tests {
         .unwrap();
         assert!(res_no_apply.contains("可在壁纸库预览和选用"));
         assert_eq!(fake.calls()[1], "create-wallpaper 星空桌面 apply_now=false");
+
+        let workspace = std::env::temp_dir().join(format!("xiaoban-wallpaper-source-{}", std::process::id()));
+        std::fs::create_dir_all(&workspace).unwrap();
+        let path = workspace.join("draft.html");
+        std::fs::write(&path, "<html><body>stars</body></html>").unwrap();
+        let from_file = wallpaper_create(fake.as_ref(), &json!({"title":"已有草稿","source_path":"draft.html"}), &workspace);
+        let traversal = wallpaper_create(fake.as_ref(), &json!({"title":"越界","source_path":"../draft.html"}), &workspace);
+        let ambiguous = wallpaper_create(fake.as_ref(), &json!({"title":"重复来源","source_path":"draft.html","html":"<html></html>"}), &workspace);
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(workspace).unwrap();
+        assert!(from_file.unwrap().contains("可在壁纸库预览和选用"));
+        assert!(traversal.is_err());
+        assert!(ambiguous.is_err());
+        assert_eq!(fake.calls()[2..], ["create-wallpaper 已有草稿 apply_now=false"]);
     }
 
     #[test]
