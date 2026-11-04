@@ -4,7 +4,7 @@ import type { WidgetCheck } from './preview-probe.ts';
 
 declare global {
   interface Window {
-    __XIAOBAN_WIDGET_PREVIEW__?: { html: string; checks: WidgetCheck[] };
+    __XIAOBAN_WIDGET_PREVIEW__?: { html: string; checks: WidgetCheck[] } | { wallpaperUrl: string };
   }
 }
 
@@ -12,6 +12,25 @@ export function mountWidgetPreview() {
   const draft = window.__XIAOBAN_WIDGET_PREVIEW__;
   delete window.__XIAOBAN_WIDGET_PREVIEW__;
   if (!desktop || !draft) return;
+
+  if ('wallpaperUrl' in draft) {
+    const frame = document.createElement('iframe');
+    frame.setAttribute('sandbox', 'allow-scripts');
+    frame.referrerPolicy = 'no-referrer';
+    frame.style.cssText = 'display:block;border:0;width:100vw;height:100vh';
+    document.body.style.cssText = 'margin:0;overflow:hidden;background:#111';
+    frame.addEventListener('load', () => {
+      // Give animated content time to paint before the host captures the webview.
+      window.setTimeout(() => {
+        void invoke('widget_preview_report', {
+          report: { initialVisible: true, finalVisible: true, errors: [], steps: [] },
+        }).catch(console.error);
+      }, 500);
+    }, { once: true });
+    frame.src = draft.wallpaperUrl;
+    document.body.append(frame);
+    return;
+  }
 
   const html = customWidgetDocument(draft.html, true, draft.checks);
   const frame = document.createElement('iframe');

@@ -12,7 +12,7 @@ use agent_kernel::{Risk, Tool, ToolCtx, ToolSpec};
 use serde_json::{json, Value};
 use std::{fs::File, io::Read, path::{Component, Path}};
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 #[derive(Default, Clone, Debug, PartialEq)]
 pub struct CompanionChange {
@@ -210,6 +210,7 @@ impl Desktop for TauriDesktop {
             let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
             crate::local_media::save_local_html(&root, title, description, html)?
         };
+        let _ = self.app.emit_to("control", "wallpaper-library-changed", ());
         if apply_now {
             self.apply_wallpaper(&item.id)?;
         }
@@ -225,6 +226,7 @@ impl Desktop for TauriDesktop {
         let state = self.app.state::<crate::content::ContentState>();
         let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
         let item = crate::local_media::import_file(&crate::content::root(&self.app)?, &path)?;
+        let _ = self.app.emit_to("control", "wallpaper-library-changed", ());
         Ok(item.id)
     }
 

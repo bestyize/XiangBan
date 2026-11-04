@@ -131,6 +131,7 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
           listen<typeof store.speech.settings>("tts-settings-changed", value => { if (!disposed) store.speech.settings = value; }),
           listen<AiConfigView>("ai-config-changed", () => { if (!disposed) void store.chat.refresh(); }),
           listen<Settings>("settings-changed", (settings) => { if (!disposed) store.settings = settings; }),
+          listen("wallpaper-library-changed", () => { if (!disposed) void store.refreshLibrary().catch(() => {}); }),
           listen<WebsiteStatus>("website-status", (website) => { if (!disposed) store.website = website; }),
           listen<AccountSession | null>("account-changed", (account) => { if (!disposed) { store.account = account; void restoreDefaultModel(); void invoke('refresh_ai_providers', { force: true }).catch(() => {}); } }),
           listen<boolean>("games-active", (active) => { if (!disposed) store.game.active = active; }),

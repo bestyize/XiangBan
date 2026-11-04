@@ -365,6 +365,11 @@ pub fn asset_url(resource: &Resource) -> String {
         format!("wallpaper-asset://localhost/{}", resource.sha256)
     }
 }
+pub(crate) fn web_cover_url(resource: &Resource) -> String {
+    let url = asset_url(resource);
+    let (origin, hash) = url.rsplit_once('/').expect("local wallpaper asset URL");
+    format!("{origin}/cover/{hash}")
+}
 pub fn cached(root: &Path, resource: &Resource) -> bool {
     if resource.url.starts_with("builtin://") {
         return true;
@@ -751,13 +756,27 @@ pub fn serve(
             .body(include_bytes!("../../public/wallpapers/sandbox.html").to_vec()).unwrap();
     }
     let name = request.uri().path().trim_start_matches('/');
-    if !hash_name(name) {
+    let cover_hash = name.strip_prefix("cover/");
+    if !hash_name(cover_hash.unwrap_or(name)) {
         return error(404);
     }
     let root = match crate::content::root(app) {
         Ok(root) => root,
         Err(_) => return error(404),
     };
+    if let Some(hash) = cover_hash {
+        if !crate::local_media::read(&root).is_ok_and(|catalog| catalog.items.iter().any(|item| {
+            item.kind == "web" && item.resource.sha256 == hash
+        })) {
+            return error(404);
+        }
+        let Ok(bytes) = fs::read(crate::local_media::web_cover_path(&root, hash)) else { return error(404); };
+        return tauri::http::Response::builder()
+            .header("Content-Type", "image/jpeg")
+            .header("X-Content-Type-Options", "nosniff")
+            .body(bytes)
+            .unwrap();
+    }
     let mut items = all_items(&root);
     if let Ok(data) = fs::read(root.join("active.json")) {
         if let Ok(item) = serde_json::from_slice::<Wallpaper>(&data) {
@@ -805,6 +824,10 @@ pub fn serve(
         .header("Access-Control-Allow-Origin", "*")
         .header("X-Content-Type-Options", "nosniff")
         .header("Cache-Control", "public, max-age=31536000, immutable");
+    if resource.mime == "text/html" && request.uri().query() == Some("snapshot=1") {
+        response = response.header("Content-Security-Policy",
+            "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; object-src 'none'; base-uri 'none'; form-action 'none'");
+    }
     if partial {
         response = response.header("Content-Range", format!("bytes {start}-{end}/{length}"));
     }

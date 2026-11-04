@@ -21,6 +21,7 @@ pub struct ContentState {
     windows: Mutex<Vec<WallpaperWindow>>,
     pub reports: Mutex<BTreeMap<String, Value>>,
     pub io: Mutex<()>,
+    cover_capture: Mutex<()>,
 }
 #[derive(Clone)]
 struct WallpaperWindow {
@@ -384,6 +385,8 @@ pub fn get_wallpaper_library(app: tauri::AppHandle) -> Result<Value, String> {
                 .as_ref()
                 .filter(|r| library::cached(&root, r))
                 .map(library::asset_url)
+                .or_else(|| (local && item.kind == "web" && crate::local_media::web_cover_path(&root, &item.resource.sha256).is_file())
+                    .then(|| library::web_cover_url(&item.resource)))
                 .or_else(|| (item.kind == "image" && installed).then(|| library::asset_url(&item.resource)));
             let source = if local { "local" } else if item.id.starts_with("builtin-") { "builtin" } else { "subscription" };
             let preview = (installed && item.kind != "canvas").then(|| library::asset_url(&item.resource));
@@ -391,6 +394,30 @@ pub fn get_wallpaper_library(app: tauri::AppHandle) -> Result<Value, String> {
         })
         .collect::<Vec<_>>();
     Ok(json!({"items":items,"source":config.catalog_url,"activeId":config.wallpaper_id}))
+}
+
+#[tauri::command]
+pub async fn wallpaper_ensure_cover(window: tauri::WebviewWindow, id: String) -> Result<String, String> {
+    if window.label() != "control" { return Err("只能在壁纸库生成封面".into()); }
+    let app = window.app_handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<ContentState>();
+        let _capture = state.cover_capture.lock().unwrap_or_else(|e| e.into_inner());
+        let root = root(&app)?;
+        let item = crate::local_media::read(&root)?.items.into_iter()
+            .find(|item| item.id == id && item.kind == "web")
+            .ok_or("找不到网页壁纸")?;
+        let hash = &item.resource.sha256;
+        if !crate::local_media::web_cover_path(&root, hash).is_file() {
+            let jpeg = crate::widget_preview::wallpaper_cover(&app, &item.resource)?;
+            let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
+            if !crate::local_media::read(&root)?.items.iter().any(|entry| entry.id == id && entry.resource.sha256 == *hash) {
+                return Err("壁纸已被删除".into());
+            }
+            crate::local_media::save_web_cover(&root, hash, &jpeg)?;
+        }
+        Ok(library::web_cover_url(&item.resource))
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

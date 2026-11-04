@@ -157,6 +157,19 @@ fn receive<T>(rx: mpsc::Receiver<T>, ctx: &ToolCtx, deadline: Instant) -> Result
 }
 
 pub(crate) fn run(app: &AppHandle, request: Request, ctx: &ToolCtx) -> Result<Preview, String> {
+    let compatibility_issues = crate::custom_widgets::widget_html_problems(&request.html);
+    let payload = json!({"html": request.html, "checks": request.checks});
+    let (report, screenshot) = render_snapshot(app, payload, request.width.unwrap_or(280.0), request.height.unwrap_or(240.0), ctx)?;
+    Ok(Preview { report, screenshot, compatibility_issues })
+}
+
+pub(crate) fn wallpaper_cover(app: &AppHandle, resource: &crate::library::Resource) -> Result<Vec<u8>, String> {
+    let payload = json!({"wallpaperUrl": format!("{}?snapshot=1", crate::library::asset_url(resource))});
+    let (_, screenshot) = render_snapshot(app, payload, 640.0, 360.0, &ToolCtx::detached("wallpaper-cover"))?;
+    screenshot
+}
+
+fn render_snapshot(app: &AppHandle, payload: Value, width: f64, height: f64, ctx: &ToolCtx) -> Result<(Report, Result<Vec<u8>, String>), String> {
     if ctx.is_cancelled() {
         return Err("组件预览已取消".into());
     }
@@ -171,8 +184,6 @@ pub(crate) fn run(app: &AppHandle, request: Request, ctx: &ToolCtx) -> Result<Pr
         .unwrap_or_else(|e| e.into_inner())
         .insert(label.clone(), sender);
     let guard = WindowGuard { app, label };
-    let compatibility_issues = crate::custom_widgets::widget_html_problems(&request.html);
-    let payload = json!({"html": request.html, "checks": request.checks});
     let deadline = Instant::now() + Duration::from_secs(12);
     let builder = WebviewWindowBuilder::new(
         app,
@@ -185,24 +196,17 @@ pub(crate) fn run(app: &AppHandle, request: Request, ctx: &ToolCtx) -> Result<Pr
     .focused(false)
     .skip_taskbar(true)
     .resizable(false)
-    .inner_size(
-        request.width.unwrap_or(280.0),
-        request.height.unwrap_or(240.0),
-    )
+    .inner_size(width, height)
     .initialization_script(format!("window.__XIAOBAN_WIDGET_PREVIEW__={payload};"));
     #[cfg(target_os = "macos")]
-    let builder = builder.incognito(true);
+    let builder = builder.incognito(true).background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
     let window = builder.build().map_err(|e| e.to_string())?;
     let report = receive(receiver, ctx, deadline)?;
     let screenshot = screenshot(&window, ctx, deadline);
     if ctx.is_cancelled() {
         return Err("组件预览已取消".into());
     }
-    Ok(Preview {
-        report,
-        screenshot,
-        compatibility_issues,
-    })
+    Ok((report, screenshot))
 }
 
 type CaptureSender = mpsc::SyncSender<Result<Vec<u8>, String>>;

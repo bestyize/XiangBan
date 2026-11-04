@@ -237,6 +237,19 @@ pub fn import_file(root: &Path, source: &Path) -> Result<Wallpaper, String> {
 
 pub(crate) const MAX_HTML_BYTES: u64 = 4 * 1024 * 1024;
 
+pub(crate) fn web_cover_path(root: &Path, hash: &str) -> std::path::PathBuf {
+    root.join("cache").join(format!("web-cover-{hash}.jpg"))
+}
+
+pub(crate) fn save_web_cover(root: &Path, hash: &str, jpeg: &[u8]) -> Result<(), String> {
+    let path = web_cover_path(root, hash);
+    fs::create_dir_all(root.join("cache")).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension("part");
+    let result = fs::write(&temporary, jpeg).and_then(|_| fs::rename(&temporary, &path));
+    if result.is_err() { let _ = fs::remove_file(&temporary); }
+    result.map_err(|e| e.to_string())
+}
+
 pub fn save_local_html(
     root: &Path,
     title: &str,
@@ -328,6 +341,7 @@ pub fn delete_local_wallpaper(root: &Path, id: &str) -> Result<String, String> {
     if !in_use {
         let file_path = root.join("imports").join(&hash);
         let _ = fs::remove_file(file_path);
+        if removed.kind == "web" { let _ = fs::remove_file(web_cover_path(root, &hash)); }
     }
     Ok(hash)
 }
