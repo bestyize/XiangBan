@@ -2015,7 +2015,7 @@ pub async fn chat_predict_followup(app: tauri::AppHandle, window: tauri::Webview
         let mut profile = provider_profile(&config);
         profile.supports_tools = false;
         profile.prompt_cache = false;
-        profile.extra_body = json!({});
+        profile.extra_body.clear();
         profile.max_output_tokens = Some(256);
         profile.timeouts.response_header_seconds = 8;
         profile.timeouts.first_event_seconds = 8;
