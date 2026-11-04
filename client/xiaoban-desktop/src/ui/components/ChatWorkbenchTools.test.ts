@@ -43,7 +43,8 @@ describe('add-capability menu hover interaction', () => {
     const { wrapper } = setup();
     await wrapper.get('[data-testid=chat-add-menu]').trigger('click');
     await wrapper.get('[data-testid=chat-add-tools]').trigger('click');
-    expect(wrapper.get('[aria-label=工具]').text()).toContain('操作电脑操作手机设计画板');
+    expect(wrapper.get('[aria-label=工具]').text()).toContain('操作电脑设计画板');
+    expect(wrapper.find('[data-testid=chat-tool-phone]').exists()).toBe(false);
     expect(wrapper.find('[data-testid=chat-capability-search]').exists()).toBe(false);
     await wrapper.get('[data-testid=chat-tool-computer]').trigger('click'); await flushPromises();
     expect(wrapper.emitted('use-tool')).toEqual([['computer']]);
