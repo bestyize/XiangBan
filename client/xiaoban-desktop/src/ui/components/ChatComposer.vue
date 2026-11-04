@@ -93,6 +93,28 @@ const filePicker = ref<HTMLInputElement | null>(null);
 const MAX_IMAGES = MAX_ATTACHMENTS;
 const skills = computed({ get: () => chat.draft.skills, set: value => { chat.draft.skills = value; } });
 const selectedTool = computed({ get: () => chat.draft.tool ?? null, set: (value: BuiltinTool | null) => { chat.draft.tool = value; } });
+const prediction = ref('');
+let predictionRequest = 0;
+const predictionSession = computed(() => props.page === 'chat' && shown.value && props.store.desktop
+  && chat.configured && !running.value && !chat.sending && !chat.queue?.items.length
+  && !draft.value && !attachments.value.length && !skills.value.length && !selectedTool.value
+  && !composing.value && !attachmentReading.value && !capturing.value && !asr?.recordingRequested
+  ? chat.currentId : null);
+function clearPrediction() {
+  predictionRequest++;
+  prediction.value = '';
+}
+watch([predictionSession, () => chat.model], clearPrediction, { flush: 'sync' });
+watch(() => chat.completedReply, async reply => {
+  clearPrediction();
+  if (!reply || predictionSession.value !== reply.session) return;
+  const request = predictionRequest;
+  try {
+    const text = await invoke<string | null>('chat_predict_followup', { sessionId: reply.session });
+    if (request === predictionRequest && predictionSession.value === reply.session) prediction.value = text ?? '';
+  } catch { /* Predictions are optional and do not affect the reply. */ }
+});
+onUnmounted(clearPrediction);
 const canSend = computed(() => chat.configured && !chat.sending && !compacting.value && !attachmentReading.value && !capturing.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0 || skills.value.length > 0));
 
 /* ── Voice ───────────────────────────────────────────────────────────── */
@@ -244,6 +266,14 @@ function onSlashKey(event: KeyboardEvent): boolean {
 function onKeydown(event: KeyboardEvent) {
   if (mentions.keydown(event, composing.value)) return;
   if (onSlashKey(event)) return;
+  if (prediction.value && !event.isComposing && !composing.value) {
+    if (event.key === 'Tab' && !event.shiftKey && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      draft.value = prediction.value;
+      return;
+    }
+    if (event.key === 'Escape') clearPrediction();
+  }
   if (event.key !== 'Enter' || event.shiftKey || isImeEnter(event, composing.value)) return;
   event.preventDefault();
   void submit();
@@ -367,7 +397,7 @@ watch([() => props.store.creationDraft, () => chat.configured, shown], ([text, c
   for (const item of handed) if (attachments.value.length < MAX_IMAGES) attachments.value.push(item);
 }, { immediate: true });
 
-const placeholderText = computed(() => !props.store.desktop ? '请在桌面应用中使用小伴 AI' : !chat.configured ? '先到设置里配置模型' : props.placeholder || '问点什么，或交给小伴去办就行');
+const placeholderText = computed(() => prediction.value ? `${prediction.value}  ·  Tab 接受` : !props.store.desktop ? '请在桌面应用中使用小伴 AI' : !chat.configured ? '先到设置里配置模型' : props.placeholder || '问点什么，或交给小伴去办就行');
 defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 </script>
 

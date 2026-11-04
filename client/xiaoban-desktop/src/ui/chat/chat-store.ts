@@ -22,6 +22,7 @@ export interface ChatDeps {
 }
 
 export interface ChatStore {
+  completedReply: { session: string } | null;
   queues: Record<string, MessageQueue>;
   readonly queue: MessageQueue | null;
   enqueue(text: string, attachments: PendingAttachment[], mentions: Mention[], mode?: 'queue' | 'steer' | 'replace', designId?:string, previewTarget?:PreviewTarget): Promise<boolean>;
@@ -404,6 +405,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     compactingId: null as string | null,
     views: {} as Record<string, SessionView>,
     currentId: null as string | null,
+    completedReply: null as ChatStore['completedReply'],
     sentHere(session) { return sent.has(session); },
     get attention() {
       return Object.values(store.views).reduce((sum, view) => sum + view.approvals.length + view.questions.length, 0);
@@ -847,7 +849,10 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     applyEvent(view, event);
     if (event.type === 'done' && store.currentId === session) {
       const last = view.items.at(-1);
-      if (last?.kind === 'assistant' && last.text.trim()) deps.onReply?.(session, last.text, last.id);
+      if (last?.kind === 'assistant' && last.text.trim()) {
+        store.completedReply = { session };
+        deps.onReply?.(session, last.text, last.id);
+      }
     }
     if ((event.type === 'cancelled' || event.type === 'error') && store.currentId === session) deps.onActivity?.();
     if (event.type === 'done' || event.type === 'cancelled' || event.type === 'error') queueMicrotask(() => sent.delete(session));

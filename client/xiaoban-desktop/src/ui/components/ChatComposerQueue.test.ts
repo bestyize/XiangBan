@@ -34,3 +34,38 @@ describe('composing while a reply is running',()=>{
     await h.wrapper.get('[data-testid=chat-attachment-remove-0]').trigger('click');expect(h.chat.draft.attachments).toHaveLength(0);h.wrapper.unmount();h.chat.dispose();
   });
 });
+
+describe('follow-up predictions', () => {
+  it('accepts the suggestion as a draft without sending it', async () => {
+    const h = setup();
+    native.mockResolvedValueOnce('按刚才定的方案实现。');
+    h.chat.views.s1.running = false;
+    h.chat.completedReply = { session: 's1' };
+    await flushPromises();
+    const input = h.wrapper.get('textarea');
+    expect(input.attributes('placeholder')).toContain('按刚才定的方案实现。');
+    expect(h.chat.draft.text).toBe('');
+    await input.trigger('keydown', { key: 'Tab' });
+    expect(h.chat.draft.text).toBe('按刚才定的方案实现。');
+    expect(h.host.mock.calls.some(([command]) => command === 'chat_send')).toBe(false);
+    h.wrapper.unmount();
+    h.chat.dispose();
+  });
+
+  it('discards a late suggestion after the user starts typing', async () => {
+    const h = setup();
+    let resolve!: (text: string) => void;
+    native.mockReturnValueOnce(new Promise<string>(done => { resolve = done; }));
+    h.chat.views.s1.running = false;
+    h.chat.completedReply = { session: 's1' };
+    await flushPromises();
+    const input = h.wrapper.get('textarea');
+    await input.setValue('我想先看看其他方案');
+    await input.setValue('');
+    resolve('按刚才定的方案实现。');
+    await flushPromises();
+    expect(input.attributes('placeholder')).not.toContain('按刚才定的方案实现。');
+    h.wrapper.unmount();
+    h.chat.dispose();
+  });
+});
