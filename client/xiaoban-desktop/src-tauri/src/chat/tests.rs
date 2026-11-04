@@ -674,7 +674,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
     let permission = Arc::new(permission_with_danger_check(PermissionMode::Auto, move |request: &ApprovalRequest<'_>| {
         lock(&log).push((request.tool.to_string(), request.danger.map(str::to_string)));
         Approval::Deny
-    }, shared));
+    }, shared, RemoteRuns::default()));
     let provider = Arc::new(ScriptedProvider::new(steps));
     let desktop = Arc::new(FakeDesktop::default());
     let todo = Arc::new(Todo::new());
@@ -746,31 +746,24 @@ fn computer_use_repair_dispatches_only_the_approved_permission() {
 }
 
 #[test]
-fn full_trust_runs_everyday_commands_and_stops_only_for_the_dangerous_ones() {
+fn local_auto_runs_commands_and_writes_without_waiting_for_approval() {
     let steps = vec![
         call("1", "shell", json!({"command": "echo fine"})),
         call("2", "shell", json!({"command": "rm -rf build node_modules"})),
-        call("3", "shell", json!({"command": "sudo true"})),
-        call("4", "shell", json!({"command": "git push --force origin main"})),
+        call("3", "shell", json!({"command": "echo DROP TABLE example"})),
+        call("4", "shell", json!({"command": "echo id_ed25519"})),
         call("5", "write_file", json!({"path": "notes.txt", "content": "ok"})),
         Step::text("done"),
     ];
     let (rig, asked) = trusted_rig("trusted-danger", steps);
     let (result, _) = run(&rig, "go");
     assert_eq!(result.unwrap().text, "done");
-    let asked = lock(&asked).clone();
-    assert_eq!(
-        asked.iter().map(|(tool, _)| tool.as_str()).collect::<Vec<_>>(),
-        vec!["shell", "shell"],
-        "only the two dangerous commands asked; the harmless ones and the file write ran on their own"
-    );
-    assert_eq!(asked[0].1.as_deref(), Some("以管理员权限运行"));
-    assert_eq!(asked[1].1.as_deref(), Some("会丢失改动或改写远端历史的 git 操作"));
+    assert!(lock(&asked).is_empty());
     let results = tool_results(&rig);
     assert_eq!(results.len(), 5);
     assert!(results[0].contains("fine"), "{}", results[0]);
     assert!(!results[1].contains("denied"), "a delete inside the working folder is not interrupted: {}", results[1]);
-    assert!(results[2].contains("denied") && results[3].contains("denied"), "{results:?}");
+    assert!(results[2].contains("DROP TABLE example") && results[3].contains("id_ed25519"), "{results:?}");
     assert_eq!(fs::read_to_string(rig.workspace.join("notes.txt")).unwrap(), "ok");
 }
 
@@ -1034,7 +1027,7 @@ fn automatic_output_limits_are_protocol_specific_and_independent_of_context_head
 }
 
 #[test]
-fn background_process_tools_are_registered_and_asked_like_the_shell() {
+fn background_process_tools_are_registered_and_follow_local_auto() {
     let dir = TempDir::new("process-tools");
     let workspace = dir.path("work");
     fs::create_dir_all(&workspace).unwrap();
@@ -1046,8 +1039,8 @@ fn background_process_tools_are_registered_and_asked_like_the_shell() {
     let permission = Arc::new(permission_with_danger_check(PermissionMode::Auto, move |request: &ApprovalRequest<'_>| {
         lock(&log).push(request.tool.to_string());
         Approval::Deny
-    }, workspace_slot));
-    let steps = vec![call("1", "process_start", json!({"command": "sudo true"})), Step::text("好")];
+    }, workspace_slot, RemoteRuns::default()));
+    let steps = vec![call("1", "process_start", json!({"command": "echo DROP TABLE example"})), Step::text("好")];
     let agent = assemble(Parts {
         provider: Arc::new(ScriptedProvider::new(steps)),
         dirs: &dirs,
@@ -1070,7 +1063,7 @@ fn background_process_tools_are_registered_and_asked_like_the_shell() {
         assert!(names.contains(&tool.to_string()), "{tool} missing from {names:?}");
     }
     agent.run("s1", "go", &mut |_| {}, &Arc::new(AtomicBool::new(false))).unwrap();
-    assert_eq!(*lock(&asked), vec!["process_start".to_string()], "full trust still asks before a flagged background command");
+    assert!(lock(&asked).is_empty());
     manager.shutdown().unwrap();
 }
 

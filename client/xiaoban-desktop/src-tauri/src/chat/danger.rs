@@ -1,4 +1,4 @@
-//! Calls that are asked about even when the user chose "完全信任".
+//! Calls that are asked about even when the user chose "自动".
 //!
 //! This reads a command line the way a careful person would and recognises the well-known ways to destroy data,
 //! escalate privileges, leak secrets or change the machine for good. It is a heuristic, not a sandbox: a script file,
@@ -54,7 +54,7 @@ pub fn assess(tool: &str, args: &Value, workspace: Option<&Path>) -> Option<&'st
         return None;
     }
     // The model repeats a command the command sandbox refused. Asking is what lets the approval take it out of the
-    // sandbox once (`sandbox_gate::allow_once`), even in 完全信任.
+    // sandbox once (`sandbox_gate::allow_once`), even in 自动.
     if args.get("outside_sandbox").and_then(Value::as_bool) == Some(true) {
         return Some(R_OUTSIDE_SANDBOX);
     }
@@ -212,12 +212,20 @@ fn assess_command(command: &str, ctx: &Ctx) -> Option<&'static str> {
     if ctx.depth > MAX_DEPTH {
         return None;
     }
-    if let Some(reason) = assess_text(&command.to_lowercase()) {
+    let mut segments = split(command);
+    let mut raw = command.to_lowercase();
+    if let [segment] = segments.as_mut_slice() {
+        if let Some(at) = plain_text_argument(command, &segment.words) {
+            segment.words[at].text.clear();
+            raw = segment.words.iter().map(|word| word.text.as_str()).collect::<Vec<_>>().join(" ").to_lowercase();
+        }
+    }
+    if let Some(reason) = assess_text(&raw) {
         return Some(reason);
     }
     let mut previous: Option<String> = None;
     let mut ctx = *ctx;
-    for segment in split(command) {
+    for segment in segments {
         if let Some(reason) = assess_words(&segment.words, segment.piped, previous.as_deref(), &ctx) {
             return Some(reason);
         }
@@ -227,6 +235,38 @@ fn assess_command(command: &str, ctx: &Ctx) -> Option<&'static str> {
         previous = command_index(&segment.words).map(|i| name(&segment.words[i]));
     }
     None
+}
+
+/// Search patterns and commit messages are text. Keep path arguments in the check,
+/// and use the original text when shell syntax or options make the arguments ambiguous.
+fn plain_text_argument(command: &str, words: &[Word]) -> Option<usize> {
+    if command.contains(['\n', '\r', '\\', '$', '`', '%', '!', '^', '<', '>', ';', '|', '&', '(', ')']) {
+        return None;
+    }
+    let (program, args) = words.split_first()?;
+    if program.quoted {
+        return None;
+    }
+    let at = match program.text.as_str() {
+        "git" if args.len() == 3 && args[0].text == "commit" && matches!(args[1].text.as_str(), "-m" | "--message") => 2,
+        cmd @ ("rg" | "grep") => {
+            let at = args.iter().take_while(|arg| {
+                let flag = arg.text.as_str();
+                matches!(flag, "-n" | "--line-number" | "-i" | "--ignore-case" | "-F" | "--fixed-strings")
+                    || cmd == "grep" && matches!(flag, "-r" | "-R" | "--recursive")
+            }).count();
+            let explicit = matches!(args.get(at)?.text.as_str(), "-e" | "--regexp");
+            let at = at + usize::from(explicit);
+            if args.get(at + 1..)?.iter().any(|arg| arg.text.starts_with('-')) {
+                return None;
+            }
+            at
+        }
+        _ => return None,
+    };
+    let word = args.get(at)?;
+    let plain = word.text.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'));
+    ((word.quoted || plain) && !word.text.starts_with('-')).then_some(at + 1)
 }
 
 /// `cd` somewhere outside the working folder (or home, with no argument), or a symbolic link to such a place.
@@ -610,6 +650,11 @@ fn assess_words(words: &[Word], piped: bool, previous: Option<&str>, ctx: &Ctx) 
         "net" if first == "user" || first == "localgroup" => return Some(R_SYSTEM),
         "tmutil" if first.starts_with("delete") || first.starts_with("disable") || first == "eraseall" => return Some(R_SYSTEM),
         "netsh" if lower.iter().any(|a| a.contains("firewall")) => return Some(R_SYSTEM),
+        "csrutil" | "spctl" | "bcdedit" | "ufw" if matches!(
+            (cmd, lower.iter().map(String::as_str).collect::<Vec<_>>().as_slice()),
+            ("csrutil", ["status"]) | ("spctl", ["--status"]) | ("bcdedit", ["/enum"]) |
+            ("ufw", ["status"] | ["status", "verbose" | "numbered"])
+        ) => {}
         "csrutil" | "spctl" | "nvram" | "bless" | "bcdedit" | "vssadmin" | "wevtutil" | "visudo" | "passwd" | "useradd" | "userdel" | "usermod" | "dscl"
         | "sysadminctl" | "iptables" | "ip6tables" | "ufw" | "nft" | "pfctl" | "set-executionpolicy" | "add-mppreference" | "set-mppreference" => return Some(R_SYSTEM),
         "curl" => {
@@ -842,6 +887,44 @@ mod tests {
         assert_eq!(check("echo ok\nrm -rf /"), Some(R_DELETE));
         assert_eq!(check("echo \"a > b\" ~/.zshrc"), None, "a quoted > is not a redirection");
         assert_eq!(check("echo x > ~/.zshrc"), Some(R_STARTUP));
+    }
+
+    #[test]
+    fn search_patterns_and_commit_messages_are_distinct_from_paths_and_executable_text() {
+        for command in [
+            "git commit -m 'document DROP TABLE and id_ed25519'",
+            "rg -n 'id_ed25519' docs",
+            "rg -n id_ed25519 docs",
+            "rg -e 'DROP TABLE' src",
+            "grep -r 'DROP TABLE' migrations",
+        ] {
+            assert_eq!(check(command), None, "{command}");
+        }
+        for (command, reason) in [
+            ("rg -n 'id_ed25519' ~/.ssh/id_ed25519", R_SECRET),
+            ("grep -f 'id_ed25519' docs", R_SECRET),
+            ("grep 'id_ed25519' -e needle", R_SECRET),
+            ("rg -e 'id_ed25519' docs; cat ~/.ssh/id_ed25519", R_SECRET),
+            ("rg \"$(cat ~/.ssh/id_ed25519)\" docs", R_SECRET),
+            ("printf 'DROP TABLE users' | psql", R_DATABASE),
+            ("git commit -m 'document DROP TABLE'; psql -c 'DROP TABLE users'", R_DATABASE),
+        ] {
+            assert_eq!(check(command), Some(reason), "{command}");
+        }
+    }
+
+    #[test]
+    fn reading_system_status_does_not_approve_changes_or_elevation() {
+        for command in ["ufw status", "ufw status verbose", "ufw status numbered", "csrutil status", "spctl --status", "bcdedit /enum"] {
+            assert_eq!(check(command), None, "{command}");
+        }
+        for (command, reason) in [
+            ("ufw disable", R_SYSTEM), ("csrutil disable", R_SYSTEM), ("spctl --global-disable", R_SYSTEM),
+            ("bcdedit /set testsigning on", R_SYSTEM), ("sudo ufw status", R_PRIV),
+            ("ufw status; ufw disable", R_SYSTEM),
+        ] {
+            assert_eq!(check(command), Some(reason), "{command}");
+        }
     }
 
     #[test]

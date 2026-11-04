@@ -3,9 +3,9 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Check, ChevronDown, Settings2, ShieldAlert, ShieldCheck } from 'lucide-vue-next';
 import type { ControlStore } from '../control-types.ts';
 
-/** 默认权限 / 完全信任 under the message box. The mode is the chat store's `permissionMode`:
+/** 默认权限 / 自动 under the message box. The mode is the chat store's `permissionMode`:
  *  `ask` asks before writing files, running commands and changing settings (an approval can be remembered);
- *  `auto` uses normal user permissions, including outside-workspace files; dangerous operations still ask.
+ *  `auto` uses normal user permissions, including outside-workspace files, without per-call local approval.
  *  Optional command isolation can be enabled separately in settings. */
 const props = defineProps<{ store: ControlStore; disabled?: boolean }>();
 
@@ -15,7 +15,7 @@ const mode = computed(() => props.store.chat.permissionMode);
 const full = computed(() => mode.value === 'auto');
 const options = [
   { id: 'ask', label: '默认权限', desc: '读写文件、运行命令前先问你，可以记住授权' },
-  { id: 'auto', label: '完全信任', desc: '按当前用户权限访问文件和执行命令，不限工作区；高风险操作仍会先问你。命令沙箱可在设置中单独开启' },
+  { id: 'auto', label: '自动', desc: '电脑上发起的任务可按当前用户权限读写文件和运行命令，无需逐次确认。命令沙箱可在设置中单独开启' },
 ] as const;
 
 function close() { open.value = false; }
@@ -37,8 +37,8 @@ function settings() { close(); props.store.openSettings('safety'); }
 
 <template>
   <div ref="root" class="perm-anchor">
-    <button type="button" class="perm-trigger" :class="{ 'is-full': full }" data-testid="chat-permission-toggle" aria-haspopup="menu" :aria-expanded="open" :title="full ? '完全信任：不再询问直接执行' : '默认权限：执行前先问你'" :disabled="disabled" @click="open = !open">
-      <ShieldAlert v-if="full" :size="14" /><ShieldCheck v-else :size="14" /><span>{{ full ? '完全信任' : '默认权限' }}</span><ChevronDown :size="11" :stroke-width="2.4" />
+    <button type="button" class="perm-trigger" :class="{ 'is-full': full }" data-testid="chat-permission-toggle" aria-haspopup="menu" :aria-expanded="open" :title="full ? '自动 · 文件和命令无需逐次确认' : '默认权限：执行前先问你'" :disabled="disabled" @click="open = !open">
+      <ShieldAlert v-if="full" :size="14" /><ShieldCheck v-else :size="14" /><span>{{ full ? '自动' : '默认权限' }}</span><ChevronDown :size="11" :stroke-width="2.4" />
     </button>
     <div v-show="open" class="xb-menu perm-menu" role="menu" aria-label="权限">
       <button v-for="option in options" :key="option.id" type="button" class="perm-option" role="menuitemradio" :class="{ active: mode === option.id, warn: option.id === 'auto' }" :aria-checked="mode === option.id" :title="option.desc" :aria-description="option.desc" :data-testid="`perm-${option.id}`" @click="pick(option.id)">

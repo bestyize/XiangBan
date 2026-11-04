@@ -73,7 +73,7 @@ describe('安全与权限', () => {
     const { wrapper } = await open();
     expect(wrapper.getComponent(NSwitch).props('value')).toBe(false);
     expect(wrapper.find('[data-testid="sandbox-network"]').exists()).toBe(false);
-    expect(wrapper.text()).toContain('完全信任使用当前用户权限');
+    expect(wrapper.text()).toContain('自动模式使用当前用户权限');
     await wrapper.getComponent(NSwitch).vm.$emit('update:value', true);
     await flushPromises();
     expect(ipc).toHaveBeenCalledWith('chat_set_command_sandbox', { enabled: true });

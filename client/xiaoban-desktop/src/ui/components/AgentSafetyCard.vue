@@ -50,7 +50,7 @@ const setCommandSandbox = (enabled: boolean) => act('sandbox', () => invoke('cha
 const setNetwork = (allowed: boolean) => act('network', () => invoke('chat_set_sandbox_network', { allowed }));
 const saveLimits = () => act('limits', () => invoke('chat_set_execution_limits', { limits: { ...limits.value } }), '执行预算已保存，下次开始或继续时生效');
 const setWindowsSandbox = (enabled: boolean) => act('windows', () => invoke('chat_set_windows_sandbox', { enabled }),
-  enabled ? '已开启 Windows 沙箱，完全信任下的命令改为低完整性运行' : '已关闭 Windows 沙箱');
+  enabled ? '已开启 Windows 沙箱，自动模式下的命令改为低完整性运行' : '已关闭 Windows 沙箱');
 const saveHooks = () => act('hooks', async () => {
   const count = await invoke<number>('chat_save_hooks', { text: hooks.value });
   props.store.notify(count ? `已保存 ${count} 条 hook，下次工具调用起生效` : '已清除所有 hook', 'success');
@@ -80,9 +80,9 @@ onMounted(load);
 
       <div class="xb-group-title">权限与命令沙箱</div>
       <div class="xb-group">
-        <div class="xb-row"><div class="xb-row-text"><b>完全信任使用当前用户权限</b><span>可读写工作区外的文件、安装或卸载全局软件包、运行命令。提权、批量删除等高风险操作仍需确认；系统管理员和隐私权限由操作系统决定。命令沙箱默认关闭，开启后只限制命令，不改变文件工具的权限。</span></div></div>
+        <div class="xb-row"><div class="xb-row-text"><b>自动模式使用当前用户权限</b><span>电脑上发起的任务可直接读写文件和运行命令。管理员和隐私授权由操作系统决定。手机远控保留高风险确认。命令沙箱仅限制命令，默认关闭。</span></div></div>
         <div v-if="view.sandboxAvailable" class="xb-row">
-          <div class="xb-row-text"><b>隔离完全信任下的命令</b><span>可选。开启后命令只能写工作目录、临时目录和软件包缓存，并限制读取密钥目录。全局 npm、brew 等操作可能被拦截；关闭后恢复当前用户权限。对下一次启动的命令生效，已经运行的进程需停止后重启。</span></div>
+          <div class="xb-row-text"><b>隔离自动模式下的命令</b><span>可选。开启后命令只能写工作目录、临时目录和软件包缓存，并限制读取密钥目录。全局 npm、brew 等操作可能被拦截；关闭后恢复当前用户权限。对下一次启动的命令生效，已经运行的进程需停止后重启。</span></div>
           <NSwitch :value="!!view.commandSandbox" :loading="busy === 'sandbox'" :disabled="!!busy" aria-label="命令沙箱" data-testid="command-sandbox" @update:value="setCommandSandbox" />
         </div>
         <div v-if="view.sandboxAvailable && view.commandSandbox" class="xb-row">
@@ -91,12 +91,12 @@ onMounted(load);
         </div>
         <template v-if="view.platform === 'windows'">
           <div class="xb-row">
-            <div class="xb-row-text"><b>Windows 沙箱（实验性）</b><span>完全信任下的命令以“低完整性”运行，只能写工作目录和小伴自己的临时目录，不能改动你的其他文件；不限制读取，也不限制联网。</span></div>
+            <div class="xb-row-text"><b>Windows 沙箱（实验性）</b><span>自动模式下的命令以“低完整性”运行，只能写工作目录和小伴自己的临时目录，不能改动你的其他文件；不限制读取，也不限制联网。</span></div>
             <NSwitch :value="!!view.windowsSandbox" :loading="busy === 'windows'" :disabled="!!busy" aria-label="Windows 沙箱" data-testid="windows-sandbox" @update:value="setWindowsSandbox" />
           </div>
           <div class="xb-row"><NAlert type="warning" :show-icon="false" style="flex:1" data-testid="windows-sandbox-note">开启时会把工作目录及其中的文件标记为“低完整性”（修改的是这些文件的系统安全标签，不改内容），之后换的工作目录也会在第一次使用前标记。标记较多文件需要一点时间。部分需要写入用户目录的工具（如全局安装、某些编译器缓存）可能在沙箱里失败，遇到时可关闭此选项。</NAlert></div>
         </template>
-        <div v-if="!view.sandboxAvailable && view.platform !== 'windows'" class="xb-row"><NAlert type="warning" :show-icon="false" style="flex:1" data-testid="sandbox-unavailable">当前系统不支持可选命令沙箱。完全信任下按当前用户权限执行，高风险操作仍需确认。</NAlert></div>
+        <div v-if="!view.sandboxAvailable && view.platform !== 'windows'" class="xb-row"><NAlert type="warning" :show-icon="false" style="flex:1" data-testid="sandbox-unavailable">当前系统不支持可选命令沙箱。自动模式下按当前用户权限执行命令。</NAlert></div>
       </div>
 
       <div class="xb-group-title">已记住的授权</div>

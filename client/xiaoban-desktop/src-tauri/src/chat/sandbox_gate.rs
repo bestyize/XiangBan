@@ -1,11 +1,10 @@
 //! When the shell and background processes run inside the OS sandbox.
 //!
-//! Full trust uses normal user permissions by default. Command isolation is a separate opt-in setting;
+//! Auto uses normal user permissions by default. Command isolation is a separate opt-in setting;
 //! when enabled, writes stay in the workspace, temporary folders and package caches. Ask mode keeps
 //! running explicitly approved commands with the user's normal permissions.
 //!
-//! A command the danger check flagged is asked even in full trust; when the user allows it, they mean that very
-//! command, which usually reaches outside the folder (`rm -rf ~/Downloads/old`). It runs once outside the sandbox.
+//! An approved sandbox escape applies to the exact command and session, for one launch only.
 
 use agent_kernel::sandbox::{self, SandboxHook, SandboxPolicy};
 use agent_kernel::{Permission, PermissionMode};
@@ -13,7 +12,7 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
-/// "完全信任时允许命令联网" in settings; on by default, since installing dependencies needs it.
+/// "允许沙箱中的命令联网" in settings; on by default, since installing dependencies needs it.
 static NETWORK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
 
 static ENABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

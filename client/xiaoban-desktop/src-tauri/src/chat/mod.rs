@@ -177,6 +177,7 @@ pub struct ChatState {
     /// The folder each conversation works in, as of its latest message. The danger check needs it to tell work
     /// inside from outside, and two conversations may be answering in different folders at once.
     workspaces: Workspaces,
+    remote_runs: RemoteRuns,
     todo: Arc<Todo>,
     runs: Mutex<HashMap<String, Arc<AtomicBool>>>,
     delivery: Mutex<()>,
@@ -211,11 +212,13 @@ impl ChatState {
             move |request: &ApprovalRequest<'_>| ask_approval(&app, &broker, request)
         };
         let workspaces = Workspaces::default();
+        let remote_runs = RemoteRuns::default();
         Self {
             broker,
             // Each conversation carries its own mode and sets it again before every run.
-            permission: Arc::new(permission_with_danger_check(PermissionMode::Ask, approver, workspaces.clone())),
+            permission: Arc::new(permission_with_danger_check(PermissionMode::Ask, approver, workspaces.clone(), remote_runs.clone())),
             workspaces,
+            remote_runs,
             todo: Arc::new(match Dirs::of(app) {
                 Ok(dirs) => Todo::new().persistent(dirs.chat.join("progress")),
                 // build_agent rejects the missing data directory before execution.
@@ -238,7 +241,7 @@ impl ChatState {
     }
 }
 
-use permission_policy::{Workspaces, folder_for, permission_with_danger_check};
+use permission_policy::{RemoteRuns, Workspaces, folder_for, permission_with_danger_check};
 
 fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: Value) {
     crate::phone_link::observe_chat_event(app, name, &payload);
@@ -324,9 +327,13 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
             }
         }
     }
-    // A flagged command the user allowed is meant as written, usually outside the working folder: run it once
-    // outside the full-trust sandbox, or the approval would change nothing.
-    if decision == Approval::Once && request.danger.is_some() && matches!(request.tool, "shell" | "process_start") {
+    // A pending local command can resume automatically when the user switches modes. That alone does
+    // not authorize leaving the optional sandbox. Phone runs keep their existing flagged-command grants.
+    if decision == Approval::Once && !request.is_cancelled() && request.danger.is_some()
+        && matches!(request.tool, "shell" | "process_start")
+        && (request.arguments["outside_sandbox"].as_bool() == Some(true)
+            || lock(&app.state::<ChatState>().remote_runs).contains(request.session))
+    {
         if let Some(command) = request.arguments.get("command").and_then(Value::as_str) {
             sandbox_gate::allow_once(request.session, command);
         }
@@ -1078,6 +1085,7 @@ impl Drop for HostRunCleanup{fn drop(&mut self){if std::thread::panicking(){emit
 fn finish_run(app: &tauri::AppHandle, session: &str, success: Option<bool>) {
     let state = app.state::<ChatState>();
     let _delivery = lock(&state.delivery);
+    lock(&state.remote_runs).remove(session);
     lock(&state.runs).remove(session);
     lock(&state.leases).remove(session);
     state.broker.drop_session(session);
@@ -1406,6 +1414,12 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
     let perm_mode = if summary.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
     state.permission.set_session_mode(&summary.id, perm_mode);
     let trust_history=JsonlStore::new(Dirs::of(&app)?.sessions()).load(&summary.id).map_err(|e|e.to_string())?;
+    let origin = if retry {
+        trust_history.last().and_then(|message| message.structured_content.as_ref())
+    } else {
+        queued.as_ref().and_then(|entry| entry.message.structured_content.as_ref())
+    };
+    let remote_run = origin.and_then(|metadata| metadata["source"].as_str()) == Some("phone");
     state.permission.restore_trust(&Dirs::of(&app)?.chat.join("trust"),&summary.id,trust_history.iter().any(|m|m.role==agent_kernel::Role::Tool))?;
     {
         let dirs=Dirs::of(&app)?;
@@ -1471,6 +1485,9 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
     let from_queue = queued.is_some();
     let started = std::thread::Builder::new().name(format!("chat-{id}")).spawn(move || {
         let mut cleanup=HostRunCleanup{app:handle.clone(),session:id.clone(),success:Some(false)};
+        if remote_run {
+            lock(&handle.state::<ChatState>().remote_runs).insert(id.clone());
+        }
         let _watch=control.watch(cancel.clone());
         let sender = handle.clone();
         let session = id.clone();
@@ -2338,7 +2355,7 @@ pub(crate) fn remote_session_snapshot(app: &tauri::AppHandle, session_id: &str, 
     }))
 }
 
-/// 手机发来的 `message.send`：强制将该对话切换为最严格权限（`ask` + `require_review`），并写入持久化 outbox。
+/// 手机发来的 `message.send` 进入持久化 outbox，执行时保留手机远控的高风险检查。
 pub(crate) fn remote_send_message(
     app: &tauri::AppHandle,
     peer_id: &str,
@@ -2393,7 +2410,7 @@ pub(crate) fn remote_send_message(
         }
     };
 
-    // 权限（开发阶段便利优先）：手机新建的对话默认“完全信任”（高风险操作仍然每次都问），手机明确要 `ask` 才是默认权限；
+    // 手机新建的对话默认“自动”，手机明确要 `ask` 才是默认权限。
     // 已有的对话保持它现在的模式，不因为手机发了一条消息就被降级或升级。
     // 以前这里每条消息都强制降回 ask 并要求逐步复核，结果每一步都要点一次，几乎没法干活。
     let state = app.state::<ChatState>();
@@ -2426,8 +2443,8 @@ pub(crate) fn remote_send_message(
     }))
 }
 
-/// 手机切换这个对话的权限：`ask`（默认权限，执行前先问）或 `auto`（完全信任）。
-/// 和桌面上的开关是同一个：高风险操作（删文件、危险命令等）在完全信任下仍然每次都问。
+/// 手机切换这个对话的权限：`ask`（默认权限）或 `auto`（自动）。
+/// 手机发起的执行在自动下也保留高风险确认。
 pub(crate) fn remote_set_permission(app: &tauri::AppHandle, session_id: &str, mode: &str) -> Result<String, String> {
     if session_id.starts_with("del-") {
         return Err("外部 Agent 的任务有自己的权限，不能在这里切换".into());

@@ -104,9 +104,10 @@ describe('新建任务', () => {
   it('turns the permission button red in full trust and links to the safety settings', async () => {
     const h = await open();
     await click('chat-permission-toggle');
+    expect(q('perm-auto')!.textContent).toContain('自动');
     await click('perm-auto');
     expect(h.chat.permissionMode).toBe('auto');
-    expect(q('chat-permission-toggle')!.textContent).toContain('完全信任');
+    expect(q('chat-permission-toggle')!.textContent).toContain('自动');
     expect(q('chat-permission-toggle')!.classList.contains('is-full')).toBe(true);
     await click('chat-permission-toggle');
     await click('perm-settings');

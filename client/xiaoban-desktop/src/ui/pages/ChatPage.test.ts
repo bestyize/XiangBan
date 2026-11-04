@@ -678,12 +678,12 @@ describe('asking the user', () => {
     expect(h.calls.at(-1)).toEqual(['chat_answer_approval', { id: 'a7', decision: 'always' }]);
   });
 
-  it('says why a dangerous operation is asked even in full trust, and never offers to remember it', async () => {
+  it('shows why the operation requires confirmation and never offers to remember it', async () => {
     const h = await running();
     h.emit('chat-approval', approval({ id: 'a9', arguments: { command: 'sudo rm -rf /tmp/x' }, danger: '以管理员权限运行', canRemember: false }));
     await flushPromises();
     expect(q('approval-danger')!.textContent).toContain('以管理员权限运行');
-    expect(q('approval-danger')!.textContent).toContain('完全信任');
+    expect(q('approval-danger')!.textContent).toContain('需要确认');
     expect(q('chat-approval')!.className).toContain('dangerous');
     expect(q('approval-always')).toBeNull();
     expect(q('approval-tainted')).toBeNull();
