@@ -116,6 +116,7 @@ pub(super) fn kick(app: &tauri::AppHandle, session: &str) {
             Some(entry),
             None,
             None,
+            None,
         )?;
         Ok(())
     })();
@@ -217,6 +218,7 @@ pub fn chat_enqueue(
     stop_now: Option<bool>,
     design_id: Option<String>,
     preview_target: Option<crate::chat_preview::Target>,
+    community_context: Option<super::community_context::CommunityContext>,
 ) -> Result<Value, String> {
     chat_window(&window)?;
     checked_session_id(&session_id)?;
@@ -269,7 +271,12 @@ pub fn chat_enqueue(
     let files = AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments"));
     let saved = files.import(&session_id, &inputs)?;
     let mut message = Message::user(user_parts(&text, &model_images));
-    message.structured_content = Some(json!({"attachments":saved,"designId":design_id,"previewTarget":preview_target}));
+    message.structured_content = Some(json!({
+        "attachments": saved,
+        "designId": design_id,
+        "previewTarget": preview_target,
+        "communityContext": community_context.map(super::community_context::CommunityContext::bounded),
+    }));
     let mentions = mentions
         .unwrap_or_default()
         .into_iter()

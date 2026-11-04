@@ -4,6 +4,7 @@ import { ArrowDown, ArrowUp, Check, ChevronDown, Clock3, CornerDownLeft, FileTex
 import { invoke } from '../../bridge.ts';
 import type { ChatStore } from '../chat/chat-store.ts';
 import type { QueueEntry } from '../chat/types.ts';
+import { legacyCommunityMessage } from '../chat/community-context.ts';
 const props = defineProps<{ chat: ChatStore; running: boolean }>();
 const queue = computed(() => props.chat.queue);
 const expanded = ref(false);
@@ -13,7 +14,10 @@ const removedImages = ref<number[]>([]);
 const removedFiles = ref<string[]>([]);
 const busy = ref(false);
 const dragging = ref<string | null>(null);
-const entries = computed(() => expanded.value ? queue.value?.items ?? [] : (queue.value?.items ?? []).slice(0, 2));
+const entries = computed(() => {
+  const items = queue.value?.items ?? [];
+  return (expanded.value ? items : items.slice(0, 2)).map(entry => ({ ...entry, visibleText: legacyCommunityMessage(entry.text).text }));
+});
 watch(() => props.chat.currentId, () => { editing.value = null; expanded.value = false; });
 const previews = ref<Record<string, string>>({});
 const previewKey = (e: QueueEntry) => `${props.chat.currentId}:${e.id}:${e.images}`;
@@ -39,7 +43,7 @@ async function begin(entry: QueueEntry) {
     if (!await props.chat.updateQueue('pause', undefined, undefined, session) || props.chat.currentId !== session) return;
     const current = props.chat.queue?.items.find(e => e.id === entry.id && !e.dispatching);
     if (!current) return;
-    editing.value = current.id; editText.value = current.text; removedImages.value = []; removedFiles.value = [];
+    editing.value = current.id; editText.value = legacyCommunityMessage(current.text).text; removedImages.value = []; removedFiles.value = [];
   } finally { busy.value = false; }
 }
 async function act(action: Parameters<ChatStore['updateQueue']>[0], id?: string, options?: Parameters<ChatStore['updateQueue']>[2]) {
@@ -50,7 +54,12 @@ async function act(action: Parameters<ChatStore['updateQueue']>[0], id?: string,
   try { if (await props.chat.updateQueue(action, id, options, session)) { if (props.chat.currentId === session) editing.value = null; } }
   finally { busy.value = false; }
 }
-function save() { void act('edit', editing.value ?? undefined, { text: editText.value, removeImages: removedImages.value, removeFiles: removedFiles.value }); }
+function save() {
+  const entry = queue.value?.items.find(item => item.id === editing.value);
+  if (!entry) return;
+  const { prefix } = legacyCommunityMessage(entry.text);
+  void act('edit', entry.id, { text: prefix + editText.value, removeImages: removedImages.value, removeFiles: removedFiles.value });
+}
 function move(id: string, before: string) {
   const ids = queue.value?.items.map(e => e.id) ?? [];
   const from = ids.indexOf(id), to = ids.indexOf(before);
@@ -86,7 +95,7 @@ function step(id: string, delta: number) {
         <template v-else>
           <span class="queue-number">{{ index + 1 }}</span>
           <img v-if="previews[previewKey(entry)]" class="queue-thumb" :src="previews[previewKey(entry)]" alt="排队图片预览" />
-          <div class="queue-content"><p :title="entry.text">{{ entry.text || '附件消息' }}</p><div class="queue-meta"><span v-if="entry.dispatching">正在发送…</span><span v-else-if="entry.mode === 'steer'">等待补充到当前任务</span><span v-if="entry.images"><Image :size="10" />{{ entry.images }} 张图片</span><span v-for="file in entry.files.filter(f => !f.mime?.startsWith('image/'))" :key="file.id"><FileText :size="10" />{{ file.name }}</span></div></div>
+          <div class="queue-content"><p :title="entry.visibleText">{{ entry.visibleText || '附件消息' }}</p><div class="queue-meta"><span v-if="entry.dispatching">正在发送…</span><span v-else-if="entry.mode === 'steer'">等待补充到当前任务</span><span v-if="entry.images"><Image :size="10" />{{ entry.images }} 张图片</span><span v-for="file in entry.files.filter(f => !f.mime?.startsWith('image/'))" :key="file.id"><FileText :size="10" />{{ file.name }}</span></div></div>
           <div class="queue-actions">
             <button type="button" class="queue-action" :disabled="busy || entry.dispatching || index === 0" aria-label="上移" @click="step(entry.id, -1)"><ArrowUp :size="12" /></button>
             <button type="button" class="queue-action" :disabled="busy || entry.dispatching || index === queue.items.length - 1" aria-label="下移" @click="step(entry.id, 1)"><ArrowDown :size="12" /></button>

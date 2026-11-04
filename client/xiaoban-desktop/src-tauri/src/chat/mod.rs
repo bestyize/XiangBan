@@ -24,6 +24,7 @@ mod fork;
 mod git_command;
 mod git_snapshot;
 mod community;
+mod community_context;
 mod compact;
 mod danger;
 mod desktop_tools;
@@ -714,6 +715,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .middleware(feature_hints::RecoveryHint)
         // `/技能名`：把用户点名的技能说明放到这条请求后面。
         .middleware(skill_invocation::SkillInvocation::new(skills.clone()).mentioning(mentions::skill_names(&mentions)))
+        .middleware(community_context::CommunityContextMiddleware)
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .middleware(ContinueGuard::new())
         // Bounded transient-error recovery; cancellation and the shared run budget still apply.
@@ -1319,7 +1321,7 @@ fn bind_expert(plugins: &Path, pick: &ExpertPick) -> Result<sessions::ExpertBind
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, window: tauri::Webview, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>, design_id:Option<String>, preview_target:Option<crate::chat_preview::Target>) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, window: tauri::Webview, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>, design_id:Option<String>, preview_target:Option<crate::chat_preview::Target>, community_context: Option<community_context::CommunityContext>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
     if let Some(id)=&design_id{crate::design::store(&app)?.load(id)?;}
     let preview_target=preview_target.map(|target|target.context(&app,&session_id)).transpose()?;
@@ -1343,17 +1345,17 @@ pub fn chat_send(app: tauri::AppHandle, window: tauri::Webview, session_id: Stri
         let state = app.state::<ChatState>();
         if mentions.is_empty() { lock(&state.mentions).remove(&session_id); } else { lock(&state.mentions).insert(session_id.clone(), mentions); }
     }
-    send_prepared(app.clone(), session_id, text, images, retry, attachments, None, design_id, preview_target)
+    send_prepared(app.clone(), session_id, text, images, retry, attachments, None, design_id, preview_target, community_context.map(community_context::CommunityContext::bounded))
 }
 
 /// Starts an answer. The command above checks who is asking; the host's own callers (long-term goals) come here.
 pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
     let state = app.state::<ChatState>();
     let _delivery = lock(&state.delivery);
-    send_prepared(app.clone(), session_id, text, images, retry, attachments, None, None, None)
+    send_prepared(app.clone(), session_id, text, images, retry, attachments, None, None, None, None)
 }
 
-fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, queued: Option<outbox::Entry>,design_id:Option<String>, preview_target:Option<Value>) -> Result<SessionSummary, String> {
+fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, queued: Option<outbox::Entry>,design_id:Option<String>, preview_target:Option<Value>, community_context: Option<community_context::CommunityContext>) -> Result<SessionSummary, String> {
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
@@ -1470,7 +1472,13 @@ fn send_prepared(app: tauri::AppHandle, session_id: String, text: String, images
         Err(error) => { lock(&state.runs).remove(&session_id); lock(&state.leases).remove(&session_id); return Err(error); }
     };
     let saved_for_thread = saved.clone();
-    let input_metadata = queued.as_ref().and_then(|entry|entry.message.structured_content.clone()).or_else(||Some(json!({"attachments":saved,"designId":design_id,"previewTarget":preview_target})));
+    let input_metadata = queued.as_ref().and_then(|entry| entry.message.structured_content.clone())
+        .or_else(|| Some(json!({
+            "attachments": saved,
+            "designId": design_id,
+            "previewTarget": preview_target,
+            "communityContext": community_context,
+        })));
     if let Err(error) = outbox_host::open(&app, &session_id) {
         lock(&state.runs).remove(&session_id); lock(&state.leases).remove(&session_id);
         if queued.is_none() { attachment_store.rollback(&saved); }

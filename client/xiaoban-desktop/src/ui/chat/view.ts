@@ -1,4 +1,5 @@
 import { attachmentCards } from './attachments.ts';
+import { legacyCommunityMessage } from './community-context.ts';
 import { generatedImages } from './generated-images.ts';
 import { modelFailure, retryNotice, toolInputNotice } from './model-errors.ts';
 import { withoutVoiceNotes } from '../../voice/interruption.ts';
@@ -55,7 +56,7 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
     }
     if (message.role === 'user') {
       const images = (message.parts ?? []).filter(part => part.type === 'image').map(part => (part as { url: string }).url);
-      const text = withoutVoiceNotes(textOf(message));
+      const text = withoutVoiceNotes(legacyCommunityMessage(textOf(message)).text);
       const files = attachmentCards(message.structured_content);
       if (text || images.length || files.length) items.push({ kind: 'user', id: nextId(view), text, images, ...(message.structured_content && typeof message.structured_content === 'object' && 'delivery' in message.structured_content && message.structured_content.delivery === 'steer' ? { delivery: 'steer' as const } : {}), ...(files.length ? { files } : {}) });
     } else if (message.role === 'assistant') {

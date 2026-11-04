@@ -1222,6 +1222,36 @@ describe('durable message queues', () => {
   });
 });
 
+it('keeps community page data separate from visible text and preserves it on queue retry', async () => {
+  const page = { title: '项目 A', url: 'https://chat.xiangban.xyz/open-source/a/b', excerpt: '页面正文' };
+  let currentPage = page;
+  let fail = true;
+  const h = harness({
+    chat_new_session: () => summary('s1'),
+    chat_send: () => summary('s1'),
+    chat_enqueue: () => {
+      if (fail) throw new Error('lost response');
+      return { revision: 1, paused: false, reason: '', items: [] };
+    },
+  });
+  h.deps.messageContext = async () => currentPage;
+  await h.store.init();
+  expect(await h.store.send('这个项目做什么？')).toBe(true);
+  expect(h.calls.find(([command]) => command === 'chat_send')?.[1]).toMatchObject({
+    text: '这个项目做什么？', communityContext: page,
+  });
+  expect(h.store.current()?.items[0]).toMatchObject({ kind: 'user', text: '这个项目做什么？' });
+
+  expect(await h.store.enqueue('再举个例子', [], [])).toBe(false);
+  currentPage = { ...page, title: '项目 B' };
+  fail = false;
+  expect(await h.store.enqueue('再举个例子', [], [])).toBe(true);
+  const enqueues = h.calls.filter(([command]) => command === 'chat_enqueue').map(([, args]) => args);
+  expect(enqueues[0]).toMatchObject({ text: '再举个例子', communityContext: page });
+  expect(enqueues[1]).toEqual(enqueues[0]);
+  h.store.dispose();
+});
+
 it('keeps the design selected at submission in both direct and queued messages',async()=>{
  const h=harness({chat_new_session:()=>summary('s1'),chat_send:()=>summary('s1'),chat_enqueue:()=>({revision:1,paused:false,reason:'',items:[]})});await h.store.init();
  const first='design-012345678901234567890123',second='design-000000000000000000000000';

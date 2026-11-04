@@ -3,6 +3,7 @@ import type { PendingAttachment } from './attachments.ts';
 import type { Mention, MentionItem } from './mentions.ts';
 import type { MessageQueue, SessionModel } from './types.ts';
 import { modelFailure } from './model-errors.ts';
+import type { CommunityContext } from './community-context.ts';
 import { reactive, ref, watch } from 'vue';
 import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, ExpertView, Library, Overview, QuestionRequest, RecentWorkspace, SessionSummary, SessionView, WireMessage, WorktreeInfo, WorktreeLink } from './types.ts';
 import { applyEvent, checkpointNotice, describeCall, interruptedNotice, itemsFromHistory, newView, nextId, summaryNotice, workspaceNotice } from './view.ts';
@@ -13,7 +14,7 @@ import { unresolvedCalls } from './task-progress.ts';
 export interface ChatDeps {
   onReply?(session: string, text: string, key?: string): void;
   onActivity?(): void;
-  messageContext?(): Promise<string>;
+  messageContext?(): Promise<CommunityContext | undefined>;
   desktop: boolean;
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
   listen<T>(event: string, callback: (payload: T) => void): Promise<() => void>;
@@ -151,7 +152,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   let selectionRevision = 0;
   const draftSending = ref(false);
   const queueSending = reactive(new Set<string>());
-  const queueAttempts = new Map<string, { payload: string; id: string }>();
+  const queueAttempts = new Map<string, { payload: string; id: string; communityContext?: CommunityContext }>();
   const defaultPermissionMode = ref<'ask' | 'auto'>('ask');
   const pendingPermissionMode = ref<'ask' | 'auto'>('ask');
   let contextRevision = 0;
@@ -371,13 +372,16 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       queueSending.add(session);
       try {
         const payload = JSON.stringify([text, attachments, mentions, mode, designId, previewTarget]);
-        const uniqueId = typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-        if (queueAttempts.get(session)?.payload !== payload) queueAttempts.set(session, { payload, id: `q-${uniqueId}` });
-        const requestId = queueAttempts.get(session)!.id;
+        let attempt = queueAttempts.get(session);
+        if (attempt?.payload !== payload) {
+          const uniqueId = typeof globalThis.crypto?.randomUUID === 'function' ? globalThis.crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+          attempt = { payload, id: `q-${uniqueId}`, communityContext: await deps.messageContext?.() };
+          queueAttempts.set(session, attempt);
+        }
+        const { id: requestId, communityContext } = attempt;
         const images = attachments.filter((a): a is string => typeof a === 'string');
         const files = attachments.filter(a => typeof a !== 'string').map(({ name, dataUrl }) => ({ name, dataUrl }));
-        const context = await deps.messageContext?.();
-        const queue = await deps.invoke<MessageQueue>('chat_enqueue', { sessionId: session, text: (context ?? '') + text, mode: mode === 'replace' ? 'queue' : mode, stopNow: mode === 'replace', requestId, images, attachments: files, mentions, ...(designId?{designId}:{}), ...(previewTarget?{previewTarget}:{}) });
+        const queue = await deps.invoke<MessageQueue>('chat_enqueue', { sessionId: session, text, ...(communityContext ? { communityContext } : {}), mode: mode === 'replace' ? 'queue' : mode, stopNow: mode === 'replace', requestId, images, attachments: files, mentions, ...(designId?{designId}:{}), ...(previewTarget?{previewTarget}:{}) });
         applyQueue(session, queue);
         queueAttempts.delete(session);
         sent.add(session);
@@ -588,8 +592,8 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       view.status = '';
       try {
         // Images are left out entirely when there are none, so a plain message keeps its old shape.
-        const context = await messageContext;
-        const args = { sessionId: id, text: (context ?? '') + note + text, ...(designId?{designId}:{}), ...(previewTarget?{previewTarget}:{}), ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}), ...(mentions.length ? { mentions: mentions.map(({kind,id}) => ({kind,id})) } : {}) };
+        const communityContext = await messageContext;
+        const args = { sessionId: id, text: note + text, ...(communityContext ? { communityContext } : {}), ...(designId?{designId}:{}), ...(previewTarget?{previewTarget}:{}), ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}), ...(mentions.length ? { mentions: mentions.map(({kind,id}) => ({kind,id})) } : {}) };
         sent.add(id);
         upsert(await deps.invoke<SessionSummary>('chat_send', args));
         return true;
