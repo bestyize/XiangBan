@@ -26,6 +26,11 @@ async function init() {
     await mountCapture();
     return;
   }
+  if (mode === "widget-preview") {
+    const { mountWidgetPreview } = await import("./widgets/preview.ts");
+    mountWidgetPreview();
+    return;
+  }
   await import("./style.css");
   if (mode === "pet-greeting") {
     const { mountGreetingBubble } = await import("./pets/greeting-mount.ts");

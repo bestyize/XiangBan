@@ -38,6 +38,7 @@ mod games;
 mod game_packs;
 mod rituals;
 mod widgets;
+mod widget_preview;
 mod pets;
 mod pet_packs;
 mod custom_widgets;
@@ -872,6 +873,7 @@ fn main() {
             widgets::get_desktop_widgets, widgets::add_desktop_widget, widgets::update_desktop_widget, widgets::remove_desktop_widget,
             widgets::set_widgets_editing, widgets::get_desktop_widget, widgets::move_desktop_widget, widgets::show_widget_settings, widgets::resize_desktop_widget, widgets::get_widget_settings, widgets::update_widget_settings, widgets::remove_widget_settings, widgets::close_widget_settings, widgets::size_widget_settings, widgets::search_widget_cities, widgets::get_widget_weather, widgets::get_widget_forecast, widgets::get_widget_air_quality, widgets::get_widget_stock_watchlist, widgets::get_widget_stocks, widgets::save_desktop_widget_content,
             widgets::list_custom_widgets, widgets::save_custom_widget, widgets::remove_custom_widget,
+            widget_preview::widget_preview_report,
             reminders::get_care_settings, reminders::configure_care, reminders::upsert_care_rule, reminders::delete_care_rule,
             reminders::preview_care_rule, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
             reminders::snooze_care, reminders::care_synthesize, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,
@@ -920,6 +922,7 @@ fn main() {
         .register_uri_scheme_protocol("chat-preview", |context, request| chat_preview::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("design-preview", |context, request| design::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
+        .manage(widget_preview::State::default())
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
             if label.starts_with("baidu-auth-") { invoke.resolver.reject("授权页面没有原生命令权限"); return true; }
@@ -929,7 +932,7 @@ fn main() {
                 invoke.resolver.reject("只能在聊天和声音设置中使用语音识别");
                 return true;
             }
-            let allowed=community::invocation_permission(label,command).or_else(||configuration_window::permitted(label,command)).or_else(||design_window::permitted(label,command)).or_else(||capture_editor::permitted(label,command)).or_else(||companion_dialogue::permitted(label,command)).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
+            let allowed=widget_preview::permitted(label,command).or_else(||community::invocation_permission(label,command)).or_else(||configuration_window::permitted(label,command)).or_else(||design_window::permitted(label,command)).or_else(||capture_editor::permitted(label,command)).or_else(||companion_dialogue::permitted(label,command)).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if matches!(command, "get_network_config" | "save_network_config" | "test_network_connection") { return label=="control"; }
                 if matches!(command, "reset_screen_capture_permission" | "open_screen_capture_settings") { return label=="control"; }
                 // 资料库 is managed from the console; 超级小伴 may only save into it (see float_assistant's shared list).
@@ -965,6 +968,17 @@ fn main() {
                 }
             }
             app.manage(chat::ChatState::new(app.handle()));
+            if std::env::args().any(|arg| arg == "--smoke-test")
+                && std::env::var_os("XIAOBAN_WIDGET_PREVIEW_SMOKE").is_some()
+            {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    let result = widget_preview::smoke(&handle);
+                    eprintln!("Widget preview smoke: {result:?}");
+                    handle.exit(i32::from(result.is_err()));
+                });
+                return Ok(());
+            }
             chat::goals::resume_pending(app.handle());
             phone_link::start(app.handle());
             voice_service::start(app.handle());

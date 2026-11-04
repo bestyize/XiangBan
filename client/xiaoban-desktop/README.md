@@ -322,6 +322,10 @@ Canvas 运行在独立的低权限壁纸窗口和 opaque-origin iframe 中，不
 
 `game_read_format` 与 `widget_read_format` 在格式规范之后附带创作手册（[游戏](docs/craft/game.md)、[小组件](docs/craft/widget.md)），写明风格方向、层级配色、手感反馈、完整流程与交付前自查；手册只约束创作质量，不改变宿主校验。
 
+桌面小组件草稿可先用 `widget_preview` 在同一组件沙箱里运行，工具返回截图、短时脚本异常和可选的填写、点击、可见性检查结果。用 `widget_read` 按模板 id 读回已有原稿，修改后覆盖同 id 时可保留桌面实例。网页壁纸创作默认保存到壁纸库，先预览，用户要求换上时再应用。
+
+组件原生预览验证可在开发前端运行时执行 `XIAOBAN_WIDGET_PREVIEW_SMOKE=1 xiaoban-desktop --smoke-test`。测试使用隔离数据目录，检查日期输入、按钮、实际截图和启动白屏的异常。
+
 自定义及第三方服务商使用 Responses / Anthropic 协议时，可在配置弹窗的“高级设置”单独设置单次输出上限（1024–131072 token）；留空优先读取模型目录可选的 `maxOutputTokens`（自动最多 32768），未知模型保守使用 8192，不根据模型名称猜测能力。显式设置仍受模型声明上限和上下文一半的约束，真实请求与上下文预留使用同一有效预算。更换模型、地址或协议时恢复自动；目录更新更换推荐模型时也会清除旧设置。小伴 AI 继续采用保守预算；Chat Completions 保留端点默认输出参数，暂不提供此控件。旧配置可直接读取。
 
 针对性验证：`npx vitest run src/ui/chat/view.test.ts src/ui/chat/chat-store.test.ts src/ui/components/AiConfigCard.test.ts`、`npx vue-tsc --noEmit`；原生运行 `cargo test --manifest-path src-tauri/Cargo.toml --locked --bin xiaoban-desktop chat::`、相同命令筛选 `ai_config::` 与 `ai_catalogue::`。内核回归测试在仓库根运行 `cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --features openai,anthropic --test truncation --test guards --test anthropic --test responses --test openai_http`，使用脚本模型与本地假服务，不消耗生产模型额度。

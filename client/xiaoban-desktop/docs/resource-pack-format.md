@@ -110,17 +110,15 @@ manifest 字段：
 | `description` | 否 | 一句话介绍，最多 80 个字 |
 | `width` | 否 | 默认宽度，100 到 800 像素，默认 280 |
 | `height` | 否 | 默认高度，80 到 800 像素，默认 240 |
-| `theme` | 否 | 底板风格：`transparent` 透明无底（默认）、`glass` 毛玻璃、`paper` 纸张 |
+| `theme` | 否 | 兼容字段，接受 `transparent`（默认）、`glass`、`paper`。组件背景由 `index.html` 绘制。 |
 
 `index.html` 不超过 128 KB，单个自包含页面，要求：
 
 - 在 `width × height` 里自适应，不出现滚动条。应用会给页面加上 `html, body { margin: 0; overflow: hidden }`。
-- 默认透明无底：`html`、`body` 不要画铺满的背景，只在用户需要时才加底板。
+- `html`、`body` 背景保持透明。默认按组件用途设计背景，画在内部内容容器上，外沿保留透明留白。用户指定的外观优先。
 - 不引用外部资源，不依赖联网。
 
-组件运行在 `sandbox="allow-scripts"` 的 iframe 里，没有同源权限，所以和壁纸一样不能用 `localStorage`、cookie、IndexedDB。
-
-> **脚本的已知限制。** 组件通过 `srcdoc` 嵌入应用页面，会继承应用的内容安全策略（`script-src 'self'`）。在浏览器里用同样的策略实测，这种子框架里的内联 `<script>` 不会执行，去掉策略则可以执行。这一点还没有在打包后的应用里实测过。需要交互时，先用纯 HTML 和 CSS 实现（`:hover`、`:checked`、`<details>`、CSS 动画），要用脚本的组件请在应用里放出来确认能跑再分享。
+组件在独立页面的 `sandbox="allow-scripts"` iframe 中运行。内联脚本可以执行，页面没有同源权限，不能使用 `localStorage`、`sessionStorage`、Cookie 或 IndexedDB。发布前在组件沙箱预览首屏，并检查一次主要操作。
 
 已有同 `id` 的自创组件时拒绝导入，最多加载 40 个自创组件。
 

@@ -1,4 +1,12 @@
 import {installCustomAppearance} from './custom-appearance.ts';
+import {installWidgetProbe, type WidgetCheck} from './preview-probe.ts';
+
+export function customWidgetShell(desktop: boolean): string {
+  if (!desktop) return '/widgets/sandbox.html';
+  return navigator.userAgent.includes('Windows')
+    ? 'http://wallpaper-asset.localhost/widget-sandbox'
+    : 'wallpaper-asset://localhost/widget-sandbox';
+}
 
 // This function runs inside the opaque-origin iframe; keep it self-contained.
 export function installCustomDrag() {
@@ -44,7 +52,7 @@ export function installCustomDrag() {
   document.addEventListener('dragstart', event => { if (pointer) event.preventDefault(); }, true);
 }
 
-export function customWidgetDocument(html: string, draggable: boolean): string {
+export function customWidgetDocument(html: string, draggable: boolean, checks?: WidgetCheck[]): string {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const style = doc.createElement('style');
   style.textContent = 'html,body{margin:0!important;padding:0!important;overflow:hidden!important;width:100%!important;height:100%!important;background:transparent!important}';
@@ -56,6 +64,12 @@ export function customWidgetDocument(html: string, draggable: boolean): string {
     const script = doc.createElement('script');
     script.textContent = `(${installCustomDrag.toString()})();`;
     doc.head.prepend(script);
+  }
+  if (checks) {
+    const probe = doc.createElement('script');
+    const args = JSON.stringify(checks).replaceAll('<', '\\u003c');
+    probe.textContent = `(${installWidgetProbe.toString()})(${args});`;
+    doc.head.prepend(probe);
   }
   return '<!DOCTYPE html>' + doc.documentElement.outerHTML;
 }

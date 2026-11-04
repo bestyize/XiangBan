@@ -131,6 +131,74 @@ pub fn validate(pack: &Value) -> Result<(), String> {
     Ok(())
 }
 
+/// Whether a CSS background value draws nothing.
+fn clear_background(value: &str) -> bool {
+    let value = value.trim().trim_end_matches("!important").trim().to_ascii_lowercase();
+    if ["transparent", "none", "inherit", "initial", "unset", ""].contains(&value.as_str()) || value.starts_with("var(") {
+        return true;
+    }
+    let alpha = |inner: &str| inner.rsplit([',', '/']).next().map(str::trim).is_some_and(|a| a.trim_end_matches('%').parse::<f64>().is_ok_and(|a| a == 0.0));
+    ["rgba(", "hsla(", "rgb(", "hsl("].iter().any(|f| value.strip_prefix(f).and_then(|v| v.strip_suffix(')')).is_some_and(|inner| (inner.contains(',') && inner.split(',').count() == 4 || inner.contains('/')) && alpha(inner)))
+}
+
+/// Report common HTML incompatibilities for the assistant's preview and save tools.
+pub(crate) fn widget_html_problems(html: &str) -> Vec<String> {
+    let lower = html.to_ascii_lowercase();
+    let mut problems = Vec::new();
+    if lower.contains("-webkit-app-region") {
+        problems.push("不要使用 -webkit-app-region：宿主已经提供按住空白处拖动".to_string());
+    }
+    if lower.contains("__tauri") || lower.contains("@tauri-apps") {
+        problems.push("不要直接调用 Tauri，组件在沙盒里运行".to_string());
+    }
+    for storage in ["localStorage", "sessionStorage"] {
+        let accesses_storage = html.match_indices(storage).any(|(start, _)| {
+            let preceding = html[..start].chars().next_back();
+            let suffix = html[start + storage.len()..].trim_start();
+            !preceding.is_some_and(|c| c.is_alphanumeric() || matches!(c, '_' | '$'))
+                && (suffix.starts_with('.') || suffix.starts_with('[') || suffix.starts_with("?."))
+        });
+        if accesses_storage {
+            problems.push(format!(
+                "组件沙箱禁止访问 {storage}，读取或写入都会抛错。请用内存保存本次输入，让首次界面直接可见，提交有效数据后立即更新界面。"
+            ));
+        }
+    }
+    let mut opaque = |what: &str, declarations: &str| {
+        for declaration in declarations.split(';') {
+            let Some((property, value)) = declaration.split_once(':') else { continue };
+            let property = property.trim();
+            if (property == "background" || property == "background-color") && !clear_background(value) {
+                problems.push(format!("{what} 的背景是 `{}`。请让 html、body 保持透明，把组件背景画在内部容器上。", value.trim()));
+                return;
+            }
+        }
+    };
+    let mut rest = lower.as_str();
+    while let Some(start) = rest.find("<style") {
+        let after = &rest[start..];
+        let Some(open) = after.find('>') else { break };
+        let end = after.find("</style").unwrap_or(after.len());
+        let css = &after[(open + 1).min(end)..end];
+        let mut selector_start = 0;
+        while let Some(brace) = css[selector_start..].find('{').map(|i| i + selector_start) {
+            let Some(close) = css[brace..].find('}').map(|i| i + brace) else { break };
+            let selector = css[selector_start..brace].rsplit("*/").next().unwrap_or("");
+            if let Some(page) = selector.split(',').map(str::trim).find(|s| *s == "html" || *s == "body" || *s == ":root") {
+                opaque(page, &css[brace + 1..close]);
+            }
+            selector_start = close + 1;
+        }
+        rest = &after[end..];
+    }
+    if let Some(tag) = lower.find("<body").map(|i| &lower[i..]).and_then(|t| t.split_once('>').map(|(tag, _)| tag)) {
+        if let Some(style) = tag.split_once("style=").map(|(_, v)| v.trim_start_matches(['"', '\'']).split(['"', '\'']).next().unwrap_or("")) {
+            opaque("body", style);
+        }
+    }
+    problems
+}
+
 /// Loads all user custom widget packs from `directory`, in file-name order.
 pub fn load_user(directory: &Path) -> Vec<Value> {
     let mut list = Vec::new();

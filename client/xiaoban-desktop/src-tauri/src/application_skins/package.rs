@@ -389,6 +389,7 @@ pub(super) fn format_guide() -> Value {
         "scope":"小伴主窗口的背景场景与装饰图层；不改变桌面壁纸、桌宠、控件布局。theme.json 配色暂不生效，不承诺改变按钮或文字配色。",
         "workflow":["先 skin_read_format，无需用户提供样例或到源码目录找规范", "已有图片可直接 skin_create(background_image)，自动生成配置和预览图", "需要多图层时在工作区子目录制作下面的完整文件，再 skin_create(source_dir)", "原生打包并用导入器校验，安装到装扮→皮肤，并在工作区交付 ZIP", "创建不改变当前皮肤；用户要求换肤时先 skin_list，再 skin_apply；导出已有自制皮肤用 skin_export"],
         "background_image":"generated:<image_generate 返回的图片 id>，或当前工作区内的相对 PNG/JPEG/WebP 文件路径。不要传外链、绝对路径或 base64。工具自动生成 WebP 背景与 preview.webp；图片生成失败时可使用工作区已有或自行绘制的栅格图片，不要伪造图片编号。",
+        "composition":"先根据用户主题和窗口内容安排主体与留白。背景按 cover 裁切，主体关键部分放在宽窄窗口都能保住的区域。侧栏、正文和输入区附近用安静的底色或低对比纹理。对照实际皮肤预览检查宽窄尺寸下的主体裁切、文字可读性和交互物件遮挡。ZIP 校验只确认格式和素材可导入，预览未检查时如实说明。",
         "create_example":{"id":"earth-pulse","name":"地球脉动","background_image":"earth.png"},
         "source_dir_example":{"source_dir":"earth-skin"},
         "files":{

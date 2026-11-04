@@ -28,7 +28,10 @@ describe('custom widget isolated shell',()=>{
   expect(rust).toContain(`.header("Content-Security-Policy","${csp}")`);
   expect(rust).toContain('include_bytes!("../../public/widgets/sandbox.html")');
   const config=JSON.parse(readFileSync('src-tauri/tauri.conf.json','utf8'));
-  expect(config.app.security.csp).toContain("script-src 'self';");
+  const hostScripts=config.app.security.csp.split(';').find((directive:string)=>directive.trim().startsWith('script-src '))!.trim().split(/\s+/);
+  expect(hostScripts).toContain("'self'");
+  expect(hostScripts).not.toContain("'unsafe-inline'");
+  expect(hostScripts).not.toContain("'unsafe-eval'");
  });
  it('verifies builtin pelican-bike widget pack validity and safe sandbox embedding',()=>{
   const pelicanJson = JSON.parse(readFileSync('public/widgets/pelican-bike.json', 'utf8'));

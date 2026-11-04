@@ -66,7 +66,7 @@ pub(super) const FEATURES: &[Feature] = &[
         does: "选用或创作粒子类桌面特效。", by_hand: "", tools: &["effect_list", "effect_set", "effect_monitor_set", "effect_create", "effect_delete", "effect_read_format"] },
     Feature { id: "widget", name: "桌面组件", path: "侧栏「装扮」→「组件」", page: Some(("studio", Some("widgets"))),
         does: "放置、移动、缩放、隐藏、移除时钟/天气/待办/日程/股票/木鱼/月历/纪念日组件；待办条目（增加、标记完成）、纪念日（标题、日期、倒数或已过去、每年重复）、今日日程、股票自选的内容也能直接设置（widget_add / widget_update 的 content）；还能创作自定义组件；可设层级：置顶（始终浮在其他窗口上方）或贴桌面，层级会保存，重启后仍保持，不是临时的。",
-        by_hand: "", tools: &["widget_list", "widget_add", "widget_update", "widget_remove", "widget_read_format", "widget_create", "widget_delete_custom"] },
+        by_hand: "", tools: &["widget_list", "widget_add", "widget_update", "widget_remove", "widget_read_format", "widget_preview", "widget_read", "widget_create", "widget_delete_custom"] },
     Feature { id: "pet", name: "桌面伙伴（宠物）", path: "侧栏「装扮」→「伙伴」", page: Some(("studio", Some("pets"))),
         does: "添加多只桌面宠物，换形象、改表情、位置、大小、层级（置顶/贴桌面，会保存、重启后仍保持），创作新的宠物主题；盆栽小伴的显示、表情和外壳。",
         by_hand: "", tools: &["pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove", "companion_set"] },

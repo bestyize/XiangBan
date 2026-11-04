@@ -5,6 +5,7 @@
 //! The tools talk to a `Desktop`, so they can be tested without a running app.
 
 use super::community;
+use crate::custom_widgets::widget_html_problems;
 use crate::preferences::{EXPRESSIONS, SKINS};
 use crate::reminders::Rule;
 use agent_kernel::{Risk, Tool, ToolCtx, ToolSpec};
@@ -66,6 +67,12 @@ pub trait Desktop: Send + Sync {
     fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String>;
     fn widget_remove(&self, id: &str) -> Result<(), String>;
     fn custom_widgets(&self) -> Result<Value, String>;
+    fn read_custom_widget(&self, id: &str) -> Result<Value, String> {
+        self.custom_widgets()?.as_array().and_then(|items| items.iter().find(|item| item["id"].as_str() == Some(id))).cloned().ok_or_else(|| format!("未找到组件模板「{id}」，可用 widget_list 查看。"))
+    }
+    fn preview_widget(&self, _: crate::widget_preview::Request, _: &ToolCtx) -> Result<crate::widget_preview::Preview, String> {
+        Err("当前宿主无法运行组件预览".into())
+    }
     fn create_custom_widget(&self, pack:&Value, place_now:bool, overwrite:bool)->Result<Value,String>;
     fn delete_custom_widget(&self, id: &str) -> Result<(), String>;
     fn games(&self) -> Result<Value, String>;
@@ -290,6 +297,16 @@ impl Desktop for TauriDesktop {
         Ok(json!(crate::custom_widgets::load_all(&root.join("custom_widgets"))))
     }
 
+    fn read_custom_widget(&self, id: &str) -> Result<Value, String> {
+        let root = crate::storage::root(&self.app)?;
+        crate::custom_widgets::find(&root.join("custom_widgets"), id)
+            .ok_or_else(|| format!("未找到组件模板「{id}」，可用 widget_list 查看。"))
+    }
+
+    fn preview_widget(&self, request: crate::widget_preview::Request, ctx: &ToolCtx) -> Result<crate::widget_preview::Preview, String> {
+        crate::widget_preview::run(&self.app, request, ctx)
+    }
+
     fn create_custom_widget(&self,pack:&Value,place_now:bool,overwrite:bool)->Result<Value,String>{
         let root=crate::storage::root(&self.app)?;
         let dir=root.join("custom_widgets");
@@ -443,16 +460,16 @@ fn wallpaper_create(desktop: &dyn Desktop, args: &Value) -> Result<String, Strin
     let title = text_arg(args, "title")?;
     let html = text_arg(args, "html")?;
     let description = optional_text(args, "description")?;
-    let apply_now = optional_bool(args, "apply_now")?.unwrap_or(true);
+    let apply_now = optional_bool(args, "apply_now")?.unwrap_or(false);
 
     let res = desktop.create_wallpaper(title, description, html, apply_now)?;
     let id = res["id"].as_str().unwrap_or_default();
     let applied_msg = if res["applied"].as_bool().unwrap_or(false) {
         "，并已立即应用为当前桌面壁纸"
     } else {
-        "（可在壁纸库随时选用）"
+        "（可在壁纸库预览和选用）"
     };
-    Ok(format!("已成功创作动态网页壁纸「{title}」（id: {id}）{applied_msg}。"))
+    Ok(format!("已保存动态网页壁纸「{title}」（id: {id}）{applied_msg}。请在壁纸预览中检查画面与主要交互。"))
 }
 
 fn wallpaper_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
@@ -694,19 +711,29 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
         let scale = w["scale"].as_f64().unwrap_or(1.0);
         let enabled = w["enabled"].as_bool().unwrap_or(true);
         let city = w.get("city").and_then(|c| c.get("name")).and_then(Value::as_str).map(|n| format!(" | 城市: {n}")).unwrap_or_default();
-        let state = if enabled { "显示中" } else { "已隐藏" };
+        let state = if enabled { "已启用" } else { "已隐藏" };
         let layer = if w["layer"].as_str() == Some("topmost") { "始终置顶" } else { "贴桌面" };
-        lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state} | {layer} | 位置 ({}, {}) | 显示器 {}", widget_kind_label(kind), widget_theme_label(theme), w["x"], w["y"], w["monitor"]));
+        let template = w["customId"].as_str().map(|id| format!(" | 模板: {id}")).unwrap_or_default();
+        lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state} | {layer} | 位置 ({}, {}) | 显示器 {}{template}", widget_kind_label(kind), widget_theme_label(theme), w["x"], w["y"], w["monitor"]));
         lines.extend(super::widget_content::summary(w));
     }
     let templates = desktop.custom_widgets()?;
     if let Some(templates) = templates.as_array().filter(|items| !items.is_empty()) {
+        lines.push("组件的启用和位置是布局状态，实际内容请在组件预览或桌面上核验。".into());
         lines.push("自创组件模板（放到桌面用 widget_add(kind=\"custom\", custom_id=行首的 id)，删除模板用 widget_delete_custom）：".into());
         for template in templates {
             lines.push(format!("{} | {}", template["id"].as_str().unwrap_or("?"), template["name"].as_str().unwrap_or("自创组件")));
         }
     }
     Ok(lines.join("\n"))
+}
+
+fn widget_read(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+    let id = text_arg(args, "id")?;
+    if !crate::custom_widgets::valid_widget_id(id) {
+        return Err("组件模板 id 无效，请用 widget_list 查找模板 id。".into());
+    }
+    Ok(desktop.read_custom_widget(id)?.to_string())
 }
 
 fn widget_content_schema() -> Value {
@@ -837,62 +864,6 @@ fn widget_remove(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     Ok(format!("已从桌面移除组件 {id}"))
 }
 
-/// Whether a CSS background value draws nothing.
-fn clear_background(value: &str) -> bool {
-    let value = value.trim().trim_end_matches("!important").trim().to_ascii_lowercase();
-    if ["transparent", "none", "inherit", "initial", "unset", ""].contains(&value.as_str()) || value.starts_with("var(") {
-        return true;
-    }
-    let alpha = |inner: &str| inner.rsplit([',', '/']).next().map(str::trim).is_some_and(|a| a.trim_end_matches('%').parse::<f64>().is_ok_and(|a| a == 0.0));
-    ["rgba(", "hsla(", "rgb(", "hsl("].iter().any(|f| value.strip_prefix(f).and_then(|v| v.strip_suffix(')')).is_some_and(|inner| (inner.contains(',') && inner.split(',').count() == 4 || inner.contains('/')) && alpha(inner)))
-}
-
-/// The widget rules a page can be checked against before it is saved (see `WIDGET_FORMAT`). Only what is clearly
-/// wrong: drag regions or Tauri the host already provides, and a background drawn on the whole page.
-fn widget_html_problems(html: &str) -> Vec<String> {
-    let lower = html.to_ascii_lowercase();
-    let mut problems = Vec::new();
-    if lower.contains("-webkit-app-region") {
-        problems.push("不要使用 -webkit-app-region：宿主已经提供按住空白处拖动".to_string());
-    }
-    if lower.contains("__tauri") || lower.contains("@tauri-apps") {
-        problems.push("不要直接调用 Tauri，组件在沙盒里运行".to_string());
-    }
-    let mut opaque = |what: &str, declarations: &str| {
-        for declaration in declarations.split(';') {
-            let Some((property, value)) = declaration.split_once(':') else { continue };
-            let property = property.trim();
-            if (property == "background" || property == "background-color") && !clear_background(value) {
-                problems.push(format!("{what} 的背景是 `{}`：页面和主体要保持透明，需要底板时画在组件内容里", value.trim()));
-                return;
-            }
-        }
-    };
-    let mut rest = lower.as_str();
-    while let Some(start) = rest.find("<style") {
-        let after = &rest[start..];
-        let Some(open) = after.find('>') else { break };
-        let end = after.find("</style").unwrap_or(after.len());
-        let css = &after[(open + 1).min(end)..end];
-        let mut selector_start = 0;
-        while let Some(brace) = css[selector_start..].find('{').map(|i| i + selector_start) {
-            let Some(close) = css[brace..].find('}').map(|i| i + brace) else { break };
-            let selector = css[selector_start..brace].rsplit("*/").next().unwrap_or("");
-            if let Some(page) = selector.split(',').map(str::trim).find(|s| *s == "html" || *s == "body" || *s == ":root") {
-                opaque(page, &css[brace + 1..close]);
-            }
-            selector_start = close + 1;
-        }
-        rest = &after[end..];
-    }
-    if let Some(tag) = lower.find("<body").map(|i| &lower[i..]).and_then(|t| t.split_once('>').map(|(tag, _)| tag)) {
-        if let Some(style) = tag.split_once("style=").map(|(_, v)| v.trim_start_matches(['"', '\'']).split(['"', '\'']).next().unwrap_or("")) {
-            opaque("body", style);
-        }
-    }
-    problems
-}
-
 fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     let id = text_arg(args, "id")?;
     let name = text_arg(args, "name")?;
@@ -925,11 +896,11 @@ fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     }
     let res = desktop.create_custom_widget(&pack, place_now, overwrite)?;
     let placed_msg = if res["placed"].as_bool().unwrap_or(false) {
-        "，并已直接添加到桌面上展示"
+        "，已添加到桌面"
     } else {
         "（未自动放置到桌面，可在组件库随时添加）"
     };
-    Ok(format!("已成功创建小组件「{name}」（id: {id}）{placed_msg}。"))
+    Ok(format!("已保存小组件「{name}」（id: {id}）{placed_msg}。请在实际组件沙箱中核验首屏可见和主要操作可用，再向用户确认显示效果。"))
 }
 
 fn widget_delete_custom(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
@@ -1047,7 +1018,7 @@ fn game_create(desktop: &dyn Desktop, args: &Value, workspace: &std::path::Path)
     let made = desktop.create_game(id, name, description, &files, save, overwrite)?;
     let replaced = if made["replaced"].as_bool().unwrap_or(false) { "（已覆盖同 id 的旧版本）" } else { "" };
     let saves = if save { "，已启用本机存档" } else { "" };
-    Ok(format!("已保存游戏「{name}」（id: {id}）{replaced}{saves}，共 {} 个文件。游戏还没有打开，需要试玩时调用 game_open(id: \"{id}\")。", files.len() + 1))
+    Ok(format!("已保存游戏「{name}」（id: {id}）{replaced}{saves}，共 {} 个文件。请用 game_open(id: \"{id}\") 试玩一个代表性流程，再确认实际玩法。", files.len() + 1))
 }
 
 fn game_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
@@ -1082,11 +1053,12 @@ fn game_read_format(_: &dyn Desktop, _: &Value) -> Result<String, String> {
 
 /// What `widget_read_format` returns: the rules for a custom widget's HTML.
 const WIDGET_FORMAT: &str = "自定义小组件规范（小伴程序内置，无需查找本地文件）：\n\
-1. 形式：一个完整的自包含单文件 HTML（包含 <style>、DOM 结构与 <script> 逻辑），如番茄钟、极简时钟、每日诗词、倒数日、喝水提醒、趣味小工具。默认宽 280、高 240，内容在声明的 width、height 视口内自适应，避免横向溢出和滚动条。\n\
-2. 透明：宿主固定透明无底，不提供外壳主题、底板或纹理。html、body 背景透明，默认不绘制铺满组件的底板；仅在用户明确需要时，在组件内容中绘制底板。\n\
+1. 形式：一个完整的自包含 UTF-8 HTML，支持内联 <style>、<script>、SVG 和 data: 素材。组件模板连同 JSON 元数据最多 128 KiB。让它离线可用，不依赖 CDN、外部资源、fetch 或外部脚本。默认宽 280、高 240，内容在声明的 width、height 视口内自适应，避免横向溢出和滚动条。\n\
+2. 背景：默认根据组件的用途、信息密度和交互设计背景。把背景画在内部内容容器上，html、body 和外沿留白保持透明。优先遵循用户指定的风格、颜色和透明度。用户要求无底时可以省略背景。\n\
 3. 阴影：允许小范围、低透明度的柔和投影，建议 box-shadow:0 1px 3px -2px rgba(0,0,0,0.12)，filter:drop-shadow(0 1px 1px rgba(0,0,0,0.08))，周围留至少 4px 空间；避免大模糊、大偏移、多层外投影以及贴着视口边缘画阴影，防止被截断。\n\
 4. 裁切：宿主按声明的矩形视口裁切。角色头部、耳朵、蝴蝶结、突出装饰及动画最大位移都必须包含在视口内，并预留透明安全边距。绝对定位前确认实际的 position 容器；探出卡片的角色应以卡片为定位父级，并在整体视口中预留顶部空间，不能用负 top 让内容伸出整个视口，不能依赖 overflow:visible 越过 iframe 或窗口边界。\n\
-5. 拖动：宿主统一提供按住非交互区域拖动和位置保存，无需自行实现窗口拖拽；不要使用 Electron 的 -webkit-app-region 或直接调用 Tauri。按钮、输入框等使用语义化元素；自定义手势区域加 data-no-drag，保留可拖动的背景区域。";
+5. 拖动：宿主统一提供按住非交互区域拖动和位置保存，无需自行实现窗口拖拽；不要使用 Electron 的 -webkit-app-region 或直接调用 Tauri。按钮、输入框等使用语义化元素；自定义手势区域加 data-no-drag，保留可拖动的背景区域。\n\
+6. 沙箱与首屏：组件在独立、无同源权限的沙箱页面里运行。localStorage、sessionStorage、Cookie、IndexedDB 不可用。用户输入保存在当前组件页面的内存中，重载后需要重新输入。默认显示可操作的首屏或输入表单，校验成功后直接切换到结果。即使初始化脚本出错，也要有可见内容。";
 
 /// How to make a widget look good, returned after the rules so the model reads both before writing.
 const WIDGET_CRAFT: &str = include_str!("../../../docs/craft/widget.md");
@@ -1186,13 +1158,13 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "wallpaper_create",
-                "为用户创作一份全新的自包含 HTML 动态/交互桌面壁纸（或整屏桌面小游戏）。可编写单文件 HTML、CSS 与 JavaScript 脚本（支持 Canvas、WebGL、CSS 动效及动画循环），自动适应 100vw/100vh 屏幕尺寸。创作完成后会自动保存至本地壁纸库并去重，默认立即应用到当前桌面。",
+                "创作自包含的单文件 HTML 动态或交互壁纸（最多 4 MiB），可用 Canvas、WebGL、内联 CSS/JS。壁纸运行于隔离 iframe，不能用本地存储、Cookie、IndexedDB、弹窗或外层导航。作品应离线可用，不依赖外链或网络。用 100vw × 100vh 并处理 resize，主体避开桌面图标密集区，考虑不同屏幕比例，暂停不可见的动画。创作先保存到壁纸库，预览画面和交互后，用户要求换上时再用 wallpaper_apply。apply_now 默认 false。",
                 object(
                     json!({
                         "title": { "type": "string", "description": "动态壁纸标题（最多 48 字，如 水墨涟漪交互壁纸）" },
                         "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含完整的 <!DOCTYPE html>、<style>、Canvas/DOM 结构与动画逻辑）" },
                         "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
-                        "apply_now": { "type": "boolean", "description": "创作完成后是否立即应用为桌面壁纸，默认 true" },
+                        "apply_now": { "type": "boolean", "description": "是否立即应用为桌面壁纸。默认 false，用户明确要求立即换上时使用 true" },
                     }),
                     &["title", "html"],
                 ),
@@ -1324,12 +1296,13 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             ).risk(Risk::Write).self_managed().serial(),
             widget_add,
         ),
-        tool(&desktop, ToolSpec::new("widget_read_format", "读取自定义小组件的 HTML 规范（透明、阴影、裁切、拖动）。用 widget_create 创作前先调用；规范已内置在程序中。", none()).risk(Risk::Read).parallel(), widget_read_format),
+        tool(&desktop, ToolSpec::new("widget_read_format", "读取自定义小组件的 HTML 规范（背景设计、沙箱限制、首屏、裁切、拖动）。用 widget_create 创作前先调用；规范已内置在程序中。", none()).risk(Risk::Read).parallel(), widget_read_format),
+        tool(&desktop, ToolSpec::new("widget_read", "按 widget_list 返回的模板 id 读取完整组件原稿、尺寸与来源，用于修改已有自创组件。保留用户未要求修改的内容。内置组件作为参考时另存新 id。", object(json!({"id":{"type":"string"}}), &["id"])).risk(Risk::Read).parallel().max_output(160_000), widget_read),
         tool(
             &desktop,
             ToolSpec::new(
                 "widget_create",
-                "为用户创作一个新的自定义单文件 HTML 桌面小组件（番茄钟、每日诗词、倒数日等），默认宽 280、高 240，完成后默认放到桌面。先调用 widget_read_format 阅读透明、裁切、拖动等规范再写。",
+                "为用户创作自包含的单文件 HTML 桌面小组件，默认宽 280、高 240，默认按用途设计背景，保存后默认放到桌面。先调用 widget_read_format，再用 widget_preview 检查同一份草稿的首屏和主要操作。修改已放置的组件时用 widget_read 读回原稿，覆盖时传原 id、overwrite=true、place_now=false。",
                 object(
                     json!({
                         "id": { "type": "string", "description": "小组件英文标识（小写字母、数字、-、_，如 pomodoro-timer）" },
@@ -1518,6 +1491,8 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.computer_use_diagnose()?.to_string()) },
         ),
     ];
+    let preview_host = desktop.clone();
+    items.push(crate::widget_preview::tool(move |request, ctx| preview_host.preview_widget(request, ctx)));
     if let Some(mgr) = desktop.delegation_manager() {
         items.extend(super::delegation_tools::tools(mgr, workspace));
     }
@@ -1719,7 +1694,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 50);
+        assert_eq!(names.len(), 52);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1729,7 +1704,7 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["app_guide", "care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "game_read_format", "pet_catalog", "pet_read_format", "skin_list", "skin_read_format", "wallpaper_list", "widget_list", "widget_read_format"]);
+        assert_eq!(read, vec!["app_guide", "care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "game_read_format", "pet_catalog", "pet_read_format", "skin_list", "skin_read_format", "wallpaper_list", "widget_list", "widget_preview", "widget_read", "widget_read_format"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
@@ -1922,6 +1897,7 @@ mod tests {
             "<style>body { background: rgba(0, 0, 0, 0) !important }</style>",
             "<style>:root{--c:#fff} body{background:var(--clear)}</style><body style=\"margin:0\">",
             "<style>/* body */ .body{background:#000}</style>",
+            "<div>localStorage</div><script>const my_localStorage = { value: 1 }; my_localStorage.value++;</script>",
         ];
         for html in ok {
             assert!(widget_html_problems(html).is_empty(), "{html}: {:?}", widget_html_problems(html));
@@ -1932,13 +1908,16 @@ mod tests {
             ("<body style=\"background:linear-gradient(#fff,#eee)\">", "body 的背景"),
             ("<style>.drag{-webkit-app-region:drag}</style>", "app-region"),
             ("<script>window.__TAURI__.core.invoke('x')</script>", "Tauri"),
+            ("<script>window.sessionStorage ?.getItem('birth')</script>", "sessionStorage"),
         ] {
             let problems = widget_html_problems(html).join("\n");
             assert!(problems.contains(fragment), "{html}: {problems}");
         }
         let fake = Arc::new(Fake::default());
-        let error = call(&fake, "widget_create", json!({"id": "card", "name": "卡片", "html": "<style>body{background:#fff}</style>"})).unwrap_err();
+        let html = "<form hidden>出生日期</form><script>const saved = localStorage.getItem('birth'); document.querySelector('form').hidden = !!saved;</script>";
+        let error = call(&fake, "widget_create", json!({"id": "card", "name": "卡片", "html": html, "overwrite": true})).unwrap_err();
         assert!(error.contains("没有保存") && error.contains("widget_read_format"), "{error}");
+        assert!(error.contains("localStorage") && error.contains("首次界面"), "{error}");
         assert!(fake.calls().is_empty(), "nothing is saved");
     }
 
@@ -2001,7 +1980,7 @@ mod tests {
         let fake = Arc::new(Fake::default());
         let out = call(&fake, "widget_list", json!({})).unwrap();
         assert!(out.contains("桌面当前放置了 2 个组件"));
-        assert!(out.contains("wgt-1 | 桌面时钟 (clock) | 暖白风格 (ivory) | 缩放 1.00 | 显示中"));
+        assert!(out.contains("wgt-1 | 桌面时钟 (clock) | 暖白风格 (ivory) | 缩放 1.00 | 已启用"));
         assert!(out.contains("wgt-2 | 天气时钟 (weather) | 暖白风格 (ivory) | 缩放 1.20 | 城市: 上海 | 已隐藏"));
     }
 
@@ -2023,8 +2002,16 @@ mod tests {
         for (kind, label) in [("notes", "待办事项"), ("countdown", "倒数日／纪念日"), ("woodfish", "电子木鱼")] {
             assert!(call(&fake, "widget_add", json!({"kind":kind})).unwrap().contains(label));
         }
-        *fake.templates.lock().unwrap_or_else(|e| e.into_inner()) = vec![json!({"id":"my-clock","name":"专注时钟"})];
-        assert!(call(&fake, "widget_list", json!({})).unwrap().contains("my-clock | 专注时钟"));
+        let original = json!({"id":"my-clock","name":"专注时钟","width":280,"height":160,"html":"<button id='start'>开始</button>"});
+        *fake.templates.lock().unwrap_or_else(|e| e.into_inner()) = vec![original.clone()];
+        fake.extra_widgets.lock().unwrap_or_else(|e| e.into_inner())
+            .push(json!({"id":"placed-clock","kind":"custom","customId":"my-clock"}));
+        let listed = call(&fake, "widget_list", json!({})).unwrap();
+        assert!(listed.lines().any(|line| line.starts_with("placed-clock |") && line.contains("模板: my-clock")));
+        assert!(listed.contains("my-clock | 专注时钟"));
+        let saved: Value = serde_json::from_str(&call(&fake, "widget_read", json!({"id":"my-clock"})).unwrap()).unwrap();
+        assert_eq!(saved, original);
+        assert!(call(&fake, "widget_read", json!({"id":"../my-clock"})).unwrap_err().contains("id 无效"));
         let all = tools(fake.clone());
         let add = all.iter().find(|tool| tool.spec().name == "widget_add").unwrap().spec();
         assert_eq!(add.schema["properties"]["kind"]["enum"], json!(crate::widgets::KINDS));
@@ -2061,7 +2048,10 @@ mod tests {
         let fake = Arc::new(Fake::default());
         let out = call(&fake, "widget_update", json!({"id": "wgt-1", "scale": 1.2, "enabled": false})).unwrap();
         assert_eq!(out, "已更新桌面组件 wgt-1");
-        assert_eq!(fake.calls(), vec![r#"widget-update wgt-1 {"enabled":false,"scale":1.2}"#]);
+        let calls = fake.calls();
+        assert_eq!(calls.len(), 1);
+        let patch: Value = serde_json::from_str(calls[0].strip_prefix("widget-update wgt-1 ").unwrap()).unwrap();
+        assert_eq!(patch, json!({"enabled":false,"scale":1.2}));
 
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1", "scale": 0.5})).unwrap_err().contains("缩放范围"));
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1", "x": 1.5})).unwrap_err().contains("x 坐标范围"));
@@ -2277,7 +2267,7 @@ mod tests {
             }),
         )
         .unwrap();
-        assert!(res.contains("已成功创作动态网页壁纸「水墨涟漪交互壁纸」"));
+        assert!(res.contains("已保存动态网页壁纸「水墨涟漪交互壁纸」"));
         assert!(res.contains("并已立即应用为当前桌面壁纸"));
         assert_eq!(fake.calls(), vec!["create-wallpaper 水墨涟漪交互壁纸 apply_now=true"]);
 
@@ -2286,12 +2276,11 @@ mod tests {
             "wallpaper_create",
             json!({
                 "title": "星空桌面",
-                "html": "<html><body>stars</body></html>",
-                "apply_now": false
+                "html": "<html><body>stars</body></html>"
             }),
         )
         .unwrap();
-        assert!(res_no_apply.contains("可在壁纸库随时选用"));
+        assert!(res_no_apply.contains("可在壁纸库预览和选用"));
         assert_eq!(fake.calls()[1], "create-wallpaper 星空桌面 apply_now=false");
     }
 
