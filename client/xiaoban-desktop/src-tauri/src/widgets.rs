@@ -3,7 +3,7 @@ use crate::care_weather::{City, Weather};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{collections::HashMap, fs, io::Read, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -312,9 +312,17 @@ pub fn start(app: &tauri::AppHandle) {
     match result { Ok(layout)=>*state.layout.lock().unwrap_or_else(|e| e.into_inner())=layout,Err(error)=>*state.load_error.lock().unwrap_or_else(|e| e.into_inner())=Some(error) }
     sync(app);
     let app=app.clone();std::thread::spawn(move||{
-        let mut previous=String::new();
+        let mut previous = Vec::new();
         loop{std::thread::sleep(std::time::Duration::from_secs(3));
-            if let Ok(areas)=monitors(&app){let signature=serde_json::to_string(&areas).unwrap_or_default();if signature!=previous{previous=signature;sync(&app);crate::effects::sync(&app);crate::content::sync(&app);}}
+            if let Ok(areas)=monitors(&app) {
+                if areas != previous {
+                    sync(&app);
+                    let _ = app.emit_to("control", "wallpaper-displays-changed", &areas);
+                    previous = areas;
+                    let handle = app.clone();
+                    tauri::async_runtime::spawn(crate::content::displays_changed(handle));
+                }
+            }
         }
     });
 }

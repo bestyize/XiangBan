@@ -71,10 +71,15 @@ export function useWallpaperWorkspace(store: ControlStore) {
     if(!result.library.items.some(item=>item.definition.id === result.id && item.installed)) throw new Error("下载未完成校验，请重试");
     store.library=result.library; prepared.set(key,result.id); return result.id;
   }
-  async function action(apply: boolean, preview = false) {
+  async function action(apply: boolean, preview = false, monitor?: string) {
     const chosen=selection.value; if(!chosen || busy.value) return;
     const options=cloneOptions(draft.value); progress.value=null; progressId=chosen.source === "local" ? chosen.item.definition.id : prepared.get(chosen.item.id) || chosen.item.desktop_id; busy.value=true;
-    try { const id=await prepare(chosen); progressId=id; if(apply) await store.applyWallpaper(id,options,preview); else store.notify("已保存到我的壁纸","success"); }
+    try {
+      const id=await prepare(chosen); progressId=id;
+      if (!apply) store.notify("已保存到我的壁纸","success");
+      else if (preview || monitor === undefined) await store.applyWallpaper(id, options, preview);
+      else await store.applyWallpaper(id, options, false, monitor);
+    }
     catch(e) {if(String(e)===DOWNLOAD_CANCELLED) store.notify(DOWNLOAD_CANCELLED,"info"); else store.notify(e,"error");} finally {busy.value=false;progress.value=null;progressId=undefined;}
   }
   if(store.desktop && !store.info?.uiSmoke && tab.value === "online") {void load();void loadCategories();}

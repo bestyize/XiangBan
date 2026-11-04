@@ -14,6 +14,7 @@ export interface Settings {
   fps: 30 | 60;
   autostart: boolean;
   wallpaperId: string;
+  wallpaperMonitor?: string;
   wallpaperOptions: WallpaperOptions;
   catalogUrl: string;
   updateUrl: string;
@@ -304,6 +305,7 @@ export const defaults: Settings = {
   autostart: true,
   wallpaperId: "companion",
   wallpaperOptions: wallpaperDefaults,
+  wallpaperMonitor: "",
   catalogUrl: "",
   updateUrl: "https://wallpaper.xiangban.xyz/api/v1/desktop/updates",
   websiteUrl: "https://wallpaper.xiangban.xyz",

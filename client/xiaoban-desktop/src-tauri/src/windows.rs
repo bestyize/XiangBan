@@ -84,6 +84,14 @@ pub fn attach_wallpaper(
     attach_desktop(window, parent, *monitor.position(), monitor.size().width as i32, monitor.size().height as i32)
 }
 
+pub fn attach_wallpaper_area(
+    window: &tauri::WebviewWindow,
+    area: &crate::widget_geometry::MonitorArea,
+    parent: usize,
+) -> Result<usize, String> {
+    attach_desktop(window, parent, tauri::PhysicalPosition::new(area.x as i32, area.y as i32), area.width as i32, area.height as i32)
+}
+
 unsafe extern "system" fn find_icon_host(hwnd: HWND, data: LPARAM) -> i32 {
     let host=FindWindowExW(hwnd,null_mut(),wide("SHELLDLL_DefView").as_ptr(),std::ptr::null());
     if !host.is_null(){*(data as *mut HWND)=host;return 0;}1
@@ -280,7 +288,7 @@ pub fn drag_companion(window: &tauri::WebviewWindow) -> Result<(), String> {
 /// All desktop layers are siblings below Explorer's icon view. Reapply this order
 /// after a scene becomes visible, including when a newly downloaded wallpaper replaces one.
 pub fn order_desktop_layers(app: &tauri::AppHandle) -> Result<(), String> {
-    let mut labels: Vec<String> = ["media-a", "media-b"].into_iter().map(str::to_string).collect();
+    let mut labels = crate::content::labels(app);
     labels.extend(crate::effects::labels(app));
     labels.push("pet".into());
     for label in labels {
@@ -403,10 +411,8 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
             let under = unsafe { WindowFromPoint(cursor) };
             let desktop = ["WorkerW", "Progman", "SysListView32", "SHELLDLL_DefView"]
                 .contains(&class_name(under).as_str());
-            for label in ["pet", "wallpaper", "media-a", "media-b"] {
-                let Some(window) = app.get_webview_window(label) else {
-                    continue;
-                };
+            for (label, window) in app.webview_windows() {
+                if label != "pet" && label != "wallpaper" && !crate::content::is_wallpaper(&label) { continue; }
                 let Ok(native) = window.hwnd() else {
                     continue;
                 };
@@ -424,7 +430,7 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
                     released,
                     desktop: desktop || under == hwnd,
                 };
-                if crate::content::media_label(label) { crate::content::send_cursor(&window, &sample); }
+                if crate::content::is_wallpaper(&label) { crate::content::send_cursor(&window, &sample); }
                 else { let _ = window.emit("desktop-cursor", sample); }
                 if label == "wallpaper" && ticks % 60 == 0 {
                     let parent = unsafe { GetParent(hwnd) };

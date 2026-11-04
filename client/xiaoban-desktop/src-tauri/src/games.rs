@@ -197,7 +197,8 @@ async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Resul
     crate::widgets::sync(app);
     crate::reminders::set_game_active(app, true);
     let _ = app.emit("games-active", true);
-    let mut background_labels: Vec<String> = ["pet", "wallpaper", "media-a", "media-b", "media-preview"].into_iter().map(str::to_string).collect();
+    let mut background_labels: Vec<String> = ["pet", "wallpaper", "media-preview"].into_iter().map(str::to_string).collect();
+    background_labels.extend(crate::content::labels(app));
     background_labels.extend(crate::effects::labels(app));
     for label in &background_labels {
         app.state::<crate::DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove(label);
@@ -289,7 +290,7 @@ pub async fn smoke(app:&tauri::AppHandle)->Result<Value,String>{
     let before=crate::settings(app);
     let position=app.get_webview_window("pet").and_then(|w|w.outer_position().ok());
     open_selected(app, Some("falling-blocks".into())).await?;
-    if !is_active(app) || app.get_webview_window("pet").is_some() || app.get_webview_window("wallpaper").is_some() || app.get_webview_window("media-a").is_some() || app.get_webview_window("media-b").is_some(){return Err("游戏窗口未暂停背景".into());}
+    if !is_active(app) || app.get_webview_window("pet").is_some() || app.get_webview_window("wallpaper").is_some() || !crate::content::labels(app).is_empty(){return Err("游戏窗口未暂停背景".into());}
     let deadline=std::time::Instant::now()+std::time::Duration::from_secs(145);
     let report=loop {
         if let Some(report)=app.state::<GameState>().smoke_report.lock().unwrap_or_else(|e| e.into_inner()).clone(){break report;}

@@ -1,6 +1,8 @@
 use crate::{
     library::{self, Options, Wallpaper},
-    settings, DesktopState,
+    settings,
+    widget_geometry::{self, MonitorArea},
+    DesktopState,
 };
 use serde_json::{json, Value};
 use std::{
@@ -10,21 +12,31 @@ use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
-use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Default)]
 pub struct ContentState {
     pub operation: tauri::async_runtime::Mutex<()>,
-    pub active: Mutex<Option<Wallpaper>>,
-    pub label: Mutex<Option<String>>,
+    active: Mutex<Option<Wallpaper>>,
+    windows: Mutex<Vec<WallpaperWindow>>,
     pub reports: Mutex<BTreeMap<String, Value>>,
     pub io: Mutex<()>,
 }
+#[derive(Clone)]
+struct WallpaperWindow {
+    label: String,
+    area: MonitorArea,
+}
+
+fn active_windows(app: &tauri::AppHandle) -> Vec<WallpaperWindow> {
+    app.state::<ContentState>().windows.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
 pub fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(crate::storage::root(app)?.join("wallpapers"))
 }
 pub fn permitted(label: &str, command: &str) -> bool {
-    if ["export_resource_pack", "import_resource_pack"].contains(&command) { return label == "control"; }
+    if ["export_resource_pack", "import_resource_pack", "get_wallpaper_displays"].contains(&command) { return label == "control"; }
     if command.starts_with("tts_") { return label == "control"; }
     if command.contains("account") || command.starts_with("chat_") || command.starts_with("community_") || command.starts_with("phone_link_") || command.starts_with("speech_agent_") || command.starts_with("voice_service_") { return label == "control"; }
     if command.contains("website") || command.starts_with("fetch_site_") || ["select_site_wallpaper","download_site_wallpaper","cancel_site_download"].contains(&command) { return label == "control"; }
@@ -32,31 +44,61 @@ pub fn permitted(label: &str, command: &str) -> bool {
     if ["control", "pet", "wallpaper"].contains(&label) {
         return true;
     }
-    (["media-a", "media-b", "media-preview"].contains(&label) || crate::effects::is_effect(label)) && command == "scene_ready"
+    (media_label(label) || crate::effects::is_effect(label)) && command == "scene_ready"
 }
+
+pub fn is_wallpaper(label: &str) -> bool {
+    ["media-a", "media-b"].iter().any(|prefix| {
+        label == *prefix || label.strip_prefix(*prefix).and_then(|rest| rest.strip_prefix('-'))
+            .is_some_and(|index| !index.is_empty() && index.bytes().all(|byte| byte.is_ascii_digit()))
+    })
+}
+
 pub fn media_label(label: &str) -> bool {
-    ["media-a", "media-b", "media-preview"].contains(&label)
+    label == "media-preview" || is_wallpaper(label)
 }
 
-pub fn composing(app: &tauri::AppHandle) -> bool {
-    cfg!(windows) && app.state::<ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()).as_ref()
-        .is_some_and(|label| app.get_webview_window(label).is_some())
+pub fn labels(app: &tauri::AppHandle) -> Vec<String> {
+    app.webview_windows().into_keys().filter(|label| is_wallpaper(label)).collect()
 }
 
-fn composition(app: &tauri::AppHandle, preview: bool) -> Value {
+pub fn is_active_window(app: &tauri::AppHandle, label: &str) -> bool {
+    active_windows(app).iter().any(|window| window.label == label)
+}
+
+pub fn composing_on(app: &tauri::AppHandle, area: &MonitorArea) -> bool {
+    cfg!(windows) && active_windows(app).iter().any(|window| {
+        window.area.id == area.id && app.get_webview_window(&window.label).is_some()
+    })
+}
+
+pub fn companion_window(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
+    if !cfg!(windows) { return None; }
+    active_windows(app).into_iter().find(|window| window.area.primary)
+        .and_then(|window| app.get_webview_window(&window.label))
+}
+
+#[tauri::command]
+pub fn get_wallpaper_displays(app: tauri::AppHandle) -> Result<Vec<MonitorArea>, String> {
+    crate::widgets::monitors(&app)
+}
+
+fn composition(app: &tauri::AppHandle, area: Option<&MonitorArea>) -> Value {
     let config = settings(app);
-    let embedded = cfg!(windows) && !preview;
+    let embedded = area.filter(|_| cfg!(windows));
+    let overlay = embedded.is_some_and(|m| m.primary) && config.mode == "wallpaper" && config.companion_enabled;
+    let position = embedded.filter(|_| overlay).and_then(|m| {
+        let p = app.get_webview_window("pet")?.outer_position().ok()?;
+        Some(json!({"x":(f64::from(p.x)-m.x)/m.scale,"y":(f64::from(p.y)-m.y)/m.scale}))
+    });
+    let effects = embedded.map_or(Value::Null, |m| crate::effects::render_payload(app, m));
     let mut value = json!(config);
-    value["overlay"] = json!(embedded && config.mode == "wallpaper" && config.companion_enabled);
-    let monitor = app.primary_monitor().ok().flatten();
-    let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
-    let position = app.get_webview_window("pet").and_then(|w| w.outer_position().ok());
-    let position = position.zip(monitor).map(|(p, m)| json!({"x":(p.x-m.position().x) as f64 / scale,"y":(p.y-m.position().y) as f64 / scale}));
-    json!({"config":value,"effects":if embedded { crate::effects::render_payload(app) } else { Value::Null },"petPosition":position})
+    value["overlay"] = json!(overlay);
+    json!({"config":value,"effects":effects,"petPosition":position})
 }
 
-fn payload(app: &tauri::AppHandle, item: &Wallpaper, options: &Options, preview: bool) -> Value {
-    let composition = composition(app, preview);
+fn payload(app: &tauri::AppHandle, item: &Wallpaper, options: &Options, area: Option<&MonitorArea>) -> Value {
+    let composition = composition(app, area);
     json!({"item":{"id":item.id,"title":item.title,"kind":item.kind,"resourceUrl":library::asset_url(&item.resource),
         "assets":item.assets.iter().map(|(key,r)|(key.clone(),json!({"url":library::asset_url(r),"mime":r.mime}))).collect::<BTreeMap<_,_>>()},
         "options":render_options(app, &item.id, options),"config":composition["config"],"effects":composition["effects"],"petPosition":composition["petPosition"],
@@ -79,23 +121,18 @@ fn open(
     app: &tauri::AppHandle,
     item: &Wallpaper,
     options: &Options,
-    preview: bool,
-) -> Result<String, String> {
+    label: &str,
+    area: Option<&MonitorArea>,
+) -> Result<(), String> {
     let state = app.state::<ContentState>();
-    let label = if preview {
-        "media-preview"
-    } else if state.label.lock().unwrap_or_else(|e| e.into_inner()).as_deref() == Some("media-a") {
-        "media-b"
-    } else {
-        "media-a"
-    };
+    let preview = area.is_none();
     if let Some(old) = app.get_webview_window(label) {
         old.destroy().map_err(|e| e.to_string())?;
         // Destruction is dispatched to the UI thread; wait until Tauri removes the label before
         // reusing the preview window for the next online wallpaper.
         let deadline = Instant::now() + Duration::from_secs(3);
         while app.get_webview_window(label).is_some() {
-            if Instant::now() >= deadline { return Err("上一个壁纸预览仍在关闭，请稍后重试。".into()); }
+            if Instant::now() >= deadline { return Err("上一个壁纸窗口仍在关闭，请稍后重试。".into()); }
             std::thread::sleep(Duration::from_millis(10));
         }
     }
@@ -105,17 +142,8 @@ fn open(
         .unwrap()
         .remove(label);
     state.reports.lock().unwrap_or_else(|e| e.into_inner()).remove(label);
-    let monitor = app
-        .primary_monitor()
-        .map_err(|e| e.to_string())?
-        .ok_or("没有主显示器")?;
-    let scale = monitor.scale_factor();
     #[cfg(windows)]
-    let parent = if preview {
-        None
-    } else {
-        Some(crate::windows::desktop_parent()?)
-    };
+    let parent = area.map(|_| crate::windows::desktop_parent()).transpose()?;
     let mut builder = WebviewWindowBuilder::new(
         app,
         label,
@@ -136,27 +164,13 @@ fn open(
     .focused(preview)
     .initialization_script(format!(
         "window.__XIAOBAN_CONTENT__={};",
-        payload(app, item, options, preview)
-    ))
-    .inner_size(
-        if preview {
-            960.0
-        } else {
-            monitor.size().width as f64 / scale
-        },
-        if preview {
-            600.0
-        } else {
-            monitor.size().height as f64 / scale
-        },
-    );
-    if preview {
-        builder = builder.center();
+        payload(app, item, options, area)
+    ));
+    if let Some(area) = area {
+        builder = builder.inner_size(area.width / area.scale, area.height / area.scale)
+            .position(area.x / area.scale, area.y / area.scale);
     } else {
-        builder = builder.position(
-            monitor.position().x as f64 / scale,
-            monitor.position().y as f64 / scale,
-        );
+        builder = builder.inner_size(960.0, 600.0).center();
     }
     #[cfg(target_os = "macos")]
     let builder =
@@ -170,54 +184,93 @@ fn open(
         builder
     };
     let window = builder.build().map_err(|e| e.to_string())?;
-    if !preview {
-        #[cfg(windows)]
-        {
-            if let Err(error) = crate::windows::attach_wallpaper(&window, &monitor, parent.unwrap())
-            {
-                let _ = window.destroy();
-                return Err(error);
-            }
+    let result = (|| -> Result<(), String> {
+        #[cfg(target_os = "macos")]
+        crate::macos::configure_scene(&window, !preview, preview)?;
+        if let Some(area) = area {
+            #[cfg(windows)]
+            crate::windows::attach_wallpaper_area(&window, area, parent.unwrap())?;
+            #[cfg(target_os = "macos")]
+            crate::macos::place_widget(&window, area.x, area.y, area.width, area.height)?;
+            window.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
         }
-        if let Err(error) = window.set_ignore_cursor_events(true) {
-            let _ = window.destroy();
-            return Err(error.to_string());
-        }
-    }
-    #[cfg(target_os = "macos")]
-    if let Err(error) = crate::macos::configure_scene(&window, !preview, true) {
-        let _ = window.destroy();
-        return Err(error);
-    }
-    Ok(label.into())
+        Ok(())
+    })();
+    if result.is_err() { let _ = window.destroy(); }
+    result
 }
 
-fn wait(app: &tauri::AppHandle, label: &str) -> Result<(), String> {
+fn destroy(app: &tauri::AppHandle, label: &str) {
+    if let Some(window) = app.get_webview_window(label) { let _ = window.destroy(); }
+    app.state::<DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove(label);
+    app.state::<ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).remove(label);
+}
+
+fn open_wallpapers(
+    app: &tauri::AppHandle,
+    item: &Wallpaper,
+    options: &Options,
+    areas: &[&MonitorArea],
+) -> Result<Vec<WallpaperWindow>, String> {
+    if areas.is_empty() { return Err("没有找到显示器".into()); }
+    // Alternate labels so a replacement can finish loading while the old group is visible.
+    let bank = if active_windows(app).first().is_some_and(|window| window.label == "media-a") {
+        "media-b"
+    } else {
+        "media-a"
+    };
+    let mut windows: Vec<WallpaperWindow> = Vec::new();
+    for (index, area) in areas.iter().enumerate() {
+        let label = if index == 0 { bank.into() } else { format!("{bank}-{index}") };
+        if let Err(error) = open(app, item, options, &label, Some(area)) {
+            for window in &windows { destroy(app, &window.label); }
+            return Err(error);
+        }
+        windows.push(WallpaperWindow { label, area: (**area).clone() });
+    }
+    Ok(windows)
+}
+
+fn wait(app: &tauri::AppHandle, labels: &[String]) -> Result<(), String> {
     let deadline = Instant::now() + Duration::from_secs(25);
+    let state = app.state::<ContentState>();
+    let desktop = app.state::<DesktopState>();
     while Instant::now() < deadline {
-        if let Some(report) = app
-            .state::<ContentState>()
-            .reports
-            .lock()
-            .unwrap()
-            .get(label)
         {
-            if let Some(error) = report.get("error").and_then(Value::as_str) {
-                return Err(error.into());
+            let reports = state.reports.lock().unwrap_or_else(|e| e.into_inner());
+            for label in labels {
+                if let Some(error) = reports.get(label).and_then(|report| report["error"].as_str()) {
+                    return Err(error.into());
+                }
             }
         }
-        if app
-            .state::<DesktopState>()
-            .ready_scenes
-            .lock()
-            .unwrap()
-            .contains(label)
-        {
-            return Ok(());
-        }
+        let ready = desktop.ready_scenes.lock().unwrap_or_else(|e| e.into_inner());
+        if labels.iter().all(|label| ready.contains(label)) { return Ok(()); }
+        drop(ready);
         std::thread::sleep(Duration::from_millis(100));
     }
     Err("壁纸未在 25 秒内完成加载，已保留之前的壁纸。".into())
+}
+
+async fn wait_until_ready(app: &tauri::AppHandle, labels: Vec<String>) -> Result<(), String> {
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || wait(&handle, &labels)).await.map_err(|e| e.to_string())?
+}
+
+fn show(app: &tauri::AppHandle, windows: &[WallpaperWindow]) -> Result<(), String> {
+    for entry in windows {
+        let window = app.get_webview_window(&entry.label).ok_or("壁纸窗口已关闭")?;
+        window.show().map_err(|e| e.to_string())?;
+    }
+    #[cfg(windows)]
+    if !windows.is_empty() { crate::windows::order_desktop_layers(app)?; }
+    Ok(())
+}
+
+fn replace_windows(app: &tauri::AppHandle, windows: Vec<WallpaperWindow>) {
+    let state = app.state::<ContentState>();
+    let old = std::mem::replace(&mut *state.windows.lock().unwrap_or_else(|e| e.into_inner()), windows);
+    for window in old { destroy(app, &window.label); }
 }
 
 pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
@@ -238,18 +291,53 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
         return Err("壁纸缓存不完整，请重新应用壁纸。".into());
     }
     let options = library::validate_options(&item, config.wallpaper_options)?;
-    let label = open(app, &item, &options, false)?;
+    let displays = crate::widgets::monitors(app)?;
+    let areas = widget_geometry::targets(&displays, &config.wallpaper_monitor);
+    let windows = open_wallpapers(app, &item, &options, &areas)?;
     *app.state::<ContentState>().active.lock().unwrap_or_else(|e| e.into_inner()) = Some(item);
-    *app.state::<ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()) = Some(label);
+    replace_windows(app, windows);
+    // During game restore the UI thread can acknowledge a window before the group is installed.
+    let ready = app.state::<DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let loaded: Vec<_> = active_windows(app).into_iter().filter(|window| ready.contains(&window.label)).collect();
+    if let Err(error) = show(app, &loaded) {
+        close_active(app);
+        return Err(error);
+    }
     Ok(true)
+}
+
+pub async fn displays_changed(app: tauri::AppHandle) {
+    let state = app.state::<ContentState>();
+    let _operation = state.operation.lock().await;
+    if crate::games::is_active(&app) { return; }
+    let result = async {
+        let config = settings(&app);
+        let item = state.active.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        let Some(item) = item.filter(|item| item.id == config.wallpaper_id) else { return Ok(()); };
+        let displays = crate::widgets::monitors(&app)?;
+        let areas = widget_geometry::targets(&displays, &config.wallpaper_monitor);
+        let current = active_windows(&app);
+        if current.iter().map(|window| &window.area).eq(areas.iter().copied()) { return Ok(()); }
+        let windows = open_wallpapers(&app, &item, &config.wallpaper_options, &areas)?;
+        let labels = windows.iter().map(|window| window.label.clone()).collect();
+        if let Err(error) = wait_until_ready(&app, labels).await.and_then(|_| show(&app, &windows)) {
+            for window in windows { destroy(&app, &window.label); }
+            return Err(error);
+        }
+        replace_windows(&app, windows);
+        Ok::<(), String>(())
+    }.await;
+    if let Err(error) = result { let _ = app.emit("desktop-error", error); }
+    sync(&app);
+    crate::effects::sync(&app);
 }
 
 pub fn sync(app: &tauri::AppHandle) {
     if crate::games::is_active(app) { return; }
     let config = settings(app);
-    for label in ["media-a", "media-b"] {
-        if let Some(window) = app.get_webview_window(label) {
-            let mut value = composition(app, false);
+    for entry in active_windows(app) {
+        if let Some(window) = app.get_webview_window(&entry.label) {
+            let mut value = composition(app, Some(&entry.area));
             value["options"] = render_options(app, &config.wallpaper_id, &config.wallpaper_options);
             let _ = window.eval(format!(
                 "window.dispatchEvent(new CustomEvent('content-config',{{detail:{value}}}));"
@@ -258,7 +346,7 @@ pub fn sync(app: &tauri::AppHandle) {
     }
     #[cfg(windows)]
     if let Some(pet) = app.get_webview_window("pet") {
-        if composing(app) && config.mode == "wallpaper" { let _ = pet.hide(); }
+        if companion_window(app).is_some() && config.mode == "wallpaper" { let _ = pet.hide(); }
         else if config.companion_enabled {
             let was_visible = pet.is_visible().unwrap_or(false);
             let _ = pet.show();
@@ -276,13 +364,8 @@ pub fn send_cursor(window: &tauri::WebviewWindow, sample: &impl serde::Serialize
     }
 }
 pub fn close_active(app: &tauri::AppHandle) {
-    for label in ["media-a", "media-b"] {
-        if let Some(window) = app.get_webview_window(label) {
-            let _ = window.destroy();
-        }
-    }
+    replace_windows(app, Vec::new());
     *app.state::<ContentState>().active.lock().unwrap_or_else(|e| e.into_inner()) = None;
-    *app.state::<ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
 #[tauri::command]
@@ -353,7 +436,7 @@ pub async fn delete_local_wallpaper(
     // If currently active, reset to companion
     let current_id = settings(&app).wallpaper_id;
     if current_id == id {
-        let _ = apply_wallpaper(app.clone(), "companion".into(), Default::default(), false).await;
+        let _ = apply_wallpaper(app.clone(), "companion".into(), Default::default(), false, None).await;
     }
 
     let library = get_wallpaper_library(app.clone())?;
@@ -383,6 +466,7 @@ pub async fn apply_wallpaper(
     id: String,
     options: Options,
     preview: bool,
+    monitor: Option<String>,
 ) -> Result<Value, String> {
     let operation = app.state::<ContentState>();
     let _selection = operation.operation.lock().await;
@@ -393,11 +477,14 @@ pub async fn apply_wallpaper(
         if preview {
             return Err("系统桌面无需预览。".into());
         }
-        let previous = settings(&app);
-        let mut config = previous.clone();
-        config.wallpaper_id = id;
-        crate::persist(&app, &config)?;
-        *app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()) = config;
+        {
+            let state = app.state::<DesktopState>();
+            let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
+            let mut config = settings(&app);
+            config.wallpaper_id = id;
+            crate::persist(&app, &config)?;
+            *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = config;
+        }
         close_active(&app);
         crate::publish(&app);
         return Ok(json!(settings(&app)));
@@ -421,60 +508,51 @@ pub async fn apply_wallpaper(
     if crate::games::is_active(&app) {
         return Err("请先退出游戏空间，再预览或应用壁纸。".into());
     }
-    let label = open(&app, &item, &options, preview)?;
-    let handle = app.clone();
-    let waiting = label.clone();
-    if let Err(error) = tauri::async_runtime::spawn_blocking(move || wait(&handle, &waiting))
-        .await
-        .map_err(|e| e.to_string())?
-    {
-        if let Some(window) = app.get_webview_window(&label) {
-            let _ = window.destroy();
-        }
-        return Err(error);
-    }
-    if crate::games::is_active(&app) {
-        if let Some(window) = app.get_webview_window(&label) { let _ = window.destroy(); }
-        return Err("请先退出游戏空间，再预览或应用壁纸。".into());
-    }
     if preview {
+        let label = "media-preview";
+        open(&app, &item, &options, label, None)?;
+        if let Err(error) = wait_until_ready(&app, vec![label.into()]).await {
+            destroy(&app, label);
+            return Err(error);
+        }
         return Ok(json!({"preview":true}));
     }
-    let mut config = settings(&app);
-    config.wallpaper_id = id;
-    config.wallpaper_options = options;
+    let selection = monitor.unwrap_or_else(|| settings(&app).wallpaper_monitor);
+    if selection.len() > 512 { return Err("显示器标识无效".into()); }
+    let displays = crate::widgets::monitors(&app)?;
+    let areas = widget_geometry::targets(&displays, &selection);
     let active_path = root(&app)?.join("active.json");
-    let previous = app.state::<ContentState>().active.lock().unwrap_or_else(|e| e.into_inner()).clone();
-    if let Err(error) = library::save_json(&active_path, &item) {
-        if let Some(window) = app.get_webview_window(&label) {
-            let _ = window.destroy();
+    let windows = open_wallpapers(&app, &item, &options, &areas)?;
+    let labels = windows.iter().map(|window| window.label.clone()).collect();
+    let ready = wait_until_ready(&app, labels).await;
+    let commit = || -> Result<(), String> {
+        ready?;
+        show(&app, &windows)?;
+        let state = app.state::<DesktopState>();
+        let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
+        let mut config = settings(&app);
+        config.wallpaper_id = id;
+        config.wallpaper_monitor = selection;
+        config.wallpaper_options = options;
+        let previous = operation.active.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        library::save_json(&active_path, &item)?;
+        if let Err(error) = crate::persist(&app, &config) {
+            if let Some(previous) = previous {
+                let _ = library::save_json(&active_path, &previous);
+            } else {
+                let _ = fs::remove_file(&active_path);
+            }
+            return Err(error);
         }
+        *operation.active.lock().unwrap_or_else(|e| e.into_inner()) = Some(item);
+        *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = config;
+        Ok(())
+    };
+    if let Err(error) = commit() {
+        for window in windows { destroy(&app, &window.label); }
         return Err(error);
     }
-    if let Err(error) = crate::persist(&app, &config) {
-        if let Some(previous) = previous {
-            let _ = library::save_json(&active_path, &previous);
-        } else {
-            let _ = fs::remove_file(&active_path);
-        }
-        if let Some(window) = app.get_webview_window(&label) {
-            let _ = window.destroy();
-        }
-        return Err(error);
-    }
-    let old = app
-        .state::<ContentState>()
-        .label
-        .lock()
-        .unwrap()
-        .replace(label.clone());
-    *app.state::<ContentState>().active.lock().unwrap_or_else(|e| e.into_inner()) = Some(item);
-    *app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()) = config;
-    if let Some(old) = old.filter(|old| old != &label) {
-        if let Some(window) = app.get_webview_window(&old) {
-            let _ = window.destroy();
-        }
-    }
+    replace_windows(&app, windows);
     if let Some(window) = app.get_webview_window("wallpaper") {
         let _ = window.destroy();
     }
@@ -573,13 +651,14 @@ mod tests {
     use super::*;
     #[test]
     fn wallpaper_code_cannot_use_desktop_or_startup_commands() {
-        for label in ["media-a", "media-b", "media-preview", "unknown"] {
+        for label in ["media-a", "media-b", "media-a-1", "media-b-2", "media-preview", "unknown"] {
             for command in [
                 "set_autostart",
                 "quit",
                 "get_settings",
                 "open_download_url",
                 "import_wallpaper_catalog",
+                "get_wallpaper_displays",
                 "import_local_wallpaper",
                 "export_resource_pack",
                 "import_resource_pack",
@@ -598,12 +677,14 @@ mod tests {
             }
         }
         assert!(permitted("media-a", "scene_ready"));
+        assert!(permitted("media-b-2", "scene_ready"));
+        assert!(!permitted("media-b-extra", "scene_ready"));
         assert!(permitted("control", "set_autostart"));
     }
 }
 
 pub(crate) fn smoke_render_report(app: &tauri::AppHandle, id: &str) -> Result<Value, String> {
-    let label = app.state::<ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("没有背景窗口")?;
+    let label = active_windows(app).into_iter().next().ok_or("没有背景窗口")?.label;
     let report = app.state::<ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).get(&label).cloned().ok_or("没有渲染报告")?;
     if report.get("privilegedIpcBlocked") != Some(&Value::Bool(true)) { return Err("壁纸窗口没有隔离桌面接口".into()); }
     #[allow(unused_mut)]
@@ -635,7 +716,7 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
         "test-video",
         "test-canvas",
     ] {
-        apply_wallpaper(app.clone(), id.into(), Options::default(), false).await?;
+        apply_wallpaper(app.clone(), id.into(), Options::default(), false, None).await?;
         cases.push(smoke_render_report(app, id)?);
     }
     let previous = settings(app).wallpaper_id;
@@ -644,6 +725,7 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
         "test-bad-hash".into(),
         Options::default(),
         false,
+        None,
     )
     .await
     .is_err();
@@ -660,7 +742,7 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || library::fetch_json(&offline))
         .await
         .map_err(|e| e.to_string())??;
-    apply_wallpaper(app.clone(), "test-canvas".into(), Options::default(), false).await?;
+    apply_wallpaper(app.clone(), "test-canvas".into(), Options::default(), false, None).await?;
     let local_directory = PathBuf::from(std::env::var_os("XIAOBAN_LOCAL_WALLPAPER_TEST_DIR").ok_or("缺少本地壁纸测试目录")?);
     let mut local_cases = Vec::new();
     for filename in ["本地图 image.png", "本地视频.mp4"] {
@@ -669,20 +751,20 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
         let duplicate = crate::local_media::import_file(&root(app)?, &source)?;
         if item.id != duplicate.id { return Err("重复导入没有去重".into()); }
         fs::remove_file(&source).map_err(|e| e.to_string())?;
-        apply_wallpaper(app.clone(), item.id.clone(), Options::default(), false).await?;
+        apply_wallpaper(app.clone(), item.id.clone(), Options::default(), false, None).await?;
         local_cases.push(smoke_render_report(app, &item.id)?);
     }
     if crate::local_media::read(&root(app)?)?.items.len() != 2 { return Err("本地导入重复保存了元数据".into()); }
     close_active(app);
     if !restore(app)? { return Err("无法恢复本地壁纸".into()); }
-    let restored_label = app.state::<ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("没有恢复窗口")?;
+    let restored_label = active_windows(app).into_iter().next().ok_or("没有恢复窗口")?.label;
     let handle = app.clone();
-    tauri::async_runtime::spawn_blocking(move || wait(&handle, &restored_label)).await.map_err(|e| e.to_string())??;
+    wait_until_ready(&handle, vec![restored_label]).await?;
     smoke_render_report(app, &settings(app).wallpaper_id)?;
     let effects = if std::env::var("XIAOBAN_EFFECTS_SMOKE").ok().as_deref() == Some("1") {
         Some(crate::effects_smoke::run(app).await?)
     } else { None };
-    apply_wallpaper(app.clone(), "companion".into(), Options::default(), false).await?;
+    apply_wallpaper(app.clone(), "companion".into(), Options::default(), false, None).await?;
     Ok(
         json!({"cases":cases,"cacheOffline":true,"hashFailurePreserved":preserved,"updateChecked":true,
             "localImports":{"cases":local_cases,"sourceDeleted":true,"deduplicated":true,"restored":true},"effects":effects}),

@@ -978,11 +978,11 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
             .as_str()
             .ok_or("网站未返回交付 ID")?
             .to_string();
-        content::apply_wallpaper(app.clone(), id.clone(), library::Options::default(), false)
+        content::apply_wallpaper(app.clone(), id.clone(), library::Options::default(), false, None)
             .await?;
         cases.push(content::smoke_render_report(app, &id)?);
         // A second application verifies that the downloaded resource works from the local cache.
-        content::apply_wallpaper(app.clone(), id, library::Options::default(), true).await?;
+        content::apply_wallpaper(app.clone(), id, library::Options::default(), true, None).await?;
     }
     let status = check_website(app.clone()).await?;
     if status["update"]["available"] != true {

@@ -74,7 +74,7 @@ it('spins only on the online tab while a fetch is pending', async () => {
  await flushPromises();
  const spinning = () => String(document.body.querySelector('.n-spin-body') !== null);
  expect(spinning()).toBe('false');
- expect(invoke).not.toHaveBeenCalled();
+ expect(invoke).not.toHaveBeenCalledWith('fetch_site_wallpapers', expect.any(Object));
  await wrapper.get('[data-testid="wallpaper-scope-online"]').trigger('click'); await flushPromises();
  expect(invoke).toHaveBeenCalledWith('fetch_site_wallpapers', expect.any(Object));
  expect(spinning()).toBe('true');
@@ -100,3 +100,35 @@ it('keeps the online feed when the page is kept alive and navigated away', async
  wrapper.unmount();
 });
 
+
+it('applies a wallpaper to the chosen display without changing the desktop during preview', async () => {
+ vi.mocked(invoke).mockReset();
+ vi.mocked(invoke).mockResolvedValue([
+  { id: 'main', name: '内建显示器', width: 1920, height: 1080, primary: true },
+  { id: 'left', name: 'DELL', width: 2560, height: 1440, primary: false },
+ ]);
+ const applyWallpaper = vi.fn().mockResolvedValue(undefined);
+ const store = reactive({
+  desktop: true, settings: { ...defaults, wallpaperMonitor: 'disconnected' },
+  library: { items: [{ definition: { id: 'multi-screen', title: '星空', kind: 'web' }, installed: true, source: 'builtin' }] },
+  applyWallpaper, notify: vi.fn(),
+ } as unknown as ControlStore);
+ const wrapper = mount(WallpaperPage, { props: { store }, global: {
+  stubs: { NButton: { template: '<button><slot /></button>' }, NSelect: stub, NInput: stub },
+ } });
+ await wrapper.get('[data-testid="wallpaper-card-multi-screen"]').trigger('click');
+ await flushPromises();
+ const picker = wrapper.get<HTMLSelectElement>('[data-testid="wallpaper-display"]');
+ expect(picker.element.value).toBe('disconnected');
+ expect(picker.text()).toContain('原显示器已断开');
+ expect(picker.text()).toContain('全部显示器');
+ await picker.setValue('left');
+ expect(applyWallpaper).not.toHaveBeenCalled();
+ await wrapper.findAll('button').find(button => button.text() === '独立窗口预览')!.trigger('click');
+ await flushPromises();
+ expect(applyWallpaper).toHaveBeenLastCalledWith('multi-screen', expect.any(Object), true);
+ await wrapper.get('[data-testid="apply-wallpaper"]').trigger('click');
+ await flushPromises();
+ expect(applyWallpaper).toHaveBeenLastCalledWith('multi-screen', expect.any(Object), false, 'left');
+ wrapper.unmount();
+});

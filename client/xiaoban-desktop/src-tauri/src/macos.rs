@@ -274,13 +274,12 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
                 let moved = (point.x, point.y) != previous;
                 let pressed = down && !previous_down;
                 let released = !down && previous_down;
+                let windows = handle.webview_windows();
                 let desktop = pressed
-                    && ["wallpaper", "media-a", "media-b"].iter().any(|label| handle.get_webview_window(label).is_some())
+                    && windows.keys().any(|label| label == "wallpaper" || crate::content::is_wallpaper(label))
                     && desktop_at_point(point, mtm);
-                for label in ["pet", "wallpaper", "media-a", "media-b"] {
-                    let Some(window) = handle.get_webview_window(label) else {
-                        continue;
-                    };
+                for (label, window) in windows {
+                    if label != "pet" && label != "wallpaper" && !crate::content::is_wallpaper(&label) { continue; }
                     // A window that is being created or closed has no AppKit window yet; skip it
                     // for this tick instead of failing the whole sample.
                     let Ok(ns) = native(&window) else {
@@ -307,7 +306,7 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
                             released,
                             desktop,
                         };
-                    if crate::content::media_label(label) { crate::content::send_cursor(&window, &sample); }
+                    if crate::content::is_wallpaper(&label) { crate::content::send_cursor(&window, &sample); }
                     else { let _ = window.emit("desktop-cursor", sample); }
                 }
                 Ok(((point.x, point.y), down))

@@ -1,6 +1,6 @@
 //! Per-monitor widget placement. Windows uses global physical pixels;
 //! macOS uses global AppKit points with a top-left origin.
-#[derive(Clone, Debug, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub struct MonitorArea {
     pub id: String, pub name: String, pub x: f64, pub y: f64,
     pub width: f64, pub height: f64, pub scale: f64, pub primary: bool,
@@ -8,6 +8,14 @@ pub struct MonitorArea {
 pub fn resolve<'a>(areas: &'a [MonitorArea], saved: Option<&str>) -> Option<&'a MonitorArea> {
     saved.and_then(|id|areas.iter().find(|m|m.id==id))
         .or_else(||areas.iter().find(|m|m.primary)).or_else(||areas.first())
+}
+/// Empty selects the primary display, "*" selects all, and a disconnected display falls back.
+pub fn targets<'a>(areas: &'a [MonitorArea], selection: &str) -> Vec<&'a MonitorArea> {
+    if selection == "*" {
+        areas.iter().collect()
+    } else {
+        resolve(areas, (!selection.is_empty()).then_some(selection)).into_iter().collect()
+    }
 }
 pub fn at_point(areas: &[MonitorArea], x: f64, y: f64) -> Option<&MonitorArea> {
     areas.iter().find(|m|x>=m.x&&x<m.x+m.width&&y>=m.y&&y<m.y+m.height)
@@ -60,6 +68,18 @@ mod tests {
     #[test]fn small_screens_and_monitor_gaps_remain_finite(){
         let screen=monitor("small",-500.,0.,200.,150.,1.,true);assert_eq!(drag_position(&screen,600.,700.,(-100.,400.),(0.5,0.5)),(0.,0.));
         let screens=vec![screen,monitor("right",1000.,0.,800.,600.,1.,false)];assert_eq!(at_point(&screens,900.,100.).unwrap().id,"right");
+    }
+    #[test]
+    fn selects_primary_one_or_all_displays_without_losing_the_disconnected_selection() {
+        let main = monitor("main", 0., 0., 1920., 1080., 1., true);
+        let left = monitor("left", -2560., 0., 2560., 1440., 2., false);
+        let screens = [left, main];
+        assert_eq!(targets(&screens, ""), vec![&screens[1]]);
+        assert_eq!(targets(&screens, "left"), vec![&screens[0]]);
+        assert_eq!(targets(&screens, "*"), vec![&screens[0], &screens[1]]);
+        assert_eq!(targets(&screens[1..], "left"), vec![&screens[1]]);
+        assert_eq!(targets(&screens, "left"), vec![&screens[0]]);
+        assert!(targets(&[], "*").is_empty());
     }
     #[test]fn appkit_conversion_handles_screens_above_and_below(){
         assert_eq!(from_bottom_left(900.,-1280.,0.,1024.),(-1280.,-124.));assert_eq!(from_bottom_left(900.,0.,900.,1080.),(0.,-1080.));assert_eq!(from_bottom_left(900.,0.,-768.,768.),(0.,900.));

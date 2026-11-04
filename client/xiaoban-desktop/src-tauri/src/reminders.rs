@@ -333,9 +333,10 @@ pub fn delete_care_rule(window: tauri::WebviewWindow, id: String) -> Result<serd
 fn companion_visible(app: &tauri::AppHandle) -> bool {
     let settings = crate::settings(app);
     if !settings.companion_enabled { return false; }
-    if settings.mode == "wallpaper" && crate::content::composing(app) {
-        return ["media-a", "media-b"].iter().any(|label| app.get_webview_window(label)
-            .is_some_and(|window| window.is_visible().unwrap_or(false)));
+    if settings.mode == "wallpaper" {
+        if let Some(window) = crate::content::companion_window(app) {
+            return window.is_visible().unwrap_or(false);
+        }
     }
     app.get_webview_window("pet").is_some_and(|w| w.is_visible().unwrap_or(false))
 }
@@ -432,8 +433,9 @@ fn show(app: &tauri::AppHandle, items: Vec<Pending>) -> Result<(), String> {
     if state.runtime.lock().unwrap_or_else(|e| e.into_inner()).ready && delivery.sound { care_system::play_sound(); }
     // Events into low-permission media scenes are deliberately browser-local,
     // produced only by native trusted code, and carry no caller-provided JS.
-    for label in ["pet", "wallpaper", "media-a", "media-b"] {
-        if let Some(window) = app.get_webview_window(label) { let _ = window.eval("window.dispatchEvent(new CustomEvent('care-expression',{detail:'happy'}))"); }
+    for window in ["pet", "wallpaper"].into_iter().filter_map(|label| app.get_webview_window(label))
+        .chain(crate::content::companion_window(app)) {
+        let _ = window.eval("window.dispatchEvent(new CustomEvent('care-expression',{detail:'happy'}))");
     }
     Ok(())
 }
@@ -726,12 +728,8 @@ fn presence_tick(app: &tauri::AppHandle, elapsed: f64) {
         let payload = serde_json::json!({"kind": kind.as_str()});
         let _ = app.emit_to("pet", "companion-presence", payload.clone());
         for (label,window) in app.webview_windows(){if crate::pets::is_pet(&label){let _=window.eval(format!("window.dispatchEvent(new CustomEvent('pet-presence',{{detail:{payload}}}));"));}}
-        if crate::content::composing(app) {
-            for label in ["media-a", "media-b"] {
-                if let Some(window) = app.get_webview_window(label) {
-                    let _ = window.eval(format!("window.dispatchEvent(new CustomEvent('companion-presence',{{detail:{payload}}}))"));
-                }
-            }
+        if let Some(window) = crate::content::companion_window(app) {
+            let _ = window.eval(format!("window.dispatchEvent(new CustomEvent('companion-presence',{{detail:{payload}}}))"));
         }
     }
     // Reuse the existing OS activity sample; do not sample keyboard/lock state twice.

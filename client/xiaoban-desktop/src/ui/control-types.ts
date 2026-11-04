@@ -101,7 +101,7 @@ export interface ControlStore {
   /** Removes a user's own game folder (and closes the game space first if it is open). */
   deleteUserGame(id: string): Promise<void>;
   openUserGamesFolder(): Promise<void>;
-  applyWallpaper(id: string, options: WallpaperOptions, preview?: boolean): Promise<void>;
+  applyWallpaper(id: string, options: WallpaperOptions, preview?: boolean, monitor?: string): Promise<void>;
   importMedia(): Promise<string | null>;
   deleteWallpaper(id: string): Promise<void>;
   setAutomaticUpdates(enabled: boolean): Promise<void>;

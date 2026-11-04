@@ -189,7 +189,7 @@ impl Desktop for TauriDesktop {
 
     fn apply_wallpaper(&self, id: &str) -> Result<(), String> {
         let app = self.app.clone();
-        tauri::async_runtime::block_on(crate::content::apply_wallpaper(app, id.to_string(), Default::default(), false)).map(|_| ())
+        tauri::async_runtime::block_on(crate::content::apply_wallpaper(app, id.to_string(), Default::default(), false, None)).map(|_| ())
     }
 
     fn create_wallpaper(&self, title: &str, description: Option<&str>, html: &str, apply_now: bool) -> Result<Value, String> {

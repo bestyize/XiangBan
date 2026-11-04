@@ -2,6 +2,7 @@
 //! effect works with any wallpaper (or the plain system desktop) behind it. It is a separate desktop window
 //! and not part of a wallpaper window, so changing the wallpaper never touches it.
 use crate::{effect_packs, preferences::Settings, settings, storage, DesktopState};
+use crate::widget_geometry::{targets, MonitorArea};
 use serde_json::{json, Value};
 use std::{
     path::{Path, PathBuf},
@@ -17,9 +18,6 @@ static RECONCILE: Mutex<()> = Mutex::new(());
 static PLACEMENT: Mutex<String> = Mutex::new(String::new());
 pub fn is_effect(label: &str) -> bool { label == LABEL || label.strip_prefix("effects-").is_some_and(|s| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit())) }
 pub fn labels(app: &tauri::AppHandle) -> Vec<String> { app.webview_windows().keys().filter(|s| is_effect(s)).cloned().collect() }
-fn targets<'a>(areas: &'a [crate::widget_geometry::MonitorArea], selection: &str) -> Vec<&'a crate::widget_geometry::MonitorArea> {
-    if selection == "*" { areas.iter().collect() } else { crate::widget_geometry::resolve(areas, if selection.is_empty() { None } else { Some(selection) }).into_iter().collect() }
-}
 pub fn monitor_state(app: &tauri::AppHandle) -> Result<Value, String> {
     let areas = crate::widgets::monitors(app)?;
     let selected = settings(app).effects.monitor;
@@ -41,12 +39,12 @@ fn wanted(app: &tauri::AppHandle, config: &Settings) -> Option<Value> {
     effect_packs::find(&folder(app).ok()?, &config.effects.selected)
 }
 
-pub fn render_payload(app: &tauri::AppHandle) -> Value {
+pub fn render_payload(app: &tauri::AppHandle, area: &MonitorArea) -> Value {
     let config = settings(app);
-    // Windows custom wallpaper draws its own primary-screen effect. Never draw it there
-    // when the user selected only a secondary screen.
-    let primary_selected = crate::widgets::monitors(app).ok().is_some_and(|areas| targets(&areas, &config.effects.monitor).iter().any(|m| m.primary));
-    if !primary_selected { return Value::Null; }
+    let selected = crate::widgets::monitors(app).ok().is_some_and(|areas| {
+        targets(&areas, &config.effects.monitor).iter().any(|m| m.id == area.id)
+    });
+    if !selected { return Value::Null; }
     wanted(app, &config).map(|pack| payload(app, &config, &pack)).unwrap_or(Value::Null)
 }
 
@@ -65,11 +63,8 @@ pub fn reconcile(app: &tauri::AppHandle) {
     let areas = match crate::widgets::monitors(app) { Ok(areas) => areas, Err(e) => { let _ = app.emit("desktop-error", e); return; } };
     let selected = targets(&areas, &current.effects.monitor);
     if selected.is_empty() { let _ = app.emit("desktop-error", "没有找到显示器"); return; }
-    // When a Windows custom wallpaper renders the primary effect itself, keep
-    // the other screens' overlays; do not place an overlapping primary overlay.
-    #[cfg(windows)] let composing = crate::content::composing(app);
-    #[cfg(not(windows))] let composing = false;
-    let overlay: Vec<_> = selected.iter().copied().filter(|m| !(composing && m.primary)).collect();
+    // Windows wallpaper windows render the effect on the displays they cover.
+    let overlay: Vec<_> = selected.into_iter().filter(|area| !crate::content::composing_on(app, area)).collect();
     let signature = serde_json::to_string(&overlay).unwrap_or_default();
     let mut placement = PLACEMENT.lock().unwrap_or_else(|e| e.into_inner());
     if *placement != signature || labels(app).len() != overlay.len() {

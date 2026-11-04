@@ -191,7 +191,7 @@ pub async fn community_schemes_restore(
         .unwrap_or("companion")
         .to_string();
     let options = crate::settings(&app).wallpaper_options;
-    if let Err(e) = crate::content::apply_wallpaper(app.clone(), wall, options, false).await {
+    if let Err(e) = crate::content::apply_wallpaper(app.clone(), wall, options, false, None).await {
         messages.push(format!("壁纸：{e}"));
     }
     if let Err(e) = crate::set_desktop_effects(app.clone(), snap["effects"].clone()) {

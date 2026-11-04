@@ -60,7 +60,7 @@ pub async fn run(app: &tauri::AppHandle) -> Result<Value, String> {
     if !app.state::<DesktopState>().isolated { return Err("桌面特效验证只能使用隔离配置".into()); }
     let previous_mode = settings(app).mode;
     crate::set_mode(app.clone(), "wallpaper".into()).await?;
-    crate::content::apply_wallpaper(app.clone(), "companion".into(), Default::default(), false).await?;
+    crate::content::apply_wallpaper(app.clone(), "companion".into(), Default::default(), false, None).await?;
     let mut cases = Vec::new();
     for id in SCENES {
         let handle = app.clone();
@@ -75,17 +75,16 @@ pub async fn run(app: &tauri::AppHandle) -> Result<Value, String> {
     settle(app, true).await?;
     let mut independent = Vec::new();
     for id in ["test-image", "test-video", "test-canvas", "companion"] {
-        crate::content::apply_wallpaper(app.clone(), id.into(), Default::default(), false).await?;
+        crate::content::apply_wallpaper(app.clone(), id.into(), Default::default(), false, None).await?;
         settle(app, false).await?;
         if app.get_webview_window(LABEL).is_none() || settings(app).effects != kept { return Err(format!("应用壁纸 {id} 后桌面特效消失或被改动")); }
         let mut state = json!({"id": id, "overlayPresent": true});
         #[cfg(windows)]
         {
             state["native"] = crate::windows::diagnostics(app);
-            let active = app.state::<crate::content::ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()).clone();
-            if let Some(label) = active {
+            if let Some(window) = crate::content::companion_window(app) {
                 state["composition"] = app.state::<crate::content::ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner())
-                    .get(&label).cloned().unwrap_or(Value::Null);
+                    .get(window.label()).cloned().unwrap_or(Value::Null);
             }
         }
         independent.push(state);

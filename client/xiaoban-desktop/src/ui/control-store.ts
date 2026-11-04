@@ -248,9 +248,9 @@ export function createControlStore(notify: ControlStore["notify"], options: { co
       if (!desktop) throw new Error("请在桌面应用中打开游戏文件夹");
       await invoke("open_user_games_folder");
     },
-    async applyWallpaper(id, options, preview = false) {
+    async applyWallpaper(id, options, preview = false, monitor) {
       if (!desktop) throw new Error("请在桌面应用中预览或应用壁纸");
-      const settings = await invoke<Settings>("apply_wallpaper", { id, options: clone(options), preview });
+      const settings = await invoke<Settings>("apply_wallpaper", { id, options: clone(options), preview, ...(monitor === undefined ? {} : { monitor }) });
       if (!preview) { store.settings = settings; await store.refreshLibrary(); }
     },
     async importMedia() {

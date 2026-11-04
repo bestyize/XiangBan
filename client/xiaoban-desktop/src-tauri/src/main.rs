@@ -520,10 +520,8 @@ fn set_companion_skin(app: tauri::AppHandle, skin: String) -> Result<Settings, S
 #[tauri::command]
 fn poke(app: tauri::AppHandle) {
     let _ = app.emit("pet-poke", ());
-    for label in ["media-a", "media-b"] {
-        if let Some(window) = app.get_webview_window(label) {
-            let _ = window.eval("window.dispatchEvent(new Event('content-poke'));".to_string());
-        }
+    if let Some(window) = content::companion_window(&app) {
+        let _ = window.eval("window.dispatchEvent(new Event('content-poke'));".to_string());
     }
 }
 
@@ -537,6 +535,17 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
             if failed { return Ok(()); }
         }
     }
+    if content::is_wallpaper(window.label()) {
+        let app = window.app_handle();
+        // Staged wallpapers stay hidden until the entire replacement is ready.
+        app.state::<DesktopState>().ready_scenes.lock().unwrap().insert(window.label().into());
+        if content::is_active_window(app, window.label()) {
+            window.show().map_err(|e| e.to_string())?;
+            #[cfg(windows)]
+            windows::order_desktop_layers(app)?;
+        }
+        return Ok(());
+    }
     window.show().map_err(|e| e.to_string())?;
     #[cfg(windows)]
     if window.label() == "pet" {
@@ -548,8 +557,8 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
     #[cfg(target_os = "macos")]
     macos::configure_scene(
         &window,
-        (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") || ["media-a", "media-b"].contains(&window.label()) || effects::is_effect(window.label()),
-        ["media-a", "media-b"].contains(&window.label()),
+        (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") || effects::is_effect(window.label()),
+        false,
     )?;
     if window.label() == "pet" || window.label() == float_assistant::LABEL || widgets::is_widget(window.label()) || pets::is_pet(window.label()) {
         let default = if widgets::is_widget(window.label()) || (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") { "desktop" } else { "topmost" };
@@ -851,7 +860,7 @@ fn main() {
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
     let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![application_skins::skin_list, application_skins::skin_apply, application_skins::skin_delete, application_skins::skin_import, application_skins::skin_export, resource_packs::export_resource_pack, resource_packs::import_resource_pack, get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_appearance, set_accent, get_appearance, set_chat_composer_pet, set_companion_links, set_companion_skin, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
-            get_startup_status, set_autostart, network::get_network_config, network::save_network_config, network::test_network_connection, content::get_wallpaper_library, content::import_wallpaper_catalog, content::delete_local_wallpaper,
+            get_startup_status, set_autostart, network::get_network_config, network::save_network_config, network::test_network_connection, content::get_wallpaper_library, content::get_wallpaper_displays, content::import_wallpaper_catalog, content::delete_local_wallpaper,
             desk_game::open_desktop_game, desk_game::close_desktop_game, desk_game::desk_set_regions,
             games::open_game_space, games::close_game_space, games::get_game_catalog, games::load_game_save,
             games::save_game_save, games::get_game_status, games::set_game_desktop_double_click,
