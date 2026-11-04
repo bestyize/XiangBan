@@ -39,15 +39,6 @@ internal fun ReplyContentCards(env: CommunityEnv, refs: List<ResolvedWorkReferen
     }
 }
 
-@Composable
-internal fun ReplyAttachments(env: CommunityEnv, attachments: List<ForumAttachment>, topicId: Long?) {
-    attachments.take(5).forEach { attachment -> Column(Modifier.padding(top = 10.dp)) {
-        Text(attachment.name, style = XType.Body, fontWeight = FontWeight.Medium)
-        Text("${attachment.size} 字节 · ${if (attachment.price == 0) "免费" else "${attachment.price} 积分"}", style = XType.Caption, color = LocalExtraColors.current.ink3)
-        GhostPillButton("在网页查看与下载", { topicId?.let { env.platform?.openUrl(env.forum.topicUrl(it)) } }, enabled = topicId != null && env.platform != null)
-    } }
-}
-
 /** New-reply uploads are the only pending assets this composer may delete. */
 @Composable
 internal fun NativeReplyComposer(env: CommunityEnv, topicId: Long, onDismiss: () -> Unit, onSent: () -> Unit, panelModifier: Modifier, editingPost: Post? = null, dismissRequest: Int = 0) {

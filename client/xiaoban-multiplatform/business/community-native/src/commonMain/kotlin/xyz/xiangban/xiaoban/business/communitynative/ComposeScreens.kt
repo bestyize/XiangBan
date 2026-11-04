@@ -97,17 +97,24 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     var pollText by rememberSaveable { mutableStateOf("") }
     var pollDays by rememberSaveable { mutableStateOf(7) }
 
-    LaunchedEffect(attempt) {
+    LaunchedEffect(attempt, session.accountId) {
+        categories = null
         loadError = null
         try {
-            val all = env.forum.categories()
+            val trustLevel = if (session.loggedIn) env.forum.uploadSession().user.trustLevel else 0
+            val all = env.forum.categories().filter { category ->
+                category.parentId == null || (category.slug != "create-guides" &&
+                    trustLevel >= if (category.adminOnly) 3 else category.minPostLevel.coerceIn(0, 3))
+            }
             categories = all
+            if (all.none { it.id == categoryId }) categoryId = -1
+            if (all.none { it.parentId == parentId }) parentId = -1
             val helpBoard = all.firstOrNull { it.slug in setOf("share-help", "resource-help") }
             if (help && helpBoard != null && categoryId < 0) {
                 parentId = helpBoard.parentId ?: parentId
                 categoryId = helpBoard.id
             } else if (parentId < 0) {
-                val firstParent = all.firstOrNull { it.parentId == null && !it.adminOnly && all.any { c -> c.parentId == it.id } }
+                val firstParent = all.firstOrNull { it.parentId == null && all.any { c -> c.parentId == it.id } }
                 if (firstParent != null) parentId = firstParent.id
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -118,8 +125,8 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     }
 
     val all = categories.orEmpty()
-    val parents = all.filter { it.parentId == null && !it.adminOnly && all.any { c -> c.parentId == it.id } }
-    val children = all.filter { it.parentId == parentId && !it.adminOnly }
+    val parents = all.filter { it.parentId == null && all.any { c -> c.parentId == it.id } }
+    val children = all.filter { it.parentId == parentId }
     val chosen = all.firstOrNull { it.id == categoryId }
     val isHelp = chosen?.slug in setOf("share-help", "resource-help")
     val isCasual = chosen?.let { category -> all.any { it.id == category.parentId && it.slug == "casual" } } == true

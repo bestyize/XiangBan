@@ -50,24 +50,21 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.DiscussController
-import xyz.xiangban.xiaoban.common.community.Scheme
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.Pack
 import xyz.xiangban.xiaoban.common.community.Poll
 import xyz.xiangban.xiaoban.common.community.cardTitle
 import xyz.xiangban.xiaoban.common.community.Topic
-import xyz.xiangban.xiaoban.common.community.VisualKinds
 import xyz.xiangban.xiaoban.common.community.agoText
 import xyz.xiangban.xiaoban.common.community.compactCount
 import xyz.xiangban.xiaoban.common.community.kindLabel
 import xyz.xiangban.xiaoban.common.community.messageOf
 
 internal enum class DiscussSub(val key: String, val label: String) {
-    All("all", "全部"), Create("create", "创作"), Learn("learn", "教程"),
-    Offwork("casual-offwork", "下班了"), Gear("casual-gear", "数码"),
-    Fun("casual-fun", "吃喝玩乐"), Media("casual-media", "片单乐评");
+    All("all", "全部"), Learn("learn", "教程"),
+    Travel("casual-travel", "旅行"), Books("casual-books", "读书"),
+    Screen("casual-screen", "影视动漫"), Feelings("casual-feelings", "情感心理"),
+    Food("casual-food", "美食"), Work("casual-work", "职场"), Games("casual-games", "游戏");
 
     companion object {
         fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: All
@@ -267,145 +264,106 @@ private fun learnChannel(filter: String): String = when (filter) {
 private val LearnTags = listOf("" to "全部", "claude-code" to "Claude Code", "codex" to "Codex", "提示词" to "提示词", "工作流" to "工作流", "本地部署" to "本地部署", "ai-硬件" to "AI 硬件")
 
 
-private sealed interface DiscussionEntry {
-    val key: String
-    val date: String
+private const val IdeasTitle = "小伴桌面1.0.0发布，支持动态桌面，一句话生成特效！"
 
-    data class Post(val topic: Topic) : DiscussionEntry {
-        override val key = "topic:${topic.id}"
-        override val date = topic.createdAt
+@Composable
+internal fun IdeasTab(env: CommunityEnv, open: (Route) -> Unit) {
+    val loader = rememberLoader(env, IdeasTitle) {
+        env.forum.searchTopics("小伴桌面1.0.0发布").items.firstOrNull { it.title == IdeasTitle }
     }
-    data class Work(val pack: Pack) : DiscussionEntry {
-        override val key = "pack:${pack.id}"
-        override val date = pack.updatedAt
+    val state by loader.state.collectAsState()
+    LoadBox(state, loader::reload) { topic ->
+        NoteFeed(env, listOfNotNull(topic), open, showCategory = true)
     }
-    data class DesktopScheme(val scheme: Scheme) : DiscussionEntry {
-        override val key = "scheme:${scheme.id}"
-        override val date = scheme.createdAt
-    }
-}
-
-private data class DiscussionPage(val entries: List<DiscussionEntry>, val hasMore: Boolean)
-
-private suspend fun loadDiscussion(
-    env: CommunityEnv, sub: DiscussSub, filter: String, tag: String, page: Int,
-): DiscussionPage = coroutineScope {
-    val category = when (sub) {
-        DiscussSub.All -> "create,learn,casual,resource-movies,resource-music"
-        DiscussSub.Create -> if (filter.isBlank() || filter == "schemes") "create" else "create-$filter"
-        DiscussSub.Learn -> learnChannel(filter)
-        DiscussSub.Media -> when (filter) {
-            "movies" -> "resource-movies"
-            "music" -> "resource-music"
-            else -> "casual-media,resource-movies,resource-music"
-        }
-        else -> sub.key
-    }
-    val home = sub != DiscussSub.Media
-    val wantsWorks = sub == DiscussSub.All || sub == DiscussSub.Create
-    val topics = async {
-        if (filter == "schemes") null
-        else env.forum.topics(sort = "new", category = category, tag = tag.ifBlank { null }, page = page, home = home)
-    }
-    val packs = async {
-        if (wantsWorks && filter != "schemes") env.forum.packs(kind = filter.ifBlank { null }, page = page, tag = tag.ifBlank { null })
-        else null
-    }
-    val schemes = async {
-        if (wantsWorks && tag.isBlank() && (filter.isBlank() || filter == "schemes")) env.content.schemes(page)
-        else null
-    }
-    val topicPage = topics.await()
-    val packPage = packs.await()
-    val schemePage = schemes.await()
-    val linked = packPage?.items.orEmpty().mapNotNull { it.topicId }.toSet()
-    val entries = topicPage?.items.orEmpty().filterNot { it.id in linked }.map { DiscussionEntry.Post(it) } +
-        packPage?.items.orEmpty().map { DiscussionEntry.Work(it) } +
-        schemePage?.items.orEmpty().map { DiscussionEntry.DesktopScheme(it) }
-    DiscussionPage(entries.sortedByDescending { it.date }, listOf(topicPage, packPage, schemePage).any { it?.hasMore == true })
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussSub) -> Unit, open: (Route) -> Unit) {
     val session by env.session.state.collectAsState()
-    var filter by rememberSaveable(sub.key) { mutableStateOf("") }
+    var filter by rememberSaveable { mutableStateOf("") }
     var tag by rememberSaveable { mutableStateOf("") }
     var page by rememberSaveable { mutableIntStateOf(1) }
-
-    fun selectTag(value: String) {
-        selectSub(DiscussSub.All)
-        tag = value
-        filter = ""
-        page = 1
-    }
+    var following by rememberSaveable { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         PageChipRow(DiscussSub.entries.map { it.key to it.label }, sub.key, {
             selectSub(DiscussSub.byKey(it))
             filter = ""; tag = ""; page = 1
         })
-        val subFilters = when (sub) {
-            DiscussSub.Create -> CreateChips
-            DiscussSub.Learn -> LearnTags
-            DiscussSub.Media -> listOf("" to "全部", "movies" to "影视", "music" to "音乐")
-            else -> emptyList()
-        }
-        if (subFilters.isNotEmpty()) PageChipRow(subFilters, filter, { filter = it; page = 1 })
+        if (sub == DiscussSub.Learn) PageChipRow(LearnTags, filter, { filter = it; page = 1 })
+        PageChipRow(listOf("all" to "新帖", "following" to "关注"), if (following) "following" else "all", {
+            following = it == "following"
+            page = 1
+        })
         if (tag.isNotEmpty()) {
             TextButton(onClick = { tag = ""; page = 1 }) { Text("# $tag ×") }
         }
-        BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-            val columns = when {
-                maxWidth >= 960.dp -> 4
-                maxWidth >= 720.dp -> 3
-                else -> 2
+        if (following && !session.loggedIn) {
+            CenterMessage("登录后查看关注动态", "登录", { open(Route.Login) })
+        } else {
+            val category = when (sub) {
+                DiscussSub.All -> "learn,casual,resource-music"
+                DiscussSub.Learn -> learnChannel(filter)
+                else -> sub.key
             }
-            val loader = rememberLoader(env, listOf(sub, filter, tag, page, session.accountId)) {
-                loadDiscussion(env, sub, filter, tag, page)
+            val loader = rememberLoader(env, listOf(category, tag, page, following, session.accountId)) {
+                if (following) env.forum.followingTopics(page, category, tag.ifBlank { null }, home = true)
+                else env.forum.topics(sort = "new", category = category, page = page, tag = tag.ifBlank { null }, home = true)
             }
             val state by loader.state.collectAsState()
             PullToRefreshBox(
-                isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize(),
+                isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.weight(1f).fillMaxWidth(),
             ) {
                 LoadBox(state, loader::reload) { result ->
-                    LazyVerticalStaggeredGrid(
-                        StaggeredGridCells.Fixed(columns), Modifier.fillMaxSize(), contentPadding = FeedPadding,
-                        horizontalArrangement = Arrangement.spacedBy(Gap), verticalItemSpacing = Gap,
-                    ) {
-                        staggeredItems(result.entries, key = { it.key }) { entry ->
-                            when (entry) {
-                                is DiscussionEntry.Post -> VisualTopicCard(env, entry.topic, discussion = true,
-                                    onTag = ::selectTag, onLogin = { open(Route.Login) }) { open(Route.Topic(entry.topic.id)) }
-                                is DiscussionEntry.Work -> {
-                                    val pack = entry.pack
-                                    Column {
-                                        if (pack.kind in VisualKinds) LookCard(pack, masonry = true) { open(Route.Pack(pack.id)) }
-                                        else SkillCard(pack) { open(Route.Ability(pack.id)) }
-                                        Text("创作 · ${if (pack.kind == "game") "查看试玩" else "查看导入"}",
-                                            Modifier.clickable { open(if (pack.kind in VisualKinds) Route.Pack(pack.id) else Route.Ability(pack.id)) }
-                                                .padding(horizontal = 8.dp, vertical = 4.dp), style = XType.Caption, color = Brand)
-                                    }
-                                }
-                                is DiscussionEntry.DesktopScheme -> WhiteCard(Modifier.clickable { open(Route.Scheme(entry.scheme.id)) }) {
-                                    Text("创作 · 桌面方案", style = XType.Caption, color = Brand)
-                                    Text(entry.scheme.title, style = XType.Section)
-                                    Text("查看导入", style = XType.Caption)
-                                }
-                            }
-                        }
-                        if (result.entries.isEmpty()) item(span = StaggeredGridItemSpan.FullLine) {
-                            CenterMessage("暂时没有符合条件的笔记", modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp))
-                        }
-                        if (page > 1 || result.hasMore) item(span = StaggeredGridItemSpan.FullLine) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                                TextButton(enabled = page > 1, onClick = { page-- }) { Text("上一页") }
-                                TextButton(enabled = result.hasMore && page < 1000, onClick = { page++ }) { Text("下一页") }
-                            }
-                        }
+                    NoteFeed(env, result.items, open, showCategory = true, onTag = {
+                        selectSub(DiscussSub.All)
+                        tag = it; filter = ""; page = 1
+                    }) {
+                        if (page > 1 || result.hasMore) NotePager(page, result.hasMore) { page = it }
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun NotePager(page: Int, hasMore: Boolean, select: (Int) -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+        TextButton(enabled = page > 1, onClick = { select(page - 1) }) { Text("上一页") }
+        TextButton(enabled = hasMore && page < 1000, onClick = { select(page + 1) }) { Text("下一页") }
+    }
+}
+
+@Composable
+internal fun NoteFeed(
+    env: CommunityEnv,
+    topics: List<Topic>,
+    open: (Route) -> Unit,
+    showCategory: Boolean,
+    onTag: ((String) -> Unit)? = null,
+    footer: @Composable () -> Unit = {},
+) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val columns = when {
+            maxWidth >= 960.dp -> 4
+            maxWidth >= 720.dp -> 3
+            else -> 2
+        }
+        LazyVerticalStaggeredGrid(
+            StaggeredGridCells.Fixed(columns), Modifier.fillMaxSize(), contentPadding = FeedPadding,
+            horizontalArrangement = Arrangement.spacedBy(Gap), verticalItemSpacing = Gap,
+        ) {
+            staggeredItems(topics, key = { it.id }) { topic ->
+                VisualTopicCard(env, topic, noteCover = true,
+                    onCategory = if (showCategory) ({ open(Route.Articles(topic.category.slug, topic.category.name)) }) else null,
+                    onTag = onTag, onLogin = { open(Route.Login) }) { open(Route.Topic(topic.id)) }
+            }
+            if (topics.isEmpty()) item(span = StaggeredGridItemSpan.FullLine) {
+                CenterMessage("暂时没有帖子", modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp))
+            }
+            item(span = StaggeredGridItemSpan.FullLine) { footer() }
         }
     }
 }

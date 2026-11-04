@@ -128,6 +128,18 @@ class AndroidPlatformActions(
         tts?.stop()
     }
 
+    override fun enqueueSoftwareDownload(url: String, filename: String): Boolean {
+        if (android.os.Build.VERSION.SDK_INT < 29) return false
+        return runCatching {
+            val manager = context.getSystemService(android.app.DownloadManager::class.java)
+            val request = android.app.DownloadManager.Request(android.net.Uri.parse(url))
+                .setTitle(filename)
+                .setNotificationVisibility(android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, filename)
+            manager.enqueue(request)
+        }.isSuccess
+    }
+
     override fun openUrl(url: String) {
         val view = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         runCatching { context.startActivity(view) }

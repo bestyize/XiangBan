@@ -32,6 +32,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -299,7 +301,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
         Text("${if (help != null) "回答" else "评论"} ${posts.size}${if (more && posts.isNotEmpty()) "+" else ""}", style = XType.Section, fontWeight = FontWeight.SemiBold)
         posts.forEach { post ->
             PostItem(
-                env, post, open = open, topicId = topicId,
+                env, post, open = open,
                 onEdit = if (session.loggedIn && replyCanEdit(post, session.accountId, editTopic)) ({ editing = post }) else null,
                 accepted = help?.acceptedPostId == post.id,
                 onAccept = if (help != null && help.canAccept && post.author.uid != help.authorUid) ({ help.onAccept(post) }) else null,
@@ -318,7 +320,7 @@ internal fun CommentsSection(env: CommunityEnv, topicId: Long, reloadKey: Int = 
 }
 
 @Composable
-internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null, open: ((Route) -> Unit)? = null, topicId: Long? = null, onEdit: (() -> Unit)? = null) {
+internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, onAccept: (() -> Unit)? = null, open: ((Route) -> Unit)? = null, onEdit: (() -> Unit)? = null) {
     Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Avatar(post.author.nickname, 30.dp, showInitial = true)
         Column(Modifier.weight(1f)) {
@@ -332,7 +334,7 @@ internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, 
                 RichBody(env, post.bodyHtml, Modifier.padding(top = 2.dp), fontSize = XType.Body.fontSize, lineHeight = XType.Body.lineHeight)
                 ReplyContentCards(env, post.workRefs, open)
                 LinkedGameCards(env, post.bodyHtml, open, post.workRefs.map { it.id })
-                ReplyAttachments(env, post.attachments, topicId)
+                ForumAttachments(env, post.attachments, open)
             }
             if (!post.blocked && post.status == "normal") Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 PostLikeAction(env, post, open)
@@ -353,10 +355,12 @@ internal fun PostItem(env: CommunityEnv, post: Post, accepted: Boolean = false, 
 fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
     val session by env.session.state.collectAsState()
-    val loader = rememberLoader(env, id) { env.forum.topic(id) }
+    val loader = rememberLoader(env, listOf(id, session.accountId)) { env.forum.topic(id) }
     val state by loader.state.collectAsState()
     var share by remember { mutableStateOf(false) }
     var replying by remember { mutableStateOf(false) }
+    var confirmClose by remember(id) { mutableStateOf(false) }
+    var closingHelp by remember(id) { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
     var reloadKey by remember { mutableStateOf(0) }
     Box(Modifier.fillMaxSize()) {
@@ -372,38 +376,58 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                 }
                 Column(Modifier.fillMaxSize()) {
                     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
-                        if (topic.isCasual) {
-                            val article = remember(topic.bodyHtml) { casualArticle(topic.bodyHtml, env.config.forumBase) }
-                            CasualGallery(env, article.images)
-                        }
                         Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface).padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp)) {
-                            if (!topic.isCasual) Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                                 if (topic.pinned) Text("置顶", style = XType.Caption, fontWeight = FontWeight.SemiBold, color = Brand)
                                 if (topic.help != null) {
                                     Text("求助", style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Brand)
                                     HelpStatusTag(topic.help!!)
                                     Text(helpRemain(topic.help!!), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 } else {
-                                    Text(topic.category.name, style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    LinkText(topic.category.name, { open(Route.Articles(topic.category.slug, topic.category.name)) })
                                 }
                             }
-                            if (topic.title.isNotBlank()) Text(topic.title, Modifier.padding(top = if (topic.isCasual) 0.dp else 10.dp), style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                            if (topic.title.isNotBlank()) Text(topic.title, Modifier.padding(top = 10.dp), style = XType.Headline, fontWeight = FontWeight.SemiBold)
                             Row(Modifier.padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Avatar(topic.author.nickname, 32.dp, showInitial = true)
+                                TopicAuthorAvatar(env, topic.author, 32.dp)
                                 Column {
                                     Text(topic.author.nickname, Modifier.clickable { open(Route.User(topic.author.uid)) }, style = XType.Body, fontWeight = FontWeight.SemiBold)
-                                    Text("发布于 ${agoText(topic.createdAt)}", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    val level = listOf("新人", "成员", "老用户", "守护者").getOrNull(topic.author.trustLevel)
+                                    Text(listOfNotNull(level, "${agoText(topic.createdAt)}发布", "${topic.viewCount} 次浏览",
+                                        topic.editedAt?.let { "编辑于 ${agoText(it)}" },
+                                        "已锁定".takeIf { topic.locked == true },
+                                        "阅读等级 ${topic.minReadLevel}".takeIf { topic.minReadLevel > 0 },
+                                    ).joinToString(" · "), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
-                            RichBody(env, topic.bodyHtml, Modifier.padding(top = 12.dp), hideImages = topic.isCasual, onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
+                            if (topic.help?.status == "open" && topic.author.uid == session.accountId) {
+                                TextButton(onClick = { confirmClose = true }, enabled = !closingHelp) { Text("关闭求助") }
+                            }
+                            if (confirmClose) AlertDialog(
+                                onDismissRequest = { if (!closingHelp) confirmClose = false },
+                                title = { Text("关闭求助？") },
+                                text = { Text("尚未发放的悬赏积分将退还。") },
+                                confirmButton = {
+                                    TextButton(enabled = !closingHelp, onClick = {
+                                        guarded {
+                                            closingHelp = true
+                                            try {
+                                                env.forum.closeHelp(topic.id)
+                                                confirmClose = false
+                                                loader.reload()
+                                            } finally {
+                                                closingHelp = false
+                                            }
+                                        }
+                                    }) { Text("关闭求助") }
+                                },
+                                dismissButton = {
+                                    TextButton(enabled = !closingHelp, onClick = { confirmClose = false }) { Text("取消") }
+                                },
+                            )
+                            RichBody(env, topic.bodyHtml, Modifier.padding(top = 12.dp), onCopy = { text -> env.platform?.copy(text); toast = "已复制全文" })
                             LinkedGameCards(env, topic.bodyHtml, open)
-                            topic.attachments.forEach { attachment ->
-                                Column(Modifier.padding(top = 12.dp)) {
-                                    Text(attachment.name, style = XType.Body, fontWeight = FontWeight.Medium)
-                                    Text("${attachment.size} 字节 · ${if (attachment.price == 0) "免费" else "${attachment.price} 积分"}", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                                    GhostPillButton("在网页查看与下载", { env.platform?.openUrl(env.forum.topicUrl(topic.id)) }, enabled = env.platform != null)
-                                }
-                            }
+                            ForumAttachments(env, topic.attachments, open)
                             Box(Modifier.padding(top = 10.dp)) { NativeReportAction(env, "topic", topic.id, open) }
                             topic.help?.takeIf { it.bounty > 0 }?.let { Text("悬赏 ${it.bounty} 分", Modifier.padding(top = 12.dp), style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = Amber) }
                             topic.poll?.let { PollView(env, topic, it, open) { msg -> toast = msg } }
@@ -421,22 +445,20 @@ fun TopicDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: (Rout
                     Hairline()
                     Row(Modifier.fillMaxWidth().height(60.dp).background(MaterialTheme.colorScheme.surface).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(
-                            Modifier.weight(1f).height(40.dp).padding(horizontal = 4.dp).clip(CircleShape).background(LocalExtraColors.current.fill).clickable { if (session.loggedIn) replying = true else open(Route.Login) }.padding(horizontal = 16.dp),
+                            Modifier.weight(1f).height(40.dp).padding(horizontal = 4.dp).clip(CircleShape).background(LocalExtraColors.current.fill).clickable(enabled = topic.locked != true) { if (session.loggedIn) replying = true else open(Route.Login) }.padding(horizontal = 16.dp),
                             contentAlignment = Alignment.CenterStart,
-                        ) { Text(if (session.loggedIn) "写回复…" else "登录后回复", style = XType.Secondary, color = LocalExtraColors.current.ink3) }
-                        if (topic.help != null) {
-                            PillButton("用 AI 做一个", { open(Route.AiChat) }, Modifier.padding(start = 4.dp), height = 40.dp, icon = XIcons.Sparkle)
-                        } else Row(Modifier.clip(CircleShape).clickable {
+                        ) { Text(if (topic.locked == true) "帖子已锁定" else if (session.loggedIn) "写回复…" else "登录后回复", style = XType.Secondary, color = LocalExtraColors.current.ink3) }
+                        Row(Modifier.clip(CircleShape).clickable {
                             guarded {
                                 val next = !liked
-                                env.forum.setTopicLiked(topic.id, next)
-                                liked = next; likeCount = (likeCount + if (next) 1 else -1).coerceAtLeast(0)
+                                val result = env.forum.setTopicLiked(topic.id, next)
+                                liked = result.liked; likeCount = result.likeCount
                             }
                         }.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                             XIcon(XIcons.Heart, tint = if (liked) Brand else MaterialTheme.colorScheme.onSurface, description = if (liked) "取消点赞" else "点赞")
                             Text("$likeCount", style = XType.Secondary, color = if (liked) Brand else MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        if (topic.help == null) IconTap(XIcons.Bookmark, if (bookmarked) "取消收藏" else "收藏", {
+                        IconTap(XIcons.Bookmark, if (bookmarked) "取消收藏" else "收藏", {
                             guarded { val next = !bookmarked; env.forum.setTopicBookmarked(topic.id, next); bookmarked = next; toast = if (next) "已收藏" else "已取消收藏" }
                         }, tint = if (bookmarked) Brand else MaterialTheme.colorScheme.onSurface)
                     }

@@ -1,6 +1,13 @@
 package xyz.xiangban.xiaoban.common.community
 
 import io.ktor.client.HttpClient
+import io.ktor.client.request.header
+import io.ktor.client.request.prepareGet
+import io.ktor.client.statement.bodyAsChannel
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
+import io.ktor.utils.io.readRemaining
+import kotlinx.io.readByteArray
 import io.ktor.http.HttpMethod
 import io.ktor.http.encodeURLParameter
 import kotlinx.serialization.builtins.serializer
@@ -16,7 +23,7 @@ import kotlinx.serialization.serializer
 private val ProjectReadmePath = Regex("projects/[a-f0-9]{64}[.]json")
 
 /** 论坛接口（只读浏览 + 登录态相关的几项）。需要登录的请求带上 [token]，公开内容没登录也能看。 */
-class ForumApi(client: HttpClient, config: CommunityConfig, private val token: suspend () -> String?) {
+class ForumApi(private val client: HttpClient, config: CommunityConfig, private val token: suspend () -> String?) {
     private val http = JsonHttp(client, config.forumBase)
     private val site = config.forumBase.trimEnd('/')
     private val uploads = ForumUploads(client, config, token)
@@ -76,6 +83,12 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     }
     private fun repoPath(owner: String, repo: String) = "/api/discover/repo/${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
     suspend fun repoDetail(owner: String, repo: String): RepoDetail = get(repoPath(owner, repo))
+    suspend fun softwareSummaries(): Map<String, SoftwareSummary> =
+        http.send(HttpMethod.Get, "/api/open-source/software", serializer())
+
+    suspend fun softwareSnapshot(project: String): SoftwareSnapshot? =
+        http.send(HttpMethod.Get, "/api/open-source/software/${project.split('/').joinToString("/") { it.encodeURLParameter() }}", serializer())
+
     suspend fun openSourceCatalog(): OpenSourceCatalog = get("/api/open-source")
     suspend fun openSourceProject(owner: String, repo: String): OpenSourceCatalog = http.send(
         HttpMethod.Get,
@@ -188,6 +201,10 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     }
 
     /** 求助者采纳一条回答，悬赏积分随之发给回答者。 */
+    suspend fun closeHelp(topicId: Long) {
+        write(HttpMethod.Post, "/api/topics/$topicId/help/close")
+    }
+
     suspend fun acceptAnswer(topicId: Long, postId: Long) { write(HttpMethod.Post, "/api/topics/$topicId/help/accept", buildJsonObject { put("post_id", postId) }) }
 
     suspend fun setPostLiked(id: Long, liked: Boolean): LikeState {
@@ -201,6 +218,28 @@ class ForumApi(client: HttpClient, config: CommunityConfig, private val token: s
     // ── 登录态 ──
     suspend fun uploadSession(): ForumUploadSession = http.send(HttpMethod.Post, "/api/session", serializer(), body = "{}", token = token())
     suspend fun uploadImage(file: ForumUploadFile, maxBytes: Long): ForumImage = uploads.image(file, maxBytes)
+    suspend fun purchaseAttachment(attachment: ForumAttachment): AttachmentPurchase =
+        write(HttpMethod.Post, "/api/attachments/${attachment.id.encodeURLParameter()}/purchase",
+            buildJsonObject { put("price", attachment.price) })
+            .let { CommunityJson.decodeFromJsonElement(serializer<AttachmentPurchase>(), it) }
+
+    suspend fun downloadAttachment(attachment: ForumAttachment): ByteArray {
+        val size = attachment.size
+        if (size !in 0..(64L * 1024 * 1024)) throw ApiException(0, "附件大小超出 App 下载范围")
+        val access = token()
+        return client.prepareGet("$site/api/attachments/${attachment.id.encodeURLParameter()}") {
+            if (access != null) header(HttpHeaders.Authorization, "Bearer $access")
+        }.execute { response ->
+            if (response.status.value !in 200..299) {
+                throw parseApiError(response.status.value, response.bodyAsText())
+            }
+            if (response.status.value != 200) throw ApiException(0, "附件下载响应无效")
+            val bytes = response.bodyAsChannel().readRemaining(size + 1).readByteArray()
+            if (bytes.size.toLong() != size) throw ApiException(0, "附件下载不完整，请重试")
+            bytes
+        }
+    }
+
     suspend fun uploadAttachment(file: ForumUploadFile, maxBytes: Long): ForumAttachment = uploads.attachment(file, maxBytes)
     suspend fun deletePendingAttachment(id: String) {
         if (!ForumAssetId.matches(id)) throw ApiException(400, "附件编号无效")

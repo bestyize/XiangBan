@@ -24,6 +24,7 @@ kotlin {
         namespace = "xyz.xiangban.xiaoban.business.communitynative"
         compileSdk = libs.versions.android.compileSdk.get().toInt()
         minSdk = libs.versions.android.minSdk.get().toInt()
+        androidResources { enable = true }
 
         compilerOptions {
             jvmTarget = JvmTarget.JVM_11
@@ -36,6 +37,7 @@ kotlin {
             api(project(":common:link-core"))
             implementation(project(":common:webview"))
             implementation(libs.compose.runtime)
+            implementation(libs.compose.components.resources)
             implementation(libs.compose.foundation)
             implementation(libs.compose.animation)
             implementation(libs.compose.material3)

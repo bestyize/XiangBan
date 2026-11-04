@@ -31,6 +31,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -50,9 +51,7 @@ import xyz.xiangban.xiaoban.common.community.HelpStats
 import xyz.xiangban.xiaoban.common.community.Load
 import xyz.xiangban.xiaoban.common.community.ToolArtifact
 import xyz.xiangban.xiaoban.common.community.ToolDetail
-import xyz.xiangban.xiaoban.common.community.ToolSummary
 import xyz.xiangban.xiaoban.common.community.Topic
-import xyz.xiangban.xiaoban.common.community.compactCount
 import xyz.xiangban.xiaoban.common.community.formatDownloadSize
 import xyz.xiangban.xiaoban.common.community.nowMillis
 import xyz.xiangban.xiaoban.common.community.parseIsoMillis
@@ -60,34 +59,40 @@ import xyz.xiangban.xiaoban.common.community.remainText
 
 /** 资源的三个二级栏目；精选独立放在首页。 */
 internal enum class ResourceSub(val key: String, val label: String) {
-    Tools("tools", "工具下载"), Docs("docs", "资料"), Help("help", "求助悬赏");
+    Software("software", "开源软件"), Media("media", "影视"), Help("help", "求助悬赏");
 
     companion object {
-        fun byKey(key: String) = entries.firstOrNull { it.key == key } ?: Tools
+        fun byKey(key: String) = if (key == "docs") Media else entries.firstOrNull { it.key == key } ?: Software
     }
 }
 
 @Composable
 internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> Unit) {
     when (sub) {
-        ResourceSub.Tools -> ToolsTab(env, open)
-        ResourceSub.Docs -> DocsTab(env, open)
+        ResourceSub.Software -> SoftwareDirectoryTab(env, open)
+        ResourceSub.Media -> ResourceMediaTab(env, open)
         ResourceSub.Help -> HelpTab(env, open)
     }
 }
 
-private val Gap = 8.dp
-
-/** 栏目顶部的灰色说明，前面带一个小 i。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TabNote(text: String) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 2.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        XIcon(XIcons.Info, tint = LocalExtraColors.current.ink3, size = 14.dp, modifier = Modifier.padding(top = 2.dp))
-        Text(text, style = XType.Caption, color = LocalExtraColors.current.ink3)
+private fun ResourceMediaTab(env: CommunityEnv, open: (Route) -> Unit) {
+    var page by rememberSaveable { mutableIntStateOf(1) }
+    val loader = rememberLoader(env, page) {
+        env.forum.topics(sort = "new", category = "resource-movies", page = page, home = false)
+    }
+    val state by loader.state.collectAsState()
+    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
+        LoadBox(state, loader::reload) { result ->
+            NoteFeed(env, result.items, open, showCategory = true) {
+                if (page > 1 || result.hasMore) NotePager(page, result.hasMore) { page = it }
+            }
+        }
     }
 }
 
-// ───────────── AI 工具 ─────────────
+private val Gap = 8.dp
 
 /** 许可证小标签：闭源带锁、开源带代码符号、待确认带问号，灰底。 */
 @Composable
@@ -105,88 +110,6 @@ private fun ToolIcon(name: String, developer: String, size: androidx.compose.ui.
     val logo = BrandLogos.tool(name) ?: BrandLogos.find(name) ?: BrandLogos.find(developer)
     val openai = name.contains("chatgpt", true) || developer.contains("openai", true)
     BrandTile(logo, name, size = size, corner = corner, dashed = logo == null && openai)
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ToolsTab(env: CommunityEnv, open: (Route) -> Unit) {
-    val loader = rememberLoader(env, "tools") { env.forum.tools() }
-    val state by loader.state.collectAsState()
-    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
-        LoadBox(state, loader::reload) { list ->
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = FeedPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
-                item { EditorialSection(env, "resource-tools", "工具导读", open) }
-                if (list.items.isEmpty()) item { CenterMessage("还没有收录的 AI 工具", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)) }
-                items(list.items, key = { it.key }) { tool -> ToolRow(env, tool) { open(Route.Tool(tool.key)) } }
-                if (list.items.any { it.sample }) item { FootNote("版本号和更新日期为示例数据。") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ToolRow(env: CommunityEnv, tool: ToolSummary, onClick: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().outlinedCard(12.dp).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        var iconFailed by remember(tool.iconUrl) { mutableStateOf(false) }
-        if (tool.iconUrl.isNotBlank() && !iconFailed) coil3.compose.AsyncImage(env.forum.imageUrl(tool.iconUrl), null, imageLoader = rememberImageLoader(), modifier = Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)), contentScale = androidx.compose.ui.layout.ContentScale.Fit, onError = { iconFailed = true })
-        else ToolIcon(tool.name, tool.developer)
-        Column(Modifier.weight(1f)) {
-            Text(tool.name, style = XType.Body, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                LicenseChip(tool.license, tool.licenseText)
-                val meta = when {
-                    tool.license == "unknown" && tool.latestVersion == null -> "许可证核实中"
-                    else -> listOfNotNull(tool.latestVersion, tool.latestDate?.takeIf { it.isNotEmpty() }?.let { "$it 更新" }).joinToString(" · ")
-                }
-                if (meta.isNotEmpty()) Text(meta, style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        XIcon(XIcons.ChevronRight, tint = LocalExtraColors.current.ink3, size = 18.dp)
-    }
-}
-
-// ───────────── 资料 ─────────────
-
-private val DocTints = listOf(Color(0xFFF1ECE4), Color(0xFFE6F4EA), Color(0xFFE8EEF8))
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DocsTab(env: CommunityEnv, open: (Route) -> Unit) {
-    val loader = rememberLoader(env, "docs") { env.forum.docs() }
-    val state by loader.state.collectAsState()
-    PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
-        LoadBox(state, loader::reload) { groups ->
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = FeedPadding, verticalArrangement = Arrangement.spacedBy(Gap)) {
-                item { EditorialSection(env, "resource-docs", "资料导读", open) }
-                item { TabNote("官方文档的索引和导读，原文一律跳转官网。") }
-                if (groups.groups.isEmpty()) item { CenterMessage("还没有收录的资料", modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp)) }
-                groups.groups.forEach { group ->
-                    item(key = "g-${group.name}") {
-                        WhiteCard(padding = 14.dp) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                BrandTile(BrandLogos.find(group.name), group.name, size = 28.dp, corner = 8.dp)
-                                Text(group.name, Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.SemiBold)
-                                Text("${group.items.size} 篇", style = XType.Caption, color = LocalExtraColors.current.ink3)
-                            }
-                            group.items.forEachIndexed { index, doc ->
-                                if (index > 0) Hairline()
-                                Row(Modifier.fillMaxWidth().clickable { env.platform?.openUrl(doc.url) }.padding(vertical = 14.dp),
-                                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(doc.title, style = XType.Secondary, fontWeight = FontWeight.Normal)
-                                    }
-                                    XIcon(XIcons.ExternalLink, size = 15.dp, tint = LocalExtraColors.current.ink3)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 }
 
 // ───────────── 历史社区分享 ─────────────
@@ -272,14 +195,18 @@ private fun HelpCard(env: CommunityEnv, topic: Topic, open: (Route) -> Unit) {
                 Text(helpRemain(help), style = XType.Caption, color = LocalExtraColors.current.ink3)
             }
         }
-        val thumb = topic.images.firstOrNull()?.let { env.forum.imageUrl(it) }
+        if (help == null) Text("站方指南", style = XType.Caption, color = Brand)
+        var failed by remember(topic.id, topic.images) { mutableIntStateOf(0) }
+        val thumb = topic.images.getOrNull(failed)?.let(env.forum::imageUrl)
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (thumb != null) Box(Modifier.size(72.dp)) {
-                Cover(thumb, topic.id, Modifier.fillMaxSize())
-                Text("参考图", Modifier.align(Alignment.BottomStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(Color.Black.copy(alpha = 0.4f)).padding(horizontal = 4.dp), style = XType.Caption, color = Color.White)
-            }
             Column(Modifier.weight(1f)) {
                 Text(topic.title, style = XType.Secondary, fontWeight = FontWeight.Normal, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (topic.excerpt.isNotBlank() && topic.excerpt != topic.title) {
+                    Text(topic.excerpt, style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            if (thumb != null) Box(Modifier.width(96.dp)) {
+                CommunityCover(thumb, onError = { failed++ }) { TopicCoverStats(topic) }
             }
         }
         Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -106,17 +106,26 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
             check(image.asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it))
         }
 
-    private suspend fun saveImage(filename: String, mime: String, write: (java.io.OutputStream) -> Unit): CommunityPosterResult {
+    override val forumDownloadSupported = true
+
+    override suspend fun saveForumDownload(filename: String, bytes: ByteArray): CommunityPosterResult =
+        saveFile(filename, "application/octet-stream", download = true) { it.write(bytes) }
+
+    private suspend fun saveImage(filename: String, mime: String, write: (java.io.OutputStream) -> Unit): CommunityPosterResult =
+        saveFile(filename, mime, download = false, write = write)
+
+    private suspend fun saveFile(filename: String, mime: String, download: Boolean, write: (java.io.OutputStream) -> Unit): CommunityPosterResult {
         var inserted: Uri? = null
         return try {
             if (Build.VERSION.SDK_INT >= 29) withContext(Dispatchers.IO) {
                 val values = ContentValues().apply {
                     put(MediaStore.Images.Media.DISPLAY_NAME, filename)
                     put(MediaStore.Images.Media.MIME_TYPE, mime)
-                    put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Xiaoban")
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, (if (download) Environment.DIRECTORY_DOWNLOADS else Environment.DIRECTORY_PICTURES) + "/Xiaoban")
                     put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
-                val uri = activity.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return@withContext CommunityPosterResult.Failed
+                val collection = if (download) MediaStore.Downloads.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                val uri = activity.contentResolver.insert(collection, values) ?: return@withContext CommunityPosterResult.Failed
                 inserted = uri
                 activity.contentResolver.openOutputStream(uri)?.use(write) ?: error("No output")
                 check(activity.contentResolver.update(uri, ContentValues().apply { put(MediaStore.Images.Media.IS_PENDING, 0) }, null, null) > 0)

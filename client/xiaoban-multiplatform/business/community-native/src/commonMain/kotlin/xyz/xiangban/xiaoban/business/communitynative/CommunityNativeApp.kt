@@ -160,6 +160,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.News -> NewsDetailScreen(env, route.key, pop, push)
         is Route.Repo -> RepoDetailScreen(env, route.owner, route.repo, pop, push)
         is Route.WebPage -> EmbeddedWebPage(route.url, pop, env.platform)
+        is Route.Software -> SoftwareDetailScreen(env, route.project, pop, push)
         is Route.OpenSource -> RepoDetailScreen(env, route.owner, route.repo, pop, push, curated = true)
         is Route.OpenSourceCollection -> OpenSourceCollectionScreen(env, route.key, pop, push)
         Route.OpenSourceShares -> OpenSourceSharesScreen(env, pop, push)

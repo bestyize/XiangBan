@@ -31,7 +31,11 @@ data class ForumUploadLimits(
 @Serializable
 data class ForumImage(val id: String, val url: String, val size: Long)
 @Serializable
-data class ForumAttachment(val id: String, val name: String, val size: Long, val price: Int = 0, val purchased: Boolean = true)
+data class ForumAttachment(val id: String, val name: String, val size: Long, val price: Int = 0, val purchased: Boolean = false)
+
+@Serializable
+data class AttachmentPurchase(val purchased: Boolean, val charged: Int, val balance: Int)
+
 
 internal val ForumAssetId = Regex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 

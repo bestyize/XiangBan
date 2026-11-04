@@ -46,7 +46,10 @@ internal fun EditorialListScreen(env: CommunityEnv, category: String, title: Str
     val controller = remember(env, category) { DiscussController(env.forum, scope, category = category, home = false) }
     Column(Modifier.fillMaxSize()) {
         ScreenBar(title, back)
-        if (category.startsWith("resource-")) CasualWaterfall(env, controller, open)
-        else TopicFeed(controller, "暂无图文分享", open, initialSort = "new") { TopicCard(env, it, open, {}) }
+        when {
+            category == "casual" || category.startsWith("casual-") || category in setOf("resource-movies", "resource-music") ->
+                CasualWaterfall(env, controller, open)
+            else -> TopicFeed(controller, "暂无图文分享", open) { TopicCard(env, it, open, {}) }
+        }
     }
 }

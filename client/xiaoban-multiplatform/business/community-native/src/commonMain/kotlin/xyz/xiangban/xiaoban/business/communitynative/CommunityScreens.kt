@@ -31,10 +31,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-internal enum class CommunitySection(val label: String) { Home("首页"), Discuss("讨论"), Resources("资源") }
+internal enum class CommunitySection(val label: String) { Home("首页"), Ideas("创意"), Discuss("讨论"), Resources("资源") }
 
 /**
- * 社区：顶部是 首页 / 讨论 / 资源 三个栏目，每个栏目下面有自己的二级栏目。
+ * 社区：顶部是 首页 / 创意 / 讨论 / 资源 四个栏目，每个栏目下面有自己的二级栏目。
  * 内容可以滚到底部的悬浮导航下面，所以各列表自己在末尾留出空白。
  */
 @Composable
@@ -42,23 +42,30 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
     var section by rememberSaveable { mutableStateOf(CommunitySection.Home.name) }
     var homeSub by rememberSaveable { mutableStateOf(HomeSub.Recommend.key) }
     var discussSub by rememberSaveable { mutableStateOf(DiscussSub.All.key) }
-    var resourceSub by rememberSaveable { mutableStateOf(ResourceSub.Tools.key) }
+    var resourceSub by rememberSaveable { mutableStateOf(ResourceSub.Software.key) }
     val current = CommunitySection.valueOf(section)
 
     fun switchTo(target: CommunitySection, sub: String) {
         section = target.name
         when (target) {
+            CommunitySection.Ideas -> Unit
             CommunitySection.Home -> homeSub = sub
             CommunitySection.Discuss -> discussSub = sub
             CommunitySection.Resources -> resourceSub = sub
         }
     }
 
-    LaunchedEffect(section, resourceSub) {
-        if (current == CommunitySection.Resources && resourceSub == "media") {
-            switchTo(CommunitySection.Discuss, DiscussSub.Media.key)
-            resourceSub = ResourceSub.Tools.key
+    LaunchedEffect(Unit) {
+        if (discussSub == "create") {
+            if (current == CommunitySection.Discuss) section = CommunitySection.Ideas.name
+            discussSub = DiscussSub.All.key
         }
+        if (discussSub == "casual-media") {
+            if (current == CommunitySection.Discuss) section = CommunitySection.Resources.name
+            resourceSub = ResourceSub.Media.key
+            discussSub = DiscussSub.All.key
+        }
+        resourceSub = ResourceSub.byKey(resourceSub).key
     }
 
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -66,7 +73,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
             CommunityHeader(current, onSelect = { section = it.name }, onSearch = { open(Route.Search) })
             when (current) {
                 CommunitySection.Home -> TabStrip(HomeSub.entries.filter { it != HomeSub.Hot }.map { it.key to it.label }, if (homeSub == HomeSub.Hot.key) HomeSub.OpenSource.key else homeSub, centered = true) { homeSub = it }
-                CommunitySection.Discuss -> Unit
+                CommunitySection.Ideas, CommunitySection.Discuss -> Unit
                 CommunitySection.Resources -> TabStrip(ResourceSub.entries.map { it.key to it.label }, ResourceSub.byKey(resourceSub).key, centered = true) { resourceSub = it }
             }
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -79,6 +86,7 @@ fun CommunityScreen(env: CommunityEnv, open: (Route) -> Unit) {
                         HomeSub.Track -> TrackTab(env)
                         HomeSub.Nav -> NavTab(env)
                     }
+                    CommunitySection.Ideas -> IdeasTab(env, open)
                     CommunitySection.Discuss -> DiscussTab(env, DiscussSub.byKey(discussSub), { discussSub = it.key }, open)
                     CommunitySection.Resources -> ResourceTab(env, ResourceSub.byKey(resourceSub), open)
                 }
@@ -96,7 +104,7 @@ private fun CommunityHeader(current: CommunitySection, onSelect: (CommunitySecti
                     XIcon(XIcons.SparkleSmall, tint = Brand, size = 18.dp)
                 }
             }
-            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally)) {
+            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally)) {
                 CommunitySection.entries.forEach { s ->
                     val selected = s == current
                     Column(Modifier.clickable { onSelect(s) }.height(40.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {

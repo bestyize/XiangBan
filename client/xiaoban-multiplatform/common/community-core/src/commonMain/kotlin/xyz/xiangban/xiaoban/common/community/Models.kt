@@ -131,6 +131,8 @@ data class Topic(
     @SerialName("view_count") val viewCount: Int = 0,
     @SerialName("created_at") val createdAt: String = "",
     @SerialName("last_reply_at") val lastReplyAt: String = "",
+    @SerialName("edited_at") val editedAt: String? = null,
+    @SerialName("min_read_level") val minReadLevel: Int = 0,
     /** 正文里的前几张站内图片（`/api/images/{id}`），列表卡片用作配图。 */
     val images: List<String> = emptyList(),
     /** 只有求助帖有。 */

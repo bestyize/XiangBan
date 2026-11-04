@@ -471,7 +471,7 @@ fun RepoDetailScreen(env: CommunityEnv, owner: String, repo: String, back: () ->
 }
 
 @Composable
-private fun CuratedComment(
+internal fun CuratedComment(
     env: CommunityEnv,
     comment: NewsComment,
     parentName: String?,
