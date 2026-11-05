@@ -15,6 +15,12 @@
 
 允许与其他客户端重复代码；不要强行套用网页 UI 或全局共享实现。各客户端维护自己的协议模型。
 
+## 注册入口开关
+
+原生登录页从账号中心 `GET /api/auth/methods` 读取邮箱、手机号注册开关，与桌面和网页一致；每次打开重新读取，失败默认只展示邮箱验证码入口，密码登录仍支持用户名、邮箱、手机号。短信由账号中心的独立 PNVS 或原有发信通道处理，手机端不持有服务商密钥。管理员在账号中心「发信设置 → 新用户注册方式」控制开放方式。
+
+验证：`:common:community-core:jvmTest --tests '*AccountSignupMethodsTest*'` 和 `:business:community-native:compileAndroidMain`；未做实机或 iOS 验收。
+
 ## 模块
 
 | 模块 | 说明 |

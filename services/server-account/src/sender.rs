@@ -1,5 +1,6 @@
 use crate::{
-    config::SenderConfig,
+    config::{AppConfig, SenderConfig},
+    codes::Purpose,
     error::AppError,
     identifier::{Identifier, Kind},
     tencent::TencentSender,
@@ -117,11 +118,12 @@ pub enum SenderKind {
 #[derive(Clone)]
 pub struct Sender {
     inner: Arc<RwLock<SenderKind>>,
+    pnvs: Option<crate::pnvs::PnvsSender>,
 }
 
 impl Sender {
-    pub fn from_config(config: &SenderConfig) -> Result<Self, AppError> {
-        let kind = match config {
+    pub fn from_config(config: &AppConfig) -> Result<Self, AppError> {
+        let kind = match &config.sender {
             SenderConfig::Console => {
                 tracing::warn!("ACCOUNT_SENDER=console：验证码只写入日志，生产环境必须设为 tencent 或配置 SMTP");
                 SenderKind::Console
@@ -130,6 +132,7 @@ impl Sender {
         };
         Ok(Self {
             inner: Arc::new(RwLock::new(kind)),
+            pnvs: config.pnvs.as_ref().map(crate::pnvs::PnvsSender::new).transpose()?,
         })
     }
 
@@ -137,6 +140,7 @@ impl Sender {
     pub fn capture() -> Self {
         Self {
             inner: Arc::new(RwLock::new(SenderKind::Capture(Arc::new(Mutex::new(Vec::new()))))),
+            pnvs: None,
         }
     }
 
@@ -176,6 +180,9 @@ impl Sender {
 
     /// 当前发信通道能不能给这类标识发验证码。
     pub fn can_send(&self, kind: Kind) -> bool {
+        if kind == Kind::Phone && self.pnvs.is_some() {
+            return true;
+        }
         let guard = self.inner.read().unwrap();
         match &*guard {
             SenderKind::Console => true,
@@ -194,7 +201,16 @@ impl Sender {
         }
     }
 
-    pub async fn send_code(&self, target: &Identifier, code: &str, ttl_minutes: i64) -> Result<(), AppError> {
+    pub fn has_pnvs(&self) -> bool {
+        self.pnvs.is_some()
+    }
+
+    pub async fn send_code(&self, target: &Identifier, code: &str, ttl_minutes: i64, purpose: Purpose) -> Result<(), AppError> {
+        if let Some(pnvs) = &self.pnvs {
+            if target.kind == Kind::Phone {
+                return pnvs.send_sms(&target.value, code, ttl_minutes, purpose).await;
+            }
+        }
         let kind = { self.inner.read().unwrap().clone() };
         match kind {
             SenderKind::Console => {
@@ -264,5 +280,40 @@ impl SavedSenderConfig {
             }
             _ => Ok(SenderKind::Console),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pnvs_keeps_phone_available_when_email_sender_switches_to_smtp() {
+        let config = AppConfig::from_lookup(|key| match key {
+            "ACCOUNT_SMS_PROVIDER" => Some("aliyun_pnvs".into()),
+            "ALIYUN_PNVS_ACCESS_KEY_ID" => Some("id".into()),
+            "ALIYUN_PNVS_ACCESS_KEY_SECRET" => Some("secret".into()),
+            "ALIYUN_PNVS_SIGN_NAME" => Some("预置签名".into()),
+            _ => None,
+        });
+        let smtp = SmtpConfig {
+            host: "smtp.example.com".into(), port: 465, secure: true,
+            username: "mail".into(), password: "secret".into(),
+            from_name: "小伴".into(), from_email: "mail@example.com".into(),
+        };
+        let sender = Sender::from_config(&config).unwrap();
+        sender.update(SenderKind::Smtp(smtp.clone()));
+        assert!(sender.has_pnvs());
+        assert!(sender.can_send(Kind::Phone));
+        assert!(sender.can_send(Kind::Email));
+        assert_eq!(sender.current_type(), "smtp");
+
+        let legacy = Sender::from_config(&AppConfig::from_lookup(|_| None)).unwrap();
+        legacy.update(SenderKind::Smtp(smtp));
+        assert!(!legacy.has_pnvs());
+        assert!(!legacy.can_send(Kind::Phone));
+
+        let incomplete = AppConfig::from_lookup(|key| (key == "ACCOUNT_SMS_PROVIDER").then(|| "aliyun_pnvs".into()));
+        assert!(Sender::from_config(&incomplete).is_err());
     }
 }

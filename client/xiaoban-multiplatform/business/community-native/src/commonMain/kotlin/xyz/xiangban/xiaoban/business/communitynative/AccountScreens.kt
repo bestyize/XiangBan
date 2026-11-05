@@ -43,6 +43,7 @@ import xyz.xiangban.xiaoban.common.community.EdgeVoices
 import xyz.xiangban.xiaoban.common.community.SpeechSource
 import xyz.xiangban.xiaoban.common.community.ApiException
 import xyz.xiangban.xiaoban.common.community.CodeLogin
+import xyz.xiangban.xiaoban.common.community.AccountSignupMethods
 import xyz.xiangban.xiaoban.common.community.messageOf
 
 private enum class LoginMode(val label: String) { Code("验证码登录"), Password("密码登录") }
@@ -61,6 +62,15 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var cooldown by remember { mutableStateOf(0) }
+    var methods by remember { mutableStateOf(AccountSignupMethods()) }
+
+    LaunchedEffect(Unit) { methods = env.account.signupMethods() }
+    val codeIdentifierLabel = when {
+        methods.email && methods.phone -> "邮箱或手机号"
+        methods.phone -> "手机号"
+        else -> "邮箱"
+    }
+    val codeIdentifierAllowed = if ('@' in identifier) methods.email else methods.phone
 
     LaunchedEffect(cooldown) { if (cooldown > 0) { delay(1000); cooldown -= 1 } }
 
@@ -109,14 +119,14 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
                         }
                     }
                 }
-                TextBox(identifier, { identifier = it.trim() }, Modifier.padding(top = 14.dp), label = if (mode == LoginMode.Code) "邮箱或手机号" else "用户名、邮箱或手机号", placeholder = if (mode == LoginMode.Code) "请输入邮箱或手机号" else "请输入用户名、邮箱或手机号", leadingIcon = XIcons.User, filled = true, fontSize = 14)
+                TextBox(identifier, { identifier = it.trim() }, Modifier.padding(top = 14.dp), label = if (mode == LoginMode.Code) codeIdentifierLabel else "用户名、邮箱或手机号", placeholder = if (mode == LoginMode.Code) "请输入$codeIdentifierLabel" else "请输入用户名、邮箱或手机号", leadingIcon = XIcons.User, filled = true, fontSize = 14)
                 if (mode == LoginMode.Code) {
                     Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                         TextBox(code, { code = it.trim() }, Modifier.weight(1f), label = "验证码", placeholder = "6 位数字", keyboardType = KeyboardType.Number, leadingIcon = XIcons.Lock, filled = true, fontSize = 14)
                         GhostPillButton(
                             if (cooldown > 0) "${cooldown}s" else "获取验证码",
                             { run { env.account.sendCode(identifier); cooldown = 60 } },
-                            enabled = identifier.isNotBlank() && cooldown == 0 && !busy, height = 48.dp, fontSize = 14,
+                            enabled = identifier.isNotBlank() && codeIdentifierAllowed && cooldown == 0 && !busy, height = 48.dp, fontSize = 14,
                         )
                     }
                 } else {
@@ -139,7 +149,7 @@ fun LoginDialog(env: CommunityEnv, done: () -> Unit, back: () -> Unit) {
                         }
                     },
                     Modifier.padding(top = 16.dp).fillMaxWidth(),
-                    enabled = !busy && identifier.isNotBlank() && (if (mode == LoginMode.Code) code.isNotBlank() else password.isNotBlank()),
+                    enabled = !busy && identifier.isNotBlank() && (if (mode == LoginMode.Code) code.isNotBlank() && codeIdentifierAllowed else password.isNotBlank()),
                     height = 44.dp,
                 )
                 if (mode == LoginMode.Code) Text("首次登录将引导注册", Modifier.padding(top = 10.dp).fillMaxWidth(), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)

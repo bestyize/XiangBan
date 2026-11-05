@@ -482,6 +482,7 @@ pub struct SmtpView {
 pub struct SenderConfigView {
     pub provider: String,
     pub smtp: Option<SmtpView>,
+    pub pnvs_configured: bool,
 }
 
 pub async fn get_sender(
@@ -499,7 +500,7 @@ pub async fn get_sender(
         from_name: s.from_name,
         from_email: s.from_email,
     });
-    Ok(Json(SenderConfigView { provider, smtp }))
+    Ok(Json(SenderConfigView { provider, smtp, pnvs_configured: state.sender.has_pnvs() }))
 }
 
 #[derive(Deserialize)]

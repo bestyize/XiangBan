@@ -1,6 +1,14 @@
 use std::{env, path::PathBuf};
 
 #[derive(Clone, Debug)]
+pub struct PnvsConfig {
+    pub access_key_id: String,
+    pub access_key_secret: String,
+    pub sign_name: String,
+    pub scheme_name: Option<String>,
+}
+
+#[derive(Clone, Debug)]
 pub struct SmsConfig {
     pub sdk_app_id: String,
     pub sign_name: String,
@@ -51,6 +59,7 @@ pub struct AppConfig {
     pub email_clients: Vec<String>,
     pub clients: Vec<(String, String)>,
     pub sender: SenderConfig,
+    pub pnvs: Option<PnvsConfig>,
     pub forum_provision_key: Option<String>,
     pub admin_user: Option<String>,
     pub admin_password: Option<String>,
@@ -138,6 +147,12 @@ impl AppConfig {
             },
             clients,
             sender,
+            pnvs: (get("ACCOUNT_SMS_PROVIDER").as_deref() == Some("aliyun_pnvs")).then(|| PnvsConfig {
+                access_key_id: get("ALIYUN_PNVS_ACCESS_KEY_ID").unwrap_or_default(),
+                access_key_secret: get("ALIYUN_PNVS_ACCESS_KEY_SECRET").unwrap_or_default(),
+                sign_name: get("ALIYUN_PNVS_SIGN_NAME").unwrap_or_default(),
+                scheme_name: get("ALIYUN_PNVS_SCHEME_NAME"),
+            }),
             forum_provision_key: get("ACCOUNT_FORUM_PROVISION_KEY").filter(|v| v.len() >= 32),
             admin_user: get("ACCOUNT_ADMIN_USER"),
             admin_password: get("ACCOUNT_ADMIN_PASSWORD"),

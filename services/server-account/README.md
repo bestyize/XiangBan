@@ -2,7 +2,7 @@
 
 状态：已实现（v1）。只负责账号基本信息与登录凭证：邮箱/手机号验证码验证身份、注册时设置唯一且不可修改的用户名与密码、用户名/邮箱/手机号加密码登录、头像、令牌签发，并带一个管理后台（用户、应用、操作日志）。不存任何产品业务数据。设计取舍见 [docs/architecture/account-center.md](../../docs/architecture/account-center.md)。
 
-技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），Ed25519（EdDSA）签发 JWT，Argon2 存密码，腾讯云短信/邮件发送验证码；管理后台为 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。默认端口 55009。
+技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），Ed25519（EdDSA）签发 JWT，Argon2 存密码，支持阿里云 PNVS 短信认证、腾讯云短信/邮件和 SMTP 邮件发送验证码；管理后台为 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。默认端口 55009。
 
 ## 运行与验证
 
@@ -68,6 +68,27 @@ cargo run --manifest-path services/server-account/Cargo.toml -- gen-keys
 
 未配置某一通道时，该类型标识符的发送返回 400 提示暂未开通。
 
+## 阿里云短信认证（个人账号可接入）
+
+在阿里云「号码认证服务 → 短信认证」完成个人实名认证、开通并购买对应套餐，在账号中心环境配置：
+
+```dotenv
+ACCOUNT_SMS_PROVIDER=aliyun_pnvs
+ALIYUN_PNVS_ACCESS_KEY_ID=RAM用户的AccessKeyID
+ALIYUN_PNVS_ACCESS_KEY_SECRET=RAM用户的AccessKeySecret
+ALIYUN_PNVS_SIGN_NAME=控制台系统赠送签名
+# 可选，不填使用阿里云默认方案
+# ALIYUN_PNVS_SCHEME_NAME=方案名
+```
+
+RAM 用户仅需 `dypns:SendSmsVerifyCode` 权限（资源 `*`）。不要购买普通短信 SMS 套餐，它不能抵扣 PNVS；签名必须使用号码认证控制台预置签名。参考[个人接入指南](https://help.aliyun.com/zh/pnvs/use-cases/sms-verify-for-individual-developers)。
+
+此通道独立于 `ACCOUNT_SENDER` 和后台保存的邮件通道，优先处理所有手机号验证码，可与 SMTP 并用。环境配置重启生效；启用但缺少密钥或签名时服务启动报错。手机号注册仍默认关闭，管理员在 `/admin/` 的「发信设置 → 新用户注册方式」勾选手机号注册并保存后开放。桌面、官网、社区与手机登录页读取 `GET /api/auth/methods` 决定展示的方式；接口不可用时默认只展示邮箱。开关保存在数据库并立即生效，客户端重新打开登录页后读取；已注册用户的密码登录不受影响，后端也拒绝关闭方式的新注册及新绑定。
+
+预置模板：登录/注册 `100001`、重置密码 `100003`、验证待绑定手机号 `100005`。按[发送接口文档](https://help.aliyun.com/zh/pnvs/developer-reference/api-dypnsapi-2017-05-25-sendsmsverifycode)，通过 `TemplateParam` 传入账号中心生成的验证码及有效分钟数（`code`、`min`），仅调用 `SendSmsVerifyCode`，不调用阿里云核验接口。本地继续执行 HMAC 存储、用途隔离、一次性消费、过期、错误次数与发送限流；不记录 PNVS 请求 URL 或完整响应，避免日志泄露手机号与验证码。
+
+Docker 独立部署栈已透传以上变量，见 `infra/account/.env.production.example`。生产凭据不入库，当前未进行真实账号短信联调；上线前用实际预置签名验证送达。
+
 ## 接口
 
 成功返回 JSON；失败统一为 `{"error":true,"code":"...","message":"..."}`，限流类错误带 `retry_after` 与 `Retry-After` 头。`identifier` 含 `@` 视为邮箱（转小写），否则按中国大陆手机号处理（规范化为 `+86…`）。`client_id` 必须是已登记应用。
@@ -99,7 +120,7 @@ cargo run --manifest-path services/server-account/Cargo.toml -- gen-keys
 
 | 方法 路径 | 说明 |
 | --- | --- |
-| `GET/PUT /api/admin/signup-methods` | Admin | 读取 / 修改上面的开关 `{email, phone}`，存在 `system_settings`，改动写入审计 `signup_methods.update`。保存时至少开放一种，且当前发信通道必须能发送对应验证码（手机号需腾讯云短信），否则 400 |
+| `GET/PUT /api/admin/signup-methods` | Admin | 读取 / 修改上面的开关 `{email, phone}`，存在 `system_settings`，改动写入审计 `signup_methods.update`。保存时至少开放一种，且当前发信通道必须能发送对应验证码（手机号支持阿里云 PNVS 或腾讯云短信），否则 400 |
 | `POST /api/admin/login` | `{username, password}`，返回 `{token, expires_in, admin}` |
 | `GET /api/admin/me` | 当前管理员 |
 | `POST /api/admin/password` | `{current_password, new_password}`，成功后所有管理员令牌失效 |
@@ -114,7 +135,7 @@ cargo run --manifest-path services/server-account/Cargo.toml -- gen-keys
 | `GET /api/admin/sender` / `PUT /api/admin/sender` | 读取 / 保存发信通道 `{provider: console｜smtp｜tencent, smtp?}`；SMTP 密码只返回 `has_password`，保存时留空表示沿用已存密码 |
 | `POST /api/admin/sender/test` | `{recipient, smtp?}`，用表单里尚未保存的 SMTP 参数或当前通道发一封测试验证码邮件 |
 
-后台「发信设置」保存的通道用主密钥加密存进 `system_settings`，立即热切换，重启后优先于 `ACCOUNT_SENDER`。SMTP 通道只发邮件，手机号验证码会返回 400。
+后台「发信设置」保存的通道用主密钥加密存进 `system_settings`，立即热切换，重启后优先于 `ACCOUNT_SENDER`。SMTP 通道只发邮件；配置独立 PNVS 通道后，手机号验证码走 PNVS，邮箱继续走 SMTP。未配置 PNVS 时沿用原发信通道。
 
 停用用户、下线设备、应用增删改和管理员改密码都会写入 `admin_audit`。已发出的访问令牌无法撤回，停用后最长仍可在业务服务里再存活 `ACCOUNT_ACCESS_TTL_SECS`（默认 30 分钟）。
 

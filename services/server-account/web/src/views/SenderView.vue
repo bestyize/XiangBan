@@ -9,6 +9,7 @@ const testing = ref(false);
 const message = ref<{ type: 'ok' | 'error'; text: string } | null>(null);
 
 const provider = ref<'console' | 'smtp' | 'tencent'>('console');
+const pnvsConfigured = ref(false);
 const smtp = reactive<SmtpConfig>({
   host: '',
   port: 465,
@@ -62,6 +63,7 @@ async function load() {
     const [data, methods] = await Promise.all([api.getSender(), api.getSignupMethods()]);
     Object.assign(signup, methods);
     provider.value = data.provider;
+    pnvsConfigured.value = data.pnvs_configured;
     if (data.smtp) {
       smtp.host = data.smtp.host || '';
       smtp.port = data.smtp.port || 465;
@@ -246,10 +248,16 @@ onMounted(load);
     </div>
 
     <div v-if="!loading" class="card form-card" style="margin-top: 16px;">
+      <div class="section-title">手机号短信通道</div>
+      <p class="muted">
+        {{ pnvsConfigured ? '已配置阿里云短信认证（PNVS），手机号验证码通过该通道发送，可与上方 SMTP 邮件并用。' : '未配置阿里云短信认证，手机号验证码使用上方发信通道。' }}
+      </p>
+      <p class="muted">阿里云短信认证密钥与预置签名通过服务器环境变量配置；配置完成后重启账号中心，再开放手机号注册。</p>
+      <div class="section-divider"></div>
       <div class="section-title">新用户注册方式</div>
       <p class="muted" style="margin: 0 0 12px;">
         只控制新用户用哪种方式注册，以及已有账号新绑定哪种方式；已经注册的账号照常登录、重置密码。
-        开放某种方式前，上面的发信通道必须能发送对应的验证码（手机号需要腾讯云短信）。
+        开放某种方式前，必须配置能发送对应验证码的通道（手机号支持阿里云短信认证或腾讯云短信）。
       </p>
       <div v-if="signupMessage" class="banner" :class="signupMessage.type">{{ signupMessage.text }}</div>
       <label class="check-row"><input v-model="signup.email" type="checkbox" /> 邮箱验证码注册</label>

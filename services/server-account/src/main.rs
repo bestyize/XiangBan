@@ -12,6 +12,7 @@ mod password;
 mod ratelimit;
 mod registration;
 mod sender;
+mod pnvs;
 mod sessions;
 mod signup_methods;
 mod state;
@@ -118,7 +119,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let config = AppConfig::from_env();
     let keys = keys::Keys::load(&config)?;
-    let sender = sender::Sender::from_config(&config.sender)?;
+    let sender = sender::Sender::from_config(&config)?;
 
     let pool = db::connect(&config.database_url, None).await?;
     db::migrate(&pool).await?;

@@ -10,10 +10,23 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.serializer
+import kotlinx.serialization.Serializable
+import kotlinx.coroutines.CancellationException
+
+@Serializable
+data class AccountSignupMethods(val email: Boolean = true, val phone: Boolean = false)
 
 /** 相伴统一账号中心。和网页端 `api/account.ts` 是同一组接口。 */
 class AccountApi(client: HttpClient, private val config: CommunityConfig) {
     private val http = JsonHttp(client, config.accountBase)
+
+    suspend fun signupMethods(): AccountSignupMethods = try {
+        http.send(HttpMethod.Get, "/api/auth/methods", serializer())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        AccountSignupMethods()
+    }
 
     suspend fun sendCode(identifier: String, purpose: String = "login") {
         http.raw(HttpMethod.Post, "/api/auth/code/send", obj { put("identifier", identifier); put("purpose", purpose) })

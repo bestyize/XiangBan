@@ -91,4 +91,5 @@ export interface SignupMethods {
 export interface SenderConfig {
   provider: 'console' | 'smtp' | 'tencent';
   smtp?: SmtpConfig | null;
+  pnvs_configured: boolean;
 }

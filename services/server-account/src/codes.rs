@@ -84,7 +84,7 @@ pub async fn issue(state: &AppState, ident: &Identifier, purpose: Purpose, ip: &
     .fetch_one(&state.pool)
     .await?;
 
-    if let Err(err) = state.sender.send_code(ident, &code, cfg.code_ttl_secs / 60).await {
+    if let Err(err) = state.sender.send_code(ident, &code, (cfg.code_ttl_secs + 59) / 60, purpose).await {
         sqlx::query("DELETE FROM verification_codes WHERE id = $1").bind(row_id).execute(&state.pool).await?;
         return Err(err);
     }

@@ -1056,3 +1056,41 @@ async fn signup_methods_default_to_email_only_and_gate_new_phone_accounts_but_no
     assert_eq!((status, body["code"].as_str()), (StatusCode::FORBIDDEN, Some("signup_method_disabled")));
     h.cleanup().await;
 }
+
+#[tokio::test]
+async fn pnvs_supports_smtp_and_signup_switch_rejects_previously_issued_registration_token() {
+    let mut h = harness!(&[]);
+    let (_, pending) = h.code_login("13800138000", CLIENT).await;
+    let mut config = (*h.state.config).clone();
+    config.pnvs = Some(crate::config::PnvsConfig {
+        access_key_id: "dummy-pnvs-id".into(),
+        access_key_secret: "dummy-pnvs-secret".into(),
+        sign_name: "预置签名".into(),
+        scheme_name: None,
+    });
+    h.state.sender = Arc::new(Sender::from_config(&config).unwrap());
+    h.state.config = Arc::new(config);
+    h.app = build_router(h.state.clone());
+    let token = h.admin_token().await;
+    let admin = Some(token.as_str());
+    let (status, _) = h.call(Method::PUT, "/api/admin/sender", admin, json!({
+        "provider": "smtp", "smtp": {"host":"smtp.example.com", "port":465,
+        "username":"mail", "password":"smtp-secret", "from_name":"小伴", "from_email":"mail@example.com"}
+    })).await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, sender) = h.call(Method::GET, "/api/admin/sender", admin, Value::Null).await;
+    assert_eq!(sender["provider"], "smtp");
+    assert_eq!(sender["pnvs_configured"], true);
+    assert!(!sender.to_string().contains("dummy-pnvs"));
+    assert!(h.state.sender.can_send(crate::identifier::Kind::Phone));
+    assert!(h.state.sender.can_send(crate::identifier::Kind::Email));
+    assert_eq!(h.call(Method::PUT, "/api/admin/signup-methods", admin, json!({"email":true,"phone":true})).await.0, StatusCode::OK);
+    assert_eq!(h.call(Method::GET, "/api/auth/methods", None, Value::Null).await.1, json!({"email":true,"phone":true}));
+    h.call(Method::PUT, "/api/admin/signup-methods", admin, json!({"email":true,"phone":false})).await;
+    let (status, err) = h.post("/api/auth/register", None, json!({
+        "registration_token":pending["registration_token"], "username":"pending_phone",
+        "password":PASSWORD, "client_id":CLIENT
+    })).await;
+    assert_eq!((status, err["code"].as_str()), (StatusCode::FORBIDDEN, Some("signup_method_disabled")));
+    h.cleanup().await;
+}
