@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -178,7 +177,7 @@ internal fun ImageGenerationSheet(
     var frames by remember { mutableStateOf("9") }
     var duration by remember { mutableStateOf("200") }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        BottomSheet(onDismiss, Modifier.imePadding()) {
+        BottomSheet(onDismiss) {
             Text("生成图片", style = XType.Title)
             if ("gif" in formats) Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 ChipPill("静态图片", selected = !gif, onClick = { gif = false })

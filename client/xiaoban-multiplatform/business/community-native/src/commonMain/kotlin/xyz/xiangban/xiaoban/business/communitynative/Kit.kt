@@ -173,13 +173,13 @@ fun OverlayTransition(visible: Boolean, direction: String = "bottom", content: @
     }
 }
 
-/** 盖住整页的半透明遮罩，底部是圆角白色面板。点遮罩或按返回键关闭。[flush] 为真时面板里的选项通栏接边（自己管左右边距）。 */
+/** 遮罩覆盖整页，面板统一避让键盘，避免聊天页的同级覆盖层落在 IME 后面。[flush] 为真时选项通栏接边。 */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun BottomSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, flush: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     BackHandler(onBack = onDismiss)
     Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).clickable(indication = null, interactionSource = null) { onDismiss() },
+        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).clickable(indication = null, interactionSource = null) { onDismiss() }.imePadding(),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Column(
