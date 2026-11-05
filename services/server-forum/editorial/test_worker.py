@@ -97,6 +97,14 @@ class EditorialTests(unittest.TestCase):
         self.assertEqual(target.read_bytes(), raw)
         self.assertEqual(target.stat().st_mode & 0o777, 0o640)
 
+    def test_image_format_follows_gateway_capabilities(self):
+        worker = object.__new__(w.Worker)
+        worker.gateway = 'https://ai.example'
+        for formats, expected in ((['png'], 'png'), (['png', 'webp'], 'webp')):
+            with self.subTest(formats=formats), patch.object(worker, 'ai_token', return_value='private'), patch('worker.api', return_value={'media': {'image': {'formats': formats}}}) as api:
+                self.assertEqual(worker.image_format(), expected)
+                api.assert_called_once_with(worker.gateway, '/api/ai/tiers', 'private')
+
     def test_new_topic_import_converts_png_once_and_references_webp(self):
         w.enqueue(self.db, 'learn-a', 'https://docs.example/a', 'source')
         job = self.db.execute('SELECT * FROM jobs').fetchone()
@@ -109,9 +117,9 @@ class EditorialTests(unittest.TestCase):
         w.atomic(dest / 'evidence.json', {'title': '官方资料', 'url': job['url'], 'retrieved_at': w.stamp()})
         w.atomic(dest / 'review.json', {'approved': True, 'issues': [], 'article_sha256': w.hashlib.sha256(json.dumps(article, sort_keys=True, ensure_ascii=False).encode()).hexdigest()})
         response = {'data': [{'b64_json': w.base64.b64encode(image_bytes()).decode()}]}
-        with patch.object(worker, 'existing_draft', return_value=None), patch.object(worker, 'model', return_value=response) as model, patch.object(worker, 'publish'), patch('worker.api', return_value={'id': 'draft'}) as api:
+        with patch.object(worker, 'image_format', return_value='png'), patch.object(worker, 'existing_draft', return_value=None), patch.object(worker, 'model', return_value=response) as model, patch.object(worker, 'publish'), patch('worker.api', return_value={'id': 'draft'}) as api:
             worker.process(job, {'id': 'learn-a', 'destination': 'topic', 'category': 'learn-a'})
-            model.assert_called_once_with(job['id'], 'images/generations', {'prompt': 'illustration', 'n': 1, 'output_format': 'webp'})
+            model.assert_called_once_with(job['id'], 'images/generations', {'prompt': 'illustration', 'n': 1, 'output_format': 'png'})
             payload = api.call_args.args[3]
             self.assertIn('](<images/cover.webp>)', payload['body'])
             self.assertEqual(payload['images'][0]['path'], 'images/cover.webp')
