@@ -5,9 +5,10 @@ import { aiBucketLabel, formatAiCredits } from '../src/lib/aiCredits.ts'
 test('converts integer gateway quota to 小伴点 at $10 = 1,000 credits', () => {
   for (const [quota, expected] of [
     [5_000_000, '1,000 点'], [500_000, '100 点'], [250_000, '50 点'],
-    [62_500, '12.5 点'], [500, '0.1 点'], [1, '0.0002 点'],
-    [1_234_567, '246.9134 点'], [75_000_000, '15,000 点'],
-    [0, '0 点'], [-500, '−0.1 点'],
+    [62_500, '12 点'], [500, '<1 点'], [1, '<1 点'],
+    [1_234_567, '246 点'], [75_000_000, '15,000 点'],
+    [145_000, '29 点'], [4_999, '<1 点'], [5_000, '1 点'], [9_999, '1 点'],
+    [0, '0 点'], [-500, '−<1 点'],
   ] as const) assert.equal(formatAiCredits(quota), expected)
 })
 
@@ -16,7 +17,7 @@ test('respects configured quota units, defaults old servers and keeps tiny charg
   for (const unit of [undefined, 0, -1, NaN, Infinity]) {
     assert.equal(formatAiCredits(5_000_000, unit), '1,000 点')
   }
-  assert.equal(formatAiCredits(1, 2_000_000), '<0.0001 点')
+  assert.equal(formatAiCredits(1, 2_000_000), '<1 点')
 })
 
 test('labels AI buckets separately from forum community points', () => {

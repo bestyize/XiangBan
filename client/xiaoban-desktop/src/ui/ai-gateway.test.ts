@@ -28,12 +28,16 @@ describe("ai gateway formatting", () => {
     expect(formatAiCredits(5_000_000)).toBe("1,000 点");
     expect(formatAiCredits(250_000)).toBe("50 点");
     expect(formatAiCredits(500_000)).toBe("100 点");
-    expect(formatAiCredits(500)).toBe("0.1 点");
-    expect(formatAiCredits(1)).toBe("0.0002 点");
-    expect(formatAiCredits(1_234_567)).toBe("246.9134 点");
+    expect(formatAiCredits(500)).toBe("<1 点");
+    expect(formatAiCredits(1)).toBe("<1 点");
+    expect(formatAiCredits(1_234_567)).toBe("246 点");
+    expect(formatAiCredits(145_000)).toBe("29 点");
+    expect(formatAiCredits(4_999)).toBe("<1 点");
+    expect(formatAiCredits(5_000)).toBe("1 点");
+    expect(formatAiCredits(9_999)).toBe("1 点");
     expect(formatAiCredits(0)).toBe("0 点");
     expect(formatAiCredits(75_000_000)).toBe("15,000 点");
-    expect(formatAiCredits(-500)).toBe("−0.1 点");
+    expect(formatAiCredits(-500)).toBe("−<1 点");
   });
 
   it("uses the server rate with a safe default for invalid or missing rates", () => {
@@ -41,7 +45,7 @@ describe("ai gateway formatting", () => {
     expect(formatAiCredits(5_000_000, 0)).toBe("1,000 点");
     expect(formatAiCredits(5_000_000, NaN)).toBe("1,000 点");
     expect(formatAiCredits(5_000_000, -1)).toBe("1,000 点");
-    expect(formatAiCredits(1, 2_000_000)).toBe("<0.0001 点");
+    expect(formatAiCredits(1, 2_000_000)).toBe("<1 点");
   });
 
   it("names the kinds the gateway hands out and falls back for new ones", () => {

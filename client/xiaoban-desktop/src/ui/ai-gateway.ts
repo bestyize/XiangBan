@@ -17,12 +17,11 @@ export const AI_CREDITS_PER_DOLLAR = 100;
 
 export function formatAiCredits(quota: number, quotaPerDollar = 500_000): string {
   const unit = Number.isFinite(quotaPerDollar) && quotaPerDollar > 0 ? quotaPerDollar : 500_000;
-  const credits = quota / unit * AI_CREDITS_PER_DOLLAR;
+  const credits = quota / (unit / AI_CREDITS_PER_DOLLAR);
   const value = Math.abs(credits);
   const sign = credits < 0 ? "−" : "";
-  // Keep small charges visible, including one base quota unit (0.0002 点 at the default rate).
-  const text = value > 0 && value < 0.0001 ? "<0.0001"
-    : value.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  // Truncate the display only; never overstate a balance or hide a nonzero charge as zero.
+  const text = value > 0 && value < 1 ? "<1" : Math.floor(value).toLocaleString("en-US");
   return `${sign}${text} 点`;
 }
 

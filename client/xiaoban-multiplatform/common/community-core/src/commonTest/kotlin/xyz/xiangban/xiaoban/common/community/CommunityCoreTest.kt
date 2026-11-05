@@ -472,7 +472,7 @@ class AiGatewayAndCloudChatTest {
     @Test
     fun `credits formatting and tier selection match desktop rules`() {
         assertEquals("50 点", formatAiCredits(250_000, 500_000))
-        assertEquals("12.5 点", formatAiCredits(62_500, 500_000))
+        assertEquals("12 点", formatAiCredits(62_500, 500_000))
         assertEquals("1,250 点", formatAiCredits(6_250_000, 500_000))
         assertEquals("12,000 点", formatAiCredits(60_000_000, 500_000))
         assertEquals("试用点数", bucketKindLabel("trial"))
