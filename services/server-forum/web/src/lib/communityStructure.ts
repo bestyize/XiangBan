@@ -31,8 +31,9 @@ export function discussionCategory(tab:string, filter='', categories:Category[] 
 export function resourceTopicCategory(tab:string) {
   return ({media:'resource-movies',help:'resource-help',open:'resource-open'} as Record<string,string>)[tab] || canonicalCategory(tab)
 }
+export function categoryLabel(category:Category) { return category.slug === 'resource-open' ? '开源讨论' : category.name }
 export function resourceTabs(categories:Category[]) {
-  return [{key:'software',label:'开源软件'},...sectionCategories(categories,'resources').filter(c=>c.parent_id !== null).map(c=>({key:c.slug,label:c.slug==='resource-open' ? '开源讨论' : c.name}))]
+  return [{key:'software',label:'开源软件'},...sectionCategories(categories,'resources').filter(c=>c.parent_id !== null).map(c=>({key:c.slug,label:categoryLabel(c)}))]
 }
 export function categoryDestination(category:Category, categories:Category[]):string {
   if (!activeCategories(categories).some(c=>c.id===category.id)) return `/c/${category.slug}`

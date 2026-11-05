@@ -8,7 +8,9 @@ import type { Attachment, TopicInput } from '@/api/types'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
-import { READ_LEVELS, TRUST_LABEL, requiredPostLevel, tagLabel } from '@/lib/format'
+import { READ_LEVELS, TRUST_LABEL, tagLabel } from '@/lib/format'
+import { postingSections, postingSelection, type PostingSectionKey } from '@/lib/postingStructure'
+import { categoryLabel, canonicalCategory } from '@/lib/communityStructure'
 import { useHead } from '@/lib/head'
 
 const route = useRoute()
@@ -21,7 +23,7 @@ const editId = computed(() => (route.name === 'edit' ? Number(route.params.id) :
 useHead(() => ({ title: editId.value ? '编辑帖子' : '发帖' }))
 
 const form = reactive({
-  rootId: 0,
+  sectionKey: 'discuss' as PostingSectionKey,
   categoryId: 0,
   title: '',
   body: '',
@@ -33,6 +35,8 @@ const form = reactive({
 })
 /** 编辑时帖子原来的阅读权限；发帖人后来被降级时，原值仍然可以保留。 */
 const originalReadLevel = ref<number | null>(null)
+const originalCategoryId = ref<number>()
+const selectionTouched = ref(false)
 const attachments = ref<Attachment[]>([])
 const tagDraft = ref('')
 const busy = ref(false)
@@ -41,50 +45,30 @@ const error = ref('')
 /** 当前登录用户的信任等级；没登录按 0。 */
 const myLevel = computed(() => session.user?.trust_level ?? 0)
 
-/**
- * 用户能发帖的分类：一级分类下必须选到二级；新发帖时去掉当前信任等级发不了的板块
- * （比如只有守护者能发的「小伴产品」和站务公告）。游客会先被要求登录，这里按最低等级算。
- * 编辑已有帖子时不过滤，免得作者被降级后没法改自己的帖子。
- */
-const roots = computed(() =>
-  (editId.value ? meta.allTree : meta.tree.filter(n=>n.posting_enabled))
-    .map(n => ({
-      ...n,
-      children: n.children.filter(c => editId.value || c.posting_enabled && requiredPostLevel(c) <= myLevel.value),
-    }))
-    .filter(n => editId.value || n.children.length > 0),
-)
-const root = computed(() => roots.value.find(r => r.id === form.rootId))
-const leaves = computed(() => root.value?.children ?? [])
-const leaf = computed(() => leaves.value.find(l => l.id === form.categoryId))
-const isCasual = computed(() => root.value?.slug === 'casual')
-const isHelp = computed(() => ['share-help','resource-help'].includes(leaf.value?.slug || ''))
-/** 选中的二级分类上的内置标签；已经加到帖子上的也留着，方便点第二次取消。 */
+/** 页面归属决定发布入口，数据库父分类只用于入口内分组与权限。 */
+const destinations = computed(() => postingSections(meta.categories, myLevel.value, originalCategoryId.value))
+const destination = computed(() => destinations.value.find(s => s.key === form.sectionKey))
+const leaves = computed(() => destination.value?.groups.flatMap(g => g.categories) ?? [])
+const leaf = computed(() => leaves.value.find(c => c.id === form.categoryId))
+const parent = computed(() => meta.byId.get(leaf.value?.parent_id ?? 0))
+const isCasual = computed(() => leaf.value?.slug === 'casual' || parent.value?.slug === 'casual')
+const isHelp = computed(() => leaf.value?.slug === 'resource-help')
 const presetTags = computed(() => leaf.value?.preset_tags ?? [])
 
-// 从 ?category= 预选分类（可以是一级或二级）。
 watch(
-  () => [meta.categories.length, route.query.category] as const,
-  () => {
-    if (editId.value || form.rootId) return
-    const slug = typeof route.query.category === 'string' ? route.query.category : ''
-    const c = meta.bySlug.get(slug)
-    if (!c) return
-    const parent = meta.parentOf(c)
-    form.rootId = parent?.id ?? 0
-    if (c.parent_id) form.categoryId = c.id
+  [() => meta.categories, () => route.query.category, () => route.query.section, () => myLevel.value],
+  ([categories, slug, section], previous) => {
+    if (editId.value || !categories.length) return
+    if (previous && (slug !== previous[1] || section !== previous[2])) selectionTouched.value = false
+    if (selectionTouched.value) return
+    const fallback = section === 'ideas' || section === 'resources' ? section : 'discuss'
+    Object.assign(form, postingSelection(destinations.value, typeof slug === 'string' ? canonicalCategory(slug) : '', categories, fallback))
   },
   { immediate: true },
 )
-
-watch(
-  () => form.rootId,
-  () => {
-    if (!leaves.value.some(l => l.id === form.categoryId)) {
-      form.categoryId = leaves.value.length === 1 ? leaves.value[0].id : 0
-    }
-  },
-)
+watch(leaves, available => {
+  if (!available.some(c => c.id === form.categoryId)) form.categoryId = available.length === 1 ? available[0]!.id : 0
+})
 
 // 编辑：载入原帖。
 watch(
@@ -100,7 +84,8 @@ watch(
       }
       await meta.load()
       const c = meta.byId.get(t.category.id)
-      form.rootId = c?.parent_id ?? c?.id ?? 0
+      originalCategoryId.value = t.category.id
+      form.sectionKey = c?.section === 'ideas' || c?.section === 'resources' ? c.section : 'discuss'
       form.categoryId = t.category.id
       form.title = t.title
       form.body = t.body_md
@@ -154,7 +139,7 @@ const titleHint = computed(() => isCasual.value ? '添加标题（可选）' : '
 
 async function submit() {
   error.value = ''
-  if (!form.categoryId) return (error.value = '请选择分类')
+  if (!leaf.value) return (error.value = '请选择分类')
   if (!isCasual.value && titleLen.value < 4) return (error.value = '标题至少 4 个字')
   if (attachments.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) return (error.value = '附件下载积分必须为 0～10 的整数')
   if (isHelp.value && !editId.value && (!Number.isInteger(form.bounty) || form.bounty < 0 || form.bounty > 1000)) return (error.value = '悬赏积分必须为 0～1000 的整数')
@@ -212,19 +197,22 @@ const blocked = computed(() => {
         <fieldset class="kinds">
           <legend>发到哪里</legend>
           <div class="root-opts">
-            <label v-for="r in roots" :key="r.id" class="root" :class="{ on: form.rootId === r.id }">
-              <input v-model="form.rootId" type="radio" name="root" :value="r.id" />
+            <label v-for="r in destinations" :key="r.key" class="root" :class="{ on: form.sectionKey === r.key }">
+              <input v-model="form.sectionKey" type="radio" name="destination" :value="r.key" @change="selectionTouched = true" />
               <span class="rname">{{ r.name }}</span>
               <span class="rdesc">{{ r.description }}</span>
             </label>
           </div>
         </fieldset>
-        <div v-if="leaves.length" class="leaves" role="radiogroup" aria-label="二级分类">
-          <label v-for="l in leaves" :key="l.id" class="leaf" :class="{ on: form.categoryId === l.id }">
-            <input v-model="form.categoryId" type="radio" name="leaf" :value="l.id" />
-            {{ l.name }}
-          </label>
-        </div>
+        <fieldset v-for="group in destination?.groups ?? []" :key="group.id" class="category-group">
+          <legend v-if="(destination?.groups.length ?? 0) > 1">{{ group.name }}</legend>
+          <div class="leaves" role="radiogroup" :aria-label="`${group.name}分类`">
+            <label v-for="l in group.categories" :key="l.id" class="leaf" :class="{ on: form.categoryId === l.id }">
+              <input v-model="form.categoryId" type="radio" name="leaf" :value="l.id" @change="selectionTouched = true" />
+              {{ categoryLabel(l) }}
+            </label>
+          </div>
+        </fieldset>
         <p v-if="leaf?.description" class="leaf-note">{{ leaf.description }}</p>
       </section>
 
@@ -437,12 +425,14 @@ legend {
   color: var(--ink-3);
   line-height: 1.4;
 }
+.category-group {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
 .leaves {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line);
 }
 .leaf {
   position: relative;

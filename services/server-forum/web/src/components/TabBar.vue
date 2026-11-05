@@ -22,6 +22,7 @@ function publish(path: string) {
     ? discussionCategory(tab, tab === 'learn' ? String(route.query.filter ?? '') : '', meta.categories) : undefined
   const selected = meta.bySlug.get(category || '')
   if (path === '/new' && selected?.status === 'active' && selected.posting_enabled) void router.push({path,query:{category}})
+  else if (path === '/new') void router.push({path,query:{section:route.name === 'ideas' ? 'ideas' : route.name === 'resources' ? 'resources' : 'discuss'}})
   else void router.push(path)
 }
 </script>
