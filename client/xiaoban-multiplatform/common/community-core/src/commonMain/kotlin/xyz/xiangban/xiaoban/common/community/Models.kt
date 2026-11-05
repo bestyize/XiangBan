@@ -164,6 +164,9 @@ data class Category(
     val description: String = "",
     @SerialName("min_post_level") val minPostLevel: Int = 0,
     @SerialName("admin_only") val adminOnly: Boolean = false,
+    val section: String? = null,
+    val status: String = "active",
+    @SerialName("posting_enabled") val postingEnabled: Boolean = true,
 )
 
 @Serializable

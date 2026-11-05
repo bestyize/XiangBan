@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -45,6 +46,22 @@ import xyz.xiangban.xiaoban.common.community.messageOf
 import xyz.xiangban.xiaoban.common.community.parsePollOptions
 import xyz.xiangban.xiaoban.common.community.pollDraftError
 
+private enum class PostingSection(val label: String) {
+    Ideas("创意"), Discuss("讨论"), Resources("资源"),
+}
+
+private fun Category.postingSection(parent: Category?): PostingSection =
+    when (section ?: parent?.section) {
+        "ideas" -> PostingSection.Ideas
+        "resources" -> PostingSection.Resources
+        "discuss", "site" -> PostingSection.Discuss
+        else -> when (parent?.slug ?: slug) {
+            "create", "xiaoban" -> PostingSection.Ideas
+            "resources", "share" -> PostingSection.Resources
+            else -> PostingSection.Discuss
+        }
+    }
+
 /**
  * 发帖：选一个具体的分类，写标题和正文，发布。发成功后直接打开这个帖子。
  * 图片上传成功后回填站内 Markdown；附件通过既有 attachment_ids 挂到帖子上。
@@ -56,7 +73,8 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     val session by env.session.state.collectAsState()
     var categories by remember { mutableStateOf<List<Category>?>(null) }
     var loadError by remember { mutableStateOf<String?>(null) }
-    var parentId by rememberSaveable { mutableStateOf(-1) }
+    var sectionIndex by rememberSaveable { mutableStateOf(PostingSection.Discuss.ordinal) }
+    var trustLevel by remember { mutableIntStateOf(0) }
     var categoryId by rememberSaveable { mutableStateOf(-1) }
     var title by rememberSaveable { mutableStateOf(initialTitle) }
     var body by rememberSaveable { mutableStateOf(initialBody) }
@@ -101,22 +119,8 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
         categories = null
         loadError = null
         try {
-            val trustLevel = if (session.loggedIn) env.forum.uploadSession().user.trustLevel else 0
-            val all = env.forum.categories().filter { category ->
-                category.parentId == null || (category.slug != "create-guides" &&
-                    trustLevel >= if (category.adminOnly) 3 else category.minPostLevel.coerceIn(0, 3))
-            }
-            categories = all
-            if (all.none { it.id == categoryId }) categoryId = -1
-            if (all.none { it.parentId == parentId }) parentId = -1
-            val helpBoard = all.firstOrNull { it.slug in setOf("share-help", "resource-help") }
-            if (help && helpBoard != null && categoryId < 0) {
-                parentId = helpBoard.parentId ?: parentId
-                categoryId = helpBoard.id
-            } else if (parentId < 0) {
-                val firstParent = all.firstOrNull { it.parentId == null && all.any { c -> c.parentId == it.id } }
-                if (firstParent != null) parentId = firstParent.id
-            }
+            trustLevel = if (session.loggedIn) env.forum.uploadSession().user.trustLevel else 0
+            categories = env.forum.categories()
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -125,11 +129,35 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
     }
 
     val all = categories.orEmpty()
-    val parents = all.filter { it.parentId == null && all.any { c -> c.parentId == it.id } }
-    val children = all.filter { it.parentId == parentId }
-    val chosen = all.firstOrNull { it.id == categoryId }
+    val byId = remember(all) { all.associateBy { it.id } }
+    val available = remember(all, trustLevel) {
+        val parentIds = all.mapNotNull { it.parentId }.toSet()
+        all.filter { category ->
+            val parent = byId[category.parentId]
+            val level = if (category.adminOnly) 3 else category.minPostLevel.coerceIn(0, 3)
+            category.id !in parentIds && category.slug != "create-guides" &&
+                category.status == "active" && category.postingEnabled && trustLevel >= level &&
+                (category.parentId == null || (parent?.status == "active" && parent.postingEnabled))
+        }.groupBy { it.postingSection(byId[it.parentId]) }
+    }
+    val section = PostingSection.entries.getOrNull(sectionIndex) ?: PostingSection.Discuss
+    val chosen = available.values.flatten().firstOrNull { it.id == categoryId }
+    LaunchedEffect(categories, available) {
+        if (categories != null) {
+            if (chosen == null) {
+                val preferred = if (help) available[PostingSection.Resources]
+                    ?.firstOrNull { it.slug in setOf("share-help", "resource-help") } else null
+                categoryId = preferred?.id ?: -1
+                if (preferred != null) sectionIndex = PostingSection.Resources.ordinal
+                else if (section !in available) sectionIndex = PostingSection.entries
+                    .firstOrNull { it in available }?.ordinal ?: PostingSection.Discuss.ordinal
+            } else {
+                sectionIndex = chosen.postingSection(byId[chosen.parentId]).ordinal
+            }
+        }
+    }
     val isHelp = chosen?.slug in setOf("share-help", "resource-help")
-    val isCasual = chosen?.let { category -> all.any { it.id == category.parentId && it.slug == "casual" } } == true
+    val isCasual = chosen?.let { it.slug == "casual" || byId[it.parentId]?.slug == "casual" } == true
     val pollOptions = parsePollOptions(pollText)
     val pollError = if (pollEnabled) pollDraftError(pollOptions, pollDays.takeIf { it != 0 }) else null
     val titleLength = title.trim().split(Regex("\\s+")).joinToString(" ").count { !it.isLowSurrogate() }
@@ -256,14 +284,26 @@ fun NewPostScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit, he
                     loadError != null -> Banner(loadError.orEmpty(), warn = true, actionText = "重试", onAction = { attempt++ })
                     categories == null -> Spinner(Modifier.fillMaxWidth().height(100.dp))
                     else -> Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                        ChipRow(parents.map { it.id to it.name }, parentId) { parentId = it }
-                        children.forEach { category ->
-                            Row(Modifier.fillMaxWidth().clickable { categoryId = category.id; choosingCategory = false }.padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(category.name, Modifier.weight(1f), style = XType.Body, color = if (categoryId == category.id) Brand else MaterialTheme.colorScheme.onSurface)
-                                if (categoryId == category.id) XIcon(XIcons.Check, size = 18.dp, tint = Brand)
+                        ChipRow(PostingSection.entries.filter { it in available }.map { it.ordinal to it.label }, sectionIndex) { sectionIndex = it }
+                        val groups = available[section].orEmpty().groupBy { it.parentId }
+                        groups.forEach { (parent, children) ->
+                            if (groups.size > 1 && parent != null) byId[parent]?.let {
+                                Text(it.name, Modifier.padding(top = 12.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                            }
+                            children.forEach { category ->
+                                Row(
+                                    Modifier.fillMaxWidth().clickable {
+                                        categoryId = category.id
+                                        choosingCategory = false
+                                    }.padding(vertical = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(category.name, Modifier.weight(1f), style = XType.Body, color = if (categoryId == category.id) Brand else MaterialTheme.colorScheme.onSurface)
+                                    if (categoryId == category.id) XIcon(XIcons.Check, size = 18.dp, tint = Brand)
+                                }
                             }
                         }
-                        if (children.isEmpty()) Text("这个分类暂时没有可发布的版块", Modifier.padding(vertical = 20.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                        if (groups.isEmpty()) Text("暂时没有可发布的版块", Modifier.padding(vertical = 20.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
                     }
                 }
             }

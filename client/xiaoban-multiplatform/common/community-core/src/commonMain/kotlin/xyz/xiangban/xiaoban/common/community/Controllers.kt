@@ -116,6 +116,7 @@ class DiscussController(
     private val tag: String? = null,
     private val helpStatus: String? = null,
     private val home: Boolean = true,
+    private val activeOnly: Boolean = false,
 ) {
     private val _state = MutableStateFlow(DiscussState())
     val state: StateFlow<DiscussState> = _state.asStateFlow()
@@ -144,7 +145,7 @@ class DiscussController(
         _state.value = _state.value.copy(loading = true, error = null)
         scope.launch {
             try {
-                val p = if (sort == "following") api.followingTopics(requested) else api.topics(sort = if (sort == "featured") "new" else sort, category = category, page = requested, tag = tag, helpStatus = helpStatus, home = home, featured = sort == "featured")
+                val p = if (sort == "following") api.followingTopics(requested, activeOnly = activeOnly) else api.topics(sort = if (sort == "featured") "new" else sort, category = category, page = requested, tag = tag, helpStatus = helpStatus, home = home, featured = sort == "featured", activeOnly = activeOnly)
                 if (mine == generation) _state.value = _state.value.copy(topics = (if (replace) emptyList() else _state.value.topics) + p.items, hasMore = p.hasMore, loading = false)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

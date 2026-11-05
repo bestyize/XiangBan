@@ -303,13 +303,13 @@ internal fun DiscussTab(env: CommunityEnv, sub: DiscussSub, selectSub: (DiscussS
             CenterMessage("登录后查看关注动态", "登录", { open(Route.Login) })
         } else {
             val category = when (sub) {
-                DiscussSub.All -> "learn,casual,resource-music"
+                DiscussSub.All -> "learn,casual"
                 DiscussSub.Learn -> learnChannel(filter)
                 else -> sub.key
             }
             val loader = rememberLoader(env, listOf(category, tag, page, following, session.accountId)) {
-                if (following) env.forum.followingTopics(page, category, tag.ifBlank { null }, home = true)
-                else env.forum.topics(sort = "new", category = category, page = page, tag = tag.ifBlank { null }, home = true)
+                if (following) env.forum.followingTopics(page, category, tag.ifBlank { null }, home = category != "casual-chat", activeOnly = true)
+                else env.forum.topics(sort = "new", category = category, page = page, tag = tag.ifBlank { null }, home = category != "casual-chat", activeOnly = true)
             }
             val state by loader.state.collectAsState()
             PullToRefreshBox(

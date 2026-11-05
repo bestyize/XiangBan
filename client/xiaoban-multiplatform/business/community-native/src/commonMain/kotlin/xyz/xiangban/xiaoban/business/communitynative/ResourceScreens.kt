@@ -57,12 +57,17 @@ import xyz.xiangban.xiaoban.common.community.nowMillis
 import xyz.xiangban.xiaoban.common.community.parseIsoMillis
 import xyz.xiangban.xiaoban.common.community.remainText
 
-/** 资源的三个二级栏目；精选独立放在首页。 */
+/** 资源的二级栏目；精选独立放在首页。 */
 internal enum class ResourceSub(val key: String, val label: String) {
-    Software("software", "开源软件"), Media("media", "影视"), Help("help", "求助悬赏");
+    Software("software", "开源软件"), Discussion("resource-open", "开源讨论"), Media("media", "影视"), Help("help", "求助悬赏");
 
     companion object {
-        fun byKey(key: String) = if (key == "docs") Media else entries.firstOrNull { it.key == key } ?: Software
+        fun byKey(key: String) = when (key) {
+            "open" -> Discussion
+            "resource-movies" -> Media
+            "resource-help" -> Help
+            else -> entries.firstOrNull { it.key == key } ?: Software
+        }
     }
 }
 
@@ -70,6 +75,7 @@ internal enum class ResourceSub(val key: String, val label: String) {
 internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> Unit) {
     when (sub) {
         ResourceSub.Software -> SoftwareDirectoryTab(env, open)
+        ResourceSub.Discussion -> OpenSourceCommunityShares(env, open)
         ResourceSub.Media -> ResourceMediaTab(env, open)
         ResourceSub.Help -> HelpTab(env, open)
     }
@@ -80,7 +86,7 @@ internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> U
 private fun ResourceMediaTab(env: CommunityEnv, open: (Route) -> Unit) {
     var page by rememberSaveable { mutableIntStateOf(1) }
     val loader = rememberLoader(env, page) {
-        env.forum.topics(sort = "new", category = "resource-movies", page = page, home = false)
+        env.forum.topics(sort = "new", category = "resource-movies", page = page, home = false, activeOnly = true)
     }
     val state by loader.state.collectAsState()
     PullToRefreshBox(isRefreshing = state is Load.Loading, onRefresh = loader::reload, modifier = Modifier.fillMaxSize()) {
@@ -117,7 +123,7 @@ private fun ToolIcon(name: String, developer: String, size: androidx.compose.ui.
 @Composable
 internal fun OpenSourceCommunityShares(env: CommunityEnv, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
-    val controller = remember(env) { DiscussController(env.forum, scope, category = "resource-open", home = false) }
+    val controller = remember(env) { DiscussController(env.forum, scope, category = "resource-open", home = false, activeOnly = true) }
     CasualWaterfall(env, controller, open)
 }
 
@@ -146,7 +152,7 @@ internal fun helpRemain(help: HelpInfo): String = when {
 @Composable
 private fun HelpTab(env: CommunityEnv, open: (Route) -> Unit) {
     val scope = rememberCoroutineScope()
-    val controller = remember(env) { DiscussController(env.forum, scope, category = "resource-help", home = false) }
+    val controller = remember(env) { DiscussController(env.forum, scope, category = "resource-help", home = false, activeOnly = true) }
     val stats = rememberLoader(env, "help-stats") { env.forum.helpStats() }
     val statsState by stats.state.collectAsState()
     TopicFeed(controller, "还没有人发求助", open, header = {

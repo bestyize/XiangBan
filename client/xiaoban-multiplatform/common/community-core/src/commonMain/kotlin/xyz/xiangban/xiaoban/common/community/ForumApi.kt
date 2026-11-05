@@ -56,8 +56,9 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
         helpStatus: String? = null,
         home: Boolean = true,
         featured: Boolean = false,
+        activeOnly: Boolean = false,
     ): Page<Topic> =
-        get("/api/topics${query("sort" to sort, "category" to category, "tag" to tag, "help_status" to helpStatus, "home" to (if (home) true else null), "featured" to (if (featured) true else null), "page" to page)}")
+        get("/api/topics${query("sort" to sort, "category" to category, "tag" to tag, "help_status" to helpStatus, "home" to (if (home) true else null), "featured" to (if (featured) true else null), "page" to page, "active_only" to activeOnly.takeIf { it })}")
 
     suspend fun votePoll(topicId: Long, option: Int): Poll =
         write(HttpMethod.Put, "/api/topics/$topicId/poll/vote", buildJsonObject { put("option", option) })
@@ -142,8 +143,8 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     suspend fun searchTopics(q: String, page: Int = 1): Page<Topic> = get("/api/search${query("q" to q, "page" to page)}")
 
     suspend fun categories(): List<Category> = get("/api/categories")
-    suspend fun followingTopics(page: Int = 1, category: String? = null, tag: String? = null, home: Boolean = false): Page<Topic> =
-        get("/api/me/following/topics${query("page" to page, "category" to category, "tag" to tag, "home" to home.takeIf { it })}")
+    suspend fun followingTopics(page: Int = 1, category: String? = null, tag: String? = null, home: Boolean = false, activeOnly: Boolean = false): Page<Topic> =
+        get("/api/me/following/topics${query("page" to page, "category" to category, "tag" to tag, "home" to home.takeIf { it }, "active_only" to activeOnly.takeIf { it })}")
     suspend fun topicTags(): List<DiscussionTag> = get("/api/tags")
 
     // ── 发帖与互动（需要登录） ──
