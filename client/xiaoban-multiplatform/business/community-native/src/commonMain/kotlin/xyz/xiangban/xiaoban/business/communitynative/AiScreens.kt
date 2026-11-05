@@ -74,7 +74,8 @@ import xyz.xiangban.xiaoban.common.community.ChatTurn
 import xyz.xiangban.xiaoban.common.community.chatTitle
 import xyz.xiangban.xiaoban.common.community.CloudChatController
 import xyz.xiangban.xiaoban.common.community.CloudChatState
-import xyz.xiangban.xiaoban.common.community.formatAiMoney
+import xyz.xiangban.xiaoban.common.community.formatAiCredits
+import xyz.xiangban.xiaoban.common.community.bucketKindLabel
 
 private val StarterPrompts = listOf(
     "帮我理清今天最重要的三件事",
@@ -83,10 +84,10 @@ private val StarterPrompts = listOf(
 )
 
 private fun quotaText(balance: AiBalance?): String = when {
-    balance == null -> "读取额度中…"
-    balance.total > 0L -> "剩余 ${formatAiMoney(balance.total, balance.quotaPerUnit)}"
-    balance.trial.available -> "试用 ${formatAiMoney(balance.trial.quota, balance.quotaPerUnit)}"
-    else -> "额度已用完"
+    balance == null -> "读取点数中…"
+    balance.total > 0L -> "剩余 ${formatAiCredits(balance.total, balance.quotaPerUnit)}"
+    balance.trial.available -> "试用 ${formatAiCredits(balance.trial.quota, balance.quotaPerUnit)}"
+    else -> "点数已用完"
 }
 
 private fun CloudChatState.modelName(): String = activeTier?.displayName ?: tiers.firstOrNull()?.displayName ?: "小伴AI"
@@ -159,7 +160,7 @@ fun AiHomeScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> 
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     FeatureTile(XIcons.Monitor, "我的设备", computerDesc, Modifier.weight(1f)) { open(Route.Devices) }
-                    FeatureTile(XIcons.Star, "模型与额度", if (session.loggedIn) quotaText(cloud.balance) else "登录后可用", Modifier.weight(1f)) { open(Route.Models) }
+                    FeatureTile(XIcons.Star, "模型与点数", if (session.loggedIn) quotaText(cloud.balance) else "登录后可用", Modifier.weight(1f)) { open(Route.Models) }
                 }
 
                 Text("试试这样问我", Modifier.padding(top = 22.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
@@ -288,7 +289,7 @@ private fun FeatureTile(icon: androidx.compose.ui.graphics.vector.ImageVector, t
     }
 }
 
-/** 左侧对话列表抽屉：新对话、存下来的对话（最近的在前，正在看的那个底色加深，长按删除）、模型与额度、设置。 */
+/** 左侧对话列表抽屉：新对话、存下来的对话（最近的在前，正在看的那个底色加深，长按删除）、模型与点数、设置。 */
 @Composable
 private fun AiDrawer(
     cloud: CloudChatState, onClose: () -> Unit, onNew: () -> Unit, onOpen: (String) -> Unit, onDelete: (ChatSummary) -> Unit,
@@ -352,7 +353,7 @@ private fun AiDrawer(
                     }
                 }
                 Column(Modifier.padding(12.dp).clip(RoundedCornerShape(16.dp)).background(LocalExtraColors.current.fill)) {
-                    DrawerLink(XIcons.Star, "模型与额度", onModels)
+                    DrawerLink(XIcons.Star, "模型与点数", onModels)
                     DrawerLink(XIcons.Sliders, "设置", onSettings)
                 }
             }
@@ -411,7 +412,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
             )
             if (!session.loggedIn) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    LoginPrompt("登录即可与小伴对话", "使用统一小伴账号开启对话，新用户享有免费试用额度，不用自己准备模型密钥。", { open(Route.Login) })
+                    LoginPrompt("登录即可与小伴对话", "使用统一小伴账号开启对话，新用户享有免费试用点数，不用自己准备模型密钥。", { open(Route.Login) })
                 }
             } else {
                 Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -572,7 +573,7 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
                         Modifier.padding(top = 8.dp).fillMaxWidth().clickable { modelSheet = false; open(Route.Models) }.padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("模型与额度（余额、兑换）", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
+                        Text("模型与点数（余额、兑换）", Modifier.weight(1f), style = XType.Body, fontWeight = FontWeight.SemiBold)
                         XIcon(XIcons.ChevronRight, size = 16.dp)
                     }
                     GhostPillButton("取消", { modelSheet = false }, Modifier.padding(top = 4.dp).fillMaxWidth())
@@ -619,7 +620,7 @@ private fun CloudMessages(messages: List<ChatTurn>, sending: Boolean, platform: 
                         ChatImageThumbnail(ChatImagePreview(data, "生成的图片 ${index + 1}"), onPreview)
                     }
                     if (!turn.imageGeneration && turn.id == last?.id && !sending && turn.error.orEmpty().contains("结果尚未确认")) LinkText("已核对，继续", onReviewed)
-                    if (turn.error.orEmpty().let { it.contains("额度") || it.contains("兑换") }) LinkText("去兑换额度 ›", onQuota)
+                    if (turn.error.orEmpty().let { it.contains("额度") || it.contains("点数") || it.contains("兑换") }) LinkText("去兑换点数 ›", onQuota)
                 }
             }
         }
@@ -639,7 +640,7 @@ private fun ChatApproval.toRequest(): RemoteApprovalRequest = RemoteApprovalRequ
     tool = tool, danger = danger,
 )
 
-// ───────────── 模型与额度 ─────────────
+// ───────────── 模型与点数 ─────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -663,10 +664,10 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            ScreenBar("模型与额度", onBack = back)
+            ScreenBar("模型与点数", onBack = back)
             if (!session.loggedIn) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    LoginPrompt("登录后查看额度", "小伴AI 的额度跟着账号走，换手机、换电脑自动同步。", { open(Route.Login) })
+                    LoginPrompt("登录后查看点数", "小伴点跟着账号走，换手机、换电脑自动同步。", { open(Route.Login) })
                 }
             } else {
                 Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(bottom = 24.dp)) {
@@ -713,12 +714,31 @@ fun ModelsScreen(env: CommunityEnv, chat: CloudChatController, back: () -> Unit,
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                 Row(Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.background).padding(vertical = 12.dp)) {
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(cloud.balance?.let { formatAiMoney(it.total, it.quotaPerUnit) } ?: "—", style = XType.Headline, fontWeight = FontWeight.SemiBold)
-                        Text("剩余额度", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(cloud.balance?.let { formatAiCredits(it.total, it.quotaPerUnit) } ?: "—", style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                        Text("剩余小伴点", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(expiryText(cloud.balance) ?: "—", style = XType.Headline, fontWeight = FontWeight.SemiBold)
                         Text("到期时间", Modifier.padding(top = 2.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+                cloud.balance?.let { balance ->
+                    Text(
+                        "其中付费点数 ${formatAiCredits(balance.paid, balance.quotaPerUnit)}",
+                        Modifier.padding(top = 8.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    if (balance.trial.available) {
+                        Text(
+                            "首次使用自动发放 ${formatAiCredits(balance.trial.quota, balance.quotaPerUnit)} 试用点数，${balance.trial.days} 天内有效。",
+                            Modifier.padding(top = 8.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    balance.buckets.forEach { bucket ->
+                        Text(
+                            "${bucketKindLabel(bucket.kind)} · ${formatAiCredits(bucket.remaining, balance.quotaPerUnit)} / ${formatAiCredits(bucket.total, balance.quotaPerUnit)}" +
+                                (bucket.expiresAt?.let { " · ${it.take(10)} 到期" } ?: " · 长期有效"),
+                            Modifier.padding(top = 8.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                 }
                 Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {

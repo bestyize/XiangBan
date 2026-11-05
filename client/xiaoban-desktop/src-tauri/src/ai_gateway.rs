@@ -53,7 +53,7 @@ pub struct Balance {
     pub product: ProductInfo,
     #[serde(default)]
     pub credit_purchase_url: String,
-    /// 1 美元对应的额度点数，界面据此换算成美元。
+    /// 1 美元对应的底层整数额度；界面按每美元 100 小伴点展示。
     pub quota_per_unit: i64,
     pub total: i64,
     pub paid: i64,

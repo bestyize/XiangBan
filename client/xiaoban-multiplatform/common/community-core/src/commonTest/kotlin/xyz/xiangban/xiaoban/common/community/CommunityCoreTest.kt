@@ -470,12 +470,12 @@ class AiGatewayAndCloudChatTest {
     }"""
 
     @Test
-    fun `money formatting and tier selection match desktop rules`() {
-        assertEquals("$0.50", formatAiMoney(250_000, 500_000))
-        assertEquals("$0.125", formatAiMoney(62_500, 500_000))
-        assertEquals("$12.50", formatAiMoney(6_250_000, 500_000))
-        assertEquals("$120", formatAiMoney(60_000_000, 500_000))
-        assertEquals("试用额度", bucketKindLabel("trial"))
+    fun `credits formatting and tier selection match desktop rules`() {
+        assertEquals("50 点", formatAiCredits(250_000, 500_000))
+        assertEquals("12.5 点", formatAiCredits(62_500, 500_000))
+        assertEquals("1,250 点", formatAiCredits(6_250_000, 500_000))
+        assertEquals("12,000 点", formatAiCredits(60_000_000, 500_000))
+        assertEquals("试用点数", bucketKindLabel("trial"))
         assertEquals("月卡", bucketKindLabel("monthly"))
         assertEquals("加油包", bucketKindLabel("topup"))
 
@@ -588,7 +588,7 @@ class AiGatewayAndCloudChatTest {
         server.on("/api/ai/redeem", body = """{"ok":true,"kind":"topup","quota":500000,"expires_at":null,"balance":750000}""")
         controller.redeem("ABCD-EFGH-JKLM-NPQR")
         controller.state.await { !it.redeeming && it.redeemMessage != null }
-        assertEquals("兑换成功，到账 $1.00", controller.state.value.redeemMessage)
+        assertEquals("兑换成功，到账 100 点", controller.state.value.redeemMessage)
     }
 }
 

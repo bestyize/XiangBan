@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bucketLabel, expiryText, money, pickTier } from "./ai-gateway.ts";
+import { bucketLabel, expiryText, formatAiCredits, pickTier } from "./ai-gateway.ts";
 import type { AiTier } from "../bridge.ts";
 
 const tier = (name: string, patch: Partial<AiTier> = {}): AiTier => ({ tier: name, displayName: name, description: "", isDefault: false, requiresPaid: false, available: true, ...patch });
@@ -24,25 +24,31 @@ describe("picking a tier", () => {
 });
 
 describe("ai gateway formatting", () => {
-  it("shows credit in dollars with extra precision below one dollar", () => {
-    expect(money(250_000, 500_000)).toBe("$0.50");
-    expect(money(1_000, 500_000)).toBe("$0.002");
-    expect(money(500_000, 500_000)).toBe("$1.00");
-    expect(money(1_234_567, 500_000)).toBe("$2.47");
-    expect(money(0, 500_000)).toBe("$0.00");
-    expect(money(75_000_000, 500_000)).toBe("$150");
-    expect(money(-500, 500_000)).toBe("−$0.001");
+  it("shows 1,000 credits for $10 and preserves small charges", () => {
+    expect(formatAiCredits(5_000_000)).toBe("1,000 点");
+    expect(formatAiCredits(250_000)).toBe("50 点");
+    expect(formatAiCredits(500_000)).toBe("100 点");
+    expect(formatAiCredits(500)).toBe("0.1 点");
+    expect(formatAiCredits(1)).toBe("0.0002 点");
+    expect(formatAiCredits(1_234_567)).toBe("246.9134 点");
+    expect(formatAiCredits(0)).toBe("0 点");
+    expect(formatAiCredits(75_000_000)).toBe("15,000 点");
+    expect(formatAiCredits(-500)).toBe("−0.1 点");
   });
 
-  it("does not divide by zero when the server sends a broken rate", () => {
-    expect(money(10, 0)).toBe("$10.00");
+  it("uses the server rate with a safe default for invalid or missing rates", () => {
+    expect(formatAiCredits(10_000_000, 1_000_000)).toBe("1,000 点");
+    expect(formatAiCredits(5_000_000, 0)).toBe("1,000 点");
+    expect(formatAiCredits(5_000_000, NaN)).toBe("1,000 点");
+    expect(formatAiCredits(5_000_000, -1)).toBe("1,000 点");
+    expect(formatAiCredits(1, 2_000_000)).toBe("<0.0001 点");
   });
 
   it("names the kinds the gateway hands out and falls back for new ones", () => {
-    expect(bucketLabel("trial")).toBe("试用额度");
+    expect(bucketLabel("trial")).toBe("试用点数");
     expect(bucketLabel("monthly")).toBe("月卡");
     expect(bucketLabel("topup")).toBe("加油包");
-    expect(bucketLabel("something-new")).toBe("额度");
+    expect(bucketLabel("something-new")).toBe("点数");
   });
 
   it("warns only in the last three days before an expiry", () => {

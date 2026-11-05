@@ -3,6 +3,7 @@ import type { AiMessage } from '../lib/aiHistory'
 
 export interface AiTier { tier: string; display_name: string; description: string; is_default: boolean; available: boolean; requires_paid: boolean; chat_protocol?: AiChatProtocol }
 export interface AiBalance { product: {product_id:string; name:string}; total: number; paid:number; quota_per_unit: number; buckets: {id:number; kind:string; total:number; remaining:number; expires_at:string|null; created_at:string}[]; trial: { available: boolean; quota:number; days:number }; credit_purchase_url: string }
+export interface AiRedeemed { kind: string; quota: number; expires_at: string | null; balance: number }
 
 export function aiBaseUrl(configured: string): string {
   const url = new URL(configured || 'https://ai.xiangban.xyz')
@@ -35,7 +36,9 @@ export const aiApi = {
     if (!Number.isFinite(value?.total) || typeof value?.trial?.available !== 'boolean' || !Array.isArray(value?.buckets)) throw new Error('AI 额度数据异常，请重试。')
     return value
   },
-  async redeem(token: string, code: string): Promise<void> { await request('/api/ai/redeem', token, { method: 'POST', body: JSON.stringify({ code }) }) },
+  async redeem(token: string, code: string): Promise<AiRedeemed> {
+    return (await request('/api/ai/redeem', token, { method: 'POST', body: JSON.stringify({ code }) })).json()
+  },
   async chat(token: string, tier: AiTier, messages: AiMessage[], signal: AbortSignal, onText: (text: string) => void): Promise<void> {
     const protocol = tier.chat_protocol ?? 'chat_completions'
     const responses = protocol === 'responses'

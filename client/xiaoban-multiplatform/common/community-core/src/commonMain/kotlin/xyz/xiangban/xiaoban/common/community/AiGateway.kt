@@ -24,9 +24,6 @@ import io.ktor.http.Url
 import kotlin.io.encoding.Base64
 import kotlinx.io.Buffer
 import kotlinx.io.readByteArray
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.roundToLong
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CancellationException
@@ -165,45 +162,10 @@ fun pickAiTier(tiers: List<AiTier>, current: String): String {
 }
 
 fun bucketKindLabel(kind: String): String = when (kind) {
-    "trial" -> "试用额度"
+    "trial" -> "试用点数"
     "monthly" -> "月卡"
     "topup" -> "加油包"
-    else -> "额度"
-}
-
-/**
- * 与桌面端 `money(points, perDollar)` 保持一致：
- * 额度统一折算成美元显示；大于等于 $100 取整，$1–$100 保留两位小数，小于 $1 保留三位小数（去掉末尾多余的第 3 位 0）。
- */
-fun formatAiMoney(points: Long, quotaPerUnit: Long = 500_000): String {
-    val unit = max(quotaPerUnit, 1L).toDouble()
-    val dollars = points.toDouble() / unit
-    val sign = if (dollars < 0) "−" else ""
-    val value = abs(dollars)
-    if (value >= 100.0) {
-        return "$sign$${formatWithCommas(value.roundToLong())}"
-    }
-    if (value >= 1.0) {
-        val cents = (value * 100.0).roundToLong()
-        val whole = cents / 100
-        val frac = (cents % 100).toString().padStart(2, '0')
-        return "$sign$${formatWithCommas(whole)}.$frac"
-    }
-    val millis = (value * 1000.0).roundToLong()
-    val whole = millis / 1000
-    val frac3 = (millis % 1000).toString().padStart(3, '0')
-    val frac = if (frac3.endsWith('0')) frac3.dropLast(1) else frac3
-    return "$sign$$whole.$frac"
-}
-
-private fun formatWithCommas(n: Long): String {
-    val digits = n.toString()
-    val out = StringBuilder()
-    for (i in digits.indices) {
-        if (i > 0 && (digits.length - i) % 3 == 0) out.append(',')
-        out.append(digits[i])
-    }
-    return out.toString()
+    else -> "点数"
 }
 
 // ───────────── server-ai 网络客户端 ─────────────
@@ -1109,7 +1071,7 @@ class CloudChatController(
                 val unit = _state.value.balance?.quotaPerUnit ?: 500_000
                 _state.value = _state.value.copy(
                     redeeming = false,
-                    redeemMessage = "兑换成功，到账 ${formatAiMoney(done.quota, unit)}",
+                    redeemMessage = "兑换成功，到账 ${formatAiCredits(done.quota, unit)}",
                 )
                 loadMeta()
             } catch (e: CancellationException) {

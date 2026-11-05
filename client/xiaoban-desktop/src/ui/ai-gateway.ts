@@ -8,18 +8,22 @@ export function pickTier(tiers: AiTier[], activeTier: string, current: string): 
   return (usable.find(t => t.isDefault) ?? usable[0])?.tier ?? "";
 }
 
-const kindLabels: Record<string, string> = { trial: "试用额度", monthly: "月卡", topup: "加油包" };
+const kindLabels: Record<string, string> = { trial: "试用点数", monthly: "月卡", topup: "加油包" };
 
-export const bucketLabel = (kind: string) => kindLabels[kind] ?? "额度";
+export const bucketLabel = (kind: string) => kindLabels[kind] ?? "点数";
 
-/** Credit is always shown in US dollars: two decimals, three below $1 so one chat's change never reads as $0.00. */
-export function money(points: number, perDollar: number): string {
-  const dollars = points / Math.max(perDollar, 1);
-  const abs = Math.abs(dollars);
-  const min = abs >= 100 ? 0 : 2;
-  const max = abs >= 100 ? 0 : abs >= 1 ? 2 : 3;
-  const text = abs.toLocaleString("en-US", { minimumFractionDigits: min, maximumFractionDigits: max });
-  return `${dollars < 0 ? "−" : ""}$${text}`;
+/** Display only: $10 of gateway quota = 1,000 小伴点. The API still uses integer quota. */
+export const AI_CREDITS_PER_DOLLAR = 100;
+
+export function formatAiCredits(quota: number, quotaPerDollar = 500_000): string {
+  const unit = Number.isFinite(quotaPerDollar) && quotaPerDollar > 0 ? quotaPerDollar : 500_000;
+  const credits = quota / unit * AI_CREDITS_PER_DOLLAR;
+  const value = Math.abs(credits);
+  const sign = credits < 0 ? "−" : "";
+  // Keep small charges visible, including one base quota unit (0.0002 点 at the default rate).
+  const text = value > 0 && value < 0.0001 ? "<0.0001"
+    : value.toLocaleString("en-US", { maximumFractionDigits: 4 });
+  return `${sign}${text} 点`;
 }
 
 export function expiryText(expiresAt: string | null, now = Date.now()): string {

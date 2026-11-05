@@ -109,7 +109,7 @@ describe('小伴 AI card', () => {
     mountCard(createStore(session('u1')));
     await flushPromises();
     expect(text('gateway-card-status')).toBe('可使用');
-    expect(text('gateway-card-fact')).toBe('$5.50');
+    expect(text('gateway-card-fact')).toBe('550 点');
     expect(has('gateway-code')).toBe(false);
     expect(has('gateway-tier-standard')).toBe(false);
   });
@@ -152,11 +152,11 @@ describe('小伴 AI card', () => {
     const before = gatewayCalls().length;
     await openDialog();
     expect(gatewayCalls().length).toBeGreaterThan(before);
-    expect(text('gateway-total')).toBe('$5.50');
-    expect(text('gateway-paid')).toContain('$5.00');
+    expect(text('gateway-total')).toBe('550 点');
+    expect(text('gateway-paid')).toContain('500 点');
     const rows = document.body.querySelectorAll('[data-testid="gateway-buckets"] li');
     expect(rows).toHaveLength(2);
-    expect(rows[0].textContent).toContain('试用额度');
+    expect(rows[0].textContent).toContain('试用点数');
     expect(rows[1].textContent).toContain('月卡');
     expect(text('gateway-subtitle')).toContain('小伴壁纸');
   });
@@ -168,13 +168,13 @@ describe('小伴 AI card', () => {
     mountCard(store);
     await flushPromises();
     await openDialog();
-    expect(text('gateway-total')).toBe('$5.50');
+    expect(text('gateway-total')).toBe('550 点');
     expect(q('gateway-tier-premium')!.hasAttribute('disabled')).toBe(false);
 
     owner = 'u2';
     store.account = session('u2');
     await flushPromises();
-    expect(text('gateway-total')).toBe('$0.00');
+    expect(text('gateway-total')).toBe('0 点');
     expect(q('gateway-tier-premium')!.hasAttribute('disabled')).toBe(true);
   });
 });
@@ -185,7 +185,7 @@ describe('小伴 AI dialog: balance and redeem', () => {
     mountCard(createStore(session('u1')));
     await flushPromises();
     await openDialog();
-    expect(text('gateway-trial-hint')).toContain('$0.50 试用额度');
+    expect(text('gateway-trial-hint')).toContain('50 点 试用点数');
     expect(text('gateway-trial-hint')).toContain('7 天');
   });
 
@@ -206,9 +206,9 @@ describe('小伴 AI dialog: balance and redeem', () => {
     await submit();
 
     expect(ipc).toHaveBeenCalledWith('ai_gateway_redeem', { code: '  ABCD-EFGH  ' });
-    expect(text('gateway-redeem-done')).toContain('$5.00');
-    expect(text('gateway-total')).toBe('$5.50');
-    expect(text('gateway-card-fact')).toBe('$5.50');
+    expect(text('gateway-redeem-done')).toContain('500 点');
+    expect(text('gateway-total')).toBe('550 点');
+    expect(text('gateway-card-fact')).toBe('550 点');
     expect(codeValue()).toBe('');
   });
 
@@ -343,8 +343,8 @@ describe('小伴 AI dialog: chat model', () => {
     expect(q('gateway-tier-standard')!.getAttribute('aria-checked')).toBe('true');
     expect(q('gateway-tier-premium')!.getAttribute('aria-checked')).toBe('false');
     expect(q('gateway-tier-premium')!.hasAttribute('disabled')).toBe(true);
-    expect(text('gateway-tier-premium')).toContain('需付费额度');
-    expect(q('gateway-tier-premium')!.getAttribute('title')).toContain('兑换付费额度后可用');
+    expect(text('gateway-tier-premium')).toContain('需付费点数');
+    expect(q('gateway-tier-premium')!.getAttribute('title')).toContain('兑换付费点数后可用');
     expect(text('gateway-use-btn')).toBe('使用此模型');
     expect(has('gateway-active')).toBe(false);
   });
@@ -433,7 +433,7 @@ describe('小伴 AI dialog: chat model', () => {
     mountCard(createStore(session('u1')));
     await flushPromises();
     await openDialog();
-    expect(text('gateway-total')).toBe('$0.50');
+    expect(text('gateway-total')).toBe('50 点');
     expect(document.body.querySelectorAll('[role="radio"]')).toHaveLength(0);
     expect(text('gateway-load-error')).toContain('暂时不可用');
   });
