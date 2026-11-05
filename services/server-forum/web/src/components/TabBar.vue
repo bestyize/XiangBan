@@ -1,24 +1,27 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DISCUSSION_TABS, discussionCategory, resourceTopicCategory } from '@/lib/communityStructure'
+import { discussionTabs, discussionCategory, resourceTopicCategory } from '@/lib/communityStructure'
+import { useMeta } from '@/stores/meta'
 import { areaOf } from '@/lib/sections'
 import { useTheme, THEME_LABEL } from '@/lib/theme'
 import BrandMark from './BrandMark.vue'
 import AppIcon from './AppIcon.vue'
 import ModalDialog from './ModalDialog.vue'
+const meta = useMeta()
 const route = useRoute(), router = useRouter(), { preference, openAppearance } = useTheme()
 const area = computed(() => areaOf(route)), publishing = ref(false)
 const links = [{to:'/ai',key:'ai',label:'小伴 AI'}, {to:'/create',key:'create',label:'创造'}, {to:'/',key:'community',label:'社区'}, {to:'/me',key:'me',label:'我的'}]
 function publish(path: string) {
   publishing.value = false
   const tab = String(route.query.tab ?? '')
-  const category = route.name === 'resources' && tab === 'media'
+  const category = route.name === 'resources' && tab !== 'software' && Boolean(tab)
     ? resourceTopicCategory(tab)
-    : route.name === 'ideas' ? 'create'
-    : route.name === 'discuss' && DISCUSSION_TABS.some(item => item.key === tab && tab !== 'all')
-    ? discussionCategory(tab, tab === 'learn' ? String(route.query.filter ?? '') : '') : undefined
-  if (path === '/new' && category) void router.push({path,query:{category}})
+    : route.name === 'ideas' ? String(route.query.category || 'create')
+    : route.name === 'discuss' && discussionTabs(meta.categories).some(item => item.key === tab && tab !== 'all')
+    ? discussionCategory(tab, tab === 'learn' ? String(route.query.filter ?? '') : '', meta.categories) : undefined
+  const selected = meta.bySlug.get(category || '')
+  if (path === '/new' && selected?.status === 'active' && selected.posting_enabled) void router.push({path,query:{category}})
   else void router.push(path)
 }
 </script>

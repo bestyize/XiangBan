@@ -354,3 +354,11 @@ API：
 账号私有订阅、周期任务及期刊档案，桌面/手机/网页统一管理入口。配置、计费边界、投递不确定状态和验证范围见 [资讯订阅](docs/information-subscriptions.md)。未部署，不读取收件箱，不接收用户本地 API Key。
 
 开源精选正式详情页现支持默认中文 README / English 切换、真实项目卡片、来源及许可证、现有评论与浏览器收藏。逐项目发布产物位于 `web/public/open-source-readmes/`；缺少已审稿时仅提供官方原文入口。生成、校验及增量发布流程见 [README 采编规范](editorial/OPEN_SOURCE_README_WORKFLOW.md#正式网页发布路径2026-11-03-接入)。
+
+## 社区分类与发帖归属（2026-11-06）
+
+社区页面按首页、创意、讨论、资源组织。首页的精选、排行榜、追踪、导航属于独立目录或数据模块，不作为帖子分类。数据库分类的 `section`（ideas/discuss/resources/site）、`status`（active/archived，后台显示启用/停用）和 `posting_enabled` 是浏览、发帖及自动采编共同使用的策略；后台修改名称、归属或状态后，新打开的页面读取同一分类接口。一级分类修改归属同步子分类；停用一级分类对其全部子分类生效。讨论页提供站务入口。
+
+资源页的开源软件是目录，开源讨论是帖子分类；影视、求助悬赏读取各自帖子。发帖按当前板块预选，停用或禁止发帖的分类不能新发、迁入或通过采编发布；原作者可编辑自己现有文章。旧分类记录 AI 工具、资料、音乐、片单乐评及产品使用已移除，关联帖子和稿件重归现行分类，文章删除状态保持不变，不保留这些旧分类入口。迁移只执行一次，之后不会覆盖后台设置。
+
+验证：前端 `npm run typecheck`、`node --experimental-strip-types --test tests/communityStructure.test.ts tests/navigation.test.ts`；隔离 PostgreSQL 中运行 `cargo test --locked taxonomy::tests`；采编 `python3 -m unittest discover -s editorial -p 'test_*.py'`。部署前在本地构建 Linux 二进制和网页资源。

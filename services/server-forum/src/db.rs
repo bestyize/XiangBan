@@ -54,6 +54,9 @@ CREATE TABLE IF NOT EXISTS data_migrations (
 
 -- 内置标签：发帖时按这个分类给出一组可一键选用的标签（追加列，已部署的库启动时自动补上）。
 ALTER TABLE categories ADD COLUMN IF NOT EXISTS preset_tags TEXT[] NOT NULL DEFAULT '{}';
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS section TEXT NOT NULL DEFAULT 'discuss' CHECK(section IN ('ideas','discuss','resources','site'));
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','archived'));
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS posting_enabled BOOLEAN NOT NULL DEFAULT true;
 
 CREATE TABLE IF NOT EXISTS topics (
     id             BIGSERIAL PRIMARY KEY,
@@ -327,13 +330,10 @@ const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool
     ("share", "资源分享", "分享合法来源的软件、影视、音乐和学习资料", "normal", None, 1, true, true, false),
     ("share-software", "精品软件", "好用的正版、开源和免费软件，不要贴破解版", "normal", Some("share"), 1, true, true, false),
     ("share-movies", "电影资源", "片单、影评，以及公版和授权影片，不要贴盗版下载链接", "normal", Some("share"), 1, true, true, false),
-    ("share-music", "音乐资源", "歌单、乐评，以及公版和授权音乐，不要贴盗版下载链接", "normal", Some("share"), 1, true, true, false),
-    ("share-learn", "学习资料", "课程、电子书、文档和笔记，请只分享可以公开的资料", "normal", Some("share"), 1, true, true, false),
     ("share-help", "资源求助", "求助合法来源的软件、学习资料和资源，可使用积分悬赏", "normal", Some("share"), 1, true, true, false),
     ("xiaoban", "小伴产品", "小伴系列产品的官方介绍与更新：壁纸、游戏、App。由站方发布，欢迎在帖子下回复反馈", "normal", None, 3, true, false, false),
     ("xiaoban-wallpaper", "小伴壁纸", "小伴壁纸的下载、更新和使用技巧，也欢迎分享你自己做的壁纸、特效、组件资源包", "normal", Some("xiaoban"), 0, true, false, false),
     ("xiaoban-game", "小伴游戏", "小伴游戏的新玩法、攻略和更新，也欢迎分享你自己做的游戏资源包", "normal", Some("xiaoban"), 0, true, false, false),
-    ("xiaoban-app", "小伴App", "小伴 App 的功能介绍、更新和使用教程（官方发布，欢迎回复反馈）", "normal", Some("xiaoban"), 3, true, false, false),
     ("casual", "随便唠唠", "什么都可以聊，别引战", "normal", None, 1, true, false, false),
     ("casual-work", "职场", "加班、跳槽、远程办公", "normal", Some("casual"), 1, true, false, false),
     ("casual-travel", "旅行", "分享旅行路线、出行经验和旅途见闻", "normal", Some("casual"), 1, true, false, false),
@@ -348,7 +348,6 @@ const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool
     ("casual-gear", "数码装备", "键盘、显示器、NAS", "normal", Some("casual"), 1, true, false, false),
     ("casual-indie", "副业与独立开发", "", "normal", Some("casual"), 1, true, false, false),
     ("casual-fun", "吃喝玩乐", "", "normal", Some("casual"), 1, true, false, false),
-    ("casual-media", "片单乐评", "分享片单、歌单和乐评，只聊内容，不贴盗版链接", "normal", Some("casual"), 1, true, false, false),
     ("casual-think", "哲思", "聊聊想法和观点，不吵架", "normal", Some("casual"), 1, true, false, false),
     ("casual-help", "互助", "日常的小事，互相帮个忙", "normal", Some("casual"), 1, true, false, false),
     ("casual-chat", "闲聊灌水", "不进首页，不加积分", "normal", Some("casual"), 1, false, false, false),
@@ -363,11 +362,8 @@ const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool
 const PRESET_TAGS: &[(&str, &[&str])] = &[
     ("share-software", &["windows", "macos", "linux", "android", "ios", "开源", "免费", "效率工具", "开发工具", "设计工具"]),
     ("share-movies", &["片单推荐", "影评", "纪录片", "动画", "科幻", "悬疑", "喜剧", "经典老片", "公版", "授权", "4k", "美剧"]),
-    ("share-music", &["歌单推荐", "乐评", "古典", "流行", "摇滚", "电子", "爵士", "纯音乐", "独立音乐", "公版"]),
     ("xiaoban-wallpaper", &["更新日志", "下载", "使用教程", "桌面版", "手机版", "网站", "动态壁纸", "桌宠"]),
     ("xiaoban-game", &["更新日志", "新游戏", "玩法介绍", "攻略", "水墨剑客", "暮色滑翔"]),
-    ("xiaoban-app", &["更新日志", "下载", "使用教程", "新功能", "相伴", "下班了么", "android", "桌面版"]),
-    ("share-learn", &["编程", "ai", "英语", "考研", "考证", "设计", "数学", "电子书", "公开课", "笔记"]),
 ];
 
 fn preset_tags_for(slug: &str) -> Vec<String> {

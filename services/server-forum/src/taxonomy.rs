@@ -67,6 +67,27 @@ pub async fn migrate(pool: &PgPool) -> AppResult<()> {
     Ok(())
 }
 
+/// Initialize navigation policy once; subsequent administrator changes remain authoritative.
+pub async fn migrate_sections(pool: &PgPool) -> AppResult<()> {
+    const NAME: &str = "community-sections-v2";
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))").bind(NAME).execute(&mut *tx).await?;
+    let (done,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM data_migrations WHERE name=$1)").bind(NAME).fetch_one(&mut *tx).await?;
+    if done { return Ok(()); }
+    sqlx::query("UPDATE categories c SET section=CASE COALESCE(p.slug,c.slug) WHEN 'create' THEN 'ideas' WHEN 'resources' THEN 'resources' WHEN 'site' THEN 'site' ELSE 'discuss' END FROM (SELECT id,parent_id,slug FROM categories) p WHERE p.id=COALESCE(c.parent_id,c.id)").execute(&mut *tx).await?;
+    sqlx::query("UPDATE categories SET name='创意' WHERE slug='create'").execute(&mut *tx).await?;
+    // Remove retired category records without restoring or deleting any existing article.
+    for (old,new) in [("resource-tools","resource-open"),("resource-docs","resource-open"),("resource-music","casual-screen"),("casual-media","casual-screen"),("create-guides","learn-workflows"),("share-learn","resource-open"),("share-music","casual-screen"),("xiaoban-app","learn-workflows")] {
+        sqlx::query("UPDATE topics SET category_id=(SELECT id FROM categories WHERE slug=$2) WHERE category_id=(SELECT id FROM categories WHERE slug=$1)").bind(old).bind(new).execute(&mut *tx).await?;
+        sqlx::query("UPDATE editor_drafts SET category_id=(SELECT id FROM categories WHERE slug=$2) WHERE category_id=(SELECT id FROM categories WHERE slug=$1)").bind(old).bind(new).execute(&mut *tx).await?;
+        sqlx::query("DELETE FROM categories WHERE slug=$1").bind(old).execute(&mut *tx).await?;
+    }
+    sqlx::query("INSERT INTO data_migrations(name) VALUES($1)").bind(NAME).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO admin_audit(admin,action,target_type,target_id,detail) VALUES('migration','community.sections.migrate','categories',$1,'Unified sections; removed retired categories and reassigned article/draft references without changing article status')").bind(NAME).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,4 +125,30 @@ mod tests {
         pool.close().await;sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await?;
         admin.close().await;Ok(())
     }
+    #[tokio::test]
+    async fn sections_remove_retired_categories_without_restoring_posts() -> Result<(), Box<dyn std::error::Error>> {
+        let Ok(url) = std::env::var("TEST_DATABASE_URL") else { return Ok(()); };
+        let schema = format!("sections_test_{}", uuid::Uuid::new_v4().simple());
+        let admin = sqlx::PgPool::connect(&url).await?;
+        sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin).await?;
+        let pool = crate::db::connect(&url, Some(&schema)).await?;
+        crate::db::migrate(&pool).await?; crate::db::seed(&pool).await?; migrate(&pool).await?;
+        sqlx::query("INSERT INTO categories(slug,name,parent_id) VALUES('resource-docs','Old docs',(SELECT id FROM categories WHERE slug='resources'))").execute(&pool).await?;
+        let uid = uuid::Uuid::new_v4();
+        sqlx::query("INSERT INTO users(uid,nickname,trust_level) VALUES($1,'test author',3)").bind(uid).execute(&pool).await?;
+        let (topic,): (i64,) = sqlx::query_as("INSERT INTO topics(category_id,author_uid,title,body_md,body_html,excerpt,status) VALUES((SELECT id FROM categories WHERE slug='resource-docs'),$1,'Deleted article','body','body','body','deleted') RETURNING id").bind(uid).fetch_one(&pool).await?;
+        migrate_sections(&pool).await?;
+        let row: (String,String,String) = sqlx::query_as("SELECT c.slug,c.section,t.status FROM topics t JOIN categories c ON c.id=t.category_id WHERE t.id=$1").bind(topic).fetch_one(&pool).await?;
+        assert_eq!(row,("resource-open".into(),"resources".into(),"deleted".into()));
+        let (count,): (i64,) = sqlx::query_as("SELECT count(*) FROM categories WHERE slug IN ('resource-docs','resource-tools','resource-music','casual-media','create-guides')").fetch_one(&pool).await?;
+        assert_eq!(count,0);
+        sqlx::query("UPDATE categories SET status='archived',posting_enabled=false WHERE slug='casual-work'").execute(&pool).await?;
+        migrate_sections(&pool).await?;
+        let (status,): (String,) = sqlx::query_as("SELECT status FROM categories WHERE slug='casual-work'").fetch_one(&pool).await?;
+        assert_eq!(status,"archived");
+        pool.close().await;
+        sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await?;
+        Ok(())
+    }
+
 }

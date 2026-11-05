@@ -358,6 +358,21 @@ class EditorialTests(unittest.TestCase):
             verify.assert_called_once_with(job['id'],'frontier')
             source.assert_not_called()
 
+    def test_category_policy_stops_removed_and_closed_agents_before_generation(self):
+        config={'forum_url':'https://forum.example','agents':[
+            {'id':'active','enabled':True,'destination':'topic','category':'casual-work'},
+            {'id':'removed','enabled':True,'destination':'topic','category':'resource-docs'},
+            {'id':'closed','enabled':True,'destination':'topic','category':'resource-help'},
+            {'id':'frontier','enabled':True,'destination':'frontier'},
+            {'id':'disabled','enabled':False,'destination':'topic','category':'casual-work'},
+        ]}
+        with patch('worker.api',return_value=[{'slug':'casual-work','status':'active','posting_enabled':True},{'slug':'resource-help','status':'active','posting_enabled':False}]):
+            result=w.available_config(config)
+        self.assertEqual([a['id'] for a in result['agents'] if a['enabled']],['active','frontier'])
+        self.assertTrue(config['agents'][1]['enabled'])
+        with patch('worker.api',side_effect=OSError('unavailable')):
+            with self.assertRaises(OSError): w.available_config(config)
+
     def test_bounded_runs_do_not_starve_later_agents(self):
         agents = [{'id': f'agent-{i}', 'name': f'Agent {i}', 'destination': 'topic', 'enabled': True} for i in range(7)]
         for a in agents:
@@ -367,7 +382,7 @@ class EditorialTests(unittest.TestCase):
             processed.append(agent['id'])
             self.db.execute("UPDATE jobs SET status='published' WHERE id=?", (job['id'],))
             self.db.commit()
-        with patch('worker.Worker') as cls, patch('worker.discover'), contextlib.redirect_stdout(io.StringIO()):
+        with patch('worker.Worker') as cls, patch('worker.discover'), patch('worker.available_config', side_effect=lambda config:config), contextlib.redirect_stdout(io.StringIO()):
             cls.return_value.process.side_effect = publish
             for _ in range(3):
                 w.run(self.root, {'agents': agents}, self.db, 3)

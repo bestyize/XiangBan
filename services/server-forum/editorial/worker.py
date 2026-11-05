@@ -399,6 +399,17 @@ def collect_github(db,agent,source):
         if count>=source.get('limit',100):break
 
 
+def available_config(config):
+    """Use the same server policy as interactive posting. Fail closed on API errors."""
+    categories = api(config['forum_url'], '/api/categories')
+    if not isinstance(categories, list):
+        raise Stop('无法读取社区分类状态')
+    allowed = {c['slug'] for c in categories if c.get('status') == 'active' and c.get('posting_enabled')}
+    result = dict(config)
+    result['agents'] = [dict(a, enabled=bool(a.get('enabled')) and (a.get('destination') != 'topic' or a.get('category') in allowed)) for a in config['agents']]
+    return result
+
+
 def discover(db, config):
     for agent in config['agents']:
         if not agent.get('enabled'):
@@ -846,6 +857,7 @@ def audit(root, config, db):
 
 
 def run(root, config, db, limit, only_agent=None):
+    config = available_config(config)
     worker = Worker(root, config, db)
     worker.budget()
     discover(db, config)
@@ -915,6 +927,7 @@ def process_job(root,config,job,agent):
 
 def fill(root,config,db,parallel,target):
     """A bounded initial fill; a single supervisor owns claims and threads own DB connections."""
+    config = available_config(config)
     Worker(root,config,db).budget()
     discover(db,config)
     agents={a['id']:a for a in config['agents'] if a.get('enabled')}
@@ -975,7 +988,7 @@ def main():
         elif args.command == 'audit':
             audit(root, config, db)
         elif args.command == 'collect':
-            discover(db,config);print(json.dumps(snapshot(db,config),ensure_ascii=False))
+            discover(db,available_config(config));print(json.dumps(snapshot(db,config),ensure_ascii=False))
         elif args.command == 'fill':
             if not 1<=args.parallel<=8 or args.target!=20:raise Stop('补稿仅支持1–8并发及每栏20篇目标')
             fill(root,config,db,args.parallel,args.target)

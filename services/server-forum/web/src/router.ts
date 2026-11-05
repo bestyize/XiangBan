@@ -72,7 +72,7 @@ router.afterEach(to => trackRoute(to.name, to.query))
 
 // 需要登录的页面：没登录就弹登录框，停在原页面（直接打开时回我的页）。
 router.beforeEach((to, from) => {
-  if (to.path === '/resources' && to.query.tab === 'docs') return { path:'/resources', query:{ tab:'media' }, replace:true }
+  if (to.path === '/resources' && to.query.tab === 'docs') return { path:'/resources', replace:true }
   if (to.path === '/discuss' && to.query.tab === 'create') {
     const { tab, filter, page, ...query } = to.query
     return { path:'/ideas', query, hash:to.hash, replace:true }

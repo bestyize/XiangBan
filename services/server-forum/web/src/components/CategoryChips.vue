@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { categoryDestination, SECTION_LABELS } from '@/lib/communityStructure'
 import { useMeta } from '@/stores/meta'
 
 const props = defineProps<{ active?: string }>()
@@ -13,22 +14,22 @@ const root = computed(() => meta.tree.find(n => n.slug === meta.parentOf(current
 <template>
   <div class="chips-wrap">
     <nav class="row" aria-label="分类">
-      <RouterLink to="/discuss" class="chip" :class="{ on: active === 'home' }">首页</RouterLink>
+      <RouterLink to="/" class="chip" :class="{ on: active === 'home' }">首页</RouterLink>
       <RouterLink
         v-for="node in meta.tree"
         :key="node.id"
-        :to="`/c/${node.slug}`"
+        :to="categoryDestination(node,meta.categories)"
         class="chip"
         :class="{ on: root?.slug === node.slug }"
-        >{{ node.name }}</RouterLink
+        >{{ node.section === 'ideas' ? SECTION_LABELS.ideas : node.name }}</RouterLink
       >
     </nav>
     <nav v-if="root && root.children.length" class="row sub" :aria-label="`${root.name}的子分类`">
-      <RouterLink :to="`/c/${root.slug}`" class="chip" :class="{ on: active === root.slug }">全部</RouterLink>
+      <RouterLink :to="categoryDestination(root,meta.categories)" class="chip" :class="{ on: active === root.slug }">全部</RouterLink>
       <RouterLink
         v-for="c in root.children"
         :key="c.id"
-        :to="`/c/${c.slug}`"
+        :to="categoryDestination(c,meta.categories)"
         class="chip"
         :class="{ on: active === c.slug }"
         >{{ c.name }}</RouterLink

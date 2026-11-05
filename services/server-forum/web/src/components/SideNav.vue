@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { categoryDestination, SECTION_LABELS } from '@/lib/communityStructure'
 import { SHOW_CHILD_THRESHOLD, useMeta } from '@/stores/meta'
 
 const props = defineProps<{ active?: string }>()
@@ -20,20 +21,20 @@ function visibleChildren(node: (typeof meta.tree)[number]) {
 
 <template>
   <nav class="side" aria-label="分类">
-    <RouterLink to="/discuss" class="item top" :class="{ on: active === 'home' }">首页</RouterLink>
+    <RouterLink to="/" class="item top" :class="{ on: active === 'home' }">首页</RouterLink>
     <div v-for="node in meta.tree" :key="node.id" class="group">
       <RouterLink
-        :to="`/c/${node.slug}`"
+        :to="categoryDestination(node,meta.categories)"
         class="item root"
         :class="{ on: active === node.slug }"
       >
-        <span>{{ node.name }}</span>
+        <span>{{ node.section === 'ideas' ? SECTION_LABELS.ideas : node.name }}</span>
         <span class="count">{{ meta.totalCount(node) || '' }}</span>
       </RouterLink>
       <RouterLink
         v-for="child in visibleChildren(node)"
         :key="child.id"
-        :to="`/c/${child.slug}`"
+        :to="categoryDestination(child,meta.categories)"
         class="item child"
         :class="{ on: active === child.slug }"
       >

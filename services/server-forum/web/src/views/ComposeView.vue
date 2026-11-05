@@ -47,10 +47,10 @@ const myLevel = computed(() => session.user?.trust_level ?? 0)
  * 编辑已有帖子时不过滤，免得作者被降级后没法改自己的帖子。
  */
 const roots = computed(() =>
-  meta.tree
+  (editId.value ? meta.allTree : meta.tree.filter(n=>n.posting_enabled))
     .map(n => ({
       ...n,
-      children: n.children.filter(c => editId.value || requiredPostLevel(c) <= myLevel.value),
+      children: n.children.filter(c => editId.value || c.posting_enabled && requiredPostLevel(c) <= myLevel.value),
     }))
     .filter(n => editId.value || n.children.length > 0),
 )

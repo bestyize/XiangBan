@@ -34,6 +34,9 @@ export interface Category {
   id: number
   parent_id: number | null
   slug: string
+  section: 'ideas' | 'discuss' | 'resources' | 'site'
+  status: 'active' | 'archived'
+  posting_enabled: boolean
   name: string
   description: string
   kind: 'normal'

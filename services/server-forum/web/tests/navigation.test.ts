@@ -16,3 +16,7 @@ test('details and legacy scheme pages retain their parent navigation', () => {
   for (const name of ['open-source','open-source-project','open-source-collection']) strictEqual(sectionOf({name,params:{}}), 'home')
   strictEqual(areaOf({name:'content-bookmarks',params:{}}), 'me')
 })
+
+test('canonical resource category URLs belong to the resource section',()=>{
+ for(const slug of ['resources','resource-movies','resource-help','resource-open']) strictEqual(sectionOf({name:'category',params:{slug}}),'resources')
+})

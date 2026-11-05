@@ -761,7 +761,7 @@ async fn move_topic(
     .await?
     .ok_or_else(|| AppError::not_found("帖子"))?;
     let (name, has_children): (String, bool) = sqlx::query_as(
-        "SELECT name, EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = categories.id) FROM categories WHERE id = $1",
+        "SELECT name, EXISTS (SELECT 1 FROM categories ch WHERE ch.parent_id = categories.id) FROM categories WHERE id = $1 AND status='active' AND posting_enabled AND NOT EXISTS(SELECT 1 FROM categories p WHERE p.id=categories.parent_id AND (p.status<>'active' OR NOT p.posting_enabled))",
     )
     .bind(input.category_id)
     .fetch_optional(&mut *tx)
@@ -993,6 +993,9 @@ struct AdminCategory {
     name: String,
     description: String,
     kind: String,
+    section: String,
+    status: String,
+    posting_enabled: bool,
     sort_order: i32,
     min_post_level: i16,
     on_home: bool,
@@ -1004,7 +1007,7 @@ struct AdminCategory {
 }
 
 const CATEGORY_SELECT: &str = "SELECT c.id, c.parent_id, c.slug, c.name, c.description, c.kind, c.sort_order,
-        c.min_post_level, c.on_home, c.award_points, c.admin_only, c.preset_tags,
+        c.min_post_level, c.on_home, c.award_points, c.admin_only, c.preset_tags, c.section, c.status, c.posting_enabled,
         (SELECT COUNT(*) FROM topics t WHERE t.category_id = c.id AND t.status <> 'deleted') AS topic_count
     FROM categories c";
 
@@ -1013,6 +1016,12 @@ async fn list_categories(State(state): State<AppState>, _admin: AuthAdmin) -> Ap
     Ok(Json(rows))
 }
 
+fn d_section() -> String { "discuss".into() }
+fn d_status() -> String { "active".into() }
+fn validate_policy(section: &str, status: &str) -> AppResult<()> {
+    if !matches!(section,"ideas"|"discuss"|"resources"|"site") || !matches!(status,"active"|"archived") { return Err(AppError::BadRequest("分类归属或状态无效".into())); }
+    Ok(())
+}
 fn d_true() -> bool {
     true
 }
@@ -1028,6 +1037,12 @@ struct CategoryInput {
     #[serde(default)]
     description: String,
     kind: String,
+    #[serde(default = "d_section")]
+    section: String,
+    #[serde(default = "d_status")]
+    status: String,
+    #[serde(default = "d_true")]
+    posting_enabled: bool,
     #[serde(default)]
     sort_order: i32,
     #[serde(default = "d_level")]
@@ -1080,13 +1095,16 @@ async fn create_category(
         return Err(AppError::BadRequest("kind 只能是 normal".into()));
     }
     validate_level(input.min_post_level)?;
+    validate_policy(&input.section, &input.status)?;
+    let mut section = input.section.clone();
     let preset_tags = validate_preset_tags(&input.preset_tags)?;
 
     let mut tx = state.pool.begin().await?;
     if let Some(pid) = input.parent_id {
-        let parent: Option<(Option<i32>, String)> =
-            sqlx::query_as("SELECT parent_id, kind FROM categories WHERE id = $1").bind(pid).fetch_optional(&mut *tx).await?;
-        let (grand, parent_kind) = parent.ok_or_else(|| AppError::BadRequest("父分类不存在".into()))?;
+        let parent: Option<(Option<i32>, String, String)> =
+            sqlx::query_as("SELECT parent_id, kind, section FROM categories WHERE id = $1").bind(pid).fetch_optional(&mut *tx).await?;
+        let (grand, parent_kind, parent_section) = parent.ok_or_else(|| AppError::BadRequest("父分类不存在".into()))?;
+        section = parent_section;
         if grand.is_some() {
             return Err(AppError::BadRequest("分类最多两级".into()));
         }
@@ -1095,8 +1113,8 @@ async fn create_category(
         }
     }
     let inserted: Result<(i32,), sqlx::Error> = sqlx::query_as(
-        "INSERT INTO categories (parent_id, slug, name, description, kind, sort_order, min_post_level, on_home, award_points, admin_only, preset_tags)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id",
+        "INSERT INTO categories (parent_id, slug, name, description, kind, sort_order, min_post_level, on_home, award_points, admin_only, preset_tags, section, status, posting_enabled)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING id",
     )
     .bind(input.parent_id)
     .bind(&slug)
@@ -1109,6 +1127,7 @@ async fn create_category(
     .bind(input.award_points)
     .bind(input.admin_only)
     .bind(&preset_tags)
+    .bind(&section).bind(&input.status).bind(input.posting_enabled)
     .fetch_one(&mut *tx)
     .await;
     let id = match inserted {
@@ -1124,6 +1143,9 @@ async fn create_category(
 
 #[derive(Deserialize)]
 struct CategoryPatch {
+    section: Option<String>,
+    status: Option<String>,
+    posting_enabled: Option<bool>,
     name: Option<String>,
     description: Option<String>,
     sort_order: Option<i32>,
@@ -1140,6 +1162,7 @@ async fn update_category(
     Path(id): Path<i32>,
     Json(patch): Json<CategoryPatch>,
 ) -> AppResult<Json<AdminCategory>> {
+    validate_policy(patch.section.as_deref().unwrap_or("discuss"),patch.status.as_deref().unwrap_or("active"))?;
     let name = patch.name.as_deref().map(|n| validate_name(n, "分类名", 20)).transpose()?;
     let description = patch.description.as_deref().map(|d| validate_text(d, "分类说明", 200)).transpose()?;
     if let Some(level) = patch.min_post_level {
@@ -1147,12 +1170,16 @@ async fn update_category(
     }
     let preset_tags = patch.preset_tags.as_deref().map(validate_preset_tags).transpose()?;
     let mut tx = state.pool.begin().await?;
+    if let Some(section) = &patch.section {
+        let parent: Option<(String,)> = sqlx::query_as("SELECT p.section FROM categories c JOIN categories p ON p.id=c.parent_id WHERE c.id=$1").bind(id).fetch_optional(&mut *tx).await?;
+        if parent.is_some_and(|(s,)|s != *section) { return Err(AppError::BadRequest("子分类归属需与父分类一致，请修改父分类".into())); }
+    }
     let done = sqlx::query(
         "UPDATE categories SET
             name = COALESCE($2, name), description = COALESCE($3, description), sort_order = COALESCE($4, sort_order),
             min_post_level = COALESCE($5, min_post_level), on_home = COALESCE($6, on_home),
             award_points = COALESCE($7, award_points), admin_only = COALESCE($8, admin_only),
-            preset_tags = COALESCE($9, preset_tags)
+            preset_tags = COALESCE($9, preset_tags), section=COALESCE($10,section), status=COALESCE($11,status), posting_enabled=COALESCE($12,posting_enabled)
          WHERE id = $1",
     )
     .bind(id)
@@ -1164,13 +1191,18 @@ async fn update_category(
     .bind(patch.award_points)
     .bind(patch.admin_only)
     .bind(&preset_tags)
+    .bind(&patch.section).bind(&patch.status).bind(patch.posting_enabled)
     .execute(&mut *tx)
     .await?
     .rows_affected();
     if done == 0 {
         return Err(AppError::not_found("分类"));
     }
+    if let Some(section) = &patch.section {
+        sqlx::query("UPDATE categories SET section=$2 WHERE parent_id=$1").bind(id).bind(section).execute(&mut *tx).await?;
+    }
     let mut changed = json!({
+        "section":patch.section,"status":patch.status,"posting_enabled":patch.posting_enabled,
         "name": name, "description": description.as_deref().map(|d| clip(d, 30)), "sort_order": patch.sort_order,
         "min_post_level": patch.min_post_level, "on_home": patch.on_home, "award_points": patch.award_points,
         "admin_only": patch.admin_only, "preset_tags": preset_tags,

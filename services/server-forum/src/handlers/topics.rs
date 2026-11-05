@@ -172,13 +172,15 @@ struct CategoryRules {
     admin_only: bool,
     has_children: bool,
     casual: bool,
+    posting_available: bool,
 }
 
 async fn category_rules(pool: &PgPool, id: i32) -> AppResult<CategoryRules> {
     sqlx::query_as(
         "SELECT c.id, c.min_post_level, c.admin_only,
                 EXISTS(SELECT 1 FROM categories k WHERE k.parent_id = c.id) AS has_children,
-                (c.slug = 'casual' OR EXISTS(SELECT 1 FROM categories p WHERE p.id = c.parent_id AND p.slug = 'casual')) AS casual
+                (c.slug = 'casual' OR EXISTS(SELECT 1 FROM categories p WHERE p.id = c.parent_id AND p.slug = 'casual')) AS casual,
+                c.status='active' AND c.posting_enabled AND NOT EXISTS(SELECT 1 FROM categories p WHERE p.id=c.parent_id AND (p.status<>'active' OR NOT p.posting_enabled)) AS posting_available
          FROM categories c WHERE c.id = $1",
     )
     .bind(id)
@@ -278,6 +280,7 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     let user = &auth.user;
     users::ensure_can_write(user)?;
     let cat = category_rules(&state.pool, input.category_id).await?;
+    if !cat.posting_available { return Err(AppError::Forbidden("该分类已停用或已关闭发帖".into())); }
     if cat.has_children {
         return Err(AppError::BadRequest("请选择具体的二级分类".into()));
     }
@@ -365,6 +368,7 @@ pub async fn update(
     // 留在原分类总是允许（比如守护者后来被降级，仍然能改自己发的公告）；
     // 换到别的分类要有和在那里发帖一样的等级，否则等于绕过发帖限制。
     if cat.id != topic.category.id {
+        if !cat.posting_available { return Err(AppError::Forbidden("目标分类已停用或已关闭发帖".into())); }
         let need = required_post_level(cat.min_post_level, cat.admin_only);
         if user.trust_level < need {
             return Err(level_error(cat.admin_only, need));
@@ -589,5 +593,28 @@ mod tests {
         assert_eq!(tags, vec!["claude", "open-ai"]);
         assert!(clean_tags(&(0..6).map(|i| format!("t{i}")).collect::<Vec<_>>()).is_err());
     }
+    #[tokio::test]
+    async fn posting_policy_respects_category_and_parent_state() -> Result<(), Box<dyn std::error::Error>> {
+        let Ok(url) = std::env::var("TEST_DATABASE_URL") else { return Ok(()); };
+        let schema = format!("posting_policy_{}",uuid::Uuid::new_v4().simple());
+        let admin=sqlx::PgPool::connect(&url).await?;
+        sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin).await?;
+        let pool=crate::db::connect(&url,Some(&schema)).await?;
+        crate::db::migrate(&pool).await?;
+        let (parent,):(i32,)=sqlx::query_as("INSERT INTO categories(slug,name) VALUES('parent','Parent') RETURNING id").fetch_one(&pool).await?;
+        let (child,):(i32,)=sqlx::query_as("INSERT INTO categories(slug,name,parent_id) VALUES('child','Child',$1) RETURNING id").bind(parent).fetch_one(&pool).await?;
+        assert!(category_rules(&pool,child).await?.posting_available);
+        sqlx::query("UPDATE categories SET posting_enabled=false WHERE id=$1").bind(parent).execute(&pool).await?;
+        assert!(!category_rules(&pool,child).await?.posting_available);
+        sqlx::query("UPDATE categories SET posting_enabled=true,status='archived' WHERE id=$1").bind(parent).execute(&pool).await?;
+        assert!(!category_rules(&pool,child).await?.posting_available);
+        sqlx::query("UPDATE categories SET status='active' WHERE id=$1").bind(parent).execute(&pool).await?;
+        sqlx::query("UPDATE categories SET posting_enabled=false WHERE id=$1").bind(child).execute(&pool).await?;
+        assert!(!category_rules(&pool,child).await?.posting_available);
+        pool.close().await;
+        sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await?;
+        Ok(())
+    }
+
 }
 

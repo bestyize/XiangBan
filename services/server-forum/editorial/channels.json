@@ -3,7 +3,7 @@
   "parents": [
     {
       "id": "create",
-      "label": "创作"
+      "label": "创意"
     },
     {
       "id": "learn",
@@ -138,12 +138,6 @@
       "description": "围绕吃喝玩乐交流真实见闻与公开资料"
     },
     {
-      "id": "casual-media",
-      "parent": "casual",
-      "label": "片单乐评",
-      "description": "围绕片单乐评交流真实见闻与公开资料"
-    },
-    {
       "id": "casual-think",
       "parent": "casual",
       "label": "哲思",
@@ -234,28 +228,10 @@
       "description": "分享方案的真实作品、使用方法和创作技巧"
     },
     {
-      "id": "resource-tools",
-      "parent": "resources",
-      "label": "AI 工具",
-      "description": "分享AI 工具的合法来源、图文导读和使用方法"
-    },
-    {
-      "id": "resource-docs",
-      "parent": "resources",
-      "label": "资料",
-      "description": "分享资料的合法来源、图文导读和使用方法"
-    },
-    {
       "id": "resource-movies",
       "parent": "resources",
       "label": "影视",
       "description": "分享影视的合法来源、图文导读和使用方法"
-    },
-    {
-      "id": "resource-music",
-      "parent": "resources",
-      "label": "音乐",
-      "description": "分享音乐的合法来源、图文导读和使用方法"
     },
     {
       "id": "resource-help",
@@ -292,13 +268,6 @@
       "parent": "site",
       "label": "举报处理公示",
       "description": "举报处理公示的站方说明和实用指引"
-    },
-    {
-      "id": "create-guides",
-      "parent": "create",
-      "label": "产品使用",
-      "legacy_only": true,
-      "description": "分享产品使用的真实作品、使用方法和创作技巧"
     }
   ],
   "aliases": {
@@ -311,11 +280,8 @@
     "tech-creative": "learn-prompts",
     "share-software": "resource-open",
     "share-movies": "resource-movies",
-    "share-music": "resource-music",
-    "share-learn": "resource-docs",
     "share-help": "resource-help",
     "xiaoban-wallpaper": "create-wallpaper",
-    "xiaoban-game": "create-game",
-    "xiaoban-app": "create-guides"
+    "xiaoban-game": "create-game"
   }
 }

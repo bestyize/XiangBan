@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // 分类：按父子关系排成树，行内展开编辑；顶部可新建分类。
+import { useMeta } from '@/stores/meta'
 import { computed, onMounted, ref } from 'vue'
 import { adminApi, type AdminCategory, type CategoryInput } from '@/api/admin'
 import CategoryForm from './CategoryForm.vue'
@@ -28,6 +29,7 @@ const rows = computed(() => {
 async function load() {
   try {
     all.value = await adminApi.categories()
+    await useMeta().load(true)
     error.value = ''
   } catch (e) {
     error.value = errorText(e)
@@ -84,6 +86,9 @@ onMounted(load)
               {{ c.name }}
               <span class="adm-tags" style="margin-left: 6px">
                 <span v-if="c.admin_only" class="adm-tag line">仅守护者</span>
+                <span class="adm-tag line">{{ ({ideas:'创意',discuss:'讨论',resources:'资源',site:'站务'})[c.section] }}</span>
+                <span v-if="c.status === 'archived'" class="adm-tag line">已停用</span>
+                <span v-if="!c.posting_enabled" class="adm-tag line">停止新发帖</span>
                 <span v-if="!c.on_home" class="adm-tag line">不上首页</span>
                 <span v-if="!c.award_points" class="adm-tag line">不奖励积分</span>
               </span>

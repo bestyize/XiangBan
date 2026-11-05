@@ -18,6 +18,9 @@ const editing = computed(() => !!props.category)
 const form = reactive({
   parent_id: props.category?.parent_id ?? (null as number | null),
   slug: props.category?.slug ?? '',
+  section: props.category?.section ?? 'discuss',
+  status: props.category?.status ?? 'active',
+  posting_enabled: props.category?.posting_enabled ?? true,
   name: props.category?.name ?? '',
   description: props.category?.description ?? '',
   sort_order: props.category?.sort_order ?? 0,
@@ -29,8 +32,13 @@ const form = reactive({
   preset_tags: (props.category?.preset_tags ?? []).join('，'),
 })
 
+watch(()=>form.parent_id,id=>{ const parent=props.parents.find(p=>p.id===id); if(parent) form.section=parent.section })
+
 function submit() {
   const body: CategoryInput = {
+    section: form.section,
+    status: form.status,
+    posting_enabled: form.posting_enabled,
     name: form.name.trim(),
     description: form.description.trim(),
     sort_order: Number(form.sort_order) || 0,
@@ -64,6 +72,8 @@ function submit() {
         <input v-model="form.slug" class="input" required maxlength="40" placeholder="tech-example" />
         <small>2-40 位小写字母、数字或连字符，创建后不可修改</small>
       </label>
+      <label class="field"><span>所属页面</span><select v-model="form.section" :disabled="form.parent_id !== null" class="select"><option value="ideas">创意</option><option value="discuss">讨论</option><option value="resources">资源</option><option value="site">站务</option></select><small>子分类新增时沿用父分类归属；修改一级分类会同步其子分类。</small></label>
+      <label class="field"><span>分类状态</span><select v-model="form.status" class="select"><option value="active">启用</option><option value="archived">停用</option></select></label>
       <label class="field">
         <span>名称</span>
         <input v-model="form.name" class="input" required maxlength="20" />
@@ -90,7 +100,8 @@ function submit() {
       </label>
     </div>
     <div class="adm-checks">
-      <label><input v-model="form.on_home" type="checkbox" />显示在首页</label>
+      <label><input v-model="form.posting_enabled" type="checkbox" />允许新发帖（停用后自动禁止）</label>
+      <label><input v-model="form.on_home" type="checkbox" />进入聚合帖子流</label>
       <label><input v-model="form.award_points" type="checkbox" />发帖奖励积分</label>
       <label><input v-model="form.admin_only" type="checkbox" />仅守护者可发帖</label>
     </div>

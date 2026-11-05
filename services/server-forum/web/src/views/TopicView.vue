@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { canonicalCategory } from '@/lib/communityStructure'
+import { categoryDestination } from '@/lib/communityStructure'
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
@@ -259,13 +259,8 @@ async function closeHelp() {
 }
 
 function breadcrumbDestination(slug: string) {
-  switch (canonicalCategory(slug)) {
-    case 'resources': return '/resources'
-    case 'resource-movies': return '/resources?tab=media'
-    case 'resource-help': return '/resources?tab=help'
-    case 'resource-open': return '/resources?tab=software'
-    default: return `/c/${slug}`
-  }
+  const category=meta.bySlug.get(slug)
+  return category ? categoryDestination(category,meta.categories) : `/c/${slug}`
 }
 
 </script>

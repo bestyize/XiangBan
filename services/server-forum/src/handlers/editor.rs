@@ -437,7 +437,7 @@ async fn check_category(
         return Err(AppError::Forbidden("作者已被封禁或等级不足".into()));
     }
     users::ensure_can_write(&user)?;
-    let cat:Option<(i32,String,i16,bool,bool)>=sqlx::query_as("SELECT id,kind,min_post_level,admin_only,EXISTS(SELECT 1 FROM categories k WHERE k.parent_id=c.id) FROM categories c WHERE slug=ANY($1) ORDER BY (slug=$2) DESC LIMIT 1 FOR SHARE OF c")
+    let cat:Option<(i32,String,i16,bool,bool)>=sqlx::query_as("SELECT id,kind,min_post_level,admin_only,EXISTS(SELECT 1 FROM categories k WHERE k.parent_id=c.id) FROM categories c WHERE slug=ANY($1) AND c.status='active' AND c.posting_enabled AND NOT EXISTS(SELECT 1 FROM categories p WHERE p.id=c.parent_id AND (p.status<>'active' OR NOT p.posting_enabled)) ORDER BY (slug=$2) DESC LIMIT 1 FOR SHARE OF c")
         .bind(crate::taxonomy::equivalents(slug)).bind(slug).fetch_optional(&mut *conn).await?;
     let (id, kind, min, admin, children) =
         cat.ok_or_else(|| AppError::BadRequest("板块不存在".into()))?;

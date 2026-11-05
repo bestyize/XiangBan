@@ -25,6 +25,9 @@ pub struct Category {
     pub name: String,
     pub description: String,
     pub kind: String,
+    pub section: String,
+    pub status: String,
+    pub posting_enabled: bool,
     pub sort_order: i32,
     pub min_post_level: i16,
     pub on_home: bool,
@@ -38,9 +41,11 @@ pub struct Category {
 pub async fn categories(State(state): State<AppState>) -> AppResult<Json<Vec<Category>>> {
     let rows = sqlx::query_as(
         "SELECT c.id, c.parent_id, c.slug, c.name, c.description, c.kind, c.sort_order, c.min_post_level,
-                c.on_home, c.award_points, c.admin_only, c.preset_tags,
+                c.on_home, c.award_points, c.admin_only, c.preset_tags, c.section,
+                CASE WHEN p.status='archived' THEN 'archived' ELSE c.status END AS status,
+                c.posting_enabled AND COALESCE(p.posting_enabled,true) AS posting_enabled,
                 (SELECT COUNT(*) FROM topics t WHERE t.category_id = c.id AND t.status = 'normal' AND t.min_read_level = 0) AS topic_count
-         FROM categories c ORDER BY c.sort_order, c.id",
+         FROM categories c LEFT JOIN categories p ON p.id=c.parent_id ORDER BY c.sort_order, c.id",
     )
     .fetch_all(&state.pool)
     .await?;

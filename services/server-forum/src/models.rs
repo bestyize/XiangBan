@@ -203,6 +203,8 @@ const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.pin
 
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct ListFilter {
+    #[serde(default)]
+    pub active_only: bool,
     /// 分类 slug；一级分类会包含它的子分类。
     pub category: Option<String>,
     pub tag: Option<String>,
@@ -289,6 +291,9 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
             .push(" OR t.excerpt ILIKE ")
             .push_bind(pattern)
             .push(")");
+    }
+    if f.active_only {
+        qb.push(" AND c.status='active' AND NOT EXISTS(SELECT 1 FROM categories parent WHERE parent.id=c.parent_id AND parent.status<>'active')");
     }
     if f.home {
         qb.push(" AND c.on_home");

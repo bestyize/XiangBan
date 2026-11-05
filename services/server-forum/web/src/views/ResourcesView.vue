@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useMeta } from '@/stores/meta'
 import { api } from '@/api/forum'
 import type { Page, TopicItem } from '@/api/types'
 import CommunityTabs from '@/components/community/CommunityTabs.vue'
@@ -12,41 +13,42 @@ import ResourceTopicRow from '@/components/community/ResourceTopicRow.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { useCommunityResource } from '@/components/community/resource'
 import { useHead } from '@/lib/head'
-import { RESOURCE_TABS, resourceTopicCategory } from '@/lib/communityStructure'
+import { resourceTabs, resourceTopicCategory } from '@/lib/communityStructure'
 import '@/components/community/community.css'
+const meta = useMeta()
 const route = useRoute(), router = useRouter()
-const tabs = RESOURCE_TABS
-const tab = computed(() => tabs.some(t => t.key === route.query.tab) ? String(route.query.tab) : 'software')
-const sectionTitle = computed(() => tabs.find(item => item.key === tab.value)?.label || '资源')
+const tabs = computed(()=>resourceTabs(meta.categories))
+const tab = computed(() => tabs.value.some(t => t.key === resourceTopicCategory(String(route.query.tab))) ? resourceTopicCategory(String(route.query.tab)) : 'software')
+const sectionTitle = computed(() => tabs.value.find(item => item.key === tab.value)?.label || '资源')
 const page = computed(() => Math.max(1, Math.floor(Number(route.query.page) || 1)))
 type ResourceData = { kind:'topics'; result:Page<TopicItem> }
 const { data, loading, error, load } = useCommunityResource<ResourceData | null>(async () => {
   if (tab.value === 'software') return null
   const category = resourceTopicCategory(tab.value)
-  return { kind:'topics', result: await api.topics({ category, page:page.value, sort:'new' }) }
+  return { kind:'topics', result: await api.topics({ category, page:page.value, sort:'new', active_only:true }) }
 })
-watch([tab,page], load, { immediate:true })
+watch([() => meta.categories,tab,page], load, { immediate:true })
 function setTab(tab:string) { void router.replace({ query: { tab } }) }
 function go(page:number) { void router.replace({ query:{ ...route.query, page } }) }
 useHead(() => ({ title:'资源' }))
 </script>
 <template>
-  <main class="community-page resource-page" :class="{ 'resource-page--media': tab === 'media' }">
+  <main class="community-page resource-page" :class="{ 'resource-page--media': tab === 'resource-movies' }">
     <h1 class="sr-only">社区资源</h1>
     <CommunityTabs :class="{ 'resource-tabs--software': tab === 'software' }" :items="tabs" :active="tab" label="资源栏目" @change="setTab" />
     <OpenSourceSoftwareDirectory v-if="tab === 'software'" />
     <template v-else>
-      <HelpStats v-if="tab === 'help'" />
+      <HelpStats v-if="tab === 'resource-help'" />
       <RequestState :loading="loading" :error="error" @retry="load" />
       <template v-if="data?.kind === 'topics'">
         <div class="desktop-feed-heading meta-only">
           <h2 class="sr-only">{{ sectionTitle }}</h2><span>共 {{ data.result.total.toLocaleString('zh-CN') }} 条</span>
         </div>
-        <MasonryGrid v-if="tab === 'media' && data.result.items.length" class="resource-media-grid" :columns="2">
+        <MasonryGrid v-if="tab === 'resource-movies' && data.result.items.length" class="resource-media-grid" :columns="2">
           <ResourceTopicRow v-for="topic in data.result.items" :key="topic.id" :topic="topic" layout="masonry" mode="media" note-cover />
         </MasonryGrid>
-        <div v-else-if="tab === 'help'" class="resource-feed topic-grid feed-help">
-          <ResourceTopicRow v-for="topic in data.result.items" :key="topic.id" :topic="topic" mode="help" />
+        <div v-else class="resource-feed topic-grid feed-help">
+          <ResourceTopicRow v-for="topic in data.result.items" :key="topic.id" :topic="topic" :mode="tab === 'resource-help' ? 'help' : 'open'" />
         </div>
         <RequestState :empty="!data.result.items.length" />
         <PagerNav :page="data.result.page" :page-size="data.result.page_size" :total="data.result.total" @go="go" />
