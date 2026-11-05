@@ -31,10 +31,13 @@ impl Drop for TempDir {
 #[derive(Default)]
 struct FakeDesktop {
     calls: Mutex<Vec<String>>,
+    signed_in: Mutex<Option<bool>>,
 }
 
 impl Desktop for FakeDesktop {
+    fn account_signed_in(&self) -> Option<bool> { *lock(&self.signed_in) }
     fn generate_images(&self, args: Value, _ctx: &ToolCtx) -> Result<Value, String> {
+        if self.account_signed_in() == Some(false) { return Err("请先登录小伴账号，再使用图片生成".into()); }
         lock(&self.calls).push(format!("generate-image {}", args["prompt"].as_str().unwrap_or_default()));
         Ok(json!({"generated_images":[{"id":format!("{}.png", "a".repeat(64)),"name":"mock.png","mime":"image/png","width":1024,"height":1024}],"warnings":[]}))
     }
@@ -1262,6 +1265,40 @@ fn gateway_probe_is_exactly_one_hi_without_tools_or_history() {
     let request = probe_request();
     assert_eq!(request.messages, vec![Message::user_text("hi")]);
     assert!(request.tools.is_empty());
+}
+
+#[test]
+fn image_generation_can_resume_after_login_in_the_same_conversation() {
+    let rig = rig("image-login-resume", vec![
+        load(&["image_generate"]),
+        call("before-login", "image_generate", json!({"prompt":"秋风明月图"})),
+        Step::text("请先登录"),
+        load(&["image_generate"]),
+        call("after-login", "image_generate", json!({"prompt":"秋风明月图"})),
+        Step::text("图片已生成"),
+        Step::text("已退出登录"),
+    ], Approval::Once);
+    *lock(&rig.desktop.signed_in) = Some(false);
+    assert!(run(&rig, "帮我画一张秋风明月图").0.is_ok());
+    assert!(lock(&rig.desktop.calls).is_empty());
+    let before = rig.provider.requests().len();
+    *lock(&rig.desktop.signed_in) = Some(true);
+    assert!(lock(&rig.desktop.calls).is_empty(), "login itself must not submit a paid request");
+    assert!(run(&rig, "请接着上面的内容继续写完。").0.is_ok());
+    let requests = rig.provider.requests();
+    let first = &requests[before];
+    assert!(first.messages.iter().any(|m| m.synthetic && m.text().contains("当前状态】已登录") && m.text().contains("继续完成前面的原始任务")));
+    assert!(first.messages.iter().any(|m| m.role == Role::Tool && m.is_error && m.text().contains("请先登录")), "the new status must coexist with the old error");
+    assert!(requests[..before].iter().all(|r| r.messages.iter().any(|m| m.synthetic && m.text().contains("当前状态】未登录"))));
+    assert!(requests[before..].iter().all(|r| r.messages.iter().any(|m| m.synthetic && m.text().contains("当前状态】已登录"))));
+    assert_eq!(*lock(&rig.desktop.calls), vec!["generate-image 秋风明月图"]);
+    assert_eq!(lock(&rig.asked).iter().filter(|(name, _)| name == "image_generate").count(), 2, "resuming still goes through normal permission checks");
+    let history = JsonlStore::new(rig.dirs.sessions()).load("s1").unwrap();
+    assert!(!history.iter().any(|m| m.text().contains("【小伴账号当前状态】")), "never persist a stale account snapshot");
+    assert!(history.iter().any(|m| m.structured_content.as_ref().is_some_and(|value| value["generated_images"].is_array())));
+    *lock(&rig.desktop.signed_in) = Some(false);
+    assert!(run(&rig, "我退出登录了").0.is_ok());
+    assert!(rig.provider.requests().last().unwrap().messages.iter().any(|m| m.synthetic && m.text().contains("当前状态】未登录")));
 }
 
 #[test]

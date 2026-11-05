@@ -22,6 +22,8 @@ pub struct CompanionChange {
 }
 
 pub trait Desktop: Send + Sync {
+    /// Current native session only; never expose account credentials to the model.
+    fn account_signed_in(&self) -> Option<bool> { None }
     fn saved_community_tool(&self) -> Option<Arc<dyn Tool>> { None }
     fn web_search_tool(&self) -> Option<Arc<dyn Tool>> { None }
     fn skin_list(&self) -> Result<Value, String> { Err("当前宿主不支持应用皮肤".into()) }
@@ -113,6 +115,9 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn account_signed_in(&self) -> Option<bool> {
+        Some(crate::account::get_account_session(self.app.clone()).is_some())
+    }
     fn saved_community_tool(&self) -> Option<Arc<dyn Tool>> { crate::community_media::saved_tool(&self.app) }
     fn web_search_tool(&self) -> Option<Arc<dyn Tool>> { Some(super::web_search::tool(self.app.clone())) }
     fn skin_list(&self) -> Result<Value, String> { crate::application_skins::agent_list(&self.app) }

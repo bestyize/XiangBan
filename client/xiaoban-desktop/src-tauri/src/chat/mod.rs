@@ -712,7 +712,9 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     }
     // Session-bound workflows are user-authorized data; inject before context budgeting, never as a system persona.
     if let Some(workflow) = workflow { builder = builder.middleware(workflow); }
+    let account_desktop = desktop.clone();
     builder = builder
+        .middleware(feature_hints::AccountContext::new(move || account_desktop.account_signed_in()))
         // Facts about the app's own features that match the request, before trimming so their size is counted.
         .middleware(feature_hints::FeatureHints)
         .middleware(feature_hints::RecoveryHint)

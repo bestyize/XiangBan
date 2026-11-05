@@ -44,7 +44,7 @@ watch(() => session.loggedIn, v => {
 </template>
 <style>
 :root{--mobile-nav-offset:calc(56px + env(safe-area-inset-bottom));--brand-soft:color-mix(in srgb,var(--brand) 8%,var(--surface))}
-.site-layout{max-width:1023px;margin:0 auto;padding-bottom:var(--mobile-nav-offset);min-height:100dvh;--page-w:1023px}.community-layout{background:color-mix(in srgb,var(--surface) 55%,var(--paper))}.app-main{container:page / inline-size;max-width:var(--page-w);margin:0 auto;padding:8px 24px 40px;min-height:calc(100dvh - 180px)}
+.site-layout{max-width:1023px;margin:0 auto;padding-bottom:var(--mobile-nav-offset);min-height:100dvh;--page-w:1023px;background:color-mix(in srgb,var(--surface) 55%,var(--paper))}.app-main{container:page / inline-size;max-width:var(--page-w);margin:0 auto;padding:8px 24px 40px;min-height:calc(100dvh - 180px)}
 .app-footer{max-width:var(--page-w);margin:0 auto;padding:16px 24px 28px;color:var(--ink-3);font-size:12px}.app-footer nav{display:flex;flex-wrap:wrap;gap:8px 20px}.app-footer p{margin:8px 0 0}.app-footer a:hover{color:var(--ink)}
 .skip-link{position:fixed;left:12px;top:-80px;z-index:100;padding:12px 20px;background:var(--surface);border-radius:12px}.skip-link:focus{top:8px}
 @media(max-width:1023px){.app-main{padding:4px 20px 24px}.app-footer{padding:16px 20px 20px}}

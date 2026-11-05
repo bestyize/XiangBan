@@ -41,6 +41,8 @@
 
 直接在聊天中描述想生成的图片，或选择「＋ → 工具 → 生成图片」。内置 `image_generate` 通过小伴 AI 网关调用独立的生图模型，当前聊天模型无需切换，但须支持工具调用。使用前登录小伴账号并有可用额度；管理员须在 `server-ai` 的「产品与档位 → 媒体能力」配置并启用图片渠道、模型和可选尺寸，付费要求由服务端执行。桌面不接收生图模型名或上游密钥。
 
+每次模型请求前都会读取本机当前登录态，以临时上下文提供给对话，不传递令牌或写入聊天历史。因未登录而尚未开始的生图任务，登录后可在原对话点击「继续」恢复；「继续」表示继续完成原任务，也包含工具操作。登录本身不会自动发起生图，恢复时仍经过正常工具权限检查；已生成、超时、取消或结果未知的请求不会因此自动重发。回归验证：`cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::feature_hints` 与同命令筛选 `chat::tests::image_generation`。
+
 支持文生图，一次 1–4 张；未指定尺寸时使用后台首选尺寸。聊天显示生成状态与图片预览（隐藏执行过程时也保留），可在系统图片查看器打开原图，或通过原生文件对话框另存为。原图和缩略图保存在数据根的 `chat/generated-images/`，会话仅保存文件引用，重开聊天仍可查看；删除对话暂不自动清理这些图片。生成成功后，原图自动复制到「资料库 → 我的文档 → AI 生成图片」，可用“图片”筛选；按图片内容去重，保留改名、移动和标签。打开资料库会补入旧版生成的图片及此前入库失败的本机原图，不重发生成请求；从资料库删除后不会再次自动补入，也不影响聊天原图。超过资料库 3MB 提问上限的图片仍完整保存，但不能直接作为提问附件。仅接受有界且经解码验证的 PNG/JPEG/WebP；图片下载不携带账号令牌。取消、超时或上游结果未知不会自动重发，避免重复计费；成功保存的部分图片仍保留。暂不支持参考图编辑与自定义生图服务配置。
 
 验证：本目录运行 `npx vitest run src/ui/chat/generated-images.test.ts src/ui/chat/ChatGeneratedImages.test.ts src/ui/chat/view.test.ts src/ui/components/ChatWorkbenchTools.test.ts src/ui/pages/ChatPage.test.ts`、`npx vue-tsc --noEmit`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop chat::image_generation`。使用本机模拟网关与临时图片，不产生真实生图费用；线上模型效果、额度扣费及 Windows/macOS 图片查看器和保存对话框需实机验收。
