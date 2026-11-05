@@ -1,4 +1,5 @@
 import type { Category } from '../api/types'
+import { postableCategories } from './communityStructure.ts'
 
 export type PostingSectionKey = 'ideas' | 'discuss' | 'resources'
 export interface PostingGroup { id: number; name: string; categories: Category[] }
@@ -14,13 +15,9 @@ const sections: Omit<PostingSection, 'groups'>[] = [
   { key: 'resources', name: '资源', description: '开源讨论、影视与求助悬赏' },
 ]
 export function postingSections(categories: Category[], level: number, editingCategoryId?: number): PostingSection[] {
-  const active = new Set(categories.filter(c=>c.status === 'active' && (!c.parent_id || categories.some(p=>p.id === c.parent_id && p.status === 'active'))).map(c=>c.id))
-  const selectable = categories.filter(c => {
-    if (c.id === editingCategoryId) return true
-    const parent = categories.find(p => p.id === c.parent_id)
-    return active.has(c.id) && c.posting_enabled && (!parent || parent.posting_enabled)
-      && (c.admin_only ? 3 : Math.min(Math.max(c.min_post_level, 0), 3)) <= level && !categories.some(child => child.parent_id === c.id)
-  })
+  const selectable = postableCategories(categories,level)
+  const edited = categories.find(c=>c.id===editingCategoryId)
+  if (edited && !selectable.some(c=>c.id===edited.id)) selectable.push(edited)
   return sections.map(section => {
     const groups: PostingGroup[] = []
     for (const category of selectable) {

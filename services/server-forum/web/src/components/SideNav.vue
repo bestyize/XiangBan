@@ -1,35 +1,31 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { categoryDestination, SECTION_LABELS } from '@/lib/communityStructure'
+import { categoryDestination, categoryLabel, navigationSection } from '@/lib/communityStructure'
 import { SHOW_CHILD_THRESHOLD, useMeta } from '@/stores/meta'
 
 const props = defineProps<{ active?: string }>()
 const meta = useMeta()
 
-/** 当前所在的一级分类：选中二级分类时，它的父级也算展开。 */
-const activeRoot = computed(() => {
-  const c = props.active ? meta.bySlug.get(props.active) : undefined
-  return meta.parentOf(c)?.slug
+const activeSection = computed(() => {
+  const category = props.active ? meta.bySlug.get(props.active) : undefined
+  return category ? navigationSection(category) : undefined
 })
-
-function visibleChildren(node: (typeof meta.tree)[number]) {
-  // 展开的一级分类显示全部子分类；其余只露出帖子够多的子分类。
-  if (activeRoot.value === node.slug) return node.children
-  return node.children.filter(c => c.topic_count >= SHOW_CHILD_THRESHOLD)
+function visibleChildren(node: (typeof meta.navigation)[number]) {
+  return activeSection.value === node.key ? node.children : node.children.filter(c=>c.topic_count>=SHOW_CHILD_THRESHOLD)
 }
 </script>
 
 <template>
   <nav class="side" aria-label="分类">
     <RouterLink to="/" class="item top" :class="{ on: active === 'home' }">首页</RouterLink>
-    <div v-for="node in meta.tree" :key="node.id" class="group">
+    <div v-for="node in meta.navigation" :key="node.key" class="group">
       <RouterLink
-        :to="categoryDestination(node,meta.categories)"
+        :to="node.href"
         class="item root"
-        :class="{ on: active === node.slug }"
+        :class="{ on: activeSection === node.key }"
       >
-        <span>{{ node.section === 'ideas' ? SECTION_LABELS.ideas : node.name }}</span>
-        <span class="count">{{ meta.totalCount(node) || '' }}</span>
+        <span>{{ node.name }}</span>
+        <span class="count">{{ node.topic_count || '' }}</span>
       </RouterLink>
       <RouterLink
         v-for="child in visibleChildren(node)"
@@ -38,7 +34,7 @@ function visibleChildren(node: (typeof meta.tree)[number]) {
         class="item child"
         :class="{ on: active === child.slug }"
       >
-        <span>{{ child.name }}</span>
+        <span>{{ categoryLabel(child) }}</span>
         <span class="count">{{ child.topic_count || '' }}</span>
       </RouterLink>
     </div>

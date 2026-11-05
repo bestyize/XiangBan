@@ -13,7 +13,7 @@ import { useTopicList } from '@/lib/useList'
 import { useHead } from '@/lib/head'
 import { tagLabel } from '@/lib/format'
 import { articleLayout } from '@/lib/cardPresentation'
-import { canonicalCategory } from '@/lib/communityStructure'
+import { canonicalCategory, categoryHref } from '@/lib/communityStructure'
 
 const route = useRoute()
 const router = useRouter()
@@ -76,7 +76,7 @@ function compose() {
     <header class="head">
       <div>
         <p v-if="parent" class="crumb">
-          <RouterLink :to="`/c/${parent.slug}`">{{ parent.name }}</RouterLink>
+          <RouterLink :to="categoryHref(parent,meta.categories)">{{ parent.name }}</RouterLink>
         </p>
         <h1>{{ category?.name ?? '' }}</h1>
         <p v-if="category?.description" class="muted desc">{{ category.description }}</p>

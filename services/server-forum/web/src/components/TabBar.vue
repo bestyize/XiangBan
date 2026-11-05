@@ -19,7 +19,7 @@ function publish(path: string) {
     ? resourceTopicCategory(tab)
     : route.name === 'ideas' ? String(route.query.category || 'create')
     : route.name === 'discuss' && discussionTabs(meta.categories).some(item => item.key === tab && tab !== 'all')
-    ? discussionCategory(tab, tab === 'learn' ? String(route.query.filter ?? '') : '', meta.categories) : undefined
+    ? discussionCategory(tab, String(route.query.filter ?? ''), meta.categories) : undefined
   const selected = meta.bySlug.get(category || '')
   if (path === '/new' && selected?.status === 'active' && selected.posting_enabled) void router.push({path,query:{category}})
   else if (path === '/new') void router.push({path,query:{section:route.name === 'ideas' ? 'ideas' : route.name === 'resources' ? 'resources' : 'discuss'}})

@@ -242,7 +242,7 @@
     {
       "id": "resource-open",
       "parent": "resources",
-      "label": "开源精选",
+      "label": "开源讨论",
       "description": "分享开源精选的合法来源、图文导读和使用方法"
     },
     {

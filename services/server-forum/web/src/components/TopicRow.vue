@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useMeta } from '@/stores/meta'
+import { categoryHref, categoryLabel } from '@/lib/communityStructure'
+const meta = useMeta()
 import type { TopicItem } from '@/api/types'
 import UserAvatar from './UserAvatar.vue'
 import TopicStats from './TopicStats.vue'
@@ -20,7 +23,7 @@ withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { show
         <RouterLink :to="`/t/${topic.id}`">{{ topic.title || topic.excerpt || '分享生活' }}</RouterLink>
       </h3>
       <div class="meta">
-        <RouterLink v-if="showCategory" :to="`/c/${topic.category.slug}`" class="cat">{{ topic.category.name }}</RouterLink>
+        <RouterLink v-if="showCategory" :to="categoryHref(topic.category,meta.categories)" class="cat">{{ categoryLabel(topic.category) }}</RouterLink>
         <RouterLink :to="`/u/${topic.author.uid}`" class="author">{{ topic.author.nickname }}</RouterLink>
         <span>{{ topic.reply_count ? `${timeAgo(topic.last_reply_at)}回复` : timeAgo(topic.created_at) }}</span>
         <span v-if="topic.locked">已锁定</span>

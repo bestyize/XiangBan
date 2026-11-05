@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { categoryDestination, SECTION_LABELS } from '@/lib/communityStructure'
+import { categoryDestination, categoryLabel, navigationSection } from '@/lib/communityStructure'
 import { useMeta } from '@/stores/meta'
 
 const props = defineProps<{ active?: string }>()
 const meta = useMeta()
 
 const current = computed(() => (props.active ? meta.bySlug.get(props.active) : undefined))
-/** 进入某个一级分类后，第二行显示它的子分类。 */
-const root = computed(() => meta.tree.find(n => n.slug === meta.parentOf(current.value)?.slug))
+/** 展开当前社区页面下的帖子分类。 */
+const root = computed(() => current.value ? meta.navigation.find(n=>n.key===navigationSection(current.value!)) : undefined)
 </script>
 
 <template>
@@ -16,23 +16,23 @@ const root = computed(() => meta.tree.find(n => n.slug === meta.parentOf(current
     <nav class="row" aria-label="分类">
       <RouterLink to="/" class="chip" :class="{ on: active === 'home' }">首页</RouterLink>
       <RouterLink
-        v-for="node in meta.tree"
-        :key="node.id"
-        :to="categoryDestination(node,meta.categories)"
+        v-for="node in meta.navigation"
+        :key="node.key"
+        :to="node.href"
         class="chip"
-        :class="{ on: root?.slug === node.slug }"
-        >{{ node.section === 'ideas' ? SECTION_LABELS.ideas : node.name }}</RouterLink
+        :class="{ on: root?.key === node.key }"
+        >{{ node.name }}</RouterLink
       >
     </nav>
     <nav v-if="root && root.children.length" class="row sub" :aria-label="`${root.name}的子分类`">
-      <RouterLink :to="categoryDestination(root,meta.categories)" class="chip" :class="{ on: active === root.slug }">全部</RouterLink>
+      <RouterLink :to="root.href" class="chip" :class="{ on: !current }">全部</RouterLink>
       <RouterLink
         v-for="c in root.children"
         :key="c.id"
         :to="categoryDestination(c,meta.categories)"
         class="chip"
-        :class="{ on: active === c.slug }"
-        >{{ c.name }}</RouterLink
+        :class="{ on: current?.id === c.id }"
+        >{{ categoryLabel(c) }}</RouterLink
       >
     </nav>
   </div>

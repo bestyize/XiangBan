@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { canonicalCategory, postableCategories } from '@/lib/communityStructure'
+import { computed, onMounted, ref, watch } from 'vue'
 import { editorApi, type Author, type Draft, type Detail } from '@/api/editor'
 import type { AdminCategory } from '@/api/admin'
 import { readBundle, exampleMarkdown, type ImportRow } from '@/lib/postBundle'
@@ -8,7 +9,13 @@ const authors = ref<Author[]>([]), categories = ref<AdminCategory[]>([]), author
 const imports = ref<ImportRow[]>([]), drafts = ref<Draft[]>([]), checked = ref<string[]>([]), busy = ref(false), error = ref(''), progress = ref('')
 const page = ref(1), total = ref(0), published = ref(false), detail = ref<Detail | null>(null), preview = ref(''), editTitle = ref(''), editCategory = ref(''), editTags = ref(''), editBody = ref('')
 const results = ref<{ title: string; ok: boolean; message: string; url?: string }[]>([])
-const leaves = computed(() => categories.value.filter(c => !categories.value.some(k => k.parent_id === c.id)))
+function availableTo(uid:string) {
+  const account=authors.value.find(a=>a.uid===uid)
+  return account?.status==='active' && account.trust_level>=1 ? postableCategories(categories.value,account.trust_level) : []
+}
+const leaves = computed(() => availableTo(author.value))
+const editLeaves = computed(() => availableTo(detail.value?.draft.author_uid || ''))
+watch(leaves, rows=>{ if (categoryOverride.value && !rows.some(c=>c.slug===categoryOverride.value)) categoryOverride.value='' })
 async function loadDrafts() { const r = await editorApi.drafts(page.value, published.value); drafts.value = r.items; total.value = r.total; checked.value = [] }
 async function load() { const [a, c] = await Promise.all([editorApi.authors(), editorApi.context()]); authors.value = a.items; categories.value = c.categories; author.value ||= a.items[0]?.uid || ''; await loadDrafts() }
 async function run(fn: () => Promise<void>) { busy.value = true; error.value = ''; try { await fn() } catch (e) { error.value = e instanceof Error ? e.message : String(e) } finally { busy.value = false } }
@@ -19,7 +26,7 @@ async function importPosts() {
     const selected = imports.value.filter(r => r.selected && r.data && !r.error)
     for (let i = 0; i < selected.length; i++) {
       const row = selected[i]!; progress.value = `正在导入 ${i + 1} / ${selected.length}`
-      try { await editorApi.save({ ...row.data!, author_uid: author.value, category: categoryOverride.value || row.data!.category, overwrite: overwrite.value }); row.result = '已导入'; row.selected = false }
+      try { const category=canonicalCategory(categoryOverride.value || row.data!.category); if(!leaves.value.some(c=>c.slug===category)) throw new Error('该作者无法在此分类发布，请选择可用分类'); await editorApi.save({ ...row.data!, author_uid: author.value, category, overwrite: overwrite.value }); row.result = '已导入'; row.selected = false }
       catch (e) { row.result = e instanceof Error ? e.message : String(e) }
     }
     progress.value = '导入结束；失败的稿件可单独重试'; await loadDrafts()
@@ -29,6 +36,7 @@ async function open(d: Draft) { await run(async () => { const r = await editorAp
 async function save() {
   const d = detail.value; if (!d) return
   await run(async () => {
+    if(!editLeaves.value.some(c=>c.slug===editCategory.value)) throw new Error('请选择该作者可发布的分类')
     await editorApi.save({ author_uid: d.draft.author_uid, external_id: d.draft.external_id, title: editTitle.value, category: editCategory.value, tags: editTags.value.split(/[,，]/).map(v => v.trim()).filter(Boolean), body: editBody.value, images: d.images, overwrite: true, expected_updated_at: d.draft.updated_at })
     const next = await editorApi.detail(d.draft.id); detail.value = next; preview.value = next.html; await loadDrafts(); progress.value = '已保存并更新预览'
   })
@@ -68,7 +76,7 @@ onMounted(() => run(load))
   <div v-if="results.length" class="panel import-box"><p v-for="(r, i) in results" :key="i" :class="{ 'error-text': !r.ok }">{{ r.title }}：{{ r.message }} <a v-if="r.url" :href="r.url" target="_blank" rel="noopener">打开帖子</a></p></div>
   <section v-if="detail" class="panel import-box">
     <div class="adm-toolbar"><h2>{{ detail.draft.topic_id ? '已发布稿件' : '编辑与预览' }}</h2><button class="btn btn-sm" :disabled="busy" @click="detail = null">关闭</button></div>
-    <div class="edit-fields"><label>标题<input v-model="editTitle" class="input" :disabled="!!detail.draft.topic_id" maxlength="80" /></label><label>板块<select v-model="editCategory" class="select" :disabled="!!detail.draft.topic_id"><option v-for="c in leaves" :key="c.id" :value="c.slug">{{ c.name }} · {{ c.slug }}</option></select></label><label>标签（逗号分隔）<input v-model="editTags" class="input" :disabled="!!detail.draft.topic_id" /></label></div>
+    <div class="edit-fields"><label>标题<input v-model="editTitle" class="input" :disabled="!!detail.draft.topic_id" maxlength="80" /></label><label>板块<select v-model="editCategory" class="select" :disabled="!!detail.draft.topic_id"><option v-if="editCategory && !editLeaves.some(c=>c.slug===editCategory)" :value="editCategory" disabled>{{ editCategory }}（已停用，请选择可发布分类）</option><option v-for="c in editLeaves" :key="c.id" :value="c.slug">{{ c.name }} · {{ c.slug }}</option></select></label><label>标签（逗号分隔）<input v-model="editTags" class="input" :disabled="!!detail.draft.topic_id" /></label></div>
     <div class="edit-grid"><label>Markdown<textarea v-model="editBody" class="input source" :readonly="!!detail.draft.topic_id" /></label><div><span>保存后的论坛预览</span><article class="prose draft-preview" v-html="preview" /></div></div>
     <p class="muted">已导入的图片随稿件保存；预览不会公开待发布图片。修改正文后点击保存更新预览。</p><button v-if="!detail.draft.topic_id" class="btn btn-primary" :disabled="busy" @click="save">保存并更新预览</button>
   </section>

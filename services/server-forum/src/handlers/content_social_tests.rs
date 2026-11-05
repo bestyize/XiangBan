@@ -62,6 +62,9 @@ impl Harness {
         let pool = crate::db::connect(&url, Some(&schema)).await?;
         crate::db::migrate(&pool).await?;
         crate::db::seed(&pool).await?;
+        crate::taxonomy::migrate(&pool).await?;
+        crate::taxonomy::migrate_sections(&pool).await?;
+        crate::taxonomy::migrate_labels(&pool).await?;
         social::schema::init(&pool).await?;
         social::schema::init(&pool).await?;
         let mut config = AppConfig::from_env();
@@ -551,6 +554,8 @@ async fn work_discussion_supports_imported_works_schemes_and_existing_threads() 
     let (status,s)=call(&h.app,"POST",&path,Some(&token),json!({})).await;
     assert_eq!(status,StatusCode::OK,"{s}");
     let topic=s["topic_id"].as_i64().unwrap();
+    let (slug,):(String,)=sqlx::query_as("SELECT c.slug FROM topics t JOIN categories c ON c.id=t.category_id WHERE t.id=$1").bind(topic).fetch_one(&h.pool).await?;
+    assert_eq!(slug,"create-schemes");
     sqlx::query("UPDATE topics SET status='hidden' WHERE id=$1").bind(topic).execute(&h.pool).await?;
     assert_eq!(call(&h.app,"GET",&format!("/api/topics/{topic}/posts"),None,json!({})).await.0,StatusCode::NOT_FOUND);
     sqlx::query("UPDATE topics SET status='normal' WHERE id=$1").bind(topic).execute(&h.pool).await?;
@@ -620,4 +625,31 @@ async fn casual_notes_allow_no_title_and_keep_sharing_and_board_rules() -> Resul
     assert_eq!(status, StatusCode::OK, "{reply}");
     h.close().await?;
     Ok(())
+}
+
+#[tokio::test]
+async fn work_discussion_uses_current_categories_and_respects_posting_policy() -> Result<(),Box<dyn std::error::Error>> {
+    let Some(h)=Harness::new().await? else {return Ok(())};
+    let (author,token)=h.user().await;
+    for kind in ["effect","widget","wallpaper","game","skill","expert","workflow","reminder","routine","task","goal"] {
+        let id=h.pack(author,"分类映射验证","published").await;
+        sqlx::query("UPDATE packs SET kind=$2 WHERE id=$1").bind(id).bind(kind).execute(&h.pool).await?;
+        let path=format!("/api/content-social/pack/{id}/discussion");
+        let (status,out)=call(&h.app,"POST",&path,Some(&token),json!({})).await;
+        assert_eq!(status,StatusCode::OK,"{kind}: {out}");
+        let (slug,):(String,)=sqlx::query_as("SELECT c.slug FROM topics t JOIN categories c ON c.id=t.category_id WHERE t.id=$1").bind(out["topic_id"].as_i64().unwrap()).fetch_one(&h.pool).await?;
+        assert_eq!(slug,format!("create-{kind}"));
+        assert_eq!(call(&h.app,"POST",&path,Some(&token),json!({})).await.1["topic_id"],out["topic_id"]);
+    }
+    let id=h.pack(author,"分类停用验证","published").await;
+    let path=format!("/api/content-social/pack/{id}/discussion");
+    sqlx::query("UPDATE categories SET posting_enabled=false WHERE slug='create'").execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"GET",&path,Some(&token),json!({})).await.1["can_reply"],false);
+    assert_eq!(call(&h.app,"POST",&path,Some(&token),json!({})).await.0,StatusCode::FORBIDDEN);
+    let (count,):(i64,)=sqlx::query_as("SELECT count(*) FROM content_discussions WHERE kind='pack' AND target_id=$1").bind(id).fetch_one(&h.pool).await?;
+    assert_eq!(count,0);
+    sqlx::query("UPDATE categories SET posting_enabled=true WHERE slug='create'").execute(&h.pool).await?;
+    sqlx::query("UPDATE categories SET status='archived' WHERE slug='create-effect'").execute(&h.pool).await?;
+    assert_eq!(call(&h.app,"POST",&path,Some(&token),json!({})).await.0,StatusCode::FORBIDDEN);
+    h.close().await?;Ok(())
 }

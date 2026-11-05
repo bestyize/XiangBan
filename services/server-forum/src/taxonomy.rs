@@ -88,6 +88,19 @@ pub async fn migrate_sections(pool: &PgPool) -> AppResult<()> {
     Ok(())
 }
 
+/// Rename only the original built-in label; preserve administrator-customized names.
+pub async fn migrate_labels(pool: &PgPool) -> AppResult<()> {
+    const NAME: &str = "community-category-labels-v3";
+    let mut tx=pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))").bind(NAME).execute(&mut *tx).await?;
+    let (done,):(bool,)=sqlx::query_as("SELECT EXISTS(SELECT 1 FROM data_migrations WHERE name=$1)").bind(NAME).fetch_one(&mut *tx).await?;
+    if done { return Ok(()); }
+    sqlx::query("UPDATE categories SET name='开源讨论' WHERE slug='resource-open' AND name='开源精选'").execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO data_migrations(name) VALUES($1)").bind(NAME).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -146,6 +159,14 @@ mod tests {
         migrate_sections(&pool).await?;
         let (status,): (String,) = sqlx::query_as("SELECT status FROM categories WHERE slug='casual-work'").fetch_one(&pool).await?;
         assert_eq!(status,"archived");
+        sqlx::query("UPDATE categories SET name='开源精选' WHERE slug='resource-open'").execute(&pool).await?;
+        migrate_labels(&pool).await?;
+        let (name,):(String,)=sqlx::query_as("SELECT name FROM categories WHERE slug='resource-open'").fetch_one(&pool).await?;
+        assert_eq!(name,"开源讨论");
+        sqlx::query("UPDATE categories SET name='自定义讨论' WHERE slug='resource-open'").execute(&pool).await?;
+        migrate_labels(&pool).await?;
+        let (name,):(String,)=sqlx::query_as("SELECT name FROM categories WHERE slug='resource-open'").fetch_one(&pool).await?;
+        assert_eq!(name,"自定义讨论");
         pool.close().await;
         sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await?;
         Ok(())

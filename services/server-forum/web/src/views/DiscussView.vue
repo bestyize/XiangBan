@@ -8,7 +8,7 @@ import type { CommunityScheme } from '@/api/schemes'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useHead } from '@/lib/head'
-import { discussionTabs, learnFilters, canonicalCategory, discussionCategory, sectionScope, sectionCategories, categoryDestination, learnCategory } from '@/lib/communityStructure'
+import { discussionTabs, discussionFilters, discussionFilter, canonicalCategory, discussionCategory, sectionScope, sectionCategories, sectionLeaves, categoryDestination } from '@/lib/communityStructure'
 import MasonryGrid from '@/components/community/MasonryGrid.vue'
 import FilterChips from '@/components/community/FilterChips.vue'
 import CommunityPackCard from '@/components/community/CommunityPackCard.vue'
@@ -20,9 +20,9 @@ import '@/components/community/community.css'
 const route = useRoute(), router = useRouter(), session = useSession()
 const meta = useMeta()
 const DISCUSSION_TABS = computed(()=>discussionTabs(meta.categories))
-const LEARN_FILTERS = computed(()=>learnFilters(meta.categories))
 const DISCUSSION_BOARD_TOPICS = computed(()=>sectionCategories(meta.categories,'discuss').filter(c=>c.parent_id !== null).map(c=>({key:c.slug,label:c.name})))
-const ideaCategories = computed(()=>sectionCategories(meta.categories,'ideas').filter(c=>c.parent_id !== null))
+const ideaCategories = computed(()=>sectionLeaves(meta.categories,'ideas'))
+const siteRoots = computed(()=>sectionCategories(meta.categories,'site').filter(c=>c.parent_id === null))
 const ideaFilter = computed(()=>ideaCategories.value.some(c=>c.slug===query('category')) ? query('category') : '')
 const ideaKind = computed(()=>ideaFilter.value.replace(/^create-/,''))
 const packKinds = new Set(['game','widget','wallpaper','effect','pet','skill','expert','workflow','reminder','routine','task','goal'])
@@ -39,16 +39,15 @@ const board = computed(() => {
   const rawTab = query('tab')
   const legacyTab = rawTab === 'casual' ? query('filter') : rawTab
   const key = canonicalCategory(query('board') || legacyTab)
-  return DISCUSSION_BOARD_TOPICS.value.some(item => item.key === key) ||
-    (key.startsWith('casual-') && key !== tab.value && DISCUSSION_TABS.value.some(item => item.key === key)) ? key : ''
+  return key !== tab.value && DISCUSSION_BOARD_TOPICS.value.some(item => item.key === key) ? key : ''
 })
 const tag = computed(() => query('tag'))
-const subFilters = computed(() => tab.value === 'learn' ? LEARN_FILTERS.value : [])
-const filter = computed(() => subFilters.value.some(item => item.key === learnCategory(query('filter'))) ? learnCategory(query('filter')) : '')
+const subFilters = computed(() => discussionFilters(meta.categories,tab.value))
+const filter = computed(() => discussionFilter(meta.categories,tab.value,query('filter')))
 const following = computed(() => query('mode') === 'following' || query('sort') === 'following' || query('tab') === 'following')
 const page = computed(() => Math.min(1000, Math.max(1, Math.floor(Number(query('page')) || 1))))
 const category = computed(() => ideas.value ? ideaFilter.value || sectionScope(meta.categories,'ideas') : board.value || discussionCategory(tab.value, filter.value, meta.categories))
-const scope = computed(() => ({category:category.value, tag:tag.value || undefined, active_only:true, home:board.value !== 'casual-chat'}))
+const scope = computed(() => ({category:category.value, tag:tag.value || undefined, active_only:true, home:category.value !== 'casual-chat'}))
 const topicLabel = computed(() => tag.value || DISCUSSION_BOARD_TOPICS.value.find(item => item.key === board.value)?.label || '')
 
 type Entry = {kind:'topic'; value:TopicItem} | {kind:'pack'; value:PackItem} | {kind:'scheme'; value:CommunityScheme}
@@ -74,7 +73,7 @@ const { data, loading, error, load } = useCommunityResource(async () => {
 watch([() => meta.categories,ideaFilter,tab,board,tag,filter,following,page,() => session.user?.uid,() => session.loggedIn],load,{immediate:true})
 
 function navigate(values:Record<string,string|undefined>) {
-  void router.replace({query:{tab:ideas.value ? undefined : tab.value, board:board.value || undefined, tag:tag.value || undefined,
+  void router.replace({query:{tab:ideas.value ? undefined : tab.value, category:ideas.value ? ideaFilter.value || undefined : undefined, board:board.value || undefined, tag:tag.value || undefined,
     filter:filter.value || undefined, mode:following.value ? 'following' : undefined, ...values}})
 }
 function go(value:number) { navigate({page:String(value)}) }
@@ -88,11 +87,11 @@ useHead(() => ({title:ideas.value ? '创意' : '讨论'}))
     <FilterChips v-if="!ideas" :items="DISCUSSION_TABS" :active="tab" label="讨论分类"
       @change="key => navigate({tab:key,filter:undefined,board:undefined,tag:undefined})" />
     <FilterChips v-if="subFilters.length" :items="subFilters"
-      :active="filter" label="教程主题" @change="key => navigate({filter:key || undefined})" />
+      :active="filter" label="分类主题" @change="key => navigate({filter:key || undefined})" />
     <FilterChips v-if="ideas" :items="[{key:'',label:'全部'},...ideaCategories.map(c=>({key:c.slug,label:c.name}))]" :active="ideaFilter" label="创意分类" @change="key=>navigate({category:key || undefined,page:undefined})" />
-    <nav v-if="!ideas" class="discussion-extra" aria-label="其他板块"><RouterLink v-for="c in meta.tree.filter(c=>c.section==='site')" :key="c.id" :to="categoryDestination(c,meta.categories)">{{ c.name }}</RouterLink></nav>
+    <nav v-if="!ideas" class="discussion-extra" aria-label="其他板块"><RouterLink v-for="c in siteRoots" :key="c.id" :to="categoryDestination(c,meta.categories)">{{ c.name }}</RouterLink></nav>
     <button v-if="topicLabel" class="active-topic" type="button" @click="navigate({tag:undefined,board:undefined})"># {{ topicLabel }} ×</button>
-    <p v-if="board === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>
+    <p v-if="category === 'casual-chat'" class="feed-note">闲聊灌水不进首页，也不加积分</p>
     <div v-if="following && !session.loggedIn" class="login-prompt">
       <p>登录后查看关注动态。</p><button class="community-button" @click="session.requireLogin()">登录</button>
     </div>

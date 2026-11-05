@@ -144,6 +144,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     db::seed(&pool).await?;
     taxonomy::migrate(&pool).await?;
     taxonomy::migrate_sections(&pool).await?;
+    taxonomy::migrate_labels(&pool).await?;
     discover::seed(&pool).await?;
     discover::backfill_topic_images(&pool).await?;
     discover::backfill_editor_topic_images(&pool).await?;

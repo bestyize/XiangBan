@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { postableCategories } from '@/lib/communityStructure'
 // 帖子管理：搜索与筛选，行内隐藏/删除/置顶/加精/锁定，移动分类。
 import { computed, onMounted, ref } from 'vue'
 import { adminApi, type AdminCategory, type AdminTopic, type TopicAction, type PinScope, type TopicState } from '@/api/admin'
@@ -19,7 +20,6 @@ const list = usePagedList<AdminTopic>(
 const catById = computed(() => new Map(categories.value.map(c => [c.id, c])))
 const parents = computed(() => categories.value.filter(c => c.parent_id === null))
 const childrenOf = (id: number) => categories.value.filter(c => c.parent_id === id)
-const leaves = computed(() => categories.value.filter(c => !categories.value.some(x => x.parent_id === c.id)))
 const pinScopeLabel: Record<PinScope, string> = {
   none: '不置顶',
   site: '全站置顶',
@@ -30,7 +30,7 @@ const pinScopeLabel: Record<PinScope, string> = {
 /** 可移动到的分类：叶子分类。 */
 function moveTargets(t: AdminTopic) {
   const kind = catById.value.get(t.category_id)?.kind
-  return leaves.value.filter(c => c.kind === kind && c.id !== t.category_id)
+  return postableCategories(categories.value).filter(c => c.kind === kind && c.id !== t.category_id)
 }
 
 function categoryLabel(c: AdminCategory) {

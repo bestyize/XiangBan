@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useNotifications } from '@/stores/notifications'
 import { areaOf, sectionOf } from '@/lib/sections'
@@ -13,7 +14,8 @@ const titles = { community: '社区', ai: '小伴 AI', create: '创造', me: '�
 const title = computed(() => titles[areaOf(route)])
 const roots = ['home','discuss','ideas','resources','ai','create','me']
 const communityRoot = computed(() => ['home','discuss','ideas','resources'].includes(String(route.name)))
-const section = computed(() => sectionOf(route))
+const meta = useMeta()
+const section = computed(() => sectionOf(route,meta.categories))
 const destinations = ref({ home:'/', discuss:'/discuss', ideas:'/ideas', resources:'/resources' })
 watch(() => route.fullPath, path => { if (communityRoot.value) destinations.value[section.value] = path }, {immediate:true})
 const detail = computed(() => !roots.includes(String(route.name)))

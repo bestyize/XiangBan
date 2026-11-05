@@ -8,6 +8,16 @@ use serde_json::{json, Value};
 use sqlx::{PgConnection, PgPool};
 use uuid::Uuid;
 
+/// Resolve real taxonomy rows for new work discussions; never query historical slugs.
+async fn available_category(conn: &mut PgConnection, kind: &str, id: i64, level: i16) -> AppResult<Option<i32>> {
+    let slug = if kind == "pack" {
+        let pack_kind: String = sqlx::query_scalar("SELECT kind FROM packs WHERE id=$1").bind(id).fetch_one(&mut *conn).await?;
+        format!("create-{pack_kind}")
+    } else { "create-schemes".into() };
+    Ok(sqlx::query_scalar("SELECT c.id FROM categories c WHERE c.slug=$1 AND c.status='active' AND c.posting_enabled AND (CASE WHEN c.admin_only THEN 3 ELSE LEAST(GREATEST(c.min_post_level,0),3) END)<=$2 AND NOT EXISTS(SELECT 1 FROM categories p WHERE p.id=c.parent_id AND (p.status<>'active' OR NOT p.posting_enabled)) FOR SHARE OF c")
+        .bind(slug).bind(level).fetch_optional(&mut *conn).await?)
+}
+
 pub async fn state(
     pool: &PgPool,
     user: Option<&ForumUser>,
@@ -18,8 +28,11 @@ pub async fn state(
     require_visible(&mut conn, kind, id).await?;
     let topic: Option<(i64,)> = sqlx::query_as("SELECT topic_id FROM content_discussions WHERE kind=$1 AND target_id=$2 UNION SELECT topic_id FROM packs WHERE $1='pack' AND id=$2 AND topic_id IS NOT NULL LIMIT 1")
         .bind(kind).bind(id).fetch_optional(&mut *conn).await?;
-    let writable = user.is_some_and(|u| u.status != "banned" && users::ensure_can_write(u).is_ok());
+    let mut writable = user.is_some_and(|u| u.status != "banned" && users::ensure_can_write(u).is_ok());
     let Some((topic_id,)) = topic else {
+        if let Some(user) = user.filter(|_| writable) {
+            writable = available_category(&mut conn,kind,id,user.trust_level).await?.is_some();
+        }
         return Ok(
             json!({"topic_id":null,"like_count":0,"reply_count":0,"liked":false,"can_reply":writable,"locked":false}),
         );
@@ -66,23 +79,8 @@ pub async fn ensure(pool: &PgPool, user: &ForumUser, kind: &str, id: i64) -> App
             .await?;
             uid
         };
-        let pack_kind: Option<String> = if kind == "pack" {
-            sqlx::query_scalar("SELECT kind FROM packs WHERE id=$1")
-                .bind(id)
-                .fetch_optional(&mut *tx)
-                .await?
-        } else {
-            None
-        };
-        let category_slug = match pack_kind.as_deref() {
-            Some("game") => "xiaoban-game",
-            Some("wallpaper" | "effect" | "widget") | None => "xiaoban-wallpaper",
-            _ => "tech-creative",
-        };
-        let (category,): (i32,) = sqlx::query_as("SELECT id FROM categories WHERE slug=$1")
-            .bind(category_slug)
-            .fetch_one(&mut *tx)
-            .await?;
+        let category = available_category(&mut tx,kind,id,user.trust_level).await?
+            .ok_or_else(|| AppError::Forbidden("作品分类已停用、关闭发帖或当前等级不足，无法新建讨论".into()))?;
         let path = if kind == "pack" { "packs" } else { "schemes" };
         let body = format!("{summary}\n\n[查看作品](/{path}/{id})");
         let html = crate::markdown::render(&body, true);

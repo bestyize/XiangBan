@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useMeta } from '@/stores/meta'
+import { categoryHref, categoryLabel } from '@/lib/communityStructure'
+const meta = useMeta()
 import { computed, ref, watch } from 'vue'
 import type { TopicItem } from '@/api/types'
 import { cardTitleLines, wallpaperRatio, type ArticleLayout } from '@/lib/cardPresentation'
@@ -38,12 +41,12 @@ const status = computed(() => { const h=props.topic.help; if(!h) return ''; if(h
   <article class="topic-card" :class="[mode, `layout-${presentation}`, {'has-cover':image && presentation !== 'plain', 'visual-card':visual}]" :style="{'--cover-ratio':ratio,'--title-lines':cardTitleLines(topic.category.slug)}">
     <span v-if="mode === 'help' && !topic.help" class="flag guide">站方指南</span>
     <div v-if="topic.help" class="help-line"><span class="bounty">{{ topic.help.bounty ? `悬赏 ${topic.help.bounty} 分` : '无悬赏' }}</span><span class="status" :class="topic.help.status">{{ status }}</span><span v-if="status === '进行中'" class="expires">截止 {{ displayDate(topic.help.expires_at) }}</span></div>
-    <div v-if="noteCover && !image" class="note-title" :class="`tone-${topic.id % 3}`" aria-hidden="true"><small>{{ topic.category.name }}</small><strong>{{ topic.title || topic.excerpt || '社区分享' }}</strong></div>
+    <div v-if="noteCover && !image" class="note-title" :class="`tone-${topic.id % 3}`" aria-hidden="true"><small>{{ categoryLabel(topic.category) }}</small><strong>{{ topic.title || topic.excerpt || '社区分享' }}</strong></div>
     <div class="topic-main">
       <div class="topic-content">
         <h3><span v-if="topic.pinned" class="flag">{{ pinScopeLabel(topic.pin_scope) }}</span><span v-if="topic.featured" class="flag">精选</span><span v-if="topic.min_read_level > 0" class="flag">{{ readLevelBadge(topic.min_read_level) }}</span><RouterLink :to="`/t/${topic.id}`">{{ topic.title || topic.excerpt || '社区分享' }}</RouterLink></h3>
         <p v-if="topic.excerpt && (!visual || !image) && topic.excerpt !== topic.title" class="excerpt">{{ topic.excerpt }}</p>
-        <div v-if="showCategory || mode === 'media' || mode === 'open'" class="secondary"><RouterLink v-if="showCategory" :to="`/c/${topic.category.slug}`" class="tag">{{ topic.category.name }}</RouterLink><span v-else class="tag">{{ topic.tags?.[0] || topic.category.name }}</span></div>
+        <div v-if="showCategory || mode === 'media' || mode === 'open'" class="secondary"><RouterLink v-if="showCategory" :to="categoryHref(topic.category,meta.categories)" class="tag">{{ categoryLabel(topic.category) }}</RouterLink><span v-else class="tag">{{ topic.tags?.[0] || categoryLabel(topic.category) }}</span></div>
         <button v-if="noteCover && topic.tags?.[0]" type="button" class="topic-tag" @click="emit('selectTag', topic.tags[0])"># {{ topic.tags[0] }}</button>
       </div>
       <RouterLink v-if="image && presentation !== 'plain'" :to="`/t/${topic.id}`" class="cover" tabindex="-1" aria-hidden="true"><img :src="image" alt="" loading="lazy" decoding="async" @load="loaded" @error="broken.push(image!)"><span class="cover-stats"><span><DiscoverGlyph name="eye" :size="14" />{{ compactCount(topic.view_count) }}</span><span><DiscoverGlyph name="comment" :size="14" />{{ compactCount(topic.reply_count) }}</span></span></RouterLink>
