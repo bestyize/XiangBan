@@ -7,6 +7,11 @@ import { withBuiltinTool } from './builtin-tools.ts';
 const image = { id: 'a'.repeat(64) + '.png', name: '小伴生图.png', mime: 'image/png', width: 1024, height: 1024 };
 const metadata = { generated_images: [image] };
 describe('native generated image references', () => {
+  it('accepts native GIF references and rejects remote URLs masquerading as images', () => {
+    const gif = {...image, id:'b'.repeat(64) + '.gif', mime:'image/gif'};
+    expect(generatedImages({generated_images:[gif]})).toEqual([gif]);
+    expect(generatedImages({generated_images:[{...gif,id:'https://example.com/a.gif'}]})).toEqual([]);
+  });
   it('keeps the same gallery after live events and a history reload', () => {
     const view = newView('s1');
     applyEvent(view, { type: 'tool_start', id: 'g1', name: 'image_generate', arguments: '{"prompt":"cat"}' });

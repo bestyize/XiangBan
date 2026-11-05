@@ -11,6 +11,17 @@ const call = (status: ToolCall['status'] = 'done'): ToolCall => ({ kind: 'tool',
 beforeEach(() => { vi.mocked(invoke).mockReset(); vi.mocked(invoke).mockResolvedValue('data:image/png;base64,YWJj'); });
 
 describe('image generation delivery', () => {
+  it('previews and saves the original GIF without flattening the animation', async () => {
+    const gif = {...image, id:'b'.repeat(64) + '.gif', mime:'image/gif', name:'挥手.gif'};
+    vi.mocked(invoke).mockResolvedValueOnce('data:image/gif;base64,R0lGODlh');
+    const wrapper = mount(ChatGeneratedImages, {props:{calls:[{...call(),generatedImages:[gif]}]}});
+    await flushPromises();
+    expect(wrapper.get('img').attributes('src')).toBe('data:image/gif;base64,R0lGODlh');
+    vi.mocked(invoke).mockResolvedValueOnce(true);
+    await wrapper.get('figcaption button:last-child').trigger('click'); await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('chat_generated_image_save', {id:gif.id});
+    wrapper.unmount();
+  });
   it('shows progress and renders the completed gallery outside execution logs', async () => {
     const wrapper = mount(ChatGeneratedImages, { props: { calls: [call('running')] } });
     expect(wrapper.get('[role=status]').text()).toContain('正在生成图片');

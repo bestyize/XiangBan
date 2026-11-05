@@ -74,7 +74,7 @@ data class AiTiersResponse(
 )
 
 @Serializable
-data class AiMediaCapability(val available: Boolean = false, val sizes: List<String> = emptyList())
+data class AiMediaCapability(val available: Boolean = false, val sizes: List<String> = emptyList(), val formats: List<String> = listOf("png"))
 
 @Serializable
 private data class ImageGenerationResponse(val data: List<ImageGenerationItem> = emptyList())
@@ -92,6 +92,7 @@ private fun generatedImageMime(bytes: ByteArray): String? = when {
     bytes.size >= 8 && bytes.copyOf(8).contentEquals(byteArrayOf(-119, 80, 78, 71, 13, 10, 26, 10)) -> "image/png"
     bytes.size >= 3 && bytes[0] == (-1).toByte() && bytes[1] == (-40).toByte() && bytes[2] == (-1).toByte() -> "image/jpeg"
     bytes.size >= 12 && bytes.decodeToString(0, 4) == "RIFF" && bytes.decodeToString(8, 12) == "WEBP" -> "image/webp"
+    validGeneratedGif(bytes) -> "image/gif"
     else -> null
 }
 
@@ -196,14 +197,23 @@ class AiGatewayApi(
         http.send(HttpMethod.Get, "/api/ai/tiers", AiTiersResponse.serializer(), token = requireToken())
 
     /** 生图与聊天档位独立。请求可能计费，连接中断后不自动重发。 */
-    suspend fun generateImages(prompt: String, count: Int, size: String?): List<String> {
+    suspend fun generateImages(prompt: String, count: Int, size: String?, format: String = "png", frames: Int = 9, frameDurationMs: Int = 200): List<String> {
         require(prompt.isNotBlank() && prompt.length <= 4000) { "请输入 1–4000 字的图片描述" }
         require(count in 1..4)
+        require(format in listOf("png", "gif")) { "图片格式无效" }
+        if (format == "gif") {
+            require(count == 1 && frames in 2..16 && frameDurationMs in 20..2000) { "GIF 参数无效" }
+        }
         val token = requireToken()
         val payload = buildJsonObject {
             put("prompt", prompt)
             put("n", count)
             size?.let { put("size", it) }
+            if (format == "gif") {
+                put("output_format", "gif")
+                put("frame_count", frames)
+                put("frame_duration_ms", frameDurationMs)
+            }
         }
         try {
             val items = client.preparePost("$base/v1/images/generations") {
@@ -233,6 +243,7 @@ class AiGatewayApi(
                     } ?: downloadGeneratedImage(checkNotNull(item.url))
                     check(bytes.size <= MAX_GENERATED_IMAGE_BYTES)
                     val mime = checkNotNull(generatedImageMime(bytes))
+                    check(format != "gif" || mime == "image/gif")
                     images += "data:$mime;base64," + (item.base64 ?: Base64.encode(bytes))
                 } catch (e: CancellationException) {
                     throw e
@@ -779,11 +790,16 @@ class CloudChatController(
 
     fun sendWithAttachments(rawPrompt: String, attachments: List<ChatAttachment>) = sendPrompt(rawPrompt, "", attachments)
 
-    fun generateImages(rawPrompt: String, count: Int, size: String?): Boolean {
+    fun generateImages(rawPrompt: String, count: Int, size: String?, format: String = "png", frames: Int = 9, frameDurationMs: Int = 200): Boolean {
         val current = _state.value
         if (current.sending) return false
         val prompt = rawPrompt.trim()
         require(prompt.isNotBlank() && prompt.length <= 4000) { "请输入 1–4000 字的图片描述" }
+        require(count in 1..4 && format in listOf("png", "gif"))
+        if (format == "gif") {
+            require(current.imageCapability?.formats?.contains("gif") == true) { "当前图片服务尚未开放 GIF" }
+            require(count == 1 && frames in 2..16 && frameDurationMs in 20..2000) { "GIF 参数无效" }
+        }
         val userTurn = ChatTurn(id = nextId++, role = "user", text = prompt, imageGeneration = true)
         val replyId = nextId++
         val reply = ChatTurn(replyId, "assistant", "", streaming = true, imageGeneration = true, activity = "正在生成图片…")
@@ -793,7 +809,7 @@ class CloudChatController(
         persist()
         chatJob = scope.launch {
             try {
-                val images = api.generateImages(prompt, count, size)
+                val images = api.generateImages(prompt, count, size, format, frames, frameDurationMs)
                 if (epoch != sendEpoch || ownerSession != agentSession) return@launch
                 updateTurn(replyId) {
                     val text = if (images.size == count) "已生成 ${images.size} 张图片"

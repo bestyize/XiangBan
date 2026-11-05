@@ -60,6 +60,15 @@ pub const IMAGE_MAX_COUNT: u64 = 4;
 /// The largest reply relayed back (base64 images are big).
 const IMAGE_MAX_REPLY: usize = 48 * 1024 * 1024;
 
+/// GIF uses the Images API, never the streaming subscription-channel adapter.
+pub fn gif_image_model(model: &str) -> bool {
+    matches!(model, "gpt-image-2.6" | "gpt-image-2.6-sunburst" | "gpt-image-2.6-flare")
+}
+
+pub fn image_formats(model: &str) -> Vec<&'static str> {
+    if gif_image_model(model) { vec!["png", "gif"] } else { vec!["png"] }
+}
+
 /// OpenAI-style image request for the configured model. The client asks for a prompt, how many and one of the
 /// offered sizes; nothing else reaches the upstream.
 pub fn image_payload(model: &str, sizes: &[String], body: &[u8]) -> Result<Value, AppError> {
@@ -76,7 +85,31 @@ pub fn image_payload(model: &str, sizes: &[String], body: &[u8]) -> Result<Value
         Some(asked) => sizes.iter().find(|s| *s == asked).cloned().ok_or_else(|| AppError::BadRequest(format!("size 只能是 {}", sizes.join("、"))))?,
         None => sizes.first().cloned().unwrap_or_else(|| "1024x1024".into()),
     };
-    Ok(json!({ "model": model, "prompt": prompt, "n": n, "size": size }))
+    let format = match request.get("output_format") {
+        None | Some(Value::Null) => "png",
+        Some(value) => value.as_str().filter(|format| image_formats(model).contains(format))
+            .ok_or_else(|| AppError::BadRequest("当前图片服务不支持这个输出格式".into()))?,
+    };
+    let mut payload = json!({ "model": model, "prompt": prompt, "n": n, "size": size });
+    if format == "gif" {
+        if n != 1 { return Err(AppError::BadRequest("GIF 每次只能生成 1 张".into())); }
+        let count = request.get("frame_count").map_or(Some(9), Value::as_u64)
+            .filter(|n| (2..=16).contains(n)).ok_or_else(|| AppError::BadRequest("GIF 帧数需要 2 到 16".into()))?;
+        let duration = request.get("frame_duration_ms").map_or(Some(200), Value::as_u64)
+            .filter(|n| (20..=2000).contains(n)).ok_or_else(|| AppError::BadRequest("GIF 每帧时长需要 20 到 2000 毫秒".into()))?;
+        if size != "auto" {
+            let dimensions = size.split_once('x').and_then(|(w,h)| Some((w.parse::<u64>().ok()?, h.parse::<u64>().ok()?)));
+            if !dimensions.is_some_and(|(w,h)| w > 0 && h > 0 && w <= 8192 && h <= 8192 && w % 16 == 0 && h % 16 == 0 && w * h * count <= 32 * 1024 * 1024) {
+                return Err(AppError::BadRequest("GIF 尺寸须为 16 的倍数，所有帧总像素不能超过 32M；请减小尺寸或帧数".into()));
+            }
+        }
+        payload["output_format"] = json!("gif");
+        payload["frame_count"] = json!(count);
+        payload["frame_duration_ms"] = json!(duration);
+    } else if request.get("frame_count").is_some() || request.get("frame_duration_ms").is_some() {
+        return Err(AppError::BadRequest("帧数和每帧时长仅用于 GIF".into()));
+    }
+    Ok(payload)
 }
 
 /// Keeps only the images: no model, usage or provider fields reach the client.
@@ -473,6 +506,25 @@ async fn pump(
 #[cfg(test)]
 mod unit {
     use super::*;
+
+    #[test]
+    fn gif_requests_use_images_api_and_reject_unsupported_or_invalid_options_before_billing() {
+        let sizes = vec!["1024x1024".into()];
+        let body = br#"{"prompt":"cat waving in a loop","output_format":"gif","frame_count":9,"frame_duration_ms":200,"model":"evil","stream":true}"#;
+        let payload = image_payload("gpt-image-2.6-flare", &sizes, body).unwrap();
+        assert_eq!(payload, json!({"model":"gpt-image-2.6-flare","prompt":"cat waving in a loop","n":1,"size":"1024x1024","output_format":"gif","frame_count":9,"frame_duration_ms":200}));
+        assert!(!native_gpt_image("gpt-image-2.6-flare"), "GIF-capable models go directly through Images, without the subscription streaming adapter");
+        assert_eq!(image_formats("gpt-image-2.6-sunburst"), vec!["png", "gif"]);
+        assert_eq!(image_formats("gpt-image-2.5"), vec!["png"]);
+        assert!(image_payload("gpt-image-2.5", &sizes, body).is_err());
+        for options in [json!({"n":2}), json!({"frame_count":1}), json!({"frame_count":17}), json!({"frame_count":2.5}), json!({"frame_duration_ms":19}), json!({"frame_duration_ms":2001}), json!({"output_format":"svg"})] {
+            let mut request = json!({"prompt":"cat","output_format":"gif"});
+            for (key,value) in options.as_object().unwrap() { request[key] = value.clone(); }
+            assert!(image_payload("gpt-image-2.6-flare", &sizes, &serde_json::to_vec(&request).unwrap()).is_err());
+        }
+        assert!(image_payload("gpt-image-2.6-flare", &sizes, br#"{"prompt":"cat","frame_count":9}"#).is_err());
+        assert!(image_payload("gpt-image-2.6-flare", &["8192x8192".into()], br#"{"prompt":"cat","output_format":"gif"}"#).is_err());
+    }
 
     #[test]
     fn gpt_images_use_a_single_responses_tool_and_validate_size_before_billing() {

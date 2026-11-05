@@ -270,7 +270,7 @@ internal fun HotTab(env: CommunityEnv, open: (Route) -> Unit) {
             }
         }
         // 弹层要盖住底部悬浮导航，所以放在独立的全屏窗口里，而不是页面内容里。
-        if (picking) androidx.compose.ui.window.Dialog(onDismissRequest = { picking = false }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+        if (picking) androidx.compose.ui.window.Dialog(onDismissRequest = { picking = false }, properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
             IssuePicker(env, issueKey, { issueKey = it; picking = false }, { picking = false })
         }
     }

@@ -22,7 +22,7 @@ async function load(image: GeneratedImage) {
   loading.add(image.id); delete errors.value[image.id];
   try {
     const data = await invoke<string>('chat_generated_image_read', { id: image.id });
-    if (!/^data:image\/png;base64,/.test(data)) throw Error('图片预览无法识别');
+    if (!/^data:image\/(png|gif);base64,/.test(data)) throw Error('图片预览无法识别');
     if (!disposed) previews.value[image.id] = data;
   } catch (error) { if (!disposed) errors.value[image.id] = String(error); }
   finally { loading.delete(image.id); }

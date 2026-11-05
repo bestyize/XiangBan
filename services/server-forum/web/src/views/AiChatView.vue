@@ -6,6 +6,8 @@ import { aiHistoryStorage, AI_HISTORY_LIMITS, readAiHistory, writeAiHistory, typ
 import { useSession } from '@/stores/session'
 import { useHead } from '@/lib/head'
 import { aiBucketLabel, formatAiCredits } from '@/lib/aiCredits'
+import AiImageGenerator from '@/components/AiImageGenerator.vue'
+import type { ImageCapability } from '@/lib/aiImages'
 
 useHead(() => ({ title: '小伴 AI' }))
 const session = useSession()
@@ -28,6 +30,8 @@ const busy = ref(false)
 const redeeming = ref(false)
 const showHistory = ref(false)
 const showCredits = ref(false)
+const showImages = ref(false)
+const imageCapability = ref<ImageCapability>()
 const scrollArea = ref<HTMLElement | null>(null)
 let controller: AbortController | null = null
 let generation = 0
@@ -70,20 +74,23 @@ async function loadAccount(expected = generation) {
     const token = await session.accessToken()
     if (!valid()) return
     if (!token) throw new Error('无法取得登录凭证，请重新登录。')
-    const [availableTiers, wallet] = await Promise.all([aiApi.tiers(token, abort.signal), aiApi.balance(token, abort.signal)])
+    const [capabilities, wallet] = await Promise.all([aiApi.capabilities(token, abort.signal), aiApi.balance(token, abort.signal)])
     if (!valid()) return
+    const availableTiers = capabilities.tiers
+    imageCapability.value = capabilities.media.image
     tiers.value = availableTiers; balance.value = wallet
     tier.value = availableTiers.find(t => t.tier === tier.value && t.available)?.tier || availableTiers.find(t => t.is_default && t.available)?.tier || availableTiers.find(t => t.available)?.tier || ''
     if (!tier.value) accountError.value = '当前没有可用模式，请刷新模式列表或检查点数。'
   } catch (e) {
     if (valid()) {
       abort.abort()
-      tiers.value = []; tier.value = ''; balance.value = null
+      tiers.value = []; tier.value = ''; balance.value = null; imageCapability.value = undefined
       accountError.value = e instanceof Error ? e.message : 'AI 服务暂不可用。'
     }
   } finally { if (valid()) { loading.value = false; accountController = null } }
 }
 watch(uid, value => {
+  showImages.value = false; imageCapability.value = undefined
   generation++; accountSequence++; controller?.abort(); accountController?.abort(); controller = null; accountController = null; busy.value = false; loading.value = false; redeeming.value = false; showHistory.value = false
   tiers.value = []; tier.value = ''; balance.value = null; error.value = ''; accountError.value = ''; notice.value = ''; draft.value = ''; code.value = ''
   conversations.value = value ? readAiHistory(historyStorage, value) : []
@@ -153,10 +160,11 @@ async function redeem() {
 
 <template>
   <main class="ai-page">
-    <header class="ai-header"><div><h1>小伴 AI</h1><p>聊想法，找灵感</p></div><div class="header-actions"><button type="button" @click="showHistory = !showHistory" :aria-expanded="showHistory">历史</button><button type="button" @click="showCredits = !showCredits" :aria-expanded="showCredits">点数</button></div></header>
+    <header class="ai-header"><div><h1>小伴 AI</h1><p>聊想法，找灵感</p></div><div class="header-actions"><button v-if="uid" type="button" @click="showImages = !showImages" :aria-expanded="showImages">生图</button><button type="button" @click="showHistory = !showHistory" :aria-expanded="showHistory">历史</button><button type="button" @click="showCredits = !showCredits" :aria-expanded="showCredits">点数</button></div></header>
     <div v-if="!session.loggedIn" class="state"><h2>登录后开始对话</h2><p>和小伴聊聊你的想法。</p><button class="primary" @click="session.requireLogin()">登录</button></div>
     <div v-else-if="!uid" class="state"><p>正在读取账号信息…</p><button @click="session.loadSession()">重试</button></div>
     <template v-else>
+      <AiImageGenerator v-show="showImages" :key="uid" :owner="uid" :capability="imageCapability" :get-token="() => session.accessToken()" @generated="loadAccount()" />
       <section v-if="showHistory" class="panel" aria-label="对话历史"><div class="panel-head"><strong>对话历史</strong><button @click="newChat" :disabled="busy">＋ 新对话</button></div><p class="hint">历史仅保存在当前浏览器；最多保留 30 个对话，每个 100 条消息；空间不足时只保留最近记录。</p><div v-for="chat in conversations" :key="chat.id" class="history-row"><button class="history-name" :class="{ active: chat.id === selected }" :disabled="busy" @click="selected = chat.id; showHistory = false; error = ''">{{ chat.title }}</button><button :disabled="busy" :aria-label="`删除${chat.title}`" @click="removeChat(chat.id)">删除</button></div></section>
       <section v-if="showCredits" class="panel" aria-label="小伴点">
         <div class="panel-head"><strong>小伴点</strong><button @click="loadAccount()" :disabled="loading">刷新</button></div>

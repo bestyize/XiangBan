@@ -61,6 +61,14 @@ Android 在内置 `agent_mobile` 原生库时支持私有文本工作区、文�
 
 设计稿沿用 [创造中心](docs/design-specs/prototypes/create-center.html)。验证：Android `:androidApp:assembleDebug` 通过，已有游戏格式 / 官方目录 8 项 JVM 测试通过；小米 17 确认游戏优先、作品操作菜单、发布页预填真实 ZIP，以及 ZIP / PNG 系统分享面板。未提交社区发布或向外部接收方发送；电脑创作链路仅接入已有遥控对话，未替用户执行生成。导航草稿换行编码增加到 `RouteTest`，该 UI 模块当前只有 iOS 测试目标，本轮未运行。
 
+## 聊天图片与 GIF 生成（本地实现，尚未部署）
+
+小伴 AI 聊天的「＋ → 生成图片」沿用独立生图服务，不切换聊天档位。静态图每次 1–4 张；网关声明 `media.image.formats` 包含 `gif` 时显示 GIF 选项，每次 1 张，可设 2–16 帧（默认 9）和 20–2000 毫秒/帧（默认 200）。服务未开放或额度不足时明确提示；不支持参考图编辑，不在失败、取消或重新打开对话时自动重发生图请求。
+
+GIF 原数据保存在当前账号的本机对话中；播放前校验帧结构与总像素，不执行脚本、不连接网络。Android/iOS 的 GIF 缩略与大图预览使用禁用脚本的原生 WebView，静态图继续复用现有图片查看器。Android 保存原图到系统图片目录；iOS 通过系统导出面板选择保存位置，均保留 GIF 动画字节。单图 16MB、最多 16 帧、总像素 32M，不向图片下载主机发送账号令牌。
+
+验证：`:common:community-core:jvmTest --tests '*ImageGenerationTest*'`、`:business:community-native:compileAndroidMain`、`:androidApp:compileDebugKotlin`、`:shell:compileKotlinIosSimulatorArm64`。同步补齐 iOS 所需的通用并发/系统扩展导入，移除公共界面中的 Android 专用窗口参数。已验证模拟响应、参数拒绝和不自动重试；未打包、未做 Android/iOS 真机生图与系统保存验收。
+
 ## 安卓实时语音
 
 手机通话沿用桌面的级联方式：本地 Silero 检测人声、Smart Turn v3 判断是否说完、SenseVoice 转文字，再请求聊天模型并按句朗读。说话期间显示本地识别的中间字幕；可在小伴回答时开口打断，本地识别可用时会过滤语气词和朗读回声，下一轮带上已播放内容的说明。通话不会因安静自动挂断，用户可随时静音或结束；后台任务仍按原有权限运行。

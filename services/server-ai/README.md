@@ -51,6 +51,16 @@ GPT 请求支持 `auto`、`1024x1024`、`1536x1024`、`1024x1536`；每张单独
 
 针对性验证：`cargo test --offline --locked --manifest-path services/server-ai/Cargo.toml media::unit`（仓库根目录）。
 
+### GIF 与三端协议（本地实现，尚未部署）
+
+图片请求新增可选 `output_format`（默认 `png`，可选 `gif`）、`frame_count`、`frame_duration_ms`。GIF 每次 1 张，2–16 帧（默认 9），20–2000 毫秒/帧（默认 200）；静态图不接受动画字段。配置尺寸需为 16 的倍数且不超过 8192/边、所有帧总像素不超过 32M，也可配置 `auto`。不支持的格式、尺寸或参数在创建/扣费调用之前拒绝。
+
+产品图片模型为 `gpt-image-2.6`、`gpt-image-2.6-sunburst` 或 `gpt-image-2.6-flare` 时，`GET /api/ai/tiers` 的 `media.image` 返回 `formats: ["png","gif"]` 和 GIF 参数范围；其余模型返回 `["png"]`，旧客户端忽略新字段仍可静态生图。真实型号继续只由后台选择，不下发给用户。
+
+2.6 模型直接使用 New API 的 `/v1/images/generations` 非流式接口，白名单透传动画参数；不走旧版 GPT 的流式 Responses 订阅适配，也不因接口失败自动切换协议或重复请求。上线前须在 New API 配置支持 Images/GIF 的真实渠道、模型访问/GIF 权限和计费，并在产品「媒体能力」选择它；不能仅把订阅渠道别名改成 2.6 就视为支持 GIF。现有 2.5 订阅静态生图保持原路径。
+
+参数依据 [OpenAI 生图指南](https://developers.openai.com/api/docs/guides/image-generation#generate-animated-gif-output) 和 [Images API 参考](https://developers.openai.com/api/reference/resources/images/methods/generate)。指南与参考的帧数上限不同，本次使用共同支持的 2–16 帧范围。验证：`cargo test --offline --locked media::unit`，使用本地协议测试，未验证真实 2.6 渠道或收费；三端发布后还需真实模型验收。
+
 ## 语音识别
 
 `POST /v1/audio/transcriptions`：`multipart/form-data`，字段 `file`（音频，最大 25 MiB）、`language`?（语言代码，如 `zh`）、`prompt`?（提示词，最多 1000 字）；返回 `{ "text" }`。小伴本地识别不可用时的云端兜底。

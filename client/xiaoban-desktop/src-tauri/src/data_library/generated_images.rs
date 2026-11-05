@@ -1,8 +1,8 @@
 //! Copies generated originals into the library. Never calls the image service.
 use super::{Doc, Folder, Library};
-use image::{ImageFormat, ImageReader, Limits};
+use image::ImageFormat;
 use sha2::{Digest, Sha256};
-use std::{collections::HashSet, fs, io::{Cursor, Read}, path::Path, time::UNIX_EPOCH};
+use std::{collections::HashSet, fs, io::Read, path::Path, time::UNIX_EPOCH};
 use tauri::{Emitter, Manager};
 
 const MAX_GENERATED_IMAGE: u64 = 16 * 1024 * 1024;
@@ -12,7 +12,7 @@ const FOLDER_NAME: &str = "AI 生成图片";
 fn valid_id(id: &str) -> bool {
     let Some((hash, ext)) = id.split_once('.') else { return false };
     hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
-        && matches!(ext, "png" | "jpg" | "webp")
+        && matches!(ext, "png" | "jpg" | "webp" | "gif")
 }
 
 fn load_checked(root: &Path) -> Result<Library, String> {
@@ -49,14 +49,10 @@ fn import_one(library: &mut Library, root: &Path, directory: &Path, id: &str) ->
     }
     let ext = &id[65..];
     let format = image::guess_format(&bytes).map_err(|_| "生成图片格式无法识别")?;
-    if !matches!((ext, format), ("png", ImageFormat::Png) | ("jpg", ImageFormat::Jpeg) | ("webp", ImageFormat::WebP)) {
+    if !matches!((ext, format), ("png", ImageFormat::Png) | ("jpg", ImageFormat::Jpeg) | ("webp", ImageFormat::WebP) | ("gif", ImageFormat::Gif)) {
         return Err("生成图片扩展名与内容不符".into());
     }
-    let mut reader = ImageReader::with_format(Cursor::new(&bytes), format);
-    let mut limits = Limits::default();
-    limits.max_image_width = Some(8192); limits.max_image_height = Some(8192); limits.max_alloc = Some(128 * 1024 * 1024);
-    reader.limits(limits);
-    reader.decode().map_err(|_| "生成图片损坏或尺寸过大")?;
+    crate::chat::image_generation::decode_generated(&bytes)?;
 
     let name = format!("小伴生图-{}.{}", &hash[..12], ext);
     let target = root.join("files").join(&doc_id);
@@ -130,6 +126,7 @@ pub(super) fn recover(app: &tauri::AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Cursor;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     struct Temp(std::path::PathBuf);
@@ -147,6 +144,20 @@ mod tests {
         }
     }
     impl Drop for Temp { fn drop(&mut self) { let _ = fs::remove_dir_all(&self.0); } }
+
+    #[test]
+    fn gif_import_keeps_the_original_animation_and_extension() {
+        use base64::Engine;
+        let temp = Temp::new();
+        let bytes = base64::engine::general_purpose::STANDARD.decode("R0lGODlhAQABAIAAAP8AAAAA/yH/C05FVFNDQVBFMi4wAwEAAAAh+QQAFAAAACwAAAAAAQABAAACAkQBACH5BAAUAAAALAAAAAABAAEAAAICTAEAOw==").unwrap();
+        let id = format!("{:x}.gif", Sha256::digest(&bytes));
+        fs::write(temp.0.join("generated").join(&id), &bytes).unwrap();
+        let mut library = Library::default();
+        let root = temp.0.join("library");
+        assert_eq!(reconcile(&mut library, &root, &temp.0.join("generated"), &[id]), (true, vec![]));
+        let doc = &library.docs[0]; assert_eq!(doc.ext, "gif");
+        assert_eq!(fs::read(root.join("files").join(&doc.id).join(&doc.name)).unwrap(), bytes);
+    }
 
     #[test]
     fn imports_original_once_and_preserves_renames_moves_and_deletions() {

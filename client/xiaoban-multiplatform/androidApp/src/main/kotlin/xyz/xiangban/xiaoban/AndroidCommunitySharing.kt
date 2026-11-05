@@ -96,6 +96,7 @@ class CommunitySharingPlatform(private val delegate: PlatformActions, private va
             "image/png" -> "png"
             "image/jpeg" -> "jpg"
             "image/webp" -> "webp"
+            "image/gif" -> "gif"
             else -> return CommunityPosterResult.Failed
         }
         return saveImage("xiaoban-image-${System.currentTimeMillis()}.$extension", mime) { it.write(bytes) }

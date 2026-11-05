@@ -51,7 +51,13 @@ pub async fn tiers(State(state): State<AppState>, auth: AuthUser) -> Result<Json
         let mut entry = json!({ "requires_paid": setting.requires_paid, "available": !setting.requires_paid || paid });
         match products::Capability::parse(&setting.capability) {
             Some(products::Capability::Speech) => entry["voices"] = json!(setting.voices),
-            Some(products::Capability::Image) => entry["sizes"] = json!(setting.sizes),
+            Some(products::Capability::Image) => {
+                entry["sizes"] = json!(setting.sizes);
+                entry["formats"] = json!(crate::media::image_formats(&setting.model));
+                if crate::media::gif_image_model(&setting.model) {
+                    entry["gif"] = json!({"max_frames":16,"default_frames":9,"min_frame_duration_ms":20,"max_frame_duration_ms":2000,"default_frame_duration_ms":200});
+                }
+            }
             Some(products::Capability::Realtime) => entry["max_secs"] = json!(setting.max_secs),
             _ => {}
         }

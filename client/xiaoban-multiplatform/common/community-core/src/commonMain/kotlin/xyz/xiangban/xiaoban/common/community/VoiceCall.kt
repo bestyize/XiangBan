@@ -1,5 +1,7 @@
 package xyz.xiangban.xiaoban.common.community
 
+import kotlin.concurrent.Volatile
+
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope

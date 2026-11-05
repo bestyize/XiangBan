@@ -11,9 +11,11 @@ import platform.Foundation.NSTemporaryDirectory
 import platform.Foundation.NSUUID
 import platform.Foundation.create
 import platform.Foundation.NSURL
+import platform.Foundation.writeToFile
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
 import platform.UIKit.UIPasteboard
+import platform.UIKit.popoverPresentationController
 import xyz.xiangban.xiaoban.business.communitynative.PlatformActions
 import xyz.xiangban.xiaoban.business.communitynative.CommunityPosterResult
 
@@ -26,6 +28,18 @@ class IOSCommunitySharing : PlatformActions {
         NSURL.URLWithString(url)?.let { UIApplication.sharedApplication.openURL(it, emptyMap<Any?, Any>(), null) }
     }
     override val forumDownloadSupported = true
+    override val supportsChatImageSave = true
+
+    override suspend fun saveChatImage(bytes: ByteArray, mime: String): CommunityPosterResult {
+        val extension = when (mime) {
+            "image/png" -> "png"
+            "image/jpeg" -> "jpg"
+            "image/webp" -> "webp"
+            "image/gif" -> "gif"
+            else -> return CommunityPosterResult.Failed
+        }
+        return saveForumDownload("xiaoban-image-${NSUUID().UUIDString}.$extension", bytes)
+    }
 
     override suspend fun saveForumDownload(filename: String, bytes: ByteArray): CommunityPosterResult =
         withContext(Dispatchers.Main) {

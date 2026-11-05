@@ -1,0 +1,74 @@
+package xyz.xiangban.xiaoban.common.community
+
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.TextContent
+import io.ktor.http.headersOf
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlin.io.encoding.Base64
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlin.test.assertFailsWith
+
+class ImageGenerationTest {
+    private val encoded = "R0lGODlhAQABAIAAAP8AAAAA/yH/C05FVFNDQVBFMi4wAwEAAAAh+QQAFAAAACwAAAAAAQABAAACAkQBACH5BAAUAAAALAAAAAABAAEAAAICTAEAOw=="
+
+    @Test fun `GIF capability is optional and animated results preserve original bytes`() = runBlocking {
+        val old = CommunityJson.decodeFromString<AiTiersResponse>("""{"media":{"image":{"available":true,"sizes":["1024x1024"]}}}""")
+        assertEquals(listOf("png"), old.media["image"]!!.formats)
+        val requests = mutableListOf<String>()
+        val client = HttpClient(MockEngine { request ->
+            assertEquals("Bearer test-only-token", request.headers[HttpHeaders.Authorization])
+            requests += (request.body as TextContent).text
+            respond("""{"data":[{"b64_json":"$encoded"}]}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType,"application/json"))
+        }) {install(HttpTimeout)}
+        try {
+            val api = AiGatewayApi(client) {"test-only-token"}
+            val result = api.generateImages("猫挥手循环",1,"1024x1024","gif",9,200)
+            assertEquals(listOf("data:image/gif;base64,$encoded"), result)
+            val payload = CommunityJson.parseToJsonElement(requests.single()).jsonObject
+            assertEquals("gif",payload["output_format"]!!.jsonPrimitive.content)
+            assertEquals("9",payload["frame_count"]!!.jsonPrimitive.content)
+            assertFalse(payload.containsKey("model"))
+        } finally {client.close()}
+    }
+
+    @Test fun `invalid GIF parameters never send a billable request`() = runBlocking {
+        var sent = 0
+        val client = HttpClient(MockEngine { sent++; respond("{}") }) {install(HttpTimeout)}
+        try {
+            val api = AiGatewayApi(client) {"test-token"}
+            assertFailsWith<IllegalArgumentException> {api.generateImages("cat",2,null,"gif")}
+            assertFailsWith<IllegalArgumentException> {api.generateImages("cat",1,null,"gif",17)}
+            assertFailsWith<IllegalArgumentException> {api.generateImages("cat",1,null,"gif",9,19)}
+            assertEquals(0,sent)
+        } finally {client.close()}
+    }
+
+    @Test fun `an upstream error is unknown and is never retried automatically`() = runBlocking {
+        var sent = 0
+        val client = HttpClient(MockEngine { sent++; respond("""{"code":"bad_gateway"}""",HttpStatusCode.BadGateway,headersOf(HttpHeaders.ContentType,"application/json")) }) {install(HttpTimeout)}
+        try {
+            val api = AiGatewayApi(client) {"test-token"}
+            val error = assertFailsWith<ApiException> {api.generateImages("cat",1,null,"gif")}
+            assertTrue(error.message.orEmpty().contains("可能已扣除额度"))
+            assertEquals(1,sent)
+        } finally {client.close()}
+    }
+
+    @Test fun `GIF validation bounds frames pixels and malformed data before preview`() {
+        val bytes = Base64.decode(encoded)
+        assertTrue(validGeneratedGif(bytes))
+        assertFalse(validGeneratedGif(bytes.copyOf(45)))
+        val giant = bytes.copyOf(); giant[6] = (-1).toByte(); giant[7] = (-1).toByte()
+        assertFalse(validGeneratedGif(giant))
+    }
+}

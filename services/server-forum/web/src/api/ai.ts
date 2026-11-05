@@ -1,5 +1,6 @@
 import { consumeAiStream, type AiChatProtocol } from '../lib/aiStream'
 import type { AiMessage } from '../lib/aiHistory'
+import { boundedImageResponse, generatedImageItems, imagePayload, UNKNOWN_IMAGE_RESULT, type ImageCapability, type ImageOptions } from '../lib/aiImages'
 
 export interface AiTier { tier: string; display_name: string; description: string; is_default: boolean; available: boolean; requires_paid: boolean; chat_protocol?: AiChatProtocol }
 export interface AiBalance { product: {product_id:string; name:string}; total: number; paid:number; quota_per_unit: number; buckets: {id:number; kind:string; total:number; remaining:number; expires_at:string|null; created_at:string}[]; trial: { available: boolean; quota:number; days:number }; credit_purchase_url: string }
@@ -26,10 +27,31 @@ async function request(path: string, token: string, options: RequestInit = {}) {
   return response
 }
 export const aiApi = {
-  async tiers(token: string, signal?:AbortSignal): Promise<AiTier[]> {
+  async capabilities(token: string, signal?:AbortSignal): Promise<{tiers:AiTier[]; media:Record<string, ImageCapability>}> {
     const value = await (await request('/api/ai/tiers', token, {signal})).json()
     if (!Array.isArray(value?.tiers) || !value.tiers.every((item:AiTier) => typeof item?.tier === 'string' && typeof item.display_name === 'string' && typeof item.available === 'boolean')) throw new Error('AI 模式数据异常，请重试。')
-    return value.tiers
+    return {tiers:value.tiers, media:value.media ?? {}}
+  },
+  async tiers(token: string, signal?:AbortSignal): Promise<AiTier[]> {
+    return (await aiApi.capabilities(token, signal)).tiers
+  },
+  async images(token: string, options: ImageOptions, capability: ImageCapability, signal: AbortSignal): Promise<Blob[]> {
+    const payload = imagePayload(options, capability)
+    let response: Response
+    try {
+      response = await fetch(`${base()}/v1/images/generations`, {method:'POST', body:JSON.stringify(payload), headers:{Authorization:`Bearer ${token}`, 'Content-Type':'application/json'}, signal, redirect:'error'})
+    } catch { throw Error(UNKNOWN_IMAGE_RESULT) }
+    if (!response.ok) {
+      const errors: Record<string,string> = {paid_required:'图片生成需要先兑换付费额度。', insufficient_quota:'小伴 AI 额度不足。', image_unavailable:'图片生成暂未开放。'}
+      const body = JSON.parse(new TextDecoder().decode(await boundedImageResponse(response, 64 * 1024)))
+      throw Error(response.status === 401 ? '登录已过期，请重新登录。' : errors[body?.code ?? body?.error?.code] || (response.status >= 500 ? UNKNOWN_IMAGE_RESULT : `生图请求被拒绝（${response.status}），请检查描述和参数。`))
+    }
+    try {
+      const body = JSON.parse(new TextDecoder().decode(await boundedImageResponse(response)))
+      const images = await generatedImageItems(body, options.n, signal)
+      if (options.output_format === 'gif' && images.some(image => image.type !== 'image/gif')) throw Error('服务未返回 GIF')
+      return images
+    } catch { throw Error(UNKNOWN_IMAGE_RESULT) }
   },
   async balance(token: string, signal?:AbortSignal): Promise<AiBalance> {
     const value = await (await request('/api/ai/balance', token, {signal})).json()

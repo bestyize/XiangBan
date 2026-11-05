@@ -519,9 +519,10 @@ fun AiChatPage(env: CommunityEnv, chat: CloudChatController, back: () -> Unit, o
             ImageGenerationSheet(
                 initialPrompt = input,
                 sizes = cloud.imageCapability?.sizes.orEmpty(),
+                formats = cloud.imageCapability?.formats.orEmpty(),
                 onDismiss = { imageSheet = false },
-                onGenerate = { prompt, count, size ->
-                    if (chat.generateImages(prompt, count, size)) {
+                onGenerate = { prompt, count, size, format, frames, duration ->
+                    if (chat.generateImages(prompt, count, size, format, frames, duration)) {
                         input = ""
                         imageSheet = false
                     } else toast = "请先结束当前任务"
