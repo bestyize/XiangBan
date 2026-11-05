@@ -102,6 +102,8 @@ export const GATEWAY_PROVIDER = "xiaoban-ai";
 
 export interface AccountUser {
   uid: string;
+  /** Public numeric account ID; absent in sessions saved by older clients. */
+  accountId?: string;
   /** Unique and unchangeable; also the name shown everywhere. */
   username: string;
   avatarUrl?: string | null;

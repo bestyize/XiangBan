@@ -4,6 +4,7 @@ import { siteConfig } from './forum'
 
 export interface AccountUser {
   uid: string
+  account_id?: string
   /** 唯一且不可修改的用户名，也是论坛里的展示名。 */
   username: string
   avatar_url: string | null
@@ -70,6 +71,7 @@ async function call<T>(method: string, path: string, body?: unknown, token?: str
 }
 
 export const accountApi = {
+  me: (token: string) => call<AccountUser>('GET', '/api/me', undefined, token),
   redeemDesktopTicket: (ticket: string) =>
     call<TokenPair>('POST', '/api/auth/desktop-forum/redeem', { ticket }),
   sendCode: (identifier: string, purpose: 'login' | 'reset_password' = 'login') =>

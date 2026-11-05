@@ -19,6 +19,7 @@ class InMemoryTokenStorage(private var value: Tokens? = null) : TokenStorage {
     override fun save(tokens: Tokens?) { value = tokens }
 }
 
+/** accountId is the internal UID used for account isolation; user.publicAccountId is the display ID. */
 data class SessionState(val loggedIn: Boolean = false, val user: AccountUser? = null, val accountId: String? = null)
 
 /**
@@ -88,6 +89,22 @@ class SessionManager(
         storage.save(null)
         _state.value = SessionState()
         if (oldId != null) onAccountChanged(oldId, null)
+    }
+
+    /** Restore the account-center profile for sessions loaded from token storage. */
+    suspend fun loadProfile() {
+        val token = accessToken() ?: return
+        val profile = account.me(token)
+        lock.withLock {
+            if (tokens?.accessToken != token) return@withLock
+            val uid = tokens?.accountId
+            if (uid != null && uid != profile.uid) return@withLock
+            if (uid == null) {
+                tokens = tokens!!.copy(accountId = profile.uid)
+                storage.save(tokens)
+            }
+            _state.value = SessionState(loggedIn = true, user = profile, accountId = profile.uid)
+        }
     }
 
     /** 论坛认出令牌后给的昵称等资料，用来补全“我的”页。 */

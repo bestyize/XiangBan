@@ -176,6 +176,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
     // 登录后向论坛确认一次身份，顺便取昵称、积分和未读数；失败不影响页面。
     LaunchedEffect(session.loggedIn, session.accountId) {
         if (!session.loggedIn) { nickname = null; points = null; unread = 0; return@LaunchedEffect }
+        runCatching { env.session.loadProfile() }
         runCatching { env.forum.session().user }.onSuccess { nickname = it.nickname; points = it.points }
         env.remoteChat.refreshPeers()
     }
@@ -194,6 +195,9 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
                 Column(Modifier.weight(1f)) {
                     if (session.loggedIn) {
                         Text(name ?: "已登录", style = XType.Headline, fontWeight = FontWeight.SemiBold)
+                        session.user?.publicAccountId?.takeIf { it.isNotBlank() }?.let {
+                            Text("账号 ID $it", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         points?.let { Text("$it 积分", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     } else {
                         Text("未登录", style = XType.Headline, fontWeight = FontWeight.SemiBold)
@@ -221,7 +225,7 @@ fun MineScreen(env: CommunityEnv, open: (Route) -> Unit) {
                 NavRow("账号方案备份") { open(if (session.loggedIn) Route.SchemeBackups else Route.Login) }
                 NavRow("关注与粉丝") { session.accountId?.let { open(Route.User(it, "following")) } ?: open(Route.Login) }
                 NavRow("屏蔽的用户") { open(if (session.loggedIn) Route.Blocks else Route.Login) }
-                NavRow("模型与点数") { open(Route.Models) }
+                NavRow("AI 额度") { open(Route.Models) }
                 NavRow("我的设备", computers) { open(Route.Devices) }
                 NavRow("帮助与反馈") { env.platform?.openUrl("$site/c/site-feedback") }
             }

@@ -258,6 +258,33 @@ describe('ControlShell sidebar', () => {
     } finally { wrapper.unmount(); }
   });
 
+  it('opens AI quota directly in the native model window, including when signed out', async () => {
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    try {
+      await flushPromises();
+      const store = storeOf(wrapper);
+      store.navigate('games');
+      await wrapper.get('[data-testid="account-entry"]').trigger('click');
+      await wrapper.get('[data-testid="nav-ai-quota"]').trigger('click');
+      expect(invoke).toHaveBeenCalledWith('configuration_window_open', { target: 'model', tab: null, provider: 'xiaoban-ai' });
+      expect(wrapper.find('[data-testid="account-menu"]').exists()).toBe(false);
+      expect(store.page).toBe('games');
+      expect(store.settingsOpen).toBe(false);
+    } finally { wrapper.unmount(); }
+  });
+
+  it('never falls back to displaying the UID of a legacy session', async () => {
+    const wrapper = mount(ControlShell);
+    try {
+      await flushPromises();
+      storeOf(wrapper).account = { accessToken: 'a', refreshToken: 'r', expiresAt: 0,
+        user: { uid: 'private-legacy-uid', username: 'Alice' } };
+      await wrapper.get('[data-testid="account-entry"]').trigger('click');
+      expect(wrapper.find('[data-testid="account-id"]').exists()).toBe(false);
+      expect(wrapper.text()).not.toContain('private-legacy-uid');
+    } finally { wrapper.unmount(); }
+  });
+
   it('opens the page the assistant asks for: a sidebar page, a 装扮 tab, or a settings category', async () => {
     const wrapper = mount(ControlShell, { attachTo: document.body });
     try {
@@ -353,12 +380,13 @@ describe('ControlShell sidebar', () => {
       await flushPromises();
       const store = storeOf(wrapper);
       store.account = { accessToken: 'secret-access', refreshToken: 'secret-refresh', expiresAt: 0,
-        user: { uid: 'test-account-id', username: '用户名'.repeat(20), avatarUrl: null } };
+        user: { uid: 'test-account-id', accountId: '13586', username: '用户名'.repeat(20), avatarUrl: null } };
       await flushPromises();
       expect(wrapper.get('[data-testid="account-entry"]').text()).toBe(store.account.user.username);
       await wrapper.get('[data-testid="account-entry"]').trigger('click');
       expect(wrapper.get('[data-testid="account-username"]').text()).toBe(store.account.user.username);
-      expect(wrapper.get('[data-testid="account-uid"]').text()).toBe('test-account-id');
+      expect(wrapper.get('[data-testid="account-id"]').text()).toBe('13586');
+      expect(wrapper.text()).not.toContain('test-account-id');
       expect(document.body.textContent).not.toContain('secret-access');
       expect(document.body.textContent).not.toContain('secret-refresh');
       const logout = vi.spyOn(store, 'logoutAccount').mockImplementation(async () => { store.account = null; });

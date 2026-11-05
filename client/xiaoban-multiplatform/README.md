@@ -1,5 +1,11 @@
 # 小伴多端 App
 
+## 账号 ID 与 AI 额度入口
+
+「我的」展示账号中心 `account_id`（`AccountUser.publicAccountId`），「AI 额度」直接进入现有模型与点数页面。重启后从 `/api/me` 补全资料；`SessionState.accountId` / `Tokens.accountId` 仍表示内部 UID，继续用于账号隔离，不能改用数字展示 ID。
+
+验证：`:common:community-core:jvmTest --tests '*AccountAndSessionTest*'`、`:business:community-native:compileAndroidMain`。本次未做 Android/iOS 实机验收或 iOS 编译。
+
 状态：可运行原型。Android/iOS 的移动端入口使用 Compose 原生社区、AI 与桌面互联界面；桌面 Tauri 壳仍指向已停用的 xiaban.xyz。Android 与 macOS 的历史验证、iOS 编译和 Windows/Linux 桌面构建范围见下文，不代表当前版本均已实机验收。
 
 移动端和桌面端分开实现：

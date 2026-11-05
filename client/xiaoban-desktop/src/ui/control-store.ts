@@ -32,7 +32,7 @@ function mockLogin(username: string, isNewUser: boolean): LoginResult {
       accessToken: "mock.access.token",
       refreshToken: "mock.refresh.token",
       expiresAt: Math.floor(Date.now() / 1000) + 1800,
-      user: { uid: "mock-uid-1234", username },
+      user: { uid: "mock-uid-1234", accountId: "13586", username },
     },
   };
 }

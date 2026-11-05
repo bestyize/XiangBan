@@ -10,6 +10,7 @@ export interface AccountIdentity {
 
 export interface AccountUser {
   uid: string
+  account_id?: string
   /** 唯一且不可修改的用户名，也是对外展示的名字。 */
   username: string
   avatar_url: string | null

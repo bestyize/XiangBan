@@ -193,7 +193,7 @@ data class Post(
 data class AccountIdentity(val kind: String, val masked: String)
 
 @Serializable
-data class AccountUser(val uid: String, val username: String, @SerialName("avatar_url") val avatarUrl: String? = null, val identities: List<AccountIdentity> = emptyList())
+data class AccountUser(val uid: String, val username: String, @SerialName("avatar_url") val avatarUrl: String? = null, val identities: List<AccountIdentity> = emptyList(), @SerialName("account_id") val publicAccountId: String? = null)
 
 @Serializable
 data class TokenPair(

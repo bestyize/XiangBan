@@ -162,7 +162,7 @@ class ForumApiTest {
 
 class AccountAndSessionTest {
     private val config = CommunityConfig()
-    private val login = """{"access_token":"A1","refresh_token":"R1","expires_in":900,"is_new_user":false,"user":{"uid":"u1","username":"小明","identities":[]}}"""
+    private val login = """{"access_token":"A1","refresh_token":"R1","expires_in":900,"is_new_user":false,"user":{"uid":"u1","account_id":"13586","username":"小明","identities":[]}}"""
 
     @Test
     fun `code login either signs in or asks to register`() = runTest {
@@ -202,9 +202,36 @@ class AccountAndSessionTest {
         manager.loginWithPassword("小明", "pw")
         assertTrue(manager.state.value.loggedIn)
         assertEquals("小明", manager.state.value.user?.username)
+        assertEquals("13586", manager.state.value.user?.publicAccountId)
+        assertEquals("u1", manager.state.value.accountId)
         assertEquals(Tokens("A1", "R1", 1_000 + 900_000, "u1"), storage.load())
         assertTrue(session(server, storage) { 2_000 }.state.value.loggedIn, "重启后仍是登录态")
         assertEquals("A1", session(server, storage) { 2_000 }.accessToken())
+    }
+
+    @Test
+    fun `restoring a legacy token loads the public ID without changing expiry or internal identity`() = runTest {
+        val server = FakeServer()
+        server.on("/api/me", body = """{"uid":"u1","account_id":"13586","username":"小明"}""")
+        val storage = InMemoryTokenStorage(Tokens("A1", "R1", 9_999_999))
+        val manager = session(server, storage) { 1_000 }
+        manager.loadProfile()
+        assertEquals("13586", manager.state.value.user?.publicAccountId)
+        assertEquals("u1", manager.state.value.accountId)
+        assertEquals(Tokens("A1", "R1", 9_999_999, "u1"), storage.load())
+        assertEquals("Bearer A1", server.requests.single().headers[HttpHeaders.Authorization])
+    }
+
+    @Test
+    fun `a mismatched profile cannot change the displayed account ID`() = runTest {
+        val server = FakeServer()
+        server.on("/api/me", body = """{"uid":"another-user","account_id":"13587","username":"其他账号"}""")
+        val saved = Tokens("A1", "R1", 9_999_999, "u1")
+        val storage = InMemoryTokenStorage(saved)
+        val manager = session(server, storage) { 1_000 }
+        manager.loadProfile()
+        assertNull(manager.state.value.user)
+        assertEquals(saved, storage.load())
     }
 
     @Test

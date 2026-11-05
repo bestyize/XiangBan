@@ -2,7 +2,7 @@
 import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { NAlert, NButton, NSkeleton, useMessage } from 'naive-ui';
 import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LogIn, LogOut, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Trash2, Zap } from 'lucide-vue-next';
-import { invoke, listen } from '../bridge.ts';
+import { GATEWAY_PROVIDER, invoke, listen } from '../bridge.ts';
 import { accent, accents, followHost, followAccent, isDark, appearanceMode, appearanceModes, publishAccentTo, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
 import type { ControlPage, SettingsTab } from './control-types.ts';
@@ -12,7 +12,7 @@ import ChatNameDialog from './components/ChatNameDialog.vue';
 import CommunityApplyDialog from './community/CommunityApplyDialog.vue';
 import WorkspaceSearchDialog from './components/WorkspaceSearchDialog.vue';
 import { useWorkspaceSort } from './workspace-sort.ts';
-import { serveConfigurationWindows } from './configuration/windows.ts';
+import { openModelWindow, serveConfigurationWindows } from './configuration/windows.ts';
 import { acceptCloudTask } from './library/cloud-document.ts';
 import { acceptStoreTask } from './ai-store/store-window.ts';
 import SkinScene from './application-skins/SkinScene.vue';
@@ -37,6 +37,8 @@ const InteractivePage = defineAsyncComponent(pageLoaders.interactive);
 const GamesPage = defineAsyncComponent(pageLoaders.games);
 const CarePage = defineAsyncComponent(pageLoaders.care);
 const CommunityPage = defineAsyncComponent(pageLoaders.community);
+const AiGatewayCard = defineAsyncComponent(() => import('./components/AiGatewayCard.vue'));
+const quotaPreview = ref(false);
 const LoginModal = defineAsyncComponent(() => import('./components/LoginModal.vue'));
 
 const message = useMessage();
@@ -343,6 +345,11 @@ const displayName = computed(() => store.account?.user.username ?? '未登录');
 const modeLabel = computed(() => appearanceModes.find(mode => mode.value === appearanceMode.value)?.label ?? '');
 const unread = computed(() => store.website.announcements.filter(item => store.website.dismissed[item.id] !== item.revision).length);
 const hasUpdate = computed(() => !!store.website.update?.available);
+function openAiQuota() {
+  closeMenu();
+  if (store.desktop) { void openModelWindow(GATEWAY_PROVIDER).catch(error => store.notify(error, 'error')); }
+  else quotaPreview.value = true;
+}
 function openSettings(tab?: Parameters<typeof store.openSettings>[0]) { closeMenu(); store.openSettings(tab); }
 function login() { closeMenu(); store.openLogin(); }
 const loggingOut = ref(false);
@@ -571,13 +578,14 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
         <div v-if="menuOpen" class="xb-menu account-menu" role="menu" aria-label="账号菜单" data-testid="account-menu">
           <div v-if="store.account" class="account-head" data-testid="account-info">
             <span class="account-avatar lg" :class="{ 'is-placeholder': !store.account.user.avatarUrl }"><img v-if="store.account.user.avatarUrl" :src="store.account.user.avatarUrl" alt="" /><Sparkles v-else :size="22" :stroke-width="2" aria-hidden="true" /></span>
-            <div><b data-testid="account-username">{{ store.account.user.username }}</b><span>账号 ID <span data-testid="account-uid">{{ store.account.user.uid }}</span></span></div>
+            <div><b data-testid="account-username">{{ store.account.user.username }}</b><span v-if="store.account.user.accountId">账号 ID <span data-testid="account-id">{{ store.account.user.accountId }}</span></span></div>
           </div>
           <button v-else type="button" class="xb-menu-item account-login" role="menuitem" data-testid="account-login" @click="login">
             <span class="account-avatar lg is-placeholder"><Sparkles :size="22" :stroke-width="2" aria-hidden="true" /></span>
             <span class="login-copy"><b>登录 / 注册</b><small>登录后即可使用小伴 AI</small></span><LogIn :size="15" class="xb-menu-hint" />
           </button>
           <div class="xb-menu-sep"></div>
+          <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-ai-quota" title="查看小伴 AI 额度、兑换点数和配置模型" aria-description="查看小伴 AI 额度、兑换点数和配置模型" @click="openAiQuota"><Sparkles :size="16" />AI 额度</button>
           <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-settings" @click="openSettings()"><SlidersHorizontal :size="16" />设置<span class="xb-menu-hint">{{ mod }},</span></button>
           <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-appearance" @click="openSettings('appearance')"><Palette :size="16" />外观<span class="xb-menu-hint">{{ modeLabel }}</span></button>
           <div class="accent-row" role="radiogroup" aria-label="主题色">
@@ -630,6 +638,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
         </div>
       </div>
     </div>
+    <AiGatewayCard v-if="quotaPreview" :store="store" :config="null" initial-open hide-summary @close="quotaPreview = false" />
     <ChatNameDialog :show="!!renamingId || !!renamingWorkspace" :title="renamingWorkspace ? '重命名项目' : '重命名对话'" :placeholder="renamingWorkspace ? '给这个项目起个名字' : '给这个对话起个名字'" :initial="renamingWorkspace ? renamingWorkspaceTitle : renamingTitle" :max-length="60" confirm-text="保存" :busy="renameBusy" @close="renamingId = ''; renamingWorkspace = ''" @submit="value => renamingWorkspace ? submitWorkspaceRename(value) : submitRename(value)" />
     <div class="control-main">
       <main class="control-workspace" :class="{ 'fixed-page-workspace': fixedPages.includes(store.page) }">

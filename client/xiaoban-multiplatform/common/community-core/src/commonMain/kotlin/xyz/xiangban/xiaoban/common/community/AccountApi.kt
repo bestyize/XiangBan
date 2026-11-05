@@ -44,6 +44,9 @@ class AccountApi(client: HttpClient, private val config: CommunityConfig) {
             obj { put("registration_token", registrationToken); put("username", username); put("password", password); put("client_id", config.clientId); put("device_name", config.deviceName) },
         )
 
+    suspend fun me(token: String): AccountUser =
+        http.send(HttpMethod.Get, "/api/me", serializer(), token = token)
+
     suspend fun refresh(refreshToken: String): TokenPair =
         http.send(HttpMethod.Post, "/api/auth/refresh", serializer(), obj { put("refresh_token", refreshToken); put("client_id", config.clientId) })
 

@@ -57,6 +57,7 @@ export const useSession = defineStore('session', () => {
   const loginOpen = ref(false)
   const loginReturnTo = ref('')
   const restoring = ref(false)
+  const accountId = ref<string | null>(null)
   const scope = new SessionScope()
   let restoreSequence = 0
 
@@ -75,6 +76,7 @@ export const useSession = defineStore('session', () => {
     scope.advance()
     restoring.value = false
     info.value = null
+    accountId.value = null
     save(next)
   }
 
@@ -110,6 +112,10 @@ export const useSession = defineStore('session', () => {
       if (!active()) return
       info.value = result
       clearInvite()
+      const token = await accessToken()
+      if (!token || !active()) return
+      const profile = await accountApi.me(token).catch(() => null)
+      if (active() && profile?.uid === result.user.uid) accountId.value = profile.account_id || null
     } catch (error) {
       if (active() && error instanceof Error && 'status' in error && (error as { status: number }).status === 401) changeIdentity(null)
     }
@@ -176,6 +182,7 @@ export const useSession = defineStore('session', () => {
 
   return {
     tokens,
+    accountId,
     info,
     user,
     loggedIn,

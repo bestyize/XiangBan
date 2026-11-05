@@ -9,14 +9,14 @@ useHead(() => ({title:'我的'}))
 const session = useSession(), inbox = useNotifications(), { preference, accentName, openAppearance } = useTheme()
 const groups = [
   [{to:'/me/subscriptions',icon:'bell',title:'资讯订阅',description:'我的订阅与历史期刊'}, {to:'/me/works',icon:'create',title:'我的作品',description:'查看已发布的作品与方案'}, {to:'/me/content-bookmarks',icon:'bookmark',title:'作品收藏',description:'留住喜欢的作品和桌面方案'}, {to:'/settings#bm-title',icon:'folder',title:'帖子收藏',description:'值得再读的讨论与经验'}],
-  [{to:'/notifications',icon:'bell',title:'消息通知',description:'回复、提及与社区消息'}, {to:'/ai?panel=account',icon:'ai',title:'小伴 AI 与额度',description:'查看可用额度和使用模式'}, {to:'/points',icon:'plus',title:'社区积分',description:'签到、邀请与积分账本'}, {to:'/settings',icon:'settings',title:'账户与设置',description:'个人资料、隐私和屏蔽管理'}],
+  [{to:'/notifications',icon:'bell',title:'消息通知',description:'回复、提及与社区消息'}, {to:'/ai?panel=account',icon:'ai',title:'AI 额度',description:'查看可用额度和使用模式'}, {to:'/points',icon:'plus',title:'社区积分',description:'签到、邀请与积分账本'}, {to:'/settings',icon:'settings',title:'账户与设置',description:'个人资料、隐私和屏蔽管理'}],
 ]
 </script>
 <template>
   <div class="me-page">
     <section class="profile-block">
       <UserAvatar :name="session.user?.nickname || '小伴'" :src="session.user?.avatar_url" :size="64" />
-      <div v-if="session.loggedIn"><h1>{{ session.user?.nickname || (session.restoring ? '正在加载…' : '欢迎回来') }}</h1><RouterLink v-if="session.user" :to="`/u/${session.user.uid}`">查看个人主页 <span aria-hidden="true">›</span></RouterLink><p v-else>账号已登录，资料加载后显示</p></div>
+      <div v-if="session.loggedIn"><h1>{{ session.user?.nickname || (session.restoring ? '正在加载…' : '欢迎回来') }}</h1><p v-if="session.accountId" data-testid="account-id">账号 ID {{ session.accountId }}</p><RouterLink v-if="session.user" :to="`/u/${session.user.uid}`">查看个人主页 <span aria-hidden="true">›</span></RouterLink><p v-else>账号已登录，资料加载后显示</p></div>
       <div v-else><h1>让灵感有个落脚处</h1><p>登录后收藏、交流，也可以和小伴聊聊。</p><button class="btn btn-primary" @click="session.loginOpen = true">登录 / 注册</button></div>
     </section>
     <section v-for="(rows,i) in groups" :key="i" class="me-group" :aria-label="i === 0 ? '我的内容' : '账户与消息'">

@@ -1,5 +1,11 @@
 # 小伴桌面：桌宠、动态壁纸与 Agent
 
+## 账号 ID 与 AI 额度入口
+
+账号菜单展示账号中心的数字字符串 `account_id`，内部 `uid` 继续用于身份和业务关联。旧登录缓存缺少数字 ID 时保留登录，通过续期后的 `/api/me` 补取；暂未取得时不显示 ID，也不回退展示 UUID。菜单中的「AI 额度」直接打开现有小伴 AI 原生配置窗口；浏览器预览使用内嵌降级。
+
+验证：`npx vitest run src/ui/ControlShell.test.ts src/ui/components/AiGatewayCard.test.ts`、`npx vue-tsc --noEmit`，以及 `cargo test --offline --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop account::tests`。
+
 ## 应用皮肤（第一版）
 
 对话中可让小伴查看皮肤、切换为「江南烟雨」等内置 / 已安装皮肤，或恢复默认。创作皮肤先通过内置 `skin_read_format` 读取真实规范，再用 `skin_create` 从生图编号、工作区栅格图片或完整图层草稿生成并校验 ZIP，安装到「装扮 → 皮肤」，同时在当前工作区交付 ZIP；无需用户提供模板。创建只安装、不应用；用户要求换肤时才使用 `skin_apply`，已有自制皮肤可用 `skin_export` 导出。聊天工具与页面操作共享解析、存储和通知，主界面收到变更后刷新，旧列表响应不会覆盖新选择。`theme.json` 配色仍未启用，场景皮肤与明暗模式、主题色分别管理。

@@ -37,6 +37,7 @@ async function install() {
         <p class="lead">
           {{ account.user.username }}<span v-if="account.email" class="muted-inline"> · {{ account.email }}</span>
         </p>
+        <p v-if="account.user.account_id" data-testid="account-id">账号 ID {{ account.user.account_id }}</p>
         <p class="hint">同一个账号可登录小伴桌面、小伴手机壁纸和相伴其他产品。</p>
         <button class="btn" type="button" @click="logout">退出登录</button>
       </template>
@@ -44,6 +45,7 @@ async function install() {
         <p class="lead">用用户名、邮箱或手机号加密码登录；新用户用邮箱验证码注册并设置用户名和密码。小伴桌面与手机端共用同一个账号。</p>
         <button class="btn btn-primary" type="button" @click="account.openLogin()">登录 / 注册</button>
       </template>
+      <p><a class="btn" href="https://chat.xiangban.xyz/ai?panel=account" target="_blank" rel="noopener noreferrer">AI 额度</a></p>
     </section>
 
     <section v-if="!isStandalone && (canInstall || isIOS)" class="section">

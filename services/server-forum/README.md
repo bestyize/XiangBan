@@ -1,5 +1,11 @@
 # server-forum：超级小伴论坛
 
+## 账号 ID 与 AI 额度入口
+
+「我的」从账号中心 `/api/me` 读取并展示数字字符串 `account_id`，不会展示内部 UUID；换号和退出会清除展示 ID，过期请求不能覆盖当前账号。「AI 额度」通过 `/ai?panel=account` 直接展开现有额度、兑换和模型配置面板。
+
+验证：在 `web/` 执行 `npm run typecheck`、`node --experimental-strip-types --test tests/session.test.ts tests/ai.test.ts tests/aiCredits.test.ts`。
+
 状态：一期（网页版）已实现并部署。超级小伴社区 `chat.xiangban.xyz` 以发现、讨论和资源组织内容；讨论包含创作、学习和教程、休闲，资源包含 AI 工具、资料、影音娱乐、求助悬赏，另有站务。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
 
 栏目清单位于 [`editorial/channels.json`](editorial/channels.json)，前台映射在 [`web/src/lib/communityStructure.ts`](web/src/lib/communityStructure.ts)。启动迁移会将旧技术、资源和小伴产品分类改为当前栏目，保留分类 ID、历史帖子与权限；旧 slug 查询兼容，旧分类页面跳转至新地址。下文关于旧迁移的记录用于解释历史实现，不代表当前分类仍使用旧名称。创作和方案页面同时呈现真实作品与图文导读，资源工具和资料同时呈现真实目录与导读，彼此独立计数。小伴前沿和日报使用发现页文章通道。常驻采编的来源、预算、发布验证与部署见 [`editorial/README.md`](editorial/README.md)。

@@ -17,6 +17,9 @@ const CLIENT_ID: &str = "xiaoban-desktop-wallpaper";
 #[serde(rename_all = "camelCase")]
 pub struct AccountUser {
     pub uid: String,
+    /// Public numeric ID; preserve sessions saved before this field was added.
+    #[serde(default)]
+    pub account_id: String,
     /// 唯一且不可修改的用户名，也是对外展示的名字。
     pub username: String,
     pub avatar_url: Option<String>,
@@ -199,6 +202,7 @@ fn parse_login(val: &Value, now_sec: i64) -> Result<LoginResult, AccountFailure>
     let user_val = &val["user"];
     let user = AccountUser {
         uid: user_val["uid"].as_str().ok_or("缺少 uid")?.to_string(),
+        account_id: user_val["account_id"].as_str().unwrap_or_default().to_string(),
         username: user_val["username"].as_str().filter(|s| !s.is_empty()).ok_or("缺少 username")?.to_string(),
         avatar_url: user_val["avatar_url"].as_str().map(String::from),
     };
@@ -224,7 +228,7 @@ fn is_fresh(session: &AccountSession, now_sec: i64) -> bool {
 }
 
 fn daily_refresh_due(session: &AccountSession, now_sec: i64) -> bool {
-    if !is_fresh(session, now_sec) || session.refreshed_at == 0 {
+    if !is_fresh(session, now_sec) || session.refreshed_at == 0 || session.user.account_id.is_empty() {
         return true;
     }
     let local_day = |seconds| chrono::DateTime::from_timestamp(seconds, 0)
@@ -318,7 +322,19 @@ async fn refresh_session(app: &tauri::AppHandle, current: &AccountSession) -> Re
             return Err(failure);
         }
     };
-    let next = parse_refresh(current, &val, now_secs())?;
+    let mut next = parse_refresh(current, &val, now_secs())?;
+    // The refresh endpoint returns tokens only. Enrich legacy sessions without losing rotated tokens on failure.
+    if next.user.account_id.is_empty() {
+        let access = next.access_token.clone();
+        let uid = next.user.uid.clone();
+        let account_id = tauri::async_runtime::spawn_blocking(move || {
+            let profile = client().ok()?.get(format!("{}/api/me", account_base_url()))
+                .bearer_auth(access).send().ok()?.error_for_status().ok()?.json::<Value>().ok()?;
+            if profile["uid"].as_str()? != uid { return None; }
+            profile["account_id"].as_str().map(str::to_owned)
+        }).await.ok().flatten();
+        if let Some(account_id) = account_id { next.user.account_id = account_id; }
+    }
     {
         let mut slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
         if !same_session(&slot, current) {
@@ -330,7 +346,8 @@ async fn refresh_session(app: &tauri::AppHandle, current: &AccountSession) -> Re
         }
         let _ = app.emit("account-changed", Some(next.clone()));
     }
-    *state.activation_retry_at.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    *state.activation_retry_at.lock().unwrap_or_else(|e| e.into_inner()) =
+        next.user.account_id.is_empty().then(|| Instant::now() + Duration::from_secs(300));
     Ok(next.access_token)
 }
 
@@ -517,7 +534,7 @@ mod tests {
     fn login_body() -> Value {
         json!({
             "access_token": "a", "refresh_token": "r", "expires_in": 1800, "is_new_user": true,
-            "user": { "uid": "123e4567-e89b-12d3-a456-426614174000", "username": "Alice_01", "avatar_url": null, "identities": [] }
+            "user": { "uid": "123e4567-e89b-12d3-a456-426614174000", "account_id": "13586", "username": "Alice_01", "avatar_url": null, "identities": [] }
         })
     }
 
@@ -525,6 +542,7 @@ mod tests {
     fn account_session_serialization_round_trip() {
         let user = AccountUser {
             uid: "123e4567-e89b-12d3-a456-426614174000".into(),
+            account_id: "13586".into(),
             username: "Alice_01".into(),
             avatar_url: Some("https://example.com/avatar.png".into()),
         };
@@ -540,6 +558,8 @@ mod tests {
         let deserialized: AccountSession = serde_json::from_str(&json_text).unwrap();
         assert_eq!(session, deserialized);
         assert_eq!(deserialized.user.username, "Alice_01");
+        assert_eq!(deserialized.user.account_id, "13586");
+        assert_eq!(serde_json::to_value(&session).unwrap()["user"]["accountId"], "13586");
     }
 
     #[test]
@@ -561,6 +581,18 @@ mod tests {
         let renewed = parse_refresh(&restored, &json!({"access_token":"new", "refresh_token":"new-r", "expires_in":2592000}), now + 86_400).unwrap();
         assert_eq!(renewed.refreshed_at, now + 86_400);
         assert!(!daily_refresh_due(&renewed, now + 86_400 + 60));
+    }
+
+    #[test]
+    fn legacy_sessions_keep_their_uid_and_request_the_public_id() {
+        let session = parse_login(&login_body(), 1000).unwrap().session;
+        assert_eq!(session.user.account_id, "13586");
+        let mut cached = serde_json::to_value(&session).unwrap();
+        cached["user"].as_object_mut().unwrap().remove("accountId");
+        let restored: AccountSession = serde_json::from_value(cached).unwrap();
+        assert_eq!(restored.user.uid, session.user.uid);
+        assert!(restored.user.account_id.is_empty());
+        assert!(daily_refresh_due(&restored, 1001));
     }
 
     #[test]
