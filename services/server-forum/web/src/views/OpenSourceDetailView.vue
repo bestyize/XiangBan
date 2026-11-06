@@ -11,6 +11,7 @@ import { useCommunityResource } from '@/components/community/resource'
 import { fetchProjectReadme, renderProjectReadme } from '@/lib/projectReadme'
 import { useRepoBookmarks } from '@/lib/repoBookmarks'
 import { useHead } from '@/lib/head'
+import { curatedProjectAbout } from '@/lib/githubProjectAbout'
 import RequestState from '@/components/community/RequestState.vue'
 import CommunityBack from '@/components/community/CommunityBack.vue'
 import DiscoverGlyph from '@/components/community/DiscoverGlyph.vue'
@@ -86,7 +87,7 @@ watch([downloadSection, historySection], ([download, history]) => {
 const card = computed(() => readme.value?.card)
 const summary = computed(() => {
   const software = fromSoftware.value && project.value && findSoftwareProject(project.value.full_name)
-  return (software && software.summary) || card.value?.summary_zh || project.value?.summary || ''
+  return (software && software.summary) || (project.value && curatedProjectAbout(project.value.full_name, card.value?.summary_zh || project.value.summary)) || ''
 })
 const github = computed(() => card.value?.github_url || `https://github.com/${project.value?.full_name}`)
 const icon = computed(() => project.value?.icon_url || card.value?.icon_source_url

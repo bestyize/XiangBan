@@ -10,6 +10,8 @@ import { useCommunityResource } from '@/components/community/resource'
 import { displayDate, repoGrowth } from '@/components/community/contract'
 import { useHead } from '@/lib/head'
 import { useRepoBookmarks } from '@/lib/repoBookmarks'
+import { repoAbout, reviewedProjectIcon } from '@/lib/githubProjectAbout'
+import ProjectIcon from '@/components/community/ProjectIcon.vue'
 import '@/components/community/community.css'
 const route = useRoute()
 const owner = computed(() => String(route.params.owner || ''))
@@ -18,6 +20,9 @@ const detail = useCommunityResource(() => discoverApi.repo(owner.value, repo.val
 const lang = ref<'zh' | 'en'>('zh'), expanded = ref(false)
 watch([owner, repo], () => { lang.value = 'zh'; expanded.value = false; void detail.load() }, { immediate:true })
 const d = computed(() => detail.data.value)
+const about = computed(() => repoAbout(d.value?.full_name || '', d.value?.description, d.value?.description_zh))
+const icon = computed(() => reviewedProjectIcon(d.value?.full_name || ''))
+const baseline = computed(() => d.value?.metric === 'star total baseline')
 const hasZh = computed(() => !!d.value?.readme.zh_blocks?.length)
 const showZh = computed(() => lang.value === 'zh' && hasZh.value)
 const blocks = computed(() => (showZh.value ? d.value?.readme.zh_blocks : d.value?.readme.blocks) ?? [])
@@ -29,19 +34,19 @@ const saved = computed(() => !!d.value && bookmarks.has(d.value.full_name))
 const saveError = bookmarks.error
 function toggleSave() { if (d.value) bookmarks.toggle(d.value.full_name) }
 function jumpToComments() { document.getElementById('comments')?.scrollIntoView({ behavior:'smooth', block:'start' }) }
-useHead(() => ({ title:d.value ? `${d.value.full_name} · 开源热榜` : '项目详情' }))
+useHead(() => ({ title:d.value ? `${d.value.full_name} · 开源热榜` : '项目详情', description: d.value ? about.value.text : '' }))
 </script>
 <template><main class="community-page"><div class="repo-page">
-  <CommunityBack fallback="/" label="返回" />
+  <CommunityBack fallback="/?tab=open-source&category=hot" label="开源热榜" />
   <RequestState :loading="detail.loading.value" :error="detail.error.value" @retry="detail.load" />
   <template v-if="d">
     <section class="hero">
-      <div class="hero-top"><span class="tile" aria-hidden="true">{{ d.repo.slice(0, 1).toUpperCase() }}</span><div class="names"><p class="owner">{{ d.owner }} /</p><h1>{{ d.repo }}</h1></div><span v-if="d.is_latest" class="rank">本周 No.{{ d.rank }}</span><span v-else class="rank off">已掉出本周榜</span></div>
-      <p v-if="d.description_zh || d.description" class="desc">{{ d.description_zh || d.description }}</p>
-      <p v-if="d.description_zh && d.description && d.description_zh !== d.description" class="orig">原文：{{ d.description }}</p>
-      <div class="stats"><div><span class="gain">{{ repoGrowth(d.star_gain) }}</span><span class="gain-l">近 7 天新增 Star</span></div><div class="mini"><div><b>{{ d.star_total.toLocaleString('zh-CN') }}</b><span>总 Star</span></div><div v-if="d.language"><b><i :style="{ background:color }" />{{ d.language }}</b><span>主要语言</span></div></div></div>
+      <div class="hero-top"><ProjectIcon class="tile" :name="d.repo" :src="icon.url" :fit="icon.fit" /><div class="names"><h1>{{ d.repo }}</h1><p class="owner">{{ d.full_name }}</p></div><span class="rank" :class="{ off: !d.is_latest }">{{ d.is_latest ? '本期' : '最近上榜' }}第 {{ d.rank }} 名</span></div>
+      <p class="desc">{{ about.text }}</p>
+      <details v-if="about.original && about.text !== about.original" class="about-original"><summary>GitHub About 原文</summary><p>{{ about.original }}</p></details>
+      <div class="stats"><div><b>{{ d.star_total.toLocaleString('zh-CN') }}</b><span>GitHub Star</span></div><div v-if="!baseline && d.star_gain != null"><b class="gain">{{ repoGrowth(d.star_gain) }}</b><span>本期新增 Star</span></div><div v-if="d.language"><b><i :style="{ background:color }" />{{ d.language }}</b><span>主要语言</span></div></div>
       <div class="actions"><button type="button" class="primary" :class="{ on:saved }" :aria-pressed="saved" @click="toggleSave">{{ saved ? '已收藏' : '收藏' }}</button><a class="secondary" :href="github" target="_blank" rel="noopener noreferrer">在 GitHub 查看 ↗</a></div>
-      <p class="meta">数据来自 GitHub Trending 周榜<template v-if="d.as_of"> · 整理于 {{ displayDate(d.as_of) }}</template> · <button type="button" class="link" @click="jumpToComments">跳到评论</button></p>
+      <p class="meta">{{ d.source || 'GitHub' }} · {{ baseline ? 'Star 总量快照' : '本期榜单数据' }}<template v-if="d.as_of"> · 整理于 {{ displayDate(d.as_of) }}</template> · <button type="button" class="link" @click="jumpToComments">跳到评论</button></p>
       <p v-if="saveError" class="meta" role="status">{{ saveError }}</p>
     </section>
     <section class="intro">
@@ -58,15 +63,20 @@ useHead(() => ({ title:d.value ? `${d.value.full_name} · 开源热榜` : '项�
   </template>
 </div></main></template>
 <style scoped>
-.repo-page { max-width:760px; margin:0 auto; padding:16px 22px 40px; background:var(--surface); }
-.hero,.intro { padding:20px 0; border-bottom:1px solid var(--line); }
-.hero-top { display:flex; align-items:center; gap:12px; } .tile { flex:none; display:grid; place-items:center; width:44px; height:44px; border-radius:12px; background:color-mix(in srgb,var(--brand) 10%,var(--surface)); color:var(--brand); font-size:20px; font-weight:700; }
-.names { flex:1; min-width:0; } .owner { margin:0; font-size:13px; color:var(--ink-3); } h1 { margin:0; font-size:22px; line-height:1.25; overflow-wrap:anywhere; }
+.repo-page { max-width:800px; margin:0 auto; padding:16px 16px 40px; }
+.hero,.intro { padding:24px; margin-top:16px; border:1px solid var(--line); border-radius:12px; background:var(--surface); }
+.hero-top { display:flex; align-items:center; gap:12px; flex-wrap:wrap; } .tile { width:48px; height:48px; border-radius:12px; }
+.names { flex:1; min-width:120px; } .owner { margin:5px 0 0; font:12px/1.5 ui-monospace,monospace; color:var(--ink-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } h1 { margin:0; font-size:22px; line-height:1.3; overflow-wrap:anywhere; }
 .rank { flex:none; font-size:12px; font-weight:600; color:var(--brand); background:color-mix(in srgb,var(--brand) 10%,var(--surface)); padding:4px 10px; border-radius:999px; } .rank.off { color:var(--ink-3); background:var(--surface-2); }
-.desc { margin:14px 0 0; font-size:15px; line-height:1.7; } .orig { margin:6px 0 0; font-size:12px; line-height:1.5; color:var(--ink-3); }
-.stats { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-top:16px; padding-top:16px; border-top:1px solid var(--line); }
-.gain { display:block; font-size:32px; font-weight:700; line-height:1; color:var(--brand); font-variant-numeric:tabular-nums; } .gain-l { display:block; margin-top:6px; font-size:12px; color:var(--ink-2); }
-.mini { display:flex; gap:20px; } .mini div { text-align:right; } .mini b { display:block; font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; } .mini span { font-size:12px; color:var(--ink-3); } .mini i { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; }
+.desc { margin:18px 0 0; font-size:15px; line-height:1.7; overflow-wrap:anywhere; }
+.about-original { margin-top:8px;font-size:12px;line-height:1.7;color:var(--ink-3); }
+.about-original summary { cursor:pointer;padding:6px 0;width:fit-content; }
+.about-original p { margin:4px 0 0;overflow-wrap:anywhere; }
+.stats { display:flex; align-items:flex-start; flex-wrap:wrap; gap:16px 32px; margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+.stats b { display:block;font-size:17px;font-weight:500;line-height:1.5;font-variant-numeric:tabular-nums; }
+.stats span { display:block;margin-top:3px;font-size:12px;color:var(--ink-3); }
+.stats i { display:inline-block;width:6px;height:6px;border-radius:50%;margin-right:5px; }
+.stats .gain { color:var(--brand); }
 .actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
 .primary,.secondary { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px; padding:0 18px; border:0; border-radius:12px; font-size:14px; font-weight:600; cursor:pointer; }
 .actions { flex-wrap:nowrap; } .actions > * { white-space:nowrap; } .primary { flex:1; min-width:96px; background:var(--brand-fill,var(--brand)); color:#fff; } .primary.on { background:color-mix(in srgb,var(--brand) 10%,var(--surface)); color:var(--brand); }
@@ -77,4 +87,5 @@ useHead(() => ({ title:d.value ? `${d.value.full_name} · 开源热榜` : '项�
 .body { position:relative; } .body.col { max-height:300px; overflow:hidden; } .fade { position:absolute; left:0; right:0; bottom:0; height:90px; background:linear-gradient(to bottom,transparent,var(--surface)); pointer-events:none; }
 .more { display:block; width:100%; min-height:44px; margin-top:8px; border:0; border-radius:12px; background:var(--surface-2); color:var(--ink); font-size:14px; font-weight:600; cursor:pointer; }
 .empty { display:flex; flex-direction:column; align-items:center; gap:6px; padding:20px 8px; text-align:center; color:var(--ink-2); font-size:13px; line-height:1.6; } .empty b { font-size:15px; color:var(--ink); } .empty .secondary { margin-top:10px; }
+@media (max-width:480px) { .repo-page { padding-inline:12px; } .hero,.intro { padding:16px; } .stats { gap:14px 20px; } }
 </style>

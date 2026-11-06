@@ -1,0 +1,949 @@
+{
+  "codecrafters-io/build-your-own-x": {
+    "original": "Master programming by recreating your favorite technologies from scratch.",
+    "zh": "通过从零重做你喜爱的技术，掌握编程。"
+  },
+  "freecodecamp/freecodecamp": {
+    "original": "freeCodeCamp.org's open-source codebase and curriculum. Learn math, programming, and computer science for free.",
+    "zh": "freeCodeCamp.org 的开源代码库与课程，免费学习数学、编程和计算机科学。",
+    "icon_url": "/open-source-media/freecodecamp-icon.png",
+    "icon_fit": "contain"
+  },
+  "ebookfoundation/free-programming-books": {
+    "original": ":books: Freely available programming books",
+    "zh": "可免费获取的编程书籍。"
+  },
+  "donnemartin/system-design-primer": {
+    "original": "Learn how to design large-scale systems. Prep for the system design interview.  Includes Anki flashcards.",
+    "zh": "学习设计大规模系统，准备系统设计面试，包含 Anki 闪卡。"
+  },
+  "obra/superpowers": {
+    "original": "An agentic skills framework & software development methodology that works.",
+    "zh": "一套行之有效的智能体技能框架与软件开发方法。",
+    "observed_descriptions": [
+      "An agentic skills framework & software development methodology that works."
+    ]
+  },
+  "practical-tutorials/project-based-learning": {
+    "original": "Curated list of project-based tutorials",
+    "zh": "精选的项目实战教程列表。"
+  },
+  "thealgorithms/python": {
+    "original": "All Algorithms implemented in Python",
+    "zh": "用 Python 实现的各类算法。"
+  },
+  "ossu/computer-science": {
+    "original": "🎓 Path to a free self-taught education in Computer Science!",
+    "zh": "一条免费自学计算机科学的学习路线。"
+  },
+  "yt-dlp/yt-dlp": {
+    "original": "A feature-rich command-line audio/video downloader",
+    "zh": "功能丰富的命令行音视频下载工具。",
+    "icon_url": "/open-source-media/ytdlp-icon.svg",
+    "icon_fit": "contain"
+  },
+  "trekhleb/javascript-algorithms": {
+    "original": "📝 Algorithms and data structures implemented in JavaScript with explanations and links to further readings",
+    "zh": "用 JavaScript 实现的算法与数据结构，附有说明及延伸阅读链接。"
+  },
+  "microsoft/vscode": {
+    "original": "Visual Studio Code",
+    "zh": "Visual Studio Code。"
+  },
+  "microsoft/markitdown": {
+    "original": "Python tool for converting files and office documents to Markdown.",
+    "zh": "将文件和办公文档转换为 Markdown 的 Python 工具。"
+  },
+  "anthropics/skills": {
+    "original": "Public repository for Agent Skills",
+    "zh": "Agent Skills 的公开仓库。",
+    "observed_descriptions": [
+      "Public repository for Agent Skills"
+    ]
+  },
+  "ollama/ollama": {
+    "original": "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models.",
+    "zh": "快速开始运行 Kimi、GLM、MiniMax、DeepSeek、gpt-oss、Qwen、Gemma 等模型。",
+    "observed_descriptions": [
+      "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models."
+    ],
+    "icon_url": "/open-source-media/ollama-icon.png",
+    "icon_fit": "contain"
+  },
+  "huggingface/transformers": {
+    "original": "🤗 Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, for both inference and training. ",
+    "zh": "Transformers：用于先进机器学习模型的模型定义框架，涵盖文本、视觉、音频和多模态模型，支持推理与训练。"
+  },
+  "langflow-ai/langflow": {
+    "original": "Langflow is a powerful tool for building and deploying AI-powered agents and workflows.",
+    "zh": "Langflow 是用于构建和部署 AI 智能体与工作流的强大工具。",
+    "icon_url": "/open-source-media/langflow-icon.svg",
+    "icon_fit": "contain"
+  },
+  "langchain-ai/langchain": {
+    "original": "The agent engineering platform.",
+    "zh": "智能体工程平台。"
+  },
+  "vercel/next.js": {
+    "original": "The React Framework",
+    "zh": "React 框架。"
+  },
+  "excalidraw/excalidraw": {
+    "original": "Virtual whiteboard for sketching hand-drawn like diagrams",
+    "zh": "用于绘制手绘风格图表的虚拟白板。",
+    "icon_url": "/open-source-media/excalidraw-icon.png",
+    "icon_fit": "contain"
+  },
+  "ggml-org/llama.cpp": {
+    "original": "LLM inference in C/C++",
+    "zh": "使用 C/C++ 进行大语言模型推理。"
+  },
+  "rustdesk/rustdesk": {
+    "original": "An open-source remote desktop application designed for self-hosting, as an alternative to TeamViewer.",
+    "zh": "面向自托管的开源远程桌面应用，可替代 TeamViewer。",
+    "icon_url": "/open-source-media/rustdesk-icon.svg",
+    "icon_fit": "contain"
+  },
+  "microsoft/generative-ai-for-beginners": {
+    "original": "21 Lessons, Get Started Building with Generative AI ",
+    "zh": "通过 21 节课程，入门生成式 AI 应用开发。"
+  },
+  "godotengine/godot": {
+    "original": "Godot Engine – Multi-platform 2D and 3D game engine",
+    "zh": "Godot Engine：跨平台的 2D 和 3D 游戏引擎。",
+    "icon_url": "/open-source-media/godot-icon.svg",
+    "icon_fit": "contain"
+  },
+  "immich-app/immich": {
+    "original": "High performance self-hosted photo and video management solution.",
+    "zh": "高性能、可自托管的照片与视频管理方案。",
+    "icon_url": "/open-source-media/immich-icon.svg",
+    "icon_fit": "contain"
+  },
+  "supabase/supabase": {
+    "original": "The Postgres development platform. Supabase gives you a dedicated Postgres database to build your web, mobile, and AI applications.",
+    "zh": "Postgres 开发平台，为构建 Web、移动和 AI 应用提供专属 Postgres 数据库。"
+  },
+  "denoland/deno": {
+    "original": "A modern runtime for JavaScript and TypeScript.",
+    "zh": "现代 JavaScript 和 TypeScript 运行时。"
+  },
+  "google-gemini/gemini-cli": {
+    "original": "An open-source AI agent that brings the power of Gemini directly into your terminal.",
+    "zh": "将 Gemini 的能力直接带入终端的开源 AI 智能体。"
+  },
+  "microsoft/terminal": {
+    "original": "The new Windows Terminal and the original Windows console host, all in the same place!",
+    "zh": "全新的 Windows Terminal 与原有 Windows 控制台宿主，集中在同一个仓库。"
+  },
+  "neovim/neovim": {
+    "original": "Vim-fork focused on extensibility and usability",
+    "zh": "注重可扩展性和易用性的 Vim 分支。",
+    "icon_url": "/open-source-media/neovim-icon.png",
+    "icon_fit": "contain"
+  },
+  "punkpeye/awesome-mcp-servers": {
+    "original": "A collection of MCP servers.",
+    "zh": "MCP 服务器集合。"
+  },
+  "nationalsecurityagency/ghidra": {
+    "original": "Ghidra is a software reverse engineering (SRE) framework",
+    "zh": "Ghidra 是一个软件逆向工程（SRE）框架。",
+    "icon_url": "/open-source-media/ghidra-icon.png",
+    "icon_fit": "contain"
+  },
+  "microsoft/web-dev-for-beginners": {
+    "original": "24 Lessons, 12 Weeks, Get Started as a Web Developer",
+    "zh": "12 周、24 节课程，入门 Web 开发。"
+  },
+  "oven-sh/bun": {
+    "original": "Incredibly fast JavaScript runtime, bundler, test runner, and package manager – all in one",
+    "zh": "将速度极快的 JavaScript 运行时、打包工具、测试运行器和包管理器集于一体。"
+  },
+  "vllm-project/vllm": {
+    "original": "A high-throughput and memory-efficient inference and serving engine for LLMs",
+    "zh": "面向大语言模型的高吞吐量、内存高效的推理与服务引擎。",
+    "icon_url": "/open-source-media/vllm-icon.png",
+    "icon_fit": "contain"
+  },
+  "stirling-tools/stirling-pdf": {
+    "original": "#1 PDF Application on GitHub that lets you edit PDFs on any device anywhere",
+    "zh": "GitHub 排名第一的 PDF 应用，让你随时随地在任何设备上编辑 PDF。",
+    "icon_url": "/open-source-media/stirling-icon.png",
+    "icon_fit": "contain"
+  },
+  "infiniflow/ragflow": {
+    "original": "RAGFlow is an agent-native database: a Retrieval-Augmented Generation (RAG) engine that grew into context infrastructure.",
+    "zh": "RAGFlow 是面向智能体的原生数据库，由检索增强生成（RAG）引擎发展为上下文基础设施。",
+    "icon_url": "/open-source-media/ragflow-icon.svg",
+    "icon_fit": "contain"
+  },
+  "zed-industries/zed": {
+    "original": "Code at the speed of thought – Zed is a high-performance, multiplayer code editor from the creators of Atom and Tree-sitter.",
+    "zh": "以思考的速度编写代码：由 Atom 和 Tree-sitter 的创造者打造的高性能多人协作代码编辑器。"
+  },
+  "microsoft/ml-for-beginners": {
+    "original": "12 weeks, 26 lessons, 52 quizzes, classic Machine Learning for all",
+    "zh": "12 周、26 节课程、52 次测验，面向所有人的经典机器学习课程。"
+  },
+  "modelcontextprotocol/servers": {
+    "original": "Model Context Protocol Reference Servers",
+    "zh": "模型上下文协议（MCP）的参考服务器。",
+    "icon_url": "/open-source-media/mcp-icon.png",
+    "icon_fit": "contain"
+  },
+  "django/django": {
+    "original": "The Web framework for perfectionists with deadlines.",
+    "zh": "为有交付期限的完美主义者打造的 Web 框架。"
+  },
+  "astral-sh/uv": {
+    "original": "An extremely fast Python package and project manager, written in Rust.",
+    "zh": "用 Rust 编写、速度极快的 Python 包与项目管理器。"
+  },
+  "gohugoio/hugo": {
+    "original": "The world’s fastest framework for building websites.",
+    "zh": "世界上构建网站最快的框架。"
+  },
+  "junegunn/fzf": {
+    "original": ":cherry_blossom: A command-line fuzzy finder",
+    "zh": "命令行模糊查找工具。"
+  },
+  "jesseduffield/lazygit": {
+    "original": "simple terminal UI for git commands",
+    "zh": "用于 Git 命令的简洁终端界面。"
+  },
+  "hoppscotch/hoppscotch": {
+    "original": "Open-Source API Development Ecosystem • https://hoppscotch.io • Offline, On-Prem & Cloud • Web, Desktop & CLI • Open-Source Alternative to Postman, Insomnia",
+    "zh": "开源 API 开发生态，支持离线、本地部署和云端，以及 Web、桌面和 CLI，可替代 Postman 与 Insomnia。https://hoppscotch.io",
+    "icon_url": "/open-source-media/hoppscotch-icon.png",
+    "icon_fit": "contain"
+  },
+  "obsproject/obs-studio": {
+    "original": "OBS Studio - Free and open source software for live streaming and screen recording",
+    "zh": "OBS Studio：免费、开源的直播与屏幕录制软件。"
+  },
+  "microsoft/ai-agents-for-beginners": {
+    "original": "18 Lessons to Get Started Building AI Agents",
+    "zh": "通过 18 节课程，入门 AI 智能体开发。"
+  },
+  "composiohq/awesome-claude-skills": {
+    "original": "A curated list of awesome Claude Skills, resources, and tools for customizing Claude AI workflows",
+    "zh": "精选 Claude Skills、资源和工具，用于定制 Claude AI 工作流。"
+  },
+  "appflowy-io/appflowy": {
+    "original": "Bring projects, wikis, and teams together with AI. AppFlowy is the AI collaborative workspace where you achieve more without losing control of your data. The leading open source Notion alternative.",
+    "zh": "借助 AI 将项目、知识库和团队聚在一起。AppFlowy 是 AI 协作工作空间，让你提高效率并保有数据控制权，也是领先的开源 Notion 替代方案。",
+    "icon_url": "/open-source-media/appflowy-icon.png",
+    "icon_fit": "contain"
+  },
+  "toeverything/affine": {
+    "original": "There can be more than Notion and Miro. AFFiNE(pronounced [ə‘fain]) is a next-gen knowledge base that brings planning, sorting and creating all together. Privacy first, open-source, customizable and ready to use. ",
+    "zh": "不只有 Notion 和 Miro。AFFiNE（读作 [ə‘fain]）是集规划、整理和创作于一体的新一代知识库，注重隐私、开源、可定制且开箱即用。"
+  },
+  "strapi/strapi": {
+    "original": "🚀 Strapi is the leading open-source headless CMS. It’s 100% JavaScript/TypeScript, fully customizable, and developer-first.",
+    "zh": "Strapi 是领先的开源无头 CMS，完全使用 JavaScript/TypeScript，支持全面定制，以开发者为中心。"
+  },
+  "microsoft/ai-for-beginners": {
+    "original": "12 Weeks, 24 Lessons, AI for All!",
+    "zh": "12 周、24 节课程，面向所有人的 AI 入门课程。"
+  },
+  "burntsushi/ripgrep": {
+    "original": "ripgrep recursively searches directories for a regex pattern while respecting your gitignore",
+    "zh": "ripgrep 递归搜索目录中的正则表达式，同时遵循 gitignore 规则。"
+  },
+  "ffmpeg/ffmpeg": {
+    "original": "Mirror of https://git.ffmpeg.org/ffmpeg.git",
+    "zh": "https://git.ffmpeg.org/ffmpeg.git 的镜像。"
+  },
+  "alacritty/alacritty": {
+    "original": "A cross-platform, OpenGL terminal emulator.",
+    "zh": "跨平台、基于 OpenGL 的终端模拟器。"
+  },
+  "coollabsio/coolify": {
+    "original": "An open-source, self-hostable PaaS alternative to Vercel, Heroku & Netlify that lets you easily deploy static sites, databases, full-stack applications and 360+ one-click services on your own servers.",
+    "zh": "可自托管的开源 PaaS，可替代 Vercel、Heroku 和 Netlify，在自己的服务器上轻松部署静态网站、数据库、全栈应用及 360 多种一键服务。",
+    "icon_url": "/open-source-media/coolify-icon.svg",
+    "icon_fit": "contain"
+  },
+  "usememos/memos": {
+    "original": "Memos is an open-source, self-hosted note-taking app that brings your everyday thoughts together in a personal timeline. Your data stays yours, and you choose what to keep private or share.",
+    "zh": "Memos 是可自托管的开源笔记应用，将日常想法汇集到个人时间线中。数据由你掌控，哪些内容私密、哪些内容分享，由你决定。",
+    "icon_url": "/open-source-media/memos-icon.svg",
+    "icon_fit": "contain"
+  },
+  "git/git": {
+    "original": "Git Source Code Mirror - This is a publish-only repository but pull requests can be turned into patches to the mailing list via GitGitGadget (https://gitgitgadget.github.io/). Please follow Documentation/SubmittingPatches procedure for any of your improvements.",
+    "zh": "Git 源代码镜像，仅用于发布；可通过 GitGitGadget（https://gitgitgadget.github.io/）将拉取请求转换为补丁发送至邮件列表。任何改进都请遵循 Documentation/SubmittingPatches 流程。"
+  },
+  "upstash/context7": {
+    "original": "Context7 Platform -- Up-to-date docs for AI agents",
+    "zh": "Context7 平台：为 AI 智能体提供最新文档。"
+  },
+  "withastro/astro": {
+    "original": "The web framework for content-driven websites.",
+    "zh": "面向内容驱动网站的 Web 框架。",
+    "icon_url": "/open-source-media/astro-icon.svg",
+    "icon_fit": "contain"
+  },
+  "penpot/penpot": {
+    "original": "Penpot: The open-source design platform for Product teams that need scalable collaboration.",
+    "zh": "Penpot：为需要规模化协作的产品团队打造的开源设计平台。"
+  },
+  "microsoft/autogen": {
+    "original": "A programming framework for agentic AI",
+    "zh": "用于智能体 AI 的编程框架。",
+    "observed_descriptions": [
+      "A programming framework for agentic AI"
+    ]
+  },
+  "sharkdp/bat": {
+    "original": "A cat(1) clone with wings.",
+    "zh": "为 cat(1) 插上翅膀的替代工具。"
+  },
+  "crewaiinc/crewai": {
+    "original": "Framework for orchestrating role-playing, autonomous AI agents. By fostering collaborative intelligence, CrewAI empowers agents to work together seamlessly, tackling complex tasks.",
+    "zh": "用于编排角色扮演型自主 AI 智能体的框架，让智能体通过协同智能紧密合作，处理复杂任务。"
+  },
+  "jellyfin/jellyfin": {
+    "original": "The Free Software Media System - Server Backend & API",
+    "zh": "自由软件媒体系统的服务端与 API。"
+  },
+  "go-gitea/gitea": {
+    "original": "Git with a cup of tea! Painless self-hosted all-in-one software development service, including Git hosting, code review, team collaboration, package registry and CI/CD",
+    "zh": "Git 配上一杯茶！易于自托管的一站式软件开发服务，包括 Git 托管、代码审查、团队协作、软件包仓库及 CI/CD。"
+  },
+  "appwrite/appwrite": {
+    "original": "The open-source cloud for agents & devs. Including Auth, Databases, Storage, Functions, Messaging, Hosting, Realtime, WAF and more",
+    "zh": "面向智能体和开发者的开源云，包含身份验证、数据库、存储、函数、消息、托管、实时通信、WAF 等。"
+  },
+  "laurent22/joplin": {
+    "original": "Joplin - the privacy-focused note taking app with sync capabilities for Windows, macOS, Linux, Android and iOS.",
+    "zh": "Joplin：注重隐私、支持同步的笔记应用，适用于 Windows、macOS、Linux、Android 和 iOS。",
+    "icon_url": "/open-source-media/joplin-icon.png",
+    "icon_fit": "contain"
+  },
+  "werwolv/imhex": {
+    "original": "🔍 A Hex Editor for Reverse Engineers, Programmers and people who value their retinas when working at 3 AM.",
+    "zh": "面向逆向工程师、程序员，以及凌晨 3 点工作时仍爱护眼睛的人们的十六进制编辑器。",
+    "icon_url": "/open-source-media/imhex-icon.svg",
+    "icon_fit": "contain"
+  },
+  "tryghost/ghost": {
+    "original": "Independent technology for modern publishing, memberships, subscriptions and newsletters.",
+    "zh": "服务于现代出版、会员、订阅和邮件简报的独立技术。"
+  },
+  "chromedevtools/chrome-devtools-mcp": {
+    "original": "Chrome DevTools for coding agents",
+    "zh": "面向编程智能体的 Chrome 开发者工具。"
+  },
+  "run-llama/llama_index": {
+    "original": "LlamaIndex is the document processing platform for AI",
+    "zh": "LlamaIndex 是面向 AI 的文档处理平台。"
+  },
+  "skylot/jadx": {
+    "original": "Dex to Java decompiler",
+    "zh": "将 Dex 反编译为 Java 的工具。"
+  },
+  "mastodon/mastodon": {
+    "original": "Your self-hosted, globally interconnected microblogging community",
+    "zh": "可自托管、与全球互联的微博社区。"
+  },
+  "x64dbg/x64dbg": {
+    "original": "An open-source user mode debugger for Windows. Optimized for reverse engineering and malware analysis.",
+    "zh": "Windows 上的开源用户态调试器，针对逆向工程和恶意软件分析优化。"
+  },
+  "calcom/cal.diy": {
+    "original": "Scheduling infrastructure for absolutely everyone.",
+    "zh": "面向所有人的日程安排基础设施。"
+  },
+  "paperless-ngx/paperless-ngx": {
+    "original": "A community-supported supercharged document management system: scan, index and archive all your documents",
+    "zh": "社区支持的增强型文档管理系统，可扫描、索引和归档所有文档。",
+    "icon_url": "/open-source-media/paperless-icon.png",
+    "icon_fit": "contain"
+  },
+  "siyuan-note/siyuan": {
+    "original": "An open-source, privacy-first, self-hosted knowledge workspace where humans and AI agents work together 开源、隐私优先、自托管的知识工作空间，让人与智能体在此协作",
+    "zh": "开源、隐私优先、自托管的知识工作空间，让人与智能体在此协作。"
+  },
+  "mitmproxy/mitmproxy": {
+    "original": "An interactive TLS-capable intercepting HTTP proxy for penetration testers and software developers.",
+    "zh": "面向渗透测试人员与软件开发者、支持 TLS 的交互式 HTTP 拦截代理。"
+  },
+  "imputnet/cobalt": {
+    "original": "best way to save what you love",
+    "zh": "保存心爱内容的最佳方式。",
+    "icon_url": "/open-source-media/cobalt-icon.png",
+    "icon_fit": "contain"
+  },
+  "payloadcms/payload": {
+    "original": "Payload is the open-source, fullstack Next.js framework, giving you instant backend superpowers. Get a full TypeScript backend and admin panel instantly. Use Payload as a headless CMS or for building powerful applications.",
+    "zh": "Payload 是开源全栈 Next.js 框架，可立即获得完整的 TypeScript 后端与管理面板，既可用作无头 CMS，也可用于构建强大的应用。"
+  },
+  "mifi/lossless-cut": {
+    "original": "The swiss army knife of lossless video/audio editing",
+    "zh": "无损音视频编辑的瑞士军刀。",
+    "icon_url": "/open-source-media/losslesscut-icon.svg",
+    "icon_fit": "contain"
+  },
+  "logseq/logseq": {
+    "original": "A privacy-first, open-source platform for knowledge management and collaboration. Download link:  http://github.com/logseq/logseq/releases. roadmap: https://logseq.io/p/NX4mc_ggEV",
+    "zh": "注重隐私的开源知识管理与协作平台。下载：http://github.com/logseq/logseq/releases；路线图：https://logseq.io/p/NX4mc_ggEV"
+  },
+  "sharkdp/fd": {
+    "original": "A simple, fast and user-friendly alternative to 'find'",
+    "zh": "简洁、快速、易用的 find 替代工具。"
+  },
+  "langchain-ai/langgraph": {
+    "original": "Build resilient agents.",
+    "zh": "构建可靠、有韧性的智能体。"
+  },
+  "lizardbyte/sunshine": {
+    "original": "Self-hosted game stream host for Moonlight.",
+    "zh": "为 Moonlight 提供服务的自托管游戏串流主机。"
+  },
+  "corentinth/it-tools": {
+    "original": "Collection of handy online tools for developers, with great UX. ",
+    "zh": "面向开发者的实用在线工具集合，注重用户体验。"
+  },
+  "hkuds/lightrag": {
+    "original": "[EMNLP2025] LightRAG: Simple and Fast Retrieval-Augmented Generation",
+    "zh": "[EMNLP2025] LightRAG：简单、快速的检索增强生成。"
+  },
+  "umami-software/umami": {
+    "original": "Umami is a privacy-first web and product analytics platform. Traffic, campaigns, behavior, conversions, and revenue in one place. No cookies, no surveillance, self-hosted or in the cloud.",
+    "zh": "Umami 是隐私优先的网站与产品分析平台，将流量、营销活动、行为、转化和收入集中展示。不使用 Cookie、不进行监视，可自托管或使用云端。"
+  },
+  "microsoft/playwright-mcp": {
+    "original": "Playwright MCP server",
+    "zh": "Playwright MCP 服务器。"
+  },
+  "triliumnext/trilium": {
+    "original": "Build your personal knowledge base with Trilium Notes",
+    "zh": "使用 Trilium Notes 构建个人知识库。"
+  },
+  "sgl-project/sglang": {
+    "original": "SGLang is a high-performance serving framework for large language models and multimodal models.",
+    "zh": "SGLang 是面向大语言模型和多模态模型的高性能服务框架。"
+  },
+  "microsoft/data-science-for-beginners": {
+    "original": "10 Weeks, 20 Lessons, Data Science for All!",
+    "zh": "10 周、20 节课程，面向所有人的数据科学课程。"
+  },
+  "vercel-labs/skills": {
+    "original": "The open agent skills tool - npx skills",
+    "zh": "开放的智能体技能工具：npx skills。"
+  },
+  "mpv-player/mpv": {
+    "original": "🎥 Command line media player",
+    "zh": "命令行媒体播放器。"
+  },
+  "nextcloud/server": {
+    "original": "☁️ Nextcloud server, a safe home for all your data",
+    "zh": "Nextcloud 服务器，为你的所有数据提供安全的家。"
+  },
+  "gchq/cyberchef": {
+    "original": "The Cyber Swiss Army Knife - a web app for encryption, encoding, compression and data analysis",
+    "zh": "网络工具瑞士军刀：用于加密、编码、压缩和数据分析的 Web 应用。"
+  },
+  "agentscope-ai/agentscope": {
+    "original": "Build and run agents you can see, understand and trust.",
+    "zh": "构建并运行可观察、可理解、值得信赖的智能体。"
+  },
+  "freecad/freecad": {
+    "original": "Official source code of FreeCAD, a free and opensource multiplatform 3D parametric modeler.",
+    "zh": "FreeCAD 官方源代码；FreeCAD 是免费、开源、跨平台的 3D 参数化建模工具。",
+    "icon_url": "/open-source-media/freecad-icon.svg",
+    "icon_fit": "contain"
+  },
+  "github/github-mcp-server": {
+    "original": "GitHub's official MCP Server",
+    "zh": "GitHub 官方 MCP 服务器。"
+  },
+  "vercel-labs/agent-skills": {
+    "original": "Vercel's official collection of agent skills",
+    "zh": "Vercel 官方智能体技能集合。"
+  },
+  "plausible/analytics": {
+    "original": "Open source, privacy-first web analytics. Lightweight, cookie-free Google Analytics alternative. Self-hosted or cloud.",
+    "zh": "开源、隐私优先的网站分析工具，是轻量、无 Cookie 的 Google Analytics 替代方案，可自托管或使用云端。"
+  },
+  "anuken/mindustry": {
+    "original": "The automation tower defense RTS",
+    "zh": "融合自动化与塔防的即时战略游戏。",
+    "icon_url": "/open-source-media/mindustry-icon.png",
+    "icon_fit": "contain"
+  },
+  "huggingface/lerobot": {
+    "original": "🤗 LeRobot: Making AI for Robotics more accessible with end-to-end learning",
+    "zh": "LeRobot：通过端到端学习，让机器人 AI 更易用。",
+    "icon_url": "/open-source-media/lerobot-icon.png",
+    "icon_fit": "contain"
+  },
+  "4ian/gdevelop": {
+    "original": "🎮 Open-source, cross-platform 2D/3D/multiplayer game engine designed for everyone.",
+    "zh": "面向所有人的开源跨平台游戏引擎，支持 2D、3D 和多人游戏。"
+  },
+  "prefecthq/fastmcp": {
+    "original": "🚀 The fast, Pythonic way to build MCP servers and clients.",
+    "zh": "以快速、符合 Python 风格的方式构建 MCP 服务器与客户端。"
+  },
+  "graphiteeditor/graphite": {
+    "original": "Community-built comprehensive 2D content creation appplication for graphic design, digital art, and interactive real-time motion graphics powered by a node-based procedural graphics engine",
+    "zh": "社区打造的综合 2D 内容创作应用，用于平面设计、数字艺术和交互式实时动态图形，基于节点式程序化图形引擎。"
+  },
+  "hashcat/hashcat": {
+    "original": "World's fastest and most advanced password recovery utility",
+    "zh": "世界上最快、最先进的密码恢复工具。"
+  },
+  "ibotpeaches/apktool": {
+    "original": "A tool for reverse engineering Android apk files",
+    "zh": "用于逆向分析 Android APK 文件的工具。"
+  },
+  "agentskills/agentskills": {
+    "original": "Specification and documentation for Agent Skills",
+    "zh": "Agent Skills 的规范与文档。"
+  },
+  "radareorg/radare2": {
+    "original": "UNIX-like reverse engineering framework and command-line toolset",
+    "zh": "类 UNIX 的逆向工程框架与命令行工具集。"
+  },
+  "arendst/tasmota": {
+    "original": "Alternative firmware for ESP8266 and ESP32 based devices with easy configuration using webUI, OTA updates, automation using timers or rules, expandability and entirely local control over MQTT, HTTP, Serial or KNX. Full documentation at",
+    "zh": "适用于 ESP8266 和 ESP32 设备的替代固件，支持 Web 界面配置、OTA 更新、定时器或规则自动化及扩展，并可通过 MQTT、HTTP、串口或 KNX 完全本地控制。"
+  },
+  "handbrake/handbrake": {
+    "original": "HandBrake's development repository ",
+    "zh": "HandBrake 的开发仓库。"
+  },
+  "navidrome/navidrome": {
+    "original": "🎧 Your Personal Streaming Service ",
+    "zh": "你的个人流媒体服务。",
+    "icon_url": "/open-source-media/navidrome-icon.png",
+    "icon_fit": "contain"
+  },
+  "frida/frida": {
+    "original": "Main repo for hosting release binaries",
+    "zh": "用于托管发行版二进制文件的主仓库。"
+  },
+  "freetubeapp/freetube": {
+    "original": "An Open Source YouTube app for privacy",
+    "zh": "注重隐私的开源 YouTube 应用。"
+  },
+  "docmost/docmost": {
+    "original": "Docmost is an open-source collaborative wiki and documentation software. It is an open-source alternative to Confluence and Notion.",
+    "zh": "Docmost 是开源协作式知识库与文档软件，可替代 Confluence 和 Notion。"
+  },
+  "blender/blender": {
+    "original": "Official mirror of Blender",
+    "zh": "Blender 官方镜像。"
+  },
+  "qmk/qmk_firmware": {
+    "original": "Open-source keyboard firmware for Atmel AVR and Arm USB families",
+    "zh": "适用于 Atmel AVR 和 Arm USB 系列的开源键盘固件。"
+  },
+  "videolan/vlc": {
+    "original": "VLC media player - plays everything, runs anywhere. Code here: https://code.videolan.org/videolan/vlc",
+    "zh": "VLC 媒体播放器：播放一切，随处运行。代码：https://code.videolan.org/videolan/vlc"
+  },
+  "rizinorg/cutter": {
+    "original": "Free and Open Source Reverse Engineering Platform powered by rizin",
+    "zh": "由 rizin 驱动的免费开源逆向工程平台。"
+  },
+  "espressif/esp-idf": {
+    "original": "Espressif IoT Development Framework. Official development framework for Espressif SoCs.",
+    "zh": "乐鑫物联网开发框架，也是乐鑫 SoC 的官方开发框架。"
+  },
+  "ppy/osu": {
+    "original": "rhythm is just a *click* away!",
+    "zh": "节奏，尽在一“点”之间！"
+  },
+  "moonlight-stream/moonlight-qt": {
+    "original": "GameStream client for PCs (Windows, Mac, Linux, and Steam Link)",
+    "zh": "面向电脑的 GameStream 客户端，支持 Windows、Mac、Linux 和 Steam Link。"
+  },
+  "wled/wled": {
+    "original": "Control WS2812B and many more types of digital RGB LEDs with an ESP32 over WiFi!",
+    "zh": "通过 WiFi，使用 ESP32 控制 WS2812B 及更多类型的数字 RGB LED！"
+  },
+  "lichess-org/lila": {
+    "original": "♞ lichess.org: the forever free, adless and open source chess server ♞",
+    "zh": "lichess.org：永远免费、无广告、开源的国际象棋服务器。"
+  },
+  "audacity/audacity": {
+    "original": "Audio Editor                                     ",
+    "zh": "音频编辑器。"
+  },
+  "openra/openra": {
+    "original": "Open Source real-time strategy game engine for early Westwood games such as Command & Conquer: Red Alert written in C# using SDL and OpenGL. Runs on Windows, Linux, *BSD and Mac OS X.",
+    "zh": "用 C# 编写、基于 SDL 和 OpenGL 的开源即时战略游戏引擎，面向《命令与征服：红色警戒》等早期 Westwood 游戏，可运行于 Windows、Linux、*BSD 和 Mac OS X。"
+  },
+  "marlinfirmware/marlin": {
+    "original": "Marlin is a firmware for RepRap 3D printers optimized for both 8 and 32 bit microcontrollers.  Marlin supports all common platforms.   Many commercial 3D printers come with Marlin installed.  Check with your vendor if you need source code for your specific machine.",
+    "zh": "Marlin 是面向 RepRap 3D 打印机的固件，针对 8 位和 32 位微控制器优化，支持所有常见平台。许多商用 3D 打印机预装了 Marlin；如需具体机型的源代码，请联系设备厂商。"
+  },
+  "microsoft/iot-for-beginners": {
+    "original": "12 Weeks, 24 Lessons, IoT for All!",
+    "zh": "12 周、24 节课程，面向所有人的物联网课程。"
+  },
+  "zephyrproject-rtos/zephyr": {
+    "original": "Primary Git Repository for the Zephyr Project. Zephyr is a new generation, scalable, optimized, secure RTOS for multiple hardware architectures.",
+    "zh": "Zephyr 项目的主要 Git 仓库。Zephyr 是面向多种硬件架构的新一代可扩展、经过优化且安全的实时操作系统。"
+  },
+  "flipperdevices/flipperzero-firmware": {
+    "original": "Flipper Zero firmware source code",
+    "zh": "Flipper Zero 固件源代码。"
+  },
+  "googleapis/mcp-toolbox": {
+    "original": "MCP Toolbox for Databases is an open source MCP server for databases.",
+    "zh": "MCP Toolbox for Databases 是面向数据库的开源 MCP 服务器。"
+  },
+  "openrct2/openrct2": {
+    "original": "An open source re-implementation of RollerCoaster Tycoon 2 🎢",
+    "zh": "《过山车大亨 2》的开源重新实现。"
+  },
+  "ardupilot/ardupilot": {
+    "original": "ArduPlane, ArduCopter, ArduRover, ArduSub source",
+    "zh": "ArduPlane、ArduCopter、ArduRover 和 ArduSub 的源代码。"
+  },
+  "zaproxy/zaproxy": {
+    "original": "The ZAP by Checkmarx Core project",
+    "zh": "Checkmarx ZAP 的核心项目。"
+  },
+  "mltframework/shotcut": {
+    "original": "cross-platform (Qt), open-source (GPLv3) video editor",
+    "zh": "跨平台、基于 Qt、采用 GPLv3 许可的开源视频编辑器。"
+  },
+  "musescore/musescore": {
+    "original": "MuseScore is an open source and free music notation software. For support, contribution, bug reports, visit MuseScore.org. Fork and make pull requests!",
+    "zh": "MuseScore 是免费开源的乐谱制作软件。寻求支持、参与贡献或报告问题，请访问 MuseScore.org。欢迎 Fork 并提交拉取请求！"
+  },
+  "refirmlabs/binwalk": {
+    "original": "Firmware Analysis Tool",
+    "zh": "固件分析工具。"
+  },
+  "juice-shop/juice-shop": {
+    "original": "OWASP Juice Shop: Probably the most modern and sophisticated insecure web application",
+    "zh": "OWASP Juice Shop：可能是最现代、最复杂的不安全 Web 应用。"
+  },
+  "luanti-org/luanti": {
+    "original": "Luanti (formerly Minetest) is an open source voxel game-creation platform with easy modding and game creation",
+    "zh": "Luanti（原 Minetest）是开源体素游戏创作平台，方便制作模组和游戏。",
+    "icon_url": "/open-source-media/luanti-icon.png",
+    "icon_fit": "contain"
+  },
+  "cleverraven/cataclysm-dda": {
+    "original": "Cataclysm - Dark Days Ahead. A turn-based survival game set in a post-apocalyptic world.",
+    "zh": "《大灾变：黑暗之日》：设定在末日世界中的回合制生存游戏。"
+  },
+  "mapeditor/tiled": {
+    "original": "Flexible level editor",
+    "zh": "灵活的关卡编辑器。"
+  },
+  "px4/px4-autopilot": {
+    "original": "PX4 Autopilot Software",
+    "zh": "PX4 自动驾驶软件。"
+  },
+  "klipper3d/klipper": {
+    "original": "Klipper is a 3d-printer firmware",
+    "zh": "Klipper 是一款 3D 打印机固件。"
+  },
+  "esphome/esphome": {
+    "original": "ESPHome is a system to control your ESP32, ESP8266, BK72xx, RP2040 by simple yet powerful configuration files and control them remotely through Home Automation systems.",
+    "zh": "ESPHome 通过简单而强大的配置文件控制 ESP32、ESP8266、BK72xx 和 RP2040，并可通过家庭自动化系统远程控制。",
+    "icon_url": "/open-source-media/esphome-icon.svg",
+    "icon_fit": "contain"
+  },
+  "kde/krita": {
+    "original": "Krita is a free and open source cross-platform application that offers an end-to-end solution for creating digital art files from scratch built on the KDE and Qt frameworks.",
+    "zh": "Krita 是基于 KDE 和 Qt 框架的免费开源跨平台应用，为从零创作数字艺术文件提供完整方案。",
+    "icon_url": "/open-source-media/krita-icon.svg",
+    "icon_fit": "contain"
+  },
+  "openscad/openscad": {
+    "original": "OpenSCAD - The Programmers Solid 3D CAD Modeller  ",
+    "zh": "OpenSCAD：面向程序员的实体 3D CAD 建模工具。"
+  },
+  "wireshark/wireshark": {
+    "original": "Read-only mirror of Wireshark's Git repository at https://gitlab.com/wireshark/wireshark. You're welcome to submit pull requests there.",
+    "zh": "Wireshark Git 仓库的只读镜像，上游位于 https://gitlab.com/wireshark/wireshark，欢迎在那里提交拉取请求。"
+  },
+  "prusa3d/prusaslicer": {
+    "original": "G-code generator for 3D printers (RepRap, Makerbot, Ultimaker etc.)",
+    "zh": "面向 RepRap、Makerbot、Ultimaker 等 3D 打印机的 G-code 生成器。"
+  },
+  "jgraph/drawio": {
+    "original": "draw.io is a JavaScript, client-side editor for general diagramming.",
+    "zh": "draw.io 是用 JavaScript 编写、在客户端运行的通用图表编辑器。"
+  },
+  "libresprite/libresprite": {
+    "original": "Animated sprite editor & pixel art tool -- Fork of the last GPLv2 commit of Aseprite",
+    "zh": "动画精灵编辑器与像素画工具，基于 Aseprite 最后一个采用 GPLv2 许可的提交分支开发。"
+  },
+  "openttd/openttd": {
+    "original": "OpenTTD is an open source simulation game based upon Transport Tycoon Deluxe",
+    "zh": "OpenTTD 是基于《运输大亨豪华版》的开源模拟游戏。",
+    "icon_url": "/open-source-media/openttd-icon.png",
+    "icon_fit": "contain"
+  },
+  "fontforge/fontforge": {
+    "original": "Free (libre) font editor for Windows, Mac OS X and GNU+Linux",
+    "zh": "适用于 Windows、Mac OS X 和 GNU+Linux 的自由字体编辑器。"
+  },
+  "opentoonz/opentoonz": {
+    "original": "OpenToonz - An open-source full-featured 2D animation creation software",
+    "zh": "OpenToonz：开源、功能完整的 2D 动画创作软件。"
+  },
+  "endless-sky/endless-sky": {
+    "original": "Space exploration, trading, and combat game.",
+    "zh": "太空探索、贸易与战斗游戏。"
+  },
+  "veloren/veloren": {
+    "original": "[mirror of https://gitlab.com/veloren/veloren] An open world, open source voxel RPG inspired by Dwarf Fortress and Cube World. This repository is a mirror. Please submit all PRs and issues on our GitLab page.",
+    "zh": "https://gitlab.com/veloren/veloren 的镜像。受《矮人要塞》和《魔方世界》启发的开放世界开源体素 RPG。本仓库仅为镜像，请在 GitLab 页面提交所有拉取请求与问题。"
+  },
+  "hedgedoc/hedgedoc": {
+    "original": "HedgeDoc - Ideas grow better together",
+    "zh": "HedgeDoc：想法在协作中成长得更好。"
+  },
+  "wesnoth/wesnoth": {
+    "original": "An open source, turn-based strategy game with a high fantasy theme.",
+    "zh": "以高奇幻世界为主题的开源回合制策略游戏。"
+  },
+  "go-vikunja/vikunja": {
+    "original": "The task manager you actually own.",
+    "zh": "真正由你掌控的任务管理器。"
+  },
+  "supertuxkart/stk-code": {
+    "original": "The code base of SuperTuxKart",
+    "zh": "SuperTuxKart 的代码库。"
+  },
+  "bambulab/bambustudio": {
+    "original": "PC Software for BambuLab and other 3D printers",
+    "zh": "适用于拓竹及其他 3D 打印机的 PC 软件。"
+  },
+  "raspberrypi/pico-sdk": {
+    "original": "",
+    "zh": "项目尚未填写 GitHub About。"
+  },
+  "vorondesign/voron-2": {
+    "original": "Voron 2 CoreXY 3D Printer design",
+    "zh": "Voron 2 CoreXY 3D 打印机设计。",
+    "icon_url": "/open-source-media/voron-icon.png",
+    "icon_fit": "mark-left"
+  },
+  "beyond-all-reason/beyond-all-reason": {
+    "original": "Main game repository for Beyond All Reason.",
+    "zh": "Beyond All Reason 游戏的主仓库。"
+  },
+  "warzone2100/warzone2100": {
+    "original": "Command the forces of The Project in a battle to rebuild the world after mankind has been nearly destroyed by nuclear missiles. A 100% free and open source real-time strategy game for Windows, macOS, Linux, BSD+",
+    "zh": "人类几乎被核导弹毁灭后，指挥“计划”组织的力量，为重建世界而战。这是完全免费开源的即时战略游戏，支持 Windows、macOS、Linux、BSD 等平台。"
+  },
+  "synfig/synfig": {
+    "original": "This is the Official source code repository of Synfig Studio animation software",
+    "zh": "Synfig Studio 动画软件的官方源代码仓库。"
+  },
+  "pencil2d/pencil": {
+    "original": "Pencil2D is an easy, intuitive tool to make 2D hand-drawn animations. Pencil2D is open source and cross-platform.",
+    "zh": "Pencil2D 是简单直观的 2D 手绘动画制作工具，开源且跨平台。"
+  },
+  "thedotmack/claude-mem": {
+    "original": "Persistent Context Across Sessions for Every Agent –  Captures everything your agent does during sessions, compresses it with AI, and injects relevant context back into future sessions. Works with Claude Code, OpenClaw, Codex, Gemini, Hermes, Copilot, OpenCode + More",
+    "zh": "为各类智能体提供跨会话的持久上下文：记录智能体在会话中的操作，用 AI 压缩，并在后续会话中注入相关上下文。适用于 Claude Code、OpenClaw、Codex、Gemini、Hermes、Copilot、OpenCode 等。",
+    "observed_descriptions": [
+      "Persistent Context Across Sessions for Every Agent – Captures everything your agent does during sessions, compresses it with AI, and injects relevant context back into future sessions. Works with Claude Code, OpenClaw, Codex, Gemini, Hermes, Copilot, OpenCode + More",
+      "Persistent Context Across Sessions for Every Agent – Captures everything your agent does during sessions, compresses it "
+    ]
+  },
+  "nutlope/hallmark": {
+    "original": "Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",
+    "zh": "面向 Claude Code、Cursor 和 Codex，减少 AI 粗糙设计感的设计技能。",
+    "observed_descriptions": [
+      "Anti-AI-slop design skill for Claude Code, Cursor, and Codex."
+    ]
+  },
+  "pingdotgg/t3code": {
+    "original": "",
+    "zh": "项目尚未填写 GitHub About。",
+    "observed_descriptions": [
+      ""
+    ]
+  },
+  "hkuds/deeptutor": {
+    "original": "DeepTutor: Lifelong Personalized Tutoring. https://deeptutor.info/.",
+    "zh": "DeepTutor：终身个性化辅导。https://deeptutor.info/",
+    "observed_descriptions": [
+      "DeepTutor: Lifelong Personalized Tutoring. https://deeptutor.info/."
+    ]
+  },
+  "max-sixty/worktrunk": {
+    "original": "Worktrunk is a CLI for Git worktree management, designed for parallel AI agent workflows",
+    "zh": "用于管理 Git worktree 的命令行工具，专为并行 AI 智能体工作流设计。",
+    "observed_descriptions": [
+      "Worktrunk is a CLI for Git worktree management, designed for parallel AI agent workflows"
+    ]
+  },
+  "milind-soni/openmausbot": {
+    "original": "Open-source Grok Bot alternative with a virtual machine that bots can use",
+    "zh": "开源的 Grok Bot 替代方案，提供可供机器人使用的虚拟机。",
+    "observed_descriptions": [
+      "Open-source Grok Bot alternative with a virtual machine that bots can use"
+    ]
+  },
+  "pbakaus/impeccable": {
+    "original": "The design vocabulary for your coding agent. Steer with polish and bolder, review with critique and audit, catch AI slop before it ships.",
+    "zh": "为编程智能体提供设计词汇：用 polish 和 bolder 引导设计，用 critique 和 audit 审查，在发布前发现粗糙的 AI 设计。",
+    "observed_descriptions": [
+      "The design vocabulary for your coding agent. Steer with polish and bolder, review with critique and audit, catch AI slop before it ships.",
+      "The design vocabulary for your coding agent. Steer with polish and bolder, review with critique and audit, catch AI slop"
+    ]
+  },
+  "hyprwm/hyprland": {
+    "original": "Hyprland is an independent, highly customizable, dynamic tiling Wayland compositor that doesn't sacrifice on its looks.",
+    "zh": "独立、高度可定制的动态平铺 Wayland 合成器，同时兼顾视觉效果。",
+    "observed_descriptions": [
+      "Hyprland is an independent, highly customizable, dynamic tiling Wayland compositor that doesn't sacrifice on its looks."
+    ]
+  },
+  "jakubkrehel/skills": {
+    "original": "A collection of agent skills that help you build great interfaces.",
+    "zh": "帮助你构建出色界面的智能体技能集合。",
+    "observed_descriptions": [
+      "A collection of agent skills that help you build great interfaces."
+    ]
+  },
+  "calesthio/openmontage": {
+    "original": "World's first open-source, agentic video production system. 12 production pipelines, 100+ tools, 700+ agent skill and production-knowledge files. Turn your AI coding assistant into a full video production studio.",
+    "zh": "世界上首个开源智能体视频制作系统，包含 12 条制作流水线、100 多个工具、700 多份智能体技能与制作知识文件，将 AI 编程助手变成完整的视频制作工作室。",
+    "observed_descriptions": [
+      "World's first open-source, agentic video production system. 12 production pipelines, 100+ tools, 700+ agent skill and production-knowledge files. Turn your AI coding assistant into a full video production studio."
+    ]
+  },
+  "multica-ai/andrej-karpathy-skills": {
+    "original": "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfalls.",
+    "zh": "用一个 CLAUDE.md 文件改进 Claude Code 的行为，源自 Andrej Karpathy 对大语言模型编程常见问题的观察。",
+    "observed_descriptions": [
+      "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfalls.",
+      "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfa"
+    ]
+  },
+  "ghostty-org/ghostty": {
+    "original": "👻 Ghostty is a fast, feature-rich, and cross-platform terminal emulator that uses platform-native UI and GPU acceleration.",
+    "zh": "Ghostty 是快速、功能丰富的跨平台终端模拟器，采用平台原生界面与 GPU 加速。",
+    "observed_descriptions": [
+      "👻 Ghostty is a fast, feature-rich, and cross-platform terminal emulator that uses platform-native UI and GPU acceleration.",
+      "👻 Ghostty is a fast, feature-rich, and cross-platform terminal emulator that uses platform-native UI and GPU acceleratio"
+    ]
+  },
+  "leonxlnx/taste-skill": {
+    "original": "Agent skills that give coding agents taste: art direction, reference images and a browser check instead of generic AI pages",
+    "zh": "为编程智能体赋予审美的技能，通过艺术指导、参考图和浏览器检查，避免生成千篇一律的 AI 页面。",
+    "observed_descriptions": [
+      "Agent skills that give coding agents taste: art direction, reference images and a browser check instead of generic AI pages",
+      "Agent skills that give coding agents taste: art direction, reference images and a browser check instead of generic AI pa"
+    ]
+  },
+  "the-pr-agent/pr-agent": {
+    "original": "🚀 PR Agent: The Original Open-Source PR Reviewer. This project is not the Qodo free tier.",
+    "zh": "PR Agent：最初的开源 PR 审查工具。本项目并非 Qodo 免费版。",
+    "observed_descriptions": [
+      "🚀 PR Agent: The Original Open-Source PR Reviewer. This project is not the Qodo free tier."
+    ]
+  },
+  "jetbrains/thinkrail": {
+    "original": "ThinkRail is the agentic IDE that gets better every time you use it",
+    "zh": "ThinkRail 是会随着每次使用不断改进的智能体 IDE。",
+    "observed_descriptions": [
+      "Vibe code with pi in a lightweight, real IDE that customises itself around the way you work — The Vibe You Need"
+    ]
+  },
+  "agricidaniel/claude-seo": {
+    "original": "Universal SEO skill for Claude Code. 26 sub-skills + 19 sub-agents covering technical SEO, E-E-A-T, schema, GEO/AEO, agent readiness (Lighthouse Agentic Browsing, WebMCP, llms.txt), backlinks, local SEO, e-commerce, international SEO, Google APIs, and PDF/Excel reporting. 9 optional extensions for live SEO data.",
+    "zh": "面向 Claude Code 的通用 SEO 技能，包含 26 个子技能和 19 个子智能体，覆盖技术 SEO、E-E-A-T、结构化数据、GEO/AEO、智能体适配（Lighthouse Agentic Browsing、WebMCP、llms.txt）、外链、本地 SEO、电商、国际 SEO、Google API 及 PDF/Excel 报告，另有 9 个可选扩展用于获取实时 SEO 数据。",
+    "observed_descriptions": [
+      "Universal SEO skill for Claude Code. 26 sub-skills + 19 sub-agents covering technical SEO, E-E-A-T, schema, GEO/AEO, agent readiness (Lighthouse Agentic Browsing, WebMCP, llms.txt), backlinks, local SEO, e-commerce, international SEO, Google APIs, and PDF/Excel reporting. 9 optional extensions for…",
+      "Universal SEO skill for Claude Code. 26 sub-skills + 19 sub-agents covering technical SEO, E-E-A-T, schema, GEO/AEO, age"
+    ]
+  },
+  "cloudflare/security-audit-skill": {
+    "original": "A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",
+    "zh": "用于多阶段安全审计的编程智能体技能，输出经独立验证、可供机器读取的发现结果。",
+    "observed_descriptions": [
+      "A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings"
+    ]
+  },
+  "tauricresearch/tradingagents": {
+    "original": "TradingAgents: Multi-Agents LLM Financial Trading Framework",
+    "zh": "TradingAgents：基于多智能体大语言模型的金融交易框架。",
+    "observed_descriptions": [
+      "TradingAgents: Multi-Agents LLM Financial Trading Framework"
+    ]
+  },
+  "affaan-m/ecc": {
+    "original": "The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Codex, Opencode, Cursor and beyond.",
+    "zh": "智能体运行框架的性能优化系统，为 Claude Code、Codex、Opencode、Cursor 等提供技能、直觉、记忆、安全及研究优先的开发方式。",
+    "observed_descriptions": [
+      "The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Codex, Opencode, Cursor and beyond.",
+      "The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development f"
+    ]
+  },
+  "heygen-com/hyperframes": {
+    "original": "Write HTML. Render video. Built for agents.",
+    "zh": "编写 HTML，渲染视频，专为智能体打造。",
+    "observed_descriptions": [
+      "Write HTML. Render video. Built for agents."
+    ]
+  },
+  "yujunzhixue/dsh-purge": {
+    "original": "DeepSeek Harness 破甲：让所有模型都能破甲，不同模型可换不同提示词；默认提示词面向国模「小码酱」。Jailbreak for every model — swap prompts per model. 求 Star 收藏 ⭐ 如要二开，请查看署名要求部分",
+    "zh": "DeepSeek Harness 破甲：让所有模型都能破甲，不同模型可换不同提示词；默认提示词面向国模「小码酱」。求 Star 收藏；如要二次开发，请查看署名要求部分。",
+    "observed_descriptions": [
+      "DeepSeek Harness 破甲：让所有模型都能破甲，不同模型可换不同提示词；默认提示词面向国模「小码酱」。Jailbreak for every model — swap prompts per model. 求 Star 收藏 ⭐ 如要二开，请查看署名要求部分",
+      "DeepSeek Harness 破甲：让所有模型都能破甲，不同模型可换不同提示词；默认提示词面向国模「小码酱」。Jailbreak for every model — swap prompts per model. 求 Star 收藏 ⭐"
+    ]
+  },
+  "langgenius/dify": {
+    "original": "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cloud, VPC, or self-hosted, so teams move from prototype to production without rebuilding the stack.",
+    "zh": "在协作工作空间中构建智能体工作流和 RAG 流水线，支持丰富的 AI 模型与工具。可部署到云端、VPC 或自托管环境，让团队从原型走向生产时无需重建技术栈。",
+    "observed_descriptions": [
+      "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cl"
+    ]
+  },
+  "open-webui/open-webui": {
+    "original": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)",
+    "zh": "易用的 AI 界面，支持 Ollama、OpenAI API 等。",
+    "observed_descriptions": [
+      "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)"
+    ]
+  },
+  "comfy-org/comfyui": {
+    "original": "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local inference engine in the world.",
+    "zh": "采用图形节点界面、功能强大且模块化的扩散模型 GUI、API 和后端，以及世界上最快的本地推理引擎。",
+    "observed_descriptions": [
+      "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local infer"
+    ]
+  },
+  "openai/codex": {
+    "original": "Lightweight coding agent that runs in your terminal",
+    "zh": "在终端中运行的轻量编程智能体。",
+    "observed_descriptions": [
+      "Lightweight coding agent that runs in your terminal"
+    ]
+  },
+  "lobehub/lobehub": {
+    "original": "🤯 LobeHub - Super-Agents on Your Team. Add super-agents to the chats your team already uses.They take on work by themselves and get better every week.",
+    "zh": "LobeHub：团队中的超级智能体。把超级智能体加入团队已有的聊天，它们会自主承担工作，并每周持续改进。",
+    "observed_descriptions": [
+      "🤯 LobeHub is your Chief Agent Operator, organizing your agents into 7×24 operations by hiring, scheduling, and reporting"
+    ]
+  },
+  "cline/cline": {
+    "original": "Autonomous coding agent as an SDK, IDE extension, or CLI assistant.",
+    "zh": "可作为 SDK、IDE 扩展或 CLI 助手使用的自主编程智能体。",
+    "observed_descriptions": [
+      "Autonomous coding agent as an SDK, IDE extension, or CLI assistant."
+    ]
+  }
+}

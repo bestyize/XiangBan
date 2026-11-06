@@ -34,14 +34,7 @@ function select(value:string){void router.replace({query:{...route.query,issue:v
   .period-summary strong{font-size:24px}
   .method summary{font-size:12px;gap:4px}
   .method p{line-height:1.9}
-  .repo-list{grid-column:2;grid-row:1/span 2;grid-template-columns:minmax(0,1fr);gap:10px}
-  .repo-list :deep(.repo-card){display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 20px;align-items:center;padding:18px 20px;min-height:84px}
-  .repo-list :deep(.repo-main){gap:10px}
-  .repo-list :deep(.repo-link h3){font-size:16px}
-  .repo-list :deep(.repo-link .external){display:none}
-  .repo-list :deep(.repo-meta){padding:0;min-width:170px;justify-content:flex-end;gap:8px 12px;max-width:260px}
-  .repo-list :deep(.repo-meta .growth){margin-left:0}
-  .repo-list :deep(.note){grid-column:1/-1;padding-left:32px;margin-top:0}
+  .repo-list{grid-column:2;grid-row:1/span 2;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
   .bookmark-note{grid-column:1;grid-row:2;line-height:1.7;align-self:start;padding:0 8px}
 }
 }

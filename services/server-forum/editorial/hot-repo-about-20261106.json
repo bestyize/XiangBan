@@ -1,0 +1,503 @@
+{
+  "issue_key": "github-rolling-2026-11-06",
+  "fetched_at": "2026-11-06T15:17:38.314798+00:00",
+  "projects": [
+    {
+      "full_name": "thedotmack/claude-mem",
+      "about": "Persistent Context Across Sessions for Every Agent –  Captures everything your agent does during sessions, compresses it with AI, and injects relevant context back into future sessions. Works with Claude Code, OpenClaw, Codex, Gemini, Hermes, Copilot, OpenCode + More",
+      "source_url": "https://github.com/thedotmack/claude-mem",
+      "license": "Apache-2.0",
+      "zh_cn": "为各类智能体提供跨会话的持久上下文：记录智能体在会话中的操作，用 AI 压缩，并在后续会话中注入相关上下文。适用于 Claude Code、OpenClaw、Codex、Gemini、Hermes、Copilot、OpenCode 等。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Persistent Context Across Sessions for Every Agent – Captures everything your agent does during sessions, compresses it with AI, and injects relevant context back into future sessions. Works with Claude Code, OpenClaw, Codex, Gemini, Hermes, Copilot, OpenCode + More",
+        "Persistent Context Across Sessions for Every Agent – Captures everything your agent does during sessions, compresses it "
+      ]
+    },
+    {
+      "full_name": "Nutlope/hallmark",
+      "about": "Anti-AI-slop design skill for Claude Code, Cursor, and Codex.",
+      "source_url": "https://github.com/Nutlope/hallmark",
+      "license": "MIT",
+      "zh_cn": "面向 Claude Code、Cursor 和 Codex，减少 AI 粗糙设计感的设计技能。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Anti-AI-slop design skill for Claude Code, Cursor, and Codex."
+      ]
+    },
+    {
+      "full_name": "pingdotgg/t3code",
+      "about": null,
+      "source_url": "https://github.com/pingdotgg/t3code",
+      "license": "MIT",
+      "zh_cn": "项目尚未填写 GitHub About。",
+      "status": "missing_about",
+      "observed_descriptions": [
+        ""
+      ]
+    },
+    {
+      "full_name": "anthropics/skills",
+      "about": "Public repository for Agent Skills",
+      "source_url": "https://github.com/anthropics/skills",
+      "license": null,
+      "zh_cn": "Agent Skills 的公开仓库。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Public repository for Agent Skills"
+      ]
+    },
+    {
+      "full_name": "HKUDS/DeepTutor",
+      "about": "DeepTutor: Lifelong Personalized Tutoring. https://deeptutor.info/.",
+      "source_url": "https://github.com/HKUDS/DeepTutor",
+      "license": "Apache-2.0",
+      "zh_cn": "DeepTutor：终身个性化辅导。https://deeptutor.info/",
+      "status": "translated",
+      "observed_descriptions": [
+        "DeepTutor: Lifelong Personalized Tutoring. https://deeptutor.info/."
+      ]
+    },
+    {
+      "full_name": "max-sixty/worktrunk",
+      "about": "Worktrunk is a CLI for Git worktree management, designed for parallel AI agent workflows",
+      "source_url": "https://github.com/max-sixty/worktrunk",
+      "license": "NOASSERTION",
+      "zh_cn": "用于管理 Git worktree 的命令行工具，专为并行 AI 智能体工作流设计。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Worktrunk is a CLI for Git worktree management, designed for parallel AI agent workflows"
+      ]
+    },
+    {
+      "full_name": "milind-soni/OpenMausBot",
+      "about": "Open-source Grok Bot alternative with a virtual machine that bots can use",
+      "source_url": "https://github.com/milind-soni/OpenMausBot",
+      "license": "Apache-2.0",
+      "zh_cn": "开源的 Grok Bot 替代方案，提供可供机器人使用的虚拟机。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Open-source Grok Bot alternative with a virtual machine that bots can use"
+      ]
+    },
+    {
+      "full_name": "obra/superpowers",
+      "about": "An agentic skills framework & software development methodology that works.",
+      "source_url": "https://github.com/obra/superpowers",
+      "license": "MIT",
+      "zh_cn": "一套行之有效的智能体技能框架与软件开发方法。",
+      "status": "translated",
+      "observed_descriptions": [
+        "An agentic skills framework & software development methodology that works."
+      ]
+    },
+    {
+      "full_name": "pbakaus/impeccable",
+      "about": "The design vocabulary for your coding agent. Steer with polish and bolder, review with critique and audit, catch AI slop before it ships.",
+      "source_url": "https://github.com/pbakaus/impeccable",
+      "license": "Apache-2.0",
+      "zh_cn": "为编程智能体提供设计词汇：用 polish 和 bolder 引导设计，用 critique 和 audit 审查，在发布前发现粗糙的 AI 设计。",
+      "status": "translated",
+      "observed_descriptions": [
+        "The design vocabulary for your coding agent. Steer with polish and bolder, review with critique and audit, catch AI slop before it ships.",
+        "The design vocabulary for your coding agent. Steer with polish and bolder, review with critique and audit, catch AI slop"
+      ]
+    },
+    {
+      "full_name": "hyprwm/Hyprland",
+      "about": "Hyprland is an independent, highly customizable, dynamic tiling Wayland compositor that doesn't sacrifice on its looks.",
+      "source_url": "https://github.com/hyprwm/Hyprland",
+      "license": "BSD-3-Clause",
+      "zh_cn": "独立、高度可定制的动态平铺 Wayland 合成器，同时兼顾视觉效果。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Hyprland is an independent, highly customizable, dynamic tiling Wayland compositor that doesn't sacrifice on its looks."
+      ]
+    },
+    {
+      "full_name": "jakubkrehel/skills",
+      "about": "A collection of agent skills that help you build great interfaces.",
+      "source_url": "https://github.com/jakubkrehel/skills",
+      "license": "MIT",
+      "zh_cn": "帮助你构建出色界面的智能体技能集合。",
+      "status": "translated",
+      "observed_descriptions": [
+        "A collection of agent skills that help you build great interfaces."
+      ]
+    },
+    {
+      "full_name": "calesthio/OpenMontage",
+      "about": "World's first open-source, agentic video production system. 12 production pipelines, 100+ tools, 700+ agent skill and production-knowledge files. Turn your AI coding assistant into a full video production studio.",
+      "source_url": "https://github.com/calesthio/OpenMontage",
+      "license": "AGPL-3.0",
+      "zh_cn": "世界上首个开源智能体视频制作系统，包含 12 条制作流水线、100 多个工具、700 多份智能体技能与制作知识文件，将 AI 编程助手变成完整的视频制作工作室。",
+      "status": "translated",
+      "observed_descriptions": [
+        "World's first open-source, agentic video production system. 12 production pipelines, 100+ tools, 700+ agent skill and production-knowledge files. Turn your AI coding assistant into a full video production studio."
+      ]
+    },
+    {
+      "full_name": "multica-ai/andrej-karpathy-skills",
+      "about": "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfalls.",
+      "source_url": "https://github.com/multica-ai/andrej-karpathy-skills",
+      "license": null,
+      "zh_cn": "用一个 CLAUDE.md 文件改进 Claude Code 的行为，源自 Andrej Karpathy 对大语言模型编程常见问题的观察。",
+      "status": "translated",
+      "observed_descriptions": [
+        "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfalls.",
+        "A single CLAUDE.md file to improve Claude Code behavior, derived from Andrej Karpathy's observations on LLM coding pitfa"
+      ]
+    },
+    {
+      "full_name": "ghostty-org/ghostty",
+      "about": "👻 Ghostty is a fast, feature-rich, and cross-platform terminal emulator that uses platform-native UI and GPU acceleration.",
+      "source_url": "https://github.com/ghostty-org/ghostty",
+      "license": "MIT",
+      "zh_cn": "Ghostty 是快速、功能丰富的跨平台终端模拟器，采用平台原生界面与 GPU 加速。",
+      "status": "translated",
+      "observed_descriptions": [
+        "👻 Ghostty is a fast, feature-rich, and cross-platform terminal emulator that uses platform-native UI and GPU acceleration.",
+        "👻 Ghostty is a fast, feature-rich, and cross-platform terminal emulator that uses platform-native UI and GPU acceleratio"
+      ]
+    },
+    {
+      "full_name": "Leonxlnx/taste-skill",
+      "about": "Agent skills that give coding agents taste: art direction, reference images and a browser check instead of generic AI pages",
+      "source_url": "https://github.com/Leonxlnx/taste-skill",
+      "license": "MIT",
+      "zh_cn": "为编程智能体赋予审美的技能，通过艺术指导、参考图和浏览器检查，避免生成千篇一律的 AI 页面。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Agent skills that give coding agents taste: art direction, reference images and a browser check instead of generic AI pages",
+        "Agent skills that give coding agents taste: art direction, reference images and a browser check instead of generic AI pa"
+      ]
+    },
+    {
+      "full_name": "The-PR-Agent/pr-agent",
+      "about": "🚀 PR Agent: The Original Open-Source PR Reviewer. This project is not the Qodo free tier.",
+      "source_url": "https://github.com/The-PR-Agent/pr-agent",
+      "license": "MIT",
+      "zh_cn": "PR Agent：最初的开源 PR 审查工具。本项目并非 Qodo 免费版。",
+      "status": "translated",
+      "observed_descriptions": [
+        "🚀 PR Agent: The Original Open-Source PR Reviewer. This project is not the Qodo free tier."
+      ]
+    },
+    {
+      "full_name": "JetBrains/thinkrail",
+      "about": "ThinkRail is the agentic IDE that gets better every time you use it",
+      "source_url": "https://github.com/JetBrains/thinkrail",
+      "license": "Apache-2.0",
+      "zh_cn": "ThinkRail 是会随着每次使用不断改进的智能体 IDE。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Vibe code with pi in a lightweight, real IDE that customises itself around the way you work — The Vibe You Need"
+      ]
+    },
+    {
+      "full_name": "AgriciDaniel/claude-seo",
+      "about": "Universal SEO skill for Claude Code. 26 sub-skills + 19 sub-agents covering technical SEO, E-E-A-T, schema, GEO/AEO, agent readiness (Lighthouse Agentic Browsing, WebMCP, llms.txt), backlinks, local SEO, e-commerce, international SEO, Google APIs, and PDF/Excel reporting. 9 optional extensions for live SEO data.",
+      "source_url": "https://github.com/AgriciDaniel/claude-seo",
+      "license": "MIT",
+      "zh_cn": "面向 Claude Code 的通用 SEO 技能，包含 26 个子技能和 19 个子智能体，覆盖技术 SEO、E-E-A-T、结构化数据、GEO/AEO、智能体适配（Lighthouse Agentic Browsing、WebMCP、llms.txt）、外链、本地 SEO、电商、国际 SEO、Google API 及 PDF/Excel 报告，另有 9 个可选扩展用于获取实时 SEO 数据。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Universal SEO skill for Claude Code. 26 sub-skills + 19 sub-agents covering technical SEO, E-E-A-T, schema, GEO/AEO, agent readiness (Lighthouse Agentic Browsing, WebMCP, llms.txt), backlinks, local SEO, e-commerce, international SEO, Google APIs, and PDF/Excel reporting. 9 optional extensions for…",
+        "Universal SEO skill for Claude Code. 26 sub-skills + 19 sub-agents covering technical SEO, E-E-A-T, schema, GEO/AEO, age"
+      ]
+    },
+    {
+      "full_name": "cloudflare/security-audit-skill",
+      "about": "A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings",
+      "source_url": "https://github.com/cloudflare/security-audit-skill",
+      "license": "MIT",
+      "zh_cn": "用于多阶段安全审计的编程智能体技能，输出经独立验证、可供机器读取的发现结果。",
+      "status": "translated",
+      "observed_descriptions": [
+        "A coding-agent skill for multi-phase security audits with independently verified, machine-readable findings"
+      ]
+    },
+    {
+      "full_name": "TauricResearch/TradingAgents",
+      "about": "TradingAgents: Multi-Agents LLM Financial Trading Framework",
+      "source_url": "https://github.com/TauricResearch/TradingAgents",
+      "license": "Apache-2.0",
+      "zh_cn": "TradingAgents：基于多智能体大语言模型的金融交易框架。",
+      "status": "translated",
+      "observed_descriptions": [
+        "TradingAgents: Multi-Agents LLM Financial Trading Framework"
+      ]
+    },
+    {
+      "full_name": "affaan-m/ECC",
+      "about": "The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Codex, Opencode, Cursor and beyond.",
+      "source_url": "https://github.com/affaan-m/ECC",
+      "license": "MIT",
+      "zh_cn": "智能体运行框架的性能优化系统，为 Claude Code、Codex、Opencode、Cursor 等提供技能、直觉、记忆、安全及研究优先的开发方式。",
+      "status": "translated",
+      "observed_descriptions": [
+        "The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development for Claude Code, Codex, Opencode, Cursor and beyond.",
+        "The agent harness performance optimization system. Skills, instincts, memory, security, and research-first development f"
+      ]
+    },
+    {
+      "full_name": "heygen-com/hyperframes",
+      "about": "Write HTML. Render video. Built for agents.",
+      "source_url": "https://github.com/heygen-com/hyperframes",
+      "license": "Apache-2.0",
+      "zh_cn": "编写 HTML，渲染视频，专为智能体打造。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Write HTML. Render video. Built for agents."
+      ]
+    },
+    {
+      "full_name": "YuJunZhiXue/dsh-purge",
+      "about": "DeepSeek Harness 破甲：让所有模型都能破甲，不同模型可换不同提示词；默认提示词面向国模「小码酱」。Jailbreak for every model — swap prompts per model. 求 Star 收藏 ⭐ 如要二开，请查看署名要求部分",
+      "source_url": "https://github.com/HunYiSage/dsh-purge",
+      "license": "Apache-2.0",
+      "zh_cn": "DeepSeek Harness 破甲：让所有模型都能破甲，不同模型可换不同提示词；默认提示词面向国模「小码酱」。求 Star 收藏；如要二次开发，请查看署名要求部分。",
+      "status": "translated",
+      "observed_descriptions": [
+        "DeepSeek Harness 破甲：让所有模型都能破甲，不同模型可换不同提示词；默认提示词面向国模「小码酱」。Jailbreak for every model — swap prompts per model. 求 Star 收藏 ⭐ 如要二开，请查看署名要求部分",
+        "DeepSeek Harness 破甲：让所有模型都能破甲，不同模型可换不同提示词；默认提示词面向国模「小码酱」。Jailbreak for every model — swap prompts per model. 求 Star 收藏 ⭐"
+      ]
+    },
+    {
+      "full_name": "ollama/ollama",
+      "about": "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models.",
+      "source_url": "https://github.com/ollama/ollama",
+      "license": "MIT",
+      "zh_cn": "快速开始运行 Kimi、GLM、MiniMax、DeepSeek、gpt-oss、Qwen、Gemma 等模型。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models."
+      ]
+    },
+    {
+      "full_name": "langgenius/dify",
+      "about": "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cloud, VPC, or self-hosted, so teams move from prototype to production without rebuilding the stack.",
+      "source_url": "https://github.com/langgenius/dify",
+      "license": "NOASSERTION",
+      "zh_cn": "在协作工作空间中构建智能体工作流和 RAG 流水线，支持丰富的 AI 模型与工具。可部署到云端、VPC 或自托管环境，让团队从原型走向生产时无需重建技术栈。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Build Agentic workflows, RAG pipelines, with rich AI model and tool support on one collaborative workspace. Deploy on cl"
+      ]
+    },
+    {
+      "full_name": "open-webui/open-webui",
+      "about": "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)",
+      "source_url": "https://github.com/open-webui/open-webui",
+      "license": "NOASSERTION",
+      "zh_cn": "易用的 AI 界面，支持 Ollama、OpenAI API 等。",
+      "status": "translated",
+      "observed_descriptions": [
+        "User-friendly AI Interface (Supports Ollama, OpenAI API, ...)"
+      ]
+    },
+    {
+      "full_name": "Comfy-Org/ComfyUI",
+      "about": "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local inference engine in the world.",
+      "source_url": "https://github.com/Comfy-Org/ComfyUI",
+      "license": "GPL-3.0",
+      "zh_cn": "采用图形节点界面、功能强大且模块化的扩散模型 GUI、API 和后端，以及世界上最快的本地推理引擎。",
+      "status": "translated",
+      "observed_descriptions": [
+        "The most powerful and modular diffusion model GUI, api and backend with a graph/nodes interface. The fastest local infer"
+      ]
+    },
+    {
+      "full_name": "openai/codex",
+      "about": "Lightweight coding agent that runs in your terminal",
+      "source_url": "https://github.com/openai/codex",
+      "license": "Apache-2.0",
+      "zh_cn": "在终端中运行的轻量编程智能体。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Lightweight coding agent that runs in your terminal"
+      ]
+    },
+    {
+      "full_name": "lobehub/lobehub",
+      "about": "🤯 LobeHub - Super-Agents on Your Team. Add super-agents to the chats your team already uses.They take on work by themselves and get better every week.",
+      "source_url": "https://github.com/lobehub/lobehub",
+      "license": "NOASSERTION",
+      "zh_cn": "LobeHub：团队中的超级智能体。把超级智能体加入团队已有的聊天，它们会自主承担工作，并每周持续改进。",
+      "status": "translated",
+      "observed_descriptions": [
+        "🤯 LobeHub is your Chief Agent Operator, organizing your agents into 7×24 operations by hiring, scheduling, and reporting"
+      ]
+    },
+    {
+      "full_name": "cline/cline",
+      "about": "Autonomous coding agent as an SDK, IDE extension, or CLI assistant.",
+      "source_url": "https://github.com/cline/cline",
+      "license": "Apache-2.0",
+      "zh_cn": "可作为 SDK、IDE 扩展或 CLI 助手使用的自主编程智能体。",
+      "status": "translated",
+      "observed_descriptions": [
+        "Autonomous coding agent as an SDK, IDE extension, or CLI assistant."
+      ]
+    },
+    {
+      "full_name": "microsoft/autogen",
+      "about": "A programming framework for agentic AI",
+      "source_url": "https://github.com/microsoft/autogen",
+      "license": "CC-BY-4.0",
+      "zh_cn": "用于智能体 AI 的编程框架。",
+      "status": "translated",
+      "observed_descriptions": [
+        "A programming framework for agentic AI"
+      ]
+    }
+  ],
+  "issues": [
+    {
+      "key": "github-rolling-2026-11-06",
+      "projects": [
+        "thedotmack/claude-mem",
+        "Nutlope/hallmark",
+        "pingdotgg/t3code",
+        "anthropics/skills",
+        "HKUDS/DeepTutor",
+        "max-sixty/worktrunk",
+        "milind-soni/OpenMausBot",
+        "obra/superpowers",
+        "pbakaus/impeccable",
+        "hyprwm/Hyprland",
+        "jakubkrehel/skills",
+        "calesthio/OpenMontage",
+        "multica-ai/andrej-karpathy-skills",
+        "ghostty-org/ghostty",
+        "Leonxlnx/taste-skill",
+        "The-PR-Agent/pr-agent"
+      ]
+    },
+    {
+      "key": "github-rolling-2026-11-05",
+      "projects": [
+        "thedotmack/claude-mem",
+        "Nutlope/hallmark",
+        "pingdotgg/t3code",
+        "pbakaus/impeccable",
+        "obra/superpowers",
+        "anthropics/skills",
+        "max-sixty/worktrunk",
+        "jakubkrehel/skills",
+        "JetBrains/thinkrail",
+        "ghostty-org/ghostty",
+        "multica-ai/andrej-karpathy-skills",
+        "hyprwm/Hyprland",
+        "AgriciDaniel/claude-seo",
+        "calesthio/OpenMontage"
+      ]
+    },
+    {
+      "key": "github-rolling-2026-11-04",
+      "projects": [
+        "Nutlope/hallmark",
+        "thedotmack/claude-mem",
+        "pingdotgg/t3code",
+        "obra/superpowers",
+        "pbakaus/impeccable",
+        "AgriciDaniel/claude-seo",
+        "JetBrains/thinkrail",
+        "anthropics/skills",
+        "jakubkrehel/skills",
+        "multica-ai/andrej-karpathy-skills",
+        "ghostty-org/ghostty",
+        "cloudflare/security-audit-skill",
+        "hyprwm/Hyprland",
+        "TauricResearch/TradingAgents",
+        "max-sixty/worktrunk",
+        "affaan-m/ECC"
+      ]
+    },
+    {
+      "key": "github-rolling-2026-11-03",
+      "projects": [
+        "Nutlope/hallmark",
+        "thedotmack/claude-mem",
+        "pbakaus/impeccable",
+        "AgriciDaniel/claude-seo",
+        "obra/superpowers",
+        "pingdotgg/t3code",
+        "JetBrains/thinkrail",
+        "cloudflare/security-audit-skill",
+        "jakubkrehel/skills",
+        "multica-ai/andrej-karpathy-skills",
+        "anthropics/skills",
+        "Leonxlnx/taste-skill",
+        "TauricResearch/TradingAgents",
+        "ghostty-org/ghostty",
+        "affaan-m/ECC",
+        "heygen-com/hyperframes"
+      ]
+    },
+    {
+      "key": "github-rolling-2026-11-02",
+      "projects": [
+        "Nutlope/hallmark",
+        "pbakaus/impeccable",
+        "AgriciDaniel/claude-seo",
+        "thedotmack/claude-mem",
+        "cloudflare/security-audit-skill",
+        "obra/superpowers",
+        "JetBrains/thinkrail",
+        "pingdotgg/t3code",
+        "multica-ai/andrej-karpathy-skills",
+        "jakubkrehel/skills",
+        "TauricResearch/TradingAgents",
+        "Leonxlnx/taste-skill",
+        "anthropics/skills",
+        "affaan-m/ECC",
+        "YuJunZhiXue/dsh-purge",
+        "ghostty-org/ghostty"
+      ]
+    },
+    {
+      "key": "github-rolling-2026-11-01",
+      "projects": [
+        "Nutlope/hallmark",
+        "pbakaus/impeccable",
+        "AgriciDaniel/claude-seo",
+        "thedotmack/claude-mem",
+        "cloudflare/security-audit-skill",
+        "obra/superpowers",
+        "JetBrains/thinkrail",
+        "pingdotgg/t3code",
+        "multica-ai/andrej-karpathy-skills",
+        "jakubkrehel/skills",
+        "TauricResearch/TradingAgents",
+        "Leonxlnx/taste-skill",
+        "anthropics/skills",
+        "affaan-m/ECC",
+        "YuJunZhiXue/dsh-purge",
+        "ghostty-org/ghostty"
+      ]
+    },
+    {
+      "key": "github-rolling-20261031",
+      "projects": [
+        "ollama/ollama",
+        "langgenius/dify",
+        "open-webui/open-webui",
+        "Comfy-Org/ComfyUI",
+        "openai/codex",
+        "lobehub/lobehub",
+        "cline/cline",
+        "microsoft/autogen"
+      ]
+    }
+  ],
+  "review": {
+    "total": 31,
+    "translated": 30,
+    "missing_about": [
+      "pingdotgg/t3code"
+    ],
+    "publication": "local files only",
+    "method": "Faithful translation of the current GitHub About. Historical source descriptions are recorded to match the published seven issues; original text is disclosed in the detail view. Decorative emoji and duplicate bilingual wording are omitted."
+  }
+}

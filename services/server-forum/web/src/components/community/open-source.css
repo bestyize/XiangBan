@@ -112,3 +112,11 @@
 .os-feed--cover-preview .os-cover-caption {
   font-size: clamp(10px, 3.4cqw, 12px);
 }
+
+/* Compact curated cards use the full collection width when no media is present. */
+@media (min-width:700px) {
+  .os-feed > .os-project-grid > .os-collection-card { grid-column:span 2; }
+  .os-collection-entry > .os-project-card--curated:not(.os-project-card--media) {
+    display: flex;
+  }
+}

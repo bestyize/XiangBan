@@ -1,0 +1,1547 @@
+{
+  "source": "https://chat.xiangban.xyz/api/open-source",
+  "revision": 3,
+  "fetched_at": "2026-11-06T15:12:41.730025+00:00",
+  "scope": "GitHub About translations for curated project cards only",
+  "collections": [
+    {
+      "key": "ideas-to-things",
+      "projects": [
+        "excalidraw/excalidraw",
+        "withastro/astro",
+        "VoronDesign/Voron-2"
+      ]
+    },
+    {
+      "key": "understand-ai-tools",
+      "projects": [
+        "ollama/ollama",
+        "obra/superpowers",
+        "modelcontextprotocol/servers"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "full_name": "codecrafters-io/build-your-own-x",
+      "github_full_name": "codecrafters-io/build-your-own-x",
+      "source_url": "https://github.com/codecrafters-io/build-your-own-x",
+      "about": "Master programming by recreating your favorite technologies from scratch.",
+      "license": null,
+      "zh_cn": "通过从零重做你喜爱的技术，掌握编程。",
+      "status": "translated"
+    },
+    {
+      "full_name": "freeCodeCamp/freeCodeCamp",
+      "github_full_name": "freeCodeCamp/freeCodeCamp",
+      "source_url": "https://github.com/freeCodeCamp/freeCodeCamp",
+      "about": "freeCodeCamp.org's open-source codebase and curriculum. Learn math, programming, and computer science for free.",
+      "license": "BSD-3-Clause",
+      "zh_cn": "freeCodeCamp.org 的开源代码库与课程，免费学习数学、编程和计算机科学。",
+      "status": "translated"
+    },
+    {
+      "full_name": "EbookFoundation/free-programming-books",
+      "github_full_name": "EbookFoundation/free-programming-books",
+      "source_url": "https://github.com/EbookFoundation/free-programming-books",
+      "about": ":books: Freely available programming books",
+      "license": "CC-BY-4.0",
+      "zh_cn": "可免费获取的编程书籍。",
+      "status": "translated"
+    },
+    {
+      "full_name": "donnemartin/system-design-primer",
+      "github_full_name": "donnemartin/system-design-primer",
+      "source_url": "https://github.com/donnemartin/system-design-primer",
+      "about": "Learn how to design large-scale systems. Prep for the system design interview.  Includes Anki flashcards.",
+      "license": "NOASSERTION",
+      "zh_cn": "学习设计大规模系统，准备系统设计面试，包含 Anki 闪卡。",
+      "status": "translated"
+    },
+    {
+      "full_name": "obra/superpowers",
+      "github_full_name": "obra/superpowers",
+      "source_url": "https://github.com/obra/superpowers",
+      "about": "An agentic skills framework & software development methodology that works.",
+      "license": "MIT",
+      "zh_cn": "一套行之有效的智能体技能框架与软件开发方法。",
+      "status": "translated"
+    },
+    {
+      "full_name": "practical-tutorials/project-based-learning",
+      "github_full_name": "practical-tutorials/project-based-learning",
+      "source_url": "https://github.com/practical-tutorials/project-based-learning",
+      "about": "Curated list of project-based tutorials",
+      "license": "MIT",
+      "zh_cn": "精选的项目实战教程列表。",
+      "status": "translated"
+    },
+    {
+      "full_name": "TheAlgorithms/Python",
+      "github_full_name": "TheAlgorithms/Python",
+      "source_url": "https://github.com/TheAlgorithms/Python",
+      "about": "All Algorithms implemented in Python",
+      "license": "MIT",
+      "zh_cn": "用 Python 实现的各类算法。",
+      "status": "translated"
+    },
+    {
+      "full_name": "ossu/computer-science",
+      "github_full_name": "ossu/computer-science",
+      "source_url": "https://github.com/ossu/computer-science",
+      "about": "🎓 Path to a free self-taught education in Computer Science!",
+      "license": "MIT",
+      "zh_cn": "一条免费自学计算机科学的学习路线。",
+      "status": "translated"
+    },
+    {
+      "full_name": "yt-dlp/yt-dlp",
+      "github_full_name": "yt-dlp/yt-dlp",
+      "source_url": "https://github.com/yt-dlp/yt-dlp",
+      "about": "A feature-rich command-line audio/video downloader",
+      "license": "Unlicense",
+      "zh_cn": "功能丰富的命令行音视频下载工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "trekhleb/javascript-algorithms",
+      "github_full_name": "trekhleb/javascript-algorithms",
+      "source_url": "https://github.com/trekhleb/javascript-algorithms",
+      "about": "📝 Algorithms and data structures implemented in JavaScript with explanations and links to further readings",
+      "license": "MIT",
+      "zh_cn": "用 JavaScript 实现的算法与数据结构，附有说明及延伸阅读链接。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/vscode",
+      "github_full_name": "microsoft/vscode",
+      "source_url": "https://github.com/microsoft/vscode",
+      "about": "Visual Studio Code",
+      "license": "MIT",
+      "zh_cn": "Visual Studio Code。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/markitdown",
+      "github_full_name": "microsoft/markitdown",
+      "source_url": "https://github.com/microsoft/markitdown",
+      "about": "Python tool for converting files and office documents to Markdown.",
+      "license": "MIT",
+      "zh_cn": "将文件和办公文档转换为 Markdown 的 Python 工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "anthropics/skills",
+      "github_full_name": "anthropics/skills",
+      "source_url": "https://github.com/anthropics/skills",
+      "about": "Public repository for Agent Skills",
+      "license": null,
+      "zh_cn": "Agent Skills 的公开仓库。",
+      "status": "translated"
+    },
+    {
+      "full_name": "ollama/ollama",
+      "github_full_name": "ollama/ollama",
+      "source_url": "https://github.com/ollama/ollama",
+      "about": "Get up and running with Kimi, GLM, MiniMax, DeepSeek, gpt-oss, Qwen, Gemma and other models.",
+      "license": "MIT",
+      "zh_cn": "快速开始运行 Kimi、GLM、MiniMax、DeepSeek、gpt-oss、Qwen、Gemma 等模型。",
+      "status": "translated"
+    },
+    {
+      "full_name": "huggingface/transformers",
+      "github_full_name": "huggingface/transformers",
+      "source_url": "https://github.com/huggingface/transformers",
+      "about": "🤗 Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, for both inference and training. ",
+      "license": "Apache-2.0",
+      "zh_cn": "Transformers：用于先进机器学习模型的模型定义框架，涵盖文本、视觉、音频和多模态模型，支持推理与训练。",
+      "status": "translated"
+    },
+    {
+      "full_name": "langflow-ai/langflow",
+      "github_full_name": "langflow-ai/langflow",
+      "source_url": "https://github.com/langflow-ai/langflow",
+      "about": "Langflow is a powerful tool for building and deploying AI-powered agents and workflows.",
+      "license": "MIT",
+      "zh_cn": "Langflow 是用于构建和部署 AI 智能体与工作流的强大工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "langchain-ai/langchain",
+      "github_full_name": "langchain-ai/langchain",
+      "source_url": "https://github.com/langchain-ai/langchain",
+      "about": "The agent engineering platform.",
+      "license": "MIT",
+      "zh_cn": "智能体工程平台。",
+      "status": "translated"
+    },
+    {
+      "full_name": "vercel/next.js",
+      "github_full_name": "vercel/next.js",
+      "source_url": "https://github.com/vercel/next.js",
+      "about": "The React Framework",
+      "license": "MIT",
+      "zh_cn": "React 框架。",
+      "status": "translated"
+    },
+    {
+      "full_name": "excalidraw/excalidraw",
+      "github_full_name": "excalidraw/excalidraw",
+      "source_url": "https://github.com/excalidraw/excalidraw",
+      "about": "Virtual whiteboard for sketching hand-drawn like diagrams",
+      "license": "MIT",
+      "zh_cn": "用于绘制手绘风格图表的虚拟白板。",
+      "status": "translated"
+    },
+    {
+      "full_name": "ggml-org/llama.cpp",
+      "github_full_name": "ggml-org/llama.cpp",
+      "source_url": "https://github.com/ggml-org/llama.cpp",
+      "about": "LLM inference in C/C++",
+      "license": "MIT",
+      "zh_cn": "使用 C/C++ 进行大语言模型推理。",
+      "status": "translated"
+    },
+    {
+      "full_name": "rustdesk/rustdesk",
+      "github_full_name": "rustdesk/rustdesk",
+      "source_url": "https://github.com/rustdesk/rustdesk",
+      "about": "An open-source remote desktop application designed for self-hosting, as an alternative to TeamViewer.",
+      "license": "AGPL-3.0",
+      "zh_cn": "面向自托管的开源远程桌面应用，可替代 TeamViewer。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/generative-ai-for-beginners",
+      "github_full_name": "microsoft/generative-ai-for-beginners",
+      "source_url": "https://github.com/microsoft/generative-ai-for-beginners",
+      "about": "21 Lessons, Get Started Building with Generative AI ",
+      "license": "MIT",
+      "zh_cn": "通过 21 节课程，入门生成式 AI 应用开发。",
+      "status": "translated"
+    },
+    {
+      "full_name": "godotengine/godot",
+      "github_full_name": "godotengine/godot",
+      "source_url": "https://github.com/godotengine/godot",
+      "about": "Godot Engine – Multi-platform 2D and 3D game engine",
+      "license": "MIT",
+      "zh_cn": "Godot Engine：跨平台的 2D 和 3D 游戏引擎。",
+      "status": "translated"
+    },
+    {
+      "full_name": "immich-app/immich",
+      "github_full_name": "immich-app/immich",
+      "source_url": "https://github.com/immich-app/immich",
+      "about": "High performance self-hosted photo and video management solution.",
+      "license": "AGPL-3.0",
+      "zh_cn": "高性能、可自托管的照片与视频管理方案。",
+      "status": "translated"
+    },
+    {
+      "full_name": "supabase/supabase",
+      "github_full_name": "supabase/supabase",
+      "source_url": "https://github.com/supabase/supabase",
+      "about": "The Postgres development platform. Supabase gives you a dedicated Postgres database to build your web, mobile, and AI applications.",
+      "license": "Apache-2.0",
+      "zh_cn": "Postgres 开发平台，为构建 Web、移动和 AI 应用提供专属 Postgres 数据库。",
+      "status": "translated"
+    },
+    {
+      "full_name": "denoland/deno",
+      "github_full_name": "denoland/deno",
+      "source_url": "https://github.com/denoland/deno",
+      "about": "A modern runtime for JavaScript and TypeScript.",
+      "license": "MIT",
+      "zh_cn": "现代 JavaScript 和 TypeScript 运行时。",
+      "status": "translated"
+    },
+    {
+      "full_name": "google-gemini/gemini-cli",
+      "github_full_name": "google-gemini/gemini-cli",
+      "source_url": "https://github.com/google-gemini/gemini-cli",
+      "about": "An open-source AI agent that brings the power of Gemini directly into your terminal.",
+      "license": "Apache-2.0",
+      "zh_cn": "将 Gemini 的能力直接带入终端的开源 AI 智能体。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/terminal",
+      "github_full_name": "microsoft/terminal",
+      "source_url": "https://github.com/microsoft/terminal",
+      "about": "The new Windows Terminal and the original Windows console host, all in the same place!",
+      "license": "MIT",
+      "zh_cn": "全新的 Windows Terminal 与原有 Windows 控制台宿主，集中在同一个仓库。",
+      "status": "translated"
+    },
+    {
+      "full_name": "neovim/neovim",
+      "github_full_name": "neovim/neovim",
+      "source_url": "https://github.com/neovim/neovim",
+      "about": "Vim-fork focused on extensibility and usability",
+      "license": "NOASSERTION",
+      "zh_cn": "注重可扩展性和易用性的 Vim 分支。",
+      "status": "translated"
+    },
+    {
+      "full_name": "punkpeye/awesome-mcp-servers",
+      "github_full_name": "punkpeye/awesome-mcp-servers",
+      "source_url": "https://github.com/punkpeye/awesome-mcp-servers",
+      "about": "A collection of MCP servers.",
+      "license": "MIT",
+      "zh_cn": "MCP 服务器集合。",
+      "status": "translated"
+    },
+    {
+      "full_name": "NationalSecurityAgency/ghidra",
+      "github_full_name": "NationalSecurityAgency/ghidra",
+      "source_url": "https://github.com/NationalSecurityAgency/ghidra",
+      "about": "Ghidra is a software reverse engineering (SRE) framework",
+      "license": "Apache-2.0",
+      "zh_cn": "Ghidra 是一个软件逆向工程（SRE）框架。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/Web-Dev-For-Beginners",
+      "github_full_name": "microsoft/Web-Dev-For-Beginners",
+      "source_url": "https://github.com/microsoft/Web-Dev-For-Beginners",
+      "about": "24 Lessons, 12 Weeks, Get Started as a Web Developer",
+      "license": "MIT",
+      "zh_cn": "12 周、24 节课程，入门 Web 开发。",
+      "status": "translated"
+    },
+    {
+      "full_name": "oven-sh/bun",
+      "github_full_name": "oven-sh/bun",
+      "source_url": "https://github.com/oven-sh/bun",
+      "about": "Incredibly fast JavaScript runtime, bundler, test runner, and package manager – all in one",
+      "license": "NOASSERTION",
+      "zh_cn": "将速度极快的 JavaScript 运行时、打包工具、测试运行器和包管理器集于一体。",
+      "status": "translated"
+    },
+    {
+      "full_name": "vllm-project/vllm",
+      "github_full_name": "vllm-project/vllm",
+      "source_url": "https://github.com/vllm-project/vllm",
+      "about": "A high-throughput and memory-efficient inference and serving engine for LLMs",
+      "license": "Apache-2.0",
+      "zh_cn": "面向大语言模型的高吞吐量、内存高效的推理与服务引擎。",
+      "status": "translated"
+    },
+    {
+      "full_name": "Stirling-Tools/Stirling-PDF",
+      "github_full_name": "Stirling-Tools/Stirling-PDF",
+      "source_url": "https://github.com/Stirling-Tools/Stirling-PDF",
+      "about": "#1 PDF Application on GitHub that lets you edit PDFs on any device anywhere",
+      "license": "NOASSERTION",
+      "zh_cn": "GitHub 排名第一的 PDF 应用，让你随时随地在任何设备上编辑 PDF。",
+      "status": "translated"
+    },
+    {
+      "full_name": "infiniflow/ragflow",
+      "github_full_name": "infiniflow/ragflow",
+      "source_url": "https://github.com/infiniflow/ragflow",
+      "about": "RAGFlow is an agent-native database: a Retrieval-Augmented Generation (RAG) engine that grew into context infrastructure.",
+      "license": "Apache-2.0",
+      "zh_cn": "RAGFlow 是面向智能体的原生数据库，由检索增强生成（RAG）引擎发展为上下文基础设施。",
+      "status": "translated"
+    },
+    {
+      "full_name": "zed-industries/zed",
+      "github_full_name": "zed-industries/zed",
+      "source_url": "https://github.com/zed-industries/zed",
+      "about": "Code at the speed of thought – Zed is a high-performance, multiplayer code editor from the creators of Atom and Tree-sitter.",
+      "license": "NOASSERTION",
+      "zh_cn": "以思考的速度编写代码：由 Atom 和 Tree-sitter 的创造者打造的高性能多人协作代码编辑器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/ML-For-Beginners",
+      "github_full_name": "microsoft/ML-For-Beginners",
+      "source_url": "https://github.com/microsoft/ML-For-Beginners",
+      "about": "12 weeks, 26 lessons, 52 quizzes, classic Machine Learning for all",
+      "license": "MIT",
+      "zh_cn": "12 周、26 节课程、52 次测验，面向所有人的经典机器学习课程。",
+      "status": "translated"
+    },
+    {
+      "full_name": "modelcontextprotocol/servers",
+      "github_full_name": "modelcontextprotocol/servers",
+      "source_url": "https://github.com/modelcontextprotocol/servers",
+      "about": "Model Context Protocol Reference Servers",
+      "license": "NOASSERTION",
+      "zh_cn": "模型上下文协议（MCP）的参考服务器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "django/django",
+      "github_full_name": "django/django",
+      "source_url": "https://github.com/django/django",
+      "about": "The Web framework for perfectionists with deadlines.",
+      "license": "BSD-3-Clause",
+      "zh_cn": "为有交付期限的完美主义者打造的 Web 框架。",
+      "status": "translated"
+    },
+    {
+      "full_name": "astral-sh/uv",
+      "github_full_name": "astral-sh/uv",
+      "source_url": "https://github.com/astral-sh/uv",
+      "about": "An extremely fast Python package and project manager, written in Rust.",
+      "license": "Apache-2.0",
+      "zh_cn": "用 Rust 编写、速度极快的 Python 包与项目管理器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "gohugoio/hugo",
+      "github_full_name": "gohugoio/hugo",
+      "source_url": "https://github.com/gohugoio/hugo",
+      "about": "The world’s fastest framework for building websites.",
+      "license": "Apache-2.0",
+      "zh_cn": "世界上构建网站最快的框架。",
+      "status": "translated"
+    },
+    {
+      "full_name": "junegunn/fzf",
+      "github_full_name": "junegunn/fzf",
+      "source_url": "https://github.com/junegunn/fzf",
+      "about": ":cherry_blossom: A command-line fuzzy finder",
+      "license": "MIT",
+      "zh_cn": "命令行模糊查找工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "jesseduffield/lazygit",
+      "github_full_name": "jesseduffield/lazygit",
+      "source_url": "https://github.com/jesseduffield/lazygit",
+      "about": "simple terminal UI for git commands",
+      "license": "MIT",
+      "zh_cn": "用于 Git 命令的简洁终端界面。",
+      "status": "translated"
+    },
+    {
+      "full_name": "hoppscotch/hoppscotch",
+      "github_full_name": "hoppscotch/hoppscotch",
+      "source_url": "https://github.com/hoppscotch/hoppscotch",
+      "about": "Open-Source API Development Ecosystem • https://hoppscotch.io • Offline, On-Prem & Cloud • Web, Desktop & CLI • Open-Source Alternative to Postman, Insomnia",
+      "license": "MIT",
+      "zh_cn": "开源 API 开发生态，支持离线、本地部署和云端，以及 Web、桌面和 CLI，可替代 Postman 与 Insomnia。https://hoppscotch.io",
+      "status": "translated"
+    },
+    {
+      "full_name": "obsproject/obs-studio",
+      "github_full_name": "obsproject/obs-studio",
+      "source_url": "https://github.com/obsproject/obs-studio",
+      "about": "OBS Studio - Free and open source software for live streaming and screen recording",
+      "license": "GPL-2.0",
+      "zh_cn": "OBS Studio：免费、开源的直播与屏幕录制软件。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/ai-agents-for-beginners",
+      "github_full_name": "microsoft/ai-agents-for-beginners",
+      "source_url": "https://github.com/microsoft/ai-agents-for-beginners",
+      "about": "18 Lessons to Get Started Building AI Agents",
+      "license": "MIT",
+      "zh_cn": "通过 18 节课程，入门 AI 智能体开发。",
+      "status": "translated"
+    },
+    {
+      "full_name": "ComposioHQ/awesome-claude-skills",
+      "github_full_name": "ComposioHQ/awesome-claude-skills",
+      "source_url": "https://github.com/ComposioHQ/awesome-claude-skills",
+      "about": "A curated list of awesome Claude Skills, resources, and tools for customizing Claude AI workflows",
+      "license": null,
+      "zh_cn": "精选 Claude Skills、资源和工具，用于定制 Claude AI 工作流。",
+      "status": "translated"
+    },
+    {
+      "full_name": "AppFlowy-IO/AppFlowy",
+      "github_full_name": "AppFlowy-IO/AppFlowy",
+      "source_url": "https://github.com/AppFlowy-IO/AppFlowy",
+      "about": "Bring projects, wikis, and teams together with AI. AppFlowy is the AI collaborative workspace where you achieve more without losing control of your data. The leading open source Notion alternative.",
+      "license": "AGPL-3.0",
+      "zh_cn": "借助 AI 将项目、知识库和团队聚在一起。AppFlowy 是 AI 协作工作空间，让你提高效率并保有数据控制权，也是领先的开源 Notion 替代方案。",
+      "status": "translated"
+    },
+    {
+      "full_name": "toeverything/AFFiNE",
+      "github_full_name": "toeverything/AFFiNE",
+      "source_url": "https://github.com/toeverything/AFFiNE",
+      "about": "There can be more than Notion and Miro. AFFiNE(pronounced [ə‘fain]) is a next-gen knowledge base that brings planning, sorting and creating all together. Privacy first, open-source, customizable and ready to use. ",
+      "license": "NOASSERTION",
+      "zh_cn": "不只有 Notion 和 Miro。AFFiNE（读作 [ə‘fain]）是集规划、整理和创作于一体的新一代知识库，注重隐私、开源、可定制且开箱即用。",
+      "status": "translated"
+    },
+    {
+      "full_name": "strapi/strapi",
+      "github_full_name": "strapi/strapi",
+      "source_url": "https://github.com/strapi/strapi",
+      "about": "🚀 Strapi is the leading open-source headless CMS. It’s 100% JavaScript/TypeScript, fully customizable, and developer-first.",
+      "license": "NOASSERTION",
+      "zh_cn": "Strapi 是领先的开源无头 CMS，完全使用 JavaScript/TypeScript，支持全面定制，以开发者为中心。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/AI-For-Beginners",
+      "github_full_name": "microsoft/AI-For-Beginners",
+      "source_url": "https://github.com/microsoft/AI-For-Beginners",
+      "about": "12 Weeks, 24 Lessons, AI for All!",
+      "license": "MIT",
+      "zh_cn": "12 周、24 节课程，面向所有人的 AI 入门课程。",
+      "status": "translated"
+    },
+    {
+      "full_name": "BurntSushi/ripgrep",
+      "github_full_name": "BurntSushi/ripgrep",
+      "source_url": "https://github.com/BurntSushi/ripgrep",
+      "about": "ripgrep recursively searches directories for a regex pattern while respecting your gitignore",
+      "license": "Unlicense",
+      "zh_cn": "ripgrep 递归搜索目录中的正则表达式，同时遵循 gitignore 规则。",
+      "status": "translated"
+    },
+    {
+      "full_name": "FFmpeg/FFmpeg",
+      "github_full_name": "FFmpeg/FFmpeg",
+      "source_url": "https://github.com/FFmpeg/FFmpeg",
+      "about": "Mirror of https://git.ffmpeg.org/ffmpeg.git",
+      "license": "NOASSERTION",
+      "zh_cn": "https://git.ffmpeg.org/ffmpeg.git 的镜像。",
+      "status": "translated"
+    },
+    {
+      "full_name": "alacritty/alacritty",
+      "github_full_name": "alacritty/alacritty",
+      "source_url": "https://github.com/alacritty/alacritty",
+      "about": "A cross-platform, OpenGL terminal emulator.",
+      "license": "Apache-2.0",
+      "zh_cn": "跨平台、基于 OpenGL 的终端模拟器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "coollabsio/coolify",
+      "github_full_name": "coollabsio/coolify",
+      "source_url": "https://github.com/coollabsio/coolify",
+      "about": "An open-source, self-hostable PaaS alternative to Vercel, Heroku & Netlify that lets you easily deploy static sites, databases, full-stack applications and 360+ one-click services on your own servers.",
+      "license": "Apache-2.0",
+      "zh_cn": "可自托管的开源 PaaS，可替代 Vercel、Heroku 和 Netlify，在自己的服务器上轻松部署静态网站、数据库、全栈应用及 360 多种一键服务。",
+      "status": "translated"
+    },
+    {
+      "full_name": "usememos/memos",
+      "github_full_name": "usememos/memos",
+      "source_url": "https://github.com/usememos/memos",
+      "about": "Memos is an open-source, self-hosted note-taking app that brings your everyday thoughts together in a personal timeline. Your data stays yours, and you choose what to keep private or share.",
+      "license": "MIT",
+      "zh_cn": "Memos 是可自托管的开源笔记应用，将日常想法汇集到个人时间线中。数据由你掌控，哪些内容私密、哪些内容分享，由你决定。",
+      "status": "translated"
+    },
+    {
+      "full_name": "git/git",
+      "github_full_name": "git/git",
+      "source_url": "https://github.com/git/git",
+      "about": "Git Source Code Mirror - This is a publish-only repository but pull requests can be turned into patches to the mailing list via GitGitGadget (https://gitgitgadget.github.io/). Please follow Documentation/SubmittingPatches procedure for any of your improvements.",
+      "license": "NOASSERTION",
+      "zh_cn": "Git 源代码镜像，仅用于发布；可通过 GitGitGadget（https://gitgitgadget.github.io/）将拉取请求转换为补丁发送至邮件列表。任何改进都请遵循 Documentation/SubmittingPatches 流程。",
+      "status": "translated"
+    },
+    {
+      "full_name": "upstash/context7",
+      "github_full_name": "upstash/context7",
+      "source_url": "https://github.com/upstash/context7",
+      "about": "Context7 Platform -- Up-to-date docs for AI agents",
+      "license": "MIT",
+      "zh_cn": "Context7 平台：为 AI 智能体提供最新文档。",
+      "status": "translated"
+    },
+    {
+      "full_name": "withastro/astro",
+      "github_full_name": "withastro/astro",
+      "source_url": "https://github.com/withastro/astro",
+      "about": "The web framework for content-driven websites.",
+      "license": "NOASSERTION",
+      "zh_cn": "面向内容驱动网站的 Web 框架。",
+      "status": "translated"
+    },
+    {
+      "full_name": "penpot/penpot",
+      "github_full_name": "penpot/penpot",
+      "source_url": "https://github.com/penpot/penpot",
+      "about": "Penpot: The open-source design platform for Product teams that need scalable collaboration.",
+      "license": "MPL-2.0",
+      "zh_cn": "Penpot：为需要规模化协作的产品团队打造的开源设计平台。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/autogen",
+      "github_full_name": "microsoft/autogen",
+      "source_url": "https://github.com/microsoft/autogen",
+      "about": "A programming framework for agentic AI",
+      "license": "CC-BY-4.0",
+      "zh_cn": "用于智能体 AI 的编程框架。",
+      "status": "translated"
+    },
+    {
+      "full_name": "sharkdp/bat",
+      "github_full_name": "sharkdp/bat",
+      "source_url": "https://github.com/sharkdp/bat",
+      "about": "A cat(1) clone with wings.",
+      "license": "Apache-2.0",
+      "zh_cn": "为 cat(1) 插上翅膀的替代工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "crewAIInc/crewAI",
+      "github_full_name": "crewAIInc/crewAI",
+      "source_url": "https://github.com/crewAIInc/crewAI",
+      "about": "Framework for orchestrating role-playing, autonomous AI agents. By fostering collaborative intelligence, CrewAI empowers agents to work together seamlessly, tackling complex tasks.",
+      "license": "MIT",
+      "zh_cn": "用于编排角色扮演型自主 AI 智能体的框架，让智能体通过协同智能紧密合作，处理复杂任务。",
+      "status": "translated"
+    },
+    {
+      "full_name": "jellyfin/jellyfin",
+      "github_full_name": "jellyfin/jellyfin",
+      "source_url": "https://github.com/jellyfin/jellyfin",
+      "about": "The Free Software Media System - Server Backend & API",
+      "license": "GPL-2.0",
+      "zh_cn": "自由软件媒体系统的服务端与 API。",
+      "status": "translated"
+    },
+    {
+      "full_name": "go-gitea/gitea",
+      "github_full_name": "go-gitea/gitea",
+      "source_url": "https://github.com/go-gitea/gitea",
+      "about": "Git with a cup of tea! Painless self-hosted all-in-one software development service, including Git hosting, code review, team collaboration, package registry and CI/CD",
+      "license": "MIT",
+      "zh_cn": "Git 配上一杯茶！易于自托管的一站式软件开发服务，包括 Git 托管、代码审查、团队协作、软件包仓库及 CI/CD。",
+      "status": "translated"
+    },
+    {
+      "full_name": "appwrite/appwrite",
+      "github_full_name": "appwrite/appwrite",
+      "source_url": "https://github.com/appwrite/appwrite",
+      "about": "The open-source cloud for agents & devs. Including Auth, Databases, Storage, Functions, Messaging, Hosting, Realtime, WAF and more",
+      "license": "BSD-3-Clause",
+      "zh_cn": "面向智能体和开发者的开源云，包含身份验证、数据库、存储、函数、消息、托管、实时通信、WAF 等。",
+      "status": "translated"
+    },
+    {
+      "full_name": "laurent22/joplin",
+      "github_full_name": "laurent22/joplin",
+      "source_url": "https://github.com/laurent22/joplin",
+      "about": "Joplin - the privacy-focused note taking app with sync capabilities for Windows, macOS, Linux, Android and iOS.",
+      "license": "NOASSERTION",
+      "zh_cn": "Joplin：注重隐私、支持同步的笔记应用，适用于 Windows、macOS、Linux、Android 和 iOS。",
+      "status": "translated"
+    },
+    {
+      "full_name": "WerWolv/ImHex",
+      "github_full_name": "WerWolv/ImHex",
+      "source_url": "https://github.com/WerWolv/ImHex",
+      "about": "🔍 A Hex Editor for Reverse Engineers, Programmers and people who value their retinas when working at 3 AM.",
+      "license": "GPL-2.0",
+      "zh_cn": "面向逆向工程师、程序员，以及凌晨 3 点工作时仍爱护眼睛的人们的十六进制编辑器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "TryGhost/Ghost",
+      "github_full_name": "TryGhost/Ghost",
+      "source_url": "https://github.com/TryGhost/Ghost",
+      "about": "Independent technology for modern publishing, memberships, subscriptions and newsletters.",
+      "license": "MIT",
+      "zh_cn": "服务于现代出版、会员、订阅和邮件简报的独立技术。",
+      "status": "translated"
+    },
+    {
+      "full_name": "ChromeDevTools/chrome-devtools-mcp",
+      "github_full_name": "ChromeDevTools/chrome-devtools-mcp",
+      "source_url": "https://github.com/ChromeDevTools/chrome-devtools-mcp",
+      "about": "Chrome DevTools for coding agents",
+      "license": "Apache-2.0",
+      "zh_cn": "面向编程智能体的 Chrome 开发者工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "run-llama/llama_index",
+      "github_full_name": "run-llama/llama_index",
+      "source_url": "https://github.com/run-llama/llama_index",
+      "about": "LlamaIndex is the document processing platform for AI",
+      "license": "MIT",
+      "zh_cn": "LlamaIndex 是面向 AI 的文档处理平台。",
+      "status": "translated"
+    },
+    {
+      "full_name": "skylot/jadx",
+      "github_full_name": "skylot/jadx",
+      "source_url": "https://github.com/skylot/jadx",
+      "about": "Dex to Java decompiler",
+      "license": "Apache-2.0",
+      "zh_cn": "将 Dex 反编译为 Java 的工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "mastodon/mastodon",
+      "github_full_name": "mastodon/mastodon",
+      "source_url": "https://github.com/mastodon/mastodon",
+      "about": "Your self-hosted, globally interconnected microblogging community",
+      "license": "AGPL-3.0",
+      "zh_cn": "可自托管、与全球互联的微博社区。",
+      "status": "translated"
+    },
+    {
+      "full_name": "x64dbg/x64dbg",
+      "github_full_name": "x64dbg/x64dbg",
+      "source_url": "https://github.com/x64dbg/x64dbg",
+      "about": "An open-source user mode debugger for Windows. Optimized for reverse engineering and malware analysis.",
+      "license": "NOASSERTION",
+      "zh_cn": "Windows 上的开源用户态调试器，针对逆向工程和恶意软件分析优化。",
+      "status": "translated"
+    },
+    {
+      "full_name": "calcom/cal.diy",
+      "github_full_name": "calcom/cal.diy",
+      "source_url": "https://github.com/calcom/cal.diy",
+      "about": "Scheduling infrastructure for absolutely everyone.",
+      "license": "MIT",
+      "zh_cn": "面向所有人的日程安排基础设施。",
+      "status": "translated"
+    },
+    {
+      "full_name": "paperless-ngx/paperless-ngx",
+      "github_full_name": "paperless-ngx/paperless-ngx",
+      "source_url": "https://github.com/paperless-ngx/paperless-ngx",
+      "about": "A community-supported supercharged document management system: scan, index and archive all your documents",
+      "license": "GPL-3.0",
+      "zh_cn": "社区支持的增强型文档管理系统，可扫描、索引和归档所有文档。",
+      "status": "translated"
+    },
+    {
+      "full_name": "siyuan-note/siyuan",
+      "github_full_name": "siyuan-note/siyuan",
+      "source_url": "https://github.com/siyuan-note/siyuan",
+      "about": "An open-source, privacy-first, self-hosted knowledge workspace where humans and AI agents work together 开源、隐私优先、自托管的知识工作空间，让人与智能体在此协作",
+      "license": "AGPL-3.0",
+      "zh_cn": "开源、隐私优先、自托管的知识工作空间，让人与智能体在此协作。",
+      "status": "translated"
+    },
+    {
+      "full_name": "mitmproxy/mitmproxy",
+      "github_full_name": "mitmproxy/mitmproxy",
+      "source_url": "https://github.com/mitmproxy/mitmproxy",
+      "about": "An interactive TLS-capable intercepting HTTP proxy for penetration testers and software developers.",
+      "license": "MIT",
+      "zh_cn": "面向渗透测试人员与软件开发者、支持 TLS 的交互式 HTTP 拦截代理。",
+      "status": "translated"
+    },
+    {
+      "full_name": "imputnet/cobalt",
+      "github_full_name": "imputnet/cobalt",
+      "source_url": "https://github.com/imputnet/cobalt",
+      "about": "best way to save what you love",
+      "license": "AGPL-3.0",
+      "zh_cn": "保存心爱内容的最佳方式。",
+      "status": "translated"
+    },
+    {
+      "full_name": "payloadcms/payload",
+      "github_full_name": "payloadcms/payload",
+      "source_url": "https://github.com/payloadcms/payload",
+      "about": "Payload is the open-source, fullstack Next.js framework, giving you instant backend superpowers. Get a full TypeScript backend and admin panel instantly. Use Payload as a headless CMS or for building powerful applications.",
+      "license": "MIT",
+      "zh_cn": "Payload 是开源全栈 Next.js 框架，可立即获得完整的 TypeScript 后端与管理面板，既可用作无头 CMS，也可用于构建强大的应用。",
+      "status": "translated"
+    },
+    {
+      "full_name": "mifi/lossless-cut",
+      "github_full_name": "mifi/lossless-cut",
+      "source_url": "https://github.com/mifi/lossless-cut",
+      "about": "The swiss army knife of lossless video/audio editing",
+      "license": "GPL-2.0",
+      "zh_cn": "无损音视频编辑的瑞士军刀。",
+      "status": "translated"
+    },
+    {
+      "full_name": "logseq/logseq",
+      "github_full_name": "logseq/logseq",
+      "source_url": "https://github.com/logseq/logseq",
+      "about": "A privacy-first, open-source platform for knowledge management and collaboration. Download link:  http://github.com/logseq/logseq/releases. roadmap: https://logseq.io/p/NX4mc_ggEV",
+      "license": "AGPL-3.0",
+      "zh_cn": "注重隐私的开源知识管理与协作平台。下载：http://github.com/logseq/logseq/releases；路线图：https://logseq.io/p/NX4mc_ggEV",
+      "status": "translated"
+    },
+    {
+      "full_name": "sharkdp/fd",
+      "github_full_name": "sharkdp/fd",
+      "source_url": "https://github.com/sharkdp/fd",
+      "about": "A simple, fast and user-friendly alternative to 'find'",
+      "license": "Apache-2.0",
+      "zh_cn": "简洁、快速、易用的 find 替代工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "langchain-ai/langgraph",
+      "github_full_name": "langchain-ai/langgraph",
+      "source_url": "https://github.com/langchain-ai/langgraph",
+      "about": "Build resilient agents.",
+      "license": "MIT",
+      "zh_cn": "构建可靠、有韧性的智能体。",
+      "status": "translated"
+    },
+    {
+      "full_name": "LizardByte/Sunshine",
+      "github_full_name": "LizardByte/Sunshine",
+      "source_url": "https://github.com/LizardByte/Sunshine",
+      "about": "Self-hosted game stream host for Moonlight.",
+      "license": "GPL-3.0",
+      "zh_cn": "为 Moonlight 提供服务的自托管游戏串流主机。",
+      "status": "translated"
+    },
+    {
+      "full_name": "CorentinTh/it-tools",
+      "github_full_name": "CorentinTh/it-tools",
+      "source_url": "https://github.com/CorentinTh/it-tools",
+      "about": "Collection of handy online tools for developers, with great UX. ",
+      "license": "GPL-3.0",
+      "zh_cn": "面向开发者的实用在线工具集合，注重用户体验。",
+      "status": "translated"
+    },
+    {
+      "full_name": "HKUDS/LightRAG",
+      "github_full_name": "HKUDS/LightRAG",
+      "source_url": "https://github.com/HKUDS/LightRAG",
+      "about": "[EMNLP2025] LightRAG: Simple and Fast Retrieval-Augmented Generation",
+      "license": "MIT",
+      "zh_cn": "[EMNLP2025] LightRAG：简单、快速的检索增强生成。",
+      "status": "translated"
+    },
+    {
+      "full_name": "umami-software/umami",
+      "github_full_name": "umami-software/umami",
+      "source_url": "https://github.com/umami-software/umami",
+      "about": "Umami is a privacy-first web and product analytics platform. Traffic, campaigns, behavior, conversions, and revenue in one place. No cookies, no surveillance, self-hosted or in the cloud.",
+      "license": "MIT",
+      "zh_cn": "Umami 是隐私优先的网站与产品分析平台，将流量、营销活动、行为、转化和收入集中展示。不使用 Cookie、不进行监视，可自托管或使用云端。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/playwright-mcp",
+      "github_full_name": "microsoft/playwright-mcp",
+      "source_url": "https://github.com/microsoft/playwright-mcp",
+      "about": "Playwright MCP server",
+      "license": "Apache-2.0",
+      "zh_cn": "Playwright MCP 服务器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "TriliumNext/Trilium",
+      "github_full_name": "TriliumNext/Trilium",
+      "source_url": "https://github.com/TriliumNext/Trilium",
+      "about": "Build your personal knowledge base with Trilium Notes",
+      "license": "AGPL-3.0",
+      "zh_cn": "使用 Trilium Notes 构建个人知识库。",
+      "status": "translated"
+    },
+    {
+      "full_name": "sgl-project/sglang",
+      "github_full_name": "sgl-project/sglang",
+      "source_url": "https://github.com/sgl-project/sglang",
+      "about": "SGLang is a high-performance serving framework for large language models and multimodal models.",
+      "license": "Apache-2.0",
+      "zh_cn": "SGLang 是面向大语言模型和多模态模型的高性能服务框架。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/Data-Science-For-Beginners",
+      "github_full_name": "microsoft/Data-Science-For-Beginners",
+      "source_url": "https://github.com/microsoft/Data-Science-For-Beginners",
+      "about": "10 Weeks, 20 Lessons, Data Science for All!",
+      "license": "MIT",
+      "zh_cn": "10 周、20 节课程，面向所有人的数据科学课程。",
+      "status": "translated"
+    },
+    {
+      "full_name": "vercel-labs/skills",
+      "github_full_name": "vercel-labs/skills",
+      "source_url": "https://github.com/vercel-labs/skills",
+      "about": "The open agent skills tool - npx skills",
+      "license": "MIT",
+      "zh_cn": "开放的智能体技能工具：npx skills。",
+      "status": "translated"
+    },
+    {
+      "full_name": "mpv-player/mpv",
+      "github_full_name": "mpv-player/mpv",
+      "source_url": "https://github.com/mpv-player/mpv",
+      "about": "🎥 Command line media player",
+      "license": "NOASSERTION",
+      "zh_cn": "命令行媒体播放器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "nextcloud/server",
+      "github_full_name": "nextcloud/server",
+      "source_url": "https://github.com/nextcloud/server",
+      "about": "☁️ Nextcloud server, a safe home for all your data",
+      "license": "AGPL-3.0",
+      "zh_cn": "Nextcloud 服务器，为你的所有数据提供安全的家。",
+      "status": "translated"
+    },
+    {
+      "full_name": "gchq/CyberChef",
+      "github_full_name": "gchq/CyberChef",
+      "source_url": "https://github.com/gchq/CyberChef",
+      "about": "The Cyber Swiss Army Knife - a web app for encryption, encoding, compression and data analysis",
+      "license": "Apache-2.0",
+      "zh_cn": "网络工具瑞士军刀：用于加密、编码、压缩和数据分析的 Web 应用。",
+      "status": "translated"
+    },
+    {
+      "full_name": "agentscope-ai/agentscope",
+      "github_full_name": "agentscope-ai/agentscope",
+      "source_url": "https://github.com/agentscope-ai/agentscope",
+      "about": "Build and run agents you can see, understand and trust.",
+      "license": "Apache-2.0",
+      "zh_cn": "构建并运行可观察、可理解、值得信赖的智能体。",
+      "status": "translated"
+    },
+    {
+      "full_name": "FreeCAD/FreeCAD",
+      "github_full_name": "FreeCAD/FreeCAD",
+      "source_url": "https://github.com/FreeCAD/FreeCAD",
+      "about": "Official source code of FreeCAD, a free and opensource multiplatform 3D parametric modeler.",
+      "license": "LGPL-2.1",
+      "zh_cn": "FreeCAD 官方源代码；FreeCAD 是免费、开源、跨平台的 3D 参数化建模工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "github/github-mcp-server",
+      "github_full_name": "github/github-mcp-server",
+      "source_url": "https://github.com/github/github-mcp-server",
+      "about": "GitHub's official MCP Server",
+      "license": "MIT",
+      "zh_cn": "GitHub 官方 MCP 服务器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "vercel-labs/agent-skills",
+      "github_full_name": "vercel-labs/agent-skills",
+      "source_url": "https://github.com/vercel-labs/agent-skills",
+      "about": "Vercel's official collection of agent skills",
+      "license": null,
+      "zh_cn": "Vercel 官方智能体技能集合。",
+      "status": "translated"
+    },
+    {
+      "full_name": "plausible/analytics",
+      "github_full_name": "plausible/analytics",
+      "source_url": "https://github.com/plausible/analytics",
+      "about": "Open source, privacy-first web analytics. Lightweight, cookie-free Google Analytics alternative. Self-hosted or cloud.",
+      "license": "AGPL-3.0",
+      "zh_cn": "开源、隐私优先的网站分析工具，是轻量、无 Cookie 的 Google Analytics 替代方案，可自托管或使用云端。",
+      "status": "translated"
+    },
+    {
+      "full_name": "Anuken/Mindustry",
+      "github_full_name": "Anuken/Mindustry",
+      "source_url": "https://github.com/Anuken/Mindustry",
+      "about": "The automation tower defense RTS",
+      "license": "GPL-3.0",
+      "zh_cn": "融合自动化与塔防的即时战略游戏。",
+      "status": "translated"
+    },
+    {
+      "full_name": "huggingface/lerobot",
+      "github_full_name": "huggingface/lerobot",
+      "source_url": "https://github.com/huggingface/lerobot",
+      "about": "🤗 LeRobot: Making AI for Robotics more accessible with end-to-end learning",
+      "license": "Apache-2.0",
+      "zh_cn": "LeRobot：通过端到端学习，让机器人 AI 更易用。",
+      "status": "translated"
+    },
+    {
+      "full_name": "4ian/GDevelop",
+      "github_full_name": "4ian/GDevelop",
+      "source_url": "https://github.com/4ian/GDevelop",
+      "about": "🎮 Open-source, cross-platform 2D/3D/multiplayer game engine designed for everyone.",
+      "license": "NOASSERTION",
+      "zh_cn": "面向所有人的开源跨平台游戏引擎，支持 2D、3D 和多人游戏。",
+      "status": "translated"
+    },
+    {
+      "full_name": "PrefectHQ/fastmcp",
+      "github_full_name": "PrefectHQ/fastmcp",
+      "source_url": "https://github.com/PrefectHQ/fastmcp",
+      "about": "🚀 The fast, Pythonic way to build MCP servers and clients.",
+      "license": "Apache-2.0",
+      "zh_cn": "以快速、符合 Python 风格的方式构建 MCP 服务器与客户端。",
+      "status": "translated"
+    },
+    {
+      "full_name": "GraphiteEditor/Graphite",
+      "github_full_name": "GraphiteEditor/Graphite",
+      "source_url": "https://github.com/GraphiteEditor/Graphite",
+      "about": "Community-built comprehensive 2D content creation appplication for graphic design, digital art, and interactive real-time motion graphics powered by a node-based procedural graphics engine",
+      "license": "Apache-2.0",
+      "zh_cn": "社区打造的综合 2D 内容创作应用，用于平面设计、数字艺术和交互式实时动态图形，基于节点式程序化图形引擎。",
+      "status": "translated"
+    },
+    {
+      "full_name": "hashcat/hashcat",
+      "github_full_name": "hashcat/hashcat",
+      "source_url": "https://github.com/hashcat/hashcat",
+      "about": "World's fastest and most advanced password recovery utility",
+      "license": null,
+      "zh_cn": "世界上最快、最先进的密码恢复工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "iBotPeaches/Apktool",
+      "github_full_name": "iBotPeaches/Apktool",
+      "source_url": "https://github.com/iBotPeaches/Apktool",
+      "about": "A tool for reverse engineering Android apk files",
+      "license": "Apache-2.0",
+      "zh_cn": "用于逆向分析 Android APK 文件的工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "agentskills/agentskills",
+      "github_full_name": "agentskills/agentskills",
+      "source_url": "https://github.com/agentskills/agentskills",
+      "about": "Specification and documentation for Agent Skills",
+      "license": "Apache-2.0",
+      "zh_cn": "Agent Skills 的规范与文档。",
+      "status": "translated"
+    },
+    {
+      "full_name": "radareorg/radare2",
+      "github_full_name": "radareorg/radare2",
+      "source_url": "https://github.com/radareorg/radare2",
+      "about": "UNIX-like reverse engineering framework and command-line toolset",
+      "license": "NOASSERTION",
+      "zh_cn": "类 UNIX 的逆向工程框架与命令行工具集。",
+      "status": "translated"
+    },
+    {
+      "full_name": "arendst/Tasmota",
+      "github_full_name": "arendst/Tasmota",
+      "source_url": "https://github.com/arendst/Tasmota",
+      "about": "Alternative firmware for ESP8266 and ESP32 based devices with easy configuration using webUI, OTA updates, automation using timers or rules, expandability and entirely local control over MQTT, HTTP, Serial or KNX. Full documentation at",
+      "license": "GPL-3.0",
+      "zh_cn": "适用于 ESP8266 和 ESP32 设备的替代固件，支持 Web 界面配置、OTA 更新、定时器或规则自动化及扩展，并可通过 MQTT、HTTP、串口或 KNX 完全本地控制。",
+      "status": "translated"
+    },
+    {
+      "full_name": "HandBrake/HandBrake",
+      "github_full_name": "HandBrake/HandBrake",
+      "source_url": "https://github.com/HandBrake/HandBrake",
+      "about": "HandBrake's development repository ",
+      "license": "NOASSERTION",
+      "zh_cn": "HandBrake 的开发仓库。",
+      "status": "translated"
+    },
+    {
+      "full_name": "navidrome/navidrome",
+      "github_full_name": "navidrome/navidrome",
+      "source_url": "https://github.com/navidrome/navidrome",
+      "about": "🎧 Your Personal Streaming Service ",
+      "license": "GPL-3.0",
+      "zh_cn": "你的个人流媒体服务。",
+      "status": "translated"
+    },
+    {
+      "full_name": "frida/frida",
+      "github_full_name": "frida/frida",
+      "source_url": "https://github.com/frida/frida",
+      "about": "Main repo for hosting release binaries",
+      "license": "NOASSERTION",
+      "zh_cn": "用于托管发行版二进制文件的主仓库。",
+      "status": "translated"
+    },
+    {
+      "full_name": "FreeTubeApp/FreeTube",
+      "github_full_name": "FreeTubeApp/FreeTube",
+      "source_url": "https://github.com/FreeTubeApp/FreeTube",
+      "about": "An Open Source YouTube app for privacy",
+      "license": "AGPL-3.0",
+      "zh_cn": "注重隐私的开源 YouTube 应用。",
+      "status": "translated"
+    },
+    {
+      "full_name": "docmost/docmost",
+      "github_full_name": "docmost/docmost",
+      "source_url": "https://github.com/docmost/docmost",
+      "about": "Docmost is an open-source collaborative wiki and documentation software. It is an open-source alternative to Confluence and Notion.",
+      "license": "AGPL-3.0",
+      "zh_cn": "Docmost 是开源协作式知识库与文档软件，可替代 Confluence 和 Notion。",
+      "status": "translated"
+    },
+    {
+      "full_name": "blender/blender",
+      "github_full_name": "blender/blender",
+      "source_url": "https://github.com/blender/blender",
+      "about": "Official mirror of Blender",
+      "license": "NOASSERTION",
+      "zh_cn": "Blender 官方镜像。",
+      "status": "translated"
+    },
+    {
+      "full_name": "qmk/qmk_firmware",
+      "github_full_name": "qmk/qmk_firmware",
+      "source_url": "https://github.com/qmk/qmk_firmware",
+      "about": "Open-source keyboard firmware for Atmel AVR and Arm USB families",
+      "license": "GPL-2.0",
+      "zh_cn": "适用于 Atmel AVR 和 Arm USB 系列的开源键盘固件。",
+      "status": "translated"
+    },
+    {
+      "full_name": "videolan/vlc",
+      "github_full_name": "videolan/vlc",
+      "source_url": "https://github.com/videolan/vlc",
+      "about": "VLC media player - plays everything, runs anywhere. Code here: https://code.videolan.org/videolan/vlc",
+      "license": "GPL-2.0",
+      "zh_cn": "VLC 媒体播放器：播放一切，随处运行。代码：https://code.videolan.org/videolan/vlc",
+      "status": "translated"
+    },
+    {
+      "full_name": "rizinorg/cutter",
+      "github_full_name": "rizinorg/cutter",
+      "source_url": "https://github.com/rizinorg/cutter",
+      "about": "Free and Open Source Reverse Engineering Platform powered by rizin",
+      "license": "GPL-3.0",
+      "zh_cn": "由 rizin 驱动的免费开源逆向工程平台。",
+      "status": "translated"
+    },
+    {
+      "full_name": "espressif/esp-idf",
+      "github_full_name": "espressif/esp-idf",
+      "source_url": "https://github.com/espressif/esp-idf",
+      "about": "Espressif IoT Development Framework. Official development framework for Espressif SoCs.",
+      "license": "Apache-2.0",
+      "zh_cn": "乐鑫物联网开发框架，也是乐鑫 SoC 的官方开发框架。",
+      "status": "translated"
+    },
+    {
+      "full_name": "ppy/osu",
+      "github_full_name": "ppy/osu",
+      "source_url": "https://github.com/ppy/osu",
+      "about": "rhythm is just a *click* away!",
+      "license": "MIT",
+      "zh_cn": "节奏，尽在一“点”之间！",
+      "status": "translated"
+    },
+    {
+      "full_name": "moonlight-stream/moonlight-qt",
+      "github_full_name": "moonlight-stream/moonlight-qt",
+      "source_url": "https://github.com/moonlight-stream/moonlight-qt",
+      "about": "GameStream client for PCs (Windows, Mac, Linux, and Steam Link)",
+      "license": "GPL-3.0",
+      "zh_cn": "面向电脑的 GameStream 客户端，支持 Windows、Mac、Linux 和 Steam Link。",
+      "status": "translated"
+    },
+    {
+      "full_name": "wled/WLED",
+      "github_full_name": "wled/WLED",
+      "source_url": "https://github.com/wled/WLED",
+      "about": "Control WS2812B and many more types of digital RGB LEDs with an ESP32 over WiFi!",
+      "license": "EUPL-1.2",
+      "zh_cn": "通过 WiFi，使用 ESP32 控制 WS2812B 及更多类型的数字 RGB LED！",
+      "status": "translated"
+    },
+    {
+      "full_name": "lichess-org/lila",
+      "github_full_name": "lichess-org/lila",
+      "source_url": "https://github.com/lichess-org/lila",
+      "about": "♞ lichess.org: the forever free, adless and open source chess server ♞",
+      "license": "AGPL-3.0",
+      "zh_cn": "lichess.org：永远免费、无广告、开源的国际象棋服务器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "audacity/audacity",
+      "github_full_name": "audacity/audacity",
+      "source_url": "https://github.com/audacity/audacity",
+      "about": "Audio Editor                                     ",
+      "license": "NOASSERTION",
+      "zh_cn": "音频编辑器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "OpenRA/OpenRA",
+      "github_full_name": "OpenRA/OpenRA",
+      "source_url": "https://github.com/OpenRA/OpenRA",
+      "about": "Open Source real-time strategy game engine for early Westwood games such as Command & Conquer: Red Alert written in C# using SDL and OpenGL. Runs on Windows, Linux, *BSD and Mac OS X.",
+      "license": "GPL-3.0",
+      "zh_cn": "用 C# 编写、基于 SDL 和 OpenGL 的开源即时战略游戏引擎，面向《命令与征服：红色警戒》等早期 Westwood 游戏，可运行于 Windows、Linux、*BSD 和 Mac OS X。",
+      "status": "translated"
+    },
+    {
+      "full_name": "MarlinFirmware/Marlin",
+      "github_full_name": "MarlinFirmware/Marlin",
+      "source_url": "https://github.com/MarlinFirmware/Marlin",
+      "about": "Marlin is a firmware for RepRap 3D printers optimized for both 8 and 32 bit microcontrollers.  Marlin supports all common platforms.   Many commercial 3D printers come with Marlin installed.  Check with your vendor if you need source code for your specific machine.",
+      "license": "GPL-3.0",
+      "zh_cn": "Marlin 是面向 RepRap 3D 打印机的固件，针对 8 位和 32 位微控制器优化，支持所有常见平台。许多商用 3D 打印机预装了 Marlin；如需具体机型的源代码，请联系设备厂商。",
+      "status": "translated"
+    },
+    {
+      "full_name": "microsoft/IoT-For-Beginners",
+      "github_full_name": "microsoft/IoT-For-Beginners",
+      "source_url": "https://github.com/microsoft/IoT-For-Beginners",
+      "about": "12 Weeks, 24 Lessons, IoT for All!",
+      "license": "MIT",
+      "zh_cn": "12 周、24 节课程，面向所有人的物联网课程。",
+      "status": "translated"
+    },
+    {
+      "full_name": "zephyrproject-rtos/zephyr",
+      "github_full_name": "zephyrproject-rtos/zephyr",
+      "source_url": "https://github.com/zephyrproject-rtos/zephyr",
+      "about": "Primary Git Repository for the Zephyr Project. Zephyr is a new generation, scalable, optimized, secure RTOS for multiple hardware architectures.",
+      "license": "Apache-2.0",
+      "zh_cn": "Zephyr 项目的主要 Git 仓库。Zephyr 是面向多种硬件架构的新一代可扩展、经过优化且安全的实时操作系统。",
+      "status": "translated"
+    },
+    {
+      "full_name": "flipperdevices/flipperzero-firmware",
+      "github_full_name": "flipperdevices/flipperzero-firmware",
+      "source_url": "https://github.com/flipperdevices/flipperzero-firmware",
+      "about": "Flipper Zero firmware source code",
+      "license": "GPL-3.0",
+      "zh_cn": "Flipper Zero 固件源代码。",
+      "status": "translated"
+    },
+    {
+      "full_name": "googleapis/mcp-toolbox",
+      "github_full_name": "googleapis/mcp-toolbox",
+      "source_url": "https://github.com/googleapis/mcp-toolbox",
+      "about": "MCP Toolbox for Databases is an open source MCP server for databases.",
+      "license": "Apache-2.0",
+      "zh_cn": "MCP Toolbox for Databases 是面向数据库的开源 MCP 服务器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "OpenRCT2/OpenRCT2",
+      "github_full_name": "OpenRCT2/OpenRCT2",
+      "source_url": "https://github.com/OpenRCT2/OpenRCT2",
+      "about": "An open source re-implementation of RollerCoaster Tycoon 2 🎢",
+      "license": "GPL-3.0",
+      "zh_cn": "《过山车大亨 2》的开源重新实现。",
+      "status": "translated"
+    },
+    {
+      "full_name": "ArduPilot/ardupilot",
+      "github_full_name": "ArduPilot/ardupilot",
+      "source_url": "https://github.com/ArduPilot/ardupilot",
+      "about": "ArduPlane, ArduCopter, ArduRover, ArduSub source",
+      "license": "GPL-3.0",
+      "zh_cn": "ArduPlane、ArduCopter、ArduRover 和 ArduSub 的源代码。",
+      "status": "translated"
+    },
+    {
+      "full_name": "zaproxy/zaproxy",
+      "github_full_name": "zaproxy/zaproxy",
+      "source_url": "https://github.com/zaproxy/zaproxy",
+      "about": "The ZAP by Checkmarx Core project",
+      "license": "Apache-2.0",
+      "zh_cn": "Checkmarx ZAP 的核心项目。",
+      "status": "translated"
+    },
+    {
+      "full_name": "mltframework/shotcut",
+      "github_full_name": "mltframework/shotcut",
+      "source_url": "https://github.com/mltframework/shotcut",
+      "about": "cross-platform (Qt), open-source (GPLv3) video editor",
+      "license": "GPL-3.0",
+      "zh_cn": "跨平台、基于 Qt、采用 GPLv3 许可的开源视频编辑器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "musescore/MuseScore",
+      "github_full_name": "musescore/MuseScore",
+      "source_url": "https://github.com/musescore/MuseScore",
+      "about": "MuseScore is an open source and free music notation software. For support, contribution, bug reports, visit MuseScore.org. Fork and make pull requests!",
+      "license": "NOASSERTION",
+      "zh_cn": "MuseScore 是免费开源的乐谱制作软件。寻求支持、参与贡献或报告问题，请访问 MuseScore.org。欢迎 Fork 并提交拉取请求！",
+      "status": "translated"
+    },
+    {
+      "full_name": "ReFirmLabs/binwalk",
+      "github_full_name": "ReFirmLabs/binwalk",
+      "source_url": "https://github.com/ReFirmLabs/binwalk",
+      "about": "Firmware Analysis Tool",
+      "license": "MIT",
+      "zh_cn": "固件分析工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "juice-shop/juice-shop",
+      "github_full_name": "juice-shop/juice-shop",
+      "source_url": "https://github.com/juice-shop/juice-shop",
+      "about": "OWASP Juice Shop: Probably the most modern and sophisticated insecure web application",
+      "license": "MIT",
+      "zh_cn": "OWASP Juice Shop：可能是最现代、最复杂的不安全 Web 应用。",
+      "status": "translated"
+    },
+    {
+      "full_name": "luanti-org/luanti",
+      "github_full_name": "luanti-org/luanti",
+      "source_url": "https://github.com/luanti-org/luanti",
+      "about": "Luanti (formerly Minetest) is an open source voxel game-creation platform with easy modding and game creation",
+      "license": "NOASSERTION",
+      "zh_cn": "Luanti（原 Minetest）是开源体素游戏创作平台，方便制作模组和游戏。",
+      "status": "translated"
+    },
+    {
+      "full_name": "CleverRaven/Cataclysm-DDA",
+      "github_full_name": "CleverRaven/Cataclysm-DDA",
+      "source_url": "https://github.com/CleverRaven/Cataclysm-DDA",
+      "about": "Cataclysm - Dark Days Ahead. A turn-based survival game set in a post-apocalyptic world.",
+      "license": "NOASSERTION",
+      "zh_cn": "《大灾变：黑暗之日》：设定在末日世界中的回合制生存游戏。",
+      "status": "translated"
+    },
+    {
+      "full_name": "mapeditor/tiled",
+      "github_full_name": "mapeditor/tiled",
+      "source_url": "https://github.com/mapeditor/tiled",
+      "about": "Flexible level editor",
+      "license": "NOASSERTION",
+      "zh_cn": "灵活的关卡编辑器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "PX4/PX4-Autopilot",
+      "github_full_name": "PX4/PX4-Autopilot",
+      "source_url": "https://github.com/PX4/PX4-Autopilot",
+      "about": "PX4 Autopilot Software",
+      "license": "BSD-3-Clause",
+      "zh_cn": "PX4 自动驾驶软件。",
+      "status": "translated"
+    },
+    {
+      "full_name": "Klipper3d/klipper",
+      "github_full_name": "Klipper3d/klipper",
+      "source_url": "https://github.com/Klipper3d/klipper",
+      "about": "Klipper is a 3d-printer firmware",
+      "license": "GPL-3.0",
+      "zh_cn": "Klipper 是一款 3D 打印机固件。",
+      "status": "translated"
+    },
+    {
+      "full_name": "esphome/esphome",
+      "github_full_name": "esphome/esphome",
+      "source_url": "https://github.com/esphome/esphome",
+      "about": "ESPHome is a system to control your ESP32, ESP8266, BK72xx, RP2040 by simple yet powerful configuration files and control them remotely through Home Automation systems.",
+      "license": "NOASSERTION",
+      "zh_cn": "ESPHome 通过简单而强大的配置文件控制 ESP32、ESP8266、BK72xx 和 RP2040，并可通过家庭自动化系统远程控制。",
+      "status": "translated"
+    },
+    {
+      "full_name": "KDE/krita",
+      "github_full_name": "KDE/krita",
+      "source_url": "https://github.com/KDE/krita",
+      "about": "Krita is a free and open source cross-platform application that offers an end-to-end solution for creating digital art files from scratch built on the KDE and Qt frameworks.",
+      "license": "GPL-3.0",
+      "zh_cn": "Krita 是基于 KDE 和 Qt 框架的免费开源跨平台应用，为从零创作数字艺术文件提供完整方案。",
+      "status": "translated"
+    },
+    {
+      "full_name": "openscad/openscad",
+      "github_full_name": "openscad/openscad",
+      "source_url": "https://github.com/openscad/openscad",
+      "about": "OpenSCAD - The Programmers Solid 3D CAD Modeller  ",
+      "license": "NOASSERTION",
+      "zh_cn": "OpenSCAD：面向程序员的实体 3D CAD 建模工具。",
+      "status": "translated"
+    },
+    {
+      "full_name": "wireshark/wireshark",
+      "github_full_name": "wireshark/wireshark",
+      "source_url": "https://github.com/wireshark/wireshark",
+      "about": "Read-only mirror of Wireshark's Git repository at https://gitlab.com/wireshark/wireshark. You're welcome to submit pull requests there.",
+      "license": "GPL-2.0",
+      "zh_cn": "Wireshark Git 仓库的只读镜像，上游位于 https://gitlab.com/wireshark/wireshark，欢迎在那里提交拉取请求。",
+      "status": "translated"
+    },
+    {
+      "full_name": "prusa3d/PrusaSlicer",
+      "github_full_name": "prusa3d/PrusaSlicer",
+      "source_url": "https://github.com/prusa3d/PrusaSlicer",
+      "about": "G-code generator for 3D printers (RepRap, Makerbot, Ultimaker etc.)",
+      "license": "AGPL-3.0",
+      "zh_cn": "面向 RepRap、Makerbot、Ultimaker 等 3D 打印机的 G-code 生成器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "jgraph/drawio",
+      "github_full_name": "jgraph/drawio",
+      "source_url": "https://github.com/jgraph/drawio",
+      "about": "draw.io is a JavaScript, client-side editor for general diagramming.",
+      "license": "Apache-2.0",
+      "zh_cn": "draw.io 是用 JavaScript 编写、在客户端运行的通用图表编辑器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "LibreSprite/LibreSprite",
+      "github_full_name": "LibreSprite/LibreSprite",
+      "source_url": "https://github.com/LibreSprite/LibreSprite",
+      "about": "Animated sprite editor & pixel art tool -- Fork of the last GPLv2 commit of Aseprite",
+      "license": "GPL-2.0",
+      "zh_cn": "动画精灵编辑器与像素画工具，基于 Aseprite 最后一个采用 GPLv2 许可的提交分支开发。",
+      "status": "translated"
+    },
+    {
+      "full_name": "OpenTTD/OpenTTD",
+      "github_full_name": "OpenTTD/OpenTTD",
+      "source_url": "https://github.com/OpenTTD/OpenTTD",
+      "about": "OpenTTD is an open source simulation game based upon Transport Tycoon Deluxe",
+      "license": "NOASSERTION",
+      "zh_cn": "OpenTTD 是基于《运输大亨豪华版》的开源模拟游戏。",
+      "status": "translated"
+    },
+    {
+      "full_name": "fontforge/fontforge",
+      "github_full_name": "fontforge/fontforge",
+      "source_url": "https://github.com/fontforge/fontforge",
+      "about": "Free (libre) font editor for Windows, Mac OS X and GNU+Linux",
+      "license": "NOASSERTION",
+      "zh_cn": "适用于 Windows、Mac OS X 和 GNU+Linux 的自由字体编辑器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "opentoonz/opentoonz",
+      "github_full_name": "opentoonz/opentoonz",
+      "source_url": "https://github.com/opentoonz/opentoonz",
+      "about": "OpenToonz - An open-source full-featured 2D animation creation software",
+      "license": "NOASSERTION",
+      "zh_cn": "OpenToonz：开源、功能完整的 2D 动画创作软件。",
+      "status": "translated"
+    },
+    {
+      "full_name": "endless-sky/endless-sky",
+      "github_full_name": "endless-sky/endless-sky",
+      "source_url": "https://github.com/endless-sky/endless-sky",
+      "about": "Space exploration, trading, and combat game.",
+      "license": "GPL-3.0",
+      "zh_cn": "太空探索、贸易与战斗游戏。",
+      "status": "translated"
+    },
+    {
+      "full_name": "veloren/veloren",
+      "github_full_name": "veloren/veloren",
+      "source_url": "https://github.com/veloren/veloren",
+      "about": "[mirror of https://gitlab.com/veloren/veloren] An open world, open source voxel RPG inspired by Dwarf Fortress and Cube World. This repository is a mirror. Please submit all PRs and issues on our GitLab page.",
+      "license": "GPL-3.0",
+      "zh_cn": "https://gitlab.com/veloren/veloren 的镜像。受《矮人要塞》和《魔方世界》启发的开放世界开源体素 RPG。本仓库仅为镜像，请在 GitLab 页面提交所有拉取请求与问题。",
+      "status": "translated"
+    },
+    {
+      "full_name": "hedgedoc/hedgedoc",
+      "github_full_name": "hedgedoc/hedgedoc",
+      "source_url": "https://github.com/hedgedoc/hedgedoc",
+      "about": "HedgeDoc - Ideas grow better together",
+      "license": "AGPL-3.0",
+      "zh_cn": "HedgeDoc：想法在协作中成长得更好。",
+      "status": "translated"
+    },
+    {
+      "full_name": "wesnoth/wesnoth",
+      "github_full_name": "wesnoth/wesnoth",
+      "source_url": "https://github.com/wesnoth/wesnoth",
+      "about": "An open source, turn-based strategy game with a high fantasy theme.",
+      "license": "GPL-2.0",
+      "zh_cn": "以高奇幻世界为主题的开源回合制策略游戏。",
+      "status": "translated"
+    },
+    {
+      "full_name": "go-vikunja/vikunja",
+      "github_full_name": "go-vikunja/vikunja",
+      "source_url": "https://github.com/go-vikunja/vikunja",
+      "about": "The task manager you actually own.",
+      "license": "AGPL-3.0",
+      "zh_cn": "真正由你掌控的任务管理器。",
+      "status": "translated"
+    },
+    {
+      "full_name": "supertuxkart/stk-code",
+      "github_full_name": "supertuxkart/stk-code",
+      "source_url": "https://github.com/supertuxkart/stk-code",
+      "about": "The code base of SuperTuxKart",
+      "license": "NOASSERTION",
+      "zh_cn": "SuperTuxKart 的代码库。",
+      "status": "translated"
+    },
+    {
+      "full_name": "bambulab/BambuStudio",
+      "github_full_name": "bambulab/BambuStudio",
+      "source_url": "https://github.com/bambulab/BambuStudio",
+      "about": "PC Software for BambuLab and other 3D printers",
+      "license": "AGPL-3.0",
+      "zh_cn": "适用于拓竹及其他 3D 打印机的 PC 软件。",
+      "status": "translated"
+    },
+    {
+      "full_name": "raspberrypi/pico-sdk",
+      "github_full_name": "raspberrypi/pico-sdk",
+      "source_url": "https://github.com/raspberrypi/pico-sdk",
+      "about": null,
+      "license": "BSD-3-Clause",
+      "zh_cn": "项目尚未填写 GitHub About。",
+      "status": "missing_about"
+    },
+    {
+      "full_name": "VoronDesign/Voron-2",
+      "github_full_name": "VoronDesign/Voron-2",
+      "source_url": "https://github.com/VoronDesign/Voron-2",
+      "about": "Voron 2 CoreXY 3D Printer design",
+      "license": "GPL-3.0",
+      "zh_cn": "Voron 2 CoreXY 3D 打印机设计。",
+      "status": "translated"
+    },
+    {
+      "full_name": "beyond-all-reason/Beyond-All-Reason",
+      "github_full_name": "beyond-all-reason/Beyond-All-Reason",
+      "source_url": "https://github.com/beyond-all-reason/Beyond-All-Reason",
+      "about": "Main game repository for Beyond All Reason.",
+      "license": "NOASSERTION",
+      "zh_cn": "Beyond All Reason 游戏的主仓库。",
+      "status": "translated"
+    },
+    {
+      "full_name": "Warzone2100/warzone2100",
+      "github_full_name": "Warzone2100/warzone2100",
+      "source_url": "https://github.com/Warzone2100/warzone2100",
+      "about": "Command the forces of The Project in a battle to rebuild the world after mankind has been nearly destroyed by nuclear missiles. A 100% free and open source real-time strategy game for Windows, macOS, Linux, BSD+",
+      "license": "GPL-2.0",
+      "zh_cn": "人类几乎被核导弹毁灭后，指挥“计划”组织的力量，为重建世界而战。这是完全免费开源的即时战略游戏，支持 Windows、macOS、Linux、BSD 等平台。",
+      "status": "translated"
+    },
+    {
+      "full_name": "synfig/synfig",
+      "github_full_name": "synfig/synfig",
+      "source_url": "https://github.com/synfig/synfig",
+      "about": "This is the Official source code repository of Synfig Studio animation software",
+      "license": "GPL-3.0",
+      "zh_cn": "Synfig Studio 动画软件的官方源代码仓库。",
+      "status": "translated"
+    },
+    {
+      "full_name": "pencil2d/pencil",
+      "github_full_name": "pencil2d/pencil",
+      "source_url": "https://github.com/pencil2d/pencil",
+      "about": "Pencil2D is an easy, intuitive tool to make 2D hand-drawn animations. Pencil2D is open source and cross-platform.",
+      "license": "GPL-2.0",
+      "zh_cn": "Pencil2D 是简单直观的 2D 手绘动画制作工具，开源且跨平台。",
+      "status": "translated"
+    }
+  ],
+  "review": {
+    "total": 168,
+    "translated": 167,
+    "missing_about": [
+      "raspberrypi/pico-sdk"
+    ],
+    "method": "Translate the complete GitHub About without adding product claims. Decorative emoji and duplicate bilingual text are omitted. Original text and links are retained here; an empty About gets an explicit missing-description label.",
+    "publication": "local files only"
+  }
+}
