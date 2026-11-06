@@ -5,7 +5,7 @@ const web = new URL('../', import.meta.url)
 const source = new URL('../../../../client/xiaoban-desktop/src/widgets/', import.meta.url)
 const dest = new URL('src/components/creation/widget-preview/', web)
 await mkdir(new URL('assets/', dest), { recursive: true })
-for (const name of ['model.ts','content.ts','calendar.ts','holidays.json','ItemForm.vue','resize.ts','custom-drag.ts','custom-appearance.ts','surface.css','assets/design-reference.png','assets/woodfish-body-mask.svg','assets/woodfish-mallet-mask.svg']) {
+for (const name of ['model.ts','content.ts','calendar.ts','holidays.json','ItemForm.vue','resize.ts','custom-drag.ts','preview-probe.ts','custom-appearance.ts','surface.css','assets/design-reference.png','assets/woodfish-body-mask.svg','assets/woodfish-mallet-mask.svg']) {
   if (/\.(?:ts|vue)$/.test(name)) { const contents = await readFile(new URL(name, source), 'utf8'); await writeFile(new URL(name, dest), contents.replace(/(from\s+['\"]\.[^'\"]+)\.ts(['\"])/g, '$1$2')) }
   else await copyFile(new URL(name, source), new URL(name, dest))
 }
