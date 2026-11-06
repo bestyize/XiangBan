@@ -6,7 +6,7 @@ import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
 
 const model = defineModel<string>({ required: true })
-const props = defineProps<{ placeholder?: string; rows?: number; label: string; id: string }>()
+const props = defineProps<{ placeholder?: string; rows?: number; label: string; id: string; compact?: boolean }>()
 
 const mode = ref<'write' | 'preview'>('write')
 const html = ref('')
@@ -116,11 +116,14 @@ function focus() {
   requestAnimationFrame(() => textarea.value?.focus())
 }
 
-defineExpose({ focus })
+/** 紧凑模式没有工具栏，由外面的按钮来选图。 */
+function pickImage() { picker.value?.click() }
+
+defineExpose({ focus, pickImage })
 </script>
 
 <template>
-  <div class="editor">
+  <div class="editor" :class="{ compact }">
     <div class="bar">
       <div class="modes" role="tablist" :aria-label="props.label">
         <button type="button" role="tab" :aria-selected="mode === 'write'" :class="{ on: mode === 'write' }" @click="mode = 'write'">
@@ -136,12 +139,12 @@ defineExpose({ focus })
         <button type="button" title="插入图片，也可以直接粘贴或拖进来" :disabled="uploading > 0" @click="picker?.click()">
           {{ uploading ? '上传中' : '插图' }}
         </button>
-        <input ref="picker" class="picker" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple tabindex="-1" aria-hidden="true" @change="onPick" />
         <button type="button" title="行内代码" @click="wrap('`', '`', 'code')">代码</button>
         <button type="button" title="代码块" @click="wrap('\n```bash\n', '\n```\n', '')">代码块</button>
         <button type="button" title="列表" @click="wrap('\n- ', '', '')">列表</button>
       </div>
     </div>
+    <input ref="picker" class="picker" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple tabindex="-1" aria-hidden="true" @change="onPick" />
     <label :for="id" class="sr-only">{{ label }}</label>
     <textarea
       v-show="mode === 'write'"
@@ -240,5 +243,28 @@ defineExpose({ focus })
   color: var(--ink-3);
   border-top: 1px solid var(--line);
   background: var(--surface-2);
+}
+.editor.compact {
+  border: 0;
+  border-radius: 0;
+  background: none;
+  overflow: visible;
+}
+.editor.compact:focus-within {
+  box-shadow: none;
+}
+.editor.compact .bar,
+.editor.compact .hint {
+  display: none;
+}
+/* 16px 以上，iOS 聚焦时才不会自动放大页面。 */
+.editor.compact .textarea {
+  min-height: 88px;
+  max-height: 30dvh;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 16px;
+  resize: none;
 }
 </style>

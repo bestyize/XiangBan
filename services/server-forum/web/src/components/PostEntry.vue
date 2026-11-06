@@ -12,7 +12,7 @@ import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
 import { TRUST_LABEL, formatDateTime, timeAgo } from '@/lib/format'
 
-const props = defineProps<{ post: PostItem; topicAuthor: string; canReply: boolean; accepted?: boolean }>()
+const props = defineProps<{ post: PostItem; topicAuthor: string; canReply: boolean; accepted?: boolean; replyToName?: string }>()
 const emit = defineEmits<{ reply: [post: PostItem]; report: [post: PostItem]; removed: [] }>()
 const session = useSession()
 const toast = useToast()
@@ -87,7 +87,7 @@ async function remove() {
         <RouterLink :to="`/u/${post.author.uid}`" class="name">{{ post.author.nickname }}</RouterLink>
         <span v-if="post.author.uid === topicAuthor" class="op">楼主</span>
         <span v-if="post.author.trust_level >= 2" class="tl">{{ TRUST_LABEL[post.author.trust_level] }}</span>
-        <a v-if="post.reply_to_floor" :href="`#floor-${post.reply_to_floor}`" class="replyto">回复 #{{ post.reply_to_floor }}</a>
+        <a v-if="post.reply_to_floor" :href="`#floor-${post.reply_to_floor}`" class="replyto"><span class="only-wide">回复 #{{ post.reply_to_floor }}</span><span class="only-narrow">回复 {{ replyToName || `#${post.reply_to_floor}` }}</span></a>
         <time :datetime="post.created_at" :title="formatDateTime(post.created_at)" class="time">{{ timeAgo(post.created_at) }}</time>
         <a :href="`#floor-${post.floor}`" class="floor">#{{ post.floor }}</a>
       </header>
@@ -106,7 +106,8 @@ async function remove() {
       <template v-else><div class="prose body" v-html="post.body_html" /><ReplyWorkCards :items="post.work_refs ?? []" /><AttachmentList v-if="post.attachments?.length" :items="post.attachments" restricted /></template>
 
       <footer v-if="post.status === 'normal' && !editing" class="actions">
-        <button type="button" class="act" :class="{ on: post.liked }" :aria-pressed="post.liked" @click="like">
+        <time :datetime="post.created_at" class="time-m">{{ timeAgo(post.created_at) }}</time>
+        <button type="button" class="act act-like" :class="{ on: post.liked }" :aria-pressed="post.liked" @click="like">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.5s-5-3-5-7a2.8 2.8 0 0 1 5-1.7A2.8 2.8 0 0 1 13 6.5c0 4-5 7-5 7z" /></svg>
           {{ post.like_count || '赞' }}
         </button>
@@ -239,10 +240,64 @@ async function remove() {
   gap: 8px;
   margin-top: 8px;
 }
+.only-narrow,
+.time-m {
+  display: none;
+}
 @media (max-width: 767px) {
   .post {
-    padding: 14px 0;
+    padding: 12px 0;
     gap: 10px;
+  }
+  /* 手机上去掉楼层号、等级标签和头部时间，时间挪到正文下面，赞靠右。 */
+  .tl,
+  .floor,
+  .head .time,
+  .only-wide {
+    display: none;
+  }
+  .only-narrow {
+    display: inline;
+  }
+  .head {
+    margin-bottom: 2px;
+  }
+  .name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+  .replyto {
+    text-decoration: none;
+  }
+  .body {
+    line-height: 1.6;
+  }
+  .actions {
+    gap: 14px;
+    margin: 4px 0 0;
+  }
+  .time-m {
+    display: inline;
+    font-size: var(--fs-xs);
+    color: var(--ink-3);
+  }
+  .act {
+    min-height: 32px;
+    padding: 4px 0;
+    font-weight: 500;
+  }
+  .act:hover {
+    background: none;
+  }
+  .act-like {
+    order: 99;
+    margin-left: auto;
+    gap: 5px;
+  }
+  .act-like svg {
+    width: 18px;
+    height: 18px;
   }
 }
 .blocked-row {

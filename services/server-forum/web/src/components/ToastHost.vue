@@ -22,6 +22,9 @@ const toast = useToast()
   justify-items: center;
   pointer-events: none;
 }
+@media (max-width: 767px) {
+  .toasts { bottom: calc(72px + env(safe-area-inset-bottom)); }
+}
 .toast {
   background: var(--ink);
   color: var(--paper);

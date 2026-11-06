@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { categoryDestination } from '@/lib/communityStructure'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
 import ReplyExtrasEditor from '@/components/ReplyExtrasEditor.vue'
@@ -57,6 +57,41 @@ const replyTo = ref<PostItem | null>(null)
 const sending = ref(false)
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const reportTarget = ref<{ type: 'topic' | 'post'; id: number } | null>(null)
+
+// 手机上（<768px）评论改成「底部栏 + 弹出的输入面板」，桌面端保持原来的页内回复框。
+const mobileQuery = window.matchMedia('(max-width: 767px)')
+const isMobile = ref(mobileQuery.matches)
+const syncMobile = () => { isMobile.value = mobileQuery.matches }
+mobileQuery.addEventListener('change', syncMobile)
+onBeforeUnmount(() => mobileQuery.removeEventListener('change', syncMobile))
+const composerOpen = ref(false), kbInset = ref(0)
+const postNames = computed(() => new Map(posts.value.map(p => [p.id, p.author.nickname])))
+const repliesTitle = computed(() => {
+  const count = topic.value?.reply_count ?? 0
+  if (isMobile.value) return count ? `共 ${count} 条评论` : '评论'
+  return count ? `${count} 条回复` : '还没有回复'
+})
+function closeComposer() { composerOpen.value = false }
+// 软键盘弹出时，visualViewport 变矮；把面板抬到键盘上方。
+function syncKeyboardInset() {
+  const vv = window.visualViewport
+  kbInset.value = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0
+}
+watch(composerOpen, (open, _, cleanup) => {
+  if (!open) return
+  const root = document.documentElement, previous = root.style.overflow, vv = window.visualViewport
+  root.style.overflow = 'hidden'
+  vv?.addEventListener('resize', syncKeyboardInset)
+  vv?.addEventListener('scroll', syncKeyboardInset)
+  syncKeyboardInset()
+  cleanup(() => {
+    root.style.overflow = previous
+    vv?.removeEventListener('resize', syncKeyboardInset)
+    vv?.removeEventListener('scroll', syncKeyboardInset)
+    kbInset.value = 0
+  })
+})
+watch(isMobile, mobile => { if (!mobile) composerOpen.value = false })
 const helpBusy = ref(false)
 const helpOwner = computed(() => session.user?.uid === topic.value?.author.uid)
 const helpExpired = ref(false)
@@ -121,6 +156,7 @@ watch(
     draft.value = ''
     replyRefs.value = []; replyFiles.value = []; uploading.value = false
     replyTo.value = null
+    composerOpen.value = false
     // 链接带了楼层锚点时，先翻到那一页。
     const floor = Number(String(route.hash).replace('#floor-', ''))
     const page = floor > 0 ? Math.ceil(floor / POST_PAGE) : 1
@@ -198,9 +234,15 @@ async function removeTopic() {
   }
 }
 
-function startReply(post: PostItem | null) {
+async function startReply(post: PostItem | null) {
   if (!session.requireLogin()) return
   replyTo.value = post
+  if (isMobile.value) {
+    composerOpen.value = true
+    await nextTick()
+    editor.value?.focus()
+    return
+  }
   document.getElementById('reply-box')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   editor.value?.focus()
 }
@@ -219,6 +261,7 @@ async function sendReply() {
     draft.value = ''
     replyRefs.value = []; replyFiles.value = []; uploading.value = false
     replyTo.value = null
+    composerOpen.value = false
     topic.value.reply_count += 1
     const lastPage = Math.ceil(res.floor / POST_PAGE)
     await loadPosts(lastPage)
@@ -229,6 +272,10 @@ async function sendReply() {
   } finally {
     sending.value = false
   }
+}
+
+function scrollToReplies() {
+  document.getElementById('replies')?.scrollIntoView({ behavior: 'smooth' })
 }
 
 function goPosts(page: number) {
@@ -319,11 +366,11 @@ function breadcrumbDestination(slug: string) {
       </div>
 
       <div class="actions">
-        <button type="button" class="btn" :class="{ liked: topic.viewer.liked }" :aria-pressed="topic.viewer.liked" @click="toggleLike">
+        <button type="button" class="btn act-like" :class="{ liked: topic.viewer.liked }" :aria-pressed="topic.viewer.liked" @click="toggleLike">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.5s-5-3-5-7a2.8 2.8 0 0 1 5-1.7A2.8 2.8 0 0 1 13 6.5c0 4-5 7-5 7z" /></svg>
           {{ topic.like_count ? `赞 ${topic.like_count}` : '赞' }}
         </button>
-        <button type="button" class="btn" :aria-pressed="topic.viewer.bookmarked" @click="toggleBookmark">
+        <button type="button" class="btn act-bookmark" :aria-pressed="topic.viewer.bookmarked" @click="toggleBookmark">
           {{ topic.viewer.bookmarked ? '已收藏' : '收藏' }}
         </button>
         <button type="button" class="btn" @click="share">分享</button>
@@ -357,7 +404,8 @@ function breadcrumbDestination(slug: string) {
       </div>
 
       <section id="replies" class="replies" aria-labelledby="replies-title">
-        <h2 id="replies-title">{{ topic.reply_count ? `${topic.reply_count} 条回复` : '还没有回复' }}</h2>
+        <h2 id="replies-title">{{ repliesTitle }}</h2>
+        <p v-if="isMobile && !posts.length" class="empty-note">还没有评论，来说点什么吧</p>
         <div v-if="posts.length" class="list">
           <div v-for="p in posts" :key="p.id" class="answer">
           <div v-if="topic.help?.accepted_post_id === p.id" class="accepted">✓ 已采纳的回答</div>
@@ -366,6 +414,7 @@ function breadcrumbDestination(slug: string) {
             :topic-author="topic.author.uid"
             :can-reply="!topic.locked"
             :accepted="topic.help?.accepted_post_id === p.id"
+            :reply-to-name="p.reply_to ? postNames.get(p.reply_to) : undefined"
             @reply="startReply"
             @report="post => report({ type: 'post', id: post.id })"
             @removed="topic.reply_count = Math.max(0, topic.reply_count - 1)"
@@ -378,34 +427,74 @@ function breadcrumbDestination(slug: string) {
         <PagerNav :page="postPage" :page-size="POST_PAGE" :total="postTotal" @go="goPosts" />
       </section>
 
-      <section id="reply-box" class="reply-box" aria-label="回复">
-        <p v-if="topic.locked" class="panel note">帖子已锁定，不能再回复。</p>
-        <div v-else-if="!session.loggedIn" class="panel note">
-          <span>登录后参与讨论，或者告诉大家你的看法。</span>
-          <button type="button" class="btn btn-primary btn-sm" @click="session.loginOpen = true">登录</button>
+      <Teleport to="body" :disabled="!isMobile">
+        <div v-if="isMobile && composerOpen" class="sheet-backdrop" @click="closeComposer" />
+        <section
+          v-show="!isMobile || composerOpen"
+          id="reply-box"
+          class="reply-box"
+          :class="{ sheet: isMobile }"
+          :style="isMobile ? { bottom: `${kbInset}px` } : undefined"
+          :role="isMobile ? 'dialog' : undefined"
+          aria-label="回复"
+          @keydown.esc="closeComposer"
+        >
+          <p v-if="topic.locked" class="panel note">帖子已锁定，不能再回复。</p>
+          <div v-else-if="!session.loggedIn" class="panel note">
+            <span>登录后参与讨论，或者告诉大家你的看法。</span>
+            <button type="button" class="btn btn-primary btn-sm" @click="session.loginOpen = true">登录</button>
+          </div>
+          <form v-else class="compose" @submit.prevent="sendReply">
+            <div v-if="isMobile" class="sheet-head">
+              <strong>{{ replyTo ? `回复 ${replyTo.author.nickname}` : '写评论' }}</strong>
+              <button type="button" class="btn btn-ghost btn-sm" @click="closeComposer">收起</button>
+            </div>
+            <div v-else-if="replyTo" class="replying">
+              回复 #{{ replyTo.floor }} {{ replyTo.author.nickname }}
+              <button type="button" class="btn btn-ghost btn-sm" @click="replyTo = null">取消</button>
+            </div>
+            <MarkdownEditor
+              id="reply-editor"
+              ref="editor"
+              v-model="draft"
+              label="回复内容"
+              :rows="isMobile ? 3 : 5"
+              :compact="isMobile"
+              :placeholder="isMobile ? '说点什么…' : '说点有用的：你领到了吗？用的什么方法？'"
+            />
+            <ReplyExtrasEditor v-if="session.info" :key="topic.id" v-model:work-refs="replyRefs" v-model:attachments="replyFiles" :max-bytes="session.info.limits.upload_max_bytes" :disabled="sending" @uploading="uploading = $event" />
+            <div class="send">
+              <div v-if="isMobile" class="sheet-tools">
+                <button type="button" class="tool" aria-label="插入图片" @click="editor?.pickImage()">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="1.6" /><path d="m21 16-5-5-9 9" /></svg>
+                </button>
+              </div>
+              <span v-else class="muted">{{ session.user?.trust_level === 0 ? `新人每天可以回复 ${session.info?.limits.daily_posts ?? 10} 次` : '' }}</span>
+              <button type="submit" class="btn btn-primary" :disabled="sending || uploading || draft.trim().length < 2">
+                {{ sending ? '正在发送' : isMobile ? '发送' : '发表回复' }}
+              </button>
+            </div>
+          </form>
+        </section>
+      </Teleport>
+
+      <Teleport to="body">
+        <div v-if="isMobile" v-show="!composerOpen" class="topic-bar" role="group" aria-label="帖子互动">
+          <button type="button" class="bar-capsule" :disabled="topic.locked" @click="startReply(null)">{{ topic.locked ? '帖子已锁定' : '说点什么…' }}</button>
+          <button type="button" class="bar-btn" :class="{ on: topic.viewer.liked }" :aria-pressed="topic.viewer.liked" aria-label="赞" @click="toggleLike">
+            <svg viewBox="0 0 24 24" width="24" height="24" :fill="topic.viewer.liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" /></svg>
+            <span>{{ topic.like_count || '赞' }}</span>
+          </button>
+          <button type="button" class="bar-btn" :class="{ on: topic.viewer.bookmarked }" :aria-pressed="topic.viewer.bookmarked" aria-label="收藏" @click="toggleBookmark">
+            <svg viewBox="0 0 24 24" width="24" height="24" :fill="topic.viewer.bookmarked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4Z" /></svg>
+            <span>{{ topic.viewer.bookmarked ? '已收藏' : '收藏' }}</span>
+          </button>
+          <button type="button" class="bar-btn" :aria-label="`评论，共 ${topic.reply_count} 条`" @click="scrollToReplies">
+            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v13h-8l-5 4v-4H4Z" /></svg>
+            <span>{{ topic.reply_count || '评论' }}</span>
+          </button>
         </div>
-        <form v-else class="compose" @submit.prevent="sendReply">
-          <div v-if="replyTo" class="replying">
-            回复 #{{ replyTo.floor }} {{ replyTo.author.nickname }}
-            <button type="button" class="btn btn-ghost btn-sm" @click="replyTo = null">取消</button>
-          </div>
-          <MarkdownEditor
-            id="reply-editor"
-            ref="editor"
-            v-model="draft"
-            label="回复内容"
-            :rows="5"
-            placeholder="说点有用的：你领到了吗？用的什么方法？"
-          />
-          <ReplyExtrasEditor v-if="session.info" :key="topic.id" v-model:work-refs="replyRefs" v-model:attachments="replyFiles" :max-bytes="session.info.limits.upload_max_bytes" :disabled="sending" @uploading="uploading = $event" />
-          <div class="send">
-            <span class="muted">{{ session.user?.trust_level === 0 ? `新人每天可以回复 ${session.info?.limits.daily_posts ?? 10} 次` : '' }}</span>
-            <button type="submit" class="btn btn-primary" :disabled="sending || uploading || draft.trim().length < 2">
-              {{ sending ? '正在发送' : '发表回复' }}
-            </button>
-          </div>
-        </form>
-      </section>
+      </Teleport>
     </article>
 
     <ReportDialog :target="reportTarget" @close="reportTarget = null" />
@@ -623,6 +712,11 @@ function breadcrumbDestination(slug: string) {
   width: 40%;
 }
 @media (max-width: 767px) {
+  .act-like, .act-bookmark { display:none; }
+  .replies { scroll-margin-top:60px; }
+  .replies h2 { font-size:15px; font-weight:600; }
+  .list, .list > :deep(*) { border:0; }
+  .empty-note { margin:0; padding:32px 0 24px; text-align:center; font-size:var(--fs-sm); color:var(--ink-3); }
   .topic-shell :deep(.center) { padding:16px 16px 24px; }
   .title { font-size:20px; line-height:1.4; font-weight:600; }
   .actions .btn, .note .btn { min-height:44px; }
@@ -631,5 +725,90 @@ function breadcrumbDestination(slug: string) {
     flex-direction: column;
     align-items: flex-start;
   }
+  /* 底部栏盖住主导航，高度与它一致，页面底部的留白不用再调。 */
+  .topic-bar {
+    position: fixed;
+    z-index: 38;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    box-sizing: border-box;
+    height: calc(56px + env(safe-area-inset-bottom));
+    padding: 0 8px 0 12px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+  .bar-capsule {
+    flex: 1;
+    min-width: 0;
+    height: 38px;
+    margin-right: 6px;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 19px;
+    background: var(--surface-2);
+    color: var(--ink-3);
+    font-size: 14px;
+    text-align: left;
+  }
+  .bar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 5px;
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .bar-btn.on { color: var(--brand); }
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 39;
+    background: rgba(0, 0, 0, 0.35);
+  }
+  .reply-box.sheet {
+    position: fixed;
+    z-index: 40;
+    left: 0;
+    right: 0;
+    margin: 0;
+    box-sizing: border-box;
+    max-height: 80dvh;
+    overflow: auto;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: var(--surface);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.14);
+  }
+  .sheet .compose { gap: 8px; }
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: var(--fs-sm);
+  }
+  .sheet .send { justify-content: space-between; }
+  .sheet-tools { display: flex; gap: 4px; }
+  .sheet-tools .tool {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border: 0;
+    background: none;
+    color: var(--ink-2);
+  }
+  .sheet .send .btn { min-width: 84px; min-height: 40px; border-radius: 20px; }
 }
 </style>
