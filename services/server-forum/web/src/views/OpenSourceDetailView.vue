@@ -16,6 +16,8 @@ import RequestState from '@/components/community/RequestState.vue'
 import CommunityBack from '@/components/community/CommunityBack.vue'
 import DiscoverGlyph from '@/components/community/DiscoverGlyph.vue'
 import RepoComments from '@/components/community/RepoComments.vue'
+import DockButton from '@/components/comments/DockButton.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import OpenSourceReleaseHistory from '@/components/community/OpenSourceReleaseHistory.vue'
 import OpenSourceReleasePackages from '@/components/community/OpenSourceReleasePackages.vue'
 import OpenSourceProjectCard from '@/components/community/OpenSourceProjectCard.vue'
@@ -240,7 +242,7 @@ async function articleClick(event: MouseEvent) {
           </section>
         </aside>
       </div>
-      <RepoComments :key="project.full_name" :owner="project.full_name.split('/')[0]!" :repo="project.full_name.split('/')[1]!" editorial><template #actions><a class="readme-bar-action" :href="github" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看项目"><DiscoverGlyph name="github" :size="24" /></a><button class="readme-bar-action" :class="{ saved: bookmarks.has(project.full_name) }" :aria-pressed="bookmarks.has(project.full_name)" title="收藏保存在当前浏览器" @click="bookmarks.toggle(project.full_name)"><DiscoverGlyph name="star" :size="26"/><span>{{ bookmarks.has(project.full_name) ? '已收藏' : '收藏' }}</span></button></template></RepoComments>
+      <RepoComments style="--comments-bleed: 20px" :key="project.full_name" :owner="project.full_name.split('/')[0]!" :repo="project.full_name.split('/')[1]!"><template #actions><a class="readme-bar-action" :href="github" target="_blank" rel="noopener noreferrer" aria-label="在 GitHub 查看项目"><DiscoverGlyph name="github" :size="24" /></a><DockButton :label="bookmarks.has(project.full_name) ? '取消收藏' : '收藏'" :text="bookmarks.has(project.full_name) ? '已收藏' : '收藏'" :active="bookmarks.has(project.full_name)" @click="bookmarks.toggle(project.full_name)"><AppIcon name="bookmark" :size="24" /></DockButton></template></RepoComments>
       <p v-if="bookmarks.error.value" class="readme-save-error" role="alert">{{ bookmarks.error.value }}</p>
     </template>
     <RequestState v-else-if="loading || error" :loading="loading" :error="error" @retry="load" />

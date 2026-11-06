@@ -59,7 +59,7 @@ useHead(() => ({ title:d.value ? `${d.value.full_name} · 开源热榜` : '项�
       </template>
       <div v-else class="empty"><b>{{ d.readme.status === 'none' ? '这个仓库没有 README' : '暂时无法获取 README' }}</b><span>{{ d.readme.status === 'none' ? '作者还没有写项目介绍，可以去 GitHub 查看代码和文档。' : '稍后再来看看，或直接去 GitHub 查看。' }}</span><a class="secondary" :href="github" target="_blank" rel="noopener noreferrer">在 GitHub 查看 ↗</a></div>
     </section>
-    <RepoComments :owner="owner" :repo="repo" />
+    <RepoComments style="--comments-bleed: 16px" :owner="owner" :repo="repo" />
   </template>
 </div></main></template>
 <style scoped>

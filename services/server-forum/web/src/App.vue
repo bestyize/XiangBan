@@ -11,6 +11,8 @@ import { useMeta } from '@/stores/meta'
 import { captureInvite } from '@/lib/invite'
 import { areaOf } from '@/lib/sections'
 const route = useRoute(), session = useSession(), meta = useMeta()
+// 这些详情页在手机上有底部互动栏，页脚链接会被它挤在评论和栏之间，所以隐藏。
+const DOCK_PAGES = new Set(['topic', 'daily-detail', 'frontier-detail', 'open-source-project', 'repo-detail', 'pack', 'scheme'])
 captureInvite()
 let visitDay = ''
 watch([() => route.fullPath, () => session.user?.uid], () => {
@@ -37,7 +39,7 @@ watch(() => session.loggedIn, v => {
       <section v-if="route.meta.auth && !protectedReady" class="session-locked"><template v-if="session.loggedIn"><p>正在确认账号信息…</p><button class="btn" @click="session.loadSession()">重新读取</button></template><template v-else><p>登录已过期，重新登录后可以继续。</p><button class="btn btn-primary" @click="session.loginOpen = true">重新登录</button></template></section>
       <RouterView v-slot="{ Component }"><component :is="Component" v-if="!route.meta.auth || viewIdentity !== 'guest'" :key="viewIdentity" v-show="!route.meta.auth || protectedReady" /></RouterView>
     </main>
-    <footer v-if="!route.meta.focus" class="app-footer" :class="{'footer-hide-narrow':route.name === 'topic'}"><nav aria-label="站点信息"><RouterLink to="/rules">社区规则</RouterLink><RouterLink to="/terms">用户协议</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink><a href="mailto:support@xiangban.xyz">联系我们</a><a href="https://wallpaper.xiangban.xyz/#desktop-downloads" target="_blank" rel="noopener noreferrer">下载客户端</a></nav><p>发现好内容，体验新想法。</p></footer>
+    <footer v-if="!route.meta.focus" class="app-footer" :class="{'footer-hide-narrow':DOCK_PAGES.has(String(route.name))}"><nav aria-label="站点信息"><RouterLink to="/rules">社区规则</RouterLink><RouterLink to="/terms">用户协议</RouterLink><RouterLink to="/privacy">隐私政策</RouterLink><a href="mailto:support@xiangban.xyz">联系我们</a><a href="https://wallpaper.xiangban.xyz/#desktop-downloads" target="_blank" rel="noopener noreferrer">下载客户端</a></nav><p>发现好内容，体验新想法。</p></footer>
     <TabBar />
   </div>
   <LoginDialog /><ToastHost /><AppearanceDialog />
