@@ -64,7 +64,12 @@ const isMobile = ref(mobileQuery.matches)
 const syncMobile = () => { isMobile.value = mobileQuery.matches }
 mobileQuery.addEventListener('change', syncMobile)
 onBeforeUnmount(() => mobileQuery.removeEventListener('change', syncMobile))
-const composerOpen = ref(false), kbInset = ref(0)
+const composerOpen = ref(false), moreOpen = ref(false), kbInset = ref(0)
+const sheetOpen = computed(() => composerOpen.value || moreOpen.value)
+// 菜单里的操作先收起菜单再执行，避免遮罩留在对话框或跳转后的页面上。
+function fromMore(action: () => unknown) { moreOpen.value = false; void action() }
+function openPoster() { posterOpen.value = true }
+function reportTopic() { if (topic.value) report({ type: 'topic', id: topic.value.id }) }
 const postNames = computed(() => new Map(posts.value.map(p => [p.id, p.author.nickname])))
 const repliesTitle = computed(() => {
   const count = topic.value?.reply_count ?? 0
@@ -77,7 +82,7 @@ function syncKeyboardInset() {
   const vv = window.visualViewport
   kbInset.value = vv ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0
 }
-watch(composerOpen, (open, _, cleanup) => {
+watch(sheetOpen, (open, _, cleanup) => {
   if (!open) return
   const root = document.documentElement, previous = root.style.overflow, vv = window.visualViewport
   root.style.overflow = 'hidden'
@@ -91,7 +96,7 @@ watch(composerOpen, (open, _, cleanup) => {
     kbInset.value = 0
   })
 })
-watch(isMobile, mobile => { if (!mobile) composerOpen.value = false })
+watch(isMobile, mobile => { if (!mobile) { composerOpen.value = false; moreOpen.value = false } })
 const helpBusy = ref(false)
 const helpOwner = computed(() => session.user?.uid === topic.value?.author.uid)
 const helpExpired = ref(false)
@@ -156,7 +161,7 @@ watch(
     draft.value = ''
     replyRefs.value = []; replyFiles.value = []; uploading.value = false
     replyTo.value = null
-    composerOpen.value = false
+    composerOpen.value = false; moreOpen.value = false
     // 链接带了楼层锚点时，先翻到那一页。
     const floor = Number(String(route.hash).replace('#floor-', ''))
     const page = floor > 0 ? Math.ceil(floor / POST_PAGE) : 1
@@ -343,10 +348,15 @@ function breadcrumbDestination(slug: string) {
       </nav>
       <h1 v-if="topic.title || topic.pinned" class="title"><span v-if="topic.pinned" class="pin-badge">{{ pinScopeLabel(topic.pin_scope) }}</span>{{ topic.title }}</h1>
       <div class="byline">
-        <RouterLink :to="`/u/${topic.author.uid}`" class="who">
-          <UserAvatar :name="topic.author.nickname" :src="topic.author.avatar_url" :size="28" />
-          <span class="name">{{ topic.author.nickname }}</span>
-        </RouterLink>
+        <div class="byline-top">
+          <RouterLink :to="`/u/${topic.author.uid}`" class="who">
+            <UserAvatar :name="topic.author.nickname" :src="topic.author.avatar_url" :size="28" />
+            <span class="name">{{ topic.author.nickname }}</span>
+          </RouterLink>
+          <button type="button" class="more-btn" aria-label="更多操作" aria-haspopup="dialog" @click="moreOpen = true">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
+          </button>
+        </div>
         <span class="tl">{{ TRUST_LABEL[topic.author.trust_level] }}</span>
         <time :datetime="topic.created_at" :title="formatDateTime(topic.created_at)">{{ timeAgo(topic.created_at) }}发布</time>
         <span v-if="topic.edited_at">编辑于 {{ timeAgo(topic.edited_at) }}</span>
@@ -366,11 +376,11 @@ function breadcrumbDestination(slug: string) {
       </div>
 
       <div class="actions">
-        <button type="button" class="btn act-like" :class="{ liked: topic.viewer.liked }" :aria-pressed="topic.viewer.liked" @click="toggleLike">
+        <button type="button" class="btn" :class="{ liked: topic.viewer.liked }" :aria-pressed="topic.viewer.liked" @click="toggleLike">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13.5s-5-3-5-7a2.8 2.8 0 0 1 5-1.7A2.8 2.8 0 0 1 13 6.5c0 4-5 7-5 7z" /></svg>
           {{ topic.like_count ? `赞 ${topic.like_count}` : '赞' }}
         </button>
-        <button type="button" class="btn act-bookmark" :aria-pressed="topic.viewer.bookmarked" @click="toggleBookmark">
+        <button type="button" class="btn" :aria-pressed="topic.viewer.bookmarked" @click="toggleBookmark">
           {{ topic.viewer.bookmarked ? '已收藏' : '收藏' }}
         </button>
         <button type="button" class="btn" @click="share">分享</button>
@@ -405,7 +415,11 @@ function breadcrumbDestination(slug: string) {
 
       <section id="replies" class="replies" aria-labelledby="replies-title">
         <h2 id="replies-title">{{ repliesTitle }}</h2>
-        <p v-if="isMobile && !posts.length" class="empty-note">还没有评论，来说点什么吧</p>
+        <div v-if="isMobile && !posts.length" class="empty-note">
+          <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v13h-8l-5 4v-4H4Z" /></svg>
+          <strong>还没有评论</strong>
+          <span>说点什么，做第一个留言的人</span>
+        </div>
         <div v-if="posts.length" class="list">
           <div v-for="p in posts" :key="p.id" class="answer">
           <div v-if="topic.help?.accepted_post_id === p.id" class="accepted">✓ 已采纳的回答</div>
@@ -479,7 +493,31 @@ function breadcrumbDestination(slug: string) {
       </Teleport>
 
       <Teleport to="body">
-        <div v-if="isMobile" v-show="!composerOpen" class="topic-bar" role="group" aria-label="帖子互动">
+        <template v-if="isMobile && moreOpen">
+          <div class="sheet-backdrop" @click="moreOpen = false" />
+          <div class="more-sheet" role="dialog" aria-label="更多操作" @keydown.esc="moreOpen = false">
+            <button type="button" class="more-row" @click="fromMore(share)">分享</button>
+            <button type="button" class="more-row" @click="fromMore(openPoster)">生成海报</button>
+            <template v-if="topic.viewer.can_pin">
+              <label class="more-row more-pin">
+                <span>置顶范围</span>
+                <select v-model="pinScopeDraft" aria-label="置顶范围">
+                  <option value="site">全站</option>
+                  <option value="parent">一级板块</option>
+                  <option value="category">二级板块</option>
+                </select>
+              </label>
+              <button type="button" class="more-row" @click="fromMore(togglePin)">{{ pinActionLabel }}</button>
+            </template>
+            <template v-if="topic.viewer.can_edit">
+              <RouterLink :to="`/t/${topic.id}/edit`" class="more-row" @click="moreOpen = false">编辑</RouterLink>
+              <button type="button" class="more-row danger" @click="fromMore(removeTopic)">删除</button>
+            </template>
+            <button v-else-if="session.user?.uid !== topic.author.uid" type="button" class="more-row" @click="fromMore(reportTopic)">举报</button>
+            <button type="button" class="more-cancel" @click="moreOpen = false">取消</button>
+          </div>
+        </template>
+        <div v-if="isMobile" v-show="!composerOpen && !moreOpen" class="topic-bar" role="group" aria-label="帖子互动">
           <button type="button" class="bar-capsule" :disabled="topic.locked" @click="startReply(null)">{{ topic.locked ? '帖子已锁定' : '说点什么…' }}</button>
           <button type="button" class="bar-btn" :class="{ on: topic.viewer.liked }" :aria-pressed="topic.viewer.liked" aria-label="赞" @click="toggleLike">
             <svg viewBox="0 0 24 24" width="24" height="24" :fill="topic.viewer.liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8Z" /></svg>
@@ -642,6 +680,13 @@ function breadcrumbDestination(slug: string) {
 .spacer {
   flex: 1;
 }
+/* 桌面端：包一层只为手机上把“更多”按钮放到作者行右侧，这里让它不影响原布局。 */
+.byline-top {
+  display: contents;
+}
+.more-btn {
+  display: none;
+}
 .replies h2 {
   font-size: var(--fs-md);
   margin: 0 0 10px;
@@ -712,15 +757,25 @@ function breadcrumbDestination(slug: string) {
   width: 40%;
 }
 @media (max-width: 767px) {
-  .act-like, .act-bookmark { display:none; }
+  /* 内容栏铺满屏幕宽度并去掉卡片圆角；左右 8px、底部 20px 是 App.vue 里手机社区页 app-main 的留白，抵消后白底一直铺到底部栏。 */
+  .topic-shell :deep(.center) { margin:0 -8px -20px; border-radius:0; }
+  .byline-top { display:flex; align-items:center; justify-content:space-between; width:100%; }
+  .more-btn { display:grid; place-items:center; width:44px; height:44px; margin:-8px -12px -8px 0; border:0; background:none; color:var(--ink-2); }
+  .byline .tl { display:none; }
+  /* 分享、海报、举报、编辑等收进“更多”菜单；赞和收藏在底部栏。 */
+  .actions { display:none; }
+  .tags { margin-bottom:4px; }
   .replies { scroll-margin-top:60px; }
   .replies h2 { font-size:15px; font-weight:600; }
   .list, .list > :deep(*) { border:0; }
-  .empty-note { margin:0; padding:32px 0 24px; text-align:center; font-size:var(--fs-sm); color:var(--ink-3); }
+  .empty-note { display:grid; justify-items:center; gap:6px; padding:36px 0 28px; text-align:center; color:var(--ink-3); }
+  .empty-note svg { margin-bottom:6px; opacity:.45; }
+  .empty-note strong { font-size:var(--fs-md); font-weight:600; color:var(--ink-2); }
+  .empty-note span { font-size:var(--fs-sm); }
   .topic-shell :deep(.center) { padding:16px 16px 24px; }
   .title { font-size:20px; line-height:1.4; font-weight:600; }
   .actions .btn, .note .btn { min-height:44px; }
-  .replies { padding-top:16px; border-top:8px solid var(--surface-2); }
+  .replies { padding-top:14px; padding-bottom:24px; margin-top:16px; border-top:1px solid var(--line); }
   .note {
     flex-direction: column;
     align-items: flex-start;
@@ -810,5 +865,49 @@ function breadcrumbDestination(slug: string) {
     color: var(--ink-2);
   }
   .sheet .send .btn { min-width: 84px; min-height: 40px; border-radius: 20px; }
+  .more-sheet {
+    position: fixed;
+    z-index: 40;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    box-sizing: border-box;
+    max-height: 80dvh;
+    overflow: auto;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.14);
+  }
+  .more-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 54px;
+    padding: 0 16px;
+    border: 0;
+    border-bottom: 1px solid var(--line);
+    background: none;
+    color: var(--ink);
+    font-size: 16px;
+  }
+  .more-row.danger { color: var(--danger); }
+  .more-pin { justify-content: space-between; color: var(--ink-2); }
+  .more-pin select { border: 0; background: none; color: var(--ink); font-size: 16px; text-align: right; }
+  .more-cancel {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 54px;
+    margin-top: 8px;
+    border: 0;
+    border-top: 8px solid var(--surface-2);
+    background: var(--surface);
+    color: var(--ink-2);
+    font-size: 16px;
+  }
 }
 </style>
