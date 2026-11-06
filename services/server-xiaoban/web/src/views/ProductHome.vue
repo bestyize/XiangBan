@@ -26,18 +26,18 @@ watch(() => route.hash, jumpToHash)
       </div>
       <div class="hero-visual">
         <div class="visual-head"><div><span class="visual-mark">✳</span> 小伴桌面 <span class="visual-divider">/</span> 对话创作</div><span class="visual-dots">● ● ●</span></div>
-        <img src="/desktop/chat.webp" alt="小伴桌面对话界面与任务执行过程" width="1280" height="800">
-        <div class="visual-caption"><span>界面截图来自历史版本</span><span>功能与界面请以客户端为准</span></div>
+        <img src="/desktop/current-home.webp" alt="小伴桌面新建任务界面，展示对话输入和创作入口" width="849" height="670">
+        <div class="visual-caption"><span>小伴桌面 3.1.1 实机截图</span><span>从一句话，开始下一步</span></div>
       </div>
     </section>
     <div class="intro-line wrap"><span>AN ASSISTANT FOR WHAT'S NEXT</span><p>不止回答问题，<strong>也陪你往前走。</strong></p><span>01 — 03</span></div>
     <section class="story wrap" id="work">
       <div class="section-label"><span>01 / WORK</span><span>工作，一起推进</span></div>
-      <div class="story-grid"><div class="story-copy"><h2>从问题出发，<br>一步步完成任务。</h2><p>查找资料、整理文件、规划步骤。用自然的对话告诉小伴你的目标，查看任务执行过程，并在需要时确认操作。</p><RouterLink to="/features" class="text-link">了解 AI 工作能力 <span>↗</span></RouterLink></div><div class="image-panel sage"><img src="/desktop/chatguide.webp" alt="小伴桌面的对话创作指南界面，展示可尝试的任务示例" width="1280" height="800" loading="lazy"><div class="image-label">对话 · 任务 · 执行过程 <span> / 历史版本界面</span></div></div></div>
+      <div class="story-grid"><div class="story-copy"><h2>从问题出发，<br>一步步完成任务。</h2><p>查找资料、整理文件、规划步骤。用自然的对话告诉小伴你的目标，查看任务执行过程，并在需要时确认操作。</p><RouterLink to="/features" class="text-link">了解 AI 工作能力 <span>↗</span></RouterLink></div><div class="image-panel sage"><img src="/desktop/task-plan.webp" alt="小伴将咖啡店活动页面的创作任务拆解为多个执行步骤" width="849" height="440" loading="lazy"><div class="image-label">任务示例 · 规划并执行</div></div></div>
     </section>
     <section class="story wrap" id="create">
       <div class="section-label"><span>02 / CREATE</span><span>创意，逐渐成形</span></div>
-      <div class="story-grid reverse"><div class="story-copy"><h2>有个想法？<br>试着把它做出来。</h2><p>和小伴一起探索设计、网页、游戏或桌面内容。通过对话不断调整，在作品区查看成果，让灵感有继续生长的空间。</p><RouterLink to="/features#create" class="text-link">了解创作能力 <span>↗</span></RouterLink></div><div class="image-panel cream"><img src="/desktop/games.webp" alt="小伴桌面的游戏空间界面" width="1280" height="800" loading="lazy"><div class="image-label">灵感 · 创作 · 作品 <span> / 历史版本界面</span></div></div></div>
+      <div class="story-grid reverse"><div class="story-copy"><h2>有个想法？<br>试着把它做出来。</h2><p>和小伴一起探索设计、网页、游戏或桌面内容。通过对话不断调整，在作品区查看成果，让灵感有继续生长的空间。右图是一次真实任务生成的示例页面。</p><RouterLink to="/features#create" class="text-link">了解创作能力 <span>↗</span></RouterLink></div><div class="image-panel cream"><img src="/desktop/task-result.webp" alt="小伴根据示例需求生成的咖啡店活动页面" width="535" height="387" loading="lazy"><div class="image-label">示例作品 · 咖啡店活动页面</div></div></div>
     </section>
     <section class="story wrap" id="desktop">
       <div class="section-label"><span>03 / MAKE IT YOURS</span><span>桌面，也有自己的样子</span></div>
