@@ -8,7 +8,10 @@ export const router = createRouter({
   scrollBehavior: () => false,
   routes: [
     { path: '/desktop', redirect: to => ({ path: '/', query: to.query, hash: to.hash }) },
-    { path: '/', name: 'desktop', component: () => import('./views/DesktopView.vue'), meta: { tab: 'desktop' } },
+    { path: '/', name: 'desktop', component: () => import('./views/ProductHome.vue'), meta: { tab: 'desktop' } },
+    { path: '/features', name: 'features', component: () => import('./views/ProductFeatures.vue'), meta: { tab: 'product' } },
+    { path: '/download', name: 'download', component: () => import('./views/ProductDownload.vue'), meta: { tab: 'product' } },
+    { path: '/desktop-experience', name: 'desktop-experience', component: () => import('./views/DesktopView.vue'), meta: { tab: 'product' } },
     { path: '/guide', name: 'guide', component: () => import('./views/GuideView.vue'), meta: { tab: 'guide' } },
     { path: '/plugins', name: 'plugins', component: () => import('./views/PluginsView.vue'), meta: { tab: 'plugins' } },
     { path: '/images', name: 'home', component: () => import('./views/BrowseView.vue'), meta: { tab: 'home' } },
@@ -71,8 +74,14 @@ router.beforeEach((to, from) => {
 })
 
 router.afterEach(async (to, from) => {
-  if (to.path === from.path) return
+  if (to.path === from.path && to.hash === from.hash) return
   await nextTick()
-  window.scrollTo({ top: scrollByPath.get(to.path) ?? 0, behavior: 'instant' })
+  if (to.hash) {
+    let id = to.hash.slice(1)
+    try { id = decodeURIComponent(id) } catch { /* Keep the original hash. */ }
+    const target = document.getElementById(id)
+    if (target) { target.scrollIntoView(); return }
+  }
+  if (to.path !== from.path) window.scrollTo({ top: scrollByPath.get(to.path) ?? 0, behavior: 'instant' })
 })
 

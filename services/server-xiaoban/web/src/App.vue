@@ -16,7 +16,7 @@ const account = useAccount()
 
 // The admin console has its own layout; the public site's navigation and viewer stay out of it.
 watch(() => route.meta.tab, tab => {
-  document.documentElement.dataset.siteTheme = tab === 'desktop' || tab === 'plugins' ? 'light' : 'dark'
+  document.documentElement.dataset.siteTheme = tab === 'desktop' || tab === 'product' || tab === 'plugins' ? 'light' : 'dark'
 }, { immediate: true })
 
 const isAdmin = computed(() => route.meta.admin === true)

@@ -10,7 +10,9 @@ const tab = computed(() => route.meta.tab as string)
 
 const FORUM_URL = 'https://chat.xiangban.xyz/c/xiaoban-wallpaper'
 const links = [
-  { to: '/images', tab: 'home', label: '图片' },
+  { to: '/features', tab: 'product', label: '功能' },
+  { to: '/download', tab: 'download', label: '下载' },
+  { to: '/images', tab: 'home', label: '壁纸' },
   { to: '/videos', tab: 'videos', label: '视频' },
   { to: '/guide', tab: 'guide', label: '玩法指南' },
   { to: '/plugins', tab: 'plugins', label: 'AI 插件' },
@@ -27,8 +29,8 @@ const links = [
           v-for="l in links"
           :key="l.to"
           :to="l.to"
-          :class="{ active: tab === l.tab }"
-          :aria-current="tab === l.tab ? 'page' : undefined"
+          :class="{ active: (l.to === '/features' ? route.path === '/features' || route.path === '/desktop-experience' : l.to === '/download' ? route.path === '/download' : tab === l.tab) }"
+          :aria-current="(l.to === '/features' ? route.path === '/features' || route.path === '/desktop-experience' : l.to === '/download' ? route.path === '/download' : tab === l.tab) ? 'page' : undefined"
         >
           {{ l.label }}
         </RouterLink>
