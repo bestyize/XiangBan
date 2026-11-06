@@ -3,15 +3,23 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { discussionTabs, discussionCategory, resourceTopicCategory } from '@/lib/communityStructure'
 import { useMeta } from '@/stores/meta'
-import { areaOf } from '@/lib/sections'
+import { areaOf, sectionOf } from '@/lib/sections'
 import { useTheme, THEME_LABEL } from '@/lib/theme'
 import BrandMark from './BrandMark.vue'
 import AppIcon from './AppIcon.vue'
 import ModalDialog from './ModalDialog.vue'
 const meta = useMeta()
 const route = useRoute(), router = useRouter(), { preference, openAppearance } = useTheme()
-const area = computed(() => areaOf(route)), publishing = ref(false)
-const links = [{to:'/ai',key:'ai',label:'小伴 AI'}, {to:'/create',key:'create',label:'创造'}, {to:'/',key:'community',label:'社区'}, {to:'/me',key:'me',label:'我的'}]
+const publishing = ref(false)
+const links = [{to:'/',key:'home',label:'首页',icon:'grid'}, {to:'/discuss',key:'discuss',label:'讨论',icon:'community'}, {to:'/resources',key:'resources',label:'资源',icon:'folder'}, {to:'/me',key:'me',label:'我的',icon:'me'}]
+// AI 和创造页不在主导航里：AI 从“我的”进入，创造页是首页“试玩”的延伸。创意没有对应入口，不高亮任何项。
+const current = computed(() => {
+  const area = areaOf(route)
+  if (area === 'me' || area === 'ai') return 'me'
+  if (area === 'create') return 'home'
+  const section = sectionOf(route, meta.categories)
+  return section === 'ideas' ? '' : section
+})
 function publish(path: string) {
   publishing.value = false
   const tab = String(route.query.tab ?? '')
@@ -32,7 +40,7 @@ function publish(path: string) {
     <div class="nav-items">
       <template v-for="(item,index) in links" :key="item.key">
         <button v-if="index === 2" type="button" class="nav-publish" :class="{active:publishing}" aria-label="发布" :aria-expanded="publishing" aria-haspopup="dialog" @click="publishing = true"><span class="publish-icon"><AppIcon name="plus" /></span><span class="publish-label">发布</span></button>
-        <RouterLink :to="item.to" :class="['nav-item',{active:area === item.key && !publishing}]" :aria-label="item.label" :aria-current="area === item.key ? 'page' : undefined"><AppIcon :name="item.key === 'ai' ? 'chat' : item.key === 'create' ? 'ai' : item.key === 'community' ? 'grid' : item.key" /><span class="desktop-label">{{ item.label }}</span><span class="mobile-label">{{ item.key === 'ai' ? '小伴AI' : item.label }}</span></RouterLink>
+        <RouterLink :to="item.to" :class="['nav-item',{active:current === item.key && !publishing}]" :aria-label="item.label" :aria-current="current === item.key ? 'page' : undefined"><AppIcon :name="item.icon" /><span class="desktop-label">{{ item.label }}</span><span class="mobile-label">{{ item.label }}</span></RouterLink>
       </template>
     </div>
     <div class="nav-bottom">
