@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { builtinGame, isBuiltinGameMessage } from '@/lib/builtinCreation'
 import { fitGameViewport } from '@/lib/gameViewport'
-const props = defineProps<{ gameId: string }>()
+const props = defineProps<{ gameId: string; autostart?: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 const game = computed(() => builtinGame(props.gameId)), frame = ref<HTMLIFrameElement | null>(null), dialog = ref<HTMLDialogElement | null>(null), nonce = ref(''), generation = ref(0), error = ref(''), loading = ref(false), ready = ref(false), connected = ref(false)
 const surface=ref<HTMLElement>(), fullscreen=ref(false), fullscreenAvailable=ref(false), started=ref(false)
@@ -56,11 +56,13 @@ onMounted(() => {
   document.addEventListener('fullscreenchange',fullscreenChanged)
   stageObserver=new ResizeObserver(([entry]) => { if (entry) stageSize.value={width:entry.contentRect.width,height:entry.contentRect.height} })
   if (stage.value) stageObserver.observe(stage.value)
+  // 从卡片点击直接进入：弹层立刻打开并显示加载状态，全屏请求沿用这次点击的用户激活。
+  if (props.autostart) open()
 })
 // Resources and the handshake finish inside the preview. Keep fullscreen in
 // this direct click handler so waiting for the network cannot lose activation.
-function start() {
-  if (!connected.value || error.value || !dialog.value) return false
+function open() {
+  if (!dialog.value) return false
   previousFocus=document.activeElement instanceof HTMLElement ? document.activeElement : null
   previousOverflow=document.documentElement.style.overflow
   document.documentElement.style.overflow='hidden'
@@ -69,6 +71,7 @@ function start() {
   if (!desktop.value) void enterFullscreen()
   return true
 }
+function start() { return connected.value && !error.value && open() }
 defineExpose({start,restart,readyToPlay:connected,error})
 const url = computed(() => game.value && ready.value ? `/builtin-games/${game.value.id}/index.html?hostNonce=${encodeURIComponent(nonce.value)}` : '')
 function initialize() { frame.value?.contentWindow?.postMessage({channel:'xiaban.game-host',protocol:1,type:'host.init',nonce:nonce.value,save:null,safeArea:{top:0,right:0,bottom:0,left:0}}, '*') }
