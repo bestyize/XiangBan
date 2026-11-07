@@ -74,6 +74,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
     // One sheet at a time; submenus retain the selected work without stacking focus locks.
     var panel by remember { mutableStateOf("actions") }
     var creating by remember { mutableStateOf(false) }
+    var remixSource by remember { mutableStateOf<MobileGame?>(null) }
     var createKind by rememberSaveable { mutableStateOf("游戏") }
     var idea by rememberSaveable { mutableStateOf("") }
     var remotePrompt by remember { mutableStateOf<String?>(null) }
@@ -87,10 +88,10 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
     val imageLoader = remember(context) { ImageLoader.Builder(context).components { add(SvgDecoder.Factory()) }.build() }
     DisposableEffect(imageLoader) { onDispose { imageLoader.shutdown() } }
     val covers = remember { mutableStateMapOf<String, ByteArray>() }
-    val overlay = detail != null || creating || remotePrompt != null
+    val overlay = detail != null || creating || remotePrompt != null || remixSource != null
     LaunchedEffect(overlay) { onOverlayChanged(overlay) }
     DisposableEffect(Unit) { onDispose { onOverlayChanged(false) } }
-    fun close() { if (!busy) { detail = null; creating = false; remotePrompt = null; panel = "actions" } }
+    fun close() { if (!busy) { detail = null; creating = false; remotePrompt = null; remixSource = null; panel = "actions" } }
     BackHandler(enabled = overlay) { if (!busy && detail != null && panel != "actions") panel = "actions" else close() }
     fun createLocal(prompt: String) {
         if (!session.loggedIn) { open(Route.Login); return }
@@ -158,87 +159,63 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
             }
         } finally { errors = failures; loading = false }
     }
-    val officialItems = official.map { CreationItem(it.id, it.name, it.description, "游戏", it) }
     val myItems = games.map { CreationItem(it.id, it.name, it.description, "游戏", it, true) }
-    val visible = (if (mine) myItems else officialItems + DesktopIdeas).filter { category == "全部" || it.kind == category }
+    val visible = myItems.filter { category == "全部" || it.kind == category }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        LazyColumn(Modifier.fillMaxSize().blur(if (detail != null || creating || remotePrompt != null) 3.dp else 0.dp).statusBarsPadding(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                        listOf(false to "发现", true to "我的作品").forEach { (value, label) ->
-                            Column(Modifier.semantics { selected = mine == value }.clickable(role = Role.Tab) { mine = value; category = "全部" }.padding(vertical = 7.dp)) {
-                                Text(label, style = XType.Title, fontWeight = if (mine == value) FontWeight.SemiBold else FontWeight.Normal, color = if (mine == value) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-                                Box(Modifier.padding(top = 8.dp).width(20.dp).height(3.dp).background(if (mine == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background, CircleShape))
-                            }
+        Column(Modifier.fillMaxSize().statusBarsPadding()) {
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    listOf(false to "广场", true to "我的作品").forEach { (value, label) ->
+                        Column(Modifier.semantics { selected = mine == value }.clickable(role = Role.Tab) { mine = value; category = "全部" }.padding(vertical = 8.dp)) {
+                            Text(label, style = XType.Title, fontWeight = if (mine == value) FontWeight.SemiBold else FontWeight.Normal, color = if (mine == value) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+                            Box(Modifier.padding(top = 8.dp).width(20.dp).height(3.dp).background(if (mine == value) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.background, CircleShape))
                         }
                     }
-                    if (mine) IconTap(XIcons.Plus, "新建作品", { prepare() }, Modifier.background(MaterialTheme.colorScheme.primary.copy(alpha = .09f), CircleShape), tint = MaterialTheme.colorScheme.primary, size = 21.dp)
                 }
+                IconTap(XIcons.Search, "搜索应用", {}) // Search destination is reserved for a later version.
+                if (mine) IconTap(XIcons.Plus, "新建作品", { prepare() })
             }
-            if (!mine) item {
-                Row(Modifier.fillMaxWidth().outlinedCard(17.dp).clickable { prepare() }.padding(15.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
-                    XIcon(XIcons.Sparkle, tint = MaterialTheme.colorScheme.primary, size = 27.dp)
-                    Column(Modifier.weight(1f)) {
-                        Text("你想创造什么？", style = XType.Body, fontWeight = FontWeight.SemiBold)
-                        Text("一个游戏，一片风景，一位小伙伴…", Modifier.padding(top = 5.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!mine) AppPlazaScreen(env, official, games, covers, imageLoader, loading, errors, { reload++ },
+                onOfficial = { game -> detail = CreationItem(game.id, game.name, game.description, "游戏", game); panel = "actions" }, open = open)
+            else LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = NavInset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                item {
+                    Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable { prepare() }.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        XIcon(XIcons.Sparkle, tint = MaterialTheme.colorScheme.primary, size = 24.dp)
+                        Column(Modifier.weight(1f)) {
+                            Text("你想做个什么？", style = XType.Body, fontWeight = FontWeight.SemiBold)
+                            Text("和小伴一起，把想法变成作品", Modifier.padding(top = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                        }
                     }
-                    XIcon(XIcons.ArrowRight, tint = MaterialTheme.colorScheme.primary, size = 18.dp)
                 }
-            } else item {
-                Text("本机作品 · 电脑创作的装扮保存在对应电脑", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            item { CreationChips(CreationTypes, category) { category = it } }
-            if (errors.isNotEmpty()) item {
-                Text(errors.joinToString("\n"), style = XType.Caption, color = MaterialTheme.colorScheme.error)
-                LinkText("重新读取", { reload++ })
-            }
-            if (loading && visible.isEmpty()) item { Box(Modifier.fillMaxWidth().height(120.dp)) { Spinner() } }
-            if (!loading && visible.isEmpty()) item {
-                EmptyState(XIcons.Sparkle, "还没有${if (category == "全部") "" else category}作品", if (category !in listOf("全部", "游戏")) "桌面装扮在电脑上创作与使用，手机可遥控电脑继续创作。" else "从一个小小的想法开始吧。")
-                GhostPillButton("创作第一件作品", { prepare() }, Modifier.fillMaxWidth())
-            }
-            if (mine) {
+                item { Text("本机作品 · 电脑创作的装扮保存在对应电脑", style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { CreationChips(CreationTypes, category) { category = it } }
+                if (errors.isNotEmpty()) item {
+                    Text(errors.joinToString("\n"), style = XType.Caption, color = MaterialTheme.colorScheme.error)
+                    LinkText("重新读取", { reload++ })
+                }
+                if (loading && visible.isEmpty()) item { Spinner(Modifier.fillMaxWidth().height(120.dp)) }
+                if (!loading && visible.isEmpty()) item {
+                    EmptyState(XIcons.Sparkle, "还没有${if (category == "全部") "" else category}作品", if (category !in listOf("全部", "游戏")) "桌面装扮在电脑上创作与使用，手机可遥控电脑继续创作。" else "从一个小小的想法开始吧。")
+                    AppActionButton("创作第一件作品", { prepare() }, Modifier.fillMaxWidth(), primary = true)
+                }
                 item { CreationSection("本机作品", "刷新", { if (!loading) reload++ }) }
                 items(visible, key = { it.key }) { entry ->
-                    Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable(role = Role.Button) { detail = entry; panel = "actions" }.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth().outlinedCard(16.dp).clickable(role = Role.Button) { detail = entry; panel = "actions" }.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(68.dp))
                         Column(Modifier.weight(1f)) {
                             Text(entry.name, style = XType.Body, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("${entry.kind} · ${entry.device}", Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("保存在这台手机上", Modifier.padding(top = 6.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("${entry.kind} · ${entry.device}", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("保存在这台手机上", Modifier.padding(top = 4.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        XIcon(XIcons.More, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 18.dp)
-                    }
-                }
-            } else {
-                // Games deliberately precede every desktop decoration, including the all-types view.
-                listOf("游戏", "桌面装扮").forEach { group ->
-                    val groupItems = visible.filter { (it.kind == "游戏") == (group == "游戏") }
-                    if (groupItems.isNotEmpty()) {
-                        item(key = "heading-$group") { CreationSection(if (group == "游戏") "给自己几分钟好玩" else "让桌面有点不一样", if (group == "游戏") "${groupItems.size} 款" else "电脑创作灵感") }
-                        items(groupItems.chunked(2), key = { row -> row.joinToString { it.key } }) { row ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                row.forEach { entry ->
-                                    Column(Modifier.weight(1f).clip(RoundedCornerShape(15.dp)).clickable(role = Role.Button) { detail = entry; panel = "actions" }.semantics { contentDescription = "${entry.name}，打开作品操作" }) {
-                                        CreationCover(entry, covers[entry.key], imageLoader, Modifier.fillMaxWidth().aspectRatio(1.12f))
-                                        Text(entry.name, Modifier.padding(top = 9.dp), style = XType.Secondary, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                                            Text(entry.kind, Modifier.weight(1f), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            XIcon(if (entry.game != null) XIcons.Phone else XIcons.Monitor, size = 11.dp, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            Text(entry.device, Modifier.padding(start = 3.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                        }
-                                    }
-                                }
-                                if (row.size == 1) Spacer(Modifier.weight(1f))
-                            }
-                        }
+                        XIcon(XIcons.More, tint = MaterialTheme.colorScheme.onSurfaceVariant, size = 20.dp)
                     }
                 }
             }
         }
         detail?.let { entry ->
-            CreationSheet({ if (!busy && panel != "actions") panel = "actions" else close() }) {
+            if (!entry.owned && entry.game != null) OfficialAppSheet(env, entry.game, covers[entry.key], imageLoader,
+                dismiss = { close() }, remix = { detail = null; remixSource = entry.game })
+            else CreationSheet({ if (!busy && panel != "actions") panel = "actions" else close() }) {
                 Column(Modifier.fillMaxWidth().heightIn(max = 590.dp).verticalScroll(rememberScrollState())) {
                     if (panel in listOf("actions", "preview")) Row(Modifier.padding(bottom = 21.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CreationCover(entry, covers[entry.key], imageLoader, Modifier.size(52.dp), cornerRadius = 11)
@@ -271,7 +248,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                                 CreationAction(XIcons.Globe, "分享到社区", enabled = !busy) {
                                     close()
                                     if (entry.owned) open(Route.PublishPack(localGameId = entry.id))
-                                    else open(Route.CreationPost("分享：${entry.name}", "${entry.name}\n\n${entry.description}\n\n${if (entry.game != null) "来自小伴官方游戏，在小伴手机「创造」中游玩。" else "小伴桌面创作灵感，可连接电脑制作。"}"))
+                                    else open(Route.CreationPost("分享：${entry.name}", "${entry.name}\n\n${entry.description}\n\n${if (entry.game != null) "来自小伴官方游戏，在小伴手机「应用」中游玩。" else "小伴桌面创作灵感，可连接电脑制作。"}"))
                                 }
                                 CreationAction(XIcons.Share, "分享到其他渠道", enabled = !busy, divider = true, arrow = true) { panel = "share" }
                             }
@@ -349,8 +326,11 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
                     hints.forEach { hint -> Text(hint.take(14), Modifier.clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceVariant).clickable { idea = hint }.padding(9.dp), style = XType.Caption) }
                 }
                 Text(if (createKind == "游戏") "在手机上制作，进入对话后先确认方案。" else "选择已连接电脑后进入对话，作品保存在电脑上。", Modifier.padding(vertical = 16.dp), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                PillButton(if (createKind == "游戏") "和小伴一起创作" else "选择电脑继续创作", { startCreation() }, Modifier.fillMaxWidth(), enabled = idea.isNotBlank())
+                AppActionButton(if (createKind == "游戏") "和小伴一起创作" else "选择电脑继续创作", { startCreation() }, Modifier.fillMaxWidth(), primary = true, enabled = idea.isNotBlank())
             }
+        }
+        remixSource?.let { source ->
+            AppRemixSheet(env, chat, source.name, source.description, { remixSource = null }, open)
         }
         remotePrompt?.let { prompt ->
             CreationSheet({ close() }) {
@@ -389,35 +369,19 @@ private fun CreationChips(values: List<String>, value: String, select: (String) 
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         values.forEach { item ->
             val active = value == item
-            Text(item, Modifier.clip(RoundedCornerShape(6.dp)).background(if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.background).semantics { selected = active }.clickable(role = Role.Button) { select(item) }.padding(horizontal = 9.dp, vertical = 5.dp), style = XType.Caption, color = if (active) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(item, Modifier.clip(CircleShape).heightIn(min = 34.dp).background(if (active) LocalExtraColors.current.brandSoft else LocalExtraColors.current.fill).semantics { selected = active }.clickable(role = Role.Button) { select(item) }.padding(horizontal = 9.dp, vertical = 5.dp), style = XType.Caption, color = if (active) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
 
-/** Creation-center sheet tokens mirror create-center.html; other app sheets retain their styles. */
+/** Creation sheets share the active mobile palette and standard bottom-sheet behavior. */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
 private fun CreationSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    val dark = MaterialTheme.colorScheme.surface.luminance() < .5f
-    val colors = MaterialTheme.colorScheme.copy(
-        background = Color(if (dark) 0xff1b1d20 else 0xfffafaf9),
-        surface = Color(if (dark) 0xff26292d else 0xffffffff),
-        onSurface = Color(if (dark) 0xfff2f2ef else 0xff292a2d),
-        onSurfaceVariant = Color(if (dark) 0xffa4a7ad else 0xff83878c),
-        outlineVariant = Color(if (dark) 0xff34373b else 0xffeeefec),
-        error = Color(if (dark) 0xffff8d9d else 0xffd53b4d),
-    )
-    BackHandler(onBack = onDismiss)
-    MaterialTheme(colorScheme = colors) {
-        Box(Modifier.fillMaxSize().background(Color(0x4511131a)).clickable(indication = null, interactionSource = null) { onDismiss() }, contentAlignment = Alignment.BottomCenter) {
-            Column(panelModifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 25.dp, topEnd = 25.dp))
-                .background(colors.background).clickable(indication = null, interactionSource = null) {}
-                .navigationBarsPadding().padding(start = 20.dp, end = 20.dp, top = 15.dp, bottom = 20.dp)) {
-                Box(Modifier.align(Alignment.CenterHorizontally).size(32.dp, 4.dp).clip(CircleShape).background(colors.onSurfaceVariant.copy(alpha = .25f)))
-                Spacer(Modifier.height(22.dp))
-                content()
-            }
-        }
+    BottomSheet(onDismiss, panelModifier, cornerRadius = 16.dp) {
+        Box(Modifier.align(Alignment.CenterHorizontally).size(32.dp, 4.dp).clip(CircleShape).background(LocalExtraColors.current.line))
+        Spacer(Modifier.height(16.dp))
+        content()
     }
 }
 
@@ -440,7 +404,7 @@ private fun CreationAction(icon: ImageVector, title: String, trailing: String = 
 @Composable
 private fun CreationCover(item: CreationItem, bytes: ByteArray?, loader: ImageLoader, modifier: Modifier, cornerRadius: Int = 15) {
     var failed by remember(bytes) { mutableStateOf(false) }
-    Box(modifier.clip(RoundedCornerShape(cornerRadius.dp)).background(when (item.id) { "jade-gomoku" -> androidx.compose.ui.graphics.Color(0xff211b13); "ink-blade" -> androidx.compose.ui.graphics.Color(0xffe7e0cd); "pro-cube" -> androidx.compose.ui.graphics.Color(0xff0a1020); else -> MaterialTheme.colorScheme.surfaceVariant }), contentAlignment = Alignment.Center) {
+    Box(modifier.clip(RoundedCornerShape(cornerRadius.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
         if (bytes == null || failed) XIcon(if (item.game != null) XIcons.Gamepad else XIcons.Sparkle, size = 28.dp, tint = MaterialTheme.colorScheme.primary)
         else AsyncImage(model = bytes, imageLoader = loader, contentDescription = null, modifier = Modifier.fillMaxSize().then(if (item.kind == "伙伴") Modifier.padding(10.dp) else Modifier), contentScale = if (item.game != null || item.id == "sunflower") ContentScale.Fit else ContentScale.Crop, onError = { failed = true })
     }

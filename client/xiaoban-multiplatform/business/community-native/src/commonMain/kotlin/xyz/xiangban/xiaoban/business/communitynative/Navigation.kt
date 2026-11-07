@@ -173,7 +173,7 @@ sealed interface Route {
 }
 
 /** 悬浮导航里的四个去处（中间的“发布”是弹层，不是页面）。 */
-enum class Tab(val label: String) { Ai("小伴AI"), Games("创造"), Community("社区"), Mine("我的") }
+enum class Tab(val label: String) { Ai("小伴AI"), Games("应用"), Community("社区"), Mine("我的") }
 
 /** Only explicit HTTP(S) URLs with a host can enter the embedded browser. */
 internal fun webPageRoute(url: String): Route.WebPage? {
