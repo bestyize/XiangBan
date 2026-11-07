@@ -11,6 +11,7 @@
 | 聊天附件与文件分析 | [agent-file-tools.md](agent-file-tools.md) |
 | 专家团运行时 | [team-runtime.md](team-runtime.md) |
 | 连接器插件格式与接入边界 | [connector-plugins.md](connector-plugins.md) |
+| 小伴应用（游戏、工具、测评）的包格式、运行时协议与 SDK（协议 2 为草案） | [app-runtime/README.md](app-runtime/README.md)、[给 AI 的创作规则](app-runtime/ai-brief.md) |
 
 以下保留为设计决策、演进规划或历史修复记录，阅读时结合文内基线：
 
