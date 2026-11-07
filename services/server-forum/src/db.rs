@@ -837,6 +837,8 @@ ALTER TABLE packs ADD COLUMN IF NOT EXISTS remix_of_version INT;
 -- 创建时一并记下原作者，原作品被删后改编作品仍能署名。
 ALTER TABLE packs ADD COLUMN IF NOT EXISTS remix_of_author_uid UUID;
 ALTER TABLE packs ADD COLUMN IF NOT EXISTS network_disabled BOOLEAN NOT NULL DEFAULT FALSE;
+-- 应用广场「创作者精选」：编辑挑选的时间，空表示未精选。与信任等级无关，不影响可见性。
+ALTER TABLE packs ADD COLUMN IF NOT EXISTS featured_at TIMESTAMPTZ;
 CREATE INDEX IF NOT EXISTS packs_remix_idx ON packs (remix_of_pack_id) WHERE remix_of_pack_id IS NOT NULL;
 
 -- 直传凭证签发记录：资源机回调确认文件落盘并校验过哈希后才算 verified，发布内容包只认已确认的上传。
