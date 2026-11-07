@@ -11,7 +11,7 @@
 | 规范、原型、给 AI 的规则 | `feat/app-plaza-runtime` | Claude Fable 5 | 已提交（`935174c9`）；下面三项已合入这个分支 |
 | 手机端应用广场界面（Compose） | `feat/app-plaza-ui` | Codex gpt-6.1-sol | 已在真机上验证并合并（`56f1e86e`），审查时补了 2 个修复 |
 | Android 运行时协议 2 小样 | `spike/android-runtime-v2` | Codex gpt-6.1-terra | 13 项全部在真机上通过，已合并（`2b192fe6`），审查时补了 2 个修复 |
-| 服务端 `app` 类型与协议 2 字段 | `feat/forum-app-kind` | Claude Sonnet 5.5 | 已审查并合并（`dcad0aa3`），未部署 |
+| 服务端 `app` 类型与协议 2 字段 | `feat/forum-app-kind` | Claude Sonnet 5.5 | 已审查并合并（`dcad0aa3`），2026-11-08 已部署到香港机 |
 | 审查、真机验证（小米 14）、合并 | — | Claude Fable 5 | 第一批完成 |
 
 ## 第一批范围
@@ -103,3 +103,19 @@
   - 没有部署。测试期间改过的手机设置（USB 连接时保持常亮、ADB 端口转发）都已恢复。
 - 2026-11-08：`feat/app-plaza-runtime` 推送到 GitHub（`origin/feat/app-plaza-runtime`，推送时最新提交是 `feb0e1cf`），还没合进 `main`，也没有开 PR。
 - 2026-11-08：PR #143 合进 `main`，合并提交 `7e7142b8`。用合并提交的方式保留了分步提交的历史。删除了三个 worktree 和已合并的本地分支，远端的 `feat/app-plaza-runtime` 分支还保留着。服务端还没部署。
+- 2026-11-08：服务端部署到香港机（`chat.xiangban.xyz`，systemd `server-forum`）。
+  - 用的是从 `main` 的 `c4790cd0` 在本机交叉编译的二进制（sha256 前 16 位 `eacbf4017c10e15e`），服务器上的 `DEPLOYED_COMMIT` 已改成 `c4790cd0`。
+  - 网页前端没有变化（从已部署的 `723ca5dd` 到现在，`web/` 下没有文件改动），所以没有重新发布前端。
+  - 部署前做了备份：数据库 `backups/xiaban_forum-before-appplaza-20261107T204213Z.sql.gz`（58 MB，包含 224 张表，导出完整）；旧二进制 `backups/server-forum.before-appplaza-20261107T204213Z`（`8a4dddad…`）。
+  - 数据库加了 6 个字段：`pack_versions.runtime_protocol`，以及 `packs` 表的 `allow_remix`、`remix_of_pack_id`、`remix_of_version`、`remix_of_author_uid`、`network_disabled`。都是追加的、带默认值的字段，旧二进制照样能跑，回滚只需要换回旧二进制，不用动数据库。`data_migrations` 没有新增记录（仍是 21 条）。
+  - 冒烟测试：
+    - `/`、`/sitemap.xml`、`/robots.txt`、`/api/discover/home`、`/api/categories`、`/api/topics` 都返回 200。
+    - `?kind=app` 和带 `X-Xiaoban-Runtime: 1,2` 请求头的列表都能正常返回（现在都是 0 条）。
+    - 后台禁止联网接口不带登录返回 401；用伪造令牌申请 `app` 上传凭证返回 401。
+    - 线上唯一一个已发布的游戏（id 55）部署前后都是 404（作者被封禁或讨论帖不可见），没有变化。
+    - 日志里没有新的报错。
+  - **部署过程中有一次误操作**：上传新二进制后，我想用 `--help` 检查它能不能运行，但这个程序不处理命令行参数，会直接按正常方式启动。它用线上配置跑完了数据库迁移，加上了上面那 6 个字段，然后因为端口被旧服务占着，启动失败退出。这一步发生在数据库备份之后，加字段的效果和正式重启时完全一样，`data_migrations` 和后台审计记录都没有变化。但新代码在正式切换前已经连过一次线上数据库，后台任务也可能短暂启动过。以后检查二进制只看 `file` 和 `ldd`，不要直接运行它。
+  - 还没做的：
+    - 文件服务 `services/server-resource` 自己的大小上限没改，超过它上限的 `app` / `game` 包传不上去。
+    - 网页社区试玩仍然只运行审核等级为 0 或 1 的作品，包大小上限也还是 5 MB。
+    - 新版手机 App 还没有发布。
