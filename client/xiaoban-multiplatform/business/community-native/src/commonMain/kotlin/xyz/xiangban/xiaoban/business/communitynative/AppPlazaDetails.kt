@@ -103,7 +103,6 @@ internal fun AppPostContent(env: CommunityEnv, chat: CloudChatController, pack: 
                         GameTrialButton(env, pack.id, open = open, modifier = Modifier.fillMaxWidth(), label = if (orientation == "landscape") "横屏进入" else "进入", appStyle = true)
                         AppActionButton("做一个我的版本", { remix = true }, Modifier.fillMaxWidth(), icon = XIcons.Pen)
                     } else Text("作品暂不可用", style = XType.Secondary, color = LocalExtraColors.current.ink3)
-                    Text("评论 · ${pack.replyCount}", Modifier.fillMaxWidth().clickable { scope.launch { scroll.animateScrollTo(scroll.maxValue) } }.padding(vertical = 8.dp), style = XType.Section, fontWeight = FontWeight.SemiBold)
                 }
                 comments()
             }
