@@ -9,8 +9,8 @@
 | 工作 | 分支（worktree） | 执行 | 状态 |
 | --- | --- | --- | --- |
 | 规范、原型、给 AI 的规则 | `feat/app-plaza-runtime` | Claude Fable 5 | 已提交（`935174c9`） |
-| 手机端应用广场界面（Compose） | `feat/app-plaza-ui`（`.claude/worktrees/plaza-ui`） | Codex gpt-6.1-sol | 进行中 |
-| Android 运行时协议 2 小样 | `spike/android-runtime-v2`（`.claude/worktrees/runtime-spike`） | Codex gpt-6.1-terra | 进行中 |
+| 手机端应用广场界面（Compose） | `feat/app-plaza-ui`（`.claude/worktrees/plaza-ui`） | Codex gpt-6.1-sol | 已完成，6 个提交（`3c6a1f2c`…`e16fb885`）；真机看过广场首屏，社区作品、帖子页还没在真机上看过 |
+| Android 运行时协议 2 小样 | `spike/android-runtime-v2`（`.claude/worktrees/runtime-spike`） | Codex gpt-6.1-terra | 已完成并在真机上验证，5 个提交（`a9d3fd73`…`e4583354`）；摄像头和麦克风待人工点同意 |
 | 服务端 `app` 类型与协议 2 字段 | `feat/forum-app-kind`（`.claude/worktrees/server-v2`） | Claude Sonnet 5.5 | 已完成并通过审查，7 个提交（`53b1f89d`…`383b4256`），未合并、未部署 |
 | 审查、真机验证（小米 14）、合并 | — | Claude Fable 5 | 等上面三项完成 |
 
@@ -72,3 +72,20 @@
     - 改编作品没有校验 `kind` 必须和原作一致。
     - 下载接口不按 `X-Xiaoban-Runtime` 过滤。
     - 协议 2 的 `id` 仍然沿用 1～64 位的规则，规范写的是 2～64 位，两边要统一。
+- 2026-11-08：Android 运行时小样完成，在小米 14 上验证（Android 16，系统 WebView 156），详细结果见 [spike-android.md](spike-android.md)。
+  - 通过：
+    - 安全上下文，源是 `https://spike1.app.xiangban.xyz`
+    - localStorage、IndexedDB、OPFS；localStorage 在进程被强制停止后数据还在
+    - ES modules、Worker、WebAssembly
+    - 公网 fetch 能用，局域网 fetch 被拦截
+    - 页面加载前注入 `xb`，安全区数值正确
+    - `xb.storage` 3 MB 往返用时 373 毫秒，强制停止后数据还在
+    - `hide` / `show` 事件
+    - 用历史记录实现返回：逐层回退，回到首页后第一次提示、第二次退出
+  - 发现的问题：Android 16 上 targetSdk 37 的 App 收不到 `onBackPressed`，已改为 `OnBackInvokedCallback`（`e4583354`）。现有的 `MobileGameActivity` 也要检查这个问题。
+  - 还没测：摄像头和麦克风（需要人在手机上点系统权限弹窗）、100 MB 包、发往局域网的 WebSocket。
+- 2026-11-08：广场界面完成。
+  - Codex 沙盒写不了 worktree 的 git 元数据，没法提交，改由我按功能分成 6 个提交。
+  - 编译通过；Codex 报告 community-core 的 326 个 JVM 测试全部通过。
+  - 在小米 14 上看过广场首屏：底栏「应用」，精选游戏的「官方」标记在封面右下角。
+  - 线上 `chat.xiangban.xyz/api/packs` 现在一个作品都没有，所以社区作品显示「还没有社区作品」。准备在本机起论坛并放入测试作品，用来看瀑布流和帖子页，但**本机磁盘满了**（数据卷只剩约 2.7 GB，Rust 链接时用完），停在这一步。我已删掉自己这次产生的 Android 中间编译产物和 Rust 增量缓存。
