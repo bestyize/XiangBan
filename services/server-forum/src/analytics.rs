@@ -20,7 +20,7 @@ pub const EVENTS: &[&str] = &[
 
 /// 维度（可选）：内容类型，或来源。每个事件至多带一个。
 pub const DIMS: &[&str] = &[
-    "effect", "reminder", "routine", "task", "goal", "widget", "game", "wallpaper", "skill", "expert", "workflow",
+    "effect", "reminder", "routine", "task", "goal", "widget", "game", "app", "wallpaper", "skill", "expert", "workflow",
     "web", "desktop", "link", "weekly", "pack", "topic", "scheme", "project",
 ];
 

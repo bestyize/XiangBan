@@ -18,7 +18,8 @@ const KINDS: &[(&str, u64, bool)] = &[
     ("task", MB, true),
     ("goal", MB, true),
     ("widget", 8 * MB, false),
-    ("game", 8 * MB, false),
+    ("game", 100 * MB, false),
+    ("app", 100 * MB, false),
     ("wallpaper", 32 * MB, false),
     ("skill", 8 * MB, false),
     ("expert", MB, false),
@@ -213,7 +214,11 @@ packs/effect/a.zip
     #[test]
     fn kind_limits_follow_the_plan() {
         assert_eq!(kind_limit("effect"), Some(MB));
-        assert_eq!(kind_limit("game"), Some(8 * MB));
+        assert_eq!(kind_limit("game"), Some(100 * MB));
+        assert_eq!(kind_limit("app"), Some(100 * MB));
+        assert_eq!(upload_limit("app"), Some(100 * MB));
+        assert_eq!(kind_limit("widget"), Some(8 * MB));
+        assert!(!is_pure_data("app"));
         assert_eq!(kind_limit("wallpaper"), Some(32 * MB));
         assert_eq!(kind_limit("unknown"), None);
         assert!(is_pure_data("reminder"));
@@ -233,6 +238,8 @@ packs/effect/a.zip
         assert!(!one_click_allowed("goal", 2, "published"));
         assert!(!one_click_allowed("widget", 2, "published"));
         assert!(!one_click_allowed("game", 2, "published"));
+        assert!(!one_click_allowed("app", 2, "published"));
+        assert!(one_click_allowed("app", 1, "published"));
         // 没发布就不行，无论谁的
         assert!(!one_click_allowed("effect", 0, "pending"));
     }
