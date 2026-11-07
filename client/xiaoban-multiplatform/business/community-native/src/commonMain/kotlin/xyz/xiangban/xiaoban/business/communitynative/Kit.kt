@@ -123,7 +123,7 @@ private data class NavSlot(val tab: Tab?, val icon: ImageVector, val label: Stri
 
 private val NavSlots = listOf(
     NavSlot(Tab.Ai, XIcons.Message, "小伴AI"),
-    NavSlot(Tab.Games, XIcons.Sparkle, "创造"),
+    NavSlot(Tab.Games, XIcons.Sparkle, Tab.Games.label),
     NavSlot(null, XIcons.Plus, "发布"),
     NavSlot(Tab.Community, XIcons.Grid, "社区"),
     NavSlot(Tab.Mine, XIcons.User, "我的"),
@@ -166,6 +166,7 @@ fun OverlayTransition(visible: Boolean, direction: String = "bottom", content: @
     AnimatedVisibility(visible = visible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200))) {
         val panel = when (direction) {
             "left" -> Modifier.animateEnterExit(enter = slideInHorizontally(tween(200)) { -it }, exit = slideOutHorizontally(tween(200)) { -it })
+            "top" -> Modifier.animateEnterExit(enter = slideInVertically(tween(200)) { -it }, exit = slideOutVertically(tween(200)) { -it })
             "bottom" -> Modifier.animateEnterExit(enter = slideInVertically(tween(200)) { it }, exit = slideOutVertically(tween(200)) { it })
             else -> Modifier
         }
@@ -176,14 +177,14 @@ fun OverlayTransition(visible: Boolean, direction: String = "bottom", content: @
 /** 遮罩覆盖整页，面板统一避让键盘，避免聊天页的同级覆盖层落在 IME 后面。[flush] 为真时选项通栏接边。 */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun BottomSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, flush: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
+fun BottomSheet(onDismiss: () -> Unit, panelModifier: Modifier = Modifier, flush: Boolean = false, cornerRadius: Dp = 20.dp, content: @Composable ColumnScope.() -> Unit) {
     BackHandler(onBack = onDismiss)
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).clickable(indication = null, interactionSource = null) { onDismiss() }.imePadding(),
         contentAlignment = Alignment.BottomCenter,
     ) {
         Column(
-            panelModifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)).background(MaterialTheme.colorScheme.surface)
+            panelModifier.fillMaxWidth().clip(RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius)).background(MaterialTheme.colorScheme.surface)
                 .clickable(indication = null, interactionSource = null) {}
                 .navigationBarsPadding().let { if (flush) it.padding(top = 16.dp) else it.padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 24.dp) },
             content = content,

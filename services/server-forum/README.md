@@ -169,7 +169,7 @@ GIF 直接播放原动画，下载保留原格式。图片按账号存在当前�
 
 接口都在 `/api` 下，实现见 `src/handlers/content.rs`，纯逻辑（体积上限、清单检查、签名）见 `src/content.rs`。
 
-- 内容包类型与体积上限：effect/reminder/routine/task/goal ≤ 1MB，widget/game/skill/workflow ≤ 8MB，expert ≤ 1MB，wallpaper ≤ 32MB。信任分级 T0 官方、T1 已审核、T2 用户未审；T2 只有 effect、scheme、reminder 返回 `one_click: true`，其余类型需要桌面端二次确认。
+- 内容包类型与体积上限：effect/reminder/routine/task/goal ≤ 1MB，widget/skill/workflow ≤ 8MB，game/app ≤ 100MB，expert ≤ 1MB，wallpaper ≤ 32MB。信任分级 T0 官方、T1 已审核、T2 用户未审；T2 只有 effect、scheme、reminder 返回 `one_click: true`，其余类型需要桌面端二次确认。
 - 前台：`GET /packs`（`kind`、`q`、`tag`、`author`、`sort=new|hot`、分页）、`GET /packs/{id}`（含版本与清单）、`GET /packs/{id}/download?version=`（返回签名地址、`sha256`、`size`、官方镜像 `mirrors`；客户端每个来源都要校验 sha256）、`POST /packs/{id}/applied`（应用计数，匿名可调）、`GET/POST /schemes`、`GET /schemes/{id}`、`GET /me/schemes`、`POST /schemes/{id}/remove`、`GET /projects[/{slug}]`、`GET /weekly[/{week}]`、`GET /share/{kind}/{id}`（`pack|topic|scheme|project|weekly`，返回落地页地址与 `xiaoban://community/...` 深链接）。
 - 用户发布流程（文件不经过本服务）：
   1. `POST /packs/upload-ticket {kind,size,sha256}`（需登录）→ `{ticket, upload_url, file_key}`；
@@ -180,6 +180,20 @@ GIF 直接播放原动画，下载保留原格式。图片按账号存在当前�
 - 我的作品：`GET /me/packs`（自己发布的全部内容包，含下架、被拒与是否在审核中）、`POST /packs/{id}/remove`（作者自己下架）。发布时必须带 `rights_ack: true`（权利声明）。网页入口是 `/publish`（上传 zip 与封面、填信息、勾选声明；`?pack=编号` 发新版本）和 `/me/works`。
 - 后台（管理员令牌）：`GET/POST /admin/packs`（POST 是官方直接登记 T0/T1，文件已由运维放进资源机，可带魔搭等 https 镜像）、`POST /admin/packs/{id}/mirrors`（给某个版本补官方镜像，同名替换，最多 5 个；镜像地址不需要被信任，客户端对每个来源都校验 sha256）、`POST /admin/packs/{id}/review`（`approve|reject|remove|restore`）、`GET /admin/moderation`（待审队列）、`PUT /admin/projects/{slug}`、`PUT /admin/weekly/{week}`（草稿不对外，周刊条目只存引用，下架的内容包读取时自动隐去）。
 - 集成测试：`TEST_DATABASE_URL=postgres://… cargo test content_tests` 覆盖凭证、回调、发布、版本、审核、下载签名、配额、周刊和分享。
+
+### 应用广场后端（运行时协议 2，2026-11-08，本地实现，尚未部署）
+
+规范见 [docs/architecture/app-runtime/README.md](../../docs/architecture/app-runtime/README.md)。本轮只做内容包后端，不含 `app.xiangban.xyz` 文件服务、域名封禁和断点续传。
+
+- 新增内容类型 `app`，与 `game` 一样不是纯数据；`game` 和 `app` 的体积上限提高到 100MB（凭证、官方登记都按此校验），其他类型不变。收藏筛选和埋点维度同步认 `app`。
+- 清单带 `runtimeProtocol: 2` 时按规范第 3.3 节校验（`schemaVersion` 为 3、`kind` 为 game/app、名称 ≤ 24 字、简介 1～80 字、`category`/`orientation`/`input`/`capabilities` 取值、`icon`/`cover` 必填、`windows`/`pointer` 只给 `layer: "desktop"`）；没有该字段的按协议 1 原规则，不变。协议号记在 `pack_versions.runtime_protocol`（默认 1）。
+- `packs` 新增 `allow_remix`（默认 true）、`remix_of_pack_id`、`remix_of_version`、`remix_of_author_uid`（创建时一并记下原作者，原作品被删后仍署名）、`network_disabled`。列表和详情返回 `runtime_protocol`（当前版本）、`allow_remix`、`remix_of`（`{pack_id, version, author}` 或 null）、`remix_count`（已上架的改编数）、`network_disabled`。
+- `POST /packs` 可带 `allow_remix`、`remix_of_pack_id`、`remix_of_version`（不传取原作品当前版本）。原作品不存在、未上架、版本不存在返回 400，不允许改编返回 403。
+- `GET /packs` 默认不含改编作品，`remix_of=<pack_id>` 时只返回改编自该作品的作品。
+- 请求头 `X-Xiaoban-Runtime`（如 `1,2`，缺失或读不出按 `1`）：列表过滤掉当前版本协议不在集合内的作品，详情对这类作品返回 404。下载接口不看这个头。
+- `POST /admin/packs/{id}/network {disabled, note?}`：管理员令牌，开关“禁止联网”并写审计，不影响审核状态。
+- 可见性不看信任等级：列表、详情、下载对 game/app 都不按 `trust_level` 过滤，T2 未审作品同样可见可下载。
+- 验证：`TEST_DATABASE_URL=… cargo test --manifest-path services/server-forum/Cargo.toml content::`（清单单元测试）和 `app_plaza`（体积、发布、改编、协议过滤、后台开关的集成测试）。全量测试里有 5 个与本改动无关的既有失败（`db::tests` 三个板块种子断言、`discover_tests::topics_carry_images_polls_and_help_stats`、`points::tests::purchases_are_atomic_...`），改动前同样失败。
 
 ## 创作作品互动（2026-11-01）
 

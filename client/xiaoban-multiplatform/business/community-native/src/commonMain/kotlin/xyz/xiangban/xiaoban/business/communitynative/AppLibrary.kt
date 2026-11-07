@@ -1,0 +1,85 @@
+package xyz.xiangban.xiaoban.business.communitynative
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
+import coil3.ImageLoader
+import coil3.compose.LocalPlatformContext
+import coil3.network.ktor3.KtorNetworkFetcherFactory
+import coil3.svg.SvgDecoder
+import kotlinx.coroutines.CancellationException
+import xyz.xiangban.xiaoban.common.community.*
+
+/** Only official/local favorites live here; public works use the existing account bookmark API. */
+internal class AppLibraryState(private val prefs: AppPrefs) {
+    var favorites by mutableStateOf(AppFavorites.decode(prefs.get("app-favorites")))
+        private set
+    fun toggle(item: AppShortcut) {
+        val next = AppFavorites.toggle(favorites, item)
+        prefs.put("app-favorites", AppFavorites.encode(next))
+        favorites = next
+    }
+}
+
+@Composable
+internal fun AppActionButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, primary: Boolean = false,
+    enabled: Boolean = true, height: Dp = 48.dp, icon: ImageVector? = null) {
+    val extra = LocalExtraColors.current
+    val tint = if (primary) extra.brandInk else MaterialTheme.colorScheme.onSurface
+    Row(modifier.height(height).clip(CircleShape).background(if (primary) extra.brandSoft else extra.fill)
+        .clickable(enabled = enabled, onClick = onClick).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+        icon?.let { XIcon(it, tint = tint.copy(alpha = if (enabled) 1f else .4f), size = 20.dp) }
+        Text(text, style = if (height <= 34.dp) XType.Secondary else XType.Body, fontWeight = FontWeight.SemiBold, color = tint.copy(alpha = if (enabled) 1f else .4f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+internal fun AppShortcutIcon(env: CommunityEnv, item: AppShortcut, modifier: Modifier = Modifier.size(56.dp)) {
+    var bytes by remember(item.key) { mutableStateOf<ByteArray?>(null) }
+    LaunchedEffect(env, item.key) {
+        try {
+            bytes = when (item.source) {
+                "builtin" -> env.platform?.builtinGameCover(item.id)
+                "local" -> env.games?.readFile(item.id, "cover.svg")?.encodeToByteArray()
+                else -> null
+            }
+        } catch (e: CancellationException) { throw e } catch (_: Exception) { /* neutral game icon */ }
+    }
+    Box(modifier.clip(RoundedCornerShape(16.dp)).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
+        XIcon(XIcons.Gamepad, size = 24.dp, tint = LocalExtraColors.current.brandInk)
+        val model: Any? = bytes ?: item.coverUrl?.let(env.forum::imageUrl)
+        if (model != null) AsyncImage(model, null, imageLoader = rememberAppImageLoader(), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+    }
+}
+
+@Composable
+internal fun rememberAppImageLoader(): ImageLoader {
+    val context = LocalPlatformContext.current
+    val loader = remember(context) { ImageLoader.Builder(context).components { add(SvgDecoder.Factory()); add(KtorNetworkFetcherFactory()) }.build() }
+    DisposableEffect(loader) { onDispose { loader.shutdown() } }
+    return loader
+}
+
+@Composable
+internal fun AppShortcutTile(env: CommunityEnv, item: AppShortcut, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Column(modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        AppShortcutIcon(env, item)
+        Text(item.title, Modifier.padding(top = 8.dp), style = XType.Caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}

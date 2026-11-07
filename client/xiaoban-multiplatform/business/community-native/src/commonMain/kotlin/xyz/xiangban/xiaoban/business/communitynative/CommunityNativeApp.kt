@@ -63,6 +63,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
         var publishOpen by rememberSaveable { mutableStateOf(false) }
         var aiDrawerOpen by rememberSaveable { mutableStateOf(false) }
         var gameOverlayOpen by remember { mutableStateOf(false) }
+        var appDrawerOpen by remember { mutableStateOf(false) }
         // 首页的创作入口：打开对话页时直接弹出生图面板，或切到“创造”并打开对应类型的创作面板。
         var pendingImageSheet by remember { mutableStateOf(false) }
         var pendingCreation by remember { mutableStateOf<String?>(null) }
@@ -87,13 +88,14 @@ fun CommunityNativeApp(env: CommunityEnv) {
                             env, chat, ::push, { aiDrawerOpen = true },
                             onCreateImage = { if (!chat.state.value.sending) chat.clearConversation(); pendingImageSheet = true; push(Route.AiChat) },
                             onCreateWork = { kind -> pendingCreation = kind; tab = Tab.Games.name },
+                            onGoPlaza = { tab = Tab.Games.name }, onAppDrawerChanged = { appDrawerOpen = it },
                         )
                         Tab.Games -> GamesScreen(env, chat, ::push, onOverlayChanged = { gameOverlayOpen = it }, createRequest = pendingCreation, onCreateRequestHandled = { pendingCreation = null })
                         Tab.Community -> CommunityScreen(env, ::push)
                         Tab.Mine -> MineScreen(env, ::push)
                     }
                 }
-                if (!gameOverlayOpen || tab != Tab.Games.name) FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
+                if ((!gameOverlayOpen || tab != Tab.Games.name) && (!appDrawerOpen || tab != Tab.Ai.name)) FloatingNav(Tab.valueOf(tab), publishOpen, onSelect = { tab = it.name }, onPublish = { publishOpen = true }, modifier = Modifier.align(Alignment.BottomCenter))
                 AiDrawerOverlay(chat, aiDrawerOpen, { aiDrawerOpen = false }, ::push)
             }
             val pages = stack.filter { it != Route.Login }
@@ -139,7 +141,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
 @Composable
 private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Route, push: (Route) -> Unit, pop: () -> Unit, imageSheet: Boolean, onImageSheetOpened: () -> Unit) {
     when (route) {
-        is Route.Pack -> PackDetailScreen(env, route.id, pop, push)
+        is Route.Pack -> PackDetailScreen(env, route.id, pop, push, chat)
         is Route.Ability -> AbilityDetailScreen(env, route.id, pop, push)
         is Route.Scheme -> SchemeDetailScreen(env, route.id, pop, push)
         Route.SchemeBackups -> NativeSchemeBackupsScreen(env, pop, push)

@@ -559,3 +559,237 @@ async fn pack_lifecycle_upload_review_download() -> Result<(), Box<dyn std::erro
     sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
     Ok(())
 }
+
+// ───────────────────────── 应用广场（运行时协议 2） ─────────────────────────
+
+async fn call_with_runtime(app: &axum::Router, path: &str, runtime: Option<&str>) -> (StatusCode, Value) {
+    let mut req = Request::builder().method("GET").uri(path);
+    if let Some(runtime) = runtime {
+        req = req.header("x-xiaoban-runtime", runtime);
+    }
+    let response = app.clone().oneshot(req.body(Body::empty()).unwrap()).await.unwrap();
+    let status = response.status();
+    let bytes = to_bytes(response.into_body(), 8 * 1024 * 1024).await.unwrap();
+    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+}
+
+fn manifest_v2(kind: &str, id: &str) -> Value {
+    let category = if kind == "game" { "casual" } else { "tool" };
+    json!({
+        "schemaVersion": 3, "runtimeProtocol": 2, "kind": kind, "id": id, "name": "测试作品",
+        "description": "一个测试用的作品。", "version": "1.0.0", "category": category,
+        "icon": "icon.png", "cover": "cover.png", "input": ["touch"]
+    })
+}
+
+/// 走完整的“凭证 → 资源机回调 → 发布”流程，返回发布接口的状态码与响应。
+async fn publish_pack(app: &axum::Router, secret: &[u8], token: &str, kind: &str, manifest: Value, extra: Value) -> (StatusCode, Value) {
+    let sha = format!("{:0>64x}", Uuid::new_v4().as_u128());
+    let (s, t) = call(app, "POST", "/api/packs/upload-ticket", Some(token), json!({"kind":kind,"size":1000,"sha256":sha})).await;
+    assert_eq!(s, StatusCode::OK, "{t}");
+    let file_key = t["file_key"].as_str().unwrap().to_string();
+    assert_eq!(callback(app, secret, json!({"file_key":file_key,"size":1000,"sha256":sha,"manifest":manifest}), true).await, StatusCode::OK);
+    let mut body = json!({"kind":kind,"title":"测试作品","file_key":file_key,"rights_ack":true});
+    for (k, v) in extra.as_object().into_iter().flatten() {
+        body[k] = v.clone();
+    }
+    call(app, "POST", "/api/packs", Some(token), body).await
+}
+
+/// 需要 TEST_DATABASE_URL；每次使用独立 schema。
+#[tokio::test]
+async fn app_plaza_kind_remix_protocol_filter_and_network_switch() -> Result<(), Box<dyn std::error::Error>> {
+    let Ok(url) = std::env::var("TEST_DATABASE_URL") else {
+        eprintln!("skipped: TEST_DATABASE_URL is not set");
+        return Ok(());
+    };
+    let schema = format!("content_test_{}", Uuid::new_v4().simple());
+    let admin_pool = crate::db::connect(&url, None).await?;
+    sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin_pool).await?;
+    let pool = crate::db::connect(&url, Some(&schema)).await?;
+    crate::db::migrate(&pool).await?;
+    crate::db::seed(&pool).await?;
+
+    let mut config = AppConfig::from_env();
+    config.resource_base_url = Some("https://res.test".into());
+    config.resource_secret = b"0123456789abcdef0123456789abcdef".to_vec();
+    config.admin_user = Some("root".into());
+    config.admin_password = Some("correct-horse-battery".into());
+    config.daily_pack_publishes = 50;
+    crate::handlers::admin::seed_admin(&pool, &config).await?;
+    let secret = config.resource_secret.clone();
+
+    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new()).unwrap();
+    let pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+    let x = URL_SAFE_NO_PAD.encode(pair.public_key().as_ref());
+    let verifier = JwksVerifier::with_static_key("iss".into(), "aud".into(), DecodingKey::from_ed_components(&x).unwrap());
+    let enc = EncodingKey::from_ed_der(pkcs8.as_ref());
+    let user_token = |uid: Uuid| {
+        #[derive(serde::Serialize)]
+        struct C {
+            iss: String,
+            sub: String,
+            aud: String,
+            exp: i64,
+        }
+        let c = C { iss: "iss".into(), sub: uid.to_string(), aud: "aud".into(), exp: chrono::Utc::now().timestamp() + 600 };
+        encode(&Header::new(Algorithm::EdDSA), &c, &enc).unwrap()
+    };
+    let state = AppState { pool: pool.clone(), config: Arc::new(config), verifier: Arc::new(verifier), http: reqwest::Client::new() };
+    let app = crate::build_router(state);
+    let (author, other) = (Uuid::new_v4(), Uuid::new_v4());
+    let (author_t, other_t) = (user_token(author), user_token(other));
+    let mb = 1024 * 1024;
+    let sha = "a".repeat(64);
+
+    // 体积：game 与 app 100 MB，其他类型不变。
+    for (kind, size, expect) in [
+        ("app", 100 * mb, StatusCode::OK),
+        ("app", 100 * mb + 1, StatusCode::BAD_REQUEST),
+        ("game", 100 * mb, StatusCode::OK),
+        ("game", 100 * mb + 1, StatusCode::BAD_REQUEST),
+        ("widget", 8 * mb, StatusCode::OK),
+        ("widget", 8 * mb + 1, StatusCode::BAD_REQUEST),
+    ] {
+        let (s, b) = call(&app, "POST", "/api/packs/upload-ticket", Some(&author_t), json!({"kind":kind,"size":size,"sha256":sha})).await;
+        assert_eq!(s, expect, "{kind} {size}: {b}");
+    }
+
+    // app 发布：协议 2 清单；协议 2 清单的字段错误会在回调时被拒。
+    let (s, b) = call(&app, "POST", "/api/packs/upload-ticket", Some(&author_t), json!({"kind":"app","size":1000,"sha256":sha})).await;
+    assert_eq!(s, StatusCode::OK, "{b}");
+    let mut bad = manifest_v2("app", "bad-app");
+    bad["category"] = json!("action");
+    let key = b["file_key"].as_str().unwrap();
+    assert_eq!(callback(&app, &secret, json!({"file_key":key,"size":1000,"sha256":sha,"manifest":bad}), true).await, StatusCode::BAD_REQUEST);
+
+    let (s, quiz) = publish_pack(&app, &secret, &author_t, "app", manifest_v2("app", "quiz-one"), json!({})).await;
+    assert_eq!(s, StatusCode::OK, "{quiz}");
+    let quiz_id = quiz["id"].as_i64().unwrap();
+    assert_eq!(quiz["trust_level"], 2);
+    let (s, detail) = call_with_runtime(&app, &format!("/api/packs/{quiz_id}"), Some("1,2")).await;
+    assert_eq!(s, StatusCode::OK);
+    assert_eq!(detail["kind"], "app");
+    assert_eq!(detail["runtime_protocol"], 2);
+    assert_eq!(detail["allow_remix"], true);
+    assert_eq!(detail["remix_of"], Value::Null);
+    assert_eq!(detail["remix_count"], 0);
+    assert_eq!(detail["network_disabled"], false);
+    assert_eq!(detail["one_click"], false);
+    assert_eq!(detail["versions"][0]["manifest"]["runtimeProtocol"], 2);
+    let (s, _) = publish_pack(&app, &secret, &author_t, "app", manifest_v2("app", "quiz-one"), json!({})).await;
+    assert_eq!(s, StatusCode::CONFLICT, "id 在所有类型里唯一");
+
+    // 信任等级不影响可见性：未审（T2）的 app 和 game 无需登录就能列出、看详情、下载。
+    let (s, game) = publish_pack(&app, &secret, &author_t, "game", manifest_v2("game", "game-one"), json!({})).await;
+    assert_eq!(s, StatusCode::OK, "{game}");
+    let game_id = game["id"].as_i64().unwrap();
+    let (_, list) = call_with_runtime(&app, "/api/packs?kind=app", Some("1,2")).await;
+    assert_eq!(list["total"], 1);
+    assert_eq!(list["items"][0]["trust_level"], 2);
+    let (s, d) = call(&app, "GET", &format!("/api/packs/{game_id}/download"), None, Value::Null).await;
+    assert_eq!(s, StatusCode::OK, "{d}");
+    let (s, d) = call(&app, "GET", &format!("/api/packs/{quiz_id}/download"), None, Value::Null).await;
+    assert_eq!(s, StatusCode::OK, "{d}");
+
+    // 改编：不允许改编的作品不能被改编；不存在、已下架的来源也拒绝。
+    let (s, closed) = publish_pack(&app, &secret, &author_t, "app", manifest_v2("app", "closed-one"), json!({"allow_remix": false})).await;
+    assert_eq!(s, StatusCode::OK, "{closed}");
+    let closed_id = closed["id"].as_i64().unwrap();
+    let (_, closed_detail) = call_with_runtime(&app, &format!("/api/packs/{closed_id}"), Some("2")).await;
+    assert_eq!(closed_detail["allow_remix"], false);
+    let (s, r) = publish_pack(&app, &secret, &other_t, "app", manifest_v2("app", "remix-closed"), json!({"remix_of_pack_id": closed_id})).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{r}");
+    let (s, _) = publish_pack(&app, &secret, &other_t, "app", manifest_v2("app", "remix-ghost"), json!({"remix_of_pack_id": 987654})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "来源不存在");
+    let (s, _) = publish_pack(&app, &secret, &other_t, "app", manifest_v2("app", "remix-badver"), json!({"remix_of_pack_id": quiz_id, "remix_of_version": 9})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "来源没有这个版本");
+    let (s, gone) = publish_pack(&app, &secret, &author_t, "app", manifest_v2("app", "gone-one"), json!({})).await;
+    assert_eq!(s, StatusCode::OK, "{gone}");
+    let gone_id = gone["id"].as_i64().unwrap();
+    call(&app, "POST", &format!("/api/packs/{gone_id}/remove"), Some(&author_t), Value::Null).await;
+    let (s, _) = publish_pack(&app, &secret, &other_t, "app", manifest_v2("app", "remix-removed"), json!({"remix_of_pack_id": gone_id})).await;
+    assert_eq!(s, StatusCode::BAD_REQUEST, "来源已下架");
+
+    // 允许改编的作品可以被改编；改编作品不出现在主列表，只能用 remix_of 查。
+    let (s, remix) = publish_pack(&app, &secret, &other_t, "app", manifest_v2("app", "quiz-remix"), json!({"remix_of_pack_id": quiz_id})).await;
+    assert_eq!(s, StatusCode::OK, "{remix}");
+    let remix_id = remix["id"].as_i64().unwrap();
+    let (_, feed) = call_with_runtime(&app, "/api/packs?kind=app", Some("2")).await;
+    let ids: Vec<i64> = feed["items"].as_array().unwrap().iter().map(|i| i["id"].as_i64().unwrap()).collect();
+    assert!(ids.contains(&quiz_id) && ids.contains(&closed_id));
+    assert!(!ids.contains(&remix_id), "改编作品不进主列表");
+    assert_eq!(feed["total"], 2);
+    let (_, remixes) = call_with_runtime(&app, &format!("/api/packs?remix_of={quiz_id}"), Some("2")).await;
+    assert_eq!(remixes["total"], 1);
+    assert_eq!(remixes["items"][0]["id"], remix_id);
+    assert_eq!(remixes["items"][0]["remix_of"]["pack_id"], quiz_id);
+    assert_eq!(remixes["items"][0]["remix_of"]["version"], 1);
+    assert_eq!(remixes["items"][0]["remix_of"]["author"]["uid"], author.to_string());
+    let (_, none) = call_with_runtime(&app, &format!("/api/packs?remix_of={closed_id}"), Some("2")).await;
+    assert_eq!(none["total"], 0);
+    let (_, quiz_detail) = call_with_runtime(&app, &format!("/api/packs/{quiz_id}"), Some("2")).await;
+    assert_eq!(quiz_detail["remix_count"], 1);
+    // 原作品被删除后，改编作品仍在，仍署名原作者，也仍不进主列表。
+    sqlx::query("DELETE FROM packs WHERE id = $1").bind(quiz_id).execute(&pool).await?;
+    let (_, orphan) = call_with_runtime(&app, &format!("/api/packs/{remix_id}"), Some("2")).await;
+    assert_eq!(orphan["remix_of"]["pack_id"], Value::Null);
+    assert_eq!(orphan["remix_of"]["author"]["uid"], author.to_string());
+    let (_, feed) = call_with_runtime(&app, "/api/packs?kind=app", Some("2")).await;
+    assert_eq!(feed["total"], 1, "只剩 closed-one");
+
+    // X-Xiaoban-Runtime：没有请求头按 1；协议 2 的作品对旧客户端不可见。
+    let (s, old) = publish_pack(&app, &secret, &author_t, "game", manifest("game", "old-game", "1.0.0"), json!({})).await;
+    assert_eq!(s, StatusCode::OK, "{old}");
+    let old_id = old["id"].as_i64().unwrap();
+    let (_, old_detail) = call_with_runtime(&app, &format!("/api/packs/{old_id}"), None).await;
+    assert_eq!(old_detail["runtime_protocol"], 1);
+    let (_, plain) = call_with_runtime(&app, "/api/packs?kind=game", None).await;
+    assert_eq!(plain["total"], 1);
+    assert_eq!(plain["items"][0]["id"], old_id);
+    let (_, one) = call_with_runtime(&app, "/api/packs?kind=game", Some("1")).await;
+    assert_eq!(one["total"], 1);
+    let (_, both) = call_with_runtime(&app, "/api/packs?kind=game", Some("1, 2")).await;
+    assert_eq!(both["total"], 2);
+    let (_, only_two) = call_with_runtime(&app, "/api/packs?kind=game", Some("2")).await;
+    assert_eq!(only_two["total"], 1);
+    assert_eq!(only_two["items"][0]["id"], game_id);
+    let (_, junk) = call_with_runtime(&app, "/api/packs?kind=game", Some("abc")).await;
+    assert_eq!(junk["total"], 1, "读不出来按 1");
+    let (s, _) = call_with_runtime(&app, &format!("/api/packs/{game_id}"), None).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = call_with_runtime(&app, &format!("/api/packs/{old_id}"), Some("2")).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = call_with_runtime(&app, &format!("/api/packs/{game_id}"), Some("1,2")).await;
+    assert_eq!(s, StatusCode::OK);
+
+    // 后台“禁止联网”开关：只有管理员能用。
+    let path = format!("/api/admin/packs/{closed_id}/network");
+    let (s, _) = call(&app, "POST", &path, None, json!({"disabled": true})).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED);
+    let (s, _) = call(&app, "POST", &path, Some(&author_t), json!({"disabled": true})).await;
+    assert_eq!(s, StatusCode::UNAUTHORIZED, "普通用户（包括作者）不能改");
+    let (s, login) = call(&app, "POST", "/api/admin/login", None, json!({"username":"root","password":"correct-horse-battery"})).await;
+    assert_eq!(s, StatusCode::OK, "{login}");
+    let admin_t = login["token"].as_str().unwrap().to_string();
+    let (s, r) = call(&app, "POST", &path, Some(&admin_t), json!({"disabled": true, "note": "外链广告"})).await;
+    assert_eq!(s, StatusCode::OK, "{r}");
+    assert_eq!(r["network_disabled"], true);
+    let (_, d) = call_with_runtime(&app, &format!("/api/packs/{closed_id}"), Some("2")).await;
+    assert_eq!(d["network_disabled"], true);
+    let (_, l) = call_with_runtime(&app, "/api/packs?kind=app", Some("2")).await;
+    assert_eq!(l["items"][0]["network_disabled"], true);
+    let (s, _) = call(&app, "POST", "/api/admin/packs/987654/network", Some(&admin_t), json!({"disabled": true})).await;
+    assert_eq!(s, StatusCode::NOT_FOUND);
+    let (s, _) = call(&app, "POST", &path, Some(&admin_t), json!({"disabled": false})).await;
+    assert_eq!(s, StatusCode::OK);
+    let (_, d) = call_with_runtime(&app, &format!("/api/packs/{closed_id}"), Some("2")).await;
+    assert_eq!(d["network_disabled"], false);
+    let (audits,): (i64,) = sqlx::query_as("SELECT count(*) FROM admin_audit WHERE action = 'pack.network'").fetch_one(&pool).await?;
+    assert_eq!(audits, 2, "每次切换都有审计记录");
+
+    drop(app);
+    pool.close().await;
+    sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin_pool).await?;
+    Ok(())
+}

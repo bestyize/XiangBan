@@ -180,13 +180,17 @@ internal fun TopicRow(topic: Topic, onClick: () -> Unit) {
 
 /** 作品详情：顶部封面（带返回和分享），标题、标签、作者、简介、更新记录、评论；底栏与帖子一样提供评论、点赞、收藏和分享。 */
 @Composable
-fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null) {
+fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Route) -> Unit)? = null, chat: xyz.xiangban.xiaoban.common.community.CloudChatController? = null) {
     val loader = rememberLoader(env, id) { env.forum.pack(id) }
     val state by loader.state.collectAsState()
     var share by remember { mutableStateOf(false) }
     var toast by remember { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         LoadBox(state, loader::reload) { pack ->
+            if (pack.kind == "game" && chat != null) {
+                AppPostContent(env, chat, pack, back, open)
+                return@LoadBox
+            }
             if (pack.kind in xyz.xiangban.xiaoban.common.community.CapabilityPackKinds) {
                 CapabilityDetailContent(env, pack, back, open = open)
                 return@LoadBox
@@ -202,7 +206,6 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                         Text(pack.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
                         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             Text(kindLabel(pack.kind), style = XType.Caption, color = LocalExtraColors.current.ink3)
-                            Text(pack.trustLabel, style = XType.Caption, color = LocalExtraColors.current.ink3)
                             if (pack.pureData) Text("纯数据", style = XType.Caption, color = LocalExtraColors.current.ink3)
                             if (pack.applyCount > 0) Text("${pack.applyCount} 次应用", style = XType.Caption, color = LocalExtraColors.current.ink3)
                         }

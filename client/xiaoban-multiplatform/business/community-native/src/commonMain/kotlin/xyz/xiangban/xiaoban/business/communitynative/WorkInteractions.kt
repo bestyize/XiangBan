@@ -20,6 +20,7 @@ import xyz.xiangban.xiaoban.common.community.*
 @Composable
 internal fun WorkInteractionLayout(
     env: CommunityEnv, kind: String, id: Long, open: ((Route) -> Unit)?, onShare: () -> Unit, enabled: Boolean = true,
+    onComments: (() -> Unit)? = null,
     content: @Composable (comments: @Composable () -> Unit) -> Unit,
 ) {
     if (!enabled) { content {}; return }
@@ -100,9 +101,11 @@ internal fun WorkInteractionLayout(
                 IconTap(XIcons.Bookmark, if (bookmarked == true) "取消收藏" else "收藏", { act {
                     val current = bookmarked ?: env.contentSocial.state(kind, id).bookmarked
                     bookmarked = env.contentSocial.bookmark(kind, id, !current).bookmarked
+                    env.contentBookmarkRevision.value++
                     bookmarkError = false
                 } }, tint = if (bookmarked == true) Brand else MaterialTheme.colorScheme.onSurface)
-                IconTap(XIcons.Share, "分享作品", onShare)
+                if (onComments != null) IconTap(XIcons.Message, "查看评论", onComments)
+                else IconTap(XIcons.Share, "分享作品", onShare)
             }
             if (bookmarkError) Text("收藏状态读取失败，点击收藏可重试", Modifier.padding(horizontal = 12.dp, vertical = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
         }

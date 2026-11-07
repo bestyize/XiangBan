@@ -64,7 +64,7 @@ internal fun CapabilityDetailContent(env: CommunityEnv, pack: Pack, back: () -> 
                 Text(pack.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
                 pack.author?.let { author -> Text(author.nickname ?: "作者", Modifier.padding(top = 6.dp).clickable(enabled = open != null) { open?.invoke(Route.User(author.uid)) }, style = XType.Body, color = LocalExtraColors.current.brandInk) }
                 if (manualOnly) BlueTag("手动模板 · 不自动执行", Modifier.padding(top = 8.dp))
-                Text("${kindLabel(pack.kind)} · ${pack.trustLabel} · v${pack.version}", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
+                Text("${kindLabel(pack.kind)} · v${pack.version}", Modifier.padding(top = 6.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                 if (pack.status != "published") Text(contentWorkState(pack), Modifier.padding(top = 8.dp), color = Danger, style = XType.Secondary)
                 if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 10.dp), style = XType.Body)
             }
@@ -274,7 +274,7 @@ fun PublishContentScreen(env: CommunityEnv, packId: Long?, back: () -> Unit, ope
                 Text("我确认这是我的原创或已获授权，并同意按社区规则发布。", style = XType.Secondary)
             }
             if (fileKey.isNotEmpty()) Text("文件已上传，可继续校验与发布。", style = XType.Caption, color = LocalExtraColors.current.ink3)
-            Text("上传和导入不会执行内容。新版本会重新进入审核，实际状态以我的作品为准。", style = XType.Caption, color = LocalExtraColors.current.ink3)
+            Text("上传和导入不会执行内容。发布后会出现在社区作品里。", style = XType.Caption, color = LocalExtraColors.current.ink3)
             error?.let { Text(it, color = Danger, style = XType.Body) }
             if (busy) Text(step.ifEmpty { "正在选择文件…" }, style = XType.Secondary, color = LocalExtraColors.current.ink3)
             PillButton(if (busy) "处理中…" else if (fileKey.isEmpty()) "上传并提交发布" else "继续校验并发布", {
