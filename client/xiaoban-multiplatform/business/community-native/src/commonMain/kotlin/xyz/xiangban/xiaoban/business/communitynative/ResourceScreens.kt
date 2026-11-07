@@ -59,11 +59,11 @@ import xyz.xiangban.xiaoban.common.community.remainText
 
 /** 资源的二级栏目；精选独立放在首页。 */
 internal enum class ResourceSub(val key: String, val label: String) {
-    Software("software", "开源软件"), Discussion("resource-open", "开源讨论"), Media("media", "影视"), Help("help", "求助悬赏");
+    Software("software", "开源软件"), Media("media", "影视"), Help("help", "求助悬赏");
 
     companion object {
+        // 旧版本存下的 "open" / "resource-open"（已下线的开源讨论）不在列表里，会落到默认的开源软件。
         fun byKey(key: String) = when (key) {
-            "open" -> Discussion
             "resource-movies" -> Media
             "resource-help" -> Help
             else -> entries.firstOrNull { it.key == key } ?: Software
@@ -75,7 +75,6 @@ internal enum class ResourceSub(val key: String, val label: String) {
 internal fun ResourceTab(env: CommunityEnv, sub: ResourceSub, open: (Route) -> Unit) {
     when (sub) {
         ResourceSub.Software -> SoftwareDirectoryTab(env, open)
-        ResourceSub.Discussion -> OpenSourceCommunityShares(env, open)
         ResourceSub.Media -> ResourceMediaTab(env, open)
         ResourceSub.Help -> HelpTab(env, open)
     }
@@ -116,15 +115,6 @@ private fun ToolIcon(name: String, developer: String, size: androidx.compose.ui.
     val logo = BrandLogos.tool(name) ?: BrandLogos.find(name) ?: BrandLogos.find(developer)
     val openai = name.contains("chatgpt", true) || developer.contains("openai", true)
     BrandTile(logo, name, size = size, corner = corner, dashed = logo == null && openai)
-}
-
-// ───────────── 历史社区分享 ─────────────
-
-@Composable
-internal fun OpenSourceCommunityShares(env: CommunityEnv, open: (Route) -> Unit) {
-    val scope = rememberCoroutineScope()
-    val controller = remember(env) { DiscussController(env.forum, scope, category = "resource-open", home = false, activeOnly = true) }
-    CasualWaterfall(env, controller, open)
 }
 
 // ───────────── 求助悬赏 ─────────────

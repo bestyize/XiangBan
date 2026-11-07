@@ -170,7 +170,6 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         is Route.Software -> SoftwareDetailScreen(env, route.project, pop, push)
         is Route.OpenSource -> RepoDetailScreen(env, route.owner, route.repo, pop, push, curated = true)
         is Route.OpenSourceCollection -> OpenSourceCollectionScreen(env, route.key, pop, push)
-        Route.OpenSourceShares -> OpenSourceSharesScreen(env, pop, push)
         Route.Leaderboard -> LeaderboardScreen(env, pop)
         Route.UsageLeaderboard -> LiveUsageRankingsScreen(env, pop)
         Route.Scatter -> ScatterScreen(env, pop, push)

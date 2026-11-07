@@ -30,13 +30,13 @@ class CommunityFeedAlignmentTest {
 
     @Test fun `category metadata preserves posting restrictions and legacy defaults`() {
         val modern = CommunityJson.decodeFromString<Category>(
-            """{"id":7,"parent_id":2,"slug":"resource-open","name":"开源讨论","section":"resources","status":"archived","posting_enabled":false}""",
+            """{"id":7,"parent_id":2,"slug":"resource-movies","name":"影视","section":"resources","status":"archived","posting_enabled":false}""",
         )
         assertEquals("resources", modern.section)
         assertEquals("archived", modern.status)
         assertFalse(modern.postingEnabled)
 
-        val legacy = CommunityJson.decodeFromString<Category>("""{"id":7,"slug":"resource-open","name":"开源讨论"}""")
+        val legacy = CommunityJson.decodeFromString<Category>("""{"id":7,"slug":"resource-movies","name":"影视"}""")
         assertNull(legacy.section)
         assertEquals("active", legacy.status)
         assertTrue(legacy.postingEnabled)

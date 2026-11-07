@@ -32,11 +32,6 @@ import xyz.xiangban.xiaoban.common.community.formatStars
 
 private fun OpenSourceProject.route() = Route.OpenSource(fullName.substringBefore('/'), fullName.substringAfter('/'))
 
-@Composable
-internal fun OpenSourceSharesScreen(env: CommunityEnv, back: () -> Unit, open: (Route) -> Unit) {
-    Column(Modifier.fillMaxSize()) { ScreenBar("社区分享", onBack = back); OpenSourceCommunityShares(env, open) }
-}
-
 /** 真实图片加载失败时收起，不制造渐变封面。 */
 @Composable
 private fun OpenSourceImage(env: CommunityEnv, project: OpenSourceProject) {
@@ -73,7 +68,6 @@ internal fun OpenSourceTab(env: CommunityEnv, open: (Route) -> Unit, initialCate
                         Column(Modifier.weight(1f)) {
                             Text("${projects.size} 个项目", Modifier.padding(top = 4.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                         }
-                        LinkText("社区分享", { open(Route.OpenSourceShares) })
                     }
                 }
                 if (projects.isEmpty()) item(key = "empty") {

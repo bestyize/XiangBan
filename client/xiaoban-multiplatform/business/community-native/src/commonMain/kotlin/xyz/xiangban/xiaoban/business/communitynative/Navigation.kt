@@ -35,7 +35,6 @@ sealed interface Route {
     data class Software(val project: String) : Route
     data class OpenSource(val owner: String, val repo: String) : Route
     data class OpenSourceCollection(val key: String) : Route
-    data object OpenSourceShares : Route
     /** 模型天梯。 */
     data object Leaderboard : Route
     /** OpenRouter 调用量 Top 50 与历史完整日榜。 */
@@ -88,7 +87,6 @@ sealed interface Route {
         is Software -> "software:${project.encodeURLParameter()}"
         is OpenSource -> "opensource:${owner.encodeURLParameter()}/${repo.encodeURLParameter()}"
         is OpenSourceCollection -> "opensource-collection:${key.encodeURLParameter()}"
-        OpenSourceShares -> "opensource-shares"
         Leaderboard -> "leaderboard"
         UsageLeaderboard -> "usage-leaderboard"
         Scatter -> "scatter"
@@ -135,7 +133,6 @@ sealed interface Route {
                 "web" -> runCatching { webPageRoute(value.decodeURLPart()) }.getOrNull()
                 "opensource-collection" -> runCatching { value.decodeURLPart().takeIf { it.isNotBlank() }?.let(::OpenSourceCollection) }.getOrNull()
                 "software" -> runCatching { value.decodeURLPart().takeIf { it.matches(Regex("[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+")) }?.let(::Software) }.getOrNull()
-                "opensource-shares" -> OpenSourceShares
                 "repo", "opensource" -> runCatching {
                     val owner = value.substringBefore('/').decodeURLPart()
                     val repo = value.substringAfter('/', "").decodeURLPart()
