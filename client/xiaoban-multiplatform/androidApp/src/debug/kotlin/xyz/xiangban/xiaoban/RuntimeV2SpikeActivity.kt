@@ -72,7 +72,9 @@ class RuntimeV2SpikeActivity : Activity() {
         }
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
-                if (request.origin.toString() != origin || pendingPermission != null || request.resources.any { it != PermissionRequest.RESOURCE_VIDEO_CAPTURE && it != PermissionRequest.RESOURCE_AUDIO_CAPTURE }) { request.deny(); return }
+                android.util.Log.i("RuntimeV2Spike", "permission request from ${request.origin} for ${request.resources.joinToString()}")
+                // PermissionRequest.origin carries a trailing slash; compare scheme and host instead of the raw string.
+                if ("${request.origin.scheme}://${request.origin.host}" != origin || pendingPermission != null || request.resources.any { it != PermissionRequest.RESOURCE_VIDEO_CAPTURE && it != PermissionRequest.RESOURCE_AUDIO_CAPTURE }) { request.deny(); return }
                 pendingPermission = request
                 AlertDialog.Builder(this@RuntimeV2SpikeActivity).setTitle("允许测试摄像头或麦克风？")
                     .setMessage("测试页请求：${request.resources.joinToString { if (it == PermissionRequest.RESOURCE_VIDEO_CAPTURE) "摄像头" else "麦克风" }}。")

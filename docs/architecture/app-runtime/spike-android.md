@@ -48,13 +48,15 @@ adb shell am start -n xyz.xiangban.xiaoban/.RuntimeV2SpikeActivity
 | 7 WebAssembly | 通过，`add(2,3)=5` |
 | 8a 公网 fetch | 通过，返回不透明响应 |
 | 8b 局域网 fetch | 通过，被拦截 |
-| 9 摄像头和麦克风 | 未测：需要用户在系统权限弹窗里亲手同意。应用现在没有这两项权限 |
+| 9 摄像头和麦克风 | 修复后通过：小样自己的同意框 → 系统权限 → `getUserMedia` 都拿到了媒体流。系统权限是测试时用 `pm grant` 临时授予、测完 `pm revoke` 收回的，系统权限弹窗本身没有经过 |
 | 10 `xb` 注入与安全区 | 通过，`safeArea.top = 44.67` |
 | 11 `xb.storage` 3 MB 往返 | 通过：内容一致，用时 373 毫秒；`am force-stop` 后再读还在 |
 | 12 系统返回 | 修复后通过：点按钮压入两条历史后，第 1、2 次返回逐层回退（`#two` → `#one` → 无），第 3 次提示「再按一次退出」，第 4 次退出 |
 | 13 `hide` / `show` | 通过：按 Home 后回来，依次收到 `hide`、`visibilitychange: hidden`、`show`、`visibilitychange: visible` |
 
 **发现的问题和结论**
+
+- **权限请求的来源带结尾斜杠。** `PermissionRequest.origin` 是 `https://spike1.app.xiangban.xyz/`，和作品源直接比字符串会不相等，请求被拒绝（`NotAllowedError`）。已改为比较协议和主机名。正式宿主同样要注意。
 
 - **返回键在 Android 16 上收不到。** App 的 targetSdk 是 37，在 Android 16 上，系统不再调用 `Activity.onBackPressed`，返回键直接关掉页面。已改为在 `onStart` / `onStop` 里注册和注销 `OnBackInvokedCallback`。正式宿主和现有的 `MobileGameActivity` 都要这样处理，后者也是靠 `onBackPressed`，要单独检查。
 - **没有用户操作就压入的历史记录，返回时会被跳过。** 用 CDP 直接调 `history.pushState` 压入两条，按返回不会逐层回退，而是直接走宿主的退出流程；点页面按钮压入的就正常。这和规范第 6.3 节写的「宿主跳过没有用户操作就压入的历史记录」一致，是 Chromium 本身的行为，不用宿主额外处理。
