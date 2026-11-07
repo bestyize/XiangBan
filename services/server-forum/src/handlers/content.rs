@@ -94,7 +94,12 @@ fn like_pattern(q: &str) -> String {
 const PACK_COLUMNS: &str = "p.id, p.kind, p.slug, p.title, p.summary, p.tags, p.author_uid, u.nickname AS author_name,
     p.trust_level, p.status, p.current_version, p.cover_key, p.apply_count, p.topic_id, p.created_at, p.updated_at,
     COALESCE((SELECT t.like_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS like_count,
-    COALESCE((SELECT t.reply_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS reply_count";
+    COALESCE((SELECT t.reply_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS reply_count,
+    COALESCE((SELECT v.runtime_protocol FROM pack_versions v WHERE v.pack_id=p.id AND v.version=p.current_version),1) AS runtime_protocol,
+    p.allow_remix, p.remix_of_pack_id, p.remix_of_version, p.remix_of_author_uid,
+    (SELECT ra.nickname FROM users ra WHERE ra.uid=p.remix_of_author_uid) AS remix_author_name,
+    (SELECT count(*) FROM packs r WHERE r.remix_of_pack_id=p.id AND r.status='published') AS remix_count,
+    p.network_disabled";
 
 #[derive(sqlx::FromRow)]
 struct PackRow {
@@ -114,12 +119,28 @@ struct PackRow {
     topic_id: Option<i64>,
     like_count: i32,
     reply_count: i32,
+    runtime_protocol: i16,
+    allow_remix: bool,
+    remix_of_pack_id: Option<i64>,
+    remix_of_version: Option<i32>,
+    remix_of_author_uid: Option<Uuid>,
+    remix_author_name: Option<String>,
+    remix_count: i64,
+    network_disabled: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
 
 impl PackRow {
     fn json(&self, state: &AppState) -> Value {
+        // 改编关系：原作品被删后 pack_id 为空，但原作者仍保留署名。
+        let remix_of = (self.remix_of_pack_id.is_some() || self.remix_of_author_uid.is_some()).then(|| {
+            json!({
+                "pack_id": self.remix_of_pack_id,
+                "version": self.remix_of_version,
+                "author": self.remix_of_author_uid.map(|uid| json!({ "uid": uid, "nickname": self.remix_author_name })),
+            })
+        });
         json!({
             "id": self.id,
             "kind": self.kind,
@@ -138,6 +159,11 @@ impl PackRow {
             "reply_count": self.reply_count,
             "one_click": content::one_click_allowed(&self.kind, self.trust_level, &self.status),
             "pure_data": content::is_pure_data(&self.kind),
+            "runtime_protocol": self.runtime_protocol,
+            "allow_remix": self.allow_remix,
+            "remix_of": remix_of,
+            "remix_count": self.remix_count,
+            "network_disabled": self.network_disabled,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         })
@@ -540,7 +566,7 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     .fetch_one(&mut *tx)
     .await
     .map_err(slug_conflict)?;
-    insert_version(&mut tx, id, 1, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), "").await?;
+    insert_version(&mut tx, id, 1, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), "", info.runtime_protocol).await?;
     // 用户发布的内容先上架（未审标记），同时进审核队列，由人工看过后升级为“已审核”。
     let note = review.map_or(String::new(), |w| format!("命中复核词：{w}"));
     crate::moderation::enqueue(&mut tx, "pack", id, &note).await?;
@@ -580,10 +606,11 @@ async fn insert_version(
     file_key: &str,
     mirrors: &Value,
     changelog: &str,
+    runtime_protocol: i16,
 ) -> AppResult<()> {
     sqlx::query(
-        "INSERT INTO pack_versions (pack_id, version, label, sha256, size, manifest, file_key, mirrors, changelog)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        "INSERT INTO pack_versions (pack_id, version, label, sha256, size, manifest, file_key, mirrors, changelog, runtime_protocol)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
     )
     .bind(pack_id)
     .bind(version)
@@ -594,6 +621,7 @@ async fn insert_version(
     .bind(file_key)
     .bind(mirrors)
     .bind(changelog)
+    .bind(runtime_protocol)
     .execute(&mut *tx)
     .await?;
     Ok(())
@@ -630,7 +658,7 @@ async fn add_version(
         return Err(AppError::BadRequest("新版本的 id 必须与原来一致".into()));
     }
     let next = current + 1;
-    insert_version(&mut tx, id, next, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), &changelog)
+    insert_version(&mut tx, id, next, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), &changelog, info.runtime_protocol)
         .await
         .map_err(|e| match e {
             AppError::Database(sqlx::Error::Database(db)) if db.is_unique_violation() => AppError::Conflict("版本冲突，请重试".into()),
@@ -1133,7 +1161,7 @@ async fn admin_create_pack(
     .fetch_one(&mut *tx)
     .await
     .map_err(slug_conflict)?;
-    insert_version(&mut tx, id, 1, &info.version_label, &input.sha256, input.size, &input.manifest, &input.file_key, &json!(input.mirrors), "")
+    insert_version(&mut tx, id, 1, &info.version_label, &input.sha256, input.size, &input.manifest, &input.file_key, &json!(input.mirrors), "", info.runtime_protocol)
         .await?;
     audit(&mut tx, &admin, "pack.create", "pack", id, format!("{} {}", input.kind, info.slug)).await?;
     tx.commit().await?;

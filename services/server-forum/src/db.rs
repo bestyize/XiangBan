@@ -829,6 +829,16 @@ CREATE TABLE IF NOT EXISTS pack_versions (
     PRIMARY KEY (pack_id, version)
 );
 
+-- 应用广场（运行时协议 2）：版本记录协议号；作品记录改编关系、是否允许改编和后台的“禁止联网”开关。
+ALTER TABLE pack_versions ADD COLUMN IF NOT EXISTS runtime_protocol SMALLINT NOT NULL DEFAULT 1;
+ALTER TABLE packs ADD COLUMN IF NOT EXISTS allow_remix BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE packs ADD COLUMN IF NOT EXISTS remix_of_pack_id BIGINT REFERENCES packs(id) ON DELETE SET NULL;
+ALTER TABLE packs ADD COLUMN IF NOT EXISTS remix_of_version INT;
+-- 创建时一并记下原作者，原作品被删后改编作品仍能署名。
+ALTER TABLE packs ADD COLUMN IF NOT EXISTS remix_of_author_uid UUID;
+ALTER TABLE packs ADD COLUMN IF NOT EXISTS network_disabled BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE INDEX IF NOT EXISTS packs_remix_idx ON packs (remix_of_pack_id) WHERE remix_of_pack_id IS NOT NULL;
+
 -- 直传凭证签发记录：资源机回调确认文件落盘并校验过哈希后才算 verified，发布内容包只认已确认的上传。
 CREATE TABLE IF NOT EXISTS pack_uploads (
     file_key      TEXT PRIMARY KEY,
