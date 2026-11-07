@@ -51,6 +51,7 @@ pub fn admin_routes() -> Router<AppState> {
     Router::new()
         .route("/packs", get(admin_list_packs).post(admin_create_pack))
         .route("/packs/{id}/review", post(admin_review_pack))
+        .route("/packs/{id}/network", post(admin_set_network))
         .route("/packs/{id}/mirrors", post(admin_add_mirror))
         .route("/schemes", post(admin_create_scheme))
         .route("/projects", get(admin_list_projects))
@@ -1310,6 +1311,35 @@ async fn admin_review_pack(
     notify_pack_author(&mut tx, id, &input.action, &note).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "trust_level": new_trust, "status": new_status })))
+}
+
+#[derive(Deserialize)]
+pub struct NetworkInput {
+    disabled: bool,
+    #[serde(default)]
+    note: String,
+}
+
+/// 后台开关“禁止联网”：宿主打开作品时检查，打开后只允许同源（规范第 5.5 节）。只改标记，不动审核状态。
+async fn admin_set_network(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Path(id): Path<i64>,
+    Json(input): Json<NetworkInput>,
+) -> AppResult<Json<Value>> {
+    let note = clean_text(&input.note, "备注", 200, false)?;
+    let mut tx = state.pool.begin().await?;
+    let updated = sqlx::query("UPDATE packs SET network_disabled = $2 WHERE id = $1")
+        .bind(id)
+        .bind(input.disabled)
+        .execute(&mut *tx)
+        .await?;
+    if updated.rows_affected() == 0 {
+        return Err(AppError::not_found("内容包"));
+    }
+    audit(&mut tx, &admin, "pack.network", "pack", id, format!("network_disabled={}; {note}", input.disabled)).await?;
+    tx.commit().await?;
+    Ok(Json(json!({ "id": id, "network_disabled": input.disabled })))
 }
 
 #[derive(Deserialize)]
