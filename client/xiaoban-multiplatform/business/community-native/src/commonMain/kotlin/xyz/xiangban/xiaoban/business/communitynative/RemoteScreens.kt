@@ -79,7 +79,7 @@ private val SetupSteps = listOf(
 
 /** 毫秒时间戳 → “刚刚 / N 分钟前 / N 小时前 / N 天前”。 */
 @OptIn(kotlin.time.ExperimentalTime::class)
-private fun relativeTime(ms: Long): String {
+internal fun relativeTime(ms: Long): String {
     if (ms <= 0) return ""
     val diff = (kotlin.time.Clock.System.now().toEpochMilliseconds() - ms) / 1000
     return when {

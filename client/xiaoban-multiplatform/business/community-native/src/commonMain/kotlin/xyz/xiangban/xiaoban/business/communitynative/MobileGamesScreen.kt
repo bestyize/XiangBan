@@ -62,7 +62,7 @@ private val DesktopIdeas = listOf(
 
 @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
-fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit, onOverlayChanged: (Boolean) -> Unit = {}) {
+fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> Unit, onOverlayChanged: (Boolean) -> Unit = {}, createRequest: String? = null, onCreateRequestHandled: () -> Unit = {}) {
     var official by remember { mutableStateOf(emptyList<MobileGame>()) }
     var games by remember { mutableStateOf(emptyList<MobileGame>()) }
     var errors by remember { mutableStateOf(emptyList<String>()) }
@@ -115,6 +115,13 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
         createKind = item?.kind ?: category.takeUnless { it == "全部" } ?: "游戏"
         idea = item?.description.orEmpty()
         creating = true
+    }
+    LaunchedEffect(createRequest) {
+        createRequest?.let { kind ->
+            prepare()
+            createKind = kind
+            onCreateRequestHandled()
+        }
     }
     fun runAction(action: suspend () -> Unit) {
         if (busy) return

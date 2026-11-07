@@ -63,6 +63,9 @@ fun CommunityNativeApp(env: CommunityEnv) {
         var publishOpen by rememberSaveable { mutableStateOf(false) }
         var aiDrawerOpen by rememberSaveable { mutableStateOf(false) }
         var gameOverlayOpen by remember { mutableStateOf(false) }
+        // 首页的创作入口：打开对话页时直接弹出生图面板，或切到“创造”并打开对应类型的创作面板。
+        var pendingImageSheet by remember { mutableStateOf(false) }
+        var pendingCreation by remember { mutableStateOf<String?>(null) }
         val stack = Route.decodeStack(stackText)
         // 回调可能在异步操作（如登录）结束后才调用，所以每次都读最新的栈，而不是组合时捕获的那份。
         fun push(route: Route) { stackText = Route.encodeStack(Route.decodeStack(stackText) + route) }
@@ -80,8 +83,12 @@ fun CommunityNativeApp(env: CommunityEnv) {
             Box(Modifier.fillMaxSize().graphicsLayer { translationX = -size.width * tabShift }) {
                 AnimatedContent(targetState = Tab.valueOf(tab), modifier = Modifier.fillMaxSize(), transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) }, label = "主导航切换") { currentTab ->
                     when (currentTab) {
-                        Tab.Ai -> AiHomeScreen(env, chat, ::push, { aiDrawerOpen = true })
-                        Tab.Games -> GamesScreen(env, chat, ::push, onOverlayChanged = { gameOverlayOpen = it })
+                        Tab.Ai -> AiHomeScreen(
+                            env, chat, ::push, { aiDrawerOpen = true },
+                            onCreateImage = { if (!chat.state.value.sending) chat.clearConversation(); pendingImageSheet = true; push(Route.AiChat) },
+                            onCreateWork = { kind -> pendingCreation = kind; tab = Tab.Games.name },
+                        )
+                        Tab.Games -> GamesScreen(env, chat, ::push, onOverlayChanged = { gameOverlayOpen = it }, createRequest = pendingCreation, onCreateRequestHandled = { pendingCreation = null })
                         Tab.Community -> CommunityScreen(env, ::push)
                         Tab.Mine -> MineScreen(env, ::push)
                     }
@@ -106,7 +113,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
                 visiblePages.lastOrNull()?.let { route ->
                     // 子页面盖住一级页，并吃掉点击，免得穿透到下面。
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding().clickable(indication = null, interactionSource = null) {}) {
-                        RouteScreen(env, chat, route, ::push, ::pop)
+                        RouteScreen(env, chat, route, ::push, ::pop, pendingImageSheet) { pendingImageSheet = false }
                     }
                 }
             }
@@ -130,7 +137,7 @@ fun CommunityNativeApp(env: CommunityEnv) {
 }
 
 @Composable
-private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Route, push: (Route) -> Unit, pop: () -> Unit) {
+private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Route, push: (Route) -> Unit, pop: () -> Unit, imageSheet: Boolean, onImageSheetOpened: () -> Unit) {
     when (route) {
         is Route.Pack -> PackDetailScreen(env, route.id, pop, push)
         is Route.Ability -> AbilityDetailScreen(env, route.id, pop, push)
@@ -172,7 +179,7 @@ private fun RouteScreen(env: CommunityEnv, chat: CloudChatController, route: Rou
         Route.Appearance -> AppearanceScreen(back = pop)
         Route.Voice -> VoiceSettingsScreen(env, back = pop)
         Route.ToolEnvironment -> ToolEnvironmentScreen(env.platform?.toolEnvironment, back = pop)
-        Route.AiChat -> AiChatPage(env, chat, back = pop, open = push)
+        Route.AiChat -> AiChatPage(env, chat, back = pop, open = push, openImageSheet = imageSheet, onImageSheetOpened = onImageSheetOpened)
         Route.Devices -> DevicesScreen(env, back = pop, open = push)
         is Route.RemoteChat -> RemoteChatScreen(env, route.peer, back = pop, open = push, initialDraft = route.draft)
     }

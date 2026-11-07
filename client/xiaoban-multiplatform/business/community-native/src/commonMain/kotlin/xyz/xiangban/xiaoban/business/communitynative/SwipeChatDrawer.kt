@@ -28,18 +28,25 @@ internal fun SwipeChatDrawer(visible: Boolean, onClose: () -> Unit, content: @Co
         var offset by remember(pixels) { mutableFloatStateOf(-pixels) }
         var mounted by remember { mutableStateOf(false) }
         var settling by remember { mutableStateOf<Job?>(null) }
+        // Job.isActive is not snapshot state; a stale `true` would make the drawer swallow every tap.
+        var animating by remember { mutableStateOf(false) }
         val scope = rememberCoroutineScope()
         val close by rememberUpdatedState(onClose)
         fun settle(open: Boolean, velocity: Float = 0f, notify: Boolean = false) {
             settling?.cancel()
+            animating = true
             settling = scope.launch {
-                animate(offset, if (open) 0f else -pixels, initialVelocity = velocity,
-                    animationSpec = spring(dampingRatio = 1f, stiffness = 500f)) { value, _ ->
-                    offset = value.coerceIn(-pixels, 0f)
-                }
-                if (!open) {
-                    mounted = false
-                    if (notify) close()
+                try {
+                    animate(offset, if (open) 0f else -pixels, initialVelocity = velocity,
+                        animationSpec = spring(dampingRatio = 1f, stiffness = 500f)) { value, _ ->
+                        offset = value.coerceIn(-pixels, 0f)
+                    }
+                    if (!open) {
+                        mounted = false
+                        if (notify) close()
+                    }
+                } finally {
+                    if (settling === coroutineContext[Job]) animating = false
                 }
             }
         }
@@ -52,7 +59,7 @@ internal fun SwipeChatDrawer(visible: Boolean, onClose: () -> Unit, content: @Co
             val drag = Modifier.draggable(
                 state = rememberDraggableState { delta -> offset = (offset + delta).coerceIn(-pixels, 0f) },
                 orientation = Orientation.Horizontal,
-                startDragImmediately = settling?.isActive == true,
+                startDragImmediately = animating,
                 onDragStarted = { settling?.cancel() },
                 onDragStopped = { velocity ->
                     val open = when {
