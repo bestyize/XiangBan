@@ -36,6 +36,8 @@ dependencies {
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
+    debugImplementation(libs.androidx.webkit)
+    testDebugImplementation(libs.junit)
 }
 
 android {
