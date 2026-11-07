@@ -192,6 +192,7 @@ GIF 直接播放原动画，下载保留原格式。图片按账号存在当前�
 - `GET /packs` 默认不含改编作品，`remix_of=<pack_id>` 时只返回改编自该作品的作品。
 - 请求头 `X-Xiaoban-Runtime`（如 `1,2`，缺失或读不出按 `1`）：列表过滤掉当前版本协议不在集合内的作品，详情对这类作品返回 404。下载接口不看这个头。
 - `POST /admin/packs/{id}/network {disabled, note?}`：管理员令牌，开关“禁止联网”并写审计，不影响审核状态。
+- 创作者精选：`packs.featured_at`（空表示未精选）。列表和详情返回 `featured`（布尔）和 `featured_at`；`GET /packs?featured=true` 只列出被精选的作品，按 `featured_at DESC, id DESC` 排序（覆盖 `sort`），可与 `kind`、`X-Xiaoban-Runtime` 等筛选叠加，不传或 `false` 不过滤。`POST /admin/packs/{id}/featured {featured, note?}`：管理员令牌，只允许已上架（`published`）的作品（否则 400，未知作品 404），设置时间取当前时间（重复精选会刷新时间），写审计 `pack.featured`。与信任等级无关，不影响可见性。
 - 可见性不看信任等级：列表、详情、下载对 game/app 都不按 `trust_level` 过滤，T2 未审作品同样可见可下载。
 - 验证：`TEST_DATABASE_URL=… cargo test --manifest-path services/server-forum/Cargo.toml content::`（清单单元测试）和 `app_plaza`（体积、发布、改编、协议过滤、后台开关的集成测试）。全量测试里有 5 个与本改动无关的既有失败（`db::tests` 三个板块种子断言、`discover_tests::topics_carry_images_polls_and_help_stats`、`points::tests::purchases_are_atomic_...`），改动前同样失败。
 
