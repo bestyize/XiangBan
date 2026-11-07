@@ -27,10 +27,19 @@
     { x: 4200, top: [58, 64, 80], low: [170, 176, 192], tint: [150, 160, 180, 0.42], sun: 0, moon: 0, rain: 0, leaves: 0, petals: 0, bamboo: 0, snow: 1, reeds: 0.3, forest: 0.85, blizzard: 0.3 },
     { x: 5200, top: [26, 29, 42], low: [182, 188, 204], tint: [175, 180, 200, 0.32], sun: 0, moon: 1, rain: 0, leaves: 0, petals: 0, bamboo: 0, snow: 0.5, reeds: 0.4, forest: 0.9, blizzard: 0.15 },
   ]
-  const ENV_KEYS = ['sun', 'moon', 'rain', 'leaves', 'petals', 'bamboo', 'snow', 'reeds', 'forest', 'blizzard']
+  // 烽火卷 (浅绛): ochre earth under an indigo-tinged sky, golden poplars, Gobi haze, an overcast pass, a night sandstorm, a red dawn.
+  const SKY_BEACON = [
+    { x: 0, top: [206, 192, 168], low: [242, 231, 208], tint: [248, 230, 198, 0.12], sun: 0.85, leaves: 0.35, poplar: 0.25, dust: 0.15 },
+    { x: 1300, top: [216, 196, 156], low: [246, 232, 202], tint: [250, 226, 182, 0.2], sun: 0.85, leaves: 1, poplar: 1, dust: 0.1 },
+    { x: 2300, top: [222, 204, 174], low: [248, 236, 212], tint: [252, 232, 198, 0.22], sun: 1, leaves: 0.12, poplar: 0.25, dust: 0.6 },
+    { x: 3300, top: [168, 166, 164], low: [224, 216, 200], tint: [212, 204, 190, 0.26], sun: 0.3, leaves: 0, poplar: 0, dust: 0.25 },
+    { x: 4200, top: [22, 20, 24], low: [92, 78, 66], tint: [118, 98, 84, 0.42], sun: 0, sand: 1, dust: 0.6, night: 1 },
+    { x: 5200, top: [64, 60, 76], low: [228, 196, 158], tint: [236, 202, 162, 0.26], sun: 0.75, sand: 0.12, dust: 0.3 },
+  ]
+  const ENV_KEYS = ['sun', 'moon', 'rain', 'leaves', 'petals', 'bamboo', 'snow', 'reeds', 'forest', 'blizzard', 'poplar', 'dust', 'sand', 'night']
 
   function environment(x, volumeId = 1) {
-    const sky = volumeId === 2 ? SKY_SNOW : SKY_BAMBOO
+    const sky = volumeId === 3 ? SKY_BEACON : volumeId === 2 ? SKY_SNOW : SKY_BAMBOO
     let a = sky[0], b = sky[0], t = 0
     for (let i = 0; i < sky.length - 1; i++) {
       const next = sky[i + 1]
@@ -56,8 +65,15 @@
     { s: 'shrine', x: 4420, alpha: 0.8 }, { s: 'snowTree1', x: 4880 }, { s: 'snowPine', x: 5540, alpha: 0.6 }, { s: 'plumTree', x: 5760 },
   ]
 
-  function grass(res) {
-    const random = art.rng(91)
+  const PROPS_BEACON = [
+    { s: 'beacon', x: 300, smoke: true }, { s: 'banner0', x: 640 }, { s: 'poplar0', x: 1560 }, { s: 'poplar1', x: 2130 },
+    { s: 'poplar1', x: 2480, alpha: 0.85 }, { s: 'beacon', x: 3060, smoke: true, alpha: 0.85 }, { s: 'banner1', x: 3330 }, { s: 'cityWall', x: 3820, alpha: 0.82 },
+    { s: 'tents', x: 4420, alpha: 0.9 }, { s: 'banner2', x: 4640 }, { s: 'tents2', x: 4830, alpha: 0.9 }, { s: 'banner0', x: 5150 },
+    { s: 'banner1', x: 5420 }, { s: 'dais', x: 5960, alpha: 0.92 },
+  ]
+
+  function grass(res, color = INK, seed = 91) {
+    const random = art.rng(seed)
     const period = 900
     const tufts = []
     for (let i = 0; i < 24; i++) {
@@ -71,7 +87,7 @@
         const x = tuft.x + shift
         if (x < u0 - 50 || x > u1 + 50) continue
         tuft.blades.forEach((blade, k) => {
-          g.fillStyle = art.rgba(INK, blade.alpha)
+          g.fillStyle = art.rgba(color, blade.alpha)
           art.leaf(g, x + k * 2.4, 394, blade.a, blade.l, blade.w)
         })
       }
@@ -128,6 +144,25 @@
       a.icicle = art.icicleSprite(r(1))
       a.reedBack = art.reeds({ period: 180, count: 9, height: 80, res: r(0.7), seed: 55, top: 190, bottom: GROUND + 10, alpha: 0.92 })
       a.reedFront = art.reeds({ period: 210, count: 5, height: 96, res: r(0.7), seed: 57, top: 180, bottom: GROUND + 14, alpha: 0.85 })
+    } else if (volumeId === 3) {
+      a.far = art.mountains({ width: span(0.06), top: 30, height: 236, base: 250, res: r(0.3), seed: 201, peakW: [40, 110], peakH: [60, 150], gap: [0.5, 1.1], round: 1.6, detail: 18, detailAmp: 9, color: [86, 92, 104], alpha: 0.3, depth: 70, strokeCell: 4, strokeDensity: 0.45, strokeLen: 9, outline: 0.5, trees: 0, treeH: 3, fadeH: 80, indigo: 0.22 })
+      a.mid = art.mountains({ width: span(0.16), top: 90, height: 182, base: 266, res: r(0.4), seed: 211, peakW: [90, 200], peakH: [40, 110], gap: [0.5, 1], round: 2.2, detail: 22, detailAmp: 12, color: [72, 66, 60], alpha: 0.4, depth: 46, strokeCell: 4, strokeDensity: 0.55, strokeLen: 8, outline: 0.7, trees: 0.08, treeH: 4, fadeH: 60, ochre: 0.16, indigo: 0.1, wall: { from: 0, to: span(0.16), alpha: 0.5, towerEvery: 260 } })
+      a.near = art.mountains({ width: span(0.32), top: 170, height: 126, base: 290, res: r(0.5), seed: 223, peakW: [140, 300], peakH: [18, 60], gap: [0.6, 1], round: 2.4, detail: 26, detailAmp: 8, color: [54, 46, 38], alpha: 0.5, depth: 34, strokeCell: 3, strokeDensity: 0.55, strokeLen: 7, outline: 0.85, trees: 0.12, treeH: 6, ochre: 0.32, fadeH: 40 })
+      a.groveFar = art.poplarGrove({ period: 1300, count: 14, height: [40, 80], base: 292, top: 190, res: r(0.45), seed: 231, color: [70, 62, 52], alpha: 0.32 })
+      a.groveNear = art.poplarGrove({ period: 1700, count: 7, height: [90, 150], base: 304, top: 130, res: r(0.6), seed: 237, color: [34, 30, 28], alpha: 0.55 })
+      a.ground = art.desertGround({ period: 1024, line: GROUND, depth: 92, res: r(1), seed: 17 })
+      a.grassDry = art.dryGrass({ period: 240, line: GROUND, height: 30, res: r(0.8), seed: 241 })
+      a.grassBurnt = art.dryGrass({ period: 240, line: GROUND, height: 30, res: r(0.8), seed: 243, burnt: true })
+      a.grass = grass(r(0.6), [96, 70, 40], 93)
+      a.beacon = art.beaconTower(r(1))
+      a.poplar0 = art.poplar(r(0.9), 5, 1); a.poplar1 = art.poplar(r(0.9), 9, 0.8)
+      a.cityWall = art.cityWall(r(0.9)); a.tents = art.tents(r(0.9), 7); a.tents2 = art.tents(r(0.9), 12); a.dais = art.dais(r(0.9))
+      a.banner0 = art.banner(r(1), 1); a.banner1 = art.banner(r(1), 2); a.banner2 = art.banner(r(1), 3)
+      a.ramparts = (world.ramparts || []).map((wall, i) => ({ wall, s: art.rampart(r(1), 3 + i, wall.h) }))
+      a.flames = art.flameSprites(r(1))
+      a.pot = art.potSprite(r(1.4))
+      a.dust = art.dustSprite(64)
+      a.goldLeaf = art.ochreLeafSprite()
     } else {
       a.far = art.mountains({ width: span(0.06), top: 30, height: 236, base: 248, res: r(0.3), seed: 11, peakW: [26, 64], peakH: [85, 185], gap: [0.45, 1.05], round: 1.25, detail: 16, detailAmp: 9, color: [80, 92, 108], alpha: 0.3, depth: 70, strokeCell: 4, strokeDensity: 0.55, strokeLen: 9, outline: 0.55, trees: 0.12, treeH: 3, fadeH: 80 })
       a.mid = art.mountains({ width: span(0.16), top: 90, height: 182, base: 264, res: r(0.4), seed: 23, peakW: [60, 150], peakH: [45, 120], gap: [0.55, 1.1], round: 1.6, detail: 22, detailAmp: 12, color: [56, 62, 72], alpha: 0.42, depth: 46, strokeCell: 4, strokeDensity: 0.6, strokeLen: 8, outline: 0.75, trees: 0.4, treeH: 6, fadeH: 60, pavilions: [520, 1300] })
@@ -151,7 +186,9 @@
     }
     a.platforms = world.platforms.map((p, i) => volumeId === 2
       ? { p, s: art.snowRock(p.w, p.y, GROUND, 40 + i, r(1)) }
-      : p.x >= WATER[0] && p.x < WATER[1]
+      : volumeId === 3
+        ? { p, s: art.earthBlock(p.w, p.y, GROUND, 60 + i, r(1)) }
+        : p.x >= WATER[0] && p.x < WATER[1]
         ? { p, s: art.bridge(p.w, p.y, GROUND, r(1), 30 + i) }
         : { p, s: art.rock(p.w, p.y, GROUND, 40 + i, r(1)) })
     a.splats = [0, 1, 2, 3, 4, 5].map((i) => art.splat(100 + i, 128))
@@ -185,6 +222,52 @@
       ctx.drawImage(a.mist, u - w / 2, y - h / 2 + (art.hash(n, seed + 3) - 0.5) * h * 0.4, w, h)
     }
     ctx.globalAlpha = 1
+  }
+
+  // Ochre dust drifting in a band, like the paper mist but carried on the wind (west to east).
+  function dustBand(ctx, a, cam, f, y, h, alpha, drift, seed) {
+    if (!a.dust) return
+    layer(ctx, cam, f)
+    const spacing = 220
+    const offset = cam.left * f
+    const first = Math.floor((offset - drift - 500) / spacing)
+    for (let n = first; n * spacing + drift < offset + cam.viewW + 200; n++) {
+      const w = 340 * (0.7 + art.hash(n, seed) * 0.8)
+      const u = n * spacing + art.hash(n, seed + 1) * 120 + drift
+      ctx.globalAlpha = alpha * (0.5 + 0.5 * art.hash(n, seed + 2))
+      ctx.drawImage(a.dust, u - w / 2, y - h / 2 + (art.hash(n, seed + 3) - 0.5) * h * 0.4, w, h)
+    }
+    ctx.globalAlpha = 1
+  }
+
+  // 狼烟: a column of ink smoke rising from a lit beacon and leaning downwind.
+  function beaconSmoke(ctx, a, x, y, clock, seed) {
+    const flames = a.flames
+    if (flames) {
+      const f = flames[Math.floor(clock * 9 + seed) % flames.length]
+      ctx.globalAlpha = 0.9
+      ctx.drawImage(f.node, x - f.ox * 0.7, y - f.oy * 0.7, f.width * 0.7, f.height * 0.7)
+    }
+    for (let k = 0; k < 9; k++) {
+      const q = (clock * 0.12 + k / 9 + art.hash(k, seed) * 0.05) % 1
+      const size = 10 + q * 54
+      ctx.globalAlpha = 0.32 * (1 - q) * Math.min(1, q * 6)
+      ctx.drawImage(a.puff, x + q * q * 70 + Math.sin(clock * 0.8 + k) * 4 - size / 2, y - 6 - q * 170 - size / 2, size, size)
+    }
+    ctx.globalAlpha = 1
+  }
+
+  // Camp fire in the raided camp: a small flame and a warm glow on the ground.
+  function campfire(ctx, a, x, clock) {
+    ctx.globalAlpha = 0.35 + 0.08 * Math.sin(clock * 11 + x)
+    ctx.drawImage(a.light, x - 46, GROUND - 46, 92, 60)
+    ctx.globalAlpha = 1
+    ctx.fillStyle = 'rgba(30,24,20,0.85)'
+    ctx.fillRect(x - 12, GROUND - 3, 24, 3)
+    if (a.flames) {
+      const f = a.flames[Math.floor(clock * 10 + x) % a.flames.length]
+      ctx.drawImage(f.node, x - f.ox * 0.8, GROUND - 2 - f.oy * 0.8, f.width * 0.8, f.height * 0.8)
+    }
   }
 
   function drawBackground(ctx, a, cam, e, clock) {
@@ -245,6 +328,23 @@
         art.drawStrip(ctx, a.reeds, cam.left * 0.72 - 30, cam.viewW + 60, 900)
         ctx.globalAlpha = 1
       }
+    } else if (a.volumeId === 3) {
+      if (e.dust > 0.05) dustBand(ctx, a, cam, 0.4, 268, 70, e.dust * 0.5, clock * 9, 61)
+      if (e.poplar > 0.02) {
+        const sway = Math.sin(clock * 0.5) * 0.006
+        layer(ctx, cam, 0.55, sway, 292)
+        ctx.globalAlpha = e.poplar
+        art.drawStrip(ctx, a.groveFar, cam.left * 0.55 - 30, cam.viewW + 60, 1300)
+        ctx.globalAlpha = 1
+      }
+      mist(ctx, a, cam, 0.7, 296, 30, 0.45, clock * 14, 29)
+      if (e.poplar > 0.02) {
+        const sway = Math.sin(clock * 0.6 + 1) * 0.009
+        layer(ctx, cam, 0.8, sway, 304)
+        ctx.globalAlpha = e.poplar * 0.95
+        art.drawStrip(ctx, a.groveNear, cam.left * 0.8 - 40, cam.viewW + 80, 1700)
+        ctx.globalAlpha = 1
+      }
     } else {
       if (e.bamboo > 0.02) {
         const sway = Math.sin(clock * 0.6) * 0.01 + Math.sin(clock * 1.7) * 0.004
@@ -287,6 +387,19 @@
         art.drawSprite(ctx, s, prop.x, GROUND, prop.alpha ?? 1)
       }
       drawReedBeds(ctx, a, a.reedBack, cam, e, clock, 1)
+    } else if (a.volumeId === 3) {
+      art.drawStrip(ctx, a.ground, cam.left, cam.viewW, 1024)
+      for (const prop of PROPS_BEACON) {
+        const s = a[prop.s]
+        if (!s || prop.x + s.width < left || prop.x - s.width > right) continue
+        art.drawSprite(ctx, s, prop.x, GROUND, prop.alpha ?? 1)
+        if (prop.smoke && s.fireAt) beaconSmoke(ctx, a, prop.x + s.fireAt[0], GROUND + s.fireAt[1], clock, prop.x)
+      }
+      for (const lightX of a.world.dark?.lights || []) if (lightX > left - 40 && lightX < right + 40) campfire(ctx, a, lightX, clock)
+      for (const entry of a.ramparts) {
+        if (entry.wall.x + 40 < left || entry.wall.x - 40 > right) continue
+        art.drawSprite(ctx, entry.s, entry.wall.x, GROUND)
+      }
     } else {
       ctx.save()
       ctx.beginPath()
@@ -354,6 +467,14 @@
         ctx.globalAlpha = 1
       }
       if (gale > 0.05) mist(ctx, a, cam, 1.12, GROUND - 2, 54, 0.62 * gale, clock * 70, 41)
+    } else if (a.volumeId === 3) {
+      const sway = Math.sin(clock * 0.9 + 2) * 0.014
+      layer(ctx, cam, 1.18, sway, 394)
+      ctx.globalAlpha = 0.7
+      art.drawStrip(ctx, a.grass, cam.left * 1.18 - 30, cam.viewW + 60, 900)
+      ctx.globalAlpha = 1
+      const sand = Math.max(e.sand || 0, (e.dust || 0) * 0.4)
+      if (sand > 0.05) dustBand(ctx, a, cam, 1.12, GROUND - 6, 60, 0.55 * sand, clock * 90, 43)
     } else {
       const sway = Math.sin(clock * 0.9 + 2) * 0.012
       layer(ctx, cam, 1.3, sway, 400)
@@ -366,7 +487,7 @@
     }
   }
 
-  function createWeather() { return { leaves: [], drops: [], snow: [], ripples: [], rippleClock: 0, gale: 0, dir: -1 } }
+  function createWeather() { return { leaves: [], drops: [], snow: [], sand: [], ripples: [], rippleClock: 0, gale: 0, dir: -1 } }
 
   function spawnLeaf(w, cam, e, anywhere) {
     const petal = Math.random() < e.petals / Math.max(0.01, e.petals + e.leaves)
@@ -407,6 +528,19 @@
       if (flake.x < -0.06) { flake.x += 1.14; flake.y = Math.random() }
       else if (flake.x > 1.08) { flake.x -= 1.14; flake.y = Math.random() }
     }
+    // Sand in the night storm: grains and grit streaks blown west to east.
+    const sandCount = Math.round(150 * (e.sand || 0) + 26 * (e.dust || 0))
+    while (w.sand.length < sandCount) w.sand.push({ x: Math.random(), y: Math.random(), z: 0.2 + Math.random() * 0.8, phase: Math.random() * 6 })
+    if (w.sand.length > sandCount) w.sand.length = sandCount
+    const sandGust = 1 + 0.45 * Math.sin(clock * 0.6) + 0.25 * Math.sin(clock * 1.7 + 2)
+    for (const grain of w.sand) {
+      grain.x += (90 + 260 * grain.z) * sandGust * (0.3 + (e.sand || 0)) * dt / cam.viewW
+      grain.y += (8 + Math.sin(clock * 2 + grain.phase) * 18) * dt / cam.viewH
+      if (grain.x > 1.06) { grain.x -= 1.12; grain.y = Math.random() }
+      if (grain.y > 1.04) grain.y -= 1.08
+      else if (grain.y < -0.04) grain.y += 1.08
+    }
+    w.sandGust = sandGust
     const drops = Math.round(160 * (e.rain || 0))
     while (w.drops.length < drops) w.drops.push({ x: Math.random(), y: Math.random(), len: 0.03 + Math.random() * 0.03, speed: 1.6 + Math.random() * 0.9 })
     if (w.drops.length > drops) w.drops.length = drops
@@ -430,7 +564,7 @@
       ctx.translate(leaf.x, leaf.y)
       ctx.rotate(leaf.spin * 0.6 + (leaf.petal ? 0 : 2.4))
       ctx.scale(1, Math.cos(leaf.spin) * 0.9 + 0.1)
-      ctx.drawImage(leaf.petal ? a.petal : a.leaf, -leaf.size / 2, -leaf.size / 2, leaf.size, leaf.size)
+      ctx.drawImage(leaf.petal ? a.petal : (a.goldLeaf || a.leaf), -leaf.size / 2, -leaf.size / 2, leaf.size, leaf.size)
       ctx.restore()
     }
     if (w.snow.length) {
@@ -452,6 +586,28 @@
         const size = (3.2 + 11 * flake.z * flake.z) * P
         ctx.globalAlpha = 0.5 + 0.45 * flake.z
         ctx.drawImage(a.snowflake, flake.x * cam.width - size / 2, flake.y * cam.height - size / 2, size, size)
+      }
+      ctx.globalAlpha = 1
+      layer(ctx, cam, 1)
+    }
+    if (w.sand.length) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0)
+      const P = cam.P
+      ctx.lineCap = 'round'
+      ctx.strokeStyle = 'rgba(176,138,92,' + (0.18 + 0.3 * (e.sand || 0)).toFixed(3) + ')'
+      ctx.lineWidth = Math.max(1, P * 0.7)
+      ctx.beginPath()
+      for (const grain of w.sand) {
+        if (grain.z < 0.45) continue
+        const x = grain.x * cam.width, y = grain.y * cam.height, l = (10 + 40 * grain.z) * P * (w.sandGust || 1) * (0.3 + (e.sand || 0))
+        ctx.moveTo(x, y); ctx.lineTo(x - l, y + l * 0.04)
+      }
+      ctx.stroke()
+      ctx.fillStyle = 'rgba(120,92,62,0.6)'
+      for (const grain of w.sand) {
+        const r = (0.5 + 1.4 * grain.z) * P
+        ctx.globalAlpha = 0.35 + 0.5 * grain.z
+        ctx.fillRect(grain.x * cam.width - r, grain.y * cam.height - r * 0.5, r * 2, r)
       }
       ctx.globalAlpha = 1
       layer(ctx, cam, 1)

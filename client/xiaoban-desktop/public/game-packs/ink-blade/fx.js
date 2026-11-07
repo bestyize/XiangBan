@@ -67,7 +67,7 @@
     for (let i = 0; i < count; i++) {
       const a = (opts.angle ?? -Math.PI / 2) + (Math.random() - 0.5) * (opts.spread ?? 2.4)
       const v = (opts.speed ?? 50) * (0.4 + Math.random())
-      fx.parts.push({ kind: 'puff', x: x + (Math.random() - 0.5) * (opts.w ?? 10), y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: (opts.size ?? 6) * (0.6 + Math.random() * 0.6), grow: opts.grow ?? 2.2, t: 0, life: (opts.life ?? 0.5) * (0.7 + Math.random() * 0.6), alpha: opts.alpha ?? 0.35, light: opts.light || false })
+      fx.parts.push({ kind: 'puff', x: x + (Math.random() - 0.5) * (opts.w ?? 10), y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: (opts.size ?? 6) * (0.6 + Math.random() * 0.6), grow: opts.grow ?? 2.2, t: 0, life: (opts.life ?? 0.5) * (0.7 + Math.random() * 0.6), alpha: opts.alpha ?? 0.35, light: opts.light || false, red: opts.red || false, dust: opts.dust || false })
     }
     cap(fx.parts, 420)
   }
@@ -208,7 +208,7 @@
       } else if (p.kind === 'puff') {
         const r = p.r * (1 + q * p.grow)
         ctx.globalAlpha = p.alpha * (1 - q)
-        ctx.drawImage(p.red ? a.glow : p.light ? a.light : a.puff, p.x - r, p.y - r, r * 2, r * 2)
+        ctx.drawImage(p.red ? a.glow : p.dust && a.dust ? a.dust : p.light ? a.light : a.puff, p.x - r, p.y - r, r * 2, r * 2)
       } else if (p.kind === 'converge') {
         if (p.t < 0) continue
         const e = ease(q)

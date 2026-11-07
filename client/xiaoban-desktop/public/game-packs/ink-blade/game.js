@@ -34,7 +34,7 @@
 
   let touchUI = matchMedia('(any-pointer: coarse)').matches
   gameNode.classList.toggle('touch', touchUI)
-  let selectedVolume = (duel && duel.level.startsWith('2-')) ? 2 : 1
+  let selectedVolume = duel ? LV.level(duel.level).volume : 1
   let save = PROGRESS.empty(), saveApplied = false, currentLevel = duel ? duel.level : '1-1'
   let difficulty = params.get('difficulty') === 'easy' ? 'easy' : 'normal'
   let state = rules.createGame({ difficulty, level: currentLevel }), phase = 'welcome'
@@ -43,8 +43,9 @@
   let assets = null, assetKey = '', rebuildTimer = 0, quality = 1, frameCost = 0, frameSamples = 0
   let hostReady = false, roundStarted = false, roundPosted = false, resultPosted = false
   let lastFrame = 0, accumulator = 0, clock = 0, lastProgress = 0, leaving = false, wasFullscreen = false
-  let toastTimer = 0, promptTimer = 0, dashImage = 0, phantomImage = 0, footClock = 0, coverMix = 0
+  let toastTimer = 0, promptTimer = 0, dashImage = 0, phantomImage = 0, footClock = 0, coverMix = 0, darkOn = false
   const shown = new Set()
+  const stuck = [], horses = []
   const camera = { x: 400 }
   const fx = FX.create()
   const weather = scene.createWeather()
@@ -327,6 +328,14 @@
     ice: ['冰面无摩擦：提早收步，出剑也会顺势滑出去', '冰面无摩擦：提早收步，出剑也会顺势滑出去'],
     reed: ['静立芦丛片刻即可隐身，射手失去目标；隐身时出剑为伏击', '静立芦丛片刻即可隐身，射手失去目标；隐身时出剑为伏击'],
     gust: ['风起：行走与起跳会被风推着走，冲刺不受影响', '风起：行走与起跳会被风推着走，冲刺不受影响'],
+    strict: ['军中不乱刀：连斩里的后两刀弹不开来势，要弹反先收刀，再出新的一剑', '军中不乱刀：连斩里的后两刀弹不开来势，要弹反先收刀，再出新的一剑'],
+    volley: ['箭影落地：躲到残墙背后，或走出箭影；留在箭影里的敌人会被射倒', '箭影落地：躲到残墙背后，或走出箭影；留在箭影里的敌人会被射倒'],
+    grass: ['枯草遇火即燃，火顺风向东 → 烧得快，逆风慢；把敌人引进草里', '枯草遇火即燃，火顺风向东 → 烧得快，逆风慢；把敌人引进草里'],
+    fire: ['火起：别站在火里，烧过的焦土不会再燃', '火起：别站在火里，烧过的焦土不会再燃'],
+    pot: ['火油罐飞来时出剑，可将它斩回投掷者', '火油罐飞来时按 J，可将它斩回投掷者'],
+    cavalry: ['骑兵冲锋：枪尖朱光到身前时出剑，可将其打落马下；也可跳过或闪身', '骑兵冲锋：枪尖朱光到身前时按 J，可将其打落马下；也可跳过或闪身'],
+    pavise: ['盾阵正面刀枪不入：弹反领阵者的枪，整阵失衡；或闪身绕到背后', '盾阵正面刀枪不入：弹反领阵者的枪，整阵失衡；或闪身绕到背后'],
+    dark: ['夜里风沙蔽目：看得见的只有敌人的朱眼与刃光，营火处才亮', '夜里风沙蔽目：看得见的只有敌人的朱眼与刃光，营火处才亮'],
   }
 
   function showPrompt(key) {
@@ -405,7 +414,7 @@
   function startRound(levelId = currentLevel, asDuel = false) {
     audio.resume()
     if (touchUI && !document.fullscreenElement) void requestImmersive(false)
-    currentLevel = LV.level(levelId) ? levelId : (selectedVolume === 2 ? '2-1' : '1-1')
+    currentLevel = LV.level(levelId) ? levelId : selectedVolume + '-1'
     const lvl = LV.level(currentLevel)
     if (lvl) selectedVolume = lvl.volume
     duelRound = asDuel && Boolean(duel) && duel.level === currentLevel
@@ -416,7 +425,7 @@
     resultDelay = 0
     globalThis.XiabanResultShare?.reset()
     phase = 'playing'; roundStarted = true; roundPosted = false; resultPosted = false
-    resetInput(); FX.clear(fx); anims.clear()
+    resetInput(); FX.clear(fx); anims.clear(); stuck.length = 0; horses.length = 0
     accumulator = 0; lastProgress = 0
     camera.x = cameraTarget()
     setOverlays('playing')
@@ -469,7 +478,7 @@
     selectedVolume = vol
     save = { ...save, volume: vol }
     persistSave()
-    const firstLevel = vol === 2 ? '2-1' : '1-1'
+    const firstLevel = vol + '-1'
     if (LV.level(currentLevel)?.volume !== vol) currentLevel = firstLevel
     state = rules.createGame({ difficulty, level: currentLevel })
     const key = vol + ':' + Math.round(k * dpr * 16) + ':' + Math.round(viewW / 60)
@@ -500,8 +509,7 @@
     const world = LV.volume(selectedVolume) || WORLD
     const total = PROGRESS.sealCount(save, world.id), max = PROGRESS.maxSeals(world.id)
     $('selectProgress').textContent = total + ' / ' + max + ' 印'
-    for (const tab of [$('volTab1'), $('volTab2')]) {
-      if (!tab) continue
+    for (const tab of document.querySelectorAll('.volume-tab')) {
       const vol = Number(tab.dataset.vol)
       const active = vol === selectedVolume
       tab.classList.toggle('active', active)
@@ -529,7 +537,7 @@
         card.addEventListener('click', () => startRound(level.id))
         queueMicrotask(() => drawThumb(thumb, level, Boolean(entry)))
       } else {
-        card.append(el('span', 'level-lock', level.scroll ? (level.volume === 2 ? '通过「独钓」后展开' : '通过「无常」后展开') : '通过上一幅后展开'))
+        card.append(el('span', 'level-lock', level.scroll ? '通过「' + LV.volumeLevels(level.volume).filter((entry) => !entry.scroll).pop().name + '」后展开' : '通过上一幅后展开'))
         card.setAttribute('aria-label', level.sub + level.name + '，尚未展开')
       }
       return card
@@ -586,16 +594,16 @@
     persistSave()
     const area = (state.world ? state.world.areas : WORLD.areas)[Math.max(0, state.area)]
     const nextId = result.cleared ? PROGRESS.next(level.id) : null
-    const isV2 = level.volume === 2
+    const copy = (state.world || WORLD).copy
     $('resultSeal').textContent = result.cleared ? '品' : '败'
     $('resultSeal').classList.toggle('lose', !result.cleared)
     $('resultBadge').textContent = (difficulty === 'easy' ? '入门 · ' : '江湖 · ') + levelLabel(level)
     $('resultTitle').textContent = result.cleared
-      ? (level.boss || level.scroll ? (p.damageTaken === 0 ? '片墨不沾身' : (isV2 ? '一剑断寒江' : '一剑破无常')) : level.name + ' · ' + (outcome.firstClear ? '入画' : '再临'))
+      ? (level.boss || level.scroll ? (p.damageTaken === 0 ? '片墨不沾身' : copy.win) : level.name + ' · ' + (outcome.firstClear ? '入画' : '再临'))
       : result.kills >= 12 ? '墨尽，意未尽' : '画卷未完'
     $('resultDescription').textContent = result.cleared
-      ? (level.boss || level.scroll ? (isV2 ? '钓叟收竿踏雪而去，江面重归沉寂。' : '斗笠客化作一池淡墨，竹林重归寂静。') : outcome.firstClear && nextId ? '下一幅「' + LV.level(nextId).name + '」已经展开。' : '墨迹未干，可再求更高一品。')
-      : level.boss ? (isV2 ? '钓叟仍立在雪岸。朱光一闪，便是出剑之时。' : '无常仍立在月下。朱光一闪，便是出剑之时。') : '提剑再入，' + (area ? area.name : '江岸') + '还在等你。'
+      ? (level.boss || level.scroll ? copy.winLine : outcome.firstClear && nextId ? '下一幅「' + LV.level(nextId).name + '」已经展开。' : '墨迹未干，可再求更高一品。')
+      : level.boss ? copy.loseLine : '提剑再入，' + (area ? area.name : copy.place) + '还在等你。'
     $('resultScore').textContent = result.score
     $('resultGrade').textContent = result.cleared ? LV.GRADES[result.grade] + (outcome.newGrade && !outcome.firstClear ? ' · 新品' : '') : '本局积分'
     $('resultGrade').classList.toggle('graded', result.cleared)
@@ -640,8 +648,7 @@
 
   $('startButton').addEventListener('click', () => { if (duel) startRound(duel.level, true); else openSelect() })
   $('selectBack').addEventListener('click', backToWelcome)
-  $('volTab1')?.addEventListener('click', () => selectVolume(1))
-  $('volTab2')?.addEventListener('click', () => selectVolume(2))
+  for (const tab of document.querySelectorAll('.volume-tab')) tab.addEventListener('click', () => selectVolume(Number(tab.dataset.vol)))
   $('restartButton').addEventListener('click', () => startRound(currentLevel, duelRound))
   $('nextButton').addEventListener('click', () => { const nextId = PROGRESS.next(currentLevel); if (nextId) startRound(nextId) })
   $('mapButton').addEventListener('click', openSelect)
@@ -679,6 +686,9 @@
     puppet: { a0: -2.35, a1: 0.85, r: 36, width: 11, color: '#272a30' },
     shield: { a0: -2.6, a1: 0.9, r: 36, width: 14, color: '#22252a' },
     boss: [{ a0: -2.4, a1: 0.9 }, { a0: 2.75, a1: -1.3 }, { a0: -2.9, a1: 1.25 }],
+    soldier: { a0: -2.35, a1: 0.85, r: 36, width: 11, color: '#26282d' },
+    footman: { a0: -2.35, a1: 0.85, r: 36, width: 12, color: '#24262b' },
+    general: [{ a0: -2.5, a1: 1 }, { a0: 2.7, a1: -1.2 }, { a0: -3, a1: 1.3 }],
   }
 
   function snapshot(enemy) {
@@ -686,10 +696,13 @@
     const pose = a ? { ...a.pose } : fig.basePose()
     const kind = enemy.type
     const copy = { type: kind, x: enemy.x, y: enemy.y, facing: enemy.facing, state: enemy.state, vx: 0, vy: 0, seed: enemy.seed }
+    const ghostAnim = a ? { ...a, r: a.r ? { ...a.r } : undefined } : fig.createAnim(enemy)
     return (c, alpha) => {
       const look = { alpha, color: '#1d1f23' }
       if (kind === 'crow') fig.drawCrow(c, copy, copy.x, copy.y, look, clock)
       else if (kind === 'dummy') fig.drawDummy(c, copy, copy.x, copy.y, look, a || { wobble: 0 }, clock)
+      else if ((kind === 'cavalry' || (kind === 'general' && enemy.mounted)) && fig.drawRider) fig.drawRider(c, kind, { ...copy, mounted: true, vx: 0 }, ghostAnim, copy.x, copy.y, copy.facing, look, clock, 0)
+      else if (!fig.KINDS[kind]) return
       else fig.drawHumanoid(c, kind, pose, copy.x, copy.y, copy.facing, look, clock, enemy.seed)
     }
   }
@@ -781,7 +794,7 @@
           break
         case 'kill': {
           const target = state.enemies.find((enemy) => enemy.id === e.id) || { id: e.id, type: e.kind, x: e.x, y: e.y, facing: e.facing, seed: 0 }
-          const boss = e.kind === 'boss'
+          const boss = rules.BOSSES.has(e.kind)
           FX.ghost(fx, snapshot({ ...target, x: e.x, y: e.y, facing: e.facing, type: e.kind }), boss ? 2 : 0.85, boss ? 24 : 14)
           const cy = e.kind === 'crow' ? e.y : e.y - 26
           FX.splat(fx, assets.splats, e.x, cy, boss ? 150 : 66, { life: boss ? 1.4 : 0.7 })
@@ -793,7 +806,8 @@
           break
         }
         case 'spawn':
-          FX.converge(fx, e.x, e.kind === 'crow' ? e.y : e.y - 28, e.kind === 'boss' ? 60 : 26, e.kind === 'boss' ? 110 : 70, e.kind === 'boss' ? 0.9 : 0.7)
+          const bigSpawn = rules.BOSSES.has(e.kind) || e.kind === 'cavalry'
+          FX.converge(fx, e.x, e.kind === 'crow' ? e.y : e.y - (e.kind === 'cavalry' ? 40 : 28), bigSpawn ? 60 : 26, bigSpawn ? 110 : 70, bigSpawn ? 0.9 : 0.7)
           audio.play('spawn')
           break
         case 'tell':
@@ -806,14 +820,16 @@
           break
         case 'enemySwing': {
           const enemy = byId(e.id)
-          const spec = e.kind === 'boss' ? { ...ENEMY_SWINGS.boss[e.step ?? 0], r: 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
+          const big = e.kind === 'boss' || e.kind === 'general'
+          const spec = big ? { ...ENEMY_SWINGS[e.kind][e.step ?? 0], r: e.mounted ? 78 : 66, width: 24, color: '#0f1012' } : ENEMY_SWINGS[e.kind]
           if (!spec || !enemy) break
+          const lift = e.mounted ? 70 : big ? 50 : 36
           FX.trail(fx, {
-            x: enemy.x, y: enemy.y - (e.kind === 'boss' ? 50 : 36), follow: () => [enemy.x, enemy.y - (e.kind === 'boss' ? 50 : 36)], followFor: 0.12,
+            x: enemy.x, y: enemy.y - lift, follow: () => [enemy.x, enemy.y - lift], followFor: 0.12,
             facing: e.facing, a0: spec.a0, a1: spec.a1, r: spec.r, width: spec.width, grow: 0.09, life: 0.3, color: spec.color,
-            edge: e.kind === 'boss' ? CINNABAR : null, hairs: e.kind === 'boss' ? 14 : 9,
+            edge: big ? CINNABAR : null, hairs: big ? 14 : 9,
           })
-          audio.play(e.kind === 'boss' ? 'heavy' : 'slash')
+          audio.play(big ? 'heavy' : 'slash')
           break
         }
         case 'shoot':
@@ -851,11 +867,11 @@
           for (const enemy of state.enemies) if (enemy.alive && Math.abs(enemy.x - p.x) < 470) FX.splat(fx, assets.splats, enemy.x, enemy.y - 26, 80, { life: 0.8 })
           break
         case 'lock':
-          if (e.id !== 'gate' && e.id !== 'boss') toast('墨障合围 · 斩尽方可前行', 1800)
-          audio.play('gong')
+          if (e.id !== 'gate' && !inBossFight()) toast(state.level.volume === 3 ? '烽烟合围 · 斩尽方可前行' : '墨障合围 · 斩尽方可前行', 1800)
+          audio.play(state.level.volume === 3 ? 'horn' : 'gong')
           break
         case 'clear':
-          if (e.id !== 'boss') toast('墨障散去，前路已开', 1800)
+          if (!state.plan.find((encounter) => encounter.id === e.id)?.waves[0].some((spec) => rules.BOSSES.has(spec.type))) toast(state.level.volume === 3 ? '烽烟散去，前路已开' : '墨障散去，前路已开', 1800)
           audio.play('ui')
           break
         case 'area':
@@ -872,10 +888,10 @@
         case 'bossIntro': {
           FX.letterbox(fx, 2.2)
           $('bossBar').hidden = false
-          const isAngler = e.kind === 'angler' || (state.level.boss && state.level.volume === 2)
-          $('bossTitle').textContent = isAngler ? '苏寒江' : '无常'
-          $('bossSub').textContent = isAngler ? '寒江钓叟' : '斗笠客'
+          $('bossTitle').textContent = state.world.copy.boss
+          $('bossSub').textContent = state.world.copy.bossSub
           audio.play('gong')
+          if (state.level.volume === 3) audio.play('horn')
           break
         }
         case 'bossPhase': {
@@ -883,8 +899,7 @@
           FX.shake(fx, 9)
           FX.ring(fx, e.x, e.y, 10, 220, 0.8, 'rgba(15,16,18,0.7)', 10)
           FX.ring(fx, e.x, e.y, 10, 160, 0.6, CINNABAR, 3)
-          const anglerPhase = e.kind === 'angler' || (state.level.boss && state.level.volume === 2)
-          toast(anglerPhase ? '断竿化剑 · 风雪大作' : '无常怒 · 墨气翻涌', 2000)
+          toast(state.world.copy.phase, 2000)
           audio.play('roar')
           break
         }
@@ -966,6 +981,74 @@
           FX.shake(fx, 6)
           audio.play('ambush')
           break
+        case 'volleyTell':
+          FX.seal(fx, '危', e.x, rules.GROUND - 120, 20, Math.min(1.4, e.tele))
+          promptOnce('danger')
+          audio.play('volleyTell')
+          break
+        case 'volleyHit': {
+          FX.shake(fx, 3)
+          const half = e.w / 2
+          for (let i = 0; i < 26; i++) {
+            const x = e.x + (Math.random() * 2 - 1) * half
+            if (rules.sheltered(state, x)) continue
+            stuck.push({ x, t: 0, tilt: -0.5 - Math.random() * 0.35, len: 13 + Math.random() * 7 })
+          }
+          if (stuck.length > 160) stuck.splice(0, stuck.length - 160)
+          FX.puff(fx, e.x, rules.GROUND - 2, 10, { speed: 60, size: 6, alpha: 0.28, w: e.w * 0.8, ...dustPuff() })
+          audio.play('volleyHit')
+          break
+        }
+        case 'potThrow':
+          audio.play('potThrow')
+          break
+        case 'potBreak':
+          FX.drops(fx, e.x, e.y, 12, { speed: 240, size: 1.5, color: '#7a5a36', stain: false })
+          FX.puff(fx, e.x, e.y, 8, { speed: 70, size: 8, alpha: 0.4, life: 0.8, red: true })
+          FX.shake(fx, 3)
+          audio.play('potBreak')
+          break
+        case 'ignite':
+          audio.play('ignite')
+          break
+        case 'fireStart':
+          FX.puff(fx, e.x, rules.GROUND - 4, 6, { speed: 50, size: 7, alpha: 0.35, life: 0.7, red: true, w: e.w })
+          break
+        case 'burn':
+          FX.puff(fx, e.x, e.y - 20, 6, { speed: 60, size: 6, alpha: 0.4, life: 0.6 })
+          if (!e.id) audio.play('burn')
+          break
+        case 'charge':
+          FX.puff(fx, e.x - e.facing * 20, e.y - 2, 10, { angle: e.facing > 0 ? Math.PI : 0, spread: 0.8, speed: 110, size: 7, alpha: 0.32, ...dustPuff() })
+          audio.play('charge')
+          if (Math.random() < 0.5 || e.boss) audio.play('neigh')
+          break
+        case 'unhorse': {
+          FX.seal(fx, '落', e.x, e.y - (e.boss ? 120 : 96), e.boss ? 28 : 22, 1.1)
+          FX.puff(fx, e.x, e.y - 4, 14, { speed: 90, size: 9, alpha: 0.4, life: 0.9, w: 40, ...dustPuff() })
+          FX.shake(fx, e.boss ? 10 : 6)
+          horses.push({ x: e.x, y: e.y, facing: e.facing, t: 0, life: 1.8, phase: 0 })
+          audio.play('unhorse')
+          break
+        }
+        case 'rear':
+          FX.seal(fx, '勒', e.x, e.y - 118, 24, 1)
+          FX.puff(fx, e.x + e.facing * 10, e.y - 2, 10, { speed: 80, size: 8, alpha: 0.35, ...dustPuff() })
+          audio.play('neigh')
+          break
+        case 'formationBreak':
+          FX.seal(fx, '破', e.x, e.y - 30, 26, 1.1)
+          for (const id of e.ids) {
+            const member = byId(id)
+            if (member) FX.sparks(fx, member.x, member.y - 34, 8, '#8d877c', { len: 16, speed: 300 })
+          }
+          FX.shake(fx, 7)
+          audio.play('formationBreak')
+          break
+        case 'flag':
+          audio.play('flag')
+          audio.play('horn')
+          break
         case 'gust':
           toast(e.dir > 0 ? '风起 · 自左向右 →' : '← 风起 · 自右向左', 1700)
           audio.play('gust')
@@ -993,11 +1076,11 @@
 
   function surfaceBelow(x, y) {
     let best = rules.GROUND
-    for (const platform of WORLD.platforms) if (x >= platform.x && x <= platform.x + platform.w && platform.y >= y - 1 && platform.y < best) best = platform.y
+    for (const platform of state.world.platforms) if (x >= platform.x && x <= platform.x + platform.w && platform.y >= y - 1 && platform.y < best) best = platform.y
     return best
   }
 
-  const inBossFight = () => Boolean(state.lock) && state.plan[state.encounter]?.id === 'boss'
+  const inBossFight = () => Boolean(state.lock) && Boolean(state.plan[state.encounter]?.waves[0].some((spec) => rules.BOSSES.has(spec.type)))
 
   function shadow(x, y, size) {
     const ground = surfaceBelow(x, y)
@@ -1018,8 +1101,17 @@
     ctx.restore()
   }
 
+  const TELLS = new Set(['tele', 'crouch', 'waveTell', 'phantomTell', 'chargeTell', 'flagTell', 'rushTell'])
+  const DANGER_TELLS = new Set(['crouch', 'phantomTell', 'flagTell', 'rushTell'])
+
   function teleProgress(enemy) {
-    const telling = enemy.state === 'tele' || enemy.state === 'crouch' || enemy.state === 'waveTell' || enemy.state === 'phantomTell' || (enemy.state === 'combo' && enemy.combo?.phase === 'tele')
+    // A charging lance glints brighter as it closes in: the cue for the parry.
+    if ((enemy.type === 'cavalry' && enemy.state === 'attack') || (enemy.type === 'general' && enemy.state === 'charge')) {
+      const dx = state.player.x - enemy.x
+      if (enemy.hitDone || Math.sign(dx) !== Math.sign(enemy.vx)) return -1
+      return Math.max(0, Math.min(1, 1 - (Math.abs(dx) - 40) / 230))
+    }
+    const telling = TELLS.has(enemy.state) || (enemy.state === 'combo' && enemy.combo?.phase === 'tele')
     return telling && enemy.teleTotal ? 1 - Math.max(0, enemy.t) / enemy.teleTotal : -1
   }
 
@@ -1038,20 +1130,31 @@
       fig.updateDummy(a, dt)
       shadow(enemy.x, enemy.y, 14)
       out = fig.drawDummy(ctx, enemy, enemy.x, enemy.y, look, a, clock)
+    } else if ((enemy.type === 'cavalry' || (enemy.type === 'general' && enemy.mounted)) && fig.drawRider) {
+      shadow(enemy.x, enemy.y, enemy.type === 'general' ? 40 : 34)
+      if (enemy.state === 'attack' || enemy.state === 'charge') {
+        if (Math.random() < dt * 22) FX.puff(fx, enemy.x - enemy.facing * 24, rules.GROUND - 2, 1, { speed: 50, size: 6, alpha: 0.32, ...dustPuff() })
+        anim(enemy.id, enemy).hoof = (anim(enemy.id, enemy).hoof || 0) - dt
+        if (anim(enemy.id, enemy).hoof <= 0) { anim(enemy.id, enemy).hoof = 0.26; audio.play('hoof') }
+      }
+      if (enemy.type === 'general' && enemy.phase2 && enemy.state !== 'dying' && Math.random() < 0.5) FX.smoke(fx, enemy.x, enemy.y - 50, { w: 34, h: 60, alpha: 0.2, red: Math.random() < 0.25 })
+      out = fig.drawRider(ctx, enemy.type, enemy, a, enemy.x, enemy.y, enemy.facing, look, clock, dt)
     } else {
       const pose = fig.updatePose(enemy.type, enemy, a, dt, clock, rules)
-      const isBoss = enemy.type === 'boss' || enemy.type === 'angler'
+      const isBoss = rules.isBoss(enemy)
       shadow(enemy.x, enemy.y, isBoss ? 26 : 16)
       if (isBoss && enemy.phase2 && enemy.state !== 'dying' && Math.random() < 0.5) FX.smoke(fx, enemy.x, enemy.y - 40, { w: 30, h: 60, alpha: 0.2, red: Math.random() < 0.25 })
-      if (isBoss && enemy.state === 'phantom' && phantomImage > 0) {
+      if (isBoss && (enemy.state === 'phantom' || enemy.state === 'rush') && phantomImage > 0) {
         const copy = { ...pose }, x = enemy.x, y = enemy.y, facing = enemy.facing
         FX.ghost(fx, (c, alpha) => fig.drawHumanoid(c, enemy.type, copy, x, y, facing, { alpha: alpha * 0.4, color: '#2a2a2e' }, clock, enemy.seed), 0.3, 0)
       }
       out = fig.drawHumanoid(ctx, enemy.type, pose, enemy.x, enemy.y, enemy.facing, look, clock, enemy.seed)
       if (!isBoss && Math.random() < dt * 1.8) FX.drops(fx, enemy.x + (Math.random() - 0.5) * 16, enemy.y - 20 - Math.random() * 20, 1, { speed: 20, size: 1.1 })
     }
-    const isBoss = enemy.type === 'boss' || enemy.type === 'angler'
-    if (progress >= 0 && out.tip && enemy.state !== 'crouch' && enemy.state !== 'phantomTell') glint(out.tip[0], out.tip[1], Math.pow(progress, 2.2), isBoss ? 1.25 : 1)
+    const isBoss = rules.isBoss(enemy)
+    const glinting = progress >= 0 && out.tip && !DANGER_TELLS.has(enemy.state)
+    if (glinting) glint(out.tip[0], out.tip[1], Math.pow(progress, 2.2), isBoss ? 1.25 : 1)
+    if (darkOn && out.head && enemy.type !== 'dummy') eyeMarks.push({ head: out.head, facing: enemy.facing, glow: look.eyeGlow, tip: glinting ? out.tip : null, progress, boss: isBoss })
     if (enemy.state === 'stagger' || enemy.state === 'broken') {
       const pulse = 1 + Math.sin(clock * 10) * 0.08
       const top = out.head ? out.head[1] - (isBoss ? 30 : 22) : enemy.y - 70
@@ -1071,14 +1174,22 @@
     ctx.restore()
   }
 
-  const isSnowVolume = () => (state.level ? state.level.volume : selectedVolume) === 2
-  const snowPuff = () => (isSnowVolume() ? { light: true, alpha: 0.75 } : {})
+  const currentVolume = () => (state.level ? state.level.volume : selectedVolume)
+  const isSnowVolume = () => currentVolume() === 2
+  const dustPuff = () => (currentVolume() === 3 ? { dust: true, alpha: 0.5 } : {})
+  const snowPuff = () => (isSnowVolume() ? { light: true, alpha: 0.75 } : dustPuff())
 
   function footsteps(p, dt) {
-    if (dt <= 0 || !isSnowVolume() || p.dead || !p.onGround || Math.abs(p.vx) < 70) { footClock = Math.min(footClock, 0.06); return }
+    const volume = currentVolume()
+    if (dt <= 0 || volume === 1 || p.dead || !p.onGround || Math.abs(p.vx) < 70) { footClock = Math.min(footClock, 0.06); return }
     footClock -= dt * Math.min(1.7, Math.abs(p.vx) / 200 + 0.4)
     if (footClock > 0) return
     footClock = 0.3
+    if (volume === 3) {
+      audio.play('sandstep')
+      FX.puff(fx, p.x - p.facing * 5, rules.GROUND - 1, 1, { speed: 30, size: 4, alpha: 0.35, dust: true, angle: -Math.PI / 2 - p.facing * 0.7, spread: 1, life: 0.45 })
+      return
+    }
     const onIce = [...(state.world.iceZones || []), ...(state.world.thinIce || [])].some(([x0, x1]) => p.x >= x0 && p.x <= x1)
     audio.play(onIce ? 'iceslide' : 'snowstep')
     if (!onIce) FX.puff(fx, p.x - p.facing * 5, rules.GROUND - 1, 2, { speed: 36, size: 3, alpha: 0.7, light: true, angle: -Math.PI / 2 - p.facing * 0.7, spread: 1.1, life: 0.4 })
@@ -1213,8 +1324,190 @@
     }
   }
 
+  // ------------------------------------------------------------ terrain: 烽火卷 grass fire, arrow rain, horses, night
+
+  const flameAt = (x, base, scale, seed, alpha = 1) => {
+    const flames = assets.flames
+    if (!flames) return
+    const f = flames[Math.floor(clock * 11 + seed * 3.7) % flames.length]
+    const flicker = scale * (0.9 + 0.12 * Math.sin(clock * 17 + seed))
+    ctx.globalAlpha = alpha
+    ctx.drawImage(f.node, x - f.ox * flicker, base - f.oy * flicker, f.width * flicker, f.height * flicker)
+    ctx.globalAlpha = 1
+  }
+
+  function drawGrassFire(cam) {
+    const left = cam.left - 40, right = cam.left + cam.viewW + 40
+    const cell = rules.GRASS_CELL
+    let burning = 0
+    for (const patch of state.grass) {
+      if (patch.x + cell < left || patch.x > right) continue
+      const strip = patch.s === 'dry' ? assets.grassDry : assets.grassBurnt
+      if (!strip) break
+      ctx.save()
+      ctx.beginPath(); ctx.rect(patch.x, rules.GROUND - 60, cell, 72); ctx.clip()
+      art.drawStrip(ctx, strip, patch.x, cell, 240)
+      ctx.restore()
+    }
+    for (const patch of state.grass) {
+      if (patch.s !== 'burn' || patch.x + cell < left || patch.x > right) continue
+      burning += 1
+      const grow = Math.min(1, patch.t / 0.4) * Math.min(1, (3.4 - patch.t) / 0.8)
+      ctx.globalAlpha = 0.22 * grow
+      ctx.drawImage(assets.glow, patch.x - 20, rules.GROUND - 50, cell + 40, 60)
+      ctx.globalAlpha = 1
+      flameAt(patch.x + 7, rules.GROUND + 1, 0.55 + 0.5 * grow, patch.id)
+      flameAt(patch.x + 17, rules.GROUND + 1, 0.4 + 0.45 * grow, patch.id + 0.5)
+      if (Math.random() < 0.05) FX.smoke(fx, patch.x + cell / 2, rules.GROUND - 34, { alpha: 0.2, w: 18, h: 10 })
+    }
+    for (const fire of state.fires) {
+      if (fire.x1 < left || fire.x0 > right) continue
+      burning += 1
+      const grow = Math.min(1, fire.t / 0.25) * Math.min(1, (fire.life - fire.t) / 0.6)
+      ctx.globalAlpha = 0.2 * grow
+      ctx.drawImage(assets.glow, fire.x0 - 14, rules.GROUND - 40, fire.x1 - fire.x0 + 28, 50)
+      ctx.globalAlpha = 1
+      ctx.fillStyle = 'rgba(24,20,18,' + (0.35 * grow).toFixed(3) + ')'
+      ctx.beginPath(); ctx.ellipse((fire.x0 + fire.x1) / 2, rules.GROUND + 2, (fire.x1 - fire.x0) / 2, 3, 0, 0, Math.PI * 2); ctx.fill()
+      for (let x = fire.x0 + 6, k = 0; x < fire.x1; x += 13, k++) flameAt(x, rules.GROUND + 1, (0.45 + 0.25 * art.hash(k, fire.id)) * grow, fire.id + k)
+    }
+    return burning
+  }
+
+  // Arrow rain: the shadow gathers on the ground (with gaps where a wall shelters), a dark sheet falls, and shafts stay stuck.
+  function drawVolleys() {
+    const G = rules.GROUND
+    for (const volley of state.volleys) {
+      const half = volley.w / 2
+      const q = Math.min(1, volley.t / volley.tele)
+      if (!volley.landed) {
+        for (let i = 0; i < 40; i++) {
+          const x = volley.x + (art.hash(i, volley.id) * 2 - 1) * half
+          if (rules.sheltered(state, x)) continue
+          const y = G + 2 + art.hash(i + 7, volley.id) * 9
+          ctx.strokeStyle = 'rgba(26,22,20,' + (0.12 + 0.5 * q * art.hash(i + 3, volley.id)).toFixed(3) + ')'
+          ctx.lineWidth = 1.2
+          ctx.beginPath(); ctx.moveTo(x - 4, y + 1); ctx.lineTo(x + 4, y - 1); ctx.stroke()
+        }
+        ctx.fillStyle = 'rgba(26,22,20,' + (0.06 + 0.16 * q).toFixed(3) + ')'
+        ctx.beginPath(); ctx.ellipse(volley.x, G + 5, half * (0.5 + 0.5 * q), 6, 0, 0, Math.PI * 2); ctx.fill()
+        if (q > 0.7) {
+          const fall = (q - 0.7) / 0.3
+          ctx.strokeStyle = 'rgba(20,18,18,0.75)'; ctx.lineWidth = 1
+          ctx.beginPath()
+          for (let i = 0; i < 34; i++) {
+            const x = volley.x + (art.hash(i + 20, volley.id) * 2 - 1) * half
+            const y = G - 300 + 300 * fall * (0.7 + 0.3 * art.hash(i + 40, volley.id))
+            ctx.moveTo(x + (G - y) * 0.45, y); ctx.lineTo(x + (G - y) * 0.45 - 7, y + 15)
+          }
+          ctx.stroke()
+        }
+      }
+    }
+  }
+
+  function drawStuckArrows(dt) {
+    for (let i = stuck.length - 1; i >= 0; i--) {
+      const arrow = stuck[i]
+      arrow.t += dt
+      if (arrow.t > 7) { stuck.splice(i, 1); continue }
+      const fade = arrow.t > 5.5 ? 1 - (arrow.t - 5.5) / 1.5 : 1
+      ctx.save(); ctx.translate(arrow.x, rules.GROUND + 1); ctx.rotate(arrow.tilt)
+      ctx.globalAlpha = 0.85 * fade
+      ctx.strokeStyle = '#1a1b1e'; ctx.lineWidth = 1.1
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, -arrow.len); ctx.stroke()
+      ctx.fillStyle = '#1a1b1e'
+      ctx.beginPath(); ctx.moveTo(0, -arrow.len); ctx.lineTo(-2.5, -arrow.len + 4); ctx.lineTo(2.5, -arrow.len + 4); ctx.fill()
+      ctx.restore()
+    }
+  }
+
+  function drawHorses(dt) {
+    for (let i = horses.length - 1; i >= 0; i--) {
+      const horse = horses[i]
+      horse.t += dt
+      if (horse.t > horse.life) { horses.splice(i, 1); continue }
+      horse.x += horse.facing * 380 * dt
+      horse.phase += 380 * dt
+      const alpha = Math.max(0, 1 - horse.t / horse.life)
+      if (fig.drawHorse) fig.drawHorse(ctx, horse.x, horse.y, horse.facing, { alpha, color: '#202226' }, clock, horse.phase)
+      if (Math.random() < dt * 20) FX.puff(fx, horse.x - horse.facing * 16, rules.GROUND - 2, 1, { speed: 40, size: 6, alpha: 0.3 * alpha, ...dustPuff() })
+    }
+  }
+
+  // 夜袭: the night sandstorm leaves light only around the swordsman, the camp fires and anything burning.
+  let darkNode = null
+  const eyeMarks = []
+  function darknessAt(x) {
+    const dark = state.world.dark
+    if (!dark) return 0
+    const [z0, z1] = dark.zone
+    return Math.max(0, Math.min(1, (x - z0 + 120) / 240, (z1 + 120 - x) / 240))
+  }
+
+  function drawDarkness(cam) {
+    const d = darknessAt(camera.x)
+    if (d < 0.02) return false
+    const scale = 0.25
+    const w = Math.max(1, Math.round(cam.width * scale)), h = Math.max(1, Math.round(cam.height * scale))
+    if (!darkNode || darkNode.width !== w || darkNode.height !== h) { darkNode = document.createElement('canvas'); darkNode.width = w; darkNode.height = h }
+    const g = darkNode.getContext('2d')
+    const k2 = cam.P * scale
+    g.globalCompositeOperation = 'source-over'
+    g.clearRect(0, 0, w, h)
+    g.fillStyle = 'rgba(10,9,11,' + (0.9 * d).toFixed(3) + ')'
+    g.fillRect(0, 0, w, h)
+    g.globalCompositeOperation = 'destination-out'
+    const hole = (x, y, r, power = 1) => {
+      const sx = (x - cam.left) * k2, sy = (y - cam.top) * k2, sr = r * k2
+      if (sx + sr < 0 || sx - sr > w) return
+      const grad = g.createRadialGradient(sx, sy, 0, sx, sy, sr)
+      grad.addColorStop(0, 'rgba(0,0,0,' + power + ')'); grad.addColorStop(0.55, 'rgba(0,0,0,' + power * 0.8 + ')'); grad.addColorStop(1, 'rgba(0,0,0,0)')
+      g.fillStyle = grad
+      g.fillRect(sx - sr, sy - sr, sr * 2, sr * 2)
+    }
+    const p = state.player
+    hole(p.x, p.y - 30, state.world.dark.radius)
+    for (const x of state.world.dark.lights) hole(x, rules.GROUND - 24, 125 + 8 * Math.sin(clock * 9 + x), 0.95)
+    for (const cell of state.grass) if (cell.s === 'burn') hole(cell.x + 12, rules.GROUND - 20, 70, 0.85)
+    for (const fire of state.fires) hole((fire.x0 + fire.x1) / 2, rules.GROUND - 20, 80, 0.85)
+    for (const shot of state.projectiles) if (shot.type === 'pot') hole(shot.x, shot.y, 34, 0.7)
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.drawImage(darkNode, 0, 0, cam.width, cam.height)
+    scene.layer(ctx, cam, 1)
+    return true
+  }
+
+  // Outside the light only the ember eyes and the blade glints show.
+  function drawEyes() {
+    for (const mark of eyeMarks) {
+      const [x, y] = mark.head
+      const glow = 0.4 + 0.6 * mark.glow
+      ctx.save()
+      ctx.globalAlpha = 0.5 * glow
+      ctx.drawImage(assets.glow, x - 9, y - 7, 18, 14)
+      ctx.globalAlpha = 1
+      ctx.fillStyle = '#e2412c'
+      ctx.beginPath(); ctx.ellipse(x + mark.facing * 2, y, 1.6, 1.1, 0, 0, Math.PI * 2); ctx.ellipse(x - mark.facing * 2.4, y + 0.4, 1.2, 0.9, 0, 0, Math.PI * 2); ctx.fill()
+      ctx.restore()
+      if (mark.tip && mark.progress >= 0) glint(mark.tip[0], mark.tip[1], Math.pow(mark.progress, 2.2), mark.boss ? 1.25 : 1)
+    }
+  }
+
   function drawProjectiles() {
     for (const shot of state.projectiles) {
+      if (shot.type === 'pot') {
+        const s = assets.pot
+        ctx.save(); ctx.translate(shot.x, shot.y); ctx.rotate(state.clock * 9 + shot.id)
+        if (s) ctx.drawImage(s.node, -s.ox, -s.oy, s.width, s.height)
+        ctx.restore()
+        const mine = shot.owner === 'player'
+        ctx.globalAlpha = 0.6 + 0.3 * Math.sin(clock * 40)
+        ctx.drawImage(assets.glow, shot.x - 6, shot.y - 14, 12, 12)
+        ctx.globalAlpha = 1
+        if (Math.random() < 0.6) FX.smoke(fx, shot.x, shot.y - 6, { alpha: mine ? 0.3 : 0.2, w: 4, h: 4 })
+        continue
+      }
       if (shot.type === 'arrow') {
         const angle = Math.atan2(shot.vy, shot.vx)
         const mine = shot.owner === 'player'
@@ -1304,8 +1597,10 @@
       env.blizzard = Math.max(env.blizzard || 0, state.wind.power)
       env.windDir = state.wind.dir
     }
-    const night = env.moon > 0.5
+    const night = env.moon > 0.5 || (env.night || 0) > 0.5
     if (night !== gameNode.classList.contains('night')) gameNode.classList.toggle('night', night)
+    darkOn = darknessAt(camera.x) > 0.02
+    eyeMarks.length = 0
     scene.updateWeather(weather, cam, env, dt, clock)
     FX.update(fx, fxDt)
     phantomImage = Math.max(0, phantomImage - dt)
@@ -1313,7 +1608,10 @@
     scene.drawGround(ctx, assets, cam, env, clock)
     scene.layer(ctx, cam, 1)
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+    const burning = state.grass.length || state.fires.length ? drawGrassFire(cam) : 0
     FX.drawDecals(ctx, fx)
+    drawStuckArrows(phase === 'paused' ? 0 : fxDt)
+    drawVolleys()
     drawCracks()
     drawHangingIcicles()
     drawBarrier()
@@ -1322,7 +1620,9 @@
     for (const enemy of state.enemies) drawEnemy(enemy, simDt)
     drawProjectiles()
     drawFallingIcicles()
+    drawHorses(simDt)
     drawPlayer(phase === 'welcome' ? dt : simDt)
+    if (darkOn && drawDarkness(cam)) drawEyes()
     FX.drawFront(ctx, fx, assets)
     coverMix += ((state.player.hidden ? 1 : 0) - coverMix) * Math.min(1, dt * 9)
     if (coverMix > 0.05) {
@@ -1335,7 +1635,11 @@
     scene.drawWeather(ctx, assets, cam, weather, env)
     scene.drawPost(ctx, assets, cam, env, quality)
     FX.drawScreen(ctx, fx, cam)
-    audio.update({ combat: phase === 'playing' && Boolean(state.lock) && state.plan[state.encounter]?.id !== 'gate', boss: phase === 'playing' && inBossFight(), rain: env.rain, snow: env.snow, gale: weather.gale })
+    const volume = currentVolume()
+    audio.update({
+      combat: phase === 'playing' && Boolean(state.lock) && state.plan[state.encounter]?.id !== 'gate', boss: phase === 'playing' && inBossFight(), rain: env.rain, snow: env.snow, gale: weather.gale,
+      fire: Math.min(1, burning / 6), sand: env.sand || 0, war: volume === 3, volume,
+    })
   }
 
   // ------------------------------------------------------------ HUD
@@ -1385,7 +1689,7 @@
       }
       hud.combo = p.combo
     }
-    const boss = state.enemies.find((enemy) => enemy.type === 'boss')
+    const boss = state.enemies.find((enemy) => rules.isBoss(enemy))
     if (boss) {
       const hp = Math.round(boss.hp / boss.maxHp * 1000), posture = Math.round(boss.posture)
       if (hp !== hud.boss) { $('bossHp').style.width = hp / 10 + '%'; hud.boss = hp }

@@ -50,7 +50,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .combo.pop strong { animation: combo-pop .22s ease-out; }
 @keyframes combo-pop { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
 
-.boss-bar { position: absolute; z-index: 3; left: 50%; top: calc(max(10px, var(--safe-top)) + 50px); transform: translateX(-50%); width: min(420px, 52%); pointer-events: none; }
+.boss-bar { position: absolute; z-index: 3; left: 50%; top: calc(max(10px, var(--safe-top)) + 70px); transform: translateX(-50%); width: min(420px, 52%); pointer-events: none; }
 .boss-name { display: flex; align-items: baseline; justify-content: center; gap: 8px; font-family: var(--brush); margin-bottom: 4px; }
 .boss-name b { font-size: 18px; font-weight: 600; letter-spacing: 6px; }
 .boss-name span { font-size: 10px; color: var(--muted); letter-spacing: 2px; }
@@ -77,7 +77,7 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .game.night .score-block strong, .game.night .boss-name b, .game.night .combo { color: #f4eddc; text-shadow: 0 0 10px #1b1b1d; }
 .game.night .boss-hp { background: #efe7d42e; }
 .game.night .boss-hp span { background: linear-gradient(90deg, #e9e0c9, #f6f0e2); }
-.game.boss-fight .prompt { top: calc(max(10px, var(--safe-top)) + 104px); }
+.game.boss-fight .prompt { top: calc(max(10px, var(--safe-top)) + 124px); }
 .toast { position: absolute; z-index: 5; top: 50%; left: 50%; transform: translateX(-50%); padding: 9px 18px; border-radius: 20px; background: #f4eddcf0; box-shadow: 0 5px 20px #3a2c1a1a; font-size: 12px; color: var(--ink-2); white-space: nowrap; pointer-events: none; }
 
 .controls { position: absolute; z-index: 4; inset: 0; pointer-events: none; }
@@ -223,7 +223,7 @@ h1 { margin: 0; font-family: var(--brush); font-size: clamp(44px, 6.4vw, 78px); 
   .welcome-foot { margin-top: 10px; }
   .area-title strong { font-size: 44px; }
   .score-block strong { font-size: 22px; }
-  .boss-bar { top: calc(max(8px, var(--safe-top)) + 44px); }
+  .boss-bar { top: calc(max(8px, var(--safe-top)) + 62px); }
   .combo { top: calc(max(10px, var(--safe-top)) + 54px); }
   .combo strong { font-size: 32px; }
   .result-card { width: 470px; display: grid; grid-template-columns: 1fr 1.25fr; column-gap: 18px; align-items: center; padding: 14px 22px 6px; }

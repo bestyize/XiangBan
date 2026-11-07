@@ -18,13 +18,18 @@
     ronin: { thigh: 13, shin: 13, torso: 18, upper: 10, fore: 9.5, head: 5.6, limbs: [5.4, 4.4, 4.2, 3.6], blade: 32, bladeW: 3.2, color: '#24262b', robe: 'straw', hat: 'douli' },
     spearman: { thigh: 14, shin: 14, torso: 22, upper: 12, fore: 11, head: 5.6, limbs: [6.2, 5.2, 5.2, 4.2], blade: 0, color: '#1b1d22', robe: 'armor', hat: 'helmet', spear: true, grip: { span: 13 } },
     hammer: { thigh: 16, shin: 15, torso: 26, upper: 14, fore: 13, head: 7.2, limbs: [8.5, 7.2, 7.5, 6.2], blade: 0, color: '#202228', robe: 'vest', headStyle: 'blob', hammer: true, grip: { span: 11 } },
+    soldier: { thigh: 13, shin: 13, torso: 20, upper: 10.5, fore: 10, head: 5.5, limbs: [5.6, 4.6, 4.6, 3.8], blade: 30, bladeW: 3.4, color: '#202226', robe: 'armor', hat: 'kettle', headStyle: 'plain' },
+    footman: { thigh: 13, shin: 13, torso: 20, upper: 10.5, fore: 10, head: 5.5, limbs: [5.6, 4.6, 4.6, 3.8], blade: 31, bladeW: 4.4, color: '#1c1e22', robe: 'armor', hat: 'cavhelm', headStyle: 'plain', sabre: true, cape: 18 },
+    bomber: { thigh: 12.5, shin: 12.5, torso: 19, upper: 10, fore: 9.5, head: 5.4, limbs: [5.4, 4.5, 4.6, 3.8], blade: 0, color: '#25262a', robe: 'padded', hat: 'wrap', headStyle: 'plain', pot: true, satchel: true },
+    pavise: { thigh: 14, shin: 13, torso: 22, upper: 12, fore: 11, head: 5.6, limbs: [6.4, 5.4, 5.6, 4.6], blade: 0, color: '#1e2024', robe: 'armor', hat: 'kettle', headStyle: 'plain', pavise: true, shortSpear: true },
+    general: { thigh: 18, shin: 18, torso: 26, upper: 14, fore: 13, head: 6.6, limbs: [8.2, 6.8, 7.2, 5.8], blade: 0, color: '#0d0e10', robe: 'lamellar', hat: 'warhelm', headStyle: 'plain', broadsword: true, backFlags: true, cape: 28, grip: { span: 15 } },
     angler: { thigh: 16, shin: 16, torso: 24, upper: 12, fore: 11, head: 6.2, limbs: [6.2, 5.2, 5.4, 4.4], blade: 0, color: '#121316', robe: 'straw', hat: 'douli', beard: true, rod: true, grip: { span: 12 } },
   }
 
-  const POSE_KEYS = ['lean', 'crouch', 'l1', 'b1', 'l2', 'b2', 'ou', 'of', 'sw', 'reach', 'head', 'rot', 'bob', 'draw', 'air', 'flutter', 'wrist']
+  const POSE_KEYS = ['lean', 'crouch', 'l1', 'b1', 'l2', 'b2', 'ou', 'of', 'sw', 'reach', 'head', 'rot', 'bob', 'draw', 'air', 'flutter', 'wrist', 'one', 'flag', 'pot', 'sh']
 
   function basePose() {
-    return { lean: 0.06, crouch: 1, l1: 0.18, b1: 0.3, l2: -0.16, b2: 0.22, ou: 0.1, of: -0.4, sw: 2.45, reach: 0.75, head: 0, rot: 0, bob: 0, draw: 0, air: 0, flutter: 0, wrist: 0 }
+    return { lean: 0.06, crouch: 1, l1: 0.18, b1: 0.3, l2: -0.16, b2: 0.22, ou: 0.1, of: -0.4, sw: 2.45, reach: 0.75, head: 0, rot: 0, bob: 0, draw: 0, air: 0, flutter: 0, wrist: 0, one: 0, flag: 0, pot: 0, sh: 0 }
   }
 
   function createAnim(entity) {
@@ -120,6 +125,14 @@
     if (e.type === 'hammer') { t.sw = -0.6; t.reach = 0.95; t.lean = 0.25; t.crouch = 4 }
     if (e.type === 'ronin') { t.lean = 0.42; t.crouch = 3.5; t.sw = 1.2; t.wrist = -0.35 }
     if (e.type === 'puppet' || e.type === 'shield') t.wrist = -0.25
+    if (e.type === 'soldier' || e.type === 'footman') { t.wrist = -0.3; t.lean = 0.3 }
+    if (e.type === 'bomber') { t.lean = 0.22; t.sw = 0.9; t.reach = 0.85; t.ou = 1.2; t.of = 1.0; t.pot = 1 }
+    if (e.type === 'pavise') {
+      t.lean = 0.14; t.crouch = 5; t.sw = 0.6; t.reach = 0.75; t.wrist = -1.5
+      Object.assign(t, { l1: 0.38, b1: 0.45, l2: -0.32, b2: 0.28 })
+      return paviseState(e, t, anim, time, progress, speed)
+    }
+    if (e.type === 'bomber') return bomberState(e, t, anim, time, progress, speed)
     switch (e.state) {
       case 'spawn':
         t.crouch = 8; t.lean = 0.6
@@ -167,6 +180,116 @@
         break
       case 'hop':
         t.air = 1; Object.assign(t, { l1: 0.7, b1: 1.3, l2: -0.1, b2: 0.9, lean: -0.1 })
+        break
+    }
+    return t
+  }
+
+  function bomberState(e, t, anim, time, progress, speed) {
+    switch (e.state) {
+      case 'spawn': t.crouch = 8; t.lean = 0.5; break
+      case 'walk': runLegs(t, anim.phase, clamp(speed / 150, 0.4, 0.9)); t.lean = 0.3; t.crouch = 3.5; break
+      case 'hop': t.air = 1; Object.assign(t, { l1: 0.7, b1: 1.3, l2: -0.1, b2: 0.9, lean: -0.1 }); break
+      case 'tele':
+        t.sw = lerp(0.9, -2.35, ease(progress * 1.3)); t.reach = 1; t.lean = lerp(0.3, -0.2, ease(progress)); t.crouch = 3 + progress * 3
+        t.ou = 1.4; t.of = 1.25
+        Object.assign(t, { l1: 0.5, b1: 0.45, l2: -0.5, b2: 0.2 })
+        break
+      case 'recover':
+        t.sw = 1.15; t.reach = 1.25; t.lean = 0.66; t.crouch = 5; t.pot = 0; t.ou = -0.5; t.of = -0.9
+        Object.assign(t, { l1: 0.7, b1: 0.4, l2: -0.6, b2: 0.15 })
+        break
+      case 'hurt': t.lean = -0.38; t.sw = -1.8; t.ou = 2; t.of = 2.4; t.crouch = 2; t.head = -0.3; t.pot = 0; break
+      case 'stagger':
+        t.lean = -0.55 + Math.sin(time * 9) * 0.06; t.sw = -2.7; t.reach = 1; t.ou = 2.6; t.of = 3; t.crouch = 5; t.head = -0.45; t.pot = 0
+        Object.assign(t, { l1: 0.5, b1: 0.6, l2: -0.35, b2: 0.3 })
+        break
+    }
+    return t
+  }
+
+  // Pavise bearer: the shield stands braced; `sh` swings it open, `wrist` keeps the spear axis independent of the arm.
+  function paviseState(e, t, anim, time, progress, speed) {
+    switch (e.state) {
+      case 'spawn': t.crouch = 8; t.lean = 0.4; break
+      case 'walk': runLegs(t, anim.phase, clamp(speed / 150, 0.3, 0.6)); t.lean = 0.2; break
+      case 'tele': {
+        const q = ease(progress * 2)
+        t.sw = lerp(0.6, 2.7, q); t.reach = lerp(0.75, 0.9, q); t.wrist = (lerp(-0.7, 0, q)) - t.sw; t.lean = lerp(0.14, -0.02, q); t.crouch = 5 + progress * 2
+        Object.assign(t, { l1: 0.5, b1: 0.45, l2: -0.45, b2: 0.25 })
+        break
+      }
+      case 'attack':
+        t.sw = 0.12; t.reach = 1.4; t.wrist = -0.12; t.lean = 0.45; t.crouch = 6; anim.snap = true
+        Object.assign(t, { l1: 0.75, b1: 0.4, l2: -0.7, b2: 0.1 })
+        break
+      case 'recover': t.sw = 0.5; t.reach = 1.1; t.wrist = -0.55; t.lean = 0.3; t.crouch = 5; break
+      case 'hurt': t.lean = -0.3; t.sh = 0.25; t.sw = 0.2; t.wrist = -0.9; t.head = -0.25; break
+      case 'stagger':
+        t.sh = 1; t.lean = -0.5 + Math.sin(time * 9) * 0.05; t.sw = -2.5; t.reach = 1; t.wrist = 0.5; t.ou = 2.7; t.of = 3.0; t.crouch = 5; t.head = -0.4
+        Object.assign(t, { l1: 0.5, b1: 0.6, l2: -0.35, b2: 0.3 })
+        break
+    }
+    return t
+  }
+
+  function generalPose(e, anim, time) {
+    const t = basePose()
+    const speed = Math.abs(e.vx)
+    t.flutter = clamp(speed / 260, 0, 1)
+    anim.snap = false
+    const progress = e.teleTotal ? 1 - Math.max(0, e.t) / e.teleTotal : 0
+    const breathe = Math.sin(time * 1.4)
+    t.lean = 0.12; t.sw = -0.3; t.reach = 0.95; t.ou = -0.3; t.of = -0.6; t.crouch = 3; t.wrist = 0
+    switch (e.state) {
+      case 'spawn':
+      case 'intro':
+        t.one = 1; t.sw = 0.9; t.reach = 0.55; t.wrist = -2.3; t.lean = 0.02 + breathe * 0.02; t.ou = 0.15; t.of = -0.2
+        break
+      case 'idle':
+        t.crouch = 4 + breathe; t.sw = -0.3 + breathe * 0.04; t.lean = 0.16
+        Object.assign(t, { l1: 0.45, b1: 0.4, l2: -0.4, b2: 0.15 })
+        break
+      case 'walk':
+        runLegs(t, anim.phase, 0.65); t.lean = 0.26; t.sw = -0.3
+        break
+      case 'combo': {
+        const step = e.combo ? e.combo.i : 0
+        const raised = [-2.5, 2.9, -1.95][step]
+        const swing = [1.0, -0.25, 1.3][step]
+        if (e.combo?.phase === 'tele') { t.sw = lerp(-0.3, raised, ease(progress * 1.5)); t.reach = 1; t.lean = -0.1; t.crouch = 5 }
+        else { t.sw = swing; t.reach = 1.05; t.lean = 0.55; t.crouch = 7; anim.snap = true }
+        Object.assign(t, { l1: 0.7, b1: 0.45, l2: -0.7, b2: 0.12 })
+        break
+      }
+      case 'flagTell':
+        t.one = 1; t.flag = ease(progress * 2.2); t.sw = 0.8; t.reach = 0.8; t.wrist = -2.2; t.lean = -0.1; t.crouch = 3
+        t.ou = 2.9; t.of = 3.0
+        break
+      case 'rushTell':
+        t.crouch = 7 + progress * 7; t.lean = 0.55; t.sw = 2.7; t.wrist = 0.3; t.reach = 1
+        Object.assign(t, { l1: 0.9, b1: 1.4, l2: -0.3, b2: 1.1 })
+        break
+      case 'rush':
+        t.lean = 0.95; t.crouch = 8; t.sw = 0.05; t.reach = 1.4; t.flutter = 1; anim.snap = true
+        Object.assign(t, { l1: 1.2, b1: 0.5, l2: -1.1, b2: 0.15 })
+        break
+      case 'backstep':
+        t.air = 1; t.lean = -0.3; t.sw = -1.2; t.reach = 1
+        break
+      case 'roar':
+        t.one = 1; t.lean = -0.4; t.sw = -2.0; t.wrist = 0; t.reach = 0.9; t.ou = 2.8; t.of = 3.1; t.head = -0.4; t.crouch = 3
+        break
+      case 'broken':
+        t.one = 1; t.lean = 0.85; t.crouch = 16; t.sw = 0.6; t.wrist = -0.4; t.reach = 1; t.ou = 0.6; t.of = 0.4; t.head = 0.3
+        Object.assign(t, { l1: 1.2, b1: 2.3, l2: -0.2, b2: 1.6 })
+        break
+      case 'recover':
+        t.lean = 0.4; t.sw = 0.7; t.crouch = 6
+        break
+      case 'dying':
+        t.one = 1; t.lean = 0.9; t.crouch = 18; t.sw = 0.5; t.wrist = -0.4; t.ou = 0.5; t.of = 0.2; t.head = 0.5
+        Object.assign(t, { l1: 1.3, b1: 2.4, l2: -0.15, b2: 1.7 })
         break
     }
     return t
@@ -314,10 +437,10 @@
 
   function updatePose(kind, entity, anim, dt, time, rules) {
     const speed = Math.abs(entity.vx)
-    anim.phase += speed * dt * (kind === 'boss' || kind === 'angler' ? 0.06 : 0.085)
+    anim.phase += speed * dt * (kind === 'boss' || kind === 'angler' || kind === 'general' ? 0.06 : 0.085)
     anim.flip = Math.max(0, anim.flip - dt / 0.42)
     anim.parry = Math.max(0, anim.parry - dt)
-    const target = kind === 'player' ? playerPose(entity, anim, time, rules) : (kind === 'boss' || kind === 'angler') ? bossPose(entity, anim, time) : enemyPose(entity, anim, time)
+    const target = kind === 'player' ? playerPose(entity, anim, time, rules) : kind === 'general' ? generalPose(entity, anim, time) : (kind === 'boss' || kind === 'angler') ? bossPose(entity, anim, time) : enemyPose(entity, anim, time)
     const rate = anim.snap ? 1 : 1 - Math.exp(-dt * 16)
     for (const key of POSE_KEYS) {
       if (key === 'rot' && (anim.flip > 0 || entity.dead)) { anim.pose.rot = target.rot; continue }
@@ -375,7 +498,7 @@
     const angle = pose.sw + (pose.wrist || 0)
     const axis = [Math.cos(angle), Math.sin(angle)]
     let rear = null
-    if (spec.grip) {
+    if (spec.grip && !(pose.one > 0.5)) {
       rear = [hx - axis[0] * spec.grip.span, hy - axis[1] * spec.grip.span]
       const [bx, by, rx, ry] = ik(offShoulder[0], offShoulder[1], rear[0], rear[1], spec.upper, spec.fore)
       offElbow = [bx, by]; offHand = [rx, ry]
@@ -400,7 +523,7 @@
     const flutter = pose.flutter
     const wave = Math.sin(time * 11 + seed) * (0.8 + flutter * 1.6)
     const long = spec.robe === 'long' ? 1 : 0
-    const hemDepth = long ? 30 : spec.robe === 'hood' ? 13 : 14
+    const hemDepth = long ? 30 : spec.robe === 'lamellar' ? 21 : spec.robe === 'hood' ? 13 : 14
     const backX = -9 - flutter * (long ? 16 : 9) - long * 3
     const frontX = 7 + Math.max(0, Math.sin(pose.l1)) * 7 + long * 4
     const sf = [neck[0] + fwd[0] * 4.6 - up[0] * 2, neck[1] + fwd[1] * 4.6 - up[1] * 2]
@@ -426,7 +549,7 @@
         ctx.strokeStyle = 'rgba(20,20,22,0.82)'; ctx.lineWidth = 1.3
         ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke()
       }
-    } else if (spec.robe === 'armor') {
+    } else if (spec.robe === 'armor' || spec.robe === 'lamellar') {
       ctx.quadraticCurveTo((hf[0] + hb[0]) / 2, hip[1] + hemDepth, hb[0], hb[1])
       ctx.quadraticCurveTo(wb[0] - 3, (wb[1] + hb[1]) / 2, wb[0], wb[1])
       ctx.quadraticCurveTo(sb[0] - 1.5, (sb[1] + wb[1]) / 2, sb[0], sb[1])
@@ -435,11 +558,16 @@
       for (let y = sf[1] + 6; y < hf[1]; y += 5) {
         ctx.beginPath(); ctx.moveTo(sb[0] + 2, y); ctx.lineTo(sf[0] - 2, y); ctx.stroke()
       }
-    } else if (spec.robe === 'vest') {
+    } else if (spec.robe === 'vest' || spec.robe === 'padded') {
       ctx.quadraticCurveTo((hf[0] + hb[0]) / 2, hip[1] + hemDepth - 4, hb[0], hb[1] - 4)
       ctx.quadraticCurveTo(wb[0] - 2, (wb[1] + hb[1]) / 2, wb[0], wb[1])
       ctx.quadraticCurveTo(sb[0] - 1, (sb[1] + wb[1]) / 2, sb[0], sb[1])
       ctx.closePath(); ctx.fill()
+      if (spec.robe === 'padded') {
+        ctx.strokeStyle = 'rgba(235,225,210,0.26)'; ctx.lineWidth = 0.7
+        for (let k = 0; k < 4; k++) { const y = sf[1] + 4 + k * 5; ctx.beginPath(); ctx.moveTo(sb[0] + 2, y); ctx.lineTo(sf[0] - 1, y + 0.6); ctx.stroke() }
+        ctx.beginPath(); ctx.moveTo(lerp(sb[0], sf[0], 0.5), sf[1] + 3); ctx.lineTo(lerp(hb[0], hf[0], 0.5), hf[1] - 2); ctx.stroke()
+      }
     } else if (spec.robe === 'rags' || spec.robe === 'long') {
       const teeth = spec.robe === 'long' ? 7 : 5
       for (let i = 1; i <= teeth; i++) {
@@ -487,7 +615,7 @@
       ctx.quadraticCurveTo(hx + r * 1.1, hy + r * 1.3, hx + r * 0.6, hy + r * 0.2)
       ctx.closePath(); ctx.fill()
     }
-    if (spec.headStyle && !look.flash) eyes(ctx, hx + r * 0.42, hy - r * 0.1, look.eyeGlow || 0, spec.head)
+    if (spec.headStyle && !look.flash && !LATE_HATS[spec.hat]) eyes(ctx, hx + r * 0.42, hy - r * 0.1, look.eyeGlow || 0, spec.head)
   }
 
   function eyes(ctx, x, y, glow, size) {
@@ -500,7 +628,74 @@
     ctx.restore()
   }
 
+  const LATE_HATS = { kettle: 1, cavhelm: 1, wrap: 1, warhelm: 1 }
+
+  // Soldier helmets, the rider's dented helm, the bomber's headwrap and the general's war helm. Eyes are drawn afterwards, on top.
+  function drawHat2(ctx, spec, s, pose, time, look, seed) {
+    const [hx, hy] = s.head
+    const r = spec.head
+    const fl = pose.flutter
+    ctx.save(); ctx.translate(hx, hy); ctx.rotate(s.headTilt * 0.7)
+    const flash = look.flash
+    const metal = flash ? look.color : spec.hat === 'warhelm' ? '#17181b' : '#2a2c31'
+    ctx.fillStyle = metal; ctx.strokeStyle = metal
+    const pale = 'rgba(239,231,212,0.34)'
+    if (spec.hat === 'wrap') {
+      ctx.fillStyle = flash ? look.color : '#33343a'
+      ctx.beginPath(); ctx.ellipse(0.5, -r * 0.95, r * 1.28, r * 0.78, -0.08, 0, TAU); ctx.fill()
+      ctx.beginPath(); ctx.ellipse(1.5, -r * 1.5, r * 0.8, r * 0.55, 0.1, 0, TAU); ctx.fill()
+      const wave = Math.sin(time * 8 + seed) * (1.5 + fl * 2)
+      ctx.beginPath(); ctx.moveTo(-r * 0.9, -r * 1.1)
+      ctx.quadraticCurveTo(-r * 2 - fl * 5, -r * 0.6 + wave, -r * 2.8 - fl * 9, r * 0.9 + wave * 1.4)
+      ctx.quadraticCurveTo(-r * 1.8 - fl * 4, -r * 0.1, -r * 0.7, -r * 0.3); ctx.closePath(); ctx.fill()
+      if (!flash) {
+        ctx.strokeStyle = 'rgba(235,225,210,0.34)'; ctx.lineWidth = 0.7
+        for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(-r * 1.1 + i * 3.2, -r * 1.5 + i * 0.8); ctx.quadraticCurveTo(0, -r * 1.2 + i * 1.4, r * 1.2, -r * 0.8 + i * 1.6); ctx.stroke() }
+      }
+    } else {
+      const big = spec.hat === 'warhelm' ? 1.18 : 1
+      const dome = r * 1.14 * big, cy = -r * 0.6
+      ctx.beginPath(); ctx.arc(0, cy, dome, Math.PI, 0); ctx.fill()
+      ctx.beginPath(); ctx.roundRect(-dome - 0.6, cy - 0.4, dome * 2 + 1.2, 2.3, 1); ctx.fill()
+      // neck guard
+      const len = spec.hat === 'warhelm' ? 13 : 7
+      ctx.beginPath(); ctx.moveTo(-dome * 0.95, cy + 1); ctx.lineTo(-dome - 2.5 - fl * 2, cy + len * 0.6); ctx.lineTo(-dome * 0.4, cy + len); ctx.lineTo(-dome * 0.35, cy + 2); ctx.closePath(); ctx.fill()
+      if (spec.hat === 'warhelm') {
+        ctx.beginPath(); ctx.moveTo(dome * 0.8, cy + 1); ctx.lineTo(dome * 0.35, cy + 8); ctx.lineTo(dome * 0.1, cy + 2); ctx.closePath(); ctx.fill()
+      }
+      ctx.beginPath(); ctx.arc(0, cy - dome - 0.8, 1.6, 0, TAU); ctx.fill()
+      if (!flash) {
+        ctx.strokeStyle = pale; ctx.lineWidth = 0.6
+        ctx.beginPath(); ctx.arc(0, cy, dome - 1.4, Math.PI * 1.1, Math.PI * 1.85); ctx.stroke()
+        if (spec.hat === 'cavhelm') { ctx.beginPath(); ctx.moveTo(-1.5, cy - dome + 0.6); ctx.lineTo(0.8, cy - dome + 3.4); ctx.lineTo(-0.4, cy - dome + 5.6); ctx.stroke() }
+      }
+      const top = cy - dome - 1
+      if (spec.hat === 'cavhelm') {
+        ctx.strokeStyle = flash ? look.color : '#1a1b1e'; ctx.lineWidth = 1.6
+        for (let i = 0; i < 4; i++) {
+          const w = Math.sin(time * 9 + i + seed) * (1 + fl * 2)
+          ctx.beginPath(); ctx.moveTo(0, top); ctx.quadraticCurveTo(-3 - i, top - 4 - fl, -6 - i * 1.8 - fl * 5, top + 1 + i * 1.6 + w); ctx.stroke()
+        }
+      } else if (spec.hat === 'warhelm') {
+        ctx.fillStyle = flash ? look.color : '#2a2c31'
+        ctx.beginPath(); ctx.roundRect(-2, top - 4, 4, 5, 1); ctx.fill()
+        if (!flash) {
+          ctx.fillStyle = CINNABAR; ctx.strokeStyle = CINNABAR
+          const sway = Math.sin(time * 5 + seed) * 1.5, back = 7 + fl * 10
+          ctx.beginPath(); ctx.moveTo(-2, top - 3)
+          ctx.quadraticCurveTo(-3, top - 22, 4 - back * 0.3, top - 30 + sway)
+          ctx.quadraticCurveTo(-back * 0.5, top - 20, -back, top - 16 + sway * 1.5)
+          ctx.quadraticCurveTo(-back * 0.35, top - 12, 2.5, top - 3); ctx.closePath(); ctx.fill()
+          ctx.lineWidth = 1
+          for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, top - 5); ctx.quadraticCurveTo(-6 - i * 2, top - 18 + i * 3, -back - 4 - i * 2 - fl * 4, top - 12 + i * 4 + sway); ctx.stroke() }
+        }
+      }
+    }
+    ctx.restore()
+  }
+
   function drawHat(ctx, spec, s, pose, time, look, seed) {
+    if (LATE_HATS[spec.hat]) return drawHat2(ctx, spec, s, pose, time, look, seed)
     const [hx, hy] = s.head
     if (spec.hat === 'helmet') {
       ctx.save(); ctx.translate(hx, hy - spec.head * 0.65); ctx.rotate(s.headTilt * 0.7)
@@ -585,7 +780,7 @@
     const [dx, dy] = s.axis
     const len = spec.blade, w = spec.bladeW
     const nx = -dy, ny = dx
-    const tip = [hx + dx * len, hy + dy * len]
+    let tip = [hx + dx * len, hy + dy * len]
     out.tip = tip
     ctx.save()
     // Hilt: a hand-and-a-half grip with its pommel behind the fist and a wrapped middle.
@@ -600,10 +795,19 @@
     ctx.beginPath(); ctx.moveTo(hx + dx * 2.8 + nx * 3.6, hy + dy * 2.8 + ny * 3.6); ctx.lineTo(hx + dx * 2.8 - nx * 3.6, hy + dy * 2.8 - ny * 3.6); ctx.stroke()
     ctx.fillStyle = look.color || spec.color
     ctx.beginPath()
-    ctx.moveTo(hx + dx * 3.4 + nx * w / 2, hy + dy * 3.4 + ny * w / 2)
-    ctx.lineTo(hx + dx * len * 0.86 + nx * w * 0.45, hy + dy * len * 0.86 + ny * w * 0.45)
-    ctx.lineTo(tip[0], tip[1])
-    ctx.lineTo(hx + dx * 3.4 - nx * w / 2, hy + dy * 3.4 - ny * w / 2)
+    if (spec.sabre) {
+      // curved sabre: spine bows up, edge bellies, point swings forward
+      const q = (u, v) => [hx + dx * u + nx * v, hy + dy * u + ny * v]
+      out.tip = tip = q(len + 1, 3.6)
+      ctx.moveTo(...q(3.4, -w / 2))
+      ctx.quadraticCurveTo(...q(len * 0.55, -w / 2 - 3.2), ...tip)
+      ctx.quadraticCurveTo(...q(len * 0.6, w * 0.7 + 1), ...q(3.4, w / 2))
+    } else {
+      ctx.moveTo(hx + dx * 3.4 + nx * w / 2, hy + dy * 3.4 + ny * w / 2)
+      ctx.lineTo(hx + dx * len * 0.86 + nx * w * 0.45, hy + dy * len * 0.86 + ny * w * 0.45)
+      ctx.lineTo(tip[0], tip[1])
+      ctx.lineTo(hx + dx * 3.4 - nx * w / 2, hy + dy * 3.4 - ny * w / 2)
+    }
     ctx.closePath(); ctx.fill()
     if (!look.flash) {
       ctx.strokeStyle = look.edge || 'rgba(239,231,212,0.75)'
@@ -728,6 +932,196 @@
     ctx.restore()
   }
 
+  // Two-handed (or one-handed when pose.one) heavy 大刀 with a wide curved blade and a cinnabar collar tassel.
+  function drawBroadsword(ctx, spec, s, look, out, time) {
+    const [hx, hy] = s.hand
+    const [dx, dy] = s.axis
+    const nx = -dy, ny = dx
+    const P = (a, b) => [hx + dx * a + nx * b, hy + dy * a + ny * b]
+    const butt = spec.grip.span + 5
+    out.tip = P(90, -3)
+    ctx.save()
+    const ink = look.color || spec.color
+    ctx.strokeStyle = look.flash ? look.color : '#2d2219'; ctx.lineWidth = 3
+    ctx.beginPath(); ctx.moveTo(...P(-butt, 0)); ctx.lineTo(...P(40, 0)); ctx.stroke()
+    if (!look.flash) {
+      ctx.strokeStyle = 'rgba(235,225,210,0.45)'; ctx.lineWidth = 3.2; ctx.lineCap = 'butt'
+      ctx.beginPath(); ctx.moveTo(...P(-butt + 1, 0)); ctx.lineTo(...P(-butt + 4, 0)); ctx.stroke()
+      ctx.lineCap = 'round'
+    }
+    ctx.fillStyle = ink
+    ctx.beginPath(); ctx.arc(...P(-butt, 0), 2.4, 0, TAU); ctx.fill()
+    ctx.strokeStyle = ink; ctx.lineWidth = 2.2
+    ctx.beginPath(); ctx.moveTo(...P(40, -5)); ctx.lineTo(...P(40, 5)); ctx.stroke()
+    ctx.fillStyle = look.flash ? look.color : '#34373d'
+    ctx.beginPath()
+    ctx.moveTo(...P(40, -2.4))
+    ctx.lineTo(...P(84, -3.2))
+    ctx.lineTo(...P(91, -3))
+    ctx.quadraticCurveTo(...P(80, 15), ...P(60, 12.5))
+    ctx.quadraticCurveTo(...P(48, 10), ...P(41, 3))
+    ctx.closePath(); ctx.fill()
+    if (!look.flash) {
+      ctx.strokeStyle = 'rgba(239,231,212,0.7)'; ctx.lineWidth = 0.6
+      ctx.beginPath(); ctx.moveTo(...P(88, -1)); ctx.quadraticCurveTo(...P(78, 12.4), ...P(60, 11)); ctx.stroke()
+      ctx.strokeStyle = 'rgba(239,231,212,0.3)'; ctx.lineWidth = 0.7
+      ctx.beginPath(); ctx.moveTo(...P(45, 0)); ctx.lineTo(...P(80, -0.5)); ctx.stroke()
+      ctx.fillStyle = CINNABAR; ctx.strokeStyle = CINNABAR; ctx.lineWidth = 1.1
+      const sway = Math.sin(time * 6) * 2 - 2
+      ctx.beginPath(); ctx.arc(...P(39, 0), 1.7, 0, TAU); ctx.fill()
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(...P(39, 0)); ctx.quadraticCurveTo(...P(35 - i * 2, 4 + i * 2), hx + dx * (34 - i * 2) + nx * (8 + i * 2) + sway, hy + dy * (34 - i * 2) + ny * (8 + i * 2) + 5 + i * 2); ctx.stroke() }
+    }
+    ctx.restore()
+  }
+
+  // Short spear held one-handed beside the pavise.
+  function drawShortSpear(ctx, spec, s, look, out) {
+    const [hx, hy] = s.hand
+    const [dx, dy] = s.axis
+    const nx = -dy, ny = dx
+    const shaft = 46, tip = [hx + dx * (shaft + 13), hy + dy * (shaft + 13)]
+    out.tip = tip
+    ctx.save()
+    ctx.strokeStyle = look.flash ? look.color : '#3a2d22'; ctx.lineWidth = 2.4
+    ctx.beginPath(); ctx.moveTo(hx - dx * 16, hy - dy * 16); ctx.lineTo(hx + dx * shaft, hy + dy * shaft); ctx.stroke()
+    if (!look.flash) {
+      ctx.fillStyle = CINNABAR
+      ctx.beginPath()
+      ctx.moveTo(hx + dx * (shaft - 2), hy + dy * (shaft - 2))
+      ctx.quadraticCurveTo(hx + dx * (shaft + 4) + nx * 4, hy + dy * (shaft + 4) + ny * 4 + 1, hx + dx * (shaft + 7), hy + dy * (shaft + 7) + 3)
+      ctx.quadraticCurveTo(hx + dx * (shaft + 3) - nx * 3, hy + dy * (shaft + 3) - ny * 3, hx + dx * (shaft - 2), hy + dy * (shaft - 2)); ctx.fill()
+    }
+    ctx.fillStyle = look.flash ? look.color : '#e5dfd2'
+    ctx.beginPath()
+    ctx.moveTo(hx + dx * shaft + nx * 3.2, hy + dy * shaft + ny * 3.2); ctx.lineTo(tip[0], tip[1]); ctx.lineTo(hx + dx * shaft - nx * 3.2, hy + dy * shaft - ny * 3.2)
+    ctx.closePath(); ctx.fill()
+    ctx.restore()
+  }
+
+  // Clay fire-pot ~7 radius with a short fuse; returns the fuse tip (local).
+  function drawPot(ctx, cx, cy, look, time) {
+    ctx.save()
+    const flash = look.flash
+    ctx.fillStyle = flash ? look.color : '#8d6a3b'
+    ctx.beginPath(); ctx.arc(cx, cy, 7, 0, TAU); ctx.fill()
+    ctx.beginPath(); ctx.roundRect(cx - 3, cy - 9, 6, 4, 1.2); ctx.fill()
+    if (!flash) {
+      ctx.fillStyle = 'rgba(40,28,18,0.55)'
+      ctx.beginPath(); ctx.arc(cx + 2, cy + 2.4, 6, -0.3, Math.PI * 0.85); ctx.lineTo(cx, cy + 1); ctx.fill()
+      ctx.strokeStyle = '#1b1a1a'; ctx.lineWidth = 0.9
+      ctx.beginPath(); ctx.arc(cx, cy, 7, 0, TAU); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(cx - 6.4, cy - 1.5); ctx.quadraticCurveTo(cx, cy + 1.5, cx + 6.4, cy - 1.5); ctx.stroke()
+      ctx.fillStyle = '#1b1a1a'; ctx.beginPath(); ctx.ellipse(cx, cy - 8.6, 2.4, 1, 0, 0, TAU); ctx.fill()
+    }
+    const fx = cx + 3.2, fy = cy - 14
+    ctx.strokeStyle = look.flash ? look.color : '#cdbf9a'; ctx.lineWidth = 1.1
+    ctx.beginPath(); ctx.moveTo(cx, cy - 8.6); ctx.quadraticCurveTo(cx + 0.5, cy - 12, fx, fy); ctx.stroke()
+    ctx.restore()
+    return [fx, fy]
+  }
+
+  // Standing pavise: 15 x 62, planks, pale lacquer panel with an ink beast-face, iron studs. Origin = bottom centre.
+  function drawPavise(ctx, pose, look) {
+    const sh = pose.sh
+    const bx = 15 + sh * 9, tilt = sh * 0.85
+    ctx.save()
+    ctx.translate(bx, -1); ctx.rotate(tilt)
+    const flash = look.flash
+    ctx.fillStyle = flash ? look.color : '#3b3027'
+    ctx.beginPath(); ctx.roundRect(-7.5, -62, 15, 62, 2.2); ctx.fill()
+    if (!flash) {
+      ctx.strokeStyle = 'rgba(20,18,16,0.7)'; ctx.lineWidth = 0.7
+      for (const x of [-2.6, 2.6]) { ctx.beginPath(); ctx.moveTo(x, -61); ctx.lineTo(x, -1); ctx.stroke() }
+      ctx.fillStyle = '#d8cdb0'
+      ctx.beginPath(); ctx.roundRect(-5.2, -53, 10.4, 31, 2); ctx.fill()
+      ctx.strokeStyle = '#17171a'; ctx.fillStyle = '#17171a'; ctx.lineWidth = 1
+      // beast face: brow, slit eyes, snout and fangs
+      ctx.beginPath(); ctx.moveTo(-4.4, -46.5); ctx.lineTo(0, -44.6); ctx.lineTo(4.4, -46.5); ctx.stroke()
+      ctx.beginPath(); ctx.ellipse(-2.3, -43.6, 1.6, 0.8, 0.35, 0, TAU); ctx.ellipse(2.3, -43.6, 1.6, 0.8, -0.35, 0, TAU); ctx.fill()
+      ctx.beginPath(); ctx.moveTo(-1.4, -40.2); ctx.lineTo(0, -38.4); ctx.lineTo(1.4, -40.2); ctx.stroke()
+      ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(-3.6, -35.5); ctx.quadraticCurveTo(0, -33.4, 3.6, -35.5); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(-2.4, -35); ctx.lineTo(-1.8, -31.2); ctx.lineTo(-1.1, -34.6); ctx.moveTo(2.4, -35); ctx.lineTo(1.8, -31.2); ctx.lineTo(1.1, -34.6); ctx.fill()
+      ctx.lineWidth = 0.8
+      for (const [a, b] of [[-4.5, -50], [4.5, -50], [-4.5, -25], [4.5, -25]]) { ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(a * 0.6, b + 2.6); ctx.stroke() }
+      ctx.fillStyle = '#9a9b9a'
+      for (const y of [-58.5, -15, -5.5]) for (const x of [-4.8, 4.8]) { ctx.beginPath(); ctx.arc(x, y, 0.95, 0, TAU); ctx.fill() }
+      ctx.strokeStyle = 'rgba(190,190,185,0.3)'; ctx.lineWidth = 1
+      ctx.beginPath(); ctx.roundRect(-7, -61.5, 14, 61, 2); ctx.stroke()
+      ctx.fillStyle = '#242220'; ctx.fillRect(-7.5, -3, 15, 3)
+    }
+    ctx.restore()
+  }
+
+  function drawBanner(ctx, hand, facing, look, time, seed) {
+    const [hx, hy] = hand
+    const top = [hx + 1, hy - 44]
+    ctx.save()
+    ctx.strokeStyle = look.flash ? look.color : '#2d2219'; ctx.lineWidth = 2
+    ctx.beginPath(); ctx.moveTo(hx - 1, hy + 9); ctx.lineTo(top[0], top[1] - 2); ctx.stroke()
+    const w = 24, h = 17
+    const wave = (k) => Math.sin(time * 7 + k * 1.3 + seed) * (1 + k * 1.5)
+    ctx.fillStyle = look.flash ? look.color : '#e8dfc6'
+    ctx.beginPath(); ctx.moveTo(top[0], top[1])
+    for (let i = 1; i <= 4; i++) ctx.lineTo(top[0] - (w * i) / 4, top[1] + wave(i) * 0.6 - 1)
+    for (let i = 4; i >= 0; i--) ctx.lineTo(top[0] - (w * i) / 4 + (i === 0 ? 0 : 0), top[1] + h + wave(i) * 0.6 - (i === 4 ? 3 : 0))
+    ctx.closePath(); ctx.fill()
+    if (!look.flash) {
+      ctx.strokeStyle = '#17171a'; ctx.lineWidth = 0.9; ctx.stroke()
+      ctx.save()
+      ctx.translate(top[0] - w * 0.5, top[1] + h * 0.5 + wave(2) * 0.3); ctx.scale(facing, 1)
+      ctx.fillStyle = '#17171a'; ctx.font = '700 12px "Kaiti SC","STKaiti","KaiTi","Songti SC",serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+      ctx.fillText('令', 0, 0.5)
+      ctx.restore()
+      ctx.strokeStyle = CINNABAR; ctx.lineWidth = 1
+      for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.moveTo(top[0], top[1]); ctx.quadraticCurveTo(top[0] + 2 + i, top[1] - 3, top[0] + 2 + i * 1.5, top[1] - 7 - i); ctx.stroke() }
+    }
+    ctx.restore()
+  }
+
+  // 靠旗: four small pennants fanned out behind the shoulders.
+  function drawBackFlags(ctx, s, pose, look, time, seed) {
+    const ax = s.neck[0] - s.fwd[0] * 4 - s.up[0] * 4, ay = s.neck[1] - s.fwd[1] * 4 - s.up[1] * 4
+    ctx.save()
+    ctx.fillStyle = look.color; ctx.strokeStyle = look.color
+    const fl = pose.flutter
+    for (let i = 0; i < 4; i++) {
+      const a = -1.75 - i * 0.28, L = 27 - i * 1.5
+      const dx = Math.cos(a), dy = Math.sin(a), nx = -dy, ny = dx
+      const tx = ax + dx * L, ty = ay + dy * L
+      ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(tx, ty); ctx.stroke()
+      const sway = Math.sin(time * 6 + i * 1.1 + seed) * (1.2 + fl * 3) - fl * 5
+      ctx.beginPath()
+      ctx.moveTo(ax + dx * L * 0.3, ay + dy * L * 0.3)
+      ctx.lineTo(tx, ty)
+      ctx.quadraticCurveTo(tx - dx * 5 - nx * 4 + sway * 0.4, ty - dy * 5 - ny * 4, ax + dx * L * 0.3 - nx * 7 + sway, ay + dy * L * 0.3 - ny * 7 + 2)
+      ctx.closePath(); ctx.fill()
+      if (!look.flash) {
+        ctx.strokeStyle = 'rgba(235,225,210,0.34)'; ctx.lineWidth = 0.6
+        ctx.beginPath(); ctx.moveTo(ax + dx * L * 0.35 - nx * 2, ay + dy * L * 0.35 - ny * 2); ctx.lineTo(tx - dx * 4 - nx * 2.5, ty - dy * 4 - ny * 2.5); ctx.stroke()
+        ctx.strokeStyle = look.color
+      }
+    }
+    ctx.restore()
+  }
+
+  function drawCape(ctx, spec, s, pose, time, look, seed) {
+    const len = spec.cape, fl = pose.flutter
+    const wave = Math.sin(time * 8 + seed) * (1.2 + fl * 2.5)
+    const top = [s.neck[0] - s.fwd[0] * 3, s.neck[1] - s.fwd[1] * 3]
+    const mid = [s.hip[0] - 7 - fl * len * 0.4, s.neck[1] + (s.hip[1] - s.neck[1]) * 0.55]
+    const end = [s.hip[0] - 5 - len * 0.45 - fl * len * 0.7, s.hip[1] + len * 0.55 + wave]
+    const low = [s.hip[0] - 4, s.hip[1] + len * 0.5]
+    ctx.save()
+    if (!look.flash) ctx.fillStyle = look.color || spec.color
+    ctx.beginPath(); ctx.moveTo(top[0], top[1])
+    ctx.quadraticCurveTo(mid[0] - 3, mid[1], end[0], end[1])
+    ctx.quadraticCurveTo((end[0] + low[0]) / 2, end[1] + 3 + wave * 0.5, low[0], low[1])
+    ctx.quadraticCurveTo(s.hip[0] + 1, (low[1] + s.hip[1]) / 2, s.hip[0] + 2, s.hip[1])
+    ctx.closePath(); ctx.fill()
+    ctx.restore()
+  }
+
   function drawSleeve(ctx, from, to, pose, time, seed, back) {
     const flutter = pose.flutter
     const dx = to[0] - from[0], dy = to[1] - from[1]
@@ -759,6 +1153,19 @@
     }
     ctx.fillStyle = color; ctx.strokeStyle = color
     const [lu, lf, au, af] = spec.limbs
+    const gripOn = !!spec.grip && !(pose.one > 0.5)
+    if (spec.cape) drawCape(ctx, spec, s, pose, time, look, seed)
+    if (spec.backFlags) drawBackFlags(ctx, s, pose, { ...look, color }, time, seed)
+    let paviseHand = null
+    if (spec.pavise) {
+      const sh = pose.sh, bx = 15 + sh * 9, tilt = sh * 0.85
+      const lx = -3, ly = -32
+      const h = [bx + lx * Math.cos(tilt) - ly * Math.sin(tilt), -1 + lx * Math.sin(tilt) + ly * Math.cos(tilt)]
+      const free = s.offHand
+      const tgt = [lerp(h[0], free[0], clamp(sh * 1.4, 0, 1)), lerp(h[1], free[1], clamp(sh * 1.4, 0, 1))]
+      const [ex, ey, hx2, hy2] = ik(s.offShoulder[0], s.offShoulder[1], tgt[0], tgt[1], spec.upper, spec.fore)
+      paviseHand = [[ex, ey], [hx2, hy2]]
+    }
 
     // Wet-ink halo keeps silhouettes legible over busy washes.
     if (look.halo) {
@@ -770,7 +1177,8 @@
       ctx.fillStyle = color
     }
 
-    if (!spec.grip) limb(ctx, [s.offShoulder, s.offElbow, s.offHand], au * 0.92)
+    if (paviseHand) limb(ctx, [s.offShoulder, paviseHand[0], paviseHand[1]], au * 0.92)
+    else if (!gripOn) limb(ctx, [s.offShoulder, s.offElbow, s.offHand], au * 0.92)
     if (spec.sleeves) drawSleeve(ctx, s.shoulder, s.offElbow, pose, time, seed, true)
     limb(ctx, [s.hip, s.back.knee, s.back.foot], lu)
     ctx.lineWidth = lf
@@ -789,33 +1197,81 @@
       ctx.beginPath(); ctx.moveTo(wb[0], wb[1]); ctx.quadraticCurveTo(wb[0] - 4, wb[1] + 5, wb[0] - 6 + sway, wb[1] + 10); ctx.stroke()
       ctx.restore()
     }
+    if (spec.satchel) {
+      ctx.save()
+      ctx.fillStyle = look.flash ? look.color : '#1c1d20'
+      const sx = s.hip[0] + s.fwd[0] * 3, sy = s.hip[1] + 4
+      if (!look.flash) {
+        ctx.strokeStyle = 'rgba(235,225,210,0.3)'; ctx.lineWidth = 1.2
+        ctx.beginPath(); ctx.moveTo(s.neck[0] - s.fwd[0] * 3, s.neck[1] + 1); ctx.lineTo(sx + 1, sy - 2); ctx.stroke()
+      }
+      ctx.beginPath(); ctx.ellipse(sx, sy + 2, 7.5, 6.5, 0.2, 0, TAU); ctx.fill()
+      if (!look.flash) {
+        ctx.fillStyle = '#8d6a3b'
+        for (const dx of [-3.4, 0.2, 3.6]) { ctx.beginPath(); ctx.arc(sx + dx, sy - 3.4 - (dx === 0.2 ? 1 : 0), 2.6, 0, TAU); ctx.fill() }
+      }
+      ctx.restore()
+      ctx.fillStyle = color; ctx.strokeStyle = color
+    }
     drawHead(ctx, spec, s, look, time, seed)
     if (spec.hat) drawHat(ctx, spec, s, pose, time, look, seed)
+    if (spec.headStyle && !look.flash && LATE_HATS[spec.hat]) eyes(ctx, s.head[0] + spec.head * 0.42, s.head[1] - spec.head * 0.1, look.eyeGlow || 0, spec.head)
+    if (spec.robe === 'lamellar') {
+      ctx.fillStyle = look.flash ? look.color : '#191a1d'
+      ctx.beginPath(); ctx.ellipse(s.shoulder[0] + 1, s.shoulder[1] + 2, 9, 6.5, -0.2, 0, TAU); ctx.fill()
+      if (!look.flash) { ctx.strokeStyle = 'rgba(235,225,210,0.3)'; ctx.lineWidth = 0.7; ctx.beginPath(); ctx.arc(s.shoulder[0] + 1, s.shoulder[1] + 2, 5.5, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke() }
+      ctx.fillStyle = color; ctx.strokeStyle = color
+    }
+    if (spec.pavise) {
+      ctx.save()
+      const sh = pose.sh
+      drawPavise(ctx, pose, look)
+      ctx.restore()
+      void sh
+    }
     if (spec.shield) drawShield(ctx, s, look)
     if (spec.bow) {
       const pull = drawBow(ctx, s, pose, look, out)
       limb(ctx, [s.shoulder, [lerp(s.shoulder[0], pull[0], 0.5) - 2, lerp(s.shoulder[1], pull[1], 0.5) + 3], pull], af)
-    } else if (spec.grip) {
-      if (spec.spear) drawSpear(ctx, spec, s, look, out)
+    } else if (gripOn) {
+      if (spec.broadsword) drawBroadsword(ctx, spec, s, look, out, time)
+      else if (spec.spear) drawSpear(ctx, spec, s, look, out)
       else if (spec.hammer) drawHammer(ctx, spec, s, look, out)
       else drawRod(ctx, spec, s, look, out)
       ctx.fillStyle = color; ctx.strokeStyle = color
+      if (spec.broadsword && pose.flag > 0.05) drawBanner(ctx, s.offHand, facing, look, time, seed)
       limb(ctx, [s.offShoulder, s.offElbow, s.offHand], au * 0.92)
       limb(ctx, [s.shoulder, s.elbow, s.hand], au)
       ctx.lineWidth = af
       ctx.beginPath(); ctx.moveTo(s.offElbow[0], s.offElbow[1]); ctx.lineTo(s.offHand[0], s.offHand[1]); ctx.stroke()
       ctx.beginPath(); ctx.moveTo(s.elbow[0], s.elbow[1]); ctx.lineTo(s.hand[0], s.hand[1]); ctx.stroke()
-      binding(ctx, s.hand, s.axis, look, spec.hammer ? 3.8 : 2.8)
-      binding(ctx, s.offHand, s.axis, look, spec.hammer ? 3.8 : 2.8)
+      if (!spec.broadsword) {
+        binding(ctx, s.hand, s.axis, look, spec.hammer ? 3.8 : 2.8)
+        binding(ctx, s.offHand, s.axis, look, spec.hammer ? 3.8 : 2.8)
+      }
       const r = af * 0.62
       fist(ctx, s.offHand, r, look, color)
       fist(ctx, s.hand, r, look, color)
     } else {
+      if (spec.broadsword) {
+        if (pose.flag > 0.05) drawBanner(ctx, s.offHand, facing, look, time, seed)
+        ctx.fillStyle = color; ctx.strokeStyle = color
+        limb(ctx, [s.offShoulder, s.offElbow, s.offHand], au * 0.92)
+        fist(ctx, s.offHand, af * 0.62, look, color)
+        drawBroadsword(ctx, spec, s, look, out, time)
+      } else if (spec.shortSpear) drawShortSpear(ctx, spec, s, look, out)
+      ctx.fillStyle = color; ctx.strokeStyle = color
       limb(ctx, [s.shoulder, s.elbow, s.hand], au)
       if (spec.sleeves) drawSleeve(ctx, s.shoulder, s.elbow, pose, time, seed, false)
       ctx.lineWidth = af
       ctx.beginPath(); ctx.moveTo(s.elbow[0], s.elbow[1]); ctx.lineTo(s.hand[0], s.hand[1]); ctx.stroke()
-      drawBlade(ctx, spec, s, look, out)
+      if (spec.broadsword || spec.shortSpear) fist(ctx, s.hand, af * 0.62, look, color)
+      if (spec.pot && pose.pot > 0.5) {
+        const c = [s.hand[0] + 1.5, s.hand[1] - 5.5]
+        out.tip = drawPot(ctx, c[0], c[1], look, time)
+        fist(ctx, s.hand, af * 0.7, look, color)
+      }
+      if (!spec.broadsword && !spec.shortSpear) drawBlade(ctx, spec, s, look, out)
     }
     ctx.restore()
     const map = (p) => p && [x + p[0] * facing, y + p[1]]
@@ -824,6 +1280,417 @@
     out.neck = map(s.neck)
     out.hip = map(s.hip)
     return out
+  }
+
+  // ---------------------------------------------------------------- horse & riders
+
+  const HIP_F = [13, -31], HIP_H = [-15, -31], PIVOT = [-14, 0]
+  const frac = (v) => v - Math.floor(v)
+
+  function taper(ctx, a, b, w0, w1) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1
+    const nx = -dy / l, ny = dx / l
+    ctx.beginPath()
+    ctx.moveTo(a[0] + nx * w0 / 2, a[1] + ny * w0 / 2); ctx.lineTo(b[0] + nx * w1 / 2, b[1] + ny * w1 / 2)
+    ctx.lineTo(b[0] - nx * w1 / 2, b[1] - ny * w1 / 2); ctx.lineTo(a[0] - nx * w0 / 2, a[1] - ny * w0 / 2); ctx.closePath(); ctx.fill()
+    ctx.beginPath(); ctx.arc(a[0], a[1], w0 / 2, 0, TAU); ctx.arc(b[0], b[1], w1 / 2, 0, TAU); ctx.fill()
+  }
+
+  function legIK(hip, foot, l1, l2, bendFwd) {
+    let dx = foot[0] - hip[0], dy = foot[1] - hip[1]
+    let d = Math.hypot(dx, dy) || 0.001
+    const max = l1 + l2 - 0.05
+    if (d > max) { dx *= max / d; dy *= max / d; d = max }
+    const a = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1))
+    const base = Math.atan2(dy, dx)
+    const ang = bendFwd ? base - a : base + a
+    return [hip[0] + Math.cos(ang) * l1, hip[1] + Math.sin(ang) * l1]
+  }
+
+  const GAITS = {
+    gallop: { duty: 0.4, off: { hf: 0, hn: 0.12, ff: 0.5, fn: 0.62 }, fwdF: 15, bckF: 9, fwdH: 11, bckH: 15, liftF: 15, liftH: 12 },
+    trot: { duty: 0.5, off: { hf: 0, hn: 0.5, ff: 0.5, fn: 0 }, fwdF: 9, bckF: 7, fwdH: 7, bckH: 9, liftF: 9, liftH: 8 },
+  }
+
+  function gaitFoot(hip, front, key, st) {
+    const g = GAITS[st.mode] || GAITS.trot
+    const w = st.w
+    const fwd = (front ? g.fwdF : g.fwdH) * w, bck = (front ? g.bckF : g.bckH) * w, lift = (front ? g.liftF : g.liftH) * w
+    const u = frac(st.phase + g.off[key])
+    let fx, fy = 0
+    if (u < g.duty) fx = lerp(fwd, -bck, u / g.duty)
+    else { const q = (u - g.duty) / (1 - g.duty); fx = lerp(-bck, fwd, q * q * (3 - 2 * q)); fy = -Math.sin(q * Math.PI) * lift }
+    return [hip[0] + fx, fy]
+  }
+
+  function drawLeg(ctx, hip, foot, front, color, flash) {
+    const knee = legIK(hip, foot, 16, 17, front)
+    ctx.fillStyle = color; ctx.strokeStyle = color
+    taper(ctx, hip, knee, front ? 6.6 : 8, front ? 3.6 : 3.8)
+    // cannon bone and hoof
+    const ex = foot[0] - knee[0], ey = foot[1] - knee[1], l = Math.hypot(ex, ey) || 1
+    const pastern = [foot[0] - ex / l * 3, foot[1] - ey / l * 3]
+    taper(ctx, knee, pastern, 3.6, 2.8)
+    ctx.beginPath(); ctx.ellipse(foot[0] + ex / l * 0.5 + 0.8, foot[1] - 0.8, 3.4, 2.4, Math.atan2(ey, ex) * 0.5, 0, TAU); ctx.fill()
+    if (!flash) { ctx.strokeStyle = 'rgba(235,225,210,0.16)'; ctx.lineWidth = 0.6; ctx.beginPath(); ctx.moveTo(hip[0], hip[1] + 2); ctx.lineTo(knee[0], knee[1]); ctx.stroke() }
+  }
+
+  // Paints the horse. st = { phase, mode, w, rear, paw, flow, nod, loose, riderFn }.
+  // Returns a map from the (rotated) horse frame to this canvas's local space.
+  function paintHorse(ctx, st, look, time, seed) {
+    const flash = look.flash
+    const col = look.color || '#17181b'
+    const rear = st.rear || 0
+    const gal = st.mode === 'gallop' ? st.w : 0
+    const rock = Math.sin(st.phase * TAU * 1) * 0.045 * gal
+    const ang = -rear * 0.7 + rock
+    const bob = st.mode === 'stand' ? 0 : -Math.abs(Math.sin(st.phase * TAU)) * (st.mode === 'gallop' ? 3 : 1.6) * st.w
+    const ca = Math.cos(ang), sa = Math.sin(ang)
+    const P = (p) => {
+      const dx = p[0] - PIVOT[0], dy = p[1] - PIVOT[1]
+      return [PIVOT[0] + dx * ca - dy * sa, PIVOT[1] + dx * sa + dy * ca + bob]
+    }
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+    if (look.halo) {
+      ctx.save(); ctx.globalAlpha *= look.halo; ctx.fillStyle = 'rgba(239,231,212,1)'
+      ctx.beginPath(); ctx.ellipse(2, -38, 34, 30, 0, 0, TAU); ctx.fill(); ctx.restore()
+    }
+    // legs
+    const tuck = clamp(rear * 3, 0, 1)
+    const hipF = P(HIP_F), hipH = P(HIP_H)
+    const foreFoot = (key) => {
+      const g = gaitFoot(HIP_F, true, key, st)
+      if (st.paw && key === 'fn') { const pw = Math.max(0, Math.sin(time * 4.2 + seed)); g[0] += pw * 6; g[1] -= pw * 12 }
+      const tk = [HIP_F[0] + 12, -21 - (key === 'fn' ? 3 : 0)]
+      return P([lerp(g[0], tk[0], tuck), lerp(g[1], tk[1], tuck)])
+    }
+    const hindFoot = (key) => {
+      const g = gaitFoot(HIP_H, false, key, st)
+      if (rear > 0.01) g[0] = lerp(g[0], HIP_H[0] + (key === 'hn' ? 3 : -4), clamp(rear * 3, 0, 1))
+      return g
+    }
+    const farC = flash ? col : 'rgba(17,18,21,0.82)'
+    const legCol = look.color ? col : '#1a1b1e'
+    ctx.globalAlpha *= 1
+    drawLeg(ctx, hipH, hindFoot('hf'), false, flash ? col : '#303237', flash)
+    drawLeg(ctx, hipF, foreFoot('ff'), true, flash ? col : '#303237', flash)
+    void farC
+    // body (rotated frame)
+    ctx.save()
+    ctx.translate(PIVOT[0], PIVOT[1] + bob); ctx.rotate(ang); ctx.translate(-PIVOT[0], -PIVOT[1])
+    ctx.fillStyle = col; ctx.strokeStyle = col
+    const flow = st.flow
+    // tail
+    for (let i = 0; i < 3; i++) {
+      const w = Math.sin(time * 9 + i * 1.3 + seed) * (2 + flow * 4)
+      ctx.lineWidth = 3.2 - i * 0.7
+      ctx.beginPath(); ctx.moveTo(-22, -42 + i)
+      ctx.quadraticCurveTo(-30 - flow * 8, -42 - flow * 3 + w * 0.4, -37 - flow * 17 - i * 2, -33 + (1 - flow) * 9 - i * 2 + w)
+      ctx.stroke()
+    }
+    // wash 1: barrel, chest and rump
+    ctx.beginPath(); ctx.ellipse(-1, -36, 22, 9.5, 0.03, 0, TAU); ctx.fill()
+    ctx.beginPath(); ctx.ellipse(13, -37, 10.5, 11, 0, 0, TAU); ctx.fill()
+    ctx.beginPath(); ctx.ellipse(-15, -38, 10.5, 10, 0, 0, TAU); ctx.fill()
+    // neck and head
+    const hd = [0, st.nod || 0]
+    ctx.beginPath(); ctx.moveTo(6, -43)
+    ctx.quadraticCurveTo(18, -58, 30 + hd[0], -62 + hd[1])
+    ctx.lineTo(34 + hd[0], -53 + hd[1]); ctx.quadraticCurveTo(27, -43, 21, -29); ctx.closePath(); ctx.fill()
+    const poll = [31 + hd[0], -61.5 + hd[1]], muzzle = [46 + hd[0], -49 + hd[1] + (st.headDown || 0)]
+    taper(ctx, poll, muzzle, 8.2, 4.4)
+    ctx.beginPath(); ctx.arc(36 + hd[0], -55 + hd[1], 4.8, 0, TAU); ctx.fill()
+    ctx.beginPath(); ctx.moveTo(29 + hd[0], -63 + hd[1]); ctx.lineTo(28.5 + hd[0], -70 + hd[1]); ctx.lineTo(33 + hd[0], -64.5 + hd[1]); ctx.closePath(); ctx.fill()
+    // mane
+    ctx.lineWidth = 2.1
+    for (let i = 0; i < 7; i++) {
+      const t = i / 6
+      const bx = lerp(9, 29, t) + hd[0] * t, by = lerp(-45, -63.5, Math.pow(t, 0.8)) + hd[1] * t
+      const w = Math.sin(time * 8 + i * 0.9 + seed) * (1.5 + flow * 3)
+      ctx.beginPath(); ctx.moveTo(bx, by)
+      ctx.quadraticCurveTo(bx - 4 - flow * 5, by - 1 + w * 0.3, bx - 8 - flow * 11, by + 4 + w)
+      ctx.stroke()
+    }
+    if (!flash) {
+      // wash 2: lighter belly bloom and a wet highlight along the back
+      ctx.fillStyle = 'rgba(92,88,82,0.30)'
+      ctx.beginPath(); ctx.ellipse(-2, -32, 19, 5, 0.02, 0, TAU); ctx.fill()
+      ctx.strokeStyle = 'rgba(235,225,210,0.17)'; ctx.lineWidth = 0.8
+      ctx.beginPath(); ctx.moveTo(-22, -43); ctx.quadraticCurveTo(-5, -47, 9, -45); ctx.quadraticCurveTo(20, -58, 29, -63.5); ctx.stroke()
+      // saddle cloth and saddle
+      ctx.fillStyle = st.cloth || '#6b5a42'
+      ctx.beginPath(); ctx.moveTo(-9, -44.5); ctx.lineTo(9, -44.5); ctx.lineTo(10.5, -29.5); ctx.lineTo(-10.5, -29.5); ctx.closePath(); ctx.fill()
+      ctx.strokeStyle = 'rgba(20,18,16,0.8)'; ctx.lineWidth = 0.9
+      ctx.beginPath(); ctx.moveTo(-10, -32); ctx.lineTo(10, -32); ctx.stroke()
+      ctx.strokeStyle = 'rgba(235,225,210,0.5)'; ctx.lineWidth = 0.7
+      ctx.beginPath(); ctx.moveTo(-9, -35); ctx.lineTo(9.4, -35); ctx.stroke()
+      ctx.fillStyle = '#202125'
+      ctx.beginPath(); ctx.ellipse(0, -45, 9, 3.4, 0, Math.PI, 0); ctx.fill()
+      // bridle
+      ctx.strokeStyle = 'rgba(235,225,210,0.42)'; ctx.lineWidth = 0.6
+      ctx.beginPath(); ctx.moveTo(31 + hd[0], -62 + hd[1]); ctx.lineTo(38 + hd[0], -51 + hd[1]); ctx.moveTo(43 + hd[0], -52 + hd[1]); ctx.lineTo(37 + hd[0], -57 + hd[1]); ctx.stroke()
+      // eye
+      eyes(ctx, 37.5 + hd[0], -58 + hd[1], look.eyeGlow || 0, 4.2)
+    }
+    const reinFrom = [43 + hd[0], -51 + hd[1]]
+    const map = (p) => P(p)
+    if (st.riderFn) st.riderFn(ctx, map, reinFrom)
+    else if (!flash) {
+      // loose reins and dangling stirrup leathers
+      ctx.strokeStyle = 'rgba(235,225,210,0.5)'; ctx.lineWidth = 0.8
+      const sway = Math.sin(time * 9 + seed) * 2.5
+      ctx.beginPath(); ctx.moveTo(reinFrom[0], reinFrom[1]); ctx.quadraticCurveTo(26, -34 + sway, 6, -44); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(6, -43); ctx.lineTo(9 + sway * 0.4, -31); ctx.stroke()
+      ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(9 + sway * 0.4, -30, 2.4, 1.5, 0, 0, TAU); ctx.fill()
+    }
+    ctx.restore()
+    // near legs over the body
+    drawLeg(ctx, hipH, hindFoot('hn'), false, flash ? col : legCol, flash)
+    drawLeg(ctx, hipF, foreFoot('fn'), true, flash ? col : legCol, flash)
+    return P
+  }
+
+  // Polearm drawn through grip point `g` at angle a. style 'lance' | 'halberd'. Returns tip.
+  function drawPolearm(ctx, g, a, style, look, time) {
+    const dx = Math.cos(a), dy = Math.sin(a), nx = -dy, ny = dx
+    const hal = style === 'halberd'
+    const back = hal ? 30 : 26, shaft = hal ? 78 : 70, head = hal ? 17 : 15
+    const pt = (u, v) => [g[0] + dx * u + nx * v, g[1] + dy * u + ny * v]
+    const tip = pt(shaft + head, 0)
+    ctx.save()
+    ctx.strokeStyle = look.flash ? look.color : '#3a2d22'; ctx.lineWidth = hal ? 2.8 : 2.4
+    ctx.beginPath(); ctx.moveTo(...pt(-back, 0)); ctx.lineTo(...pt(shaft, 0)); ctx.stroke()
+    if (!look.flash) {
+      ctx.strokeStyle = 'rgba(235,225,210,0.5)'; ctx.lineWidth = 3; ctx.lineCap = 'butt'
+      ctx.beginPath(); ctx.moveTo(...pt(2.5, 0)); ctx.lineTo(...pt(6, 0)); ctx.stroke(); ctx.lineCap = 'round'
+    }
+    ctx.fillStyle = look.flash ? look.color : '#e5dfd2'
+    ctx.beginPath(); ctx.moveTo(...pt(shaft, 3.1)); ctx.lineTo(...tip); ctx.lineTo(...pt(shaft, -3.1)); ctx.closePath(); ctx.fill()
+    if (hal) {
+      // crescent blade bowing out of one side of the head
+      ctx.beginPath()
+      ctx.moveTo(...pt(shaft - 4, 2))
+      ctx.quadraticCurveTo(...pt(shaft + 8, 17), ...pt(shaft + 1, 17.5))
+      ctx.quadraticCurveTo(...pt(shaft - 2, 10), ...pt(shaft - 11, 3))
+      ctx.closePath(); ctx.fill()
+      ctx.beginPath(); ctx.moveTo(...pt(shaft - 4, -2)); ctx.lineTo(...pt(shaft + 3, -9)); ctx.lineTo(...pt(shaft - 9, -3)); ctx.closePath(); ctx.fill()
+    }
+    if (!look.flash) {
+      ctx.fillStyle = CINNABAR
+      const sway = Math.sin(time * 7) * 1.5
+      ctx.beginPath()
+      ctx.moveTo(...pt(shaft - 2, 0))
+      ctx.quadraticCurveTo(pt(shaft - 6, 5)[0] + sway, pt(shaft - 6, 5)[1] + 3, pt(shaft - 14, 6)[0] + sway * 2, pt(shaft - 14, 6)[1] + 6 + sway)
+      ctx.quadraticCurveTo(pt(shaft - 7, -1)[0], pt(shaft - 7, -1)[1] + 3, ...pt(shaft - 2, 0)); ctx.fill()
+    }
+    ctx.restore()
+    return tip
+  }
+
+  function paintRider(ctx, kind, r, look, time, seed, map, reinFrom, flow) {
+    const gen = kind === 'general'
+    const flash = look.flash
+    const col = look.color || (gen ? '#0d0e10' : '#1f2125')
+    const armor = flash ? col : gen ? '#16171a' : '#25272c'
+    const pale = 'rgba(235,225,210,0.3)'
+    const H = [0, -44.5], len = gen ? 22 : 19.5
+    const L = r.lean
+    const N = [H[0] + Math.sin(L) * len, H[1] - Math.cos(L) * len]
+    const Sh = [N[0] - Math.sin(L) * 2.5, N[1] + Math.cos(L) * 2.5]
+    const headTilt = L * 0.5
+    const hr = gen ? 6.2 : 5.4
+    const HC = [N[0] + Math.sin(headTilt) * (hr + 1.2), N[1] - Math.cos(headTilt) * (hr + 1.2)]
+    const out = { tip: null, head: HC }
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+    ctx.fillStyle = col; ctx.strokeStyle = col
+    // back flags and cape
+    if (gen && !flash) {
+      for (let i = 0; i < 4; i++) {
+        const a = -1.85 - i * 0.3, L2 = 24 - i * 1.5
+        const dx = Math.cos(a), dy = Math.sin(a), nx = -dy, ny = dx
+        const ax = Sh[0] - 3, ay = Sh[1] - 2
+        const tx = ax + dx * L2, ty = ay + dy * L2
+        const sway = Math.sin(time * 6 + i * 1.1 + seed) * (1.2 + flow * 3) - flow * 5
+        ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(tx, ty); ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(ax + dx * L2 * 0.3, ay + dy * L2 * 0.3); ctx.lineTo(tx, ty)
+        ctx.quadraticCurveTo(tx - dx * 4 - nx * 4 + sway * 0.4, ty - dy * 4 - ny * 4, ax + dx * L2 * 0.3 - nx * 7 + sway, ay + dy * L2 * 0.3 - ny * 7 + 2); ctx.closePath(); ctx.fill()
+      }
+    }
+    const wave = Math.sin(time * 8 + seed) * (1.5 + flow * 3)
+    const capeLen = gen ? 20 : 13
+    ctx.beginPath(); ctx.moveTo(N[0] - 2, N[1] + 1)
+    ctx.quadraticCurveTo(N[0] - 8 - flow * capeLen * 0.4, N[1] + 6, N[0] - 6 - capeLen * 0.5 - flow * capeLen * 0.8, N[1] + 12 + capeLen * 0.2 + wave)
+    ctx.quadraticCurveTo(N[0] - 6 - capeLen * 0.2 - flow * capeLen * 0.5, H[1] + 6 + wave * 0.5, H[0] - 5, H[1] + 4)
+    ctx.closePath(); ctx.fill()
+    // rider's leg and stirrup
+    ctx.lineWidth = gen ? 7 : 6
+    const K = [H[0] + 9, H[1] + 7], F = [H[0] + 5, H[1] + 18]
+    ctx.beginPath(); ctx.moveTo(H[0], H[1]); ctx.lineTo(K[0], K[1]); ctx.lineTo(F[0], F[1]); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(F[0] - 2, F[1] + 0.5); ctx.lineTo(F[0] + 4.5, F[1] + 0.8); ctx.lineWidth = 3.4; ctx.stroke()
+    // torso: armoured body
+    ctx.fillStyle = armor; ctx.strokeStyle = armor
+    ctx.lineWidth = gen ? 14 : 12
+    ctx.beginPath(); ctx.moveTo(H[0], H[1]); ctx.lineTo(N[0], N[1]); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(H[0] - 7, H[1] + 1); ctx.lineTo(H[0] + 8, H[1] + 1); ctx.lineTo(H[0] + 10.5, H[1] + 8); ctx.lineTo(H[0] - 9, H[1] + 8); ctx.closePath(); ctx.fill()
+    ctx.beginPath(); ctx.ellipse(Sh[0] + 0.5, Sh[1] + 1.5, gen ? 8.5 : 7, gen ? 6 : 5, -0.2, 0, TAU); ctx.fill()
+    if (!flash) {
+      ctx.strokeStyle = pale; ctx.lineWidth = 0.7
+      for (let k = 0; k < 4; k++) { const t = (k + 1) / 5; const px = lerp(H[0], N[0], t), py = lerp(H[1], N[1], t); ctx.beginPath(); ctx.moveTo(px - 6, py); ctx.lineTo(px + 6, py); ctx.stroke() }
+      ctx.beginPath(); ctx.moveTo(H[0] - 8, H[1] + 4.5); ctx.lineTo(H[0] + 9, H[1] + 4.5); ctx.stroke()
+    }
+    // arms
+    const aim = r.a
+    const gp = [Sh[0] + 6 + Math.cos(aim) * 4, Sh[1] + 6 + Math.sin(aim) * 5]
+    const upper = gen ? 11 : 10, fore = gen ? 10.5 : 9.5
+    // off hand: reins or the raised command flag
+    const reinHand = [Sh[0] + 14, Sh[1] + 5]
+    const raised = [Sh[0] + 4, Sh[1] - 17]
+    const offT = [lerp(reinHand[0], raised[0], r.flag), lerp(reinHand[1], raised[1], r.flag)]
+    const [ox, oy, ohx, ohy] = ik(Sh[0], Sh[1], offT[0], offT[1], upper, fore)
+    if (!flash) {
+      ctx.strokeStyle = 'rgba(235,225,210,0.5)'; ctx.lineWidth = 0.8
+      ctx.beginPath(); ctx.moveTo(ohx, ohy); ctx.quadraticCurveTo((ohx + reinFrom[0]) / 2, Math.max(ohy, reinFrom[1]) + 4, reinFrom[0], reinFrom[1]); ctx.stroke()
+    }
+    // weapon
+    out.tip = drawPolearm(ctx, gp, aim, gen ? 'halberd' : 'lance', look, time)
+    ctx.strokeStyle = col; ctx.fillStyle = col
+    const limbW = gen ? 6.4 : 5.2
+    if (r.flag > 0.04) drawBanner(ctx, [ohx, ohy], 1, look, time, seed)
+    ctx.strokeStyle = armor
+    const [ex, ey, hx, hy] = ik(Sh[0], Sh[1], gp[0], gp[1], upper, fore)
+    ctx.lineWidth = limbW; ctx.beginPath(); ctx.moveTo(Sh[0], Sh[1]); ctx.lineTo(ex, ey); ctx.lineTo(hx, hy); ctx.stroke()
+    ctx.strokeStyle = armor; ctx.lineWidth = limbW; ctx.beginPath(); ctx.moveTo(Sh[0] - 1, Sh[1]); ctx.lineTo(ox, oy); ctx.lineTo(ohx, ohy); ctx.stroke()
+    ctx.fillStyle = col
+    ctx.beginPath(); ctx.arc(hx, hy, 3, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(ohx, ohy, 2.8, 0, TAU); ctx.fill()
+    // head and helmet
+    ctx.fillStyle = col
+    ctx.beginPath(); ctx.arc(HC[0], HC[1], hr, 0, TAU); ctx.fill()
+    const metal = flash ? col : gen ? '#17181b' : '#2a2c31'
+    ctx.save(); ctx.translate(HC[0], HC[1]); ctx.rotate(headTilt * 0.7)
+    ctx.fillStyle = metal; ctx.strokeStyle = metal
+    const dome = hr * (gen ? 1.3 : 1.14), cy = -hr * 0.6
+    ctx.beginPath(); ctx.arc(0, cy, dome, Math.PI, 0); ctx.fill()
+    ctx.beginPath(); ctx.roundRect(-dome - 0.6, cy - 0.4, dome * 2 + 1.2, 2.3, 1); ctx.fill()
+    const nl = gen ? 12 : 7
+    ctx.beginPath(); ctx.moveTo(-dome * 0.95, cy + 1); ctx.lineTo(-dome - 2.5 - flow * 3, cy + nl * 0.6); ctx.lineTo(-dome * 0.4, cy + nl); ctx.lineTo(-dome * 0.35, cy + 2); ctx.closePath(); ctx.fill()
+    ctx.beginPath(); ctx.arc(0, cy - dome - 0.8, 1.6, 0, TAU); ctx.fill()
+    const top = cy - dome - 1
+    if (!flash) {
+      ctx.strokeStyle = pale; ctx.lineWidth = 0.6
+      ctx.beginPath(); ctx.arc(0, cy, dome - 1.4, Math.PI * 1.1, Math.PI * 1.85); ctx.stroke()
+    }
+    if (gen) {
+      if (!flash) {
+        ctx.fillStyle = CINNABAR; ctx.strokeStyle = CINNABAR
+        const sway = Math.sin(time * 5 + seed) * 1.8, back = 8 + flow * 13
+        ctx.beginPath(); ctx.moveTo(-2, top - 2)
+        ctx.quadraticCurveTo(-3, top - 22, 4 - back * 0.3, top - 30 + sway)
+        ctx.quadraticCurveTo(-back * 0.5, top - 20, -back, top - 16 + sway * 1.5)
+        ctx.quadraticCurveTo(-back * 0.35, top - 12, 2.5, top - 2); ctx.closePath(); ctx.fill()
+        ctx.lineWidth = 1
+        for (let i = 0; i < 4; i++) { ctx.beginPath(); ctx.moveTo(0, top - 4); ctx.quadraticCurveTo(-6 - i * 2, top - 17 + i * 3, -back - 4 - i * 2 - flow * 5, top - 11 + i * 4 + sway); ctx.stroke() }
+      }
+    } else {
+      ctx.strokeStyle = flash ? col : '#17181a'; ctx.lineWidth = 1.7
+      for (let i = 0; i < 4; i++) {
+        const w = Math.sin(time * 9 + i + seed) * (1 + flow * 2)
+        ctx.beginPath(); ctx.moveTo(0, top); ctx.quadraticCurveTo(-3 - i, top - 4 - flow, -6 - i * 1.8 - flow * 6, top + 1 + i * 1.6 + w); ctx.stroke()
+      }
+    }
+    ctx.restore()
+    if (!flash) eyes(ctx, HC[0] + hr * 0.42, HC[1] - hr * 0.1, look.eyeGlow || 0, hr)
+    return out
+  }
+
+  // ---- rider state -> targets
+  function riderTargets(kind, e) {
+    const T = { a: -1.38, rear: 0, lean: 0.03, mode: 'stand', w: 0, flag: 0, paw: true, snap: false, nod: 0, headDown: 0 }
+    const p = e.teleTotal ? 1 - Math.max(0, e.t) / e.teleTotal : 0
+    const st = e.state
+    const gen = kind === 'general'
+    switch (st) {
+      case 'walk':
+      case 'reposition': T.mode = 'trot'; T.w = 0.95; T.a = -1.3; T.lean = -0.04; T.paw = false; break
+      case 'tele':
+      case 'chargeTell': {
+        const q = ease(p)
+        T.paw = !gen && false
+        T.rear = (gen ? 0.12 : 0.34) * Math.sin(Math.min(1, p * 1.25) * Math.PI * 0.8)
+        T.a = p < 0.5 ? lerp(-0.9, -1.5, ease(p * 2)) : lerp(-1.5, -0.03, ease((p - 0.5) * 2))
+        if (gen && st === 'chargeTell') { T.a = lerp(-1.3, -0.03, ease(p * 1.4)); T.paw = true; T.rear = 0 }
+        T.lean = lerp(0.0, 0.3, q)
+        break
+      }
+      case 'attack':
+      case 'charge': T.mode = 'gallop'; T.w = 1; T.a = -0.03; T.lean = 0.38; T.paw = false; break
+      case 'recover':
+        T.rear = 0.32; T.a = -0.45; T.lean = -0.2; T.paw = false; break
+      case 'hurt': T.rear = 0.22; T.a = -1.0; T.lean = -0.4; T.paw = false; T.headDown = -3; break
+      case 'roar': T.rear = 0.6; T.a = -1.0; T.lean = -0.5; T.paw = false; T.nod = -3; break
+      case 'broken':
+      case 'dying': T.lean = 0.75; T.a = 1.2; T.paw = false; T.headDown = 8; T.nod = 4; break
+      case 'flagTell': T.flag = ease(p * 2.2); T.rear = 0.2 * Math.sin(Math.min(1, p) * Math.PI); T.a = -1.3; T.lean = -0.08; T.paw = false; break
+      case 'combo': {
+        const step = e.combo ? e.combo.i : 0
+        const raised = [-2.45, 2.7][Math.min(1, step)]
+        const swing = [0.85, -0.35][Math.min(1, step)]
+        if (e.combo?.phase === 'tele') { T.a = lerp(-1.3, raised, ease(p * 1.5)); T.lean = -0.1 }
+        else { T.a = swing; T.lean = 0.5; T.snap = true }
+        T.paw = false
+        break
+      }
+    }
+    return T
+  }
+
+  function riderState(anim, T, e, dt, facing) {
+    const r = anim.r || (anim.r = { a: T.a, rear: 0, lean: 0, w: 0, flag: 0, gait: 0, dir: 1, nod: 0, headDown: 0 })
+    const k = T.snap ? 1 : 1 - Math.exp(-dt * 14)
+    for (const key of ['a', 'rear', 'lean', 'flag', 'nod', 'headDown']) r[key] += (T[key] - r[key]) * k
+    r.w += (T.w - r.w) * (1 - Math.exp(-dt * 9))
+    const vx = e.vx || 0
+    if (Math.abs(vx) > 8) r.dir = vx * facing >= 0 ? 1 : -1
+    const sp = Math.abs(vx)
+    const stride = T.mode === 'gallop' ? 110 : 62
+    const eff = T.mode === 'stand' && r.w < 0.05 ? 0 : Math.max(sp, T.mode === 'trot' ? 40 : T.mode === 'gallop' ? 200 : 0)
+    r.gait += r.dir * eff * dt / stride
+    r.mode = T.mode === 'stand' && r.w > 0.05 ? (r.mode || 'trot') : T.mode
+    return r
+  }
+
+  function drawRider(ctx, kind, enemy, anim, x, y, facing, look, time, dt = 1 / 60) {
+    const gen = kind === 'general'
+    const S = gen ? 1.25 : 1
+    const T = riderTargets(kind, enemy)
+    const r = riderState(anim, T, enemy, dt || 1 / 60, facing)
+    const seed = enemy.seed || 0
+    const flow = clamp(Math.abs(enemy.vx || 0) / 320 + (r.mode === 'gallop' ? r.w * 0.5 : 0), 0, 1)
+    let res = { tip: null, head: [x, y - 80 * S] }
+    let fnMap = null
+    ctx.save()
+    ctx.translate(x, y); ctx.scale(facing * S, S)
+    if (look.alpha !== undefined) ctx.globalAlpha *= look.alpha
+    const st = {
+      phase: r.gait, mode: r.mode || 'stand', w: r.w, rear: r.rear, paw: T.paw && r.w < 0.1, flow, nod: r.nod + (r.mode === 'gallop' ? Math.sin(r.gait * TAU) * 1.8 : 0), headDown: r.headDown,
+      cloth: gen ? '#5a4a36' : '#6b5a42',
+      riderFn: (c, map, rein) => { res = paintRider(c, kind, r, look, time, seed, map, rein, flow); fnMap = map },
+    }
+    const P = paintHorse(ctx, st, look, time, seed)
+    ctx.restore()
+    const toWorld = (p) => { const m = P(p); return [x + facing * S * m[0], y + S * m[1]] }
+    // tip/head are in the rotated horse frame; convert
+    res = { tip: res.tip && toWorld(res.tip), head: toWorld(res.head) }
+    void fnMap
+    return res
+  }
+
+  // Riderless horse for after the rider is thrown. phase = gallop phase (cycles).
+  function drawHorse(ctx, x, y, facing, look, time, phase = 0) {
+    ctx.save()
+    ctx.translate(x, y); ctx.scale(facing, 1)
+    if (look.alpha !== undefined) ctx.globalAlpha *= look.alpha
+    paintHorse(ctx, { phase, mode: 'gallop', w: 1, rear: 0, paw: false, flow: 1, nod: Math.sin(phase * TAU) * 2, headDown: 2, riderFn: null }, look, time, 0)
+    ctx.restore()
   }
 
   // ---------------------------------------------------------------- scarf
@@ -957,6 +1824,6 @@
   }
 
   globalThis.XiabanInkFigures = {
-    KINDS, CINNABAR, PAPER, createAnim, updatePose, drawHumanoid, updateScarf, drawCrow, drawDummy, updateDummy, basePose, skeleton,
+    KINDS, CINNABAR, PAPER, createAnim, updatePose, drawHumanoid, drawRider, drawHorse, updateScarf, drawCrow, drawDummy, updateDummy, basePose, skeleton,
   }
 })()

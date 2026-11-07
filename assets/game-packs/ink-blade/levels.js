@@ -116,7 +116,84 @@
     },
   }
 
-  // Challenge stats: maxCombo, executions, airKills, deflectKills, parries, bossExecutions, icicleKills, crackKills, slideKills, ambushes, time (seconds, at most).
+  // 烽火卷: the first 浅绛 scroll. 烽燧 arrow volleys behind ruined walls, 胡杨 dry grass that burns downwind,
+  // 戈壁 cavalry, 关城 shield walls, 夜袭 a night sandstorm, 将台 the mounted general.
+  const BEACON = {
+    id: 3, name: '烽火卷', length: 6120,
+    // 军中不乱刀: only a fresh swing parries; a swing chained onto a running combo never does.
+    strictParry: true,
+    areas: [
+      { x: 0, name: '烽燧', sub: '第一幅' },
+      { x: 1440, name: '胡杨', sub: '第二幅' },
+      { x: 2330, name: '戈壁', sub: '第三幅' },
+      { x: 3290, name: '关城', sub: '第四幅' },
+      { x: 4230, name: '夜袭', sub: '第五幅' },
+      { x: 5230, name: '将台', sub: '终幅' },
+    ],
+    platforms: [
+      { x: 1040, y: 238, w: 150 },
+      { x: 1690, y: 250, w: 170 },
+      { x: 2060, y: 232, w: 110 },
+      { x: 2700, y: 236, w: 104 },
+      { x: 3530, y: 212, w: 190 },
+      { x: 3930, y: 218, w: 170 },
+      { x: 4560, y: 246, w: 120 },
+      { x: 4870, y: 240, w: 130 },
+    ],
+    // Volleys come from the east (dir -1, falling westward); a ruined wall of height h shelters the strip just west of it.
+    volley: { zone: [0, 1440], cycle: [2.8, 1.2], width: 280, dir: -1 },
+    ramparts: [{ x: 900, h: 50 }, { x: 1330, h: 56 }],
+    // Dry grass catches fire from a fire pot and burns downwind (fireWind) faster than upwind.
+    grass: [[1470, 1700], [1880, 2250]],
+    fireWind: 1,
+    // 夜袭: a night sandstorm. Light only reaches `radius` around the player and around the camp fires; archers see half as far.
+    dark: { zone: [4230, 5230], radius: 165, lights: [4440, 4810, 5020] },
+    prompts: [
+      { x: 0, key: 'move' }, { x: 300, key: 'strict' }, { x: 560, key: 'jump' }, { x: 1410, key: 'dash' }, { x: 1460, key: 'grass', local: true }, { x: 4250, key: 'dark', local: true },
+    ],
+    encounters: {
+      beacon: { id: 'beacon', trigger: 940, lock: [700, 1440], waves: [
+        [{ type: 'soldier', side: 1 }, { type: 'soldier', side: 1, delay: 0.6 }],
+        [{ type: 'soldier', side: 1 }, { type: 'soldier', side: -1, delay: 0.3 }, { type: 'archer', x: 1110, y: 238, delay: 0.5 }, { type: 'spearman', side: 1, delay: 1.2 }],
+      ] },
+      poplar: { id: 'poplar', trigger: 1600, lock: [1380, 2100], waves: [
+        [{ type: 'bomber', side: 1 }, { type: 'soldier', side: -1, delay: 0.3 }, { type: 'soldier', side: 1, delay: 0.8 }],
+        [{ type: 'bomber', side: 1 }, { type: 'bomber', x: 1760, y: 250, delay: 0.3 }, { type: 'soldier', side: -1 }, { type: 'soldier', side: 1, delay: 1 }, { type: 'soldier', side: -1, delay: 1.6 }],
+      ] },
+      gobi: { id: 'gobi', trigger: 2720, lock: [2400, 3140], waves: [
+        [{ type: 'cavalry', side: 1 }, { type: 'soldier', side: -1, delay: 0.6 }],
+        [{ type: 'cavalry', side: -1 }, { type: 'bomber', side: 1, delay: 0.4 }, { type: 'soldier', side: 1, delay: 1 }],
+        [{ type: 'cavalry', side: 1 }, { type: 'cavalry', side: -1, delay: 2.4 }, { type: 'archer', x: 2752, y: 236, delay: 0.5 }],
+      ] },
+      pass: { id: 'pass', trigger: 3680, lock: [3360, 4120], waves: [
+        [{ type: 'pavise', x: 3950, group: 'a' }, { type: 'pavise', x: 3992, group: 'a', delay: 0.15 }, { type: 'pavise', x: 4034, group: 'a', delay: 0.3 }, { type: 'archer', x: 4010, y: 218, delay: 0.5 }],
+        [{ type: 'pavise', x: 3440, group: 'b' }, { type: 'pavise', x: 3482, group: 'b', delay: 0.15 }, { type: 'soldier', side: 1, delay: 0.4 }, { type: 'soldier', side: 1, delay: 1.2 }, { type: 'archer', x: 3610, y: 212, delay: 0.6 }],
+      ] },
+      raid: { id: 'raid', trigger: 4580, lock: [4300, 5060], waves: [
+        [{ type: 'soldier', side: 1 }, { type: 'soldier', side: -1, delay: 0.3 }, { type: 'bomber', x: 4620, y: 246, delay: 0.5 }, { type: 'crow', side: 1, delay: 1 }],
+        [{ type: 'pavise', x: 4930, group: 'c' }, { type: 'pavise', x: 4972, group: 'c', delay: 0.15 }, { type: 'cavalry', side: -1, delay: 0.8 }, { type: 'soldier', side: -1, delay: 1.8 }],
+        [{ type: 'cavalry', side: 1 }, { type: 'soldier', side: -1, delay: 0.3 }, { type: 'bomber', x: 4930, y: 240, delay: 0.5 }, { type: 'cavalry', side: -1, delay: 2.6 }],
+      ] },
+      dais: { id: 'dais', trigger: 5560, lock: [5300, 6060], waves: [[{ type: 'general', x: 5900 }]] },
+    },
+  }
+
+  // Each 卷's boss and closing lines, read by the result screen and the boss bar.
+  BAMBOO.copy = {
+    boss: '无常', bossSub: '斗笠客', win: '一剑破无常', winLine: '斗笠客化作一池淡墨，竹林重归寂静。', loseLine: '无常仍立在月下。朱光一闪，便是出剑之时。',
+    phase: '无常怒 · 墨气翻涌', place: '竹林',
+  }
+  SNOW_RIVER.copy = {
+    boss: '苏寒江', bossSub: '寒江钓叟', win: '一剑断寒江', winLine: '钓叟收竿踏雪而去，江面重归沉寂。', loseLine: '钓叟仍立在雪岸。朱光一闪，便是出剑之时。',
+    phase: '断竿化剑 · 风雪大作', place: '江岸',
+  }
+  BEACON.copy = {
+    boss: '萧破虏', bossSub: '铁骑将军', win: '一剑落将旗', winLine: '将旗倒在烟里，烽燧的火一盏盏熄了。', loseLine: '将军仍勒马台前。枪尖朱光一闪，便是出剑之时。',
+    phase: '弃马提刀 · 令旗招箭', place: '边关',
+  }
+
+  // Challenge stats: maxCombo, executions, airKills, deflectKills, parries, bossExecutions, icicleKills, crackKills, slideKills, ambushes,
+  // volleyKills, fireKills, unhorses, formationBreaks, time (seconds, at most).
   // grades: scores for 妙品 / 神品 / 逸品; any clear is at least 能品.
   const LEVELS = [
     { id: '1-1', code: 101, volume: 1, name: '山门', sub: '第一幅', range: [0, 1440], start: 520, encounters: ['gate'],
@@ -150,6 +227,22 @@
     { id: '2-scroll', code: 200, volume: 2, name: '长卷', sub: '全卷连战', range: [0, 6120], start: 520,
       encounters: ['snow_peak', 'ferry', 'ice_lake', 'reeds', 'blizzard', 'angler'], par: 450, hurt: 4, scroll: true,
       challenge: { stat: 'time', goal: 380, at: 'most', text: '6 分 20 秒内踏雪通卷' }, grades: [15000, 20000, 25000] },
+    // 卷三 · 烽火卷
+    { id: '3-1', code: 301, volume: 3, name: '烽燧', sub: '第一幅', range: [0, 1440], start: 520, encounters: ['beacon'],
+      par: 60, hurt: 1, challenge: { stat: 'volleyKills', goal: 2, text: '引箭雨射倒 2 名敌人' }, grades: [2100, 2700, 3400] },
+    { id: '3-2', code: 302, volume: 3, name: '胡杨', sub: '第二幅', range: [1340, 2330], start: 1460, encounters: ['poplar'],
+      par: 100, hurt: 2, challenge: { stat: 'fireKills', goal: 3, text: '以野火击倒 3 名敌人' }, grades: [2800, 3400, 4200] },
+    { id: '3-3', code: 303, volume: 3, name: '戈壁', sub: '第三幅', range: [2290, 3290], start: 2340, encounters: ['gobi'],
+      par: 115, hurt: 2, challenge: { stat: 'unhorses', goal: 3, text: '弹反冲锋，打落 3 名骑兵' }, grades: [3400, 4800, 6200] },
+    { id: '3-4', code: 304, volume: 3, name: '关城', sub: '第四幅', range: [3250, 4230], start: 3300, encounters: ['pass'],
+      par: 105, hurt: 2, challenge: { stat: 'formationBreaks', goal: 2, text: '弹反领阵者，破阵 2 次' }, grades: [3200, 4400, 5600] },
+    { id: '3-5', code: 305, volume: 3, name: '夜袭', sub: '第五幅', range: [4200, 5230], start: 4250, encounters: ['raid'],
+      par: 110, hurt: 2, challenge: { stat: 'parries', goal: 8, text: '弹反 8 次' }, grades: [4200, 5600, 7000] },
+    { id: '3-6', code: 306, volume: 3, name: '将台', sub: '终幅', range: [5190, 6120], start: 5240, encounters: ['dais'],
+      par: 150, hurt: 2, boss: true, challenge: { stat: 'bossExecutions', goal: 2, text: '破势处决将军 2 次' }, grades: [6000, 8000, 9800] },
+    { id: '3-scroll', code: 300, volume: 3, name: '长卷', sub: '全卷连战', range: [0, 6120], start: 520,
+      encounters: ['beacon', 'poplar', 'gobi', 'pass', 'raid', 'dais'], par: 480, hurt: 4, scroll: true,
+      challenge: { stat: 'time', goal: 420, at: 'most', text: '7 分钟内踏破烽烟' }, grades: [18000, 24000, 30000] },
   ]
 
   const GRADES = ['', '能品', '妙品', '神品', '逸品']
@@ -157,10 +250,11 @@
   const byId = new Map(LEVELS.map((level) => [level.id, level]))
   const byCode = new Map(LEVELS.map((level) => [level.code, level]))
 
-  function volume(id) { return [BAMBOO, SNOW_RIVER].find((entry) => entry.id === id) || null }
+  const VOLUMES = [BAMBOO, SNOW_RIVER, BEACON]
+  function volume(id) { return VOLUMES.find((entry) => entry.id === id) || null }
   function level(id) { return byId.get(id) || null }
   function levelByCode(code) { return byCode.get(code) || null }
   function volumeLevels(id) { return LEVELS.filter((entry) => entry.volume === id) }
 
-  globalThis.XiabanInkLevels = { VOLUMES: [BAMBOO, SNOW_RIVER], LEVELS, GRADES, SEALS, volume, level, levelByCode, volumeLevels }
+  globalThis.XiabanInkLevels = { VOLUMES, LEVELS, GRADES, SEALS, volume, level, levelByCode, volumeLevels }
 })()

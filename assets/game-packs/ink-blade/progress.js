@@ -15,7 +15,7 @@
     const save = empty()
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return save
     if (raw.difficulty === 'easy') save.difficulty = 'easy'
-    if (raw.volume === 2) save.volume = 2
+    if (LV.volume(raw.volume)) save.volume = raw.volume
     if (Array.isArray(raw.prompts)) {
       save.prompts = [...new Set(raw.prompts.filter((key) => typeof key === 'string' && /^[a-z]{1,16}$/.test(key)))].slice(0, 32)
     }
@@ -75,9 +75,7 @@
   function maxSeals(volume) { return LV.volumeLevels(volume).length * 3 }
 
   function volumeUnlocked(save, volumeId) {
-    if (volumeId === 1) return true
-    if (volumeId === 2) return true
-    return false
+    return Boolean(LV.volume(volumeId))
   }
 
   function rememberPrompt(save, key) {

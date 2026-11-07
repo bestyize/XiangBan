@@ -230,6 +230,12 @@
         ochre.addColorStop(0, 'rgba(168,116,64,0)'); ochre.addColorStop(1, 'rgba(168,116,64,' + o.ochre + ')')
         g.fillStyle = ochre; g.fill()
       }
+      if (o.indigo) {
+        // 花青 wash: cool blue-grey on the upper body, fading downward.
+        const indigo = g.createLinearGradient(0, o.base - o.peakH[1], 0, o.base - o.peakH[1] * 0.1)
+        indigo.addColorStop(0, 'rgba(70,96,120,' + o.indigo + ')'); indigo.addColorStop(1, 'rgba(70,96,120,0)')
+        g.fillStyle = indigo; g.fill()
+      }
       // Ink settles along ridges and bleeds downward (墨分五色).
       for (let i = 0; i < ys.length; i++) {
         const x = a + i
@@ -278,6 +284,29 @@
         }
       }
       if (o.pavilions) for (const px of o.pavilions) if (px > a - 40 && px < b + 40) pavilion(g, px, ridge(px) + 2, o.pavilionScale || 1, o.color, Math.min(1, o.alpha * 1.6))
+      if (o.wall && o.wall.to > a - 20 && o.wall.from < b + 20) {
+        // Distant Great Wall (长城): a thin crenellated line riding the ridge, with small watchtowers.
+        const w = o.wall, wa = w.alpha ?? o.alpha * 1.4
+        const x0 = Math.max(a, w.from), x1 = Math.min(b, w.to)
+        g.fillStyle = rgba(o.color, wa)
+        for (let x = x0; x < x1; x += 1) {
+          const y = ridge(x) - 1
+          g.fillRect(x, y - 2.6, 1.2, 2.6 + 1.4)
+        }
+        for (let x = Math.ceil(x0 / 3) * 3; x < x1; x += 3) {
+          if (Math.floor(x / 3) % 2) continue
+          g.fillRect(x, ridge(x) - 4.4, 1.6, 1.8)
+        }
+        if (w.towerEvery) {
+          for (let tx = Math.ceil(x0 / w.towerEvery) * w.towerEvery; tx < x1; tx += w.towerEvery) {
+            const y = ridge(tx) - 1
+            g.fillRect(tx - 3, y - 9, 6, 9.5)
+            g.fillRect(tx - 4, y - 10.6, 8, 1.8)
+            g.fillStyle = rgba(PAPER, 0.5); g.fillRect(tx - 1, y - 6.5, 2, 2.6); g.fillStyle = rgba(o.color, wa)
+            for (const cx of [-4, -1.2, 1.6]) g.fillRect(tx + cx, y - 12.2, 1.6, 1.8)
+          }
+        }
+      }
       if (o.snow) {
         // Snowfields are left as bare paper (留白): a ragged cap that sinks deeper on higher peaks, with ink hatching only on the shaded flank.
         const from = o.snowFrom ?? 40, cap = o.snowDepth ?? o.depth * 1.3
@@ -1237,10 +1266,726 @@
     return node
   }
 
+  // ============================================================ 烽火卷 · 浅绛 (volume 3)
+  const OCHRE = [168, 116, 64], OCHRE_L = [196, 150, 88], GOLD = [200, 152, 60], INDIGO = [70, 96, 120]
+  const KAITI = '"Kaiti SC","STKaiti","KaiTi","Songti SC",serif'
+
+  // Packed earth and gravel with a thin ochre wash that thins downward.
+  function desertGround(o) {
+    const n = noise(o.seed, 64)
+    const random = rng(o.seed + 5)
+    const lineY = (x) => o.line + (n((x / o.period) * 64) - 0.5) * 3.5
+    const pebbles = [], tufts = [], ruts = [], patches = []
+    for (let i = 0; i < o.period / 14; i++) pebbles.push({ x: random() * o.period, y: o.line + 3 + Math.pow(random(), 1.3) * (o.depth - 6), r: 0.6 + random() * 2.6, a: 0.12 + random() * 0.32, ochre: random() < 0.4 })
+    for (let i = 0; i < o.period / 75; i++) tufts.push({ x: random() * o.period, h: 5 + random() * 9, k: 3 + Math.floor(random() * 3), a: 0.3 + random() * 0.35 })
+    for (let i = 0; i < 3; i++) ruts.push({ x: random() * o.period, len: 120 + random() * 220, y: o.line + 8 + random() * (o.depth * 0.5) })
+    for (let i = 0; i < o.period / 90; i++) patches.push({ x: random() * o.period, y: o.line + 6 + random() * (o.depth - 14), rx: 30 + random() * 70, ry: 3 + random() * 5, c: random() < 0.5 ? OCHRE_L : INK, a: 0.05 + random() * 0.07 })
+    return strip(o.period, o.line - 20, o.depth + 20, o.res, (g, u0, u1) => {
+      const wash = g.createLinearGradient(0, o.line, 0, o.line + o.depth)
+      wash.addColorStop(0, rgba(OCHRE, 0.42)); wash.addColorStop(0.35, rgba(OCHRE, 0.2)); wash.addColorStop(1, rgba(OCHRE, 0.03))
+      g.fillStyle = wash
+      g.beginPath(); g.moveTo(u0 - 2, o.line + o.depth)
+      for (let x = u0 - 2; x <= u1 + 2; x += 2) g.lineTo(x, lineY(x))
+      g.lineTo(u1 + 2, o.line + o.depth); g.closePath(); g.fill()
+      const ink = g.createLinearGradient(0, o.line, 0, o.line + o.depth * 0.6)
+      ink.addColorStop(0, rgba(INK, 0.14)); ink.addColorStop(1, rgba(INK, 0))
+      g.fillStyle = ink; g.fill()
+      for (const shift of [-o.period, 0, o.period]) {
+        for (const p of patches) {
+          const x = p.x + shift
+          if (x + p.rx < u0 || x - p.rx > u1) continue
+          g.fillStyle = rgba(p.c, p.a); g.beginPath(); g.ellipse(x, p.y, p.rx, p.ry, 0, 0, Math.PI * 2); g.fill()
+        }
+        for (const r of ruts) {
+          g.strokeStyle = rgba(INK, 0.1); g.lineWidth = 0.8; g.setLineDash([14, 5, 6, 4])
+          g.beginPath(); g.moveTo(r.x + shift, r.y); g.quadraticCurveTo(r.x + shift + r.len / 2, r.y + 1.6, r.x + shift + r.len, r.y - 0.5); g.stroke()
+          g.beginPath(); g.moveTo(r.x + shift, r.y + 4); g.quadraticCurveTo(r.x + shift + r.len / 2, r.y + 5.4, r.x + shift + r.len, r.y + 3.4); g.stroke()
+          g.setLineDash([])
+        }
+        dryBrush(g, (t) => { const x = shift + t * o.period; return [x, lineY(x), 0, 1] }, 5, 9, INK, 0.82, o.seed + 3, 260)
+        for (const p of pebbles) {
+          const x = p.x + shift
+          if (x < u0 - 6 || x > u1 + 6) continue
+          g.fillStyle = p.ochre ? rgba(OCHRE, p.a * 1.2) : rgba(INK, p.a)
+          g.beginPath(); g.ellipse(x, p.y, p.r * 1.5, p.r * 0.7, 0, 0, Math.PI * 2); g.fill()
+          if (p.r > 2) { g.fillStyle = rgba(INK, p.a * 0.8); g.fillRect(x - p.r, p.y + p.r * 0.5, p.r * 2.2, 0.7) }
+        }
+        for (const t of tufts) {
+          const x = t.x + shift
+          if (x < u0 - 20 || x > u1 + 20) continue
+          const y = lineY(x)
+          for (let k = 0; k < t.k; k++) {
+            g.fillStyle = k % 2 ? rgba(OCHRE, t.a) : rgba(INK, t.a * 0.8)
+            leaf(g, x + k * 1.4, y + 1, -Math.PI / 2 + (k - t.k / 2) * 0.4 + 0.1, t.h * (0.6 + (k % 2) * 0.5), 0.9)
+          }
+        }
+      }
+    })
+  }
+
+  // Autumn grass (枯草): thin curved blades, or the charred stubble left after the fire.
+  function dryGrass(o) {
+    const random = rng(o.seed)
+    const count = Math.round(o.period * (o.burnt ? 0.5 : 1.05))
+    const blades = []
+    for (let i = 0; i < count; i++) {
+      const burnt = o.burnt
+      blades.push({
+        x: random() * o.period, h: burnt ? 2 + random() * o.height * 0.16 : o.height * (0.6 + random() * 0.4),
+        lean: (random() - 0.5) * (burnt ? 0.5 : 1.1), bend: (random() - 0.5) * 0.9, w: burnt ? 1.1 + random() * 0.8 : 0.7 + random() * 0.9,
+        pick: random(), a: burnt ? 0.5 + random() * 0.4 : 0.28 + random() * 0.42, seed: random(),
+      })
+    }
+    const stalks = []
+    if (o.burnt) for (let i = 0; i < o.period / 70; i++) stalks.push({ x: random() * o.period, h: o.height * (0.3 + random() * 0.4), bend: (random() > 0.5 ? 1 : -1) * (0.3 + random() * 0.6) })
+    const ash = []
+    if (o.burnt) for (let i = 0; i < o.period / 40; i++) ash.push({ x: random() * o.period, rx: 14 + random() * 40, ry: 1.5 + random() * 3, a: 0.1 + random() * 0.18 })
+    return strip(o.period, o.line - o.height - 12, o.height + 18, o.res, (g, u0, u1) => {
+      for (const shift of [-o.period, 0, o.period]) {
+        for (const p of ash) {
+          const x = p.x + shift
+          if (x + p.rx < u0 || x - p.rx > u1) continue
+          g.fillStyle = 'rgba(120,114,106,' + p.a + ')'; g.beginPath(); g.ellipse(x, o.line + 3, p.rx, p.ry, 0, 0, Math.PI * 2); g.fill()
+        }
+        for (const b of blades) {
+          const x = b.x + shift
+          if (x < u0 - o.height || x > u1 + o.height) continue
+          const tx = x + b.lean * b.h * 0.7, ty = o.line + 1 - b.h
+          if (o.burnt) {
+            g.strokeStyle = rgba(INK, b.a); g.lineWidth = b.w
+            g.beginPath(); g.moveTo(x, o.line + 2); g.lineTo(x + b.lean * b.h, ty + b.h * 0.2); g.stroke()
+          } else {
+            const col = b.pick < 0.45 ? OCHRE : b.pick < 0.75 ? OCHRE_L : INK
+            g.strokeStyle = rgba(col, col === INK ? b.a * 0.7 : b.a); g.lineWidth = b.w
+            g.beginPath(); g.moveTo(x, o.line + 2)
+            g.quadraticCurveTo(x + b.lean * b.h * 0.15 + b.bend * 4, o.line - b.h * 0.55, tx + b.bend * b.h * 0.3, ty); g.stroke()
+          }
+        }
+        for (const s of stalks) {
+          const x = s.x + shift
+          if (x < u0 - 30 || x > u1 + 30) continue
+          g.strokeStyle = rgba(INK, 0.85); g.lineWidth = 1.1
+          g.beginPath(); g.moveTo(x, o.line + 2); g.quadraticCurveTo(x + s.bend * 4, o.line - s.h * 0.6, x + s.bend * s.h * 0.55, o.line - s.h); g.stroke()
+        }
+      }
+    })
+  }
+
+  // Clustered leaf dabs (点叶): golden ochre blots with ink dots and a few ink edge touches.
+  function leafDabs(g, cx, cy, rx, ry, count, random, alpha, inkDots = 0.35) {
+    for (let i = 0; i < count; i++) {
+      const a = random() * Math.PI * 2, d = Math.sqrt(random())
+      const x = cx + Math.cos(a) * rx * d, y = cy + Math.sin(a) * ry * d - (1 - d) * 0
+      const r = 2.2 + random() * 3.6
+      g.fillStyle = rgba(random() < 0.3 ? OCHRE_L : GOLD, alpha * (0.55 + random() * 0.45))
+      g.beginPath(); g.ellipse(x, y, r * 1.25, r * 0.8, (random() - 0.5) * 1.2, 0, Math.PI * 2); g.fill()
+      if (random() < inkDots) {
+        g.fillStyle = rgba(INK, 0.35 + random() * 0.4)
+        g.beginPath(); g.ellipse(x + (random() - 0.5) * 5, y + 1.5 + random() * 2.5, 0.8 + random() * 1.2, 0.6 + random() * 0.8, 0, 0, Math.PI * 2); g.fill()
+      }
+    }
+  }
+
+  // 胡杨: gnarled twisted split trunk under a cloud of golden leaf dabs. Origin at the trunk base.
+  function poplar(res, seed, scale = 1) {
+    const random = rng(seed)
+    return sprite(320 * scale, 270 * scale, res, (g) => {
+      g.scale(scale, scale)
+      g.fillStyle = rgba(INK, 0.12); g.beginPath(); g.ellipse(0, 1, 52, 3.5, 0, 0, Math.PI * 2); g.fill()
+      const tips = []
+      const limb = (x, y, angle, len, width, depth) => {
+        const pts = [[x, y]]
+        let cx = x, cy = y, a = angle
+        const segs = 6
+        for (let i = 1; i <= segs; i++) {
+          a += (random() - 0.5) * 0.7
+          cx += Math.cos(a) * len / segs; cy += Math.sin(a) * len / segs
+          pts.push([cx, cy])
+        }
+        g.fillStyle = rgba(INK, 0.84)
+        ribbon(g, pts, (t) => width * (1 - t * 0.5) * (1 + 0.18 * Math.sin(t * 17 + seed)))
+        g.strokeStyle = rgba(PAPER, 0.28); g.lineWidth = 0.7
+        for (let i = 1; i < segs; i++) { g.beginPath(); g.moveTo(pts[i][0] - width * 0.1, pts[i][1] + 2); g.lineTo(pts[i + 1][0] - width * 0.1, pts[i + 1][1] + 3); g.stroke() }
+        if (depth <= 0 || width < 2.2) { tips.push([cx, cy]); return }
+        const kids = depth > 1 ? 2 : 1 + (random() > 0.5 ? 1 : 0)
+        for (let k = 0; k < kids; k++) limb(cx, cy, a + (k === 0 ? -1 : 1) * (0.35 + random() * 0.55) * (kids === 1 ? 0.5 : 1), len * (0.62 + random() * 0.2), width * 0.62, depth - 1)
+      }
+      // Trunk: a wide twisting base that splits in two near the middle.
+      const trunk = []
+      for (let i = 0; i <= 10; i++) { const t = i / 10; trunk.push([Math.sin(t * 4.2 + seed) * 9 * t + t * 6, -t * 78]) }
+      g.fillStyle = rgba(INK, 0.9)
+      ribbon(g, trunk, (t) => 30 * (1 - t * 0.55) + (t < 0.15 ? 12 * (0.15 - t) / 0.15 : 0))
+      // Cracked bark: split gap and pale fissures.
+      g.fillStyle = rgba(PAPER, 0.5)
+      g.beginPath(); g.moveTo(-1, -22); g.quadraticCurveTo(3, -42, 0, -62); g.quadraticCurveTo(-3, -42, -1, -22); g.fill()
+      g.strokeStyle = rgba(PAPER, 0.3); g.lineWidth = 0.8
+      for (let i = 0; i < 12; i++) {
+        const t = 0.05 + random() * 0.8, p = trunk[Math.floor(t * 10)]
+        const x = p[0] + (random() - 0.5) * 14, y = p[1]
+        g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + (random() - 0.5) * 3, y - 6, x + (random() - 0.5) * 4, y - 10 - random() * 8); g.stroke()
+      }
+      dryBrush(g, (t) => [trunk[Math.round(t * 10)][0] - 11 * (1 - t * 0.5), trunk[Math.round(t * 10)][1], 0, 1], 5, 5, INK, 0.7, seed + 8, 14)
+      // Washed ochre on the sunward side of the trunk.
+      g.fillStyle = rgba(OCHRE, 0.28)
+      ribbon(g, trunk.map((p, i) => [p[0] + 7 * (1 - i / 14), p[1]]), (t) => 7 * (1 - t * 0.6))
+      const top = trunk[10]
+      limb(top[0], top[1], -Math.PI / 2 - 0.8, 50, 15, 3)
+      limb(top[0], top[1], -Math.PI / 2 + 0.7, 52, 15, 3)
+      limb(top[0], top[1] + 20, -Math.PI / 2 - 1.15, 40, 9, 2)
+      limb(trunk[6][0], trunk[6][1], -Math.PI / 2 + 1.15, 38, 8, 2)
+      // Crown.
+      for (const [x, y] of tips) {
+        leafDabs(g, x, y - 4, 24, 15, 26, random, 0.42)
+      }
+      for (const [x, y] of tips) leafDabs(g, x + (random() - 0.5) * 10, y - 8, 20, 12, 10, random, 0.55, 0.5)
+      g.globalAlpha = 1
+    }, 160 * scale, 267 * scale)
+  }
+
+  // Distant poplar row for parallax.
+  function poplarGrove(o) {
+    const random = rng(o.seed)
+    const trees = []
+    for (let i = 0; i < o.count; i++) trees.push({ x: random() * o.period, h: lerp(o.height[0], o.height[1], random()), lean: (random() - 0.5) * 0.3, s: random() })
+    const a = o.alpha ?? 0.3
+    return strip(o.period, o.top, o.base - o.top + 4, o.res, (g, u0, u1) => {
+      for (const shift of [-o.period, 0, o.period]) for (const t of trees) {
+        const x = t.x + shift, h = t.h
+        if (x < u0 - h || x > u1 + h) continue
+        const rnd = rng(Math.floor(t.s * 1e6))
+        const bend = (rnd() - 0.5) * 8
+        g.fillStyle = rgba(o.color, Math.min(1, a * 1.9))
+        ribbon(g, [[x, o.base], [x + bend * 0.5, o.base - h * 0.25], [x + bend, o.base - h * 0.5]], (u) => h * 0.07 * (1 - u * 0.6) + 0.8)
+        g.strokeStyle = rgba(o.color, Math.min(1, a * 1.5)); g.lineWidth = Math.max(0.6, h * 0.025)
+        for (const k of [-1, 1]) { g.beginPath(); g.moveTo(x + bend * 0.6, o.base - h * 0.35); g.quadraticCurveTo(x + bend + k * h * 0.12, o.base - h * 0.5, x + bend + k * h * 0.25, o.base - h * 0.66); g.stroke() }
+        for (const [dx, dy, rr] of [[0, 0.62, 0.3], [-0.2, 0.52, 0.2], [0.22, 0.54, 0.22], [0.05, 0.78, 0.2]]) {
+          g.fillStyle = rgba(random() < 0.3 ? OCHRE_L : GOLD, a * (0.7 + random() * 0.4))
+          g.beginPath(); g.ellipse(x + bend + dx * h, o.base - dy * h, rr * h * 0.9, rr * h * 0.6, 0, 0, Math.PI * 2); g.fill()
+        }
+        leafDabs(g, x + bend, o.base - h * 0.62, h * 0.32, h * 0.2, Math.round(h / 6), random, a * 0.9, 0.25)
+        g.fillStyle = rgba(o.color, a * 1.3)
+        for (let i = 0; i < 5; i++) { g.beginPath(); g.arc(x + bend + (random() - 0.5) * h * 0.5, o.base - h * (0.5 + random() * 0.3), 0.7 + random() * 0.6, 0, Math.PI * 2); g.fill() }
+      }
+    })
+  }
+
+  function ochreLeafSprite(size = 32) {
+    const node = canvas(size, size)
+    const g = node.getContext('2d')
+    g.translate(size / 2, size / 2)
+    g.fillStyle = rgba(GOLD, 0.9)
+    g.beginPath()
+    const r = size * 0.36
+    for (let i = 0; i <= 24; i++) {
+      const a = (i / 24) * Math.PI * 2
+      const rr = r * (0.92 + (i % 2 ? 0.1 : -0.04)) * (a > 3.4 ? 0.9 : 1)
+      const x = Math.cos(a) * rr * 1.05, y = Math.sin(a) * rr * 0.88
+      if (i === 0) g.moveTo(x, y); else g.lineTo(x, y)
+    }
+    g.closePath(); g.fill()
+    g.fillStyle = rgba(OCHRE, 0.45); g.beginPath(); g.ellipse(r * 0.15, r * 0.2, r * 0.55, r * 0.35, 0.3, 0, Math.PI * 2); g.fill()
+    g.strokeStyle = rgba(INK, 0.5); g.lineWidth = Math.max(0.5, size / 40)
+    g.beginPath(); g.moveTo(-r * 1.15, r * 0.1); g.lineTo(r * 0.8, -r * 0.05); g.stroke()
+    return node
+  }
+
+  function dustSprite(size = 64) {
+    const node = canvas(size, size)
+    const g = node.getContext('2d')
+    const c = size / 2
+    const random = rng(41)
+    for (let i = 0; i < 9; i++) {
+      const x = c + (random() - 0.5) * size * 0.28, y = c + (random() - 0.5) * size * 0.28, r = size * (0.2 + random() * 0.16)
+      const grad = g.createRadialGradient(x, y, 0, x, y, r)
+      grad.addColorStop(0, 'rgba(176,152,120,0.22)'); grad.addColorStop(0.6, 'rgba(176,152,120,0.1)'); grad.addColorStop(1, 'rgba(176,152,120,0)')
+      g.fillStyle = grad; g.fillRect(0, 0, size, size)
+    }
+    return node
+  }
+
+  // Clay fire pot; the game draws the fuse ember itself.
+  function potSprite(res) {
+    return sprite(18, 22, res, (g) => {
+      g.fillStyle = rgba(INK, 0.9)
+      g.beginPath(); g.moveTo(-3.5, -5.6); g.bezierCurveTo(-9, -4, -9, 6, -3.5, 7); g.lineTo(3.5, 7); g.bezierCurveTo(9, 6, 9, -4, 3.5, -5.6); g.closePath(); g.fill()
+      g.fillStyle = rgba(OCHRE, 0.55); g.beginPath(); g.ellipse(-2.2, 0.8, 3.4, 5, 0.2, 0, Math.PI * 2); g.fill()
+      g.fillStyle = rgba(OCHRE_L, 0.4); g.beginPath(); g.ellipse(-3.4, -1.6, 1.4, 2.4, 0.3, 0, Math.PI * 2); g.fill()
+      g.fillStyle = rgba(INK, 0.9); g.fillRect(-4.6, -7, 9.2, 2)
+      g.strokeStyle = rgba(OCHRE_L, 0.9); g.lineWidth = 0.9
+      for (const y of [-4.6, -3.4]) { g.beginPath(); g.moveTo(-3.6, y); g.lineTo(3.6, y + 0.4); g.stroke() }
+      g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 0.9; g.beginPath(); g.moveTo(0, -7); g.quadraticCurveTo(1.6, -9, 1, -11); g.stroke()
+    }, 9, 13)
+  }
+
+  // Rammed-earth (夯土) fill: ochre wash over pale ink, tamped layer lines, indigo-grey shade on one side, ink outline.
+  // `trace()` must build the closed path; box = [x0, y0, x1, y1].
+  function earthFill(g, trace, box, random, o = {}) {
+    const [x0, y0, x1, y1] = box
+    const w = x1 - x0, h = y1 - y0
+    g.save()
+    trace(); g.clip()
+    const body = g.createLinearGradient(0, y0, 0, y1)
+    body.addColorStop(0, rgba(OCHRE_L, o.top ?? 0.5)); body.addColorStop(1, rgba(OCHRE, o.bottom ?? 0.36))
+    g.fillStyle = body; g.fillRect(x0 - 2, y0 - 2, w + 4, h + 4)
+    g.fillStyle = rgba(INK, o.ink ?? 0.1); g.fillRect(x0 - 2, y0 - 2, w + 4, h + 4)
+    // Shaded side.
+    const shade = g.createLinearGradient(x0 + w * 0.5, 0, x1, 0)
+    shade.addColorStop(0, rgba(INDIGO, 0)); shade.addColorStop(1, rgba(INDIGO, o.shade ?? 0.3))
+    g.fillStyle = shade; g.fillRect(x0, y0, w, h)
+    // Tamped layers.
+    const step = o.layer ?? 9
+    for (let y = y0 + step * 0.6; y < y1; y += step * (0.8 + random() * 0.5)) {
+      g.strokeStyle = rgba(INK, 0.18 + random() * 0.2); g.lineWidth = 0.5 + random() * 0.7
+      g.setLineDash([6 + random() * 24, 1 + random() * 5])
+      g.beginPath(); g.moveTo(x0 - 2, y); g.lineTo(x0 + w * 0.4, y + (random() - 0.5) * 1.6); g.lineTo(x1 + 2, y + (random() - 0.5) * 2); g.stroke()
+    }
+    g.setLineDash([])
+    // Weathering streaks and pits.
+    for (let i = 0; i < w * h / 260; i++) {
+      const x = x0 + random() * w, y = y0 + random() * h
+      g.strokeStyle = rgba(INK, 0.1 + random() * 0.2); g.lineWidth = 0.5 + random() * 0.6
+      g.beginPath(); g.moveTo(x, y); g.lineTo(x + (random() - 0.5) * 3, y + 3 + random() * 9); g.stroke()
+    }
+    g.restore()
+  }
+
+  function inkOutline(g, pts, width = 1.6, alpha = 0.85, closed = false) {
+    g.strokeStyle = rgba(INK, alpha); g.lineWidth = width
+    g.beginPath(); g.moveTo(pts[0][0], pts[0][1])
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1])
+    if (closed) g.closePath()
+    g.stroke()
+  }
+
+  // 烽燧: tapered rammed-earth beacon tower. sprite.fireAt is the brazier position relative to the origin.
+  function beaconTower(res) {
+    const random = rng(311)
+    const s = sprite(90, 175, res, (g) => {
+      const bw = 37, tw = 24, topY = -126
+      g.fillStyle = rgba(INK, 0.14); g.beginPath(); g.ellipse(0, 1, 52, 3.5, 0, 0, Math.PI * 2); g.fill()
+      const trace = () => {
+        g.beginPath(); g.moveTo(-bw - 3, 0); g.lineTo(-bw, -6); g.lineTo(-tw - 1, topY + 2); g.lineTo(-tw, topY)
+        g.lineTo(-tw + 5, topY - 1); g.lineTo(tw - 2, topY - 1); g.lineTo(tw, topY); g.lineTo(tw + 1, topY + 2); g.lineTo(bw, -6); g.lineTo(bw + 3, 0); g.closePath()
+      }
+      earthFill(g, trace, [-bw - 3, topY - 12, bw + 3, 0], random, { layer: 7, shade: 0.34 })
+      // Eroded base and rough edges.
+      inkOutline(g, [[-bw - 3, 0], [-bw, -6], [-tw - 1, topY + 2], [-tw, topY]], 1.8, 0.9)
+      inkOutline(g, [[bw + 3, 0], [bw, -6], [tw + 1, topY + 2], [tw, topY]], 1.8, 0.9)
+      // Crenellated parapet.
+      for (let i = 0; i < 5; i++) {
+        const x = -tw - 1 + i * (2 * tw + 2) / 5 + 1
+        g.beginPath(); g.rect(x, topY - 12, 7, 12); g.closePath()
+        earthFill(g, () => { g.beginPath(); g.rect(x, topY - 12, 7, 12) }, [x, topY - 12, x + 7, topY], random, { layer: 4, shade: 0.2 })
+        inkOutline(g, [[x, topY], [x, topY - 12], [x + 7, topY - 12], [x + 7, topY]], 1.2, 0.85)
+      }
+      dryBrush(g, (t) => [lerp(-tw - 2, tw + 2, t), topY - 0.5, 0, 1], 2.4, 5, INK, 0.9, 5, 24)
+      // Opening and ladder holes.
+      g.fillStyle = rgba(INK, 0.7)
+      g.beginPath(); g.moveTo(-6, 0); g.lineTo(-6, -20); g.quadraticCurveTo(0, -27, 6, -20); g.lineTo(6, 0); g.closePath(); g.fill()
+      g.fillStyle = rgba(INK, 0.55)
+      for (const [x, y] of [[-17, -50], [14, -74], [-12, -98], [17, -112]]) g.fillRect(x, y, 4, 3)
+      // Wooden frame and brazier (积薪).
+      g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 2.4
+      g.beginPath(); g.moveTo(-14, topY - 1); g.lineTo(-10, topY - 30); g.moveTo(14, topY - 1); g.lineTo(10, topY - 30); g.stroke()
+      g.lineWidth = 1.6; g.beginPath(); g.moveTo(-13, topY - 24); g.lineTo(13, topY - 24); g.moveTo(-12, topY - 9); g.lineTo(12, topY - 15); g.moveTo(12, topY - 9); g.lineTo(-12, topY - 15); g.stroke()
+      g.fillStyle = rgba(INK, 0.9)
+      g.beginPath(); g.moveTo(-12, topY - 24); g.lineTo(12, topY - 24); g.lineTo(8, topY - 31); g.lineTo(-8, topY - 31); g.closePath(); g.fill()
+      g.strokeStyle = rgba(OCHRE, 0.9); g.lineWidth = 1.2
+      for (let i = -3; i <= 3; i++) { g.beginPath(); g.moveTo(i * 3, topY - 25); g.lineTo(i * 3.4, topY - 31); g.stroke() }
+      // Ground rubble and a drift of tufts.
+      for (let i = 0; i < 12; i++) {
+        const x = (random() - 0.5) * 100, r = 1 + random() * 2.6
+        g.fillStyle = rgba(random() < 0.5 ? OCHRE : INK, 0.3 + random() * 0.3)
+        g.beginPath(); g.ellipse(x, -r * 0.4, r * 1.4, r * 0.8, 0, 0, Math.PI * 2); g.fill()
+      }
+    }, 45, 172)
+    s.fireAt = [0, -126 - 31]
+    return s
+  }
+
+  // Broken low earthen wall used as cover; origin at base centre.
+  function rampart(res, seed, h = 52) {
+    const random = rng(seed)
+    const hw = 17
+    return sprite(52, h + 14, res, (g) => {
+      g.fillStyle = rgba(INK, 0.14); g.beginPath(); g.ellipse(0, 1, 30, 3, 0, 0, Math.PI * 2); g.fill()
+      const top = [[-hw - 1, -h * (0.55 + random() * 0.15)], [-hw * 0.6, -h * 0.82], [-hw * 0.35, -h * 0.7], [-hw * 0.1, -h], [hw * 0.2, -h * 0.86], [hw * 0.4, -h * 0.94], [hw * 0.62, -h * 0.66], [hw + 1, -h * 0.72]]
+      const trace = () => {
+        g.beginPath(); g.moveTo(-hw - 5, 0); g.lineTo(-hw - 1, -4)
+        for (const p of top) g.lineTo(p[0], p[1])
+        g.lineTo(hw + 2, -5); g.lineTo(hw + 6, 0); g.closePath()
+      }
+      earthFill(g, trace, [-hw - 5, -h, hw + 6, 0], random, { layer: 6, shade: 0.32 })
+      inkOutline(g, [[-hw - 5, 0], [-hw - 1, -4], ...top, [hw + 2, -5], [hw + 6, 0]], 1.7, 0.88)
+      dryBrush(g, (t) => { const i = Math.min(top.length - 2, Math.floor(t * (top.length - 1))), f = t * (top.length - 1) - i; return [lerp(top[i][0], top[i + 1][0], f), lerp(top[i][1], top[i + 1][1], f) - 0.5, 0, 1] }, 2.6, 5, INK, 0.9, seed + 2, 30)
+      for (let i = 0; i < 9; i++) {
+        const x = (random() - 0.5) * 46, r = 1 + random() * 2.8
+        g.fillStyle = rgba(random() < 0.5 ? OCHRE : INK, 0.3 + random() * 0.4)
+        g.beginPath(); g.ellipse(x, -r * 0.4, r * 1.4, r * 0.8, random(), 0, Math.PI * 2); g.fill()
+      }
+    }, 26, h + 12)
+  }
+
+  // Ruined rammed-earth block / broken wall-top: same contract as `rock`.
+  function earthBlock(w, topY, groundY, seed, res) {
+    const random = rng(seed)
+    const h = groundY - topY
+    const pad = 16
+    return sprite(w + pad * 2, h + 26, res, (g) => {
+      const left = [[-8 - random() * 3, h + 4], [-5 - random() * 3, h * 0.6], [-2, h * 0.25]]
+      const right = [[w + 2, h * 0.25], [w + 6 + random() * 3, h * 0.65], [w + 9, h + 4]]
+      const trace = () => {
+        g.beginPath(); g.moveTo(left[0][0], left[0][1]); g.lineTo(left[1][0], left[1][1]); g.lineTo(left[2][0], left[2][1]); g.lineTo(0, 1)
+        g.lineTo(w, 1); g.lineTo(right[0][0], right[0][1]); g.lineTo(right[1][0], right[1][1]); g.lineTo(right[2][0], right[2][1]); g.closePath()
+      }
+      earthFill(g, trace, [-10, 0, w + 10, h + 4], random, { layer: 8, top: 0.5, bottom: 0.2, ink: 0.14, shade: 0.22 })
+      // Fade toward the ground like the stone platforms.
+      g.save(); g.globalCompositeOperation = 'destination-out'
+      const fade = g.createLinearGradient(0, h * 0.55, 0, h + 4)
+      fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,0.5)')
+      g.fillStyle = fade; g.fillRect(-12, h * 0.55, w + 24, h * 0.5 + 6); g.restore()
+      inkOutline(g, [left[0], left[1], left[2], [0, 1]], 1.6, 0.7)
+      inkOutline(g, [[w, 1], right[0], right[1], right[2]], 1.6, 0.7)
+      // Brick courses near the top.
+      g.strokeStyle = rgba(INK, 0.3); g.lineWidth = 0.7
+      for (let row = 0; row < 3 && row * 8 + 9 < h; row++) {
+        const y = 9 + row * 8
+        for (let x = (row % 2) * 7; x < w; x += 14 + random() * 4) { g.beginPath(); g.moveTo(x, y - 8); g.lineTo(x, y); g.stroke() }
+      }
+      // Firm walkable top edge.
+      dryBrush(g, (t) => [lerp(-2, w + 2, t), Math.sin(t * Math.PI * 3) * -0.4, 0, 1], 3.6, 7, INK, 0.96, seed + 7, 40)
+      g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 1.5
+      g.beginPath(); g.moveTo(-1, 0.4); g.lineTo(w + 1, 0.4); g.stroke()
+      // Loose bricks and tufts on top.
+      for (let i = 0; i < Math.max(2, w / 40); i++) {
+        const x = 6 + random() * (w - 14), bw = 5 + random() * 4
+        g.fillStyle = rgba(OCHRE, 0.55); g.fillRect(x, -3, bw, 3)
+        g.strokeStyle = rgba(INK, 0.75); g.lineWidth = 0.9; g.strokeRect(x, -3, bw, 3)
+      }
+      for (let i = 0; i < w / 18; i++) {
+        const x = random() * w
+        g.fillStyle = rgba(INK, 0.5)
+        leaf(g, x, 0, -Math.PI / 2 + (random() - 0.5) * 0.8, 3 + random() * 4, 0.9)
+      }
+      for (let i = 0; i < 5; i++) {
+        const x = left[0][0] + random() * (w + 20), r = 1 + random() * 2
+        g.fillStyle = rgba(INK, 0.35); g.beginPath(); g.ellipse(x, h + 3, r * 1.6, r * 0.7, 0, 0, Math.PI * 2); g.fill()
+      }
+    }, pad, 4)
+  }
+
+  // Hanging war-banner cloth attached to a pole at x; flutters to the right. `glyph` is painted vertically.
+  function flagCloth(g, x, y, w, h, cloth, clothAlpha, glyph, glyphColor, glyphAlpha, random, fontPx) {
+    const ph = random() * 6
+    // Rectangular banner with a notched swallowtail bottom and gently waving free edge.
+    g.beginPath(); g.moveTo(x, y)
+    const pts = []
+    for (let i = 0; i <= 10; i++) { const t = i / 10; pts.push([x + w * t, y + Math.sin(t * 4 + ph) * 1.6 * t]) }
+    for (const p of pts) g.lineTo(p[0], p[1])
+    const ex = x + w + Math.sin(ph) * 1.5
+    g.lineTo(ex, y + h * 0.5); g.lineTo(ex + 1, y + h)
+    g.lineTo(x + w * 0.62, y + h - h * 0.12); g.lineTo(x + w * 0.3, y + h)
+    g.lineTo(x, y + h - 2); g.closePath()
+    g.fillStyle = rgba(cloth, clothAlpha); g.fill()
+    g.fillStyle = rgba(INK, 0.1); g.fill()
+    g.strokeStyle = rgba(INK, 0.82); g.lineWidth = 1.2; g.stroke()
+    // Cloth folds.
+    g.strokeStyle = rgba(INK, 0.16); g.lineWidth = 0.7
+    for (let i = 1; i < 4; i++) { g.beginPath(); g.moveTo(x + w * i / 4, y + 2); g.quadraticCurveTo(x + w * i / 4 + 2, y + h * 0.5, x + w * i / 4 - 1, y + h - 4); g.stroke() }
+    if (glyph) {
+      g.fillStyle = rgba(glyphColor, glyphAlpha)
+      g.font = '700 ' + fontPx + 'px ' + KAITI; g.textAlign = 'center'; g.textBaseline = 'middle'
+      g.fillText(glyph, x + w * 0.5, y + h * 0.45)
+    }
+  }
+
+  function banner(res, seed) {
+    const random = rng(seed)
+    return sprite(40, 120, res, (g) => {
+      const inkCloth = seed % 2 === 1
+      g.fillStyle = rgba(INK, 0.12); g.beginPath(); g.ellipse(0, 1, 12, 2.2, 0, 0, Math.PI * 2); g.fill()
+      g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 2.2
+      g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -116); g.stroke()
+      g.fillStyle = rgba(INK, 0.9); g.beginPath(); g.moveTo(0, -122); g.lineTo(-2, -115); g.lineTo(2, -115); g.closePath(); g.fill()
+      g.strokeStyle = rgba(OCHRE, 0.7); g.lineWidth = 0.8; g.beginPath(); g.moveTo(-0.4, -4); g.lineTo(-0.4, -110); g.stroke()
+      const glyph = ['令', '戍', '烽', '守'][seed % 4]
+      flagCloth(g, 1, -112, 28, 62, inkCloth ? INK : OCHRE_L, inkCloth ? 0.78 : 0.7, glyph, inkCloth ? PAPER : INK, inkCloth ? 0.7 : 0.45, random, 19)
+      g.fillStyle = rgba(INK, 0.5); g.beginPath(); g.arc(0, -112, 2, 0, Math.PI * 2); g.fill()
+    }, 6, 118)
+  }
+
+  // Four flame tongues for animation. The only place cinnabar appears in volume three.
+  function flameSprites(res) {
+    const specs = [
+      { sway: 0.0, tip: 0.0, w: 1.0, h: 1.0, side: 0.1 },
+      { sway: 3.0, tip: 2.5, w: 0.92, h: 0.94, side: -0.12 },
+      { sway: -3.2, tip: -2.8, w: 1.04, h: 0.98, side: 0.2 },
+      { sway: 1.4, tip: -1.2, w: 0.86, h: 1.0, side: -0.2 },
+    ]
+    return specs.map((s, idx) => sprite(22, 38, res, (g) => {
+      const tongue = (hh, ww, sway, tip) => {
+        g.beginPath(); g.moveTo(-ww, 0)
+        g.bezierCurveTo(-ww * 1.15, -hh * 0.35, -ww * 0.4 + sway * 0.5, -hh * 0.62, tip + sway, -hh)
+        g.bezierCurveTo(ww * 0.25 + sway * 0.6, -hh * 0.6, ww * 1.2, -hh * 0.35, ww, 0)
+        g.bezierCurveTo(ww * 0.5, 2, -ww * 0.5, 2, -ww, 0); g.closePath()
+      }
+      // Smoky ink wisp around the flame.
+      g.fillStyle = rgba(INK, 0.3)
+      tongue(35 * s.h, 10.2 * s.w, s.sway * 1.1, s.tip * 1.1); g.fill()
+      g.strokeStyle = rgba(INK, 0.5); g.lineWidth = 0.9; g.stroke()
+      g.strokeStyle = rgba(INK, 0.35); g.lineWidth = 0.8
+      g.beginPath(); g.moveTo(s.side * 22, -6); g.quadraticCurveTo(s.side * 36, -18, s.side * 18 + s.sway, -30 * s.h); g.stroke()
+      // Cinnabar to ember body.
+      const body = g.createLinearGradient(0, 0, 0, -32 * s.h)
+      body.addColorStop(0, 'rgba(226,65,44,0.96)'); body.addColorStop(0.55, 'rgba(210,56,38,0.88)'); body.addColorStop(1, 'rgba(178,46,34,0.35)')
+      g.fillStyle = body
+      tongue(31 * s.h, 8.4 * s.w, s.sway, s.tip); g.fill()
+      // Warm core.
+      const core = g.createLinearGradient(0, 0, 0, -22 * s.h)
+      core.addColorStop(0, 'rgba(244,170,70,0.95)'); core.addColorStop(1, 'rgba(226,65,44,0.2)')
+      g.fillStyle = core
+      tongue(21 * s.h, 5.2 * s.w, s.sway * 0.6, s.tip * 0.5); g.fill()
+      // Pale heart.
+      g.fillStyle = 'rgba(250,226,156,0.95)'
+      tongue(11 * s.h, 3 * s.w, s.sway * 0.2, 0); g.fill()
+      // Soft ink flick at the tip.
+      g.fillStyle = rgba(INK, 0.4 + idx * 0.04)
+      g.beginPath(); g.ellipse(s.tip + s.sway * 1.1, -34 * s.h, 1.1, 2, s.sway * 0.1, 0, Math.PI * 2); g.fill()
+    }, 11, 37))
+  }
+
+  // Felt tents (毡帐), weapon rack and banners; origin base centre.
+  function tents(res, seed) {
+    const random = rng(seed)
+    return sprite(280, 150, res, (g) => {
+      g.fillStyle = rgba(INK, 0.1); g.beginPath(); g.ellipse(0, 1, 135, 4, 0, 0, Math.PI * 2); g.fill()
+      const tent = (cx, w, h, wallFrac) => {
+        const wy = -h * wallFrac
+        const trace = () => {
+          g.beginPath(); g.moveTo(cx - w / 2, 0); g.lineTo(cx - w / 2, wy)
+          g.quadraticCurveTo(cx - w * 0.3, wy - h * 0.12, cx - 2, -h); g.lineTo(cx + 2, -h)
+          g.quadraticCurveTo(cx + w * 0.3, wy - h * 0.12, cx + w / 2, wy); g.lineTo(cx + w / 2, 0)
+          g.quadraticCurveTo(cx, 3, cx - w / 2, 0); g.closePath()
+        }
+        trace()
+        const felt = g.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0)
+        felt.addColorStop(0, rgba(OCHRE_L, 0.5)); felt.addColorStop(0.6, rgba(OCHRE, 0.42)); felt.addColorStop(1, rgba(INDIGO, 0.5))
+        g.fillStyle = felt; g.fill()
+        g.fillStyle = rgba(INK, 0.1); g.fill()
+        g.save(); trace(); g.clip()
+        g.strokeStyle = rgba(INK, 0.34); g.lineWidth = 0.9
+        for (let i = 1; i < 6; i++) { const x = cx - w / 2 + w * i / 6; g.beginPath(); g.moveTo(cx + (x - cx) * 0.1, -h); g.quadraticCurveTo(x, wy * 1.1, x + (x - cx) * 0.02, 0); g.stroke() }
+        // Felt bands (ropes) around the tent.
+        g.strokeStyle = rgba(INK, 0.55); g.lineWidth = 1.3
+        for (const y of [wy, wy - h * 0.2]) { g.beginPath(); g.moveTo(cx - w / 2 - 2, y); g.quadraticCurveTo(cx, y + 5, cx + w / 2 + 2, y); g.stroke() }
+        g.fillStyle = rgba(INK, 0.82)
+        g.beginPath(); g.moveTo(cx - w * 0.09, 0); g.lineTo(cx - w * 0.09, -h * 0.28); g.quadraticCurveTo(cx, -h * 0.36, cx + w * 0.09, -h * 0.28); g.lineTo(cx + w * 0.09, 0); g.closePath(); g.fill()
+        for (let i = 0; i < w * 0.7; i++) { g.fillStyle = rgba(INK, 0.06 + random() * 0.12); g.fillRect(cx - w / 2 + random() * w, -random() * h, 1 + random() * 2, 0.8) }
+        g.restore()
+        g.strokeStyle = rgba(INK, 0.88); g.lineWidth = 1.6
+        trace(); g.stroke()
+        g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 1.4; g.beginPath(); g.moveTo(cx, -h); g.lineTo(cx, -h - 7); g.stroke()
+        // Guy ropes with pegs.
+        g.strokeStyle = rgba(INK, 0.5); g.lineWidth = 0.7
+        for (const side of [-1, 1]) {
+          const px = cx + side * (w / 2 + 16 + random() * 8)
+          g.beginPath(); g.moveTo(cx + side * w * 0.24, wy - h * 0.14); g.quadraticCurveTo((cx + px) / 2, wy * 0.2, px, 1); g.stroke()
+          g.strokeStyle = rgba(INK, 0.8); g.lineWidth = 1.4; g.beginPath(); g.moveTo(px, 1); g.lineTo(px + side * 1.6, -3); g.stroke()
+          g.strokeStyle = rgba(INK, 0.5); g.lineWidth = 0.7
+        }
+      }
+      tent(-86, 78, 56, 0.4)
+      tent(-8, 104, 76, 0.38)
+      tent(86, 64, 44, 0.42)
+      // Weapon rack.
+      g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 2
+      g.beginPath(); g.moveTo(-138, 0); g.lineTo(-138, -30); g.moveTo(-122, 0); g.lineTo(-122, -30); g.moveTo(-142, -22); g.lineTo(-118, -22); g.moveTo(-142, -12); g.lineTo(-118, -12); g.stroke()
+      g.lineWidth = 1.2
+      for (let i = 0; i < 4; i++) {
+        const x = -136 + i * 4.5, top = -66 - random() * 14
+        g.beginPath(); g.moveTo(x, -4); g.lineTo(x + (i - 1.5) * 1.2, top); g.stroke()
+        g.fillStyle = rgba(INK, 0.9); g.beginPath(); g.moveTo(x + (i - 1.5) * 1.2, top - 7); g.lineTo(x + (i - 1.5) * 1.2 - 1.6, top); g.lineTo(x + (i - 1.5) * 1.2 + 1.6, top); g.closePath(); g.fill()
+      }
+      // Tall banners.
+      for (const [x, h, cloth, a] of [[130, 130, INK, 0.72], [-58, 112, OCHRE_L, 0.7]]) {
+        g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 2; g.beginPath(); g.moveTo(x, 0); g.lineTo(x, -h); g.stroke()
+        flagCloth(g, x + 1, -h + 3, 22, 44, cloth, a, null, INK, 0, random, 0)
+      }
+    }, 140, 148)
+  }
+
+  // Ruled-line (界画) tiled roof with upturned eaves.
+  function tileRoof(g, cx, half, y, rise, alpha) {
+    g.beginPath()
+    g.moveTo(cx - half - 9, y - 10)
+    g.quadraticCurveTo(cx - half + 4, y + 3, cx - half + 18, y + 3)
+    g.lineTo(cx + half - 18, y + 3)
+    g.quadraticCurveTo(cx + half - 4, y + 3, cx + half + 9, y - 10)
+    g.quadraticCurveTo(cx + half - 6, y - rise * 0.35, cx + half * 0.3, y - rise)
+    g.lineTo(cx - half * 0.3, y - rise)
+    g.quadraticCurveTo(cx - half + 6, y - rise * 0.35, cx - half - 9, y - 10)
+    g.closePath()
+    g.fillStyle = rgba(INK, alpha); g.fill()
+    g.fillStyle = rgba(INDIGO, 0.3); g.fill()
+    g.save(); g.clip()
+    g.strokeStyle = rgba(PAPER, 0.22); g.lineWidth = 0.7
+    for (let x = cx - half; x <= cx + half; x += 5) { g.beginPath(); g.moveTo(cx + (x - cx) * 0.3, y - rise); g.lineTo(x + (x - cx) * 0.06, y + 3); g.stroke() }
+    g.restore()
+    g.strokeStyle = rgba(INK, 0.95); g.lineWidth = 2.6
+    g.beginPath(); g.moveTo(cx - half * 0.32, y - rise); g.lineTo(cx + half * 0.32, y - rise); g.stroke()
+    g.lineWidth = 1.3
+    g.beginPath(); g.moveTo(cx - half - 9, y - 10); g.quadraticCurveTo(cx - half + 4, y + 3, cx - half + 18, y + 3); g.lineTo(cx + half - 18, y + 3); g.quadraticCurveTo(cx + half - 4, y + 3, cx + half + 9, y - 10); g.stroke()
+    // Ridge finials.
+    g.fillStyle = rgba(INK, 0.95)
+    for (const s of [-1, 1]) { g.beginPath(); g.moveTo(cx + s * half * 0.3, y - rise); g.lineTo(cx + s * half * 0.3 + s * 2, y - rise - 6); g.lineTo(cx + s * half * 0.3 - s * 3, y - rise); g.closePath(); g.fill() }
+    // Bracket sets (斗拱) under the eaves.
+    g.fillStyle = rgba(INK, alpha * 0.8)
+    for (let x = cx - half + 14; x <= cx + half - 12; x += 9) g.fillRect(x - 2.2, y + 3, 4.4, 4.2)
+  }
+
+  // 关城: long city wall with a two-storey gate tower and an arched opening. Origin at base centre.
+  function cityWall(res) {
+    const random = rng(8801)
+    return sprite(460, 270, res, (g) => {
+      const wallTop = -92, wallHalf = 230
+      // Wall body with indigo-grey shade toward the bottom.
+      const wallTrace = () => { g.beginPath(); g.rect(-wallHalf, wallTop, wallHalf * 2, -wallTop) }
+      earthFill(g, wallTrace, [-wallHalf, wallTop, wallHalf, 0], random, { layer: 8, top: 0.42, bottom: 0.3, ink: 0.12, shade: 0.12 })
+      const shade = g.createLinearGradient(0, wallTop, 0, 0)
+      shade.addColorStop(0, rgba(INDIGO, 0)); shade.addColorStop(1, rgba(INDIGO, 0.22))
+      g.fillStyle = shade; g.fillRect(-wallHalf, wallTop, wallHalf * 2, -wallTop)
+      // Brick joints.
+      g.strokeStyle = rgba(INK, 0.16); g.lineWidth = 0.6
+      for (let row = 0; row < 6; row++) {
+        const y = wallTop + 14 + row * 14
+        for (let x = -wallHalf + (row % 2) * 10; x < wallHalf; x += 20 + random() * 6) { g.beginPath(); g.moveTo(x, y - 14); g.lineTo(x, y); g.stroke() }
+      }
+      // Crenellations along both wings.
+      for (let x = -wallHalf; x < wallHalf; x += 17) {
+        if (Math.abs(x + 4) < 76) continue
+        const hh = 9 + (random() < 0.12 ? -5 : 0)
+        earthFill(g, () => { g.beginPath(); g.rect(x, wallTop - hh, 10, hh) }, [x, wallTop - hh, x + 10, wallTop], random, { layer: 4, shade: 0.2 })
+        inkOutline(g, [[x, wallTop], [x, wallTop - hh], [x + 10, wallTop - hh], [x + 10, wallTop]], 1.2, 0.82)
+      }
+      dryBrush(g, (t) => [lerp(-wallHalf, wallHalf, t), wallTop - 0.4, 0, 1], 2.6, 5, INK, 0.85, 3, 90)
+      g.strokeStyle = rgba(INK, 0.5); g.lineWidth = 1; g.beginPath(); g.moveTo(-wallHalf, wallTop + 4); g.lineTo(wallHalf, wallTop + 4); g.stroke()
+      // Gate bastion.
+      const baseTop = -112
+      earthFill(g, () => { g.beginPath(); g.rect(-72, baseTop, 144, -baseTop) }, [-72, baseTop, 72, 0], random, { layer: 7, top: 0.5, bottom: 0.36, ink: 0.14, shade: 0.3 })
+      inkOutline(g, [[-72, 0], [-72, baseTop], [72, baseTop], [72, 0]], 1.8, 0.88)
+      g.strokeStyle = rgba(INK, 0.4); g.lineWidth = 1; g.beginPath(); g.moveTo(-76, baseTop + 6); g.lineTo(76, baseTop + 6); g.stroke()
+      // Arched gateway.
+      g.fillStyle = rgba(INK, 0.86)
+      g.beginPath(); g.moveTo(-21, 0); g.lineTo(-21, -48); g.quadraticCurveTo(-21, -72, 0, -72); g.quadraticCurveTo(21, -72, 21, -48); g.lineTo(21, 0); g.closePath(); g.fill()
+      g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 2; g.beginPath(); g.moveTo(-25, 0); g.lineTo(-25, -48); g.quadraticCurveTo(-25, -77, 0, -77); g.quadraticCurveTo(25, -77, 25, -48); g.lineTo(25, 0); g.stroke()
+      g.fillStyle = rgba(OCHRE, 0.3); g.fillRect(-1, -70, 2, 70)
+      g.fillStyle = rgba(INK, 0.5)
+      for (let i = -2; i <= 2; i++) for (let j = 0; j < 4; j++) { g.beginPath(); g.arc(i * 6.5 + 3, -10 - j * 14, 0.9, 0, Math.PI * 2); g.fill() }
+      // Tower: lower storey.
+      const colAlpha = 0.82
+      const storey = (half, y0, y1, cols) => {
+        g.fillStyle = rgba(OCHRE_L, 0.4); g.fillRect(-half, y1, half * 2, y0 - y1)
+        g.fillStyle = rgba(INK, 0.08); g.fillRect(-half, y1, half * 2, y0 - y1)
+        g.strokeStyle = rgba(INK, 0.4); g.lineWidth = 0.6
+        for (let i = 0; i < cols; i++) {
+          const x0 = -half + (half * 2) * i / cols + 4, x1 = -half + (half * 2) * (i + 1) / cols - 4
+          g.fillStyle = rgba(INK, 0.35); g.fillRect(x0, y1 + 8, x1 - x0, (y0 - y1) - 14)
+          for (let x = x0; x <= x1; x += 4) { g.beginPath(); g.moveTo(x, y1 + 8); g.lineTo(x, y0 - 6); g.stroke() }
+          for (let y = y1 + 8; y <= y0 - 6; y += 5) { g.beginPath(); g.moveTo(x0, y); g.lineTo(x1, y); g.stroke() }
+        }
+        g.fillStyle = rgba(INK, colAlpha)
+        for (let i = 0; i <= cols; i++) g.fillRect(-half + (half * 2) * i / cols - 2, y1, 4, y0 - y1)
+        g.fillRect(-half - 3, y1, half * 2 + 6, 3.5); g.fillRect(-half - 3, y0 - 3, half * 2 + 6, 3)
+      }
+      storey(58, baseTop, baseTop - 42, 4)
+      tileRoof(g, 0, 82, baseTop - 42, 20, 0.84)
+      storey(40, baseTop - 62, baseTop - 100, 3)
+      g.fillStyle = rgba(PAPER, 0.85); g.fillRect(-14, baseTop - 98, 28, 9)
+      g.strokeStyle = rgba(INK, 0.7); g.lineWidth = 1; g.strokeRect(-14, baseTop - 98, 28, 9)
+      g.fillStyle = rgba(INK, 0.8); g.font = '700 7px ' + KAITI; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('雄 关', 0, baseTop - 93.5)
+      tileRoof(g, 0, 64, baseTop - 100, 34, 0.88)
+      g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 1.4; g.beginPath(); g.moveTo(0, baseTop - 134); g.lineTo(0, baseTop - 148); g.stroke()
+      g.fillStyle = rgba(INK, 0.9); g.beginPath(); g.arc(0, baseTop - 150, 2.3, 0, Math.PI * 2); g.fill()
+      // Weathering at the wall feet and broken tips.
+      for (let i = 0; i < 40; i++) {
+        const x = (random() - 0.5) * 440, r = 1 + random() * 3
+        g.fillStyle = rgba(random() < 0.5 ? OCHRE : INK, 0.15 + random() * 0.25)
+        g.beginPath(); g.ellipse(x, -r * 0.3, r * 1.8, r * 0.6, 0, 0, Math.PI * 2); g.fill()
+      }
+      // Dissolve both far ends of the wall into the paper.
+      g.save(); g.globalCompositeOperation = 'destination-out'
+      for (const s of [-1, 1]) {
+        const f = g.createLinearGradient(s * (wallHalf - 90), 0, s * wallHalf, 0)
+        f.addColorStop(0, 'rgba(0,0,0,0)'); f.addColorStop(1, 'rgba(0,0,0,1)')
+        g.fillStyle = f; g.fillRect(s > 0 ? wallHalf - 90 : -wallHalf, wallTop - 14, 90, 16 - wallTop)
+      }
+      g.restore()
+    }, 230, 268)
+  }
+
+  // 将台: stepped command platform with banners and a drum. Origin at base centre.
+  function dais(res) {
+    const random = rng(9917)
+    return sprite(380, 230, res, (g) => {
+      g.fillStyle = rgba(INK, 0.14); g.beginPath(); g.ellipse(0, 1, 196, 4, 0, 0, Math.PI * 2); g.fill()
+      const tier = (half, y0, y1, opts) => {
+        earthFill(g, () => { g.beginPath(); g.moveTo(-half, y0); g.lineTo(-half + 3, y1); g.lineTo(half - 3, y1); g.lineTo(half, y0); g.closePath() }, [-half, y1, half, y0], random, opts)
+        inkOutline(g, [[-half, y0], [-half + 3, y1], [half - 3, y1], [half, y0]], 1.7, 0.85)
+        g.strokeStyle = rgba(INK, 0.3); g.lineWidth = 0.6
+        for (let x = -half + 8; x < half - 4; x += 15 + random() * 5) { g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y1 + 3); g.stroke() }
+        dryBrush(g, (t) => [lerp(-half + 3, half - 3, t), y1 - 0.4, 0, 1], 2.8, 5, INK, 0.9, y1 + 9, 40)
+      }
+      tier(188, 0, -30, { layer: 8, shade: 0.28 })
+      tier(150, -30, -58, { layer: 7, shade: 0.28 })
+      tier(112, -58, -86, { layer: 7, shade: 0.28 })
+      // Stairs.
+      for (let i = 0; i < 14; i++) {
+        const y = -i * 6.15, half = lerp(31, 28, i / 14)
+        g.fillStyle = rgba(i % 2 ? OCHRE_L : PAPER, i % 2 ? 0.55 : 0.5); g.fillRect(-half, y - 6.15, half * 2, 6.15)
+        g.strokeStyle = rgba(INK, 0.55); g.lineWidth = 0.9; g.beginPath(); g.moveTo(-half, y - 6.15); g.lineTo(half, y - 6.15); g.stroke()
+      }
+      inkOutline(g, [[-31, 0], [-28, -86]], 1.5, 0.8); inkOutline(g, [[31, 0], [28, -86]], 1.5, 0.8)
+      // Railing around the top platform, open at the stairs.
+      g.strokeStyle = rgba(INK, 0.86); g.lineWidth = 1.5
+      for (const s of [-1, 1]) {
+        g.beginPath(); g.moveTo(s * 30, -100); g.lineTo(s * 108, -100); g.moveTo(s * 30, -93); g.lineTo(s * 108, -93); g.stroke()
+        for (let x = 30; x <= 108; x += 13) { g.lineWidth = 2; g.beginPath(); g.moveTo(s * x, -86); g.lineTo(s * x, -104); g.stroke() }
+        g.lineWidth = 1.5
+      }
+      // Flag poles and banners.
+      for (const [x, glyph] of [[-92, '萧'], [92, '令']]) {
+        g.fillStyle = rgba(INK, 0.1); g.beginPath(); g.ellipse(x, -86, 7, 1.6, 0, 0, Math.PI * 2); g.fill()
+        g.strokeStyle = rgba(INK, 0.92); g.lineWidth = 2.6; g.beginPath(); g.moveTo(x, -86); g.lineTo(x, -224); g.stroke()
+        g.strokeStyle = rgba(OCHRE, 0.7); g.lineWidth = 0.8; g.beginPath(); g.moveTo(x - 0.6, -90); g.lineTo(x - 0.6, -218); g.stroke()
+        g.fillStyle = rgba(INK, 0.92); g.beginPath(); g.moveTo(x, -229); g.lineTo(x - 2.4, -221); g.lineTo(x + 2.4, -221); g.closePath(); g.fill()
+        flagCloth(g, x + 1.5, -219, 46, 96, OCHRE_L, 0.74, glyph, INK, 0.62, random, 40)
+        g.strokeStyle = rgba(INK, 0.7); g.lineWidth = 1.3; g.beginPath(); g.moveTo(x, -217); g.lineTo(x + 47, -217); g.stroke()
+      }
+      // War drum on a stand.
+      const dx = 62, dy = -100
+      g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 2.2
+      g.beginPath(); g.moveTo(dx - 14, -86); g.lineTo(dx - 10, dy + 2); g.moveTo(dx + 14, -86); g.lineTo(dx + 10, dy + 2); g.moveTo(dx - 16, -86); g.lineTo(dx + 16, -86); g.stroke()
+      g.fillStyle = rgba(INK, 0.88)
+      g.beginPath(); g.moveTo(dx - 16, dy - 3); g.quadraticCurveTo(dx, dy - 21, dx + 16, dy - 3); g.quadraticCurveTo(dx + 20, dy + 8, dx + 16, dy + 12); g.quadraticCurveTo(dx, dy + 16, dx - 16, dy + 12); g.quadraticCurveTo(dx - 20, dy + 8, dx - 16, dy - 3); g.closePath(); g.fill()
+      g.fillStyle = rgba(OCHRE_L, 0.8); g.beginPath(); g.ellipse(dx + 15, dy + 5, 4.4, 9, 0.05, 0, Math.PI * 2); g.fill()
+      g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 1; g.beginPath(); g.ellipse(dx + 15, dy + 5, 4.4, 9, 0.05, 0, Math.PI * 2); g.stroke()
+      g.fillStyle = rgba(PAPER, 0.55)
+      for (let i = 0; i < 6; i++) { g.beginPath(); g.arc(dx - 12 + i * 5, dy - 8 + Math.sin(i * 0.5 + 0.4) * -2 + (i % 2) * 0.1, 1, 0, Math.PI * 2); g.fill() }
+      g.strokeStyle = rgba(INK, 0.9); g.lineWidth = 1.3; g.beginPath(); g.moveTo(dx - 6, dy - 16); g.lineTo(dx - 18, dy - 26); g.moveTo(dx + 2, dy - 16); g.lineTo(dx - 4, dy - 28); g.stroke()
+      // Tufts and rubble at the foot.
+      for (let i = 0; i < 22; i++) {
+        const x = (random() - 0.5) * 390, r = 1 + random() * 2.4
+        g.fillStyle = rgba(random() < 0.5 ? OCHRE : INK, 0.2 + random() * 0.3)
+        g.beginPath(); g.ellipse(x, -r * 0.3, r * 1.6, r * 0.6, 0, 0, Math.PI * 2); g.fill()
+      }
+    }, 190, 228)
+  }
+
   globalThis.XiabanInkArt = {
     PAPER, INK, CINNABAR, rgba, rng, hash, noise, fbm, canvas, strip, drawStrip, paperGrain, vignette,
     ribbon, dryBrush, leaf, leafCluster, mountains, bamboo, ground, snowGround, iceSurface, reeds, water,
     sprite, drawSprite, rock, bridge, gate, lantern, deadTree, pine, snowPine, snowPier, snowRock, snowForest, plumBranches, inkCloud, blossom, thinIce, icicleSprite, pillar, stele, shrine,
     splat, softDisc, sun, moon, mist, leafSprite, petalSprite, waveSprite, iceSpikeSprite, snowflakeSprite, clamp, lerp,
+    desertGround, dryGrass, poplar, poplarGrove, beaconTower, rampart, earthBlock, cityWall, tents, dais, banner, ochreLeafSprite, dustSprite, potSprite, flameSprites,
   }
 })()

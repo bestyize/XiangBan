@@ -31,7 +31,19 @@
     spearman: { hp: 4, w: 16, h: 56, score: 220, speed: 78, reach: 130, tele: 0.52, active: 0.14, recover: 0.65, lunge: 280, damage: 1 },
     hammer: { hp: 7, w: 22, h: 66, score: 320, speed: 52, reach: 105, tele: 0.68, active: 0.18, recover: 0.85, lunge: 190, damage: 1 },
     angler: { hp: 48, w: 20, h: 68, score: 2500 },
+    // 烽火卷
+    soldier: { hp: 3, w: 15, h: 54, score: 120, speed: 112, reach: 82, tele: 0.48, active: 0.12, recover: 0.52, lunge: 330, damage: 1 },
+    bomber: { hp: 2, w: 14, h: 52, score: 150 },
+    cavalry: { hp: 6, w: 26, h: 76, score: 300, speed: 220, reach: 74, tele: 0.62, active: 1.5, recover: 0.95, lunge: 460, damage: 1 },
+    footman: { hp: 3, w: 15, h: 54, score: 300, speed: 104, reach: 80, tele: 0.5, active: 0.12, recover: 0.55, lunge: 300, damage: 1 },
+    pavise: { hp: 4, w: 18, h: 56, score: 200, speed: 46, reach: 86, tele: 0.62, active: 0.14, recover: 0.7, lunge: 170, damage: 1 },
+    general: { hp: 56, w: 26, h: 82, score: 3000 },
   }
+  const BOSSES = new Set(['boss', 'angler', 'general'])
+  // Damage a raised shield cannot stop: the ink stroke and the terrain (falling ice, cracks, arrow rain, fire).
+  const UNBLOCKED = new Set(['strike', 'icicle', 'crack', 'volley', 'fire'])
+  const isBoss = (enemy) => BOSSES.has(enemy.type)
+  const POT_GRAVITY = 900
 
   function mulberry(seed) {
     let value = seed >>> 0
@@ -64,6 +76,7 @@
       bonus: null, victoryT: 0, events: [],
       icicles: (world.icicles || []).map((spec, index) => ({ id: index, x: spec.x, top: spec.y, len: spec.len || 24, y: spec.y + (spec.len || 24), state: 'hang', vy: 0, hits: [], hitPlayer: false })),
       cracks: [], nextCrack: 0, wind: { phase: 'calm', dir: 0, power: 0, cycle: -1 },
+      volleys: [], volleyClock: world.volley ? world.volley.cycle[0] + world.volley.cycle[1] - 1.8 : 0, fires: [], grass: grassCells(world),
       player: {
         x: level.start, y: GROUND, vx: 0, vy: 0, w: 13, h: 54, facing: 1,
         onGround: true, coyote: 0, airJumps: 1, airDash: 1,
@@ -73,10 +86,22 @@
         ink: 0, combo: 0, comboTimer: 0, maxCombo: 0, kills: 0, parries: 0, executions: 0,
         score: 0, damageTaken: 0, airTime: 0, airKills: 0, deflectKills: 0, bossExecutions: 0, strikes: 0,
         icicleKills: 0, crackKills: 0, slideKills: 0, ambushes: 0, standT: 0, coverT: 0, hideT: 0, spottedT: 0, hidden: false,
+        volleyKills: 0, fireKills: 0, unhorses: 0, formationBreaks: 0,
       },
     }
     state.random = mulberry(state.seed)
     return state
+  }
+
+  const GRASS_CELL = 24
+
+  /** 胡杨 dry grass, cut into cells that catch fire one by one. */
+  function grassCells(world) {
+    const cells = []
+    for (const [x0, x1] of world.grass || []) {
+      for (let x = x0; x + GRASS_CELL <= x1 + 0.5; x += GRASS_CELL) cells.push({ id: cells.length, x, s: 'dry', t: 0, down: false, up: false })
+    }
+    return cells
   }
 
   function emit(state, type, data = {}) { state.events.push({ type, ...data }) }
@@ -173,9 +198,11 @@
     const player = state.player
     const air = !player.onGround
     const current = player.action?.type === 'slash' ? player.action : null
+    // A swing started while the previous one is still running continues the combo (and, in a strict 卷, cannot parry).
+    const chained = Boolean(current)
     let stage = current ? (current.stage + 1) % STAGES.length : state.clock - player.slashEndClock < 0.3 ? player.nextStage : 0
     if (air && stage === 2) stage = 0
-    player.action = { type: 'slash', stage, t: 0, hits: [], air, ambush: player.hidden }
+    player.action = { type: 'slash', stage, t: 0, hits: [], air, ambush: player.hidden, chained }
     player.slashStartClock = state.clock
     player.slashBuffer = 0
     if (air && player.vy > -80) player.vy = Math.min(player.vy, 40)
@@ -342,7 +369,7 @@
       if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || action.hits.includes(enemy.id)) continue
       if (!overlaps(box, enemyBox(enemy))) continue
       action.hits.push(enemy.id)
-      const unaware = action.ambush && enemy.type !== 'boss' && enemy.type !== 'angler' && (enemy.state === 'idle' || enemy.state === 'walk')
+      const unaware = action.ambush && !isBoss(enemy) && (enemy.state === 'idle' || enemy.state === 'walk')
       const before = enemy.hp
       hitEnemy(state, enemy, stage.damage + (unaware ? 2 : 0), action.stage === 2 ? 'heavy' : 'slash')
       if (unaware && !action.ambushed && enemy.hp < before) {
@@ -359,7 +386,9 @@
       if (shot.owner !== 'enemy' || shot.dead || action.hits.includes('p' + shot.id)) continue
       const shotBox = shot.type === 'wave'
         ? { x0: shot.x - 18, x1: shot.x + 18, y0: GROUND - 38, y1: GROUND }
-        : { x0: shot.x - 10, x1: shot.x + 10, y0: shot.y - 6, y1: shot.y + 6 }
+        : shot.type === 'pot'
+          ? { x0: shot.x - 12, x1: shot.x + 12, y0: shot.y - 10, y1: shot.y + 10 }
+          : { x0: shot.x - 10, x1: shot.x + 10, y0: shot.y - 6, y1: shot.y + 6 }
       if (!overlaps(box, shotBox)) continue
       action.hits.push('p' + shot.id)
       deflect(state, shot)
@@ -379,9 +408,18 @@
       return
     }
     shot.owner = 'player'
+    shot.life = 1.6
+    if (shot.type === 'pot') {
+      // A batted pot is lobbed back at its thrower, or flung ahead if the thrower is gone.
+      const thrower = state.enemies.find((enemy) => enemy.id === shot.source && enemy.alive)
+      const aim = thrower && sign(thrower.x - player.x) === player.facing ? thrower : null
+      const { vx, vy } = aim ? lob(shot.x, shot.y, aim.x, aim.y - 30, 420, 0.4, 0.9) : { vx: player.facing * 360, vy: -320 }
+      shot.vx = vx; shot.vy = vy; shot.life = 2.4
+      emit(state, 'deflect', { x: shot.x, y: shot.y, pot: true })
+      return
+    }
     shot.vx = player.facing * Math.max(520, Math.abs(shot.vx) * 1.3)
     shot.vy = -40
-    shot.life = 1.6
     emit(state, 'deflect', { x: shot.x, y: shot.y })
   }
 
@@ -407,14 +445,21 @@
     }
   }
 
+  /** A swing parries only inside its opening window; in a strict 卷 a swing pressed while the last one was still running never does. */
+  function inParryWindow(state) {
+    const player = state.player
+    const action = player.action
+    if (action?.type !== 'slash' || state.clock - player.slashStartClock > state.diff.parry) return false
+    return !(state.world.strictParry && action.chained)
+  }
+
   // Resolve one enemy strike reaching the player: parried, evaded by i-frames, or taken.
   function enemyStrike(state, attacker, damage, kind = 'melee') {
     const player = state.player
     if (player.dead) return 'miss'
     const action = player.action
     const facingAttacker = sign(attacker.x - player.x) === player.facing || Math.abs(attacker.x - player.x) < 10
-    const inWindow = action?.type === 'slash' && state.clock - player.slashStartClock <= state.diff.parry
-    if (kind !== 'unblockable' && inWindow && facingAttacker) {
+    if (kind !== 'unblockable' && inParryWindow(state) && facingAttacker) {
       parry(state, attacker)
       return 'parry'
     }
@@ -436,12 +481,20 @@
     const x = (attacker.x + player.x) / 2
     emit(state, 'parry', { x, y: player.y - 38, target: attacker.type, id: attacker.id })
     if (attacker.type === 'crow') { kill(state, attacker, 'parry'); return }
-    if (attacker.type === 'boss') {
-      attacker.posture = Math.min(attacker.postureMax, attacker.posture + 22)
+    if (isBoss(attacker)) {
+      // Meeting the general's lance head-on reins the horse in: a long opening and a big posture blow.
+      const charge = attacker.type === 'general' && attacker.state === 'charge'
+      attacker.posture = Math.min(attacker.postureMax, attacker.posture + (charge ? 34 : 22))
+      if (charge) {
+        attacker.state = 'recover'; attacker.t = 1.1; attacker.vx = -attacker.facing * 60
+        emit(state, 'rear', { id: attacker.id, x: attacker.x, y: attacker.y, facing: attacker.facing })
+      }
       attacker.postureClock = state.clock
       if (attacker.posture >= attacker.postureMax) breakBoss(state, attacker)
       return
     }
+    if (attacker.type === 'cavalry') { unhorse(state, attacker); return }
+    if (attacker.type === 'pavise') { breakFormation(state, attacker); return }
     attacker.state = 'stagger'
     attacker.openedAt = state.clock
     attacker.t = attacker.type === 'shield' ? 1.8 : 1.3
@@ -457,13 +510,24 @@
     boss.combo = null
     state.slow = 0.6; state.slowScale = 0.3
     emit(state, 'broken', { id: boss.id, x: boss.x, y: boss.y - boss.h })
+    // Breaking the mounted general's posture throws him from the saddle: the second phase starts on foot.
+    if (boss.type === 'general' && boss.mounted) {
+      dismount(state, boss)
+      if (!boss.phase2) { boss.phase2 = true; emit(state, 'bossPhase', { id: boss.id, kind: boss.type, x: boss.x, y: boss.y - 40 }) }
+    }
+  }
+
+  function dismount(state, boss) {
+    boss.mounted = false
+    boss.w = 20; boss.h = 70
+    emit(state, 'unhorse', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, boss: true })
   }
 
   function hitEnemy(state, enemy, damage, source) {
     const player = state.player
     if (!enemy.alive || enemy.state === 'spawn' || enemy.state === 'dying') return
     const fromFront = sign(player.x - enemy.x) === enemy.facing
-    if (enemy.type === 'shield' && enemy.state !== 'stagger' && fromFront && source !== 'strike' && source !== 'icicle' && source !== 'crack') {
+    if ((enemy.type === 'shield' || enemy.type === 'pavise') && enemy.state !== 'stagger' && fromFront && !UNBLOCKED.has(source)) {
       state.hitstop = Math.max(state.hitstop, 0.05)
       if (source !== 'arrow') player.vx = -player.facing * 150
       emit(state, 'block', { x: enemy.x + enemy.facing * 18, y: enemy.y - 34 })
@@ -472,7 +536,7 @@
     const melee = source === 'slash' || source === 'heavy'
     // Only a swing begun after the opening can execute; the parrying swing itself never does.
     const fresh = melee && player.slashStartClock > (enemy.openedAt ?? Infinity)
-    if (enemy.type === 'boss' || enemy.type === 'angler') {
+    if (isBoss(enemy)) {
       if (enemy.state === 'broken' && fresh) {
         enemy.hp -= 10
         enemy.posture = 0
@@ -484,8 +548,10 @@
         state.hitstop = Math.max(state.hitstop, 0.16); state.slow = 0.7; state.slowScale = 0.25
         emit(state, 'execute', { id: enemy.id, x: enemy.x, y: enemy.y - 40, boss: true })
       } else {
-        enemy.hp -= source === 'strike' ? 6 : damage
-        enemy.posture = Math.min(enemy.postureMax, enemy.posture + (source === 'strike' ? 30 : source === 'heavy' ? 6 : 3))
+        // The general's barded horse turns most blades: in the saddle a slash barely scratches him; parry the charge instead.
+        const barded = enemy.type === 'general' && enemy.mounted && melee
+        enemy.hp -= source === 'strike' ? 6 : barded ? (source === 'heavy' ? 1 : 0) : damage
+        enemy.posture = Math.min(enemy.postureMax, enemy.posture + (source === 'strike' ? 30 : barded ? (source === 'heavy' ? 2 : 1) : source === 'heavy' ? 6 : 3))
         // Pressing a guarded boss provokes a fast counter; the punish window is after its own attacks.
         if (melee && (enemy.state === 'idle' || enemy.state === 'walk')) {
           enemy.pressure = (enemy.pressure || 0) + 1
@@ -512,7 +578,8 @@
       } else if (!enemy.phase2 && enemy.hp <= enemy.maxHp * 0.5) {
         enemy.phase2 = true
         enemy.state = 'roar'; enemy.t = 1.25; enemy.vx = 0; enemy.combo = null
-        emit(state, 'bossPhase', { id: enemy.id, x: enemy.x, y: enemy.y - 40 })
+        if (enemy.type === 'general' && enemy.mounted) dismount(state, enemy)
+        emit(state, 'bossPhase', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y - 40 })
       }
       return
     }
@@ -524,7 +591,9 @@
       kill(state, enemy, 'execute')
       return
     }
-    enemy.hp -= source === 'strike' ? 4 : source === 'arrow' ? 3 : damage
+    // A mounted lancer takes one point from any single blow.
+    const mounted = enemy.type === 'cavalry' && source !== 'strike'
+    enemy.hp -= source === 'strike' ? 4 : mounted ? 1 : source === 'arrow' ? 3 : damage
     enemy.flash = 0.12
     addCombo(state); addScore(state, 10 * damage); addInk(state, 6)
     state.hitstop = Math.max(state.hitstop, source === 'heavy' ? 0.085 : 0.05)
@@ -533,10 +602,12 @@
     // Late in a telegraph the strike is committed: hits land but do not interrupt, so a slightly early
     // press still meets the blade inside the parry window.
     const committed = enemy.state === 'attack' || (enemy.state === 'tele' && enemy.t < enemy.teleTotal * 0.55)
-    if (enemy.type !== 'crow' && !committed) {
+    // A stagger is the opening for an execution, so an ordinary hit never cuts it short.
+    if (enemy.type !== 'crow' && !committed && enemy.state !== 'stagger') {
+      const heavy = enemy.type === 'cavalry' || enemy.type === 'pavise'
       enemy.state = 'hurt'
-      enemy.t = enemy.type === 'shield' ? 0.22 : 0.3
-      enemy.vx = (sign(enemy.x - player.x) || 1) * (source === 'heavy' ? 260 : 170)
+      enemy.t = enemy.type === 'shield' || heavy ? 0.22 : 0.3
+      enemy.vx = (sign(enemy.x - player.x) || 1) * (source === 'heavy' ? 260 : 170) * (heavy ? 0.35 : 1)
     }
   }
 
@@ -555,6 +626,8 @@
     if (how === 'arrow') player.deflectKills += 1
     else if (how === 'icicle') player.icicleKills += 1
     else if (how === 'crack') player.crackKills += 1
+    else if (how === 'volley') player.volleyKills += 1
+    else if (how === 'fire' || how === 'pot') player.fireKills += 1
     else if (how !== 'strike') {
       if (!player.onGround) player.airKills += 1
       else if (onIceZone(state, player.x) && Math.abs(player.vx) >= 70) player.slideKills += 1
@@ -575,15 +648,19 @@
       x, y: crow ? 150 + state.random() * 30 : spec.y ?? GROUND, vx: 0, vy: 0, w: kind.w, h: kind.h,
       homeY: spec.y ?? GROUND, onPlatform: spec.y !== undefined && spec.y < GROUND,
       facing: sign(state.player.x - x) || -1, hp: kind.hp, maxHp: kind.hp,
-      state: 'spawn', t: spec.type === 'boss' ? 0.9 : 0.75, cd: 0.4 + state.random() * 0.8, hopCd: 0, flash: 0,
+      state: 'spawn', t: BOSSES.has(spec.type) ? 0.9 : 0.75, cd: 0.4 + state.random() * 0.8, hopCd: 0, flash: 0,
       hitDone: false, side, seed: state.random() * 10, combo: null, move: null,
     }
-    if (spec.type === 'boss' || spec.type === 'angler') {
-      enemy.hp = enemy.maxHp = spec.type === 'angler' ? (state.difficulty === 'easy' ? 36 : 50) : state.diff.bossHp
+    if (BOSSES.has(spec.type)) {
+      enemy.hp = enemy.maxHp = spec.type === 'angler' ? (state.difficulty === 'easy' ? 36 : 50) : spec.type === 'general' ? (state.difficulty === 'easy' ? 40 : 56) : state.diff.bossHp
       enemy.posture = 0; enemy.postureMax = 100; enemy.postureClock = 0; enemy.phase2 = false
       enemy.moves = 0
     }
     if (spec.type === 'shield') prompt(state, 'shield')
+    if (spec.type === 'cavalry') prompt(state, 'cavalry')
+    if (spec.type === 'pavise') { enemy.group = spec.group || 'p' + enemy.id; prompt(state, 'pavise') }
+    if (spec.type === 'general') enemy.mounted = true
+    enemy.burnCd = 0
     state.enemies.push(enemy)
     if (!enemy.delay) emit(state, 'spawn', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y })
     return enemy
@@ -592,7 +669,7 @@
   function attackers(state) {
     let count = 0
     for (const enemy of state.enemies) {
-      if (enemy.alive && enemy.type !== 'boss' && enemy.type !== 'angler' && (enemy.state === 'tele' || enemy.state === 'attack' || enemy.state === 'dive')) count += 1
+      if (enemy.alive && !isBoss(enemy) && (enemy.state === 'tele' || enemy.state === 'attack' || enemy.state === 'dive')) count += 1
     }
     return count
   }
@@ -722,7 +799,7 @@
         if (!enemy.onPlatform && Math.abs(dx) < 120 && enemy.hopCd <= 0 && enemy.y >= GROUND - 0.5) {
           enemy.state = 'hop'; enemy.vx = -enemy.facing * 290; enemy.vy = -440; enemy.hopCd = 2
           emit(state, 'hop', { id: enemy.id, x: enemy.x, y: enemy.y })
-        } else if (enemy.cd <= 0 && Math.abs(dx) < 640 && !player.hidden) {
+        } else if (enemy.cd <= 0 && Math.abs(dx) < (inDark(state, enemy.x) ? 340 : 640) && !player.hidden) {
           telegraph(state, enemy, 0.8)
         }
         break
@@ -1002,6 +1079,413 @@
         break
     }
     moveGround(state, enemy, dt)
+  }
+
+  // ------------------------------------------------------------ 烽火卷 enemies
+
+  const inDark = (state, x) => Boolean(state.world.dark) && x >= state.world.dark.zone[0] && x <= state.world.dark.zone[1]
+
+  /** Fire-pot thrower: keeps its distance and lobs a clay pot of oil that bursts into flame where it lands. */
+  function updateBomber(state, enemy, dt) {
+    const player = state.player
+    const dx = player.x - enemy.x
+    const distance = Math.abs(dx)
+    const range = inDark(state, enemy.x) ? 340 : 520
+    enemy.hopCd -= dt
+    switch (enemy.state) {
+      case 'idle':
+      case 'walk':
+        if (!player.dead) enemy.facing = sign(dx) || enemy.facing
+        if (player.dead) { enemy.vx *= 0.8; break }
+        if (!enemy.onPlatform && distance < 110 && enemy.hopCd <= 0 && enemy.y >= GROUND - 0.5) {
+          enemy.state = 'hop'; enemy.vx = -enemy.facing * 280; enemy.vy = -430; enemy.hopCd = 2.2
+          emit(state, 'hop', { id: enemy.id, x: enemy.x, y: enemy.y })
+          break
+        }
+        if (!enemy.onPlatform && distance > 330) { enemy.state = 'walk'; enemy.vx += (enemy.facing * 70 - enemy.vx) * Math.min(1, dt * 6) }
+        else if (!enemy.onPlatform && distance < 170) { enemy.state = 'walk'; enemy.vx += (-enemy.facing * 80 - enemy.vx) * Math.min(1, dt * 6) }
+        else { enemy.state = 'idle'; enemy.vx *= Math.pow(0.02, dt) }
+        if (enemy.cd <= 0 && distance < range && mayAttack(state)) telegraph(state, enemy, 0.6)
+        break
+      case 'hop':
+        if (enemy.vy === 0 && enemy.y >= enemy.homeY - 0.5) { enemy.state = 'idle'; enemy.vx = 0; enemy.cd = Math.max(enemy.cd, 0.5) }
+        break
+      case 'tele':
+        enemy.vx = 0
+        if (enemy.t <= 0) { throwPot(state, enemy); enemy.state = 'recover'; enemy.t = 0.6 }
+        break
+      case 'recover':
+        enemy.vx *= Math.pow(0.01, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = (1.9 + state.random() * 1.3) / state.diff.aggression }
+        break
+      case 'hurt':
+      case 'stagger':
+        enemy.vx *= Math.pow(0.004, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = Math.max(enemy.cd, 0.6) }
+        break
+    }
+    moveGround(state, enemy, dt)
+  }
+
+  function lob(sx, sy, tx, ty, speed, min, max) {
+    const flight = clamp(Math.abs(tx - sx) / speed, min, max)
+    return { vx: (tx - sx) / flight, vy: (ty - sy) / flight - 0.5 * POT_GRAVITY * flight }
+  }
+
+  function throwPot(state, enemy) {
+    const player = state.player
+    const sx = enemy.x + enemy.facing * 10, sy = enemy.y - 44
+    const { vx, vy } = lob(sx, sy, player.x + player.vx * 0.2, GROUND - 6, 330, 0.6, 1.05)
+    state.projectiles.push({ id: state.nextId++, type: 'pot', owner: 'enemy', x: sx, y: sy, vx, vy, life: 3, source: enemy.id, dead: false })
+    emit(state, 'potThrow', { id: enemy.id, x: sx, y: sy })
+    prompt(state, 'pot')
+  }
+
+  /** Mounted lancer: backs off for room, then charges straight through. Parrying the lance throws the rider from the saddle. */
+  function updateCavalry(state, enemy, dt) {
+    const player = state.player
+    const kind = ENEMY.cavalry
+    const dx = player.x - enemy.x
+    const distance = Math.abs(dx)
+    const [min, max] = state.lock || [0, state.world.length]
+    switch (enemy.state) {
+      case 'idle':
+      case 'walk': {
+        if (player.dead) { enemy.vx *= 0.8; break }
+        enemy.facing = sign(dx) || enemy.facing
+        const room = Math.min(enemy.x - min, max - enemy.x) < 60
+        if (distance < 230 && !room) {
+          enemy.state = 'walk'
+          enemy.vx += (-enemy.facing * 150 - enemy.vx) * Math.min(1, dt * 5)
+        } else {
+          enemy.state = 'idle'
+          enemy.vx *= Math.pow(0.02, dt)
+          if (enemy.cd <= 0 && mayAttack(state)) telegraph(state, enemy, kind.tele)
+        }
+        break
+      }
+      case 'tele':
+        enemy.vx *= Math.pow(0.001, dt)
+        if (enemy.t <= 0) {
+          enemy.state = 'attack'; enemy.t = kind.active; enemy.hitDone = false
+          enemy.vx = enemy.facing * kind.lunge
+          emit(state, 'charge', { id: enemy.id, x: enemy.x, y: enemy.y, facing: enemy.facing })
+        }
+        break
+      case 'attack': {
+        enemy.vx = enemy.facing * kind.lunge
+        if (!enemy.hitDone) {
+          const front = enemy.facing > 0
+            ? { x0: enemy.x - 6, x1: enemy.x + enemy.w + 30, y0: GROUND - 70, y1: GROUND + 4 }
+            : { x0: enemy.x - enemy.w - 30, x1: enemy.x + 6, y0: GROUND - 70, y1: GROUND + 4 }
+          if (overlaps(front, playerBox(player))) {
+            enemy.hitDone = true
+            if (enemyStrike(state, enemy, kind.damage) === 'parry') break
+          }
+        }
+        const atEdge = (enemy.facing > 0 && enemy.x >= max - enemy.w - 2) || (enemy.facing < 0 && enemy.x <= min + enemy.w + 2)
+        if (atEdge || enemy.t <= 0) { enemy.state = 'recover'; enemy.t = kind.recover }
+        break
+      }
+      case 'recover':
+        enemy.vx *= Math.pow(0.004, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = (0.9 + state.random() * 1.1) / state.diff.aggression }
+        break
+      case 'hurt':
+        enemy.vx *= Math.pow(0.004, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = Math.max(enemy.cd, 0.4) }
+        break
+    }
+    moveGround(state, enemy, dt)
+  }
+
+  function unhorse(state, rider) {
+    const player = state.player
+    const foot = ENEMY.footman
+    emit(state, 'unhorse', { id: rider.id, x: rider.x, y: rider.y, facing: rider.facing, boss: false })
+    rider.type = 'footman'
+    rider.w = foot.w; rider.h = foot.h
+    rider.maxHp = foot.hp; rider.hp = Math.min(rider.hp, foot.hp)
+    rider.state = 'stagger'; rider.t = 1.6; rider.openedAt = state.clock
+    rider.vx = rider.facing * 120
+    player.unhorses += 1
+    addScore(state, 150)
+    emit(state, 'stagger', { id: rider.id, x: rider.x, y: rider.y - rider.h })
+  }
+
+  const formation = (state, enemy) => state.enemies.filter((other) => other.alive && other.type === 'pavise' && other.group === enemy.group && other.delay <= 0)
+
+  /** Shield wall: tall pavises advance as one line; only the soldier nearest the player thrusts from behind it. */
+  function updatePavise(state, enemy, dt) {
+    const player = state.player
+    const kind = ENEMY.pavise
+    const dx = player.x - enemy.x
+    const distance = Math.abs(dx)
+    switch (enemy.state) {
+      case 'idle':
+      case 'walk': {
+        if (player.dead) { enemy.vx *= 0.8; break }
+        if (sign(dx) && sign(dx) !== enemy.facing) {
+          enemy.turn = (enemy.turn || 0) + dt
+          if (enemy.turn > 0.55) { enemy.facing = sign(dx); enemy.turn = 0 }
+        } else enemy.turn = 0
+        const line = formation(state, enemy)
+        const leader = line.reduce((best, other) => (Math.abs(other.x - player.x) < Math.abs(best.x - player.x) ? other : best), enemy)
+        if (distance > kind.reach * 0.85) {
+          enemy.state = 'walk'
+          const speed = kind.speed * (crowded(state, enemy) ? 0.1 : 1)
+          enemy.vx += (enemy.facing * speed - enemy.vx) * Math.min(1, dt * 6)
+        } else {
+          enemy.state = 'idle'
+          enemy.vx *= Math.pow(0.02, dt)
+          if (leader === enemy && enemy.cd <= 0 && sign(dx) === enemy.facing && mayAttack(state)) telegraph(state, enemy, kind.tele)
+        }
+        break
+      }
+      case 'tele':
+        enemy.vx *= Math.pow(0.001, dt)
+        if (enemy.t <= 0) {
+          enemy.state = 'attack'; enemy.t = kind.active; enemy.hitDone = false
+          enemy.vx = enemy.facing * kind.lunge
+          emit(state, 'enemySwing', { id: enemy.id, x: enemy.x, y: enemy.y, facing: enemy.facing, kind: enemy.type })
+        }
+        break
+      case 'attack':
+        if (!enemy.hitDone) {
+          const reachBox = enemy.facing > 0
+            ? { x0: enemy.x, x1: enemy.x + kind.reach, y0: enemy.y - enemy.h - 8, y1: enemy.y + 4 }
+            : { x0: enemy.x - kind.reach, x1: enemy.x, y0: enemy.y - enemy.h - 8, y1: enemy.y + 4 }
+          if (overlaps(reachBox, playerBox(player))) {
+            enemy.hitDone = true
+            if (enemyStrike(state, enemy, kind.damage) === 'parry') break
+          }
+        }
+        enemy.vx *= Math.pow(0.02, dt)
+        if (enemy.t <= 0) { enemy.state = 'recover'; enemy.t = kind.recover }
+        break
+      case 'recover':
+        enemy.vx *= Math.pow(0.01, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = (1 + state.random() * 1.1) / state.diff.aggression }
+        break
+      case 'hurt':
+        enemy.vx *= Math.pow(0.004, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = Math.max(enemy.cd, 0.4) }
+        break
+      case 'stagger':
+        enemy.vx *= Math.pow(0.01, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = 0.6 }
+        break
+    }
+    moveGround(state, enemy, dt)
+  }
+
+  /** Parrying the leader's thrust breaks the whole line at once: every shield in it reels open. */
+  function breakFormation(state, leader) {
+    const player = state.player
+    const line = formation(state, leader)
+    for (const member of line) {
+      member.state = 'stagger'; member.t = 2; member.openedAt = state.clock
+      member.vx = (sign(member.x - player.x) || -member.facing) * 140
+    }
+    if (line.length >= 2) player.formationBreaks += 1
+    addScore(state, 60 * line.length)
+    emit(state, 'formationBreak', { id: leader.id, x: leader.x, y: leader.y - leader.h, count: line.length, ids: line.map((member) => member.id) })
+  }
+
+  // ------------------------------------------------------------ 烽火卷 boss · 铁骑将军
+
+  function chooseGeneralMove(state, boss) {
+    const player = state.player
+    const distance = Math.abs(player.x - boss.x)
+    const roll = state.random()
+    boss.moves += 1
+    if (boss.mounted) {
+      if (distance > 200) {
+        if (roll < 0.6) return startGeneralCharge(state, boss)
+        if (roll < 0.85) return startGeneralFlag(state, boss)
+        boss.state = 'walk'; boss.t = 0.9
+        return
+      }
+      if (roll < 0.38) return startCombo(state, boss)
+      if (roll < 0.55) return startGeneralFlag(state, boss)
+      boss.state = 'reposition'; boss.t = 1.3
+      return
+    }
+    if (boss.moves % 4 === 0) return startGeneralFlag(state, boss)
+    if (distance > 220) {
+      if (roll < 0.45) return startGeneralRush(state, boss)
+      if (roll < 0.75) return startGeneralFlag(state, boss)
+      boss.state = 'walk'; boss.t = 1.1
+      return
+    }
+    if (roll < 0.62) return startCombo(state, boss)
+    if (roll < 0.82) return startGeneralRush(state, boss)
+    boss.state = 'backstep'; boss.t = 0.35
+    boss.vx = -boss.facing * 400; boss.vy = -340
+  }
+
+  function startGeneralCharge(state, boss) {
+    boss.facing = sign(state.player.x - boss.x) || boss.facing
+    boss.state = 'chargeTell'
+    boss.t = 0.62 * state.diff.tele
+    boss.teleTotal = boss.t
+    emit(state, 'tell', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+  }
+
+  function startGeneralFlag(state, boss) {
+    boss.state = 'flagTell'
+    boss.t = 0.9 * state.diff.tele
+    boss.teleTotal = boss.t
+    emit(state, 'danger', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+  }
+
+  function startGeneralRush(state, boss) {
+    boss.facing = sign(state.player.x - boss.x) || boss.facing
+    boss.state = 'rushTell'
+    boss.t = 0.8 * state.diff.tele
+    boss.teleTotal = boss.t
+    emit(state, 'danger', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+  }
+
+  function updateGeneral(state, boss, dt) {
+    const player = state.player
+    const dx = player.x - boss.x
+    const [min, max] = state.lock || [0, state.world.length]
+    const faster = boss.phase2 ? 0.88 : 1
+    if (boss.state !== 'broken' && state.clock - boss.postureClock > 2) boss.posture = Math.max(0, boss.posture - 7 * dt)
+    const facePlayer = () => { if (!player.dead) boss.facing = sign(dx) || boss.facing }
+    switch (boss.state) {
+      case 'intro':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = 0.4 }
+        break
+      case 'idle':
+        facePlayer()
+        boss.vx *= Math.pow(0.01, dt)
+        if (boss.t <= 0 && !player.dead) chooseGeneralMove(state, boss)
+        break
+      case 'walk':
+        facePlayer()
+        boss.vx += (boss.facing * (boss.mounted ? 170 : 150) - boss.vx) * Math.min(1, dt * 6)
+        if (Math.abs(dx) < 120 || boss.t <= 0) startCombo(state, boss)
+        break
+      case 'reposition': {
+        boss.facing = -(sign(dx) || boss.facing)
+        boss.vx += (boss.facing * 210 - boss.vx) * Math.min(1, dt * 6)
+        const cornered = boss.x <= min + boss.w + 30 || boss.x >= max - boss.w - 30
+        if (Math.abs(dx) > 280 || cornered || boss.t <= 0) { boss.vx = 0; startGeneralCharge(state, boss) }
+        break
+      }
+      case 'backstep':
+        if (boss.t <= 0 && boss.y >= GROUND - 0.5) { boss.vx = 0; startGeneralFlag(state, boss) }
+        break
+      case 'combo': {
+        const combo = boss.combo
+        const steps = boss.mounted ? 2 : 3
+        if (combo.phase === 'tele') {
+          boss.vx *= Math.pow(0.001, dt)
+          if (boss.t <= 0) {
+            combo.phase = 'active'; boss.t = 0.13; boss.hitDone = false
+            boss.vx = boss.facing * (boss.mounted ? 200 : 290)
+            emit(state, 'enemySwing', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, kind: 'general', step: combo.i, mounted: boss.mounted })
+          }
+        } else if (combo.phase === 'active') {
+          if (!boss.hitDone && overlaps(bossReachBox(boss, boss.mounted ? 112 : 100), playerBox(player))) {
+            boss.hitDone = true
+            enemyStrike(state, boss, 1)
+            if (boss.state !== 'combo') break
+          }
+          boss.vx *= Math.pow(0.02, dt)
+          if (boss.t <= 0) {
+            combo.i += 1
+            if (combo.i >= steps) { boss.state = 'recover'; boss.t = 0.8; boss.combo = null }
+            else {
+              combo.phase = 'tele'; facePlayer()
+              boss.t = (combo.i === 2 ? 0.46 : 0.32) * faster * state.diff.tele
+              boss.teleTotal = boss.t
+              emit(state, 'tell', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+            }
+          }
+        }
+        break
+      }
+      case 'chargeTell':
+        boss.vx *= Math.pow(0.001, dt)
+        if (boss.t <= 0) {
+          boss.state = 'charge'; boss.t = 1.4; boss.hitDone = false
+          boss.vx = boss.facing * 540
+          emit(state, 'charge', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, boss: true })
+        }
+        break
+      case 'charge': {
+        boss.vx = boss.facing * 540
+        if (!boss.hitDone) {
+          const front = boss.facing > 0
+            ? { x0: boss.x - 6, x1: boss.x + boss.w + 34, y0: GROUND - 74, y1: GROUND + 4 }
+            : { x0: boss.x - boss.w - 34, x1: boss.x + 6, y0: GROUND - 74, y1: GROUND + 4 }
+          if (overlaps(front, playerBox(player))) {
+            boss.hitDone = true
+            enemyStrike(state, boss, 1)
+            if (boss.state !== 'charge') break
+          }
+        }
+        const atEdge = (boss.facing > 0 && boss.x >= max - boss.w - 2) || (boss.facing < 0 && boss.x <= min + boss.w + 2)
+        if (atEdge || boss.t <= 0) { boss.state = 'recover'; boss.t = 0.9 }
+        break
+      }
+      case 'flagTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          const half = boss.phase2 ? 160 : 130
+          callVolley(state, player.x, half * 2, 1.05, true)
+          if (boss.phase2) {
+            const side = player.x - min > max - player.x ? -1 : 1
+            callVolley(state, player.x + side * 300, half * 2, 1.5, true)
+          }
+          emit(state, 'flag', { id: boss.id, x: boss.x, y: boss.y - boss.h })
+          boss.state = 'recover'; boss.t = 0.7
+        }
+        break
+      case 'rushTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          boss.state = 'rush'; boss.t = 0.9; boss.hitDone = false
+          boss.vx = boss.facing * 900
+          emit(state, 'phantom', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing })
+        }
+        break
+      case 'rush':
+        if (!boss.hitDone && overlaps({ x0: boss.x - 24, x1: boss.x + 24, y0: GROUND - 60, y1: GROUND }, playerBox(player))) {
+          boss.hitDone = true
+          enemyStrike(state, boss, 1, 'unblockable')
+        }
+        if ((boss.facing > 0 && boss.x >= max - 62) || (boss.facing < 0 && boss.x <= min + 62) || boss.t <= 0) {
+          boss.vx = 0; boss.state = 'recover'; boss.t = 0.85
+        }
+        break
+      case 'roar':
+        boss.vx = 0
+        if (Math.abs(dx) < 150 && !player.dead && boss.t > 1.1) { player.vx = sign(dx) * 360; player.vy = Math.min(player.vy, -200); player.onGround = false }
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = 0.3 }
+        break
+      case 'broken':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.3; boss.posture = 40 }
+        break
+      case 'recover':
+        boss.vx *= Math.pow(0.01, dt)
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = (0.45 + state.random() * 0.4) * (boss.phase2 ? 0.8 : 1) / state.diff.aggression }
+        break
+      case 'dying':
+        boss.vx = 0
+        break
+    }
+    boss.x = clamp(boss.x + boss.vx * dt, min + boss.w, max - boss.w)
+    if (boss.y < GROUND || boss.vy < 0) {
+      boss.vy = Math.min(1100, boss.vy + GRAVITY * dt)
+      boss.y = Math.min(GROUND, boss.y + boss.vy * dt)
+      if (boss.y >= GROUND) boss.vy = 0
+    }
   }
 
   function chooseAnglerMove(state, boss) {
@@ -1396,24 +1880,23 @@
       enemy.flash = Math.max(0, enemy.flash - dt)
       if (enemy.state === 'spawn') {
         if (enemy.t <= 0) {
-          if (enemy.type === 'boss' || enemy.type === 'angler') { enemy.state = 'intro'; enemy.t = 2.2; emit(state, 'bossIntro', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y }) }
+          if (isBoss(enemy)) { enemy.state = 'intro'; enemy.t = 2.2; emit(state, 'bossIntro', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y }) }
           else enemy.state = 'idle'
         }
         continue
       }
-      if (enemy.type === 'boss') {
-        if (enemy.state === 'dying') {
-          if (enemy.t <= 0) { enemy.alive = false; enemy.state = 'dead'; emit(state, 'kill', { id: enemy.id, kind: 'boss', x: enemy.x, y: enemy.y, facing: enemy.facing, how: 'boss' }) }
-          continue
-        }
-        updateBoss(state, enemy, dt)
-      } else if (enemy.type === 'angler') {
-        if (enemy.state === 'dying') {
-          if (enemy.t <= 0) { enemy.alive = false; enemy.state = 'dead'; emit(state, 'kill', { id: enemy.id, kind: 'angler', x: enemy.x, y: enemy.y, facing: enemy.facing, how: 'boss' }) }
-          continue
-        }
-        updateAngler(state, enemy, dt)
-      } else if (enemy.type === 'spearman') updateSpearman(state, enemy, dt)
+      enemy.burnCd = Math.max(0, (enemy.burnCd || 0) - dt)
+      if (isBoss(enemy) && enemy.state === 'dying') {
+        if (enemy.t <= 0) { enemy.alive = false; enemy.state = 'dead'; emit(state, 'kill', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y, facing: enemy.facing, how: 'boss' }) }
+        continue
+      }
+      if (enemy.type === 'boss') updateBoss(state, enemy, dt)
+      else if (enemy.type === 'angler') updateAngler(state, enemy, dt)
+      else if (enemy.type === 'general') updateGeneral(state, enemy, dt)
+      else if (enemy.type === 'cavalry') updateCavalry(state, enemy, dt)
+      else if (enemy.type === 'pavise') updatePavise(state, enemy, dt)
+      else if (enemy.type === 'bomber') updateBomber(state, enemy, dt)
+      else if (enemy.type === 'spearman') updateSpearman(state, enemy, dt)
       else if (enemy.type === 'ronin') updateRonin(state, enemy, dt)
       else if (enemy.type === 'hammer') updateHammer(state, enemy, dt)
       else if (enemy.type === 'crow') updateCrow(state, enemy, dt)
@@ -1431,6 +1914,10 @@
       shot.x += shot.vx * dt
       if (shot.owner === 'enemy' && (shot.type === 'arrow' || shot.type === 'dart')) shot.x += windSpeed(state, shot.x) * 0.5 * dt
       if (shot.type === 'arrow') { shot.vy += ARROW_GRAVITY * dt; shot.y += shot.vy * dt }
+      if (shot.type === 'pot') {
+        shot.vy += POT_GRAVITY * dt; shot.y += shot.vy * dt
+        if (shot.y >= GROUND - 2 || shot.life <= 0) { burstPot(state, shot, shot.x); continue }
+      }
       if (shot.life <= 0 || shot.y > GROUND + 4 || shot.x < 0 || shot.x > state.world.length) {
         if (shot.type === 'arrow' && shot.y > GROUND - 4) emit(state, 'stick', { x: shot.x, y: GROUND, vx: shot.vx, vy: shot.vy })
         shot.dead = true
@@ -1449,11 +1936,12 @@
               hurtPlayer(state, 1, shot.x)
               player.vx = -player.facing * 340
             }
-          } else if (action?.type === 'slash' && facing && state.clock - player.slashStartClock <= state.diff.parry) {
+          } else if (facing && inParryWindow(state)) {
             deflect(state, shot)
           } else if (player.iframes <= 0 && !state.strike) {
             shot.dead = true
             hurtPlayer(state, 1, shot.x - shot.vx)
+            if (shot.type === 'pot') burstPot(state, shot, player.x)
           }
         }
       } else {
@@ -1464,8 +1952,9 @@
           if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn') continue
           if (overlaps({ x0: shot.x - 8, x1: shot.x + 8, y0: shot.y - 6, y1: shot.y + 6 }, enemyBox(enemy))) {
             shot.dead = true
-            hitEnemy(state, enemy, 3, 'arrow')
+            hitEnemy(state, enemy, 3, shot.type === 'pot' ? 'pot' : 'arrow')
             if (!enemy.alive) addScore(state, 80)
+            if (shot.type === 'pot') burstPot(state, shot, enemy.x)
             break
           }
         }
@@ -1551,7 +2040,7 @@
         if (grounded && Math.abs(player.x - crack.x) <= half && player.iframes <= 0 && !state.strike) hurtPlayer(state, 1, crack.x)
         for (const enemy of state.enemies) {
           if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || enemy.state === 'dying') continue
-          if (enemy.type === 'crow' || enemy.type === 'boss' || enemy.type === 'angler' || enemy.y < GROUND - 4 || Math.abs(enemy.x - crack.x) > half) continue
+          if (enemy.type === 'crow' || isBoss(enemy) || enemy.y < GROUND - 4 || Math.abs(enemy.x - crack.x) > half) continue
           hitEnemy(state, enemy, 4, 'crack')
           if (enemy.alive) {
             enemy.state = 'stagger'; enemy.openedAt = state.clock; enemy.t = 1.4; enemy.vx = 0
@@ -1576,6 +2065,114 @@
     const now = player.coverT >= 0.35
     if (now !== player.hidden) emit(state, now ? 'hide' : 'reveal', { x: player.x, y: player.y })
     player.hidden = now
+  }
+
+  // ------------------------------------------------------------ terrain: arrow rain, wildfire
+
+  const VOLLEY_SHELTER = 46
+
+  /** A ruined wall shelters the strip on the side the arrows fall away from. */
+  function sheltered(state, x) {
+    const dir = state.world.volley?.dir ?? -1
+    return (state.world.ramparts || []).some((wall) => (dir < 0 ? x >= wall.x - VOLLEY_SHELTER && x <= wall.x + 4 : x <= wall.x + VOLLEY_SHELTER && x >= wall.x - 4))
+  }
+
+  function callVolley(state, x, w, tele, fromBoss = false) {
+    const [min, max] = state.lock || state.level.range
+    const cx = clamp(x, min + w * 0.3, max - w * 0.3)
+    const volley = { id: state.nextId++, x: cx, w, t: 0, tele: tele * state.diff.tele, landed: false, boss: fromBoss }
+    state.volleys.push(volley)
+    emit(state, 'volleyTell', { id: volley.id, x: cx, w, tele: volley.tele })
+    prompt(state, 'volley')
+    return volley
+  }
+
+  /** 烽燧: while the beacon fight is on, the far ridge looses a volley at the player's position every few seconds. */
+  function updateVolleys(state, dt) {
+    const player = state.player
+    const spec = state.world.volley
+    if (spec) {
+      const [calm, tele] = spec.cycle
+      const active = state.lock && !player.dead && player.x >= spec.zone[0] && player.x <= spec.zone[1]
+      if (active) {
+        state.volleyClock += dt
+        if (state.volleyClock >= calm + tele) {
+          state.volleyClock = 0
+          callVolley(state, player.x + (state.random() - 0.5) * 60, spec.width, tele)
+        }
+      } else state.volleyClock = calm + tele - 1.8
+    }
+    for (const volley of state.volleys) {
+      volley.t += dt
+      if (volley.landed || volley.t < volley.tele) continue
+      volley.landed = true
+      const half = volley.w / 2
+      emit(state, 'volleyHit', { id: volley.id, x: volley.x, w: volley.w })
+      if (!player.dead && Math.abs(player.x - volley.x) <= half && !sheltered(state, player.x) && player.iframes <= 0 && !state.strike) hurtPlayer(state, 1, volley.x)
+      for (const enemy of state.enemies) {
+        if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || enemy.state === 'dying' || enemy.type === 'general') continue
+        if (Math.abs(enemy.x - volley.x) > half || sheltered(state, enemy.x)) continue
+        hitEnemy(state, enemy, 3, 'volley')
+      }
+    }
+    state.volleys = state.volleys.filter((volley) => volley.t < volley.tele + 0.7)
+  }
+
+  const FIRE_DOWNWIND = 0.32, FIRE_UPWIND = 1.1, FIRE_BURN = 3.4, PATCH_LIFE = 2.4, PATCH_WIDTH = 56
+
+  function cellAt(state, x) { return state.grass.find((cell) => x >= cell.x && x < cell.x + GRASS_CELL) || null }
+
+  function lightCell(state, cell, announce) {
+    if (cell.s !== 'dry') return
+    cell.s = 'burn'; cell.t = 0; cell.down = false; cell.up = false
+    if (announce) { emit(state, 'ignite', { x: cell.x + GRASS_CELL / 2 }); prompt(state, 'fire') }
+  }
+
+  /** Oil fire: dry grass catches and spreads; bare earth burns briefly in a small patch. */
+  function igniteAt(state, x) {
+    const cell = cellAt(state, x)
+    if (cell) { if (cell.s === 'dry') lightCell(state, cell, true); return }
+    state.fires.push({ id: state.nextId++, x0: x - PATCH_WIDTH / 2, x1: x + PATCH_WIDTH / 2, t: 0, life: PATCH_LIFE })
+    emit(state, 'fireStart', { x, w: PATCH_WIDTH })
+  }
+
+  function burstPot(state, shot, x) {
+    shot.dead = true
+    emit(state, 'potBreak', { x, y: Math.min(shot.y, GROUND - 4) })
+    igniteAt(state, x)
+  }
+
+  function burningAt(state, x) {
+    const cell = cellAt(state, x)
+    if (cell && cell.s === 'burn' && cell.t > 0.1) return true
+    return state.fires.some((fire) => x >= fire.x0 && x <= fire.x1 && fire.t > 0.1)
+  }
+
+  function updateFire(state, dt) {
+    if (!state.grass.length && !state.fires.length) return
+    const dir = state.world.fireWind || 1
+    for (const cell of state.grass) {
+      if (cell.s !== 'burn') continue
+      cell.t += dt
+      const downwind = state.grass[cell.id + dir], upwind = state.grass[cell.id - dir]
+      if (!cell.down && cell.t >= FIRE_DOWNWIND) { cell.down = true; if (downwind && Math.abs(downwind.x - cell.x) === GRASS_CELL) lightCell(state, downwind, false) }
+      if (!cell.up && cell.t >= FIRE_UPWIND) { cell.up = true; if (upwind && Math.abs(upwind.x - cell.x) === GRASS_CELL) lightCell(state, upwind, false) }
+      if (cell.t >= FIRE_BURN) { cell.s = 'ash'; cell.t = 0 }
+    }
+    for (const fire of state.fires) fire.t += dt
+    state.fires = state.fires.filter((fire) => fire.t < fire.life)
+    const player = state.player
+    if (!player.dead && player.y >= GROUND - 26 && player.iframes <= 0 && !state.strike && burningAt(state, player.x)) {
+      hurtPlayer(state, 1, player.x + dir * 10)
+      emit(state, 'burn', { x: player.x, y: player.y })
+    }
+    for (const enemy of state.enemies) {
+      if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || enemy.state === 'dying' || enemy.type === 'crow' || enemy.burnCd > 0) continue
+      if (enemy.y < GROUND - 4 || !burningAt(state, enemy.x)) continue
+      enemy.burnCd = 0.9
+      hitEnemy(state, enemy, isBoss(enemy) ? 1 : 2, 'fire')
+      emit(state, 'burn', { x: enemy.x, y: enemy.y, id: enemy.id })
+    }
   }
 
   function updateEncounters(state, dt) {
@@ -1690,6 +2287,8 @@
     updateProjectiles(state, sdt)
     updateIcicles(state, sdt)
     updateThinIce(state, sdt)
+    updateVolleys(state, sdt)
+    updateFire(state, sdt)
     state.enemies = state.enemies.filter((enemy) => enemy.alive || enemy.state === 'dying')
     updateEncounters(state, dt)
     updateFlags(state)
@@ -1709,6 +2308,7 @@
 
   globalThis.XiabanInkBlade = {
     GROUND, GRAVITY, STAGES, ENEMY, DIFFICULTIES,
-    createGame, step, result, evaluate, challenge, spawnEnemy, slashBox, enemyBox, overlaps, windSpeed,
+    BOSSES, GRASS_CELL, VOLLEY_SHELTER,
+    createGame, step, result, evaluate, challenge, spawnEnemy, slashBox, enemyBox, overlaps, windSpeed, isBoss, sheltered, burningAt, callVolley, igniteAt,
   }
 })()
