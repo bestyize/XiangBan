@@ -2,7 +2,7 @@
 
 规范见 [README.md](README.md)。本文记录实施进度，每完成一步就更新。「完成」只表示表里写明的验证已经做过，没写的就是没验证。
 
-基线分支：`feat/app-plaza-runtime`。iOS 暂缓（2026-11-08 决定）。
+第一批已经合进 `main`（PR [#143](https://github.com/bestyize/XiangBan/pull/143)，合并提交 `7e7142b8`）。下一批从 `main` 开新分支。iOS 暂缓（2026-11-08 决定）。
 
 ## 分工
 
@@ -102,3 +102,4 @@
   - **合并**：三个分支依次合入 `feat/app-plaza-runtime`，没有冲突。合并后的代码：`:androidApp:assembleDebug` 通过；community-core 的 JVM 测试 326 个全部通过；小样的单元测试 3 个通过。服务端代码和它的分支完全一样（diff 为 0 行），所以没有再跑一遍服务端测试。合并后的 APK 连线上服务时，广场能正常打开，没有崩溃；线上还没有社区作品，所以显示「还没有社区作品」。
   - 没有部署。测试期间改过的手机设置（USB 连接时保持常亮、ADB 端口转发）都已恢复。
 - 2026-11-08：`feat/app-plaza-runtime` 推送到 GitHub（`origin/feat/app-plaza-runtime`，推送时最新提交是 `feb0e1cf`），还没合进 `main`，也没有开 PR。
+- 2026-11-08：PR #143 合进 `main`，合并提交 `7e7142b8`。用合并提交的方式保留了分步提交的历史。删除了三个 worktree 和已合并的本地分支，远端的 `feat/app-plaza-runtime` 分支还保留着。服务端还没部署。
