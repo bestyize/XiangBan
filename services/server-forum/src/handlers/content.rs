@@ -80,6 +80,8 @@ pub struct ListQuery {
     sort: Option<String>,
     /// 只列出改编自这个作品的作品；不传时主列表不含任何改编作品。
     remix_of: Option<i64>,
+    /// `true` 时只列出被编辑精选的作品，按精选时间倒序（覆盖 `sort`）；不传或 `false` 不过滤。
+    featured: Option<bool>,
     page: Option<i64>,
     page_size: Option<i64>,
 }
@@ -209,7 +211,10 @@ async fn list_packs(
         }
     }
     let pattern = q.q.as_deref().map(str::trim).filter(|s| !s.is_empty()).map(like_pattern);
-    let order = if q.sort.as_deref() == Some("hot") { "p.apply_count DESC, p.id DESC" } else { "p.updated_at DESC, p.id DESC" };
+    let featured = q.featured == Some(true);
+    let order = if featured {
+        "p.featured_at DESC, p.id DESC"
+    } else if q.sort.as_deref() == Some("hot") { "p.apply_count DESC, p.id DESC" } else { "p.updated_at DESC, p.id DESC" };
     let filter = "p.status = 'published'
         AND NOT EXISTS(SELECT 1 FROM users a WHERE a.uid=p.author_uid AND a.status='banned')
         AND (p.topic_id IS NULL OR EXISTS(SELECT 1 FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0))
@@ -221,7 +226,8 @@ async fn list_packs(
             AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker=$5 AND b.blocked=p.author_uid)))
         AND ($6::bigint IS NULL OR p.remix_of_pack_id = $6)
         AND ($6::bigint IS NOT NULL OR (p.remix_of_pack_id IS NULL AND p.remix_of_author_uid IS NULL))
-        AND COALESCE((SELECT v.runtime_protocol FROM pack_versions v WHERE v.pack_id=p.id AND v.version=p.current_version),1) = ANY($7::smallint[])";
+        AND COALESCE((SELECT v.runtime_protocol FROM pack_versions v WHERE v.pack_id=p.id AND v.version=p.current_version),1) = ANY($7::smallint[])
+        AND (NOT $8::bool OR p.featured_at IS NOT NULL)";
     let (total,): (i64,) = sqlx::query_as(&format!("SELECT count(*) FROM packs p WHERE {filter}"))
         .bind(&q.kind)
         .bind(&pattern)
@@ -230,11 +236,12 @@ async fn list_packs(
         .bind(follower)
         .bind(q.remix_of)
         .bind(&protocols)
+        .bind(featured)
         .fetch_one(&state.pool)
         .await?;
     let rows: Vec<PackRow> = sqlx::query_as(&format!(
         "SELECT {PACK_COLUMNS} FROM packs p LEFT JOIN users u ON u.uid = p.author_uid
-         WHERE {filter} ORDER BY {order} LIMIT $8 OFFSET $9"
+         WHERE {filter} ORDER BY {order} LIMIT $9 OFFSET $10"
     ))
     .bind(&q.kind)
     .bind(&pattern)
@@ -243,6 +250,7 @@ async fn list_packs(
     .bind(follower)
     .bind(q.remix_of)
     .bind(&protocols)
+    .bind(featured)
     .bind(size)
     .bind((page - 1) * size)
     .fetch_all(&state.pool)
