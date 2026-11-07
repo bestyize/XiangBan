@@ -11,6 +11,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -91,8 +92,13 @@ internal fun AppLibraryDrawer(env: CommunityEnv, dismiss: () -> Unit, goPlaza: (
                 if (!session.loggedIn) Text("登录后查看社区收藏", Modifier.clickable { dismiss(); open(Route.Login) }.padding(vertical = 8.dp), style = XType.Secondary, color = LocalExtraColors.current.brandInk)
                 message?.let { Text(it, style = XType.Caption, color = Danger) }
             }
-            AppActionButton("去应用广场", { dismiss(); goPlaza() }, Modifier.padding(top = 16.dp).fillMaxWidth(), primary = true, icon = XIcons.ArrowRight)
-            Box(Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp).size(48.dp, 16.dp).clickable { dismiss() }, contentAlignment = Alignment.Center) {
+            Hairline(Modifier.padding(top = 12.dp))
+            Row(Modifier.fillMaxWidth().height(44.dp).clickable(role = Role.Button) { dismiss(); goPlaza() },
+                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                Text("去应用广场", style = XType.Secondary, fontWeight = FontWeight.SemiBold, color = LocalExtraColors.current.brandInk)
+                XIcon(XIcons.ChevronRight, Modifier.padding(start = 2.dp), size = 16.dp, tint = LocalExtraColors.current.brandInk)
+            }
+            Box(Modifier.align(Alignment.CenterHorizontally).size(48.dp, 16.dp).clickable { dismiss() }, contentAlignment = Alignment.Center) {
                 Box(Modifier.size(32.dp, 4.dp).clip(CircleShape).background(LocalExtraColors.current.line))
             }
         }
