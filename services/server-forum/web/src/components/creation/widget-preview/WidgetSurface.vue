@@ -7,16 +7,14 @@ import {dateKey,lunarDate} from './calendar';
 import {emptyNote,emptyCountdown,countdownValue,occursOn,itemDone,toggleItem,scheduleLabel} from './content';
 import ItemForm from './ItemForm.vue';
 import {cornerResize} from './resize';
-import {customWidgetDocument,isCustomDragMessage} from './custom-drag';
+import {customWidgetDocument,customWidgetShell,isCustomDragMessage} from './custom-drag';
 
 const props=withDefaults(defineProps<{widget:DesktopWidget;preview?:boolean;demo?:boolean;editing?:boolean;payload?:WidgetPayload;renderScale?:number;save?:(c:WidgetContent)=>Promise<void>}>(),{preview:false,demo:false,editing:false,renderScale:1});
 const emit=defineEmits<{settings:[]}>();
 const now=ref(new Date()),error=ref(''),saving=ref(false),addOpen=ref(false),editingItem=ref<TodoItem|ReminderItem>();
 const size=computed(()=>baseSize(props.widget.kind,props.widget.custom)),clock=computed(()=>now.value.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}));
 const customFrame=ref<HTMLIFrameElement>();
-const customShell=desktop
-  ? navigator.userAgent.includes('Windows')?'http://wallpaper-asset.localhost/widget-sandbox':'wallpaper-asset://localhost/widget-sandbox'
-  : '/widgets/sandbox.html';
+const customShell=customWidgetShell(desktop);
 const surfaceScale=computed(()=>props.widget.kind==='custom'?props.renderScale:1);
 function customLayout(){customFrame.value?.contentWindow?.postMessage({type:'xiaoban-widget-layout',scale:props.renderScale,width:size.value.width,height:size.value.height},'*');}
 watch(()=>props.renderScale,customLayout,{flush:'post'});
