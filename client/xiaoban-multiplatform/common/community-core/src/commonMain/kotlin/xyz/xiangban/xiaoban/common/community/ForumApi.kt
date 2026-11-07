@@ -36,8 +36,8 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
     private suspend inline fun <reified T> get(path: String): T = http.send(HttpMethod.Get, path, serializer<T>(), token = token())
 
     // ── 内容 ──
-    suspend fun packs(kind: String? = null, sort: String? = null, q: String? = null, page: Int = 1, tag: String? = null, following: Boolean = false): Page<Pack> =
-        get("/api/packs${query("kind" to kind, "sort" to sort, "q" to q, "page" to page, "tag" to tag, "following" to following.takeIf { it })}")
+    suspend fun packs(kind: String? = null, sort: String? = null, q: String? = null, page: Int = 1, tag: String? = null, following: Boolean = false, featured: Boolean = false): Page<Pack> =
+        get("/api/packs${query("kind" to kind, "sort" to sort, "q" to q, "page" to page, "tag" to tag, "following" to following.takeIf { it }, "featured" to featured.takeIf { it })}")
 
     suspend fun pack(id: Long): Pack = get("/api/packs/$id")
     suspend fun gameDownload(id: Long, version: Int): CommunityGameDownload = get("/api/packs/$id/download?version=$version")
