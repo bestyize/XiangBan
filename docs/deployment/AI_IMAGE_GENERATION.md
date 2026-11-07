@@ -2,6 +2,19 @@
 
 2026-11-01（北京时间）核实并配置。AI 网关与 New API 的实际生产部署都在香港服务器，历史设计里的首尔同机部署设想不代表当前部署位置。服务器与密钥清单仍按本机 SSH 运维记录核实；不要为连接旧地址而忽略 SSH 主机指纹校验。
 
+## 2026-11-05：默认静态生图切换为 GPT Image 2.6
+
+按用户要求，先验证现有订阅渠道接受 `image_generation.model=gpt-image-2.6` 并返回完成图片，再将小伴产品 `wallpaper/image` 的默认型号从 `gpt-image-2.5` 切换为 `gpt-image-2.6`。`xiaoban-frontier/image` 保持原配置。
+
+- 渠道 7 新增 `gpt-image-2.6` 别名，外层模型映射至 `gpt-6.1-sol`，工具内保留 `gpt-image-2.6`。旧 2.5 路由仍可用。裸别名由订阅上游接受，响应未提供具体图片变体名，不承诺锁定 Sunburst 或 Flare。
+- 新别名沿用本站原固定价格 `0.0672` 美元/张，默认分组扣除 `33,600` 底层额度单位；增加 `image_generation:gpt-image-2.6* = 0` 的工具费覆盖，避免重复计费。
+- `server-ai` 将裸别名 2.6 纳入订阅 Responses 静态生图适配。`GET /api/ai/tiers` 只公布 `formats: ["png"]`，GIF 请求在收费调用前拒绝。明确的 `gpt-image-2.6-sunburst` / `gpt-image-2.6-flare` 仍保留独立 Images/GIF 路径，未在本次配置或验收。
+- 本地 `cargo test --offline --locked --manifest-path services/server-ai/Cargo.toml media::unit`：11 项通过；本地交叉编译 Linux release 后上传，服务健康检查 HTTP 200，未在云端编译。
+- 使用桌面现有登录令牌调用小伴 `/v1/images/generations`，不传模型名，HTTP 200，约 18.6 秒返回一张 PNG（1,061,886 字节）。响应仅含 `created`、`data`，图片项仅含 `b64_json`。
+- 最终消费记录 `12982`：型号 `gpt-image-2.6`、渠道 7、扣除 `33,600`，无额外 `tool_surcharges`。单独使用新别名的上游验证记录为 `12981`。
+
+变更前配置及二进制、变更后验证摘要保存在 `/opt/server-ai/backups/gpt-image-26-20261105-235532/`，路由登记与产品默认切换均写入 `admin_audit`。如需回退，在后台将 `wallpaper/image` 改回 `gpt-image-2.5` 即可；若同时回退程序，使用该目录的 `server-ai.before` 原子替换并重启服务。不要覆盖整个渠道、价格表或用户钱包。
+
 ## 初次上线配置
 
 本节记录最初的 Vertex 上线状态；当前路由以本文后面的「订阅接管后的当前配置」为准。
@@ -58,9 +71,9 @@ sudo systemctl restart 9router
 
 该初始 GPT 路由现已迁出渠道 6，渠道 6 改为 Antigravity 图片渠道。不要再按初始 GPT 登记整行删除渠道 6；当前回滚方式见下一节。
 
-## 订阅接管后的当前配置
+## 2026-11-01 订阅接管配置（历史基线）
 
-用户自行创建并启用 `ChatGPT Subscription (Codex)` 渠道 7，并把 `wallpaper/image` 默认模型改成 `gpt-image-2.5`。本次保留这份订阅凭据、代理、GPT 模型和默认图片选择，按用户要求把 GPT 路由全部归到该渠道。
+本节记录 2026-11-01 的配置，当前默认图片型号以本文开头的 2026-11-05 记录为准。用户自行创建并启用 `ChatGPT Subscription (Codex)` 渠道 7，并把 `wallpaper/image` 默认模型改成 `gpt-image-2.5`。本次保留这份订阅凭据、代理、GPT 模型和默认图片选择，按用户要求把 GPT 路由全部归到该渠道。
 
 | 后台模型名 | 实际通路 | 处理方式 |
 | --- | --- | --- |

@@ -60,9 +60,9 @@ pub const IMAGE_MAX_COUNT: u64 = 4;
 /// The largest reply relayed back (base64 images are big).
 const IMAGE_MAX_REPLY: usize = 48 * 1024 * 1024;
 
-/// GIF uses the Images API, never the streaming subscription-channel adapter.
+/// Explicit 2.6 variants use Images/GIF; the bare 2.6 subscription alias is static-only.
 pub fn gif_image_model(model: &str) -> bool {
-    matches!(model, "gpt-image-2.6" | "gpt-image-2.6-sunburst" | "gpt-image-2.6-flare")
+    matches!(model, "gpt-image-2.6-sunburst" | "gpt-image-2.6-flare")
 }
 
 pub fn image_formats(model: &str) -> Vec<&'static str> {
@@ -130,7 +130,7 @@ fn native_gemini_image(model: &str) -> bool {
 }
 
 fn native_gpt_image(model: &str) -> bool {
-    matches!(model, "gpt-image-1.5" | "gpt-image-2" | "gpt-image-2.5" | "gpt-image-2.5-flare" | "gpt-image-2.5-sunburst")
+    matches!(model, "gpt-image-1.5" | "gpt-image-2" | "gpt-image-2.5" | "gpt-image-2.5-flare" | "gpt-image-2.5-sunburst" | "gpt-image-2.6")
 }
 
 /// New API maps the outer image-model alias to a Responses-capable coordinator.
@@ -543,6 +543,19 @@ mod unit {
         assert_eq!(native["store"], false);
         assert!(native.get("n").is_none());
         assert!(responses_image_payload(&json!({"prompt":"cat","size":"1792x1024"})).is_err());
+    }
+
+    #[test]
+    fn gpt_26_subscription_alias_preserves_tool_model_and_rejects_gif_before_billing() {
+        let sizes = vec!["auto".into()];
+        let payload = image_payload("gpt-image-2.6", &sizes, br#"{"prompt":"cat"}"#).unwrap();
+        assert!(native_gpt_image("gpt-image-2.6"));
+        let native = responses_image_payload(&payload).unwrap();
+        assert_eq!(native["model"], "gpt-image-2.6");
+        assert_eq!(native["tools"][0]["model"], "gpt-image-2.6");
+        assert_eq!(native["tools"][0]["output_format"], "png");
+        assert_eq!(image_formats("gpt-image-2.6"), vec!["png"]);
+        assert!(image_payload("gpt-image-2.6", &sizes, br#"{"prompt":"cat","output_format":"gif"}"#).is_err());
     }
 
     #[test]

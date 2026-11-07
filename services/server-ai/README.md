@@ -45,9 +45,11 @@
 
 Gemini 原生生图模型（`gemini-3.1-flash-image`、`gemini-3-pro-image`、`gemini-3.1-flash-lite-image`、`gemini-nano-banana-2.1`）仍通过上述统一接口调用：后台会转换为 New API 的 `/v1beta/models/{model}:generateContent`，由已配置的 Gemini / Vertex 渠道处理，用户令牌、钱包和额度对账沿用原路径。需要在 New API 渠道中登记同名模型，并配置正确的图像计费。标准尺寸支持 `1024x1024`、`1536x1024`、`1024x1536`、`1792x1024`、`1024x1792` 和 `auto`，映射为相应画幅比例，使用 1K 输出；实际像素尺寸由模型决定。一次请求多张时按张顺序调用，不自动重试；后续调用失败时返回已成功生成的图片。响应只保留最终图片，不返回思考内容、文本说明、模型名或用量，且累计图片响应仍受 48 MiB 限制。
 
-GPT 生图模型（`gpt-image-1.5`、`gpt-image-2`、`gpt-image-2.5` 及其 Flare / Sunburst 变体）转换为 New API `/v1/responses` 的 `image_generation` 工具请求，支持 ChatGPT Subscription（Codex）渠道。New API 中必须登记图片模型别名，并将外层模型映射到支持生图工具的聊天模型；工具内仍使用所选图片模型。当前实测配置为渠道 7 的 `gpt-image-2.5 → gpt-6.1-sol`，同时保留图片模型的按次计费。须将 `tool_price_setting.prices` 的 `image_generation:gpt-image-2.5*` 设为 0，避免在本站固定图片价格外重复加收工具费；不改变普通 GPT 聊天的工具定价。其他图片型号仍需各自核实授权、映射和计费。
+GPT 生图模型（`gpt-image-1.5`、`gpt-image-2`、`gpt-image-2.5` 及其 Flare / Sunburst 变体，以及订阅兼容别名 `gpt-image-2.6`）转换为 New API `/v1/responses` 的 `image_generation` 工具请求，支持 ChatGPT Subscription（Codex）渠道。New API 中必须登记图片模型别名，并将外层模型映射到支持生图工具的聊天模型；工具内仍使用所选图片模型。渠道 7 已实测接受 `gpt-image-2.6` 工具型号，外层映射至 `gpt-6.1-sol`。每个独立图片别名保留按次计费，并将 `tool_price_setting.prices` 的对应 `image_generation:<型号>*` 设为 0，避免在本站固定图片价格外重复加收工具费；不改变普通 GPT 聊天的工具定价。裸别名不承诺锁定 Sunburst 或 Flare 变体，其他图片型号仍需各自核实授权、映射和计费。
 
 GPT 请求支持 `auto`、`1024x1024`、`1536x1024`、`1024x1536`；每张单独请求，无自动重试，只收集已完成的图片结果并排除 SSE 部分图片、文本与用量。Codex 订阅端点不接受 `max_tool_calls`，使用单一图片工具、关闭并行工具调用并要求单张输出。客户端接口仍为 `/v1/images/generations`；New API 原生 Codex 渠道本身没有因此新增 Images 端点。
+
+2026-11-05 已将小伴产品 `wallpaper/image` 的默认型号切换为订阅兼容别名 `gpt-image-2.6`，真实桌面账号经统一接口出图验证成功，沿用原按张价格且没有重复工具费。部署与回退见 [AI 图片生成部署记录](../../docs/deployment/AI_IMAGE_GENERATION.md)。
 
 针对性验证：`cargo test --offline --locked --manifest-path services/server-ai/Cargo.toml media::unit`（仓库根目录）。
 
@@ -55,9 +57,9 @@ GPT 请求支持 `auto`、`1024x1024`、`1536x1024`、`1024x1536`；每张单独
 
 图片请求新增可选 `output_format`（默认 `png`，可选 `gif`）、`frame_count`、`frame_duration_ms`。GIF 每次 1 张，2–16 帧（默认 9），20–2000 毫秒/帧（默认 200）；静态图不接受动画字段。配置尺寸需为 16 的倍数且不超过 8192/边、所有帧总像素不超过 32M，也可配置 `auto`。不支持的格式、尺寸或参数在创建/扣费调用之前拒绝。
 
-产品图片模型为 `gpt-image-2.6`、`gpt-image-2.6-sunburst` 或 `gpt-image-2.6-flare` 时，`GET /api/ai/tiers` 的 `media.image` 返回 `formats: ["png","gif"]` 和 GIF 参数范围；其余模型返回 `["png"]`，旧客户端忽略新字段仍可静态生图。真实型号继续只由后台选择，不下发给用户。
+产品图片模型为 `gpt-image-2.6-sunburst` 或 `gpt-image-2.6-flare` 时，`GET /api/ai/tiers` 的 `media.image` 返回 `formats: ["png","gif"]` 和 GIF 参数范围；其余模型返回 `["png"]`，旧客户端忽略新字段仍可静态生图。订阅兼容别名 `gpt-image-2.6` 只提供静态 PNG，不声明尚未验证的 GIF 能力。真实型号继续只由后台选择，不下发给用户。
 
-2.6 模型直接使用 New API 的 `/v1/images/generations` 非流式接口，白名单透传动画参数；不走旧版 GPT 的流式 Responses 订阅适配，也不因接口失败自动切换协议或重复请求。上线前须在 New API 配置支持 Images/GIF 的真实渠道、模型访问/GIF 权限和计费，并在产品「媒体能力」选择它；不能仅把订阅渠道别名改成 2.6 就视为支持 GIF。现有 2.5 订阅静态生图保持原路径。
+2.6 的明确 Sunburst / Flare 型号直接使用 New API 的 `/v1/images/generations` 非流式接口，白名单透传动画参数；不走流式 Responses 订阅适配，也不因接口失败自动切换协议或重复请求。上线前须在 New API 配置支持 Images/GIF 的真实渠道、模型访问/GIF 权限和计费，并在产品「媒体能力」选择它；不能仅把订阅渠道别名改成 2.6 就视为支持 GIF。2.5 和裸别名 2.6 的订阅静态生图使用 Responses 通路。
 
 参数依据 [OpenAI 生图指南](https://developers.openai.com/api/docs/guides/image-generation#generate-animated-gif-output) 和 [Images API 参考](https://developers.openai.com/api/reference/resources/images/methods/generate)。指南与参考的帧数上限不同，本次使用共同支持的 2–16 帧范围。验证：`cargo test --offline --locked media::unit`，使用本地协议测试，未验证真实 2.6 渠道或收费；三端发布后还需真实模型验收。
 
