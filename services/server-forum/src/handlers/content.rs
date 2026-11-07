@@ -102,7 +102,7 @@ const PACK_COLUMNS: &str = "p.id, p.kind, p.slug, p.title, p.summary, p.tags, p.
     p.allow_remix, p.remix_of_pack_id, p.remix_of_version, p.remix_of_author_uid,
     (SELECT ra.nickname FROM users ra WHERE ra.uid=p.remix_of_author_uid) AS remix_author_name,
     (SELECT count(*) FROM packs r WHERE r.remix_of_pack_id=p.id AND r.status='published') AS remix_count,
-    p.network_disabled";
+    p.network_disabled, p.featured_at";
 
 #[derive(sqlx::FromRow)]
 struct PackRow {
@@ -130,6 +130,7 @@ struct PackRow {
     remix_author_name: Option<String>,
     remix_count: i64,
     network_disabled: bool,
+    featured_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -167,6 +168,8 @@ impl PackRow {
             "remix_of": remix_of,
             "remix_count": self.remix_count,
             "network_disabled": self.network_disabled,
+            "featured": self.featured_at.is_some(),
+            "featured_at": self.featured_at,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         })
