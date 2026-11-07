@@ -18,7 +18,7 @@ test('details and legacy scheme pages retain their parent navigation', () => {
 })
 
 test('canonical resource category URLs belong to the resource section',()=>{
- for(const slug of ['resources','resource-movies','resource-help','resource-open']) strictEqual(sectionOf({name:'category',params:{slug}},[{slug,section:'resources'}]),'resources')
+ for(const slug of ['resources','resource-movies','resource-help']) strictEqual(sectionOf({name:'category',params:{slug}},[{slug,section:'resources'}]),'resources')
 })
 
 test('custom category slugs follow metadata instead of historical prefixes',()=>{

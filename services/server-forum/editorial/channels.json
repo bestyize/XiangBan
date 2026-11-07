@@ -240,12 +240,6 @@
       "description": "分享求助悬赏的合法来源、图文导读和使用方法"
     },
     {
-      "id": "resource-open",
-      "parent": "resources",
-      "label": "开源讨论",
-      "description": "分享开源精选的合法来源、图文导读和使用方法"
-    },
-    {
       "id": "site-notice",
       "parent": "site",
       "label": "公告",
@@ -278,7 +272,6 @@
     "tech-productivity": "learn-workflows",
     "tech-hardware": "learn-hardware",
     "tech-creative": "learn-prompts",
-    "share-software": "resource-open",
     "share-movies": "resource-movies",
     "share-help": "resource-help",
     "xiaoban-wallpaper": "create-wallpaper",

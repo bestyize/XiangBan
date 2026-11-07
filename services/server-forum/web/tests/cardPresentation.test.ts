@@ -11,7 +11,7 @@ test('film and music use masonry, while guides, questions and notices remain rea
   for (const category of ['resource-movies','resource-music','casual','casual-work','casual-offwork','casual-loss','casual-dream','casual-gear','casual-indie','casual-fun','casual-media','casual-think','casual-help','casual-chat']) assert.equal(articleLayout(category),'masonry')
   for (const category of ['learn-codex','learn-prompts','create-wallpaper','resource-help']) assert.equal(articleLayout(category),'reading')
   for (const category of ['site-notice','site-rules','site-feedback','site-reports']) assert.equal(articleLayout(category),'plain')
-  for (const category of ['resource-tools','resource-docs','resource-open']) assert.equal(articleLayout(category),'visual')
+  for (const category of ['resource-tools','resource-docs']) assert.equal(articleLayout(category),'visual')
 })
 test('only a wallpaper work feed becomes masonry; abilities remain directories', () => {
   assert.equal(packLayout('wallpaper',true),'masonry')

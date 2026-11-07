@@ -9,7 +9,7 @@ export function cardTitleLines(category = ''): 2 | 3 {
 export function articleLayout(category: string): ArticleLayout {
   if (category === 'site' || category.startsWith('site-')) return 'plain'
   if (category === 'casual' || category.startsWith('casual-') || ['resource-movies', 'resource-music'].includes(category)) return 'masonry'
-  return ['resource-tools', 'resource-docs', 'resource-open'].includes(category) ? 'visual' : 'reading'
+  return ['resource-tools', 'resource-docs'].includes(category) ? 'visual' : 'reading'
 }
 export function packLayout(kind: string, wallpaperFeed = false): PackLayout {
   if (wallpaperFeed && kind === 'wallpaper') return 'masonry'

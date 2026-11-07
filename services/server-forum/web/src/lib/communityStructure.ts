@@ -45,7 +45,7 @@ export function discussionCategory(tab:string, filter='', categories:Category[] 
   return discussionFilter(categories,tab,filter) || canonicalCategory(tab)
 }
 export function resourceTopicCategory(tab:string) {
-  return ({media:'resource-movies',help:'resource-help',open:'resource-open'} as Record<string,string>)[tab] || canonicalCategory(tab)
+  return ({media:'resource-movies',help:'resource-help'} as Record<string,string>)[tab] || canonicalCategory(tab)
 }
 export function categoryLabel(category:Pick<Category,'name'>) { return category.name }
 export function resourceTabs(categories:Category[]) {

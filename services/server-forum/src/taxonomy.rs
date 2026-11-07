@@ -77,7 +77,7 @@ pub async fn migrate_sections(pool: &PgPool) -> AppResult<()> {
     sqlx::query("UPDATE categories c SET section=CASE COALESCE(p.slug,c.slug) WHEN 'create' THEN 'ideas' WHEN 'resources' THEN 'resources' WHEN 'site' THEN 'site' ELSE 'discuss' END FROM (SELECT id,parent_id,slug FROM categories) p WHERE p.id=COALESCE(c.parent_id,c.id)").execute(&mut *tx).await?;
     sqlx::query("UPDATE categories SET name='创意' WHERE slug='create'").execute(&mut *tx).await?;
     // Remove retired category records without restoring or deleting any existing article.
-    for (old,new) in [("resource-tools","resource-open"),("resource-docs","resource-open"),("resource-music","casual-screen"),("casual-media","casual-screen"),("create-guides","learn-workflows"),("share-learn","resource-open"),("share-music","casual-screen"),("xiaoban-app","learn-workflows")] {
+    for (old,new) in [("resource-tools","learn-workflows"),("resource-docs","learn-workflows"),("resource-music","casual-screen"),("casual-media","casual-screen"),("create-guides","learn-workflows"),("share-learn","learn-workflows"),("share-music","casual-screen"),("xiaoban-app","learn-workflows")] {
         sqlx::query("UPDATE topics SET category_id=(SELECT id FROM categories WHERE slug=$2) WHERE category_id=(SELECT id FROM categories WHERE slug=$1)").bind(old).bind(new).execute(&mut *tx).await?;
         sqlx::query("UPDATE editor_drafts SET category_id=(SELECT id FROM categories WHERE slug=$2) WHERE category_id=(SELECT id FROM categories WHERE slug=$1)").bind(old).bind(new).execute(&mut *tx).await?;
         sqlx::query("DELETE FROM categories WHERE slug=$1").bind(old).execute(&mut *tx).await?;
@@ -88,15 +88,32 @@ pub async fn migrate_sections(pool: &PgPool) -> AppResult<()> {
     Ok(())
 }
 
-/// Rename only the original built-in label; preserve administrator-customized names.
-pub async fn migrate_labels(pool: &PgPool) -> AppResult<()> {
-    const NAME: &str = "community-category-labels-v3";
-    let mut tx=pool.begin().await?;
+/// 「开源讨论」(resource-open) 板块已下线。线上库是手工清除的；其他环境走这里：
+/// 板块里没有任何帖子、草稿和子分类才删除，否则只归档并停止发帖，绝不删除内容。
+/// `share-software` 是它的旧名，新库种子里会先建出来，一并处理。
+pub async fn retire_open_source_board(pool: &PgPool) -> AppResult<()> {
+    const NAME: &str = "remove-resource-open-v1";
+    let mut tx = pool.begin().await?;
     sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))").bind(NAME).execute(&mut *tx).await?;
-    let (done,):(bool,)=sqlx::query_as("SELECT EXISTS(SELECT 1 FROM data_migrations WHERE name=$1)").bind(NAME).fetch_one(&mut *tx).await?;
+    let (done,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM data_migrations WHERE name=$1)").bind(NAME).fetch_one(&mut *tx).await?;
     if done { return Ok(()); }
-    sqlx::query("UPDATE categories SET name='开源讨论' WHERE slug='resource-open' AND name='开源精选'").execute(&mut *tx).await?;
+    let (mut removed, mut archived) = (0, 0);
+    for slug in ["resource-open", "share-software"] {
+        let Some((id,)): Option<(i32,)> = sqlx::query_as("SELECT id FROM categories WHERE slug=$1 FOR UPDATE").bind(slug).fetch_optional(&mut *tx).await? else { continue };
+        let (used,): (bool,) = sqlx::query_as(
+            "SELECT EXISTS(SELECT 1 FROM topics WHERE category_id=$1) OR EXISTS(SELECT 1 FROM editor_drafts WHERE category_id=$1) OR EXISTS(SELECT 1 FROM categories WHERE parent_id=$1)",
+        ).bind(id).fetch_one(&mut *tx).await?;
+        if used {
+            sqlx::query("UPDATE categories SET status='archived',posting_enabled=false WHERE id=$1").bind(id).execute(&mut *tx).await?;
+            archived += 1;
+        } else {
+            sqlx::query("DELETE FROM categories WHERE id=$1").bind(id).execute(&mut *tx).await?;
+            removed += 1;
+        }
+    }
     sqlx::query("INSERT INTO data_migrations(name) VALUES($1)").bind(NAME).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO admin_audit(admin,action,target_type,target_id,detail) VALUES('migration','community.retire_board','categories',$1,$2)")
+        .bind(NAME).bind(format!("open-source board retired: {removed} removed, {archived} archived (boards with content are kept)")).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -125,6 +142,10 @@ mod tests {
         migrate(&pool).await?; migrate(&pool).await?;
         let (new_id,): (i32,) = sqlx::query_as("SELECT id FROM categories WHERE slug='learn-local'").fetch_one(&pool).await?;
         assert_eq!(id,new_id);
+        // migrate() 改完名后只剩 share-software：它对应的板块已下线，由 retire_open_source_board 负责清理。
+        let left: Vec<(String,)> = sqlx::query_as("SELECT slug FROM categories WHERE slug LIKE 'tech%' OR slug LIKE 'share%' OR slug LIKE 'xiaoban%' ORDER BY slug").fetch_all(&pool).await?;
+        assert_eq!(left.into_iter().map(|r| r.0).collect::<Vec<_>>(), ["share-software"]);
+        retire_open_source_board(&pool).await?;
         let (legacy_count,): (i64,) = sqlx::query_as("SELECT count(*) FROM categories WHERE slug LIKE 'tech%' OR slug LIKE 'share%' OR slug LIKE 'xiaoban%'").fetch_one(&pool).await?;
         assert_eq!(legacy_count,0);
         for alias in ["tech-llm","learn-local","tech","learn"] {
@@ -152,24 +173,46 @@ mod tests {
         let (topic,): (i64,) = sqlx::query_as("INSERT INTO topics(category_id,author_uid,title,body_md,body_html,excerpt,status) VALUES((SELECT id FROM categories WHERE slug='resource-docs'),$1,'Deleted article','body','body','body','deleted') RETURNING id").bind(uid).fetch_one(&pool).await?;
         migrate_sections(&pool).await?;
         let row: (String,String,String) = sqlx::query_as("SELECT c.slug,c.section,t.status FROM topics t JOIN categories c ON c.id=t.category_id WHERE t.id=$1").bind(topic).fetch_one(&pool).await?;
-        assert_eq!(row,("resource-open".into(),"resources".into(),"deleted".into()));
+        assert_eq!(row,("learn-workflows".into(),"discuss".into(),"deleted".into()));
         let (count,): (i64,) = sqlx::query_as("SELECT count(*) FROM categories WHERE slug IN ('resource-docs','resource-tools','resource-music','casual-media','create-guides')").fetch_one(&pool).await?;
         assert_eq!(count,0);
         sqlx::query("UPDATE categories SET status='archived',posting_enabled=false WHERE slug='casual-work'").execute(&pool).await?;
         migrate_sections(&pool).await?;
         let (status,): (String,) = sqlx::query_as("SELECT status FROM categories WHERE slug='casual-work'").fetch_one(&pool).await?;
         assert_eq!(status,"archived");
-        sqlx::query("UPDATE categories SET name='开源精选' WHERE slug='resource-open'").execute(&pool).await?;
-        migrate_labels(&pool).await?;
-        let (name,):(String,)=sqlx::query_as("SELECT name FROM categories WHERE slug='resource-open'").fetch_one(&pool).await?;
-        assert_eq!(name,"开源讨论");
-        sqlx::query("UPDATE categories SET name='自定义讨论' WHERE slug='resource-open'").execute(&pool).await?;
-        migrate_labels(&pool).await?;
-        let (name,):(String,)=sqlx::query_as("SELECT name FROM categories WHERE slug='resource-open'").fetch_one(&pool).await?;
-        assert_eq!(name,"自定义讨论");
         pool.close().await;
         sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await?;
         Ok(())
     }
 
+    #[tokio::test]
+    async fn retiring_the_open_source_board_never_deletes_content() -> Result<(), Box<dyn std::error::Error>> {
+        let Ok(url) = std::env::var("TEST_DATABASE_URL") else { return Ok(()); };
+        let schema = format!("retire_test_{}", uuid::Uuid::new_v4().simple());
+        let admin = sqlx::PgPool::connect(&url).await?;
+        sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin).await?;
+        let pool = crate::db::connect(&url, Some(&schema)).await?;
+        crate::db::migrate(&pool).await?; crate::db::seed(&pool).await?; migrate(&pool).await?; migrate_sections(&pool).await?;
+        let exists = |slug: &'static str| { let pool = pool.clone(); async move { sqlx::query_as::<_, (bool,)>("SELECT EXISTS(SELECT 1 FROM categories WHERE slug=$1)").bind(slug).fetch_one(&pool).await.map(|r| r.0) } };
+        // 新库：旧名 share-software 被种子建出来，板块为空 -> 直接删除。
+        assert!(exists("share-software").await?);
+        retire_open_source_board(&pool).await?;
+        assert!(!exists("share-software").await? && !exists("resource-open").await?);
+        // 已执行过就不再动（线上就是这个状态）。
+        retire_open_source_board(&pool).await?;
+        // 有内容的环境：只归档，帖子和板块都保留。
+        sqlx::query("DELETE FROM data_migrations WHERE name='remove-resource-open-v1'").execute(&pool).await?;
+        sqlx::query("INSERT INTO categories(slug,name,parent_id) VALUES('resource-open','旧板块',(SELECT id FROM categories WHERE slug='resources'))").execute(&pool).await?;
+        let uid = uuid::Uuid::new_v4();
+        sqlx::query("INSERT INTO users(uid,nickname,trust_level) VALUES($1,'test author',3)").bind(uid).execute(&pool).await?;
+        let (topic,): (i64,) = sqlx::query_as("INSERT INTO topics(category_id,author_uid,title,body_md,body_html,excerpt) VALUES((SELECT id FROM categories WHERE slug='resource-open'),$1,'Kept article','body','body','body') RETURNING id").bind(uid).fetch_one(&pool).await?;
+        retire_open_source_board(&pool).await?;
+        let (status, posting): (String, bool) = sqlx::query_as("SELECT status,posting_enabled FROM categories WHERE slug='resource-open'").fetch_one(&pool).await?;
+        assert_eq!((status.as_str(), posting), ("archived", false));
+        let (kept,): (i64,) = sqlx::query_as("SELECT count(*) FROM topics WHERE id=$1").bind(topic).fetch_one(&pool).await?;
+        assert_eq!(kept, 1);
+        pool.close().await;
+        sqlx::query(&format!("DROP SCHEMA {schema} CASCADE")).execute(&admin).await?;
+        Ok(())
+    }
 }

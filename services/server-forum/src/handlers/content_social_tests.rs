@@ -64,7 +64,7 @@ impl Harness {
         crate::db::seed(&pool).await?;
         crate::taxonomy::migrate(&pool).await?;
         crate::taxonomy::migrate_sections(&pool).await?;
-        crate::taxonomy::migrate_labels(&pool).await?;
+        crate::taxonomy::retire_open_source_board(&pool).await?;
         social::schema::init(&pool).await?;
         social::schema::init(&pool).await?;
         let mut config = AppConfig::from_env();

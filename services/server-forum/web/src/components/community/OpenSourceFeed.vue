@@ -105,7 +105,7 @@ function reset() { update({ tag: undefined, q: undefined, saved: undefined }) }
     <div v-if="catalog?.next_page && !error" ref="sentinel" class="os-feed-note">
       <button type="button" class="os-button" :disabled="loading" @click="load">加载更多</button>
     </div>
-    <footer v-if="catalog" class="os-feed-note"><span>根据项目公开资料整理 · {{ catalog.reviewed_at }}</span><RouterLink to="/resources?tab=resource-open">社区分享 →</RouterLink></footer>
+    <footer v-if="catalog" class="os-feed-note"><span>根据项目公开资料整理 · {{ catalog.reviewed_at }}</span></footer>
     </template>
   </section>
 </template>
