@@ -4,6 +4,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.plugins.HttpTimeoutCapability
+import io.ktor.client.plugins.HttpTimeoutConfig
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.TextContent
@@ -38,6 +40,21 @@ class ImageGenerationTest {
             assertEquals("gif",payload["output_format"]!!.jsonPrimitive.content)
             assertEquals("9",payload["frame_count"]!!.jsonPrimitive.content)
             assertFalse(payload.containsKey("model"))
+        } finally {client.close()}
+    }
+
+    @Test fun `image requests wait for the first byte as long as the whole request`() = runBlocking {
+        var timeouts: HttpTimeoutConfig? = null
+        val client = HttpClient(MockEngine { request ->
+            timeouts = request.getCapabilityOrNull(HttpTimeoutCapability)
+            respond("""{"data":[{"b64_json":"$encoded"}]}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType,"application/json"))
+        }) {install(HttpTimeout)}
+        try {
+            AiGatewayApi(client) {"test-token"}.generateImages("cat",1,null)
+            val config = checkNotNull(timeouts) {"the request carried no timeout configuration"}
+            assertEquals(240_000L, config.requestTimeoutMillis)
+            // 图片接口出图前没有任何数据，读超时必须不短于整体超时，否则 OkHttp 默认的 10 秒会先断开。
+            assertEquals(240_000L, config.socketTimeoutMillis)
         } finally {client.close()}
     }
 

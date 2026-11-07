@@ -220,7 +220,11 @@ class AiGatewayApi(
                 header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(payload.toString())
-                timeout { requestTimeoutMillis = 240_000 }
+                // 出图要等 20 秒左右才有第一个字节；不单独设读超时时，Android 的 OkHttp 默认 10 秒就会断开，图已生成并扣费却拿不到。
+                timeout {
+                    requestTimeoutMillis = 240_000
+                    socketTimeoutMillis = 240_000
+                }
             }.execute { response ->
                 if (!response.status.isSuccess()) {
                     val error = parseApiError(response.status.value, response.readBoundedBytes(64 * 1024).decodeToString())
