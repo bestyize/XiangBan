@@ -161,6 +161,7 @@ class CommunityEnv(
     @OptIn(ExperimentalTime::class)
     private var accountChanged: (String?, String?) -> Unit = { _, _ -> }
     val communityGameBusy = kotlinx.coroutines.flow.MutableStateFlow(false)
+    internal val appLibrary = AppLibraryState(prefs)
     val contentBookmarkRevision = kotlinx.coroutines.flow.MutableStateFlow(0)
     val session = SessionManager(account, storage, now = { Clock.System.now().toEpochMilliseconds() }, onAccountChanged = { old, new -> accountChanged(old, new) })
     val forum = ForumApi(client, config) { session.accessToken() }

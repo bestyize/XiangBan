@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.*
 
 @Composable
-internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, open: ((Route) -> Unit)?, modifier: Modifier = Modifier) {
+internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, open: ((Route) -> Unit)?, modifier: Modifier = Modifier, label: String = "试玩", appStyle: Boolean = false) {
     val scope = rememberCoroutineScope()
     val busy by env.communityGameBusy.collectAsState()
     var loading by remember(id, version) { mutableStateOf(false) }
@@ -27,8 +27,8 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
             Text("当前平台暂不支持试玩，可在 Android 或电脑上打开", style = XType.Caption, color = LocalExtraColors.current.ink3)
             return@Column
         }
-        PillButton(if (loading) "正在准备试玩…" else "试玩", {
-            if (busy) return@PillButton
+        val launchGame: () -> Unit = launchGame@{
+            if (busy) return@launchGame
             env.communityGameBusy.value = true; loading = true; error = null
             scope.launch {
                 try {
@@ -48,7 +48,9 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
                 catch (e: Exception) { error = messageOf(e) }
                 finally { loading = false; env.communityGameBusy.value = false }
             }
-        }, enabled = !busy)
+        }
+        if (appStyle) AppActionButton(if (loading) "正在准备试玩…" else label, launchGame, Modifier.fillMaxWidth(), primary = true, enabled = !busy, icon = XIcons.Play)
+        else PillButton(if (loading) "正在准备试玩…" else label, launchGame, enabled = !busy)
         error?.let { Text(it, Modifier.padding(top = 6.dp), style = XType.Caption, color = Danger) }
     }
 }
