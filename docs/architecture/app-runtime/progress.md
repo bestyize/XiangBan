@@ -11,7 +11,7 @@
 | 规范、原型、给 AI 的规则 | `feat/app-plaza-runtime` | Claude Fable 5 | 已提交（`935174c9`） |
 | 手机端应用广场界面（Compose） | `feat/app-plaza-ui`（`.claude/worktrees/plaza-ui`） | Codex gpt-6.1-sol | 进行中 |
 | Android 运行时协议 2 小样 | `spike/android-runtime-v2`（`.claude/worktrees/runtime-spike`） | Codex gpt-6.1-terra | 进行中 |
-| 服务端 `app` 类型与协议 2 字段 | `feat/forum-app-kind`（`.claude/worktrees/server-v2`） | Claude Sonnet 5.5 | 进行中 |
+| 服务端 `app` 类型与协议 2 字段 | `feat/forum-app-kind`（`.claude/worktrees/server-v2`） | Claude Sonnet 5.5 | 已完成并通过审查，7 个提交（`53b1f89d`…`383b4256`），未合并、未部署 |
 | 审查、真机验证（小米 14）、合并 | — | Claude Fable 5 | 等上面三项完成 |
 
 ## 第一批范围
@@ -57,3 +57,18 @@
 ## 记录
 
 - 2026-11-08：规范、原型和给 AI 的规则提交为基线（`935174c9`）。确认本机 Codex CLI 能调用 gpt-6.1-sol 和 gpt-6.1-terra，沙盒打开网络后能访问 Google 和 Maven 仓库。小米 14 通过 ADB 连接，WebView 156。三个任务已派出。
+- 2026-11-08：服务端第一批完成。
+  - 新增 `app` 类型；`game` 和 `app` 的上限提高到 100 MB。
+  - 校验协议 2 的清单（`runtimeProtocol: 2`，`schemaVersion: 3`）。
+  - 作品详情和列表返回新字段：`runtime_protocol`、`allow_remix`、`remix_of`、`remix_count`、`network_disabled`。
+  - 改编作品不进主信息流，用 `?remix_of=<id>` 单独列出；原作删除后保留原作者署名。
+  - 按 `X-Xiaoban-Runtime` 请求头过滤作品，旧版客户端看不到协议 2 的作品。
+  - 后台接口 `POST /api/admin/packs/{id}/network`，可以禁止或恢复某个作品联网，会写审计记录。
+  - 确认审核等级不影响 `game` 和 `app` 的列表、详情和下载。
+  - 审查时我在隔离库里重跑了完整测试：209 个通过，5 个失败。这 5 个在基线 `1bb124b4` 上也失败（三个版块种子数据测试、`discover_tests::topics_carry_images_polls_and_help_stats`、`points::tests::purchases_are_atomic_idempotent_and_keep_read_permissions`），和本次改动无关。第一次跑时 cargo 用了旧的编译产物，把源码 touch 一下才编进新测试。
+  - 遗留问题：
+    - 没有 `create-app` 讨论版块，`app` 作品可能建不了讨论帖，还没测。
+    - 文件服务 `services/server-resource` 自己的大小上限没改。
+    - 改编作品没有校验 `kind` 必须和原作一致。
+    - 下载接口不按 `X-Xiaoban-Runtime` 过滤。
+    - 协议 2 的 `id` 仍然沿用 1～64 位的规则，规范写的是 2～64 位，两边要统一。
