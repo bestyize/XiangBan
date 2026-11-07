@@ -98,7 +98,7 @@ const PACK_COLUMNS: &str = "p.id, p.kind, p.slug, p.title, p.summary, p.tags, p.
     p.trust_level, p.status, p.current_version, p.cover_key, p.apply_count, p.topic_id, p.created_at, p.updated_at,
     COALESCE((SELECT t.like_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS like_count,
     COALESCE((SELECT t.reply_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS reply_count,
-    COALESCE((SELECT v.runtime_protocol FROM pack_versions v WHERE v.pack_id=p.id AND v.version=p.current_version),1) AS runtime_protocol,
+    COALESCE((SELECT v.runtime_protocol FROM pack_versions v WHERE v.pack_id=p.id AND v.version=p.current_version),1)::smallint AS runtime_protocol,
     p.allow_remix, p.remix_of_pack_id, p.remix_of_version, p.remix_of_author_uid,
     (SELECT ra.nickname FROM users ra WHERE ra.uid=p.remix_of_author_uid) AS remix_author_name,
     (SELECT count(*) FROM packs r WHERE r.remix_of_pack_id=p.id AND r.status='published') AS remix_count,
