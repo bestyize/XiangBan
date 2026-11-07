@@ -151,10 +151,21 @@ class RuntimeV2SpikeActivity : Activity() {
     private fun event(name: String) { if (::webView.isInitialized && loaded) webView.evaluateJavascript("window.__xbEvent && window.__xbEvent('$name')", null) }
     override fun onResume() { super.onResume(); if (::webView.isInitialized) { webView.onResume(); event("show") } }
     override fun onPause() { event("hide"); super.onPause() }
-    @Deprecated("System back") override fun onBackPressed() {
+    // targetSdk 36+ on Android 16 never calls onBackPressed; back must go through OnBackInvokedDispatcher.
+    private fun handleBack() {
         if (::webView.isInitialized && webView.canGoBack()) { webView.goBack(); return }
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastBack < 2000) finish() else { lastBack = now; Toast.makeText(this, "再按一次退出", Toast.LENGTH_SHORT).show() }
     }
+    private val backCallback by lazy { android.window.OnBackInvokedCallback { handleBack() } }
+    override fun onStart() {
+        super.onStart()
+        if (android.os.Build.VERSION.SDK_INT >= 33) onBackInvokedDispatcher.registerOnBackInvokedCallback(android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback)
+    }
+    override fun onStop() {
+        if (android.os.Build.VERSION.SDK_INT >= 33) onBackInvokedDispatcher.unregisterOnBackInvokedCallback(backCallback)
+        super.onStop()
+    }
+    @Deprecated("System back before Android 13") override fun onBackPressed() = handleBack()
     override fun onDestroy() { denyPending(); storageExecutor.shutdown(); if (::webView.isInitialized) webView.destroy(); super.onDestroy() }
 }
