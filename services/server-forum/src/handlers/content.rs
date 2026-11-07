@@ -51,6 +51,7 @@ pub fn admin_routes() -> Router<AppState> {
     Router::new()
         .route("/packs", get(admin_list_packs).post(admin_create_pack))
         .route("/packs/{id}/review", post(admin_review_pack))
+        .route("/packs/{id}/network", post(admin_set_network))
         .route("/packs/{id}/mirrors", post(admin_add_mirror))
         .route("/schemes", post(admin_create_scheme))
         .route("/projects", get(admin_list_projects))
@@ -77,6 +78,8 @@ pub struct ListQuery {
     following: bool,
     /// `new`（默认）或 `hot`。
     sort: Option<String>,
+    /// 只列出改编自这个作品的作品；不传时主列表不含任何改编作品。
+    remix_of: Option<i64>,
     page: Option<i64>,
     page_size: Option<i64>,
 }
@@ -94,7 +97,12 @@ fn like_pattern(q: &str) -> String {
 const PACK_COLUMNS: &str = "p.id, p.kind, p.slug, p.title, p.summary, p.tags, p.author_uid, u.nickname AS author_name,
     p.trust_level, p.status, p.current_version, p.cover_key, p.apply_count, p.topic_id, p.created_at, p.updated_at,
     COALESCE((SELECT t.like_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS like_count,
-    COALESCE((SELECT t.reply_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS reply_count";
+    COALESCE((SELECT t.reply_count FROM topics t WHERE t.id=p.topic_id AND t.status='normal' AND t.min_read_level=0),0) AS reply_count,
+    COALESCE((SELECT v.runtime_protocol FROM pack_versions v WHERE v.pack_id=p.id AND v.version=p.current_version),1)::smallint AS runtime_protocol,
+    p.allow_remix, p.remix_of_pack_id, p.remix_of_version, p.remix_of_author_uid,
+    (SELECT ra.nickname FROM users ra WHERE ra.uid=p.remix_of_author_uid) AS remix_author_name,
+    (SELECT count(*) FROM packs r WHERE r.remix_of_pack_id=p.id AND r.status='published') AS remix_count,
+    p.network_disabled";
 
 #[derive(sqlx::FromRow)]
 struct PackRow {
@@ -114,12 +122,28 @@ struct PackRow {
     topic_id: Option<i64>,
     like_count: i32,
     reply_count: i32,
+    runtime_protocol: i16,
+    allow_remix: bool,
+    remix_of_pack_id: Option<i64>,
+    remix_of_version: Option<i32>,
+    remix_of_author_uid: Option<Uuid>,
+    remix_author_name: Option<String>,
+    remix_count: i64,
+    network_disabled: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
 
 impl PackRow {
     fn json(&self, state: &AppState) -> Value {
+        // 改编关系：原作品被删后 pack_id 为空，但原作者仍保留署名。
+        let remix_of = (self.remix_of_pack_id.is_some() || self.remix_of_author_uid.is_some()).then(|| {
+            json!({
+                "pack_id": self.remix_of_pack_id,
+                "version": self.remix_of_version,
+                "author": self.remix_of_author_uid.map(|uid| json!({ "uid": uid, "nickname": self.remix_author_name })),
+            })
+        });
         json!({
             "id": self.id,
             "kind": self.kind,
@@ -138,6 +162,11 @@ impl PackRow {
             "reply_count": self.reply_count,
             "one_click": content::one_click_allowed(&self.kind, self.trust_level, &self.status),
             "pure_data": content::is_pure_data(&self.kind),
+            "runtime_protocol": self.runtime_protocol,
+            "allow_remix": self.allow_remix,
+            "remix_of": remix_of,
+            "remix_count": self.remix_count,
+            "network_disabled": self.network_disabled,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         })
@@ -150,7 +179,23 @@ fn cover_url(state: &AppState, key: Option<&str>) -> Option<String> {
     Some(format!("{base}/{}", key?))
 }
 
-async fn list_packs(State(state): State<AppState>, MaybeUser(user): MaybeUser, Query(q): Query<ListQuery>) -> AppResult<Json<Page<Value>>> {
+/// 客户端支持的运行时协议：请求头 `X-Xiaoban-Runtime`（如 `1,2`），没有或读不出来时按 1。
+fn runtime_protocols(headers: &HeaderMap) -> Vec<i16> {
+    let parsed: Vec<i16> = headers
+        .get("x-xiaoban-runtime")
+        .and_then(|v| v.to_str().ok())
+        .map(|raw| raw.split(',').filter_map(|p| p.trim().parse::<i16>().ok()).collect())
+        .unwrap_or_default();
+    if parsed.is_empty() { vec![1] } else { parsed }
+}
+
+async fn list_packs(
+    State(state): State<AppState>,
+    MaybeUser(user): MaybeUser,
+    headers: HeaderMap,
+    Query(q): Query<ListQuery>,
+) -> AppResult<Json<Page<Value>>> {
+    let protocols = runtime_protocols(&headers);
     let follower = if q.following {
         Some(user.as_ref().ok_or_else(|| AppError::Unauthorized("请先登录".into()))?.uid)
     } else { None };
@@ -170,24 +215,31 @@ async fn list_packs(State(state): State<AppState>, MaybeUser(user): MaybeUser, Q
         AND ($3::text IS NULL OR $3 = ANY(p.tags))
         AND ($4::uuid IS NULL OR p.author_uid = $4)
         AND ($5::uuid IS NULL OR (EXISTS(SELECT 1 FROM user_follows f WHERE f.follower_uid=$5 AND f.followed_uid=p.author_uid)
-            AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker=$5 AND b.blocked=p.author_uid)))";
+            AND NOT EXISTS(SELECT 1 FROM user_blocks b WHERE b.blocker=$5 AND b.blocked=p.author_uid)))
+        AND ($6::bigint IS NULL OR p.remix_of_pack_id = $6)
+        AND ($6::bigint IS NOT NULL OR (p.remix_of_pack_id IS NULL AND p.remix_of_author_uid IS NULL))
+        AND COALESCE((SELECT v.runtime_protocol FROM pack_versions v WHERE v.pack_id=p.id AND v.version=p.current_version),1) = ANY($7::smallint[])";
     let (total,): (i64,) = sqlx::query_as(&format!("SELECT count(*) FROM packs p WHERE {filter}"))
         .bind(&q.kind)
         .bind(&pattern)
         .bind(&q.tag)
         .bind(q.author)
         .bind(follower)
+        .bind(q.remix_of)
+        .bind(&protocols)
         .fetch_one(&state.pool)
         .await?;
     let rows: Vec<PackRow> = sqlx::query_as(&format!(
         "SELECT {PACK_COLUMNS} FROM packs p LEFT JOIN users u ON u.uid = p.author_uid
-         WHERE {filter} ORDER BY {order} LIMIT $6 OFFSET $7"
+         WHERE {filter} ORDER BY {order} LIMIT $8 OFFSET $9"
     ))
     .bind(&q.kind)
     .bind(&pattern)
     .bind(&q.tag)
     .bind(q.author)
-        .bind(follower)
+    .bind(follower)
+    .bind(q.remix_of)
+    .bind(&protocols)
     .bind(size)
     .bind((page - 1) * size)
     .fetch_all(&state.pool)
@@ -213,9 +265,13 @@ async fn visible(state: &AppState, pack: &PackRow, viewer: Option<Uuid>) -> AppR
     Ok(visible)
 }
 
-async fn get_pack(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+async fn get_pack(State(state): State<AppState>, MaybeUser(user): MaybeUser, headers: HeaderMap, Path(id): Path<i64>) -> AppResult<Json<Value>> {
     let pack = find_pack(&state, id).await?;
     if !visible(&state, &pack, user.as_ref().map(|u| u.uid)).await? {
+        return Err(AppError::not_found("内容包"));
+    }
+    // 旧版客户端不认识协议 2 的作品：当作不存在。
+    if !runtime_protocols(&headers).contains(&pack.runtime_protocol) {
         return Err(AppError::not_found("内容包"));
     }
     let versions: Vec<(i32, String, String, i64, Value, String, DateTime<Utc>)> = sqlx::query_as(
@@ -443,6 +499,44 @@ pub struct CreatePackInput {
     /// 发布者确认自己有权发布这份内容（原创或已获授权），不勾选不能发布。
     #[serde(default)]
     rights_ack: bool,
+    /// 是否允许别人改编，不传按允许。
+    allow_remix: Option<bool>,
+    /// 改编自哪个作品（及版本，不传取原作品当前版本）。
+    remix_of_pack_id: Option<i64>,
+    remix_of_version: Option<i32>,
+}
+
+/// 改编来源：原作品 id、版本和原作者。
+struct RemixSource {
+    pack_id: i64,
+    version: i32,
+    author: Option<Uuid>,
+}
+
+/// 检查改编来源：必须存在、已上架且允许改编；版本必须存在。锁住原作品行，避免检查后它被改成不允许改编。
+async fn check_remix_source(tx: &mut sqlx::PgConnection, pack_id: i64, version: Option<i32>) -> AppResult<RemixSource> {
+    let row: Option<(String, bool, Option<Uuid>, i32)> =
+        sqlx::query_as("SELECT status, allow_remix, author_uid, current_version FROM packs WHERE id = $1 FOR SHARE")
+            .bind(pack_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let (status, allow, author, current) = row.ok_or_else(|| AppError::BadRequest("改编的原作品不存在".into()))?;
+    if status != "published" {
+        return Err(AppError::BadRequest("改编的原作品已下架".into()));
+    }
+    if !allow {
+        return Err(AppError::Forbidden("原作者不允许改编这个作品".into()));
+    }
+    let version = version.unwrap_or(current);
+    let exists: Option<(i32,)> = sqlx::query_as("SELECT version FROM pack_versions WHERE pack_id = $1 AND version = $2")
+        .bind(pack_id)
+        .bind(version)
+        .fetch_optional(&mut *tx)
+        .await?;
+    if exists.is_none() {
+        return Err(AppError::BadRequest("改编的原作品没有这个版本".into()));
+    }
+    Ok(RemixSource { pack_id, version, author })
 }
 
 fn clean_tags(tags: &[String]) -> AppResult<Vec<String>> {
@@ -526,9 +620,15 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     }
     let (size, sha256, manifest) = claim_upload(&mut tx, auth.user.uid, &input.kind, &input.file_key).await?;
     let info = content::validate_manifest(&manifest, &input.kind).map_err(AppError::BadRequest)?;
+    let remix = match input.remix_of_pack_id {
+        Some(source) => Some(check_remix_source(&mut tx, source, input.remix_of_version).await?),
+        None if input.remix_of_version.is_some() => return Err(AppError::BadRequest("remix_of_version 需要同时给出 remix_of_pack_id".into())),
+        None => None,
+    };
     let (id,): (i64,) = sqlx::query_as(
-        "INSERT INTO packs (kind, slug, title, summary, tags, author_uid, trust_level, status, cover_key)
-         VALUES ($1, $2, $3, $4, $5, $6, 2, 'published', $7) RETURNING id",
+        "INSERT INTO packs (kind, slug, title, summary, tags, author_uid, trust_level, status, cover_key,
+                            allow_remix, remix_of_pack_id, remix_of_version, remix_of_author_uid)
+         VALUES ($1, $2, $3, $4, $5, $6, 2, 'published', $7, $8, $9, $10, $11) RETURNING id",
     )
     .bind(&input.kind)
     .bind(&info.slug)
@@ -537,10 +637,14 @@ async fn create_pack(State(state): State<AppState>, auth: AuthUser, Json(input):
     .bind(&tags)
     .bind(auth.user.uid)
     .bind(&input.cover_key)
+    .bind(input.allow_remix.unwrap_or(true))
+    .bind(remix.as_ref().map(|r| r.pack_id))
+    .bind(remix.as_ref().map(|r| r.version))
+    .bind(remix.as_ref().and_then(|r| r.author))
     .fetch_one(&mut *tx)
     .await
     .map_err(slug_conflict)?;
-    insert_version(&mut tx, id, 1, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), "").await?;
+    insert_version(&mut tx, id, 1, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), "", info.runtime_protocol).await?;
     // 用户发布的内容先上架（未审标记），同时进审核队列，由人工看过后升级为“已审核”。
     let note = review.map_or(String::new(), |w| format!("命中复核词：{w}"));
     crate::moderation::enqueue(&mut tx, "pack", id, &note).await?;
@@ -580,10 +684,11 @@ async fn insert_version(
     file_key: &str,
     mirrors: &Value,
     changelog: &str,
+    runtime_protocol: i16,
 ) -> AppResult<()> {
     sqlx::query(
-        "INSERT INTO pack_versions (pack_id, version, label, sha256, size, manifest, file_key, mirrors, changelog)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        "INSERT INTO pack_versions (pack_id, version, label, sha256, size, manifest, file_key, mirrors, changelog, runtime_protocol)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
     )
     .bind(pack_id)
     .bind(version)
@@ -594,6 +699,7 @@ async fn insert_version(
     .bind(file_key)
     .bind(mirrors)
     .bind(changelog)
+    .bind(runtime_protocol)
     .execute(&mut *tx)
     .await?;
     Ok(())
@@ -630,7 +736,7 @@ async fn add_version(
         return Err(AppError::BadRequest("新版本的 id 必须与原来一致".into()));
     }
     let next = current + 1;
-    insert_version(&mut tx, id, next, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), &changelog)
+    insert_version(&mut tx, id, next, &info.version_label, &sha256, size, &manifest, &input.file_key, &json!([]), &changelog, info.runtime_protocol)
         .await
         .map_err(|e| match e {
             AppError::Database(sqlx::Error::Database(db)) if db.is_unique_violation() => AppError::Conflict("版本冲突，请重试".into()),
@@ -1133,7 +1239,7 @@ async fn admin_create_pack(
     .fetch_one(&mut *tx)
     .await
     .map_err(slug_conflict)?;
-    insert_version(&mut tx, id, 1, &info.version_label, &input.sha256, input.size, &input.manifest, &input.file_key, &json!(input.mirrors), "")
+    insert_version(&mut tx, id, 1, &info.version_label, &input.sha256, input.size, &input.manifest, &input.file_key, &json!(input.mirrors), "", info.runtime_protocol)
         .await?;
     audit(&mut tx, &admin, "pack.create", "pack", id, format!("{} {}", input.kind, info.slug)).await?;
     tx.commit().await?;
@@ -1205,6 +1311,35 @@ async fn admin_review_pack(
     notify_pack_author(&mut tx, id, &input.action, &note).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "trust_level": new_trust, "status": new_status })))
+}
+
+#[derive(Deserialize)]
+pub struct NetworkInput {
+    disabled: bool,
+    #[serde(default)]
+    note: String,
+}
+
+/// 后台开关“禁止联网”：宿主打开作品时检查，打开后只允许同源（规范第 5.5 节）。只改标记，不动审核状态。
+async fn admin_set_network(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Path(id): Path<i64>,
+    Json(input): Json<NetworkInput>,
+) -> AppResult<Json<Value>> {
+    let note = clean_text(&input.note, "备注", 200, false)?;
+    let mut tx = state.pool.begin().await?;
+    let updated = sqlx::query("UPDATE packs SET network_disabled = $2 WHERE id = $1")
+        .bind(id)
+        .bind(input.disabled)
+        .execute(&mut *tx)
+        .await?;
+    if updated.rows_affected() == 0 {
+        return Err(AppError::not_found("内容包"));
+    }
+    audit(&mut tx, &admin, "pack.network", "pack", id, format!("network_disabled={}; {note}", input.disabled)).await?;
+    tx.commit().await?;
+    Ok(Json(json!({ "id": id, "network_disabled": input.disabled })))
 }
 
 #[derive(Deserialize)]
