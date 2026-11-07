@@ -66,10 +66,10 @@ internal fun AppLibraryDrawer(env: CommunityEnv, dismiss: () -> Unit, goPlaza: (
         if (item.source == "community") { dismiss(); open(Route.Pack(item.id.toLong())) }
         else if (env.platform?.openGame(item.id) == true) dismiss() else message = "当前平台无法打开游戏"
     }
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.onSurface.copy(alpha = .18f)).clickable(indication = null, interactionSource = null) { dismiss() }) {
-        Column(panel.fillMaxWidth().fillMaxHeight(.8f).clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp))
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.onSurface.copy(alpha = .18f)).clickable(indication = null, interactionSource = null) { dismiss() }) {
+        Column(panel.fillMaxWidth().heightIn(max = maxHeight * .8f).clip(RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp))
             .background(MaterialTheme.colorScheme.surface).clickable(indication = null, interactionSource = null) {}.statusBarsPadding().padding(16.dp)) {
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("最近用过", Modifier.weight(1f), style = XType.Section, fontWeight = FontWeight.SemiBold)
                     IconTap(XIcons.Close, "收起我的应用", dismiss)
