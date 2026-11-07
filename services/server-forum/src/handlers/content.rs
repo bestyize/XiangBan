@@ -52,6 +52,7 @@ pub fn admin_routes() -> Router<AppState> {
         .route("/packs", get(admin_list_packs).post(admin_create_pack))
         .route("/packs/{id}/review", post(admin_review_pack))
         .route("/packs/{id}/network", post(admin_set_network))
+        .route("/packs/{id}/featured", post(admin_set_featured))
         .route("/packs/{id}/mirrors", post(admin_add_mirror))
         .route("/schemes", post(admin_create_scheme))
         .route("/projects", get(admin_list_projects))
@@ -1351,6 +1352,41 @@ async fn admin_set_network(
     audit(&mut tx, &admin, "pack.network", "pack", id, format!("network_disabled={}; {note}", input.disabled)).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "network_disabled": input.disabled })))
+}
+
+#[derive(Deserialize)]
+pub struct FeaturedInput {
+    featured: bool,
+    #[serde(default)]
+    note: String,
+}
+
+/// 后台设置“创作者精选”：只有已上架的作品可以改，精选时间取当前时间，取消则置空。不动信任等级和审核状态。
+async fn admin_set_featured(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Path(id): Path<i64>,
+    Json(input): Json<FeaturedInput>,
+) -> AppResult<Json<Value>> {
+    let note = clean_text(&input.note, "备注", 200, false)?;
+    let mut tx = state.pool.begin().await?;
+    let row: Option<(String,)> = sqlx::query_as("SELECT status FROM packs WHERE id = $1 FOR UPDATE")
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?;
+    let (status,) = row.ok_or_else(|| AppError::not_found("内容包"))?;
+    if status != "published" {
+        return Err(AppError::BadRequest("只有已上架的作品可以设为精选".into()));
+    }
+    let (featured_at,): (Option<DateTime<Utc>>,) =
+        sqlx::query_as("UPDATE packs SET featured_at = CASE WHEN $2 THEN now() ELSE NULL END WHERE id = $1 RETURNING featured_at")
+            .bind(id)
+            .bind(input.featured)
+            .fetch_one(&mut *tx)
+            .await?;
+    audit(&mut tx, &admin, "pack.featured", "pack", id, format!("featured={}; {note}", input.featured)).await?;
+    tx.commit().await?;
+    Ok(Json(json!({ "id": id, "featured": featured_at.is_some(), "featured_at": featured_at })))
 }
 
 #[derive(Deserialize)]
