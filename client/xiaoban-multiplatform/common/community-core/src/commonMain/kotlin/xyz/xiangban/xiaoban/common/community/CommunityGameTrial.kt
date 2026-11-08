@@ -14,13 +14,23 @@ data class CommunityGameDownload(
     val size: Long,
     val url: String,
 ) {
-    fun validate(pack: Pack, requestedVersion: Int) {
-        require(pack.id == packId && pack.kind == "game" && kind == "game" && pack.status == "published" && version == requestedVersion && version > 0) { "游戏或版本已不可用" }
-        require(Regex("[a-fA-F0-9]{64}").matches(sha256) && size in 1..MAX_ZIP_BYTES.toLong()) { "游戏包校验信息不完整或超过试玩大小限制" }
+    fun validate(pack: Pack, requestedVersion: Int): Int {
+        require(pack.id == packId && pack.kind == kind && kind in setOf("game", "app") && pack.status == "published" && version == requestedVersion && version > 0) { "作品或版本已不可用" }
         val published = pack.versions.firstOrNull { it.version == version } ?: error("游戏版本不存在")
+        val protocol = published.manifest.let { manifest ->
+            if ("runtimeProtocol" !in manifest) 1
+            else (manifest["runtimeProtocol"] as? JsonPrimitive)?.takeUnless { it.isString }?.intOrNull
+        }
+        require(protocol == 2 || protocol == 1 && kind == "game") { "不支持的作品运行时协议" }
+        val limit = if (protocol == 2) MAX_RUNTIME_V2_BYTES else MAX_ZIP_BYTES
+        require(Regex("[a-fA-F0-9]{64}").matches(sha256) && size in 1..limit.toLong()) { "作品包校验信息不完整或超过试玩大小限制" }
         require(published.sha256.equals(sha256, true) && published.size == size) { "游戏版本已更新，请重试" }
+        return checkNotNull(protocol)
     }
-    companion object { const val MAX_ZIP_BYTES = 5 * 1024 * 1024 }
+    companion object {
+        const val MAX_ZIP_BYTES = 5 * 1024 * 1024
+        const val MAX_RUNTIME_V2_BYTES = 100 * 1024 * 1024
+    }
 }
 
 @Serializable

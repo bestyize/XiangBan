@@ -5,6 +5,8 @@ import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlin.test.*
 
 class CommunityGameTrialTest {
@@ -39,6 +41,24 @@ class CommunityGameTrialTest {
         }
         assertFails { read(bytes(listOf("bad.js" to byteArrayOf(0xC3.toByte(), 0x28)))) }
         assertFails { read(bytes(listOf("bad.js" to byteArrayOf(0)))) }
+    }
+    @Test fun `protocol two permits an app and the larger signed archive limit`() {
+        val info = descriptor(bytes()).copy(kind = "app", size = CommunityGameDownload.MAX_RUNTIME_V2_BYTES.toLong())
+        val version = PackVersion(1, sha256 = info.sha256, size = info.size, manifest = buildJsonObject { put("runtimeProtocol", 2) })
+        val pack = Pack(info.packId, "app", title = "Tool", versions = listOf(version))
+        assertEquals(2, info.validate(pack, 1))
+        assertFails { info.validate(pack.copy(versions = listOf(version.copy(manifest = buildJsonObject { put("runtimeProtocol", "2") }))), 1) }
+        val oversized = info.copy(size = info.size + 1)
+        assertFails { oversized.validate(pack.copy(versions = listOf(version.copy(size = oversized.size))), 1) }
+    }
+
+    @Test fun `runtime negotiation and network policy come from pack requests`() = runTest {
+        val server = FakeServer()
+        server.on("/api/packs/55", body = """{"id":55,"kind":"app","title":"Tool","network_disabled":true}""")
+        val api = ForumApi(server.client, CommunityConfig(runtimeV2 = true)) { null }
+        assertEquals(true, api.pack(55).networkDisabled)
+        assertEquals("1,2", server.requests.single().headers["X-Xiaoban-Runtime"])
+        server.client.close()
     }
     @Test fun `expanded limits and unsupported formats fail before execution`() {
         assertFails { read(bytes(listOf("large.js" to ByteArray(MobileGameFormat.FILE_BYTES + 1) { 65 }))) }

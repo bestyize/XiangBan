@@ -12,7 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import xyz.xiangban.xiaoban.common.community.*
 
@@ -22,6 +25,7 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
     val busy by env.communityGameBusy.collectAsState()
     var loading by remember(id, version) { mutableStateOf(false) }
     var error by remember(id, version) { mutableStateOf<String?>(null) }
+    var pendingDownload by remember(id, version) { mutableStateOf<Pair<Long, CompletableDeferred<Boolean>>?>(null) }
     Column(modifier) {
         if (env.platform?.communityGamesSupported != true) {
             Text("当前平台暂不支持试玩，可在 Android 或电脑上打开", style = XType.Caption, color = LocalExtraColors.current.ink3)
@@ -35,10 +39,18 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
                     // Recheck publication and exact version even on cache hits. Removed works cannot run from stale cards.
                     val pack = env.forum.pack(id)
                     val chosen = version ?: pack.version
-                    require(pack.kind == "game" && pack.status == "published") { "游戏已不可用" }
+                    require(pack.kind in setOf("game", "app") && pack.status == "published") { "作品已不可用" }
                     val info = env.forum.gameDownload(id, chosen)
-                    info.validate(pack, chosen)
-                    val launched = env.platform.playCommunityGame(info, pack.title, bookmark = { next ->
+                    val protocol = info.validate(pack, chosen)
+                    val launched = if (protocol == 2) {
+                        require(env.config.runtimeV2) { "当前设备暂不支持协议 2" }
+                        if (env.platform.needsRuntimeV2MobileConfirmation(info)) {
+                            val decision = CompletableDeferred<Boolean>()
+                            pendingDownload = info.size to decision
+                            if (!decision.await()) return@launch
+                        }
+                        env.platform.playCommunityRuntimeV2(info, pack)
+                    } else env.platform.playCommunityGame(info, pack.title, bookmark = { next ->
                         if (!env.session.state.value.loggedIn) throw ApiException(401, "请先登录后收藏")
                         if (next == null) env.contentSocial.state("pack", id).bookmarked
                         else env.contentSocial.bookmark("pack", id, next).bookmarked.also { env.contentBookmarkRevision.value++ }
@@ -46,12 +58,25 @@ internal fun GameTrialButton(env: CommunityEnv, id: Long, version: Int? = null, 
                     check(launched) { "无法打开试玩，请重试" }
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { error = messageOf(e) }
-                finally { loading = false; env.communityGameBusy.value = false }
+                finally { pendingDownload = null; loading = false; env.communityGameBusy.value = false }
             }
         }
         if (appStyle) AppActionButton(if (loading) "正在准备试玩…" else label, launchGame, Modifier.fillMaxWidth(), primary = true, enabled = !busy, icon = XIcons.Play)
         else PillButton(if (loading) "正在准备试玩…" else label, launchGame, enabled = !busy)
         error?.let { Text(it, Modifier.padding(top = 6.dp), style = XType.Caption, color = Danger) }
+    }
+    pendingDownload?.let { (size, decision) ->
+        val dismiss = { decision.complete(false); Unit }
+        Dialog(onDismissRequest = dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            CenterDialog(dismiss) {
+                Text("使用移动网络下载？", style = XType.Title, fontWeight = FontWeight.SemiBold)
+                Text("作品包大小为 ${formatSize(size)}。", Modifier.padding(top = 8.dp), style = XType.Body)
+                Row(Modifier.padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GhostPillButton("取消", dismiss, Modifier.weight(1f), height = 44.dp)
+                    AppActionButton("下载", { decision.complete(true) }, Modifier.weight(1f), primary = true, height = 44.dp)
+                }
+            }
+        }
     }
 }
 

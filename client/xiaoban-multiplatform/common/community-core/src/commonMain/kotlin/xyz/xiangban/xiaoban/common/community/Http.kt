@@ -25,7 +25,7 @@ class ApiException(val status: Int, override val message: String, val code: Stri
 }
 
 /** 论坛和账号中心共用的 JSON 请求封装：统一拼地址、带令牌、把错误响应转成 [ApiException]。 */
-class JsonHttp(private val client: HttpClient, private val base: String) {
+class JsonHttp(private val client: HttpClient, private val base: String, private val headers: Map<String, String> = emptyMap()) {
     suspend fun <T> send(
         method: HttpMethod,
         path: String,
@@ -45,6 +45,7 @@ class JsonHttp(private val client: HttpClient, private val base: String) {
         val response = try {
             client.request("${base.trimEnd('/')}$path") {
                 this.method = method
+                this@JsonHttp.headers.forEach { (name, value) -> header(name, value) }
                 applyAuth(token)
                 if (body != null) {
                     contentType(ContentType.Application.Json)

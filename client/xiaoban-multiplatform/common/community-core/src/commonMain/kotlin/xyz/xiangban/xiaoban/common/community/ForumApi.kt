@@ -25,6 +25,7 @@ private val ProjectReadmePath = Regex("projects/[a-f0-9]{64}[.]json")
 /** 论坛接口（只读浏览 + 登录态相关的几项）。需要登录的请求带上 [token]，公开内容没登录也能看。 */
 class ForumApi(private val client: HttpClient, config: CommunityConfig, private val token: suspend () -> String?) {
     private val http = JsonHttp(client, config.forumBase)
+    private val packHttp = if (config.runtimeV2) JsonHttp(client, config.forumBase, mapOf("X-Xiaoban-Runtime" to "1,2")) else http
     private val site = config.forumBase.trimEnd('/')
     private val uploads = ForumUploads(client, config, token)
 
@@ -34,13 +35,14 @@ class ForumApi(private val client: HttpClient, config: CommunityConfig, private 
             .let { if (it.isEmpty()) "" else "?$it" }
 
     private suspend inline fun <reified T> get(path: String): T = http.send(HttpMethod.Get, path, serializer<T>(), token = token())
+    private suspend inline fun <reified T> getPack(path: String): T = packHttp.send(HttpMethod.Get, path, serializer<T>(), token = token())
 
     // ── 内容 ──
     suspend fun packs(kind: String? = null, sort: String? = null, q: String? = null, page: Int = 1, tag: String? = null, following: Boolean = false, featured: Boolean = false): Page<Pack> =
-        get("/api/packs${query("kind" to kind, "sort" to sort, "q" to q, "page" to page, "tag" to tag, "following" to following.takeIf { it }, "featured" to featured.takeIf { it })}")
+        getPack("/api/packs${query("kind" to kind, "sort" to sort, "q" to q, "page" to page, "tag" to tag, "following" to following.takeIf { it }, "featured" to featured.takeIf { it })}")
 
-    suspend fun pack(id: Long): Pack = get("/api/packs/$id")
-    suspend fun gameDownload(id: Long, version: Int): CommunityGameDownload = get("/api/packs/$id/download?version=$version")
+    suspend fun pack(id: Long): Pack = getPack("/api/packs/$id")
+    suspend fun gameDownload(id: Long, version: Int): CommunityGameDownload = getPack("/api/packs/$id/download?version=$version")
     suspend fun weeklyIssues(page: Int = 1): Page<WeeklyIssue> = get("/api/weekly${query("page" to page)}")
     suspend fun weekly(week: String): WeeklyDetail = get("/api/weekly/${week.encodeURLParameter()}")
     suspend fun projects(): ProjectList = get("/api/projects")

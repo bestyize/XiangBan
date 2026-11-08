@@ -8,4 +8,5 @@ data class CommunityConfig(
     val clientId: String = "xiaoban-android",
     val linkBase: String = "https://link.xiangban.xyz/api/link",
     val deviceName: String = "小伴手机应用",
+    val runtimeV2: Boolean = false,
 )

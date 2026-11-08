@@ -24,7 +24,7 @@ object BuiltinMobileGames {
         val json = Json.parseToJsonElement(manifest).jsonObject
         fun text(key: String) = (json[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
         require(text("id") == id && text("entry") == "index.html") { "内置游戏清单不匹配" }
-        require(json["runtimeProtocol"]?.jsonPrimitive?.intOrNull == 1) { "不支持的游戏协议" }
+        require("runtimeProtocol" !in json || json["runtimeProtocol"]?.jsonPrimitive?.intOrNull == 1) { "不支持的游戏协议" }
         val orientation = text("orientation") ?: "portrait"
         require(orientation in listOf("portrait", "landscape"))
         return MobileGame(id, requireNotNull(text("name")), requireNotNull(text("description")), json["save"]?.jsonPrimitive?.booleanOrNull ?: false, orientation)

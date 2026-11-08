@@ -1,6 +1,7 @@
 package xyz.xiangban.xiaoban
 
 import android.content.Context
+import android.content.res.AssetManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,14 +12,42 @@ import xyz.xiangban.xiaoban.common.community.MobileGameHistory
 
 internal class AndroidGameLibrary(private val context: Context) {
     suspend fun games(): List<MobileGame> = withContext(Dispatchers.IO) {
-        BuiltinMobileGames.ids.map { id ->
-            BuiltinMobileGames.read(id, context.assets.open("game-packs/$id/manifest.json").bufferedReader().use { it.readText() })
+        val ids = if (BuildConfig.DEBUG) BuiltinMobileGames.ids + RUNTIME_V2_FIXTURE else BuiltinMobileGames.ids
+        ids.map { id ->
+            val root = checkNotNull(bundledGameRoot(id))
+            val manifest = context.assets.bundledGameManifest(root)
+            when (readRuntimeProtocol(manifest)) {
+                1 -> BuiltinMobileGames.read(id, manifest)
+                else -> context.assets.loadBundledRuntimeV2(id, root).manifest.let {
+                    MobileGame(it.id, it.name, it.description, orientation = it.orientation)
+                }
+            }
         }
     }
     suspend fun cover(id: String): ByteArray? = withContext(Dispatchers.IO) {
-        if (id !in BuiltinMobileGames.ids) return@withContext null
-        context.assets.open("game-packs/$id/cover.svg").use { it.readBytes() }
+        val root = bundledGameRoot(id) ?: return@withContext null
+        val assets = context.assets
+        if (readRuntimeProtocol(assets.bundledGameManifest(root)) == 2) {
+            val pack = assets.loadBundledRuntimeV2(id, root)
+            pack.open(pack.manifest.cover)?.use { it.readBytes() }
+        } else assets.open("$root/cover.svg").use { it.readBytes() }
     }
+}
+
+internal const val RUNTIME_V2_FIXTURE = "runtime-v2-fixture"
+
+internal fun bundledGameRoot(id: String): String? = when {
+    BuildConfig.DEBUG && id == RUNTIME_V2_FIXTURE -> RUNTIME_V2_FIXTURE
+    id in BuiltinMobileGames.ids -> "game-packs/$id"
+    else -> null
+}
+
+internal fun AssetManager.bundledGameManifest(root: String): String =
+    readRuntimeManifest(this, root)
+
+internal fun AssetManager.loadBundledRuntimeV2(id: String, root: String): RuntimeV2Package {
+    val host = if (id == RUNTIME_V2_FIXTURE) "local-$id" else "official-$id"
+    return RuntimeV2Package.load(this, root, host).also { require(it.manifest.id == id) { "内置作品清单不匹配" } }
 }
 
 /** Same process as the runner; the StateFlow refreshes the library when returning from play. */

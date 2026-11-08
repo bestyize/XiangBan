@@ -76,6 +76,8 @@ interface PlatformActions : VoicePlatform {
     val recentCommunityGames: kotlinx.coroutines.flow.StateFlow<List<xyz.xiangban.xiaoban.common.community.RecentCommunityGame>> get() = EmptyRecentCommunityGames
     suspend fun playCommunityGame(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, title: String,
         bookmark: suspend (Boolean?) -> Boolean, login: () -> Unit): Boolean = false
+    suspend fun playCommunityRuntimeV2(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, pack: xyz.xiangban.xiaoban.common.community.Pack): Boolean = false
+    suspend fun needsRuntimeV2MobileConfirmation(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload): Boolean = false
     val gamesSupported: Boolean get() = false
     val recentGames: kotlinx.coroutines.flow.StateFlow<List<String>> get() = EmptyRecentGames
     suspend fun builtinGames(): List<xyz.xiangban.xiaoban.common.community.MobileGame> = emptyList()

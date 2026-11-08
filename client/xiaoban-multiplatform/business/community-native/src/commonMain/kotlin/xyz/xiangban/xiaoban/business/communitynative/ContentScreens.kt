@@ -187,7 +187,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
     var toast by remember { mutableStateOf<String?>(null) }
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
         LoadBox(state, loader::reload) { pack ->
-            if (pack.kind == "game" && chat != null) {
+            if (pack.kind in setOf("game", "app") && chat != null) {
                 AppPostContent(env, chat, pack, back, open)
                 return@LoadBox
             }
@@ -216,7 +216,7 @@ fun PackDetailScreen(env: CommunityEnv, id: Long, back: () -> Unit, open: ((Rout
                                 Text("v${pack.version}" + (pack.versions.firstOrNull { it.version == pack.version }?.size?.takeIf { it > 0 }?.let { " · " + formatSize(it) } ?: "") + pack.updatedAt.take(10).takeIf { it.isNotBlank() }?.let { " · 更新于 $it" }.orEmpty(), style = XType.Caption, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
-                        if (pack.kind == "game" && pack.status == "published") GameTrialButton(env, pack.id, open = open, modifier = Modifier.padding(top = 16.dp))
+                        if (pack.kind in setOf("game", "app") && pack.status == "published") GameTrialButton(env, pack.id, open = open, modifier = Modifier.padding(top = 16.dp))
                         if (pack.summary.isNotBlank()) Text(pack.summary, Modifier.padding(top = 16.dp), style = XType.Body)
                         if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, Modifier.padding(top = 12.dp), style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         if (pack.status == "published") NativeReportAction(env, "pack", pack.id, open)

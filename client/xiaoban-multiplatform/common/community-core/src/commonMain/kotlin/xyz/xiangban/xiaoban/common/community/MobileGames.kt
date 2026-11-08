@@ -100,6 +100,9 @@ private fun MobileGame.json(): JsonObject = buildJsonObject {
 fun readMobileGameManifest(text: String): MobileGame {
     require(text.encodeToByteArray().size <= 64 * 1024) { "manifest.json 不能超过 64 KB" }
     val json = MobileGameJson.parseToJsonElement(text) as? JsonObject ?: throw IllegalArgumentException("manifest.json 需要是 JSON 对象")
+    require("runtimeProtocol" !in json || (json["runtimeProtocol"] as? JsonPrimitive)?.let { !it.isString && it.intOrNull == 1 } == true) {
+        "不支持的游戏协议"
+    }
     require((json["schemaVersion"] as? JsonPrimitive)?.let { !it.isString && it.intOrNull == 1 } == true && json.gameString("kind") == "game") {
         "手机当前只支持 schemaVersion=1、kind=game 的文本游戏包"
     }

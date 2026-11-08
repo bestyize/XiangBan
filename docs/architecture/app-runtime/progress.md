@@ -53,7 +53,7 @@
 
 ## 之后的批次
 
-1. Android 正式宿主：以小样为基础改造运行页，实现 `xb` 第一批接口、胶囊、权限同意框和网络限制。
+1. Android 正式宿主：内置测试包已验证协议分流、`xb` 基础接口、胶囊、相机、麦克风及网络限制；社区协议 2 包已接入，并用本地论坛在真机上验证。大包真机与生产发布待办。
 2. `app.xiangban.xyz` 文件服务和 SDK 注入；通配证书；申请加入公共后缀列表（需要产品负责人操作）。
 3. 手机 Agent 新工具：`app_*`、`lib_add`、`asset_image`、`app_publish`；工作区支持二进制文件。
 4. 广场接入改编列表（精选工具和创作者精选已在 2026-11-08 下午接入，见记录）。
@@ -143,3 +143,20 @@
   - 测试：手机端最后一次完整跑 community-core，326 个里有 1 个失败，是 `MobileAgentExtensionsTest`（里面有 3 秒超时，机器忙时偶发）。它在这个分支上单独跑 4 次失败过 1 次，在 `main` 上单独跑 2 次都通过，这批改动没有碰到智能体运行时。更早的一次整套里 `ChatHistoryTest` 也失败过 1 次，单独重跑通过。最后加「格」字图标之后，只重跑了 `AppPlazaTest` 并编译了 APK，没有再跑整套。
   - 待办：桌面端登记 MBTI（`src-tauri/src/games.rs` 的 `IDS` 现在只有 9 款，`catalog.json` 里没有 `mbti`，基准副本检查也要带上）；`server-resource` 的大小上限；发布新版手机 App；《茶签归位》和 MBTI 的完整一局在手机上还没玩过（按你的要求没有逐项测）。
 - 2026-11-08：第二批（分支 `fix/app-plaza-polish`）合入 `main`（合并提交 `c65beafa`），并推送到 `origin/main`；远端保留了 `origin/fix/app-plaza-polish`，删除了已合并的本地分支。线上论坛部署的提交 `684b5cf7` 现已进入主分支。
+- 2026-11-08：Android 正式宿主第一步在小米 14 真机通过（Android 16，WebView 156）。
+  - 正常入口「应用 → 精选游戏 → 全部 → 协议 2 宿主测试 → 打开」。内置作品按清单的 `runtimeProtocol` 分流，字段缺失按协议 1 处理。协议 2 进入正式 `RuntimeV2Activity`，测试包资源只进入 Debug 构建；现有协议 1 继续走 `MobileGameActivity` 的离线 iframe。
+  - 真机确认测试包源为 `https://local-runtime-v2-fixture.app.xiangban.xyz`，是安全上下文，首段页面脚本已能读到 `xb`。同源资源可读，外网请求被拦截。本步只加载内置资源，社区协议 2 下载与正式联网策略留待后续。
+  - `xb.storage` 写入、读取、列键、删除和 4 MiB 字符串往返通过；进程强制停止后从广场重开仍能读回写入值。Home 切到后台再从任务切换器回来，收到 `hide` / `show`；展开和收起宿主菜单也收到对应事件。
+  - 对照[应用广场设计稿](../../../client/xiaoban-multiplatform/docs/design-specs/prototypes/app-plaza.html)的 b7/b8 画板，核对竖屏胶囊与底部菜单、横屏胶囊与 440 dp 居中菜单。实机返回顺序为二级 → 一级 → 首页 → 展开菜单并提示「再返回一次也会退出」→ 退出；胶囊 ✕、菜单外点击收起和「重新开始」也通过。收藏、分享、反馈在测试菜单中保留设计稿位置，交互待接入。
+  - 协议 1 回归：MBTI 从精选工具打开并恢复已有答题进度；《墨渡》（56）从广场打开后完成一次有效蓄力跳跃；《茶签归位》（57）打开第 1 关、移动一签并撤销。三者均确认在原 `allow-scripts` iframe 内运行。
+  - 本地验证：`:androidApp:assembleDebug` 和 `:androidApp:compileReleaseKotlin` 通过；协议 2 路径、清单及小样请求测试共 6 项通过；community-core 的 `GameLibraryTest`、`MobileGamesTest`、`CommunityGameTrialTest`、`AppPlazaTest` 共 22 项通过。系统权限弹窗、后台断网开关、局域网 WebSocket 和 100 MB 社区包仍待专项验证。
+- 2026-11-08：协议 2 媒体授权和网络策略通过小米 14 真机验证。
+  - 相机、麦克风分别显示作品同意框，再显示 Android 系统权限弹窗。均点了「本次使用允许」，网页取得 `live` 视频轨与音频轨，使用时胶囊亮提示点。麦克风另测了在作品同意框点「不允许」，网页收到 `NotAllowedError`。作品同意按作品与能力保存，设置里的逐作品撤销入口待接入。
+  - 协议 2 WebView 使用独立进程及独立数据目录，HTTPS/WSS 都经本机 CONNECT 代理。代理检查域名与解析结果，只连接已检查的公网地址。联网时公网 HTTPS fetch 与 WSS 握手通过；同一 Wi-Fi 下用手机直连探针证明局域网监听端口可达，作品对该端口的 HTTPS fetch 与 WSS 均失败，监听端没有收到额外连接。代理同时记录了局域网与 `127.0.0.1` WSS 的拒绝。WebRTC 仍按规范尽力限制，未验证其他 UDP 或系统路由的边界。
+  - 用 Debug 测试包模拟 `network_disabled=true` 后从广场重开，包内文件仍返回 200，公网 HTTPS 与 WSS 均失败。真实论坛返回的字段将在社区包接入后走同一路径验证。本次没有修改线上作品或后台开关。
+  - `:androidApp:assembleDebug` 和 `:androidApp:testDebugUnitTest --tests '*RuntimeV2*'` 通过，含 3 项新代理测试。
+- 2026-11-08：Android 接入社区协议 2 包。
+  - WebView 支持协议 2 的设备请求作品时带 `X-Xiaoban-Runtime: 1,2`。从作品详情打开时重新取上架状态、指定版本及 `network_disabled`。按版本清单分流，`app` 与 `game` 的协议 2 包进正式宿主，协议 1 游戏保留原入口与下载限制。缺失断网字段时按断网处理。
+  - 下载请求不携带论坛账号令牌，禁止重定向，支持签名地址的 Range 续传。校验大小与 SHA-256 后流式解压到暂存目录，检查清单、资源路径、CRC、文件数和展开体积，再原子发布到私有缓存。Android 实现 ZIP 和展开合计各 100 MiB 的上限，移动网络超过 20 MiB 且无缓存时先确认。
+  - 小米 14 通过 Debug 本地论坛预览从广场打开协议 2 工具，确认 `https://16002.app.xiangban.xyz` 安全上下文和首段脚本前注入。切换本地论坛响应的 `network_disabled` 再打开，同一 ZIP 缓存只下载一次，断网时包内文件和存档可读，公网 HTTPS 与 WSS 失败；解除断网后公网 HTTPS 恢复。菜单按设计稿显示社区作者和「举报」位置。
+  - `:androidApp:assembleDebug`、`:androidApp:compileReleaseKotlin` 和 28 项针对性测试通过。100 MB 包、实际断点续传及移动网络确认框尚未真机验收；线上论坛与资源服务未改动，生产资源上传上限仍待配套。

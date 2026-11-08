@@ -32,9 +32,11 @@ internal object AndroidCommunityGames {
         }
         return history
     }
-    @Synchronized fun opened(context: Context, session: PlaySession) {
+    fun opened(context: Context, session: PlaySession) = opened(context, session.recent)
+
+    @Synchronized fun opened(context: Context, recentGame: RecentCommunityGame) {
         recent(context)
-        history.value = CommunityGameHistory.opened(history.value, session.recent)
+        history.value = CommunityGameHistory.opened(history.value, recentGame)
         context.getSharedPreferences("community_game_history", Context.MODE_PRIVATE).edit()
             .putString("recent", CommunityGameHistory.encode(history.value)).apply()
     }

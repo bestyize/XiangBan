@@ -67,7 +67,7 @@ class MainActivity : ComponentActivity() {
         val previewBase = if (BuildConfig.DEBUG) intent.getStringExtra("forum_preview_base")?.takeIf {
             it.matches(Regex("http://127\\.0\\.0\\.1:[0-9]{2,5}")) && it.substringAfterLast(':').toInt() in 1024..65535
         } else null
-        val communityConfig = xyz.xiangban.xiaoban.common.community.CommunityConfig().let { config ->
+        val communityConfig = xyz.xiangban.xiaoban.common.community.CommunityConfig(runtimeV2 = RuntimeV2Activity.supported(this)).let { config ->
             if (previewBase == null) config else config.copy(forumBase = previewBase)
         }
         setContent {

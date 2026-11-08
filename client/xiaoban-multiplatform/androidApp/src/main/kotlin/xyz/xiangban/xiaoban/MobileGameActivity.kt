@@ -97,7 +97,19 @@ class MobileGameActivity : Activity() {
         showMessage("正在检查游戏…")
         scope.launch {
             try {
-                val game = withContext(Dispatchers.IO) { loadSnapshot(gameId) }
+                val root = if (trial == null) bundledGameRoot(gameId) else null
+                val manifest = root?.let { withContext(Dispatchers.IO) { assets.bundledGameManifest(it) } }
+                if (isFinishing || isDestroyed) return@launch
+                if (manifest != null && readRuntimeProtocol(manifest) == 2) {
+                    require(!intent.getBooleanExtra(EXTRA_EXPORT, false)) { "内置作品无需导出" }
+                    val context = applicationContext
+                    val id = gameId
+                    val opened: (() -> Unit)? = if (id == RUNTIME_V2_FIXTURE) null else ({ AndroidGameHistory.opened(context, id) })
+                    startActivity(RuntimeV2Activity.launchIntent(this@MobileGameActivity, opened).putExtra(EXTRA_GAME_ID, id))
+                    finish()
+                    return@launch
+                }
+                val game = withContext(Dispatchers.IO) { loadSnapshot(gameId, root, manifest) }
                 if (isFinishing || isDestroyed) return@launch
                 snapshot = game
                 if (intent.getBooleanExtra(EXTRA_EXPORT, false)) {
@@ -113,16 +125,15 @@ class MobileGameActivity : Activity() {
         }
     }
 
-    private suspend fun loadSnapshot(id: String): GameSnapshot {
+    private suspend fun loadSnapshot(id: String, root: String?, bundledManifest: String?): GameSnapshot {
         trial?.let { session ->
             require(!intent.getBooleanExtra(EXTRA_EXPORT, false))
             val game = session.archive.game
             return GameSnapshot(id, session.recent.title, game.orientation, game.save, if (game.save) readSave() else null, session.archive.files)
         }
-        if (id in BuiltinMobileGames.ids) {
+        if (root != null) {
             require(!intent.getBooleanExtra(EXTRA_EXPORT, false)) { "官方游戏无需导出" }
-            val root = "game-packs/$id"
-            val game = BuiltinMobileGames.read(id, assets.open("$root/manifest.json").bufferedReader().use { it.readText() })
+            val game = BuiltinMobileGames.read(id, checkNotNull(bundledManifest))
             val contents = linkedMapOf<String, ByteArray>()
             fun collect(directory: String) {
                 for (name in assets.list("$root/$directory").orEmpty()) {

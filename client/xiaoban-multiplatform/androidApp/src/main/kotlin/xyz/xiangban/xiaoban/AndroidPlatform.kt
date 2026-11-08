@@ -170,6 +170,10 @@ class AndroidPlatformActions(
     override suspend fun playCommunityGame(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, title: String,
         bookmark: suspend (Boolean?) -> Boolean, login: () -> Unit): Boolean =
         (context as? android.app.Activity)?.let { AndroidCommunityGames.play(it, download, title, bookmark, login) } ?: false
+    override suspend fun playCommunityRuntimeV2(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload, pack: xyz.xiangban.xiaoban.common.community.Pack): Boolean =
+        (context as? android.app.Activity)?.let { AndroidRuntimeV2Community.play(it, download, pack) } ?: false
+    override suspend fun needsRuntimeV2MobileConfirmation(download: xyz.xiangban.xiaoban.common.community.CommunityGameDownload): Boolean =
+        AndroidRuntimeV2Community.needsMobileConfirmation(context, download)
     override val gamesSupported = true
     override val recentGames get() = AndroidGameHistory.flow(context)
     override suspend fun builtinGames() = gameLibrary.games()

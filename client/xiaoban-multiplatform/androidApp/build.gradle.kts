@@ -29,14 +29,17 @@ dependencies {
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.webkit)
     implementation("com.google.zxing:core:3.5.4")
     implementation(libs.onnxruntime.android)
     implementation("org.apache.commons:commons-compress:1.27.1")
     implementation("org.tukaani:xz:1.10")
 
     implementation(libs.compose.uiToolingPreview)
+    implementation(libs.compose.foundation)
+    implementation(libs.compose.material3)
+    implementation(libs.compose.animation)
     debugImplementation(libs.compose.uiTooling)
-    debugImplementation(libs.androidx.webkit)
     testDebugImplementation(libs.junit)
 }
 

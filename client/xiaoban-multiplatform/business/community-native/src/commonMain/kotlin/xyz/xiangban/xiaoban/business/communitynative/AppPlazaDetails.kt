@@ -57,7 +57,7 @@ internal fun OfficialAppSheet(env: CommunityEnv, game: MobileGame, cover: ByteAr
             AppActionButton(if (game.orientation == "landscape") "横屏打开" else "打开", {
                 if (env.platform?.openGame(game.id) == true) dismiss() else message = "当前平台无法打开游戏"
             }, Modifier.fillMaxWidth(), primary = true, icon = XIcons.Play)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (shortcut.valid) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 AppActionButton(if (favorite) "已收藏" else "收藏", { env.appLibrary.toggle(shortcut) }, Modifier.weight(1f), icon = XIcons.Bookmark)
                 AppActionButton("做一个我的版本", remix, Modifier.weight(1f))
             }
@@ -97,7 +97,7 @@ internal fun AppPostContent(env: CommunityEnv, chat: CloudChatController, pack: 
                     Text(pack.title, style = XType.Headline, fontWeight = FontWeight.SemiBold)
                     if (pack.summary.isNotBlank()) Text(pack.summary, style = XType.Body)
                     if (pack.tags.isNotEmpty()) Text(pack.tags.joinToString("  ") { "#$it" }, style = XType.Secondary, color = LocalExtraColors.current.brandInk)
-                    Text(listOfNotNull(pack.updatedAt.take(10).takeIf { it.isNotBlank() }, "游戏",
+                    Text(listOfNotNull(pack.updatedAt.take(10).takeIf { it.isNotBlank() }, if (pack.kind == "app") "工具" else "游戏",
                         when (orientation) { "landscape" -> "横屏"; "portrait" -> "竖屏"; else -> null }, "${pack.applyCount} 人玩过").joinToString(" · "), style = XType.Caption, color = LocalExtraColors.current.ink3)
                     if (pack.status == "published") {
                         GameTrialButton(env, pack.id, open = open, modifier = Modifier.fillMaxWidth(), label = if (orientation == "landscape") "横屏进入" else "进入", appStyle = true)
