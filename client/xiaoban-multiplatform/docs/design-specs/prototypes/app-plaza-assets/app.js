@@ -27,6 +27,7 @@ const icon = (n, cls = '') => `<svg class="${cls}" aria-hidden="true" viewBox="0
 const G = 'game-center-assets/';
 
 const AUTHORS = {'纸鹤':'#5b6a9a','二十四':'#a57d43','听雨':'#5f7484','阿渔':'#3f8580','墨点':'#3b3733','小满':'#9a4a3c','Kiko':'#6d5a8f','我':'#b06a34','南风':'#6f7f5a','七七':'#8a6a8c','老周':'#5a6470'};
+AUTHORS['创作者'] = '#d27a77';
 const APPS = [
   {id:'ink-blade', name:'水墨剑客', kind:'游戏', src:'official', o:'L', cover:G+'ink-blade.svg', plays:'2.3 万', line:'竹林、雪江、烽火三卷',
     desc:'横屏水墨动作：竹林、雪江、烽火三卷各六幅，逐幅解锁、集三印、求逸品。朱光一闪时出剑弹反，斩破月下无常、寒江钓叟与铁骑将军。'},
@@ -52,6 +53,8 @@ const APPS = [
     note:'每个节气配一句古诗和一件当季小事，做得很克制。霜降这一页尤其好看。', desc:'打开就是今天的节气：一句古诗、一件当季小事、离下个节气还有几天。'},
   {id:'rain', name:'雨窗白噪音', kind:'工具', o:'P', art:'rain', author:'听雨', pick:true, allowRemix:false, plays:'2,760', likes:301, comments:27, time:'2 周前', tags:'#白噪音 #专注',
     note:'雨声、雷声和远处的车声可以分别调。作者自己录的雨，比素材库的好听。', desc:'窗边下雨的白噪音。雨、雷、远处车流三条声音分开调，支持定时关闭。'},
+  {id:'wancisou', name:'万磁搜', kind:'工具', o:'P', icon:'app-plaza-assets/wancisou-icon.svg', cover:'app-plaza-assets/wancisou-preview.svg', author:'创作者', pick:true, plays:'128', likes:23, comments:4, time:'今天', tags:'#搜索 #工具',
+    line:'跨站搜索公开资源', desc:'同时搜索多个磁力索引站，按相关性查看结果。点击资源卡片即可查看并复制磁力链接；部分来源可能暂时不可用。'},
   {id:'fish', name:'像素钓鱼，等浮漂一沉就收线', kind:'游戏', o:'P', art:'fish', author:'阿渔', remixes:['shrimp', 'nightfish', 'icefish'], plays:'312', likes:46, comments:12, time:'2 小时前', tags:'#像素 #休闲',
     desc:'一根竿、一片湖，等浮漂一沉就收线。钓到的鱼会进图鉴，一共 24 种。第一次做游戏，请大家多提意见。'},
   {id:'lot', name:'今日一签', kind:'工具', o:'P', art:'lot', author:'小满', plays:'1,024', likes:138, comments:40, time:'5 小时前', tags:'#每日 #小签', desc:'每天可以抽一支签，签文都是我写的大白话，不吓人。'},
@@ -66,9 +69,8 @@ const APPS = [
 ];
 const A = Object.fromEntries(APPS.map(a => [a.id, a]));
 const GAMES = ['ink-blade', 'origami', 'dusk-glider', 'merge-2048', 'jade-gomoku', 'water-sort', 'block-puzzle', 'pro-cube', 'snake-arena'].map(i => A[i]);
-const TOOLS = APPS.filter(a => a.src === 'official' && a.kind !== '游戏');
-const PICKS = ['origami', 'solar', 'rain'].map(i => A[i]);
-const WORKS = ['fish', 'origami', 'lot', 'bounce', 'stroke', 'rain', 'plum', 'solar'].map(i => A[i]);
+const TOOLS = [A.wancisou, ...APPS.filter(a => a.src === 'official' && a.kind !== '游戏')];
+const WORKS = ['wancisou', 'origami', 'solar', 'rain', 'fish', 'lot', 'bounce', 'stroke', 'plum'].map(i => A[i]);
 const COMMENTS = [['南风', '浮漂沉下去那一下好有手感，求出夜钓', '1 小时前', 8], ['七七', '图鉴第 17 种在哪钓的？找了好久', '40 分钟前', 3], ['老周', '做一个我的版本，改成了钓虾 😂', '12 分钟前', 1]];
 const recent = ['ink-blade', 'mbti', 'merge-2048', 'origami', 'focus', 'solar'];
 const favs = new Set(['solar', 'water-sort', 'mood']);
@@ -101,6 +103,7 @@ function cover(a, style = '') {
   return `<div class="art" style="background:color-mix(in srgb,var(${a.t}) 14%,var(--surface));display:grid;place-items:center"><span style="font-family:Songti SC,STSong,serif;font-weight:700;font-size:60px;color:var(${a.t})">${a.glyph}</span></div>`;
 }
 function ico(a, size = '') {
+  if (a.icon) return `<div class="ico ${size}"><img src="${a.icon}" alt=""></div>`;
   if (a.glyph) return `<div class="ico glyph ${size}" style="--t:var(${a.t})"><span>${a.glyph}</span></div>`;
   return `<div class="ico ${size}">${cover(a)}</div>`;
 }
@@ -119,7 +122,7 @@ const ALL_BOARDS = [
   {id:'b2', title:'小伴AI · 下拉打开我的应用', start:{screen:'home', drawer:true, hinted:true}},
   {id:'b3', title:'小伴AI · 对话里递上应用', start:{screen:'chat', chat:'mbti'}},
   {id:'b4', title:'应用 · 广场', start:{screen:'plaza'}},
-  {id:'b5', title:'应用 · 社区作品（帖子）', start:{screen:'post', post:'fish'}},
+  {id:'b5', title:'应用 · 社区作品（帖子）', start:{screen:'post', post:'wancisou'}},
   {id:'b9', title:'做一个我的版本', start:{screen:'post', post:'fish', remix:'fish'}},
   {id:'b6', title:'应用 · 长按官方应用查看详情', start:{screen:'plaza', sheet:'mbti'}},
   {id:'b7', title:'全屏 · 竖屏', start:{screen:'run', app:'mbti'}},
@@ -437,9 +440,6 @@ function ttile(a) {
 function trow(a) {
   return `<div class="trow" data-a="open:${a.id}" role="button">${ico(a, 'sm')}<span style="min-width:0;flex:1"><b>${a.name}</b><small>${a.line}</small></span><button class="pill" data-a="launch:${a.id}">打开</button></div>`;
 }
-function pcard(a) {
-  return `<button class="card pcard" data-a="open:${a.id}"><div class="cv">${cover(a)}</div><b>${a.name}</b><div class="who">${ava(a.author)}<span>${a.author}</span></div></button>`;
-}
 function wcard(a) {
   const liked = likes.has(a.id);
   return `<div class="card wcard" data-a="open:${a.id}" role="button"><div class="cv ${a.o === 'L' ? 'l' : 'p'}">${cover(a)}<div class="stat"><span>${icon('play')}${a.plays}</span><span>${icon('comment')}${a.comments}</span></div></div>
@@ -462,15 +462,13 @@ function plaza(s) {
       <div class="hscroll">${GAMES.map(gcard).join('')}</div>
       <div class="sec"><h3>精选工具</h3><button data-a="list:tools">全部${icon('right')}</button></div>
       <div class="tgrid">${TOOLS.slice(0, 4).map(ttile).join('')}</div>
-      <div class="sec"><h3>创作者精选</h3><button data-a="list:picks">全部${icon('right')}</button></div>
-      <div class="hscroll">${PICKS.map(pcard).join('')}</div>
       <div class="sec"><h3>社区作品</h3><button data-a="make">发布我的${icon('right')}</button></div>
       <div class="chips">${['推荐', '最新', '游戏', '工具'].map(t => `<button class="chip ${s.wtab === t ? 'on' : ''}" data-a="wtab:${t}">${t}</button>`).join('')}</div>
       ${waterfall(works)}<div class="endnote">继续下滑，加载更多</div>`;
   } else {
     body = `<button class="card make" data-a="make">${icon('sparkle')}<span style="flex:1"><b>你想做个什么？</b><small>一个游戏、一个小工具、一份测评…</small></span></button>
       <div class="sec"><h3>已发布</h3><span class="t-cap">发布后出现在社区作品里</span></div>
-      ${['tea', 'water'].map(i => { const a = A[i]; return `<div class="card work"><div class="work-top" data-a="open:${a.id}" role="button"><div class="art-box">${cover(a)}</div><span style="flex:1"><b>${a.name}</b><small>${a.kind} · ${oriText(a)} · ${a.time}发布</small>${a.pick ? '<small class="picked">已选入创作者精选</small>' : ''}</span></div>
+      ${['tea', 'water'].map(i => { const a = A[i]; return `<div class="card work"><div class="work-top" data-a="open:${a.id}" role="button"><div class="art-box">${cover(a)}</div><span style="flex:1"><b>${a.name}</b><small>${a.kind} · ${oriText(a)} · ${a.time}发布</small>${a.pick ? '<small class="picked">已推荐到社区作品</small>' : ''}</span></div>
         <div class="stats"><span>${icon('play')}${a.plays}</span><span>${icon('heart')}${a.likes}</span><span>${icon('comment')}${a.comments}</span>${a.remixN ? `<span>${icon('pen')}${a.remixN} 个改编</span>` : ''}</div>
         <div class="allow"><span>允许别人改编</span><button class="sw ${a.allowRemix === false ? '' : 'on'}" data-a="allow:${a.id}" role="switch" aria-checked="${a.allowRemix !== false}" aria-label="允许别人改编"><i></i></button></div></div>`; }).join('')}
       <div class="sec"><h3>草稿</h3></div>
@@ -479,13 +477,12 @@ function plaza(s) {
   return `<div class="screen">${statusBar()}${top}<div class="scroll"><div class="pad">${body}<div class="nav-space"></div></div></div>${nav('plaza')}</div>`;
 }
 function list(s) {
-  const map = {games:['精选游戏', GAMES], tools:['精选工具', TOOLS], picks:['创作者精选', PICKS]};
+  const map = {games:['精选游戏', GAMES], tools:['精选工具', TOOLS]};
   const [title, items] = map[s.list];
   const shown = items.filter(a => s.filter === '全部' || (s.filter === '横屏') === (a.o === 'L'));
   const chipSet = ['全部', '竖屏', '横屏'];
   const chips = s.list === 'tools' ? '' : `<div class="chips">${chipSet.map(f => `<button class="chip ${s.filter === f ? 'on' : ''}" data-a="filter:${f}">${f}</button>`).join('')}</div>`;
   const content = s.list === 'tools' ? `<div class="tgrid" style="row-gap:16px">${shown.map(ttile).join('')}</div>`
-    : s.list === 'picks' ? waterfall(shown)
     : `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px 10px">${shown.map(a => gcard(a).replace('class="gcard"', 'class="gcard" style="width:auto"')).join('')}</div>`;
   return `<div class="screen">${statusBar()}<div class="bar"><button class="ic" data-a="back" aria-label="返回">${icon('left')}</button><h1>${title}</h1><span class="ic"></span></div>
     <div class="scroll"><div class="pad">${chips}${content}<div style="height:40px"></div></div></div></div>`;
@@ -493,7 +490,7 @@ function list(s) {
 function post(s) {
   const a = A[s.post], liked = likes.has(a.id), fav = favs.has(a.id), mine = a.author === '我', fol = follows.has(a.author);
   const pos = ['', 'transform:scale(1.25);object-position:30% 60%', 'transform:scale(1.5);object-position:70% 30%'];
-  const gallery = `<div class="gallery ${a.o === 'L' ? 'l' : 'p'}">${pos.map((p, i) => `<div style="${a.cover ? '' : `filter:hue-rotate(${i * 12}deg) brightness(${1 - i * .05})`}">${cover(a, p)}<span class="idx">${i + 1}/3</span></div>`).join('')}</div>`;
+  const gallery = `<div class="gallery ${a.o === 'L' ? 'l' : 'p'}">${(a.id === 'wancisou' ? [pos[0]] : pos).map((p, i) => `<div style="${a.cover ? '' : `filter:hue-rotate(${i * 12}deg) brightness(${1 - i * .05})`}">${cover(a, p)}<span class="idx">${i + 1}/${a.id === 'wancisou' ? 1 : 3}</span></div>`).join('')}</div>`;
   return `<div class="screen post-page">${statusBar()}
     <div class="post-bar"><button class="ic" data-a="back" aria-label="返回">${icon('left')}</button><span class="who">${ava(a.author, 'lg')}${mine ? '我' : a.author}</span>
       ${mine ? '' : `<button class="follow ${fol ? 'done' : ''}" data-a="follow:${a.author}">${fol ? '已关注' : '关注'}</button>`}<button class="ic" data-a="pop" aria-label="更多">${icon('more')}</button></div>

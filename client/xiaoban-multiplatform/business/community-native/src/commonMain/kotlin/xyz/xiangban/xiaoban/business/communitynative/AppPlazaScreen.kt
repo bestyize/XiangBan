@@ -49,6 +49,8 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
     val state by loader.state.collectAsState()
     val picksLoader = rememberLoader(env, "app-plaza-picks-${session.accountId}") { env.forum.packs(featured = true) }
     val picks by picksLoader.state.collectAsState()
+    val pickItems = (picks as? Load.Ready)?.value?.items.orEmpty().filter { it.kind == "game" || it.kind == "app" }
+    val featuredTools = pickItems.filter { it.kind == "app" }
     LaunchedEffect(state) {
         (state as? Load.Ready)?.value?.let { result ->
             entries = ((if (page == 1) emptyList() else entries) + result.items).distinctBy { it.id }
@@ -60,7 +62,8 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
     val recent = recentAppShortcuts(recentIds, available, recentCommunity)
     var message by remember { mutableStateOf<String?>(null) }
     val ratios = remember(filter) { mutableStateMapOf<Long, Float>() }
-    val columns = appWaterfallColumns(entries) { pack -> 1f / (ratios[pack.id] ?: (4f / 3f)) + .6f }
+    val communityPosts = if (filter == "推荐") (pickItems + entries).distinctBy { it.id } else entries
+    val columns = appWaterfallColumns(communityPosts) { pack -> 1f / (ratios[pack.id] ?: (4f / 3f)) + .6f }
     Box(Modifier.fillMaxSize()) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = NavInset), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (recent.isNotEmpty()) {
@@ -83,24 +86,20 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
                 }
             }
             if (errors.isNotEmpty()) item { Banner(errors.joinToString("\n"), Modifier.padding(horizontal = 16.dp), warn = true, actionText = "重试", onAction = reload) }
-            if (tools.isNotEmpty()) {
+            if (tools.isNotEmpty() || featuredTools.isNotEmpty()) {
                 item { PlazaHeading("精选工具", "全部", onAllTools) }
                 item {
+                    val shortcuts = tools.map { AppShortcut("builtin", it.id, it.name) } +
+                        featuredTools.map { AppShortcut("community", it.id.toString(), it.title, it.coverUrl) }
                     Row(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        tools.take(4).forEach { tool ->
-                            AppShortcutTile(env, AppShortcut("builtin", tool.id, tool.name), Modifier.weight(1f),
-                                onDetails = { onOfficialDetails(tool) }) { onOfficial(tool) }
+                        shortcuts.take(4).forEach { shortcut ->
+                            val tool = tools.firstOrNull { it.id == shortcut.id && shortcut.source == "builtin" }
+                            AppShortcutTile(env, shortcut, Modifier.weight(1f),
+                                onDetails = { if (tool != null) onOfficialDetails(tool) else open(Route.Pack(shortcut.id.toLong())) }) {
+                                if (tool != null) onOfficial(tool) else open(Route.Pack(shortcut.id.toLong()))
+                            }
                         }
-                        repeat(4 - tools.take(4).size) { Spacer(Modifier.weight(1f)) }
-                    }
-                }
-            }
-            val pickItems = (picks as? Load.Ready)?.value?.items.orEmpty()
-            if (pickItems.isNotEmpty()) {
-                item { PlazaHeading("创作者精选") }
-                item {
-                    LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(pickItems, key = { it.id }) { pack -> CreatorPickCard(env, pack, Modifier.width(260.dp)) { open(Route.Pack(pack.id)) } }
+                        repeat(4 - shortcuts.take(4).size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }
@@ -120,7 +119,7 @@ internal fun AppPlazaScreen(env: CommunityEnv, official: List<MobileGame>, local
                 }
                 when (val current = state) {
                     is Load.Ready -> item {
-                        if (entries.isEmpty()) Text(if (filter == "工具") "还没有社区工具" else "还没有社区作品", Modifier.padding(24.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
+                        if (communityPosts.isEmpty()) Text(if (filter == "工具") "还没有社区工具" else "还没有社区作品", Modifier.padding(24.dp), style = XType.Secondary, color = LocalExtraColors.current.ink3)
                         else if (current.value.hasMore) AppActionButton("加载更多", { page++ }, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
                         else Text("已看完所有作品", Modifier.padding(16.dp), style = XType.Caption, color = LocalExtraColors.current.ink3)
                     }
@@ -167,41 +166,32 @@ internal fun PlazaChip(label: String, active: Boolean, onClick: () -> Unit) {
         style = XType.Secondary, color = if (active) LocalExtraColors.current.brandInk else MaterialTheme.colorScheme.onSurface)
 }
 
-/** 创作者精选：16:9 封面、作者、两行简介。 */
-@Composable
-private fun CreatorPickCard(env: CommunityEnv, pack: Pack, modifier: Modifier, onClick: () -> Unit) {
-    Column(modifier.outlinedCard(16.dp).clickable(role = Role.Button, onClick = onClick)) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(LocalExtraColors.current.fill), contentAlignment = Alignment.Center) {
-            XIcon(XIcons.Gamepad, size = 24.dp, tint = LocalExtraColors.current.ink3)
-            pack.coverUrl?.let { url -> AsyncImage(env.forum.imageUrl(url), null, imageLoader = rememberImageLoader(), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
-        }
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Avatar(pack.author?.nickname ?: "作者", 18.dp, showInitial = true)
-                Text(pack.author?.nickname ?: "社区作者", style = XType.Caption, color = LocalExtraColors.current.ink3, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Text(pack.title, style = XType.Section, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (pack.summary.isNotBlank()) Text(pack.summary, style = XType.Secondary, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
 /** 精选工具「全部」：四列图标网格。 */
 @Composable
 internal fun FeaturedToolsPage(env: CommunityEnv, tools: List<MobileGame>, back: () -> Unit,
-    onDetails: (MobileGame) -> Unit, onOpen: (MobileGame) -> Unit) {
+    onDetails: (MobileGame) -> Unit, onOpen: (MobileGame) -> Unit, open: (Route) -> Unit) {
+    val session by env.session.state.collectAsState()
+    val loader = rememberLoader(env, "featured-tools-${session.accountId}") { env.forum.packs(kind = "app", featured = true) }
+    val featured by loader.state.collectAsState()
+    val communityTools = (featured as? Load.Ready)?.value?.items.orEmpty()
+    val shortcuts = tools.map { AppShortcut("builtin", it.id, it.name) } +
+        communityTools.map { AppShortcut("community", it.id.toString(), it.title, it.coverUrl) }
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         ScreenBar("精选工具", back)
         LazyColumn(Modifier.fillMaxSize().navigationBarsPadding(), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            items(tools.chunked(4)) { row ->
+            items(shortcuts.chunked(4)) { row ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { tool ->
-                        AppShortcutTile(env, AppShortcut("builtin", tool.id, tool.name), Modifier.weight(1f),
-                            onDetails = { onDetails(tool) }) { onOpen(tool) }
+                    row.forEach { shortcut ->
+                        val tool = tools.firstOrNull { it.id == shortcut.id && shortcut.source == "builtin" }
+                        AppShortcutTile(env, shortcut, Modifier.weight(1f),
+                            onDetails = { if (tool != null) onDetails(tool) else open(Route.Pack(shortcut.id.toLong())) }) {
+                            if (tool != null) onOpen(tool) else open(Route.Pack(shortcut.id.toLong()))
+                        }
                     }
                     repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
                 }
             }
+            if (featured is Load.Failed) item { Banner((featured as Load.Failed).message, Modifier.fillMaxWidth(), warn = true, actionText = "重试", onAction = loader::reload) }
         }
     }
 }

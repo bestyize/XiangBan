@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 3,
+  "runtimeProtocol": 2,
+  "kind": "app",
+  "id": "wancisou",
+  "name": "万磁搜",
+  "description": "跨站搜索公开资源，查看结果并复制磁力链接。",
+  "version": "1.0.0",
+  "category": "tool",
+  "entry": "index.html",
+  "icon": "icon.svg",
+  "cover": "cover.svg",
+  "orientation": "portrait",
+  "input": ["touch", "mouse", "keyboard"],
+  "capabilities": ["clipboard"],
+  "intents": ["磁力搜索", "搜索资源", "找种子"]
+}

@@ -94,7 +94,7 @@ async function copyLink() {
     <p v-else-if="loadError" class="state" role="alert">{{ loadError }} <button class="btn" type="button" @click="reload++">重试</button></p>
     <p v-else-if="!pack" class="state">加载中</p>
     <article v-else class="pack">
-      <div v-if="pack.cover_url" class="cover" :class="{ 'game-cover': pack.kind === 'game' || pack.kind === 'widget' }" :style="coverStyle(pack)" role="img" :aria-label="`${pack.title} 封面`" />
+      <div v-if="pack.cover_url" class="cover" :class="{ 'game-cover': pack.kind === 'game' || pack.kind === 'widget' || pack.kind === 'app' }" :style="coverStyle(pack)" role="img" :aria-label="`${pack.title} 封面`" />
       <div class="head">
         <h1>{{ pack.title }}</h1>
         <p class="meta">
@@ -114,7 +114,7 @@ async function copyLink() {
         <CommunityGameTrial v-if="latest" :key="`${pack.id}-${latest.version}`" :pack="pack" :version="latest.version" />
         <p v-if="pack.kind === 'game' && pack.trust_level > 1 && latest?.manifest.runtimeProtocol !== 2" class="notice">此作品暂不支持网页试玩。</p>
         <p v-if="manualOnly" class="notice">这是手动使用的模板包。下载并解压后，按 README 中的步骤使用；它不会自动创建任务或运行流程。</p>
-        <p v-else-if="!pack.one_click" class="notice">
+        <p v-else-if="!pack.one_click && pack.kind !== 'game' && pack.kind !== 'app'" class="notice">
           {{ pack.trust_level === 2 && pack.kind !== 'game' && pack.kind !== 'app' ? '这是用户发布、尚未审核的内容，不支持一键应用；' : '' }}在小伴桌面端会先展示它会做什么、需要哪些权限，由你确认后才安装。
         </p>
         <ContentSocialActions v-if="pack.status === 'published'" kind="pack" :id="pack.id" />
@@ -128,8 +128,8 @@ async function copyLink() {
           <RouterLink v-if="pack.topic_id" class="btn" :to="`/t/${pack.topic_id}`">看讨论</RouterLink>
           <RouterLink v-if="isAuthor" class="btn" :to="`/publish?pack=${pack.id}`">发布新版本</RouterLink>
         </div>
-        <p v-if="!manualOnly" class="hint">没有安装小伴？在桌面端“社区”页里也能找到它。</p>
-        <p class="hint only-phone">{{ manualOnly ? '可以复制链接，在电脑上下载并阅读使用说明。' : pack.kind === 'game' ? '支持的游戏可在网页试玩；持续体验或创作请使用客户端。' : '桌面作品请在 Windows 或 macOS 客户端使用。' }}</p>
+        <p v-if="!manualOnly && pack.kind !== 'app'" class="hint">没有安装小伴？在桌面端“社区”页里也能找到它。</p>
+        <p class="hint only-phone">{{ manualOnly ? '可以复制链接，在电脑上下载并阅读使用说明。' : pack.kind === 'game' ? '支持的游戏可在网页试玩；持续体验或创作请使用客户端。' : pack.kind === 'app' ? '支持的应用可在小伴手机端打开。' : '桌面作品请在 Windows 或 macOS 客户端使用。' }}</p>
       </div>
 
       <section v-if="pack.versions.length" class="versions">

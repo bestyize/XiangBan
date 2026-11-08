@@ -6,6 +6,7 @@ export const PACK_KINDS = [
   { key: 'wallpaper', label: '壁纸' },
   { key: 'widget', label: '组件' },
   { key: 'game', label: '游戏' },
+  { key: 'app', label: '应用' },
   { key: 'reminder', label: '提醒' },
   { key: 'routine', label: '例行' },
   { key: 'task', label: '任务' },
@@ -23,12 +24,12 @@ export function kindLabel(kind: string): string {
 const MB = 1024 * 1024
 export const KIND_LIMIT: Record<string, number> = {
   effect: MB, reminder: MB, routine: MB, task: MB, goal: MB, expert: MB,
-  widget: 8 * MB, game: 8 * MB, skill: 8 * MB, workflow: 8 * MB, wallpaper: 32 * MB,
+  widget: 8 * MB, game: 8 * MB, app: 100 * MB, skill: 8 * MB, workflow: 8 * MB, wallpaper: 32 * MB,
 }
 export const COVER_LIMIT = 2 * MB
 
 /** 视觉类内容用封面图卡片，文字为主的能力类用单列。 */
-export const VISUAL_KINDS = ['effect', 'wallpaper', 'widget', 'game']
+export const VISUAL_KINDS = ['effect', 'wallpaper', 'widget', 'game', 'app']
 
 export function trustLabel(level: number): string {
   return level === 0 ? '官方' : level === 1 ? '已审核' : '未审核'

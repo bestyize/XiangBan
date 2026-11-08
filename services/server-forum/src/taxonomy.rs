@@ -88,6 +88,23 @@ pub async fn migrate_sections(pool: &PgPool) -> AppResult<()> {
     Ok(())
 }
 
+/// Add the app-post board to already migrated databases without overwriting administrator edits.
+pub async fn add_app_channel(pool: &PgPool) -> AppResult<()> {
+    const NAME: &str = "community-create-app-v1";
+    let mut tx = pool.begin().await?;
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))").bind(NAME).execute(&mut *tx).await?;
+    let (done,): (bool,) = sqlx::query_as("SELECT EXISTS(SELECT 1 FROM data_migrations WHERE name=$1)").bind(NAME).fetch_one(&mut *tx).await?;
+    if done { return Ok(()); }
+    let channel = manifest().channels.iter().find(|channel| channel.id == "create-app").expect("create-app channel");
+    sqlx::query("INSERT INTO categories(slug,name,description,parent_id,section,sort_order,award_points) VALUES($1,$2,$3,(SELECT id FROM categories WHERE slug='create'),'ideas',(SELECT COALESCE(MAX(sort_order),0)+1 FROM categories WHERE parent_id=(SELECT id FROM categories WHERE slug='create')),false) ON CONFLICT(slug) DO NOTHING")
+        .bind(&channel.id).bind(&channel.label).bind(&channel.description).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO data_migrations(name) VALUES($1)").bind(NAME).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO admin_audit(admin,action,target_type,target_id,detail) VALUES('migration','community.app_channel.add','categories',$1,'Added application posts under ideas without changing existing categories')")
+        .bind(NAME).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
 /// 「开源讨论」(resource-open) 板块已下线。线上库是手工清除的；其他环境走这里：
 /// 板块里没有任何帖子、草稿和子分类才删除，否则只归档并停止发帖，绝不删除内容。
 /// `share-software` 是它的旧名，新库种子里会先建出来，一并处理。

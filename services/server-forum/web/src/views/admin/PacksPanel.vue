@@ -20,6 +20,11 @@ async function review(id: number, action: PackReviewAction, confirmText?: string
   if (ok) await list.load()
 }
 
+async function setFeatured(pack: AdminPack) {
+  const ok = await perform(() => adminApi.setPackFeatured(pack.id, !pack.featured), pack.featured ? '已取消精选' : '已设为精选')
+  if (ok) await list.load()
+}
+
 // ───────── 官方登记 ─────────
 const form = reactive({
   kind: 'effect',
@@ -153,6 +158,7 @@ onMounted(list.load)
           <td data-label="使用">{{ p.apply_count }}</td>
           <td data-label="更新" class="shrink">{{ fmtTime(p.updated_at) }}</td>
           <td data-label="操作" class="adm-actions">
+            <button v-if="p.status === 'published'" class="btn btn-sm" @click="setFeatured(p)">{{ p.featured ? '取消精选' : '设为精选' }}</button>
             <button v-if="p.trust_level > 1 && p.status === 'published'" class="btn btn-sm" @click="review(p.id, 'approve')">通过审核</button>
             <button v-if="p.status === 'published'" class="btn btn-sm" @click="review(p.id, 'remove', '确定下架这个内容包？')">下架</button>
             <button v-else class="btn btn-sm" @click="review(p.id, 'restore')">恢复上架</button>

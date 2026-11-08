@@ -291,6 +291,7 @@ export const adminApi = {
   packs: (params: { status?: string; kind?: string; page?: number; page_size?: number }) =>
     request<AdminPage<AdminPack>>('GET', `/packs${qs(params)}`),
   createPack: (body: OfficialPackInput) => request<{ id: number; slug: string }>('POST', '/packs', body),
+  setPackFeatured: (id: number, featured: boolean) => request<{ id: number; featured: boolean }>('POST', `/packs/${id}/featured`, { featured }),
   reviewPack: (id: number, action: PackReviewAction, note = '') =>
     request<{ id: number; trust_level: number; status: string }>('POST', `/packs/${id}/review`, { action, note }),
   metrics: (days = 14) => request<Metrics>('GET', `/metrics${qs({ days })}`),
@@ -399,6 +400,7 @@ export interface AdminPack {
   status: 'pending' | 'published' | 'rejected' | 'removed'
   version: number
   apply_count: number
+  featured: boolean
   updated_at: string
 }
 

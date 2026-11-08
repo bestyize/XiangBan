@@ -227,7 +227,7 @@ fun GamesScreen(env: CommunityEnv, chat: CloudChatController, open: (Route) -> U
             }
         }
         if (allTools && !mine) FeaturedToolsPage(env, official.filter { BuiltinMobileGames.isTool(it.id) }, back = { allTools = false },
-            onDetails = ::showOfficialDetails, onOpen = ::openOfficial)
+            onDetails = ::showOfficialDetails, onOpen = ::openOfficial, open = open)
         if (allGames && !mine) FeaturedGamesPage(official.filterNot { BuiltinMobileGames.isTool(it.id) }, covers, imageLoader, back = { allGames = false },
             onDetails = ::showOfficialDetails, onOpen = ::openOfficial)
         detail?.let { entry ->

@@ -180,6 +180,12 @@
       "description": "分享游戏的真实作品、使用方法和创作技巧"
     },
     {
+      "id": "create-app",
+      "parent": "create",
+      "label": "应用",
+      "description": "分享工具和测评应用的真实作品、使用方法和创作技巧"
+    },
+    {
       "id": "create-reminder",
       "parent": "create",
       "label": "提醒",

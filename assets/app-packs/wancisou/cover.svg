@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+  <defs>
+    <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#FFF1EE"/><stop offset="1" stop-color="#F5F5F7"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-40%" width="140%" height="200%"><feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#183042" flood-opacity=".09"/></filter>
+  </defs>
+  <rect width="640" height="360" rx="28" fill="url(#bg)"/>
+  <text x="42" y="74" fill="#183042" font-family="Arial, sans-serif" font-size="35" font-weight="700">万磁搜</text>
+  <rect x="42" y="94" width="556" height="50" rx="15" fill="#fff" stroke="#E7E7EA"/>
+  <circle cx="65" cy="119" r="8" fill="none" stroke="#FD7979" stroke-width="2"/><path d="m71 125 7 7" stroke="#FD7979" stroke-width="2"/>
+  <text x="89" y="126" fill="#6E6872" font-family="Arial, sans-serif" font-size="16">搜索公开资源</text>
+  <rect x="517" y="101" width="72" height="36" rx="11" fill="#FD7979"/><text x="553" y="125" fill="#fff" text-anchor="middle" font-family="Arial, sans-serif" font-size="15" font-weight="700">搜索</text>
+  <g filter="url(#shadow)">
+    <rect x="42" y="178" width="556" height="138" rx="22" fill="#fff"/>
+    <text x="62" y="211" fill="#183042" font-family="Arial, sans-serif" font-size="19" font-weight="700">Ubuntu 24.04 LTS Desktop</text>
+    <rect x="551" y="192" width="30" height="21" rx="11" fill="#FCE5EC"/><text x="566" y="207" fill="#E66A8D" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="700">#1</text>
+    <rect x="62" y="230" width="61" height="25" rx="13" fill="#E4F4FD"/><text x="92" y="247" fill="#2D9CDB" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">BtSow</text>
+    <rect x="130" y="230" width="63" height="25" rx="13" fill="#FCE5EC"/><text x="161" y="247" fill="#E66A8D" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">5.7 GB</text>
+    <rect x="200" y="230" width="105" height="25" rx="13" fill="#F0EAFF"/><text x="252" y="247" fill="#8E6CE8" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">2026-07-11</text>
+    <rect x="62" y="266" width="73" height="25" rx="13" fill="#FFF0E2"/><text x="99" y="283" fill="#F2994A" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">下载 77</text>
+    <rect x="142" y="266" width="70" height="25" rx="13" fill="#E5F8EE"/><text x="177" y="283" fill="#27AE60" text-anchor="middle" font-family="Arial, sans-serif" font-size="13">做种 50</text>
+    <rect x="486" y="261" width="95" height="33" rx="17" fill="#FFF1EE"/><text x="533" y="283" fill="#F26060" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700">复制磁力</text>
+  </g>
+</svg>

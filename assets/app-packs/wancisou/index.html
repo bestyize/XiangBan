@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>万磁搜</title>
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="app">
+    <header class="masthead"><h1>万磁搜</h1></header>
+    <form class="search" id="search-form" autocomplete="off">
+      <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.7"/><path d="m16 16 4.3 4.3"/></svg>
+      <input id="query" type="search" aria-label="搜索关键词" placeholder="搜索关键词" maxlength="128" required>
+      <button id="submit" type="submit">搜索</button>
+    </form>
+    <div class="source-row"><label class="source-select"><select id="source" aria-label="搜索来源"><option value="all">全部来源</option></select></label></div>
+    <main id="results" aria-live="polite"></main>
+  </div>
+  <div class="modal" id="modal" hidden>
+    <div class="backdrop" data-close></div>
+    <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
+      <header class="dialog-head"><div><h2 id="modal-title">磁力链接</h2><p id="modal-subtitle"></p></div><button class="close" type="button" data-close aria-label="关闭">×</button></header>
+      <div id="modal-body"></div>
+    </section>
+  </div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

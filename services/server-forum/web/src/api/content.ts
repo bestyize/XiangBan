@@ -4,7 +4,7 @@ import { appRuntimeBase } from '@/lib/appRuntime'
 import type { Page } from './types'
 
 export const runtimeBase = appRuntimeBase(import.meta.env?.VITE_APP_RUNTIME_BASE, import.meta.env?.DEV === true)
-const runtimeHeaders = runtimeBase ? { 'X-Xiaoban-Runtime': '1,2' } : undefined
+const runtimeHeaders = { 'X-Xiaoban-Runtime': '1,2' }
 
 export interface PackAuthor {
   uid: string
