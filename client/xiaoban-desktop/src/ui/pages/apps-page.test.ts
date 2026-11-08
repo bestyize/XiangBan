@@ -169,7 +169,7 @@ it('switches to user apps tab and displays user creations', async () => {
     await flushPromises();
     expect(openApp).toHaveBeenCalledWith('pomodoro-timer', {
       title: '番茄时钟',
-      orientation: 'landscape',
+      orientation: 'portrait',
       entry: 'index.html',
     });
   } finally {

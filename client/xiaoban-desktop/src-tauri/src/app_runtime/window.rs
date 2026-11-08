@@ -3,6 +3,8 @@
 //! Completely decoupled from desktop wallpaper and companion pet layers.
 
 use std::sync::Mutex;
+#[cfg(target_os = "macos")]
+use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const BRIDGE_JS: &str = include_str!("../../resources/runtime-v2/bridge.js");
@@ -33,6 +35,24 @@ pub fn default_dimensions(orientation: Option<&str>) -> (f64, f64) {
         Some("landscape") => (1024.0, 640.0),
         _ => (1024.0, 720.0),
     }
+}
+
+pub fn network_allowed() -> bool {
+    #[cfg(windows)]
+    { true }
+    #[cfg(target_os = "macos")]
+    {
+        static SUPPORTED: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        *SUPPORTED.get_or_init(|| {
+            std::process::Command::new("/usr/bin/sw_vers").arg("-productVersion").output()
+                .ok().filter(|output| output.status.success())
+                .and_then(|output| String::from_utf8(output.stdout).ok())
+                .and_then(|version| version.split('.').next()?.parse::<u32>().ok())
+                .is_some_and(|major| major >= 14)
+        })
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    { false }
 }
 
 pub async fn open_app(
@@ -80,6 +100,12 @@ pub async fn open_app(
         format!("小伴 · {title}")
     };
 
+    let own_path_for_navigation = format!("/{app_id}/");
+    let proxy = if network_allowed() {
+        Some(url::Url::parse(&format!("http://127.0.0.1:{}", super::network::port()?))
+            .map_err(|e| format!("应用网络代理地址无效: {e}"))?)
+    } else { None };
+
     let builder = WebviewWindowBuilder::new(app, &label, webview_url)
         .title(&display_title)
         .inner_size(width, height)
@@ -89,13 +115,33 @@ pub async fn open_app(
         .shadow(true)
         .center()
         .visible(true)
+        .on_navigation(move |url| {
+            let own_origin = if cfg!(windows) {
+                url.scheme() == "http" && url.host_str() == Some("app-pack.localhost")
+            } else {
+                url.scheme() == "app-pack" && url.host_str() == Some("localhost")
+            };
+            own_origin && url.path().starts_with(&own_path_for_navigation)
+        })
+        .on_new_window(|_, _| tauri::webview::NewWindowResponse::Deny)
         .initialization_script(BRIDGE_JS.to_string());
 
     #[cfg(windows)]
-    let builder = if let Ok(root) = crate::storage::root(app) {
-        builder.data_directory(crate::storage::webview(&root))
-    } else {
-        builder
+    let builder = builder
+        .proxy_url(proxy.expect("Windows application network proxy is enabled"))
+        .data_directory(crate::storage::root(app)?.join("apps").join("webview").join(app_id))
+        .additional_browser_args("--proxy-bypass-list=<-loopback>");
+
+    #[cfg(target_os = "macos")]
+    let builder = {
+        if let Some(proxy) = proxy {
+            let digest = Sha256::digest(format!("xiaoban-app-runtime:{app_id}").as_bytes());
+            let mut identifier = [0u8; 16];
+            identifier.copy_from_slice(&digest[..16]);
+            builder.proxy_url(proxy).data_store_identifier(identifier)
+        } else {
+            builder.incognito(true)
+        }
     };
 
     let window = builder.build().map_err(|e| format!("创建应用窗口失败: {e}"))?;

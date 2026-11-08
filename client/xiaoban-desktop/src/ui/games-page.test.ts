@@ -6,33 +6,35 @@ import GamesPage from './pages/GamesPage.vue';
 import type { ControlStore } from './control-types';
 import { fallbackCoverUrl } from '../games/catalog.ts';
 
-const builtin = { id: 'merge-2048', name: '2048', description: '合成数字', entry: 'index.html', cover: 'cover.svg', runtimeProtocol: 1, source: 'builtin' as const, base: '/game-packs/merge-2048/' };
+const builtin = { id: 'merge-2048', name: '2048', description: '合成数字', entry: 'index.html', cover: 'cover.svg', runtimeProtocol: 2, source: 'builtin' as const, base: '/game-packs/merge-2048/' };
 const mine = { id: 'star-catcher', name: '接星星', description: '接住落下的星星', entry: 'index.html', runtimeProtocol: 1, save: true, source: 'user' as const, base: 'game-pack://localhost/star-catcher/' };
 const stubs = { NAlert: { template: '<div class="alert"><slot /></div>' }, NButton: { template: '<button><slot /></button>' }, NSkeleton: true, NTag: true, NPopconfirm: { template: '<div><slot name="trigger" /><slot /></div>', emits: ['positive-click'] } };
 
 function setup(catalog: { games: unknown[]; errors?: string[] }, desktop = true) {
   const openGames = vi.fn().mockResolvedValue(undefined);
+  const openApp = vi.fn().mockResolvedValue(undefined);
   const store = {
-    desktop, settings: { gameDesktopDoubleClick: false }, game: { desktopDoubleClickSupported: true }, openGames, notify: vi.fn(),
+    desktop, settings: { gameDesktopDoubleClick: false }, game: { desktopDoubleClickSupported: true }, openGames, openApp, notify: vi.fn(),
     listGames: vi.fn(async () => ({ games: catalog.games, errors: catalog.errors ?? [], directory: null })),
     deleteUserGame: vi.fn().mockResolvedValue(undefined), openUserGamesFolder: vi.fn().mockResolvedValue(undefined),
   } as unknown as ControlStore;
-  return { store, openGames, wrapper: mount(GamesPage, { props: { store }, global: { stubs } }) };
+  return { store, openGames, openApp, wrapper: mount(GamesPage, { props: { store }, global: { stubs } }) };
 }
 
 async function customTab(wrapper:ReturnType<typeof mount>){await wrapper.findAll('.xb-tabs-lg [role=tab]').find(t=>t.text()==='我的游戏')!.trigger('click');await flushPromises();}
 
 it('opens the selected local game on a single click and supports keyboard entry', async () => {
-  const { wrapper, openGames } = setup({ games: [builtin] });
+  const { wrapper, openApp, openGames } = setup({ games: [builtin] });
   try {
     await flushPromises();
     expect(wrapper.findAll('.xb-tabs-lg [role=tab]').map(t=>t.text())).toEqual(['官方游戏','我的游戏']);expect(wrapper.find('.resource-library-header').exists()).toBe(false);
     expect(wrapper.get('.game-card img').attributes('src')).toBe('/game-packs/merge-2048/cover.svg');
     await wrapper.get('.game-card').trigger('click'); await flushPromises();
-    expect(openGames).toHaveBeenCalledWith('merge-2048');
+    expect(openApp).toHaveBeenCalledWith('merge-2048', { title: '2048', orientation: 'portrait', entry: 'index.html' });
+    expect(openGames).not.toHaveBeenCalled();
     expect(wrapper.find('.shortcut-card').exists()).toBe(false);expect(wrapper.find('h2').exists()).toBe(false);expect(wrapper.find('.section-heading').exists()).toBe(false);expect(wrapper.find('.games-body').text()).not.toContain('离线可玩');
     await wrapper.get('.game-card').trigger('keydown', { key: 'Enter' }); await flushPromises();
-    expect(openGames).toHaveBeenCalledTimes(2);
+    expect(openApp).toHaveBeenCalledTimes(2);
   } finally { wrapper.unmount(); }
 });
 

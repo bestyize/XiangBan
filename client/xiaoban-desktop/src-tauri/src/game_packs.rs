@@ -25,10 +25,6 @@ pub const MAX_ASSETS: usize = 60;
 pub const MAX_ASSET_BYTES: usize = 4 * 1024 * 1024;
 pub const MAX_ASSETS_TOTAL: usize = 16 * 1024 * 1024;
 const COVER_EXTENSIONS: [&str; 5] = ["svg", "png", "jpg", "jpeg", "webp"];
-pub const HOST_SCRIPT: &str = "";
-const HOST_TAG: &str = "";
-fn injected_host_script() -> Vec<u8> { Vec::new() }
-
 /// Serialises create/delete so two tool calls never rename the same folder at once.
 static WRITE_LOCK: Mutex<()> = Mutex::new(());
 
@@ -197,7 +193,7 @@ pub fn validate_manifest(dir: &Path, folder: &str, manifest: &Value) -> Result<V
     let layer = Layer::from_value(manifest)?;
     let mut entry = json!({
         "id": folder, "name": name, "description": description, "entry": "index.html",
-        "runtimeProtocol": 1, "save": false, "layer": layer.name(), "capabilities": layer.capabilities,
+        "runtimeProtocol": protocol.unwrap_or(1), "save": false, "layer": layer.name(), "capabilities": layer.capabilities,
     });
     if let Some(cover) = manifest.get("cover").filter(|v| !v.is_null()) {
         let cover = cover.as_str().ok_or("cover 需要是文字路径")?;
@@ -337,30 +333,6 @@ fn percent_decode(raw: &str) -> Option<String> {
     String::from_utf8(out).ok()
 }
 
-/// Puts the desktop host adapter into an entry page that does not load it itself.
-pub fn inject_host(html: &str) -> String {
-    if html.contains("desktop-host.js") {
-        return html.to_string();
-    }
-    let lower = html.to_ascii_lowercase();
-    for tag in ["<head", "<html"] {
-        let mut from = 0;
-        while let Some(found) = lower[from..].find(tag) {
-            let start = from + found;
-            let after = start + tag.len();
-            let boundary = lower.as_bytes().get(after).is_none_or(|c| matches!(c, b'>' | b'/' | b' ' | b'\t' | b'\n' | b'\r'));
-            if boundary {
-                if let Some(close) = lower[after..].find('>') {
-                    let at = after + close + 1;
-                    return format!("{}{HOST_TAG}{}", &html[..at], &html[at..]);
-                }
-            }
-            from = after;
-        }
-    }
-    format!("{HOST_TAG}{html}")
-}
-
 fn parse_range(header: &str, length: u64) -> Option<(u64, u64)> {
     let spec = header.strip_prefix("bytes=")?;
     if spec.contains(',') || length == 0 {
@@ -376,20 +348,14 @@ fn parse_range(header: &str, length: u64) -> Option<(u64, u64)> {
     (start <= end && start < length).then_some((start, end))
 }
 
-/// Answers one request path (`/<id>/<file>` or `/__host/desktop-host.js`) from `root`.
+/// Answers one request path (`/<id>/<file>`) from `root`.
 pub fn serve_from(root: &Path, raw_path: &str, range: Option<&str>) -> Served {
     let Some(path) = percent_decode(raw_path) else { return Served::status(400) };
     if path.contains(['\\', '\0']) {
         return Served::status(400);
     }
     let segments: Vec<&str> = path.trim_start_matches('/').split('/').collect();
-    if segments[0] == "__host" {
-        return if segments == ["__host", "desktop-host.js"] {
-            Served { status: 200, mime: mime_for("js").unwrap_or_default(), body: injected_host_script(), range: None }
-        } else {
-            Served::status(404)
-        };
-    }
+    if segments[0] == "__host" { return Served::status(404); }
     let id = segments[0];
     if check_id(id).is_err() {
         return Served::status(404);
@@ -417,10 +383,7 @@ pub fn serve_from(root: &Path, raw_path: &str, range: Option<&str>) -> Served {
         Err(_) => return Served::status(404),
     };
     let Ok(bytes) = fs::read(&file) else { return Served::status(404) };
-    if rest == ["index.html"] {
-        let html = String::from_utf8_lossy(&bytes);
-        return Served { status: 200, mime, body: inject_host(&html).into_bytes(), range: None };
-    }
+    if rest == ["index.html"] { return Served { status: 200, mime, body: bytes, range: None }; }
     if let Some(header) = range.filter(|_| ext != "html") {
         return match parse_range(header, length) {
             Some((start, end)) => Served { status: 206, mime, body: bytes[start as usize..=end as usize].to_vec(), range: Some(format!("bytes {start}-{end}/{length}")) },
@@ -808,7 +771,8 @@ mod tests {
         assert!(check(with("description", json!("字".repeat(81)))).unwrap_err().contains("80"));
         assert!(check(with("description", json!("字".repeat(80)))).is_ok());
         assert!(check(with("entry", json!("main.html"))).is_err());
-        assert!(check(with("runtimeProtocol", json!(2))).is_err());
+        assert_eq!(check(with("runtimeProtocol", json!(2))).unwrap()["runtimeProtocol"], 2);
+        assert!(check(with("runtimeProtocol", json!(3))).is_err());
         assert!(check(with("save", json!("yes"))).is_err());
         assert!(check(with("orientation", json!("diagonal"))).is_err());
         // Cover must be a relative path to a real image inside the folder.
@@ -862,18 +826,7 @@ mod tests {
     }
 
     #[test]
-    fn host_script_is_injected_unless_the_page_already_loads_it() {
-        assert_eq!(inject_host("<html><head><title>x</title></head></html>"), format!("<html><head>{HOST_TAG}<title>x</title></head></html>"));
-        assert!(inject_host("<HEAD lang=a><meta></HEAD>").starts_with(&format!("<HEAD lang=a>{HOST_TAG}")));
-        assert!(inject_host("<header></header><head>").contains(&format!("<head>{HOST_TAG}")), "<header> is not <head>");
-        assert!(inject_host("<html><body>x</body></html>").starts_with(&format!("<html>{HOST_TAG}")));
-        assert!(inject_host("<p>bare</p>").starts_with(HOST_TAG));
-        let own = "<head><script src=\"./desktop-host.js\"></script></head>";
-        assert_eq!(inject_host(own), own);
-    }
-
-    #[test]
-    fn the_protocol_returns_the_entry_page_with_the_host_script_injected() {
+    fn the_protocol_returns_the_entry_page_without_legacy_injection() {
         let r = root("serve-entry");
         make(&r, "demo-game");
         for path in ["/demo-game/index.html", "/demo-game/", "/demo-game"] {
@@ -881,17 +834,13 @@ mod tests {
             assert_eq!(page.status, 200, "{path}");
             assert!(page.mime.starts_with("text/html"));
             let body = String::from_utf8(page.body).unwrap();
-            assert!(body.contains(&format!("<head>{HOST_TAG}<title>")), "{body}");
+            assert!(body.contains("<head><title>"), "{body}");
             assert!(body.contains("game.js"));
         }
         let script = serve_from(&r, "/demo-game/game.js", None);
         assert_eq!((script.status, script.mime), (200, "text/javascript; charset=utf-8"));
         assert_eq!(script.body, b"document.title='x'");
-        let host = serve_from(&r, "/__host/desktop-host.js", None);
-        assert_eq!(host.status, 200);
-        assert!(host.body.starts_with(HOST_SCRIPT.as_bytes()));
-        assert!(String::from_utf8(host.body.clone()).unwrap().contains("type:'game.ready'"));
-        assert!(HOST_SCRIPT.contains("xiaban.game-pack"));
+        assert_eq!(serve_from(&r, "/__host/desktop-host.js", None).status, 404);
         assert_eq!(serve_from(&r, "/__host/other.js", None).status, 404);
         assert_eq!(serve_from(&r, "/missing-game/index.html", None).status, 404);
         assert_eq!(serve_from(&r, "/demo-game/nope.js", None).status, 404);

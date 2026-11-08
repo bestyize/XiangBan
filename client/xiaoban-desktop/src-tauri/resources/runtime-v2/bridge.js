@@ -5,6 +5,9 @@
   try {
     delete window.__TAURI__;
   } catch {}
+  for (const name of ['RTCPeerConnection', 'webkitRTCPeerConnection']) {
+    try { Object.defineProperty(window, name, { value: undefined, configurable: false }); } catch {}
+  }
 
   const events = new Map();
   const zeroInsets = Object.freeze({ top: 0, right: 0, bottom: 0, left: 0 });

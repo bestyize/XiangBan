@@ -18,16 +18,18 @@ pub fn base_url(app_id: &str) -> String {
     }
 }
 
-pub fn csp(windows: bool) -> String {
+pub fn csp(windows: bool, network_allowed: bool) -> String {
     let origin = if windows {
         "app-pack: http://app-pack.localhost"
     } else {
         "app-pack:"
     };
+    let remote = if network_allowed { " https:" } else { "" };
+    let remote_connect = if network_allowed { " https: wss:" } else { "" };
     format!(
-        "default-src 'none'; script-src 'self' {origin} 'unsafe-inline'; style-src 'self' {origin} 'unsafe-inline'; \
-         img-src 'self' {origin} data: blob:; media-src 'self' {origin} data: blob:; font-src 'self' {origin} data:; \
-         connect-src 'none'; frame-src 'none'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'"
+        "default-src 'none'; script-src 'self' {origin}{remote} 'unsafe-inline'; style-src 'self' {origin}{remote} 'unsafe-inline'; \
+         img-src 'self' {origin}{remote} data: blob:; media-src 'self' {origin}{remote} data: blob:; font-src 'self' {origin}{remote} data:; \
+         connect-src 'self' {origin}{remote_connect}; frame-src 'none'; worker-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'"
     )
 }
 
@@ -153,8 +155,8 @@ pub fn resolve_app_file(root: &Path, segments: &[String]) -> Option<(PathBuf, &'
     let ext = filename.rsplit('.').next()?;
     let mime = mime_for(ext)?;
 
-    // Check 1: User installed packs under apps/packs/<id>
-    let user_pack_dir = root.join("apps").join("packs").join(app_id);
+    // The desktop creator and the app plaza both list packs from games/packs.
+    let user_pack_dir = crate::game_packs::packs_dir(root).join(app_id);
     let mut candidate = user_pack_dir.clone();
     for p in &rel_parts {
         candidate.push(p);
@@ -252,11 +254,24 @@ pub fn serve_from(root: &Path, raw_path: &str, range_header: Option<&str>) -> Se
     }
 }
 
-pub fn serve(app: &tauri::AppHandle, request: tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
+pub fn serve_for(root: &Path, window_label: &str, raw_path: &str, range_header: Option<&str>) -> Served {
+    let Some(app_id) = super::window::app_id_from_label(window_label) else {
+        return Served::status(403);
+    };
+    let Some(segments) = safe_segments(raw_path) else {
+        return Served::status(400);
+    };
+    if segments.first().map(String::as_str) != Some(app_id) {
+        return Served::status(403);
+    }
+    serve_from(root, raw_path, range_header)
+}
+
+pub fn serve(app: &tauri::AppHandle, window_label: &str, request: tauri::http::Request<Vec<u8>>) -> tauri::http::Response<Vec<u8>> {
     let root = crate::storage::root(app);
     let range = request.headers().get("range").and_then(|v| v.to_str().ok());
     let served = match root {
-        Ok(root) => serve_from(&root, request.uri().path(), range),
+        Ok(root) => serve_for(&root, window_label, request.uri().path(), range),
         Err(_) => Served::status(404),
     };
 
@@ -264,7 +279,7 @@ pub fn serve(app: &tauri::AppHandle, request: tauri::http::Request<Vec<u8>>) -> 
         .status(served.status)
         .header("Content-Type", served.mime)
         .header("Content-Length", served.body.len())
-        .header("Content-Security-Policy", csp(cfg!(windows)))
+        .header("Content-Security-Policy", csp(cfg!(windows), super::window::network_allowed()))
         .header("X-Content-Type-Options", "nosniff")
         .header("Referrer-Policy", "no-referrer")
         .header("Access-Control-Allow-Origin", "*")
@@ -290,6 +305,18 @@ mod tests {
         } else {
             assert_eq!(url, "app-pack://localhost/mbti/");
         }
+    }
+
+    #[test]
+    fn one_runtime_window_cannot_request_another_pack() {
+        let root = std::env::temp_dir().join(format!("xiaoban-app-runtime-request-{}", std::process::id()));
+        let pack = crate::game_packs::packs_dir(&root).join("one");
+        fs::create_dir_all(&pack).unwrap();
+        fs::write(pack.join("index.html"), "<title>one</title>").unwrap();
+        assert_eq!(serve_for(&root, "app-runtime-one", "/one/index.html", None).status, 200);
+        assert_eq!(serve_for(&root, "app-runtime-two", "/one/index.html", None).status, 403);
+        assert_eq!(serve_for(&root, "control", "/one/index.html", None).status, 403);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

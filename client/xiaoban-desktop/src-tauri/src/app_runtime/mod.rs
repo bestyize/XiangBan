@@ -1,6 +1,7 @@
 //! V2 App Runtime module for Xiaoban Desktop.
 
 pub mod protocol;
+pub mod network;
 pub mod storage;
 pub mod window;
 

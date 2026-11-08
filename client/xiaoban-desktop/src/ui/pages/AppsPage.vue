@@ -120,8 +120,8 @@ async function launchApp(app: GameManifest) {
   if (!props.store.desktop || opening.value) return;
   opening.value = true;
   try {
-    // In legacy Games mode, continue to support openGames for existing tests/workspaces
-    if (isGamesMode.value && app.id !== 'mbti') {
+    // Older user packs still need the protocol 1 host.
+    if (app.source === 'user' && app.runtimeProtocol !== 2) {
       await props.store.openGames(app.id);
       return;
     }
@@ -129,7 +129,7 @@ async function launchApp(app: GameManifest) {
     // In modern Apps Plaza mode, all apps launch directly in V2 independent window container!
     await props.store.openApp(app.id, {
       title: app.name,
-      orientation: app.orientation === 'portrait' ? 'portrait' : 'landscape',
+      orientation: app.orientation === 'landscape' ? 'landscape' : 'portrait',
       entry: app.entry ?? 'index.html',
     });
   } catch (error) {

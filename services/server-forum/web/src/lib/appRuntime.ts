@@ -1,5 +1,10 @@
 export const appRuntimeChannel = 'xiaoban.app-runtime.v2'
 
+export function canTrialPack(kind: string, status: string, trustLevel: number, protocol: unknown): boolean {
+  return status === 'published' && (kind === 'game' || (kind === 'app' && protocol === 2)) &&
+    (protocol === 2 || trustLevel === 0 || trustLevel === 1)
+}
+
 export function appRuntimeBase(value: unknown, development: boolean): URL | null {
   if (typeof value !== 'string' || !value) return null
   try {

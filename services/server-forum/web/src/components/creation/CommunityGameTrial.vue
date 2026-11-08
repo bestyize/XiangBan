@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, shallowRef } from 'vue'
 import { contentApi, runtimeBase, type PackDetail } from '@/api/content'
-import { appRuntimeChannel, appRuntimeEntry } from '@/lib/appRuntime'
+import { appRuntimeChannel, appRuntimeEntry, canTrialPack } from '@/lib/appRuntime'
 import { appRuntimeStorage } from '@/lib/appRuntimeStorage'
 import { readGameZip, sandboxUrl, validateDownload } from '@/lib/creationTrial'
 const props = defineProps<{ pack: PackDetail; version: number }>()
@@ -11,8 +11,8 @@ let hostTimer: ReturnType<typeof setTimeout> | undefined
 let exitTimer: ReturnType<typeof setTimeout> | undefined
 const usesV2 = computed(() => props.pack.versions.find(v => v.version === props.version)?.manifest.runtimeProtocol === 2)
 const configured = computed(() => usesV2.value ? Boolean(runtimeBase) : Boolean(import.meta.env.VITE_GAME_SANDBOX_URL))
-const eligible = computed(() => (props.pack.kind === 'game' || (usesV2.value && props.pack.kind === 'app')) &&
-  props.pack.status === 'published' && [0,1].includes(props.pack.trust_level))
+const eligible = computed(() => canTrialPack(props.pack.kind, props.pack.status, props.pack.trust_level,
+  props.pack.versions.find(v => v.version === props.version)?.manifest.runtimeProtocol))
 async function start() {
   if (loading.value || exitTimer) return
   const current = ++sequence; loading.value = true; error.value = ''; active.value = false; host.value = ''
@@ -20,7 +20,7 @@ async function start() {
     const pack = await contentApi.pack(props.pack.id)
     if (current !== sequence) return
     const selected = pack.versions.find(v => v.version === props.version)
-    if (!selected || pack.status !== 'published' || ![0,1].includes(pack.trust_level)) throw new Error('作品暂不可试玩')
+    if (!selected || !canTrialPack(pack.kind, pack.status, pack.trust_level, selected.manifest.runtimeProtocol)) throw new Error('作品暂不可试玩')
     if (usesV2.value) {
       if (!runtimeBase) throw new Error('网页试玩宿主尚未配置，请稍后再试')
       const url = appRuntimeEntry(runtimeBase, pack.id, selected.version, selected.manifest)

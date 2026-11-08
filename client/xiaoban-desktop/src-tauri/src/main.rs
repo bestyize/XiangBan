@@ -926,7 +926,7 @@ fn main() {
         .register_uri_scheme_protocol("chat-preview", |context, request| chat_preview::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("design-preview", |context, request| design::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
-        .register_uri_scheme_protocol("app-pack", |context, request| app_runtime::serve(context.app_handle(), request))
+        .register_uri_scheme_protocol("app-pack", |context, request| app_runtime::serve(context.app_handle(), context.webview_label(), request))
         .manage(widget_preview::State::default())
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();

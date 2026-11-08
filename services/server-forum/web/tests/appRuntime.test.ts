@@ -1,8 +1,15 @@
 import { test } from 'node:test'
 import { strict as assert } from 'node:assert'
-import { appRuntimeBase, appRuntimeEntry } from '../src/lib/appRuntime.ts'
+import { appRuntimeBase, appRuntimeEntry, canTrialPack } from '../src/lib/appRuntime.ts'
 
 const manifest = { schemaVersion: 3, runtimeProtocol: 2 }
+
+test('published protocol 2 community works remain playable at trust level 2', () => {
+  assert.equal(canTrialPack('game', 'published', 2, 2), true)
+  assert.equal(canTrialPack('app', 'published', 2, 2), true)
+  assert.equal(canTrialPack('game', 'published', 2, 1), false)
+  assert.equal(canTrialPack('game', 'disabled', 0, 2), false)
+})
 
 test('only an https origin without credentials, port or path is a runtime base', () => {
   assert.equal(appRuntimeBase('https://app.xiangban.xyz', false)?.hostname, 'app.xiangban.xyz')

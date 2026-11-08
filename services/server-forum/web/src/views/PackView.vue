@@ -99,7 +99,7 @@ async function copyLink() {
         <h1>{{ pack.title }}</h1>
         <p class="meta">
           <span>{{ kindLabel(pack.kind) }}</span>
-          <span :class="{ warn: pack.trust_level === 2 }">{{ trustLabel(pack.trust_level) }}</span>
+          <span v-if="pack.kind !== 'game' && pack.kind !== 'app'" :class="{ warn: pack.trust_level === 2 }">{{ trustLabel(pack.trust_level) }}</span>
           <span v-if="pack.pure_data">纯数据</span>
           <span v-if="pack.apply_count">{{ pack.apply_count }} 次使用</span>
         </p>
@@ -112,10 +112,10 @@ async function copyLink() {
           <RouterLink v-for="t in pack.tags" :key="t" :to="`/tag/${encodeURIComponent(t)}`">{{ t }}</RouterLink>
         </p>
         <CommunityGameTrial v-if="latest" :key="`${pack.id}-${latest.version}`" :pack="pack" :version="latest.version" />
-        <p v-if="pack.kind === 'game' && pack.trust_level > 1" class="notice">此作品尚未审核，暂不支持网页试玩。</p>
+        <p v-if="pack.kind === 'game' && pack.trust_level > 1 && latest?.manifest.runtimeProtocol !== 2" class="notice">此作品暂不支持网页试玩。</p>
         <p v-if="manualOnly" class="notice">这是手动使用的模板包。下载并解压后，按 README 中的步骤使用；它不会自动创建任务或运行流程。</p>
         <p v-else-if="!pack.one_click" class="notice">
-          {{ pack.trust_level === 2 ? '这是用户发布、尚未审核的内容，不支持一键应用；' : '' }}在小伴桌面端会先展示它会做什么、需要哪些权限，由你确认后才安装。
+          {{ pack.trust_level === 2 && pack.kind !== 'game' && pack.kind !== 'app' ? '这是用户发布、尚未审核的内容，不支持一键应用；' : '' }}在小伴桌面端会先展示它会做什么、需要哪些权限，由你确认后才安装。
         </p>
         <ContentSocialActions v-if="pack.status === 'published'" kind="pack" :id="pack.id" />
         <WorkDiscussion v-if="pack.status === 'published'" :id="pack.id" />
