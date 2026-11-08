@@ -435,7 +435,15 @@ class AgentRuntime(
                     )
                 }
             }
-            "error" -> _events.emit(AgentEvent.Failure(obj["message"].str() ?: "智能体引擎出错", activeRuns.value.values.map { it.id }.toSet()))
+            "error" -> {
+                val failed = activeRuns.value.values.filter { it.generation == epoch }.map { it.id }.toSet()
+                activeRuns.update { running -> running.filterValues { it.generation != epoch || it.id !in failed } }
+                failed.forEach { runId ->
+                    runCatching { sendFor(h, epoch, line { put("type", "cancel"); put("id", runId) }) }
+                    requestRuns.value.filterValues { it == runId }.keys.forEach { requests.value[it]?.cancel() }
+                }
+                _events.emit(AgentEvent.Failure(obj["message"].str() ?: "智能体引擎出错", failed))
+            }
         }
     }
 }

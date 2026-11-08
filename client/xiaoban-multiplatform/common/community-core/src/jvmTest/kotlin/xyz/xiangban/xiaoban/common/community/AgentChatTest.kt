@@ -68,6 +68,45 @@ class AgentChatTest {
         Unit
     }
 
+    @Test
+    fun `a protocol error clears the active run so retry does not deadlock`() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val queue = java.util.concurrent.LinkedBlockingQueue<String>()
+        val runs = java.util.concurrent.atomic.AtomicInteger()
+        val lastSent = java.util.concurrent.atomic.AtomicReference("")
+        val bridge = object : AgentBridge {
+            override fun start(config: String) = 1L
+            override fun send(handle: Long, line: String) {
+                if (!line.contains("\"type\":\"run\"")) return
+                lastSent.set(line)
+                if (runs.incrementAndGet() == 1) {
+                    queue.put("""{"type":"error","message":"invalid message: unknown field"}""")
+                } else {
+                    val runId = Regex("\"id\":\"([^\"]+)\"").find(line)!!.groupValues[1]
+                    queue.put("""{"type":"run_end","run":"$runId","ok":true,"text":"已恢复","turns":1,"finish":"stop"}""")
+                }
+            }
+            override fun poll(handle: Long, timeoutMs: Long): String? =
+                queue.poll(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)
+            override fun stop(handle: Long) = Unit
+        }
+        val api = AiGatewayApi(HttpClient(MockEngine { respond("{}") }), CommunityConfig()) { "token" }
+        val runtime = AgentRuntime(bridge, { _, _ -> ModelResult(200) }, emptyList(), "", "", scope)
+        val chat = CloudChatController(api, scope, agent = runtime)
+        delay(50)
+        chat.send("你好")
+        withTimeout(5_000) { while (chat.state.value.sending) delay(10) }
+        assertTrue(chat.state.value.messages.last().error.orEmpty().contains("invalid message"))
+        chat.retryLast()
+        withTimeout(5_000) { while (chat.state.value.sending) delay(10) }
+        assertEquals(null, chat.state.value.messages.last().error)
+        assertEquals("已恢复", chat.state.value.messages.last().text)
+        assertTrue(lastSent.get().contains("\"input\":\"你好\""), "未真正启动的一轮重试时重新携带输入")
+        runtime.stop()
+        scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
+        Unit
+    }
+
     private class JvmBridge : AgentBridge {
         override fun start(config: String) = AgentNative.nativeStart(config)
         override fun send(handle: Long, line: String) = AgentNative.nativeSend(handle, line)

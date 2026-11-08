@@ -1069,7 +1069,13 @@ class CloudChatController(
                 }
             }
             is AgentEvent.Failure -> if (agentRun != null && _state.value.sending && (event.runs == null || agentRun in event.runs)) {
-                updateTurn(agentReplyId) { it.copy(streaming = false, error = event.message, tools = settleTools(it.tools, true)) }
+                val rejectedBeforeRun = event.message.let {
+                    "invalid message" in it || "needs exactly one of" in it || "line too long" in it || "cannot start the run" in it || "must be 1 to" in it
+                }
+                updateTurn(agentReplyId) {
+                    val unstarted = rejectedBeforeRun && it.text.isEmpty() && it.reasoning.isEmpty() && it.tools.isEmpty() && it.records.isEmpty()
+                    it.copy(streaming = false, error = event.message, nativeNotStarted = it.nativeNotStarted || unstarted, tools = settleTools(it.tools, true))
+                }
                 agentRun = null
                 _state.value = _state.value.copy(sending = false, approval = null, question = null)
                 persist()
