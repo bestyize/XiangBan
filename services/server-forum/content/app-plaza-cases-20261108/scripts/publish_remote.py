@@ -8,6 +8,7 @@
 已存在的作品（同一个 id）不会重复登记，只会把精选状态调整到和 register.json 一致。
 """
 import argparse
+import getpass
 import json
 import sys
 import urllib.error
@@ -47,6 +48,7 @@ def main() -> None:
     parser.add_argument("--base", required=True)
     parser.add_argument("--register", required=True, type=Path)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--ask-password", action="store_true", help="不读 .env 里的密码，运行时当场输入")
     args = parser.parse_args()
     entries = json.loads(args.register.read_text(encoding="utf-8"))
     if args.dry_run:
@@ -54,11 +56,17 @@ def main() -> None:
             print("将登记", entry["body"]["manifest"]["id"], "精选" if entry["featured"] else "")
         return
     env = read_env(args.env)
-    status, login = call(args.base, "POST", "/api/admin/login", body={
-        "username": env.get("FORUM_ADMIN_USER", ""), "password": env.get("FORUM_ADMIN_PASSWORD", ""),
-    })
+    username = env.get("FORUM_ADMIN_USER", "")
+    if args.ask_password:
+        # 论坛 .env 里的密码只是创建账号时的初始值，登录后改过密码就不再有效；这里当场输入，不回显，不落盘。
+        username = input(f"管理员用户名 [{username}]: ").strip() or username
+        password = getpass.getpass("管理员密码（输入时不显示）: ")
+    else:
+        password = env.get("FORUM_ADMIN_PASSWORD", "")
+    status, login = call(args.base, "POST", "/api/admin/login", body={"username": username, "password": password})
+    del password
     if status != 200 or not login or "token" not in login:
-        sys.exit(f"管理员登录失败（HTTP {status}），已停止，没有登记任何作品")
+        sys.exit(f"管理员登录失败（HTTP {status}），已停止，没有登记任何作品，也不会自动重试")
     token = login["token"]
     status, listing = call(args.base, "GET", "/api/admin/packs?kind=game&page_size=100", token)
     existing = {item["slug"]: item for item in (listing or {}).get("items", [])} if status == 200 else {}
