@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">MBTI 性格测评</title>
+  <desc id="desc">米色纸张上的宋体标题，以及代表四个偏好维度的相交圆、方格、三角与平行线。</desc>
+  <defs>
+    <linearGradient id="paper" x2="0" y2="1"><stop stop-color="#faf5eb"/><stop offset="1" stop-color="#eee5d5"/></linearGradient>
+    <radialGradient id="light" cx="0" cy="0" r="1"><stop stop-color="#fffdf7" stop-opacity=".9"/><stop offset="1" stop-color="#fffdf7" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="640" height="360" fill="url(#paper)"/>
+  <rect width="640" height="360" fill="url(#light)"/>
+  <g fill="none" stroke="#9a7b4f" stroke-width="1.5" opacity=".9">
+    <circle cx="391" cy="114" r="28"/><circle cx="414" cy="114" r="28"/>
+    <path d="M494 86h56v56h-56zM494 114h56M522 86v56"/>
+    <path d="m402 210-31 55h62ZM387 238h30"/>
+    <path d="M491 220h62M491 238h62M491 256h62"/>
+    <circle cx="510" cy="220" r="4" fill="#eee5d5"/><circle cx="535" cy="256" r="4" fill="#eee5d5"/>
+  </g>
+  <path d="M461 66v229M355 179h214" stroke="#dfd3bf"/>
+  <g fill="#756b5e" text-anchor="middle" font-family="serif" font-size="12">
+    <text x="403" y="163">E / I</text><text x="522" y="163">S / N</text>
+    <text x="403" y="291">T / F</text><text x="522" y="291">J / P</text>
+  </g>
+  <g font-family="Songti SC, STSong, SimSun, serif">
+    <rect x="52" y="51" width="30" height="32" rx="3" fill="none" stroke="#c32640"/>
+    <text x="67" y="74" font-size="22" text-anchor="middle" fill="#c32640">格</text>
+    <text x="52" y="169" font-size="66" fill="#3b352c">MBTI</text>
+    <text x="54" y="213" font-size="26" fill="#3b352c">性格测评</text>
+  </g>
+  <text x="54" y="274" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="14" fill="#756b5e">48 道日常选择，认识此刻的自己。</text>
+  <text x="98" y="72" font-family="PingFang SC, Microsoft YaHei, sans-serif" font-size="12" fill="#756b5e">小伴 · 自我观察</text>
+</svg>

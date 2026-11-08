@@ -1,0 +1,31 @@
+:root {
+  color-scheme: light;
+  --serif: "Songti SC", "STSong", "SimSun", serif;
+  --ink: #3b352c;
+  --muted: #756b5e;
+  --paper: #f6f1e7;
+  --card: #fffaf2;
+  --line: #e4dac9;
+  --art: #9a7b4f;
+  --accent: #c32640;
+  --accent-soft: #fff0f0;
+  --bar-first: #9a7b4f;
+  --bar-second: #e4dac9;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: var(--ink); background: var(--paper);
+}
+body { background: radial-gradient(ellipse at 15% 0%, #fffcf5 0%, transparent 60%), linear-gradient(180deg, var(--paper), #efe8db); }
+.primary-button { color: var(--accent); background: var(--accent-soft); border-color: #efd5d2; }
+.secondary-button { color: var(--ink); background: #eae4db; }
+.option[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.option[aria-pressed="true"] .option-key { color: var(--accent); }
+@media (hover: hover) {
+  .primary-button:hover:enabled { background: #fbe1e1; }
+  .text-button:hover:enabled { background: #e8dfd166; color: var(--ink); }
+  .option:hover:enabled, .last-result:hover:enabled { border-color: var(--art); }
+  .secondary-button:hover:enabled { background: #e3dbcf; }
+}
+button:active:enabled { transform: translateY(1px); }
+@media (prefers-reduced-motion: no-preference) {
+  .option, .primary-button, .text-button { transition: background-color .15s, border-color .15s; }
+}
